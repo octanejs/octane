@@ -55,6 +55,10 @@ function markup(node: Element): string {
 
 const SERVER_ARM = '<b class="server">server</b><em>e</em>';
 
+// The development compile renders the hookless Pair through the lite slot,
+// which rebuilds its fragment where the server node stood.
+const PAIR_REBUILT = 'a fragment starting with <u>';
+
 /** A published structural mismatch diagnostic. */
 function rebuilt(loc: string, expected: string, server = '<b>'): string {
 	return (
@@ -187,6 +191,7 @@ describe.each([
 			call: '<Hydrate split={false} when={load()}>',
 			html: '<div><i>ok</i></div><em>e</em>',
 			sibling: 'em',
+			expected: 'a component range',
 		},
 		{
 			shape: 'a fragment component',
@@ -194,6 +199,7 @@ describe.each([
 			call: '<Pair />',
 			html: '<u>u</u><i>x</i><em>e</em>',
 			sibling: 'em',
+			expected: PAIR_REBUILT,
 		},
 		{
 			shape: 'a component before a caught @try',
@@ -201,6 +207,7 @@ describe.each([
 			call: '<Pair />',
 			html: '<u>u</u><i>x</i><s>boom</s>',
 			sibling: 's',
+			expected: PAIR_REBUILT,
 		},
 		{
 			shape: 'a component before a <Hydrate> that never hydrates',
@@ -208,17 +215,18 @@ describe.each([
 			call: '<Pair />',
 			html: '<u>u</u><i>x</i><s>static</s>',
 			sibling: 's',
+			expected: PAIR_REBUILT,
 		},
 	])(
 		'builds $shape ahead of the sibling it leaves adopted',
-		async ({ name, call, html, sibling }) => {
+		async ({ name, call, html, sibling, expected }) => {
 			const { section, served, recoverable } = await hydrate(name);
 			const adopted = served(sibling);
 
 			expect(markup(section)).toBe(html);
 			expect(section.querySelector(sibling)).toBe(adopted);
 			expect(recoverable).toHaveLength(1);
-			expect(warnings()).toEqual(dev ? [rebuilt(site(name, call, true), 'a component range')] : []);
+			expect(warnings()).toEqual(dev ? [rebuilt(site(name, call, true), expected)] : []);
 		},
 	);
 
@@ -230,7 +238,7 @@ describe.each([
 		expect(warnings()).toEqual(
 			dev
 				? [
-						rebuilt(site('TailBranch', '<Pair />'), 'a component range'),
+						rebuilt(site('TailBranch', '<Pair />'), PAIR_REBUILT),
 						rebuilt(
 							site('TailBranch', '@if (props.server) {'),
 							'the end of the branch',

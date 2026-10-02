@@ -941,6 +941,154 @@ export function activate(root, source, options) { return adoptBindings(root, Vie
 	);
 });
 
+// Islands read module-scope signals rather than props (#1514). A view with no
+// props parameter must still adopt its real SSR output without the renderer.
+test('zero-argument island views adopt module signals without the renderer', async (t) => {
+	const directory = import.meta.dirname;
+	const modules = {
+		'zero-state.tsrx': `import { derived$, signal$ } from 'octane/signals';
+export const count$ = signal$(1);
+export const label$ = derived$(() => 'n=' + count$.get());
+export function increment() { count$.set((n) => n + 1); }`,
+		'zero-island.tsrx': `import { count$, increment, label$ } from './zero-state.tsrx';
+export function Island() @{ 'use dom bindings';
+ <section title={label$}><button type="button" onClick={increment}>{count$}</button></section>
+}`,
+		'zero-island.tsx': `/** @jsxImportSource octane */
+import { count$, increment, label$ } from './zero-state.tsrx';
+export function Island() { 'use dom bindings';
+ return <section title={label$}><button type="button" onClick={increment}>{count$}</button></section>;
+}`,
+	};
+	const options = { dev: false, hmr: false };
+	const renderer = /packages\/octane\/src\/(?:runtime(?:\.server)?\.ts|internal\/client\.ts)$/;
+	const bundle = async (entry, mode = 'client') => {
+		const result = await build({
+			stdin: {
+				contents: compile(entry, path.join(directory, 'zero-entry.tsrx'), { ...options, mode })
+					.code,
+				resolveDir: directory,
+			},
+			bundle: true,
+			metafile: true,
+			write: false,
+			minify: true,
+			treeShaking: true,
+			format: 'esm',
+			platform: mode === 'server' ? 'node' : 'browser',
+			target: 'es2022',
+			legalComments: 'none',
+			tsconfigRaw: { compilerOptions: {} },
+			define: { 'process.env.NODE_ENV': '"production"', __OCTANE_PROFILE_ENABLED__: 'false' },
+			plugins: [
+				{
+					name: 'zero-argument-island',
+					setup(plugin) {
+						plugin.onResolve(
+							{ filter: /zero-(?:state\.tsrx|island\.tsr?x)(?:\?.*)?$/ },
+							(args) => ({
+								path: path.resolve(args.resolveDir, args.path),
+								namespace: 'zero-argument-island',
+							}),
+						);
+						plugin.onLoad({ filter: /.*/, namespace: 'zero-argument-island' }, ({ path: id }) => ({
+							// Compile the requested id, so a binding query selects its artifact.
+							contents: compile(modules[path.basename(id.split('?')[0])], id, { ...options, mode })
+								.code,
+							loader: 'js',
+							resolveDir: directory,
+						}));
+					},
+				},
+			],
+		});
+		const code = result.outputFiles[0].text;
+		return {
+			api: await import('data:text/javascript;base64,' + Buffer.from(code).toString('base64')),
+			gzip: gzipSync(code, { level: 9 }).length,
+			resolved: Object.keys(result.metafile.inputs),
+		};
+	};
+	const window = new Window();
+	const globals = new Map();
+	for (const name of ['window', 'document', 'Node', 'Element', 'HTMLElement', 'Comment', 'Text']) {
+		globals.set(name, Object.getOwnPropertyDescriptor(globalThis, name));
+		Object.defineProperty(globalThis, name, {
+			configurable: true,
+			value: name === 'window' ? window : window[name],
+		});
+	}
+	t.after(() => {
+		for (const [name, descriptor] of globals) {
+			if (descriptor) Object.defineProperty(globalThis, name, descriptor);
+			else delete globalThis[name];
+		}
+		window.close();
+	});
+
+	// Each dialect gets its own bundles, so module state starts fresh.
+	for (const extension of ['tsrx', 'tsx']) {
+		const server = await bundle(
+			`import { Island } from './zero-island.${extension}';
+import { renderToString } from 'octane/server';
+export function render() { return renderToString(Island, {}).html; }`,
+			'server',
+		);
+		// Module declarations resolve to the document's cells, as on an island page.
+		const island = await bundle(`import { adoptBindings } from 'octane/behavior';
+import { count$ } from './zero-state.tsrx';
+import { Island } from './zero-island.${extension}';
+// A zero-argument view never reads its source snapshot.
+const source = { getSnapshot: () => null, subscribe: () => () => {} };
+export function activate(root) { return adoptBindings(root, Island, source); }
+export function read() { return count$.get(); }
+export function write(value) { count$.set(value); }`);
+		assert.deepEqual(
+			island.resolved.filter((id) => renderer.test(id)),
+			[],
+			`A zero-argument .${extension} island reached the renderer.`,
+		);
+		// Control: ordinary hydration of the same view does load the renderer, so the
+		// check above cannot pass because the pattern stopped matching.
+		const hydrated = await bundle(`import { hydrateRoot } from 'octane';
+import { Island } from './zero-island.${extension}';
+export function activate(container) { return hydrateRoot(container, Island, {}); }`);
+		assert.ok(hydrated.resolved.some((id) => renderer.test(id)));
+		t.diagnostic(
+			JSON.stringify({ extension, islandGzip: island.gzip, hydratedGzip: hydrated.gzip }),
+		);
+
+		const host = window.document.createElement('div');
+		host.innerHTML = server.api.render();
+		window.document.body.append(host);
+		const section = host.querySelector('section');
+		const button = host.querySelector('button');
+		assert.equal(section.title, 'n=1');
+		assert.equal(button.textContent, '1');
+		const binding = island.api.activate(section);
+		try {
+			assert.ok(host.querySelector('section') === section);
+			assert.ok(host.querySelector('button') === button);
+			button.click();
+			assert.equal(island.api.read(), 2);
+			assert.equal(section.title, 'n=2');
+			assert.equal(button.textContent, '2');
+			island.api.write(5);
+			assert.equal(section.title, 'n=5');
+			assert.equal(button.textContent, '5');
+		} finally {
+			binding.dispose();
+		}
+		// Disposal releases the handler and subscriptions but keeps the server nodes.
+		button.click();
+		assert.equal(island.api.read(), 5);
+		island.api.write(7);
+		assert.ok(host.querySelector('button') === button);
+		assert.equal(button.textContent, '5');
+		host.remove();
+	}
+});
+
 test('list-free programs omit list costs while imported legacy lists remain live', async (t) => {
 	const directory = path.resolve('packages/octane');
 	const sources = {

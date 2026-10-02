@@ -99,7 +99,12 @@ production transforms use one TypeScript-preserving Program print and return a
 real source map. Manually slotted modules get memo-only lowering: no new slots,
 inferred dependencies, or custom-hook wrappers. Modules with imported `use()`
 or unsupported specialization/printing shapes retain the existing surgical
-slotting path. `octane-no-slot` remains a hard opt-out.
+slotting path. A printing shape is unsupported when esrap has no visitor for it,
+or when its visitor would print different code, such as `declare global`, a
+cast assignment target, or a non-null assertion that continues an optional
+chain. Syntax that a parent's visitor prints, such as template literals, switch
+cases, catch clauses, and default or namespace imports, takes the inline path.
+`octane-no-slot` remains a hard opt-out.
 
 Both authored tiers require a known literal dependency array (no spreads or
 holes), or explicit `null`. `useMemo` requires a synchronous, zero-parameter

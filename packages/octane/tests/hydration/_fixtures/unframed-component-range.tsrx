@@ -1,4 +1,4 @@
-import { Hydrate, use } from 'octane';
+import { Hydrate, use, useRef } from 'octane';
 import { load, never } from 'octane/hydration';
 
 function Em() @{
@@ -148,10 +148,13 @@ function Under(props: { leaf: Promise<string> }) @{
 	<u>{use(props.leaf) as string}</u>
 }
 
+// A hook keeps this a full component call in both compiles; the development
+// compile renders a hookless call through the lite slot instead.
 function FragChild(props: { leaf: Promise<string> }) @{
+	const mark = useRef<HTMLElement | null>(null);
 	<>
 		<Under leaf={props.leaf} />
-		<i>{'x'}</i>
+		<i ref={mark}>{'x'}</i>
 	</>
 }
 
