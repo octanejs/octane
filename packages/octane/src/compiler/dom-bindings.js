@@ -726,6 +726,19 @@ function bindingRestSpreads(fn, render, props, lexical, filename) {
 	return { render: mapCow(render, replacements), hasRest, sites, conditional };
 }
 
+/**
+ * A fixed view binds an only child the author asserts is a `string` or `number`
+ * as one text leaf, reading a signal handle's value. Its SSR must serialize the
+ * same text rather than frame a handle as a renderable child.
+ */
+export function isScalarTextAssertion(expression) {
+	return (
+		expression?.type === 'TSAsExpression' &&
+		(expression.typeAnnotation.type === 'TSStringKeyword' ||
+			expression.typeAnnotation.type === 'TSNumberKeyword')
+	);
+}
+
 function planView(fn, filename, source, imports, lexical, native = null) {
 	const render = native?.element ?? bindingRender(fn, filename);
 	const nodes = [];
@@ -951,9 +964,7 @@ function planView(fn, filename, source, imports, lexical, native = null) {
 			authoredChildren.length === children.length &&
 			(child?.type === 'JSXText' ||
 				(expression?.type === 'Literal' && typeof expression.value === 'string') ||
-				(expression?.type === 'TSAsExpression' &&
-					(expression.typeAnnotation.type === 'TSStringKeyword' ||
-						expression.typeAnnotation.type === 'TSNumberKeyword')));
+				isScalarTextAssertion(expression));
 		const opaqueChildren = authoredChildren.length !== children.length;
 		const openChildren = tag !== 'textarea' && opaqueChildren && children.length > 0;
 		if (tag === 'textarea' && children.some((child) => child.type !== 'JSXText'))
