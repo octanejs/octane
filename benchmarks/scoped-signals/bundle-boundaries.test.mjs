@@ -1627,6 +1627,187 @@ export default {...current, ${mount ? 'adoptScalar' : 'adopt'}: __adoptBindings}
 	}
 });
 
+// Casting handle text to `string` or `number` is how a signal-backed fixed view
+// stays on the scalar adopter, so its server output must be the text that the
+// selected artifact binds. Each view's control drops the casts: a bare handle
+// is a renderable hole, which selects the structural program the cast avoids.
+test('handle text casts keep fixed views on the scalar adopter', async (t) => {
+	const directory = path.resolve('packages/octane');
+	const state = `import { signal$, derived$ } from 'octane/signals';
+export const count$ = signal$(1);
+export const label$ = derived$(() => 'n=' + count$.get());`;
+	const views = {
+		Count: '<p title={props.title}>{count$ as number}</p>',
+		Label: '<p title={props.title}>{label$ as number}</p>',
+		Nested: '<p title={props.title}><b>{count$ as number}</b><i>{label$ as number}</i></p>',
+	};
+	const expected = {
+		Count: ['1', '7'],
+		Label: ['n=1', 'n=7'],
+		Nested: ['1n=1', '7n=7'],
+	};
+	const markup = (name) =>
+		name.endsWith('Bare')
+			? views[name.slice(0, -'Bare'.length)].replaceAll(' as number', '')
+			: views[name];
+	// Leaves only the general adopter retains, as in the fixed scalar guard above.
+	const generalOnly =
+		/\/src\/(?:stream-protocol\.ts|signals\/(?:native-read-seeds|control-handoff)\.ts)$/;
+	const program = /\/src\/dom-binding-program\.ts$/;
+	const bundle = async (view, mode, legacy = false) => {
+		const entry =
+			mode === 'server'
+				? `import {View} from './${view}.tsrx'; import {renderToString} from 'octane/server';
+export function render(props) { return renderToString(View, props).html; }`
+				: `import view from './${view}.tsrx?octane-bindings=View';
+export { count$ } from './state.tsrx';
+export function adopt(root, source) { return view.adopt(root, view, source); }`;
+		const result = await build({
+			stdin: { contents: entry, resolveDir: directory },
+			bundle: true,
+			write: false,
+			minify: true,
+			metafile: true,
+			format: 'esm',
+			platform: mode === 'server' ? 'node' : 'browser',
+			target: 'es2022',
+			legalComments: 'none',
+			tsconfigRaw: { compilerOptions: {} },
+			define: { 'process.env.NODE_ENV': '"production"', __OCTANE_PROFILE_ENABLED__: 'false' },
+			plugins: [
+				{
+					name: 'handle-cast-artifacts',
+					setup(plugin) {
+						plugin.onResolve({ filter: /^\.\/\w+\.tsrx(?:\?.*)?$/ }, ({ path: id }) => ({
+							path: id,
+							namespace: 'handle-cast',
+						}));
+						plugin.onLoad({ filter: /.*/, namespace: 'handle-cast' }, ({ path: id }) => {
+							const current = id.startsWith('current:');
+							const request = current ? id.slice('current:'.length) : id;
+							const name = path.basename(request.split('?')[0], '.tsrx');
+							return {
+								// The general adopter remains the compatibility entry for
+								// every fixed view, so it is the positive control.
+								contents:
+									!current && legacy && request.includes('?')
+										? `import current from ${JSON.stringify('current:' + request)};
+import {__adoptBindings} from 'octane/dom-bindings';
+export default {...current, adopt: __adoptBindings};`
+										: compile(
+												name === 'state'
+													? state
+													: `import { count$, label$ } from './state.tsrx';
+export function View(props) @{ 'use dom bindings'; ${markup(name)} }`,
+												path.join(directory, request),
+												{ mode, dev: false, hmr: false },
+											).code,
+								loader: 'js',
+								resolveDir: directory,
+							};
+						});
+						plugin.onResolve({ filter: /^current:/ }, ({ path: id }) => ({
+							path: id,
+							namespace: 'handle-cast',
+						}));
+					},
+				},
+			],
+		});
+		const code = result.outputFiles[0].text;
+		const [output] = Object.values(result.metafile.outputs);
+		return {
+			api: await import('data:text/javascript;base64,' + Buffer.from(code).toString('base64')),
+			gzip: gzipSync(code, { level: 9 }).length,
+			resolved: Object.keys(result.metafile.inputs).map((id) => id.replaceAll('\\', '/')),
+			generalBytes: Object.entries(output.inputs)
+				.filter(([id]) => generalOnly.test(id.replaceAll('\\', '/')))
+				.reduce((total, [, input]) => total + input.bytesInOutput, 0),
+		};
+	};
+	const window = new Window();
+	const globals = new Map();
+	for (const name of ['window', 'document', 'Node', 'Element', 'HTMLElement', 'Comment', 'Text']) {
+		globals.set(name, Object.getOwnPropertyDescriptor(globalThis, name));
+		Object.defineProperty(globalThis, name, {
+			configurable: true,
+			value: name === 'window' ? window : window[name],
+		});
+	}
+	t.after(() => {
+		for (const [name, descriptor] of globals) {
+			if (descriptor) Object.defineProperty(globalThis, name, descriptor);
+			else delete globalThis[name];
+		}
+		window.close();
+	});
+	// Adopt real server output, then update the handle. Every bundle carries its
+	// own signal document, so each adoption starts from the declared value.
+	const exercise = (view, server, client) => {
+		const host = window.document.createElement('div');
+		window.document.body.append(host);
+		host.innerHTML = server.api.render({ title: 'Count' });
+		const root = host.firstElementChild;
+		const texts = [];
+		const walker = window.document.createTreeWalker(root, 4);
+		while (walker.nextNode()) texts.push(walker.currentNode);
+		const handle = client.api.adopt(root, {
+			getSnapshot: () => ({ title: 'Count' }),
+			subscribe: () => () => {},
+		});
+		try {
+			assert.equal(root.textContent, expected[view][0], `${view}: initial text`);
+			client.api.count$.set(7);
+			assert.equal(root.textContent, expected[view][1], `${view}: updated text`);
+			// Identity checks avoid assert's deep inspection of DOM graphs.
+			assert.ok(host.firstElementChild === root, `${view}: the adopted root was replaced`);
+			const after = window.document.createTreeWalker(root, 4);
+			for (const text of texts) {
+				assert.ok(after.nextNode() && after.currentNode === text, `${view}: a text node changed`);
+			}
+		} finally {
+			handle.dispose();
+			host.remove();
+		}
+	};
+	for (const view of Object.keys(views)) {
+		const server = await bundle(view, 'server');
+		const selected = await bundle(view, 'client');
+		const legacy = await bundle(view, 'client', true);
+		const bare = await bundle(view + 'Bare', 'client');
+		exercise(view, server, selected);
+		exercise(view, server, legacy);
+		exercise(view, await bundle(view + 'Bare', 'server'), bare);
+		assert.ok(
+			bare.resolved.some((id) => program.test(id)),
+			`${view}: the bare-handle control no longer selects the structural program`,
+		);
+		assert.ok(
+			!selected.resolved.some((id) => program.test(id)),
+			`${view}: a cast handle selected the structural program`,
+		);
+		assert.ok(legacy.generalBytes > 0, `${view}: the general adopter control lost its leaves`);
+		assert.equal(
+			selected.generalBytes,
+			0,
+			`${view}: the scalar adopter retained general-only leaves`,
+		);
+		t.diagnostic(
+			JSON.stringify({
+				view,
+				selectedGzip: selected.gzip,
+				generalGzip: legacy.gzip,
+				bareGzip: bare.gzip,
+			}),
+		);
+		// Measured 0.76 (Count) and 0.78 (Label, Nested).
+		assert.ok(
+			selected.gzip / bare.gzip < 0.82,
+			`${view}: cast/bare gzip ratio: ${selected.gzip}/${bare.gzip}`,
+		);
+	}
+});
+
 test('early whole-style bindings exclude later renderer attribute tables', async (t) => {
 	const directory = await mkdtemp(path.join(tmpdir(), 'octane-style-boundary-'));
 	t.after(() => rm(directory, { recursive: true, force: true }));

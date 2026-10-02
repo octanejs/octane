@@ -11657,6 +11657,9 @@ export function componentSlotLite<P>(
 	// render only) — consumed by the post-body cursor advance below.
 	let adoptedOpen: Comment | null = null;
 	let adoptedClose: Node | null = null;
+	// The server node an anchorless call found where its range belonged (first
+	// hydration render only); undefined when it claimed a range or none.
+	let unframed: Node | null | undefined;
 	if (scope === undefined) {
 		scope = new ScopeImpl(parentScope, parentScope.block);
 		// Lite scope's `block` exposes the host/anchor as the body's DOM context
@@ -11693,6 +11696,11 @@ export function componentSlotLite<P>(
 				endMarker = hydration.close(open);
 				adoptedClose = endMarker;
 				hydration.node = getNextSibling(open);
+			} else if (anchor === undefined) {
+				// The server frames an anchorless call (see componentSlotImpl), so the
+				// host's server content is something else: rebuild this call in place of
+				// the server nodes from its claim.
+				unframed = open;
 			} else if (open === hydration.rebuiltTail) {
 				// The body may adopt this unframed server node as its root.
 				hydration.rebuiltTail = null;
@@ -11709,6 +11717,19 @@ export function componentSlotLite<P>(
 		parentScope.slots[slotKey] = scope;
 		// Register on parent.children so unmountScope(parent) walks into us.
 		(parentScope.children ??= []).push({ key: slotKey, scope });
+		if (unframed !== undefined) {
+			mountUnframedLite(
+				hydration!,
+				parentScope,
+				slotKey,
+				host,
+				comp,
+				props,
+				invocationSite,
+				unframed,
+			);
+			return;
+		}
 	} else {
 		// Re-render: the parent's host/anchor are stable across renders so no
 		// need to rebuild the LiteBlockImpl. Skip the allocation on warm path.
@@ -11754,6 +11775,41 @@ export function componentSlotLite<P>(
 	// its commitBag insert MOVES the previous sibling's root to the shared
 	// anchor. Mirrors componentSlot's post-render advance.
 	if (hydration !== null && adoptedClose !== null) hydration.node = getNextSibling(adoptedClose);
+}
+
+// An anchorless lite call whose server range is missing: render it between
+// fresh markers without adopting, then report and discard the server nodes from
+// `stale`, as componentSlot does for a missing range. The body renders through
+// componentSlotLite again, which finds the registered scope.
+function mountUnframedLite<P>(
+	hydration: HydrationCapability,
+	parentScope: Scope,
+	slotKey: number,
+	host: Node,
+	comp: ComponentBody<P>,
+	props: P,
+	invocationSite: string | undefined,
+	stale: Node | null,
+): void {
+	hydration.save(host);
+	const start = (STAGED_DOM?.view(document) ?? document).createComment('comp');
+	const end = (STAGED_DOM?.view(document) ?? document).createComment('/comp');
+	(STAGED_DOM?.view(host) ?? host).insertBefore(start, null);
+	(STAGED_DOM?.view(host) ?? host).insertBefore(end, null);
+	hydration.markFresh(start);
+	hydration.markFresh(end);
+	(parentScope.slots[slotKey] as Scope).block.endMarker = end;
+	hydration.renderUnframed(
+		() => componentSlotLite(parentScope, slotKey, host, comp, props, invocationSite),
+		undefined,
+		start,
+		end,
+		parentScope,
+		slotKey,
+		stale,
+		null,
+	);
+	hydration.node = getNextSibling(end);
 }
 
 // Keep the fresh-subtree callback's extra captures out of ordinary lite dispatch.
@@ -18922,31 +18978,34 @@ class HydrationCapability {
 	}
 
 	/**
-	 * First render of a component whose server range was missing, into the
-	 * fresh `block` componentSlot minted before `anchor`. The server emits that
-	 * range only when the render completes; when it throws, the boundary that
-	 * catches it renders its catch arm in that place. So the server nodes from
-	 * `stale` stay until the body has run, and the body, which adopts nothing,
-	 * still consumes its positional seeds as the server's render did. A seeded
-	 * rejection then reaches its boundary with the server's catch arm intact,
-	 * and only the fresh markers are removed. Any other outcome reports the
-	 * mismatch and discards those server nodes.
+	 * First render, by `render(target)`, of a component whose server range was
+	 * missing, between the fresh `start`/`end` markers its slot minted before
+	 * `anchor`. The server emits that range only when the render completes;
+	 * when it throws, the boundary that catches it renders its catch arm in
+	 * that place. So the server nodes from `stale` stay until the body has run,
+	 * and the body, which adopts nothing, still consumes its positional seeds
+	 * as the server's render did. A seeded rejection then reaches its boundary
+	 * with the server's catch arm intact, and only the fresh markers are
+	 * removed. Any other outcome reports the mismatch and discards those server
+	 * nodes, unless `stale` is client-built: the rebuild that built it already
+	 * reported and discarded the server's.
 	 */
-	renderUnframed(
-		block: Block,
+	renderUnframed<T>(
+		render: (target: T) => void,
+		target: T,
+		start: Node,
+		end: Node,
 		scope: Scope,
 		slotKey: number,
 		stale: Node | null,
 		anchor: Node | null,
 	): void {
-		const start = block.startMarker!;
-		const end = block.endMarker!;
 		const previousReplay = this.replayDepth;
 		const previousNative = setNativeAdoptionResolver(null);
 		this.replayDepth = ++this.depth;
 		let rejected = false;
 		try {
-			renderBlock(block);
+			render(target);
 		} catch (error) {
 			rejected = this.isRejection(error);
 			throw error;
@@ -18957,7 +19016,7 @@ class HydrationCapability {
 			if (rejected) {
 				removeRange(start, getNextSibling(end));
 				this.node = stale;
-			} else {
+			} else if (stale === null || !this.isFresh(stale)) {
 				noteRecoverableHydrationError(() => new Error(formatClientError(55)));
 				if (process.env.NODE_ENV !== 'production') {
 					const loc = siteLoc(scope, slotKey);
@@ -31458,10 +31517,13 @@ function componentSlotImpl(
 			open = anchor as Node;
 			hydrationCursor = open;
 		} else if (!inherited && hydration !== null && !hydration.isOpen(anchor ?? null)) {
-			// The anchor is null (appended child) or a non-open marker (the slot is the
-			// sole hole of a control-flow arm, so its anchor is the arm's end marker).
-			// In both cases mountTry/renderBlock parked the cursor on the server range's
-			// `<!--[-->`; adopt from it, the same way childSlot's cursor branch does.
+			// The anchor is absent (an appended child: compiled calls omit it only when
+			// every child of the host is a component), null (a runtime caller's
+			// whole-container slot, or a compiled anchor walk that ran off the end of
+			// its host), or a non-open marker (the slot is the sole hole of a
+			// control-flow arm, so its anchor is the arm's end marker). In these cases
+			// mountTry/renderBlock parked the cursor on the server range's `<!--[-->`;
+			// adopt from it, the same way childSlot's cursor branch does.
 			let c: Node | null = hydration.node;
 			if (c === null || (STAGED_DOM?.view(c) ?? c).parentNode !== domParent)
 				c = getFirstChild(domParent);
@@ -31478,8 +31540,8 @@ function componentSlotImpl(
 			if (parentBlock === hydration!.rootBlock) hydration!.claimRootRemainder(getNextSibling(end));
 			hydration!.node = getNextSibling(start);
 		} else if (
-			singleRoot === true ||
-			(singleRoot === 2 && (identity as any).$$singleRoot === true)
+			(singleRoot === true || (singleRoot === 2 && (identity as any).$$singleRoot === true)) &&
+			(hydration === null || anchor !== undefined)
 		) {
 			// Client singleRoot: NO markers — the component's single root element
 			// self-delimits (set as block.startMarker/endMarker after render below).
@@ -31495,6 +31557,11 @@ function componentSlotImpl(
 			// Park hydration on the fresh close marker so the client body builds
 			// rather than adopting an unrelated sibling. The server nodes stay until
 			// the body has run (HydrationCapability.renderUnframed).
+			// An anchorless call needs the range even when it renders a single root:
+			// the server frames every child of an all-component host, so the host's
+			// server content is something else. (The single-root path would compare
+			// the body's template with the cursor, which may still sit on the host or
+			// an ancestor.)
 			if (hydration !== null) {
 				unframed = hydrationCursor;
 				hydration.save(domParent);
@@ -31891,7 +31958,17 @@ function componentSlotImpl(
 			if (state.inherited) b.exclusiveMarkers = true;
 			state.block = b;
 			if (unframed === undefined) renderBlock(b);
-			else hydration!.renderUnframed(b, parentScope, slotKey, unframed, state.anchor);
+			else
+				hydration!.renderUnframed(
+					renderBlock,
+					b,
+					b.startMarker!,
+					b.endMarker!,
+					parentScope,
+					slotKey,
+					unframed,
+					state.anchor,
+				);
 		}
 	} else if (state.block) {
 		// `memo(Component)` — skip the body when new props shallow-equal the
