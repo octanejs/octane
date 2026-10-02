@@ -4,6 +4,7 @@ import { test } from 'node:test';
 import {
 	scopedSignalsProjects,
 	signalsBrowserTests,
+	signalsMutationTests,
 	signalsRuntimeTests,
 } from './scoped-signals-projects.mjs';
 
@@ -21,6 +22,20 @@ function selected(file) {
 		)
 		.map(({ test: config }) => config.name);
 }
+
+test('mutation verifiers have one ordinary Node owner outside the runtime glob', () => {
+	const file = 'packages/octane/tests/mutations/stream-closure.test.ts';
+	assert.deepEqual(selected(file), ['octane-signals-mutations']);
+	assert.ok(signalsMutationTests.some((pattern) => matchesGlob(file, pattern)));
+	assert.equal(
+		signalsRuntimeTests.some((pattern) => matchesGlob(file, pattern)),
+		false,
+	);
+	const project = byName.get('octane-signals-mutations');
+	assert.equal(project.test.environment, 'node');
+	assert.equal(project.plugins, undefined);
+	assert.equal(project.testExecution, undefined);
+});
 
 test('engine fixtures run only under Node, without a DOM/compiler plugin', () => {
 	for (const feature of [

@@ -29,6 +29,7 @@ import baseUIPristineBrowser from './packages/base-ui/tests/vitest.pristine.brow
 import {
 	scopedSignalsProjects,
 	signalsBrowserTests,
+	signalsMutationTests,
 	signalsRuntimeTests,
 } from './scripts/scoped-signals-projects.mjs';
 import { reactCompatSpikeProjects } from './experiments/react-compat/vitest.config.js';
@@ -693,6 +694,7 @@ export default defineConfig({
 					exclude: [
 						...configDefaults.exclude,
 						...signalsRuntimeTests,
+						...signalsMutationTests,
 						'packages/octane/tests/profiling-runtime.test.tsrx',
 						'packages/octane/tests/devtools-runtime.test.tsrx',
 						'packages/octane/tests/devtools-transitions.test.tsrx',
@@ -776,6 +778,7 @@ export default defineConfig({
 					exclude: [
 						...configDefaults.exclude,
 						...signalsRuntimeTests,
+						...signalsMutationTests,
 						// tests/compiler/ holds the suites that never mount a component: they
 						// hand the compiler a source string and their own options, so the
 						// plugin config and OCTANE_TEST_COMPILE_MODE above cannot reach them
