@@ -19182,27 +19182,41 @@ class HydrationCapability {
 	}
 
 	/**
-	 * A list's first hydrating fill when the server rendered none of its items
-	 * but the client has some. Discard whatever the server's @empty arm
-	 * rendered and report the list once, at its own site. Each item then finds
-	 * the cursor at `end`, which this remembers as rebuilt, so discardItems
-	 * builds it quietly as a client mount would, and a later attempt that finds
-	 * its own items here rebuilds them quietly too.
+	 * A list's first hydrating render when the client renders the other arm:
+	 * the server rendered items (`serverItems`) but the client builds its
+	 * @empty arm, or the server rendered none but the client has items. Discard
+	 * what the server rendered and report the list once, at its own site. The
+	 * range's `end` is remembered as rebuilt, so each client item finds the
+	 * cursor there and discardItems builds it quietly, and a later attempt that
+	 * finds the earlier attempt's own content here rebuilds it quietly too.
 	 */
-	discardEmptyList(scope: Scope, slotKey: number, start: Node, end: Node): void {
+	discardListArm(
+		scope: Scope,
+		slotKey: number,
+		start: Node,
+		end: Node,
+		serverItems: boolean,
+	): void {
 		const first = getNextSibling(start)!;
+		// When the server rendered no items, only an @empty arm leaves content
+		// between the markers.
 		this.discard(
 			scope,
 			slotKey,
 			first,
 			end,
 			HYDRATION_REBUILT?.has(end) === true,
-			process.env.NODE_ENV !== 'production' ? 'a populated list' : '',
-			// Only an @empty arm leaves content between the markers.
 			process.env.NODE_ENV !== 'production'
-				? first === end
-					? 'an empty list'
-					: 'an empty list (@empty)'
+				? serverItems
+					? 'an empty list (@empty)'
+					: 'a populated list'
+				: '',
+			process.env.NODE_ENV !== 'production'
+				? serverItems
+					? 'a populated list'
+					: first === end
+						? 'an empty list'
+						: 'an empty list (@empty)'
 				: null,
 		);
 	}
@@ -19226,24 +19240,6 @@ class HydrationCapability {
 		if (!this.staleServerValues)
 			noteRecoverableHydrationError(() => new Error(formatClientError(56)));
 		removeRange(from, end);
-	}
-
-	/**
-	 * A list's first hydrating render when the server rendered items but the
-	 * client has none and builds its @empty arm instead. Discard the server's
-	 * items and report the list once, at its own site. A later attempt that
-	 * finds the earlier attempt's @empty arm here rebuilds it quietly.
-	 */
-	discardPopulatedList(scope: Scope, slotKey: number, start: Node, end: Node): void {
-		this.discard(
-			scope,
-			slotKey,
-			getNextSibling(start),
-			end,
-			HYDRATION_REBUILT?.has(end) === true,
-			process.env.NODE_ENV !== 'production' ? 'an empty list (@empty)' : '',
-			process.env.NODE_ENV !== 'production' ? 'a populated list' : null,
-		);
 	}
 
 	/**
@@ -43126,7 +43122,7 @@ export function forBlock<T>(
 				(serverMarkerState === 1 ||
 					(serverMarkerState === -1 && hydration.isOpen(getNextSibling(state.start))))
 			) {
-				hydration.discardPopulatedList(parentScope, slotKey, state.start, state.end);
+				hydration.discardListArm(parentScope, slotKey, state.start, state.end, true);
 				suspendForEmpty = true;
 			} else if (hydration !== null) {
 				// The server already rendered the @empty content directly inside the
@@ -43187,7 +43183,7 @@ export function forBlock<T>(
 				getNextSibling(state.start) !== state.end &&
 				!hydration.isOpen(getNextSibling(state.start))))
 	) {
-		hydration.discardEmptyList(parentScope, slotKey, state.start, state.end);
+		hydration.discardListArm(parentScope, slotKey, state.start, state.end, false);
 	}
 	const f = flags || 0;
 	let pure = (f & 1) !== 0;
