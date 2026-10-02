@@ -19858,7 +19858,7 @@ class HydrationCapability {
 				);
 			// The rebuilt root takes the discarded node's place. Server nodes after
 			// it may still belong to later client siblings, so it goes before them
-			// rather than at its block's end (rebuiltPosition).
+			// rather than at its block's end (rebuiltAt).
 			this.rebuiltTail = this.node;
 			return (this.rebuiltRoot = this.freshClone(template));
 		}
@@ -19927,16 +19927,17 @@ class HydrationCapability {
 	}
 
 	/**
-	 * Where a detached root goes in `parent`: a rebuilt root before the server
-	 * node that followed the node it replaced, while that node is still there;
-	 * any other root at `end`. A rebuilt root commits before any later sibling
-	 * can rebuild, since the subtree it holds no longer hydrates.
+	 * Where a detached root that mismatch recovery rebuilt goes in `parent`:
+	 * before the server node that followed the node it replaced, while that
+	 * node is still there. Undefined for any other root, which goes at its
+	 * block's end. A rebuilt root commits before any later sibling can rebuild,
+	 * since the subtree it holds no longer hydrates.
 	 */
-	rebuiltPosition(root: Node, parent: Node, end: Node | null): Node | null {
+	rebuiltAt(root: Node, parent: Node): Node | undefined {
 		const next = this.rebuiltTail;
 		return root === this.rebuiltRoot && next !== null && domNode(next).parentNode === parent
 			? next
-			: end;
+			: undefined;
 	}
 
 	/**
@@ -20647,9 +20648,7 @@ function commitBag<T>(scope: Scope, root: Node | null, bag: T): T {
 			const parent = block.parentNode;
 			(STAGED_DOM?.view(parent) ?? parent).insertBefore(
 				root,
-				hydration === null
-					? block.endMarker
-					: hydration.rebuiltPosition(root, parent, block.endMarker),
+				hydration?.rebuiltAt(root, parent) ?? block.endMarker,
 			);
 		}
 	}
