@@ -19,26 +19,39 @@ const FIXTURE = join(
 const FILE = 'rebuilt-fragment-suspended-child.tsrx';
 const SOURCE = readFileSync(FIXTURE, 'utf8');
 
+const AFTER_HOLES =
+	'a fragment with <i> after its leading holes but the server rendered the end of the parent block';
+
 const SHAPES = [
 	{
 		shape: 'a fragment that starts with the suspending child',
 		name: 'HoleFirstBranch',
 		html: '<u>z</u><i>x</i><em>e</em>',
-		expected: 'a comment',
+		expected: AFTER_HOLES,
 	},
 	{
 		shape: 'a fragment that starts with static markup',
 		name: 'StaticFirstBranch',
 		html: '<i>x</i><u>z</u><em>e</em>',
-		expected: '<i>',
+		expected: 'a fragment starting with <i> but the server rendered <b>',
 	},
 	{
 		shape: 'a fragment whose suspending child renders a range',
 		name: 'FramedFirstBranch',
 		html: '<u>z</u><s>s</s><i>x</i><em>e</em>',
-		expected: 'a comment',
+		expected: AFTER_HOLES,
+	},
+	{
+		shape: 'a fragment whose static root after the child is text',
+		name: 'HoleThenTextBranch',
+		html: '<u>z</u>x<em>e</em>',
+		expected: 'a fragment starting with a comment but the server rendered <b>',
 	},
 ];
+
+function escape(text: string): string {
+	return text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
 
 /** Element and text markup, ignoring hydration comments. */
 function markup(node: Element): string {
@@ -117,8 +130,7 @@ describe.each([
 	function rebuilt(expected: string) {
 		return expect.stringMatching(
 			new RegExp(
-				`^Octane hydration mismatch at ${FILE.replace('.', '\\.')}\\b.*` +
-					`the client expected a fragment starting with ${expected} but the server rendered <b>\\.`,
+				`^Octane hydration mismatch at ${escape(FILE)}\\b.*the client expected ${escape(expected)}`,
 			),
 		);
 	}

@@ -20,8 +20,8 @@ function UnderPair(props: { leaf: Promise<string> }) @{
 	</>
 }
 
-// A leading hole matches any server node, so only the range's size shows
-// that the server rendered another component there.
+// The suspending child comes first. The static root after it shows that the
+// server rendered another component there.
 function HoleFirst(props: { leaf: Promise<string> }) @{
 	<>
 		<Under leaf={props.leaf} />
@@ -41,6 +41,15 @@ function FramedFirst(props: { leaf: Promise<string> }) @{
 	<>
 		<UnderPair leaf={props.leaf} />
 		<i>{'x'}</i>
+	</>
+}
+
+// No static element root shows that the server rendered another component
+// there, only the range's size does.
+function HoleThenText(props: { leaf: Promise<string> }) @{
+	<>
+		<Under leaf={props.leaf} />
+		{'x'}
 	</>
 }
 
@@ -99,6 +108,26 @@ export function FramedFirstBranch(props: { server?: boolean; leaf: Promise<strin
 				} @else {
 					<>
 						<FramedFirst leaf={props.leaf} />
+						<Em />
+					</>
+				}
+			</section>
+		</Hydrate>
+	</div>
+}
+
+export function HoleThenTextBranch(props: { server?: boolean; leaf: Promise<string> }) @{
+	<div>
+		<Hydrate split={false} when={load()}>
+			<section>
+				@if (props.server) {
+					<>
+						<Bold />
+						<Em />
+					</>
+				} @else {
+					<>
+						<HoleThenText leaf={props.leaf} />
 						<Em />
 					</>
 				}
