@@ -34,7 +34,8 @@ function sourceFacts(root, file, manifest, seen = new Set()) {
 	if (seen.has(file)) throw new Error(`Cyclic export coverage requires review: ${file}`);
 	seen = new Set([...seen, file]);
 	const source = readFileSync(path.join(root, file), 'utf8');
-	const sourcePath = path.resolve(root, file);
+	// TypeScript requests forward-slash file names, including on Windows.
+	const sourcePath = path.resolve(root, file).replaceAll(path.sep, '/');
 	const ast = ts.createSourceFile(
 		sourcePath,
 		source,
