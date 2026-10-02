@@ -3,8 +3,9 @@
 Status: independent and deferred hydration are implemented; islands-only route
 modes and automatic shell removal remain proposed. Updated against `main @ c988ad10a` on 2026-09-18, after [#1069](https://github.com/octanejs/octane/pull/1069).
 [Issue #1118](https://github.com/octanejs/octane/issues/1118) tracks the remaining
-client-JavaScript reduction work. The public API is documented in
-[deferred hydration](./deferred-hydration.md).
+client-JavaScript reduction work, and [issue #1514](https://github.com/octanejs/octane/issues/1514)
+tracks renderer-free island activation ([progress](#renderer-free-island-activation-1514)).
+The public API is documented in [deferred hydration](./deferred-hydration.md).
 
 ## Implemented baseline
 
@@ -34,6 +35,30 @@ or an indirect strategy retain the ordinary boundary path. The server currently
 forces nested boundaries to `never` and suppresses their seed and independent
 sidecars. Removing the compiler diagnostic alone would not make live islands
 under a static shell work.
+
+## Renderer-free island activation (#1514)
+
+An island can stop loading the renderer only when its view compiles as a
+`'use dom bindings'` program. A route stops loading it only when its shell is no
+longer hydrated as well. The audit linked from #1514 found that every
+independent island in `examples/signal-chat`, the conversation-streaming
+benchmark and the Vite plugin fixture was rejected by the binding compiler. The
+steps below make islands eligible one construct at a time. Only the last step
+removes bytes from a real page.
+
+| Step | Status | Guard |
+| --- | --- | --- |
+| 1. Diagnose `x$.get()` in a binding view | Done in [#1304](https://github.com/octanejs/octane/pull/1304): runtime error #308 at activation; `.latest()` is rejected at compile time. | |
+| 2. Zero-argument views | Done: a view may declare no props parameter. Activation still takes a `BindingSource`; its snapshot is unused. | `bundle-boundaries.test.mjs`: "zero-argument island views adopt module signals without the renderer" (TSRX and TSX, with a `hydrateRoot` control); `behavior-root.test.ts` adopts, hydrates and mounts real SSR output. |
+| 3. Lower `.get()`/`.latest()` reads into subscribed projections | Proposed | |
+| 4. Mount-only effects as binding activation and cleanup | Proposed | |
+| 5. `@try`/`@pending`/`@catch` in binding programs | Proposed | |
+| 6. Renderer-free activation and an islands-only route mode | Proposed | |
+
+A zero-argument view's module declarations resolve to the document's cells,
+which a compiled state module installs without the renderer. Delegated binding
+handlers run without restoring a custom signal owner, so a deliberately custom
+owner still needs `runWithSignalOwner` around its callbacks.
 
 ## Remaining static-shell design
 

@@ -527,6 +527,10 @@ publishes synchronously, including when the enclosing signal batch has not yet
 delivered subscriptions. Use it before a native operation such as
 `form.requestSubmit()` that immediately depends on updated button properties.
 
+A view that reads only module-scope signal handles may declare no props
+parameter, as in `export function Counter() @{ 'use dom bindings'; … }`.
+Activation still takes a `BindingSource`; its snapshot is unused.
+
 The compiler selects a separate binding artifact; authors keep normal typed
 component imports. Do not import generated query modules by hand. A direct call
 from an uncompiled plain `.ts` file throws; import a compiled activation function
