@@ -12,6 +12,8 @@ const address = await resolveExampleServerAddress({
 
 export default defineConfig({
 	testDir: '.',
+	// The islands-only JavaScript budget measures bundled production chunks.
+	testIgnore: productionPreview ? [] : ['islands-budget.spec.ts'],
 	fullyParallel: false,
 	forbidOnly: Boolean(process.env.CI),
 	retries: process.env.CI ? 1 : 0,

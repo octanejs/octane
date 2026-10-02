@@ -123,7 +123,11 @@ import {
 	lowerNativeAttributeReads,
 } from './native-attribute-reads.js';
 import { isScalarTextAssertion, prepareDomBindings } from './dom-bindings.js';
-import { parseDomBindingRequest } from './dom-binding-request.js';
+import {
+	isHydrateIslandRendererRequest,
+	parseDomBindingIslandRequest,
+	parseDomBindingRequest,
+} from './dom-binding-request.js';
 import {
 	createTemplateIr,
 	appendTemplatePart,
@@ -10076,8 +10080,9 @@ function compileAuthored(source, filename, options, bundlerMetadata) {
 	}
 	const bindingRequest = parseDomBindingRequest(filename);
 	const bindingExport = bindingRequest?.exportName ?? null;
+	const islandRequest = parseDomBindingIslandRequest(filename);
 	if (
-		bindingExport !== null &&
+		(bindingExport !== null || islandRequest !== null) &&
 		(mode !== 'client' ||
 			hydrateBoundaryPathFromId(filename) !== null ||
 			(options?.renderer?.target && options.renderer.target !== 'dom'))
@@ -10087,6 +10092,7 @@ function compileAuthored(source, filename, options, bundlerMetadata) {
 		);
 	}
 	const hasDomBindings =
+		islandRequest !== null ||
 		bindingExport !== null ||
 		source.includes('use dom bindings') ||
 		source.includes('adoptBindings') ||
@@ -10112,6 +10118,7 @@ function compileAuthored(source, filename, options, bundlerMetadata) {
 					bakeStaticAttr,
 					escapeHtml,
 					mount: bindingRequest?.mount ?? false,
+					island: islandRequest,
 					props: bindingRequest?.props ?? null,
 					fixedProps: bindingRequest?.fixedProps ?? null,
 					fixedPropNames: options?.domBindingFixedProps ?? null,
@@ -10262,6 +10269,7 @@ function compileInternal(
 						hydrateBoundaryPathFromId(filename),
 						analyzedAst,
 						options?.isDescriptorChildrenImport,
+						isHydrateIslandRendererRequest(filename),
 					)
 				: prepareServerHydrateBoundaries(source, cleanFilename, analyzedAst);
 		if (hydratePreparation !== null) {
@@ -15410,15 +15418,23 @@ function ssrEmitTry(node, ctx, name, inlinedSubs, parentNs, cssHash, componentNs
 	// `siteKey` is a stable source-position hash so a boundary keeps its identity
 	// across streaming passes (the runtime adds the frame path per instance).
 	const trailing = [];
-	if (componentNs !== null || node.propagateSuspense === true) {
+	// A presentation-binding view names its @try region on the boundary's own
+	// range; the arm suffix is appended by ssrTry once it knows what it rendered.
+	const bindingSite = node._octaneBindingSite
+		? inheritOriginLoc(b.literal(bindingMarker(node._octaneBindingSite, 'y')), node)
+		: null;
+	if (componentNs !== null || node.propagateSuspense === true || bindingSite !== null) {
 		trailing.push(
 			componentNs === null
 				? inheritOriginLoc(b.id('undefined'), node)
 				: inheritOriginLoc(b.literal(componentNs, JSON.stringify(componentNs)), node),
 		);
 	}
-	if (node.propagateSuspense === true) {
-		trailing.push(inheritOriginLoc(b.literal(true, 'true'), node));
+	if (node.propagateSuspense === true || bindingSite !== null) {
+		trailing.push(inheritOriginLoc(b.literal(node.propagateSuspense === true), node));
+	}
+	if (bindingSite !== null) {
+		trailing.push(inheritOriginLoc(b.literal(false), node), bindingSite);
 	}
 	return ssrCall(
 		'ssrTry',
@@ -24828,6 +24844,9 @@ function normalizeChildren(
 						propagateSuspense: n.propagateSuspense === true,
 						pendingKeyword: n.pendingKeyword ?? null,
 						handlerKeyword: n.handlerKeyword ?? null,
+						...(n._octaneBindingSite === undefined
+							? {}
+							: { _octaneBindingSite: n._octaneBindingSite }),
 					},
 				),
 			);

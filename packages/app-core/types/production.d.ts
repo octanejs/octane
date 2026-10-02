@@ -82,6 +82,11 @@ export interface ServerManifest {
 	clientBuild?: ClientBuildManifest | null;
 	/** Client-build records used to complete strict independent Hydrate sidecars. */
 	independentHydration?: IndependentHydrationBuildManifest | null;
+	/**
+	 * Template URL of the renderer-free bootstrap that replaces the hydration entry
+	 * for `hydrate: 'islands'` routes. Required when any route opts in.
+	 */
+	islandsEntry?: string | null;
 }
 
 export interface HandlerOptions {

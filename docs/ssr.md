@@ -597,6 +597,39 @@ response socket closes. Its HTTP transport negotiates streaming gzip for
 eligible SSR and static text responses while preserving HEAD, partial,
 pre-encoded, `no-transform`, and non-compressible responses.
 
+### Islands-only routes
+
+A route whose interactive parts are all independent
+[`<Hydrate>` islands](./deferred-hydration.md#independent) can skip hydrating its
+shell. `hydrate: 'islands'` serves the same server-rendered document with a
+second, renderer-free bootstrap entry:
+
+```ts
+export default defineConfig({
+  router: {
+    routes: [new RenderRoute({ path: '/', entry: '/src/App.tsrx', hydrate: 'islands' })],
+  },
+});
+```
+
+The shell's module, its layout, and the renderer never load in the browser. The
+islands entry captures early input, joins streamed signals and the document
+lifecycle, registers the page's independent islands, and then runs
+`router.preHydrate`. The shell's CSS still ships with the route; its page chunk is
+not preloaded. An island whose only child is a zero-argument
+`'use dom bindings'` view activates without the renderer; any other island loads
+the renderer through its own chunk, as before.
+
+The shell is never hydrated, so the build rejects one that needs client work.
+Outside its independent islands, the route's components may not use hooks,
+event handlers, refs, controlled `value`/`checked`, ordinary `<Hydrate>`, `@try`,
+signal reads or handle bindings, attribute spreads, or components Octane cannot
+check, and the app may not configure `rootBoundary`. The build also fails if the
+islands entry or the `preHydrate` hook reaches the renderer. This is a
+conservative source check of the shell, not a semantic proof; anything it cannot
+check is rejected. Client navigation into an islands-only route is not
+supported, and the Rsbuild integration refuses the option for now.
+
 ### Root boundaries, server functions, and CSP
 
 `rootBoundary` uses importable component entries so the same pending/error UI
@@ -659,10 +692,10 @@ const cspNonce = async (context, next) => {
 
 These are the known gaps between Octane SSR and a full streaming SSR stack:
 
-- **Islands-only route hydration and shell removal**: deferred and independent
-  [`<Hydrate>` boundaries](./deferred-hydration.md) are implemented, but the
-  generated app entry still loads the route and hydrates the composed root.
-  Automatic shell removal and renderer-free island selection remain
+- **Automatic shell removal**: [islands-only routes](#islands-only-routes) are an
+  explicit Vite opt-in with a conservative build check. Proving an arbitrary
+  shell inert, a `none` mode for routes without islands, client navigation into
+  an islands-only route, and Rsbuild support remain
   [proposed](./hydration-islands-plan.md).
 - **Streamed head hoisting**: head elements and resource hints hoisted from
   INSIDE a streamed Suspense boundary don't ship in the stream (the shell

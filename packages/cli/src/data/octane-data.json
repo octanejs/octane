@@ -3518,6 +3518,11 @@
       "message": "`<textarea>` children must be text: strings, numbers, or arrays of them. One child was %s. A textarea's content is its default value, so it cannot contain elements; render them outside the textarea or pass a string.",
       "runtime": ["client", "server"],
       "status": "active"
+    },
+    "337": {
+      "message": "Structural hydration leases do not support @try regions.",
+      "runtime": ["client"],
+      "status": "active"
     }
   }
 }

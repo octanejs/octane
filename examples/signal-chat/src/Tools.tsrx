@@ -4,6 +4,7 @@ import { recordActivation } from './measurements.ts';
 import { tools$ } from './State.tsrx';
 
 export function Tools() @{
+	'use dom bindings';
 	useLayoutEffect(() => recordActivation('tools'), []);
 	<section class="tools" aria-label="Tool activity">
 		<header class="panel-header">

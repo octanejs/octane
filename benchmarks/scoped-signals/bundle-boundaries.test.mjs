@@ -1089,6 +1089,166 @@ export function activate(container) { return hydrateRoot(container, Island, {});
 	}
 });
 
+// An independent island whose only child is a zero-argument binding view selects
+// that view's program as its activator (#1514). Its chunk must not reach the
+// renderer; the same island over an ordinary component still activates with it.
+test('independent islands over binding views activate without the renderer', async (t) => {
+	const directory = import.meta.dirname;
+	const app = `import { Hydrate } from 'octane';
+import { interaction } from 'octane/hydration';
+import { Panel } from './island-panel.tsrx';
+export function App() @{
+ <main><Hydrate independent when={interaction()}><Panel /></Hydrate></main>
+}`;
+	const panel = (bindings) => `import { useLayoutEffect } from 'octane';
+import { count$, increment, mounted } from './island-state.tsrx';
+export function Panel() @{
+ ${bindings ? "'use dom bindings';" : ''}
+ useLayoutEffect(() => mounted(), []);
+ <section>
+  <button type="button" onClick={increment}>{count$}</button>
+  @if (count$.get() > 2) { <p>many</p> }
+ </section>
+}`;
+	const state = `import { signal$ } from 'octane/signals';
+export const count$ = signal$(1);
+export let activations = 0;
+export function mounted() { activations++; }
+export function increment() { count$.set((n) => n + 1); }`;
+	const options = { dev: false, hmr: false };
+	const renderer = /packages\/octane\/src\/(?:runtime(?:\.server)?\.ts|internal\/client\.ts)$/;
+	const bundle = async (entry, bindings, mode = 'client') => {
+		const sources = {
+			'island-app.tsrx': app,
+			'island-panel.tsrx': panel(bindings),
+			'island-state.tsrx': state,
+		};
+		const result = await build({
+			stdin: {
+				contents: compile(entry, path.join(directory, 'island-entry.tsrx'), { ...options, mode })
+					.code,
+				resolveDir: directory,
+			},
+			bundle: true,
+			metafile: true,
+			write: false,
+			minify: true,
+			treeShaking: true,
+			format: 'esm',
+			platform: mode === 'server' ? 'node' : 'browser',
+			target: 'es2022',
+			legalComments: 'none',
+			tsconfigRaw: { compilerOptions: {} },
+			define: { 'process.env.NODE_ENV': '"production"', __OCTANE_PROFILE_ENABLED__: 'false' },
+			plugins: [
+				{
+					name: 'binding-island',
+					setup(plugin) {
+						plugin.onResolve({ filter: /island-(?:app|panel|state)\.tsrx(?:\?.*)?$/ }, (args) => ({
+							path: path.resolve(args.resolveDir, args.path),
+							namespace: 'binding-island',
+						}));
+						plugin.onLoad({ filter: /.*/, namespace: 'binding-island' }, ({ path: id }) => ({
+							// Compile the requested id, so every island query selects its module.
+							contents: compile(sources[path.basename(id.split('?')[0])], id, { ...options, mode })
+								.code,
+							loader: 'js',
+							resolveDir: directory,
+						}));
+					},
+				},
+			],
+		});
+		const code = result.outputFiles[0].text;
+		return {
+			api: await import('data:text/javascript;base64,' + Buffer.from(code).toString('base64')),
+			gzip: gzipSync(code, { level: 9 }).length,
+			resolved: Object.keys(result.metafile.inputs),
+		};
+	};
+	const window = new Window();
+	const globals = new Map();
+	for (const name of [
+		'window',
+		'document',
+		'Node',
+		'Element',
+		'HTMLElement',
+		'Comment',
+		'Text',
+		'Event',
+		'MouseEvent',
+		'MutationObserver',
+	]) {
+		globals.set(name, Object.getOwnPropertyDescriptor(globalThis, name));
+		Object.defineProperty(globalThis, name, {
+			configurable: true,
+			value: name === 'window' ? window : window[name],
+		});
+	}
+	t.after(() => {
+		for (const [name, descriptor] of globals) {
+			if (descriptor) Object.defineProperty(globalThis, name, descriptor);
+			else delete globalThis[name];
+		}
+		window.close();
+	});
+
+	const sizes = {};
+	for (const bindings of [true, false]) {
+		const server = await bundle(
+			`import { App } from './island-app.tsrx';
+import { renderToString } from 'octane/server';
+export function render() {
+ return renderToString(App, undefined, {
+  independentHydration: { buildId: 'island', resolve: (moduleId) => ({ moduleId, styles: [] }) },
+ }).html;
+}`,
+			bindings,
+			'server',
+		);
+		// The island chunk is exactly what the bootstrap loads for this boundary.
+		const island = await bundle(
+			`export { default } from './island-app.tsrx?octane-hydrate=0';
+export { activations, count$ } from './island-state.tsrx';`,
+			bindings,
+		);
+		const reached = island.resolved.filter((id) => renderer.test(id));
+		if (bindings) assert.deepEqual(reached, [], 'A binding-view island reached the renderer.');
+		// Control: the ordinary component's island still loads the renderer, so the
+		// check above cannot pass because the pattern stopped matching.
+		else assert.ok(reached.length > 0, 'An ordinary island did not load the renderer.');
+		sizes[bindings ? 'binding' : 'renderer'] = island.gzip;
+
+		const host = window.document.createElement('div');
+		host.innerHTML = server.api.render();
+		window.document.body.append(host);
+		const element = host.querySelector('[data-octane-hydrate-id]');
+		const sidecar = element.querySelector('script[data-octane-independent]');
+		const manifest = JSON.parse(sidecar.textContent);
+		sidecar.remove();
+		const button = host.querySelector('button');
+		assert.equal(button.textContent, '1');
+		const root = await island.api.default({ element, manifest, captures: [], intents: [] });
+		try {
+			assert.equal(island.api.activations, 1);
+			assert.ok(host.querySelector('button') === button);
+			button.click();
+			button.click();
+			assert.equal(island.api.count$.get(), 3);
+			// The renderer control only proves activation; its commits are scheduled.
+			if (bindings) {
+				assert.equal(button.textContent, '3');
+				assert.equal(host.querySelector('p')?.textContent, 'many');
+			}
+		} finally {
+			root?.unmount();
+		}
+		host.remove();
+	}
+	t.diagnostic(JSON.stringify(sizes));
+});
+
 test('list-free programs omit list costs while imported legacy lists remain live', async (t) => {
 	const directory = path.resolve('packages/octane');
 	const sources = {

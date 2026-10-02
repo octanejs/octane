@@ -8,6 +8,13 @@ import { hasPendingWork } from '../../src/index.js';
 import { renderToString } from '../../src/runtime.server.js';
 import { createScope } from 'octane/signals';
 import { evaluateCompiledFixtureCode } from '../_server-fixture.js';
+import * as DomBindingIsland from '../../src/dom-binding-island.js';
+import * as DomBindingPrograms from '../../src/dom-binding-program.js';
+import * as DomBindingSignals from '../../src/dom-binding-signals.js';
+import {
+	formatDomBindingIslandRequest,
+	HYDRATE_ISLAND_RENDERER_QUERY,
+} from '../../src/compiler/dom-binding-request.js';
 import {
 	createIndependentHydrateManifest,
 	serializeIndependentHydrateManifest,
@@ -947,6 +954,130 @@ function Unrelated() {
 		first.remove();
 		second.remove();
 	});
+
+	// An island whose only child is a zero-argument binding view activates
+	// through that view's own program; any other child keeps the renderer.
+	it.each([false, true].flatMap((dev) => [true, false].map((bindings) => ({ dev, bindings }))))(
+		'selects the island activator from its child view module (%j)',
+		async ({ dev, bindings }) => {
+			const app = `import { Hydrate } from 'octane';
+import { interaction } from 'octane/hydration';
+import { Counter } from './Counter.tsrx';
+export function App() @{
+  <main>
+    <Hydrate independent when={interaction({ events: 'click' })}>
+      <Counter />
+    </Hydrate>
+  </main>
+}`;
+			const counter = `import { useLayoutEffect } from 'octane';
+import { count$, mounted } from './state';
+export function Counter() @{
+  ${bindings ? "'use dom bindings';" : ''}
+  useLayoutEffect(() => mounted(), []);
+  <section>
+    <button type="button" onClick={() => count$.set((count) => count + 1)}>{count$}</button>
+    @if (count$.get() > 2) {
+      <p>many</p>
+    }
+  </section>
+}`;
+			const appFile = '/project/src/App.tsrx';
+			const counterFile = '/project/src/Counter.tsrx';
+			const scope = createScope({ scopeKey: `binding-island-${dev}-${bindings}` });
+			const count$ = scope.signal$('count', 1);
+			const mounted = vi.fn();
+			const state = { './state': { count$, mounted } };
+			const counterServer = evaluateCompiledFixtureCode(
+				compile(counter, counterFile, { mode: 'server', dev }).code,
+				counterFile,
+				'server',
+				state,
+			);
+			const server = evaluateCompiledFixtureCode(
+				compile(app, appFile, { mode: 'server', dev }).code,
+				appFile,
+				'server',
+				{ './Counter.tsrx': counterServer },
+			);
+			// Resolve the island's module requests exactly as a bundler would.
+			const islandRequest = formatDomBindingIslandRequest('./Counter.tsrx', {
+				exportName: 'Counter',
+				host: appFile,
+				boundary: '0',
+			});
+			const rendererRequest = `./App.tsrx?octane-hydrate=0&${HYDRATE_ISLAND_RENDERER_QUERY}=1`;
+			const clientModule = (
+				source: string,
+				id: string,
+				modules: Record<string, Record<string, unknown>>,
+			) =>
+				evaluateCompiledFixtureCode(
+					compile(source, id, { mode: 'client', dev }).code,
+					id,
+					'client',
+					modules,
+				);
+			const selected = clientModule(
+				counter,
+				counterFile + islandRequest.slice('./Counter.tsrx'.length),
+				bindings
+					? {
+							'./Counter.tsrx?octane-bindings=Counter': clientModule(
+								counter,
+								counterFile + '?octane-bindings=Counter',
+								{
+									...state,
+									'octane/dom-binding-program': DomBindingPrograms,
+									'octane/dom-binding-signals': DomBindingSignals,
+								},
+							),
+							'octane/dom-binding-island': DomBindingIsland,
+						}
+					: {
+							[rendererRequest]: clientModule(
+								app,
+								appFile + rendererRequest.slice('./App.tsrx'.length),
+								{ './Counter.tsrx': clientModule(counter, counterFile, state) },
+							),
+						},
+			);
+			const entry = clientModule(app, appFile + '?octane-hydrate=0', { [islandRequest]: selected });
+			const host = document.createElement('div');
+			host.innerHTML = renderToString(server.App, undefined, {
+				signalOwner: scope,
+				independentHydration: {
+					buildId: 'binding-island-build',
+					resolve: (moduleId) => ({ moduleId, styles: [] }),
+				},
+			}).html;
+			document.body.append(host);
+			const serverButton = host.querySelector('button')!;
+			const errors: unknown[] = [];
+			const cleanup = bootstrapIndependentHydration(host, {
+				buildId: 'binding-island-build',
+				signalOwner: scope,
+				loadStyles() {},
+				loadModule: async () => entry,
+				onError: (error) => errors.push(error),
+			});
+			try {
+				serverButton.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
+				await vi.waitFor(() => expect(scope.get(count$)).toBe(2));
+				await vi.waitFor(() => expect(mounted).toHaveBeenCalledOnce());
+				expect(host.querySelector('button')).toBe(serverButton);
+				await vi.waitFor(() => expect(serverButton.textContent).toBe('2'));
+				serverButton.click();
+				await vi.waitFor(() => expect(host.querySelector('p')?.textContent).toBe('many'));
+				expect(serverButton.textContent).toBe('3');
+				expect(errors).toEqual([]);
+			} finally {
+				cleanup();
+				scope.dispose();
+				host.remove();
+			}
+		},
+	);
 
 	it('escapes inert sidecar delimiters without losing capture data', () => {
 		const manifest = createIndependentHydrateManifest(

@@ -21,9 +21,16 @@ import {
 	parseBindingMarker,
 	type BindingKey,
 } from './dom-binding-protocol.js';
-import { HYDRATION_FOR_PREFIX } from './hydration-markers.js';
+import {
+	HYDRATION_FOR_PREFIX,
+	HYDRATION_START,
+	NATIVE_SIGNAL_FRESH_COMMENT,
+	STREAM_SEED_COMMENT,
+	SUSPENSE_RESOLVED_COMMENT,
+	TRY_CATCH_COMMENT,
+} from './hydration-markers.js';
 import { moveNativeNodeBefore } from './dom-focused-move.js';
-import { rendererRangeClose } from './stream-protocol.js';
+import { rendererRangeClose, STREAM_BOUNDARY_ATTR } from './stream-protocol.js';
 import {
 	BINDING_HANDOFF,
 	registerBindingEvent,
@@ -34,7 +41,12 @@ import {
 	type BindingHandoffRest,
 } from './dom-binding-handoff.js';
 import type { createBindingClassGroup, BindingClassGroup } from './dom-binding-classes.js';
-import type { __createBindingSignals, BindingSignalConnection } from './dom-binding-signals.js';
+import type {
+	__createBindingReads,
+	__createBindingSignals,
+	BindingReadTracker,
+	BindingSignalConnection,
+} from './dom-binding-signals.js';
 import type { __createBindingStyles } from './dom-binding-styles.js';
 import type {
 	__createBindingProjections,
@@ -291,6 +303,10 @@ export interface BindingFragment {
 	readonly styleIndices?: readonly number[];
 	readonly projectionGroups?: readonly BindingProjectionGroup[];
 	project(environment: readonly unknown[]): readonly unknown[];
+	/** Fragment-local `const` declarations, appended to the environment once per preparation. */
+	scope?(environment: readonly unknown[]): readonly unknown[];
+	/** A view's mount-only effect callbacks, run once after its first activating commit. */
+	effects?(environment: readonly unknown[]): readonly unknown[];
 	readonly regions: readonly BindingRegion[];
 	readonly constructible?: false;
 	readonly constructionError?: string;
@@ -356,6 +372,11 @@ export type BindingRegion = { readonly node: number } & (
 			read(environment: readonly unknown[]): unknown;
 	  }
 	| { readonly kind: 'opaque' }
+	| {
+			readonly kind: 'try';
+			/** The body, then the optional `@pending` and `@catch` arms. */
+			readonly arms: readonly [BindingFragment, BindingFragment | null, BindingFragment | null];
+	  }
 );
 
 /** @internal Imported only by query artifacts which contain structural presentation. */
@@ -366,10 +387,13 @@ export interface CompiledBindingProgram<Props> {
 	readonly scalar?: CompiledBindings<Props>;
 	readonly adoptScalar?: typeof __adoptBindings | typeof __adoptScalarBindings;
 	readonly connectSignal?: typeof __createBindingSignals;
+	readonly trackReads?: typeof __createBindingReads;
 	readonly connectStyle?: typeof __createBindingStyles;
 	readonly connectProjection?: typeof __createBindingProjections;
 	readonly createControls?: typeof __createBindingControls;
 	readonly list?: BindingListCapability;
+	readonly tryRegions?: BindingTryCapability;
+	readonly effects?: BindingEffectsCapability;
 	readonly hostOperations?: BindingProgramHostOperations;
 	readonly initialOperations?: BindingProgramInitializers;
 	readonly adopt: typeof __adoptLeanBindingProgram<Props> & {
@@ -392,6 +416,9 @@ interface RegionInstance {
 	signalFrame?: number;
 	unresolvedSlot?: boolean;
 	slot?: string;
+	/** A `@try` region keeps showing `@catch` until its `reset` runs. */
+	caught?: { readonly error: unknown };
+	reset?: () => void;
 }
 
 interface FragmentInstance {
@@ -416,6 +443,8 @@ interface FragmentInstance {
 	controller?: AbortController;
 	cleanup?: BindingActivationCleanup;
 	updateAdapters?: () => void;
+	/** Cleanups returned by mount-only effects; `null` once they have run. */
+	effects?: Array<() => void> | null;
 }
 
 interface FragmentPlan {
@@ -436,6 +465,7 @@ interface RegionPlan {
 	items: Map<string, FragmentPlan> | null;
 	text: string | null;
 	slot?: string;
+	caught?: { readonly error: unknown };
 }
 
 interface Transaction {
@@ -453,7 +483,13 @@ interface Transaction {
 	hostOperations?: BindingProgramHostOperations;
 	initialOperations?: BindingProgramInitializers;
 	list?: BindingListCapability;
+	tryRegions?: BindingTryCapability;
+	effects?: BindingEffectsCapability;
 	notifySignal?(prepare: () => () => void): void;
+	reads?: BindingReadTracker;
+	refresh?: () => void;
+	run?: <T>(callback: () => T) => T;
+	waits?: WeakSet<object>;
 	preparing?: boolean;
 	frame: number;
 	published?: () => void;
@@ -520,6 +556,7 @@ export function __createStructuralBindingHandoff(
 				const definition = region.definition;
 				if (definition.kind === 'for' || definition.kind === 'opaque')
 					throw new Error(formatClientError(283));
+				if (definition.kind === 'try') throw new Error(formatClientError(337));
 				if (definition.kind === 'text' && definition.generic)
 					throw new Error(formatClientError(284));
 				if (
@@ -713,6 +750,7 @@ function releaseInstance(instance: FragmentInstance, transaction: Transaction): 
 	attempt(() => instance.cleanup?.());
 	instance.cleanup = undefined;
 	instance.updateAdapters = undefined;
+	if (instance.effects) transaction.effects!.release(instance, attempt);
 	for (const connection of instance.signals?.values() ?? [])
 		attempt(() => connection.dispose(transaction.preservePresentation));
 	instance.signals?.clear();
@@ -888,7 +926,58 @@ function adoptRegion(region: RegionInstance, id: string, transaction: Transactio
 			if (text?.nodeType !== 3 || text.nextSibling !== range.end) mismatch();
 			region.text = text as Text;
 		}
+	} else if (definition.kind === 'try') {
+		transaction.tryRegions!.adopt(region, definition, id, transaction);
 	}
+}
+
+/**
+ * The server wraps its `@try` output in this region and records the arm it
+ * rendered. Renderer protocol nodes may precede that arm's own range: resolved
+ * seeds, a catch receipt, or a streamed boundary. A pending boundary that is
+ * still streaming is claimed here, exactly as the renderer claims it, so its
+ * late segment can no longer swap into binding-owned DOM. An arm the server could
+ * not render for adoption is rebuilt by the first commit.
+ */
+function adoptTry(
+	region: RegionInstance,
+	definition: Extract<BindingRegion, { kind: 'try' }>,
+	id: string,
+	transaction: Transaction,
+): void {
+	const range = region.range;
+	let arm = region.arm;
+	let node = range.start.nextSibling;
+	while (node !== range.end && node !== null) {
+		if (node.nodeType === 1 && (node as Element).localName === 'template') {
+			const next = node.nextSibling;
+			if (!(node as Element).hasAttribute(STREAM_BOUNDARY_ATTR)) mismatch();
+			// An errored boundary has no adoptable arm; otherwise its fallback is.
+			arm = (node as Element).hasAttribute('data-oct-err') ? -2 : 1;
+			node.parentNode!.removeChild(node);
+			node = next;
+			continue;
+		}
+		if (node.nodeType === 1 && (node as Element).localName === 'script') {
+			node = node.nextSibling;
+			continue;
+		}
+		if (node.nodeType !== 8) mismatch();
+		const data = (node as Comment).data;
+		if (data.startsWith(NATIVE_SIGNAL_FRESH_COMMENT)) arm = -2;
+		else if (data.startsWith(STREAM_SEED_COMMENT)) arm = 0;
+		else if (data.startsWith(TRY_CATCH_COMMENT)) {
+			if (arm !== -2) arm = 2;
+		} else if (!data.startsWith(SUSPENSE_RESOLVED_COMMENT)) break;
+		node = node.nextSibling;
+	}
+	region.arm = arm;
+	if (arm < 0 || node === range.end) return;
+	const body = rangeAt(node, range.end);
+	if (body.start.data !== HYDRATION_START || body.end.nextSibling !== range.end) mismatch();
+	const fragment = definition.arms[arm];
+	if (fragment) region.child = resolveFragment(fragment, id, body, false, transaction);
+	else if (body.start.nextSibling !== body.end) mismatch();
 }
 
 function createFragment(
@@ -1053,6 +1142,9 @@ function prepareFragment(
 ): FragmentPlan {
 	requireActive(transaction);
 	const definition = instance.definition;
+	// Arm-local declarations run once per preparation and every projection,
+	// region and committed adapter of this fragment sees the same values.
+	if (definition.scope) environment = environment.concat(definition.scope(environment));
 	const controls = instance.controls && new Map<number, BindingControlPrepared>();
 	const plan: FragmentPlan = {
 		instance,
@@ -1150,6 +1242,15 @@ function prepareFragment(
 					: [descriptor.props(environment)],
 				transaction,
 			);
+		} else if (descriptor.kind === 'try') {
+			transaction.tryRegions!.prepare(
+				instance,
+				region,
+				candidate,
+				environment,
+				document,
+				transaction,
+			);
 		} else if (descriptor.kind === 'slot') {
 			const value = descriptor.read(environment);
 			if (
@@ -1177,6 +1278,100 @@ function prepareFragment(
 	}
 	requireActive(transaction);
 	return plan;
+}
+
+function isThenable(value: unknown): value is PromiseLike<unknown> {
+	return (
+		value !== null &&
+		(typeof value === 'object' || typeof value === 'function') &&
+		typeof (value as { then?: unknown }).then === 'function'
+	);
+}
+
+/**
+ * Selects a `@try` arm like the renderer: a thrown thenable shows `@pending`
+ * and the body is attempted again on the next preparation; any other error
+ * shows `@catch`, which stays selected until its deferred `reset` runs.
+ */
+function prepareTry(
+	instance: FragmentInstance,
+	region: RegionInstance,
+	candidate: RegionPlan,
+	environment: readonly unknown[],
+	document: Document,
+	transaction: Transaction,
+): void {
+	const descriptor = region.definition as Extract<BindingRegion, { kind: 'try' }>;
+	let caught = region.caught;
+	if (caught === undefined) {
+		const created = transaction.candidates.size;
+		const observed = transaction.reads?.size() ?? 0;
+		try {
+			candidate.child = prepareFragment(
+				region.arm === 0 && region.child
+					? region.child
+					: createFragment(descriptor.arms[0], instance.id, document, transaction),
+				environment,
+				transaction,
+			);
+			candidate.arm = 0;
+			return;
+		} catch (thrown) {
+			if (thrown === stopped) throw thrown;
+			// Release what the abandoned body constructed; its committed DOM is untouched.
+			if (transaction.candidates.size > created)
+				for (const fresh of [...transaction.candidates].slice(created))
+					releaseInstance(fresh, transaction);
+			if (isThenable(thrown)) {
+				// Tracked reads already reported their source before throwing. Only an
+				// opaque thenable needs its own wake-up.
+				if ((transaction.reads?.size() ?? 0) === observed) waitFor(thrown, transaction);
+				candidate.arm = 1;
+				const pending = descriptor.arms[1];
+				if (pending)
+					candidate.child = prepareFragment(
+						region.arm === 1 && region.child
+							? region.child
+							: createFragment(pending, instance.id, document, transaction),
+						environment,
+						transaction,
+					);
+				return;
+			}
+			if (!descriptor.arms[2]) throw thrown;
+			caught = { error: thrown };
+		}
+	}
+	candidate.arm = 2;
+	candidate.caught = caught;
+	region.reset ??= () => {
+		// Like the renderer, reset is deferred: `retry(); reset();` and the reverse
+		// order both attempt the body after the retry's writes.
+		queueMicrotask(() => {
+			if (transaction.disposed || region.caught === undefined) return;
+			region.caught = undefined;
+			transaction.refresh!();
+		});
+	};
+	// A catch arm is kept for its error. An adopted server catch arm has none
+	// yet, so the first client failure takes over its DOM instead of rebuilding it.
+	candidate.child = prepareFragment(
+		region.arm === 2 && region.child && (region.caught === caught || region.caught === undefined)
+			? region.child
+			: createFragment(descriptor.arms[2]!, instance.id, document, transaction),
+		environment.concat([caught.error, region.reset]),
+		transaction,
+	);
+}
+
+function waitFor(thenable: PromiseLike<unknown>, transaction: Transaction): void {
+	const waits = (transaction.waits ??= new WeakSet());
+	if (waits.has(thenable)) return;
+	waits.add(thenable);
+	const retry = (): void => {
+		if (!transaction.disposed) transaction.refresh!();
+	};
+	thenable.then(retry, retry);
 }
 
 function removeRange(range: BindingRange, interior: boolean, transaction?: Transaction): void {
@@ -1292,6 +1487,7 @@ function commitRegion(plan: RegionPlan, id: string, transaction: Transaction): v
 	region.child = child;
 	region.arm = plan.arm;
 	if (definition.kind === 'slot') region.slot = plan.slot;
+	else if (definition.kind === 'try') region.caught = plan.caught;
 	if (oldChild !== child) {
 		if (oldChild) releaseInstance(oldChild, transaction);
 		if (transaction.disposed) return;
@@ -1304,12 +1500,14 @@ function commitRegion(plan: RegionPlan, id: string, transaction: Transaction): v
 			insertBody(
 				child!,
 				region.range,
-				definition.kind === 'if' && !!definition.armRange,
+				definition.kind === 'try' || (definition.kind === 'if' && !!definition.armRange),
 				transaction,
 			);
 	}
 	if (definition.kind === 'if')
 		region.range.start.data = `${BINDING_OPEN_PREFIX}${id};${region.site};${plan.arm}`;
+	else if (definition.kind === 'try')
+		region.range.start.data = `${BINDING_OPEN_PREFIX}${id};${region.site};y${plan.arm}`;
 }
 
 function writeText(region: RegionInstance, value: string): void {
@@ -1417,6 +1615,32 @@ function activateInstance(instance: FragmentInstance, transaction: Transaction):
 		if (region.items)
 			for (const child of region.items.values()) activateInstance(child, transaction);
 	}
+	// Mount-only effects run children before parents, after the activating commit.
+	if (instance.definition.effects) transaction.effects!.run(instance, transaction);
+}
+
+/**
+ * Mount-only effects run once, after the activating commit has adopted or
+ * inserted their view and installed its native adapters, under the program's
+ * signal owner. Cleanups run when the view leaves or the program is disposed.
+ */
+function runEffects(instance: FragmentInstance, transaction: Transaction): void {
+	if (instance.effects !== undefined || transaction.disposed) return;
+	const effects: Array<() => void> = (instance.effects = []);
+	for (const effect of instance.definition.effects!(instance.environment)) {
+		if (instance.disposed || transaction.disposed) break;
+		const cleanup = transaction.run!(() => (effect as () => unknown)());
+		// Like a production renderer effect, only a returned function is a cleanup.
+		if (typeof cleanup !== 'function') continue;
+		if (instance.disposed) (cleanup as () => void)();
+		else effects.push(cleanup as () => void);
+	}
+}
+
+function releaseEffects(instance: FragmentInstance, attempt: (callback: () => void) => void): void {
+	const effects = instance.effects;
+	instance.effects = null;
+	if (effects) for (const cleanup of effects) attempt(cleanup);
 }
 
 function bindProgram<Props>(
@@ -1448,6 +1672,8 @@ function bindProgram<Props>(
 		projections: descriptor.connectProjection?.(),
 		controls: descriptor.createControls?.(),
 		list,
+		tryRegions: descriptor.tryRegions,
+		effects: descriptor.effects,
 		hostOperations,
 		initialOperations: descriptor.initialOperations ?? hostOperations,
 		frame: 0,
@@ -1462,6 +1688,7 @@ function bindProgram<Props>(
 	let dirty = false;
 	let revision = 0;
 	let mounted = !mount;
+	let committed = false;
 	let unsubscribe: (() => void) | undefined;
 	const signal = options?.signal;
 	const dispose = (disposal?: { preserveDOM?: boolean }, publish?: () => void): void => {
@@ -1500,6 +1727,14 @@ function bindProgram<Props>(
 		unsubscribe = undefined;
 		try {
 			stop?.();
+		} catch (error) {
+			if (!failed) {
+				failed = true;
+				failure = error;
+			}
+		}
+		try {
+			transaction.reads?.dispose();
 		} catch (error) {
 			if (!failed) {
 				failed = true;
@@ -1563,20 +1798,34 @@ function bindProgram<Props>(
 					throw new TypeError(formatClientError(296));
 				transaction.preparing = true;
 				transaction.frame++;
-				const plan = prepareFragment(
-					instance!,
-					descriptor.prepareProps ? descriptor.prepareProps(snapshot) : [snapshot],
-					transaction,
-				);
-				if (!dirty && !transaction.disposed && transaction.controls)
+				const environment = descriptor.prepareProps
+					? descriptor.prepareProps(snapshot)
+					: [snapshot];
+				let plan: FragmentPlan | undefined;
+				try {
+					plan = transaction.reads
+						? transaction.reads.prepare(() => prepareFragment(instance!, environment, transaction))
+						: prepareFragment(instance!, environment, transaction);
+				} catch (error) {
+					// A program that reads signals waits for them, like a suspended root
+					// keeping its server markup: the last committed DOM stays live and
+					// every source the preparation reached can retry it.
+					if (
+						error === stopped ||
+						(error as Error | null)?.name === 'ScopeDisposedError' ||
+						!transaction.reads?.fail(error, committed)
+					)
+						throw error;
+				}
+				if (plan && !dirty && !transaction.disposed && transaction.controls)
 					transaction.hostOperations!.publish(plan, transaction);
-				while (signalUpdates?.size && !dirty && !transaction.disposed) {
+				while (plan && signalUpdates?.size && !dirty && !transaction.disposed) {
 					const pending = [...signalUpdates];
 					signalUpdates.clear();
 					for (const prepare of pending) prepare();
 				}
 				transaction.preparing = false;
-				if (dirty || transaction.disposed) {
+				if (!plan || dirty || transaction.disposed) {
 					for (const candidate of [...transaction.candidates])
 						if (candidate !== instance) releaseInstance(candidate, transaction);
 					if (instance!.fresh) {
@@ -1597,7 +1846,9 @@ function bindProgram<Props>(
 					?.isContentEditable;
 				commitFragment(plan, transaction);
 				if (transaction.disposed) break;
+				committed = true;
 				transaction.published?.();
+				transaction.reads?.publish();
 				if (!mounted) {
 					moveRange(instance!.range, target!.parent, target!.before ?? null, transaction);
 					mounted = true;
@@ -1612,6 +1863,10 @@ function bindProgram<Props>(
 			} catch {
 				/* The publication failure remains primary. */
 			}
+			// Retiring the data's owner (a document being left) notifies its readers.
+			// That ends a live presentation, which keeps its last DOM; it is not an
+			// error. A presentation that never committed still reports it.
+			if (committed && (error as Error | null)?.name === 'ScopeDisposedError') return;
 			throw error;
 		} finally {
 			transaction.preparing = false;
@@ -1633,8 +1888,10 @@ function bindProgram<Props>(
 		drain();
 	};
 	transaction.consumer = refresh;
+	transaction.refresh = refresh;
 	const owner = currentSignalOwner();
 	const run = owner === null ? <T>(callback: () => T): T => callback() : captureSignalOwner(owner);
+	transaction.run = run;
 	refresh[NATIVE_TRANSITION_CONSUMER] = {
 		active: () => !transaction.disposed,
 		prepare: () =>
@@ -1667,11 +1924,13 @@ function bindProgram<Props>(
 					const snapshot = source.getSnapshot();
 					if (snapshot != null && typeof (snapshot as { then?: unknown }).then === 'function')
 						throw new TypeError(formatClientError(296));
-					plan = prepareFragment(
-						instance!,
-						descriptor.prepareProps ? descriptor.prepareProps(snapshot) : [snapshot],
-						transaction,
-					);
+					const environment = descriptor.prepareProps
+						? descriptor.prepareProps(snapshot)
+						: [snapshot];
+					plan = transaction.reads
+						? transaction.reads.prepare(() => prepareFragment(instance!, environment, transaction))
+						: prepareFragment(instance!, environment, transaction);
+					if (transaction.reads) preview.receipts.push(transaction.reads.preview());
 				} catch (error) {
 					discard();
 					throw error;
@@ -1720,6 +1979,7 @@ function bindProgram<Props>(
 				};
 			}),
 	};
+	transaction.reads = descriptor.trackReads?.(refresh);
 	let handoff: BindingHandoff | undefined;
 	const handle = {
 		refresh,
@@ -1884,6 +2144,16 @@ export function __mountLeanBindingProgram<Props>(
 export const __bindingList = { adopt: adoptList, prepare: prepareList, commit: commitList };
 
 type BindingListCapability = typeof __bindingList;
+
+/** @internal Selected only by programs containing `@try` regions. */
+export const __bindingTry = { adopt: adoptTry, prepare: prepareTry };
+
+type BindingTryCapability = typeof __bindingTry;
+
+/** @internal Selected only by programs whose views declare mount-only effects. */
+export const __bindingEffects = { run: runEffects, release: releaseEffects };
+
+type BindingEffectsCapability = typeof __bindingEffects;
 
 /** @internal Selected only for controls, grouped projections/classes, or native initialization. */
 export const __bindingProgramHostOperations = {

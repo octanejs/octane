@@ -161,6 +161,14 @@ export function evaluateCompiledFixtureCode<T extends CompiledFixtureModule>(
 		(_match: string, kind: string, name: string) => `${kind} ${name} = __exports.${name} =`,
 	);
 	code = code.replace(/export\s+default\s+/g, '__exports.default = ');
+	// A compiler-selected module may forward its default export to another query.
+	code = code.replace(
+		/export\s*\{\s*default\s*\}\s*from\s*['"]([^'"]+)['"];?/g,
+		(match: string, request: string) =>
+			runtimeModules === undefined || !Object.hasOwn(runtimeModules, request)
+				? match
+				: `__exports.default = __runtimeModules[${JSON.stringify(request)}].default;`,
+	);
 
 	if (/^\s*import\s/m.test(code) || /^\s*export\s/m.test(code)) {
 		throw new Error(

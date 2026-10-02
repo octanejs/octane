@@ -26,7 +26,14 @@ import {
 import { validateRendererModuleSource } from './compile-universal.js';
 import { collectReassignedBindings } from './hook-deps.js';
 import { HYDRATE_QUERY_PARAM, hydrateBoundaryPathFromId } from './hydrate-boundaries.js';
-import { parseDomBindingRequest, formatDomBindingRequest } from './dom-binding-request.js';
+import {
+	formatDomBindingIslandRequest,
+	formatDomBindingRequest,
+	HYDRATE_ISLAND_RENDERER_QUERY,
+	isHydrateIslandRendererRequest,
+	parseDomBindingIslandRequest,
+	parseDomBindingRequest,
+} from './dom-binding-request.js';
 import {
 	DOM_RENDERER_MODULE,
 	normalizeRendererConfig,
@@ -63,6 +70,7 @@ export {
 	validateCssModuleConstants,
 } from './css-module-imports.js';
 export { HYDRATE_QUERY_PARAM } from './hydrate-boundaries.js';
+export { analyzeIslandsShell } from './islands-shell.js';
 export {
 	CLIENT_REFERENCE_MANIFEST_FILENAME,
 	CLIENT_REFERENCE_MANIFEST_VERSION,
@@ -1191,7 +1199,8 @@ class OctaneBundlerCompiler {
 		const file = cleanModuleId(id);
 		const hydrateBoundaryPath = hydrateBoundaryPathFromId(id);
 		const bindingRequest = parseDomBindingRequest(id);
-		if (bindingRequest !== null && hydrateBoundaryPath !== null) {
+		const islandRequest = parseDomBindingIslandRequest(id);
+		if ((bindingRequest !== null || islandRequest !== null) && hydrateBoundaryPath !== null) {
 			throw new Error('Octane DOM binding and Hydrate queries cannot be combined.');
 		}
 		const collected = {
@@ -1262,7 +1271,7 @@ class OctaneBundlerCompiler {
 		const fullCompile =
 			this._isFullCompileSource(file, collected) &&
 			this._passesOwnershipGate(file, filename, pragmaOwned);
-		if (bindingRequest !== null && !fullCompile) {
+		if ((bindingRequest !== null || islandRequest !== null) && !fullCompile) {
 			throw new Error('Octane DOM binding queries require a compiler-owned .tsrx/.tsx view.');
 		}
 		// The narrow-the-rule config error concerns modules Octane owns. Under
@@ -1311,11 +1320,15 @@ class OctaneBundlerCompiler {
 				!hasRendererBoundaries &&
 				typeof options.resolveCssModuleConstant === 'function';
 			const compileFilename =
-				bindingRequest !== null
-					? formatDomBindingRequest(filename, bindingRequest)
-					: hydrateBoundaryPath === null
-						? filename
-						: `${filename}?${HYDRATE_QUERY_PARAM}=${encodeURIComponent(hydrateBoundaryPath)}`;
+				islandRequest !== null
+					? formatDomBindingIslandRequest(filename, islandRequest)
+					: bindingRequest !== null
+						? formatDomBindingRequest(filename, bindingRequest)
+						: hydrateBoundaryPath === null
+							? filename
+							: `${filename}?${HYDRATE_QUERY_PARAM}=${encodeURIComponent(hydrateBoundaryPath)}${
+									isHydrateIslandRendererRequest(id) ? `&${HYDRATE_ISLAND_RENDERER_QUERY}=1` : ''
+								}`;
 			const compileOptions = {
 				hmr,
 				mode: environment,

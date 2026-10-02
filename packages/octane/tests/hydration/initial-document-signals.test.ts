@@ -16,6 +16,10 @@ import {
 } from 'octane/server';
 import * as Signals from 'octane/signals';
 import { createScope, runWithSignalOwner, type ScopeSeed } from 'octane/signals';
+import {
+	formatDomBindingIslandRequest,
+	HYDRATE_ISLAND_RENDERER_QUERY,
+} from '../../src/compiler/dom-binding-request.js';
 import { loadCompiledFixtureSource } from '../_server-fixture.js';
 import {
 	activateStreamedMarkup,
@@ -52,13 +56,34 @@ function fixture(dev: boolean) {
 	return {
 		server: { ...server, Independent: independentServer.Independent },
 		client,
-		independent: () =>
-			loadCompiledFixtureSource(independentSource, {
+		independent: () => {
+			// Resolve the island module's requests exactly as a bundler would: the
+			// child's island request falls back to the renderer island module.
+			const islandRequest = formatDomBindingIslandRequest('./initial-document-signals.tsrx', {
+				exportName: 'IndependentReader',
+				host: independentId,
+				boundary: '0',
+			});
+			const rendererQuery = `?octane-hydrate=0&${HYDRATE_ISLAND_RENDERER_QUERY}=1`;
+			const renderer = loadCompiledFixtureSource(independentSource, {
+				...options,
+				id: independentId + rendererQuery,
+				mode: 'client',
+				runtimeModules: { ...options.runtimeModules, './initial-document-signals.tsrx': client },
+			});
+			const selected = loadCompiledFixtureSource(source, {
+				...options,
+				id: options.id + islandRequest.slice(islandRequest.indexOf('?')),
+				mode: 'client',
+				runtimeModules: { ['./initial-document-independent.tsrx' + rendererQuery]: renderer },
+			});
+			return loadCompiledFixtureSource(independentSource, {
 				...options,
 				id: independentId + '?octane-hydrate=0',
 				mode: 'client',
-				runtimeModules: { ...options.runtimeModules, './initial-document-signals.tsrx': client },
-			}),
+				runtimeModules: { [islandRequest]: selected },
+			});
+		},
 	};
 }
 

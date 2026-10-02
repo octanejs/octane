@@ -45,6 +45,7 @@
     "./behavior": "./src/behavior-root.ts",
     "./dom-bindings": "./src/dom-bindings.ts",
     "./dom-binding-program": "./src/dom-binding-program.ts",
+    "./dom-binding-island": "./src/dom-binding-island.ts",
     "./dom-binding-classes": "./src/dom-binding-classes.ts",
     "./dom-binding-signals": "./src/dom-binding-signals.ts",
     "./dom-binding-controls": "./src/dom-binding-controls.ts",
@@ -152,6 +153,11 @@
         "types": "./dist/dom-binding-program.d.ts",
         "node": "./dist/node/dom-binding-program.js",
         "default": "./dist/dom-binding-program.js"
+      },
+      "./dom-binding-island": {
+        "types": "./dist/dom-binding-island.d.ts",
+        "node": "./dist/node/dom-binding-island.js",
+        "default": "./dist/dom-binding-island.js"
       },
       "./dom-binding-classes": {
         "types": "./dist/dom-binding-classes.d.ts",

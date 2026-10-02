@@ -9,6 +9,7 @@ export {
 } from '@octanejs/app-core';
 export type {
 	RenderRouteEntry,
+	RenderRouteHydration,
 	RenderRouteOptions,
 	Route,
 	RouteMatch,

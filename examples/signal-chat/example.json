@@ -16,10 +16,19 @@
     "native-events",
     "keyed-reconciliation",
     "tsrx-control-flow",
-    "server-functions"
+    "server-functions",
+    "islands-only-routes",
+    "dom-bindings"
   ],
   "commands": { "build": ["build"], "typecheck": "typecheck", "e2e": "test:e2e" },
   "journeys": [
+    {
+      "id": "renderer-free-islands",
+      "title": "Activate every island of an islands-only route without loading the renderer, within its JavaScript budget",
+      "kind": "golden",
+      "spec": "e2e/islands-budget.spec.ts",
+      "critical": true
+    },
     {
       "id": "configured-run-evidence",
       "title": "Configure deferred and eager workloads through the native form and download matching captures",
