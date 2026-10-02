@@ -104,3 +104,31 @@ export function RootEmptyList(props: { server?: boolean }) @{
 		<GateLeaf />
 	</ul>
 }
+
+// Reading a module `let` keeps the call lite in a production compile.
+let label = 'client';
+
+function LiteLabel() @{
+	<p>{label as string}</p>
+}
+
+// The lite call renders into the arm's <section>, its lite host, and discards
+// the server's <u> there before the root suspends.
+export function RootLiteHost(props: { server?: boolean }) @{
+	<div>
+		@if (props.server) {
+			<section>
+				<ClientMark />
+				<u class="server">{'server'}</u>
+				<hr />
+			</section>
+		} @else {
+			<section>
+				<ClientMark />
+				<LiteLabel />
+				<hr />
+			</section>
+		}
+		<GateLeaf />
+	</div>
+}
