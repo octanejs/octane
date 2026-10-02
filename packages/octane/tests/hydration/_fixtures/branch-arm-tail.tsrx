@@ -39,7 +39,7 @@ export function SwitchComponents(props: { k: string }) @{
 }
 
 // The client's empty arm claims nothing of the server's other arm, the shape
-// the router binding renders its server-only scroll restoration script with.
+// the router binding once rendered its server-only scroll restoration script with.
 export function EmptyArm(props: { on: boolean }) @{
 	<div id="r">
 		@if (props.on) {
@@ -47,6 +47,27 @@ export function EmptyArm(props: { on: boolean }) @{
 		} @else {
 			<></>
 		}
+	</div>
+}
+
+// An arm with no body: the client renders nothing in the slot.
+export function NoElseArm(props: { on: boolean }) @{
+	<div id="r">
+		@if (props.on) {
+			<Leaf v="x" />
+		}
+	</div>
+}
+
+export function EmptyArmThenChild(props: { on: boolean; Child: ComponentBody }) @{
+	const Child = props.Child;
+	<div id="r">
+		@if (props.on) {
+			<Leaf v="x" />
+		} @else {
+			<></>
+		}
+		<Child />
 	</div>
 }
 
