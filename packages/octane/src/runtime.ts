@@ -11743,6 +11743,10 @@ export function componentSlotLite<P>(
 	let profileDidThrow = false;
 	let profileThrown: unknown;
 	const nativeToken = NATIVE_READ_DRIVER === null ? -1 : beginActiveNativeReadScope(scope);
+	// The first node after the template that adopted the frame's content.
+	let claimed: Node | null | undefined;
+	const outerClaim =
+		adoptedOpen === null ? undefined : hydration!.beginClaim(getNextSibling(adoptedOpen));
 	try {
 		if (signalDocumentEnabled || scope.block.idState.renderOwner?.signalOwner !== undefined) {
 			// Same owner-resolution order as runWithBlockSignalOwner, but the
@@ -11759,6 +11763,7 @@ export function componentSlotLite<P>(
 		profileThrown = error;
 		throw error;
 	} finally {
+		if (adoptedOpen !== null) claimed = hydration!.endClaim(outerClaim);
 		if (nativeToken >= 0) NATIVE_READ_DRIVER!.endScope(nativeToken);
 		if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__)
 			__profileEndRender(profileFrame, profileDidThrow, profileThrown);
@@ -11770,8 +11775,12 @@ export function componentSlotLite<P>(
 	// cursor ON its adopted root (clone() parks it there), so without this a
 	// following sibling lite slot sees a non-marker node, adopts no range, and
 	// its commitBag insert MOVES the previous sibling's root to the shared
-	// anchor. Mirrors componentSlot's post-render advance.
-	if (hydration !== null && adoptedClose !== null) hydration.node = getNextSibling(adoptedClose);
+	// anchor. Mirrors componentSlot's post-render advance. First, discard what
+	// the server rendered in the frame after this component's content.
+	if (hydration !== null && adoptedClose !== null) {
+		hydration.settleClaim(scope, adoptedClose, claimed, parentScope, slotKey);
+		hydration.node = getNextSibling(adoptedClose);
+	}
 }
 
 // An anchorless lite call whose server range is missing: render it between
@@ -18442,6 +18451,10 @@ function initDomOperations(): void {
 interface LazyTemplateRecord {
 	html: string;
 	ns: 0 | 1 | 2 | 3;
+	/**
+	 * Raw multi-root markup: the number of roots, as the compiler counts them.
+	 * 0 = one root, or HTML roots pre-wrapped in `<octane-frag>`.
+	 */
 	frag: number;
 	parsed: Array<Node | null>;
 	/**
@@ -18558,6 +18571,23 @@ function lazyRootDescriptor(lazy: LazyTemplateRecord): string | 3 | 8 {
  */
 function isLazyFragment(lazy: LazyTemplateRecord): boolean {
 	return lazy.frag !== 0 || lazyRootDescriptor(lazy) === 'octane-frag';
+}
+
+/**
+ * How many roots a multi-root template has. The compiler passes the count as
+ * a raw fragment's `frag`; a parsed or pre-wrapped template counts its
+ * children.
+ */
+function templateRootCount(template: Node | LazyTemplateRecord): number {
+	let parsed: Node;
+	if ((template as Node).nodeType === undefined) {
+		const lazy = template as LazyTemplateRecord;
+		if (lazy.frag !== 0) return lazy.frag;
+		parsed = resolveLazyTemplate(lazy);
+	} else parsed = template as Node;
+	let count = 0;
+	for (let child = getFirstChild(parsed); child !== null; child = getNextSibling(child)) count++;
+	return count;
 }
 
 /**
@@ -18794,6 +18824,16 @@ class HydrationCapability {
 	readonly liteRanges = new WeakMap<Scope, HydratedLiteRange>();
 	readonly classWrites = new Map<Element, PendingHydrationClassWrite>();
 	private readonly textWarnings = new Map<Text, PendingHydrationTextWarning>();
+	/**
+	 * The first node of the adopted range whose claim is open (beginClaim),
+	 * until the template that renders that range's content adopts it.
+	 */
+	private claimFrom: Node | null = null;
+	/**
+	 * The first node after that template's roots, which the range's content
+	 * does not claim. Undefined until the template adopts claimFrom.
+	 */
+	private claimEnd: Node | null | undefined = undefined;
 	/** Skip component-frame adoption until the declared container owner. */
 	passthroughRanges = false;
 	/** A slot lent a server range whose first render has yet to claim it. */
@@ -19020,6 +19060,102 @@ class HydrationCapability {
 				}
 			}
 		}
+	}
+
+	/**
+	 * Open a claim on the server range a slot adopted, whose content starts at
+	 * `first`, for the first render of that content. Returns what endClaim
+	 * restores. Claims nest: a range's content adopts its template before the
+	 * slots inside it render, so an enclosing claim is settled by then, or no
+	 * template will settle it, and only its record needs restoring.
+	 */
+	beginClaim(first: Node | null): Node | null | undefined {
+		const outer = this.claimEnd;
+		this.claimFrom = first;
+		this.claimEnd = undefined;
+		return outer;
+	}
+
+	/**
+	 * Close the open claim, restoring `outer` from beginClaim. Returns the first
+	 * node after the roots of the template that adopted the range's first node,
+	 * or undefined when no template did (claimRoots).
+	 */
+	endClaim(outer: Node | null | undefined): Node | null | undefined {
+		const from = this.claimEnd;
+		this.claimFrom = null;
+		this.claimEnd = outer;
+		return from;
+	}
+
+	/**
+	 * First render of a component into the server range it adopted, `block`'s
+	 * own: its component frame, or the range of a renderable hole or list item
+	 * whose value it is. The server may have rendered another component there,
+	 * or more from this one, whose content starts with what the client renders.
+	 * Remove and report what is left after the client's content (settleClaim).
+	 */
+	renderClaimed(block: Block, scope: Scope, slotKey: number): void {
+		const outer = this.beginClaim(getNextSibling(block.startMarker!));
+		let from: Node | null | undefined;
+		try {
+			renderBlock(block);
+		} finally {
+			from = this.endClaim(outer);
+		}
+		if (!block.disposed) this.settleClaim(block, block.endMarker!, from, scope, slotKey);
+	}
+
+	/**
+	 * After `owner` first rendered its content into an adopted server range
+	 * that ends at `end`, remove and report the server content left after it,
+	 * from `from` (endClaim). When no template adopted the range's first node,
+	 * the content is the owner's slots, and the last one left the cursor past
+	 * its range. A cursor on `end` means nothing is left, and anything less
+	 * certain is left in place. The slot at `scope`'s `slotKey` owns the range.
+	 */
+	settleClaim(
+		owner: Scope,
+		end: Node,
+		from: Node | null | undefined,
+		scope: Scope,
+		slotKey: number,
+	): void {
+		const cursor = this.node;
+		if (cursor === end || this.abandoned) return;
+		if (from === undefined) {
+			// A slot that adopted a server node without a range parks the cursor
+			// on that node, so the cursor must follow the last slot's own range.
+			const slots = owner.slots;
+			const last = slots[slots.length - 1];
+			const lastEnd: Node | null | undefined =
+				this.liteRanges.get(last)?.end ?? (last?.borrowed || last?.inherited ? null : last?.end);
+			if (lastEnd == null || getNextSibling(lastEnd) !== cursor) return;
+			from = cursor;
+		}
+		if (from === null || from === end) return;
+		// Leave anything a recovery built, and a tail outside the range.
+		for (let node: Node | null = from; node !== end; node = getNextSibling(node)) {
+			if (node === null || this.freshNodes.has(node)) return;
+		}
+		if (PRESENTATION_HYDRATION?.revision !== undefined) presentationMiss();
+		const parent = domNode(end).parentNode!;
+		this.save(parent);
+		// Captures that changed before a dormant boundary activated legitimately
+		// differ from the server's; still discard, but there is nothing to report.
+		if (!this.staleServerValues) {
+			noteRecoverableHydrationError(() => new Error(formatClientError(51)));
+			if (process.env.NODE_ENV !== 'production') {
+				// A return slot or a list item has no site of its own: name the
+				// returning component, else the list's host.
+				const loc =
+					siteLoc(scope, slotKey) ||
+					componentSourceLoc(scope.block.body) ||
+					(parent as any).__oct_loc;
+				if (loc) this.warnStructural(loc, 'the end of the component', this.describe(from));
+			}
+		}
+		removeRange(from, end);
 	}
 
 	/** Read the `<!--oct-catch:T:C-->` comment ahead of a caught arm's range. */
@@ -19956,15 +20092,52 @@ class HydrationCapability {
 				(template !== null
 					? fragmentRootMatches(cursor, template, partialStyles)
 					: lazyFragmentRootMatches(cursor, lazy!))
-			)
+			) {
+				if (cursor === this.claimFrom) this.claimRoots(cursor, template ?? lazy!);
 				return { __oct_vfrag: true, firstChild: cursor } as unknown as Node;
+			}
 			return this.rebuildFragment(template ?? resolveLazyTemplate(lazy!), cursor, loc);
 		}
 		if (claimsRoot)
 			this.claimRootRemainder(
 				framedRemainder === undefined ? (unframedRemainder ?? null) : framedRemainder,
 			);
+		if (cursor === this.claimFrom) this.claimRoots(cursor, null);
 		return cursor;
+	}
+
+	/**
+	 * A template adopted `root`, the first node of the range whose claim is
+	 * open. When the template is that range's content, record the first node
+	 * after its roots: after `root`, or after the `fragment` template's roots,
+	 * stepped as the compiled walk steps them. The template is the content when
+	 * it renders in the range's owner: the block whose markers the range's
+	 * are, a component inheriting them, or the lite component that adopted the
+	 * range. A component that adopts `root` without a range of its own renders
+	 * in its own scope, and the slots after it claim the nodes after its root.
+	 */
+	private claimRoots(root: Node, fragment: Node | LazyTemplateRecord | null): void {
+		const open = domNode(root).previousSibling;
+		const scope = CURRENT_SCOPE;
+		if (
+			open === null ||
+			scope === null ||
+			(scope.block.startMarker !== open && this.liteRanges.get(scope)?.start !== open)
+		)
+			return;
+		this.claimFrom = null;
+		let node: Node | null = root;
+		// Stepping over each root's own range, the first close marker is the end
+		// of the claimed range: the server's range ends before the template's
+		// roots do, and nothing follows them.
+		for (let i = fragment === null ? 1 : templateRootCount(fragment); i > 1; i--) {
+			node = this.sibling(node, 1);
+			if (node === null || isBlockClose(node)) {
+				this.claimEnd = node;
+				return;
+			}
+		}
+		this.claimEnd = getNextSibling(this.isOpen(node) ? this.close(node) : node);
 	}
 
 	/**
@@ -31400,6 +31573,8 @@ function componentSlotImpl(
 	// The server node that stood where hydration expected this call's range.
 	// Undefined when the claim found the range (or claimed none).
 	let unframed: Node | null | undefined;
+	// This call adopted the server's range for the component's frame.
+	let adoptedFrame = false;
 	if (state === undefined) {
 		let start: Comment | null = null;
 		let end: Comment | null = null;
@@ -31488,6 +31663,9 @@ function componentSlotImpl(
 			end = hydration!.close(open);
 			if (parentBlock === hydration!.rootBlock) hydration!.claimRootRemainder(getNextSibling(end));
 			hydration!.node = getNextSibling(start);
+			// A passthrough root's owner adopts whatever range the server rendered
+			// first in the container, so its own output need not fill that range.
+			adoptedFrame = !hydrationPassthrough;
 		} else if (
 			(singleRoot === true || (singleRoot === 2 && (identity as any).$$singleRoot === true)) &&
 			(hydration === null || anchor !== undefined)
@@ -31895,8 +32073,7 @@ function componentSlotImpl(
 			// markers, never remove them (the branch-block precedent).
 			if (state.inherited) b.exclusiveMarkers = true;
 			state.block = b;
-			if (unframed === undefined) renderBlock(b);
-			else
+			if (unframed !== undefined)
 				hydration!.renderUnframed(
 					renderBlock,
 					b,
@@ -31907,6 +32084,9 @@ function componentSlotImpl(
 					unframed,
 					state.anchor,
 				);
+			// The server may have rendered more in the frame, for another component.
+			else if (adoptedFrame) hydration!.renderClaimed(b, parentScope, slotKey);
+			else renderBlock(b);
 		}
 	} else if (state.block) {
 		// `memo(Component)` — skip the body when new props shallow-equal the
@@ -35356,9 +35536,10 @@ export function childSlot(
 		)?.[HYDRATION_RANGE_BOUNDARY] !== 'owner';
 	// Reaching the selected owner through a value slot (for example a keyed list
 	// item) ends passthrough exactly as componentSlot does, so later siblings and
-	// boundaries know the server cursor has been handed off.
-	if (hydration?.passthroughRanges === true && !hydrationTransparent)
-		hydration.passthroughRanges = false;
+	// boundaries know the server cursor has been handed off. The owner adopts
+	// whatever range the server rendered first, so its output need not fill it.
+	const passthroughOwner = hydration?.passthroughRanges === true && !hydrationTransparent;
+	if (passthroughOwner) hydration!.passthroughRanges = false;
 	const iterable = iterableChildArray(value);
 	if (iterable !== null) value = iterable;
 	const preparedList =
@@ -36235,6 +36416,14 @@ export function childSlot(
 			// The server content is gone: build the value and its subtree on the
 			// client, so that no descendant adopts a server node outside the range.
 			hydration!.suspend(() => renderBlock(b));
+		} else if (
+			adoptedRange &&
+			!passthroughOwner &&
+			comp !== (hostElementBody as unknown as ComponentBody)
+		) {
+			// The server may have rendered more in the range, for another value.
+			// (claimRange already settled a host's.)
+			hydration!.renderClaimed(b, parentScope, slotKey);
 		} else {
 			renderBlock(b);
 		}
