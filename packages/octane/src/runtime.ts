@@ -3810,6 +3810,14 @@ function restoreRootRange(
 	after: Node | null,
 	nodes: Node[],
 ): void {
+	// A newer undo can already have removed a speculative slot, including its
+	// markers. That bounded snapshot no longer owns a range in this parent;
+	// walking to a bound that is gone would erase unrelated committed siblings.
+	if (
+		(before !== null && (STAGED_DOM?.view(before) ?? before).parentNode !== parent) ||
+		(after !== null && (STAGED_DOM?.view(after) ?? after).parentNode !== parent)
+	)
+		return;
 	const retained = new Set(nodes);
 	let node = before === null ? getFirstChild(parent) : getNextSibling(before);
 	while (node !== null && node !== after) {
@@ -3846,14 +3854,6 @@ function journalRootRange(parent: Node, before: Node | null, after: Node | null)
 			}
 			restore = [...restore.slice(0, start), ...current, ...restore.slice(end + 1)];
 		}
-		// A newer undo can already have removed a speculative slot, including its
-		// markers. That bounded snapshot no longer owns a range in this parent;
-		// falling back to firstChild/null would erase unrelated committed siblings.
-		if (
-			(before !== null && (STAGED_DOM?.view(before) ?? before).parentNode !== parent) ||
-			(after !== null && (STAGED_DOM?.view(after) ?? after).parentNode !== parent)
-		)
-			return;
 		restoreRootRange(parent, before, after, restore);
 	});
 }

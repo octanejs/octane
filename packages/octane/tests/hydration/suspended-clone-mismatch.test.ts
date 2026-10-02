@@ -17,7 +17,8 @@ const FIXTURE = join(
 	'packages/octane/tests/hydration/_fixtures/suspended-clone-mismatch.tsrx',
 );
 type Fixture = typeof import('./_fixtures/suspended-clone-mismatch.tsrx');
-type Component = 'GateBranch' | 'GateForm' | 'GateNested' | 'GateEmptyList' | 'GateLongerList';
+type Component =
+	'GateBranch' | 'GateForm' | 'GateNested' | 'GateEmptyList' | 'GateLongerList' | 'GateDetached';
 
 const server = loadServerFixture<Fixture>(FIXTURE, { id: 'suspended-clone-mismatch.tsrx' });
 
@@ -194,4 +195,31 @@ describe.each([true, false])('suspended @try arm rebuilt during hydration (dev=%
 			expect(recoverable).toHaveLength(expected.recoverable);
 		},
 	);
+
+	// Something outside the attempt detaches the arm's bounds while it renders.
+	// Its rollback cannot restore a range it no longer finds, and must leave the
+	// boundary's committed siblings alone rather than sweep to the parent's end.
+	it('leaves siblings in place when the arm loses its bounds before rolling back', async () => {
+		serve('GateDetached');
+		const button = container.querySelector('button')!;
+		const div = container.querySelector('div')!;
+		client.external.detach = () => {
+			client.external.detach = undefined;
+			for (let node = button.previousSibling; node !== null;) {
+				const previous: ChildNode | null = node.previousSibling;
+				if (node.nodeType === 8) node.remove();
+				else if (node.nodeType === 1) break;
+				node = previous;
+			}
+		};
+		const recoverable: unknown[] = [];
+		try {
+			hydrate('GateDetached', recoverable);
+			await act(() => {});
+			expect(div.contains(button)).toBe(true);
+			expect(button.textContent).toBe('after');
+		} finally {
+			client.external.detach = undefined;
+		}
+	});
 });

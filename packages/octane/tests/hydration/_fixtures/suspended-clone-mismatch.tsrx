@@ -101,3 +101,25 @@ export function GateLongerList(props: { server?: boolean }) @{
 		}
 	</div>
 }
+
+// Runs `detach` while the arm's first attempt renders, then suspends.
+export const external: { detach?: () => void } = {};
+
+function DetachingLeaf() @{
+	<i>{(external.detach?.(), read(gate.promise)) as string}</i>
+}
+
+export function GateDetached(props: { server?: boolean }) @{
+	<div>
+		@try {
+			@if (props.server) {
+				<b class="server">{'server'}</b>
+			} @else {
+				<DetachingLeaf />
+			}
+		} @pending {
+			<p>{'pending'}</p>
+		}
+		<button>{'after'}</button>
+	</div>
+}
