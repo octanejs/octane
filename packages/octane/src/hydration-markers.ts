@@ -52,6 +52,15 @@ export const HYDRATION_FOR_ITEMS = '[f1';
 export const HYDRATION_FOR_ARM_INDEX = HYDRATION_FOR_PREFIX.length;
 
 /**
+ * Leads a `@try` arm range that holds the server's `@catch` arm:
+ * `<!--oct-catch:T:C-->`, where T and C count the positional `use()` seeds the
+ * abandoned try body and the catch arm left in the seed stream. Without it a
+ * client cannot tell a caught arm from a successful one, so it would adopt the
+ * catch DOM as try-body content.
+ */
+export const TRY_CATCH_COMMENT = 'oct-catch:';
+
+/**
  * Serialize one `useId()` value. The client regenerates the id the server
  * already wrote, so the namespace prefix, the `in-` infix, the base-36 ordinal,
  * and both colons must be produced in exactly one place: a divergence here

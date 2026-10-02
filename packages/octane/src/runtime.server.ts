@@ -125,6 +125,7 @@ import {
 	HYDRATE_MEDIA_ATTR,
 	HYDRATE_VISIBLE_MARGIN_ATTR,
 	HYDRATE_VISIBLE_THRESHOLD_ATTR,
+	TRY_CATCH_COMMENT,
 } from './hydration-markers.js';
 import { streamedSignalBootstrapJs } from './server/early-signals.js';
 import {
@@ -681,6 +682,49 @@ interface Job {
 let SUSPENDED: { promise: PromiseLike<unknown>; key: string }[] | null = null;
 let RESOLVED: ResolvedMap | null = null;
 let SERIAL: unknown[] | null = null;
+// Seed runs that boundaries moved out of SERIAL into their own sidecar or
+// stream segment, in splice order. Either one ships inside the boundary's
+// HTML, so an enclosing @try that renders its catch arm instead discards it,
+// while the client still replays that try body against positional seeds (see
+// ssrTry's catch path). Every rewind of SERIAL rewinds this list to the same
+// checkpoint.
+let SERIAL_ISOLATIONS: SerialIsolation[] | null = null;
+interface SerialIsolation {
+	at: number;
+	seeds: unknown[];
+}
+
+/** Move the seeds after a checkpoint out of SERIAL for a boundary's own payload. */
+function isolateSerial(serialStart: number): unknown[] {
+	if (SERIAL === null) return [];
+	const seeds = SERIAL.splice(serialStart);
+	if (seeds.length !== 0) (SERIAL_ISOLATIONS ??= []).push({ at: serialStart, seeds });
+	return seeds;
+}
+
+/** Drop the seeds, and the isolated runs, a discarded render left after a checkpoint. */
+function rewindSerial(serialStart: number, isolationStart: number): void {
+	if (SERIAL !== null) SERIAL.length = serialStart;
+	if (SERIAL_ISOLATIONS !== null) SERIAL_ISOLATIONS.length = isolationStart;
+}
+
+/**
+ * Put back, at their original positions, the runs isolated since a checkpoint.
+ * Each run was spliced off the then-tail of SERIAL, so undoing the splices in
+ * reverse order restores render order, including runs nested in other runs.
+ */
+function restoreSerialIsolations(isolationStart: number): void {
+	const isolations = SERIAL_ISOLATIONS;
+	if (isolations === null || SERIAL === null) return;
+	for (let i = isolations.length - 1; i >= isolationStart; i--) {
+		// No spread: a large run would overflow the call's argument stack.
+		const { at, seeds } = isolations[i];
+		const tail = SERIAL.splice(at);
+		for (let j = 0; j < seeds.length; j++) SERIAL.push(seeds[j]);
+		for (let j = 0; j < tail.length; j++) SERIAL.push(tail[j]);
+	}
+	isolations.length = isolationStart;
+}
 // The active component frame (see Frame). Never null during a render pass —
 // render() installs a root frame before invoking the component.
 let FRAME: Frame | null = null;
@@ -4648,6 +4692,7 @@ function captureComponentReplayState(scope: SSRScope, frame: Frame | null) {
 		headXfer: headCollections?.preloadXfer ?? null,
 		serial,
 		serialLength: serial !== null ? serial.length : 0,
+		serialIsolations: SERIAL_ISOLATIONS?.length ?? 0,
 		susp,
 		suspLength: susp !== null ? susp.length : 0,
 		jobs,
@@ -4719,6 +4764,7 @@ function rewindComponentReplayState(
 		}
 	}
 	if (snapshot.serial !== null) snapshot.serial.length = snapshot.serialLength;
+	if (SERIAL_ISOLATIONS !== null) SERIAL_ISOLATIONS.length = snapshot.serialIsolations;
 	if (snapshot.susp !== null) snapshot.susp.length = snapshot.suspLength;
 	if (snapshot.jobs !== null) snapshot.jobs.length = snapshot.jobsLength;
 	VT_SSR_TRY_SEQ = snapshot.vtTrySeq;
@@ -5582,6 +5628,7 @@ const PermanentStaticHydrate = /* @__PURE__ */ markComponentFlags(
 				return ssrHtml(ssrChildrenHtml(props.children, scope));
 			const childIdStart = ID_COUNTER;
 			const serialStart = SERIAL?.length ?? 0;
+			const isolationStart = SERIAL_ISOLATIONS?.length ?? 0;
 			const children = ssrBlock(
 				ssrTry(
 					scope,
@@ -5592,7 +5639,7 @@ const PermanentStaticHydrate = /* @__PURE__ */ markComponentFlags(
 				),
 			);
 			const idCount = ID_COUNTER - childIdStart;
-			if (SERIAL !== null) SERIAL.splice(serialStart);
+			rewindSerial(serialStart, isolationStart);
 			const streamToken = streamTokenForPendingHtml(children);
 			const markerToken = streamToken === null ? '' : streamToken + ':';
 			const endToken = streamToken === null ? '' : ':' + streamToken;
@@ -5665,7 +5712,7 @@ const hydrate = /* @__PURE__ */ markComponentFlags(
 							nativeReads = finishNativeSeedCapture(nativeCapture, previousNativeReads, false);
 						}
 						const idCount = ID_COUNTER - childIdStart;
-						const childSeeds = SERIAL === null ? [] : SERIAL.splice(serialStart);
+						const childSeeds = isolateSerial(serialStart);
 						const permanentStaticAncestor = PERMANENT_STATIC_HYDRATE_DEPTH !== 0;
 						const attrs = ssrHydrateAttrs(
 							id,
@@ -8663,6 +8710,7 @@ interface Ambient {
 	susp: SuspendedList | null;
 	res: ResolvedMap | null;
 	serial: unknown[] | null;
+	serialIsolations: SerialIsolation[] | null;
 	frame: Frame | null;
 	deferred: Job[] | null;
 	comp: ServerComponent | null;
@@ -8701,6 +8749,7 @@ function saveAmbient(): Ambient {
 		susp: SUSPENDED,
 		res: RESOLVED,
 		serial: SERIAL,
+		serialIsolations: SERIAL_ISOLATIONS,
 		frame: FRAME,
 		deferred: DEFERRED,
 		comp: CURRENT_COMP,
@@ -8759,6 +8808,7 @@ function restoreAmbient(a: Ambient): void {
 	SUSPENDED = a.susp;
 	RESOLVED = a.res;
 	SERIAL = a.serial;
+	SERIAL_ISOLATIONS = a.serialIsolations;
 	FRAME = a.frame;
 	DEFERRED = a.deferred;
 	CURRENT_COMP = a.comp;
@@ -8832,6 +8882,7 @@ function runFullFramedPass(
 	FALLBACK_HOIST_DEPTH = 0;
 	const suspended = (SUSPENDED = [] as SuspendedList);
 	const serial = (SERIAL = [] as unknown[]);
+	SERIAL_ISOLATIONS = null;
 	const deferred = (DEFERRED = [] as Job[]);
 	RESOLVED = resolved;
 	CURRENT_SSR_ELEMENT = null;
@@ -8986,6 +9037,7 @@ function runDiscoveryRound(
 	FALLBACK_HOIST_DEPTH = 0;
 	const suspended = (SUSPENDED = [] as SuspendedList);
 	SERIAL = [] as unknown[];
+	SERIAL_ISOLATIONS = null;
 	const deferred = (DEFERRED = [] as Job[]);
 	RESOLVED = resolved;
 	CURRENT_SSR_ELEMENT = null;
@@ -10328,6 +10380,7 @@ export function ssrTry(
 	const armScope = outerAsyncScope + '|@arm:' + siteKey + '#' + occurrence.toString(36) + ':';
 	let entry: StreamBoundary | undefined;
 	const serialStart = SERIAL?.length ?? 0;
+	const isolationStart = SERIAL_ISOLATIONS?.length ?? 0;
 	let ancestorKeys: string[] = EMPTY_SNAPSHOT_LIST;
 	let ownerKeys: string[] = EMPTY_SNAPSHOT_LIST;
 	if (stream !== null) {
@@ -10420,7 +10473,7 @@ export function ssrTry(
 		// This body cannot be replayed from ready values alone. Remove its
 		// positional seeds too; the fresh client body must not shift a sibling's
 		// use() cursor. Its original useId range remains reserved by the marker.
-		if (SERIAL !== null) SERIAL.length = serialStart;
+		rewindSerial(serialStart, isolationStart);
 		const idCount = Math.max(0, ID_COUNTER - (boundaryIds ? 0 : outerIdCounter));
 		return '<!--' + NATIVE_SIGNAL_FRESH_COMMENT + idCount + '-->' + inner;
 	};
@@ -10463,6 +10516,7 @@ export function ssrTry(
 			if (nativeCapture < 0) NATIVE_SERVER_READS = null;
 			const deferredStart = DEFERRED?.length ?? 0;
 			const serialStart = SERIAL?.length ?? 0;
+			const isolationStart = SERIAL_ISOLATIONS?.length ?? 0;
 			const css = CSS;
 			const cssSnapshot = snapshotStyles(css);
 			const head = HEAD;
@@ -10491,7 +10545,7 @@ export function ssrTry(
 				finishNativeSeedCapture(nativeCapture, previousNativeReads, false);
 				if (SUSPENDED !== null) SUSPENDED.length = suspendedStart;
 				if (DEFERRED !== null) DEFERRED.length = deferredStart;
-				if (SERIAL !== null) SERIAL.length = serialStart;
+				rewindSerial(serialStart, isolationStart);
 				if (css !== null && cssSnapshot !== null) {
 					css.replay = null;
 					css.clear();
@@ -10577,14 +10631,12 @@ export function ssrTry(
 									['vt-share', vtOuter.update],
 								])
 							: inner;
-					if (SERIAL !== null) {
-						if (!entry.serverOwnedStatic) entry.seeds = SERIAL.slice(serialStart);
-						SERIAL.length = serialStart;
-					}
+					const seeds = isolateSerial(serialStart);
+					if (!entry.serverOwnedStatic) entry.seeds = seeds;
 					pruneUnrepresentedStreamDescendants(stream!, key, entry.html);
-				} else if (SERIAL !== null) {
-					// Later passes re-render from cache — drop the duplicate seeds.
-					SERIAL.length = serialStart;
+				} else {
+					// Later passes re-render from cache; the segment already has these.
+					isolateSerial(serialStart);
 				}
 				ID_COUNTER = entry.pendingIdOffset;
 				return pendingForm();
@@ -10597,7 +10649,7 @@ export function ssrTry(
 				// Reserve sequential IDs and isolate positional use() seeds from siblings.
 				// A client-owned promise can suspend even though the server resolved it.
 				const idCount = ID_COUNTER - outerIdCounter;
-				const seeds = SERIAL === null ? [] : SERIAL.splice(serialStart);
+				const seeds = isolateSerial(serialStart);
 				const native = NATIVE_READ_COLLECTOR?.serialize(
 					nativeReads,
 					RESOLVED?.initialDocumentSignals,
@@ -10622,7 +10674,7 @@ export function ssrTry(
 				if (stream !== null) {
 					// Drop seeds pushed by the partially-rendered body — they belong to
 					// the boundary's own slice once it completes.
-					if (SERIAL !== null) SERIAL.length = serialStart;
+					rewindSerial(serialStart, isolationStart);
 					if (entry === undefined) {
 						const pendingIdOffset = Math.max(0, ID_COUNTER - outerIdCounter);
 						restoreOuterIds();
@@ -10654,12 +10706,20 @@ export function ssrTry(
 				// Preserve values consumed before the rejection plus its typed rejection
 				// record. The client replays that exact seed order, throws at the same
 				// use(), then hydrates the already-streamed catch arm (whose own use() calls
-				// consume any seeds appended while rendering it below).
-				const caughtSeeds =
-					entry !== undefined && !entry.serverOwnedStatic && SERIAL !== null
-						? SERIAL.slice(serialStart)
-						: [];
-				if (entry !== undefined && SERIAL !== null) SERIAL.length = serialStart;
+				// consume any seeds appended while rendering it below). The replay adopts
+				// no DOM, so a nested boundary in the body reads positional seeds, not
+				// the sidecar this arm discards: return its run to the stream first.
+				restoreSerialIsolations(isolationStart);
+				// A buffered body's seeds stay in the root stream; a streamed one's
+				// travel in its own segment. Either way the catch arm's follow them.
+				const tryRun = entry === undefined ? null : isolateSerial(serialStart);
+				const catchStart = SERIAL?.length ?? serialStart;
+				const trySeeds =
+					tryRun === null
+						? catchStart - serialStart
+						: entry?.serverOwnedStatic === true
+							? 0
+							: tryRun.length;
 				const nativeCapture = NATIVE_READ_COLLECTOR?.beginCapture() ?? -1;
 				const previousNativeReads = NATIVE_SERVER_READS;
 				if (nativeCapture < 0) NATIVE_SERVER_READS = null;
@@ -10670,6 +10730,14 @@ export function ssrTry(
 				} finally {
 					catchReads = finishNativeSeedCapture(nativeCapture, previousNativeReads, false);
 				}
+				// Tell the client this range is the caught arm, so it replays the try
+				// body without adopting and then adopts the catch arm. A static
+				// boundary ships no seeds; a native-fresh arm is rebuilt instead.
+				if (MARKERS && !nativeFresh) {
+					const catchSeeds =
+						SERIAL === null || entry?.serverOwnedStatic === true ? 0 : SERIAL.length - catchStart;
+					inner = `<!--${TRY_CATCH_COMMENT}${trySeeds}:${catchSeeds}-->` + inner;
+				}
 				inner = nativeFreshArm(inner);
 				if (entry !== undefined) {
 					if (entry.state !== 'done') {
@@ -10678,19 +10746,14 @@ export function ssrTry(
 								catchReads,
 								RESOLVED?.initialDocumentSignals,
 							);
-						if (SERIAL !== null) {
-							if (!entry.serverOwnedStatic) {
-								caughtSeeds.push(...SERIAL.slice(serialStart));
-							}
-							SERIAL.length = serialStart;
-						}
+						const catchRun = isolateSerial(serialStart);
 						entry.state = 'done';
 						entry.html = inner;
 						entry.rawHtml = VT_SSR_HAS_RAW_HTML;
-						entry.seeds = nativeFresh ? [] : caughtSeeds;
+						entry.seeds = nativeFresh || entry.serverOwnedStatic ? [] : tryRun!.concat(catchRun);
 						pruneUnrepresentedStreamDescendants(stream!, key, entry.html);
-					} else if (SERIAL !== null) {
-						SERIAL.length = serialStart;
+					} else {
+						isolateSerial(serialStart);
 					}
 					ID_COUNTER = entry.pendingIdOffset;
 					return pendingForm();
@@ -10702,7 +10765,7 @@ export function ssrTry(
 				// Fizz keeps a Suspense shell valid when its primary content throws:
 				// publish the fallback, report the error, and mark this boundary for a
 				// client render. Buffered JSX Suspense uses a fresh-arm marker below.
-				if (SERIAL !== null) SERIAL.length = serialStart;
+				rewindSerial(serialStart, isolationStart);
 				if (entry === undefined && PERMANENT_STATIC_HYDRATE_DEPTH !== 0) throw e;
 				if (entry === undefined) {
 					const pendingIdOffset = Math.max(0, ID_COUNTER - outerIdCounter);
@@ -10743,7 +10806,7 @@ export function ssrTry(
 				// A buffered Suspense boundary can retry on hydration just like a
 				// streamed boundary. Discard failed-content seeds and mark only this
 				// arm for a fresh client render; surrounding server hosts still adopt.
-				if (SERIAL !== null) SERIAL.length = serialStart;
+				rewindSerial(serialStart, isolationStart);
 				const reports = RESOLVED?.bufferedErrors ?? (RESOLVED!.bufferedErrors = new Map());
 				if (!reports.has(key)) reports.set(key, { error: e, reported: false });
 				nativeFresh = true;

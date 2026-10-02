@@ -7,6 +7,7 @@ import * as RT from 'octane/server';
 import type { StreamOptions } from 'octane/server';
 import { prerender, type RenderOptions } from 'octane/static';
 import { hydrateRoot, flushSync } from '../src/index.js';
+import { TRY_CATCH_COMMENT } from '../src/hydration-markers.js';
 import {
 	Boundary as ClientBoundary,
 	Nested as ClientNested,
@@ -42,6 +43,9 @@ const m = evalServer(
 
 const OPEN = '<!--[-->';
 const CLOSE = '<!--]-->';
+/** Leads a caught arm, counting the try body's and catch arm's positional seeds. */
+const CAUGHT = (trySeeds: number, catchSeeds: number) =>
+	`<!--${TRY_CATCH_COMMENT}${trySeeds}:${catchSeeds}-->`;
 const seed = (json: string) =>
 	`<script type="application/json" data-octane-suspense>${json}</script>`;
 
@@ -1286,7 +1290,7 @@ export function App(props) @{
 	it('routes a rejected use(promise) to @catch and seeds the catch hydration path', async () => {
 		const out = await prerender(m.Boundary, { promise: Promise.reject(new Error('nope')) });
 		expect(out.html).toBe(
-			`<div id="box">${OPEN}${OPEN}<span class="err">nope</span>${CLOSE}${CLOSE}</div>` +
+			`<div id="box">${OPEN}${CAUGHT(1, 0)}${OPEN}<span class="err">nope</span>${CLOSE}${CLOSE}</div>` +
 				seed(
 					'{"__octane_new_rejection__":{"version":1,"values":[null],"rejections":[[0,{"kind":"error","name":"Error","message":"nope","fields":{}}]]}}',
 				),

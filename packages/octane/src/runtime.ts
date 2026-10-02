@@ -189,6 +189,7 @@ import {
 	HYDRATION_FOR_ARM_INDEX,
 	HYDRATION_FOR_PREFIX,
 	HYDRATE_MARKER_SELECTOR,
+	TRY_CATCH_COMMENT,
 } from './hydration-markers.js';
 import {
 	ACTIVITY_TAG,
@@ -18607,7 +18608,10 @@ class HydrationCapability {
 	/** Parent captures changed before this dormant boundary activated. */
 	staleServerValues = false;
 	depth = 0;
-	/** Depth of a render that adopts nothing but still consumes positional seeds. */
+	/**
+	 * Depth of a render that adopts nothing but still consumes positional seeds:
+	 * a server-caught try body's replay, or `renderUnframed`.
+	 */
 	replayDepth = -1;
 	seedCursor = 0;
 	hasAdjacentRangePair = false;
@@ -18800,6 +18804,105 @@ class HydrationCapability {
 				}
 			}
 		}
+	}
+
+	/** Read the `<!--oct-catch:T:C-->` comment ahead of a caught arm's range. */
+	takeServerCatch(cursor: Node | null): ServerCatch | null {
+		if (cursor?.nodeType !== 8) return null;
+		const data = (STAGED_DOM?.view(cursor as Comment) ?? (cursor as Comment)).data;
+		if (!data.startsWith(TRY_CATCH_COMMENT)) return null;
+		const counts = /^(0|[1-9]\d*):(0|[1-9]\d*)$/.exec(data.slice(TRY_CATCH_COMMENT.length));
+		const start = getNextSibling(cursor);
+		if (counts === null || !this.isOpen(start)) return null;
+		return {
+			marker: cursor as Comment,
+			start,
+			end: this.close(start),
+			trySeeds: Number(counts[1]),
+			catchSeeds: Number(counts[2]),
+			seedEnd: 0,
+		};
+	}
+
+	/**
+	 * Render a try body whose server render threw, ahead of the server's catch
+	 * arm. That DOM belongs to the catch arm, so nothing in the body may adopt,
+	 * but the body still consumes its own positional seeds so that it throws
+	 * where the server's did. The catch arm's seeds start where the server's
+	 * body stopped, however many the replay read.
+	 */
+	replayCaughtTry(block: Block, caught: ServerCatch): void {
+		const seeds = this.seeds as HydrationSeedArray | null;
+		const tryEnd = this.seedCursor + caught.trySeeds;
+		caught.seedEnd = tryEnd + caught.catchSeeds;
+		// A body that reads past where the server's threw must not take the catch
+		// arm's seeds. Stop at the body's own, so it suspends there instead.
+		if (seeds !== null && tryEnd < seeds.length) {
+			const own: HydrationSeedArray = seeds.slice(0, tryEnd);
+			const events = seeds[HYDRATION_SITE_EVENTS];
+			if (events !== undefined) own[HYDRATION_SITE_EVENTS] = events;
+			this.seeds = own;
+		}
+		const previousReplay = this.replayDepth;
+		// A streamed arm's native values are the catch arm's, as is its DOM.
+		const previousNative = setNativeAdoptionResolver(null);
+		this.replayDepth = ++this.depth;
+		try {
+			// The server only marks an arm it caught, so this boundary catches.
+			this.renderTryBody(block, true);
+		} finally {
+			this.replayDepth = previousReplay;
+			this.depth--;
+			setNativeAdoptionResolver(previousNative);
+			this.seeds = seeds;
+			if (seeds !== null) this.seedCursor = Math.min(tryEnd, seeds.length);
+		}
+	}
+
+	/**
+	 * Keep the server's catch arm until the render that read it commits, then
+	 * drop its marker, and the arm too unless it was adopted. A discarded render
+	 * removes only what the client inserted into the slot, so a retried
+	 * hydration replays against the server's range again.
+	 */
+	settleServerCatch(caught: ServerCatch, slot: TrySlot | ErrorSlot, adopted: boolean): void {
+		const { start, end } = slot;
+		const { marker } = caught;
+		if (!adopted) this.rebuiltSlot(slot.parentBlock, end);
+		const settle = (discarded: boolean): void => {
+			if ((STAGED_DOM?.view(marker) ?? marker).parentNode === null) return;
+			if (discarded) {
+				// A streamed arm's seed comment precedes the marker, and the retry
+				// reads its seeds through it.
+				let first = getNextSibling(start);
+				if (
+					first?.nodeType === 8 &&
+					(STAGED_DOM?.view(first as Comment) ?? (first as Comment)).data.startsWith(
+						STREAM_SEED_COMMENT,
+					)
+				)
+					first = getNextSibling(first);
+				removeRange(first, marker);
+				removeRange(getNextSibling(caught.end), end);
+			} else removeRange(marker, adopted ? caught.start : getNextSibling(caught.end));
+		};
+		if (WIP_CAPTURE === null) settle(false);
+		else (WIP_CAPTURE.renderCleanups ??= []).push(settle);
+	}
+
+	/** Later siblings read the seeds after the boundary, whichever arm rendered. */
+	skipServerCatchSeeds(caught: ServerCatch): void {
+		if (this.seeds !== null) this.seedCursor = Math.min(caught.seedEnd, this.seeds.length);
+	}
+
+	/**
+	 * The client rebuilt this slot's arm, adopting nothing inside it. Park the
+	 * cursor on its end. A root-level slot parks past its end, where the root's
+	 * next sibling starts, or the stale remainder that finishRoot sweeps. Claiming
+	 * that node as the remainder would sweep a sibling the root still adopts.
+	 */
+	rebuiltSlot(owner: Block, end: Node): void {
+		this.node = owner === this.rootBlock ? getNextSibling(end) : end;
 	}
 
 	isOpen(node: Node | null): node is Comment {
@@ -37383,6 +37486,7 @@ export function errorBlock(
 	let start: Node | null = null;
 	let end: Node | null = null;
 	let freshBoundary = false;
+	let caught: ServerCatch | null = null;
 	if (!state.passthrough) {
 		let cursor = getNextSibling(state.start);
 		const freshIds = takeNativeFreshArm(hydration, cursor, state.end, state.idState);
@@ -37391,15 +37495,17 @@ export function errorBlock(
 			freshBoundary = true;
 			cursor = state.end;
 		}
-		if (hydration !== null && hydration.isOpen(cursor)) {
+		caught = hydration?.takeServerCatch(cursor) ?? null;
+		if (caught === null && hydration !== null && hydration.isOpen(cursor)) {
 			start = cursor;
 			end = hydration.close(cursor);
 			hydration.node = getNextSibling(start);
 		} else {
+			// A server catch arm stays put while the body replays ahead of it.
 			start = (STAGED_DOM?.view(document) ?? document).createComment('try-b');
 			end = (STAGED_DOM?.view(document) ?? document).createComment('/try-b');
-			domNode(state.domParent).insertBefore(start, state.end);
-			domNode(state.domParent).insertBefore(end, state.end);
+			domNode(state.domParent).insertBefore(start, caught?.marker ?? state.end);
+			domNode(state.domParent).insertBefore(end, caught?.marker ?? state.end);
 			if (hydration !== null) {
 				hydration.markFresh(start);
 				hydration.markFresh(end);
@@ -37425,21 +37531,38 @@ export function errorBlock(
 	const previousNative = freshBoundary ? setNativeAdoptionResolver(null) : undefined;
 	if (freshBoundary) hydration!.depth++;
 	try {
-		if (hydration !== null) hydration.renderTryBody(body, true);
+		if (caught !== null) {
+			hydration!.replayCaughtTry(body, caught);
+			hydration!.settleServerCatch(caught, state, false);
+		} else if (hydration !== null) hydration.renderTryBody(body, true);
 		else renderBlock(body);
 		state.hasResolved = true;
 	} catch (error) {
+		if (caught !== null) {
+			// Drop the replay: whoever handles a hand-off retries hydration against
+			// the server's range, and a repeated throw adopts the catch arm in it.
+			state.block = null;
+			unmountBlock(body);
+		}
 		if (isHostContextRequest(error) || isSuspenseException(error) || isAdoptionControl(error))
 			throw error;
-		const adoptServerCatch = hydration?.isRejection(error) === true;
-		switchErrorToCatch(
-			state,
-			error,
-			true,
-			adoptServerCatch && start !== null ? start : undefined,
-			adoptServerCatch && end !== null ? end : undefined,
-		);
+		if (caught !== null) {
+			// Unmounting the replay can report a cleanup error that disposes the parent.
+			if (state.parentBlock.disposed) return state.reset;
+			hydration!.settleServerCatch(caught, state, true);
+			switchErrorToCatch(state, error, true, caught.start, caught.end);
+		} else {
+			const adoptServerCatch = hydration?.isRejection(error) === true;
+			switchErrorToCatch(
+				state,
+				error,
+				true,
+				adoptServerCatch && start !== null ? start : undefined,
+				adoptServerCatch && end !== null ? end : undefined,
+			);
+		}
 	} finally {
+		if (caught !== null) hydration!.skipServerCatchSeeds(caught);
 		if (freshBoundary) hydration!.depth--;
 		if (previousNative !== undefined) setNativeAdoptionResolver(previousNative);
 	}
@@ -37480,7 +37603,8 @@ function switchErrorToCatchInner(
 		unmountBlock(previous, !adopting);
 		if (state.parentBlock.disposed || state.block !== null) return;
 	}
-	// A replay that adopts nothing still reads rejection seeds (renderUnframed).
+	// A replay that adopts nothing still reads rejection seeds (a server-caught
+	// try body, or renderUnframed).
 	const rejection = currentHydration?.isRejection(error) === true;
 	const caughtError = rejection ? error.reason : error;
 	state.hasResolved = false;
@@ -37495,7 +37619,7 @@ function switchErrorToCatchInner(
 			if (hydration !== null) {
 				if (hydration.isClose(state.end)) {
 					removeRange(getNextSibling(state.start), state.end);
-					hydration.node = state.end;
+					hydration.rebuiltSlot(state.parentBlock, state.end);
 				}
 				hydration.markFresh(start);
 				hydration.markFresh(end);
@@ -38097,6 +38221,19 @@ function renderInitialSuspenseHydration(state: TrySlot, initial: InitialSuspense
 	}
 }
 
+/**
+ * A boundary arm the server rendered as `@catch` because its try body threw.
+ * `seedEnd` is the stream position past both arms' seeds, set by the replay.
+ */
+interface ServerCatch {
+	marker: Comment;
+	start: Comment;
+	end: Comment;
+	trySeeds: number;
+	catchSeeds: number;
+	seedEnd: number;
+}
+
 function mountTry(state: TrySlot): void {
 	if (state.retrySignalOwners !== undefined) clearSignalRetryOwners(state);
 	cancelSuspenseRetry(state);
@@ -38201,7 +38338,8 @@ function mountTry(state: TrySlot): void {
 		scopedSeeds = null;
 		scopedNativeRaw = undefined;
 	}
-	if (hydration !== null && hydration.isOpen(adoptCursor)) {
+	const caught = hydration?.takeServerCatch(adoptCursor) ?? null;
+	if (caught === null && hydration !== null && hydration.isOpen(adoptCursor)) {
 		// ADOPT the server's inner arm range (no inserted markers — byte-for-byte;
 		// see ifBlock). The seeded use() values let the try body render its success
 		// arm and adopt the server DOM.
@@ -38209,11 +38347,13 @@ function mountTry(state: TrySlot): void {
 		bEnd = hydration.close(bStart);
 		hydration.node = getNextSibling(bStart);
 	} else {
-		scopedSeeds = null;
+		// A server catch arm keeps its seed scope: the replay below reads it, and
+		// a repeated throw adopts the arm with the rest.
+		if (caught === null) scopedSeeds = null;
 		bStart = (STAGED_DOM?.view(document) ?? document).createComment('try-b');
 		bEnd = (STAGED_DOM?.view(document) ?? document).createComment('/try-b');
-		domNode(state.domParent).insertBefore(bStart, state.end);
-		domNode(state.domParent).insertBefore(bEnd, state.end);
+		domNode(state.domParent).insertBefore(bStart, caught?.marker ?? state.end);
+		domNode(state.domParent).insertBefore(bEnd, caught?.marker ?? state.end);
 		if (hydration !== null) {
 			hydration.markFresh(bStart);
 			hydration.markFresh(bEnd);
@@ -38247,36 +38387,53 @@ function mountTry(state: TrySlot): void {
 	// adoption. A live child must not borrow an ancestor's historical data.
 	if (freshBoundary) hydration!.depth++;
 	try {
-		if (hydration !== null) hydration.renderTryBody(b, state.catchBody !== null);
+		if (caught !== null) {
+			hydration!.replayCaughtTry(b, caught);
+			hydration!.settleServerCatch(caught, state, false);
+		} else if (hydration !== null) hydration.renderTryBody(b, state.catchBody !== null);
 		else renderBlock(b);
 		state.hasResolved = true;
 		if (wasPending) recordSuspenseCommit(state);
 	} catch (err) {
 		// §6.3 control signal — bypass the local boundary (see the try-body
 		// re-render catch above); the renderer-region owner handles it.
-		if (isHostContextRequest(err) || isAdoptionControl(err)) throw err;
+		const control = isHostContextRequest(err) || isAdoptionControl(err);
+		if (caught !== null && (control || (isSuspenseException(err) && state.propagateSuspense))) {
+			// Whoever handles this retries hydration against the server's range.
+			state.tryBlock = null;
+			state.block = null;
+			unmountBlock(b);
+			throw err;
+		}
+		if (control) throw err;
 		if (isSuspenseException(err)) {
-			if (state.propagateSuspense) throw err;
-			handleSuspense(state, err.thenable, b);
+			if (caught === null) {
+				if (state.propagateSuspense) throw err;
+				handleSuspense(state, err.thenable, b);
+			} else {
+				// The client body waits where the server's threw. It renders fresh
+				// from here on, so its fallback must not adopt the stale catch arm.
+				hydration!.settleServerCatch(caught, state, false);
+				hydration!.suspend(() => handleSuspense(state, err.thenable, b));
+			}
 		} else {
-			const adoptServerCatch = hydration?.isRejection(err) === true;
+			// The server's catch arm sits beside a replayed body, or, for a seeded
+			// rejection, inside the adopted range this body was rendering.
+			const rejection = caught === null && hydration?.isRejection(err) === true;
+			const catchStart = caught?.start ?? (rejection ? bStart : undefined);
+			const catchEnd = caught?.end ?? (rejection ? bEnd : undefined);
 			if (state.tryBlock) {
-				// A rejection seed means the DOM already contains the server's catch
-				// arm inside this adopted range. Tear down the aborted try render's
-				// bookkeeping while preserving that range for catch-arm adoption.
-				unmountBlock(state.tryBlock, !adoptServerCatch);
+				// Tear down the aborted try render's bookkeeping, preserving a range it
+				// shares with the catch arm for adoption.
+				unmountBlock(state.tryBlock, !rejection);
 				state.tryBlock = null;
 				state.block = null;
 			}
-			switchToCatch(
-				state,
-				err,
-				true,
-				adoptServerCatch ? bStart : undefined,
-				adoptServerCatch ? bEnd : undefined,
-			);
+			if (caught !== null) hydration!.settleServerCatch(caught, state, true);
+			switchToCatch(state, err, true, catchStart, catchEnd);
 		}
 	} finally {
+		if (caught !== null) hydration!.skipServerCatchSeeds(caught);
 		if (freshBoundary) hydration!.depth--;
 		if (previousNative !== undefined) setNativeAdoptionResolver(previousNative);
 		if (hasScopedBoundary) {
@@ -40572,7 +40729,8 @@ function switchToCatchInner(
 	// Preserve the internal wrapper while bubbling through catch-less boundaries,
 	// then expose the original decoded reason only to the boundary that actually
 	// owns a catch arm (including primitive and null rejection reasons). A
-	// replay that adopts nothing still reads rejection seeds (renderUnframed).
+	// replay that adopts nothing still reads rejection seeds (a server-caught try
+	// body, or renderUnframed).
 	const hydrationRejection = currentHydration?.isRejection(err) === true;
 	const caughtError = hydrationRejection ? err.reason : err;
 	setTryBranch(state, 0);
@@ -40593,7 +40751,7 @@ function switchToCatchInner(
 			// that minted fresh markers under hydration owns no server range.
 			if (hydration.isClose(state.end)) {
 				removeRange(getNextSibling(state.start), state.end);
-				hydration.node = state.end;
+				hydration.rebuiltSlot(state.parentBlock, state.end);
 			}
 			// Client-built replacement markers survive root-remainder sweeps.
 			hydration.markFresh(bStart);

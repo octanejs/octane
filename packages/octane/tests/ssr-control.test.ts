@@ -3,6 +3,7 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { compile } from 'octane/compiler';
 import { injectStyle } from '../src/index.js';
+import { TRY_CATCH_COMMENT } from '../src/hydration-markers.js';
 import * as RT from 'octane/server';
 import { prerender } from 'octane/static';
 import { loadCompiledFixtureSource } from './_server-fixture';
@@ -26,6 +27,9 @@ const m = evalServer(readFileSync(join(FIXTURES, 'ssr-control.tsrx'), 'utf8'), '
 
 const OPEN = '<!--[-->';
 const CLOSE = '<!--]-->';
+/** Leads a caught arm, counting the try body's and catch arm's positional seeds. */
+const CAUGHT = (trySeeds: number, catchSeeds: number) =>
+	`<!--${TRY_CATCH_COMMENT}${trySeeds}:${catchSeeds}-->`;
 const FOR_EMPTY_OPEN = '<!--[f0-->';
 const FOR_ITEMS_OPEN = '<!--[f1-->';
 
@@ -145,7 +149,9 @@ describe('SSR Phase 3 — control flow with block markers', () => {
 				},
 			})
 		).html;
-		expect(caught).toBe(`<div>${OPEN}${OPEN}<span class="error">boom</span>${CLOSE}${CLOSE}</div>`);
+		expect(caught).toBe(
+			`<div>${OPEN}${CAUGHT(0, 0)}${OPEN}<span class="error">boom</span>${CLOSE}${CLOSE}</div>`,
+		);
 	});
 
 	it('@catch exposes a callable server reset function', async () => {
@@ -165,7 +171,7 @@ describe('SSR Phase 3 — control flow with block markers', () => {
 		);
 
 		expect((await RT.renderToString(boundary.Boundary)).html).toBe(
-			`${OPEN}${OPEN}<span data-reset="function">boom</span>${CLOSE}${CLOSE}`,
+			`${OPEN}${CAUGHT(0, 0)}${OPEN}<span data-reset="function">boom</span>${CLOSE}${CLOSE}`,
 		);
 	});
 });
