@@ -128,9 +128,10 @@ function inferredDependencyArray(inferred, state, origin) {
 	);
 }
 
-// Match the surgical pass's base-hook and imported-hook slot policy. Local
-// custom helpers keep their authored boundaries. Existing explicit memo slots are
-// already the effective third argument, so no unused fourth argument is added.
+// Match the surgical pass's base-hook and custom-hook slot policy: imported and
+// module-declared custom hooks get a withSlot boundary, other helpers keep their
+// authored call. Existing explicit memo slots are already the effective third
+// argument, so no unused fourth argument is added.
 function slotBaseHooks(ast, state, options) {
 	function visit(node) {
 		if (node === null || typeof node !== 'object') return node;
