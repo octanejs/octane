@@ -125,7 +125,7 @@ type ContextMenuListProps = {
 	className: string | undefined;
 	setFloating: (node: HTMLElement | null) => void;
 	floatingStyles: FloatingStyles;
-	floatingProps: Record<string, unknown>;
+	floatingProps: Record<string, unknown> & { ref?: undefined };
 	items: ContextMenuListItem[];
 };
 

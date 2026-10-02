@@ -10,8 +10,8 @@
 // name" on source that compiles and runs correctly (octanejs/octane#737).
 //
 // The failure is silent — `compileToVolarMappings` reports no error — and it is
-// invisible to CI wherever a package typechecks through `tsgo`, which does not
-// read `.tsrx` at all. This scan is the guard: it is a pure string check over
+// invisible to CI wherever a program typechecks through plain `tsc`, which does
+// not read `.tsrx` at all. This scan is the guard: it is a pure string check over
 // generated identifiers, so it cannot be fooled by a package's tsconfig.
 
 import { readdirSync, readFileSync, statSync } from 'node:fs';
@@ -91,7 +91,7 @@ if (violations.length > 0) {
 		}
 	}
 	console.error(
-		'\nEach one surfaces in editors and `tsrx-tsc` as TS2304 on source that compiles and runs',
+		'\nEach one surfaces in editors and `octane-tsc` as TS2304 on source that compiles and runs',
 	);
 	console.error(
 		'correctly. Fix the lowering that drops the declaration, not the component that trips it.',

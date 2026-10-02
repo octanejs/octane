@@ -34,7 +34,7 @@
     "test:pristine": "pnpm test:upstream",
     "test:upstream": "jest --config tests/upstream-jest.config.cjs --rootDir upstream --runInBand --no-watchman",
     "parity:inventory": "node ../../scripts/react-parity/react-select-runtime-inventory.mjs && node ../../scripts/react-parity/react-select-adaptation.mjs --write",
-    "typecheck": "tsrx-tsc --noEmit -p tsconfig.json && tsrx-tsc --noEmit -p tests/browser/tsconfig.json && tsrx-tsc --noEmit -p tests/upstream/tsconfig.json && tsrx-tsc --noEmit -p typetests/tsconfig.local.json && tsrx-tsc --noEmit -p typetests/tsconfig.compat.json && tsc --noEmit -p typetests/tsconfig.upstream.json",
+    "typecheck": "octane-tsc -p tsconfig.json -p tests/browser/tsconfig.json -p tests/upstream/tsconfig.json -p typetests/tsconfig.local.json -p typetests/tsconfig.compat.json && tsc --noEmit -p typetests/tsconfig.upstream.json",
     "upstream:verify": "node scripts/verify-upstream.mjs",
     "crosswalk:verify": "node scripts/verify-crosswalk.mjs"
   },

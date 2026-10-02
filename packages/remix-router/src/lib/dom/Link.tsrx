@@ -105,7 +105,7 @@ export function Link(props: LinkProps) @{
 	const isSpaLink = !(parsed.isExternal || reloadDocument);
 
 	<a
-		{...rest}
+		{...rest as typeof rest & { ref?: undefined }}
 		href={(isSpaLink ? maskedHref : undefined) || parsed.absoluteURL || href}
 		onClick={isSpaLink ? handleClick : onClick}
 		ref={ref}

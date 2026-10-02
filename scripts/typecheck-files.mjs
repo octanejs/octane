@@ -73,7 +73,7 @@ function isWithin(directory, file) {
 }
 
 function showProject(config) {
-	const result = spawnSync('tsrx-tsc', ['--showConfig', '-p', config], {
+	const result = spawnSync('octane-tsc', ['--showConfig', '-p', config], {
 		encoding: 'utf8',
 	});
 	if (result.error) throw result.error;
@@ -96,7 +96,6 @@ function showProject(config) {
 		config,
 		files,
 		fileSet: new Set(files),
-		checker: files.some((file) => file.endsWith('.tsrx')) ? 'tsrx-tsc' : 'tsgo',
 		incremental: Boolean(shown.compilerOptions?.composite || shown.compilerOptions?.incremental),
 	};
 }
@@ -194,7 +193,6 @@ function runProjects(selectedProjects, workingDirectory) {
 			const roots = [...new Set([...files, ...declarationFiles])].sort();
 			const hasJavaScript = [...files].some((file) => /\.[cm]?jsx?$/.test(file));
 			const hasTsrx = [...files].some((file) => file.endsWith('.tsrx'));
-			const checker = project.checker === 'tsrx-tsc' || hasTsrx ? 'tsrx-tsc' : 'tsgo';
 			const temporaryConfig = path.join(temporaryDirectory, `tsconfig-${index}.json`);
 			writeFileSync(
 				temporaryConfig,
@@ -225,9 +223,9 @@ function runProjects(selectedProjects, workingDirectory) {
 
 			const relativeConfig = path.relative(workingDirectory, project.config) || project.config;
 			console.log(
-				`Typechecking ${files.size} selected file${files.size === 1 ? '' : 's'} from ${relativeConfig} with ${checker}.`,
+				`Typechecking ${files.size} selected file${files.size === 1 ? '' : 's'} from ${relativeConfig}.`,
 			);
-			const result = spawnSync(checker, ['--noEmit', '-p', temporaryConfig], {
+			const result = spawnSync('octane-tsc', ['-p', temporaryConfig], {
 				cwd: workingDirectory,
 				stdio: 'inherit',
 			});

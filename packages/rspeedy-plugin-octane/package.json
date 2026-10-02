@@ -39,7 +39,7 @@
     "demo": "rspeedy dev --root examples/demo",
     "demo:native": "node scripts/run-lynx-explorer-demo.mjs",
     "demo:build": "rspeedy build --root examples/demo",
-    "demo:typecheck": "tsrx-tsc --noEmit -p examples/demo/tsconfig.json",
+    "demo:typecheck": "octane-tsc -p examples/demo/tsconfig.json",
     "demo:check": "pnpm demo:typecheck && pnpm demo:build",
     "test": "vitest run --root ../.. --project rspeedy-plugin",
     "test:compat": "node scripts/compatibility-smoke.mjs"

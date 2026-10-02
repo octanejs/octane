@@ -721,7 +721,7 @@ export type ViewBox = CartesianViewBoxRequired | PolarViewBoxRequired;
 export function adaptEventHandlers(
 	props: unknown,
 	newHandler?: (e: Event) => void,
-): Record<string, (e: Event) => void> | null {
+): (Record<string, (e: Event) => void> & { ref?: undefined }) | null {
 	if (!props || typeof props === 'function' || typeof props === 'boolean') {
 		return null;
 	}

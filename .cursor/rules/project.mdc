@@ -114,8 +114,8 @@ becomes `any`, including the package's own exported components. It is ambient, s
 it ships in the tarball and applies to any program that includes it.
 `pnpm tsrx-decls:check` enforces this.
 
-Typecheck any program containing `.tsrx` with `tsrx-tsc --noEmit`, never plain
-`tsc`. Octane-owned `.tsx` files carry a leading `/** @jsxImportSource octane */`
+Typecheck any program containing `.tsrx` with `octane-tsc -p <tsconfig>`, never
+plain `tsc`. Octane-owned `.tsx` files carry a leading `/** @jsxImportSource octane */`
 pragma. Use `OctaneNode` for renderables, never `React.ReactNode`.
 
 ## Published packages

@@ -47,7 +47,7 @@
     "test:feasibility": "vitest run --root ../.. --project pdf-feasibility --project pdf-feasibility-ssr --project pdf-feasibility-hydration",
     "test:parity": "vitest run --root ../.. --project pdf-parity",
     "test:ssr": "vitest run --root ../.. --project pdf-ssr",
-    "test:types": "tsc --noEmit -p typetests/tsconfig.pristine.json && tsrx-tsc --noEmit -p typetests/tsconfig.adapted.json",
+    "test:types": "tsc --noEmit -p typetests/tsconfig.pristine.json && octane-tsc -p typetests/tsconfig.adapted.json",
     "upstream:verify": "node --test tests/audit/upstream-inventory.test.mjs && node audit/upstream-inventory.mjs",
     "test:pristine": "node ../../scripts/react-parity/pdf-pristine-runtime.mjs"
   },

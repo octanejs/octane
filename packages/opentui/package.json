@@ -48,7 +48,7 @@
   "scripts": {
     "test": "vitest run --root ../.. --project opentui && pnpm test:native",
     "test:native": "NODE_OPTIONS= REACT_PORT_TEST_REPORT_DIR= bun ../../node_modules/vitest/vitest.mjs run --config vitest.native.config.ts",
-    "typecheck": "tsrx-tsc --noEmit"
+    "typecheck": "octane-tsc -p tsconfig.json"
   },
   "peerDependencies": {
     "@opentui/core": ">=0.5.8 <0.6.0",

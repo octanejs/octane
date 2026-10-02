@@ -1,6 +1,7 @@
 packages:
   - packages/*
   - scripts/react-parity/fixtures/*
+  - scripts/octane-tsc
   - benchmarks/news
   - benchmarks/news/*
   - benchmarks/js-framework

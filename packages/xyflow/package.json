@@ -45,7 +45,7 @@
   "scripts": {
     "test": "vitest run --root ../.. --project xyflow --project xyflow-differential",
     "port:upstream": "node ./scripts/port-upstream.mjs",
-    "typecheck": "tsrx-tsc --noEmit -p tsconfig.json"
+    "typecheck": "octane-tsc -p tsconfig.json"
   },
   "dependencies": {
     "@octanejs/zustand": "workspace:*",

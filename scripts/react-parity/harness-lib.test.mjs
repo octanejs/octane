@@ -547,7 +547,6 @@ test('uses Node package entrypoints for every TypeScript compiler', () => {
 	};
 	const entrypoints = {
 		tsc: 'node_modules/typescript/bin/tsc',
-		tsgo: 'node_modules/@typescript/native-preview/bin/tsgo',
 		'tsrx-tsc': 'node_modules/@tsrx/typescript-plugin/dist/tsc.js',
 	};
 
@@ -795,7 +794,7 @@ test('accepts standard TypeScript for plain adapted type suites', () => {
 	assert.doesNotThrow(() => validateManifest(manifest({ lanes: [lane] })));
 });
 
-test('rejects adapted type evidence that bypasses a supported TypeScript compiler', () => {
+test('rejects TypeScript execution through an unsupported compiler', () => {
 	const lane = {
 		...manifest().lanes[0],
 		id: 'adapted-types',
@@ -809,7 +808,7 @@ test('rejects adapted type evidence that bypasses a supported TypeScript compile
 	};
 	assert.throws(
 		() => validateManifest(manifest({ lanes: [lane] })),
-		/adapted-types execution must use tsc or tsrx-tsc/,
+		/adapted-types execution compiler is unsupported/,
 	);
 });
 
@@ -1097,9 +1096,9 @@ test('requires explicit type evidence origins and supported compilers', () => {
 		wrongCompiler.lanes[0].execution.compiler = type === 'pristine-types' ? 'tsrx-tsc' : 'tsgo';
 		assert.throws(
 			() => validateManifest(wrongCompiler),
-			new RegExp(
-				`${type} execution must use ${type === 'pristine-types' ? 'tsc' : 'tsc or tsrx-tsc'}`,
-			),
+			type === 'pristine-types'
+				? /pristine-types execution must use tsc/
+				: /execution compiler is unsupported/,
 		);
 	}
 

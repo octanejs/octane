@@ -272,7 +272,7 @@
     "generate": "node scripts/generate.mjs",
     "generate:check": "node scripts/generate.mjs --check",
     "test": "vitest run --root ../.. --project sanity-icons --project sanity-icons-ssr",
-    "typecheck": "tsgo --noEmit -p tsconfig.json"
+    "typecheck": "octane-tsc -p tsconfig.json"
   },
   "peerDependencies": {
     "octane": "workspace:^0.7.0"

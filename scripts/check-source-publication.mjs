@@ -52,15 +52,7 @@ export const RULES = {
  * Nothing may be added here without the issue that tracks the fix.
  */
 export const SOURCE_PUBLICATION_DEBT = {
-	// These projects still run `tsgo` over a package that ships `.tsrx`, because
-	// the package does not yet compile under `tsrx-tsc` (error counts measured
-	// 2026-08-12 on `pnpm exec tsrx-tsc --noEmit -p <project>`).
-	[RULES.tsgo]: [
-		'packages/dnd-kit/typetests/tsconfig.json', // 4 errors
-		'packages/redux-toolkit/tsconfig.json', // 4 errors
-		'packages/redux-toolkit/typetests/tsconfig.json', // 2 errors
-		'packages/tiptap/typetests/tsconfig.json', // 3 errors
-	],
+	[RULES.tsgo]: [],
 	// These validation projects still hand shipped source the Node globals a
 	// browser application does not have. Dropping `types: ["node"]` is the fix;
 	// where shipped source genuinely reads `process`, the source is the defect.
@@ -177,8 +169,8 @@ export const SOURCE_PUBLICATION_DEBT = {
 	],
 };
 
-const CHECKERS = new Set(['tsgo', 'tsrx-tsc', 'tsc']);
-const TSRX_CHECKER = 'tsrx-tsc';
+const CHECKERS = new Set(['octane-tsc', 'tsgo', 'tsrx-tsc', 'tsc']);
+const TSRX_CHECKERS = new Set(['octane-tsc', 'tsrx-tsc']);
 const JAVASCRIPT_MODULE = /\.[cm]?js$/;
 const TEST_MODULE = /\.(?:test|spec)\.[cm]?js$/;
 const TSCONFIG_FILE = /^tsconfig(?:\..+)?\.json$/;
@@ -211,7 +203,7 @@ function splitCommands(script) {
 /**
  * Walk the root typecheck chain, following `pnpm <script>`,
  * `pnpm --dir <dir> <script>`, and `pnpm --filter <package> <script>` the way
- * pnpm does, and return every `<checker> --noEmit -p <project>` it reaches.
+ * pnpm does, and return every `<checker> -p <project>` it reaches, including each `-p` of one call.
  * A package cannot escape this gate by hiding its project behind a delegation.
  */
 export function collectTypecheckProjects(
@@ -247,13 +239,17 @@ export function collectTypecheckProjects(
 	const runCommand = (directory, command) => {
 		const words = command.split(/\s+/).filter((word) => word !== 'pnpm' && word !== 'exec');
 		const checkerIndex = words.findIndex((word) => CHECKERS.has(word));
-		const projectIndex = words.indexOf('-p');
-		if (checkerIndex !== -1 && projectIndex !== -1 && words[projectIndex + 1]) {
-			const project = path.resolve(directory, words[projectIndex + 1]);
+		const projectArguments = words.flatMap((word, index) =>
+			word === '-p' && words[index + 1] ? [words[index + 1]] : [],
+		);
+		if (checkerIndex !== -1 && projectArguments.length) {
 			const checker = words[checkerIndex];
-			const existing = projects.get(project) ?? new Set();
-			existing.add(checker);
-			projects.set(project, existing);
+			for (const projectArgument of projectArguments) {
+				const project = path.resolve(directory, projectArgument);
+				const existing = projects.get(project) ?? new Set();
+				existing.add(checker);
+				projects.set(project, existing);
+			}
 			return;
 		}
 		if (!command.startsWith('pnpm')) return;
@@ -396,7 +392,11 @@ export function findSourcePublicationViolations(
 		// the chain.
 		for (const project of packageProjects.sort()) {
 			const checkers = projects.get(project);
-			if (publishesTsrx && !checkers.has(TSRX_CHECKER) && !isPinnedUpstreamProject(project, pkg)) {
+			if (
+				publishesTsrx &&
+				![...checkers].some((checker) => TSRX_CHECKERS.has(checker)) &&
+				!isPinnedUpstreamProject(project, pkg)
+			) {
 				violations.push({
 					rule: RULES.tsgo,
 					id: toPosix(path.relative(repo, project)),

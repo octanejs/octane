@@ -1,4 +1,4 @@
-// GENERATED-SHAPED consumer type probe — see scripts/typecheck.mjs.
+// GENERATED-SHAPED consumer type probe, checked through tsconfig.consumer.json.
 //
 // Proves the PUBLISHED subpath surface carries real types. The package
 // tsconfig excludes tests/ and src/ never imports its own subpaths, so

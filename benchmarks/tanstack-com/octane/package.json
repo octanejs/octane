@@ -7,7 +7,7 @@
   "scripts": {
     "dev": "vite dev --port 3000",
     "build": "vite build",
-    "typecheck": "tsrx-tsc --noEmit -p tsconfig.json",
+    "typecheck": "octane-tsc -p tsconfig.json",
     "start": "node .output/server/index.mjs"
   },
   "dependencies": {

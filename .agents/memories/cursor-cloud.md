@@ -11,9 +11,9 @@ These notes apply on a Cursor Cloud VM. Local machines can ignore them.
 - `pnpm test` is the full suite (3,900+ tests, each also rerun through the
   `octane-prod` compiler path) and is very heavy. Prefer targeted runs while
   iterating: `./node_modules/.bin/vitest run <file.test.ts> --reporter=dot`.
-- Typecheck is per-project; the fast native `tsgo` (`@typescript/native-preview`)
-  drives it, e.g. `./node_modules/.bin/tsgo --noEmit -p packages/octane/tsconfig.json`.
-  Programs containing `.tsrx` must use `tsrx-tsc --noEmit`, never plain `tsc`.
+- Typecheck is per-project through `octane-tsc` (TypeScript 7 with the tsrx
+  content mapper), e.g. `./node_modules/.bin/octane-tsc -p packages/octane/tsconfig.json`.
+  Never use plain `tsc` for a program containing `.tsrx`.
 - Run an app in dev with `pnpm --filter <pkg> dev`. `draftboard-example`
   (port 5228) and `octane-playground` are client-only and need no network.
   `hacker-news-example` dev (`node server.mjs tsrx`) fetches the live Hacker News

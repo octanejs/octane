@@ -41,7 +41,7 @@
   },
   "scripts": {
     "test": "vitest run --root ../.. --project tanstack-query --project tanstack-query-adapted --project tanstack-query-adapted-ssr --project tanstack-query-differential --project tanstack-query-ssr",
-    "typecheck": "tsrx-tsc --noEmit -p tsconfig.json",
+    "typecheck": "octane-tsc -p tsconfig.json",
     "upstream:verify": "node ../../scripts/react-parity/verify-provenance.mjs --package-dir ."
   },
   "dependencies": {

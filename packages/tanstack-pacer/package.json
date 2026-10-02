@@ -6,7 +6,7 @@
   "engines": {
     "node": ">=22.22.2"
   },
-  "description": "TanStack Pacer bindings for Octane \u2014 debouncing, throttling, rate limiting, queuing, and batching hooks over the framework-agnostic @tanstack/pacer core.",
+  "description": "TanStack Pacer bindings for Octane — debouncing, throttling, rate limiting, queuing, and batching hooks over the framework-agnostic @tanstack/pacer core.",
   "author": {
     "name": "Dominic Gannaway",
     "email": "dg@domgan.com"
@@ -48,7 +48,7 @@
   },
   "scripts": {
     "test": "vitest run --root ../.. --project tanstack-pacer --project tanstack-pacer-adapted --project tanstack-pacer-differential --project tanstack-pacer-parity-audit",
-    "typecheck": "tsrx-tsc --noEmit && tsrx-tsc --noEmit -p typetests/octane-only/tsconfig.json && tsrx-tsc --noEmit -p tests/types/tsconfig.json",
+    "typecheck": "octane-tsc -p tsconfig.json -p typetests/octane-only/tsconfig.json -p tests/types/tsconfig.json",
     "upstream:verify": "node ../../scripts/react-parity/verify-provenance.mjs --package-dir ."
   },
   "dependencies": {

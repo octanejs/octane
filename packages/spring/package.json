@@ -42,7 +42,7 @@
   "scripts": {
     "test": "pnpm upstream:verify && vitest run --project spring",
     "upstream:verify": "node ../../scripts/react-parity/react-spring-upstream.mjs",
-    "typecheck": "tsrx-tsc --noEmit -p tsconfig.json && tsgo --noEmit -p typetests/tsconfig.json"
+    "typecheck": "octane-tsc -p tsconfig.json -p typetests/tsconfig.json"
   },
   "dependencies": {
     "@react-spring/rafz": "10.1.2"

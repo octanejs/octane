@@ -32,7 +32,7 @@
   },
   "scripts": {
     "test": "vitest run --project tanstack-hotkeys",
-    "typecheck": "tsrx-tsc --noEmit"
+    "typecheck": "octane-tsc -p tsconfig.json"
   },
   "dependencies": {
     "@tanstack/hotkeys": "0.8.0"

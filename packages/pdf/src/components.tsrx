@@ -77,7 +77,10 @@ function renderMessage(value: NodeOrRenderer): unknown {
 	return typeof value === 'function' ? value() : value;
 }
 
-function withEventData(props: Record<string, unknown>, value: unknown): Record<string, unknown> {
+function withEventData(
+	props: Record<string, unknown>,
+	value: unknown,
+): Record<string, unknown> & { ref?: undefined } {
 	return makeEventProps(props as never, () => value) as Record<string, unknown>;
 }
 

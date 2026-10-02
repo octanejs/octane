@@ -34,7 +34,7 @@
   },
   "scripts": {
     "test": "vitest run --root ../.. --project portabletext --project portabletext-ssr",
-    "typecheck": "tsgo --noEmit -p tsconfig.json"
+    "typecheck": "octane-tsc -p tsconfig.json"
   },
   "dependencies": {
     "@portabletext/toolkit": "catalog:default",

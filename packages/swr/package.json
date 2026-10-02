@@ -62,12 +62,12 @@
     "u2:test": "vitest run ./tests/unit ./tests/differential --config ./tests/probes/vitest.config.mjs",
     "u2:types": "tsc -p ./typetests/internal/tsconfig.json",
     "u3:test": "vitest run ./tests/upstream/root ./tests/differential/root.test.ts --config ./tests/probes/vitest.config.mjs",
-    "u3:types": "tsrx-tsc --noEmit -p ./typetests/root/tsconfig.json",
+    "u3:types": "octane-tsc -p typetests/root/tsconfig.json",
     "u4:test": "vitest run ./tests/upstream/specialized ./tests/differential/specialized-exports.test.ts --config ./tests/probes/vitest.config.mjs",
-    "u4:types": "tsrx-tsc --noEmit -p ./typetests/specialized/tsconfig.json",
+    "u4:types": "octane-tsc -p typetests/specialized/tsconfig.json",
     "upstream:verify": "node ./audit/verify-provenance.mjs",
     "u6:adoption": "vitest run ./tests/adoption --config ./tests/probes/vitest.config.mjs",
-    "u6:types": "tsrx-tsc --noEmit -p ./tests/adoption/tsconfig.json"
+    "u6:types": "octane-tsc -p tests/adoption/tsconfig.json"
   },
   "dependencies": {
     "dequal": "^2.0.3"
