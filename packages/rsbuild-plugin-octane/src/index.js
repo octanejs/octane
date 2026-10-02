@@ -136,6 +136,21 @@ function hasRoutes(config) {
 }
 
 /**
+ * The renderer-free islands entry and its shell checks exist only in the Vite
+ * integration so far. Refuse the route option rather than hydrating the shell.
+ * @param {import('@octanejs/app-core').ResolvedOctaneConfig | null} config
+ */
+function assertSupportedHydration(config) {
+	const route = config?.router.routes.find(
+		(candidate) => candidate.type === 'render' && candidate.hydrate === 'islands',
+	);
+	if (route)
+		throw new Error(
+			`[@octanejs/rsbuild-plugin] RenderRoute ${JSON.stringify(route.path)} uses hydrate: 'islands', which this integration does not support yet. Use @octanejs/vite-plugin or remove the option.`,
+		);
+}
+
+/**
  * @param {import('@octanejs/app-core').ResolvedOctaneConfig} config
  * @param {boolean | undefined} strongOverride
  */
@@ -150,6 +165,7 @@ function configSignature(config, strongOverride) {
 						entry: route.entry,
 						layout: route.layout,
 						status: route.status,
+						hydrate: route.hydrate,
 					}
 				: { type: route.type, path: route.path, methods: route.methods },
 		),
@@ -269,6 +285,7 @@ export function pluginOctane(inlineOptions = {}) {
 					})
 				: null;
 			const initialConfig = initialLoaded?.config ?? null;
+			assertSupportedHydration(initialConfig);
 			const strong = inlineOptions.strong ?? initialConfig?.compiler.strong;
 			const appEnabled = hasRoutes(initialConfig);
 			const buildTargetPlan =
@@ -331,6 +348,7 @@ export function pluginOctane(inlineOptions = {}) {
 					throw error;
 				}
 				registerConfigDependencies(context, loaded);
+				assertSupportedHydration(loaded.config);
 				const signature = configSignature(loaded.config, inlineOptions.strong);
 				if (lastConfigSignature && signature !== lastConfigSignature) configNeedsReload = true;
 				lastConfigSignature = signature;

@@ -9,6 +9,7 @@ import { prerender } from 'octane/static';
 import { initializeHydrationEventCapture, interaction } from 'octane/hydration';
 import { loadCompiledFixtureSource, loadServerFixture } from './_server-fixture.js';
 import { collectPipeableStream, collectReadableStream } from './_server-stream.js';
+import { rendererRangeClose } from '../src/stream-protocol.js';
 // CLIENT-compiled fixture (registers click delegation at import).
 import {
 	Boundary,
@@ -27,6 +28,10 @@ import {
 	StyledBoundary,
 } from './_fixtures/ssr-suspense.tsrx';
 import { DeferredWithPermanentStaticStream } from './_fixtures/ssr-permanent-static-stream.tsrx';
+import {
+	BindingListFallbackBoundary,
+	ListFallbackBoundary,
+} from './_fixtures/ssr-stream-list-fallbacks.tsrx';
 import { RawTemplateBoundary } from './conformance/_fixtures/fizz-streaming.tsrx';
 
 // Streaming SSR — renderToPipeableStream / renderToReadableStream: shell with
@@ -49,6 +54,10 @@ const server = serverModule();
 const permanentStaticServer = loadServerFixture<{
 	DeferredWithPermanentStaticStream: typeof DeferredWithPermanentStaticStream;
 }>('packages/octane/tests/_fixtures/ssr-permanent-static-stream.tsrx');
+const listFallbackServer = loadServerFixture<{
+	ListFallbackBoundary: typeof ListFallbackBoundary;
+	BindingListFallbackBoundary: typeof BindingListFallbackBoundary;
+}>('packages/octane/tests/_fixtures/ssr-stream-list-fallbacks.tsrx');
 const rawTemplateServer = loadServerFixture<{
 	RawTemplateBoundary: typeof RawTemplateBoundary;
 }>('packages/octane/tests/conformance/_fixtures/fizz-streaming.tsrx');
@@ -876,6 +885,183 @@ describe('renderToPipeableStream — chunk protocol', () => {
 			.map((node) => node.data);
 		expect(comments).toEqual(['[2', 'oct-seed:counted', ']2']);
 	});
+
+	it('ends a revealed fallback at the boundary close the client range parser finds', async () => {
+		const d = deferred<string>();
+		const c = collector();
+		ServerRT.renderToPipeableStream(server.Boundary, { promise: d.promise }).pipe(c.dest);
+		d.resolve('done');
+		await c.ended;
+		container.innerHTML = c.chunks[0];
+		const runtimeScript = Array.from(container.querySelectorAll('script')).find((script) =>
+			(script.textContent || '').includes('$OCTRC=function'),
+		);
+		// eslint-disable-next-line no-eval
+		(0, eval)(runtimeScript!.textContent || '');
+
+		// Each payload opens the fallback. When the client counts it as a range,
+		// the first close belongs to it and `.after` is still fallback content;
+		// otherwise that close ends the boundary and `.after` follows it. The
+		// inline swap must draw the same line, or hydration adopts a different
+		// boundary than the reveal produced.
+		const payloads = [
+			'f1',
+			'[',
+			'[2',
+			'[f0',
+			'[f1',
+			'[f0;b;v;0',
+			'[f1;b;v;0',
+			'[b;v;root',
+			'[b;v;0;t',
+			'[b;v;0;v',
+			'[b;v;0;s',
+			'[b;v;0;o',
+			'[b;v;0;0',
+			'[b;v;0;12',
+			'[b;v;0;-1',
+			'[b;v;0;y',
+			'[b;v;0;y0',
+			'[b;v;0;y2',
+			'[b;v;0;k;s:"a;b"',
+			'[b;v;0;k;n:1',
+			'[b;v;0;k;s:"\u2028"',
+			'[1',
+			'[02',
+			'[f',
+			'[f2',
+			'[f0;',
+			'[f0;b;v',
+			'[f0;b;v;',
+			'[f0;b;v;0;1',
+			'[b;',
+			'[b;v',
+			'[b;v;0',
+			'[b;v;0;',
+			'[b;;0;t',
+			'[b;v;;t',
+			'[b;v;0;x',
+			'[b;v;0;01',
+			'[b;v;0;-2',
+			'[b;v;0;y3',
+			'[b;v;0;y01',
+			'[b;v;0;k',
+			'[b;v;0;k;s:',
+			'[b;v;0;k;x:1',
+			'[x',
+		];
+		for (const payload of payloads) {
+			container.innerHTML =
+				'<!--[--><template data-oct-b="p"></template><!--' +
+				payload +
+				'--><i class="fallback">loading</i><!--]--><b class="after">after</b><!--]-->' +
+				'<div hidden data-oct-s="p"><span class="ready">ready</span></div>';
+			const clientClose = rendererRangeClose(container.firstChild);
+			const afterInBoundary = clientClose === container.lastChild?.previousSibling;
+
+			(window as any).$OCTRC('p');
+			expect(container.querySelector('.fallback'), payload).toBeNull();
+			expect(container.querySelector('.ready')?.textContent, payload).toBe('ready');
+			expect(container.querySelector('.after') === null, payload).toBe(afterInBoundary);
+		}
+	});
+
+	it.each([
+		['list items', 'ListFallbackBoundary', ListFallbackBoundary, ['a', 'b']],
+		['an @empty list', 'ListFallbackBoundary', ListFallbackBoundary, []],
+		['a binding view list', 'BindingListFallbackBoundary', BindingListFallbackBoundary, ['a']],
+		[
+			'a binding view with several items',
+			'BindingListFallbackBoundary',
+			BindingListFallbackBoundary,
+			['a', 'b', 'c'],
+		],
+	] as const)(
+		'reveals and hydrates a streamed boundary whose fallback renders %s',
+		async (_label, name, Client, items) => {
+			const d = deferred<string>();
+			const c = collector();
+			ServerRT.renderToPipeableStream(listFallbackServer[name], {
+				promise: d.promise,
+				items,
+			}).pipe(c.dest);
+			expect(c.chunks[0]).toContain('list-fallback-tail');
+			d.resolve('rows ready');
+			await c.ended;
+
+			container.innerHTML = c.chunks.join('');
+			activate(container);
+			expect(
+				container.querySelector('.list-fallback-item, .list-fallback-empty, .list-fallback-tail'),
+			).toBeNull();
+			const ready = container.querySelector('.rows-ready');
+			const after = container.querySelector('#list-fallback-after') as HTMLButtonElement;
+			expect(ready?.textContent).toBe('rows ready');
+			expect(container.querySelector('#list-fallback')!.textContent).toBe('rows ready0');
+
+			const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+			const onRecoverableError = vi.fn();
+			const root = hydrateRoot(
+				container,
+				Client as any,
+				{ promise: new Promise<string>(() => {}), items },
+				{ onRecoverableError },
+			);
+			try {
+				flushSync(() => {});
+				expect(container.querySelector('.rows-ready')).toBe(ready);
+				expect(container.querySelector('#list-fallback-after')).toBe(after);
+				expect(errorSpy).not.toHaveBeenCalled();
+				expect(onRecoverableError).not.toHaveBeenCalled();
+				flushSync(() => after.click());
+				expect(container.querySelector('#list-fallback')!.textContent).toBe('rows ready1');
+			} finally {
+				root.unmount();
+				errorSpy.mockRestore();
+			}
+			expect(container.querySelector('#list-fallback')).toBeNull();
+		},
+	);
+
+	it.each([
+		['list items', 'ListFallbackBoundary', ListFallbackBoundary],
+		['a binding view list', 'BindingListFallbackBoundary', BindingListFallbackBoundary],
+	] as const)(
+		'claims a still-pending shell whose fallback renders %s',
+		async (_label, name, Client) => {
+			const items = ['a', 'b'];
+			const d = deferred<string>();
+			const c = collector();
+			ServerRT.renderToPipeableStream(listFallbackServer[name], { promise: d.promise, items }).pipe(
+				c.dest,
+			);
+			container.innerHTML = c.chunks[0];
+			activate(container);
+			const after = container.querySelector('#list-fallback-after') as HTMLButtonElement;
+
+			// Hydrating before the segment arrives takes mountTry's documented
+			// client-render path for the boundary, which reports a structural warning.
+			const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+			const client = deferred<string>();
+			const root = hydrateRoot(container, Client as any, { promise: client.promise, items });
+			try {
+				flushSync(() => {});
+				expect(container.querySelector('template[data-oct-b]')).toBeNull();
+				expect(container.querySelectorAll('.list-fallback-item')).toHaveLength(2);
+				expect(container.querySelectorAll('.list-fallback-tail')).toHaveLength(1);
+				expect(container.querySelector('#list-fallback-after')).toBe(after);
+				flushSync(() => after.click());
+				expect(after.textContent).toBe('1');
+
+				await act(() => client.resolve('client rows'));
+				expect(container.querySelector('#list-fallback')!.textContent).toBe('client rows1');
+				expect(container.querySelector('#list-fallback-after')).toBe(after);
+			} finally {
+				root.unmount();
+				errorSpy.mockRestore();
+			}
+		},
+	);
 
 	it('streams independent sibling boundaries as separate segments', async () => {
 		const a = deferred<string>();

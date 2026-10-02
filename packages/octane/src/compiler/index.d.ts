@@ -205,6 +205,10 @@ export interface CompileInspection {
 		ast: unknown;
 		html: string;
 		raw?: string;
+		/** Client templates: the namespace flag passed to `template()`. */
+		ns?: number;
+		/** Client templates: a raw multi-root template's root count, else 0. */
+		frag?: number;
 		origins: {
 			start: number;
 			end: number;

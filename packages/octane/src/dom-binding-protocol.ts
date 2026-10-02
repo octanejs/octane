@@ -55,7 +55,7 @@ export function decodeBindingKey(encoded: string): BindingKey {
 export interface BindingMarker {
 	id: string;
 	site: string;
-	kind: 'root' | 'if' | 'for' | 'item' | 'text' | 'view' | 'slot' | 'opaque';
+	kind: 'root' | 'if' | 'for' | 'item' | 'text' | 'view' | 'slot' | 'opaque' | 'try';
 	arm?: number;
 	key?: string;
 }
@@ -85,6 +85,11 @@ export function parseBindingMarker(data: string): BindingMarker | null {
 	if (kind === 'v') return { id, site, kind: 'view' };
 	if (kind === 's') return { id, site, kind: 'slot' };
 	if (kind === 'o') return { id, site, kind: 'opaque' };
+	// `@try` records the arm the server rendered: content, `@pending` or `@catch`.
+	// A bare `y` is a client-constructed region that has not selected an arm yet.
+	if (kind === 'y') return { id, site, kind: 'try', arm: -1 };
+	if (kind.length === 2 && kind[0] === 'y' && kind[1]! >= '0' && kind[1]! <= '2')
+		return { id, site, kind: 'try', arm: kind.charCodeAt(1) - 48 };
 	if (kind.startsWith('k;')) {
 		const key = kind.slice(2);
 		try {
@@ -101,6 +106,17 @@ export function parseBindingMarker(data: string): BindingMarker | null {
 	return null;
 }
 
+/**
+ * `isBindingOpenComment` as regular-expression source over the payload after
+ * its leading `[`. The inline stream swap runtime is script text and cannot
+ * call this module, so it embeds the source to balance binding ranges in a
+ * streamed fallback; a stream test holds both spellings of the grammar equal.
+ * `[^]` rather than `.` keeps line separators inside an encoded string key, and
+ * the groups capture because a non-capturing group costs every streamed page.
+ */
+export const BINDING_OPEN_TAIL_SOURCE =
+	'f[01];b;[^;]+;[^;]+|b;[^;]+;(root|[^;]+;([tvso\\d]|-1|[1-9]\\d+|y[012]?|k;[sn]:[^]+))';
+
 export function isBindingOpenComment(data: string): boolean {
 	// The general hydration/early-stream path only counts balanced ranges. Keep
 	// exact receipt decoding, key validation, and allocations in adoption itself.
@@ -116,6 +132,9 @@ export function isBindingOpenComment(data: string): boolean {
 	const siteEnd = data.indexOf(';', idEnd + 1);
 	if (siteEnd <= idEnd + 1 || siteEnd === data.length - 1) return false;
 	const tail = siteEnd + 1;
+	// A `@try` range records its arm: `y0` content, `y1` pending, `y2` catch. A
+	// client template's bare `y` has not selected one yet.
+	if (data[tail] === 'y') return /^y[012]?$/.test(data.slice(tail));
 	if (data.length === tail + 1) {
 		const code = data.charCodeAt(tail);
 		return (

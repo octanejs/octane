@@ -277,6 +277,15 @@ resolves to either one at render time makes server rendering throw. Use
 Activation adopts the matching server DOM in template and JSX-returning
 components, preserving edits made to uncontrolled inputs before activation.
 
+When an independent boundary's only child is a prop-less component imported
+from a project `.tsrx` module, and that component is a zero-argument
+`'use dom bindings'` view, the island activates through the view's binding
+program without loading the renderer. Selection is automatic: the island asks
+the view's own module, which forwards to the ordinary renderer activator for any
+other component. Captured interactions replay once the program has adopted the
+server DOM. Delegated handlers run without restoring a custom signal owner, so
+keep the view's state in module or document signals.
+
 #### Replaceable selections versus commands
 
 Independent widgets normally preserve every captured interaction in order. A
@@ -527,6 +536,10 @@ publishes synchronously, including when the enclosing signal batch has not yet
 delivered subscriptions. Use it before a native operation such as
 `form.requestSubmit()` that immediately depends on updated button properties.
 
+A view that reads only module-scope signal handles may declare no props
+parameter, as in `export function Counter() @{ 'use dom bindings'; … }`.
+Activation still takes a `BindingSource`; its snapshot is unused.
+
 The compiler selects a separate binding artifact; authors keep normal typed
 component imports. Do not import generated query modules by hand. A direct call
 from an uncompiled plain `.ts` file throws; import a compiled activation function
@@ -544,34 +557,63 @@ reading ambient state inside a projection. Snapshots must be synchronous values,
 never promises or other thenables.
 
 Pass an imported signal handle directly to a supported binding, for example
-`<span>{count$ as number}</span>`, to keep its subscription. Sampling it with
-`count$.get()` would produce a value that has no `BindingSource` notification.
-Selected binding artifacts diagnose actual native reads in eager imported `.get()`
-calls during activation or source publication, including computed/optional calls
-and pure setup aliases with an imported receiver. The check observes the canonical
-native-read protocol;
-ordinary imported `.get()` methods remain pure projections and are not subscribed.
-Normal SSR reads remain valid. A deliberate sample should enter through the source
-snapshot: `props.count.get()` continues to update only when that source publishes.
-Receiver aliases mixing props and imports, receiver expressions containing props
-samples, and optional chains combining imported reads with props samples retain
-their conservative sampling behavior; use direct handles or explicit source
-snapshots until subscribed projection lowering supports
-those shapes. Direct `.latest(fallback)` calls remain unsupported compiler
-diagnostics rather than implicitly subscribed reads.
+`<span>{count$ as number}</span>`, to bind it without preparing the view again.
+A view may also read an imported handle with `count$.get()` or
+`count$.latest(fallback)`, including through computed or optional calls and
+setup or block declarations. Such a view always compiles to a program, which
+subscribes to every source its projections, branch tests, list items and
+declarations read, and prepares again when one changes. Event handlers and
+effects sample at the time they run; they never subscribe. A deliberate sample
+should enter through the source snapshot: `props.count.get()` still updates only
+when that source publishes, and `.latest()` on a props value remains a compiler
+diagnostic. Receiver aliases mixing props and imports, receiver expressions
+containing props samples, and optional chains combining imported reads with props
+samples keep their conservative sampling behavior. A fixed scalar view, and an
+imported read evaluated while its module loads, has no preparation to subscribe
+from, so an actual native read there is still the activation diagnostic.
 
-Known native attribute projections already own their read subscriptions and keep
-that behavior, including imported `.get()` reads inside the computation. Setup
-values sampled before that computation still need a direct handle or an explicit
-source snapshot. Deferred provider configuration callbacks retain their provider
-contract; their opaque invocation is outside this eager-accessor diagnostic.
+A read of a pending async value suspends the preparation. Outside `@try`, the
+program keeps its last DOM, like a suspended root keeping its server markup, and
+prepares again when a source it reached changes. A failure before the first
+commit throws from activation; a later one is reported through `reportError`
+while the last DOM stays live. Retiring the signals' owner, as a document does
+when the page is left, ends the program quietly with its last DOM.
+
+Known native attribute projections own their read subscriptions and keep that
+behavior, including imported `.get()` reads inside the computation. Deferred
+provider configuration callbacks retain their provider contract.
+
+`@try`/`@pending`/`@catch` work in binding programs exactly as in the renderer.
+A thenable thrown while preparing the body selects `@pending`, and the body is
+attempted again on the next preparation. Any other error selects `@catch`, which
+stays selected until its `reset` runs; `reset` is deferred, so
+`retry(); reset();` and the reverse both retry after the retry's writes.
+Activation adopts whichever arm the server rendered, including a streamed
+boundary whose segment has already arrived. A boundary still streaming at
+activation is claimed, exactly as the renderer claims it, so its late segment
+cannot replace live DOM. `finally` and destructured `@catch` parameters are
+compiler diagnostics.
+
+A block may declare `const` aliases before its output, as in
+`@try { const frame = history$.get(); <ul>…</ul> }`. They run once per
+preparation, in order, and every projection, region and handler of that block
+sees the same values.
+
+A view's setup may also declare mount-only effects:
+`useLayoutEffect(callback, [])` or `useEffect(callback, [])`, imported from
+`octane`, with an explicit empty array. They run once, children before parents,
+after the commit that adopts or inserts the view and installs its handlers, under
+the program's signal owner. A returned function runs when the view leaves, for
+example when its branch is no longer selected, or when the program is disposed.
+Other hooks remain diagnostics; keep instance state in signals.
 
 Pure projections also accept the canonical `isSignalHandle` import from `octane/signals` and unshadowed `String` and `Math.min` calls. Local `const` event and ref callbacks may be named or aliased in setup; their bodies execute as native adapters, not while preparing presentation values. They cannot be used as eager projections. Named refs preserve dependency-based attachment, but a ref that captures another local callback is unsupported. An explicit component `ref` may forward a ref supplied through props; this does not authorize arbitrary component-prop spreads.
 
 Compiler-proven presentation supports native HTML/SVG, text, native events and
-refs, direct signal bindings, conditions, keyed lists, and supported pure child
-composition. Hooks, arbitrary component logic, unsupported spreads, and raw
-HTML produce a diagnostic, not a renderer fallback. Structural programs own
+refs, direct signal bindings, subscribed imported reads, conditions, keyed lists,
+`@try` regions, mount-only effects, and supported pure child composition. Other
+hooks, arbitrary component logic, unsupported spreads, and raw HTML produce a
+diagnostic, not a renderer fallback. Structural programs own
 only their declared regions; fixed programs update properties without replacing
 nodes.
 

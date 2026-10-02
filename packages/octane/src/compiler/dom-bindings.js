@@ -21,8 +21,10 @@ import { fixedBindingProps } from './dom-binding-fixed-props.js';
 import { needsBindingProgram, planBindingProgram } from './dom-binding-program.js';
 import {
 	parseDomBindingRequest,
+	formatDomBindingRequest,
 	DOM_BINDINGS_QUERY,
 	DOM_BINDINGS_MOUNT_QUERY,
+	HYDRATE_ISLAND_RENDERER_QUERY,
 } from './dom-binding-request.js';
 
 export { DOM_BINDINGS_QUERY, DOM_BINDINGS_MOUNT_QUERY } from './dom-binding-request.js';
@@ -341,6 +343,44 @@ function importedReadReceiver(input, imports, lexical, parameterScope, seen = ne
 	);
 }
 
+/** `get()` or `latest(fallback)` on a member receiver; other calls are not signal reads. */
+function signalReadName(node) {
+	const callee = unwrap(node?.callee);
+	if (
+		(node?.type !== 'CallExpression' && node?.type !== 'OptionalCallExpression') ||
+		!['MemberExpression', 'OptionalMemberExpression'].includes(callee?.type) ||
+		node.arguments.some((argument) => argument.type === 'SpreadElement')
+	)
+		return null;
+	const name = callee.computed ? callee.property?.value : callee.property?.name;
+	return (name === 'get' && node.arguments.length === 0) ||
+		(name === 'latest' && node.arguments.length <= 1)
+		? name
+		: null;
+}
+
+/**
+ * `useLayoutEffect(callback, [])` or `useEffect(callback, [])` in a binding
+ * view's setup. The explicit empty array is required: an omitted array would
+ * be inferred, and a non-empty one would ask for updates a binding never runs.
+ */
+function isMountEffectShape(statement) {
+	const call = statement?.type === 'ExpressionStatement' ? unwrap(statement.expression) : null;
+	const callee = unwrap(call?.callee);
+	return (
+		call?.type === 'CallExpression' &&
+		!call.optional &&
+		callee?.type === 'Identifier' &&
+		(callee.name === 'useLayoutEffect' || callee.name === 'useEffect') &&
+		call.arguments.length === 2 &&
+		['ArrowFunctionExpression', 'FunctionExpression'].includes(unwrap(call.arguments[0])?.type) &&
+		!unwrap(call.arguments[0]).async &&
+		!unwrap(call.arguments[0]).generator &&
+		unwrap(call.arguments[1])?.type === 'ArrayExpression' &&
+		unwrap(call.arguments[1]).elements.length === 0
+	);
+}
+
 // Fixed-prop folding copies calls while retaining their authored source ranges.
 function bindingReadOrigin(node) {
 	return node.start == null || node.end == null ? node : `${node.type}:${node.start}:${node.end}`;
@@ -444,10 +484,11 @@ function assertProjection(
 	};
 	const readMethod = (node) => {
 		const callee = unwrap(node?.callee);
+		const read = signalReadName(node);
 		const sampled =
-			(node?.type === 'CallExpression' || node?.type === 'OptionalCallExpression') &&
-			node.arguments.length === 0 &&
-			(callee?.computed ? callee.property?.value === 'get' : callee?.property?.name === 'get');
+			read === 'get' ||
+			// A latest read is subscribed, so only an imported handle may supply it.
+			(read === 'latest' && importedReadReceiver(callee.object, imports, lexical, parameterScope));
 		if (
 			!['MemberExpression', 'OptionalMemberExpression'].includes(callee?.type) ||
 			(!sampled &&
@@ -534,11 +575,8 @@ function assertProjection(
 				importedProjectionCall(node, imports, lexical, parameterScope) ||
 				factoryProjection(callee)
 			) {
-				if (
-					node.arguments.length === 0 &&
-					['MemberExpression', 'OptionalMemberExpression'].includes(callee?.type) &&
-					(callee.computed ? callee.property?.value : callee.property?.name) === 'get'
-				) {
+				const read = signalReadName(node);
+				if (read !== null) {
 					const reads = importedReadReceiver(callee.object, imports, lexical, parameterScope)
 						? lexical.domBindingImportedReads
 						: lexical.domBindingSourceSamples;
@@ -601,24 +639,28 @@ function bindingRender(fn, filename, required = true) {
 	if (
 		!setup.every(
 			(statement) =>
-				statement.type === 'VariableDeclaration' &&
-				statement.kind === 'const' &&
-				statement.declarations.every((decl) => decl.id.type === 'Identifier' && decl.init),
+				isMountEffectShape(statement) ||
+				(statement.type === 'VariableDeclaration' &&
+					statement.kind === 'const' &&
+					statement.declarations.every((decl) => decl.id.type === 'Identifier' && decl.init)),
 		)
 	)
-		error(filename, fn, 'binding setup supports only pure const aliases before its output');
+		error(
+			filename,
+			fn,
+			'binding setup supports only pure const aliases and mount-only effects before its output',
+		);
 	if (
 		!render ||
 		fn.async ||
 		fn.generator ||
 		fn.params.length > 1 ||
-		(required && fn.params.length !== 1) ||
 		(fn.params.length === 1 && !['Identifier', 'ObjectPattern'].includes(fn.params[0].type))
 	) {
 		error(
 			filename,
 			fn,
-			'a binding view needs an ordinary props parameter and one template output, without early returns',
+			'a binding view takes at most one ordinary props parameter and needs one template output, without early returns',
 		);
 	}
 	bindingParameterNames(fn.params[0], filename);
@@ -1562,6 +1604,8 @@ function projectProgram(ast, plan, filename, lexical) {
 		const hostCapability = plan.hostOperations ? allocate('_bindingHostOperations') : null;
 		const initialCapability = plan.initialOperations ? allocate('_bindingInitialOperations') : null;
 		const listCapability = plan.lists ? allocate('_bindingList') : null;
+		const tryCapability = plan.tries ? allocate('_bindingTry') : null;
+		const effectsCapability = plan.mounts ? allocate('_bindingEffects') : null;
 		const projectionFactory = plan.projectionsEnabled ? allocate('_bindingProjections') : null;
 		// Imported child artifacts carry their optional capabilities. Forward a
 		// factory rather than loading every capability for every parent view.
@@ -1668,6 +1712,8 @@ function projectProgram(ast, plan, filename, lexical) {
 							['__adoptLeanBindingProgram', adopt],
 							['__mountLeanBindingProgram', mount],
 							...(listCapability ? [['__bindingList', listCapability]] : []),
+							...(tryCapability ? [['__bindingTry', tryCapability]] : []),
+							...(effectsCapability ? [['__bindingEffects', effectsCapability]] : []),
 							...(hostCapability ? [['__bindingProgramHostOperations', hostCapability]] : []),
 							...(initialCapability ? [['__bindingProgramInitializers', initialCapability]] : []),
 						],
@@ -1704,9 +1750,12 @@ function projectProgram(ast, plan, filename, lexical) {
 							...(scalar ? [b.prop('init', b.id('scalar'), scalar)] : []),
 							...(adoptScalar ? [b.prop('init', b.id('adoptScalar'), b.id(adoptScalar))] : []),
 							...capability('connectStyle', styleFactory),
+							...capability('trackReads', null),
 							...capability('connectProjection', projectionFactory),
 							...capability('createControls', controlFactory),
 							...capability('list', listCapability),
+							...capability('tryRegions', tryCapability),
+							...capability('effects', effectsCapability),
 							...capability('hostOperations', hostCapability),
 							...capability('initialOperations', initialCapability),
 							...(signalFactory
@@ -1819,10 +1868,21 @@ function projectProgram(ast, plan, filename, lexical) {
 	};
 }
 
-function checkImportedBindingReads(artifact, lexical) {
+function checkImportedBindingReads(artifact, lexical, program) {
 	const replacements = new Map();
-	const helper = lexical.domBindingAllocateName('_bindingSnapshot');
-	const check = (node) => inheritHookMemoOrigin(b.call(b.id(helper), b.arrow([], node)), node);
+	const helpers = new Map();
+	// A program subscribes to the sources its projections read. A fixed scalar
+	// adopter has no read capability, and a read evaluated while the module loads
+	// runs outside any preparation, so both keep the activation diagnostic.
+	const check = (node, tracked) => {
+		const imported = tracked ? '__trackBindingRead' : '__assertBindingSnapshot';
+		if (!helpers.has(imported))
+			helpers.set(
+				imported,
+				lexical.domBindingAllocateName(tracked ? '_bindingRead' : '_bindingSnapshot'),
+			);
+		return inheritHookMemoOrigin(b.call(b.id(helpers.get(imported)), b.arrow([], node)), node);
+	};
 	const hasSourceSample = (node) => {
 		let sampled = false;
 		walk(node, (child) => {
@@ -1830,36 +1890,70 @@ function checkImportedBindingReads(artifact, lexical) {
 		});
 		return sampled;
 	};
-	walk(artifact, (node) => {
-		if (lexical.domBindingReadExclusions.has(node)) return false;
+	const visit = (node, deferred) => {
+		if (!node || typeof node !== 'object') return;
+		if (Array.isArray(node)) {
+			for (const child of node) visit(child, deferred);
+			return;
+		}
+		if (typeof node.type !== 'string' || lexical.domBindingReadExclusions.has(node)) return;
+		let importedRead = false;
 		if (node.type === 'ChainExpression') {
-			let importedRead = false;
 			walk(node, (child) => {
 				if (lexical.domBindingImportedReads.has(bindingReadOrigin(child))) importedRead = true;
 			});
-			if (importedRead) {
-				// A mixed chain has no separate optional-call boundary at which to
-				// check imports while preserving deliberate source sampling.
-				if (hasSourceSample(node)) return false;
-				// Preserve the authored chain's complete optional short circuit.
-				replacements.set(node, check(node));
-				return false;
-			}
+		} else importedRead = lexical.domBindingImportedReads.has(bindingReadOrigin(node));
+		if (importedRead) {
+			// A mixed chain has no separate optional-call boundary at which to
+			// check imports while preserving deliberate source sampling. A chain is
+			// otherwise checked whole to preserve its optional short circuit.
+			if (!hasSourceSample(node)) replacements.set(node, check(node, program && deferred));
+			return;
 		}
-		if (lexical.domBindingImportedReads.has(bindingReadOrigin(node))) {
-			if (hasSourceSample(node)) return false;
-			replacements.set(node, check(node));
-			return false;
-		}
-	});
+		const callable = [
+			'ArrowFunctionExpression',
+			'FunctionExpression',
+			'FunctionDeclaration',
+		].includes(node.type);
+		for (const [key, child] of Object.entries(node))
+			if (!SKIP.has(key)) visit(child, deferred || callable);
+	};
+	visit(artifact.body, false);
 	if (replacements.size === 0) return artifact;
-	const checked = mapCow(artifact, replacements);
+	const origin = replacements.keys().next().value;
+	let checked = mapCow(artifact, replacements);
+	let tracker = null;
+	if (helpers.has('__trackBindingRead')) {
+		tracker = lexical.domBindingAllocateName('_bindingReads');
+		// The export is this module's program descriptor; its own capability
+		// replaces any forwarded from imported child programs.
+		const exported = checked.body.find((node) => node.type === 'ExportDefaultDeclaration');
+		const descriptor = exported.declaration;
+		checked = mapCow(
+			checked,
+			new Map([
+				[
+					descriptor,
+					{
+						...descriptor,
+						properties: [
+							...descriptor.properties.filter((property) => property.key?.name !== 'trackReads'),
+							inheritHookMemoOrigin(b.prop('init', b.id('trackReads'), b.id(tracker)), origin),
+						],
+					},
+				],
+			]),
+		);
+	}
 	return {
 		...checked,
 		body: [
 			inheritHookMemoOrigin(
-				b.imports([['__assertBindingSnapshot', helper]], 'octane/dom-binding-signals'),
-				replacements.keys().next().value,
+				b.imports(
+					[...helpers, ...(tracker ? [['__createBindingReads', tracker]] : [])],
+					'octane/dom-binding-signals',
+				),
+				origin,
 			),
 			...checked.body,
 		],
@@ -2031,8 +2125,84 @@ function lowerAdoptions(ast, filename) {
 	return { ...lowered, body: [...added, ...lowered.body] };
 }
 
+/** A module specifier for `to`, resolved from the module at `from`. */
+function relativeModuleRequest(from, to) {
+	const fromDirectory = from.replace(/\\/g, '/').split('/').slice(0, -1);
+	const target = to.replace(/\\/g, '/').split('/');
+	let shared = 0;
+	while (
+		shared < fromDirectory.length &&
+		shared < target.length - 1 &&
+		fromDirectory[shared] === target[shared]
+	)
+		shared++;
+	const up = fromDirectory.length - shared;
+	return (up === 0 ? './' : '../'.repeat(up)) + target.slice(shared).join('/');
+}
+
+/**
+ * Answer an independent island's activator request. Only this module can prove
+ * that its export is a zero-argument binding view, which activates without the
+ * renderer; any other export forwards to the host's renderer island module.
+ */
+function bindingIslandModule(ast, filename, island) {
+	const view = ast.body.find(
+		(statement) =>
+			statement.type === 'ExportNamedDeclaration' &&
+			statement.declaration?.type === 'FunctionDeclaration' &&
+			statement.declaration.id?.name === island.exportName,
+	)?.declaration;
+	const origin = view ?? ast.body[0] ?? ast;
+	const self = './' + filename.replace(/\\/g, '/').split('/').pop();
+	if (view && view.params.length === 0 && statements(view).some(isDirective)) {
+		return {
+			...ast,
+			body: [
+				inheritHookMemoOrigin(
+					b.imports(
+						[['default', '_$bindingIslandView']],
+						formatDomBindingRequest(self, { exportName: island.exportName }),
+					),
+					origin,
+				),
+				inheritHookMemoOrigin(
+					b.imports(
+						[['__createBindingIslandActivator', '_$createBindingIslandActivator']],
+						'octane/dom-binding-island',
+					),
+					origin,
+				),
+				inheritHookMemoOrigin(
+					b.export_default(
+						b.call(b.id('_$createBindingIslandActivator'), b.id('_$bindingIslandView')),
+					),
+					origin,
+				),
+			],
+		};
+	}
+	return {
+		...ast,
+		body: [
+			inheritHookMemoOrigin(
+				b.export(
+					null,
+					[b.export_specifier('default')],
+					[],
+					'value',
+					b.literal(
+						`${relativeModuleRequest(filename, island.host)}?octane-hydrate=${encodeURIComponent(island.boundary)}&${HYDRATE_ISLAND_RENDERER_QUERY}=1`,
+					),
+				),
+				origin,
+			),
+		],
+	};
+}
+
 /** Annotate normal SSR/client output, or select a pure adoption descriptor Program. */
 export function prepareDomBindings(ast, source, filename, selectedExport, helpers) {
+	if (helpers.island) return bindingIslandModule(ast, filename, helpers.island);
 	if (
 		helpers.fixedPropNames !== null &&
 		helpers.fixedPropNames !== undefined &&
@@ -2090,6 +2260,25 @@ export function prepareDomBindings(ast, source, filename, selectedExport, helper
 					?.get(node.name)
 			: null;
 	lexical.domBindingLocalDeclaration = localDeclaration;
+	const readsImportedSignal = (fn) => {
+		const scope = lexical.nodeScopes.get(fn.body) ?? lexical.rootScope;
+		let found = false;
+		walk(fn.body, (node) => {
+			if (found || isMountEffectShape(node)) return false;
+			// Native adapters sample at delivery; they never subscribe.
+			if (
+				(node.type === 'JSXAttribute' || node.type === 'Attribute') &&
+				/^(?:ref|on[A-Z].*)$/.test(attrName(node) ?? '')
+			)
+				return false;
+			if (
+				signalReadName(node) !== null &&
+				importedReadReceiver(unwrap(node.callee).object, imports, lexical, scope)
+			)
+				found = true;
+		});
+		return found;
+	};
 	const callbackFor = (expression) => {
 		let value = unwrap(expression);
 		const seen = new Set();
@@ -2166,6 +2355,24 @@ export function prepareDomBindings(ast, source, filename, selectedExport, helper
 			]),
 		);
 		const fixed = fixedBindingProps(fn, fixedProps, lexical, localDeclaration, isRuntimeReference);
+		const effects = statements(fn)
+			.filter(isMountEffectShape)
+			.map((statement) => {
+				const call = unwrap(statement.expression);
+				const hook = imports.get(call.callee.name);
+				if (
+					hook?.source !== 'octane' ||
+					hook.imported !== call.callee.name ||
+					lexical.resolveBinding(lexical.nodeScopes.get(call.callee), call.callee.name)?.scope !==
+						lexical.rootScope
+				)
+					error(
+						filename,
+						call,
+						`binding effects must call ${call.callee.name} imported from 'octane'`,
+					);
+				return call.arguments[0];
+			});
 		const projectionBody = (value, expressions, temporaries = []) => {
 			value = fixed.fold(value);
 			const required = new Set();
@@ -2212,6 +2419,7 @@ export function prepareDomBindings(ast, source, filename, selectedExport, helper
 			allocateProgramName,
 			projectionBody,
 			annotationsOnly,
+			effects,
 			fixed,
 			fixedChildProps,
 			restSites: rest.sites,
@@ -2426,7 +2634,11 @@ export function prepareDomBindings(ast, source, filename, selectedExport, helper
 		const structural =
 			node.params[0]?.type === 'ObjectPattern' ||
 			needsBindingProgram(render, isUnbound) ||
-			statements(node).some((statement) => statement.type === 'VariableDeclaration');
+			statements(node).some(
+				(statement) => statement.type === 'VariableDeclaration' || isMountEffectShape(statement),
+			) ||
+			// Only a program subscribes to the imported signals its projections read.
+			readsImportedSignal(node);
 		if (structural || (helpers.mount && selectedExport === node.id.name)) {
 			const plan = programFor(
 				node,
@@ -2510,7 +2722,11 @@ export function prepareDomBindings(ast, source, filename, selectedExport, helper
 				imports,
 			),
 		);
-		return checkImportedBindingReads(projectProgram(ast, plan, filename, lexical), lexical);
+		return checkImportedBindingReads(
+			projectProgram(ast, plan, filename, lexical),
+			lexical,
+			Boolean(plan.root),
+		);
 	}
 	if (helpers.collectConstants) {
 		const names = new Set();

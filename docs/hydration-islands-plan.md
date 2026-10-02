@@ -1,10 +1,12 @@
 # Static shells and independently hydrated islands
 
-Status: independent and deferred hydration are implemented; islands-only route
-modes and automatic shell removal remain proposed. Updated against `main @ c988ad10a` on 2026-09-18, after [#1069](https://github.com/octanejs/octane/pull/1069).
+Status: independent and deferred hydration, renderer-free island activation, and
+an explicit islands-only route mode for the Vite integration are implemented;
+automatic shell removal remains proposed. Updated against `main @ c988ad10a` on 2026-09-18, after [#1069](https://github.com/octanejs/octane/pull/1069).
 [Issue #1118](https://github.com/octanejs/octane/issues/1118) tracks the remaining
-client-JavaScript reduction work. The public API is documented in
-[deferred hydration](./deferred-hydration.md).
+client-JavaScript reduction work, and [issue #1514](https://github.com/octanejs/octane/issues/1514)
+tracks renderer-free island activation ([progress](#renderer-free-island-activation-1514)).
+The public API is documented in [deferred hydration](./deferred-hydration.md).
 
 ## Implemented baseline
 
@@ -13,9 +15,9 @@ client-JavaScript reduction work. The public API is documented in
 | Ordinary split `<Hydrate>` | [Compiler extraction](../packages/octane/src/compiler/hydrate-boundaries.js) creates reproducible child entries and can move exclusively owned private declarations into them. | Activation remains parent-first. Its live client capture array can contain callbacks, refs, promises, or DOM nodes; it is not a server serializer. |
 | `<Hydrate independent>` | Compiler-proven standalone entries, [per-instance JSON sidecars](../packages/octane/src/independent-hydration-protocol.ts), deterministic ID namespaces, boundary-local seeds, signal identities, and stylesheet URLs. Vite and Rspack emit matching build manifests. | Requires splitting and supported captures. Parent-owned lifecycle values and unsupported initializers fail compilation; request-time data must pass the codec. |
 | Independent-island bootstrap | [Sidecar discovery](../packages/octane/src/hydration/independent-island.ts), incremental/streamed registration, early native intent capture, stylesheet loading before activation, replay, and pause/resume/disposal. | Captured interactions drive pre-root activation; ordinary visibility, idle, media, and custom strategy drivers are absent. The generated activator in [the client runtime](../packages/octane/src/runtime.ts) still calls `hydrateRoot` and loads the renderer. |
-| Compiled DOM bindings | [Renderer-free presentation](./deferred-hydration.md#compiled-presentation-on-existing-dom), including supported structural views, direct signal bindings, controls, events, and cleanup. | Opted in through `'use dom bindings'` and activated by explicit host calls. Independent Hydrate does not automatically select this tier. |
+| Compiled DOM bindings | [Renderer-free presentation](./deferred-hydration.md#compiled-presentation-on-existing-dom), including supported structural views, direct and subscribed signal reads, `@try`, mount-only effects, controls, events, and cleanup. | Opted in through `'use dom bindings'`. Independent Hydrate selects this tier automatically for a prop-less imported zero-argument view. |
 | Permanent-static Hydrate | The exact `<Hydrate split={false} when={never()}>` form erases its client subtree and exclusively owned private declarations, preserves its server range, and reserves skipped IDs. | A static leaf in the hydration ownership tree: ordinary nested boundaries become inert, and an independent descendant fails with `OCTANE_HYDRATE_INDEPENDENT_STATIC_PARENT`. |
-| App bootstrap | [The generated client entry](../packages/app-core/src/codegen.js) registers independent islands before loading the route, layout, and configured root boundaries. | It still imports the route module and calls `hydrateRoot` for the complete composed root. There is no islands-only route mode. |
+| App bootstrap | [The generated client entry](../packages/app-core/src/codegen.js) registers independent islands before loading the route, layout, and configured root boundaries. A `hydrate: 'islands'` route boots from a second, renderer-free entry instead. | The full entry still imports the route module and calls `hydrateRoot` for the complete composed root. The islands entry is Vite-only and requires an author opt-in checked at build time. |
 
 Independent activation does not need to evaluate or hydrate the lexical parent.
 This separates module and DOM ownership. The island still loads the renderer and
@@ -35,6 +37,40 @@ forces nested boundaries to `never` and suppresses their seed and independent
 sidecars. Removing the compiler diagnostic alone would not make live islands
 under a static shell work.
 
+## Renderer-free island activation (#1514)
+
+An island can stop loading the renderer only when its view compiles as a
+`'use dom bindings'` program. A route stops loading it only when its shell is no
+longer hydrated as well. The audit linked from #1514 found that every
+independent island in `examples/signal-chat`, the conversation-streaming
+benchmark and the Vite plugin fixture was rejected by the binding compiler. The
+steps below make islands eligible one construct at a time. Only the last step
+removes bytes from a real page.
+
+| Step | Status | Guard |
+| --- | --- | --- |
+| 1. Diagnose `x$.get()` in a binding view | Done in [#1304](https://github.com/octanejs/octane/pull/1304): runtime error #308 at activation; `.latest()` is rejected at compile time. | |
+| 2. Zero-argument views | Done: a view may declare no props parameter. Activation still takes a `BindingSource`; its snapshot is unused. | `bundle-boundaries.test.mjs`: "zero-argument island views adopt module signals without the renderer" (TSRX and TSX, with a `hydrateRoot` control); `behavior-root.test.ts` adopts, hydrates and mounts real SSR output. |
+| 3. Lower `.get()`/`.latest()` reads into subscribed projections | Done: imported reads in projections, branch tests, lists and block `const` declarations subscribe; a suspended preparation keeps its last DOM. | `behavior-root.test.ts`: subscribed reads in every accessor form, structure, later publications and block declarations; owner retirement. |
+| 4. Mount-only effects as binding activation and cleanup | Done: `useLayoutEffect`/`useEffect` with an explicit `[]` run once after activation and clean up with their view. The `ready` flag pattern moves to a signal set by the effect. | `behavior-root.test.ts`: effect order, branch cleanup and disposal; non-mount effects stay diagnostics. |
+| 5. `@try`/`@pending`/`@catch` in binding programs | Done: a `try` region with sticky `@catch`, deferred `reset`, adoption of every server arm, and a claim of a still-streaming boundary. | `behavior-root.test.ts`: arm switching and adoption, a streamed claim, and renderer hydration of the same output. |
+| 6. Renderer-free activation and an islands-only route mode | Done: an island selects its child view's program through that view's module, and `hydrate: 'islands'` serves the shell with a renderer-free entry. | `independent-island.test.ts` (selection and fallback); `bundle-boundaries.test.mjs`: "independent islands over binding views activate without the renderer"; `islands-route.test.ts` (production build, shell rejection, renderer reachability); signal-chat e2e budget. |
+
+`examples/signal-chat` is the pilot: both routes are islands-only and every
+island is a binding view, with `Metrics` and the composer's `ready` flag moved
+to signals. Measured with gzip-9 per script, the deferred route loads 18 scripts
+and 71,124 bytes (69.5 KiB) after activating every island, against 160,586 bytes
+(156.8 KiB) of client JavaScript, including a 98,222-byte renderer chunk, on
+`main @ 02e4eb0ac`. The renderer is not loaded; the e2e suite holds the route to
+the 70 KiB ceiling.
+
+A zero-argument view's module declarations resolve to the document's cells,
+which a compiled state module installs without the renderer. Delegated binding
+handlers run without restoring a custom signal owner, so a deliberately custom
+owner still needs `runWithSignalOwner` around its callbacks. Selection is
+limited to a prop-less child imported from a project `.tsrx` module; a capture,
+a prop, a local child, or a package component keeps the renderer activator.
+
 ## Remaining static-shell design
 
 An SSR page can have a root-to-island component chain that produces useful HTML
@@ -53,13 +89,21 @@ they do not establish every imported helper or descendant's client obligations.
 Start with explicitly opted-in immutable SSR/SSG document routes and keep
 ordinary `hydrateRoot`, `root.render`, and client navigation semantics.
 
-The following are design labels, not configuration options:
+`RenderRoute`'s `hydrate` option selects `'full'` or `'islands'`; `none` remains a
+design label:
 
-| Mode | Proposed behavior |
+| Mode | Behavior |
 | --- | --- |
-| `full` | Current whole-root hydration; default and fallback for unproven entries. |
-| `none` | Proven immutable document with no live island frontier; no Octane hydration bootstrap. |
-| `islands` | Server-owned immutable shell with independently activated Hydrate frontiers; the client entry never imports the shell or hydrates the root. |
+| `full` | Whole-root hydration; the default. |
+| `none` | Proposed: a proven immutable document with no live island frontier and no Octane hydration bootstrap. |
+| `islands` | Implemented for Vite as an explicit opt-in: a server-owned immutable shell with independently activated Hydrate frontiers; the client entry never imports the shell or hydrates the root. |
+
+The implemented `islands` mode trusts the author's opt-in and checks it
+conservatively rather than proving it: the build rejects hooks, handlers, refs,
+controlled values, ordinary Hydrate, `@try`, signal reads and handle bindings,
+spreads, and unknown components in the shell, and any renderer reachable from
+the islands entry or `preHydrate`. The compiler proof below is still the path to
+selecting a mode automatically.
 
 Choose eligibility per route and selected export. Unknown facts select `full`.
 Ordinary parent-first Hydrate is not a standalone frontier. A client navigation
@@ -183,8 +227,9 @@ no-root-hydration lanes. Report eager and deferred JS, total raw/gzip/Brotli JS,
 HTML and inline script bytes, CSS, requests, first-interaction latency, SSR and
 compiler cost, and retained memory separately. Deferral is not deletion; bundle
 ceilings are not observed sizes. Use matched baseline/candidate builds and
-semantic controls before claiming savings. No islands-only static-shell
-performance result is established by this note.
+semantic controls before claiming savings. The signal-chat measurement above is
+a size result for one pilot; no latency or memory result is established by this
+note.
 
 ## Provenance
 
