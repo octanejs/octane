@@ -72,11 +72,18 @@ export function runWithServerSignalQueryAttemptObserver<T>(
 export function serverSignalQueryAttemptObserver(
 	scopeKey: string,
 ): ServerSignalQueryAttemptObserverContext | undefined {
-	const context = CURRENT_OBSERVER;
+	let context = CURRENT_OBSERVER;
 	if (context === undefined) return;
 	const ownerKey = context.owner.documentOwner.scopeKey;
 	if (scopeKey !== ownerKey && scopeKey !== `${ownerKey}:instance:${context.owner.instanceKey}`) {
-		return;
+		// An inline row reads its enclosing owner's declarations. Observe that
+		// cell under the owner that holds it, which the browser binds by key.
+		let owner = context.owner.enclosingOwner;
+		while (owner !== undefined && scopeKey !== `${ownerKey}:instance:${owner.instanceKey}`) {
+			owner = owner.enclosingOwner;
+		}
+		if (owner === undefined) return;
+		context = { owner, observe: context.observe, createObservations: context.createObservations };
 	}
 	if (typeof context.createObservations !== 'function') {
 		throw new TypeError(formatClientError(192));
