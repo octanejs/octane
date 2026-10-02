@@ -68,15 +68,25 @@ jobs:
 
       # A failing suite is recorded in its result JSON and rendered in the
       # report, so both trees always run to completion before the verdict.
-      # Byte suites are deterministic and run once per tree. js-framework runs
-      # base, head, head, base so runner drift over the job cancels out.
+      # Byte suites are deterministic and run once per tree, both trees at once.
+      # js-framework runs base, head, head, base so runner drift over the job
+      # cancels out.
       - name: Benchmark bundle size
         id: bytes
         run: |
-          (cd "$BASE_TREE" && node benchmarks/bench.mjs --results-dir="$RESULTS/base" bundle-size bundle-reachability) \
-            || echo "::warning::base bundle benchmarks failed"
+          mkdir -p "$RESULTS"
+          (cd "$BASE_TREE" && node benchmarks/bench.mjs --results-dir="$RESULTS/base" bundle-size bundle-reachability) > "$RESULTS/base-bytes.log" 2>&1 &
+          base=$!
+          node benchmarks/bench.mjs --results-dir="$RESULTS/head" bundle-size bundle-reachability > "$RESULTS/head-bytes.log" 2>&1 &
+          head=$!
+          wait "$base" || echo "::warning::base bundle benchmarks failed"
           status=0
-          node benchmarks/bench.mjs --results-dir="$RESULTS/head" bundle-size bundle-reachability || status=$?
+          wait "$head" || status=$?
+          for side in base head; do
+            echo "::group::$side bundle benchmarks"
+            cat "$RESULTS/$side-bytes.log"
+            echo "::endgroup::"
+          done
           echo "status=$status" >> "$GITHUB_OUTPUT"
 
       - name: Benchmark js-framework
@@ -89,7 +99,7 @@ jobs:
             side=${round%%:*}
             tree=$GITHUB_WORKSPACE
             if [ "$side" = base ]; then tree=$BASE_TREE; fi
-            if (cd "$tree" && node benchmarks/bench.mjs --results-dir="$RESULTS/$side-js-${round##*:}" js-framework); then :
+            if (cd "$tree" && node benchmarks/bench.mjs --results-dir="$RESULTS/$side-js-${round##*:}" --servers=octane-tsrx-jsbench,octane-jsx-jsbench js-framework); then :
             elif [ "$side" = head ]; then status=1
             else echo "::warning::base js-framework round failed"; fi
           done

@@ -1471,6 +1471,7 @@ const LIST = flags.has('--list');
 const BASELINE_DIR = path.resolve(REPO, kv.get('baseline-dir') || 'benchmarks/baselines/local');
 const RATIOS_FILE = path.resolve(REPO, 'benchmarks/baselines/ratios.json');
 const RESULTS_DIR = path.resolve(REPO, kv.get('results-dir') || 'benchmarks/results');
+const SERVER_FILTERS = kv.get('servers')?.split(',');
 
 if (LIST) {
 	console.log('Available suites:');
@@ -1666,6 +1667,7 @@ async function runSuite(suite) {
 	const started = [];
 	try {
 		for (const srv of suite.servers) {
+			if (SERVER_FILTERS && !SERVER_FILTERS.includes(srv.filter)) continue;
 			console.error(`  building ${srv.filter}…`);
 			buildServer(srv.filter, RESULTS_DIR);
 			console.error(`  starting ${srv.filter} preview on :${srv.port}…`);
