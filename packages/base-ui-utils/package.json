@@ -284,7 +284,7 @@
   },
   "scripts": {
     "test": "vitest run --config tests/vitest.owned.config.ts",
-    "typecheck": "tsrx-tsc --noEmit -p tsconfig.json",
+    "typecheck": "octane-tsc -p tsconfig.json",
     "upstream:verify": "node ../../scripts/react-parity/verify-provenance.mjs",
     "test:upstream": "vitest run --config tests/vitest.config.ts",
     "test:pristine": "node ../../scripts/react-parity/run-pristine.mjs base-ui-utils"

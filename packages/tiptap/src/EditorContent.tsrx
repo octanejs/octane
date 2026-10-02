@@ -160,7 +160,10 @@ export function PureEditorContent(props: EditorContentProps) @{
 	}, [editor]);
 
 	<>
-		<div {...rest} ref={[ref ?? null, innerRef ?? null, editorContentRef]} />
+		<div
+			{...rest as typeof rest & { ref?: undefined }}
+			ref={[ref ?? null, innerRef ?? null, editorContentRef]}
+		/>
 		@if (contentComponent) {
 			<Portals contentComponent={contentComponent} />
 		}
