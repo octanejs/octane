@@ -149,6 +149,9 @@ describe.each([
 			const recoverable = await hydrate(name, { server: true }, {});
 
 			expect(markup(container.querySelector('i')!)).toBe(html);
+			// The server content after the rebuilt clone is the rest of what its
+			// mismatch replaced: the arm discards it under that one report.
+			expect(markup(container.firstElementChild!)).toBe(`<i>${html}</i>`);
 			expect(recoverable).toEqual([expect.stringMatching(STRUCTURAL)]);
 			expect(warnings()).toEqual(dev ? [rebuilt(leaf)] : []);
 		},
