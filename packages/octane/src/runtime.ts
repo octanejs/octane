@@ -8881,6 +8881,7 @@ interface DeferredLayoutDriver {
 	stageEffects(): boolean;
 	stageAction(action: () => void, durable?: boolean): boolean;
 	retireHosts(block: Block): void;
+	retireHostTree(node: Node): void;
 	stageTeardown(cleanup: Cleanup, phase: number, scope: Scope): boolean;
 	stageDeactivation(slot: EffectSlot, scope: Scope): boolean;
 	projectEventBundle(bundle: HandlerBundle): HandlerBundle;
@@ -8934,6 +8935,7 @@ interface StagedCommitCapture {
 	controls: Map<ControlledState, ControlledState>;
 	signalHosts?: Map<SignalHostPropSourcesBinding, SignalHostPropSourcesBinding>;
 	retiredBlocks?: Block[];
+	retiredHostTrees?: Node[];
 	owners: Map<
 		RootRenderOwner,
 		{
@@ -9299,6 +9301,20 @@ function ensureDeferredLayoutDriver(): void {
 					}, true);
 				}
 				blocks.push(block);
+			},
+			retireHostTree(node) {
+				// Like retireHosts: one queued action per capture stamps every
+				// removed host root ahead of the DOM removals queued after it.
+				const capture = STAGED_COMMIT_CAPTURE!;
+				let nodes = capture.retiredHostTrees;
+				if (nodes === undefined) {
+					const list: Node[] = (nodes = capture.retiredHostTrees = []);
+					capture.enqueue(() => {
+						const epoch = ++eventRootEpoch;
+						for (let i = 0; i < list.length; i++) stampRetiredHostTree(list[i], epoch);
+					}, true);
+				}
+				nodes.push(node);
 			},
 			stageTeardown(cleanup, phase, scope) {
 				const capture = STAGED_COMMIT_CAPTURE;
@@ -19260,6 +19276,46 @@ class HydrationCapability {
 	}
 
 	/**
+	 * A list's first hydrating render when the client renders the other arm:
+	 * the server rendered items (`serverItems`) but the client builds its
+	 * @empty arm, or the server rendered none but the client has items. Discard
+	 * what the server rendered and report the list once, at its own site. The
+	 * range's `end` is remembered as rebuilt, so each client item finds the
+	 * cursor there and discardItems builds it quietly, and a later attempt that
+	 * finds the earlier attempt's own content here rebuilds it quietly too.
+	 */
+	discardListArm(
+		scope: Scope,
+		slotKey: number,
+		start: Node,
+		end: Node,
+		serverItems: boolean,
+	): void {
+		const first = getNextSibling(start)!;
+		// When the server rendered no items, only an @empty arm leaves content
+		// between the markers.
+		this.discard(
+			scope,
+			slotKey,
+			first,
+			end,
+			HYDRATION_REBUILT?.has(end) === true,
+			process.env.NODE_ENV !== 'production'
+				? serverItems
+					? 'an empty list (@empty)'
+					: 'a populated list'
+				: '',
+			process.env.NODE_ENV !== 'production'
+				? serverItems
+					? 'a populated list'
+					: first === end
+						? 'an empty list'
+						: 'an empty list (@empty)'
+				: null,
+		);
+	}
+
+	/**
 	 * Report a control-flow or list range whose server content before `end` was
 	 * discarded so the client could build its own arm there. Returns whether it
 	 * reported, so callers warn only then. A suspended boundary's next attempt
@@ -19296,24 +19352,6 @@ class HydrationCapability {
 		if (!this.staleServerValues)
 			noteRecoverableHydrationError(() => new Error(formatClientError(56)));
 		removeRange(from, end);
-	}
-
-	/**
-	 * A list's first hydrating render when the server rendered items but the
-	 * client has none and builds its @empty arm instead. Discard the server's
-	 * items and report the list once, at its own site. A later attempt that
-	 * finds the earlier attempt's @empty arm here rebuilds it quietly.
-	 */
-	discardPopulatedList(scope: Scope, slotKey: number, start: Node, end: Node): void {
-		this.discard(
-			scope,
-			slotKey,
-			getNextSibling(start),
-			end,
-			HYDRATION_REBUILT?.has(end) === true,
-			process.env.NODE_ENV !== 'production' ? 'an empty list (@empty)' : '',
-			process.env.NODE_ENV !== 'production' ? 'a populated list' : null,
-		);
 	}
 
 	/**
@@ -26346,6 +26384,31 @@ function isUsableEventSlot(slot: EventSlot): boolean {
 const EMPTY_ARGS: any[] = [];
 let SIGNAL_EVENT_OWNERS: WeakMap<Element, SignalOwner | ScopeImpl | BlockImpl> | null = null;
 
+// Epoch of this task's first removed host root (retireEventHostTree); 0 when none
+// is pending. Older stamps belong to nodes already detached and are ignored.
+let retiringHostsSince = 0;
+
+/**
+ * Take a removed subtree out of delegated dispatch when no disposing Block covers
+ * it: a pure host in a value hole belongs to the live Block that rendered it.
+ * Every such removal detaches the node right after this, within the same task,
+ * so only the root is stamped and the stamp only needs to outlive the task.
+ */
+function retireEventHostTree(node: Node): void {
+	if (STAGED_COMMIT_CAPTURE) DEFERRED_LAYOUT_DRIVER!.retireHostTree(node);
+	else stampRetiredHostTree(node, ++eventRootEpoch);
+}
+
+function stampRetiredHostTree(node: Node, epoch: number): void {
+	if (retiringHostsSince === 0) {
+		retiringHostsSince = epoch;
+		queueMicrotask(() => {
+			retiringHostsSince = 0;
+		});
+	}
+	(node as any).$$retiredEpoch = epoch;
+}
+
 /** Publish a native handler; compiled bundle updates omit the key to refresh only authority. */
 export function setEventHandler(el: Element, key?: string, handler?: any): void {
 	if (key !== undefined) {
@@ -27152,6 +27215,17 @@ function snapshotDelegatedSlots(
 	const suppressDisabled =
 		(type.flags & EVENT_DISABLED_MOUSE) !== 0 ||
 		(!capture && (type.flags & EVENT_DISABLED_ENTER) !== 0);
+	// Only a removed subtree's root carries its stamp (retireEventHostTree), so the
+	// outermost one retired before this delivery retires every path node below it.
+	let retiredTop = -1;
+	if (retiringHostsSince !== 0)
+		for (let index = CAPTURE_PATH.length - 1; index >= base; index--) {
+			const stamp = CAPTURE_PATH[index].$$retiredEpoch;
+			if (stamp >= retiringHostsSince && stamp <= epoch) {
+				retiredTop = index;
+				break;
+			}
+		}
 	let found = false;
 	let retired: number;
 	for (let index = base; index < CAPTURE_PATH.length; index++) {
@@ -27163,12 +27237,13 @@ function snapshotDelegatedSlots(
 		// An unclaimed host reads `undefined`, which is not above zero.
 		const active =
 			slot != null &&
-			((suppressDisabled &&
-				node.disabled &&
-				(node.localName === 'button' ||
-					node.localName === 'input' ||
-					node.localName === 'select' ||
-					node.localName === 'textarea')) ||
+			(index <= retiredTop ||
+				(suppressDisabled &&
+					node.disabled &&
+					(node.localName === 'button' ||
+						node.localName === 'input' ||
+						node.localName === 'select' ||
+						node.localName === 'textarea')) ||
 				((retired = node.$$eventOwner?.retired) > 0 && retired <= epoch))
 				? null
 				: slot;
@@ -33989,6 +34064,11 @@ function hostElementBody(d: ElementDescriptor, block: Block): void {
 				);
 				journalRootProperty(block, 'deoptNode', block.deoptNode);
 			}
+			// This Block keeps rendering, so the replaced element retires on its own,
+			// before its children leave it and can take focus with them.
+			if (ROOT_RENDER_TRANSACTION !== null)
+				deferRootRange(block.parentNode, null, null, () => retireEventHostTree(retired));
+			else retireEventHostTree(retired);
 			// The children slot's live content — markers included — sat inside the
 			// removed element, so a preserved slot would keep rendering into the
 			// detached node. Run the subtree's cleanups and drop the slot state so
@@ -42879,9 +42959,22 @@ function detachDeoptTreeRefs(
 	uncommitted: UncommittedRefAttaches | null = null,
 	activityRefs: WeakMap<Element | FragmentInstance, ActivityRefState> | null = null,
 ): void {
+	// Teardown runs just before every blockless de-opt removal detaches `node`.
+	if (out === null) retireEventHostTree(node);
 	// No de-opt descriptor ref was ever stamped → nothing to detach or collect
 	// anywhere; skip the subtree scan. (Monotone flag — see noteDeoptRef.)
 	if (!DEOPT_REFS_STAMPED) return;
+	detachDeoptSubtreeRefs(node, out, shouldDetach, ownerScope, uncommitted, activityRefs);
+}
+
+function detachDeoptSubtreeRefs(
+	node: Node,
+	out: SuspenseRefEntry[] | null,
+	shouldDetach: boolean,
+	ownerScope: Scope | undefined,
+	uncommitted: UncommittedRefAttaches | null,
+	activityRefs: WeakMap<Element | FragmentInstance, ActivityRefState> | null,
+): void {
 	const ref = getDeoptDesc(node)?.props?.ref ?? activityRefs?.get(node as Element)?.connected;
 	if (ref != null) {
 		if (out !== null) {
@@ -42912,7 +43005,7 @@ function detachDeoptTreeRefs(
 			c = nodeAfterPortalRange(c, rangeEnd);
 			continue;
 		}
-		detachDeoptTreeRefs(c, out, shouldDetach, ownerScope, uncommitted, activityRefs);
+		detachDeoptSubtreeRefs(c, out, shouldDetach, ownerScope, uncommitted, activityRefs);
 		c = getNextSibling(c);
 	}
 }
@@ -43303,7 +43396,7 @@ export function forBlock<T>(
 				(serverMarkerState === 1 ||
 					(serverMarkerState === -1 && hydration.isOpen(getNextSibling(state.start))))
 			) {
-				hydration.discardPopulatedList(parentScope, slotKey, state.start, state.end);
+				hydration.discardListArm(parentScope, slotKey, state.start, state.end, true);
 				suspendForEmpty = true;
 			} else if (hydration !== null) {
 				// The server already rendered the @empty content directly inside the
@@ -43349,10 +43442,11 @@ export function forBlock<T>(
 		} else unmountBlock(state.emptyBlock);
 		state.emptyBlock = null;
 	}
-	// Hydrating + the SERVER rendered the @empty body (the node right after `start` is NOT an
-	// item's `<!--[-->`) but the client now has items — a STRUCTURAL mismatch. Discard the
-	// stale @empty DOM and point the cursor at `end` so the reconcile client-mounts the items
-	// into a clean range (mountItem's no-marker guard handles the build).
+	// Hydrating + the SERVER rendered no items (its open marker says so, or, on a legacy
+	// marker, the node right after `start` is NOT an item's `<!--[-->` but @empty content)
+	// but the client now has items — a STRUCTURAL mismatch. Discard any stale @empty DOM,
+	// report the list once, and point the cursor at `end` so the reconcile client-mounts the
+	// items into a clean range (mountItem's no-marker guard builds them without reporting).
 	if (
 		!isEmpty &&
 		hydration !== null &&
@@ -43363,15 +43457,7 @@ export function forBlock<T>(
 				getNextSibling(state.start) !== state.end &&
 				!hydration.isOpen(getNextSibling(state.start))))
 	) {
-		hydration.save(domParent);
-		// Marking the list's end also keeps the client items, which find the cursor
-		// there, from reporting the same recovery again.
-		if (hydration.reportRebuiltRange(state.end) && process.env.NODE_ENV !== 'production') {
-			const mmLoc = siteLoc(parentScope, slotKey) || (domParent as any).__oct_loc;
-			if (mmLoc) hydration.warnStructural(mmLoc, 'a populated list', 'an empty list (@empty)');
-		}
-		removeRange(getNextSibling(state.start), state.end);
-		hydration.node = state.end;
+		hydration.discardListArm(parentScope, slotKey, state.start, state.end, false);
 	}
 	const f = flags || 0;
 	let pure = (f & 1) !== 0;
