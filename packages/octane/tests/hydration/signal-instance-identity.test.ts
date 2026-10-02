@@ -1275,6 +1275,14 @@ export function App(props) { return <Card content={<div><Leaf remember={props.re
 export function App(props) { return <main>{['a', 'b'].map((k) => <Row key={k} remember={props.remember}/>)}</main>; }`,
 		},
 		{
+			// Each keyed host row renders through its own host renderer; the row's
+			// key must still separate one row's signal instance from the other's.
+			shape: 'keyed host rows',
+			ext: 'tsx',
+			leaves: 2,
+			source: `export function App(props) { return <main>{['a', 'b'].map((k) => <div key={k}><Leaf remember={props.remember}/></div>)}</main>; }`,
+		},
+		{
 			shape: 'direct calls in keyed fragments',
 			ext: 'tsx',
 			leaves: 2,
