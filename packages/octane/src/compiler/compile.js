@@ -83,6 +83,7 @@ import {
 	armJump,
 	assertTemplateJumps,
 } from './arm-exits.js';
+import { assertForOfHeaders } from './for-headers.js';
 import { HOOK_NAMES, NATIVE_SIGNAL_HOOK_NAMES } from './hook-names.js';
 export { HOOK_NAMES } from './hook-names.js';
 import {
@@ -10015,9 +10016,14 @@ function compileAuthored(source, filename, options, bundlerMetadata) {
 	}
 	const cleanFilename = cleanCompileFilename(filename);
 	let analyzedAst = markParserSensitiveHosts(
-		normalizeAuthoredJsxLiterals(parseModule(source, cleanFilename)),
+		declareBareForBindings(
+			normalizeAuthoredJsxLiterals(parseModule(source, cleanFilename)),
+			source,
+			cleanFilename,
+		),
 	);
 	analyzeTsrx(analyzedAst, cleanFilename);
+	assertForOfHeaders(analyzedAst, source, cleanFilename);
 	assertTemplateJumps(analyzedAst, source, cleanFilename);
 	adoptParserAst(analyzedAst);
 	assertNoLegacyContextProviders(analyzedAst, source, cleanFilename);
@@ -11517,10 +11523,11 @@ function compileInternal(
 		} else if (
 			node.type === 'ImportDeclaration' &&
 			node.source.value === 'octane' &&
-			node.phase !== 'defer'
+			node.phase == null
 		) {
 			// Preserve ALL user-imported names from octane (Portal, createContext,
 			// use, custom helpers, etc.) — merged into the single prelude import.
+			// A `defer` or `source` phase import stays its own declaration.
 			addUserImportSpecifiers(ctx, node);
 		} else {
 			// Style blocks anywhere in a non-component statement: assigned blocks
@@ -12205,9 +12212,9 @@ function compileServer(
 					: compileServerComponent({ ...node.declaration, default: true }, ctx)),
 			);
 		} else if (node.type === 'ImportDeclaration' && node.source.value === 'octane') {
-			// Preserve the authored deferred namespace while routing it to the server runtime.
-			// Other user imports are merged into the eager server runtime prelude.
-			if (node.phase === 'defer') {
+			// Preserve an authored `defer` or `source` phase import while routing it to the
+			// server runtime. Other user imports are merged into the eager server runtime prelude.
+			if (node.phase != null) {
 				bodyNodes.push({
 					...node,
 					source: { ...node.source, value: 'octane/server', raw: '"octane/server"' },
@@ -24299,6 +24306,68 @@ function normalizeAuthoredJsxLiterals(ast) {
 	});
 }
 
+// `@for (item of items)` is TSRX's bare-left row binding: @tsrx/core lowers it
+// to the row callback's parameter, so each row binds its own writable item and
+// shadows any outer name. Unlike a JavaScript `for…of`, it never assigns an
+// existing target. Give it the `let` header shape every pass reads, once on the
+// authored module, so no pass can mistake the row binding for an outer
+// reference or assume it is never reassigned.
+function declareBareForBindings(ast, source, filename) {
+	if (!source.includes('@for')) return ast;
+	const declare = (node) => {
+		if (
+			node.type !== 'JSXForExpression' ||
+			node.statementType !== 'ForOfStatement' ||
+			node.left?.type === 'VariableDeclaration'
+		) {
+			return null;
+		}
+		const left = node.left;
+		const target = nonBindingTarget(left);
+		if (target !== null) {
+			const l = target.loc?.start;
+			const at = l ? ` (${filename.split(/[\\/]/).pop()}:${l.line}:${l.column})` : '';
+			throw new Error(
+				`A \`@for\` header declares each row's own item binding, so it cannot assign the ` +
+					`item to \`${source.slice(target.start, target.end)}\`. Bind a name or a ` +
+					`destructuring pattern instead: \`@for (item of items)\` or ` +
+					`\`@for ({ id } of items)\`.${at}`,
+			);
+		}
+		return mapAst({ ...node, left: inheritOriginLoc(b.let(left, null), left) }, declare);
+	};
+	return mapAst(ast, declare);
+}
+
+// The first target in a bare `@for` header that a declaration cannot bind,
+// such as a member expression, or null when every target is a name.
+function nonBindingTarget(pattern) {
+	switch (pattern?.type) {
+		case 'Identifier':
+			return null;
+		case 'AssignmentPattern':
+			return nonBindingTarget(pattern.left);
+		case 'RestElement':
+			return nonBindingTarget(pattern.argument);
+		case 'ArrayPattern':
+			for (const element of pattern.elements) {
+				const target = element === null ? null : nonBindingTarget(element);
+				if (target !== null) return target;
+			}
+			return null;
+		case 'ObjectPattern':
+			for (const property of pattern.properties) {
+				const target = nonBindingTarget(
+					property.type === 'RestElement' ? property.argument : property.value,
+				);
+				if (target !== null) return target;
+			}
+			return null;
+		default:
+			return pattern;
+	}
+}
+
 function requiresImperativeHostTree(root, ctx) {
 	return (
 		(ctx.mode !== 'server' && root._octaneImperativeHost === true) || alwaysImperativeHost(root)
@@ -32752,16 +32821,32 @@ function makeTryCall(node, ctx, inlinedSubs, parentNs = 'html', cssHash = null) 
 	let catchBodyStmts = null;
 	if (node.handler) {
 		const handler = node.handler;
-		const errName = handler.param?.name || '_err';
 		const resetName = handler.resetParam?.name || '_reset';
 		const catchStmts = handler.body.body;
 		// The catch body sees `err` and `reset` as bindings unpacked from the
 		// tryBlock-supplied props object. We synthesize a small destructuring
 		// VariableDeclaration at the top of the body so the user's identifiers
 		// resolve. The body is otherwise compiled like any component body.
+		// `err` unpacks into the authored binding, which may be a destructuring
+		// pattern (`@catch ({ message = fallback }: Error)`) whose defaults read
+		// component locals; the env analysis below sees those reads as captures.
+		// Its annotation is type-only, so a typed binding is copied without it.
+		const param = handler.param;
+		const errBinding =
+			param == null
+				? b.id('_err')
+				: param.typeAnnotation
+					? { ...param, typeAnnotation: null }
+					: param;
 		const destructure = b.const(
 			b.object_pattern([
-				b.prop('init', b.id('err'), b.id(errName), false, errName === 'err'),
+				b.prop(
+					'init',
+					b.id('err'),
+					errBinding,
+					false,
+					errBinding.type === 'Identifier' && errBinding.name === 'err',
+				),
 				b.prop('init', b.id('reset'), b.id(resetName), false, resetName === 'reset'),
 			]),
 			b.id('__props'),

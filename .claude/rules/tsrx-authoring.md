@@ -83,6 +83,11 @@ setup.
 @try { } @pending { } @catch (e) { }
 ```
 
+An `@for` header may omit the keyword: `@for (item of items)` or
+`@for ({ id } of items)` binds each row's own item, as a `let` header does,
+and shadows any outer name. A header cannot assign an existing target such as
+`obj.x`; the compiler rejects it.
+
 An arm ends early with `return;` or `return null;` (or `continue;` in an `@for`
 body) from anywhere in its setup; only that arm's output is skipped. A value
 return or a `break` that targets the directive is a compile error. A child
@@ -105,6 +110,10 @@ Write the key in the header. A React-style `key={…}` on the row's only root
 element is the same row key and compiles identically on DOM and universal
 renderers, taking precedence over a header key. A row key cannot read a
 `const` declared inside the row body; the compiler rejects it.
+
+The `@for` header is always a `for…of`. A `for…in` or a C-style
+`(init; test; update)` header is a compile error: iterate `Object.keys(obj)` or
+a built index array instead.
 
 ## Refs
 

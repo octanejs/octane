@@ -1257,6 +1257,7 @@ overrides:
 packageExtensionsChecksum: sha256-kfm1FmKj+dGJ1mbVor30ucTdX3Yg+IVGhIkuq6dFEI0=
 
 patchedDependencies:
+  '@tsrx/core@0.4.0': 709228ff024f2bb39d3688aff373cff7e02517aea5bd7de2b0a17880a85c3e94
   '@tsrx/prettier-plugin@0.4.10': 1afb94e67a22bc3f5c16db0293e10cee42c1b31f4a3725340b73e1537e252dbc
   '@vitest/browser@4.1.10': d32609637593fc211ed808df6fbea6cb1da80adb049c0b0752bda8e1586d0ae0
   '@vitest/mocker@4.1.10': 538740e541a5a8ef50611b521995775cac3031548f696745eb4b90a7bd659ca4
@@ -3150,7 +3151,7 @@ importers:
     dependencies:
       '@tsrx/core':
         specifier: catalog:default
-        version: 0.4.0
+        version: 0.4.0(patch_hash=709228ff024f2bb39d3688aff373cff7e02517aea5bd7de2b0a17880a85c3e94)
       miniflare:
         specifier: catalog:default
         version: 4.20260714.0(bufferutil@4.1.0)(utf-8-validate@5.0.10)
@@ -7117,7 +7118,7 @@ importers:
     dependencies:
       '@tsrx/core':
         specifier: catalog:default
-        version: 0.4.0
+        version: 0.4.0(patch_hash=709228ff024f2bb39d3688aff373cff7e02517aea5bd7de2b0a17880a85c3e94)
       '@tsrx/oxc':
         specifier: catalog:default
         version: 0.16.0(svelte@5.56.7)
@@ -7193,7 +7194,7 @@ importers:
     devDependencies:
       '@tsrx/core':
         specifier: catalog:default
-        version: 0.4.0
+        version: 0.4.0(patch_hash=709228ff024f2bb39d3688aff373cff7e02517aea5bd7de2b0a17880a85c3e94)
       '@types/node':
         specifier: catalog:default
         version: 24.13.3
@@ -10852,7 +10853,7 @@ importers:
         version: 3.23.0
       '@tsrx/core':
         specifier: catalog:default
-        version: 0.4.0
+        version: 0.4.0(patch_hash=709228ff024f2bb39d3688aff373cff7e02517aea5bd7de2b0a17880a85c3e94)
       '@tsrx/prettier-plugin':
         specifier: catalog:default
         version: 0.4.10(patch_hash=1afb94e67a22bc3f5c16db0293e10cee42c1b31f4a3725340b73e1537e252dbc)(prettier@3.9.6)
@@ -48173,7 +48174,7 @@ snapshots:
     transitivePeerDependencies:
       - '@typescript-eslint/types'
 
-  '@tsrx/core@0.4.0':
+  '@tsrx/core@0.4.0(patch_hash=709228ff024f2bb39d3688aff373cff7e02517aea5bd7de2b0a17880a85c3e94)':
     dependencies:
       '@jridgewell/sourcemap-codec': 1.5.5
       '@noble/hashes': 2.2.0
