@@ -1,4 +1,4 @@
-import { Activity, ErrorBoundary, use } from 'octane';
+import { Activity, ErrorBoundary, use, useState } from 'octane';
 
 function label(): string {
 	return 'ok';
@@ -190,6 +190,56 @@ export function SiblingBranch(props: { server?: boolean }) @{
 				<Em />
 			</>
 		}
+	</div>
+}
+
+// Two roots, so each instance owns a component range.
+function Tally(props: { name: string }) @{
+	const [count, setCount] = useState(0);
+	<>
+		<button class={props.name} onClick={() => setCount(count + 1)}>
+			{props.name + ':' + count}
+		</button>
+		<small class={props.name}>{props.name as string}</small>
+	</>
+}
+
+function Count(props: { name: string }) @{
+	const [count, setCount] = useState(0);
+	<button class={props.name} onClick={() => setCount(count + 1)}>{props.name + ':' + count}</button>
+}
+
+// Returns its output as a value rather than through an @{} body.
+function Badge(props: { step: number }) {
+	return <strong class="badge">{'badge:' + props.step}</strong>;
+}
+
+interface ComponentProps {
+	k: string;
+	tag: 'mark' | 'span';
+	step: number;
+}
+
+function ComponentLeaf(props: ComponentProps) @{
+	<i>
+		<Tally name="inner" />
+		<Count key={props.k} name="keyed" />
+		<props.tag class="tag">{'step:' + props.step}</props.tag>
+		<Badge step={props.step} />
+		{label() as string}
+	</i>
+}
+
+// The rebuilt leaf's components have no server ranges, while the cursor rests
+// on the range the server rendered for the Tally that follows.
+export function ComponentBranch(props: ComponentProps & { server?: boolean }) @{
+	<div>
+		@if (props.server) {
+			<b class="server">{'server'}</b>
+		} @else {
+			<ComponentLeaf k={props.k} tag={props.tag} step={props.step} />
+		}
+		<Tally name="after" />
 	</div>
 }
 
