@@ -58,6 +58,14 @@ export function App(props) @{
 	<main><Suspense fallback={<i>waiting</i>}><Mid id={props.id} load={props.load} rendered={props.rendered}/></Suspense></main>
 }`,
 	},
+	// No boundary above Field: its suspended hydration read waits at the root.
+	unbounded: {
+		id: '/src/app.tsrx',
+		source: `import { Field } from './field';
+export function App(props) @{
+	<main><Field id={props.id} load={props.load} rendered={props.rendered}/></main>
+}`,
+	},
 };
 
 interface Scenario {
@@ -217,6 +225,39 @@ describe('query reads in returned JSX through hydration', () => {
 					expect(uncaught(errors)).toEqual([]);
 					expect(browserLoad.mock.calls.map(([id]) => id)).toEqual(['b']);
 					expect(container.querySelector('output')!.textContent).toBe('browser b');
+				},
+			});
+		},
+	);
+
+	it.each(
+		(['tsx', 'tsrx', 'unbounded'] as const).flatMap((app) =>
+			(['tsx', 'tsrx'] as const).flatMap((field) =>
+				[false, true].map((dev) => ({ app, field, dev })),
+			),
+		),
+	)(
+		"loads the browser's own selection over a seed for another request ($app app, $field field, dev: $dev)",
+		async ({ app, field, dev }) => {
+			// The server seeded Field's query for 'a', under the same owner the
+			// browser adopts. The browser selects 'b', so that history cannot
+			// present it: the query loads 'b' as if unseeded, and adoption keeps
+			// the server's output node while reporting the changed text.
+			const browserLoad = vi.fn(async (id: string) => `browser ${id}`);
+			await hydrateScenario({
+				app,
+				field,
+				dev,
+				serverId: 'a',
+				clientId: 'b',
+				browserLoad,
+				run: async ({ container, result, errors, drain }) => {
+					await drain();
+					expect(errors).not.toEqual([]);
+					expect(uncaught(errors)).toEqual([]);
+					expect(browserLoad.mock.calls.map(([id]) => id)).toEqual(['b']);
+					expect(container.querySelector('output')).toBe(result);
+					expect(result.textContent).toBe('browser b');
 				},
 			});
 		},

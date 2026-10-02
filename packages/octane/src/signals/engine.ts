@@ -738,11 +738,27 @@ class AdoptionFrameImpl implements AdoptionFrame {
 		return new AdoptionFrameImpl(this.data);
 	}
 
-	read(node: ScopedNode, read: SignalReadMode): NodeState {
+	read(node: ScopedNode, read: SignalReadMode): NodeState | undefined {
 		this.assertActive();
 		const seed =
 			this.data.entries.get(seedKey(node.key, read)) ??
 			(read === 'value' ? undefined : this.data.entries.get(seedKey(node.key)));
+		// A resource seed holds the request the server resolved. When the client
+		// selects another one (its props or state differ from the server's), that
+		// history cannot present it. Hydration then reads the node live, exactly
+		// like a request the server never seeded: the client loads its own
+		// selection and adoption reconciles the server output. An explicit frame
+		// has no live fallback.
+		if (
+			node.kind === 'async' &&
+			read !== 'latest' &&
+			seed?.entry.kind === 'async' &&
+			seed.entry.available !== false &&
+			!this.data.owner.resources?.get(node)?.acceptsSeed(seed.entry)
+		) {
+			if (getNativeAdoptionResolver()) return undefined;
+			throw new SignalFrameError(formatClientError(145, node.key));
+		}
 		const sourceKey = seedKey(node.key, read);
 		let source = this.sources.get(sourceKey);
 		if (!source) {
@@ -790,12 +806,6 @@ class AdoptionFrameImpl implements AdoptionFrame {
 			return {
 				snapshot: { status: 'pending', refreshing: false, connection: 'none', complete: false },
 			};
-		}
-		if (node.kind === 'async' && read !== 'latest') {
-			const binding = this.data.owner.resources?.get(node);
-			if (!binding?.acceptsSeed(seed.entry)) {
-				throw new SignalFrameError(formatClientError(145, node.key));
-			}
 		}
 		return seedState(seed);
 	}
