@@ -19412,15 +19412,16 @@ class HydrationCapability {
 	 * content from the cursor up to `end`, stopping at any client nodes that
 	 * mismatch recovery built there, and report it once.
 	 *
-	 * An arm that claimed nothing leaves the cursor on `first`, and the whole
-	 * range is then the server's other arm rather than a tail after this one.
-	 * The cursor does not move past the elements and text that a template
-	 * adopts either, so at an element or text node it cannot tell what the arm
-	 * adopted from what the server rendered for another arm. Both stay.
+	 * An arm that rendered nothing leaves the cursor on `first`, and the whole
+	 * range is then the server's other arm: it is discarded and reported as an
+	 * empty client branch, as an arm with no body is. The cursor does not move
+	 * past the elements and text that a template adopts, so at an element or
+	 * text node it cannot tell what the arm adopted from what the server
+	 * rendered for another arm. Both stay.
 	 */
 	discardArmTail(scope: Scope, slotKey: number, first: Node, end: Node): void {
 		const from = this.node;
-		if (from === first || !this.isOpen(from)) return;
+		if (!this.isOpen(from)) return;
 		let stop: Node | null = null;
 		let node: Node | null = from;
 		while (node !== null && node !== end) {
@@ -19437,7 +19438,12 @@ class HydrationCapability {
 			noteRecoverableHydrationError(() => new Error(formatClientError(51)));
 			if (process.env.NODE_ENV !== 'production') {
 				const loc = siteLoc(scope, slotKey);
-				if (loc) this.warnStructural(loc, 'the end of the branch', this.describe(from));
+				if (loc)
+					this.warnStructural(
+						loc,
+						from === first ? 'an empty branch' : 'the end of the branch',
+						this.describe(from),
+					);
 			}
 		}
 		removeRange(from, stop ?? end);
@@ -42023,7 +42029,8 @@ function renderBranchSlot(
 					hydration!.node = getNextSibling(state.end as Node);
 				} else {
 					renderBlock(b);
-					// The server may have rendered another arm here, longer than this one.
+					// The server may have rendered another arm here, longer than this one
+					// or one this arm renders nothing of.
 					if (inner !== null && hydration!.node !== bEnd)
 						hydration!.discardArmTail(parentScope, slotKey, first!, bEnd);
 				}
