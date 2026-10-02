@@ -31375,23 +31375,22 @@ function componentSlotImpl(
 		hydration !== null &&
 		((anchor != null && hydration.isFresh(anchor)) || hydration.isFresh(domParent))
 	) {
-		hydration.suspend(() =>
-			componentSlotImpl(
-				outputHandler,
-				parentScope,
-				slotKey,
-				domParent,
-				body,
-				identity,
-				props,
-				renderProps,
-				anchor,
-				key,
-				singleRoot,
-				inherit,
-				hasKey,
-				invocationSite,
-			),
+		suspendFreshComponent(
+			hydration,
+			outputHandler,
+			parentScope,
+			slotKey,
+			domParent,
+			body,
+			identity,
+			props,
+			renderProps,
+			anchor,
+			key,
+			singleRoot,
+			inherit,
+			hasKey,
+			invocationSite,
 		);
 		return;
 	}
@@ -31929,6 +31928,45 @@ function componentSlotImpl(
 	// no following sibling (sole root) — leave the cursor where the body put it.
 	if (hydration !== null && !state.inherited && state.end !== null)
 		hydration.node = getNextSibling(state.end);
+}
+
+// Keep the fresh-subtree callback out of componentSlotImpl: a closure there
+// captures every parameter, so each mount and update would allocate a context.
+function suspendFreshComponent(
+	hydration: HydrationCapability,
+	outputHandler: OutputHandler | null,
+	parentScope: Scope,
+	slotKey: number,
+	domParent: Node,
+	body: ComponentBody,
+	identity: ComponentBody | string,
+	props: any,
+	renderProps: any,
+	anchor: Node | null | undefined,
+	key: any,
+	singleRoot: boolean | 2 | undefined,
+	inherit: boolean | undefined,
+	hasKey: boolean | undefined,
+	invocationSite: string | undefined,
+): void {
+	hydration.suspend(() =>
+		componentSlotImpl(
+			outputHandler,
+			parentScope,
+			slotKey,
+			domParent,
+			body,
+			identity,
+			props,
+			renderProps,
+			anchor,
+			key,
+			singleRoot,
+			inherit,
+			hasKey,
+			invocationSite,
+		),
+	);
 }
 
 // ---------------------------------------------------------------------------
