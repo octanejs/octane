@@ -11,7 +11,8 @@ import { loadCompiledFixtureSource, loadServerFixture } from '../_server-fixture
 // root in its place: it reports the mismatch once, keeps the server siblings
 // around it adopted, and the rebuilt root later unmounts and remounts with the
 // rest of its arm. A hooked call renders through the full component slot, and
-// so does a production compile's call whose output reads only constants.
+// so does a production compile's call whose output reads only constants. Every
+// case runs in every compile mode.
 
 const FIXTURE = join(
 	process.cwd(),
@@ -35,7 +36,8 @@ const SERVER_SECTION = '<em>e</em><u>u</u><b>p</b><hr>';
 
 const CALLS = [
 	{ call: 'a hooked component', name: 'Full', rebuilt: '<p>p</p>' },
-	// A development compile renders this hookless call through the lite slot instead.
+	// A development compile renders this hookless call through the lite slot, which
+	// rebuilds it in place the same way.
 	{ call: 'a constant-output component', name: 'ConstantOutput', rebuilt: '<p>c</p>' },
 ];
 
