@@ -39,7 +39,9 @@ const exportsMap = JSON.parse(
 ).exports;
 
 const REPEATS = 32;
+const DRIVER = { name: 'driver', component: 'Driver', control: true, conditional: true };
 const CASES = [
+	DRIVER,
 	{ name: 'declaration', component: 'Declaration' },
 	{ name: 'identifier_deps', component: 'IdentifierDeps', runtimeFallback: true },
 	{ name: 'direct_return', component: 'DirectReturn', hitArraysPerRender: 2 },
@@ -249,6 +251,24 @@ function summarizedCounters(counters) {
 	};
 }
 
+// Every render reaches the scenario through the same public root update, whose
+// own work (root transaction and retry bookkeeping) is unrelated to memo hooks.
+// Subtracting the hook-free driver's same-phase counts leaves only the work a
+// scenario's hooks add. The driver keeps its own ops and guards, and raw
+// per-phase counts stay in the JSON metadata.
+function memoCounters(measurements, fixture, phase) {
+	const counters = measurements[`${fixture.name}_${phase}`].counters;
+	if (fixture.control) return counters;
+	const driver = measurements[`${DRIVER.name}_${phase}`].counters;
+	return Object.fromEntries(
+		Object.entries(counters).map(([kind, count]) => {
+			const net = count - driver[kind];
+			assert.ok(net >= 0, `${fixture.name} ${phase} ${kind} is below the hook-free driver`);
+			return [kind, net];
+		}),
+	);
+}
+
 function eligibleTotals(measurements) {
 	const counts = {
 		eligible_hit_functions: 0,
@@ -258,9 +278,9 @@ function eligibleTotals(measurements) {
 	};
 	const budgets = { ...counts };
 	for (const fixture of CASES) {
-		if (fixture.runtimeFallback || fixture.alwaysFresh) continue;
-		const hit = summarizedCounters(measurements[`${fixture.name}_hit`].counters);
-		const miss = summarizedCounters(measurements[`${fixture.name}_miss`].counters);
+		if (fixture.control || fixture.runtimeFallback || fixture.alwaysFresh) continue;
+		const hit = summarizedCounters(memoCounters(measurements, fixture, 'hit'));
+		const miss = summarizedCounters(memoCounters(measurements, fixture, 'miss'));
 		counts.eligible_hit_functions += hit.functions;
 		counts.eligible_hit_application_array_literals += hit.application_array_literals;
 		counts.eligible_hit_arrays += hit.arrays;
@@ -301,7 +321,11 @@ function exercise(bundle, observed) {
 				`${tick}:${enabled ? expectedValues.join(',') : 'off'}`,
 				fixture.name,
 			);
-			assert.equal(records.length, expectedValues.length, `${fixture.name} observations`);
+			assert.equal(
+				records.length,
+				fixture.control ? 0 : expectedValues.length,
+				`${fixture.name} observations`,
+			);
 			for (let index = 0; index < records.length; index++) {
 				const record = records[index];
 				assert.equal(record.box.value, expectedValues[index], `${fixture.name} value`);
@@ -355,7 +379,13 @@ function exercise(bundle, observed) {
 			globalThis[COUNTER_GLOBAL] = emptyCounters();
 			work();
 			const counters = { ...globalThis[COUNTER_GLOBAL] };
-			if (observed) measurements[`${fixture.name}_${name}`] = { renders, counters };
+			if (observed)
+				measurements[`${fixture.name}_${name}`] = {
+					fixture: fixture.name,
+					phase: name,
+					renders,
+					counters,
+				};
 		}
 
 		phase('mount', 1, () => compare(render(1, 0), 'fresh', 0));
@@ -651,10 +681,12 @@ try {
 		}
 		ops.callback_name_mismatches = val(nameDifferences.length);
 		onePerRender.callback_name_mismatches = val(1);
-		for (const [phase, measurement] of Object.entries(observed.measurements)) {
-			for (const [metric, count] of Object.entries(summarizedCounters(measurement.counters))) {
-				ops[`${phase}_${metric}`] = val(count);
-				onePerRender[`${phase}_${metric}`] = val(measurement.renders || 1);
+		for (const [key, measurement] of Object.entries(observed.measurements)) {
+			const fixture = CASES.find(({ name }) => name === measurement.fixture);
+			const counters = memoCounters(observed.measurements, fixture, measurement.phase);
+			for (const [metric, count] of Object.entries(summarizedCounters(counters))) {
+				ops[`${key}_${metric}`] = val(count);
+				onePerRender[`${key}_${metric}`] = val(measurement.renders || 1);
 			}
 		}
 		targets.push({
@@ -674,9 +706,9 @@ try {
 			console.log(`  callback-name mismatches: ${JSON.stringify(nameDifferences)}`);
 		}
 		for (const fixture of CASES) {
-			const hit = summarizedCounters(observed.measurements[`${fixture.name}_hit`].counters);
+			const hit = summarizedCounters(memoCounters(observed.measurements, fixture, 'hit'));
 			console.log(
-				`  ${fixture.name}: ${hit.functions} function expressions, ${hit.arrays} array creations / ${REPEATS} dependency-hit renders`,
+				`  ${fixture.name}${fixture.control ? ' (subtracted from each scenario)' : ''}: ${hit.functions} function expressions, ${hit.arrays} array creations / ${REPEATS} dependency-hit renders`,
 			);
 		}
 	}

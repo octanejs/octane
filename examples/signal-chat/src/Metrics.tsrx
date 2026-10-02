@@ -1,15 +1,24 @@
-import { useLayoutEffect, useState } from 'octane';
+import { useLayoutEffect } from 'octane';
 import 'octane/signals';
 import { session$ } from './State.tsrx';
-import { captureSnapshot, exportCapture, recordActivation } from './measurements.ts';
+import {
+	captureEnabled$,
+	captureTruncated$,
+	exportBrowserTrace,
+	exportState$,
+	observationCount$,
+	observationRows$,
+	startCapturePolling,
+	timings$,
+	traceHref,
+} from './CaptureState.tsrx';
+import { recordActivation } from './measurements.ts';
 
 export function Metrics() @{
-	const [capture, setCapture] = useState(captureSnapshot());
-	const [exportState, setExportState] = useState('');
+	'use dom bindings';
 	useLayoutEffect(() => {
 		recordActivation('metrics');
-		const timer = setInterval(() => setCapture(captureSnapshot()), 400);
-		return () => clearInterval(timer);
+		return startCapturePolling();
 	}, []);
 	<section class="metrics" aria-label="Capture measurements">
 		<header class="panel-header">
@@ -20,22 +29,17 @@ export function Metrics() @{
 			Navigation → observed DOM. Times include capture overhead and are not paint or INP.
 		</p>
 		<dl class="timings">
-			@for (const region of ['shell', 'answer', 'history', 'tools']; key region) {
-				const observation = capture.observations.find(
-					(entry) => entry.region === region && entry.event === 'dom-observed',
-				);
+			@for (const timing of timings$.get(); key timing.region) {
 				<div>
-					<dt>{region as string}</dt>
-					<dd>
-						{observation ? `${observation.at.toFixed(1)} ms` : '—'}
-					</dd>
+					<dt>{timing.region as string}</dt>
+					<dd>{timing.label as string}</dd>
 				</div>
 			}
 		</dl>
-		@if (!capture.enabled) {
+		@if (!captureEnabled$.get()) {
 			<p>Observation disabled or waiting for bootstrap.</p>
 		}
-		@if (capture.truncated) {
+		@if (captureTruncated$.get()) {
 			<p role="alert">Browser capture limit reached.</p>
 		}
 		@try {
@@ -50,22 +54,11 @@ export function Metrics() @{
 					{String(config.turns)}
 					turns
 				</p>
-				<button
-					type="button"
-					onClick={() => {
-						setExportState('Exporting…');
-						void exportCapture(config.run).then(
-							() => setExportState('Exported'),
-							(error: unknown) => setExportState(String(error)),
-						);
-					}}
-				>Export browser trace</button>
-				<output>{exportState as string}</output>
-				<a
-					href={'/__lab/trace?run=' + encodeURIComponent(config.run)}
-					target="_blank"
-					rel="noreferrer"
-				>Producer trace ↗</a>
+				<button type="button" onClick={() => exportBrowserTrace(config.run)}>
+					Export browser trace
+				</button>
+				<output>{exportState$ as string}</output>
+				<a href={traceHref(config.run)} target="_blank" rel="noreferrer">Producer trace ↗</a>
 				<small>
 					Run
 					<code>{config.run as string}</code>
@@ -77,14 +70,12 @@ export function Metrics() @{
 			<p>Capture configuration failed.</p>
 		}
 		<details>
-			<summary>Observation log ({String(capture.observations.length)})</summary>
+			<summary>Observation log ({observationCount$ as string})</summary>
 			<ol class="observation-log">
-				@for (const entry of capture.observations; key capture.observations.indexOf(entry)) {
+				@for (const entry of observationRows$.get(); key entry.index) {
 					<li>
-						<time>{entry.at.toFixed(1) as string}</time>
-						<span>{`${entry.region ?? 'document'} · ${entry.event}${
-							entry.revision === undefined ? '' : ` · r${entry.revision}`
-						}`}</span>
+						<time>{entry.at as string}</time>
+						<span>{entry.label as string}</span>
 					</li>
 				}
 			</ol>
