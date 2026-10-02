@@ -315,6 +315,7 @@ type ClientErrorArguments = {
 	330: [];
 	331: [];
 	336: [unknown];
+	337: [];
 };
 
 export function formatClientError<Code extends keyof ClientErrorArguments>(
@@ -1374,6 +1375,11 @@ export function formatClientError<Code extends keyof ClientErrorArguments>(
 			case 336:
 				return formatDevErrorMessage(
 					"`<textarea>` children must be text: strings, numbers, or arrays of them. One child was %s. A textarea's content is its default value, so it cannot contain elements; render them outside the textarea or pass a string.",
+					args,
+				);
+			case 337:
+				return formatDevErrorMessage(
+					'Structural hydration leases do not support @try regions.',
 					args,
 				);
 			default:

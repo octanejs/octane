@@ -60,6 +60,13 @@ export const HYDRATION_FOR_ARM_INDEX = HYDRATION_FOR_PREFIX.length;
  */
 export const TRY_CATCH_COMMENT = 'oct-catch:';
 
+/** Leads a resolved `@try` arm whose server render reserved sequential IDs. */
+export const SUSPENSE_RESOLVED_COMMENT = 'oct-suspense:';
+/** Comment-data prefix left in a swapped boundary for hydration seed scoping. */
+export const STREAM_SEED_COMMENT = 'oct-seed:';
+/** A server arm with untransportable demand is mounted fresh within its own range. */
+export const NATIVE_SIGNAL_FRESH_COMMENT = 'oct-native-fresh:';
+
 /**
  * Serialize one `useId()` value. The client regenerates the id the server
  * already wrote, so the namespace prefix, the `in-` infix, the base-36 ordinal,
