@@ -17,7 +17,7 @@ const FIXTURE = join(
 	'packages/octane/tests/hydration/_fixtures/suspended-clone-mismatch.tsrx',
 );
 type Fixture = typeof import('./_fixtures/suspended-clone-mismatch.tsrx');
-type Component = 'GateBranch' | 'GateForm' | 'GateNested';
+type Component = 'GateBranch' | 'GateForm' | 'GateNested' | 'GateEmptyList' | 'GateLongerList';
 
 const server = loadServerFixture<Fixture>(FIXTURE, { id: 'suspended-clone-mismatch.tsrx' });
 
@@ -170,4 +170,28 @@ describe.each([true, false])('suspended @try arm rebuilt during hydration (dev=%
 		expect(structural()).toEqual(expected.structural);
 		expect(recoverable).toHaveLength(expected.recoverable);
 	});
+
+	it.each(['GateEmptyList', 'GateLongerList'] as const)(
+		'leaves the server children of a de-opt host in place while pending (%s)',
+		async (component) => {
+			const expected = await control(component);
+
+			const resume = serve(component);
+			const served = markup();
+			const host = container.querySelector('ul');
+			const recoverable: unknown[] = [];
+			hydrate(component, recoverable);
+			await act(() => {});
+
+			expect(markup()).toBe(served);
+			expect(container.querySelector('ul')).toBe(host);
+			expect(recoverable).toEqual([]);
+
+			await resume();
+			expect(markup()).toBe(expected.html);
+			expect(container.querySelector('ul')).toBe(host);
+			expect(structural()).toEqual(expected.structural);
+			expect(recoverable).toHaveLength(expected.recoverable);
+		},
+	);
 });

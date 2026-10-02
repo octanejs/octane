@@ -33090,6 +33090,7 @@ function reconcileDeoptChildren(el: Element, children: any, ownerBlock: Block): 
 	// so just build + append each child. Skips the keyed-match Map / Set / reorder
 	// bookkeeping below, which is the hot path for large initial mounts.
 	if (firstChild === null) {
+		saveDeoptChildren(el);
 		for (let i = 0; i < next.length; i++) {
 			const node = reconcileDeoptNode(null, next[i], ownerBlock, childNs);
 			if (node !== null) {
@@ -33199,6 +33200,7 @@ function reconcileDeoptChildren(el: Element, children: any, ownerBlock: Block): 
 		const want = result[i];
 		const at = hasForeign ? nextDeoptOwnedChild(cursor, hydrationOwnsUnstamped === true) : cursor;
 		if (at !== want) {
+			saveDeoptChildren(el);
 			if (journal) journalRootChildren(el);
 			if (renderingFocus === null) (STAGED_DOM?.view(el) ?? el).insertBefore(want, at);
 			else {
@@ -33210,6 +33212,16 @@ function reconcileDeoptChildren(el: Element, children: any, ownerBlock: Block): 
 		// detaching want. Read its successor only after that movement completes.
 		cursor = getNextSibling(want);
 	}
+}
+
+/**
+ * Before reconcileDeoptChildren inserts or moves children of a server host it
+ * is hydrating: a speculative attempt records them, so that one which suspends
+ * leaves the server's children as they were (HydrationCapability.save).
+ */
+function saveDeoptChildren(el: Element): void {
+	const hydration = activeHydration();
+	if (hydration !== null && !hydration.isFresh(el)) hydration.save(el);
 }
 
 // Resume point of an owned-children walk after a foreign portal range: the first

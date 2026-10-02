@@ -1,3 +1,5 @@
+import { createElement, type OctaneNode } from 'octane';
+
 function read(value: unknown): string {
 	if (value !== undefined) throw value;
 	return 'ok';
@@ -60,6 +62,38 @@ export function GateNested(props: { server?: boolean }) @{
 				} @pending {
 					<p>{'inner pending'}</p>
 				}
+				<GateLeaf />
+			</>
+		} @pending {
+			<p>{'pending'}</p>
+		}
+	</div>
+}
+
+function list(items: string[]): OctaneNode {
+	return createElement('ul', null, items.map((item) => createElement('li', { key: item }, item)));
+}
+
+// The server's de-opt host is empty; the client fills it.
+export function GateEmptyList(props: { server?: boolean }) @{
+	<div>
+		@try {
+			<>
+				{list(props.server ? [] : ['client'])}
+				<GateLeaf />
+			</>
+		} @pending {
+			<p>{'pending'}</p>
+		}
+	</div>
+}
+
+// The client renders one more child into the server's de-opt host.
+export function GateLongerList(props: { server?: boolean }) @{
+	<div>
+		@try {
+			<>
+				{list(props.server ? ['a'] : ['a', 'b'])}
 				<GateLeaf />
 			</>
 		} @pending {
