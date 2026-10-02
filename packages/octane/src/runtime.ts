@@ -19404,6 +19404,47 @@ class HydrationCapability {
 	}
 
 	/**
+	 * Runs after a branch's first hydrating render, which adopted the server's
+	 * arm range from `first` to `end`. Every range the arm claims parks the
+	 * cursor past it, so once the arm has claimed something, a server range
+	 * still at the cursor is one that nothing in the arm claimed: the server
+	 * rendered another arm here, longer than this one. Discard the server
+	 * content from the cursor up to `end`, stopping at any client nodes that
+	 * mismatch recovery built there, and report it once.
+	 *
+	 * An arm that claimed nothing leaves the cursor on `first`, and the whole
+	 * range is then the server's other arm rather than a tail after this one.
+	 * The cursor does not move past the elements and text that a template
+	 * adopts either, so at an element or text node it cannot tell what the arm
+	 * adopted from what the server rendered for another arm. Both stay.
+	 */
+	discardArmTail(scope: Scope, slotKey: number, first: Node, end: Node): void {
+		const from = this.node;
+		if (from === first || !this.isOpen(from)) return;
+		let stop: Node | null = null;
+		let node: Node | null = from;
+		while (node !== null && node !== end) {
+			if (stop === null && this.freshNodes.has(node)) stop = node;
+			node = getNextSibling(node);
+		}
+		// Clear it only when the cursor precedes `end`.
+		if (node === null) return;
+		if (PRESENTATION_HYDRATION?.revision !== undefined) presentationMiss();
+		this.save(domNode(end).parentNode!);
+		// Captures that changed before a dormant boundary activated legitimately
+		// differ from the server's; still discard, but there is nothing to report.
+		if (!this.staleServerValues) {
+			noteRecoverableHydrationError(() => new Error(formatClientError(51)));
+			if (process.env.NODE_ENV !== 'production') {
+				const loc = siteLoc(scope, slotKey);
+				if (loc) this.warnStructural(loc, 'the end of the branch', this.describe(from));
+			}
+		}
+		removeRange(from, stop ?? end);
+		this.node = end;
+	}
+
+	/**
 	 * Remove the server content from `from` up to `end` that a child slot's
 	 * value cannot adopt, and point the cursor at `end`. Reports the structural
 	 * mismatch (`expected`, and the `actual` server node or a description of
@@ -41912,6 +41953,7 @@ function renderBranchSlot(
 				let rebuild = false;
 				let inner: Comment | null = null;
 				let innerEnd: Comment | null = null;
+				let first: Node | null = null;
 				if (hydration !== null && hydration.isOpen(getNextSibling(state.start))) {
 					inner = getNextSibling(state.start) as Comment;
 					innerEnd = hydration.close(inner);
@@ -41947,7 +41989,7 @@ function renderBranchSlot(
 				if (inner !== null) {
 					bStart = inner;
 					bEnd = innerEnd as Comment;
-					hydration!.node = getNextSibling(inner);
+					hydration!.node = first = getNextSibling(inner);
 				} else {
 					bStart = state.start;
 					bEnd = state.end as Node;
@@ -41981,6 +42023,9 @@ function renderBranchSlot(
 					hydration!.node = getNextSibling(state.end as Node);
 				} else {
 					renderBlock(b);
+					// The server may have rendered another arm here, longer than this one.
+					if (inner !== null && hydration!.node !== bEnd)
+						hydration!.discardArmTail(parentScope, slotKey, first!, bEnd);
 				}
 			} else if (hydration !== null && getNextSibling(state.start) !== state.end) {
 				if (PRESENTATION_HYDRATION?.revision !== undefined) throw new Error(formatClientError(75));
