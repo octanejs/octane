@@ -11797,6 +11797,12 @@ export function componentSlotLite<P>(
 	if (hydration !== null && adoptedClose !== null) {
 		hydration.settleClaim(scope, adoptedClose, claimed, parentScope, slotKey);
 		hydration.node = getNextSibling(adoptedClose);
+	} else if (hydration !== null) {
+		// A hydrating replay, such as a suspended activation's resume, re-renders
+		// an adopted range without adopting it again; its new siblings still adopt
+		// from after it.
+		const range = hydration.liteRanges.get(scope);
+		if (range !== undefined) hydration.node = getNextSibling(range.end);
 	}
 }
 
@@ -14741,6 +14747,8 @@ interface PreservedHydrateActivation {
 	capture: OffscreenCapture;
 	source: Block | null;
 	cursor: Node | null;
+	/** The source mounted inside client-built DOM, which it resumes as. */
+	fresh: boolean;
 }
 
 // Allocate bookkeeping only when an already-visible SSR arm really suspends.
@@ -14892,8 +14900,9 @@ function findSuspendedHydrateBlock(scope: Scope, thenable: TrackedThenable<unkno
 function preserveSuspendedHydrateActivation(
 	state: HydrateSlot,
 	hydration: HydrationCapability,
-	thenable: TrackedThenable<unknown>,
+	suspension: SuspenseException,
 ): void {
+	const thenable = suspension.thenable;
 	const suspendedBlock = findSuspendedHydrateBlock(state.block, thenable);
 	const activation: PreservedHydrateActivation = {
 		hydration,
@@ -14902,7 +14911,9 @@ function preserveSuspendedHydrateActivation(
 		capture: WIP_CAPTURE!,
 		source: suspendedBlock === state.block ? null : suspendedBlock,
 		cursor: hydration.node,
+		fresh: hydration.freshSuspension === suspension,
 	};
+	hydration.freshSuspension = null;
 	const activations = (preservedHydrateActivations ??= new WeakMap());
 	if (!activations.has(state)) preservedHydrateActivationCount++;
 	activations.set(state, activation);
@@ -15092,7 +15103,7 @@ function createHydrateBoundaryBody(
 			// The SSR arm is already the visible content. Let its adopted try block
 			// remain connected and retry adoption in the same hydration capability
 			// once application data settles, without ever mounting a cloned fallback.
-			preserveSuspendedHydrateActivation(state, hydration, error.thenable);
+			preserveSuspendedHydrateActivation(state, hydration, error);
 			return;
 		}
 		state.hydrated = true;
@@ -15853,12 +15864,16 @@ function activateHydrateBoundary(state: HydrateSlot): void {
 			// ranges on an ordinary parent replay. Complete the actually suspended
 			// leaf at its saved cursor first, then let its ancestors reconcile the
 			// already-adopted siblings without treating their range as fresh DOM.
+			// A leaf that mounted inside a mismatch's client-built replacement has
+			// no server DOM to adopt and completes as a client render.
+			const source = preserved.source;
 			hydration.node = preserved.cursor;
 			try {
-				renderBlock(preserved.source);
+				if (preserved.fresh) hydration.suspend(() => renderBlock(source));
+				else renderBlock(source);
 			} catch (error) {
 				if (!isSuspenseException(error)) throw error;
-				preserveSuspendedHydrateActivation(state, hydration, error.thenable);
+				preserveSuspendedHydrateActivation(state, hydration, error);
 				return;
 			}
 		}
@@ -18876,8 +18891,16 @@ class HydrationCapability {
 	 * does not claim. Undefined until the template adopts claimFrom.
 	 */
 	private claimEnd: Node | null | undefined = undefined;
+	/** The last suspension thrown out of a client-built subtree (suspend). */
+	freshSuspension: SuspenseException | null = null;
 	/** Skip component-frame adoption until the declared container owner. */
 	passthroughRanges = false;
+	/**
+	 * The root renders through a passthrough shell. Its owner adopts the first
+	 * server range it meets, so the ranges below it can sit a level off the
+	 * client components that adopt them.
+	 */
+	passthroughRoot = false;
 	/** A slot lent a server range whose first render has yet to claim it. */
 	lentSlot: ChildSlot | null = null;
 	nativeAdoption?: NativeAdoptionState;
@@ -18986,6 +19009,9 @@ class HydrationCapability {
 		const previousNative = setNativeAdoptionResolver(null);
 		try {
 			return fn();
+		} catch (error) {
+			if (isSuspenseException(error)) this.freshSuspension = error;
+			throw error;
 		} finally {
 			setNativeAdoptionResolver(previousNative);
 			this.depth--;
@@ -20179,8 +20205,12 @@ class HydrationCapability {
 					? fragmentRootMatches(cursor, template, partialStyles)
 					: lazyFragmentRootMatches(cursor, lazy!))
 			) {
-				if (cursor === this.claimFrom) this.claimRoots(cursor, template ?? lazy!);
-				return { __oct_vfrag: true, firstChild: cursor } as unknown as Node;
+				// A leading hole matches any server node, so a fragment that is a
+				// range's content must also fit in that range. Roots that outnumber
+				// what the server rendered there belong to other content, and only a
+				// rebuild creates the static ones.
+				if (cursor !== this.claimFrom || this.claimRoots(cursor, template ?? lazy!) || claimsRoot)
+					return { __oct_vfrag: true, firstChild: cursor } as unknown as Node;
 			}
 			return this.rebuildFragment(template ?? resolveLazyTemplate(lazy!), cursor, loc);
 		}
@@ -20202,8 +20232,12 @@ class HydrationCapability {
 	 * are, a component inheriting them, or the lite component that adopted the
 	 * range. A component that adopts `root` without a range of its own renders
 	 * in its own scope, and the slots after it claim the nodes after its root.
+	 * Returns false when the range ends before the template's roots do: every
+	 * root, a hole included, renders at least one server node, so the server
+	 * rendered other content there. Below a passthrough root, the range may
+	 * instead be one level inside the template's (passthroughRoot).
 	 */
-	private claimRoots(root: Node, fragment: Node | LazyTemplateRecord | null): void {
+	private claimRoots(root: Node, fragment: Node | LazyTemplateRecord | null): boolean {
 		const open = domNode(root).previousSibling;
 		const scope = CURRENT_SCOPE;
 		if (
@@ -20211,20 +20245,20 @@ class HydrationCapability {
 			scope === null ||
 			(scope.block.startMarker !== open && this.liteRanges.get(scope)?.start !== open)
 		)
-			return;
+			return true;
 		this.claimFrom = null;
 		let node: Node | null = root;
-		// Stepping over each root's own range, the first close marker is the end
-		// of the claimed range: the server's range ends before the template's
-		// roots do, and nothing follows them.
+		// Step over each root's own range. A close marker first is the end of the
+		// claimed range, and nothing follows it.
 		for (let i = fragment === null ? 1 : templateRootCount(fragment); i > 1; i--) {
 			node = this.sibling(node, 1);
 			if (node === null || isBlockClose(node)) {
 				this.claimEnd = node;
-				return;
+				return this.passthroughRoot;
 			}
 		}
 		this.claimEnd = getNextSibling(this.isOpen(node) ? this.close(node) : node);
+		return true;
 	}
 
 	/**
@@ -47619,7 +47653,7 @@ function hydrateRootWithOutputHandler(
 		}
 		if (nativeManifest !== undefined)
 			hydration.nativeAdoption = ownNativeAdoption(rootBlock, nativeManifest);
-		hydration.passthroughRanges =
+		hydration.passthroughRanges = hydration.passthroughRoot =
 			(body as ComponentBody & { [HYDRATION_RANGE_BOUNDARY]?: 'passthrough' | 'owner' })[
 				HYDRATION_RANGE_BOUNDARY
 			] === 'passthrough';
