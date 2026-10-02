@@ -101,6 +101,17 @@ export function parseBindingMarker(data: string): BindingMarker | null {
 	return null;
 }
 
+/**
+ * `isBindingOpenComment` as regular-expression source over the payload after
+ * its leading `[`. The inline stream swap runtime is script text and cannot
+ * call this module, so it embeds the source to balance binding ranges in a
+ * streamed fallback; a stream test holds both spellings of the grammar equal.
+ * `[^]` rather than `.` keeps line separators inside an encoded string key, and
+ * the groups capture because a non-capturing group costs every streamed page.
+ */
+export const BINDING_OPEN_TAIL_SOURCE =
+	'f[01];b;[^;]+;[^;]+|b;[^;]+;(root|[^;]+;([tvso\\d]|-1|[1-9]\\d+|k;[sn]:[^]+))';
+
 export function isBindingOpenComment(data: string): boolean {
 	// The general hydration/early-stream path only counts balanced ranges. Keep
 	// exact receipt decoding, key validation, and allocations in adoption itself.

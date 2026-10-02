@@ -269,6 +269,34 @@ export function SharedWaveApp(props: StreamProps) @{
 	</section>
 }
 
+// The fallback renders its lists directly beside the stream sentinel, so the
+// reveal must balance their ranges to reach the exit-annotated tail.
+export function ListExitApp(props: StreamProps & { rows: string[]; cells: string[] }) @{
+	<section>
+		<>
+			@try {
+				<StreamTextContent promise={props.promise} id="list-exit-content" />
+			} @pending {
+				<>
+					@for (const row of props.rows; key row) {
+						<ViewTransition exit="row-exit">
+							<div id={'list-exit-row-' + row}>{row as string}</div>
+						</ViewTransition>
+					}
+					@for (const cell of props.cells; key cell) {
+						<ViewTransition exit="row-exit">
+							<div id={'list-exit-cell-' + cell}>{cell as string}</div>
+						</ViewTransition>
+					}
+					<ViewTransition exit="tail-exit">
+						<p id="list-exit-tail">{'Loading'}</p>
+					</ViewTransition>
+				</>
+			}
+		</>
+	</section>
+}
+
 function LateViewContent(props: StreamProps) @{
 	const text = use(props.promise) as string;
 	<ViewTransition enter="late-enter">

@@ -30,6 +30,7 @@ import {
 	StaticScopeStyleApp,
 	ScopedRefNameApp,
 	InvalidScopeApp,
+	ListExitApp,
 	QueuedHydrationApp,
 } from './_fixtures/view-transition-ssr.tsrx';
 
@@ -578,6 +579,51 @@ describe('ReactDOMFizzViewTransition (ported)', () => {
 			native.frames[0].finish();
 			await Promise.resolve();
 			expect(native.frames).toHaveLength(1);
+		} finally {
+			native.restore();
+		}
+	});
+
+	it('captures every exit of a fallback that renders lists directly', async () => {
+		const native = mockNativeTransitions();
+		try {
+			const d = deferred<string>();
+			const c = collector();
+			const props = { promise: d.promise, rows: ['a', 'b'], cells: ['c'] };
+			ServerRT.renderToPipeableStream(server.ListExitApp, props).pipe(c.dest);
+			d.resolve('Content');
+			await c.ended;
+			container.innerHTML = c.chunks.join('');
+			activate(container);
+			await Promise.resolve();
+			expect(native.frames).toHaveLength(1);
+			const exits = Object.fromEntries(
+				Array.from(container.querySelectorAll<HTMLElement>('[id^="list-exit-"]'))
+					.filter((el) => !el.closest('[hidden]'))
+					.map((el) => [el.id, el.style.viewTransitionClass]),
+			);
+			expect(exits).toEqual({
+				'list-exit-row-a': 'row-exit',
+				'list-exit-row-b': 'row-exit',
+				'list-exit-cell-c': 'row-exit',
+				'list-exit-tail': 'tail-exit',
+			});
+			native.frames[0].update();
+			expect(Array.from(container.querySelectorAll('[id^="list-exit-"]'), (el) => el.id)).toEqual([
+				'list-exit-content',
+			]);
+			native.frames[0].ready();
+			native.frames[0].finish();
+			await Promise.resolve();
+
+			const content = container.querySelector('#list-exit-content');
+			const root = hydrateRoot(container, ListExitApp, {
+				...props,
+				promise: new Promise<string>(() => {}),
+			});
+			await Promise.resolve();
+			expect(container.querySelector('#list-exit-content')).toBe(content);
+			root.unmount();
 		} finally {
 			native.restore();
 		}
