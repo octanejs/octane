@@ -140,7 +140,10 @@ transparent: the same witnessed inputs produce the same result and render work
 has no application-visible side effects. Production client builds apply that
 assertion to every user-authored render operation—local, imported, static or
 computed member, call-produced, callback-bearing, constructed, or tagged—and can
-then reuse eligible regions and keyed rows. A `use*` name is not a purity oracle
+then reuse eligible regions and keyed rows. An eligible expression in a host
+hole, host attribute, or component prop is cached as if a `const` in setup named
+it; one in a directive arm or component children still evaluates only when it
+renders. A `use*` name is not a purity oracle
 and does not reintroduce Rules of Hooks; actual hook calls stay in normal
 component or custom-hook setup and use compiler-assigned slots. Built-ins are
 recognized by import provenance, including optional calls, and same-module

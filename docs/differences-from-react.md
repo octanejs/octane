@@ -279,6 +279,16 @@ stay on the conservative setup path. Their context subscriptions, state cells,
 suspension points, and effect lifecycles remain outside ordinary projection
 caches.
 
+An eligible expression that the template evaluates on every render (a host
+child hole, a host attribute, or a component prop) gets the same cache as that
+expression named by a `const` in setup. `<output>{total.toFixed(2)}</output>`
+recomputes only when `total` changes, as it does under React Compiler.
+Expressions in `@if`, `@for`, `@switch`, and `@try` arms, component children,
+and built-in boundaries still evaluate only when they render. Expressions that
+contain JSX, event handlers, refs, and keys keep their own lowering. A
+component that returns JSX gets the cache only after an authored hook call, so
+a hookless one remains an ordinary function.
+
 For an eligible operation, the cache guard witnesses the callable and its
 receiver as well as explicit arguments. A derived receiver such as
 `factory().read(input)` is represented by the factory, its receiver, and its

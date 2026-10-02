@@ -3553,6 +3553,44 @@ function immutableArrayProjection(node, provenance) {
 	return walk(node) && found !== null ? found : null;
 }
 
+// The admission rule for an automatic calculation, shared by authored `const`
+// declarations and the Strong render expressions hoisted into them. Returns the
+// unwrapped initializer with its component-local dependencies, or null when the
+// value must stay live. `selfName` is the declared name, if any.
+function autoCalculationOf(expression, selfName, componentLocals, ctx, immutableStates) {
+	const init = unwrapTsExpr(expression);
+	// An arrow/function init is auto-callback's job, not ours.
+	if (FN_TYPES.has(init?.type)) return null;
+	if (!isPropCreationExpr(init, ctx)) return null;
+	// Every call reached during render must satisfy the same projection contract
+	// the region cache uses. Compatibility-mode member calls fail closed.
+	const immutableProjection = immutableArrayProjection(init, immutableStates);
+	if (immutableProjection === null && containsRenderCall([init], ctx)) return null;
+	const deps = [];
+	const seen = new Set();
+	const free = collectFreeIdentifiers(init, []);
+	for (const name of free) {
+		if (name === selfName) return null; // self-referential; leave alone
+		if (!componentLocals.has(name)) continue;
+		if (seen.has(name)) continue;
+		seen.add(name);
+		deps.push(name);
+	}
+	// Every free name must be a witnessed component local. An unwitnessed
+	// module/global read would make the cache freeze on something no dependency
+	// can observe, which is a different bargain from the one above.
+	for (const name of free) {
+		if (
+			!componentLocals.has(name) &&
+			!ctx.moduleFunctionDeclarations?.has(name) &&
+			!ctx.importedNames?.has(name)
+		) {
+			return null;
+		}
+	}
+	return { init, deps, immutableProjection };
+}
+
 function rewriteAutoCalculation(
 	stmt,
 	componentLocals,
@@ -3565,35 +3603,15 @@ function rewriteAutoCalculation(
 	const decl = stmt.declarations[0];
 	if (!decl || decl.id?.type !== 'Identifier' || !decl.init) return stmt;
 	if (!renderReadNames.has(decl.id.name)) return stmt;
-	const init = unwrapTsExpr(decl.init);
-	// An arrow/function init is auto-callback's job, not ours.
-	if (FN_TYPES.has(init?.type)) return stmt;
-	if (!isPropCreationExpr(init, ctx)) return stmt;
-	// Every call reached during render must satisfy the same projection contract
-	// the region cache uses. Compatibility-mode member calls fail closed.
-	const immutableProjection = immutableArrayProjection(init, immutableStates);
-	if (immutableProjection === null && containsRenderCall([init], ctx)) return stmt;
-	const deps = [];
-	const seen = new Set();
-	for (const name of collectFreeIdentifiers(init, [])) {
-		if (name === decl.id.name) return stmt; // self-referential; leave alone
-		if (!componentLocals.has(name)) continue;
-		if (seen.has(name)) continue;
-		seen.add(name);
-		deps.push(name);
-	}
-	// Every free name must be a witnessed component local. An unwitnessed
-	// module/global read would make the cache freeze on something no dependency
-	// can observe, which is a different bargain from the one above.
-	for (const name of collectFreeIdentifiers(init, [])) {
-		if (
-			!componentLocals.has(name) &&
-			!ctx.moduleFunctionDeclarations?.has(name) &&
-			!ctx.importedNames?.has(name)
-		) {
-			return stmt;
-		}
-	}
+	const calculation = autoCalculationOf(
+		decl.init,
+		decl.id.name,
+		componentLocals,
+		ctx,
+		immutableStates,
+	);
+	if (calculation === null) return stmt;
+	const { init, deps, immutableProjection } = calculation;
 	return {
 		...stmt,
 		declarations: [
@@ -3617,6 +3635,221 @@ function rewriteAutoCalculation(
 			},
 		],
 	};
+}
+
+// Built-in boundaries own when their props and children evaluate; an alias
+// imported from 'octane' is covered by octaneImportLocals.
+const BUILTIN_BOUNDARY_TAGS = new Set([
+	'Suspense',
+	'ErrorBoundary',
+	'Activity',
+	'unstable_Activity',
+	'Hydrate',
+	'ViewTransition',
+	'unstable_ViewTransition',
+	'Fragment',
+]);
+
+// Value facts about an expression that stay true of a `const` bound to it.
+const CALCULATION_VALUE_PROOFS = [
+	'octane_string_child',
+	'octane_primitive_text_child',
+	'octane_primitive_value',
+];
+
+/**
+ * Strong render expressions are cached exactly as if they were named (#1610).
+ * A Strong module asserts that every render-time call is a pure projection of
+ * witnessed inputs, so `<output>{total.toFixed(2)}</output>` and
+ * `const formatted = total.toFixed(2); <output>{formatted}</output>` are the
+ * same program. Only the declaration used to reach rewriteAutoCalculation.
+ *
+ * Each expression the template evaluates on every entered render (a host child
+ * hole, a host attribute, or an ordinary component prop) that the shared
+ * admission rule accepts moves to a compiler-named `const` appended to setup,
+ * and the template reads that name instead. Under the Strong contract, moving
+ * a pure projection from template evaluation to the end of setup is
+ * unobservable. Positions whose evaluation is conditional or deferred keep
+ * their expression: directive arms, component children (the child decides
+ * whether and when they render), and built-in boundaries. An expression holding
+ * JSX keeps its list and descriptor lowering, and event handlers, refs, and
+ * keys keep their wiring. A render tree that writes to anything keeps its whole
+ * evaluation order.
+ *
+ * Returns null when nothing moves; otherwise the copy-on-write render nodes,
+ * the declarations to append, and their names.
+ */
+function hoistStrongRenderCalculations(jsxNodes, ctx, immutableStates) {
+	if (ctx.strongMemo !== true || ctx.nativeReads || !ctx.currentComponentLocals) return null;
+	if (renderTreeWrites(jsxNodes)) return null;
+	const declarations = [];
+	const names = [];
+	const nodes = mapNodes(jsxNodes, visitNode);
+	return declarations.length === 0 ? null : { jsxNodes: nodes, declarations, names };
+
+	function visitNode(node) {
+		switch (node?.type) {
+			case 'JSXElement':
+				return visitElement(node);
+			case 'JSXFragment': {
+				const children = mapNodes(node.children, visitNode);
+				return children === node.children ? node : { ...node, children };
+			}
+			case 'JSXExpressionContainer':
+				return visitContainer(node);
+			default:
+				return node;
+		}
+	}
+
+	function visitElement(node) {
+		const opening = node.openingElement;
+		const tag = opening?.name;
+		const component = isComponentTag(node);
+		if (component) {
+			if (
+				node.activityDescriptor === true ||
+				tag?.type !== 'JSXIdentifier' ||
+				BUILTIN_BOUNDARY_TAGS.has(tag.name) ||
+				ctx.octaneImportLocals?.has(tag.name)
+			) {
+				return node;
+			}
+		} else if (tag?.type !== 'JSXIdentifier' || tag.name === 'style' || tag.name === 'script') {
+			return node;
+		}
+		const attributes = mapNodes(opening.attributes, (attribute) => {
+			if (attribute.type !== 'JSXAttribute' || attribute.name?.type !== 'JSXIdentifier') {
+				return attribute;
+			}
+			const name = attribute.name.name;
+			if (name === 'key' || name === 'ref' || name === 'children') return attribute;
+			if (!component && /^on[A-Z]/.test(name)) return attribute;
+			if (attribute.value?.type !== 'JSXExpressionContainer') return attribute;
+			const value = visitContainer(attribute.value);
+			return value === attribute.value ? attribute : { ...attribute, value };
+		});
+		// Component children render inside the child, if at all.
+		const children = component ? node.children : mapNodes(node.children, visitNode);
+		if (attributes === opening.attributes && children === node.children) return node;
+		return {
+			...node,
+			openingElement: attributes === opening.attributes ? opening : { ...opening, attributes },
+			children,
+		};
+	}
+
+	function visitContainer(container) {
+		const expression = container.expression;
+		const inner = unwrapTsExpr(expression);
+		if (!inner || inner.type === 'JSXEmptyExpression' || containsJsxNode(inner)) return container;
+		if (autoCalculationOf(inner, null, ctx.currentComponentLocals, ctx, immutableStates) === null) {
+			return container;
+		}
+		const name = allocCompilerName(ctx, '__calc');
+		declarations.push(inheritOriginLoc(b.const(name, inner), inner));
+		names.push(name);
+		// A child warm plan runs outside this body, so it keeps the authored prop.
+		(ctx.hoistedRenderCalculations ??= new Map()).set(name, expression);
+		const reference = b.id(name, inner);
+		for (const proof of CALCULATION_VALUE_PROOFS) {
+			if (inner.metadata?.[proof] === true) reference.metadata[proof] = true;
+		}
+		return { ...container, expression: replaceUnwrappedExpression(expression, reference) };
+	}
+}
+
+// Does this top-level statement call an authored, unconditional Octane hook?
+// After one, a return-JSX function already requires a render scope, so a cache
+// cannot change how it may be called.
+function establishesRenderScope(statement) {
+	if (statement.type === 'VariableDeclaration') {
+		return (statement.declarations || []).some(
+			(declaration) => stableHookCallName(unwrapTsExpr(declaration.init)) !== null,
+		);
+	}
+	return (
+		statement.type === 'ExpressionStatement' &&
+		stableHookCallName(unwrapTsExpr(statement.expression)) !== null
+	);
+}
+
+// The return-JSX form of hoistStrongRenderCalculations. A top-level
+// `return <jsx>` reached after the render-scope proof above gets the same
+// calculations, declared immediately before it. Returns null when nothing moves.
+function hoistStrongReturnCalculations(statements, ctx) {
+	if (ctx.strongMemo !== true || ctx.nativeReads) return null;
+	let out = null;
+	const names = [];
+	let established = false;
+	for (let index = 0; index < statements.length; index++) {
+		const statement = statements[index];
+		if (established && statement.type === 'ReturnStatement' && isJsxNode(statement.argument)) {
+			const hoisted = hoistStrongRenderCalculations([statement.argument], ctx, null);
+			if (hoisted !== null) {
+				out ??= statements.slice(0, index);
+				out.push(...hoisted.declarations, { ...statement, argument: hoisted.jsxNodes[0] });
+				names.push(...hoisted.names);
+				continue;
+			}
+		}
+		out?.push(statement);
+		established ||= establishesRenderScope(statement);
+	}
+	return out === null ? null : { statements: out, names };
+}
+
+function mapNodes(nodes, map) {
+	if (!Array.isArray(nodes)) return nodes;
+	let out = nodes;
+	for (let index = 0; index < nodes.length; index++) {
+		const next = map(nodes[index]);
+		if (next === nodes[index]) continue;
+		if (out === nodes) out = nodes.slice();
+		out[index] = next;
+	}
+	return out;
+}
+
+// Rebuild the TS/paren wrappers unwrapTsExpr looked through around a new core.
+function replaceUnwrappedExpression(expression, replacement) {
+	if (expression === unwrapTsExpr(expression)) return replacement;
+	return {
+		...expression,
+		expression: replaceUnwrappedExpression(expression.expression, replacement),
+	};
+}
+
+// Does the render tree assign, update, or delete anything while it renders?
+// Function values run later and are skipped.
+function renderTreeWrites(nodes) {
+	let found = false;
+	const seen = new WeakSet();
+	walk(nodes);
+	return found;
+
+	function walk(node) {
+		if (found || node === null || typeof node !== 'object') return;
+		if (Array.isArray(node)) {
+			for (const child of node) walk(child);
+			return;
+		}
+		if (seen.has(node)) return;
+		seen.add(node);
+		if (FN_TYPES.has(node.type)) return;
+		if (
+			node.type === 'AssignmentExpression' ||
+			node.type === 'UpdateExpression' ||
+			(node.type === 'UnaryExpression' && node.operator === 'delete')
+		) {
+			found = true;
+			return;
+		}
+		for (const key in node) {
+			if (AST_WALK_SKIP_KEYS.has(key)) continue;
+			walk(node[key]);
+		}
+	}
 }
 
 // A cached calculation can own a renderable array only when its value never
@@ -16505,6 +16738,7 @@ function compileFunctionBody(node, ctx, name, parentNs = 'html', cssHash = null,
 	ctx._puInlineLowering = inlineLowering;
 	let warmThunk = null;
 	let staticChildOnly = false;
+	let hoistedCalculations = null;
 	if (options && options.autoCallback) {
 		const creations = [];
 		const warmChildren = [];
@@ -16529,6 +16763,18 @@ function compileFunctionBody(node, ctx, name, parentNs = 'html', cssHash = null,
 		// lowered by the authored inline tier rather than re-wrapped. Client only:
 		// a server render evaluates each body once, so a cache is pure overhead.
 		if (ctx.currentComponentLocals && ctx.mode !== 'server') {
+			// Strong inline render expressions become calculations too (#1610). A
+			// returned-output body lowers its JSX into a record whose holes may be
+			// evaluated later, so it keeps them inline.
+			const hoisted = returnedOutput
+				? null
+				: hoistStrongRenderCalculations(jsxNodes, ctx, immutableStateProvenance);
+			if (hoisted !== null) {
+				jsxNodes = hoisted.jsxNodes;
+				hoistedCalculations = hoisted.declarations;
+				workingStatements = [...workingStatements, ...hoistedCalculations];
+				ctx.currentComponentLocals = new Set([...ctx.currentComponentLocals, ...hoisted.names]);
+			}
 			const renderReadNames = collectRenderReadNames(jsxNodes, ctx);
 			if (renderReadNames.size > 0) {
 				workingStatements = workingStatements.map((statement) => {
@@ -16689,7 +16935,7 @@ function compileFunctionBody(node, ctx, name, parentNs = 'html', cssHash = null,
 	ctx._fnOrigin = node.loc ? node : (node.id ?? prevFnOrigin);
 	if (autoCalculatedDeclarations !== null) {
 		const refs = collectAutoCalculatedRenderableRefs(
-			statements,
+			hoistedCalculations === null ? statements : [...statements, ...hoistedCalculations],
 			jsxNodes,
 			autoCalculatedDeclarations,
 		);
@@ -18756,8 +19002,14 @@ function parallelUseWalkJsx(nodes, ctx, componentName, creations, warmChildren, 
 			if (key === 'ref' || key === 'key') return; // instance-wired props — skip this slot
 			let value;
 			if (a.value == null) value = b.literal(true, 'true', a);
-			else if (a.value.type === 'JSXExpressionContainer') value = a.value.expression;
-			else if (typeof a.value.value === 'string')
+			else if (a.value.type === 'JSXExpressionContainer') {
+				// A hoisted Strong calculation is declared inside the body; the warm
+				// plan runs outside it, so it evaluates the authored prop instead.
+				const hoisted = unwrapTsExpr(a.value.expression);
+				value =
+					(hoisted?.type === 'Identifier' && ctx.hoistedRenderCalculations?.get(hoisted.name)) ||
+					a.value.expression;
+			} else if (typeof a.value.value === 'string')
 				// JSX string attrs may hold raw newlines — re-derive a valid raw.
 				value = b.literal(a.value.value, JSON.stringify(a.value.value), a.value);
 			else value = a.value; // Literal
@@ -20459,7 +20711,12 @@ function compileReturnJsxFunction(node, ctx, options) {
 	ctx.currentMapTemps = mapTemps;
 	let newStatements;
 	try {
-		const authoredStatements = node.body.body || [];
+		let authoredStatements = node.body.body || [];
+		const hoisted = hoistStrongReturnCalculations(authoredStatements, ctx);
+		if (hoisted !== null) {
+			authoredStatements = hoisted.statements;
+			ctx.currentComponentLocals = new Set([...ctx.currentComponentLocals, ...hoisted.names]);
+		}
 		const renderedRoots = authoredStatements
 			.filter((statement) => statement.type === 'ReturnStatement' && isJsxNode(statement.argument))
 			.map((statement) => statement.argument);
@@ -20480,14 +20737,7 @@ function compileReturnJsxFunction(node, ctx, options) {
 					sourceStatement,
 				);
 			}
-			if (!renderScopeEstablished && sourceStatement.type === 'VariableDeclaration') {
-				renderScopeEstablished = (sourceStatement.declarations || []).some(
-					(declaration) => stableHookCallName(unwrapTsExpr(declaration.init)) !== null,
-				);
-			} else if (!renderScopeEstablished && sourceStatement.type === 'ExpressionStatement') {
-				renderScopeEstablished =
-					stableHookCallName(unwrapTsExpr(sourceStatement.expression)) !== null;
-			}
+			renderScopeEstablished ||= establishesRenderScope(sourceStatement);
 			if (ctx.nativeReads) {
 				const nativeCalculation = lowerNativeAutoCalculation(calculated, ctx, name, false);
 				if (nativeCalculation !== null)
