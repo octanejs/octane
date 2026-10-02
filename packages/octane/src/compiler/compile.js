@@ -698,6 +698,13 @@ function componentInvocationSite(ctx, node) {
 	)}`;
 }
 
+// The site of a compiler-synthesized fragment renderer: the client's `_frag$N`
+// and the server's `__sfragment`/`_sfrag$N` wrappers. They represent their
+// enclosing component's JSX rather than invoking a component, so neither
+// runtime gives them a signal instance level (RENDERER_INVOCATION_SITE there).
+// The server renders most returned JSX inline, and `.tsrx` has no renderer.
+const RENDERER_INVOCATION_SITE = 'r:';
+
 // Only signal-aware modules, and `$` hooks that return live signals, pay for a
 // custom-hook call site that keys the instance declarations it reaches. An
 // import alias may drop the `$`, so the exported name counts too, exactly as in
@@ -15534,10 +15541,9 @@ function ssrEmitTsrxExpression(node, ctx, name, inlinedSubs, parentNs, cssHash, 
 				b.literal(false),
 				undefinedNode(),
 				undefinedNode(),
-				// Hash the authored JSX, as the client's lowerHostFragment does, not
-				// the synthetic wrapper: every signal instance below this renderer
-				// chains its key from this site.
-				b.literal(componentInvocationSite(ctx, expr)),
+				// Like the client's lowerHostFragment renderer, this one keeps the
+				// enclosing component's signal identity.
+				b.literal(RENDERER_INVOCATION_SITE),
 			],
 			node,
 		);
@@ -22250,7 +22256,7 @@ function lowerHostFragment(
 	return inheritOriginLoc(
 		b.call(
 			'_$createElementFromConfig',
-			b.literal(componentInvocationSite(ctx, node)),
+			b.literal(RENDERER_INVOCATION_SITE),
 			b.id(fragName),
 			b.object(holeProps),
 		),
@@ -22664,7 +22670,7 @@ function serverValueDirectiveFold(
 		return inheritOriginLoc(
 			b.call(
 				'_$createElementFromConfig',
-				b.literal(componentInvocationSite(ctx, directive)),
+				b.literal(RENDERER_INVOCATION_SITE),
 				b.id(wrapperName),
 				b.object(descriptorProps),
 			),

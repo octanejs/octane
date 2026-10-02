@@ -1239,6 +1239,272 @@ export function App(props) @{ <main>@try { <List ids={props.ids} load={props.loa
 			}
 		},
 	);
+
+	// A component that returns JSX renders it through a compiled fragment or a
+	// host descriptor on the client, but inline on the server, and a `.tsrx`
+	// body has neither. Only authored component invocations may shape the
+	// instance identity of the signal components below that JSX.
+	const RETURNED_JSX_LEAF = `import { signal$ } from 'octane/signals';
+export function Leaf(props) {
+  const draft$ = signal$('x');
+  props.remember();
+  return <p><button onClick={() => draft$.set(draft$.get() + '!')}>edit</button><output>{String(draft$.get())}</output></p>;
+}`;
+	const RETURNED_JSX_APPS = [
+		{
+			shape: 'returned host chain',
+			ext: 'tsx',
+			leaves: 1,
+			source: `function Mid(props) { const [n] = useState(1); return <div data-n={n}><Leaf remember={props.remember}/></div>; }
+function Wrap(props) { return <section><Mid remember={props.remember}/></section>; }
+export function App(props) { return <main><Wrap remember={props.remember}/></main>; }`,
+		},
+		{
+			shape: 'host value prop',
+			ext: 'tsx',
+			leaves: 1,
+			source: `function Card(props) { return <section>{props.content}</section>; }
+export function App(props) { return <Card content={<div><Leaf remember={props.remember}/></div>}/>; }`,
+		},
+		{
+			shape: 'keyed returned rows',
+			ext: 'tsx',
+			leaves: 2,
+			source: `function Row(props) { return <div><Leaf remember={props.remember}/></div>; }
+export function App(props) { return <main>{['a', 'b'].map((k) => <Row key={k} remember={props.remember}/>)}</main>; }`,
+		},
+		{
+			shape: 'direct calls in keyed fragments',
+			ext: 'tsx',
+			leaves: 2,
+			source: `function Row(props) { return <div><Leaf remember={props.remember}/></div>; }
+export function App(props) { return <main>{['a', 'b'].map((k) => <Fragment key={k}>{Row(props)}</Fragment>)}</main>; }`,
+		},
+		{
+			shape: 'dynamic host tag',
+			ext: 'tsx',
+			leaves: 1,
+			source: `export function App(props) { const Tag = props.tag; return <Tag><Leaf remember={props.remember}/></Tag>; }`,
+		},
+		{
+			shape: 'host value in a hookless template component',
+			ext: 'tsrx',
+			leaves: 1,
+			source: `function Card(props) @{ <section>{props.content}</section> }
+export function App(props) @{ <main><Card content={<div><Leaf remember={props.remember}/></div>}/></main> }`,
+		},
+		{
+			shape: 'returned host in @for rows',
+			ext: 'tsrx',
+			leaves: 2,
+			source: `function Row(props) { return <div><Leaf remember={props.remember}/></div>; }
+export function App(props) @{ <main>@for (const k of ['a', 'b']; key k) { <Row remember={props.remember}/> }</main> }`,
+		},
+	];
+
+	it.each(
+		[false, true].flatMap((dev) =>
+			[false, true].flatMap((signalsApp) =>
+				RETURNED_JSX_APPS.map((app) => ({ ...app, dev, signalsApp })),
+			),
+		),
+	)(
+		'keeps signal owners below returned JSX identical through hydration ($shape, signals app: $signalsApp, dev: $dev)',
+		async ({ ext, leaves, source, dev, signalsApp }) => {
+			vi.resetModules();
+			const server = await import('../../src/runtime.server.js');
+			const client = await import('../../src/runtime.js');
+			const signals = await import('../../src/signals/index.js');
+			const { loadCompiledFixtureSource } = await import('../_server-fixture.js');
+			// Importing signals switches the app module to native-read lowering, which
+			// represents the same JSX as host descriptors instead of fragments.
+			const app = `import { Fragment, useState } from 'octane';${signalsApp ? " import 'octane/signals';" : ''}
+import { Leaf } from './leaf';
+${source}`;
+			const load = (mode: 'client' | 'server') => {
+				const compileOptions = { dev, hmr: false };
+				const runtimeModules = { 'octane/signals': signals };
+				const leaf = loadCompiledFixtureSource(RETURNED_JSX_LEAF, {
+					id: '/src/leaf.tsx',
+					mode,
+					compileOptions,
+					runtimeModules,
+				});
+				return loadCompiledFixtureSource(app, {
+					id: `/src/app.${ext}`,
+					mode,
+					compileOptions,
+					runtimeModules: { ...runtimeModules, './leaf': leaf },
+				});
+			};
+			const serverModule = load('server');
+			const clientModule = load('client');
+			const owner = Object.freeze({ scopeKey: 'returned-jsx-owner' });
+			const instanceKey = () =>
+				(signals.currentSignalOwner() as { instanceKey?: string } | null)?.instanceKey ?? 'missing';
+			const serverKeys: string[] = [];
+			const clientKeys: string[] = [];
+			const container = document.createElement('div');
+			document.body.append(container);
+			let root: ReturnType<typeof client.hydrateRoot> | undefined;
+			try {
+				container.innerHTML = server.renderToString(
+					serverModule.App,
+					{ tag: 'section', remember: () => serverKeys.push(instanceKey()) },
+					{ signalOwner: owner },
+				).html;
+				expect(serverKeys).toHaveLength(leaves);
+				expect(new Set(serverKeys).size).toBe(leaves);
+				const outputs = [...container.querySelectorAll('output')];
+				const errors: unknown[] = [];
+				root = client.hydrateRoot(
+					container,
+					clientModule.App,
+					{ tag: 'section', remember: () => clientKeys.push(instanceKey()) },
+					{
+						signalOwner: owner,
+						onRecoverableError: (error) => errors.push(error),
+						onUncaughtError: (error) => errors.push(error),
+					},
+				);
+				expect(clientKeys).toEqual(serverKeys);
+				expect([...container.querySelectorAll('output')]).toEqual(outputs);
+				// The returned JSX's handler and text both resolve the Leaf's own cell.
+				container.querySelector('button')!.click();
+				await Promise.resolve();
+				client.flushSync(() => {});
+				expect(outputs.map((output) => output.textContent)).toEqual(['x!', 'x'].slice(0, leaves));
+				expect(errors).toEqual([]);
+			} finally {
+				root?.unmount();
+				container.remove();
+			}
+		},
+	);
+
+	const RETURNED_JSX_FIELD = `import { query$, currentSignalOwner } from 'octane/signals';
+export function Field(props) @{
+  const value$ = query$(() => 'field', props.load);
+  props.remember(currentSignalOwner());
+  <output>{value$}</output>
+}`;
+
+	it.each(
+		[false, true].flatMap((dev) =>
+			[
+				{
+					rows: 1,
+					source: `function Mid(props) { const [n] = useState(1); return <div data-n={n}><Field load={props.load} remember={props.remember}/></div>; }
+function Wrap(props) { return <section><Mid load={props.load} remember={props.remember}/></section>; }
+export function App(props) { return <main><Suspense fallback={<i>waiting</i>}><Wrap load={props.load} remember={props.remember}/></Suspense></main>; }`,
+				},
+				{
+					// Discovery replays the suspended row's renderer on its own; it must
+					// still evaluate the query under the keyed row's final owner.
+					rows: 2,
+					source: `function Row(props) { return <div>{use(props.gate) as string}<Field load={props.load} remember={props.remember}/></div>; }
+export function App(props) { return <main><Suspense fallback={<i>waiting</i>}>{['a', 'b'].map((k) => <Fragment key={k}>{Row(props)}</Fragment>)}</Suspense></main>; }`,
+				},
+			].flatMap((app) => [false, true].map((signalsApp) => ({ ...app, dev, signalsApp }))),
+		),
+	)(
+		'resumes server queries below returned JSX under their server owners (rows: $rows, signals app: $signalsApp, dev: $dev)',
+		async ({ rows, source, dev, signalsApp }) => {
+			vi.resetModules();
+			const server = await import('../../src/runtime.server.js');
+			const client = await import('../../src/runtime.js');
+			const signals = await import('../../src/signals/index.js');
+			const { bootstrapStreamedSignalHydration } =
+				await import('../../src/hydration/streamed-signals.js');
+			const { loadCompiledFixtureSource } = await import('../_server-fixture.js');
+			const { activateStreamedMarkup, resetStreamRuntimeGlobals } =
+				await import('../_server-stream.js');
+			const { drainProducers } = await import('../_fixtures/signals-async-controls.js');
+			const app = `import { Fragment, Suspense, use, useState } from 'octane';${signalsApp ? " import 'octane/signals';" : ''}
+import { Field } from './field';
+${source}`;
+			const load = (mode: 'client' | 'server') => {
+				const compileOptions = { dev, hmr: false };
+				const runtimeModules = {
+					'octane/signals': signals,
+					'octane/signals/query': signals,
+					'octane/signals/facade': signals,
+				};
+				const field = loadCompiledFixtureSource(RETURNED_JSX_FIELD, {
+					id: '/src/field.tsrx',
+					mode,
+					compileOptions,
+					runtimeModules,
+				});
+				return loadCompiledFixtureSource(app, {
+					id: '/src/app.tsx',
+					mode,
+					compileOptions,
+					runtimeModules: { ...runtimeModules, './field': field },
+				});
+			};
+			const serverModule = load('server');
+			const clientModule = load('client');
+			const ownerKey = (owner: SignalOwner | null) =>
+				(owner as { instanceKey?: string } | null)?.instanceKey ?? 'missing';
+			const serverOwners = new Set<string>();
+			const clientOwners = new Set<string>();
+			const serverLoad = vi.fn(async () => 'server result');
+			const browserLoad = vi.fn(async () => 'browser result');
+			const streamedSignals = { buildId: 'returned-jsx', documentId: 'returned-jsx' };
+			const container = document.createElement('div');
+			document.body.append(container);
+			let root: ReturnType<typeof client.hydrateRoot> | undefined;
+			let hydration: ReturnType<typeof bootstrapStreamedSignalHydration> | undefined;
+			try {
+				const output = await server.prerender(
+					serverModule.App,
+					{
+						gate: Promise.resolve('gate'),
+						load: serverLoad,
+						remember: (owner: SignalOwner | null) => serverOwners.add(ownerKey(owner)),
+					},
+					{ streamedSignals },
+				);
+				container.innerHTML = output.html;
+				activateStreamedMarkup(container);
+				const outputs = [...container.querySelectorAll('output')];
+				expect(outputs.map((node) => node.textContent)).toEqual(Array(rows).fill('server result'));
+				const errors: unknown[] = [];
+				hydration = bootstrapStreamedSignalHydration(streamedSignals);
+				root = client.hydrateRoot(
+					container,
+					clientModule.App,
+					{
+						gate: Promise.resolve('gate'),
+						load: browserLoad,
+						remember: (owner: SignalOwner | null) => clientOwners.add(ownerKey(owner)),
+					},
+					{
+						signalOwner: hydration.signalOwner,
+						onRecoverableError: (error) => errors.push(error),
+						onUncaughtError: (error) => errors.push(error),
+					},
+				);
+				// Every owner a server pass evaluated a query under is one the browser
+				// resumes, and every row has its own. Check before draining: a query
+				// without its server seed refetches from here on.
+				expect(clientOwners.size).toBe(rows);
+				expect(serverOwners).toEqual(clientOwners);
+				await drainProducers();
+				client.flushSync(() => {});
+				expect(browserLoad).not.toHaveBeenCalled();
+				expect([...container.querySelectorAll('output')]).toEqual(outputs);
+				expect(outputs.map((node) => node.textContent)).toEqual(Array(rows).fill('server result'));
+				expect(errors).toEqual([]);
+			} finally {
+				root?.unmount();
+				hydration?.dispose();
+				container.remove();
+				resetStreamRuntimeGlobals();
+			}
+		},
+	);
 });
 
 describe('opaque keyed signals across hydration and retries', () => {

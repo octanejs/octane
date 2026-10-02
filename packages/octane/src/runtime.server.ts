@@ -487,6 +487,11 @@ let ID_COUNTER = 0;
 let ID_PREFIX = '';
 let SIGNAL_INSTANCE_PREFIX = '';
 type ServerSignalInstanceKey = string | Frame;
+// Compiler-synthesized fragment renderers carry this invocation site. They
+// render their enclosing component's JSX, so they add no instance key segment
+// and keep the enclosing owner and pending list keys (runtime.ts spells the
+// same constant; the client renders the same JSX through such renderers).
+const RENDERER_INVOCATION_SITE = 'r:';
 let SIGNAL_COMPONENT_INSTANCE_KEY: ServerSignalInstanceKey = '';
 let SERVER_SIGNAL_OWNER_ACTIVE = false;
 let SIGNAL_CONTROL_SITE = '';
@@ -685,6 +690,8 @@ interface Job {
 	parentScope: SSRScope | null;
 	frame: Frame;
 	signalInstanceKey: ServerSignalInstanceKey;
+	/** List keys a fragment renderer's frame continued (see retainRendererJobListKeys). */
+	signalListKeys?: ServerSignalListKeys | null;
 }
 let SUSPENDED: { promise: PromiseLike<unknown>; key: string }[] | null = null;
 let RESOLVED: ResolvedMap | null = null;
@@ -5152,6 +5159,9 @@ function renderComponentFramed(
 	inherit?: boolean,
 	instanceKey?: ServerSignalInstanceKey,
 	bindingMarker?: string,
+	// A fragment renderer's frame continues the list keys pending at its call
+	// site; `undefined` starts a component's own list scope.
+	rendererListKeys?: ServerSignalListKeys | null,
 ): string {
 	const previous = captureServerComponentContext();
 	const parentScope = parent ?? previous.scope;
@@ -5164,7 +5174,7 @@ function renderComponentFramed(
 	ASYNC_SCOPE = frame.asyncScope;
 	if (instanceKey !== undefined) SIGNAL_COMPONENT_INSTANCE_KEY = instanceKey;
 	SIGNAL_CONTROL_SITE = '';
-	SIGNAL_LIST_KEYS = null;
+	SIGNAL_LIST_KEYS = rendererListKeys ?? null;
 	const nativeToken = NATIVE_READ_COLLECTOR === null ? -1 : beginActiveNativeReadScope(scope);
 	let nativeCompleted = false;
 	try {
@@ -5250,6 +5260,21 @@ function renderComponentFramed(
 		SERVER_SIGNAL_OWNER_ACTIVE = previous.signalOwnerActive;
 		SIGNAL_CONTROL_SITE = previous.signalControl;
 		SIGNAL_LIST_KEYS = previous.signalListKeys;
+		if (rendererListKeys != null && frame.deferred)
+			retainRendererJobListKeys(frame, rendererListKeys);
+	}
+}
+
+// A discovery job replays one frame on its own. The list keys a renderer frame
+// continued are not part of the frame, so its job records them for the replay.
+function retainRendererJobListKeys(frame: Frame, keys: ServerSignalListKeys): void {
+	const jobs = DEFERRED;
+	if (jobs === null) return;
+	for (let index = jobs.length - 1; index >= 0; index--) {
+		if (jobs[index]!.frame === frame) {
+			jobs[index]!.signalListKeys = keys;
+			return;
+		}
 	}
 }
 
@@ -5279,8 +5304,11 @@ export function ssrComponent(
 	// this small string-rendering wrapper does not retain the client Activity engine.
 	const activity = comp === Activity;
 	if (activity && key === undefined) key = props?.key;
+	// A fragment renderer renders its enclosing component's JSX under that
+	// component's identity, exactly like the inline HTML the client also folds.
+	const renderer = invocationSite === RENDERER_INVOCATION_SITE;
 	let signalInstanceKey: ServerSignalInstanceKey | undefined =
-		SERVER_SIGNAL_BINDINGS_ENABLED && RESOLVED !== null
+		!renderer && SERVER_SIGNAL_BINDINGS_ENABLED && RESOLVED !== null
 			? serverStructuralSignalInstanceKey(invocationSite, key)
 			: undefined;
 	// Component recursion is one of SSR's hottest and deepest paths. Install the
@@ -5364,7 +5392,8 @@ export function ssrComponent(
 		// move the optional fields into a separately allocated property backing.
 		const seg = pf === null ? 0 : nextChildSegment(pf);
 		const namespace = explicitNamespace ?? pf?.namespace;
-		const potentialSignalKey = signalInstanceKey === undefined && SERVER_SIGNAL_BINDINGS_POTENTIAL;
+		const potentialSignalKey =
+			!renderer && signalInstanceKey === undefined && SERVER_SIGNAL_BINDINGS_POTENTIAL;
 		const frame: Frame = potentialSignalKey
 			? {
 					parent: pf,
@@ -5406,6 +5435,7 @@ export function ssrComponent(
 			inherit,
 			signalInstanceKey,
 			bindingMarker,
+			renderer ? SIGNAL_LIST_KEYS : undefined,
 		);
 	} finally {
 		if (identityScoped !== true) ASYNC_SCOPE = previousIdentityScope;
@@ -9085,6 +9115,8 @@ function runDiscoveryRound(
 					frame,
 					undefined,
 					job.signalInstanceKey,
+					undefined,
+					job.signalListKeys,
 				);
 			} catch (err) {
 				// A bare (@try-less) use() in the job body rethrows SSR_SUSPENSE; the
