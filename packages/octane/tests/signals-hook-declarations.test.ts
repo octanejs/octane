@@ -54,6 +54,7 @@ function load(mode: 'client' | 'server', compileOptions: { dev: boolean }) {
 		runtimeModules: {
 			'octane/signals': Signals,
 			'./signals-hook-declarations-pair': pair,
+			'./signals-hook-declarations-cell': cell,
 			'./signals-hook-declarations-forward.tsrx': forward,
 		},
 	});
@@ -115,10 +116,11 @@ describe('signal declarations inside custom hooks', () => {
 		});
 
 		// Composing modules that do not import signals still key each `$` hook call.
-		for (const via of ['plain', 'renamed', 'forwarded', 'aliased'] as const) {
+		for (const via of ['plain', 'renamed', 'local', 'forwarded', 'aliased'] as const) {
 			const composer = {
 				plain: 'a plain module',
 				renamed: 'a plain module through an alias with $',
+				local: 'a plain module that imports only signals',
 				forwarded: 'a .tsrx module',
 				aliased: 'a .tsrx module through an alias without $',
 			}[via];

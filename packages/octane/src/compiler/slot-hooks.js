@@ -111,9 +111,27 @@ function octaneHookLocals(ast, nativeReads = false, explicitlyOwned = false) {
 		locals,
 		importsHook:
 			importsHook ||
-			((hasOctaneImport || explicitlyOwned) && (importsCustomHook || hasHookMethods(ast))),
+			((hasOctaneImport || explicitlyOwned) && (importsCustomHook || hasHookMethods(ast))) ||
+			// A runtime signals import makes the module Octane's. Its hooks may
+			// compose one another, and each call keys the instance declarations it
+			// reaches, so give their calls boundaries without an `octane` import.
+			(nativeReads && (importsCustomHook || declaresHook(ast))),
 		hasOctaneImport,
 	};
+}
+
+function declaresHook(ast) {
+	return (ast.body || []).some((statement) => {
+		const node =
+			statement.type === 'ExportNamedDeclaration' || statement.type === 'ExportDefaultDeclaration'
+				? statement.declaration
+				: statement;
+		if (node?.type === 'FunctionDeclaration') return /^use[A-Z]/.test(node.id?.name ?? '');
+		return (
+			node?.type === 'VariableDeclaration' &&
+			node.declarations.some((declaration) => /^use[A-Z]/.test(declaration.id?.name ?? ''))
+		);
+	});
 }
 
 // A disposable expression or nonescaping local const root can omit return-value
