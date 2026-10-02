@@ -155,3 +155,27 @@ No elapsed-time improvement is established; the supported result is the removed
 lookup per staged update with unchanged creation counts. The `613508303`
 revalidation repeated the deterministic counters and byte measurements, without
 claiming those historical timings describe the newer base.
+
+## October 2026 breach recovery
+
+On 2026-10-02 main breached four guards: `cycle_runtime_functions` (193),
+`updater_runtime_functions` (128), `click_runtime_functions` (64), and
+`click_runtime_objects` (257). The weekly job had failed before its ratio step
+since late August, so CI never reported them. Per-site attribution, which maps
+each creation event through the source map to its `runtime.ts` line, and
+`git bisect` over this runner's output found two causes:
+
+| Counter | First bad commit | Site | Disposition |
+| --- | --- | --- | --- |
+| functions, every transition | `5ead1ff2c` (#1069) | `setNativeCandidateResolver(() => …)` in `runTransition`, plus one lazily registered Action resolver | Fixed: module functions that read the active batch |
+| functions, every delegated click | `5ead1ff2c` (#1069) | `invoke` closure in `fireEventSlot` | Fixed: the closure exists only when a handler enters another signal owner |
+| objects, once per run | `8a45222ab` (#1068) | first `DelegatedEventFrame` in the dispatch frame pool | Work model: one-time allowance |
+
+The frame pool replaced Symbol-keyed properties that every dispatch added to
+and deleted from the native Event. It allocates one frame per nesting depth on
+the first dispatch and reuses it afterwards, so `click_runtime_objects` now has
+a one-time allowance of 1. Its per-cycle budget is unchanged at 4. After the
+fix, every counter matches the work model again. `held` and `urgent` each
+create 64 fewer functions as well, because they run the same transition path.
+The root-render transaction cost that #833 added to `hook-memo` is not involved
+here, since every cycle in this suite is a hook update.

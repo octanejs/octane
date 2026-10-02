@@ -156,7 +156,10 @@ The harness:
 
 - **MOUNT**: fresh `page.goto` per sample.
 - **BUMP\_** ops: one page, `__mount()` once, then loop `__bumpAt<N>()` ×
-  (warmup + iter).
+  (warmup + iter). Each timed sample runs a calibrated batch of bumps and
+  divides: the batch doubles from 50 until it takes at least 20 ms, so even a
+  sub-microsecond bump spans 200 or more ticks of Chromium's 100 µs clock. The
+  harness prints the chosen batch size for each op.
 - **BUMP_SWEEP**: same shape but executes all 10 bumps in a single in-page loop
   before the rAF gate.
 - **UNMOUNT**: one page; per iteration `__mount()` (untimed), time `__unmount()`,
@@ -190,3 +193,43 @@ descriptors. Stateful or escaping components retain normal component boundaries
 and inspectable return values.
 
 Default: 5 warmups + 20 iters. Pass an integer to `bench` to override iters.
+
+## October 2026 breach recovery
+
+On 2026-10-02 main breached the `bump_shallow` dialect guard (33.8×, max 5.5),
+and `work.mjs` reported 30 deterministic gate failures. `git bisect` over
+compiled output of both twins put every failure on `5ead1ff2c` (#1069):
+
+- **TSX:** component descriptors became
+  `_$createElementFromConfig(site, Component, props)`. The proof that lets a
+  private static component render through its parent's template still matched
+  only `_$createElement(Component, props)`. Every chain link therefore fell back
+  to a full component slot plus a descriptor child slot: the shallow bump went
+  from 10 full and 90 lite slots to 100 full slots, and from 0.010 to 0.034 ms.
+  `df0a0863a` (#1378) later wrapped the same return in its direct-call split,
+  so the proof now reads the body call's record.
+- **TSRX:** after any prop-bound attribute such as `class={kind}`, the module
+  renders signal-capable bindings, and later identifier holes compile to
+  `bindSignalChild`. For a primitive, that binding always reached `childSlot`,
+  so C1's counter wrote through the general child path instead of one `setText`.
+  `bindSignalChild` now keeps `textHoleUpdate`'s primitive fast path.
+
+With both fixes every work count matches the 2026-09-14 baseline again. The
+timing guard needed a harness change too. With 50 bumps per sample, a TSRX bump
+(about 0.5 µs) spans less than one 100 µs clock tick, so its samples read 0 or
+0.002 ms and the ratio swung between about 5× and 12× on unchanged code. Bump
+samples are now calibrated to at least 20 ms. The same runner on the same
+machine, with identical batch sizes (51,200 TSRX and 3,200 TSX bumps):
+
+| Checkout | TSRX bump | TSX bump | TSX/TSRX |
+| --- | ---: | ---: | ---: |
+| `1ed5d2ab9` (before #1069), two runs | 0.42–0.47 µs | 6.46–6.95 µs | 14.66–15.26× |
+| This fix, two runs | 0.47–0.48 µs | 6.18–6.37 µs | 13.23–13.26× |
+
+The fix restores the pre-#1069 ratio and does not leave a residual TSX cost. The
+guard's ceiling moves from 5.5 to 18. The earlier ceiling was calibrated on
+floor-clamped TSRX samples, below the true pre-regression ratio. The #1069 TSX
+regression, about 34 µs over 0.47 µs, still breaches the new ceiling by a wide
+margin. Shorter calibrated samples (5 ms) read the TSX bump 15–30% slower,
+because the first bumps after each sample's `gc()` cost more, so the sample
+length matters when comparing runs.
