@@ -11910,7 +11910,8 @@ function renderUnframedLite<P>(
 // anchor), the template claims the server nodes after it, and only a body of
 // one root can take its place: the body's end marker is `root`, which the first
 // of several roots replaces. Any other body renders unframed in place of `root`
-// alone, as componentSlot renders a call it cannot prove single-root.
+// alone (renderUnframed), as componentSlot renders a call it cannot prove
+// single-root.
 function renderLiteInPlace<P>(
 	hydration: HydrationCapability,
 	parentScope: Scope,
@@ -11937,7 +11938,7 @@ function renderLiteInPlace<P>(
 			props,
 			invocationSite,
 			root,
-			getNextSibling(root),
+			root,
 		);
 		return;
 	}
@@ -19180,7 +19181,10 @@ class HydrationCapability {
 	 * but not a later sibling's range, unless `stale` is client-built: the
 	 * rebuild that built it already reported and discarded the server's. A
 	 * discard that reaches the end of the enclosing server range reports once
-	 * for that range (firstAtRangeEnd).
+	 * for that range (firstAtRangeEnd). A claim anchored at the element or text
+	 * that a template hole's walk found (not its block's end marker) stands in
+	 * place of exactly that node, wherever the cursor rests: the template
+	 * claims the server nodes after it.
 	 */
 	renderUnframed<T>(
 		render: (target: T) => void,
@@ -19209,11 +19213,17 @@ class HydrationCapability {
 				this.node = stale;
 			} else {
 				this.unframedClaims?.delete(owner);
+				let from = stale;
+				let anchor = claim.anchor;
+				if (anchor !== null && anchor.nodeType !== 8 && anchor !== claim.scope.block.endMarker) {
+					from = anchor;
+					anchor = getNextSibling(anchor);
+				}
 				if (rejected) {
 					removeRange(claim.start, getNextSibling(claim.end));
 					this.node = stale;
-				} else if (stale === null || !this.isFresh(stale)) {
-					const node = stale === null ? null : this.discardInPlace(stale, claim.anchor);
+				} else if (from === null || !this.isFresh(from)) {
+					const node = from === null ? null : this.discardInPlace(from, anchor);
 					// The discard stops at `anchor`, at a later sibling's range or
 					// boundary, or at the end of the enclosing server range, which may
 					// be `anchor` itself.
@@ -19221,7 +19231,7 @@ class HydrationCapability {
 						noteRecoverableHydrationError(() => new Error(formatClientError(55)));
 						if (process.env.NODE_ENV !== 'production') {
 							const loc = siteLoc(claim.scope, claim.slotKey);
-							if (loc) this.warnStructural(loc, 'a component range', describeHydrationNode(stale));
+							if (loc) this.warnStructural(loc, 'a component range', describeHydrationNode(from));
 						}
 					}
 				}
@@ -32250,20 +32260,7 @@ function componentSlotImpl(
 			// the server frames every child of an all-component host, so the host's
 			// server content is something else. (The single-root path would compare
 			// the body's template with the cursor, which may still sit on the host or
-			// an ancestor.) A hole of a template the parent adopted stands where the
-			// range belonged: the element or text its walk found, not the node at
-			// the cursor (see componentSlotLite's anchored miss). The call replaces
-			// exactly that node, and the slot anchors after it, since the template
-			// claims the nodes that follow.
-			if (
-				hydration !== null &&
-				anchor != null &&
-				anchor.nodeType !== 8 &&
-				anchor !== parentBlock.endMarker
-			) {
-				hydrationCursor = anchor;
-				anchor = getNextSibling(anchor);
-			}
+			// an ancestor.)
 			let before = anchor ?? null;
 			if (hydration !== null) {
 				unframed = hydrationCursor;
