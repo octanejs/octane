@@ -1,27 +1,7 @@
-import { randomUUID } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
-import { test as base, expect, type APIRequestContext, type Page } from '@playwright/test';
-import { collectBrowserDiagnostics, settleBrowserFrames } from '../../_shared/e2e/browser.ts';
-
-const test = base.extend<{ diagnosticsGate: void }>({
-	diagnosticsGate: [
-		async ({ page }, use, testInfo) => {
-			const diagnostics = collectBrowserDiagnostics(page, {
-				failOnConsoleLevels: ['warning', 'error'],
-				failOnHydrationWarnings: true,
-				hydrationWarningPattern: /hydration.*mismatch|mismatch.*hydrat|recoverable.*hydrat/i,
-			});
-			try {
-				await use();
-				await settleBrowserFrames(page);
-				diagnostics.assertClean(testInfo.title);
-			} finally {
-				diagnostics.stop();
-			}
-		},
-		{ auto: true },
-	],
-});
+import type { APIRequestContext } from '@playwright/test';
+import { settleBrowserFrames } from '../../_shared/e2e/browser.ts';
+import { completedAnswer, configuration, expect, open, test } from './lab.ts';
 
 type TraceEvent = {
 	channel: 'session' | 'answer' | 'history' | 'tools';
@@ -32,41 +12,12 @@ type TraceEvent = {
 	transport: 'document' | 'rpc';
 };
 
-function configuration(options: Record<string, string | number> = {}, eager = false) {
-	const run = randomUUID();
-	const search = new URLSearchParams({
-		run,
-		scenario: 'steady',
-		auth: '40',
-		answer: '60',
-		history: '120',
-		interval: '30',
-		waves: '6',
-		turns: '3',
-	});
-	for (const [key, value] of Object.entries(options)) search.set(key, String(value));
-	return { run, path: `${eager ? '/eager' : '/'}?${search}` };
-}
-
 async function trace(request: APIRequestContext, run: string) {
 	const response = await request.get(`/__lab/trace?run=${encodeURIComponent(run)}`);
 	expect(response.ok()).toBe(true);
 	const result = (await response.json()) as { truncated: boolean; events: TraceEvent[] };
 	expect(result.truncated).toBe(false);
 	return result.events;
-}
-
-async function open(page: Page, path: string) {
-	await page.goto(path, { waitUntil: 'commit' });
-	await expect(page.locator('[data-lab-shell]')).toBeVisible();
-}
-
-async function completedAnswer(page: Page, waves: number) {
-	await expect(page.locator('[data-answer]')).toHaveAttribute('data-revision', String(waves));
-	await expect(page.getByRole('region', { name: 'Conversation', exact: true })).toHaveAttribute(
-		'data-complete',
-		'true',
-	);
 }
 
 test('streams a public shell and independent first results with one ready HTML snapshot', async ({

@@ -25,8 +25,8 @@
     "brotli": 22752
   },
   "root-chained-jsx": {
-    "raw": 85952,
-    "gzip": 28512,
+    "raw": 86016,
+    "gzip": 28544,
     "brotli": 25344
   },
   "root-static": {

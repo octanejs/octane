@@ -4,6 +4,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { summarizeSamples, timingStatForJson } from '../lib/stats.mjs';
+import { analyzeCompiledOutput, assertCycleControls } from './output.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const SOURCE_ROOT = process.env.OCTANE_GRAPH_ROOT
@@ -112,46 +113,6 @@ const variants = [
 		samples: [],
 	})),
 ];
-
-function warmPlanCount(code) {
-	return code.match(/\b__warm:\s*\(/g)?.length ?? 0;
-}
-
-function walkAst(node, visit, seen = new WeakSet()) {
-	if (node === null || typeof node !== 'object' || seen.has(node)) return;
-	seen.add(node);
-	if (Array.isArray(node)) {
-		for (const child of node) walkAst(child, visit, seen);
-		return;
-	}
-	if (typeof node.type !== 'string') return;
-	visit(node);
-	for (const value of Object.values(node)) walkAst(value, visit, seen);
-}
-
-function analyzeCompiledOutput(code, filename) {
-	const ast = parseModule(code, filename);
-	let templateBinding = null;
-	let singleRootBinding = null;
-	for (const statement of ast.body) {
-		if (statement.type !== 'ImportDeclaration' || statement.source?.value !== 'octane') continue;
-		for (const specifier of statement.specifiers || []) {
-			if (specifier.type !== 'ImportSpecifier') continue;
-			if (specifier.imported?.name === 'template') templateBinding = specifier.local.name;
-			if (specifier.imported?.name === '__s') singleRootBinding = specifier.local.name;
-		}
-	}
-	const templates = [];
-	let singleRootCapabilities = 0;
-	walkAst(ast, (node) => {
-		if (node.type !== 'CallExpression' || node.callee?.type !== 'Identifier') return;
-		if (node.callee.name === templateBinding && typeof node.arguments[0]?.value === 'string') {
-			templates.push(node.arguments[0].value);
-		}
-		if (node.callee.name === singleRootBinding) singleRootCapabilities++;
-	});
-	return { templates, singleRootCapabilities };
-}
 
 function anchorCount(template) {
 	return template.split('<!>').length - 1;
@@ -326,7 +287,7 @@ function assertAnchorlessControls() {
 				anchorlessOptions,
 			);
 			assert.equal(result.diagnostics.length, 0, `${name} emitted compiler diagnostics`);
-			const analysis = analyzeCompiledOutput(result.code, `${name}.compiled.js`);
+			const analysis = analyzeCompiledOutput(parseModule, result.code, `${name}.compiled.js`);
 			const probes = [];
 			for (const [index, component] of graph.components.entries()) {
 				const safe = expectedSafety.get(component.name);
@@ -349,24 +310,6 @@ function assertAnchorlessControls() {
 	return controls;
 }
 
-function assertCycleControls() {
-	const syncCycle = compile(
-		'export function CycleA() @{ <CycleB /> }\nfunction CycleB() @{ <CycleA /> }',
-		'synchronous-cycle.tsrx',
-		options,
-	);
-	assert.equal(syncCycle.diagnostics.length, 0, 'synchronous cycle emitted compiler diagnostics');
-	assert.equal(warmPlanCount(syncCycle.code), 0, 'synchronous cycle gained a warm plan');
-
-	const seededCycle = compile(
-		"import { Opaque } from './opaque';\nexport function CycleA() @{ <><CycleB /><Opaque /></> }\nfunction CycleB() @{ <CycleA /> }",
-		'opaque-cycle.tsrx',
-		options,
-	);
-	assert.equal(seededCycle.diagnostics.length, 0, 'opaque cycle emitted compiler diagnostics');
-	assert.equal(warmPlanCount(seededCycle.code), 2, 'opaque cycle lost warm reachability');
-}
-
 function compileVariant(variant) {
 	const started = performance.now();
 	compile(
@@ -379,7 +322,11 @@ function compileVariant(variant) {
 
 function validateExistingVariant(variant, result) {
 	const witnesses = result.code.match(/const __memoDep[\w$]* = live;/g)?.length ?? 0;
-	const warmPlans = warmPlanCount(result.code);
+	const { warmPlans } = analyzeCompiledOutput(
+		parseModule,
+		result.code,
+		`${variant.name}.compiled.js`,
+	);
 	const hoistedDeclarations =
 		result.code.match(/^(?:export )?function Component\d+\(/gm)?.length ?? 0;
 	const dependentFirst = variant.name.endsWith('dependent-first');
@@ -415,10 +362,10 @@ function validateExistingVariant(variant, result) {
 
 function validateAnchorlessVariant(variant, result) {
 	assert.equal(result.diagnostics.length, 0, `${variant.name} emitted compiler diagnostics`);
-	const analysis = analyzeCompiledOutput(result.code, `${variant.name}.compiled.js`);
+	const analysis = analyzeCompiledOutput(parseModule, result.code, `${variant.name}.compiled.js`);
 	const template = findTemplate(analysis, 'data-anchorless-benchmark');
 	const anchors = anchorCount(template);
-	const warmPlans = warmPlanCount(result.code);
+	const { warmPlans } = analysis;
 	const hoistedDeclarations = result.code.match(/^function AnchorlessChain\d+\(/gm)?.length ?? 0;
 	const expectedHoistedDeclarations = variant.reverse ? 0 : variant.components - 1;
 	assert.equal(anchors, 2, `${variant.name} lost the unsafe-chain positional anchors`);
@@ -468,7 +415,7 @@ const rows = [];
 let semanticControls = [];
 
 try {
-	if (!anchorlessOnly) assertCycleControls();
+	if (!anchorlessOnly) assertCycleControls({ compile, parseModule, options });
 	semanticControls = assertAnchorlessControls();
 	// Compile and validate every deterministic semantic surface before the warmups.
 	// Timed samples below contain only the public compiler call.

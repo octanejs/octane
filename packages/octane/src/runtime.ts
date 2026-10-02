@@ -138,6 +138,7 @@ import type {
 	IndependentHydrateActivationContext,
 	IndependentHydrateActivator,
 } from './hydration/independent-island.js';
+import { cloneHydrationReplayEvent } from './hydration/replay-event.js';
 import {
 	HYDRATE_DEFAULT_INTERACTION_EVENTS,
 	HYDRATE_INTERACTION_EVENTS_ATTR,
@@ -11807,7 +11808,7 @@ export function componentSlotLite<P>(
 	// the server rendered in the frame after this component's content.
 	if (hydration !== null && adoptedClose !== null) {
 		hydration.settleClaim(scope, adoptedClose, claimed, parentScope, slotKey);
-		hydration.node = getNextSibling(adoptedClose);
+		hydration.parkPast(adoptedClose, parentScope);
 	}
 }
 
@@ -15987,98 +15988,6 @@ function discardHydratePresentation(state: HydrateSlot, capture: OffscreenCaptur
 	state.serverActivationStarted = false;
 }
 
-function cloneHydrationReplayEvent(event: Event, target: Element): Event {
-	const clone = constructHydrationReplayEvent(event, target);
-	// No event init dictionary carries `timeStamp`: every constructor stamps the
-	// replay-time clock. Consumers measure input against the original clock (how
-	// long a press is held, pointerdown to pointerup), so the replay keeps it as an
-	// own property shadowing Event.prototype's getter, configurable like the
-	// getter. A boundary that replays its parent's replay reads that own property,
-	// so nested replay still reports the original input's time. `isTrusted` is
-	// untouched: the clone is a constructed, untrusted event.
-	Object.defineProperty(clone, 'timeStamp', { value: event.timeStamp, configurable: true });
-	return clone;
-}
-
-function constructHydrationReplayEvent(event: Event, target: Element): Event {
-	// Event constructors are realm-specific, so the clone is always built with the
-	// TARGET's constructors: hydrating an iframe-owned root from its parent realm
-	// must still replay an event the iframe's own code recognizes. A detached
-	// synthetic Document has no defaultView and falls back to the ambient realm.
-	const realm = target.ownerDocument.defaultView ?? globalThis;
-	// Same-realm replay is the overwhelmingly common case, so it stays a plain
-	// constructor walk: no brand string, no comparisons beyond `instanceof`.
-	// PointerEvent extends MouseEvent, so it must be tested first or pointer-
-	// specific metadata (pressure, pointerId, tilt, etc.) is discarded.
-	if (realm.PointerEvent !== undefined && event instanceof realm.PointerEvent) {
-		return new realm.PointerEvent(event.type, event);
-	}
-	if (realm.KeyboardEvent !== undefined && event instanceof realm.KeyboardEvent) {
-		return new realm.KeyboardEvent(event.type, event);
-	}
-	if (realm.MouseEvent !== undefined && event instanceof realm.MouseEvent) {
-		return new realm.MouseEvent(event.type, event);
-	}
-	if (realm.FocusEvent !== undefined && event instanceof realm.FocusEvent) {
-		return new realm.FocusEvent(event.type, event);
-	}
-	if (realm.InputEvent !== undefined && event instanceof realm.InputEvent) {
-		return new realm.InputEvent(event.type, event);
-	}
-	if (realm.CompositionEvent !== undefined && event instanceof realm.CompositionEvent) {
-		return new realm.CompositionEvent(event.type, event);
-	}
-	if (realm.TouchEvent !== undefined && event instanceof realm.TouchEvent) {
-		return cloneHydrationTouchEvent(event, realm.TouchEvent);
-	}
-	// Cold: a programmatic dispatch may cross realms, where the original event
-	// came from a parent Window while its target belongs to an iframe Window (or
-	// the reverse). No local constructor claims it, but Web IDL's toStringTag
-	// still reports the platform family across that identity boundary.
-	const brand = Object.prototype.toString.call(event);
-	if (realm.PointerEvent !== undefined && brand === '[object PointerEvent]') {
-		return new realm.PointerEvent(event.type, event);
-	}
-	if (realm.KeyboardEvent !== undefined && brand === '[object KeyboardEvent]') {
-		return new realm.KeyboardEvent(event.type, event);
-	}
-	if (realm.MouseEvent !== undefined && brand === '[object MouseEvent]') {
-		return new realm.MouseEvent(event.type, event);
-	}
-	if (realm.FocusEvent !== undefined && brand === '[object FocusEvent]') {
-		return new realm.FocusEvent(event.type, event);
-	}
-	if (realm.InputEvent !== undefined && brand === '[object InputEvent]') {
-		return new realm.InputEvent(event.type, event);
-	}
-	if (realm.CompositionEvent !== undefined && brand === '[object CompositionEvent]') {
-		return new realm.CompositionEvent(event.type, event);
-	}
-	if (realm.TouchEvent !== undefined && brand === '[object TouchEvent]') {
-		return cloneHydrationTouchEvent(event as TouchEvent, realm.TouchEvent);
-	}
-	return new realm.Event(event.type, event);
-}
-
-function cloneHydrationTouchEvent(
-	event: TouchEvent,
-	TouchEventImpl: typeof TouchEvent,
-): TouchEvent {
-	return new TouchEventImpl(event.type, {
-		bubbles: event.bubbles,
-		cancelable: event.cancelable,
-		composed: event.composed,
-		detail: event.detail,
-		ctrlKey: event.ctrlKey,
-		shiftKey: event.shiftKey,
-		altKey: event.altKey,
-		metaKey: event.metaKey,
-		touches: Array.from(event.touches),
-		targetTouches: Array.from(event.targetTouches),
-		changedTouches: Array.from(event.changedTouches),
-	});
-}
-
 function notifyHydrateBoundary(state: HydrateSlot, scope: Scope): void {
 	if (state.block.disposed || state.didNotify || !state.hydrated) return;
 	const retryBatch = suspenseRetryBatchForSubtree(state.block);
@@ -18909,6 +18818,17 @@ class HydrationCapability {
 	passthroughRanges = false;
 	/** A slot lent a server range whose first render has yet to claim it. */
 	lentSlot: ChildSlot | null = null;
+	/**
+	 * The adopted @if/@switch arm that renderAdoptedArm is rendering. Null once
+	 * the arm clones a template of its own, whose roots the cursor rests on.
+	 */
+	private arm: Block | null = null;
+	/**
+	 * Where the last server range that one of `arm`'s own slots claimed parked
+	 * the cursor, and how many slots `arm` had then.
+	 */
+	private armTail: Node | null = null;
+	private armSlots = 0;
 	nativeAdoption?: NativeAdoptionState;
 	retryPresentation?: () => void;
 	presentation?: boolean;
@@ -19674,27 +19594,65 @@ class HydrationCapability {
 	}
 
 	/**
+	 * A slot of `parent` claimed the server range that `close` ends. Step the
+	 * cursor past it to the next sibling's server content.
+	 */
+	parkPast(close: Node, parent: Scope): void {
+		const next = (this.node = getNextSibling(close));
+		if (parent === this.arm) {
+			this.armTail = next;
+			this.armSlots = parent.slots.length;
+		}
+	}
+
+	/**
+	 * First render of an @if or @switch arm into the server range it adopted,
+	 * `block`'s own. When the arm's content is its own slots and the last of
+	 * them claimed a server range, returns the node that claim parked the
+	 * cursor on: whatever the server rendered from there belongs to no client
+	 * node (discardArmTail). Null when the arm cloned a template of its own, or
+	 * a later slot adopted without claiming a range, since the cursor then
+	 * rests on the roots they adopted.
+	 */
+	renderAdoptedArm(block: Block): Node | null {
+		const outerArm = this.arm;
+		const outerTail = this.armTail;
+		const outerSlots = this.armSlots;
+		this.arm = block;
+		this.armTail = null;
+		try {
+			renderBlock(block);
+			return this.arm === block && this.armSlots === block.slots.length ? this.armTail : null;
+		} finally {
+			this.arm = outerArm;
+			this.armTail = outerTail;
+			this.armSlots = outerSlots;
+		}
+	}
+
+	/**
 	 * Runs after a branch's first hydrating render, which adopted the server's
 	 * arm range from `first` to `end`. Every range the arm claims parks the
 	 * cursor past it, or on its close marker when the slot rebuilt its content
 	 * (a @try body that threw on the client), so once the arm has claimed
 	 * something, a server range at the cursor or just after that marker is one
 	 * that nothing in the arm claimed: the server rendered another arm here,
-	 * longer than this one. Discard the server content from there up to `end`,
-	 * stopping at any client nodes that mismatch recovery built there, and
-	 * report it once.
+	 * longer than this one. So is any server content at `parked`, where the
+	 * arm's last slot parked the cursor after its range (renderAdoptedArm).
+	 * Discard the server content from there up to `end`, stopping at any
+	 * client nodes that mismatch recovery built there, and report it once.
 	 *
 	 * An arm that rendered nothing leaves the cursor on `first`, and the whole
 	 * range is then the server's other arm: it is discarded and reported as an
 	 * empty client branch, as an arm with no body is. The cursor does not move
 	 * past the elements and text that a template adopts, so at an element or
-	 * text node it cannot tell what the arm adopted from what the server
-	 * rendered for another arm. Both stay.
+	 * text node it cannot otherwise tell what the arm adopted from what the
+	 * server rendered for another arm. Both stay.
 	 */
-	discardArmTail(scope: Scope, slotKey: number, first: Node, end: Node): void {
+	discardArmTail(scope: Scope, slotKey: number, first: Node, end: Node, parked: Node | null): void {
 		let from = this.node;
 		if (this.isClose(from)) from = getNextSibling(from);
-		if (!this.isOpen(from)) return;
+		if (!this.isOpen(from) && (parked === null || from !== parked)) return;
 		let stop: Node | null = null;
 		let node: Node | null = from;
 		while (node !== null && node !== end) {
@@ -20127,6 +20085,8 @@ class HydrationCapability {
 		partialStyles?: string,
 	): Node {
 		const cursor = this.node;
+		// The arm's own template: its roots may follow the arm's last claim.
+		if (this.arm !== null && CURRENT_SCOPE?.block === this.arm) this.arm = null;
 		const isFragment =
 			template !== null ? (template as any).__oct_frag === true : isLazyFragment(lazy!);
 		// Lite/no-template wrappers can render the logical root while sharing the
@@ -32406,7 +32366,7 @@ function componentSlotImpl(
 	// An INHERITED slot adopted nothing: its end is the PARENT's marker and it has
 	// no following sibling (sole root) — leave the cursor where the body put it.
 	if (hydration !== null && !state.inherited && state.end !== null)
-		hydration.node = getNextSibling(state.end);
+		hydration.parkPast(state.end, parentScope);
 }
 
 // Keep the fresh-subtree callback out of componentSlotImpl: a closure there
@@ -42578,17 +42538,17 @@ function renderBranchSlot(
 					// then park the cursor after the slot for the next sibling.
 					hydration!.suspend(() => renderBlock(b));
 					hydration!.node = getNextSibling(state.end as Node);
+				} else if (inner !== null) {
+					const parked = hydration!.renderAdoptedArm(b);
+					// What a rebuilt root left of the server's content goes quietly, with
+					// the mismatch it already reported.
+					if (hydration!.rebuiltTail !== null) hydration!.sweepRebuiltTail(bEnd);
+					// The server may have rendered another arm here, longer than this one
+					// or one this arm renders nothing of.
+					if (hydration!.node !== bEnd)
+						hydration!.discardArmTail(parentScope, slotKey, first!, bEnd, parked);
 				} else {
 					renderBlock(b);
-					if (inner !== null) {
-						// What a rebuilt root left of the server's content goes quietly, with
-						// the mismatch it already reported.
-						if (hydration!.rebuiltTail !== null) hydration!.sweepRebuiltTail(bEnd);
-						// The server may have rendered another arm here, longer than this one
-						// or one this arm renders nothing of.
-						if (hydration!.node !== bEnd)
-							hydration!.discardArmTail(parentScope, slotKey, first!, bEnd);
-					}
 				}
 			} else if (hydration !== null && getNextSibling(state.start) !== state.end) {
 				if (PRESENTATION_HYDRATION?.revision !== undefined) throw new Error(formatClientError(75));
@@ -42742,7 +42702,7 @@ function renderBranchSlot(
 	// following sibling @if/@switch adopts its own markers instead of seeing this
 	// slot's close marker and mounting fresh DOM at the enclosing anchor.
 	if (hydration !== null && !state.borrowed && state.end !== null) {
-		hydration.node = getNextSibling(state.end);
+		hydration.parkPast(state.end, parentScope);
 	}
 }
 
