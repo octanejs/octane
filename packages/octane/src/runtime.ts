@@ -10793,14 +10793,10 @@ export function renderBlock(block: Block): void {
 	// A replacement dynamic range owns client DOM even while its parent adopts
 	// server siblings. Fresh control-flow markers can instead be replay scaffolding
 	// whose body must still read the server rejection seed before adopting a catch.
-	// A component that renders in place of a server node may adopt it.
 	if (
 		hydration !== null &&
 		(!hydration.owns(block) ||
-			(block.kind === 'dynamic' &&
-				block.endMarker !== null &&
-				hydration.isFresh(block.endMarker) &&
-				!hydration.framesInPlace(block.endMarker)))
+			(block.kind === 'dynamic' && block.endMarker !== null && hydration.rebuilds(block.endMarker)))
 	) {
 		hydration.suspend(() => renderBlock(block));
 		return;
@@ -19266,11 +19262,16 @@ class HydrationCapability {
 	}
 
 	/**
-	 * Whether `end` closes the fresh range renderUnframed placed before the
-	 * server node it renders in place of, whose body may adopt that node.
+	 * Whether the dynamic range that `end` closes was built on the client, so
+	 * its body builds rather than adopts. The fresh range renderUnframed placed
+	 * before the server node it renders in place of was not: its body may
+	 * adopt that node.
 	 */
-	framesInPlace(end: Node): boolean {
-		return this.inPlaceUnframed && this.inPlace !== null && getNextSibling(end) === this.inPlace;
+	rebuilds(end: Node): boolean {
+		return (
+			this.freshNodes.has(end) &&
+			!(this.inPlaceUnframed && this.inPlace !== null && getNextSibling(end) === this.inPlace)
+		);
 	}
 
 	/**
