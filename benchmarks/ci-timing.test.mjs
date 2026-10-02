@@ -38,6 +38,28 @@ test('only successful jobs are timed, and wall clock spans first start to last e
 	assert.equal(summary.jobTime, 420);
 });
 
+// A typecheck PR read React parity checks +700% from a 116s "Set up job" wait for a runner.
+test('a job is timed from its first step after runner setup', () => {
+	const slowSetup = {
+		...job('React parity checks', 0, 136),
+		steps: [
+			{
+				name: 'Set up job',
+				started_at: job('', 0, 0).started_at,
+				completed_at: job('', 116, 0).started_at,
+			},
+			{
+				name: 'Checkout code',
+				started_at: job('', 116, 0).started_at,
+				completed_at: job('', 136, 0).started_at,
+			},
+		],
+	};
+	const summary = summarizeJobs([slowSetup]);
+	assert.equal(summary.durations.get('React parity checks'), 20);
+	assert.equal(summary.wallClock, 136);
+});
+
 test('draft and closed-event runs, which skip the gate job, are not timed', () => {
 	assert.equal(
 		ranGatedJobs([job('lint', 0, 3), job('classify changeset release', 0, 0, 'skipped')]),
