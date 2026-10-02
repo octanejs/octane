@@ -2576,10 +2576,21 @@ function nativeCandidateForAction(batch: TransitionActionBatch): SignalActionFra
 function ensureNativeActionResolver(): void {
 	if (nativeActionResolverInstalled) return;
 	nativeActionResolverInstalled = true;
-	registerNativeActionResolver(() => {
-		const batch = transitionActionBatchForUpdate();
-		return batch === null ? undefined : nativeCandidateForAction(batch);
-	});
+	registerNativeActionResolver(resolveNativeActionCandidate);
+}
+
+function resolveNativeActionCandidate(): SignalActionFrame | undefined {
+	const batch = transitionActionBatchForUpdate();
+	return batch === null ? undefined : nativeCandidateForAction(batch);
+}
+
+// Installed only inside runTransition's synchronous slice, where the active batch
+// is that transition's own: a nested transition joins its parent's batch. Reading
+// it here instead of capturing it keeps every transition free of a closure.
+function resolveTransitionNativeCandidate(): SignalActionFrame | undefined {
+	const candidate = nativeCandidateForAction(ACTIVE_TRANSITION_ACTION_BATCH!);
+	swapActiveSignalCandidate(candidate);
+	return candidate;
 }
 
 function createTransitionActionBatch(): TransitionActionBatch {
@@ -27943,52 +27954,13 @@ function fireEventSlot(
 	// render writes. A pure computation's own write guard stays in force, and
 	// Effect Event permission and signal ownership are unchanged.
 	const nativeFrame = NATIVE_READ_DRIVER?.pauseLifecycle() ?? -1;
-	const invoke = (): void => {
-		if (typeof slot === 'function') {
-			slot(event);
-			return;
-		}
-		if (process.env.NODE_ENV !== 'production' && isInvalidEventListenerSlot(slot)) {
-			invokeInvalidEventListener(`\`${slot.name}\``, slot.value, event);
-			return;
-		}
-		if (isHandlerBundle(slot)) {
-			const bundle = slot;
-			const a = bundle.args;
-			if (typeof a !== 'number') {
-				switch (a.length) {
-					case 0:
-						bundle.fn();
-						break;
-					case 1:
-						bundle.fn(a[0]);
-						break;
-					case 2:
-						bundle.fn(a[0], a[1]);
-						break;
-					default:
-						bundle.fn.apply(null, a);
-				}
-			} else if (a === 1) {
-				bundle.fn(bundle.a0);
-			} else if (a === 2) {
-				bundle.fn(bundle.a0, bundle.a1);
-			} else if (a === -1) {
-				bundle.fn(event, bundle.a0);
-			} else {
-				bundle.fn(event, bundle.a0, bundle.a1);
-			}
-			return;
-		}
-		invokeInvalidEventListener(`${event.type} event`, slot, event);
-	};
 	try {
 		const owner =
 			recorded instanceof ScopeImpl || recorded instanceof BlockImpl
 				? scopeSignalOwner(recorded)
 				: recorded;
-		if (owner === undefined || currentSignalOwner() === owner) invoke();
-		else runWithSignalOwner(owner, invoke);
+		if (owner === undefined || currentSignalOwner() === owner) invokeEventSlot(slot, event);
+		else runWithSignalOwner(owner, () => invokeEventSlot(slot, event));
 	} catch (err) {
 		reportListenerError(err);
 	} finally {
@@ -27996,6 +27968,48 @@ function fireEventSlot(
 		CURRENT_SCOPE = previousScope;
 		CURRENT_BLOCK = previousBlock;
 	}
+}
+
+// Only a handler entering another signal owner needs a callback; the ordinary
+// dispatch calls this directly.
+function invokeEventSlot(slot: EventSlot, event: Event): void {
+	if (typeof slot === 'function') {
+		slot(event);
+		return;
+	}
+	if (process.env.NODE_ENV !== 'production' && isInvalidEventListenerSlot(slot)) {
+		invokeInvalidEventListener(`\`${slot.name}\``, slot.value, event);
+		return;
+	}
+	if (isHandlerBundle(slot)) {
+		const bundle = slot;
+		const a = bundle.args;
+		if (typeof a !== 'number') {
+			switch (a.length) {
+				case 0:
+					bundle.fn();
+					break;
+				case 1:
+					bundle.fn(a[0]);
+					break;
+				case 2:
+					bundle.fn(a[0], a[1]);
+					break;
+				default:
+					bundle.fn.apply(null, a);
+			}
+		} else if (a === 1) {
+			bundle.fn(bundle.a0);
+		} else if (a === 2) {
+			bundle.fn(bundle.a0, bundle.a1);
+		} else if (a === -1) {
+			bundle.fn(event, bundle.a0);
+		} else {
+			bundle.fn(event, bundle.a0, bundle.a1);
+		}
+		return;
+	}
+	invokeInvalidEventListener(`${event.type} event`, slot, event);
 }
 
 function invokeInvalidEventListener(label: string, listener: unknown, event: Event): void {
@@ -35594,6 +35608,38 @@ export function bindSignalChild(
 			: null;
 	const cachedText = prior?.text ?? (previous instanceof Text ? previous : null);
 	if (!isSignalHandle(value)) {
+		const type = typeof value;
+		// An ordinary marker-bounded hole keeps textHoleUpdate's fast path: its
+		// token is the last primitive, and a changed primitive rewrites the slot's
+		// Text node. Objects never become the token, so it is never read later.
+		const primitiveToken =
+			slotKey !== 0 &&
+			!onlyChild &&
+			bindingMarker === undefined &&
+			ownsHost === undefined &&
+			value !== null &&
+			type !== 'object' &&
+			type !== 'function';
+		if (
+			primitiveToken &&
+			prior === null &&
+			!(CURRENT_BLOCK?.pending && !CURRENT_BLOCK.crossRenderUpdate)
+		) {
+			const state = parentScope.slots[slotKey] as ChildSlot | undefined;
+			if (
+				state !== undefined &&
+				state.text !== null &&
+				state.block === null &&
+				state.forSlot === null &&
+				state.hostNode === null &&
+				state.portal === null &&
+				state.implicitSignal === undefined &&
+				!dangerouslySetInnerHTMLOwnsChild(domParent, value)
+			) {
+				if (previous !== value) setText(state.text, value === true ? '' : value);
+				return value;
+			}
+		}
 		const text = onlyChild
 			? childTextHole(parentScope, slotKey, domParent, value, cachedText)
 			: (bindingMarker === undefined
@@ -35608,7 +35654,7 @@ export function bindSignalChild(
 			if (WIP_CAPTURE === null) finish(false);
 			else (WIP_CAPTURE.renderCleanups ??= []).push(finish);
 		}
-		return text;
+		return primitiveToken ? value : text;
 	}
 	if (prior !== null && !prior.disposed && prior.handle === value) {
 		const next = readSignalBinding(value);
@@ -40910,11 +40956,7 @@ function runTransition(fn: () => void | Promise<unknown>, hook?: TransitionHookS
 		tickTransitionCount(+1);
 		try {
 			const previousCandidate = activeCandidate;
-			const nativeResolver = setNativeCandidateResolver(() => {
-				const candidate = nativeCandidateForAction(actionBatch);
-				swapActiveSignalCandidate(candidate);
-				return candidate;
-			});
+			const nativeResolver = setNativeCandidateResolver(resolveTransitionNativeCandidate);
 			try {
 				result = fn();
 			} finally {

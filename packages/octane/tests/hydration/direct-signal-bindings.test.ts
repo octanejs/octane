@@ -10,6 +10,7 @@ import {
 	bindSignalChild,
 	bindSignalValue,
 	childSlot,
+	createElement,
 	createElementAt,
 	createElementFromConfig,
 	createRoot,
@@ -696,6 +697,63 @@ Pass.defaultProps = { label: 'default' };`,
 		await Promise.resolve();
 		expect(container.textContent).toBe('scalar again');
 		expect(token).toBeNull();
+		owner.dispose();
+	});
+
+	it('updates a signal-capable text hole beside siblings in place through every value kind', async () => {
+		// The earlier prop-bound class makes the module signal-capable, so the later
+		// `{props.value}` hole compiles to bindSignalChild rather than textHoleUpdate.
+		const app = loadCompiledFixtureSource(
+			`function Tag({ kind }) @{ <i class={kind}>{'t'}</i> }
+export function App(props) @{ <p>{'n:'}{props.value}<Tag kind="x" /></p> }`,
+			{ id: '/src/signal-capable-text-hole.tsrx', mode: 'client', compileOptions: { hmr: false } },
+		);
+		const container = document.createElement('div');
+		document.body.appendChild(container);
+		const owner = createScope({ scopeKey: 'signal-capable-text-hole' });
+		const text$ = owner.signal$('text', 's1');
+		const paragraph = () => container.querySelector('p')!;
+		const render = (value: unknown) => flushSync(() => root!.render(app.App, { value }));
+		const mutations = new MutationObserver(() => {});
+		const records = () => mutations.takeRecords();
+
+		root = createRoot(container);
+		root.render(app.App, { value: 1 });
+		expect(paragraph().textContent).toBe('n:1t');
+		const hole = [...paragraph().childNodes].find((node) => node.nodeValue === '1')!;
+		mutations.observe(paragraph(), { characterData: true, childList: true, subtree: true });
+
+		render(2);
+		expect(paragraph().textContent).toBe('n:2t');
+		expect(hole.nodeValue).toBe('2');
+		expect(records().map((record) => [record.type, record.target])).toEqual([
+			['characterData', hole],
+		]);
+
+		render(2);
+		expect(records()).toEqual([]);
+
+		render(true);
+		expect(paragraph().textContent).toBe('n:t');
+		render(3);
+		expect(paragraph().textContent).toBe('n:3t');
+		render(createElement('em', null, 'e'));
+		expect(paragraph().textContent).toBe('n:et');
+		expect(paragraph().querySelector('em')?.nextElementSibling?.tagName).toBe('I');
+		render(4);
+		expect(paragraph().textContent).toBe('n:4t');
+
+		render(text$);
+		expect(paragraph().textContent).toBe('n:s1t');
+		text$.set('s2');
+		await Promise.resolve();
+		expect(paragraph().textContent).toBe('n:s2t');
+		render(5);
+		expect(paragraph().textContent).toBe('n:5t');
+		text$.set('s3');
+		await Promise.resolve();
+		expect(paragraph().textContent).toBe('n:5t');
+		mutations.disconnect();
 		owner.dispose();
 	});
 
