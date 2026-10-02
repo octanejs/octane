@@ -218,6 +218,35 @@ describe.each([
 		});
 	});
 
+	it('keeps a row a retry inserted on the client when a later retry resumes inside it', async () => {
+		const gate = pending();
+		const { nodes, leaf, slow } = await hydratePending('RowProbe', {
+			items: ['x'],
+			gate: gate.promise,
+		});
+		const q = nodes.section.querySelector('q');
+		const promises = { leaf: leaf.promise, gate: gate.promise, slow: slow.promise };
+		flushSync(() => root!.render(client.RowProbe, { ...promises, items: ['x', 'q'] }));
+		// The retry inserts the row, then suspends at Gate.
+		await act(async () => leaf.resolve('x'));
+		// The next retry opens the row, whose Slow suspends; the one after resumes it.
+		flushSync(() => root!.render(client.RowProbe, { ...promises, items: ['x', 'q'], open: 'q' }));
+		await act(async () => gate.resolve('g'));
+		await act(async () => slow.resolve('S'));
+
+		expect(markup(nodes.section)).toBe('<s>x</s><s>q<i>S</i></s><u>x</u><q>g</q><em>e</em>');
+		expect(nodes.section.firstElementChild).toBe(nodes.first);
+		expect(nodes.section.querySelector('u')).toBe(nodes.u);
+		expect(nodes.section.querySelector('q')).toBe(q);
+		expect(nodes.section.querySelector('em')).toBe(nodes.em);
+		expectNoDiagnostics();
+
+		await act(async () => root!.render(client.RowProbe, { ...promises, items: ['q'] }));
+		expect(markup(nodes.section)).toBe('<s>q</s><u>x</u><q>g</q><em>e</em>');
+		expect(nodes.section.querySelector('em')).toBe(nodes.em);
+		expectNoDiagnostics();
+	});
+
 	describe('a renderable hole', () => {
 		it.each([
 			{ title: 'swaps the component', from: 'a', to: 'b' },

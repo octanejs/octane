@@ -45831,7 +45831,7 @@ function mountItem<T>(
 					: '',
 			);
 		}
-		return hydration.suspend(() =>
+		const block = hydration.suspend(() =>
 			mountItem(
 				parentBlock,
 				parentNode,
@@ -45845,6 +45845,10 @@ function mountItem<T>(
 				ssrMarkerless,
 			),
 		);
+		// Like a block renderUpdate builds, every later render of the row stays on
+		// the client, including a retry that resumes a block suspended inside it.
+		if (inserted) hydration.recordUpdate(block);
+		return block;
 	}
 	if (
 		singleRoot === true ||

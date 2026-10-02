@@ -89,3 +89,41 @@ export function HoleProbe(props: {
 		</Hydrate>
 	</div>
 }
+
+function Gate(props: { server?: boolean; gate: Promise<string> }) @{
+	<q>{(props.server ? 'g' : use(props.gate)) as string}</q>
+}
+
+function Row(props: { item: string; open: boolean; slow: Promise<string> }) @{
+	<s>
+		{props.item as string}
+		@if (props.open) {
+			<Slow slow={props.slow} />
+		}
+	</s>
+}
+
+// Rows that a retry inserts, then opens in a later retry. Gate suspends the
+// retry that inserts them, so they finish before a later capture change opens
+// one and its Slow suspends; the retry after that resumes inside the row.
+export function RowProbe(props: {
+	server?: boolean;
+	leaf: Promise<string>;
+	gate: Promise<string>;
+	slow: Promise<string>;
+	items: string[];
+	open?: string;
+}) @{
+	<div>
+		<Hydrate split={false} when={load()}>
+			<section>
+				@for (const item of props.items; key item) {
+					<Row item={item} open={item === props.open} slow={props.slow} />
+				}
+				<Pend server={props.server} leaf={props.leaf} />
+				<Gate server={props.server} gate={props.gate} />
+				<Em />
+			</section>
+		</Hydrate>
+	</div>
+}
