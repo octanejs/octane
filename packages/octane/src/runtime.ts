@@ -11641,6 +11641,9 @@ export function componentSlotLite<P>(
 	// render only) — consumed by the post-body cursor advance below.
 	let adoptedOpen: Comment | null = null;
 	let adoptedClose: Node | null = null;
+	// The server node a call without a range found instead (hydration first
+	// render only): its body may adopt it in place.
+	let inPlace: Node | null = null;
 	if (scope === undefined) {
 		scope = new ScopeImpl(parentScope, parentScope.block);
 		// Lite scope's `block` exposes the host/anchor as the body's DOM context
@@ -11677,7 +11680,7 @@ export function componentSlotLite<P>(
 				endMarker = hydration.close(open);
 				adoptedClose = endMarker;
 				hydration.node = getNextSibling(open);
-			}
+			} else inPlace = open;
 		}
 		scope.block = new LiteBlockImpl(host, endMarker, parentScope.block) as unknown as Block;
 		stampSignalInstance(scope, parentScope, invocationSite, undefined, false);
@@ -11690,6 +11693,20 @@ export function componentSlotLite<P>(
 		parentScope.slots[slotKey] = scope;
 		// Register on parent.children so unmountScope(parent) walks into us.
 		(parentScope.children ??= []).push({ key: slotKey, scope });
+		if (inPlace !== null) {
+			renderLiteInPlace(
+				hydration!,
+				parentScope,
+				slotKey,
+				host,
+				comp,
+				props,
+				invocationSite,
+				anchor,
+				inPlace,
+			);
+			return;
+		}
 	} else {
 		// Re-render: the parent's host/anchor are stable across renders so no
 		// need to rebuild the LiteBlockImpl. Skip the allocation on warm path.
@@ -11735,6 +11752,28 @@ export function componentSlotLite<P>(
 	// its commitBag insert MOVES the previous sibling's root to the shared
 	// anchor. Mirrors componentSlot's post-render advance.
 	if (hydration !== null && adoptedClose !== null) hydration.node = getNextSibling(adoptedClose);
+}
+
+// A lite call without a server range, at the server node `root`: its body may
+// adopt that node in place (HydrationCapability.renderInPlace). The body renders
+// through componentSlotLite again, which finds the registered scope. A separate
+// function keeps the callback's captures out of ordinary lite dispatch.
+function renderLiteInPlace<P>(
+	hydration: HydrationCapability,
+	parentScope: Scope,
+	slotKey: number,
+	host: Node,
+	comp: ComponentBody<P>,
+	props: P,
+	invocationSite: string | undefined,
+	anchor: Node | undefined,
+	root: Node,
+): void {
+	hydration.renderInPlace(
+		() => componentSlotLite(parentScope, slotKey, host, comp, props, invocationSite, anchor),
+		undefined,
+		root,
+	);
 }
 
 // Keep the fresh-subtree callback's extra captures out of ordinary lite dispatch.
@@ -18713,6 +18752,8 @@ class HydrationCapability {
 	private abandoned = false;
 	private readonly freshNodes = new WeakSet<Node>();
 	private readonly unframedRootRanges = new WeakMap<Node, Node>();
+	/** The server node renderInPlace's body may adopt, until a template does. */
+	private inPlace: Node | null = null;
 	/** Pairs discovered while matching an outer range; released with this hydration pass. */
 	private matchingCloses: WeakMap<Node, Comment> | null = null;
 	/** First unclaimed root sibling after a compiled root clone; undefined until known. */
@@ -18945,6 +18986,29 @@ class HydrationCapability {
 				}
 			}
 		}
+	}
+
+	/**
+	 * First render, by `render(target)`, of a component call that found `root`
+	 * at the cursor instead of a server range of its own. Its template adopts
+	 * `root` in place when they match. clone() leaves the cursor on a root it
+	 * adopts, and the root's own holes move it into the root's children, but
+	 * the next sibling's server content starts after the root, so step past it.
+	 * A body that rebuilt `root` or rendered nothing there leaves the cursor
+	 * where it put it. Returns whether the body adopted `root`.
+	 */
+	renderInPlace<T>(render: (target: T) => void, target: T, root: Node): boolean {
+		const outer = this.inPlace;
+		this.inPlace = root;
+		let adopted = false;
+		try {
+			render(target);
+			adopted = this.inPlace === null;
+		} finally {
+			this.inPlace = outer;
+		}
+		if (adopted) this.node = getNextSibling(root);
+		return adopted;
 	}
 
 	/** Read the `<!--oct-catch:T:C-->` comment ahead of a caught arm's range. */
@@ -19826,6 +19890,7 @@ class HydrationCapability {
 			this.claimRootRemainder(
 				framedRemainder === undefined ? (unframedRemainder ?? null) : framedRemainder,
 			);
+		if (cursor === this.inPlace) this.inPlace = null;
 		return cursor;
 	}
 
@@ -31665,11 +31730,17 @@ function componentSlotImpl(
 			)
 				profileTrackComponent(b, identity);
 			state.block = b;
+			// Hydrating, whether the body adopted the server node at the cursor in
+			// place; undefined when the render threw.
+			let adopted: boolean | undefined;
 			try {
-				renderBlock(b);
+				if (hydrationCursor === null) {
+					renderBlock(b);
+					adopted = false;
+				} else adopted = hydration!.renderInPlace(renderBlock, b, hydrationCursor);
 			} finally {
 				if (
-					hydration !== null &&
+					adopted !== false &&
 					hydrationCursor !== null &&
 					(STAGED_DOM?.view(hydrationCursor) ?? hydrationCursor).parentNode === domParent
 				) {
@@ -31677,6 +31748,8 @@ function componentSlotImpl(
 					// present, so the client-mount before/after probe cannot observe an
 					// insertion. Stamp the adopted cursor itself as the block boundary;
 					// a later return-shape switch can then unmount that host normally.
+					// A render that threw keeps this stamp. One that rebuilt the node, or
+					// met a close marker, inserted its own root, which the probe finds.
 					b.startMarker = hydrationCursor;
 					b.endMarker = hydrationCursor;
 				} else {
@@ -31730,8 +31803,8 @@ function componentSlotImpl(
 	// cursor at the end — an EMPTY component (`<></>`, e.g. the router's
 	// <Transitioner/>) renders nothing, so without this the cursor stays parked on
 	// the component's own `<!--]-->` and the following sibling desyncs. Mirrors
-	// forBlock's `hydrateNode = state.end.nextSibling`. (singleRoot is client-only —
-	// during hydration the server always wraps the output, so state.end is set.)
+	// forBlock's `hydrateNode = state.end.nextSibling`. (A hydrating singleRoot
+	// slot found no range: renderInPlace stepped past any server node it adopted.)
 	// An INHERITED slot adopted nothing: its end is the PARENT's marker and it has
 	// no following sibling (sole root) — leave the cursor where the body put it.
 	if (hydration !== null && !state.inherited && state.end !== null)
