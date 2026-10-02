@@ -1914,6 +1914,12 @@ export interface Block extends Scope {
 	pending: boolean;
 	disposed: boolean;
 	/**
+	 * Event-route epoch at which this Block's hosts left delegated dispatch; 0 while
+	 * they are live. A staged deletion records it when it publishes. See
+	 * isRetiredEventHost.
+	 */
+	retiredEpoch: number;
+	/**
 	 * RENDER_VALID / RENDER_INVALID / RENDER_RETRYING, separate from mount lifetime.
 	 * Kept numeric because nested renders can invalidate an active retry in place.
 	 */
@@ -10298,6 +10304,7 @@ class BlockImpl {
 	// Scheduler / lifecycle.
 	declare pending: boolean;
 	declare disposed: boolean;
+	declare retiredEpoch: number;
 	declare mounted: boolean;
 	declare renderStatus: number;
 	declare pendingMode: 'urgent' | 'transition' | null;
@@ -10414,6 +10421,7 @@ class BlockImpl {
 		this.itemIndex = 0;
 		this.pending = false;
 		this.disposed = false;
+		this.retiredEpoch = 0;
 		this.mounted = false;
 		this.renderStatus = RENDER_VALID;
 		this.pendingMode = null;
@@ -11656,6 +11664,7 @@ function unmountBlock(block: Block, detachDom: boolean = true): void {
 
 function unmountBlockInner(block: Block, detachDom: boolean): void {
 	block.disposed = true;
+	retireEventOwner(block);
 	if (
 		typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' &&
 		__OCTANE_PROFILE_ENABLED__ &&
@@ -18150,6 +18159,8 @@ function initDomOperations(): void {
 		// De-opt child scans and uncontrolled form baselines also read absent symbols.
 		seedExpando(elementProto, DEOPT_DESC, false);
 		seedExpando(elementProto, DEFAULT_VALUE_BASELINE, false);
+		// Every handler publication reads the host's renderer before claiming it.
+		seedExpando(elementProto, '$$eventOwner', false);
 		if (process.env.NODE_ENV !== 'production') {
 			seedExpando(elementProto, '__oct_loc');
 		}
@@ -25595,6 +25606,30 @@ function isUsableEventSlot(slot: EventSlot): boolean {
 const EMPTY_ARGS: any[] = [];
 let SIGNAL_EVENT_OWNERS: WeakMap<Element, SignalOwner | ScopeImpl | BlockImpl> | null = null;
 
+/**
+ * Take a disposed Block's hosts out of delegated dispatch. Teardown disposes a
+ * Block before detaching its DOM, and detaching a focused host dispatches
+ * focusout synchronously. A staged deletion keeps the committed hosts live until
+ * it publishes; this action is queued before the Block's DOM removal.
+ */
+function retireEventOwner(block: Block): void {
+	if (STAGED_COMMIT_CAPTURE === null) block.retiredEpoch = ++eventRootEpoch;
+	else
+		DEFERRED_LAYOUT_DRIVER!.stageAction(() => {
+			block.retiredEpoch = ++eventRootEpoch;
+		}, true);
+}
+
+/**
+ * Whether a native delivery that began at `epoch` must skip this host. Like a
+ * removed portal's route, a host that retires during a delivery keeps its
+ * handlers through the end of that delivery.
+ */
+function isRetiredEventHost(node: any, epoch: number): boolean {
+	const owner = node.$$eventOwner as Block | undefined;
+	return owner !== undefined && owner.retiredEpoch !== 0 && owner.retiredEpoch <= epoch;
+}
+
 /** Publish a native handler; compiled bundle updates omit the key to refresh only authority. */
 export function setEventHandler(el: Element, key?: string, handler?: any): void {
 	if (key !== undefined) {
@@ -25608,6 +25643,13 @@ export function setEventHandler(el: Element, key?: string, handler?: any): void 
 			journalBag();
 		}
 		(STAGED_DOM?.view(el as any) ?? (el as any))[key] = handler;
+		// The rendering Block owns this host's dispatch lifetime (retireEventOwner).
+		// Lite rows republish under their list's Block, so only a disposed claim is
+		// replaced, as when a hydration retry adopts the same server node. `disposed`
+		// never resets, so the claim needs no journal entry.
+		const owner = (el as any).$$eventOwner as Block | undefined;
+		if (CURRENT_BLOCK !== null && (owner === undefined || owner.disposed))
+			(el as any).$$eventOwner = CURRENT_BLOCK;
 	}
 	// Explicit authority also applies to handlers in modules with no signal bindings.
 	const explicitOwner =
@@ -26380,8 +26422,14 @@ const CAPTURE_SLOTS: EventSlot[] = [];
 let CAPTURE_OWNERS: (SignalOwner | ScopeImpl | BlockImpl | undefined)[] | null = null;
 
 /** Snapshot the phase's handler slots; returns whether any node on the path has one. */
-function snapshotDelegatedSlots(base: number, type: DelegatedEventType, capture: boolean): boolean {
+function snapshotDelegatedSlots(
+	event: Event,
+	base: number,
+	type: DelegatedEventType,
+	capture: boolean,
+): boolean {
 	const key = capture ? type.captureKey : type.bubbleKey;
+	const epoch = (event as any)[EVENT_ROOT_EPOCH] ?? eventRootEpoch;
 	const suppressDisabled =
 		(type.flags & EVENT_DISABLED_MOUSE) !== 0 ||
 		(!capture && (type.flags & EVENT_DISABLED_ENTER) !== 0);
@@ -26389,14 +26437,17 @@ function snapshotDelegatedSlots(base: number, type: DelegatedEventType, capture:
 	for (let index = base; index < CAPTURE_PATH.length; index++) {
 		const node = CAPTURE_PATH[index];
 		const slot = node[key] as EventSlot;
+		// A host retired before this delivery began starts no handler, as React never
+		// calls an unmounted component's handlers. Snapshotted handlers still run.
 		const active =
 			slot != null &&
-			suppressDisabled &&
-			node.disabled &&
-			(node.localName === 'button' ||
-				node.localName === 'input' ||
-				node.localName === 'select' ||
-				node.localName === 'textarea')
+			((suppressDisabled &&
+				node.disabled &&
+				(node.localName === 'button' ||
+					node.localName === 'input' ||
+					node.localName === 'select' ||
+					node.localName === 'textarea')) ||
+				isRetiredEventHost(node, epoch))
 				? null
 				: slot;
 		CAPTURE_SLOTS[index] = active;
@@ -26882,7 +26933,7 @@ function dispatchDelegated(this: Node, event: Event): void {
 		// nothing can observe the propagation frame: leave the native event's
 		// stopPropagation/currentTarget untouched instead of patching and restoring
 		// them for every unhandled pointer/touch/input event under the root.
-		if (!snapshotDelegatedSlots(pathBase, type, false) && submitRec === null) return;
+		if (!snapshotDelegatedSlots(event, pathBase, type, false) && submitRec === null) return;
 		stop = Object.getOwnPropertyDescriptor(event, 'stopPropagation');
 		propagationStarted = true;
 		frame = beginDelegatedPropagation(event, stop, null);
@@ -26948,7 +26999,7 @@ function dispatchDelegatedCapture(
 	buildDelegatedPath(event, this, path);
 	// Without a capture handler on the path no callback can observe the frame, so
 	// the native stopPropagation/currentTarget stay untouched (see dispatchDelegated).
-	const hasSlot = snapshotDelegatedSlots(pathBase, type, true);
+	const hasSlot = snapshotDelegatedSlots(event, pathBase, type, true);
 	const stop = hasSlot ? Object.getOwnPropertyDescriptor(event, 'stopPropagation') : undefined;
 	const immediate =
 		hasSlot && (type.flags & EVENT_NATIVE_CAPTURE) !== 0
@@ -43890,7 +43941,10 @@ function deferRootOwnedListClear(state: ForSlot, certified: boolean = false): bo
 			}
 			if (node !== end) wholeParent = false;
 		}
-		for (let block = oldHead; block !== null; block = block.nextSibling) block.disposed = true;
+		for (let block = oldHead; block !== null; block = block.nextSibling) {
+			block.disposed = true;
+			retireEventOwner(block);
+		}
 		if (wholeParent) {
 			(STAGED_DOM?.view(parent) ?? parent).textContent = '';
 			(STAGED_DOM?.view(parent) ?? parent).appendChild(start);
@@ -43979,6 +44033,7 @@ function batchClearItems(
 			// additionally skips the subtree scan for ref-free items.
 			if (b.deoptNode !== null && b.deoptRefs) detachDeoptTreeRefs(b.deoptNode, null);
 			b.disposed = true;
+			retireEventOwner(b);
 		}
 	}
 	oldItems.clear();
