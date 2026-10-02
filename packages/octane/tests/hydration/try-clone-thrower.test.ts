@@ -11,7 +11,8 @@ import type { PageProps } from './_fixtures/try-clone-thrower.tsrx';
 // against server content that is about to be discarded: often the server's own
 // catch arm, rendered because the server's body threw the same way. None of it
 // is a mismatch. A body that completes or suspends still reports one; a root
-// that suspends reports from the attempt that commits.
+// or a resolved Suspense arm that suspends keeps its server content and reports
+// from the attempt that commits.
 // Recoverable errors publish in dev and prod; console diagnostics in dev only.
 
 const server = loadServerFixture(
@@ -264,25 +265,17 @@ describe('hydrateRoot — a try body that does not reach its catch arm still rep
 		root.unmount();
 	});
 
-	it('reports a template clone that suspends in a @try with @pending', async () => {
-		const { root, recovered, caught } = await hydrateServerHtml(
-			'PendingBranch',
-			{ server: true },
-			{ value: undefined, promise: new Promise(() => {}) },
-		);
-		expect(caught).toEqual([]);
-		expect(recovered).toHaveLength(1);
-		expect(mismatches()).toEqual(DEV ? [expect.stringContaining(CLONE_MISMATCH)] : []);
-		root.unmount();
-	});
-
-	// Without @pending the root suspends, keeps the server content, and the
-	// attempt that commits after the promise resolves reports the clone.
-	it('reports a template clone that suspends its root once the root commits', async () => {
+	// Without @pending the root suspends; with it, the resolved arm does. Either
+	// keeps the server content, and the attempt that commits after the promise
+	// resolves reports the clone.
+	it.each([
+		['its root', 'Branch'],
+		['a @try with @pending', 'PendingBranch'],
+	] as const)('reports a template clone that suspends %s once it commits', async (_, name) => {
 		let resolve!: (value: string) => void;
 		const promise = new Promise<string>((done) => (resolve = done));
 		const { root, recovered, caught } = await hydrateServerHtml(
-			'Branch',
+			name,
 			{ server: true },
 			{ value: undefined, promise },
 		);
