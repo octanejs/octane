@@ -25852,6 +25852,47 @@ function isRetiredEventHost(node: any, epoch: number): boolean {
 	return owner !== undefined && owner.retiredEpoch !== 0 && owner.retiredEpoch <= epoch;
 }
 
+// Epoch of this task's first removed host root (retireEventHostTree); 0 when none
+// is pending. Older stamps belong to nodes already detached and are ignored.
+let retiringHostsSince = 0;
+
+/**
+ * Take a removed subtree out of delegated dispatch when no disposing Block covers
+ * it: a pure host in a value hole belongs to the live Block that rendered it.
+ * Every such removal detaches the node right after this, within the same task,
+ * so only the root is stamped and the stamp only needs to outlive the task.
+ */
+function retireEventHostTree(node: Node): void {
+	if ((node as any).nodeType !== 1) return;
+	if (STAGED_COMMIT_CAPTURE === null) stampRetiredEventHost(node);
+	else DEFERRED_LAYOUT_DRIVER!.stageAction(() => stampRetiredEventHost(node), true);
+}
+
+function stampRetiredEventHost(node: Node): void {
+	const epoch = ++eventRootEpoch;
+	if (retiringHostsSince === 0) {
+		retiringHostsSince = epoch;
+		queueMicrotask(endRetiringHosts);
+	}
+	(node as any).$$retiredEpoch = epoch;
+}
+
+function endRetiringHosts(): void {
+	retiringHostsSince = 0;
+}
+
+/**
+ * Highest path index inside a subtree whose removal began before the delivery at
+ * `epoch`, or -1. The outermost stamped root retires every node beneath it.
+ */
+function retiredHostSubtreeTop(base: number, epoch: number): number {
+	for (let index = CAPTURE_PATH.length - 1; index >= base; index--) {
+		const retired = CAPTURE_PATH[index].$$retiredEpoch;
+		if (retired >= retiringHostsSince && retired <= epoch) return index;
+	}
+	return -1;
+}
+
 /** Publish a native handler; compiled bundle updates omit the key to refresh only authority. */
 export function setEventHandler(el: Element, key?: string, handler?: any): void {
 	if (key !== undefined) {
@@ -26655,6 +26696,8 @@ function snapshotDelegatedSlots(
 	const suppressDisabled =
 		(type.flags & EVENT_DISABLED_MOUSE) !== 0 ||
 		(!capture && (type.flags & EVENT_DISABLED_ENTER) !== 0);
+	// Only a removed subtree's root carries its stamp, so find the outermost one.
+	const retiredTop = retiringHostsSince === 0 ? -1 : retiredHostSubtreeTop(base, epoch);
 	let found = false;
 	for (let index = base; index < CAPTURE_PATH.length; index++) {
 		const node = CAPTURE_PATH[index];
@@ -26663,12 +26706,13 @@ function snapshotDelegatedSlots(
 		// calls an unmounted component's handlers. Snapshotted handlers still run.
 		const active =
 			slot != null &&
-			((suppressDisabled &&
-				node.disabled &&
-				(node.localName === 'button' ||
-					node.localName === 'input' ||
-					node.localName === 'select' ||
-					node.localName === 'textarea')) ||
+			(index <= retiredTop ||
+				(suppressDisabled &&
+					node.disabled &&
+					(node.localName === 'button' ||
+						node.localName === 'input' ||
+						node.localName === 'select' ||
+						node.localName === 'textarea')) ||
 				isRetiredEventHost(node, epoch))
 				? null
 				: slot;
@@ -33455,6 +33499,11 @@ function hostElementBody(d: ElementDescriptor, block: Block): void {
 				);
 				journalRootProperty(block, 'deoptNode', block.deoptNode);
 			}
+			// This Block keeps rendering, so the replaced element retires on its own,
+			// before its children leave it and can take focus with them.
+			if (ROOT_RENDER_TRANSACTION !== null)
+				deferRootRange(block.parentNode, null, null, () => retireEventHostTree(retired));
+			else retireEventHostTree(retired);
 			// The children slot's live content — markers included — sat inside the
 			// removed element, so a preserved slot would keep rendering into the
 			// detached node. Run the subtree's cleanups and drop the slot state so
@@ -42212,9 +42261,22 @@ function detachDeoptTreeRefs(
 	uncommitted: UncommittedRefAttaches | null = null,
 	activityRefs: WeakMap<Element | FragmentInstance, ActivityRefState> | null = null,
 ): void {
+	// Teardown runs just before every blockless de-opt removal detaches `node`.
+	if (out === null) retireEventHostTree(node);
 	// No de-opt descriptor ref was ever stamped → nothing to detach or collect
 	// anywhere; skip the subtree scan. (Monotone flag — see noteDeoptRef.)
 	if (!DEOPT_REFS_STAMPED) return;
+	detachDeoptSubtreeRefs(node, out, shouldDetach, ownerScope, uncommitted, activityRefs);
+}
+
+function detachDeoptSubtreeRefs(
+	node: Node,
+	out: SuspenseRefEntry[] | null,
+	shouldDetach: boolean,
+	ownerScope: Scope | undefined,
+	uncommitted: UncommittedRefAttaches | null,
+	activityRefs: WeakMap<Element | FragmentInstance, ActivityRefState> | null,
+): void {
 	const ref = getDeoptDesc(node)?.props?.ref ?? activityRefs?.get(node as Element)?.connected;
 	if (ref != null) {
 		if (out !== null) {
@@ -42245,7 +42307,7 @@ function detachDeoptTreeRefs(
 			c = nodeAfterPortalRange(c, rangeEnd);
 			continue;
 		}
-		detachDeoptTreeRefs(c, out, shouldDetach, ownerScope, uncommitted, activityRefs);
+		detachDeoptSubtreeRefs(c, out, shouldDetach, ownerScope, uncommitted, activityRefs);
 		c = getNextSibling(c);
 	}
 }
