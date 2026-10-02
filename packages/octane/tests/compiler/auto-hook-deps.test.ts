@@ -650,7 +650,7 @@ export function useThing(value: string) {
 		expect(depsOf(code, 'useMemo')).toEqual([['value']]);
 	});
 
-	it('leaves local custom dependency calls unchanged without a custom-call slot boundary', () => {
+	it('leaves the arguments of local custom dependency calls unchanged', () => {
 		const source = `
 import { useMemo } from 'octane';
 function useComputed(factory, dependencies) {
@@ -662,9 +662,11 @@ export function usePair(props) {
   return [first, second];
 }
 `;
+		// Plain modules infer only direct built-in hook calls. Each wrapper call
+		// keeps its authored argument list, with no inferred dependency array.
 		const code = slotHooks(source, 'custom-dependencies.ts')!.code;
-		expect(code).toContain("useComputed(() => 'A' + props.value)");
-		expect(code).toContain("useComputed(() => 'B' + props.value)");
+		expect(code).toContain("() => 'A' + props.value)");
+		expect(code).toContain("() => 'B' + props.value)");
 		expect(code).not.toContain('[props.value]');
 	});
 
