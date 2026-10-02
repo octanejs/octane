@@ -1800,7 +1800,7 @@ export function View(props) @{ 'use dom bindings'; ${markup(name)} }`,
 				bareGzip: bare.gzip,
 			}),
 		);
-		// Measured 0.75 (Count) and 0.77 (Label, Nested).
+		// Measured 0.76 (Count) and 0.78 (Label, Nested).
 		assert.ok(
 			selected.gzip / bare.gzip < 0.82,
 			`${view}: cast/bare gzip ratio: ${selected.gzip}/${bare.gzip}`,
