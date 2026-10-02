@@ -19406,11 +19406,13 @@ class HydrationCapability {
 	/**
 	 * Runs after a branch's first hydrating render, which adopted the server's
 	 * arm range from `first` to `end`. Every range the arm claims parks the
-	 * cursor past it, so once the arm has claimed something, a server range
-	 * still at the cursor is one that nothing in the arm claimed: the server
-	 * rendered another arm here, longer than this one. Discard the server
-	 * content from the cursor up to `end`, stopping at any client nodes that
-	 * mismatch recovery built there, and report it once.
+	 * cursor past it, or on its close marker when the slot rebuilt its content
+	 * (a @try body that threw on the client), so once the arm has claimed
+	 * something, a server range at the cursor or just after that marker is one
+	 * that nothing in the arm claimed: the server rendered another arm here,
+	 * longer than this one. Discard the server content from there up to `end`,
+	 * stopping at any client nodes that mismatch recovery built there, and
+	 * report it once.
 	 *
 	 * An arm that claimed nothing leaves the cursor on `first`, and the whole
 	 * range is then the server's other arm rather than a tail after this one.
@@ -19419,8 +19421,10 @@ class HydrationCapability {
 	 * adopted from what the server rendered for another arm. Both stay.
 	 */
 	discardArmTail(scope: Scope, slotKey: number, first: Node, end: Node): void {
-		const from = this.node;
-		if (from === first || !this.isOpen(from)) return;
+		let from = this.node;
+		if (from === first) return;
+		if (this.isClose(from)) from = getNextSibling(from);
+		if (!this.isOpen(from)) return;
 		let stop: Node | null = null;
 		let node: Node | null = from;
 		while (node !== null && node !== end) {

@@ -63,6 +63,38 @@ export function TrailingHosts(props: { on: boolean }) @{
 	</div>
 }
 
+function Boom(props: { boom: boolean }) @{
+	if (props.boom) throw new Error('client throws');
+	<u>{'ok' as string}</u>
+}
+
+// The arm ends with a boundary whose body throws on the client, so the client
+// builds the catch arm where the server rendered the body.
+export function CaughtLast(props: { on: boolean; boom: boolean }) @{
+	<div id="r">
+		@if (props.on) {
+			<>
+				<Leaf v="x" />
+				@try {
+					<Boom boom={props.boom} />
+				} @catch (e) {
+					<p>{'caught' as string}</p>
+				}
+			</>
+		} @else {
+			<>
+				<Leaf v="x" />
+				@try {
+					<Boom boom={props.boom} />
+				} @catch (e) {
+					<p>{'caught' as string}</p>
+				}
+				<Leaf v="z" />
+			</>
+		}
+	</div>
+}
+
 export function Tail() @{
 	<u>{'tail' as string}</u>
 }

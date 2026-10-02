@@ -141,6 +141,15 @@ describe.each([
 		expect(markup(s.host)).toBe('<em>x</em>');
 	});
 
+	it('discards the server components after a boundary that rebuilt its arm', async () => {
+		const s = await hydrate('CaughtLast', { on: false, boom: false }, { on: true, boom: true });
+
+		expect(markup(s.host)).toBe('<em>x</em><p>caught</p>');
+		expect(s.host.querySelector('em')).toBe(s.ems[0]);
+		expect(s.recoverable).toEqual([expect.stringMatching(STRUCTURAL)]);
+		expect(warnings()).toEqual(dev ? [tailReport('CaughtLast', '@if')] : []);
+	});
+
 	it('builds the components a longer client arm adds and reports it once', async () => {
 		const s = await hydrate('SwitchComponents', { k: 'one' }, { k: 'two' });
 
