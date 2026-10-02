@@ -15,7 +15,4 @@ arm is removed as part of the one reported mismatch. A `@switch` or `@if` that
 the server did not render keeps the rebuilt root inside its own range. A text
 hole after the rebuilt root no longer throws `NotFoundError`. A Suspense
 boundary that resumes hydration after the rebuild places the root the same way
-and keeps the server siblings it adopted. A `@switch` or `@if` arm that the
-server did not render, and that suspends while hydrating, keeps the server
-element it adopted, whether a deferred boundary retries it or its case changes
-first.
+and keeps the server siblings it adopted.

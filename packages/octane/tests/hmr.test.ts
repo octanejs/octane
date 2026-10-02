@@ -600,6 +600,65 @@ describe('hmr — runtime wrapper', () => {
 		}
 	});
 
+	it('refreshes a root that hydration built after its server range ended', async () => {
+		// The server arm ends after its Em; the client's adds a Leaf, so hydration
+		// builds the Leaf's root at that arm's end. The arm's closing marker is
+		// not that root, so a handoff resets the Leaf alone.
+		const source = (label: string) => `
+			import { useState } from 'octane';
+			export function Leaf() @{
+				useState(0);
+				<i>{'${label}'}</i>
+			}
+			function Em() @{
+				<em>{'e'}</em>
+			}
+			export function App(props: { server?: boolean }) @{
+				<div>
+					@if (props.server) {
+						<>
+							<Em />
+						</>
+					} @else {
+						<>
+							<Em />
+							<Leaf />
+						</>
+					}
+				</div>
+			}
+		`;
+		const filename = '/src/Appended.tsrx';
+		const server = loadCompiledFixtureSource(source('v1'), { id: filename, mode: 'server' });
+		const container = document.createElement('div');
+		container.innerHTML = renderToString(server.App, { server: true }).html;
+		document.body.appendChild(container);
+		const errSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+		const hot = webpackHotModule(filename);
+		const root = hydrateRoot(
+			container,
+			await hot.load(source('v1')),
+			{},
+			{
+				onRecoverableError: () => {},
+			},
+		);
+		const children = () => Array.from(container.firstElementChild!.children, (el) => el.outerHTML);
+		try {
+			flushSync(() => {});
+			expect(children()).toEqual(['<em>e</em>', '<i>v1</i>']);
+
+			await hot.load(source('v2'));
+			flushSync(() => {});
+			expect(hot.invalidated).toBe(false);
+			expect(children()).toEqual(['<em>e</em>', '<i>v2</i>']);
+		} finally {
+			root.unmount();
+			container.remove();
+			errSpy.mockRestore();
+		}
+	});
+
 	it('refreshes a compiled child in place without duplicating its single root', async () => {
 		const initialChild = await compileHmrComponent(
 			`
