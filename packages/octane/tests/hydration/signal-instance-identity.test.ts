@@ -1247,8 +1247,9 @@ export function App(props) @{ <main>@try { <List ids={props.ids} load={props.loa
 	const RETURNED_JSX_LEAF = `import { signal$ } from 'octane/signals';
 export function Leaf(props) {
   const draft$ = signal$('x');
+  const read = String(draft$.get());
   props.remember();
-  return <p><button onClick={() => draft$.set(draft$.get() + '!')}>edit</button><output>{String(draft$.get())}</output></p>;
+  return <p data-read={read}><button onClick={() => draft$.set(draft$.get() + '!')}>edit</button><output>{String(draft$.get())}</output></p>;
 }`;
 	const RETURNED_JSX_APPS = [
 		{
@@ -1369,11 +1370,16 @@ ${source}`;
 				);
 				expect(clientKeys).toEqual(serverKeys);
 				expect([...container.querySelectorAll('output')]).toEqual(outputs);
-				// The returned JSX's handler and text both resolve the Leaf's own cell.
+				// The returned JSX's handler, its text, and the Leaf body's own read all
+				// resolve the Leaf's cell.
 				container.querySelector('button')!.click();
 				await Promise.resolve();
 				client.flushSync(() => {});
-				expect(outputs.map((output) => output.textContent)).toEqual(['x!', 'x'].slice(0, leaves));
+				const edited = ['x!', 'x'].slice(0, leaves);
+				expect(outputs.map((output) => output.textContent)).toEqual(edited);
+				expect(
+					[...container.querySelectorAll('p')].map((host) => host.getAttribute('data-read')),
+				).toEqual(edited);
 				expect(errors).toEqual([]);
 			} finally {
 				root?.unmount();
