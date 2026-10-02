@@ -7,6 +7,7 @@ import { print as esrapPrint } from 'esrap';
 import esrapTsx from 'esrap/languages/tsx';
 import { METHOD_DEP_IMPORT } from './hook-deps.js';
 import { nativeReadActivationIndex } from './native-read-codegen.js';
+import { signalHookCallSite } from './signal-declarations.js';
 import { adaptManualHookProviders } from './manual-hooks.js';
 import {
 	hasInlineMemoDirectEval,
@@ -98,15 +99,24 @@ function pure(node) {
 	return { ...node, __octanePure: true };
 }
 
-function allocateHookSlot(state, origin) {
+function allocateHookSlot(state, origin, hookNames = null) {
 	const index = state.slotDeclarations.length;
 	if (state.slotBase === null) state.slotBase = allocName(state, '_hs$');
 	const name = allocName(state, `_h$${index}`);
 	const offset =
 		index === 0 ? b.id(state.slotBase) : b.binary('+', b.id(state.slotBase), b.literal(index));
-	state.slotDeclarations.push(
-		inheritHookMemoOrigin(b.const(name, pure(b.call('Symbol', offset))), origin),
-	);
+	let slot = pure(b.call('Symbol', offset));
+	// Mirrors the surgical pass: a signal-aware custom-hook call keys the
+	// instance declarations it reaches by its authored position.
+	if (
+		hookNames !== null &&
+		state.signalHookSites &&
+		(state.nativeReads || hookNames.some((name) => typeof name === 'string' && name.endsWith('$')))
+	) {
+		const site = signalHookCallSite(state.filename, origin);
+		slot = pure(b.call(requireHelper(state, 'signalHookSite'), slot, b.literal(site)));
+	}
+	state.slotDeclarations.push(inheritHookMemoOrigin(b.const(name, slot), origin));
 	return b.id(name, origin);
 }
 
@@ -145,11 +155,11 @@ function slotBaseHooks(ast, state, options) {
 					allocateName: (name) => allocName(state, name),
 					visit,
 					requireReceiver: () => requireHelper(state, 'callWithReceiver'),
-					wrap: (call, origin) =>
+					wrap: (call, origin, method) =>
 						inheritHookMemoOrigin(
 							b.call(
 								requireHelper(state, 'withSlot', 'octane'),
-								allocateHookSlot(state, origin),
+								allocateHookSlot(state, origin, [method]),
 								b.arrow([], call),
 							),
 							origin,
@@ -159,9 +169,10 @@ function slotBaseHooks(ast, state, options) {
 			);
 			if (lowered !== null) return inheritHookMemoOrigin(lowered, node);
 		}
-		if (!options.manualSlots && hookMethodName(node, options.hookLocals) !== null) {
+		const method = options.manualSlots ? null : hookMethodName(node, options.hookLocals);
+		if (method !== null) {
 			assertSynchronousHookMethod(node);
-			const slot = allocateHookSlot(state, node);
+			const slot = allocateHookSlot(state, node, [method]);
 			const mapped = mapChildren(node, visit);
 			return inheritHookMemoOrigin(
 				b.call(requireHelper(state, 'withSlot', 'octane'), slot, b.arrow([], mapped)),
@@ -169,7 +180,7 @@ function slotBaseHooks(ast, state, options) {
 			);
 		}
 		if (!options.manualSlots && node.type === 'CallExpression' && node._octaneCustomHookCall) {
-			const slot = allocateHookSlot(state, node);
+			const slot = allocateHookSlot(state, node, [node.callee.name, node._octaneCustomHookCall]);
 			const mapped = mapChildren(node, visit);
 			const callee = mapped.typeArguments
 				? {
@@ -414,6 +425,9 @@ export function inlinePlainHookMemos(ast, source, id, options) {
 	);
 	if (!canPrintProgram(ast, visitors)) return null;
 	const state = {
+		filename: id,
+		nativeReads: options.nativeReads === true,
+		signalHookSites: options.signalHookSites === true,
 		usedNames: collectUsedNames(ast),
 		helpers: new Map(),
 		slotBase: null,
