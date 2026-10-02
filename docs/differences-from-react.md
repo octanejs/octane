@@ -911,6 +911,10 @@ What differs is the event API and synthesis layer:
   no synthesis from `over`/`out`.
 - `onFocus`/`onBlur` use the browser's bubbling `focusin`/`focusout` events,
   including capture variants; the event object retains that native type.
+- Removing a focused host can make the browser dispatch `focusout` while the
+  removal is in progress. Hosts whose component has unmounted start no handler
+  for it, but still-mounted ancestors receive it. React suppresses every event
+  during its commit, including those ancestors' handlers.
 - There are no synthetic `onChange`/`onBeforeInput`/`onSelect` polyfills — use
   the native events (`onInput` etc.).
 - Root listeners are non-passive. `preventDefault()` in `onWheel` or
