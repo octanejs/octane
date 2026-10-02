@@ -44800,48 +44800,61 @@ function batchClearItems(
 		oldItems.clear();
 		return;
 	}
-	// Dispose the items before their DOM leaves, like every other deletion:
-	// cleanups observe attached hosts, and the focusout that removing a focused
-	// host dispatches finds them retired. Walk the intrusive item chain (head →
-	// nextSibling) rather than the Map's iterator: zero allocation and a
-	// monomorphic pointer chase. Callers reset head/tail only AFTER this returns,
-	// so the chain still covers exactly the old items here.
-	for (let b: Block | null = state.head; b !== null; b = b.nextSibling) {
-		if (b.cleanups !== null || b.children !== null || b._slots !== null) {
-			unmountBlock(b, false);
-		} else {
-			// Pure-host de-opt item (deoptItemBody with no component descendants):
-			// nothing to unmount scope-wise, but its subtree may carry stamped refs
-			// that must not keep pointing at the batch-removed DOM. Guarded so the
-			// common template-row clear stays a single null check; `deoptRefs`
-			// additionally skips the subtree scan for ref-free items.
-			if (b.deoptNode !== null && b.deoptRefs) detachDeoptTreeRefs(b.deoptNode, null);
-			b.disposed = true;
-			if (STAGED_COMMIT_CAPTURE) DEFERRED_LAYOUT_DRIVER!.retireHosts(b);
-			else b.retired = ++eventRootEpoch;
+	// One teardown bracket spans the items and their DOM, as in unmountBlock: a
+	// cleanup error dispatches to its boundary only after the list is cleared, so a
+	// boundary re-render cannot dispose the list while this still writes through it.
+	const first = state.head;
+	if (first !== null && TEARDOWN_DEPTH === 0) {
+		TEARDOWN_HANDLER = findTryHandler(first.parentBlock) ?? rendererRegionTryHandler(first);
+		TEARDOWN_BLOCK = first;
+	}
+	TEARDOWN_DEPTH++;
+	try {
+		// Dispose the items before their DOM leaves, like every other deletion:
+		// cleanups observe attached hosts, and the focusout that removing a focused
+		// host dispatches finds them retired. Walk the intrusive item chain (head →
+		// nextSibling) rather than the Map's iterator: zero allocation and a
+		// monomorphic pointer chase. Callers reset head/tail only AFTER this returns,
+		// so the chain still covers exactly the old items here.
+		for (let b: Block | null = state.head; b !== null; b = b.nextSibling) {
+			if (b.cleanups !== null || b.children !== null || b._slots !== null) {
+				unmountBlock(b, false);
+			} else {
+				// Pure-host de-opt item (deoptItemBody with no component descendants):
+				// nothing to unmount scope-wise, but its subtree may carry stamped refs
+				// that must not keep pointing at the batch-removed DOM. Guarded so the
+				// common template-row clear stays a single null check; `deoptRefs`
+				// additionally skips the subtree scan for ref-free items.
+				if (b.deoptNode !== null && b.deoptRefs) detachDeoptTreeRefs(b.deoptNode, null);
+				b.disposed = true;
+				if (STAGED_COMMIT_CAPTURE) DEFERRED_LAYOUT_DRIVER!.retireHosts(b);
+				else b.retired = ++eventRootEpoch;
+			}
 		}
+		const p = domNode(state.start).parentNode!;
+		if (domNode(state.start).previousSibling === null && getNextSibling(state.end) === null) {
+			// forBlock owns the parent — nuke everything in one DOM op, then re-add markers.
+			(STAGED_DOM?.view(p as Element) ?? (p as Element)).textContent = '';
+			(STAGED_DOM?.view(p) ?? p).appendChild(state.start);
+			(STAGED_DOM?.view(p) ?? p).appendChild(state.end);
+		} else if (oldItems.size < RANGE_CLEAR_MIN_ITEMS) {
+			// Shared parent (other JSX interleaved) — detach the marker span directly.
+			// Each removal takes a whole item subtree, so this is one call per ITEM,
+			// not per node.
+			removeRange(getNextSibling(state.start), state.end);
+		} else if (STAGED_DOM !== null) {
+			STAGED_DOM.clearBetween(state.start, state.end);
+		} else {
+			// Large shared-parent clear — one bulk DOM call amortizes the Range setup.
+			const range = document.createRange();
+			range.setStartAfter(state.start);
+			range.setEndBefore(state.end);
+			range.deleteContents();
+		}
+		oldItems.clear();
+	} finally {
+		if (--TEARDOWN_DEPTH === 0) dispatchTeardownErrors();
 	}
-	const p = domNode(state.start).parentNode!;
-	if (domNode(state.start).previousSibling === null && getNextSibling(state.end) === null) {
-		// forBlock owns the parent — nuke everything in one DOM op, then re-add markers.
-		(STAGED_DOM?.view(p as Element) ?? (p as Element)).textContent = '';
-		(STAGED_DOM?.view(p) ?? p).appendChild(state.start);
-		(STAGED_DOM?.view(p) ?? p).appendChild(state.end);
-	} else if (oldItems.size < RANGE_CLEAR_MIN_ITEMS) {
-		// Shared parent (other JSX interleaved) — detach the marker span directly.
-		// Each removal takes a whole item subtree, so this is one call per ITEM,
-		// not per node.
-		removeRange(getNextSibling(state.start), state.end);
-	} else if (STAGED_DOM !== null) {
-		STAGED_DOM.clearBetween(state.start, state.end);
-	} else {
-		// Large shared-parent clear — one bulk DOM call amortizes the Range setup.
-		const range = document.createRange();
-		range.setStartAfter(state.start);
-		range.setEndBefore(state.end);
-		range.deleteContents();
-	}
-	oldItems.clear();
 }
 
 function mountItem<T>(
