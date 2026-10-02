@@ -68,6 +68,38 @@ describe.each(['test', 'production'])('host values with %s runtime semantics', (
 		}
 	});
 
+	it('restores a removed namespaced attribute in its namespace when a later sibling suspends', async () => {
+		vi.stubEnv('NODE_ENV', environment);
+		const XLINK = 'http://www.w3.org/1999/xlink';
+		let resolve!: () => void;
+		const pending = new Promise<void>((done) => {
+			resolve = done;
+		});
+		let waiting = false;
+		const read = () => {
+			if (waiting) throw pending;
+			return 'ready';
+		};
+		const r = mount(client.PendingSprite, { href: '#initial', read });
+		const use = r.find('#pending-use');
+		const namespaced = () =>
+			[...use.attributes]
+				.filter((attribute) => attribute.name !== 'id')
+				.map((attribute) => [attribute.namespaceURI, attribute.name, attribute.value]);
+		try {
+			expect(namespaced()).toEqual([[XLINK, 'xlink:href', '#initial']]);
+			waiting = true;
+			r.update(client.PendingSprite, { href: undefined, read });
+			expect(namespaced()).toEqual([[XLINK, 'xlink:href', '#initial']]);
+			waiting = false;
+			await act(() => resolve());
+			expect(r.find('#pending-use')).toBe(use);
+			expect(namespaced()).toEqual([]);
+		} finally {
+			r.unmount();
+		}
+	});
+
 	it('preserves coercion, aliases, URL filtering, and special host properties across updates', () => {
 		vi.stubEnv('NODE_ENV', environment);
 		const warning = vi.spyOn(console, 'error').mockImplementation(() => {});

@@ -1714,15 +1714,13 @@ let HYDRATION_DIAGNOSTIC_HOLDS = 0;
 let HELD_HYDRATION_DIAGNOSTICS: Array<() => void> | null = null;
 
 /**
- * DEV-only: log a hydration-mismatch warning unless a try body holds it. A
- * `structural` one also waits for its root attempt's commit; value repairs are
- * not all undone when that attempt rolls back, so their retry may not repeat
- * the warning.
+ * DEV-only: log a hydration-mismatch warning unless a try body holds it, then
+ * wait for its root attempt's commit. That attempt's rollback undoes its
+ * structural recovery and value repairs, so the retry repeats the warning.
  */
-function logHydrationMismatch(message: string, structural = false): void {
-	if (currentHydration?.holds(() => logHydrationMismatch(message, structural)) === true) return;
-	if (!structural || currentHydration?.awaitsCommit(() => console.error(message)) !== true)
-		console.error(message);
+function logHydrationMismatch(message: string): void {
+	if (currentHydration?.holds(() => logHydrationMismatch(message)) === true) return;
+	if (currentHydration?.awaitsCommit(() => console.error(message)) !== true) console.error(message);
 }
 
 /**
@@ -1794,7 +1792,6 @@ function warnHydrationStructuralMismatch(
 	logHydrationMismatch(
 		`Octane hydration mismatch at ${loc}: the client expected ${expected} but the server ` +
 			`rendered ${actual}. The mismatched subtree was rebuilt on the client.`,
-		true,
 	);
 }
 
@@ -4796,8 +4793,14 @@ function journalText(node: Text, previous: string | null): void {
 	journalBag();
 }
 
-function journalAttr(el: Element, name: string): void {
-	TRANSITION_JOURNAL!.push(JOURNAL_ATTR, el, name, (STAGED_DOM?.view(el) ?? el).getAttribute(name));
+/** A namespaced attribute (`xlink:href`) journals its name as `[namespace, name]`. */
+function journalAttr(el: Element, name: string, ns?: string | null): void {
+	TRANSITION_JOURNAL!.push(
+		JOURNAL_ATTR,
+		el,
+		ns ? [ns, name] : name,
+		(STAGED_DOM?.view(el) ?? el).getAttribute(name),
+	);
 	journalBag();
 }
 
@@ -4895,11 +4898,16 @@ function rollbackTransitionJournal(checkpoint: number, owner: Block): void {
 				case JOURNAL_TEXT:
 					(STAGED_DOM?.view(target as Text) ?? (target as Text)).nodeValue = a;
 					break;
-				case JOURNAL_ATTR:
-					if (b === null)
-						(STAGED_DOM?.view(target as Element) ?? (target as Element)).removeAttribute(a);
-					else (STAGED_DOM?.view(target as Element) ?? (target as Element)).setAttribute(a, b);
+				case JOURNAL_ATTR: {
+					const el = STAGED_DOM?.view(target as Element) ?? (target as Element);
+					// Removal by qualified name also finds a namespaced attribute, but
+					// restoring one (`xlink:href`) must recreate it in its namespace.
+					const name = typeof a === 'string' ? a : a[1];
+					if (b === null) el.removeAttribute(name);
+					else if (name === a) el.setAttribute(name, b);
+					else el.setAttributeNS(a[0], name, b);
 					break;
+				}
 				case JOURNAL_PROP:
 					// DOM properties join the projected rollback; metadata stays ordinary.
 					(STAGED_DOM !== null && target?.nodeType !== undefined
@@ -19081,6 +19089,21 @@ class HydrationCapability {
 		this.textWarnings.clear();
 	}
 
+	/**
+	 * Runs before hydration overwrites a server value: `node`'s text, or its
+	 * `attribute`. A root's hydrating attempt that suspends rolls back and
+	 * retries over the server DOM, so it journals the value for the retry to
+	 * find, repair, and report. A freshly cloned template holds the client
+	 * template's value, not the server's, so it has nothing to restore.
+	 */
+	private journalRepair(node: Node, attribute: string | null): void {
+		if (!inRootHydrationAttempt()) return;
+		if (attribute !== null) {
+			if (!this.freshNodes.has(node)) journalAttr(node as Element, attribute);
+		} else if (!this.freshNodes.has(domNode(node).parentNode!))
+			journalText(node as Text, (STAGED_DOM?.view(node as Text) ?? (node as Text)).nodeValue);
+	}
+
 	removeRange(start: Node, end: Node): void {
 		removeHydrationRange(start, end);
 	}
@@ -19598,8 +19621,10 @@ class HydrationCapability {
 				// Suppression keeps the server's text, but a clone that mismatch recovery
 				// built fresh holds the client template's placeholder: there is no server
 				// text to keep, and the rebuild was already reported structurally.
-				if (!suppressed || this.freshNodes.has(el))
+				if (!suppressed || this.freshNodes.has(el)) {
+					this.journalRepair(first, null);
 					(STAGED_DOM?.view(first as Text) ?? (first as Text)).nodeValue = text;
+				}
 			}
 			if (getNextSibling(first) !== null) {
 				this.save(el);
@@ -19734,8 +19759,10 @@ class HydrationCapability {
 					this.recordTextMismatch(posNode as Text, host && (host as any).__oct_loc, server);
 				// As in htext: a fresh mismatch clone has no server text to keep. Its
 				// template's `<!>` reads as the server's empty slot, swapped for '' above.
-				if (!suppressed || this.freshNodes.has(host!))
+				if (!suppressed || this.freshNodes.has(host!)) {
+					this.journalRepair(posNode, null);
 					(STAGED_DOM?.view(posNode as Text) ?? (posNode as Text)).nodeValue = text;
+				}
 			}
 			return posNode as Text;
 		}
@@ -19852,6 +19879,7 @@ class HydrationCapability {
 				// value that never existed in either the server or final client output.
 				if ((STAGED_DOM?.view(el) ?? el).getAttribute('class') === rawTarget) continue;
 				if (!this.allowClass(el, write.next, write.absentIsEmpty)) continue;
+				this.journalRepair(el, 'class');
 				if (write.remove) (STAGED_DOM?.view(el) ?? el).removeAttribute('class');
 				else if (write.useAttribute)
 					(STAGED_DOM?.view(el) ?? el).setAttribute('class', write.next!);
@@ -19912,6 +19940,7 @@ class HydrationCapability {
 		const expectsStyleAttribute = expected !== '';
 		if (before === expected && hadStyleAttribute === expectsStyleAttribute) return true;
 
+		this.journalRepair(el, 'style');
 		if (expectsStyleAttribute) style.cssText = expected;
 		else (STAGED_DOM?.view(el) ?? el).removeAttribute('style');
 		if (mode === 2 && process.env.NODE_ENV !== 'production' && !this.staleServerValues) {
@@ -23680,7 +23709,7 @@ export function setAttribute(el: Element, name: string, value: any): void {
 	const hydration = activeHydration();
 	if (hydration !== null && !hydration.allowAttribute(el, name, next)) return;
 	const ns = attrNamespace(name);
-	if (TRANSITION_JOURNAL !== null) journalAttr(el, name);
+	if (TRANSITION_JOURNAL !== null) journalAttr(el, name, ns);
 	if (next === null) {
 		if (ns) {
 			const colon = name.indexOf(':');
