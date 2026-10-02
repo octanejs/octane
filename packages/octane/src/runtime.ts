@@ -11734,7 +11734,16 @@ export function componentSlotLite<P>(
 				// host's server content is something else: rebuild this call in place of
 				// the server nodes from its claim.
 				unframed = open;
-			} else inPlace = open;
+			} else if (anchor === null || anchor === parentScope.block.endMarker) inPlace = open;
+			else {
+				// A hole of a template the parent adopted: walking that template found
+				// this call's server node, but the cursor stays where the adoption left
+				// it, on a root before that node. A templateless body anchors at its
+				// block's end marker instead, with the cursor on the call's server
+				// node, and a walk that ran off the end of its host found no node.
+				hydration.node = anchor;
+				inPlace = anchor;
+			}
 		}
 		scope.block = new LiteBlockImpl(host, endMarker, parentScope.block) as unknown as Block;
 		stampSignalInstance(scope, parentScope, invocationSite, undefined, false);
@@ -31999,6 +32008,11 @@ function componentSlotImpl(
 			// self-delimits (set as block.startMarker/endMarker after render below).
 			// The `2` form resolves cross-module callees by their definition-site
 			// stamp; a string tag or unstamped component falls through to markers.
+			// Hydrating, a hole of a template the parent adopted renders in place of
+			// the server node that template's walk found, not of the node at the
+			// cursor (see componentSlotLite's anchored miss).
+			if (hydration !== null && anchor != null && anchor !== parentBlock.endMarker)
+				hydrationCursor = hydration.node = anchor;
 			start = null;
 			end = null;
 		} else {
