@@ -1,6 +1,6 @@
 import { formatClientError } from '../error-codes.client.generated.js';
 import { createResourceCellWith } from './engine.js';
-import { Descriptor, descriptorKey, signalOptionsKey } from './facade.js';
+import { declarationKey, Descriptor, descriptorKey, signalOptionsKey } from './facade.js';
 import { runWithSignalOwner } from './owner-context.js';
 import { initializeResource, query as createQueryRequest } from './requests.js';
 import {
@@ -42,10 +42,12 @@ export function __queryAt<A, T>(
 	const explicit = signalOptionsKey(options);
 	site ??= explicit;
 	const authoredKey = descriptorKey(site, explicit);
-	const key =
+	const key = declarationKey(
+		site,
 		explicit !== undefined && (site?.startsWith('g:') || site?.startsWith('i:'))
 			? site.slice(0, 2) + authoredKey
-			: authoredKey;
+			: authoredKey,
+	);
 	const request = (
 		createQueryRequest as unknown as (
 			key: string,

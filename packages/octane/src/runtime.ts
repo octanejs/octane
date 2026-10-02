@@ -258,6 +258,7 @@ import {
 	retireSignalOwnerIdentity,
 	runWithSignalOwner,
 } from './signals/owner-context.js';
+import { createSignalHookSites } from './signals/declaration-path.js';
 import {
 	documentSignalOwner,
 	enableSignalDocument,
@@ -12124,6 +12125,13 @@ export function withSlot<T>(sym: HookSlot, fn: (...a: any[]) => T, ...args: any[
 		}
 	}
 }
+
+/**
+ * @internal Register a signal-aware custom-hook call site. Its position-hashed
+ * site keys instance declarations reached through that call, so two calls of one
+ * hook own separate cells with identities that match between server and client.
+ */
+export const signalHookSite = /* @__PURE__ */ createSignalHookSites(slotStack);
 
 // Length-prefix each segment so a numeric site cannot collide with a described
 // Symbol and descriptions containing delimiters cannot alias a different path.
