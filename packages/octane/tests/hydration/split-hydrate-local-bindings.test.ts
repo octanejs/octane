@@ -182,7 +182,7 @@ for (const dev of [false, true]) {
 			}
 		});
 
-		it('keeps nested @catch reset parameters local to the split child', async () => {
+		it('keeps nested @catch reset and destructured error parameters local to the split child', async () => {
 			const page = await hydrate(dev, 'NestedCatch', {
 				...base,
 				state: { failed: true },
