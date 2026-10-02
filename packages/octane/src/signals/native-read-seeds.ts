@@ -5,8 +5,7 @@ import type { NativeAdoptionOwner, NativeReadSource } from './read-protocol.js';
 import { decodeSignalValue, snapshotSignalValue } from '../data-encoding.js';
 
 export const NATIVE_SIGNAL_SEED_ATTR = 'data-octane-native-signals';
-/** A server arm with untransportable demand is mounted fresh within its own range. */
-export const NATIVE_SIGNAL_FRESH_COMMENT = 'oct-native-fresh:';
+export { NATIVE_SIGNAL_FRESH_COMMENT } from '../hydration-markers.js';
 
 export interface NativeSignalReference {
 	readonly key: string;

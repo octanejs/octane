@@ -49,6 +49,7 @@ function Transcript({ frame }: { frame: AnswerFrame }) @{
 }
 
 export function Conversation() @{
+	'use dom bindings';
 	useLayoutEffect(() => recordActivation('answer'), []);
 	<section class="conversation" aria-label="Conversation" data-complete={answerComplete$}>
 		<header class="panel-header">
