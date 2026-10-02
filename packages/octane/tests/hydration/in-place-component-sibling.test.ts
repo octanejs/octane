@@ -41,56 +41,67 @@ function markup(node: Element): string {
 
 const STRUCTURAL = /the mismatched subtree was rebuilt on the client/;
 
+const server = loadServerFixture(FIXTURE, { id: FILE });
+const clients = {
+	development: loadCompiledFixtureSource(SOURCE, {
+		id: FILE,
+		mode: 'client',
+		compileOptions: { dev: true },
+	}),
+	production: loadCompiledFixtureSource(SOURCE, {
+		id: FILE,
+		mode: 'client',
+		compileOptions: { dev: false },
+	}),
+};
+
+let container: HTMLElement;
+let root: ReturnType<typeof hydrateRoot> | null;
+let errSpy: ReturnType<typeof vi.spyOn>;
+
+beforeEach(() => {
+	container = document.createElement('div');
+	document.body.appendChild(container);
+	root = null;
+	errSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+});
+
+afterEach(() => {
+	root?.unmount();
+	container.remove();
+	errSpy.mockRestore();
+});
+
+const warnings = () =>
+	errSpy.mock.calls
+		.map((call: unknown[]) => String(call[0]))
+		.filter((message: string) => message.includes('hydration mismatch'));
+
+/** The server render's elements in the fixture's host, and the hydration's recoverable errors. */
+async function hydrate(
+	client: Record<string, any>,
+	name: string,
+	serverProps: Record<string, unknown>,
+	clientProps: Record<string, unknown>,
+): Promise<{ host: Element; serverNodes: Element[]; recoverable: string[] }> {
+	container.innerHTML = ServerRT.renderToString(server[name], serverProps).html;
+	const host = container.firstElementChild!;
+	const serverNodes = [...host.children];
+	const recoverable: string[] = [];
+	root = hydrateRoot(container, client[name], clientProps, {
+		onRecoverableError: (error: unknown) => recoverable.push((error as Error).message),
+	});
+	flushSync(() => {});
+	// Recoverable reports are delivered after the hydration burst.
+	await act(async () => {});
+	return { host, serverNodes, recoverable };
+}
+
 describe.each([
 	{ name: 'development compile', dev: true },
 	{ name: 'production compile', dev: false },
 ])('hydrateRoot — a component after one adopted without a range ($name)', ({ dev }) => {
-	const server = loadServerFixture(FIXTURE, { id: FILE });
-	const client = loadCompiledFixtureSource(SOURCE, {
-		id: FILE,
-		mode: 'client',
-		compileOptions: { dev },
-	});
-	let container: HTMLElement;
-	let root: ReturnType<typeof hydrateRoot> | null;
-	let errSpy: ReturnType<typeof vi.spyOn>;
-
-	beforeEach(() => {
-		container = document.createElement('div');
-		document.body.appendChild(container);
-		root = null;
-		errSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
-	});
-
-	afterEach(() => {
-		root?.unmount();
-		container.remove();
-		errSpy.mockRestore();
-	});
-
-	const warnings = () =>
-		errSpy.mock.calls
-			.map((call: unknown[]) => String(call[0]))
-			.filter((message: string) => message.includes('hydration mismatch'));
-
-	/** The server render's elements in the fixture's host, and the hydration's recoverable errors. */
-	async function hydrate(
-		name: string,
-		serverProps: Record<string, unknown>,
-		clientProps: Record<string, unknown>,
-	): Promise<{ host: Element; serverNodes: Element[]; recoverable: string[] }> {
-		container.innerHTML = ServerRT.renderToString(server[name], serverProps).html;
-		const host = container.firstElementChild!;
-		const serverNodes = [...host.children];
-		const recoverable: string[] = [];
-		root = hydrateRoot(container, client[name], clientProps, {
-			onRecoverableError: (error: unknown) => recoverable.push((error as Error).message),
-		});
-		flushSync(() => {});
-		// Recoverable reports are delivered after the hydration burst.
-		await act(async () => {});
-		return { host, serverNodes, recoverable };
-	}
+	const client = dev ? clients.development : clients.production;
 
 	it.each([
 		{ block: 'an @if arm', name: 'IfArm', first: '<em>x</em>' },
@@ -102,6 +113,7 @@ describe.each([
 		},
 	])('the next component adopts its own server range in $block', async ({ name, first }) => {
 		const { host, serverNodes, recoverable } = await hydrate(
+			client,
 			name,
 			{ on: false, z: 'z' },
 			{ on: true, z: 'z' },
@@ -122,6 +134,7 @@ describe.each([
 
 	it('rebuilds the next component over the server content after the adopted element', async () => {
 		const { host, serverNodes, recoverable } = await hydrate(
+			client,
 			'ShortArm',
 			{ on: false, z: 'z' },
 			{ on: true, z: 'z' },
@@ -142,24 +155,9 @@ describe.each([
 		);
 	});
 
-	// The production compile gives Empty a full component slot, which rebuilds a
-	// call without a server range rather than rendering it against the cursor.
-	it.runIf(dev)('a component that renders nothing leaves the element to the next one', async () => {
-		const { host, serverNodes, recoverable } = await hydrate(
-			'EmptyFirstArm',
-			{ on: false, z: 'z' },
-			{ on: true, z: 'z' },
-		);
-
-		expect(markup(host)).toBe('<em>x</em><em>z</em>');
-		expect(host.children).toHaveLength(2);
-		expect(host.children[0]).toBe(serverNodes[0]);
-		expect(host.children[1]).toBe(serverNodes[1]);
-		expect(recoverable).toEqual([]);
-	});
-
 	it('removes a returned single root rebuilt at the end of its server range', async () => {
 		const { host, serverNodes, recoverable } = await hydrate(
+			client,
 			'MaybeThenSibling',
 			{ shown: false },
 			{ shown: true },
@@ -183,5 +181,25 @@ describe.each([
 		flushSync(() => root!.render(client.MaybeThenSibling, { shown: true }));
 		expect(markup(host)).toBe('<b>m</b><p>p</p>');
 		expect(host.querySelector('p')).toBe(p);
+	});
+});
+
+// The development compile renders these hookless calls through the lite slot.
+// The production compile gives Empty a full component slot, which rebuilds a
+// call without a server range rather than rendering it against the cursor.
+describe('hydrateRoot — a lite component that renders nothing before one adopted in place', () => {
+	it('leaves the element to the next component', async () => {
+		const { host, serverNodes, recoverable } = await hydrate(
+			clients.development,
+			'EmptyFirstArm',
+			{ on: false, z: 'z' },
+			{ on: true, z: 'z' },
+		);
+
+		expect(markup(host)).toBe('<em>x</em><em>z</em>');
+		expect(host.children).toHaveLength(2);
+		expect(host.children[0]).toBe(serverNodes[0]);
+		expect(host.children[1]).toBe(serverNodes[1]);
+		expect(recoverable).toEqual([]);
 	});
 });
