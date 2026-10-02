@@ -108,6 +108,10 @@ element is the same row key and compiles identically on DOM and universal
 renderers, taking precedence over a header key. A row key cannot read a
 `const` declared inside the row body; the compiler rejects it.
 
+The `@for` header is always a `for…of`. A `for…in` or a C-style
+`(init; test; update)` header is a compile error: iterate `Object.keys(obj)` or
+a built index array instead.
+
 ## Refs
 
 Refs are passed as props, React-19 style: `ref={cb}`, `ref={obj}`, or multi-ref

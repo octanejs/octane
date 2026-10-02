@@ -83,6 +83,7 @@ import {
 	armJump,
 	assertTemplateJumps,
 } from './arm-exits.js';
+import { assertForOfHeaders } from './for-headers.js';
 import { HOOK_NAMES, NATIVE_SIGNAL_HOOK_NAMES } from './hook-names.js';
 export { HOOK_NAMES } from './hook-names.js';
 import {
@@ -10010,6 +10011,7 @@ function compileAuthored(source, filename, options, bundlerMetadata) {
 		normalizeAuthoredJsxLiterals(parseModule(source, cleanFilename)),
 	);
 	analyzeTsrx(analyzedAst, cleanFilename);
+	assertForOfHeaders(analyzedAst, source, cleanFilename);
 	assertTemplateJumps(analyzedAst, source, cleanFilename);
 	adoptParserAst(analyzedAst);
 	assertNoLegacyContextProviders(analyzedAst, source, cleanFilename);
