@@ -18980,6 +18980,8 @@ class HydrationCapability {
 	private inPlaceUnframed = false;
 	/** Where the server nodes a template adopted at inPlace end; undefined until one does. */
 	private inPlaceEnd: Node | null | undefined = undefined;
+	/** The server node at the last root of a fragment adopted at inPlace, when that root is a hole. */
+	private inPlaceHole: Node | null = null;
 	/**
 	 * Whether the root's remainder or inPlace may still be claimed by a clone.
 	 * Both claims are rare, so adopt()'s common path tests only this flag.
@@ -19541,9 +19543,11 @@ class HydrationCapability {
 		const outer = this.inPlace;
 		const outerUnframed = this.inPlaceUnframed;
 		const outerEnd = this.inPlaceEnd;
+		const outerHole = this.inPlaceHole;
 		this.inPlace = root;
 		this.inPlaceUnframed = unframed;
 		this.inPlaceEnd = undefined;
+		this.inPlaceHole = null;
 		this.pendingClaims = true;
 		let end: Node | null | undefined;
 		try {
@@ -19553,11 +19557,44 @@ class HydrationCapability {
 			this.inPlace = outer;
 			this.inPlaceUnframed = outerUnframed;
 			this.inPlaceEnd = outerEnd;
+			this.inPlaceHole = outerHole;
 			this.pendingClaims = outer !== null || this.rootRemainder === undefined;
 		}
 		if (end === undefined) return false;
 		this.node = end;
 		return true;
+	}
+
+	/**
+	 * The open marker of the server range that a renderable hole adopts on its
+	 * first render, at `anchor`, where its compiled walk found the server node
+	 * for its own placeholder. Under a template that adopted another
+	 * component's markup in place (renderInPlace), the server did not frame
+	 * what it rendered there, as it frames every hole's value, so frame it
+	 * here. The walk counts one server node for a hole, and matched each root
+	 * after it, so the frame holds `anchor`. A fragment's last root has no root
+	 * after it (inPlaceHole), so the frame holds `anchor` only when it is the
+	 * kind of node the value renders: text for a primitive, an element for an
+	 * object. Otherwise the server rendered nothing for the hole, and the
+	 * fragment's server nodes end before `anchor`. Returns `anchor` when it is
+	 * the server's open marker, and null for any other node outside such a
+	 * template, or at a placeholder the hole shares (`ownEnd` unset).
+	 */
+	holeOpen(anchor: Node | null | undefined, value: unknown, ownEnd?: boolean): Comment | null {
+		if (isBlockOpen(anchor ?? null)) return anchor as Comment;
+		if (anchor == null || this.inPlaceEnd === undefined || !ownEnd) return null;
+		const last = anchor === this.inPlaceHole;
+		const object = value !== null && (typeof value === 'object' || typeof value === 'function');
+		const holds = !last || (anchor.nodeType === 3 ? !object : anchor.nodeType === 1 && object);
+		const parent = domNode(domNode(anchor).parentNode!);
+		const doc = STAGED_DOM?.view(document) ?? document;
+		const start = doc.createComment(HYDRATION_START);
+		const end = doc.createComment(HYDRATION_END);
+		this.save(parent);
+		parent.insertBefore(start, anchor);
+		parent.insertBefore(end, holds ? getNextSibling(anchor) : anchor);
+		if (last) this.inPlaceEnd = getNextSibling(end);
+		return start;
 	}
 
 	/**
@@ -20422,11 +20459,14 @@ class HydrationCapability {
 			if (actual === null || (bounded === true && isBlockClose(actual))) return undefined;
 			// A template comment is a dynamic logical hole. Its server form may be
 			// text or a marker range, so only static text/element roots compare shape.
-			if (
-				expected.nodeType !== 8 &&
-				!hydrationNodeMatches(actual, expected, partialStyles, String(childIndex))
-			) {
-				return undefined;
+			if (expected.nodeType !== 8) {
+				if (!hydrationNodeMatches(actual, expected, partialStyles, String(childIndex)))
+					return undefined;
+			} else if (bounded === true && getNextSibling(expected) === null) {
+				// In place of another component's markup, the server may have
+				// rendered nothing for a last root that is a hole, and the node there
+				// follows the fragment. Only the hole's value tells (holeOpen).
+				this.inPlaceHole = actual;
 			}
 			actual = this.sibling(actual, 1);
 			expected = getNextSibling(expected);
@@ -36675,13 +36715,14 @@ export function childSlot(
 			end = null;
 		} else if (unframedComponentRoot) {
 			[start, end] = hydration!.wrapUnframedRoot(hydration!.node!);
-		} else if (hydration !== null && hydration.isOpen(anchor ?? null)) {
+		} else if (hydration !== null && (start = hydration.holeOpen(anchor, value, ownEnd))) {
 			// Hydration (nested hole): the anchor resolved via child/sibling to the
 			// server's `<!--[-->`. Adopt that `<!--[-->…<!--]-->` range as our markers
 			// and point the cursor at the first content node for the Block's clone()
-			// / the text adopt below.
-			start = anchor as Comment;
-			end = hydration.close(anchor as Node);
+			// / the text adopt below. In a template adopted in place of another
+			// component's markup, holeOpen frames the server's node as the server
+			// would have.
+			end = hydration.close(start);
 			if (parentBlock === hydration.rootBlock) hydration.claimRootRemainder(getNextSibling(end));
 			hydration.node = getNextSibling(start);
 			adoptedRange = true;
