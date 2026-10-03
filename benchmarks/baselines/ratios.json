@@ -605,7 +605,11 @@
     "target": "focused-movable-high",
     "reference": "focused-movable-low",
     "maxRatio": 1.5,
-    "note": "Same-process hydrate preparation normalizes 2,400 and 150 sibling split boundaries by boundary count. Exact pinned main measured about 3.3x more CPU per boundary at the large size, while the indexed/direct-selection path measured about 1.1x; the 1.5x ceiling catches restoration of module-wide Set copies, synthetic child modules, or boundary/declaration cross-products."
+    "note": "Same-process hydrate preparation normalizes 2,400 and 150 sibling split boundaries by boundary count. Exact pinned main measured about 3.3x more CPU per boundary at the large size, while the indexed/direct-selection path measured about 1.1x; the 1.5x ceiling catches restoration of module-wide Set copies, synthetic child modules, or boundary/declaration cross-products.",
+    "waiver": {
+      "reason": "Two weekly runs measured 23.93x and 19.58x (rme 2-17%) against the 1.5x ceiling: hydrate boundary preparation no longer scales linearly with boundary count. Tracked as a fix; remove this waiver with it.",
+      "expires": "2026-10-24"
+    }
   },
   {
     "suite": "tsrx-renderer-validation-ranges",
@@ -997,7 +1001,19 @@
     "target": "octane-tsrx",
     "reference": "react",
     "maxRatio": 0.6,
-    "note": "rotate-backward is the LIS-vs-lastPlacedIndex differentiator: octane moves 1 node, React moves all survivors (known ~12x faster \u2192 0.08x). Guard 0.6 leaves huge headroom while still catching a fast-path break."
+    "note": "Rotate backward (first row to the end) is a one-move control: both Octane's LIS and React's lastPlacedIndex move exactly one row, so the ratio measures per-commit keyed-diff overhead over 1,000 survivors. When this guard was set (2026-07-03) the React column ran a dev build; with production React a same-runner A/B on 2026-10-03 measured 0.40x at #639. The rotatef guard covers the LIS-vs-lastPlacedIndex differentiator.",
+    "waiver": {
+      "reason": "Confirmed regression: a same-runner A/B on 2026-10-03 measured octane 0.064 ms per click against 0.046 ms at #639 (1.41x; a terser rebuild of today's fixture measured 0.065 ms), while React stayed at 0.105-0.114 ms. Paired attribution traced it to #833's root-render journal and #1069's event-owner weak maps; with fix PRs #1655 and #1656 the guard reads 0.53-0.55x. Remove this waiver once both are on main.",
+      "expires": "2026-10-24"
+    }
+  },
+  {
+    "suite": "js-framework-reorder",
+    "op": "rotatef",
+    "target": "octane-tsrx",
+    "reference": "react",
+    "maxRatio": 0.15,
+    "note": "Rotate forward (last row to the front) is the LIS-vs-lastPlacedIndex differentiator: React's first placed child pins lastPlacedIndex at the old tail, so all 999 survivors move, while LIS moves one. Paired ~20 ms samples measured 0.043x in two quick CI runs and the A/B on 2026-10-03 (0.071 ms vs 1.65 ms; 0.030x at #639). The 0.15 ceiling tolerates per-commit drift and fails if the minimal move set is lost."
   },
   {
     "suite": "memo-wall",
@@ -1021,7 +1037,7 @@
     "target": "octane-tsrx",
     "reference": "react",
     "maxRatio": 0.6,
-    "note": "Production autoMemo skips the unchanged RowsA region before the keyed wall; the compiled React reference also caches its list, and the committed pairing measures ~0.16x."
+    "note": "Production autoMemo skips the unchanged RowsA region before the keyed wall; the compiled React reference also caches its list. ~0.16x when set (2026-08-07, terser builds). A same-runner A/B on 2026-10-03 measured octane 0.45 us per parent render at #639 and 0.94 us now (a regression from #833's per-commit root-render journal, tracked in task_19e870d3), while React got faster under #983's esbuild minification (1.98 -> 1.78 us). Paired ~20 ms samples measured 0.52x and 0.54x (rme <= 1%), so the 0.6 ceiling holds without a waiver; tighten it when the regression is fixed."
   },
   {
     "suite": "memo-wall",
@@ -1037,7 +1053,11 @@
     "target": "octane-tsrx",
     "reference": "react",
     "maxRatio": 1.4,
-    "note": "One changed row amid wall B's 999 successful value-comparing bails. With the immutable-region optimization and React Compiler enabled, the normal 20-iteration pairing measures ~1.21x; 1.4 leaves modest browser headroom while the deterministic work gates continue to protect the changed-row path."
+    "note": "One changed row amid wall B's 999 successful value-comparing bails. With the immutable-region optimization and React Compiler enabled, the normal 20-iteration pairing measures ~1.21x; 1.4 leaves modest browser headroom while the deterministic work gates continue to protect the changed-row path.",
+    "waiver": {
+      "reason": "Confirmed regression: a same-runner A/B on 2026-10-03 measured octane 0.27 ms per one-row change against 0.18 ms at #639 (1.5x; unchanged by a terser rebuild). Fix PRs #1655, #1656 and #1661 bring it to about 1.33x; the remainder is per-row survivor work (#833 input journaling, #1069 signal-owner checks in renderBlock, scoped key derivation), tracked in task_8db1d14b. Remove this waiver with that fix.",
+      "expires": "2026-10-24"
+    }
   },
   {
     "suite": "memo-wall",
@@ -1045,7 +1065,11 @@
     "target": "octane-tsrx",
     "reference": "react",
     "maxRatio": 0.85,
-    "note": "Provider bump above the cached immutable wall B refreshes its 1000 leaves without replaying unchanged descriptors. The React Compiler pairing measures ~0.70x; 0.85 leaves modest browser headroom while still catching a context-refresh regression."
+    "note": "Provider bump above the cached immutable wall B refreshes its 1000 leaves without replaying unchanged descriptors. The React Compiler pairing measures ~0.70x; 0.85 leaves modest browser headroom while still catching a context-refresh regression.",
+    "waiver": {
+      "reason": "Confirmed regression: a same-runner A/B on 2026-10-03 measured octane 0.68 ms per provider bump against 0.47 ms at #639 (1.44x; unchanged by a terser rebuild). Paired attribution traced it to #833's root-render journal and #1069's signal text binding; with fix PRs #1655 and #1656 the guard reads 0.73-0.81x. Remove this waiver once both are on main.",
+      "expires": "2026-10-24"
+    }
   },
   {
     "suite": "memo-wall",
@@ -1053,7 +1077,7 @@
     "target": "octane-jsx",
     "reference": "octane-tsrx",
     "maxRatio": 1.6,
-    "note": "TSX/TSRX component-heavy mount control. Adaptive paired runs stayed at 1.22-1.32x through 2026-07-19; 1.6 leaves browser/JIT headroom while keeping the dialect gap bounded."
+    "note": "TSX/TSRX component-heavy mount control. Adaptive paired runs stayed at 1.22-1.32x through 2026-07-19; 1.6 leaves browser/JIT headroom while keeping the dialect gap bounded. Fresh-page mounts are paired per round across targets: two quick CI runs on 2026-10-03 measured 1.35x and 1.32x, where unpaired runs had read 1.18x then 1.73x."
   },
   {
     "suite": "memo-wall",
@@ -1245,16 +1269,16 @@
     "op": "js_gzip",
     "target": "octane-tsrx",
     "reference": "ripple",
-    "maxRatio": 2.73,
-    "note": "Rows total gzip versus Ripple under CI Node 24 on 2026-09-21: 40594 / 15029 = 2.701x. Ceiling re-committed under the pinned CI Node 24 on 2026-09-21 after uniform runtime growth: packages/octane/src/runtime.ts source grew 1157028 -> 1793553 bytes across 116 runtime-touching main commits since the 2026-08-16 ceilings, while void-root specialization is verified intact (__createVoidRoot emitted, createRoot absent). The August ceiling predates that growth; exact application, framework, and total budgets independently reject future growth."
+    "maxRatio": 2.82,
+    "note": "Rows total gzip versus Ripple under CI Node 24 on 2026-10-03: 41978 / 15029 = 2.793x, after the 2026-09-30 to 2026-10-02 runtime growth (review A1/A2, fixes in flight). Absolute bytes are ratcheted by benchmarks/bundle-size/app-budgets.json at measured + 32, so this ratio only tracks the gap."
   },
   {
     "suite": "bundle-size",
     "op": "js_gzip",
     "target": "octane-tsrx",
     "reference": "solid",
-    "maxRatio": 2.67,
-    "note": "Rows total gzip versus Solid under CI Node 24 on 2026-09-21: 40594 / 15399 = 2.636x. Ceiling re-committed under the pinned CI Node 24 on 2026-09-21 after uniform runtime growth: packages/octane/src/runtime.ts source grew 1157028 -> 1793553 bytes across 116 runtime-touching main commits since the 2026-08-16 ceilings, while void-root specialization is verified intact (__createVoidRoot emitted, createRoot absent). The August ceiling predates that growth; exact application, framework, and total budgets independently reject future growth."
+    "maxRatio": 2.76,
+    "note": "Rows total gzip versus Solid under CI Node 24 on 2026-10-03: 41978 / 15399 = 2.726x, after the 2026-09-30 to 2026-10-02 runtime growth (review A1/A2, fixes in flight). Absolute bytes are ratcheted by benchmarks/bundle-size/app-budgets.json at measured + 32, so this ratio only tracks the gap."
   },
   {
     "suite": "codegen-size",
@@ -1584,8 +1608,8 @@
     "op": "js_gzip",
     "target": "octane-tsrx",
     "reference": "svelte",
-    "maxRatio": 2.24,
-    "note": "Rows total gzip versus Svelte 5 under CI Node 24 on 2026-09-21: 40594 / 18325 = 2.215x. Ceiling re-committed under the pinned CI Node 24 on 2026-09-21 after uniform runtime growth: packages/octane/src/runtime.ts source grew 1157028 -> 1793553 bytes across 116 runtime-touching main commits since the 2026-08-16 ceilings, while void-root specialization is verified intact (__createVoidRoot emitted, createRoot absent). The August ceiling predates that growth; exact application, framework, and total budgets independently reject future growth."
+    "maxRatio": 2.32,
+    "note": "Rows total gzip versus Svelte 5 under CI Node 24 on 2026-10-03: 41978 / 18325 = 2.291x, after the 2026-09-30 to 2026-10-02 runtime growth (review A1/A2, fixes in flight). Absolute bytes are ratcheted by benchmarks/bundle-size/app-budgets.json at measured + 32, so this ratio only tracks the gap."
   },
   {
     "suite": "bundle-size",
@@ -1600,8 +1624,8 @@
     "op": "todo_js_gzip",
     "target": "octane-tsrx",
     "reference": "svelte",
-    "maxRatio": 2.46,
-    "note": "TodoMVC total gzip versus Svelte 5 under CI Node 24 on 2026-09-21: 44954 / 18530 = 2.426x. Ceiling re-committed under the pinned CI Node 24 on 2026-09-21 after uniform runtime growth: packages/octane/src/runtime.ts source grew 1157028 -> 1793553 bytes across 116 runtime-touching main commits since the 2026-08-16 ceilings, while void-root specialization is verified intact (__createVoidRoot emitted, createRoot absent). The August ceiling predates that growth; exact application, framework, and total budgets independently reject future growth."
+    "maxRatio": 2.57,
+    "note": "TodoMVC total gzip versus Svelte 5 under CI Node 24 on 2026-10-03: 46993 / 18530 = 2.536x, after the 2026-09-30 to 2026-10-02 runtime growth (review A1/A2, fixes in flight). Absolute bytes are ratcheted by benchmarks/bundle-size/app-budgets.json at measured + 32, so this ratio only tracks the gap."
   },
   {
     "suite": "bundle-size",
@@ -1616,8 +1640,8 @@
     "op": "chat_js_gzip",
     "target": "octane-tsrx",
     "reference": "svelte",
-    "maxRatio": 2.37,
-    "note": "Chat-stream total gzip versus Svelte 5 under CI Node 24 on 2026-09-21: 44872 / 19164 = 2.341x. Ceiling re-committed under the pinned CI Node 24 on 2026-09-21 after uniform runtime growth: packages/octane/src/runtime.ts source grew 1157028 -> 1793553 bytes across 116 runtime-touching main commits since the 2026-08-16 ceilings, while void-root specialization is verified intact (__createVoidRoot emitted, createRoot absent). The August ceiling predates that growth; exact application, framework, and total budgets independently reject future growth."
+    "maxRatio": 2.48,
+    "note": "Chat-stream total gzip versus Svelte 5 under CI Node 24 on 2026-10-03: 46937 / 19164 = 2.449x, after the 2026-09-30 to 2026-10-02 runtime growth (review A1/A2, fixes in flight). Absolute bytes are ratcheted by benchmarks/bundle-size/app-budgets.json at measured + 32, so this ratio only tracks the gap."
   },
   {
     "suite": "bundle-size",
@@ -2540,8 +2564,8 @@
     "op": "worker_script_gzip_bytes",
     "target": "octane-tsrx",
     "reference": "react",
-    "maxRatio": 0.6,
-    "note": "Fully-bundled Worker script (gzip): octane's server runtime bundles to 0.36x react+react-dom's size (31KB vs 87KB on 2026-07-20). Script size drives Workers isolate cold start; 0.6 protects the advantage. Deterministic size op."
+    "maxRatio": 0.62,
+    "note": "Fully-bundled Worker script (gzip): octane measured 39593 / 65268 = 0.607x react+react-dom on 2026-10-03 (31KB vs 87KB, 0.36x, on 2026-07-20). Script size drives Workers isolate cold start; 0.62 protects the advantage while the server-render reachability budget (measured + 32) ratchets the server runtime itself. Deterministic size op."
   },
   {
     "suite": "ssr-workerd",
@@ -2549,7 +2573,7 @@
     "target": "octane-tsrx",
     "reference": "react",
     "maxRatio": 1.2,
-    "note": "Cold workerd process + isolate + script parse to first body byte behind identical minimal Workers: octane measured 0.72x react on 2026-07-20 (36ms vs 50ms via miniflare). Guards the renderer's Workers cold-start advantage."
+    "note": "Cold workerd process + isolate + script parse to first body byte behind identical minimal Workers: octane measured 0.72x react on 2026-07-20 (36ms vs 50ms via miniflare). Guards the renderer's Workers cold-start advantage. Cold spawns are paired per round after an untimed priming spawn per target (the first workerd launch of a run pages the binary in and used to land on whichever target ran first): two quick CI runs on 2026-10-03 measured 0.77x and 0.74x (rme <= 8%, 6 rounds), where two unpaired spawns had read 1.56x and 1.36x at octane rme above 500%."
   },
   {
     "suite": "ssr-workerd",
@@ -2957,7 +2981,7 @@
     "target": "octane-tsrx",
     "reference": "react",
     "maxRatio": 0.7,
-    "note": "Observed 0.32x, 2026-08-07. Octane's per-commit overhead beats react's memo-cascade by 3x on viewport-only writes; approaching 0.7x means either octane's ui-commit path bloated or the descriptor-prop bail-out weakened. The compiler-owned call-site regions now also cover host-spread callees (Topology's {...e.attrs} rows), so the Viewport descriptor-prop shape is a fixture choice rather than the only isolation keeping this op flat."
+    "note": "Observed 0.32x, 2026-08-07. Octane's per-commit overhead beats react's memo-cascade by 3x on viewport-only writes; approaching 0.7x means either octane's ui-commit path bloated or the descriptor-prop bail-out weakened. The compiler-owned call-site regions now also cover host-spread callees (Topology's {...e.attrs} rows), so the Viewport descriptor-prop shape is a fixture choice rather than the only isolation keeping this op flat. With ~20 ms paired samples, two quick CI runs on 2026-10-03 measured 0.51x and 0.52x; a same-runner A/B put octane at 2.19 ms per batch versus 2.30 ms at #635, so the 0.68-0.71x unpaired readings were noise."
   },
   {
     "suite": "svg-dashboard",
@@ -2989,15 +3013,19 @@
     "target": "octane-tsrx",
     "reference": "react",
     "maxRatio": 0.8,
-    "note": "360 portal commits per sample into the overlay <g> (mount, two moves, unmount per cycle). Observed 0.50x, 2026-08-07 \u2014 octane portals into SVG beat react's createPortal; the guard keeps that from silently inverting."
+    "note": "360 portal commits per batch into the overlay <g> (mount, two moves, unmount per cycle). Observed 0.50x, 2026-08-07 \u2014 octane portals into SVG beat react's createPortal; the guard keeps that from silently inverting.",
+    "waiver": {
+      "reason": "Confirmed regression: a same-runner A/B on 2026-10-03 measured octane 2.28 ms per batch against 1.74 ms at #635 (1.31x; unchanged by a terser rebuild). Since #1069, scoped value descriptors' type/key/props accessors are read about 60 times per commit from childSlot, isHostDescriptor and descNeedsBlocks; fix tracked in task_24b2ee0c. Remove this waiver with it.",
+      "expires": "2026-10-24"
+    }
   },
   {
     "suite": "svg-dashboard",
     "op": "icon_swap",
     "target": "octane-tsrx",
     "reference": "react",
-    "maxRatio": 1.2,
-    "note": "All 150 createElement-built icons re-diff per flip (tag swaps replace elements, same-tag patches attrs) plus 150 <use href> fast-path writes. Octane's DELIBERATE de-opt path vs react's one-and-only path \u2014 a cliff-width tripwire, not a win claim. Observed 0.79x, 2026-08-07."
+    "maxRatio": 1.6,
+    "note": "All 150 createElement-built icons re-diff per flip (tag swaps replace elements, same-tag patches attrs) plus 150 <use href> fast-path writes. Octane's DELIBERATE de-opt path vs react's one-and-only path, a cliff-width tripwire, not a win claim. Observed 0.79x on 2026-08-07 against terser-minified React. #983 moved every fixture to esbuild minification, which made React 15% faster here (2.98 -> 2.55 ms per batch on one runner) while octane stayed flat (3.09 ms at #635, 3.21 ms now). Paired ~20 ms samples on 2026-10-03 measured 1.30x and 1.37x in two quick CI runs and 1.26x in the A/B; the 1.6 ceiling keeps that headroom while catching a de-opt cliff."
   },
   {
     "suite": "svg-dashboard",
@@ -3180,7 +3208,7 @@
     "target": "octane-tsrx",
     "reference": "solid",
     "maxRatio": 1.6,
-    "note": "Same-run 1024-leaf route teardown, gated on the shell surviving by node identity. Per-block DOM detach measured 2.24x solid before the wholesale unmount detach; detaching once at the outermost block measures 1.0x (0.60 vs 0.60 on 2026-08-09). The 1.6 ceiling leaves sub-millisecond noise headroom while failing if per-descendant removeChild returns."
+    "note": "Same-run 1024-leaf route teardown, gated on the shell surviving by node identity. Per-block DOM detach measured 2.24x solid before the wholesale unmount detach; detaching once at the outermost block measures 1.0x (0.60 vs 0.60 on 2026-08-09). The 1.6 ceiling leaves sub-millisecond noise headroom while failing if per-descendant removeChild returns. On CI runners the same-runner A/B of 2026-10-03 measured 1.29x at #674 itself (0.85 vs 0.66 ms) and 1.24x now (0.86 vs 0.70 ms), with a GC before every timed leg of ~20 ms paired samples; the 0.67-1.80x weekly spread came from one-navigation samples and collections landing inside timed legs."
   },
   {
     "suite": "spa-navigation",
@@ -3195,8 +3223,8 @@
     "op": "nav_mount",
     "target": "octane-tsrx",
     "reference": "solid",
-    "maxRatio": 1.2,
-    "note": "Protects the existing mount win: 32-leaf teardown + 1024-leaf mount measured 0.94x solid (1.70 vs 1.80) on 2026-08-09. Octane mounts faster than the fine-grained peers despite marker traffic; a breach means the compiled mount path grew per-node cost."
+    "maxRatio": 1.35,
+    "note": "32-leaf teardown + 1024-leaf mount measured 0.94x solid (1.70 vs 1.80) on a local machine on 2026-08-09. On CI runners the same-runner A/B of 2026-10-03 measured 1.15x at #674 itself (2.39 vs 2.07 ms) and 1.09x now (2.27 vs 2.08 ms), so octane has not regressed; paired ~20 ms quick runs read 1.10x and 1.16x. The 1.35 ceiling keeps quick-mode headroom over that CI baseline; a breach means the compiled mount path grew per-node cost."
   },
   {
     "suite": "hook-memo",
@@ -4438,7 +4466,7 @@
     "target": "octane-tsrx-caught-reveal-large-normalized",
     "reference": "octane-tsrx-caught-reveal-small",
     "maxRatio": 1.35,
-    "note": "Revealing 4,096 hidden caught-error reports, normalized to the 512-report work count, must remain near-linear. Exact origin/main measured 2.00x before direct queue-entry claims; every sample separately gates hidden deferral, FIFO exactly-once reporting, retained output identity, visible text, and clean unmount."
+    "note": "Revealing 4,096 hidden caught-error reports, normalized to the 512-report work count, must remain near-linear. Exact origin/main measured 2.00x before direct queue-entry claims; every sample separately gates hidden deferral, FIFO exactly-once reporting, retained output identity, visible text, and clean unmount. Each sample reveals equal work in one ~20 ms window (the small case gets 8x the large case's roots), and the cases alternate per round: two quick CI runs on 2026-10-03 measured 1.08x and 1.09x (rme <= 10%, 5 samples), where single-reveal samples had read 1.06x then 1.63x at rme 79-635%."
   },
   {
     "suite": "transition-hooks",

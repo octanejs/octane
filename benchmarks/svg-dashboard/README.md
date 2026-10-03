@@ -47,11 +47,16 @@ frameworks contribute only binding + reconciliation machinery.
 | `series_toggle` | structural add/remove + y-domain rescale of surviving paths + keyed tick relabel |
 | `style_spread_pulse` | style objects with unitless SVG props + `data-*` spread bags on 200 edges |
 
-Op sizing: each timed body batches enough semantic repetition (ticks, frames,
-cycles — never loop-and-divide) that every flavor's median clears ~1–1.5 ms;
-below that, Chromium's 0.1 ms timer granularity dominates and the runner's
-compare gate refuses to call a sub-ms move a regression. Batch sizes are the
-constants at the top of `run.mjs`.
+Op sizing: each op's batch is a fixed amount of semantic repetition (ticks,
+frames, cycles), and its median is reported per batch. A timed sample repeats
+the batch a per-target calibrated number of times, about 20 ms of work, and
+divides: a single ~1.5 ms batch sat within 15 ticks of Chromium's 0.1 ms timer
+and let one sample's JIT or GC jitter decide a guard. Batch sizes are the
+constants at the top of `run.mjs`; `meta.batchesPerSample` records the repeats.
+
+The timed pass pairs targets: every target's measure page is open at once in
+one browser, and each sample round visits all of them in a rotating order, so
+the two sides of a ratio guard share the runner's state.
 
 ## Correctness gates (all untimed, all fatal)
 

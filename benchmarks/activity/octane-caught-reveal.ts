@@ -6,8 +6,8 @@ import { HiddenCaughtReveal } from './HiddenCaughtReveal.tsrx';
 const target = document.getElementById('main');
 if (target === null) throw new Error('Missing #main');
 
-installCaughtRevealBenchmark(target, (model: CaughtRevealModel) => {
-	const root = createRoot(target, { onCaughtError: (error) => model.report(error) });
+installCaughtRevealBenchmark(target, (model: CaughtRevealModel, container: HTMLElement) => {
+	const root = createRoot(container, { onCaughtError: (error) => model.report(error) });
 	return {
 		render: (props) => {
 			flushSync(() => root.render(HiddenCaughtReveal, props));

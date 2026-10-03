@@ -26,8 +26,14 @@
 // synchronously where the framework allows it (react flushSync, solid flush());
 // Preact and vue-vapor hooks return a thenable the harness awaits inside the
 // timed window — gc() is forced before every timed sample, and sub-millisecond
-// ops loop enough invocations inside the timed window to keep newly auto-memoized
-// regions above performance.now()'s resolution before dividing by the rep count.
+// ops loop a per-target calibrated number of invocations inside the timed
+// window, about 20 ms per sample, before dividing by the rep count.
+//
+// Targets are PAIRED per sample: for each op every target's page is open at
+// once in one browser (each in its own context), and every sample round visits
+// all targets in a rotating order. A ratio guard's two sides are then measured
+// within the same few hundred milliseconds, so runner drift cannot land on one
+// side only. `mount` keeps one fresh page per sample, paired the same way.
 //
 // FINE-GRAINED COLUMNS (solid / vue-vapor): there is no memo wall — component
 // bodies run once, so the probes count CREATIONS plus leaf TEXT-EFFECT re-runs
@@ -50,12 +56,12 @@
 
 import { chromium } from 'playwright';
 import fs from 'node:fs';
+import { roundOrder, SAMPLE_MS } from '../lib/paired.mjs';
 import { scoreOf, summarizeSamples, timingStatForJson } from '../lib/stats.mjs';
 
 const ITER = parseInt(process.argv[2] || '20', 10);
 const WARMUP = 5;
 const YIELD_MS = 5;
-const TARGET_BATCH_MS = 8;
 const MAX_REPS = 65_536;
 const ROWS = 1000;
 
@@ -133,130 +139,145 @@ async function freshPage(browser, url) {
 // In-page DOM snapshot, taken after the verification invocation: proves the
 // render actually reached the document (leaf text = current theme, the changed
 // row's inner cell shows the bumped value, both walls still hold 1000 rows).
-// Duplicated inline in each page.evaluate (evaluate can't share host closures).
+// installSnapshot defines it in the page, so a verification can take it in
+// the same task as its invocation.
+function snapshotDom() {
+	const state = window.__state();
+	const t = (s) => {
+		const el = document.querySelector(s);
+		return el ? el.textContent : null;
+	};
+	const dom = {
+		rowsA: document.querySelectorAll('#wall-a .rows > .item').length,
+		rowsB: document.querySelectorAll('#wall-b .rows > .item').length,
+		leafA0: t('#wall-a .rows > .item .leaf'),
+		leafB0: t('#wall-b .rows > .item .leaf'),
+		midInnerA: t('#wall-a .rows > .item:nth-child(' + (state.mid + 1) + ') .inner'),
+		midInnerB: t('#wall-b .rows > .item:nth-child(' + (state.mid + 1) + ') .inner'),
+	};
+	return { delta: { ...window.__renders }, state, dom };
+}
+const installSnapshot = (page) => page.evaluate(`window.__benchSnapshot = ${snapshotDom}`);
 
 // MOUNT — fresh page per sample (quiescent start, freshly-collected heap);
-// time the synchronous __mount(). One extra fresh page runs the verification
+// time the synchronous __mount(). Each round mounts every target once, in a
+// rotating order. One extra fresh page per target runs the verification
 // (render counts + DOM snapshot).
-async function measureMount(browser, url) {
-	const samples = [];
+async function measureMount(browser, targets) {
+	const samples = new Map(targets.map((t) => [t, []]));
 	for (let i = 0; i < WARMUP + ITER; i++) {
-		const { ctx, page } = await freshPage(browser, url);
-		const dt = await page.evaluate(async () => {
-			(window.gc || (() => {}))();
-			void document.body?.offsetHeight;
-			const t0 = performance.now();
-			const r = window.__mount();
-			if (r && typeof r.then === 'function') await r;
-			return performance.now() - t0;
-		});
-		if (i >= WARMUP) samples.push(dt);
-		await ctx.close();
-	}
-	const { ctx, page } = await freshPage(browser, url);
-	const verify = await page.evaluate(async () => {
-		window.__resetRenders();
-		const r = window.__mount();
-		if (r && typeof r.then === 'function') await r;
-		const state = window.__state();
-		const t = (s) => {
-			const el = document.querySelector(s);
-			return el ? el.textContent : null;
-		};
-		const dom = {
-			rowsA: document.querySelectorAll('#wall-a .rows > .item').length,
-			rowsB: document.querySelectorAll('#wall-b .rows > .item').length,
-			leafA0: t('#wall-a .rows > .item .leaf'),
-			leafB0: t('#wall-b .rows > .item .leaf'),
-			midInnerA: t('#wall-a .rows > .item:nth-child(' + (state.mid + 1) + ') .inner'),
-			midInnerB: t('#wall-b .rows > .item:nth-child(' + (state.mid + 1) + ') .inner'),
-		};
-		return { delta: { ...window.__renders }, state, dom };
-	});
-	await ctx.close();
-	return { samples, ...verify };
-}
-
-// LOOP op — mount once (untimed), calibrate the target-specific repetition
-// count to an 8ms batch, then time that batch and divide by its reps. Afterwards:
-// capture the whole-loop counters, then run ONE verification invocation with
-// fresh counters + a DOM snapshot.
-async function measureLoop(browser, url, op) {
-	const { ctx, page } = await freshPage(browser, url);
-	await page.evaluate(() => window.__mount());
-	await sleep(50);
-	const res = await page.evaluate(
-		async ({ hook, initialReps, WARMUP, ITER, YIELD_MS, TARGET_BATCH_MS, MAX_REPS }) => {
-			const fn = window[hook];
-			if (typeof fn !== 'function') throw new Error('missing ' + hook);
-			const gc = window.gc || (() => {});
-			const runBatch = async (count) => {
+		for (const t of roundOrder(targets, i)) {
+			const { ctx, page } = await freshPage(browser, t.url);
+			const dt = await page.evaluate(async () => {
+				(window.gc || (() => {}))();
 				void document.body?.offsetHeight;
 				const t0 = performance.now();
+				const r = window.__mount();
+				if (r && typeof r.then === 'function') await r;
+				return performance.now() - t0;
+			});
+			if (i >= WARMUP) samples.get(t).push(dt);
+			await ctx.close();
+		}
+	}
+	const out = new Map();
+	for (const t of targets) {
+		const { ctx, page } = await freshPage(browser, t.url);
+		await installSnapshot(page);
+		const verify = await page.evaluate(async () => {
+			window.__resetRenders();
+			const r = window.__mount();
+			if (r && typeof r.then === 'function') await r;
+			return window.__benchSnapshot();
+		});
+		await ctx.close();
+		out.set(t, { samples: samples.get(t), ...verify });
+	}
+	return out;
+}
+
+// LOOP op — mount every target once (untimed), calibrate each target's
+// repetition count to a SAMPLE_MS batch, then time paired rounds of batches and
+// divide by their reps. Afterwards, per target: capture the whole-loop
+// counters, then run ONE verification invocation with fresh counters + a DOM
+// snapshot.
+async function measureLoop(browser, targets, op) {
+	const states = [];
+	try {
+		for (const t of targets) {
+			const { ctx, page } = await freshPage(browser, t.url);
+			states.push({ t, ctx, page, reps: op.reps, samples: [] });
+			await page.evaluate(() => window.__mount());
+			await page.evaluate((hook) => {
+				const fn = window[hook];
+				if (typeof fn !== 'function') throw new Error('missing ' + hook);
 				// Async-commit targets (Preact and vue-vapor) await the flush BETWEEN
 				// reps so they don't coalesce into one commit; sync targets are unchanged.
-				for (let k = 0; k < count; k++) {
-					const r = fn();
-					if (r && typeof r.then === 'function') await r;
-				}
-				return performance.now() - t0;
-			};
+				window.__benchBatch = async (count) => {
+					void document.body?.offsetHeight;
+					const t0 = performance.now();
+					for (let k = 0; k < count; k++) {
+						const r = fn();
+						if (r && typeof r.then === 'function') await r;
+					}
+					return performance.now() - t0;
+				};
+			}, op.hook);
+		}
+		await sleep(50);
 
-			// Warm the operation before calibration, then scale until the measured
-			// batch clears the timer-resolution floor. Calibration is untimed work;
-			// its render counters are reset before the sampled loop below.
-			let reps = initialReps;
-			await runBatch(reps);
-			while (reps < MAX_REPS) {
-				gc();
-				const elapsed = await runBatch(reps);
-				if (elapsed >= TARGET_BATCH_MS) break;
-				const estimated = elapsed > 0 ? Math.ceil((reps * TARGET_BATCH_MS) / elapsed) : reps * 10;
-				reps = Math.min(MAX_REPS, Math.max(reps * 2, estimated));
+		// Warm the operation before calibration, then scale until the measured
+		// batch reaches SAMPLE_MS. Calibration is untimed work; its render
+		// counters are reset before the sampled rounds below.
+		for (const state of states) {
+			await state.page.bringToFront();
+			state.reps = await state.page.evaluate(
+				async ({ initialReps, SAMPLE_MS, MAX_REPS }) => {
+					const gc = window.gc || (() => {});
+					let reps = initialReps;
+					await window.__benchBatch(reps);
+					while (reps < MAX_REPS) {
+						gc();
+						const elapsed = await window.__benchBatch(reps);
+						if (elapsed >= SAMPLE_MS) break;
+						const estimated = elapsed > 0 ? Math.ceil((reps * SAMPLE_MS) / elapsed) : reps * 10;
+						reps = Math.min(MAX_REPS, Math.max(reps * 2, estimated));
+					}
+					window.__resetRenders();
+					return reps;
+				},
+				{ initialReps: op.reps, SAMPLE_MS, MAX_REPS },
+			);
+		}
+
+		for (let i = 0; i < WARMUP + ITER; i++) {
+			for (const state of roundOrder(states, i)) {
+				await state.page.bringToFront();
+				const dt = await state.page.evaluate(async (reps) => {
+					(window.gc || (() => {}))();
+					return (await window.__benchBatch(reps)) / reps;
+				}, state.reps);
+				if (i >= WARMUP) state.samples.push(dt);
+				await sleep(YIELD_MS);
 			}
-			await new Promise((r) => setTimeout(r, YIELD_MS));
-			window.__resetRenders();
-			const out = [];
-			for (let i = 0; i < WARMUP + ITER; i++) {
-				gc();
-				const dt = (await runBatch(reps)) / reps;
-				if (i >= WARMUP) out.push(dt);
-				await new Promise((r) => setTimeout(r, YIELD_MS));
-			}
-			const loop = { ...window.__renders };
-			window.__resetRenders();
-			{
-				const r = fn();
+		}
+
+		const out = new Map();
+		for (const state of states) {
+			await installSnapshot(state.page);
+			const verify = await state.page.evaluate(async (hook) => {
+				const loop = { ...window.__renders };
+				window.__resetRenders();
+				const r = window[hook]();
 				if (r && typeof r.then === 'function') await r;
-			}
-			const delta = { ...window.__renders };
-			const state = window.__state();
-			const t = (s) => {
-				const el = document.querySelector(s);
-				return el ? el.textContent : null;
-			};
-			const dom = {
-				rowsA: document.querySelectorAll('#wall-a .rows > .item').length,
-				rowsB: document.querySelectorAll('#wall-b .rows > .item').length,
-				leafA0: t('#wall-a .rows > .item .leaf'),
-				leafB0: t('#wall-b .rows > .item .leaf'),
-				midInnerA: t('#wall-a .rows > .item:nth-child(' + (state.mid + 1) + ') .inner'),
-				midInnerB: t('#wall-b .rows > .item:nth-child(' + (state.mid + 1) + ') .inner'),
-			};
-			return { samples: out, reps, loop, delta, state, dom };
-		},
-		{
-			hook: op.hook,
-			initialReps: op.reps,
-			WARMUP,
-			ITER,
-			YIELD_MS,
-			TARGET_BATCH_MS,
-			MAX_REPS,
-		},
-	);
-	await ctx.close();
-	return res;
+				return { loop, ...window.__benchSnapshot() };
+			}, op.hook);
+			out.set(state.t, { samples: state.samples, reps: state.reps, ...verify });
+		}
+		return out;
+	} finally {
+		for (const state of states) await state.ctx.close();
+	}
 }
 
 const countersEqual = (got, expect) => Object.keys(Z).every((k) => got[k] === expect[k]);
@@ -310,53 +331,63 @@ function checkGates(op, res) {
 	return errs;
 }
 
-async function runTarget(t, failures) {
+async function runTargets(failures) {
 	const browser = await chromium.launch({
 		headless: true,
 		args: ['--disable-extensions', '--no-sandbox', '--js-flags=--expose-gc'],
 	});
-
-	const { ctx, page } = await freshPage(browser, t.url);
-	const hasGc = await page.evaluate(() => typeof window.gc === 'function');
-	await ctx.close();
-	if (!hasGc) {
-		console.error(
-			'  ! window.gc unavailable (need --js-flags=--expose-gc) — results will be noisier',
-		);
-	}
-
-	const results = {};
-	const meta = { gates: 'pass', reps: { mount: 1 } };
-	for (const op of OPS) {
-		console.error(`  → ${op.name}`);
-		const res =
-			op.hook === null ? await measureMount(browser, t.url) : await measureLoop(browser, t.url, op);
-		if (op.hook !== null) {
-			meta.reps[op.name] = res.reps;
-			console.error(`    calibrated ${res.reps} reps/sample`);
+	try {
+		const { ctx, page } = await freshPage(browser, TARGETS[0].url);
+		const hasGc = await page.evaluate(() => typeof window.gc === 'function');
+		await ctx.close();
+		if (!hasGc) {
+			console.error(
+				'  ! window.gc unavailable (need --js-flags=--expose-gc) — results will be noisier',
+			);
 		}
-		results[op.name] = { ...summarize(res.samples), samples: res.samples.length };
-		if (op.name === 'mount') meta.mountRenders = res.delta;
-		const errs = checkGates(op, res);
-		if (errs.length > 0) {
-			meta.gates = 'fail';
-			for (const e of errs) {
-				failures.push(`${t.name}: ${e}`);
-				console.error(`  ✗ GATE ${e}`);
+
+		const all = Object.fromEntries(
+			TARGETS.map((t) => [t.name, { results: {}, meta: { gates: 'pass', reps: { mount: 1 } } }]),
+		);
+		for (const op of OPS) {
+			console.error(`  → ${op.name}`);
+			const byTarget =
+				op.hook === null
+					? await measureMount(browser, TARGETS)
+					: await measureLoop(browser, TARGETS, op);
+			for (const t of TARGETS) {
+				const res = byTarget.get(t);
+				const { results, meta } = all[t.name];
+				if (op.hook !== null) meta.reps[op.name] = res.reps;
+				results[op.name] = { ...summarize(res.samples), samples: res.samples.length };
+				if (op.name === 'mount') meta.mountRenders = res.delta;
+				const errs = checkGates(op, res);
+				if (errs.length > 0) {
+					meta.gates = 'fail';
+					for (const e of errs) {
+						failures.push(`${t.name}: ${e}`);
+						console.error(`  ✗ GATE ${e}`);
+					}
+				}
+			}
+			if (op.hook !== null) {
+				console.error(
+					`    calibrated reps/sample ${TARGETS.map((t) => `${t.name}=${all[t.name].meta.reps[op.name]}`).join(' ')}`,
+				);
 			}
 		}
+		return all;
+	} finally {
+		await browser.close();
 	}
-	await browser.close();
-	return { results, meta };
 }
 
 (async () => {
-	const all = {};
 	const failures = [];
-	for (const t of TARGETS) {
-		console.error(`Running ${t.name} (${t.url}) × ${ITER} (+${WARMUP} warmup)…`);
-		all[t.name] = await runTarget(t, failures);
-	}
+	console.error(
+		`Pairing ${TARGETS.map((t) => t.name).join(', ')} × ${ITER} (+${WARMUP} warmup) per op…`,
+	);
+	const all = await runTargets(failures);
 
 	const cols = TARGETS.map((t) => t.name);
 	const W = 32;

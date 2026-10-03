@@ -127,7 +127,10 @@ function measurePlainHook(source, environment) {
 		throw new Error(`Plain ${environment} hook output contains invalid TypeScript`);
 	}
 	return {
-		bytes: Buffer.byteLength(code),
+		// Pure-call annotations let bundlers drop an unused module-level
+		// createContext, and they vanish under minification with the printer's
+		// trailing newlines, so neither is output growth.
+		bytes: Buffer.byteLength(code.replaceAll('/* @__PURE__ */ ', '').trimEnd()),
 		batch: countImportedCalls(ast, environment === 'server' ? 'puBatch' : 'useBatch'),
 		use: countImportedCalls(ast, 'use'),
 	};

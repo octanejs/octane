@@ -86,12 +86,18 @@ component and text shape without throwing. Root creation, hidden rendering, and
 optional GC all happen outside the timer. The timer covers only the public
 hidden-to-visible render and its root `onCaughtError` reports.
 
-Every sample verifies that hidden catches publish no reports, reveal publishes
-each report exactly once in FIFO order, visible text and output identity survive,
-and unmount empties the root. The large target is normalized to the small work
-count and compared against that small target, preventing repeated per-action
-queue searches from returning without relying on a machine-specific absolute
-timing ceiling.
+One reveal takes a millisecond or two, so a sample prepares several independent
+hidden roots and reveals them all in one timed window, reporting the time per
+root. The large case's root count scales until a sample takes about 20 ms, and
+the small case gets eight times as many roots, so both samples reveal the same
+number of boundaries. The two cases alternate within each round.
+
+Every sample verifies, for every root, that hidden catches publish no reports,
+reveal publishes each report exactly once in FIFO order, visible text and output
+identity survive, and unmount empties the root. The large target is normalized
+to the small work count and compared against that small target, preventing
+repeated per-action queue searches from returning without relying on a
+machine-specific absolute timing ceiling.
 
 ## Regression guards
 

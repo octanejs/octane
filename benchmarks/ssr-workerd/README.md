@@ -29,6 +29,10 @@ Three targets:
 | `workerd_shell_*` / `workerd_total_*`              | warm request: first body chunk / stream end per scenario; `workerd_total_allfast.opsPerSec` is the throughput number |
 
 Cold ops are mean-scored (every sample is a fresh workerd process + isolate).
+They are paired: each target first gets one untimed spawn, since the first
+workerd launch of a run also pages the binary in, and then every round spawns
+each target once in a rotating order. The unified runner's quick mode runs six
+rounds.
 Requests are dispatched with `accept-encoding: identity` — workerd otherwise
 gzip-buffers the stream and chunk timing would observe the compressor, not the
 renderer. Miniflare cold start is a **local approximation** of Cloudflare's

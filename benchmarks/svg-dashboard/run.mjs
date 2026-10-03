@@ -27,11 +27,16 @@
 //      forced-layout cost.
 //
 // Methodology mirrors list-clear/dbmon: window-hook ops committed
-// synchronously (flushSync / solid flush()) with the whole warmup+iteration
-// loop inside ONE page.evaluate; gc() before each sample; ops are rotational
-// so repetition is semantic (ticks, frames, cycles), and each op batch is
-// sized to clear ~1.5ms medians on the fastest flavor (the runner refuses to
-// call a sub-ms move a regression).
+// synchronously (flushSync / solid flush()); gc() before each sample; ops are
+// rotational so repetition is semantic (ticks, frames, cycles). Each op's batch
+// is the reported unit, and a sample repeats the batch a per-target calibrated
+// number of times, about 20 ms of work, then divides: a single ~1.5ms batch
+// sat within 15 timer ticks and its JIT/GC jitter decided guards.
+//
+// The timed pass PAIRS targets per sample: every target's measure page stays
+// open in one browser (each in its own context), and every sample round visits
+// all targets in a rotating order, so a ratio guard's two sides share the
+// runner's state at the time.
 //
 // Servers must be running first (production preview recommended):
 //   pnpm --filter octane-tsrx-svg-dashboard-bench preview   # :5302
@@ -48,6 +53,7 @@ import { createHash } from 'node:crypto';
 import { readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { calibratedReps, roundOrder } from '../lib/paired.mjs';
 import { scoreOf, summarizeSamples, timingStatForJson } from '../lib/stats.mjs';
 import { censusDomNodes, deterministicCount, deterministicStatForJson } from '../lib/dom-nodes.mjs';
 import * as sharedOps from './octane-tsrx/src/ops.js';
@@ -57,9 +63,9 @@ const ITER = parseInt(process.argv[2] || '20', 10);
 const WARMUP = Math.min(8, Math.max(2, ITER));
 const YIELD_MS = 5;
 
-// Per-sample batch sizes. Repetition is semantic (stream ticks, drag frames,
-// tooltip cycles); every batch must keep the fastest flavor's median >= ~1.5ms
-// and react under ~30ms. Tune here, never in the op bodies.
+// Per-batch sizes. Repetition is semantic (stream ticks, drag frames, tooltip
+// cycles); the batch is the reported unit, and samples repeat it up to about
+// 20 ms (MAX_BATCHES caps the repeats). Tune here, never in the op bodies.
 const TICKS = 8;
 const SPARSE_TICKS = 20;
 const DRAG_FRAMES = 30;
@@ -71,6 +77,7 @@ const CHURNS = 2;
 const ICON_FLIPS = 3;
 const TOGGLE_CYCLES = 3; // off+on per cycle
 const PULSES = 6;
+const MAX_BATCHES = 64;
 
 // Hard ceiling for the jitless production-call count of one octane __tick()
 // (call-count phenomena — e.g. per-write sanitize/alias lookups — can hide
@@ -570,47 +577,86 @@ function checkGates(target, expected, actual) {
 }
 
 // ---------------------------------------------------------------------------
-// Timed measurement: one fresh page, ops run in declaration order, the whole
-// warmup+iteration loop inside one evaluate per op.
+// Timed measurement: one fresh page per target, ops run in declaration order,
+// every sample round visiting all targets in a rotating order.
 
-async function measureOps(page) {
-	const results = {};
-	for (const op of OPS) {
-		const samples = await page.evaluate(
-			async ({ preSrc, bodySrc, WARMUP, ITER, YIELD_MS }) => {
-				const pre = preSrc ? new Function(preSrc) : null;
-				const fn = new Function(bodySrc);
-				const gc = window.gc || (() => {});
-				const yieldTask = () => new Promise((r) => setTimeout(r, YIELD_MS));
-				const out = [];
-				for (let i = 0; i < WARMUP + ITER; i++) {
-					if (pre) pre();
+// One sample of `batches` repeats of the op on the current page, as the
+// duration of one batch. An op with `pre` (mount after reset) times each batch
+// in its own window after an untimed pre() and yield; the rest time all
+// repeats in one window.
+async function sampleOp(page, op, batches) {
+	return await page.evaluate(
+		async ({ preSrc, bodySrc, batches, YIELD_MS }) => {
+			const pre = preSrc ? new Function(preSrc) : null;
+			const fn = new Function(bodySrc);
+			const gc = window.gc || (() => {});
+			const yieldTask = () => new Promise((r) => setTimeout(r, YIELD_MS));
+			if (pre) {
+				let total = 0;
+				for (let b = 0; b < batches; b++) {
+					pre();
 					await yieldTask();
 					gc();
 					void document.body?.offsetHeight;
 					const t0 = performance.now();
 					fn();
-					const dt = performance.now() - t0;
-					if (i >= WARMUP) out.push(dt);
+					total += performance.now() - t0;
 				}
-				return out;
-			},
-			{ preSrc: op.pre ?? null, bodySrc: op.body, WARMUP, ITER, YIELD_MS },
-		);
-		// Cheap post-op invariant: the dashboard shape survived the loop.
-		const shape = await page.evaluate(() => ({
-			nodes: document.querySelectorAll('.nodes > g').length,
-			edges: document.querySelectorAll('.edges > path').length,
-			icons: document.querySelectorAll('.icons > .icon').length,
-		}));
-		if (shape.nodes !== 150 || shape.edges !== 200 || shape.icons !== 150) {
-			throw new Error(
-				`${op.name} left ${shape.nodes} nodes / ${shape.edges} edges / ${shape.icons} icons`,
-			);
+				return total / batches;
+			}
+			await yieldTask();
+			gc();
+			void document.body?.offsetHeight;
+			const t0 = performance.now();
+			for (let b = 0; b < batches; b++) fn();
+			return (performance.now() - t0) / batches;
+		},
+		{ preSrc: op.pre ?? null, bodySrc: op.body, batches, YIELD_MS },
+	);
+}
+
+async function measureOps(pages) {
+	const results = new Map(pages.map(({ target }) => [target.name, {}]));
+	const batchesPerSample = new Map(pages.map(({ target }) => [target.name, {}]));
+	for (const op of OPS) {
+		// Batches per sample, per target: the second of two single-batch runs
+		// (the first runs before the op's code is optimized) sets the count.
+		const batches = new Map();
+		for (const { target, page } of pages) {
+			await page.bringToFront();
+			await sampleOp(page, op, 1);
+			const count = calibratedReps(1, await sampleOp(page, op, 1), MAX_BATCHES);
+			batches.set(target.name, count);
+			batchesPerSample.get(target.name)[op.name] = count;
 		}
-		results[op.name] = summarizeSamples(samples);
+		const samples = new Map(pages.map(({ target }) => [target.name, []]));
+		for (let i = 0; i < WARMUP + ITER; i++) {
+			for (const { target, page } of roundOrder(pages, i)) {
+				await page.bringToFront();
+				const dt = await sampleOp(page, op, batches.get(target.name));
+				if (i >= WARMUP) samples.get(target.name).push(dt);
+			}
+		}
+		for (const { target, page } of pages) {
+			// Cheap post-op invariant: the dashboard shape survived the loop.
+			const shape = await page.evaluate(() => ({
+				nodes: document.querySelectorAll('.nodes > g').length,
+				edges: document.querySelectorAll('.edges > path').length,
+				icons: document.querySelectorAll('.icons > .icon').length,
+			}));
+			if (shape.nodes !== 150 || shape.edges !== 200 || shape.icons !== 150) {
+				throw new Error(
+					`${target.name}: ${op.name} left ${shape.nodes} nodes / ${shape.edges} edges / ${shape.icons} icons`,
+				);
+			}
+			results.get(target.name)[op.name] = summarizeSamples(samples.get(target.name));
+		}
+		console.error(
+			`  → ${op.name.padEnd(18)} batches/sample ` +
+				pages.map(({ target }) => `${target.name}=${batches.get(target.name)}`).join(' '),
+		);
 	}
-	return results;
+	return { results, batchesPerSample };
 }
 
 // Jitless production-call count for a single octane __tick() after an
@@ -673,6 +719,8 @@ async function freshPage(browser, url) {
 	return { ctx, page };
 }
 
+// Gates, census, and deterministic counters for one target, in its own
+// browser. The timed pass runs later, paired across every passing target.
 async function runTarget(target, expected) {
 	const browser = await chromium.launch({
 		headless: true,
@@ -725,19 +773,7 @@ async function runTarget(target, expected) {
 			await censusPage.ctx.close();
 		}
 
-		// Timed pass on a fresh page.
-		const measurePage = await freshPage(browser, target.url);
-		let ops;
-		try {
-			if (!(await measurePage.page.evaluate(() => typeof window.gc === 'function'))) {
-				console.error('  ! window.gc unavailable (need --js-flags=--expose-gc) — noisier results');
-			}
-			console.error('  → ops');
-			ops = await measureOps(measurePage.page);
-		} finally {
-			await measurePage.ctx.close();
-		}
-
+		const ops = {};
 		ops.nodes_full = deterministicCount(census.total);
 		ops.elements_full = deterministicCount(census.elements);
 		ops.text_full = deterministicCount(census.text);
@@ -767,6 +803,23 @@ async function runTarget(target, expected) {
 	}
 }
 
+async function measurePaired(targets) {
+	const browser = await chromium.launch({
+		headless: true,
+		args: ['--disable-extensions', '--no-sandbox', '--js-flags=--expose-gc'],
+	});
+	try {
+		const pages = [];
+		for (const target of targets) pages.push({ target, ...(await freshPage(browser, target.url)) });
+		if (!(await pages[0].page.evaluate(() => typeof window.gc === 'function'))) {
+			console.error('  ! window.gc unavailable (need --js-flags=--expose-gc) — noisier results');
+		}
+		return await measureOps(pages);
+	} finally {
+		await browser.close();
+	}
+}
+
 // ---------------------------------------------------------------------------
 
 (async () => {
@@ -778,7 +831,7 @@ async function runTarget(target, expected) {
 
 	if (failures.length === 0) {
 		for (const target of TARGETS) {
-			console.error(`Running ${target.name} (${target.url}) × ${ITER} (+${WARMUP} warmup)…`);
+			console.error(`Checking ${target.name} (${target.url}) gates and census…`);
 			try {
 				const result = await runTarget(target, expected);
 				if (result.failures.length > 0) {
@@ -798,6 +851,29 @@ async function runTarget(target, expected) {
 				console.error(`  ✗ ${message}`);
 			}
 			await sleep(100);
+		}
+
+		// Timed pass, paired across every target whose gates passed.
+		const timedNames = Object.keys(all);
+		if (timedNames.length > 0) {
+			console.error(`Timing ${timedNames.join(', ')} paired × ${ITER} (+${WARMUP} warmup)…`);
+			try {
+				const { results, batchesPerSample } = await measurePaired(
+					TARGETS.filter((t) => all[t.name]),
+				);
+				for (const name of timedNames) {
+					Object.assign(all[name].ops, results.get(name));
+					all[name].meta.batchesPerSample = batchesPerSample.get(name);
+				}
+			} catch (error) {
+				const message = `timed pass: ${error instanceof Error ? error.message : String(error)}`;
+				failures.push(message);
+				console.error(`  ✗ ${message}`);
+				for (const name of timedNames) {
+					failedTargets.add(name);
+					delete all[name];
+				}
+			}
 		}
 
 		// Cross-flavor parity: the canonical DOM serialization must hash
