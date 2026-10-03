@@ -237,10 +237,14 @@ async function measureNav(browser, targets, { from, to }, { throttle = 0 } = {})
 					};
 					const result = window.__mount(from);
 					if (result && typeof result.then === 'function') await result;
+					// GC runs before every timed leg, as it did when each sample was a
+					// single navigation: the untimed return leg allocates a whole route,
+					// and its collection must not land inside the next timed leg.
+					const gc = window.gc || (() => {});
 					window.__benchLegs = async (legs) => {
-						(window.gc || (() => {}))();
 						let total = 0;
 						for (let k = 0; k < legs; k++) {
+							gc();
 							void document.body?.offsetHeight;
 							const t0 = performance.now();
 							await nav(to);

@@ -142,9 +142,9 @@ forced before every timed sample. This times framework JS work, not pixels on
 screen.
 
 A single navigation is 0.3–2 ms, so a sample is a per-target calibrated run of
-round trips. Each timed `from → to` leg is followed by an untimed return and a
-task yield, and the sample is the summed timed legs, about 20 ms, divided by
-their count (`meta.legsPerSample`). Targets are paired: for each op every
+round trips. Each timed `from → to` leg starts after a forced GC and is followed
+by an untimed return and a task yield, and the sample is the summed timed legs,
+about 20 ms, divided by their count (`meta.legsPerSample`). Targets are paired: for each op every
 target's page is open at once, and each sample round visits all of them in a
 rotating order, so the two sides of a ratio guard share the runner's state.
 
