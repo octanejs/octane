@@ -35299,9 +35299,9 @@ function deoptItemBody(item: any, scope: Scope): void {
 // Returns false, leaving the item to its ordinary render, whenever that render
 // could differ: hydration, signal owners, native reads, a non-root capture, an
 // unsettled item, recorded context reads, or any other child regime. Reached
-// only through ForSlot.itemUpdate, so the compiled @for path that shares
+// only through ForSlot.plainDeopt, so the compiled @for path that shares
 // updateSurvivor never retains the descriptor renderer.
-function updateDeoptComponent(block: Block, item: any): boolean {
+function updateDeoptComponent(block: Block, item: any, index: number): boolean {
 	const slot = block.slots[0] as ChildSlot | undefined;
 	const child = slot?.block;
 	if (
@@ -35324,6 +35324,8 @@ function updateDeoptComponent(block: Block, item: any): boolean {
 		activeHydration() !== null
 	)
 		return false;
+	// The ordinary render below writes the same index if this returns false.
+	block.itemIndex = index;
 	const previousScope = CURRENT_SCOPE;
 	const previousBlock = CURRENT_BLOCK;
 	CURRENT_SCOPE = block;
@@ -36358,8 +36360,7 @@ function renderPreparedChildList(
 			emptyBlock: null,
 			env: undefined,
 			adopt: null,
-			plainDeopt: false,
-			itemUpdate: null,
+			plainDeopt: null,
 			mappedNative: undefined,
 			selectionItems: undefined,
 			signalSite: undefined,
@@ -36460,8 +36461,7 @@ function renderPreparedChildList(
 	// guarded by those two conditions. Record it on the slot rather than
 	// re-deriving it by identity in mountItem (see ForSlot.plainDeopt).
 	const plainDeopt = compiledMapBody === undefined && mappedFallback !== true;
-	state.forSlot.plainDeopt = plainDeopt;
-	state.forSlot.itemUpdate = plainDeopt ? updateDeoptComponent : null;
+	state.forSlot.plainDeopt = plainDeopt ? updateDeoptComponent : null;
 	const fastFlags = compiledMapFlags || 0;
 	const ssrMarkerless =
 		compiledMapBody === undefined ? markerlessMappedFallback || plainDeopt : (fastFlags & 16) !== 0;
@@ -44890,23 +44890,18 @@ interface ForSlot {
 	// Keeps descriptor↔compiled adoption off every ordinary descriptor list.
 	// Undefined means the arm has not been selected; false is a selected fallback.
 	mappedNative: boolean | undefined;
-	// True when this de-opt list's items render through the plain `deoptItemBody`
-	// — no compiled map body, no mapped fallback wrapper. `mountItem` needs the
-	// fact but must NOT name `deoptItemBody` to get it: a live identity
-	// comparison there is a reference from the compiled `@for` path that every
-	// application reaches, and it makes the entire descriptor renderer
-	// (childSlot, fragment refs, portals, transitions, the attribute tables)
-	// reachable from apps that only ever render compiled templates. Recorded on
-	// the slot instead, so the reference stays inside childSlot, which already
-	// retains that graph. Both ForSlot literals declare it so every slot shares
-	// one hidden class; only childSlot ever stamps or reads it, because only
-	// childSlot passes mountItem the de-opt sentinel.
-	plainDeopt: boolean;
-	// A plain de-opt list's survivor update (updateDeoptComponent), null on
-	// every other list. A function rather than a flag for the same reason as
-	// plainDeopt: updateSurvivor, which compiled @for lists share, calls it
-	// without naming the descriptor renderer.
-	itemUpdate: ((block: Block, item: any) => boolean) | null;
+	// Set exactly when this de-opt list's items render through the plain
+	// `deoptItemBody` (no compiled map body, no mapped fallback wrapper), to that
+	// list's survivor update, updateDeoptComponent; null on every other list.
+	// `mountItem` and `updateSurvivor` need the fact but must NOT name
+	// `deoptItemBody` to get it: a live reference there comes from the compiled
+	// `@for` path that every application reaches, and it makes the entire
+	// descriptor renderer (childSlot, fragment refs, portals, transitions, the
+	// attribute tables) reachable from apps that only ever render compiled
+	// templates. Recorded on the slot instead, so the reference stays inside
+	// childSlot, which already retains that graph. Both ForSlot literals declare
+	// it so every slot shares one hidden class.
+	plainDeopt: ((block: Block, item: any, index: number) => boolean) | null;
 	// Set only when the compiler proved a keyed equality selection. Identity
 	// gates the two-row update without retaining extra state on ordinary lists.
 	selectionItems: ArrayLike<any> | undefined;
@@ -45018,11 +45013,10 @@ export function forBlock<T>(
 			emptyBlock: null,
 			env: undefined,
 			adopt: null,
-			// Compiled `@for` slots never read this — they never pass the de-opt
-			// sentinel — but both ForSlot literals declare it so every slot shares
-			// one hidden class and the stamp in childSlot transitions nothing.
-			plainDeopt: false,
-			itemUpdate: null,
+			// Stays null on a compiled `@for` slot, but both ForSlot literals
+			// declare it so every slot shares one hidden class and the stamp in
+			// childSlot transitions nothing.
+			plainDeopt: null,
 			mappedNative: undefined,
 			selectionItems: undefined,
 			signalSite,
@@ -45750,12 +45744,10 @@ function updateSurvivor<T>(
 	if (pure && block.props === newItem && (indexIndependent || block.itemIndex === newIdx)) {
 		block.itemIndex = newIdx;
 		block.body = itemBody as ComponentBody;
-	} else {
+	} else if (
 		// A plain de-opt list can update a same-component item without its render.
-		if (block.forSlot!.itemUpdate?.(block, newItem)) {
-			block.itemIndex = newIdx;
-			return;
-		}
+		!block.forSlot!.plainDeopt?.(block, newItem, newIdx)
+	) {
 		// Item and captured inputs change together before the body can run. One
 		// entry restores both without a second property key or journal guard.
 		if (journal && (block.props !== newItem || block.extra !== env))
@@ -46844,7 +46836,7 @@ function mountItem<T>(
 				ssrMarkerless &&
 				!hydration.isOpen(node) &&
 				(singleRoot !== 2 ||
-					forSlot.plainDeopt !== true ||
+					!forSlot.plainDeopt ||
 					(isHostDescriptor(item) && !descNeedsBlocks(item)))
 			) {
 				// The outer @for pair is the only list framing on the wire. Each proven
@@ -46854,7 +46846,7 @@ function mountItem<T>(
 					node !== null &&
 					node !== forSlot.end &&
 					(singleRoot !== 2 ||
-						forSlot.plainDeopt !== true ||
+						!forSlot.plainDeopt ||
 						(node.nodeType === 1 &&
 							domNode(node).parentNode === parentNode &&
 							isHostElementOfType(node as Element, (item as ElementDescriptor).type as string)))
@@ -46872,7 +46864,7 @@ function mountItem<T>(
 					block.forSlot = forSlot;
 					block.key = key;
 					block.itemIndex = index;
-					if (singleRoot === 2 && forSlot.plainDeopt === true) block.deoptNode = node;
+					if (singleRoot === 2 && forSlot.plainDeopt) block.deoptNode = node;
 					renderBlock(block);
 					hydration.node = domNode(block.endMarker)?.nextSibling ?? getNextSibling(node);
 					return block;
@@ -46910,7 +46902,7 @@ function mountItem<T>(
 			hydration.discardItems(
 				forSlot.end,
 				process.env.NODE_ENV !== 'production'
-					? forSlot.plainDeopt === true && isHostDescriptor(item) && !descNeedsBlocks(item)
+					? forSlot.plainDeopt && isHostDescriptor(item) && !descNeedsBlocks(item)
 						? `<${item.type as string}>`
 						: 'another list item'
 					: '',
