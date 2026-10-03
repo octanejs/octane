@@ -93,6 +93,7 @@ export abstract class RedeclarableBinding<D> {
 			// A candidate frame must not mutate committed state; a later render rebinds.
 			if (activeCandidate !== undefined) return this.node;
 			this.captures = captures;
+			this.presented = invocation;
 			this.installDefinition(definition, sequence);
 			return this.node;
 		}
