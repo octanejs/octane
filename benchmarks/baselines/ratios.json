@@ -5442,6 +5442,38 @@
   },
   {
     "suite": "root-transactions",
+    "op": "rotate_row_slots",
+    "target": "reorders",
+    "reference": "reorders-work-budget",
+    "maxRatio": 0,
+    "note": "Moving the first of 256 keyed pure survivors to the end shifts every survivor's index without journaling it per row: the list's shape record restores indices from its chain. #833 journaled each index, four slots per row, about half of its 1,000-row rotate regression (0.050 to 0.071 ms on one runner). DOM order and survivor identity are checked in the same run."
+  },
+  {
+    "suite": "root-transactions",
+    "op": "reverse_row_slots",
+    "target": "reorders",
+    "reference": "reorders-work-budget",
+    "maxRatio": 0,
+    "note": "Reversing 256 keyed pure survivors journals no per-row index; the shape record restores every row's index on rollback. DOM order and survivor identity are checked in the same run."
+  },
+  {
+    "suite": "root-transactions",
+    "op": "remove_first_row_slots",
+    "target": "reorders",
+    "reference": "reorders-work-budget",
+    "maxRatio": 0,
+    "note": "Removing the first of 256 keyed rows shifts every suffix survivor's index without a per-row journal entry. DOM order and survivor identity are checked in the same run."
+  },
+  {
+    "suite": "root-transactions",
+    "op": "insert_first_row_slots",
+    "target": "reorders",
+    "reference": "reorders-work-budget",
+    "maxRatio": 0,
+    "note": "Inserting one row ahead of 256 keyed survivors journals the new row, not one index entry per survivor. DOM order and survivor identity are checked in the same run."
+  },
+  {
+    "suite": "root-transactions",
     "op": "changed_reads",
     "target": "text-compiled",
     "reference": "text-compiled-work",

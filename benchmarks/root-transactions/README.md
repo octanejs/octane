@@ -33,6 +33,11 @@ heap allocation or application latency measurements.
 | Input journal slots, 256 rows changing items and captures | 2,048 | 1,024 |
 | Input journal slots, only items or captures change | 1,024 | 1,024 |
 | Input journal slots, neither changes | 0 | 0 |
+| Index journal slots per row, keyed rotate/reverse/remove/insert of 256 rows | 4 | 0 |
+
+Keyed survivors no longer journal their index: the list's shape record already
+restores each row's index from its chain position on rollback
+([reorders.mjs](reorders.mjs)).
 
 See [contracts.md](contracts.md), [retirement.md](retirement.md),
 [inputs.md](inputs.md), and [bags.md](bags.md) for contracts, exact baseline

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { act, mount } from './_helpers';
-import { FreshRootScopeHold } from './_fixtures/fresh-root-scope-hold.tsrx';
+import { FreshRootScopeHold, KeyedIndexHold } from './_fixtures/fresh-root-scope-hold.tsrx';
 
 function deferred<T>() {
 	let resolve!: (value: T) => void;
@@ -60,6 +60,38 @@ describe('new scopes in a held root render', () => {
 		} finally {
 			root.unmount();
 			external.remove();
+		}
+	});
+});
+
+describe('keyed rows in a held root render', () => {
+	const initial = ['a', 'b', 'c', 'd'];
+	const rows = (root: ReturnType<typeof mount>) =>
+		root.findAll('ol li').map((row) => row.textContent);
+
+	it.each([
+		['rotate', ['b', 'c', 'd', 'a']],
+		['reverse', ['d', 'c', 'b', 'a']],
+		['remove first', ['b', 'c', 'd']],
+		['insert first', ['x', 'a', 'b', 'c', 'd']],
+	])('renders each row at its position after a held %s', async (_name, next) => {
+		const pending = deferred<string>();
+		const root = mount(KeyedIndexHold, { items: initial, promise: fulfilled('first') });
+		try {
+			const nodes = new Map(initial.map((item) => [item, root.find('#row-' + item)]));
+			root.update(KeyedIndexHold, { items: next, promise: pending.promise });
+			expect(rows(root)).toEqual(['a:0', 'b:1', 'c:2', 'd:3']);
+			for (const [item, node] of nodes) expect(root.find('#row-' + item)).toBe(node);
+
+			await act(() => pending.resolve('second'));
+			expect(rows(root)).toEqual(next.map((item, index) => item + ':' + index));
+			for (const item of next)
+				if (nodes.has(item)) expect(root.find('#row-' + item)).toBe(nodes.get(item));
+
+			root.update(KeyedIndexHold, { items: initial, promise: fulfilled('third') });
+			expect(rows(root)).toEqual(['a:0', 'b:1', 'c:2', 'd:3']);
+		} finally {
+			root.unmount();
 		}
 	});
 });

@@ -27,3 +27,14 @@ export function FreshRootScopeHold(props) @{
 		<Reader promise={props.promise} />
 	</main>
 }
+
+export function KeyedIndexHold(props: { items: string[]; promise: PromiseLike<string> }) @{
+	<main>
+		<ol>
+			@for (const item of props.items; index i; key item) {
+				<li id={'row-' + item}>{item + ':' + i}</li>
+			}
+		</ol>
+		<Reader promise={props.promise} />
+	</main>
+}
