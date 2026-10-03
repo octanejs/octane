@@ -173,6 +173,31 @@ export function Label() {
 	});
 
 	it.each([
+		['queueMicrotask', 'queueMicrotask(() => setWidth(el.current?.offsetWidth ?? 0));'],
+		[
+			'a zero-delay timer',
+			'setTimeout(() => {\n\t\t\tconst rect = el.current?.getBoundingClientRect();\n\t\t\tsetWidth(rect?.width ?? 0);\n\t\t});',
+		],
+		['startTransition', 'startTransition(() => setWidth(el.current?.offsetWidth ?? 0));'],
+	])('names useLayoutSnapshot when a measurement is stored from %s', (_, body) => {
+		const source = `import { startTransition, useLayoutEffect, useRef, useState } from 'octane';
+export function Label() {
+	const el = useRef<HTMLSpanElement>(null);
+	const [width, setWidth] = useState(0);
+	useLayoutEffect(() => {
+		${body}
+	});
+	return <span ref={el}>{String(width)}</span>;
+}
+`;
+		const diagnostic = errors(source).find(
+			(entry) => entry.code === 'OCTANE_STRONG_EFFECT_STATE_UPDATE',
+		);
+		expect(diagnostic?.message).toContain('useLayoutSnapshot');
+		expect(diagnostic?.suggestions?.[0].hook).toBe('useLayoutSnapshot');
+	});
+
+	it.each([
 		[
 			'the returned cleanup',
 			'setValue(name);\n\t\treturn () => console.log(el.current?.offsetWidth);',
