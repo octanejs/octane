@@ -13713,14 +13713,14 @@ interface LayoutSnapshotBox<T> {
 }
 
 // Development only: consecutive unequal measurements per snapshot cell within
-// one update chain. A snapshot that settles between passes resets its count.
+// one nested-update chain. A snapshot that settles between passes resets its count.
 let LAYOUT_SNAPSHOT_CHANGES: WeakMap<object, { chain: number; count: number }> | null = null;
 
 function countLayoutSnapshotChange(cell: object, block: Block): void {
 	const changes = (LAYOUT_SNAPSHOT_CHANGES ??= new WeakMap());
 	let record = changes.get(cell);
-	if (record === undefined || record.chain !== UPDATE_CHAIN_ID) {
-		record = { chain: UPDATE_CHAIN_ID, count: 0 };
+	if (record === undefined || record.chain !== NESTED_UPDATE_CHAIN_ID) {
+		record = { chain: NESTED_UPDATE_CHAIN_ID, count: 0 };
 		changes.set(cell, record);
 	}
 	// Name the hook only once it has changed on every pass that could have spent
@@ -13729,7 +13729,7 @@ function countLayoutSnapshotChange(cell: object, block: Block): void {
 		const source = componentSourceLoc(block.body);
 		(LAYOUT_SNAPSHOT_DIVERGENCE ??= new WeakMap()).set(block, {
 			cell,
-			chain: UPDATE_CHAIN_ID,
+			chain: NESTED_UPDATE_CHAIN_ID,
 			message: `useLayoutSnapshot in ${componentName(block)}${source ? ` (${source})` : ''} did not converge.`,
 		});
 	}

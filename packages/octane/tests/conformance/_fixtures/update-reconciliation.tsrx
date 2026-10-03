@@ -6,6 +6,7 @@ import {
 	useContext,
 	useEffect,
 	useLayoutEffect,
+	useLayoutSnapshot,
 	useReducer,
 	useState,
 	useSyncExternalStore,
@@ -465,6 +466,17 @@ export function PassiveStepLayoutMeasure(props: { limit: number }) @{
 		if (measured !== step) setMeasured(step);
 	}, null);
 	<span id="passive-layout-measure">{`${step}:${measured}`}</span>
+}
+
+// The same cascade measured through useLayoutSnapshot, which publishes one
+// converging snapshot of each committed step.
+export function PassiveStepLayoutSnapshot(props: { limit: number }) @{
+	const [step, setStep] = useState(0);
+	const measured = useLayoutSnapshot(() => step * 10, { initial: -1 });
+	useEffect(() => {
+		if (step < props.limit) setStep(step + 1);
+	}, null);
+	<span id="passive-layout-snapshot">{`${step}:${measured}`}</span>
 }
 
 function PassiveStepMeasureChild(props: { step: number; publish: (width: number) => void }) @{
