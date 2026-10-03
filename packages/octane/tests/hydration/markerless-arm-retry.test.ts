@@ -202,6 +202,8 @@ describe.each([
 		{ arm: 'an @if arm', name: 'TrailingRoot' },
 		{ arm: 'the body of a component the client adopted', name: 'TrailingFrame' },
 		{ arm: 'an @if arm that suspends before it clones', name: 'TrailingClone' },
+		{ arm: 'the body of a component in a descriptor list item', name: 'TrailingDescriptor' },
+		{ arm: 'the body of a component in a keyed @for row', name: 'TrailingRow' },
 	];
 
 	it.each(TRAILING)('keeps and owns the static last root of $arm', async ({ name }) => {

@@ -18971,6 +18971,10 @@ class HydrationCapability {
 	private heldBranches: WeakMap<Node, Node | null> | null = null;
 	/** The arm of each branch that holdMarkerlessBranch held, to its start comment (renderHeld). */
 	private heldArms: WeakMap<Block, Node> | null = null;
+	/** How many list items' first renders are under way (renderItem). */
+	private itemDepth = 0;
+	/** The start comments that holdMarkerlessBranch inserted within those renders, oldest first. */
+	private itemHolds: Node[] | null = null;
 	private readonly unframedRootRanges = new WeakMap<Node, Node>();
 	/** Unframed claims whose render suspended, by the block that claimed (renderUnframed). */
 	private unframedClaims: WeakMap<Block, UnframedClaim> | null = null;
@@ -20015,6 +20019,16 @@ class HydrationCapability {
 	 */
 	private reachedRangeEnd(node: Node | null): void {
 		if (isBlockClose(node)) this.remember((HYDRATION_REBUILT ??= new WeakSet()), node);
+	}
+
+	/**
+	 * Before another first fill of `list`, a descriptor list that kept no items
+	 * after its first fill threw, as in a suspended deferred boundary's retry.
+	 * The cursor is where the resumed render left it, so adoption starts over
+	 * from the server's first item, as forBlock's does.
+	 */
+	refillList(list: ForSlot): void {
+		if (list.size === 0 && this.isOpen(list.start)) this.node = getNextSibling(list.start);
 	}
 
 	/**
@@ -21078,7 +21092,40 @@ class HydrationCapability {
 			claimed === undefined ? this.markerlessEnd(start, parent, after) : claimed,
 		);
 		(this.heldArms ??= new WeakMap()).set(state.block!, start);
+		if (this.itemDepth !== 0) (this.itemHolds ??= []).push(start);
 		state.markerlessBefore = start;
+	}
+
+	/**
+	 * First render of `block`, a list item adopting the server content at the
+	 * cursor. A render that throws leaves its list no block to keep, so the
+	 * list's retry adopts the same content again. Remove the start comments of
+	 * the branches that this attempt held, whose slots never render again: an
+	 * attempt that is discarded leaves the server DOM as it was.
+	 */
+	renderItem(block: Block): void {
+		const mark = this.itemHolds?.length ?? 0;
+		this.itemDepth++;
+		try {
+			renderBlock(block);
+		} catch (error) {
+			const holds = this.itemHolds;
+			if (holds !== null) {
+				for (let i = holds.length - 1; i >= mark; i--) {
+					const start = holds[i];
+					const parent = domNode(start).parentNode;
+					if (parent !== null) {
+						this.save(parent);
+						domNode(start as ChildNode).remove();
+					}
+					this.heldBranches!.delete(start);
+				}
+				holds.length = mark;
+			}
+			throw error;
+		} finally {
+			if (--this.itemDepth === 0) this.itemHolds = null;
+		}
 	}
 
 	/**
@@ -35972,6 +36019,8 @@ function renderPreparedChildList(
 	mappedFallback?: boolean,
 ): void {
 	const passthroughList = hydration?.passthroughRanges === true && state.borrowed;
+	if (hydration !== null && !passthroughList && state.forSlot !== null)
+		hydration.refillList(state.forSlot);
 	let passthroughStart: Comment | null = null;
 	let passthroughEnd: Comment | null = null;
 	if (preparedList.items.length === 0 && hydration === null && state.ownerHost !== null) {
@@ -46544,7 +46593,7 @@ function mountItem<T>(
 					block.key = key;
 					block.itemIndex = index;
 					if (singleRoot === 2 && forSlot.plainDeopt === true) block.deoptNode = node;
-					renderBlock(block);
+					hydration.renderItem(block);
 					hydration.node = domNode(block.endMarker)?.nextSibling ?? getNextSibling(node);
 					return block;
 				}
@@ -46568,7 +46617,7 @@ function mountItem<T>(
 				block.forSlot = forSlot;
 				block.key = key;
 				block.itemIndex = index;
-				renderBlock(block);
+				hydration.renderItem(block);
 				hydration.node = getNextSibling(itemEnd);
 				return block;
 			}
