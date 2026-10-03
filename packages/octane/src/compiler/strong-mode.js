@@ -202,6 +202,7 @@ export const STRONG_RENDER_STATE_GETTER_CALL = 'OCTANE_STRONG_RENDER_STATE_GETTE
 export const STRONG_RENDER_MODULE_STATE_READ = 'OCTANE_STRONG_RENDER_MODULE_STATE_READ';
 export const STRONG_RENDER_AMBIENT_READ = 'OCTANE_STRONG_RENDER_AMBIENT_READ';
 export const STRONG_EFFECT_STATE_UPDATE = 'OCTANE_STRONG_EFFECT_STATE_UPDATE';
+export const STRONG_REF_STATE_UPDATE = 'OCTANE_STRONG_REF_STATE_UPDATE';
 export const STRONG_RENDER_REF_WRITE = 'OCTANE_STRONG_RENDER_REF_WRITE';
 export const STRONG_RENDER_REF_READ = 'OCTANE_STRONG_RENDER_REF_READ';
 export const STRONG_RENDER_SNAPSHOT_MUTATION = 'OCTANE_STRONG_RENDER_SNAPSHOT_MUTATION';
@@ -1749,6 +1750,25 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 		const effect = currentEffect;
 		if (effect !== null && !effect.snapshot && effect.callback?.kind === 'callback') {
 			effect.measures ??= readsLayout(effect.callback.node);
+		}
+		if (effect?.ref === true) {
+			report(
+				STRONG_REF_STATE_UPDATE,
+				node,
+				effect.measures === true
+					? 'Strong mode does not allow synchronous state updates in a callback ref. Octane calls it while the element commits, before paint, like layout effect setup, and this one copies a DOM measurement into state. Pass a ref object and render from the measurement with useLayoutSnapshot(() => measure(), { initial }) instead: it measures after layout and re-renders before paint only when the value changes.'
+					: 'Strong mode does not allow synchronous state updates in a callback ref. Octane calls it while the element commits, before paint, like layout effect setup, so startTransition, queueMicrotask, Promise.resolve().then, and a zero-delay setTimeout count too. Pass a ref object to keep the element, and read it from effects and event handlers. Render from a DOM measurement with useLayoutSnapshot.',
+				[
+					effect.measures === true
+						? {
+								hook: 'useLayoutSnapshot',
+								message:
+									'Replace the state and the callback ref with a ref object and useLayoutSnapshot.',
+							}
+						: { hook: 'useRef', message: 'Keep the element in a ref object.' },
+				],
+			);
+			return;
 		}
 		if (effect?.measures === true) {
 			report(
@@ -4462,6 +4482,38 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 		);
 	}
 
+	// Octane calls a host element's callback ref while the element commits,
+	// before paint, so its state updates follow the effect setup rules. Only
+	// those are checked: a ref has no dependency list, and the cleanup and
+	// effect-chain checks belong to effects.
+	function visitHostRef(expression, scope) {
+		const node = unwrap(expression);
+		if (node?.type === 'ArrayExpression') {
+			for (const element of node.elements ?? []) {
+				if (element !== null && element.type !== 'SpreadElement') visitHostRef(element, scope);
+			}
+			return;
+		}
+		const callback = callableValue(node, scope);
+		if (callback === null) return;
+		const enclosingEffect = currentEffect;
+		const enclosingOwnsWrites = effectOwnsWrites;
+		const enclosingCollectReads = collectEffectReads;
+		const record = { node, callback, writes: new Set(), snapshot: false, ref: true };
+		const enclosingPolicy = effectPolicy.enterEffect(record);
+		currentEffect = record;
+		effectOwnsWrites = true;
+		collectEffectReads = false;
+		try {
+			visitCallable(callback, node, 'effect');
+		} finally {
+			currentEffect = enclosingEffect;
+			effectOwnsWrites = enclosingOwnsWrites;
+			collectEffectReads = enclosingCollectReads;
+			effectPolicy.exitEffect(enclosingPolicy);
+		}
+	}
+
 	// Synchronous effect setup must not read inputs that dependency inference
 	// cannot see. Effect Events are the declared non-reactive escape.
 	function hiddenEffectRead(phase) {
@@ -5087,7 +5139,23 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 				) {
 					reportModuleStateRead(name);
 				}
-				break;
+				for (const key in node) {
+					if (!SKIP_KEYS.has(key) && !key.startsWith('_octane')) visit(node[key], scope, phase);
+				}
+				// A component decides when to call a ref prop. A host element's ref
+				// runs when the element commits, wherever its JSX was created.
+				if (
+					!member &&
+					(name?.type === 'JSXNamespacedName' ||
+						(name?.type === 'JSXIdentifier' && /^[a-z]|-/.test(name.name)))
+				) {
+					for (const attribute of node.attributes ?? []) {
+						if (attribute.type === 'JSXAttribute' && attribute.name?.name === 'ref') {
+							visitHostRef(attribute.value?.expression, scope);
+						}
+					}
+				}
+				return;
 			}
 			case 'JSXSpreadAttribute':
 				visit(node.argument, scope, phase);

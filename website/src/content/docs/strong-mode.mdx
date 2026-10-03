@@ -213,6 +213,45 @@ export function Label({ text }: { text: string }) {
 
 `useLayoutSnapshot` measures after each commit and re-renders before paint only when the value changes. `initial` is the value for the first render and for server rendering. It does not observe later resizes: subscribe to those with an observer in an effect.
 
+<h3 id="recipe-ref-measurement">Measure an element from a callback ref</h3>
+
+React: `<span ref={(el) => { if (el) setWidth(el.offsetWidth); }}>`
+
+Strong: `const width = useLayoutSnapshot(() => el.current?.offsetWidth ?? 0, { initial: 0 });`
+
+Reports [`OCTANE_STRONG_REF_STATE_UPDATE`](#octane-strong-ref-state-update).
+
+```tsx
+'use strong';
+import { useState } from 'octane';
+
+export function Label({ text }: { text: string }) {
+	const [width, setWidth] = useState(0);
+	return (
+		<span
+			ref={(el) => {
+				if (el) setWidth(el.offsetWidth);
+			}}
+		>
+			{text + ' (' + width + 'px)'}
+		</span>
+	);
+}
+```
+
+```tsx
+'use strong';
+import { useLayoutSnapshot, useRef } from 'octane';
+
+export function Label({ text }: { text: string }) {
+	const el = useRef<HTMLSpanElement>(null);
+	const width = useLayoutSnapshot(() => el.current?.offsetWidth ?? 0, { initial: 0 });
+	return <span ref={el}>{text + ' (' + width + 'px)'}</span>;
+}
+```
+
+A callback ref runs while the element commits, so a state update there renders the component a second time before paint. `useLayoutSnapshot` reads the element after layout on every commit and re-renders only when the measurement changes. To follow resizes that happen without a commit, attach a `ResizeObserver` from the ref or an effect; its callback may update state.
+
 <h3 id="recipe-manual-memo">Drop useMemo and useCallback</h3>
 
 React: `const total = useMemo(() => sum(items), [items]);`
@@ -515,6 +554,14 @@ A hint never fails a build or `octane analyze --strict`. `octane analyze --code 
 Effect setup calls a state updater synchronously. This includes updaters and callbacks returned by same-module custom hooks, and callbacks that run before the next paint: `startTransition`, a `useTransition` start function, `queueMicrotask`, `.then`/`.catch`/`.finally` on `Promise.resolve(value)` or `Promise.reject()`, `setTimeout` without a positive delay, and code after an `await` that resumes without waiting on any path, such as `await null` or `await (flag ? load() : null)`.
 
 **Replacement.** Derive the value during render, or use `useLinkedState` when state follows another value. When the effect copies a measurement of the committed DOM into state, render from `useLayoutSnapshot` instead. `requestAnimationFrame`, timers with a positive delay, and external subscription callbacks remain event-driven.
+
+<h4 id="octane-strong-ref-state-update">
+	<code>OCTANE_STRONG_REF_STATE_UPDATE</code>
+</h4>
+
+A host element's callback ref calls a state updater synchronously: an inline or local function, a state setter passed as the ref, or a function in a `ref={[...]}` list. Octane calls a callback ref while the element commits, before paint, so it follows the effect setup rules, and callbacks that run before the next paint, such as `startTransition`, `queueMicrotask`, and `setTimeout` without a positive delay, count too. A component's `ref` prop is not checked, because the component decides when to call it.
+
+**Replacement.** Pass a ref object to keep the element, and read it from effects and event handlers. When the callback copies a measurement of the element into state, render from `useLayoutSnapshot` instead. `requestAnimationFrame`, timers with a positive delay, and observer or listener callbacks the ref attaches remain event-driven.
 
 <h4 id="octane-strong-effect-data-fetch">
 	<code>OCTANE_STRONG_EFFECT_DATA_FETCH</code>

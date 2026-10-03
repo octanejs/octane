@@ -190,8 +190,8 @@ writes could not hide behind same-value sets or run updater side effects first.
 ## 3. Rule table (strict semantics)
 
 This table describes the **proposed runtime-backed contract**, not the complete
-shipped Strong-mode feature set. In particular, cleanup restrictions, callback-ref
-restrictions, runtime guards, and hook-cell policies are not implemented.
+shipped Strong-mode feature set. In particular, cleanup restrictions, runtime
+guards, and hook-cell policies are not implemented.
 
 | Context                                                                        | Policy                                                                              |
 | ------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------- |
@@ -201,7 +201,7 @@ restrictions, runtime guards, and hook-cell policies are not implemented.
 | `useInsertionEffect` setup                                                     | Hard error                                                                          |
 | Effect setup frames (`useEffect`, `useLayoutEffect`) — any sync call depth     | Proposed runtime hard error; only statically provable setup writes are rejected today |
 | Effect cleanup frames — all effect kinds, update and unmount                   | Hard error                                                                          |
-| Callback refs during commit                                                    | Same policy as layout-effect setup; `useLayoutSnapshot` covers measurement (§9 OQ)  |
+| Callback refs during commit                                                    | Same policy as layout-effect setup; `useLayoutSnapshot` covers measurement. Only statically provable host callback-ref writes are rejected today (`OCTANE_STRONG_REF_STATE_UPDATE`) |
 | DOM event handlers, actions, form actions                                      | Allowed, batched                                                                    |
 | Callbacks executing on a later causal turn — async continuations, timers, observers, subscription notifications, deliberate deferral (`queueMicrotask`/`setTimeout`, §7) | Allowed, no wrapper required (§2)                                                   |
 | Subscription callbacks replayed synchronously during effect setup              | Hard error — still the commit cascade; read the initial value as a snapshot (§2)    |
@@ -532,9 +532,13 @@ and rollout decisions.
   distinguish compiled call sites from symbol-ranged binding boundaries in
   prod compiles) vs. an explicit registration table. Needs a perf-neutral
   answer on the two-item `useState` fast path.
-- **Future callback-ref policy**: strict error (measurement belongs to
-  `useLayoutSnapshot`) or event-like allowance (attach *is* a DOM event of
-  sorts)? The shipped compiler does not impose the proposed callback-ref ban.
+- **Callback-ref policy (settled 2026-10-03)**: strict error, not an event-like
+  allowance. A host callback ref runs in the commit cascade, so the compiler
+  checks its state updates like layout-effect setup
+  (`OCTANE_STRONG_REF_STATE_UPDATE`), and measurement belongs to
+  `useLayoutSnapshot`. Work the ref defers to a later turn (frames, positive
+  timers, observers, listeners) stays legal, and a component's `ref` prop is
+  unchecked because the component decides when to call it.
 - **Linked-state adoption**: composite sources already use `Object.is` unless a
   `sourceEqual` comparator is supplied; prior source/value and transition
   generation behavior are implemented. Remaining work concerns migrating real

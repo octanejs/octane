@@ -58,6 +58,16 @@ export const STRONG_DIAGNOSTICS = [
 		primitives: ['useLinkedState', 'useLayoutSnapshot'],
 	},
 	{
+		code: 'OCTANE_STRONG_REF_STATE_UPDATE',
+		section: 'effects',
+		severity: 'error',
+		detects:
+			"A host element's callback ref calls a state updater synchronously: an inline or local function, a state setter passed as the ref, or a function in a `ref={[...]}` list. Octane calls a callback ref while the element commits, before paint, so it follows the effect setup rules, and callbacks that run before the next paint, such as `startTransition`, `queueMicrotask`, and `setTimeout` without a positive delay, count too. A component's `ref` prop is not checked, because the component decides when to call it.",
+		replacement:
+			'Pass a ref object to keep the element, and read it from effects and event handlers. When the callback copies a measurement of the element into state, render from `useLayoutSnapshot` instead. `requestAnimationFrame`, timers with a positive delay, and observer or listener callbacks the ref attaches remain event-driven.',
+		primitives: ['useRef', 'useLayoutSnapshot'],
+	},
+	{
 		code: 'OCTANE_STRONG_EFFECT_DATA_FETCH',
 		section: 'effects',
 		severity: 'error',
@@ -491,6 +501,37 @@ export function Label({ text }: { text: string }) {
 }
 `,
 		note: '`useLayoutSnapshot` measures after each commit and re-renders before paint only when the value changes. `initial` is the value for the first render and for server rendering. It does not observe later resizes: subscribe to those with an observer in an effect.',
+	},
+	{
+		id: 'ref-measurement',
+		title: 'Measure an element from a callback ref',
+		react: '<span ref={(el) => { if (el) setWidth(el.offsetWidth); }}>',
+		strong: 'const width = useLayoutSnapshot(() => el.current?.offsetWidth ?? 0, { initial: 0 });',
+		codes: ['OCTANE_STRONG_REF_STATE_UPDATE'],
+		before: `import { useState } from 'octane';
+
+export function Label({ text }: { text: string }) {
+	const [width, setWidth] = useState(0);
+	return (
+		<span
+			ref={(el) => {
+				if (el) setWidth(el.offsetWidth);
+			}}
+		>
+			{text + ' (' + width + 'px)'}
+		</span>
+	);
+}
+`,
+		after: `import { useLayoutSnapshot, useRef } from 'octane';
+
+export function Label({ text }: { text: string }) {
+	const el = useRef<HTMLSpanElement>(null);
+	const width = useLayoutSnapshot(() => el.current?.offsetWidth ?? 0, { initial: 0 });
+	return <span ref={el}>{text + ' (' + width + 'px)'}</span>;
+}
+`,
+		note: 'A callback ref runs while the element commits, so a state update there renders the component a second time before paint. `useLayoutSnapshot` reads the element after layout on every commit and re-renders only when the measurement changes. To follow resizes that happen without a commit, attach a `ResizeObserver` from the ref or an effect; its callback may update state.',
 	},
 	{
 		id: 'manual-memo',
