@@ -36495,13 +36495,22 @@ export function bindSignalChild(
 	onlyChild?: boolean,
 	bindingMarker?: string,
 ): unknown {
+	// A markerless only-child hole keeps its last written primitive as the token
+	// (see below), whose Text node is the host's first child. An unchanged
+	// primitive then does nothing, as childTextHoleUpdate's raw-value guard does,
+	// without a DOM read. Raw HTML still claims the host first.
+	const textToken = onlyChild && previous != null && typeof previous !== 'object';
+	if (textToken && previous === value && !dangerouslySetInnerHTMLOwnsChild(domParent, value))
+		return value;
 	const prior =
 		typeof previous === 'object' &&
 		previous !== null &&
 		(previous as DirectSignalChildBinding)[DIRECT_SIGNAL_CHILD] === true
 			? (previous as DirectSignalChildBinding)
 			: null;
-	const cachedText = prior?.text ?? (previous instanceof Text ? previous : null);
+	const cachedText =
+		prior?.text ??
+		(previous instanceof Text ? previous : textToken ? (getFirstChild(domParent) as Text) : null);
 	if (!isSignalHandle(value)) {
 		const type = typeof value;
 		// An ordinary marker-bounded hole keeps textHoleUpdate's fast path: its
@@ -36547,7 +36556,22 @@ export function bindSignalChild(
 			if (WIP_CAPTURE === null) finish(false);
 			else (WIP_CAPTURE.renderCleanups ??= []).push(finish);
 		}
-		return primitiveToken ? value : text;
+		if (primitiveToken) return value;
+		// A primitive whose Text node is the host's first child becomes the token.
+		// A previous token or a client mount's empty template proves that position;
+		// otherwise compare once, because hydration can keep unclaimed server
+		// content ahead of the node it adopted. A staged ViewTransition render has
+		// not placed the node yet.
+		return text !== null &&
+			type !== 'object' &&
+			type !== 'function' &&
+			parentScope.slots[slotKey] === undefined &&
+			STAGED_DOM === null &&
+			(textToken ||
+				(previous === null && !parentScope.mounted && currentHydration === null) ||
+				getFirstChild(domParent) === text)
+			? value
+			: text;
 	}
 	if (prior !== null && !prior.disposed && prior.handle === value) {
 		const next = readSignalBinding(value);
