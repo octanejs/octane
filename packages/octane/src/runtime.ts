@@ -12104,9 +12104,6 @@ function unmountBlockInner(block: Block, detachDom: boolean): void {
 			(block.startMarker !== null &&
 				block.endMarker !== null &&
 				domNode(block.startMarker).parentNode !== null));
-	// A portal's DOM lies outside every enclosing deletion's range: it retires its
-	// own before any cleanup below it runs (retireEventHostTree).
-	if (block.kind === 'portal' && removesOwnDom) retireHostRange(block.startMarker, block.endMarker);
 	// Depth-first cleanup of all scopes reachable from this block.
 	unmountScope(block, detachDom && !removesOwnDom);
 	if (owner?.current === block) NATIVE_READ_DRIVER?.clearDeferredRefs(owner);
@@ -31438,6 +31435,10 @@ function teardownPortalState(state: PortalSlot): void {
 		return;
 	}
 	if (state.block) {
+		// Its DOM lies outside every enclosing deletion's range: retire it here. A
+		// portal compiled into a template routes its events through a host element
+		// inside its owner, which the enclosing deletion has already retired.
+		retireHostRange(state.start, state.end);
 		unmountBlock(state.block, true);
 		state.block = null;
 	}
