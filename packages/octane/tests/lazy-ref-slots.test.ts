@@ -70,4 +70,29 @@ describe('lazy ref compiler slots', () => {
 			);
 		}
 	}
+
+	// An empty call keeps the factory position, as useState and useRef keep their
+	// initializer position, so the missing factory fails as a missing factory
+	// rather than as a missing compiler slot.
+	it.each(['ts', 'tsrx'] as const)(
+		'reserves the factory position in an empty .%s call',
+		(dialect) => {
+			const source = `import { createElement, useLazyRef } from 'octane';
+			export function App() ${
+				dialect === 'tsrx'
+					? `@{ useLazyRef(); <p /> }`
+					: `{ useLazyRef(); return createElement('p'); }`
+			}`;
+			const id = `lazy-ref-empty.${dialect}`;
+			const { App } =
+				dialect === 'ts'
+					? loadPlainHookFixtureSource(source, { id, mode: 'client', inlineHookMemo: false })
+					: loadCompiledFixtureSource(source, {
+							id,
+							mode: 'client',
+							compileOptions: { hmr: false, dev: false },
+						});
+			expect(() => mount(App)).toThrow(TypeError);
+		},
+	);
 });

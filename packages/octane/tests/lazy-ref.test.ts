@@ -1,15 +1,28 @@
 import { describe, expect, it, vi } from 'vitest';
 import { renderToString } from 'octane/server';
 import { flushSync, hydrateRoot } from '../src/index.js';
-import { mount } from './_helpers';
+import { act, mount } from './_helpers';
 import { loadServerFixture } from './_server-fixture.js';
 import {
 	CaptureRef,
 	FunctionRef,
 	FunctionResultRef,
 	LazyRef,
+	SuspendedRefBoundary,
+	TransitionRef,
 	UndefinedRef,
 } from './_fixtures/lazy-ref.tsrx';
+
+function deferred() {
+	let resolve!: (value: string) => void;
+	const promise = new Promise<string>((done) => (resolve = done));
+	return { promise, resolve };
+}
+
+function countingFactory() {
+	let calls = 0;
+	return vi.fn(() => ({ name: `made-${++calls}` }));
+}
 
 describe('useLazyRef initialization', () => {
 	it('keeps the first value on updates and initializes again on remount', () => {
@@ -72,6 +85,50 @@ describe('useLazyRef initialization', () => {
 		expect(report.mock.calls[1][0]).toBe(ref);
 		expect(ref.current).toEqual({ name: 'changed' });
 		expect(replacement).not.toHaveBeenCalled();
+		view.unmount();
+	});
+
+	it('commits the ref whose value rendered after a first mount suspends', async () => {
+		const factory = countingFactory();
+		const report = vi.fn();
+		const { promise, resolve } = deferred();
+		const view = mount(SuspendedRefBoundary, { factory, promise, report });
+		expect(view.find('i').textContent).toBe('loading');
+		expect(report).not.toHaveBeenCalled();
+
+		await act(() => resolve('ready'));
+		expect(report).toHaveBeenCalledTimes(1);
+		const [ref] = report.mock.calls[0];
+		expect(view.find('p').textContent).toBe(`ready:${ref.current.name}:0`);
+
+		const calls = factory.mock.calls.length;
+		view.click('button');
+		view.click('button');
+		expect(view.find('button').textContent).toBe('2');
+		expect(view.find('p').textContent).toBe(`ready:${ref.current.name}:0`);
+		expect(factory).toHaveBeenCalledTimes(calls);
+		view.unmount();
+	});
+
+	it('commits the ref whose value rendered after a transition suspends', async () => {
+		const factory = countingFactory();
+		const report = vi.fn();
+		const { promise, resolve } = deferred();
+		const view = mount(TransitionRef, { factory, next: promise, report });
+		await act(() => view.click('button'));
+		expect(view.find('p').textContent).toBe('idle');
+		expect(report).not.toHaveBeenCalled();
+
+		await act(() => resolve('ready'));
+		expect(report).toHaveBeenCalledTimes(1);
+		const [ref] = report.mock.calls[0];
+		expect(view.find('p').textContent).toBe(`ready:${ref.current.name}:1`);
+
+		const calls = factory.mock.calls.length;
+		await act(() => view.click('button'));
+		expect(view.find('p').textContent).toBe(`ready:${ref.current.name}:2`);
+		expect(report).toHaveBeenCalledTimes(1);
+		expect(factory).toHaveBeenCalledTimes(calls);
 		view.unmount();
 	});
 

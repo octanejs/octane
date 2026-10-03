@@ -141,7 +141,7 @@
         {
           "path": "packages/cmdk/src/components/command.tsrx",
           "role": "support",
-          "sha256": "7e8682576b12ffaf366dd134381fa43b907d38d4978fd0873d6ed008f80ee1f2"
+          "sha256": "99b2cde33a534d57893990ccbe079fdcd8c984e2f1f473133e500667070b9b1e"
         },
         {
           "path": "packages/cmdk/src/components/item.tsrx",
@@ -161,7 +161,7 @@
         {
           "path": "packages/cmdk/src/hooks.tsrx",
           "role": "support",
-          "sha256": "c57f03964c409294fc18d2e027544526016eb58198a30963f9fcfc1d897d4e75"
+          "sha256": "bde73514aacc577d19bd8cd5ee61f606f5b8b65c23465a7e34efdb381a11af7a"
         },
         {
           "path": "packages/cmdk/audit/upstream.lock.json",

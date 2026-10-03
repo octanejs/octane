@@ -3,6 +3,7 @@ import {
 	analyzeStrongHookPolicies,
 	collectReassignedBindings,
 } from './hook-deps.js';
+import { REF_HOOKS } from './hook-names.js';
 import { createRendererRegionResolver } from './renderer-boundaries.js';
 import { analyzeStrongHTML } from './strong-html.js';
 import { analyzeStrongDOM } from './strong-dom.js';
@@ -1919,21 +1920,24 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 		if (object?.type === 'SequenceExpression') {
 			return isRefObject(object.expressions?.[object.expressions.length - 1], scope);
 		}
-		return (
-			object?.type === 'CallExpression' &&
-			(importedHook(object.callee, scope) === 'useRef' ||
-				importedHook(object.callee, scope) === 'useLazyRef')
-		);
+		return object?.type === 'CallExpression' && REF_HOOKS.has(importedHook(object.callee, scope));
 	}
 
-	function lazyRefFactory(args) {
+	// The argument a call receives at `position`, seen through literal array
+	// spreads: `useState(...[init])` passes `init` exactly as `useState(init)`
+	// does. An opaque spread at or before the position hides it.
+	function argumentAt(args, position) {
+		let current = 0;
 		for (const argument of args ?? []) {
-			if (argument.type !== 'SpreadElement') return argument;
+			if (argument.type !== 'SpreadElement') {
+				if (current++ === position) return argument;
+				continue;
+			}
 			const array = unwrap(argument.argument);
 			if (array?.type !== 'ArrayExpression') return null;
-			if (array.elements.length > 0) {
-				const first = array.elements[0];
-				return first?.type === 'SpreadElement' ? null : first;
+			for (const element of array.elements) {
+				if (element?.type === 'SpreadElement') return null;
+				if (current++ === position) return element;
 			}
 		}
 		return null;
@@ -3032,8 +3036,7 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 				bind(declaration.id, stateTuple);
 			} else if (
 				initial?.type === 'CallExpression' &&
-				(importedHook(initial.callee, scope) === 'useRef' ||
-					importedHook(initial.callee, scope) === 'useLazyRef')
+				REF_HOOKS.has(importedHook(initial.callee, scope))
 			) {
 				bind(declaration.id, { kind: 'ref', declaration: declaration.id });
 			} else if (declarationKind === 'const' && transitionStart(initial, scope)) {
@@ -4675,11 +4678,11 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 		else visitCallable(value, origin, phase, args);
 	}
 
-	function visitSynchronousHookCallback(value, scope, phase, stateInitializer = false) {
+	function visitSynchronousHookCallback(value, scope, phase, lazyInitializer = false) {
 		const checkImpureCalls = currentFunctionChecksImpureCalls;
-		// Lazy state initialization may read a clock, randomness, or browser state. Keep its
-		// existing state/ref/Effect Event checks at the synchronous render phase.
-		if (stateInitializer) currentFunctionChecksImpureCalls = false;
+		// Lazy state and ref initialization may read a clock, randomness, or browser state.
+		// Keep its existing state/ref/Effect Event checks at the synchronous render phase.
+		if (lazyInitializer) currentFunctionChecksImpureCalls = false;
 		try {
 			visitCallable(callableValue(value, scope), unwrap(value), phase);
 		} finally {
@@ -4711,16 +4714,14 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 		}
 	}
 
-	function visitStateCallback(node, hook, index, setters, scope) {
-		const args = node.arguments ?? [];
-		if (args.slice(0, index + 1).some((argument) => argument.type === 'SpreadElement')) return;
-		const callback = callableValue(args[index], scope);
+	function visitStateCallback(node, hook, value, setters, scope) {
+		const callback = callableValue(value, scope);
 		if (callback === null) return;
-		const origin = unwrap(args[index]);
+		const origin = unwrap(value);
 		if (hook === 'useReducer') {
 			visitPureCallback(callback, origin, [stateTupleBinding(node, scope).snapshot, OTHER_BINDING]);
 		} else if (hook === 'useOptimistic') {
-			const passthrough = snapshotBinding(args[0], scope) ?? OTHER_BINDING;
+			const passthrough = snapshotBinding(argumentAt(node.arguments, 0), scope) ?? OTHER_BINDING;
 			visitPureCallback(callback, origin, [passthrough, OTHER_BINDING]);
 		} else {
 			for (const setter of setters) {
@@ -5420,11 +5421,33 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 					hook === null && pureCallbackIndex === -1 && executionPhase === 'render'
 						? renderPolicy.arrayCallbackIndex(callee, scope)
 						: -1;
+				// The hook and updater callbacks visited below with their own phase. visitEffect
+				// still reads its callback by syntactic position.
+				const synchronousCallback =
+					synchronousCallbackIndex === -1
+						? null
+						: EFFECT_HOOKS.has(hook)
+							? (node.arguments?.[synchronousCallbackIndex] ?? null)
+							: argumentAt(node.arguments, synchronousCallbackIndex);
+				const pureCallback =
+					pureCallbackIndex === -1 ? null : argumentAt(node.arguments, pureCallbackIndex);
+				const ownsCallback = (value) =>
+					value != null &&
+					(value === synchronousCallback || value === pureCallback) &&
+					FUNCTION_TYPES.has(unwrap(value)?.type);
 				for (let index = 0; index < (node.arguments?.length ?? 0); index++) {
 					const argument = node.arguments[index];
-					if (
-						(index !== synchronousCallbackIndex &&
-							index !== pureCallbackIndex &&
+					const array = argument.type === 'SpreadElement' ? unwrap(argument.argument) : null;
+					if (array?.type === 'ArrayExpression' && array.elements.some(ownsCallback)) {
+						// A literal spread's other elements evaluate here, in order.
+						let elementPhase = executionPhase;
+						for (const element of array.elements) {
+							if (element === null) continue;
+							if (!ownsCallback(element)) visit(element, scope, elementPhase);
+							elementPhase = phaseAfter(element, elementPhase);
+						}
+					} else if (
+						(!ownsCallback(argument) &&
 							(index !== arrayCallbackIndex || unwrap(argument)?.generator === true) &&
 							!(index === 0 && component !== null)) ||
 						!FUNCTION_TYPES.has(unwrap(argument)?.type)
@@ -5442,8 +5465,8 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 						ARRAY_CALLBACK_ARGUMENTS,
 					);
 				}
-				if (pureCallbackIndex !== -1) {
-					visitStateCallback(node, hook, pureCallbackIndex, updaterSetters, scope);
+				if (pureCallback !== null) {
+					visitStateCallback(node, hook, pureCallback, updaterSetters, scope);
 				}
 				if (hook === null) {
 					if (executionPhase === 'deferred') {
@@ -5502,19 +5525,19 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 						unlinkedPropInitializers.add(unwrap(node.arguments[0]));
 					}
 					visitSynchronousHookCallback(
-						hook === 'useLazyRef' ? lazyRefFactory(node.arguments) : node.arguments?.[0],
+						synchronousCallback,
 						scope,
 						executionPhase,
-						hook === 'useState',
+						hook !== 'useMemo',
 					);
 					return;
 				}
 				if (hook === 'useReducer') {
-					visitSynchronousHookCallback(node.arguments?.[2], scope, executionPhase, true);
+					visitSynchronousHookCallback(synchronousCallback, scope, executionPhase, true);
 					return;
 				}
 				if (hook === 'useLinkedState') {
-					visitSynchronousHookCallback(node.arguments?.[1], scope, executionPhase);
+					visitSynchronousHookCallback(synchronousCallback, scope, executionPhase);
 					visitLinkedStateComparators(node.arguments?.[2], scope, executionPhase);
 					return;
 				}

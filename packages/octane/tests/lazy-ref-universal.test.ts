@@ -64,6 +64,39 @@ describe.each([
 		}
 	});
 
+	it('keeps writes to a ref escaped from an abandoned render', () => {
+		const escaped: { current: { name: string } }[] = [];
+		const plan = Runtime.universalPlan('object', { kind: 'host', type: 'value' });
+		const Component = Runtime.defineUniversalComponent('object', () => {
+			escaped.push(Runtime.useLazyRef(() => ({ name: 'initial' })));
+			return Runtime.universalValue(plan, []);
+		});
+		const container = Runtime.createObjectContainer();
+		const root = Runtime.createUniversalRoot(container, Runtime.createObjectDriver());
+		try {
+			const prepared = root.prepare(Component, undefined);
+			expect(prepared.status).toBe('prepared');
+			prepared.abort();
+			const [abandoned] = escaped;
+			expect(abandoned.current).toEqual({ name: 'initial' });
+			const replacement = { name: 'replacement' };
+			abandoned.current = replacement;
+			expect(abandoned.current).toBe(replacement);
+
+			root.render(Component, undefined);
+			const committed = escaped.at(-1)!;
+			expect(committed).not.toBe(abandoned);
+			expect(committed.current).toEqual({ name: 'initial' });
+			committed.current = { name: 'committed' };
+			root.render(Component, undefined);
+			expect(escaped.at(-1)).toBe(committed);
+			expect(committed.current).toEqual({ name: 'committed' });
+			expect(abandoned.current).toBe(replacement);
+		} finally {
+			root.unmount();
+		}
+	});
+
 	it('retains function and undefined results as values', () => {
 		const callback = vi.fn();
 		const makeCallback = vi.fn(() => callback);
