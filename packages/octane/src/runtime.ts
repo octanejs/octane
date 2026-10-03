@@ -33936,13 +33936,10 @@ function warnMissingListKey(owner: Block | null): void {
 	}
 }
 
-function deoptKey(item: any, index: number): any {
-	return ownListKey(item, true) ?? index;
-}
-
-// The key an element or portal list item carries, or null. Each field read of a
-// scoped JSX value resolves its record again, so the key is read once.
-// `warnMissing` is set for runtime-built arrays, which React expects to be keyed.
+// The key an element or portal list item carries, or null when the item falls
+// back to its index. Each field read of a scoped JSX value resolves its record
+// again, so the key is read once. `warnMissing` is set for runtime-built arrays,
+// which React expects to be keyed; positional children never warn.
 function ownListKey(item: any, warnMissing: boolean): any {
 	if (item == null) return null;
 	const kind = item.$$kind;
@@ -33968,13 +33965,8 @@ function ownListKey(item: any, warnMissing: boolean): any {
 // fresh array. Those are FIXED siblings (they never reorder), so the de-opt list keys
 // them by index SILENTLY — unlike a `.map()` result, where a missing key is a real
 // reorder hazard worth warning about. createElement tags its positional arrays in
-// this set so childSlot can pick the silent key function.
+// this set so childSlot can key them without the missing-key warning.
 const POSITIONAL_CHILDREN = new WeakSet<object>();
-
-// Index key WITHOUT the missing-key warning — used for positional children arrays.
-function deoptKeyPositional(item: any, index: number): any {
-	return ownListKey(item, false) ?? index;
-}
 
 // Compiler contract: a VALUE-position JSX fragment (`<>…</>` in `.tsx` bodies,
 // and every MDX document root) lowers to an array literal — FIXED siblings in
@@ -34702,7 +34694,7 @@ function prepareDeoptList(
 		if (key != null) return { items: [value], keys: ['k' + String(key)] };
 	}
 	if (forceSingle) {
-		return { items: [value], keys: [singleDeoptKey(value, deoptKeyPositional(value, 0))] };
+		return { items: [value], keys: [singleDeoptKey(value, ownListKey(value, false) ?? 0)] };
 	}
 	return null;
 }
@@ -34752,7 +34744,7 @@ function flattenDeoptChildren(out: any[], v: any): void {
 function flattenDeoptChildrenKeyed(outVals: any[], outKeys: any[], v: any, prefix: string): void {
 	if (v == null || v === false || v === true || v === '') return;
 	if (Array.isArray(v)) {
-		const keyForItem = POSITIONAL_CHILDREN.has(v) ? deoptKeyPositional : deoptKey;
+		const warnMissing = !POSITIONAL_CHILDREN.has(v);
 		for (let i = 0; i < v.length; i++) {
 			const item = v[i];
 			if (Array.isArray(item)) {
@@ -34761,7 +34753,7 @@ function flattenDeoptChildrenKeyed(outVals: any[], outKeys: any[], v: any, prefi
 				// empty — consumes its position, emits nothing
 			} else {
 				outVals.push(item);
-				const k = keyForItem(item, i);
+				const k = ownListKey(item, warnMissing) ?? i;
 				if (prefix === '') {
 					outKeys.push(typeof k === 'string' && k[0] === ':' ? ':' + k : k);
 				} else {
