@@ -217,29 +217,47 @@ describe.each([
 		expect(warnings()).toHaveLength(dev ? 1 : 0);
 	});
 
-	it("completes a child of a rebuilt root that inherits its wrapper's range, as when its data is ready", async () => {
-		// The wrapper renders in a full component slot, whose resume completes
-		// the range that the inheriting call's rebuilt root fills.
-		const name = 'InheritedRootBranch';
-		render(name, { server: true, leaf: fulfilled('unused') });
-		await hydrate(name, { leaf: fulfilled('z') });
-		const ready = markup(section());
-		root!.unmount();
-		recoverable = [];
-		errSpy.mockClear();
+	it.each([
+		{
+			shape: "a call that inherits its wrapper's range",
+			name: 'InheritedRootBranch',
+			html: '<p><em>z</em><s>s</s></p><em>e</em>',
+		},
+		{
+			shape: 'the value of a renderable hole',
+			name: 'RebuiltHoleValueBranch',
+			html: '<p data-tag="p"><em>z</em><s>s</s></p><em>e</em>',
+		},
+		{
+			shape: "a component's return value",
+			name: 'ReturnBranch',
+			html: '<p><em>z</em><s>s</s></p><em>e</em>',
+		},
+	])(
+		'completes a child of a root rebuilt as $shape, as when its data is ready',
+		async ({ name, html }) => {
+			// The rebuilt root takes the rest of its range when it commits, before
+			// its child suspends, whichever slot then completes the range.
+			render(name, { server: true, leaf: fulfilled('unused') });
+			await hydrate(name, { leaf: fulfilled('z') });
+			const ready = markup(section());
+			root!.unmount();
+			recoverable = [];
+			errSpy.mockClear();
 
-		render(name, { server: true, leaf: fulfilled('unused') });
-		const em = section().lastElementChild!;
-		const leaf = pending();
-		await hydrate(name, { leaf: leaf.promise });
-		await act(async () => leaf.resolve('z'));
+			render(name, { server: true, leaf: fulfilled('unused') });
+			const em = section().lastElementChild!;
+			const leaf = pending();
+			await hydrate(name, { leaf: leaf.promise });
+			await act(async () => leaf.resolve('z'));
 
-		expect(markup(section())).toBe('<p><em>z</em><s>s</s></p><em>e</em>');
-		expect(markup(section())).toBe(ready);
-		expect(section().lastElementChild).toBe(em);
-		expect(recoverable).toEqual([expect.stringMatching(MISMATCH)]);
-		expect(warnings()).toHaveLength(dev ? 1 : 0);
-	});
+			expect(markup(section())).toBe(html);
+			expect(markup(section())).toBe(ready);
+			expect(section().lastElementChild).toBe(em);
+			expect(recoverable).toEqual([expect.stringMatching(MISMATCH)]);
+			expect(warnings()).toHaveLength(dev ? 1 : 0);
+		},
+	);
 
 	it.each([
 		{ wrapper: 'a lite component', name: 'RebuiltHoleBranch' },

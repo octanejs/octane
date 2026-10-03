@@ -268,6 +268,48 @@ export function InheritedRootBranch(props: { server?: boolean; leaf: Promise<str
 	</div>
 }
 
+// The same rebuilt root in a component with hooks.
+function StatePara(props: { leaf: Promise<string> }) @{
+	const [tag] = useState('p');
+	<p data-tag={tag}>
+		<EmPair leaf={props.leaf} />
+	</p>
+}
+
+// The rebuilt root is the value of a renderable hole.
+export function RebuiltHoleValueBranch(props: { server?: boolean; leaf: Promise<string> }) @{
+	<div>
+		<Hydrate split={false} when={load()}>
+			<section>
+				{props.server ? <BoldThenEm /> : <StatePara leaf={props.leaf} />}
+				<Em />
+			</section>
+		</Hydrate>
+	</div>
+}
+
+// The rebuilt root is what a component returns into the range it adopted.
+function ReturningPara(props: { server?: boolean; leaf: Promise<string> }) {
+	if (props.server) return <>
+		<b class="server">{'server'}</b>
+		<em>{'tail'}</em>
+	</>;
+	return <p>
+		<EmPair leaf={props.leaf} />
+	</p>;
+}
+
+export function ReturnBranch(props: { server?: boolean; leaf: Promise<string> }) @{
+	<div>
+		<Hydrate split={false} when={load()}>
+			<section>
+				<ReturningPara server={props.server} leaf={props.leaf} />
+				<Em />
+			</section>
+		</Hydrate>
+	</div>
+}
+
 function UnderValue(props: { v: string }) @{
 	<u>{props.v as string}</u>
 }

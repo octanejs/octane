@@ -11856,15 +11856,9 @@ export function componentSlotLite<P>(
 	} else if (hydration !== null) {
 		// A hydrating replay, such as a suspended activation's resume, re-renders
 		// an adopted range without adopting it again; its new siblings still adopt
-		// from after it. When this range's whole content is a root rebuilt by an
-		// attempt that suspended before settling it, here or in a component that
-		// inherits the range, the rest of the range is that root's server tail
-		// (settleClaim).
+		// from after it.
 		const range = hydration.liteRanges.get(scope);
-		if (range !== undefined) {
-			if (hydration.rebuiltRange === range.start) hydration.sweepRebuiltTail(range.end);
-			hydration.node = getNextSibling(range.end);
-		}
+		if (range !== undefined) hydration.node = getNextSibling(range.end);
 	}
 }
 
@@ -18962,8 +18956,8 @@ class HydrationCapability {
 	 * slot claims it or the enclosing range ends (sweepRebuiltTail).
 	 */
 	rebuiltTail: Node | null = null;
-	/** The start of the range whose whole content rebuiltRoot is (claimRoots), until its tail goes. */
-	rebuiltRange: Node | null = null;
+	/** The start of the range whose whole content rebuiltRoot is (claimRoots), until it commits. */
+	private rebuiltRange: Node | null = null;
 	/**
 	 * The start comment of each markerless branch that holdMarkerlessBranch
 	 * holds, to where its content reached when it threw.
@@ -19476,10 +19470,9 @@ class HydrationCapability {
 	 * the content is the owner's slots, and the last one left the cursor past
 	 * its range, or past the server nodes it adopted in place. A cursor on
 	 * `end` means nothing is left, and anything less certain is left in place.
-	 * When the content is a root rebuilt over the range's first node, the tail
-	 * is the rest of the server content that the root's reported mismatch
-	 * replaced, which goes quietly (sweepRebuiltTail).
-	 * The slot at `scope`'s `slotKey` owns the range.
+	 * (A root rebuilt as the range's whole content already took the rest of
+	 * the range when it committed: rebuiltAt.) The slot at `scope`'s `slotKey`
+	 * owns the range.
 	 */
 	settleClaim(
 		owner: Scope,
@@ -19490,10 +19483,6 @@ class HydrationCapability {
 	): void {
 		const cursor = this.node;
 		if (cursor === end || this.abandoned) return;
-		if (from === this.rebuiltTail && from !== null) {
-			this.sweepRebuiltTail(end);
-			if (this.node === end) return;
-		}
 		if (from === undefined) {
 			// The cursor must follow the last slot's own server nodes: its range,
 			// or the nodes it adopted in place (parkInPlace). After any other slot,
@@ -20841,21 +20830,42 @@ class HydrationCapability {
 	 * Document holds one element), or else before the server node that
 	 * followed that one while it is still there. Undefined for any other root,
 	 * which goes at its block's end. A rebuilt root commits before any later
-	 * sibling can rebuild, since the subtree it holds no longer hydrates.
+	 * sibling can rebuild, since the subtree it holds no longer hydrates. A
+	 * root that is its range's whole content takes the rest of that range with
+	 * it: the server content its reported mismatch replaced, which goes without
+	 * a second report, whichever render completes the range.
 	 */
 	rebuiltAt(root: Node, parent: Node): Node | null | undefined {
 		if (root !== this.rebuiltRoot) return undefined;
 		const replaced = this.replaced;
 		const next = this.rebuiltTail;
+		const range = this.rebuiltRange;
 		this.replaced = null;
+		this.rebuiltRange = null;
 		if (replaced !== null && domNode(replaced).parentNode === parent) {
 			const last = isBlockOpen(replaced) ? this.close(replaced) : replaced;
 			const at = getNextSibling(last);
 			this.save(parent);
 			removeHydrationRange(replaced, last);
-			return at;
+			return range === null ? at : this.takeRangeTail(at, range);
 		}
 		return next !== null && domNode(next).parentNode === parent ? next : undefined;
+	}
+
+	/**
+	 * Remove the server nodes from `from` to the end of the range that `start`
+	 * opens, and return that end, while the cursor still rests on `from`: no
+	 * later content claimed any of them. Otherwise return `from`.
+	 */
+	private takeRangeTail(from: Node | null, start: Node): Node | null {
+		const end = this.close(start);
+		if (from === null || from === end || this.node !== from) return from;
+		for (let node: Node | null = from; node !== end; node = getNextSibling(node)) {
+			if (node === null || this.freshNodes.has(node)) return from;
+		}
+		removeRange(from, end);
+		this.rebuiltTail = null;
+		return (this.node = end);
 	}
 
 	/**
@@ -20883,7 +20893,6 @@ class HydrationCapability {
 	sweepRebuiltTail(end: Node): void {
 		const tail = this.rebuiltTail;
 		this.rebuiltTail = null;
-		this.rebuiltRange = null;
 		if (
 			tail === null ||
 			tail === end ||
@@ -33021,13 +33030,8 @@ function componentSlotImpl(
 	// slot found no range: renderInPlace stepped past any server node it adopted.)
 	// An INHERITED slot adopted nothing: its end is the PARENT's marker and it has
 	// no following sibling (sole root) — leave the cursor where the body put it.
-	// A replay that completes a range whose whole content an attempt that
-	// suspended rebuilt removes that root's server tail first (settleClaim).
-	if (hydration !== null && !state.inherited && state.end !== null) {
-		const rebuilt = hydration.rebuiltRange;
-		if (rebuilt !== null && rebuilt === state.start) hydration.sweepRebuiltTail(state.end);
+	if (hydration !== null && !state.inherited && state.end !== null)
 		hydration.parkPast(state.end, parentScope);
-	}
 }
 
 // Keep the fresh-subtree callback out of componentSlotImpl: a closure there
