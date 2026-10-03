@@ -73,6 +73,35 @@ export function NestedArm(props: { on: boolean; z: string }) @{
 	</div>
 }
 
+// A component whose body is a branch with two roots.
+function Pair(props: { shown: boolean }) @{
+	@if (props.shown) {
+		<>
+			<em>{'x' as string}</em>
+			<b>{'b' as string}</b>
+		</>
+	}
+}
+
+// The first component's branch has no server range either: its roots are the
+// server arm's first two elements.
+export function BranchArm(props: { on: boolean; shown: boolean; z: string }) @{
+	<div>
+		@if (props.on) {
+			<>
+				<Pair shown={props.shown} />
+				<Leaf v={props.z} />
+			</>
+		} @else {
+			<>
+				<em>{'x' as string}</em>
+				<b>{'b' as string}</b>
+				<Leaf v={props.z} />
+			</>
+		}
+	</div>
+}
+
 // The server's arm has no range for the second component.
 export function ShortArm(props: { on: boolean; z: string }) @{
 	<div>

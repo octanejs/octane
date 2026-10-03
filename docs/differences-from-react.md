@@ -580,6 +580,10 @@ bodies or imported code pure. Lazy state initialization may obtain an initial
 timestamp or random value. Locale- and time-zone-dependent formatting of a
 provable `Date` or an `Intl` service during render reports
 `OCTANE_STRONG_RENDER_LOCALE_FORMAT`; pass an explicit locale and `timeZone`.
+Scheduling work during render with `setTimeout`, `setInterval`,
+`queueMicrotask`, `requestAnimationFrame`, or `requestIdleCallback` reports
+`OCTANE_STRONG_RENDER_SIDE_EFFECT`, including in a lazy initializer; schedule
+from an event handler or an effect.
 State values stay immutable outside render too
 (`OCTANE_STRONG_SNAPSHOT_MUTATION`), updaters and reducers follow the render
 checks because Octane may replay them (`OCTANE_STRONG_IMPURE_UPDATER`), and a

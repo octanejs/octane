@@ -929,6 +929,10 @@ These patterns become compile errors:
   or constructing an `Intl` formatter without an explicit locale (and, for
   `DateTimeFormat`, a `timeZone`) (`OCTANE_STRONG_RENDER_LOCALE_FORMAT`). Server
   and browser output would differ.
+- Calling `setTimeout`, `setInterval`, `queueMicrotask`,
+  `requestAnimationFrame`, or `requestIdleCallback` during render, including in
+  a lazy state initializer (`OCTANE_STRONG_RENDER_SIDE_EFFECT`). Schedule work
+  from an event handler, or from an effect that cancels it in cleanup.
 - Declaring a built-in hook value outside the sole nested `@{…}` block that
   uses it (`OCTANE_STRONG_HOOK_LOCALITY`).
 - Declaring a named callback outside the sole nested `@{…}` block containing
