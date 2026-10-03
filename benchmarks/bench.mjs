@@ -68,11 +68,6 @@ const HARNESS_FAILURE_ALLOWLIST = {
 			'Since #1069 (2026-09-16) every scoped element descriptor defines an enumerable __octaneInvocationSite accessor that ordinary descriptors carry only when set, so the two no longer share one shape. Decide the descriptor contract, then re-pin the expected keys.',
 		expires: '2026-10-24',
 	},
-	'lynx-render': {
-		reason:
-			'The re-entrant 10k/20k scenarios fail the transport gate: the Octane Lynx transport receives an object where the wire carries a string, and acknowledges nothing. Fix the transport before relying on this suite again.',
-		expires: '2026-10-24',
-	},
 };
 const todayISO = () => new Date().toISOString().slice(0, 10);
 

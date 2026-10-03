@@ -2441,11 +2441,7 @@
     "target": "octane-lynx",
     "reference": "react-lynx",
     "maxRatio": 1.8,
-    "note": "Same-run compiled ReactLynx guard on an identical 9,008-host tree with 2,000 verified native handlers. A 21-sample run measured Octane 3.67 ms vs ReactLynx 3.85 ms (0.95x); the wider bound tolerates sub-5-ms timing and GC noise.",
-    "waiver": {
-      "reason": "Two weekly runs measured 2.31x/2.16x (1k) and 1.41x/1.43x (10k) on 2026-10-02 and 2026-10-03, against 0.95x/0.96x when the guards were set; the same suite fails its re-entrant transport gate. Tracked as a fix; remove this waiver with it.",
-      "expires": "2026-10-24"
-    }
+    "note": "Same-run compiled ReactLynx guard on an identical 9,008-host tree with 2,000 verified native handlers. A 21-sample run measured Octane 3.67 ms vs ReactLynx 3.85 ms (0.95x); the wider bound tolerates sub-5-ms timing and GC noise."
   },
   {
     "suite": "lynx-render",
@@ -2453,11 +2449,7 @@
     "target": "octane-lynx",
     "reference": "react-lynx",
     "maxRatio": 1.4,
-    "note": "Same-run production ReactLynx parity guard on an identical 90,008-host tree with 20,000 verified native handlers. One 21-sample run measured Octane 43.76 ms vs ReactLynx 45.57 ms (0.96x); structural gates also require one compiled run and 15 total mount commands.",
-    "waiver": {
-      "reason": "Two weekly runs measured 2.31x/2.16x (1k) and 1.41x/1.43x (10k) on 2026-10-02 and 2026-10-03, against 0.95x/0.96x when the guards were set; the same suite fails its re-entrant transport gate. Tracked as a fix; remove this waiver with it.",
-      "expires": "2026-10-24"
-    }
+    "note": "Same-run production ReactLynx parity guard on an identical 90,008-host tree with 20,000 verified native handlers. One 21-sample run measured Octane 43.76 ms vs ReactLynx 45.57 ms (0.96x); structural gates also require one compiled run and 15 total mount commands."
   },
   {
     "suite": "lynx-render",
