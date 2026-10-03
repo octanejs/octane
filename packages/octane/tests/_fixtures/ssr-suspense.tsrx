@@ -205,6 +205,17 @@ export function Boundary(props) @{
 	</div>
 }
 
+// A boundary that is its component's only output, so a hydrating root claims
+// the @try as one of its own root-level slots.
+export function RootBoundary(props: { promise: Promise<string> }) @{
+	@try {
+		const value = use(props.promise);
+		<span class="root-ok">{value as string}</span>
+	} @pending {
+		<span class="root-loading">{'loading'}</span>
+	}
+}
+
 export function ThrownResourceBoundary(props: { read: () => string; promise: Promise<string> }) @{
 	<div>
 		@try {
