@@ -8,6 +8,28 @@ export function OwnerBubble(props: { remove: () => void; bubble: () => void }) @
 	</main>
 }
 
+function RemoveButton(props: { remove: () => void }) @{
+	<button onClick={props.remove}>remove</button>
+}
+
+function NestedBubble(props: { remove: () => void; bubble: () => void }) @{
+	<main onClick={props.bubble}>
+		<RemoveButton remove={props.remove} />
+	</main>
+}
+
+export function OwnerNestedBubble(props: {
+	show: boolean;
+	remove: () => void;
+	bubble: () => void;
+}) @{
+	<section>
+		@if (props.show) {
+			<NestedBubble remove={props.remove} bubble={props.bubble} />
+		}
+	</section>
+}
+
 export function HeldOwnerButton(props: { invoke: () => void; wait: () => void }) @{
 	<section>
 		@try {

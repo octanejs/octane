@@ -53,11 +53,16 @@ export function installSignalDocumentLifecycle(options: SignalDocumentLifecycleO
 		disposed = true;
 		view.removeEventListener('pagehide', hide);
 		view.removeEventListener('pageshow', show);
-		owner.retire();
-		options.streamedHydration?.suspend();
-		options.independentHydration?.();
-		wake?.(false);
-		wake = undefined;
+		try {
+			// Unmount islands while their document data is still live. Retiring first
+			// would notify each island of the retirement and break its cleanups.
+			options.independentHydration?.();
+		} finally {
+			owner.retire();
+			options.streamedHydration?.suspend();
+			wake?.(false);
+			wake = undefined;
+		}
 	};
 	const hide = (event: PageTransitionEvent): void => {
 		if (!event.persisted) {

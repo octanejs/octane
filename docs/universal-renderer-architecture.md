@@ -960,6 +960,16 @@ roots and host properties the driver can update in place. Transported roots,
 DOM-owned bridges, event props, and specialized compact `universalFor` leaf
 descriptors do not support this path.
 
+Both of these optional host paths stay out of renderers that never use them.
+The first `universalHostBinding()` call installs the subscription, flush, and
+binding-only transaction code, so a root without bindings never reaches it.
+Template programs are opted into by the driver: the `templateProgramMount`,
+`templateProgramRuns`, and `collapsedTemplateMount` capabilities take effect
+only when the driver also passes `templates: universalHostTemplates`. Without
+it those trees mount and update through ordinary host commands. The Lynx
+background driver passes it; Three does not, and so ships none of the program
+preparation, collapsed-template, or compact template update code.
+
 Transition/deferred/action/form compatibility APIs currently execute without a
 separate lane scheduler, and `memo` does not yet provide a render bailout;
 those timing/optimization gaps do not weaken transactional ownership.

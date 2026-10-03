@@ -20,6 +20,13 @@ isolate renderer/reconciler work from GPU and driver variance:
   the same complete scene and camera matrices, including direct Three;
 - 40 overlapping raycast targets, averaged across 20 native pointer events.
 
+Both binding pages pass the same module-level checksum callbacks on every
+render. A callback recreated by each `render()` dies when its scene is replaced,
+and the runner's forced `gc()` before each sample then discards optimized
+frame-loop code that inlined it. The frame sample would then time V8 recompiling
+the loop, and that cost depends on how long each framework retains the
+previous render's props rather than on its dispatch.
+
 Plain Three is a practical lower bound, not an API-equivalent declarative
 renderer. Each sample is rejected unless its public scene topology, object
 identity, updated values, disposal count, frame callback and render counts, and
@@ -49,7 +56,10 @@ intrinsics use, and constructor-form `extend` registers only its own class.
 Direct roots therefore let unused Three exports and the DOM renderer tree-shake
 from minimal applications. The full-catalogue entries explicitly retain the
 complete Three namespace. Both Octane gzip results have same-run ratio guards
-requiring them to be no larger than their React Three Fiber counterparts.
+against their React Three Fiber counterparts. The guards are ratchets at the
+measured ratio (1.031x minimal, 1.021x full on 2026-10-03), because growth in
+the shared universal runtime has outpaced Three-specific savings. Lower each
+ceiling whenever the universal core shrinks. The target is 1.0.
 
 Run through the unified harness:
 

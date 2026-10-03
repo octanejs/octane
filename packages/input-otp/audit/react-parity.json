@@ -282,7 +282,7 @@
         {
           "path": "packages/input-otp/typetests/tsconfig.json",
           "role": "support",
-          "sha256": "8576907e90b92f96e9714a27549ec16e3161e04fdd66907de6446b3709f20d32"
+          "sha256": "dcc051394861acc2f4911af7f0f5fee73d9d8c93fed5d39c765a0177aabb23bc"
         }
       ]
     }

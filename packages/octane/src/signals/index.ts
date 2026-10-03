@@ -8,6 +8,8 @@ export { ActionUncertainError, action$, isActionUncertain, optimistic$ } from '.
 export { __derivedAt, derived$ } from './derived-facade.js';
 export { __queryAt, query$ } from './query-facade.js';
 export { isSignalHandle, isWritableSignal } from './handle-protocol.js';
+// Compiled declarations list method-call captures through the hook helper.
+export { __methodDep } from '../method-dep.js';
 export {
 	__derivedScalarAt,
 	__signalAt,

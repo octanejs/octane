@@ -23,11 +23,13 @@ export function onDocumentPointerDown(event: PointerEvent) {
 			if (!didChangeFocus) {
 				didChangeFocus = true;
 
+				// `focusVisible` is newer than some consumers' DOM lib; the assertion keeps
+				// both older and current lib.dom versions compiling.
+				// https://developer.mozilla.org/en-US/docs/Web/API/HTMLElement/focus#browser_compatibility
 				current.separator.element.focus({
-					// @ts-expect-error https://developer.mozilla.org/en-US/docs/Web/API/HTMLElement/focus#browser_compatibility
 					focusVisible: false,
 					preventScroll: true,
-				});
+				} as FocusOptions);
 
 				// TRICKY
 				// Calling setPointerCapture() here would help with detecting pointer "pointermove"/"pointerup" events that happen over iframes

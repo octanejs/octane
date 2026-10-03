@@ -1,4 +1,5 @@
 import { createNativeReadCollector, type NativeReadWitness } from './native-read-collector.js';
+import { setSignalDeclarationInvocation } from './read-protocol.js';
 import {
 	mergeNativeSeedReads,
 	rewindNativeSeedReads,
@@ -9,6 +10,8 @@ import {
 interface ServerFrame {
 	collectorToken: number;
 	reads: NativeSeedReads | null;
+	/** The declaration invocation this scope interrupted, restored when it ends. */
+	outerInvocation: number;
 }
 
 interface PassFrame {
@@ -26,6 +29,7 @@ export function createNativeServerReadDriver(
 	let depth = 0;
 	let passDepth = 0;
 	let base = 0;
+	let invocations = 0;
 	const collector = createNativeReadCollector((_owner, source, version) => {
 		const frame = frames[depth - 1];
 		if (frame === undefined) return;
@@ -76,9 +80,11 @@ export function createNativeServerReadDriver(
 		},
 		beginScope(owner: object): number {
 			const token = depth++;
-			const frame = (frames[token] ??= { collectorToken: -1, reads: null });
+			const frame = (frames[token] ??= { collectorToken: -1, reads: null, outerInvocation: 0 });
 			frame.reads = null;
 			frame.collectorToken = collector.beginScope(owner);
+			// Each body invocation is one render for redeclared signal facades.
+			frame.outerInvocation = setSignalDeclarationInvocation(++invocations);
 			return token;
 		},
 		endScope(token: number, completed: boolean): void {
@@ -86,6 +92,7 @@ export function createNativeServerReadDriver(
 			const reads = frame.reads;
 			frame.reads = null;
 			depth = token;
+			setSignalDeclarationInvocation(frame.outerInvocation);
 			try {
 				if (completed && reads !== null) append(reads);
 				else if (!completed && reads !== null) recordFailure();
@@ -96,7 +103,7 @@ export function createNativeServerReadDriver(
 		/** A renderer boundary may emit its successful body in a later segment. */
 		beginCapture(): number {
 			const token = depth++;
-			const frame = (frames[token] ??= { collectorToken: -1, reads: null });
+			const frame = (frames[token] ??= { collectorToken: -1, reads: null, outerInvocation: 0 });
 			frame.collectorToken = -1;
 			frame.reads = null;
 			return token;
