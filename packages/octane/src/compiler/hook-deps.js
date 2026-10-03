@@ -1114,7 +1114,7 @@ function markStableMemoDependencies(analysis, inferred) {
 		}
 	}
 	for (const result of inferred.values()) {
-		for (const dependency of result.dependencies) {
+		for (const dependency of result.dependencies ?? []) {
 			if (!dependency.method && dependency.node.type === 'Identifier' && stable(dependency.binding))
 				dependency.stable = true;
 		}
