@@ -19624,6 +19624,33 @@ class HydrationCapability {
 		);
 	}
 
+	/**
+	 * A shell hydrated before its streamed segment swaps still has the template
+	 * sentinel instead of the seed comment. Its opaque id owns the same boundary
+	 * namespace even though there are no scoped seeds yet. Octane cannot
+	 * selectively hydrate that server fallback, so claim the boundary for the
+	 * client: remove the sentinel and its server-rendered fallback arm up to
+	 * `end`, before mountTry mounts a fresh try/pending block. Leaving either
+	 * behind would duplicate the fallback and allow a later stream swap to
+	 * overwrite client-owned DOM. Returns the boundary's id, or null when
+	 * `cursor` is not a renderer sentinel. A method so that client-only bundles
+	 * drop the stream-protocol validator with this class.
+	 */
+	claimStreamTemplate(cursor: Node | null, end: Node): string | null {
+		if (cursor?.nodeType !== 1 || !isRendererStreamBoundaryTemplate(cursor as Element)) return null;
+		const id = (STAGED_DOM?.view(cursor as Element) ?? (cursor as Element)).getAttribute(
+			STREAM_BOUNDARY_ATTR,
+		)!;
+		let stale: Node | null = cursor;
+		while (stale !== null && stale !== end) {
+			const next: Node | null = getNextSibling(stale);
+			(STAGED_DOM?.view(stale as ChildNode) ?? (stale as ChildNode)).remove();
+			stale = next;
+		}
+		this.node = end;
+		return id;
+	}
+
 	/** Read the `<!--oct-catch:T:C-->` comment ahead of a caught arm's range. */
 	takeServerCatch(cursor: Node | null): ServerCatch | null {
 		if (cursor?.nodeType !== 8) return null;
@@ -40073,32 +40100,15 @@ function mountTry(state: TrySlot): void {
 		const nativeRaw = stash?.[streamedBoundaryId + '$signals'];
 		if (typeof nativeRaw === 'string') scopedNativeRaw = nativeRaw;
 		adoptCursor = getNextSibling(adoptCursor);
-	} else if (
-		// A shell hydrated before its streamed segment swaps still has the
-		// template sentinel instead of the seed comment. Its opaque id owns the
-		// same boundary namespace even though there are no scoped seeds yet. Octane
-		// cannot selectively hydrate that server fallback, so claim the boundary for
-		// the client: remove the sentinel and its server-rendered fallback arm before
-		// mounting a fresh try/pending block. Leaving either behind would duplicate
-		// the fallback and allow a later stream swap to overwrite client-owned DOM.
-		hydration !== null &&
-		adoptCursor !== null &&
-		adoptCursor.nodeType === 1 &&
-		isRendererStreamBoundaryTemplate(adoptCursor as Element)
-	) {
-		hasScopedBoundary = true;
-		freshBoundary = true;
-		streamedBoundaryId = (
-			STAGED_DOM?.view(adoptCursor as Element) ?? (adoptCursor as Element)
-		).getAttribute(STREAM_BOUNDARY_ATTR);
-		let stale: Node | null = adoptCursor;
-		while (stale !== null && stale !== state.end) {
-			const next: Node | null = getNextSibling(stale);
-			(STAGED_DOM?.view(stale as ChildNode) ?? (stale as ChildNode)).remove();
-			stale = next;
+	} else if (hydration !== null) {
+		// A shell hydrated before its streamed segment swaps: the client claims
+		// the boundary, mounting a fresh try/pending block in the cleared range.
+		streamedBoundaryId = hydration.claimStreamTemplate(adoptCursor, state.end);
+		if (streamedBoundaryId !== null) {
+			hasScopedBoundary = true;
+			freshBoundary = true;
+			adoptCursor = state.end;
 		}
-		adoptCursor = state.end;
-		hydration.node = state.end;
 	}
 	if (streamedBoundaryId !== null) {
 		state.idState = {

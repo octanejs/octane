@@ -39,6 +39,19 @@ const existingScenarios = [
 	['binding-vanilla', 'ts'],
 	['binding-hooks', 'tsrx'],
 ];
+// Renderer clients that never hydrate. A @try boundary must not retain the
+// streamed-boundary sentinel validator that only a hydrating mount consults.
+const streamClaimFreeClientScenarios = new Set([
+	'cli-spa-starter',
+	'root-static-specialized',
+	'root-chained-jsx',
+	'root-static',
+	'root-static-local',
+	'hooks-state',
+	'prop-attributes',
+	'context',
+	'suspense-transition',
+]);
 const signalFreeClientScenarios = new Set([
 	'cli-spa-starter',
 	'root-static-specialized',
@@ -359,11 +372,13 @@ async function buildScenario(scenario, entry) {
 		.filter(([, module]) => module.renderedLength > 0)
 		.map(([id]) => id);
 	const runtimeModule = modules.find((id) => id.endsWith('/packages/octane/src/runtime.ts'));
+	const streamModule = modules.find((id) => id.endsWith('/packages/octane/src/stream-protocol.ts'));
 	return {
 		code: chunk.code,
 		modules,
 		emittedModules,
 		runtimeExports: runtimeModule ? chunk.modules[runtimeModule].renderedExports : [],
+		streamExports: streamModule ? chunk.modules[streamModule].renderedExports : [],
 	};
 }
 
@@ -377,6 +392,7 @@ try {
 			modules,
 			emittedModules = modules,
 			runtimeExports,
+			streamExports = [],
 		} = await buildScenario(scenario, entry);
 		for (const [label, pattern] of forbidden) {
 			if (serverScenario && label === 'server runtime') continue;
@@ -392,6 +408,17 @@ try {
 				),
 				[],
 				`${name}: signal-free client retained the concrete native transition implementation`,
+			);
+		}
+		// hydrate-root is the control: a hydrating client keeps the validator, so
+		// its export name still identifies it.
+		if (streamClaimFreeClientScenarios.has(id) || id === 'hydrate-root') {
+			assert.equal(
+				streamExports.includes('isRendererStreamBoundaryTemplate'),
+				id === 'hydrate-root',
+				id === 'hydrate-root'
+					? `${name}: the streamed-boundary validator was renamed; update this reachability check`
+					: `${name}: a client that never hydrates retained the streamed-boundary validator`,
 			);
 		}
 		if (id === 'prop-attributes') {
