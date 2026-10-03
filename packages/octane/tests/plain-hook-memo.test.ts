@@ -369,6 +369,49 @@ describe('memo hooks in plain modules', () => {
 			root.unmount();
 		});
 
+		it(`compares a dependency the factory reassigns by the value it had first (inline=${inlineHookMemo})`, () => {
+			const { App } = load(`
+				import { createElement, useMemo } from 'octane';
+				export function App(props) {
+					let count = props.count;
+					const bump = () => { count += 1; };
+					const value = useMemo(() => { props.record(count); bump(); return count; }, [count]);
+					return createElement('p', null, String(value));
+				}
+			`);
+			const computed: number[] = [];
+			const props = { count: 1, record: (value: number) => computed.push(value) };
+			const root = mount(App, props);
+			root.update(App, props);
+			expect(root.html()).toBe('<p>2</p>');
+			expect(computed).toEqual([1]);
+			root.update(App, { ...props, count: 2 });
+			expect(root.html()).toBe('<p>3</p>');
+			expect(computed).toEqual([1, 2]);
+			root.unmount();
+		});
+
+		it(`names the memo hook a manual module calls without a slot (inline=${inlineHookMemo})`, () => {
+			const { App } = load(
+				`
+				import { createElement, useCallback, useMemo } from 'octane';
+				export function App(props) {
+					const value = props.callback
+						? useCallback(() => props.value, [props.value])()
+						: useMemo(() => props.value, [props.value]);
+					return createElement('p', null, String(value));
+				}
+			`,
+				true,
+			);
+			expect(() => mount(App, { value: 1, callback: false })).toThrow(
+				/useMemo was called without a hook slot/,
+			);
+			expect(() => mount(App, { value: 1, callback: true })).toThrow(
+				/useCallback was called without a hook slot/,
+			);
+		});
+
 		it(`retains a previous manual memo when a replacement throws (inline=${inlineHookMemo})`, () => {
 			const { App } = load(
 				`

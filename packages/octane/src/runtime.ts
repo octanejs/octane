@@ -18091,9 +18091,11 @@ export function nativePuPub(
 // Unlike parallel-use's value sentinel, a nullable ENTRY handles every authored
 // memo value, including undefined, null, and puMiss itself. Dependency hits do
 // not construct a callback or dependency array.
-export function memoSlot(slot: HookSlot | undefined, name: 'useMemo' | 'useCallback'): HookSlot {
+// The compiler passes the hook's name only with an authored slot, which a manual
+// hook may leave undefined; a slot it appended always resolves.
+export function memoSlot(slot: HookSlot | undefined, name?: 'useMemo' | 'useCallback'): HookSlot {
 	const resolved = resolveSlot(slot);
-	if (resolved === undefined) missingSlot(name);
+	if (resolved === undefined) missingSlot(name!);
 	return resolved;
 }
 

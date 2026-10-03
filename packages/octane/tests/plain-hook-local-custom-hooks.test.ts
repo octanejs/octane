@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { act, flushSync, hydrateRoot, type Root } from '../src/runtime.js';
 import { renderToString } from '../src/runtime.server.js';
+import { slotHooks } from '../src/compiler/slot-hooks.js';
 import { mount } from './_helpers.js';
 import { loadCompiledFixtureSource, loadPlainHookFixtureSource } from './_server-fixture.js';
 
@@ -84,6 +85,78 @@ function readCells(text: string | null | undefined) {
 	};
 }
 
+// Calls whose boundary the plain pass omits, and calls that keep it because a
+// hook's execution could reach the same call again on the same path. Each
+// shape renders two cells whose state must stay separate.
+const CELL = `import { useState } from 'octane';
+type Cell = readonly [string, (value: string) => void];`;
+const OMITTED_BOUNDARY_SHAPES: Record<string, { source: string; boundaries: number }> = {
+	'a hook that reads no slot': {
+		source: `${CELL}
+function useLabel(value: string) {
+	return value;
+}
+function useCell(initial: string): Cell {
+	const [value, setValue] = useState(useLabel(initial));
+	return [value, setValue];
+}
+export default function usePair(): Cell[] {
+	return [useCell('d1'), useCell('d0')];
+}`,
+		boundaries: 2,
+	},
+	'the only call of a hook, made by another hook': {
+		source: `${CELL}
+function useInner(initial: string): Cell {
+	const [value, setValue] = useState(initial);
+	return [value, setValue];
+}
+function useOuter(initial: string) {
+	return useInner(initial);
+}
+export default function usePair(): Cell[] {
+	return [useOuter('d1'), useOuter('d0')];
+}`,
+		boundaries: 2,
+	},
+	'only calls of two hooks that call each other': {
+		source: `${CELL}
+function useLevel(depth: number): Cell[] {
+	const [value, setValue] = useState('d' + depth);
+	return depth > 0 ? [[value, setValue], ...useNext(depth - 1)] : [[value, setValue]];
+}
+function useNext(depth: number) {
+	return useLevel(depth);
+}
+export default useLevel;`,
+		boundaries: 2,
+	},
+	'the only call of a hook whose caller escapes as a value': {
+		source: `${CELL}
+function useInner(depth: number, again: (depth: number) => Cell[]): Cell[] {
+	const [value, setValue] = useState('d' + depth);
+	return depth > 0 ? [[value, setValue], ...again(depth - 1)] : [[value, setValue]];
+}
+function useLevel(depth: number): Cell[] {
+	return useInner(depth, useLevel);
+}
+export default useLevel;`,
+		boundaries: 1,
+	},
+};
+
+const PAIR = `
+import usePair from './hooks';
+
+export function Pair() @{
+	const [first, second] = usePair(1);
+	<div>
+		<button onClick={() => first[1]('updated')}>{first[0] as string}</button>
+		<output>{second[0] as string}</output>
+	</div>
+}
+`;
+
 describe('module-declared custom hooks in plain modules', () => {
 	afterEach(() => {
 		vi.restoreAllMocks();
@@ -136,6 +209,41 @@ describe('module-declared custom hooks in plain modules', () => {
 			}
 		},
 	);
+
+	for (const [shape, { source, boundaries }] of Object.entries(OMITTED_BOUNDARY_SHAPES)) {
+		it.each(MODES)(`keeps state separate for ${shape} (%j)`, ({ dev, inlineHookMemo }) => {
+			const load = (mode: 'client' | 'server') =>
+				loadCompiledFixtureSource(PAIR, {
+					id: '/src/pair.tsrx',
+					mode,
+					compileOptions: { hmr: false, dev },
+					runtimeModules: {
+						'./hooks': loadPlainHookFixtureSource(source, {
+							id: '/src/pair-hooks.ts',
+							mode,
+							hmr: dev,
+							inlineHookMemo,
+						}),
+					},
+				}).Pair;
+			expect(renderToString(load('server'), undefined).html).toBe(
+				'<div><button>d1</button><output>d0</output></div>',
+			);
+			const root = mount(load('client'));
+			try {
+				expect(root.container.textContent).toBe('d1d0');
+				root.click('button');
+				expect(root.container.textContent).toBe('updatedd0');
+			} finally {
+				root.unmount();
+			}
+		});
+
+		it(`gives ${shape} only the boundaries a repeated path needs`, () => {
+			const code = slotHooks(source, '/src/pair-hooks.ts', { dev: false, hmr: false })!.code;
+			expect(code.match(/withSlot\(/g)?.length ?? 0).toBe(boundaries);
+		});
+	}
 
 	it.each(
 		(['client', 'server'] as const).flatMap((mode) =>
