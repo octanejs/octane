@@ -11771,8 +11771,8 @@ export function componentSlotLite<P>(
 				// it, on a root before that node. A templateless body anchors at its
 				// block's end marker instead, with the cursor on the call's server
 				// node, and a walk that ran off the end of its host found no node.
-				hydration.node = anchor;
-				inPlace = anchor;
+				// The body inserts before the node after the server node (parkAtHole).
+				endMarker = hydration.parkAtHole((inPlace = anchor));
 			}
 		}
 		scope.block = new LiteBlockImpl(host, endMarker, parentScope.block) as unknown as Block;
@@ -11944,10 +11944,9 @@ function renderUnframedLite<P>(
 // separate function keeps the callback's captures out of ordinary lite dispatch.
 // When `root` is the element or text a template hole's walk found (the call's
 // anchor), the template claims the server nodes after it, and only a body of
-// one root can take its place: the body's end marker is `root`, which the first
-// of several roots replaces. Any other body renders unframed in place of `root`
-// alone (renderUnframed), as componentSlot renders a call it cannot prove
-// single-root.
+// one root can take its place. Any other body renders unframed in place of
+// `root` alone (renderUnframed), as componentSlot renders a call it cannot
+// prove single-root.
 function renderLiteInPlace<P>(
 	hydration: HydrationCapability,
 	parentScope: Scope,
@@ -19565,7 +19564,9 @@ class HydrationCapability {
 	 * after the last root, so step past it. A body that rebuilt `root` or
 	 * rendered nothing there leaves the cursor where it put it. When `unframed`,
 	 * a template that does not match leaves `root` and the nodes after it to
-	 * renderUnframed. Returns whether the body adopted `root`.
+	 * renderUnframed. Returns whether the body adopted `root`. A call in the body
+	 * that renders in place of the same `root`, before any template adopted it,
+	 * adopts it for the enclosing call too: its root is the enclosing call's.
 	 */
 	renderInPlace<T>(render: (target: T) => void, target: T, root: Node, unframed = false): boolean {
 		const outer = this.inPlace;
@@ -19590,7 +19591,28 @@ class HydrationCapability {
 		}
 		if (end === undefined) return false;
 		this.node = end;
+		if (outer === root) {
+			this.inPlace = null;
+			this.inPlaceEnd = end;
+		}
 		return true;
+	}
+
+	/**
+	 * Park the cursor on `node`, the server node that a template hole's walk
+	 * found for a single-root call without a range of its own, and return
+	 * where the call inserts: before the node after `node`. On the client the
+	 * hole's own placeholder anchors the call, but the server rendered none,
+	 * and the call's root takes `node`'s place. `node` itself cannot anchor
+	 * the call: the root is `node` when the body adopts it and replaces it when
+	 * mismatch recovery rebuilds it, so a branch or other slot that the body
+	 * anchors at its block's end would bound its content before that content,
+	 * or against a removed node. At a closing marker the server rendered
+	 * nothing for the hole, and the call inserts before it.
+	 */
+	parkAtHole(node: Node): Node | null {
+		this.node = node;
+		return isBlockClose(node) ? node : getNextSibling(node);
 	}
 
 	/**
@@ -32770,9 +32792,12 @@ function componentSlotImpl(
 			// stamp; a string tag or unstamped component falls through to markers.
 			// Hydrating, a hole of a template the parent adopted renders in place of
 			// the server node that template's walk found, not of the node at the
-			// cursor (see componentSlotLite's anchored miss).
-			if (hydration !== null && anchor != null && anchor !== parentBlock.endMarker)
-				hydrationCursor = hydration.node = anchor;
+			// cursor (see componentSlotLite's anchored miss), and inserts before the
+			// node after it (parkAtHole).
+			if (hydration !== null && anchor != null && anchor !== parentBlock.endMarker) {
+				hydrationCursor = anchor;
+				anchor = hydration.parkAtHole(anchor);
+			}
 			start = null;
 			end = null;
 		} else {
