@@ -19822,20 +19822,20 @@ class HydrationCapability {
 	/**
 	 * The open marker of the server range that an `@if`/`@switch` slot adopts
 	 * on its first render at `anchor`, as resolveOpen finds it. The server frames
-	 * every such slot, so an element or text there, other than `owner`'s end
-	 * marker, is where its template hole's walk found another arm's markup, as an
-	 * enclosing `@if` renders it when the server took another arm. The walk
-	 * counts one server node for the hole and gives the nodes after it to the
-	 * template's later roots, so that node is all the slot may claim. Frame it
-	 * in the slot's and an arm's range, as the server would have: the branch
-	 * then adopts it, rebuilds over it or discards it, and claims nothing after
-	 * it, as for any server range.
+	 * every such slot, so an element or text there, other than the end marker
+	 * of `scope`'s block, is where its template hole's walk found another arm's
+	 * markup, as an enclosing `@if` renders it when the server took another arm.
+	 * The walk counts one server node for the hole and gives the nodes after it
+	 * to the template's later roots, so that node is all the slot may claim.
+	 * Frame it in the slot's and an arm's range, as the server would have: the
+	 * branch then adopts it, rebuilds over it or discards it, and claims nothing
+	 * after it, as for any server range.
 	 */
-	branchOpen(anchor: Node | null, domParent: Node, owner: Block): Comment | null {
+	branchOpen(anchor: Node | null, domParent: Node, scope: Scope): Comment | null {
 		if (
 			anchor === null ||
 			anchor.nodeType === 8 ||
-			anchor === owner.endMarker ||
+			anchor === scope.block.endMarker ||
 			domNode(anchor).parentNode !== domParent ||
 			this.freshNodes.has(anchor)
 		)
@@ -43706,7 +43706,7 @@ export function ifBlock(
 		// branchOpen frames another arm's node that the template walk found here.
 		const open = passthrough
 			? null
-			: (hydration?.branchOpen(anchor ?? null, domParent, parentScope.block) ?? null);
+			: (hydration?.branchOpen(anchor ?? null, domParent, parentScope) ?? null);
 		if (open !== null) {
 			start = open;
 			end = hydration!.close(open);
@@ -44670,7 +44670,7 @@ export function switchBlock(
 		// END marker while the hydration cursor sits on the switch range's open.
 		const open = passthrough
 			? null
-			: (hydration?.branchOpen(anchor ?? null, domParent, parentScope.block) ?? null);
+			: (hydration?.branchOpen(anchor ?? null, domParent, parentScope) ?? null);
 		if (open !== null) {
 			start = open;
 			end = hydration!.close(open);
