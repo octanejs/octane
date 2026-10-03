@@ -208,7 +208,11 @@ export function createThreePortalTarget(
 export interface ThreeHostEnvironment {
 	/** Called once after an accepted host batch, without requiring WebGL. */
 	invalidate?(): void;
-	/** Set false to omit accepted batches from the public diagnostic history. */
+	/**
+	 * Set false to omit accepted batches from the public diagnostic history.
+	 * Roots created by `createRoot` (and therefore `Canvas` and the testing
+	 * harness) set it false so a long-lived scene does not retain every batch.
+	 */
 	recordCommits?: boolean;
 	/** Root state associated with a configured managed scene. */
 	readonly store?: RootStore;
