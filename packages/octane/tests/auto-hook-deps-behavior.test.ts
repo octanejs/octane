@@ -13,6 +13,7 @@ import {
 	CallbackReadsItself,
 	CallbackReadsLaterConst,
 	CallbackReadsLaterVar,
+	CallbackReadsReassignedLet,
 	CaptureFreeEffect,
 	CaptureFreeMemo,
 	EffectFromDerivedValue,
@@ -26,6 +27,8 @@ import {
 	EffectFromState,
 	EffectReadsLaterConst,
 	EffectReadsLaterVar,
+	EffectReadsLetAssignedBefore,
+	EffectReadsReassignedLet,
 	EffectWithStableHookResults,
 	EffectWithConvergingUpdate,
 	EffectWithFreshFunction,
@@ -830,7 +833,8 @@ describe('inferred dependencies with subscribed stores', () => {
 
 // Reading a later `let`, `const` or `class` where the hook is called throws, and
 // a later `var` is still undefined there, so a list holding it never changes.
-// The compiler infers `null` instead, and the hook runs on every render.
+// A variable assigned after the call holds its earlier value there. The compiler
+// infers `null` instead, and the hook runs on every render.
 describe('inferred dependencies that read a later declaration', () => {
 	it('runs a useEffect that reads a later const on every render', () => {
 		const entries: string[] = [];
@@ -885,6 +889,45 @@ describe('inferred dependencies that read a later declaration', () => {
 		r.update(CallbackReadsLaterVar, { prefix: 'b' });
 		expect(r.find('.value').textContent).toBe('b');
 		r.unmount();
+	});
+
+	it('reruns a useEffect whose captured let is assigned after the call', () => {
+		const log = vi.fn();
+		const r = mount(EffectReadsReassignedLet, { log, a: 'a', b: '', noise: 0 });
+		flushEffects();
+		expect(log).toHaveBeenLastCalledWith('run:a');
+
+		r.update(EffectReadsReassignedLet, { log, a: 'a', b: 'b', noise: 1 });
+		flushEffects();
+		expect(log).toHaveBeenLastCalledWith('run:b');
+		r.unmount();
+		flushEffects();
+	});
+
+	it('refreshes a useCallback whose captured let is assigned after the call', () => {
+		const r = mount(CallbackReadsReassignedLet, { a: 'a', b: '' });
+		expect(r.find('.value').textContent).toBe('a');
+
+		r.update(CallbackReadsReassignedLet, { a: 'a', b: 'b' });
+		expect(r.find('.value').textContent).toBe('b');
+		r.unmount();
+	});
+
+	it('keeps tracking a let assigned before the call', () => {
+		const log = vi.fn();
+		const r = mount(EffectReadsLetAssignedBefore, { log, a: 'a', b: 'b', noise: 0 });
+		flushEffects();
+		expect(log.mock.calls).toEqual([['run:b']]);
+
+		r.update(EffectReadsLetAssignedBefore, { log, a: 'a', b: 'b', noise: 1 });
+		flushEffects();
+		expect(log.mock.calls).toEqual([['run:b']]);
+
+		r.update(EffectReadsLetAssignedBefore, { log, a: 'a', b: 'c', noise: 2 });
+		flushEffects();
+		expect(log.mock.calls).toEqual([['run:b'], ['run:c']]);
+		r.unmount();
+		flushEffects();
 	});
 
 	it('refreshes hooks that read a later const in a plain TypeScript custom hook', () => {

@@ -367,6 +367,30 @@ export function CallbackReadsLaterVar(props) @{
 	<span class="value">{read() as string}</span>
 }
 
+// The callback reads `label` after the component assigns it again, so a list
+// read at the call would hold the earlier value.
+export function EffectReadsReassignedLet(props) @{
+	let label = props.a;
+	useEffect(() => props.log(`run:${label}`));
+	if (props.b) label = props.b;
+	<span class="noise">{props.noise as string}</span>
+}
+
+export function CallbackReadsReassignedLet(props) @{
+	let label = props.a;
+	const read = useCallback(() => label);
+	if (props.b) label = props.b;
+	<span class="value">{read() as string}</span>
+}
+
+// Assigned before the call, so the inferred list holds the value the callback reads.
+export function EffectReadsLetAssignedBefore(props) @{
+	let label = props.a;
+	if (props.b) label = props.b;
+	useEffect(() => props.log(`run:${label}`));
+	<span class="noise">{props.noise as string}</span>
+}
+
 export function ExternalHookLaterDeclaration(props) @{
 	const label = useExternalLaterLabel(props.prefix, props.log);
 	<div>
