@@ -53,6 +53,7 @@ export {
 	useMemo,
 	useCallback,
 	useRef,
+	useLazyRef,
 	useId,
 	useImperativeHandle,
 	useEffectEvent,

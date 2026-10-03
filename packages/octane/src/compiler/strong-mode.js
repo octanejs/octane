@@ -43,6 +43,7 @@ const LOCAL_VALUE_HOOKS = new Set([
 	'useMemo',
 	'useCallback',
 	'useRef',
+	'useLazyRef',
 	'useId',
 	'useEffectEvent',
 	'useDeferredValue',
@@ -1918,7 +1919,24 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 		if (object?.type === 'SequenceExpression') {
 			return isRefObject(object.expressions?.[object.expressions.length - 1], scope);
 		}
-		return object?.type === 'CallExpression' && importedHook(object.callee, scope) === 'useRef';
+		return (
+			object?.type === 'CallExpression' &&
+			(importedHook(object.callee, scope) === 'useRef' ||
+				importedHook(object.callee, scope) === 'useLazyRef')
+		);
+	}
+
+	function lazyRefFactory(args) {
+		for (const argument of args ?? []) {
+			if (argument.type !== 'SpreadElement') return argument;
+			const array = unwrap(argument.argument);
+			if (array?.type !== 'ArrayExpression') return null;
+			if (array.elements.length > 0) {
+				const first = array.elements[0];
+				return first?.type === 'SpreadElement' ? null : first;
+			}
+		}
+		return null;
 	}
 
 	function readCurrentRef(member, scope) {
@@ -3014,7 +3032,8 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 				bind(declaration.id, stateTuple);
 			} else if (
 				initial?.type === 'CallExpression' &&
-				importedHook(initial.callee, scope) === 'useRef'
+				(importedHook(initial.callee, scope) === 'useRef' ||
+					importedHook(initial.callee, scope) === 'useLazyRef')
 			) {
 				bind(declaration.id, { kind: 'ref', declaration: declaration.id });
 			} else if (declarationKind === 'const' && transitionStart(initial, scope)) {
@@ -5377,7 +5396,10 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 						? 1
 						: hook === 'useReducer'
 							? 2
-							: hook === 'useState' || hook === 'useMemo' || EFFECT_HOOKS.has(hook)
+							: hook === 'useState' ||
+								  hook === 'useMemo' ||
+								  hook === 'useLazyRef' ||
+								  EFFECT_HOOKS.has(hook)
 								? 0
 								: -1;
 				const updaterSetters =
@@ -5470,7 +5492,7 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 					propProjection(node.arguments?.[1], scope)
 				)
 					unlinkedPropInitializers.add(unwrap(node.arguments[1]));
-				if (hook === 'useState' || hook === 'useMemo') {
+				if (hook === 'useState' || hook === 'useMemo' || hook === 'useLazyRef') {
 					if (
 						hook === 'useState' &&
 						executionPhase === 'render' &&
@@ -5480,7 +5502,7 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 						unlinkedPropInitializers.add(unwrap(node.arguments[0]));
 					}
 					visitSynchronousHookCallback(
-						node.arguments?.[0],
+						hook === 'useLazyRef' ? lazyRefFactory(node.arguments) : node.arguments?.[0],
 						scope,
 						executionPhase,
 						hook === 'useState',
