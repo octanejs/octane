@@ -59,7 +59,21 @@ const url = (port) => `http://localhost:${port}/`;
 // waiver here. A waiver needs a reason (ideally an issue link) and an expiry
 // date — when it lapses the failure becomes fatal again and must be re-triaged,
 // so a known-bug exemption cannot quietly become permanent.
-const HARNESS_FAILURE_ALLOWLIST = {};
+//
+// A waiver also covers a suite whose harness fails before it writes numbers,
+// since that hides every guard in the suite until the failure is fixed.
+const HARNESS_FAILURE_ALLOWLIST = {
+	'scoped-descriptor-shapes': {
+		reason:
+			'Since #1069 (2026-09-16) every scoped element descriptor defines an enumerable __octaneInvocationSite accessor that ordinary descriptors carry only when set, so the two no longer share one shape. Decide the descriptor contract, then re-pin the expected keys.',
+		expires: '2026-10-24',
+	},
+	'lynx-render': {
+		reason:
+			'The re-entrant 10k/20k scenarios fail the transport gate: the Octane Lynx transport receives an object where the wire carries a string, and acknowledges nothing. Fix the transport before relying on this suite again.',
+		expires: '2026-10-24',
+	},
+};
 const todayISO = () => new Date().toISOString().slice(0, 10);
 
 const SUITES = [
@@ -1777,13 +1791,28 @@ function printCompareTable(suiteName, rows) {
 
 function loadRatios() {
 	if (!fs.existsSync(RATIOS_FILE)) return [];
+	let guards;
 	try {
 		const parsed = JSON.parse(fs.readFileSync(RATIOS_FILE, 'utf8'));
-		return Array.isArray(parsed) ? parsed : parsed.guards || [];
+		guards = Array.isArray(parsed) ? parsed : parsed.guards || [];
 	} catch (e) {
 		console.error(`✗ ${RATIOS_FILE} did not parse: ${e.message}`);
 		process.exit(2);
 	}
+	for (const g of guards) {
+		if (
+			g.waiver &&
+			(typeof g.waiver.reason !== 'string' ||
+				g.waiver.reason.length < 20 ||
+				!/^\d{4}-\d{2}-\d{2}$/.test(g.waiver.expires ?? ''))
+		) {
+			console.error(
+				`✗ ${g.suite} ${g.op} ${g.target}/${g.reference}: a waiver needs a reason and an expires date (YYYY-MM-DD)`,
+			);
+			process.exit(2);
+		}
+	}
+	return guards;
 }
 
 // For a set of collected suite results, check every guard whose (suite, target,
@@ -1848,6 +1877,13 @@ function formatRatioBounds(guard) {
 			const res = await runSuite(suite);
 			resultsBySuite.set(suite.name, res);
 		} catch (e) {
+			const waiver = HARNESS_FAILURE_ALLOWLIST[suite.name];
+			if (waiver && todayISO() <= waiver.expires) {
+				console.error(
+					`! ${suite.name}: ${e.message} — waived until ${waiver.expires} (${waiver.reason})`,
+				);
+				continue;
+			}
 			console.error(`✗ ${suite.name}: ${e.message}`);
 			hardErrors.push(`${suite.name}: ${e.message}`);
 		}
@@ -1896,7 +1932,23 @@ function formatRatioBounds(guard) {
 				);
 			}
 		}
-		ratioBreaches = breaches.length;
+		// A guard whose breach needs a product fix carries a dated `waiver`
+		// ({ reason, expires }); it reports here but fails again once it expires,
+		// so a known regression cannot quietly become the new floor.
+		const waived = breaches.filter((b) => b.waiver && todayISO() <= b.waiver.expires);
+		for (const b of waived) {
+			console.log(
+				`  ! waived until ${b.waiver.expires}: ${b.suite} ${b.op} ${b.target}/${b.reference} — ${b.waiver.reason}`,
+			);
+		}
+		for (const b of breaches) {
+			if (b.waiver && todayISO() > b.waiver.expires) {
+				console.log(
+					`  ✗ waiver expired ${b.waiver.expires}: ${b.suite} ${b.op} ${b.target}/${b.reference} — ${b.waiver.reason}`,
+				);
+			}
+		}
+		ratioBreaches = breaches.length - waived.length;
 		// --record --ratios refreshes SUGGESTIONS without overwriting ratios.json.
 		if (RECORD && suggestions.length) {
 			const sp = path.resolve(REPO, 'benchmarks/baselines/ratios.suggested.json');

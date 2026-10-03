@@ -68,10 +68,12 @@ try {
 		const block =
 			"const block = createBlock('control-flow', owner.block, el, null, null, body, props);";
 		assert.equal(source.split(body).length, 2, 'one native style body observation site');
-		assert.equal(source.split(block).length, 2, 'one native presentation allocation site');
+		// A first structured value allocates its Block; so does one that replaces
+		// a scalar style literal written directly. Count every allocation.
+		assert.equal(source.split(block).length, 3, 'two native presentation allocation sites');
 		return source
 			.replace(body, body + '\n globalThis.__plainStyleWork.bodies++;')
-			.replace(block, 'globalThis.__plainStyleWork.blocks++; ' + block);
+			.replaceAll(block, 'globalThis.__plainStyleWork.blocks++; ' + block);
 	}
 	async function bundle(observed) {
 		return build({

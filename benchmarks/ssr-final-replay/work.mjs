@@ -99,10 +99,13 @@ function instrument(text) {
 		assert.ok(start >= 0 && at >= start + end.length, name);
 		text = text.slice(0, at) + `\nglobalThis.${counter}.${metric}++;` + text.slice(at);
 	}
-	text = once(
-		text,
-		'for (const { promise, key } of suspended) {',
-		`for (const { promise, key } of suspended) { globalThis.${counter}.suspended_visits++;`,
+	// Every pass over a wave's suspended members: settling it, and the
+	// stalled-wave check that decides whether the wave spends the pass limit.
+	const suspendedLoop = 'for (const { promise, key } of suspended) {';
+	assert.equal(text.split(suspendedLoop).length, 3, suspendedLoop);
+	text = text.replaceAll(
+		suspendedLoop,
+		`${suspendedLoop} globalThis.${counter}.suspended_visits++;`,
 	);
 	assert.equal(text.split('instrumented.then(NOOP, NOOP);').length, 3);
 	text = text.replaceAll(
