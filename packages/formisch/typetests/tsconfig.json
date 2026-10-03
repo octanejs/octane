@@ -12,9 +12,8 @@
     "types": ["node"],
     "noEmit": true,
     "noErrorTruncation": true,
-    "baseUrl": "../../..",
     "paths": {
-      "@octanejs/formisch": ["packages/formisch/src/index.ts"]
+      "@octanejs/formisch": ["../src/index.ts"]
     }
   },
   "include": [
