@@ -681,6 +681,63 @@ export function App(props) @{
 		}
 	});
 
+	// A closure reads its bindings when it runs, after the body has finished.
+	// A later var, a later assignment, or a binding whose own initializer holds
+	// the declaration is not the value at the declaration.
+	const lateBindingHooks = loadPlainHookFixtureSource<any>(
+		`import { derived$ } from 'octane/signals';
+export function useLaterVar$(next: string) {
+	const label$ = derived$(() => prefix);
+	var prefix = next;
+	return label$;
+}
+export function useReassigned$(first: string, last: string) {
+	let value = first;
+	const label$ = derived$(() => value);
+	value = last;
+	return label$;
+}
+export function useCount$(items: string[]) {
+	const api = { count$: derived$(() => api.items.length), items };
+	return api.count$;
+}`,
+		{
+			id: '/local-derived-late-bindings.ts',
+			mode: 'client',
+			inlineHookMemo: !mode.dev,
+			runtimeModules: { 'octane/signals': signals },
+		},
+	);
+	const lateBindingUser = loadCompiledFixtureSource<any>(
+		`import { useCount$, useLaterVar$, useReassigned$ } from './local-derived-late-bindings';
+export function App(props) @{
+ const later$ = useLaterVar$(props.next);
+ const reassigned$ = useReassigned$('first', props.last);
+ const count$ = useCount$(props.items);
+ <p>{(later$.get() + '|' + reassigned$.get() + '|' + String(count$.get())) as string}</p>
+}`,
+		{
+			id: '/local-derived-late-bindings-user.tsrx',
+			mode: 'client',
+			compileOptions: { ...mode, hmr: false },
+			runtimeModules: {
+				'octane/signals': signals,
+				'./local-derived-late-bindings': lateBindingHooks,
+			},
+		},
+	);
+	it('follows a later var, a later assignment, and its own initializer', async () => {
+		const { App } = lateBindingUser;
+		const root = mount(App, { next: '>', last: 'a', items: ['x'] });
+		try {
+			expect(root.find('p').textContent).toBe('>|a|1');
+			await act(() => root.update(App, { next: '#', last: 'b', items: ['x', 'y'] }));
+			expect(root.find('p').textContent).toBe('#|b|2');
+		} finally {
+			root.unmount();
+		}
+	});
+
 	const localDerivedKeyedSignal = load<any>(
 		`import { derived$, signal$ } from 'octane/signals';
 export function App(props) @{
