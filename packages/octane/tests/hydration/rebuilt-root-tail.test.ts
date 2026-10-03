@@ -223,6 +223,22 @@ describe.each([
 		},
 	);
 
+	it('keeps the node a later call claims after a root rebuilt by a branch with no server range', async () => {
+		const section = render('MarkerlessRebuilt', { server: true });
+		const stale = section.querySelector('.server')!;
+		const claimed = section.querySelector('em')!;
+
+		const recoverable = await hydrate('MarkerlessRebuilt', { inner: true });
+
+		expect(markup(section)).toBe('<p>p</p><em>e</em>');
+		expect(section.querySelector('em')).toBe(claimed);
+		expect(stale.isConnected).toBe(false);
+		expect(recoverable).toEqual([expect.stringMatching(MISMATCH)]);
+		expect(warnings()).toEqual(
+			dev ? [rebuilt(siteOf('export function MarkerlessRebuilt(', '<p>'))] : [],
+		);
+	});
+
 	it.each([
 		...SHAPES.map(({ shape, name }) => ({ shape, name })),
 		...CONTROLS.map(({ control, name }) => ({ shape: control, name })),

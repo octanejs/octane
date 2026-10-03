@@ -206,3 +206,24 @@ export function HoleThenElement(props: { server?: boolean }) {
 		<Arm />
 	</section>;
 }
+
+// Control: a branch the server rendered no range for rebuilds its root over
+// the first node of another arm's range, whose next node a later call claims.
+// The branch's content ends with its claim, not with that range.
+export function MarkerlessRebuilt(props: { server?: boolean; inner?: boolean }) @{
+	<section>
+		@if (props.server) {
+			<>
+				<b class="server">{'server'}</b>
+				<em>{'e'}</em>
+			</>
+		} @else {
+			<>
+				@if (props.inner) {
+					<p>{'p'}</p>
+				}
+				<Em />
+			</>
+		}
+	</section>
+}

@@ -20700,10 +20700,12 @@ class HydrationCapability {
 			this.rebuiltTail = this.node;
 			this.rebuiltRange = null;
 			// The rebuilt root can be a range's whole content: what the server
-			// rendered after the node it replaces is then the range's tail.
+			// rendered after the node it replaces is then the range's tail. A
+			// markerless branch (claimOwner) has no range: its claim alone ends it.
 			if (cursor === this.claimFrom) {
 				this.claimRoots(cursor, null);
-				if (this.claimFrom === null) this.rebuiltRange = domNode(cursor).previousSibling;
+				if (this.claimFrom === null && CURRENT_SCOPE!.block !== this.claimOwner)
+					this.rebuiltRange = domNode(cursor).previousSibling;
 			}
 			return (this.rebuiltRoot = this.freshClone(template));
 		}
