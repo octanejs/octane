@@ -10940,7 +10940,7 @@ function compileInternal(
 			rendererBoundaryPreparation?.universalUnits,
 		),
 	});
-	let hookDepHelperNeeded = false;
+	let hookDepHelperLocal = null;
 	ast = applyHookDependencies(ast, {
 		filename,
 		nativeReads: options?.nativeReads === true,
@@ -10949,7 +10949,11 @@ function compileInternal(
 			rendererBoundaryPreparation?.universalUnits,
 		),
 		onRuntimeHelper: () => {
-			hookDepHelperNeeded = true;
+			hookDepHelperLocal = allocCompilerName(
+				{ usedCompilerNames: collectIdentifierNames(ast), compilerNameSuffixes: null },
+				rtAlias(METHOD_DEP_IMPORT),
+			);
+			return hookDepHelperLocal;
 		},
 	});
 	const hmrOption = options && options.hmr;
@@ -11122,7 +11126,10 @@ function compileInternal(
 		_moduleOrigin: ast.body.find((n) => n?.loc != null) ?? ast,
 	};
 	ctx.privateWarmLists = source.includes('@for') ? collectPrivateWarmLists(ast.body) : null;
-	if (hookDepHelperNeeded) ctx.runtimeNeeded.add(METHOD_DEP_IMPORT);
+	if (hookDepHelperLocal !== null) {
+		ctx.runtimeNeeded.add(METHOD_DEP_IMPORT);
+		(ctx.privateRuntimeAliases ??= new Map()).set(METHOD_DEP_IMPORT, hookDepHelperLocal);
+	}
 	{
 		const imports = collectOctaneImportBindings(ast.body);
 		ctx.octaneImportLocals = imports.locals;
@@ -12464,13 +12471,17 @@ function compileServer(
 	// Mirror the client transform exactly. Effects are server no-ops, but
 	// useMemo/useCallback execute during SSR and must receive the same inferred
 	// dependency shape as hydration's client compile.
-	let hookDepHelperNeeded = false;
+	let hookDepHelperLocal = null;
 	ast = applyHookDependencies(ast, {
 		filename,
 		nativeReads: options?.nativeReads === true,
 		hookRuntimeModules: hookRuntimeModulesForCompile(options),
 		onRuntimeHelper: () => {
-			hookDepHelperNeeded = true;
+			hookDepHelperLocal = allocCompilerName(
+				{ usedCompilerNames: collectIdentifierNames(ast), compilerNameSuffixes: null },
+				rtAlias(METHOD_DEP_IMPORT),
+			);
+			return hookDepHelperLocal;
 		},
 	});
 	const ctx = {
@@ -12530,7 +12541,10 @@ function compileServer(
 		// Scaffolding without a more precise authored construct maps here.
 		_moduleOrigin: ast.body.find((n) => n?.loc != null) ?? ast,
 	};
-	if (hookDepHelperNeeded) ctx.runtimeNeeded.add(METHOD_DEP_IMPORT);
+	if (hookDepHelperLocal !== null) {
+		ctx.runtimeNeeded.add(METHOD_DEP_IMPORT);
+		(ctx.privateRuntimeAliases ??= new Map()).set(METHOD_DEP_IMPORT, hookDepHelperLocal);
+	}
 	{
 		const imports = collectOctaneImportBindings(ast.body);
 		ctx.octaneImportLocals = imports.locals;

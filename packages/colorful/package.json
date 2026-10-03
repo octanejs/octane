@@ -1,6 +1,6 @@
 {
   "name": "@octanejs/colorful",
-  "version": "0.0.23",
+  "version": "0.0.24",
   "description": "Exact Octane binding for react-colorful 5.8.0",
   "license": "MIT",
   "type": "module",
@@ -40,7 +40,7 @@
     "test:pristine": "node ../../scripts/react-parity/jest-full-runner.mjs --config packages/colorful/tests/upstream-jest.config.cjs --root packages/colorful/upstream"
   },
   "peerDependencies": {
-    "octane": "workspace:^0.7.0"
+    "octane": "workspace:^0.8.0"
   },
   "devDependencies": {
     "@tsrx/react": "catalog:default",
