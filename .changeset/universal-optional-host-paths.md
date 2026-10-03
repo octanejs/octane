@@ -1,6 +1,5 @@
 ---
 'octane': minor
-'@octanejs/lynx': patch
 ---
 
 Universal renderers now ship host-binding and template-program code only when they use it. A Three scene's production bundle is about 5.2 KB gzip smaller.
