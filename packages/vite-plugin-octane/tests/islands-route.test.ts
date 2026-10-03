@@ -44,7 +44,14 @@ export function Counter() @{
   'use dom bindings';
   <button type="button" onClick={increment}>{count$}</button>
 }`,
-	'src/Header.tsrx': `export function Header() @{ <header><h1>Islands</h1></header> }`,
+	// Static output may interpolate plain-module values and assets.
+	'src/copy.ts': `export const tagline = 'Server-rendered shell';`,
+	'src/logo.svg': `<svg xmlns="http://www.w3.org/2000/svg" width="1" height="1"></svg>`,
+	'src/Header.tsrx': `import { tagline } from './copy.ts';
+import logo from './logo.svg';
+export function Header() @{
+  <header><img src={logo} alt="" /><h1>Islands</h1><p>{tagline as string}</p></header>
+}`,
 	'src/App.tsrx': `import { Hydrate } from 'octane';
 import { interaction } from 'octane/hydration';
 import { Counter } from './Counter.tsrx';
@@ -155,6 +162,7 @@ describe('islands-only routes', { timeout: 180_000 }, () => {
 		expect(full).toContain('rel="modulepreload"');
 		// Both responses render the same server shell and island.
 		expect(islands).toContain('<h1>Islands</h1>');
+		expect(islands).toContain('Server-rendered shell');
 		expect(islands).toContain('data-octane-hydrate-independent');
 	});
 
@@ -164,6 +172,42 @@ describe('islands-only routes', { timeout: 180_000 }, () => {
 				'src/Header.tsrx': `export function Header() @{ <header><button onClick={() => {}}>Menu</button></header> }`,
 			}),
 		).rejects.toThrow(/hydrate: 'islands'.*Header\.tsrx:1:.*"onClick" needs client code/s);
+	});
+
+	// Dev serves the route either way; without a warning its interactive shell
+	// would be silently inert there until the first production build failed.
+	it('warns in dev when a shell needs client work, and keeps serving it', async () => {
+		const root = writeProject({
+			'src/Header.tsrx': `export function Header() @{ <header><button onClick={() => {}}>Menu</button></header> }`,
+		});
+		const warnings: string[] = [];
+		const logger = createLogger('silent');
+		logger.warn = (message) => {
+			warnings.push(message);
+		};
+		const server = await createServer({
+			root,
+			customLogger: logger,
+			server: { host: '127.0.0.1', port: 0, hmr: false, ws: false },
+		});
+		try {
+			await server.listen();
+			const address = server.httpServer?.address();
+			if (!address || typeof address !== 'object') throw new Error('dev server has no address');
+			for (let request = 0; request < 2; request++) {
+				const response = await fetch(`http://127.0.0.1:${address.port}/`);
+				expect(response.status).toBe(200);
+				expect(await response.text()).toContain('Menu');
+			}
+			// The source check names the build failure; the render witness may also report the site.
+			const source = warnings.filter((message) => message.includes('needs client code'));
+			expect(source).toHaveLength(1);
+			expect(source[0]).toMatch(
+				/hydrate: 'islands'.*Header\.tsrx:1:.*"onClick" needs client code/s,
+			);
+		} finally {
+			await server.close();
+		}
 	});
 
 	// The build checks the shell's source, which cannot follow a plain helper's

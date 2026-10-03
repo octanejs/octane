@@ -380,6 +380,12 @@ export interface Scope {
 	block: Block;
 	parent: Scope | null;
 	/**
+	 * An event handler published this scope as its signal authority. Deletion then
+	 * records retirement for a scope that never resolved an owner, so a handler
+	 * queued past the deletion cannot mint fresh instance state for it.
+	 */
+	signalTokenEscaped: boolean;
+	/**
 	 * Hook slot map. Lazily allocated on the first hook call via `ensureHooks`.
 	 * For-of item bodies that never call a hook (the common case in
 	 * js-framework-benchmark-shaped lists) keep this as `null` for their
@@ -1815,9 +1821,15 @@ let HELD_HYDRATION_DIAGNOSTICS: Array<() => void> | null = null;
  * DEV-only: log a hydration-mismatch warning unless a try body holds it, then
  * wait for its root attempt's commit. That attempt's rollback undoes its
  * structural recovery and value repairs, so the retry repeats the warning.
+ * Nothing is logged under captures that changed before a dormant boundary
+ * activated (staleServerValues).
  */
 function logHydrationMismatch(message: string): void {
-	if (currentHydration?.holds(() => logHydrationMismatch(message)) === true) return;
+	if (
+		currentHydration?.staleServerValues === true ||
+		currentHydration?.holds(() => logHydrationMismatch(message)) === true
+	)
+		return;
 	if (currentHydration?.awaitsCommit(() => console.error(message)) !== true) console.error(message);
 }
 
@@ -4177,13 +4189,8 @@ function rollbackRootRender(transaction: RootRenderTransaction): void {
 					undoCreatedInRootRender(transaction.log[i + 1], transaction.log[i + 2]);
 				else if (transaction.log[i] === JOURNAL_RETIRED)
 					transaction.log[i + 1].delete(transaction.log[i + 2]);
-				else if (transaction.log[i] === JOURNAL_EVENT_OWNER) {
-					const owners = transaction.log[i + 1];
-					const el = transaction.log[i + 2];
-					const previous = transaction.log[i + 3];
-					if (previous === undefined) owners.delete(el);
-					else owners.set(el, previous);
-				}
+				else if (transaction.log[i] === JOURNAL_EVENT_OWNER)
+					transaction.log[i + 1].$$signalOwner = transaction.log[i + 2];
 			}
 			transaction.log.length = 0;
 		}
@@ -5084,8 +5091,7 @@ function rollbackTransitionJournal(checkpoint: number, owner: Block): void {
 					target();
 					break;
 				case JOURNAL_EVENT_OWNER:
-					if (b === undefined) target.delete(a);
-					else target.set(a, b);
+					target.$$signalOwner = a;
 					break;
 				default:
 					// Spread snapshots include enumerable symbols as well as strings.
@@ -10553,6 +10559,7 @@ class BlockImpl {
 	declare signalInstanceValue: unknown;
 	declare signalInstanceHasKey: boolean;
 	declare signalInstanceResolved: string | undefined;
+	declare signalTokenEscaped: boolean;
 	declare $$ctxValues: Map<Context<any>, any> | null;
 	// Contexts whose value this block's subtree consumes — stamped on this block
 	// AND its memo ancestors by useContextInternal. The TRANSITIVE signal: a
@@ -10707,6 +10714,7 @@ class BlockImpl {
 		this.signalInstanceValue = undefined;
 		this.signalInstanceHasKey = false;
 		this.signalInstanceResolved = undefined;
+		this.signalTokenEscaped = false;
 	}
 }
 
@@ -10744,6 +10752,7 @@ class ScopeImpl {
 	declare signalInstanceValue: unknown;
 	declare signalInstanceHasKey: boolean;
 	declare signalInstanceResolved: string | undefined;
+	declare signalTokenEscaped: boolean;
 
 	constructor(parent: Scope, block: Block) {
 		this.block = block;
@@ -10766,6 +10775,7 @@ class ScopeImpl {
 		this.signalInstanceValue = undefined;
 		this.signalInstanceHasKey = false;
 		this.signalInstanceResolved = undefined;
+		this.signalTokenEscaped = false;
 	}
 }
 
@@ -12282,7 +12292,10 @@ function runScopeCleanups(scope: Scope, retireUnowned: boolean): void {
 		if (retireUnowned) SCOPE_SIGNAL_OWNERS.set(scope, null);
 		else SCOPE_SIGNAL_OWNERS.delete(scope);
 		retireRendererSignalOwner(signalOwner);
-	} else if (retireUnowned && signalOwner === false) {
+	} else if (
+		retireUnowned &&
+		(signalOwner === false || (signalOwner === undefined && scope.signalTokenEscaped))
+	) {
 		if (
 			STAGED_COMMIT_CAPTURE !== null &&
 			DEFERRED_LAYOUT_DRIVER!.stageAction(() => retireUnownedSignalScope(scope), true)
@@ -12296,7 +12309,8 @@ function retireUnownedSignalScope(scope: Scope): void {
 	// Resolve at publication, after deferred cleanups which may read the first
 	// handle. Null records retirement without allocating speculative authority.
 	const owner = SCOPE_SIGNAL_OWNERS.get(scope);
-	if (owner === false) SCOPE_SIGNAL_OWNERS.set(scope, null);
+	if (owner === false || (owner === undefined && scope.signalTokenEscaped))
+		SCOPE_SIGNAL_OWNERS.set(scope, null);
 	else if (owner) {
 		SCOPE_SIGNAL_OWNERS.set(scope, null);
 		retireRendererSignalOwner(owner);
@@ -18961,7 +18975,12 @@ function skipFoldedHeadPrefix(container: RootContainer, node: Node | null): Node
  * discard its methods together with the marker/mismatch/seed helper graph.
  */
 class HydrationCapability {
-	/** Parent captures changed before this dormant boundary activated. */
+	/**
+	 * Parent captures changed before this dormant boundary activated, so the
+	 * server HTML predates the client's state. Recovery still runs, but reports
+	 * nothing (noteRecoverableHydrationError, logHydrationMismatch), and no server
+	 * value is kept (keepsServerValue).
+	 */
 	staleServerValues = false;
 	depth = 0;
 	/**
@@ -19550,19 +19569,15 @@ class HydrationCapability {
 		if (PRESENTATION_HYDRATION?.revision !== undefined) presentationMiss();
 		const parent = domNode(end).parentNode!;
 		this.save(parent);
-		// Captures that changed before a dormant boundary activated legitimately
-		// differ from the server's; still discard, but there is nothing to report.
-		if (!this.staleServerValues) {
-			noteRecoverableHydrationError(() => new Error(formatClientError(51)));
-			if (process.env.NODE_ENV !== 'production') {
-				// A return slot or a list item has no site of its own: name the
-				// returning component, else the list's host.
-				const loc =
-					siteLoc(scope, slotKey) ||
-					componentSourceLoc(scope.block.body) ||
-					(parent as any).__oct_loc;
-				if (loc) this.warnStructural(loc, 'the end of the component', this.describe(from));
-			}
+		noteRecoverableHydrationError(() => new Error(formatClientError(51)));
+		if (process.env.NODE_ENV !== 'production') {
+			// A return slot or a list item has no site of its own: name the
+			// returning component, else the list's host.
+			const loc =
+				siteLoc(scope, slotKey) ||
+				componentSourceLoc(scope.block.body) ||
+				(parent as any).__oct_loc;
+			if (loc) this.warnStructural(loc, 'the end of the component', this.describe(from));
 		}
 		removeRange(from, end);
 	}
@@ -19896,15 +19911,11 @@ class HydrationCapability {
 	}
 
 	/**
-	 * Report a structural mismatch that recovery rebuilds on the client, unless
-	 * the captures changed before a dormant boundary activated. Returns whether
-	 * it reported, so callers warn only then. A method, so that bundles which
-	 * never hydrate do not retain the report.
+	 * Report a structural mismatch that recovery rebuilds on the client. A
+	 * method, so that bundles which never hydrate do not retain the report.
 	 */
-	reportStructural(): boolean {
-		if (this.staleServerValues) return false;
+	reportStructural(): void {
 		noteRecoverableHydrationError(() => new Error(formatClientError(51)));
-		return true;
 	}
 
 	/**
@@ -20112,15 +20123,14 @@ class HydrationCapability {
 	 * discarded so the client could build its own arm there. Returns whether it
 	 * reported, so callers warn only then. A suspended boundary's next attempt
 	 * finds the earlier attempt's content before the same `end` (a list's open
-	 * marker still names the server's arm), and captures that changed before a
-	 * dormant boundary activated legitimately differ from the server's: neither
-	 * is a mismatch to report. A root attempt that rolls back restores the server
-	 * content and forgets `end`, so its retry reports.
+	 * marker still names the server's arm): that is not a mismatch to report. A
+	 * root attempt that rolls back restores the server content and forgets
+	 * `end`, so its retry reports.
 	 */
 	reportRebuiltRange(end: Node): boolean {
 		const rebuilt = HYDRATION_REBUILT?.has(end) === true;
 		this.remember((HYDRATION_REBUILT ??= new WeakSet()), end);
-		if (rebuilt || this.staleServerValues) return false;
+		if (rebuilt) return false;
 		noteRecoverableHydrationError(() => new Error(formatClientError(51)));
 		return true;
 	}
@@ -20198,10 +20208,7 @@ class HydrationCapability {
 		while (node !== null && node !== end) node = getNextSibling(node);
 		if (node === null) return;
 		this.save(domNode(end).parentNode!);
-		// Captures that changed before a dormant boundary activated legitimately
-		// differ from the server's; still discard, but there is nothing to report.
-		if (!this.staleServerValues)
-			noteRecoverableHydrationError(() => new Error(formatClientError(56)));
+		noteRecoverableHydrationError(() => new Error(formatClientError(56)));
 		removeRange(from, end);
 	}
 
@@ -20303,19 +20310,15 @@ class HydrationCapability {
 		if (node === null) return;
 		if (PRESENTATION_HYDRATION?.revision !== undefined) presentationMiss();
 		this.save(domNode(end).parentNode!);
-		// Captures that changed before a dormant boundary activated legitimately
-		// differ from the server's; still discard, but there is nothing to report.
-		if (!this.staleServerValues) {
-			noteRecoverableHydrationError(() => new Error(formatClientError(51)));
-			if (process.env.NODE_ENV !== 'production') {
-				const loc = siteLoc(scope, slotKey);
-				if (loc)
-					this.warnStructural(
-						loc,
-						from === first ? 'an empty branch' : 'the end of the branch',
-						this.describe(from),
-					);
-			}
+		noteRecoverableHydrationError(() => new Error(formatClientError(51)));
+		if (process.env.NODE_ENV !== 'production') {
+			const loc = siteLoc(scope, slotKey);
+			if (loc)
+				this.warnStructural(
+					loc,
+					from === first ? 'an empty branch' : 'the end of the branch',
+					this.describe(from),
+				);
 		}
 		removeRange(from, stop ?? end);
 		this.node = end;
@@ -20326,8 +20329,7 @@ class HydrationCapability {
 	 * value cannot adopt, and point the cursor at `end`. Reports the structural
 	 * mismatch (`expected`, and the `actual` server node or a description of
 	 * it, describe it in development) unless it is `quiet`, as it is when an
-	 * earlier attempt already rebuilt this content, or the captures legitimately
-	 * changed before a dormant boundary activated. Remembers `end` for later
+	 * earlier attempt already rebuilt this content. Remembers `end` for later
 	 * attempts.
 	 */
 	private discard(
@@ -20341,7 +20343,7 @@ class HydrationCapability {
 	): true {
 		if (PRESENTATION_HYDRATION?.revision !== undefined) presentationMiss();
 		this.save(domNode((from ?? end)!).parentNode!);
-		if (!quiet && !this.staleServerValues) {
+		if (!quiet) {
 			noteRecoverableHydrationError(() => new Error(formatClientError(51)));
 			if (process.env.NODE_ENV !== 'production') {
 				// A return slot or a list item has no site of its own: name the
@@ -20364,8 +20366,6 @@ class HydrationCapability {
 	}
 
 	recordTextMismatch(node: Text, loc: string | undefined, server: string | null): void {
-		// Text already repaired from newer captures is not a server/client mismatch.
-		if (this.staleServerValues) return;
 		if (process.env.NODE_ENV === 'production' && ROOT_ERROR_HANDLERS === null) return;
 		// Nor is the placeholder of a template that mismatch recovery cloned fresh:
 		// its host holds the client template's text, and the rebuild has already
@@ -20456,16 +20456,12 @@ class HydrationCapability {
 		if (stale === end) return;
 		if (PRESENTATION_HYDRATION?.revision !== undefined) presentationMiss();
 		this.save(domNode(end).parentNode!);
-		// Captures that changed before a dormant boundary activated legitimately
-		// differ from the server's; still recover, but there is nothing to report.
-		if (!this.staleServerValues) {
-			noteRecoverableHydrationError(() => new Error(formatClientError(51)));
-			if (process.env.NODE_ENV !== 'production') {
-				const loc = siteLoc(scope, slotKey);
-				if (loc) {
-					const client = str === '' ? 'nothing' : `text ${JSON.stringify(str)}`;
-					this.warnStructural(loc, kept ? `the end of ${client}` : client, this.describe(stale));
-				}
+		noteRecoverableHydrationError(() => new Error(formatClientError(51)));
+		if (process.env.NODE_ENV !== 'production') {
+			const loc = siteLoc(scope, slotKey);
+			if (loc) {
+				const client = str === '' ? 'nothing' : `text ${JSON.stringify(str)}`;
+				this.warnStructural(loc, kept ? `the end of ${client}` : client, this.describe(stale));
 			}
 		}
 		removeRange(stale, end);
@@ -20565,6 +20561,43 @@ class HydrationCapability {
 
 	isFresh(node: Node): boolean {
 		return this.freshNodes.has(node);
+	}
+
+	/**
+	 * Whether `el` keeps the server's value where the client's differs:
+	 * suppressHydrationWarning keeps it, unless there is no server value worth
+	 * keeping. A clone that mismatch recovery built fresh holds the client
+	 * template, and the rebuild was already reported. Under captures that changed
+	 * before a dormant boundary activated, the server value predates the client's.
+	 */
+	keepsServerValue(el: Node | null): boolean {
+		return isHydrationSuppressed(el) && !this.freshNodes.has(el!) && !this.staleServerValues;
+	}
+
+	/**
+	 * `el`'s server `dangerouslySetInnerHTML` content differs from the client's
+	 * `next`. React keeps the server's, and so does hydration unless it predates
+	 * the client's state (staleServerValues): then replace it in place, as text
+	 * repairs do. An attempt that is discarded restores the server's children
+	 * for its retry (save), where a client write deferred to the root's commit
+	 * would still run. Returns whether it replaced them. A method, so that
+	 * bundles which never hydrate do not retain it.
+	 */
+	repairHTML(el: Element, next: string, server: string, expected: string): boolean {
+		if (!this.staleServerValues) {
+			if (process.env.NODE_ENV !== 'production' && !this.keepsServerValue(el))
+				warnHydrationKeptServerValue(
+					(el as any).__oct_loc,
+					'`dangerouslySetInnerHTML` content',
+					server,
+					expected,
+				);
+			return false;
+		}
+		this.save(el);
+		if (el.localName === 'script') (STAGED_DOM?.view(el) ?? el).textContent = next;
+		else (STAGED_DOM?.view(el) ?? el).innerHTML = next;
+		return true;
 	}
 
 	/**
@@ -20761,7 +20794,7 @@ class HydrationCapability {
 					framedRemainder === undefined ? (unframedRemainder ?? null) : framedRemainder,
 				);
 			if (template === null) template = resolveLazyTemplate(lazy!);
-			if (this.firstAtRangeEnd(cursor) && !this.staleServerValues) {
+			if (this.firstAtRangeEnd(cursor)) {
 				noteRecoverableHydrationError(() => new Error(formatClientError(51)));
 				if (process.env.NODE_ENV !== 'production')
 					warnHydrationStructuralMismatch(
@@ -20821,18 +20854,15 @@ class HydrationCapability {
 			const atRangeEnd = isBlockClose(cursor);
 			// A retry over a node whose replacement never committed already reported
 			// it, and a range end reports once (firstAtRangeEnd).
-			if (
-				cursor !== this.replaced &&
-				(!atRangeEnd || this.firstAtRangeEnd(cursor)) &&
-				this.reportStructural() &&
-				process.env.NODE_ENV !== 'production' &&
-				loc
-			)
-				warnHydrationStructuralMismatch(
-					loc,
-					describeHydrationNode(template),
-					describeHydrationNode(cursor),
-				);
+			if (cursor !== this.replaced && (!atRangeEnd || this.firstAtRangeEnd(cursor))) {
+				this.reportStructural();
+				if (process.env.NODE_ENV !== 'production' && loc)
+					warnHydrationStructuralMismatch(
+						loc,
+						describeHydrationNode(template),
+						describeHydrationNode(cursor),
+					);
+			}
 			if (atRangeEnd) return this.freshClone(template);
 			// Recovery discards only a node this template renders into. The compiled
 			// mount inserts into its scope's block, which for a lite component is
@@ -20998,30 +21028,26 @@ class HydrationCapability {
 		// its later siblings' server content, before the end marker it shares
 		// with them (renderInPlace).
 		const inPlace = block instanceof LiteBlockImpl && !this.liteRanges.has(scope!);
-		// Captures that changed before a dormant boundary activated legitimately
-		// differ from the server's; still rebuild, but there is nothing to report.
-		if (!this.staleServerValues) {
-			noteRecoverableHydrationError(() => new Error(formatClientError(51)));
-			if (process.env.NODE_ENV !== 'production') {
-				// Name the lite call itself: its scope holds no locations of its own.
-				const owner = inPlace ? scope!.parent : null;
-				const site = owner === null ? '' : siteLoc(owner, owner.slots.indexOf(scope));
-				// A leading hole matches any server node: name the static root that
-				// did not match, and what the server rendered in its place.
-				let expected = getFirstChild(template);
-				let actual: Node | null = cursor;
-				while (expected !== null && expected.nodeType === 8) {
-					expected = getNextSibling(expected);
-					actual = actual === null ? null : this.sibling(actual, 1);
-				}
-				warnHydrationStructuralMismatch(
-					rebuilt.loc || site || componentSourceLoc(CURRENT_BLOCK?.body) || CURRENT_SCOPE?.locFile,
-					expected === getFirstChild(template) || expected === null
-						? `a fragment starting with ${describeHydrationNode(getFirstChild(template))}`
-						: `a fragment with ${describeHydrationNode(expected)} after its leading holes`,
-					describeHydrationNode(expected === null ? cursor : actual),
-				);
+		noteRecoverableHydrationError(() => new Error(formatClientError(51)));
+		if (process.env.NODE_ENV !== 'production') {
+			// Name the lite call itself: its scope holds no locations of its own.
+			const owner = inPlace ? scope!.parent : null;
+			const site = owner === null ? '' : siteLoc(owner, owner.slots.indexOf(scope));
+			// A leading hole matches any server node: name the static root that
+			// did not match, and what the server rendered in its place.
+			let expected = getFirstChild(template);
+			let actual: Node | null = cursor;
+			while (expected !== null && expected.nodeType === 8) {
+				expected = getNextSibling(expected);
+				actual = actual === null ? null : this.sibling(actual, 1);
 			}
+			warnHydrationStructuralMismatch(
+				rebuilt.loc || site || componentSourceLoc(CURRENT_BLOCK?.body) || CURRENT_SCOPE?.locFile,
+				expected === getFirstChild(template) || expected === null
+					? `a fragment starting with ${describeHydrationNode(getFirstChild(template))}`
+					: `a fragment with ${describeHydrationNode(expected)} after its leading holes`,
+				describeHydrationNode(expected === null ? cursor : actual),
+			);
 		}
 		const parent = block?.parentNode;
 		const end = block?.endMarker ?? null;
@@ -21406,13 +21432,8 @@ class HydrationCapability {
 				domBindingClaims.get(el as Element)?.get('#text') !== server &&
 				!isTextParserNormalizedMatch(server, text)
 			) {
-				const suppressed = isHydrationSuppressed(el);
-				if (!suppressed)
+				if (!this.keepsServerValue(el)) {
 					this.recordTextMismatch(first as Text, loc || (el as any).__oct_loc, server);
-				// Suppression keeps the server's text, but a clone that mismatch recovery
-				// built fresh holds the client template's placeholder: there is no server
-				// text to keep, and the rebuild was already reported structurally.
-				if (!suppressed || this.freshNodes.has(el)) {
 					this.journalRepair(first, null);
 					(STAGED_DOM?.view(first as Text) ?? (first as Text)).nodeValue = text;
 				}
@@ -21458,9 +21479,7 @@ class HydrationCapability {
 	): void {
 		if (PRESENTATION_HYDRATION?.revision !== undefined) presentationMiss();
 		this.save(el);
-		// Captures that changed before a dormant boundary activated legitimately
-		// differ from the server's; still recover, but there is nothing to report.
-		if (!this.staleServerValues && !isHydrationSuppressed(el)) {
+		if (!isHydrationSuppressed(el)) {
 			noteRecoverableHydrationError(() => new Error(formatClientError(62)), this.rootBlock);
 			if (process.env.NODE_ENV !== 'production') {
 				// Name a server range by the content it frames.
@@ -21507,9 +21526,7 @@ class HydrationCapability {
 		this.save(el);
 		if (stale !== null) {
 			if ((el as Element).localName === 'textarea') stale = getNextSibling(stale);
-			// Server content for captures that changed before a dormant boundary
-			// activated is not a mismatch to report either.
-			else if (!rebuilt && !this.staleServerValues) {
+			else if (!rebuilt) {
 				noteRecoverableHydrationError(() => new Error(formatClientError(51)), this.rootBlock);
 				if (process.env.NODE_ENV !== 'production')
 					warnHydrationStructuralMismatch(
@@ -21593,12 +21610,10 @@ class HydrationCapability {
 			const server = (STAGED_DOM?.view(posNode as Text) ?? (posNode as Text)).nodeValue;
 			if (server !== text && !isTextParserNormalizedMatch(server, text)) {
 				const host = (STAGED_DOM?.view(posNode) ?? posNode).parentNode;
-				const suppressed = isHydrationSuppressed(host);
-				if (!suppressed)
+				// A fresh mismatch clone's template `<!>` reads as the server's empty
+				// slot, swapped for '' above, and takes the client's text.
+				if (!this.keepsServerValue(host)) {
 					this.recordTextMismatch(posNode as Text, host && (host as any).__oct_loc, server);
-				// As in htext: a fresh mismatch clone has no server text to keep. Its
-				// template's `<!>` reads as the server's empty slot, swapped for '' above.
-				if (!suppressed || this.freshNodes.has(host!)) {
 					this.journalRepair(posNode, null);
 					(STAGED_DOM?.view(posNode as Text) ?? (posNode as Text)).nodeValue = text;
 				}
@@ -21611,19 +21626,23 @@ class HydrationCapability {
 		// structural mismatch, just like an extra client element. Build the client
 		// text so recovery succeeds, but publish the normal dev diagnostic. A
 		// suppressed host keeps the absent server value by installing only an empty
-		// tracking node; later real commits can update that node normally.
-		if (text !== '' && !suppressed) {
+		// tracking node (keepsServerValue); later real commits can update that node
+		// normally.
+		const keep = this.keepsServerValue(host);
+		if (text !== '' && !keep) {
 			if (host !== null) this.save(host);
-			noteRecoverableHydrationError(() => new Error(formatClientError(54)));
-			if (process.env.NODE_ENV !== 'production') {
-				warnHydrationStructuralMismatch(
-					host && (host as any).__oct_loc,
-					`text ${JSON.stringify(text)}`,
-					describeHydrationNode(posNode),
-				);
+			if (!suppressed) {
+				noteRecoverableHydrationError(() => new Error(formatClientError(54)));
+				if (process.env.NODE_ENV !== 'production') {
+					warnHydrationStructuralMismatch(
+						host && (host as any).__oct_loc,
+						`text ${JSON.stringify(text)}`,
+						describeHydrationNode(posNode),
+					);
+				}
 			}
 		}
-		const created = (STAGED_DOM?.view(document) ?? document).createTextNode(suppressed ? '' : text);
+		const created = (STAGED_DOM?.view(document) ?? document).createTextNode(keep ? '' : text);
 		if (posNode !== null && (STAGED_DOM?.view(posNode) ?? posNode).parentNode !== null) {
 			domNode((STAGED_DOM?.view(posNode) ?? posNode).parentNode!).insertBefore(created, posNode);
 		}
@@ -21668,13 +21687,12 @@ class HydrationCapability {
 		if (server === next) return false;
 		if (domBindingClaims.get(el)?.get(name) === server) return false;
 		if (next !== null && isAttributeParserNormalizedMatch(server, next)) return false;
-		const mode = hydrationMismatchMode(el);
 		// A clone that mismatch recovery built fresh holds the client template, not
-		// server output: the rebuild was already reported, and there is no server
-		// value for suppression to keep, so the client value applies silently.
+		// server output: the rebuild was already reported, so the client value
+		// applies silently.
 		if (this.isFresh(el)) return true;
-		if (mode === 1) return false;
-		if (process.env.NODE_ENV !== 'production' && mode === 2 && !this.staleServerValues)
+		if (this.keepsServerValue(el)) return false;
+		if (process.env.NODE_ENV !== 'production' && hydrationMismatchMode(el) === 2)
 			warnHydrationValueMismatch((el as any).__oct_loc, `attribute \`${name}\``, server, next);
 		this.repaired(el, name);
 		return true;
@@ -21688,11 +21706,10 @@ class HydrationCapability {
 		if (domBindingClaims.get(el)?.get('class') === rawServer) return false;
 		// Fresh mismatch clones apply the client class silently, as in allowAttribute.
 		if (mode === 0 || this.isFresh(el)) return true;
-		if (mode === 1) return false;
+		if (this.keepsServerValue(el)) return false;
 		if (
 			process.env.NODE_ENV !== 'production' &&
 			mode === 2 &&
-			!this.staleServerValues &&
 			// Class writes flush after the render. A boundary whose body adopted
 			// `el` and then threw to its catch arm has removed it since.
 			domNode(this.rootBlock.parentNode).contains(el)
@@ -21742,10 +21759,7 @@ class HydrationCapability {
 		staticCss?: string,
 		entries?: readonly unknown[],
 	): boolean {
-		const mode = hydrationMismatchMode(el);
-		// Suppression keeps the server style, but a fresh mismatch clone has none to
-		// keep: it holds the client template and takes the complete client style.
-		if (mode === 1 && !this.isFresh(el)) return true;
+		if (this.keepsServerValue(el)) return true;
 		const style = (STAGED_DOM?.view(el as HTMLElement) ?? (el as HTMLElement)).style;
 		const hadStyleAttribute = (STAGED_DOM?.view(el) ?? el).hasAttribute('style');
 		const before = style.cssText;
@@ -21791,9 +21805,8 @@ class HydrationCapability {
 		if (expectsStyleAttribute) style.cssText = expected;
 		else (STAGED_DOM?.view(el) ?? el).removeAttribute('style');
 		if (
-			mode === 2 &&
 			process.env.NODE_ENV !== 'production' &&
-			!this.staleServerValues &&
+			hydrationMismatchMode(el) === 2 &&
 			!this.isFresh(el)
 		) {
 			warnHydrationValueMismatch((el as any).__oct_loc, 'style', before, expected);
@@ -22988,8 +23001,10 @@ export function presentationWrite<T>(
 	if (kind === 'setEventHandler') {
 		preparePresentationOperation(frame, prepared[0], 'event:' + prepared[1], () => {
 			writer(...prepared);
-			if (SIGNAL_BINDINGS_ENABLED || signalDocumentEnabled)
-				(SIGNAL_EVENT_OWNERS ??= new WeakMap()).set(prepared[0], frame.scope as ScopeImpl);
+			if (SIGNAL_BINDINGS_ENABLED || signalDocumentEnabled) {
+				SIGNAL_EVENT_OWNERS_RECORDED = true;
+				prepared[0].$$signalOwner = frame.scope as ScopeImpl;
+			}
 		});
 		return undefined as T;
 	}
@@ -23947,13 +23962,14 @@ export function bindSignalText(
 	// signal token must still re-enter the read path even when its handle is
 	// unchanged, so pending/error recovery is not hidden by this scalar guard.
 	// A supplied previousValue may itself be undefined, so count arguments.
-	if (
-		previous instanceof Text &&
-		arguments.length > 6 &&
-		previousValue === value &&
-		!isSignalHandle(value)
-	)
+	if (previous instanceof Text && !isSignalHandle(value)) {
+		if (arguments.length > 6 && previousValue === value) return previous;
+		// A scalar over the Text this hole already owns is bindDirectSignal's
+		// unbound scalar write without its policy dispatch. setText journals the
+		// text and this binding bag.
+		setText(previous, value);
 		return previous;
+	}
 	if (previous === undefined && bindingMarker !== undefined) {
 		const existing = activeHydration() !== null ? getNextSibling(position) : null;
 		previous = bindingText(
@@ -24206,22 +24222,12 @@ export function setHTML(el: Element, value: any): void {
 			el.localName === 'script'
 				? normalizeScriptTextForHydration(escapeInlineScriptContentForHydration(next))
 				: normalizeHTMLForHydration(el, next);
-		if (server === expected) {
-			if (el.localName !== 'script') {
-				const host = STAGED_DOM?.view(el as any) ?? (el as any);
-				journalRootProperty(el, DANGER_HTML_VALUE, host[DANGER_HTML_VALUE]);
-				host[DANGER_HTML_VALUE] = next;
-			}
-			return;
+		if (server !== expected && !hydration.repairHTML(el, next, server, expected)) return;
+		if (el.localName !== 'script') {
+			const host = STAGED_DOM?.view(el as any) ?? (el as any);
+			journalRootProperty(el, DANGER_HTML_VALUE, host[DANGER_HTML_VALUE]);
+			host[DANGER_HTML_VALUE] = next;
 		}
-		if (isHydrationSuppressed(el)) return;
-		if (process.env.NODE_ENV !== 'production')
-			warnHydrationKeptServerValue(
-				(el as any).__oct_loc,
-				'`dangerouslySetInnerHTML` content',
-				server,
-				expected,
-			);
 		return;
 	}
 	if (el.localName === 'script') {
@@ -27743,14 +27749,18 @@ function isUsableEventSlot(slot: EventSlot): boolean {
 // a direct guard avoids an idle projection call or an ordinary self-assignment.
 // A live scope token already captures unchanged authority. Explicit/environment
 // and document owners still refresh it; staged updates must publish in order
-// even when the committed map matches, because an earlier owner write may be pending.
+// even when the committed owner matches, because an earlier owner write may be pending.
 // ---------------------------------------------------------------------------
 
 // Data equality skips dispatch/journal snapshots, never authority publication:
 // a stable callback can move to another owner without changing its captures.
 // Compare staged fields first and keep array-reference semantics for arity N.
 const EMPTY_ARGS: any[] = [];
-let SIGNAL_EVENT_OWNERS: WeakMap<Element, SignalOwner | ScopeImpl | BlockImpl> | null = null;
+type SignalEventOwner = SignalOwner | ScopeImpl | BlockImpl;
+// Event authority lives on the host beside its handler slots, so publishing it
+// for each mounted row is a property write rather than a weak-map insertion.
+// The flag keeps documents that never record authority off the dispatch read.
+let SIGNAL_EVENT_OWNERS_RECORDED = false;
 
 // Epoch of this task's first removed host root (retireEventHostTree); 0 when none
 // is pending. Older stamps belong to nodes already detached and are ignored.
@@ -27806,7 +27816,7 @@ export function setEventHandler(el: Element, key?: string, handler?: any): void 
 		SIGNAL_BINDINGS_ENABLED ||
 		signalDocumentEnabled ||
 		explicitOwner !== null ||
-		SIGNAL_EVENT_OWNERS !== null
+		SIGNAL_EVENT_OWNERS_RECORDED
 	) {
 		// Retain the precise invocation for an event-only reader whose signal
 		// module may arrive later. No owner or wrapper is allocated speculatively.
@@ -27821,27 +27831,24 @@ export function setEventHandler(el: Element, key?: string, handler?: any): void 
 			// Mark that a scope token escaped before queuing publication. A staged
 			// event may be followed by deletion in the same preparation; recording
 			// only at publication would miss that retirement. Discard leaves only
-			// conservative weak metadata, never an owner or signal state.
-			if (
-				(owner instanceof ScopeImpl || owner instanceof BlockImpl) &&
-				SCOPE_SIGNAL_OWNERS.get(owner) === undefined
-			)
-				SCOPE_SIGNAL_OWNERS.set(owner, false);
+			// this conservative flag, never an owner or signal state.
+			if ((owner instanceof ScopeImpl || owner instanceof BlockImpl) && !owner.signalTokenEscaped)
+				owner.signalTokenEscaped = true;
 			// Later writers must replace explicit authority with the usual scope
 			// token, including when both writers are still waiting for publication.
-			const owners = (SIGNAL_EVENT_OWNERS ??= new WeakMap());
+			SIGNAL_EVENT_OWNERS_RECORDED = true;
 			// Compare queued writes at publication: an earlier preparation may
 			// replace even the authority that is currently committed.
 			if (STAGED_COMMIT_CAPTURE !== null)
 				DEFERRED_LAYOUT_DRIVER!.stageAction(() => {
-					if (owners.get(el) !== owner) owners.set(el, owner);
+					if ((el as any).$$signalOwner !== owner) (el as any).$$signalOwner = owner;
 				});
 			else {
-				const previous = owners.get(el);
+				const previous = (el as any).$$signalOwner as SignalEventOwner | undefined;
 				if (previous !== owner) {
 					if (TRANSITION_JOURNAL !== null)
-						TRANSITION_JOURNAL.push(JOURNAL_EVENT_OWNER, owners, el, previous);
-					owners.set(el, owner);
+						TRANSITION_JOURNAL.push(JOURNAL_EVENT_OWNER, el, previous, null);
+					(el as any).$$signalOwner = owner;
 				}
 			}
 		}
@@ -27865,13 +27872,13 @@ export function evt0u(d: HandlerBundle, fn: any): void {
 			signalDocumentEnabled ||
 			activeSynchronousSignalOwner !== null ||
 			activeSignalOwnerEnvironment !== undefined ||
-			SIGNAL_EVENT_OWNERS !== null) &&
+			SIGNAL_EVENT_OWNERS_RECORDED) &&
 		(activeSynchronousSignalOwner !== null ||
 			activeSignalOwnerEnvironment !== undefined ||
 			STAGED_COMMIT_CAPTURE !== null ||
 			signalDocumentEnabled ||
 			CURRENT_SCOPE?.block.idState.renderOwner?.signalOwner !== undefined ||
-			SIGNAL_EVENT_OWNERS?.get(d.el!) !== CURRENT_SCOPE)
+			(d.el as any).$$signalOwner !== CURRENT_SCOPE)
 	)
 		setEventHandler(d.el!);
 }
@@ -27893,13 +27900,13 @@ export function evt1u(d: HandlerBundle, fn: any, a0: any): void {
 			signalDocumentEnabled ||
 			activeSynchronousSignalOwner !== null ||
 			activeSignalOwnerEnvironment !== undefined ||
-			SIGNAL_EVENT_OWNERS !== null) &&
+			SIGNAL_EVENT_OWNERS_RECORDED) &&
 		(activeSynchronousSignalOwner !== null ||
 			activeSignalOwnerEnvironment !== undefined ||
 			STAGED_COMMIT_CAPTURE !== null ||
 			signalDocumentEnabled ||
 			CURRENT_SCOPE?.block.idState.renderOwner?.signalOwner !== undefined ||
-			SIGNAL_EVENT_OWNERS?.get(d.el!) !== CURRENT_SCOPE)
+			(d.el as any).$$signalOwner !== CURRENT_SCOPE)
 	)
 		setEventHandler(d.el!);
 }
@@ -27922,13 +27929,13 @@ export function evt2u(d: HandlerBundle, fn: any, a0: any, a1: any): void {
 			signalDocumentEnabled ||
 			activeSynchronousSignalOwner !== null ||
 			activeSignalOwnerEnvironment !== undefined ||
-			SIGNAL_EVENT_OWNERS !== null) &&
+			SIGNAL_EVENT_OWNERS_RECORDED) &&
 		(activeSynchronousSignalOwner !== null ||
 			activeSignalOwnerEnvironment !== undefined ||
 			STAGED_COMMIT_CAPTURE !== null ||
 			signalDocumentEnabled ||
 			CURRENT_SCOPE?.block.idState.renderOwner?.signalOwner !== undefined ||
-			SIGNAL_EVENT_OWNERS?.get(d.el!) !== CURRENT_SCOPE)
+			(d.el as any).$$signalOwner !== CURRENT_SCOPE)
 	)
 		setEventHandler(d.el!);
 }
@@ -27963,13 +27970,13 @@ export function evtNu(d: HandlerBundle, fn: any, args: any[]): void {
 			signalDocumentEnabled ||
 			activeSynchronousSignalOwner !== null ||
 			activeSignalOwnerEnvironment !== undefined ||
-			SIGNAL_EVENT_OWNERS !== null) &&
+			SIGNAL_EVENT_OWNERS_RECORDED) &&
 		(activeSynchronousSignalOwner !== null ||
 			activeSignalOwnerEnvironment !== undefined ||
 			STAGED_COMMIT_CAPTURE !== null ||
 			signalDocumentEnabled ||
 			CURRENT_SCOPE?.block.idState.renderOwner?.signalOwner !== undefined ||
-			SIGNAL_EVENT_OWNERS?.get(d.el!) !== CURRENT_SCOPE)
+			(d.el as any).$$signalOwner !== CURRENT_SCOPE)
 	)
 		setEventHandler(d.el!);
 }
@@ -28565,7 +28572,7 @@ const CAPTURE_PATH: any[] = [];
 const CAPTURE_SLOTS: EventSlot[] = [];
 // Authority is a phase snapshot too: an earlier callback may publish a new
 // handler/owner before a queued ancestor runs. Allocate only after ownership exists.
-let CAPTURE_OWNERS: (SignalOwner | ScopeImpl | BlockImpl | undefined)[] | null = null;
+let CAPTURE_OWNERS: (SignalEventOwner | undefined)[] | null = null;
 
 /** Snapshot the phase's handler slots; returns whether any node on the path has one. */
 function snapshotDelegatedSlots(
@@ -28611,8 +28618,7 @@ function snapshotDelegatedSlots(
 		CAPTURE_SLOTS[index] = active;
 		if (active != null) {
 			found = true;
-			if (SIGNAL_EVENT_OWNERS !== null)
-				(CAPTURE_OWNERS ??= [])[index] = SIGNAL_EVENT_OWNERS.get(node);
+			if (SIGNAL_EVENT_OWNERS_RECORDED) (CAPTURE_OWNERS ??= [])[index] = node.$$signalOwner;
 		}
 	}
 	return found;
@@ -35517,7 +35523,8 @@ function hostElementBody(d: ElementDescriptor, block: Block): void {
 		// element fresh with hydration SUSPENDED for its subtree (so children client-mount
 		// rather than mis-adopt). Recovery runs in dev + prod; the warning is dev-only.
 		hydration.save(block.parentNode);
-		if (hydration.reportStructural() && process.env.NODE_ENV !== 'production') {
+		hydration.reportStructural();
+		if (process.env.NODE_ENV !== 'production') {
 			const mmLoc =
 				(domNode(hydration.node).parentNode as any)?.__oct_loc || runtimeHostSiteLoc(block);
 			if (mmLoc)
@@ -47880,10 +47887,12 @@ let RECOVERABLE_REPORTED: WeakSet<Block> | null = null;
  * report is delivered on a microtask so a user callback can never re-enter the
  * in-progress hydration walk. A hydrating try body holds it until the body
  * settles (HYDRATION_DIAGNOSTIC_HOLDS), and a root's hydrating attempt delivers
- * it only if it commits (inRootHydrationAttempt).
+ * it only if it commits (inRootHydrationAttempt). Recovery from server output
+ * that predates the client's state is not a mismatch: the one gate for every
+ * site is the capture staleness of the hydration that recovers.
  */
 function noteRecoverableHydrationError(makeError: () => Error, block: Block | null = null): void {
-	if (ROOT_ERROR_HANDLERS === null) return;
+	if (ROOT_ERROR_HANDLERS === null || currentHydration?.staleServerValues === true) return;
 	const from = block ?? CURRENT_BLOCK;
 	if (currentHydration?.holds(() => noteRecoverableHydrationError(makeError, from))) return;
 	const h = rootErrorHandlersFor(from)?.onRecoverableError;
