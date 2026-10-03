@@ -1025,6 +1025,22 @@
   },
   {
     "suite": "memo-wall",
+    "op": "bailed_row_journal_slots",
+    "target": "survivor-work",
+    "reference": "survivor-work-budget",
+    "maxRatio": 0,
+    "note": "A value-position memo row that bails on equal props (memo-wall wall B's one_change_B shape) adds no root-journal slot. Entering the de-opt item's own render journaled its inputs and its render, 8 slots per bailed row; render probes, host identity, and the one changed row are checked in the same run."
+  },
+  {
+    "suite": "memo-wall",
+    "op": "bailed_row_calls",
+    "target": "survivor-work",
+    "reference": "survivor-work-budget",
+    "maxRatio": 1,
+    "note": "Production-bundle calls per bailed value-position memo row, from jitless precise coverage: 26 to create and key the descriptor, visit the survivor, and take the memo bail. Entering the de-opt item's own render (renderBlock, deoptItemBody, a nested childSlot) cost 48. Same semantic controls as bailed_row_journal_slots."
+  },
+  {
+    "suite": "memo-wall",
     "op": "mount",
     "target": "octane-tsrx",
     "reference": "react",
@@ -1052,12 +1068,8 @@
     "op": "one_change_B",
     "target": "octane-tsrx",
     "reference": "react",
-    "maxRatio": 1.4,
-    "note": "One changed row amid wall B's 999 successful value-comparing bails. With the immutable-region optimization and React Compiler enabled, the normal 20-iteration pairing measures ~1.21x; 1.4 leaves modest browser headroom while the deterministic work gates continue to protect the changed-row path.",
-    "waiver": {
-      "reason": "Confirmed regression: a same-runner A/B on 2026-10-03 measured octane 0.27 ms per one-row change against 0.18 ms at #639 (1.5x; unchanged by a terser rebuild). Fix PRs #1655, #1656 and #1661 bring it to about 1.33x; the remainder is per-row survivor work (#833 input journaling, #1069 signal-owner checks in renderBlock, scoped key derivation), tracked in task_8db1d14b. Remove this waiver with that fix.",
-      "expires": "2026-10-24"
-    }
+    "maxRatio": 1.1,
+    "note": "One changed row amid wall B's 999 successful value-comparing bails. Surviving rows whose descriptor names the same component take the memo bail without entering their item render (#1664). Paired ~20 ms samples on 2026-10-03 measured 0.80x, 0.80x and 0.82x across two runs (octane 0.136-0.160 ms, React Compiler 0.170-0.196 ms). The previous code measured 1.30-1.41x, and #639 measured 0.97x. 1.1 leaves about 35% browser headroom and still catches a return of the per-row item render. memo-wall survivor-work guards its per-row calls and journal slots deterministically."
   },
   {
     "suite": "memo-wall",

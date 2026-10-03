@@ -46,6 +46,8 @@ benchmarks/memo-wall/
 ├── svelte/       # Vite app, dev :5278 (fine-grained creation/text probes)
 ├── run.mjs        # Playwright harness — drives all targets, enforces the gates
 ├── work.mjs       # untimed Chromium precise-call-coverage work gates
+├── bail-compare.mjs  # own-prop lookups per bailed row (ratio guard)
+├── survivor-work.mjs # journal slots and calls per bailed wall-B row (ratio guards)
 ├── package.json   # umbrella: `pnpm bench`
 └── README.md
 ```
@@ -86,8 +88,9 @@ how `<Row>` is put on screen:
 - **wall B — value-position**: a plain-`.ts` helper (`src/wall-b.ts`) builds
   `createElement(Row, props)` descriptors that reach the DOM through a
   `{rows}` children hole → `childSlot`'s keyed de-opt list → the **childSlot
-  arm** of `tryMemoBail`. This is the shape every `@octanejs/*` binding
-  produces. Both dialects cache the imported helper's result against its input
+  arm** of `tryMemoBail`, which a surviving row whose descriptor names the same
+  component takes straight from the keyed survivor visit. This is the shape
+  every `@octanejs/*` binding produces. Both dialects cache the imported helper's result against its input
   and reuse the compiler-proven immutable renderable region, refreshing existing
   context consumers directly when a Provider changes. When the input changes,
   fresh descriptors still exercise memo bailouts on prop VALUES, not object
@@ -133,6 +136,15 @@ survivor visits and memo comparisons for equal/context-only updates; context
 updates still refresh exactly 1000 leaves. Returned-JSX wrapper descriptor
 counts have upper ceilings rather than exact requirements.
 Mount and one-change A/B also carry exact compiled-work gates.
+
+`survivor-work.mjs` runs in every suite run and feeds two ratio guards with the
+per-row cost of wall B's one-change shape: a compiled memo row, a plain-JS
+`createElement` helper and a `{rows}` hole, at 128 and 256 rows, with one row
+changed. The difference between the two sizes gives the root-journal slots
+(budget 0) and the jitless production-bundle calls (budget 26) each bailed row
+adds. Render probes, host identity and the changed row's text are checked in
+the same run. Pass a runtime source path to compare another revision:
+`node survivor-work.mjs /path/to/runtime.ts`.
 
 The React Row/Inner/Leaf counters likewise make those component bodies impure,
 so React Compiler conservatively leaves them alone; the explicit `memo`
