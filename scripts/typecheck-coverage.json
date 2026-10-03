@@ -1,11 +1,43 @@
 {
   "schemaVersion": 1,
-  "scope": "Projects and explicit private-port exceptions added by the 2026-09-02 cleanup audit.",
+  "scope": "Projects and explicit exceptions for the root octane-tsc typecheck. Every published package's tsconfig.json and .tsrx-aware typecheck projects must be reached, or listed here with a reason and an expiry date.",
   "requiredProjects": [
     "packages/blocknote/tsconfig.supported.json",
     "packages/puck/tsconfig.json",
     "packages/thinking-orbs/tsconfig.json",
     "packages/xyflow/tsconfig.json"
   ],
-  "privateExceptions": []
+  "privateExceptions": [],
+  "publishedExceptions": [
+    {
+      "package": "@octanejs/drei",
+      "projects": ["packages/drei/tsconfig.json", "packages/drei/typetests/tsconfig.json"],
+      "reason": "octane/compiler/volar virtual TSX passes a keyed @for row's `key` as a component prop (Clone.three.tsrx), types a <Suspense> without children as missing them (Example.three.tsrx), and passes an undefined ref to ThreeRef (Sky.three.tsrx); none of these errors has a source location.",
+      "expires": "2026-10-31"
+    },
+    {
+      "package": "@octanejs/ink",
+      "projects": ["packages/ink/tsconfig.json", "packages/ink/typetests/tsconfig.json"],
+      "reason": "octane/compiler/volar virtual TSX gives the @try boundary component in ErrorBoundary.ink.tsrx an `unknown` return type, so TypeScript rejects it as a JSX component; the error has no source location.",
+      "expires": "2026-10-31"
+    },
+    {
+      "package": "@octanejs/select",
+      "projects": [
+        "packages/select/tsconfig.json",
+        "packages/select/tests/browser/tsconfig.json",
+        "packages/select/tests/upstream/tsconfig.json",
+        "packages/select/typetests/tsconfig.local.json",
+        "packages/select/typetests/tsconfig.compat.json"
+      ],
+      "reason": "octane/compiler/volar virtual TSX types a forwarded ref in components.tsrx as `unknown`, which is not assignable to Ref<HTMLInputElement>; the error has no source location.",
+      "expires": "2026-10-31"
+    }
+  ],
+  "materializedProjects": [
+    {
+      "project": "packages/floating-ui/typetests/tsconfig.adapted.json",
+      "reason": "Compiles the upstream @floating-ui/react type tests that the React parity harness materializes into packages/floating-ui/tests/upstream/, which is gitignored, so a clean checkout has no inputs. The parity lane typechecks it after materializing."
+    }
+  ]
 }

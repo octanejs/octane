@@ -10,7 +10,6 @@
     "noErrorTruncation": true,
     "noUnusedLocals": false,
     "noUnusedParameters": false,
-    "baseUrl": ".",
     "paths": {
       "octane": ["../../octane/src/index.ts"],
       "octane/*": ["../../octane/src/*"]

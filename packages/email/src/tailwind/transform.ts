@@ -11,6 +11,7 @@ import {
 	type NumberNode,
 	type Percentage,
 	type Rule,
+	type WalkOptionsVisit,
 } from 'css-tree';
 import { readFile } from 'node:fs/promises';
 import { createRequire } from 'node:module';
@@ -99,7 +100,7 @@ ${options.utility ?? ''}
 						if (value.property.startsWith('--'))
 							customProperties.set(value.property, generate(value.value));
 					},
-				});
+				} satisfies WalkOptionsVisit<Declaration>);
 				list?.remove(item);
 				return;
 			}
@@ -116,11 +117,11 @@ ${options.utility ?? ''}
 						declarations += `${value.property}:${sanitizeOklchColors(resolvedValue, 'value')}${important};`;
 					}
 				},
-			});
+			} satisfies WalkOptionsVisit<Declaration>);
 			if (declarations) inline.set(className, declarations);
 			list?.remove(item);
 		},
-	});
+	} satisfies WalkOptionsVisit<Rule>);
 	// What remains is media/pseudo CSS plus Tailwind's supporting at-rules.
 	if (ast.type !== 'StyleSheet') throw new Error('Tailwind generated an invalid stylesheet.');
 	for (const node of ast.children) nonInlineNodes.push(node as Rule | Atrule);
@@ -407,7 +408,7 @@ function sanitizeOklchColors(value: string, context: 'stylesheet' | 'value'): st
 			if (color.name.toLowerCase() !== 'oklch') return;
 			item.data = oklchToRgbNode(color);
 		},
-	});
+	} satisfies WalkOptionsVisit<FunctionNode>);
 	return generate(ast);
 }
 
