@@ -179,7 +179,8 @@ const SUITES = [
 		// portal tooltip overlay, and a createElement icon layer (octane's
 		// de-opt path). The harness byte-compares the DOM against a Node-side
 		// replay of the shared ops module and cross-hashes DOM parity across
-		// all four fixtures before timing anything.
+		// all four fixtures before timing anything. The untimed work pass
+		// then counts deferred-JSX accessor reads per Octane ui commit.
 		name: 'svg-dashboard',
 		cwd: 'svg-dashboard',
 		servers: [
@@ -190,7 +191,10 @@ const SUITES = [
 			{ filter: 'inferno-svg-dashboard-bench', port: 5324 },
 		],
 		iter: { normal: 20, quick: 3 },
-		runs: [{ script: 'run.mjs', args: (n) => [String(n)] }],
+		runs: [
+			{ script: 'run.mjs', args: (n) => [String(n)] },
+			{ label: 'work', script: 'work.mjs', args: () => [] },
+		],
 	},
 	{
 		// Fresh implementation of localvoid/UIbench's complete 96-case desktop

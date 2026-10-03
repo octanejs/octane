@@ -2993,6 +2993,22 @@
   },
   {
     "suite": "svg-dashboard",
+    "op": "tooltip_cycle_scoped_reads",
+    "target": "octane-tsrx-work",
+    "reference": "octane-tsrx-work-budget",
+    "maxRatio": 1,
+    "note": "Deferred-JSX accessor reads across 16 tooltip commits (4 open/move/move/close cycles), counted by jitless precise coverage of the unminified production bundle. Viewport re-classifies its identical defs/layers props on every ui commit; reading each value's type and key once per classification cut 1,408 reads to 404 for the same renderBlock/childSlot/deoptItemBody visits. Tooltip and viewport states match the shared ops replay and the dashboard subtrees keep their DOM identity."
+  },
+  {
+    "suite": "svg-dashboard",
+    "op": "pan_zoom_scoped_reads",
+    "target": "octane-tsrx-work",
+    "reference": "octane-tsrx-work-budget",
+    "maxRatio": 1,
+    "note": "Deferred-JSX accessor reads across 8 pan_zoom commits with no portal: 85 per commit before read-once classification, 23 after (defs 3, four layers children 5 each). Semantic controls as tooltip_cycle_scoped_reads."
+  },
+  {
+    "suite": "svg-dashboard",
     "op": "icon_swap",
     "target": "octane-tsrx",
     "reference": "react",
