@@ -19002,6 +19002,8 @@ class HydrationCapability {
 	 * slot claims it or the enclosing range ends (sweepRebuiltTail).
 	 */
 	rebuiltTail: Node | null = null;
+	/** The start of the range whose whole content rebuiltRoot is (claimRoots), until it commits. */
+	private rebuiltRange: Node | null = null;
 	/**
 	 * The start comment of each markerless branch that holdMarkerlessBranch
 	 * holds, to where its content reaches: after its template's roots once that
@@ -19530,7 +19532,9 @@ class HydrationCapability {
 	 * the content is the owner's slots, and the last one left the cursor past
 	 * its range, or past the server nodes it adopted in place. A cursor on
 	 * `end` means nothing is left, and anything less certain is left in place.
-	 * The slot at `scope`'s `slotKey` owns the range.
+	 * (A root rebuilt as the range's whole content already took the rest of
+	 * the range when it committed: rebuiltAt.) The slot at `scope`'s `slotKey`
+	 * owns the range.
 	 */
 	settleClaim(
 		owner: Scope,
@@ -20763,6 +20767,15 @@ class HydrationCapability {
 					framedRemainder === undefined ? (unframedRemainder ?? null) : framedRemainder,
 				);
 			this.rebuiltTail = this.node;
+			this.rebuiltRange = null;
+			// The rebuilt root can be a range's whole content: what the server
+			// rendered after the node it replaces is then the range's tail. A
+			// markerless branch (claimOwner) has no range: its claim alone ends it.
+			if (cursor === this.claimFrom) {
+				this.claimRoots(cursor, null);
+				if (this.claimFrom === null && CURRENT_SCOPE!.block !== this.claimOwner)
+					this.rebuiltRange = domNode(cursor).previousSibling;
+			}
 			return (this.rebuiltRoot = this.freshClone(template));
 		}
 		if (isFragment) {
@@ -20814,14 +20827,15 @@ class HydrationCapability {
 
 	/**
 	 * A template adopted `root`, the first node of the range whose claim is
-	 * open. When the template is that range's content, record the first node
-	 * after its roots: after `root`, or after the `fragment` template's roots,
-	 * stepped as the compiled walk steps them. The template is the content when
-	 * it renders in the range's owner: the block whose markers the range's
-	 * are, a component inheriting them, the lite component that adopted the
-	 * range, or the markerless branch whose content it is (claimOwner). A
-	 * component that adopts `root` without a range of its own renders in its
-	 * own scope, and the slots after it claim the nodes after its root.
+	 * open, or rebuilt its single root over it. When the template is that
+	 * range's content, record the first node after its roots: after `root`, or
+	 * after the `fragment` template's roots, stepped as the compiled walk steps
+	 * them. The template is the content when it renders in the range's owner:
+	 * the block whose markers the range's are, a component inheriting them, the
+	 * lite component that adopted the range, or the markerless branch whose
+	 * content it is (claimOwner). A component that adopts `root` without a
+	 * range of its own renders in its own scope, and the slots after it claim
+	 * the nodes after its root.
 	 * Returns false when the range ends before the template's roots do: every
 	 * root, a hole included, renders at least one server node, so the server
 	 * rendered other content there. Below a passthrough root, the range may
@@ -20950,21 +20964,42 @@ class HydrationCapability {
 	 * Document holds one element), or else before the server node that
 	 * followed that one while it is still there. Undefined for any other root,
 	 * which goes at its block's end. A rebuilt root commits before any later
-	 * sibling can rebuild, since the subtree it holds no longer hydrates.
+	 * sibling can rebuild, since the subtree it holds no longer hydrates. A
+	 * root that is its range's whole content takes the rest of that range with
+	 * it: the server content its reported mismatch replaced, which goes without
+	 * a second report, whichever render completes the range.
 	 */
 	rebuiltAt(root: Node, parent: Node): Node | null | undefined {
 		if (root !== this.rebuiltRoot) return undefined;
 		const replaced = this.replaced;
 		const next = this.rebuiltTail;
+		const range = this.rebuiltRange;
 		this.replaced = null;
+		this.rebuiltRange = null;
 		if (replaced !== null && domNode(replaced).parentNode === parent) {
 			const last = isBlockOpen(replaced) ? this.close(replaced) : replaced;
 			const at = getNextSibling(last);
 			this.save(parent);
 			removeHydrationRange(replaced, last);
-			return at;
+			return range === null ? at : this.takeRangeTail(at, range);
 		}
 		return next !== null && domNode(next).parentNode === parent ? next : undefined;
+	}
+
+	/**
+	 * Remove the server nodes from `from` to the end of the range that `start`
+	 * opens, and return that end, while the cursor still rests on `from`: no
+	 * later content claimed any of them. Otherwise return `from`.
+	 */
+	private takeRangeTail(from: Node | null, start: Node): Node | null {
+		const end = this.close(start);
+		if (from === null || from === end || this.node !== from) return from;
+		for (let node: Node | null = from; node !== end; node = getNextSibling(node)) {
+			if (node === null || this.freshNodes.has(node)) return from;
+		}
+		removeRange(from, end);
+		this.rebuiltTail = null;
+		return (this.node = end);
 	}
 
 	/**

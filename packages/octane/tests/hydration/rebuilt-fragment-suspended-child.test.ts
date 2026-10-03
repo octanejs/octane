@@ -217,6 +217,92 @@ describe.each([
 		expect(warnings()).toHaveLength(dev ? 1 : 0);
 	});
 
+	it.each([
+		{
+			shape: "a call that inherits its wrapper's range",
+			name: 'InheritedRootBranch',
+			html: '<p><em>z</em><s>s</s></p><em>e</em>',
+		},
+		{
+			shape: 'the value of a renderable hole',
+			name: 'RebuiltHoleValueBranch',
+			html: '<p data-tag="p"><em>z</em><s>s</s></p><em>e</em>',
+		},
+		{
+			shape: "a component's return value",
+			name: 'ReturnBranch',
+			html: '<p><em>z</em><s>s</s></p><em>e</em>',
+		},
+		{
+			shape: 'a component that suspends before its template',
+			name: 'SetupRootBranch',
+			html: '<p>z</p><em>e</em>',
+		},
+		{
+			shape: 'a component that suspends before the rebuilt root commits',
+			name: 'InlineRootBranch',
+			html: '<p>z</p><em>e</em>',
+		},
+		{
+			shape: 'a component with hooks that suspends before the rebuilt root commits',
+			name: 'StateInlineRootBranch',
+			html: '<p data-tag="p">z</p><em>e</em>',
+		},
+	])(
+		'completes a child of a root rebuilt as $shape, as when its data is ready',
+		async ({ name, html }) => {
+			// The rebuilt root takes the rest of its range when it commits: before
+			// its child suspends, or in the resume, which claims the range again.
+			render(name, { server: true, leaf: fulfilled('unused') });
+			await hydrate(name, { leaf: fulfilled('z') });
+			const ready = markup(section());
+			root!.unmount();
+			recoverable = [];
+			errSpy.mockClear();
+
+			render(name, { server: true, leaf: fulfilled('unused') });
+			const em = section().lastElementChild!;
+			const leaf = pending();
+			await hydrate(name, { leaf: leaf.promise });
+			await act(async () => leaf.resolve('z'));
+
+			expect(markup(section())).toBe(html);
+			expect(markup(section())).toBe(ready);
+			expect(section().lastElementChild).toBe(em);
+			expect(recoverable).toEqual([expect.stringMatching(MISMATCH)]);
+			expect(warnings()).toHaveLength(dev ? 1 : 0);
+		},
+	);
+
+	it.each([
+		{ wrapper: 'a lite component', name: 'RebuiltHoleBranch' },
+		{ wrapper: 'a component with hooks', name: 'StateRebuiltHoleBranch' },
+	])(
+		'keeps the root that $wrapper adopted after a hole whose call rebuilt its root, as when its data is ready',
+		async ({ name }) => {
+			render(name, { server: true, leaf: fulfilled('unused') });
+			await hydrate(name, { leaf: fulfilled('z') });
+			const ready = markup(section());
+			root!.unmount();
+			recoverable = [];
+			errSpy.mockClear();
+
+			render(name, { server: true, leaf: fulfilled('unused') });
+			const italic = container.querySelector('i')!;
+			const em = container.querySelector('em')!;
+			const leaf = pending();
+			await hydrate(name, { leaf: leaf.promise });
+			await act(async () => leaf.resolve('z'));
+
+			expect(markup(section())).toBe('<p><em>z</em><s>s</s></p><i>x</i><em>e</em>');
+			expect(markup(section())).toBe(ready);
+			expect(section().querySelector('i')).toBe(italic);
+			expect(section().lastElementChild).toBe(em);
+			expect(recoverable).toEqual([expect.stringMatching(MISMATCH)]);
+			expect(warnings()).toHaveLength(dev ? 1 : 0);
+		},
+	);
+
 	it('claims the range again for a component that suspended before its template did', async () => {
 		const name = 'SetupFirstBranch';
 		render(name, { server: true, leaf: fulfilled('unused') });
