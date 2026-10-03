@@ -265,7 +265,13 @@ export function Benchmarks() @{
 								target="_blank"
 								rel="noreferrer"
 							>{'benchmarks/'}</a>
-							{' for what each suite measures.'}
+							{' for what each suite measures. This snapshot measures Octane 0.8.0 on 3 October 2026. See the '}
+							<a
+								href="https://github.com/octanejs/octane/blob/main/benchmarks/baselines/website-refresh.md"
+								target="_blank"
+								rel="noreferrer"
+							>measurement notes</a>
+							{' for the source revision, environment, and reproduction command.'}
 						</p>
 					</header>
 
