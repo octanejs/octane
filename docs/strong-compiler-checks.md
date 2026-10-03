@@ -12,7 +12,8 @@ support explicit dependencies, manual memo hooks, and ordinary raw HTML props.
 | `OCTANE_STRONG_EFFECT_STATE_UPDATE` | Effect setup calls a state updater synchronously. This includes updaters and callbacks returned by same-module custom hooks, and callbacks that run before the next paint: `startTransition`, a `useTransition` start function, `queueMicrotask`, `.then`/`.catch`/`.finally` on `Promise.resolve(value)` or `Promise.reject()`, `setTimeout` without a positive delay, and code after an `await` that resumes without waiting on any path, such as `await null` or `await (flag ? load() : null)`. | Derive the value during render, or use `useLinkedState` when state follows another value. `requestAnimationFrame`, timers with a positive delay, and external subscription callbacks remain event-driven. |
 | `OCTANE_STRONG_EFFECT_DATA_FETCH` | A state update runs after an `await`, or in a `.then`, `.catch`, or `.finally` callback, of work the effect started, and the returned cleanup does not provably cancel or ignore it. An async effect callback returns a promise, so it cannot return cleanup. | Read asynchronous render data with `use()` or a query binding. For external synchronization, abort an `AbortController` whose `signal` is passed to the request, or set a flag declared in the effect from its cleanup and check it before the update. See [Effect cleanup](#effect-cleanup). |
 | `OCTANE_STRONG_EFFECT_HIDDEN_DEPENDENCY` | Synchronous effect setup calls a state getter, reads `current` from a value ref, or reads a reassigned module `let` or `var`. None of these is an inferred dependency, so the effect does not re-run when they change. | Read the render snapshot, or move the non-reactive read into a `useEffectEvent` callback. Octane never double-invokes effects, so first-run and `didInit` guards are unnecessary. |
-| `OCTANE_STRONG_EFFECT_RESOURCE_LEAK` | Effect setup acquires a platform listener, timer, observer, connection, or geolocation watch that the returned cleanup does not release. | Release it in the returned cleanup; see [Effect cleanup](#effect-cleanup). |
+| `OCTANE_STRONG_EFFECT_RESOURCE_LEAK` | Effect setup acquires a platform listener, timer, observer, connection, or geolocation watch that the returned cleanup does not release. A `useLayoutSnapshot` measurement is checked like effect setup, but its return value is the snapshot, so it can never release one. | Release it in the returned cleanup; see [Effect cleanup](#effect-cleanup). Acquire resources for a snapshot in a separate effect. |
+| `OCTANE_STRONG_LAYOUT_SNAPSHOT_ASYNC` | A `useLayoutSnapshot` measurement is an `async` or generator function. It returns a new promise or iterator on every commit, so the snapshot never converges. | Return the measurement synchronously, and read asynchronous render data with `use()` or a query binding. |
 | `OCTANE_STRONG_EFFECT_CHAIN` | An effect reads state written by another effect's own execution or promise continuation in the same component. | Derive the value during render, use `useLinkedState`, or combine the external synchronization. External subscription and timer callbacks remain event-driven updates. |
 | `OCTANE_STRONG_UNLINKED_PROP_STATE` | An eager `useState` initializer or two-argument `useReducer` initial state is derived from component props. | Use `useLinkedState(source, reconcile)` for state that follows a source. Use `useState(() => initialValue)` or an explicit third `useReducer` initializer for a deliberate initial capture. |
 | `OCTANE_STRONG_EXPLICIT_DEPENDENCIES` | An explicit dependency argument differs from the compiler's inferred inputs, or cannot be proven equivalent. | Omit the dependency argument. An equivalent array produces a **hint**, not an error; its authored behavior is preserved. |
@@ -229,15 +230,15 @@ functions and methods on arbitrary objects remain opaque.
 | --- | --- | --- |
 | `OCTANE_STRONG_RENDER_IMPURE_CALL` | Unshadowed `Date.now()`, `Math.random()`, `performance.now()`, `Date()`, `new Date()`, `crypto.randomUUID()`, or `crypto.getRandomValues()` during render, including inside callbacks that known array methods run synchronously. A `key` or `@for` key built from one of these gets its own message. | Read time or randomness outside render and pass a snapshot. Use `useId()` for element IDs. Give each list item a stable ID from its data, such as `item.id`. |
 | `OCTANE_STRONG_RENDER_LOCALE_FORMAT` | During render, `toLocaleString()`, `toLocaleDateString()`, or `toLocaleTimeString()` on a provable `Date` without both a locale and a visible `timeZone` option; `toString()` or `toTimeString()` on a provable `Date`; an `Intl` service constructed without a locale (a `DateTimeFormat` also needs a `timeZone`); or a call on a module-level formatter created that way. | Pass an explicit locale and time zone, for example `toLocaleString('en-US', { timeZone: 'UTC' })` or `new Intl.DateTimeFormat(locale, { timeZone })`. Otherwise format in an event or effect and render the stored text. |
-| `OCTANE_STRONG_RENDER_SIDE_EFFECT` | Unshadowed `setTimeout()`, `setInterval()`, `queueMicrotask()`, `requestAnimationFrame()`, or `requestIdleCallback()` during render, directly, on `window` or `globalThis`, or through an unreassigned alias. Lazy state initializers are part of render for this check. | Schedule the work from an event handler, or from an effect that cancels it in cleanup. Defining a callback that schedules later stays valid; calling it during render does not. |
+| `OCTANE_STRONG_RENDER_SIDE_EFFECT` | Unshadowed `setTimeout()`, `setInterval()`, `queueMicrotask()`, `requestAnimationFrame()`, or `requestIdleCallback()` during render, directly, on `window` or `globalThis`, or through an unreassigned alias. Lazy state and ref initializers are part of render for this check. | Schedule the work from an event handler, or from an effect that cancels it in cleanup. Defining a callback that schedules later stays valid; calling it during render does not. |
 
 The array methods whose callbacks run in the caller's phase are `every`,
 `filter`, `find`, `findIndex`, `findLast`, `findLastIndex`, `flatMap`,
 `forEach`, `map`, `reduce`, `reduceRight`, `some`, `sort`, `toSorted`, and the
 mapping function of `Array.from`. During render every other render rule applies
 inside them too, so `items.forEach(setSelected)` is a render state update. The
-same callbacks in events, effects, and lazy state initializers keep their
-existing rules.
+same callbacks in events, effects, and lazy state and ref initializers keep
+their existing rules.
 
 A `Date` is provable when it is built with `new Date(...)` from an unshadowed
 `Date`, directly or through an unreassigned local alias. A date passed as a prop
@@ -252,8 +253,8 @@ Registering a timer, microtask, or frame callback is a side effect even though
 the callback runs later. A component can render more or fewer times than it
 commits, so the work would be scheduled an unpredictable number of times. The
 registered callback itself is deferred and follows the deferred rules. A lazy
-state initializer may capture a clock or random value, but scheduling there is
-still reported. Updaters and reducers report scheduling as
+state or `useLazyRef` initializer may capture a clock or random value, but
+scheduling there is still reported. Updaters and reducers report scheduling as
 `OCTANE_STRONG_IMPURE_UPDATER`. Promise continuations such as `.then()` are not
 part of this check, because `use(fetch(url).then((r) => r.json()))` is valid
 render code.

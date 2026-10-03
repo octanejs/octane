@@ -4,6 +4,7 @@ import {
 	createUniversalRoot,
 	defineUniversalComponent,
 	universalActivity,
+	universalFor,
 	universalKey,
 	universalList,
 	universalPlan,
@@ -1705,6 +1706,142 @@ describe('Three universal driver', () => {
 
 		root.unmount();
 		container.flushDisposals();
+	});
+
+	describe('retained root meshes', () => {
+		type MeshItem = { readonly id: string; readonly name?: string; readonly x: number };
+		const leaf = universalPlan('three', {
+			kind: 'host',
+			type: 'mesh',
+			bindings: [
+				['name', 0],
+				['position', 1],
+			],
+		});
+		// The compiler's form of a keyed loop of `<mesh name={...} position={[x, 0, 0]} />`.
+		const Meshes = defineUniversalComponent('three', (props: { items: readonly MeshItem[] }) =>
+			universalFor(
+				props.items,
+				(item) => item.id,
+				(item) => [item.name ?? item.id, [item.x, 0, 0]],
+				null,
+				true,
+				true,
+				undefined,
+				leaf,
+			),
+		);
+		const meshes = (...items: (number | Omit<MeshItem, 'id'>)[]) => ({
+			items: items.map((item, index): MeshItem => {
+				const id = String.fromCharCode(97 + index);
+				return typeof item === 'number' ? { id, x: item } : { id, ...item };
+			}),
+		});
+
+		it('reasserts a publicly hidden mesh on its next update', () => {
+			const { container, root, scene } = createRoot();
+			root.render(Meshes, meshes(0, 1));
+			const [a, b] = scene.children as THREE.Mesh[];
+			a.visible = false;
+
+			root.render(Meshes, meshes(2, 3));
+			expect(scene.children[0]).toBe(a);
+			expect(scene.children[1]).toBe(b);
+			expect(a.visible).toBe(true);
+			expect([a.position.x, b.position.x]).toEqual([2, 3]);
+
+			root.unmount();
+			container.flushDisposals();
+		});
+
+		it('restores publicly reordered meshes on their next update', () => {
+			const { container, root, scene } = createRoot();
+			root.render(Meshes, meshes(0, 1));
+			const [a, b] = scene.children as THREE.Mesh[];
+			scene.remove(a);
+			scene.add(a);
+			expect(scene.children[0]).toBe(b);
+
+			root.render(Meshes, meshes(2, 3));
+			expect(scene.children[0]).toBe(a);
+			expect(scene.children[1]).toBe(b);
+			expect([a.position.x, b.position.x]).toEqual([2, 3]);
+
+			root.unmount();
+			container.flushDisposals();
+		});
+
+		it('renames a mesh while moving its siblings', () => {
+			const { container, root, scene } = createRoot();
+			root.render(Meshes, meshes(0, 1));
+			const [a, b] = scene.children as THREE.Mesh[];
+
+			root.render(Meshes, meshes({ name: 'renamed', x: 2 }, 3));
+			expect([a.name, b.name]).toEqual(['renamed', 'b']);
+			expect([a.position.x, b.position.x]).toEqual([2, 3]);
+
+			root.unmount();
+			container.flushDisposals();
+		});
+
+		it('applies a prop first authored on a later update', () => {
+			const meshPlan = universalPlan('three', { kind: 'host', type: 'mesh', propsSlot: 0 });
+			const Scene = defineUniversalComponent('three', (props: { x: number; scale?: number }) =>
+				universalValue(meshPlan, [
+					universalProps([
+						['set', 'name', 'scaled'],
+						['set', 'position', [props.x, 0, 0]],
+						...(props.scale === undefined
+							? []
+							: [['set', 'scale', [props.scale, props.scale, props.scale]] as const]),
+					]),
+				]),
+			);
+			const { container, root, scene } = createRoot();
+			root.render(Scene, { x: 1 });
+			const mesh = scene.children[0] as THREE.Mesh;
+
+			root.render(Scene, { x: 2, scale: 3 });
+			expect(mesh.position.x).toBe(2);
+			expect(mesh.scale.toArray()).toEqual([3, 3, 3]);
+
+			root.unmount();
+			container.flushDisposals();
+		});
+
+		it('applies each update command to the instance its id names', () => {
+			registerThreeIntrinsic('Mesh', THREE.Mesh);
+			const scene = new THREE.Scene();
+			const container = createThreeContainer({ scene, environment: { scheduleDispose() {} } });
+			const driver = createThreeDriver();
+			const root = createUniversalRoot(container, driver);
+			root.render(Meshes, meshes(0, 1));
+			const [a, b] = scene.children as THREE.Mesh[];
+			const [createA, createB] = container.commits[0].commands;
+			if (createA.op !== 'create' || createB.op !== 'create') {
+				throw new Error('Expected the mount batch to create both meshes first.');
+			}
+
+			driver
+				.prepareBatch(
+					container,
+					{
+						renderer: container.renderer,
+						version: Number.MAX_SAFE_INTEGER,
+						commands: [
+							{ op: 'update', id: createB.id, props: { name: 'b', position: [5, 0, 0] } },
+							{ op: 'update', id: createA.id, props: { name: 'a', position: [4, 0, 0] } },
+						],
+					},
+					{ invokeLocalCallback() {} },
+				)
+				.apply();
+			expect([a.name, b.name]).toEqual(['a', 'b']);
+			expect([a.position.x, b.position.x]).toEqual([4, 5]);
+
+			root.unmount();
+			container.flushDisposals();
+		});
 	});
 
 	it('does not invoke authored array helpers while selecting the direct leaf path', () => {

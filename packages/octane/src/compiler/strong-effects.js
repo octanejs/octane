@@ -7,6 +7,8 @@
 // lexical analysis, never from spelling. Nothing here annotates the parser tree
 // or changes emitted code.
 
+import { REF_HOOKS } from './hook-names.js';
+
 export const STRONG_EFFECT_DATA_FETCH = 'OCTANE_STRONG_EFFECT_DATA_FETCH';
 export const STRONG_EFFECT_HIDDEN_DEPENDENCY = 'OCTANE_STRONG_EFFECT_HIDDEN_DEPENDENCY';
 export const STRONG_EFFECT_RESOURCE_LEAK = 'OCTANE_STRONG_EFFECT_RESOURCE_LEAK';
@@ -76,6 +78,13 @@ const FETCH_MESSAGES = {
 		'Strong mode requires cleanup for a state update that runs after an await in an effect, but an async effect callback returns a promise instead of cleanup. Read asynchronous render data with use() or a query binding, or start the async work inside a synchronous effect whose returned cleanup aborts it or sets a flag checked before this update.',
 	ineffective:
 		'Strong mode requires the effect cleanup to cancel or ignore this asynchronous state update, but the returned cleanup does neither. Abort an AbortController whose signal is passed to the request, or set a flag in the cleanup and check it before this update, after the last await.',
+};
+// A useLayoutSnapshot measurement is checked like effect setup, but its return
+// value is the snapshot, so the cleanup advice above does not apply to it.
+const SNAPSHOT_MESSAGES = {
+	fetch:
+		'Strong mode does not allow a useLayoutSnapshot measurement to update state after an await or promise callback. Its return value is the snapshot, so it cannot return cleanup that cancels the update. Read asynchronous render data with use() or a query binding, or start the request in an effect whose returned cleanup aborts it.',
+	leak: "Strong mode does not allow a useLayoutSnapshot measurement to acquire this platform resource. Its return value is the snapshot, not cleanup, so nothing can release it. Acquire the resource in an effect and release it in that effect's returned cleanup.",
 };
 const LEAK_MESSAGES = {
 	listener:
@@ -1113,7 +1122,7 @@ export function createStrongEffectPolicy({ ast, analysis, callNames, report }) {
 			const init = unwrap(decl.init);
 			const binding = bindings[0]?.binding;
 			if (decl.id?.type === 'Identifier' && binding && !binding.reassigned) {
-				if (init?.type === 'CallExpression' && callNames.get(init) === 'useRef') {
+				if (init?.type === 'CallExpression' && REF_HOOKS.has(callNames.get(init))) {
 					roots.add(binding);
 					declarations.set(decl.id, binding);
 					names.add(binding.name);
@@ -1615,12 +1624,18 @@ export function createStrongEffectPolicy({ ast, analysis, callNames, report }) {
 				report(
 					STRONG_EFFECT_DATA_FETCH,
 					write.origin,
-					FETCH_MESSAGES[asyncCallback ? 'async' : hasCleanup ? 'ineffective' : 'missing'],
+					record.snapshot
+						? SNAPSHOT_MESSAGES.fetch
+						: FETCH_MESSAGES[asyncCallback ? 'async' : hasCleanup ? 'ineffective' : 'missing'],
 				);
 			}
 			for (const acquisition of record.acquisitions) {
 				if (released(acquisition, cleanup, record)) continue;
-				report(STRONG_EFFECT_RESOURCE_LEAK, acquisition.node, LEAK_MESSAGES[acquisition.kind]);
+				report(
+					STRONG_EFFECT_RESOURCE_LEAK,
+					acquisition.node,
+					record.snapshot ? SNAPSHOT_MESSAGES.leak : LEAK_MESSAGES[acquisition.kind],
+				);
 			}
 		},
 		// Callbacks of these calls run before the browser paints, so an update

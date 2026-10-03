@@ -4501,6 +4501,23 @@ export function sameUniversalHostPropValue(left: unknown, right: unknown, depth 
 	return leftCount === rightCount;
 }
 
+/** Whether a committed record can take a compact list's leaf at its position. */
+function isCompactLeafRecord(
+	record: LogicalRecord | undefined,
+	key: UniversalKey,
+	type: string,
+	owner: UniversalOwnerRecord,
+): boolean {
+	return (
+		record !== undefined &&
+		record.kind === 'host' &&
+		Object.is(record.key, key) &&
+		record.type === type &&
+		record.children.length === 0 &&
+		record.owner === owner
+	);
+}
+
 function shallowPropsEqual(
 	left: Readonly<Record<string, unknown>>,
 	right: Readonly<Record<string, unknown>>,
@@ -6564,40 +6581,57 @@ export function useRef<T>(initial: T, slot?: unknown): { current: T } {
 	}
 	const owner = currentDraftOwner();
 	const resolved = resolveHookSlot(slot);
-	let hook = owner.hooks.get(resolved) as RefHook<T> | undefined;
-	if (hook?.kind !== 'ref') {
-		const record = owner.record;
-		const value = {} as { current: T };
-		Object.defineProperty(value, 'current', {
-			enumerable: true,
-			get() {
-				const draft = findDraftOwner(record);
-				const live = (draft?.hooks.get(resolved) ?? record.hooks.get(resolved)) as
-					RefHook<T> | undefined;
-				return live?.kind === 'ref' ? live.current : initial;
-			},
-			set(next: T) {
-				const draft = findDraftOwner(record);
-				if (draft !== null) {
-					let live = draft.hooks.get(resolved) as RefHook<T> | undefined;
-					if (live?.kind !== 'ref') return;
-					if (!draft.clonedHooks.has(resolved)) {
-						live = { ...live };
-						draft.hooks.set(resolved, live);
-						draft.clonedHooks.add(resolved);
-					}
-					live.current = next;
-					return;
+	const hook = owner.hooks.get(resolved) as RefHook<T> | undefined;
+	return hook?.kind === 'ref' ? hook.value : createRefHook(owner, resolved, initial);
+}
+
+export function useLazyRef<T>(factory: () => T, slot?: unknown): { current: T } {
+	const owner = currentDraftOwner();
+	const resolved = resolveHookSlot(slot);
+	const hook = owner.hooks.get(resolved) as RefHook<T> | undefined;
+	return hook?.kind === 'ref' ? hook.value : createRefHook(owner, resolved, factory());
+}
+
+function createRefHook<T>(owner: DraftOwner, resolved: unknown, initial: T): { current: T } {
+	const record = owner.record;
+	// What the ref holds when no render or commit owns its cell, as after the
+	// render that created it is abandoned: a plain object keeps its last write.
+	// Tracking every write also keeps this accessor from pinning the initial
+	// value, often a large lazy one, after the ref is reassigned. A cell counts
+	// as this ref's own only when it carries this accessor (clones copy it), so
+	// an abandoned ref never reads or writes a ref committed later in its slot.
+	let detached = initial;
+	const value = {} as { current: T };
+	Object.defineProperty(value, 'current', {
+		enumerable: true,
+		get() {
+			const draft = findDraftOwner(record);
+			const live = (draft?.hooks.get(resolved) ?? record.hooks.get(resolved)) as
+				RefHook<T> | undefined;
+			return live?.kind === 'ref' && live.value === value ? live.current : detached;
+		},
+		set(next: T) {
+			detached = next;
+			const draft = findDraftOwner(record);
+			if (draft !== null) {
+				let live = draft.hooks.get(resolved) as RefHook<T> | undefined;
+				if (live?.kind !== 'ref' || live.value !== value) return;
+				if (!draft.clonedHooks.has(resolved)) {
+					live = { ...live };
+					draft.hooks.set(resolved, live);
+					draft.clonedHooks.add(resolved);
 				}
-				const live = record.hooks.get(resolved) as RefHook<T> | undefined;
-				if (live?.kind === 'ref') live.current = next;
-			},
-		});
-		hook = { kind: 'ref', current: initial, value };
-		owner.hooks.set(resolved, hook);
-		owner.clonedHooks.add(resolved);
-	}
-	return hook.value;
+				live.current = next;
+				return;
+			}
+			const live = record.hooks.get(resolved) as RefHook<T> | undefined;
+			if (live?.kind === 'ref' && live.value === value) live.current = next;
+		},
+	});
+	const hook = { kind: 'ref' as const, current: initial, value };
+	owner.hooks.set(resolved, hook);
+	owner.clonedHooks.add(resolved);
+	return value;
 }
 
 export function useId(slot?: unknown): string {
@@ -7935,12 +7969,44 @@ function freezeUniversalHostBatch(
 		}
 		Object.freeze(command);
 	}
+	return freezeUniversalHostBatchShell(renderer, version, commands);
+}
+
+/** Freeze a batch and its command list; every command must already be frozen. */
+function freezeUniversalHostBatchShell(
+	renderer: string,
+	version: number,
+	commands: readonly UniversalHostCommand[],
+): UniversalHostBatch {
 	return Object.freeze({
 		renderer,
 		version,
 		commands: Object.freeze(commands),
 	});
 }
+
+/**
+ * Freezing gives an object its own hidden class, which the engine reaches from
+ * the unfrozen class only through a weak transition. Batches and commands are
+ * transient, so a full collection with no batch alive drops those classes, and
+ * every optimized reader of a batch (this core, drivers, transports) is thrown
+ * away and relearns during the next commit. One frozen instance of the batch
+ * and of each common command keeps their classes alive. Each literal must keep
+ * the property order the commit paths emit, or it pins a different class.
+ */
+const PINNED_HOST_BATCH_SHAPES: readonly object[] = Object.freeze([
+	Object.freeze({
+		renderer: '',
+		version: 0,
+		commands: Object.freeze([
+			Object.freeze({ op: 'update', id: 0, props: EMPTY_STATIC_HOST_PROPS }),
+		]),
+	}),
+	Object.freeze({ op: 'create', id: 0, type: '', props: EMPTY_STATIC_HOST_PROPS }),
+	Object.freeze({ op: 'insert', parent: null, id: 0, before: null }),
+	Object.freeze({ op: 'remove', parent: null, id: 0 }),
+	Object.freeze({ op: 'destroy', id: 0 }),
+]);
 
 function collectEffectEventCells(owners: readonly UniversalOwnerRecord[]): EffectEventCell[] {
 	const cells: EffectEventCell[] = [];
@@ -8009,6 +8075,8 @@ interface UniversalPortalHandleEntry {
 // DOM-owned boundary facade, and the optional host-binding and template
 // supports. The class is not exported; `UniversalRoot` is the public type.
 class UniversalRootImpl<Container, PublicInstance> implements UniversalRoot<any> {
+	/** Reachable from every root, so bundlers and collectors both keep it. */
+	static readonly pinnedHostBatchShapes = PINNED_HOST_BATCH_SHAPES;
 	readonly renderer: string;
 	readonly rootRecord: LogicalRecord;
 	private readonly universalIdRoot = NEXT_UNIVERSAL_ID_ROOT++;
@@ -10270,6 +10338,41 @@ class UniversalRootImpl<Container, PublicInstance> implements UniversalRoot<any>
 		this.treeFeatures = 0;
 	}
 
+	/**
+	 * The frozen command, if any, that moves one paired committed leaf to its
+	 * compact props. An update runs the enclosing loop once, so its per-leaf body
+	 * lives here, where the engine sees it as the hot code it is.
+	 */
+	private compactLeafCommand(
+		list: BlueprintCompactLeafList,
+		index: number,
+		record: LogicalRecord,
+		lastBinding: string | null,
+	): UniversalHostCommand | null {
+		const host = list.host!;
+		const hostProps = this.compactLeafProps(list, index);
+		if (
+			(lastBinding === null ||
+				!hasOwnProp.call(record.props, lastBinding) ||
+				!hasOwnProp.call(hostProps, lastBinding) ||
+				Object.is(record.props[lastBinding], hostProps[lastBinding])) &&
+			shallowPropsEqual(record.props, hostProps, list.propCount)
+		) {
+			return null;
+		}
+		const kind = this.driver.updates?.classify(host.type, record.props, hostProps) ?? 'update';
+		const frozenProps = Object.freeze(hostProps);
+		if (kind === 'update') {
+			return Object.freeze({ op: 'update', id: record.id, props: frozenProps });
+		}
+		if (kind === 'recreate') {
+			return Object.freeze({ op: 'recreate', id: record.id, type: host.type, props: frozenProps });
+		}
+		throw new TypeError(
+			`Universal update classifier returned invalid kind ${JSON.stringify(kind)}.`,
+		);
+	}
+
 	private tryCreateCompactLeafUpdateTransaction(
 		blueprint: BlueprintRange,
 		attempt: RenderAttempt,
@@ -10304,19 +10407,13 @@ class UniversalRootImpl<Container, PublicInstance> implements UniversalRoot<any>
 					sawCompactList = true;
 					if (next.key !== null || list.owners !== null) return false;
 					if (list.host === null) continue;
-					const host = list.host;
-					if (list.keys.length !== list.values.length) return false;
+					const keys = list.keys;
+					if (keys.length !== list.values.length) return false;
+					const type = list.host.type;
+					const owner = list.owner;
 					const start = recordIndex;
-					for (let leafIndex = 0; leafIndex < list.keys.length; leafIndex++) {
-						const record = records[recordIndex++];
-						if (
-							record === undefined ||
-							record.kind !== 'host' ||
-							!Object.is(record.key, list.keys[leafIndex]) ||
-							record.type !== host.type ||
-							record.children.length !== 0 ||
-							record.owner !== list.owner
-						) {
+					for (let leafIndex = 0; leafIndex < keys.length; leafIndex++) {
+						if (!isCompactLeafRecord(records[recordIndex++], keys[leafIndex], type, owner)) {
 							return false;
 						}
 					}
@@ -10345,48 +10442,22 @@ class UniversalRootImpl<Container, PublicInstance> implements UniversalRoot<any>
 			return null;
 		}
 
-		for (const { list } of matches) {
-			for (let index = 0; index < list.keys.length; index++) this.compactLeafProps(list, index);
-		}
+		// Compact lists exist only without a transport or prop codec, so deriving a
+		// leaf's props cannot throw or reach the driver. Derive, compare, and emit
+		// each leaf's frozen command in one pass over the matched records.
 		const commands: UniversalHostCommand[] = [];
 		for (const { list, records, start } of matches) {
-			const host = list.host!;
-			const bindings = host.bindings;
+			const bindings = list.host!.bindings;
 			const lastBinding =
 				bindings === undefined || bindings.length === 0 ? null : bindings[bindings.length - 1][0];
 			for (let index = 0; index < list.keys.length; index++) {
-				const record = records[start + index];
-				const hostProps = list.props[index]!;
-				if (
-					(lastBinding === null ||
-						!hasOwnProp.call(record.props, lastBinding) ||
-						!hasOwnProp.call(hostProps, lastBinding) ||
-						Object.is(record.props[lastBinding], hostProps[lastBinding])) &&
-					shallowPropsEqual(record.props, hostProps, list.propCount)
-				) {
-					continue;
-				}
-				const kind = this.driver.updates?.classify(host.type, record.props, hostProps) ?? 'update';
-				const frozenProps = Object.freeze(hostProps);
-				if (kind === 'update') {
-					commands.push({ op: 'update', id: record.id, props: frozenProps });
-				} else if (kind === 'recreate') {
-					commands.push({
-						op: 'recreate',
-						id: record.id,
-						type: host.type,
-						props: frozenProps,
-					});
-				} else {
-					throw new TypeError(
-						`Universal update classifier returned invalid kind ${JSON.stringify(kind)}.`,
-					);
-				}
+				const command = this.compactLeafCommand(list, index, records[start + index], lastBinding);
+				if (command !== null) commands.push(command);
 			}
 		}
 		if (commands.length === 0) return null;
 
-		const batch = freezeUniversalHostBatch(this.renderer, this.nextBatchVersion++, commands);
+		const batch = freezeUniversalHostBatchShell(this.renderer, this.nextBatchVersion++, commands);
 		const preparedHost = this.driver.prepareBatch(this.container, batch, {
 			invokeLocalCallback: (listener, args) => this.invokeLocalCallback(listener, args),
 		});

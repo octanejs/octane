@@ -580,8 +580,8 @@ non-idempotent globals such as `Date.now()`, `Math.random()`, and
 `crypto.randomUUID()` (`OCTANE_STRONG_RENDER_IMPURE_CALL`), including inside
 callbacks that known array methods run synchronously. These checks follow
 supported aliases and synchronous helpers; they do not prove arbitrary method
-bodies or imported code pure. Lazy state initialization may obtain an initial
-timestamp or random value. Locale- and time-zone-dependent formatting of a
+bodies or imported code pure. Lazy state and `useLazyRef` initialization may
+obtain an initial timestamp or random value. Locale- and time-zone-dependent formatting of a
 provable `Date` or an `Intl` service during render reports
 `OCTANE_STRONG_RENDER_LOCALE_FORMAT`; pass an explicit locale and `timeZone`.
 Scheduling work during render with `setTimeout`, `setInterval`,
@@ -609,8 +609,9 @@ imports. Those values still have to satisfy the render-snapshot contract.
 
 For changing browser state, use `useSyncExternalStore` with a server snapshot
 and render its returned snapshot. Browser reads in its snapshot callbacks,
-events, effects, and deferred callbacks remain supported. Lazy `useState` and
-`useReducer` initializers may also read browser state for an initial value. They
+events, effects, and deferred callbacks remain supported. Lazy `useState`,
+`useReducer`, and `useLazyRef` initializers may also read browser state for an
+initial value. They
 still run during server rendering: guard unavailable browser APIs and ensure the
 server and client agree on initial output. A `typeof window` guard inside an
 ordinary render calculation does not make the calculation snapshot-safe.
@@ -1728,6 +1729,16 @@ function Search({ ref }) @{
 
 A ref may be a callback, a `{ current }` object, or an array of refs as shown
 above.
+
+Octane also supports lazy initialization of a mutable ref with
+`useLazyRef(() => createValue())`. Plain `useRef(callback)` retains React-compatible
+behavior and stores the callback itself. The lazy factory runs during render, so
+abandoned work, retries, remounts, and separate server and hydration renders can
+invoke it again; keep it free of side effects and use an effect for resources
+requiring cleanup. Strong mode checks the factory like a lazy `useState`
+initializer: it may read a clock, randomness, or browser state for the initial
+value, but it may not schedule work. The experimental Valdi writer's existing
+adapter ABI does not support this hook.
 
 ### Fragment refs
 

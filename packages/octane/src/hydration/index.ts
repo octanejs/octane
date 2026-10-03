@@ -17,6 +17,7 @@ export {
 	type IndependentHydrateBootstrapOptions,
 	type IndependentHydrateRegistration,
 	type IndependentHydrateLifecycle,
+	type IndependentHydrateStrategies,
 } from './independent-island.js';
 export {
 	createIndependentHydrateManifest,

@@ -20,6 +20,10 @@
 declare const process: { env: { NODE_ENV?: string } };
 
 import { resolveHookPath } from './hook-slot-cache.js';
+import type {
+	LayoutSnapshotOptions,
+	LayoutSnapshotOptionsWithInitial,
+} from './layout-snapshot-types.js';
 import { domBindingClaims } from './dom-binding-claims.js';
 import { DOMStage } from './dom-stage.js';
 import { __normalizeBindingStyle } from './dom-binding-styles.js';
@@ -2418,10 +2422,10 @@ let TRANSITION_DEPTH = 0;
  * after the first `await` runs, so post-await setters would otherwise schedule
  * at urgent priority. Keeping this count elevated across the in-flight window
  * preserves Octane's automatic post-await transition priority. Caveat: it's a
- * process-global window, so an unrelated update outside a delegated event or
- * flushSync while an async action is pending is also tagged transition —
- * perfect per-action scoping would need AsyncContext, which isn't available
- * in the browser target.
+ * process-global window, so an unrelated update outside a delegated event,
+ * flushSync or commit callback (see inCommitCallback) while an async action is
+ * pending is also tagged transition — perfect per-action scoping would need
+ * AsyncContext, which isn't available in the browser target.
  */
 let ASYNC_TRANSITION_COUNT = 0;
 
@@ -2681,14 +2685,26 @@ function createTransitionActionBatch(): TransitionActionBatch {
 	};
 }
 
+/**
+ * Insertion and layout effect callbacks and callback refs run synchronously
+ * inside a commit, so no post-await Action continuation can be on the stack.
+ * Like React, their updates are urgent and never join an in-flight Action;
+ * commitEffects also clears any transition the commit inherited. A transition
+ * started inside the callback still owns its own updates. Store consistency
+ * checks need no case here: scheduleStoreRender is already urgent.
+ */
+function inCommitCallback(): boolean {
+	return (EFFECT_BODY_DEPTH > 0 && CURRENT_EFFECT_PHASE !== PASSIVE) || REF_CALLBACK_DEPTH > 0;
+}
+
 function transitionActionBatchForUpdate(): TransitionActionBatch | null {
 	if (ACTIVE_TRANSITION_ACTION_BATCH !== null) return ACTIVE_TRANSITION_ACTION_BATCH;
 	// AsyncContext is not available in the browser target, so post-await Action
 	// continuations share the one entangled in-flight batch. Delegated handlers
-	// (including continuous events) and flushSync opt out of that fallback.
-	// This only selects the batch: continuous events still flush in a microtask,
-	// and an explicit transition inside a handler wins above.
-	if (syncFlush || _dispatchDepth > 0) return null;
+	// (including continuous events), flushSync and commit callbacks opt out of
+	// that fallback. This only selects the batch: continuous events still flush
+	// in a microtask, and an explicit transition inside a handler wins above.
+	if (syncFlush || _dispatchDepth > 0 || inCommitCallback()) return null;
 	return IN_FLIGHT_TRANSITION_ACTION_BATCH;
 }
 
@@ -3047,7 +3063,7 @@ function urgentTransitionCellUpdate(block: Block): boolean {
 	return (
 		TRANSITION_DEPTH === 0 &&
 		!(CURRENT_BLOCK === block && block.currentRenderMode === 'transition') &&
-		(syncFlush || _dispatchDepth > 0 || ASYNC_TRANSITION_COUNT === 0)
+		(syncFlush || _dispatchDepth > 0 || ASYNC_TRANSITION_COUNT === 0 || inCommitCallback())
 	);
 }
 
@@ -6890,8 +6906,24 @@ function inNestedUpdateCallback(): boolean {
 
 class MaximumUpdateDepthError extends Error {}
 
-function maximumUpdateDepthError(): Error {
-	return new MaximumUpdateDepthError(formatClientError(1));
+// Development attribution for a block whose nested-update budget was spent by a
+// layout snapshot that changed on every pass. Tagged with its update chain so a
+// later, unrelated loop on the same block keeps the generic message.
+let LAYOUT_SNAPSHOT_DIVERGENCE: WeakMap<
+	Block,
+	{ cell: object; chain: number; message: string }
+> | null = null;
+
+function maximumUpdateDepthError(block?: Block): Error {
+	const error = new MaximumUpdateDepthError(formatClientError(1));
+	if (process.env.NODE_ENV !== 'production' && block !== undefined) {
+		const divergence = LAYOUT_SNAPSHOT_DIVERGENCE?.get(block);
+		if (divergence !== undefined) {
+			LAYOUT_SNAPSHOT_DIVERGENCE!.delete(block);
+			if (divergence.chain === block.nestedUpdateChain) error.message += ` ${divergence.message}`;
+		}
+	}
+	return error;
 }
 
 let CROSS_RENDER_WARNINGS: WeakMap<ComponentBody, WeakSet<ComponentBody>> | null = null;
@@ -6978,7 +7010,7 @@ function scheduleRender(block: Block): void {
 	const mode: 'urgent' | 'transition' =
 		TRANSITION_DEPTH > 0 ||
 		(renderPhaseSelf && block.currentRenderMode === 'transition') ||
-		(!syncFlush && _dispatchDepth === 0 && ASYNC_TRANSITION_COUNT > 0)
+		(!syncFlush && _dispatchDepth === 0 && ASYNC_TRANSITION_COUNT > 0 && !inCommitCallback())
 			? 'transition'
 			: 'urgent';
 	const deferred = DEFERRED_SPAWN || (renderPhaseSelf && block.currentRenderDeferred);
@@ -7079,7 +7111,7 @@ function drainHydrationRenderPhaseUpdates(root: Block): void {
 			try {
 				if (block.nestedUpdateError) {
 					block.nestedUpdateError = false;
-					throw maximumUpdateDepthError();
+					throw maximumUpdateDepthError(block);
 				}
 
 				const seen = (renders ??= new Map()).get(block) ?? 0;
@@ -7259,7 +7291,7 @@ function drainQueue(): { err: any } | null {
 			if (block.kind === 'root' && !block.mounted) createdInRootRender(block);
 			if (block.nestedUpdateError) {
 				block.nestedUpdateError = false;
-				throw maximumUpdateDepthError();
+				throw maximumUpdateDepthError(block);
 			}
 			// Guarded render-phase updates (derived state) converge in a couple of
 			// passes; an unguarded one re-queues its own block forever. Cap per-block
@@ -9717,6 +9749,13 @@ function completeDeferredLayouts(capture: DeferredLayoutCapture, interrupted = f
 		DEFERRED_LAYOUT_HELD_WORK = new Set(heldWork);
 	}
 	const nativeFrame = NATIVE_READ_DRIVER?.pauseLifecycle() ?? -1;
+	// These are the commit's own refs and layout effects, so they run outside any
+	// transition, as in commitEffects. An interruption from a commit flushed
+	// inside startTransition must not stage their updates into that transition.
+	const transitionDepth = TRANSITION_DEPTH;
+	const actionBatch = ACTIVE_TRANSITION_ACTION_BATCH;
+	TRANSITION_DEPTH = 0;
+	ACTIVE_TRANSITION_ACTION_BATCH = null;
 	EFFECT_COMMIT_DEPTH++;
 	try {
 		// A direct root commit can arrive while readiness was pending. Its live
@@ -9776,6 +9815,8 @@ function completeDeferredLayouts(capture: DeferredLayoutCapture, interrupted = f
 		}
 		COMPLETING_DEFERRED_LAYOUT = previousCompleting;
 		DEFERRED_LAYOUT_HELD_WORK = previousHeldWork;
+		TRANSITION_DEPTH = transitionDepth;
+		ACTIVE_TRANSITION_ACTION_BATCH = actionBatch;
 		try {
 			if (nativeFrame >= 0) NATIVE_READ_DRIVER!.resumeLifecycle(nativeFrame);
 		} finally {
@@ -9817,6 +9858,13 @@ function commitEffects(): void {
 	}
 	DEFERRED_LAYOUT_DRIVER?.beforeCommit();
 	const nativeFrame = NATIVE_READ_DRIVER?.pauseLifecycle() ?? -1;
+	// Like React, a commit clears the ambient transition: one flushed inside a
+	// startTransition callback does not make its callbacks' updates transitions
+	// or stage them into that Action. See inCommitCallback.
+	const transitionDepth = TRANSITION_DEPTH;
+	const actionBatch = ACTIVE_TRANSITION_ACTION_BATCH;
+	TRANSITION_DEPTH = 0;
+	ACTIVE_TRANSITION_ACTION_BATCH = null;
 	EFFECT_COMMIT_DEPTH++;
 	try {
 		// React publishes every Effect Event body before any insertion/layout effect
@@ -9857,6 +9905,8 @@ function commitEffects(): void {
 		// commit or in a passive drain (flushSync from a passive effect) never reset it.
 		if (EFFECT_COMMIT_DEPTH === 1) finishNestedUpdateCommit();
 	} finally {
+		TRANSITION_DEPTH = transitionDepth;
+		ACTIVE_TRANSITION_ACTION_BATCH = actionBatch;
 		if (nativeFrame >= 0) NATIVE_READ_DRIVER!.resumeLifecycle(nativeFrame);
 		finishEffectCommit();
 	}
@@ -10908,7 +10958,7 @@ export function renderBlock(block: Block): void {
 		while (renderBlockInner(block)) {
 			if (block.nestedUpdateError) {
 				block.nestedUpdateError = false;
-				throw maximumUpdateDepthError();
+				throw maximumUpdateDepthError(block);
 			}
 			if (++retries > RENDER_PHASE_UPDATE_LIMIT) throw new Error(formatClientError(9));
 		}
@@ -11301,7 +11351,10 @@ function renderBlockInner(block: Block): true | undefined {
 		}
 		EFFECT_EVENT_RENDER_TARGET = prevEffectEventTarget;
 		EFFECT_EVENT_ACTION_TARGET = prevEffectEventActionTarget;
-		ACTIVE_WARM_PLANS.length = warmPlanCheckpoint;
+		// Most renders register no warm plan. Compare before restoring: storing
+		// an array's length is not free even when the length is unchanged.
+		if (ACTIVE_WARM_PLANS.length !== warmPlanCheckpoint)
+			ACTIVE_WARM_PLANS.length = warmPlanCheckpoint;
 		CURRENT_WARM_EPISODE = prevWarmEpisode;
 		CURRENT_EFFECT_RENDER_VERSION = prevEffectRenderVersion;
 		CURRENT_EFFECT_REACHED = prevEffectReached;
@@ -11930,7 +11983,8 @@ export function componentSlotLite<P>(
 		if (nativeToken >= 0) NATIVE_READ_DRIVER!.endScope(nativeToken);
 		if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__)
 			__profileEndRender(profileFrame, profileDidThrow, profileThrown);
-		ACTIVE_WARM_PLANS.length = warmPlanCheckpoint;
+		if (ACTIVE_WARM_PLANS.length !== warmPlanCheckpoint)
+			ACTIVE_WARM_PLANS.length = warmPlanCheckpoint;
 		CURRENT_SCOPE = prevScope;
 	}
 	// Hydration: advance the cursor PAST this component's adopted range so the
@@ -13652,6 +13706,97 @@ export function useLayoutEffect(fn: EffectFn, deps?: any[] | null, slot?: HookSl
 	const [d, s] = resolveHookArgs('useLayoutEffect', deps, slot);
 	enqueueEffect(s, fn, d, LAYOUT);
 }
+
+interface LayoutSnapshotBox<T> {
+	value: T | undefined;
+	effectSlot: symbol;
+}
+
+// Development only: consecutive unequal measurements per snapshot cell within
+// one update chain. A snapshot that settles between passes resets its count.
+let LAYOUT_SNAPSHOT_CHANGES: WeakMap<object, { chain: number; count: number }> | null = null;
+
+function countLayoutSnapshotChange(cell: object, block: Block): void {
+	const changes = (LAYOUT_SNAPSHOT_CHANGES ??= new WeakMap());
+	let record = changes.get(cell);
+	if (record === undefined || record.chain !== UPDATE_CHAIN_ID) {
+		record = { chain: UPDATE_CHAIN_ID, count: 0 };
+		changes.set(cell, record);
+	}
+	// Name the hook only once it has changed on every pass that could have spent
+	// the nested-update budget. The generic depth error reports it.
+	if (++record.count === NESTED_UPDATE_LIMIT) {
+		const source = componentSourceLoc(block.body);
+		(LAYOUT_SNAPSHOT_DIVERGENCE ??= new WeakMap()).set(block, {
+			cell,
+			chain: UPDATE_CHAIN_ID,
+			message: `useLayoutSnapshot in ${componentName(block)}${source ? ` (${source})` : ''} did not converge.`,
+		});
+	}
+}
+
+function settleLayoutSnapshot(cell: object, block: Block): void {
+	const record = LAYOUT_SNAPSHOT_CHANGES?.get(cell);
+	if (record === undefined) return;
+	LAYOUT_SNAPSHOT_CHANGES!.delete(cell);
+	if (LAYOUT_SNAPSHOT_DIVERGENCE?.get(block)?.cell === cell)
+		LAYOUT_SNAPSHOT_DIVERGENCE.delete(block);
+}
+
+/** Read a value from the committed layout and publish changes before paint. */
+export function useLayoutSnapshot<T>(
+	measure: () => T,
+	options: LayoutSnapshotOptionsWithInitial<T>,
+	slot?: symbol,
+): T;
+export function useLayoutSnapshot<T>(
+	measure: () => T,
+	options?: LayoutSnapshotOptions<T>,
+	slot?: symbol,
+): T | undefined;
+export function useLayoutSnapshot<T>(
+	measure: () => T,
+	options?: LayoutSnapshotOptions<any> | symbol,
+	slot?: HookSlot,
+): T | undefined {
+	// Plain hook transforms append a Symbol where optional options were omitted;
+	// production numeric slots have a separate padded argument.
+	if (typeof options === 'symbol') {
+		if (slot === undefined) slot = options;
+		options = undefined;
+	}
+	// readStateHook resolves the call path once. Without an own slot or an
+	// enclosing custom-hook path there is nothing for it to resolve.
+	if (slot === undefined && slotStack.length === 0) missingSlot('useLayoutSnapshot');
+	const block = CURRENT_BLOCK!;
+	const state = readStateHook<LayoutSnapshotBox<T> | undefined>(undefined, slot, false);
+	// Boxing preserves function-valued initial values and measurements as data,
+	// and lets a custom comparator decide whether even an identical value changes.
+	// The box is created on mount, without a per-render initializer closure.
+	const box = (state.value ??= {
+		value: options?.initial as T | undefined,
+		effectSlot: Symbol('layout snapshot effect'),
+	});
+	enqueueEffect(
+		box.effectSlot,
+		() => {
+			const next = measure();
+			const current = state.value!;
+			if ((options?.equal ?? Object.is)(current.value, next)) {
+				if (process.env.NODE_ENV !== 'production') settleLayoutSnapshot(state, block);
+				return;
+			}
+			if (process.env.NODE_ENV !== 'production') countLayoutSnapshotChange(state, block);
+			// This runs inside a layout effect, so the update is urgent and never joins
+			// a pending Action: it belongs to the commit being measured.
+			state.setter({ value: next, effectSlot: current.effectSlot });
+		},
+		undefined,
+		LAYOUT,
+	);
+	return box.value;
+}
+
 export function useInsertionEffect(fn: EffectFn, deps?: any[] | null, slot?: symbol): void;
 export function useInsertionEffect(fn: EffectFn, deps?: any[] | null, slot?: HookSlot): void {
 	const [d, s] = resolveHookArgs('useInsertionEffect', deps, slot);
@@ -13932,6 +14077,19 @@ export function useRef<T>(initial?: T, slot?: HookSlot): { current: T | undefine
 		ensureHooks(scope).set(slot, s);
 	}
 	return s;
+}
+
+export function useLazyRef<T>(factory: () => T, slot?: symbol): { current: T };
+export function useLazyRef<T>(factory: () => T, slot?: HookSlot): { current: T } {
+	slot = resolveSlot(slot);
+	if (slot === undefined) missingSlot('useLazyRef');
+	const scope = CURRENT_SCOPE!;
+	let ref = scope.hooks?.get(slot) as { current: T } | undefined;
+	if (ref === undefined) {
+		ref = { current: factory() };
+		ensureHooks(scope).set(slot, ref);
+	}
+	return ref;
 }
 
 /**
@@ -16802,6 +16960,10 @@ function createScopedResolver<T>(read: () => T): () => T {
 	let resolvedValue: T;
 
 	return (): T => {
+		// A record that read no context is the same in every scope, and every
+		// field read of a scoped value lands here. Return it without consulting
+		// the scope, which only a context-reading record compares.
+		if (resolved && resolvedReads === null) return resolvedValue;
 		const scope = CURRENT_SCOPE;
 		const sameScope =
 			resolvedScope === scope ||
@@ -16809,10 +16971,10 @@ function createScopedResolver<T>(read: () => T): () => T {
 				scope !== null &&
 				scope.block.parentBlock === resolvedScope.block &&
 				scope.$$ctxValues === null);
-		// A record that read no context is the same in every scope, so only a
-		// context-reading one is rebuilt when its resolving scope changes. Host
-		// classification previews a record in the parent block before its direct
-		// child block renders it, so that one same-context handoff is reusable.
+		// A context-reading record is rebuilt when its resolving scope changes.
+		// Host classification previews a record in the parent block before its
+		// direct child block renders it, so that one same-context handoff is
+		// reusable.
 		if (!resolved || scopedReadsChanged(resolvedReads) || (resolvedReads !== null && !sameScope)) {
 			const previousTracking = SCOPED_READ_TRACKING;
 			const previousReads = SCOPED_READS;
@@ -16836,9 +16998,10 @@ function createScopedResolver<T>(read: () => T): () => T {
 			resolved = true;
 		} else {
 			// Move ownership from the previewing parent to its direct child so a
-			// later sibling or provider scope still resolves independently.
+			// later sibling or provider scope still resolves independently. Only a
+			// context-reading record reaches this branch.
 			resolvedScope = scope;
-			if (resolvedReads !== null) replayScopedContextReads(resolvedReads, CURRENT_BLOCK);
+			replayScopedContextReads(resolvedReads!, CURRENT_BLOCK);
 		}
 		return resolvedValue;
 	};
@@ -31613,14 +31776,11 @@ function normalizePortalBody(rawBody: any, rawProps: any): { body: ComponentBody
 	// An unkeyed component element renders as the portal Block itself. A keyed
 	// one takes the generic path below, whose childSlot remounts it when its key
 	// changes, exactly as for a keyed host element.
-	if (
-		rawBody != null &&
-		rawBody.$$kind === ELEMENT_TAG &&
-		typeof rawBody.type === 'function' &&
-		rawBody.key === null
-	) {
+	// Each field read of a scoped JSX value resolves its record again.
+	const type = rawBody != null && rawBody.$$kind === ELEMENT_TAG ? rawBody.type : undefined;
+	if (typeof type === 'function' && rawBody.key === null) {
 		return {
-			body: rawBody.type as ComponentBody,
+			body: type as ComponentBody,
 			props: rawBody.props,
 		};
 	}
@@ -33988,35 +34148,37 @@ function warnMissingListKey(owner: Block | null): void {
 	}
 }
 
-function deoptKey(item: any, index: number): any {
-	const element = item != null && item.$$kind === ELEMENT_TAG;
-	if (item?.$$kind === PORTAL_TAG && item.key != null) return item.key;
-	if (element && item.key != null && !ELEMENTS_MISSING_LIST_KEY.has(item)) return item.key;
+// The key an element or portal list item carries, or null when the item falls
+// back to its index. Each field read of a scoped JSX value resolves its record
+// again, so the key is read once. `warnMissing` is set for runtime-built arrays,
+// which React expects to be keyed; positional children never warn.
+function ownListKey(item: any, warnMissing: boolean): any {
+	if (item == null) return null;
+	const kind = item.$$kind;
+	if (kind !== ELEMENT_TAG && kind !== PORTAL_TAG) return null;
+	const key = item.key;
 	// React parity: unkeyed array children fall back to the index, with a deduplicated
 	// dev warning. Only ELEMENTS need keys: empty slots, primitives, and nested
 	// iterables are legal list members and must not produce a missing-key warning.
 	// (Suppressed during hydration adoption — markers drive matching.)
-	if (element && process.env.NODE_ENV !== 'production' && activeHydration() === null) {
+	if (
+		process.env.NODE_ENV !== 'production' &&
+		warnMissing &&
+		kind === ELEMENT_TAG &&
+		(key == null || ELEMENTS_MISSING_LIST_KEY.has(item)) &&
+		activeHydration() === null
+	) {
 		warnMissingListKey(CURRENT_BLOCK);
 	}
-	return element && item.key != null ? item.key : index;
+	return key != null ? key : null;
 }
 
 // `createElement(tag, props, a, b, …)` collapses MULTIPLE positional children into a
 // fresh array. Those are FIXED siblings (they never reorder), so the de-opt list keys
 // them by index SILENTLY — unlike a `.map()` result, where a missing key is a real
 // reorder hazard worth warning about. createElement tags its positional arrays in
-// this set so childSlot can pick the silent key function.
+// this set so childSlot can key them without the missing-key warning.
 const POSITIONAL_CHILDREN = new WeakSet<object>();
-
-// Index key WITHOUT the missing-key warning — used for positional children arrays.
-function deoptKeyPositional(item: any, index: number): any {
-	return item != null &&
-		(item.$$kind === ELEMENT_TAG || item.$$kind === PORTAL_TAG) &&
-		item.key != null
-		? item.key
-		: index;
-}
 
 // Compiler contract: a VALUE-position JSX fragment (`<>…</>` in `.tsx` bodies,
 // and every MDX document root) lowers to an array literal — FIXED siblings in
@@ -34594,16 +34756,16 @@ function nestedDeoptKeyPrefix(path: readonly (string | number)[]): string | null
 function appendScopedDeoptKey(
 	outKeys: any[],
 	path: readonly (string | number)[],
-	item: any,
-	index: number,
+	// ownListKey's result: null when the item carries no key.
 	key: any,
+	index: number,
 	keyPrefix: string | null | undefined,
 ): string | null | undefined {
 	// Reconciliation keys are internal: top-level implicit positions are numbers,
 	// explicit keys carry a 'k' prefix, and nested paths are JSON strings. These
 	// namespaces keep index 0 distinct from key="0" and user keys distinct from
 	// nested wrapper paths without allocating a string for every unkeyed child.
-	const explicit = (isElementDescriptor(item) || item?.$$kind === PORTAL_TAG) && item.key != null;
+	const explicit = key !== null;
 	// The unwrapped top level — a plain children array or a single-layer Fragment,
 	// which is what every `{items.map(...)}` list and every binding's rendered
 	// output produces — is the hot path: it re-keys EVERY child on EVERY parent
@@ -34651,7 +34813,7 @@ function flattenReactChildContainer(
 	kind: DeoptWrapperKind,
 	path: readonly (string | number)[],
 ): void {
-	const keyFn = kind === 'fragment' ? deoptKeyPositional : deoptKey;
+	const warnMissing = kind !== 'fragment';
 	const count = children.length;
 	let keyPrefix: string | null | undefined = count > 1 ? undefined : null;
 	for (let i = 0; i < count; i++) {
@@ -34659,15 +34821,22 @@ function flattenReactChildContainer(
 		if (isFragmentDescriptor(item)) {
 			if (item.ref != null || hasOwnProp.call(item.props, 'ref')) {
 				outItems.push(fragmentRefDescriptor(item));
-				keyPrefix = appendScopedDeoptKey(outKeys, path, item, i, keyFn(item, i), keyPrefix);
+				keyPrefix = appendScopedDeoptKey(
+					outKeys,
+					path,
+					ownListKey(item, warnMissing),
+					i,
+					keyPrefix,
+				);
 				continue;
 			}
 			const nested = fragmentDescriptorChildren(item);
-			if (item.key != null) {
+			const key = item.key;
+			if (key != null) {
 				flattenReactChildContainer(outItems, outKeys, nested, 'fragment', [
 					...path,
 					'keyed-fragment',
-					item.key,
+					key,
 				]);
 			} else {
 				const nestedPath =
@@ -34692,7 +34861,7 @@ function flattenReactChildContainer(
 			continue;
 		}
 		outItems.push(item);
-		keyPrefix = appendScopedDeoptKey(outKeys, path, item, i, keyFn(item, i), keyPrefix);
+		keyPrefix = appendScopedDeoptKey(outKeys, path, ownListKey(item, warnMissing), i, keyPrefix);
 	}
 }
 
@@ -34706,11 +34875,13 @@ function prepareDeoptList(
 	value: any,
 	forceSingle: boolean = false,
 	includeKeyedSingle: boolean = true,
+	// childSlot passes the element type it already read; undefined otherwise.
+	elementType: unknown = isElementDescriptor(value) ? value.type : undefined,
 ): PreparedDeoptList | null {
 	// childSlot calls this for EVERY renderable hole on every render, and the
 	// non-list answer (a lone component descriptor, text, null) is the common one
 	// — build the two output arrays only once a list regime is established.
-	if (isFragmentDescriptor(value)) {
+	if (elementType === Fragment) {
 		if (value.ref != null || hasOwnProp.call(value.props, 'ref')) {
 			return {
 				items: [fragmentRefDescriptor(value)],
@@ -34719,7 +34890,8 @@ function prepareDeoptList(
 		}
 		const items: any[] = [];
 		const keys: any[] = [];
-		const path = value.key == null ? [] : ['keyed-fragment', value.key];
+		const key = value.key;
+		const path = key == null ? [] : ['keyed-fragment', key];
 		flattenReactChildContainer(items, keys, fragmentDescriptorChildren(value), 'fragment', path);
 		return { items, keys };
 	}
@@ -34729,11 +34901,12 @@ function prepareDeoptList(
 		flattenReactChildContainer(items, keys, value, deoptWrapperKind(value), []);
 		return { items, keys };
 	}
-	if (includeKeyedSingle && isElementDescriptor(value) && value.key != null) {
-		return { items: [value], keys: [singleDeoptKey(value, value.key)] };
+	if (includeKeyedSingle && isElementDescriptor(value)) {
+		const key = value.key;
+		if (key != null) return { items: [value], keys: ['k' + String(key)] };
 	}
 	if (forceSingle) {
-		return { items: [value], keys: [singleDeoptKey(value, deoptKeyPositional(value, 0))] };
+		return { items: [value], keys: [singleDeoptKey(value, ownListKey(value, false) ?? 0)] };
 	}
 	return null;
 }
@@ -34783,7 +34956,7 @@ function flattenDeoptChildren(out: any[], v: any): void {
 function flattenDeoptChildrenKeyed(outVals: any[], outKeys: any[], v: any, prefix: string): void {
 	if (v == null || v === false || v === true || v === '') return;
 	if (Array.isArray(v)) {
-		const keyForItem = POSITIONAL_CHILDREN.has(v) ? deoptKeyPositional : deoptKey;
+		const warnMissing = !POSITIONAL_CHILDREN.has(v);
 		for (let i = 0; i < v.length; i++) {
 			const item = v[i];
 			if (Array.isArray(item)) {
@@ -34792,7 +34965,7 @@ function flattenDeoptChildrenKeyed(outVals: any[], outKeys: any[], v: any, prefi
 				// empty — consumes its position, emits nothing
 			} else {
 				outVals.push(item);
-				const k = keyForItem(item, i);
+				const k = ownListKey(item, warnMissing) ?? i;
 				if (prefix === '') {
 					outKeys.push(typeof k === 'string' && k[0] === ':' ? ':' + k : k);
 				} else {
@@ -35117,10 +35290,15 @@ function deoptItemBody(item: any, scope: Scope): void {
 	// below — and reorder/teardown — keep a live range. Client-only by
 	// construction (hydrated items always adopt the server's pair).
 	const existingChild = scope.slots[0] as ChildSlot | undefined;
+	// Each field read of a scoped JSX value resolves its record again. A component
+	// descriptor always needs Blocks, so it skips descNeedsBlocks' second read.
+	const itemType = isElementDescriptor(item) ? item.type : undefined;
+	const hostItem = typeof itemType === 'string';
 	const needsBlocks =
-		(isHostDescriptor(item) &&
+		(hostItem &&
 			existingChild?.__kind === 'childSlot' &&
 			existingChild.currentComp === (hostElementBody as unknown as ComponentBody)) ||
+		typeof itemType === 'function' ||
 		descNeedsBlocks(item);
 	const sm = block.startMarker;
 	if (
@@ -35128,7 +35306,7 @@ function deoptItemBody(item: any, scope: Scope): void {
 		sm === block.endMarker &&
 		sm.nodeType !== 8 /* COMMENT_NODE — i.e. self-marked, not a pair */ &&
 		(STAGED_DOM?.view(sm) ?? sm).parentNode !== null &&
-		(needsBlocks || !isHostDescriptor(item))
+		(needsBlocks || !hostItem)
 	) {
 		const p = (STAGED_DOM?.view(sm) ?? sm).parentNode!;
 		if (ROOT_RENDER_TRANSACTION !== null) {
@@ -35169,8 +35347,8 @@ function deoptItemBody(item: any, scope: Scope): void {
 			if (
 				scope.slots[0] === undefined &&
 				stale.nodeType === 1 /* Element */ &&
-				isHostDescriptor(item) &&
-				isHostElementOfType(stale as Element, item.type) &&
+				hostItem &&
+				isHostElementOfType(stale as Element, itemType as string) &&
 				(STAGED_DOM?.view(stale) ?? stale).parentNode === block.parentNode
 			) {
 				transfer = stale;
@@ -35336,6 +35514,73 @@ function deoptItemBody(item: any, scope: Scope): void {
 		}
 	}
 	block.deoptNode = node;
+}
+
+// A de-opt list item reaches its component through the item's own render,
+// deoptItemBody, and a nested childSlot. When the new descriptor names the
+// component already mounted there, that childSlot only takes its same-component
+// branch: the memo bail, the identical-props bail, or a props update and render
+// of the existing Block. A list of re-created descriptors mostly bails, so each
+// surviving row would pay a whole item render for one comparison. Take that
+// branch here instead, in the item's scope and with the priority its render
+// would inherit. A bail leaves the item's committed descriptor in place: its
+// props are the ones the bailed component kept, so a later render of the item
+// bails on them again, and the root journal needs no entry for it.
+//
+// Returns false, leaving the item to its ordinary render, whenever that render
+// could differ: hydration, signal owners, native reads, a non-root capture, an
+// unsettled item, recorded context reads, or any other child regime. Reached
+// only through ForSlot.plainDeopt, so the compiled @for path that shares
+// updateSurvivor never retains the descriptor renderer.
+function updateDeoptComponent(block: Block, item: any, index: number): boolean {
+	const slot = block.slots[0] as ChildSlot | undefined;
+	const child = slot?.block;
+	if (
+		child == null ||
+		block.body !== deoptItemBody ||
+		block.extra !== block.forSlot!.env ||
+		slot!.__kind !== 'childSlot' ||
+		slot!.forSlot !== null ||
+		slot!.implicitSignal !== undefined ||
+		item?.$$kind !== ELEMENT_TAG ||
+		block.pending ||
+		block.pendingMode !== null ||
+		block.renderStatus !== RENDER_VALID ||
+		block.deoptNode !== null ||
+		block.$$ctxDirect !== null ||
+		NATIVE_READ_DRIVER !== null ||
+		(WIP_CAPTURE !== null && WIP_CAPTURE.rootTransaction !== true) ||
+		signalDocumentEnabled ||
+		block.idState.renderOwner?.signalOwner !== undefined ||
+		activeHydration() !== null
+	)
+		return false;
+	// The ordinary render below writes the same index if this returns false.
+	block.itemIndex = index;
+	const previousScope = CURRENT_SCOPE;
+	const previousBlock = CURRENT_BLOCK;
+	CURRENT_SCOPE = block;
+	CURRENT_BLOCK = block;
+	try {
+		// A scoped descriptor resolves its fields in the scope that reads them.
+		const comp = item.type;
+		if (comp !== slot!.currentComp) return false;
+		block.currentRenderMode = previousBlock?.currentRenderMode ?? 'urgent';
+		block.currentRenderDeferred = previousBlock?.currentRenderDeferred ?? false;
+		const props = item.props;
+		if (tryMemoBail(child, comp, props) || (props === child.props && tryImplicitBail(child)))
+			return true;
+		if (ROOT_RENDER_TRANSACTION !== null && !ROOT_RENDER_ROLLBACK && block.props !== item)
+			TRANSITION_JOURNAL!.push(JOURNAL_INPUTS, block, block.props, block.extra);
+		block.props = item;
+		if (child.props !== props) journalRootProperty(child, 'props', child.props);
+		child.props = props;
+		renderBlock(child);
+		return true;
+	} finally {
+		CURRENT_SCOPE = previousScope;
+		CURRENT_BLOCK = previousBlock;
+	}
 }
 
 // Guarded native maps invoke componentSlot directly from their compiled item
@@ -36346,7 +36591,7 @@ function renderPreparedChildList(
 			emptyBlock: null,
 			env: undefined,
 			adopt: null,
-			plainDeopt: false,
+			plainDeopt: null,
 			mappedNative: undefined,
 			selectionItems: undefined,
 			signalSite: undefined,
@@ -36447,7 +36692,7 @@ function renderPreparedChildList(
 	// guarded by those two conditions. Record it on the slot rather than
 	// re-deriving it by identity in mountItem (see ForSlot.plainDeopt).
 	const plainDeopt = compiledMapBody === undefined && mappedFallback !== true;
-	state.forSlot.plainDeopt = plainDeopt;
+	state.forSlot.plainDeopt = plainDeopt ? updateDeoptComponent : null;
 	const fastFlags = compiledMapFlags || 0;
 	const ssrMarkerless =
 		compiledMapBody === undefined ? markerlessMappedFallback || plainDeopt : (fastFlags & 16) !== 0;
@@ -36918,11 +37163,15 @@ export function childSlot(
 		}
 		break;
 	}
+	// Each field read of a scoped JSX value resolves its record again, and this
+	// classifies every renderable hole on every render. Read the type once here;
+	// later branches read only the fields they consume.
+	const elementType = isElementDescriptor(value) ? value.type : undefined;
 	const valueComponent =
 		typeof value === 'function'
 			? (value as ComponentBody)
-			: isElementDescriptor(value) && typeof value.type === 'function'
-				? (value.type as ComponentBody)
+			: typeof elementType === 'function'
+				? (elementType as ComponentBody)
 				: null;
 	const hydrationTransparent =
 		hydration?.passthroughRanges === true &&
@@ -36944,7 +37193,7 @@ export function childSlot(
 	const preparedList =
 		compiledMapBody !== undefined
 			? { items: value as any[], keys: null }
-			: prepareDeoptList(value, false, includeKeyedSingle);
+			: prepareDeoptList(value, false, includeKeyedSingle, elementType);
 	// A LONE PURE-HOST descriptor (host/text-only subtree — no components, no
 	// portals, no render functions). Computed once per call: the slot init below
 	// uses it to pick the ANCHORLESS regime, the promotion after it to detect a
@@ -36953,17 +37202,19 @@ export function childSlot(
 	// Once a host gains component children, keep its reconciled Block while it
 	// remains a host descriptor. Dropping back to the raw path would recreate
 	// the host and every surviving input when the last component is removed.
+	// After Usable unwrapping a host descriptor is no thenable, so it needs Blocks
+	// exactly when its children do.
 	const pureHost =
 		preparedList === null &&
-		isHostDescriptor(value) &&
+		typeof elementType === 'string' &&
 		state?.currentComp !== (hostElementBody as unknown as ComponentBody) &&
-		!descNeedsBlocks(value);
+		!descNeedsBlocks((value as ElementDescriptor).children);
 	let rootShapeChanged = false;
 	if (state !== undefined && ROOT_RENDER_TRANSACTION !== null) {
 		const component =
 			pureHost || preparedList !== null
 				? null
-				: isHostDescriptor(value)
+				: typeof elementType === 'string'
 					? (hostElementBody as unknown as ComponentBody)
 					: valueComponent;
 		const unchangedList = preparedList !== null && state.forSlot !== null;
@@ -36976,7 +37227,7 @@ export function childSlot(
 			state.hostNode !== null &&
 			state.block === null &&
 			state.hostNode.nodeType === 1 &&
-			isHostElementOfType(state.hostNode as Element, (value as ElementDescriptor).type as string);
+			isHostElementOfType(state.hostNode as Element, elementType as string);
 		const primitive = value == null || (typeof value !== 'object' && typeof value !== 'function');
 		const text = primitive ? coerceChildText(value) : null;
 		const unchangedText =
@@ -36998,8 +37249,7 @@ export function childSlot(
 		hydration.node !== null &&
 		domNode(hydration.node).parentNode === domParent &&
 		preparedList === null &&
-		isElementDescriptor(value) &&
-		typeof value.type === 'function' &&
+		typeof elementType === 'function' &&
 		!hydration.isOpen(anchor ?? null) &&
 		!hydration.isOpen(hydration.node);
 	if (
@@ -37378,9 +37628,11 @@ export function childSlot(
 	let props: any = {};
 	let isBodyFn = false;
 	let invocationSite: string | undefined;
-	let componentKey: unknown;
-	let componentHasKey = false;
-	if (isHostDescriptor(value)) {
+	// A component descriptor's invocation site and key identify a new instance
+	// only, so the mount path below reads them; a same-component update never
+	// resolves them.
+	let componentDescriptor: ElementDescriptor | null = null;
+	if (typeof elementType === 'string') {
 		if (pureHost) {
 			// Pure host/text → reconcile in place, REUSING the existing node so DOM
 			// state survives a re-render. Switching in from a component/text first
@@ -37453,15 +37705,13 @@ export function childSlot(
 		isBodyFn = true;
 	} else if (isElementDescriptor(value)) {
 		const dispatch = activityDescriptorDispatch;
-		const activity = dispatch !== null && (value.type as unknown) === dispatch.type;
-		if (!activity && typeof value.type !== 'function' && typeof value.type !== 'string') {
-			throw invalidElementTypeError(value.type);
+		const activity = dispatch !== null && (elementType as unknown) === dispatch.type;
+		if (!activity && typeof elementType !== 'function') {
+			throw invalidElementTypeError(elementType);
 		}
-		comp = activity ? dispatch!.body : (value.type as ComponentBody);
+		comp = activity ? dispatch!.body : (elementType as ComponentBody);
 		props = value.props;
-		invocationSite = value.__octaneInvocationSite;
-		componentKey = value.key;
-		componentHasKey = value.key != null;
+		componentDescriptor = value;
 	}
 	if (comp !== null) {
 		// A bare render-FUNCTION child (a `.tsrx` `{children}` body forwarded onto a `.ts`
@@ -37499,6 +37749,8 @@ export function childSlot(
 			return;
 		}
 		if (state.block !== null && comp === state.currentComp) {
+			// updateDeoptComponent takes this branch for a de-opt list item without
+			// entering the item's render; keep the two in step.
 			// Same component identity → update in place (matches componentSlot),
 			// honoring React.memo's bail — previously only componentSlot did, so a
 			// memo()'d component rendered as VALUE-POSITION children (e.g. provider
@@ -37523,10 +37775,16 @@ export function childSlot(
 			renderBlock(state.block);
 			return;
 		}
-		const signalInstanceKey =
-			SIGNAL_BINDINGS_ENABLED || signalDocumentEnabled
-				? { parentScope, invocationSite, key: componentKey, hasKey: componentHasKey }
-				: undefined;
+		let signalInstanceKey: SignalInstanceKey | undefined;
+		if (SIGNAL_BINDINGS_ENABLED || signalDocumentEnabled) {
+			const key = componentDescriptor?.key;
+			signalInstanceKey = {
+				parentScope,
+				invocationSite: componentDescriptor?.__octaneInvocationSite ?? invocationSite,
+				key,
+				hasKey: key != null,
+			};
+		}
 		const retryLocation =
 			(state.block === null && state.hostNode === null && state.text === null) ||
 			parentBlock.idState.renderOwner?.signalOwner === undefined
@@ -44874,18 +45132,18 @@ interface ForSlot {
 	// Keeps descriptor↔compiled adoption off every ordinary descriptor list.
 	// Undefined means the arm has not been selected; false is a selected fallback.
 	mappedNative: boolean | undefined;
-	// True when this de-opt list's items render through the plain `deoptItemBody`
-	// — no compiled map body, no mapped fallback wrapper. `mountItem` needs the
-	// fact but must NOT name `deoptItemBody` to get it: a live identity
-	// comparison there is a reference from the compiled `@for` path that every
-	// application reaches, and it makes the entire descriptor renderer
-	// (childSlot, fragment refs, portals, transitions, the attribute tables)
-	// reachable from apps that only ever render compiled templates. Recorded on
-	// the slot instead, so the reference stays inside childSlot, which already
-	// retains that graph. Both ForSlot literals declare it so every slot shares
-	// one hidden class; only childSlot ever stamps or reads it, because only
-	// childSlot passes mountItem the de-opt sentinel.
-	plainDeopt: boolean;
+	// Set exactly when this de-opt list's items render through the plain
+	// `deoptItemBody` (no compiled map body, no mapped fallback wrapper), to that
+	// list's survivor update, updateDeoptComponent; null on every other list.
+	// `mountItem` and `updateSurvivor` need the fact but must NOT name
+	// `deoptItemBody` to get it: a live reference there comes from the compiled
+	// `@for` path that every application reaches, and it makes the entire
+	// descriptor renderer (childSlot, fragment refs, portals, transitions, the
+	// attribute tables) reachable from apps that only ever render compiled
+	// templates. Recorded on the slot instead, so the reference stays inside
+	// childSlot, which already retains that graph. Both ForSlot literals declare
+	// it so every slot shares one hidden class.
+	plainDeopt: ((block: Block, item: any, index: number) => boolean) | null;
 	// Set only when the compiler proved a keyed equality selection. Identity
 	// gates the two-row update without retaining extra state on ordinary lists.
 	selectionItems: ArrayLike<any> | undefined;
@@ -44997,10 +45255,10 @@ export function forBlock<T>(
 			emptyBlock: null,
 			env: undefined,
 			adopt: null,
-			// Compiled `@for` slots never read this — they never pass the de-opt
-			// sentinel — but both ForSlot literals declare it so every slot shares
-			// one hidden class and the stamp in childSlot transitions nothing.
-			plainDeopt: false,
+			// Stays null on a compiled `@for` slot, but both ForSlot literals
+			// declare it so every slot shares one hidden class and the stamp in
+			// childSlot transitions nothing.
+			plainDeopt: null,
 			mappedNative: undefined,
 			selectionItems: undefined,
 			signalSite,
@@ -45728,7 +45986,10 @@ function updateSurvivor<T>(
 	if (pure && block.props === newItem && (indexIndependent || block.itemIndex === newIdx)) {
 		block.itemIndex = newIdx;
 		block.body = itemBody as ComponentBody;
-	} else {
+	} else if (
+		// A plain de-opt list can update a same-component item without its render.
+		!block.forSlot!.plainDeopt?.(block, newItem, newIdx)
+	) {
 		// Item and captured inputs change together before the body can run. One
 		// entry restores both without a second property key or journal guard.
 		if (journal && (block.props !== newItem || block.extra !== env))
@@ -46817,7 +47078,7 @@ function mountItem<T>(
 				ssrMarkerless &&
 				!hydration.isOpen(node) &&
 				(singleRoot !== 2 ||
-					forSlot.plainDeopt !== true ||
+					!forSlot.plainDeopt ||
 					(isHostDescriptor(item) && !descNeedsBlocks(item)))
 			) {
 				// The outer @for pair is the only list framing on the wire. Each proven
@@ -46827,7 +47088,7 @@ function mountItem<T>(
 					node !== null &&
 					node !== forSlot.end &&
 					(singleRoot !== 2 ||
-						forSlot.plainDeopt !== true ||
+						!forSlot.plainDeopt ||
 						(node.nodeType === 1 &&
 							domNode(node).parentNode === parentNode &&
 							isHostElementOfType(node as Element, (item as ElementDescriptor).type as string)))
@@ -46845,7 +47106,7 @@ function mountItem<T>(
 					block.forSlot = forSlot;
 					block.key = key;
 					block.itemIndex = index;
-					if (singleRoot === 2 && forSlot.plainDeopt === true) block.deoptNode = node;
+					if (singleRoot === 2 && forSlot.plainDeopt) block.deoptNode = node;
 					renderBlock(block);
 					hydration.node = domNode(block.endMarker)?.nextSibling ?? getNextSibling(node);
 					return block;
@@ -46883,7 +47144,7 @@ function mountItem<T>(
 			hydration.discardItems(
 				forSlot.end,
 				process.env.NODE_ENV !== 'production'
-					? forSlot.plainDeopt === true && isHostDescriptor(item) && !descNeedsBlocks(item)
+					? forSlot.plainDeopt && isHostDescriptor(item) && !descNeedsBlocks(item)
 						? `<${item.type as string}>`
 						: 'another list item'
 					: '',
