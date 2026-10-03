@@ -103,7 +103,7 @@ const FRAMEWORKS: SeriesDef[] = [
 	{ key: 'preact', label: 'Preact 10', color: '#7478fb' },
 	{ key: 'solid', label: 'Solid 2.0 beta', color: '#1baf7a' },
 	{ key: 'svelte', label: 'Svelte 5', color: '#f57547' },
-	{ key: 'ripple', label: 'Ripple 0.3', color: '#9085e9' },
+	{ key: 'ripple', label: 'Ripple 0.4', color: '#9085e9' },
 	{ key: 'vue-vapor', label: 'Vue Vapor 3.6 RC', color: '#e06ec4' },
 	// The weather-app fixtures publish plain `vue` (same 3.6 pin). Color follows
 	// the entity, and the two Vue keys never appear on the same card.

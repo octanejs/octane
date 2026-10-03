@@ -3,7 +3,7 @@ import { test } from 'node:test';
 import path from 'node:path';
 import { build } from 'esbuild';
 import { bundleScenarios } from '../activity/bundle-scenarios.mjs';
-import { selectMinimalScenarios, verifyByteBudget } from './minimal-gates.mjs';
+import { ratchetBudget, selectMinimalScenarios, verifyByteBudget } from './minimal-gates.mjs';
 import { verifyScenario } from './verify-reachability.mjs';
 
 const scenarios = [
@@ -16,18 +16,62 @@ test('budget enforcement preserves default and grouped scenario selection', () =
 	assert.deepEqual(selectMinimalScenarios([], scenarios), {
 		selectedScenarios: scenarios,
 		enforceBudgets: false,
+		writeBudgets: false,
 	});
 	assert.deepEqual(selectMinimalScenarios(['--budgets', 'behavior-root'], scenarios), {
 		selectedScenarios: scenarios.slice(1),
 		enforceBudgets: true,
+		writeBudgets: false,
 	});
 	assert.deepEqual(selectMinimalScenarios(['behavior-root-esbuild', '--budgets'], scenarios), {
 		selectedScenarios: [scenarios[2]],
 		enforceBudgets: true,
+		writeBudgets: false,
 	});
 	assert.deepEqual(selectMinimalScenarios(['--budgets'], scenarios), {
 		selectedScenarios: scenarios,
 		enforceBudgets: true,
+		writeBudgets: false,
+	});
+	assert.deepEqual(selectMinimalScenarios(['--write-budgets', 'root-static'], scenarios), {
+		selectedScenarios: scenarios.slice(0, 1),
+		enforceBudgets: false,
+		writeBudgets: true,
+	});
+});
+
+test('checking and rewriting budgets in one run is rejected', () => {
+	assert.throws(
+		() => selectMinimalScenarios(['--budgets', '--write-budgets'], scenarios),
+		/pass one/,
+	);
+});
+
+// Brotli can grow when code is removed, so only raw and gzip get the tight gate.
+test('a rewritten budget is the measurement plus 32 raw and gzip bytes and 256 brotli bytes', () => {
+	assert.deepEqual(ratchetBudget({ raw: 1000, gzip: 400, brotli: 350 }), {
+		raw: 1032,
+		gzip: 432,
+		brotli: 606,
+	});
+	assert.throws(() => ratchetBudget({ raw: 1000, gzip: 0, brotli: 350 }), /gzip budget/);
+});
+
+test('rewriting a budget lowers it, keeps it when the measurement fits, and raises only a breach', () => {
+	const current = { raw: 1032, gzip: 432, brotli: 606 };
+	// Code removed: raw and gzip shrink, brotli grows but still fits its budget.
+	assert.deepEqual(ratchetBudget({ raw: 900, gzip: 380, brotli: 470 }, current), {
+		raw: 932,
+		gzip: 412,
+		brotli: 606,
+	});
+	// Unchanged bytes rewrite to the same budget.
+	assert.deepEqual(ratchetBudget({ raw: 1000, gzip: 400, brotli: 350 }, current), current);
+	// Only the breached metric rises, to measured + headroom.
+	assert.deepEqual(ratchetBudget({ raw: 1040, gzip: 400, brotli: 350 }, current), {
+		raw: 1072,
+		gzip: 432,
+		brotli: 606,
 	});
 });
 

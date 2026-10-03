@@ -1190,7 +1190,7 @@
     "target": "octane-jsx",
     "reference": "octane-jsx-budget",
     "maxRatio": 1,
-    "note": "Rows JSX application production raw bytes must not exceed the committed 32-byte-aligned same-run ceiling."
+    "note": "Rows JSX application production raw bytes must not exceed the committed same-run ceiling."
   },
   {
     "suite": "bundle-size",
@@ -1198,7 +1198,7 @@
     "target": "octane-jsx",
     "reference": "octane-jsx-budget",
     "maxRatio": 1,
-    "note": "Rows JSX application production gzip bytes must not exceed the committed 32-byte-aligned same-run ceiling."
+    "note": "Rows JSX application production gzip bytes must not exceed the committed same-run ceiling."
   },
   {
     "suite": "bundle-size",
@@ -1206,7 +1206,7 @@
     "target": "octane-jsx",
     "reference": "octane-jsx-budget",
     "maxRatio": 1,
-    "note": "Rows JSX application production brotli bytes must not exceed the committed 32-byte-aligned same-run ceiling."
+    "note": "Rows JSX application production brotli bytes must not exceed the committed same-run ceiling."
   },
   {
     "suite": "bundle-size",
@@ -1214,7 +1214,7 @@
     "target": "octane-jsx",
     "reference": "octane-jsx-budget",
     "maxRatio": 1,
-    "note": "Rows JSX framework production raw bytes must not exceed the committed 32-byte-aligned same-run ceiling."
+    "note": "Rows JSX framework production raw bytes must not exceed the committed same-run ceiling."
   },
   {
     "suite": "bundle-size",
@@ -1222,7 +1222,7 @@
     "target": "octane-jsx",
     "reference": "octane-jsx-budget",
     "maxRatio": 1,
-    "note": "Rows JSX framework production gzip bytes must not exceed the committed 32-byte-aligned same-run ceiling."
+    "note": "Rows JSX framework production gzip bytes must not exceed the committed same-run ceiling."
   },
   {
     "suite": "bundle-size",
@@ -1230,7 +1230,7 @@
     "target": "octane-jsx",
     "reference": "octane-jsx-budget",
     "maxRatio": 1,
-    "note": "Rows JSX framework production brotli bytes must not exceed the committed 32-byte-aligned same-run ceiling."
+    "note": "Rows JSX framework production brotli bytes must not exceed the committed same-run ceiling."
   },
   {
     "suite": "bundle-size",
@@ -1238,7 +1238,7 @@
     "target": "octane-jsx",
     "reference": "octane-jsx-budget",
     "maxRatio": 1,
-    "note": "Rows JSX total production raw bytes must not exceed the committed 32-byte-aligned same-run ceiling."
+    "note": "Rows JSX total production raw bytes must not exceed the committed same-run ceiling."
   },
   {
     "suite": "bundle-size",
@@ -1246,7 +1246,7 @@
     "target": "octane-jsx",
     "reference": "octane-jsx-budget",
     "maxRatio": 1,
-    "note": "Rows JSX total production gzip bytes must not exceed the committed 32-byte-aligned same-run ceiling."
+    "note": "Rows JSX total production gzip bytes must not exceed the committed same-run ceiling."
   },
   {
     "suite": "bundle-size",
@@ -1254,7 +1254,7 @@
     "target": "octane-jsx",
     "reference": "octane-jsx-budget",
     "maxRatio": 1,
-    "note": "Rows JSX total production brotli bytes must not exceed the committed 32-byte-aligned same-run ceiling."
+    "note": "Rows JSX total production brotli bytes must not exceed the committed same-run ceiling."
   },
   {
     "suite": "bundle-size",
@@ -1681,7 +1681,7 @@
     "target": "octane-tsrx",
     "reference": "octane-tsrx-budget",
     "maxRatio": 1,
-    "note": "Rows application production raw bytes must not exceed the committed 32-byte-aligned same-run ceiling."
+    "note": "Rows application production raw bytes must not exceed the committed same-run ceiling."
   },
   {
     "suite": "bundle-size",
@@ -1689,7 +1689,7 @@
     "target": "octane-tsrx",
     "reference": "octane-tsrx-budget",
     "maxRatio": 1,
-    "note": "Rows application production gzip bytes must not exceed the committed 32-byte-aligned same-run ceiling."
+    "note": "Rows application production gzip bytes must not exceed the committed same-run ceiling."
   },
   {
     "suite": "bundle-size",
@@ -1697,7 +1697,7 @@
     "target": "octane-tsrx",
     "reference": "octane-tsrx-budget",
     "maxRatio": 1,
-    "note": "Rows application production brotli bytes must not exceed the committed 32-byte-aligned same-run ceiling."
+    "note": "Rows application production brotli bytes must not exceed the committed same-run ceiling."
   },
   {
     "suite": "bundle-size",
@@ -1705,7 +1705,7 @@
     "target": "octane-tsrx",
     "reference": "octane-tsrx-budget",
     "maxRatio": 1,
-    "note": "Rows framework production raw bytes must not exceed the committed 32-byte-aligned same-run ceiling."
+    "note": "Rows framework production raw bytes must not exceed the committed same-run ceiling."
   },
   {
     "suite": "bundle-size",
@@ -1713,7 +1713,7 @@
     "target": "octane-tsrx",
     "reference": "octane-tsrx-budget",
     "maxRatio": 1,
-    "note": "Rows framework production gzip bytes must not exceed the committed 32-byte-aligned same-run ceiling."
+    "note": "Rows framework production gzip bytes must not exceed the committed same-run ceiling."
   },
   {
     "suite": "bundle-size",
@@ -1721,7 +1721,7 @@
     "target": "octane-tsrx",
     "reference": "octane-tsrx-budget",
     "maxRatio": 1,
-    "note": "Rows framework production brotli bytes must not exceed the committed 32-byte-aligned same-run ceiling."
+    "note": "Rows framework production brotli bytes must not exceed the committed same-run ceiling."
   },
   {
     "suite": "bundle-size",
@@ -1729,7 +1729,7 @@
     "target": "octane-tsrx",
     "reference": "octane-tsrx-budget",
     "maxRatio": 1,
-    "note": "Rows total production raw bytes must not exceed the committed 32-byte-aligned same-run ceiling."
+    "note": "Rows total production raw bytes must not exceed the committed same-run ceiling."
   },
   {
     "suite": "bundle-size",
@@ -1737,7 +1737,7 @@
     "target": "octane-tsrx",
     "reference": "octane-tsrx-budget",
     "maxRatio": 1,
-    "note": "Rows total production gzip bytes must not exceed the committed 32-byte-aligned same-run ceiling."
+    "note": "Rows total production gzip bytes must not exceed the committed same-run ceiling."
   },
   {
     "suite": "bundle-size",
@@ -1745,7 +1745,7 @@
     "target": "octane-tsrx",
     "reference": "octane-tsrx-budget",
     "maxRatio": 1,
-    "note": "Rows total production brotli bytes must not exceed the committed 32-byte-aligned same-run ceiling."
+    "note": "Rows total production brotli bytes must not exceed the committed same-run ceiling."
   },
   {
     "suite": "bundle-size",
@@ -1753,7 +1753,7 @@
     "target": "octane-tsrx",
     "reference": "octane-tsrx-budget",
     "maxRatio": 1,
-    "note": "TodoMVC application production raw bytes must not exceed the committed 32-byte-aligned same-run ceiling."
+    "note": "TodoMVC application production raw bytes must not exceed the committed same-run ceiling."
   },
   {
     "suite": "bundle-size",
@@ -1761,7 +1761,7 @@
     "target": "octane-tsrx",
     "reference": "octane-tsrx-budget",
     "maxRatio": 1,
-    "note": "TodoMVC application production gzip bytes must not exceed the committed 32-byte-aligned same-run ceiling."
+    "note": "TodoMVC application production gzip bytes must not exceed the committed same-run ceiling."
   },
   {
     "suite": "bundle-size",
@@ -1769,7 +1769,7 @@
     "target": "octane-tsrx",
     "reference": "octane-tsrx-budget",
     "maxRatio": 1,
-    "note": "TodoMVC application production brotli bytes must not exceed the committed 32-byte-aligned same-run ceiling."
+    "note": "TodoMVC application production brotli bytes must not exceed the committed same-run ceiling."
   },
   {
     "suite": "bundle-size",
@@ -1777,7 +1777,7 @@
     "target": "octane-tsrx",
     "reference": "octane-tsrx-budget",
     "maxRatio": 1,
-    "note": "TodoMVC framework production raw bytes must not exceed the committed 32-byte-aligned same-run ceiling."
+    "note": "TodoMVC framework production raw bytes must not exceed the committed same-run ceiling."
   },
   {
     "suite": "bundle-size",
@@ -1785,7 +1785,7 @@
     "target": "octane-tsrx",
     "reference": "octane-tsrx-budget",
     "maxRatio": 1,
-    "note": "TodoMVC framework production gzip bytes must not exceed the committed 32-byte-aligned same-run ceiling."
+    "note": "TodoMVC framework production gzip bytes must not exceed the committed same-run ceiling."
   },
   {
     "suite": "bundle-size",
@@ -1793,7 +1793,7 @@
     "target": "octane-tsrx",
     "reference": "octane-tsrx-budget",
     "maxRatio": 1,
-    "note": "TodoMVC framework production brotli bytes must not exceed the committed 32-byte-aligned same-run ceiling."
+    "note": "TodoMVC framework production brotli bytes must not exceed the committed same-run ceiling."
   },
   {
     "suite": "bundle-size",
@@ -1801,7 +1801,7 @@
     "target": "octane-tsrx",
     "reference": "octane-tsrx-budget",
     "maxRatio": 1,
-    "note": "TodoMVC total production raw bytes must not exceed the committed 32-byte-aligned same-run ceiling."
+    "note": "TodoMVC total production raw bytes must not exceed the committed same-run ceiling."
   },
   {
     "suite": "bundle-size",
@@ -1809,7 +1809,7 @@
     "target": "octane-tsrx",
     "reference": "octane-tsrx-budget",
     "maxRatio": 1,
-    "note": "TodoMVC total production gzip bytes must not exceed the committed 32-byte-aligned same-run ceiling."
+    "note": "TodoMVC total production gzip bytes must not exceed the committed same-run ceiling."
   },
   {
     "suite": "bundle-size",
@@ -1817,7 +1817,7 @@
     "target": "octane-tsrx",
     "reference": "octane-tsrx-budget",
     "maxRatio": 1,
-    "note": "TodoMVC total production brotli bytes must not exceed the committed 32-byte-aligned same-run ceiling."
+    "note": "TodoMVC total production brotli bytes must not exceed the committed same-run ceiling."
   },
   {
     "suite": "bundle-size",
@@ -1825,7 +1825,7 @@
     "target": "octane-tsrx",
     "reference": "octane-tsrx-budget",
     "maxRatio": 1,
-    "note": "Chat-stream application production raw bytes must not exceed the committed 32-byte-aligned same-run ceiling."
+    "note": "Chat-stream application production raw bytes must not exceed the committed same-run ceiling."
   },
   {
     "suite": "bundle-size",
@@ -1833,7 +1833,7 @@
     "target": "octane-tsrx",
     "reference": "octane-tsrx-budget",
     "maxRatio": 1,
-    "note": "Chat-stream application production gzip bytes must not exceed the committed 32-byte-aligned same-run ceiling."
+    "note": "Chat-stream application production gzip bytes must not exceed the committed same-run ceiling."
   },
   {
     "suite": "bundle-size",
@@ -1841,7 +1841,7 @@
     "target": "octane-tsrx",
     "reference": "octane-tsrx-budget",
     "maxRatio": 1,
-    "note": "Chat-stream application production brotli bytes must not exceed the committed 32-byte-aligned same-run ceiling."
+    "note": "Chat-stream application production brotli bytes must not exceed the committed same-run ceiling."
   },
   {
     "suite": "bundle-size",
@@ -1849,7 +1849,7 @@
     "target": "octane-tsrx",
     "reference": "octane-tsrx-budget",
     "maxRatio": 1,
-    "note": "Chat-stream framework production raw bytes must not exceed the committed 32-byte-aligned same-run ceiling."
+    "note": "Chat-stream framework production raw bytes must not exceed the committed same-run ceiling."
   },
   {
     "suite": "bundle-size",
@@ -1857,7 +1857,7 @@
     "target": "octane-tsrx",
     "reference": "octane-tsrx-budget",
     "maxRatio": 1,
-    "note": "Chat-stream framework production gzip bytes must not exceed the committed 32-byte-aligned same-run ceiling."
+    "note": "Chat-stream framework production gzip bytes must not exceed the committed same-run ceiling."
   },
   {
     "suite": "bundle-size",
@@ -1865,7 +1865,7 @@
     "target": "octane-tsrx",
     "reference": "octane-tsrx-budget",
     "maxRatio": 1,
-    "note": "Chat-stream framework production brotli bytes must not exceed the committed 32-byte-aligned same-run ceiling."
+    "note": "Chat-stream framework production brotli bytes must not exceed the committed same-run ceiling."
   },
   {
     "suite": "bundle-size",
@@ -1873,7 +1873,7 @@
     "target": "octane-tsrx",
     "reference": "octane-tsrx-budget",
     "maxRatio": 1,
-    "note": "Chat-stream total production raw bytes must not exceed the committed 32-byte-aligned same-run ceiling."
+    "note": "Chat-stream total production raw bytes must not exceed the committed same-run ceiling."
   },
   {
     "suite": "bundle-size",
@@ -1881,7 +1881,7 @@
     "target": "octane-tsrx",
     "reference": "octane-tsrx-budget",
     "maxRatio": 1,
-    "note": "Chat-stream total production gzip bytes must not exceed the committed 32-byte-aligned same-run ceiling."
+    "note": "Chat-stream total production gzip bytes must not exceed the committed same-run ceiling."
   },
   {
     "suite": "bundle-size",
@@ -1889,7 +1889,7 @@
     "target": "octane-tsrx",
     "reference": "octane-tsrx-budget",
     "maxRatio": 1,
-    "note": "Chat-stream total production brotli bytes must not exceed the committed 32-byte-aligned same-run ceiling."
+    "note": "Chat-stream total production brotli bytes must not exceed the committed same-run ceiling."
   },
   {
     "suite": "bundle-size",
@@ -1897,7 +1897,7 @@
     "target": "octane-tsrx",
     "reference": "octane-tsrx-budget",
     "maxRatio": 1,
-    "note": "Weather-app application production raw bytes must not exceed the committed 32-byte-aligned same-run ceiling."
+    "note": "Weather-app application production raw bytes must not exceed the committed same-run ceiling."
   },
   {
     "suite": "bundle-size",
@@ -1905,7 +1905,7 @@
     "target": "octane-tsrx",
     "reference": "octane-tsrx-budget",
     "maxRatio": 1,
-    "note": "Weather-app application production gzip bytes must not exceed the committed 32-byte-aligned same-run ceiling."
+    "note": "Weather-app application production gzip bytes must not exceed the committed same-run ceiling."
   },
   {
     "suite": "bundle-size",
@@ -1913,7 +1913,7 @@
     "target": "octane-tsrx",
     "reference": "octane-tsrx-budget",
     "maxRatio": 1,
-    "note": "Weather-app application production brotli bytes must not exceed the committed 32-byte-aligned same-run ceiling."
+    "note": "Weather-app application production brotli bytes must not exceed the committed same-run ceiling."
   },
   {
     "suite": "bundle-size",
@@ -1921,7 +1921,7 @@
     "target": "octane-tsrx",
     "reference": "octane-tsrx-budget",
     "maxRatio": 1,
-    "note": "Weather-app framework production raw bytes must not exceed the committed 32-byte-aligned same-run ceiling."
+    "note": "Weather-app framework production raw bytes must not exceed the committed same-run ceiling."
   },
   {
     "suite": "bundle-size",
@@ -1929,7 +1929,7 @@
     "target": "octane-tsrx",
     "reference": "octane-tsrx-budget",
     "maxRatio": 1,
-    "note": "Weather-app framework production gzip bytes must not exceed the committed 32-byte-aligned same-run ceiling."
+    "note": "Weather-app framework production gzip bytes must not exceed the committed same-run ceiling."
   },
   {
     "suite": "bundle-size",
@@ -1937,7 +1937,7 @@
     "target": "octane-tsrx",
     "reference": "octane-tsrx-budget",
     "maxRatio": 1,
-    "note": "Weather-app framework production brotli bytes must not exceed the committed 32-byte-aligned same-run ceiling."
+    "note": "Weather-app framework production brotli bytes must not exceed the committed same-run ceiling."
   },
   {
     "suite": "bundle-size",
@@ -1945,7 +1945,7 @@
     "target": "octane-tsrx",
     "reference": "octane-tsrx-budget",
     "maxRatio": 1,
-    "note": "Weather-app total production raw bytes must not exceed the committed 32-byte-aligned same-run ceiling."
+    "note": "Weather-app total production raw bytes must not exceed the committed same-run ceiling."
   },
   {
     "suite": "bundle-size",
@@ -1953,7 +1953,7 @@
     "target": "octane-tsrx",
     "reference": "octane-tsrx-budget",
     "maxRatio": 1,
-    "note": "Weather-app total production gzip bytes must not exceed the committed 32-byte-aligned same-run ceiling."
+    "note": "Weather-app total production gzip bytes must not exceed the committed same-run ceiling."
   },
   {
     "suite": "bundle-size",
@@ -1961,7 +1961,79 @@
     "target": "octane-tsrx",
     "reference": "octane-tsrx-budget",
     "maxRatio": 1,
-    "note": "Weather-app total production brotli bytes must not exceed the committed 32-byte-aligned same-run ceiling."
+    "note": "Weather-app total production brotli bytes must not exceed the committed same-run ceiling."
+  },
+  {
+    "suite": "bundle-size",
+    "op": "bindings_app_raw",
+    "target": "octane-tsrx",
+    "reference": "octane-tsrx-budget",
+    "maxRatio": 1,
+    "note": "Binding-heavy application application (authored and compiled binding source) production raw bytes must not exceed the committed same-run ceiling."
+  },
+  {
+    "suite": "bundle-size",
+    "op": "bindings_app_gzip",
+    "target": "octane-tsrx",
+    "reference": "octane-tsrx-budget",
+    "maxRatio": 1,
+    "note": "Binding-heavy application application (authored and compiled binding source) production gzip bytes must not exceed the committed same-run ceiling."
+  },
+  {
+    "suite": "bundle-size",
+    "op": "bindings_app_brotli",
+    "target": "octane-tsrx",
+    "reference": "octane-tsrx-budget",
+    "maxRatio": 1,
+    "note": "Binding-heavy application application (authored and compiled binding source) production brotli bytes must not exceed the committed same-run ceiling."
+  },
+  {
+    "suite": "bundle-size",
+    "op": "bindings_fw_raw",
+    "target": "octane-tsrx",
+    "reference": "octane-tsrx-budget",
+    "maxRatio": 1,
+    "note": "Binding-heavy application framework production raw bytes must not exceed the committed same-run ceiling."
+  },
+  {
+    "suite": "bundle-size",
+    "op": "bindings_fw_gzip",
+    "target": "octane-tsrx",
+    "reference": "octane-tsrx-budget",
+    "maxRatio": 1,
+    "note": "Binding-heavy application framework production gzip bytes must not exceed the committed same-run ceiling."
+  },
+  {
+    "suite": "bundle-size",
+    "op": "bindings_fw_brotli",
+    "target": "octane-tsrx",
+    "reference": "octane-tsrx-budget",
+    "maxRatio": 1,
+    "note": "Binding-heavy application framework production brotli bytes must not exceed the committed same-run ceiling."
+  },
+  {
+    "suite": "bundle-size",
+    "op": "bindings_js_raw",
+    "target": "octane-tsrx",
+    "reference": "octane-tsrx-budget",
+    "maxRatio": 1,
+    "note": "Binding-heavy application total production raw bytes must not exceed the committed same-run ceiling."
+  },
+  {
+    "suite": "bundle-size",
+    "op": "bindings_js_gzip",
+    "target": "octane-tsrx",
+    "reference": "octane-tsrx-budget",
+    "maxRatio": 1,
+    "note": "Binding-heavy application total production gzip bytes must not exceed the committed same-run ceiling."
+  },
+  {
+    "suite": "bundle-size",
+    "op": "bindings_js_brotli",
+    "target": "octane-tsrx",
+    "reference": "octane-tsrx-budget",
+    "maxRatio": 1,
+    "note": "Binding-heavy application total production brotli bytes must not exceed the committed same-run ceiling."
   },
   {
     "suite": "weather-app-lighthouse",
@@ -2926,6 +2998,54 @@
     "reference": "binding-usehooks-ts-esbuild-budget",
     "maxRatio": 1,
     "note": "A real esbuild production bundle executing the interactive public usehooks-ts counter; deterministic brotli bytes must not exceed its committed same-run budget."
+  },
+  {
+    "suite": "bundle-reachability",
+    "op": "raw",
+    "target": "binding-apollo-client-vite",
+    "reference": "binding-apollo-client-vite-budget",
+    "maxRatio": 1,
+    "note": "A real Vite production bundle executing the public Apollo Client binding; deterministic raw bytes must not exceed its committed same-run budget."
+  },
+  {
+    "suite": "bundle-reachability",
+    "op": "gzip",
+    "target": "binding-apollo-client-vite",
+    "reference": "binding-apollo-client-vite-budget",
+    "maxRatio": 1,
+    "note": "A real Vite production bundle executing the public Apollo Client binding; deterministic gzip bytes must not exceed its committed same-run budget."
+  },
+  {
+    "suite": "bundle-reachability",
+    "op": "brotli",
+    "target": "binding-apollo-client-vite",
+    "reference": "binding-apollo-client-vite-budget",
+    "maxRatio": 1,
+    "note": "A real Vite production bundle executing the public Apollo Client binding; deterministic brotli bytes must not exceed its committed same-run budget."
+  },
+  {
+    "suite": "bundle-reachability",
+    "op": "raw",
+    "target": "binding-apollo-client-esbuild",
+    "reference": "binding-apollo-client-esbuild-budget",
+    "maxRatio": 1,
+    "note": "A real esbuild production bundle executing the public Apollo Client binding; deterministic raw bytes must not exceed its committed same-run budget."
+  },
+  {
+    "suite": "bundle-reachability",
+    "op": "gzip",
+    "target": "binding-apollo-client-esbuild",
+    "reference": "binding-apollo-client-esbuild-budget",
+    "maxRatio": 1,
+    "note": "A real esbuild production bundle executing the public Apollo Client binding; deterministic gzip bytes must not exceed its committed same-run budget."
+  },
+  {
+    "suite": "bundle-reachability",
+    "op": "brotli",
+    "target": "binding-apollo-client-esbuild",
+    "reference": "binding-apollo-client-esbuild-budget",
+    "maxRatio": 1,
+    "note": "A real esbuild production bundle executing the public Apollo Client binding; deterministic brotli bytes must not exceed its committed same-run budget."
   },
   {
     "suite": "svg-dashboard",

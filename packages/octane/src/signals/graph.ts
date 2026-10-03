@@ -1,16 +1,11 @@
 import { formatClientError } from '../error-codes.client.generated.js';
 import {
 	activeCandidate,
-	candidateWriteCount,
-	deferCandidateInvalidation,
-	recordCandidateUrgentWrite,
+	candidateHooks,
 	registerCandidateGraph,
-	registerSignalActionFrameFactory,
-	registerSignalTransitionCoordinatorFactory,
 	withoutSignalCandidate,
 } from './transition-state.js';
-import { SignalActionFrame } from './transition-action.js';
-import { createSignalTransitionCoordinator } from './transition-coordinator.js';
+import { installSignalActions } from '#octane/signal-actions/graph';
 import type { SignalCandidateFrame } from './transition-candidate.js';
 import {
 	createReactiveSystem,
@@ -69,12 +64,6 @@ export interface GraphOwner {
 		read: SignalReadMode,
 	): readonly NativeSerializedScope[] | undefined;
 	trace(type: SignalTraceEvent['type'], node?: ScopedNode): void;
-	/** Internal prototype: only explicitly supported producers may enter a candidate. */
-	forkCandidate?(
-		node: ScopedNode,
-		target: ScopedNode,
-		frame: SignalCandidateFrame,
-	): CandidateProducer | undefined;
 }
 
 export interface CandidateProducer {
@@ -162,7 +151,7 @@ const graph = createReactiveSystem({
 			}
 			node.owner.trace('invalidate', node);
 			if (node.invalidateAttempt) {
-				if (deferCandidateInvalidation) {
+				if (candidateHooks.defer) {
 					const invalidate = node.invalidateAttempt;
 					queued.add(() => {
 						// An accepted read can already have replaced this producer.
@@ -531,7 +520,7 @@ export class ScopedNode<T = any> implements SignalHandle<T>, ReactiveNode {
 					: value;
 			// Equal committed values can still withdraw private transition intent.
 			// Revoke every old receipt before cancellation callbacks can reenter.
-			const releases = candidateWriteCount ? recordCandidateUrgentWrite(this, value) : undefined;
+			const releases = candidateHooks.urgentWrite?.(this, value);
 			try {
 				if (!Object.is(previous, next)) {
 					publishNode(this, readyState(next));
@@ -1007,7 +996,7 @@ interface DeclarationView {
 	canonicalRevision: number;
 }
 
-type DeclarationViewFork = (
+export type DeclarationViewFork = (
 	target: ScopedNode,
 	frame: SignalCandidateFrame,
 ) => CandidateProducer | undefined;
@@ -1226,7 +1215,9 @@ registerCandidateGraph({
 	releaseRetention,
 	createNativeSource,
 	attachObserver,
+	declarationViewFork,
 });
 
-registerSignalActionFrameFactory(() => new SignalActionFrame());
-registerSignalTransitionCoordinatorFactory(createSignalTransitionCoordinator);
+// Renderer Actions stage writes to signals loaded after they awaited. An islands
+// build moves this registration into the renderer (see action-capability.ts).
+installSignalActions();
