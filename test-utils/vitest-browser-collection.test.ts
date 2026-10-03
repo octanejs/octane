@@ -56,7 +56,7 @@ test('browser collection releases a file mock before collecting an unmocked cons
 		join(root, 'vitest.config.mjs'),
 		`
 import { playwright } from '@vitest/browser-playwright';
-export default { test: {
+export default { cacheDir: ${JSON.stringify(join(root, 'vite-cache'))}, test: {
   name: 'collection', include: ['*.test.mjs'], fileParallelism: false,
   browser: { enabled: true, headless: true, provider: playwright(), instances: [{ browser: 'chromium' }] }
 } };
