@@ -72,6 +72,13 @@ vi.mock('./dependency.mjs', () => ({ value: 'mocked' }));
 // it does not also depend on browser-transform timing for static-import hoisting.
 const { value } = await import('./dependency.mjs');
 if (value !== 'mocked') throw new Error('The first file must see its own mock');
+// Chromium applies request interception asynchronously, so a request issued
+// right after vi.mock can bypass the mock route (vitest-dev/vitest#8339). The
+// provider answers this probe once registration has verified interception.
+const probe = await fetch('/__vitest_interception_probe__', { cache: 'no-store' });
+if (probe.headers.get('x-vitest-probe') !== '1') {
+  throw new Error('Mock registration must verify request interception first');
+}
 it('mocked', () => { throw new Error('Collection must not execute test bodies'); });
 `,
 	);

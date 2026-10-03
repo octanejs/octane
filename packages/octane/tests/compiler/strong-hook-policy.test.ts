@@ -207,6 +207,17 @@ export function App(props) @{
 		expect(() => compile(reordered, '/src/App.tsrx')).not.toThrow();
 	});
 
+	it('rejects an omitted list that reads a variable assigned after the call', () => {
+		const setup = 'let label = props.a; useEffect(() => console.log(label)); label = props.b;';
+		expect(() => compile(app(setup), '/src/App.tsrx')).not.toThrow();
+		expect(() => compile(strong(app(setup)), '/src/App.tsrx')).toThrow(
+			/UNTRACKED_EFFECT\] Strong mode does not allow useEffect to read `label` while the component assigns it after the call/,
+		);
+		const assignedFirst =
+			'let label = props.a; label = props.b; useEffect(() => console.log(label));';
+		expect(() => compile(strong(app(assignedFirst)), '/src/App.tsrx')).not.toThrow();
+	});
+
 	it('rejects a later declaration read by a plain TypeScript hook', () => {
 		const source = `"use strong"; import { useEffect } from 'octane'; export function useLog(value: string) { useEffect(() => console.log(label)); const label = value.trim(); }`;
 		expect(() => slotHooks(source, '/src/useLog.ts')).toThrow(EVERY_RENDER);

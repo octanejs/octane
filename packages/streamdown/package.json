@@ -1,6 +1,6 @@
 {
   "name": "@octanejs/streamdown",
-  "version": "0.1.37",
+  "version": "0.1.38",
   "license": "Apache-2.0",
   "type": "module",
   "sideEffects": [
@@ -100,7 +100,7 @@
     "unist-util-visit-parents": "^6.0.0"
   },
   "peerDependencies": {
-    "octane": "workspace:^0.7.0"
+    "octane": "workspace:^0.8.0"
   },
   "devDependencies": {
     "@octanejs/testing-library": "workspace:*",
