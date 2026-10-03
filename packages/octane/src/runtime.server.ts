@@ -8020,6 +8020,18 @@ export function useRef<T>(initial?: T, slot?: ServerHookSlot): { current: T | un
 	return rec.ref as { current: T | undefined };
 }
 
+export function useLazyRef<T>(factory: () => T, slot?: symbol): { current: T };
+export function useLazyRef<T>(factory: () => T, slot?: ServerHookSlot): { current: T } {
+	const position = hookPosition(slot);
+	if (position === null) return { current: factory() };
+	let rec = position.list[position.index] as RefHookRec | undefined;
+	if (rec === undefined) {
+		rec = { ref: { current: factory() } };
+		position.list[position.index] = rec;
+	}
+	return rec.ref as { current: T };
+}
+
 /** React's `useDebugValue` — devtools-only on the client, no-op everywhere. */
 export function useDebugValue(_value?: unknown, _format?: unknown): void {}
 

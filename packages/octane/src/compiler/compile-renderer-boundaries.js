@@ -20,6 +20,7 @@ const AUTO_RUNTIME_HOOKS = new Set([
 	'useMemo',
 	'useCallback',
 	'useRef',
+	'useLazyRef',
 	'useId',
 	'useEffectEvent',
 	'useImperativeHandle',

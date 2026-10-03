@@ -148,6 +148,11 @@ export const docsMeta: DocMeta[] = [
 				searchTerms: ['createResizeObserver', 'ResizeObserver', 'resize', 'measure', 'layout'],
 			},
 			{
+				id: 'use-lazy-ref',
+				title: 'Initialize a ref lazily with useLazyRef',
+				level: 3,
+			},
+			{
 				id: 'use-sync-external-store',
 				title: 'Subscribe to external state with useSyncExternalStore',
 				level: 3,

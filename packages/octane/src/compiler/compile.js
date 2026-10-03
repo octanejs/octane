@@ -84,7 +84,13 @@ import {
 	assertTemplateJumps,
 } from './arm-exits.js';
 import { assertForOfHeaders } from './for-headers.js';
-import { HOOK_NAMES, NATIVE_SIGNAL_HOOK_NAMES } from './hook-names.js';
+import {
+	HOOK_NAMES,
+	INITIAL_VALUE_HOOKS,
+	NATIVE_SIGNAL_HOOK_NAMES,
+	REF_HOOKS,
+	SPREAD_PATH_SLOT_HOOKS,
+} from './hook-names.js';
 export { HOOK_NAMES } from './hook-names.js';
 import {
 	expandDomRendererRegionsAst,
@@ -2994,7 +3000,7 @@ function readsCallbackScope(node, callbackScope) {
  * Stability sources:
  *   - useState / useLinkedState / useReducer setters and state getters
  *     (second/third slots)
- *   - useRef returns (the ref object itself, not .current)
+ *   - useRef / useLazyRef returns (the ref object itself, not .current)
  *   - useCallback returns
  *   - Arrows previously declared in this body whose free vars are themselves
  *     all stable — transitive (auto-callback adds them back into the set)
@@ -3039,10 +3045,10 @@ function computeStableLocals(statements, componentLocals) {
 				if (callName === 'useState' || callName === 'useLinkedState' || callName === 'useReducer') {
 					continue;
 				}
-				// x = useRef(...) / useCallback(...) — the
+				// x = useRef(...) / useLazyRef(...) / useCallback(...) — the
 				// return value is stable for the lifetime of the component.
 				if (
-					(callName === 'useRef' || callName === 'useCallback') &&
+					(REF_HOOKS.has(callName) || callName === 'useCallback') &&
 					decl.id.type === 'Identifier'
 				) {
 					stable.add(decl.id.name);
@@ -3101,7 +3107,7 @@ function computeInvariantLocals(statements, componentLocals, autoCallback) {
 					if (getter?.type === 'Identifier') invariant.add(getter.name);
 					continue;
 				}
-				if (callName === 'useRef' && decl.id.type === 'Identifier') {
+				if (REF_HOOKS.has(callName) && decl.id.type === 'Identifier') {
 					invariant.add(decl.id.name);
 					continue;
 				}
@@ -5856,6 +5862,7 @@ const SETUP_PASSIVE_HOOKS = new Set([
 const SETUP_SYNC_FACTORY_HOOKS = new Set([
 	'useMemo',
 	'useState',
+	'useLazyRef',
 	'useLinkedState',
 	'useReducer',
 	'useSyncExternalStore',
@@ -19861,6 +19868,7 @@ const NUMERIC_HOOK_SLOT_POSITION = {
 	useMemo: 2,
 	useCallback: 2,
 	useRef: 1,
+	useLazyRef: 1,
 	useEffectEvent: 1,
 	useImperativeHandle: 3,
 	useActionState: 3,
@@ -19872,9 +19880,7 @@ const NUMERIC_HOOK_SLOT_POSITION = {
 function appendHookSlotArgument(name, args, slot, numeric, origin) {
 	const out = [...args];
 	const position =
-		numeric || name === 'useState' || name === 'useRef'
-			? NUMERIC_HOOK_SLOT_POSITION[name]
-			: undefined;
+		numeric || INITIAL_VALUE_HOOKS.has(name) ? NUMERIC_HOOK_SLOT_POSITION[name] : undefined;
 	if (position !== undefined) {
 		while (out.length < position) out.push(b.id('undefined', origin));
 	}
@@ -20657,10 +20663,7 @@ function rewriteHookCalls(node, ctx, componentName, localRoot = false) {
 				// changes a custom hook's defaults, rest values or arguments.length.
 				// State/ref spreads also need this path: an empty spread has no
 				// initializer position into which a trailing slot may safely fall.
-				if (
-					isCustom ||
-					(hasSpread && (name === 'useState' || name === 'useRef' || name === 'useLayoutSnapshot'))
-				)
+				if (isCustom || (hasSpread && SPREAD_PATH_SLOT_HOOKS.has(name)))
 					return wrapHookCallWithSlot(n, ctx, slot, callee, args);
 
 				const hookArgs = explicitMemoSlot
@@ -20749,10 +20752,7 @@ function rewriteHookCalls(node, ctx, componentName, localRoot = false) {
 					: getterHelper !== null
 						? b.id(runtimeAliasForContext(ctx, getterHelper))
 						: n.callee;
-				if (
-					(name === 'useState' || name === 'useRef' || name === 'useLayoutSnapshot') &&
-					args.some((arg) => arg.type === 'SpreadElement')
-				)
+				if (SPREAD_PATH_SLOT_HOOKS.has(name) && args.some((arg) => arg.type === 'SpreadElement'))
 					return wrapHookCallWithSlot(n, ctx, slot, callee, args);
 				return {
 					...n,

@@ -6,6 +6,7 @@ import { builders as b, clone_ast_node as cloneAstNode, withDeferredImports } fr
 import { print as esrapPrint } from 'esrap';
 import esrapTsx from 'esrap/languages/tsx';
 import { METHOD_DEP_IMPORT } from './hook-deps.js';
+import { INITIAL_VALUE_HOOKS, SPREAD_PATH_SLOT_HOOKS } from './hook-names.js';
 import { nativeReadActivationIndex } from './native-read-codegen.js';
 import { signalHookCallSite } from './signal-declarations.js';
 import { adaptManualHookProviders } from './manual-hooks.js';
@@ -231,7 +232,7 @@ function slotBaseHooks(ast, state, options) {
 		}
 		if (slot !== null) {
 			if (
-				(imported === 'useState' || imported === 'useRef' || imported === 'useLayoutSnapshot') &&
+				SPREAD_PATH_SLOT_HOOKS.has(imported) &&
 				args.some((arg) => arg.type === 'SpreadElement')
 			) {
 				const fn = mapped.typeArguments
@@ -248,7 +249,7 @@ function slotBaseHooks(ast, state, options) {
 					arguments: [slot, fn, ...args],
 				};
 			}
-			if (args.length === 0 && (imported === 'useState' || imported === 'useRef'))
+			if (args.length === 0 && INITIAL_VALUE_HOOKS.has(imported))
 				args.push(b.id('undefined', node));
 			args.push(slot);
 		}

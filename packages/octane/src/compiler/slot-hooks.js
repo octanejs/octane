@@ -18,7 +18,11 @@ import { parseModule, builders as b } from '@tsrx/core';
 import { parseModule as parseFallbackModule } from '#octane/compiler-parser';
 import { findRootFactoryImports, proveVoidRoots } from './void-roots.js';
 import { HOOK_NAMES, collectNestedBindingNames, hookSlotHash } from './compile.js';
-import { NATIVE_SIGNAL_HOOK_NAMES } from './hook-names.js';
+import {
+	INITIAL_VALUE_HOOKS,
+	NATIVE_SIGNAL_HOOK_NAMES,
+	SPREAD_PATH_SLOT_HOOKS,
+} from './hook-names.js';
 import { METHOD_DEP_IMPORT, annotateHookCalls, analyzeStrongMemoCandidates } from './hook-deps.js';
 import { inlinePlainHookMemos } from './plain-hook-memo.js';
 import { assertStrongMode } from './strong-mode.js';
@@ -1242,7 +1246,7 @@ function walk(node, owner, st) {
 				});
 			}
 			if (
-				(imported === 'useState' || imported === 'useRef' || imported === 'useLayoutSnapshot') &&
+				SPREAD_PATH_SLOT_HOOKS.has(imported) &&
 				node.arguments.some((arg) => arg.type === 'SpreadElement')
 			) {
 				const open = callOpenParen(node, st.source);
@@ -1275,11 +1279,12 @@ function walk(node, owner, st) {
 					});
 				}
 			} else if (node.arguments.length === 0) {
-				// State/ref initializers may themselves be Symbols. Reserve their
-				// authored position even when empty; other hooks keep their ABI.
+				// State/ref initial values may themselves be Symbols, and a lazy ref's
+				// factory owns the same position. Reserve it even when empty; other
+				// hooks keep their ABI.
 				st.edits.push({
 					pos: node.end - 1,
-					text: imported === 'useState' || imported === 'useRef' ? `undefined, ${sym}` : sym,
+					text: INITIAL_VALUE_HOOKS.has(imported) ? `undefined, ${sym}` : sym,
 				});
 			} else {
 				// `useState(0)` → `useState(0, _h$N)` — insert AFTER the last arg's end so

@@ -234,6 +234,25 @@ default; pass `{ sourceEqual, valueEqual }` as a third argument when you need
 something else. Like `useState`, `useLinkedState` supports an optional third
 tuple item, `getValue`.
 
+## Lazy ref initialization
+
+When a mutable ref needs an expensive initial value, pass a factory to
+`useLazyRef`:
+
+```ts
+const cache = useLazyRef(() => new Map<string, string>());
+```
+
+Subsequent renders keep the same ref and do not rerun the factory.
+`useRef(callback)` stores the callback itself; a lazy factory may also return a
+function to store it as the ref value. The factory runs during render, and can
+run again when work is abandoned or retried, on remount, and separately for
+server rendering and hydration. Keep it free of side effects; use an effect for
+resources needing cleanup. Strong mode checks it like a lazy `useState`
+initializer, so it may read a clock, randomness, or browser state but may not
+schedule work. The experimental Valdi writer's existing adapter ABI does not
+support this hook.
+
 ## Measurements after layout
 
 Use `useLayoutSnapshot` when rendered output depends on a measurement of the
@@ -1008,8 +1027,8 @@ export function ViewportWidth() @{
 ```
 
 Browser reads in event handlers, effects, and deferred callbacks remain valid.
-Lazy `useState` and `useReducer` initializers may capture an initial browser
-value, but they still run during server rendering. Guard browser APIs there and
+Lazy `useState`, `useReducer`, and `useLazyRef` initializers may capture an
+initial browser value, but they still run during server rendering. Guard browser APIs there and
 ensure server and client initial output agrees. A `typeof window` guard in an
 ordinary render expression still reads ambient state and is rejected.
 

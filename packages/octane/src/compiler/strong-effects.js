@@ -7,6 +7,8 @@
 // lexical analysis, never from spelling. Nothing here annotates the parser tree
 // or changes emitted code.
 
+import { REF_HOOKS } from './hook-names.js';
+
 export const STRONG_EFFECT_DATA_FETCH = 'OCTANE_STRONG_EFFECT_DATA_FETCH';
 export const STRONG_EFFECT_HIDDEN_DEPENDENCY = 'OCTANE_STRONG_EFFECT_HIDDEN_DEPENDENCY';
 export const STRONG_EFFECT_RESOURCE_LEAK = 'OCTANE_STRONG_EFFECT_RESOURCE_LEAK';
@@ -1120,7 +1122,7 @@ export function createStrongEffectPolicy({ ast, analysis, callNames, report }) {
 			const init = unwrap(decl.init);
 			const binding = bindings[0]?.binding;
 			if (decl.id?.type === 'Identifier' && binding && !binding.reassigned) {
-				if (init?.type === 'CallExpression' && callNames.get(init) === 'useRef') {
+				if (init?.type === 'CallExpression' && REF_HOOKS.has(callNames.get(init))) {
 					roots.add(binding);
 					declarations.set(decl.id, binding);
 					names.add(binding.name);

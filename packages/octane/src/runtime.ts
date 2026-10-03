@@ -14029,6 +14029,19 @@ export function useRef<T>(initial?: T, slot?: HookSlot): { current: T | undefine
 	return s;
 }
 
+export function useLazyRef<T>(factory: () => T, slot?: symbol): { current: T };
+export function useLazyRef<T>(factory: () => T, slot?: HookSlot): { current: T } {
+	slot = resolveSlot(slot);
+	if (slot === undefined) missingSlot('useLazyRef');
+	const scope = CURRENT_SCOPE!;
+	let ref = scope.hooks?.get(slot) as { current: T } | undefined;
+	if (ref === undefined) {
+		ref = { current: factory() };
+		ensureHooks(scope).set(slot, ref);
+	}
+	return ref;
+}
+
 /**
  * React's `useDebugValue(value, format?)` — a devtools-only label for custom
  * hooks. Octane has no devtools inspector, so it is a no-op; exported so custom
