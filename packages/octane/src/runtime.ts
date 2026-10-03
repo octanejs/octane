@@ -19664,6 +19664,33 @@ class HydrationCapability {
 		);
 	}
 
+	/**
+	 * A shell hydrated before its streamed segment swaps still has the template
+	 * sentinel instead of the seed comment. Its opaque id owns the same boundary
+	 * namespace even though there are no scoped seeds yet. Octane cannot
+	 * selectively hydrate that server fallback, so claim the boundary for the
+	 * client: remove the sentinel and its server-rendered fallback arm up to
+	 * `end`, before mountTry mounts a fresh try/pending block. Leaving either
+	 * behind would duplicate the fallback and allow a later stream swap to
+	 * overwrite client-owned DOM. Returns the boundary's id, or null when
+	 * `cursor` is not a renderer sentinel. A method so that client-only bundles
+	 * drop the stream-protocol validator with this class.
+	 */
+	claimStreamTemplate(cursor: Node | null, end: Node): string | null {
+		if (cursor?.nodeType !== 1 || !isRendererStreamBoundaryTemplate(cursor as Element)) return null;
+		const id = (STAGED_DOM?.view(cursor as Element) ?? (cursor as Element)).getAttribute(
+			STREAM_BOUNDARY_ATTR,
+		)!;
+		let stale: Node | null = cursor;
+		while (stale !== null && stale !== end) {
+			const next: Node | null = getNextSibling(stale);
+			(STAGED_DOM?.view(stale as ChildNode) ?? (stale as ChildNode)).remove();
+			stale = next;
+		}
+		this.node = end;
+		return id;
+	}
+
 	/** Read the `<!--oct-catch:T:C-->` comment ahead of a caught arm's range. */
 	takeServerCatch(cursor: Node | null): ServerCatch | null {
 		if (cursor?.nodeType !== 8) return null;
@@ -19726,7 +19753,7 @@ class HydrationCapability {
 	settleServerCatch(caught: ServerCatch, slot: TrySlot | ErrorSlot, adopted: boolean): void {
 		const { start, end } = slot;
 		const { marker } = caught;
-		if (!adopted) this.rebuiltSlot(slot.parentBlock, end);
+		if (!adopted) this.rebuiltSlot(end);
 		const settle = (discarded: boolean): void => {
 			if ((STAGED_DOM?.view(marker) ?? marker).parentNode === null) return;
 			if (discarded) {
@@ -19755,12 +19782,11 @@ class HydrationCapability {
 
 	/**
 	 * The client rebuilt this slot's arm, adopting nothing inside it. Park the
-	 * cursor on its end. A root-level slot parks past its end, where the root's
-	 * next sibling starts, or the stale remainder that finishRoot sweeps. Claiming
-	 * that node as the remainder would sweep a sibling the root still adopts.
+	 * cursor past its end, where the next sibling's server content starts, as
+	 * the boundary itself does after it renders.
 	 */
-	rebuiltSlot(owner: Block, end: Node): void {
-		this.node = owner === this.rootBlock ? getNextSibling(end) : end;
+	rebuiltSlot(end: Node): void {
+		this.node = getNextSibling(end);
 	}
 
 	isOpen(node: Node | null): node is Comment {
@@ -20081,9 +20107,13 @@ class HydrationCapability {
 
 	/**
 	 * A slot of `parent` claimed the server range that `close` ends. Step the
-	 * cursor past it to the next sibling's server content.
+	 * cursor past it to the next sibling's server content. A parent that the
+	 * slot's render disposed, as a cleanup error an ancestor boundary caught
+	 * does, owns no server content any more: the cursor stays where that
+	 * boundary left it.
 	 */
 	parkPast(close: Node, parent: Scope): void {
+		if (parent.block.disposed) return;
 		const next = (this.node = getNextSibling(close));
 		if (parent === this.arm) {
 			this.armTail = next;
@@ -20142,16 +20172,16 @@ class HydrationCapability {
 
 	/**
 	 * Runs after a branch's first hydrating render, which adopted the server's
-	 * arm range from `first` to `end`. Every range the arm claims parks the
-	 * cursor past it, or on its close marker when the slot rebuilt its content
-	 * (a @try body that threw on the client), so once the arm has claimed
-	 * something, a server range at the cursor or just after that marker is one
-	 * that nothing in the arm claimed: the server rendered another arm here,
-	 * longer than this one. So is any server content at `parked`, where the
-	 * arm parked the cursor after its own template's roots, or after its last
-	 * slot's range or in-place root (renderAdoptedArm).
-	 * Discard the server content from there up to `end`, stopping at any
-	 * client nodes that mismatch recovery built there, and report it once.
+	 * arm range from `first` to `end`. Every slot the arm renders parks the
+	 * cursor past the range it claimed, even one whose content it rebuilt (a
+	 * @try body that threw on the client), so once the arm has claimed
+	 * something, a server range at the cursor is one that nothing in the arm
+	 * claimed: the server rendered another arm here, longer than this one. So
+	 * is any server content at `parked`, where the arm parked the cursor after
+	 * its own template's roots, or after its last slot's range or in-place root
+	 * (renderAdoptedArm). Discard the server content from there up to `end`,
+	 * stopping at any client nodes that mismatch recovery built there, and
+	 * report it once.
 	 *
 	 * An arm that rendered nothing leaves the cursor on `first`, and the whole
 	 * range is then the server's other arm: it is discarded and reported as an
@@ -20161,8 +20191,7 @@ class HydrationCapability {
 	 * server rendered for another arm: `parked` does, and anything else stays.
 	 */
 	discardArmTail(scope: Scope, slotKey: number, first: Node, end: Node, parked: Node | null): void {
-		let from = this.node;
-		if (this.isClose(from)) from = getNextSibling(from);
+		const from = this.node;
 		if (!this.isOpen(from) && (parked === null || from !== parked)) return;
 		let stop: Node | null = null;
 		let node: Node | null = from;
@@ -33153,8 +33182,8 @@ function componentSlotImpl(
 	// sibling adopts from the right node. The body itself doesn't reliably leave the
 	// cursor at the end — an EMPTY component (`<></>`, e.g. the router's
 	// <Transitioner/>) renders nothing, so without this the cursor stays parked on
-	// the component's own `<!--]-->` and the following sibling desyncs. Mirrors
-	// forBlock's `hydrateNode = state.end.nextSibling`. (A hydrating singleRoot
+	// the component's own `<!--]-->` and the following sibling desyncs. Every
+	// slot parks this way, forBlock and tryBlock included. (A hydrating singleRoot
 	// slot found no range: renderInPlace stepped past any server node it adopted.)
 	// An INHERITED slot adopted nothing: its end is the PARENT's marker and it has
 	// no following sibling (sole root) — leave the cursor where the body put it.
@@ -37589,7 +37618,7 @@ export function childSlot(
 		// hole adopts the right node (mirrors componentSlot's post-render advance).
 		// (Hydration always adopts a marker pair, so `state.end` is non-null here.)
 		if (hydration !== null && !state.borrowed && state.end !== null) {
-			hydration.node = getNextSibling(state.end);
+			hydration.parkPast(state.end, parentScope);
 		}
 		return;
 	}
@@ -39269,10 +39298,7 @@ export function errorBlock(
 		caught.props = { err: state.err, reset: state.reset };
 		caught.extra = state.env;
 		renderBlock(caught);
-		return state.reset;
-	}
-
-	if (state.branch === 1 && state.block !== null) {
+	} else if (state.branch === 1 && state.block !== null) {
 		const current = state.block;
 		current.body = state.tryBody;
 		current.extra = state.env;
@@ -39284,14 +39310,20 @@ export function errorBlock(
 				throw error;
 			switchErrorToCatch(state, error, true);
 		}
-		return state.reset;
-	}
+	} else mountErrorBoundary(state, hydration);
+	// Hydration: park past the boundary's range, as every slot does, so a
+	// following sibling adopts its own server content.
+	if (!state.passthrough) hydration?.parkPast(state.end, parentScope);
+	return state.reset;
+}
 
+/** Mount the boundary's try body, or its catch arm when the body throws. */
+function mountErrorBoundary(state: ErrorSlot, hydration: HydrationCapability | null): void {
 	if (state.block !== null) {
 		const previous = state.block;
 		state.block = null;
 		unmountBlock(previous);
-		if (state.parentBlock.disposed || state.block !== null) return state.reset;
+		if (state.parentBlock.disposed || state.block !== null) return;
 	}
 	setTryBranch(state, 1);
 	let start: Node | null = null;
@@ -39335,8 +39367,8 @@ export function errorBlock(
 	);
 	body.idState = state.idState;
 	(body as any).$$tryHandler = (error: unknown) => {
-		switchErrorToCatch(state!, error);
-		return state!.block;
+		switchErrorToCatch(state, error);
+		return state.block;
 	};
 	state.block = body;
 	const previousNative = freshBoundary ? setNativeAdoptionResolver(null) : undefined;
@@ -39359,7 +39391,7 @@ export function errorBlock(
 			throw error;
 		if (caught !== null) {
 			// Unmounting the replay can report a cleanup error that disposes the parent.
-			if (state.parentBlock.disposed) return state.reset;
+			if (state.parentBlock.disposed) return;
 			hydration!.settleServerCatch(caught, state, true);
 			switchErrorToCatch(state, error, true, caught.start, caught.end);
 		} else {
@@ -39377,7 +39409,6 @@ export function errorBlock(
 		if (freshBoundary) hydration!.depth--;
 		if (previousNative !== undefined) setNativeAdoptionResolver(previousNative);
 	}
-	return state.reset;
 }
 
 function switchErrorToCatch(
@@ -39430,7 +39461,7 @@ function switchErrorToCatchInner(
 			if (hydration !== null) {
 				if (hydration.isClose(state.end)) {
 					removeRange(getNextSibling(state.start), state.end);
-					hydration.rebuiltSlot(state.parentBlock, state.end);
+					hydration.rebuiltSlot(state.end);
 				}
 				hydration.markFresh(start);
 				hydration.markFresh(end);
@@ -39605,13 +39636,10 @@ export function tryBlock(
 	}
 	if (initial !== undefined) {
 		initialSuspenseHydrationRenderer!(s, initial);
-		return s.reset;
-	}
-	if (s.passthrough) {
+	} else if (s.passthrough) {
 		renderPassthroughTry(s);
 		return s.reset;
-	}
-	if (s.branch === 0) {
+	} else if (s.branch === 0) {
 		// Already showing catch — re-render with current err (props identity unchanged).
 		s.block!.body = s.catchBody!;
 		s.block!.props = { err: s.err, reset: s.reset };
@@ -39636,6 +39664,9 @@ export function tryBlock(
 	} else {
 		mountTry(s);
 	}
+	// Hydration: whichever arm rendered, park past the boundary's range, as every
+	// slot does, so a following sibling adopts its own server content.
+	hydration?.parkPast(s.end, parentScope);
 	return s.reset;
 }
 
@@ -40112,32 +40143,15 @@ function mountTry(state: TrySlot): void {
 		const nativeRaw = stash?.[streamedBoundaryId + '$signals'];
 		if (typeof nativeRaw === 'string') scopedNativeRaw = nativeRaw;
 		adoptCursor = getNextSibling(adoptCursor);
-	} else if (
-		// A shell hydrated before its streamed segment swaps still has the
-		// template sentinel instead of the seed comment. Its opaque id owns the
-		// same boundary namespace even though there are no scoped seeds yet. Octane
-		// cannot selectively hydrate that server fallback, so claim the boundary for
-		// the client: remove the sentinel and its server-rendered fallback arm before
-		// mounting a fresh try/pending block. Leaving either behind would duplicate
-		// the fallback and allow a later stream swap to overwrite client-owned DOM.
-		hydration !== null &&
-		adoptCursor !== null &&
-		adoptCursor.nodeType === 1 &&
-		isRendererStreamBoundaryTemplate(adoptCursor as Element)
-	) {
-		hasScopedBoundary = true;
-		freshBoundary = true;
-		streamedBoundaryId = (
-			STAGED_DOM?.view(adoptCursor as Element) ?? (adoptCursor as Element)
-		).getAttribute(STREAM_BOUNDARY_ATTR);
-		let stale: Node | null = adoptCursor;
-		while (stale !== null && stale !== state.end) {
-			const next: Node | null = getNextSibling(stale);
-			(STAGED_DOM?.view(stale as ChildNode) ?? (stale as ChildNode)).remove();
-			stale = next;
+	} else if (hydration !== null) {
+		// A shell hydrated before its streamed segment swaps: the client claims
+		// the boundary, mounting a fresh try/pending block in the cleared range.
+		streamedBoundaryId = hydration.claimStreamTemplate(adoptCursor, state.end);
+		if (streamedBoundaryId !== null) {
+			hasScopedBoundary = true;
+			freshBoundary = true;
+			adoptCursor = state.end;
 		}
-		adoptCursor = state.end;
-		hydration.node = state.end;
 	}
 	if (streamedBoundaryId !== null) {
 		state.idState = {
@@ -42558,13 +42572,12 @@ function switchToCatchInner(
 			// build. The aborted try adoption consumed only part of the server range
 			// and its teardown removed only the nodes its own block had claimed —
 			// discard whatever server content is left inside the slot and park the
-			// cursor on the slot's close marker so FOLLOWING siblings keep adopting
-			// from an aligned position (same convention as the abandoned-adoption
-			// pending swap). Only an adopted slot pair bounds server DOM; a slot
+			// cursor past the slot so FOLLOWING siblings keep adopting from an
+			// aligned position. Only an adopted slot pair bounds server DOM; a slot
 			// that minted fresh markers under hydration owns no server range.
 			if (hydration.isClose(state.end)) {
 				removeRange(getNextSibling(state.start), state.end);
-				hydration.rebuiltSlot(state.parentBlock, state.end);
+				hydration.rebuiltSlot(state.end);
 			}
 			// Client-built replacement markers survive root-remainder sweeps.
 			hydration.markFresh(bStart);
@@ -44142,7 +44155,7 @@ export function activityBlock(
 				hydration.suspend(() => (state!.hidden ? renderHiddenActivity(state!) : renderBlock(b)));
 				if (state!.hidden) hideActivityRange(state!);
 			});
-			hydration.node = getNextSibling(bEnd);
+			hydration.parkPast(bEnd, parentScope);
 			return;
 		}
 		if (wantHidden) {
@@ -44156,7 +44169,7 @@ export function activityBlock(
 		} else {
 			renderBlock(b);
 		}
-		if (adopted && hydration !== null) hydration.node = getNextSibling(bEnd);
+		if (adopted) hydration!.parkPast(bEnd, parentScope);
 		return;
 	}
 
@@ -44841,7 +44854,7 @@ export function forBlock<T>(
 		}
 		// Advance the cursor past the whole @for so the next sibling's clone()
 		// doesn't read a position left inside this consumed range.
-		if (hydration !== null) hydration.node = getNextSibling(state.end);
+		hydration?.parkPast(state.end, parentScope);
 		return;
 	}
 	// We have items (or no empty body). If an empty branch was previously
@@ -44939,7 +44952,7 @@ export function forBlock<T>(
 	// clone() starts after this block — covers the zero-item, no-@empty case where
 	// reconcileKeyed mounts nothing and the cursor would otherwise stay on the
 	// inner close marker.
-	if (hydration !== null) hydration.node = getNextSibling(state.end);
+	hydration?.parkPast(state.end, parentScope);
 }
 
 /**
