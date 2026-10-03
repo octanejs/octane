@@ -66,5 +66,22 @@
       "gzip": 57795,
       "brotli": 50571
     }
+  },
+  "bindings": {
+    "app": {
+      "raw": 355953,
+      "gzip": 121757,
+      "brotli": 101927
+    },
+    "framework": {
+      "raw": 362921,
+      "gzip": 118679,
+      "brotli": 103106
+    },
+    "total": {
+      "raw": 718842,
+      "gzip": 240437,
+      "brotli": 204829
+    }
   }
 }
