@@ -13650,9 +13650,9 @@ export function useLayoutSnapshot<T>(
 				block.nestedUpdateCount >= NESTED_UPDATE_LIMIT
 			) {
 				const source = componentSourceLoc(block.body);
-				throw new MaximumUpdateDepthError(
-					`${formatClientError(1)} useLayoutSnapshot in ${componentName(block)}${source ? ` (${source})` : ''} did not converge.`,
-				);
+				const error = new MaximumUpdateDepthError(formatClientError(1));
+				error.message += ` useLayoutSnapshot in ${componentName(block)}${source ? ` (${source})` : ''} did not converge.`;
+				throw error;
 			}
 			// A pending async Action may otherwise hold this state update or lower
 			// its priority. This publication belongs to the commit being measured.
