@@ -310,6 +310,82 @@ export function ReturnBranch(props: { server?: boolean; leaf: Promise<string> })
 	</div>
 }
 
+// Suspends before its template rebuilds its single root.
+function SetupPara(props: { leaf: Promise<string> }) @{
+	const value = use(props.leaf);
+	<p>{value as string}</p>
+}
+
+export function SetupRootBranch(props: { server?: boolean; leaf: Promise<string> }) @{
+	<div>
+		<Hydrate split={false} when={load()}>
+			<section>
+				@if (props.server) {
+					<>
+						<BoldThenEm />
+						<Em />
+					</>
+				} @else {
+					<>
+						<SetupPara leaf={props.leaf} />
+						<Em />
+					</>
+				}
+			</section>
+		</Hydrate>
+	</div>
+}
+
+// Suspends after its template rebuilt its single root, before the root commits.
+function InlinePara(props: { leaf: Promise<string> }) @{
+	<p>{use(props.leaf) as string}</p>
+}
+
+export function InlineRootBranch(props: { server?: boolean; leaf: Promise<string> }) @{
+	<div>
+		<Hydrate split={false} when={load()}>
+			<section>
+				@if (props.server) {
+					<>
+						<BoldThenEm />
+						<Em />
+					</>
+				} @else {
+					<>
+						<InlinePara leaf={props.leaf} />
+						<Em />
+					</>
+				}
+			</section>
+		</Hydrate>
+	</div>
+}
+
+function StateInlinePara(props: { leaf: Promise<string> }) @{
+	const [tag] = useState('p');
+	<p data-tag={tag}>{use(props.leaf) as string}</p>
+}
+
+export function StateInlineRootBranch(props: { server?: boolean; leaf: Promise<string> }) @{
+	<div>
+		<Hydrate split={false} when={load()}>
+			<section>
+				@if (props.server) {
+					<>
+						<BoldThenEm />
+						<Em />
+					</>
+				} @else {
+					<>
+						<StateInlinePara leaf={props.leaf} />
+						<Em />
+					</>
+				}
+			</section>
+		</Hydrate>
+	</div>
+}
+
 function UnderValue(props: { v: string }) @{
 	<u>{props.v as string}</u>
 }

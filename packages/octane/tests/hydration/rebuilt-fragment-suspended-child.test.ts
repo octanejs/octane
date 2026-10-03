@@ -233,11 +233,26 @@ describe.each([
 			name: 'ReturnBranch',
 			html: '<p><em>z</em><s>s</s></p><em>e</em>',
 		},
+		{
+			shape: 'a component that suspends before its template',
+			name: 'SetupRootBranch',
+			html: '<p>z</p><em>e</em>',
+		},
+		{
+			shape: 'a component that suspends before the rebuilt root commits',
+			name: 'InlineRootBranch',
+			html: '<p>z</p><em>e</em>',
+		},
+		{
+			shape: 'a component with hooks that suspends before the rebuilt root commits',
+			name: 'StateInlineRootBranch',
+			html: '<p data-tag="p">z</p><em>e</em>',
+		},
 	])(
 		'completes a child of a root rebuilt as $shape, as when its data is ready',
 		async ({ name, html }) => {
-			// The rebuilt root takes the rest of its range when it commits, before
-			// its child suspends, whichever slot then completes the range.
+			// The rebuilt root takes the rest of its range when it commits: before
+			// its child suspends, or in the resume, which claims the range again.
 			render(name, { server: true, leaf: fulfilled('unused') });
 			await hydrate(name, { leaf: fulfilled('z') });
 			const ready = markup(section());
