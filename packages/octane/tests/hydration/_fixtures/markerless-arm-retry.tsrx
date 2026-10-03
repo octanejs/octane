@@ -418,3 +418,34 @@ export function TrailingFrame(props: { server?: boolean; k: string; leaf: Promis
 		</Hydrate>
 	</div>
 }
+
+// The same component in a body that returns JSX: the boundary's children are
+// descriptors, so the section's children are a list, and the arm renders in
+// its first item. That item's first render suspends, so the list keeps no
+// item, and the retry adopts the server's items again.
+export function TrailingDescriptor(props: { server?: boolean; k: string; leaf: Promise<string> }) {
+	const Shape = props.server ? ServerFrame : ClientFrame;
+	return <div>
+		<Hydrate split={false} when={load()}>
+			<section>
+				<Shape k={props.k} leaf={props.leaf} />
+				<em>{'e'}</em>
+			</section>
+		</Hydrate>
+	</div>;
+}
+
+// The same component as the row of a keyed @for.
+export function TrailingRow(props: { server?: boolean; k: string; leaf: Promise<string> }) @{
+	const Shape = props.server ? ServerFrame : ClientFrame;
+	<div>
+		<Hydrate split={false} when={load()}>
+			<section>
+				@for (const row of ['a']; key row) {
+					<Shape k={props.k} leaf={props.leaf} />
+				}
+				<em>{'e'}</em>
+			</section>
+		</Hydrate>
+	</div>
+}
