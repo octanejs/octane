@@ -12,7 +12,7 @@
     }
   ],
   "dependencies": [
-    "@octanejs/base-ui@0.1.59",
+    "@octanejs/base-ui@0.1.60",
     "cn"
   ],
   "registryDependencies": [
