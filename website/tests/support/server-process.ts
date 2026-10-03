@@ -5,7 +5,7 @@
 // tell "our server answered" from "something answered" — and both used to carry
 // their own copy.
 import { spawn, type ChildProcess } from 'node:child_process';
-import { createServer } from 'node:net';
+import { createServer, type AddressInfo, type Server } from 'node:net';
 import { readFile, rename, writeFile } from 'node:fs/promises';
 
 const PROCESS_OUTPUT_LIMIT = 64 * 1024;
@@ -74,43 +74,116 @@ export function waitForChildExit(
 	});
 }
 
+function listenOn(port: number, host: string): Promise<Server> {
+	return new Promise((resolve, reject) => {
+		const srv = createServer();
+		srv.once('error', reject);
+		srv.listen(port, host, () => {
+			srv.off('error', reject);
+			resolve(srv);
+		});
+	});
+}
+
+function closeListener(srv: Server): Promise<void> {
+	// An already-closed listener reports ERR_SERVER_NOT_RUNNING here; releasing
+	// twice (production setup's catch path) is not an error.
+	return new Promise((resolve) => srv.close(() => resolve()));
+}
+
+const RESERVE_ATTEMPTS = 20;
+
 // A fresh ephemeral port per run — NEVER a fixed one. With a fixed port, a
 // leftover server from an earlier run (or another checkout) already listening
 // there makes the spawned `--strictPort` server die instantly while the probe
 // happily connects to the imposter — and the suite silently asserts against
 // foreign code. That exact failure mode shipped a red main.
-export function getFreePort(): Promise<number> {
-	return new Promise((resolve, reject) => {
-		const srv = createServer();
-		srv.once('error', reject);
-		srv.listen(0, '127.0.0.1', () => {
-			const { port } = srv.address() as import('node:net').AddressInfo;
-			srv.close(() => resolve(port));
-		});
-	});
+//
+// The port is also HELD until the caller is ready to bind it for real. A probe
+// that closes its socket before returning leaves the number free for any other
+// process (a parallel vitest project, another checkout) to take while the
+// caller is still building the site or clearing a cache, and `--strictPort`
+// then kills the server on startup. Keeping the socket listening reserves the
+// number up to release(), which belongs immediately before the spawn. See
+// startServerOnFreePort for the window that remains after it.
+//
+// It is held on BOTH loopback addresses. The servers listen on `localhost`,
+// which Node resolves to ONE address, `::1` or 127.0.0.1 depending on the
+// host's resolver. A port picked and held on 127.0.0.1 alone proves nothing
+// about [::1]:port: a listener may already own it, and the kernel can still
+// hand it to a new `::1` listener while only the IPv4 side is held. On a host
+// without IPv6 loopback nothing can listen on `::1`, so the IPv4 hold alone is
+// complete there.
+export async function reserveFreePort(): Promise<{ port: number; release: () => Promise<void> }> {
+	for (let attempt = 0; attempt < RESERVE_ATTEMPTS; attempt++) {
+		const v4 = await listenOn(0, '127.0.0.1');
+		const { port } = v4.address() as AddressInfo;
+		let v6: Server | undefined;
+		try {
+			v6 = await listenOn(port, '::1');
+		} catch (error) {
+			const code = (error as NodeJS.ErrnoException).code;
+			if (code !== 'EADDRNOTAVAIL' && code !== 'EAFNOSUPPORT') {
+				await closeListener(v4);
+				// Taken on the IPv6 side only: pick another number.
+				if (code === 'EADDRINUSE') continue;
+				throw error;
+			}
+		}
+		return {
+			port,
+			release: async () => {
+				await Promise.all([closeListener(v4), v6 && closeListener(v6)]);
+			},
+		};
+	}
+	throw new Error(`no port was free on both loopback addresses in ${RESERVE_ATTEMPTS} attempts`);
 }
 
-// Same ephemeral port, but HELD until the caller is ready to bind it for real.
+// Vite under `--strictPort` turns EADDRINUSE into "Port N is already in use"
+// and exits before listening. Matching the port just released keeps a plugin's
+// own failure on some other port from passing for a lost race.
+function lostItsPort(error: unknown, port: number): boolean {
+	return (
+		error instanceof Error &&
+		error.message.includes('before listening') &&
+		error.message.includes(`Port ${port} is already in use`)
+	);
+}
+
+const START_ATTEMPTS = 3;
+
+// Start a server on a freshly reserved port that nothing else knows yet.
 //
-// getFreePort() closes the probe socket before returning, which is fine when the
-// server spawns immediately after. The production setup now builds the site
-// first — a minute or more between choosing the port and binding it — and an
-// unheld port is free for any other process (a parallel vitest project, another
-// checkout) to take in that window. `--strictPort` would then kill the preview
-// server on startup. Keeping the socket listening reserves the number, so the
-// only gap is the few milliseconds between release() and the spawn.
-export async function reserveFreePort(): Promise<{ port: number; release: () => Promise<void> }> {
-	const srv = createServer();
-	const port = await new Promise<number>((resolve, reject) => {
-		srv.once('error', reject);
-		srv.listen(0, '127.0.0.1', () => {
-			resolve((srv.address() as import('node:net').AddressInfo).port);
-		});
-	});
-	return {
-		port,
-		release: () => new Promise<void>((resolve) => srv.close(() => resolve())),
-	};
+// release() has to come before the child binds, and a `pnpm exec vite` child
+// then spends its whole startup (the pnpm wrapper, the config loader, every
+// plugin's setup) before it calls listen(). That is far longer than the gap
+// between release() and the spawn, and no reservation can cover it. A port
+// taken inside that window kills the child before it listens: waitForServer
+// reports that the child exited, and its output names the lost port. That
+// outcome alone is a harness race, not a server failure, so it is retried on a
+// new reservation. Every other startup failure is rethrown unchanged.
+//
+// `spawnAt` must keep the child it returns where the caller's stop hook can
+// reach it, because a hook timeout can abandon this wait while the child lives.
+// The production preview server cannot use this helper: its origin is handed
+// to the specs before it is spawned, so its port cannot change.
+export async function startServerOnFreePort(
+	spawnAt: (port: number) => ChildProcess,
+	url: (port: number) => string,
+	timeoutMs: number,
+): Promise<number> {
+	for (let attempt = 1; ; attempt++) {
+		const { port, release } = await reserveFreePort();
+		await release();
+		const child = spawnAt(port);
+		try {
+			await waitForServer(child, url(port), timeoutMs);
+			return port;
+		} catch (error) {
+			if (attempt >= START_ATTEMPTS || !lostItsPort(error, port)) throw error;
+		}
+	}
 }
 
 // Cross-process readiness handshake for a server built in the BACKGROUND.
