@@ -76,6 +76,7 @@ describe('DEV SSR islands shell witness', () => {
 
 	it.each([
 		['effects', 'Effects', ['useEffect', 'useLayoutEffect']],
+		['a layout snapshot under an alias', 'Snapshot', ['useLayoutSnapshot']],
 		['an imperative handle', 'Handle', ['useImperativeHandle']],
 		['a store subscription', 'Store', ['useSyncExternalStore']],
 	] as const)('reports %s by the component that calls them', (_construct, name, hooks) => {
@@ -201,6 +202,7 @@ describe('DEV SSR islands shell witness', () => {
 
 		expect(render(shell.Handler).witnesses).toEqual([]);
 		expect(render(shell.Effects).witnesses).toEqual([]);
+		expect(render(shell.Snapshot).witnesses).toEqual([]);
 		expect(render(shell.SignalText).witnesses).toEqual([]);
 	});
 });

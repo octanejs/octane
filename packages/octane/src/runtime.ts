@@ -20,6 +20,7 @@
 declare const process: { env: { NODE_ENV?: string } };
 
 import { resolveHookPath } from './hook-slot-cache.js';
+import type { LayoutSnapshotOptions } from './layout-snapshot-types.js';
 import { domBindingClaims } from './dom-binding-claims.js';
 import { DOMStage } from './dom-stage.js';
 import { __normalizeBindingStyle } from './dom-binding-styles.js';
@@ -13599,6 +13600,89 @@ export function useLayoutEffect(fn: EffectFn, deps?: any[] | null, slot?: HookSl
 	const [d, s] = resolveHookArgs('useLayoutEffect', deps, slot);
 	enqueueEffect(s, fn, d, LAYOUT);
 }
+
+/** Read a value from the committed layout and publish changes before paint. */
+export function useLayoutSnapshot<T>(
+	measure: () => T,
+	options: LayoutSnapshotOptions<T, T> & { initial: T },
+	slot?: symbol,
+): T;
+export function useLayoutSnapshot<T>(
+	measure: () => T,
+	options?: LayoutSnapshotOptions<T>,
+	slot?: symbol,
+): T | undefined;
+export function useLayoutSnapshot<T>(
+	measure: () => T,
+	options?: LayoutSnapshotOptions<any> | symbol,
+	slot?: HookSlot,
+): T | undefined {
+	// Plain hook transforms append a Symbol where optional options were omitted;
+	// production numeric slots have a separate padded argument.
+	if (typeof options === 'symbol') {
+		if (slot === undefined) slot = options;
+		options = undefined;
+	}
+	const resolved = resolveSlot(slot);
+	if (resolved === undefined) missingSlot('useLayoutSnapshot');
+	const block = CURRENT_BLOCK!;
+	// Boxing preserves function-valued initial values and measurements as data,
+	// and lets a custom comparator decide whether even an identical value changes.
+	const state = readStateHook(
+		() => ({
+			value: options?.initial as T | undefined,
+			effectSlot: Symbol('layout snapshot effect'),
+		}),
+		slot,
+		false,
+	);
+	enqueueEffect(
+		state.value.effectSlot,
+		() => {
+			const next = measure();
+			const equal = options?.equal ?? Object.is;
+			if (equal(state.value.value, next)) return;
+			if (
+				process.env.NODE_ENV !== 'production' &&
+				!block.pending &&
+				inNestedUpdateCallback() &&
+				block.nestedUpdateChain === UPDATE_CHAIN_ID &&
+				block.nestedUpdateCount >= NESTED_UPDATE_LIMIT
+			) {
+				const source = componentSourceLoc(block.body);
+				throw new MaximumUpdateDepthError(
+					`${formatClientError(1)} useLayoutSnapshot in ${componentName(block)}${source ? ` (${source})` : ''} did not converge.`,
+				);
+			}
+			// A pending async Action may otherwise hold this state update or lower
+			// its priority. This publication belongs to the commit being measured.
+			const previousSync = syncFlush;
+			const previousBatch = ACTIVE_TRANSITION_ACTION_BATCH;
+			const previousDepth = TRANSITION_DEPTH;
+			syncFlush = true;
+			ACTIVE_TRANSITION_ACTION_BATCH = null;
+			TRANSITION_DEPTH = 0;
+			try {
+				state.setter({ value: next, effectSlot: state.value.effectSlot });
+			} finally {
+				syncFlush = previousSync;
+				ACTIVE_TRANSITION_ACTION_BATCH = previousBatch;
+				TRANSITION_DEPTH = previousDepth;
+				// A Suspense resume can commit effects outside the normal flush, and
+				// an async flush can hit its layout-cascade limit. Unlike flushSync,
+				// those paths do not re-arm work suppressed by syncFlush for us.
+				if (!previousSync && block.pending && !scheduled) {
+					scheduled = true;
+					queueMicrotask(flush);
+				}
+			}
+		},
+		undefined,
+		LAYOUT,
+	);
+	return state.value.value;
+}
+
 export function useInsertionEffect(fn: EffectFn, deps?: any[] | null, slot?: symbol): void;
 export function useInsertionEffect(fn: EffectFn, deps?: any[] | null, slot?: HookSlot): void {
 	const [d, s] = resolveHookArgs('useInsertionEffect', deps, slot);

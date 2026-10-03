@@ -234,6 +234,43 @@ default; pass `{ sourceEqual, valueEqual }` as a third argument when you need
 something else. Like `useState`, `useLinkedState` supports an optional third
 tuple item, `getValue`.
 
+## Measurements after layout
+
+Use `useLayoutSnapshot` when rendered output depends on a measurement of the
+committed DOM. The first render uses the supplied initial value; Octane measures
+after the element and its ref are committed and updates the snapshot when the
+measurement changes.
+
+```tsx
+import { useLayoutSnapshot, useRef } from 'octane';
+
+export function MeasuredContent() @{
+	const content = useRef<HTMLDivElement | null>(null);
+	const height = useLayoutSnapshot(() => content.current?.offsetHeight ?? 0, {
+		initial: 0,
+	});
+
+	<section>
+		<div ref={content}>Content to measure</div>
+		<p>{'Height: ' + height}</p>
+	</section>
+}
+```
+
+The measurement runs after each committed render of the component that reaches
+the hook, before the browser paints. It does not run during server rendering;
+the server and the first hydration render both use `initial`, or `undefined`
+when no initial value is supplied. Snapshots are compared with `Object.is` by
+default. For measurements that return a new object, supply `equal` to compare
+their contents and avoid repeated updates.
+
+The callback is for measurement, not acquiring resources or setting up
+subscriptions. The hook does not observe later changes to layout by itself. Use
+an effect and an observer or event callback for changes such as resizing or
+scrolling that happen independently of the component's commits. This hook is
+available for the DOM renderer; the experimental universal and Valdi renderers
+do not support it.
+
 ## Conditional hooks
 
 Unlike React, a hook can sit behind a guard or after an early `return`:

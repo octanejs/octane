@@ -27,6 +27,7 @@ export { readNativeDomStyle, readNativeDomProps } from './signals/read-protocol.
 // ---------------------------------------------------------------------------
 
 import { resolveHookPath } from './hook-slot-cache.js';
+import type { LayoutSnapshotOptions } from './layout-snapshot-types.js';
 import {
 	BINDING_OPEN_TAIL_SOURCE,
 	bindingRootMarker,
@@ -7885,6 +7886,35 @@ export function useEffect(): void {
 export function useLayoutEffect(): void {
 	if (SHELL_WITNESS !== null && process.env.NODE_ENV !== 'production')
 		witnessShellHook('useLayoutEffect', useLayoutEffect);
+}
+export function useLayoutSnapshot<T>(
+	measure: () => T,
+	options: LayoutSnapshotOptions<T, T> & { initial: T },
+	slot?: symbol,
+): T;
+export function useLayoutSnapshot<T>(
+	measure: () => T,
+	options?: LayoutSnapshotOptions<T>,
+	slot?: symbol,
+): T | undefined;
+export function useLayoutSnapshot<T>(
+	_measure: () => T,
+	options?: LayoutSnapshotOptions<any> | symbol,
+	slot?: ServerHookSlot,
+): T | undefined {
+	if (SHELL_WITNESS !== null && process.env.NODE_ENV !== 'production')
+		witnessShellHook('useLayoutSnapshot', useLayoutSnapshot);
+	if (typeof options === 'symbol') {
+		if (slot === undefined) slot = options;
+		options = undefined;
+	}
+	// A server render may retry after a render-phase update. The initial snapshot
+	// belongs to the hook's first pass, just as on the client.
+	return stateHook<T | undefined, never>(
+		(value) => value,
+		() => options?.initial,
+		slot,
+	)[0];
 }
 // Insertion effects inject styles the server render already emitted.
 export function useInsertionEffect(): void {}
