@@ -22,6 +22,16 @@ function serverModule(): Record<string, any> {
 }
 const server = serverModule();
 
+/** Element and text markup, ignoring hydration comments. */
+function markup(node: Element): string {
+	const copy = node.cloneNode(true) as Element;
+	const walker = document.createTreeWalker(copy, NodeFilter.SHOW_COMMENT);
+	const comments: Node[] = [];
+	while (walker.nextNode()) comments.push(walker.currentNode);
+	for (const comment of comments) comment.parentNode!.removeChild(comment);
+	return copy.innerHTML;
+}
+
 let container: HTMLElement;
 beforeEach(() => {
 	container = document.createElement('div');
@@ -103,6 +113,49 @@ describe.each([false, true])('hydrateRoot — resolved @try siblings (dev=%s)', 
 			} finally {
 				root?.unmount();
 				warn.mockRestore();
+				error.mockRestore();
+			}
+		},
+	);
+
+	it.each([
+		{ name: 'TryThenPair', fail: false },
+		{ name: 'TryThenPair', fail: true },
+		{ name: 'BoundaryThenPair', fail: false },
+		{ name: 'BoundaryThenPair', fail: true },
+	])(
+		'adopts the server nodes of a multi-root component after $name (client failure=$fail)',
+		async ({ name, fail }) => {
+			container.innerHTML = ServerRT.renderToString(server[name], { fail: false }).html;
+			const section = container.querySelector('section')!;
+			const original = [...section.querySelectorAll('*')];
+			const recoverable = vi.fn();
+			const caught = vi.fn();
+			const error = vi.spyOn(console, 'error').mockImplementation(() => {});
+			let root: ReturnType<typeof hydrateRoot> | undefined;
+			try {
+				root = hydrateRoot(
+					container,
+					client[name],
+					{ fail },
+					{ onCaughtError: caught, onRecoverableError: recoverable },
+				);
+				flushSync(() => {});
+				await act(async () => {});
+				expect(markup(section)).toBe(
+					`<button>${fail ? 'error' : 'inside'}</button><i>pair</i><s>s</s><button>after</button>`,
+				);
+				// Only the arm a client failure replaced is new.
+				expect([...section.querySelectorAll('*')]).toEqual(
+					fail ? [section.querySelector('button'), ...original.slice(1)] : original,
+				);
+				expect(caught.mock.calls.map(([value]) => value.message)).toEqual(
+					fail ? ['synthetic client failure'] : [],
+				);
+				expect(recoverable).not.toHaveBeenCalled();
+				expect(error).not.toHaveBeenCalled();
+			} finally {
+				root?.unmount();
 				error.mockRestore();
 			}
 		},
