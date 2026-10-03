@@ -5,10 +5,19 @@
  * the renderer activator. Importing this module never loads the renderer.
  */
 import { formatClientError } from './error-codes.client.generated.js';
-import type { BindingSource } from './dom-bindings.js';
-import type { BindingRange, CompiledBindingProgram } from './dom-binding-program.js';
+import type { BindingHandle, BindingSource } from './dom-bindings.js';
+import {
+	BINDING_FIRST_COMMIT,
+	type BindingFirstCommit,
+	type BindingRange,
+	type CompiledBindingProgram,
+} from './dom-binding-program.js';
 import { parseBindingMarker } from './dom-binding-protocol.js';
-import { isHydrationSelectionIntentCurrent } from './hydration/event-capture.js';
+import {
+	holdHydrationReplays,
+	isHydrationSelectionIntentCurrent,
+	type HydrationReplayIntent,
+} from './hydration/event-capture.js';
 import type {
 	IndependentHydrateActivationContext,
 	IndependentHydrateActivator,
@@ -67,16 +76,39 @@ export function __createBindingIslandActivator(
 		// wraps that owner for renderer-created instance scopes.
 		const owner =
 			(signalOwner as SignalRendererOwnerIdentity | undefined)?.documentOwner ?? signalOwner;
-		const adopt = () => program.adopt(root, program, NO_PROPS);
+		const adopt = (): BindingHandle & BindingFirstCommit => program.adopt(root, program, NO_PROPS);
 		const handle = owner === undefined ? adopt() : captureSignalOwner(owner)(adopt);
-		// Adoption publishes synchronously, so captured input replays against the
-		// live listeners immediately, in its original order.
-		for (const replay of context.intents) {
-			if (replay.earlyBinding || !isHydrationSelectionIntentCurrent(replay)) continue;
-			const target = replay.event.target as Node | null;
-			if (target === null || target.nodeType !== 1 || !element.contains(target)) continue;
-			target.dispatchEvent(cloneHydrationReplayEvent(replay.event, target as Element));
-		}
-		return { unmount: () => handle.dispose() };
+		const replay = (replays: readonly HydrationReplayIntent[]): void => {
+			for (const replay of replays) {
+				if (replay.earlyBinding || !isHydrationSelectionIntentCurrent(replay)) continue;
+				const target = replay.event.target as Node | null;
+				if (target === null || target.nodeType !== 1 || !element.contains(target)) continue;
+				target.dispatchEvent(cloneHydrationReplayEvent(replay.event, target as Element));
+			}
+		};
+		// Later input for the island joins this queue until the view goes live.
+		let intents: HydrationReplayIntent[] | null = null;
+		const pending = handle[BINDING_FIRST_COMMIT]?.((activated) => {
+			if (!activated) intents = null;
+			// Replay after the commit that installed the listeners has finished.
+			else
+				queueMicrotask(() => {
+					const replays = intents;
+					intents = null;
+					if (replays !== null) replay(replays);
+				});
+		});
+		// A first preparation that suspended keeps the server DOM without
+		// listeners. Its captured and live input waits for that commit.
+		if (pending) {
+			intents = context.intents.slice();
+			holdHydrationReplays(element, () => intents);
+		} else replay(context.intents);
+		return {
+			unmount: () => {
+				intents = null;
+				handle.dispose();
+			},
+		};
 	};
 }
