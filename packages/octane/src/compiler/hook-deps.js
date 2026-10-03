@@ -1809,9 +1809,10 @@ export function analyzeHookDependencies(ast, options = {}) {
  * The supplied callbacks must belong to this AST so lexical bindings are shared.
  * `invariantCall` marks a `const` initialized by that call as one identity for
  * the lifetime of its scope, like a ref. `evaluatedAt` gives the source offset
- * where a callback's captures would be read eagerly: a capture whose `let`,
- * `const` or `class` is declared after it may still be in its temporal dead
- * zone there, so that callback reports null.
+ * where a callback's captures would be read eagerly, for a callback that runs
+ * later. A capture declared after that offset is in its temporal dead zone or
+ * still undefined there, and a reassigned one may change before the callback
+ * reads it, so such a callback reports null.
  */
 export function analyzeCallbackDependencies(ast, callbacks, options = {}) {
 	const analysis = buildScopes(
@@ -1820,7 +1821,7 @@ export function analyzeCallbackDependencies(ast, callbacks, options = {}) {
 		new Set(['octane', ...(options.hookRuntimeModules || [])]),
 	);
 	markDependencyInvariantBindings(analysis, options.invariantCall ?? null);
-	const declaredAt = options.evaluatedAt ? lexicalDeclarationStarts(ast, analysis) : null;
+	const declaredAt = options.evaluatedAt ? declarationStarts(ast, analysis) : null;
 	const inferred = new Map();
 	for (const original of callbacks) {
 		const callback = unwrapValue(original);
@@ -1830,7 +1831,9 @@ export function analyzeCallbackDependencies(ast, callbacks, options = {}) {
 		const at = declaredAt === null ? undefined : options.evaluatedAt(original);
 		if (
 			at !== undefined &&
-			dependencies?.some((dependency) => (declaredAt.get(dependency.binding) ?? -1) > at)
+			dependencies?.some(
+				({ binding }) => binding.reassigned || (declaredAt.get(binding) ?? -1) > at,
+			)
 		)
 			dependencies = null;
 		inferred.set(original, dependencies);
@@ -1838,12 +1841,13 @@ export function analyzeCallbackDependencies(ast, callbacks, options = {}) {
 	return inferred;
 }
 
-function lexicalDeclarationStarts(ast, analysis) {
+// The last declaration of each variable or class binding: a repeated `var`
+// assigns again where it appears.
+function declarationStarts(ast, analysis) {
 	const starts = new Map();
-	for (const { bindings, kind } of analysis.declarators) {
-		if (kind === 'var') continue;
+	for (const { bindings } of analysis.declarators) {
 		for (const { pattern, binding } of bindings)
-			if (!starts.has(binding)) starts.set(binding, pattern.start);
+			if (!(starts.get(binding) >= pattern.start)) starts.set(binding, pattern.start);
 	}
 	const seen = new WeakSet();
 	const visit = (node) => {
