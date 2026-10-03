@@ -5,12 +5,9 @@ import {
 	deferCandidateInvalidation,
 	recordCandidateUrgentWrite,
 	registerCandidateGraph,
-	registerSignalActionFrameFactory,
-	registerSignalTransitionCoordinatorFactory,
 	withoutSignalCandidate,
 } from './transition-state.js';
-import { SignalActionFrame } from './transition-action.js';
-import { createSignalTransitionCoordinator } from './transition-coordinator.js';
+import { installSignalActions } from '#octane/signal-actions/graph';
 import type { SignalCandidateFrame } from './transition-candidate.js';
 import {
 	createReactiveSystem,
@@ -1228,5 +1225,6 @@ registerCandidateGraph({
 	attachObserver,
 });
 
-registerSignalActionFrameFactory(() => new SignalActionFrame());
-registerSignalTransitionCoordinatorFactory(createSignalTransitionCoordinator);
+// Renderer Actions stage writes to signals loaded after they awaited. An islands
+// build moves this registration into the renderer (see action-capability.ts).
+installSignalActions();

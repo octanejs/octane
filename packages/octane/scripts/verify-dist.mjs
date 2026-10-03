@@ -744,6 +744,38 @@ export async function verifyDist(pkgDir) {
 		);
 	}
 
+	// Published modules import the `#octane/dist/` twin of a source `#octane/` key
+	// (build-runtime.mjs). The repository and the tarball must resolve it alike.
+	const distImports = Object.keys(pkg.imports ?? {}).filter((key) =>
+		key.startsWith('#octane/dist/'),
+	);
+	const importDrift = distImports.filter((key) => {
+		const targets = new Set();
+		collectExportTargets(pkg.imports[key], targets);
+		return (
+			JSON.stringify(pkg.imports[key]) !== JSON.stringify(pkg.publishConfig.imports?.[key]) ||
+			[...targets].some((target) => !existsSync(join(pkgDir, target)))
+		);
+	});
+	const sourceImports = distImports.map((key) => `#octane/${key.slice('#octane/dist/'.length)}`);
+	const unrewritten = readdirSync(dist, { recursive: true })
+		.filter((file) => /\.c?js$/.test(file))
+		.filter((file) => {
+			const code = readFileSync(join(dist, file), 'utf8');
+			return sourceImports.some((key) => code.includes(`'${key}'`) || code.includes(`"${key}"`));
+		});
+	if (importDrift.length > 0 || unrewritten.length > 0) {
+		throw new Error(
+			`octane dist verify: package imports do not resolve to dist:\n` +
+				[
+					...importDrift.map(
+						(key) => `  ${key} differs from publishConfig or names a missing file`,
+					),
+					...unrewritten.map((file) => `  dist/${file} imports a source-only #octane key`),
+				].join('\n'),
+		);
+	}
+
 	const missingNode = missingNodeConditions(pkg.publishConfig.exports);
 	if (missingNode.length > 0) {
 		throw new Error(
