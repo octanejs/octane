@@ -71,10 +71,162 @@ describe('islands-only shell analysis', () => {
 		['a handle binding', '<p>{count$ as string}</p>', /signal handle binding/],
 		['a spread', '<div {...props} />', /attribute spread/],
 		['a package component', '<Library />', /<Library> cannot be checked/],
-	])('rejects %s', (_name, body, message) => {
-		const { problems } = analyzeIslandsShell(shell(body), '/src/Page.tsrx');
+		[
+			'a local component passed as a prop',
+			'<Static render={Item} />',
+			/"onClick" needs client code/,
+			"function Item() @{ <button onClick={() => alert('x')}>x</button> }",
+		],
+		[
+			'a local function called to render output',
+			'<nav>{renderMenu()}</nav>',
+			/"onClick" needs client code/,
+			'function renderMenu() { return <button onClick={() => {}}>Menu</button>; }',
+		],
+		[
+			'a package component passed as a prop',
+			'<Static render={Library} />',
+			/Library cannot be checked/,
+		],
+		[
+			'a module-level wrapped component passed as a prop',
+			'<Static render={Item} />',
+			/component Item cannot be checked/,
+			"import { memo } from 'octane';\nconst Item = memo(() => <button onClick={() => {}}>x</button>);",
+		],
+		[
+			'a function alias passed as a prop',
+			'<Static render={Alias} />',
+			/"onClick" needs client code/,
+			'function Item() @{ <button onClick={() => {}}>x</button> }\nconst Alias = Item;',
+		],
+		[
+			'a namespaced package component passed as a prop',
+			'<Static render={UI.Button} />',
+			/component UI\.Button cannot be checked/,
+			"import * as UI from 'library-ui';",
+		],
+		[
+			'a hook imported under an alias',
+			"onMount(() => { document.title = 'client'; }, []); <main>static</main>",
+			/hook useEffect\(\)/,
+			"import { useEffect as onMount } from 'octane';",
+		],
+		[
+			'a hook through a namespace import',
+			'const [n] = O.useState(0); <main>{String(n) as string}</main>',
+			/hook useState\(\)/,
+			"import * as O from 'octane';",
+		],
+		[
+			'a signal declaration imported under an alias',
+			'const open$ = local(false); <main />',
+			/component signal declaration/,
+			"import { signal$ as local } from 'octane/signals';",
+		],
+		[
+			'a signal handle bound through a member',
+			'<p>{state.count$ as any}</p>',
+			/signal handle binding/,
+			"import * as state from './state';",
+		],
+		[
+			'a signal handle imported under an alias',
+			'<p>{live as any}</p>',
+			/signal handle binding/,
+			"import { count$ as live } from './state';",
+		],
+		[
+			'a signal handle bound through a module alias',
+			'<p>{live as any}</p>',
+			/signal handle binding/,
+			'const live = count$;',
+		],
+	])('rejects %s', (_name, body, message, imports = '') => {
+		const { problems } = analyzeIslandsShell(shell(body, imports), '/src/Page.tsrx');
 		expect(problems.map((problem) => problem.message).join('\n')).toMatch(message);
 		expect(problems[0]).toMatchObject({ line: expect.any(Number), column: expect.any(Number) });
+	});
+
+	it('checks the helpers and components a shell hands to JSX by reference', () => {
+		const result = analyzeIslandsShell(
+			shell(
+				`<main title={format(props.title)}>
+    <Static render={Island} items={[label, props.extra]} theme={Theme} button={UI.Button} />
+    <img src={logo} alt={tagline} />
+    {format(props.body) as string}
+  </main>`,
+				`import { label } from 'library';
+import { tagline } from './copy.ts';
+import logo from './logo.svg';
+import * as UI from './ui.tsrx';
+const Theme = { color: 'red' };
+function format(value) { return String(value).trim(); }`,
+			),
+			'/src/Page.tsrx',
+		);
+		expect(result.problems).toEqual([]);
+		// Values are checked only if they can render; the bundler skips plain modules.
+		expect(result.components).toEqual([
+			{ source: './Static.tsrx', exportName: 'Static' },
+			{ source: './Island.tsrx', exportName: 'Island', value: true },
+			{ source: './ui.tsrx', exportName: 'Button', value: true },
+			{ source: './logo.svg', exportName: 'default', value: true },
+			{ source: './copy.ts', exportName: 'tagline', value: true },
+		]);
+	});
+
+	it('checks an export passed into JSX as a value only when it can render', () => {
+		const source = `import { memo } from 'octane';
+export const tagline = String(Date.now());
+export const Theme = { color: 'red' };
+export const label = 'static';
+export function Item() @{ <button onClick={() => {}}>x</button> }
+export const Wrapped = memo(() => <p />);`;
+		const check = (name: string, values = true) =>
+			analyzeIslandsShell(source, '/src/values.tsrx', [name], { values }).problems.map(
+				(problem) => problem.message,
+			);
+		expect(check('tagline')).toEqual([]);
+		expect(check('Theme')).toEqual([]);
+		expect(check('label')).toEqual([]);
+		expect(check('Item')).toEqual(['"onClick" needs client code the shell never loads']);
+		expect(check('Wrapped')).toEqual(['export "Wrapped" cannot be checked as static shell output']);
+		// Rendered as a component, the same value export cannot be checked.
+		expect(check('Theme', false)).toEqual([
+			'export "Theme" cannot be checked as static shell output',
+		]);
+	});
+
+	it.each([
+		[
+			'a wrapped component',
+			"import { memo } from 'octane';\nexport default memo(() => <p />);",
+			['export "default" cannot be checked as static shell output'],
+		],
+		[
+			'an interactive function',
+			'export default function () @{ <button onClick={() => {}}>x</button> }',
+			['"onClick" needs client code the shell never loads'],
+		],
+		['an inert value', "export default 'static';", []],
+	] as const)('checks a default export passed as a value: %s', (_name, source, messages) => {
+		const { problems } = analyzeIslandsShell(source, '/src/value.tsrx', ['default'], {
+			values: true,
+		});
+		expect(problems.map((problem) => problem.message)).toEqual(messages);
+	});
+
+	it('does not read a binding as a reference to a same-named function', () => {
+		const source = `function open() @{ <button onClick={() => {}}>Open</button> }
+function close() @{ <button onClick={() => {}}>Close</button> }
+function label() @{ <button onClick={() => {}}>Label</button> }
+export function Page({ open }, [close]) @{
+  const { text: label = 'static' } = {};
+  function format(label, value) { return String(value).trim(); }
+  <p>{format(null, props.title) as string}</p>
+}`;
+		expect(analyzeIslandsShell(source, '/src/Page.tsrx', ['Page']).problems).toEqual([]);
 	});
 
 	it('checks local components the shell renders and only the selected exports', () => {

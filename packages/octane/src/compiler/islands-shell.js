@@ -10,9 +10,22 @@
  */
 import { parseModule } from '@tsrx/core';
 
-const SKIP = new Set(['loc', 'start', 'end', 'range', 'metadata', 'parent', 'typeAnnotation']);
+const SKIP = new Set([
+	'loc',
+	'start',
+	'end',
+	'range',
+	'metadata',
+	'parent',
+	'typeAnnotation',
+	'typeArguments',
+	'typeParameters',
+	'returnType',
+	'label',
+]);
 const CONTROLLED = new Set(['input', 'textarea', 'select']);
 const SIGNAL_DECLARATIONS = new Set(['signal$', 'derived$', 'query$', 'action$']);
+const HOOK = /^use(?:[A-Z0-9_]|$)/;
 
 function children(node) {
 	const result = [];
@@ -51,6 +64,13 @@ function exportedName(node) {
 	return node.type === 'Identifier' ? node.name : node.value;
 }
 
+/** The static name of a member access (`a.b`, `a['b']`), or null. */
+function propertyOf(node) {
+	const property = node.property;
+	if (!node.computed) return property?.name ?? null;
+	return property?.type === 'Literal' && typeof property.value === 'string' ? property.value : null;
+}
+
 function attributeName(attribute) {
 	const name = attribute.name;
 	return name?.type === 'JSXNamespacedName'
@@ -59,15 +79,26 @@ function attributeName(attribute) {
 }
 
 /**
+ * A component the shell hands to JSX as a value (`render={Item}`) is reported
+ * with `value: true`. Check those exports with `{ values: true }`: a function is
+ * checked like a rendered component, while an inert or non-component value (a
+ * string, an asset URL, a theme object) is not shell output.
+ *
  * @param {string} source
  * @param {string} filename
  * @param {readonly string[] | null} exports Rendered exports, or null for every export.
+ * @param {{ values?: boolean }} [options] The selected exports were passed as values.
  * @returns {{
  *   problems: Array<{ message: string, line: number, column: number }>,
- *   components: Array<{ source: string, exportName: string }>,
+ *   components: Array<{ source: string, exportName: string, value?: true }>,
  * }}
  */
-export function analyzeIslandsShell(source, filename, exports = null) {
+export function analyzeIslandsShell(
+	source,
+	filename,
+	exports = null,
+	{ values: passedValues = false } = {},
+) {
 	const ast = parseModule(source, filename);
 	const imports = new Map();
 	// Local bindings that hold a function (declarations and function-valued
@@ -163,11 +194,90 @@ export function analyzeIslandsShell(source, filename, exports = null) {
 		queue.push(fn);
 	};
 	const relative = (record) => /^\.\.?\//.test(record.source) && record.imported !== '*';
-	const component = (record) =>
-		components.set(`${record.source}#${record.imported}`, {
-			source: record.source,
-			exportName: record.imported,
-		});
+	// A rendered component is checked strictly; a value only if it can render.
+	const component = (record, value = false) => {
+		const key = `${record.source}#${record.imported}`;
+		if (value && components.has(key)) return;
+		components.set(
+			key,
+			value
+				? { source: record.source, exportName: record.imported, value: true }
+				: { source: record.source, exportName: record.imported },
+		);
+	};
+	// The name a callee was exported as: an import alias does not hide a hook.
+	const importedName = (name) => {
+		const record = imports.get(name);
+		return record === undefined || record.imported === '*' || record.imported === 'default'
+			? name
+			: record.imported;
+	};
+	// A signal handle, directly, through a member, or through an import or
+	// module-level alias.
+	const isHandle = (node, seen = new Set()) => {
+		node = unwrap(node);
+		if (node?.type === 'MemberExpression') return /\$$/.test(propertyOf(node) ?? '');
+		if (node?.type !== 'Identifier') return false;
+		if (/\$$/.test(node.name) || /\$$/.test(importedName(node.name))) return true;
+		if (seen.has(node.name)) return false;
+		seen.add(node.name);
+		return isHandle(values.get(node.name), seen);
+	};
+	// Follow module-level `const A = B` aliases to the binding they name.
+	const aliased = (name) => {
+		const seen = new Set();
+		for (let value = unwrap(values.get(name)); value?.type === 'Identifier';) {
+			if (seen.has(name)) break;
+			seen.add(name);
+			name = value.name;
+			value = unwrap(values.get(name));
+		}
+		return name;
+	};
+	// A value passed into JSX may be rendered as a component by its receiver.
+	const passed = (node) => {
+		node = unwrap(node);
+		if (node?.type === 'Identifier') {
+			const name = aliased(node.name);
+			const fn = functions.get(name);
+			if (fn !== undefined) {
+				enqueue(fn);
+				return;
+			}
+			const record = imports.get(name);
+			if (record === undefined) {
+				// A module-level wrapper (`memo(...)`) is as uncheckable here as a tag.
+				const value = unwrap(values.get(name));
+				if (value != null && /^[A-Z]/.test(name) && !INERT.has(value.type))
+					report(node, `component ${node.name} cannot be checked as static shell output`);
+			} else if (relative(record)) component(record, true);
+			else if (/^[A-Z]/.test(name) && !/^octane(?:\/|$)/.test(record.source))
+				report(node, `component ${node.name} cannot be checked as static shell output`);
+		} else if (node?.type === 'MemberExpression') {
+			// `UI.Button` through a namespace import names that module's export.
+			const object = unwrap(node.object);
+			const record = object?.type === 'Identifier' ? imports.get(aliased(object.name)) : undefined;
+			const property = propertyOf(node);
+			if (record === undefined || property === null || !/^[A-Z]/.test(property)) return;
+			if (record.imported === '*' && /^\.\.?\//.test(record.source))
+				component({ source: record.source, imported: property }, true);
+			else if (!/^octane(?:\/|$)/.test(record.source))
+				report(
+					node,
+					`component ${object.name}.${property} cannot be checked as static shell output`,
+				);
+		} else if (node?.type === 'ArrayExpression') {
+			for (const element of node.elements) passed(element);
+		} else if (node?.type === 'ObjectExpression') {
+			for (const property of node.properties) passed(property.value ?? property.argument);
+		} else if (node?.type === 'ConditionalExpression') {
+			passed(node.consequent);
+			passed(node.alternate);
+		} else if (node?.type === 'LogicalExpression') {
+			passed(node.left);
+			passed(node.right);
+		}
+	};
 	// Follow one export to the component it names, failing closed when the
 	// source alone cannot say what renders.
 	const follow = (name, target, statement) => {
@@ -175,12 +285,16 @@ export function analyzeIslandsShell(source, filename, exports = null) {
 		const record = target?.source ? target : local !== undefined ? imports.get(local) : undefined;
 		if (target?.fn) enqueue(target.fn);
 		else if (local !== undefined && functions.has(local)) enqueue(functions.get(local));
-		else if (record && relative(record)) component(record);
+		else if (record && relative(record)) component(record, passedValues);
 		else if (
-			exports === null &&
+			(exports === null || passedValues) &&
 			INERT.has((local !== undefined ? values.get(local) : target?.value)?.type)
 		)
 			return;
+		// A passed value that is neither a function nor named like a component
+		// (a computed string or URL) renders nothing interactive. A default
+		// export carries no name to tell, so it is checked like a component.
+		else if (passedValues && name !== 'default' && !/^[A-Z]/.test(name)) return;
 		else
 			report(statement, `export ${JSON.stringify(name)} cannot be checked as static shell output`);
 	};
@@ -194,6 +308,26 @@ export function analyzeIslandsShell(source, filename, exports = null) {
 			const entry = exported.find(([exportedAs]) => exportedAs === name);
 			follow(name, entry?.[1], entry?.[2] ?? star);
 		}
+	// A binding introduces names; only its default values and computed keys run.
+	const pattern = (node) => {
+		if (node == null || node.type === 'Identifier') return;
+		if (node.type === 'AssignmentPattern') {
+			pattern(node.left);
+			visit(node.right);
+		} else if (node.type === 'ObjectPattern') {
+			for (const property of node.properties) {
+				if (property.type === 'RestElement') pattern(property.argument);
+				else {
+					if (property.computed) visit(property.key);
+					pattern(property.value);
+				}
+			}
+		} else if (node.type === 'ArrayPattern') {
+			for (const element of node.elements) pattern(element);
+		} else if (node.type === 'RestElement') pattern(node.argument);
+		else if (node.type === 'TSParameterProperty') pattern(node.parameter);
+		else visit(node);
+	};
 	const visit = (node) => {
 		if (node.type === 'JSXElement') {
 			const opening = node.openingElement;
@@ -236,35 +370,61 @@ export function analyzeIslandsShell(source, filename, exports = null) {
 					attribute.value.expression.type !== 'Literal'
 				)
 					report(attribute, `a controlled ${JSON.stringify(name)} needs the renderer`);
+				else if (attribute.value?.type === 'JSXExpressionContainer')
+					passed(attribute.value.expression);
 			}
+			for (const child of node.children ?? [])
+				if (child.type === 'JSXExpressionContainer') passed(child.expression);
 		} else if (node.type === 'JSXTryExpression' || node.type === 'TryStatement') {
 			report(node, '@try recovery needs the renderer; move it into an independent island');
-		} else if (
-			node.type === 'JSXExpressionContainer' &&
-			/\$$/.test(nameOf(node.expression) ?? '')
-		) {
+		} else if (node.type === 'JSXExpressionContainer' && isHandle(node.expression)) {
 			report(node, 'a signal handle binding needs client code the shell never loads');
 		} else if (node.type === 'CallExpression') {
 			const callee = unwrap(node.callee);
-			const name = nameOf(callee);
-			const property = callee?.type === 'MemberExpression' ? callee.property : null;
-			const member = !callee?.computed
-				? property?.name
-				: property?.type === 'Literal'
-					? property.value
-					: null;
-			if (name !== null && /^use(?:[A-Z0-9_]|$)/.test(name))
-				report(node, `hook ${name}() needs the renderer`);
-			else if (name !== null && SIGNAL_DECLARATIONS.has(name))
+			const local = nameOf(callee);
+			const name = local === null ? null : importedName(local);
+			// `O.useState()` and `React.useEffect()` are hooks through their namespace.
+			const member = callee?.type === 'MemberExpression' ? propertyOf(callee) : null;
+			if (name !== null && HOOK.test(name)) report(node, `hook ${name}() needs the renderer`);
+			else if (member !== null && HOOK.test(member))
+				report(node, `hook ${member}() needs the renderer`);
+			else if (
+				(name !== null && SIGNAL_DECLARATIONS.has(name)) ||
+				(member !== null && SIGNAL_DECLARATIONS.has(member))
+			)
 				report(node, 'a component signal declaration needs the renderer');
 			else if (member === 'get' || member === 'latest' || member === 'snapshot')
 				report(node, `a signal .${member}() read is not live in a static shell`);
+		} else if (node.type === 'VariableDeclarator') {
+			pattern(node.id);
+			if (node.init) visit(node.init);
+			return;
+		} else if (FUNCTIONS.has(node.type)) {
+			// A nested function's own name and parameters are bindings.
+			for (const parameter of node.params) pattern(parameter);
+			visit(node.body);
+			return;
+		} else if (node.type === 'CatchClause') {
+			pattern(node.param);
+			visit(node.body);
+			return;
+		} else if (node.type === 'Identifier') {
+			// Any local function the shell references may run or render on the
+			// server, whether as a tag, a call, or a value handed to a component.
+			const fn = functions.get(aliased(node.name));
+			if (fn !== undefined) enqueue(fn);
+		} else if (node.type === 'MemberExpression' && !node.computed) {
+			visit(node.object);
+			return;
+		} else if (node.type === 'Property' && !node.computed) {
+			visit(node.value);
+			return;
 		}
 		for (const child of children(node)) visit(child);
 	};
 	while (queue.length > 0) {
 		const fn = queue.shift();
-		for (const parameter of fn.params) visit(parameter);
+		for (const parameter of fn.params) pattern(parameter);
 		visit(fn.body);
 	}
 	return { problems, components: [...components.values()] };
