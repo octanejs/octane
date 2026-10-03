@@ -264,12 +264,18 @@ when no initial value is supplied. Snapshots are compared with `Object.is` by
 default. For measurements that return a new object, supply `equal` to compare
 their contents and avoid repeated updates.
 
+The measurement runs in the component's layout phase, in hook order. A
+`useLayoutEffect` declared after it in the same component runs after the
+measurement, so DOM it changes is not measured until the next commit. Call
+`useLayoutSnapshot` after layout effects that change the DOM it measures.
+
 The callback is for measurement, not acquiring resources or setting up
-subscriptions. The hook does not observe later changes to layout by itself. Use
-an effect and an observer or event callback for changes such as resizing or
-scrolling that happen independently of the component's commits. This hook is
-available for the DOM renderer; the experimental universal and Valdi renderers
-do not support it.
+subscriptions. The hook does not observe later changes to layout by itself. For
+changes such as resizing or scrolling that happen independently of the
+component's commits, have an observer or event callback update state so the
+component commits again; that commit measures again. This hook is available for
+the DOM renderer; the experimental universal and Valdi renderers do not support
+it.
 
 ## Conditional hooks
 

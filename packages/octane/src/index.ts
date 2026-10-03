@@ -4,7 +4,10 @@ export { createResizeObserver } from './resize-observer.js';
 // read `version` can tree-shake this module and the package.json payload in full.
 export { version } from './version.js';
 export type * from './public-types.js';
-export type { LayoutSnapshotOptions } from './layout-snapshot-types.js';
+export type {
+	LayoutSnapshotOptions,
+	LayoutSnapshotOptionsWithInitial,
+} from './layout-snapshot-types.js';
 export { StrictMode, unstable_batchedUpdates } from './compatibility.js';
 export { initializeHydrationEventCapture } from './hydration/event-capture.js';
 // Keep external DOM ownership separate from the reconciling runtime so

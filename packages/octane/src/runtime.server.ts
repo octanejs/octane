@@ -27,7 +27,10 @@ export { readNativeDomStyle, readNativeDomProps } from './signals/read-protocol.
 // ---------------------------------------------------------------------------
 
 import { resolveHookPath } from './hook-slot-cache.js';
-import type { LayoutSnapshotOptions } from './layout-snapshot-types.js';
+import type {
+	LayoutSnapshotOptions,
+	LayoutSnapshotOptionsWithInitial,
+} from './layout-snapshot-types.js';
 import {
 	BINDING_OPEN_TAIL_SOURCE,
 	bindingRootMarker,
@@ -4611,10 +4614,19 @@ interface MemoHookRec {
 interface RefHookRec {
 	ref: { current: unknown };
 }
+interface LayoutSnapshotHookRec {
+	snapshot: unknown;
+}
 interface NativeLocalHookRec {
 	nativeValue: unknown;
 }
-type AnyHookRec = HookRec | LinkedHookRec<any, any> | MemoHookRec | RefHookRec | NativeLocalHookRec;
+type AnyHookRec =
+	| HookRec
+	| LinkedHookRec<any, any>
+	| MemoHookRec
+	| RefHookRec
+	| LayoutSnapshotHookRec
+	| NativeLocalHookRec;
 type ServerHookSlot = symbol | string | number;
 
 // Server twin of the client slot ABI. Modules reserve disjoint ranges for
@@ -7889,7 +7901,7 @@ export function useLayoutEffect(): void {
 }
 export function useLayoutSnapshot<T>(
 	measure: () => T,
-	options: LayoutSnapshotOptions<T, T> & { initial: T },
+	options: LayoutSnapshotOptionsWithInitial<T>,
 	slot?: symbol,
 ): T;
 export function useLayoutSnapshot<T>(
@@ -7908,13 +7920,17 @@ export function useLayoutSnapshot<T>(
 		if (slot === undefined) slot = options;
 		options = undefined;
 	}
+	const position = hookPosition(slot);
+	if (position === null) return options?.initial;
 	// A server render may retry after a render-phase update. The initial snapshot
-	// belongs to the hook's first pass, just as on the client.
-	return stateHook<T | undefined, never>(
-		(value) => value,
-		() => options?.initial,
-		slot,
-	)[0];
+	// belongs to the hook's first pass, just as on the client. Nothing dispatches
+	// to it, so it needs no state queue or dispatcher.
+	let record = position.list[position.index] as LayoutSnapshotHookRec | undefined;
+	if (record === undefined) {
+		record = { snapshot: options?.initial };
+		position.list[position.index] = record;
+	}
+	return record.snapshot as T | undefined;
 }
 // Insertion effects inject styles the server render already emitted.
 export function useInsertionEffect(): void {}

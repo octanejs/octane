@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { createRoot, flushSync, hydrateRoot, startTransition } from '../src/index.js';
+import { act, createRoot, flushSync, hydrateRoot, startTransition } from '../src/index.js';
 import * as Server from 'octane/server';
 import { mount } from './_helpers.js';
 import { loadCompiledFixtureSource, loadPlainHookFixtureSource } from './_server-fixture.js';
@@ -379,13 +379,21 @@ describe.each([true, false])('layout snapshots (dev: %s)', (dev) => {
 		}
 	});
 
-	it('bounds a measurement that cannot converge', () => {
+	it('bounds a measurement that cannot converge', async () => {
 		const { Feedback } = fixture('client', dev);
-		expect(() => mount(Feedback)).toThrow(
-			dev
-				? /useLayoutSnapshot in Feedback \(layout-snapshot\.tsrx:\d+:\d+\) did not converge/
-				: /useLayoutSnapshot in Feedback did not converge/,
-		);
+		const container = document.createElement('div');
+		document.body.appendChild(container);
+		const root = createRoot(container);
+		try {
+			await expect(act(() => root.render(Feedback))).rejects.toThrow(
+				dev
+					? /useLayoutSnapshot in Feedback \(layout-snapshot\.tsrx:\d+:\d+\) did not converge/
+					: /useLayoutSnapshot in Feedback did not converge/,
+			);
+		} finally {
+			root.unmount();
+			container.remove();
+		}
 	});
 });
 
@@ -417,6 +425,84 @@ it('reports a non-converging async commit in production instead of stranding wor
 		scheduled.mockRestore();
 		vi.unstubAllEnvs();
 	}
+});
+
+// Outside Strong mode: these fixtures deliberately loop through layout effects.
+const loopSource = `
+import { useLayoutEffect, useLayoutSnapshot, useRef, useState } from 'octane';
+
+export function CommitsBeforeReporting(props) @{
+	const value = useLayoutSnapshot(() => props.next(), { initial: 0 });
+	useLayoutEffect(() => {
+		props.onLayout(value);
+	}, null);
+	<output>{String(value) as string}</output>
+}
+
+export function LayoutEffectLoop() @{
+	const [tick, setTick] = useState(0);
+	const ref = useRef(null);
+	const value = useLayoutSnapshot(() => ref.current?.getAttribute('data-tick'), {
+		initial: '',
+	});
+	useLayoutEffect(() => {
+		if (value === String(tick)) setTick((current) => current + 1);
+	}, null);
+	<output ref={ref} data-tick={tick}>{value as string}</output>
+}
+`;
+
+describe.each([true, false])('non-converging layout snapshots (dev: %s)', (dev) => {
+	const loops = () =>
+		loadCompiledFixtureSource(loopSource, {
+			id: '/packages/octane/tests/_fixtures/layout-snapshot-loops.tsrx',
+			mode: 'client',
+			compileOptions: { dev, hmr: false },
+		});
+
+	it('finishes the commit before reporting the depth error', async () => {
+		const { CommitsBeforeReporting } = loops();
+		const container = document.createElement('div');
+		document.body.appendChild(container);
+		const root = createRoot(container);
+		let measurements = 0;
+		const committed: number[] = [];
+		try {
+			await expect(
+				act(() =>
+					root.render(CommitsBeforeReporting, {
+						next: () => ++measurements,
+						onLayout: (value: number) => committed.push(value),
+					}),
+				),
+			).rejects.toThrow(/useLayoutSnapshot in CommitsBeforeReporting.* did not converge/);
+			// Every commit that measured also ran the layout effect declared after the
+			// hook, including the last one: the limit stops the next render instead.
+			expect(measurements).toBeGreaterThan(1);
+			expect(committed).toHaveLength(measurements);
+		} finally {
+			root.unmount();
+			container.remove();
+		}
+	});
+
+	it('does not blame a snapshot that settles between passes of another loop', async () => {
+		const { LayoutEffectLoop } = loops();
+		const container = document.createElement('div');
+		document.body.appendChild(container);
+		const root = createRoot(container);
+		let error: unknown;
+		try {
+			await act(() => root.render(LayoutEffectLoop));
+		} catch (caught) {
+			error = caught;
+		} finally {
+			root.unmount();
+			container.remove();
+		}
+		expect(String(error)).toMatch(/Maximum update depth exceeded/);
+		expect(String(error)).not.toContain('useLayoutSnapshot');
+	});
 });
 
 describe('layout snapshot hook call paths', () => {

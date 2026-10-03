@@ -644,10 +644,13 @@ Make sure the calculation converges; an oscillating measurement reaches the upda
 depth limit.
 
 The callback is for synchronous measurement, not setting state or acquiring
-resources. The hook does not observe layout changes on its own. For changes that
-can occur without a component commit, such as resizing, use an effect and an
-observer as well. `useLayoutSnapshot` is available for the DOM renderer; the
-experimental universal and Valdi renderers do not support it.
+resources. It runs in hook order with the component's other layout effects, so
+call `useLayoutSnapshot` after any `useLayoutEffect` that changes the DOM it
+measures. The hook does not observe layout changes on its own. For changes that
+can occur without a component commit, such as resizing, have an observer callback
+update state so the component commits again; that commit measures again.
+`useLayoutSnapshot` is available for the DOM renderer; the experimental universal
+and Valdi renderers do not support it.
 
 <h3 id="createResizeObserver">
 	Measure resizes with <code>createResizeObserver</code>
@@ -694,8 +697,9 @@ queued entry. The observer can be reused after disconnect. Pass an owning window
 constructor as the second argument when needed, for example
 `createResizeObserver(callback, iframe.contentWindow.ResizeObserver)`.
 
-If rendered output needs its first measurement before paint, use
-[`useLayoutSnapshot`](#use-layout-snapshot) in addition to the observer. Effects do not run during SSR,
+If rendered output needs its first measurement before paint, render it from
+[`useLayoutSnapshot`](#use-layout-snapshot) and have the observer callback update
+state only to request a commit, which measures again. Effects do not run during SSR,
 and importing the helper does not initialize browser resources. The helper uses
 the native observer available in that window; it does not polyfill missing
 `ResizeObserver` support.

@@ -78,6 +78,53 @@ export function App() @{
   <div>{String(measured) as string}</div>
 }`;
 		expect(() => compile(source, '/src/App.tsrx')).toThrow('OCTANE_STRONG_EFFECT_RESOURCE_LEAK');
+		// The returned function is the snapshot, so cleanup advice would be wrong.
+		expect(() => compile(source, '/src/App.tsrx')).toThrow(
+			'Its return value is the snapshot, not cleanup',
+		);
+	});
+
+	it('explains that a measurement cannot cancel a promise continuation', () => {
+		const source = `"use strong";
+import { useLayoutSnapshot, useState } from 'octane';
+export function App(props) @{
+  const [data, setData] = useState(null);
+  const measured = useLayoutSnapshot(() => {
+    fetch(props.url).then((response) => setData(response));
+    return 1;
+  });
+  <div>{String(data) + measured as string}</div>
+}`;
+		expect(() => compile(source, '/src/App.tsrx')).toThrow('OCTANE_STRONG_EFFECT_DATA_FETCH');
+		expect(() => compile(source, '/src/App.tsrx')).toThrow(
+			'it cannot return cleanup that cancels the update',
+		);
+	});
+
+	it.each([
+		['an async', 'async () => 1'],
+		['a generator', 'function* () { yield 1; }'],
+	])('rejects %s measurement that can never converge', (_kind, measure) => {
+		const source = `"use strong";
+import { useLayoutSnapshot } from 'octane';
+export function App() @{
+  const measured = useLayoutSnapshot(${measure});
+  <div>{String(measured) as string}</div>
+}`;
+		expect(() => compile(source, '/src/App.tsrx')).toThrow('OCTANE_STRONG_LAYOUT_SNAPSHOT_ASYNC');
+	});
+
+	it('keeps a synchronous measurement that awaits nothing legal', () => {
+		const source = `"use strong";
+import { useLayoutSnapshot, useRef } from 'octane';
+export function App() @{
+  const ref = useRef(null);
+  const measured = useLayoutSnapshot(function () { return ref.current?.offsetWidth ?? 0; }, {
+    initial: 0,
+  });
+  <div ref={ref}>{measured as number}</div>
+}`;
+		expect(() => compile(source, '/src/App.tsrx')).not.toThrow();
 	});
 
 	it('rejects pre-paint scheduled state writes from measurement', () => {

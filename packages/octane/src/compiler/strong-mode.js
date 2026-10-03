@@ -201,6 +201,7 @@ export const STRONG_RENDER_IMPURE_CALL = 'OCTANE_STRONG_RENDER_IMPURE_CALL';
 export const STRONG_RENDER_EFFECT_EVENT_CALL = 'OCTANE_STRONG_RENDER_EFFECT_EVENT_CALL';
 export const STRONG_EFFECT_EVENT_DEPENDENCY = 'OCTANE_STRONG_EFFECT_EVENT_DEPENDENCY';
 export const STRONG_EFFECT_CHAIN = 'OCTANE_STRONG_EFFECT_CHAIN';
+export const STRONG_LAYOUT_SNAPSHOT_ASYNC = 'OCTANE_STRONG_LAYOUT_SNAPSHOT_ASYNC';
 export const STRONG_UNLINKED_PROP_STATE = 'OCTANE_STRONG_UNLINKED_PROP_STATE';
 export const STRONG_DIRECTIVE_PLACEMENT = 'OCTANE_STRONG_DIRECTIVE_PLACEMENT';
 export const STRONG_HOOK_LOCALITY = 'OCTANE_STRONG_HOOK_LOCALITY';
@@ -4344,6 +4345,19 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 			writes: new Set(),
 			snapshot,
 		};
+		if (
+			snapshot &&
+			callback?.kind === 'callback' &&
+			(callback.node.async === true || callback.node.generator === true)
+		) {
+			// A promise or iterator is a new object on every commit, so Object.is
+			// never settles the snapshot and it re-renders until the depth limit.
+			report(
+				STRONG_LAYOUT_SNAPSHOT_ASYNC,
+				callback.node,
+				'Strong mode requires useLayoutSnapshot to measure synchronously. An async or generator callback returns a new object on every commit, so the snapshot never converges. Return the measurement directly, and read asynchronous render data with use() or a query binding.',
+			);
+		}
 		const enclosingPolicy = effectPolicy.enterEffect(record);
 		currentEffect = record;
 		effectOwnsWrites = true;
