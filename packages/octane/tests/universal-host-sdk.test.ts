@@ -16,6 +16,7 @@ import {
 	universalContext,
 	universalFor,
 	universalHostComponentLeafPlan,
+	universalHostTemplates,
 	universalPlan,
 	universalProps,
 	universalTry,
@@ -40,6 +41,7 @@ function createTemplateObjectDriver(
 	const base = createObjectDriver();
 	return {
 		...base,
+		templates: universalHostTemplates,
 		capabilities: {
 			...base.capabilities,
 			templateMount: true,
@@ -1438,6 +1440,69 @@ describe('universal prepared host SDK', () => {
 		container.dispatchEvent(container.children[0].children[1], 'select', undefined);
 		expect(log).toEqual(['first:a', 'second:a', 'third:c']);
 		root.unmount();
+	});
+
+	it('mounts program-capable keyed rows through ordinary host commands without template support', () => {
+		const container = createObjectContainer();
+		// The driver negotiates every program capability but does not pass the
+		// template support, so these rows must still mount, update, and dispatch.
+		const root = createUniversalRoot(container, {
+			...createTemplateObjectDriver(true, true, false, true),
+			templates: undefined,
+		});
+		const log: string[] = [];
+		const plan = universalPlan('object', {
+			kind: 'host',
+			type: 'row',
+			bindings: [['id', 0]],
+			children: [
+				{ kind: 'slot', slot: 1 },
+				{ kind: 'host', type: 'action', bindings: [['onSelect', 2]] },
+			],
+		});
+		const Scene = defineUniversalComponent(
+			'object',
+			(props: { ids: readonly string[]; prefix: string }) =>
+				universalFor(
+					props.ids,
+					(id) => id,
+					(id) =>
+						universalValue(plan, [
+							id,
+							`${props.prefix}-${id}`,
+							() => log.push(`${props.prefix}:${id}`),
+						]),
+					null,
+					false,
+					false,
+					true,
+				),
+		);
+
+		const prepared = root.prepare(Scene, { ids: ['a', 'b'], prefix: 'first' });
+		if (prepared.status !== 'prepared') throw new Error('Expected a prepared transaction.');
+		expect(
+			prepared.batch.commands.filter(
+				(command) => command.op === 'mount-template-range' || command.op === 'mount-template-run',
+			),
+		).toEqual([]);
+		prepared.commit();
+
+		const [first, second] = container.children;
+		expect(container.children.map((row) => row.props.id)).toEqual(['a', 'b']);
+		expect(first.children[0].props.value).toBe('first-a');
+		container.dispatchEvent(first.children[1], 'select', undefined);
+		expect(log).toEqual(['first:a']);
+
+		root.render(Scene, { ids: ['b', 'a'], prefix: 'second' });
+		expect(container.children).toHaveLength(2);
+		expect(container.children[0]).toBe(second);
+		expect(container.children[1]).toBe(first);
+		expect(first.children[0].props.value).toBe('second-a');
+		container.dispatchEvent(first.children[1], 'select', undefined);
+		expect(log).toEqual(['first:a', 'second:a']);
+		root.unmount();
+		expect(container.children).toEqual([]);
 	});
 
 	it('ensures an opaque descendant before publishing newly added refs and callbacks', () => {

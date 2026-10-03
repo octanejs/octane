@@ -39,6 +39,7 @@ try {
 		createObjectDriver,
 		createUniversalRoot,
 		defineUniversalComponent,
+		universalHostTemplates,
 		universalPlan,
 		universalValue,
 	} = await import(runtimeUrl);
@@ -47,6 +48,7 @@ try {
 		const base = createObjectDriver('object');
 		return {
 			...base,
+			templates: universalHostTemplates,
 			capabilities: {
 				...base.capabilities,
 				templateMount: true,

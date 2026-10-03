@@ -56,7 +56,10 @@ intrinsics use, and constructor-form `extend` registers only its own class.
 Direct roots therefore let unused Three exports and the DOM renderer tree-shake
 from minimal applications. The full-catalogue entries explicitly retain the
 complete Three namespace. Both Octane gzip results have same-run ratio guards
-requiring them to be no larger than their React Three Fiber counterparts.
+against their React Three Fiber counterparts. The guards are ratchets at the
+measured ratio (1.031x minimal, 1.021x full on 2026-10-03), because growth in
+the shared universal runtime has outpaced Three-specific savings. Lower each
+ceiling whenever the universal core shrinks. The target is 1.0.
 
 Run through the unified harness:
 

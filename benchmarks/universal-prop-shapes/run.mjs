@@ -83,6 +83,7 @@ const {
 	defineUniversalComponent,
 	universalComponent,
 	universalFor,
+	universalHostTemplates,
 	universalPlan,
 	universalProps,
 	universalValue,
@@ -139,6 +140,7 @@ for (const mode of [
 	let templateMounts = 0;
 	const root = createUniversalRoot(container, {
 		...base,
+		templates: universalHostTemplates,
 		capabilities:
 			mode === 'fallback-event-host'
 				? {

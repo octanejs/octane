@@ -2342,6 +2342,7 @@ export function Scene() @{ <><Shared0 /><Native><Shared0 /></Native></> }
 		const base = createObjectDriver();
 		const root = createUniversalRoot(container, {
 			...base,
+			templates: UniversalRuntime.universalHostTemplates,
 			capabilities: { ...base.capabilities, templateProgramMount: true },
 			events: {
 				classify(name) {
