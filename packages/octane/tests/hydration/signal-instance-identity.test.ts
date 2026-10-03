@@ -25,6 +25,7 @@ import {
 // a module's first load waits on the shared Vite transform queue, which a
 // loaded run can stall for seconds inside the first scenario's test timeout.
 import '../_server-fixture.js';
+import type { CompiledFixtureModule } from '../_server-fixture.js';
 import '../_server-stream.js';
 import '../_fixtures/signals-async-controls.js';
 import '../../src/hydration/streamed-signals.js';
@@ -1727,6 +1728,183 @@ export function App(props) @{
 				root.unmount();
 				container.remove();
 				resetStreamRuntimeGlobals();
+			}
+		},
+	);
+});
+
+// A component without hooks still owns one signal instance level, and its
+// arms, rows and value children resolve their owners below that level on both
+// sides. Development and production compile hookless calls differently.
+const HOOKLESS_LEAF = `import { signal$ } from 'octane/signals';
+export function Leaf(props) {
+	const value$ = signal$('leaf');
+	props.remember('leaf');
+	return <output>{String(value$.get())}</output>;
+}`;
+
+const HOOKLESS_LEAF_APPS: Record<string, string> = {
+	'value under @if': `import { Leaf } from './leaf';
+function Card(props) @{ <section>@if (props.on) { <div>{props.content}</div> }</section> }
+export function App(props) @{ <main><Card on={true} content={<Leaf remember={props.remember}/>}/></main> }`,
+	'host value under @if': `import { Leaf } from './leaf';
+function Card(props) @{ <section>@if (props.on) { <div>{props.content}</div> }</section> }
+export function App(props) @{ <main><Card on={true} content={<p><Leaf remember={props.remember}/></p>}/></main> }`,
+	'value under @for': `import { Leaf } from './leaf';
+function Card(props) @{ <section>@for (const id of props.ids; key id) { <div>{props.content}</div> }</section> }
+export function App(props) @{ <main><Card ids={['a']} content={<Leaf remember={props.remember}/>}/></main> }`,
+	'component under @if': `import { Leaf } from './leaf';
+function Card(props) @{ <section>@if (props.on) { <Leaf remember={props.remember}/> }</section> }
+export function App(props) @{ <main><Card on={true} remember={props.remember}/></main> }`,
+	'value under nested hookless arms': `import { Leaf } from './leaf';
+function Inner(props) @{ <span>@if (props.on) { <b>{props.content}</b> }</span> }
+function Card(props) @{ <section>@if (props.on) { <Inner on={true} content={props.content}/> }</section> }
+export function App(props) @{ <main><Card on={true} content={<Leaf remember={props.remember}/>}/></main> }`,
+};
+
+// Hookless siblings retried after a browser-only suspension keep their own
+// owners, whatever the hookless component rendered before them contains.
+const HOOKLESS_RETRY_FIRSTS: Record<string, string> = {
+	'nested hookless child': `function Inner(props) @{ <b>inner</b> }
+function First(props) @{ <i><Inner/></i> }`,
+	'@if arm': `function First(props) @{ <i>@if (props.on) { <b>inner</b> }</i> }`,
+};
+
+const hooklessRetryApp = (first: string) => `import { use } from 'octane';
+${first}
+function Probe(props) @{ props.remember(props.name); <u>{props.name as string}</u> }
+function Gate(props) @{ const value = props.wait ? use(props.wait()) : 'done'; <s>{value as string}</s> }
+export function App(props) @{ <main>@try { <><First on={true}/><Probe name="b" remember={props.remember}/><Probe name="c" remember={props.remember}/><Gate wait={props.wait}/></> } @pending { <p>waiting</p> }</main> }`;
+
+async function loadHooklessScenario(source: string, dev: boolean, leaf: boolean) {
+	vi.resetModules();
+	const server = await import('../../src/runtime.server.js');
+	const client = await import('../../src/runtime.js');
+	const signals = await import('../../src/signals/index.js');
+	const { loadCompiledFixtureSource } = await import('../_server-fixture.js');
+	const compileOptions = { dev, hmr: false };
+	const load = (mode: 'client' | 'server') => {
+		const runtimeModules: Record<string, CompiledFixtureModule> = { 'octane/signals': signals };
+		if (leaf) {
+			runtimeModules['./leaf'] = loadCompiledFixtureSource(HOOKLESS_LEAF, {
+				id: '/src/leaf.tsx',
+				mode,
+				compileOptions,
+				runtimeModules,
+			});
+		}
+		return loadCompiledFixtureSource(source, {
+			id: '/src/app.tsrx',
+			mode,
+			compileOptions,
+			runtimeModules,
+		});
+	};
+	const owners: Record<'server' | 'client', [string, string][]> = { server: [], client: [] };
+	const remember = (side: 'server' | 'client') => (name: string) =>
+		owners[side].push([
+			name,
+			(signals.currentSignalOwner() as { instanceKey?: string } | null)?.instanceKey ?? 'missing',
+		]);
+	// Every browser owner must be the server owner of the same component.
+	const expectServerOwners = (names: string[]) => {
+		const serverKeys = new Map(owners.server);
+		expect([...serverKeys.keys()]).toEqual(names);
+		expect(new Set(serverKeys.values()).size).toBe(names.length);
+		expect([...serverKeys.values()]).not.toContain('missing');
+		expect(new Set(owners.client.map(([name]) => name))).toEqual(new Set(names));
+		expect(owners.client).toEqual(owners.client.map(([name]) => [name, serverKeys.get(name)]));
+	};
+	return {
+		server,
+		client,
+		serverModule: load('server'),
+		clientModule: load('client'),
+		remember,
+		expectServerOwners,
+	};
+}
+
+describe('hookless component signal instance identity', () => {
+	it.each(
+		Object.keys(HOOKLESS_LEAF_APPS).flatMap((shape) =>
+			[false, true].map((dev) => ({ shape, dev })),
+		),
+	)(
+		'keeps the owner of a $shape inside a hookless component through hydration (dev: $dev)',
+		async ({ shape, dev }) => {
+			const { server, client, serverModule, clientModule, remember, expectServerOwners } =
+				await loadHooklessScenario(HOOKLESS_LEAF_APPS[shape]!, dev, true);
+			const signalOwner = { scopeKey: 'hookless-arm-owner' };
+			const output = server.renderToString(
+				serverModule.App,
+				{ remember: remember('server') },
+				{ signalOwner },
+			);
+			const container = document.createElement('div');
+			container.innerHTML = output.html;
+			document.body.append(container);
+			const result = container.querySelector('output');
+			const errors: unknown[] = [];
+			const root = client.hydrateRoot(
+				container,
+				clientModule.App,
+				{ remember: remember('client') },
+				{ signalOwner, onRecoverableError: (error) => errors.push(error) },
+			);
+			try {
+				expectServerOwners(['leaf']);
+				expect(container.querySelector('output')).toBe(result);
+				expect(result?.textContent).toBe('leaf');
+				expect(errors).toEqual([]);
+			} finally {
+				root.unmount();
+				container.remove();
+			}
+		},
+	);
+
+	it.each(
+		Object.keys(HOOKLESS_RETRY_FIRSTS).flatMap((first) =>
+			[false, true].map((dev) => ({ first, dev })),
+		),
+	)(
+		'keeps hookless sibling owners apart when hydration retries after a $first (dev: $dev)',
+		async ({ first, dev }) => {
+			const { server, client, serverModule, clientModule, remember, expectServerOwners } =
+				await loadHooklessScenario(hooklessRetryApp(HOOKLESS_RETRY_FIRSTS[first]!), dev, false);
+			const signalOwner = { scopeKey: 'hookless-retry-owner' };
+			// Only the browser suspends, so hydration retries the server's @try body.
+			const output = server.renderToString(
+				serverModule.App,
+				{ remember: remember('server') },
+				{ signalOwner },
+			);
+			const container = document.createElement('div');
+			container.innerHTML = output.html;
+			document.body.append(container);
+			const probes = [...container.querySelectorAll('u')];
+			let resolve!: (value: string) => void;
+			const pending = new Promise<string>((done) => (resolve = done));
+			const errors: unknown[] = [];
+			const root = client.hydrateRoot(
+				container,
+				clientModule.App,
+				{ remember: remember('client'), wait: () => pending },
+				{ signalOwner, onRecoverableError: (error) => errors.push(error) },
+			);
+			try {
+				resolve('done');
+				await pending;
+				await new Promise((done) => setTimeout(done, 0));
+				client.flushSync(() => {});
+				expect(container.querySelector('s')?.textContent).toBe('done');
+				expect([...container.querySelectorAll('u')]).toEqual(probes);
+				expectServerOwners(['b', 'c']);
+				expect(errors).toEqual([]);
+			} finally {
+				root.unmount();
+				container.remove();
 			}
 		},
 	);

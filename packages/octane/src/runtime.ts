@@ -622,7 +622,7 @@ function signalRetrySlot(scope: Scope, target: Scope): unknown[] | null {
 	for (let index = 0; index < scope.slots.length; index++) {
 		const slot = scope.slots[index];
 		if (slot === null || typeof slot !== 'object') continue;
-		if (block.forSlot !== null && (slot === block.forSlot || slot.forSlot === block.forSlot))
+		if (block.forSlot != null && (slot === block.forSlot || slot.forSlot === block.forSlot))
 			return ['slot', index, 'item', block.key];
 		if (slot.block === block || slot.tryBlock === block || slot.emptyBlock === block) {
 			// Slot indices and branch tags are compiler/reconciler identities. Do
@@ -969,7 +969,7 @@ function structuralSignalInstanceKey(
 		const block = scope.block;
 		if (!visited.has(block)) {
 			visited.add(block);
-			if (block.forSlot !== null) itemTokens.push(signalIdentityToken(block.key, block.itemIndex));
+			if (block.forSlot) itemTokens.push(signalIdentityToken(block.key, block.itemIndex));
 			base = resolveSignalInstanceKey(block);
 		}
 		scope = scope.parent;
@@ -979,7 +979,7 @@ function structuralSignalInstanceKey(
 	while (base === undefined && block !== null) {
 		if (!visited.has(block)) {
 			visited.add(block);
-			if (block.forSlot !== null) itemTokens.push(signalIdentityToken(block.key, block.itemIndex));
+			if (block.forSlot) itemTokens.push(signalIdentityToken(block.key, block.itemIndex));
 		}
 		base = resolveSignalInstanceKey(block);
 		block = block.parentBlock;
@@ -1010,19 +1010,19 @@ function structuralSignalInstanceKey(
 	);
 }
 
+/** Stamp a fresh lite scope, whose other stamp fields are still their defaults. */
 function stampSignalInstance(
 	scope: Scope,
 	parentScope: Scope,
 	invocationSite: string | undefined,
-	key: unknown,
-	hasKey: boolean,
 ): void {
 	if (SIGNAL_BINDINGS_ENABLED || signalDocumentEnabled) {
-		scope.signalInstanceParent = parentScope;
-		scope.signalInstanceSite = invocationSite;
-		scope.signalInstanceValue = key;
-		scope.signalInstanceHasKey = hasKey;
-		scope.signalInstanceResolved = undefined;
+		// Blocks the body creates (arms, rows, value slots) hang off its DOM
+		// stand-in, not the scope. Their key walks resolve this level through
+		// the stand-in, so it carries the same recipe.
+		const block = scope.block;
+		block.signalInstanceParent = scope.signalInstanceParent = parentScope;
+		block.signalInstanceSite = scope.signalInstanceSite = invocationSite;
 	}
 }
 
@@ -1038,7 +1038,7 @@ function scopeSignalOwner(scope: Scope | null): SignalOwner | undefined {
 	let owner = SCOPE_SIGNAL_OWNERS.get(scope);
 	if (
 		(owner === undefined || owner === false) &&
-		scope.block.forSlot === null &&
+		!scope.block.forSlot &&
 		scope.signalInstanceParent === null &&
 		scope.signalInstanceResolved === undefined
 	) {
@@ -11657,9 +11657,11 @@ class LiteBlockImpl {
 	declare parentBlock: Block;
 	declare $$ctxValues: Map<Context<any>, any> | null;
 	declare idState: RootIdState;
-	// Signal-instance fields exist on every Block stand-in: lite blocks are
-	// never stamped, but structuralSignalInstanceKey walks scope.block chains
-	// and reads them polymorphically, so they must be present (and null).
+	// Signal-instance fields exist on every Block stand-in: signal key walks
+	// read them polymorphically through scope.block and parentBlock chains.
+	// stampSignalInstance gives it its lite scope's recipe, so descendant walks
+	// keep that level. It has no forSlot field: signal readers test forSlot
+	// loosely, so a stand-in never counts as a list row.
 	declare signalInstanceParent: Scope | null;
 	declare signalInstanceSite: string | undefined;
 	declare signalInstanceValue: unknown;
@@ -11796,7 +11798,7 @@ export function componentSlotLite<P>(
 			}
 		}
 		scope.block = new LiteBlockImpl(host, endMarker, parentScope.block) as unknown as Block;
-		stampSignalInstance(scope, parentScope, invocationSite, undefined, false);
+		stampSignalInstance(scope, parentScope, invocationSite);
 		if (adoptedOpen !== null && adoptedClose !== null) {
 			hydration!.liteRanges.set(scope, {
 				start: adoptedOpen,
