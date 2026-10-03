@@ -221,11 +221,14 @@ import {
 import { createNativeReadRetry, type NativeReadRetry } from './signals/native-read-retry.js';
 import {
 	activeCandidate,
-	createSignalActionFrame,
-	createSignalTransitionCoordinator,
 	swapActiveSignalCandidate,
 	withoutSignalCandidate,
 } from './signals/transition-state.js';
+// The graph registers these by default; an islands build bundles them here.
+import {
+	createSignalActionFrame,
+	createSignalTransitionCoordinator,
+} from '#octane/signal-actions/renderer';
 import { installNativeSignalActionExtension } from './signals/transition-candidate.js';
 import type { SignalActionFrame } from './signals/transition-action.js';
 import type {
@@ -2599,8 +2602,8 @@ function nativeCandidateForAction(batch: TransitionActionBatch): SignalActionFra
 	}
 	candidate ??= batch.native = createSignalActionFrame?.();
 	if (candidate !== undefined && NATIVE_TRANSITION_DRIVER === null) {
-		// Signals can first load after this Action awaited. Both capabilities are
-		// live registrations, so initialize only when its first frame is acquired.
+		// Signals can first load after this Action awaited, so initialize the
+		// coordinator only when its first frame is acquired.
 		NATIVE_TRANSITION_DRIVER = createSignalTransitionCoordinator!<NativeTransitionTypes>({
 			get attempt() {
 				return NATIVE_TRANSITION_ATTEMPT;

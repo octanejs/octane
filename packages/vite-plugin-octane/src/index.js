@@ -234,6 +234,16 @@ function has_islands_route(config) {
 }
 
 /**
+ * Every rendered document of this app is an islands-only page.
+ * @param {ResolvedOctaneConfig | null} config
+ * @returns {boolean}
+ */
+function has_only_islands_routes(config) {
+	const routes = config?.router.routes.filter((route) => route.type === 'render') ?? [];
+	return routes.length > 0 && routes.every((route) => route.hydrate === 'islands');
+}
+
+/**
  * Check every islands-only route's shell for client work. The shell's modules
  * never load in the browser, so every component it renders outside its
  * independent islands must be static server output. A build fails on the
@@ -595,8 +605,27 @@ export function octane(inlineOptions = {}) {
 								return { relative: true };
 							}
 						};
+						// Only the renderer consumes the signal Action frame. Islands-only
+						// documents load signals without it, so this condition moves the
+						// frame from the signal graph into the renderer (octane's
+						// action-capability.ts). Either placement is complete; it chooses
+						// which pages pay, so mixed apps keep the default.
+						/** @type {UserConfig['resolve']} */
+						let resolve;
+						if (has_only_islands_routes(buildOctaneConfig)) {
+							const { defaultClientConditions } = await import('vite');
+							// Vite concatenates plugin conditions onto the user's own, and
+							// replaces its defaults only when none were configured.
+							resolve = {
+								conditions: [
+									...(userConfig.resolve?.conditions ? [] : defaultClientConditions),
+									'octane-islands',
+								],
+							};
+						}
 						return {
 							...base,
+							...(resolve ? { resolve } : null),
 							build: buildConfig,
 							experimental: {
 								...userConfig.experimental,
