@@ -6429,7 +6429,7 @@ function vtWouldWrap(): boolean {
 /** Settle passives from nested sync commits before choosing capture priority and owners. */
 function vtDrainPassivesBeforeCapture(): boolean {
 	let passes = 0;
-	while (effectQueues[PASSIVE].length > 0 || pendingPassiveUnmounts.length > 0) {
+	while (hasPendingPassiveWork()) {
 		if (DEFERRED_LAYOUT_DRIVER?.holdPassivesBeforeRender() === true) return true;
 		// A long cascade keeps normal commit scheduling without retaining a stale
 		// animation batch. Ordinary passive effects still retain their yield policy.
@@ -6837,7 +6837,28 @@ function isActEnvironment(): boolean {
 const NESTED_UPDATE_LIMIT = 50;
 const ACT_DRAIN_LIMIT = NESTED_UPDATE_LIMIT + 50;
 let UPDATE_CHAIN_ID = 0;
+// The synchronous-callback budget (Block.nestedUpdateCount) has its own chain.
+// It restarts with every user update chain and after any outermost commit when
+// no synchronous-callback update was scheduled since the previous one. That is
+// React's rule: commitRootImpl resets nestedUpdateCount when a commit leaves no
+// sync work. The flag also sees a passive effect's own flushSync update, which
+// lands between outermost commits. Each passive-driven commit therefore gets a
+// fresh budget, while UPDATE_CHAIN_ID keeps the passive warning counting the
+// whole cascade.
+let NESTED_UPDATE_CHAIN_ID = 0;
+let NESTED_UPDATE_SCHEDULED = false;
+// Passive effects drained before a render join it, so a passive cascade that
+// re-measures in a layout effect would spend one sync update per step on the
+// same chain. When a block exhausts its budget while passive effects wait, they
+// are held for this chain (see scheduleRender) until a commit settles without them.
+let HELD_PASSIVE_CHAIN = -1;
 let PASSIVE_UPDATE_COUNTS: WeakMap<Block, { chain: number; count: number }> | null = null;
+
+function warnPassiveUpdateDepth(): void {
+	console.error(
+		'Maximum update depth exceeded. Check the dependencies of effects that schedule state updates.',
+	);
+}
 
 function countPassiveUpdate(block: Block): void {
 	if (process.env.NODE_ENV === 'production') return;
@@ -6847,10 +6868,19 @@ function countPassiveUpdate(block: Block): void {
 		state = { chain: UPDATE_CHAIN_ID, count: 0 };
 		counts.set(block, state);
 	}
-	if (++state.count === NESTED_UPDATE_LIMIT + 1) {
-		console.error(
-			'Maximum update depth exceeded. Check the dependencies of effects that schedule state updates.',
-		);
+	if (++state.count === NESTED_UPDATE_LIMIT + 1) warnPassiveUpdateDepth();
+}
+
+/** Close one outermost commit's share of the synchronous-callback chain. */
+function finishNestedUpdateCommit(): void {
+	if (NESTED_UPDATE_SCHEDULED) NESTED_UPDATE_SCHEDULED = false;
+	else {
+		// A hold that ends in a settled commit proves the exhausted budget was
+		// spent by a passive cascade riding along with each re-measure. React
+		// warns about that cascade without throwing, and so does Octane.
+		if (process.env.NODE_ENV !== 'production' && HELD_PASSIVE_CHAIN === NESTED_UPDATE_CHAIN_ID)
+			warnPassiveUpdateDepth();
+		NESTED_UPDATE_CHAIN_ID++;
 	}
 }
 
@@ -6965,11 +6995,30 @@ function scheduleRender(block: Block): void {
 		// finite chain converge; synchronous callbacks retain the hard loop guard.
 		countPassiveUpdate(block);
 	} else if (inNestedUpdateCallback()) {
-		if (block.nestedUpdateChain !== UPDATE_CHAIN_ID) {
-			block.nestedUpdateChain = UPDATE_CHAIN_ID;
+		NESTED_UPDATE_SCHEDULED = true;
+		if (block.nestedUpdateChain !== NESTED_UPDATE_CHAIN_ID) {
+			block.nestedUpdateChain = NESTED_UPDATE_CHAIN_ID;
 			block.nestedUpdateCount = 0;
 		}
-		if (++block.nestedUpdateCount > NESTED_UPDATE_LIMIT) block.nestedUpdateError = true;
+		if (++block.nestedUpdateCount > NESTED_UPDATE_LIMIT) {
+			// Exhausted while passive effects wait to join the next render: hold
+			// them so that render carries only this budget's updates. A passive
+			// cascade re-measuring once per step settles, and its commit starts a
+			// fresh chain. A real loop schedules again and throws below. Only an
+			// outermost commit can settle the chain and release the hold, so work
+			// driven from a passive effect (flushSync there) keeps the plain error.
+			if (
+				block.nestedUpdateCount === NESTED_UPDATE_LIMIT + 1 &&
+				EFFECT_COMMIT_DEPTH <= 1 &&
+				CURRENT_EFFECT_PHASE !== PASSIVE &&
+				hasPendingPassiveWork()
+			) {
+				HELD_PASSIVE_CHAIN = NESTED_UPDATE_CHAIN_ID;
+			} else {
+				HELD_PASSIVE_CHAIN = -1;
+				block.nestedUpdateError = true;
+			}
+		}
 	} else if (CURRENT_BLOCK === null) {
 		// A user/root update starts a new chain. This prevents fifty unrelated
 		// events, roots, or wide-batch members from sharing the recursion budget
@@ -6978,7 +7027,7 @@ function scheduleRender(block: Block): void {
 		// effect -> render-phase update -> effect cycle could reset its budget on
 		// every pass. Pure render-phase loops retain the separate drain guard below.
 		UPDATE_CHAIN_ID++;
-		block.nestedUpdateChain = UPDATE_CHAIN_ID;
+		block.nestedUpdateChain = ++NESTED_UPDATE_CHAIN_ID;
 		block.nestedUpdateCount = 0;
 		block.nestedUpdateError = false;
 	}
@@ -8560,7 +8609,7 @@ function vtFlush(
 
 /** Drain pending passive effects ahead of a render pass (see flush()). */
 function drainPassivesBeforeRender(): void {
-	if (effectQueues[PASSIVE].length > 0 || pendingPassiveUnmounts.length > 0) {
+	if (hasPendingPassiveWork()) {
 		if (DEFERRED_LAYOUT_DRIVER?.holdPassivesBeforeRender() === true) return;
 		drainPassiveEffects();
 	}
@@ -9606,8 +9655,7 @@ function restoreDeferredPassives(capture: DeferredLayoutCapture): void {
 	for (const entry of capture.passiveUnmounts) pendingPassiveUnmounts.push(entry);
 	for (const entry of laterUnmounts) pendingPassiveUnmounts.push(entry);
 	capture.passiveUnmounts.length = 0;
-	if ((effectQueues[PASSIVE].length > 0 || pendingPassiveUnmounts.length > 0) && !passiveScheduled)
-		schedulePassiveFlush();
+	if (hasPendingPassiveWork() && !passiveScheduled) schedulePassiveFlush();
 }
 
 /** An animation batch owns its passive work without blocking unrelated commits. */
@@ -9762,14 +9810,9 @@ function commitEffects(): void {
 		!hasControlledSyncs()
 	) {
 		if (DEFERRED_LAYOUT_DRIVER?.defer(null, null) === true) return;
-		if (effectQueues[PASSIVE].length > 0 || pendingPassiveUnmounts.length > 0)
-			DEFERRED_LAYOUT_DRIVER?.beforeCommit();
-		if (
-			(effectQueues[PASSIVE].length > 0 || pendingPassiveUnmounts.length > 0) &&
-			!passiveScheduled
-		) {
-			schedulePassiveFlush();
-		}
+		if (hasPendingPassiveWork()) DEFERRED_LAYOUT_DRIVER?.beforeCommit();
+		if (hasPendingPassiveWork() && !passiveScheduled) schedulePassiveFlush();
+		if (EFFECT_COMMIT_DEPTH === 0) finishNestedUpdateCommit();
 		return;
 	}
 	DEFERRED_LAYOUT_DRIVER?.beforeCommit();
@@ -9809,12 +9852,10 @@ function commitEffects(): void {
 		// against the store and re-render any that tore. Mirrors React draining its
 		// store-consistency checks right after commitLayoutEffects.
 		drainStoreSyncs();
-		if (
-			(effectQueues[PASSIVE].length > 0 || pendingPassiveUnmounts.length > 0) &&
-			!passiveScheduled
-		) {
-			schedulePassiveFlush();
-		}
+		if (hasPendingPassiveWork() && !passiveScheduled) schedulePassiveFlush();
+		// Only an outermost commit closes the chain. Commits nested in another
+		// commit or in a passive drain (flushSync from a passive effect) never reset it.
+		if (EFFECT_COMMIT_DEPTH === 1) finishNestedUpdateCommit();
 	} finally {
 		if (nativeFrame >= 0) NATIVE_READ_DRIVER!.resumeLifecycle(nativeFrame);
 		finishEffectCommit();
@@ -9838,6 +9879,8 @@ function flushPassivePostPaint(): void {
 /**
  * Test/test-environment helper — synchronously drain any queued passive
  * (`useEffect`) bodies that would normally fire after paint. Idempotent.
+ * While a queued commit settles an exhausted update budget, the bodies stay
+ * queued until that commit (see scheduleRender), as `hasPendingWork()` reports.
  * Real apps should not call this; rely on the normal post-paint scheduler.
  */
 export function drainPassiveEffects(): void {
@@ -10344,6 +10387,9 @@ function runLayoutEffects(q: PendingEffect[]): void {
  * drainMutationEffects (see its comment).
  */
 function drainPassivePhase(): void {
+	// Held passives wait for the queued commit that settles the exhausted chain;
+	// that commit re-arms the post-paint drain (see scheduleRender).
+	if (HELD_PASSIVE_CHAIN === NESTED_UPDATE_CHAIN_ID) return;
 	EFFECT_COMMIT_DEPTH++;
 	try {
 		drainDeferredPassiveUnmounts();
@@ -10388,6 +10434,10 @@ function drainEffectEventCommitActions(): InlineCaughtErrorReport[] | null {
 // the captured handler routes a late throw to the try boundary that enclosed
 // the deletion — the same routing reportTeardownError gave the sync destroys.
 const pendingPassiveUnmounts: Array<Cleanup | TryHandler | Block | null> = [];
+
+function hasPendingPassiveWork(): boolean {
+	return effectQueues[PASSIVE].length > 0 || pendingPassiveUnmounts.length > 0;
+}
 
 function drainDeferredPassiveUnmounts(): void {
 	if (pendingPassiveUnmounts.length === 0) return;
@@ -48369,6 +48419,7 @@ function makeRoot(
 				}
 			} else {
 				UPDATE_CHAIN_ID++;
+				NESTED_UPDATE_CHAIN_ID++;
 				nestedRootRenderChain = UPDATE_CHAIN_ID;
 				nestedRootRenderCount = 0;
 			}
@@ -48476,6 +48527,7 @@ function makeRoot(
 				EFFECT_EVENT_LIFECYCLE_DEPTH === 0
 			) {
 				UPDATE_CHAIN_ID++;
+				NESTED_UPDATE_CHAIN_ID++;
 			}
 			if (
 				process.env.NODE_ENV !== 'production' &&
