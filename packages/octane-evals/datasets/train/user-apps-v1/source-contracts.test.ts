@@ -203,6 +203,8 @@ const STRONG_REPAIR_TASKS = [
 	'octane.strong-sorted-tags',
 	'octane.strong-click-tally',
 	'octane.strong-save-counter',
+	'octane.strong-lazy-ref',
+	'octane.strong-measured-width',
 ];
 
 const contracts: Record<string, Contract> = {

@@ -2311,6 +2311,7 @@ export function analyzeStrongHookPolicies(ast, options = {}) {
 			diagnostics.push({
 				code: 'OCTANE_STRONG_MANUAL_MEMO',
 				node: call,
+				hook: name,
 				severity: 'error',
 				message: `Strong mode owns calculation and callback caching. Replace ${name} with a const declaration and let the compiler track its inputs.`,
 			});

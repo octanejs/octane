@@ -396,7 +396,7 @@ const [selection, setSelection, getSelection] = useLinkedState(
   overrode it since" idiom that controlled/uncontrolled widget internals
   hand-roll today.
 
-### 6.2 `useLayoutSnapshot(measure, options?)`
+### 6.2 `useLayoutSnapshot(measure, options?)` — shipped
 
 Replaces: "measure the DOM after commit, then set state" — physically
 legitimate (the DOM did not exist earlier), which argues for a managed
@@ -486,9 +486,9 @@ like any other callback-turn transition. What deferral gives up is only the
 `setTimeout` instead of the intended primitive gets working code, not an
 error. The response to that is quality pressure, not prohibition:
 
-- fix-its and docs route the common cases to shipped `useLinkedState` and
-  actions, with `useLayoutSnapshot` and `useSource` remaining possible future
-  primitives;
+- fix-its and docs route the common cases to shipped `useLinkedState`,
+  `useLayoutSnapshot`, and actions, with `useSource` remaining a possible future
+  primitive;
 - possible future evaluation could monitor whether agent output drifts toward
   deferral instead of those primitives; no continuous phase-4 monitor is
   currently implemented.
@@ -512,7 +512,7 @@ The original staged rollout was **not executed**. Current status is:
 
 | Historical milestone | What actually shipped or remains proposed |
 | -------------------- | ---------------------------------------- |
-| Report-only diagnostics, repository inventory, and codemods | Not implemented; they were not prerequisites for opt-in Strong mode. |
+| Report-only diagnostics, repository inventory, and codemods | Not prerequisites for opt-in Strong mode. Added later as `octane analyze --strong-preview` (what Strong would report, grouped by code) and `octane analyze --fix` (lazy-ref and manual-memo rewrites). |
 | Replacement primitives | `useLinkedState` shipped in [#366](https://github.com/octanejs/octane/pull/366) and `useLayoutSnapshot` is available; a core `useHydrated` and `useSource` remain proposals. |
 | Render-context enforcement | Opt-in compiler diagnostics shipped in [#376](https://github.com/octanejs/octane/pull/376); runtime phase guards and per-cell policy did not. |
 | Effect setup and cleanup | Provable synchronous setup updates are compiler errors in opted-in modules; cleanup restrictions remain unimplemented. |

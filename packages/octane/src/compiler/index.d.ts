@@ -131,6 +131,31 @@ export interface CompilePosition {
 	column: number;
 }
 
+/** A source replacement, as offsets into the module text the compiler received. */
+export interface CompileEdit {
+	start: number;
+	end: number;
+	text: string;
+}
+
+/**
+ * How to resolve a diagnostic. `edits` are applied together, or not at all;
+ * a suggestion without them names the replacement in `message` only.
+ */
+export interface CompileSuggestion {
+	message: string;
+	/** The Octane hook the replacement uses, such as `useLazyRef`. */
+	hook?: string;
+	edits?: readonly CompileEdit[];
+}
+
+/** Rename an event attribute, such as a native text `onChange` to `onInput`. */
+export interface CompileAttributeSuggestion {
+	start: CompilePosition;
+	end: CompilePosition;
+	attribute: string;
+}
+
 export interface CompileDiagnostic {
 	code: string;
 	severity: 'warning' | 'error' | 'hint';
@@ -138,11 +163,7 @@ export interface CompileDiagnostic {
 	filename: string;
 	start: CompilePosition;
 	end: CompilePosition;
-	suggestions?: readonly {
-		start: CompilePosition;
-		end: CompilePosition;
-		attribute: string;
-	}[];
+	suggestions?: readonly (CompileSuggestion | CompileAttributeSuggestion)[];
 }
 
 export interface CompileSourceMap {
@@ -250,6 +271,18 @@ export function compile(
 	options: CompileOptions & { inspect: true },
 ): CompileResult & { inspect: CompileInspection };
 export function compile(source: string, filename: string, options?: CompileOptions): CompileResult;
+
+/**
+ * Every diagnostic a module produces, where `compile()` throws the first error.
+ * Strong violations are all reported, with their suggestions. `error` is any
+ * other compilation failure; code generation did not run, so diagnostics only
+ * it would raise are absent.
+ */
+export function collectDiagnostics(
+	source: string,
+	filename: string,
+	options?: CompileOptions,
+): { diagnostics: CompileDiagnostic[]; error: unknown };
 
 /** Produce typed virtual TSX and authored-source mappings for language tooling. */
 export function compileToVolarMappings(

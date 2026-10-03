@@ -142,11 +142,29 @@ describe('llms text', () => {
 				'useCallback',
 				'useMemo',
 				'useEffectEvent',
-				'/docs/build-tools#strong-mode',
+				'useLazyRef',
+				'useLayoutSnapshot',
+				'OCTANE_STRONG_MANUAL_MEMO',
+				'OCTANE_STRONG_RENDER_REF_READ',
+				'--strong-preview',
+				'--fix',
+				'/docs/strong-mode',
 			]) {
 				expect(strongGuide, marker).toContain(marker);
 			}
 		}
+
+		// The guide those summaries point at is served whole, every code included.
+		const strongMode = docBySlug('strong-mode')!;
+		expect(strongMode).toMatchObject({
+			source: 'website',
+			url: 'https://octanejs.dev/docs/strong-mode',
+		});
+		expect(strongMode.sections).toContainEqual(
+			expect.objectContaining({ id: 'diagnostic-reference' }),
+		);
+		expect(strongMode.markdown).toContain('<h4 id="octane-strong-render-ref-read">');
+		expect(LLMS_FULL_TXT).toContain(strongMode.markdown.trim());
 	});
 
 	it('publishes core browser requirements in both agent summaries', () => {

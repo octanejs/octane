@@ -4,7 +4,7 @@
 compiler rejects it:
 
 ```text
-src/App.tsrx:9:39: [OCTANE_STRONG_RENDER_IMPURE_CALL] Strong mode does not allow nondeterministic calls during render. Read time or randomness outside render and pass the result as a prop or state snapshot.
+src/App.tsrx:9:39: [OCTANE_STRONG_RENDER_IMPURE_CALL] Strong mode does not allow nondeterministic calls during render. Read time or randomness outside render and pass the result as a prop or state snapshot. See https://octanejs.dev/docs/strong-mode#octane-strong-render-impure-call
 ```
 
 Fix the component so it compiles in Strong mode and meets these requirements:

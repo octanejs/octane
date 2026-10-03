@@ -14,7 +14,8 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 
 // Verifies the Strong repair task family:
 // - each starter fails Strong compilation with the exact error its prompt quotes,
-//   and each reference compiles;
+//   and each reference compiles (without --check, a stale quote of the same
+//   diagnostic code is rewritten to the current message);
 // - each recorded workaround (`tasks/<id>/negatives/<name>/src/App.tsrx`), the
 //   rewrites agents reach for when a Strong error blocks them, fails its grader;
 // - each recorded alternative answer (`tasks/<id>/alternatives/<name>/src/App.tsrx`)
@@ -36,8 +37,11 @@ const { compile } = await import(
 	pathToFileURL(join(repositoryRoot, 'packages', 'octane', 'src', 'compiler', 'compile.js')).href
 );
 
+const check = process.argv.includes('--check');
 const tasks = catalog.tasks.filter((task) => task.familyId === STRONG_REPAIR_FAMILY);
 const problems = [];
+const refreshedPrompts = [];
+const diagnosticCode = (message) => /\[(OCTANE_[A-Z_]+)\]/.exec(message)?.[1];
 for (const task of tasks) {
 	const taskRoot = join(tasksRoot, task.taskId);
 	const strongError = (kind) => {
@@ -52,11 +56,25 @@ for (const task of tasks) {
 	};
 	const starterError = strongError('starter');
 	const referenceError = strongError('reference');
+	const promptPath = join(taskRoot, 'prompt.md');
+	const prompt = readFileSync(promptPath, 'utf8');
+	const quoted = /```text\n([^\n]*)\n```/.exec(prompt);
 	if (starterError === null) {
 		problems.push(`${task.taskId}: the starter compiles in Strong mode.`);
-	} else if (!readFileSync(join(taskRoot, 'prompt.md'), 'utf8').includes(starterError)) {
+	} else if (
+		!prompt.includes(starterError) &&
+		!check &&
+		quoted !== null &&
+		diagnosticCode(quoted[1]) === diagnosticCode(starterError)
+	) {
+		writeFileSync(
+			promptPath,
+			prompt.replace(quoted[0], () => `\`\`\`text\n${starterError}\n\`\`\``),
+		);
+		refreshedPrompts.push(task.taskId);
+	} else if (!prompt.includes(starterError)) {
 		problems.push(
-			`${task.taskId}: prompt.md does not quote the starter's current error:\n${starterError}`,
+			`${task.taskId}: prompt.md does not quote the starter's current error${check ? ' (pnpm --filter @octanejs/evals strong-repair:verify refreshes a quote of the same diagnostic)' : ''}:\n${starterError}`,
 		);
 	}
 	if (referenceError !== null)
@@ -159,7 +177,7 @@ const content = `${JSON.stringify(sorted, null, 2)}\n`;
 const gaps = Object.values(sorted).filter((status) => status === 'compiles-keeps-bug').length;
 const workarounds = Object.keys(sorted).length;
 const alternatives = graded.length - workarounds;
-if (process.argv.includes('--check')) {
+if (check) {
 	if (!existsSync(ledgerPath) || readFileSync(ledgerPath, 'utf8') !== content) {
 		console.error(
 			`${relative(repositoryRoot, ledgerPath)} is stale; run pnpm --filter @octanejs/evals strong-repair:verify`,
@@ -174,4 +192,9 @@ if (process.argv.includes('--check')) {
 	console.log(
 		`wrote ${relative(repositoryRoot, ledgerPath)}: ${workarounds} workarounds, ${gaps} compile and keep the bug (${alternatives} alternative answers pass)`,
 	);
+	if (refreshedPrompts.length > 0) {
+		console.log(
+			`refreshed the quoted error in ${refreshedPrompts.join(', ')}; run pnpm --filter @octanejs/evals corpus:generate`,
+		);
+	}
 }

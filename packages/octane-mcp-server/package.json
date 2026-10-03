@@ -29,7 +29,8 @@
   },
   "exports": {
     ".": "./src/index.js",
-    "./bridge": "./src/bridge.js"
+    "./bridge": "./src/bridge.js",
+    "./strong": "./src/strong.js"
   },
   "scripts": {
     "start": "node src/index.js",

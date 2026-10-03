@@ -240,11 +240,31 @@ export const REACT_API_MAP = {
 		note: 'Same reducer and lazy-init semantics; Octane additionally exposes a stable current-state getter at tuple index 2.',
 	},
 	useEffect: { status: 'same', note: 'Identical deps/cleanup semantics.' },
-	useLayoutEffect: { status: 'same', note: 'Identical: synchronous after DOM mutation.' },
+	useLayoutEffect: {
+		status: 'same',
+		note: 'Identical: synchronous after DOM mutation.',
+		strong:
+			'Strong mode rejects copying a DOM measurement into state from layout effect setup (OCTANE_STRONG_EFFECT_STATE_UPDATE). Render from useLayoutSnapshot(() => measure(), { initial }) instead.',
+	},
 	useInsertionEffect: { status: 'same', note: 'Supported.' },
-	useMemo: { status: 'same', note: 'Identical.' },
-	useCallback: { status: 'same', note: 'Identical.' },
-	useRef: { status: 'same', note: 'Identical.' },
+	useMemo: {
+		status: 'same',
+		note: 'Identical.',
+		strong:
+			'Strong mode rejects useMemo (OCTANE_STRONG_MANUAL_MEMO). Write the calculation as a plain const; Strong compilation caches it from its inferred inputs. octane analyze --strong-preview --fix applies the rewrite.',
+	},
+	useCallback: {
+		status: 'same',
+		note: 'Identical.',
+		strong:
+			'Strong mode rejects useCallback (OCTANE_STRONG_MANUAL_MEMO). Declare the callback as a plain const; Strong compilation caches it from its inferred inputs. octane analyze --strong-preview --fix applies the rewrite.',
+	},
+	useRef: {
+		status: 'same',
+		note: 'Identical.',
+		strong:
+			'Strong mode rejects reading or writing ref.current during render (OCTANE_STRONG_RENDER_REF_READ, OCTANE_STRONG_RENDER_REF_WRITE). Replace lazy initialization (if (ref.current === null) ref.current = create()) with useLazyRef(() => create()), and a latest-value ref with useEffectEvent.',
+	},
 	useContext: { status: 'same', note: 'Identical.' },
 	useId: { status: 'same', note: 'Identical, hydration-stable.' },
 	useImperativeHandle: {
@@ -678,6 +698,20 @@ function planFor(report) {
 	const unsupported = (report.apis ?? []).filter((row) => row.status === 'unsupported');
 	for (const row of unsupported) {
 		steps.push(`${row.name} (${row.count}x): ${row.note}`);
+	}
+	// Strong mode is opt-in, so its notes stay one conditional step rather than
+	// rewrites every bridge needs.
+	const strongNotes = (report.apis ?? [])
+		.filter((row) => row.strong)
+		.map((row) => `${row.name} (${row.count}x): ${row.strong}`);
+	if (strongNotes.length > 0) {
+		steps.push(
+			[
+				'If the ported modules compile in Strong mode ("use strong" or compiler.strong), rewrite the React idioms it rejects.',
+				...strongNotes,
+				'Look up any OCTANE_STRONG_* code with octane_strong_explain, and follow the migrate-to-strong skill.',
+			].join(' '),
+		);
 	}
 	steps.push(
 		'Re-author any JSX components shipped by the package in .tsrx: compiled React JSX output cannot run on Octane, and hooks called from non-compiled files need compiler slotting (see the bridge-react-package skill for the subSlot pattern).',

@@ -136,10 +136,19 @@ export function DocPage() @{
 				margin: 2.25rem 0 0.65rem;
 				scroll-margin-top: 5.5rem;
 			}
+			/* Authored reference entries, such as one Strong diagnostic per heading.
+			   Only anchored ones: demo cards style their own unanchored h4s. */
+			.prose :global(h4[id]) {
+				font-size: 1rem;
+				margin: 1.75rem 0 0.5rem;
+				overflow-wrap: anywhere;
+				scroll-margin-top: 5.5rem;
+			}
 			@media (max-width: 800px) {
 				/* Clear both the site header and the collapsed sticky docs menu. */
 				.prose :global(h2[id]),
-				.prose :global(h3[id]) {
+				.prose :global(h3[id]),
+				.prose :global(h4[id]) {
 					scroll-margin-top: 9rem;
 				}
 			}
