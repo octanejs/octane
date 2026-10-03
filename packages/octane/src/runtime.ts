@@ -12104,6 +12104,9 @@ function unmountBlockInner(block: Block, detachDom: boolean): void {
 			(block.startMarker !== null &&
 				block.endMarker !== null &&
 				domNode(block.startMarker).parentNode !== null));
+	// A portal's DOM lies outside every enclosing deletion's range: it retires its
+	// own before any cleanup below it runs (retireEventHostTree).
+	if (block.kind === 'portal' && removesOwnDom) retireHostRange(block.startMarker, block.endMarker);
 	// Depth-first cleanup of all scopes reachable from this block.
 	unmountScope(block, detachDom && !removesOwnDom);
 	if (owner?.current === block) NATIVE_READ_DRIVER?.clearDeferredRefs(owner);
@@ -31435,8 +31438,6 @@ function teardownPortalState(state: PortalSlot): void {
 		return;
 	}
 	if (state.block) {
-		// Its DOM lies outside every enclosing deletion's range: retire it here.
-		retireHostRange(state.start, state.end);
 		unmountBlock(state.block, true);
 		state.block = null;
 	}
@@ -46450,8 +46451,8 @@ function deferRootOwnedListClear(state: ForSlot, certified: boolean = false): bo
 		// drain over several focused documents (an array) retires none; an inert
 		// row's handler belongs to its live list owner.
 		let row: Node | null | undefined = (renderingFocus as FocusSelectionSnapshot | null)?.focused;
-		while (row != null && row.parentNode !== parent)
-			row = row.parentNode ?? (row as ShadowRoot).host;
+		while (row != null && domNode(row).parentNode !== parent)
+			row = domNode(row).parentNode ?? (row as ShadowRoot).host;
 		if (row != null) retireEventHostTree(row);
 		if (wholeParent) {
 			(STAGED_DOM?.view(parent) ?? parent).textContent = '';
@@ -46514,6 +46515,8 @@ function batchClearItems(
 		TEARDOWN_HANDLER = findTryHandler(first.parentBlock) ?? rendererRegionTryHandler(first);
 		TEARDOWN_BLOCK = first;
 	}
+	// As for parked rows: only captured focus (or no capture) can make a row dispatch.
+	const retire = renderingFocus !== null || !inFlush;
 	TEARDOWN_DEPTH++;
 	try {
 		// Dispose the items before their DOM leaves, like every other deletion:
@@ -46522,6 +46525,7 @@ function batchClearItems(
 		// monomorphic pointer chase. Callers reset head/tail only AFTER this returns,
 		// so the chain still covers exactly the old items here.
 		for (let b: Block | null = state.head; b !== null; b = b.nextSibling) {
+			if (retire) retireHostRange(b.startMarker, b.endMarker);
 			if (b.cleanups !== null || b.children !== null || b._slots !== null) {
 				unmountBlock(b, false);
 			} else {

@@ -95,6 +95,20 @@ export function PortalToggle({ observe, restore, show, target }: PortalProps) @{
 	</section>
 }
 
+// The same dialog through a portal compiled in a template; its events route
+// through the wrapper.
+function TemplatePortaledDialog({ observe, restore, target }: PortalProps) @{
+	<div>{createPortal(<Dialog observe={observe} restore={restore} />, target)}</div>
+}
+
+export function TemplatePortalToggle({ observe, restore, show, target }: PortalProps) @{
+	<section onBlur={() => observe('parent')}>
+		@if (show) {
+			<TemplatePortaledDialog observe={observe} restore={restore} target={target} />
+		}
+	</section>
+}
+
 // A value hole's input has a Block of its own, below the row. The restoring
 // component sits before it in the row.
 export function EditableRows({ observe, restore, rows, editing }: Props & {

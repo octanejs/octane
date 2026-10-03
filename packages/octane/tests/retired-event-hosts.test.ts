@@ -14,6 +14,7 @@ import {
 	PortalToggle,
 	SiblingToggle,
 	SignalForm,
+	TemplatePortalToggle,
 	Toggle,
 } from './_fixtures/retired-event-hosts.tsrx';
 
@@ -102,22 +103,27 @@ describe('deletion cleanup moves focus before its children unmount (#1472)', () 
 		r.unmount();
 	});
 
-	it("skips a portaled dialog's child handler when the dialog restores focus", () => {
-		const target = document.createElement('div');
-		document.body.append(target);
-		const seen: string[] = [];
-		const observe = (entry: string) => seen.push(entry);
-		const r = mount(PortalToggle, { observe, restore, show: true, target });
-		(target.querySelector('input') as HTMLInputElement).focus();
-		flushSync(() => r.root.render(PortalToggle, { observe, restore, show: false, target }));
-		expect(document.activeElement).toBe(restore);
-		expect(target.querySelector('form')).toBeNull();
-		// The portal's logical parent is the live section.
-		expect(seen).toEqual(['parent']);
-		expect(errors).toEqual([]);
-		r.unmount();
-		target.remove();
-	});
+	for (const [shape, Fixture] of [
+		['returned', PortalToggle],
+		['template', TemplatePortalToggle],
+	] as const) {
+		it(`skips a ${shape} portal's child handler when its dialog restores focus`, () => {
+			const target = document.createElement('div');
+			document.body.append(target);
+			const seen: string[] = [];
+			const observe = (entry: string) => seen.push(entry);
+			const r = mount(Fixture, { observe, restore, show: true, target });
+			(target.querySelector('input') as HTMLInputElement).focus();
+			flushSync(() => r.root.render(Fixture, { observe, restore, show: false, target }));
+			expect(document.activeElement).toBe(restore);
+			expect(target.querySelector('form')).toBeNull();
+			// The portal's logical parent is the live section.
+			expect(seen).toEqual(['parent']);
+			expect(errors).toEqual([]);
+			r.unmount();
+			target.remove();
+		});
+	}
 
 	it("keeps a live sibling's handler when a deletion cleanup moves focus off it", () => {
 		const seen: string[] = [];
