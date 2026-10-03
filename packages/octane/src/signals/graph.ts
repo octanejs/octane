@@ -60,6 +60,8 @@ export interface GraphOwner {
 	readonly readBarrier?: Promise<void> | undefined;
 	readonly observers: Set<SignalObserver>;
 	readonly seedable: boolean;
+	/** Holds a writable or asynchronous derived cell that new render inputs cannot re-select. */
+	unkeyedState?: boolean;
 	beginAdoption(seed: ScopeSeed): AdoptionFrame;
 	serializeRead(
 		node: ScopedNode,

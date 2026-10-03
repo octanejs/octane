@@ -199,7 +199,17 @@ installSignalOwnerRetirement((owner) => {
 	identityScopes.delete(identity);
 	scopeOwners.delete(scope);
 	scope.dispose();
-});
+}, supersedeOwner);
+
+/** A query$ re-selects from new render inputs; a writable or asynchronous derived cell cannot. */
+function supersedeOwner(owner: SignalOwner): boolean {
+	const identity = (owner as SignalRendererOwnerIdentity).instanceOwner;
+	if (retiredIdentities.has(identity)) return false;
+	const scope = identityScopes.get(identity) as ScopeImpl | undefined;
+	if (scope?.unkeyedState) return false;
+	scope?.supersede();
+	return true;
+}
 
 /** @internal A document may freeze read work without retiring data or accepted writes. */
 export function createSignalOwnerLifecycle(owner: SignalOwner) {
@@ -489,6 +499,9 @@ export function __signalAt<T>(
 				scope: site?.startsWith('g:') ? 'document' : 'instance',
 				nodeKey: key,
 			});
+			// The first declaration's initial value wins, so the cell cannot follow
+			// a superseding render's inputs the way a query$ selection does.
+			(owner as ScopeImpl).unkeyedState = true;
 			return createDeclaredSignalCell(
 				owner,
 				key,

@@ -5,6 +5,7 @@ let installedEnvironment: SignalOwnerEnvironment | undefined;
 let synchronousOwner: SignalOwner | null = null;
 let defaultOwner: (() => SignalOwner | null) | undefined;
 let retireOwner: ((owner: SignalOwner) => void) | undefined;
+let supersedeOwner: ((owner: SignalOwner) => boolean) | undefined;
 
 /** @internal Live capability guards; reading them never installs a default owner. */
 export {
@@ -89,10 +90,26 @@ export function retireSignalOwnerIdentity(owner: SignalOwner): void {
 	retireOwner?.(owner);
 }
 
-export function installSignalOwnerRetirement(retire: (owner: SignalOwner) => void): () => void {
+/**
+ * @internal Hand a suspended attempt's renderer owner to a restart with new
+ * inputs, or return false when its cells cannot follow them. A query$
+ * re-selects from the values its description captures, so its request
+ * survives them; a writable signal's initial value and an asynchronous
+ * derived$ result do not. Unset until the facade loads.
+ */
+export { supersedeOwner as supersedeSignalOwner };
+
+export function installSignalOwnerRetirement(
+	retire: (owner: SignalOwner) => void,
+	supersede?: (owner: SignalOwner) => boolean,
+): () => void {
 	const previous = retireOwner;
+	const previousSupersede = supersedeOwner;
 	retireOwner = retire;
+	supersedeOwner = supersede;
 	return () => {
-		if (retireOwner === retire) retireOwner = previous;
+		if (retireOwner !== retire) return;
+		retireOwner = previous;
+		supersedeOwner = previousSupersede;
 	};
 }
