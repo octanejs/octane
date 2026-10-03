@@ -101,6 +101,7 @@ import {
 	// static-markup emission of `ssrEmitElement`.
 	VOID_ELEMENTS,
 } from './constants.js';
+import { READ_ONLY_VALUE_INPUT_TYPES } from './dom-tables.js';
 import {
 	createIndependentHydrateManifest,
 	serializeIndependentHydrateManifest,
@@ -220,6 +221,8 @@ function isSignalHandle(value: unknown): value is SignalHandle<unknown> {
 }
 
 function readSignalBinding(handle: SignalHandle<unknown>): unknown {
+	if (SHELL_WITNESS !== null && process.env.NODE_ENV !== 'production')
+		witnessShellHost('signal', handle.kind);
 	// Server bindings must contribute their historical value to the hydration
 	// snapshot. Only client bindings bypass the component-wide read collector.
 	if (RESOLVED !== null && !SERVER_SIGNAL_OWNER_ACTIVE) {
@@ -283,6 +286,8 @@ function unwrapSsrSignalControlValue(value: unknown): unknown {
 /** @internal Preserve a writable control's identity until the final JSX winner is known. */
 export function ssrSignalControlValue(value: unknown, site: string): unknown {
 	if (!isWritableSignal(value)) return ssrSignalValue(value);
+	if (SHELL_WITNESS !== null && process.env.NODE_ENV !== 'production')
+		witnessShellHost('signal', value.kind);
 	if (RESOLVED !== null && !SERVER_SIGNAL_OWNER_ACTIVE) {
 		return withServerSignalBinding(() => serverSignalControlValue(value, site));
 	}
@@ -771,6 +776,12 @@ let SSR_NESTING_WARNINGS: Set<string> | null | undefined = null;
 // allocated from DEV-only branches, so optimized server bundles erase it.
 let DEV_SSR_ATTRIBUTE_WARNINGS: Set<string> | null = null;
 let DEV_SSR_CUSTOM_HOST_DEPTH = 0;
+// Islands-only shell witness (RenderOptions.shellWitness), installed per
+// canonical pass of a development render that asked for it. Null otherwise,
+// including every production and discovery pass, so each witness site costs
+// one null check on a branch that already drops or reads the construct. The
+// environment check after it lets a production bundle drop the site entirely.
+let SHELL_WITNESS: ShellWitnessSink | null = null;
 
 // Walk a frame to its dotted path ('' for the root). Memoized per frame.
 function framePath(f: Frame): string {
@@ -964,15 +975,136 @@ function withSsrElementContext(
 	}
 }
 
-/** Compiler ABI: validate and scope one native element during a DEV SSR render. */
+/**
+ * Compiler ABI: validate and scope one native element during a DEV SSR render.
+ * `clientWork` lists the element's authored props that need client code and
+ * that the server output erases: its event handlers, `ref`, and a `value` or
+ * `checked` the user could edit.
+ */
 export function ssrElement(
 	tag: string,
 	location: string | undefined,
 	render: () => string,
 	htmlIntegrationPoint?: boolean,
+	clientWork?: string,
 ): string {
 	if (process.env.NODE_ENV === 'production' || SSR_NESTING_WARNINGS === null) return render();
+	if (clientWork !== undefined && SHELL_WITNESS !== null) {
+		for (const name of clientWork.split(' ')) {
+			reportShellWitness(
+				name === 'ref' ? 'ref' : name === 'value' || name === 'checked' ? 'control' : 'event',
+				name,
+				tag.toLowerCase(),
+				location,
+			);
+		}
+	}
 	return withSsrElementContext(tag, location, render, undefined, htmlIntegrationPoint);
+}
+
+/**
+ * Client work a server render serialized outside every independent
+ * `<Hydrate>` island (see `RenderOptions.shellWitness`).
+ */
+export interface ShellWitness {
+	/**
+	 * A delegated event handler or function form action, a ref, an effect or
+	 * store-subscription hook, a controlled form value the user can edit, or a
+	 * live signal-handle binding.
+	 */
+	readonly kind: 'event' | 'ref' | 'effect' | 'control' | 'signal';
+	/** The prop (`onClick`, `ref`, `value`), hook (`useEffect`), or signal kind (`derived`). */
+	readonly name: string;
+	/** The host element that carries the prop or binding. */
+	readonly tag?: string;
+	/** `file:line:column` of that element, present in development compiler output. */
+	readonly location?: string;
+	/** The rendering component, or for a hook the function that called it. */
+	readonly component?: string;
+}
+
+interface ShellWitnessSink {
+	readonly report: (witness: ShellWitness) => void;
+	/** One report per construct and site for the whole render, across passes. */
+	readonly seen: Set<string>;
+	/** Depth of independent Hydrate subtrees: islands activate on their own. */
+	islands: number;
+}
+
+function componentName(component: ServerComponent | null): string | undefined {
+	if (component === null) return undefined;
+	const displayName = (component as { displayName?: unknown }).displayName;
+	return typeof displayName === 'string' ? displayName : component.name || undefined;
+}
+
+/** Report one construct unless an independent island owns it or it was already reported. */
+function reportShellWitness(
+	kind: ShellWitness['kind'],
+	name: string,
+	tag: string | undefined,
+	location: string | undefined,
+	caller?: string,
+): void {
+	const sink = SHELL_WITNESS!;
+	if (sink.islands !== 0) return;
+	const component = caller ?? componentName(CURRENT_COMP);
+	const key = kind + ' ' + name + ' ' + (tag ?? '') + ' ' + (location ?? component ?? '');
+	if (sink.seen.has(key)) return;
+	sink.seen.add(key);
+	const witness: { -readonly [K in keyof ShellWitness]: ShellWitness[K] } = { kind, name };
+	if (tag !== undefined) witness.tag = tag;
+	if (location !== undefined) witness.location = location;
+	if (component !== undefined) witness.component = component;
+	sink.report(witness);
+}
+
+/** A prop or binding on the host element being serialized. */
+function witnessShellHost(kind: ShellWitness['kind'], name: string, tag?: string): void {
+	const element = CURRENT_SSR_ELEMENT;
+	reportShellWitness(kind, name, tag ?? element?.tag, element?.location);
+}
+
+/**
+ * An effect or subscription hook. A route's page and layout run inside its
+ * root wrapper's frame, so the hook's caller names the function more exactly
+ * than the frame does. Only reached for a witness, never on a static shell.
+ */
+function witnessShellHook(name: string, hook: Function): void {
+	if (SHELL_WITNESS!.islands !== 0) return;
+	let caller: string | undefined;
+	const capture = (Error as { captureStackTrace?: (target: object, above: Function) => void })
+		.captureStackTrace;
+	if (capture !== undefined) {
+		const trace: { stack?: string } = {};
+		capture(trace, hook);
+		// Only the hook's own caller: an anonymous frame names nothing.
+		const frame = /^\s*at (?:async )?([^\s(]+) \(/.exec(trace.stack?.split('\n')[1] ?? '');
+		if (frame !== null) caller = frame[1].slice(frame[1].lastIndexOf('.') + 1) || undefined;
+	}
+	reportShellWitness('effect', name, undefined, undefined, caller);
+}
+
+function isEventPropName(name: string): boolean {
+	if (name.length < 3 || name.charCodeAt(0) !== 111 /* o */ || name.charCodeAt(1) !== 110 /* n */)
+		return false;
+	const c = name.charCodeAt(2);
+	return c >= 65 && c <= 90;
+}
+
+/**
+ * A controlled `value`/`checked` diverges without the renderer only where the
+ * user can change it: React's controlled-without-a-handler rule, with the
+ * native editability of readOnly (input and textarea) and disabled controls.
+ */
+function witnessShellControls(tag: string, prop: (name: string) => unknown): void {
+	if (tag !== 'input' && tag !== 'textarea' && tag !== 'select') return;
+	if (prop('disabled') || (tag !== 'select' && (prop('readOnly') || prop('readonly')))) return;
+	if (
+		prop('value') != null &&
+		!(tag === 'input' && READ_ONLY_VALUE_INPUT_TYPES.has(prop('type') as string))
+	)
+		witnessShellHost('control', 'value', tag);
+	if (tag === 'input' && prop('checked') != null) witnessShellHost('control', 'checked', tag);
 }
 
 /** Compiler ABI: validate one authored static or dynamic text child in DEV SSR. */
@@ -2462,6 +2594,9 @@ function ssrHostElement(
 				devValidateSsrHostProps(props, semanticTag, namespace);
 				devValidateSsrFormProps(semanticTag, props, children);
 			}
+			if (isCtlTag && SHELL_WITNESS !== null && process.env.NODE_ENV !== 'production') {
+				witnessShellControls(semanticTag, (name) => props[name]);
+			}
 			for (const k in props) {
 				const val = props[k];
 				// `dangerouslySetInnerHTML` is element CONTENT, not an attribute — capture
@@ -3354,6 +3489,8 @@ export function ssrAttr(
 			((tag === 'form' && name === 'action') ||
 				((tag === 'button' || tag === 'input') && name === 'formaction'))
 		) {
+			if (SHELL_WITNESS !== null && dev)
+				witnessShellHost('event', name === 'action' ? name : 'formAction', tag);
 			return '';
 		}
 		if (dev && !isCustomTag && tag !== undefined) {
@@ -3544,7 +3681,12 @@ function ssrAttrEntry(
 	namespace: AttributeNamespace = 'html',
 ): string {
 	namespace = resolveAttributeNamespace(namespace);
-	if (k === 'key' || k === 'ref' || k === 'children') return '';
+	if (k === 'key' || k === 'children') return '';
+	if (k === 'ref') {
+		if (SHELL_WITNESS !== null && process.env.NODE_ENV !== 'production' && v != null)
+			witnessShellHost('ref', k, tag);
+		return '';
+	}
 	if (
 		k === 'suppressHydrationWarning' ||
 		k === 'suppressContentEditableWarning' ||
@@ -3552,7 +3694,11 @@ function ssrAttrEntry(
 		k === '__octaneNativeChangeDiagnostic'
 	)
 		return '';
-	if (k.length > 2 && k[0] === 'o' && k[1] === 'n' && k[2] >= 'A' && k[2] <= 'Z') return '';
+	if (k.length > 2 && k[0] === 'o' && k[1] === 'n' && k[2] >= 'A' && k[2] <= 'Z') {
+		if (SHELL_WITNESS !== null && process.env.NODE_ENV !== 'production' && typeof v === 'function')
+			witnessShellHost('event', k, tag);
+		return '';
+	}
 	if (k === 'style') return ssrStyle(v);
 	if (k === 'className' || k === 'class') return ssrAttr('class', v, tag, namespace);
 	if (VALID_ATTR_NAME.test(k)) return ssrAttr(k, v, tag, namespace);
@@ -3691,6 +3837,15 @@ export function ssrAttrs(
 	// to this resolution and the original Map is no longer consulted by name.
 	const resolved = new Map<string, PropWriter>();
 	let needsWinningOrderSort = false;
+	// Spread writers reach the server only here; direct handler and ref props
+	// were erased by the compiler (see ssrElement).
+	if (SHELL_WITNESS !== null && dev && tag !== undefined) {
+		for (const { name, value } of props.values()) {
+			if (name === 'ref' ? value != null : isEventPropName(name) && typeof value === 'function')
+				witnessShellHost(name === 'ref' ? 'ref' : 'event', name, tag);
+		}
+		if (skipFormControls) witnessShellControls(tag, (name) => props.get(name)?.value);
+	}
 	for (const writer of props.values()) {
 		const { name: rawName, lastOrder } = writer;
 		if (
@@ -4093,6 +4248,11 @@ export function ssrFormAuthoringDiagnostics(
 		const props: Record<string, unknown> = Object.create(null);
 		for (const [name, value] of sources) props[name] = value;
 		devValidateSsrFormProps(tag, props);
+		if (
+			SHELL_WITNESS !== null &&
+			typeof (tag === 'form' ? props.action : (props.formAction ?? props.formaction)) === 'function'
+		)
+			witnessShellHost('event', tag === 'form' ? 'action' : 'formAction', tag);
 	}
 	return '';
 }
@@ -5559,6 +5719,10 @@ function ssrIndependentHydrateSidecar(props: InternalHydrateProps, instanceId: s
 }
 
 function withServerIndependentIdentity<T>(prefix: string, idSeed: number, render: () => T): T {
+	// An independent island activates on its own, so its client work is not an
+	// islands shell's (see RenderOptions.shellWitness).
+	const island = SHELL_WITNESS;
+	if (island !== null) island.islands++;
 	const previous = SIGNAL_INSTANCE_PREFIX;
 	const previousInstance = SIGNAL_COMPONENT_INSTANCE_KEY;
 	const previousControl = SIGNAL_CONTROL_SITE;
@@ -5582,6 +5746,7 @@ function withServerIndependentIdentity<T>(prefix: string, idSeed: number, render
 		// The island hydrates in its own deterministic namespace. The parent
 		// still reserves the IDs consumed here when it adopts the outer wrapper.
 		ID_COUNTER = previousIdCounter + ID_COUNTER - idSeed;
+		if (island !== null) island.islands--;
 	}
 }
 
@@ -7702,10 +7867,22 @@ export function __useReducerWithGetter<S, A, I = S>(
 	) as [S, (action: A) => void, () => S];
 }
 
-export function useEffect(): void {}
-export const useLayoutEffect = useEffect;
-export const useInsertionEffect = useEffect;
-export function useImperativeHandle(): void {}
+// Effects never run on the server. An islands shell never runs them on the
+// client either, so a development render can witness each one it reaches.
+export function useEffect(): void {
+	if (SHELL_WITNESS !== null && process.env.NODE_ENV !== 'production')
+		witnessShellHook('useEffect', useEffect);
+}
+export function useLayoutEffect(): void {
+	if (SHELL_WITNESS !== null && process.env.NODE_ENV !== 'production')
+		witnessShellHook('useLayoutEffect', useLayoutEffect);
+}
+// Insertion effects inject styles the server render already emitted.
+export function useInsertionEffect(): void {}
+export function useImperativeHandle(): void {
+	if (SHELL_WITNESS !== null && process.env.NODE_ENV !== 'production')
+		witnessShellHook('useImperativeHandle', useImperativeHandle);
+}
 
 let devMemoComputeDepth = 0;
 
@@ -7840,6 +8017,9 @@ export function useSyncExternalStore<T>(
 	serverSnapshotOrSlot: unknown = undefined,
 	_slot?: unknown,
 ): T {
+	// The client subscribes in a passive effect.
+	if (SHELL_WITNESS !== null && process.env.NODE_ENV !== 'production')
+		witnessShellHook('useSyncExternalStore', useSyncExternalStore);
 	// `getServerSnapshot` (if provided) precedes the trailing slot symbol.
 	const getServerSnapshot = arguments.length >= 4 ? (serverSnapshotOrSlot as () => T) : undefined;
 	return getServerSnapshot ? getServerSnapshot() : getSnapshot();
@@ -8330,6 +8510,14 @@ export interface RenderOptions {
 	};
 	/** Caller-controlled namespace for `useId`; use distinct prefixes for sibling roots. */
 	identifierPrefix?: string;
+	/**
+	 * Development renders only: called once per construct and site that needs
+	 * client code but renders outside every independent `<Hydrate>` island (see
+	 * `ShellWitness`). An islands-only route's shell never loads its modules in
+	 * the browser, so none of these would run. Production renders ignore it,
+	 * since production compiler output erases static handler and ref props.
+	 */
+	shellWitness?: (witness: ShellWitness) => void;
 	/** Called with any error thrown during the render (before it propagates). */
 	onError?: (error: unknown) => void;
 	/**
@@ -8556,6 +8744,8 @@ type ResolvedMap = Map<string, SuspenseOutcome> & {
 	nextAsyncIdentity: number;
 	/** Lazily allocated DEV SSR invalid-nesting warnings reported by this render. */
 	nestingWarnings?: Set<string>;
+	/** Islands-only shell witness state, allocated once a DEV render asks for it. */
+	shellWitness?: ShellWitnessSink;
 	pu: {
 		created: Map<string, ServerPuCreation>;
 		resolvedT: Map<PromiseLike<unknown>, SuspenseResult>;
@@ -8775,6 +8965,7 @@ interface Ambient {
 	asyncScope: string;
 	ssrElement: SsrElementContext | null;
 	nestingWarnings: Set<string> | null | undefined;
+	shellWitness: ShellWitnessSink | null;
 	vtTrySeq: number;
 	vtHasCandidates: boolean;
 	vtHasRawHtml: boolean;
@@ -8814,6 +9005,7 @@ function saveAmbient(): Ambient {
 		asyncScope: ASYNC_SCOPE,
 		ssrElement: CURRENT_SSR_ELEMENT,
 		nestingWarnings: SSR_NESTING_WARNINGS,
+		shellWitness: SHELL_WITNESS,
 		vtTrySeq: VT_SSR_TRY_SEQ,
 		vtHasCandidates: VT_SSR_HAS_CANDIDATES,
 		vtHasRawHtml: VT_SSR_HAS_RAW_HTML,
@@ -8873,6 +9065,7 @@ function restoreAmbient(a: Ambient): void {
 	ASYNC_SCOPE = a.asyncScope;
 	CURRENT_SSR_ELEMENT = a.ssrElement;
 	SSR_NESTING_WARNINGS = a.nestingWarnings;
+	SHELL_WITNESS = a.shellWitness;
 	VT_SSR_TRY_SEQ = a.vtTrySeq;
 	VT_SSR_HAS_CANDIDATES = a.vtHasCandidates;
 	VT_SSR_HAS_RAW_HTML = a.vtHasRawHtml;
@@ -8943,6 +9136,12 @@ function runFullFramedPass(
 	RESOLVED = resolved;
 	CURRENT_SSR_ELEMENT = null;
 	SSR_NESTING_WARNINGS = resolved.nestingWarnings;
+	// A render that did not ask pays one property read; production never asks.
+	const shellWitness = resolved.resourceOptions?.shellWitness;
+	SHELL_WITNESS =
+		shellWitness === undefined || process.env.NODE_ENV === 'production'
+			? null
+			: (resolved.shellWitness ??= { report: shellWitness, seen: new Set(), islands: 0 });
 	const root = ssrScope(null);
 	CURRENT_SCOPE = root;
 	// A root frame so use() keys resolve; the root component is the fallback
@@ -9098,6 +9297,7 @@ function runDiscoveryRound(
 	RESOLVED = resolved;
 	CURRENT_SSR_ELEMENT = null;
 	SSR_NESTING_WARNINGS = null;
+	SHELL_WITNESS = null;
 	FRAME = null;
 	CURRENT_COMP = null;
 	CURRENT_PROPS = null;

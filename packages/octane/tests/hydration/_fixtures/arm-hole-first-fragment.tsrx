@@ -126,3 +126,92 @@ export function SuspenseHoleFirst(props: { on: boolean }) @{
 		}
 	</section>
 }
+
+function Pair() @{
+	<>
+		<s>{'s'}</s>
+		<b>{'a'}</b>
+	</>
+}
+
+// The client else-arm's hole holds an @if or @switch, and the server rendered
+// the then-arm's plain hosts: the hole's walk finds the server's <s> where the
+// slot's own range would be, and the arm's static <b> matches the server's <b>.
+export function NestedIfHoleFirst(props: { server?: boolean; inner?: boolean }) @{
+	<section>
+		@if (props.server) {
+			<>
+				<s>{'s'}</s>
+				<b>{'a'}</b>
+			</>
+		} @else {
+			<>
+				@if (props.inner) {
+					<>
+						<s>{'s'}</s>
+						<b>{'a'}</b>
+					</>
+				}
+				<b>{'a'}</b>
+			</>
+		}
+		<em>{'e'}</em>
+	</section>
+}
+
+export function NestedIfHoleMid(props: { server?: boolean; inner?: boolean }) @{
+	<section>
+		@if (props.server) {
+			<>
+				<i>{'i'}</i>
+				<s>{'s'}</s>
+				<b>{'a'}</b>
+			</>
+		} @else {
+			<>
+				<i>{'i'}</i>
+				@if (props.inner) {
+					<>
+						<s>{'s'}</s>
+						<b>{'a'}</b>
+					</>
+				}
+				<b>{'a'}</b>
+			</>
+		}
+		<em>{'e'}</em>
+	</section>
+}
+
+export function NestedSwitchHoleFirst(props: { server?: boolean; inner?: string }) @{
+	<section>
+		@if (props.server) {
+			<>
+				<s>{'s'}</s>
+				<b>{'a'}</b>
+			</>
+		} @else {
+			<>
+				@switch (props.inner) {
+					@case 'pair': {
+						<>
+							<s>{'s'}</s>
+							<b>{'a'}</b>
+						</>
+					}
+					@case 's': {
+						<s>{'s'}</s>
+					}
+					@case 'p': {
+						<p>{'p'}</p>
+					}
+					@case 'component': {
+						<Pair />
+					}
+				}
+				<b>{'a'}</b>
+			</>
+		}
+		<em>{'e'}</em>
+	</section>
+}

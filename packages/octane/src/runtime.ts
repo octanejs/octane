@@ -19838,6 +19838,39 @@ class HydrationCapability {
 		return cursor !== null && isBlockOpen(cursor) ? (cursor as Comment) : null;
 	}
 
+	/**
+	 * The open marker of the server range that an `@if`/`@switch` slot adopts
+	 * on its first render at `anchor`, as resolveOpen finds it. The server frames
+	 * every such slot, so an element or text there, other than the end marker
+	 * of `scope`'s block, is where its template hole's walk found another arm's
+	 * markup, as an enclosing `@if` renders it when the server took another arm.
+	 * The walk counts one server node for the hole and gives the nodes after it
+	 * to the template's later roots, so that node is all the slot may claim.
+	 * Frame it in the slot's and an arm's range, as the server would have: the
+	 * branch then adopts it, rebuilds over it or discards it, and claims nothing
+	 * after it, as for any server range.
+	 */
+	branchOpen(anchor: Node | null, domParent: Node, scope: Scope): Comment | null {
+		if (
+			anchor === null ||
+			anchor.nodeType === 8 ||
+			anchor === scope.block.endMarker ||
+			domNode(anchor).parentNode !== domParent ||
+			this.freshNodes.has(anchor)
+		)
+			return this.resolveOpen(anchor, domParent);
+		const doc = STAGED_DOM?.view(document) ?? document;
+		const parent = domNode(domParent);
+		const next = getNextSibling(anchor);
+		const open = doc.createComment(HYDRATION_START);
+		this.save(domParent);
+		parent.insertBefore(open, anchor);
+		parent.insertBefore(doc.createComment(HYDRATION_START), anchor);
+		parent.insertBefore(doc.createComment(HYDRATION_END), next);
+		parent.insertBefore(doc.createComment(HYDRATION_END), next);
+		return open;
+	}
+
 	markerState(node: Node): -1 | 0 | 1 {
 		return ssrForMarkerState(node);
 	}
@@ -21373,36 +21406,70 @@ class HydrationCapability {
 					(STAGED_DOM?.view(first as Text) ?? (first as Text)).nodeValue = text;
 				}
 			}
-			if (getNextSibling(first) !== null) {
-				this.save(el);
-				noteRecoverableHydrationError(() => new Error(formatClientError(62)), this.rootBlock);
-				if (process.env.NODE_ENV !== 'production') {
-					warnHydrationStructuralMismatch(
-						loc || (el as any).__oct_loc,
-						'the end of the text element',
-						describeHydrationNode(getNextSibling(first)),
-					);
-				}
-				while (getNextSibling(first) !== null)
-					(STAGED_DOM?.view(el) ?? el).removeChild(getNextSibling(first)!);
-			}
+			const next = getNextSibling(first);
+			if (next !== null) this.discardUnclaimedText(el, next, null, loc);
 			return first as Text;
 		}
 		// A sole primitive can be framed by the server (e.g. a spread or ternary
-		// child). Unwrap only an exact text-only frame, then use the same adoption,
-		// mismatch and suppression behavior as bare text, without child-slot state.
+		// child). Unwrap only an exact text-only or empty frame, then use the same
+		// adoption, mismatch and suppression behavior as bare text, without
+		// child-slot state.
 		if (this.isOpen(first)) {
 			const child = getNextSibling(first);
-			const end = (STAGED_DOM?.view(child) ?? child)?.nextSibling ?? null;
-			if (child?.nodeType === 3 && this.isClose(end) && getNextSibling(end) === null) {
+			const end = child?.nodeType === 3 ? getNextSibling(child) : child;
+			if (this.isClose(end) && getNextSibling(end) === null) {
 				(STAGED_DOM?.view(first) ?? first).remove();
 				(STAGED_DOM?.view(end) ?? end).remove();
 				return this.htext(el, text, loc);
 			}
 		}
+		// Anything else the server rendered here is content the text cannot adopt.
+		if (first !== null) this.discardUnclaimedText(el, first, text, loc);
 		const created = (STAGED_DOM?.view(document) ?? document).createTextNode(text);
 		(STAGED_DOM?.view(el) ?? el).appendChild(created);
 		return created;
+	}
+
+	/**
+	 * Remove the server content in `el`, an only-child text host, from `from` to
+	 * its end. The hole adopts at most one leading Text node there, so anything
+	 * else is server content the client renders nothing for, and later updates
+	 * would land beside it. Reports the recovery where the client expected
+	 * `text` (nothing when it is '', or, when null, the end of the Text node it
+	 * adopted). suppressHydrationWarning silences the report but still discards:
+	 * the server content is not a text value to keep.
+	 */
+	private discardUnclaimedText(
+		el: Node,
+		from: ChildNode,
+		text: string | null,
+		loc: string | undefined,
+	): void {
+		if (PRESENTATION_HYDRATION?.revision !== undefined) presentationMiss();
+		this.save(el);
+		// Captures that changed before a dormant boundary activated legitimately
+		// differ from the server's; still recover, but there is nothing to report.
+		if (!this.staleServerValues && !isHydrationSuppressed(el)) {
+			noteRecoverableHydrationError(() => new Error(formatClientError(62)), this.rootBlock);
+			if (process.env.NODE_ENV !== 'production') {
+				// Name a server range by the content it frames.
+				const inner = this.isOpen(from) ? getNextSibling(from) : null;
+				warnHydrationStructuralMismatch(
+					loc || (el as any).__oct_loc,
+					text === null
+						? 'the end of the text element'
+						: text === ''
+							? 'nothing'
+							: `text ${JSON.stringify(text)}`,
+					describeHydrationNode(inner ?? from),
+				);
+			}
+		}
+		for (let node: ChildNode | null = from; node !== null;) {
+			const next = getNextSibling(node);
+			(STAGED_DOM?.view(el) ?? el).removeChild(node);
+			node = next;
+		}
 	}
 
 	/**
@@ -21493,28 +21560,12 @@ class HydrationCapability {
 		const first = getFirstChild(el);
 		if (first === null || (el as Element).localName === 'textarea') return;
 		const next = getNextSibling(first);
-		const framed = this.isOpen(first);
-		if (framed && this.isClose(next) && getNextSibling(next) === null) {
+		if (this.isOpen(first) && this.isClose(next) && getNextSibling(next) === null) {
 			(STAGED_DOM?.view(first) ?? first).remove();
 			(STAGED_DOM?.view(next) ?? next).remove();
 			return;
 		}
-		if (PRESENTATION_HYDRATION?.revision !== undefined) presentationMiss();
-		this.save(el);
-		// Captures that changed before a dormant boundary activated legitimately
-		// differ from the server's; still recover, but there is nothing to report.
-		if (!this.staleServerValues) {
-			noteRecoverableHydrationError(() => new Error(formatClientError(62)), this.rootBlock);
-			if (process.env.NODE_ENV !== 'production') {
-				warnHydrationStructuralMismatch(
-					loc || (el as any).__oct_loc,
-					'nothing',
-					describeHydrationNode(framed && next !== null ? next : first),
-				);
-			}
-		}
-		for (let n = getFirstChild(el); n !== null; n = getFirstChild(el))
-			(STAGED_DOM?.view(el) ?? el).removeChild(n);
+		this.discardUnclaimedText(el, first, '', loc);
 	}
 
 	htextSwap(posNode: Node | null, text: string): Text {
@@ -43719,7 +43770,10 @@ export function ifBlock(
 		// SOLE-hole case — a @if that is the only thing an enclosing arm/component
 		// renders (e.g. `@try { @if (…) {…} }`, the router Match shape) — where the
 		// anchor is the arm's END marker and the cursor is parked on the @if's open.
-		const open = passthrough ? null : (hydration?.resolveOpen(anchor ?? null, domParent) ?? null);
+		// branchOpen frames another arm's node that the template walk found here.
+		const open = passthrough
+			? null
+			: (hydration?.branchOpen(anchor ?? null, domParent, parentScope) ?? null);
 		if (open !== null) {
 			start = open;
 			end = hydration!.close(open);
@@ -44668,7 +44722,9 @@ export function switchBlock(
 		// Mirror ifBlock's sole-control-flow adoption: when @switch is the only
 		// output of an enclosing component/arm, its compiler anchor is that owner's
 		// END marker while the hydration cursor sits on the switch range's open.
-		const open = passthrough ? null : (hydration?.resolveOpen(anchor ?? null, domParent) ?? null);
+		const open = passthrough
+			? null
+			: (hydration?.branchOpen(anchor ?? null, domParent, parentScope) ?? null);
 		if (open !== null) {
 			start = open;
 			end = hydration!.close(open);

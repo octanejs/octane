@@ -160,6 +160,7 @@ import {
 // dom-tables.js header for per-table semantics.
 import {
 	VOID_ELEMENTS,
+	READ_ONLY_VALUE_INPUT_TYPES,
 	BOOLEAN_ATTR_PROPS,
 	MUST_USE_PROPERTY_PROPS,
 	POSITIVE_NUMERIC_ATTR_PROPS,
@@ -2535,6 +2536,66 @@ function normalizeJsxAttrName(raw, tag, namespace = 'html') {
 // bindings on the client.
 function isEventAttrName(name) {
 	return name.length > 2 && name.startsWith('on') && /^[A-Z]/.test(name[2]);
+}
+
+/**
+ * DEV SSR: the authored props of one host element that need client code and
+ * that server output erases: event handlers, `ref`, and a `value`/`checked`
+ * the user can edit (React's controlled-without-a-handler rule, with native
+ * readOnly/disabled editability). The server runtime reports them when an
+ * islands-only shell renders the element outside its independent islands.
+ * Only literals are known here: a non-literal handler, ref, or value counts,
+ * while a non-literal readOnly or disabled may lock the field, so it does not.
+ * Returns the names space-separated, or null for the common inert element.
+ */
+function ssrShellClientWork(tag, attrs) {
+	const values = new Map();
+	for (const attr of attrs) {
+		if (attr.type === 'Attribute' || attr.type === 'JSXAttribute') {
+			values.set(jsxAttrRawName(attr), attr.value);
+		}
+	}
+	// `{ value }` for a bare or literal attribute, null when only runtime knows.
+	// Type-only wrappers (`as`, `!`, `satisfies`, parentheses) keep a literal known.
+	const known = (value) => {
+		if (value == null) return { value: true };
+		const expression = unwrapTsExpr(
+			value.type === 'JSXExpressionContainer' ? value.expression : value,
+		);
+		if (expression.type === 'Literal') return { value: expression.value };
+		if (expression.type === 'Identifier' && expression.name === 'undefined') {
+			return { value: undefined };
+		}
+		return null;
+	};
+	const present = (name) => {
+		if (!values.has(name)) return false;
+		const value = known(values.get(name));
+		return value === null || value.value != null;
+	};
+	const work = [];
+	for (const [name, value] of values) {
+		if (name !== 'ref' && !isEventAttrName(name)) continue;
+		// A literal is never a handler or ref: null/undefined clear it, and a
+		// string `on*` attribute is dropped (with a DEV warning) on both sides.
+		if (value != null && known(value) === null) work.push(name);
+	}
+	const enabled = (name) => {
+		const value = values.has(name) ? known(values.get(name)) : { value: false };
+		return value === null || !!value.value;
+	};
+	if (
+		(tag === 'input' || tag === 'textarea' || tag === 'select') &&
+		!enabled('disabled') &&
+		(tag === 'select' || (!enabled('readOnly') && !enabled('readonly')))
+	) {
+		const type = tag === 'input' && values.has('type') ? known(values.get('type')) : null;
+		if (present('value') && !(type !== null && READ_ONLY_VALUE_INPUT_TYPES.has(type.value))) {
+			work.push('value');
+		}
+		if (tag === 'input' && present('checked')) work.push('checked');
+	}
+	return work.length === 0 ? null : work.join(' ');
 }
 
 // All keys + values are string/number/bool literals → safe to serialize at
@@ -14014,7 +14075,10 @@ function ssrEmitElement(node, ctx, name, inlinedSubs, parentNs, cssHash, compone
 			: ssrVoid(node);
 		ctx.runtimeNeeded.add('ssrElement');
 		const args = [b.literal(tag, JSON.stringify(tag)), source, ssrThunk(body, node)];
+		const clientWork = ssrShellClientWork(tag, attrs);
 		if (htmlIntegrationPoint) args.push(b.literal(true, 'true'));
+		else if (clientWork !== null) args.push(ssrVoid(node));
+		if (clientWork !== null) args.push(b.literal(clientWork, JSON.stringify(clientWork)));
 		return ssrCall('ssrElement', args, node);
 	};
 
