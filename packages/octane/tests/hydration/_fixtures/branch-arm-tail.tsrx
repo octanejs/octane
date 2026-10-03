@@ -1,4 +1,4 @@
-import { Hydrate, type ComponentBody } from 'octane';
+import { Activity, ErrorBoundary, Hydrate, use, type ComponentBody } from 'octane';
 import type { HydrationStrategy } from 'octane/hydration';
 
 function Leaf(props: { v: string }) @{
@@ -111,6 +111,175 @@ export function CaughtLast(props: { on: boolean; boom: boolean }) @{
 					<p>{'caught' as string}</p>
 				}
 				<Leaf v="z" />
+			</>
+		}
+	</div>
+}
+
+const ITEMS = ['a', 'b'];
+
+// Each arm below ends with one slot, where the server's arm goes on to render
+// an element or text after it.
+export function ListThenHost(props: { on: boolean }) @{
+	<div id="r">
+		@if (props.on) {
+			<>
+				<Leaf v="x" />
+				@for (const item of ITEMS; key item) {
+					<li>{item as string}</li>
+				}
+			</>
+		} @else {
+			<>
+				<Leaf v="x" />
+				@for (const item of ITEMS; key item) {
+					<li>{item as string}</li>
+				}
+				<b>{'tail' as string}</b>
+			</>
+		}
+	</div>
+}
+
+export function ListThenText(props: { on: boolean }) @{
+	<div id="r">
+		@if (props.on) {
+			<>
+				<Leaf v="x" />
+				@for (const item of ITEMS; key item) {
+					<li>{item as string}</li>
+				}
+			</>
+		} @else {
+			<>
+				<Leaf v="x" />
+				@for (const item of ITEMS; key item) {
+					<li>{item as string}</li>
+				}
+				{'tail' as string}
+			</>
+		}
+	</div>
+}
+
+export function TryThenHost(props: { on: boolean; boom: boolean }) @{
+	<div id="r">
+		@if (props.on) {
+			<>
+				<Leaf v="x" />
+				@try {
+					<Boom boom={props.boom} />
+				} @catch (e) {
+					<p>{'caught' as string}</p>
+				}
+			</>
+		} @else {
+			<>
+				<Leaf v="x" />
+				@try {
+					<Boom boom={props.boom} />
+				} @catch (e) {
+					<p>{'caught' as string}</p>
+				}
+				<b>{'tail' as string}</b>
+			</>
+		}
+	</div>
+}
+
+export function TryThenText(props: { on: boolean; boom: boolean }) @{
+	<div id="r">
+		@if (props.on) {
+			<>
+				<Leaf v="x" />
+				@try {
+					<Boom boom={props.boom} />
+				} @catch (e) {
+					<p>{'caught' as string}</p>
+				}
+			</>
+		} @else {
+			<>
+				<Leaf v="x" />
+				@try {
+					<Boom boom={props.boom} />
+				} @catch (e) {
+					<p>{'caught' as string}</p>
+				}
+				{'tail' as string}
+			</>
+		}
+	</div>
+}
+
+export function BoundaryThenHost(props: { on: boolean; boom: boolean }) @{
+	<div id="r">
+		@if (props.on) {
+			<>
+				<Leaf v="x" />
+				<ErrorBoundary fallback={<p>{'caught'}</p>}>
+					<Boom boom={props.boom} />
+				</ErrorBoundary>
+			</>
+		} @else {
+			<>
+				<Leaf v="x" />
+				<ErrorBoundary fallback={<p>{'caught'}</p>}>
+					<Boom boom={props.boom} />
+				</ErrorBoundary>
+				<b>{'tail' as string}</b>
+			</>
+		}
+	</div>
+}
+
+export function ActivityThenHost(props: { on: boolean }) @{
+	<div id="r">
+		@if (props.on) {
+			<>
+				<Leaf v="x" />
+				<Activity mode="visible">
+					<u>{'a' as string}</u>
+				</Activity>
+			</>
+		} @else {
+			<>
+				<Leaf v="x" />
+				<Activity mode="visible">
+					<u>{'a' as string}</u>
+				</Activity>
+				<b>{'tail' as string}</b>
+			</>
+		}
+	</div>
+}
+
+function Wait(props: { value: Promise<string> }) @{
+	<u>{use(props.value) as string}</u>
+}
+
+// The server rendered the boundary's resolved body, which the client keeps on
+// screen while its own read of the value is still pending.
+export function PendingThenHost(props: { on: boolean; value: Promise<string> }) @{
+	<div id="r">
+		@if (props.on) {
+			<>
+				<Leaf v="x" />
+				@try {
+					<Wait value={props.value} />
+				} @pending {
+					<p>{'loading' as string}</p>
+				}
+			</>
+		} @else {
+			<>
+				<Leaf v="x" />
+				@try {
+					<Wait value={props.value} />
+				} @pending {
+					<p>{'loading' as string}</p>
+				}
+				<b>{'tail' as string}</b>
 			</>
 		}
 	</div>

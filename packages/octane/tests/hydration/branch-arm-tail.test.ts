@@ -155,6 +155,86 @@ describe.each([
 		expect(warnings()).toEqual(dev ? [tailReport('CaughtLast', '@if')] : []);
 	});
 
+	// Every slot leaves the cursor past the server content it claimed, so the
+	// arm knows where its last slot ends, whatever kind of slot that is.
+	it.each([
+		{
+			name: 'ListThenHost',
+			props: {},
+			html: '<em>x</em><li>a</li><li>b</li>',
+			tail: '<b>tail</b>',
+		},
+		{ name: 'ListThenText', props: {}, html: '<em>x</em><li>a</li><li>b</li>', tail: 'tail' },
+		{
+			name: 'TryThenHost',
+			props: { boom: false },
+			html: '<em>x</em><u>ok</u>',
+			tail: '<b>tail</b>',
+		},
+		{ name: 'TryThenText', props: { boom: false }, html: '<em>x</em><u>ok</u>', tail: 'tail' },
+		{
+			name: 'BoundaryThenHost',
+			props: { boom: false },
+			html: '<em>x</em><u>ok</u>',
+			tail: '<b>tail</b>',
+		},
+		{ name: 'ActivityThenHost', props: {}, html: '<em>x</em><u>a</u>', tail: '<b>tail</b>' },
+	])(
+		'discards the server content after the last slot of a $name arm and reports it once',
+		async ({ name, props, html, tail }) => {
+			const s = await hydrate(name, { ...props, on: false }, { ...props, on: true });
+
+			expect(markup(s.host)).toBe(html);
+			expect([...s.host.querySelectorAll('*')]).toEqual(
+				s.nodes.filter((node) => node.textContent !== 'tail'),
+			);
+			expect(s.recoverable).toEqual([expect.stringMatching(STRUCTURAL)]);
+			expect(warnings()).toEqual(
+				dev ? [tailReport(name, '@if', tail === 'tail' ? 'text "tail"' : '<b>')] : [],
+			);
+
+			s.render({ ...props, on: false });
+			expect(markup(s.host)).toBe(html + tail);
+			s.render({ ...props, on: true });
+			expect(markup(s.host)).toBe(html);
+		},
+	);
+
+	it.each([
+		{ name: 'TryThenHost', tail: '<b>' },
+		{ name: 'TryThenText', tail: 'text "tail"' },
+		{ name: 'BoundaryThenHost', tail: '<b>' },
+	])(
+		'discards the server content after a $name boundary that caught a client error',
+		async ({ name, tail }) => {
+			const s = await hydrate(name, { on: false, boom: false }, { on: true, boom: true });
+
+			expect(markup(s.host)).toBe('<em>x</em><p>caught</p>');
+			expect(s.host.querySelector('em')).toBe(s.ems[0]);
+			expect(s.recoverable).toEqual([expect.stringMatching(STRUCTURAL)]);
+			expect(warnings()).toEqual(dev ? [tailReport(name, '@if', tail)] : []);
+		},
+	);
+
+	it('discards the server content after a boundary that waits on the server arm', async () => {
+		const ready = Object.assign(Promise.resolve('v'), { status: 'fulfilled', value: 'v' });
+		let resolve!: (value: string) => void;
+		const value = new Promise<string>((accept) => (resolve = accept));
+		const s = await hydrate('PendingThenHost', { on: false, value: ready }, { on: true, value });
+
+		// The boundary keeps the server's arm on screen while its body loads.
+		expect(markup(s.host)).toBe('<em>x</em><u>v</u>');
+		const [em, u] = s.nodes.filter((node) => node.matches('em, u'));
+		expect([...s.host.querySelectorAll('em, u')]).toEqual([em, u]);
+		expect(s.recoverable).toEqual([expect.stringMatching(STRUCTURAL)]);
+		expect(warnings()).toEqual(dev ? [tailReport('PendingThenHost', '@if', '<b>')] : []);
+
+		await act(async () => resolve('v'));
+		expect(markup(s.host)).toBe('<em>x</em><u>v</u>');
+		expect(s.host.querySelector('em')).toBe(em);
+		expect(s.recoverable).toHaveLength(1);
+	});
+
 	// The cursor rests on the elements and text that a template adopts, so the
 	// arm records where its own template's roots end.
 	it.each([
@@ -278,6 +358,14 @@ describe.each([
 		{ name: 'IfInheritedHost', props: { on: true }, html: '<em>x</em>' },
 		{ name: 'IfLaterHost', props: { on: true }, html: '<em>x</em><em>y</em>' },
 		{ name: 'HoleWithoutRange', props: { on: true }, html: '<em>x</em><b>b</b>' },
+		{ name: 'ListThenText', props: { on: false }, html: '<em>x</em><li>a</li><li>b</li>tail' },
+		{
+			name: 'TryThenHost',
+			props: { on: false, boom: false },
+			html: '<em>x</em><u>ok</u><b>tail</b>',
+		},
+		{ name: 'BoundaryThenHost', props: { on: true, boom: false }, html: '<em>x</em><u>ok</u>' },
+		{ name: 'ActivityThenHost', props: { on: false }, html: '<em>x</em><u>a</u><b>tail</b>' },
 		{
 			name: 'NestedArms',
 			props: { on: true, inner: true },
