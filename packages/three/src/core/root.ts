@@ -469,6 +469,9 @@ function ensureHostRoot(internals: ThreeRootInternals<any>): void {
 	let hostRoot: UniversalRoot | null = null;
 	const environment: ThreeHostEnvironment = {
 		store: internals.store,
+		// An application root commits for its whole lifetime; keeping every accepted
+		// batch would retain each replaced props object and listener table forever.
+		recordCommits: false,
 		invalidate: () => internals.store.getState().invalidate(),
 		eventScope(priority, run) {
 			const root = hostRoot;

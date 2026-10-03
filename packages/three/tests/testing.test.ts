@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import * as THREE from 'three';
 import { defineUniversalComponent } from 'octane/universal';
 import { create } from '@octanejs/three/testing';
+import { getThreeInstance } from '../src/core/driver.js';
 import { TestingScene } from './_fixtures/testing.three.tsrx';
 
 afterEach(() => {
@@ -75,6 +76,34 @@ describe('@octanejs/three deterministic testing helper', () => {
 
 		expect(testRoot.scene.children).toEqual([]);
 		expect(testRoot.renderer.disposed).toBe(true);
+	});
+
+	it('keeps no accepted host batch history on a configured root', async () => {
+		const testRoot = await create(TestingScene, {
+			name: 'render-0',
+			position: [0, 0, 0],
+			onFrame() {},
+		});
+
+		try {
+			const group = testRoot.scene.children[0] as THREE.Group;
+			const container = getThreeInstance(group)?.root;
+			expect(container?.scene).toBe(testRoot.scene);
+			for (let index = 1; index <= 5; index++) {
+				testRoot.update(TestingScene, {
+					name: `render-${index}`,
+					position: [index, 0, 0],
+					onFrame() {},
+				});
+			}
+			expect(group.name).toBe('render-5');
+			expect(group.position.x).toBe(5);
+			// Every accepted batch carries the replaced props and listener values; an
+			// application root would otherwise retain each one for its lifetime.
+			expect(container?.commits).toEqual([]);
+		} finally {
+			testRoot.unmount();
+		}
 	});
 
 	it('uses a plain canvas-like target when no DOM is available', async () => {

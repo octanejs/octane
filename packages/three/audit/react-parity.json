@@ -137,7 +137,7 @@
         {
           "path": "packages/three/tests/hooks.test.ts",
           "role": "test",
-          "sha256": "4a8b86de71e2efb52e380be2ef481f6ae16f0d1aebd0ce654961b5871d7cb967",
+          "sha256": "aae7a0d04cdf0edafaf3fa214c50b06742caf050107a17788639fc1348f843a8",
           "cases": [
             {
               "id": "adapted:three-build-graph",
