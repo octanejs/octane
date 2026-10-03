@@ -463,13 +463,18 @@ change; see [browser sample preparation](../README.md#browser-sample-preparation
 
 - **Inner-loop timing.** The tiny ops (rotate / displace_k / remove\*) are far
   below `performance.now()` resolution for a single click, so each timed
-  sample loops N clicks and divides: N=20 for displace/rotate/remove, N=4 for
-  reverse/shuffle (reverse is self-inverse; shuffle reseeds per click, so
-  repeated clicks are valid work), N=1 for the 100-row inserts. Caveat:
-  `removeevery10` decays 1000 → ~122 rows across its 20 clicks, so its number
-  is the mean over that decaying sequence — comparable across targets, not to
-  a single 1000-row click. Every sample starts from a fresh 1k `#run` (reset
-  outside the timed window).
+  sample loops N clicks and divides. The length-preserving ops (reverse,
+  shuffle, rotate, displace) calibrate N per target until a sample takes about
+  20 ms (reverse is self-inverse; shuffle reseeds per click, so repeated clicks
+  are valid work); `meta.clicksPerSample` records each N. The remove ops keep
+  N=20 and the 100-row inserts N=1. Caveat: `removeevery10` decays 1000 → ~122
+  rows across its 20 clicks, so its number is the mean over that decaying
+  sequence — comparable across targets, not to a single 1000-row click. Every
+  sample starts from a fresh 1k `#run` (reset outside the timed window).
+- **Paired targets.** Every target's page stays open in one browser, each in
+  its own context, and each sample round visits all targets in a rotating
+  order. The two sides of a ratio guard are measured within the same round, so
+  runner drift moves both.
 - **Identity gate** (uibench-style), run once per op outside the timed loop:
   every `<tr>` is stamped with `tr.__benchId = <row id>` before the op; after
   one click the harness asserts every surviving row id is rendered by the

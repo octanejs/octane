@@ -587,7 +587,13 @@ const SUITES = [
 			{ label: 'refs', script: 'refs.mjs', args: (n) => [String(n)] },
 			{ label: 'refs-work', script: 'refs-work.mjs', args: () => [] },
 			{ label: 'bundle', script: 'bundle.mjs', args: () => [] },
-			{ label: 'caught-reveal', script: 'caught-reveal-run.mjs', args: (n) => [String(n)] },
+			// The scaling guard compares paired equal-work samples; quick mode's two
+			// iterations would leave its median on a single pair.
+			{
+				label: 'caught-reveal',
+				script: 'caught-reveal-run.mjs',
+				args: (n) => [String(Math.max(n, 5))],
+			},
 		],
 	},
 	{
@@ -632,7 +638,10 @@ const SUITES = [
 			{ filter: 'svelte-memowall-bench', port: 5278 },
 		],
 		iter: { normal: 20, quick: 3 },
-		runs: [{ script: 'run.mjs', args: (n) => [String(n)] }],
+		runs: [
+			{ script: 'run.mjs', args: (n) => [String(n)] },
+			{ label: 'bail-compare', script: 'bail-compare.mjs', args: () => [] },
+		],
 	},
 	{
 		name: 'portal-swarm',
@@ -792,7 +801,9 @@ const SUITES = [
 		name: 'ssr-workerd',
 		cwd: 'ssr-workerd',
 		servers: [],
-		iter: { normal: 10, quick: 2 },
+		// Each iteration is one paired round of cold workerd spawns; two rounds
+		// left the mean-scored cold guard on a single noisy pair.
+		iter: { normal: 10, quick: 6 },
 		runs: [{ script: 'run.mjs', args: (n) => [String(n)] }],
 	},
 	{
@@ -1337,6 +1348,7 @@ const SUITES = [
 		runs: [
 			{ script: 'retirement.mjs', args: () => [] },
 			{ script: 'inputs.mjs', args: () => [] },
+			{ script: 'reorders.mjs', args: () => [] },
 			{ script: 'contracts.mjs', args: () => [] },
 		],
 	},
@@ -1777,13 +1789,28 @@ function printCompareTable(suiteName, rows) {
 
 function loadRatios() {
 	if (!fs.existsSync(RATIOS_FILE)) return [];
+	let guards;
 	try {
 		const parsed = JSON.parse(fs.readFileSync(RATIOS_FILE, 'utf8'));
-		return Array.isArray(parsed) ? parsed : parsed.guards || [];
+		guards = Array.isArray(parsed) ? parsed : parsed.guards || [];
 	} catch (e) {
 		console.error(`✗ ${RATIOS_FILE} did not parse: ${e.message}`);
 		process.exit(2);
 	}
+	for (const g of guards) {
+		if (
+			g.waiver &&
+			(typeof g.waiver.reason !== 'string' ||
+				g.waiver.reason.length < 20 ||
+				!/^\d{4}-\d{2}-\d{2}$/.test(g.waiver.expires ?? ''))
+		) {
+			console.error(
+				`✗ ${g.suite} ${g.op} ${g.target}/${g.reference}: a waiver needs a reason and an expires date (YYYY-MM-DD)`,
+			);
+			process.exit(2);
+		}
+	}
+	return guards;
 }
 
 // For a set of collected suite results, check every guard whose (suite, target,
@@ -1896,7 +1923,23 @@ function formatRatioBounds(guard) {
 				);
 			}
 		}
-		ratioBreaches = breaches.length;
+		// A guard whose breach needs a product fix carries a dated `waiver`
+		// ({ reason, expires }); it reports here but fails again once it expires,
+		// so a known regression cannot quietly become the new floor.
+		const waived = breaches.filter((b) => b.waiver && todayISO() <= b.waiver.expires);
+		for (const b of waived) {
+			console.log(
+				`  ! waived until ${b.waiver.expires}: ${b.suite} ${b.op} ${b.target}/${b.reference} — ${b.waiver.reason}`,
+			);
+		}
+		for (const b of breaches) {
+			if (b.waiver && todayISO() > b.waiver.expires) {
+				console.log(
+					`  ✗ waiver expired ${b.waiver.expires}: ${b.suite} ${b.op} ${b.target}/${b.reference} — ${b.waiver.reason}`,
+				);
+			}
+		}
+		ratioBreaches = breaches.length - waived.length;
 		// --record --ratios refreshes SUGGESTIONS without overwriting ratios.json.
 		if (RECORD && suggestions.length) {
 			const sp = path.resolve(REPO, 'benchmarks/baselines/ratios.suggested.json');

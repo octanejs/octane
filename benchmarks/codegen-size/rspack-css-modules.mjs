@@ -215,10 +215,16 @@ async function buildFixture(fixture, mode, proven, minify, withRuntime = false) 
 	// Compilation and Module wrap native build state; only these copied strings
 	// survive compiler.close(). The emitted files remain the byte-size oracle.
 	const { assets, providerSource } = snapshot;
+	const scripts = assets.filter((name) => name.endsWith('.cjs'));
+	// The bundled server runtime loads streamed-signal injection with import(),
+	// so Rspack emits it as its own chunk. The measured entry never evaluates it.
 	assert.deepEqual(
-		assets.filter((name) => name.endsWith('.cjs')),
-		['main.cjs'],
+		scripts.filter(
+			(name) => name !== 'main.cjs' && !(withRuntime && /^\d+\.main\.cjs$/.test(name)),
+		),
+		[],
 	);
+	assert.ok(scripts.includes('main.cjs'), 'missing main.cjs');
 	assert.deepEqual(
 		assets.filter((name) => name.endsWith('.css')),
 		['main.css'],

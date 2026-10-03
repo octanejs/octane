@@ -31,18 +31,30 @@
 // nextTick(), so the timed window extends until it settles. GC is forced before
 // each timed sample. This times framework JS work, not pixels on screen.
 //
+// One navigation is 0.3-2 ms, only a few of Chromium's 100 µs clock ticks, so a
+// sample is a per-target calibrated run of round trips: each timed `from -> to`
+// leg is followed by an untimed return and a task yield, and the sample is the
+// summed timed legs (about 20 ms) divided by their count. Chromium jitters its
+// clamped clock, so the summed legs stay unbiased. Targets are PAIRED: for each
+// op every target's page is open in one browser (each in its own context), and
+// every sample round visits all targets in a rotating order, so a ratio guard's
+// two sides share the runner's state at the time.
+//
 // Usage:
 //   node run.mjs [iter]   # default 20 (bench:long passes 40)
 
 import { chromium } from 'playwright';
 import fs from 'node:fs';
 import { censusDomNodes, deterministicCount } from '../lib/dom-nodes.mjs';
+import { calibratedReps, roundOrder } from '../lib/paired.mjs';
 import { scoreOf, summarizeSamples, timingStatForJson } from '../lib/stats.mjs';
 
 const ITER = parseInt(process.argv[2] || '20', 10);
-const WARMUP = 10;
+// Untimed samples per op and target; each already holds many navigations.
+const WARMUP = 2;
 const YIELD_MS = 5;
 const THROTTLE_RATE = 6;
+const MAX_LEGS = 200;
 
 const TARGETS = process.env.TARGETS
 	? JSON.parse(process.env.TARGETS)
@@ -204,46 +216,82 @@ async function measureDom(browser, url) {
 	}
 }
 
-// One navigation op: mount at `from`, then per sample time from -> to and
-// return to `from` untimed, so every timed sample starts from the same tree.
-async function measureNav(browser, url, { from, to }, { throttle = 0 } = {}) {
-	const { ctx, page } = await freshPage(browser, url);
-	if (throttle > 0) {
-		const session = await page.context().newCDPSession(page);
-		await session.send('Emulation.setCPUThrottlingRate', { rate: throttle });
-	}
-	await page.evaluate(async (route) => {
-		const result = window.__mount(route);
-		if (result && typeof result.then === 'function') await result;
-	}, from);
-	await sleep(50);
-	const samples = await page.evaluate(
-		async ({ from, to, WARMUP, ITER, YIELD_MS }) => {
-			const gc = window.gc || (() => {});
-			const nav = async (route) => {
-				const result = window.__navigate(route);
-				if (result && typeof result.then === 'function') await result;
-			};
-			const out = [];
-			for (let i = 0; i < WARMUP + ITER; i++) {
-				gc();
-				void document.body?.offsetHeight;
-				const t0 = performance.now();
-				await nav(to);
-				const dt = performance.now() - t0;
-				if (i >= WARMUP) out.push(dt);
-				await new Promise((r) => setTimeout(r, YIELD_MS));
-				await nav(from);
-				await new Promise((r) => setTimeout(r, YIELD_MS));
+// One navigation op across every target: mount each target at `from`, then per
+// sample time `legs` from -> to navigations, returning to `from` untimed after
+// each, so every timed leg starts from the same tree.
+async function measureNav(browser, targets, { from, to }, { throttle = 0 } = {}) {
+	const states = [];
+	try {
+		for (const t of targets) {
+			const { ctx, page } = await freshPage(browser, t.url);
+			states.push({ t, ctx, page, legs: 1, samples: [] });
+			if (throttle > 0) {
+				const session = await page.context().newCDPSession(page);
+				await session.send('Emulation.setCPUThrottlingRate', { rate: throttle });
 			}
-			return out;
-		},
-		{ from, to, WARMUP, ITER, YIELD_MS },
-	);
-	await ctx.close();
-	return summarize(samples);
+			await page.evaluate(
+				async ({ from, to, YIELD_MS }) => {
+					const nav = async (route) => {
+						const result = window.__navigate(route);
+						if (result && typeof result.then === 'function') await result;
+					};
+					const result = window.__mount(from);
+					if (result && typeof result.then === 'function') await result;
+					// GC runs before every timed leg, as it did when each sample was a
+					// single navigation: the untimed return leg allocates a whole route,
+					// and its collection must not land inside the next timed leg.
+					const gc = window.gc || (() => {});
+					window.__benchLegs = async (legs) => {
+						let total = 0;
+						for (let k = 0; k < legs; k++) {
+							gc();
+							void document.body?.offsetHeight;
+							const t0 = performance.now();
+							await nav(to);
+							total += performance.now() - t0;
+							await new Promise((r) => setTimeout(r, YIELD_MS));
+							await nav(from);
+							await new Promise((r) => setTimeout(r, YIELD_MS));
+						}
+						return total / legs;
+					};
+				},
+				{ from, to, YIELD_MS },
+			);
+		}
+		await sleep(50);
+
+		// Legs per sample, per target: two scaling rounds from three legs, so the
+		// count comes from navigations that already ran optimized code.
+		for (const state of states) {
+			await state.page.bringToFront();
+			let legs = 3;
+			await state.page.evaluate((n) => window.__benchLegs(n), legs);
+			for (let round = 0; round < 2; round++) {
+				const perLeg = await state.page.evaluate((n) => window.__benchLegs(n), legs);
+				legs = calibratedReps(legs, perLeg * legs, MAX_LEGS);
+			}
+			state.legs = legs;
+		}
+
+		for (let i = 0; i < WARMUP + ITER; i++) {
+			for (const state of roundOrder(states, i)) {
+				await state.page.bringToFront();
+				const dt = await state.page.evaluate((n) => window.__benchLegs(n), state.legs);
+				if (i >= WARMUP) state.samples.push(dt);
+				await sleep(YIELD_MS);
+			}
+		}
+		return new Map(
+			states.map((state) => [state.t.name, { stat: summarize(state.samples), legs: state.legs }]),
+		);
+	} finally {
+		for (const state of states) await state.ctx.close();
+	}
 }
 
+// Semantic gate and DOM census for one target, in its own browser. The timed
+// navigations run later, paired across every passing target.
 async function runTarget(t) {
 	const browser = await chromium.launch({
 		headless: true,
@@ -265,12 +313,6 @@ async function runTarget(t) {
 		const dom = await measureDom(browser, t.url);
 
 		const results = {};
-		for (const nav of NAVS) {
-			console.error(`  → ${nav.op}`);
-			results[nav.op] = await measureNav(browser, t.url, nav);
-		}
-		console.error(`  → nav_deep_6x`);
-		results.nav_deep_6x = await measureNav(browser, t.url, NAVS[0], { throttle: THROTTLE_RATE });
 		results.__dom = dom;
 		results.nodes_deep = deterministicCount(dom.deep.total);
 		results.elements_deep = deterministicCount(dom.deep.elements);
@@ -288,7 +330,7 @@ async function runTarget(t) {
 	const failedTargets = new Set();
 
 	for (const t of TARGETS) {
-		console.error(`Running ${t.name} (${t.url}) × ${ITER} (+${WARMUP} warmup)…`);
+		console.error(`Checking ${t.name} (${t.url}) semantic gate and census…`);
 		try {
 			const { gateErrors, results } = await runTarget(t);
 			if (gateErrors.length > 0) {
@@ -306,6 +348,46 @@ async function runTarget(t) {
 			const message = `${t.name}: ${error instanceof Error ? error.message : String(error)}`;
 			failures.push(message);
 			console.error(`  ✗ ${message}`);
+		}
+	}
+
+	// Timed navigations, paired across every target whose gate passed.
+	const timedTargets = TARGETS.filter((t) => all[t.name]);
+	if (timedTargets.length > 0) {
+		console.error(
+			`Timing ${timedTargets.map((t) => t.name).join(', ')} paired × ${ITER} (+${WARMUP} warmup)…`,
+		);
+		const browser = await chromium.launch({
+			headless: true,
+			args: ['--disable-extensions', '--no-sandbox', '--js-flags=--expose-gc'],
+		});
+		try {
+			const runs = [
+				...NAVS.map((nav) => ({ op: nav.op, nav, options: {} })),
+				{ op: 'nav_deep_6x', nav: NAVS[0], options: { throttle: THROTTLE_RATE } },
+			];
+			for (const { op, nav, options } of runs) {
+				const byTarget = await measureNav(browser, timedTargets, nav, options);
+				for (const t of timedTargets) {
+					const { stat, legs } = byTarget.get(t.name);
+					all[t.name][op] = stat;
+					(all[t.name].__legs ??= {})[op] = legs;
+				}
+				console.error(
+					`  → ${op.padEnd(13)} legs/sample ` +
+						timedTargets.map((t) => `${t.name}=${all[t.name].__legs[op]}`).join(' '),
+				);
+			}
+		} catch (error) {
+			const message = `timed pass: ${error instanceof Error ? error.message : String(error)}`;
+			failures.push(message);
+			console.error(`  ✗ ${message}`);
+			for (const t of timedTargets) {
+				failedTargets.add(t.name);
+				delete all[t.name];
+			}
+		} finally {
+			await browser.close();
 		}
 	}
 
@@ -389,6 +471,7 @@ async function runTarget(t) {
 				meta: {
 					gates: failedTargets.has(t.name) ? 'fail' : 'pass',
 					...(all[t.name]?.__dom ? { dom: all[t.name].__dom } : null),
+					...(all[t.name]?.__legs ? { legsPerSample: all[t.name].__legs } : null),
 				},
 			})),
 		};

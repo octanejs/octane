@@ -460,7 +460,7 @@
         {
           "path": "packages/formisch/typetests/tsconfig.json",
           "role": "support",
-          "sha256": "d3cf7d342548bc62204c1ad14b6c0f0708e7b11ec153243bf819b8da5cb39fb3"
+          "sha256": "c84fd734b7c1b16524485ec42ed0814810719af2821c5210a89ba18bd214480b"
         },
         {
           "path": "packages/formisch/audit/type-parity.json",

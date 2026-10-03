@@ -224,24 +224,40 @@ export function withoutInferredMemoName(expression) {
 		: expression;
 }
 
+// Dependency expressions run exactly once, before the raw slot, so each is
+// copied to a temporary. A binding the analysis proved stable is read in place.
+function dependencyRead(dependency, index, temp, copy) {
+	if (dependency.type === 'Identifier' && dependency._octaneStableRead === true) return dependency;
+	const name = temp(`__hkd${index}`);
+	copy(name, withoutInferredMemoName(dependency));
+	return name;
+}
+
+const read = (dependency) => (typeof dependency === 'string' ? id(dependency) : { ...dependency });
+
+// A slot the compiler appended always resolves. Only an authored slot, which a
+// manual hook may leave undefined, needs the hook's name for the missing-slot error.
 function slotCall(entry, runtime) {
-	return b.call(runtime('memoSlot'), entry.slot ?? b.void0, b.literal(entry.name));
+	return entry.slot?._octaneCompilerSlot === true
+		? b.call(runtime('memoSlot'), entry.slot)
+		: b.call(runtime('memoSlot'), entry.slot ?? b.void0, b.literal(entry.name));
 }
 
 /**
  * Build a closure-free sequence expression. `temp` allocates and registers a
  * function-local mutable binding; `runtime` registers an import and returns its
- * local name. Dependency expressions run exactly once, before the raw slot.
+ * local name. Dependency expressions run exactly once, before the raw slot
+ * (see dependencyRead).
  */
 export function buildSlotMemoExpression(entry, { temp, runtime }) {
 	if (entry.expression === null) return null;
 	const slot = temp('__hks');
 	const sequence = [];
-	const depNames = (entry.deps || []).map((dependency, index) => {
-		const name = temp(`__hkd${index}`);
-		sequence.push(assign(id(name), withoutInferredMemoName(dependency)));
-		return name;
-	});
+	const depNames = (entry.deps || []).map((dependency, index) =>
+		dependencyRead(dependency, index, temp, (name, value) =>
+			sequence.push(assign(id(name), value)),
+		),
+	);
 	sequence.push(assign(id(slot), slotCall(entry, runtime)));
 	if (entry.deps === null) {
 		sequence.push(b.call(runtime('memoPublishAlways'), id(slot), entry.expression));
@@ -250,13 +266,13 @@ export function buildSlotMemoExpression(entry, { temp, runtime }) {
 		sequence.push(
 			assign(
 				id(previous),
-				b.call(runtime(`memoTake${depNames.length}`), id(slot), ...depNames.map(id)),
+				b.call(runtime(`memoTake${depNames.length}`), id(slot), ...depNames.map(read)),
 			),
 		);
 		sequence.push(
 			b.conditional(
 				b.binary('===', id(previous), b.null),
-				b.call(runtime('memoPublish'), id(slot), entry.expression, ...depNames.map(id)),
+				b.call(runtime('memoPublish'), id(slot), entry.expression, ...depNames.map(read)),
 				b.member(id(previous), 'value'),
 			),
 		);
@@ -308,11 +324,11 @@ function replaceOwnReturns(root, result, label) {
 export function buildSlotMemoStatements(entry, { temp, runtime }, target) {
 	const slot = temp('__hks');
 	const statements = [];
-	const depNames = (entry.deps || []).map((dependency, index) => {
-		const name = temp(`__hkd${index}`);
-		statements.push(b.stmt(assign(id(name), withoutInferredMemoName(dependency))));
-		return name;
-	});
+	const depNames = (entry.deps || []).map((dependency, index) =>
+		dependencyRead(dependency, index, temp, (name, value) =>
+			statements.push(b.stmt(assign(id(name), value))),
+		),
+	);
 	statements.push(b.stmt(assign(id(slot), slotCall(entry, runtime))));
 	const value = temp('__hkv');
 	let compute;
@@ -332,7 +348,7 @@ export function buildSlotMemoStatements(entry, { temp, runtime }, target) {
 			target,
 			entry.deps === null
 				? b.call(runtime('memoPublishAlways'), id(slot), id(value))
-				: b.call(runtime('memoPublish'), id(slot), id(value), ...depNames.map(id)),
+				: b.call(runtime('memoPublish'), id(slot), id(value), ...depNames.map(read)),
 		),
 	);
 	if (entry.deps === null) {
@@ -343,7 +359,7 @@ export function buildSlotMemoStatements(entry, { temp, runtime }, target) {
 			b.stmt(
 				assign(
 					id(previous),
-					b.call(runtime(`memoTake${depNames.length}`), id(slot), ...depNames.map(id)),
+					b.call(runtime(`memoTake${depNames.length}`), id(slot), ...depNames.map(read)),
 				),
 			),
 			b.if(

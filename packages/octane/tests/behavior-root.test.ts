@@ -8358,6 +8358,98 @@ export function Streamed() @{
 			}
 		});
 
+		// Like the renderer's resolved boundary, a server-resolved @try arm stays
+		// while the client's own read is pending, then hydrates in place.
+		it(`keeps a server-resolved @try arm while the client read is pending (${dev ? 'dev' : 'prod'})`, async () => {
+			const source = `import { useLayoutEffect } from 'octane';
+import { answer$, log } from './island-state';
+function Mark() @{
+  useLayoutEffect(() => log('mark mounted'), []);
+  <i>mark</i>
+}
+export function Answer() @{
+  'use dom bindings';
+  <section>
+    @try {
+      <>
+        <p data-answer>{answer$.get() as string}</p>
+        <button type="button" onClick={() => log('clicked')}>go</button>
+        <Mark />
+      </>
+    } @pending {
+      <p data-pending>waiting</p>
+    }
+  </section>
+}`;
+			const scope = createScope({ scopeKey: `island-kept-try-${dev}` });
+			const events: string[] = [];
+			const log = (event: string) => events.push(event);
+			const serverAnswer = deferred<string>();
+			const loadServer = query(
+				`island-kept-server-${dev}`,
+				(_argument: undefined) => serverAnswer.promise,
+			);
+			const requests = new Map<number, ReturnType<typeof deferred<string>>>();
+			const request = (generation: number) => {
+				let pending = requests.get(generation);
+				if (!pending) requests.set(generation, (pending = deferred<string>()));
+				return pending;
+			};
+			const loadClient = query(
+				`island-kept-client-${dev}`,
+				(generation: number) => request(generation).promise,
+			);
+			const generation$ = scope.signal$('generation', 0);
+			const server = authoredPresentation('Answer', {}, dev, source, {
+				'./island-state': {
+					answer$: createResource(scope, 'server', () => loadServer(undefined)),
+					log,
+				},
+			});
+			const client = authoredPresentation('Answer', {}, dev, source, {
+				'./island-state': {
+					answer$: createResource(scope, 'client', () => loadClient(generation$.get())),
+					log,
+				},
+			});
+			const settle = async () => {
+				for (let index = 0; index < 4; index++) await Promise.resolve();
+			};
+			try {
+				serverAnswer.resolve('server');
+				await settle();
+				container.innerHTML = renderToString(server.server.Answer, {}).html;
+				const answer = container.querySelector('[data-answer]')!;
+				const button = container.querySelector('button')!;
+				expect(answer.textContent).toBe('server');
+				const handle = client.attach(container.querySelector('section')!, client.state);
+				expect(container.querySelector('[data-answer]')).toBe(answer);
+				expect(container.querySelector('[data-pending]')).toBeNull();
+				// Nothing in the kept arm is live before a client commit prepares it.
+				expect(events).toEqual([]);
+
+				request(0).resolve('client');
+				await settle();
+				expect(container.querySelector('[data-answer]')).toBe(answer);
+				expect(container.querySelector('button')).toBe(button);
+				expect(answer.textContent).toBe('client');
+				expect(events).toEqual(['mark mounted']);
+				button.click();
+				expect(events).toEqual(['mark mounted', 'clicked']);
+
+				// Once committed, the arm is the client's: a new read shows @pending.
+				generation$.set(1);
+				expect(container.querySelector('[data-pending]')).not.toBeNull();
+				expect(container.querySelector('[data-answer]')).toBeNull();
+				request(1).resolve('next');
+				await settle();
+				expect(container.querySelector('[data-answer]')!.textContent).toBe('next');
+				handle.dispose();
+			} finally {
+				scope.dispose();
+			}
+		});
+
 		it(`preserves presentation refs through replacement and cleanup failure (${dev ? 'dev' : 'prod'})`, () => {
 			const refA = { current: null as HTMLInputElement | null };
 			const refB = { current: null as HTMLInputElement | null };

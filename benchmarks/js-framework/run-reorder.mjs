@@ -9,12 +9,19 @@
 //   1. INNER-LOOP TIMING. Most reorder ops are far below performance.now()'s
 //      effective resolution (a rotate is ~1 DOM move), so a single click
 //      quantizes to the ~0.1ms timer floor. Each timed sample therefore loops
-//      REPS clicks inside the timed window and divides (the signal-favoring
-//      harness's BUMP_REPS pattern): REPS=100 for the guarded rotate pair,
-//      REPS=20 for displace_k / remove*, and REPS=4 for reverse + shuffle (reverse is
-//      self-inverse and shuffle reseeds per click, so repeated clicks are
-//      valid, comparable work). The 100-row insert ops are big enough to time
-//      with a single click (REPS=1).
+//      clicks inside the timed window and divides (the signal-favoring
+//      harness's calibrated-batch pattern). Length-preserving ops (reverse,
+//      shuffle, rotate*, displace*) calibrate their click count per target
+//      until one sample takes about 20 ms: reverse is self-inverse and shuffle
+//      reseeds per click, so repeated clicks are valid, comparable work. The
+//      remove* ops keep 20 clicks because each click shrinks the table, and the
+//      100-row insert ops are big enough to time with a single click.
+//
+//      Targets are PAIRED per sample: every target's page stays open in one
+//      browser (its own context, so its own renderer process), and each sample
+//      round visits every target once in a rotating order. A guard's two sides
+//      are then measured a few hundred milliseconds apart instead of minutes
+//      apart, so runner drift cannot land on one side of the ratio.
 //
 //   2. IDENTITY GATE (uibench-style), run ONCE per op OUTSIDE the timed loop.
 //      Before the op every <tr> is stamped with an expando
@@ -28,7 +35,7 @@
 //      not a win.
 //
 // Ops each start from a fresh 1k `#run` (the reset click sits outside the
-// timed window). Note REPS>1 samples measure the MEAN over the click
+// timed window). Note multi-click samples measure the MEAN over the click
 // sequence: length-preserving ops (rotate/displace/reverse/shuffle) do
 // identical work per click, `removefirst` shrinks 1000→980 (~constant), but
 // `removeevery10` decays 1000→~122 across its 20 clicks — its number is the
@@ -50,11 +57,15 @@
 import fs from 'node:fs';
 import { pathToFileURL } from 'node:url';
 import { chromium } from 'playwright';
+import { calibratedReps, roundOrder } from '../lib/paired.mjs';
 import { scoreOf, summarizeSamples, timingStatForJson } from '../lib/stats.mjs';
 
 const ITER = parseInt(process.argv[2] || '8', 10);
 const WARMUP = 2; // untimed per-op samples before the ITER timed ones
 const ROW_COUNT = 1000;
+// Ceiling on a calibrated sample's clicks; the cheapest rotation is ~17 µs.
+const MAX_REPS = 2000;
+const YIELD_MS = 20;
 
 const TARGETS = process.env.TARGETS
 	? JSON.parse(process.env.TARGETS)
@@ -105,12 +116,23 @@ const fill100 = () => new Array(100).fill(NEW);
 
 // Op table. `name` doubles as the button id (`#<name>`). `expected(pre, ctx)`
 // replays the op on the pre-click id list for the identity gate; ctx carries
-// the per-target shuffle-seed stream.
+// the per-target shuffle-seed stream. `reps` is the click count per sample;
+// `calibrate` ops raise it per target until a sample takes about 20 ms.
 const OPS = [
-	{ name: 'reverse', reps: 4, expected: (pre) => pre.slice().reverse() },
-	{ name: 'shuffle', reps: 4, expected: (pre, ctx) => shuffleWithSeed(pre, ctx.nextSeed()) },
-	{ name: 'rotatef', reps: 100, expected: (pre) => [pre[pre.length - 1], ...pre.slice(0, -1)] },
-	{ name: 'rotateb', reps: 100, expected: (pre) => [...pre.slice(1), pre[0]] },
+	{ name: 'reverse', reps: 4, calibrate: true, expected: (pre) => pre.slice().reverse() },
+	{
+		name: 'shuffle',
+		reps: 4,
+		calibrate: true,
+		expected: (pre, ctx) => shuffleWithSeed(pre, ctx.nextSeed()),
+	},
+	{
+		name: 'rotatef',
+		reps: 20,
+		calibrate: true,
+		expected: (pre) => [pre[pre.length - 1], ...pre.slice(0, -1)],
+	},
+	{ name: 'rotateb', reps: 20, calibrate: true, expected: (pre) => [...pre.slice(1), pre[0]] },
 	{ name: 'prepend100', reps: 1, expected: (pre) => fill100().concat(pre) },
 	{ name: 'append100', reps: 1, expected: (pre) => pre.concat(fill100()) },
 	{
@@ -126,11 +148,36 @@ const OPS = [
 	// displace_k: the fixture moves the FIRST k rows (as a group, order
 	// preserved) to the END. The k sweep brackets the runtime's K_DISP=4
 	// small-displacement threshold (see README).
-	{ name: 'displace3', reps: 20, expected: (pre) => pre.slice(3).concat(pre.slice(0, 3)) },
-	{ name: 'displace4', reps: 20, expected: (pre) => pre.slice(4).concat(pre.slice(0, 4)) },
-	{ name: 'displace5', reps: 20, expected: (pre) => pre.slice(5).concat(pre.slice(0, 5)) },
-	{ name: 'displace6', reps: 20, expected: (pre) => pre.slice(6).concat(pre.slice(0, 6)) },
-	{ name: 'displace8', reps: 20, expected: (pre) => pre.slice(8).concat(pre.slice(0, 8)) },
+	{
+		name: 'displace3',
+		reps: 20,
+		calibrate: true,
+		expected: (pre) => pre.slice(3).concat(pre.slice(0, 3)),
+	},
+	{
+		name: 'displace4',
+		reps: 20,
+		calibrate: true,
+		expected: (pre) => pre.slice(4).concat(pre.slice(0, 4)),
+	},
+	{
+		name: 'displace5',
+		reps: 20,
+		calibrate: true,
+		expected: (pre) => pre.slice(5).concat(pre.slice(0, 5)),
+	},
+	{
+		name: 'displace6',
+		reps: 20,
+		calibrate: true,
+		expected: (pre) => pre.slice(6).concat(pre.slice(0, 6)),
+	},
+	{
+		name: 'displace8',
+		reps: 20,
+		calibrate: true,
+		expected: (pre) => pre.slice(8).concat(pre.slice(0, 8)),
+	},
 ];
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -401,11 +448,10 @@ async function scratchStorageGate(page, targetName) {
 	return measurement;
 }
 
-async function runTarget(t) {
-	const browser = await chromium.launch({
-		headless: true,
-		args: ['--disable-extensions', '--js-flags=--expose-gc'],
-	});
+// One target's page, in its own context (so its own renderer process) inside
+// the shared browser. Every target stays open for the whole run so each sample
+// round can visit all of them.
+async function openTarget(browser, t) {
 	const context = await browser.newContext();
 	const page = await context.newPage();
 	await page.goto(t.url, { waitUntil: 'load' });
@@ -431,51 +477,87 @@ async function runTarget(t) {
 		await page.evaluate(() => document.getElementById('clear').click());
 		await sleep(50);
 	}
+	return { t, context, page, ctx, results: {}, gateFails: {}, reps: {}, scratchWork: undefined };
+}
 
-	const results = {};
-	const gateFails = {};
-	for (const op of OPS) {
-		// Correctness first, once, outside any timed window. A gate failure is a
-		// per-(target,op) fact: record it, skip this op's timing (its DOM is
-		// wrong, so any number would be garbage), and keep going so the other
-		// targets/ops still produce a full matrix. The run still exits non-zero
-		// and BENCH_JSON still carries a top-level `failed` field (see below) —
-		// the gate is NOT weakened, only its blast radius is. Skipping a failed
-		// op's timed loop keeps the shuffle-seed stream in lockstep: only the
-		// shuffle op advances it, and its gate advances harness+fixture by one
-		// click each before any skip, so they stay aligned regardless.
+// One sample of `reps` clicks from a fresh 1k table, keeping the mirrored
+// shuffle stream in lockstep with every #shuffle click.
+async function sampleOnce(state, op, reps) {
+	await state.page.bringToFront();
+	await resetRows(state.page);
+	const dt = await timeSample(state.page, `#${op.name}`, reps);
+	if (op.name === 'shuffle') state.ctx.advance(reps);
+	return dt;
+}
+
+// Click count for one target's sample: a calibrated op scales its declared
+// count toward a ~20 ms sample, re-measuring after each step because the first
+// clicks run before the op's code is optimized. It never scales down.
+async function calibrate(state, op) {
+	if (!op.calibrate) return op.reps;
+	let reps = op.reps;
+	for (let round = 0; round < 3; round++) {
+		const next = calibratedReps(reps, (await sampleOnce(state, op, reps)) * reps, MAX_REPS);
+		if (next === reps) break;
+		reps = next;
+		await sleep(YIELD_MS);
+	}
+	return reps;
+}
+
+async function measureOp(states, op) {
+	// Correctness first, once per target, outside any timed window. A gate
+	// failure is a per-(target,op) fact: record it, skip this op's timing for
+	// that target (its DOM is wrong, so any number would be garbage), and keep
+	// going so the other targets/ops still produce a full matrix. The run still
+	// exits non-zero and BENCH_JSON still carries a top-level `failed` field
+	// (see below) — the gate is NOT weakened, only its blast radius is.
+	// Skipping a failed op's timed loop keeps the shuffle-seed stream in
+	// lockstep: only the shuffle op advances it, and its gate advances
+	// harness+fixture by one click each before any skip, so they stay aligned.
+	const timed = [];
+	for (const state of states) {
 		try {
-			await identityGate(page, op, ctx, t.name);
+			await state.page.bringToFront();
+			await identityGate(state.page, op, state.ctx, state.t.name);
 		} catch (e) {
 			const msg = String(e && e.message ? e.message : e);
-			gateFails[op.name] = msg;
-			results[op.name] = null;
-			console.error(`  ⚠ GATE FAIL ${t.name}/${op.name}: ${msg}`);
+			state.gateFails[op.name] = msg;
+			state.results[op.name] = null;
+			console.error(`  ⚠ GATE FAIL ${state.t.name}/${op.name}: ${msg}`);
 			continue;
 		}
-		const samples = [];
-		for (let i = 0; i < WARMUP + ITER; i++) {
-			await resetRows(page);
-			const dt = await timeSample(page, `#${op.name}`, op.reps);
-			if (op.name === 'shuffle') ctx.advance(op.reps);
-			if (i >= WARMUP) samples.push(dt);
-			await sleep(20);
-		}
-		results[op.name] = summarize(samples);
+		state.reps[op.name] = await calibrate(state, op);
+		timed.push(state);
 	}
-	let scratchWork;
-	if (t.name === 'octane-tsrx' || t.name === 'octane-jsx') {
+	const samples = new Map(timed.map((state) => [state, []]));
+	for (let i = 0; i < WARMUP + ITER; i++) {
+		for (const state of roundOrder(timed, i)) {
+			const dt = await sampleOnce(state, op, state.reps[op.name]);
+			if (i >= WARMUP) samples.get(state).push(dt);
+			await sleep(YIELD_MS);
+		}
+	}
+	for (const state of timed) state.results[op.name] = summarize(samples.get(state));
+	console.error(
+		`  ${op.name.padEnd(13)} clicks/sample ` +
+			timed.map((state) => `${state.t.name}=${state.reps[op.name]}`).join(' '),
+	);
+}
+
+async function runTargets(states) {
+	for (const op of OPS) await measureOp(states, op);
+	for (const state of states) {
+		if (state.t.name !== 'octane-tsrx' && state.t.name !== 'octane-jsx') continue;
 		try {
-			scratchWork = await scratchStorageGate(page, t.name);
+			await state.page.bringToFront();
+			state.scratchWork = await scratchStorageGate(state.page, state.t.name);
 		} catch (error) {
 			const message = String(error && error.message ? error.message : error);
-			gateFails['scratch-storage'] = message;
-			console.error(`  ⚠ SCRATCH FAIL ${t.name}: ${message}`);
+			state.gateFails['scratch-storage'] = message;
+			console.error(`  ⚠ SCRATCH FAIL ${state.t.name}: ${message}`);
 		}
 	}
-
-	await browser.close();
-	return { results, gateFails, scratchWork };
 }
 
 // Per-target identity-gate summary for BENCH_JSON meta: "pass" when every op
@@ -500,26 +582,42 @@ function writeBenchJson(payload) {
 
 async function main() {
 	const all = {};
+	const browser = await chromium.launch({
+		headless: true,
+		args: ['--disable-extensions', '--js-flags=--expose-gc'],
+	});
+	const states = [];
 	// A hard crash (server down, selector missing, etc.) still writes a flagged
 	// BENCH_JSON from whatever completed, then rethrows → exit 1.
 	try {
 		for (const t of TARGETS) {
-			console.error(`Running ${t.name} (${t.url}) × ${ITER} (+${WARMUP} warmup, per-op gate)…`);
-			all[t.name] = await runTarget(t);
+			console.error(`Opening ${t.name} (${t.url})…`);
+			states.push(await openTarget(browser, t));
 		}
+		console.error(
+			`Pairing ${states.length} targets × ${ITER} (+${WARMUP} warmup) per op, per-op gate…`,
+		);
+		await runTargets(states);
 	} catch (e) {
 		writeBenchJson({
 			suite: 'keyed-reorder-matrix',
 			iterations: ITER,
 			failed: String(e && e.message ? e.message : e),
-			targets: Object.entries(all).map(([name, { results, gateFails, scratchWork }]) => ({
-				name,
-				ops: Object.fromEntries(Object.entries(results).filter(([, v]) => v != null)),
+			targets: states.map(({ t, results, gateFails, scratchWork }) => ({
+				name: t.name,
+				ops: Object.fromEntries(
+					Object.entries(results)
+						.filter(([, v]) => v != null)
+						.map(([op, r]) => [op, timingStatForJson(r)]),
+				),
 				meta: gateMeta(gateFails, scratchWork),
 			})),
 		});
 		throw e;
+	} finally {
+		await browser.close();
 	}
+	for (const state of states) all[state.t.name] = state;
 
 	const cols = TARGETS.map((t) => t.name);
 	const W = 26;
@@ -582,7 +680,10 @@ async function main() {
 					.filter(([, v]) => v != null)
 					.map(([op, r]) => [op, timingStatForJson(r)]),
 			),
-			meta: gateMeta(all[t.name].gateFails, all[t.name].scratchWork),
+			meta: {
+				...gateMeta(all[t.name].gateFails, all[t.name].scratchWork),
+				clicksPerSample: all[t.name].reps,
+			},
 		})),
 	});
 	if (failures.length) {
