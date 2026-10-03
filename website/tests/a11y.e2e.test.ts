@@ -124,13 +124,8 @@ const NON_CONTRAST_BASELINE: Record<string, readonly DeferredFinding[]> = {
 		{ ruleId: 'aria-input-field-name', nodeSelector: 'div[contenteditable="true"]' },
 		{ ruleId: 'scrollable-region-focusable', nodeSelector: '.ͼ4 > .cm-scroller' },
 	]),
-	// The header links's styling does not distinguish it from body text, and
-	// the heatmap's overflow region again.
+	// The heatmap's overflow region again. Intro links are visibly underlined.
 	...forRoute('/benchmarks', [
-		{
-			ruleId: 'link-in-text-block',
-			nodeSelector: '.benchpage-sub > a[target="_blank"][rel="noreferrer"]',
-		},
 		{ ruleId: 'scrollable-region-focusable', nodeSelector: '.bx-heat-scroll' },
 	]),
 	// The devtools filter input is unlabeled.

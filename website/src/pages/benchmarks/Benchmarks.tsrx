@@ -80,6 +80,10 @@ export function Benchmarks() @{
 				padding: 0.1rem 0.4rem;
 				font-size: 0.9em;
 			}
+			.benchpage-sub a {
+				text-decoration: underline;
+				text-underline-offset: 0.15em;
+			}
 			/* The benchmark scroll-spy is the page's primary left sidebar, matching
 			   the documentation layout instead of occupying a separate right rail. */
 			.benchpage-frame {
@@ -265,7 +269,13 @@ export function Benchmarks() @{
 								target="_blank"
 								rel="noreferrer"
 							>{'benchmarks/'}</a>
-							{' for what each suite measures.'}
+							{' for what each suite measures. This snapshot measures Octane 0.8.0 on 3 October 2026. See the '}
+							<a
+								href="https://github.com/octanejs/octane/blob/main/benchmarks/baselines/website-refresh.md"
+								target="_blank"
+								rel="noreferrer"
+							>measurement notes</a>
+							{' for the source revision, environment, and reproduction command.'}
 						</p>
 					</header>
 
