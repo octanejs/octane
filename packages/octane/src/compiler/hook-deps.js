@@ -1458,9 +1458,7 @@ function hasOpaqueExecutionDirective(fn) {
 }
 
 // The `octane` runtime export inferred method-call dependencies compile to.
-// Both emitters alias it: the full compiler through `ctx.runtimeNeeded` (its
-// `_$`-prefixed rtAlias convention is baked into methodDepNode below) and the
-// surgical pass through its own helper-import allocator.
+// Both emitters alias it through their own collision-safe import allocators.
 export const METHOD_DEP_IMPORT = '__methodDep';
 
 // The emitted dependency expression for a one-level method call:
@@ -1469,12 +1467,12 @@ export const METHOD_DEP_IMPORT = '__methodDep';
 // the authored member's source range so source maps and the surgical pass's
 // offset expectations stay anchored to the authored expression, while the
 // cloned root identifier keeps its own authored position.
-function methodDepNode(dependency) {
+function methodDepNode(dependency, helperLocal) {
 	// Every synthesized node is stamped with the authored member's origin — the
 	// bundler print path asserts a loc on each printed node, including the
 	// helper's callee identifier.
 	const call = b.call(
-		b.id(`_$${METHOD_DEP_IMPORT}`, dependency.node),
+		b.id(helperLocal, dependency.node),
 		{ ...dependency.method.root },
 		b.literal(dependency.method.name, JSON.stringify(dependency.method.name), dependency.node),
 		...(dependency.method.guarded ? [b.literal(true, 'true', dependency.node)] : []),
@@ -2345,8 +2343,15 @@ export function analyzeStrongHookPolicies(ast, options = {}) {
  * Untouched subtrees stay shared with the input by reference. Returns the
  * rebuilt module plus the inference map re-keyed to the rebuilt call nodes.
  */
-/** @param {any} ast @param {any} analysis @param {Map<any, any>} inferred @param {boolean} insertDeps @param {boolean} nativeReads */
-function rebuildWithHookMetadata(ast, analysis, inferred, insertDeps, nativeReads = false) {
+/** @param {any} ast @param {any} analysis @param {Map<any, any>} inferred @param {boolean} insertDeps @param {boolean} nativeReads @param {string} helperLocal */
+function rebuildWithHookMetadata(
+	ast,
+	analysis,
+	inferred,
+	insertDeps,
+	nativeReads = false,
+	helperLocal = `_$${METHOD_DEP_IMPORT}`,
+) {
 	const annotations = analysis.callAnnotations;
 	const rekeyedInferred = new Map();
 	/** @param {any} node @returns {any} */
@@ -2391,7 +2396,7 @@ function rebuildWithHookMetadata(ast, analysis, inferred, insertDeps, nativeRead
 							: b.array(
 									result.dependencies.map((/** @type {any} */ dependency) =>
 										dependency.method
-											? methodDepNode(dependency)
+											? methodDepNode(dependency, helperLocal)
 											: cloneDependency(dependency.node),
 									),
 								)),
@@ -2430,24 +2435,30 @@ export function annotateHookCalls(ast, options = {}) {
  * dependency arrays inserted at each candidate call. Copy-on-write — the input
  * AST is never modified; callers must use the returned module.
  */
-/** @param {any} ast @param {{ onlyImported?: boolean, hookRuntimeModules?: readonly string[], filename?: string, onRuntimeHelper?: (name: string) => void, nativeReads?: boolean }} [options] */
+/** @param {any} ast @param {{ onlyImported?: boolean, hookRuntimeModules?: readonly string[], filename?: string, onRuntimeHelper?: (name: string) => string | void, nativeReads?: boolean }} [options] */
 export function applyHookDependencies(ast, options = {}) {
 	const { analysis, inferred } = analyzeInternal(ast, options);
-	// The inserted `_$__methodDep(...)` calls need their aliased runtime import;
-	// the caller owns import assembly, so report the requirement rather than
-	// splicing an ImportDeclaration into a module whose runtime request
-	// ('octane' vs 'octane/server') this pass cannot know.
+	// The caller owns the runtime import and can allocate an alias that avoids
+	// authored bindings and helper imports introduced by earlier passes.
+	let helperLocal = `_$${METHOD_DEP_IMPORT}`;
 	if (options.onRuntimeHelper !== undefined) {
 		outer: for (const result of inferred.values()) {
 			for (const dependency of result.dependencies ?? []) {
 				if (dependency.method) {
-					options.onRuntimeHelper(METHOD_DEP_IMPORT);
+					helperLocal = options.onRuntimeHelper(METHOD_DEP_IMPORT) ?? helperLocal;
 					break outer;
 				}
 			}
 		}
 	}
-	return rebuildWithHookMetadata(ast, analysis, inferred, true, options.nativeReads === true).ast;
+	return rebuildWithHookMetadata(
+		ast,
+		analysis,
+		inferred,
+		true,
+		options.nativeReads === true,
+		helperLocal,
+	).ast;
 }
 
 /**

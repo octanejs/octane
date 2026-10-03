@@ -302,24 +302,6 @@ const STATE_GETTER_HELPERS = {
 	useReducer: '__useReducerWithGetter',
 };
 
-function collectIdentifierNames(root) {
-	const names = new Set();
-	const walk = (node) => {
-		if (node == null || typeof node !== 'object') return;
-		if (Array.isArray(node)) {
-			for (const child of node) walk(child);
-			return;
-		}
-		if (node.type === 'Identifier' && typeof node.name === 'string') names.add(node.name);
-		for (const key in node) {
-			if (key === 'type' || key === 'loc' || key === 'start' || key === 'end') continue;
-			walk(node[key]);
-		}
-	};
-	walk(root);
-	return names;
-}
-
 function allocSlotName(st, preferred) {
 	let name = preferred;
 	while (st.usedNames.has(name)) name += '$';
@@ -1573,7 +1555,9 @@ export function slotHooks(source, id, options) {
 		decls: [],
 		parallelHelpers: new Map(),
 		provenContextBindings: collectProvenContextBindings(ast),
-		usedNames: collectIdentifierNames(ast),
+		// Signal lowering has already reserved its generated locals as well as
+		// authored names, so subsequent helpers must allocate from the same set.
+		usedNames: signalLowering.usedNames,
 		slotBaseName: null,
 		hookSlotsName: null,
 		voidRootNames: new Map(),

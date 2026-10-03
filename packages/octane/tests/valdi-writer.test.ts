@@ -361,6 +361,28 @@ describe.each([false, true])('compiled Valdi writer behavior in dev=%s', (dev) =
 		expect(events).toEqual(['effect:6', 'cleanup:6', 'effect:10']);
 	});
 
+	it.each([false, true])(
+		'forwards method dependencies despite a shadowing local (strong=%s)',
+		(strong) => {
+			const fixture = writerFixture(
+				`import { useLayoutEffect } from 'octane';
+			 export function Scene(props) @{
+				const _$__methodDep = () => 42;
+				useLayoutEffect(() => props.notify());
+				<view value={_$__methodDep()} />
+			 }`,
+				dev,
+				{ strong },
+			);
+			const first = () => {};
+			const next = () => {};
+			expect(fixture.render(fixture.module.Scene, { notify: first })[0].props.value).toBe(42);
+			expect(fixture.effects[0].deps).toEqual([first]);
+			fixture.render(fixture.module.Scene, { notify: next });
+			expect(fixture.effects[0].deps).toEqual([next]);
+		},
+	);
+
 	it('resolves recursive calls through the registered component export', () => {
 		const fixture = writerFixture(
 			`export function Scene(props) @{
