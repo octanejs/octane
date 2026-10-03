@@ -1114,7 +1114,7 @@ function markStableMemoDependencies(analysis, inferred) {
 		}
 	}
 	for (const result of inferred.values()) {
-		for (const dependency of result.dependencies) {
+		for (const dependency of result.dependencies ?? []) {
 			if (!dependency.method && dependency.node.type === 'Identifier' && stable(dependency.binding))
 				dependency.stable = true;
 		}
@@ -1939,6 +1939,7 @@ function analyzeInternal(ast, options) {
 	if (options.inferDependencies === false) return { analysis, inferred };
 	markDependencyInvariantBindings(analysis);
 
+	const readBeforeInitialized = lateDependencyFinder(ast, analysis);
 	for (const candidate of analysis.candidates) {
 		const rawCallback = candidate.call.arguments[candidate.config.callback];
 		const callback = unwrapValue(rawCallback);
@@ -1959,6 +1960,10 @@ function analyzeInternal(ast, options) {
 				);
 			}
 		}
+		// A list that would read a capture before its initialization cannot track
+		// it, so run every render, as an omitted list does in React.
+		if (readBeforeInitialized(dependencies, candidate.call, candidate.scope) !== undefined)
+			dependencies = null;
 		inferred.set(candidate.call, {
 			name: candidate.name,
 			depsIndex: candidate.config.deps,
@@ -1992,9 +1997,9 @@ export function collectReassignedBindings(ast) {
 
 /**
  * Return inferred dependency expressions for every supported hook call whose
- * dependency argument is omitted. Explicit arrays, `null`, and any other
- * explicit dependency expression are left untouched. Read-only: the input AST
- * is never modified.
+ * dependency argument is omitted, or null where the hook must run on every
+ * render. Explicit arrays, `null`, and any other explicit dependency expression
+ * are left untouched. Read-only: the input AST is never modified.
  */
 export function analyzeHookDependencies(ast, options = {}) {
 	return analyzeInternal(ast, options).inferred;
@@ -2038,6 +2043,24 @@ export function analyzeCallbackDependencies(ast, callbacks, options = {}) {
 		inferred.set(original, dependencies);
 	}
 	return inferred;
+}
+
+// A dependency list is read where its hook is called, but the callback may read
+// a capture later. Returns the first dependency that the calling function
+// initializes after the call: there it is in its temporal dead zone, or an
+// undefined `var`. Source order says nothing about when an enclosing function or
+// the module initializes its bindings, which is usually before this function
+// runs, so their bindings keep their inferred dependencies.
+function lateDependencyFinder(ast, analysis) {
+	let initializedAt = null;
+	return (dependencies, call, scope) => {
+		const owner = nearestFunctionScope(scope);
+		return dependencies.find(({ binding }) => {
+			if (nearestFunctionScope(binding.scope) !== owner) return false;
+			initializedAt ??= initializationEnds(ast, analysis);
+			return (initializedAt.get(binding) ?? -1) > call.start;
+		});
+	};
 }
 
 // Where each variable or class binding finishes initializing: the end of its
@@ -2229,6 +2252,16 @@ export function analyzeStrongHookPolicies(ast, options = {}) {
 	const { analysis, callNames } = analyzeStrongHookBindings(ast, options);
 	const diagnostics = [];
 	let markedInvariants = false;
+	const markInvariants = () => {
+		if (markedInvariants) return;
+		markDependencyInvariantBindings(analysis);
+		markedInvariants = true;
+	};
+	const readBeforeInitialized = lateDependencyFinder(ast, analysis);
+	const inferredDependencies = (callback) =>
+		isFunction(callback)
+			? collectDependencies(callback, analysis.functionScopes.get(callback) ?? null, analysis)
+			: collectCallbackReference(callback, analysis);
 	for (const { call, scope } of analysis.calls) {
 		const name = callNames.get(call);
 		const config = DEPENDENCY_HOOKS.get(name);
@@ -2243,7 +2276,21 @@ export function analyzeStrongHookPolicies(ast, options = {}) {
 			continue;
 		}
 		const argument = call.arguments[config.deps];
-		if (argument === undefined || isUnshadowedUndefined(argument, scope)) continue;
+		if (argument === undefined || isUnshadowedUndefined(argument, scope)) {
+			// Inference would run this hook on every render, which is the
+			// untracked form Strong rejects when authored as `null`.
+			markInvariants();
+			const dependencies = inferredDependencies(unwrapValue(call.arguments[config.callback]));
+			const late = dependencies && readBeforeInitialized(dependencies, call, scope);
+			if (late)
+				diagnostics.push({
+					code: 'OCTANE_STRONG_UNTRACKED_EFFECT',
+					node: late.node,
+					severity: 'error',
+					message: `Strong mode does not allow ${name} to read \`${late.binding.name}\` before its declaration. Its dependencies are read where the hook is called, so the compiler cannot track this value and the hook would run on every render. Declare \`${late.binding.name}\` before calling ${name}.`,
+				});
+			continue;
+		}
 		const authored = unwrapValue(argument);
 		if (
 			(authored?.type === 'Literal' && authored.value === null) ||
@@ -2260,15 +2307,14 @@ export function analyzeStrongHookPolicies(ast, options = {}) {
 		}
 		let equivalent = false;
 		if (authored?.type === 'ArrayExpression') {
-			if (!markedInvariants) {
-				markDependencyInvariantBindings(analysis);
-				markedInvariants = true;
-			}
+			markInvariants();
 			const callback = unwrapValue(call.arguments[config.callback]);
-			const inferred = isFunction(callback)
-				? collectDependencies(callback, analysis.functionScopes.get(callback) ?? null, analysis)
-				: collectCallbackReference(callback, analysis);
-			equivalent = equivalentStrongDependencies(authored, callback, inferred, analysis);
+			equivalent = equivalentStrongDependencies(
+				authored,
+				callback,
+				inferredDependencies(callback),
+				analysis,
+			);
 		}
 		diagnostics.push({
 			code: 'OCTANE_STRONG_EXPLICIT_DEPENDENCIES',
@@ -2323,18 +2369,24 @@ function rebuildWithHookMetadata(ast, analysis, inferred, insertDeps, nativeRead
 			if (props !== undefined) Object.assign(out, props);
 			if (result !== undefined) {
 				// Only an omission (including Strong’s proven undefined placeholder) grants
-				// this capability. Arrays, null, and forwarded dependencies stay ordinary.
-				if (nativeReads && result.name === 'useMemo') out._octaneNativeInferredMemo = true;
+				// this capability. Arrays, null, and forwarded dependencies stay ordinary,
+				// and so does an omission inferred as null.
+				if (nativeReads && result.name === 'useMemo' && result.dependencies !== null)
+					out._octaneNativeInferredMemo = true;
 				if (insertDeps) {
 					const args = out.arguments.slice();
-					// The synthesized array maps to the hook call it belongs to; each
+					// The synthesized list maps to the hook call it belongs to; each
 					// dependency clone keeps its authored position.
 					args.splice(result.depsIndex, result.replaceDependency ? 1 : 0, {
-						...b.array(
-							result.dependencies.map((/** @type {any} */ dependency) =>
-								dependency.method ? methodDepNode(dependency) : cloneDependency(dependency.node),
-							),
-						),
+						...(result.dependencies === null
+							? b.literal(null)
+							: b.array(
+									result.dependencies.map((/** @type {any} */ dependency) =>
+										dependency.method
+											? methodDepNode(dependency)
+											: cloneDependency(dependency.node),
+									),
+								)),
 						start: node.start,
 						end: node.end,
 						loc: node.loc,
@@ -2379,7 +2431,7 @@ export function applyHookDependencies(ast, options = {}) {
 	// ('octane' vs 'octane/server') this pass cannot know.
 	if (options.onRuntimeHelper !== undefined) {
 		outer: for (const result of inferred.values()) {
-			for (const dependency of result.dependencies) {
+			for (const dependency of result.dependencies ?? []) {
 				if (dependency.method) {
 					options.onRuntimeHelper(METHOD_DEP_IMPORT);
 					break outer;

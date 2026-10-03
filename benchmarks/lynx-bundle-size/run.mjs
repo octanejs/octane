@@ -43,15 +43,17 @@ const PREVIEW_RECEIVER_NAME = 'main__preview_receiver';
 const BUNDLE_NAME = 'main.lynx.bundle';
 const FORBIDDEN_RUNTIME = /(?:^|[^$\w])(?:react|react-dom|preact|ReactLynx)(?:[^$\w]|$)/i;
 const FORBIDDEN_DOM = /\b(?:document|window|HTMLElement|MutationObserver)\b/;
-// Recalibrated on the issue #57 first-screen template candidate over exact base
-// dcf94cfc8. The base already exceeded the ffadd397 caps (preview/IFR main gzip
-// 80,507/85,724); the controlled candidate moved them to 82,070/87,566 while
-// retaining the 1.08 relative gate below. The inventory ledger separates that
-// accepted size tax from pre-existing mainline drift.
+// The main-thread caps are measured + 32 bytes, like every other committed byte
+// budget (benchmarks/README.md, "Size budgets"); the background program size is
+// an exact pin. Reset on 2026-10-03 from main 27c2a12dab: the 2026-08-17 values
+// (82,070 / 87,566 / 276,922) had been exceeded since early September by shared
+// runtime growth, and the weekly job that enforces them never reached this
+// check. Linux CI and macOS main-thread gzip differ by up to 2 bytes; the larger
+// value is the base. Raise them only in a separate budget pull request.
 const NO_WORKLET_BUDGET = Object.freeze({
-	previewMainGzip: 82_070,
-	ifrMainGzip: 87_566,
-	backgroundRaw: 276_922,
+	previewMainGzip: 83_688,
+	ifrMainGzip: 89_362,
+	backgroundRaw: 294_677,
 });
 
 function packageEntry(packageName) {

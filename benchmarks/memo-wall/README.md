@@ -153,12 +153,16 @@ eligible and are visible in the generated `react/compiler-runtime` cache code.
 | `ctx_through_wall_B`      | same, wall B                              | 0 row, 0 inner, **1000 leaf**    |
 
 All ops commit synchronously (`flushSync` inside the `window.__op` hooks); the
-harness first calibrates each target/operation to an 8ms batch, then forces
+harness first calibrates each target/operation to a 20ms batch, then forces
 `gc()` before every sample and divides the batch by its repetition count. This
-keeps auto-memoized and fine-grained regions above the browser timer's
-resolution without making slower memo-wall targets run oversized batches.
-Default 20 iterations (+5 warmup); `node run.mjs 50` for longer. The chosen
-repetition counts are recorded in each target's result metadata.
+keeps auto-memoized and fine-grained regions far above the browser timer's
+100µs resolution without making slower memo-wall targets run oversized batches.
+Targets are paired: for each operation every target's page is open at once, and
+each sample round visits all of them in a rotating order, so the two sides of a
+ratio guard share the runner's state. `mount` takes one fresh page per sample,
+paired the same way. Default 20 iterations (+5 warmup); `node run.mjs 50` for
+longer. The chosen repetition counts are recorded in each target's result
+metadata.
 
 Native **Preact** (`:5267`) uses `memo` and core context. **Svelte 5** (`:5278`)
 reports compiler-granular behavior: component-creation probes run once, context

@@ -120,7 +120,9 @@ function allocateHookSlot(state, origin, hookNames = null) {
 	return { ...b.id(name, origin), _octaneCompilerSlot: true };
 }
 
-function inferredDependencyArray(inferred, state, origin) {
+// A null inference runs the hook on every render.
+function inferredDependencyList(inferred, state, origin) {
+	if (inferred.dependencies === null) return inheritHookMemoOrigin(b.literal(null), origin);
 	return inheritHookMemoOrigin(
 		b.array(
 			inferred.dependencies.map((dependency) =>
@@ -218,7 +220,7 @@ function slotBaseHooks(ast, state, options) {
 		const mapped = mapChildren(node, visit);
 		const args = mapped.arguments.slice();
 		if (inferred !== undefined) {
-			args.splice(inferred.depsIndex, 0, inferredDependencyArray(inferred, state, node));
+			args.splice(inferred.depsIndex, 0, inferredDependencyList(inferred, state, node));
 		}
 		let callee = mapped.callee;
 		if (options.getterCalls.has(node) && options.stateGetterHelpers[imported]) {
