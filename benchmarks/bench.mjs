@@ -59,16 +59,7 @@ const url = (port) => `http://localhost:${port}/`;
 // waiver here. A waiver needs a reason (ideally an issue link) and an expiry
 // date — when it lapses the failure becomes fatal again and must be re-triaged,
 // so a known-bug exemption cannot quietly become permanent.
-//
-// A waiver also covers a suite whose harness fails before it writes numbers,
-// since that hides every guard in the suite until the failure is fixed.
-const HARNESS_FAILURE_ALLOWLIST = {
-	'scoped-descriptor-shapes': {
-		reason:
-			'Since #1069 (2026-09-16) every scoped element descriptor defines an enumerable __octaneInvocationSite accessor that ordinary descriptors carry only when set, so the two no longer share one shape. Decide the descriptor contract, then re-pin the expected keys.',
-		expires: '2026-10-24',
-	},
-};
+const HARNESS_FAILURE_ALLOWLIST = {};
 const todayISO = () => new Date().toISOString().slice(0, 10);
 
 const SUITES = [
@@ -1880,13 +1871,6 @@ function formatRatioBounds(guard) {
 			const res = await runSuite(suite);
 			resultsBySuite.set(suite.name, res);
 		} catch (e) {
-			const waiver = HARNESS_FAILURE_ALLOWLIST[suite.name];
-			if (waiver && todayISO() <= waiver.expires) {
-				console.error(
-					`! ${suite.name}: ${e.message} — waived until ${waiver.expires} (${waiver.reason})`,
-				);
-				continue;
-			}
 			console.error(`✗ ${suite.name}: ${e.message}`);
 			hardErrors.push(`${suite.name}: ${e.message}`);
 		}
