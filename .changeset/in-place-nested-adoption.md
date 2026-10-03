@@ -1,5 +1,0 @@
----
-'octane': patch
----
-
-Hydrate a component call that has no server range of its own when a component inside the callee's branch adopts the server node at the call. This happens when the server rendered another branch's markup there, and an arm of the callee's `@if` or `@switch` renders a component whose root matches that node. Hydration rendered the inner component in place of the node, but the call itself did not record that it had adopted the node. The page looked right after hydration, but two things went wrong. Swapping the component that the call renders, for example through an imported binding, left the old component's content on screen next to the new component. When the call was the whole arm of an adopted branch, the server nodes after the adopted node in that arm were never removed. The call now adopts the node with the component inside it, in development and production builds. A swap replaces the call's content, and the leftover server nodes are removed and reported once through `onRecoverableError`.

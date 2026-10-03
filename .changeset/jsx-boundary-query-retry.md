@@ -1,5 +1,0 @@
----
-'octane': patch
----
-
-Stop a query below a JSX `<Suspense>` from reloading without end during hydration, and resume the server value that a `.tsx` component reads in its returned JSX. A JSX `<Suspense>` or `<ErrorBoundary>` gave its try body a new identity on every render. A boundary retrying its own suspended first attempt therefore looked like it had received new children: it retired the attempt's queries and started fresh ones. When the browser had to load a query, for example one without a server seed, each load resolved into another retry and another load, and the page re-rendered indefinitely. The boundary now keeps one body and carries its children like a compiled `@try`, so only new children restart the attempt. On the server, a component's returned value rendered outside that component's signal owner, while the client renders it inside. A `query$` that a `.tsx` component reads with `.get()` in its returned JSX was therefore seeded under the parent's identity and loaded twice on the server, and the browser loaded it again with a hydration mismatch. The server now renders a returned value inside its component's owner.

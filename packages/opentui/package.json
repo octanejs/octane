@@ -1,6 +1,6 @@
 {
   "name": "@octanejs/opentui",
-  "version": "0.0.12",
+  "version": "0.0.13",
   "license": "MIT",
   "type": "module",
   "sideEffects": false,
@@ -52,7 +52,7 @@
   },
   "peerDependencies": {
     "@opentui/core": ">=0.5.8 <0.6.0",
-    "octane": "workspace:^0.7.0"
+    "octane": "workspace:^0.8.0"
   },
   "devDependencies": {
     "@opentui/core": "catalog:default",

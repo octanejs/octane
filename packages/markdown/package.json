@@ -1,6 +1,6 @@
 {
   "name": "@octanejs/markdown",
-  "version": "0.0.23",
+  "version": "0.0.24",
   "license": "MIT",
   "type": "module",
   "sideEffects": false,
@@ -50,7 +50,7 @@
     "vfile": "^6.0.0"
   },
   "peerDependencies": {
-    "octane": "workspace:^0.7.0"
+    "octane": "workspace:^0.8.0"
   },
   "devDependencies": {
     "@octanejs/testing-library": "workspace:*",

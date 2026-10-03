@@ -1,6 +1,6 @@
 {
   "name": "@octanejs/motion",
-  "version": "0.1.57",
+  "version": "0.1.58",
   "license": "MIT",
   "type": "module",
   "sideEffects": false,
@@ -50,7 +50,7 @@
     "motion-dom": "catalog:default"
   },
   "peerDependencies": {
-    "octane": "workspace:^0.7.0"
+    "octane": "workspace:^0.8.0"
   },
   "devDependencies": {
     "@swc/core": "1.15.41",

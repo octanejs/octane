@@ -1,6 +1,6 @@
 {
   "name": "@octanejs/auto-animate",
-  "version": "0.0.13",
+  "version": "0.0.14",
   "description": "Octane binding for @formkit/auto-animate 0.10.0: vanilla core reused, React useAutoAnimate ported.",
   "license": "MIT",
   "type": "module",
@@ -41,7 +41,7 @@
     "@formkit/auto-animate": "0.10.0"
   },
   "peerDependencies": {
-    "octane": "workspace:^0.7.0"
+    "octane": "workspace:^0.8.0"
   },
   "devDependencies": {
     "@octanejs/testing-library": "workspace:*",

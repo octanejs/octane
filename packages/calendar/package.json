@@ -1,6 +1,6 @@
 {
   "name": "@octanejs/calendar",
-  "version": "0.0.14",
+  "version": "0.0.15",
   "description": "react-calendar for Octane.",
   "license": "MIT",
   "type": "module",
@@ -49,7 +49,7 @@
     "warning": "^4.0.0"
   },
   "peerDependencies": {
-    "octane": "workspace:^0.7.0"
+    "octane": "workspace:^0.8.0"
   },
   "devDependencies": {
     "@octanejs/testing-library": "workspace:*",
