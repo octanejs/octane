@@ -682,7 +682,8 @@ export function App(props) @{
 	});
 
 	// A closure reads its bindings when it runs, after the body has finished.
-	// A later var or a later assignment is not the value at the declaration.
+	// A later var, a later assignment, or a binding whose own initializer holds
+	// the declaration is not the value at the declaration.
 	const lateBindingHooks = loadPlainHookFixtureSource<any>(
 		`import { derived$ } from 'octane/signals';
 export function useLaterVar$(next: string) {
@@ -695,6 +696,10 @@ export function useReassigned$(first: string, last: string) {
 	const label$ = derived$(() => value);
 	value = last;
 	return label$;
+}
+export function useCount$(items: string[]) {
+	const api = { count$: derived$(() => api.items.length), items };
+	return api.count$;
 }`,
 		{
 			id: '/local-derived-late-bindings.ts',
@@ -704,11 +709,12 @@ export function useReassigned$(first: string, last: string) {
 		},
 	);
 	const lateBindingUser = loadCompiledFixtureSource<any>(
-		`import { useLaterVar$, useReassigned$ } from './local-derived-late-bindings';
+		`import { useCount$, useLaterVar$, useReassigned$ } from './local-derived-late-bindings';
 export function App(props) @{
  const later$ = useLaterVar$(props.next);
  const reassigned$ = useReassigned$('first', props.last);
- <p>{(later$.get() + '|' + reassigned$.get()) as string}</p>
+ const count$ = useCount$(props.items);
+ <p>{(later$.get() + '|' + reassigned$.get() + '|' + String(count$.get())) as string}</p>
 }`,
 		{
 			id: '/local-derived-late-bindings-user.tsrx',
@@ -720,13 +726,13 @@ export function App(props) @{
 			},
 		},
 	);
-	it('follows a later var and a later assignment its closure reads', async () => {
+	it('follows a later var, a later assignment, and its own initializer', async () => {
 		const { App } = lateBindingUser;
-		const root = mount(App, { next: '>', last: 'a' });
+		const root = mount(App, { next: '>', last: 'a', items: ['x'] });
 		try {
-			expect(root.find('p').textContent).toBe('>|a');
-			await act(() => root.update(App, { next: '#', last: 'b' }));
-			expect(root.find('p').textContent).toBe('#|b');
+			expect(root.find('p').textContent).toBe('>|a|1');
+			await act(() => root.update(App, { next: '#', last: 'b', items: ['x', 'y'] }));
+			expect(root.find('p').textContent).toBe('#|b|2');
 		} finally {
 			root.unmount();
 		}

@@ -1810,9 +1810,10 @@ export function analyzeHookDependencies(ast, options = {}) {
  * `invariantCall` marks a `const` initialized by that call as one identity for
  * the lifetime of its scope, like a ref. `evaluatedAt` gives the source offset
  * where a callback's captures would be read eagerly, for a callback that runs
- * later. A capture declared after that offset is in its temporal dead zone or
- * still undefined there, and a reassigned one may change before the callback
- * reads it, so such a callback reports null.
+ * later. A capture initialized after that offset, including one whose own
+ * initializer holds the callback, is in its temporal dead zone or still
+ * undefined there, and a reassigned one may change before the callback reads
+ * it, so such a callback reports null.
  */
 export function analyzeCallbackDependencies(ast, callbacks, options = {}) {
 	const analysis = buildScopes(
@@ -1821,7 +1822,7 @@ export function analyzeCallbackDependencies(ast, callbacks, options = {}) {
 		new Set(['octane', ...(options.hookRuntimeModules || [])]),
 	);
 	markDependencyInvariantBindings(analysis, options.invariantCall ?? null);
-	const declaredAt = options.evaluatedAt ? declarationStarts(ast, analysis) : null;
+	const declaredAt = options.evaluatedAt ? initializationEnds(ast, analysis) : null;
 	const inferred = new Map();
 	for (const original of callbacks) {
 		const callback = unwrapValue(original);
@@ -1841,13 +1842,13 @@ export function analyzeCallbackDependencies(ast, callbacks, options = {}) {
 	return inferred;
 }
 
-// The last declaration of each variable or class binding: a repeated `var`
-// assigns again where it appears.
-function declarationStarts(ast, analysis) {
-	const starts = new Map();
-	for (const { bindings } of analysis.declarators) {
-		for (const { pattern, binding } of bindings)
-			if (!(starts.get(binding) >= pattern.start)) starts.set(binding, pattern.start);
+// Where each variable or class binding finishes initializing: the end of its
+// last declarator, since a repeated `var` assigns again where it appears.
+function initializationEnds(ast, analysis) {
+	const ends = new Map();
+	for (const { decl, bindings } of analysis.declarators) {
+		for (const { binding } of bindings)
+			if (!(ends.get(binding) >= decl.end)) ends.set(binding, decl.end);
 	}
 	const seen = new WeakSet();
 	const visit = (node) => {
@@ -1863,12 +1864,12 @@ function declarationStarts(ast, analysis) {
 				: undefined;
 		if (scope !== undefined) {
 			const binding = resolveBinding(scope, node.id.name);
-			if (binding !== null && !starts.has(binding)) starts.set(binding, node.start);
+			if (binding !== null && !ends.has(binding)) ends.set(binding, node.end);
 		}
 		for (const key in node) if (!AST_META_KEYS.has(key)) visit(node[key]);
 	};
 	visit(ast);
-	return starts;
+	return ends;
 }
 
 // Strong dependency policy deliberately shares inference's lexical graph and
