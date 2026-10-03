@@ -1746,20 +1746,25 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 			return;
 		}
 		// Copying a measurement of the committed DOM into state is the job
-		// useLayoutSnapshot does without a second render pass.
+		// useLayoutSnapshot does without a second render pass. The read may sit
+		// in the effect's own setup, or in the function the update runs in: a
+		// helper setup calls, or a microtask or transition callback that still
+		// counts as setup.
 		const effect = currentEffect;
-		if (effect !== null && !effect.snapshot && effect.callback?.kind === 'callback') {
-			effect.measures ??= readsLayout(effect.callback.node);
-		}
+		const measures =
+			effect !== null &&
+			!effect.snapshot &&
+			((effect.callback?.kind === 'callback' && measuresLayout(effect.callback.node)) ||
+				measuresLayout(currentFunction));
 		if (effect?.ref === true) {
 			report(
 				STRONG_REF_STATE_UPDATE,
 				node,
-				effect.measures === true
+				measures
 					? 'Strong mode does not allow synchronous state updates in a callback ref. Octane calls it while the element commits, before paint, like layout effect setup, and this one copies a DOM measurement into state. Pass a ref object and render from the measurement with useLayoutSnapshot(() => measure(), { initial }) instead: it measures after layout and re-renders before paint only when the value changes.'
 					: 'Strong mode does not allow synchronous state updates in a callback ref. Octane calls it while the element commits, before paint, like layout effect setup, so startTransition, queueMicrotask, Promise.resolve().then, and a zero-delay setTimeout count too. Pass a ref object to keep the element, and read it from effects and event handlers. Render from a DOM measurement with useLayoutSnapshot.',
 				[
-					effect.measures === true
+					measures
 						? {
 								hook: 'useLayoutSnapshot',
 								message:
@@ -1770,7 +1775,7 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 			);
 			return;
 		}
-		if (effect?.measures === true) {
+		if (measures) {
 			report(
 				STRONG_EFFECT_STATE_UPDATE,
 				node,
@@ -1954,6 +1959,14 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 			(staticExpressionValue(expression, scope) & ~NULLISH_VALUE) === 0 ||
 			definitelySkippedOptionalContinuation(unwrap(expression), scope)
 		);
+	}
+
+	const layoutReaders = new WeakMap();
+	function measuresLayout(fn) {
+		if (fn == null) return false;
+		let reads = layoutReaders.get(fn);
+		if (reads === undefined) layoutReaders.set(fn, (reads = readsLayout(fn)));
+		return reads;
 	}
 
 	// React's lazy ref idiom reads and writes `current` during render. Both
