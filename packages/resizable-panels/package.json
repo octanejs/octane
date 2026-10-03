@@ -35,7 +35,7 @@
     "upstream:verify": "node ../../scripts/react-parity/verify-provenance.mjs && node audit/verify-provenance.mjs",
     "upstream:verify:negative-controls": "node audit/verify-provenance.mjs --negative-controls",
     "typecheck:probes": "tsc --noEmit -p audit/type-probes/tsconfig.pristine.json && tsrx-tsc --noEmit -p typetests/tsconfig.json",
-    "typecheck": "tsrx-tsc --noEmit -p tsconfig.json && tsrx-tsc --noEmit -p typetests/tsconfig.json"
+    "typecheck": "octane-tsc -p tsconfig.json -p typetests/tsconfig.json"
   },
   "peerDependencies": {
     "octane": "workspace:^0.7.0"

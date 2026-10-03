@@ -24,7 +24,7 @@ export function onDocumentPointerDown(event: PointerEvent) {
 				didChangeFocus = true;
 
 				current.separator.element.focus({
-					// @ts-expect-error https://developer.mozilla.org/en-US/docs/Web/API/HTMLElement/focus#browser_compatibility
+					// https://developer.mozilla.org/en-US/docs/Web/API/HTMLElement/focus#browser_compatibility
 					focusVisible: false,
 					preventScroll: true,
 				});
