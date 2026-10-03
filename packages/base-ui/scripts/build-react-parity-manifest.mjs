@@ -109,6 +109,7 @@ for (const name of ['base-ui', 'base-ui-utils']) {
 								`${prefix}/tests/${pristine ? 'vitest.pristine.browser.config.ts' : 'vitest.browser.config.ts'}`,
 							),
 							evidence('patches/@vitest__browser@4.1.10.patch'),
+							evidence('patches/@vitest__browser-playwright@4.1.10.patch'),
 							evidence('patches/@vitest__mocker@4.1.10.patch'),
 							...(!pristine ? [evidence(`${prefix}/tests/support/browser-renderer.ts`)] : []),
 						]
