@@ -403,6 +403,77 @@ it.each([false, true])(
 	},
 );
 
+async function activeIsland(owner: ReturnType<typeof createScope>, unmount: () => void) {
+	metadata();
+	const element = document.createElement('div');
+	element.setAttribute('data-octane-hydrate-id', 'widget');
+	element.setAttribute('data-octane-hydrate-when', 'interaction');
+	element.innerHTML = '<button>Original</button>';
+	document.body.append(element);
+	const manifest = createIndependentHydrateManifest(
+		{
+			version: 1,
+			boundaryId: 'template',
+			exportName: 'default',
+			captureSchema: [],
+			hookSeed: 0,
+			idSeed: 0,
+			signalSites: [],
+			parentDependencies: false,
+		},
+		[],
+		'widget',
+		'build',
+		{ moduleId: 'widget.js', styles: [] },
+	);
+	const independent = registerIndependentHydrationIsland(element, manifest, {
+		load: async () => ({ default: () => ({ unmount }) }),
+		loadStyles() {},
+		signalOwner: owner,
+	});
+	const lifecycle = installSignalDocumentLifecycle({
+		document,
+		signalOwner: owner,
+		buildId: 'build',
+		documentId: 'document',
+		independentHydration: independent,
+	});
+	cleanups.push(lifecycle.dispose);
+	element.firstElementChild!.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+	await tick();
+	return lifecycle;
+}
+
+// Leaving the page tears islands down before it retires their document data,
+// so an island's own cleanup still reads live signals and is never notified
+// of the retirement.
+it('unmounts independent islands before it retires their document signals', async () => {
+	const owner = createScope({ scopeKey: 'island-exit-document' });
+	const label$ = owner.signal$('label', 'live');
+	const seen: unknown[] = [];
+	const unmount = vi.fn(() => {
+		try {
+			seen.push(label$.get());
+		} catch (error) {
+			seen.push(error);
+		}
+	});
+	await activeIsland(owner, unmount);
+	transition('pagehide', false);
+	expect(unmount).toHaveBeenCalledOnce();
+	expect(seen).toEqual(['live']);
+	expect(owner.retired).toBe(true);
+});
+
+it('still retires document signals when an island fails to unmount', async () => {
+	const owner = createScope({ scopeKey: 'island-failed-exit-document' });
+	const lifecycle = await activeIsland(owner, () => {
+		throw new Error('cleanup failed');
+	});
+	expect(() => lifecycle.dispose()).toThrow('cleanup failed');
+	expect(owner.retired).toBe(true);
+});
+
 it('keeps completed query data and writable drafts without refetching on restore', async () => {
 	const { signalOwner: owner } = install();
 	const load = vi.fn(async () => 'completed');
