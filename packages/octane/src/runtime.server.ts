@@ -10383,6 +10383,16 @@ function pruneStreamBoundariesAbsentFromShell(
 	}
 }
 
+// A presentation-binding view labels a @try boundary's own range with the arm
+// it rendered (0 content, 1 pending, 2 catch). The label replaces the plain open
+// marker, so renderer hydration still sees one balanced range. Module scope keeps
+// ssrTry, which runs once per boundary per pass, free of a per-call closure.
+function ssrTryArm(content: string, arm: 0 | 1 | 2, bindingMarker: string | undefined): string {
+	return bindingMarker === undefined || !MARKERS
+		? ssrBlock(content)
+		: '<!--' + bindingMarker + arm + '-->' + content + BLOCK_CLOSE;
+}
+
 /**
  * Compiled `@try` / JSX `<Suspense>` boundary. `siteKey` is the compiler's
  * source-position hash; combined with the frame path + per-frame occurrence it
@@ -10410,13 +10420,6 @@ export function ssrTry(
 	bindingMarker?: string,
 ): string {
 	VT_SSR_TRY_SEQ++;
-	// A presentation-binding view labels this boundary's own range with the arm
-	// it rendered (0 content, 1 pending, 2 catch). The label replaces the plain
-	// open marker, so renderer hydration still sees one balanced range.
-	const slot = (content: string, arm: 0 | 1 | 2): string =>
-		bindingMarker === undefined || !MARKERS
-			? ssrBlock(content)
-			: '<!--' + bindingMarker + arm + '-->' + content + BLOCK_CLOSE;
 	// Consume the nearest un-consumed outer ViewTransition candidate: its
 	// name/share/update propagate onto this boundary's streamed content chunk
 	// so the old/new captures pair across the swap (Fizz vt-* parity).
@@ -10654,12 +10657,13 @@ export function ssrTry(
 			fallback = renderFallback();
 		}
 		if (entry !== undefined) {
-			return slot(
+			return ssrTryArm(
 				'<template ' + STREAM_BOUNDARY_ATTR + '="' + entry.id + '"></template>' + fallback,
 				1,
+				bindingMarker,
 			);
 		}
-		return slot(nativeFreshArm(pendFn !== null ? fallback : ''), 1);
+		return ssrTryArm(nativeFreshArm(pendFn !== null ? fallback : ''), 1, bindingMarker);
 	};
 	try {
 		try {
@@ -10718,7 +10722,7 @@ export function ssrTry(
 					nativeReads,
 					RESOLVED?.initialDocumentSignals,
 				);
-				return slot(
+				return ssrTryArm(
 					`<!--${SUSPENSE_RESOLVED_COMMENT}${idCount}-->` +
 						(seeds.length === 0
 							? ''
@@ -10728,9 +10732,10 @@ export function ssrTry(
 							: serializeNativeSignalSeeds(native, NONCE_ATTR, SUSPENSE_RESOLVED_NATIVE_ATTR)) +
 						inner,
 					0,
+					bindingMarker,
 				);
 			}
-			return slot(inner, 0);
+			return ssrTryArm(inner, 0, bindingMarker);
 		} catch (e) {
 			nativeFresh = NATIVE_SERVER_FAILURES !== nativeFailureStart;
 			e = normalizeThrownServerThenable(e);
@@ -10824,7 +10829,7 @@ export function ssrTry(
 					return pendingForm();
 				}
 				if (!nativeFresh) appendNativeSeedReads(catchReads);
-				return slot(inner, 2);
+				return ssrTryArm(inner, 2, bindingMarker);
 			}
 			if (stream !== null) {
 				// Fizz keeps a Suspense shell valid when its primary content throws:
