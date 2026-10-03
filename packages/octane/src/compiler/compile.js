@@ -160,6 +160,7 @@ import {
 // dom-tables.js header for per-table semantics.
 import {
 	VOID_ELEMENTS,
+	READ_ONLY_VALUE_INPUT_TYPES,
 	BOOLEAN_ATTR_PROPS,
 	MUST_USE_PROPERTY_PROPS,
 	POSITIVE_NUMERIC_ATTR_PROPS,
@@ -2537,6 +2538,66 @@ function isEventAttrName(name) {
 	return name.length > 2 && name.startsWith('on') && /^[A-Z]/.test(name[2]);
 }
 
+/**
+ * DEV SSR: the authored props of one host element that need client code and
+ * that server output erases: event handlers, `ref`, and a `value`/`checked`
+ * the user can edit (React's controlled-without-a-handler rule, with native
+ * readOnly/disabled editability). The server runtime reports them when an
+ * islands-only shell renders the element outside its independent islands.
+ * Only literals are known here: a non-literal handler, ref, or value counts,
+ * while a non-literal readOnly or disabled may lock the field, so it does not.
+ * Returns the names space-separated, or null for the common inert element.
+ */
+function ssrShellClientWork(tag, attrs) {
+	const values = new Map();
+	for (const attr of attrs) {
+		if (attr.type === 'Attribute' || attr.type === 'JSXAttribute') {
+			values.set(jsxAttrRawName(attr), attr.value);
+		}
+	}
+	// `{ value }` for a bare or literal attribute, null when only runtime knows.
+	// Type-only wrappers (`as`, `!`, `satisfies`, parentheses) keep a literal known.
+	const known = (value) => {
+		if (value == null) return { value: true };
+		const expression = unwrapTsExpr(
+			value.type === 'JSXExpressionContainer' ? value.expression : value,
+		);
+		if (expression.type === 'Literal') return { value: expression.value };
+		if (expression.type === 'Identifier' && expression.name === 'undefined') {
+			return { value: undefined };
+		}
+		return null;
+	};
+	const present = (name) => {
+		if (!values.has(name)) return false;
+		const value = known(values.get(name));
+		return value === null || value.value != null;
+	};
+	const work = [];
+	for (const [name, value] of values) {
+		if (name !== 'ref' && !isEventAttrName(name)) continue;
+		// A literal is never a handler or ref: null/undefined clear it, and a
+		// string `on*` attribute is dropped (with a DEV warning) on both sides.
+		if (value != null && known(value) === null) work.push(name);
+	}
+	const enabled = (name) => {
+		const value = values.has(name) ? known(values.get(name)) : { value: false };
+		return value === null || !!value.value;
+	};
+	if (
+		(tag === 'input' || tag === 'textarea' || tag === 'select') &&
+		!enabled('disabled') &&
+		(tag === 'select' || (!enabled('readOnly') && !enabled('readonly')))
+	) {
+		const type = tag === 'input' && values.has('type') ? known(values.get('type')) : null;
+		if (present('value') && !(type !== null && READ_ONLY_VALUE_INPUT_TYPES.has(type.value))) {
+			work.push('value');
+		}
+		if (tag === 'input' && present('checked')) work.push('checked');
+	}
+	return work.length === 0 ? null : work.join(' ');
+}
+
 // All keys + values are string/number/bool literals → safe to serialize at
 // compile time into a `style="…"` HTML attribute (no runtime cost). Keys that
 // are computed or properties with non-literal values disqualify the whole
@@ -3598,6 +3659,75 @@ function autoCalculationOf(expression, selfName, componentLocals, ctx, immutable
 	return { init, deps, immutableProjection };
 }
 
+// The single-name `const` declarator a calculation can replace, or null.
+function calculationDeclarator(stmt) {
+	if (stmt.type !== 'VariableDeclaration' || stmt.kind !== 'const') return null;
+	if (stmt.declarations?.length !== 1) return null;
+	const decl = stmt.declarations[0];
+	if (!decl || decl.id?.type !== 'Identifier' || !decl.init) return null;
+	return decl;
+}
+
+/**
+ * Extends the template's reads through every calculation that will be cached.
+ * A cache hits only while each of its dependencies keeps its identity, so a
+ * `const` that only another cached calculation reads is a render read too.
+ * Otherwise it recomputes every render and the calculation reading it misses
+ * every render as well. Runs a worklist to a fixed point, so a chain of any
+ * length closes. A declaration that rewriteAutoCalculation would leave alone
+ * (a hook call, a live receiver, a `let`, a self-reference) adds nothing, and a
+ * value only a handler reads never enters.
+ *
+ * A cache evaluates its dependencies where the declaration stands, so a
+ * calculation whose callback reads a binding declared later in `statements`
+ * would throw in that binding's temporal dead zone. Such a declaration leaves
+ * the set and stays uncached. Mutates and returns `renderReadNames`.
+ */
+function closeCalculationReads(
+	statements,
+	renderReadNames,
+	componentLocals,
+	ctx,
+	immutableStates = null,
+) {
+	if (renderReadNames.size === 0) return renderReadNames;
+	const declaredAt = new Map();
+	const declarators = new Map();
+	for (let index = 0; index < statements.length; index++) {
+		const statement = statements[index];
+		if (statement.type === 'VariableDeclaration' && statement.kind !== 'var') {
+			const names = new Set();
+			for (const declaration of statement.declarations) collectPatternNames(declaration.id, names);
+			for (const name of names) declaredAt.set(name, index);
+		} else if (statement.type === 'ClassDeclaration' && statement.id) {
+			declaredAt.set(statement.id.name, index);
+		}
+		const decl = calculationDeclarator(statement);
+		if (decl !== null) declarators.set(decl.id.name, decl);
+	}
+	const forward = [];
+	const pending = [...renderReadNames];
+	while (pending.length > 0) {
+		const name = pending.pop();
+		const decl = declarators.get(name);
+		if (decl === undefined) continue;
+		const calculation = autoCalculationOf(decl.init, name, componentLocals, ctx, immutableStates);
+		if (calculation === null) continue;
+		const at = declaredAt.get(name);
+		if (calculation.deps.some((dependency) => declaredAt.get(dependency) > at)) {
+			forward.push(name);
+			continue;
+		}
+		for (const dependency of calculation.deps) {
+			if (renderReadNames.has(dependency)) continue;
+			renderReadNames.add(dependency);
+			pending.push(dependency);
+		}
+	}
+	for (const name of forward) renderReadNames.delete(name);
+	return renderReadNames;
+}
+
 function rewriteAutoCalculation(
 	stmt,
 	componentLocals,
@@ -3605,11 +3735,8 @@ function rewriteAutoCalculation(
 	ctx,
 	immutableStates = null,
 ) {
-	if (stmt.type !== 'VariableDeclaration' || stmt.kind !== 'const') return stmt;
-	if (stmt.declarations?.length !== 1) return stmt;
-	const decl = stmt.declarations[0];
-	if (!decl || decl.id?.type !== 'Identifier' || !decl.init) return stmt;
-	if (!renderReadNames.has(decl.id.name)) return stmt;
+	const decl = calculationDeclarator(stmt);
+	if (decl === null || !renderReadNames.has(decl.id.name)) return stmt;
 	const calculation = autoCalculationOf(
 		decl.init,
 		decl.id.name,
@@ -4051,10 +4178,7 @@ function lowerNativeAutoCalculation(statement, ctx, componentName, scoped = true
 		if (immutable !== undefined) misses.push(b.unary('!', immutableGuard()));
 		region = b.block([
 			...depDeclarations,
-			b.const(
-				slot,
-				b.call(requireRuntimeForContext(ctx, 'memoSlot'), b.id(rawSlot), b.literal('useMemo')),
-			),
+			b.const(slot, b.call(requireRuntimeForContext(ctx, 'memoSlot'), b.id(rawSlot))),
 			b.const(
 				previous,
 				b.call(
@@ -10389,6 +10513,7 @@ function compileAuthored(source, filename, options, bundlerMetadata) {
 				: isKnownTextChildExpression,
 		),
 		cleanFilename,
+		{ hmr: mode === 'client' && Boolean(options?.hmr) },
 	);
 	if (bundlerMetadata !== null) bundlerMetadata.hydrateAst = signalAst;
 	const memoizedAst = strongModeEnabled
@@ -13950,7 +14075,10 @@ function ssrEmitElement(node, ctx, name, inlinedSubs, parentNs, cssHash, compone
 			: ssrVoid(node);
 		ctx.runtimeNeeded.add('ssrElement');
 		const args = [b.literal(tag, JSON.stringify(tag)), source, ssrThunk(body, node)];
+		const clientWork = ssrShellClientWork(tag, attrs);
 		if (htmlIntegrationPoint) args.push(b.literal(true, 'true'));
+		else if (clientWork !== null) args.push(ssrVoid(node));
+		if (clientWork !== null) args.push(b.literal(clientWork, JSON.stringify(clientWork)));
 		return ssrCall('ssrElement', args, node);
 	};
 
@@ -16781,7 +16909,13 @@ function compileFunctionBody(node, ctx, name, parentNs = 'html', cssHash = null,
 				workingStatements = [...workingStatements, ...hoistedCalculations];
 				ctx.currentComponentLocals = new Set([...ctx.currentComponentLocals, ...hoisted.names]);
 			}
-			const renderReadNames = collectRenderReadNames(jsxNodes, ctx);
+			const renderReadNames = closeCalculationReads(
+				workingStatements,
+				collectRenderReadNames(jsxNodes, ctx),
+				ctx.currentComponentLocals,
+				ctx,
+				immutableStateProvenance,
+			);
 			if (renderReadNames.size > 0) {
 				workingStatements = workingStatements.map((statement) => {
 					const rewritten = rewriteAutoCalculation(
@@ -19728,7 +19862,10 @@ function appendHookSlotArgument(name, args, slot, numeric, origin) {
 	if (position !== undefined) {
 		while (out.length < position) out.push(b.id('undefined', origin));
 	}
-	out.push(typeof slot === 'string' ? b.id(slot, origin) : inheritOriginLoc(slot, origin));
+	out.push({
+		...(typeof slot === 'string' ? b.id(slot, origin) : inheritOriginLoc(slot, origin)),
+		_octaneCompilerSlot: true,
+	});
 	return out;
 }
 
@@ -20726,7 +20863,15 @@ function compileReturnJsxFunction(node, ctx, options) {
 		const renderedRoots = authoredStatements
 			.filter((statement) => statement.type === 'ReturnStatement' && isJsxNode(statement.argument))
 			.map((statement) => statement.argument);
-		const renderReadNames = collectRenderReadNames(renderedRoots, ctx);
+		// Only declarations after the first authored hook are rewritten below, so
+		// only they extend the chain.
+		const firstHook = authoredStatements.findIndex(establishesRenderScope);
+		const renderReadNames = closeCalculationReads(
+			firstHook === -1 ? [] : authoredStatements.slice(firstHook + 1),
+			collectRenderReadNames(renderedRoots, ctx),
+			ctx.currentComponentLocals,
+			ctx,
+		);
 		let autoCalculatedDeclarations = null;
 		let renderScopeEstablished = false;
 		newStatements = authoredStatements.flatMap((sourceStatement) => {

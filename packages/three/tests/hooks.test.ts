@@ -151,7 +151,7 @@ describe('Three hooks and graph helpers', () => {
 			expect(initial.object).toBeInstanceOf(THREE.Group);
 			expect(initial.instance.object).toBe(initial.object);
 			expect(initial.instanceHandle.current).toBe(initial.instance);
-			expect(initial.instance.root.commits.length).toBeGreaterThan(0);
+			expect(initial.instance.root.scene).toBe(scene);
 			expect(initial.graph.nodes['fixture-mesh']).toBe(graphMesh);
 			expect(initial.graph.meshes['fixture-mesh']).toBe(graphMesh);
 			expect(initial.graph.materials['fixture-material']).toBe(material);

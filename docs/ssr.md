@@ -428,6 +428,17 @@ concurrently rather than awaiting `allReady` before reading. Same
   before it propagates.
 - `identifierPrefix?: string` — namespaces root-local `useId` values. Pass the
   same value to `hydrateRoot` and use distinct prefixes for sibling roots.
+- `shellWitness?: (witness: ShellWitness) => void` — development only. Called
+  once per construct and site that needs client code but renders outside every
+  independent `<Hydrate>` island: an event handler or function form action, a
+  ref, an effect or store-subscription hook, a controlled `value`/`checked` the
+  user can edit, or a live signal-handle binding. Each witness names its `kind`,
+  the prop, hook, or signal kind, and where known the host `tag`, the element's
+  source `location`, and the rendering `component`. It reports what the render
+  reaches, including a suspended `@try` arm it attempts, and never changes the
+  output. The Vite dev server uses it to check
+  [islands-only routes](#islands-only-routes). Production renders ignore it,
+  because production compiler output erases static handler and ref props.
 - `signal?: AbortSignal` — abort a suspended async/streaming render when the
   request dies; pending promises reject with `signal.reason` and streams cancel.
 - `timeoutMs?: number` — per-render override of the suspense settle deadline;
@@ -629,6 +640,17 @@ islands entry or the `preHydrate` hook reaches the renderer. This is a
 conservative source check of the shell, not a semantic proof; anything it cannot
 check is rejected. Client navigation into an islands-only route is not
 supported, and the Rsbuild integration refuses the option for now.
+
+The dev server also checks what each request's render reaches. When an
+islands-only shell renders an event handler, ref, effect or store subscription,
+editable controlled value, or live signal binding outside its independent
+islands, the server warns once with the element's source location or the
+component's name, and keeps serving the route. This follows components passed
+by reference, aliases, spreads, and elements that helpers create, which a source
+check cannot follow, but it sees only the branches a request renders.
+Production servers do not run it: production compiler output drops static
+handler and ref props before rendering, and the routes stream per request, so
+there is no build-time render to check.
 
 ### Root boundaries, server functions, and CSP
 

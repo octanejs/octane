@@ -11,7 +11,7 @@ import {
 	useTransition,
 } from 'octane';
 import { createResource, createScope, query, type QueryContext } from 'octane/signals';
-import { formatCounter$ } from './signals-native-readers';
+import { boxValue, counterParts$, formatCounter$ } from './signals-native-readers';
 
 export function createCounter$(scopeKey = 'native-counter', initial = 0) {
 	const scope = createScope({ scopeKey });
@@ -32,6 +32,23 @@ export function DerivedReader(props: CounterFixture) @{
 
 export function ImportedReader(props: CounterFixture) @{
 	<p class="signal-value">{formatCounter$(props) as string}</p>
+}
+
+// A chain of cached calculations whose first link reads a signal inside an
+// imported helper. The read witness must invalidate that link, and through it
+// the link the template reads.
+export function NativeChainedReader(props: CounterFixture & {
+	identify: (value: object) => string;
+}) @{
+	const [tick, setTick] = useState(0);
+	const parts = counterParts$(props);
+	const boxed = boxValue(parts);
+	<section>
+		<button class="tick" onClick={() => setTick(tick + 1)}>{'tick'}</button>
+		<p class="signal-value">{String(boxed.value[0])}</p>
+		<span class="identity">{props.identify(boxed) as string}</span>
+		<span class="tick-value">{String(tick)}</span>
+	</section>
 }
 
 const MemoReader = memo(SignalReader);

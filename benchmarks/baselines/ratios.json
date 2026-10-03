@@ -1001,6 +1001,14 @@
   },
   {
     "suite": "memo-wall",
+    "op": "bail_own_lookups",
+    "target": "bail-compare",
+    "reference": "bail-compare-work-budget",
+    "maxRatio": 1,
+    "note": "A memo row with four primitive props and one callback compares equal props with one own-prop lookup, for the callback. #1279 looked up every key, five per row, which slowed memo-wall one_change_B's 999 value-comparing bails; render probes, host identity, and a single changed row are checked in the same run."
+  },
+  {
+    "suite": "memo-wall",
     "op": "mount",
     "target": "octane-tsrx",
     "reference": "react",
@@ -1253,8 +1261,8 @@
     "op": "gzip",
     "target": "compiled",
     "reference": "source",
-    "maxRatio": 1.06,
-    "note": "The former 24397 / 23519 corpus record became invalid when its supposedly fixed behavioral fixtures changed; canonical main now measures 26666 / 24713 = 1.079x on those same current files. Lifetime-invariant callbacks, immutable-host aliases, and exact template interning reduce the reviewed current corpus to about 26130 / 24713 = 1.057x, guarded below the unchanged-base compiler at 1.06x."
+    "maxRatio": 1.3,
+    "note": "Rebaselined under Node 24 on 2026-10-03 at 421287457c: 35039 / 27077 = 1.294x. The 1.06x record (26132 / 24713 at 136b0e3d66, #638) went unchecked because the suite wrote no numbers from 2026-09-16 until its Rspack chunk assertion was fixed. Compiler growth: the 14 corpus files of 136b0e3d66 that the current compiler still accepts compile to 22338 -> 25107 gzip (1.124x). 5ead1ff2c0 (#1069) alone adds 2065 B there, because every opaque text and attribute binding became signal-capable, a design #1270 kept. The rest is gradual: +1026 B from 2026-08-07 to 2026-09-14, less later trims. Corpus drift: tests extended the context, boundary, control, controlled-forms-diff and components fixtures, raising source gzip 24713 -> 27077. Changed fixtures account for the remaining +6138 compiled bytes (context.tsrx alone 2161 -> 5296). The current compiler rejects the old context and components sources, so their compiler and corpus growth cannot be separated. The 1.30x ceiling leaves 161 B."
   },
   {
     "suite": "codegen-size",
@@ -2116,8 +2124,8 @@
     "op": "update_1k",
     "target": "octane",
     "reference": "r3f-9.6.1",
-    "maxRatio": 1.0,
-    "note": "In-place position updates of 1,000 retained meshes must not be slower than React Three Fiber."
+    "maxRatio": 1.05,
+    "note": "In-place position updates of 1,000 retained meshes, ratcheted from 1.0. Roots used to keep every committed host batch. Keeping the previous mount batch alive across the runner's forced gc() made the next update about 25% faster (0.77x). Releasing that history to fix the leak measures 0.989x-1.000x on 2026-10-03. Cut update-path allocations, then restore 1.0."
   },
   {
     "suite": "three-renderer",
@@ -2157,7 +2165,7 @@
     "target": "octane",
     "reference": "r3f-9.6.1",
     "maxRatio": 1.0,
-    "note": "Per-frame dispatch to 1,000 useFrame subscribers, including the same scene render, must not be slower than React Three Fiber."
+    "note": "Per-frame dispatch to 1,000 useFrame subscribers, including the same scene render, must not be slower than React Three Fiber. Both pages pass stable checksum callbacks: a per-render callback dies once its scene is replaced, and the forced gc() before each sample then deoptimizes the frame loop that inlined it (1.33x after #1044 released retained effect history; 0.81x with stable callbacks on 2026-10-03)."
   },
   {
     "suite": "three-renderer",

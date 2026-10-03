@@ -74,7 +74,7 @@ async function compileHmrComponent(
 				},
 			)
 			.replace(
-				/^import\s*\{([\s\S]*?)\}\s*from\s*(['"])(\.\.?\/[^'"]+)\2;/gm,
+				/^import\s*\{([\s\S]*?)\}\s*from\s*(['"])(\.\.?\/[^'"]+|octane\/signals)\2;/gm,
 				(_match: string, imports: string, _quote: string, request: string) => {
 					const properties = imports
 						.split(',')
@@ -913,6 +913,29 @@ describe('hmr — runtime wrapper', () => {
 
 		expect(r.find('p').textContent).toBe('memo after');
 		expect(log.splice(0)).toEqual(['cleanup before', 'mount after']);
+		r.unmount();
+	});
+
+	it('publishes an edited signal declaration closure during refresh', async () => {
+		const modules = { 'octane/signals': await import('octane/signals') };
+		const source = (suffix: string) => `
+			import { derived$ } from 'octane/signals';
+			export function App(props) @{
+				const label$ = derived$(() => props.label + '${suffix}');
+				<p>{label$.get() as string}</p>
+			}
+		`;
+		const initial = await compileHmrComponent(source(' before'), 'App', '/src/App.tsrx', modules);
+		const updated = await compileHmrComponent(source(' after'), 'App', '/src/App.tsrx', modules);
+		const r = mount(initial, { label: 'a' });
+		expect(r.find('p').textContent).toBe('a before');
+
+		// The captured props are unchanged, but the edited closure replaces the old one.
+		flushSync(() => {
+			expect((initial as any)[HMR].update(updated)).toBe(true);
+		});
+
+		expect(r.find('p').textContent).toBe('a after');
 		r.unmount();
 	});
 
