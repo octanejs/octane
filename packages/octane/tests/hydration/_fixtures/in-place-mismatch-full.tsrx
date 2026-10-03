@@ -63,3 +63,37 @@ export function ConstantOutput(props: { on: boolean }) @{
 		}
 	</div>
 }
+
+// The call is its host's last child, so the server element it replaces has no
+// next sibling: the rebuilt root is appended in its place.
+export function FullLast(props: { on: boolean }) @{
+	<div id="r">
+		@if (props.on) {
+			<section>
+				<hr />
+				<Para />
+			</section>
+		} @else {
+			<section>
+				<hr />
+				<u>{'u' as string}</u>
+			</section>
+		}
+	</div>
+}
+
+export function ConstantOutputLast(props: { on: boolean }) @{
+	<div id="r">
+		@if (props.on) {
+			<section>
+				<hr />
+				<Constant />
+			</section>
+		} @else {
+			<section>
+				<hr />
+				<u>{'u' as string}</u>
+			</section>
+		}
+	</div>
+}

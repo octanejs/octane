@@ -15854,11 +15854,8 @@ function createHydrateSlot(
 		hydration !== null &&
 		!hydration.isFresh(wrapper) &&
 		(STAGED_DOM?.view(wrapper) ?? wrapper).parentNode === parentNode;
-	if ((STAGED_DOM?.view(wrapper) ?? wrapper).parentNode !== parentNode)
-		(STAGED_DOM?.view(parentNode) ?? parentNode).insertBefore(
-			wrapper,
-			hydration?.rebuiltAt(wrapper, parentNode) ?? parentBlock.endMarker,
-		);
+	if (hydration !== null) hydration.insertRoot(wrapper, parentBlock);
+	else (STAGED_DOM?.view(parentNode) ?? parentNode).insertBefore(wrapper, parentBlock.endMarker);
 	if (!(STAGED_DOM?.view(wrapper) ?? wrapper).hasAttribute(HYDRATE_ID_ATTR))
 		(STAGED_DOM?.view(wrapper) ?? wrapper).setAttribute(HYDRATE_ID_ATTR, boundaryId);
 	if (!(STAGED_DOM?.view(wrapper) ?? wrapper).hasAttribute(HYDRATE_WHEN_ATTR))
@@ -18994,7 +18991,7 @@ class HydrationCapability {
 	private rebuiltRoot: Node | null = null;
 	/**
 	 * The mismatched server node (or the range it opens) that rebuiltRoot
-	 * replaces. It stays in place until rebuiltRoot commits (rebuiltAt): an
+	 * replaces. It stays in place until rebuiltRoot commits (insertRoot): an
 	 * attempt that suspends first leaves the server DOM as it was, and its
 	 * retry rebuilds over the same node (resumeAt) without reporting it again.
 	 */
@@ -19015,6 +19012,8 @@ class HydrationCapability {
 	private heldBranches: WeakMap<Node, Node | null> | null = null;
 	/** The arm of each branch that holdMarkerlessBranch held, to its start comment (renderHeld). */
 	private heldArms: WeakMap<Block, Node> | null = null;
+	/** The start comments that holdMarkerlessBranch inserted in each list's items, by list (refill). */
+	private listHolds: WeakMap<ForSlot, Node[]> | null = null;
 	private readonly unframedRootRanges = new WeakMap<Node, Node>();
 	/** Unframed claims whose render suspended, by the block that claimed (renderUnframed). */
 	private unframedClaims: WeakMap<Block, UnframedClaim> | null = null;
@@ -19237,11 +19236,6 @@ class HydrationCapability {
 	/** Record that a hydrating update built `owner` on the client (see updates). */
 	recordUpdate(owner: Block | ChildSlot): void {
 		(this.updates ??= new WeakSet()).add(owner);
-	}
-
-	/** Whether a hydrating update built `owner` on the client (see updates). */
-	builtByUpdate(owner: Block | ChildSlot): boolean {
-		return this.updates?.has(owner) === true;
 	}
 
 	/**
@@ -19535,7 +19529,7 @@ class HydrationCapability {
 	 * its range, or past the server nodes it adopted in place. A cursor on
 	 * `end` means nothing is left, and anything less certain is left in place.
 	 * (A root rebuilt as the range's whole content already took the rest of
-	 * the range when it committed: rebuiltAt.) The slot at `scope`'s `slotKey`
+	 * the range when it committed: insertRoot.) The slot at `scope`'s `slotKey`
 	 * owns the range.
 	 */
 	settleClaim(
@@ -19817,6 +19811,27 @@ class HydrationCapability {
 		return found;
 	}
 
+	/**
+	 * Adopt the text of a binding-view text hole whose server range `posNode`
+	 * opens: the range's one text node, or a new one when the server rendered it
+	 * empty. Any other range content does not match the template. Null when
+	 * `posNode` opens no range, so bindingText builds one.
+	 */
+	adoptBindingText(posNode: Node | null, text: string): Text | null {
+		if (!isBlockOpen(posNode)) return null;
+		const close = this.close(posNode);
+		const existing = getNextSibling(posNode);
+		if (existing !== close && existing?.nodeType === 3 && getNextSibling(existing) === close) {
+			if ((STAGED_DOM?.view(existing) ?? existing).nodeValue !== text)
+				(STAGED_DOM?.view(existing) ?? existing).nodeValue = text;
+			return existing as Text;
+		}
+		if (existing !== close) throw new TypeError(formatClientError(72));
+		const node = (STAGED_DOM?.view(document) ?? document).createTextNode(text);
+		domNode((STAGED_DOM?.view(close) ?? close).parentNode)!.insertBefore(node, close);
+		return node;
+	}
+
 	resolveOpen(anchor: Node | null | undefined, domParent: Node): Comment | null {
 		if (isBlockOpen(anchor ?? null)) return anchor as Comment;
 		let cursor = this.node;
@@ -20088,6 +20103,43 @@ class HydrationCapability {
 	 */
 	private reachedRangeEnd(node: Node | null): void {
 		if (isBlockClose(node)) this.remember((HYDRATION_REBUILT ??= new WeakSet()), node);
+	}
+
+	/**
+	 * Start a first fill of `list`, which adopts the server's items, at the
+	 * first of them. A list that kept no items after a fill threw, as in a
+	 * suspended deferred boundary's retry, fills again after the resumed render
+	 * left the cursor inside an item. The attempts of the items it did not keep
+	 * were discarded, so remove the start comments of the branches they held:
+	 * an attempt that is discarded leaves the server DOM as it was.
+	 */
+	refill(list: ForSlot): void {
+		const holds = this.listHolds?.get(list);
+		if (holds !== undefined) {
+			this.listHolds!.delete(list);
+			for (let i = 0; i < holds.length; i++) {
+				const start = holds[i];
+				const parent = domNode(start).parentNode;
+				if (parent === null || !this.heldBranches!.delete(start)) continue;
+				this.save(parent);
+				domNode(start as ChildNode).remove();
+			}
+		}
+		this.node = getNextSibling(list.start);
+	}
+
+	/**
+	 * Whether a hydrating update of `slot`, whose list exists, builds that list
+	 * on the client: an earlier hydrating update built it (recordUpdate).
+	 * Otherwise the list adopts the server's items, and when it kept none, its
+	 * first fill starts over from the first of them (refill).
+	 */
+	buildsList(slot: ChildSlot): boolean {
+		if (this.updates?.has(slot) === true) return true;
+		const list = slot.forSlot!;
+		if (list.size === 0 && !(this.passthroughRanges && slot.borrowed) && this.isOpen(list.start))
+			this.refill(list);
+		return false;
 	}
 
 	/**
@@ -20753,17 +20805,12 @@ class HydrationCapability {
 				return this.freshClone(template);
 			}
 			// Step past the mismatched node, which stays until the rebuilt root
-			// commits in its place (rebuiltAt). Server nodes after it may still
+			// commits in its place (insertRoot). Server nodes after it may still
 			// belong to later client siblings, so the root goes before them rather
 			// than at its block's end.
 			this.node = getNextSibling(isBlockOpen(cursor) ? this.close(cursor) : cursor);
 			this.replaced = cursor;
 			this.reachedRangeEnd(this.node);
-			// A lite call that found no server range inserts before the node it
-			// found there, which the rebuilt root replaces. A lite block is only that
-			// insertion context, so point it past the node: when the node was its
-			// host's last child, the root is appended in its place.
-			if (block instanceof LiteBlockImpl && block.endMarker === cursor) block.endMarker = this.node;
 			if (claimsRoot)
 				this.claimRootRemainder(
 					framedRemainder === undefined ? (unframedRemainder ?? null) : framedRemainder,
@@ -20961,31 +21008,40 @@ class HydrationCapability {
 	}
 
 	/**
-	 * Where a detached root that mismatch recovery rebuilt goes in `parent`:
-	 * in place of the server node it replaces, which goes now (first, since a
-	 * Document holds one element), or else before the server node that
-	 * followed that one while it is still there. Undefined for any other root,
-	 * which goes at its block's end. A rebuilt root commits before any later
-	 * sibling can rebuild, since the subtree it holds no longer hydrates. A
-	 * root that is its range's whole content takes the rest of that range with
-	 * it: the server content its reported mismatch replaced, which goes without
-	 * a second report, whichever render completes the range.
+	 * Commit a template's root to its block's parent. clone() returns an
+	 * adopted server root already in place, and moving it before the block's
+	 * end would reorder it after any extra trailing server sibling just before
+	 * finishRoot removes the remainder. A root that mismatch recovery rebuilt
+	 * goes in place of the server node it replaces, which goes now (first,
+	 * since a Document holds one element), or else before the server node that
+	 * followed that one while it is still there. Any other root goes at its
+	 * block's end. A rebuilt root commits before any later sibling can rebuild,
+	 * since the subtree it holds no longer hydrates. When the replaced node was
+	 * its parent's last child the root is appended: the block's end may be that
+	 * very node (a single-root call anchors on the server node its template's
+	 * walk found). A root that is its range's whole content takes the rest of
+	 * that range with it: the server content its reported mismatch replaced,
+	 * which goes without a second report, whichever render completes the range.
 	 */
-	rebuiltAt(root: Node, parent: Node): Node | null | undefined {
-		if (root !== this.rebuiltRoot) return undefined;
-		const replaced = this.replaced;
-		const next = this.rebuiltTail;
-		const range = this.rebuiltRange;
-		this.replaced = null;
-		this.rebuiltRange = null;
-		if (replaced !== null && domNode(replaced).parentNode === parent) {
-			const last = isBlockOpen(replaced) ? this.close(replaced) : replaced;
-			const at = getNextSibling(last);
-			this.save(parent);
-			removeHydrationRange(replaced, last);
-			return range === null ? at : this.takeRangeTail(at, range);
+	insertRoot(root: Node, block: Block): void {
+		const parent = block.parentNode;
+		if ((STAGED_DOM?.view(root) ?? root).parentNode === parent) return;
+		let at = block.endMarker;
+		if (root === this.rebuiltRoot) {
+			const replaced = this.replaced;
+			const next = this.rebuiltTail;
+			const range = this.rebuiltRange;
+			this.replaced = null;
+			this.rebuiltRange = null;
+			if (replaced !== null && domNode(replaced).parentNode === parent) {
+				const last = isBlockOpen(replaced) ? this.close(replaced) : replaced;
+				at = getNextSibling(last);
+				this.save(parent);
+				removeHydrationRange(replaced, last);
+				if (range !== null) at = this.takeRangeTail(at, range);
+			} else if (next !== null && domNode(next).parentNode === parent) at = next;
 		}
-		return next !== null && domNode(next).parentNode === parent ? next : undefined;
+		(STAGED_DOM?.view(parent) ?? parent).insertBefore(root, at);
 	}
 
 	/**
@@ -21182,6 +21238,15 @@ class HydrationCapability {
 			claimed === undefined ? this.markerlessEnd(start, parent, after) : claimed,
 		);
 		(this.heldArms ??= new WeakMap()).set(state.block!, start);
+		// An item whose first render throws is no block of its list's, so the
+		// list's next fill adopts the item's server nodes again (refill).
+		for (let block = state.block!.parentBlock; block !== null; block = block.parentBlock) {
+			const list = block.forSlot;
+			if (list == null) continue;
+			const holds = (this.listHolds ??= new WeakMap()).get(list);
+			if (holds === undefined) this.listHolds.set(list, [start]);
+			else holds.push(start);
+		}
 		state.markerlessBefore = start;
 	}
 
@@ -21899,18 +21964,10 @@ function commitBag<T>(scope: Scope, root: Node | null, bag: T): T {
 	if (root !== null) {
 		const block = scope.block;
 		const hydration = activeHydration();
-		// clone() returns the already-attached server node during hydration. Moving
-		// that adopted root before the block anchor is usually a no-op, but with an
-		// extra trailing server sibling it would reorder the valid root after the
-		// stale node just before finishRoot removes the remainder. A detached
-		// mismatch replacement takes the place of the server node it replaces,
-		// which stays until now.
-		if (hydration === null || (STAGED_DOM?.view(root) ?? root).parentNode !== block.parentNode) {
+		if (hydration !== null) hydration.insertRoot(root, block);
+		else {
 			const parent = block.parentNode;
-			(STAGED_DOM?.view(parent) ?? parent).insertBefore(
-				root,
-				hydration?.rebuiltAt(root, parent) ?? block.endMarker,
-			);
+			(STAGED_DOM?.view(parent) ?? parent).insertBefore(root, block.endMarker);
 		}
 	}
 	scope.slots[0] = bag;
@@ -22091,19 +22148,10 @@ export function bindingText(posNode: Node | null, value: unknown, marker: string
 		});
 		return existing as Text;
 	}
-	if (hydration !== null && isBlockOpen(posNode)) {
-		const close = hydration.close(posNode);
-		const existing = getNextSibling(posNode);
-		if (existing !== close && existing?.nodeType === 3 && getNextSibling(existing) === close) {
-			if ((STAGED_DOM?.view(existing) ?? existing).nodeValue !== text)
-				(STAGED_DOM?.view(existing) ?? existing).nodeValue = text;
-			return existing as Text;
-		}
-		if (existing !== close) throw new TypeError(formatClientError(72));
-		const node = (STAGED_DOM?.view(document) ?? document).createTextNode(text);
-		domNode((STAGED_DOM?.view(close) ?? close).parentNode)!.insertBefore(node, close);
-		return node;
-	}
+	// Only hydrateRoot constructs the capability, so client-only bundles drop the
+	// range-marker validator that adoption needs.
+	const adopted = hydration?.adoptBindingText(posNode, text);
+	if (adopted) return adopted;
 	const parent = domNode(posNode)!.parentNode!;
 	const close = (STAGED_DOM?.view(document) ?? document).createComment(HYDRATION_END);
 	(STAGED_DOM?.view(posNode as Comment) ?? (posNode as Comment)).data = marker;
@@ -35711,10 +35759,16 @@ function isPortalTarget(block: Block, domParent: Node): boolean {
 	return false;
 }
 
-const NATIVE_ARRAY_MAP = Array.prototype.map;
+// Snapshot the intrinsics at module load, before user code can replace them,
+// so a later replacement is recognized as authored code. Bundlers cannot prove
+// a bare property read side-effect-free, so each read sits in a pure IIFE:
+// a bundle that never reaches these guards drops it rather than keeping a dead
+// statement. `Reflect.apply` is a known-pure global read and needs no wrapper.
+const NATIVE_ARRAY_MAP = /* @__PURE__ */ (() => Array.prototype.map)();
 const NATIVE_ARRAY_FILTER = /* @__PURE__ */ (() => Array.prototype.filter)();
 const NATIVE_REFLECT_APPLY = Reflect.apply;
-const NATIVE_ARRAY_SPECIES_GETTER = Object.getOwnPropertyDescriptor(Array, Symbol.species)?.get;
+const NATIVE_ARRAY_SPECIES_GETTER = /* @__PURE__ */ (() =>
+	Object.getOwnPropertyDescriptor(Array, Symbol.species)?.get)();
 // Components hand the reconciler immutable array snapshots. Memoizing indexed
 // accessor classification by snapshot identity avoids a descriptor allocation
 // per row on every unchanged parent render; holes and intrinsic overrides are
@@ -37101,10 +37155,7 @@ export function childSlot(
 	if (preparedList !== null) {
 		// A hydrating update builds a list that replaces other content, or one an
 		// earlier hydrating update built, on the client.
-		if (
-			rebuild ||
-			(hydratingUpdate && (state.forSlot === null || hydration!.builtByUpdate(state)))
-		) {
+		if (rebuild || (hydratingUpdate && (state.forSlot === null || hydration!.buildsList(state)))) {
 			if (hydratingUpdate) hydration!.recordUpdate(state);
 			// Mount each item rather than look for server items that are not there.
 			const slot = state;
@@ -44816,7 +44867,7 @@ export function forBlock<T>(
 	// A pending child can replay its adopted slot with the cursor back on the
 	// outer open marker. First-fill adoption always starts inside that range,
 	// including a zero-item list that already has a retained slot.
-	if (hydration !== null && state.size === 0) hydration.node = getNextSibling(state.start);
+	if (hydration !== null && state.size === 0) hydration.refill(state);
 	// New direct-host list output carries its server-selected arm on the existing
 	// outer open comment. Legacy/general list ranges return -1 and retain the
 	// content-shape checks used before markerless SSR items existed.
