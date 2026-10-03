@@ -1253,8 +1253,8 @@
     "op": "gzip",
     "target": "compiled",
     "reference": "source",
-    "maxRatio": 1.06,
-    "note": "The former 24397 / 23519 corpus record became invalid when its supposedly fixed behavioral fixtures changed; canonical main now measures 26666 / 24713 = 1.079x on those same current files. Lifetime-invariant callbacks, immutable-host aliases, and exact template interning reduce the reviewed current corpus to about 26130 / 24713 = 1.057x, guarded below the unchanged-base compiler at 1.06x."
+    "maxRatio": 1.3,
+    "note": "Rebaselined under Node 24 on 2026-10-03 at 421287457c: 35039 / 27077 = 1.294x. The 1.06x record (26132 / 24713 at 136b0e3d66, #638) went unchecked because the suite wrote no numbers from 2026-09-16 until its Rspack chunk assertion was fixed. Compiler growth: the 14 corpus files of 136b0e3d66 that the current compiler still accepts compile to 22338 -> 25107 gzip (1.124x). 5ead1ff2c0 (#1069) alone adds 2065 B there, because every opaque text and attribute binding became signal-capable, a design #1270 kept. The rest is gradual: +1026 B from 2026-08-07 to 2026-09-14, less later trims. Corpus drift: tests extended the context, boundary, control, controlled-forms-diff and components fixtures, raising source gzip 24713 -> 27077. Changed fixtures account for the remaining +6138 compiled bytes (context.tsrx alone 2161 -> 5296). The current compiler rejects the old context and components sources, so their compiler and corpus growth cannot be separated. The 1.30x ceiling leaves 161 B."
   },
   {
     "suite": "codegen-size",
