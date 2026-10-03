@@ -35,6 +35,8 @@ export function __queryAt<A, T>(
 	select: () => A | typeof skip,
 	load: (selection: A, context: QueryContext<T>) => QueryLoadResult<T>,
 	options?: QueryOptions & SignalOptions,
+	// Compiler-listed render values that select, load and options capture.
+	captures?: readonly unknown[],
 ): QuerySignal<T> {
 	if (typeof select !== 'function' || typeof load !== 'function') {
 		throw new TypeError(formatClientError(193));
@@ -71,6 +73,7 @@ export function __queryAt<A, T>(
 				initializeResource,
 				false,
 				sequence,
+				captures,
 			) as QuerySignal<T>,
 		site,
 	);

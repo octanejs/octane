@@ -106,3 +106,81 @@ describe.each(modes)('redeclared local query selectors after hydration (%j)', (m
 		}
 	});
 });
+
+// Two declarations naming one cell present the first declaration in a render,
+// on the server as in the browser.
+const sharedKeySource = `import { derived$ } from 'octane/signals';
+export function App(props) @{
+ const first$ = derived$(() => 'first:' + props.a, { key: 'shared' });
+ const second$ = derived$(() => 'second:' + props.b, { key: 'shared' });
+ <p>{(first$.get() + '|' + second$.get()) as string}</p>
+}`;
+
+describe.each(modes)('a shared declaration key across hydration (%j)', (mode) => {
+	const options = {
+		id: '/src/local-shared-key-hydration.tsrx',
+		compileOptions: { ...mode, hmr: false },
+		runtimeModules: { 'octane/signals': signals },
+	};
+	const server = loadCompiledFixtureSource<any>(sharedKeySource, { ...options, mode: 'server' });
+	const client = loadCompiledFixtureSource<any>(sharedKeySource, { ...options, mode: 'client' });
+
+	it('renders and hydrates the first declaration of a shared key', async () => {
+		const { html } = await prerender(server.App, { a: 1, b: 2 });
+		const container = document.createElement('div');
+		container.innerHTML = html;
+		document.body.append(container);
+		const paragraph = container.querySelector('p')!;
+		expect(paragraph.textContent).toBe('first:1|first:1');
+		const errors: unknown[] = [];
+		const root = hydrateRoot(
+			container,
+			client.App,
+			{ a: 1, b: 2 },
+			{
+				onRecoverableError: (error) => errors.push(error),
+				onUncaughtError: (error) => errors.push(error),
+			},
+		);
+		try {
+			await act(async () => {});
+			expect(container.querySelector('p')).toBe(paragraph);
+			expect(paragraph.textContent).toBe('first:1|first:1');
+			await act(() => root.render(client.App, { a: 2, b: 3 }));
+			expect(paragraph.textContent).toBe('first:2|first:2');
+			expect(errors).toEqual([]);
+		} finally {
+			root.unmount();
+			container.remove();
+		}
+	});
+});
+
+// Strong mode rejects a render-phase state update, so it has no replay to render.
+describe.each(modes.filter((mode) => !mode.strong))(
+	'a render-phase update replay on the server (%j)',
+	(mode) => {
+		const replay = loadCompiledFixtureSource<any>(
+			`import { useState } from 'octane';
+import { derived$ } from 'octane/signals';
+export function App(props) @{
+ const [n, setN] = useState(0);
+ if (n === 0) setN(props.n);
+ const label$ = derived$(() => 'n' + n);
+ <p>{label$.get() as string}</p>
+}`,
+			{
+				id: '/src/local-replay-render.tsrx',
+				mode: 'server',
+				compileOptions: { ...mode, hmr: false },
+				runtimeModules: { 'octane/signals': signals },
+			},
+		);
+		it('renders the replay with its own captured values', async () => {
+			const { html } = await prerender(replay.App, { n: 3 });
+			const container = document.createElement('div');
+			container.innerHTML = html;
+			expect(container.querySelector('p')!.textContent).toBe('n3');
+		});
+	},
+);
