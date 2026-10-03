@@ -125,12 +125,12 @@ export interface UniversalRendererMetadata {
 	readonly target: 'universal';
 }
 
-const UNIVERSAL_LAZY_METADATA: UniversalRendererMetadata = Object.freeze({
+const UNIVERSAL_LAZY_METADATA: UniversalRendererMetadata = /* @__PURE__ */ Object.freeze({
 	id: '<lazy>',
 	target: 'universal',
 });
 
-const UNIVERSAL_CONTEXT_METADATA: UniversalRendererMetadata = Object.freeze({
+const UNIVERSAL_CONTEXT_METADATA: UniversalRendererMetadata = /* @__PURE__ */ Object.freeze({
 	id: '<context>',
 	target: 'universal',
 });
@@ -1040,8 +1040,8 @@ const EMPTY_BLUEPRINT_EVENTS = new Map<string, BlueprintEvent>();
 const EMPTY_BLUEPRINT_HOST_CALLBACKS = new Map<string, BlueprintHostCallback>();
 const EMPTY_COMMITTED_EVENTS = new Map<string, CommittedEvent>();
 const EMPTY_COMMITTED_HOST_CALLBACKS = new Map<string, CommittedHostCallback>();
-const EMPTY_STATIC_HOST_PROPS: Record<string, unknown> = Object.freeze({});
-const EMPTY_STATIC_PROP_NAMES: readonly string[] = Object.freeze([]);
+const EMPTY_STATIC_HOST_PROPS: Record<string, unknown> = /* @__PURE__ */ Object.freeze({});
+const EMPTY_STATIC_PROP_NAMES: readonly string[] = /* @__PURE__ */ Object.freeze([]);
 
 interface DraftRecord {
 	record: LogicalRecord;
@@ -6542,7 +6542,7 @@ export interface FormStatus {
 	action: string | ((formData: UniversalFormData) => void | Promise<void>) | null;
 }
 
-const UNIVERSAL_FORM_STATUS: FormStatus = Object.freeze({
+const UNIVERSAL_FORM_STATUS: FormStatus = /* @__PURE__ */ Object.freeze({
 	pending: false,
 	data: null,
 	method: null,
