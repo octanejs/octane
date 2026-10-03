@@ -76,6 +76,36 @@ cache and rejects Vitest's unexpected-reload warning. It fails with the original
 configuration and passes with the preload; five additional cold starts also
 passed without the warning. No test cases or assertions were removed.
 
+## Browser mock interception race
+
+On loaded Linux runners, a browser test file could occasionally import the real
+module right after its own `vi.mock`. The browser-tooling collection regression
+failed this way. `@vitest/browser-playwright` 4.1.10 applies browser mocks
+through `context.route()`, and clearing mocks between files removes every
+route. Playwright 1.61.1 sends `Fetch.enable` again only when the route count
+goes from zero to one, and Chromium applies it after acknowledging the command.
+A module request issued within a millisecond of that acknowledgement can
+therefore bypass the mock route (vitest-dev/vitest#8339).
+
+`patches/@vitest__browser-playwright@4.1.10.patch` backports the upstream fix,
+vitest-dev/vitest#11083, which is not in any 4.x release. On a context's first mock
+registration, the provider installs a route that fulfils
+`/__vitest_interception_probe__`. It then fetches that URL until the response
+proves interception is live, and only then adds the mock route. The probe route
+stays installed, so interception remains on for later files. The patch covers
+every lane that uses the `playwright()` provider, including the adapted and
+pristine Base UI browser lanes.
+
+With `DEBUG=pw:protocol`, the 20 adapted Base UI browser files that call
+`vi.mock` sent `Fetch.enable` and `Fetch.disable` 20 times each without the
+patch. Each file's first paused request arrived 0–2 ms after `Fetch.enable`.
+With the patch, the same files sent `Fetch.enable` once and `Fetch.disable`
+never, and the probe was answered before the first mocked module was requested.
+The collection regression in `test-utils/vitest-browser-collection.test.ts`
+fetches the probe after its mocked import, so it fails when the patch is
+missing. Drop the patch when Vitest is upgraded to a release that contains the
+fix.
+
 ## Observer constraints
 
 The lifecycle observer depends on the pinned Vitest Playwright provider and
