@@ -11248,7 +11248,10 @@ function renderBlockInner(block: Block): true | undefined {
 		}
 		EFFECT_EVENT_RENDER_TARGET = prevEffectEventTarget;
 		EFFECT_EVENT_ACTION_TARGET = prevEffectEventActionTarget;
-		ACTIVE_WARM_PLANS.length = warmPlanCheckpoint;
+		// Most renders register no warm plan. Compare before restoring: storing
+		// an array's length is not free even when the length is unchanged.
+		if (ACTIVE_WARM_PLANS.length !== warmPlanCheckpoint)
+			ACTIVE_WARM_PLANS.length = warmPlanCheckpoint;
 		CURRENT_WARM_EPISODE = prevWarmEpisode;
 		CURRENT_EFFECT_RENDER_VERSION = prevEffectRenderVersion;
 		CURRENT_EFFECT_REACHED = prevEffectReached;
@@ -11877,7 +11880,8 @@ export function componentSlotLite<P>(
 		if (nativeToken >= 0) NATIVE_READ_DRIVER!.endScope(nativeToken);
 		if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__)
 			__profileEndRender(profileFrame, profileDidThrow, profileThrown);
-		ACTIVE_WARM_PLANS.length = warmPlanCheckpoint;
+		if (ACTIVE_WARM_PLANS.length !== warmPlanCheckpoint)
+			ACTIVE_WARM_PLANS.length = warmPlanCheckpoint;
 		CURRENT_SCOPE = prevScope;
 	}
 	// Hydration: advance the cursor PAST this component's adopted range so the
