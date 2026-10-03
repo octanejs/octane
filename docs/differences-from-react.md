@@ -419,7 +419,10 @@ let freshLabels = formatRows(rows); // Not cached: `let` is an escape hatch.
 
 An eligible `const` keeps the same identity until its tracked component-local
 inputs change. This lets a region key on the identity of a derived value instead
-of seeing a new array or object on every render.
+of seeing a new array or object on every render. Caching follows a chain: in
+`const labels = formatRows(rows); const view = wrapRows(labels);` with only
+`view` in the template, `labels` is cached too, so `view` is rebuilt only when
+`rows` changes.
 
 The same callee rule governs declaration caching. In compatibility mode, the virtualizer call must stay
 live because its window can move while the virtualizer object keeps the same
