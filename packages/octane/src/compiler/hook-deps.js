@@ -1111,7 +1111,7 @@ function isInvariantInitializer(node) {
 	return isInvariantLiteral(node);
 }
 
-function markDependencyInvariantBindings(analysis) {
+function markDependencyInvariantBindings(analysis, invariantCall = null) {
 	// Seed the lattice with the bindings whose identity is fixed for the
 	// program's lifetime, so the `const alias = original` propagation below
 	// carries them into component scope for free.
@@ -1141,6 +1141,8 @@ function markDependencyInvariantBindings(analysis) {
 					dependencyInvariant = resolveBinding(scope, init.name)?.dependencyInvariant === true;
 				}
 				if (!dependencyInvariant) dependencyInvariant = isInvariantInitializer(init);
+				if (!dependencyInvariant && init?.type === 'CallExpression' && invariantCall !== null)
+					dependencyInvariant = invariantCall(init);
 				if (dependencyInvariant && bindings[0] && !bindings[0].binding.dependencyInvariant) {
 					bindings[0].binding.dependencyInvariant = true;
 					changed = true;
@@ -1693,7 +1695,7 @@ function collectCallbackReference(expression, analysis) {
 	return [{ node: value, key: `b${binding.id}:callback`, binding }];
 }
 
-function cloneDependency(node) {
+export function cloneDependency(node) {
 	if (node.type === 'Identifier') return { ...node };
 	if (node.type === 'ChainExpression') {
 		return { ...node, expression: cloneDependency(node.expression) };
@@ -1805,6 +1807,11 @@ export function analyzeHookDependencies(ast, options = {}) {
  * hook call. Results retain the hook collector's receiver-aware method records;
  * null means the expression is not an analyzable callback, never an empty list.
  * The supplied callbacks must belong to this AST so lexical bindings are shared.
+ * `invariantCall` marks a `const` initialized by that call as one identity for
+ * the lifetime of its scope, like a ref. `evaluatedAt` gives the source offset
+ * where a callback's captures would be read eagerly: a capture whose `let`,
+ * `const` or `class` is declared after it may still be in its temporal dead
+ * zone there, so that callback reports null.
  */
 export function analyzeCallbackDependencies(ast, callbacks, options = {}) {
 	const analysis = buildScopes(
@@ -1812,18 +1819,52 @@ export function analyzeCallbackDependencies(ast, callbacks, options = {}) {
 		options.onlyImported === true,
 		new Set(['octane', ...(options.hookRuntimeModules || [])]),
 	);
-	markDependencyInvariantBindings(analysis);
+	markDependencyInvariantBindings(analysis, options.invariantCall ?? null);
+	const declaredAt = options.evaluatedAt ? lexicalDeclarationStarts(ast, analysis) : null;
 	const inferred = new Map();
 	for (const original of callbacks) {
 		const callback = unwrapValue(original);
-		inferred.set(
-			original,
-			isFunction(callback)
-				? collectDependencies(callback, analysis.functionScopes.get(callback) || null, analysis)
-				: collectCallbackReference(callback, analysis),
-		);
+		let dependencies = isFunction(callback)
+			? collectDependencies(callback, analysis.functionScopes.get(callback) || null, analysis)
+			: collectCallbackReference(callback, analysis);
+		const at = declaredAt === null ? undefined : options.evaluatedAt(original);
+		if (
+			at !== undefined &&
+			dependencies?.some((dependency) => (declaredAt.get(dependency.binding) ?? -1) > at)
+		)
+			dependencies = null;
+		inferred.set(original, dependencies);
 	}
 	return inferred;
+}
+
+function lexicalDeclarationStarts(ast, analysis) {
+	const starts = new Map();
+	for (const { bindings, kind } of analysis.declarators) {
+		if (kind === 'var') continue;
+		for (const { pattern, binding } of bindings)
+			if (!starts.has(binding)) starts.set(binding, pattern.start);
+	}
+	const seen = new WeakSet();
+	const visit = (node) => {
+		if (node === null || typeof node !== 'object' || seen.has(node)) return;
+		seen.add(node);
+		if (Array.isArray(node)) {
+			for (const child of node) visit(child);
+			return;
+		}
+		const scope =
+			node.type === 'ClassDeclaration' && node.id
+				? (analysis.nodeScopes.get(node.id) ?? analysis.nodeScopes.get(node))
+				: undefined;
+		if (scope !== undefined) {
+			const binding = resolveBinding(scope, node.id.name);
+			if (binding !== null && !starts.has(binding)) starts.set(binding, node.start);
+		}
+		for (const key in node) if (!AST_META_KEYS.has(key)) visit(node[key]);
+	};
+	visit(ast);
+	return starts;
 }
 
 // Strong dependency policy deliberately shares inference's lexical graph and
