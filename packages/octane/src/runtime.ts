@@ -19811,6 +19811,27 @@ class HydrationCapability {
 		return found;
 	}
 
+	/**
+	 * Adopt the text of a binding-view text hole whose server range `posNode`
+	 * opens: the range's one text node, or a new one when the server rendered it
+	 * empty. Any other range content does not match the template. Null when
+	 * `posNode` opens no range, so bindingText builds one.
+	 */
+	adoptBindingText(posNode: Node | null, text: string): Text | null {
+		if (!isBlockOpen(posNode)) return null;
+		const close = this.close(posNode);
+		const existing = getNextSibling(posNode);
+		if (existing !== close && existing?.nodeType === 3 && getNextSibling(existing) === close) {
+			if ((STAGED_DOM?.view(existing) ?? existing).nodeValue !== text)
+				(STAGED_DOM?.view(existing) ?? existing).nodeValue = text;
+			return existing as Text;
+		}
+		if (existing !== close) throw new TypeError(formatClientError(72));
+		const node = (STAGED_DOM?.view(document) ?? document).createTextNode(text);
+		domNode((STAGED_DOM?.view(close) ?? close).parentNode)!.insertBefore(node, close);
+		return node;
+	}
+
 	resolveOpen(anchor: Node | null | undefined, domParent: Node): Comment | null {
 		if (isBlockOpen(anchor ?? null)) return anchor as Comment;
 		let cursor = this.node;
@@ -22127,19 +22148,10 @@ export function bindingText(posNode: Node | null, value: unknown, marker: string
 		});
 		return existing as Text;
 	}
-	if (hydration !== null && isBlockOpen(posNode)) {
-		const close = hydration.close(posNode);
-		const existing = getNextSibling(posNode);
-		if (existing !== close && existing?.nodeType === 3 && getNextSibling(existing) === close) {
-			if ((STAGED_DOM?.view(existing) ?? existing).nodeValue !== text)
-				(STAGED_DOM?.view(existing) ?? existing).nodeValue = text;
-			return existing as Text;
-		}
-		if (existing !== close) throw new TypeError(formatClientError(72));
-		const node = (STAGED_DOM?.view(document) ?? document).createTextNode(text);
-		domNode((STAGED_DOM?.view(close) ?? close).parentNode)!.insertBefore(node, close);
-		return node;
-	}
+	// Only hydrateRoot constructs the capability, so client-only bundles drop the
+	// range-marker validator that adoption needs.
+	const adopted = hydration?.adoptBindingText(posNode, text);
+	if (adopted) return adopted;
 	const parent = domNode(posNode)!.parentNode!;
 	const close = (STAGED_DOM?.view(document) ?? document).createComment(HYDRATION_END);
 	(STAGED_DOM?.view(posNode as Comment) ?? (posNode as Comment)).data = marker;
