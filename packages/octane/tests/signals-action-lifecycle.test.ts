@@ -15,9 +15,12 @@ async function pendingAction(nested = true) {
 	const ready = deferred<{
 		scope: import('octane/signals').Scope;
 		count: import('octane/signals').WritableSignal<number>;
+		tripled(): number;
+		looked: import('octane/signals').Resource<number>;
 		notifications: number[];
 		synchronousCount: number;
 		synchronousDoubled: number;
+		synchronousTripled: number;
 		stop(): void;
 	}>();
 	const release = deferred<void>();
@@ -28,22 +31,52 @@ async function pendingAction(nested = true) {
 			let stop: (() => void) | undefined;
 			try {
 				// The renderer Action starts before the signal engine is imported.
-				const { createScope } = await import('octane/signals');
-				scope = createScope({ scopeKey: 'late-action-owner' });
+				const { createResource, createScope, derived$, query, runWithSignalOwner } =
+					await import('octane/signals');
+				const owner = (scope = createScope({ scopeKey: 'late-action-owner' }));
 				const count = scope.signal$('count', 0);
 				const doubled = scope.derived$('doubled', () => count.get() * 2);
+				// A declared derived cell and a query resource each stage through
+				// their own binding, unlike the scope's plain derived value.
+				const tripled$ = derived$(() => count.get() * 3, { key: 'tripled' });
+				const tripled = () => runWithSignalOwner(owner, () => tripled$.get());
+				const lookup = query('late-action-lookup', (value: number) => value * 10);
+				const looked = createResource(scope, 'looked', () => lookup(count.get()));
+				try {
+					looked.get();
+				} catch (pending) {
+					await pending;
+				}
 				const notifications: number[] = [];
 				stop = count.subscribe(() => notifications.push(count.get()));
 				let synchronousCount!: number;
 				let synchronousDoubled!: number;
+				let synchronousTripled!: number;
 				const write = () => {
 					count.set(2);
 					synchronousCount = count.get();
 					synchronousDoubled = doubled.get();
+					synchronousTripled = tripled();
+					try {
+						looked.get();
+					} catch (pending) {
+						// A staged selection loads privately; anything else is a failure.
+						if (typeof (pending as PromiseLike<unknown>)?.then !== 'function') throw pending;
+					}
 				};
 				if (nested) startTransition(write);
 				else write();
-				ready.resolve({ scope, count, notifications, synchronousCount, synchronousDoubled, stop });
+				ready.resolve({
+					scope,
+					count,
+					tripled,
+					looked,
+					notifications,
+					synchronousCount,
+					synchronousDoubled,
+					synchronousTripled,
+					stop,
+				});
 				await release.promise;
 			} catch (error) {
 				stop?.();
@@ -96,10 +129,12 @@ describe('native signal Action lifetimes', () => {
 			// Only a synchronous transition scope exposes its staged reads.
 			expect(action.synchronousCount).toBe(0);
 			expect(action.synchronousDoubled).toBe(0);
-			expect(action.count.get()).toBe(0);
+			expect(action.synchronousTripled).toBe(0);
+			expect([action.count.get(), action.tripled(), action.looked.get()]).toEqual([0, 0, 0]);
 			expect(action.notifications).toEqual([]);
 			await action.finish();
-			expect(action.count.get()).toBe(2);
+			expect([action.count.get(), action.tripled()]).toEqual([2, 6]);
+			await expect.poll(() => action.looked.latest()).toBe(20);
 			expect(action.notifications).toEqual([2]);
 		});
 	});
@@ -109,10 +144,12 @@ describe('native signal Action lifetimes', () => {
 		try {
 			expect(state.synchronousCount).toBe(2);
 			expect(state.synchronousDoubled).toBe(4);
-			expect(state.count.get()).toBe(0);
+			expect(state.synchronousTripled).toBe(6);
+			expect([state.count.get(), state.tripled(), state.looked.get()]).toEqual([0, 0, 0]);
 			expect(state.notifications).toEqual([]);
 			await state.finish();
-			expect(state.count.get()).toBe(2);
+			expect([state.count.get(), state.tripled()]).toEqual([2, 6]);
+			await expect.poll(() => state.looked.latest()).toBe(20);
 			expect(state.notifications).toEqual([2]);
 		} finally {
 			await state.finish();
