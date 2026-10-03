@@ -15029,11 +15029,17 @@ function pendingHydrateOwner(target: Block): HydrateSlot | null {
 }
 
 function findSuspendedHydrateBlock(scope: Scope, thenable: TrackedThenable<unknown>): Block | null {
-	const own = (scope.block as Block & { __thenables?: TrackedThenable<unknown>[] }).__thenables;
-	if (own !== undefined && own.includes(thenable)) return scope.block;
-	// Compiler-emitted useBatch can suspend before use() registers a thenable on
-	// its block. The deepest unfinished registered child is that same source.
-	let suspended: Block | null = scope.block.mounted ? null : scope.block;
+	const block = scope.block;
+	let suspended: Block | null = null;
+	// A lite scope's block is a DOM-context proxy (LiteBlockImpl) with no render
+	// or mount state, so it is never the source. The Blocks below it still are.
+	if (block.block === block) {
+		const own = (block as Block & { __thenables?: TrackedThenable<unknown>[] }).__thenables;
+		if (own !== undefined && own.includes(thenable)) return block;
+		// Compiler-emitted useBatch can suspend before use() registers a thenable
+		// on its block. The deepest unfinished registered child is that same source.
+		if (!block.mounted) suspended = block;
+	}
 	forEachSubtreeChild(scope, (child) => {
 		const candidate = findSuspendedHydrateBlock(child, thenable);
 		if (candidate !== null) suspended = candidate;
