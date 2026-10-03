@@ -1278,11 +1278,7 @@
     "target": "compiled",
     "reference": "source",
     "maxRatio": 1.06,
-    "note": "The former 24397 / 23519 corpus record became invalid when its supposedly fixed behavioral fixtures changed; canonical main now measures 26666 / 24713 = 1.079x on those same current files. Lifetime-invariant callbacks, immutable-host aliases, and exact template interning reduce the reviewed current corpus to about 26130 / 24713 = 1.057x, guarded below the unchanged-base compiler at 1.06x.",
-    "waiver": {
-      "reason": "Measured 35068 / 27077 = 1.295x on 2026-10-03 against the reviewed 1.057x. The suite wrote no numbers from 2026-09-16 until its Rspack chunk assertion was fixed, so compiler-output growth went unseen; tracked as a fix; remove this waiver with it.",
-      "expires": "2026-10-24"
-    }
+    "note": "The former 24397 / 23519 corpus record became invalid when its supposedly fixed behavioral fixtures changed; canonical main now measures 26666 / 24713 = 1.079x on those same current files. Lifetime-invariant callbacks, immutable-host aliases, and exact template interning reduce the reviewed current corpus to about 26130 / 24713 = 1.057x, guarded below the unchanged-base compiler at 1.06x."
   },
   {
     "suite": "codegen-size",
@@ -5530,11 +5526,7 @@
     "target": "text-compiled",
     "reference": "text-compiled-work",
     "maxRatio": 0,
-    "note": "Live DOM getter calls preserve first raw-thenable rollback and external edits; descriptor updates reuse the value already read for comparison.",
-    "waiver": {
-      "reason": "Measured 128 live text reads for 128 unchanged compiled-text updates on 2026-10-03, where the guard allows none. contracts.mjs crashed from 2026-09-15 until its harness was fixed, so the regression went unseen; tracked as a fix; remove this waiver with it.",
-      "expires": "2026-10-24"
-    }
+    "note": "Live DOM getter calls preserve first raw-thenable rollback and external edits; descriptor updates reuse the value already read for comparison."
   },
   {
     "suite": "root-transactions",
@@ -8697,11 +8689,7 @@
     "op": "try_closures",
     "reference": "wave-budget",
     "maxRatio": 1,
-    "note": "Retained 32-wave work:33 full passes, 528 suspended visits, 496 pending probes, 13,728 closure expression events. Positive measured work budgets, with complete output controls; no latency or engine allocation inference.",
-    "waiver": {
-      "reason": "Measured 14784 against 13728 on 2026-10-03: one extra evaluated closure per ssrTry call (1056 calls) since 2026-09-14. The suite wrote no numbers from 2026-09-29 until its harness was fixed, so the growth went unseen; tracked as a fix; remove this waiver with it.",
-      "expires": "2026-10-24"
-    }
+    "note": "Retained 32-wave work:33 full passes, 528 suspended visits, 496 pending probes, 13,728 closure expression events. Positive measured work budgets, with complete output controls; no latency or engine allocation inference."
   },
   {
     "suite": "view-transitions",
