@@ -2,69 +2,69 @@
   "rows": {
     "app": {
       "raw": 7544,
-      "gzip": 2595,
-      "brotli": 2478
+      "gzip": 2594,
+      "brotli": 2482
     },
     "framework": {
-      "raw": 119320,
-      "gzip": 39456,
-      "brotli": 35063
+      "raw": 117723,
+      "gzip": 38826,
+      "brotli": 34495
     },
     "total": {
-      "raw": 126832,
-      "gzip": 42019,
-      "brotli": 37285
+      "raw": 125235,
+      "gzip": 41388,
+      "brotli": 36721
     }
   },
   "todo": {
     "app": {
       "raw": 5142,
-      "gzip": 2508,
-      "brotli": 2376
+      "gzip": 2509,
+      "brotli": 2375
     },
     "framework": {
-      "raw": 137109,
-      "gzip": 44556,
-      "brotli": 39373
+      "raw": 135512,
+      "gzip": 43962,
+      "brotli": 38777
     },
     "total": {
-      "raw": 142219,
-      "gzip": 47032,
-      "brotli": 41493
+      "raw": 140622,
+      "gzip": 46439,
+      "brotli": 40896
     }
   },
   "chat": {
     "app": {
       "raw": 6685,
-      "gzip": 3009,
-      "brotli": 2897
+      "gzip": 3010,
+      "brotli": 2895
     },
     "framework": {
-      "raw": 134775,
-      "gzip": 43999,
-      "brotli": 38904
+      "raw": 133178,
+      "gzip": 43407,
+      "brotli": 38402
     },
     "total": {
-      "raw": 141428,
-      "gzip": 46976,
-      "brotli": 41545
+      "raw": 139831,
+      "gzip": 46385,
+      "brotli": 41041
     }
   },
   "weather": {
     "app": {
       "raw": 26767,
-      "gzip": 9076,
-      "brotli": 7853
+      "gzip": 9077,
+      "brotli": 7840
     },
     "framework": {
-      "raw": 151659,
-      "gzip": 49346,
-      "brotli": 43482
+      "raw": 150061,
+      "gzip": 48750,
+      "brotli": 42995
     },
     "total": {
-      "raw": 178394,
-      "gzip": 58390,
-      "brotli": 51079
+      "raw": 176796,
+      "gzip": 57795,
+      "brotli": 50579
     }
   }
 }
