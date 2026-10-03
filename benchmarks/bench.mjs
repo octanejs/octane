@@ -601,7 +601,13 @@ const SUITES = [
 			{ label: 'refs', script: 'refs.mjs', args: (n) => [String(n)] },
 			{ label: 'refs-work', script: 'refs-work.mjs', args: () => [] },
 			{ label: 'bundle', script: 'bundle.mjs', args: () => [] },
-			{ label: 'caught-reveal', script: 'caught-reveal-run.mjs', args: (n) => [String(n)] },
+			// The scaling guard compares paired equal-work samples; quick mode's two
+			// iterations would leave its median on a single pair.
+			{
+				label: 'caught-reveal',
+				script: 'caught-reveal-run.mjs',
+				args: (n) => [String(Math.max(n, 5))],
+			},
 		],
 	},
 	{
@@ -806,7 +812,9 @@ const SUITES = [
 		name: 'ssr-workerd',
 		cwd: 'ssr-workerd',
 		servers: [],
-		iter: { normal: 10, quick: 2 },
+		// Each iteration is one paired round of cold workerd spawns; two rounds
+		// left the mean-scored cold guard on a single noisy pair.
+		iter: { normal: 10, quick: 6 },
 		runs: [{ script: 'run.mjs', args: (n) => [String(n)] }],
 	},
 	{
