@@ -57,7 +57,7 @@
   "hydrate-root": {
     "raw": 173667,
     "gzip": 55151,
-    "brotli": 48064
+    "brotli": 48355
   },
   "deferred-hydration": {
     "raw": 237016,
