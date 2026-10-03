@@ -21375,36 +21375,65 @@ class HydrationCapability {
 					(STAGED_DOM?.view(first as Text) ?? (first as Text)).nodeValue = text;
 				}
 			}
-			if (getNextSibling(first) !== null) {
-				this.save(el);
-				noteRecoverableHydrationError(() => new Error(formatClientError(62)), this.rootBlock);
-				if (process.env.NODE_ENV !== 'production') {
-					warnHydrationStructuralMismatch(
-						loc || (el as any).__oct_loc,
-						'the end of the text element',
-						describeHydrationNode(getNextSibling(first)),
-					);
-				}
-				while (getNextSibling(first) !== null)
-					(STAGED_DOM?.view(el) ?? el).removeChild(getNextSibling(first)!);
-			}
+			const next = getNextSibling(first);
+			if (next !== null) this.discardUnclaimedText(el, next, null, loc);
 			return first as Text;
 		}
 		// A sole primitive can be framed by the server (e.g. a spread or ternary
-		// child). Unwrap only an exact text-only frame, then use the same adoption,
-		// mismatch and suppression behavior as bare text, without child-slot state.
+		// child). Unwrap only an exact text-only or empty frame, then use the same
+		// adoption, mismatch and suppression behavior as bare text, without
+		// child-slot state.
 		if (this.isOpen(first)) {
 			const child = getNextSibling(first);
-			const end = (STAGED_DOM?.view(child) ?? child)?.nextSibling ?? null;
-			if (child?.nodeType === 3 && this.isClose(end) && getNextSibling(end) === null) {
+			const end = child?.nodeType === 3 ? getNextSibling(child) : child;
+			if (this.isClose(end) && getNextSibling(end) === null) {
 				(STAGED_DOM?.view(first) ?? first).remove();
 				(STAGED_DOM?.view(end) ?? end).remove();
 				return this.htext(el, text, loc);
 			}
 		}
+		// Anything else the server rendered here is content the text cannot adopt.
+		if (first !== null) this.discardUnclaimedText(el, first, text, loc);
 		const created = (STAGED_DOM?.view(document) ?? document).createTextNode(text);
 		(STAGED_DOM?.view(el) ?? el).appendChild(created);
 		return created;
+	}
+
+	/**
+	 * Remove the server content in `el`, an only-child text host, from `from` to
+	 * its end. The hole adopts at most one leading Text node there, so anything
+	 * else is server content the client renders nothing for, and later updates
+	 * would land beside it. Reports the recovery like hempty, where the client
+	 * expected `text` (or, when null, the end of the Text node it adopted).
+	 * suppressHydrationWarning silences the report but still discards: the server
+	 * content is not a text value to keep.
+	 */
+	private discardUnclaimedText(
+		el: Node,
+		from: ChildNode,
+		text: string | null,
+		loc: string | undefined,
+	): void {
+		if (PRESENTATION_HYDRATION?.revision !== undefined) presentationMiss();
+		this.save(el);
+		if (!isHydrationSuppressed(el)) {
+			noteRecoverableHydrationError(() => new Error(formatClientError(62)), this.rootBlock);
+			if (process.env.NODE_ENV !== 'production')
+				warnHydrationStructuralMismatch(
+					loc || (el as any).__oct_loc,
+					text === null
+						? 'the end of the text element'
+						: text === ''
+							? 'nothing'
+							: `text ${JSON.stringify(text)}`,
+					describeHydrationNode(from),
+				);
+		}
+		for (let node: ChildNode | null = from; node !== null;) {
+			const next = getNextSibling(node);
+			(STAGED_DOM?.view(el) ?? el).removeChild(node);
+			node = next;
+		}
 	}
 
 	/**
