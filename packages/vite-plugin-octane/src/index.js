@@ -234,21 +234,30 @@ function has_islands_route(config) {
 }
 
 /**
- * Fail the build when an islands-only route's shell needs client work. The
- * shell's modules never load in the browser, so every component it renders
- * outside its independent islands must be static server output.
+ * Check every islands-only route's shell for client work. The shell's modules
+ * never load in the browser, so every component it renders outside its
+ * independent islands must be static server output. A build fails on the
+ * first problem; dev reports each one and keeps serving.
  *
- * @param {import('vite').Rollup.PluginContext} context
+ * @param {(source: string, importer: string) => Promise<{ id: string, external?: boolean | 'absolute' | 'relative' } | null>} resolve
  * @param {string} projectRoot
  * @param {ResolvedOctaneConfig} config
+ * @param {(message: string) => void} report
+ * @param {(file: string, exports: string[] | null) => ReturnType<typeof analyzeIslandsShell>} [analyze]
  */
-async function assertStaticIslandsShells(context, projectRoot, config) {
+async function checkIslandsShells(
+	resolve,
+	projectRoot,
+	config,
+	report,
+	analyze = (file, exports) => analyzeIslandsShell(fs.readFileSync(file, 'utf-8'), file, exports),
+) {
 	/** @type {Map<string, Set<string> | null>} */
 	const checked = new Map();
 	for (const route of config.router.routes) {
 		if (route.type !== 'render' || route.hydrate !== 'islands') continue;
 		const fail = (/** @type {string} */ message) =>
-			context.error(
+			report(
 				`[@octanejs/vite-plugin] RenderRoute ${JSON.stringify(route.path)} uses hydrate: 'islands', but ${message}`,
 			);
 		if (config.rootBoundary.pending || config.rootBoundary.catch)
@@ -274,9 +283,11 @@ async function assertStaticIslandsShells(context, projectRoot, config) {
 			const seen = checked.get(file);
 			if (seen === null || (exports !== null && exports.every((name) => seen?.has(name)))) continue;
 			checked.set(file, exports === null ? null : new Set([...(seen ?? []), ...exports]));
-			if (!is_octane_module_path(file))
+			if (!is_octane_module_path(file)) {
 				fail(`its shell renders ${file}, which Octane cannot check.`);
-			const result = analyzeIslandsShell(fs.readFileSync(file, 'utf-8'), file, exports);
+				continue;
+			}
+			const result = analyze(file, exports);
 			if (result.problems.length > 0) {
 				const [problem] = result.problems;
 				fail(
@@ -284,13 +295,56 @@ async function assertStaticIslandsShells(context, projectRoot, config) {
 				);
 			}
 			for (const component of result.components) {
-				const resolved = await context.resolve(component.source, file, { skipSelf: true });
+				const resolved = await resolve(component.source, file);
 				if (!resolved || resolved.external)
 					fail(`its shell renders ${component.source}, which Octane cannot check.`);
 				else pending.push([resolved.id.split('?')[0], [component.exportName]]);
 			}
 		}
 	}
+}
+
+/**
+ * Dev serves an islands-only route whatever its shell does, so an interactive
+ * shell would be silently inert there. Warn once per problem, from the same
+ * check the build enforces, re-analyzing a module only when it changes.
+ *
+ * @param {ViteDevServer} server
+ * @param {string} projectRoot
+ */
+function createIslandsShellWarnings(server, projectRoot) {
+	/** @type {Map<string, { mtimeMs: number, result: ReturnType<typeof analyzeIslandsShell> }>} */
+	const analyses = new Map();
+	/** @type {Set<string>} */
+	let warned = new Set();
+	/** @param {ResolvedOctaneConfig} config */
+	return async (config) => {
+		/** @type {Set<string>} */
+		const current = new Set();
+		await checkIslandsShells(
+			async (source, importer) =>
+				(await server.environments.ssr.pluginContainer.resolveId(source, importer)) ?? null,
+			projectRoot,
+			config,
+			(message) => current.add(message),
+			(file, exports) => {
+				const key = `${file}\0${exports?.join(',') ?? '*'}`;
+				const mtimeMs = fs.statSync(file).mtimeMs;
+				const cached = analyses.get(key);
+				if (cached?.mtimeMs === mtimeMs) return cached.result;
+				const result = analyzeIslandsShell(fs.readFileSync(file, 'utf-8'), file, exports);
+				analyses.set(key, { mtimeMs, result });
+				return result;
+			},
+		);
+		for (const message of current)
+			if (!warned.has(message))
+				server.config.logger.warn(
+					`${message} A production build fails until the shell is static.`,
+					{ timestamp: true },
+				);
+		warned = current;
+	};
 }
 
 /**
@@ -557,10 +611,11 @@ export function octane(inlineOptions = {}) {
 			});
 			islandsEntryFile = null;
 			if (has_islands_route(buildOctaneConfig)) {
-				await assertStaticIslandsShells(
-					this,
+				await checkIslandsShells(
+					(source, importer) => this.resolve(source, importer, { skipSelf: true }),
 					root,
 					/** @type {ResolvedOctaneConfig} */ (buildOctaneConfig),
+					(message) => this.error(message),
 				);
 				this.emitFile({
 					type: 'chunk',
@@ -795,6 +850,7 @@ export function octane(inlineOptions = {}) {
 			let initPromise = null;
 			/** @type {number} */
 			let lastConfigErrorMtimeMs = 0;
+			const warnIslandsShells = createIslandsShellWarnings(vite, root);
 
 			async function ensureConfigLoaded() {
 				if (octaneConfig && router) return;
@@ -906,6 +962,10 @@ export function octane(inlineOptions = {}) {
 						if (!freshMatch) {
 							next();
 							return;
+						}
+						if (freshMatch.route.type === 'render' && freshMatch.route.hydrate === 'islands') {
+							// A shell module that fails to parse reports through its SSR load.
+							await warnIslandsShells(octaneConfig).catch(() => {});
 						}
 
 						const request = nodeRequestToWebRequest(req, res);

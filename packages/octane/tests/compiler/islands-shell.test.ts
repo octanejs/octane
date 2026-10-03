@@ -71,10 +71,76 @@ describe('islands-only shell analysis', () => {
 		['a handle binding', '<p>{count$ as string}</p>', /signal handle binding/],
 		['a spread', '<div {...props} />', /attribute spread/],
 		['a package component', '<Library />', /<Library> cannot be checked/],
-	])('rejects %s', (_name, body, message) => {
-		const { problems } = analyzeIslandsShell(shell(body), '/src/Page.tsrx');
+		[
+			'a local component passed as a prop',
+			'<Static render={Item} />',
+			/"onClick" needs client code/,
+			"function Item() @{ <button onClick={() => alert('x')}>x</button> }",
+		],
+		[
+			'a local function called to render output',
+			'<nav>{renderMenu()}</nav>',
+			/"onClick" needs client code/,
+			'function renderMenu() { return <button onClick={() => {}}>Menu</button>; }',
+		],
+		[
+			'a package component passed as a prop',
+			'<Static render={Library} />',
+			/Library cannot be checked/,
+		],
+		[
+			'a hook imported under an alias',
+			"onMount(() => { document.title = 'client'; }, []); <main>static</main>",
+			/hook useEffect\(\)/,
+			"import { useEffect as onMount } from 'octane';",
+		],
+		[
+			'a hook through a namespace import',
+			'const [n] = O.useState(0); <main>{String(n) as string}</main>',
+			/hook useState\(\)/,
+			"import * as O from 'octane';",
+		],
+		[
+			'a signal declaration imported under an alias',
+			'const open$ = local(false); <main />',
+			/component signal declaration/,
+			"import { signal$ as local } from 'octane/signals';",
+		],
+		[
+			'a signal handle bound through a member',
+			'<p>{state.count$ as any}</p>',
+			/signal handle binding/,
+			"import * as state from './state';",
+		],
+		[
+			'a signal handle bound through a module alias',
+			'<p>{live as any}</p>',
+			/signal handle binding/,
+			'const live = count$;',
+		],
+	])('rejects %s', (_name, body, message, imports = '') => {
+		const { problems } = analyzeIslandsShell(shell(body, imports), '/src/Page.tsrx');
 		expect(problems.map((problem) => problem.message).join('\n')).toMatch(message);
 		expect(problems[0]).toMatchObject({ line: expect.any(Number), column: expect.any(Number) });
+	});
+
+	it('checks the helpers and components a shell hands to JSX by reference', () => {
+		const result = analyzeIslandsShell(
+			shell(
+				`<main title={format(props.title)}>
+    <Static render={Island} items={[label, props.extra]} />
+    {format(props.body) as string}
+  </main>`,
+				`import { label } from 'library';
+function format(value) { return String(value).trim(); }`,
+			),
+			'/src/Page.tsrx',
+		);
+		expect(result.problems).toEqual([]);
+		expect(result.components).toEqual([
+			{ source: './Static.tsrx', exportName: 'Static' },
+			{ source: './Island.tsrx', exportName: 'Island' },
+		]);
 	});
 
 	it('checks local components the shell renders and only the selected exports', () => {

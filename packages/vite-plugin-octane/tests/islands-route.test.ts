@@ -7,7 +7,7 @@ import { afterAll, describe, expect, it } from 'vitest';
 import fs from 'node:fs';
 import path from 'node:path';
 import { pathToFileURL, fileURLToPath } from 'node:url';
-import { build, type Plugin } from 'vite';
+import { build, createLogger, createServer, type Plugin } from 'vite';
 import { createTempProject } from '../../octane/tests/_temp-project.js';
 
 const packageRoot = fileURLToPath(new URL('../', import.meta.url));
@@ -62,7 +62,7 @@ interface BuiltGraph {
 	chunks: Map<string, { imports: string[]; modules: string[]; facade: string | null }>;
 }
 
-async function buildProject(overrides: Record<string, string> = {}) {
+function writeProject(overrides: Record<string, string> = {}) {
 	const project = createTempProject('octane-vite-islands');
 	projects.push(project);
 	const root = project.root;
@@ -78,6 +78,11 @@ async function buildProject(overrides: Record<string, string> = {}) {
 	link('octane', path.join(repoRoot, 'packages/octane'));
 	link('@octanejs/vite-plugin', packageRoot);
 	link('vite', path.join(packageRoot, 'node_modules/vite'));
+	return root;
+}
+
+async function buildProject(overrides: Record<string, string> = {}) {
+	const root = writeProject(overrides);
 	const graph: BuiltGraph = { chunks: new Map() };
 	// Observe the client graph the browser would load; the server build is separate.
 	const probe: Plugin = {
@@ -159,6 +164,39 @@ describe('islands-only routes', { timeout: 180_000 }, () => {
 				'src/Header.tsrx': `export function Header() @{ <header><button onClick={() => {}}>Menu</button></header> }`,
 			}),
 		).rejects.toThrow(/hydrate: 'islands'.*Header\.tsrx:1:.*"onClick" needs client code/s);
+	});
+
+	// Dev serves the route either way; without a warning its interactive shell
+	// would be silently inert there until the first production build failed.
+	it('warns in dev when a shell needs client work, and keeps serving it', async () => {
+		const root = writeProject({
+			'src/Header.tsrx': `export function Header() @{ <header><button onClick={() => {}}>Menu</button></header> }`,
+		});
+		const warnings: string[] = [];
+		const logger = createLogger('silent');
+		logger.warn = (message) => {
+			warnings.push(message);
+		};
+		const server = await createServer({
+			root,
+			customLogger: logger,
+			server: { host: '127.0.0.1', port: 0, hmr: false, ws: false },
+		});
+		try {
+			await server.listen();
+			const address = server.httpServer?.address();
+			if (!address || typeof address !== 'object') throw new Error('dev server has no address');
+			for (let request = 0; request < 2; request++) {
+				const response = await fetch(`http://127.0.0.1:${address.port}/`);
+				expect(response.status).toBe(200);
+				expect(await response.text()).toContain('Menu');
+			}
+			const shell = warnings.filter((message) => message.includes("hydrate: 'islands'"));
+			expect(shell).toHaveLength(1);
+			expect(shell[0]).toMatch(/Header\.tsrx:1:.*"onClick" needs client code/);
+		} finally {
+			await server.close();
+		}
 	});
 
 	it('rejects a preHydrate hook that reaches the renderer', async () => {
