@@ -4,10 +4,6 @@ import type { ScopeSeed, SignalOwner, SignalRendererOwnerIdentity } from '../sig
 import { captureInitialDocumentSignals } from '../signals/native-read-seeds.js';
 import {
 	HYDRATE_ID_ATTR,
-	HYDRATE_IDLE_TIMEOUT_ATTR,
-	HYDRATE_MEDIA_ATTR,
-	HYDRATE_VISIBLE_MARGIN_ATTR,
-	HYDRATE_VISIBLE_THRESHOLD_ATTR,
 	HYDRATE_WHEN_ATTR,
 	HYDRATE_INDEPENDENT_ATTR,
 	INDEPENDENT_HYDRATE_MANIFEST_ATTR,
@@ -30,10 +26,7 @@ import {
 	type HydrationReplayIntent,
 } from './event-capture.js';
 import { isHydrationLifecycleEvent } from './interaction-config.js';
-import { idle } from './idle.js';
-import { media } from './media.js';
 import type { HydrationStrategy } from './types.js';
-import { visible } from './visible.js';
 
 export interface IndependentHydrateActivationContext {
 	readonly element: Element;
@@ -49,9 +42,24 @@ export type IndependentHydrateActivator = (
 	context: IndependentHydrateActivationContext,
 ) => void | { unmount(): void } | Promise<void | { unmount(): void }>;
 
+/**
+ * Rebuilds each automatic strategy an independent wrapper can serialize, from
+ * that wrapper's attributes. `octane/hydration/independent-strategies` exports
+ * the built-in implementation.
+ */
+export type IndependentHydrateStrategies = Readonly<
+	Record<'idle' | 'visible' | 'media', (element: Element) => HydrationStrategy>
+>;
+
 export interface IndependentHydrateRegistration {
 	readonly load: () => Promise<Record<string, unknown>>;
 	readonly loadStyles: (styles: readonly string[]) => void | Promise<void>;
+	/**
+	 * Arms an `idle`, `visible` or `media` trigger during registration. When it is
+	 * omitted, such an island loads the built-in strategies and arms once they
+	 * resolve, so a page without such islands never ships them.
+	 */
+	readonly strategies?: IndependentHydrateStrategies;
 	readonly signalOwner?: SignalOwner;
 	/** Initial document history shared with the matching server renderer. */
 	readonly initialDocumentSignals?: ScopeSeed;
@@ -63,34 +71,12 @@ export interface IndependentHydrateBootstrapOptions {
 	readonly buildId?: string;
 	readonly loadModule: (moduleId: string) => Promise<Record<string, unknown>>;
 	readonly loadStyles: (styles: readonly string[]) => void | Promise<void>;
+	/** See {@link IndependentHydrateRegistration.strategies}. */
+	readonly strategies?: IndependentHydrateStrategies;
 	readonly signalOwner?: SignalOwner;
 	/** Initial document history shared with the matching server renderer. */
 	readonly initialDocumentSignals?: ScopeSeed;
 	readonly onError?: (error: unknown) => void;
-}
-
-/**
- * Rebuild the built-in automatic strategy the server serialized for this
- * boundary. The lexical parent that evaluated `when` never runs here, so the
- * server encodes each strategy's `_p` parameters on the wrapper. `interaction` is
- * owned by pre-root capture and `never` stays inert; the server and compiler
- * reject `condition` and function-form `when` for independent boundaries.
- */
-function automaticStrategy(element: Element, when: string | null): HydrationStrategy | null {
-	if (when === 'idle') {
-		const timeout = element.getAttribute(HYDRATE_IDLE_TIMEOUT_ATTR);
-		return idle(timeout === null ? {} : { timeout: Number(timeout) });
-	}
-	if (when === 'visible') {
-		const rootMargin = element.getAttribute(HYDRATE_VISIBLE_MARGIN_ATTR);
-		const threshold = element.getAttribute(HYDRATE_VISIBLE_THRESHOLD_ATTR);
-		return visible({
-			...(rootMargin === null ? {} : { rootMargin }),
-			...(threshold === null ? {} : { threshold: threshold.split(',').map(Number) }),
-		});
-	}
-	if (when === 'media') return media(element.getAttribute(HYDRATE_MEDIA_ATTR) ?? '');
-	return null;
 }
 
 export interface IndependentHydrateLifecycle {
@@ -114,7 +100,7 @@ export function registerIndependentHydrationIsland(
 	if (element.getAttribute(HYDRATE_ID_ATTR) !== manifest.boundaryId) {
 		throw new Error(formatClientError(216));
 	}
-	const { load, loadStyles, signalOwner, onError } = registration;
+	const { load, loadStyles, strategies, signalOwner, onError } = registration;
 	let initialDocumentSignals =
 		registration.initialDocumentSignals === undefined
 			? undefined
@@ -134,7 +120,10 @@ export function registerIndependentHydrationIsland(
 	let root: { unmount(): void } | undefined;
 	const intents: HydrationReplayIntent[] = takePendingHydrationIntents(element) ?? [];
 	const when = element.getAttribute(HYDRATE_WHEN_ATTR);
-	const strategy = automaticStrategy(element, when);
+	// `interaction` is owned by pre-root capture and `never` stays inert; the
+	// server and compiler reject `condition` and function-form `when` here.
+	const automatic = when === 'idle' || when === 'visible' || when === 'media';
+	let strategy = automatic ? strategies?.[when](element) : undefined;
 	// A fired automatic strategy is a standing activation request, like a
 	// retained intent: pause defers it and resume honors it without re-arming.
 	let triggered = when === 'load';
@@ -244,6 +233,20 @@ export function registerIndependentHydrationIsland(
 	};
 	registerHydrationIntentBoundary(element, boundary);
 	arm();
+	if (automatic && !strategies) {
+		// Most islands pages never need the strategies, so they load on demand. Arm
+		// once they resolve, unless disposed; resume arms a paused island. A failed
+		// load or arm reports like one during registration would have.
+		import('./independent-strategies.js')
+			.then((module) => {
+				if (disposed) return;
+				strategy = module.independentHydrationStrategies[when](element);
+				if (!paused) arm();
+			})
+			.catch((error) => {
+				if (!disposed) onError?.(error);
+			});
+	}
 	if (intents.length !== 0 || triggered) activate();
 	return Object.assign(
 		() => {
@@ -288,7 +291,7 @@ export function bootstrapIndependentHydration(
 	root: ParentNode,
 	options: IndependentHydrateBootstrapOptions,
 ): IndependentHydrateLifecycle {
-	const { buildId, loadModule, loadStyles, signalOwner, onError } = options;
+	const { buildId, loadModule, loadStyles, strategies, signalOwner, onError } = options;
 	let initialDocumentSignals =
 		options.initialDocumentSignals === undefined
 			? undefined
@@ -335,6 +338,7 @@ export function bootstrapIndependentHydration(
 				registerIndependentHydrationIsland(element, manifest, {
 					load: () => loadModule(manifest.moduleId),
 					loadStyles,
+					...(strategies === undefined ? {} : { strategies }),
 					...(signalOwner === undefined ? {} : { signalOwner }),
 					...(initialDocumentSignals === undefined ? {} : { initialDocumentSignals }),
 					...(onError === undefined ? {} : { onError }),
