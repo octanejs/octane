@@ -19,6 +19,7 @@ import {
 	MultiHostLayoutApp,
 	NestedShareApp,
 } from './_fixtures/view-transition-matching.tsrx';
+import { loadCompiledFixtureSource } from './_server-fixture.js';
 
 function holdFonts() {
 	let resolve!: () => void;
@@ -370,6 +371,81 @@ describe('ViewTransition activation and matching', () => {
 			expect(calls).toBe(2);
 		} finally {
 			finish();
+			fonts.restore();
+			otherRoot.unmount();
+			otherContainer.remove();
+		}
+	});
+
+	it('runs a deferred layout cascade urgently when a commit inside a transition interrupts it', async () => {
+		const fonts = holdFonts();
+		const { Counter } = loadCompiledFixtureSource(
+			`import { useLayoutEffect, useState } from 'octane';
+export function Counter(props) @{
+	const [value, setValue] = useState(0);
+	props.expose(setValue);
+	useLayoutEffect(() => {
+		props.onLayout(value);
+	}, [value]);
+	<i>{String(value) as string}</i>
+}`,
+			{
+				id: '/packages/octane/tests/_fixtures/view-transition-interrupting-counter.tsrx',
+				mode: 'client',
+				compileOptions: { hmr: false },
+			},
+		);
+		const otherContainer = document.createElement('div');
+		document.body.append(otherContainer);
+		const otherRoot = createRoot(otherContainer);
+		const events: string[] = [];
+		let setCount!: (value: number) => void;
+		(document as any).startViewTransition = (input: { update: () => unknown }) => {
+			const ready = Promise.resolve(input.update());
+			return { ready, updateCallbackDone: ready, finished: ready, skipTransition() {} };
+		};
+		try {
+			await act(() => {
+				root.render(DeferredOwnershipApp, {
+					generation: 0,
+					cascade: true,
+					events,
+					requestFont: fonts.request,
+				});
+				otherRoot.render(Counter, {
+					expose: (setter: typeof setCount) => (setCount = setter),
+					onLayout: () => {},
+				});
+			});
+			events.length = 0;
+			let interrupted: string[] = [];
+			let interruptedText = '';
+			await act(async () => {
+				startTransition(() =>
+					root.render(DeferredOwnershipApp, {
+						generation: 1,
+						cascade: true,
+						events,
+						requestFont: fonts.request,
+					}),
+				);
+				await nextTask();
+				expect(events).not.toContain('layout:1:0');
+				setCount(1);
+				startTransition(() => {
+					// The urgent commit completes the deferred layout. Its cascade is a
+					// commit-phase update, not part of the surrounding transition.
+					flushSync(() => {});
+					interrupted = events.slice();
+					interruptedText = container.textContent!;
+				});
+				fonts.release();
+			});
+			expect(interrupted).toContain('layout:1:0');
+			expect(interrupted).toContain('layout:1:1');
+			expect(interruptedText).toBe('11');
+			expect(otherContainer.textContent).toBe('1');
+		} finally {
 			fonts.restore();
 			otherRoot.unmount();
 			otherContainer.remove();

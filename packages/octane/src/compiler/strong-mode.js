@@ -50,6 +50,7 @@ const LOCAL_VALUE_HOOKS = new Set([
 	'useDeferredValue',
 	'useTransition',
 	'useSyncExternalStore',
+	'useLayoutSnapshot',
 	'useActionState',
 	'useFormState',
 	'useFormStatus',
@@ -202,6 +203,7 @@ export const STRONG_RENDER_IMPURE_CALL = 'OCTANE_STRONG_RENDER_IMPURE_CALL';
 export const STRONG_RENDER_EFFECT_EVENT_CALL = 'OCTANE_STRONG_RENDER_EFFECT_EVENT_CALL';
 export const STRONG_EFFECT_EVENT_DEPENDENCY = 'OCTANE_STRONG_EFFECT_EVENT_DEPENDENCY';
 export const STRONG_EFFECT_CHAIN = 'OCTANE_STRONG_EFFECT_CHAIN';
+export const STRONG_LAYOUT_SNAPSHOT_ASYNC = 'OCTANE_STRONG_LAYOUT_SNAPSHOT_ASYNC';
 export const STRONG_UNLINKED_PROP_STATE = 'OCTANE_STRONG_UNLINKED_PROP_STATE';
 export const STRONG_DIRECTIVE_PLACEMENT = 'OCTANE_STRONG_DIRECTIVE_PLACEMENT';
 export const STRONG_HOOK_LOCALITY = 'OCTANE_STRONG_HOOK_LOCALITY';
@@ -2862,7 +2864,11 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 				visit(body, functionScope, phase);
 				// An expression body returns its value, so it can supply the cleanup
 				// exactly like a block body's return statement.
-				if (currentEffect !== null && effectCallbackIsCurrent(currentEffect.callback)) {
+				if (
+					currentEffect !== null &&
+					!currentEffect.snapshot &&
+					effectCallbackIsCurrent(currentEffect.callback)
+				) {
 					markEffectCleanup(body, functionScope);
 				}
 				if (returnCollector?.fn === node) {
@@ -3056,7 +3062,7 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 					value?.kind === 'callback' ||
 					value?.kind === 'callback-choice' ||
 					value?.kind === 'effect-event' ||
-					value?.kind === 'linked-options' ||
+					value?.kind === 'comparator-options' ||
 					value?.kind === 'linked-key' ||
 					value?.kind === 'constant' ||
 					value?.kind === 'transition-start' ||
@@ -3084,10 +3090,10 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 					initial?.type === 'ConditionalExpression' ||
 					initial?.type === 'LogicalExpression' ||
 					initial?.type === 'SequenceExpression') &&
-				linkedStateOptionsExpression(initial, scope)
+				hookComparatorOptionsExpression(initial, scope)
 			) {
 				target.bindings.set(declaration.id.name, {
-					kind: 'linked-options',
+					kind: 'comparator-options',
 					node: initial,
 					scope,
 				});
@@ -3721,7 +3727,7 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 				return TRUTHY_VALUE;
 			}
 			if (binding?.kind === 'callback-choice') return binding.value;
-			if (binding?.kind === 'linked-options') {
+			if (binding?.kind === 'comparator-options') {
 				if (activeCallbacks.has(binding.node)) return UNKNOWN_VALUE;
 				activeCallbacks.add(binding.node);
 				try {
@@ -4348,9 +4354,10 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 		return effectPolicy.joinFlow(consequent, alternate);
 	}
 
-	function visitEffect(node, scope) {
+	function visitEffect(node, scope, snapshot = false) {
 		const enclosingEffect = currentEffect;
 		const enclosingOwnsWrites = effectOwnsWrites;
+		const enclosingCollectReads = collectEffectReads;
 		const callback = callableValue(node.arguments?.[0], scope);
 		const record = {
 			node,
@@ -4358,17 +4365,35 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 			callback,
 			reads: new Set(),
 			writes: new Set(),
+			snapshot,
 		};
+		if (
+			snapshot &&
+			callback?.kind === 'callback' &&
+			(callback.node.async === true || callback.node.generator === true)
+		) {
+			// A promise or iterator is a new object on every commit, so Object.is
+			// never settles the snapshot and it re-renders until the depth limit.
+			report(
+				STRONG_LAYOUT_SNAPSHOT_ASYNC,
+				callback.node,
+				'Strong mode requires useLayoutSnapshot to measure synchronously. An async or generator callback returns a new object on every commit, so the snapshot never converges. Return the measurement directly, and read asynchronous render data with use() or a query binding.',
+			);
+		}
 		const enclosingPolicy = effectPolicy.enterEffect(record);
 		currentEffect = record;
 		effectOwnsWrites = true;
+		if (snapshot) collectEffectReads = false;
 		effectRecords.push(record);
 		try {
-			visitExplicitStateDependencies(node.arguments?.[1], scope, record.reads);
+			if (!snapshot) visitExplicitStateDependencies(node.arguments?.[1], scope, record.reads);
 			visitCallable(callback, unwrap(node.arguments?.[0]), 'effect');
+			if (snapshot)
+				visitHookComparators(node.arguments?.[1], scope, 'effect', undefined, undefined, true);
 		} finally {
 			currentEffect = enclosingEffect;
 			effectOwnsWrites = enclosingOwnsWrites;
+			collectEffectReads = enclosingCollectReads;
 			effectPolicy.exitEffect(enclosingPolicy);
 		}
 		effectPolicy.finishEffect(
@@ -4766,7 +4791,7 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 		}
 	}
 
-	function linkedStateComparatorName(property, scope) {
+	function hookComparatorName(property, scope, snapshot = false) {
 		if (property?.type !== 'Property' || property.kind !== 'init') return null;
 		const key = unwrap(property.key);
 		const name =
@@ -4775,17 +4800,23 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 					? key.name
 					: key?.value
 				: staticPrimitiveValue(key, scope);
-		return name === 'sourceEqual' || name === 'valueEqual' ? name : null;
+		return snapshot
+			? name === 'equal'
+				? name
+				: null
+			: name === 'sourceEqual' || name === 'valueEqual'
+				? name
+				: null;
 	}
 
-	function linkedStateOptionsExpression(value, scope) {
+	function hookComparatorOptionsExpression(value, scope) {
 		const options = unwrap(value);
 		if (options?.type === 'Identifier') {
-			return resolve(scope, options.name)?.kind === 'linked-options';
+			return resolve(scope, options.name)?.kind === 'comparator-options';
 		}
 		if (options?.type === 'SequenceExpression') {
 			const expressions = options.expressions ?? [];
-			return linkedStateOptionsExpression(expressions[expressions.length - 1], scope);
+			return hookComparatorOptionsExpression(expressions[expressions.length - 1], scope);
 		}
 		if (options?.type === 'ConditionalExpression' || options?.type === 'LogicalExpression') {
 			const logical = options.type === 'LogicalExpression';
@@ -4795,27 +4826,35 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 			return (
 				((branches & 1) !== 0 &&
 					(!logical || options.operator !== '&&') &&
-					linkedStateOptionsExpression(logical ? options.left : options.consequent, scope)) ||
+					hookComparatorOptionsExpression(logical ? options.left : options.consequent, scope)) ||
 				((branches & 2) !== 0 &&
-					linkedStateOptionsExpression(logical ? options.right : options.alternate, scope))
+					hookComparatorOptionsExpression(logical ? options.right : options.alternate, scope))
 			);
 		}
 		return (
 			options?.type === 'ObjectExpression' &&
 			(options.properties ?? []).some((property) =>
 				property.type === 'SpreadElement'
-					? linkedStateOptionsExpression(property.argument, scope)
-					: linkedStateComparatorName(property, scope) !== null,
+					? hookComparatorOptionsExpression(property.argument, scope)
+					: hookComparatorName(property, scope) !== null ||
+						hookComparatorName(property, scope, true) !== null,
 			)
 		);
 	}
 
-	function visitLinkedStateComparators(value, parentScope, phase, overridden, activeOptions) {
+	function visitHookComparators(
+		value,
+		parentScope,
+		phase,
+		overridden,
+		activeOptions,
+		snapshot = false,
+	) {
 		let options = unwrap(value);
 		let scope = parentScope;
 		if (options?.type === 'Identifier') {
 			const binding = resolve(scope, options.name);
-			if (binding?.kind !== 'linked-options') return;
+			if (binding?.kind !== 'comparator-options') return;
 			options = binding.node;
 			scope = binding.scope;
 		}
@@ -4834,12 +4873,13 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 		try {
 			if (options.type === 'SequenceExpression') {
 				const expressions = options.expressions ?? [];
-				visitLinkedStateComparators(
+				visitHookComparators(
 					expressions[expressions.length - 1],
 					scope,
 					phase,
 					overridden,
 					activeOptions,
+					snapshot,
 				);
 				return;
 			}
@@ -4852,19 +4892,20 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 					logical && options.operator === '&&' ? null : logical ? options.left : options.consequent;
 				const second = logical ? options.right : options.alternate;
 				if (branches !== 3) {
-					visitLinkedStateComparators(
+					visitHookComparators(
 						branches === 1 ? first : second,
 						scope,
 						phase,
 						overridden,
 						activeOptions,
+						snapshot,
 					);
 					return;
 				}
 				const firstOverrides = new Set(overridden);
 				const secondOverrides = new Set(overridden);
-				visitLinkedStateComparators(first, scope, phase, firstOverrides, activeOptions);
-				visitLinkedStateComparators(second, scope, phase, secondOverrides, activeOptions);
+				visitHookComparators(first, scope, phase, firstOverrides, activeOptions, snapshot);
+				visitHookComparators(second, scope, phase, secondOverrides, activeOptions, snapshot);
 				for (const name of firstOverrides) {
 					if (secondOverrides.has(name)) overridden.add(name);
 				}
@@ -4874,13 +4915,22 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 			for (let index = properties.length - 1; index >= 0; index--) {
 				const property = properties[index];
 				if (property.type === 'SpreadElement') {
-					visitLinkedStateComparators(property.argument, scope, phase, overridden, activeOptions);
+					visitHookComparators(
+						property.argument,
+						scope,
+						phase,
+						overridden,
+						activeOptions,
+						snapshot,
+					);
 					continue;
 				}
-				const name = linkedStateComparatorName(property, scope);
+				const name = hookComparatorName(property, scope, snapshot);
 				if (name !== null && !overridden.has(name)) {
 					overridden.add(name);
-					visitSynchronousHookCallback(property.value, scope, phase);
+					if (snapshot)
+						visitCallable(callableValue(property.value, scope), unwrap(property.value), 'effect');
+					else visitSynchronousHookCallback(property.value, scope, phase);
 				}
 			}
 		} finally {
@@ -5025,7 +5075,11 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 			}
 			case 'ReturnStatement': {
 				visit(node.argument, scope, phase);
-				if (currentEffect !== null && effectCallbackIsCurrent(currentEffect.callback)) {
+				if (
+					currentEffect !== null &&
+					!currentEffect.snapshot &&
+					effectCallbackIsCurrent(currentEffect.callback)
+				) {
 					markEffectCleanup(node.argument, scope);
 				}
 				if (returnCollector?.fn === currentFunction) {
@@ -5400,6 +5454,7 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 							: hook === 'useState' ||
 								  hook === 'useMemo' ||
 								  hook === 'useLazyRef' ||
+								  hook === 'useLayoutSnapshot' ||
 								  EFFECT_HOOKS.has(hook)
 								? 0
 								: -1;
@@ -5421,12 +5476,13 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 					hook === null && pureCallbackIndex === -1 && executionPhase === 'render'
 						? renderPolicy.arrayCallbackIndex(callee, scope)
 						: -1;
-				// The hook and updater callbacks visited below with their own phase. visitEffect
-				// still reads its callback by syntactic position.
+				// The hook and updater callbacks visited below with their own phase. visitEffect,
+				// which also checks useLayoutSnapshot, still reads its callback by syntactic
+				// position.
 				const synchronousCallback =
 					synchronousCallbackIndex === -1
 						? null
-						: EFFECT_HOOKS.has(hook)
+						: EFFECT_HOOKS.has(hook) || hook === 'useLayoutSnapshot'
 							? (node.arguments?.[synchronousCallbackIndex] ?? null)
 							: argumentAt(node.arguments, synchronousCallbackIndex);
 				const pureCallback =
@@ -5507,6 +5563,12 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 					visitEffect(node, scope);
 					return;
 				}
+				if (hook === 'useLayoutSnapshot') {
+					// The callback runs at layout time. Apply effect ownership checks,
+					// but its return is data and its options are not dependencies.
+					visitEffect(node, scope, true);
+					return;
+				}
 				if (
 					hook === 'useReducer' &&
 					executionPhase === 'render' &&
@@ -5538,7 +5600,7 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 				}
 				if (hook === 'useLinkedState') {
 					visitSynchronousHookCallback(synchronousCallback, scope, executionPhase);
-					visitLinkedStateComparators(node.arguments?.[2], scope, executionPhase);
+					visitHookComparators(node.arguments?.[2], scope, executionPhase);
 					return;
 				}
 				if (component !== null) {

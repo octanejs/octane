@@ -15,6 +15,7 @@ const AUTO_RUNTIME_HOOKS = new Set([
 	'useReducer',
 	'useEffect',
 	'useLayoutEffect',
+	'useLayoutSnapshot',
 	'useInsertionEffect',
 	'useMemo',
 	'useCallback',

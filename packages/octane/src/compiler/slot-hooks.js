@@ -18,7 +18,11 @@ import { parseModule, builders as b } from '@tsrx/core';
 import { parseModule as parseFallbackModule } from '#octane/compiler-parser';
 import { findRootFactoryImports, proveVoidRoots } from './void-roots.js';
 import { HOOK_NAMES, collectNestedBindingNames, hookSlotHash } from './compile.js';
-import { INITIAL_VALUE_HOOKS, NATIVE_SIGNAL_HOOK_NAMES } from './hook-names.js';
+import {
+	INITIAL_VALUE_HOOKS,
+	NATIVE_SIGNAL_HOOK_NAMES,
+	SPREAD_PATH_SLOT_HOOKS,
+} from './hook-names.js';
 import { METHOD_DEP_IMPORT, annotateHookCalls, analyzeStrongMemoCandidates } from './hook-deps.js';
 import { inlinePlainHookMemos } from './plain-hook-memo.js';
 import { assertStrongMode } from './strong-mode.js';
@@ -1242,7 +1246,7 @@ function walk(node, owner, st) {
 				});
 			}
 			if (
-				INITIAL_VALUE_HOOKS.has(imported) &&
+				SPREAD_PATH_SLOT_HOOKS.has(imported) &&
 				node.arguments.some((arg) => arg.type === 'SpreadElement')
 			) {
 				const open = callOpenParen(node, st.source);

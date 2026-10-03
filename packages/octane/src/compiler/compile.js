@@ -89,6 +89,7 @@ import {
 	INITIAL_VALUE_HOOKS,
 	NATIVE_SIGNAL_HOOK_NAMES,
 	REF_HOOKS,
+	SPREAD_PATH_SLOT_HOOKS,
 } from './hook-names.js';
 export { HOOK_NAMES } from './hook-names.js';
 import {
@@ -5842,6 +5843,7 @@ const SETUP_PASSIVE_HOOKS = new Set([
 	'useRef',
 	'useEffect',
 	'useLayoutEffect',
+	'useLayoutSnapshot',
 	'useInsertionEffect',
 	'useImperativeHandle',
 	'useEffectEvent',
@@ -19861,6 +19863,7 @@ const NUMERIC_HOOK_SLOT_POSITION = {
 	useReducer: 3,
 	useEffect: 2,
 	useLayoutEffect: 2,
+	useLayoutSnapshot: 2,
 	useInsertionEffect: 2,
 	useMemo: 2,
 	useCallback: 2,
@@ -20660,7 +20663,7 @@ function rewriteHookCalls(node, ctx, componentName, localRoot = false) {
 				// changes a custom hook's defaults, rest values or arguments.length.
 				// State/ref spreads also need this path: an empty spread has no
 				// initializer position into which a trailing slot may safely fall.
-				if (isCustom || (hasSpread && INITIAL_VALUE_HOOKS.has(name)))
+				if (isCustom || (hasSpread && SPREAD_PATH_SLOT_HOOKS.has(name)))
 					return wrapHookCallWithSlot(n, ctx, slot, callee, args);
 
 				const hookArgs = explicitMemoSlot
@@ -20749,7 +20752,7 @@ function rewriteHookCalls(node, ctx, componentName, localRoot = false) {
 					: getterHelper !== null
 						? b.id(runtimeAliasForContext(ctx, getterHelper))
 						: n.callee;
-				if (INITIAL_VALUE_HOOKS.has(name) && args.some((arg) => arg.type === 'SpreadElement'))
+				if (SPREAD_PATH_SLOT_HOOKS.has(name) && args.some((arg) => arg.type === 'SpreadElement'))
 					return wrapHookCallWithSlot(n, ctx, slot, callee, args);
 				return {
 					...n,
