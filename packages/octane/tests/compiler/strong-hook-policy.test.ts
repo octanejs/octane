@@ -191,6 +191,39 @@ export function App(props) @{
 		);
 	});
 
+	// Compatibility modules infer `null` here and run the hook every render.
+	it.each([
+		'useEffect(() => console.log(prefix)); const prefix = props.prefix;',
+		'useEffect(() => console.log(prefix), undefined); const prefix = props.prefix;',
+		'useLayoutEffect(() => console.log(prefix)); var prefix = props.prefix;',
+		'useImperativeHandle(props.ref, () => ({ prefix })); const prefix = props.prefix;',
+	])('rejects an omitted list that reads a later declaration: %s', (setup) => {
+		const source = app(setup);
+		expect(() => compile(source, '/src/App.tsrx')).not.toThrow();
+		expect(() => compile(strong(source), '/src/App.tsrx')).toThrow(
+			/UNTRACKED_EFFECT\] Strong mode does not allow \w+ to read `prefix` before its declaration/,
+		);
+		const reordered = strong(app(setup.replace(/^(.*?;) (.*)$/, '$2 $1')));
+		expect(() => compile(reordered, '/src/App.tsrx')).not.toThrow();
+	});
+
+	it('rejects an omitted list that reads a variable assigned after the call', () => {
+		const setup = 'let label = props.a; useEffect(() => console.log(label)); label = props.b;';
+		expect(() => compile(app(setup), '/src/App.tsrx')).not.toThrow();
+		expect(() => compile(strong(app(setup)), '/src/App.tsrx')).toThrow(
+			/UNTRACKED_EFFECT\] Strong mode does not allow useEffect to read `label` while the component assigns it after the call/,
+		);
+		const assignedFirst =
+			'let label = props.a; label = props.b; useEffect(() => console.log(label));';
+		expect(() => compile(strong(app(assignedFirst)), '/src/App.tsrx')).not.toThrow();
+	});
+
+	it('rejects a later declaration read by a plain TypeScript hook', () => {
+		const source = `"use strong"; import { useEffect } from 'octane'; export function useLog(value: string) { useEffect(() => console.log(label)); const label = value.trim(); }`;
+		expect(() => slotHooks(source, '/src/useLog.ts')).toThrow(EVERY_RENDER);
+		expect(() => compile(source, '/src/useLog.tsx')).toThrow(EVERY_RENDER);
+	});
+
 	it('enforces policies in plain TypeScript and TSX', () => {
 		const source = `"use strong"; import { useEffect } from 'octane'; export function useLog(value: string) { useEffect(() => console.log(value), []); }`;
 		expect(() => slotHooks(source, '/src/useLog.ts')).toThrow(EXPLICIT);

@@ -122,28 +122,38 @@ export function mount(parent,props) {
 		id: String(index),
 		label: 'Row ' + index,
 	}));
-	const originalSet = WeakMap.prototype.set;
 	let records = 0;
-	const count = (callback) => {
-		records = 0;
-		// Observe actual element-to-invocation authority writes. This is work
-		// evidence; latest handlers, drafts and DOM identity are checked separately.
-		WeakMap.prototype.set = function (key, value) {
+	let counting = false;
+	// Observe actual element-to-invocation authority writes: the runtime keeps
+	// each host's authority in its $$signalOwner property, so an accessor on the
+	// prototype sees every publication. This is work evidence; latest handlers,
+	// drafts and DOM identity are checked separately.
+	const stored = Symbol('authority');
+	Object.defineProperty(window.Element.prototype, '$$signalOwner', {
+		configurable: true,
+		get() {
+			return this[stored];
+		},
+		set(value) {
 			if (
-				key instanceof window.Element &&
+				counting &&
 				value !== null &&
 				typeof value === 'object' &&
 				Array.isArray(value.slots) &&
 				value.block !== undefined
 			)
 				records++;
-			return Reflect.apply(originalSet, this, [key, value]);
-		};
+			this[stored] = value;
+		},
+	});
+	const count = (callback) => {
+		records = 0;
+		counting = true;
 		try {
 			callback();
 			return records;
 		} finally {
-			WeakMap.prototype.set = originalSet;
+			counting = false;
 		}
 	};
 	try {
@@ -200,7 +210,6 @@ export function mount(parent,props) {
 			},
 		};
 	} finally {
-		WeakMap.prototype.set = originalSet;
 		mounted?.dispose();
 		host.remove();
 		window.close();

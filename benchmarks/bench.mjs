@@ -302,7 +302,10 @@ const SUITES = [
 		cwd: 'scoped-signals',
 		servers: [],
 		iter: { normal: 9, quick: 3 },
-		runs: [{ script: 'run-dom-bindings.mjs', args: (_n, quick) => (quick ? ['--quick'] : []) }],
+		runs: [
+			{ script: 'run-dom-bindings.mjs', args: (_n, quick) => (quick ? ['--quick'] : []) },
+			{ label: 'event-owners', script: 'event-owners.mjs', args: () => [] },
+		],
 	},
 	{
 		name: 'signal-favoring',
@@ -587,7 +590,13 @@ const SUITES = [
 			{ label: 'refs', script: 'refs.mjs', args: (n) => [String(n)] },
 			{ label: 'refs-work', script: 'refs-work.mjs', args: () => [] },
 			{ label: 'bundle', script: 'bundle.mjs', args: () => [] },
-			{ label: 'caught-reveal', script: 'caught-reveal-run.mjs', args: (n) => [String(n)] },
+			// The scaling guard compares paired equal-work samples; quick mode's two
+			// iterations would leave its median on a single pair.
+			{
+				label: 'caught-reveal',
+				script: 'caught-reveal-run.mjs',
+				args: (n) => [String(Math.max(n, 5))],
+			},
 		],
 	},
 	{
@@ -632,7 +641,10 @@ const SUITES = [
 			{ filter: 'svelte-memowall-bench', port: 5278 },
 		],
 		iter: { normal: 20, quick: 3 },
-		runs: [{ script: 'run.mjs', args: (n) => [String(n)] }],
+		runs: [
+			{ script: 'run.mjs', args: (n) => [String(n)] },
+			{ label: 'bail-compare', script: 'bail-compare.mjs', args: () => [] },
+		],
 	},
 	{
 		name: 'portal-swarm',
@@ -792,7 +804,9 @@ const SUITES = [
 		name: 'ssr-workerd',
 		cwd: 'ssr-workerd',
 		servers: [],
-		iter: { normal: 10, quick: 2 },
+		// Each iteration is one paired round of cold workerd spawns; two rounds
+		// left the mean-scored cold guard on a single noisy pair.
+		iter: { normal: 10, quick: 6 },
 		runs: [{ script: 'run.mjs', args: (n) => [String(n)] }],
 	},
 	{
@@ -1337,6 +1351,7 @@ const SUITES = [
 		runs: [
 			{ script: 'retirement.mjs', args: () => [] },
 			{ script: 'inputs.mjs', args: () => [] },
+			{ script: 'reorders.mjs', args: () => [] },
 			{ script: 'contracts.mjs', args: () => [] },
 		],
 	},

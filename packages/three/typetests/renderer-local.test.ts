@@ -14,6 +14,11 @@ type _NoConflictingLine = Assert<
 type _HasThreeLine = Assert<Equal<'threeLine' extends keyof RendererElements ? true : false, true>>;
 type _PublicCatalogueMatchesRenderer = Assert<Equal<keyof ThreeElements, keyof RendererElements>>;
 type _InstanceObjectIsGeneric = Assert<Equal<Instance<THREE.Group>['object'], THREE.Group>>;
+// Under `jsx: preserve`, authored JSX children reach a component's `children`
+// prop only through this attribute.
+type _ChildrenAttributeIsChildren = Assert<
+	Equal<keyof RendererJSX.ElementChildrenAttribute, 'children'>
+>;
 
 const meshProps: RendererElements['mesh'] = {
 	position: [1, 2, 3],

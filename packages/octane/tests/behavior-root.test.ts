@@ -42,6 +42,9 @@ import {
 	isSignalHandle,
 	query,
 	bindSignalControl,
+	optimistic$,
+	retireSignalOwnerIdentity,
+	ScopeDisposedError,
 } from '../src/signals/index.js';
 import type {
 	ActionPresentationProps,
@@ -7958,6 +7961,274 @@ export function Retiring() @{
 			expect(() => handle.dispose()).not.toThrow();
 		});
 
+		// Every capability that subscribes answers for its own sources. A scope
+		// observed only through one of them retiring ends the presentation quietly,
+		// including a later read of that scope once a control's lease has ended.
+		for (const [capability, markup, observe] of [
+			['tracked read', '<p title={text$.get()}>text</p>', (node: HTMLElement) => node.title],
+			['signal text', '<p>{text$ as string}</p>', (node: HTMLElement) => node.textContent],
+			['signal attribute', '<p title={text$}>text</p>', (node: HTMLElement) => node.title],
+			['style', '<p style={look}>text</p>', (node: HTMLElement) => node.style.color],
+			[
+				'projection',
+				'<p sx={styles.size(size$)}>text</p>',
+				(node: HTMLElement) => node.style.height,
+			],
+			[
+				'projected style',
+				'<p sx={styles.paint(live$)}>text</p>',
+				(node: HTMLElement) => node.style.color,
+			],
+			[
+				'control',
+				'<input value={text$} />',
+				(node: HTMLElement) => (node as HTMLInputElement).value,
+			],
+		] as const)
+			it(`ends quietly when a scope observed only through a ${capability} retires (${dev ? 'dev' : 'prod'})`, () => {
+				const source = `import { live$, open$, text$, color$, size$ } from './island-state';
+import * as stylex from 'binding-styles';
+const look = { color: color$ };
+const styles = stylex.create({
+  size: (size) => ({ className: 'sized', style: { height: size } }),
+  paint: () => ({ className: 'painted', style: look }),
+});
+export function Observed() @{
+  'use dom bindings';
+  <section data-live={live$.get()}>${markup}@if (open$.get()) { <i>{text$.get() as string}</i> }</section>
+}`;
+				const scope = createScope({ scopeKey: `island-capability-live-${dev}` });
+				const retiring = createScope({ scopeKey: `island-capability-retiring-${dev}` });
+				const live$ = scope.signal$('live', 'first');
+				const open$ = scope.signal$('open', false);
+				const text$ = retiring.signal$('text', 'kept');
+				const color$ = retiring.signal$('color', 'red');
+				const size$ = retiring.signal$('size', 2);
+				const fixture = authoredPresentation(
+					'Observed',
+					{},
+					dev,
+					source,
+					{
+						'./island-state': { live$, open$, text$, color$, size$ },
+						'binding-styles': {
+							create: (configuration: unknown) => configuration,
+							props: (value: unknown) => value,
+						},
+					},
+					{
+						knownAttributeSpreads: [
+							{
+								source: 'binding-styles',
+								imported: '*',
+								members: ['props'],
+								fields: ['className', 'style'],
+								style: 'object',
+								jsxAttribute: 'sx',
+							},
+						],
+					},
+				);
+				const reportError = vi.fn();
+				const original = globalThis.reportError;
+				globalThis.reportError = reportError;
+				try {
+					container.innerHTML = fixture.html;
+					const section = container.querySelector('section')!;
+					const node = section.firstElementChild as HTMLElement;
+					const handle = fixture.attach(section, fixture.state);
+					const initial = observe(node);
+					text$.set('updated');
+					color$.set('blue');
+					size$.set(3);
+					const updated = observe(node);
+					expect(updated).not.toBe(initial);
+					const html = section.innerHTML;
+					expect(() => retiring.dispose()).not.toThrow();
+					expect(() => open$.set(true)).not.toThrow();
+					expect(reportError).not.toHaveBeenCalled();
+					expect(container.querySelector('section')).toBe(section);
+					expect([section.innerHTML, observe(node)]).toEqual([html, updated]);
+					live$.set('ended');
+					expect(section.getAttribute('data-live')).toBe('first');
+					expect(() => handle.dispose()).not.toThrow();
+				} finally {
+					globalThis.reportError = original;
+					scope.dispose();
+				}
+			});
+
+		// Declared and optimistic handles resolve a cell through the program's
+		// owner: a scope, an owner identity, or a renderer instance of a document.
+		// That owner retiring is the handle's own retirement, even though resolving
+		// through a retired identity now refuses rather than returning its cell.
+		for (const kind of ['declared', 'optimistic'] as const)
+			for (const ownerKind of ['scope', 'identity', 'document'] as const)
+				it(`ends quietly when the ${ownerKind} owner of its ${kind} handle retires (${dev ? 'dev' : 'prod'})`, () => {
+					const source = `import { live$, text$ } from './island-state';
+export function Resolved() @{
+  'use dom bindings';
+  <section data-live={live$.get()}><p>{text$ as string}</p></section>
+}`;
+					const scope = createScope({ scopeKey: `island-resolved-live-${dev}` });
+					const live$ = scope.signal$('live', 'first');
+					const key = `island-resolved-${kind}-${ownerKind}-${dev}`;
+					const document = { scopeKey: `${key}-document` };
+					const owned = createScope({ scopeKey: key });
+					const owner =
+						ownerKind === 'scope'
+							? owned
+							: ownerKind === 'identity'
+								? document
+								: {
+										scopeKey: `${key}-instance`,
+										documentOwner: document,
+										instanceOwner: {},
+										instanceKey: 'island',
+									};
+					const declared$ = __signalAt(key, 'kept');
+					const text$ = kind === 'declared' ? declared$ : optimistic$(declared$);
+					const fixture = authoredPresentation('Resolved', {}, dev, source, {
+						'./island-state': { live$, text$ },
+					});
+					const reportError = vi.fn();
+					const original = globalThis.reportError;
+					globalThis.reportError = reportError;
+					try {
+						container.innerHTML = fixture.html;
+						const section = container.querySelector('section')!;
+						const handle = runWithSignalOwner(owner, () => fixture.attach(section, fixture.state));
+						runWithSignalOwner(owner, () => declared$.set('updated'));
+						expect(section.textContent).toBe('updated');
+						expect(() =>
+							ownerKind === 'scope' ? owned.dispose() : retireSignalOwnerIdentity(document),
+						).not.toThrow();
+						expect(reportError).not.toHaveBeenCalled();
+						expect(container.querySelector('section')).toBe(section);
+						expect(section.textContent).toBe('updated');
+						live$.set('ended');
+						expect(section.getAttribute('data-live')).toBe('first');
+						expect(() => handle.dispose()).not.toThrow();
+					} finally {
+						globalThis.reportError = original;
+						scope.dispose();
+						owned.dispose();
+					}
+				});
+
+		// A handle a transition accepted is observed like one bound directly.
+		for (const [binding, markup, observe] of [
+			[
+				'text handle',
+				'<p>{(pick$.get() ? second$ : first$) as string}</p>',
+				(node: HTMLElement) => node.textContent,
+			],
+			[
+				'control',
+				'<input value={pick$.get() ? second$ : first$} />',
+				(node: HTMLElement) => (node as HTMLInputElement).value,
+			],
+		] as const)
+			it(`ends quietly when a ${binding} accepted by a transition retires (${dev ? 'dev' : 'prod'})`, async () => {
+				const source = `import { pick$, open$, first$, second$ } from './island-state';
+export function Picked() @{
+  'use dom bindings';
+  <section>${markup}@if (open$.get()) { <i>{second$.get() as string}</i> }</section>
+}`;
+				const scope = createScope({ scopeKey: `island-transition-live-${dev}` });
+				const retiring = createScope({ scopeKey: `island-transition-retiring-${dev}` });
+				const pick$ = scope.signal$('pick', false);
+				const open$ = scope.signal$('open', false);
+				const first$ = scope.signal$('first', 'first');
+				const second$ = retiring.signal$('second', 'second');
+				const fixture = authoredPresentation('Picked', {}, dev, source, {
+					'./island-state': { pick$, open$, first$, second$ },
+				});
+				const reportError = vi.fn();
+				const original = globalThis.reportError;
+				globalThis.reportError = reportError;
+				try {
+					container.innerHTML = fixture.html;
+					const section = container.querySelector('section')!;
+					const node = section.firstElementChild as HTMLElement;
+					const handle = fixture.attach(section, fixture.state);
+					let settled!: Promise<void>;
+					startTransition(() => {
+						settled = (async () => pick$.set(true))();
+						return settled;
+					});
+					await settled;
+					await vi.waitFor(() => expect(observe(node)).toBe('second'));
+					second$.set('accepted');
+					expect(observe(node)).toBe('accepted');
+					const html = section.innerHTML;
+					expect(() => retiring.dispose()).not.toThrow();
+					expect(() => open$.set(true)).not.toThrow();
+					expect(reportError).not.toHaveBeenCalled();
+					expect([section.innerHTML, observe(node)]).toEqual([html, 'accepted']);
+					pick$.set(false);
+					expect(observe(node)).toBe('accepted');
+					expect(() => handle.dispose()).not.toThrow();
+				} finally {
+					globalThis.reportError = original;
+					scope.dispose();
+				}
+			});
+
+		// Only a source the program already observes retiring ends it quietly. A
+		// first read of an unrelated, already retired scope (or an error that only
+		// shares the name) is an ordinary failure of a committed program: it is
+		// reported, and the presentation keeps its last DOM and stays live.
+		for (const [form, read] of [
+			['tracked read', 'gone$.get() as string'],
+			['handle', 'gone$ as string'],
+			['look-alike error', 'lookAlike() as string'],
+		] as const)
+			it(`reports a committed ${form} of an unrelated retired scope and stays live (${dev ? 'dev' : 'prod'})`, () => {
+				const source = `import { label$, open$, gone$, lookAlike } from './island-state';
+export function Unrelated() @{
+  'use dom bindings';
+  <section title={label$.get()}>@if (open$.get()) { <p>{${read}}</p> }</section>
+}`;
+				const scope = createScope({ scopeKey: `island-unrelated-${dev}` });
+				const retired = createScope({ scopeKey: `island-unrelated-retired-${dev}` });
+				const label$ = scope.signal$('label', 'live');
+				const open$ = scope.signal$('open', false);
+				const gone$ = retired.signal$('gone', 'gone');
+				const lookAlike = (): string => {
+					throw Object.assign(new Error('not a retirement'), { name: 'ScopeDisposedError' });
+				};
+				const fixture = authoredPresentation('Unrelated', {}, dev, source, {
+					'./island-state': { label$, open$, gone$, lookAlike },
+				});
+				const reportError = vi.fn();
+				const original = globalThis.reportError;
+				globalThis.reportError = reportError;
+				try {
+					container.innerHTML = fixture.html;
+					const section = container.querySelector('section')!;
+					const handle = fixture.attach(section, fixture.state);
+					retired.dispose();
+					expect(() => open$.set(true)).not.toThrow();
+					expect(reportError).toHaveBeenCalledOnce();
+					const [error] = reportError.mock.calls[0]!;
+					if (form === 'look-alike error') expect(error).not.toBeInstanceOf(ScopeDisposedError);
+					else expect(error).toBeInstanceOf(ScopeDisposedError);
+					expect(container.querySelector('section')).toBe(section);
+					expect(section.querySelector('p')).toBeNull();
+					open$.set(false);
+					label$.set('updated');
+					expect([section.title, section.textContent]).toEqual(['updated', '']);
+					expect(reportError).toHaveBeenCalledOnce();
+					handle.dispose();
+					label$.set('disposed');
+					expect(section.title).toBe('updated');
+				} finally {
+					globalThis.reportError = original;
+					scope.dispose();
+				}
+			});
+
 		// The `ready`/activation pattern: effects declared with an explicit empty
 		// array run once after their view is live and clean up when it leaves.
 		it(`runs mount-only effects after activation and cleans them up with their view (${dev ? 'dev' : 'prod'})`, () => {
@@ -8237,6 +8508,61 @@ export function Answer() @{
 			}
 		});
 
+		// hydrateRoot adopts a binding view's text holes in place, whether the
+		// server filled them or left them empty, and later writes keep the DOM
+		// identical to what the server renders for the same values.
+		it(`hydrates a binding view's filled and empty text holes with the ordinary renderer (${dev ? 'dev' : 'prod'})`, async () => {
+			const source = `import { label$, note$ } from './island-state';
+export function Label() @{
+  'use dom bindings';
+  <p>{label$.get() as string}<b>{note$.get() as string}</b></p>
+}`;
+			const scope = createScope({ scopeKey: `island-hydrate-text-${dev}` });
+			const label$ = scope.signal$('label', 'server label');
+			const note$ = scope.signal$('note', '');
+			const fixture = authoredPresentation('Label', {}, dev, source, {
+				'./island-state': { label$, note$ },
+			});
+			// The server may append a seed script that hydration consumes, so compare
+			// the view's own markup.
+			const serverMarkup = (html: string) => {
+				const template = document.createElement('template');
+				template.innerHTML = html;
+				return template.content.querySelector('p')!.outerHTML;
+			};
+			const error = vi.spyOn(console, 'error').mockImplementation(() => {});
+			try {
+				container.innerHTML = fixture.html;
+				const paragraph = container.querySelector('p')!;
+				const label = [...paragraph.childNodes].find(
+					(node) => node.nodeType === 3 && node.nodeValue === 'server label',
+				)!;
+				expect(label).toBeDefined();
+				hydratedRoot = hydrateRoot(container, fixture.loadClient().Label, {});
+				await act(async () => {
+					for (let index = 0; index < 4; index++) await Promise.resolve();
+				});
+				expect(paragraph.outerHTML).toBe(serverMarkup(fixture.html));
+				act(() => {
+					label$.set('client label');
+					note$.set('client note');
+				});
+				expect(container.querySelector('p')).toBe(paragraph);
+				expect(label.isConnected).toBe(true);
+				expect(label.nodeValue).toBe('client label');
+				expect(container.querySelector('b')!.textContent).toBe('client note');
+				expect(paragraph.outerHTML).toBe(
+					serverMarkup(renderToString(fixture.server.Label, {}).html),
+				);
+				expect(error).not.toHaveBeenCalled();
+			} finally {
+				error.mockRestore();
+				hydratedRoot?.unmount();
+				hydratedRoot = undefined;
+				scope.dispose();
+			}
+		});
+
 		// A streamed boundary may still be pending when its island activates. The
 		// binding claims it, so the late server segment cannot replace live DOM.
 		it(`claims a streamed @try fallback before its segment arrives (${dev ? 'dev' : 'prod'})`, async () => {
@@ -8299,6 +8625,98 @@ export function Streamed() @{
 				handle.dispose();
 			} finally {
 				resetStreamRuntimeGlobals();
+				scope.dispose();
+			}
+		});
+
+		// Like the renderer's resolved boundary, a server-resolved @try arm stays
+		// while the client's own read is pending, then hydrates in place.
+		it(`keeps a server-resolved @try arm while the client read is pending (${dev ? 'dev' : 'prod'})`, async () => {
+			const source = `import { useLayoutEffect } from 'octane';
+import { answer$, log } from './island-state';
+function Mark() @{
+  useLayoutEffect(() => log('mark mounted'), []);
+  <i>mark</i>
+}
+export function Answer() @{
+  'use dom bindings';
+  <section>
+    @try {
+      <>
+        <p data-answer>{answer$.get() as string}</p>
+        <button type="button" onClick={() => log('clicked')}>go</button>
+        <Mark />
+      </>
+    } @pending {
+      <p data-pending>waiting</p>
+    }
+  </section>
+}`;
+			const scope = createScope({ scopeKey: `island-kept-try-${dev}` });
+			const events: string[] = [];
+			const log = (event: string) => events.push(event);
+			const serverAnswer = deferred<string>();
+			const loadServer = query(
+				`island-kept-server-${dev}`,
+				(_argument: undefined) => serverAnswer.promise,
+			);
+			const requests = new Map<number, ReturnType<typeof deferred<string>>>();
+			const request = (generation: number) => {
+				let pending = requests.get(generation);
+				if (!pending) requests.set(generation, (pending = deferred<string>()));
+				return pending;
+			};
+			const loadClient = query(
+				`island-kept-client-${dev}`,
+				(generation: number) => request(generation).promise,
+			);
+			const generation$ = scope.signal$('generation', 0);
+			const server = authoredPresentation('Answer', {}, dev, source, {
+				'./island-state': {
+					answer$: createResource(scope, 'server', () => loadServer(undefined)),
+					log,
+				},
+			});
+			const client = authoredPresentation('Answer', {}, dev, source, {
+				'./island-state': {
+					answer$: createResource(scope, 'client', () => loadClient(generation$.get())),
+					log,
+				},
+			});
+			const settle = async () => {
+				for (let index = 0; index < 4; index++) await Promise.resolve();
+			};
+			try {
+				serverAnswer.resolve('server');
+				await settle();
+				container.innerHTML = renderToString(server.server.Answer, {}).html;
+				const answer = container.querySelector('[data-answer]')!;
+				const button = container.querySelector('button')!;
+				expect(answer.textContent).toBe('server');
+				const handle = client.attach(container.querySelector('section')!, client.state);
+				expect(container.querySelector('[data-answer]')).toBe(answer);
+				expect(container.querySelector('[data-pending]')).toBeNull();
+				// Nothing in the kept arm is live before a client commit prepares it.
+				expect(events).toEqual([]);
+
+				request(0).resolve('client');
+				await settle();
+				expect(container.querySelector('[data-answer]')).toBe(answer);
+				expect(container.querySelector('button')).toBe(button);
+				expect(answer.textContent).toBe('client');
+				expect(events).toEqual(['mark mounted']);
+				button.click();
+				expect(events).toEqual(['mark mounted', 'clicked']);
+
+				// Once committed, the arm is the client's: a new read shows @pending.
+				generation$.set(1);
+				expect(container.querySelector('[data-pending]')).not.toBeNull();
+				expect(container.querySelector('[data-answer]')).toBeNull();
+				request(1).resolve('next');
+				await settle();
+				expect(container.querySelector('[data-answer]')!.textContent).toBe('next');
+				handle.dispose();
+			} finally {
 				scope.dispose();
 			}
 		});

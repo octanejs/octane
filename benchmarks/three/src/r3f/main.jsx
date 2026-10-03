@@ -91,6 +91,20 @@ let frameChecksum = 0;
 let eventCalls = 0;
 let eventChecksum = 0;
 
+// Checksum callbacks keep one identity for the whole page, like the Octane page.
+// A callback recreated by every render() dies once its scene is replaced, and
+// the forced gc() before each sample then discards optimized frame-loop code
+// that inlined it. Stable callbacks keep the timed section on renderer dispatch.
+function recordFrame(id) {
+	frameCalls++;
+	frameChecksum += id + 1;
+}
+
+function recordEvent(id) {
+	eventCalls++;
+	eventChecksum += id + 1;
+}
+
 function render(mode, items = [], version = 0) {
 	return new Promise((resolve, reject) => {
 		const timeout = setTimeout(
@@ -110,14 +124,8 @@ function render(mode, items = [], version = 0) {
 						version={version}
 						geometry={geometry}
 						material={material}
-						recordFrame={(id) => {
-							frameCalls++;
-							frameChecksum += id + 1;
-						}}
-						recordEvent={(id) => {
-							eventCalls++;
-							eventChecksum += id + 1;
-						}}
+						recordFrame={recordFrame}
+						recordEvent={recordEvent}
 						recordCommit={recordCommit}
 					/>,
 				);

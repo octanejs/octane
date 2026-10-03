@@ -9,6 +9,7 @@ import type {
 	UniversalSerializableValue,
 	UniversalTransportIdentity,
 } from 'octane/universal/native';
+import { universalHostTemplates } from 'octane/universal/native';
 import {
 	LYNX_TRANSPORT_PROTOCOL_VERSION,
 	LYNX_TRANSPORT_RENDERER,
@@ -1500,6 +1501,7 @@ export function createLynxClientDriver(
 	const negotiatedState = container === undefined ? null : containerState(container);
 	const driver: UniversalHostDriver<LynxClientContainer, LynxPublicHandle> = {
 		id: LYNX_TRANSPORT_RENDERER,
+		templates: universalHostTemplates,
 		capabilities: Object.freeze({
 			text: 'host' as const,
 			visibility: true,

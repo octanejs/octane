@@ -38,6 +38,10 @@ Use this to investigate performance regressions, benchmark results, scheduler/re
      a quick smoke result with a full result.
    - Treat a delta inside observed variance as inconclusive. Prefer ratio guards
      and deterministic counters when wall-clock noise is larger than the claim.
+   - The pull request benchmark gates js-framework production calls and DOM
+     mutations per operation against the merge commit's first parent: any
+     increase fails it. Wall time there is a paired report, called slower or
+     faster only when its 95% interval lies beyond ±3%.
 
 4. **Diagnose**
    - Runtime hot paths: scheduler queues, effect flushing, keyed reconciliation, event delegation, context propagation, refs.

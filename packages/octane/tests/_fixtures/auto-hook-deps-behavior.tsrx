@@ -1,5 +1,9 @@
-import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'octane';
-import { useExternalEffect, useExternalMemo } from './auto-hook-deps-external.ts';
+import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'octane';
+import {
+	useExternalEffect,
+	useExternalLaterLabel,
+	useExternalMemo,
+} from './auto-hook-deps-external.ts';
 
 export function EffectFromProps(props) @{
 	useEffect(() => {
@@ -318,6 +322,79 @@ export function MemoFromInstanceMethodCall(props) @{
 	const label = useMemo(() => formatter.format(props.value));
 	<div>
 		<span class="value">{label as string}</span>
+		<span class="noise">{props.noise as string}</span>
+	</div>
+}
+
+// Each hook below reads a binding initialized after the hook call. Reading it
+// at the call would hit its temporal dead zone, or a still-undefined `var`, so
+// an omitted dependency list runs the hook on every render, as in React.
+export function EffectReadsLaterConst(props) @{
+	useEffect(() => {
+		props.log(`run:${prefix}`);
+		return () => props.log(`cleanup:${prefix}`);
+	});
+	const prefix = props.prefix;
+	<span class="noise">{props.noise as string}</span>
+}
+
+export function CallbackReadsLaterConst(props) @{
+	const read = useCallback(() => prefix);
+	const prefix = props.prefix;
+	<span class="value">{read() as string}</span>
+}
+
+export function MemoReadsLaterConst(props) @{
+	const reader = useMemo(() => ({ read: () => prefix }));
+	const prefix = props.prefix;
+	<span class="value">{reader.read() as string}</span>
+}
+
+export function CallbackReadsItself(props) @{
+	const countdown = useCallback((n) => (n > 0 ? countdown(n - 1) : props.prefix));
+	<span class="value">{countdown(2) as string}</span>
+}
+
+export function EffectReadsLaterVar(props) @{
+	useEffect(() => props.log(`run:${prefix}`));
+	var prefix = props.prefix;
+	<span class="noise">{props.noise as string}</span>
+}
+
+export function CallbackReadsLaterVar(props) @{
+	const read = useCallback(() => prefix);
+	var prefix = props.prefix;
+	<span class="value">{read() as string}</span>
+}
+
+// The callback reads `label` after the component assigns it again, so a list
+// read at the call would hold the earlier value.
+export function EffectReadsReassignedLet(props) @{
+	let label = props.a;
+	useEffect(() => props.log(`run:${label}`));
+	if (props.b) label = props.b;
+	<span class="noise">{props.noise as string}</span>
+}
+
+export function CallbackReadsReassignedLet(props) @{
+	let label = props.a;
+	const read = useCallback(() => label);
+	if (props.b) label = props.b;
+	<span class="value">{read() as string}</span>
+}
+
+// Assigned before the call, so the inferred list holds the value the callback reads.
+export function EffectReadsLetAssignedBefore(props) @{
+	let label = props.a;
+	if (props.b) label = props.b;
+	useEffect(() => props.log(`run:${label}`));
+	<span class="noise">{props.noise as string}</span>
+}
+
+export function ExternalHookLaterDeclaration(props) @{
+	const label = useExternalLaterLabel(props.prefix, props.log);
+	<div>
+		<span class="value">{label}</span>
 		<span class="noise">{props.noise as string}</span>
 	</div>
 }

@@ -7,6 +7,9 @@ export const SIGNAL_BINDING_SUBSCRIBE: unique symbol = Symbol.for(
 export const SIGNAL_BINDING_IDENTITY: unique symbol = Symbol.for(
 	'octane.signal-binding-identity',
 ) as any;
+export const SIGNAL_BINDING_RETIRED: unique symbol = Symbol.for(
+	'octane.signal-binding-retired',
+) as any;
 export const QUERY_REQUEST: unique symbol = Symbol.for('octane.query-request') as any;
 export const SIGNAL_OWNER_RESOLVE: unique symbol = Symbol.for('octane.signal-owner-resolve') as any;
 
@@ -35,6 +38,8 @@ export interface SignalHandle<T> {
 	readonly [SIGNAL_BINDING_READ]: () => T;
 	/** @internal Observe invalidation; optional teardown replaces the owning scope's final invalidation. */
 	readonly [SIGNAL_BINDING_SUBSCRIBE]: (notify: () => void, onRetire?: () => void) => () => void;
+	/** @internal Whether the handle's own owner retired, as `onRetire` would report. Failure paths only. */
+	readonly [SIGNAL_BINDING_RETIRED]?: () => boolean;
 	readonly [SIGNAL_BINDING_IDENTITY]: () => SignalBindingIdentity;
 	readonly key: string;
 	readonly kind: 'signal' | 'derived' | 'async';
