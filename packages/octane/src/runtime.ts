@@ -16910,6 +16910,10 @@ function createScopedResolver<T>(read: () => T): () => T {
 	let resolvedValue: T;
 
 	return (): T => {
+		// A record that read no context is the same in every scope, and every
+		// field read of a scoped value lands here. Return it without consulting
+		// the scope, which only a context-reading record compares.
+		if (resolved && resolvedReads === null) return resolvedValue;
 		const scope = CURRENT_SCOPE;
 		const sameScope =
 			resolvedScope === scope ||
@@ -16917,10 +16921,10 @@ function createScopedResolver<T>(read: () => T): () => T {
 				scope !== null &&
 				scope.block.parentBlock === resolvedScope.block &&
 				scope.$$ctxValues === null);
-		// A record that read no context is the same in every scope, so only a
-		// context-reading one is rebuilt when its resolving scope changes. Host
-		// classification previews a record in the parent block before its direct
-		// child block renders it, so that one same-context handoff is reusable.
+		// A context-reading record is rebuilt when its resolving scope changes.
+		// Host classification previews a record in the parent block before its
+		// direct child block renders it, so that one same-context handoff is
+		// reusable.
 		if (!resolved || scopedReadsChanged(resolvedReads) || (resolvedReads !== null && !sameScope)) {
 			const previousTracking = SCOPED_READ_TRACKING;
 			const previousReads = SCOPED_READS;
@@ -16944,9 +16948,10 @@ function createScopedResolver<T>(read: () => T): () => T {
 			resolved = true;
 		} else {
 			// Move ownership from the previewing parent to its direct child so a
-			// later sibling or provider scope still resolves independently.
+			// later sibling or provider scope still resolves independently. Only a
+			// context-reading record reaches this branch.
 			resolvedScope = scope;
-			if (resolvedReads !== null) replayScopedContextReads(resolvedReads, CURRENT_BLOCK);
+			replayScopedContextReads(resolvedReads!, CURRENT_BLOCK);
 		}
 		return resolvedValue;
 	};
@@ -31721,14 +31726,11 @@ function normalizePortalBody(rawBody: any, rawProps: any): { body: ComponentBody
 	// An unkeyed component element renders as the portal Block itself. A keyed
 	// one takes the generic path below, whose childSlot remounts it when its key
 	// changes, exactly as for a keyed host element.
-	if (
-		rawBody != null &&
-		rawBody.$$kind === ELEMENT_TAG &&
-		typeof rawBody.type === 'function' &&
-		rawBody.key === null
-	) {
+	// Each field read of a scoped JSX value resolves its record again.
+	const type = rawBody != null && rawBody.$$kind === ELEMENT_TAG ? rawBody.type : undefined;
+	if (typeof type === 'function' && rawBody.key === null) {
 		return {
-			body: rawBody.type as ComponentBody,
+			body: type as ComponentBody,
 			props: rawBody.props,
 		};
 	}
@@ -34096,35 +34098,37 @@ function warnMissingListKey(owner: Block | null): void {
 	}
 }
 
-function deoptKey(item: any, index: number): any {
-	const element = item != null && item.$$kind === ELEMENT_TAG;
-	if (item?.$$kind === PORTAL_TAG && item.key != null) return item.key;
-	if (element && item.key != null && !ELEMENTS_MISSING_LIST_KEY.has(item)) return item.key;
+// The key an element or portal list item carries, or null when the item falls
+// back to its index. Each field read of a scoped JSX value resolves its record
+// again, so the key is read once. `warnMissing` is set for runtime-built arrays,
+// which React expects to be keyed; positional children never warn.
+function ownListKey(item: any, warnMissing: boolean): any {
+	if (item == null) return null;
+	const kind = item.$$kind;
+	if (kind !== ELEMENT_TAG && kind !== PORTAL_TAG) return null;
+	const key = item.key;
 	// React parity: unkeyed array children fall back to the index, with a deduplicated
 	// dev warning. Only ELEMENTS need keys: empty slots, primitives, and nested
 	// iterables are legal list members and must not produce a missing-key warning.
 	// (Suppressed during hydration adoption — markers drive matching.)
-	if (element && process.env.NODE_ENV !== 'production' && activeHydration() === null) {
+	if (
+		process.env.NODE_ENV !== 'production' &&
+		warnMissing &&
+		kind === ELEMENT_TAG &&
+		(key == null || ELEMENTS_MISSING_LIST_KEY.has(item)) &&
+		activeHydration() === null
+	) {
 		warnMissingListKey(CURRENT_BLOCK);
 	}
-	return element && item.key != null ? item.key : index;
+	return key != null ? key : null;
 }
 
 // `createElement(tag, props, a, b, …)` collapses MULTIPLE positional children into a
 // fresh array. Those are FIXED siblings (they never reorder), so the de-opt list keys
 // them by index SILENTLY — unlike a `.map()` result, where a missing key is a real
 // reorder hazard worth warning about. createElement tags its positional arrays in
-// this set so childSlot can pick the silent key function.
+// this set so childSlot can key them without the missing-key warning.
 const POSITIONAL_CHILDREN = new WeakSet<object>();
-
-// Index key WITHOUT the missing-key warning — used for positional children arrays.
-function deoptKeyPositional(item: any, index: number): any {
-	return item != null &&
-		(item.$$kind === ELEMENT_TAG || item.$$kind === PORTAL_TAG) &&
-		item.key != null
-		? item.key
-		: index;
-}
 
 // Compiler contract: a VALUE-position JSX fragment (`<>…</>` in `.tsx` bodies,
 // and every MDX document root) lowers to an array literal — FIXED siblings in
@@ -34702,16 +34706,16 @@ function nestedDeoptKeyPrefix(path: readonly (string | number)[]): string | null
 function appendScopedDeoptKey(
 	outKeys: any[],
 	path: readonly (string | number)[],
-	item: any,
-	index: number,
+	// ownListKey's result: null when the item carries no key.
 	key: any,
+	index: number,
 	keyPrefix: string | null | undefined,
 ): string | null | undefined {
 	// Reconciliation keys are internal: top-level implicit positions are numbers,
 	// explicit keys carry a 'k' prefix, and nested paths are JSON strings. These
 	// namespaces keep index 0 distinct from key="0" and user keys distinct from
 	// nested wrapper paths without allocating a string for every unkeyed child.
-	const explicit = (isElementDescriptor(item) || item?.$$kind === PORTAL_TAG) && item.key != null;
+	const explicit = key !== null;
 	// The unwrapped top level — a plain children array or a single-layer Fragment,
 	// which is what every `{items.map(...)}` list and every binding's rendered
 	// output produces — is the hot path: it re-keys EVERY child on EVERY parent
@@ -34759,7 +34763,7 @@ function flattenReactChildContainer(
 	kind: DeoptWrapperKind,
 	path: readonly (string | number)[],
 ): void {
-	const keyFn = kind === 'fragment' ? deoptKeyPositional : deoptKey;
+	const warnMissing = kind !== 'fragment';
 	const count = children.length;
 	let keyPrefix: string | null | undefined = count > 1 ? undefined : null;
 	for (let i = 0; i < count; i++) {
@@ -34767,15 +34771,22 @@ function flattenReactChildContainer(
 		if (isFragmentDescriptor(item)) {
 			if (item.ref != null || hasOwnProp.call(item.props, 'ref')) {
 				outItems.push(fragmentRefDescriptor(item));
-				keyPrefix = appendScopedDeoptKey(outKeys, path, item, i, keyFn(item, i), keyPrefix);
+				keyPrefix = appendScopedDeoptKey(
+					outKeys,
+					path,
+					ownListKey(item, warnMissing),
+					i,
+					keyPrefix,
+				);
 				continue;
 			}
 			const nested = fragmentDescriptorChildren(item);
-			if (item.key != null) {
+			const key = item.key;
+			if (key != null) {
 				flattenReactChildContainer(outItems, outKeys, nested, 'fragment', [
 					...path,
 					'keyed-fragment',
-					item.key,
+					key,
 				]);
 			} else {
 				const nestedPath =
@@ -34800,7 +34811,7 @@ function flattenReactChildContainer(
 			continue;
 		}
 		outItems.push(item);
-		keyPrefix = appendScopedDeoptKey(outKeys, path, item, i, keyFn(item, i), keyPrefix);
+		keyPrefix = appendScopedDeoptKey(outKeys, path, ownListKey(item, warnMissing), i, keyPrefix);
 	}
 }
 
@@ -34814,11 +34825,13 @@ function prepareDeoptList(
 	value: any,
 	forceSingle: boolean = false,
 	includeKeyedSingle: boolean = true,
+	// childSlot passes the element type it already read; undefined otherwise.
+	elementType: unknown = isElementDescriptor(value) ? value.type : undefined,
 ): PreparedDeoptList | null {
 	// childSlot calls this for EVERY renderable hole on every render, and the
 	// non-list answer (a lone component descriptor, text, null) is the common one
 	// — build the two output arrays only once a list regime is established.
-	if (isFragmentDescriptor(value)) {
+	if (elementType === Fragment) {
 		if (value.ref != null || hasOwnProp.call(value.props, 'ref')) {
 			return {
 				items: [fragmentRefDescriptor(value)],
@@ -34827,7 +34840,8 @@ function prepareDeoptList(
 		}
 		const items: any[] = [];
 		const keys: any[] = [];
-		const path = value.key == null ? [] : ['keyed-fragment', value.key];
+		const key = value.key;
+		const path = key == null ? [] : ['keyed-fragment', key];
 		flattenReactChildContainer(items, keys, fragmentDescriptorChildren(value), 'fragment', path);
 		return { items, keys };
 	}
@@ -34837,11 +34851,12 @@ function prepareDeoptList(
 		flattenReactChildContainer(items, keys, value, deoptWrapperKind(value), []);
 		return { items, keys };
 	}
-	if (includeKeyedSingle && isElementDescriptor(value) && value.key != null) {
-		return { items: [value], keys: [singleDeoptKey(value, value.key)] };
+	if (includeKeyedSingle && isElementDescriptor(value)) {
+		const key = value.key;
+		if (key != null) return { items: [value], keys: ['k' + String(key)] };
 	}
 	if (forceSingle) {
-		return { items: [value], keys: [singleDeoptKey(value, deoptKeyPositional(value, 0))] };
+		return { items: [value], keys: [singleDeoptKey(value, ownListKey(value, false) ?? 0)] };
 	}
 	return null;
 }
@@ -34891,7 +34906,7 @@ function flattenDeoptChildren(out: any[], v: any): void {
 function flattenDeoptChildrenKeyed(outVals: any[], outKeys: any[], v: any, prefix: string): void {
 	if (v == null || v === false || v === true || v === '') return;
 	if (Array.isArray(v)) {
-		const keyForItem = POSITIONAL_CHILDREN.has(v) ? deoptKeyPositional : deoptKey;
+		const warnMissing = !POSITIONAL_CHILDREN.has(v);
 		for (let i = 0; i < v.length; i++) {
 			const item = v[i];
 			if (Array.isArray(item)) {
@@ -34900,7 +34915,7 @@ function flattenDeoptChildrenKeyed(outVals: any[], outKeys: any[], v: any, prefi
 				// empty — consumes its position, emits nothing
 			} else {
 				outVals.push(item);
-				const k = keyForItem(item, i);
+				const k = ownListKey(item, warnMissing) ?? i;
 				if (prefix === '') {
 					outKeys.push(typeof k === 'string' && k[0] === ':' ? ':' + k : k);
 				} else {
@@ -35225,10 +35240,15 @@ function deoptItemBody(item: any, scope: Scope): void {
 	// below — and reorder/teardown — keep a live range. Client-only by
 	// construction (hydrated items always adopt the server's pair).
 	const existingChild = scope.slots[0] as ChildSlot | undefined;
+	// Each field read of a scoped JSX value resolves its record again. A component
+	// descriptor always needs Blocks, so it skips descNeedsBlocks' second read.
+	const itemType = isElementDescriptor(item) ? item.type : undefined;
+	const hostItem = typeof itemType === 'string';
 	const needsBlocks =
-		(isHostDescriptor(item) &&
+		(hostItem &&
 			existingChild?.__kind === 'childSlot' &&
 			existingChild.currentComp === (hostElementBody as unknown as ComponentBody)) ||
+		typeof itemType === 'function' ||
 		descNeedsBlocks(item);
 	const sm = block.startMarker;
 	if (
@@ -35236,7 +35256,7 @@ function deoptItemBody(item: any, scope: Scope): void {
 		sm === block.endMarker &&
 		sm.nodeType !== 8 /* COMMENT_NODE — i.e. self-marked, not a pair */ &&
 		(STAGED_DOM?.view(sm) ?? sm).parentNode !== null &&
-		(needsBlocks || !isHostDescriptor(item))
+		(needsBlocks || !hostItem)
 	) {
 		const p = (STAGED_DOM?.view(sm) ?? sm).parentNode!;
 		if (ROOT_RENDER_TRANSACTION !== null) {
@@ -35277,8 +35297,8 @@ function deoptItemBody(item: any, scope: Scope): void {
 			if (
 				scope.slots[0] === undefined &&
 				stale.nodeType === 1 /* Element */ &&
-				isHostDescriptor(item) &&
-				isHostElementOfType(stale as Element, item.type) &&
+				hostItem &&
+				isHostElementOfType(stale as Element, itemType as string) &&
 				(STAGED_DOM?.view(stale) ?? stale).parentNode === block.parentNode
 			) {
 				transfer = stale;
@@ -37093,11 +37113,15 @@ export function childSlot(
 		}
 		break;
 	}
+	// Each field read of a scoped JSX value resolves its record again, and this
+	// classifies every renderable hole on every render. Read the type once here;
+	// later branches read only the fields they consume.
+	const elementType = isElementDescriptor(value) ? value.type : undefined;
 	const valueComponent =
 		typeof value === 'function'
 			? (value as ComponentBody)
-			: isElementDescriptor(value) && typeof value.type === 'function'
-				? (value.type as ComponentBody)
+			: typeof elementType === 'function'
+				? (elementType as ComponentBody)
 				: null;
 	const hydrationTransparent =
 		hydration?.passthroughRanges === true &&
@@ -37119,7 +37143,7 @@ export function childSlot(
 	const preparedList =
 		compiledMapBody !== undefined
 			? { items: value as any[], keys: null }
-			: prepareDeoptList(value, false, includeKeyedSingle);
+			: prepareDeoptList(value, false, includeKeyedSingle, elementType);
 	// A LONE PURE-HOST descriptor (host/text-only subtree — no components, no
 	// portals, no render functions). Computed once per call: the slot init below
 	// uses it to pick the ANCHORLESS regime, the promotion after it to detect a
@@ -37128,17 +37152,19 @@ export function childSlot(
 	// Once a host gains component children, keep its reconciled Block while it
 	// remains a host descriptor. Dropping back to the raw path would recreate
 	// the host and every surviving input when the last component is removed.
+	// After Usable unwrapping a host descriptor is no thenable, so it needs Blocks
+	// exactly when its children do.
 	const pureHost =
 		preparedList === null &&
-		isHostDescriptor(value) &&
+		typeof elementType === 'string' &&
 		state?.currentComp !== (hostElementBody as unknown as ComponentBody) &&
-		!descNeedsBlocks(value);
+		!descNeedsBlocks((value as ElementDescriptor).children);
 	let rootShapeChanged = false;
 	if (state !== undefined && ROOT_RENDER_TRANSACTION !== null) {
 		const component =
 			pureHost || preparedList !== null
 				? null
-				: isHostDescriptor(value)
+				: typeof elementType === 'string'
 					? (hostElementBody as unknown as ComponentBody)
 					: valueComponent;
 		const unchangedList = preparedList !== null && state.forSlot !== null;
@@ -37151,7 +37177,7 @@ export function childSlot(
 			state.hostNode !== null &&
 			state.block === null &&
 			state.hostNode.nodeType === 1 &&
-			isHostElementOfType(state.hostNode as Element, (value as ElementDescriptor).type as string);
+			isHostElementOfType(state.hostNode as Element, elementType as string);
 		const primitive = value == null || (typeof value !== 'object' && typeof value !== 'function');
 		const text = primitive ? coerceChildText(value) : null;
 		const unchangedText =
@@ -37173,8 +37199,7 @@ export function childSlot(
 		hydration.node !== null &&
 		domNode(hydration.node).parentNode === domParent &&
 		preparedList === null &&
-		isElementDescriptor(value) &&
-		typeof value.type === 'function' &&
+		typeof elementType === 'function' &&
 		!hydration.isOpen(anchor ?? null) &&
 		!hydration.isOpen(hydration.node);
 	if (
@@ -37553,9 +37578,11 @@ export function childSlot(
 	let props: any = {};
 	let isBodyFn = false;
 	let invocationSite: string | undefined;
-	let componentKey: unknown;
-	let componentHasKey = false;
-	if (isHostDescriptor(value)) {
+	// A component descriptor's invocation site and key identify a new instance
+	// only, so the mount path below reads them; a same-component update never
+	// resolves them.
+	let componentDescriptor: ElementDescriptor | null = null;
+	if (typeof elementType === 'string') {
 		if (pureHost) {
 			// Pure host/text → reconcile in place, REUSING the existing node so DOM
 			// state survives a re-render. Switching in from a component/text first
@@ -37628,15 +37655,13 @@ export function childSlot(
 		isBodyFn = true;
 	} else if (isElementDescriptor(value)) {
 		const dispatch = activityDescriptorDispatch;
-		const activity = dispatch !== null && (value.type as unknown) === dispatch.type;
-		if (!activity && typeof value.type !== 'function' && typeof value.type !== 'string') {
-			throw invalidElementTypeError(value.type);
+		const activity = dispatch !== null && (elementType as unknown) === dispatch.type;
+		if (!activity && typeof elementType !== 'function') {
+			throw invalidElementTypeError(elementType);
 		}
-		comp = activity ? dispatch!.body : (value.type as ComponentBody);
+		comp = activity ? dispatch!.body : (elementType as ComponentBody);
 		props = value.props;
-		invocationSite = value.__octaneInvocationSite;
-		componentKey = value.key;
-		componentHasKey = value.key != null;
+		componentDescriptor = value;
 	}
 	if (comp !== null) {
 		// A bare render-FUNCTION child (a `.tsrx` `{children}` body forwarded onto a `.ts`
@@ -37700,10 +37725,16 @@ export function childSlot(
 			renderBlock(state.block);
 			return;
 		}
-		const signalInstanceKey =
-			SIGNAL_BINDINGS_ENABLED || signalDocumentEnabled
-				? { parentScope, invocationSite, key: componentKey, hasKey: componentHasKey }
-				: undefined;
+		let signalInstanceKey: SignalInstanceKey | undefined;
+		if (SIGNAL_BINDINGS_ENABLED || signalDocumentEnabled) {
+			const key = componentDescriptor?.key;
+			signalInstanceKey = {
+				parentScope,
+				invocationSite: componentDescriptor?.__octaneInvocationSite ?? invocationSite,
+				key,
+				hasKey: key != null,
+			};
+		}
 		const retryLocation =
 			(state.block === null && state.hostNode === null && state.text === null) ||
 			parentBlock.idState.renderOwner?.signalOwner === undefined

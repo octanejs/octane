@@ -85,6 +85,23 @@ across flavors in `baselines/ratios.json`. `production_calls_tick` counts one
 octane `__tick()` in a separate `--jitless` Chromium (15,449 at introduction)
 with a hard ceiling in `run.mjs`.
 
+`work.mjs` (the runner's untimed `work` pass) rebuilds the octane fixture
+without minification and counts named production calls under jitless
+Chromium precise coverage. `App` hands `Viewport` its dashboard subtrees as
+deferred JSX values, so each ui commit classifies the identical `defs` value
+and the four children of the `layers` Fragment again, and every field it reads
+from a deferred value runs an accessor that resolves the value's record. The
+gate sums those accessor calls over 16 `tooltip_swarm` commits and 8 `pan_zoom`
+commits and guards each sum against a reviewed budget (`*_scoped_reads`, max
+ratio 1). It reports `renderBlock`, `childSlot` and `deoptItemBody` calls as
+structural controls, checks every commit's tooltip and viewport state against
+the shared ops replay, and fails if a dashboard subtree is remounted.
+
+| commits | reads before read-once classification | reads after |
+| --- | ---: | ---: |
+| 16 `tooltip_swarm` | 1,408 | 404 |
+| 8 `pan_zoom` | 680 | 184 |
+
 Comment and whitespace/empty text nodes are **reported, never asserted
 equal**: octane emits loop/portal markers (255 comments at mount), svelte
 emits anchors (452 comments + empty text), react emits none.

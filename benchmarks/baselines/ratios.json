@@ -3145,11 +3145,23 @@
     "target": "octane-tsrx",
     "reference": "react",
     "maxRatio": 0.8,
-    "note": "360 portal commits per batch into the overlay <g> (mount, two moves, unmount per cycle). Observed 0.50x, 2026-08-07 \u2014 octane portals into SVG beat react's createPortal; the guard keeps that from silently inverting.",
-    "waiver": {
-      "reason": "Confirmed regression: a same-runner A/B on 2026-10-03 measured octane 2.28 ms per batch against 1.74 ms at #635 (1.31x; unchanged by a terser rebuild). Since #1069, scoped value descriptors' type/key/props accessors are read about 60 times per commit from childSlot, isHostDescriptor and descNeedsBlocks; fix tracked in task_24b2ee0c. Remove this waiver with it.",
-      "expires": "2026-10-24"
-    }
+    "note": "360 portal commits per batch into the overlay <g> (mount, two moves, unmount per cycle). Observed 0.50x, 2026-08-07 \u2014 octane portals into SVG beat react's createPortal; the guard keeps that from silently inverting. #1069 had raised it to 0.78x (2.03 ms per batch on a paired runner); reading deferred JSX values' fields once per classification brought it back to 0.70x (1.79-1.83 ms, paired A/B run 37117916097, 2026-10-03)."
+  },
+  {
+    "suite": "svg-dashboard",
+    "op": "tooltip_cycle_scoped_reads",
+    "target": "octane-tsrx-work",
+    "reference": "octane-tsrx-work-budget",
+    "maxRatio": 1,
+    "note": "Deferred-JSX accessor reads across 16 tooltip commits (4 open/move/move/close cycles), counted by jitless precise coverage of the unminified production bundle. Viewport re-classifies its identical defs/layers props on every ui commit; reading each value's type and key once per classification cut 1,408 reads to 404 for the same renderBlock/childSlot/deoptItemBody visits. Tooltip and viewport states match the shared ops replay and the dashboard subtrees keep their DOM identity."
+  },
+  {
+    "suite": "svg-dashboard",
+    "op": "pan_zoom_scoped_reads",
+    "target": "octane-tsrx-work",
+    "reference": "octane-tsrx-work-budget",
+    "maxRatio": 1,
+    "note": "Deferred-JSX accessor reads across 8 pan_zoom commits with no portal: 85 per commit before read-once classification, 23 after (defs 3, four layers children 5 each). Semantic controls as tooltip_cycle_scoped_reads."
   },
   {
     "suite": "svg-dashboard",
