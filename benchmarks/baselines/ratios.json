@@ -2181,11 +2181,7 @@
     "target": "octane",
     "reference": "r3f-9.6.1",
     "maxRatio": 1.0,
-    "note": "Per-frame dispatch to 1,000 useFrame subscribers, including the same scene render, must not be slower than React Three Fiber.",
-    "waiver": {
-      "reason": "Two weekly runs measured 1.18x and 1.28x (rme 4-13%) against the must-not-be-slower ceiling of 1. Tracked as a fix; remove this waiver with it.",
-      "expires": "2026-10-24"
-    }
+    "note": "Per-frame dispatch to 1,000 useFrame subscribers, including the same scene render, must not be slower than React Three Fiber."
   },
   {
     "suite": "three-renderer",
@@ -2201,11 +2197,7 @@
     "target": "octane-min",
     "reference": "r3f-min",
     "maxRatio": 1.0,
-    "note": "Minimal direct-root production gzip must not exceed React Three Fiber; each built bundle renders and verifies the same real Mesh in Chromium.",
-    "waiver": {
-      "reason": "Measured 199063 / 187994 = 1.059x on 2026-10-03: the Octane Three bundle now exceeds React Three Fiber, driven by shared-runtime growth. Tracked as a fix; remove this waiver with it.",
-      "expires": "2026-10-24"
-    }
+    "note": "Minimal direct-root production gzip must not exceed React Three Fiber; each built bundle renders and verifies the same real Mesh in Chromium."
   },
   {
     "suite": "three-bundle-size",
@@ -2213,11 +2205,7 @@
     "target": "octane-full",
     "reference": "r3f-full",
     "maxRatio": 1.0,
-    "note": "Full-catalogue production gzip must not exceed React Three Fiber; each built bundle verifies the complete Three namespace and the same real Mesh in Chromium.",
-    "waiver": {
-      "reason": "Measured 260785 / 250292 = 1.042x on 2026-10-03: the Octane Three bundle now exceeds React Three Fiber, driven by shared-runtime growth. Tracked as a fix; remove this waiver with it.",
-      "expires": "2026-10-24"
-    }
+    "note": "Full-catalogue production gzip must not exceed React Three Fiber; each built bundle verifies the complete Three namespace and the same real Mesh in Chromium."
   },
   {
     "suite": "react-hosted-islands",
