@@ -11,4 +11,5 @@ It reported nothing, and every later update wrote the text beside the stale
 server nodes. Hydration now removes that content, so the element holds only the
 client's text. It reports the mismatch through `onRecoverableError` and, in
 development, a located warning. `suppressHydrationWarning` silences the report,
-and an empty server frame is not reported, the same as an empty element.
+here and when the client renders nothing over such content. An empty server
+frame is not reported, the same as an empty element.

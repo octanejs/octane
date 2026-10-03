@@ -21403,10 +21403,10 @@ class HydrationCapability {
 	 * Remove the server content in `el`, an only-child text host, from `from` to
 	 * its end. The hole adopts at most one leading Text node there, so anything
 	 * else is server content the client renders nothing for, and later updates
-	 * would land beside it. Reports the recovery like hempty, where the client
-	 * expected `text` (or, when null, the end of the Text node it adopted).
-	 * suppressHydrationWarning silences the report but still discards: the server
-	 * content is not a text value to keep.
+	 * would land beside it. Reports the recovery where the client expected
+	 * `text` (nothing when it is '', or, when null, the end of the Text node it
+	 * adopted). suppressHydrationWarning silences the report but still discards:
+	 * the server content is not a text value to keep.
 	 */
 	private discardUnclaimedText(
 		el: Node,
@@ -21416,9 +21416,13 @@ class HydrationCapability {
 	): void {
 		if (PRESENTATION_HYDRATION?.revision !== undefined) presentationMiss();
 		this.save(el);
-		if (!isHydrationSuppressed(el)) {
+		// Captures that changed before a dormant boundary activated legitimately
+		// differ from the server's; still recover, but there is nothing to report.
+		if (!this.staleServerValues && !isHydrationSuppressed(el)) {
 			noteRecoverableHydrationError(() => new Error(formatClientError(62)), this.rootBlock);
-			if (process.env.NODE_ENV !== 'production')
+			if (process.env.NODE_ENV !== 'production') {
+				// Name a server range by the content it frames.
+				const inner = this.isOpen(from) ? getNextSibling(from) : null;
 				warnHydrationStructuralMismatch(
 					loc || (el as any).__oct_loc,
 					text === null
@@ -21426,8 +21430,9 @@ class HydrationCapability {
 						: text === ''
 							? 'nothing'
 							: `text ${JSON.stringify(text)}`,
-					describeHydrationNode(from),
+					describeHydrationNode(inner ?? from),
 				);
+			}
 		}
 		for (let node: ChildNode | null = from; node !== null;) {
 			const next = getNextSibling(node);
@@ -21524,28 +21529,12 @@ class HydrationCapability {
 		const first = getFirstChild(el);
 		if (first === null || (el as Element).localName === 'textarea') return;
 		const next = getNextSibling(first);
-		const framed = this.isOpen(first);
-		if (framed && this.isClose(next) && getNextSibling(next) === null) {
+		if (this.isOpen(first) && this.isClose(next) && getNextSibling(next) === null) {
 			(STAGED_DOM?.view(first) ?? first).remove();
 			(STAGED_DOM?.view(next) ?? next).remove();
 			return;
 		}
-		if (PRESENTATION_HYDRATION?.revision !== undefined) presentationMiss();
-		this.save(el);
-		// Captures that changed before a dormant boundary activated legitimately
-		// differ from the server's; still recover, but there is nothing to report.
-		if (!this.staleServerValues) {
-			noteRecoverableHydrationError(() => new Error(formatClientError(62)), this.rootBlock);
-			if (process.env.NODE_ENV !== 'production') {
-				warnHydrationStructuralMismatch(
-					loc || (el as any).__oct_loc,
-					'nothing',
-					describeHydrationNode(framed && next !== null ? next : first),
-				);
-			}
-		}
-		for (let n = getFirstChild(el); n !== null; n = getFirstChild(el))
-			(STAGED_DOM?.view(el) ?? el).removeChild(n);
+		this.discardUnclaimedText(el, first, '', loc);
 	}
 
 	htextSwap(posNode: Node | null, text: string): Text {

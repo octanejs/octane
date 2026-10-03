@@ -206,6 +206,27 @@ describe.each([
 		},
 	);
 
+	it.each([null, ''])(
+		'discards server content silently for a %j value in a suppressed host',
+		async (value) => {
+			const { p, recovered } = hydrate('Suppressed', '<b>x</b>', { value });
+			expect(p.innerHTML).toBe('');
+			await Promise.resolve();
+			expect(recovered).toEqual([]);
+			expect(warns()).toEqual([]);
+			flushSync(() => root!.render(client.Suppressed, { value: 'b' }));
+			expect(p.innerHTML).toBe('b');
+		},
+	);
+
+	// A text binding has no child slot to adopt a server range, so it discards
+	// the range and names what the range held.
+	it('discards a server range in a text binding and names its content', async () => {
+		const { p, recovered } = hydrate('Text', '<!--[--><b>x</b><!--]-->', { value: 'a' });
+		expect(p.innerHTML).toBe('a');
+		await expectReported(recovered, lineOf('function Text('), '<b>');
+	});
+
 	// The server's leading text is still kept, as suppression keeps any text value.
 	it('keeps the server text and discards the content after it silently in a suppressed host', async () => {
 		const { p, serverChildren, recovered } = hydrate('Suppressed', 'x<b>y</b>', { value: 'a' });
