@@ -1,8 +1,36 @@
 import assert from 'node:assert/strict';
 
+// Every committed byte budget is a ratchet: the measured production bytes plus
+// this fixed headroom. A change that grows a bundle by more than the headroom
+// fails CI, and the budget is raised only in a separate pull request that names
+// the bytes and the reason (CONTRIBUTING.md, "Size budgets").
+export const BUDGET_HEADROOM_BYTES = 32;
+export const BYTE_METRICS = ['raw', 'gzip', 'brotli'];
+
+export function ratchetBudget(measured) {
+	return Object.fromEntries(
+		BYTE_METRICS.map((metric) => {
+			assert.equal(
+				Number.isSafeInteger(measured[metric]) && measured[metric] > 0,
+				true,
+				`cannot derive a ${metric} budget from ${measured[metric]}`,
+			);
+			return [metric, measured[metric] + BUDGET_HEADROOM_BYTES];
+		}),
+	);
+}
+
 export function selectMinimalScenarios(args, scenarios) {
 	const enforceBudgets = args.includes('--budgets');
-	const requested = args.filter((argument) => argument !== '--budgets');
+	const writeBudgets = args.includes('--write-budgets');
+	assert.equal(
+		enforceBudgets && writeBudgets,
+		false,
+		'--budgets checks the committed budgets and --write-budgets replaces them; pass one',
+	);
+	const requested = args.filter(
+		(argument) => argument !== '--budgets' && argument !== '--write-budgets',
+	);
 	for (const argument of requested) {
 		assert.equal(
 			scenarios.some(({ id, name }) => argument === id || argument === name),
@@ -14,11 +42,11 @@ export function selectMinimalScenarios(args, scenarios) {
 		? scenarios.filter(({ id, name }) => requested.includes(id) || requested.includes(name))
 		: scenarios;
 	assert.notEqual(selectedScenarios.length, 0, 'At least one minimal-import scenario must run');
-	return { selectedScenarios, enforceBudgets };
+	return { selectedScenarios, enforceBudgets, writeBudgets };
 }
 
 export function verifyByteBudget(name, measured, budget, enforce) {
-	for (const metric of ['raw', 'gzip', 'brotli']) {
+	for (const metric of BYTE_METRICS) {
 		assert.equal(
 			Number.isSafeInteger(budget[metric]) && budget[metric] > 0,
 			true,

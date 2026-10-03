@@ -3,7 +3,7 @@ import { test } from 'node:test';
 import path from 'node:path';
 import { build } from 'esbuild';
 import { bundleScenarios } from '../activity/bundle-scenarios.mjs';
-import { selectMinimalScenarios, verifyByteBudget } from './minimal-gates.mjs';
+import { ratchetBudget, selectMinimalScenarios, verifyByteBudget } from './minimal-gates.mjs';
 import { verifyScenario } from './verify-reachability.mjs';
 
 const scenarios = [
@@ -16,19 +16,44 @@ test('budget enforcement preserves default and grouped scenario selection', () =
 	assert.deepEqual(selectMinimalScenarios([], scenarios), {
 		selectedScenarios: scenarios,
 		enforceBudgets: false,
+		writeBudgets: false,
 	});
 	assert.deepEqual(selectMinimalScenarios(['--budgets', 'behavior-root'], scenarios), {
 		selectedScenarios: scenarios.slice(1),
 		enforceBudgets: true,
+		writeBudgets: false,
 	});
 	assert.deepEqual(selectMinimalScenarios(['behavior-root-esbuild', '--budgets'], scenarios), {
 		selectedScenarios: [scenarios[2]],
 		enforceBudgets: true,
+		writeBudgets: false,
 	});
 	assert.deepEqual(selectMinimalScenarios(['--budgets'], scenarios), {
 		selectedScenarios: scenarios,
 		enforceBudgets: true,
+		writeBudgets: false,
 	});
+	assert.deepEqual(selectMinimalScenarios(['--write-budgets', 'root-static'], scenarios), {
+		selectedScenarios: scenarios.slice(0, 1),
+		enforceBudgets: false,
+		writeBudgets: true,
+	});
+});
+
+test('checking and rewriting budgets in one run is rejected', () => {
+	assert.throws(
+		() => selectMinimalScenarios(['--budgets', '--write-budgets'], scenarios),
+		/pass one/,
+	);
+});
+
+test('a rewritten budget is the measurement plus a fixed 32-byte headroom', () => {
+	assert.deepEqual(ratchetBudget({ raw: 1000, gzip: 400, brotli: 350 }), {
+		raw: 1032,
+		gzip: 432,
+		brotli: 382,
+	});
+	assert.throws(() => ratchetBudget({ raw: 1000, gzip: 0, brotli: 350 }), /gzip budget/);
 });
 
 test('invalid scenario arguments fail instead of silently skipping builds', () => {

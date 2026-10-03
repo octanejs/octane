@@ -165,21 +165,28 @@ describe('CI workflow aggregation', () => {
 		assert.doesNotMatch(shard, /input-otp\/tests\/browser\/\*\*\/\*\.spec\.ts/);
 	});
 
-	test('gates the renderer-free behavior bundle once per full CI run', () => {
+	// Every scenario and every complete Octane application, not a chosen few:
+	// unenforced budgets drifted over their limits with no pull request failing.
+	test('enforces every committed bundle budget once per full CI run', () => {
 		assert.match(
 			jobSource('test_shard'),
-			/- name: Verify renderer-free behavior bundle\n\s+if: matrix\.shard == '1\/4'\n\s+run: node benchmarks\/bundle-size\/run-minimal\.mjs behavior-root/,
+			/- name: Verify every bundle budget\n\s+if: matrix\.shard == '1\/4'\n\s+run: \|\n\s+node benchmarks\/bundle-size\/run-minimal\.mjs --budgets\n\s+node benchmarks\/bundle-size\/run\.mjs --budgets octane-tsrx octane-jsx\n/,
 		);
+		assert.doesNotMatch(jobSource('test_shard'), /run-minimal\.mjs --budgets \S/);
+		for (const suite of [
+			'benchmarks/bundle-size/minimal-gates.test.mjs',
+			'benchmarks/bundle-size/budget-raises.test.mjs',
+		]) {
+			assert.ok(packageJson.scripts['ci:workflow:test'].split(' ').includes(suite), suite);
+		}
 	});
 
-	test('enforces recovered signal-free application budgets once per full CI run', () => {
+	test('checks that budget raises land alone against the change itself', () => {
+		const lint = jobSource('lint_checks');
+		assert.match(lint, /fetch-depth: 0/);
 		assert.match(
-			jobSource('test_shard'),
-			/- name: Verify signal-free application bundle budgets\n\s+if: matrix\.shard == '1\/4'\n\s+run: node benchmarks\/bundle-size\/run-minimal\.mjs --budgets root-static-local root-chained-jsx hooks-state prop-attributes context/,
-		);
-		assert.match(
-			packageJson.scripts['ci:workflow:test'],
-			/benchmarks\/bundle-size\/minimal-gates\.test\.mjs/,
+			lint,
+			/BUDGET_BASE: \$\{\{ github\.event_name == 'pull_request' && 'HEAD\^1' \|\| github\.event\.before \}\}\n\s+run: node benchmarks\/bundle-size\/budget-raises\.mjs --base "\$BUDGET_BASE"/,
 		);
 	});
 
@@ -194,13 +201,6 @@ describe('CI workflow aggregation', () => {
 			assert.ok(benchWorkflow.includes(`node --test ${suite}`), suite);
 			assert.ok(workflowTests.includes(suite), suite);
 		}
-	});
-
-	test('gates binding reachability into the octane namespace once per full CI run', () => {
-		assert.match(
-			jobSource('test_shard'),
-			/- name: Verify Apollo binding keeps octane tree-shakeable\n\s+if: matrix\.shard == '1\/4'\n\s+run: node benchmarks\/bundle-size\/run-minimal\.mjs binding-apollo-client/,
-		);
 	});
 
 	test('runs and reports tests only on Node 24 while retaining the Node 22 engine baseline', () => {
