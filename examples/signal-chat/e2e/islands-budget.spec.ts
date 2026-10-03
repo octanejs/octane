@@ -34,9 +34,9 @@ test('activates every island without the renderer within the islands-only JavaSc
 		type: 'islands-only JavaScript',
 		description: `${files.length} scripts, ${gzip} bytes gzip-9`,
 	});
-	// #1514 targets 70 KiB. Island activation fixes #1629 (+171 B) and #1660
-	// (+197 B) carried the route past it. The known cut that brings it back under
-	// is the ~4.1 KB signal Action frame and transition coordinator that
-	// signals/graph.ts registers at load, though only the renderer uses them.
-	expect(gzip).toBeLessThanOrEqual(71 * 1024);
+	// #1514 targets 70 KiB. Every route of this app is islands-only, so its client
+	// build places the signal Action frame and transition coordinator with the
+	// renderer (the `octane-islands` condition) rather than the signal graph, about
+	// 4 KB that these pages load but never run. The route measures 67,719 B since.
+	expect(gzip).toBeLessThanOrEqual(68 * 1024);
 });
