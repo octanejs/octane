@@ -203,3 +203,32 @@ describe('hydrateRoot — a lite component that renders nothing before one adopt
 		expect(recoverable).toEqual([]);
 	});
 });
+
+// A branch with no server range of its own, inside a component adopted in
+// place, owns every root it adopted there: switching it off removes them all,
+// and the next component keeps its server range. As above, only the
+// development compile renders this hookless call against the cursor.
+describe('hydrateRoot — a branch in a component adopted in place', () => {
+	it('owns every root it adopted', async () => {
+		const client = clients.development;
+		const props = { on: true, shown: true, z: 'z' };
+		const { host, serverNodes, recoverable } = await hydrate(
+			client,
+			'BranchArm',
+			{ ...props, on: false },
+			props,
+		);
+
+		expect(markup(host)).toBe('<em>x</em><b>b</b><em>z</em>');
+		expect(host.children).toHaveLength(3);
+		serverNodes.forEach((node, i) => expect(host.children[i]).toBe(node));
+		expect(recoverable).toEqual([]);
+		expect(warnings()).toEqual([]);
+
+		flushSync(() => root!.render(client.BranchArm, { ...props, shown: false }));
+		expect(markup(host)).toBe('<em>z</em>');
+		expect(host.children[0]).toBe(serverNodes[2]);
+		flushSync(() => root!.render(client.BranchArm, props));
+		expect(markup(host)).toBe('<em>x</em><b>b</b><em>z</em>');
+	});
+});

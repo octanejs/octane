@@ -46,6 +46,12 @@ function withoutTail(adopted: Element[]): Element[] {
 	return adopted.filter((element) => element.localName !== 'u');
 }
 
+/** `actual` holds exactly the `expected` nodes: the same objects, in order. */
+function expectSame(actual: ArrayLike<Node>, expected: readonly Node[]): void {
+	expect(actual).toHaveLength(expected.length);
+	Array.from(actual).forEach((node, i) => expect(node).toBe(expected[i]));
+}
+
 const DISCARDED =
 	'Hydration mismatch: the server-rendered node did not match the client render; ' +
 	'the mismatched subtree was rebuilt on the client.';
@@ -61,7 +67,7 @@ describe.each([
 		compileOptions: { dev },
 	});
 	let container: HTMLElement;
-	let root: { unmount(): void } | null;
+	let root: { render(component: unknown, props?: unknown): void; unmount(): void } | null;
 	let errSpy: ReturnType<typeof vi.spyOn>;
 
 	beforeEach(() => {
@@ -163,6 +169,62 @@ describe.each([
 		expect(Array.from(div.children)).toEqual(adopted);
 		expect(recoverable).toEqual([]);
 		expect(warnings()).toEqual([]);
+	});
+
+	// A branch the server rendered no range for ends after every root its
+	// template adopted in place, not after the first: the arm keeps them all,
+	// and the branch owns them.
+	it.each([
+		{ branch: 'an @if', name: 'MarkerlessArm' },
+		{ branch: 'a @switch', name: 'MarkerlessSwitch' },
+		{ branch: 'an @if inside another', name: 'MarkerlessNested' },
+	])(
+		'discards only the server tail after the roots of $branch with no server range',
+		async ({ name }) => {
+			const { div, adopted, recoverable } = await hydrate(name, { server: true }, { inner: true });
+
+			expect(markup(div)).toBe('<s>s</s><b>a</b>');
+			expectSame(div.children, withoutTail(adopted));
+			expect(recoverable).toEqual([DISCARDED]);
+			expect(warnings()).toEqual(dev ? [report(name)] : []);
+
+			flushSync(() => root!.render(client[name], { inner: false }));
+			expect(markup(div)).toBe('');
+			flushSync(() => root!.render(client[name], { inner: true }));
+			expect(markup(div)).toBe('<s>s</s><b>a</b>');
+		},
+	);
+
+	it('keeps every root of a branch with no server range when the server rendered no more', async () => {
+		const { div, adopted, recoverable } = await hydrate(
+			'MarkerlessSameArm',
+			{ server: true },
+			{ inner: true },
+		);
+
+		expect(markup(div)).toBe('<s>s</s><b>a</b>');
+		expectSame(div.children, adopted);
+		expect(recoverable).toEqual([]);
+		expect(warnings()).toEqual([]);
+
+		flushSync(() => root!.render(client.MarkerlessSameArm, { inner: false }));
+		expect(markup(div)).toBe('');
+	});
+
+	// Its roots outnumber what the server rendered before the arm's end, so
+	// the branch is built on the client in place of the server's content.
+	it('rebuilds a branch with no server range whose roots the server’s arm ends before', async () => {
+		const { div, recoverable } = await hydrate(
+			'MarkerlessShortArm',
+			{ server: true },
+			{ inner: true },
+		);
+
+		expect(markup(div)).toBe('<s>s</s><b>a</b>');
+		expect(recoverable).toEqual([DISCARDED]);
+
+		flushSync(() => root!.render(client.MarkerlessShortArm, { inner: false }));
+		expect(markup(div)).toBe('');
 	});
 
 	it('keeps a root that recovery rebuilt in the arm while discarding the tail', async () => {
