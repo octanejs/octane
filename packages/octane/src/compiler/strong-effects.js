@@ -1087,6 +1087,15 @@ export function createStrongEffectPolicy({ ast, analysis, callNames, report }) {
 		};
 		const { roots, aliases, declarations, owners } = references;
 		const names = new Set();
+		const callbackAssignments = new WeakMap();
+		const callbackPaths = new WeakMap();
+		const aliasDeclarators = new WeakMap();
+		const aliasPaths = new Map();
+		const callbackCandidates = new Map();
+		const refAttributes = [];
+		const attached = new Set();
+		const attachedHosts = new Set();
+		const invalidAttachments = new Set();
 		// A stored value may come from either arm of a conditional or logical
 		// expression, as in `const id = enabled ? setInterval(tick, ms) : null`.
 		const own = (value, key) => {
@@ -1137,6 +1146,7 @@ export function createStrongEffectPolicy({ ast, analysis, callNames, report }) {
 				const root = target && (aliases.get(target) ?? (roots.has(target) ? target : null));
 				if (root) {
 					aliases.set(binding, root);
+					aliasDeclarators.set(decl, binding);
 					declarations.set(decl.id, root);
 					names.add(binding.name);
 					changed = true;
@@ -1154,6 +1164,21 @@ export function createStrongEffectPolicy({ ast, analysis, callNames, report }) {
 				const key = keyOf(node.left);
 				if (key !== null) own(node.right, key);
 			}
+			if (roots.size !== 0 && FUNCTIONS.has(node.type)) callbackPaths.set(node, parents.slice());
+			if (node.type === 'VariableDeclarator' && aliasDeclarators.has(node)) {
+				aliasPaths.set(aliasDeclarators.get(node), parents.slice());
+			}
+			if (
+				roots.size !== 0 &&
+				node.type === 'JSXAttribute' &&
+				node.name?.name === 'ref' &&
+				node.value?.type === 'JSXExpressionContainer'
+			) {
+				const opening = parents.at(-1);
+				const name = opening?.type === 'JSXOpeningElement' ? opening.name : null;
+				const host = name?.type === 'JSXIdentifier' && /^[a-z]/.test(name.name);
+				refAttributes.push({ expression: node.value.expression, host, ancestors: parents.slice() });
+			}
 			if (node.type === 'Identifier' && names.has(node.name)) classify(node, parents);
 			parents.push(node);
 			for (const key in node) {
@@ -1162,7 +1187,326 @@ export function createStrongEffectPolicy({ ast, analysis, callNames, report }) {
 			parents.pop();
 		};
 		visit(ast);
+		for (const { expression, host, ancestors } of refAttributes) {
+			attachCallbacks(expression, host, ancestors);
+		}
+		checkCallbackUses();
+		for (const root of attached) {
+			if (invalidAttachments.has(root)) continue;
+			references.escaped.add(root);
+			if (attachedHosts.has(root)) references.host.add(root);
+		}
 		return references;
+
+		// The hook analysis does not assign lexical scopes to TSRX template
+		// bindings, so a matching row or catch name cannot prove this identity.
+		function templateShadowed(name, ancestors) {
+			for (let index = 0; index < ancestors.length; index++) {
+				const ancestor = ancestors[index];
+				const child = ancestors[index + 1];
+				if (
+					ancestor.type === 'JSXForExpression' &&
+					child !== ancestor.right &&
+					child !== ancestor.empty &&
+					(patternBinds(ancestor.left, name) || patternBinds(ancestor.index, name))
+				)
+					return true;
+				if (
+					ancestor.type === 'JSXTryExpression' &&
+					child === ancestor.handler &&
+					(patternBinds(ancestor.handler?.param, name) ||
+						patternBinds(ancestor.handler?.resetParam, name))
+				)
+					return true;
+			}
+			return false;
+		}
+
+		function patternBinds(pattern, name) {
+			if (pattern == null) return false;
+			switch (pattern.type) {
+				case 'Identifier':
+					return pattern.name === name;
+				case 'VariableDeclaration':
+					return pattern.declarations.some((declaration) => patternBinds(declaration.id, name));
+				case 'AssignmentPattern':
+					return patternBinds(pattern.left, name);
+				case 'RestElement':
+					return patternBinds(pattern.argument, name);
+				case 'ArrayPattern':
+					return pattern.elements.some((element) => patternBinds(element, name));
+				case 'ObjectPattern':
+					return pattern.properties.some((property) =>
+						patternBinds(
+							property.type === 'RestElement' ? property.argument : property.value,
+							name,
+						),
+					);
+				default:
+					return false;
+			}
+		}
+
+		// Follow only actual ref values; a callback supplied to another prop is
+		// not evidence that its captured refs receive an attached instance.
+		function attachCallbacks(expression, host, ancestors) {
+			const value = unwrap(expression);
+			if (value == null) return;
+			if (value.type === 'ArrayExpression') {
+				for (const entry of value.elements) attachCallbacks(entry, host, ancestors);
+				return;
+			}
+			if (value.type === 'ConditionalExpression') {
+				const only = selected(value);
+				if (only !== null) return attachCallbacks(only, host, ancestors);
+				attachCallbacks(value.consequent, host, ancestors);
+				attachCallbacks(value.alternate, host, ancestors);
+				return;
+			}
+			if (value.type === 'LogicalExpression') {
+				const only = selected(value);
+				if (only !== null) return attachCallbacks(only, host, ancestors);
+				if (value.operator !== '&&') attachCallbacks(value.left, host, ancestors);
+				attachCallbacks(value.right, host, ancestors);
+				return;
+			}
+			if (value.type === 'SequenceExpression') {
+				attachCallbacks(value.expressions?.at(-1), host, ancestors);
+				return;
+			}
+			if (value.type === 'Identifier' && templateShadowed(value.name, ancestors)) return;
+			const callback = functionOf(value);
+			if (callback === null || callback.async || callback.generator) return;
+			const assignments = callbackRefs(callback);
+			for (const root of assignments.good) {
+				attached.add(root);
+				if (host) attachedHosts.add(root);
+				let candidate = callbackCandidates.get(callback);
+				if (!candidate) callbackCandidates.set(callback, (candidate = new Set()));
+				candidate.add(root);
+			}
+			for (const root of assignments.bad) {
+				invalidAttachments.add(root);
+			}
+		}
+
+		function callbackRefs(callback) {
+			const cached = callbackAssignments.get(callback);
+			if (cached) return cached;
+			const result = { good: new Set(), bad: new Set() };
+			callbackAssignments.set(callback, result);
+			const parameter = parametersOf(callback)[0];
+			if (!parameter || parameter.reassigned) return result;
+			const fromParameter = (expression) => {
+				let value = unwrap(expression);
+				for (let depth = 0; value?.type === 'Identifier' && depth < 16; depth++) {
+					const binding = bindingOf(value);
+					if (!binding || binding.reassigned) return false;
+					if (binding === parameter) return true;
+					value = stableInit(binding);
+				}
+				return false;
+			};
+			const ancestors = [...(callbackPaths.get(callback) ?? []), callback];
+			const unshadowedAlias = (binding) => {
+				while (aliases.has(binding)) {
+					const init = stableInit(binding);
+					if (
+						init?.type !== 'Identifier' ||
+						templateShadowed(init.name, aliasPaths.get(binding) ?? [])
+					) {
+						return false;
+					}
+					binding = bindingOf(init);
+				}
+				return true;
+			};
+			const write = (target, value, direct, cleanup) => {
+				target = unwrap(target);
+				if (target?.type === 'MemberExpression') {
+					const object = unwrap(target.object);
+					const binding = object?.type === 'Identifier' ? bindingOf(object) : null;
+					const root = binding && (aliases.get(binding) ?? (roots.has(binding) ? binding : null));
+					if (!root || templateShadowed(object.name, ancestors) || !unshadowedAlias(binding))
+						return;
+					const property = memberName(target);
+					if (property !== 'current' && property !== null) return;
+					if (property === 'current' && direct && fromParameter(value)) result.good.add(root);
+					else if (
+						property === 'current' &&
+						(direct || cleanup) &&
+						value &&
+						staticValue(value) == null
+					) {
+						// A callback or its returned cleanup may clear the instance.
+					} else result.bad.add(root);
+				} else if (target?.type === 'ArrayPattern') {
+					for (const element of target.elements) write(element, null, false, false);
+				} else if (target?.type === 'ObjectPattern') {
+					for (const property of target.properties) {
+						write(
+							property.type === 'RestElement' ? property.argument : property.value,
+							null,
+							false,
+							false,
+						);
+					}
+				} else if (target?.type === 'AssignmentPattern') {
+					write(target.left, null, false, false);
+				} else if (target?.type === 'RestElement') {
+					write(target.argument, null, false, false);
+				}
+			};
+			const scan = (node, nested = false, cleanup = false, loop = false) => {
+				if (node == null || typeof node !== 'object') return;
+				if (Array.isArray(node)) {
+					for (const child of node) {
+						scan(child, nested, cleanup, loop);
+						if (child?.type === 'ReturnStatement' || child?.type === 'ThrowStatement') break;
+					}
+					return;
+				}
+				if (FUNCTIONS.has(node.type)) {
+					nested = true;
+					cleanup = false;
+				}
+				if (node.type === 'ForOfStatement' || node.type === 'ForInStatement') {
+					write(node.left, null, false, false);
+				}
+				loop ||= [
+					'ForStatement',
+					'ForOfStatement',
+					'ForInStatement',
+					'WhileStatement',
+					'DoWhileStatement',
+					'SwitchStatement',
+				].includes(node.type);
+				if (node.type === 'AssignmentExpression')
+					write(
+						node.left,
+						node.right,
+						node.operator === '=' && !nested && !loop,
+						node.operator === '=' && cleanup && !loop,
+					);
+				if (
+					node.type === 'UpdateExpression' ||
+					(node.type === 'UnaryExpression' && node.operator === 'delete')
+				) {
+					write(node.argument, null, false, false);
+				}
+				ancestors.push(node);
+				const returned = node.type === 'ReturnStatement' && !nested ? unwrap(node.argument) : null;
+				if (FUNCTIONS.has(returned?.type) && !returned.async && !returned.generator) {
+					ancestors.push(returned);
+					scan(returned.body, true, true, loop);
+					ancestors.pop();
+				} else if (node.type === 'IfStatement' && staticValue(node.test) !== UNKNOWN) {
+					scan(node.test, nested, cleanup, loop);
+					scan(staticValue(node.test) ? node.consequent : node.alternate, nested, cleanup, loop);
+				} else if (
+					(node.type === 'ConditionalExpression' || node.type === 'LogicalExpression') &&
+					selected(node) !== null
+				) {
+					scan(selected(node), nested, cleanup, loop);
+				} else {
+					for (const key in node) {
+						if (!SKIP_KEYS.has(key) && !key.startsWith('_octane'))
+							scan(node[key], nested, cleanup, loop);
+					}
+				}
+				ancestors.pop();
+			};
+			scan(callback.body);
+			return result;
+		}
+
+		// A callback used for anything other than a ref may receive a different
+		// argument (for example an event). Do not infer an attached ref from it.
+		function checkCallbackUses() {
+			if (callbackCandidates.size === 0) return;
+			const bindings = new Map();
+			const aliasDeclarations = new WeakMap();
+			for (const record of functions) {
+				if (record.binding && !record.binding.reassigned && callbackCandidates.has(record.node)) {
+					bindings.set(record.binding, record.node);
+				}
+			}
+			for (const { decl, bindings: declared } of declarators) {
+				const binding = declared[0]?.binding;
+				if (decl.id?.type !== 'Identifier' || !binding || binding.reassigned) continue;
+				const callback = functionOf(decl.init);
+				if (callbackCandidates.has(callback)) {
+					bindings.set(binding, callback);
+					aliasDeclarations.set(decl, callback);
+				}
+			}
+			if (bindings.size === 0) return;
+			const path = [];
+			const walk = (node) => {
+				if (node == null || typeof node !== 'object') return;
+				if (Array.isArray(node)) {
+					for (const child of node) walk(child);
+					return;
+				}
+				if (node.type === 'Identifier' && !templateShadowed(node.name, path)) {
+					const callback = bindings.get(bindingOf(node));
+					if (callback && !safeCallbackUse(node, path, callback, aliasDeclarations)) {
+						for (const root of callbackCandidates.get(callback)) invalidAttachments.add(root);
+					}
+				}
+				path.push(node);
+				for (const key in node) {
+					if (!SKIP_KEYS.has(key) && !key.startsWith('_octane')) walk(node[key]);
+				}
+				path.pop();
+			};
+			walk(ast);
+		}
+
+		function safeCallbackUse(identifier, path, callback, aliasDeclarations) {
+			let current = identifier;
+			let index = path.length - 1;
+			let parent = path[index];
+			if (
+				(parent?.type === 'FunctionDeclaration' && parent.id === current) ||
+				(parent?.type === 'VariableDeclarator' && parent.id === current) ||
+				(parent?.type === 'MemberExpression' && parent.property === current && !parent.computed) ||
+				((parent?.type === 'Property' || parent?.type === 'MethodDefinition') &&
+					parent.key === current &&
+					!parent.computed &&
+					!parent.shorthand)
+			)
+				return true;
+			while (index >= 0 && TRANSPARENT.has(path[index].type)) current = path[index--];
+			parent = path[index];
+			if (
+				parent?.type === 'VariableDeclarator' &&
+				parent.init === current &&
+				aliasDeclarations.get(parent) === callback
+			)
+				return true;
+			while (index >= 0) {
+				parent = path[index];
+				if (
+					TRANSPARENT.has(parent.type) ||
+					parent.type === 'ArrayExpression' ||
+					(parent.type === 'LogicalExpression' &&
+						(parent.operator !== '&&' || parent.right === current)) ||
+					(parent.type === 'ConditionalExpression' && parent.test !== current) ||
+					(parent.type === 'SequenceExpression' && parent.expressions?.at(-1) === current)
+				) {
+					current = parent;
+					index--;
+					continue;
+				}
+				break;
+			}
+			return (
+				path[index]?.type === 'JSXExpressionContainer' &&
+				path[index - 1]?.type === 'JSXAttribute' &&
+				path[index - 1].name?.name === 'ref'
+			);
+		}
 	}
 
 	function classify(identifier, parents) {
