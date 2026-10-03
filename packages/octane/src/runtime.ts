@@ -703,13 +703,30 @@ function retainSignalRetryScope(
 		for (const child of scope.children) retainSignalRetryScope(child.scope, root, holder);
 }
 
-// A root render defers a live tree's teardown to its commit, after a
-// replacement has claimed the owners the cache took from it. Leave those
-// scopes ownerless; an ownerless scope still records retirement when deleted.
-function detachSignalRetryScope(scope: Scope, cache: SignalRetryOwners): void {
+// Move a restarted primary's owners to its boundary's retry cache, where the
+// replacement claims them by path. A root render defers this tree's teardown to
+// its commit, after that claim, so leave each scope ownerless; it still records
+// retirement when deleted. A nested boundary's primary claims only from its own
+// cache, so its owners stay with it and retire with this tree.
+function handOverSignalRetryScope(scope: Scope, root: Scope, state: TrySlot): void {
 	const owner = SCOPE_SIGNAL_OWNERS.get(scope);
-	if (owner && cache.owners.has(owner)) SCOPE_SIGNAL_OWNERS.set(scope, false);
-	forEachSubtreeChild(scope, (child) => detachSignalRetryScope(child, cache));
+	const path = owner ? signalRetryPath(scope, root) : null;
+	if (path !== null) {
+		const cache = (state.retrySignalOwners ??= { paths: {}, owners: new Set() });
+		const node = signalRetryNode(cache, path, true)!;
+		if (node.owner !== undefined && node.owner !== owner) {
+			cache.owners.delete(node.owner);
+			retireRendererSignalOwner(node.owner);
+		}
+		node.owner = owner as SignalRendererOwnerIdentity;
+		cache.owners.add(node.owner);
+		SCOPE_SIGNAL_OWNERS.set(scope, false);
+	}
+	forEachSubtreeChild(scope, (child) => {
+		const nested = (child as any).__trySlot as TrySlot | undefined;
+		if (nested === undefined || nested.propagateSuspense)
+			handOverSignalRetryScope(child, root, state);
+	});
 }
 
 function clearSignalRetryOwners(holder: { retrySignalOwners?: SignalRetryOwners }): void {
@@ -39611,12 +39628,9 @@ function restartUncommittedTry(state: TrySlot): Block | null {
 	collectVisibleSubtreeRefs(old, refs);
 	showTryBlock(state);
 	state.tryBlock = null;
-	// The replacement claims the abandoned primary's signal owners by path,
-	// like a retry of a discarded hydration attempt; see supersedeSignalRetryOwners.
-	if (signalDocumentEnabled || state.idState.renderOwner?.signalOwner !== undefined) {
-		retainSignalRetryScope(old, old, state, true);
-		if (state.retrySignalOwners !== undefined) detachSignalRetryScope(old, state.retrySignalOwners);
-	}
+	// Like a retry of a discarded hydration attempt; see supersedeSignalRetryOwners.
+	if (signalDocumentEnabled || state.idState.renderOwner?.signalOwner !== undefined)
+		handOverSignalRetryScope(old, old, state);
 	supersedeSignalRetryOwners(state);
 	// Neither these refs nor the primary's captured effects ever committed.
 	// Its hook registrations still need real teardown (e.g. transition listeners).

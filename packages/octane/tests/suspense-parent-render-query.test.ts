@@ -29,6 +29,23 @@ export function Field(props) {
 	const value$ = derived$(() => props.load(props.id));
 	return <output>{String(value$.get())}</output>;
 }`,
+	// A boundary nested in the restarted attempt, with its own pending query.
+	nested: `import { Suspense } from 'octane';
+import { query$ } from 'octane/signals';
+function Inner(props) @{
+	const inner$ = query$(() => 'inner-' + props.id, props.load);
+	<b>{inner$.get() as string}</b>
+}
+function Outer(props) @{
+	const value$ = query$(() => props.id, props.load);
+	<output>{value$.get() as string}</output>
+}
+export function Field(props) @{
+	<span>
+		<Suspense fallback={<u>{'inner'}</u>}><Inner id={props.id} load={props.load} /></Suspense>
+		<Outer id={props.id} load={props.load} />
+	</span>
+}`,
 };
 
 const APPS = {
@@ -109,7 +126,7 @@ function compileApp(app: AppName, field: FieldName): any {
 		const compileOptions = { dev, hmr: false };
 		const runtimeModules = { 'octane/signals': signals };
 		const fieldModule = loadCompiledFixtureSource(FIELDS[field], {
-			id: `/src/field-${field}.tsx`,
+			id: `/src/field-${field}.${FIELDS[field].includes(') @{') ? 'tsrx' : 'tsx'}`,
 			mode: 'client',
 			compileOptions,
 			runtimeModules,
@@ -279,6 +296,27 @@ describe.each(['tsx', 'tsrx'] as const)(
 				for (const call of [...calls]) await settle(call, call.id.toUpperCase());
 				for (const call of [...calls]) await settle(call, call.id.toUpperCase());
 				expect(shown()).toBe('B');
+			});
+		});
+	},
+);
+
+describe.each(Object.keys(APPS) as AppName[])(
+	'a boundary nested in a restarted attempt (%s app)',
+	(app) => {
+		compileApp(app, 'nested');
+
+		it('aborts its own pending request instead of holding it for the outer boundary', async () => {
+			await scenario(app, 'nested', async ({ ids, shown, update, settle, calls }) => {
+				expect([...ids()].sort()).toEqual(['a', 'inner-a']);
+				const inner = calls.find((call) => call.id === 'inner-a')!;
+				await update((controls) => controls.setNote((n) => n + 1));
+				// The nested boundary restarts on its own; only the outer attempt keeps its query.
+				expect(inner.signal.aborted).toBe(true);
+				expect(ids().filter((id) => id === 'a')).toEqual(['a']);
+				for (const call of [...calls]) await settle(call, call.id.toUpperCase());
+				for (const call of [...calls]) await settle(call, call.id.toUpperCase());
+				expect(shown()).toBe('A');
 			});
 		});
 	},
