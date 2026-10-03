@@ -51,6 +51,10 @@ const ACCESSORS = [
 // reported, not budgeted, so a change that skips work legitimately can land.
 const CONTROLS = ['renderBlock', 'childSlot', 'deoptItemBody'];
 const METRICS = [...ACCESSORS, ...CONTROLS];
+// Every ui commit renders Viewport and classifies `defs`. Coverage omits a
+// function that ran zero times, so the other metrics are checked by name in
+// the bundle source instead: a renamed function would otherwise count as zero.
+const MUST_CALL = ['scopedValueType', 'renderBlock', 'childSlot'];
 
 const TOOLTIP_CYCLES = 4;
 const PAN_STEPS = 8; // one full preset rotation
@@ -93,20 +97,20 @@ function expectedUi() {
 
 function countNamed(coverage) {
 	const counts = Object.fromEntries(METRICS.map((name) => [name, 0]));
-	const seen = new Set();
+	const assets = new Set();
 	let productionCalls = 0;
 	for (const script of coverage.result) {
 		if (!script.url.includes('/assets/')) continue;
+		assets.add(script.url);
 		for (const fn of script.functions) {
 			productionCalls += fn.ranges[0]?.count ?? 0;
 			if (Object.hasOwn(counts, fn.functionName)) {
-				seen.add(fn.functionName);
 				counts[fn.functionName] += fn.ranges[0]?.count ?? 0;
 			}
 		}
 	}
 	if (productionCalls === 0) throw new Error('operation produced no production asset calls');
-	return { counts, seen };
+	return { counts, assets };
 }
 
 // The page-side operations. Each records, with native DOM reads only, the ui
@@ -197,11 +201,20 @@ async function measure(browser, name, operation, ui) {
 		if (!(await page.evaluate(holdSubtrees))) throw new Error(`${name}: dashboard did not mount`);
 		await cdp.send('Profiler.takePreciseCoverage');
 		const states = await page.evaluate(`(${operation.run})(${operation.steps})`);
-		const { counts, seen } = countNamed(await cdp.send('Profiler.takePreciseCoverage'));
+		const { counts, assets } = countNamed(await cdp.send('Profiler.takePreciseCoverage'));
 
 		const failures = [];
-		for (const metric of ['scopedValueType', ...CONTROLS]) {
-			if (!seen.has(metric)) failures.push(`${name}: ${metric} is not a named production function`);
+		const source = (
+			await Promise.all([...assets].map((url) => fetch(url).then((response) => response.text())))
+		).join('\n');
+		for (const metric of METRICS) {
+			if (!source.includes(`function ${metric}(`)) {
+				failures.push(`${name}: ${metric} is not a named function in the production bundle`);
+			}
+		}
+		for (const metric of MUST_CALL) {
+			if (counts[metric] === 0)
+				failures.push(`${name}: the measured commits never called ${metric}`);
 		}
 		if (JSON.stringify(states) !== JSON.stringify(operation.expected(ui))) {
 			failures.push(
