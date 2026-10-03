@@ -286,6 +286,26 @@ non-CI gates above and relevant local validation pass. Keep the PR ready while
 CI runs, but do not call it fully ready or merge-ready until every required
 check is terminal and successful.
 
+### Size budgets
+
+Every committed byte budget in `benchmarks/bundle-size/` (each public-import
+reachability scenario in `minimal-budgets.json`, each complete Octane
+application in `app-budgets.json` and `jsx-budgets.json`) is a ratchet at the
+measured production bytes plus 32 for raw and gzip. Brotli gets 256, because
+removing code can raise it. CI enforces all of them on every pull request.
+
+- A feature or fix pull request never raises a budget. Make the growth smaller,
+  usually by moving the new code behind the capability that needs it, or raise
+  the budget first in a separate pull request.
+- That budget pull request changes only the budget files and prose. Its
+  description names each budget, the old and new bytes, and why the growth is
+  worth it. CI fails a raise that travels with any other change.
+- Lowering a budget is welcome anywhere. After a change that saves bytes, record
+  the new floor so the next regression cannot spend it.
+
+Measure and record budgets with the commands in
+[`benchmarks/README.md`](./benchmarks/README.md#size-budgets).
+
 ## AI-assisted contributions
 
 Agent-written changes are welcome, with one rule: tick the provenance box in the

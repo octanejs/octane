@@ -60,6 +60,24 @@ Use this to investigate performance regressions, benchmark results, scheduler/re
    - Re-run the final candidate after self-review changes. Never report a stale
      intermediate measurement as the final result.
 
+## Size budgets and the pull request gates
+
+- Every byte budget in `benchmarks/bundle-size/` (`minimal-budgets.json`,
+  `app-budgets.json`, `jsx-budgets.json`) is the measured production bytes plus
+  32 for raw and gzip, and CI enforces all of them. Brotli gets 256 because it
+  can grow when code is removed; judge growth by raw and gzip. Check a change with
+  `node benchmarks/bundle-size/run-minimal.mjs --budgets` and
+  `node benchmarks/bundle-size/run.mjs --budgets octane-tsrx octane-jsx`; pass
+  scenario or target names to narrow a run while iterating.
+- Never raise a budget in a feature or fix pull request, including to absorb your
+  own growth. Shrink the change, typically by moving hydration-only or
+  feature-only code behind the capability that owns it, or ask for a separate
+  budget pull request that changes only budget files and prose and names the
+  bytes and the reason. `benchmarks/bundle-size/budget-raises.mjs` fails CI on a
+  raise that travels with other changes.
+- When a change saves bytes, lower the budget in the same pull request with
+  `--write-budgets` for the scenarios it improved, and report the delta.
+
 ## Report template
 
 ```md

@@ -348,7 +348,7 @@ internally, get their own baseline and guard namespace.
 | `tsrx-renderer-selection` | tsrx-renderer-selection | none (Node-only) | ordered filename-to-renderer classification with semantic checksums, comparing retained normalized config against equivalent raw revalidation |
 | `tsrx-native-change-analysis` | tsrx-native-change-analysis | none (Node-only) | native-onChange analysis plus client/server compilation for 500/4,000 hostless JSX sites, paired with an AST-identical marker control that conservatively forces the scan |
 | `tsrx-vite-preflight-parsing` | tsrx-vite-preflight-parsing | none (Node-only) | real production client/server Vite transforms with output/map/meta/dependency/classification checksums, exact-root adapter/authoritative parse counts for production, development, CSS, and shared-plugin multi-environment paths, host-owned TypeScript first/second client environment timings, plus shared-AST/reparsed classification controls |
-| `bundle-size` | bundle-size | none (builds) | shipped JS bytes: production builds of js-framework, TodoMVC, chat-stream, and weather-app, normalized minify, raw/gzip/brotli |
+| `bundle-size` | bundle-size | none (builds) | shipped JS bytes: production builds of js-framework, TodoMVC, chat-stream, weather-app, and the Octane-only bindings app, normalized minify, raw/gzip/brotli |
 | `bundle-reachability` | bundle-size | none (builds and executes in jsdom) | isolated public feature imports, exact production-bundle behavior, forbidden-module reachability, and committed raw/gzip/brotli budgets |
 | `three-renderer` | three | Octane Three, R3F, plain Three | 1,000-object lifecycle, reconstruction/disposal, frame subscribers, and raycast events |
 | `three-bundle-size` | three | none (builds, then checks in Chromium) | minimal/full-catalogue shipped JS bytes for Octane Three, R3F, and plain Three |
@@ -383,18 +383,26 @@ runtime cost separately. App-shaped
 sets use `todo_*`, `chat_*`, and `weather_*` operation prefixes; weather's shared
 service and formatting modules count as app code in both framework builds.
 
-`bundle-size/app-budgets.json` independently caps all four complete Octane TSRX
+The `bindings_*` set is an Octane-only application,
+[`bundle-size/apps/bindings`](bundle-size/apps/bindings/octane-tsrx), that
+renders components and hooks from `@octanejs/radix`, `@octanejs/base-ui`,
+`@octanejs/aria`, `@octanejs/mantine-hooks`, `@octanejs/usehooks-ts`,
+`@octanejs/floating-ui`, and `@octanejs/motion`. Bindings ship their source, so
+the build compiles them with the production Octane compiler and they count as
+`app` bytes. It is the only row whose bytes move with compiler output for plain
+`.ts` binding hooks.
+
+`bundle-size/app-budgets.json` independently caps all five complete Octane TSRX
 applications, while `bundle-size/jsx-budgets.json` separately caps the Octane JSX
 rows application. Each fixture has application, framework, and total raw, gzip,
-and brotli ceilings: forty-five deterministic limits in total. The harness
+and brotli ceilings: fifty-four deterministic limits in total. The harness
 publishes those committed values as separate same-run `octane-tsrx-budget` and
-`octane-jsx-budget` targets, and forty-five `maxRatio: 1` guards enforce them
+`octane-jsx-budget` targets, and fifty-four `maxRatio: 1` guards enforce them
 alongside the existing cross-framework comparisons. Independent dialect budgets
 allow either runtime to shrink without making the other dialect look larger by
-comparison. Ceilings retain at least 32 bytes of headroom and are rounded to
-32-byte boundaries, so small changes in another framework cannot hide Octane
-application or runtime growth. Refresh a ceiling only with a reviewed explanation
-and a production measurement using the pinned CI Node version.
+comparison. Each raw and gzip ceiling is the measured value plus 32 bytes (see
+[Size budgets](#size-budgets)), so small changes in another framework cannot
+hide Octane application or runtime growth.
 
 `bundle-reachability` builds twenty-four independent public-entry feature fixtures
 across thirty-two production builds with the production Octane compiler,
@@ -435,33 +443,47 @@ writers and never retain the generic attribute route with its form-control
 writers and DOM routing tables.
 
 `bundle-size/minimal-budgets.json` supplies explicit raw, gzip, and brotli byte
-ceilings for every feature. Budgets leave about 3% deterministic headroom, with
-small byte-aligned allowances for tiny isolated entries. Each scenario publishes
-its committed ceiling as a
-same-run `*-budget` reference target, so ninety-nine `maxRatio: 1` entries in
-`baselines/ratios.json` enforce all three metrics in the existing weekly/manual
-Bench CI workflow. The behavior fixture runner also enforces its ceilings directly.
-Full PR and main CI run both behavior builds once in test shard 1/4, so changes
-that grow this renderer-free closure fail before merge. Run that focused gate
-with `node benchmarks/bundle-size/run-minimal.mjs behavior-root`; an unknown or
-empty scenario name fails instead of skipping the builds. The same shard also
-enforces the unchanged committed raw, gzip, and brotli ceilings for the recovered
-same-file static-root, hooks, prop-driven attribute, and local Context fixtures:
+ceilings for every feature. Each scenario publishes its committed ceiling as a
+same-run `*-budget` reference target, so one hundred and five `maxRatio: 1`
+entries in `baselines/ratios.json` also enforce all three metrics in the
+weekly/manual Bench CI workflow. An unknown or empty scenario name fails instead
+of skipping the builds.
+
+### Size budgets
+
+Every committed byte budget, for each reachability scenario and each complete
+Octane application, is a ratchet: the measured production bytes plus 32 for raw
+and gzip. Full PR and main CI enforce all of them in test shard 1/4, so a change
+that grows any of these bundles by more than 32 raw or gzip bytes fails before
+merge. Brotli budgets get 256 bytes: brotli is not monotonic in code size, and a
+change that only removed code has raised it by 120 bytes, so a tight brotli
+budget would fail reductions. The commands:
 
 ```bash
-node benchmarks/bundle-size/run-minimal.mjs --budgets root-static-local root-chained-jsx hooks-state prop-attributes context
+node benchmarks/bundle-size/run-minimal.mjs --budgets
+node benchmarks/bundle-size/run.mjs --budgets octane-tsrx octane-jsx
 ```
 
-`--budgets` applies direct byte enforcement to the selected scenarios (or all
-scenarios when no selection is supplied). Report mode still emits paired budget
-targets for the existing ratio runner. Generic roots, hydration, and SSR remain
-in that wider suite; some currently exceed their historical ceilings, so the
-focused PR gate does not claim those regressions are resolved. Run the complete
-executable and byte guard directly with:
+Positional arguments narrow either command to some scenarios or targets while
+you iterate.
+
+A feature change never raises a budget. Reduce the growth, or open a separate
+pull request that changes only the budget files (and prose) and states the bytes
+and the reason; `benchmarks/bundle-size/budget-raises.mjs` fails CI when a raise
+travels with any other change. Lowering a budget is welcome in any pull request.
+Record new values with the same commands that check them:
 
 ```bash
-node benchmarks/bench.mjs --quick --ratios bundle-reachability
+node benchmarks/bundle-size/run-minimal.mjs --write-budgets [scenario...]
+node benchmarks/bundle-size/run.mjs --write-budgets octane-tsrx octane-jsx
 ```
+
+Both ratchet each metric of what they built: down to measured + 32 raw and gzip
+bytes (measured + 256 brotli) where that is lower, unchanged where the
+measurement still fits, and up only where it is breached. A breach is then the
+only way to get a raise, and that raise needs its own pull request. Every other
+budget is left untouched. Measure with the pinned CI Node version; the bytes are
+identical on macOS and Linux.
 
 ## Adding a suite
 
