@@ -38317,12 +38317,16 @@ const OBJ_PROTO = Object.prototype;
 
 // Runs on every re-render for every memo child (both tryMemoBail call sites),
 // so the common plain-object case is a zero-allocation for-in compare — no
-// Object.keys arrays. Semantics match React's shallowEqual exactly: Object.is
-// on values (NaN equal, ±0 differ), own-enumerable string keys only, key-SET
-// equality (loop 1 checks ownership and values, loop 2's count balances the
-// key sets). Inherited values must not stand in for removed own props, even
-// when they compare equal. Non-plain prototypes take the exact Object.keys
-// slow path, where for-in would also see inherited keys.
+// Object.keys arrays. Semantics match React's shallowEqual: Object.is on values
+// (NaN equal, ±0 differ), own-enumerable string keys only, key-SET equality
+// (loop 1 checks values and ownership, loop 2's count balances the key sets).
+// Inherited values must not stand in for removed own props, even when they
+// compare equal. On a plain or null-prototype object a missing own prop reads
+// as undefined or an Object.prototype member, which is a function or an object,
+// so only those values need the ownership lookup; a primitive that compares
+// equal is already own unless Object.prototype itself carries that primitive.
+// Non-plain prototypes take the exact Object.keys slow path, where for-in would
+// also see inherited keys.
 function shallowEqualProps(a: any, b: any): boolean {
 	if (a === b) return true;
 	if (a == null || b == null) return false;
@@ -38334,7 +38338,12 @@ function shallowEqualProps(a: any, b: any): boolean {
 	let count = 0;
 	for (const k in a) {
 		const v = a[k];
-		if (!hasOwnProp.call(b, k) || !Object.is(v, b[k])) return false;
+		if (!Object.is(v, b[k])) return false;
+		if (
+			(v === undefined || typeof v === 'object' || typeof v === 'function') &&
+			!hasOwnProp.call(b, k)
+		)
+			return false;
 		count++;
 	}
 	for (const _k in b) count--;

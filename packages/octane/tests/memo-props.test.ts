@@ -3,7 +3,7 @@ import { createElement, flushSync, hydrateRoot, memo } from 'octane';
 import * as Server from 'octane/server';
 import * as Universal from 'octane/universal';
 import { mount } from './_helpers';
-import { TemplateHost, ValueHost } from './_fixtures/memo-props.tsrx';
+import { KeysHost, TemplateHost, ValueHost } from './_fixtures/memo-props.tsrx';
 import { loadServerFixture } from './_server-fixture';
 
 const server = loadServerFixture('packages/octane/tests/_fixtures/memo-props.tsrx');
@@ -73,6 +73,23 @@ describe.each([
 });
 
 describe('memo own prop membership', () => {
+	it('updates after replacing an own __proto__ prop that holds Object.prototype', () => {
+		// A plain object without an own __proto__ reads Object.prototype through
+		// the inherited accessor, so only ownership tells these props apart.
+		const previous = propsWith(false, { ['__proto__']: Object.prototype, label: 'kept' });
+		const next = propsWith(false, { label: 'kept', other: 'added' });
+		const r = mount(KeysHost, { childProps: previous });
+		try {
+			expect(r.container.textContent).toBe('__proto__,label');
+			r.update(KeysHost, { childProps: next });
+			expect(r.container.textContent).toBe('label,other');
+			r.update(KeysHost, { childProps: previous });
+			expect(r.container.textContent).toBe('__proto__,label');
+		} finally {
+			r.unmount();
+		}
+	});
+
 	it('distinguishes an explicit undefined prop from a missing prop', () => {
 		const Presence = memo((props: Record<string, unknown>) =>
 			createElement('output', null, Object.hasOwn(props, 'flag') ? 'present' : 'missing'),

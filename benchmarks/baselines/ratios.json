@@ -1001,6 +1001,14 @@
   },
   {
     "suite": "memo-wall",
+    "op": "bail_own_lookups",
+    "target": "bail-compare",
+    "reference": "bail-compare-work-budget",
+    "maxRatio": 1,
+    "note": "A memo row with four primitive props and one callback compares equal props with one own-prop lookup, for the callback. #1279 looked up every key, five per row, which slowed memo-wall one_change_B's 999 value-comparing bails; render probes, host identity, and a single changed row are checked in the same run."
+  },
+  {
+    "suite": "memo-wall",
     "op": "mount",
     "target": "octane-tsrx",
     "reference": "react",
