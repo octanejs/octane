@@ -16,6 +16,7 @@ import {
 	ImportedReader,
 	MemoParent,
 	NativeActivity,
+	NativeChainedReader,
 	NativeAsyncBoundary,
 	NativeAsyncValue,
 	NativeDeletionRace,
@@ -163,6 +164,48 @@ describe('native signal rendering', () => {
 		} finally {
 			derived.unmount();
 			imported.unmount();
+			state.scope.dispose();
+		}
+	});
+
+	it('refreshes a cached calculation chain whose first link reads a signal', () => {
+		const state = createCounter$('chained', 1);
+		let next = 0;
+		const ids = new WeakMap<object, number>();
+		const identify = (value: object) => {
+			let id = ids.get(value);
+			if (id === undefined) ids.set(value, (id = ++next));
+			return 'id' + id;
+		};
+		const r = mount(NativeChainedReader, { ...state, identify });
+		try {
+			expect(r.find('.signal-value').textContent).toBe('1');
+			const first = r.find('.identity').textContent;
+
+			r.click('.tick');
+			expect(r.find('.tick-value').textContent).toBe('1');
+			expect(r.find('.signal-value').textContent).toBe('1');
+			// Production compiles cache both links on the unchanged reads.
+			if (process.env.OCTANE_TEST_COMPILE_MODE === 'prod') {
+				expect(r.find('.identity').textContent).toBe(first);
+			}
+
+			flushSync(() => state.scope.set(state.count$, 5));
+			expect(r.find('.signal-value').textContent).toBe('5');
+			expect(r.find('.identity').textContent).not.toBe(first);
+			const second = r.find('.identity').textContent;
+
+			r.click('.tick');
+			expect(r.find('.tick-value').textContent).toBe('2');
+			expect(r.find('.signal-value').textContent).toBe('5');
+			if (process.env.OCTANE_TEST_COMPILE_MODE === 'prod') {
+				expect(r.find('.identity').textContent).toBe(second);
+			}
+
+			flushSync(() => state.scope.set(state.count$, 6));
+			expect(r.find('.signal-value').textContent).toBe('6');
+		} finally {
+			r.unmount();
 			state.scope.dispose();
 		}
 	});

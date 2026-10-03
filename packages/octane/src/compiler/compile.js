@@ -3598,6 +3598,75 @@ function autoCalculationOf(expression, selfName, componentLocals, ctx, immutable
 	return { init, deps, immutableProjection };
 }
 
+// The single-name `const` declarator a calculation can replace, or null.
+function calculationDeclarator(stmt) {
+	if (stmt.type !== 'VariableDeclaration' || stmt.kind !== 'const') return null;
+	if (stmt.declarations?.length !== 1) return null;
+	const decl = stmt.declarations[0];
+	if (!decl || decl.id?.type !== 'Identifier' || !decl.init) return null;
+	return decl;
+}
+
+/**
+ * Extends the template's reads through every calculation that will be cached.
+ * A cache hits only while each of its dependencies keeps its identity, so a
+ * `const` that only another cached calculation reads is a render read too.
+ * Otherwise it recomputes every render and the calculation reading it misses
+ * every render as well. Runs a worklist to a fixed point, so a chain of any
+ * length closes. A declaration that rewriteAutoCalculation would leave alone
+ * (a hook call, a live receiver, a `let`, a self-reference) adds nothing, and a
+ * value only a handler reads never enters.
+ *
+ * A cache evaluates its dependencies where the declaration stands, so a
+ * calculation whose callback reads a binding declared later in `statements`
+ * would throw in that binding's temporal dead zone. Such a declaration leaves
+ * the set and stays uncached. Mutates and returns `renderReadNames`.
+ */
+function closeCalculationReads(
+	statements,
+	renderReadNames,
+	componentLocals,
+	ctx,
+	immutableStates = null,
+) {
+	if (renderReadNames.size === 0) return renderReadNames;
+	const declaredAt = new Map();
+	const declarators = new Map();
+	for (let index = 0; index < statements.length; index++) {
+		const statement = statements[index];
+		if (statement.type === 'VariableDeclaration' && statement.kind !== 'var') {
+			const names = new Set();
+			for (const declaration of statement.declarations) collectPatternNames(declaration.id, names);
+			for (const name of names) declaredAt.set(name, index);
+		} else if (statement.type === 'ClassDeclaration' && statement.id) {
+			declaredAt.set(statement.id.name, index);
+		}
+		const decl = calculationDeclarator(statement);
+		if (decl !== null) declarators.set(decl.id.name, decl);
+	}
+	const forward = [];
+	const pending = [...renderReadNames];
+	while (pending.length > 0) {
+		const name = pending.pop();
+		const decl = declarators.get(name);
+		if (decl === undefined) continue;
+		const calculation = autoCalculationOf(decl.init, name, componentLocals, ctx, immutableStates);
+		if (calculation === null) continue;
+		const at = declaredAt.get(name);
+		if (calculation.deps.some((dependency) => declaredAt.get(dependency) > at)) {
+			forward.push(name);
+			continue;
+		}
+		for (const dependency of calculation.deps) {
+			if (renderReadNames.has(dependency)) continue;
+			renderReadNames.add(dependency);
+			pending.push(dependency);
+		}
+	}
+	for (const name of forward) renderReadNames.delete(name);
+	return renderReadNames;
+}
+
 function rewriteAutoCalculation(
 	stmt,
 	componentLocals,
@@ -3605,11 +3674,8 @@ function rewriteAutoCalculation(
 	ctx,
 	immutableStates = null,
 ) {
-	if (stmt.type !== 'VariableDeclaration' || stmt.kind !== 'const') return stmt;
-	if (stmt.declarations?.length !== 1) return stmt;
-	const decl = stmt.declarations[0];
-	if (!decl || decl.id?.type !== 'Identifier' || !decl.init) return stmt;
-	if (!renderReadNames.has(decl.id.name)) return stmt;
+	const decl = calculationDeclarator(stmt);
+	if (decl === null || !renderReadNames.has(decl.id.name)) return stmt;
 	const calculation = autoCalculationOf(
 		decl.init,
 		decl.id.name,
@@ -16782,7 +16848,13 @@ function compileFunctionBody(node, ctx, name, parentNs = 'html', cssHash = null,
 				workingStatements = [...workingStatements, ...hoistedCalculations];
 				ctx.currentComponentLocals = new Set([...ctx.currentComponentLocals, ...hoisted.names]);
 			}
-			const renderReadNames = collectRenderReadNames(jsxNodes, ctx);
+			const renderReadNames = closeCalculationReads(
+				workingStatements,
+				collectRenderReadNames(jsxNodes, ctx),
+				ctx.currentComponentLocals,
+				ctx,
+				immutableStateProvenance,
+			);
 			if (renderReadNames.size > 0) {
 				workingStatements = workingStatements.map((statement) => {
 					const rewritten = rewriteAutoCalculation(
@@ -20727,7 +20799,15 @@ function compileReturnJsxFunction(node, ctx, options) {
 		const renderedRoots = authoredStatements
 			.filter((statement) => statement.type === 'ReturnStatement' && isJsxNode(statement.argument))
 			.map((statement) => statement.argument);
-		const renderReadNames = collectRenderReadNames(renderedRoots, ctx);
+		// Only declarations after the first authored hook are rewritten below, so
+		// only they extend the chain.
+		const firstHook = authoredStatements.findIndex(establishesRenderScope);
+		const renderReadNames = closeCalculationReads(
+			firstHook === -1 ? [] : authoredStatements.slice(firstHook + 1),
+			collectRenderReadNames(renderedRoots, ctx),
+			ctx.currentComponentLocals,
+			ctx,
+		);
 		let autoCalculatedDeclarations = null;
 		let renderScopeEstablished = false;
 		newStatements = authoredStatements.flatMap((sourceStatement) => {
