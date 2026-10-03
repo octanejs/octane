@@ -348,27 +348,48 @@ function hasFullCompilerHookBoundary(call, importedName) {
 	);
 }
 
-function markReassignedPattern(pattern, scope) {
+// `writes`, when given, records where each binding is last assigned (the end
+// of `site`) and whether a function nested inside its own assigns it.
+function markReassignedPattern(pattern, scope, writes = null, site = null) {
 	const value = unwrapValue(pattern);
 	if (!value) return;
 	if (value.type === 'Identifier') {
 		const binding = resolveBinding(scope, value.name);
-		if (binding !== null) binding.reassigned = true;
+		if (binding === null) return;
+		binding.reassigned = true;
+		if (writes !== null)
+			recordWrite(
+				writes,
+				binding,
+				site.end,
+				nearestFunctionScope(scope) !== nearestFunctionScope(binding.scope),
+			);
 		return;
 	}
 	if (value.type === 'AssignmentPattern') {
-		markReassignedPattern(value.left, scope);
+		markReassignedPattern(value.left, scope, writes, site);
 	} else if (value.type === 'RestElement') {
-		markReassignedPattern(value.argument, scope);
+		markReassignedPattern(value.argument, scope, writes, site);
 	} else if (value.type === 'ArrayPattern') {
-		for (const element of value.elements || []) markReassignedPattern(element, scope);
+		for (const element of value.elements || []) markReassignedPattern(element, scope, writes, site);
 	} else if (value.type === 'ObjectPattern') {
 		for (const property of value.properties || []) {
 			markReassignedPattern(
 				property.type === 'RestElement' ? property.argument : property.value,
 				scope,
+				writes,
+				site,
 			);
 		}
+	}
+}
+
+function recordWrite(writes, binding, end, deferred) {
+	const previous = writes.get(binding);
+	if (previous === undefined) writes.set(binding, { end, deferred });
+	else {
+		if (end > previous.end) previous.end = end;
+		if (deferred) previous.deferred = true;
 	}
 }
 
@@ -388,6 +409,7 @@ function buildScopes(ast, onlyImported, hookRuntimeModules, bindingsOnly = false
 	const callAnnotations = new Map();
 	const declarationBindings = bindingsOnly ? new Map() : null;
 	const firstDefinitions = bindingsOnly ? new Map() : null;
+	const writes = new Map();
 	predeclareDirect(ast.body, moduleScope, hookRuntimeModules, bindingsOnly);
 	collectHoistedVars(ast, moduleScope, true, bindingsOnly);
 
@@ -412,7 +434,10 @@ function buildScopes(ast, onlyImported, hookRuntimeModules, bindingsOnly = false
 
 	function invalidateVisibleBindings(scope) {
 		for (let current = scope; current !== null; current = current.parent) {
-			for (const binding of current.bindings.values()) binding.reassigned = true;
+			for (const binding of current.bindings.values()) {
+				binding.reassigned = true;
+				recordWrite(writes, binding, Infinity, true);
+			}
 		}
 	}
 
@@ -639,7 +664,7 @@ function buildScopes(ast, onlyImported, hookRuntimeModules, bindingsOnly = false
 			} else {
 				walk(node.left, loopScope);
 				if (node.left?.type !== 'VariableDeclaration' && node.type !== 'JSXForExpression')
-					markReassignedPattern(node.left, loopScope);
+					markReassignedPattern(node.left, loopScope, writes, node);
 				else if (bindingsOnly && node.left.kind === 'var') {
 					for (const decl of node.left.declarations || [])
 						markReassignedPattern(decl.id, loopScope);
@@ -670,9 +695,9 @@ function buildScopes(ast, onlyImported, hookRuntimeModules, bindingsOnly = false
 		}
 
 		if (node.type === 'AssignmentExpression') {
-			markReassignedPattern(node.left, scope);
+			markReassignedPattern(node.left, scope, writes, node);
 		} else if (node.type === 'UpdateExpression') {
-			markReassignedPattern(node.argument, scope);
+			markReassignedPattern(node.argument, scope, writes, node);
 		}
 
 		if (bindingsOnly && node.type === 'CallExpression') {
@@ -825,6 +850,7 @@ function buildScopes(ast, onlyImported, hookRuntimeModules, bindingsOnly = false
 		trustedHookNames,
 		callAnnotations,
 		declarationBindings,
+		writes,
 	};
 	if (bindingsOnly) return analysis;
 	if (onlyImported) annotateLocalHookAliases(analysis);
@@ -1945,7 +1971,7 @@ function analyzeInternal(ast, options) {
 	if (options.inferDependencies === false) return { analysis, inferred };
 	markDependencyInvariantBindings(analysis);
 
-	const readBeforeInitialized = lateDependencyFinder(ast, analysis);
+	const findLate = lateDependencyFinder(ast, analysis);
 	for (const candidate of analysis.candidates) {
 		const rawCallback = candidate.call.arguments[candidate.config.callback];
 		const callback = unwrapValue(rawCallback);
@@ -1966,10 +1992,9 @@ function analyzeInternal(ast, options) {
 				);
 			}
 		}
-		// A list that would read a capture before its initialization cannot track
-		// it, so run every render, as an omitted list does in React.
-		if (readBeforeInitialized(dependencies, candidate.call, candidate.scope) !== undefined)
-			dependencies = null;
+		// A list holding a value the callback may not see cannot track it, so run
+		// every render, as an omitted list does in React.
+		if (findLate(dependencies, candidate.call, candidate.scope) !== undefined) dependencies = null;
 		inferred.set(candidate.call, {
 			name: candidate.name,
 			depsIndex: candidate.config.deps,
@@ -2052,20 +2077,29 @@ export function analyzeCallbackDependencies(ast, callbacks, options = {}) {
 }
 
 // A dependency list is read where its hook is called, but the callback may read
-// a capture later. Returns the first dependency that the calling function
-// initializes after the call: there it is in its temporal dead zone, or an
-// undefined `var`. Source order says nothing about when an enclosing function or
-// the module initializes its bindings, which is usually before this function
-// runs, so their bindings keep their inferred dependencies.
+// a capture later. Returns the first dependency whose value at the call can
+// differ from the one the callback reads, with `assigned` saying why:
+// - false: the calling function initializes it after the call, where it is in
+//   its temporal dead zone or an undefined `var`;
+// - true: the calling function assigns it after the call, or a function nested
+//   in it assigns it at a time source order cannot place.
+// Source order says nothing about when an enclosing function or the module
+// initializes or assigns its bindings, so their bindings keep their inferred
+// dependencies.
 function lateDependencyFinder(ast, analysis) {
 	let initializedAt = null;
 	return (dependencies, call, scope) => {
 		const owner = nearestFunctionScope(scope);
-		return dependencies.find(({ binding }) => {
-			if (nearestFunctionScope(binding.scope) !== owner) return false;
+		for (const dependency of dependencies) {
+			const { binding } = dependency;
+			if (nearestFunctionScope(binding.scope) !== owner) continue;
 			initializedAt ??= initializationEnds(ast, analysis);
-			return (initializedAt.get(binding) ?? -1) > call.start;
-		});
+			if ((initializedAt.get(binding) ?? -1) > call.start) return { dependency, assigned: false };
+			const write = analysis.writes.get(binding);
+			if (write !== undefined && (write.deferred || write.end > call.start))
+				return { dependency, assigned: true };
+		}
+		return undefined;
 	};
 }
 
@@ -2263,7 +2297,7 @@ export function analyzeStrongHookPolicies(ast, options = {}) {
 		markDependencyInvariantBindings(analysis);
 		markedInvariants = true;
 	};
-	const readBeforeInitialized = lateDependencyFinder(ast, analysis);
+	const findLate = lateDependencyFinder(ast, analysis);
 	const inferredDependencies = (callback) =>
 		isFunction(callback)
 			? collectDependencies(callback, analysis.functionScopes.get(callback) ?? null, analysis)
@@ -2287,14 +2321,18 @@ export function analyzeStrongHookPolicies(ast, options = {}) {
 			// untracked form Strong rejects when authored as `null`.
 			markInvariants();
 			const dependencies = inferredDependencies(unwrapValue(call.arguments[config.callback]));
-			const late = dependencies && readBeforeInitialized(dependencies, call, scope);
-			if (late)
+			const late = dependencies && findLate(dependencies, call, scope);
+			if (late) {
+				const variable = `\`${late.dependency.binding.name}\``;
 				diagnostics.push({
 					code: 'OCTANE_STRONG_UNTRACKED_EFFECT',
-					node: late.node,
+					node: late.dependency.node,
 					severity: 'error',
-					message: `Strong mode does not allow ${name} to read \`${late.binding.name}\` before its declaration. Its dependencies are read where the hook is called, so the compiler cannot track this value and the hook would run on every render. Declare \`${late.binding.name}\` before calling ${name}.`,
+					message: late.assigned
+						? `Strong mode does not allow ${name} to read ${variable} while the component assigns it after the call or from a nested function. Its dependencies are read where the hook is called, so the compiler cannot track this value and the hook would run on every render. Finish assigning ${variable} before calling ${name}, or keep the value in state or a ref.`
+						: `Strong mode does not allow ${name} to read ${variable} before its declaration. Its dependencies are read where the hook is called, so the compiler cannot track this value and the hook would run on every render. Declare ${variable} before calling ${name}.`,
 				});
+			}
 			continue;
 		}
 		const authored = unwrapValue(argument);
