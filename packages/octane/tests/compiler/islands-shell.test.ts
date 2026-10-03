@@ -171,6 +171,25 @@ export const Wrapped = memo(() => <p />);`;
 		]);
 	});
 
+	it.each([
+		[
+			'a wrapped component',
+			"import { memo } from 'octane';\nexport default memo(() => <p />);",
+			['export "default" cannot be checked as static shell output'],
+		],
+		[
+			'an interactive function',
+			'export default function () @{ <button onClick={() => {}}>x</button> }',
+			['"onClick" needs client code the shell never loads'],
+		],
+		['an inert value', "export default 'static';", []],
+	] as const)('checks a default export passed as a value: %s', (_name, source, messages) => {
+		const { problems } = analyzeIslandsShell(source, '/src/value.tsrx', ['default'], {
+			values: true,
+		});
+		expect(problems.map((problem) => problem.message)).toEqual(messages);
+	});
+
 	it('does not read a binding as a reference to a same-named function', () => {
 		const source = `function open() @{ <button onClick={() => {}}>Open</button> }
 function close() @{ <button onClick={() => {}}>Close</button> }

@@ -257,8 +257,9 @@ export function analyzeIslandsShell(
 		)
 			return;
 		// A passed value that is neither a function nor named like a component
-		// (a computed string or URL) renders nothing interactive.
-		else if (passedValues && !/^[A-Z]/.test(name)) return;
+		// (a computed string or URL) renders nothing interactive. A default
+		// export carries no name to tell, so it is checked like a component.
+		else if (passedValues && name !== 'default' && !/^[A-Z]/.test(name)) return;
 		else
 			report(statement, `export ${JSON.stringify(name)} cannot be checked as static shell output`);
 	};
