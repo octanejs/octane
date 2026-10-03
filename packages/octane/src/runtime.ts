@@ -20,6 +20,10 @@
 declare const process: { env: { NODE_ENV?: string } };
 
 import { resolveHookPath } from './hook-slot-cache.js';
+import type {
+	LayoutSnapshotOptions,
+	LayoutSnapshotOptionsWithInitial,
+} from './layout-snapshot-types.js';
 import { domBindingClaims } from './dom-binding-claims.js';
 import { DOMStage } from './dom-stage.js';
 import { __normalizeBindingStyle } from './dom-binding-styles.js';
@@ -2418,10 +2422,10 @@ let TRANSITION_DEPTH = 0;
  * after the first `await` runs, so post-await setters would otherwise schedule
  * at urgent priority. Keeping this count elevated across the in-flight window
  * preserves Octane's automatic post-await transition priority. Caveat: it's a
- * process-global window, so an unrelated update outside a delegated event or
- * flushSync while an async action is pending is also tagged transition —
- * perfect per-action scoping would need AsyncContext, which isn't available
- * in the browser target.
+ * process-global window, so an unrelated update outside a delegated event,
+ * flushSync or commit callback (see inCommitCallback) while an async action is
+ * pending is also tagged transition — perfect per-action scoping would need
+ * AsyncContext, which isn't available in the browser target.
  */
 let ASYNC_TRANSITION_COUNT = 0;
 
@@ -2681,14 +2685,26 @@ function createTransitionActionBatch(): TransitionActionBatch {
 	};
 }
 
+/**
+ * Insertion and layout effect callbacks and callback refs run synchronously
+ * inside a commit, so no post-await Action continuation can be on the stack.
+ * Like React, their updates are urgent and never join an in-flight Action;
+ * commitEffects also clears any transition the commit inherited. A transition
+ * started inside the callback still owns its own updates. Store consistency
+ * checks need no case here: scheduleStoreRender is already urgent.
+ */
+function inCommitCallback(): boolean {
+	return (EFFECT_BODY_DEPTH > 0 && CURRENT_EFFECT_PHASE !== PASSIVE) || REF_CALLBACK_DEPTH > 0;
+}
+
 function transitionActionBatchForUpdate(): TransitionActionBatch | null {
 	if (ACTIVE_TRANSITION_ACTION_BATCH !== null) return ACTIVE_TRANSITION_ACTION_BATCH;
 	// AsyncContext is not available in the browser target, so post-await Action
 	// continuations share the one entangled in-flight batch. Delegated handlers
-	// (including continuous events) and flushSync opt out of that fallback.
-	// This only selects the batch: continuous events still flush in a microtask,
-	// and an explicit transition inside a handler wins above.
-	if (syncFlush || _dispatchDepth > 0) return null;
+	// (including continuous events), flushSync and commit callbacks opt out of
+	// that fallback. This only selects the batch: continuous events still flush
+	// in a microtask, and an explicit transition inside a handler wins above.
+	if (syncFlush || _dispatchDepth > 0 || inCommitCallback()) return null;
 	return IN_FLIGHT_TRANSITION_ACTION_BATCH;
 }
 
@@ -3047,7 +3063,7 @@ function urgentTransitionCellUpdate(block: Block): boolean {
 	return (
 		TRANSITION_DEPTH === 0 &&
 		!(CURRENT_BLOCK === block && block.currentRenderMode === 'transition') &&
-		(syncFlush || _dispatchDepth > 0 || ASYNC_TRANSITION_COUNT === 0)
+		(syncFlush || _dispatchDepth > 0 || ASYNC_TRANSITION_COUNT === 0 || inCommitCallback())
 	);
 }
 
@@ -6860,8 +6876,24 @@ function inNestedUpdateCallback(): boolean {
 
 class MaximumUpdateDepthError extends Error {}
 
-function maximumUpdateDepthError(): Error {
-	return new MaximumUpdateDepthError(formatClientError(1));
+// Development attribution for a block whose nested-update budget was spent by a
+// layout snapshot that changed on every pass. Tagged with its update chain so a
+// later, unrelated loop on the same block keeps the generic message.
+let LAYOUT_SNAPSHOT_DIVERGENCE: WeakMap<
+	Block,
+	{ cell: object; chain: number; message: string }
+> | null = null;
+
+function maximumUpdateDepthError(block?: Block): Error {
+	const error = new MaximumUpdateDepthError(formatClientError(1));
+	if (process.env.NODE_ENV !== 'production' && block !== undefined) {
+		const divergence = LAYOUT_SNAPSHOT_DIVERGENCE?.get(block);
+		if (divergence !== undefined) {
+			LAYOUT_SNAPSHOT_DIVERGENCE!.delete(block);
+			if (divergence.chain === block.nestedUpdateChain) error.message += ` ${divergence.message}`;
+		}
+	}
+	return error;
 }
 
 let CROSS_RENDER_WARNINGS: WeakMap<ComponentBody, WeakSet<ComponentBody>> | null = null;
@@ -6948,7 +6980,7 @@ function scheduleRender(block: Block): void {
 	const mode: 'urgent' | 'transition' =
 		TRANSITION_DEPTH > 0 ||
 		(renderPhaseSelf && block.currentRenderMode === 'transition') ||
-		(!syncFlush && _dispatchDepth === 0 && ASYNC_TRANSITION_COUNT > 0)
+		(!syncFlush && _dispatchDepth === 0 && ASYNC_TRANSITION_COUNT > 0 && !inCommitCallback())
 			? 'transition'
 			: 'urgent';
 	const deferred = DEFERRED_SPAWN || (renderPhaseSelf && block.currentRenderDeferred);
@@ -7030,7 +7062,7 @@ function drainHydrationRenderPhaseUpdates(root: Block): void {
 			try {
 				if (block.nestedUpdateError) {
 					block.nestedUpdateError = false;
-					throw maximumUpdateDepthError();
+					throw maximumUpdateDepthError(block);
 				}
 
 				const seen = (renders ??= new Map()).get(block) ?? 0;
@@ -7210,7 +7242,7 @@ function drainQueue(): { err: any } | null {
 			if (block.kind === 'root' && !block.mounted) createdInRootRender(block);
 			if (block.nestedUpdateError) {
 				block.nestedUpdateError = false;
-				throw maximumUpdateDepthError();
+				throw maximumUpdateDepthError(block);
 			}
 			// Guarded render-phase updates (derived state) converge in a couple of
 			// passes; an unguarded one re-queues its own block forever. Cap per-block
@@ -9669,6 +9701,13 @@ function completeDeferredLayouts(capture: DeferredLayoutCapture, interrupted = f
 		DEFERRED_LAYOUT_HELD_WORK = new Set(heldWork);
 	}
 	const nativeFrame = NATIVE_READ_DRIVER?.pauseLifecycle() ?? -1;
+	// These are the commit's own refs and layout effects, so they run outside any
+	// transition, as in commitEffects. An interruption from a commit flushed
+	// inside startTransition must not stage their updates into that transition.
+	const transitionDepth = TRANSITION_DEPTH;
+	const actionBatch = ACTIVE_TRANSITION_ACTION_BATCH;
+	TRANSITION_DEPTH = 0;
+	ACTIVE_TRANSITION_ACTION_BATCH = null;
 	EFFECT_COMMIT_DEPTH++;
 	try {
 		// A direct root commit can arrive while readiness was pending. Its live
@@ -9728,6 +9767,8 @@ function completeDeferredLayouts(capture: DeferredLayoutCapture, interrupted = f
 		}
 		COMPLETING_DEFERRED_LAYOUT = previousCompleting;
 		DEFERRED_LAYOUT_HELD_WORK = previousHeldWork;
+		TRANSITION_DEPTH = transitionDepth;
+		ACTIVE_TRANSITION_ACTION_BATCH = actionBatch;
 		try {
 			if (nativeFrame >= 0) NATIVE_READ_DRIVER!.resumeLifecycle(nativeFrame);
 		} finally {
@@ -9774,6 +9815,13 @@ function commitEffects(): void {
 	}
 	DEFERRED_LAYOUT_DRIVER?.beforeCommit();
 	const nativeFrame = NATIVE_READ_DRIVER?.pauseLifecycle() ?? -1;
+	// Like React, a commit clears the ambient transition: one flushed inside a
+	// startTransition callback does not make its callbacks' updates transitions
+	// or stage them into that Action. See inCommitCallback.
+	const transitionDepth = TRANSITION_DEPTH;
+	const actionBatch = ACTIVE_TRANSITION_ACTION_BATCH;
+	TRANSITION_DEPTH = 0;
+	ACTIVE_TRANSITION_ACTION_BATCH = null;
 	EFFECT_COMMIT_DEPTH++;
 	try {
 		// React publishes every Effect Event body before any insertion/layout effect
@@ -9816,6 +9864,8 @@ function commitEffects(): void {
 			schedulePassiveFlush();
 		}
 	} finally {
+		TRANSITION_DEPTH = transitionDepth;
+		ACTIVE_TRANSITION_ACTION_BATCH = actionBatch;
 		if (nativeFrame >= 0) NATIVE_READ_DRIVER!.resumeLifecycle(nativeFrame);
 		finishEffectCommit();
 	}
@@ -10858,7 +10908,7 @@ export function renderBlock(block: Block): void {
 		while (renderBlockInner(block)) {
 			if (block.nestedUpdateError) {
 				block.nestedUpdateError = false;
-				throw maximumUpdateDepthError();
+				throw maximumUpdateDepthError(block);
 			}
 			if (++retries > RENDER_PHASE_UPDATE_LIMIT) throw new Error(formatClientError(9));
 		}
@@ -13602,6 +13652,97 @@ export function useLayoutEffect(fn: EffectFn, deps?: any[] | null, slot?: HookSl
 	const [d, s] = resolveHookArgs('useLayoutEffect', deps, slot);
 	enqueueEffect(s, fn, d, LAYOUT);
 }
+
+interface LayoutSnapshotBox<T> {
+	value: T | undefined;
+	effectSlot: symbol;
+}
+
+// Development only: consecutive unequal measurements per snapshot cell within
+// one update chain. A snapshot that settles between passes resets its count.
+let LAYOUT_SNAPSHOT_CHANGES: WeakMap<object, { chain: number; count: number }> | null = null;
+
+function countLayoutSnapshotChange(cell: object, block: Block): void {
+	const changes = (LAYOUT_SNAPSHOT_CHANGES ??= new WeakMap());
+	let record = changes.get(cell);
+	if (record === undefined || record.chain !== UPDATE_CHAIN_ID) {
+		record = { chain: UPDATE_CHAIN_ID, count: 0 };
+		changes.set(cell, record);
+	}
+	// Name the hook only once it has changed on every pass that could have spent
+	// the nested-update budget. The generic depth error reports it.
+	if (++record.count === NESTED_UPDATE_LIMIT) {
+		const source = componentSourceLoc(block.body);
+		(LAYOUT_SNAPSHOT_DIVERGENCE ??= new WeakMap()).set(block, {
+			cell,
+			chain: UPDATE_CHAIN_ID,
+			message: `useLayoutSnapshot in ${componentName(block)}${source ? ` (${source})` : ''} did not converge.`,
+		});
+	}
+}
+
+function settleLayoutSnapshot(cell: object, block: Block): void {
+	const record = LAYOUT_SNAPSHOT_CHANGES?.get(cell);
+	if (record === undefined) return;
+	LAYOUT_SNAPSHOT_CHANGES!.delete(cell);
+	if (LAYOUT_SNAPSHOT_DIVERGENCE?.get(block)?.cell === cell)
+		LAYOUT_SNAPSHOT_DIVERGENCE.delete(block);
+}
+
+/** Read a value from the committed layout and publish changes before paint. */
+export function useLayoutSnapshot<T>(
+	measure: () => T,
+	options: LayoutSnapshotOptionsWithInitial<T>,
+	slot?: symbol,
+): T;
+export function useLayoutSnapshot<T>(
+	measure: () => T,
+	options?: LayoutSnapshotOptions<T>,
+	slot?: symbol,
+): T | undefined;
+export function useLayoutSnapshot<T>(
+	measure: () => T,
+	options?: LayoutSnapshotOptions<any> | symbol,
+	slot?: HookSlot,
+): T | undefined {
+	// Plain hook transforms append a Symbol where optional options were omitted;
+	// production numeric slots have a separate padded argument.
+	if (typeof options === 'symbol') {
+		if (slot === undefined) slot = options;
+		options = undefined;
+	}
+	// readStateHook resolves the call path once. Without an own slot or an
+	// enclosing custom-hook path there is nothing for it to resolve.
+	if (slot === undefined && slotStack.length === 0) missingSlot('useLayoutSnapshot');
+	const block = CURRENT_BLOCK!;
+	const state = readStateHook<LayoutSnapshotBox<T> | undefined>(undefined, slot, false);
+	// Boxing preserves function-valued initial values and measurements as data,
+	// and lets a custom comparator decide whether even an identical value changes.
+	// The box is created on mount, without a per-render initializer closure.
+	const box = (state.value ??= {
+		value: options?.initial as T | undefined,
+		effectSlot: Symbol('layout snapshot effect'),
+	});
+	enqueueEffect(
+		box.effectSlot,
+		() => {
+			const next = measure();
+			const current = state.value!;
+			if ((options?.equal ?? Object.is)(current.value, next)) {
+				if (process.env.NODE_ENV !== 'production') settleLayoutSnapshot(state, block);
+				return;
+			}
+			if (process.env.NODE_ENV !== 'production') countLayoutSnapshotChange(state, block);
+			// This runs inside a layout effect, so the update is urgent and never joins
+			// a pending Action: it belongs to the commit being measured.
+			state.setter({ value: next, effectSlot: current.effectSlot });
+		},
+		undefined,
+		LAYOUT,
+	);
+	return box.value;
+}
+
 export function useInsertionEffect(fn: EffectFn, deps?: any[] | null, slot?: symbol): void;
 export function useInsertionEffect(fn: EffectFn, deps?: any[] | null, slot?: HookSlot): void {
 	const [d, s] = resolveHookArgs('useInsertionEffect', deps, slot);

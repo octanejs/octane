@@ -11,6 +11,7 @@ import {
 	SignalAlias,
 	SignalAttribute,
 	SignalText,
+	Snapshot,
 	Store,
 	choose,
 } from './ssr-shell-witness.tsrx';
@@ -24,6 +25,7 @@ export function Islands() @{
 			<Handler />
 			<Ref />
 			<Effects />
+			<Snapshot />
 			<Handle />
 			<Store />
 			<Controlled query="q" agreed />

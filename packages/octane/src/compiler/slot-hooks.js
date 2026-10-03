@@ -1242,7 +1242,7 @@ function walk(node, owner, st) {
 				});
 			}
 			if (
-				(imported === 'useState' || imported === 'useRef') &&
+				(imported === 'useState' || imported === 'useRef' || imported === 'useLayoutSnapshot') &&
 				node.arguments.some((arg) => arg.type === 'SpreadElement')
 			) {
 				const open = callOpenParen(node, st.source);

@@ -360,10 +360,10 @@ consult a strict/compat hook-cell policy.
 
 ## 6. Replacement primitives
 
-Only `useLinkedState`, the existing state getter, and already established hooks
-such as `useSyncExternalStore` are shipped Octane APIs in this section.
-`useLayoutSnapshot`, a core `useHydrated`, and `useSource` are retained future
-ideas, not current exports.
+`useLinkedState` and `useLayoutSnapshot`, the existing state getter, and
+established hooks such as `useSyncExternalStore` are shipped Octane APIs in this
+section. A core `useHydrated` and `useSource` remain future ideas, not current
+exports.
 
 ### 6.1 `useLinkedState(source, reconcile, options?)` — shipped
 
@@ -396,7 +396,7 @@ const [selection, setSelection, getSelection] = useLinkedState(
   overrode it since" idiom that controlled/uncontrolled widget internals
   hand-roll today.
 
-### 6.2 `useLayoutSnapshot(measure, options?)` — future proposal
+### 6.2 `useLayoutSnapshot(measure, options?)`
 
 Replaces: "measure the DOM after commit, then set state" — physically
 legitimate (the DOM did not exist earlier), which argues for a managed
@@ -408,18 +408,15 @@ const height = useLayoutSnapshot(() => ref.current?.offsetHeight, {
 });
 ```
 
-- `measure` would run at layout timing after commit (post-mutation, pre-paint).
-- The result would be compared with the previous snapshot — `Object.is` by default,
+- `measure` runs at layout timing after the component commits its DOM and refs,
+  before paint. It runs when a committed render reaches the hook.
+- The result is compared with the previous snapshot — `Object.is` by default,
   `options.equal` for rect-like shapes — and only a change schedules the
-  re-render in which the hook returns the new value. The equality guard being
-  **built in** removes the single most common infinite-loop bug in React
-  apps; the convergence budget is bounded with dev source attribution.
-- First render and SSR would return `options.initial` (else `undefined`);
-  `measure` would never run on the server.
-- Continuous observation (`ResizeObserver`, scroll) would stay in callbacks,
-  which are legal transition sites; the primitive would cover commit-coupled
-  measurement
-  only.
+  re-render in which the hook returns the new value.
+- First render and SSR return `options.initial` (else `undefined`);
+  `measure` never runs on the server.
+- Continuous observation (`ResizeObserver`, scroll) stays in callbacks; the
+  primitive covers commit-coupled measurement only.
 
 ### 6.3 Core `useHydrated()` — future proposal
 
@@ -516,7 +513,7 @@ The original staged rollout was **not executed**. Current status is:
 | Historical milestone | What actually shipped or remains proposed |
 | -------------------- | ---------------------------------------- |
 | Report-only diagnostics, repository inventory, and codemods | Not implemented; they were not prerequisites for opt-in Strong mode. |
-| Replacement primitives | `useLinkedState` shipped in [#366](https://github.com/octanejs/octane/pull/366); `useLayoutSnapshot`, a core `useHydrated`, and `useSource` remain proposals. |
+| Replacement primitives | `useLinkedState` shipped in [#366](https://github.com/octanejs/octane/pull/366) and `useLayoutSnapshot` is available; a core `useHydrated` and `useSource` remain proposals. |
 | Render-context enforcement | Opt-in compiler diagnostics shipped in [#376](https://github.com/octanejs/octane/pull/376); runtime phase guards and per-cell policy did not. |
 | Effect setup and cleanup | Provable synchronous setup updates are compiler errors in opted-in modules; cleanup restrictions remain unimplemented. |
 | Dependency compatibility | Package containment is automatic; no manifest flag, compatibility exception list, or consumer approval is required. |
