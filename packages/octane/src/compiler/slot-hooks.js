@@ -1276,16 +1276,20 @@ function walk(node, owner, st) {
 				// offsets, preserving arbitrary TS syntax byte-for-byte. Method-call
 				// dependencies are the one synthesized form: the helper call's root is
 				// a bare identifier and its name a JSON string, so no arbitrary TS
-				// syntax needs reprinting there either.
-				const deps = emitInferredDependencies(inferred.dependencies, st);
+				// syntax needs reprinting there either. A null inference runs the hook
+				// on every render.
+				const deps =
+					inferred.dependencies === null
+						? 'null'
+						: `[${emitInferredDependencies(inferred.dependencies, st)}]`;
 				if (inferred.replaceDependency) {
 					const argument = node.arguments[inferred.depsIndex];
-					st.edits.push({ pos: argument.start, end: argument.end, text: `[${deps}]` });
+					st.edits.push({ pos: argument.start, end: argument.end, text: deps });
 					st.edits.push({ pos: node.end - 1, text: `${strongCallSeparator(node, st)}${sym}` });
 				} else {
 					st.edits.push({
 						pos: st.strong ? node.end - 1 : node.arguments[node.arguments.length - 1].end,
-						text: `${st.strong ? strongCallSeparator(node, st) : ', '}[${deps}], ${sym}`,
+						text: `${st.strong ? strongCallSeparator(node, st) : ', '}${deps}, ${sym}`,
 					});
 				}
 			} else if (node.arguments.length === 0) {

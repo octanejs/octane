@@ -118,6 +118,7 @@ change between renders:
 | `useEffectEvent` results | Omitted because Effect Events are non-reactive |
 | Imports and unreassigned module-scope `const`/`function`/`class` | Omitted as program-lifetime identities |
 | A local `const` naming one of those stable values, or a literal | Omitted |
+| A local binding initialized after the hook call, such as a later `const` or `var`, or the `const` that receives the hook's own result | No list: `null` runs the hook on every render, as an omitted array does in React. Strong mode reports it instead |
 
 A member read through a stable module binding, such as `CONFIG.mode`, is also
 omitted. Mutating such an object in place is therefore not witnessed by a
