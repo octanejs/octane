@@ -1113,7 +1113,10 @@ export function createStrongEffectPolicy({ ast, analysis, callNames, report }) {
 			const init = unwrap(decl.init);
 			const binding = bindings[0]?.binding;
 			if (decl.id?.type === 'Identifier' && binding && !binding.reassigned) {
-				if (init?.type === 'CallExpression' && callNames.get(init) === 'useRef') {
+				if (
+					init?.type === 'CallExpression' &&
+					(callNames.get(init) === 'useRef' || callNames.get(init) === 'useLazyRef')
+				) {
 					roots.add(binding);
 					declarations.set(decl.id, binding);
 					names.add(binding.name);

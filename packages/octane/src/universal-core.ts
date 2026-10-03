@@ -6564,40 +6564,49 @@ export function useRef<T>(initial: T, slot?: unknown): { current: T } {
 	}
 	const owner = currentDraftOwner();
 	const resolved = resolveHookSlot(slot);
-	let hook = owner.hooks.get(resolved) as RefHook<T> | undefined;
-	if (hook?.kind !== 'ref') {
-		const record = owner.record;
-		const value = {} as { current: T };
-		Object.defineProperty(value, 'current', {
-			enumerable: true,
-			get() {
-				const draft = findDraftOwner(record);
-				const live = (draft?.hooks.get(resolved) ?? record.hooks.get(resolved)) as
-					RefHook<T> | undefined;
-				return live?.kind === 'ref' ? live.current : initial;
-			},
-			set(next: T) {
-				const draft = findDraftOwner(record);
-				if (draft !== null) {
-					let live = draft.hooks.get(resolved) as RefHook<T> | undefined;
-					if (live?.kind !== 'ref') return;
-					if (!draft.clonedHooks.has(resolved)) {
-						live = { ...live };
-						draft.hooks.set(resolved, live);
-						draft.clonedHooks.add(resolved);
-					}
-					live.current = next;
-					return;
+	const hook = owner.hooks.get(resolved) as RefHook<T> | undefined;
+	return hook?.kind === 'ref' ? hook.value : createRefHook(owner, resolved, initial);
+}
+
+export function useLazyRef<T>(factory: () => T, slot?: unknown): { current: T } {
+	const owner = currentDraftOwner();
+	const resolved = resolveHookSlot(slot);
+	const hook = owner.hooks.get(resolved) as RefHook<T> | undefined;
+	return hook?.kind === 'ref' ? hook.value : createRefHook(owner, resolved, factory());
+}
+
+function createRefHook<T>(owner: DraftOwner, resolved: unknown, initial: T): { current: T } {
+	const record = owner.record;
+	const value = {} as { current: T };
+	Object.defineProperty(value, 'current', {
+		enumerable: true,
+		get() {
+			const draft = findDraftOwner(record);
+			const live = (draft?.hooks.get(resolved) ?? record.hooks.get(resolved)) as
+				RefHook<T> | undefined;
+			return live?.kind === 'ref' ? live.current : initial;
+		},
+		set(next: T) {
+			const draft = findDraftOwner(record);
+			if (draft !== null) {
+				let live = draft.hooks.get(resolved) as RefHook<T> | undefined;
+				if (live?.kind !== 'ref') return;
+				if (!draft.clonedHooks.has(resolved)) {
+					live = { ...live };
+					draft.hooks.set(resolved, live);
+					draft.clonedHooks.add(resolved);
 				}
-				const live = record.hooks.get(resolved) as RefHook<T> | undefined;
-				if (live?.kind === 'ref') live.current = next;
-			},
-		});
-		hook = { kind: 'ref', current: initial, value };
-		owner.hooks.set(resolved, hook);
-		owner.clonedHooks.add(resolved);
-	}
-	return hook.value;
+				live.current = next;
+				return;
+			}
+			const live = record.hooks.get(resolved) as RefHook<T> | undefined;
+			if (live?.kind === 'ref') live.current = next;
+		},
+	});
+	const hook = { kind: 'ref' as const, current: initial, value };
+	owner.hooks.set(resolved, hook);
+	owner.clonedHooks.add(resolved);
+	return value;
 }
 
 export function useId(slot?: unknown): string {

@@ -21,7 +21,7 @@ const DEPENDENCY_HOOKS = new Map([
 // lifetime-stable. useEffectEvent is intentionally NOT identity-stable, but is
 // non-reactive by API contract: including its fresh wrapper would re-run an
 // effect on every render and defeat the hook's purpose.
-const OMITTED_DEPENDENCY_RESULT_HOOKS = new Set(['useRef', 'useEffectEvent']);
+const OMITTED_DEPENDENCY_RESULT_HOOKS = new Set(['useRef', 'useLazyRef', 'useEffectEvent']);
 const STABLE_TUPLE_RESULTS = new Map([
 	['useState', new Set([1, 2])],
 	['useLinkedState', new Set([1, 2])],

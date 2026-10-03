@@ -234,6 +234,23 @@ default; pass `{ sourceEqual, valueEqual }` as a third argument when you need
 something else. Like `useState`, `useLinkedState` supports an optional third
 tuple item, `getValue`.
 
+## Lazy ref initialization
+
+When a mutable ref needs an expensive initial value, pass a factory to
+`useLazyRef`:
+
+```ts
+const cache = useLazyRef(() => new Map<string, string>());
+```
+
+Subsequent renders keep the same ref and do not rerun the factory.
+`useRef(callback)` stores the callback itself; a lazy factory may also return a
+function to store it as the ref value. The factory runs during render,
+and can run again when work is abandoned or retried, on remount, and separately
+for server rendering and hydration. Keep the factory pure; use an effect for
+resources needing cleanup. Strong mode applies its normal render-time rules to the factory. The experimental
+Valdi writer's existing adapter ABI does not support this hook.
+
 ## Conditional hooks
 
 Unlike React, a hook can sit behind a guard or after an early `return`:

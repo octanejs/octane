@@ -3042,7 +3042,7 @@ function computeStableLocals(statements, componentLocals) {
 				// x = useRef(...) / useCallback(...) — the
 				// return value is stable for the lifetime of the component.
 				if (
-					(callName === 'useRef' || callName === 'useCallback') &&
+					(callName === 'useRef' || callName === 'useLazyRef' || callName === 'useCallback') &&
 					decl.id.type === 'Identifier'
 				) {
 					stable.add(decl.id.name);
@@ -3101,7 +3101,7 @@ function computeInvariantLocals(statements, componentLocals, autoCallback) {
 					if (getter?.type === 'Identifier') invariant.add(getter.name);
 					continue;
 				}
-				if (callName === 'useRef' && decl.id.type === 'Identifier') {
+				if ((callName === 'useRef' || callName === 'useLazyRef') && decl.id.type === 'Identifier') {
 					invariant.add(decl.id.name);
 					continue;
 				}
@@ -5855,6 +5855,7 @@ const SETUP_PASSIVE_HOOKS = new Set([
 const SETUP_SYNC_FACTORY_HOOKS = new Set([
 	'useMemo',
 	'useState',
+	'useLazyRef',
 	'useLinkedState',
 	'useReducer',
 	'useSyncExternalStore',
@@ -19859,6 +19860,7 @@ const NUMERIC_HOOK_SLOT_POSITION = {
 	useMemo: 2,
 	useCallback: 2,
 	useRef: 1,
+	useLazyRef: 1,
 	useEffectEvent: 1,
 	useImperativeHandle: 3,
 	useActionState: 3,
@@ -19870,7 +19872,7 @@ const NUMERIC_HOOK_SLOT_POSITION = {
 function appendHookSlotArgument(name, args, slot, numeric, origin) {
 	const out = [...args];
 	const position =
-		numeric || name === 'useState' || name === 'useRef'
+		numeric || name === 'useState' || name === 'useRef' || name === 'useLazyRef'
 			? NUMERIC_HOOK_SLOT_POSITION[name]
 			: undefined;
 	if (position !== undefined) {
@@ -20655,7 +20657,10 @@ function rewriteHookCalls(node, ctx, componentName, localRoot = false) {
 				// changes a custom hook's defaults, rest values or arguments.length.
 				// State/ref spreads also need this path: an empty spread has no
 				// initializer position into which a trailing slot may safely fall.
-				if (isCustom || (hasSpread && (name === 'useState' || name === 'useRef')))
+				if (
+					isCustom ||
+					(hasSpread && (name === 'useState' || name === 'useRef' || name === 'useLazyRef'))
+				)
 					return wrapHookCallWithSlot(n, ctx, slot, callee, args);
 
 				const hookArgs = explicitMemoSlot
@@ -20745,7 +20750,7 @@ function rewriteHookCalls(node, ctx, componentName, localRoot = false) {
 						? b.id(runtimeAliasForContext(ctx, getterHelper))
 						: n.callee;
 				if (
-					(name === 'useState' || name === 'useRef') &&
+					(name === 'useState' || name === 'useRef' || name === 'useLazyRef') &&
 					args.some((arg) => arg.type === 'SpreadElement')
 				)
 					return wrapHookCallWithSlot(n, ctx, slot, callee, args);

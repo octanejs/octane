@@ -9,6 +9,7 @@ export const HOOK_NAMES = new Set([
 	'useMemo',
 	'useCallback',
 	'useRef',
+	'useLazyRef',
 	'useId',
 	'useEffectEvent',
 	'useImperativeHandle',

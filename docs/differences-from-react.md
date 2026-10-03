@@ -1729,6 +1729,14 @@ function Search({ ref }) @{
 A ref may be a callback, a `{ current }` object, or an array of refs as shown
 above.
 
+Octane also supports lazy initialization of a mutable ref with
+`useLazyRef(() => createValue())`. Plain `useRef(callback)` retains React-compatible
+behavior and stores the callback itself. The lazy factory runs
+during render, so abandoned work, retries, remounts, and separate server and
+hydration renders can invoke it again; keep the factory pure and use an effect for
+resources requiring cleanup. Strong mode checks the factory as render-time work. The experimental
+Valdi writer's existing adapter ABI does not support this hook.
+
 ### Fragment refs
 
 An explicit `<Fragment ref={ref}>` provides a typed `FragmentInstance` without

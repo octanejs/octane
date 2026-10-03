@@ -476,6 +476,35 @@ Refs are ordinary props in Octane, so your own component can accept `ref` direct
 There is no `forwardRef` wrapper. A host element can also receive several refs at once,
 for example `ref={[inputRef, measurementRef]}`.
 
+<h3 id="use-lazy-ref">
+	Initialize a ref lazily with <code>useLazyRef</code>
+</h3>
+
+For a value that is expensive to create and needs mutable ref semantics, pass a
+factory to `useLazyRef`:
+
+```tsrx
+import { useLazyRef } from 'octane';
+
+export function CacheButton() @{
+	const cache = useLazyRef(() => new Map<string, string>());
+
+	<button onClick={() => cache.current.set('greeting', 'hello')}>{'Cache'}</button>
+}
+```
+
+The factory initializes the ref when its cell is created; later renders keep the
+same ref and do not recreate its value. `useRef(callback)` stores the callback
+itself, as in React. A `useLazyRef` factory can also return a function to store
+as the ref value.
+
+The factory runs during render, before a commit. It may run again for abandoned
+or retried renders, on remount, and independently during server rendering and
+hydration. Keep the factory pure; use an effect for subscriptions and other
+work requiring cleanup. In Strong mode, the factory follows render-time rules, and
+the ref's `current` is read or changed from an event or effect, not during render.
+The experimental Valdi writer's existing adapter ABI does not support this hook.
+
 ### Synchronize an external system with `useEffect`
 
 Page metadata does not need an effect. Render `<title>` directly and Octane hoists it to
