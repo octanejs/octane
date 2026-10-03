@@ -425,3 +425,262 @@ describe('auto-calculation — Strong inline render expressions', () => {
 		r.unmount();
 	});
 });
+
+// A cached calculation can only hit while each of its inputs keeps its
+// identity, so a `const` read only by another cached calculation is cached too,
+// through a chain of any length. Compatibility mode admits imported callees, so
+// the runner supplies the projections as a module; Strong admits any call, so
+// there they arrive as props.
+const CHAINED_CALCULATIONS = `
+	import { useState } from 'octane';
+	import { project, wrap, identify, make } from './chain-probes';
+
+	type Row = { readonly id: number; readonly n: number };
+
+	export function Chained() @{
+		const [rows, setRows] = useState<readonly Row[]>([{ id: 1, n: 1 }]);
+		const [tick, setTick] = useState(0);
+		const labels = project(rows);
+		const wrapped = wrap(labels);
+		const boxed = wrap(wrapped);
+		<div>
+			<button id="chain-tick" onClick={() => setTick(tick + 1)}>{'tick'}</button>
+			<button
+				id="chain-add"
+				onClick={() => setRows([...rows, { id: rows.length + 1, n: rows.length + 1 }])}
+			>{'add'}</button>
+			<span id="chain-identity">{identify(boxed) as string}</span>
+			<span id="chain-values">{boxed.value.value.join(',') as string}</span>
+			<span id="chain-tick-value">{String(tick)}</span>
+		</div>
+	}
+
+	type Reader = { readonly read: () => readonly string[] };
+
+	// A dependency array is evaluated at its declaration, so a calculation whose
+	// callback reads a later const cannot be cached: its dependency on labels
+	// would read labels before it is initialized.
+	export function ForwardRead() @{
+		const [rows] = useState<readonly Row[]>([{ id: 1, n: 1 }]);
+		const reader: Reader = make(() => labels);
+		const labels = project(rows);
+		<span id="forward-read">{reader.read().join(',') as string}</span>
+	}
+
+	export function ChainedForwardRead() @{
+		const [rows] = useState<readonly Row[]>([{ id: 1, n: 1 }]);
+		const reader: Reader = make(() => labels);
+		const labels = project(rows);
+		const boxed = wrap(reader);
+		<span id="chained-forward-read">{(boxed.value as Reader).read().join(',') as string}</span>
+	}
+`;
+
+const RETURN_CHAINED_CALCULATIONS = `
+	import { useState } from 'octane';
+	import { project, wrap, identify } from './chain-probes';
+
+	type Row = { readonly id: number; readonly n: number };
+
+	export function ReturnChained() {
+		const [rows, setRows] = useState<readonly Row[]>([{ id: 1, n: 1 }]);
+		const [tick, setTick] = useState(0);
+		const labels = project(rows);
+		const wrapped = wrap(labels);
+		return (
+			<div>
+				<button id="return-chain-tick" onClick={() => setTick(tick + 1)}>tick</button>
+				<button
+					id="return-chain-add"
+					onClick={() => setRows([...rows, { id: rows.length + 1, n: rows.length + 1 }])}
+				>
+					add
+				</button>
+				<span id="return-chain-identity">{identify(wrapped)}</span>
+				<span id="return-chain-values">{wrapped.value.join(',')}</span>
+				<span id="return-chain-tick-value">{String(tick)}</span>
+			</div>
+		);
+	}
+`;
+
+// Strong hoists `identify(wrap(labels))` into a compiler-named calculation, so
+// `labels` is read only by that calculation.
+const STRONG_CHAINED_CALCULATIONS = `
+	'use strong';
+	import { useState } from 'octane';
+
+	type Row = { readonly id: number; readonly n: number };
+	type Reader = { readonly read: () => readonly string[] };
+	type Probes = {
+		project: (rows: readonly Row[]) => readonly string[];
+		wrap: (value: object) => { readonly value: object };
+		make: (read: () => readonly string[]) => Reader;
+		identify: (value: object) => string;
+	};
+
+	export function StrongChained({ project, wrap, identify }: Probes) @{
+		const [rows, setRows] = useState<readonly Row[]>([{ id: 1, n: 1 }]);
+		const [tick, setTick] = useState(0);
+		const labels = project(rows);
+		<div>
+			<button id="strong-chain-tick" onClick={() => setTick(tick + 1)}>{'tick'}</button>
+			<button
+				id="strong-chain-add"
+				onClick={() => setRows([...rows, { id: rows.length + 1, n: rows.length + 1 }])}
+			>{'add'}</button>
+			<span id="strong-chain-identity">{identify(wrap(labels)) as string}</span>
+			<span id="strong-chain-values">{labels.join(',') as string}</span>
+			<span id="strong-chain-tick-value">{String(tick)}</span>
+		</div>
+	}
+
+	// The hoisted calculation reads reader, whose callback reads a later const.
+	export function StrongForwardRead({ project, make }: Probes) @{
+		const [rows] = useState<readonly Row[]>([{ id: 1, n: 1 }]);
+		const reader = make(() => labels);
+		const labels = project(rows);
+		<span id="strong-forward-read">{reader.read().join(',') as string}</span>
+	}
+`;
+
+const STRONG_RETURN_CHAINED_CALCULATIONS = `
+	'use strong';
+	import { useState } from 'octane';
+
+	type Row = { readonly id: number; readonly n: number };
+	type Probes = {
+		project: (rows: readonly Row[]) => readonly string[];
+		wrap: (value: object) => { readonly value: object };
+		identify: (value: object) => string;
+	};
+
+	export function StrongReturnChained({ project, wrap, identify }: Probes) {
+		const [rows, setRows] = useState<readonly Row[]>([{ id: 1, n: 1 }]);
+		const [tick, setTick] = useState(0);
+		const labels = project(rows);
+		return (
+			<div>
+				<button id="strong-return-chain-tick" onClick={() => setTick(tick + 1)}>tick</button>
+				<button
+					id="strong-return-chain-add"
+					onClick={() => setRows([...rows, { id: rows.length + 1, n: rows.length + 1 }])}
+				>
+					add
+				</button>
+				<span id="strong-return-chain-identity">{identify(wrap(labels))}</span>
+				<span id="strong-return-chain-values">{labels.join(',')}</span>
+				<span id="strong-return-chain-tick-value">{String(tick)}</span>
+			</div>
+		);
+	}
+`;
+
+describe('auto-calculation — chained calculations', () => {
+	function chainProbes() {
+		let next = 0;
+		const ids = new WeakMap<object, number>();
+		return {
+			project: (rows: ReadonlyArray<{ id: number; n: number }>) =>
+				rows.map((row) => `r${row.id}:${row.n}`),
+			wrap: (value: object) => ({ value }),
+			make: (read: () => readonly string[]) => ({ read }),
+			identify: (value: object) => {
+				let id = ids.get(value);
+				if (id === undefined) ids.set(value, (id = ++next));
+				return 'id' + id;
+			},
+		};
+	}
+
+	const compileOptions = { hmr: false, dev: false };
+	const runtimeModules = { './chain-probes': chainProbes() };
+	const chained = loadCompiledFixtureSource(CHAINED_CALCULATIONS, {
+		id: 'chained-calculations.tsrx',
+		mode: 'client',
+		compileOptions,
+		runtimeModules,
+	});
+	const returnChained = loadCompiledFixtureSource(RETURN_CHAINED_CALCULATIONS, {
+		id: 'return-chained-calculations.tsx',
+		mode: 'client',
+		compileOptions,
+		runtimeModules,
+	});
+	const strongChained = loadCompiledFixtureSource(STRONG_CHAINED_CALCULATIONS, {
+		id: 'strong-chained-calculations.tsrx',
+		mode: 'client',
+		compileOptions,
+	});
+	const strongReturnChained = loadCompiledFixtureSource(STRONG_RETURN_CHAINED_CALCULATIONS, {
+		id: 'strong-return-chained-calculations.tsx',
+		mode: 'client',
+		compileOptions,
+	});
+
+	// Each case renders a chain's last value's identity and its values. The
+	// identity holds across an unrelated update, changes with the chain's
+	// first input, then holds again.
+	function expectChainStable(
+		r: ReturnType<typeof mount>,
+		prefix: string,
+		values: readonly [string, string],
+	) {
+		const first = r.find(`#${prefix}-identity`).textContent;
+		expect(r.find(`#${prefix}-values`).textContent).toBe(values[0]);
+
+		r.click(`#${prefix}-tick`);
+		expect(r.find(`#${prefix}-tick-value`).textContent).toBe('1');
+		expect(r.find(`#${prefix}-identity`).textContent).toBe(first);
+
+		r.click(`#${prefix}-add`);
+		const second = r.find(`#${prefix}-identity`).textContent;
+		expect(second).not.toBe(first);
+		expect(r.find(`#${prefix}-values`).textContent).toBe(values[1]);
+
+		r.click(`#${prefix}-tick`);
+		expect(r.find(`#${prefix}-tick-value`).textContent).toBe('2');
+		expect(r.find(`#${prefix}-identity`).textContent).toBe(second);
+		expect(r.find(`#${prefix}-values`).textContent).toBe(values[1]);
+	}
+
+	it('caches every link of a const chain the template reads only at its end', () => {
+		const r = mount(chained.Chained);
+		expectChainStable(r, 'chain', ['r1:1', 'r1:1,r2:2']);
+		r.unmount();
+	});
+
+	it('never caches a calculation whose callback reads a later const', () => {
+		const direct = mount(chained.ForwardRead);
+		expect(direct.find('#forward-read').textContent).toBe('r1:1');
+		direct.unmount();
+
+		// Following the chain from `boxed` must not cache `reader` either.
+		const chain = mount(chained.ChainedForwardRead);
+		expect(chain.find('#chained-forward-read').textContent).toBe('r1:1');
+		chain.unmount();
+
+		// Nor following it from a Strong inline calculation.
+		const strong = mount(strongChained.StrongForwardRead, chainProbes());
+		expect(strong.find('#strong-forward-read').textContent).toBe('r1:1');
+		strong.unmount();
+	});
+
+	it('caches a const chain in a return component after an authored hook', () => {
+		const r = mount(returnChained.ReturnChained);
+		expectChainStable(r, 'return-chain', ['r1:1', 'r1:1,r2:2']);
+		r.unmount();
+	});
+
+	it('caches a const that only a Strong inline calculation reads', () => {
+		const r = mount(strongChained.StrongChained, chainProbes());
+		expectChainStable(r, 'strong-chain', ['r1:1', 'r1:1,r2:2']);
+		r.unmount();
+	});
+
+	it('caches a const that only a Strong returned inline calculation reads', () => {
+		const r = mount(strongReturnChained.StrongReturnChained, chainProbes());
+		expectChainStable(r, 'strong-return-chain', ['r1:1', 'r1:1,r2:2']);
+		r.unmount();
+	});
+});

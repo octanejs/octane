@@ -46,6 +46,13 @@ const scenarios = {
 	'@if arm disposes the owning child': ['parent'],
 	'@if arm host with a live owner signal': ['parent'],
 	'@for row removal after a list update': ['parent'],
+	// A deletion's cleanups run parent first: focus moves off a host whose own
+	// component has not been torn down yet.
+	'deletion cleanup moves focus off a child component': ['parent'],
+	'deletion cleanup moves focus off a portaled child component': ['parent'],
+	'row cleanup moves focus off a value hole in the row': ['parent'],
+	// An inert list clears every row in one operation.
+	'list clear removes a focused row': ['parent'],
 	// The section handler was in the dispatch snapshot before the removal.
 	'handler captured before removal': ['remove', 'section'],
 	// A value hole's pure host is removed while its rendering Block stays live.
@@ -87,7 +94,15 @@ declare global {
 			startTransition: typeof startTransition;
 			ViewTransition: typeof ViewTransition;
 			fixtures: Record<
-				'SignalForm' | 'PlainForm' | 'ChildArm' | 'HostArm' | 'Rows' | 'Captured',
+				| 'SignalForm'
+				| 'PlainForm'
+				| 'ChildArm'
+				| 'HostArm'
+				| 'Rows'
+				| 'Captured'
+				| 'DialogArm'
+				| 'PortalDialogArm'
+				| 'EditableRows',
 				Fixture
 			>;
 			deoptFixtures: Record<
@@ -308,6 +323,43 @@ async function run(dev: boolean, scenario: Scenario) {
 					flushSync(() => root.render(fixtures.Rows, props([1, 2], 'second')));
 					focus(host.querySelector('input[data-row="1"]')!);
 					flushSync(() => root.render(fixtures.Rows, props([2], 'third')));
+					break;
+				}
+				case 'deletion cleanup moves focus off a child component':
+				case 'deletion cleanup moves focus off a portaled child component': {
+					const Fixture =
+						scenario === 'deletion cleanup moves focus off a child component'
+							? fixtures.DialogArm
+							: fixtures.PortalDialogArm;
+					const target = byId('portal');
+					const root = mount(host);
+					const render = (show: boolean) =>
+						flushSync(() => root.render(Fixture, { observe, show, restore: outside, target }));
+					render(true);
+					focus(document.querySelector('input[data-draft]')!);
+					render(false);
+					break;
+				}
+				case 'row cleanup moves focus off a value hole in the row': {
+					const root = mount(host);
+					const render = (rows: number[]) =>
+						flushSync(() =>
+							root.render(fixtures.EditableRows, { observe, rows, restore: outside }),
+						);
+					render([1, 2]);
+					focus(host.querySelector('input')!);
+					render([2]);
+					break;
+				}
+				case 'list clear removes a focused row': {
+					const root = mount(host);
+					const render = (rows: number[]) =>
+						flushSync(() =>
+							root.render(fixtures.Rows, { observe, rows, onRowBlur: () => observe('row') }),
+						);
+					render(Array.from({ length: 20 }, (_, index) => index + 1));
+					focus(host.querySelector('input[data-row="5"]')!);
+					render([]);
 					break;
 				}
 				case 'handler captured before removal': {
