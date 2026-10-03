@@ -251,7 +251,11 @@ export function analyzeReport({
 			continue;
 		}
 		const { deterministic, timing, unchanged } = compareSuite(suite, base[suite], head[suite]);
-		const larger = deterministic.filter((row) => row.verdict === 'larger');
+		// A value over its budget is already a failure above, not growth within budget.
+		const breached = new Set(breaches.map(({ target, op }) => `${target}\0${op}`));
+		const larger = deterministic.filter(
+			(row) => row.verdict === 'larger' && !breached.has(`${row.target}\0${row.op}`),
+		);
 		if (SUITE_INFO[suite]?.workGate && larger.length) {
 			failures.push(`❌ ${suite}: ${larger.length} work counter(s) increased`);
 		} else if (larger.length) {

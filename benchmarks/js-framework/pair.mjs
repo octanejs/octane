@@ -175,9 +175,16 @@ const parityFor = (op, repeat) => {
 // freshly built rows instead.
 async function prepare(page, op) {
 	if (op.name === 'update') {
-		await page.evaluate(() => document.getElementById('run').click());
-		await page.waitForFunction(() => document.querySelectorAll('tbody tr').length === 1000, null, {
-			timeout: 5000,
+		// Commit the rebuild before the sample and prove it replaced the rows, so
+		// no stale labels or in-flight random draws reach the timed window.
+		await page.evaluate(async () => {
+			const before = document.querySelector('tbody tr');
+			document.getElementById('run').click();
+			if (window.__benchFlush) await window.__benchFlush();
+			const rows = document.querySelectorAll('tbody tr');
+			if (rows.length !== 1000 || rows[0] === before) {
+				throw new Error('update preparation did not rebuild the 1,000 rows');
+			}
 		});
 	}
 	await ensureState(page, op.pre);
