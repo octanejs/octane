@@ -4,6 +4,11 @@ import * as ServerRuntime from 'octane/server';
 import { act, flushEffects, mount } from './_helpers';
 import { loadPlainHookFixtureSource, loadServerFixture } from './_server-fixture';
 import { flushSync } from '../src/index.js';
+import { ShadowedNestedRowEffect, ShadowedRowEffect } from './_fixtures/for-shadowed-effects.tsrx';
+import {
+	ShadowedNestedRowEffectStrong,
+	ShadowedRowEffectStrong,
+} from './_fixtures/for-shadowed-effects-strong.tsrx';
 import {
 	CallbackReadsItself,
 	CallbackReadsLaterConst,
@@ -73,6 +78,66 @@ function createStore(initial: string) {
 }
 
 describe('inferred useEffect dependencies — behavior', () => {
+	it.each([
+		['compatibility', ShadowedNestedRowEffect],
+		['Strong', ShadowedNestedRowEffectStrong],
+	] as const)(
+		'tracks destructured bindings in nested keyed rows in %s mode',
+		(_label, Component) => {
+			const entries: string[] = [];
+			const log = (entry: string) => entries.push(entry);
+			const r = mount(Component, {
+				groups: [{ id: 'group', items: [{ id: 'row', value: 'a' }] }],
+				log,
+			});
+			flushEffects();
+			expect(entries).toEqual(['run:a']);
+			r.update(Component, { groups: [{ id: 'group', items: [{ id: 'row', value: 'b' }] }], log });
+			flushEffects();
+			expect(entries).toEqual(['run:a', 'cleanup:a', 'run:b']);
+			r.unmount();
+			flushEffects();
+			expect(entries).toEqual(['run:a', 'cleanup:a', 'run:b', 'cleanup:b']);
+		},
+	);
+
+	it.each([
+		['compatibility', ShadowedRowEffect],
+		['Strong', ShadowedRowEffectStrong],
+	] as const)(
+		'tracks a shadowing keyed row and the outer empty value in %s mode',
+		(_label, Component) => {
+			const entries: string[] = [];
+			const log = (entry: string) => entries.push(entry);
+			const first = { id: '1', value: 'first' };
+			const replacement = { id: '1', value: 'second' };
+			const r = mount(Component, { items: [], log, emptyValue: 'a', noise: 0 });
+			flushEffects();
+			expect(entries).toEqual(['empty:outer:a']);
+			r.update(Component, { items: [], log, emptyValue: 'a', noise: 1 });
+			flushEffects();
+			expect(entries).toEqual(['empty:outer:a']);
+			r.update(Component, { items: [], log, emptyValue: 'b', noise: 1 });
+			flushEffects();
+			expect(entries).toEqual(['empty:outer:a', 'empty-cleanup:outer:a', 'empty:outer:b']);
+			r.update(Component, { items: [first], log, emptyValue: 'b', noise: 1 });
+			flushEffects();
+			expect(entries.slice(-2)).toEqual(['empty-cleanup:outer:b', 'run:first']);
+			r.update(Component, { items: [replacement], log, emptyValue: 'b', noise: 1 });
+			flushEffects();
+			expect(entries.slice(-2)).toEqual(['cleanup:first', 'run:second']);
+			r.update(Component, { items: [replacement], log, emptyValue: 'b', noise: 2 });
+			flushEffects();
+			expect(entries.slice(-2)).toEqual(['cleanup:first', 'run:second']);
+			r.update(Component, { items: [], log, emptyValue: 'c', noise: 2 });
+			flushEffects();
+			expect(entries.slice(-2)).toEqual(['cleanup:second', 'empty:outer:c']);
+			r.unmount();
+			flushEffects();
+			expect(entries.at(-1)).toBe('empty-cleanup:outer:c');
+		},
+	);
+
 	it('ignores unrelated props and refreshes the captured value with ordered cleanup', () => {
 		const entries: string[] = [];
 		const log = (entry: string) => entries.push(entry);

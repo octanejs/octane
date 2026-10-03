@@ -1,6 +1,6 @@
 {
   "name": "@octanejs/wagmi",
-  "version": "0.0.40",
+  "version": "0.0.41",
   "license": "MIT",
   "type": "module",
   "engines": {
@@ -46,7 +46,7 @@
     "@tanstack/query-core": "catalog:default"
   },
   "peerDependencies": {
-    "octane": "workspace:^0.7.0"
+    "octane": "workspace:^0.8.0"
   },
   "devDependencies": {
     "@tanstack/react-query": "catalog:default",
