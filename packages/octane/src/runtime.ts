@@ -6887,17 +6887,19 @@ function countPassiveUpdate(block: Block): void {
 	if (++state.count === NESTED_UPDATE_LIMIT + 1) warnPassiveUpdateDepth();
 }
 
+function settleNestedUpdateChain(): void {
+	// A hold that ends in a settled commit proves the exhausted budget was spent
+	// by a passive cascade riding along with each re-measure. React warns about
+	// that cascade without throwing, and so does Octane.
+	if (process.env.NODE_ENV !== 'production' && HELD_PASSIVE_CHAIN === NESTED_UPDATE_CHAIN_ID)
+		warnPassiveUpdateDepth();
+	NESTED_UPDATE_CHAIN_ID++;
+}
+
 /** Close one outermost commit's share of the synchronous-callback chain. */
 function finishNestedUpdateCommit(): void {
 	if (NESTED_UPDATE_SCHEDULED) NESTED_UPDATE_SCHEDULED = false;
-	else {
-		// A hold that ends in a settled commit proves the exhausted budget was
-		// spent by a passive cascade riding along with each re-measure. React
-		// warns about that cascade without throwing, and so does Octane.
-		if (process.env.NODE_ENV !== 'production' && HELD_PASSIVE_CHAIN === NESTED_UPDATE_CHAIN_ID)
-			warnPassiveUpdateDepth();
-		NESTED_UPDATE_CHAIN_ID++;
-	}
+	else settleNestedUpdateChain();
 }
 
 function inNestedUpdateCallback(): boolean {
@@ -10437,9 +10439,15 @@ function runLayoutEffects(q: PendingEffect[]): void {
  * drainMutationEffects (see its comment).
  */
 function drainPassivePhase(): void {
-	// Held passives wait for the queued commit that settles the exhausted chain;
-	// that commit re-arms the post-paint drain (see scheduleRender).
-	if (HELD_PASSIVE_CHAIN === NESTED_UPDATE_CHAIN_ID) return;
+	// Held passives wait for the queued render that settles the exhausted chain;
+	// its commit re-arms the post-paint drain (see scheduleRender).
+	if (HELD_PASSIVE_CHAIN === NESTED_UPDATE_CHAIN_ID) {
+		if (QUEUE.length !== 0) return;
+		// That render already ran, in a commit nested inside a deferred layout
+		// completion, so no outermost commit closed the chain. Close it here
+		// rather than strand the held effects.
+		settleNestedUpdateChain();
+	}
 	EFFECT_COMMIT_DEPTH++;
 	try {
 		drainDeferredPassiveUnmounts();
