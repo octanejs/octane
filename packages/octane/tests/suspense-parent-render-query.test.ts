@@ -229,15 +229,16 @@ describe.each(Object.keys(APPS) as AppName[])(
 			});
 		});
 
-		it('loads a changed selection once and releases the superseded request on reveal', async () => {
+		it('loads a changed selection once and aborts the superseded request', async () => {
 			await scenario(app, 'query', async ({ ids, shown, update, settle, calls }) => {
 				await update((controls) => controls.setId('b'));
+				expect(calls[0]!.signal.aborted).toBe(true);
 				await update(tick);
 				expect(ids()).toEqual(['a', 'b']);
+				expect(calls[1]!.signal.aborted).toBe(false);
 				expect(shown()).toBe('waiting');
 				await settle(calls[1], 'B');
 				expect(shown()).toBe('B');
-				expect(calls[0]!.signal.aborted).toBe(true);
 				expect(calls[1]!.signal.aborted).toBe(false);
 				// The settled superseded load cannot publish over the revealed selection.
 				await settle(calls[0], 'stale');

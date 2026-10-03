@@ -261,7 +261,7 @@ import {
 	currentSignalOwner,
 	retireSignalOwnerIdentity,
 	runWithSignalOwner,
-	signalOwnerFollowsInputs,
+	supersedeSignalOwner,
 } from './signals/owner-context.js';
 import { createSignalHookSites } from './signals/declaration-path.js';
 import {
@@ -727,7 +727,7 @@ function supersedeSignalRetryOwners(holder: { retrySignalOwners?: SignalRetryOwn
 	const cache = holder.retrySignalOwners;
 	if (cache === undefined) return;
 	const retired: SignalRendererOwnerIdentity[] = [];
-	collectRetiredSignalRetryOwners(cache.paths, cache, retired, signalOwnerFollowsInputs);
+	collectRetiredSignalRetryOwners(cache.paths, cache, retired, supersedeSignalOwner);
 	for (const owner of retired) retireRendererSignalOwner(owner);
 }
 

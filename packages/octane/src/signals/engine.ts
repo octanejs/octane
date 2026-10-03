@@ -80,6 +80,7 @@ export interface DerivedBindingLifecycle {
 	declared(sequence: number): void;
 	/** A later render's declaration of this cell, with a computation that may capture new values. */
 	redeclare(compute: DerivedCompute<any>, sequence: number): ScopedNode;
+	supersede(): void;
 }
 
 type DerivedBindingFactory<T> = new (
@@ -207,6 +208,13 @@ export class ScopeImpl implements Scope, GraphOwner {
 	frames: Set<AdoptionFrameImpl> | undefined = undefined;
 	/** Holds a writable or asynchronous derived cell that new render inputs cannot re-select. */
 	unkeyedState = false;
+
+	/** An attempt that never committed restarts with new inputs and keeps these cells. */
+	supersede(): void {
+		if (this.resources) for (const binding of this.resources.values()) binding.supersede();
+		if (this.derivedBindings)
+			for (const binding of this.derivedBindings.values()) binding.supersede();
+	}
 	private readonly seedEntries: Map<string, DecodedSeedEntry> | undefined;
 	private readonly traceLimit: number;
 	private events: SignalTraceEvent[] | undefined = undefined;

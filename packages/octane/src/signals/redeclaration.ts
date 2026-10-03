@@ -22,6 +22,8 @@ export abstract class RedeclarableBinding<D> {
 	/** Declaration order of the committed definition. Older closures never rebind it. */
 	protected sequence = 0;
 	declare private staged?: StagedDeclaration<D>;
+	/** Kept by an attempt that restarted before any render declaring it was accepted. */
+	declare private provisional?: boolean;
 	abstract readonly node: ScopedNode;
 	abstract readonly owner: { readonly retired: boolean };
 
@@ -42,6 +44,15 @@ export abstract class RedeclarableBinding<D> {
 	/** Record the declaration that created this cell. */
 	declared(sequence: number): void {
 		this.sequence = sequence;
+	}
+
+	/**
+	 * A suspended attempt that never committed restarts with new inputs and keeps
+	 * this cell. No committed reader presents it, so until a render declaring it
+	 * is accepted, a discarded render's definition replaces the abandoned one.
+	 */
+	supersede(): void {
+		this.provisional = true;
 	}
 
 	redeclare(definition: D, sequence: number): ScopedNode {
@@ -68,10 +79,11 @@ export abstract class RedeclarableBinding<D> {
 			if (this.staged !== next) return;
 			this.staged = undefined;
 			if (this.owner.retired) return;
-			if (discarded) {
+			if (discarded && !this.provisional) {
 				this.discardDefinition();
 				return;
 			}
+			if (!discarded) this.provisional = false;
 			if (view === undefined) this.installDefinition(definition, sequence);
 			else this.acceptView(view, sequence, definition);
 		});

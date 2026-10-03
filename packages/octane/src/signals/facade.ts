@@ -199,15 +199,16 @@ installSignalOwnerRetirement((owner) => {
 	identityScopes.delete(identity);
 	scopeOwners.delete(scope);
 	scope.dispose();
-}, ownerFollowsInputs);
+}, supersedeOwner);
 
 /** A query$ re-selects from new render inputs; a writable or asynchronous derived cell cannot. */
-function ownerFollowsInputs(owner: SignalOwner): boolean {
+function supersedeOwner(owner: SignalOwner): boolean {
 	const identity = (owner as SignalRendererOwnerIdentity).instanceOwner;
-	return (
-		!retiredIdentities.has(identity) &&
-		(identityScopes.get(identity) as ScopeImpl | undefined)?.unkeyedState !== true
-	);
+	if (retiredIdentities.has(identity)) return false;
+	const scope = identityScopes.get(identity) as ScopeImpl | undefined;
+	if (scope?.unkeyedState) return false;
+	scope?.supersede();
+	return true;
 }
 
 /** @internal A document may freeze read work without retiring data or accepted writes. */

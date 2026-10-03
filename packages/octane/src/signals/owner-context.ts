@@ -5,7 +5,7 @@ let installedEnvironment: SignalOwnerEnvironment | undefined;
 let synchronousOwner: SignalOwner | null = null;
 let defaultOwner: (() => SignalOwner | null) | undefined;
 let retireOwner: ((owner: SignalOwner) => void) | undefined;
-let ownerFollowsInputs: ((owner: SignalOwner) => boolean) | undefined;
+let supersedeOwner: ((owner: SignalOwner) => boolean) | undefined;
 
 /** @internal Live capability guards; reading them never installs a default owner. */
 export {
@@ -91,24 +91,25 @@ export function retireSignalOwnerIdentity(owner: SignalOwner): void {
 }
 
 /**
- * @internal Whether a render with new inputs may keep this renderer owner's
- * cells. A query$ re-selects from the values its description captures, so its
- * request survives them; a writable signal's initial value and an asynchronous
- * derived$ result do not follow them. Unset until the facade loads.
+ * @internal Hand a suspended attempt's renderer owner to a restart with new
+ * inputs, or return false when its cells cannot follow them. A query$
+ * re-selects from the values its description captures, so its request
+ * survives them; a writable signal's initial value and an asynchronous
+ * derived$ result do not. Unset until the facade loads.
  */
-export { ownerFollowsInputs as signalOwnerFollowsInputs };
+export { supersedeOwner as supersedeSignalOwner };
 
 export function installSignalOwnerRetirement(
 	retire: (owner: SignalOwner) => void,
-	followsInputs?: (owner: SignalOwner) => boolean,
+	supersede?: (owner: SignalOwner) => boolean,
 ): () => void {
 	const previous = retireOwner;
-	const previousFollowsInputs = ownerFollowsInputs;
+	const previousSupersede = supersedeOwner;
 	retireOwner = retire;
-	ownerFollowsInputs = followsInputs;
+	supersedeOwner = supersede;
 	return () => {
 		if (retireOwner !== retire) return;
 		retireOwner = previous;
-		ownerFollowsInputs = previousFollowsInputs;
+		supersedeOwner = previousSupersede;
 	};
 }
