@@ -66,6 +66,7 @@
     "./react": "./src/react/index.ts",
     "./hydration": "./src/hydration/index.ts",
     "./hydration/streamed-signals": "./src/hydration/streamed-signals.ts",
+    "./hydration/independent-strategies": "./src/hydration/independent-strategies.ts",
     "./behavior": "./src/behavior-root.ts",
     "./dom-bindings": "./src/dom-bindings.ts",
     "./dom-binding-program": "./src/dom-binding-program.ts",
@@ -174,6 +175,11 @@
         "types": "./dist/hydration/streamed-signals.d.ts",
         "node": "./dist/node/hydration/streamed-signals.js",
         "default": "./dist/hydration/streamed-signals.js"
+      },
+      "./hydration/independent-strategies": {
+        "types": "./dist/hydration/independent-strategies.d.ts",
+        "node": "./dist/node/hydration/independent-strategies.js",
+        "default": "./dist/hydration/independent-strategies.js"
       },
       "./behavior": {
         "types": "./dist/behavior-root.d.ts",

@@ -134,6 +134,16 @@ describe('islands-only routes', { timeout: 180_000 }, () => {
 		const renderer = /packages\/octane\/src\/(?:index|runtime|internal\/client)\.ts$/;
 		const staticModules = [...reached].flatMap((file) => graph.chunks.get(file)!.modules);
 		expect(staticModules.filter((id) => renderer.test(id))).toEqual([]);
+		// This page's island uses interaction(), so the idle(), visible() and media()
+		// triggers stay out of its bootstrap; an island that needs one loads them.
+		const strategies =
+			/packages\/octane\/src\/hydration\/(?:idle|visible|media|independent-strategies|strategy-attributes)\.ts$/;
+		expect(staticModules.filter((id) => strategies.test(id))).toEqual([]);
+		// Control: the build still emits them, so the check above cannot pass
+		// because the pattern stopped matching.
+		expect(
+			[...graph.chunks.values()].some((chunk) => chunk.modules.some((id) => strategies.test(id))),
+		).toBe(true);
 		// Control: the full entry of the same build does load the renderer.
 		const fullEntry = [...graph.chunks].find(
 			([, chunk]) => chunk.facade === '\0virtual:octane-hydrate',

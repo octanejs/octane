@@ -262,7 +262,13 @@ resumes an unfinished load activation when it becomes active again.
 non-default parameters (`timeout`, `rootMargin`, `threshold`, the media query) on
 the boundary, and the bootstrap installs the same idle callback, shared
 `IntersectionObserver`, or `matchMedia` listener that an ordinary boundary uses.
-The widget activates when that trigger fires. As with an ordinary boundary, a
+These strategies ship as a separate chunk. The bootstrap loads it the first time
+a registered widget needs one and installs the trigger once it arrives, so a
+page whose widgets use only `load()` and `interaction()` never downloads them.
+A custom host that passes `strategies: independentHydrationStrategies`, from
+`octane/hydration/independent-strategies`, to `bootstrapIndependentHydration` or
+`registerIndependentHydrationIsland` installs the trigger during registration
+instead. The widget activates when that trigger fires. As with an ordinary boundary, a
 click on an `idle`, `visible`, or `media` widget does not force it to activate.
 Pausing the document removes a pending trigger. Resuming re-installs it, or
 activates at once if the strategy already fired. `interaction()` activates on

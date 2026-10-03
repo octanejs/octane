@@ -214,6 +214,7 @@ export const REQUIRED_PUBLIC_VALUE_EXPORTS = {
 		'bootstrapStreamedSignalResults',
 		'installSignalDocumentLifecycle',
 	],
+	'./hydration/independent-strategies': ['independentHydrationStrategies'],
 	'./behavior': ['adoptBindings', 'mountBindings', 'attachBehaviorRoot', 'unbound'],
 	'./dom-bindings': ['__adoptBindings', '__adoptScalarBindings', '__bindingURL', '__mountBindings'],
 	'./dom-binding-program': [
