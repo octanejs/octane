@@ -93,6 +93,8 @@ export interface BindingControlLease {
 	prepareCurrent(): BindingControlPrepared;
 	active(): boolean;
 	composing(): boolean;
+	/** Whether the bound handle's own owner retired, which ended this lease. */
+	retired(): boolean;
 	dispose(): void;
 }
 
@@ -120,6 +122,7 @@ export function __createBindingControls(owner = currentSignalOwner()) {
 			if (!channels) CONTROL_BINDINGS.set(control, (channels = new Set()));
 			channels.add(channel);
 			let disposed = false;
+			let ownerRetired = false;
 			let initialized = false;
 			let composing = false;
 			let raw: unknown;
@@ -243,7 +246,10 @@ export function __createBindingControls(owner = currentSignalOwner()) {
 								() => {
 									// The document may retire before application pagehide cleanup.
 									// Do not read dead authority or release a replacement's lease.
-									if (!disposed && generation === ticket) dispose();
+									if (!disposed && generation === ticket) {
+										ownerRetired = true;
+										dispose();
+									}
 								},
 							),
 						);
@@ -298,7 +304,10 @@ export function __createBindingControls(owner = currentSignalOwner()) {
 									}),
 									() => {
 										if (!accepted) invalid = true;
-										else if (!disposed && generation === ticket) dispose();
+										else if (!disposed && generation === ticket) {
+											ownerRetired = true;
+											dispose();
+										}
 									},
 								),
 							)
@@ -405,6 +414,7 @@ export function __createBindingControls(owner = currentSignalOwner()) {
 				prepareCurrent: () => prepare(raw),
 				active: () => !disposed,
 				composing: () => composing,
+				retired: () => ownerRetired,
 				dispose,
 			};
 		},

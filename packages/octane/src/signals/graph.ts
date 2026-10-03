@@ -42,6 +42,7 @@ import {
 import {
 	SIGNAL_BINDING_READ,
 	SIGNAL_BINDING_SUBSCRIBE,
+	SIGNAL_BINDING_RETIRED,
 	SIGNAL_BINDING_IDENTITY,
 	SIGNAL_HANDLE,
 	type AdoptionFrame,
@@ -499,6 +500,10 @@ export class ScopedNode<T = any> implements SignalHandle<T>, ReactiveNode {
 					),
 			true,
 		);
+	}
+
+	[SIGNAL_BINDING_RETIRED](): boolean {
+		return this.owner.retired;
 	}
 
 	[SIGNAL_BINDING_IDENTITY]() {

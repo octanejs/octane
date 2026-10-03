@@ -1,6 +1,6 @@
 import { formatClientError } from './error-codes.client.generated.js';
 import { captureSignalOwner, currentSignalOwner } from './signals/owner-context.js';
-import { __prepareBindingSources } from './dom-binding-styles.js';
+import { __prepareBindingSources, __retiredBindingSource } from './dom-binding-styles.js';
 import {
 	forwardNativeTransitionConsumer,
 	setNativeReadObserver,
@@ -10,6 +10,7 @@ import {
 import {
 	SIGNAL_HANDLE,
 	SIGNAL_BINDING_READ,
+	SIGNAL_BINDING_RETIRED,
 	SIGNAL_BINDING_SUBSCRIBE,
 	type SignalHandle,
 } from './signals/types.js';
@@ -23,6 +24,8 @@ export interface BindingSignalConnection {
 	preview(value: unknown): BindingPreparedValue;
 	/** Optional whole-style writer, present only on the selected style capability. */
 	write?(value: unknown): void;
+	/** Error path only: whether the owner of a source this connection observes retired. */
+	retired(): boolean;
 	dispose(preservePresentation?: boolean): void;
 }
 
@@ -92,6 +95,8 @@ export interface BindingReadTracker {
 	 * commit, which the caller throws.
 	 */
 	fail(error: unknown, committed: boolean): boolean;
+	/** Error path only: whether the owner of a subscribed source retired. */
+	retired(): boolean;
 	dispose(): void;
 }
 
@@ -183,6 +188,7 @@ export function __createBindingReads(notify: () => void): BindingReadTracker {
 		preview() {
 			return __prepareBindingSources(reads, subscriptions, notify, () => !disposed, run);
 		},
+		retired: () => __retiredBindingSource(subscriptions),
 		dispose() {
 			if (disposed) return;
 			disposed = true;
@@ -234,6 +240,16 @@ export function __createBindingSignals() {
 			return {
 				get,
 				dispose,
+				// Only a subscribed handle is observed. Its own owner retiring wakes
+				// this connection, and the read that follows throws.
+				retired(): boolean {
+					try {
+						return !!unsubscribe && run(() => handle![SIGNAL_BINDING_RETIRED]?.()) === true;
+					} catch {
+						// An unresolvable handle is not proof of retirement; report.
+						return false;
+					}
+				},
 				preview(next): BindingPreparedValue {
 					const nextHandle = isSignal(next) ? next : undefined;
 					const ticket = generation;

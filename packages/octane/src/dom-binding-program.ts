@@ -1677,6 +1677,21 @@ function releaseEffects(instance: FragmentInstance, attempt: (callback: () => vo
 	if (effects) for (const cleanup of effects) attempt(cleanup);
 }
 
+/**
+ * Error path only: inspection allocates. Retiring the owner of a source this
+ * program observes (a document being left) notifies it, and the read that
+ * wakes then throws. Every capability that subscribes answers for its own.
+ */
+function observesRetiredSource(transaction: Transaction): boolean {
+	if (transaction.reads?.retired()) return true;
+	for (const instance of transaction.all) {
+		for (const region of instance.regions) if (region.signal?.retired()) return true;
+		for (const connections of [instance.signals, instance.projections, instance.controls])
+			for (const connection of connections?.values() ?? []) if (connection.retired()) return true;
+	}
+	return false;
+}
+
 function bindProgram<Props>(
 	root: Element | BindingRange | BindingMountTarget,
 	descriptor: CompiledBindingProgram<Props>,
@@ -1850,10 +1865,11 @@ function bindProgram<Props>(
 				} catch (error) {
 					// A program that reads signals waits for them, like a suspended root
 					// keeping its server markup: the last committed DOM stays live and
-					// every source the preparation reached can retry it.
+					// every source the preparation reached can retry it. A retired
+					// observed source instead ends the presentation below.
 					if (
 						error === stopped ||
-						(error as Error | null)?.name === 'ScopeDisposedError' ||
+						(committed && observesRetiredSource(transaction)) ||
 						!transaction.reads?.fail(error, committed)
 					)
 						throw error;
@@ -1900,15 +1916,17 @@ function bindProgram<Props>(
 			}
 		} catch (error) {
 			if (error === stopped) return;
+			// Retiring the owner of a source this program observes ends a live
+			// presentation, which keeps its last DOM; it is not an error. A read of
+			// an unrelated retired scope, or a presentation that never committed,
+			// still fails. Ask before dispose releases the observed sources.
+			const ended = committed && observesRetiredSource(transaction);
 			try {
 				dispose();
 			} catch {
 				/* The publication failure remains primary. */
 			}
-			// Retiring the data's owner (a document being left) notifies its readers.
-			// That ends a live presentation, which keeps its last DOM; it is not an
-			// error. A presentation that never committed still reports it.
-			if (committed && (error as Error | null)?.name === 'ScopeDisposedError') return;
+			if (ended) return;
 			throw error;
 		} finally {
 			transaction.preparing = false;
