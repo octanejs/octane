@@ -513,6 +513,29 @@ export function PassiveStepChildMeasure(props: { limit: number }) @{
 	</div>
 }
 
+function PassiveStepOffsetChild(props: { step: number; offset: number }) @{
+	const [measured, setMeasured] = useState(-1);
+	useLayoutEffect(() => {
+		const next = Math.floor((props.step + props.offset) / 2);
+		if (measured !== next) setMeasured(next);
+	}, null);
+	<span>{measured as number}</span>
+}
+
+// The same cascade measured by two children with their own state, offset so
+// exactly one of them publishes per step. The parent's only updates come from
+// its passive effect.
+export function PassiveStepSplitMeasure(props: { limit: number }) @{
+	const [step, setStep] = useState(0);
+	useEffect(() => {
+		if (step < props.limit) setStep(step + 1);
+	}, null);
+	<div id="passive-split-measure" data-step={step as number}>
+		<PassiveStepOffsetChild step={step} offset={0} />
+		<PassiveStepOffsetChild step={step} offset={1} />
+	</div>
+}
+
 // A passive effect schedules an update on every commit while a layout effect
 // never converges: the layout loop must still exhaust its budget.
 export function PassiveCascadeLayoutLoop() @{
@@ -591,13 +614,49 @@ export function SynchronousPassiveEffectLoop() @{
 	<span>{step as number}</span>
 }
 
-// Each loop's flushSync commit queues the next passive effect before the other
-// loop schedules, so passive work is always waiting when a budget runs out.
+// Each loop's flushSync render first runs the passive effect the other loop's
+// commit queued, so half of each loop's steps start outside its own flushSync.
 export function SynchronousPassiveEffectLoops() @{
 	<div>
 		<SynchronousPassiveEffectLoop />
 		<SynchronousPassiveEffectLoop />
 	</div>
+}
+
+// The child loop mounts one step after this one, so this loop runs out of
+// budget first. The child's effect runs before its parent's, and its flushSync
+// commit queues its next passive effect, so passive work is waiting when this
+// loop's own flushSync spends the last update.
+export function SynchronousPassiveEffectLoopOverChild() @{
+	const [step, setStep] = useState(0);
+	useEffect(() => {
+		flushSync(() => setStep(step + 1));
+	}, [step]);
+	<div>
+		@if (step > 0) {
+			<SynchronousPassiveEffectLoop />
+		}
+		<span>{step as number}</span>
+	</div>
+}
+
+function SynchronousLoopMeasure(props: { step: number }) @{
+	const [measured, setMeasured] = useState(props.step);
+	useLayoutEffect(() => {
+		if (measured !== props.step) setMeasured(props.step);
+	}, null);
+	<span>{measured as number}</span>
+}
+
+// Each step's flushSync commit runs a child layout effect that publishes one
+// converging measurement, so that child spends its budget inside a commit the
+// passive effect started, while the loop's next passive effect is queued.
+export function SynchronousPassiveEffectLoopWithMeasure() @{
+	const [step, setStep] = useState(0);
+	useEffect(() => {
+		flushSync(() => setStep(step + 1));
+	}, [step]);
+	<SynchronousLoopMeasure step={step} />
 }
 
 export function RefCallbackLoop() @{
@@ -607,6 +666,30 @@ export function RefCallbackLoop() @{
 			for (let i = 0; i < 50; i++) dispatch(1);
 		}}
 	>{count as number}</div>
+}
+
+// A callback ref that schedules its owner on every call and reports each call.
+export function CountedRefCallbackLoop(props: { onRef: () => void }) @{
+	const [count, dispatch] = useReducer((value: number) => value + 1, 0);
+	<div
+		ref={() => {
+			props.onRef();
+			dispatch(1);
+		}}
+	>{count as number}</div>
+}
+
+// The same loop, first committed by flushSync in a passive effect.
+export function FlushSyncInEffectRefCallbackLoop(props: { onRef: () => void }) @{
+	const [shown, setShown] = useState(false);
+	useEffect(() => {
+		flushSync(() => setShown(true));
+	}, []);
+	<div>
+		@if (shown) {
+			<CountedRefCallbackLoop onRef={props.onRef} />
+		}
+	</div>
 }
 
 export function FiniteLayoutChain(props) @{

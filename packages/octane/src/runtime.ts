@@ -7018,9 +7018,13 @@ function scheduleRender(block: Block): void {
 		}
 		return;
 	}
-	if (CURRENT_EFFECT_PHASE === PASSIVE && !syncFlush) {
+	if (CURRENT_EFFECT_PHASE === PASSIVE && (!syncFlush || inFlush)) {
 		// Passive cascades yield between commits. Warn in development, but let a
 		// finite chain converge; synchronous callbacks retain the hard loop guard.
+		// A flushSync drain that runs pending passives before its render (inFlush)
+		// does not make their updates synchronous, as in React. A flushSync that a
+		// passive effect calls from a post-paint or act() drain still does: its
+		// callback runs before inFlush is set.
 		countPassiveUpdate(block);
 	} else if (inNestedUpdateCallback()) {
 		NESTED_UPDATE_SCHEDULED = true;
@@ -8679,6 +8683,10 @@ export function flushSync<T>(fn: () => T): T {
 		// inside fn still flushes inline (React isn't "rendering" during the
 		// callback), while one landing inside the drain defers (guard above).
 		inFlush = true;
+		// The drain is a commit of its own, outside the phase of an effect that
+		// called flushSync: its ref callbacks and store checks are not passive work.
+		const effectPhase = CURRENT_EFFECT_PHASE;
+		CURRENT_EFFECT_PHASE = -1;
 		let pendingError: { err: any } | null = null;
 		try {
 			// Drain anything scheduled by fn (same depth-sorted, coalescing drain as flush()).
@@ -8703,6 +8711,7 @@ export function flushSync<T>(fn: () => T): T {
 			}
 		} finally {
 			inFlush = false;
+			CURRENT_EFFECT_PHASE = effectPhase;
 			if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__)
 				__devtoolsNotifyFlush();
 		}
