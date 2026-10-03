@@ -926,10 +926,11 @@ What differs is the event API and synthesis layer:
 - `onFocus`/`onBlur` use the browser's bubbling `focusin`/`focusout` events,
   including capture variants; the event object retains that native type.
 - Removing a focused host can make the browser dispatch `focusout` while the
-  removal is in progress. The removed hosts, and any host whose component has
-  unmounted, start no handler for it, but still-mounted ancestors receive it.
-  React suppresses every event during its commit, including those ancestors'
-  handlers.
+  removal is in progress, and so can a deletion cleanup that moves focus. Every
+  host the deletion removes starts no handler for it, including hosts of child
+  components the teardown has not reached yet, but still-mounted ancestors
+  receive it. React suppresses every event during its commit, including those
+  ancestors' handlers.
 - There are no synthetic `onChange`/`onBeforeInput`/`onSelect` polyfills — use
   the native events (`onInput` etc.).
 - Root listeners are non-passive. `preventDefault()` in `onWheel` or
