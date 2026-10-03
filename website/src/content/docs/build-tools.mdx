@@ -288,6 +288,9 @@ A Strong module cannot:
   and a stable item ID for keys.
 - Format a provable `Date` or `Intl` value while rendering without an explicit
   locale and time zone (`OCTANE_STRONG_RENDER_LOCALE_FORMAT`).
+- Schedule work while rendering with `setTimeout`, `setInterval`,
+  `queueMicrotask`, `requestAnimationFrame`, or `requestIdleCallback`, including
+  in a lazy state initializer (`OCTANE_STRONG_RENDER_SIDE_EFFECT`).
 - Declare a built-in hook value or its dependent effect outside the sole nested
   `@{…}` block that uses it (`OCTANE_STRONG_HOOK_LOCALITY`).
 - Declare a named native event handler outside the sole deeper nested `@{…}`
