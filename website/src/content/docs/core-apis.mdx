@@ -610,6 +610,48 @@ callback that an effect can call without reconnecting when its captures change. 
 wrapper identity is fresh on each render, but a wrapper registered by a committed effect
 always calls the latest committed body; do not add Effect Events to dependency arrays.
 
+<h3 id="use-layout-snapshot">
+	Measure committed layout with <code>useLayoutSnapshot</code>
+</h3>
+
+Use `useLayoutSnapshot` when rendered output depends on a measurement of the
+committed DOM:
+
+```tsrx
+import { useLayoutSnapshot, useRef } from 'octane';
+
+export function MeasuredContent() @{
+	const content = useRef<HTMLDivElement | null>(null);
+	const height = useLayoutSnapshot(() => content.current?.offsetHeight ?? 0, {
+		initial: 0,
+	});
+
+	<section>
+		<div ref={content}>Content to measure</div>
+		<p>{'Height: ' + height}</p>
+	</section>
+}
+```
+
+The callback measures after the DOM and refs are committed, before paint, on each
+committed render of the component that reaches the hook. The server and first
+hydration render use `initial`, or `undefined` if it is omitted; `initial` is used
+only when the hook is first mounted. Snapshots are compared with `Object.is` by
+default. Supply `equal(previous, next)` for a custom comparison, such as comparing
+the fields of a new object. Without an initial value, `previous` may be `undefined`.
+Only an unequal measurement triggers an update, which may cause another measurement.
+Make sure the calculation converges; an oscillating measurement reaches the update
+depth limit.
+
+The callback is for synchronous measurement, not setting state or acquiring
+resources. It runs in hook order with the component's other layout effects, so
+call `useLayoutSnapshot` after any `useLayoutEffect` that changes the DOM it
+measures. The hook does not observe layout changes on its own. For changes that
+can occur without a component commit, such as resizing, have an observer callback
+update state so the component commits again; that commit measures again.
+`useLayoutSnapshot` is available for the DOM renderer; the experimental universal
+and Valdi renderers do not support it.
+
 <h3 id="createResizeObserver">
 	Measure resizes with <code>createResizeObserver</code>
 </h3>
@@ -655,8 +697,9 @@ queued entry. The observer can be reused after disconnect. Pass an owning window
 constructor as the second argument when needed, for example
 `createResizeObserver(callback, iframe.contentWindow.ResizeObserver)`.
 
-If the first measurement must happen before paint, measure synchronously in
-`useLayoutEffect` before installing the observer. Effects do not run during SSR,
+If rendered output needs its first measurement before paint, render it from
+[`useLayoutSnapshot`](#use-layout-snapshot) and have the observer callback update
+state only to request a commit, which measures again. Effects do not run during SSR,
 and importing the helper does not initialize browser resources. The helper uses
 the native observer available in that window; it does not polyfill missing
 `ResizeObserver` support.
@@ -1452,6 +1495,10 @@ handlers; return here when you have a specific problem to solve.
 			<li>
 				<code>useLayoutEffect</code>
 				<span>Measure or adjust layout before paint.</span>
+			</li>
+			<li>
+				<code>useLayoutSnapshot</code>
+				<span>Render from a committed layout measurement before paint.</span>
 			</li>
 			<li>
 				<code>createResizeObserver</code>

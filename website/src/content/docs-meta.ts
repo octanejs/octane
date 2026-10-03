@@ -153,6 +153,11 @@ export const docsMeta: DocMeta[] = [
 				level: 3,
 			},
 			{
+				id: 'use-layout-snapshot',
+				title: 'Measure committed layout with useLayoutSnapshot',
+				level: 3,
+			},
+			{
 				id: 'createResizeObserver',
 				title: 'Measure resizes with createResizeObserver',
 				level: 3,

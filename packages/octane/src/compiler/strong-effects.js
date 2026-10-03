@@ -77,6 +77,13 @@ const FETCH_MESSAGES = {
 	ineffective:
 		'Strong mode requires the effect cleanup to cancel or ignore this asynchronous state update, but the returned cleanup does neither. Abort an AbortController whose signal is passed to the request, or set a flag in the cleanup and check it before this update, after the last await.',
 };
+// A useLayoutSnapshot measurement is checked like effect setup, but its return
+// value is the snapshot, so the cleanup advice above does not apply to it.
+const SNAPSHOT_MESSAGES = {
+	fetch:
+		'Strong mode does not allow a useLayoutSnapshot measurement to update state after an await or promise callback. Its return value is the snapshot, so it cannot return cleanup that cancels the update. Read asynchronous render data with use() or a query binding, or start the request in an effect whose returned cleanup aborts it.',
+	leak: "Strong mode does not allow a useLayoutSnapshot measurement to acquire this platform resource. Its return value is the snapshot, not cleanup, so nothing can release it. Acquire the resource in an effect and release it in that effect's returned cleanup.",
+};
 const LEAK_MESSAGES = {
 	listener:
 		'Strong mode requires effect cleanup to remove this event listener. Keep the handler in a variable and pass it to removeEventListener in the returned cleanup, with the same capture option, or pass an AbortController signal in the listener options and abort it in cleanup.',
@@ -1615,12 +1622,18 @@ export function createStrongEffectPolicy({ ast, analysis, callNames, report }) {
 				report(
 					STRONG_EFFECT_DATA_FETCH,
 					write.origin,
-					FETCH_MESSAGES[asyncCallback ? 'async' : hasCleanup ? 'ineffective' : 'missing'],
+					record.snapshot
+						? SNAPSHOT_MESSAGES.fetch
+						: FETCH_MESSAGES[asyncCallback ? 'async' : hasCleanup ? 'ineffective' : 'missing'],
 				);
 			}
 			for (const acquisition of record.acquisitions) {
 				if (released(acquisition, cleanup, record)) continue;
-				report(STRONG_EFFECT_RESOURCE_LEAK, acquisition.node, LEAK_MESSAGES[acquisition.kind]);
+				report(
+					STRONG_EFFECT_RESOURCE_LEAK,
+					acquisition.node,
+					record.snapshot ? SNAPSHOT_MESSAGES.leak : LEAK_MESSAGES[acquisition.kind],
+				);
 			}
 		},
 		// Callbacks of these calls run before the browser paints, so an update
