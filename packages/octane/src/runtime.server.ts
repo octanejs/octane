@@ -3028,10 +3028,14 @@ export function ssrForBlock(content: string, hasItems: boolean): string {
 // overwhelmingly ASCII (site keys, prop names, route segments), so those units
 // come from a prebuilt table and only the rare non-ASCII unit pays the slow
 // path. The emitted bytes are unchanged.
-const ASCII_ASYNC_IDENTITY_UNITS: string[] = [];
-for (let code = 0; code < 128; code++) {
-	ASCII_ASYNC_IDENTITY_UNITS.push(code.toString(16).padStart(4, '0'));
-}
+//
+// The table is built once at module load by a pure-annotated call rather than a
+// top-level loop. A loop is a side effect no bundler can drop, so every server
+// bundle kept it even when nothing encodes an identity.
+const ASCII_ASYNC_IDENTITY_UNITS: readonly string[] = /* @__PURE__ */ Array.from(
+	{ length: 128 },
+	(_, code) => code.toString(16).padStart(4, '0'),
+);
 /**
  * @internal Exported for direct testing: a conflating or wrong-width encoding is
  * invisible through `prerender`, because occurrence tracking assigns list items
@@ -4792,9 +4796,11 @@ function stateHook<S, A>(
 // state (absent skips the restore; empty still clears what a discarded pass
 // added). The list is frozen so an accidental write fails loudly instead of
 // leaking state into an unrelated snapshot; nothing mutates the maps or sets.
+// Bundlers cannot prove `Object.freeze` pure, so the annotation lets a server
+// bundle without replay snapshots drop the list.
 const EMPTY_SNAPSHOT_MAP: Map<never, never> = new Map<never, never>();
 const EMPTY_SNAPSHOT_SET: Set<never> = new Set<never>();
-const EMPTY_SNAPSHOT_LIST = Object.freeze([]) as never[];
+const EMPTY_SNAPSHOT_LIST = /* @__PURE__ */ Object.freeze([]) as never[];
 
 function snapshotMap<K, V>(map: Map<K, V> | null | undefined): Map<K, V> | null {
 	return map == null ? null : map.size === 0 ? EMPTY_SNAPSHOT_MAP : new Map(map);

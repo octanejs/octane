@@ -499,6 +499,24 @@ try {
 					`${name}: unrelated DOM namespace tables reached isolated server helpers`,
 				);
 			}
+			// The async-identity encoder reads an ASCII unit table built at module
+			// load. A bundle without the encoder must drop the table; server-render
+			// keeps the encoder, so it proves the pattern still matches.
+			const encodesIdentities = serverRuntimeExports.includes('encodeAsyncIdentityString');
+			if (id === 'server-render') {
+				assert.equal(
+					encodesIdentities,
+					true,
+					`${name}: the async-identity encoder was renamed or left server rendering; update this reachability check`,
+				);
+			}
+			assert.equal(
+				/\.toString\(16\)\.padStart\(4,\s*["']0["']\)/.test(code),
+				encodesIdentities,
+				encodesIdentities
+					? `${name}: the async-identity encoder no longer formats code units; update this reachability check`
+					: `${name}: a server bundle that never encodes an async identity retained its ASCII unit table`,
+			);
 		} else if (
 			id === 'capture-only' ||
 			id === 'behavior-root' ||
