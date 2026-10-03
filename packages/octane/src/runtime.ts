@@ -6445,7 +6445,7 @@ function vtWouldWrap(): boolean {
 /** Settle passives from nested sync commits before choosing capture priority and owners. */
 function vtDrainPassivesBeforeCapture(): boolean {
 	let passes = 0;
-	while (hasPendingPassiveWork()) {
+	while (effectQueues[PASSIVE].length > 0 || pendingPassiveUnmounts.length > 0) {
 		if (DEFERRED_LAYOUT_DRIVER?.holdPassivesBeforeRender() === true) return true;
 		// A long cascade keeps normal commit scheduling without retaining a stale
 		// animation batch. Ordinary passive effects still retain their yield policy.
@@ -6896,12 +6896,6 @@ function settleNestedUpdateChain(): void {
 	NESTED_UPDATE_CHAIN_ID++;
 }
 
-/** Close one outermost commit's share of the synchronous-callback chain. */
-function finishNestedUpdateCommit(): void {
-	if (NESTED_UPDATE_SCHEDULED) NESTED_UPDATE_SCHEDULED = false;
-	else settleNestedUpdateChain();
-}
-
 function inNestedUpdateCallback(): boolean {
 	return EFFECT_BODY_DEPTH > 0 || REF_CALLBACK_DEPTH > 0 || STORE_SYNC_DEPTH > 0;
 }
@@ -7045,7 +7039,7 @@ function scheduleRender(block: Block): void {
 				block.nestedUpdateCount === NESTED_UPDATE_LIMIT + 1 &&
 				EFFECT_COMMIT_DEPTH <= 1 &&
 				CURRENT_EFFECT_PHASE !== PASSIVE &&
-				hasPendingPassiveWork()
+				(effectQueues[PASSIVE].length > 0 || pendingPassiveUnmounts.length > 0)
 			) {
 				HELD_PASSIVE_CHAIN = NESTED_UPDATE_CHAIN_ID;
 			} else {
@@ -8643,7 +8637,7 @@ function vtFlush(
 
 /** Drain pending passive effects ahead of a render pass (see flush()). */
 function drainPassivesBeforeRender(): void {
-	if (hasPendingPassiveWork()) {
+	if (effectQueues[PASSIVE].length > 0 || pendingPassiveUnmounts.length > 0) {
 		if (DEFERRED_LAYOUT_DRIVER?.holdPassivesBeforeRender() === true) return;
 		drainPassiveEffects();
 	}
@@ -9689,7 +9683,8 @@ function restoreDeferredPassives(capture: DeferredLayoutCapture): void {
 	for (const entry of capture.passiveUnmounts) pendingPassiveUnmounts.push(entry);
 	for (const entry of laterUnmounts) pendingPassiveUnmounts.push(entry);
 	capture.passiveUnmounts.length = 0;
-	if (hasPendingPassiveWork() && !passiveScheduled) schedulePassiveFlush();
+	if ((effectQueues[PASSIVE].length > 0 || pendingPassiveUnmounts.length > 0) && !passiveScheduled)
+		schedulePassiveFlush();
 }
 
 /** An animation batch owns its passive work without blocking unrelated commits. */
@@ -9853,9 +9848,21 @@ function commitEffects(): void {
 		!hasControlledSyncs()
 	) {
 		if (DEFERRED_LAYOUT_DRIVER?.defer(null, null) === true) return;
-		if (hasPendingPassiveWork()) DEFERRED_LAYOUT_DRIVER?.beforeCommit();
-		if (hasPendingPassiveWork() && !passiveScheduled) schedulePassiveFlush();
-		if (EFFECT_COMMIT_DEPTH === 0) finishNestedUpdateCommit();
+		if (effectQueues[PASSIVE].length > 0 || pendingPassiveUnmounts.length > 0)
+			DEFERRED_LAYOUT_DRIVER?.beforeCommit();
+		if (
+			(effectQueues[PASSIVE].length > 0 || pendingPassiveUnmounts.length > 0) &&
+			!passiveScheduled
+		) {
+			schedulePassiveFlush();
+		}
+		// Close this commit's share of the sync-callback chain inline: commits
+		// are hot, and only a settled hold needs the out-of-line path.
+		if (EFFECT_COMMIT_DEPTH === 0) {
+			if (NESTED_UPDATE_SCHEDULED) NESTED_UPDATE_SCHEDULED = false;
+			else if (HELD_PASSIVE_CHAIN === NESTED_UPDATE_CHAIN_ID) settleNestedUpdateChain();
+			else NESTED_UPDATE_CHAIN_ID++;
+		}
 		return;
 	}
 	DEFERRED_LAYOUT_DRIVER?.beforeCommit();
@@ -9902,10 +9909,19 @@ function commitEffects(): void {
 		// against the store and re-render any that tore. Mirrors React draining its
 		// store-consistency checks right after commitLayoutEffects.
 		drainStoreSyncs();
-		if (hasPendingPassiveWork() && !passiveScheduled) schedulePassiveFlush();
+		if (
+			(effectQueues[PASSIVE].length > 0 || pendingPassiveUnmounts.length > 0) &&
+			!passiveScheduled
+		) {
+			schedulePassiveFlush();
+		}
 		// Only an outermost commit closes the chain. Commits nested in another
 		// commit or in a passive drain (flushSync from a passive effect) never reset it.
-		if (EFFECT_COMMIT_DEPTH === 1) finishNestedUpdateCommit();
+		if (EFFECT_COMMIT_DEPTH === 1) {
+			if (NESTED_UPDATE_SCHEDULED) NESTED_UPDATE_SCHEDULED = false;
+			else if (HELD_PASSIVE_CHAIN === NESTED_UPDATE_CHAIN_ID) settleNestedUpdateChain();
+			else NESTED_UPDATE_CHAIN_ID++;
+		}
 	} finally {
 		TRANSITION_DEPTH = transitionDepth;
 		ACTIVE_TRANSITION_ACTION_BATCH = actionBatch;
@@ -10492,10 +10508,6 @@ function drainEffectEventCommitActions(): InlineCaughtErrorReport[] | null {
 // the captured handler routes a late throw to the try boundary that enclosed
 // the deletion — the same routing reportTeardownError gave the sync destroys.
 const pendingPassiveUnmounts: Array<Cleanup | TryHandler | Block | null> = [];
-
-function hasPendingPassiveWork(): boolean {
-	return effectQueues[PASSIVE].length > 0 || pendingPassiveUnmounts.length > 0;
-}
 
 function drainDeferredPassiveUnmounts(): void {
 	if (pendingPassiveUnmounts.length === 0) return;

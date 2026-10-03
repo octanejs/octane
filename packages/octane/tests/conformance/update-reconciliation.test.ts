@@ -560,6 +560,10 @@ describe('ReactUpdates update reconciliation', () => {
 			expect(container.querySelector('#passive-layout-measure')!.textContent).toBe('60:60');
 			expectCascadeWarning();
 
+			await act(() => root.render(Fixture.PassiveStepAfterMeasure, { limit: 60 }));
+			expect(container.querySelector('#passive-after-measure')!.textContent).toBe('60:60');
+			expectCascadeWarning();
+
 			await act(() => root.render(Fixture.PassiveStepLayoutSnapshot, { limit: 60 }));
 			expect(container.querySelector('#passive-layout-snapshot')!.textContent).toBe('60:600');
 			expectCascadeWarning();

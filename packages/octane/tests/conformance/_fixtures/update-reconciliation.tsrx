@@ -468,6 +468,20 @@ export function PassiveStepLayoutMeasure(props: { limit: number }) @{
 	<span id="passive-layout-measure">{`${step}:${measured}`}</span>
 }
 
+// The passive effect advances only after each measurement commits, so every
+// step settles before the next one starts and no passive effect is left waiting.
+export function PassiveStepAfterMeasure(props: { limit: number }) @{
+	const [step, setStep] = useState(0);
+	const [measured, setMeasured] = useState(-1);
+	useLayoutEffect(() => {
+		if (measured !== step) setMeasured(step);
+	}, null);
+	useEffect(() => {
+		if (measured === step && step < props.limit) setStep(step + 1);
+	}, [measured]);
+	<span id="passive-after-measure">{`${step}:${measured}`}</span>
+}
+
 // The same cascade measured through useLayoutSnapshot, which publishes one
 // converging snapshot of each committed step.
 export function PassiveStepLayoutSnapshot(props: { limit: number }) @{
