@@ -202,5 +202,133 @@ describe.each([
 			expect(recoverable).toEqual([]);
 			expect(warnings()).toEqual([]);
 		});
+
+		/**
+		 * Each child of `host` is the server element at that index of
+		 * `serverNodes`, or one the client built (-1).
+		 */
+		function expectNodes(host: Element, serverNodes: Element[], expected: number[]): void {
+			const children = [...host.children];
+			expect(children).toHaveLength(expected.length);
+			expected.forEach((index, i) => {
+				if (index < 0) expect(serverNodes).not.toContain(children[i]);
+				else expect(children[i]).toBe(serverNodes[index]);
+			});
+		}
+
+		// One structural report: a component at the hole reports its range as
+		// rebuilt (55) where the production compile renders it without one.
+		const REBUILT =
+			runtime === 'production' ? /^Minified Octane error #5[15];/ : /built on the client/;
+
+		// An @if or @switch at a hole of the client's arm, where the server rendered
+		// the other arm: the hole's walk finds that arm's <s>, not a range of the
+		// slot's own, and the arm's static <b> matches the server's <b> after it.
+		// The slot takes the place of exactly that <s>, so the <b> stays the arm's.
+		it('renders a nested @if in place of the other arm’s node at its hole', async () => {
+			const { host, serverNodes, recoverable } = await hydrate(
+				'NestedIfHoleFirst',
+				{ server: true },
+				{ inner: true },
+			);
+			const [, b, em] = serverNodes;
+
+			expect(markup(host)).toBe('<s>s</s><b>a</b><b>a</b><em>e</em>');
+			expectNodes(host, serverNodes, [-1, -1, 1, 2]);
+			expect(recoverable).toEqual([expect.stringMatching(STRUCTURAL)]);
+
+			flushSync(() => root!.render(client.NestedIfHoleFirst, { inner: false }));
+			expect(markup(host)).toBe('<b>a</b><em>e</em>');
+			expect(host.children[0]).toBe(b);
+			flushSync(() => root!.render(client.NestedIfHoleFirst, { inner: true }));
+			expect(markup(host)).toBe('<s>s</s><b>a</b><b>a</b><em>e</em>');
+			expect(host.children[2]).toBe(b);
+			expect(host.children[3]).toBe(em);
+			expect(recoverable).toHaveLength(1);
+		});
+
+		it.each([
+			{
+				name: 'NestedIfHoleFirst',
+				props: { inner: false },
+				html: '<b>a</b><em>e</em>',
+				nodes: [1, 2],
+				next: { inner: true },
+				updated: '<s>s</s><b>a</b><b>a</b><em>e</em>',
+			},
+			{
+				name: 'NestedIfHoleMid',
+				props: { inner: true },
+				html: '<i>i</i><s>s</s><b>a</b><b>a</b><em>e</em>',
+				nodes: [0, -1, -1, 2, 3],
+				next: { inner: false },
+				updated: '<i>i</i><b>a</b><em>e</em>',
+			},
+			{
+				name: 'NestedIfHoleMid',
+				props: { inner: false },
+				html: '<i>i</i><b>a</b><em>e</em>',
+				nodes: [0, 2, 3],
+				next: { inner: true },
+				updated: '<i>i</i><s>s</s><b>a</b><b>a</b><em>e</em>',
+			},
+			{
+				name: 'NestedSwitchHoleFirst',
+				props: { inner: 'pair' },
+				html: '<s>s</s><b>a</b><b>a</b><em>e</em>',
+				nodes: [-1, -1, 1, 2],
+				next: { inner: 's' },
+				updated: '<s>s</s><b>a</b><em>e</em>',
+			},
+			{
+				name: 'NestedSwitchHoleFirst',
+				props: { inner: 's' },
+				html: '<s>s</s><b>a</b><em>e</em>',
+				nodes: [0, 1, 2],
+				next: { inner: 'p' },
+				updated: '<p>p</p><b>a</b><em>e</em>',
+			},
+			{
+				name: 'NestedSwitchHoleFirst',
+				props: { inner: 'p' },
+				html: '<p>p</p><b>a</b><em>e</em>',
+				nodes: [-1, 1, 2],
+				next: { inner: 'pair' },
+				updated: '<s>s</s><b>a</b><b>a</b><em>e</em>',
+			},
+			{
+				name: 'NestedSwitchHoleFirst',
+				props: { inner: 'component' },
+				html: '<s>s</s><b>a</b><b>a</b><em>e</em>',
+				nodes: [-1, -1, 1, 2],
+				next: { inner: 'none' },
+				updated: '<b>a</b><em>e</em>',
+			},
+			{
+				name: 'NestedSwitchHoleFirst',
+				props: { inner: 'none' },
+				html: '<b>a</b><em>e</em>',
+				nodes: [1, 2],
+				next: { inner: 'component' },
+				updated: '<s>s</s><b>a</b><b>a</b><em>e</em>',
+			},
+		])(
+			'renders $name with $props in place of the other arm’s node at its hole',
+			async ({ name, props, html, nodes, next, updated }) => {
+				const { host, serverNodes, recoverable } = await hydrate(name, { server: true }, props);
+				// Only an arm that is the other arm's node adopts it without a report.
+				const adopted = nodes.every((index) => index >= 0) && nodes.length === serverNodes.length;
+
+				expect(markup(host)).toBe(html);
+				expectNodes(host, serverNodes, nodes);
+				expect(recoverable).toEqual(adopted ? [] : [expect.stringMatching(REBUILT)]);
+				if (adopted) expect(warnings()).toEqual([]);
+
+				flushSync(() => root!.render(client[name], next));
+				expect(markup(host)).toBe(updated);
+				expect(serverNodes.at(-1)!.isConnected).toBe(true);
+				expect(recoverable).toHaveLength(adopted ? 0 : 1);
+			},
+		);
 	},
 );

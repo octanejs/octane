@@ -19838,6 +19838,39 @@ class HydrationCapability {
 		return cursor !== null && isBlockOpen(cursor) ? (cursor as Comment) : null;
 	}
 
+	/**
+	 * The open marker of the server range that an `@if`/`@switch` slot adopts
+	 * on its first render at `anchor`, as resolveOpen finds it. The server frames
+	 * every such slot, so an element or text there, other than the end marker
+	 * of `scope`'s block, is where its template hole's walk found another arm's
+	 * markup, as an enclosing `@if` renders it when the server took another arm.
+	 * The walk counts one server node for the hole and gives the nodes after it
+	 * to the template's later roots, so that node is all the slot may claim.
+	 * Frame it in the slot's and an arm's range, as the server would have: the
+	 * branch then adopts it, rebuilds over it or discards it, and claims nothing
+	 * after it, as for any server range.
+	 */
+	branchOpen(anchor: Node | null, domParent: Node, scope: Scope): Comment | null {
+		if (
+			anchor === null ||
+			anchor.nodeType === 8 ||
+			anchor === scope.block.endMarker ||
+			domNode(anchor).parentNode !== domParent ||
+			this.freshNodes.has(anchor)
+		)
+			return this.resolveOpen(anchor, domParent);
+		const doc = STAGED_DOM?.view(document) ?? document;
+		const parent = domNode(domParent);
+		const next = getNextSibling(anchor);
+		const open = doc.createComment(HYDRATION_START);
+		this.save(domParent);
+		parent.insertBefore(open, anchor);
+		parent.insertBefore(doc.createComment(HYDRATION_START), anchor);
+		parent.insertBefore(doc.createComment(HYDRATION_END), next);
+		parent.insertBefore(doc.createComment(HYDRATION_END), next);
+		return open;
+	}
+
 	markerState(node: Node): -1 | 0 | 1 {
 		return ssrForMarkerState(node);
 	}
@@ -43737,7 +43770,10 @@ export function ifBlock(
 		// SOLE-hole case — a @if that is the only thing an enclosing arm/component
 		// renders (e.g. `@try { @if (…) {…} }`, the router Match shape) — where the
 		// anchor is the arm's END marker and the cursor is parked on the @if's open.
-		const open = passthrough ? null : (hydration?.resolveOpen(anchor ?? null, domParent) ?? null);
+		// branchOpen frames another arm's node that the template walk found here.
+		const open = passthrough
+			? null
+			: (hydration?.branchOpen(anchor ?? null, domParent, parentScope) ?? null);
 		if (open !== null) {
 			start = open;
 			end = hydration!.close(open);
@@ -44686,7 +44722,9 @@ export function switchBlock(
 		// Mirror ifBlock's sole-control-flow adoption: when @switch is the only
 		// output of an enclosing component/arm, its compiler anchor is that owner's
 		// END marker while the hydration cursor sits on the switch range's open.
-		const open = passthrough ? null : (hydration?.resolveOpen(anchor ?? null, domParent) ?? null);
+		const open = passthrough
+			? null
+			: (hydration?.branchOpen(anchor ?? null, domParent, parentScope) ?? null);
 		if (open !== null) {
 			start = open;
 			end = hydration!.close(open);
