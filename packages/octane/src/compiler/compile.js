@@ -2556,9 +2556,12 @@ function ssrShellClientWork(tag, attrs) {
 		}
 	}
 	// `{ value }` for a bare or literal attribute, null when only runtime knows.
+	// Type-only wrappers (`as`, `!`, `satisfies`, parentheses) keep a literal known.
 	const known = (value) => {
 		if (value == null) return { value: true };
-		const expression = value.type === 'JSXExpressionContainer' ? value.expression : value;
+		const expression = unwrapTsExpr(
+			value.type === 'JSXExpressionContainer' ? value.expression : value,
+		);
 		if (expression.type === 'Literal') return { value: expression.value };
 		if (expression.type === 'Identifier' && expression.name === 'undefined') {
 			return { value: undefined };

@@ -55,6 +55,8 @@ export function StaticControls(props: { query: string; choice: string }) @{
 	<form>
 		<input value={props.query} readOnly />
 		<input type="hidden" name="token" value={props.query} />
+		<input type={'hidden' as const} name="typed" value={props.query} />
+		<input value={props.query} readOnly={true as boolean} />
 		<textarea value={props.query} disabled />
 		<input defaultValue={props.query} />
 		<input type="radio" name="choice" value={props.choice} />
