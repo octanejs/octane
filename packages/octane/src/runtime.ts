@@ -35078,14 +35078,16 @@ function deoptItemBody(item: any, scope: Scope): void {
 	// below — and reorder/teardown — keep a live range. Client-only by
 	// construction (hydrated items always adopt the server's pair).
 	const existingChild = scope.slots[0] as ChildSlot | undefined;
-	// Each field read of a scoped JSX value resolves its record again.
+	// Each field read of a scoped JSX value resolves its record again. A component
+	// descriptor always needs Blocks, so it skips descNeedsBlocks' second read.
 	const itemType = isElementDescriptor(item) ? item.type : undefined;
 	const hostItem = typeof itemType === 'string';
 	const needsBlocks =
 		(hostItem &&
 			existingChild?.__kind === 'childSlot' &&
 			existingChild.currentComp === (hostElementBody as unknown as ComponentBody)) ||
-		descNeedsBlocks(item, itemType);
+		typeof itemType === 'function' ||
+		descNeedsBlocks(item);
 	const sm = block.startMarker;
 	if (
 		sm !== null &&
@@ -35360,9 +35362,7 @@ function mappedDeoptItemBody(item: any, scope: Scope): void {
 // its components need reconcilable, unmountable Blocks — so the de-opt
 // paths (childSlot, deoptItemBody) route it through `hostElementBody`/componentSlot
 // instead. Pure host/text subtrees return false and keep the cheap rebuild path.
-// `elementType` is the type a caller already read from an element `value`: each
-// field read of a scoped JSX value resolves its record again.
-function descNeedsBlocks(value: any, elementType?: unknown): boolean {
+function descNeedsBlocks(value: any): boolean {
 	// A render-FUNCTION child (the `.tsrx` lowering of `<Host>{children}</Host>` passes
 	// `props.children` as a component body, not a descriptor) needs a Block: childSlot
 	// renders a function value as a component. Without this a `.tsrx` consumer's children
@@ -35387,18 +35387,17 @@ function descNeedsBlocks(value: any, elementType?: unknown): boolean {
 	// exhaust generators before the real render.
 	if (!isElementDescriptor(value) && childrenIterator(value) !== null) return true;
 	if (value.$$kind === ELEMENT_TAG) {
-		const type = elementType ?? value.type;
 		// A Fragment descriptor is reconciled by childSlot's fragment-aware list
 		// path. If it appears below a host descriptor, keep that host on the Block
 		// path so the Fragment boundary is not mistaken for a raw host node.
 		if (
-			type === Fragment ||
-			(activityDescriptorDispatch !== null && type === activityDescriptorDispatch.type)
+			value.type === Fragment ||
+			(activityDescriptorDispatch !== null && value.type === activityDescriptorDispatch.type)
 		)
 			return true;
 		// A component descriptor (function `type`) always needs a Block; a host
 		// descriptor needs one only if its own children do (recurse).
-		return typeof type === 'function' || descNeedsBlocks(value.children);
+		return typeof value.type === 'function' || descNeedsBlocks(value.children);
 	}
 	// A portal descriptor renders into a foreign target via its own Block, so an
 	// array containing one (e.g. `useDecorators()` returning an array of portals)
@@ -36924,11 +36923,13 @@ export function childSlot(
 	// Once a host gains component children, keep its reconciled Block while it
 	// remains a host descriptor. Dropping back to the raw path would recreate
 	// the host and every surviving input when the last component is removed.
+	// After Usable unwrapping a host descriptor is no thenable, so it needs Blocks
+	// exactly when its children do.
 	const pureHost =
 		preparedList === null &&
 		typeof elementType === 'string' &&
 		state?.currentComp !== (hostElementBody as unknown as ComponentBody) &&
-		!descNeedsBlocks(value, elementType);
+		!descNeedsBlocks((value as ElementDescriptor).children);
 	let rootShapeChanged = false;
 	if (state !== undefined && ROOT_RENDER_TRANSACTION !== null) {
 		const component =
