@@ -212,25 +212,60 @@ export function analyzeIslandsShell(
 			? name
 			: record.imported;
 	};
-	// A signal handle, directly or through a member or a module-level alias.
+	// A signal handle, directly, through a member, or through an import or
+	// module-level alias.
 	const isHandle = (node, seen = new Set()) => {
 		node = unwrap(node);
 		if (node?.type === 'MemberExpression') return /\$$/.test(propertyOf(node) ?? '');
 		if (node?.type !== 'Identifier') return false;
-		if (/\$$/.test(node.name)) return true;
+		if (/\$$/.test(node.name) || /\$$/.test(importedName(node.name))) return true;
 		if (seen.has(node.name)) return false;
 		seen.add(node.name);
 		return isHandle(values.get(node.name), seen);
+	};
+	// Follow module-level `const A = B` aliases to the binding they name.
+	const aliased = (name) => {
+		const seen = new Set();
+		for (let value = unwrap(values.get(name)); value?.type === 'Identifier';) {
+			if (seen.has(name)) break;
+			seen.add(name);
+			name = value.name;
+			value = unwrap(values.get(name));
+		}
+		return name;
 	};
 	// A value passed into JSX may be rendered as a component by its receiver.
 	const passed = (node) => {
 		node = unwrap(node);
 		if (node?.type === 'Identifier') {
-			const record = imports.get(node.name);
-			if (record === undefined || functions.has(node.name)) return;
-			if (relative(record)) component(record, true);
-			else if (/^[A-Z]/.test(node.name) && !/^octane(?:\/|$)/.test(record.source))
+			const name = aliased(node.name);
+			const fn = functions.get(name);
+			if (fn !== undefined) {
+				enqueue(fn);
+				return;
+			}
+			const record = imports.get(name);
+			if (record === undefined) {
+				// A module-level wrapper (`memo(...)`) is as uncheckable here as a tag.
+				const value = unwrap(values.get(name));
+				if (value != null && /^[A-Z]/.test(name) && !INERT.has(value.type))
+					report(node, `component ${node.name} cannot be checked as static shell output`);
+			} else if (relative(record)) component(record, true);
+			else if (/^[A-Z]/.test(name) && !/^octane(?:\/|$)/.test(record.source))
 				report(node, `component ${node.name} cannot be checked as static shell output`);
+		} else if (node?.type === 'MemberExpression') {
+			// `UI.Button` through a namespace import names that module's export.
+			const object = unwrap(node.object);
+			const record = object?.type === 'Identifier' ? imports.get(aliased(object.name)) : undefined;
+			const property = propertyOf(node);
+			if (record === undefined || property === null || !/^[A-Z]/.test(property)) return;
+			if (record.imported === '*' && /^\.\.?\//.test(record.source))
+				component({ source: record.source, imported: property }, true);
+			else if (!/^octane(?:\/|$)/.test(record.source))
+				report(
+					node,
+					`component ${object.name}.${property} cannot be checked as static shell output`,
+				);
 		} else if (node?.type === 'ArrayExpression') {
 			for (const element of node.elements) passed(element);
 		} else if (node?.type === 'ObjectExpression') {
@@ -376,7 +411,7 @@ export function analyzeIslandsShell(
 		} else if (node.type === 'Identifier') {
 			// Any local function the shell references may run or render on the
 			// server, whether as a tag, a call, or a value handed to a component.
-			const fn = functions.get(node.name);
+			const fn = functions.get(aliased(node.name));
 			if (fn !== undefined) enqueue(fn);
 		} else if (node.type === 'MemberExpression' && !node.computed) {
 			visit(node.object);

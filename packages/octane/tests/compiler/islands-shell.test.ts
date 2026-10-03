@@ -89,6 +89,24 @@ describe('islands-only shell analysis', () => {
 			/Library cannot be checked/,
 		],
 		[
+			'a module-level wrapped component passed as a prop',
+			'<Static render={Item} />',
+			/component Item cannot be checked/,
+			"import { memo } from 'octane';\nconst Item = memo(() => <button onClick={() => {}}>x</button>);",
+		],
+		[
+			'a function alias passed as a prop',
+			'<Static render={Alias} />',
+			/"onClick" needs client code/,
+			'function Item() @{ <button onClick={() => {}}>x</button> }\nconst Alias = Item;',
+		],
+		[
+			'a namespaced package component passed as a prop',
+			'<Static render={UI.Button} />',
+			/component UI\.Button cannot be checked/,
+			"import * as UI from 'library-ui';",
+		],
+		[
 			'a hook imported under an alias',
 			"onMount(() => { document.title = 'client'; }, []); <main>static</main>",
 			/hook useEffect\(\)/,
@@ -113,6 +131,12 @@ describe('islands-only shell analysis', () => {
 			"import * as state from './state';",
 		],
 		[
+			'a signal handle imported under an alias',
+			'<p>{live as any}</p>',
+			/signal handle binding/,
+			"import { count$ as live } from './state';",
+		],
+		[
 			'a signal handle bound through a module alias',
 			'<p>{live as any}</p>',
 			/signal handle binding/,
@@ -128,13 +152,15 @@ describe('islands-only shell analysis', () => {
 		const result = analyzeIslandsShell(
 			shell(
 				`<main title={format(props.title)}>
-    <Static render={Island} items={[label, props.extra]} />
+    <Static render={Island} items={[label, props.extra]} theme={Theme} button={UI.Button} />
     <img src={logo} alt={tagline} />
     {format(props.body) as string}
   </main>`,
 				`import { label } from 'library';
 import { tagline } from './copy.ts';
 import logo from './logo.svg';
+import * as UI from './ui.tsrx';
+const Theme = { color: 'red' };
 function format(value) { return String(value).trim(); }`,
 			),
 			'/src/Page.tsrx',
@@ -144,6 +170,7 @@ function format(value) { return String(value).trim(); }`,
 		expect(result.components).toEqual([
 			{ source: './Static.tsrx', exportName: 'Static' },
 			{ source: './Island.tsrx', exportName: 'Island', value: true },
+			{ source: './ui.tsrx', exportName: 'Button', value: true },
 			{ source: './logo.svg', exportName: 'default', value: true },
 			{ source: './copy.ts', exportName: 'tagline', value: true },
 		]);
