@@ -11,6 +11,11 @@ import {
 	type RenderOptions,
 	type TextProps,
 } from '../src/index.js';
+import type { JSX as InkJSX } from '../src/intrinsics.js';
+
+type Assert<T extends true> = T;
+type Equal<Left, Right> =
+	(<T>() => T extends Left ? 1 : 2) extends <T>() => T extends Right ? 1 : 2 ? true : false;
 
 const App: InkComponent<{ readonly label: string }> = () => null;
 const options: RenderOptions = { interactive: false, maxFps: 60 };
@@ -22,6 +27,12 @@ const box: (props: BoxProps) => unknown = Box;
 const text: (props: TextProps) => unknown = Text;
 const key = {} as Key;
 const element = null as DOMElement | null;
+
+// Under `jsx: preserve`, authored JSX children reach a component's `children`
+// prop only through this attribute.
+type _ChildrenAttributeIsChildren = Assert<
+	Equal<keyof InkJSX.ElementChildrenAttribute, 'children'>
+>;
 
 void box;
 void text;
