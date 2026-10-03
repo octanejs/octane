@@ -74,6 +74,12 @@ export function __prepareBindingSources(
 	};
 }
 
+/** Error path only: inspection allocates. Whether a subscribed source's owner retired. */
+export function __retiredBindingSource(subscriptions: Map<NativeReadSource, unknown>): boolean {
+	for (const source of subscriptions.keys()) if (source.inspect?.().retired) return true;
+	return false;
+}
+
 /** Canonical style values after native handles and CSS units have been resolved. */
 export type BindingStyleSnapshot = Readonly<Record<string, string | null>>;
 
@@ -211,6 +217,7 @@ export function __createBindingStyles() {
 			};
 			return {
 				get,
+				retired: () => __retiredBindingSource(subscriptions),
 				preview(value): BindingPreparedValue {
 					const reads = new Map<NativeReadSource, number>();
 					const previousObserver = setNativeReadObserver((source, version) => {

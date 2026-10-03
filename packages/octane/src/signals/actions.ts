@@ -22,6 +22,7 @@ import {
 	SIGNAL_HANDLE,
 	SIGNAL_BINDING_READ,
 	SIGNAL_BINDING_SUBSCRIBE,
+	SIGNAL_BINDING_RETIRED,
 	SIGNAL_BINDING_IDENTITY,
 	SIGNAL_OWNER_RESOLVE,
 	type ActionOperation,
@@ -270,6 +271,10 @@ class OptimisticDescriptor<T> implements OptimisticSignal<T>, OwnerBoundSignal<T
 			forwardNativeTransitionConsumer(notify, () => run(notify)),
 			onRetire === undefined ? undefined : () => run(onRetire),
 		);
+	}
+
+	[SIGNAL_BINDING_RETIRED](): boolean {
+		return this.manager().view$[SIGNAL_BINDING_RETIRED]!();
 	}
 
 	[SIGNAL_BINDING_IDENTITY]() {

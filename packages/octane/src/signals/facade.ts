@@ -35,6 +35,7 @@ import {
 	SIGNAL_HANDLE,
 	SIGNAL_BINDING_IDENTITY,
 	SIGNAL_BINDING_READ,
+	SIGNAL_BINDING_RETIRED,
 	SIGNAL_BINDING_SUBSCRIBE,
 	SIGNAL_OWNER_RESOLVE,
 	type DerivedCompute,
@@ -410,6 +411,10 @@ export abstract class Descriptor<T, H extends SignalHandle<T>> implements OwnerB
 			forwardNativeTransitionConsumer(notify, () => run(notify)),
 			onRetire === undefined ? undefined : () => run(onRetire),
 		);
+	}
+
+	[SIGNAL_BINDING_RETIRED](): boolean {
+		return this.resolve()[SIGNAL_BINDING_RETIRED]?.() === true;
 	}
 
 	[SIGNAL_BINDING_IDENTITY]() {
