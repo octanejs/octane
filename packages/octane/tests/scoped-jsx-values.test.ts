@@ -4,6 +4,7 @@ import * as ServerRuntime from 'octane/server';
 import {
 	Children,
 	cloneElement,
+	createElement,
 	createScopedElement,
 	createScopedValue,
 	flushSync,
@@ -1394,6 +1395,21 @@ if (process.env.OCTANE_TEST_COMPILE_MODE === 'prod') {
 		}
 	});
 }
+
+it('enumerates a scoped value with the same keys as an ordinary descriptor', () => {
+	let reads = 0;
+	const value = createScopedValue(() => {
+		reads++;
+		return createElement('span', { key: 'a', id: 'a' }, 'alpha');
+	});
+	const keys = ['$$kind', 'type', 'props', 'key', 'ref', 'children'];
+	expect(Object.keys(createElement('span', { key: 'a', id: 'a' }, 'alpha'))).toEqual(keys);
+	expect(Object.keys(value)).toEqual(keys);
+	const enumerated: string[] = [];
+	for (const name in value) enumerated.push(name);
+	expect(enumerated).toEqual(keys);
+	expect(reads).toBe(0);
+});
 
 it('clones and maps scoped values whose resolved elements defer children', () => {
 	const reads: string[] = [];

@@ -1003,6 +1003,87 @@ export function App(props) @{ <main>@for (const item of props.items; key item) {
 		root.unmount();
 	});
 
+	it.each([false, true])(
+		'resumes component signals from JSX values at distinct call sites (dev: %s)',
+		async (dev) => {
+			vi.resetModules();
+			const server = await import('../../src/runtime.server.js');
+			const client = await import('../../src/runtime.js');
+			const signals = await import('../../src/signals/index.js');
+			const { bootstrapStreamedSignalHydration } =
+				await import('../../src/hydration/streamed-signals.js');
+			const { loadCompiledFixtureSource } = await import('../_server-fixture.js');
+			const { activateStreamedMarkup, resetStreamRuntimeGlobals } =
+				await import('../_server-stream.js');
+			const { drainProducers } = await import('../_fixtures/signals-async-controls.js');
+			// Dynamic JSX values defer their whole element until they render. The
+			// two fields share every declaration, so only each element's call site
+			// keeps their signals apart and joins the client to the server's.
+			const source = `import { signal$ } from 'octane/signals';
+function Field(props) @{
+ const label$ = signal$(props.label);
+ <section><output>{props.query(props.label) as string}</output><input value={label$}/></section>
+}
+export function App(props) @{
+ const left = <Field label={props.left} query={props.query}/>;
+ const right = <Field label={props.right} query={props.query}/>;
+ <main>@try { <div>{left}{right}</div> } @pending { <i>{'waiting'}</i> }</main>
+}`;
+			const options = {
+				id: '/src/scoped-value-call-sites.tsrx',
+				compileOptions: { dev, hmr: false },
+				runtimeModules: { 'octane/signals': signals },
+			};
+			const serverModule = loadCompiledFixtureSource(source, { ...options, mode: 'server' });
+			const clientModule = loadCompiledFixtureSource(source, { ...options, mode: 'client' });
+			const serverLoad = vi.fn(async (key: string) => `server ${key}`);
+			const browserLoad = vi.fn(async (key: string) => `browser ${key}`);
+			const props = (load: (key: string) => Promise<string>) => ({
+				left: 'left',
+				right: 'right',
+				query: (key: string) => signals.__queryAt('i:scoped-value-call-sites', () => key, load),
+			});
+			const streamedSignals = { buildId: 'scoped-value-sites', documentId: 'scoped-value-sites' };
+			const container = document.createElement('div');
+			document.body.append(container);
+			let root: ReturnType<typeof client.hydrateRoot> | undefined;
+			let hydration: ReturnType<typeof bootstrapStreamedSignalHydration> | undefined;
+			try {
+				const output = await server.prerender(serverModule.App, props(serverLoad), {
+					streamedSignals,
+				});
+				container.innerHTML = output.html;
+				activateStreamedMarkup(container);
+				const results = [...container.querySelectorAll('output')];
+				const controls = [...container.querySelectorAll('input')];
+				expect(results.map((node) => node.textContent)).toEqual(['server left', 'server right']);
+				expect(controls.map((node) => node.value)).toEqual(['left', 'right']);
+				const errors: unknown[] = [];
+				hydration = bootstrapStreamedSignalHydration(streamedSignals);
+				root = client.hydrateRoot(container, clientModule.App, props(browserLoad), {
+					signalOwner: hydration.signalOwner,
+					onRecoverableError: (error) => errors.push(error),
+					onUncaughtError: (error) => errors.push(error),
+				});
+				await drainProducers();
+				client.flushSync(() => {});
+				expect(browserLoad).not.toHaveBeenCalled();
+				expect([...container.querySelectorAll('output')]).toEqual(results);
+				expect([...container.querySelectorAll('input')]).toEqual(controls);
+				expect(results.map((node) => node.textContent)).toEqual(['server left', 'server right']);
+				expect(errors).toEqual([]);
+				controls[0]!.value = 'edited';
+				client.flushSync(() => controls[0]!.dispatchEvent(new Event('input', { bubbles: true })));
+				expect(controls.map((node) => node.value)).toEqual(['edited', 'right']);
+			} finally {
+				root?.unmount();
+				hydration?.dispose();
+				container.remove();
+				resetStreamRuntimeGlobals();
+			}
+		},
+	);
+
 	it('keeps repeated keyed call sites stable across opposite traversal order', () => {
 		const serverKeys: Record<string, string> = {};
 		const clientKeys: Record<string, string> = {};

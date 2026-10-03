@@ -1217,6 +1217,9 @@ const SCOPED_VALUE_PROPERTIES: PropertyDescriptorMap = {
 			return this[SCOPED_VALUE_RESOLVER]().children;
 		},
 	},
+	// Ordinary descriptors own this internal field only when a site exists, and
+	// a deferred value cannot know without resolving its record. Keep it readable
+	// but non-enumerable so the value enumerates the same public keys.
 	__octaneInvocationSite: {
 		configurable: true,
 		enumerable: false,
