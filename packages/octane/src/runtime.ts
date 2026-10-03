@@ -11971,7 +11971,7 @@ function renderLiteInPlace<P>(
 			root,
 		)
 	)
-		hydration.parkInPlace(parentScope);
+		hydration.parkInPlace(parentScope, parentScope.slots[slotKey]);
 }
 
 // Keep the fresh-subtree callback's extra captures out of ordinary lite dispatch.
@@ -19036,6 +19036,12 @@ class HydrationCapability {
 	 */
 	private armTail: Node | null = null;
 	private armSlots = 0;
+	/**
+	 * The slot that last adopted server nodes in place, and the node after
+	 * them, where it parked the cursor (parkInPlace).
+	 */
+	private inPlaceSlot: object | null = null;
+	private inPlaceTail: Node | null = null;
 	nativeAdoption?: NativeAdoptionState;
 	retryPresentation?: () => void;
 	presentation?: boolean;
@@ -19468,10 +19474,11 @@ class HydrationCapability {
 	 * that ends at `end`, remove and report the server content left after it,
 	 * from `from` (endClaim). When no template adopted the range's first node,
 	 * the content is the owner's slots, and the last one left the cursor past
-	 * its range. A cursor on `end` means nothing is left, and anything less
-	 * certain is left in place. When the content is a root rebuilt over the
-	 * range's first node, the tail is the rest of the server content that the
-	 * root's reported mismatch replaced, which goes quietly (sweepRebuiltTail).
+	 * its range, or past the server nodes it adopted in place. A cursor on
+	 * `end` means nothing is left, and anything less certain is left in place.
+	 * When the content is a root rebuilt over the range's first node, the tail
+	 * is the rest of the server content that the root's reported mismatch
+	 * replaced, which goes quietly (sweepRebuiltTail).
 	 * The slot at `scope`'s `slotKey` owns the range.
 	 */
 	settleClaim(
@@ -19488,13 +19495,18 @@ class HydrationCapability {
 			if (this.node === end) return;
 		}
 		if (from === undefined) {
-			// A slot that adopted a server node without a range parks the cursor
-			// on that node, so the cursor must follow the last slot's own range.
+			// The cursor must follow the last slot's own server nodes: its range,
+			// or the nodes it adopted in place (parkInPlace). After any other slot,
+			// such as one that rebuilt its root, the cursor proves nothing.
 			const slots = owner.slots;
 			const last = slots[slots.length - 1];
-			const lastEnd: Node | null | undefined =
-				this.liteRanges.get(last)?.end ?? (last?.borrowed || last?.inherited ? null : last?.end);
-			if (lastEnd == null || getNextSibling(lastEnd) !== cursor) return;
+			if (last === this.inPlaceSlot) {
+				if (cursor !== this.inPlaceTail) return;
+			} else {
+				const lastEnd: Node | null | undefined =
+					this.liteRanges.get(last)?.end ?? (last?.borrowed || last?.inherited ? null : last?.end);
+				if (lastEnd == null || getNextSibling(lastEnd) !== cursor) return;
+			}
 			from = cursor;
 		}
 		if (from === null || from === end) return;
@@ -19986,9 +19998,8 @@ class HydrationCapability {
 	}
 
 	/**
-	 * A slot of `parent` claimed the server range that `close` ends, or adopted
-	 * `close` in place as its root. Step the cursor past it to the next
-	 * sibling's server content.
+	 * A slot of `parent` claimed the server range that `close` ends. Step the
+	 * cursor past it to the next sibling's server content.
 	 */
 	parkPast(close: Node, parent: Scope): void {
 		const next = (this.node = getNextSibling(close));
@@ -19999,12 +20010,14 @@ class HydrationCapability {
 	}
 
 	/**
-	 * A lite slot of `parent` adopted server nodes in place (renderInPlace),
-	 * which left the cursor on the next sibling's server content: one root's
+	 * `slot` of `parent` adopted server nodes in place (renderInPlace), which
+	 * left the cursor on the next sibling's server content: one root's
 	 * sibling, or the node after a fragment's last root. Record it as parkPast
-	 * does.
+	 * does, and for settleClaim, which slot parked the cursor there.
 	 */
-	parkInPlace(parent: Scope): void {
+	parkInPlace(parent: Scope, slot: object): void {
+		this.inPlaceSlot = slot;
+		this.inPlaceTail = this.node;
 		if (parent === this.arm) {
 			this.armTail = this.node;
 			this.armSlots = parent.slots.length;
@@ -32946,8 +32959,9 @@ function componentSlotImpl(
 					b.endMarker = last;
 				}
 			}
-			// An arm that ends with this root cannot read its end off the cursor.
-			if (adopted) hydration!.parkPast(hydrationCursor!, parentScope);
+			// renderInPlace stepped the cursor past the adopted root. An arm or a
+			// range that ends with this root cannot tell that from the cursor alone.
+			if (adopted) hydration!.parkInPlace(parentScope, state);
 		} else {
 			const b = createBlock(
 				'dynamic',
