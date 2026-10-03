@@ -2686,14 +2686,15 @@ function createTransitionActionBatch(): TransitionActionBatch {
 }
 
 /**
- * Insertion and layout effect callbacks run synchronously inside a commit, so no
- * post-await Action continuation can be on the stack. Like React, their updates
- * are urgent and never join an in-flight Action; commitEffects also clears any
- * transition the commit inherited. A transition started inside the callback
- * still owns its own updates.
+ * Insertion and layout effect callbacks and callback refs run synchronously
+ * inside a commit, so no post-await Action continuation can be on the stack.
+ * Like React, their updates are urgent and never join an in-flight Action;
+ * commitEffects also clears any transition the commit inherited. A transition
+ * started inside the callback still owns its own updates. Store consistency
+ * checks need no case here: scheduleStoreRender is already urgent.
  */
 function inCommitCallback(): boolean {
-	return EFFECT_BODY_DEPTH > 0 && CURRENT_EFFECT_PHASE !== PASSIVE;
+	return (EFFECT_BODY_DEPTH > 0 && CURRENT_EFFECT_PHASE !== PASSIVE) || REF_CALLBACK_DEPTH > 0;
 }
 
 function transitionActionBatchForUpdate(): TransitionActionBatch | null {

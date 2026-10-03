@@ -3,7 +3,8 @@ import { act, flushSync, startTransition } from '../src/index.js';
 import { mount } from './_helpers.js';
 import { loadCompiledFixtureSource } from './_server-fixture.js';
 
-// Updates from layout effects belong to the commit that ran them, as in React.
+// Updates from layout effects and callback refs belong to the commit that ran
+// them, as in React.
 // Octane's post-await Action fallback must not capture them.
 const source = `
 import { useLayoutEffect, useRef, useState } from 'octane';
@@ -23,6 +24,20 @@ export function MeasuredCount(props) @{
 		</button>
 		<output>{label as string}</output>
 	</section>
+}
+
+export function RefMeasuredCount() @{
+	const [count, setCount] = useState(0);
+	const [measured, setMeasured] = useState('initial');
+	<button
+		data-count={count}
+		ref={(node) => {
+			if (node) setMeasured(String(count));
+		}}
+		onClick={() => setCount(count + 1)}
+	>
+		{measured as string}
+	</button>
 }
 
 export function LayoutFollower(props) @{
@@ -78,6 +93,25 @@ describe.each([true, false])('layout effect updates during an async Action (dev:
 		} finally {
 			finishFirst();
 			finishSecond();
+			await settle();
+			view.unmount();
+		}
+	});
+
+	it('commits a callback ref update before the pending Action settles', async () => {
+		const { RefMeasuredCount } = fixture();
+		const view = mount(RefMeasuredCount);
+		let finish!: () => void;
+		const pending = new Promise<void>((resolve) => (finish = resolve));
+		try {
+			expect(view.find('button').textContent).toBe('0');
+			startTransition(async () => pending);
+			(view.find('button') as HTMLButtonElement).click();
+			await settle();
+			expect(view.find('button').getAttribute('data-count')).toBe('1');
+			expect(view.find('button').textContent).toBe('1');
+		} finally {
+			finish();
 			await settle();
 			view.unmount();
 		}
