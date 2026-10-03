@@ -1,19 +1,31 @@
 // Pull request benchmark report: compares BENCH_JSON suite results collected
-// from a pull request's base commit and its merge commit on the same runner, and
-// renders the Markdown posted as the pull request's sticky comment.
+// from a pull request's base and its merge commit on the same runner, renders
+// the Markdown posted as the pull request's sticky comment, and exits non-zero
+// when a gate fails.
 //
-// Run: node benchmarks/pr-report.mjs --base=<dir> --head=<dir> [--rounds=<n>] [--out=<file>]
+// Run: node benchmarks/pr-report.mjs --base=<dir> --head=<dir> [--out=<file>]
 //
-// With --rounds, js-framework is read from <dir>-js-1 … <dir>-js-<n> instead of
-// <dir>. CI measures base, head, head, base so linear runner drift cancels in
-// each side's mean; disagreement between rounds widens the margin of error, and
-// a missing round fails the suite rather than silently shrinking the sample.
+// The base is the merge commit's first parent: the main commit the pull request
+// would land on, so every delta is this pull request's own. CI passes the
+// pull request's recorded base and how far main has moved past it in
+// EVENT_BASE_SHA and BASE_DRIFT, for the header only.
 //
-// Deterministic operations (bytes, DOM-operation and call counts) report every
-// change exactly. A timing operation is only called faster or slower outside its
-// combined relative margin of error, never under a 5% floor, by more than one
-// 0.1ms Chromium timer tick, and only when the fastest sample moved the same
-// way beyond that margin too, so a few slow outliers cannot carry a verdict. Even then one shared CI runner is noisy, so timing verdicts stay yellow.
+// Gates (exit 1):
+// - A byte value above its committed budget. Bundle suites publish each
+//   committed budget as a same-run `<target>-budget` peer.
+// - Any increase in a js-framework work counter: production calls, DOM
+//   mutations, and live insertions per operation. These are exact for a fixed
+//   build, so an increase is real extra work and needs a justification.
+// - A suite that failed on the pull request.
+//
+// Reports only:
+// - Byte changes within budget, which are listed exactly.
+// - Wall time. js-framework pairs base and head samples in one browser
+//   (js-framework/pair.mjs); an operation is called slower or faster only when
+//   the 95% confidence interval of its head/base ratio lies entirely beyond ±3%.
+//
+// The comment workflow loads this file alone from the default branch, so it
+// imports nothing outside Node's standard library.
 
 import fs from 'node:fs';
 import path from 'node:path';
@@ -21,15 +33,20 @@ import { fileURLToPath } from 'node:url';
 
 export const COMMENT_MARKER = '<!-- octane-pr-bench -->';
 export const SUITES = ['js-framework', 'bundle-size', 'bundle-reachability'];
-const TIMING_FLOOR_PERCENT = 5;
+export const TIMING_THRESHOLD = 0.03;
+// Chromium clamps performance.now() to 0.1ms. A verdict also needs the median
+// shift to span two ticks of the whole sample, so an operation that cannot loop
+// (a ~3ms create) cannot be called slower on one tick of quantization.
 const TIMER_TICK_MS = 0.1;
+const MIN_TICKS = 2;
 const DETAIL_LIMIT = 2000;
 const COMMENT_LIMIT = 60_000; // GitHub rejects comment bodies over 65,536 characters
 
 const SUITE_INFO = {
 	'js-framework': {
-		title: 'js-framework: 1k/10k row operations (ms, lower is better)',
+		title: 'js-framework: 1k/10k row operations',
 		reports: (name) => name.startsWith('octane-'),
+		workGate: true,
 	},
 	'bundle-size': {
 		title: 'Application bundle size (bytes)',
@@ -43,7 +60,16 @@ const SUITE_INFO = {
 
 const isTiming = (stat) => typeof stat?.score === 'number';
 const valueOf = (stat) => stat?.score ?? stat?.median;
-const rmeOf = (stat) => stat.scoreRme ?? stat.rme ?? 0;
+
+export function timingVerdict(paired, sampleMs) {
+	if (!paired) return 'unpaired';
+	const resolvable =
+		typeof sampleMs !== 'number' ||
+		Math.abs(paired.ratio - 1) * sampleMs >= MIN_TICKS * TIMER_TICK_MS;
+	if (resolvable && paired.low > 1 + TIMING_THRESHOLD) return 'slower';
+	if (resolvable && paired.high < 1 - TIMING_THRESHOLD) return 'faster';
+	return 'within noise';
+}
 
 export function compareSuite(suite, base, head) {
 	const reports = SUITE_INFO[suite]?.reports ?? (() => true);
@@ -73,18 +99,8 @@ export function compareSuite(suite, base, head) {
 			const percent = before === 0 ? 0 : ((after - before) / before) * 100;
 			const row = { target: target.name, op, before, after, percent };
 			if (isTiming(headStat) || isTiming(baseStat)) {
-				const noise = Math.max(TIMING_FLOOR_PERCENT, Math.hypot(rmeOf(baseStat), rmeOf(headStat)));
-				const resolvable = Math.abs(after - before) > TIMER_TICK_MS;
-				const minPercent =
-					baseStat.min > 0 ? ((headStat.min - baseStat.min) / baseStat.min) * 100 : 0;
-				const verdict = !resolvable
-					? 'within noise'
-					: percent > noise && minPercent > noise
-						? 'slower'
-						: percent < -noise && minPercent < -noise
-							? 'faster'
-							: 'within noise';
-				timing.push({ ...row, noise, verdict });
+				const paired = headStat.paired ?? null;
+				timing.push({ ...row, paired, verdict: timingVerdict(paired, headStat.sampleMs) });
 			} else if (after !== before) {
 				deterministic.push({ ...row, verdict: after > before ? 'larger' : 'smaller' });
 			} else {
@@ -95,16 +111,36 @@ export function compareSuite(suite, base, head) {
 	return { deterministic, timing, unchanged };
 }
 
+// Every head value above the same-run budget peer of its own target.
+export function findBudgetBreaches(result) {
+	const targets = new Map((result?.targets ?? []).map((target) => [target.name, target]));
+	const breaches = [];
+	for (const target of result?.targets ?? []) {
+		const budget = targets.get(`${target.name}-budget`);
+		if (!budget) continue;
+		for (const [op, limitStat] of Object.entries(budget.ops)) {
+			const value = valueOf(target.ops[op]);
+			const limit = valueOf(limitStat);
+			if (typeof value === 'number' && typeof limit === 'number' && value > limit) {
+				breaches.push({ target: target.name, op, value, limit });
+			}
+		}
+	}
+	return breaches;
+}
+
 const formatInteger = (value) => Math.round(value).toLocaleString('en-US');
 const formatSigned = (value, format) =>
 	(value > 0 ? '+' : value < 0 ? '−' : '±') + format(Math.abs(value));
 const formatPercent = (percent) => formatSigned(percent, (value) => `${value.toFixed(1)}%`);
+const formatRatio = (ratio) => formatPercent((ratio - 1) * 100);
 const ICON = {
 	slower: '🟡',
 	larger: '🔴',
 	faster: '🟢',
 	smaller: '🟢',
 	'within noise': '⚪',
+	unpaired: '⚪',
 	new: '🆕',
 };
 
@@ -124,14 +160,29 @@ function renderDeterministic(rows, unchanged) {
 	];
 }
 
+function renderBreaches(breaches) {
+	return [
+		'| target | metric | head | budget | over |',
+		'| --- | --- | ---: | ---: | ---: |',
+		...breaches.map(
+			(row) =>
+				`| ${row.target} | ${row.op} | ${formatInteger(row.value)} | ${formatInteger(row.limit)} | ` +
+				`+${formatInteger(row.value - row.limit)} |`,
+		),
+	];
+}
+
 function renderTiming(rows) {
 	return [
-		'| target | operation | base | head | Δ | noise | |',
+		'| target | operation | base ms | head ms | head/base | 95% CI | |',
 		'| --- | --- | ---: | ---: | ---: | ---: | --- |',
 		...rows.map(
 			(row) =>
-				`| ${row.target} | ${row.op} | ${row.before.toFixed(2)} | ${row.after.toFixed(2)} | ` +
-				`${formatPercent(row.percent)} | ±${row.noise.toFixed(0)}% | ${ICON[row.verdict]} ${row.verdict} |`,
+				`| ${row.target} | ${row.op} | ${row.before.toFixed(3)} | ${row.after.toFixed(3)} | ` +
+				(row.paired
+					? `${formatRatio(row.paired.ratio)} | ${formatRatio(row.paired.low)} … ${formatRatio(row.paired.high)} | `
+					: `${formatPercent(row.percent)} | – | `) +
+				`${ICON[row.verdict]} ${row.verdict} |`,
 		),
 	];
 }
@@ -148,20 +199,50 @@ const failureOf = (result) =>
 		: (result.failed ?? (result.harnessExit ? `harness exited ${result.harnessExit}` : null));
 const shortSha = (sha, fallback) => (sha ? '`' + sha.slice(0, 9) + '`' : fallback);
 
-export function renderReport({ suites = SUITES, base, head, baseSha, headSha, runUrl }) {
-	const flagged = [];
+function describeBase({ baseSha, eventBaseSha, drift }) {
+	const base = `${shortSha(baseSha, 'the base')}, the merge commit's first parent`;
+	if (!eventBaseSha || eventBaseSha === baseSha) return base;
+	const moved = Number(drift) > 0 ? ` ${drift} commit(s)` : '';
+	return `${base} (main has moved${moved} past the pull request's recorded base ${shortSha(eventBaseSha)})`;
+}
+
+// Returns the Markdown report and the gate failures it contains.
+export function analyzeReport({
+	suites = SUITES,
+	base,
+	head,
+	baseSha,
+	headSha,
+	eventBaseSha,
+	drift,
+	runUrl,
+}) {
+	const failures = [];
+	const notes = [];
 	const sections = [];
 	for (const suite of suites) {
 		sections.push('', `### ${SUITE_INFO[suite]?.title ?? suite}`, '');
 		const headFailure = failureOf(head[suite]);
 		const baseFailure = failureOf(base[suite]);
 		if (headFailure) {
-			flagged.push(`❌ ${suite} failed on this pull request`);
+			failures.push(`❌ ${suite} failed on this pull request`);
 			sections.push('❌ The suite failed on this pull request.', '', ...fenced(headFailure));
 			continue;
 		}
+		const breaches = findBudgetBreaches(head[suite]);
+		if (breaches.length) {
+			failures.push(`❌ ${suite}: ${breaches.length} value(s) exceed their committed budget`);
+			sections.push(
+				`❌ ${breaches.length} value(s) exceed their committed budget. Reduce the growth, or raise ` +
+					'the budget in a separate pull request that names the bytes and the reason ' +
+					'(CONTRIBUTING.md, "Size budgets").',
+				'',
+				...renderBreaches(breaches),
+				'',
+			);
+		}
 		if (baseFailure) {
-			flagged.push(`⚠️ ${suite} failed on the base commit and was not compared`);
+			notes.push(`⚠️ ${suite} failed on the base commit and was not compared`);
 			sections.push(
 				'⚠️ The suite failed on the base commit, so there is nothing to compare.',
 				'',
@@ -170,16 +251,24 @@ export function renderReport({ suites = SUITES, base, head, baseSha, headSha, ru
 			continue;
 		}
 		const { deterministic, timing, unchanged } = compareSuite(suite, base[suite], head[suite]);
-		const larger = deterministic.filter((row) => row.verdict === 'larger').length;
+		// A value over its budget is already a failure above, not growth within budget.
+		const breached = new Set(breaches.map(({ target, op }) => `${target}\0${op}`));
+		const larger = deterministic.filter(
+			(row) => row.verdict === 'larger' && !breached.has(`${row.target}\0${row.op}`),
+		);
+		if (SUITE_INFO[suite]?.workGate && larger.length) {
+			failures.push(`❌ ${suite}: ${larger.length} work counter(s) increased`);
+		} else if (larger.length) {
+			notes.push(`🔴 ${suite}: ${larger.length} value(s) increased within budget`);
+		}
 		const slower = timing.filter((row) => row.verdict === 'slower').length;
-		if (larger) flagged.push(`🔴 ${suite}: ${larger} value(s) increased`);
-		if (slower) flagged.push(`🟡 ${suite}: ${slower} timed operation(s) possibly slower`);
-		const moved = timing.filter((row) => row.verdict !== 'within noise');
+		if (slower) notes.push(`🟡 ${suite}: ${slower} timed operation(s) slower beyond ±3%`);
+		const moved = timing.filter((row) => row.verdict === 'slower' || row.verdict === 'faster');
 		if (moved.length) sections.push(...renderTiming(moved), '');
 		if (timing.length) {
 			sections.push(
 				'<details>',
-				`<summary>All ${timing.length} timed operations (${timing.length - moved.length} within noise)</summary>`,
+				`<summary>All ${timing.length} timed operations (${timing.length - moved.length} without a verdict)</summary>`,
 				'',
 				...renderTiming(timing),
 				'',
@@ -187,98 +276,56 @@ export function renderReport({ suites = SUITES, base, head, baseSha, headSha, ru
 				'',
 			);
 		}
-		if (timing.length && deterministic.length) sections.push('Deterministic counters:', '');
+		if (timing.length && deterministic.length) {
+			sections.push(
+				SUITE_INFO[suite]?.workGate
+					? 'Work counters (an increase fails this check):'
+					: 'Deterministic counters:',
+				'',
+			);
+		}
 		if (deterministic.length || !timing.length) {
 			sections.push(...renderDeterministic(deterministic, unchanged));
+		} else if (SUITE_INFO[suite]?.workGate && unchanged) {
+			sections.push(`All ${unchanged} work counters are unchanged.`);
 		}
 	}
+	const headline = [...failures, ...notes];
 	const body =
 		[
 			COMMENT_MARKER,
 			'## Benchmark report',
 			'',
-			flagged.length
-				? flagged.map((item) => `- ${item}`).join('\n')
-				: '🟢 No size increases and no timing regressions outside noise.',
+			headline.length
+				? headline.map((item) => `- ${item}`).join('\n')
+				: '🟢 No budget breaches, no added work, and no timing changes beyond ±3%.',
 			'',
-			`Compares ${shortSha(baseSha, 'the base')} with ${shortSha(headSha, 'the merge commit')} on the same runner. ` +
-				`Timing verdicts require a change beyond the combined margin of error (at least ${TIMING_FLOOR_PERCENT}%) and one ${TIMER_TICK_MS}ms timer tick, ` +
-				`with the fastest sample also moving beyond that margin.${runUrl ? ` [Workflow run](${runUrl})` : ''}`,
+			`Compares ${describeBase({ baseSha, eventBaseSha, drift })} with ` +
+				`${shortSha(headSha, 'the merge commit')} on the same runner. ` +
+				'A byte value over its committed budget or any increase in a js-framework work counter fails this check. ' +
+				'Wall time is a report: base and head samples alternate in one browser, and an operation is called ' +
+				`slower or faster only when the 95% confidence interval of its ratio excludes ±${TIMING_THRESHOLD * 100}%.` +
+				(runUrl ? ` [Workflow run](${runUrl})` : ''),
 			...sections,
 		].join('\n') + '\n';
-	return body.length > COMMENT_LIMIT
-		? body.slice(0, COMMENT_LIMIT) +
-				'\n\n_Truncated. The workflow run artifact has the full results._\n'
-		: body;
-}
-
-const mean = (values) => values.reduce((sum, value) => sum + value, 0) / values.length;
-
-function mergeStat(stats) {
-	if (stats.length === 1 || !stats.every(isTiming)) return stats[0];
-	const score = mean(stats.map((stat) => stat.score));
-	const spread =
-		score === 0
-			? 0
-			: ((Math.max(...stats.map((stat) => stat.score)) -
-					Math.min(...stats.map((stat) => stat.score))) /
-					score) *
-				100;
 	return {
-		score,
-		median: mean(stats.map((stat) => stat.median)),
-		min: Math.min(...stats.map((stat) => stat.min)),
-		scoreRme: Math.max(spread, ...stats.map(rmeOf)),
-		samples: stats.reduce((sum, stat) => sum + (Number(stat.samples) || 0), 0),
+		body:
+			body.length > COMMENT_LIMIT
+				? body.slice(0, COMMENT_LIMIT) +
+					'\n\n_Truncated. The workflow run artifact has the full results._\n'
+				: body,
+		failures,
 	};
 }
 
-export function mergeRounds(rounds) {
-	if (rounds.length === 1) return rounds[0];
-	const results = rounds.filter(Boolean);
-	if (results.length === 0) return null;
-	const failed = rounds
-		.map((result, index) => (result ? failureOf(result) : `round ${index + 1} produced no result`))
-		.filter(Boolean);
-	const names = [
-		...new Set(results.flatMap((result) => result.targets.map((target) => target.name))),
-	];
-	return {
-		suite: results[0].suite,
-		iterations: results[0].iterations,
-		harnessExit: failed.length ? 1 : 0,
-		...(failed.length ? { failed: failed.join(' | ') } : null),
-		targets: names.map((name) => {
-			const targets = results
-				.map((result) => result.targets.find((target) => target.name === name))
-				.filter(Boolean);
-			const ops = [...new Set(targets.flatMap((target) => Object.keys(target.ops)))];
-			return {
-				name,
-				ops: Object.fromEntries(
-					ops.map((op) => [op, mergeStat(targets.map((target) => target.ops[op]).filter(Boolean))]),
-				),
-			};
-		}),
-	};
-}
+export const renderReport = (options) => analyzeReport(options).body;
 
-const TIMING_SUITES = new Set(['js-framework']);
-
-function readSuites(directory, rounds) {
-	const read = (dir, suite) => {
-		const file = path.join(dir, `${suite}.json`);
-		return fs.existsSync(file) ? JSON.parse(fs.readFileSync(file, 'utf8')) : null;
-	};
+function readSuites(directory) {
 	return Object.fromEntries(
-		SUITES.map((suite) => [
-			suite,
-			rounds > 1 && TIMING_SUITES.has(suite)
-				? mergeRounds(
-						Array.from({ length: rounds }, (_, i) => read(`${directory}-js-${i + 1}`, suite)),
-					)
-				: read(directory, suite),
-		]),
+		SUITES.map((suite) => {
+			const file = path.join(directory, `${suite}.json`);
+			return [suite, fs.existsSync(file) ? JSON.parse(fs.readFileSync(file, 'utf8')) : null];
+		}),
 	);
 }
 
@@ -290,23 +337,22 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
 			.map((arg) => [arg.slice(2, arg.indexOf('=')), arg.slice(arg.indexOf('=') + 1)]),
 	);
 	if (!options.base || !options.head) {
-		console.error(
-			'usage: node benchmarks/pr-report.mjs --base=<dir> --head=<dir> [--rounds=<n>] [--out=<file>]',
-		);
+		console.error('usage: node benchmarks/pr-report.mjs --base=<dir> --head=<dir> [--out=<file>]');
 		process.exit(2);
 	}
-	const rounds = Number(options.rounds ?? 1);
-	if (!Number.isSafeInteger(rounds) || rounds < 1) {
-		console.error('--rounds must be a positive integer');
-		process.exit(2);
-	}
-	const body = renderReport({
-		base: readSuites(options.base, rounds),
-		head: readSuites(options.head, rounds),
+	const { body, failures } = analyzeReport({
+		base: readSuites(options.base),
+		head: readSuites(options.head),
 		baseSha: process.env.BASE_SHA,
 		headSha: process.env.HEAD_SHA,
+		eventBaseSha: process.env.EVENT_BASE_SHA,
+		drift: process.env.BASE_DRIFT,
 		runUrl: process.env.RUN_URL,
 	});
 	if (options.out) fs.writeFileSync(options.out, body);
 	else process.stdout.write(body);
+	if (failures.length) {
+		console.error(failures.join('\n'));
+		process.exitCode = 1;
+	}
 }

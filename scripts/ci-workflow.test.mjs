@@ -1682,15 +1682,41 @@ describe('Pull request benchmark report', () => {
 				),
 			);
 		}
-		assert.ok(prBenchWorkflow.includes('for round in base:1 head:1 head:2 base:2; do'));
-		assert.ok(prBenchWorkflow.includes('TARGETS: ${{ env.JS_FRAMEWORK_TARGETS }}'));
 		assert.ok(
 			prBenchWorkflow.includes(
-				'--results-dir="$RESULTS/$side-js-${round##*:}" --servers=octane-tsrx-jsbench,octane-jsx-jsbench js-framework',
+				'node benchmarks/js-framework/pair.mjs --base-tree="$BASE_TREE" \\\n' +
+					'            --base-json="$RESULTS/base/js-framework.json" \\\n' +
+					'            --head-json="$RESULTS/head/js-framework.json"',
 			),
 		);
-		assert.ok(prBenchWorkflow.includes('--base="$RESULTS/base" --head="$RESULTS/head" --rounds=2'));
-		assert.match(packageJson.scripts['ci:workflow:test'], /benchmarks\/pr-report\.test\.mjs/);
+		assert.ok(prBenchWorkflow.includes('--base="$RESULTS/base" --head="$RESULTS/head"'));
+		for (const suite of ['benchmarks/pr-report.test.mjs', 'benchmarks/lib/stats.test.mjs']) {
+			assert.ok(packageJson.scripts['ci:workflow:test'].split(' ').includes(suite), suite);
+		}
+	});
+
+	// The pull request's recorded base trails main once other merges land, so a
+	// delta against it included their changes (#1560, #1578, #1594).
+	test("compares against the merge commit's first parent", () => {
+		assert.match(prBenchWorkflow, /fetch-depth: 2\n/);
+		assert.match(prBenchWorkflow, /base=\$\(git rev-parse HEAD\^1\)\n/);
+		assert.match(prBenchWorkflow, /git worktree add --detach "\$RUNNER_TEMP\/base" "\$base"/);
+		assert.doesNotMatch(
+			prBenchWorkflow,
+			/^\s+BASE_SHA: \$\{\{ github\.event\.pull_request\.base\.sha/m,
+		);
+	});
+
+	test('fails after uploading the report when a gate fails', () => {
+		const render = prBenchWorkflow.indexOf('- name: Render report');
+		const upload = prBenchWorkflow.indexOf('- name: Upload report');
+		const fail = prBenchWorkflow.indexOf('- name: Fail on a budget breach');
+		assert.ok(render !== -1 && render < upload && upload < fail);
+		assert.match(prBenchWorkflow, /--out="\$RESULTS\/report\/report\.md" \|\| status=\$\?/);
+		assert.match(
+			prBenchWorkflow,
+			/if: steps\.bytes\.outputs\.status != '0' \|\| steps\.report\.outputs\.status != '0'/,
+		);
 	});
 
 	test('posts the report from the default branch without running pull request code', () => {
