@@ -66,7 +66,10 @@ export function App() @{
 };
 
 interface BuiltGraph {
-	chunks: Map<string, { imports: string[]; modules: string[]; facade: string | null }>;
+	chunks: Map<
+		string,
+		{ imports: string[]; modules: string[]; rendered: string[]; facade: string | null }
+	>;
 }
 
 function writeProject(overrides: Record<string, string> = {}) {
@@ -101,6 +104,9 @@ async function buildProject(overrides: Record<string, string> = {}) {
 				graph.chunks.set(output.fileName, {
 					imports: output.imports,
 					modules: output.moduleIds,
+					rendered: Object.entries(output.modules)
+						.filter(([, module]) => module.renderedLength > 0)
+						.map(([id]) => id),
 					facade: output.facadeModuleId,
 				});
 			}
@@ -164,6 +170,50 @@ describe('islands-only routes', { timeout: 180_000 }, () => {
 		expect(islands).toContain('<h1>Islands</h1>');
 		expect(islands).toContain('Server-rendered shell');
 		expect(islands).toContain('data-octane-hydrate-independent');
+	});
+
+	// Only the renderer consumes the signal Action frame and transition coordinator.
+	// An islands-only app's pages load signals without it, so its client build moves
+	// them from the signal graph into the renderer. A mixed app keeps them with the
+	// graph, so its renderer pages without signals carry nothing.
+	it('moves signal Actions into the renderer only when every route is islands', async () => {
+		const frame = /packages\/octane\/src\/signals\/transition-(?:action|coordinator)\.ts$/;
+		const placement = (graph: BuiltGraph) => {
+			const loads = (module: RegExp) => {
+				const reached = new Set<string>();
+				const visit = (file: string) => {
+					if (reached.has(file)) return;
+					reached.add(file);
+					for (const imported of graph.chunks.get(file)?.imports ?? []) visit(imported);
+				};
+				for (const [file, chunk] of graph.chunks)
+					if (chunk.rendered.some((id) => module.test(id))) visit(file);
+				return [...reached].some((file) =>
+					graph.chunks.get(file)!.rendered.some((id) => frame.test(id)),
+				);
+			};
+			return {
+				withSignals: loads(/packages\/octane\/src\/signals\/graph\.ts$/),
+				withRenderer: loads(/packages\/octane\/src\/runtime\.ts$/),
+			};
+		};
+		const mixed = await buildProject();
+		expect(placement(mixed.graph)).toEqual({ withSignals: true, withRenderer: false });
+		const islandsOnly = await buildProject({
+			'octane.config.ts': `import { defineConfig, RenderRoute } from '@octanejs/vite-plugin';
+export default defineConfig({
+	router: {
+		preHydrate: '/src/pre-hydrate.ts',
+		routes: [new RenderRoute({ path: '/', entry: ['App', '/src/App.tsrx'], hydrate: 'islands' })],
+	},
+});`,
+		});
+		expect(placement(islandsOnly.graph)).toEqual({ withSignals: false, withRenderer: true });
+		const { handler } = await import(
+			pathToFileURL(path.join(islandsOnly.root, 'dist/server/entry.js')).href
+		);
+		const html = await (await handler(new Request('http://localhost/'))).text();
+		expect(html).toContain('data-octane-hydrate-independent');
 	});
 
 	it('rejects a shell that needs client work', async () => {

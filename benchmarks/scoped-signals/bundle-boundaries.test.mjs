@@ -459,6 +459,128 @@ export function mount(parent) { const root = createRoot(parent); root.render(Vie
 	verifyTransitionBoundary(scenario('ordinary-client'), ordinary.inputs);
 });
 
+// Only the renderer consumes the signal Action frame and transition coordinator,
+// but no import edge loads code only when both renderer and graph are present.
+// package.json places it with the graph by default and with the renderer under
+// `octane-islands`, which documents that load signals without the renderer use.
+test('the octane-islands condition moves signal Actions from signal bundles into the renderer', async (t) => {
+	const directory = path.resolve('packages/octane');
+	const bundle = async (contents, conditions) => {
+		const result = await build({
+			stdin: { contents, resolveDir: directory },
+			bundle: true,
+			write: false,
+			minify: true,
+			metafile: true,
+			format: 'esm',
+			platform: 'browser',
+			target: 'es2022',
+			legalComments: 'none',
+			tsconfigRaw: { compilerOptions: {} },
+			define: { 'process.env.NODE_ENV': '"production"', __OCTANE_PROFILE_ENABLED__: 'false' },
+			...(conditions ? { conditions } : null),
+		});
+		const output = Object.values(result.metafile.outputs)[0];
+		const bytes = (name) =>
+			Object.entries(output.inputs)
+				.filter(([input]) => input.endsWith(`/src/signals/${name}.ts`))
+				.reduce((total, [, input]) => total + input.bytesInOutput, 0);
+		return {
+			code: result.outputFiles[0].text,
+			action: bytes('transition-action'),
+			coordinator: bytes('transition-coordinator'),
+		};
+	};
+	const signalBundles = BUNDLE_CASES.filter(
+		(entry) =>
+			(entry.id === 'engine' || entry.rendererFree) &&
+			!entry.graphFree &&
+			!entry.compilePlain &&
+			entry.platform === 'browser',
+	);
+	assert.ok(
+		['engine', 'streamed-signals-bootstrap'].every((id) =>
+			signalBundles.some((entry) => entry.id === id),
+		),
+	);
+	for (const entry of signalBundles) {
+		const graphPlaced = await bundle(entrySource(entry));
+		assert.ok(
+			graphPlaced.action > 0 && graphPlaced.coordinator > 0,
+			`${entry.id}: the default build keeps signal Actions with the graph.`,
+		);
+		const islands = await bundle(entrySource(entry), ['octane-islands']);
+		assert.equal(islands.action, 0, `${entry.id}: an islands signal bundle kept the Action frame.`);
+		assert.equal(
+			islands.coordinator,
+			0,
+			`${entry.id}: an islands signal bundle kept the transition coordinator.`,
+		);
+	}
+	const ordinary = entrySource(scenario('ordinary-client'));
+	const rendererOnly = await bundle(ordinary);
+	assert.deepEqual([rendererOnly.action, rendererOnly.coordinator], [0, 0]);
+	const islandsRenderer = await bundle(ordinary, ['octane-islands']);
+	assert.ok(
+		islandsRenderer.action > 0 && islandsRenderer.coordinator > 0,
+		'An islands build must carry signal Actions with the renderer.',
+	);
+
+	// Both placements stay complete. The renderer is loaded first, and its Action
+	// imports signals only after it awaited. No component reads them natively.
+	const lateSignals = `import { startTransition } from 'octane';
+export function lateSignalAction() {
+ let release;
+ const released = new Promise((resolve) => { release = resolve; });
+ let ready;
+ let action;
+ const state = new Promise((resolve, reject) => { ready = { resolve, reject }; });
+ startTransition(() => {
+  action = (async () => {
+   const { createScope } = await import('octane/signals');
+   const scope = createScope({ scopeKey: 'late-islands-action' });
+   const count = scope.signal$('count', 0);
+   const doubled = scope.derived$('doubled', () => count.get() * 2);
+   const notifications = [];
+   const stop = count.subscribe(() => notifications.push(count.get()));
+   let staged;
+   startTransition(() => { count.set(2); staged = [count.get(), doubled.get()]; });
+   ready.resolve({ scope, count, notifications, staged, stop });
+   await released;
+  })();
+  action.catch((error) => ready.reject(error));
+  return action;
+ });
+ return { state, release: () => { release(); return action; } };
+}`;
+	for (const conditions of [undefined, ['octane-islands']]) {
+		const label = conditions ? 'renderer placement' : 'graph placement';
+		const { code } = await bundle(lateSignals, conditions);
+		const api = await import('data:text/javascript;base64,' + Buffer.from(code).toString('base64'));
+		const pending = api.lateSignalAction();
+		const state = await pending.state;
+		try {
+			assert.deepEqual(state.staged, [2, 4], `${label}: the transition scope reads its writes.`);
+			assert.equal(
+				state.count.get(),
+				0,
+				`${label}: the write published before the Action settled.`,
+			);
+			assert.deepEqual(state.notifications, [], label);
+			await pending.release();
+			const deadline = performance.now() + 2_000;
+			while (state.notifications.length === 0 && performance.now() < deadline)
+				await new Promise((resolve) => setTimeout(resolve, 1));
+			assert.equal(state.count.get(), 2, label);
+			assert.deepEqual(state.notifications, [2], label);
+		} finally {
+			state.stop();
+			state.scope.dispose();
+		}
+		t.diagnostic(`${label}: late signals staged and published once`);
+	}
+});
+
 for (const id of ['ordinary-client', 'ordinary-server']) {
 	test(`${id} tree-shakes concrete native adapters and requires emitted-byte evidence`, () => {
 		const ordinary = [source(id === 'ordinary-client' ? 'runtime.ts' : 'runtime.server.ts')];

@@ -35,7 +35,10 @@ export function registerCandidateGraph(graph: CandidateGraph): void {
 	candidateGraph = graph;
 }
 
-/** Live registration also admits signals loaded after an Action has awaited. */
+/**
+ * The graph's default registration (action-capability.ts). It is live, so it
+ * also admits signals loaded after a renderer Action has awaited.
+ */
 export let createSignalActionFrame: (() => SignalActionFrame) | undefined;
 export function registerSignalActionFrameFactory(factory: () => SignalActionFrame): void {
 	createSignalActionFrame = factory;
