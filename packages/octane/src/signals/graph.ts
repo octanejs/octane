@@ -1,9 +1,7 @@
 import { formatClientError } from '../error-codes.client.generated.js';
 import {
 	activeCandidate,
-	candidateWriteCount,
-	deferCandidateInvalidation,
-	recordCandidateUrgentWrite,
+	candidateHooks,
 	registerCandidateGraph,
 	withoutSignalCandidate,
 } from './transition-state.js';
@@ -66,12 +64,6 @@ export interface GraphOwner {
 		read: SignalReadMode,
 	): readonly NativeSerializedScope[] | undefined;
 	trace(type: SignalTraceEvent['type'], node?: ScopedNode): void;
-	/** Internal prototype: only explicitly supported producers may enter a candidate. */
-	forkCandidate?(
-		node: ScopedNode,
-		target: ScopedNode,
-		frame: SignalCandidateFrame,
-	): CandidateProducer | undefined;
 }
 
 export interface CandidateProducer {
@@ -159,7 +151,7 @@ const graph = createReactiveSystem({
 			}
 			node.owner.trace('invalidate', node);
 			if (node.invalidateAttempt) {
-				if (deferCandidateInvalidation) {
+				if (candidateHooks.defer) {
 					const invalidate = node.invalidateAttempt;
 					queued.add(() => {
 						// An accepted read can already have replaced this producer.
@@ -528,7 +520,7 @@ export class ScopedNode<T = any> implements SignalHandle<T>, ReactiveNode {
 					: value;
 			// Equal committed values can still withdraw private transition intent.
 			// Revoke every old receipt before cancellation callbacks can reenter.
-			const releases = candidateWriteCount ? recordCandidateUrgentWrite(this, value) : undefined;
+			const releases = candidateHooks.urgentWrite?.(this, value);
 			try {
 				if (!Object.is(previous, next)) {
 					publishNode(this, readyState(next));
@@ -1004,7 +996,7 @@ interface DeclarationView {
 	canonicalRevision: number;
 }
 
-type DeclarationViewFork = (
+export type DeclarationViewFork = (
 	target: ScopedNode,
 	frame: SignalCandidateFrame,
 ) => CandidateProducer | undefined;
@@ -1223,6 +1215,7 @@ registerCandidateGraph({
 	releaseRetention,
 	createNativeSource,
 	attachObserver,
+	declarationViewFork,
 });
 
 // Renderer Actions stage writes to signals loaded after they awaited. An islands

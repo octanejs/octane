@@ -1,6 +1,16 @@
 import type { createReactiveSystem } from 'alien-signals/system';
-import type { GraphOwner, ScopedNode, NodeState, SignalReadMode } from './graph.js';
+import type { DerivedBinding } from './computations.js';
+import type {
+	CandidateProducer,
+	DeclarationViewFork,
+	GraphOwner,
+	ScopedNode,
+	NodeState,
+	SignalReadMode,
+} from './graph.js';
+import type { ResourceBinding } from './requests.js';
 import type { SignalActionFrame } from './transition-action.js';
+import type { SignalCandidateFrame } from './transition-candidate.js';
 import type { SignalTransitionCoordinatorFactory } from './transition-coordinator.js';
 import { setNativeCandidateResolver, type NativeReadSource } from './read-protocol.js';
 
@@ -27,6 +37,7 @@ interface CandidateGraph {
 	releaseRetention(node: ScopedNode): void;
 	createNativeSource(node: ScopedNode, mode: SignalReadMode): NativeReadSource;
 	attachObserver(node: ScopedNode, notify: () => void, native: boolean): () => void;
+	declarationViewFork(node: ScopedNode): DeclarationViewFork | undefined;
 }
 
 /** Graph registration owns model transactions; native presentation remains optional. */
@@ -77,41 +88,24 @@ export function swapActiveSignalCandidate(
 	return previous;
 }
 
-export let deferCandidateInvalidation = false;
-export function swapCandidateInvalidation(defer: boolean): boolean {
-	const previous = deferCandidateInvalidation;
-	deferCandidateInvalidation = defer;
-	return previous;
-}
-
-export let candidateWriteCount = 0;
-export let candidateWriters: WeakMap<ScopedNode, Set<SignalActionFrame>> | undefined;
-
-export function addCandidateWriter(node: ScopedNode, frame: SignalActionFrame): void {
-	candidateWriteCount++;
-	candidateWriters ??= new WeakMap();
-	let writers = candidateWriters.get(node);
-	if (!writers) candidateWriters.set(node, (writers = new Set()));
-	writers.add(frame);
-}
-
-export function removeCandidateWriter(node: ScopedNode, frame: SignalActionFrame): void {
-	const writers = candidateWriters!.get(node)!;
-	writers.delete(frame);
-	if (writers.size === 0) candidateWriters!.delete(node);
-	if (--candidateWriteCount === 0) candidateWriters = undefined;
-}
-
-export function recordCandidateUrgentWrite(
-	node: ScopedNode,
-	value: unknown,
-): (() => void)[] | undefined {
-	let releases: (() => void)[] | undefined;
-	const writers = candidateWriters?.get(node);
-	if (writers)
-		for (const frame of writers) {
-			const release = frame.recordUrgentWrite(node, value);
-			if (release) (releases ??= []).push(release);
-		}
-	return releases;
-}
+/**
+ * What only an Action frame uses, consulted by the graph and the binding modules.
+ * The frame (transition-action.ts) and its candidate producers
+ * (candidate-producers.ts) install these, so a bundle that carries no frame
+ * carries none of their code. Every field is declared up front: the graph reads
+ * this object on writes and invalidation, and its shape never changes.
+ */
+export const candidateHooks: {
+	/** Accepting a frame runs its graph's producer invalidation after the graph settles. */
+	defer: boolean;
+	/** Present while a frame holds a write: revokes or records it for an urgent write. */
+	urgentWrite?: (node: ScopedNode, value: unknown) => (() => void)[] | undefined;
+	/** Forks a resource (requests.ts) into a private candidate. */
+	resource?: (this: ResourceBinding, target: ScopedNode) => CandidateProducer;
+	/** Forks a general derived binding (computations.ts) into a private candidate. */
+	derived?: (
+		this: DerivedBinding<any>,
+		target: ScopedNode,
+		frame: SignalCandidateFrame,
+	) => CandidateProducer;
+} = { defer: false, urgentWrite: undefined, resource: undefined, derived: undefined };

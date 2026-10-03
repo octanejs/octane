@@ -4,10 +4,8 @@ import { ScopeDisposedError, SignalFrameError, SignalSerializationError } from '
 import { scopeStreams, type ScopeStreams } from './scope-streams.js';
 import {
 	ScopedNode,
-	CandidateUnsupportedError,
 	assertAlive,
 	assertWritable,
-	declarationViewFork,
 	derivedState,
 	endSignalBatch,
 	inspectNativeNode,
@@ -391,34 +389,6 @@ export class ScopeImpl implements Scope, GraphOwner {
 		// computed values from a seed.
 		this.consumeSeed(key);
 		return node as DerivedSignal<T>;
-	}
-
-	/** Candidate state is private; the ordinary node/binding maps stay untouched. */
-	forkCandidate(
-		node: ScopedNode,
-		target: ScopedNode,
-		frame: SignalCandidateFrame,
-	): CandidateProducer | undefined {
-		// A render's private declaration view forks like the cell it presents.
-		const view = this.nodes.get(node.key) === node ? undefined : declarationViewFork(node);
-		if (
-			(this.nodes.get(node.key) !== node && view === undefined) ||
-			this.readBarrier ||
-			this.frames?.size
-		) {
-			throw new CandidateUnsupportedError(formatClientError(135));
-		}
-		if (view !== undefined) return view(target, frame);
-		const resource = this.resources?.get(node);
-		if (resource) return resource.forkCandidate(target);
-		const binding = this.derivedBindings?.get(node);
-		if (binding) {
-			if (!binding.forkCandidate) {
-				throw new CandidateUnsupportedError(formatClientError(136));
-			}
-			return binding.forkCandidate(target, frame);
-		}
-		target.compute = node.compute;
 	}
 
 	createDerivedDeclaration<T>(

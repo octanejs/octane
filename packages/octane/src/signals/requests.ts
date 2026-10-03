@@ -4,7 +4,6 @@ import { createResourceCellWith } from './engine.js';
 import { SignalStreamError } from './errors.js';
 import {
 	ScopedNode,
-	CandidateUnsupportedError,
 	assertAlive,
 	assertWritable,
 	createDeclarationView,
@@ -27,10 +26,11 @@ import {
 	untrack,
 	untrackCommitted,
 	type GraphOwner,
-	type CandidateProducer,
 	type NodeState,
 } from './graph.js';
 import { RedeclarableBinding } from './redeclaration.js';
+import { candidateHooks } from './transition-state.js';
+import { installResourceCandidates } from '#octane/signal-actions/bindings';
 import {
 	QUERY_REQUEST,
 	skip,
@@ -564,29 +564,31 @@ interface ResourceView<T> {
 type Describe<T> = () => QueryRequest<T> | typeof skip;
 
 export class ResourceBinding<T = any> extends RedeclarableBinding<Describe<T>> {
-	declare private candidate?: true;
+	// Members that are not private are also used by an Action frame's producer
+	// (candidate-producers.ts), which forks this binding and publishes its selection.
+	declare candidate?: true;
 	/** Only a cell that a later render declared again with a new selection has a view. */
 	declare private view?: ResourceView<T>;
 	/** A render's description that selected the committed request, and what it read. */
 	declare private probed?: { readonly describe: Describe<T>; readonly reads: ScopedNode[] };
 	/** The query definition this binding last selected, exempt from the conflict check. */
-	private queryDefinition: QueryDefinition | undefined = undefined;
-	private selected: RequestEntry | undefined;
-	private selectedIdentity: RetainedRequestIdentity | undefined;
-	private retainedRequest: RetainedRequestIdentity | undefined;
-	private seeded: { entry: SignalSeedEntry; value: unknown } | undefined;
-	private describedAttempt: Attempt | undefined;
-	private observedAttempt: Attempt | undefined;
-	private pendingObserver: (<V>(callback: () => V) => V) | undefined;
-	private pendingPromise: PromiseLike<unknown> | undefined;
-	private resolvePending: (() => void) | undefined;
-	private streamedSelection: StreamFrameIdentity | undefined;
-	private selectionAuthority: object = {};
+	queryDefinition: QueryDefinition | undefined = undefined;
+	selected: RequestEntry | undefined;
+	selectedIdentity: RetainedRequestIdentity | undefined;
+	retainedRequest: RetainedRequestIdentity | undefined;
+	seeded: { entry: SignalSeedEntry; value: unknown } | undefined;
+	describedAttempt: Attempt | undefined;
+	observedAttempt: Attempt | undefined;
+	pendingObserver: (<V>(callback: () => V) => V) | undefined;
+	pendingPromise: PromiseLike<unknown> | undefined;
+	resolvePending: (() => void) | undefined;
+	streamedSelection: StreamFrameIdentity | undefined;
+	selectionAuthority: object = {};
 
 	constructor(
 		readonly owner: RequestOwner,
 		readonly node: ScopedNode<T>,
-		private describe: Describe<T> | undefined,
+		public describe: Describe<T> | undefined,
 		seed?: { entry: SignalSeedEntry; value: unknown },
 		retained = seed,
 	) {
@@ -653,7 +655,7 @@ export class ResourceBinding<T = any> extends RedeclarableBinding<Describe<T>> {
 		}
 		this.releaseView();
 		const node: ScopedNode<T> = createDeclarationView(this.node, (target) =>
-			binding.forkCandidate(target),
+			candidateHooks.resource!.call(binding, target),
 		);
 		const binding: ResourceBinding<T> = new ResourceBinding(this.owner, node, describe);
 		// A view is private like a candidate fork: it never owns receiver streams.
@@ -736,94 +738,6 @@ export class ResourceBinding<T = any> extends RedeclarableBinding<Describe<T>> {
 		if (this.streamedSelection === streamed) streams!.selections.delete(this.node.key);
 		else if (streamed.selectionKey !== identity) streams!.discardCompleted(streamed);
 		this.streamedSelection = undefined;
-	}
-
-	forkCandidate(target: ScopedNode<T>): CandidateProducer {
-		if (this.streamedSelection || this.owner.streams?.selections.has(this.node.key)) {
-			throw new CandidateUnsupportedError(formatClientError(201));
-		}
-		const fork = new ResourceBinding(this.owner, target, this.describe);
-		fork.candidate = true;
-		fork.queryDefinition = this.queryDefinition;
-		// Retained data belongs to its last successful request, not necessarily
-		// the current selection. A different query family must still clear it.
-		fork.retainedRequest = this.retainedRequest;
-		return {
-			dispose: () => fork.dispose(),
-			prepare: () => {
-				if (this.streamedSelection || this.owner.streams?.selections.has(this.node.key))
-					return { status: 'invalid' };
-				const entry = fork.selected;
-				const attempt = entry?.attempt;
-				if (entry) {
-					// Receiver-owned channels need their own adoption authority, even
-					// when another resource selected this canonical request first.
-					if (attempt?.streamed) return { status: 'invalid' };
-					const snapshot = entry.state.snapshot;
-					if (
-						attempt &&
-						(entry.request.definition.kind !== 'stream' || snapshot.status !== 'ready')
-					)
-						return { status: 'pending', waiting: target.state?.waiting ?? attempt.settled };
-					if (!(
-						(snapshot.status === 'ready' &&
-							(snapshot.complete || entry.request.definition.kind === 'stream')) ||
-						snapshot.status === 'error'
-					))
-						return { status: 'invalid' };
-				} else if (target.state?.snapshot.status !== 'idle') {
-					// Only an explicit skip has no selection. A description failure
-					// is not a completed request and cannot grant publication authority.
-					const state = target.state;
-					if (state?.snapshot.status === 'error')
-						return { status: 'error', error: state.snapshot.error };
-					if (state?.waiting) return { status: 'pending', waiting: state.waiting };
-					return { status: 'invalid' };
-				}
-				const state = entry?.state;
-				const authority = this.selectionAuthority;
-				const forkAuthority = fork.selectionAuthority;
-				return {
-					status: 'ready',
-					receipt: {
-						validate: () =>
-							!this.streamedSelection &&
-							!this.owner.streams?.selections.has(this.node.key) &&
-							this.selectionAuthority === authority &&
-							fork.selectionAuthority === forkAuthority &&
-							fork.selected === entry &&
-							(entry
-								? entry.state === state && entry.attempt === attempt && entry.consumers.has(fork)
-								: target.state?.snapshot.status === 'idle'),
-						publish: () => {
-							const previous = this.selected;
-							const resolve = this.resolvePending;
-							// Install the accepted consumer before releasing either lease. No
-							// selector, loader or abort callback executes in this phase.
-							entry?.consumers.add(this);
-							entry?.consumers.delete(fork);
-							this.selected = entry;
-							this.selectedIdentity = fork.selectedIdentity;
-							this.retainedRequest = fork.retainedRequest;
-							this.describedAttempt = fork.describedAttempt;
-							this.observedAttempt = fork.observedAttempt;
-							this.selectionAuthority = fork.selectionAuthority;
-							this.pendingObserver = undefined;
-							this.pendingPromise = undefined;
-							this.resolvePending = undefined;
-							this.seeded = undefined;
-							fork.selected = undefined;
-							return () => {
-								resolve?.();
-								// Acceptance or earlier abort cleanup can select the old request
-								// again. Its new current lease is not this retired selection.
-								if (previous !== entry && previous !== this.selected) previous?.remove(this);
-							};
-						},
-					},
-				};
-			},
-		};
 	}
 
 	private compute(): NodeState<T> {
@@ -1126,5 +1040,7 @@ export function initializeResource<T>(
 	seed?: { entry: SignalSeedEntry; value: unknown },
 	retained = seed,
 ): ResourceBinding<T> {
+	// Only a bundle that creates resources carries their candidate producer.
+	installResourceCandidates();
 	return new ResourceBinding(owner, node, describe, seed, retained);
 }

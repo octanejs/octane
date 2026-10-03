@@ -607,9 +607,9 @@ export function octane(inlineOptions = {}) {
 						};
 						// Only the renderer consumes the signal Action frame. Islands-only
 						// documents load signals without it, so this condition moves the
-						// frame from the signal graph into the renderer (octane's
-						// action-capability.ts). Either placement is complete; it chooses
-						// which pages pay, so mixed apps keep the default.
+						// frame and its candidate producers from the signal modules into the
+						// renderer (octane's action-capability.ts). Either placement is
+						// complete; it chooses which pages pay, so mixed apps keep the default.
 						/** @type {UserConfig['resolve']} */
 						let resolve;
 						if (has_only_islands_routes(buildOctaneConfig)) {

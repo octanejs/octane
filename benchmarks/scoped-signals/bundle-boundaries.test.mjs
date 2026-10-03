@@ -308,6 +308,7 @@ test('ordinary client roots tree-shake native transitions and require emitted-by
 		'signals/transition-candidate.ts',
 		'signals/transition-action.ts',
 		'signals/transition-coordinator.ts',
+		'signals/candidate-producers.ts',
 	]) {
 		verifyTransitionBoundary(scenario('ordinary-client'), [
 			...ordinary,
@@ -463,6 +464,8 @@ export function mount(parent) { const root = createRoot(parent); root.render(Vie
 // but no import edge loads code only when both renderer and graph are present.
 // package.json places it with the graph by default and with the renderer under
 // `octane-islands`, which documents that load signals without the renderer use.
+// The frame's candidate producers for resources and derived cells follow it:
+// by default the binding modules that create those cells carry them.
 test('the octane-islands condition moves signal Actions from signal bundles into the renderer', async (t) => {
 	const directory = path.resolve('packages/octane');
 	const bundle = async (contents, conditions) => {
@@ -489,6 +492,7 @@ test('the octane-islands condition moves signal Actions from signal bundles into
 			code: result.outputFiles[0].text,
 			action: bytes('transition-action'),
 			coordinator: bytes('transition-coordinator'),
+			producers: bytes('candidate-producers'),
 		};
 	};
 	const signalBundles = BUNDLE_CASES.filter(
@@ -509,6 +513,9 @@ test('the octane-islands condition moves signal Actions from signal bundles into
 			graphPlaced.action > 0 && graphPlaced.coordinator > 0,
 			`${entry.id}: the default build keeps signal Actions with the graph.`,
 		);
+		// The engine entry imports the module that creates resources but creates none.
+		if (entry.id === 'engine')
+			assert.equal(graphPlaced.producers, 0, 'engine: kept a producer for cells it never creates.');
 		const islands = await bundle(entrySource(entry), ['octane-islands']);
 		assert.equal(islands.action, 0, `${entry.id}: an islands signal bundle kept the Action frame.`);
 		assert.equal(
@@ -516,18 +523,33 @@ test('the octane-islands condition moves signal Actions from signal bundles into
 			0,
 			`${entry.id}: an islands signal bundle kept the transition coordinator.`,
 		);
+		assert.equal(
+			islands.producers,
+			0,
+			`${entry.id}: an islands signal bundle kept the candidate producers.`,
+		);
 	}
+	const cells = `export { createScope, createResource, derived$, query } from 'octane/signals';`;
+	assert.ok(
+		(await bundle(cells)).producers > 0,
+		'A default bundle that creates resources and derived cells must carry their producers.',
+	);
+	assert.equal((await bundle(cells, ['octane-islands'])).producers, 0);
 	const ordinary = entrySource(scenario('ordinary-client'));
 	const rendererOnly = await bundle(ordinary);
-	assert.deepEqual([rendererOnly.action, rendererOnly.coordinator], [0, 0]);
+	assert.deepEqual(
+		[rendererOnly.action, rendererOnly.coordinator, rendererOnly.producers],
+		[0, 0, 0],
+	);
 	const islandsRenderer = await bundle(ordinary, ['octane-islands']);
 	assert.ok(
-		islandsRenderer.action > 0 && islandsRenderer.coordinator > 0,
-		'An islands build must carry signal Actions with the renderer.',
+		islandsRenderer.action > 0 && islandsRenderer.coordinator > 0 && islandsRenderer.producers > 0,
+		'An islands build must carry signal Actions and their candidate producers with the renderer.',
 	);
 
 	// Both placements stay complete. The renderer is loaded first, and its Action
-	// imports signals only after it awaited. No component reads them natively.
+	// imports signals only after it awaited. No component reads them natively. A
+	// declared derived cell and a query resource stage through their own producers.
 	const lateSignals = `import { startTransition } from 'octane';
 export function lateSignalAction() {
  let release;
@@ -537,15 +559,24 @@ export function lateSignalAction() {
  const state = new Promise((resolve, reject) => { ready = { resolve, reject }; });
  startTransition(() => {
   action = (async () => {
-   const { createScope } = await import('octane/signals');
+   const { createResource, createScope, derived$, query, runWithSignalOwner } = await import('octane/signals');
    const scope = createScope({ scopeKey: 'late-islands-action' });
    const count = scope.signal$('count', 0);
    const doubled = scope.derived$('doubled', () => count.get() * 2);
+   const tripled$ = derived$(() => count.get() * 3, { key: 'tripled' });
+   const tripled = () => runWithSignalOwner(scope, () => tripled$.get());
+   const lookup = query('late-islands-lookup', (value) => value * 10);
+   const looked = createResource(scope, 'looked', () => lookup(count.get()));
+   try { looked.get(); } catch (pending) { await pending; }
    const notifications = [];
    const stop = count.subscribe(() => notifications.push(count.get()));
    let staged;
-   startTransition(() => { count.set(2); staged = [count.get(), doubled.get()]; });
-   ready.resolve({ scope, count, notifications, staged, stop });
+   startTransition(() => {
+    count.set(2);
+    staged = [count.get(), doubled.get(), tripled()];
+    try { looked.get(); } catch (pending) { if (typeof pending?.then !== 'function') throw pending; }
+   });
+   ready.resolve({ scope, count, tripled, looked, notifications, staged, stop });
    await released;
   })();
   action.catch((error) => ready.reject(error));
@@ -560,18 +591,25 @@ export function lateSignalAction() {
 		const pending = api.lateSignalAction();
 		const state = await pending.state;
 		try {
-			assert.deepEqual(state.staged, [2, 4], `${label}: the transition scope reads its writes.`);
-			assert.equal(
-				state.count.get(),
-				0,
+			assert.deepEqual(state.staged, [2, 4, 6], `${label}: the transition scope reads its writes.`);
+			assert.deepEqual(
+				[state.count.get(), state.tripled(), state.looked.get()],
+				[0, 0, 0],
 				`${label}: the write published before the Action settled.`,
 			);
 			assert.deepEqual(state.notifications, [], label);
 			await pending.release();
 			const deadline = performance.now() + 2_000;
-			while (state.notifications.length === 0 && performance.now() < deadline)
+			while (
+				(state.notifications.length === 0 || state.looked.latest() !== 20) &&
+				performance.now() < deadline
+			)
 				await new Promise((resolve) => setTimeout(resolve, 1));
-			assert.equal(state.count.get(), 2, label);
+			assert.deepEqual(
+				[state.count.get(), state.tripled(), state.looked.latest()],
+				[2, 6, 20],
+				label,
+			);
 			assert.deepEqual(state.notifications, [2], label);
 		} finally {
 			state.stop();
