@@ -1,6 +1,6 @@
 {
   "name": "@octanejs/email",
-  "version": "0.0.10",
+  "version": "0.0.11",
   "license": "MIT",
   "type": "module",
   "engines": {
@@ -45,7 +45,7 @@
     "tailwindcss": "catalog:default"
   },
   "peerDependencies": {
-    "octane": "workspace:^0.8.0"
+    "octane": "workspace:^0.9.0"
   },
   "devDependencies": {
     "@react-email/components": "catalog:default",

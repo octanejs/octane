@@ -1,5 +1,33 @@
 # octane
 
+## 0.9.0
+
+### Minor Changes
+
+- c1a8faf: Load the `idle()`, `visible()` and `media()` triggers for independent `Hydrate` widgets only when a page has a widget that uses one. The independent island bootstrap used to import all three, so every islands page shipped them, even one whose widgets used only `load()` and `interaction()`. The signal-chat islands-only route now loads 612 fewer bytes of gzipped JavaScript. A widget with one of these triggers loads the strategies the first time the bootstrap registers it, then installs its trigger. A custom host can pass `strategies: independentHydrationStrategies`, from the new `octane/hydration/independent-strategies` entry, to `bootstrapIndependentHydration` or `registerIndependentHydrationIsland` to install triggers during registration instead.
+- 00f8304: Add `useLayoutSnapshot` to derive a renderable value from a committed DOM measurement, with an SSR initial value and configurable equality. `LayoutSnapshotOptionsWithInitial` types a reusable options object whose initial value keeps the snapshot defined, and Strong mode reports an `async` or generator measurement as `OCTANE_STRONG_LAYOUT_SNAPSHOT_ASYNC`.
+
+### Patch Changes
+
+- 8e68622: Run a hook with an omitted dependency array on every render when its callback reads a local variable that the component assigns again after the hook call, or assigns from a nested function. The compiler read the variable where the hook is called to fill the inferred array, so the array held the earlier value. The hook did not re-run when only the later value changed, while the callback read that later value. React runs a hook with an omitted array on every render, and Octane now does the same in this case. A variable assigned before the call keeps its inferred dependency. Strong mode reports `OCTANE_STRONG_UNTRACKED_EFFECT` instead, asking for the assignment to finish before the hook.
+- 12c32ec: Islands-only pages no longer download the code that stages resources and derived values inside a `startTransition` Action, about 900 bytes gzip. Under the `octane-islands` condition it now ships with the renderer, alongside the signal Action frame. In the default build it ships only in bundles that create a resource or a derived value. Actions stage resource and derived reads the same way in both builds.
+- 1066cf6: Keep the signal Action frame and transition coordinator, about 4 KB gzip, out of islands-only pages. Only the renderer uses them, to hold back signal writes made inside a `startTransition` Action until it settles, so a page that loads signals without the renderer never runs them. Until now every bundle that loaded the signal graph also carried them.
+
+  Octane's package imports now choose where they live. By default they stay with the signal graph. A bundler that resolves with the `octane-islands` condition bundles them with the renderer instead. Both placements stage Action writes the same way, including for signals imported after an Action awaited. The condition only decides which pages download the code.
+
+  `@octanejs/vite-plugin` adds the condition to the production client build when every `RenderRoute` uses `hydrate: 'islands'`. Apps that also have fully hydrated routes keep the default.
+- 00f8304: Run state updates from insertion and layout effects at urgent priority, as React does during a commit. Previously an update from a layout effect that ran while an async Action was pending joined that Action and stayed hidden until it settled, and one from a commit flushed inside `startTransition` became a transition.
+- 949894d: Resolve template row and catch reset bindings in their own scope when inferring hook dependencies and checking Strong effects.
+- 39cf382: Recognize refs attached through callbacks in Strong effect analysis while preserving checks for value refs and host listener cleanup.
+- 425a32a: Make in-place updates of a keyed list of Three meshes faster. Updating 1,000 retained mesh positions now takes about 0.7–0.8× the time React Three Fiber does on the Three benchmark, down from parity. The per-item comparison and validation work now runs in small functions the JavaScript engine optimizes as hot code. A full garbage collection no longer discards the optimized code that reads frozen host batches, so the first commit after one stays fast. Behavior is unchanged.
+- 02e6726: Avoid collisions between generated signal and hook dependency imports, and prevent local bindings from shadowing inferred method dependencies.
+- 414e192: Render-heavy updates are faster. Every component render restored the warm-plan
+  stack on exit by storing its length, even though most renders register no plan
+  and leave the length unchanged. The restore now compares first. In paired
+  same-runner runs, a memo-wall single-row change through a value-position list
+  took about 13% less time, a context update through 1,000 memoized rows about 5%
+  less, and recursive-context updates 4–5% less.
+
 ## 0.8.0
 
 ### Minor Changes
