@@ -15,7 +15,7 @@ import type {
 import type { JSX as RendererJSX } from '@octanejs/lynx/intrinsics/jsx-runtime';
 import { installLynxMainThread, type LynxMainThreadController } from '@octanejs/lynx/main-thread';
 import type { UniversalComponent } from '@octanejs/lynx/renderer';
-import type { UniversalRenderable } from 'octane/universal/native';
+import type { UniversalKey, UniversalRenderable } from 'octane/universal/native';
 
 declare module '@octanejs/lynx/intrinsics' {
 	interface LynxCustomIntrinsicElements {
@@ -54,6 +54,33 @@ type _PublicMapMatchesRenderer = Assert<Equal<keyof LynxElements, keyof Renderer
 type _BuiltInsRemainExplicit = Assert<
 	Equal<'native-map' extends keyof LynxIntrinsicElements ? true : false, false>
 >;
+
+// TypeScript checks a component's JSX attributes, including a keyed `@for`
+// row's key, against `IntrinsicAttributes & Props`. An intrinsic tag reads
+// only its `IntrinsicElements` entry, so element props declare `key` too.
+type ComponentAttributes<Props> = RendererJSX.IntrinsicAttributes & Props;
+type _ComponentKeyIsUniversalKey = Assert<
+	Equal<ComponentAttributes<{ label: string }>['key'], UniversalKey | undefined>
+>;
+type _ViewKeyIsUniversalKey = Assert<
+	Equal<RendererElements['view']['key'], UniversalKey | undefined>
+>;
+type _ListItemKeyIsUniversalKey = Assert<
+	Equal<RendererElements['list-item']['key'], UniversalKey | undefined>
+>;
+type _RawTextKeyIsUniversalKey = Assert<
+	Equal<RendererElements['raw-text']['key'], UniversalKey | undefined>
+>;
+// Under `jsx: preserve`, authored JSX children reach a component's `children`
+// prop only through this attribute.
+type _ChildrenAttributeIsChildren = Assert<
+	Equal<keyof RendererJSX.ElementChildrenAttribute, 'children'>
+>;
+
+const keyedComponentProps: ComponentAttributes<{ label: string }> = { label: 'row', key: 'row' };
+
+// @ts-expect-error A key is reconciler identity, so an object is not one.
+const objectKeyProps: ComponentAttributes<{ label: string }> = { label: 'row', key: {} };
 
 const viewProps: RendererElements['view'] = {
 	className: 'card',
@@ -181,3 +208,5 @@ void domOnlyViewProps;
 void booleanStyleProps;
 void missingListItemKey;
 void unregisteredCustomProps;
+void keyedComponentProps;
+void objectKeyProps;

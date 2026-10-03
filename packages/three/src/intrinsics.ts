@@ -35,4 +35,7 @@ export type {
 /** TypeScript resolves this namespace through the intrinsic jsx-runtime export. */
 export namespace JSX {
 	export interface IntrinsicElements extends ThreeIntrinsicElements {}
+	export interface ElementChildrenAttribute {
+		children: {};
+	}
 }

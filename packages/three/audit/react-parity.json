@@ -294,7 +294,7 @@
         {
           "path": "packages/three/typetests/renderer-local.test.ts",
           "role": "support",
-          "sha256": "effaff52eb7cc8acfbc6e9fa9ea98fff5a02e1e7f3fd98ba209173338b9a6fb0"
+          "sha256": "5f4dcea1d6fab8ab013fd0c14162780a659760a51539e6bad43d425cb1d4c5d1"
         },
         {
           "path": "packages/three/typetests/subpath-api.test.ts",

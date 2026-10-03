@@ -1,4 +1,8 @@
-import type { UniversalComponent, UniversalRenderable } from 'octane/universal/native';
+import type {
+	UniversalComponent,
+	UniversalKey,
+	UniversalRenderable,
+} from 'octane/universal/native';
 
 import type {
 	LynxEvent as NativeLynxEvent,
@@ -40,6 +44,7 @@ export type LynxMainThreadEventProps = {
 export type LynxStandardProps = NativeLynxStandardProps &
 	LynxMainThreadEventProps & {
 		children?: UniversalRenderable;
+		key?: UniversalKey;
 		ref?: LynxRef;
 		'main-thread:ref'?: LynxMainThreadRefDescriptor;
 	};
@@ -68,6 +73,7 @@ export type LynxTextProps = LynxStandardProps & {
 
 export type LynxRawTextProps = {
 	text: number | string;
+	key?: UniversalKey;
 	ref?: LynxRef;
 };
 
@@ -296,5 +302,13 @@ export type LynxElements = LynxIntrinsicElements & LynxCustomIntrinsicElements;
 /** Renderer-local JSX namespace; no global or React JSX namespace is augmented. */
 export namespace JSX {
 	export type Element = UniversalRenderable;
+	export interface ElementChildrenAttribute {
+		children: {};
+	}
+	// A component's `key`, from JSX or a keyed `@for` row, belongs to the
+	// reconciler rather than the component's props.
+	export interface IntrinsicAttributes {
+		key?: UniversalKey;
+	}
 	export interface IntrinsicElements extends LynxIntrinsicElements, LynxCustomIntrinsicElements {}
 }
