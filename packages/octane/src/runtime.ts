@@ -18971,10 +18971,8 @@ class HydrationCapability {
 	private heldBranches: WeakMap<Node, Node | null> | null = null;
 	/** The arm of each branch that holdMarkerlessBranch held, to its start comment (renderHeld). */
 	private heldArms: WeakMap<Block, Node> | null = null;
-	/** How many list items' first renders are under way (renderItem). */
-	private itemDepth = 0;
-	/** The start comments that holdMarkerlessBranch inserted within those renders, oldest first. */
-	private itemHolds: Node[] | null = null;
+	/** The start comments that holdMarkerlessBranch inserted in each list's items, by list (refill). */
+	private listHolds: WeakMap<ForSlot, Node[]> | null = null;
 	private readonly unframedRootRanges = new WeakMap<Node, Node>();
 	/** Unframed claims whose render suspended, by the block that claimed (renderUnframed). */
 	private unframedClaims: WeakMap<Block, UnframedClaim> | null = null;
@@ -19197,11 +19195,6 @@ class HydrationCapability {
 	/** Record that a hydrating update built `owner` on the client (see updates). */
 	recordUpdate(owner: Block | ChildSlot): void {
 		(this.updates ??= new WeakSet()).add(owner);
-	}
-
-	/** Whether a hydrating update built `owner` on the client (see updates). */
-	builtByUpdate(owner: Block | ChildSlot): boolean {
-		return this.updates?.has(owner) === true;
 	}
 
 	/**
@@ -20049,13 +20042,40 @@ class HydrationCapability {
 	}
 
 	/**
-	 * Before another first fill of `list`, a descriptor list that kept no items
-	 * after its first fill threw, as in a suspended deferred boundary's retry.
-	 * The cursor is where the resumed render left it, so adoption starts over
-	 * from the server's first item, as forBlock's does.
+	 * Start a first fill of `list`, which adopts the server's items, at the
+	 * first of them. A list that kept no items after a fill threw, as in a
+	 * suspended deferred boundary's retry, fills again after the resumed render
+	 * left the cursor inside an item. The attempts of the items it did not keep
+	 * were discarded, so remove the start comments of the branches they held:
+	 * an attempt that is discarded leaves the server DOM as it was.
 	 */
-	refillList(list: ForSlot): void {
-		if (list.size === 0 && this.isOpen(list.start)) this.node = getNextSibling(list.start);
+	refill(list: ForSlot): void {
+		const holds = this.listHolds?.get(list);
+		if (holds !== undefined) {
+			this.listHolds!.delete(list);
+			for (let i = 0; i < holds.length; i++) {
+				const start = holds[i];
+				const parent = domNode(start).parentNode;
+				if (parent === null || !this.heldBranches!.delete(start)) continue;
+				this.save(parent);
+				domNode(start as ChildNode).remove();
+			}
+		}
+		this.node = getNextSibling(list.start);
+	}
+
+	/**
+	 * Whether a hydrating update of `slot`, whose list exists, builds that list
+	 * on the client: an earlier hydrating update built it (recordUpdate).
+	 * Otherwise the list adopts the server's items, and when it kept none, its
+	 * first fill starts over from the first of them (refill).
+	 */
+	buildsList(slot: ChildSlot): boolean {
+		if (this.updates?.has(slot) === true) return true;
+		const list = slot.forSlot!;
+		if (list.size === 0 && !(this.passthroughRanges && slot.borrowed) && this.isOpen(list.start))
+			this.refill(list);
+		return false;
 	}
 
 	/**
@@ -21119,40 +21139,16 @@ class HydrationCapability {
 			claimed === undefined ? this.markerlessEnd(start, parent, after) : claimed,
 		);
 		(this.heldArms ??= new WeakMap()).set(state.block!, start);
-		if (this.itemDepth !== 0) (this.itemHolds ??= []).push(start);
-		state.markerlessBefore = start;
-	}
-
-	/**
-	 * First render of `block`, a list item adopting the server content at the
-	 * cursor. A render that throws leaves its list no block to keep, so the
-	 * list's retry adopts the same content again. Remove the start comments of
-	 * the branches that this attempt held, whose slots never render again: an
-	 * attempt that is discarded leaves the server DOM as it was.
-	 */
-	renderItem(block: Block): void {
-		const mark = this.itemHolds?.length ?? 0;
-		this.itemDepth++;
-		try {
-			renderBlock(block);
-		} catch (error) {
-			const holds = this.itemHolds;
-			if (holds !== null) {
-				for (let i = holds.length - 1; i >= mark; i--) {
-					const start = holds[i];
-					const parent = domNode(start).parentNode;
-					if (parent !== null) {
-						this.save(parent);
-						domNode(start as ChildNode).remove();
-					}
-					this.heldBranches!.delete(start);
-				}
-				holds.length = mark;
-			}
-			throw error;
-		} finally {
-			if (--this.itemDepth === 0) this.itemHolds = null;
+		// An item whose first render throws is no block of its list's, so the
+		// list's next fill adopts the item's server nodes again (refill).
+		for (let block = state.block!.parentBlock; block !== null; block = block.parentBlock) {
+			const list = block.forSlot;
+			if (list == null) continue;
+			const holds = (this.listHolds ??= new WeakMap()).get(list);
+			if (holds === undefined) this.listHolds.set(list, [start]);
+			else holds.push(start);
 		}
+		state.markerlessBefore = start;
 	}
 
 	/**
@@ -36046,8 +36042,6 @@ function renderPreparedChildList(
 	mappedFallback?: boolean,
 ): void {
 	const passthroughList = hydration?.passthroughRanges === true && state.borrowed;
-	if (hydration !== null && !passthroughList && state.forSlot !== null)
-		hydration.refillList(state.forSlot);
 	let passthroughStart: Comment | null = null;
 	let passthroughEnd: Comment | null = null;
 	if (preparedList.items.length === 0 && hydration === null && state.ownerHost !== null) {
@@ -37073,10 +37067,7 @@ export function childSlot(
 	if (preparedList !== null) {
 		// A hydrating update builds a list that replaces other content, or one an
 		// earlier hydrating update built, on the client.
-		if (
-			rebuild ||
-			(hydratingUpdate && (state.forSlot === null || hydration!.builtByUpdate(state)))
-		) {
+		if (rebuild || (hydratingUpdate && (state.forSlot === null || hydration!.buildsList(state)))) {
 			if (hydratingUpdate) hydration!.recordUpdate(state);
 			// Mount each item rather than look for server items that are not there.
 			const slot = state;
@@ -44785,7 +44776,7 @@ export function forBlock<T>(
 	// A pending child can replay its adopted slot with the cursor back on the
 	// outer open marker. First-fill adoption always starts inside that range,
 	// including a zero-item list that already has a retained slot.
-	if (hydration !== null && state.size === 0) hydration.node = getNextSibling(state.start);
+	if (hydration !== null && state.size === 0) hydration.refill(state);
 	// New direct-host list output carries its server-selected arm on the existing
 	// outer open comment. Legacy/general list ranges return -1 and retain the
 	// content-shape checks used before markerless SSR items existed.
@@ -46603,7 +46594,7 @@ function mountItem<T>(
 					block.key = key;
 					block.itemIndex = index;
 					if (singleRoot === 2 && forSlot.plainDeopt === true) block.deoptNode = node;
-					hydration.renderItem(block);
+					renderBlock(block);
 					hydration.node = domNode(block.endMarker)?.nextSibling ?? getNextSibling(node);
 					return block;
 				}
@@ -46627,7 +46618,7 @@ function mountItem<T>(
 				block.forSlot = forSlot;
 				block.key = key;
 				block.itemIndex = index;
-				hydration.renderItem(block);
+				renderBlock(block);
 				hydration.node = getNextSibling(itemEnd);
 				return block;
 			}
