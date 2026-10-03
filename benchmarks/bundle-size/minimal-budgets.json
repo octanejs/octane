@@ -25,9 +25,9 @@
     "brotli": 22752
   },
   "root-chained-jsx": {
-    "raw": 86016,
-    "gzip": 28576,
-    "brotli": 25344
+    "raw": 84352,
+    "gzip": 27904,
+    "brotli": 24864
   },
   "root-static": {
     "raw": 201472,
@@ -45,14 +45,14 @@
     "brotli": 33120
   },
   "prop-attributes": {
-    "raw": 98032,
-    "gzip": 32528,
-    "brotli": 28880
+    "raw": 96464,
+    "gzip": 31920,
+    "brotli": 28432
   },
   "context": {
-    "raw": 117296,
-    "gzip": 38400,
-    "brotli": 33696
+    "raw": 115728,
+    "gzip": 37824,
+    "brotli": 33248
   },
   "hydrate-root": {
     "raw": 148352,
