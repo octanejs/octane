@@ -302,7 +302,10 @@ const SUITES = [
 		cwd: 'scoped-signals',
 		servers: [],
 		iter: { normal: 9, quick: 3 },
-		runs: [{ script: 'run-dom-bindings.mjs', args: (_n, quick) => (quick ? ['--quick'] : []) }],
+		runs: [
+			{ script: 'run-dom-bindings.mjs', args: (_n, quick) => (quick ? ['--quick'] : []) },
+			{ label: 'event-owners', script: 'event-owners.mjs', args: () => [] },
+		],
 	},
 	{
 		name: 'signal-favoring',

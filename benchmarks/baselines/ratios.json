@@ -9056,6 +9056,22 @@
     "note": "Changing ordinary scalar style props uses fixed-field writers without additional native style body invocations; the observed handle control must update the same CSS and preserve identity."
   },
   {
+    "suite": "signal-dom-bindings",
+    "op": "mount_row_weak_writes",
+    "target": "event-owner-rows",
+    "reference": "event-owner-rows-work-budget",
+    "maxRatio": 0,
+    "note": "Keyed rows with native click handlers, in a module that only carries potential signal bindings, record each handler's authority on its host without weak-map insertions. #1069 recorded it in two weak maps, two insertions per mounted row and +0.28 ms per 100 prepended js-framework rows; the semantic control dispatches mounted, inserted, and surviving handlers."
+  },
+  {
+    "suite": "signal-dom-bindings",
+    "op": "insert_row_weak_writes",
+    "target": "event-owner-rows",
+    "reference": "event-owner-rows-work-budget",
+    "maxRatio": 0,
+    "note": "Rows inserted ahead of 256 keyed survivors publish their handlers' authority without weak-map insertions, and the survivors keep their buttons and dispatch."
+  },
+  {
     "suite": "runtime-style-dedup",
     "op": "style_records",
     "target": "repeated",
