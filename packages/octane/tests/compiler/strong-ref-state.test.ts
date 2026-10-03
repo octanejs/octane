@@ -78,6 +78,31 @@ export function Label({ text }: { text: string }) {
 		expect(diagnostic.suggestions?.[0].hook).toBe('useRef');
 	});
 
+	// A setter passed directly runs no function of its own, so the component's
+	// own reads say nothing about the value it stores.
+	it.each([
+		['a callback ref', '', '<span ref={setNode}>{String(node) + box.offsetWidth}</span>', REF],
+		[
+			'an effect',
+			'useLayoutEffect(setNode);',
+			'<span>{String(node) + box.offsetWidth}</span>',
+			'OCTANE_STRONG_EFFECT_STATE_UPDATE',
+		],
+	])(
+		'does not read the component as the measurement when a setter is passed as %s',
+		(_, setup, output, code) => {
+			const [diagnostic] = errors(`import { useLayoutEffect, useState } from 'octane';
+export function Label({ box }: { box: { offsetWidth: number } }) {
+	const [node, setNode] = useState<HTMLElement | null>(null);
+	${setup}
+	return ${output};
+}
+`);
+			expect(diagnostic.code).toBe(code);
+			expect(diagnostic.message).not.toContain('copies a DOM measurement');
+		},
+	);
+
 	it.each([
 		['an inline function expression', '', 'function (el) { setNode(el); }'],
 		['a state setter', '', 'setNode'],

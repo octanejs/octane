@@ -1749,13 +1749,14 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 		// useLayoutSnapshot does without a second render pass. The read may sit
 		// in the effect's own setup, or in the function the update runs in: a
 		// helper setup calls, or a microtask or transition callback that still
-		// counts as setup.
+		// counts as setup. A setter passed directly as the callback runs in no
+		// function of its own, so the enclosing component's reads do not count.
 		const effect = currentEffect;
 		const measures =
 			effect !== null &&
 			!effect.snapshot &&
 			((effect.callback?.kind === 'callback' && measuresLayout(effect.callback.node)) ||
-				measuresLayout(currentFunction));
+				(currentFunction !== effect.caller && measuresLayout(currentFunction)));
 		if (effect?.ref === true) {
 			report(
 				STRONG_REF_STATE_UPDATE,
@@ -4455,6 +4456,7 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 		const record = {
 			node,
 			owner: renderOwner,
+			caller: currentFunction,
 			callback,
 			reads: new Set(),
 			writes: new Set(),
@@ -4512,7 +4514,14 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 		const enclosingEffect = currentEffect;
 		const enclosingOwnsWrites = effectOwnsWrites;
 		const enclosingCollectReads = collectEffectReads;
-		const record = { node, callback, writes: new Set(), snapshot: false, ref: true };
+		const record = {
+			node,
+			caller: currentFunction,
+			callback,
+			writes: new Set(),
+			snapshot: false,
+			ref: true,
+		};
 		const enclosingPolicy = effectPolicy.enterEffect(record);
 		currentEffect = record;
 		effectOwnsWrites = true;
