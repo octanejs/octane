@@ -59,6 +59,17 @@ export function Label({ text }: { text: string }) {
 		expect(diagnostic.suggestions?.[0].hook).toBe('useLayoutSnapshot');
 	});
 
+	it('names useLayoutSnapshot when a helper the ref calls stores a measurement', () => {
+		const [diagnostic] = errors(
+			label(
+				'const update = (el: HTMLElement) => setWidth(el.offsetWidth);',
+				'(el) => { if (el) update(el); }',
+			),
+		);
+		expect(diagnostic.code).toBe(REF);
+		expect(diagnostic.suggestions?.[0].hook).toBe('useLayoutSnapshot');
+	});
+
 	it('keeps the element-in-state guidance for an update that is not a measurement', () => {
 		const [diagnostic] = errors(label('', '(el) => setNode(el)'));
 		expect(diagnostic.code).toBe(REF);
