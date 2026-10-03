@@ -1,4 +1,4 @@
-import { Hydrate, createElement, useState, type OctaneNode } from 'octane';
+import { Hydrate, createElement, use, useState, type OctaneNode } from 'octane';
 import { condition } from 'octane/hydration';
 
 // Each Dormant* boundary stays dormant until its captures change, so the server
@@ -129,6 +129,53 @@ export function PlainSuppressed(props: { v: string }) @{
 				class={props.v}
 				style={{ color: props.v }}
 			>{props.v as string}</em>
+		</section>
+	</div>
+}
+
+function Late(props: { server?: boolean; leaf: Promise<string> }) @{
+	<u>{(props.server ? 'z' : use(props.leaf)) as string}</u>
+}
+
+// A resolved @try arm whose first attempt writes the newer HTML, then suspends.
+export function DormantArmHTML(props: { server?: boolean; html: string; leaf: Promise<string> }) @{
+	<div>
+		<Hydrate split={false} when={condition(false)}>
+			<section>
+				@try {
+					<>
+						<article dangerouslySetInnerHTML={{ __html: props.html }} />
+						<Late server={props.server} leaf={props.leaf} />
+					</>
+				} @pending {
+					<p>{'pending'}</p>
+				}
+			</section>
+		</Hydrate>
+	</div>
+}
+
+// A text hole after an element, in a suppressed host.
+export function DormantSwap(props: { v: string }) @{
+	<div>
+		<Hydrate split={false} when={condition(false)}>
+			<section>
+				<em suppressHydrationWarning>
+					<b>{'b'}</b>
+					{props.v as string}
+				</em>
+			</section>
+		</Hydrate>
+	</div>
+}
+
+export function PlainSwap(props: { v: string }) @{
+	<div>
+		<section>
+			<em suppressHydrationWarning>
+				<b>{'b'}</b>
+				{props.v as string}
+			</em>
 		</section>
 	</div>
 }

@@ -198,4 +198,56 @@ describe.each([
 		flushSync(() => root!.render(client.DormantSuppressed, { v: 'green' }));
 		expect(values(em)).toEqual({ text: 'green', title: 'green', class: 'green', color: 'green' });
 	});
+
+	it('keeps the server HTML while a resolved arm that wrote the newer HTML is pending', async () => {
+		container.innerHTML = ServerRT.renderToString(server.DormantArmHTML, {
+			server: true,
+			html: '<b>old</b>',
+			leaf: Promise.resolve('z'),
+		}).html;
+		await hydrate('DormantArmHTML', {
+			server: true,
+			html: '<b>old</b>',
+			leaf: Promise.resolve('z'),
+		});
+		let resolve!: (value: string) => void;
+		const leaf = new Promise<string>((done) => (resolve = done));
+		flushSync(() => root!.render(client.DormantArmHTML, { html: '<i>new</i>', leaf }));
+		await act(async () => {});
+
+		// The discarded attempt restored what it changed, as it does for text.
+		expect(markup(container.querySelector('section')!)).toBe(
+			'<article><b>old</b></article><u>z</u>',
+		);
+
+		await act(async () => resolve('y'));
+		expect(markup(container.querySelector('section')!)).toBe(
+			'<article><i>new</i></article><u>y</u>',
+		);
+		expect(recoverable).toEqual([]);
+		expect(warnings()).toEqual([]);
+	});
+
+	it('writes the newer text where a suppressed host lost its server text node', async () => {
+		const html = (name: string) => {
+			container.innerHTML = ServerRT.renderToString(server[name], { v: 'red' }).html;
+			// Something outside Octane replaced the server's text with another node.
+			const em = container.querySelector('em')!;
+			em.replaceChild(document.createElement('s'), em.lastChild!);
+		};
+
+		html('PlainSwap');
+		await hydrate('PlainSwap', { v: 'red' });
+		expect(container.querySelector('em')!.textContent).toBe('b');
+		root!.unmount();
+
+		root = null;
+		html('DormantSwap');
+		await hydrate('DormantSwap', { v: 'red' });
+		flushSync(() => root!.render(client.DormantSwap, { v: 'blue' }));
+		await act(async () => {});
+		expect(container.querySelector('em')!.textContent).toBe('bblue');
+		expect(recoverable).toEqual([]);
+		expect(warnings()).toEqual([]);
+	});
 });

@@ -20504,6 +20504,32 @@ class HydrationCapability {
 	}
 
 	/**
+	 * `el`'s server `dangerouslySetInnerHTML` content differs from the client's
+	 * `next`. React keeps the server's, and so does hydration unless it predates
+	 * the client's state (staleServerValues): then replace it in place, as text
+	 * repairs do. An attempt that is discarded restores the server's children
+	 * for its retry (save), where a client write deferred to the root's commit
+	 * would still run. Returns whether it replaced them. A method, so that
+	 * bundles which never hydrate do not retain it.
+	 */
+	repairHTML(el: Element, next: string, server: string, expected: string): boolean {
+		if (!this.staleServerValues) {
+			if (process.env.NODE_ENV !== 'production' && !this.keepsServerValue(el))
+				warnHydrationKeptServerValue(
+					(el as any).__oct_loc,
+					'`dangerouslySetInnerHTML` content',
+					server,
+					expected,
+				);
+			return false;
+		}
+		this.save(el);
+		if (el.localName === 'script') (STAGED_DOM?.view(el) ?? el).textContent = next;
+		else (STAGED_DOM?.view(el) ?? el).innerHTML = next;
+		return true;
+	}
+
+	/**
 	 * Whether a slot at `anchor` in `parent` sits inside a client-built
 	 * replacement. Such a slot has no server range of its own, while the cursor
 	 * still points at the server siblings that follow the replacement, so the
@@ -21509,19 +21535,23 @@ class HydrationCapability {
 		// structural mismatch, just like an extra client element. Build the client
 		// text so recovery succeeds, but publish the normal dev diagnostic. A
 		// suppressed host keeps the absent server value by installing only an empty
-		// tracking node; later real commits can update that node normally.
-		if (text !== '' && !suppressed) {
+		// tracking node (keepsServerValue); later real commits can update that node
+		// normally.
+		const keep = this.keepsServerValue(host);
+		if (text !== '' && !keep) {
 			if (host !== null) this.save(host);
-			noteRecoverableHydrationError(() => new Error(formatClientError(54)));
-			if (process.env.NODE_ENV !== 'production') {
-				warnHydrationStructuralMismatch(
-					host && (host as any).__oct_loc,
-					`text ${JSON.stringify(text)}`,
-					describeHydrationNode(posNode),
-				);
+			if (!suppressed) {
+				noteRecoverableHydrationError(() => new Error(formatClientError(54)));
+				if (process.env.NODE_ENV !== 'production') {
+					warnHydrationStructuralMismatch(
+						host && (host as any).__oct_loc,
+						`text ${JSON.stringify(text)}`,
+						describeHydrationNode(posNode),
+					);
+				}
 			}
 		}
-		const created = (STAGED_DOM?.view(document) ?? document).createTextNode(suppressed ? '' : text);
+		const created = (STAGED_DOM?.view(document) ?? document).createTextNode(keep ? '' : text);
 		if (posNode !== null && (STAGED_DOM?.view(posNode) ?? posNode).parentNode !== null) {
 			domNode((STAGED_DOM?.view(posNode) ?? posNode).parentNode!).insertBefore(created, posNode);
 		}
@@ -24107,27 +24137,13 @@ export function setHTML(el: Element, value: any): void {
 			el.localName === 'script'
 				? normalizeScriptTextForHydration(escapeInlineScriptContentForHydration(next))
 				: normalizeHTMLForHydration(el, next);
-		if (server === expected) {
-			if (el.localName !== 'script') {
-				const host = STAGED_DOM?.view(el as any) ?? (el as any);
-				journalRootProperty(el, DANGER_HTML_VALUE, host[DANGER_HTML_VALUE]);
-				host[DANGER_HTML_VALUE] = next;
-			}
-			return;
+		if (server !== expected && !hydration.repairHTML(el, next, server, expected)) return;
+		if (el.localName !== 'script') {
+			const host = STAGED_DOM?.view(el as any) ?? (el as any);
+			journalRootProperty(el, DANGER_HTML_VALUE, host[DANGER_HTML_VALUE]);
+			host[DANGER_HTML_VALUE] = next;
 		}
-		// React keeps the server's HTML on a mismatch. Server HTML that predates
-		// the client's state (staleServerValues) is not worth keeping: write the
-		// client's below.
-		if (!hydration.staleServerValues) {
-			if (process.env.NODE_ENV !== 'production' && !hydration.keepsServerValue(el))
-				warnHydrationKeptServerValue(
-					(el as any).__oct_loc,
-					'`dangerouslySetInnerHTML` content',
-					server,
-					expected,
-				);
-			return;
-		}
+		return;
 	}
 	if (el.localName === 'script') {
 		setScriptText(el, next);
