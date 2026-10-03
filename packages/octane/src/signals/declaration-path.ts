@@ -18,15 +18,27 @@ export function currentSignalDeclarationPath(): string {
  */
 export function createSignalHookSites(stack: readonly unknown[]): <S>(slot: S, site: string) => S {
 	const sites = new Map<unknown, string>();
+	// The path of each stack prefix, reused while the prefix holds the same
+	// slots. Every render of a hook reaches its declarations through the same
+	// call slots, so a declaration reads its path without rebuilding it.
+	const slots: unknown[] = [];
+	const paths: string[] = [];
 	const read = (): string => {
-		let path = '';
-		// A call boundary compiled without a site (a caller outside the signal
-		// contract) adds nothing, preserving that caller's previous identity.
-		for (let index = 0; index < stack.length; index++) {
+		const depth = stack.length;
+		let index = 0;
+		while (index < depth && index < slots.length && slots[index] === stack[index]) index++;
+		if (index < depth) slots.length = paths.length = index;
+		for (; index < depth; index++) {
 			const site = sites.get(stack[index]);
-			if (site !== undefined) path += '/' + site;
+			// A call boundary compiled without a site (a caller outside the signal
+			// contract) adds nothing, preserving that caller's previous identity.
+			// Sites are compiler hashes. Unlike '/', a NUL separator cannot appear
+			// in a realistic authored key, so a key such as 'user/h:…' declared
+			// directly cannot alias the key 'user' declared through a hook.
+			paths.push((paths[index - 1] ?? '') + (site === undefined ? '' : '\0' + site));
+			slots.push(stack[index]);
 		}
-		return path;
+		return paths[depth - 1] ?? '';
 	};
 	return (slot, site) => {
 		if (sites.size === 0) {
@@ -36,6 +48,8 @@ export function createSignalHookSites(stack: readonly unknown[]): <S>(slot: S, s
 			readPath = previous === undefined ? read : () => read() || previous();
 		}
 		sites.set(slot, site);
+		// A module re-evaluated by HMR may register a slot with a new site.
+		slots.length = paths.length = 0;
 		return slot;
 	};
 }

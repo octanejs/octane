@@ -49,8 +49,9 @@ export function createDeclaredDerivedCell<T>(
 	compute: DerivedCompute<T>,
 	options?: DerivedOptions,
 	sequence?: number,
+	captures?: readonly unknown[],
 ): DerivedSignal<T> {
-	return createDerivedCellWith(owner, key, compute, options, DerivedBinding, sequence);
+	return createDerivedCellWith(owner, key, compute, options, DerivedBinding, sequence, captures);
 }
 
 interface AttemptDependency {

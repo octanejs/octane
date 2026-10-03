@@ -10389,6 +10389,7 @@ function compileAuthored(source, filename, options, bundlerMetadata) {
 				: isKnownTextChildExpression,
 		),
 		cleanFilename,
+		{ hmr: mode === 'client' && Boolean(options?.hmr) },
 	);
 	if (bundlerMetadata !== null) bundlerMetadata.hydrateAst = signalAst;
 	const memoizedAst = strongModeEnabled

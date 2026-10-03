@@ -522,6 +522,7 @@ export function __derivedScalarAt<T>(
 	site: string | undefined,
 	compute: DerivedCompute<T>,
 	options?: DerivedOptions & SignalOptions,
+	captures?: readonly unknown[],
 ): DerivedSignal<T> {
 	if (typeof compute !== 'function') throw new TypeError(formatClientError(122));
 	const explicit = signalOptionsKey(options);
@@ -537,6 +538,7 @@ export function __derivedScalarAt<T>(
 				key,
 				() => runWithSignalOwner(owner, () => (compute as () => T)()),
 				sequence,
+				captures,
 			),
 		site,
 	);

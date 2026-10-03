@@ -58,6 +58,23 @@ export function currentSignalDeclarationStage(): SignalDeclarationStage | undefi
 	return declarationStageResolver?.();
 }
 
+let declarationInvocation = 0;
+
+/**
+ * A number unique to the render invocation evaluating declarations, or 0
+ * outside one. Unlike its stage, reading it allocates nothing.
+ */
+export function currentSignalDeclarationInvocation(): number {
+	return declarationInvocation;
+}
+
+/** The renderer enters an invocation, or restores the one it returns to. */
+export function setSignalDeclarationInvocation(invocation: number): number {
+	const previous = declarationInvocation;
+	declarationInvocation = invocation;
+	return previous;
+}
+
 let nativeActionResolver: (() => SignalCandidateFrame | undefined) | undefined;
 let nativeCandidateResolver: (() => SignalCandidateFrame | undefined) | null | undefined;
 

@@ -4,6 +4,7 @@ import { act, flushSync, hydrateRoot } from 'octane';
 import { renderToString } from 'octane/server';
 import { prerender } from 'octane/static';
 import * as Signals from 'octane/signals';
+import { compile } from '../src/compiler/compile.js';
 import { mount } from './_helpers.js';
 import { loadCompiledFixtureSource, loadPlainHookFixtureSource } from './_server-fixture.js';
 import * as Fixture from './_fixtures/signals-hook-declarations.tsrx';
@@ -264,6 +265,49 @@ describe('signal declarations inside custom hooks', () => {
 				errors.mockRestore();
 				root?.unmount();
 				container.remove();
+			}
+		});
+	}
+});
+
+describe('custom-hook declaration identity', () => {
+	const id = '/src/hook-key-path.tsrx';
+	const source = `import { derived$ } from 'octane/signals';
+function useUser$() {
+	return derived$(() => 'hook', { key: 'user' });
+}
+export function App(props) @{
+	const direct$ = derived$(() => 'direct', { key: props.alias });
+	const hook$ = useUser$();
+	<p>{(direct$.get() + '|' + hook$.get()) as string}</p>
+}`;
+	for (const compileOptions of MODES) {
+		it(`keeps an authored key that spells out a hook path apart from that path in ${JSON.stringify(compileOptions)}`, () => {
+			// A key built from the hook's own call site once named the hook's cell.
+			const site = compile(source, id, { ...compileOptions, mode: 'client' }).code.match(
+				/"(h:[0-9a-z]+)"/,
+			)?.[1];
+			expect(site).toBeDefined();
+			const props = { alias: `user/${site}` };
+			const runtimeModules = { 'octane/signals': Signals };
+			const client = loadCompiledFixtureSource<any>(source, {
+				id,
+				mode: 'client',
+				compileOptions,
+				runtimeModules,
+			});
+			const server = loadCompiledFixtureSource<any>(source, {
+				id,
+				mode: 'server',
+				compileOptions,
+				runtimeModules,
+			});
+			expect(renderToString(server.App, props).html).toContain('direct|hook');
+			const rendered = mount(client.App, props);
+			try {
+				expect(rendered.find('p').textContent).toBe('direct|hook');
+			} finally {
+				rendered.unmount();
 			}
 		});
 	}

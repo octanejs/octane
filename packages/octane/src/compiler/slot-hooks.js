@@ -1459,7 +1459,9 @@ export function slotHooks(source, id, options) {
 	// Native signal reads exist only for the DOM client and server renderers.
 	const signalHookSites =
 		(options?.renderer?.target ?? 'dom') === 'dom' && options?.universalRuntime == null;
-	const signalLowering = signalDeclarationSourceEdits(ast, id, source);
+	const signalLowering = signalDeclarationSourceEdits(ast, id, source, {
+		hmr: environment === 'client' && Boolean(options?.hmr),
+	});
 	const pureCalls = collectPureFactoryCalls(
 		ast,
 		source,
@@ -1678,7 +1680,8 @@ export function slotHooks(source, id, options) {
 		slotBase +
 		st.decls.join('\n') +
 		'\n' +
-		signalActivation;
+		signalActivation +
+		signalLowering.prelude;
 	if (activation !== null || signalLowering.usesSignals) {
 		// Plain modules may read global signals or render during evaluation.
 		// Their document capability and any render slots must already exist.
