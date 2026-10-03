@@ -67,6 +67,9 @@ export function universalHostBinding<T, U>(
 	source: { get(): T; subscribe(notify: () => void): () => void },
 	select: (value: T) => U,
 ): UniversalHostBinding<U> {
+	// A root can only meet a binding created here, so roots need the subscription
+	// and bound-batch machinery only after the first call.
+	HOST_BINDING_SUPPORT = UNIVERSAL_HOST_BINDING_SUPPORT;
 	return {
 		$$kind: UNIVERSAL_HOST_BINDING,
 		source,
@@ -77,6 +80,7 @@ export function universalHostBinding<T, U>(
 
 function isUniversalHostBinding(value: unknown): value is UniversalHostBinding<unknown> {
 	return (
+		HOST_BINDING_SUPPORT !== null &&
 		value !== null &&
 		typeof value === 'object' &&
 		(value as UniversalHostBinding<unknown>).$$kind === UNIVERSAL_HOST_BINDING
@@ -802,6 +806,13 @@ export interface UniversalHostDriver<Container = unknown, PublicInstance = unkno
 	readonly props?: UniversalHostPropCodec<Container>;
 	readonly updates?: UniversalHostUpdateCapability;
 	readonly portals?: UniversalPortalCapability<Container>;
+	/**
+	 * Template-program support. Pass `universalHostTemplates` to let the
+	 * `templateProgramMount`, `templateProgramRuns`, and `collapsedTemplateMount`
+	 * capabilities take effect; without it those trees mount and update through
+	 * ordinary host commands.
+	 */
+	readonly templates?: UniversalHostTemplates;
 	/** Validate and stage a batch without mutating the public host. */
 	prepareBatch(
 		container: Container,
@@ -3443,8 +3454,11 @@ function materializeValue(
 		const parent = CURRENT_OWNER!;
 		const attempt = currentAttempt();
 		const keys = new Set<UniversalKey>();
+		const templates = attempt.root.templates;
 		let compactTemplateEnabled =
-			compilerTemplateTree && attempt.root.driverCapabilities().templateProgramRuns === true;
+			compilerTemplateTree &&
+			templates !== null &&
+			attempt.root.driverCapabilities().templateProgramRuns === true;
 		let compactTemplateList: BlueprintCompactTemplateList | null = null;
 		const lazyOwnerScope: LazyLeafOwnerScope | null =
 			compilerLeafProps || compilerTemplateTree || compilerComponentScope
@@ -3521,15 +3535,12 @@ function materializeValue(
 					const candidate = rendered as UniversalPlanValue;
 					const candidatePlan = candidate?.$$kind === UNIVERSAL_VALUE ? candidate.plan : null;
 					const compiled =
-						candidatePlan?.root.kind === 'host'
-							? compiledCollapsedTemplateProgram(candidatePlan.root)
-							: null;
-					const prepared =
-						compiled === null ? null : attempt.root.prepareCollapsedTemplateProgram(compiled);
+						candidatePlan?.root.kind === 'host' ? templates!.compile(candidatePlan.root) : null;
+					const prepared = compiled === null ? null : templates!.prepare(attempt.root, compiled);
 					const dense =
 						compiled === null || prepared === null
 							? null
-							: prepareCollapsedTemplateValues(candidate, attempt.root, compiled, prepared);
+							: templates!.values(candidate, attempt.root, compiled, prepared);
 					if (
 						lazyOwnerScope!.owner === null &&
 						candidatePlan !== null &&
@@ -3562,7 +3573,7 @@ function materializeValue(
 							compactIndex < compactTemplateList.keys.length;
 							compactIndex++
 						) {
-							const host = preparedCollapsedTemplateBlueprint(
+							const host = templates!.blueprint(
 								compactTemplateList.plan,
 								compactTemplateList.compiled,
 								compactTemplateList.program,
@@ -4114,7 +4125,7 @@ function materializePlanValue(
 			`Universal renderer mismatch: root expects ${JSON.stringify(expectedRenderer)} but the plan targets ${JSON.stringify(value.plan.renderer)}.`,
 		);
 	}
-	const collapsed = materializeCollapsedTemplate(value);
+	const collapsed = currentAttempt().root.templates?.materialize(value) ?? null;
 	if (collapsed !== null) {
 		if (value.key !== null) collapsed.key = value.key;
 		return [collapsed];
@@ -4151,7 +4162,7 @@ function materializeCollapsedTemplate(value: UniversalPlanValue): BlueprintHost 
 	}
 	const program = compiledCollapsedTemplateProgram(value.plan.root);
 	if (program === null) return null;
-	const prepared = root.prepareCollapsedTemplateProgram(program);
+	const prepared = prepareCollapsedTemplateProgram(root, program);
 	if (prepared !== null) {
 		const fast = materializePreparedCollapsedTemplate(value, owner, root, program, prepared);
 		if (fast !== null) return fast;
@@ -4788,6 +4799,516 @@ function expandCollapsedTemplateBlueprint(host: BlueprintHost): void {
 		blueprints[collapsed.program.shape[index].parent].children.push(blueprint);
 	}
 	delete host.collapsedTemplate;
+}
+
+/**
+ * Template-program support a driver opts into as `driver.templates`. Renderers
+ * that never pass `universalHostTemplates` do not ship program preparation,
+ * collapsed-template materialization, or the compact template update path.
+ */
+export interface UniversalHostTemplates {
+	readonly $$kind: 'octane.universal.host-templates';
+}
+
+interface UniversalHostTemplateSupport extends UniversalHostTemplates {
+	compile(node: UniversalHostPlan): CompiledCollapsedTemplateProgram | null;
+	prepare(
+		root: UniversalRootImpl<any, any>,
+		compiled: CompiledCollapsedTemplateProgram,
+	): PreparedCollapsedTemplateProgram | null;
+	values(
+		value: UniversalPlanValue,
+		root: UniversalRootImpl<any, any>,
+		program: CompiledCollapsedTemplateProgram,
+		prepared: PreparedCollapsedTemplateProgram,
+	): readonly UniversalHostTemplateProgramValue[] | null;
+	blueprint: typeof preparedCollapsedTemplateBlueprint;
+	materialize(value: UniversalPlanValue): BlueprintHost | null;
+	expand(root: UniversalRootImpl<any, any>, record: LogicalRecord): void;
+	expandAll(root: UniversalRootImpl<any, any>): void;
+	update(
+		root: UniversalRootImpl<any, any>,
+		blueprint: BlueprintRange,
+		attempt: RenderAttempt,
+		component: UniversalComponent<any>,
+		props: any,
+	): UniversalTransactionImpl<any, any> | null;
+}
+
+export const universalHostTemplates: UniversalHostTemplates = {
+	$$kind: 'octane.universal.host-templates',
+	compile: compiledCollapsedTemplateProgram,
+	prepare: prepareCollapsedTemplateProgram,
+	values: prepareCollapsedTemplateValues,
+	blueprint: preparedCollapsedTemplateBlueprint,
+	materialize: materializeCollapsedTemplate,
+	expand: expandCollapsedTemplate,
+	expandAll: expandCollapsedTemplates,
+	update: tryCreateCompactTemplateUpdateTransaction,
+} satisfies UniversalHostTemplateSupport as UniversalHostTemplates;
+
+function prepareCollapsedTemplateProgram(
+	root: UniversalRootImpl<any, any>,
+	compiled: CompiledCollapsedTemplateProgram,
+): PreparedCollapsedTemplateProgram | null {
+	if (
+		root.driver.capabilities?.templateProgramMount !== true ||
+		root.driver.capabilities?.stableStaticHostProps !== true ||
+		root.textPolicy() !== 'host'
+	) {
+		return null;
+	}
+	const cache = (root.templatePrograms ??= new WeakMap());
+	const cached = cache.get(compiled);
+	if (cached !== undefined) return cached;
+	const wireNodes: UniversalHostTemplateProgramNode[] = [];
+	const wireEvents: UniversalHostTemplateProgramEvent[] = [];
+	const values: PreparedCollapsedTemplateValue[] = [];
+	const events: PreparedCollapsedTemplateEvent[] = [];
+	const sharedNodes: (BlueprintCollapsedTemplateNode | null)[] = [];
+	const reject = (): null => {
+		cache.set(compiled, null);
+		return null;
+	};
+	for (let index = 0; index < compiled.plans.length; index++) {
+		const node = compiled.plans[index];
+		const shape = compiled.shape[index];
+		if (node.kind === 'slot' || node.kind === 'text') {
+			if (node.kind === 'text' && node.slot === undefined) {
+				const props = Object.freeze({ value: String(node.value ?? '') });
+				wireNodes.push(Object.freeze({ type: shape.type, parent: shape.parent, props }));
+				sharedNodes.push(Object.freeze({ props }));
+			} else {
+				const valueIndex = values.length;
+				values.push({ node: index, name: 'value', slot: node.slot!, text: true });
+				const binding = Object.freeze({ name: 'value', valueIndex });
+				wireNodes.push(
+					Object.freeze({
+						type: shape.type,
+						parent: shape.parent,
+						props: EMPTY_STATIC_HOST_PROPS,
+						bindings: Object.freeze([binding]),
+					}),
+				);
+				sharedNodes.push(null);
+			}
+			continue;
+		}
+		const source = node.props ?? EMPTY_STATIC_HOST_PROPS;
+		const overwritten = new Set<string>();
+		for (const [name] of node.bindings ?? []) {
+			if (overwritten.has(name)) return reject();
+			overwritten.add(name);
+		}
+		let staticProps: Record<string, unknown>;
+		if (overwritten.size === 0) {
+			const shared = root.materializeStaticHostProps(node);
+			if (shared === null) return reject();
+			staticProps = shared;
+		} else {
+			let output: Record<string, unknown> | null = null;
+			for (const name of Object.keys(source)) {
+				if (overwritten.has(name)) continue;
+				const entry = source[name];
+				if (
+					!isUniversalHostTemplateProgramValue(entry) ||
+					root.classifyLifecycle(name, entry) !== null ||
+					root.classifyLocalCallback(name, entry) !== null ||
+					root.classifyEvent(name) !== null
+				) {
+					return reject();
+				}
+				const encoded = root.encodeHostProp(node.type, name, entry);
+				if (!isUniversalHostTemplateProgramValue(encoded)) return reject();
+				(output ??= {})[name] = encoded;
+			}
+			staticProps = output === null ? EMPTY_STATIC_HOST_PROPS : Object.freeze(output);
+		}
+		const bindings: UniversalHostTemplateProgramBinding[] = [];
+		let eventful = false;
+		const types = new Set<string>();
+		for (const [name, slot] of node.bindings ?? []) {
+			const definition = root.classifyEvent(name);
+			if (definition !== null) {
+				if (index === 0 || types.has(definition.type)) return reject();
+				types.add(definition.type);
+				const priority = definition.priority ?? 'default';
+				wireEvents.push(Object.freeze({ node: index, type: definition.type, priority }));
+				events.push({ node: index, prop: name, slot, type: definition.type, priority });
+				eventful = true;
+				continue;
+			}
+			const valueIndex = values.length;
+			values.push({ node: index, name, slot, text: false });
+			bindings.push(Object.freeze({ name, valueIndex }));
+		}
+		wireNodes.push(
+			Object.freeze({
+				type: shape.type,
+				parent: shape.parent,
+				props: staticProps,
+				...(bindings.length === 0 ? null : { bindings: Object.freeze(bindings) }),
+			}),
+		);
+		sharedNodes.push(
+			bindings.length === 0 && !eventful ? Object.freeze({ props: staticProps }) : null,
+		);
+	}
+	const prepared = Object.freeze({
+		wire: Object.freeze({ nodes: Object.freeze(wireNodes), events: Object.freeze(wireEvents) }),
+		values: Object.freeze(values),
+		events: Object.freeze(events),
+		sharedNodes: Object.freeze(sharedNodes),
+	});
+	cache.set(compiled, prepared);
+	return prepared;
+}
+
+function expandCollapsedTemplate(root: UniversalRootImpl<any, any>, record: LogicalRecord): void {
+	const state = record.collapsedTemplate;
+	if (state === undefined) return;
+	const events = new Map<number, Map<string, CommittedEvent>>();
+	for (const entry of state.events) {
+		let current = events.get(entry.index);
+		if (current === undefined) events.set(entry.index, (current = new Map()));
+		current.set(entry.event.type, entry.event);
+	}
+	// New child records start uncached, so invalidate the previously compact union.
+	invalidateLogicalTreeFeatures(record);
+	const records: LogicalRecord[] = [record];
+	for (let index = 1; index < state.shape.length; index++) {
+		const node = materializeCommittedCollapsedNode(state, index);
+		const child: LogicalRecord = {
+			id: node.id ?? state.firstId! + index,
+			kind: 'host',
+			key: null,
+			type: state.shape[index].type,
+			props: node.props as Record<string, unknown>,
+			ref: null,
+			refCleanup: null,
+			refAttached: false,
+			owner: state.owner,
+			events: events.get(index) ?? EMPTY_COMMITTED_EVENTS,
+			lifecycles: EMPTY_COMMITTED_HOST_CALLBACKS,
+			localCallbacks: EMPTY_COMMITTED_HOST_CALLBACKS,
+			visibility: 'visible',
+			portalRegistration: null,
+			parent: records[state.shape[index].parent],
+			children: [],
+			treeFeatures: null,
+		};
+		records.push(child);
+		child.parent!.children.push(child);
+	}
+	delete record.collapsedTemplate;
+	root.collapsedTemplates?.delete(record);
+}
+
+function expandCollapsedTemplates(root: UniversalRootImpl<any, any>): void {
+	const records = root.collapsedTemplates;
+	if (records === null || records.size === 0) return;
+	for (const record of [...records]) expandCollapsedTemplate(root, record);
+}
+
+function tryCreateCompactTemplateUpdateTransaction(
+	root: UniversalRootImpl<any, any>,
+	blueprint: BlueprintRange,
+	attempt: RenderAttempt,
+	component: UniversalComponent<any>,
+	props: any,
+): UniversalTransactionImpl<any, any> | null {
+	const owner = root.owner;
+	const draftOwner = attempt.owner;
+	if (
+		root.driver.capabilities?.templateProgramRuns !== true ||
+		owner === null ||
+		draftOwner.record !== owner ||
+		attempt.owners.length !== 1 ||
+		owner.children.length !== 0 ||
+		draftOwner.children.length !== 0 ||
+		owner.effectOrder.length !== 0 ||
+		draftOwner.seenEffects.length !== 0 ||
+		owner.contextValues !== null ||
+		draftOwner.contextValues !== null ||
+		owner.visibility !== 'visible' ||
+		draftOwner.visibility !== 'visible' ||
+		owner.isBoundary ||
+		draftOwner.isBoundary ||
+		owner.componentRevision !== draftOwner.componentRevision ||
+		owner.hooks.size !== draftOwner.hooks.size ||
+		attempt.scope !== null ||
+		attempt.retryThenables.size !== 0 ||
+		attempt.replayEntries.length !== 0 ||
+		attempt.transitionBatches.size !== 0 ||
+		attempt.transitionRender ||
+		root.bridge !== null ||
+		((root.treeFeatures | attempt.treeFeatures) & ~UNIVERSAL_TREE_EVENT) !== 0
+	) {
+		return null;
+	}
+	for (const [slot, hook] of draftOwner.hooks) {
+		const previous = owner.hooks.get(slot);
+		if (
+			previous === undefined ||
+			previous.kind !== hook.kind ||
+			(hook.kind !== 'state' && hook.kind !== 'reducer') ||
+			(hook.kind === 'state' && 'linked' in hook)
+		) {
+			return null;
+		}
+	}
+	for (const [slot, queue] of owner.updates) {
+		const applied = draftOwner.appliedUpdates.get(slot);
+		if (applied === undefined || applied.lane || applied.queue !== queue || queue.batches) {
+			return null;
+		}
+	}
+	const shells: { record: LogicalRecord; blueprint: BlueprintHost }[] = [];
+	const lists: {
+		list: BlueprintCompactTemplateList;
+		records: readonly LogicalRecord[];
+		start: number;
+	}[] = [];
+	const pair = (
+		records: readonly LogicalRecord[],
+		blueprints: readonly BlueprintNode[],
+	): boolean => {
+		let recordIndex = 0;
+		for (const next of blueprints) {
+			const list = next.kind === 'range' ? next.compactTemplateList : undefined;
+			if (list !== undefined) {
+				if (
+					next.key !== null ||
+					list.owner !== owner ||
+					list.keys.length !== list.values.length ||
+					list.keys.length !== list.captures.length
+				) {
+					return false;
+				}
+				const start = recordIndex;
+				for (let index = 0; index < list.keys.length; index++) {
+					const record = records[recordIndex++];
+					const state = record?.collapsedTemplate;
+					if (
+						record === undefined ||
+						record.kind !== 'host' ||
+						!Object.is(record.key, list.keys[index]) ||
+						record.type !== list.program.wire.nodes[0].type ||
+						record.owner !== owner ||
+						record.children.length !== 0 ||
+						record.ref != null ||
+						record.events.size !== 0 ||
+						state?.prepared !== list.program ||
+						state.values === undefined ||
+						state.firstId === undefined ||
+						state.events.length !== list.program.events.length
+					) {
+						return false;
+					}
+				}
+				lists.push({ list, records, start });
+				continue;
+			}
+			const record = records[recordIndex++];
+			if (record === undefined || !sameRecordShape(record, next) || record.kind === 'portal') {
+				return false;
+			}
+			if (record.kind === 'range') {
+				if (
+					next.kind !== 'range' ||
+					next.compactLeafList !== undefined ||
+					record.owner !== (next.owner ?? null) ||
+					!pair(record.children, next.children)
+				) {
+					return false;
+				}
+				continue;
+			}
+			if (
+				next.kind !== 'host' ||
+				record.owner !== next.owner ||
+				record.ref != null ||
+				next.ref != null ||
+				record.events.size !== 0 ||
+				next.events.size !== 0 ||
+				record.lifecycles.size !== 0 ||
+				next.lifecycles.size !== 0 ||
+				record.localCallbacks.size !== 0 ||
+				next.localCallbacks.size !== 0 ||
+				record.visibility !== 'visible' ||
+				next.visibility !== 'visible' ||
+				record.collapsedTemplate !== undefined ||
+				next.collapsedTemplate !== undefined ||
+				!pair(record.children, next.children)
+			) {
+				return false;
+			}
+			shells.push({ record, blueprint: next });
+		}
+		return recordIndex === records.length;
+	};
+	if (!pair(root.rootRecord.children, blueprint.children) || lists.length === 0) return null;
+	const commands: UniversalHostCommand[] = [];
+	const rowUpdates: { record: LogicalRecord; props: Record<string, unknown> }[] = [];
+	const recreatedEvents: {
+		id: number;
+		type: string;
+		listener: UniversalEventListenerDescriptor;
+	}[] = [];
+	const stageUpdate = (
+		type: string,
+		id: number,
+		previous: Readonly<Record<string, unknown>>,
+		next: Record<string, unknown>,
+	): UniversalHostUpdateKind => {
+		const kind = root.driver.updates?.classify(type, previous, next) ?? 'update';
+		if (kind !== 'update' && kind !== 'recreate') {
+			throw new TypeError(
+				`Universal update classifier returned invalid kind ${JSON.stringify(kind)}.`,
+			);
+		}
+		commands.push(
+			kind === 'recreate'
+				? { op: 'recreate', id, type, props: Object.freeze(next) }
+				: { op: 'update', id, props: Object.freeze(next) },
+		);
+		return kind;
+	};
+	for (const { record, blueprint: host } of shells) {
+		if (!shallowPropsEqual(record.props, host.props)) {
+			stageUpdate(host.type, record.id, record.props, host.props);
+		}
+	}
+	for (const { list, records, start } of lists) {
+		const program = list.program;
+		for (let row = 0; row < list.keys.length; row++) {
+			const record = records[start + row];
+			const accepted = record.collapsedTemplate!;
+			const values = list.values[row];
+			let previousChangedNode = -1;
+			for (let valueIndex = 0; valueIndex < program.values.length; valueIndex++) {
+				if (Object.is(accepted.values![valueIndex], values[valueIndex])) continue;
+				const index = program.values[valueIndex].node;
+				if (previousChangedNode === index) continue;
+				previousChangedNode = index;
+				const next = materializePreparedCollapsedHostProps(program, values, index);
+				const previous =
+					index === 0
+						? record.props
+						: materializePreparedCollapsedHostProps(program, accepted.values!, index);
+				const id = accepted.firstId! + index;
+				const kind = stageUpdate(program.wire.nodes[index].type, id, previous, next);
+				if (index === 0) rowUpdates.push({ record, props: next });
+				if (kind === 'recreate') {
+					for (let eventIndex = 0; eventIndex < program.events.length; eventIndex++) {
+						const site = program.events[eventIndex];
+						if (site.node !== index) continue;
+						const event = accepted.events[eventIndex].event;
+						recreatedEvents.push({
+							id,
+							type: site.type,
+							listener: { id: event.listener, priority: site.priority },
+						});
+					}
+				}
+			}
+			for (let eventIndex = 0; eventIndex < program.events.length; eventIndex++) {
+				const site = program.events[eventIndex];
+				const previous = accepted.events[eventIndex];
+				if (
+					previous.index !== site.node ||
+					previous.event.type !== site.type ||
+					typeof list.captures[row][site.slot] !== 'function'
+				) {
+					return null;
+				}
+			}
+		}
+	}
+	for (const event of recreatedEvents) commands.push({ op: 'event', ...event });
+	const batch = freezeUniversalHostBatch(root.renderer, root.nextBatchVersion++, commands);
+	const identity = root.transportIdentity(batch.version);
+	const prepareHost = (value: UniversalHostBatch) =>
+		root.driver.prepareBatch(root.container, value, {
+			invokeLocalCallback: (listener, args) => root.invokeLocalCallback(listener, args),
+		});
+	let sync: UniversalPreparedHostBatch | null = null;
+	let async: UniversalAsyncPreparedHostBatch | null = null;
+	if (root.transport?.mode === 'async') {
+		async = root.transport.prepareBatch(root.container, batch, identity);
+	} else {
+		sync =
+			root.transport === null
+				? prepareHost(batch)
+				: root.transport.prepareBatch(root.container, batch, prepareHost);
+	}
+	const prepared = sync ?? async;
+	if (!isValidPreparedHostBatch(prepared)) {
+		throw new TypeError('A universal host driver must return a valid prepared batch token.');
+	}
+	return new UniversalTransactionImpl(
+		root,
+		batch,
+		sync === null ? null : () => sync!.apply(),
+		async === null ? null : (acknowledge) => async!.apply(acknowledge),
+		identity,
+		() => {
+			for (const { record, blueprint: host } of shells) record.props = host.props;
+			for (const update of rowUpdates) update.record.props = update.props;
+			for (const { list, records, start } of lists) {
+				const program = list.program;
+				for (let row = 0; row < list.keys.length; row++) {
+					const state = records[start + row].collapsedTemplate!;
+					(state as { values: readonly UniversalHostTemplateProgramValue[] }).values =
+						list.values[row];
+					for (let eventIndex = 0; eventIndex < program.events.length; eventIndex++) {
+						const site = program.events[eventIndex];
+						const previous = state.events[eventIndex].event;
+						const handler = list.captures[row][site.slot] as (...args: any[]) => any;
+						if (previous.handler === handler && previous.owner === list.owner) continue;
+						const event: CommittedEvent = {
+							prop: site.prop,
+							type: site.type,
+							priority: site.priority,
+							handler,
+							owner: list.owner,
+							listener: previous.listener,
+						};
+						(state.events as CommittedCollapsedTemplateEvent[])[eventIndex] = {
+							index: site.node,
+							event,
+						};
+						root.handlers.set(event.listener, event);
+					}
+				}
+			}
+			owner.componentProps = draftOwner.componentProps;
+			owner.componentRevision = draftOwner.componentRevision;
+			owner.hooks = draftOwner.hooks;
+			for (const [slot, applied] of draftOwner.appliedUpdates) {
+				const queue = owner.updates.get(slot);
+				if (queue !== applied.queue || applied.lane) continue;
+				queue.splice(0, applied.consumed);
+				if (queue.length === 0) owner.updates.delete(slot);
+			}
+			root.owner = owner;
+			root.lastComponent = component;
+			root.lastProps = props;
+			root.retryRenderInput = null;
+			root.urgentBoundarySuspension = null;
+			root.bridgeContextReads = attempt.bridgeContextReads;
+			root.nextUniversalId = attempt.nextUniversalId;
+			root.treeFeatures = attempt.treeFeatures;
+		},
+		() => prepared.afterAccept?.(),
+		noopUniversalCommitTask,
+		noopUniversalCommitTask,
+		noopUniversalCommitTask,
+		null,
+		() => prepared.abort(),
+		() => root.discardDraftOwners(attempt.owners),
+		attempt.transitionBatches,
+	);
 }
 
 function walkLogical(record: LogicalRecord, visit: (record: LogicalRecord) => void): void {
@@ -7484,67 +8005,56 @@ interface UniversalPortalHandleEntry {
 	pending: number;
 }
 
+// Members without `private` are shared with this module's transactions, the
+// DOM-owned boundary facade, and the optional host-binding and template
+// supports. The class is not exported; `UniversalRoot` is the public type.
 class UniversalRootImpl<Container, PublicInstance> implements UniversalRoot<any> {
 	readonly renderer: string;
-	private readonly rootRecord: LogicalRecord;
+	readonly rootRecord: LogicalRecord;
 	private readonly universalIdRoot = NEXT_UNIVERSAL_ID_ROOT++;
 	private readonly resourceRoot = NEXT_RESOURCE_ROOT++;
 	private readonly portalRoot = NEXT_PORTAL_ROOT++;
 	private readonly transportRoot = NEXT_TRANSPORT_ROOT++;
 	private readonly portalHandles = new Map<string | number, UniversalPortalHandleEntry>();
-	private owner: UniversalOwnerRecord | null = null;
-	private bridge: BoundaryOwner | null = null;
-	private bridgeContextReads: Map<UniversalContext<any>, unknown> | null = null;
-	private unmounted = false;
-	private unmounting = false;
+	owner: UniversalOwnerRecord | null = null;
+	bridge: BoundaryOwner | null = null;
+	bridgeContextReads: Map<UniversalContext<any>, unknown> | null = null;
+	unmounted = false;
+	unmounting = false;
 	private unmountPromise: Promise<void> | null = null;
 	private asyncWork: Promise<void> = Promise.resolve();
 	private asyncWorkError: unknown = NO_PENDING_PASSIVE_ERROR;
 	private nextId = 1;
 	private nextLogicalRangeId = -1;
-	private nextUniversalId = 1;
+	nextUniversalId = 1;
 	private nextListener = NEXT_EVENT_ROOT++ * 1_000_000;
-	private nextBatchVersion = 1;
+	nextBatchVersion = 1;
 	private acceptedBatchVersion = 0;
-	private treeFeatures = 0;
-	private handlers = new Map<number, CommittedEvent>();
+	treeFeatures = 0;
+	handlers = new Map<number, CommittedEvent>();
 	private eventDefinitions: Map<string, UniversalEventDefinition | null> | null = null;
 	private staticHostProps: WeakMap<
 		UniversalHostPlan,
 		Readonly<Record<string, unknown>> | null
 	> | null = null;
-	private templatePrograms: WeakMap<
+	templatePrograms: WeakMap<
 		CompiledCollapsedTemplateProgram,
 		PreparedCollapsedTemplateProgram | null
 	> | null = null;
 	private localCallbacks = new Map<number, CommittedHostCallback>();
-	private boundHosts: Map<
-		LogicalRecord,
-		{ name: string; binding: UniversalHostBinding<unknown> }[]
-	> | null = null;
-	private readonly boundSources = new Map<
-		UniversalHostBinding<unknown>['source'],
-		{
-			records: LogicalRecord[];
-			unsubscribe: () => void;
-		}
-	>();
-	private dirtyBoundHosts: LogicalRecord[] = [];
-	private readonly dirtyBoundHostSet = new Set<LogicalRecord>();
-	private dirtyBoundSources: UniversalHostBinding<unknown>['source'][] = [];
-	private readonly dirtyBoundSourceSet = new Set<UniversalHostBinding<unknown>['source']>();
-	private boundHostScheduled = false;
+	/** @internal Created by the installed host-binding support for the first bound host. */
+	hostBindings: UniversalHostBindingState | null = null;
 	private readonly publishedListeners = new Set<number>();
-	private pending: UniversalRootPendingTransaction | null = null;
+	pending: UniversalRootPendingTransaction | null = null;
 	private suspended: UniversalSuspendedAttemptImpl | null = null;
-	private urgentBoundarySuspension: UniversalSuspendedAttemptImpl | null = null;
+	urgentBoundarySuspension: UniversalSuspendedAttemptImpl | null = null;
 	private awaitingReplay: SuspendedMemoReplay | null = null;
 	private queuedReplay: SuspendedMemoReplay | null = null;
 	private rootRetryAttempt: UniversalSuspendedAttemptImpl | null = null;
-	private lastComponent: UniversalComponent<any> | null = null;
-	private lastProps: any;
-	private retryRenderInput: readonly [UniversalComponent<any>, any] | null = null;
-	private scheduled = false;
+	lastComponent: UniversalComponent<any> | null = null;
+	lastProps: any;
+	retryRenderInput: readonly [UniversalComponent<any>, any] | null = null;
+	scheduled = false;
 	private scheduledUrgent = false;
 	private scheduledFullRoot = false;
 	private readonly scheduledOwners = new Set<UniversalOwnerRecord>();
@@ -7563,13 +8073,14 @@ class UniversalRootImpl<Container, PublicInstance> implements UniversalRoot<any>
 	private passiveScheduled = false;
 	private readonly passiveTasks: (() => void)[] = [];
 	private hostAttachments: UniversalHostAttachmentState | null = null;
-	private collapsedTemplates: Set<LogicalRecord> | null = null;
+	collapsedTemplates: Set<LogicalRecord> | null = null;
+	readonly templates: UniversalHostTemplateSupport | null;
 	private codecResourceHandle: ((id: string | number) => UniversalResourceHandle) | null = null;
 
 	constructor(
-		private readonly container: Container,
-		private readonly driver: UniversalHostDriver<Container, PublicInstance>,
-		private readonly transport:
+		readonly container: Container,
+		readonly driver: UniversalHostDriver<Container, PublicInstance>,
+		readonly transport:
 			UniversalCommitTransport<Container> | UniversalAsyncCommitTransport<Container> | null,
 		private readonly microtaskScheduler: ((callback: () => void) => void) | null,
 	) {
@@ -7580,6 +8091,7 @@ class UniversalRootImpl<Container, PublicInstance> implements UniversalRoot<any>
 			);
 		}
 		this.renderer = driver.id;
+		this.templates = (driver.templates as UniversalHostTemplateSupport | undefined) ?? null;
 		this.rootRecord = {
 			id: 0,
 			kind: 'range',
@@ -7845,250 +8357,6 @@ class UniversalRootImpl<Container, PublicInstance> implements UniversalRoot<any>
 		return this.transport !== null || this.bridge !== null;
 	}
 
-	private dropHostBindings(record: LogicalRecord): unknown {
-		const attached = this.boundHosts?.get(record);
-		if (attached === undefined) return NO_PENDING_PASSIVE_ERROR;
-		this.boundHosts!.delete(record);
-		this.dirtyBoundHostSet.delete(record);
-		const dirtyIndex = this.dirtyBoundHosts.indexOf(record);
-		if (dirtyIndex !== -1) this.dirtyBoundHosts.splice(dirtyIndex, 1);
-		let unsubscribeError: unknown = NO_PENDING_PASSIVE_ERROR;
-		for (let index = 0; index < attached.length; index++) {
-			const source = attached[index].binding.source;
-			const group = this.boundSources.get(source);
-			if (group === undefined) continue;
-			const position = group.records.indexOf(record);
-			if (position >= 0) group.records.splice(position, 1);
-			if (group.records.length === 0) {
-				this.boundSources.delete(source);
-				try {
-					group.unsubscribe();
-				} catch (error) {
-					if (unsubscribeError === NO_PENDING_PASSIVE_ERROR) unsubscribeError = error;
-				}
-			}
-		}
-		return unsubscribeError;
-	}
-
-	private commitHostBindings(record: LogicalRecord, next: BlueprintHost): unknown {
-		const bindings = next.hostBindings;
-		if (bindings === undefined || next.visibility !== 'visible') {
-			return this.dropHostBindings(record);
-		}
-		const previous = this.boundHosts?.get(record);
-		if (previous !== undefined && previous.length === bindings.size) {
-			let unchanged = true;
-			let index = 0;
-			for (const [name, binding] of bindings) {
-				const current = previous[index++];
-				if (current.name !== name || current.binding !== binding) {
-					unchanged = false;
-					break;
-				}
-			}
-			if (unchanged) return NO_PENDING_PASSIVE_ERROR;
-		}
-		const unsubscribeError = this.dropHostBindings(record);
-		const connected: { name: string; binding: UniversalHostBinding<unknown> }[] = [];
-		(this.boundHosts ??= new Map()).set(record, connected);
-		try {
-			for (const [name, binding] of bindings) {
-				connected.push({ name, binding });
-				let group = this.boundSources.get(binding.source);
-				if (group === undefined) {
-					group = { records: [], unsubscribe: () => {} };
-					this.boundSources.set(binding.source, group);
-					group.records.push(record);
-					try {
-						group.unsubscribe = this.subscribeHostBindingSource(binding.source);
-					} catch (error) {
-						this.boundSources.delete(binding.source);
-						throw error;
-					}
-				} else if (!group.records.includes(record)) group.records.push(record);
-				const value = this.encodeHostProp(next.type, name, binding.getSnapshot());
-				if (!sameUniversalHostPropValue(record.props[name], value)) {
-					this.queueHostBindingUpdate(record);
-				}
-			}
-		} catch (error) {
-			this.dropHostBindings(record);
-			throw error;
-		}
-		return unsubscribeError;
-	}
-
-	private subscribeHostBindingSource(source: UniversalHostBinding<unknown>['source']): () => void {
-		// The listener survives individual bound hosts. Do not close over the
-		// first host's binding, which can retain its removed selector and payload.
-		return source.subscribe(() => this.queueHostBindingSource(source));
-	}
-
-	private queueHostBindingUpdate(record: LogicalRecord): void {
-		if (this.unmounted || this.unmounting || !this.boundHosts?.has(record)) return;
-		if (!this.dirtyBoundHostSet.has(record)) {
-			this.dirtyBoundHostSet.add(record);
-			this.dirtyBoundHosts.push(record);
-		}
-		this.scheduleHostBindingUpdate();
-	}
-
-	private queueHostBindingSource(source: UniversalHostBinding<unknown>['source']): void {
-		if (this.unmounted || this.unmounting || !this.boundSources.has(source)) return;
-		if (!this.dirtyBoundSourceSet.has(source)) {
-			this.dirtyBoundSourceSet.add(source);
-			this.dirtyBoundSources.push(source);
-		}
-		this.scheduleHostBindingUpdate();
-	}
-
-	private scheduleHostBindingUpdate(): void {
-		SCHEDULED_UNIVERSAL_ROOTS.add(this);
-		if (this.boundHostScheduled) return;
-		this.boundHostScheduled = true;
-		this.__scheduleMicrotask(() => {
-			if (this.boundHostScheduled) this.flushHostBindingUpdates();
-		});
-	}
-
-	private restoreDirtyHostBindings(records: readonly LogicalRecord[]): void {
-		this.boundHostScheduled = false;
-		if (!this.scheduled) SCHEDULED_UNIVERSAL_ROOTS.delete(this);
-		for (let index = 0; index < records.length; index++) {
-			const record = records[index];
-			if (this.boundHosts?.has(record) && !this.dirtyBoundHostSet.has(record)) {
-				this.dirtyBoundHostSet.add(record);
-				this.dirtyBoundHosts.push(record);
-			}
-		}
-	}
-
-	/** @internal Restore a binding-only batch abandoned before host acceptance. */
-	restoreAbortedHostBindingRecords(records: readonly LogicalRecord[]): void {
-		this.restoreDirtyHostBindings(records);
-	}
-
-	private flushHostBindingUpdates(): void {
-		if (
-			(this.dirtyBoundHosts.length === 0 && this.dirtyBoundSources.length === 0) ||
-			this.unmounted ||
-			this.unmounting
-		) {
-			this.boundHostScheduled = false;
-			if (!this.scheduled) SCHEDULED_UNIVERSAL_ROOTS.delete(this);
-			return;
-		}
-		if (this.pending !== null || this.scheduled) {
-			// The queued microtask has been consumed; the pending transaction or
-			// scheduled render will arrange the next drain once it settles.
-			this.boundHostScheduled = false;
-			if (!this.scheduled) SCHEDULED_UNIVERSAL_ROOTS.delete(this);
-			return;
-		}
-		this.boundHostScheduled = false;
-		SCHEDULED_UNIVERSAL_ROOTS.delete(this);
-		let records = this.dirtyBoundHosts;
-		const sources = this.dirtyBoundSources;
-		this.dirtyBoundHosts = [];
-		this.dirtyBoundHostSet.clear();
-		this.dirtyBoundSources = [];
-		this.dirtyBoundSourceSet.clear();
-		if (sources.length === 1 && records.length === 0) {
-			records = this.boundSources.get(sources[0])?.records.slice() ?? [];
-		} else if (sources.length !== 0) {
-			const seen = new Set(records);
-			for (let index = 0; index < sources.length; index++) {
-				const group = this.boundSources.get(sources[index]);
-				if (group === undefined) continue;
-				for (let recordIndex = 0; recordIndex < group.records.length; recordIndex++) {
-					const record = group.records[recordIndex];
-					if (!seen.has(record)) {
-						seen.add(record);
-						records.push(record);
-					}
-				}
-			}
-		}
-		const changedRecords: LogicalRecord[] = [];
-		const commands: UniversalHostCommand[] = [];
-		const soleSource = sources.length === 1 ? sources[0] : null;
-		let soleSourceRead = false;
-		let soleSourceSnapshot: unknown;
-		const otherSourceSnapshots =
-			sources.length > 1 ? new Map<UniversalHostBinding<unknown>['source'], unknown>() : null;
-		try {
-			for (let recordIndex = 0; recordIndex < records.length; recordIndex++) {
-				const record = records[recordIndex];
-				const connected = this.boundHosts?.get(record);
-				if (connected === undefined || record.visibility !== 'visible') continue;
-				let next: Record<string, unknown> | null = null;
-				for (let bindingIndex = 0; bindingIndex < connected.length; bindingIndex++) {
-					const { name, binding } = connected[bindingIndex];
-					let raw: unknown;
-					if (binding.source === soleSource) {
-						if (!soleSourceRead) {
-							soleSourceSnapshot = binding.source.get();
-							soleSourceRead = true;
-						}
-						raw = soleSourceSnapshot;
-					} else if (otherSourceSnapshots !== null && sources.includes(binding.source)) {
-						if (!otherSourceSnapshots.has(binding.source)) {
-							otherSourceSnapshots.set(binding.source, binding.source.get());
-						}
-						raw = otherSourceSnapshots.get(binding.source);
-					} else {
-						raw = binding.source.get();
-					}
-					const selected = binding.select(raw);
-					const current = (next ?? record.props)[name];
-					if (this.driver.props === undefined && sameUniversalHostPropValue(current, selected))
-						continue;
-					const value = this.encodeHostProp(record.type!, name, selected);
-					if (sameUniversalHostPropValue(current, value)) continue;
-					(next ??= { ...record.props })[name] = value;
-				}
-				if (next === null) continue;
-				const kind = this.driver.updates?.classify(record.type!, record.props, next) ?? 'update';
-				if (kind !== 'update' || record.lifecycles.size !== 0) {
-					throw new Error(
-						'Experimental host bindings require update-only hosts without lifecycle callbacks.',
-					);
-				}
-				Object.freeze(next);
-				changedRecords.push(record);
-				commands.push({ op: 'update', id: record.id, props: next });
-			}
-		} catch (error) {
-			this.restoreDirtyHostBindings(records);
-			throw error;
-		}
-		if (commands.length === 0) return;
-		const batch = freezeUniversalHostBatch(this.renderer, this.nextBatchVersion++, commands);
-		let prepared: UniversalPreparedHostBatch;
-		try {
-			prepared = this.driver.prepareBatch(this.container, batch, {
-				invokeLocalCallback: (listener, args) => this.invokeLocalCallback(listener, args),
-			});
-		} catch (error) {
-			this.restoreDirtyHostBindings(records);
-			throw error;
-		}
-		if (!isValidPreparedHostBatch(prepared)) {
-			this.restoreDirtyHostBindings(records);
-			throw new TypeError('Invalid host binding batch token.');
-		}
-		const transaction = new UniversalBoundHostTransaction(
-			this,
-			batch,
-			prepared,
-			changedRecords,
-			records,
-		);
-		this.pending = transaction;
-		transaction.commit();
-	}
-
 	private enqueueAsyncWork(work: () => Promise<void>): void {
 		const run = async () => {
 			try {
@@ -8139,7 +8407,7 @@ class UniversalRootImpl<Container, PublicInstance> implements UniversalRoot<any>
 		}
 	}
 
-	private transportIdentity(version: number): UniversalTransportIdentity {
+	transportIdentity(version: number): UniversalTransportIdentity {
 		return Object.freeze({
 			protocol: UNIVERSAL_TRANSPORT_PROTOCOL_VERSION,
 			renderer: this.renderer,
@@ -8283,168 +8551,6 @@ class UniversalRootImpl<Container, PublicInstance> implements UniversalRoot<any>
 		Object.freeze(props);
 		cache.set(node, props);
 		return props;
-	}
-
-	prepareCollapsedTemplateProgram(
-		compiled: CompiledCollapsedTemplateProgram,
-	): PreparedCollapsedTemplateProgram | null {
-		if (
-			this.driver.capabilities?.templateProgramMount !== true ||
-			this.driver.capabilities?.stableStaticHostProps !== true ||
-			this.textPolicy() !== 'host'
-		) {
-			return null;
-		}
-		const cache = (this.templatePrograms ??= new WeakMap());
-		const cached = cache.get(compiled);
-		if (cached !== undefined) return cached;
-		const wireNodes: UniversalHostTemplateProgramNode[] = [];
-		const wireEvents: UniversalHostTemplateProgramEvent[] = [];
-		const values: PreparedCollapsedTemplateValue[] = [];
-		const events: PreparedCollapsedTemplateEvent[] = [];
-		const sharedNodes: (BlueprintCollapsedTemplateNode | null)[] = [];
-		const reject = (): null => {
-			cache.set(compiled, null);
-			return null;
-		};
-		for (let index = 0; index < compiled.plans.length; index++) {
-			const node = compiled.plans[index];
-			const shape = compiled.shape[index];
-			if (node.kind === 'slot' || node.kind === 'text') {
-				if (node.kind === 'text' && node.slot === undefined) {
-					const props = Object.freeze({ value: String(node.value ?? '') });
-					wireNodes.push(Object.freeze({ type: shape.type, parent: shape.parent, props }));
-					sharedNodes.push(Object.freeze({ props }));
-				} else {
-					const valueIndex = values.length;
-					values.push({ node: index, name: 'value', slot: node.slot!, text: true });
-					const binding = Object.freeze({ name: 'value', valueIndex });
-					wireNodes.push(
-						Object.freeze({
-							type: shape.type,
-							parent: shape.parent,
-							props: EMPTY_STATIC_HOST_PROPS,
-							bindings: Object.freeze([binding]),
-						}),
-					);
-					sharedNodes.push(null);
-				}
-				continue;
-			}
-			const source = node.props ?? EMPTY_STATIC_HOST_PROPS;
-			const overwritten = new Set<string>();
-			for (const [name] of node.bindings ?? []) {
-				if (overwritten.has(name)) return reject();
-				overwritten.add(name);
-			}
-			let staticProps: Record<string, unknown>;
-			if (overwritten.size === 0) {
-				const shared = this.materializeStaticHostProps(node);
-				if (shared === null) return reject();
-				staticProps = shared;
-			} else {
-				let output: Record<string, unknown> | null = null;
-				for (const name of Object.keys(source)) {
-					if (overwritten.has(name)) continue;
-					const entry = source[name];
-					if (
-						!isUniversalHostTemplateProgramValue(entry) ||
-						this.classifyLifecycle(name, entry) !== null ||
-						this.classifyLocalCallback(name, entry) !== null ||
-						this.classifyEvent(name) !== null
-					) {
-						return reject();
-					}
-					const encoded = this.encodeHostProp(node.type, name, entry);
-					if (!isUniversalHostTemplateProgramValue(encoded)) return reject();
-					(output ??= {})[name] = encoded;
-				}
-				staticProps = output === null ? EMPTY_STATIC_HOST_PROPS : Object.freeze(output);
-			}
-			const bindings: UniversalHostTemplateProgramBinding[] = [];
-			let eventful = false;
-			const types = new Set<string>();
-			for (const [name, slot] of node.bindings ?? []) {
-				const definition = this.classifyEvent(name);
-				if (definition !== null) {
-					if (index === 0 || types.has(definition.type)) return reject();
-					types.add(definition.type);
-					const priority = definition.priority ?? 'default';
-					wireEvents.push(Object.freeze({ node: index, type: definition.type, priority }));
-					events.push({ node: index, prop: name, slot, type: definition.type, priority });
-					eventful = true;
-					continue;
-				}
-				const valueIndex = values.length;
-				values.push({ node: index, name, slot, text: false });
-				bindings.push(Object.freeze({ name, valueIndex }));
-			}
-			wireNodes.push(
-				Object.freeze({
-					type: shape.type,
-					parent: shape.parent,
-					props: staticProps,
-					...(bindings.length === 0 ? null : { bindings: Object.freeze(bindings) }),
-				}),
-			);
-			sharedNodes.push(
-				bindings.length === 0 && !eventful ? Object.freeze({ props: staticProps }) : null,
-			);
-		}
-		const prepared = Object.freeze({
-			wire: Object.freeze({ nodes: Object.freeze(wireNodes), events: Object.freeze(wireEvents) }),
-			values: Object.freeze(values),
-			events: Object.freeze(events),
-			sharedNodes: Object.freeze(sharedNodes),
-		});
-		cache.set(compiled, prepared);
-		return prepared;
-	}
-
-	private expandCollapsedTemplate(record: LogicalRecord): void {
-		const state = record.collapsedTemplate;
-		if (state === undefined) return;
-		const events = new Map<number, Map<string, CommittedEvent>>();
-		for (const entry of state.events) {
-			let current = events.get(entry.index);
-			if (current === undefined) events.set(entry.index, (current = new Map()));
-			current.set(entry.event.type, entry.event);
-		}
-		// New child records start uncached, so invalidate the previously compact union.
-		invalidateLogicalTreeFeatures(record);
-		const records: LogicalRecord[] = [record];
-		for (let index = 1; index < state.shape.length; index++) {
-			const node = materializeCommittedCollapsedNode(state, index);
-			const child: LogicalRecord = {
-				id: node.id ?? state.firstId! + index,
-				kind: 'host',
-				key: null,
-				type: state.shape[index].type,
-				props: node.props as Record<string, unknown>,
-				ref: null,
-				refCleanup: null,
-				refAttached: false,
-				owner: state.owner,
-				events: events.get(index) ?? EMPTY_COMMITTED_EVENTS,
-				lifecycles: EMPTY_COMMITTED_HOST_CALLBACKS,
-				localCallbacks: EMPTY_COMMITTED_HOST_CALLBACKS,
-				visibility: 'visible',
-				portalRegistration: null,
-				parent: records[state.shape[index].parent],
-				children: [],
-				treeFeatures: null,
-			};
-			records.push(child);
-			child.parent!.children.push(child);
-		}
-		delete record.collapsedTemplate;
-		this.collapsedTemplates?.delete(record);
-	}
-
-	private expandCollapsedTemplates(): void {
-		const records = this.collapsedTemplates;
-		if (records === null || records.size === 0) return;
-		for (const record of [...records]) this.expandCollapsedTemplate(record);
 	}
 
 	classifyLifecycle(name: string, value: unknown): UniversalHostCallbackDefinition | null {
@@ -8836,7 +8942,7 @@ class UniversalRootImpl<Container, PublicInstance> implements UniversalRoot<any>
 
 	flushScheduledWork(): void {
 		if (!this.scheduled) {
-			this.flushHostBindingUpdates();
+			HOST_BINDING_SUPPORT?.flush(this);
 			return;
 		}
 		// A transported teardown is provisional until acknowledgement. Keep work
@@ -8846,7 +8952,7 @@ class UniversalRootImpl<Container, PublicInstance> implements UniversalRoot<any>
 		this.scheduled = false;
 		SCHEDULED_UNIVERSAL_ROOTS.delete(this);
 		if (this.unmounted || this.owner?.disposed || this.lastComponent === null) {
-			this.flushHostBindingUpdates();
+			HOST_BINDING_SUPPORT?.flush(this);
 			return;
 		}
 		if (this.bridge !== null) {
@@ -8892,7 +8998,7 @@ class UniversalRootImpl<Container, PublicInstance> implements UniversalRoot<any>
 		} else {
 			const input = this.scheduledRenderInput();
 			if (input === null) {
-				this.flushHostBindingUpdates();
+				HOST_BINDING_SUPPORT?.flush(this);
 				return;
 			}
 			let attempt: UniversalPreparedAttempt;
@@ -8908,7 +9014,7 @@ class UniversalRootImpl<Container, PublicInstance> implements UniversalRoot<any>
 				} finally {
 					// A binding notification may have deferred its own microtask while
 					// this scheduled render was active. Drain it even if rendering failed.
-					this.flushHostBindingUpdates();
+					HOST_BINDING_SUPPORT?.flush(this);
 				}
 				return;
 			}
@@ -8920,7 +9026,7 @@ class UniversalRootImpl<Container, PublicInstance> implements UniversalRoot<any>
 			}
 			let bindingError: unknown = NO_PENDING_PASSIVE_ERROR;
 			try {
-				this.flushHostBindingUpdates();
+				HOST_BINDING_SUPPORT?.flush(this);
 			} catch (error) {
 				bindingError = error;
 			}
@@ -9418,7 +9524,7 @@ class UniversalRootImpl<Container, PublicInstance> implements UniversalRoot<any>
 		this.flushPassiveTasks();
 	}
 
-	private discardDraftOwners(owners: readonly DraftOwner[]): void {
+	discardDraftOwners(owners: readonly DraftOwner[]): void {
 		const committed = new Set<UniversalOwnerRecord>();
 		const collect = (owner: UniversalOwnerRecord | null) => {
 			if (owner === null || committed.has(owner)) return;
@@ -10090,7 +10196,7 @@ class UniversalRootImpl<Container, PublicInstance> implements UniversalRoot<any>
 			const hosts: BlueprintHost[] = [];
 			if (templates !== undefined) {
 				for (let templateIndex = 0; templateIndex < templates.keys.length; templateIndex++) {
-					const host = preparedCollapsedTemplateBlueprint(
+					const host = this.templates!.blueprint(
 						templates.plan,
 						templates.compiled,
 						templates.program,
@@ -10123,306 +10229,6 @@ class UniversalRootImpl<Container, PublicInstance> implements UniversalRoot<any>
 			else expanded.push({ kind: 'range', key: child.key, children: hosts });
 		}
 		if (expanded !== null) node.children = expanded;
-	}
-
-	private tryCreateCompactTemplateUpdateTransaction(
-		blueprint: BlueprintRange,
-		attempt: RenderAttempt,
-		component: UniversalComponent<any>,
-		props: any,
-	): UniversalTransactionImpl<Container, PublicInstance> | null {
-		const owner = this.owner;
-		const draftOwner = attempt.owner;
-		if (
-			this.driver.capabilities?.templateProgramRuns !== true ||
-			owner === null ||
-			draftOwner.record !== owner ||
-			attempt.owners.length !== 1 ||
-			owner.children.length !== 0 ||
-			draftOwner.children.length !== 0 ||
-			owner.effectOrder.length !== 0 ||
-			draftOwner.seenEffects.length !== 0 ||
-			owner.contextValues !== null ||
-			draftOwner.contextValues !== null ||
-			owner.visibility !== 'visible' ||
-			draftOwner.visibility !== 'visible' ||
-			owner.isBoundary ||
-			draftOwner.isBoundary ||
-			owner.componentRevision !== draftOwner.componentRevision ||
-			owner.hooks.size !== draftOwner.hooks.size ||
-			attempt.scope !== null ||
-			attempt.retryThenables.size !== 0 ||
-			attempt.replayEntries.length !== 0 ||
-			attempt.transitionBatches.size !== 0 ||
-			attempt.transitionRender ||
-			this.bridge !== null ||
-			((this.treeFeatures | attempt.treeFeatures) & ~UNIVERSAL_TREE_EVENT) !== 0
-		) {
-			return null;
-		}
-		for (const [slot, hook] of draftOwner.hooks) {
-			const previous = owner.hooks.get(slot);
-			if (
-				previous === undefined ||
-				previous.kind !== hook.kind ||
-				(hook.kind !== 'state' && hook.kind !== 'reducer') ||
-				(hook.kind === 'state' && 'linked' in hook)
-			) {
-				return null;
-			}
-		}
-		for (const [slot, queue] of owner.updates) {
-			const applied = draftOwner.appliedUpdates.get(slot);
-			if (applied === undefined || applied.lane || applied.queue !== queue || queue.batches) {
-				return null;
-			}
-		}
-		const shells: { record: LogicalRecord; blueprint: BlueprintHost }[] = [];
-		const lists: {
-			list: BlueprintCompactTemplateList;
-			records: readonly LogicalRecord[];
-			start: number;
-		}[] = [];
-		const pair = (
-			records: readonly LogicalRecord[],
-			blueprints: readonly BlueprintNode[],
-		): boolean => {
-			let recordIndex = 0;
-			for (const next of blueprints) {
-				const list = next.kind === 'range' ? next.compactTemplateList : undefined;
-				if (list !== undefined) {
-					if (
-						next.key !== null ||
-						list.owner !== owner ||
-						list.keys.length !== list.values.length ||
-						list.keys.length !== list.captures.length
-					) {
-						return false;
-					}
-					const start = recordIndex;
-					for (let index = 0; index < list.keys.length; index++) {
-						const record = records[recordIndex++];
-						const state = record?.collapsedTemplate;
-						if (
-							record === undefined ||
-							record.kind !== 'host' ||
-							!Object.is(record.key, list.keys[index]) ||
-							record.type !== list.program.wire.nodes[0].type ||
-							record.owner !== owner ||
-							record.children.length !== 0 ||
-							record.ref != null ||
-							record.events.size !== 0 ||
-							state?.prepared !== list.program ||
-							state.values === undefined ||
-							state.firstId === undefined ||
-							state.events.length !== list.program.events.length
-						) {
-							return false;
-						}
-					}
-					lists.push({ list, records, start });
-					continue;
-				}
-				const record = records[recordIndex++];
-				if (record === undefined || !sameRecordShape(record, next) || record.kind === 'portal') {
-					return false;
-				}
-				if (record.kind === 'range') {
-					if (
-						next.kind !== 'range' ||
-						next.compactLeafList !== undefined ||
-						record.owner !== (next.owner ?? null) ||
-						!pair(record.children, next.children)
-					) {
-						return false;
-					}
-					continue;
-				}
-				if (
-					next.kind !== 'host' ||
-					record.owner !== next.owner ||
-					record.ref != null ||
-					next.ref != null ||
-					record.events.size !== 0 ||
-					next.events.size !== 0 ||
-					record.lifecycles.size !== 0 ||
-					next.lifecycles.size !== 0 ||
-					record.localCallbacks.size !== 0 ||
-					next.localCallbacks.size !== 0 ||
-					record.visibility !== 'visible' ||
-					next.visibility !== 'visible' ||
-					record.collapsedTemplate !== undefined ||
-					next.collapsedTemplate !== undefined ||
-					!pair(record.children, next.children)
-				) {
-					return false;
-				}
-				shells.push({ record, blueprint: next });
-			}
-			return recordIndex === records.length;
-		};
-		if (!pair(this.rootRecord.children, blueprint.children) || lists.length === 0) return null;
-		const commands: UniversalHostCommand[] = [];
-		const rowUpdates: { record: LogicalRecord; props: Record<string, unknown> }[] = [];
-		const recreatedEvents: {
-			id: number;
-			type: string;
-			listener: UniversalEventListenerDescriptor;
-		}[] = [];
-		const stageUpdate = (
-			type: string,
-			id: number,
-			previous: Readonly<Record<string, unknown>>,
-			next: Record<string, unknown>,
-		): UniversalHostUpdateKind => {
-			const kind = this.driver.updates?.classify(type, previous, next) ?? 'update';
-			if (kind !== 'update' && kind !== 'recreate') {
-				throw new TypeError(
-					`Universal update classifier returned invalid kind ${JSON.stringify(kind)}.`,
-				);
-			}
-			commands.push(
-				kind === 'recreate'
-					? { op: 'recreate', id, type, props: Object.freeze(next) }
-					: { op: 'update', id, props: Object.freeze(next) },
-			);
-			return kind;
-		};
-		for (const { record, blueprint: host } of shells) {
-			if (!shallowPropsEqual(record.props, host.props)) {
-				stageUpdate(host.type, record.id, record.props, host.props);
-			}
-		}
-		for (const { list, records, start } of lists) {
-			const program = list.program;
-			for (let row = 0; row < list.keys.length; row++) {
-				const record = records[start + row];
-				const accepted = record.collapsedTemplate!;
-				const values = list.values[row];
-				let previousChangedNode = -1;
-				for (let valueIndex = 0; valueIndex < program.values.length; valueIndex++) {
-					if (Object.is(accepted.values![valueIndex], values[valueIndex])) continue;
-					const index = program.values[valueIndex].node;
-					if (previousChangedNode === index) continue;
-					previousChangedNode = index;
-					const next = materializePreparedCollapsedHostProps(program, values, index);
-					const previous =
-						index === 0
-							? record.props
-							: materializePreparedCollapsedHostProps(program, accepted.values!, index);
-					const id = accepted.firstId! + index;
-					const kind = stageUpdate(program.wire.nodes[index].type, id, previous, next);
-					if (index === 0) rowUpdates.push({ record, props: next });
-					if (kind === 'recreate') {
-						for (let eventIndex = 0; eventIndex < program.events.length; eventIndex++) {
-							const site = program.events[eventIndex];
-							if (site.node !== index) continue;
-							const event = accepted.events[eventIndex].event;
-							recreatedEvents.push({
-								id,
-								type: site.type,
-								listener: { id: event.listener, priority: site.priority },
-							});
-						}
-					}
-				}
-				for (let eventIndex = 0; eventIndex < program.events.length; eventIndex++) {
-					const site = program.events[eventIndex];
-					const previous = accepted.events[eventIndex];
-					if (
-						previous.index !== site.node ||
-						previous.event.type !== site.type ||
-						typeof list.captures[row][site.slot] !== 'function'
-					) {
-						return null;
-					}
-				}
-			}
-		}
-		for (const event of recreatedEvents) commands.push({ op: 'event', ...event });
-		const batch = freezeUniversalHostBatch(this.renderer, this.nextBatchVersion++, commands);
-		const identity = this.transportIdentity(batch.version);
-		const prepareHost = (value: UniversalHostBatch) =>
-			this.driver.prepareBatch(this.container, value, {
-				invokeLocalCallback: (listener, args) => this.invokeLocalCallback(listener, args),
-			});
-		let sync: UniversalPreparedHostBatch | null = null;
-		let async: UniversalAsyncPreparedHostBatch | null = null;
-		if (this.transport?.mode === 'async') {
-			async = this.transport.prepareBatch(this.container, batch, identity);
-		} else {
-			sync =
-				this.transport === null
-					? prepareHost(batch)
-					: this.transport.prepareBatch(this.container, batch, prepareHost);
-		}
-		const prepared = sync ?? async;
-		if (!isValidPreparedHostBatch(prepared)) {
-			throw new TypeError('A universal host driver must return a valid prepared batch token.');
-		}
-		return new UniversalTransactionImpl(
-			this,
-			batch,
-			sync === null ? null : () => sync!.apply(),
-			async === null ? null : (acknowledge) => async!.apply(acknowledge),
-			identity,
-			() => {
-				for (const { record, blueprint: host } of shells) record.props = host.props;
-				for (const update of rowUpdates) update.record.props = update.props;
-				for (const { list, records, start } of lists) {
-					const program = list.program;
-					for (let row = 0; row < list.keys.length; row++) {
-						const state = records[start + row].collapsedTemplate!;
-						(state as { values: readonly UniversalHostTemplateProgramValue[] }).values =
-							list.values[row];
-						for (let eventIndex = 0; eventIndex < program.events.length; eventIndex++) {
-							const site = program.events[eventIndex];
-							const previous = state.events[eventIndex].event;
-							const handler = list.captures[row][site.slot] as (...args: any[]) => any;
-							if (previous.handler === handler && previous.owner === list.owner) continue;
-							const event: CommittedEvent = {
-								prop: site.prop,
-								type: site.type,
-								priority: site.priority,
-								handler,
-								owner: list.owner,
-								listener: previous.listener,
-							};
-							(state.events as CommittedCollapsedTemplateEvent[])[eventIndex] = {
-								index: site.node,
-								event,
-							};
-							this.handlers.set(event.listener, event);
-						}
-					}
-				}
-				owner.componentProps = draftOwner.componentProps;
-				owner.componentRevision = draftOwner.componentRevision;
-				owner.hooks = draftOwner.hooks;
-				for (const [slot, applied] of draftOwner.appliedUpdates) {
-					const queue = owner.updates.get(slot);
-					if (queue !== applied.queue || applied.lane) continue;
-					queue.splice(0, applied.consumed);
-					if (queue.length === 0) owner.updates.delete(slot);
-				}
-				this.owner = owner;
-				this.lastComponent = component;
-				this.lastProps = props;
-				this.retryRenderInput = null;
-				this.urgentBoundarySuspension = null;
-				this.bridgeContextReads = attempt.bridgeContextReads;
-				this.nextUniversalId = attempt.nextUniversalId;
-				this.treeFeatures = attempt.treeFeatures;
-			},
-			() => prepared.afterAccept?.(),
-			noopUniversalCommitTask,
-			noopUniversalCommitTask,
-			noopUniversalCommitTask,
-			null,
-			() => prepared.abort(),
-			() => this.discardDraftOwners(attempt.owners),
-			attempt.transitionBatches,
-		);
 	}
 
 	/** Publish stable owner records only after their compact host batch is accepted. */
@@ -10727,16 +10533,17 @@ class UniversalRootImpl<Container, PublicInstance> implements UniversalRoot<any>
 		// Compact publications update host props without publishing host binding
 		// subscriptions. Bound trees use the general accepted transaction path.
 		const hasHostBindings =
-			(this.boundHosts?.size ?? 0) !== 0 ||
+			(this.hostBindings?.hosts.size ?? 0) !== 0 ||
 			(attempt.treeFeatures & UNIVERSAL_TREE_HOST_BINDING) !== 0;
 		if (attempt.hasCompactLists && !hasHostBindings) {
-			const compactTemplateUpdate = this.tryCreateCompactTemplateUpdateTransaction(
+			const compactTemplateUpdate = this.templates?.update(
+				this,
 				blueprint,
 				attempt,
 				component,
 				props,
 			);
-			if (compactTemplateUpdate !== null) return compactTemplateUpdate;
+			if (compactTemplateUpdate != null) return compactTemplateUpdate;
 			const compactLeafUpdate = this.tryCreateCompactLeafUpdateTransaction(
 				blueprint,
 				attempt,
@@ -10852,7 +10659,7 @@ class UniversalRootImpl<Container, PublicInstance> implements UniversalRoot<any>
 			const collapsed = next.collapsedTemplate;
 			if (previous !== undefined) {
 				if (collapsed === undefined || previous.shape !== collapsed.program.shape) {
-					this.expandCollapsedTemplate(record);
+					this.templates?.expand(this, record);
 					if (collapsed !== undefined) expandCollapsedTemplateBlueprint(next);
 				}
 			} else if (collapsed !== undefined) {
@@ -11101,7 +10908,7 @@ class UniversalRootImpl<Container, PublicInstance> implements UniversalRoot<any>
 						teardownRunRecords.set(record, collapsed);
 						return;
 					}
-					this.expandCollapsedTemplate(record);
+					this.templates?.expand(this, record);
 				}
 				const nextUnderRemovedHost = underRemovedHost || record.kind === 'host';
 				for (const child of record.children) visitRemoved(child, nextUnderRemovedHost);
@@ -12580,25 +12387,30 @@ class UniversalRootImpl<Container, PublicInstance> implements UniversalRoot<any>
 					previous.deactivate();
 				}
 				// Publish bindings after the logical host and owner state has accepted.
-				let bindingPublicationError: unknown = NO_PENDING_PASSIVE_ERROR;
-				for (const record of removedHosts) {
-					const error = this.dropHostBindings(record);
-					if (bindingPublicationError === NO_PENDING_PASSIVE_ERROR) bindingPublicationError = error;
-				}
-				for (const draft of hostDrafts) {
-					try {
-						const error = this.commitHostBindings(draft.record, draft.blueprint as BlueprintHost);
-						if (bindingPublicationError === NO_PENDING_PASSIVE_ERROR)
-							bindingPublicationError = error;
-					} catch (error) {
-						// Host acceptance is already final. A failed source cleans up
-						// its own record; keep other accepted hosts subscribed and
-						// continue connecting the remaining hosts.
+				// Without installed support no host can carry a binding.
+				const bindings = HOST_BINDING_SUPPORT;
+				if (bindings !== null) {
+					let bindingPublicationError: unknown = NO_PENDING_PASSIVE_ERROR;
+					for (const record of removedHosts) {
+						const error = bindings.drop(this, record);
 						if (bindingPublicationError === NO_PENDING_PASSIVE_ERROR)
 							bindingPublicationError = error;
 					}
+					for (const draft of hostDrafts) {
+						try {
+							const error = bindings.commit(this, draft.record, draft.blueprint as BlueprintHost);
+							if (bindingPublicationError === NO_PENDING_PASSIVE_ERROR)
+								bindingPublicationError = error;
+						} catch (error) {
+							// Host acceptance is already final. A failed source cleans up
+							// its own record; keep other accepted hosts subscribed and
+							// continue connecting the remaining hosts.
+							if (bindingPublicationError === NO_PENDING_PASSIVE_ERROR)
+								bindingPublicationError = error;
+						}
+					}
+					if (bindingPublicationError !== NO_PENDING_PASSIVE_ERROR) throw bindingPublicationError;
 				}
-				if (bindingPublicationError !== NO_PENDING_PASSIVE_ERROR) throw bindingPublicationError;
 				if (portalReleaseError !== NO_PENDING_PASSIVE_ERROR) throw portalReleaseError;
 			},
 			() => (preparedHost ?? preparedAsyncHost)?.afterAccept?.(),
@@ -12714,12 +12526,7 @@ class UniversalRootImpl<Container, PublicInstance> implements UniversalRoot<any>
 			}
 			if (this.hostAttachments !== null) this.queueHostAttachmentFlush();
 			this.ensureScheduledTransitionWork();
-			if (
-				(this.dirtyBoundHosts.length !== 0 || this.dirtyBoundSources.length !== 0) &&
-				!this.boundHostScheduled
-			) {
-				this.scheduleHostBindingUpdate();
-			}
+			HOST_BINDING_SUPPORT?.resume(this);
 		}
 	}
 
@@ -12889,7 +12696,7 @@ class UniversalRootImpl<Container, PublicInstance> implements UniversalRoot<any>
 		} catch (error) {
 			pendingAbortError = error;
 		}
-		this.expandCollapsedTemplates();
+		this.templates?.expandAll(this);
 		const owners: UniversalOwnerRecord[] = [];
 		const collectOwners = (owner: UniversalOwnerRecord | null) => {
 			if (owner === null) return;
@@ -12976,19 +12783,12 @@ class UniversalRootImpl<Container, PublicInstance> implements UniversalRoot<any>
 		return {
 			batch,
 			finalize: (acceptedHostError) => {
-				let bindingUnsubscribeError: unknown = NO_PENDING_PASSIVE_ERROR;
-				if (this.boundHosts !== null) {
-					for (const record of [...this.boundHosts.keys()]) {
-						const error = this.dropHostBindings(record);
-						if (bindingUnsubscribeError === NO_PENDING_PASSIVE_ERROR)
-							bindingUnsubscribeError = error;
-					}
-				}
-				this.dirtyBoundHosts = [];
-				this.dirtyBoundHostSet.clear();
-				this.dirtyBoundSources = [];
-				this.dirtyBoundSourceSet.clear();
-				this.boundHostScheduled = false;
+				// A source may throw undefined, so test for the support instead of
+				// coalescing its result.
+				const bindingUnsubscribeError =
+					HOST_BINDING_SUPPORT === null
+						? NO_PENDING_PASSIVE_ERROR
+						: HOST_BINDING_SUPPORT.release(this);
 				this.scheduled = false;
 				this.scheduledUrgent = false;
 				this.scheduledFullRoot = false;
@@ -13131,6 +12931,342 @@ class UniversalRootImpl<Container, PublicInstance> implements UniversalRoot<any>
 }
 
 /** Local binding-only batches keep the same acceptance and error ordering with less per-event state. */
+type UniversalHostBindingSource = UniversalHostBinding<unknown>['source'];
+
+interface UniversalBoundHostProp {
+	readonly name: string;
+	readonly binding: UniversalHostBinding<unknown>;
+}
+
+interface UniversalHostBindingState {
+	readonly hosts: Map<LogicalRecord, UniversalBoundHostProp[]>;
+	readonly sources: Map<
+		UniversalHostBindingSource,
+		{ records: LogicalRecord[]; unsubscribe: () => void }
+	>;
+	dirtyHosts: LogicalRecord[];
+	readonly dirtyHostSet: Set<LogicalRecord>;
+	dirtySources: UniversalHostBindingSource[];
+	readonly dirtySourceSet: Set<UniversalHostBindingSource>;
+	scheduled: boolean;
+}
+
+/**
+ * Root operations for experimental host bindings. `universalHostBinding()`
+ * installs them, so a renderer or application that never creates a binding
+ * does not ship the subscriptions, flush, or binding-only transaction.
+ */
+interface UniversalHostBindingSupport {
+	/** Connect an accepted host's bindings, replacing any previous connection. */
+	commit(root: UniversalRootImpl<any, any>, record: LogicalRecord, next: BlueprintHost): unknown;
+	/** Disconnect a removed host. Returns the first unsubscribe error. */
+	drop(root: UniversalRootImpl<any, any>, record: LogicalRecord): unknown;
+	/** Publish queued source notifications as one binding-only host batch. */
+	flush(root: UniversalRootImpl<any, any>): void;
+	/** Re-arm notifications deferred while a transaction was pending. */
+	resume(root: UniversalRootImpl<any, any>): void;
+	/** Disconnect every host at unmount. Returns the first unsubscribe error. */
+	release(root: UniversalRootImpl<any, any>): unknown;
+}
+
+let HOST_BINDING_SUPPORT: UniversalHostBindingSupport | null = null;
+
+function dropHostBindings(root: UniversalRootImpl<any, any>, record: LogicalRecord): unknown {
+	const state = root.hostBindings;
+	const attached = state?.hosts.get(record);
+	if (state == null || attached === undefined) return NO_PENDING_PASSIVE_ERROR;
+	state.hosts.delete(record);
+	state.dirtyHostSet.delete(record);
+	const dirtyIndex = state.dirtyHosts.indexOf(record);
+	if (dirtyIndex !== -1) state.dirtyHosts.splice(dirtyIndex, 1);
+	let unsubscribeError: unknown = NO_PENDING_PASSIVE_ERROR;
+	for (let index = 0; index < attached.length; index++) {
+		const source = attached[index].binding.source;
+		const group = state.sources.get(source);
+		if (group === undefined) continue;
+		const position = group.records.indexOf(record);
+		if (position >= 0) group.records.splice(position, 1);
+		if (group.records.length === 0) {
+			state.sources.delete(source);
+			try {
+				group.unsubscribe();
+			} catch (error) {
+				if (unsubscribeError === NO_PENDING_PASSIVE_ERROR) unsubscribeError = error;
+			}
+		}
+	}
+	return unsubscribeError;
+}
+
+function commitHostBindings(
+	root: UniversalRootImpl<any, any>,
+	record: LogicalRecord,
+	next: BlueprintHost,
+): unknown {
+	const bindings = next.hostBindings;
+	if (bindings === undefined || next.visibility !== 'visible') {
+		return dropHostBindings(root, record);
+	}
+	const previous = root.hostBindings?.hosts.get(record);
+	if (previous !== undefined && previous.length === bindings.size) {
+		let unchanged = true;
+		let index = 0;
+		for (const [name, binding] of bindings) {
+			const current = previous[index++];
+			if (current.name !== name || current.binding !== binding) {
+				unchanged = false;
+				break;
+			}
+		}
+		if (unchanged) return NO_PENDING_PASSIVE_ERROR;
+	}
+	const unsubscribeError = dropHostBindings(root, record);
+	const state = (root.hostBindings ??= {
+		hosts: new Map(),
+		sources: new Map(),
+		dirtyHosts: [],
+		dirtyHostSet: new Set(),
+		dirtySources: [],
+		dirtySourceSet: new Set(),
+		scheduled: false,
+	});
+	const connected: UniversalBoundHostProp[] = [];
+	state.hosts.set(record, connected);
+	try {
+		for (const [name, binding] of bindings) {
+			connected.push({ name, binding });
+			let group = state.sources.get(binding.source);
+			if (group === undefined) {
+				group = { records: [], unsubscribe: () => {} };
+				state.sources.set(binding.source, group);
+				group.records.push(record);
+				try {
+					// The listener survives individual bound hosts. Do not close over the
+					// first host's binding, which can retain its removed selector and payload.
+					const source = binding.source;
+					group.unsubscribe = source.subscribe(() => queueHostBindingSource(root, source));
+				} catch (error) {
+					state.sources.delete(binding.source);
+					throw error;
+				}
+			} else if (!group.records.includes(record)) group.records.push(record);
+			const value = root.encodeHostProp(next.type, name, binding.getSnapshot());
+			if (!sameUniversalHostPropValue(record.props[name], value)) {
+				queueHostBindingUpdate(root, record);
+			}
+		}
+	} catch (error) {
+		dropHostBindings(root, record);
+		throw error;
+	}
+	return unsubscribeError;
+}
+
+function queueHostBindingUpdate(root: UniversalRootImpl<any, any>, record: LogicalRecord): void {
+	const state = root.hostBindings;
+	if (root.unmounted || root.unmounting || state === null || !state.hosts.has(record)) return;
+	if (!state.dirtyHostSet.has(record)) {
+		state.dirtyHostSet.add(record);
+		state.dirtyHosts.push(record);
+	}
+	scheduleHostBindingUpdate(root, state);
+}
+
+function queueHostBindingSource(
+	root: UniversalRootImpl<any, any>,
+	source: UniversalHostBindingSource,
+): void {
+	const state = root.hostBindings;
+	if (root.unmounted || root.unmounting || state === null || !state.sources.has(source)) return;
+	if (!state.dirtySourceSet.has(source)) {
+		state.dirtySourceSet.add(source);
+		state.dirtySources.push(source);
+	}
+	scheduleHostBindingUpdate(root, state);
+}
+
+function scheduleHostBindingUpdate(
+	root: UniversalRootImpl<any, any>,
+	state: UniversalHostBindingState,
+): void {
+	SCHEDULED_UNIVERSAL_ROOTS.add(root);
+	if (state.scheduled) return;
+	state.scheduled = true;
+	root.__scheduleMicrotask(() => {
+		if (state.scheduled) flushHostBindingUpdates(root);
+	});
+}
+
+function restoreDirtyHostBindings(
+	root: UniversalRootImpl<any, any>,
+	records: readonly LogicalRecord[],
+): void {
+	const state = root.hostBindings;
+	if (state === null) return;
+	state.scheduled = false;
+	if (!root.scheduled) SCHEDULED_UNIVERSAL_ROOTS.delete(root);
+	for (let index = 0; index < records.length; index++) {
+		const record = records[index];
+		if (state.hosts.has(record) && !state.dirtyHostSet.has(record)) {
+			state.dirtyHostSet.add(record);
+			state.dirtyHosts.push(record);
+		}
+	}
+}
+
+function flushHostBindingUpdates(root: UniversalRootImpl<any, any>): void {
+	const state = root.hostBindings;
+	if (state === null) return;
+	if (
+		(state.dirtyHosts.length === 0 && state.dirtySources.length === 0) ||
+		root.unmounted ||
+		root.unmounting
+	) {
+		state.scheduled = false;
+		if (!root.scheduled) SCHEDULED_UNIVERSAL_ROOTS.delete(root);
+		return;
+	}
+	if (root.pending !== null || root.scheduled) {
+		// The queued microtask has been consumed; the pending transaction or
+		// scheduled render will arrange the next drain once it settles.
+		state.scheduled = false;
+		if (!root.scheduled) SCHEDULED_UNIVERSAL_ROOTS.delete(root);
+		return;
+	}
+	state.scheduled = false;
+	SCHEDULED_UNIVERSAL_ROOTS.delete(root);
+	let records = state.dirtyHosts;
+	const sources = state.dirtySources;
+	state.dirtyHosts = [];
+	state.dirtyHostSet.clear();
+	state.dirtySources = [];
+	state.dirtySourceSet.clear();
+	if (sources.length === 1 && records.length === 0) {
+		records = state.sources.get(sources[0])?.records.slice() ?? [];
+	} else if (sources.length !== 0) {
+		const seen = new Set(records);
+		for (let index = 0; index < sources.length; index++) {
+			const group = state.sources.get(sources[index]);
+			if (group === undefined) continue;
+			for (let recordIndex = 0; recordIndex < group.records.length; recordIndex++) {
+				const record = group.records[recordIndex];
+				if (!seen.has(record)) {
+					seen.add(record);
+					records.push(record);
+				}
+			}
+		}
+	}
+	const changedRecords: LogicalRecord[] = [];
+	const commands: UniversalHostCommand[] = [];
+	const soleSource = sources.length === 1 ? sources[0] : null;
+	let soleSourceRead = false;
+	let soleSourceSnapshot: unknown;
+	const otherSourceSnapshots =
+		sources.length > 1 ? new Map<UniversalHostBindingSource, unknown>() : null;
+	const driver = root.driver;
+	try {
+		for (let recordIndex = 0; recordIndex < records.length; recordIndex++) {
+			const record = records[recordIndex];
+			const connected = state.hosts.get(record);
+			if (connected === undefined || record.visibility !== 'visible') continue;
+			let next: Record<string, unknown> | null = null;
+			for (let bindingIndex = 0; bindingIndex < connected.length; bindingIndex++) {
+				const { name, binding } = connected[bindingIndex];
+				let raw: unknown;
+				if (binding.source === soleSource) {
+					if (!soleSourceRead) {
+						soleSourceSnapshot = binding.source.get();
+						soleSourceRead = true;
+					}
+					raw = soleSourceSnapshot;
+				} else if (otherSourceSnapshots !== null && sources.includes(binding.source)) {
+					if (!otherSourceSnapshots.has(binding.source)) {
+						otherSourceSnapshots.set(binding.source, binding.source.get());
+					}
+					raw = otherSourceSnapshots.get(binding.source);
+				} else {
+					raw = binding.source.get();
+				}
+				const selected = binding.select(raw);
+				const current = (next ?? record.props)[name];
+				if (driver.props === undefined && sameUniversalHostPropValue(current, selected)) continue;
+				const value = root.encodeHostProp(record.type!, name, selected);
+				if (sameUniversalHostPropValue(current, value)) continue;
+				(next ??= { ...record.props })[name] = value;
+			}
+			if (next === null) continue;
+			const kind = driver.updates?.classify(record.type!, record.props, next) ?? 'update';
+			if (kind !== 'update' || record.lifecycles.size !== 0) {
+				throw new Error(
+					'Experimental host bindings require update-only hosts without lifecycle callbacks.',
+				);
+			}
+			Object.freeze(next);
+			changedRecords.push(record);
+			commands.push({ op: 'update', id: record.id, props: next });
+		}
+	} catch (error) {
+		restoreDirtyHostBindings(root, records);
+		throw error;
+	}
+	if (commands.length === 0) return;
+	const batch = freezeUniversalHostBatch(root.renderer, root.nextBatchVersion++, commands);
+	let prepared: UniversalPreparedHostBatch;
+	try {
+		prepared = driver.prepareBatch(root.container, batch, {
+			invokeLocalCallback: (listener, args) => root.invokeLocalCallback(listener, args),
+		});
+	} catch (error) {
+		restoreDirtyHostBindings(root, records);
+		throw error;
+	}
+	if (!isValidPreparedHostBatch(prepared)) {
+		restoreDirtyHostBindings(root, records);
+		throw new TypeError('Invalid host binding batch token.');
+	}
+	const transaction = new UniversalBoundHostTransaction(
+		root,
+		batch,
+		prepared,
+		changedRecords,
+		records,
+	);
+	root.pending = transaction;
+	transaction.commit();
+}
+
+const UNIVERSAL_HOST_BINDING_SUPPORT: UniversalHostBindingSupport = {
+	commit: commitHostBindings,
+	drop: dropHostBindings,
+	flush: flushHostBindingUpdates,
+	resume(root) {
+		const state = root.hostBindings;
+		if (
+			state !== null &&
+			(state.dirtyHosts.length !== 0 || state.dirtySources.length !== 0) &&
+			!state.scheduled
+		) {
+			scheduleHostBindingUpdate(root, state);
+		}
+	},
+	release(root) {
+		const state = root.hostBindings;
+		if (state === null) return NO_PENDING_PASSIVE_ERROR;
+		let unsubscribeError: unknown = NO_PENDING_PASSIVE_ERROR;
+		for (const record of [...state.hosts.keys()]) {
+			const error = dropHostBindings(root, record);
+			if (unsubscribeError === NO_PENDING_PASSIVE_ERROR) unsubscribeError = error;
+		}
+		state.dirtyHosts = [];
+		state.dirtyHostSet.clear();
+		state.dirtySources = [];
+		state.dirtySourceSet.clear();
+		state.scheduled = false;
+		return unsubscribeError;
+	},
+};
+
 class UniversalBoundHostTransaction<
 	Container,
 	PublicInstance,
@@ -13225,7 +13361,7 @@ class UniversalBoundHostTransaction<
 				failure = error;
 			}
 			try {
-				this.root.restoreAbortedHostBindingRecords(this.records);
+				restoreDirtyHostBindings(this.root, this.records);
 			} catch (error) {
 				if (failure === NO_PENDING_PASSIVE_ERROR) failure = error;
 			}
