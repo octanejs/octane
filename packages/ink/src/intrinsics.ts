@@ -22,6 +22,9 @@ export interface InkTextIntrinsic {
 
 export namespace JSX {
 	export type Element = UniversalRenderable;
+	export interface ElementChildrenAttribute {
+		children: {};
+	}
 	export interface IntrinsicAttributes {
 		key?: string | number | bigint;
 	}

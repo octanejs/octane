@@ -1,6 +1,10 @@
 import { formatClientError } from './error-codes.client.generated.js';
 import { __normalizeBinding, type BindingOperation, type BindingValue } from './dom-bindings.js';
-import { __createBindingStyles, __prepareBindingSources } from './dom-binding-styles.js';
+import {
+	__createBindingStyles,
+	__prepareBindingSources,
+	__retiredBindingSource,
+} from './dom-binding-styles.js';
 import type { BindingPreparedValue, BindingSignalConnection } from './dom-binding-signals.js';
 import { captureSignalOwner, currentSignalOwner } from './signals/owner-context.js';
 import {
@@ -19,6 +23,8 @@ export interface BindingProjectionConnection {
 	get(): BindingValue[];
 	preview(compute: unknown): BindingPreparedValue<BindingValue[]>;
 	writeStyle(index: number, value: BindingValue): void;
+	/** Error path only: whether the owner of a source this group observes retired. */
+	retired(): boolean;
 	dispose(preservePresentation?: boolean): void;
 }
 
@@ -101,6 +107,9 @@ export function __createBindingProjections() {
 			return {
 				group,
 				get,
+				retired: () =>
+					__retiredBindingSource(subscriptions) ||
+					[...styleConnections.values()].some((style) => style.retired()),
 				preview(next): BindingPreparedValue<BindingValue[]> {
 					if (typeof next !== 'function') throw new TypeError(formatClientError(305));
 					const reads = new Map<NativeReadSource, number>();
