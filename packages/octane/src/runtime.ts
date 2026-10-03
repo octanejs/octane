@@ -44438,11 +44438,7 @@ function detachDeoptTreeRefs(
 	ownerScope?: Scope,
 	uncommitted: UncommittedRefAttaches | null = null,
 	activityRefs: WeakMap<Element | FragmentInstance, ActivityRefState> | null = null,
-	// Only the removed subtree's root carries the retirement stamp.
-	root: boolean = true,
 ): void {
-	// Teardown runs just before every blockless de-opt removal detaches `node`.
-	if (root && out === null) retireEventHostTree(node);
 	// No de-opt descriptor ref was ever stamped → nothing to detach or collect
 	// anywhere; skip the subtree scan. (Monotone flag — see noteDeoptRef.)
 	if (!DEOPT_REFS_STAMPED) return;
@@ -44476,7 +44472,7 @@ function detachDeoptTreeRefs(
 			c = nodeAfterPortalRange(c, rangeEnd);
 			continue;
 		}
-		detachDeoptTreeRefs(c, out, shouldDetach, ownerScope, uncommitted, activityRefs, false);
+		detachDeoptTreeRefs(c, out, shouldDetach, ownerScope, uncommitted, activityRefs);
 		c = getNextSibling(c);
 	}
 }
