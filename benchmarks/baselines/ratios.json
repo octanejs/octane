@@ -2220,8 +2220,8 @@
     "op": "update_1k",
     "target": "octane",
     "reference": "r3f-9.6.1",
-    "maxRatio": 1.05,
-    "note": "In-place position updates of 1,000 retained meshes, ratcheted from 1.0. Roots used to keep every committed host batch. Keeping the previous mount batch alive across the runner's forced gc() made the next update about 25% faster (0.77x). Releasing that history to fix the leak measures 0.989x-1.000x on 2026-10-03. Cut update-path allocations, then restore 1.0."
+    "maxRatio": 1.0,
+    "note": "In-place position updates of 1,000 retained meshes must not be slower than React Three Fiber. Their per-leaf work runs in functions the engine optimizes as hot code, and pinned frozen batch shapes keep that code across the runner's forced gc(). Measured 0.72x-0.81x on 2026-10-03."
   },
   {
     "suite": "three-renderer",

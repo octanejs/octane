@@ -39,6 +39,7 @@ import {
 	HYDRATION_FOR_EMPTY,
 	HYDRATION_FOR_ITEMS,
 	HYDRATION_START,
+	TRY_CATCH_COMMENT,
 } from './hydration-markers.js';
 import {
 	ACTIVITY_TAG,
@@ -132,8 +133,7 @@ import {
 	HYDRATE_MEDIA_ATTR,
 	HYDRATE_VISIBLE_MARGIN_ATTR,
 	HYDRATE_VISIBLE_THRESHOLD_ATTR,
-	TRY_CATCH_COMMENT,
-} from './hydration-markers.js';
+} from './hydration/strategy-attributes.js';
 import { streamedSignalBootstrapJs } from './server/early-signals.js';
 import {
 	applyElementDefaultProps,

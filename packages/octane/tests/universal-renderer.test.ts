@@ -2616,6 +2616,112 @@ export function Scene() @{ <><Shared0 /><Native><Shared0 /></Native></> }
 		root.unmount();
 	});
 
+	it('commits frozen updates for only the changed leaves of a compact list', () => {
+		const container = createObjectContainer();
+		const baseDriver = createObjectDriver();
+		const root = createUniversalRoot(container, {
+			...baseDriver,
+			capabilities: { ...baseDriver.capabilities, compilerLeafProps: true },
+		});
+		const plan = universalPlan('object', {
+			kind: 'host',
+			type: 'node',
+			bindings: [
+				['name', 0],
+				['value', 1],
+			],
+		});
+		const Scene = defineUniversalComponent('object', (props: { values: readonly number[] }) =>
+			universalFor(
+				['a', 'b', 'c'],
+				(name) => name,
+				(name, index) => universalValue(plan, [name, props.values[index]]),
+				null,
+				true,
+				true,
+			),
+		);
+
+		root.render(Scene, { values: [1, 2, 3] });
+		const [a, b, c] = container.children;
+		const commits = container.commits.length;
+		root.render(Scene, { values: [1, 20, 30] });
+
+		expect(container.commits).toHaveLength(commits + 1);
+		const batch = container.commits[commits];
+		expect(batch.commands).toEqual([
+			{ op: 'update', id: b.id, props: { name: 'b', value: 20 } },
+			{ op: 'update', id: c.id, props: { name: 'c', value: 30 } },
+		]);
+		expect(Object.isFrozen(batch)).toBe(true);
+		expect(Object.isFrozen(batch.commands)).toBe(true);
+		for (const command of batch.commands) {
+			expect(Object.isFrozen(command)).toBe(true);
+			if (command.op === 'update') expect(Object.isFrozen(command.props)).toBe(true);
+		}
+		expect(container.children[0]).toBe(a);
+		expect(container.children[1]).toBe(b);
+		expect(container.children[2]).toBe(c);
+		expect(container.children.map((child) => child.props.value)).toEqual([1, 20, 30]);
+		root.unmount();
+	});
+
+	it('replaces keyed hosts whose type or children a compact leaf no longer matches', () => {
+		const container = createObjectContainer();
+		const baseDriver = createObjectDriver();
+		const root = createUniversalRoot(container, {
+			...baseDriver,
+			capabilities: { ...baseDriver.capabilities, compilerLeafProps: true },
+		});
+		const parent = universalPlan('object', {
+			kind: 'host',
+			type: 'node',
+			bindings: [['value', 0]],
+			children: [{ kind: 'host', type: 'child' }],
+		});
+		const node = universalPlan('object', { kind: 'host', type: 'node', bindings: [['value', 0]] });
+		const other = universalPlan('object', {
+			kind: 'host',
+			type: 'other',
+			bindings: [['value', 0]],
+		});
+		const Scene = defineUniversalComponent(
+			'object',
+			(props: { plan: typeof node; compact: boolean; value: number }) =>
+				props.compact
+					? universalFor(
+							['a', 'b'],
+							(name) => name,
+							() => universalValue(props.plan, [props.value]),
+							null,
+							true,
+							true,
+						)
+					: universalList(['a', 'b'], (name) =>
+							universalKey(name, universalValue(props.plan, [props.value])),
+						),
+		);
+		const hosts = () =>
+			container.children.map((child) => [child.type, child.props.value, child.children.length]);
+
+		root.render(Scene, { plan: parent, compact: false, value: 1 });
+		expect(hosts()).toEqual([
+			['node', 1, 1],
+			['node', 1, 1],
+		]);
+		root.render(Scene, { plan: node, compact: true, value: 2 });
+		expect(hosts()).toEqual([
+			['node', 2, 0],
+			['node', 2, 0],
+		]);
+		root.render(Scene, { plan: other, compact: true, value: 3 });
+		expect(hosts()).toEqual([
+			['other', 3, 0],
+			['other', 3, 0],
+		]);
+		root.unmount();
+	});
+
 	it('preserves lazy keyed-loop evaluation when eliding item owners', () => {
 		const source = `
 			export function Scene({items}) @{
