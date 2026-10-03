@@ -3,68 +3,68 @@
     "app": {
       "raw": 7544,
       "gzip": 2595,
-      "brotli": 2254
+      "brotli": 2478
     },
     "framework": {
       "raw": 119320,
       "gzip": 39456,
-      "brotli": 34839
+      "brotli": 35063
     },
     "total": {
       "raw": 126832,
       "gzip": 42019,
-      "brotli": 37061
+      "brotli": 37285
     }
   },
   "todo": {
     "app": {
       "raw": 5142,
       "gzip": 2508,
-      "brotli": 2152
+      "brotli": 2376
     },
     "framework": {
       "raw": 137109,
       "gzip": 44556,
-      "brotli": 39149
+      "brotli": 39373
     },
     "total": {
       "raw": 142219,
       "gzip": 47032,
-      "brotli": 41269
+      "brotli": 41493
     }
   },
   "chat": {
     "app": {
       "raw": 6685,
       "gzip": 3009,
-      "brotli": 2673
+      "brotli": 2897
     },
     "framework": {
       "raw": 134775,
       "gzip": 43999,
-      "brotli": 38680
+      "brotli": 38904
     },
     "total": {
       "raw": 141428,
       "gzip": 46976,
-      "brotli": 41321
+      "brotli": 41545
     }
   },
   "weather": {
     "app": {
       "raw": 26767,
       "gzip": 9076,
-      "brotli": 7629
+      "brotli": 7853
     },
     "framework": {
       "raw": 151659,
       "gzip": 49346,
-      "brotli": 43258
+      "brotli": 43482
     },
     "total": {
       "raw": 178394,
       "gzip": 58390,
-      "brotli": 50855
+      "brotli": 51079
     }
   }
 }
