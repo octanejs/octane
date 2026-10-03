@@ -1,4 +1,5 @@
 export const STRONG_RENDER_LOCALE_FORMAT = 'OCTANE_STRONG_RENDER_LOCALE_FORMAT';
+export const STRONG_RENDER_SIDE_EFFECT = 'OCTANE_STRONG_RENDER_SIDE_EFFECT';
 
 export const STRONG_RANDOM_ID_MESSAGE =
 	'Strong mode does not allow generating random IDs or bytes during render. Use useId() for element IDs; create other random values in an event handler and store them in state.';
@@ -41,13 +42,24 @@ const INTL_SERVICES = new Set([
 ]);
 const DATE = { kind: 'date' };
 const CRYPTO = { kind: 'crypto' };
+// Platform schedulers. Registering the callback is itself a side effect, even
+// though the callback runs later.
+const SCHEDULERS = new Map(
+	[
+		'setTimeout',
+		'setInterval',
+		'queueMicrotask',
+		'requestAnimationFrame',
+		'requestIdleCallback',
+	].map((name) => [name, { kind: 'scheduler', name }]),
+);
 
 /**
- * Render determinism rules that share the Strong visitor's phases and lexical
- * scopes. `visit` observes every visited node to remember proven Date, Intl and
- * crypto values by their declaring scope; the other hooks run only where the
- * visitor has already established a synchronous render phase. Nothing here
- * annotates the parser tree or changes emitted code.
+ * Render determinism and side-effect rules that share the Strong visitor's phases
+ * and lexical scopes. `visit` observes every visited node to remember proven
+ * Date, Intl, crypto and scheduler values by their declaring scope; the other
+ * hooks run only where the visitor has already established a synchronous render
+ * phase. Nothing here annotates the parser tree or changes emitted code.
  */
 export function createStrongRenderPolicy({
 	ast,
@@ -59,10 +71,11 @@ export function createStrongRenderPolicy({
 	unwrap,
 	staticPrimitiveValue,
 	isReassigned,
+	isGlobalObject,
 }) {
 	const values = new WeakMap();
 	const keys = [];
-	// Most modules declare no Date, Intl or crypto values; skip their scope walks.
+	// Most modules declare no Date, Intl, crypto or scheduler values; skip their scope walks.
 	let recorded = 0;
 	let moduleFormatters = 0;
 
@@ -86,6 +99,22 @@ export function createStrongRenderPolicy({
 		if (value?.type !== 'Identifier') return null;
 		const owner = resolveScope(scope, value.name);
 		return owner === null ? null : (values.get(owner)?.get(value.name) ?? null);
+	}
+
+	// An unshadowed scheduler, read directly, from `window` or `globalThis`, or
+	// through an unreassigned alias of either.
+	function scheduler(expression, scope) {
+		const value = unwrap(expression);
+		if (value?.type === 'Identifier') {
+			const known = SCHEDULERS.get(value.name);
+			if (known !== undefined && resolve(scope, value.name) === null) return known;
+			const alias = aliasValue(value, scope);
+			return alias?.kind === 'scheduler' ? alias : null;
+		}
+		const name = propertyName(value, scope);
+		return typeof name === 'string' && SCHEDULERS.has(name) && isGlobalObject(value.object, scope)
+			? SCHEDULERS.get(name)
+			: null;
 	}
 
 	function isDate(expression, scope) {
@@ -158,7 +187,7 @@ export function createStrongRenderPolicy({
 		// at module scope is reported wherever render uses it, including via aliases.
 		if (intl !== null) return { ...intl, module: scope === moduleScope };
 		if (unshadowed(value, scope, 'crypto')) return CRYPTO;
-		return aliasValue(value, scope);
+		return scheduler(value, scope) ?? aliasValue(value, scope);
 	}
 
 	function recordDeclaration(node, scope) {
@@ -278,6 +307,22 @@ export function createStrongRenderPolicy({
 					`Strong mode does not allow Date \`${name}()\` during render; its text includes the runtime's time zone, so server and browser output differ. Use \`toISOString()\`, or \`Intl.DateTimeFormat\` with an explicit locale and \`timeZone\`.`,
 				);
 			}
+		},
+
+		/**
+		 * Checks a call the visitor has proven runs during render, including in a
+		 * lazy initializer. Those may capture a clock or random value, but a render
+		 * can run more or fewer times than it commits, so scheduling there is not
+		 * a snapshot.
+		 */
+		schedule(callee, scope) {
+			const known = scheduler(callee, scope);
+			if (known === null) return;
+			report(
+				STRONG_RENDER_SIDE_EFFECT,
+				unwrap(callee),
+				`Strong mode does not allow calling \`${known.name}()\` during render. Scheduling work is a side effect even though the callback runs later, and a component can render more or fewer times than it commits. Schedule it from an event handler, or from an effect that cancels it in cleanup.`,
+			);
 		},
 
 		/** Checks a `new` expression that the visitor has proven runs during render. */

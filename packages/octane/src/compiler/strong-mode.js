@@ -1618,6 +1618,10 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 		filename,
 		options,
 	});
+	function isGlobalObject(node, scope) {
+		const object = ambientReference(node, scope);
+		return object === GLOBAL_OBJECT_BINDING || object === AMBIENT_GLOBAL_BINDINGS.get('window');
+	}
 	const renderPolicy = createStrongRenderPolicy({
 		ast,
 		moduleScope,
@@ -1628,6 +1632,7 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 		unwrap,
 		staticPrimitiveValue,
 		isReassigned,
+		isGlobalObject,
 	});
 	const effectPolicy = createStrongEffectPolicy({
 		ast,
@@ -1651,10 +1656,7 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 		callableValue,
 		staticPrimitiveValue,
 		ambientPropertyKey,
-		isGlobalObject(node, scope) {
-			const object = ambientReference(node, scope);
-			return object === GLOBAL_OBJECT_BINDING || object === AMBIENT_GLOBAL_BINDINGS.get('window');
-		},
+		isGlobalObject,
 		fetchFunction,
 		hookOf: (state) => importedHook(rootState(state)?.callee, moduleScope),
 	});
@@ -5512,6 +5514,16 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 				if (executionPhase === 'render' && currentFunctionChecksImpureCalls) {
 					if (impureStandardCall(callee, scope)) reportImpureCall(callee);
 					renderPolicy.call(node, callee, scope, !insidePureCallback);
+				}
+				// Lazy initializers skip the impure-call checks above but still run in
+				// render, so they may not schedule work either. Updaters and reducers
+				// report scheduling through the state policy instead.
+				if (
+					executionPhase === 'render' &&
+					currentFunctionChecksRenderReads &&
+					!insidePureCallback
+				) {
+					renderPolicy.schedule(callee, scope);
 				}
 				const mutation = statePolicy.snapshotMutation(callee, node.arguments, scope);
 				if (mutation !== null) reportSnapshotMutationIn(mutation, executionPhase);
