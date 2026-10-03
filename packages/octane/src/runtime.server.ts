@@ -302,9 +302,12 @@ function serverSignalControlValue(value: SignalHandle<unknown>, site: string): u
 	} satisfies SsrSignalControlValue;
 }
 
-const NATIVE_ARRAY_MAP = Array.prototype.map;
+// Load-time snapshots, wrapped like the client runtime's so that a server
+// bundle which never maps a list drops them instead of keeping dead reads.
+const NATIVE_ARRAY_MAP = /* @__PURE__ */ (() => Array.prototype.map)();
 const NATIVE_REFLECT_APPLY = Reflect.apply;
-const NATIVE_ARRAY_SPECIES_GETTER = Object.getOwnPropertyDescriptor(Array, Symbol.species)?.get;
+const NATIVE_ARRAY_SPECIES_GETTER = /* @__PURE__ */ (() =>
+	Object.getOwnPropertyDescriptor(Array, Symbol.species)?.get)();
 
 /** Server twin of the compiler's guarded native-array map ABI. */
 export function mapSlot(receiver: any, method: any, callback?: (...args: any[]) => any): any {
