@@ -56,6 +56,7 @@ terminal. Reference: https://octanejs.dev/docs/strong-mode
 | --- | --- | --- |
 | `if (ref.current === null) ref.current = create()` | `const ref = useLazyRef(() => create())` (`lazy-ref`) | `OCTANE_STRONG_RENDER_REF_READ`, `OCTANE_STRONG_RENDER_REF_WRITE` |
 | `useLayoutEffect(() => setWidth(el.current.offsetWidth))` | `const width = useLayoutSnapshot(() => el.current?.offsetWidth ?? 0, { initial: 0 })` (`layout-measurement`) | `OCTANE_STRONG_EFFECT_STATE_UPDATE` |
+| `ref={(el) => { if (el) setWidth(el.offsetWidth); }}` | `ref={el}` and `const width = useLayoutSnapshot(() => el.current?.offsetWidth ?? 0, { initial: 0 })` (`ref-measurement`) | `OCTANE_STRONG_REF_STATE_UPDATE` |
 | `useMemo(() => value, deps)` / `useCallback(fn, deps)` | `const value = …` / `const fn = …` (`manual-memo`) | `OCTANE_STRONG_MANUAL_MEMO` |
 | `latest.current = onTick` read from an effect | `const tick = useEffectEvent(onTick)` (`latest-ref`) | `OCTANE_STRONG_RENDER_REF_WRITE` |
 | `useEffect(() => setName(user.name))` | `useLinkedState(user.id, () => user.name)` (`prop-state`) | `OCTANE_STRONG_EFFECT_STATE_UPDATE` |
@@ -80,6 +81,11 @@ use them.
   `startTransition`, `Promise.resolve().then`, or after `await null` still runs
   before the next paint and is still `OCTANE_STRONG_EFFECT_STATE_UPDATE`.
   Derive the value, use `useLinkedState`, or render from `useLayoutSnapshot`.
+- **Moving the update into a callback ref.** Octane calls a host element's
+  callback ref while the element commits, before paint, so
+  `ref={(el) => setWidth(el.offsetWidth)}` or `ref={setNode}` is
+  `OCTANE_STRONG_REF_STATE_UPDATE`. Keep the element in a ref object and render
+  a measurement from `useLayoutSnapshot`.
 - **Suppression comments.** There are none. `suppressHydrationWarning` and
   `suppressNativeChangeWarning` on DOM elements are themselves Strong errors
   (`OCTANE_STRONG_SUPPRESSION_PROP`).
