@@ -1,3 +1,4 @@
+import { createPortal, useLayoutEffect, useState } from 'octane';
 import { useSignal$ } from 'octane/signals/client';
 
 type Observe = { readonly observe: (entry: string) => void };
@@ -80,5 +81,77 @@ export function Rows({ observe, rows, onRowBlur }: Observe & {
 export function Captured({ observe, remove }: Observe & { readonly remove: () => void }) @{
 	<section onClick={() => observe('section')}>
 		<button onClick={remove}>{'remove'}</button>
+	</section>
+}
+
+type Restoring = Toggle & { readonly restore: HTMLElement };
+
+// A child component, with a Block of its own, owns the focused input.
+function Field({ observe, onCommit }: Observe & { readonly onCommit: () => void }) @{
+	const [draft] = useState('draft');
+	<input
+		data-draft={draft}
+		onBlur={() => {
+			observe('field');
+			onCommit();
+		}}
+	/>
+}
+
+// A dialog restores focus in its own layout cleanup, before its deletion
+// reaches the Field child.
+function Dialog({ observe, restore }: Observe & { readonly restore: HTMLElement }) @{
+	const value$ = useSignal$(0);
+	useLayoutEffect(() => () => restore.focus(), []);
+	<form>
+		<Field observe={observe} onCommit={() => value$.set(1)} />
+		<output>{value$.get() as number}</output>
+	</form>
+}
+
+export function DialogArm({ observe, show, restore }: Restoring) @{
+	<section onBlur={() => observe('parent')}>
+		@if (show) {
+			<Dialog observe={observe} restore={restore} />
+		}
+	</section>
+}
+
+// A top-level portal: its DOM lies outside the range the arm's deletion removes.
+function PortaledDialog({ observe, restore, target }: Observe & {
+	readonly restore: HTMLElement;
+	readonly target: HTMLElement;
+}) {
+	return createPortal(<Dialog observe={observe} restore={restore} />, target);
+}
+
+export function PortalDialogArm({ observe, show, restore, target }: Restoring & {
+	readonly target: HTMLElement;
+}) @{
+	<section onBlur={() => observe('parent')}>
+		@if (show) {
+			<PortaledDialog observe={observe} restore={restore} target={target} />
+		}
+	</section>
+}
+
+function Restore({ restore }: { readonly restore: HTMLElement }) @{
+	useLayoutEffect(() => () => restore.focus(), []);
+	<i />
+}
+
+// A value hole's input has a Block below its row; an earlier row component
+// restores focus as the row is deleted.
+export function EditableRows({ observe, restore, rows }: Observe & {
+	readonly restore: HTMLElement;
+	readonly rows: readonly number[];
+}) @{
+	<section onBlur={() => observe('parent')}>
+		@for (const row of rows; key row) {
+			<div>
+				<Restore restore={restore} />
+				{row === 1 ? <input onBlur={() => observe('row')} /> : null}
+			</div>
+		}
 	</section>
 }

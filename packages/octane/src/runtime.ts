@@ -2071,14 +2071,6 @@ export interface Block extends Scope {
 	pending: boolean;
 	disposed: boolean;
 	/**
-	 * Event-route epoch at which this Block's hosts left delegated dispatch; 0 while
-	 * they are live. Teardown disposes a Block before detaching its DOM, and
-	 * detaching a focused host dispatches focusout synchronously, so disposal
-	 * stamps it first; a staged deletion stamps it when it publishes.
-	 * snapshotDelegatedSlots skips hosts retired before a delivery began.
-	 */
-	retired: number;
-	/**
 	 * RENDER_VALID / RENDER_INVALID / RENDER_RETRYING, separate from mount lifetime.
 	 * Kept numeric because nested renders can invalidate an active retry in place.
 	 */
@@ -4054,6 +4046,8 @@ function deferRootRange(
 	});
 	(ROOT_RENDER_TRANSACTION!.commit ??= []).push(() => {
 		if (cancelled) return;
+		// Retire the outgoing nodes before any cleanup can move focus off them.
+		nodes.forEach(retireEventHostTree);
 		cleanup?.();
 		for (const node of nodes)
 			if ((STAGED_DOM?.view(node) ?? node).parentNode === parent)
@@ -5019,6 +5013,10 @@ function flushParkedItems(): void {
 
 /** Committed root deletions clean up against connected DOM before removing the range. */
 function unmountParkedItem(item: ParkedItem): void {
+	// Retire the row before any cleanup can move focus off it. Without focus in a
+	// drain, neither its removal nor a cleanup can blur it: an unfocused bulk
+	// removal stays free of per-row work.
+	if (renderingFocus !== null || !inFlush) for (const node of item.nodes) retireEventHostTree(node);
 	try {
 		unmountBlock(item.block, false);
 	} finally {
@@ -8960,7 +8958,6 @@ interface DeferredLayoutDriver {
 	holdsPendingQueue(): boolean;
 	stageEffects(): boolean;
 	stageAction(action: () => void, durable?: boolean): boolean;
-	retireHosts(block: Block): void;
 	retireHostTree(node: Node): void;
 	stageTeardown(cleanup: Cleanup, phase: number, scope: Scope): boolean;
 	stageDeactivation(slot: EffectSlot, scope: Scope): boolean;
@@ -9014,7 +9011,6 @@ interface StagedCommitCapture {
 	bundles: Map<HandlerBundle, HandlerBundle>;
 	controls: Map<ControlledState, ControlledState>;
 	signalHosts?: Map<SignalHostPropSourcesBinding, SignalHostPropSourcesBinding>;
-	retiredBlocks?: Block[];
 	retiredHostTrees?: Node[];
 	owners: Map<
 		RootRenderOwner,
@@ -9367,32 +9363,16 @@ function ensureDeferredLayoutDriver(): void {
 				enqueueStagedAction(capture, action, durable);
 				return true;
 			},
-			retireHosts(block) {
-				// A staged deletion keeps its committed hosts live until it publishes.
-				// One queued action per capture retires them all, ahead of every DOM
-				// removal the capture queued after its first retirement.
-				const capture = STAGED_COMMIT_CAPTURE!;
-				let blocks = capture.retiredBlocks;
-				if (blocks === undefined) {
-					const list: Block[] = (blocks = capture.retiredBlocks = []);
-					capture.enqueue(() => {
-						const epoch = ++eventRootEpoch;
-						for (let i = 0; i < list.length; i++) list[i].retired = epoch;
-					}, true);
-				}
-				blocks.push(block);
-			},
 			retireHostTree(node) {
-				// Like retireHosts: one queued action per capture stamps every
-				// removed host root ahead of the DOM removals queued after it.
+				// A staged deletion keeps its committed hosts live until it publishes.
+				// One queued action per capture stamps every removed host root, ahead
+				// of the cleanups and DOM removals the capture queued after it. It
+				// runs after the capture ends, so each node stamps immediately.
 				const capture = STAGED_COMMIT_CAPTURE!;
 				let nodes = capture.retiredHostTrees;
 				if (nodes === undefined) {
 					const list: Node[] = (nodes = capture.retiredHostTrees = []);
-					capture.enqueue(() => {
-						const epoch = ++eventRootEpoch;
-						for (let i = 0; i < list.length; i++) stampRetiredHostTree(list[i], epoch);
-					}, true);
+					capture.enqueue(() => list.forEach(retireEventHostTree), true);
 				}
 				nodes.push(node);
 			},
@@ -10547,7 +10527,6 @@ class BlockImpl {
 	// Scheduler / lifecycle.
 	declare pending: boolean;
 	declare disposed: boolean;
-	declare retired: number;
 	declare mounted: boolean;
 	declare renderStatus: number;
 	declare pendingMode: 'urgent' | 'transition' | null;
@@ -10664,7 +10643,6 @@ class BlockImpl {
 		this.itemIndex = 0;
 		this.pending = false;
 		this.disposed = false;
-		this.retired = 0;
 		this.mounted = false;
 		this.renderStatus = RENDER_VALID;
 		this.pendingMode = null;
@@ -12084,10 +12062,6 @@ function unmountBlock(block: Block, detachDom: boolean = true): void {
 
 function unmountBlockInner(block: Block, detachDom: boolean): void {
 	block.disposed = true;
-	// Its hosts leave delegated dispatch before its DOM does (see `retired`). Inline:
-	// an extra call per deleted Block is measurable in bulk teardown.
-	if (STAGED_COMMIT_CAPTURE) DEFERRED_LAYOUT_DRIVER!.retireHosts(block);
-	else block.retired = ++eventRootEpoch;
 	if (
 		typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' &&
 		__OCTANE_PROFILE_ENABLED__ &&
@@ -27697,24 +27671,30 @@ let SIGNAL_EVENT_OWNERS: WeakMap<Element, SignalOwner | ScopeImpl | BlockImpl> |
 let retiringHostsSince = 0;
 
 /**
- * Take a removed subtree out of delegated dispatch when no disposing Block covers
- * it: a pure host in a value hole belongs to the live Block that rendered it.
- * Every such removal detaches the node right after this, within the same task,
- * so only the root is stamped and the stamp only needs to outlive the task.
+ * Take a subtree that a committed deletion is about to detach out of delegated
+ * dispatch. Detaching a focused host dispatches focusout synchronously, and so
+ * does a deletion cleanup that moves focus, so a deletion stamps the top-level
+ * nodes it detaches before any of its cleanups run: a host below a stamp starts
+ * no handler, whichever component owns it. Every stamped node is detached
+ * within the same task, so the stamp only needs to outlive the task.
  */
 function retireEventHostTree(node: Node): void {
-	if (STAGED_COMMIT_CAPTURE) DEFERRED_LAYOUT_DRIVER!.retireHostTree(node);
-	else stampRetiredHostTree(node, ++eventRootEpoch);
-}
-
-function stampRetiredHostTree(node: Node, epoch: number): void {
+	if (STAGED_COMMIT_CAPTURE) return DEFERRED_LAYOUT_DRIVER!.retireHostTree(node);
+	(node as any).$$retiredEpoch = ++eventRootEpoch;
 	if (retiringHostsSince === 0) {
-		retiringHostsSince = epoch;
+		retiringHostsSince = eventRootEpoch;
 		queueMicrotask(() => {
 			retiringHostsSince = 0;
 		});
 	}
-	(node as any).$$retiredEpoch = epoch;
+}
+
+/** Retire `node` and its following siblings through `last` (all of them when null). */
+function retireHostRange(node: Node | null, last: Node | null): void {
+	for (; node !== null; node = getNextSibling(node)) {
+		retireEventHostTree(node);
+		if (node === last) return;
+	}
 }
 
 /** Publish a native handler; compiled bundle updates omit the key to refresh only authority. */
@@ -27730,13 +27710,6 @@ export function setEventHandler(el: Element, key?: string, handler?: any): void 
 			journalBag();
 		}
 		(STAGED_DOM?.view(el as any) ?? (el as any))[key] = handler;
-		// The rendering Block owns this host's dispatch lifetime (`Block.retired`).
-		// Lite rows republish under their list's Block, so only a disposed claim is
-		// replaced, as when a hydration retry adopts the same server node. `disposed`
-		// never resets, so the claim needs no journal entry.
-		const owner = (el as any).$$eventOwner as Block | undefined;
-		if (CURRENT_BLOCK !== null && (owner === undefined || owner.disposed))
-			(el as any).$$eventOwner = CURRENT_BLOCK;
 	}
 	// Explicit authority also applies to handlers in modules with no signal bindings.
 	const explicitOwner =
@@ -28133,8 +28106,6 @@ export function delegateEvents(eventNames: string[]): void {
 	// They must move together even if the render that first needs a type rolls back.
 	// Seedable prototype may not exist at compiled-module load in exotic hosts.
 	const canSeed = typeof Element !== 'undefined' && Object.isExtensible(Element.prototype);
-	// Every handler publication reads its host's renderer before claiming it.
-	if (canSeed) seedExpando(Element.prototype, '$$eventOwner', false);
 	for (let i = 0; i < eventNames.length; i++) {
 		const name = eventNames[i];
 		if (_delegated.has(name)) continue;
@@ -28524,7 +28495,9 @@ function snapshotDelegatedSlots(
 		(type.flags & EVENT_DISABLED_MOUSE) !== 0 ||
 		(!capture && (type.flags & EVENT_DISABLED_ENTER) !== 0);
 	// Only a removed subtree's root carries its stamp (retireEventHostTree), so the
-	// outermost one retired before this delivery retires every path node below it.
+	// outermost one retired before this delivery retires every path node below it:
+	// React never calls an unmounted component's handlers. A host retiring during
+	// the delivery keeps its handlers to its end, like a removed portal's route.
 	let retiredTop = -1;
 	if (retiringHostsSince !== 0)
 		for (let index = CAPTURE_PATH.length - 1; index >= base; index--) {
@@ -28535,14 +28508,9 @@ function snapshotDelegatedSlots(
 			}
 		}
 	let found = false;
-	let retired: number;
 	for (let index = base; index < CAPTURE_PATH.length; index++) {
 		const node = CAPTURE_PATH[index];
 		const slot = node[key] as EventSlot;
-		// A host whose Block retired before this delivery began starts no handler, as
-		// React never calls an unmounted component's handlers. A host retiring during
-		// the delivery keeps its handlers to its end, like a removed portal's route.
-		// An unclaimed host reads `undefined`, which is not above zero.
 		const active =
 			slot != null &&
 			(index <= retiredTop ||
@@ -28551,8 +28519,7 @@ function snapshotDelegatedSlots(
 					(node.localName === 'button' ||
 						node.localName === 'input' ||
 						node.localName === 'select' ||
-						node.localName === 'textarea')) ||
-				((retired = node.$$eventOwner?.retired) > 0 && retired <= epoch))
+						node.localName === 'textarea')))
 				? null
 				: slot;
 		CAPTURE_SLOTS[index] = active;
@@ -31480,6 +31447,10 @@ function teardownPortalState(state: PortalSlot): void {
 		return;
 	}
 	if (state.block) {
+		// Its DOM lies outside every enclosing deletion's range: retire it here. A
+		// portal compiled into a template routes its events through a host element
+		// inside its owner, which the enclosing deletion has already retired.
+		retireHostRange(state.start, state.end);
 		unmountBlock(state.block, true);
 		state.block = null;
 	}
@@ -44474,22 +44445,9 @@ function detachDeoptTreeRefs(
 	uncommitted: UncommittedRefAttaches | null = null,
 	activityRefs: WeakMap<Element | FragmentInstance, ActivityRefState> | null = null,
 ): void {
-	// Teardown runs just before every blockless de-opt removal detaches `node`.
-	if (out === null) retireEventHostTree(node);
 	// No de-opt descriptor ref was ever stamped → nothing to detach or collect
 	// anywhere; skip the subtree scan. (Monotone flag — see noteDeoptRef.)
 	if (!DEOPT_REFS_STAMPED) return;
-	detachDeoptSubtreeRefs(node, out, shouldDetach, ownerScope, uncommitted, activityRefs);
-}
-
-function detachDeoptSubtreeRefs(
-	node: Node,
-	out: SuspenseRefEntry[] | null,
-	shouldDetach: boolean,
-	ownerScope: Scope | undefined,
-	uncommitted: UncommittedRefAttaches | null,
-	activityRefs: WeakMap<Element | FragmentInstance, ActivityRefState> | null,
-): void {
 	const ref = getDeoptDesc(node)?.props?.ref ?? activityRefs?.get(node as Element)?.connected;
 	if (ref != null) {
 		if (out !== null) {
@@ -44520,7 +44478,7 @@ function detachDeoptSubtreeRefs(
 			c = nodeAfterPortalRange(c, rangeEnd);
 			continue;
 		}
-		detachDeoptSubtreeRefs(c, out, shouldDetach, ownerScope, uncommitted, activityRefs);
+		detachDeoptTreeRefs(c, out, shouldDetach, ownerScope, uncommitted, activityRefs);
 		c = getNextSibling(c);
 	}
 }
@@ -46501,11 +46459,16 @@ function deferRootOwnedListClear(state: ForSlot, certified: boolean = false): bo
 			}
 			if (node !== end) wholeParent = false;
 		}
-		for (let block = oldHead; block !== null; block = block.nextSibling) {
-			block.disposed = true;
-			if (STAGED_COMMIT_CAPTURE) DEFERRED_LAYOUT_DRIVER!.retireHosts(block);
-			else block.retired = ++eventRootEpoch;
-		}
+		for (let block = oldHead; block !== null; block = block.nextSibling) block.disposed = true;
+		// Inert rows run no cleanup, so only removing a focused row can dispatch at
+		// one. Every child of this owned parent is an outgoing row: retire the one
+		// holding the focus the scheduler captured for this pass, not every row. A
+		// drain over several focused documents (an array) retires none; an inert
+		// row's handler belongs to its live list owner.
+		let row: Node | null | undefined = (renderingFocus as FocusSelectionSnapshot | null)?.focused;
+		while (row != null && domNode(row).parentNode !== parent)
+			row = domNode(row).parentNode ?? (row as ShadowRoot).host;
+		if (row != null) retireEventHostTree(row);
 		if (wholeParent) {
 			(STAGED_DOM?.view(parent) ?? parent).textContent = '';
 			(STAGED_DOM?.view(parent) ?? parent).appendChild(start);
@@ -46569,9 +46532,13 @@ function batchClearItems(
 	}
 	TEARDOWN_DEPTH++;
 	try {
+		// Retire every row before any row's cleanup can move focus off another: the
+		// whole span between the list's markers leaves below. As for parked rows,
+		// only captured focus (or no capture at all) can make a row dispatch.
+		if (renderingFocus !== null || !inFlush)
+			retireHostRange(getNextSibling(state.start), state.end);
 		// Dispose the items before their DOM leaves, like every other deletion:
-		// cleanups observe attached hosts, and the focusout that removing a focused
-		// host dispatches finds them retired. Walk the intrusive item chain (head →
+		// cleanups observe attached hosts. Walk the intrusive item chain (head →
 		// nextSibling) rather than the Map's iterator: zero allocation and a
 		// monomorphic pointer chase. Callers reset head/tail only AFTER this returns,
 		// so the chain still covers exactly the old items here.
@@ -46586,8 +46553,6 @@ function batchClearItems(
 				// additionally skips the subtree scan for ref-free items.
 				if (b.deoptNode !== null && b.deoptRefs) detachDeoptTreeRefs(b.deoptNode, null);
 				b.disposed = true;
-				if (STAGED_COMMIT_CAPTURE) DEFERRED_LAYOUT_DRIVER!.retireHosts(b);
-				else b.retired = ++eventRootEpoch;
 			}
 		}
 		const p = domNode(state.start).parentNode!;
@@ -48414,7 +48379,10 @@ function makeRoot(
 					// teardown because their DOM lives in a foreign target — see the
 					// portalSlotSlot branch in unmountScope. This also deliberately makes
 					// unmount safe after external DOM removal instead of surfacing the
-					// renderer-specific NotFoundError React happens to expose.
+					// renderer-specific NotFoundError React happens to expose. Its content
+					// retires before any cleanup runs, even a presentation left in place:
+					// its handlers belong to this root.
+					retireHostRange(getFirstChild(container), null);
 					withRefDetachSuppression(presentationRefs, () => unmountBlock(rootBlock!, false));
 					// Root unmount runs outside any flush, so no commit follows — drain the
 					// teardown ref detaches queued above directly.
