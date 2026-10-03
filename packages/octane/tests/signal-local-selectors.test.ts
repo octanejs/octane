@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import * as signals from 'octane/signals';
 import { act, createRoot, startTransition } from 'octane';
+import { renderToString } from 'octane/server';
 import { createSignalOwnerLifecycle } from '../src/signals/facade.js';
+import * as universal from '../src/universal.js';
 import { mount } from './_helpers.js';
 import { loadCompiledFixtureSource, loadPlainHookFixtureSource } from './_server-fixture.js';
 
@@ -306,6 +308,226 @@ export function App(props) @{
 			root.unmount();
 		}
 	});
+});
+
+describe.each([
+	{ dev: false, strong: false },
+	{ dev: false, strong: true },
+	{ dev: true, strong: false },
+	{ dev: true, strong: true },
+])('method captures in signals and effects (%j)', (mode) => {
+	const source = `import { useLayoutEffect } from 'octane';
+import { derived$ } from 'octane/signals';
+const _$__methodDep = 'outer';
+export function App(props) @{
+ const _$__methodDep$ = 'inner';
+ const _$__derivedAt = 'signal';
+ const value$ = derived$(() => props.calculate());
+ useLayoutEffect(() => props.notify());
+ <p>{String(value$.get()) + ':' + _$__methodDep + ':' + _$__methodDep$ + ':' + _$__derivedAt}</p>
+}`;
+
+	it('renders and updates with both method captures and authored names', () => {
+		const id = '/method-captures.tsrx';
+		const options = {
+			id,
+			compileOptions: { ...mode, hmr: false },
+			runtimeModules: { 'octane/signals': signals },
+		};
+		const server = loadCompiledFixtureSource<any>(source, { ...options, mode: 'server' });
+		const client = loadCompiledFixtureSource<any>(source, { ...options, mode: 'client' });
+		const calls: string[] = [];
+		class Model {
+			constructor(readonly value: string) {}
+			calculate() {
+				return this.value;
+			}
+			notify() {
+				calls.push(this.value);
+			}
+		}
+		expect(renderToString(server.App, new Model('server')).html).toContain(
+			'server:outer:inner:signal',
+		);
+		const root = mount(client.App, new Model('first'));
+		try {
+			expect(root.find('p').textContent).toBe('first:outer:inner:signal');
+			root.update(client.App, new Model('second'));
+			expect(root.find('p').textContent).toBe('second:outer:inner:signal');
+			expect(calls).toEqual(['first', 'second']);
+		} finally {
+			root.unmount();
+		}
+	});
+
+	it('renders captures declared by a plain JavaScript hook', () => {
+		const hook = `import { useLayoutEffect } from 'octane';
+import { derived$ } from 'octane/signals';
+const _$__methodDep$1 = 'outer';
+export function useProjection$(props) {
+ const _$__methodDep$ = 'inner';
+ const value$ = derived$(() => props.calculate() + ':' + _$__methodDep$1 + ':' + _$__methodDep$);
+ useLayoutEffect(() => props.notify());
+ return value$;
+}`;
+		const app = `import { useProjection$ } from './projection';
+export function App(props) @{ const value$ = useProjection$(props); <p>{value$.get()}</p> }`;
+		const calls: string[] = [];
+		class Model {
+			constructor(readonly value: string) {}
+			calculate() {
+				return this.value;
+			}
+			notify() {
+				calls.push(this.value);
+			}
+		}
+		const loadApp = (environment: 'client' | 'server') => {
+			const projection = loadPlainHookFixtureSource(mode.strong ? `"use strong";\n${hook}` : hook, {
+				id: '/projection.js',
+				mode: environment,
+				inlineHookMemo: false,
+				hmr: environment === 'client' && mode.dev,
+				runtimeModules: { 'octane/signals': signals },
+			});
+			return loadCompiledFixtureSource<any>(app, {
+				id: '/projection-app.tsrx',
+				mode: environment,
+				compileOptions: { ...mode, hmr: false },
+				runtimeModules: { './projection': projection },
+			});
+		};
+		const server = loadApp('server');
+		const client = loadApp('client');
+		expect(renderToString(server.App, new Model('server')).html).toContain('server:outer:inner');
+		const root = mount(client.App, new Model('first'));
+		try {
+			expect(root.find('p').textContent).toBe('first:outer:inner');
+			root.update(client.App, new Model('second'));
+			expect(root.find('p').textContent).toBe('second:outer:inner');
+			expect(calls).toEqual(['first', 'second']);
+		} finally {
+			root.unmount();
+		}
+	});
+
+	it('tracks a replaced own method even when a local has the same generated name', () => {
+		const source = `import { useLayoutEffect } from 'octane';
+export function App(props) @{
+ const _$__methodDep = () => 42;
+ useLayoutEffect(() => props.notify());
+ <p>{String(_$__methodDep())}</p>
+}`;
+		const { App } = loadCompiledFixtureSource<any>(source, {
+			id: '/method-shadow.tsrx',
+			mode: 'client',
+			compileOptions: { ...mode, hmr: false },
+		});
+		const calls: string[] = [];
+		const props = {
+			notify: () => {
+				calls.push('first');
+			},
+		};
+		const root = mount(App, props);
+		try {
+			props.notify = () => {
+				calls.push('second');
+			};
+			root.update(App, props);
+			expect(root.find('p').textContent).toBe('42');
+			expect(calls).toEqual(['first', 'second']);
+		} finally {
+			root.unmount();
+		}
+	});
+
+	it.each([
+		["import { query$ as select$ } from 'octane/signals';", 'select$'],
+		["import * as signalApi from 'octane/signals';", 'signalApi.query$'],
+	])('tracks a query selector and an effect with %s', async (importStatement, factory) => {
+		const source = `import { useLayoutEffect } from 'octane';
+${importStatement}
+export function App(props) @{
+ const query$ = ${factory}(() => props.select(), async value => value.toUpperCase());
+ const snapshot = props.includeQuery ? query$.snapshot() : null;
+ useLayoutEffect(() => props.notify());
+ <p>{(snapshot ? (snapshot.status === 'ready' ? snapshot.value : snapshot.status) : 'server') as string}</p>
+}`;
+		const options = {
+			id: '/method-query.tsrx',
+			compileOptions: { ...mode, hmr: false },
+			runtimeModules: { 'octane/signals': signals },
+		};
+		const server = loadCompiledFixtureSource<any>(source, { ...options, mode: 'server' });
+		const client = loadCompiledFixtureSource<any>(source, { ...options, mode: 'client' });
+		const calls: string[] = [];
+		class Model {
+			constructor(
+				readonly value: string,
+				readonly includeQuery = true,
+			) {}
+			select() {
+				return this.value;
+			}
+			notify() {
+				calls.push(this.value);
+			}
+		}
+		expect(renderToString(server.App, new Model('server', false)).html).toContain('server');
+		const root = mount(client.App, new Model('first'));
+		try {
+			await act(async () => {});
+			expect(root.find('p').textContent).toBe('FIRST');
+			root.update(client.App, new Model('second'));
+			await act(async () => {});
+			expect(root.find('p').textContent).toBe('SECOND');
+			expect(calls).toEqual(['first', 'second']);
+		} finally {
+			root.unmount();
+		}
+	});
+
+	it.each(['octane', 'octane/universal'])(
+		'tracks method changes in a non-DOM renderer imported from %s',
+		(runtime) => {
+			const source = `import { useLayoutEffect } from '${runtime}';
+export function App(props) @{
+ const _$__methodDep = () => 42;
+ useLayoutEffect(() => props.notify());
+ <view value={_$__methodDep()} />
+}`;
+			const { App } = loadCompiledFixtureSource<any>(source, {
+				id: '/method-shadow.object.tsrx',
+				mode: 'client',
+				compileOptions: {
+					...mode,
+					hmr: false,
+					renderer: { id: 'object', module: 'octane/universal', target: 'universal', text: 'host' },
+				},
+				runtimeModules: { 'octane/universal': universal },
+			});
+			const events: string[] = [];
+			const container = universal.createObjectContainer();
+			const root = universal.createUniversalRoot(container, universal.createObjectDriver());
+			try {
+				root.render(App, {
+					notify: () => {
+						events.push('first');
+					},
+				});
+				root.render(App, {
+					notify: () => {
+						events.push('second');
+					},
+				});
+				expect(container.children[0].props.value).toBe(42);
+				expect(events).toEqual(['first', 'second']);
+			} finally {
+				root.unmount();
+			}
+		},
+	);
 });
 
 // Strong mode rejects render-phase state updates at compile time, so this

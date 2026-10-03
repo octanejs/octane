@@ -1,6 +1,6 @@
 {
   "name": "@octanejs/styled-components",
-  "version": "0.1.49",
+  "version": "0.1.50",
   "license": "MIT",
   "type": "module",
   "engines": {
@@ -45,7 +45,7 @@
     "stylis": "catalog:default"
   },
   "peerDependencies": {
-    "octane": "workspace:^0.7.0"
+    "octane": "workspace:^0.8.0"
   },
   "devDependencies": {
     "@tsrx/react": "catalog:default",
