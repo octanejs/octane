@@ -3,7 +3,7 @@
 //
 //   node run-minimal.mjs [scenario...]                  report bytes and budget peers
 //   node run-minimal.mjs --budgets [scenario...]        fail when a scenario exceeds its budget
-//   node run-minimal.mjs --write-budgets [scenario...]  reset budgets to measured + 32 bytes
+//   node run-minimal.mjs --write-budgets [scenario...]  reset budgets to measured + headroom
 //
 // Pull request CI runs `--budgets` over every scenario. `--write-budgets` is for
 // a dedicated budget pull request only (CONTRIBUTING.md, "Size budgets").
@@ -565,7 +565,7 @@ try {
 		);
 		fs.writeFileSync(budgetFile, JSON.stringify(next, null, 2) + '\n');
 		console.log(
-			`wrote ${Object.keys(measuredBudgets).length} budget(s) as measured + 32 bytes to ${path.relative(repository, budgetFile)}`,
+			`wrote ${Object.keys(measuredBudgets).length} budget(s) as measured + headroom (raw/gzip 32, brotli 256) to ${path.relative(repository, budgetFile)}`,
 		);
 	}
 } catch (error) {

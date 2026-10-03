@@ -1,10 +1,12 @@
 import assert from 'node:assert/strict';
 
 // Every committed byte budget is a ratchet: the measured production bytes plus
-// this fixed headroom. A change that grows a bundle by more than the headroom
-// fails CI, and the budget is raised only in a separate pull request that names
-// the bytes and the reason (CONTRIBUTING.md, "Size budgets").
-export const BUDGET_HEADROOM_BYTES = 32;
+// this headroom. Raw and gzip are the growth gate: a change that grows either by
+// more than 32 bytes fails CI, and the budget is raised only in a separate pull
+// request that names the bytes and the reason (CONTRIBUTING.md, "Size budgets").
+// Brotli is not monotonic in code size; removing code has raised it by 120 bytes
+// (#1634), so it keeps 256 bytes and still catches real compressed growth.
+export const BUDGET_HEADROOM_BYTES = Object.freeze({ raw: 32, gzip: 32, brotli: 256 });
 export const BYTE_METRICS = ['raw', 'gzip', 'brotli'];
 
 export function ratchetBudget(measured) {
@@ -15,7 +17,7 @@ export function ratchetBudget(measured) {
 				true,
 				`cannot derive a ${metric} budget from ${measured[metric]}`,
 			);
-			return [metric, measured[metric] + BUDGET_HEADROOM_BYTES];
+			return [metric, measured[metric] + BUDGET_HEADROOM_BYTES[metric]];
 		}),
 	);
 }

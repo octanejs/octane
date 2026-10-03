@@ -47,11 +47,12 @@ test('checking and rewriting budgets in one run is rejected', () => {
 	);
 });
 
-test('a rewritten budget is the measurement plus a fixed 32-byte headroom', () => {
+// Brotli can grow when code is removed, so only raw and gzip get the tight gate.
+test('a rewritten budget is the measurement plus 32 raw and gzip bytes and 256 brotli bytes', () => {
 	assert.deepEqual(ratchetBudget({ raw: 1000, gzip: 400, brotli: 350 }), {
 		raw: 1032,
 		gzip: 432,
-		brotli: 382,
+		brotli: 606,
 	});
 	assert.throws(() => ratchetBudget({ raw: 1000, gzip: 0, brotli: 350 }), /gzip budget/);
 });

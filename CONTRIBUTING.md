@@ -291,8 +291,8 @@ check is terminal and successful.
 Every committed byte budget in `benchmarks/bundle-size/` (each public-import
 reachability scenario in `minimal-budgets.json`, each complete Octane
 application in `app-budgets.json` and `jsx-budgets.json`) is a ratchet at the
-measured production bytes plus 32. CI enforces all of them on every pull
-request.
+measured production bytes plus 32 for raw and gzip. Brotli gets 256, because
+removing code can raise it. CI enforces all of them on every pull request.
 
 - A feature or fix pull request never raises a budget. Make the growth smaller,
   usually by moving the new code behind the capability that needs it, or raise

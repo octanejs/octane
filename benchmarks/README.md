@@ -400,7 +400,7 @@ publishes those committed values as separate same-run `octane-tsrx-budget` and
 `octane-jsx-budget` targets, and fifty-four `maxRatio: 1` guards enforce them
 alongside the existing cross-framework comparisons. Independent dialect budgets
 allow either runtime to shrink without making the other dialect look larger by
-comparison. Each ceiling is the measured value plus 32 bytes (see
+comparison. Each raw and gzip ceiling is the measured value plus 32 bytes (see
 [Size budgets](#size-budgets)), so small changes in another framework cannot
 hide Octane application or runtime growth.
 
@@ -452,9 +452,12 @@ of skipping the builds.
 ### Size budgets
 
 Every committed byte budget, for each reachability scenario and each complete
-Octane application, is a ratchet: the measured production bytes plus 32. Full PR
-and main CI enforce all of them in test shard 1/4, so a change that grows any of
-these bundles by more than 32 bytes fails before merge:
+Octane application, is a ratchet: the measured production bytes plus 32 for raw
+and gzip. Full PR and main CI enforce all of them in test shard 1/4, so a change
+that grows any of these bundles by more than 32 raw or gzip bytes fails before
+merge. Brotli budgets get 256 bytes: brotli is not monotonic in code size, and a
+change that only removed code has raised it by 120 bytes, so a tight brotli
+budget would fail reductions. The commands:
 
 ```bash
 node benchmarks/bundle-size/run-minimal.mjs --budgets
@@ -475,8 +478,8 @@ node benchmarks/bundle-size/run-minimal.mjs --write-budgets [scenario...]
 node benchmarks/bundle-size/run.mjs --write-budgets octane-tsrx octane-jsx
 ```
 
-Both write measured + 32 bytes for what they built and leave every other budget
-untouched. Measure with the pinned CI Node version; the bytes are identical on
+Both write measured + 32 raw and gzip bytes and measured + 256 brotli bytes for
+what they built, and leave every other budget untouched. Measure with the pinned CI Node version; the bytes are identical on
 macOS and Linux.
 
 ## Adding a suite

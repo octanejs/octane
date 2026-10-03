@@ -39,7 +39,7 @@
 //
 // Positional arguments select framework targets in every set. `--budgets` fails
 // when an Octane application exceeds app-budgets.json or jsx-budgets.json, and
-// `--write-budgets` resets the selected Octane budgets to measured + 32 bytes in
+// `--write-budgets` resets the selected Octane budgets to measured + headroom in
 // a dedicated budget pull request (CONTRIBUTING.md, "Size budgets").
 process.env.NODE_ENV = 'production';
 
@@ -386,7 +386,7 @@ if (writeBudgets) {
 			);
 			budget[bucket] = ratchetBudget(measured);
 		}
-		console.log(`reset ${label} budgets to measured + 32 bytes`);
+		console.log(`reset ${label} budgets to measured + headroom (raw/gzip 32, brotli 256)`);
 	}
 	fs.writeFileSync(APP_BUDGET_FILE, JSON.stringify(APP_BUDGETS, null, 2) + '\n');
 	fs.writeFileSync(JSX_BUDGET_FILE, JSON.stringify(JSX_BUDGETS, null, 2) + '\n');

@@ -63,7 +63,8 @@ Use this to investigate performance regressions, benchmark results, scheduler/re
 
 - Every byte budget in `benchmarks/bundle-size/` (`minimal-budgets.json`,
   `app-budgets.json`, `jsx-budgets.json`) is the measured production bytes plus
-  32, and CI enforces all of them. Check a change with
+  32 for raw and gzip, and CI enforces all of them. Brotli gets 256 because it
+  can grow when code is removed; judge growth by raw and gzip. Check a change with
   `node benchmarks/bundle-size/run-minimal.mjs --budgets` and
   `node benchmarks/bundle-size/run.mjs --budgets octane-tsrx octane-jsx`; pass
   scenario or target names to narrow a run while iterating.
