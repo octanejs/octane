@@ -482,6 +482,8 @@ export class DerivedBinding<T> extends RedeclarableBinding<DerivedCompute<T>> {
 			return derivedValueState(this.node, result as T);
 		}
 		this.asynchronous = true;
+		// Captured render values alone never restart this work.
+		this.owner.unkeyedState = true;
 		current ??= attempt(this);
 		this.current = current;
 		this.node.invalidateAttempt = () => this.invalidateGraph();

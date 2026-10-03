@@ -261,6 +261,7 @@ import {
 	currentSignalOwner,
 	retireSignalOwnerIdentity,
 	runWithSignalOwner,
+	supersedeSignalOwner,
 } from './signals/owner-context.js';
 import { createSignalHookSites } from './signals/declaration-path.js';
 import {
@@ -621,7 +622,7 @@ function signalRetrySlot(scope: Scope, target: Scope): unknown[] | null {
 	for (let index = 0; index < scope.slots.length; index++) {
 		const slot = scope.slots[index];
 		if (slot === null || typeof slot !== 'object') continue;
-		if (block.forSlot !== null && (slot === block.forSlot || slot.forSlot === block.forSlot))
+		if (block.forSlot != null && (slot === block.forSlot || slot.forSlot === block.forSlot))
 			return ['slot', index, 'item', block.key];
 		if (slot.block === block || slot.tryBlock === block || slot.emptyBlock === block) {
 			// Slot indices and branch tags are compiler/reconciler identities. Do
@@ -702,11 +703,49 @@ function retainSignalRetryScope(
 		for (const child of scope.children) retainSignalRetryScope(child.scope, root, holder);
 }
 
+// Move a restarted primary's owners to its boundary's retry cache, where the
+// replacement claims them by path. A root render defers this tree's teardown to
+// its commit, after that claim, so leave each scope ownerless; it still records
+// retirement when deleted. A nested boundary's primary claims only from its own
+// cache, so its owners stay with it and retire with this tree.
+function handOverSignalRetryScope(scope: Scope, root: Scope, state: TrySlot): void {
+	const owner = SCOPE_SIGNAL_OWNERS.get(scope);
+	const path = owner ? signalRetryPath(scope, root) : null;
+	if (path !== null) {
+		const cache = (state.retrySignalOwners ??= { paths: {}, owners: new Set() });
+		const node = signalRetryNode(cache, path, true)!;
+		if (node.owner !== undefined && node.owner !== owner) {
+			cache.owners.delete(node.owner);
+			retireRendererSignalOwner(node.owner);
+		}
+		node.owner = owner as SignalRendererOwnerIdentity;
+		cache.owners.add(node.owner);
+		SCOPE_SIGNAL_OWNERS.set(scope, false);
+	}
+	forEachSubtreeChild(scope, (child) => {
+		const nested = (child as any).__trySlot as TrySlot | undefined;
+		if (nested === undefined || nested.propagateSuspense)
+			handOverSignalRetryScope(child, root, state);
+	});
+}
+
 function clearSignalRetryOwners(holder: { retrySignalOwners?: SignalRetryOwners }): void {
 	const cache = holder.retrySignalOwners;
 	if (cache === undefined) return;
 	holder.retrySignalOwners = undefined;
 	for (const owner of cache.owners) retireRendererSignalOwner(owner);
+}
+
+// New inputs restart an uncommitted attempt's hooks, not its query$ requests:
+// a redeclared query re-selects from the new inputs and shares the in-flight
+// request when its selection is unchanged. Retire only owners whose cells
+// cannot follow those inputs.
+function supersedeSignalRetryOwners(holder: { retrySignalOwners?: SignalRetryOwners }): void {
+	const cache = holder.retrySignalOwners;
+	if (cache === undefined) return;
+	const retired: SignalRendererOwnerIdentity[] = [];
+	collectRetiredSignalRetryOwners(cache.paths, cache, retired, supersedeSignalOwner);
+	for (const owner of retired) retireRendererSignalOwner(owner);
 }
 
 function discardSignalRetryItem(block: Block, error: unknown): void {
@@ -757,15 +796,16 @@ function collectRetiredSignalRetryOwners(
 	node: SignalRetryNode,
 	cache: SignalRetryOwners,
 	retired: SignalRendererOwnerIdentity[],
+	keep?: (owner: SignalRendererOwnerIdentity) => boolean,
 ): void {
-	if (node.owner !== undefined) {
+	if (node.owner !== undefined && !keep?.(node.owner)) {
 		cache.owners.delete(node.owner);
 		retired.push(node.owner);
 		node.owner = undefined;
 	}
 	if (node.children !== undefined)
 		for (const child of node.children.values())
-			collectRetiredSignalRetryOwners(child, cache, retired);
+			collectRetiredSignalRetryOwners(child, cache, retired, keep);
 }
 
 function trackSignalRetryListKeys<T>(
@@ -929,7 +969,7 @@ function structuralSignalInstanceKey(
 		const block = scope.block;
 		if (!visited.has(block)) {
 			visited.add(block);
-			if (block.forSlot !== null) itemTokens.push(signalIdentityToken(block.key, block.itemIndex));
+			if (block.forSlot) itemTokens.push(signalIdentityToken(block.key, block.itemIndex));
 			base = resolveSignalInstanceKey(block);
 		}
 		scope = scope.parent;
@@ -939,7 +979,7 @@ function structuralSignalInstanceKey(
 	while (base === undefined && block !== null) {
 		if (!visited.has(block)) {
 			visited.add(block);
-			if (block.forSlot !== null) itemTokens.push(signalIdentityToken(block.key, block.itemIndex));
+			if (block.forSlot) itemTokens.push(signalIdentityToken(block.key, block.itemIndex));
 		}
 		base = resolveSignalInstanceKey(block);
 		block = block.parentBlock;
@@ -970,19 +1010,19 @@ function structuralSignalInstanceKey(
 	);
 }
 
+/** Stamp a fresh lite scope, whose other stamp fields are still their defaults. */
 function stampSignalInstance(
 	scope: Scope,
 	parentScope: Scope,
 	invocationSite: string | undefined,
-	key: unknown,
-	hasKey: boolean,
 ): void {
 	if (SIGNAL_BINDINGS_ENABLED || signalDocumentEnabled) {
-		scope.signalInstanceParent = parentScope;
-		scope.signalInstanceSite = invocationSite;
-		scope.signalInstanceValue = key;
-		scope.signalInstanceHasKey = hasKey;
-		scope.signalInstanceResolved = undefined;
+		// Blocks the body creates (arms, rows, value slots) hang off its DOM
+		// stand-in, not the scope. Their key walks resolve this level through
+		// the stand-in, so it carries the same recipe.
+		const block = scope.block;
+		block.signalInstanceParent = scope.signalInstanceParent = parentScope;
+		block.signalInstanceSite = scope.signalInstanceSite = invocationSite;
 	}
 }
 
@@ -998,7 +1038,7 @@ function scopeSignalOwner(scope: Scope | null): SignalOwner | undefined {
 	let owner = SCOPE_SIGNAL_OWNERS.get(scope);
 	if (
 		(owner === undefined || owner === false) &&
-		scope.block.forSlot === null &&
+		!scope.block.forSlot &&
 		scope.signalInstanceParent === null &&
 		scope.signalInstanceResolved === undefined
 	) {
@@ -11617,9 +11657,11 @@ class LiteBlockImpl {
 	declare parentBlock: Block;
 	declare $$ctxValues: Map<Context<any>, any> | null;
 	declare idState: RootIdState;
-	// Signal-instance fields exist on every Block stand-in: lite blocks are
-	// never stamped, but structuralSignalInstanceKey walks scope.block chains
-	// and reads them polymorphically, so they must be present (and null).
+	// Signal-instance fields exist on every Block stand-in: signal key walks
+	// read them polymorphically through scope.block and parentBlock chains.
+	// stampSignalInstance gives it its lite scope's recipe, so descendant walks
+	// keep that level. It has no forSlot field: signal readers test forSlot
+	// loosely, so a stand-in never counts as a list row.
 	declare signalInstanceParent: Scope | null;
 	declare signalInstanceSite: string | undefined;
 	declare signalInstanceValue: unknown;
@@ -11756,7 +11798,7 @@ export function componentSlotLite<P>(
 			}
 		}
 		scope.block = new LiteBlockImpl(host, endMarker, parentScope.block) as unknown as Block;
-		stampSignalInstance(scope, parentScope, invocationSite, undefined, false);
+		stampSignalInstance(scope, parentScope, invocationSite);
 		if (adoptedOpen !== null && adoptedClose !== null) {
 			hydration!.liteRanges.set(scope, {
 				start: adoptedOpen,
@@ -18962,6 +19004,8 @@ class HydrationCapability {
 	 * slot claims it or the enclosing range ends (sweepRebuiltTail).
 	 */
 	rebuiltTail: Node | null = null;
+	/** The start of the range whose whole content rebuiltRoot is (claimRoots), until it commits. */
+	private rebuiltRange: Node | null = null;
 	/**
 	 * The start comment of each markerless branch that holdMarkerlessBranch
 	 * holds, to where its content reaches: after its template's roots once that
@@ -19487,7 +19531,9 @@ class HydrationCapability {
 	 * the content is the owner's slots, and the last one left the cursor past
 	 * its range, or past the server nodes it adopted in place. A cursor on
 	 * `end` means nothing is left, and anything less certain is left in place.
-	 * The slot at `scope`'s `slotKey` owns the range.
+	 * (A root rebuilt as the range's whole content already took the rest of
+	 * the range when it committed: rebuiltAt.) The slot at `scope`'s `slotKey`
+	 * owns the range.
 	 */
 	settleClaim(
 		owner: Scope,
@@ -20757,6 +20803,15 @@ class HydrationCapability {
 					framedRemainder === undefined ? (unframedRemainder ?? null) : framedRemainder,
 				);
 			this.rebuiltTail = this.node;
+			this.rebuiltRange = null;
+			// The rebuilt root can be a range's whole content: what the server
+			// rendered after the node it replaces is then the range's tail. A
+			// markerless branch (claimOwner) has no range: its claim alone ends it.
+			if (cursor === this.claimFrom) {
+				this.claimRoots(cursor, null);
+				if (this.claimFrom === null && CURRENT_SCOPE!.block !== this.claimOwner)
+					this.rebuiltRange = domNode(cursor).previousSibling;
+			}
 			return (this.rebuiltRoot = this.freshClone(template));
 		}
 		if (isFragment) {
@@ -20808,14 +20863,15 @@ class HydrationCapability {
 
 	/**
 	 * A template adopted `root`, the first node of the range whose claim is
-	 * open. When the template is that range's content, record the first node
-	 * after its roots: after `root`, or after the `fragment` template's roots,
-	 * stepped as the compiled walk steps them. The template is the content when
-	 * it renders in the range's owner: the block whose markers the range's
-	 * are, a component inheriting them, the lite component that adopted the
-	 * range, or the markerless branch whose content it is (claimOwner). A
-	 * component that adopts `root` without a range of its own renders in its
-	 * own scope, and the slots after it claim the nodes after its root.
+	 * open, or rebuilt its single root over it. When the template is that
+	 * range's content, record the first node after its roots: after `root`, or
+	 * after the `fragment` template's roots, stepped as the compiled walk steps
+	 * them. The template is the content when it renders in the range's owner:
+	 * the block whose markers the range's are, a component inheriting them, the
+	 * lite component that adopted the range, or the markerless branch whose
+	 * content it is (claimOwner). A component that adopts `root` without a
+	 * range of its own renders in its own scope, and the slots after it claim
+	 * the nodes after its root.
 	 * Returns false when the range ends before the template's roots do: every
 	 * root, a hole included, renders at least one server node, so the server
 	 * rendered other content there. Below a passthrough root, the range may
@@ -20944,21 +21000,42 @@ class HydrationCapability {
 	 * Document holds one element), or else before the server node that
 	 * followed that one while it is still there. Undefined for any other root,
 	 * which goes at its block's end. A rebuilt root commits before any later
-	 * sibling can rebuild, since the subtree it holds no longer hydrates.
+	 * sibling can rebuild, since the subtree it holds no longer hydrates. A
+	 * root that is its range's whole content takes the rest of that range with
+	 * it: the server content its reported mismatch replaced, which goes without
+	 * a second report, whichever render completes the range.
 	 */
 	rebuiltAt(root: Node, parent: Node): Node | null | undefined {
 		if (root !== this.rebuiltRoot) return undefined;
 		const replaced = this.replaced;
 		const next = this.rebuiltTail;
+		const range = this.rebuiltRange;
 		this.replaced = null;
+		this.rebuiltRange = null;
 		if (replaced !== null && domNode(replaced).parentNode === parent) {
 			const last = isBlockOpen(replaced) ? this.close(replaced) : replaced;
 			const at = getNextSibling(last);
 			this.save(parent);
 			removeHydrationRange(replaced, last);
-			return at;
+			return range === null ? at : this.takeRangeTail(at, range);
 		}
 		return next !== null && domNode(next).parentNode === parent ? next : undefined;
+	}
+
+	/**
+	 * Remove the server nodes from `from` to the end of the range that `start`
+	 * opens, and return that end, while the cursor still rests on `from`: no
+	 * later content claimed any of them. Otherwise return `from`.
+	 */
+	private takeRangeTail(from: Node | null, start: Node): Node | null {
+		const end = this.close(start);
+		if (from === null || from === end || this.node !== from) return from;
+		for (let node: Node | null = from; node !== end; node = getNextSibling(node)) {
+			if (node === null || this.freshNodes.has(node)) return from;
+		}
+		removeRange(from, end);
+		this.rebuiltTail = null;
+		return (this.node = end);
 	}
 
 	/**
@@ -39615,7 +39692,7 @@ export function tryBlock(
 		supersedesInputs =
 			(state.branch === 2 || state.retrySignalOwners !== undefined) &&
 			(state.tryBody !== tryBody || (state.env !== env && depsChanged(state.env, env)));
-		if (state.retrySignalOwners !== undefined && supersedesInputs) clearSignalRetryOwners(state);
+		if (supersedesInputs) supersedeSignalRetryOwners(state);
 		state.tryBody = tryBody;
 		state.catchBody = catchBody;
 		state.pendingBody = pendingBody;
@@ -39775,13 +39852,16 @@ function createTryBody(state: TrySlot, start: Node, end: Node): Block {
 
 /** New inputs abandon an initial primary that has never committed, not its fallback. */
 function restartUncommittedTry(state: TrySlot): Block | null {
-	if (state.retrySignalOwners !== undefined) clearSignalRetryOwners(state);
 	HIDDEN_REVEAL_ACTIONS?.delete(state);
 	const old = state.tryBlock!;
 	const refs: SuspenseRefEntry[] = [];
 	collectVisibleSubtreeRefs(old, refs);
 	showTryBlock(state);
 	state.tryBlock = null;
+	// Like a retry of a discarded hydration attempt; see supersedeSignalRetryOwners.
+	if (signalDocumentEnabled || state.idState.renderOwner?.signalOwner !== undefined)
+		handOverSignalRetryScope(old, old, state);
+	supersedeSignalRetryOwners(state);
 	// Neither these refs nor the primary's captured effects ever committed.
 	// Its hook registrations still need real teardown (e.g. transition listeners).
 	withRefDetachSuppression(refs, () => unmountBlock(old));
