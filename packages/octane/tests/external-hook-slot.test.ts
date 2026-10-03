@@ -102,13 +102,13 @@ describe('slotHooks surgical pass', () => {
 		expect(code).toContain('[key: string]: number;');
 		expect(code).toContain('export type Pair<A, B> = { a: A; b: B };');
 		expect(code).toContain('export const widen = <T>(x: T): T => x;');
-		// Apart from inferred dependency arrays and the call boundary around the
-		// module's own nested custom-hook call, the transform remains surgical:
+		// Apart from inferred dependency arrays and any call boundary around the
+		// module's own nested custom-hook calls, the transform remains surgical:
 		// stripping slots restores every original byte. (Default = no HMR → one
 		// runtime-reserved Symbol range; Symbol.for is dev-serve only.)
 		const stripped = code
 			.replace(
-				/^import \{ hookSlots as _\$hookSlots, withSlot as _\$withSlot \} from 'octane';\n/gm,
+				/^import \{ hookSlots as _\$hookSlots(?:, withSlot as _\$withSlot)? \} from 'octane';\n/gm,
 				'',
 			)
 			.replace(/_\$withSlot\(_h\$\d+, (\w+), /g, '$1(')
