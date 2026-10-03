@@ -50,9 +50,11 @@ module opts in. No package compatibility declaration or exception list is needed
 Vite, Rspack, and Rsbuild also accept `strong: true` in their plugin options.
 
 Opted-in modules reject statically provable updater calls during render or
-synchronous effect setup, along with render-time `ref.current` writes. The
-analysis follows synchronous calls through `useCallback`, `useEffectEvent`, and
-functions returned by analyzable `useMemo` factories. Statically known Effect
+effect setup, along with render-time `ref.current` writes. The compiler also treats
+certain scheduled callbacks as effect setup, including `queueMicrotask` and
+zero-delay `setTimeout`. The analysis follows synchronous calls
+through `useCallback`, `useEffectEvent`, and functions returned by analyzable
+`useMemo` factories. Statically known Effect
 Event calls during render (`OCTANE_STRONG_RENDER_EFFECT_EVENT_CALL`) and Effect
 Events in explicit hook dependency lists
 (`OCTANE_STRONG_EFFECT_EVENT_DEPENDENCY`) are also errors. Effect Events remain supported. Strong now rejects manual memo hooks and
@@ -60,10 +62,11 @@ non-equivalent explicit dependency lists; equivalent arrays retain their
 behavior and produce a redundancy hint. See the
 [complete current compiler checks](./strong-compiler-checks.md).
 Synchronously evaluated state initializers, linked-state reconcilers, and
-linked-state equality callbacks are render contexts too. Genuinely deferred
-callbacks and effect cleanup remain valid. There is no runtime phase guard,
-hook-cell policy, runtime-only enforcement, cleanup ban, or `stateWrites`
-configuration in the shipped model.
+linked-state equality callbacks are render contexts too. Event-driven callbacks
+remain valid subject to the other Strong diagnostics; effect cleanup has no
+blanket state-update ban. There is no runtime phase guard, hook-cell policy,
+runtime-only enforcement, cleanup ban, or `stateWrites` configuration in the
+shipped model.
 
 Strong mode also asserts pure rendering over immutable snapshots for production
 call memoization, with bounded state-snapshot mutation and nondeterministic-call
@@ -287,6 +290,11 @@ nothing forces a migration date.
 
 ### 5.1 Compiler
 
+> **Historical:** The descriptions of shipped compiler analysis and sanctioned
+> deferral in this section predate the current checks. The compiler now rejects
+> certain scheduled effect-originated updates, including `queueMicrotask`. See [Effects, state, and dependencies](./strong-compiler-checks.md#effects-state-and-dependencies)
+> for the current contract.
+
 The shipped Strong-mode compiler already identifies setters and dispatchers from
 tuple positions, tracks local aliases and helpers, distinguishes synchronous
 render/effect-setup execution from deferred callbacks, and reports stable
@@ -449,6 +457,11 @@ pattern. The measurement overrules taste, in either direction. Current prior:
 keep `useEffect`.
 
 ## 7. Deferral is the escape hatch
+
+> **Historical:** This proposed escape hatch did not remain the shipped policy.
+> The `queueMicrotask` example below is rejected by the current Strong compiler.
+> See [Effects, state, and dependencies](./strong-compiler-checks.md#effects-state-and-dependencies)
+> for supported event-driven updates and the complete current checks.
 
 The causal-turn rule (§2) is the **permanent semantic floor**, and
 deliberately deferring a write to a later turn is **sanctioned**, not a
