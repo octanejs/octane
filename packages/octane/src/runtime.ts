@@ -16790,9 +16790,10 @@ function createScopedResolver<T>(read: () => T): () => T {
 			resolved = true;
 		} else {
 			// Move ownership from the previewing parent to its direct child so a
-			// later sibling or provider scope still resolves independently.
+			// later sibling or provider scope still resolves independently. Only a
+			// context-reading record reaches this branch.
 			resolvedScope = scope;
-			if (resolvedReads !== null) replayScopedContextReads(resolvedReads, CURRENT_BLOCK);
+			replayScopedContextReads(resolvedReads!, CURRENT_BLOCK);
 		}
 		return resolvedValue;
 	};
