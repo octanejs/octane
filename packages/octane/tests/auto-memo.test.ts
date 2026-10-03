@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import * as ServerRuntime from 'octane/server';
 import { prerender } from 'octane/static';
 import { compile } from '../src/compiler/compile.js';
@@ -39,7 +39,7 @@ function expectNoCompilerRegion(code: string): void {
 	expect(code).not.toContain('compilerCacheContext');
 }
 
-function loadMappedHydrationComponents() {
+function loadMappedHydrationComponents(load = loadCompiledFixtureSource) {
 	const source = `
 		function AppImpl(props) {
 			const rows = props.rows;
@@ -57,17 +57,36 @@ function loadMappedHydrationComponents() {
 	`;
 	const id = 'tsx-custom-map-hydration.tsx';
 	return {
-		server: loadCompiledFixtureSource(source, {
+		server: load(source, {
 			id,
 			mode: 'server',
 			compileOptions: { hmr: false, dev: false },
 		}),
-		client: loadCompiledFixtureSource(source, {
+		client: load(source, {
 			id,
 			mode: 'client',
 			compileOptions: { hmr: false, dev: false },
 		}),
 	};
+}
+
+// Evaluate fresh client and server runtimes, so the next mapped render is the
+// first one either runtime sees. The fixture loader is already loaded by this
+// file's static import, so the re-import comes from the worker's module cache.
+async function loadFreshMappedRuntimes() {
+	vi.resetModules();
+	const fixtures = await import('./_server-fixture.js');
+	return {
+		...loadMappedHydrationComponents(fixtures.loadCompiledFixtureSource),
+		ClientRuntime: await import('../src/index.js'),
+		ServerRuntime: await import('octane/server'),
+	};
+}
+
+function mappedRowTexts(html: string): Array<string | null> {
+	const container = document.createElement('div');
+	container.innerHTML = html;
+	return Array.from(container.querySelectorAll('li'), (row) => row.textContent);
 }
 
 function loadMappedComponentHydrationComponents() {
@@ -2775,6 +2794,95 @@ describe('compiler-owned component-region memoization', () => {
 		} finally {
 			Array.prototype.map = originalMap;
 			root.unmount();
+		}
+	});
+
+	// Octane recognizes the native map by the intrinsics present when it loaded.
+	// A replacement installed afterwards, even before anything has rendered, is
+	// user code that every render must call.
+	it('calls an Array.prototype.map replacement installed before the first mapped render', async () => {
+		const { server, client, ClientRuntime, ServerRuntime } = await loadFreshMappedRuntimes();
+		const events: string[] = [];
+		const rows = [
+			{ id: 1, label: 'first' },
+			{ id: 2, label: 'second' },
+		];
+		const onItem = (id: number, index: number): string => `${id}:${index}`;
+		const originalMap = Array.prototype.map;
+		Array.prototype.map = function <Item, Result>(
+			this: Item[],
+			callback: (item: Item, index: number, items: Item[]) => Result,
+			thisArg?: unknown,
+		): Result[] {
+			if ((this as unknown) === rows) events.push('prototype:map');
+			return originalMap.call(this, callback, thisArg) as Result[];
+		};
+		const container = document.createElement('div');
+		document.body.appendChild(container);
+		const root = ClientRuntime.createRoot(container);
+		try {
+			const { html } = ServerRuntime.renderToString(server.App, { rows, prefix: 'server', onItem });
+			expect(events).toEqual(['prototype:map']);
+			expect(mappedRowTexts(html)).toEqual(['server:0:first', 'server:1:second']);
+
+			events.length = 0;
+			root.render(client.App as any, { rows, prefix: 'client', onItem });
+			expect(events).toEqual(['prototype:map']);
+			expect(mappedRowTexts(container.innerHTML)).toEqual(['client:0:first', 'client:1:second']);
+		} finally {
+			Array.prototype.map = originalMap;
+			root.unmount();
+			container.remove();
+		}
+	});
+
+	it('consults an Array[Symbol.species] replacement installed before the first mapped render', async () => {
+		const { server, client, ClientRuntime, ServerRuntime } = await loadFreshMappedRuntimes();
+		const events: string[] = [];
+		// Only the authored map's ArraySpeciesCreate step reads the receiver's
+		// constructor and then its species, so record the species lookup that
+		// follows that read rather than every array the renderers create.
+		let afterConstructor = false;
+		const rows = new Proxy(
+			[
+				{ id: 1, label: 'first' },
+				{ id: 2, label: 'second' },
+			],
+			{
+				get(target, key, receiver) {
+					if (key === 'constructor') afterConstructor = true;
+					return Reflect.get(target, key, receiver);
+				},
+			},
+		);
+		const onItem = (id: number, index: number): string => `${id}:${index}`;
+		const nativeSpecies = Object.getOwnPropertyDescriptor(Array, Symbol.species)!;
+		Object.defineProperty(Array, Symbol.species, {
+			...nativeSpecies,
+			get(this: unknown) {
+				if (afterConstructor) {
+					afterConstructor = false;
+					events.push('species:get');
+				}
+				return this;
+			},
+		});
+		const container = document.createElement('div');
+		document.body.appendChild(container);
+		const root = ClientRuntime.createRoot(container);
+		try {
+			const { html } = ServerRuntime.renderToString(server.App, { rows, prefix: 'server', onItem });
+			expect(events).toEqual(['species:get']);
+			expect(mappedRowTexts(html)).toEqual(['server:0:first', 'server:1:second']);
+
+			events.length = 0;
+			root.render(client.App as any, { rows, prefix: 'client', onItem });
+			expect(events).toEqual(['species:get']);
+			expect(mappedRowTexts(container.innerHTML)).toEqual(['client:0:first', 'client:1:second']);
+		} finally {
+			Object.defineProperty(Array, Symbol.species, nativeSpecies);
+			root.unmount();
+			container.remove();
 		}
 	});
 

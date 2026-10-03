@@ -149,6 +149,13 @@ const scenarios = [
 		})),
 	),
 ];
+const nativeArrayGuardExports = new Set([
+	'mapSlot',
+	'compilerCacheMappedArray',
+	'compilerCacheImmutableArrayFilter',
+]);
+// A bare intrinsic read, not a call such as `Array.prototype.map.call(...)`.
+const nativeArraySnapshot = /Array\.prototype\.(?:map|filter)(?![\w$.(])|Symbol\.species/;
 const productionDefines = {
 	__OCTANE_PROFILE_ENABLED__: 'false',
 	'process.env.NODE_ENV': JSON.stringify('production'),
@@ -383,12 +390,18 @@ async function buildScenario(scenario, entry) {
 		.filter(([, module]) => module.renderedLength > 0)
 		.map(([id]) => id);
 	const runtimeModule = modules.find((id) => id.endsWith('/packages/octane/src/runtime.ts'));
+	const serverRuntimeModule = modules.find((id) =>
+		id.endsWith('/packages/octane/src/runtime.server.ts'),
+	);
 	const streamModule = modules.find((id) => id.endsWith('/packages/octane/src/stream-protocol.ts'));
 	return {
 		code: chunk.code,
 		modules,
 		emittedModules,
 		runtimeExports: runtimeModule ? chunk.modules[runtimeModule].renderedExports : [],
+		serverRuntimeExports: serverRuntimeModule
+			? chunk.modules[serverRuntimeModule].renderedExports
+			: [],
 		streamExports: streamModule ? chunk.modules[streamModule].renderedExports : [],
 	};
 }
@@ -403,6 +416,7 @@ try {
 			modules,
 			emittedModules = modules,
 			runtimeExports,
+			serverRuntimeExports = [],
 			streamExports = [],
 		} = await buildScenario(scenario, entry);
 		for (const [label, pattern] of forbidden) {
@@ -457,6 +471,24 @@ try {
 			module.endsWith('/packages/octane/src/runtime.server.ts'),
 		);
 		const hasVanillaStore = modules.some((id) => /\/node_modules\/zustand\//.test(id));
+		// Both runtimes snapshot native array intrinsics at load for their mapped
+		// list guards. A bundle that renders none of those guards must drop the
+		// snapshots instead of keeping their reads as dead statements.
+		if (
+			scenario.bundler === 'vite' &&
+			!scenario.package &&
+			(hasRuntime || hasServerRuntime) &&
+			![...runtimeExports, ...serverRuntimeExports].some((name) =>
+				nativeArrayGuardExports.has(name),
+			)
+		) {
+			const snapshot = nativeArraySnapshot.exec(code)?.[0];
+			assert.equal(
+				snapshot,
+				undefined,
+				`${name}: a bundle that never maps a list retained the native array snapshot \`${snapshot}\``,
+			);
+		}
 		if (serverScenario) {
 			assert.equal(hasServerRuntime, true, `${name}: public server import omitted its runtime`);
 			assert.equal(hasRuntime, false, `${name}: unrelated client runtime reached server entry`);

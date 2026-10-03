@@ -35759,10 +35759,16 @@ function isPortalTarget(block: Block, domParent: Node): boolean {
 	return false;
 }
 
-const NATIVE_ARRAY_MAP = Array.prototype.map;
+// Snapshot the intrinsics at module load, before user code can replace them,
+// so a later replacement is recognized as authored code. Bundlers cannot prove
+// a bare property read side-effect-free, so each read sits in a pure IIFE:
+// a bundle that never reaches these guards drops it rather than keeping a dead
+// statement. `Reflect.apply` is a known-pure global read and needs no wrapper.
+const NATIVE_ARRAY_MAP = /* @__PURE__ */ (() => Array.prototype.map)();
 const NATIVE_ARRAY_FILTER = /* @__PURE__ */ (() => Array.prototype.filter)();
 const NATIVE_REFLECT_APPLY = Reflect.apply;
-const NATIVE_ARRAY_SPECIES_GETTER = Object.getOwnPropertyDescriptor(Array, Symbol.species)?.get;
+const NATIVE_ARRAY_SPECIES_GETTER = /* @__PURE__ */ (() =>
+	Object.getOwnPropertyDescriptor(Array, Symbol.species)?.get)();
 // Components hand the reconciler immutable array snapshots. Memoizing indexed
 // accessor classification by snapshot identity avoids a descriptor allocation
 // per row on every unchanged parent render; holes and intrinsic overrides are
