@@ -65,6 +65,17 @@ const signalFreeClientScenarios = new Set([
 	'deferred-hydration',
 	'suspense-transition',
 ]);
+// Renderer clients that never hydrate and render no binding view. A dynamic
+// text hole must not retain the hydration range-marker validator for them.
+const markerFreeClientScenarios = new Set([
+	'cli-spa-starter',
+	'root-chained-jsx',
+	'prop-attributes',
+	'context',
+	'suspense-transition',
+	'binding-mantine-hooks',
+	'binding-usehooks-ts',
+]);
 const bindingScenarios = [
 	{
 		id: 'binding-base-ui',
@@ -430,6 +441,15 @@ try {
 				),
 				[],
 				`${name}: statically named attribute bindings retained the generic attribute or control-restore writers`,
+			);
+		}
+		if (markerFreeClientScenarios.has(id)) {
+			assert.deepEqual(
+				emittedModules.filter((module) =>
+					module.endsWith('/packages/octane/src/dom-binding-protocol.ts'),
+				),
+				[],
+				`${name}: a client that never hydrates retained the binding-marker validator`,
 			);
 		}
 		const hasRuntime = modules.some((module) => module.endsWith('/packages/octane/src/runtime.ts'));
