@@ -46515,17 +46515,19 @@ function batchClearItems(
 		TEARDOWN_HANDLER = findTryHandler(first.parentBlock) ?? rendererRegionTryHandler(first);
 		TEARDOWN_BLOCK = first;
 	}
-	// As for parked rows: only captured focus (or no capture) can make a row dispatch.
-	const retire = renderingFocus !== null || !inFlush;
 	TEARDOWN_DEPTH++;
 	try {
+		// Retire every row before any row's cleanup can move focus off another: the
+		// whole span between the list's markers leaves below. As for parked rows,
+		// only captured focus (or no capture at all) can make a row dispatch.
+		if (renderingFocus !== null || !inFlush)
+			retireHostRange(getNextSibling(state.start), state.end);
 		// Dispose the items before their DOM leaves, like every other deletion:
 		// cleanups observe attached hosts. Walk the intrusive item chain (head →
 		// nextSibling) rather than the Map's iterator: zero allocation and a
 		// monomorphic pointer chase. Callers reset head/tail only AFTER this returns,
 		// so the chain still covers exactly the old items here.
 		for (let b: Block | null = state.head; b !== null; b = b.nextSibling) {
-			if (retire) retireHostRange(b.startMarker, b.endMarker);
 			if (b.cleanups !== null || b.children !== null || b._slots !== null) {
 				unmountBlock(b, false);
 			} else {
