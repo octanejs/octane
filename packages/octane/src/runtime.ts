@@ -19590,7 +19590,9 @@ class HydrationCapability {
 	 * after the last root, so step past it. A body that rebuilt `root` or
 	 * rendered nothing there leaves the cursor where it put it. When `unframed`,
 	 * a template that does not match leaves `root` and the nodes after it to
-	 * renderUnframed. Returns whether the body adopted `root`.
+	 * renderUnframed. Returns whether the body adopted `root`. A call in the body
+	 * that renders in place of the same `root`, before any template adopted it,
+	 * adopts it for the enclosing call too: its root is the enclosing call's.
 	 */
 	renderInPlace<T>(render: (target: T) => void, target: T, root: Node, unframed = false): boolean {
 		const outer = this.inPlace;
@@ -19615,6 +19617,10 @@ class HydrationCapability {
 		}
 		if (end === undefined) return false;
 		this.node = end;
+		if (outer === root) {
+			this.inPlace = null;
+			this.inPlaceEnd = end;
+		}
 		return true;
 	}
 
