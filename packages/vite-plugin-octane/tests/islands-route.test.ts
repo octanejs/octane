@@ -44,7 +44,14 @@ export function Counter() @{
   'use dom bindings';
   <button type="button" onClick={increment}>{count$}</button>
 }`,
-	'src/Header.tsrx': `export function Header() @{ <header><h1>Islands</h1></header> }`,
+	// Static output may interpolate plain-module values and assets.
+	'src/copy.ts': `export const tagline = 'Server-rendered shell';`,
+	'src/logo.svg': `<svg xmlns="http://www.w3.org/2000/svg" width="1" height="1"></svg>`,
+	'src/Header.tsrx': `import { tagline } from './copy.ts';
+import logo from './logo.svg';
+export function Header() @{
+  <header><img src={logo} alt="" /><h1>Islands</h1><p>{tagline as string}</p></header>
+}`,
 	'src/App.tsrx': `import { Hydrate } from 'octane';
 import { interaction } from 'octane/hydration';
 import { Counter } from './Counter.tsrx';
@@ -155,6 +162,7 @@ describe('islands-only routes', { timeout: 180_000 }, () => {
 		expect(full).toContain('rel="modulepreload"');
 		// Both responses render the same server shell and island.
 		expect(islands).toContain('<h1>Islands</h1>');
+		expect(islands).toContain('Server-rendered shell');
 		expect(islands).toContain('data-octane-hydrate-independent');
 	});
 

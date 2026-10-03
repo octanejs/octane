@@ -21,6 +21,7 @@ const SKIP = new Set([
 	'typeArguments',
 	'typeParameters',
 	'returnType',
+	'label',
 ]);
 const CONTROLLED = new Set(['input', 'textarea', 'select']);
 const SIGNAL_DECLARATIONS = new Set(['signal$', 'derived$', 'query$', 'action$']);
@@ -78,15 +79,26 @@ function attributeName(attribute) {
 }
 
 /**
+ * A component the shell hands to JSX as a value (`render={Item}`) is reported
+ * with `value: true`. Check those exports with `{ values: true }`: a function is
+ * checked like a rendered component, while an inert or non-component value (a
+ * string, an asset URL, a theme object) is not shell output.
+ *
  * @param {string} source
  * @param {string} filename
  * @param {readonly string[] | null} exports Rendered exports, or null for every export.
+ * @param {{ values?: boolean }} [options] The selected exports were passed as values.
  * @returns {{
  *   problems: Array<{ message: string, line: number, column: number }>,
- *   components: Array<{ source: string, exportName: string }>,
+ *   components: Array<{ source: string, exportName: string, value?: true }>,
  * }}
  */
-export function analyzeIslandsShell(source, filename, exports = null) {
+export function analyzeIslandsShell(
+	source,
+	filename,
+	exports = null,
+	{ values: passedValues = false } = {},
+) {
 	const ast = parseModule(source, filename);
 	const imports = new Map();
 	// Local bindings that hold a function (declarations and function-valued
@@ -182,11 +194,17 @@ export function analyzeIslandsShell(source, filename, exports = null) {
 		queue.push(fn);
 	};
 	const relative = (record) => /^\.\.?\//.test(record.source) && record.imported !== '*';
-	const component = (record) =>
-		components.set(`${record.source}#${record.imported}`, {
-			source: record.source,
-			exportName: record.imported,
-		});
+	// A rendered component is checked strictly; a value only if it can render.
+	const component = (record, value = false) => {
+		const key = `${record.source}#${record.imported}`;
+		if (value && components.has(key)) return;
+		components.set(
+			key,
+			value
+				? { source: record.source, exportName: record.imported, value: true }
+				: { source: record.source, exportName: record.imported },
+		);
+	};
 	// The name a callee was exported as: an import alias does not hide a hook.
 	const importedName = (name) => {
 		const record = imports.get(name);
@@ -210,7 +228,7 @@ export function analyzeIslandsShell(source, filename, exports = null) {
 		if (node?.type === 'Identifier') {
 			const record = imports.get(node.name);
 			if (record === undefined || functions.has(node.name)) return;
-			if (relative(record)) component(record);
+			if (relative(record)) component(record, true);
 			else if (/^[A-Z]/.test(node.name) && !/^octane(?:\/|$)/.test(record.source))
 				report(node, `component ${node.name} cannot be checked as static shell output`);
 		} else if (node?.type === 'ArrayExpression') {
@@ -232,12 +250,15 @@ export function analyzeIslandsShell(source, filename, exports = null) {
 		const record = target?.source ? target : local !== undefined ? imports.get(local) : undefined;
 		if (target?.fn) enqueue(target.fn);
 		else if (local !== undefined && functions.has(local)) enqueue(functions.get(local));
-		else if (record && relative(record)) component(record);
+		else if (record && relative(record)) component(record, passedValues);
 		else if (
-			exports === null &&
+			(exports === null || passedValues) &&
 			INERT.has((local !== undefined ? values.get(local) : target?.value)?.type)
 		)
 			return;
+		// A passed value that is neither a function nor named like a component
+		// (a computed string or URL) renders nothing interactive.
+		else if (passedValues && !/^[A-Z]/.test(name)) return;
 		else
 			report(statement, `export ${JSON.stringify(name)} cannot be checked as static shell output`);
 	};
@@ -251,6 +272,26 @@ export function analyzeIslandsShell(source, filename, exports = null) {
 			const entry = exported.find(([exportedAs]) => exportedAs === name);
 			follow(name, entry?.[1], entry?.[2] ?? star);
 		}
+	// A binding introduces names; only its default values and computed keys run.
+	const pattern = (node) => {
+		if (node == null || node.type === 'Identifier') return;
+		if (node.type === 'AssignmentPattern') {
+			pattern(node.left);
+			visit(node.right);
+		} else if (node.type === 'ObjectPattern') {
+			for (const property of node.properties) {
+				if (property.type === 'RestElement') pattern(property.argument);
+				else {
+					if (property.computed) visit(property.key);
+					pattern(property.value);
+				}
+			}
+		} else if (node.type === 'ArrayPattern') {
+			for (const element of node.elements) pattern(element);
+		} else if (node.type === 'RestElement') pattern(node.argument);
+		else if (node.type === 'TSParameterProperty') pattern(node.parameter);
+		else visit(node);
+	};
 	const visit = (node) => {
 		if (node.type === 'JSXElement') {
 			const opening = node.openingElement;
@@ -318,6 +359,19 @@ export function analyzeIslandsShell(source, filename, exports = null) {
 				report(node, 'a component signal declaration needs the renderer');
 			else if (member === 'get' || member === 'latest' || member === 'snapshot')
 				report(node, `a signal .${member}() read is not live in a static shell`);
+		} else if (node.type === 'VariableDeclarator') {
+			pattern(node.id);
+			if (node.init) visit(node.init);
+			return;
+		} else if (FUNCTIONS.has(node.type)) {
+			// A nested function's own name and parameters are bindings.
+			for (const parameter of node.params) pattern(parameter);
+			visit(node.body);
+			return;
+		} else if (node.type === 'CatchClause') {
+			pattern(node.param);
+			visit(node.body);
+			return;
 		} else if (node.type === 'Identifier') {
 			// Any local function the shell references may run or render on the
 			// server, whether as a tag, a call, or a value handed to a component.
@@ -334,7 +388,7 @@ export function analyzeIslandsShell(source, filename, exports = null) {
 	};
 	while (queue.length > 0) {
 		const fn = queue.shift();
-		for (const parameter of fn.params) visit(parameter);
+		for (const parameter of fn.params) pattern(parameter);
 		visit(fn.body);
 	}
 	return { problems, components: [...components.values()] };

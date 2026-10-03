@@ -129,18 +129,58 @@ describe('islands-only shell analysis', () => {
 			shell(
 				`<main title={format(props.title)}>
     <Static render={Island} items={[label, props.extra]} />
+    <img src={logo} alt={tagline} />
     {format(props.body) as string}
   </main>`,
 				`import { label } from 'library';
+import { tagline } from './copy.ts';
+import logo from './logo.svg';
 function format(value) { return String(value).trim(); }`,
 			),
 			'/src/Page.tsrx',
 		);
 		expect(result.problems).toEqual([]);
+		// Values are checked only if they can render; the bundler skips plain modules.
 		expect(result.components).toEqual([
 			{ source: './Static.tsrx', exportName: 'Static' },
-			{ source: './Island.tsrx', exportName: 'Island' },
+			{ source: './Island.tsrx', exportName: 'Island', value: true },
+			{ source: './logo.svg', exportName: 'default', value: true },
+			{ source: './copy.ts', exportName: 'tagline', value: true },
 		]);
+	});
+
+	it('checks an export passed into JSX as a value only when it can render', () => {
+		const source = `import { memo } from 'octane';
+export const tagline = String(Date.now());
+export const Theme = { color: 'red' };
+export const label = 'static';
+export function Item() @{ <button onClick={() => {}}>x</button> }
+export const Wrapped = memo(() => <p />);`;
+		const check = (name: string, values = true) =>
+			analyzeIslandsShell(source, '/src/values.tsrx', [name], { values }).problems.map(
+				(problem) => problem.message,
+			);
+		expect(check('tagline')).toEqual([]);
+		expect(check('Theme')).toEqual([]);
+		expect(check('label')).toEqual([]);
+		expect(check('Item')).toEqual(['"onClick" needs client code the shell never loads']);
+		expect(check('Wrapped')).toEqual(['export "Wrapped" cannot be checked as static shell output']);
+		// Rendered as a component, the same value export cannot be checked.
+		expect(check('Theme', false)).toEqual([
+			'export "Theme" cannot be checked as static shell output',
+		]);
+	});
+
+	it('does not read a binding as a reference to a same-named function', () => {
+		const source = `function open() @{ <button onClick={() => {}}>Open</button> }
+function close() @{ <button onClick={() => {}}>Close</button> }
+function label() @{ <button onClick={() => {}}>Label</button> }
+export function Page({ open }, [close]) @{
+  const { text: label = 'static' } = {};
+  function format(label, value) { return String(value).trim(); }
+  <p>{format(null, props.title) as string}</p>
+}`;
+		expect(analyzeIslandsShell(source, '/src/Page.tsrx', ['Page']).problems).toEqual([]);
 	});
 
 	it('checks local components the shell renders and only the selected exports', () => {

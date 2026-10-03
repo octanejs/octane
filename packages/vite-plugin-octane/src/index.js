@@ -243,15 +243,18 @@ function has_islands_route(config) {
  * @param {string} projectRoot
  * @param {ResolvedOctaneConfig} config
  * @param {(message: string) => void} report
- * @param {(file: string, exports: string[] | null) => ReturnType<typeof analyzeIslandsShell>} [analyze]
+ * @param {(file: string, exports: string[] | null, values: boolean) => ReturnType<typeof analyzeIslandsShell>} [analyze]
  */
 async function checkIslandsShells(
 	resolve,
 	projectRoot,
 	config,
 	report,
-	analyze = (file, exports) => analyzeIslandsShell(fs.readFileSync(file, 'utf-8'), file, exports),
+	analyze = (file, exports, values) =>
+		analyzeIslandsShell(fs.readFileSync(file, 'utf-8'), file, exports, { values }),
 ) {
+	// Checked exports per module: a rendered export by name, a value passed into
+	// JSX as `?name`, which a rendered check of the same export also covers.
 	/** @type {Map<string, Set<string> | null>} */
 	const checked = new Map();
 	for (const route of config.router.routes) {
@@ -263,7 +266,7 @@ async function checkIslandsShells(
 		if (config.rootBoundary.pending || config.rootBoundary.catch)
 			fail('the configured root boundaries need a hydrated root.');
 		const exportName = get_route_entry_export_name(route.entry);
-		/** @type {Array<[string, string[] | null]>} */
+		/** @type {Array<[string, string[] | null, boolean]>} */
 		const pending = [];
 		for (const [
 			modulePath,
@@ -276,18 +279,29 @@ async function checkIslandsShells(
 				pending.push([
 					path.resolve(projectRoot, modulePath.startsWith('/') ? `.${modulePath}` : modulePath),
 					exports,
+					false,
 				]);
 		}
 		while (pending.length > 0) {
-			const [file, exports] = /** @type {[string, string[] | null]} */ (pending.shift());
+			const [file, exports, values] = /** @type {[string, string[] | null, boolean]} */ (
+				pending.shift()
+			);
+			const keys = exports?.map((name) => (values ? `?${name}` : name));
 			const seen = checked.get(file);
-			if (seen === null || (exports !== null && exports.every((name) => seen?.has(name)))) continue;
-			checked.set(file, exports === null ? null : new Set([...(seen ?? []), ...exports]));
+			if (
+				seen === null ||
+				(keys !== undefined &&
+					keys.every((key) => seen?.has(key) || (key[0] === '?' && seen?.has(key.slice(1)))))
+			)
+				continue;
+			checked.set(file, keys === undefined ? null : new Set([...(seen ?? []), ...keys]));
 			if (!is_octane_module_path(file)) {
-				fail(`its shell renders ${file}, which Octane cannot check.`);
+				// A plain module has no JSX; a value it exports (a string, an asset
+				// URL) renders nothing interactive.
+				if (!values) fail(`its shell renders ${file}, which Octane cannot check.`);
 				continue;
 			}
-			const result = analyze(file, exports);
+			const result = analyze(file, exports, values);
 			if (result.problems.length > 0) {
 				const [problem] = result.problems;
 				fail(
@@ -296,9 +310,15 @@ async function checkIslandsShells(
 			}
 			for (const component of result.components) {
 				const resolved = await resolve(component.source, file);
-				if (!resolved || resolved.external)
-					fail(`its shell renders ${component.source}, which Octane cannot check.`);
-				else pending.push([resolved.id.split('?')[0], [component.exportName]]);
+				if (!resolved || resolved.external) {
+					if (!component.value)
+						fail(`its shell renders ${component.source}, which Octane cannot check.`);
+				} else
+					pending.push([
+						resolved.id.split('?')[0],
+						[component.exportName],
+						component.value === true,
+					]);
 			}
 		}
 	}
@@ -327,12 +347,14 @@ function createIslandsShellWarnings(server, projectRoot) {
 			projectRoot,
 			config,
 			(message) => current.add(message),
-			(file, exports) => {
-				const key = `${file}\0${exports?.join(',') ?? '*'}`;
+			(file, exports, values) => {
+				const key = `${file}\0${exports?.join(',') ?? '*'}\0${values}`;
 				const mtimeMs = fs.statSync(file).mtimeMs;
 				const cached = analyses.get(key);
 				if (cached?.mtimeMs === mtimeMs) return cached.result;
-				const result = analyzeIslandsShell(fs.readFileSync(file, 'utf-8'), file, exports);
+				const result = analyzeIslandsShell(fs.readFileSync(file, 'utf-8'), file, exports, {
+					values,
+				});
 				analyses.set(key, { mtimeMs, result });
 				return result;
 			},
