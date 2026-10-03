@@ -294,6 +294,21 @@ export function resolveSignalHandleForOwner<T>(
 	return resolveSignalHandleForScope(handle$, resolveOwner(owner));
 }
 
+/**
+ * @internal A retirement probe for a handle that resolves through an owner. Owner
+ * resolution refuses a retired document or instance identity, and only that,
+ * with ScopeDisposedError; the probe reads the refusal as its handle's own
+ * retirement and returns `undefined`.
+ */
+export function resolveUnlessRetired<T>(resolve: () => T): T | undefined {
+	try {
+		return resolve();
+	} catch (error) {
+		if (error instanceof ScopeDisposedError) return undefined;
+		throw error;
+	}
+}
+
 /** @internal Resolve a descriptor against an already selected signal scope. */
 export function resolveSignalHandleForScope<T>(
 	handle$: SignalHandle<T>,
@@ -414,7 +429,11 @@ export abstract class Descriptor<T, H extends SignalHandle<T>> implements OwnerB
 	}
 
 	[SIGNAL_BINDING_RETIRED](): boolean {
-		return this.resolve()[SIGNAL_BINDING_RETIRED]?.() === true;
+		// Only the owner step can refuse; the cell a subscription resolved exists.
+		const owner = resolveUnlessRetired(() =>
+			resolveDescriptorOwner(this.site, readerOwner(this.owner, requireOwner())),
+		);
+		return owner === undefined || this.resolvedCell(owner)[SIGNAL_BINDING_RETIRED]?.() === true;
 	}
 
 	[SIGNAL_BINDING_IDENTITY]() {

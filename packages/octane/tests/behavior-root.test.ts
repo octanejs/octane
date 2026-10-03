@@ -43,6 +43,7 @@ import {
 	query,
 	bindSignalControl,
 	optimistic$,
+	retireSignalOwnerIdentity,
 	ScopeDisposedError,
 } from '../src/signals/index.js';
 import type {
@@ -8057,51 +8058,63 @@ export function Observed() @{
 				}
 			});
 
-		// Declared and optimistic handles resolve a cell in an owner. That cell's
-		// owner retiring is the handle's own retirement, like a concrete handle's.
+		// Declared and optimistic handles resolve a cell through the program's
+		// owner: a scope, an owner identity, or a renderer instance of a document.
+		// That owner retiring is the handle's own retirement, even though resolving
+		// through a retired identity now refuses rather than returning its cell.
 		for (const kind of ['declared', 'optimistic'] as const)
-			it(`ends quietly when the owner of its ${kind} handle retires (${dev ? 'dev' : 'prod'})`, () => {
-				const source = `import { live$, text$ } from './island-state';
+			for (const ownerKind of ['scope', 'identity', 'document'] as const)
+				it(`ends quietly when the ${ownerKind} owner of its ${kind} handle retires (${dev ? 'dev' : 'prod'})`, () => {
+					const source = `import { live$, text$ } from './island-state';
 export function Resolved() @{
   'use dom bindings';
   <section data-live={live$.get()}><p>{text$ as string}</p></section>
 }`;
-				const scope = createScope({ scopeKey: `island-resolved-live-${dev}` });
-				const retiring = createScope({ scopeKey: `island-resolved-retiring-${dev}` });
-				const live$ = scope.signal$('live', 'first');
-				const cell$ = retiring.signal$('cell', 'kept');
-				const text$ =
-					kind === 'declared'
-						? __signalAt(`island-resolved-text-${dev}`, 'kept')
-						: optimistic$(cell$);
-				const write = (value: string): void =>
-					kind === 'declared'
-						? runWithSignalOwner(retiring, () => (text$ as typeof cell$).set(value))
-						: cell$.set(value);
-				const fixture = authoredPresentation('Resolved', {}, dev, source, {
-					'./island-state': { live$, text$ },
+					const scope = createScope({ scopeKey: `island-resolved-live-${dev}` });
+					const live$ = scope.signal$('live', 'first');
+					const key = `island-resolved-${kind}-${ownerKind}-${dev}`;
+					const document = { scopeKey: `${key}-document` };
+					const owned = createScope({ scopeKey: key });
+					const owner =
+						ownerKind === 'scope'
+							? owned
+							: ownerKind === 'identity'
+								? document
+								: {
+										scopeKey: `${key}-instance`,
+										documentOwner: document,
+										instanceOwner: {},
+										instanceKey: 'island',
+									};
+					const declared$ = __signalAt(key, 'kept');
+					const text$ = kind === 'declared' ? declared$ : optimistic$(declared$);
+					const fixture = authoredPresentation('Resolved', {}, dev, source, {
+						'./island-state': { live$, text$ },
+					});
+					const reportError = vi.fn();
+					const original = globalThis.reportError;
+					globalThis.reportError = reportError;
+					try {
+						container.innerHTML = fixture.html;
+						const section = container.querySelector('section')!;
+						const handle = runWithSignalOwner(owner, () => fixture.attach(section, fixture.state));
+						runWithSignalOwner(owner, () => declared$.set('updated'));
+						expect(section.textContent).toBe('updated');
+						expect(() =>
+							ownerKind === 'scope' ? owned.dispose() : retireSignalOwnerIdentity(document),
+						).not.toThrow();
+						expect(reportError).not.toHaveBeenCalled();
+						expect(container.querySelector('section')).toBe(section);
+						expect(section.textContent).toBe('updated');
+						live$.set('ended');
+						expect(section.getAttribute('data-live')).toBe('first');
+						expect(() => handle.dispose()).not.toThrow();
+					} finally {
+						globalThis.reportError = original;
+						scope.dispose();
+						owned.dispose();
+					}
 				});
-				const reportError = vi.fn();
-				const original = globalThis.reportError;
-				globalThis.reportError = reportError;
-				try {
-					container.innerHTML = fixture.html;
-					const section = container.querySelector('section')!;
-					const handle = runWithSignalOwner(retiring, () => fixture.attach(section, fixture.state));
-					write('updated');
-					expect(section.textContent).toBe('updated');
-					expect(() => retiring.dispose()).not.toThrow();
-					expect(reportError).not.toHaveBeenCalled();
-					expect(container.querySelector('section')).toBe(section);
-					expect(section.textContent).toBe('updated');
-					live$.set('ended');
-					expect(section.getAttribute('data-live')).toBe('first');
-					expect(() => handle.dispose()).not.toThrow();
-				} finally {
-					globalThis.reportError = original;
-					scope.dispose();
-				}
-			});
 
 		// A handle a transition accepted is observed like one bound directly.
 		for (const [binding, markup, observe] of [

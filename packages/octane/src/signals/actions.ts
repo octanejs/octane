@@ -6,7 +6,11 @@ import {
 	getSignalScope,
 } from './engine.js';
 import { createDeclaredDerivedCell } from './computations.js';
-import { resolveCurrentSignalHandle, resolveSignalHandleForOwner } from './facade.js';
+import {
+	resolveCurrentSignalHandle,
+	resolveSignalHandleForOwner,
+	resolveUnlessRetired,
+} from './facade.js';
 import {
 	ScopedNode,
 	assertWritable,
@@ -274,7 +278,9 @@ class OptimisticDescriptor<T> implements OptimisticSignal<T>, OwnerBoundSignal<T
 	}
 
 	[SIGNAL_BINDING_RETIRED](): boolean {
-		return this.manager().view$[SIGNAL_BINDING_RETIRED]!();
+		// The view lives in its source's scope; resolve that source, never a manager.
+		const source = resolveUnlessRetired(() => resolveCurrentSignalHandle(this.source$));
+		return source === undefined || source[SIGNAL_BINDING_RETIRED]?.() === true;
 	}
 
 	[SIGNAL_BINDING_IDENTITY]() {
