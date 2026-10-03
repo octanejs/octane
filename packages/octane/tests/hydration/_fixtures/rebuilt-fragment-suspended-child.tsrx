@@ -1,4 +1,4 @@
-import { Hydrate, use } from 'octane';
+import { Hydrate, use, useState } from 'octane';
 import { load } from 'octane/hydration';
 
 function Em() @{
@@ -206,6 +206,60 @@ export function RebuiltHoleBranch(props: { server?: boolean; leaf: Promise<strin
 				} @else {
 					<>
 						<ParaThenItalic leaf={props.leaf} />
+						<Em />
+					</>
+				}
+			</section>
+		</Hydrate>
+	</div>
+}
+
+// The same fragment in a component with hooks, which renders in a full slot.
+function StateParaThenItalic(props: { leaf: Promise<string> }) @{
+	const [label] = useState('x');
+	<>
+		<Para leaf={props.leaf} />
+		<i>{label as string}</i>
+	</>
+}
+
+export function StateRebuiltHoleBranch(props: { server?: boolean; leaf: Promise<string> }) @{
+	<div>
+		<Hydrate split={false} when={load()}>
+			<section>
+				@if (props.server) {
+					<>
+						<BoldThenItalic />
+						<Em />
+					</>
+				} @else {
+					<>
+						<StateParaThenItalic leaf={props.leaf} />
+						<Em />
+					</>
+				}
+			</section>
+		</Hydrate>
+	</div>
+}
+
+// A wrapper whose only call inherits its range renders the rebuilt root.
+function ParaCall(props: { leaf: Promise<string> }) @{
+	<Para leaf={props.leaf} />
+}
+
+export function InheritedRootBranch(props: { server?: boolean; leaf: Promise<string> }) @{
+	<div>
+		<Hydrate split={false} when={load()}>
+			<section>
+				@if (props.server) {
+					<>
+						<BoldThenEm />
+						<Em />
+					</>
+				} @else {
+					<>
+						<ParaCall leaf={props.leaf} />
 						<Em />
 					</>
 				}

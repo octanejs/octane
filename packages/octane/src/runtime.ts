@@ -11857,11 +11857,12 @@ export function componentSlotLite<P>(
 		// A hydrating replay, such as a suspended activation's resume, re-renders
 		// an adopted range without adopting it again; its new siblings still adopt
 		// from after it. When this range's whole content is a root rebuilt by an
-		// attempt that suspended before settling it, the rest of the range is that
-		// root's server tail (settleClaim).
+		// attempt that suspended before settling it, here or in a component that
+		// inherits the range, the rest of the range is that root's server tail
+		// (settleClaim).
 		const range = hydration.liteRanges.get(scope);
 		if (range !== undefined) {
-			if (hydration.rebuiltContent === scope) hydration.sweepRebuiltTail(range.end);
+			if (hydration.rebuiltRange === range.start) hydration.sweepRebuiltTail(range.end);
 			hydration.node = getNextSibling(range.end);
 		}
 	}
@@ -18961,8 +18962,8 @@ class HydrationCapability {
 	 * slot claims it or the enclosing range ends (sweepRebuiltTail).
 	 */
 	rebuiltTail: Node | null = null;
-	/** The scope whose range's whole content rebuiltRoot is (claimRoots), until its tail goes. */
-	rebuiltContent: Scope | null = null;
+	/** The start of the range whose whole content rebuiltRoot is (claimRoots), until its tail goes. */
+	rebuiltRange: Node | null = null;
 	/**
 	 * The start comment of each markerless branch that holdMarkerlessBranch
 	 * holds, to where its content reached when it threw.
@@ -20635,12 +20636,12 @@ class HydrationCapability {
 					framedRemainder === undefined ? (unframedRemainder ?? null) : framedRemainder,
 				);
 			this.rebuiltTail = this.node;
-			this.rebuiltContent = null;
+			this.rebuiltRange = null;
 			// The rebuilt root can be a range's whole content: what the server
 			// rendered after the node it replaces is then the range's tail.
 			if (cursor === this.claimFrom) {
 				this.claimRoots(cursor, null);
-				if (this.claimFrom === null) this.rebuiltContent = CURRENT_SCOPE;
+				if (this.claimFrom === null) this.rebuiltRange = domNode(cursor).previousSibling;
 			}
 			return (this.rebuiltRoot = this.freshClone(template));
 		}
@@ -20869,7 +20870,7 @@ class HydrationCapability {
 	sweepRebuiltTail(end: Node): void {
 		const tail = this.rebuiltTail;
 		this.rebuiltTail = null;
-		this.rebuiltContent = null;
+		this.rebuiltRange = null;
 		if (
 			tail === null ||
 			tail === end ||
@@ -33006,8 +33007,13 @@ function componentSlotImpl(
 	// slot found no range: renderInPlace stepped past any server node it adopted.)
 	// An INHERITED slot adopted nothing: its end is the PARENT's marker and it has
 	// no following sibling (sole root) — leave the cursor where the body put it.
-	if (hydration !== null && !state.inherited && state.end !== null)
+	// A replay that completes a range whose whole content an attempt that
+	// suspended rebuilt removes that root's server tail first (settleClaim).
+	if (hydration !== null && !state.inherited && state.end !== null) {
+		const rebuilt = hydration.rebuiltRange;
+		if (rebuilt !== null && rebuilt === state.start) hydration.sweepRebuiltTail(state.end);
 		hydration.parkPast(state.end, parentScope);
+	}
 }
 
 // Keep the fresh-subtree callback out of componentSlotImpl: a closure there

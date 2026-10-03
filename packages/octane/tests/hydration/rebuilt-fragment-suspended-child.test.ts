@@ -217,8 +217,10 @@ describe.each([
 		expect(warnings()).toHaveLength(dev ? 1 : 0);
 	});
 
-	it('keeps the root a fragment adopted after a hole whose call rebuilt its root, as when its data is ready', async () => {
-		const name = 'RebuiltHoleBranch';
+	it("completes a child of a rebuilt root that inherits its wrapper's range, as when its data is ready", async () => {
+		// The wrapper renders in a full component slot, whose resume completes
+		// the range that the inheriting call's rebuilt root fills.
+		const name = 'InheritedRootBranch';
 		render(name, { server: true, leaf: fulfilled('unused') });
 		await hydrate(name, { leaf: fulfilled('z') });
 		const ready = markup(section());
@@ -227,19 +229,46 @@ describe.each([
 		errSpy.mockClear();
 
 		render(name, { server: true, leaf: fulfilled('unused') });
-		const italic = container.querySelector('i')!;
-		const em = container.querySelector('em')!;
+		const em = section().lastElementChild!;
 		const leaf = pending();
 		await hydrate(name, { leaf: leaf.promise });
 		await act(async () => leaf.resolve('z'));
 
-		expect(markup(section())).toBe('<p><em>z</em><s>s</s></p><i>x</i><em>e</em>');
+		expect(markup(section())).toBe('<p><em>z</em><s>s</s></p><em>e</em>');
 		expect(markup(section())).toBe(ready);
-		expect(section().querySelector('i')).toBe(italic);
 		expect(section().lastElementChild).toBe(em);
 		expect(recoverable).toEqual([expect.stringMatching(MISMATCH)]);
 		expect(warnings()).toHaveLength(dev ? 1 : 0);
 	});
+
+	it.each([
+		{ wrapper: 'a lite component', name: 'RebuiltHoleBranch' },
+		{ wrapper: 'a component with hooks', name: 'StateRebuiltHoleBranch' },
+	])(
+		'keeps the root that $wrapper adopted after a hole whose call rebuilt its root, as when its data is ready',
+		async ({ name }) => {
+			render(name, { server: true, leaf: fulfilled('unused') });
+			await hydrate(name, { leaf: fulfilled('z') });
+			const ready = markup(section());
+			root!.unmount();
+			recoverable = [];
+			errSpy.mockClear();
+
+			render(name, { server: true, leaf: fulfilled('unused') });
+			const italic = container.querySelector('i')!;
+			const em = container.querySelector('em')!;
+			const leaf = pending();
+			await hydrate(name, { leaf: leaf.promise });
+			await act(async () => leaf.resolve('z'));
+
+			expect(markup(section())).toBe('<p><em>z</em><s>s</s></p><i>x</i><em>e</em>');
+			expect(markup(section())).toBe(ready);
+			expect(section().querySelector('i')).toBe(italic);
+			expect(section().lastElementChild).toBe(em);
+			expect(recoverable).toEqual([expect.stringMatching(MISMATCH)]);
+			expect(warnings()).toHaveLength(dev ? 1 : 0);
+		},
+	);
 
 	it('claims the range again for a component that suspended before its template did', async () => {
 		const name = 'SetupFirstBranch';
