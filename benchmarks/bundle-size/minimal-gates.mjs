@@ -9,7 +9,12 @@ import assert from 'node:assert/strict';
 export const BUDGET_HEADROOM_BYTES = Object.freeze({ raw: 32, gzip: 32, brotli: 256 });
 export const BYTE_METRICS = ['raw', 'gzip', 'brotli'];
 
-export function ratchetBudget(measured) {
+// Records a budget the way a ratchet moves: each metric drops to measured +
+// headroom when that is lower, stays where the measurement still fits, and rises
+// only when the measurement exceeds it. So rewriting budgets after a change that
+// saved bytes never raises one (brotli can grow when code is removed), and only
+// a real breach produces a raise, which then lands in its own pull request.
+export function ratchetBudget(measured, current) {
 	return Object.fromEntries(
 		BYTE_METRICS.map((metric) => {
 			assert.equal(
@@ -17,7 +22,14 @@ export function ratchetBudget(measured) {
 				true,
 				`cannot derive a ${metric} budget from ${measured[metric]}`,
 			);
-			return [metric, measured[metric] + BUDGET_HEADROOM_BYTES[metric]];
+			const fresh = measured[metric] + BUDGET_HEADROOM_BYTES[metric];
+			const previous = current?.[metric];
+			return [
+				metric,
+				Number.isSafeInteger(previous) && measured[metric] <= previous
+					? Math.min(previous, fresh)
+					: fresh,
+			];
 		}),
 	);
 }

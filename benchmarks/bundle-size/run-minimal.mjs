@@ -548,7 +548,7 @@ try {
 		const budget = budgets[name];
 		const budgetEnforced = enforceBudgets || (id === 'behavior-root' && !writeBudgets);
 		verifyByteBudget(name, measured, budget, budgetEnforced);
-		if (writeBudgets) measuredBudgets[name] = ratchetBudget(measured);
+		if (writeBudgets) measuredBudgets[name] = ratchetBudget(measured, budget);
 		payload.targets.push({
 			name,
 			ops: Object.fromEntries(

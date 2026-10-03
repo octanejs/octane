@@ -478,9 +478,12 @@ node benchmarks/bundle-size/run-minimal.mjs --write-budgets [scenario...]
 node benchmarks/bundle-size/run.mjs --write-budgets octane-tsrx octane-jsx
 ```
 
-Both write measured + 32 raw and gzip bytes and measured + 256 brotli bytes for
-what they built, and leave every other budget untouched. Measure with the pinned CI Node version; the bytes are identical on
-macOS and Linux.
+Both ratchet each metric of what they built: down to measured + 32 raw and gzip
+bytes (measured + 256 brotli) where that is lower, unchanged where the
+measurement still fits, and up only where it is breached. A breach is then the
+only way to get a raise, and that raise needs its own pull request. Every other
+budget is left untouched. Measure with the pinned CI Node version; the bytes are
+identical on macOS and Linux.
 
 ## Adding a suite
 

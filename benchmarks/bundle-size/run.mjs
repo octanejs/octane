@@ -384,9 +384,9 @@ if (writeBudgets) {
 			const measured = Object.fromEntries(
 				BYTE_METRICS.map((metric) => [metric, ops[`${prefix}${operation}_${metric}`].median]),
 			);
-			budget[bucket] = ratchetBudget(measured);
+			budget[bucket] = ratchetBudget(measured, budget[bucket]);
 		}
-		console.log(`reset ${label} budgets to measured + headroom (raw/gzip 32, brotli 256)`);
+		console.log(`ratcheted ${label} budgets to measured + headroom (raw/gzip 32, brotli 256)`);
 	}
 	fs.writeFileSync(APP_BUDGET_FILE, JSON.stringify(APP_BUDGETS, null, 2) + '\n');
 	fs.writeFileSync(JSX_BUDGET_FILE, JSON.stringify(JSX_BUDGETS, null, 2) + '\n');

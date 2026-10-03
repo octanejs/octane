@@ -57,6 +57,24 @@ test('a rewritten budget is the measurement plus 32 raw and gzip bytes and 256 b
 	assert.throws(() => ratchetBudget({ raw: 1000, gzip: 0, brotli: 350 }), /gzip budget/);
 });
 
+test('rewriting a budget lowers it, keeps it when the measurement fits, and raises only a breach', () => {
+	const current = { raw: 1032, gzip: 432, brotli: 606 };
+	// Code removed: raw and gzip shrink, brotli grows but still fits its budget.
+	assert.deepEqual(ratchetBudget({ raw: 900, gzip: 380, brotli: 470 }, current), {
+		raw: 932,
+		gzip: 412,
+		brotli: 606,
+	});
+	// Unchanged bytes rewrite to the same budget.
+	assert.deepEqual(ratchetBudget({ raw: 1000, gzip: 400, brotli: 350 }, current), current);
+	// Only the breached metric rises, to measured + headroom.
+	assert.deepEqual(ratchetBudget({ raw: 1040, gzip: 400, brotli: 350 }, current), {
+		raw: 1072,
+		gzip: 432,
+		brotli: 606,
+	});
+});
+
 test('invalid scenario arguments fail instead of silently skipping builds', () => {
 	for (const argument of ['', 'unknown', '--budget']) {
 		assert.throws(
