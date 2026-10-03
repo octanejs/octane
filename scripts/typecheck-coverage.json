@@ -33,5 +33,11 @@
       "reason": "octane/compiler/volar virtual TSX types a forwarded ref in components.tsrx as `unknown`, which is not assignable to Ref<HTMLInputElement>; the error has no source location.",
       "expires": "2026-10-31"
     }
+  ],
+  "materializedProjects": [
+    {
+      "project": "packages/floating-ui/typetests/tsconfig.adapted.json",
+      "reason": "Compiles the upstream @floating-ui/react type tests that the React parity harness materializes into packages/floating-ui/tests/upstream/, which is gitignored, so a clean checkout has no inputs. The parity lane typechecks it after materializing."
+    }
   ]
 }

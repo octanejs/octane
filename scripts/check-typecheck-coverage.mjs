@@ -64,7 +64,20 @@ export function checkTypecheckCoverage({ record, packages, rootProjects, today }
 		}
 	}
 
+	// Projects whose inputs a harness materializes from a pinned upstream and the
+	// repository ignores: a clean checkout has nothing for them to compile. This
+	// is a fact about the inputs, not debt, so it carries a reason and no date.
 	const excepted = new Set();
+	for (const entry of record.materializedProjects ?? []) {
+		const project = resolveProject(entry.project);
+		if (typeof entry.reason !== 'string' || entry.reason.trim().length < 20) {
+			errors.push(`materialized project needs a durable reason: ${entry.project}`);
+		}
+		if (reachedByOctaneTsc(project)) {
+			errors.push(`${entry.project} is typechecked now; remove it from materializedProjects`);
+		}
+		excepted.add(project);
+	}
 	for (const exception of record.publishedExceptions ?? []) {
 		const pkg = packagesByName.get(exception.package);
 		if (!pkg || pkg.private) {
@@ -121,6 +134,7 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
 	const published = packages.filter((pkg) => !pkg.private).length;
 	console.log(
 		`typecheck coverage passed (${published} published packages, ${record.requiredProjects.length} required projects, ` +
-			`${record.privateExceptions.length} private and ${(record.publishedExceptions ?? []).length} published exceptions)`,
+			`${record.privateExceptions.length} private and ${(record.publishedExceptions ?? []).length} published exceptions, ` +
+			`${(record.materializedProjects ?? []).length} materialized)`,
 	);
 }

@@ -104,6 +104,29 @@ test('an exception for a project that is typechecked now is stale', () => {
 	assert.deepEqual(errors, [`${plainConfig} is typechecked now; remove it from plain's exception`]);
 });
 
+test('a materialized project needs a reason and goes stale once it is typechecked', () => {
+	const check = (entry, rootProjects) =>
+		checkTypecheckCoverage({
+			record: { ...record(), materializedProjects: [entry] },
+			packages,
+			rootProjects,
+			today,
+		});
+	const entry = {
+		project: plainConfig,
+		reason: 'inputs are materialized from a pinned upstream and gitignored',
+	};
+	assert.deepEqual(check(entry, reached(scriptedTypetests)), []);
+	assert.match(
+		check({ ...entry, reason: 'short' }, reached(scriptedTypetests)).join('\n'),
+		/needs a durable reason/,
+	);
+	assert.match(
+		check(entry, reached(plainConfig, scriptedTypetests)).join('\n'),
+		/is typechecked now; remove it from materializedProjects/,
+	);
+});
+
 test('private packages are not required and cannot hold published exceptions', () => {
 	const errors = checkTypecheckCoverage({
 		record: record([
