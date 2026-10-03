@@ -9701,6 +9701,13 @@ function completeDeferredLayouts(capture: DeferredLayoutCapture, interrupted = f
 		DEFERRED_LAYOUT_HELD_WORK = new Set(heldWork);
 	}
 	const nativeFrame = NATIVE_READ_DRIVER?.pauseLifecycle() ?? -1;
+	// These are the commit's own refs and layout effects, so they run outside any
+	// transition, as in commitEffects. An interruption from a commit flushed
+	// inside startTransition must not stage their updates into that transition.
+	const transitionDepth = TRANSITION_DEPTH;
+	const actionBatch = ACTIVE_TRANSITION_ACTION_BATCH;
+	TRANSITION_DEPTH = 0;
+	ACTIVE_TRANSITION_ACTION_BATCH = null;
 	EFFECT_COMMIT_DEPTH++;
 	try {
 		// A direct root commit can arrive while readiness was pending. Its live
@@ -9760,6 +9767,8 @@ function completeDeferredLayouts(capture: DeferredLayoutCapture, interrupted = f
 		}
 		COMPLETING_DEFERRED_LAYOUT = previousCompleting;
 		DEFERRED_LAYOUT_HELD_WORK = previousHeldWork;
+		TRANSITION_DEPTH = transitionDepth;
+		ACTIVE_TRANSITION_ACTION_BATCH = actionBatch;
 		try {
 			if (nativeFrame >= 0) NATIVE_READ_DRIVER!.resumeLifecycle(nativeFrame);
 		} finally {
