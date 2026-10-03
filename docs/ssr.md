@@ -633,9 +633,10 @@ the renderer through its own chunk, as before.
 
 When every `RenderRoute` uses `hydrate: 'islands'`, the production client build
 also resolves Octane with the `octane-islands` package condition. The signal
-Action frame and transition coordinator then ship with the renderer, not the signal
-graph. Only renderer Actions use them, so islands pages that load signals without
-the renderer stop downloading about 4 KB gzip. Renderer pages and renderer islands
+Action frame, its transition coordinator, and the code that stages resources and
+derived values inside an Action then ship with the renderer, not the signal graph.
+Only renderer Actions use them, so islands pages that load signals without the
+renderer stop downloading about 5 KB gzip. Renderer pages and renderer islands
 load them alongside the renderer and keep staging Action writes. An app that also
 has fully hydrated routes keeps the default placement, so its renderer pages pay
 nothing when they don't use signals. Another bundler can opt in by adding
