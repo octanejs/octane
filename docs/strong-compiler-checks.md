@@ -229,6 +229,7 @@ functions and methods on arbitrary objects remain opaque.
 | --- | --- | --- |
 | `OCTANE_STRONG_RENDER_IMPURE_CALL` | Unshadowed `Date.now()`, `Math.random()`, `performance.now()`, `Date()`, `new Date()`, `crypto.randomUUID()`, or `crypto.getRandomValues()` during render, including inside callbacks that known array methods run synchronously. A `key` or `@for` key built from one of these gets its own message. | Read time or randomness outside render and pass a snapshot. Use `useId()` for element IDs. Give each list item a stable ID from its data, such as `item.id`. |
 | `OCTANE_STRONG_RENDER_LOCALE_FORMAT` | During render, `toLocaleString()`, `toLocaleDateString()`, or `toLocaleTimeString()` on a provable `Date` without both a locale and a visible `timeZone` option; `toString()` or `toTimeString()` on a provable `Date`; an `Intl` service constructed without a locale (a `DateTimeFormat` also needs a `timeZone`); or a call on a module-level formatter created that way. | Pass an explicit locale and time zone, for example `toLocaleString('en-US', { timeZone: 'UTC' })` or `new Intl.DateTimeFormat(locale, { timeZone })`. Otherwise format in an event or effect and render the stored text. |
+| `OCTANE_STRONG_RENDER_SIDE_EFFECT` | Unshadowed `setTimeout()`, `setInterval()`, `queueMicrotask()`, `requestAnimationFrame()`, or `requestIdleCallback()` during render, directly, on `window` or `globalThis`, or through an unreassigned alias. Lazy state initializers are part of render for this check. | Schedule the work from an event handler, or from an effect that cancels it in cleanup. Defining a callback that schedules later stays valid; calling it during render does not. |
 
 The array methods whose callbacks run in the caller's phase are `every`,
 `filter`, `find`, `findIndex`, `findLast`, `findLastIndex`, `flatMap`,
@@ -246,6 +247,16 @@ gives the same text in every time zone and stays valid. The `Intl` check covers
 `NumberFormat`, `PluralRules`, `RelativeTimeFormat`, and `Segmenter`, with or
 without `new`. An options value the compiler cannot see, such as an identifier,
 is not reported.
+
+Registering a timer, microtask, or frame callback is a side effect even though
+the callback runs later. A component can render more or fewer times than it
+commits, so the work would be scheduled an unpredictable number of times. The
+registered callback itself is deferred and follows the deferred rules. A lazy
+state initializer may capture a clock or random value, but scheduling there is
+still reported. Updaters and reducers report scheduling as
+`OCTANE_STRONG_IMPURE_UPDATER`. Promise continuations such as `.then()` are not
+part of this check, because `use(fetch(url).then((r) => r.json()))` is valid
+render code.
 
 ## Lists, host props, and compatibility APIs
 

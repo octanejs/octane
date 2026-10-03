@@ -46,6 +46,12 @@ function markup(node: Element): string {
 	return copy.innerHTML;
 }
 
+/** `actual` holds exactly the `expected` nodes: the same objects, in order. */
+function expectSame(actual: ArrayLike<Node>, expected: readonly Node[]): void {
+	expect(actual).toHaveLength(expected.length);
+	Array.from(actual).forEach((node, i) => expect(node).toBe(expected[i]));
+}
+
 function tail(site: string): string {
 	return (
 		`Octane hydration mismatch at ${site}: the client expected the end of the component but ` +
@@ -158,6 +164,33 @@ describe.each([
 		expect(container.querySelector('p')).toBe(adopted[adopted.length - 1]);
 		expect(warnings()).toHaveLength(dev ? 1 : 0);
 	});
+
+	// The client component's body is a branch the server rendered no range for.
+	// The branch ends after every root its template adopted in place, so only
+	// the server's tail after them goes, and the branch owns them all.
+	it.each([
+		{ server: 'tail', stale: true },
+		{ server: 'same', stale: false },
+	] as const)(
+		'keeps every root of a branch with no server range in the frame (server: $server)',
+		async ({ server: serverShape, stale }) => {
+			render('BranchBody', { server: serverShape });
+			const adopted = [...container.querySelectorAll('i, b, p')];
+
+			const recoverable = await hydrate(client.BranchBody, { inner: true });
+
+			expect(markup(container.firstElementChild!)).toBe('<i>ok</i><b>b</b><p>after</p>');
+			expectSame(container.querySelectorAll('i, b, p'), adopted);
+			expect(recoverable).toEqual(stale ? [expect.stringMatching(MISMATCH)] : []);
+			expect(warnings()).toEqual(
+				dev && stale ? [tail(siteOf('function BranchBody(', '<Shape'))] : [],
+			);
+
+			await act(async () => root!.render(client.BranchBody, { inner: false }));
+			expect(markup(container.firstElementChild!)).toBe('<p>after</p>');
+			expect(container.querySelector('p')).toBe(adopted[adopted.length - 1]);
+		},
+	);
 
 	it.each(
 		SHAPES.flatMap((shape) => [

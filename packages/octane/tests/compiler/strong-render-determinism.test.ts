@@ -7,6 +7,9 @@ const RENDER_IMPURE_CALL = 'OCTANE_STRONG_RENDER_IMPURE_CALL';
 const RENDER_LOCALE_FORMAT = 'OCTANE_STRONG_RENDER_LOCALE_FORMAT';
 const RENDER_STATE_UPDATE = 'OCTANE_STRONG_RENDER_STATE_UPDATE';
 const RENDER_REF_READ = 'OCTANE_STRONG_RENDER_REF_READ';
+const RENDER_SIDE_EFFECT = 'OCTANE_STRONG_RENDER_SIDE_EFFECT';
+const RENDER_AMBIENT_READ = 'OCTANE_STRONG_RENDER_AMBIENT_READ';
+const IMPURE_UPDATER = 'OCTANE_STRONG_IMPURE_UPDATER';
 
 const IMPORTS = "import { useEffect, useLayoutEffect, useRef, useState } from 'octane';\n";
 const MODES = [
@@ -359,6 +362,203 @@ export function Shadowed({ Date, Intl, t }) {
 		for (const mode of ['client', 'server'] as const) {
 			const standard = compile(source, '/src/Stamp.tsx', { mode });
 			const strong = compile(source, '/src/Stamp.tsx', { mode, strong: true } as any);
+			expect(strong.code).toBe(standard.code);
+		}
+	});
+});
+
+describe('Strong scheduling during render', () => {
+	const codes = (source: string, filename = '/src/App.tsx') =>
+		errors(`"use strong";\n${source}`, filename).map((entry: { code: string }) => entry.code);
+
+	it.each([
+		['setTimeout', 'setTimeout(() => notify(), 100);'],
+		['setInterval', 'setInterval(notify, 1000);'],
+		['queueMicrotask', 'queueMicrotask(notify);'],
+		['requestAnimationFrame', 'requestAnimationFrame(() => notify());'],
+		['requestIdleCallback', 'requestIdleCallback(notify);'],
+		['a kept timer id', 'const timer = setTimeout(notify, 0);'],
+		['an optional call', 'setTimeout?.(notify, 0);'],
+		['a conditional call', 'if (enabled) setTimeout(notify, 0);'],
+		['a logical call', 'enabled && queueMicrotask(notify);'],
+		['a module alias', 'later(notify, 0);'],
+		['a local alias', 'const schedule = requestAnimationFrame; schedule(notify);'],
+		['a synchronous helper', 'scheduleNotify(notify);'],
+		['a local closure', 'const run = () => setTimeout(notify, 0); run();'],
+		['a known array callback', 'items.forEach((item) => queueMicrotask(item));'],
+	])('rejects %s', (_label, setup) => {
+		const source = `const later = setTimeout;
+function scheduleNotify(callback) { setTimeout(callback, 0); }
+export function Tick({ notify, enabled, items }) {
+  ${setup}
+  return <div>Ready</div>;
+}`;
+		expectStrongError(source, '/src/App.tsx', RENDER_SIDE_EFFECT);
+	});
+
+	it('names the scheduler at its authored location', () => {
+		const source = `export function Tick({ notify }) {
+  requestAnimationFrame(notify);
+  return <div />;
+}`;
+		const [diagnostic] = errors(`"use strong";\n${source}`, '/src/App.tsx');
+		expect(diagnostic).toMatchObject({
+			code: RENDER_SIDE_EFFECT,
+			start: { line: 3, column: 2 },
+			end: { line: 3, column: 23 },
+		});
+		expect(diagnostic.message).toContain('`requestAnimationFrame()` during render');
+		expect(diagnostic.message).toContain('effect that cancels it in cleanup');
+	});
+
+	it('rejects eager factories for effects and event props', () => {
+		const factories = `function makeSetup(notify) { setTimeout(notify, 0); return () => {}; }
+function makeHandler(notify) { queueMicrotask(notify); return () => notify(); }`;
+		expectStrongError(
+			`${IMPORTS}${factories}
+export function Effect({ notify }) {
+  useEffect(makeSetup(notify), [notify]);
+  return <div />;
+}`,
+			'/src/App.tsx',
+			RENDER_SIDE_EFFECT,
+		);
+		expectStrongError(
+			`${factories}
+export function Button({ notify }) {
+  return <button onClick={makeHandler(notify)}>Notify</button>;
+}`,
+			'/src/App.tsx',
+			RENDER_SIDE_EFFECT,
+		);
+	});
+
+	it('rejects scheduling in lazy initializers, which may still capture a clock', () => {
+		expectStrongValid(
+			`${IMPORTS}export function App() {
+  const [startedAt] = useState(() => Date.now());
+  return <time>{startedAt}</time>;
+}`,
+			'/src/App.tsx',
+		);
+		for (const initializer of [
+			'useState(() => { setTimeout(() => {}, 0); return 0; })',
+			'useState(initial)',
+			'useReducer((value) => value, 0, (value) => { queueMicrotask(() => {}); return value; })',
+		]) {
+			expectStrongError(
+				`${IMPORTS}import { useReducer } from 'octane';
+function initial() { requestIdleCallback(() => {}); return 0; }
+export function App() {
+  const [value] = ${initializer};
+  return <div>{value}</div>;
+}`,
+				'/src/App.tsx',
+				RENDER_SIDE_EFFECT,
+			);
+		}
+		// A lazy initializer may read browser globals, so only the scheduling reports.
+		expect(
+			codes(`${IMPORTS}export function App() {
+  const [value] = useState(() => { window.setTimeout(() => {}, 0); return globalThis['queueMicrotask'](() => {}); });
+  return <div>{value}</div>;
+}`),
+		).toEqual([RENDER_SIDE_EFFECT, RENDER_SIDE_EFFECT]);
+	});
+
+	it('reports a global-object scheduler alongside the browser read during render', () => {
+		expect(
+			codes(`export function App({ notify }) {
+  window.setTimeout(notify, 0);
+  return <div />;
+}`),
+		).toEqual([RENDER_AMBIENT_READ, RENDER_SIDE_EFFECT]);
+	});
+
+	it('leaves scheduling in updaters and reducers to the updater check', () => {
+		expect(
+			codes(`${IMPORTS}export function App() {
+  const [count, setCount] = useState(0);
+  return <button onClick={() => setCount((current) => { setTimeout(() => {}, 0); return current + 1; })}>{count}</button>;
+}`),
+		).toEqual([IMPURE_UPDATER]);
+	});
+
+	it('checks .tsrx components and plain custom-hook modules', () => {
+		expectStrongError(
+			`export function Tick({ notify }) @{
+  setTimeout(() => notify(), 100);
+  <div>Ready</div>
+}`,
+			'/src/Tick.tsrx',
+			RENDER_SIDE_EFFECT,
+		);
+		expect(() =>
+			slotHooks(
+				'"use strong"; export function useTick(notify) { setTimeout(notify, 0); }',
+				'/src/useTick.ts',
+			),
+		).toThrow(RENDER_SIDE_EFFECT);
+		expect(() =>
+			slotHooks(
+				'"use strong"; export function useTick(notify) { return () => setTimeout(notify, 0); }',
+				'/src/useTick.ts',
+			),
+		).not.toThrow();
+	});
+
+	it('keeps events, effects, deferred bodies, unused helpers, and other names legal', () => {
+		expectStrongValid(
+			`${IMPORTS}import { useImperativeHandle } from 'octane';
+setTimeout(() => {}, 0);
+function scheduleLater() { setTimeout(() => {}, 0); }
+function unused(notify) { queueMicrotask(notify); }
+export function App({ notify, timers, ref, enabled }) {
+  const box = useRef(null);
+  const later = () => setTimeout(notify, 0);
+  useEffect(() => {
+    const timer = setTimeout(() => { setTimeout(notify, 0); }, 100);
+    return () => clearTimeout(timer);
+  });
+  useLayoutEffect(() => {
+    const frame = requestAnimationFrame(() => box.current.classList.add('in'));
+    return () => cancelAnimationFrame(frame);
+  });
+  useImperativeHandle(ref, () => ({ ping: () => queueMicrotask(notify) }));
+  timers.setTimeout(notify, 0);
+  if (false) setTimeout(notify, 0);
+  let swap = setTimeout;
+  swap = (callback) => callback();
+  swap(() => {});
+  return (
+    <div ref={box}>
+      <button onClick={() => setTimeout(notify, 0)}>Later</button>
+      <button onClick={later}>Closure</button>
+      <button onClick={scheduleLater}>Helper</button>
+    </div>
+  );
+}
+export function Shadowed({ setTimeout, requestAnimationFrame, notify }) {
+  setTimeout(notify, 0);
+  requestAnimationFrame(notify);
+  return <div />;
+}`,
+			'/src/App.tsx',
+		);
+	});
+
+	it('keeps valid Strong output unchanged', () => {
+		const source = `import { useEffect } from 'octane';
+export function Tick({ notify }) {
+  useEffect(() => {
+    const timer = setTimeout(() => notify(), 100);
+    return () => clearTimeout(timer);
+  }, [notify]);
+  return <button onClick={() => queueMicrotask(notify)}>Ready</button>;
+}`;
+		for (const mode of ['client', 'server'] as const) {
+			const standard = compile(source, '/src/Tick.tsx', { mode });
+			const strong = compile(source, '/src/Tick.tsx', { mode, strong: true } as any);
 			expect(strong.code).toBe(standard.code);
 		}
 	});

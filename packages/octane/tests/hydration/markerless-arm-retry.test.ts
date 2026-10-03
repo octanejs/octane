@@ -195,6 +195,50 @@ describe.each([
 		expect(warnings()).toEqual([]);
 	});
 
+	// The arm's last root is static. Neither the arm's first render nor its
+	// retry rests the cursor on that root, so only where its template's roots
+	// end says the arm owns it.
+	const TRAILING = [
+		{ arm: 'an @if arm', name: 'TrailingRoot' },
+		{ arm: 'the body of a component the client adopted', name: 'TrailingFrame' },
+		{ arm: 'an @if arm that suspends before it clones', name: 'TrailingClone' },
+	];
+
+	it.each(TRAILING)('keeps and owns the static last root of $arm', async ({ name }) => {
+		const { leaf, resolveLeaf, nodes, em } = await hydratePending(name);
+		await act(async () => resolveLeaf('z'));
+
+		expect(markup(section())).toBe('<s>s</s><i>z</i><b>b</b><em>e</em>');
+		expectAdopted(nodes);
+		expect(recoverable).toEqual([]);
+		expect(warnings()).toEqual([]);
+
+		render(name, 'c', leaf);
+		expect(markup(section())).toBe('<p>c</p><em>e</em>');
+		expect(tail()).toBe(em);
+		render(name, 'b', leaf);
+		expect(markup(section())).toBe('<em>e</em>');
+		render(name, 'a', leaf);
+		expect(markup(section())).toBe('<s>s</s><i>z</i><b>b</b><em>e</em>');
+		expect(tail()).toBe(em);
+	});
+
+	it.each(TRAILING)('replaces every root of $arm while it is pending', async ({ name }) => {
+		const { leaf, resolveLeaf, em } = await hydratePending(name);
+		render(name, 'c', leaf);
+		await act(async () => {});
+		await act(async () => resolveLeaf('z'));
+
+		expect(markup(section())).toBe('<p>c</p><em>e</em>');
+		expect(tail()).toBe(em);
+		expect(recoverable).toEqual([]);
+		expect(warnings()).toEqual([]);
+
+		render(name, 'a', leaf);
+		expect(markup(section())).toBe('<s>s</s><i>z</i><b>b</b><em>e</em>');
+		expect(tail()).toBe(em);
+	});
+
 	it('bounds an arm whose render ends inside its root', async () => {
 		const { nodes, em } = await hydrate('NestedTail', { k: 'a' });
 

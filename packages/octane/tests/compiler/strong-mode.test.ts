@@ -20,6 +20,20 @@ const HOOK_LOCALITY = 'OCTANE_STRONG_HOOK_LOCALITY';
 const EVENT_HANDLER_LOCALITY = 'OCTANE_STRONG_EVENT_HANDLER_LOCALITY';
 const MANUAL_MEMO = 'OCTANE_STRONG_MANUAL_MEMO';
 const EFFECT_DATA_FETCH = 'OCTANE_STRONG_EFFECT_DATA_FETCH';
+const RENDER_SIDE_EFFECT = 'OCTANE_STRONG_RENDER_SIDE_EFFECT';
+
+/**
+ * Strong reports nothing in `source` except scheduling work during render. A
+ * timer registered in render still has a deferred body, so these fixtures keep
+ * covering what that body may do.
+ */
+function expectOnlyRenderScheduling(source: string, filename: string) {
+	expect(() => compile(source, filename)).toThrow(RENDER_SIDE_EFFECT);
+	const codes = compileToVolarMappings(source, filename)
+		.diagnostics.filter((diagnostic: { severity: string }) => diagnostic.severity === 'error')
+		.map((diagnostic: { code: string }) => diagnostic.code);
+	expect(new Set(codes)).toEqual(new Set([RENDER_SIDE_EFFECT]));
+}
 
 describe('Strong mode immutable render inputs', () => {
 	const component = (
@@ -327,10 +341,15 @@ export function Fixed() @{ const date = new Date(0); <div>{date.getTime() as str
 import { useEffect } from 'octane';
 export function App() @{
   useEffect(() => { Date.now(); Math.random(); performance.now(); });
-  setTimeout(() => new Date(), 0);
-  <button onClick={() => Date.now()}>Read clock</button>
+  <button onClick={() => setTimeout(() => new Date(), 0)}>Read clock</button>
 }`;
 		expect(() => compile(source, '/src/App.tsrx')).not.toThrow();
+		// Registering the timer during render is the side effect. Its deferred
+		// callback still reads the clock outside render.
+		expectOnlyRenderScheduling(
+			source.replace('  <button', '  setTimeout(() => new Date(), 0);\n  <button'),
+			'/src/App.tsrx',
+		);
 	});
 
 	it('allows time and randomness in lazy state initializers but not memo calculations', () => {
@@ -1664,7 +1683,7 @@ export function App() @{
   <button onClick={() => setCount(count + 1)}>{count as string}</button>
 }`;
 
-		expect(() => compile(source, '/src/App.tsrx')).not.toThrow();
+		expectOnlyRenderScheduling(source, '/src/App.tsrx');
 	});
 
 	it('rejects render updates inside immediately executed functions and useMemo callbacks', () => {
@@ -2489,7 +2508,7 @@ export function App(props) @{
   <div />
 }`;
 
-		expect(() => compile(source, '/src/App.tsrx')).not.toThrow();
+		expectOnlyRenderScheduling(source, '/src/App.tsrx');
 	});
 
 	it('keeps overridden, deferred, dynamic, and unrelated linked-state comparators legal', () => {
@@ -2512,7 +2531,7 @@ export function App(props) @{
   <div />
 }`;
 
-		expect(() => compile(source, '/src/App.tsrx')).not.toThrow();
+		expectOnlyRenderScheduling(source, '/src/App.tsrx');
 	});
 
 	it('keeps unreachable, overridden, deferred, and dynamic logical callbacks legal', () => {
@@ -2850,7 +2869,7 @@ export function App(props) @{
   <div />
 }`;
 
-		expect(() => compile(source, '/src/App.tsrx')).not.toThrow();
+		expectOnlyRenderScheduling(source, '/src/App.tsrx');
 	});
 
 	it('publishes named memo state updates as editor errors', () => {
@@ -4581,7 +4600,7 @@ export function App(props) @{
     {count as string}
   </button>
 }`;
-		expect(() => compile(source, '/src/App.tsrx')).not.toThrow();
+		expectOnlyRenderScheduling(source, '/src/App.tsrx');
 	});
 
 	it.each([
@@ -4942,7 +4961,7 @@ export function App(props) @{
   (async () => { await Promise.resolve(); props.record(revision); })();
   <button onClick={() => { advance(); props.record(readRevision()); }}>Check</button>
 }`;
-		expect(() => compile(source, '/src/App.tsrx')).not.toThrow();
+		expectOnlyRenderScheduling(source, '/src/App.tsrx');
 	});
 
 	it.each([
@@ -5373,7 +5392,7 @@ export function App(props) @{
   (async () => { await Promise.resolve(); props.record(sessionStorage.getItem("theme")); })();
   <button onClick={() => props.record(readWidth(), matchMedia("(min-width: 600px)").matches)}>Check</button>
 }`;
-		expect(() => compile(source, '/src/App.tsrx')).not.toThrow();
+		expectOnlyRenderScheduling(source, '/src/App.tsrx');
 	});
 
 	it('allows lazy state and reducer initializers while checking eager arguments and memo callbacks', () => {
