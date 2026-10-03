@@ -923,6 +923,204 @@ function annotateLocalHookAliases(analysis) {
 	}
 }
 
+// A call boundary separates the slots of repeated executions of one hook body.
+// Two calls to a module's own hooks need none, so the plain pass omits theirs:
+// - A call to a hook whose execution reads no slot: through the module's own
+//   functions it calls nothing but `useContext` and other such hooks.
+// - The only use of a hook, made directly in the body of another local hook
+//   that is used only by name. Re-entering that caller passes a boundary, unless
+//   the omitted boundaries themselves form a cycle, so each omitted call runs
+//   once per enclosing path, as a call with a boundary does.
+// A signal-reading module keys the declarations a custom-hook call reaches by
+// that call's site, as a `$` hook does its signals, so both keep the boundary.
+function elideLocalHookBoundaries(ast, analysis) {
+	const { callAnnotations } = analysis;
+	const records = new Map();
+	const scopeRecords = new Map();
+	for (const record of analysis.functions) {
+		scopeRecords.set(record.scope, record);
+		if (record.binding !== null && record.stableDefinition && !record.binding.reassigned) {
+			records.set(record.binding, record);
+		}
+	}
+	const local = [];
+	const inner = new Map();
+	for (const entry of analysis.calls) {
+		for (let scope = entry.scope; scope !== null; scope = scope.parent) {
+			const record = scopeRecords.get(scope);
+			if (record === undefined) continue;
+			let calls = inner.get(record);
+			if (calls === undefined) inner.set(record, (calls = []));
+			calls.push(entry);
+		}
+		const name = callAnnotations.get(entry.call)?._octaneCustomHookCall;
+		if (name === undefined || name.endsWith('$')) continue;
+		const binding = directCallBinding(entry.call, entry.scope);
+		const record = records.get(binding);
+		if (record !== undefined && binding.name === name) local.push({ ...entry, record });
+	}
+	if (local.length === 0) return;
+	const slotFree = slotFreeFunctions(records, inner, callAnnotations);
+	const omit = new Set(local.filter(({ record }) => slotFree.has(record)).map(({ call }) => call));
+	for (const call of onlyUses(ast, analysis, records, scopeRecords, local, omit)) omit.add(call);
+	for (const call of omit) {
+		const { _octaneCustomHookCall, ...rest } = callAnnotations.get(call);
+		if (Object.keys(rest).length === 0) callAnnotations.delete(call);
+		else callAnnotations.set(call, rest);
+	}
+}
+
+// Local functions whose calls, nested functions included, all reach
+// `useContext` or another such function. Recursion is never proven.
+function slotFreeFunctions(records, inner, callAnnotations) {
+	const slotFree = new Set();
+	const candidates = [...records.values()].filter((record) => !evaluatesOpaqueCode(record.node));
+	const harmless = ({ call, scope }) =>
+		callAnnotations.get(call)?._octaneImportedHook === 'useContext' ||
+		slotFree.has(records.get(directCallBinding(call, scope)));
+	for (let changed = true; changed;) {
+		changed = false;
+		for (const record of candidates) {
+			if (!slotFree.has(record) && (inner.get(record) ?? []).every(harmless)) {
+				slotFree.add(record);
+				changed = true;
+			}
+		}
+	}
+	return slotFree;
+}
+
+// The only call of a hook, made directly by a hook used only by name, except
+// where such calls form a cycle.
+function onlyUses(ast, analysis, records, scopeRecords, local, omitted) {
+	const uses = identifierUses(ast);
+	const declarations = new Set();
+	for (const record of records.values()) {
+		if (record.node.type === 'FunctionDeclaration') declarations.add(record.node.id);
+	}
+	for (const { decl, bindings } of analysis.declarators) {
+		if (records.get(bindings[0]?.binding)?.node === unwrapValue(decl.init)) {
+			declarations.add(decl.id);
+		}
+	}
+	// Every use of the name is its declaration, an export, or a direct call.
+	const usedByName = (binding, maxCalls) => {
+		let calls = 0;
+		for (const use of uses.get(binding.name) ?? []) {
+			if (declarations.has(use.node) || use.export) continue;
+			if (!use.call) return false;
+			calls++;
+		}
+		return calls <= maxCalls;
+	};
+	const edges = new Map();
+	for (const entry of local) {
+		if (omitted.has(entry.call)) continue;
+		let caller = null;
+		for (let scope = entry.scope; scope !== null && caller === null; scope = scope.parent) {
+			caller = scopeRecords.get(scope) ?? null;
+		}
+		if (
+			caller !== null &&
+			caller !== entry.record &&
+			records.has(caller.binding) &&
+			isLocalCustomHookBinding(caller.binding) &&
+			!caller.binding.name.endsWith('$') &&
+			usedByName(entry.record.binding, 1) &&
+			usedByName(caller.binding, Infinity)
+		) {
+			edges.set(entry.call, { from: caller, to: entry.record });
+		}
+	}
+	const next = new Map();
+	for (const { from, to } of edges.values()) {
+		let targets = next.get(from);
+		if (targets === undefined) next.set(from, (targets = new Set()));
+		targets.add(to);
+	}
+	const reaches = (start, goal) => {
+		const seen = new Set();
+		const stack = [start];
+		while (stack.length > 0) {
+			const record = stack.pop();
+			if (record === goal) return true;
+			if (seen.has(record)) continue;
+			seen.add(record);
+			for (const target of next.get(record) ?? []) stack.push(target);
+		}
+		return false;
+	};
+	return [...edges].filter(([, { from, to }]) => !reaches(to, from)).map(([call]) => call);
+}
+
+// Constructors and tag functions run code no call record names.
+function evaluatesOpaqueCode(node) {
+	if (node === null || typeof node !== 'object') return false;
+	if (Array.isArray(node)) return node.some(evaluatesOpaqueCode);
+	if (node.type === 'NewExpression' || node.type === 'TaggedTemplateExpression') return true;
+	for (const key in node) {
+		if (!AST_META_KEYS.has(key) && evaluatesOpaqueCode(node[key])) return true;
+	}
+	return false;
+}
+
+// Every identifier in the module by name, whatever scope it resolves in, so a
+// shadowing name only adds uses.
+function identifierUses(ast) {
+	const uses = new Map();
+	function visit(node, parent, key) {
+		if (node === null || typeof node !== 'object') return;
+		if (Array.isArray(node)) {
+			for (const child of node) visit(child, parent, key);
+			return;
+		}
+		if (node.type === 'Identifier' || node.type === 'JSXIdentifier') {
+			let list = uses.get(node.name);
+			if (list === undefined) uses.set(node.name, (list = []));
+			list.push({
+				node,
+				call: parent?.type === 'CallExpression' && key === 'callee',
+				export:
+					parent?.type === 'ExportSpecifier' ||
+					(parent?.type === 'ExportDefaultDeclaration' && key === 'declaration'),
+			});
+		}
+		for (const child in node) {
+			if (!AST_META_KEYS.has(child)) visit(node[child], node, child);
+		}
+	}
+	visit(ast, null, null);
+	return uses;
+}
+
+// A module-local binding that nothing reassigns reads the same value each time.
+// The inline memo tier passes such a dependency to its take and publish calls
+// directly instead of copying it to a temporary first. An import is excluded:
+// its exporter can reassign it while the memo factory runs.
+function markStableMemoDependencies(analysis, inferred) {
+	const stable = (binding) => binding != null && !binding.imported && !binding.reassigned;
+	for (const { call } of analysis.calls) {
+		const name = analysis.callAnnotations.get(call)?._octaneImportedHook;
+		if (name !== 'useMemo' && name !== 'useCallback') continue;
+		const dependencies = unwrapValue(call.arguments[1]);
+		if (dependencies?.type !== 'ArrayExpression') continue;
+		for (const element of dependencies.elements) {
+			if (
+				element?.type === 'Identifier' &&
+				stable(resolveBinding(analysis.nodeScopes.get(element) ?? null, element.name))
+			) {
+				analysis.callAnnotations.set(element, { _octaneStableRead: true });
+			}
+		}
+	}
+	for (const result of inferred.values()) {
+		for (const dependency of result.dependencies) {
+			if (!dependency.method && dependency.node.type === 'Identifier' && stable(dependency.binding))
+				dependency.stable = true;
+		}
+	}
+}
+
 function collectPatternBindings(pattern, scope, into) {
 	if (!pattern) return;
 	if (pattern.type === 'Identifier') {
@@ -1111,7 +1309,7 @@ function isInvariantInitializer(node) {
 	return isInvariantLiteral(node);
 }
 
-function markDependencyInvariantBindings(analysis) {
+function markDependencyInvariantBindings(analysis, invariantCall = null) {
 	// Seed the lattice with the bindings whose identity is fixed for the
 	// program's lifetime, so the `const alias = original` propagation below
 	// carries them into component scope for free.
@@ -1141,6 +1339,8 @@ function markDependencyInvariantBindings(analysis) {
 					dependencyInvariant = resolveBinding(scope, init.name)?.dependencyInvariant === true;
 				}
 				if (!dependencyInvariant) dependencyInvariant = isInvariantInitializer(init);
+				if (!dependencyInvariant && init?.type === 'CallExpression' && invariantCall !== null)
+					dependencyInvariant = invariantCall(init);
 				if (dependencyInvariant && bindings[0] && !bindings[0].binding.dependencyInvariant) {
 					bindings[0].binding.dependencyInvariant = true;
 					changed = true;
@@ -1693,7 +1893,7 @@ function collectCallbackReference(expression, analysis) {
 	return [{ node: value, key: `b${binding.id}:callback`, binding }];
 }
 
-function cloneDependency(node) {
+export function cloneDependency(node) {
 	if (node.type === 'Identifier') return { ...node };
 	if (node.type === 'ChainExpression') {
 		return { ...node, expression: cloneDependency(node.expression) };
@@ -1805,6 +2005,13 @@ export function analyzeHookDependencies(ast, options = {}) {
  * hook call. Results retain the hook collector's receiver-aware method records;
  * null means the expression is not an analyzable callback, never an empty list.
  * The supplied callbacks must belong to this AST so lexical bindings are shared.
+ * `invariantCall` marks a `const` initialized by that call as one identity for
+ * the lifetime of its scope, like a ref. `evaluatedAt` gives the source offset
+ * where a callback's captures would be read eagerly, for a callback that runs
+ * later. A capture initialized after that offset, including one whose own
+ * initializer holds the callback, is in its temporal dead zone or still
+ * undefined there, and a reassigned one may change before the callback reads
+ * it, so such a callback reports null.
  */
 export function analyzeCallbackDependencies(ast, callbacks, options = {}) {
 	const analysis = buildScopes(
@@ -1812,18 +2019,55 @@ export function analyzeCallbackDependencies(ast, callbacks, options = {}) {
 		options.onlyImported === true,
 		new Set(['octane', ...(options.hookRuntimeModules || [])]),
 	);
-	markDependencyInvariantBindings(analysis);
+	markDependencyInvariantBindings(analysis, options.invariantCall ?? null);
+	const declaredAt = options.evaluatedAt ? initializationEnds(ast, analysis) : null;
 	const inferred = new Map();
 	for (const original of callbacks) {
 		const callback = unwrapValue(original);
-		inferred.set(
-			original,
-			isFunction(callback)
-				? collectDependencies(callback, analysis.functionScopes.get(callback) || null, analysis)
-				: collectCallbackReference(callback, analysis),
-		);
+		let dependencies = isFunction(callback)
+			? collectDependencies(callback, analysis.functionScopes.get(callback) || null, analysis)
+			: collectCallbackReference(callback, analysis);
+		const at = declaredAt === null ? undefined : options.evaluatedAt(original);
+		if (
+			at !== undefined &&
+			dependencies?.some(
+				({ binding }) => binding.reassigned || (declaredAt.get(binding) ?? -1) > at,
+			)
+		)
+			dependencies = null;
+		inferred.set(original, dependencies);
 	}
 	return inferred;
+}
+
+// Where each variable or class binding finishes initializing: the end of its
+// last declarator, since a repeated `var` assigns again where it appears.
+function initializationEnds(ast, analysis) {
+	const ends = new Map();
+	for (const { decl, bindings } of analysis.declarators) {
+		for (const { binding } of bindings)
+			if (!(ends.get(binding) >= decl.end)) ends.set(binding, decl.end);
+	}
+	const seen = new WeakSet();
+	const visit = (node) => {
+		if (node === null || typeof node !== 'object' || seen.has(node)) return;
+		seen.add(node);
+		if (Array.isArray(node)) {
+			for (const child of node) visit(child);
+			return;
+		}
+		const scope =
+			node.type === 'ClassDeclaration' && node.id
+				? (analysis.nodeScopes.get(node.id) ?? analysis.nodeScopes.get(node))
+				: undefined;
+		if (scope !== undefined) {
+			const binding = resolveBinding(scope, node.id.name);
+			if (binding !== null && !ends.has(binding)) ends.set(binding, node.end);
+		}
+		for (const key in node) if (!AST_META_KEYS.has(key)) visit(node[key]);
+	};
+	visit(ast);
+	return ends;
 }
 
 // Strong dependency policy deliberately shares inference's lexical graph and
@@ -2114,6 +2358,10 @@ function rebuildWithHookMetadata(ast, analysis, inferred, insertDeps, nativeRead
 /** @param {any} ast @param {{ onlyImported?: boolean, hookRuntimeModules?: readonly string[], filename?: string, inferDependencies?: boolean, nativeReads?: boolean }} [options] */
 export function annotateHookCalls(ast, options = {}) {
 	const { analysis, inferred } = analyzeInternal(ast, options);
+	if (options.onlyImported === true) {
+		if (options.nativeReads !== true) elideLocalHookBoundaries(ast, analysis);
+		markStableMemoDependencies(analysis, inferred);
+	}
 	return rebuildWithHookMetadata(ast, analysis, inferred, false, options.nativeReads === true);
 }
 

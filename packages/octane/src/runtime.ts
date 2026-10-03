@@ -2077,14 +2077,6 @@ export interface Block extends Scope {
 	pending: boolean;
 	disposed: boolean;
 	/**
-	 * Event-route epoch at which this Block's hosts left delegated dispatch; 0 while
-	 * they are live. Teardown disposes a Block before detaching its DOM, and
-	 * detaching a focused host dispatches focusout synchronously, so disposal
-	 * stamps it first; a staged deletion stamps it when it publishes.
-	 * snapshotDelegatedSlots skips hosts retired before a delivery began.
-	 */
-	retired: number;
-	/**
 	 * RENDER_VALID / RENDER_INVALID / RENDER_RETRYING, separate from mount lifetime.
 	 * Kept numeric because nested renders can invalidate an active retry in place.
 	 */
@@ -4060,6 +4052,8 @@ function deferRootRange(
 	});
 	(ROOT_RENDER_TRANSACTION!.commit ??= []).push(() => {
 		if (cancelled) return;
+		// Retire the outgoing nodes before any cleanup can move focus off them.
+		nodes.forEach(retireEventHostTree);
 		cleanup?.();
 		for (const node of nodes)
 			if ((STAGED_DOM?.view(node) ?? node).parentNode === parent)
@@ -5025,6 +5019,10 @@ function flushParkedItems(): void {
 
 /** Committed root deletions clean up against connected DOM before removing the range. */
 function unmountParkedItem(item: ParkedItem): void {
+	// Retire the row before any cleanup can move focus off it. Without focus in a
+	// drain, neither its removal nor a cleanup can blur it: an unfocused bulk
+	// removal stays free of per-row work.
+	if (renderingFocus !== null || !inFlush) for (const node of item.nodes) retireEventHostTree(node);
 	try {
 		unmountBlock(item.block, false);
 	} finally {
@@ -8966,7 +8964,6 @@ interface DeferredLayoutDriver {
 	holdsPendingQueue(): boolean;
 	stageEffects(): boolean;
 	stageAction(action: () => void, durable?: boolean): boolean;
-	retireHosts(block: Block): void;
 	retireHostTree(node: Node): void;
 	stageTeardown(cleanup: Cleanup, phase: number, scope: Scope): boolean;
 	stageDeactivation(slot: EffectSlot, scope: Scope): boolean;
@@ -9020,7 +9017,6 @@ interface StagedCommitCapture {
 	bundles: Map<HandlerBundle, HandlerBundle>;
 	controls: Map<ControlledState, ControlledState>;
 	signalHosts?: Map<SignalHostPropSourcesBinding, SignalHostPropSourcesBinding>;
-	retiredBlocks?: Block[];
 	retiredHostTrees?: Node[];
 	owners: Map<
 		RootRenderOwner,
@@ -9373,32 +9369,16 @@ function ensureDeferredLayoutDriver(): void {
 				enqueueStagedAction(capture, action, durable);
 				return true;
 			},
-			retireHosts(block) {
-				// A staged deletion keeps its committed hosts live until it publishes.
-				// One queued action per capture retires them all, ahead of every DOM
-				// removal the capture queued after its first retirement.
-				const capture = STAGED_COMMIT_CAPTURE!;
-				let blocks = capture.retiredBlocks;
-				if (blocks === undefined) {
-					const list: Block[] = (blocks = capture.retiredBlocks = []);
-					capture.enqueue(() => {
-						const epoch = ++eventRootEpoch;
-						for (let i = 0; i < list.length; i++) list[i].retired = epoch;
-					}, true);
-				}
-				blocks.push(block);
-			},
 			retireHostTree(node) {
-				// Like retireHosts: one queued action per capture stamps every
-				// removed host root ahead of the DOM removals queued after it.
+				// A staged deletion keeps its committed hosts live until it publishes.
+				// One queued action per capture stamps every removed host root, ahead
+				// of the cleanups and DOM removals the capture queued after it. It
+				// runs after the capture ends, so each node stamps immediately.
 				const capture = STAGED_COMMIT_CAPTURE!;
 				let nodes = capture.retiredHostTrees;
 				if (nodes === undefined) {
 					const list: Node[] = (nodes = capture.retiredHostTrees = []);
-					capture.enqueue(() => {
-						const epoch = ++eventRootEpoch;
-						for (let i = 0; i < list.length; i++) stampRetiredHostTree(list[i], epoch);
-					}, true);
+					capture.enqueue(() => list.forEach(retireEventHostTree), true);
 				}
 				nodes.push(node);
 			},
@@ -10553,7 +10533,6 @@ class BlockImpl {
 	// Scheduler / lifecycle.
 	declare pending: boolean;
 	declare disposed: boolean;
-	declare retired: number;
 	declare mounted: boolean;
 	declare renderStatus: number;
 	declare pendingMode: 'urgent' | 'transition' | null;
@@ -10670,7 +10649,6 @@ class BlockImpl {
 		this.itemIndex = 0;
 		this.pending = false;
 		this.disposed = false;
-		this.retired = 0;
 		this.mounted = false;
 		this.renderStatus = RENDER_VALID;
 		this.pendingMode = null;
@@ -11799,8 +11777,8 @@ export function componentSlotLite<P>(
 				// it, on a root before that node. A templateless body anchors at its
 				// block's end marker instead, with the cursor on the call's server
 				// node, and a walk that ran off the end of its host found no node.
-				hydration.node = anchor;
-				inPlace = anchor;
+				// The body inserts before the node after the server node (parkAtHole).
+				endMarker = hydration.parkAtHole((inPlace = anchor));
 			}
 		}
 		scope.block = new LiteBlockImpl(host, endMarker, parentScope.block) as unknown as Block;
@@ -11972,10 +11950,9 @@ function renderUnframedLite<P>(
 // separate function keeps the callback's captures out of ordinary lite dispatch.
 // When `root` is the element or text a template hole's walk found (the call's
 // anchor), the template claims the server nodes after it, and only a body of
-// one root can take its place: the body's end marker is `root`, which the first
-// of several roots replaces. Any other body renders unframed in place of `root`
-// alone (renderUnframed), as componentSlot renders a call it cannot prove
-// single-root.
+// one root can take its place. Any other body renders unframed in place of
+// `root` alone (renderUnframed), as componentSlot renders a call it cannot
+// prove single-root.
 function renderLiteInPlace<P>(
 	hydration: HydrationCapability,
 	parentScope: Scope,
@@ -12090,10 +12067,6 @@ function unmountBlock(block: Block, detachDom: boolean = true): void {
 
 function unmountBlockInner(block: Block, detachDom: boolean): void {
 	block.disposed = true;
-	// Its hosts leave delegated dispatch before its DOM does (see `retired`). Inline:
-	// an extra call per deleted Block is measurable in bulk teardown.
-	if (STAGED_COMMIT_CAPTURE) DEFERRED_LAYOUT_DRIVER!.retireHosts(block);
-	else block.retired = ++eventRootEpoch;
 	if (
 		typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' &&
 		__OCTANE_PROFILE_ENABLED__ &&
@@ -18124,9 +18097,11 @@ export function nativePuPub(
 // Unlike parallel-use's value sentinel, a nullable ENTRY handles every authored
 // memo value, including undefined, null, and puMiss itself. Dependency hits do
 // not construct a callback or dependency array.
-export function memoSlot(slot: HookSlot | undefined, name: 'useMemo' | 'useCallback'): HookSlot {
+// The compiler passes the hook's name only with an authored slot, which a manual
+// hook may leave undefined; a slot it appended always resolves.
+export function memoSlot(slot: HookSlot | undefined, name?: 'useMemo' | 'useCallback'): HookSlot {
 	const resolved = resolveSlot(slot);
-	if (resolved === undefined) missingSlot(name);
+	if (resolved === undefined) missingSlot(name!);
 	return resolved;
 }
 
@@ -19598,7 +19573,9 @@ class HydrationCapability {
 	 * after the last root, so step past it. A body that rebuilt `root` or
 	 * rendered nothing there leaves the cursor where it put it. When `unframed`,
 	 * a template that does not match leaves `root` and the nodes after it to
-	 * renderUnframed. Returns whether the body adopted `root`.
+	 * renderUnframed. Returns whether the body adopted `root`. A call in the body
+	 * that renders in place of the same `root`, before any template adopted it,
+	 * adopts it for the enclosing call too: its root is the enclosing call's.
 	 */
 	renderInPlace<T>(render: (target: T) => void, target: T, root: Node, unframed = false): boolean {
 		const outer = this.inPlace;
@@ -19623,7 +19600,28 @@ class HydrationCapability {
 		}
 		if (end === undefined) return false;
 		this.node = end;
+		if (outer === root) {
+			this.inPlace = null;
+			this.inPlaceEnd = end;
+		}
 		return true;
+	}
+
+	/**
+	 * Park the cursor on `node`, the server node that a template hole's walk
+	 * found for a single-root call without a range of its own, and return
+	 * where the call inserts: before the node after `node`. On the client the
+	 * hole's own placeholder anchors the call, but the server rendered none,
+	 * and the call's root takes `node`'s place. `node` itself cannot anchor
+	 * the call: the root is `node` when the body adopts it and replaces it when
+	 * mismatch recovery rebuilds it, so a branch or other slot that the body
+	 * anchors at its block's end would bound its content before that content,
+	 * or against a removed node. At a closing marker the server rendered
+	 * nothing for the hole, and the call inserts before it.
+	 */
+	parkAtHole(node: Node): Node | null {
+		this.node = node;
+		return isBlockClose(node) ? node : getNextSibling(node);
 	}
 
 	/**
@@ -19818,12 +19816,66 @@ class HydrationCapability {
 		return found;
 	}
 
+	/**
+	 * Adopt the text of a binding-view text hole whose server range `posNode`
+	 * opens: the range's one text node, or a new one when the server rendered it
+	 * empty. Any other range content does not match the template. Null when
+	 * `posNode` opens no range, so bindingText builds one.
+	 */
+	adoptBindingText(posNode: Node | null, text: string): Text | null {
+		if (!isBlockOpen(posNode)) return null;
+		const close = this.close(posNode);
+		const existing = getNextSibling(posNode);
+		if (existing !== close && existing?.nodeType === 3 && getNextSibling(existing) === close) {
+			if ((STAGED_DOM?.view(existing) ?? existing).nodeValue !== text)
+				(STAGED_DOM?.view(existing) ?? existing).nodeValue = text;
+			return existing as Text;
+		}
+		if (existing !== close) throw new TypeError(formatClientError(72));
+		const node = (STAGED_DOM?.view(document) ?? document).createTextNode(text);
+		domNode((STAGED_DOM?.view(close) ?? close).parentNode)!.insertBefore(node, close);
+		return node;
+	}
+
 	resolveOpen(anchor: Node | null | undefined, domParent: Node): Comment | null {
 		if (isBlockOpen(anchor ?? null)) return anchor as Comment;
 		let cursor = this.node;
 		if (cursor === null || (STAGED_DOM?.view(cursor) ?? cursor).parentNode !== domParent)
 			cursor = getFirstChild(domParent);
 		return cursor !== null && isBlockOpen(cursor) ? (cursor as Comment) : null;
+	}
+
+	/**
+	 * The open marker of the server range that an `@if`/`@switch` slot adopts
+	 * on its first render at `anchor`, as resolveOpen finds it. The server frames
+	 * every such slot, so an element or text there, other than the end marker
+	 * of `scope`'s block, is where its template hole's walk found another arm's
+	 * markup, as an enclosing `@if` renders it when the server took another arm.
+	 * The walk counts one server node for the hole and gives the nodes after it
+	 * to the template's later roots, so that node is all the slot may claim.
+	 * Frame it in the slot's and an arm's range, as the server would have: the
+	 * branch then adopts it, rebuilds over it or discards it, and claims nothing
+	 * after it, as for any server range.
+	 */
+	branchOpen(anchor: Node | null, domParent: Node, scope: Scope): Comment | null {
+		if (
+			anchor === null ||
+			anchor.nodeType === 8 ||
+			anchor === scope.block.endMarker ||
+			domNode(anchor).parentNode !== domParent ||
+			this.freshNodes.has(anchor)
+		)
+			return this.resolveOpen(anchor, domParent);
+		const doc = STAGED_DOM?.view(document) ?? document;
+		const parent = domNode(domParent);
+		const next = getNextSibling(anchor);
+		const open = doc.createComment(HYDRATION_START);
+		this.save(domParent);
+		parent.insertBefore(open, anchor);
+		parent.insertBefore(doc.createComment(HYDRATION_START), anchor);
+		parent.insertBefore(doc.createComment(HYDRATION_END), next);
+		parent.insertBefore(doc.createComment(HYDRATION_END), next);
+		return open;
 	}
 
 	markerState(node: Node): -1 | 0 | 1 {
@@ -21367,36 +21419,68 @@ class HydrationCapability {
 					(STAGED_DOM?.view(first as Text) ?? (first as Text)).nodeValue = text;
 				}
 			}
-			if (getNextSibling(first) !== null) {
-				this.save(el);
-				noteRecoverableHydrationError(() => new Error(formatClientError(62)), this.rootBlock);
-				if (process.env.NODE_ENV !== 'production') {
-					warnHydrationStructuralMismatch(
-						loc || (el as any).__oct_loc,
-						'the end of the text element',
-						describeHydrationNode(getNextSibling(first)),
-					);
-				}
-				while (getNextSibling(first) !== null)
-					(STAGED_DOM?.view(el) ?? el).removeChild(getNextSibling(first)!);
-			}
+			const next = getNextSibling(first);
+			if (next !== null) this.discardUnclaimedText(el, next, null, loc);
 			return first as Text;
 		}
 		// A sole primitive can be framed by the server (e.g. a spread or ternary
-		// child). Unwrap only an exact text-only frame, then use the same adoption,
-		// mismatch and suppression behavior as bare text, without child-slot state.
+		// child). Unwrap only an exact text-only or empty frame, then use the same
+		// adoption, mismatch and suppression behavior as bare text, without
+		// child-slot state.
 		if (this.isOpen(first)) {
 			const child = getNextSibling(first);
-			const end = (STAGED_DOM?.view(child) ?? child)?.nextSibling ?? null;
-			if (child?.nodeType === 3 && this.isClose(end) && getNextSibling(end) === null) {
+			const end = child?.nodeType === 3 ? getNextSibling(child) : child;
+			if (this.isClose(end) && getNextSibling(end) === null) {
 				(STAGED_DOM?.view(first) ?? first).remove();
 				(STAGED_DOM?.view(end) ?? end).remove();
 				return this.htext(el, text, loc);
 			}
 		}
+		// Anything else the server rendered here is content the text cannot adopt.
+		if (first !== null) this.discardUnclaimedText(el, first, text, loc);
 		const created = (STAGED_DOM?.view(document) ?? document).createTextNode(text);
 		(STAGED_DOM?.view(el) ?? el).appendChild(created);
 		return created;
+	}
+
+	/**
+	 * Remove the server content in `el`, an only-child text host, from `from` to
+	 * its end. The hole adopts at most one leading Text node there, so anything
+	 * else is server content the client renders nothing for, and later updates
+	 * would land beside it. Reports the recovery where the client expected
+	 * `text` (nothing when it is '', or, when null, the end of the Text node it
+	 * adopted). suppressHydrationWarning silences the report but still discards:
+	 * the server content is not a text value to keep.
+	 */
+	private discardUnclaimedText(
+		el: Node,
+		from: ChildNode,
+		text: string | null,
+		loc: string | undefined,
+	): void {
+		if (PRESENTATION_HYDRATION?.revision !== undefined) presentationMiss();
+		this.save(el);
+		if (!isHydrationSuppressed(el)) {
+			noteRecoverableHydrationError(() => new Error(formatClientError(62)), this.rootBlock);
+			if (process.env.NODE_ENV !== 'production') {
+				// Name a server range by the content it frames.
+				const inner = this.isOpen(from) ? getNextSibling(from) : null;
+				warnHydrationStructuralMismatch(
+					loc || (el as any).__oct_loc,
+					text === null
+						? 'the end of the text element'
+						: text === ''
+							? 'nothing'
+							: `text ${JSON.stringify(text)}`,
+					describeHydrationNode(inner ?? from),
+				);
+			}
+		}
+		for (let node: ChildNode | null = from; node !== null;) {
+			const next = getNextSibling(node);
+			(STAGED_DOM?.view(el) ?? el).removeChild(node);
+			node = next;
+		}
 	}
 
 	/**
@@ -21485,24 +21569,12 @@ class HydrationCapability {
 		const first = getFirstChild(el);
 		if (first === null || (el as Element).localName === 'textarea') return;
 		const next = getNextSibling(first);
-		const framed = this.isOpen(first);
-		if (framed && this.isClose(next) && getNextSibling(next) === null) {
+		if (this.isOpen(first) && this.isClose(next) && getNextSibling(next) === null) {
 			(STAGED_DOM?.view(first) ?? first).remove();
 			(STAGED_DOM?.view(next) ?? next).remove();
 			return;
 		}
-		if (PRESENTATION_HYDRATION?.revision !== undefined) presentationMiss();
-		this.save(el);
-		noteRecoverableHydrationError(() => new Error(formatClientError(62)), this.rootBlock);
-		if (process.env.NODE_ENV !== 'production') {
-			warnHydrationStructuralMismatch(
-				loc || (el as any).__oct_loc,
-				'nothing',
-				describeHydrationNode(framed && next !== null ? next : first),
-			);
-		}
-		for (let n = getFirstChild(el); n !== null; n = getFirstChild(el))
-			(STAGED_DOM?.view(el) ?? el).removeChild(n);
+		this.discardUnclaimedText(el, first, '', loc);
 	}
 
 	htextSwap(posNode: Node | null, text: string): Text {
@@ -22130,19 +22202,10 @@ export function bindingText(posNode: Node | null, value: unknown, marker: string
 		});
 		return existing as Text;
 	}
-	if (hydration !== null && isBlockOpen(posNode)) {
-		const close = hydration.close(posNode);
-		const existing = getNextSibling(posNode);
-		if (existing !== close && existing?.nodeType === 3 && getNextSibling(existing) === close) {
-			if ((STAGED_DOM?.view(existing) ?? existing).nodeValue !== text)
-				(STAGED_DOM?.view(existing) ?? existing).nodeValue = text;
-			return existing as Text;
-		}
-		if (existing !== close) throw new TypeError(formatClientError(72));
-		const node = (STAGED_DOM?.view(document) ?? document).createTextNode(text);
-		domNode((STAGED_DOM?.view(close) ?? close).parentNode)!.insertBefore(node, close);
-		return node;
-	}
+	// Only hydrateRoot constructs the capability, so client-only bundles drop the
+	// range-marker validator that adoption needs.
+	const adopted = hydration?.adoptBindingText(posNode, text);
+	if (adopted) return adopted;
 	const parent = domNode(posNode)!.parentNode!;
 	const close = (STAGED_DOM?.view(document) ?? document).createComment(HYDRATION_END);
 	(STAGED_DOM?.view(posNode as Comment) ?? (posNode as Comment)).data = marker;
@@ -27678,24 +27741,30 @@ let SIGNAL_EVENT_OWNERS: WeakMap<Element, SignalOwner | ScopeImpl | BlockImpl> |
 let retiringHostsSince = 0;
 
 /**
- * Take a removed subtree out of delegated dispatch when no disposing Block covers
- * it: a pure host in a value hole belongs to the live Block that rendered it.
- * Every such removal detaches the node right after this, within the same task,
- * so only the root is stamped and the stamp only needs to outlive the task.
+ * Take a subtree that a committed deletion is about to detach out of delegated
+ * dispatch. Detaching a focused host dispatches focusout synchronously, and so
+ * does a deletion cleanup that moves focus, so a deletion stamps the top-level
+ * nodes it detaches before any of its cleanups run: a host below a stamp starts
+ * no handler, whichever component owns it. Every stamped node is detached
+ * within the same task, so the stamp only needs to outlive the task.
  */
 function retireEventHostTree(node: Node): void {
-	if (STAGED_COMMIT_CAPTURE) DEFERRED_LAYOUT_DRIVER!.retireHostTree(node);
-	else stampRetiredHostTree(node, ++eventRootEpoch);
-}
-
-function stampRetiredHostTree(node: Node, epoch: number): void {
+	if (STAGED_COMMIT_CAPTURE) return DEFERRED_LAYOUT_DRIVER!.retireHostTree(node);
+	(node as any).$$retiredEpoch = ++eventRootEpoch;
 	if (retiringHostsSince === 0) {
-		retiringHostsSince = epoch;
+		retiringHostsSince = eventRootEpoch;
 		queueMicrotask(() => {
 			retiringHostsSince = 0;
 		});
 	}
-	(node as any).$$retiredEpoch = epoch;
+}
+
+/** Retire `node` and its following siblings through `last` (all of them when null). */
+function retireHostRange(node: Node | null, last: Node | null): void {
+	for (; node !== null; node = getNextSibling(node)) {
+		retireEventHostTree(node);
+		if (node === last) return;
+	}
 }
 
 /** Publish a native handler; compiled bundle updates omit the key to refresh only authority. */
@@ -27711,13 +27780,6 @@ export function setEventHandler(el: Element, key?: string, handler?: any): void 
 			journalBag();
 		}
 		(STAGED_DOM?.view(el as any) ?? (el as any))[key] = handler;
-		// The rendering Block owns this host's dispatch lifetime (`Block.retired`).
-		// Lite rows republish under their list's Block, so only a disposed claim is
-		// replaced, as when a hydration retry adopts the same server node. `disposed`
-		// never resets, so the claim needs no journal entry.
-		const owner = (el as any).$$eventOwner as Block | undefined;
-		if (CURRENT_BLOCK !== null && (owner === undefined || owner.disposed))
-			(el as any).$$eventOwner = CURRENT_BLOCK;
 	}
 	// Explicit authority also applies to handlers in modules with no signal bindings.
 	const explicitOwner =
@@ -28114,8 +28176,6 @@ export function delegateEvents(eventNames: string[]): void {
 	// They must move together even if the render that first needs a type rolls back.
 	// Seedable prototype may not exist at compiled-module load in exotic hosts.
 	const canSeed = typeof Element !== 'undefined' && Object.isExtensible(Element.prototype);
-	// Every handler publication reads its host's renderer before claiming it.
-	if (canSeed) seedExpando(Element.prototype, '$$eventOwner', false);
 	for (let i = 0; i < eventNames.length; i++) {
 		const name = eventNames[i];
 		if (_delegated.has(name)) continue;
@@ -28505,7 +28565,9 @@ function snapshotDelegatedSlots(
 		(type.flags & EVENT_DISABLED_MOUSE) !== 0 ||
 		(!capture && (type.flags & EVENT_DISABLED_ENTER) !== 0);
 	// Only a removed subtree's root carries its stamp (retireEventHostTree), so the
-	// outermost one retired before this delivery retires every path node below it.
+	// outermost one retired before this delivery retires every path node below it:
+	// React never calls an unmounted component's handlers. A host retiring during
+	// the delivery keeps its handlers to its end, like a removed portal's route.
 	let retiredTop = -1;
 	if (retiringHostsSince !== 0)
 		for (let index = CAPTURE_PATH.length - 1; index >= base; index--) {
@@ -28516,14 +28578,9 @@ function snapshotDelegatedSlots(
 			}
 		}
 	let found = false;
-	let retired: number;
 	for (let index = base; index < CAPTURE_PATH.length; index++) {
 		const node = CAPTURE_PATH[index];
 		const slot = node[key] as EventSlot;
-		// A host whose Block retired before this delivery began starts no handler, as
-		// React never calls an unmounted component's handlers. A host retiring during
-		// the delivery keeps its handlers to its end, like a removed portal's route.
-		// An unclaimed host reads `undefined`, which is not above zero.
 		const active =
 			slot != null &&
 			(index <= retiredTop ||
@@ -28532,8 +28589,7 @@ function snapshotDelegatedSlots(
 					(node.localName === 'button' ||
 						node.localName === 'input' ||
 						node.localName === 'select' ||
-						node.localName === 'textarea')) ||
-				((retired = node.$$eventOwner?.retired) > 0 && retired <= epoch))
+						node.localName === 'textarea')))
 				? null
 				: slot;
 		CAPTURE_SLOTS[index] = active;
@@ -31461,6 +31517,10 @@ function teardownPortalState(state: PortalSlot): void {
 		return;
 	}
 	if (state.block) {
+		// Its DOM lies outside every enclosing deletion's range: retire it here. A
+		// portal compiled into a template routes its events through a host element
+		// inside its owner, which the enclosing deletion has already retired.
+		retireHostRange(state.start, state.end);
 		unmountBlock(state.block, true);
 		state.block = null;
 	}
@@ -32780,9 +32840,12 @@ function componentSlotImpl(
 			// stamp; a string tag or unstamped component falls through to markers.
 			// Hydrating, a hole of a template the parent adopted renders in place of
 			// the server node that template's walk found, not of the node at the
-			// cursor (see componentSlotLite's anchored miss).
-			if (hydration !== null && anchor != null && anchor !== parentBlock.endMarker)
-				hydrationCursor = hydration.node = anchor;
+			// cursor (see componentSlotLite's anchored miss), and inserts before the
+			// node after it (parkAtHole).
+			if (hydration !== null && anchor != null && anchor !== parentBlock.endMarker) {
+				hydrationCursor = anchor;
+				anchor = hydration.parkAtHole(anchor);
+			}
 			start = null;
 			end = null;
 		} else {
@@ -35741,10 +35804,16 @@ function isPortalTarget(block: Block, domParent: Node): boolean {
 	return false;
 }
 
-const NATIVE_ARRAY_MAP = Array.prototype.map;
+// Snapshot the intrinsics at module load, before user code can replace them,
+// so a later replacement is recognized as authored code. Bundlers cannot prove
+// a bare property read side-effect-free, so each read sits in a pure IIFE:
+// a bundle that never reaches these guards drops it rather than keeping a dead
+// statement. `Reflect.apply` is a known-pure global read and needs no wrapper.
+const NATIVE_ARRAY_MAP = /* @__PURE__ */ (() => Array.prototype.map)();
 const NATIVE_ARRAY_FILTER = /* @__PURE__ */ (() => Array.prototype.filter)();
 const NATIVE_REFLECT_APPLY = Reflect.apply;
-const NATIVE_ARRAY_SPECIES_GETTER = Object.getOwnPropertyDescriptor(Array, Symbol.species)?.get;
+const NATIVE_ARRAY_SPECIES_GETTER = /* @__PURE__ */ (() =>
+	Object.getOwnPropertyDescriptor(Array, Symbol.species)?.get)();
 // Components hand the reconciler immutable array snapshots. Memoizing indexed
 // accessor classification by snapshot identity avoids a descriptor allocation
 // per row on every unchanged parent render; holes and intrinsic overrides are
@@ -36473,13 +36542,22 @@ export function bindSignalChild(
 	onlyChild?: boolean,
 	bindingMarker?: string,
 ): unknown {
+	// A markerless only-child hole keeps its last written primitive as the token
+	// (see below), whose Text node is the host's first child. An unchanged
+	// primitive then does nothing, as childTextHoleUpdate's raw-value guard does,
+	// without a DOM read. Raw HTML still claims the host first.
+	const textToken = onlyChild && previous != null && typeof previous !== 'object';
+	if (textToken && previous === value && !dangerouslySetInnerHTMLOwnsChild(domParent, value))
+		return value;
 	const prior =
 		typeof previous === 'object' &&
 		previous !== null &&
 		(previous as DirectSignalChildBinding)[DIRECT_SIGNAL_CHILD] === true
 			? (previous as DirectSignalChildBinding)
 			: null;
-	const cachedText = prior?.text ?? (previous instanceof Text ? previous : null);
+	const cachedText =
+		prior?.text ??
+		(previous instanceof Text ? previous : textToken ? (getFirstChild(domParent) as Text) : null);
 	if (!isSignalHandle(value)) {
 		const type = typeof value;
 		// An ordinary marker-bounded hole keeps textHoleUpdate's fast path: its
@@ -36525,7 +36603,22 @@ export function bindSignalChild(
 			if (WIP_CAPTURE === null) finish(false);
 			else (WIP_CAPTURE.renderCleanups ??= []).push(finish);
 		}
-		return primitiveToken ? value : text;
+		if (primitiveToken) return value;
+		// A primitive whose Text node is the host's first child becomes the token.
+		// A previous token or a client mount's empty template proves that position;
+		// otherwise compare once, because hydration can keep unclaimed server
+		// content ahead of the node it adopted. A staged ViewTransition render has
+		// not placed the node yet.
+		return text !== null &&
+			type !== 'object' &&
+			type !== 'function' &&
+			parentScope.slots[slotKey] === undefined &&
+			STAGED_DOM === null &&
+			(textToken ||
+				(previous === null && !parentScope.mounted && currentHydration === null) ||
+				getFirstChild(domParent) === text)
+			? value
+			: text;
 	}
 	if (prior !== null && !prior.disposed && prior.handle === value) {
 		const next = readSignalBinding(value);
@@ -38297,12 +38390,16 @@ const OBJ_PROTO = Object.prototype;
 
 // Runs on every re-render for every memo child (both tryMemoBail call sites),
 // so the common plain-object case is a zero-allocation for-in compare — no
-// Object.keys arrays. Semantics match React's shallowEqual exactly: Object.is
-// on values (NaN equal, ±0 differ), own-enumerable string keys only, key-SET
-// equality (loop 1 checks ownership and values, loop 2's count balances the
-// key sets). Inherited values must not stand in for removed own props, even
-// when they compare equal. Non-plain prototypes take the exact Object.keys
-// slow path, where for-in would also see inherited keys.
+// Object.keys arrays. Semantics match React's shallowEqual: Object.is on values
+// (NaN equal, ±0 differ), own-enumerable string keys only, key-SET equality
+// (loop 1 checks values and ownership, loop 2's count balances the key sets).
+// Inherited values must not stand in for removed own props, even when they
+// compare equal. On a plain or null-prototype object a missing own prop reads
+// as undefined or an Object.prototype member, which is a function or an object,
+// so only those values need the ownership lookup; a primitive that compares
+// equal is already own unless Object.prototype itself carries that primitive.
+// Non-plain prototypes take the exact Object.keys slow path, where for-in would
+// also see inherited keys.
 function shallowEqualProps(a: any, b: any): boolean {
 	if (a === b) return true;
 	if (a == null || b == null) return false;
@@ -38314,7 +38411,12 @@ function shallowEqualProps(a: any, b: any): boolean {
 	let count = 0;
 	for (const k in a) {
 		const v = a[k];
-		if (!hasOwnProp.call(b, k) || !Object.is(v, b[k])) return false;
+		if (!Object.is(v, b[k])) return false;
+		if (
+			(v === undefined || typeof v === 'object' || typeof v === 'function') &&
+			!hasOwnProp.call(b, k)
+		)
+			return false;
 		count++;
 	}
 	for (const _k in b) count--;
@@ -43664,7 +43766,10 @@ export function ifBlock(
 		// SOLE-hole case — a @if that is the only thing an enclosing arm/component
 		// renders (e.g. `@try { @if (…) {…} }`, the router Match shape) — where the
 		// anchor is the arm's END marker and the cursor is parked on the @if's open.
-		const open = passthrough ? null : (hydration?.resolveOpen(anchor ?? null, domParent) ?? null);
+		// branchOpen frames another arm's node that the template walk found here.
+		const open = passthrough
+			? null
+			: (hydration?.branchOpen(anchor ?? null, domParent, parentScope) ?? null);
 		if (open !== null) {
 			start = open;
 			end = hydration!.close(open);
@@ -44450,22 +44555,9 @@ function detachDeoptTreeRefs(
 	uncommitted: UncommittedRefAttaches | null = null,
 	activityRefs: WeakMap<Element | FragmentInstance, ActivityRefState> | null = null,
 ): void {
-	// Teardown runs just before every blockless de-opt removal detaches `node`.
-	if (out === null) retireEventHostTree(node);
 	// No de-opt descriptor ref was ever stamped → nothing to detach or collect
 	// anywhere; skip the subtree scan. (Monotone flag — see noteDeoptRef.)
 	if (!DEOPT_REFS_STAMPED) return;
-	detachDeoptSubtreeRefs(node, out, shouldDetach, ownerScope, uncommitted, activityRefs);
-}
-
-function detachDeoptSubtreeRefs(
-	node: Node,
-	out: SuspenseRefEntry[] | null,
-	shouldDetach: boolean,
-	ownerScope: Scope | undefined,
-	uncommitted: UncommittedRefAttaches | null,
-	activityRefs: WeakMap<Element | FragmentInstance, ActivityRefState> | null,
-): void {
 	const ref = getDeoptDesc(node)?.props?.ref ?? activityRefs?.get(node as Element)?.connected;
 	if (ref != null) {
 		if (out !== null) {
@@ -44496,7 +44588,7 @@ function detachDeoptSubtreeRefs(
 			c = nodeAfterPortalRange(c, rangeEnd);
 			continue;
 		}
-		detachDeoptSubtreeRefs(c, out, shouldDetach, ownerScope, uncommitted, activityRefs);
+		detachDeoptTreeRefs(c, out, shouldDetach, ownerScope, uncommitted, activityRefs);
 		c = getNextSibling(c);
 	}
 }
@@ -44626,7 +44718,9 @@ export function switchBlock(
 		// Mirror ifBlock's sole-control-flow adoption: when @switch is the only
 		// output of an enclosing component/arm, its compiler anchor is that owner's
 		// END marker while the hydration cursor sits on the switch range's open.
-		const open = passthrough ? null : (hydration?.resolveOpen(anchor ?? null, domParent) ?? null);
+		const open = passthrough
+			? null
+			: (hydration?.branchOpen(anchor ?? null, domParent, parentScope) ?? null);
 		if (open !== null) {
 			start = open;
 			end = hydration!.close(open);
@@ -46477,11 +46571,16 @@ function deferRootOwnedListClear(state: ForSlot, certified: boolean = false): bo
 			}
 			if (node !== end) wholeParent = false;
 		}
-		for (let block = oldHead; block !== null; block = block.nextSibling) {
-			block.disposed = true;
-			if (STAGED_COMMIT_CAPTURE) DEFERRED_LAYOUT_DRIVER!.retireHosts(block);
-			else block.retired = ++eventRootEpoch;
-		}
+		for (let block = oldHead; block !== null; block = block.nextSibling) block.disposed = true;
+		// Inert rows run no cleanup, so only removing a focused row can dispatch at
+		// one. Every child of this owned parent is an outgoing row: retire the one
+		// holding the focus the scheduler captured for this pass, not every row. A
+		// drain over several focused documents (an array) retires none; an inert
+		// row's handler belongs to its live list owner.
+		let row: Node | null | undefined = (renderingFocus as FocusSelectionSnapshot | null)?.focused;
+		while (row != null && domNode(row).parentNode !== parent)
+			row = domNode(row).parentNode ?? (row as ShadowRoot).host;
+		if (row != null) retireEventHostTree(row);
 		if (wholeParent) {
 			(STAGED_DOM?.view(parent) ?? parent).textContent = '';
 			(STAGED_DOM?.view(parent) ?? parent).appendChild(start);
@@ -46545,9 +46644,13 @@ function batchClearItems(
 	}
 	TEARDOWN_DEPTH++;
 	try {
+		// Retire every row before any row's cleanup can move focus off another: the
+		// whole span between the list's markers leaves below. As for parked rows,
+		// only captured focus (or no capture at all) can make a row dispatch.
+		if (renderingFocus !== null || !inFlush)
+			retireHostRange(getNextSibling(state.start), state.end);
 		// Dispose the items before their DOM leaves, like every other deletion:
-		// cleanups observe attached hosts, and the focusout that removing a focused
-		// host dispatches finds them retired. Walk the intrusive item chain (head →
+		// cleanups observe attached hosts. Walk the intrusive item chain (head →
 		// nextSibling) rather than the Map's iterator: zero allocation and a
 		// monomorphic pointer chase. Callers reset head/tail only AFTER this returns,
 		// so the chain still covers exactly the old items here.
@@ -46562,8 +46665,6 @@ function batchClearItems(
 				// additionally skips the subtree scan for ref-free items.
 				if (b.deoptNode !== null && b.deoptRefs) detachDeoptTreeRefs(b.deoptNode, null);
 				b.disposed = true;
-				if (STAGED_COMMIT_CAPTURE) DEFERRED_LAYOUT_DRIVER!.retireHosts(b);
-				else b.retired = ++eventRootEpoch;
 			}
 		}
 		const p = domNode(state.start).parentNode!;
@@ -48392,7 +48493,10 @@ function makeRoot(
 					// teardown because their DOM lives in a foreign target — see the
 					// portalSlotSlot branch in unmountScope. This also deliberately makes
 					// unmount safe after external DOM removal instead of surfacing the
-					// renderer-specific NotFoundError React happens to expose.
+					// renderer-specific NotFoundError React happens to expose. Its content
+					// retires before any cleanup runs, even a presentation left in place:
+					// its handlers belong to this root.
+					retireHostRange(getFirstChild(container), null);
 					withRefDetachSuppression(presentationRefs, () => unmountBlock(rootBlock!, false));
 					// Root unmount runs outside any flush, so no commit follows — drain the
 					// teardown ref detaches queued above directly.

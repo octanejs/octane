@@ -20,6 +20,13 @@ isolate renderer/reconciler work from GPU and driver variance:
   the same complete scene and camera matrices, including direct Three;
 - 40 overlapping raycast targets, averaged across 20 native pointer events.
 
+Both binding pages pass the same module-level checksum callbacks on every
+render. A callback recreated by each `render()` dies when its scene is replaced,
+and the runner's forced `gc()` before each sample then discards optimized
+frame-loop code that inlined it. The frame sample would then time V8 recompiling
+the loop, and that cost depends on how long each framework retains the
+previous render's props rather than on its dispatch.
+
 Plain Three is a practical lower bound, not an API-equivalent declarative
 renderer. Each sample is rejected unless its public scene topology, object
 identity, updated values, disposal count, frame callback and render counts, and

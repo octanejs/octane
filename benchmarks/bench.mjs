@@ -632,7 +632,10 @@ const SUITES = [
 			{ filter: 'svelte-memowall-bench', port: 5278 },
 		],
 		iter: { normal: 20, quick: 3 },
-		runs: [{ script: 'run.mjs', args: (n) => [String(n)] }],
+		runs: [
+			{ script: 'run.mjs', args: (n) => [String(n)] },
+			{ label: 'bail-compare', script: 'bail-compare.mjs', args: () => [] },
+		],
 	},
 	{
 		name: 'portal-swarm',

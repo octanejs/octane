@@ -5,7 +5,11 @@ import {
 	validateNativeReadWitness,
 	type NativeReadWitness,
 } from './native-read-collector.js';
-import { NATIVE_TRANSITION_CONSUMER, type NativeReadSource } from './read-protocol.js';
+import {
+	NATIVE_TRANSITION_CONSUMER,
+	setSignalDeclarationInvocation,
+	type NativeReadSource,
+} from './read-protocol.js';
 import { inspectNativeReadWitness } from './native-read-inspection.js';
 
 interface NativeReadHost {
@@ -50,6 +54,8 @@ interface RenderFrame {
 	candidates: Map<Scope, Candidate> | null;
 	/** Renderer data scoped to this one invocation, such as a declaration stage. */
 	invocationData: unknown;
+	/** The declaration invocation this one interrupted, restored when it ends. */
+	outerInvocation: number;
 }
 
 type CandidateSet = Map<Consumer, Candidate>;
@@ -80,6 +86,7 @@ export function createNativeReadDriver(host: NativeReadHost) {
 	const captures = new WeakMap<object, CandidateSet>();
 	const frames: RenderFrame[] = [];
 	let depth = 0;
+	let invocations = 0;
 	let publications: WeakMap<object, Publication> | null = null;
 	let ownerPublications: WeakMap<PublicationOwner, Publication> | null = null;
 	let unpublishedRefs: WeakMap<object, UnpublishedRef> | null = null;
@@ -297,11 +304,13 @@ export function createNativeReadDriver(host: NativeReadHost) {
 				collectorToken: -1,
 				candidates: null,
 				invocationData: null,
+				outerInvocation: 0,
 			});
 			frame.block = block;
 			frame.collectorToken = collector.beginRender(block);
 			frame.candidates = null;
 			frame.invocationData = null;
+			frame.outerInvocation = setSignalDeclarationInvocation(++invocations);
 			// Parameters precede compiler body scopes. Start with the actual Block
 			// owner, and retire prior reads even when this invocation no longer
 			// enters an instrumented body or reads a native source.
@@ -328,6 +337,7 @@ export function createNativeReadDriver(host: NativeReadHost) {
 				}
 			} finally {
 				collector.endRender(frame.collectorToken);
+				setSignalDeclarationInvocation(frame.outerInvocation);
 				frame.block = null;
 				frame.candidates = null;
 				frame.invocationData = null;

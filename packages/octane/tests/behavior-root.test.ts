@@ -8237,6 +8237,61 @@ export function Answer() @{
 			}
 		});
 
+		// hydrateRoot adopts a binding view's text holes in place, whether the
+		// server filled them or left them empty, and later writes keep the DOM
+		// identical to what the server renders for the same values.
+		it(`hydrates a binding view's filled and empty text holes with the ordinary renderer (${dev ? 'dev' : 'prod'})`, async () => {
+			const source = `import { label$, note$ } from './island-state';
+export function Label() @{
+  'use dom bindings';
+  <p>{label$.get() as string}<b>{note$.get() as string}</b></p>
+}`;
+			const scope = createScope({ scopeKey: `island-hydrate-text-${dev}` });
+			const label$ = scope.signal$('label', 'server label');
+			const note$ = scope.signal$('note', '');
+			const fixture = authoredPresentation('Label', {}, dev, source, {
+				'./island-state': { label$, note$ },
+			});
+			// The server may append a seed script that hydration consumes, so compare
+			// the view's own markup.
+			const serverMarkup = (html: string) => {
+				const template = document.createElement('template');
+				template.innerHTML = html;
+				return template.content.querySelector('p')!.outerHTML;
+			};
+			const error = vi.spyOn(console, 'error').mockImplementation(() => {});
+			try {
+				container.innerHTML = fixture.html;
+				const paragraph = container.querySelector('p')!;
+				const label = [...paragraph.childNodes].find(
+					(node) => node.nodeType === 3 && node.nodeValue === 'server label',
+				)!;
+				expect(label).toBeDefined();
+				hydratedRoot = hydrateRoot(container, fixture.loadClient().Label, {});
+				await act(async () => {
+					for (let index = 0; index < 4; index++) await Promise.resolve();
+				});
+				expect(paragraph.outerHTML).toBe(serverMarkup(fixture.html));
+				act(() => {
+					label$.set('client label');
+					note$.set('client note');
+				});
+				expect(container.querySelector('p')).toBe(paragraph);
+				expect(label.isConnected).toBe(true);
+				expect(label.nodeValue).toBe('client label');
+				expect(container.querySelector('b')!.textContent).toBe('client note');
+				expect(paragraph.outerHTML).toBe(
+					serverMarkup(renderToString(fixture.server.Label, {}).html),
+				);
+				expect(error).not.toHaveBeenCalled();
+			} finally {
+				error.mockRestore();
+				hydratedRoot?.unmount();
+				hydratedRoot = undefined;
+				scope.dispose();
+			}
+		});
+
 		// A streamed boundary may still be pending when its island activates. The
 		// binding claims it, so the late server segment cannot replace live DOM.
 		it(`claims a streamed @try fallback before its segment arrives (${dev ? 'dev' : 'prod'})`, async () => {
