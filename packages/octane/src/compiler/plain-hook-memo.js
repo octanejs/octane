@@ -231,7 +231,7 @@ function slotBaseHooks(ast, state, options) {
 		}
 		if (slot !== null) {
 			if (
-				(imported === 'useState' || imported === 'useRef') &&
+				(imported === 'useState' || imported === 'useRef' || imported === 'useLayoutSnapshot') &&
 				args.some((arg) => arg.type === 'SpreadElement')
 			) {
 				const fn = mapped.typeArguments

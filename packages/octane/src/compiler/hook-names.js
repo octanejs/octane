@@ -5,6 +5,7 @@ export const HOOK_NAMES = new Set([
 	'useReducer',
 	'useEffect',
 	'useLayoutEffect',
+	'useLayoutSnapshot',
 	'useInsertionEffect',
 	'useMemo',
 	'useCallback',

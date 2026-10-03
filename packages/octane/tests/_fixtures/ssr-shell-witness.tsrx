@@ -4,6 +4,7 @@ import {
 	useEffect,
 	useImperativeHandle,
 	useLayoutEffect,
+	useLayoutSnapshot as measureLayout,
 	useRef,
 	useSyncExternalStore,
 } from 'octane';
@@ -32,6 +33,11 @@ export function Effects() @{
 	useEffect(() => {});
 	useLayoutEffect(() => {});
 	<p>{'Effects'}</p>
+}
+
+export function Snapshot() @{
+	const value = measureLayout(() => 'client', { initial: 'server' });
+	<p>{value}</p>
 }
 
 export function Handle(props: { handle?: { current: unknown } }) @{
