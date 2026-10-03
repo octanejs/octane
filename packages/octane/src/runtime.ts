@@ -15029,11 +15029,17 @@ function pendingHydrateOwner(target: Block): HydrateSlot | null {
 }
 
 function findSuspendedHydrateBlock(scope: Scope, thenable: TrackedThenable<unknown>): Block | null {
-	const own = (scope.block as Block & { __thenables?: TrackedThenable<unknown>[] }).__thenables;
-	if (own !== undefined && own.includes(thenable)) return scope.block;
-	// Compiler-emitted useBatch can suspend before use() registers a thenable on
-	// its block. The deepest unfinished registered child is that same source.
-	let suspended: Block | null = scope.block.mounted ? null : scope.block;
+	const block = scope.block;
+	let suspended: Block | null = null;
+	// A lite scope's block is a DOM-context proxy (LiteBlockImpl) with no render
+	// or mount state, so it is never the source. The Blocks below it still are.
+	if (block.block === block) {
+		const own = (block as Block & { __thenables?: TrackedThenable<unknown>[] }).__thenables;
+		if (own !== undefined && own.includes(thenable)) return block;
+		// Compiler-emitted useBatch can suspend before use() registers a thenable
+		// on its block. The deepest unfinished registered child is that same source.
+		if (!block.mounted) suspended = block;
+	}
 	forEachSubtreeChild(scope, (child) => {
 		const candidate = findSuspendedHydrateBlock(child, thenable);
 		if (candidate !== null) suspended = candidate;
@@ -18955,9 +18961,13 @@ class HydrationCapability {
 	rebuiltTail: Node | null = null;
 	/**
 	 * The start comment of each markerless branch that holdMarkerlessBranch
-	 * holds, to where its content reached when it threw.
+	 * holds, to where its content reaches: after its template's roots once that
+	 * template adopted them (renderOwned), and else where it reached when it
+	 * threw.
 	 */
 	private heldBranches: WeakMap<Node, Node | null> | null = null;
+	/** The arm of each branch that holdMarkerlessBranch held, to its start comment (renderHeld). */
+	private heldArms: WeakMap<Block, Node> | null = null;
 	private readonly unframedRootRanges = new WeakMap<Node, Node>();
 	/** Unframed claims whose render suspended, by the block that claimed (renderUnframed). */
 	private unframedClaims: WeakMap<Block, UnframedClaim> | null = null;
@@ -19003,6 +19013,15 @@ class HydrationCapability {
 	 * does not claim. Undefined until the template adopts claimFrom.
 	 */
 	private claimEnd: Node | null | undefined = undefined;
+	/** The markerless branch whose content claim is open, with no open marker (renderOwned). */
+	private claimOwner: Block | null = null;
+	/**
+	 * Where the content that the last markerless render claimed ends
+	 * (renderOwned). Read only right after such a render, which sets it even
+	 * when it throws: the holdMarkerlessBranch after a first render that threw
+	 * reads it there.
+	 */
+	private heldClaim: Node | null | undefined = undefined;
 	/** The last suspension thrown out of a client-built subtree (suspend). */
 	freshSuspension: SuspenseException | null = null;
 	/** Skip component-frame adoption until the declared container owner. */
@@ -19391,11 +19410,12 @@ class HydrationCapability {
 				unframed = claims.has(block);
 		if (!unframed) {
 			const claim = this.suspendedClaims?.get(source);
-			if (claim === undefined) renderBlock(source);
-			else {
+			const held = this.heldArms?.get(source);
+			if (claim !== undefined) {
 				this.suspendedClaims!.delete(source);
 				this.renderClaimed(source, claim[0], claim[1]);
-			}
+			} else if (held !== undefined && this.heldBranches!.has(held)) this.renderHeld(source, held);
+			else renderBlock(source);
 			return;
 		}
 		const previousReplay = this.replayDepth;
@@ -20682,6 +20702,7 @@ class HydrationCapability {
 						? this.freshClone(fragment)
 						: this.rebuildFragment(fragment, cursor, loc);
 				this.inPlaceEnd = remainder;
+				if (cursor === this.claimFrom) this.claimRoots(cursor, fragment);
 				return { __oct_vfrag: true, firstChild: cursor } as unknown as Node;
 			}
 			// A nested fragment has no server wrapper, so its first logical root must
@@ -20720,9 +20741,10 @@ class HydrationCapability {
 	 * after its roots: after `root`, or after the `fragment` template's roots,
 	 * stepped as the compiled walk steps them. The template is the content when
 	 * it renders in the range's owner: the block whose markers the range's
-	 * are, a component inheriting them, or the lite component that adopted the
-	 * range. A component that adopts `root` without a range of its own renders
-	 * in its own scope, and the slots after it claim the nodes after its root.
+	 * are, a component inheriting them, the lite component that adopted the
+	 * range, or the markerless branch whose content it is (claimOwner). A
+	 * component that adopts `root` without a range of its own renders in its
+	 * own scope, and the slots after it claim the nodes after its root.
 	 * Returns false when the range ends before the template's roots do: every
 	 * root, a hole included, renders at least one server node, so the server
 	 * rendered other content there. Below a passthrough root, the range may
@@ -20732,9 +20754,10 @@ class HydrationCapability {
 		const open = domNode(root).previousSibling;
 		const scope = CURRENT_SCOPE;
 		if (
-			open === null ||
 			scope === null ||
-			(scope.block.startMarker !== open && this.liteRanges.get(scope)?.start !== open)
+			(scope.block !== this.claimOwner &&
+				(open === null ||
+					(scope.block.startMarker !== open && this.liteRanges.get(scope)?.start !== open)))
 		)
 			return true;
 		this.claimFrom = null;
@@ -20936,6 +20959,58 @@ class HydrationCapability {
 	}
 
 	/**
+	 * First render of `block`, a markerless branch that took the place of the
+	 * cursor, `first`, before its anchor. Returns where its content ends: after
+	 * the roots of its own template, when that template adopted `first`
+	 * (claimRoots), and else from where the render left the cursor
+	 * (markerlessEnd). The cursor rests on the first root a template adopts,
+	 * so a template with several roots claims them all only this way.
+	 */
+	renderMarkerless(block: Block, first: Node): Node | null {
+		const before = domNode(first).previousSibling;
+		const claimed = this.renderOwned(block, first);
+		return claimed === undefined
+			? this.markerlessEnd(before, block.parentNode!, block.endMarker)
+			: claimed;
+	}
+
+	/**
+	 * Render `block`, a markerless branch whose content starts at `first`, with
+	 * a claim on that content owned by `block`. Returns the first node after
+	 * the roots of its own template, when that template adopted `first`
+	 * (claimRoots), and else undefined. A render that throws leaves the same
+	 * in heldClaim.
+	 */
+	private renderOwned(block: Block, first: Node | null): Node | null | undefined {
+		const outer = this.beginClaim(first);
+		const outerOwner = this.claimOwner;
+		this.claimOwner = block;
+		try {
+			renderBlock(block);
+		} finally {
+			this.claimOwner = outerOwner;
+			this.heldClaim = this.endClaim(outer);
+		}
+		return this.heldClaim;
+	}
+
+	/**
+	 * Resume `block`, the arm of a branch that holdMarkerlessBranch holds after
+	 * `start`, with the claim its first render had. An arm that suspended
+	 * before its template adopted anything adopts in this render, and the
+	 * cursor rests on the first root it adopts, so only the claim says where
+	 * its roots end. The content reaches at least that far (heldBranchEnd),
+	 * whether or not this render completes.
+	 */
+	private renderHeld(block: Block, start: Node): void {
+		try {
+			this.renderOwned(block, getNextSibling(start));
+		} finally {
+			if (this.heldClaim !== undefined) this.heldBranches!.set(start, this.heldClaim);
+		}
+	}
+
+	/**
 	 * Where the content of a markerless branch that took the cursor's place
 	 * after `before` in `parent` ends, from where its render left the cursor.
 	 * The content is whole nodes and server ranges, from the first one up to at
@@ -20976,7 +21051,7 @@ class HydrationCapability {
 	 * `parent` threw while its content was server nodes that it adopted or has
 	 * yet to adopt, so it has no boundary yet. Mark where it starts with a
 	 * comment of the branch's own, which no adoption claims or discards the way
-	 * it can a server node, and remember where the content reached. A retry of
+	 * it can a server node, and remember where the content reaches. A retry of
 	 * the same arm finalizes from that comment, and another arm replaces the
 	 * content after it (heldBranchEnd). An attempt that is discarded instead
 	 * leaves the server DOM as it was.
@@ -20996,15 +21071,20 @@ class HydrationCapability {
 			start,
 			before === null ? getFirstChild(parent) : getNextSibling(before),
 		);
-		(this.heldBranches ??= new WeakMap()).set(start, this.markerlessEnd(start, parent, after));
+		const claimed = this.heldClaim;
+		(this.heldBranches ??= new WeakMap()).set(
+			start,
+			claimed === undefined ? this.markerlessEnd(start, parent, after) : claimed,
+		);
+		(this.heldArms ??= new WeakMap()).set(state.block!, start);
 		state.markerlessBefore = start;
 	}
 
 	/**
 	 * Where the content of a held branch that starts after `start` ends, or
 	 * undefined when `start` holds no branch. That is the later of where the
-	 * content reached when the arm threw and where the arm's last render left
-	 * the cursor. A render adopts as it advances the cursor, but it can begin
+	 * held record says the content reaches and where the arm's last render
+	 * left the cursor. A render adopts as it advances the cursor, but it can begin
 	 * from a cursor that an earlier sibling parked on `start`, and slots that
 	 * the first attempt never reached adopt only in a retry. A bound that a
 	 * retry's mismatch recovery discarded no longer counts.
@@ -21023,6 +21103,7 @@ class HydrationCapability {
 
 	/** Remove a held branch's start comment once its arm is finalized after it. */
 	dropHeldStart(start: Node, parent: Node): void {
+		this.heldBranches!.delete(start);
 		this.save(parent);
 		domNode(start as ChildNode).remove();
 	}
@@ -43293,8 +43374,10 @@ function renderBranchSlot(
 			);
 			state.block = b;
 			state.markerlessBefore = before;
+			let contentEnd: Node | null | undefined;
 			try {
-				renderBlock(b);
+				if (cursor === null) renderBlock(b);
+				else contentEnd = hydration!.renderMarkerless(b, cursor);
 			} catch (error) {
 				// A branch that throws before inserting anything stays unfinalized so
 				// a same-branch retry finalizes it. One that already inserted its
@@ -43339,15 +43422,7 @@ function renderBranchSlot(
 					hydration!.holdMarkerlessBranch(state, domParent, marker, contentBefore, after, error);
 				throw error;
 			}
-			finalizeMarkerlessBranch(
-				state,
-				domParent,
-				b,
-				marker,
-				contentBefore,
-				after,
-				cursor === null ? after : hydration!.markerlessEnd(contentBefore, domParent, after),
-			);
+			finalizeMarkerlessBranch(state, domParent, b, marker, contentBefore, after, contentEnd);
 			replaceSharedBlockBoundary(
 				parentBlock,
 				oldBlockStart,
