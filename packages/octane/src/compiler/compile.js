@@ -4117,10 +4117,7 @@ function lowerNativeAutoCalculation(statement, ctx, componentName, scoped = true
 		if (immutable !== undefined) misses.push(b.unary('!', immutableGuard()));
 		region = b.block([
 			...depDeclarations,
-			b.const(
-				slot,
-				b.call(requireRuntimeForContext(ctx, 'memoSlot'), b.id(rawSlot), b.literal('useMemo')),
-			),
+			b.const(slot, b.call(requireRuntimeForContext(ctx, 'memoSlot'), b.id(rawSlot))),
 			b.const(
 				previous,
 				b.call(
@@ -19801,7 +19798,10 @@ function appendHookSlotArgument(name, args, slot, numeric, origin) {
 	if (position !== undefined) {
 		while (out.length < position) out.push(b.id('undefined', origin));
 	}
-	out.push(typeof slot === 'string' ? b.id(slot, origin) : inheritOriginLoc(slot, origin));
+	out.push({
+		...(typeof slot === 'string' ? b.id(slot, origin) : inheritOriginLoc(slot, origin)),
+		_octaneCompilerSlot: true,
+	});
 	return out;
 }
 

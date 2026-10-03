@@ -18091,9 +18091,11 @@ export function nativePuPub(
 // Unlike parallel-use's value sentinel, a nullable ENTRY handles every authored
 // memo value, including undefined, null, and puMiss itself. Dependency hits do
 // not construct a callback or dependency array.
-export function memoSlot(slot: HookSlot | undefined, name: 'useMemo' | 'useCallback'): HookSlot {
+// The compiler passes the hook's name only with an authored slot, which a manual
+// hook may leave undefined; a slot it appended always resolves.
+export function memoSlot(slot: HookSlot | undefined, name?: 'useMemo' | 'useCallback'): HookSlot {
 	const resolved = resolveSlot(slot);
-	if (resolved === undefined) missingSlot(name);
+	if (resolved === undefined) missingSlot(name!);
 	return resolved;
 }
 
@@ -36493,13 +36495,22 @@ export function bindSignalChild(
 	onlyChild?: boolean,
 	bindingMarker?: string,
 ): unknown {
+	// A markerless only-child hole keeps its last written primitive as the token
+	// (see below), whose Text node is the host's first child. An unchanged
+	// primitive then does nothing, as childTextHoleUpdate's raw-value guard does,
+	// without a DOM read. Raw HTML still claims the host first.
+	const textToken = onlyChild && previous != null && typeof previous !== 'object';
+	if (textToken && previous === value && !dangerouslySetInnerHTMLOwnsChild(domParent, value))
+		return value;
 	const prior =
 		typeof previous === 'object' &&
 		previous !== null &&
 		(previous as DirectSignalChildBinding)[DIRECT_SIGNAL_CHILD] === true
 			? (previous as DirectSignalChildBinding)
 			: null;
-	const cachedText = prior?.text ?? (previous instanceof Text ? previous : null);
+	const cachedText =
+		prior?.text ??
+		(previous instanceof Text ? previous : textToken ? (getFirstChild(domParent) as Text) : null);
 	if (!isSignalHandle(value)) {
 		const type = typeof value;
 		// An ordinary marker-bounded hole keeps textHoleUpdate's fast path: its
@@ -36545,7 +36556,22 @@ export function bindSignalChild(
 			if (WIP_CAPTURE === null) finish(false);
 			else (WIP_CAPTURE.renderCleanups ??= []).push(finish);
 		}
-		return primitiveToken ? value : text;
+		if (primitiveToken) return value;
+		// A primitive whose Text node is the host's first child becomes the token.
+		// A previous token or a client mount's empty template proves that position;
+		// otherwise compare once, because hydration can keep unclaimed server
+		// content ahead of the node it adopted. A staged ViewTransition render has
+		// not placed the node yet.
+		return text !== null &&
+			type !== 'object' &&
+			type !== 'function' &&
+			parentScope.slots[slotKey] === undefined &&
+			STAGED_DOM === null &&
+			(textToken ||
+				(previous === null && !parentScope.mounted && currentHydration === null) ||
+				getFirstChild(domParent) === text)
+			? value
+			: text;
 	}
 	if (prior !== null && !prior.disposed && prior.handle === value) {
 		const next = readSignalBinding(value);
@@ -38317,12 +38343,16 @@ const OBJ_PROTO = Object.prototype;
 
 // Runs on every re-render for every memo child (both tryMemoBail call sites),
 // so the common plain-object case is a zero-allocation for-in compare — no
-// Object.keys arrays. Semantics match React's shallowEqual exactly: Object.is
-// on values (NaN equal, ±0 differ), own-enumerable string keys only, key-SET
-// equality (loop 1 checks ownership and values, loop 2's count balances the
-// key sets). Inherited values must not stand in for removed own props, even
-// when they compare equal. Non-plain prototypes take the exact Object.keys
-// slow path, where for-in would also see inherited keys.
+// Object.keys arrays. Semantics match React's shallowEqual: Object.is on values
+// (NaN equal, ±0 differ), own-enumerable string keys only, key-SET equality
+// (loop 1 checks values and ownership, loop 2's count balances the key sets).
+// Inherited values must not stand in for removed own props, even when they
+// compare equal. On a plain or null-prototype object a missing own prop reads
+// as undefined or an Object.prototype member, which is a function or an object,
+// so only those values need the ownership lookup; a primitive that compares
+// equal is already own unless Object.prototype itself carries that primitive.
+// Non-plain prototypes take the exact Object.keys slow path, where for-in would
+// also see inherited keys.
 function shallowEqualProps(a: any, b: any): boolean {
 	if (a === b) return true;
 	if (a == null || b == null) return false;
@@ -38334,7 +38364,12 @@ function shallowEqualProps(a: any, b: any): boolean {
 	let count = 0;
 	for (const k in a) {
 		const v = a[k];
-		if (!hasOwnProp.call(b, k) || !Object.is(v, b[k])) return false;
+		if (!Object.is(v, b[k])) return false;
+		if (
+			(v === undefined || typeof v === 'object' || typeof v === 'function') &&
+			!hasOwnProp.call(b, k)
+		)
+			return false;
 		count++;
 	}
 	for (const _k in b) count--;
