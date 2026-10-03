@@ -6597,7 +6597,9 @@ function createRefHook<T>(owner: DraftOwner, resolved: unknown, initial: T): { c
 	// What the ref holds when no render or commit owns its cell, as after the
 	// render that created it is abandoned: a plain object keeps its last write.
 	// Tracking every write also keeps this accessor from pinning the initial
-	// value, often a large lazy one, after the ref is reassigned.
+	// value, often a large lazy one, after the ref is reassigned. A cell counts
+	// as this ref's own only when it carries this accessor (clones copy it), so
+	// an abandoned ref never reads or writes a ref committed later in its slot.
 	let detached = initial;
 	const value = {} as { current: T };
 	Object.defineProperty(value, 'current', {
@@ -6606,14 +6608,14 @@ function createRefHook<T>(owner: DraftOwner, resolved: unknown, initial: T): { c
 			const draft = findDraftOwner(record);
 			const live = (draft?.hooks.get(resolved) ?? record.hooks.get(resolved)) as
 				RefHook<T> | undefined;
-			return live?.kind === 'ref' ? live.current : detached;
+			return live?.kind === 'ref' && live.value === value ? live.current : detached;
 		},
 		set(next: T) {
 			detached = next;
 			const draft = findDraftOwner(record);
 			if (draft !== null) {
 				let live = draft.hooks.get(resolved) as RefHook<T> | undefined;
-				if (live?.kind !== 'ref') return;
+				if (live?.kind !== 'ref' || live.value !== value) return;
 				if (!draft.clonedHooks.has(resolved)) {
 					live = { ...live };
 					draft.hooks.set(resolved, live);
@@ -6623,7 +6625,7 @@ function createRefHook<T>(owner: DraftOwner, resolved: unknown, initial: T): { c
 				return;
 			}
 			const live = record.hooks.get(resolved) as RefHook<T> | undefined;
-			if (live?.kind === 'ref') live.current = next;
+			if (live?.kind === 'ref' && live.value === value) live.current = next;
 		},
 	});
 	const hook = { kind: 'ref' as const, current: initial, value };

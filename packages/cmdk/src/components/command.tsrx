@@ -1,9 +1,9 @@
 // Command (root). Owns the external store, item/group registration, filtering,
 // score sort, keyboard navigation, and controlled `value` handling, and provides
 // the store + command contexts to its children.
-import { useLayoutEffect, useLazyRef, useMemo, useRef } from 'octane';
+import { useLayoutEffect, useMemo, useRef } from 'octane';
 import { CommandContext, StoreContext } from '../context.tsrx';
-import { useAsRef, useId, useScheduleLayoutEffect } from '../hooks.tsrx';
+import { useAsRef, useId, useLazyRef, useScheduleLayoutEffect } from '../hooks.tsrx';
 import { defaultFilter } from '../filter';
 import {
 	GROUP_HEADING_SELECTOR,

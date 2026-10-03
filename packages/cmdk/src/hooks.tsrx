@@ -4,7 +4,6 @@
 import {
 	useId as octaneUseId,
 	useLayoutEffect,
-	useLazyRef,
 	useRef,
 	useState,
 	useSyncExternalStore,
@@ -31,6 +30,15 @@ export function useAsRef<T>(data: T) {
 		ref.current = data;
 	});
 	return ref;
+}
+
+/** A ref whose value is computed lazily on first render. */
+export function useLazyRef<T>(fn: () => T) {
+	const ref = useRef<T | undefined>(undefined);
+	if (ref.current === undefined) {
+		ref.current = fn();
+	}
+	return ref as { current: T };
 }
 
 /** Run a selector against the store state. */

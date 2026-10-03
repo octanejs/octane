@@ -97,6 +97,44 @@ describe.each([
 		}
 	});
 
+	it('keeps a ref escaped from an abandoned update apart from the ref committed later', () => {
+		const escaped: { current: string }[] = [];
+		const refSlot = Symbol('conditional-ref');
+		const plan = Runtime.universalPlan('object', { kind: 'host', type: 'value' });
+		const Component = Runtime.defineUniversalComponent(
+			'object',
+			({ show, label }: { show: boolean; label: string }) => {
+				if (show) escaped.push(Runtime.useLazyRef(() => label, refSlot));
+				return Runtime.universalValue(plan, []);
+			},
+		);
+		const container = Runtime.createObjectContainer();
+		const root = Runtime.createUniversalRoot(container, Runtime.createObjectDriver());
+		try {
+			root.render(Component, { show: false, label: 'mounted' });
+			const prepared = root.prepare(Component, { show: true, label: 'abandoned' });
+			expect(prepared.status).toBe('prepared');
+			prepared.abort();
+			const [abandoned] = escaped;
+			expect(abandoned.current).toBe('abandoned');
+
+			root.render(Component, { show: true, label: 'committed' });
+			const committed = escaped.at(-1)!;
+			expect(committed).not.toBe(abandoned);
+			expect(committed.current).toBe('committed');
+			expect(abandoned.current).toBe('abandoned');
+
+			abandoned.current = 'abandoned write';
+			committed.current = 'committed write';
+			root.render(Component, { show: true, label: 'update' });
+			expect(escaped.at(-1)).toBe(committed);
+			expect(committed.current).toBe('committed write');
+			expect(abandoned.current).toBe('abandoned write');
+		} finally {
+			root.unmount();
+		}
+	});
+
 	it('retains function and undefined results as values', () => {
 		const callback = vi.fn();
 		const makeCallback = vi.fn(() => callback);
