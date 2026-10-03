@@ -2165,7 +2165,7 @@
     "target": "octane",
     "reference": "r3f-9.6.1",
     "maxRatio": 1.0,
-    "note": "Per-frame dispatch to 1,000 useFrame subscribers, including the same scene render, must not be slower than React Three Fiber."
+    "note": "Per-frame dispatch to 1,000 useFrame subscribers, including the same scene render, must not be slower than React Three Fiber. Both pages pass stable checksum callbacks: a per-render callback dies once its scene is replaced, and the forced gc() before each sample then deoptimizes the frame loop that inlined it (1.33x after #1044 released retained effect history; 0.81x with stable callbacks on 2026-10-03)."
   },
   {
     "suite": "three-renderer",
