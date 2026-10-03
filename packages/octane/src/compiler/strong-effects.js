@@ -1088,9 +1088,6 @@ export function createStrongEffectPolicy({ ast, analysis, callNames, report }) {
 		const { roots, aliases, declarations, owners } = references;
 		const names = new Set();
 		const callbackAssignments = new WeakMap();
-		const callbackPaths = new WeakMap();
-		const aliasDeclarators = new WeakMap();
-		const aliasPaths = new Map();
 		const callbackCandidates = new Map();
 		const refAttributes = [];
 		const attached = new Set();
@@ -1146,7 +1143,6 @@ export function createStrongEffectPolicy({ ast, analysis, callNames, report }) {
 				const root = target && (aliases.get(target) ?? (roots.has(target) ? target : null));
 				if (root) {
 					aliases.set(binding, root);
-					aliasDeclarators.set(decl, binding);
 					declarations.set(decl.id, root);
 					names.add(binding.name);
 					changed = true;
@@ -1164,10 +1160,6 @@ export function createStrongEffectPolicy({ ast, analysis, callNames, report }) {
 				const key = keyOf(node.left);
 				if (key !== null) own(node.right, key);
 			}
-			if (roots.size !== 0 && FUNCTIONS.has(node.type)) callbackPaths.set(node, parents.slice());
-			if (node.type === 'VariableDeclarator' && aliasDeclarators.has(node)) {
-				aliasPaths.set(aliasDeclarators.get(node), parents.slice());
-			}
 			if (
 				roots.size !== 0 &&
 				node.type === 'JSXAttribute' &&
@@ -1177,7 +1169,7 @@ export function createStrongEffectPolicy({ ast, analysis, callNames, report }) {
 				const opening = parents.at(-1);
 				const name = opening?.type === 'JSXOpeningElement' ? opening.name : null;
 				const host = name?.type === 'JSXIdentifier' && /^[a-z]/.test(name.name);
-				refAttributes.push({ expression: node.value.expression, host, ancestors: parents.slice() });
+				refAttributes.push({ expression: node.value.expression, host });
 			}
 			if (node.type === 'Identifier' && names.has(node.name)) classify(node, parents);
 			parents.push(node);
@@ -1187,8 +1179,8 @@ export function createStrongEffectPolicy({ ast, analysis, callNames, report }) {
 			parents.pop();
 		};
 		visit(ast);
-		for (const { expression, host, ancestors } of refAttributes) {
-			attachCallbacks(expression, host, ancestors);
+		for (const { expression, host } of refAttributes) {
+			attachCallbacks(expression, host);
 		}
 		checkCallbackUses();
 		for (const root of attached) {
@@ -1198,83 +1190,33 @@ export function createStrongEffectPolicy({ ast, analysis, callNames, report }) {
 		}
 		return references;
 
-		// The hook analysis does not assign lexical scopes to TSRX template
-		// bindings, so a matching row or catch name cannot prove this identity.
-		function templateShadowed(name, ancestors) {
-			for (let index = 0; index < ancestors.length; index++) {
-				const ancestor = ancestors[index];
-				const child = ancestors[index + 1];
-				if (
-					ancestor.type === 'JSXForExpression' &&
-					child !== ancestor.right &&
-					child !== ancestor.empty &&
-					(patternBinds(ancestor.left, name) || patternBinds(ancestor.index, name))
-				)
-					return true;
-				if (
-					ancestor.type === 'JSXTryExpression' &&
-					child === ancestor.handler &&
-					(patternBinds(ancestor.handler?.param, name) ||
-						patternBinds(ancestor.handler?.resetParam, name))
-				)
-					return true;
-			}
-			return false;
-		}
-
-		function patternBinds(pattern, name) {
-			if (pattern == null) return false;
-			switch (pattern.type) {
-				case 'Identifier':
-					return pattern.name === name;
-				case 'VariableDeclaration':
-					return pattern.declarations.some((declaration) => patternBinds(declaration.id, name));
-				case 'AssignmentPattern':
-					return patternBinds(pattern.left, name);
-				case 'RestElement':
-					return patternBinds(pattern.argument, name);
-				case 'ArrayPattern':
-					return pattern.elements.some((element) => patternBinds(element, name));
-				case 'ObjectPattern':
-					return pattern.properties.some((property) =>
-						patternBinds(
-							property.type === 'RestElement' ? property.argument : property.value,
-							name,
-						),
-					);
-				default:
-					return false;
-			}
-		}
-
 		// Follow only actual ref values; a callback supplied to another prop is
 		// not evidence that its captured refs receive an attached instance.
-		function attachCallbacks(expression, host, ancestors) {
+		function attachCallbacks(expression, host) {
 			const value = unwrap(expression);
 			if (value == null) return;
 			if (value.type === 'ArrayExpression') {
-				for (const entry of value.elements) attachCallbacks(entry, host, ancestors);
+				for (const entry of value.elements) attachCallbacks(entry, host);
 				return;
 			}
 			if (value.type === 'ConditionalExpression') {
 				const only = selected(value);
-				if (only !== null) return attachCallbacks(only, host, ancestors);
-				attachCallbacks(value.consequent, host, ancestors);
-				attachCallbacks(value.alternate, host, ancestors);
+				if (only !== null) return attachCallbacks(only, host);
+				attachCallbacks(value.consequent, host);
+				attachCallbacks(value.alternate, host);
 				return;
 			}
 			if (value.type === 'LogicalExpression') {
 				const only = selected(value);
-				if (only !== null) return attachCallbacks(only, host, ancestors);
-				if (value.operator !== '&&') attachCallbacks(value.left, host, ancestors);
-				attachCallbacks(value.right, host, ancestors);
+				if (only !== null) return attachCallbacks(only, host);
+				if (value.operator !== '&&') attachCallbacks(value.left, host);
+				attachCallbacks(value.right, host);
 				return;
 			}
 			if (value.type === 'SequenceExpression') {
-				attachCallbacks(value.expressions?.at(-1), host, ancestors);
+				attachCallbacks(value.expressions?.at(-1), host);
 				return;
 			}
-			if (value.type === 'Identifier' && templateShadowed(value.name, ancestors)) return;
 			const callback = functionOf(value);
 			if (callback === null || callback.async || callback.generator) return;
 			const assignments = callbackRefs(callback);
@@ -1307,28 +1249,13 @@ export function createStrongEffectPolicy({ ast, analysis, callNames, report }) {
 				}
 				return false;
 			};
-			const ancestors = [...(callbackPaths.get(callback) ?? []), callback];
-			const unshadowedAlias = (binding) => {
-				while (aliases.has(binding)) {
-					const init = stableInit(binding);
-					if (
-						init?.type !== 'Identifier' ||
-						templateShadowed(init.name, aliasPaths.get(binding) ?? [])
-					) {
-						return false;
-					}
-					binding = bindingOf(init);
-				}
-				return true;
-			};
 			const write = (target, value, direct, cleanup) => {
 				target = unwrap(target);
 				if (target?.type === 'MemberExpression') {
 					const object = unwrap(target.object);
 					const binding = object?.type === 'Identifier' ? bindingOf(object) : null;
 					const root = binding && (aliases.get(binding) ?? (roots.has(binding) ? binding : null));
-					if (!root || templateShadowed(object.name, ancestors) || !unshadowedAlias(binding))
-						return;
+					if (!root) return;
 					const property = memberName(target);
 					if (property !== 'current' && property !== null) return;
 					if (property === 'current' && direct && fromParameter(value)) result.good.add(root);
@@ -1394,12 +1321,9 @@ export function createStrongEffectPolicy({ ast, analysis, callNames, report }) {
 				) {
 					write(node.argument, null, false, false);
 				}
-				ancestors.push(node);
 				const returned = node.type === 'ReturnStatement' && !nested ? unwrap(node.argument) : null;
 				if (FUNCTIONS.has(returned?.type) && !returned.async && !returned.generator) {
-					ancestors.push(returned);
 					scan(returned.body, true, true, loop);
-					ancestors.pop();
 				} else if (node.type === 'IfStatement' && staticValue(node.test) !== UNKNOWN) {
 					scan(node.test, nested, cleanup, loop);
 					scan(staticValue(node.test) ? node.consequent : node.alternate, nested, cleanup, loop);
@@ -1414,7 +1338,6 @@ export function createStrongEffectPolicy({ ast, analysis, callNames, report }) {
 							scan(node[key], nested, cleanup, loop);
 					}
 				}
-				ancestors.pop();
 			};
 			scan(callback.body);
 			return result;
@@ -1448,7 +1371,7 @@ export function createStrongEffectPolicy({ ast, analysis, callNames, report }) {
 					for (const child of node) walk(child);
 					return;
 				}
-				if (node.type === 'Identifier' && !templateShadowed(node.name, path)) {
+				if (node.type === 'Identifier') {
 					const callback = bindings.get(bindingOf(node));
 					if (callback && !safeCallbackUse(node, path, callback, aliasDeclarations)) {
 						for (const root of callbackCandidates.get(callback)) invalidAttachments.add(root);

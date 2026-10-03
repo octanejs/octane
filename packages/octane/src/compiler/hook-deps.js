@@ -569,7 +569,7 @@ function buildScopes(ast, onlyImported, hookRuntimeModules, bindingsOnly = false
 			const catchScope = createScope(scope, 'block');
 			declarePattern(node.param, catchScope);
 			if (bindingsOnly) rememberPattern(node.param, catchScope);
-			if (bindingsOnly && node.resetParam) {
+			if (node.resetParam) {
 				declarePattern(node.resetParam, catchScope);
 				rememberPattern(node.resetParam, catchScope);
 			}
@@ -617,13 +617,20 @@ function buildScopes(ast, onlyImported, hookRuntimeModules, bindingsOnly = false
 			node.type === 'ForStatement' ||
 			node.type === 'ForInStatement' ||
 			node.type === 'ForOfStatement' ||
-			(bindingsOnly && node.type === 'JSXForExpression')
+			node.type === 'JSXForExpression'
 		) {
 			const loopScope = createScope(scope, 'block');
 			const loopType = node.type === 'JSXForExpression' ? node.statementType : node.type;
 			const declaration = loopType === 'ForStatement' ? node.init : node.left;
-			if (declaration?.type === 'VariableDeclaration' && declaration.kind !== 'var') {
+			if (
+				declaration?.type === 'VariableDeclaration' &&
+				(declaration.kind !== 'var' || node.type === 'JSXForExpression')
+			) {
 				for (const decl of declaration.declarations || []) declarePattern(decl.id, loopScope);
+			} else if (node.type === 'JSXForExpression') {
+				// A bare template row header declares its own writable row binding.
+				declarePattern(declaration, loopScope);
+				rememberPattern(declaration, loopScope);
 			}
 			if (loopType === 'ForStatement') {
 				walk(node.init, loopScope);
@@ -631,20 +638,21 @@ function buildScopes(ast, onlyImported, hookRuntimeModules, bindingsOnly = false
 				walk(node.update, loopScope);
 			} else {
 				walk(node.left, loopScope);
-				if (node.left?.type !== 'VariableDeclaration') markReassignedPattern(node.left, loopScope);
+				if (node.left?.type !== 'VariableDeclaration' && node.type !== 'JSXForExpression')
+					markReassignedPattern(node.left, loopScope);
 				else if (bindingsOnly && node.left.kind === 'var') {
 					for (const decl of node.left.declarations || [])
 						markReassignedPattern(decl.id, loopScope);
 				}
 				walk(node.right, node.type === 'JSXForExpression' ? scope : loopScope);
 			}
-			if (bindingsOnly && node.type === 'JSXForExpression') {
+			if (node.type === 'JSXForExpression') {
 				declarePattern(node.index, loopScope);
 				rememberPattern(node.index, loopScope);
 				walk(node.key, loopScope);
 			}
 			walk(node.body, loopScope);
-			if (bindingsOnly && node.type === 'JSXForExpression') walk(node.empty, scope);
+			if (node.type === 'JSXForExpression') walk(node.empty, scope);
 			return;
 		}
 
