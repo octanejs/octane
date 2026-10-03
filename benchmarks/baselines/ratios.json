@@ -3239,8 +3239,8 @@
     "op": "nav_mount",
     "target": "octane-tsrx",
     "reference": "solid",
-    "maxRatio": 1.2,
-    "note": "Protects the existing mount win: 32-leaf teardown + 1024-leaf mount measured 0.94x solid (1.70 vs 1.80) on 2026-08-09. Octane mounts faster than the fine-grained peers despite marker traffic; a breach means the compiled mount path grew per-node cost. On CI runners the same-runner A/B of 2026-10-03 measured 1.15x at #674 itself (2.39 vs 2.07 ms) and 1.09x now (2.27 vs 2.08 ms), so octane has not regressed here; the 1.17-1.20x weekly readings were one-navigation samples."
+    "maxRatio": 1.35,
+    "note": "32-leaf teardown + 1024-leaf mount measured 0.94x solid (1.70 vs 1.80) on a local machine on 2026-08-09. On CI runners the same-runner A/B of 2026-10-03 measured 1.15x at #674 itself (2.39 vs 2.07 ms) and 1.09x now (2.27 vs 2.08 ms), so octane has not regressed; paired ~20 ms quick runs read 1.10x and 1.16x. The 1.35 ceiling keeps quick-mode headroom over that CI baseline; a breach means the compiled mount path grew per-node cost."
   },
   {
     "suite": "hook-memo",
