@@ -325,24 +325,51 @@ const LAYOUT_PROPERTIES = new Set([
 ]);
 const LAYOUT_METHODS = new Set(['getBoundingClientRect', 'getClientRects', 'getComputedStyle']);
 
+const NESTED_FUNCTIONS = new Set([
+	'ArrowFunctionExpression',
+	'FunctionDeclaration',
+	'FunctionExpression',
+]);
+
 /**
+ * Does the effect's own synchronous setup read the committed layout? Nested
+ * functions are skipped: a returned cleanup, a frame callback, or a listener
+ * runs at another time, so its reads say nothing about the value setup stores.
+ * Writes such as `el.scrollTop = 0` are not measurements either.
+ *
  * @param {any} callback an effect callback
  * @returns {boolean}
  */
 export function readsLayout(callback) {
-	let found = false;
-	walk(callback?.body, (node) => {
-		if (found) return;
+	const body = callback?.body;
+	if (body == null) return false;
+	/** @param {any} node */
+	const visit = (node) => {
+		if (node == null || typeof node !== 'object') return false;
+		if (Array.isArray(node)) return node.some(visit);
+		if (typeof node.type !== 'string' || NESTED_FUNCTIONS.has(node.type)) return false;
+		if (
+			node.type === 'AssignmentExpression' &&
+			node.operator === '=' &&
+			unwrap(node.left)?.type === 'MemberExpression'
+		) {
+			// The target is written, not read; its object and the value still run.
+			return visit(unwrap(node.left).object) || visit(node.right);
+		}
 		if (node.type === 'MemberExpression' && node.computed !== true) {
 			const name = node.property?.name;
-			if (LAYOUT_PROPERTIES.has(name) || LAYOUT_METHODS.has(name)) found = true;
+			if (LAYOUT_PROPERTIES.has(name) || LAYOUT_METHODS.has(name)) return true;
 		} else if (
 			node.type === 'CallExpression' &&
 			node.callee?.type === 'Identifier' &&
 			LAYOUT_METHODS.has(node.callee.name)
 		) {
-			found = true;
+			return true;
 		}
-	});
-	return found;
+		for (const key in node) {
+			if (!WALK_SKIP_KEYS.has(key) && !key.startsWith('_octane') && visit(node[key])) return true;
+		}
+		return false;
+	};
+	return visit(body);
 }

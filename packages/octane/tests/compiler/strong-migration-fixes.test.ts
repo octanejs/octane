@@ -172,6 +172,34 @@ export function Label() {
 		}
 	});
 
+	it.each([
+		[
+			'the returned cleanup',
+			'setValue(name);\n\t\treturn () => console.log(el.current?.offsetWidth);',
+		],
+		[
+			'a frame callback',
+			'setValue(name);\n\t\tconst id = requestAnimationFrame(() => el.current?.getBoundingClientRect());\n\t\treturn () => cancelAnimationFrame(id);',
+		],
+		['a layout write', 'if (el.current) el.current.scrollTop = 0;\n\t\tsetValue(name);'],
+	])('does not call it a measurement when layout is only touched in %s', (_, body) => {
+		const source = `import { useEffect, useRef, useState } from 'octane';
+export function Name({ name }: { name: string }) {
+	const el = useRef<HTMLDivElement>(null);
+	const [value, setValue] = useState('');
+	useEffect(() => {
+		${body}
+	});
+	return <div ref={el}>{value}</div>;
+}
+`;
+		const diagnostic = errors(source).find(
+			(entry) => entry.code === 'OCTANE_STRONG_EFFECT_STATE_UPDATE',
+		);
+		expect(diagnostic?.message).not.toContain('copies a DOM measurement');
+		expect(diagnostic?.suggestions?.[0].hook).toBe('useLinkedState');
+	});
+
 	it('keeps the useLinkedState guidance for a state update that is not a measurement', () => {
 		const source = `import { useEffect, useState } from 'octane';
 export function Name({ name }: { name: string }) {
