@@ -96,6 +96,7 @@ export {
 	type NativeSignalReference,
 	type RenderOptions,
 	type ServerRenderNode,
+	type ShellWitness,
 	type StreamOptions,
 	type StreamInjectionSource,
 	setSsrSuspenseTimeout,

@@ -3,6 +3,7 @@
 // step with the runtime exports; `constants.ts` re-exports the public tables
 // with these same types.
 export const VOID_ELEMENTS: Set<string>;
+export const READ_ONLY_VALUE_INPUT_TYPES: Set<string>;
 export const BOOLEAN_ATTR_PROPS: Set<string>;
 export const MUST_USE_PROPERTY_PROPS: Set<string>;
 export const POSITIVE_NUMERIC_ATTR_PROPS: Set<string>;

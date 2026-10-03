@@ -102,8 +102,10 @@ The implemented `islands` mode trusts the author's opt-in and checks it
 conservatively rather than proving it: the build rejects hooks, handlers, refs,
 controlled values, ordinary Hydrate, `@try`, signal reads and handle bindings,
 spreads, and unknown components in the shell, and any renderer reachable from
-the islands entry or `preHydrate`. The compiler proof below is still the path to
-selecting a mode automatically.
+the islands entry or `preHydrate`. In development, the server render also
+reports the handlers, refs, effects, editable controlled values, and live signal
+bindings it actually reaches outside the islands (`RenderOptions.shellWitness`).
+The compiler proof below is still the path to selecting a mode automatically.
 
 Choose eligibility per route and selected export. Unknown facts select `full`.
 Ordinary parent-first Hydrate is not a standalone frontier. A client navigation

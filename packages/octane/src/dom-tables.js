@@ -43,6 +43,21 @@ export const VOID_ELEMENTS = new Set([
 ]);
 
 /**
+ * `<input>` types whose value the user never edits (ReactDOMInput's
+ * hasReadOnlyValue): a controlled `value` there needs no client re-assertion.
+ * Shared by the compiler's and the server runtime's islands shell witness.
+ */
+export const READ_ONLY_VALUE_INPUT_TYPES = new Set([
+	'button',
+	'checkbox',
+	'image',
+	'hidden',
+	'radio',
+	'reset',
+	'submit',
+]);
+
+/**
  * React's BOOLEAN attribute props (ReactDOMComponent's boolean arm, `inert`
  * included): ANY truthy value renders the canonical presence form
  * (`disabled="disabled"` → `disabled=""`, `hidden={1}` → `hidden=""`), any

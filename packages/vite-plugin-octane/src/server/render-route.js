@@ -88,6 +88,47 @@ function collectDevStylesheets(vite, roots) {
 	return [...styles];
 }
 
+/** @type {WeakMap<ViteDevServer, Set<string>>} */
+const reportedShellWitnesses = new WeakMap();
+
+/**
+ * An islands-only route's shell never loads in the browser. The build checks
+ * its source; this checks what a dev render actually reached outside the
+ * route's independent islands, through aliases, helpers, and packages the
+ * source check cannot follow, and warns once per construct and site.
+ *
+ * @param {ViteDevServer} vite
+ * @param {RenderRoute} route
+ * @returns {NonNullable<import('octane/server').RenderOptions['shellWitness']>}
+ */
+function createShellWitnessReporter(vite, route) {
+	const seen = reportedShellWitnesses.get(vite) ?? new Set();
+	reportedShellWitnesses.set(vite, seen);
+	return (witness) => {
+		const at = witness.location
+			? ` at ${witness.location}`
+			: witness.component
+				? ` in ${witness.component}`
+				: '';
+		const on = witness.tag ? ` on <${witness.tag}>` : '';
+		const what =
+			witness.kind === 'effect'
+				? `${witness.name}()${at}`
+				: witness.kind === 'signal'
+					? `a live signal binding${on}${at}`
+					: witness.kind === 'control'
+						? `a controlled "${witness.name}"${on}${at}`
+						: `${JSON.stringify(witness.name)}${on}${at}`;
+		const message =
+			`[@octanejs/vite-plugin] RenderRoute ${JSON.stringify(route.path)} uses hydrate: 'islands', ` +
+			`but its shell rendered ${what} outside an independent <Hydrate>. The shell's code never ` +
+			'loads in the browser, so this never runs there; move it into an independent island.';
+		if (seen.has(message)) return;
+		seen.add(message);
+		vite.config.logger.warn(message, { timestamp: true });
+	};
+}
+
 /**
  * @param {RenderRoute} route
  * @param {Context} context
@@ -251,6 +292,7 @@ export async function handleRenderRoute(
 			onHeadReady(/** @type {string} */ head) {
 				hoistedHead = head;
 			},
+			...(islands ? { shellWitness: createShellWitnessReporter(vite, route) } : {}),
 			signal: context.request.signal,
 			onError(/** @type {unknown} */ error) {
 				if (error instanceof Error) vite.ssrFixStacktrace(error);

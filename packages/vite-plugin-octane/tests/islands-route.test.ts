@@ -7,7 +7,7 @@ import { afterAll, describe, expect, it } from 'vitest';
 import fs from 'node:fs';
 import path from 'node:path';
 import { pathToFileURL, fileURLToPath } from 'node:url';
-import { build, type Plugin } from 'vite';
+import { build, createLogger, createServer, type Plugin } from 'vite';
 import { createTempProject } from '../../octane/tests/_temp-project.js';
 
 const packageRoot = fileURLToPath(new URL('../', import.meta.url));
@@ -62,7 +62,7 @@ interface BuiltGraph {
 	chunks: Map<string, { imports: string[]; modules: string[]; facade: string | null }>;
 }
 
-async function buildProject(overrides: Record<string, string> = {}) {
+function writeProject(overrides: Record<string, string> = {}) {
 	const project = createTempProject('octane-vite-islands');
 	projects.push(project);
 	const root = project.root;
@@ -78,6 +78,11 @@ async function buildProject(overrides: Record<string, string> = {}) {
 	link('octane', path.join(repoRoot, 'packages/octane'));
 	link('@octanejs/vite-plugin', packageRoot);
 	link('vite', path.join(packageRoot, 'node_modules/vite'));
+	return root;
+}
+
+async function buildProject(overrides: Record<string, string> = {}) {
+	const root = writeProject(overrides);
 	const graph: BuiltGraph = { chunks: new Map() };
 	// Observe the client graph the browser would load; the server build is separate.
 	const probe: Plugin = {
@@ -159,6 +164,49 @@ describe('islands-only routes', { timeout: 180_000 }, () => {
 				'src/Header.tsrx': `export function Header() @{ <header><button onClick={() => {}}>Menu</button></header> }`,
 			}),
 		).rejects.toThrow(/hydrate: 'islands'.*Header\.tsrx:1:.*"onClick" needs client code/s);
+	});
+
+	// The build checks the shell's source, which cannot follow a plain helper's
+	// createElement call. A dev render reaches the element itself and warns,
+	// once, while the route keeps serving; the island's own handler and live
+	// binding, and the same shell on a full route, stay silent.
+	it('warns in dev when a rendered shell needs client work its source hides', async () => {
+		const root = writeProject({
+			'src/menu.ts': `import { createElement } from 'octane';
+export function menuButton(label: string) {
+	return createElement('button', { type: 'button', onClick: () => {} }, label);
+}`,
+			'src/Header.tsrx': `import { menuButton } from './menu.ts';
+export function Header() @{ <header><h1>Islands</h1>{menuButton('Menu')}</header> }`,
+		});
+		const warnings: string[] = [];
+		const logger = createLogger('silent');
+		logger.warn = (message) => {
+			warnings.push(message);
+		};
+		const server = await createServer({
+			root,
+			customLogger: logger,
+			server: { host: '127.0.0.1', port: 0, hmr: false, ws: false },
+		});
+		try {
+			await server.listen();
+			const address = server.httpServer?.address();
+			if (!address || typeof address !== 'object') throw new Error('dev server has no address');
+			for (const route of ['/', '/', '/full']) {
+				const response = await fetch(`http://127.0.0.1:${address.port}${route}`);
+				expect(response.status).toBe(200);
+				expect(await response.text()).toContain('Menu</button>');
+			}
+			const witnesses = warnings.filter((message) => message.includes('outside an independent'));
+			expect(witnesses).toEqual([
+				expect.stringMatching(
+					/RenderRoute "\/" uses hydrate: 'islands', but its shell rendered "onClick" on <button> in Header outside an independent <Hydrate>/,
+				),
+			]);
+		} finally {
+			await server.close();
+		}
 	});
 
 	it('rejects a preHydrate hook that reaches the renderer', async () => {
