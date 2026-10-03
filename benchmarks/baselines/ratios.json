@@ -1029,7 +1029,7 @@
     "target": "octane-tsrx",
     "reference": "react",
     "maxRatio": 0.6,
-    "note": "Production autoMemo skips the unchanged RowsA region before the keyed wall; the compiled React reference also caches its list. ~0.16x when set (2026-08-07, terser builds). A same-runner A/B on 2026-10-03 measured octane 0.45 us per parent render at #639 and 0.94 us now (a regression, tracked in task_77ff49b7), while React got faster under #983's esbuild minification (1.98 -> 1.78 us). Paired ~20 ms samples measured 0.52x and 0.54x (rme <= 1%), so the 0.6 ceiling holds without a waiver; tighten it when the regression is fixed."
+    "note": "Production autoMemo skips the unchanged RowsA region before the keyed wall; the compiled React reference also caches its list. ~0.16x when set (2026-08-07, terser builds). A same-runner A/B on 2026-10-03 measured octane 0.45 us per parent render at #639 and 0.94 us now (a regression from #833's per-commit root-render journal, tracked in task_19e870d3), while React got faster under #983's esbuild minification (1.98 -> 1.78 us). Paired ~20 ms samples measured 0.52x and 0.54x (rme <= 1%), so the 0.6 ceiling holds without a waiver; tighten it when the regression is fixed."
   },
   {
     "suite": "memo-wall",
