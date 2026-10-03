@@ -116,6 +116,106 @@ export function NestedBranch(props: { server?: boolean; inner: boolean }) @{
 	</div>
 }
 
+// The client's arm is a branch the server rendered no range for. Its template
+// adopts the server arm's hosts in place, after which the server's arm ends
+// with a host the client does not render.
+export function MarkerlessArm(props: { server?: boolean; inner?: boolean }) @{
+	<div>
+		@if (props.server) {
+			<>
+				<s>{'s'}</s>
+				<b>{'a'}</b>
+				<u>{'tail'}</u>
+			</>
+		} @else {
+			@if (props.inner) {
+				<>
+					<s>{'s'}</s>
+					<b>{'a'}</b>
+				</>
+			}
+		}
+	</div>
+}
+
+export function MarkerlessSwitch(props: { server?: boolean; inner?: boolean }) @{
+	<div>
+		@if (props.server) {
+			<>
+				<s>{'s'}</s>
+				<b>{'a'}</b>
+				<u>{'tail'}</u>
+			</>
+		} @else {
+			@switch (props.inner) {
+				@case true: {
+					<>
+						<s>{'s'}</s>
+						<b>{'a'}</b>
+					</>
+				}
+			}
+		}
+	</div>
+}
+
+// Neither branch has a server range, and the outer one's content is the inner.
+export function MarkerlessNested(props: { server?: boolean; inner?: boolean }) @{
+	<div>
+		@if (props.server) {
+			<>
+				<s>{'s'}</s>
+				<b>{'a'}</b>
+				<u>{'tail'}</u>
+			</>
+		} @else {
+			@if (props.inner) {
+				@if (props.inner) {
+					<>
+						<s>{'s'}</s>
+						<b>{'a'}</b>
+					</>
+				}
+			}
+		}
+	</div>
+}
+
+// The server's arm renders exactly the client's hosts.
+export function MarkerlessSameArm(props: { server?: boolean; inner?: boolean }) @{
+	<div>
+		@if (props.server) {
+			<>
+				<s>{'s'}</s>
+				<b>{'a'}</b>
+			</>
+		} @else {
+			@if (props.inner) {
+				<>
+					<s>{'s'}</s>
+					<b>{'a'}</b>
+				</>
+			}
+		}
+	</div>
+}
+
+// The server's arm ends before the client's branch renders its second host.
+export function MarkerlessShortArm(props: { server?: boolean; inner?: boolean }) @{
+	<div>
+		@if (props.server) {
+			<s>{'s'}</s>
+		} @else {
+			@if (props.inner) {
+				<>
+					<s>{'s'}</s>
+					<b>{'a'}</b>
+				</>
+			}
+		}
+	</div>
+}
+
 // Both arms render the same content: the arm's template adopts the host that
 // follows its last component.
 export function SameContent(props: { server?: boolean }) @{
