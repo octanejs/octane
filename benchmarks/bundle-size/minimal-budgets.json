@@ -67,7 +67,7 @@
   "suspense-transition": {
     "raw": 165472,
     "gzip": 53167,
-    "brotli": 46608
+    "brotli": 46866
   },
   "server-hooks": {
     "raw": 509,
@@ -157,7 +157,7 @@
   "binding-apollo-client-vite": {
     "raw": 359710,
     "gzip": 112774,
-    "brotli": 98502
+    "brotli": 98767
   },
   "binding-apollo-client-esbuild": {
     "raw": 362637,
