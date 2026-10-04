@@ -1451,15 +1451,24 @@ interface SignalDeclarationRenderStage extends SignalDeclarationStage {
  * invocation, so a render-phase rerun supersedes its earlier pass. The capture's
  * commit accepts it; its discard, or a transition journal rollback that unwinds
  * this render, discards it.
+ *
+ * `declaring` names the invocation that evaluated the declaration. A directive
+ * arm or inline row that reads its component's declaration may render under a
+ * nested capture of its own, such as a @try attempt that suspends while the
+ * component commits. While the declaring invocation is still rendering, its
+ * stage and capture decide the declaration instead of the reader's.
  */
-function currentSignalDeclarationStage(): SignalDeclarationStage | undefined {
+function currentSignalDeclarationStage(declaring?: number): SignalDeclarationStage | undefined {
 	const block = CURRENT_BLOCK;
-	const capture = WIP_CAPTURE;
+	// Native reads open the invocation frame before a facade can be read.
+	const declared =
+		declaring === undefined ? undefined : NATIVE_READ_DRIVER?.enclosingInvocation(declaring);
+	const capture =
+		declared === undefined ? WIP_CAPTURE : (declared.capture as OffscreenCapture | null);
 	// Outside a render, or in a render that publishes without a capture, a
 	// declaration applies immediately.
 	if (block === null || capture === null || ROOT_RENDER_ROLLBACK) return undefined;
-	// Native reads open the invocation frame before a facade can be read.
-	const invocation = NATIVE_READ_DRIVER?.invocation(block);
+	const invocation = declared ?? NATIVE_READ_DRIVER?.invocation(block);
 	const current = invocation?.invocationData as SignalDeclarationRenderStage | null | undefined;
 	if (current != null && !current.settled && current.capture === capture) return current;
 	const callbacks: Array<(discarded: boolean) => void> = [];
