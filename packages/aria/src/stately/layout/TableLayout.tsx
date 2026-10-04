@@ -372,7 +372,7 @@ export class TableLayout<T, O extends TableLayoutProps = TableLayoutProps> exten
 
 	// For subclasses.
 	// eslint-disable-next-line
-	protected isStickyColumn(node: GridNode<T>) {
+	protected isStickyColumn(_node: GridNode<T>) {
 		return false;
 	}
 

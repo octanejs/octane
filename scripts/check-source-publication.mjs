@@ -175,20 +175,7 @@ export const SOURCE_PUBLICATION_DEBT = {
 		'create-octane',
 	],
 	[RULES.unusedLocals]: [],
-	// Unused parameters, and unused type parameters on exported generics. A `_`
-	// prefix silences both without changing a call site or a type argument
-	// position. Follow-up of #1694.
-	[RULES.unusedParameters]: [
-		'@octanejs/aria',
-		'@octanejs/base-ui',
-		'@octanejs/base-ui-utils',
-		'@octanejs/lexical',
-		'@octanejs/recharts',
-		'@octanejs/select',
-		'@octanejs/spring',
-		'@octanejs/styled-components',
-		'@octanejs/visx',
-	],
+	[RULES.unusedParameters]: [],
 };
 
 const CHECKERS = new Set(['octane-tsc', 'tsgo', 'tsrx-tsc', 'tsc']);

@@ -351,7 +351,7 @@ export interface RACValidation {
 	validationBehavior?: 'native' | 'aria';
 }
 
-export type DOMRenderFunction<E extends string, T> = (
+export type DOMRenderFunction<_E extends string, T> = (
 	props: ElementProps,
 	renderProps: T,
 ) => ReactElement;
@@ -373,7 +373,7 @@ export interface DOMRenderProps<E extends string, T> {
 }
 
 // Same as DOMRenderProps but specific for the case where the element could be a 'a' or 'div' element.
-export interface PossibleLinkDOMRenderProps<Fallback extends string, T> {
+export interface PossibleLinkDOMRenderProps<_Fallback extends string, T> {
 	/**
 	 * Overrides the default DOM element with a custom render function.
 	 * This allows rendering existing components with built-in styles and behaviors
@@ -438,7 +438,7 @@ const domComponentCache: Record<string, any> = {};
 export const dom = new Proxy(
 	{},
 	{
-		get(target, elementType) {
+		get(_target, elementType) {
 			if (typeof elementType !== 'string') {
 				return undefined;
 			}

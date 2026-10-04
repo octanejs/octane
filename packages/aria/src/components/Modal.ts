@@ -41,7 +41,7 @@ import {
 type GlobalDOMAttributes = Record<string, any>;
 type DOMAttributes = Record<string, any>;
 type RefObject<T> = SharedRefObject<T>;
-type ForwardedRef<T> = any;
+type ForwardedRef<_T> = any;
 
 export interface ModalOverlayProps
 	extends

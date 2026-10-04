@@ -16,7 +16,7 @@ export interface TableBodyProps<T> extends Omit<AsyncLoadable, 'isLoading'> {
 	loadingState?: LoadingState;
 }
 
-function TableBody<T>(props: TableBodyProps<T>): any {
+function TableBody<T>(_props: TableBodyProps<T>): any {
 	return null;
 }
 

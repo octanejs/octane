@@ -23,7 +23,7 @@ import type { MultipleSelectionStateProps } from '../selection/useMultipleSelect
 import { useCollection } from '../collections/useCollection';
 import { useControlledState } from '../utils/useControlledState';
 
-export interface TableProps<T> extends MultipleSelection, Sortable, Expandable {
+export interface TableProps<_T> extends MultipleSelection, Sortable, Expandable {
 	/** The elements that make up the table. Includes the TableHeader, TableBody, Columns, and Rows. */
 	children: [any, any];
 	/** A list of row keys to disable. */

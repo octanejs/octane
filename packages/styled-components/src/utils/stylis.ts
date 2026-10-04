@@ -265,7 +265,7 @@ export default function createStylisInstance(
 	let _selector: string;
 	let _selectorRegexp: RegExp | undefined;
 
-	const selfReferenceReplacer = (match: string, offset: number, string: string) => {
+	const selfReferenceReplacer = (match: string, _offset: number, string: string) => {
 		if (
 			/**
 			 * We only want to refer to the static class directly if the selector is part of a

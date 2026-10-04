@@ -118,7 +118,7 @@ export function parseNumber(
 	let isNegative = false;
 
 	// Strips a matched sign (leading "-12" / trailing "1234-") while recording negativity.
-	const takeSign = (match: string, sign: string) => {
+	const takeSign = (_match: string, sign: string) => {
 		if (sign === '-') {
 			isNegative = true;
 		}

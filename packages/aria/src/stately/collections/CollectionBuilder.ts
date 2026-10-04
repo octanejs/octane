@@ -12,7 +12,7 @@ import type { CollectionBase, Key, Node } from '@react-types/shared';
 import { Children, Fragment, isChildrenBlock, isValidElement } from 'octane';
 import type { PartialNode } from './types';
 
-type CollectionElement<T> = any;
+type CollectionElement<_T> = any;
 
 interface CollectionBuilderState {
 	renderer?: (value: any) => any;
@@ -89,7 +89,7 @@ export class CollectionBuilder<T extends object> {
 	private getKey(
 		item: NonNullable<CollectionElement<T>>,
 		partialNode: PartialNode<T>,
-		state: CollectionBuilderState,
+		_state: CollectionBuilderState,
 		parentKey?: Key | null,
 	): Key {
 		if (item.key != null) {

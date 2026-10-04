@@ -17,7 +17,7 @@ export interface CellProps {
 export type CellElement = any;
 export type CellRenderer = (columnKey: Key) => CellElement;
 
-function Cell(props: CellProps): any {
+function Cell(_props: CellProps): any {
 	return null;
 }
 

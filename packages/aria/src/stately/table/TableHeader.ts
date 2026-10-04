@@ -17,7 +17,7 @@ export interface TableHeaderProps<T> {
 	children: ColumnElement<T> | ColumnElement<T>[] | ColumnRenderer<T>;
 }
 
-function TableHeader<T>(props: TableHeaderProps<T>): any {
+function TableHeader<T>(_props: TableHeaderProps<T>): any {
 	return null;
 }
 

@@ -105,7 +105,7 @@
     {
       "path": "src/fastHooks.ts",
       "origin": "adapted",
-      "sha256": "9c98f5aec0313889699e0bf1d431c3595e0caca632aa6474a36798f09c6290e2",
+      "sha256": "10632d38f1592e1be2d811a2271bb4e216c4f036ca7c5c1da52cbc70dc20c523",
       "packageName": "@base-ui/utils"
     },
     {

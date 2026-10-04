@@ -203,7 +203,7 @@ export type PolymorphicCallProps<BaseProps extends BaseObject> = FastOmit<
 		ref?: any;
 	} & { [key: string]: any };
 
-export interface PolymorphicComponent<R extends Runtime, BaseProps extends BaseObject> {
+export interface PolymorphicComponent<_R extends Runtime, BaseProps extends BaseObject> {
 	(props: PolymorphicCallProps<WidenUntypedProps<BaseProps>>, scope?: any): unknown;
 	displayName?: string | undefined;
 }

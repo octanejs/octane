@@ -213,7 +213,7 @@ export type ToValues<Props extends object, AndForward = true> = unknown &
 			: never
 		: unknown);
 
-export interface SpringToFn<T = any> {
+export interface SpringToFn<_T = any> {
 	(start: any, stop: any): Promise<any> | void;
 }
 

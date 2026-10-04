@@ -500,7 +500,7 @@ export function useDroppableCollection(
 				let target = nextValidTarget(null, types, allowedOperations, getNextTarget);
 				return target ? 'move' : 'cancel';
 			},
-			onDropEnter(e, drag) {
+			onDropEnter(_e, drag) {
 				let types = getTypes(drag.items);
 				let selectionManager = localState.state.selectionManager;
 				let target: DropTarget | null = null;

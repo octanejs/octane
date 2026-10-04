@@ -65,7 +65,7 @@ export class CollectionNode<T> implements Node<T> {
 		collection: BaseCollection<T>,
 		newCollection: BaseCollection<T>,
 		// eslint-disable-next-line @typescript-eslint/no-unused-vars
-		filterFn: FilterFn<T>,
+		_filterFn: FilterFn<T>,
 	): CollectionNode<T> | null {
 		let clone = this.clone();
 		newCollection.addDescendants(clone, collection);

@@ -73,7 +73,7 @@ export type FocusDirection = 'up' | 'down' | 'pageup' | 'pagedown' | 'first' | '
 export type ClassNamesState = Record<string, boolean>;
 export type CX = (state: ClassNamesState, ...classNames: (string | undefined)[]) => string;
 
-export type GetStyles<Option, IsMulti extends boolean, Group extends GroupBase<Option>> = (
+export type GetStyles<Option, _IsMulti extends boolean, _Group extends GroupBase<Option>> = (
 	propertyName: string,
 	props: unknown,
 ) => CSSObjectWithLabel;

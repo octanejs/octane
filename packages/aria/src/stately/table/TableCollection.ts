@@ -197,7 +197,7 @@ export class TableCollection<T> extends GridCollection<T> implements ITableColle
 
 	constructor(
 		nodes: Iterable<GridNode<T>>,
-		prev?: ITableCollection<T> | null,
+		_prev?: ITableCollection<T> | null,
 		opts?: GridCollectionOptions,
 	) {
 		let rowHeaderColumnKeys: Set<Key> = new Set();

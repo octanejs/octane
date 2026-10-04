@@ -112,7 +112,7 @@ export function PopoverRoot<Payload = unknown>(props: PopoverRoot.Props<Payload>
 }
 
 function usePopoverRootStore<Payload>(
-	handle: PopoverHandle<Payload> | undefined,
+	_handle: PopoverHandle<Payload> | undefined,
 	initialState: Partial<PopoverStoreState<Payload>>,
 ) {
 	// The store is owned by this Root instance and created exactly once. It is not tied to the handle:
