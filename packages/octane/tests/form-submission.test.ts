@@ -707,6 +707,41 @@ describe('parser-time native form commands', () => {
 		expect(deliveries[0].payload?.fields).toEqual([['draft', 'current']]);
 	});
 
+	it.each(['element', 'selector'] as const)(
+		'keeps an accepted command through an already-aborted %s behavior registration',
+		async (target) => {
+			const ownerDocument = earlyDocument();
+			const form = ownerDocument.querySelector('form')!;
+			const original = submit(form);
+			const root = attach(ownerDocument.querySelector('main')!);
+			const lifetime = new ownerDocument.defaultView!.AbortController();
+			lifetime.abort();
+			const capture = vi.fn(acceptedSubmission);
+			const adopt = vi.fn();
+			const canceled = registerSave(root, [], {
+				target: target === 'element' ? form : 'form',
+				signal: lifetime.signal,
+				captureEvent: capture,
+				adopt,
+			});
+			await canceled.ready;
+			canceled.dispose();
+			expect(canceled.signal.aborted).toBe(true);
+			expect(root.signal.aborted).toBe(false);
+			expect(capture).not.toHaveBeenCalled();
+			expect(adopt).not.toHaveBeenCalled();
+			ownerDocument.querySelector('textarea')!.value = 'current';
+			const deliveries: Delivery[] = [];
+			await registerSave(root, deliveries).ready;
+			expect(original.defaultPrevented).toBe(true);
+			expect(deliveries.map(({ event }) => event)).toEqual([original]);
+			expect(deliveries[0].payload?.fields).toEqual([['draft', 'accepted']]);
+			const current = submit(form);
+			expect(deliveries.map(({ event }) => event)).toEqual([original, current]);
+			expect(deliveries[1].payload?.fields).toEqual([['draft', 'current']]);
+		},
+	);
+
 	it.each(['default', 'configured'] as const)(
 		'keeps accepted commands available after an already-aborted %s root with a configured sibling',
 		async (mode) => {

@@ -94,6 +94,25 @@ function register(id = 'save'): void {
 	});
 }
 
+let canceledRegistration: BehaviorRegistration | undefined;
+const canceledCalls: string[] = [];
+if (new URLSearchParams(location.search).has('pre-aborted')) {
+	const lifetime = new AbortController();
+	lifetime.abort();
+	canceledRegistration = root.registerBehavior({
+		id: 'save',
+		target: '#command-form',
+		events: ['submit'],
+		signal: lifetime.signal,
+		captureEvent() {
+			canceledCalls.push('capture');
+		},
+		adopt() {
+			canceledCalls.push('adopt');
+		},
+	});
+	canceledRegistration.dispose();
+}
 if (!new URLSearchParams(location.search).has('no-owner')) register();
 
 const stopHydration = bootstrapIndependentHydration(container, {
@@ -134,6 +153,8 @@ const harness = {
 			value: originalInput.value,
 			nativeSubmissions: window.__formObservation.events.length,
 			canceled: window.__formObservation.events.map((event) => event.defaultPrevented),
+			registrationCanceled: canceledRegistration?.signal.aborted,
+			canceledCalls: canceledCalls.slice(),
 		};
 	},
 };

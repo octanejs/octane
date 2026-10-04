@@ -2,7 +2,7 @@
 import { type ThreeElements, type ThreeRef } from '@octanejs/three';
 import { useCallback, useImperativeHandle, useMemo, useState } from '@octanejs/three/renderer';
 import type { OctaneNode } from 'octane';
-import { MeshNormalMaterial, MeshStandardMaterial, type ColorRepresentation, type Group } from 'three';
+import { MeshNormalMaterial, MeshStandardMaterial, type ColorRepresentation } from 'three';
 import { Center } from './Center.three.tsrx';
 import { Text3D } from './Text3D.three.tsrx';
 

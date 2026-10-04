@@ -1,6 +1,5 @@
 'use client';
 import * as React from 'octane';
-import type { SafeReact } from '@octanejs/base-ui-utils/safeReact';
 import { useControlled } from '@octanejs/base-ui-utils/useControlled';
 import { useIsoLayoutEffect } from '@octanejs/base-ui-utils/useIsoLayoutEffect';
 import { useStableCallback } from '@octanejs/base-ui-utils/useStableCallback';

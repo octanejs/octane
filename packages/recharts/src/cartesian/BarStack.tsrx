@@ -1,4 +1,4 @@
-import type { ComponentType, OctaneNode } from '../util/OctaneTypes.ts';
+import type { OctaneNode } from '../util/OctaneTypes.ts';
 import type { NormalizedStackId, StackId } from '../util/ChartUtils';
 import type { Props as LayerProps } from '../container/Layer.tsrx';
 import type { RectRadius } from '../shape/Rectangle.tsrx';

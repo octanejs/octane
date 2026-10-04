@@ -35,7 +35,7 @@ import { ColorSwatchContext } from './ColorSwatch';
 import { ColorSwatchPickerContext } from './ColorSwatchPicker';
 import { ColorWheelContext } from './ColorWheel';
 import { mergeProps } from '../upstream-exports/react-aria/mergeProps';
-import React, { createContext, type JSX } from '../compat/react';
+import { createContext, type JSX } from '../compat/react';
 
 export interface ColorPickerRenderProps {
 	/** The currently selected color. */
