@@ -61,7 +61,7 @@ export function register(hook: HookType): void {
  * });
  * ```
  */
-export function fastComponent<P extends object, E extends HTMLElement, R extends React.OctaneNode>(
+export function fastComponent<P extends object, _E extends HTMLElement, R extends React.OctaneNode>(
 	fn: (props: P) => R,
 ): typeof fn {
 	const FastComponent = (props: P): R => {

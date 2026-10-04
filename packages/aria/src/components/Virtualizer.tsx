@@ -113,7 +113,7 @@ function CollectionRoot({
 		allowsWindowScrolling: true,
 		layout,
 		collection,
-		renderView: (type, item) => {
+		renderView: (_type, item) => {
 			return item?.render?.(item);
 		},
 		onVisibleRectChange(rect) {

@@ -24,63 +24,63 @@ import createRadialScale from './scales/radial';
 
 function createScale<
 	Output = DefaultOutput,
-	DiscreteInput extends StringLike = StringLike,
-	ThresholdInput extends DefaultThresholdInput = DefaultThresholdInput,
+	_DiscreteInput extends StringLike = StringLike,
+	_ThresholdInput extends DefaultThresholdInput = DefaultThresholdInput,
 >(
 	config?: PickScaleConfig<'linear', Output> | PickScaleConfigWithoutType<'linear', Output>,
 ): PickD3Scale<'linear', Output>;
 
 function createScale<
 	Output = DefaultOutput,
-	DiscreteInput extends StringLike = StringLike,
-	ThresholdInput extends DefaultThresholdInput = DefaultThresholdInput,
+	_DiscreteInput extends StringLike = StringLike,
+	_ThresholdInput extends DefaultThresholdInput = DefaultThresholdInput,
 >(config: PickScaleConfig<'log', Output>): PickD3Scale<'log', Output>;
 
 function createScale<
 	Output = DefaultOutput,
-	DiscreteInput extends StringLike = StringLike,
-	ThresholdInput extends DefaultThresholdInput = DefaultThresholdInput,
+	_DiscreteInput extends StringLike = StringLike,
+	_ThresholdInput extends DefaultThresholdInput = DefaultThresholdInput,
 >(config: PickScaleConfig<'pow', Output>): PickD3Scale<'pow', Output>;
 
 function createScale<
 	Output = DefaultOutput,
-	DiscreteInput extends StringLike = StringLike,
-	ThresholdInput extends DefaultThresholdInput = DefaultThresholdInput,
+	_DiscreteInput extends StringLike = StringLike,
+	_ThresholdInput extends DefaultThresholdInput = DefaultThresholdInput,
 >(config: PickScaleConfig<'sqrt', Output>): PickD3Scale<'sqrt', Output>;
 
 function createScale<
 	Output = DefaultOutput,
-	DiscreteInput extends StringLike = StringLike,
-	ThresholdInput extends DefaultThresholdInput = DefaultThresholdInput,
+	_DiscreteInput extends StringLike = StringLike,
+	_ThresholdInput extends DefaultThresholdInput = DefaultThresholdInput,
 >(config: PickScaleConfig<'symlog', Output>): PickD3Scale<'symlog', Output>;
 
 function createScale<
 	Output = DefaultOutput,
-	DiscreteInput extends StringLike = StringLike,
-	ThresholdInput extends DefaultThresholdInput = DefaultThresholdInput,
+	_DiscreteInput extends StringLike = StringLike,
+	_ThresholdInput extends DefaultThresholdInput = DefaultThresholdInput,
 >(config: PickScaleConfig<'time', Output>): PickD3Scale<'time', Output>;
 
 function createScale<
 	Output = DefaultOutput,
-	DiscreteInput extends StringLike = StringLike,
-	ThresholdInput extends DefaultThresholdInput = DefaultThresholdInput,
+	_DiscreteInput extends StringLike = StringLike,
+	_ThresholdInput extends DefaultThresholdInput = DefaultThresholdInput,
 >(config: PickScaleConfig<'utc', Output>): PickD3Scale<'utc', Output>;
 
 function createScale<
 	Output = DefaultOutput,
-	DiscreteInput extends StringLike = StringLike,
-	ThresholdInput extends DefaultThresholdInput = DefaultThresholdInput,
+	_DiscreteInput extends StringLike = StringLike,
+	_ThresholdInput extends DefaultThresholdInput = DefaultThresholdInput,
 >(config: PickScaleConfig<'quantile', Output>): PickD3Scale<'quantile', Output>;
 
 function createScale<
 	Output = DefaultOutput,
-	DiscreteInput extends StringLike = StringLike,
-	ThresholdInput extends DefaultThresholdInput = DefaultThresholdInput,
+	_DiscreteInput extends StringLike = StringLike,
+	_ThresholdInput extends DefaultThresholdInput = DefaultThresholdInput,
 >(config: PickScaleConfig<'quantize', Output>): PickD3Scale<'quantize', Output>;
 
 function createScale<
 	Output = DefaultOutput,
-	DiscreteInput extends StringLike = StringLike,
+	_DiscreteInput extends StringLike = StringLike,
 	ThresholdInput extends DefaultThresholdInput = DefaultThresholdInput,
 >(
 	config: PickScaleConfig<'threshold', Output, StringLike, ThresholdInput>,
@@ -89,7 +89,7 @@ function createScale<
 function createScale<
 	Output = DefaultOutput,
 	DiscreteInput extends StringLike = StringLike,
-	ThresholdInput extends DefaultThresholdInput = DefaultThresholdInput,
+	_ThresholdInput extends DefaultThresholdInput = DefaultThresholdInput,
 >(
 	config: PickScaleConfig<'ordinal', Output, DiscreteInput>,
 ): PickD3Scale<'ordinal', Output, DiscreteInput>;
@@ -97,7 +97,7 @@ function createScale<
 function createScale<
 	Output = DefaultOutput,
 	DiscreteInput extends StringLike = StringLike,
-	ThresholdInput extends DefaultThresholdInput = DefaultThresholdInput,
+	_ThresholdInput extends DefaultThresholdInput = DefaultThresholdInput,
 >(
 	config: PickScaleConfig<'point', Output, DiscreteInput>,
 ): PickD3Scale<'point', Output, DiscreteInput>;
@@ -105,15 +105,15 @@ function createScale<
 function createScale<
 	Output = DefaultOutput,
 	DiscreteInput extends StringLike = StringLike,
-	ThresholdInput extends DefaultThresholdInput = DefaultThresholdInput,
+	_ThresholdInput extends DefaultThresholdInput = DefaultThresholdInput,
 >(
 	config: PickScaleConfig<'band', Output, DiscreteInput>,
 ): PickD3Scale<'band', Output, DiscreteInput>;
 
 function createScale<
 	Output = DefaultOutput,
-	DiscreteInput extends StringLike = StringLike,
-	ThresholdInput extends DefaultThresholdInput = DefaultThresholdInput,
+	_DiscreteInput extends StringLike = StringLike,
+	_ThresholdInput extends DefaultThresholdInput = DefaultThresholdInput,
 >(config: PickScaleConfig<'radial', Output>): PickD3Scale<'radial', Output>;
 
 function createScale<

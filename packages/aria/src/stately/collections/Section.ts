@@ -5,7 +5,7 @@ import type { SectionProps } from '@react-types/shared';
 import { Children } from 'octane';
 import type { PartialNode } from './types';
 
-function Section<T>(props: SectionProps<T>): any {
+function Section<T>(_props: SectionProps<T>): any {
 	return null;
 }
 

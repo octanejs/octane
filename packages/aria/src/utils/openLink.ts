@@ -10,7 +10,7 @@ import { S, splitSlot } from '../internal';
 import { focusWithoutScrolling } from './focusWithoutScrolling';
 import { isFirefox, isIPad, isMac, isWebKit } from './platform';
 
-type DOMAttributes<T = Element> = Record<string, any>;
+type DOMAttributes<_T = Element> = Record<string, any>;
 
 interface Router {
 	isNative: boolean;

@@ -29,10 +29,10 @@ export type MouseEvent<T = Element> = Omit<globalThis.MouseEvent, 'currentTarget
 	target: EventTarget & T;
 	nativeEvent: globalThis.MouseEvent;
 };
-export type HTMLAttributes<T = HTMLElement> = Record<string, any>;
-export type InputHTMLAttributes<T = HTMLInputElement> = Record<string, any>;
-export type LabelHTMLAttributes<T = HTMLLabelElement> = Record<string, any>;
-export type DOMAttributes<T = Element> = Record<string, any>;
+export type HTMLAttributes<_T = HTMLElement> = Record<string, any>;
+export type InputHTMLAttributes<_T = HTMLInputElement> = Record<string, any>;
+export type LabelHTMLAttributes<_T = HTMLLabelElement> = Record<string, any>;
+export type DOMAttributes<_T = Element> = Record<string, any>;
 export type MutableRefObject<T> = { current: T };
 export type RefObject<T> = { current: T };
 export type Ref<T> = ForwardedRef<T>;

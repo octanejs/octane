@@ -18,7 +18,7 @@ export type ColumnDynamicSize = `${number}fr`; // match regex: /^(\d+)(?=fr$)/
 /** All possible sizes a column can be assigned. */
 export type ColumnSize = ColumnStaticSize | ColumnDynamicSize;
 
-export type ColumnElement<T> = any;
+export type ColumnElement<_T> = any;
 export type ColumnRenderer<T> = (item: T) => ColumnElement<T>;
 export interface ColumnProps<T> {
 	/** Rendered contents of the column if `children` contains child columns. */
@@ -48,7 +48,7 @@ export interface ColumnProps<T> {
 	textValue?: string;
 }
 
-function Column<T>(props: ColumnProps<T>): any {
+function Column<T>(_props: ColumnProps<T>): any {
 	return null;
 }
 
