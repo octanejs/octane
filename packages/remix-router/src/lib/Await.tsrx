@@ -108,7 +108,7 @@ function AwaitBody(props: AwaitBodyProps) @{
 			<AwaitContext value={promise}>
 				<ResolveAwait children={props.children} />
 			</AwaitContext>
-		} @catch (caught, reset) {
+		} @catch (caught) {
 			<AwaitCaught caught={caught} errorElement={props.errorElement} onError={props.onError} />
 		}
 	}

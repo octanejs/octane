@@ -1,4 +1,4 @@
-// Vendored from react-router@8.2.0 packages/react-router/lib/types/utils.ts — unmodified.
+// Vendored from react-router@8.2.0 packages/react-router/lib/types/utils.ts — unmodified except: type-level __tests alias → removed (consumer noUnusedLocals).
 // Re-vendor with `node scripts/vendor-remix-router.mjs`; never hand-edit.
 export type Expect<T extends true> = T;
 
@@ -26,12 +26,3 @@ type _Normalize<Key extends keyof any, T> =
   :
   never
 type UnionKeys<T> = T extends any ? keyof T : never;
-
-// prettier-ignore
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
-type __tests = [
-  Expect<Equal<Normalize<{}>, {}>>,
-  Expect<Equal<Normalize<{a: string}>, {a: string}>>,
-  Expect<Equal<Normalize<{a: string} | {b: string}>, {a: string, b?: undefined} | {a?: undefined , b: string}>>,
-  Expect<Equal<Normalize<{a?: string} | {b?: string}>, {a?: string, b?: undefined} | {a?: undefined , b?: string}>>,
-]

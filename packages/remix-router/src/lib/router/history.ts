@@ -1,4 +1,4 @@
-// Vendored from react-router@8.2.0 packages/react-router/lib/router/history.ts — unmodified.
+// Vendored from react-router@8.2.0 packages/react-router/lib/router/history.ts — unmodified except: unused createBrowserHref parameter window → `_`-prefixed (consumer noUnusedParameters).
 // Re-vendor with `node scripts/vendor-remix-router.mjs`; never hand-edit.
 import { PROTOCOL_RELATIVE_URL_REGEX } from './url';
 
@@ -392,7 +392,7 @@ export function createBrowserHistory(options: BrowserHistoryOptions = {}): Brows
 		);
 	}
 
-	function createBrowserHref(window: Window, to: To) {
+	function createBrowserHref(_window: Window, to: To) {
 		return typeof to === 'string' ? to : createPath(to);
 	}
 

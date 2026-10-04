@@ -422,7 +422,7 @@ export function useFormAction(...args: any[]): string {
 	return createPath(path);
 }
 
-export type FetcherWithComponents<TData = any> = any;
+export type FetcherWithComponents<_TData = any> = any;
 
 /**
  * A hook for interacting with route loaders/actions WITHOUT navigating —
