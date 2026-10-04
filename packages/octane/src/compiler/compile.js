@@ -27679,14 +27679,13 @@ function planJsx(
 	// DOM of its own (planJsx's `ownAnchor`): the @if/@switch and lite component
 	// writers read the anchor only to create the slot, so ownSlotAnchor mints the
 	// slot a comment of its own then.
-	const slotAnchorNodeFor = (c, anchorKey, lite = false) =>
+	const slotAnchorNodeFor = (c, anchorKey) =>
 		c.ownAnchor
 			? b.call(
 					requireRuntimeForContext(ctx, 'ownSlotAnchor'),
 					b.id('__s'),
 					b.literal(c.slotIndex),
 					b.id('__block'),
-					...(lite ? [b.literal(true)] : []),
 				)
 			: anchorNodeFor(c, anchorKey);
 	// Host expression for a construct's slot call — the bag-stashed host element,
@@ -28320,7 +28319,7 @@ function planJsx(
 				liteMemo ? 'componentSlotLite' : cc.voidComponent ? 'componentSlotVoid' : 'componentSlot',
 			);
 			const memoAnchor = liteMemo
-				? slotAnchorNodeFor(cc, 'compAnchor', true)
+				? slotAnchorNodeFor(cc, 'compAnchor')
 				: anchorNodeFor(cc, 'compAnchor');
 			const trailing = liteMemo
 				? optionalCallArgs(b.literal(cc.invocationSite), memoAnchor)
@@ -28412,7 +28411,7 @@ function planJsx(
 			ctx.runtimeNeeded.add('componentSlotLite');
 			// Anchor — same rules as componentSlot (see anchorNodeFor); the
 			// endMarker case keeps the lite range inside the owning block.
-			const liteAnchor = slotAnchorNodeFor(cc, 'compAnchor', true);
+			const liteAnchor = slotAnchorNodeFor(cc, 'compAnchor');
 			pushAfterStmt(
 				cc.id,
 				org,

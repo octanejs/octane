@@ -132,7 +132,12 @@ describe.each(compiles.filter((options) => !options.strong))(
 			compileOptions: { ...options, hmr: false },
 		});
 
-		it.each(['ReplayedIfs', 'ReplayedComponent'])('%s', (shape) => {
+		it.each([
+			'ReplayedIfs',
+			'ReplayedComponent',
+			'ReplayedLiteBeforeIf',
+			'ReplayedComponentBeforeIf',
+		])('%s', (shape) => {
 			const container = document.createElement('div');
 			document.body.appendChild(container);
 			const root = createRoot(container);

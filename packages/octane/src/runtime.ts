@@ -43302,27 +43302,32 @@ interface BranchSlot {
  * mounted later would land before that shared marker, after those siblings.
  * When a client render creates the slot, mint it a comment of its own at its
  * source position. The writer reads its anchor only while creating the slot,
- * and a hydrating slot adopts the server's range, which already bounds it. A
- * lite call returns without creating its scope while its parent's render is
- * replaying (componentSlotLite), so it mints nothing until it does.
+ * and a hydrating slot adopts the server's range, which already bounds it.
+ *
+ * A render that schedules its own update mid-body replays before its slots
+ * settle: component calls return without creating anything, and a branch slot
+ * is created but renders no arm. Nothing is minted until the replay, which
+ * reaches every slot in source order; a branch slot created in the meantime
+ * takes its own anchor then, before it renders, unless it adopted a server
+ * range.
  */
-export function ownSlotAnchor(
-	scope: Scope,
-	slotKey: number,
-	block: Block,
-	lite?: boolean,
-): Node | null {
+export function ownSlotAnchor(scope: Scope, slotKey: number, block: Block): Node | null {
 	const anchor = block.endMarker;
 	const parent = block.parentNode;
 	const hydration = activeHydration();
+	const slot = scope.slots[slotKey] as BranchSlot | undefined;
 	if (
-		scope.slots[slotKey] !== undefined ||
+		(slot !== undefined && (slot.branch !== -1 || slot.start !== null)) ||
 		(hydration !== null && !hydration.inFreshRange(anchor, parent)) ||
-		(lite && CURRENT_BLOCK?.pending && !CURRENT_BLOCK.crossRenderUpdate)
+		(CURRENT_BLOCK?.pending && !CURRENT_BLOCK.crossRenderUpdate)
 	)
 		return anchor;
 	const own = (STAGED_DOM?.view(document) ?? document).createComment('');
 	(STAGED_DOM?.view(parent) ?? parent).insertBefore(own, anchor);
+	if (slot !== undefined) {
+		journalRootProperty(slot, 'anchor', slot.anchor);
+		slot.anchor = own;
+	}
 	return own;
 }
 

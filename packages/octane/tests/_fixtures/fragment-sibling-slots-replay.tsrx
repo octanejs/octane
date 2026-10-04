@@ -11,6 +11,18 @@ function OnlyA(props: { a: boolean }) @{
 	}
 }
 
+// Calls a hook, so it renders through a full component slot.
+function StatefulA(props: { a: boolean }) @{
+	const [label] = useState('a');
+	@if (props.a) {
+		<span>{label as string}</span>
+	}
+}
+
+function Nothing() @{
+	<></>
+}
+
 /** Pass a value through, scheduling the caller's own update the first time. */
 function useSettle(): (value: boolean) => boolean {
 	const [settled, setSettled] = useState(false);
@@ -51,5 +63,41 @@ function ComponentThenIf(props: { a: boolean; b: boolean }) @{
 export function ReplayedComponent(props: { a: boolean; b: boolean }) @{
 	<main>
 		<ComponentThenIf a={props.a} b={props.b} />
+	</main>
+}
+
+// The update is scheduled while an earlier sibling's arguments are evaluated:
+// that call waits for the replay, while the later @if creates its slot now.
+function LiteThenIf(props: { a: boolean; b: boolean }) @{
+	const settle = useSettle();
+	<>
+		<OnlyA a={settle(props.a)} />
+		@if (props.b) {
+			<span>{'b'}</span>
+		}
+		<Nothing />
+	</>
+}
+
+export function ReplayedLiteBeforeIf(props: { a: boolean; b: boolean }) @{
+	<main>
+		<LiteThenIf a={props.a} b={props.b} />
+	</main>
+}
+
+function StatefulThenIf(props: { a: boolean; b: boolean }) @{
+	const settle = useSettle();
+	<>
+		<StatefulA a={settle(props.a)} />
+		@if (props.b) {
+			<span>{'b'}</span>
+		}
+		<Nothing />
+	</>
+}
+
+export function ReplayedComponentBeforeIf(props: { a: boolean; b: boolean }) @{
+	<main>
+		<StatefulThenIf a={props.a} b={props.b} />
 	</main>
 }
