@@ -10449,12 +10449,12 @@ function prepareAuthoredAst(source, cleanFilename, options) {
  * otherwise surface one finding per run.
  *
  * Strong analysis runs on the same prepared tree compilation uses. Ordinary
- * compilation then runs unchanged on the original source and options, so its
- * own validation and warnings are kept rather than reimplemented. When Strong
- * analysis found an error, compilation would throw exactly that first
- * violation from the same tree, so it is skipped; code generation never runs
- * for such a module, and diagnostics it alone would raise are absent. Any other
- * compilation failure is returned as `error`.
+ * compilation then continues from that tree and analysis instead of preparing
+ * the module again, so its own validation and warnings are kept rather than
+ * reimplemented. When Strong analysis found an error, compilation would throw
+ * exactly that first violation from the same tree, so it is skipped; code
+ * generation never runs for such a module, and diagnostics it alone would raise
+ * are absent. Any other compilation failure is returned as `error`.
  *
  * @param {string} source
  * @param {string} filename
@@ -10472,6 +10472,7 @@ export function collectDiagnostics(source, filename, options) {
 		diagnostics.push(diagnostic);
 	};
 	const cleanFilename = cleanCompileFilename(filename);
+	let analyzed = null;
 	if (options?.strong === true || source.includes('use strong')) {
 		let prepared = null;
 		try {
@@ -10480,13 +10481,13 @@ export function collectDiagnostics(source, filename, options) {
 			// Compilation below reports the same failure in its own terms.
 		}
 		if (prepared !== null) {
-			let strong = null;
 			try {
-				strong = analyzeStrongMode(prepared.ast, source, cleanFilename, prepared.options);
+				const strong = analyzeStrongMode(prepared.ast, source, cleanFilename, prepared.options);
+				for (const diagnostic of strong.diagnostics) add(diagnostic);
+				analyzed = { ...prepared, strong };
 			} catch {
 				// Compilation runs the same analysis and returns the failure.
 			}
-			for (const diagnostic of strong?.diagnostics ?? []) add(diagnostic);
 		}
 	}
 	if (diagnostics.some((diagnostic) => diagnostic.severity === 'error')) {
@@ -10494,23 +10495,31 @@ export function collectDiagnostics(source, filename, options) {
 	}
 	let error = null;
 	try {
-		for (const diagnostic of compile(source, filename, options).diagnostics ?? []) add(diagnostic);
+		const result = compileAuthored(source, filename, options, null, analyzed);
+		for (const diagnostic of result.diagnostics ?? []) add(diagnostic);
 	} catch (thrown) {
 		error = thrown;
 	}
 	return { diagnostics, error };
 }
 
-function compileAuthored(source, filename, options, bundlerMetadata) {
+/**
+ * @param {any} [analyzed] a module `collectDiagnostics` already prepared and
+ *   passed through Strong analysis without an error, so neither is repeated
+ */
+function compileAuthored(source, filename, options, bundlerMetadata, analyzed = null) {
 	const mode = (options && options.mode) || 'client';
 	if (mode !== 'client' && mode !== 'server') {
 		throw new Error(`Unknown compile mode "${mode}" — expected 'client' or 'server'.`);
 	}
 	const cleanFilename = cleanCompileFilename(filename);
-	const prepared = prepareAuthoredAst(source, cleanFilename, options);
+	const prepared = analyzed ?? prepareAuthoredAst(source, cleanFilename, options);
 	let analyzedAst = prepared.ast;
 	options = prepared.options;
-	const strongAnalysis = assertStrongMode(analyzedAst, source, cleanFilename, options);
+	const strongAnalysis =
+		analyzed === null
+			? assertStrongMode(analyzedAst, source, cleanFilename, options)
+			: analyzed.strong;
 	const strongModeEnabled = strongAnalysis?.enabled === true;
 	analyzedAst = markKnownAttributeSpreads(analyzedAst, options?.knownAttributeSpreads);
 	if (analyzedAst.metadata?.octaneNativeAttributeProjection) {
