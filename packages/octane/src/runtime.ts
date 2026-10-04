@@ -40140,13 +40140,10 @@ export function tryBlock(
 		if (supersedesInputs) supersedeSignalRetryOwners(state);
 		// A boundary can retry after its parent's render rolls back, e.g. when the
 		// wakeable it was pending on settles. It must render the committed inputs.
-		const journalInputs = ROOT_RENDER_TRANSACTION !== null && !ROOT_RENDER_ROLLBACK;
-		if (journalInputs) {
-			if (state.tryBody !== tryBody) journalRootProperty(state, 'tryBody', state.tryBody);
-			if (state.catchBody !== catchBody) journalRootProperty(state, 'catchBody', state.catchBody);
-			if (state.pendingBody !== pendingBody)
-				journalRootProperty(state, 'pendingBody', state.pendingBody);
-		}
+		if (state.tryBody !== tryBody) journalRootProperty(state, 'tryBody', state.tryBody);
+		if (state.catchBody !== catchBody) journalRootProperty(state, 'catchBody', state.catchBody);
+		if (state.pendingBody !== pendingBody)
+			journalRootProperty(state, 'pendingBody', state.pendingBody);
 		state.tryBody = tryBody;
 		state.catchBody = catchBody;
 		state.pendingBody = pendingBody;
@@ -40155,8 +40152,11 @@ export function tryBlock(
 		// A whole-origin unwind instead restores its driving cells; restore the
 		// matching environment before a queued descendant can retry this primary,
 		// rather than waiting for the origin's later pending-cue render to do it.
-		if ((journalInputs || ACTIVE_TRANSITION_ATTEMPT !== null) && state.env !== env)
-			TRANSITION_JOURNAL!.push(JOURNAL_PROP, state, 'env', state.env);
+		if (state.env !== env) {
+			if (ACTIVE_TRANSITION_ATTEMPT !== null)
+				TRANSITION_JOURNAL!.push(JOURNAL_PROP, state, 'env', state.env);
+			else journalRootProperty(state, 'env', state.env);
+		}
 		state.env = env;
 	}
 	const s = state;
