@@ -179,21 +179,11 @@ export const SOURCE_PUBLICATION_DEBT = {
 	// keeps unused locals and type-level tests in it. The fix belongs in the
 	// vendoring script. Follow-up of #1694.
 	[RULES.unusedLocals]: ['@octanejs/remix-router'],
-	// Unused parameters, and unused type parameters on exported generics. A `_`
-	// prefix silences both without changing a call site or a type argument
-	// position. Follow-up of #1694.
-	[RULES.unusedParameters]: [
-		'@octanejs/aria',
-		'@octanejs/base-ui',
-		'@octanejs/base-ui-utils',
-		'@octanejs/lexical',
-		'@octanejs/recharts',
-		'@octanejs/remix-router',
-		'@octanejs/select',
-		'@octanejs/spring',
-		'@octanejs/styled-components',
-		'@octanejs/visx',
-	],
+	// Unused parameters and type parameters in the same vendored router core.
+	// Elsewhere a `_` prefix silences both without changing a call site or a
+	// type argument position, but here it is a hand edit, so this too belongs in
+	// the vendoring script. Follow-up of #1694.
+	[RULES.unusedParameters]: ['@octanejs/remix-router'],
 };
 
 const CHECKERS = new Set(['octane-tsc', 'tsgo', 'tsrx-tsc', 'tsc']);

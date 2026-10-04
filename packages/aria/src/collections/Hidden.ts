@@ -62,7 +62,7 @@ export function Hidden(props: { children: any; target?: Element | null }): any {
 }
 
 /** Creates a component that returns null if it is in a hidden subtree. */
-export function createHideableComponent<T, P = {}>(
+export function createHideableComponent<_T, P = {}>(
 	fn: (props: P, ref: any) => any,
 ): (props: P & { ref?: any }) => any {
 	// octane adaptation: no forwardRef — the ref arrives as a normal prop and is

@@ -2996,7 +2996,7 @@
     {
       "path": "src/number-field/utils/parse.ts",
       "origin": "adapted",
-      "sha256": "030f50820cb13d419bec209ce42e897a015180f3daec94c3864251c08655a8dc",
+      "sha256": "4857c67abaf11e1f3d3be9832114b2d86c68f83bf6df7ba0305caad37e4b925b",
       "packageName": "@base-ui/react"
     },
     {
@@ -3122,7 +3122,7 @@
     {
       "path": "src/popover/root/PopoverRoot.tsrx",
       "origin": "adapted",
-      "sha256": "bc487fcbc971ebac7f5afb4c80ae1bee479c448fa0d6ada720420d8e04554fef",
+      "sha256": "745feb7b1181733ef629d8a8056204566582050e9edaf988215c5371a52235cf",
       "packageName": "@base-ui/react"
     },
     {

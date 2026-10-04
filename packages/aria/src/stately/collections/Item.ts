@@ -6,7 +6,7 @@ import type { ItemProps } from '@react-types/shared';
 import { Children } from 'octane';
 import type { PartialNode } from './types';
 
-function Item<T>(props: ItemProps<T>): any {
+function Item<T>(_props: ItemProps<T>): any {
 	return null;
 }
 

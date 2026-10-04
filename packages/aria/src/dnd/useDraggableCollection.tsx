@@ -23,7 +23,7 @@ export interface DraggableCollectionOptions {}
  * touch based drag and drop, in addition to full parity for keyboard and screen reader users.
  */
 export function useDraggableCollection(
-	props: DraggableCollectionOptions,
+	_props: DraggableCollectionOptions,
 	state: DraggableCollectionState,
 	ref: RefObject<HTMLElement | null>,
 ): void {

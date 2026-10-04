@@ -25,7 +25,7 @@ import { S, splitSlot, subSlot } from '../internal';
 
 // octane adaptations: structural aliases for the React types upstream drags along.
 type ReactNode = any;
-type ForwardedRef<T> = any;
+type ForwardedRef<_T> = any;
 
 export interface DragAndDropContextValue {
 	dragAndDropHooks?: DragAndDropHooks;
