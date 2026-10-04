@@ -40138,6 +40138,12 @@ export function tryBlock(
 			(state.branch === 2 || state.retrySignalOwners !== undefined) &&
 			(state.tryBody !== tryBody || (state.env !== env && depsChanged(state.env, env)));
 		if (supersedesInputs) supersedeSignalRetryOwners(state);
+		// A boundary can retry after its parent's render rolls back, e.g. when the
+		// wakeable it was pending on settles. It must render the committed inputs.
+		if (state.tryBody !== tryBody) journalRootProperty(state, 'tryBody', state.tryBody);
+		if (state.catchBody !== catchBody) journalRootProperty(state, 'catchBody', state.catchBody);
+		if (state.pendingBody !== pendingBody)
+			journalRootProperty(state, 'pendingBody', state.pendingBody);
 		state.tryBody = tryBody;
 		state.catchBody = catchBody;
 		state.pendingBody = pendingBody;
@@ -40146,8 +40152,11 @@ export function tryBlock(
 		// A whole-origin unwind instead restores its driving cells; restore the
 		// matching environment before a queued descendant can retry this primary,
 		// rather than waiting for the origin's later pending-cue render to do it.
-		if (ACTIVE_TRANSITION_ATTEMPT !== null && state.env !== env)
-			TRANSITION_JOURNAL!.push(JOURNAL_PROP, state, 'env', state.env);
+		if (state.env !== env) {
+			if (ACTIVE_TRANSITION_ATTEMPT !== null)
+				TRANSITION_JOURNAL!.push(JOURNAL_PROP, state, 'env', state.env);
+			else journalRootProperty(state, 'env', state.env);
+		}
 		state.env = env;
 	}
 	const s = state;
@@ -41847,6 +41856,24 @@ function attemptHiddenReveal(
 	}
 }
 
+/**
+ * A parent render can reveal this boundary and then roll back when a later
+ * sibling suspends the root. The journal restores the hidden display and the
+ * fallback's deferred unmount, so the boundary record must return with them.
+ * Otherwise it treats the re-hidden primary as visible and orphans the fallback.
+ * A restart disposes an uncommitted primary for good; the restored record then
+ * names a disposed primary, which the next render or retry replaces.
+ */
+function journalRootReveal(state: TrySlot): void {
+	journalObjectOnce(state);
+	// Updates parked while hidden are committed work that only a reveal publishes.
+	const parked = HIDDEN_REVEAL_ACTIONS?.get(state);
+	if (parked !== undefined)
+		journalUndo(() => {
+			HIDDEN_REVEAL_ACTIONS!.set(state, parked);
+		});
+}
+
 function attemptHiddenRevealInner(
 	state: TrySlot,
 	scheduledMode?: 'urgent' | 'transition',
@@ -41887,6 +41914,7 @@ function attemptHiddenRevealInner(
 		discardOffscreenCapture(supersededCapture);
 		deactivateScope(tryBlock, false);
 	}
+	if (ROOT_RENDER_TRANSACTION !== null && !ROOT_RENDER_ROLLBACK) journalRootReveal(state);
 	const effectDeps = snapshotSubtreeEffectDeps(tryBlock);
 	if (reason === 'parent' && !RESUME_REPLAY && !state.hasResolved) {
 		// A completed speculative retry still is not a mount. New props must
