@@ -259,6 +259,44 @@ for (const production of [false, true]) {
 				expect(submissions).toHaveLength(3);
 			});
 
+			it.each(['container', 'form'])(
+				'preserves an early submission through an already-aborted registration on a %s root',
+				async (root) => {
+					const { page, submissions, load } = await openPage(
+						'index',
+						`?pre-aborted${root === 'form' ? '&form-root' : ''}`,
+					);
+					await page.getByLabel('Draft', { exact: true }).fill('accepted');
+					await page.getByRole('button', { name: 'Save', exact: true }).click();
+					await page.getByLabel('Draft', { exact: true }).fill('edited');
+					await load();
+					const state = await page.evaluate(() => window.__formSubmission.state());
+					expect(state.deliveries).toEqual([
+						expect.objectContaining({
+							fields: [
+								['draft', 'accepted'],
+								['intent', 'save'],
+							],
+							early: true,
+							immutable: true,
+							original: true,
+							submitterSame: true,
+							trusted: true,
+						}),
+					]);
+					expect(state).toMatchObject({
+						registrationCanceled: true,
+						canceledCalls: [],
+						captures: [expect.any(Object)],
+						value: 'edited',
+						nativeSubmissions: 1,
+						canceled: [true],
+						errors: [],
+					});
+					expect(submissions).toEqual([]);
+				},
+			);
+
 			for (const path of [
 				'button',
 				'implicit Enter',
