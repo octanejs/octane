@@ -60,8 +60,8 @@
     "brotli": 48355
   },
   "deferred-hydration": {
-    "raw": 237016,
-    "gzip": 74973,
+    "raw": 237338,
+    "gzip": 75032,
     "brotli": 65007
   },
   "suspense-transition": {
