@@ -11,6 +11,9 @@ Snapshot patch and main-thread PAPI calls.
 ```bash
 node benchmarks/bench.mjs --quick lynx-render
 
+# The fixture contract that PR CI runs: reentrant drain and program-run mount.
+node --test benchmarks/lynx-render/workload.test.mjs
+
 # Multiple samples for a meaningful same-machine comparison:
 node benchmarks/lynx-render/run.mjs 9
 ```
@@ -28,7 +31,9 @@ Targets:
 - `drain_ms` on `octane-lynx-reentrant-{10k,20k}` — an Octane-only transport
   scaling pair that queues a synchronous commit burst from inside one Element
   PAPI update. Every version must be acknowledged and completed in order, and
-  the final native host must expose the last queued value.
+  the final native host must expose the last queued value. The burst is encoded
+  with the transport codec before the timer starts, as the background transport
+  would send it, so the interval is the receiver's drain.
 
 Each 1,000-row sample must create exactly 9,008 reachable host nodes and install
 2,000 native event tokens; 10,000-row samples must create 90,008 nodes and
@@ -53,9 +58,9 @@ silently reinstalling every row's event handlers.
 The `--quick` command records three samples to stabilize its same-run regression
 guards; longer runs provide stronger performance evidence. Every run warms both
 frameworks, alternates target order, and reports median and relative variation.
-ReactLynx's actual Snapshot transport
-serializes patches; the current Octane in-process ContextProxy transfers objects
-by reference, so serialization is not charged to Octane. Root/page creation,
+Both sides pay serialization: ReactLynx's actual Snapshot transport serializes
+patches, and Octane's transport codec encodes every message to a JSON string
+that the receiver decodes. Root/page creation,
 row-data generation, checksum validation, and teardown are outside both timers.
 
 ## Findings and path to ReactLynx parity
