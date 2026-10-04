@@ -11,7 +11,8 @@ name: PR bench
 #
 # The job fails when a byte value exceeds its committed budget, when a
 # js-framework work counter (production calls, DOM mutations) increases, or
-# when a benchmark fails on the merge commit. Wall time is reported only.
+# when a benchmark fails on the merge commit. Wall time is reported only, and
+# so is the path-filtered lynx-render suite.
 
 on:
   pull_request:
@@ -107,6 +108,23 @@ jobs:
             --base-json="$RESULTS/base/js-framework.json" \
             --head-json="$RESULTS/head/js-framework.json" \
             || echo "::warning::paired js-framework benchmark failed; the report names the side"
+
+      # Lynx dual-thread render cost is a report only, and it runs only when the
+      # pull request touches the Lynx renderer, the universal runtime it builds
+      # on, its compiler backend, or the harness. Its deterministic counters
+      # (wire bytes, Element PAPI calls, renders, fixture bytes) are exact for a
+      # build; its timings are unpaired. Base and head run one after the other.
+      - name: Benchmark lynx-render (report only)
+        run: |
+          lynx_paths='^(packages/lynx/|packages/rspeedy-plugin-octane/|packages/octane/src/universal|packages/octane/src/compiler/(compile-universal|compile-lynx|universal-runtime|renderers)\.js$|benchmarks/lynx-render/)'
+          if ! git diff --name-only HEAD^1 HEAD | grep -qE "$lynx_paths"; then
+            echo "No Lynx render path changed; lynx-render is not reported."
+            exit 0
+          fi
+          (cd "$BASE_TREE" && node benchmarks/bench.mjs --quick --results-dir="$RESULTS/base" lynx-render) \
+            || echo "::warning::base lynx-render benchmark failed"
+          node benchmarks/bench.mjs --quick --results-dir="$RESULTS/head" lynx-render \
+            || echo "::warning::lynx-render benchmark failed; the report names it"
 
       # The report exits non-zero for a budget breach, an increased work
       # counter, or a benchmark that failed on the merge commit. Record that and

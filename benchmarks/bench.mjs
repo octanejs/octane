@@ -1061,6 +1061,9 @@ const SUITES = [
 		// Compiled Octane and pinned ReactLynx dual-thread render cost (Node-only)
 		// on the same cheap Element PAPI. Both visible trees and real native taps
 		// must match; three quick samples keep same-run ratio guards stable.
+		// Octane-only cold-page variants time the main-thread first screen and
+		// its adoption, and deterministic counters report wire bytes, Element
+		// PAPI calls, renders, and per-thread fixture bytes (#1055 baseline).
 		name: 'lynx-render',
 		cwd: 'lynx-render',
 		servers: [],

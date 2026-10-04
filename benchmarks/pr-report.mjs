@@ -23,6 +23,8 @@
 // - Wall time. js-framework pairs base and head samples in one browser
 //   (js-framework/pair.mjs); an operation is called slower or faster only when
 //   the 95% confidence interval of its head/base ratio lies entirely beyond ±3%.
+// - Report-only suites, which never fail the check: lynx-render runs only when
+//   a pull request touches the Lynx renderer, so its section appears only then.
 //
 // The comment workflow loads this file alone from the default branch, so it
 // imports nothing outside Node's standard library.
@@ -32,7 +34,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 export const COMMENT_MARKER = '<!-- octane-pr-bench -->';
-export const SUITES = ['js-framework', 'bundle-size', 'bundle-reachability'];
+export const SUITES = ['js-framework', 'bundle-size', 'bundle-reachability', 'lynx-render'];
 export const TIMING_THRESHOLD = 0.03;
 // Chromium clamps performance.now() to 0.1ms. A verdict also needs the median
 // shift to span two ticks of the whole sample, so an operation that cannot loop
@@ -55,6 +57,13 @@ const SUITE_INFO = {
 	'bundle-reachability': {
 		title: 'Public-import reachability bundles (bytes)',
 		reports: (name) => !name.endsWith('-budget'),
+	},
+	'lynx-render': {
+		title: 'Lynx dual-thread render (report only)',
+		reports: (name) => name.startsWith('octane-lynx'),
+		// Path-filtered in CI: an absent result means the suite was not selected.
+		optional: true,
+		reportOnly: true,
 	},
 };
 
@@ -221,11 +230,14 @@ export function analyzeReport({
 	const notes = [];
 	const sections = [];
 	for (const suite of suites) {
-		sections.push('', `### ${SUITE_INFO[suite]?.title ?? suite}`, '');
+		const info = SUITE_INFO[suite];
+		if (info?.optional && head[suite] == null) continue;
+		sections.push('', `### ${info?.title ?? suite}`, '');
 		const headFailure = failureOf(head[suite]);
 		const baseFailure = failureOf(base[suite]);
 		if (headFailure) {
-			failures.push(`❌ ${suite} failed on this pull request`);
+			if (info?.reportOnly) notes.push(`⚠️ ${suite} failed on this pull request (report only)`);
+			else failures.push(`❌ ${suite} failed on this pull request`);
 			sections.push('❌ The suite failed on this pull request.', '', ...fenced(headFailure));
 			continue;
 		}
@@ -256,8 +268,10 @@ export function analyzeReport({
 		const larger = deterministic.filter(
 			(row) => row.verdict === 'larger' && !breached.has(`${row.target}\0${row.op}`),
 		);
-		if (SUITE_INFO[suite]?.workGate && larger.length) {
+		if (info?.workGate && larger.length) {
 			failures.push(`❌ ${suite}: ${larger.length} work counter(s) increased`);
+		} else if (info?.reportOnly && larger.length) {
+			notes.push(`🔴 ${suite}: ${larger.length} counter(s) increased (report only)`);
 		} else if (larger.length) {
 			notes.push(`🔴 ${suite}: ${larger.length} value(s) increased within budget`);
 		}
@@ -278,7 +292,7 @@ export function analyzeReport({
 		}
 		if (timing.length && deterministic.length) {
 			sections.push(
-				SUITE_INFO[suite]?.workGate
+				info?.workGate
 					? 'Work counters (an increase fails this check):'
 					: 'Deterministic counters:',
 				'',
@@ -286,7 +300,7 @@ export function analyzeReport({
 		}
 		if (deterministic.length || !timing.length) {
 			sections.push(...renderDeterministic(deterministic, unchanged));
-		} else if (SUITE_INFO[suite]?.workGate && unchanged) {
+		} else if (info?.workGate && unchanged) {
 			sections.push(`All ${unchanged} work counters are unchanged.`);
 		}
 	}
