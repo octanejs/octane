@@ -1,4 +1,4 @@
-import type { MutableRefObject, OctaneElement, OctaneNode } from '../util/OctaneTypes.ts';
+import type { MutableRefObject, OctaneNode } from '../util/OctaneTypes.ts';
 import * as React from 'octane';
 import { useMemo, useRef } from 'octane';
 import { clsx } from 'clsx';

@@ -62,7 +62,7 @@ export function __queryAt<A, T>(
 	return new QueryDescriptor(
 		key,
 		'async',
-		(owner) =>
+		(owner, declaring) =>
 			createResourceCellWith(
 				owner,
 				key,
@@ -74,6 +74,7 @@ export function __queryAt<A, T>(
 				false,
 				sequence,
 				captures,
+				declaring,
 			) as QuerySignal<T>,
 		site,
 	);

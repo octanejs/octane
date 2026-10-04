@@ -60,7 +60,7 @@
   },
   {
     "path": "src/react/useSetAtom.ts",
-    "sha256": "05cca1758d64dfda7383d42b274378208e25eea35437a4e849e33ea994ef6465",
+    "sha256": "cb600f8eca8b17d9dbd78ac94da16b8a11c33c6bd949257588c746db2fd9ef01",
     "origin": "adapted",
     "packageName": "jotai"
   },

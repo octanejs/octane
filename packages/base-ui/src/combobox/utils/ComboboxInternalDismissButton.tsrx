@@ -15,7 +15,7 @@ type DismissEvent = React.MouseEvent<HTMLElement> | React.KeyboardEvent<HTMLElem
 export const ComboboxInternalDismissButton = function ComboboxInternalDismissButton(
 	_WithRef: React.PropsWithoutRef<{}> & { ref?: React.Ref<HTMLSpanElement> },
 ) {
-	const { ref: forwardedRef = null, ..._ } = _WithRef;
+	const { ref: forwardedRef = null } = _WithRef;
 	const store = useComboboxRootContext();
 
 	const { buttonRef, getButtonProps } = useButton({

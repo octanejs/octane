@@ -26,7 +26,6 @@ import type {
 	DateSegmentType,
 } from '../upstream-exports/react-stately/useDateFieldState';
 import type { DatePickerState } from '../upstream-exports/react-stately/useDatePickerState';
-import { getEventTarget } from '../upstream-exports/react-aria/private/utils/shadowdom/DOMFunctions';
 import React, { type ReactNode } from '../compat/react';
 import { useVisuallyHidden } from '../upstream-exports/react-aria/VisuallyHidden';
 

@@ -197,6 +197,7 @@ describe('CI workflow aggregation', () => {
 		for (const suite of [
 			'benchmarks/lynx-table/stages/*.test.mjs',
 			'benchmarks/lynx-list/*.test.mjs',
+			'benchmarks/lynx-render/*.test.mjs',
 		]) {
 			assert.ok(benchWorkflow.includes(`node --test ${suite}`), suite);
 			assert.ok(workflowTests.includes(suite), suite);
@@ -1705,6 +1706,32 @@ describe('Pull request benchmark report', () => {
 			prBenchWorkflow,
 			/^\s+BASE_SHA: \$\{\{ github\.event\.pull_request\.base\.sha/m,
 		);
+	});
+
+	// #1055: the Lynx compiler backend is judged against this suite, so a pull
+	// request touching the Lynx path sees its numbers without being gated by them.
+	test('reports lynx-render, path-filtered, without gating on it', () => {
+		const step = prBenchWorkflow.slice(
+			prBenchWorkflow.indexOf('- name: Benchmark lynx-render (report only)'),
+			prBenchWorkflow.indexOf('- name: Render report'),
+		);
+		assert.match(step, /git diff --name-only HEAD\^1 HEAD \| grep -qE "\$lynx_paths"/);
+		for (const prefix of [
+			'packages/lynx/',
+			'packages/rspeedy-plugin-octane/',
+			'benchmarks/lynx-render/',
+		]) {
+			assert.ok(step.includes(prefix), prefix);
+		}
+		for (const results of ['base', 'head']) {
+			assert.ok(
+				step.includes(
+					`node benchmarks/bench.mjs --quick --results-dir="$RESULTS/${results}" lynx-render`,
+				),
+				results,
+			);
+		}
+		assert.equal(step.match(/\|\| echo "::warning::/g)?.length, 2);
 	});
 
 	test('fails after uploading the report when a gate fails', () => {

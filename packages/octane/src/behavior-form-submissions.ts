@@ -178,7 +178,9 @@ function createSubmissionController(
 		flush: () => mailbox.flush(),
 		skip: (owner, event) => enabledRoots.has(owner) && mailbox.has(event),
 		release: (entry) => {
-			if (enabledRoots.has(entry.root)) releaseBehaviorSubmissions(entry, services);
+			// An already-aborted registration never acquired custody of pending submissions.
+			if (enabledRoots.has(entry.root) && entry.root.behaviors.has(entry))
+				releaseBehaviorSubmissions(entry, services);
 		},
 		dispose: (owner) => {
 			// A canceled root never established custody in this document registry.

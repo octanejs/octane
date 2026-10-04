@@ -1,5 +1,4 @@
 /** @jsxImportSource octane */
-import type * as React from 'octane';
 import { EMPTY_ARRAY } from '@octanejs/base-ui-utils/empty';
 import { error } from '@octanejs/base-ui-utils/error';
 import { flattenLeafItems, stringifyAsLabel } from '../../internals/resolveValueLabel.tsrx';

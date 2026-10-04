@@ -746,7 +746,7 @@
     {
       "path": "src/alert-dialog/handle.ts",
       "origin": "adapted",
-      "sha256": "79669d2d4b9c6964701cf1747e20f8b2fb4413899a28207762ccb1fa8296510b",
+      "sha256": "d5954b85a25268554edda9a310791aa1786f7afc1d1dfac4633749c1156847fb",
       "packageName": "@base-ui/react"
     },
     {
@@ -1160,7 +1160,7 @@
     {
       "path": "src/combobox/items/createItems.ts",
       "origin": "adapted",
-      "sha256": "920f2df705133503e0dec9b1f8887d8bb84fc039fc8a99881f627f20521eab18",
+      "sha256": "7fa0cd2aecb3f8f9cdfa7c65b16b4fe45171d41ed7ce9dc2971f0dc2d54718c8",
       "packageName": "@base-ui/react"
     },
     {
@@ -1172,7 +1172,7 @@
     {
       "path": "src/combobox/label/ComboboxLabel.tsrx",
       "origin": "adapted",
-      "sha256": "55c208b792d49033caf59e07f2ec9b3140e50e8705a6eb80e60991287108a689",
+      "sha256": "012a31931c97639bbed7856ddcda18e7eaf6e2f0cfdd05a0506c0a0991820351",
       "packageName": "@base-ui/react"
     },
     {
@@ -1292,7 +1292,7 @@
     {
       "path": "src/combobox/utils/ComboboxInternalDismissButton.tsrx",
       "origin": "adapted",
-      "sha256": "d6878fab2233655fb4f0f4765d27c1071d1c58974fa5183fb34a467496e43a56",
+      "sha256": "0fb31e715bafc586bcc459f06b1bdc176ceba46ca0a7def796e5774e23b2ad77",
       "packageName": "@base-ui/react"
     },
     {
@@ -1322,7 +1322,7 @@
     {
       "path": "src/combobox/value/ComboboxValue.tsrx",
       "origin": "adapted",
-      "sha256": "82aeffc09d2e23e2d5ecb8e2b2a0644c2d423f51195ffec736c5d922a3eef17b",
+      "sha256": "c5351450258b31da34b9a4b804245f9959872f1c25287c74af69853f8e991086",
       "packageName": "@base-ui/react"
     },
     {
@@ -1562,7 +1562,7 @@
     {
       "path": "src/drawer/handle.ts",
       "origin": "adapted",
-      "sha256": "69476ffbde1b7a6892c584bdfbbb502fd32cd2a5cbdac8fb8cb71fd1dd0cf483",
+      "sha256": "f6ea3239fd88ba1ff9d4480f25cf43df73548f160beeea6a58b8eeab35b62f7c",
       "packageName": "@base-ui/react"
     },
     {
@@ -1592,7 +1592,7 @@
     {
       "path": "src/drawer/popup/DrawerPopup.tsrx",
       "origin": "adapted",
-      "sha256": "c0a72dc2aecf5157c462d9d3054708dd750459d301cdca9d5df53cc81003f8c4",
+      "sha256": "d55fbb9b486e2b22e3ef5b6b0e6941a431648a107119f35a183bbc8c43e432f9",
       "packageName": "@base-ui/react"
     },
     {
@@ -1748,7 +1748,7 @@
     {
       "path": "src/field/label/FieldLabel.tsrx",
       "origin": "adapted",
-      "sha256": "47cb72d1e963c8b6e590e397e7527d4e7189b2b99011919e76960ed1af1afdbd",
+      "sha256": "9ffd3deb53dfa304e377386361df3bd19bbf518afaf12f0328377b2b70b72443",
       "packageName": "@base-ui/react"
     },
     {
@@ -2060,7 +2060,7 @@
     {
       "path": "src/internals/PrehydrationScript.tsrx",
       "origin": "adapted",
-      "sha256": "b48dec887177d503a0fa5c7204cf25e97a135d56bab952d04d73f3945195c950",
+      "sha256": "40e8d420133452efd5fce004b4d50ae63eead79de4c19d8f32c04ca855b3b783",
       "packageName": "@base-ui/react"
     },
     {
@@ -2270,13 +2270,13 @@
     {
       "path": "src/internals/labelable-provider/LabelableContext.ts",
       "origin": "adapted",
-      "sha256": "37c86a0a062cb359aaf2752e6eb8c23e14421375c2d902451f0fad722bf97cda",
+      "sha256": "660703a892a8e9ba764e4982e525b7a6c5237e10b56beb4232c7104c0ef2542a",
       "packageName": "@base-ui/react"
     },
     {
       "path": "src/internals/labelable-provider/LabelableProvider.tsrx",
       "origin": "adapted",
-      "sha256": "dd54d83b0cdaa4ff8f679191b8a7f12418194d0341781fe46a377942183b8ed9",
+      "sha256": "1cde96db8988bcf6601118982f3e9cc42a2c9326fb9abfc5c70c55da729b02f6",
       "packageName": "@base-ui/react"
     },
     {
@@ -2402,7 +2402,7 @@
     {
       "path": "src/internals/use-button/useButton.ts",
       "origin": "adapted",
-      "sha256": "d7009fc33640f8d48530a06396ecad5294b7e1265555366a155461942a23d712",
+      "sha256": "cd5191255aca5e18fe5436e9b319cf60b11c3fa36b9a2ea1aeddc9a7a696dd46",
       "packageName": "@base-ui/react"
     },
     {
@@ -2642,7 +2642,7 @@
     {
       "path": "src/menu/submenu-trigger/MenuSubmenuTrigger.tsrx",
       "origin": "adapted",
-      "sha256": "6e94569d8e464c7b9ae95ac067c0b0c6cd08ce6688aa629dab79c6466e7fe24c",
+      "sha256": "4089fefba00684b13b9e707767edbe877ba7e66d2ba58825d1519bff30709134",
       "packageName": "@base-ui/react"
     },
     {
@@ -2948,7 +2948,7 @@
     {
       "path": "src/number-field/input/NumberFieldInput.tsrx",
       "origin": "adapted",
-      "sha256": "7fedb3aca793c2141ee088bd85706f79f1031c1ff7712fe848746ef266c0ed2e",
+      "sha256": "7d93a19f8dec534d778224f7fa48f63763bc8ef45c0f772baaf7102d924e55ae",
       "packageName": "@base-ui/react"
     },
     {
@@ -3026,13 +3026,13 @@
     {
       "path": "src/otp-field/input/OTPFieldInput.tsrx",
       "origin": "adapted",
-      "sha256": "0199b8f44329516a79221db8ce0839bf53699541bd19472434e3a126dc9280b6",
+      "sha256": "ddfdb51c313e6a1ba51ceb27ae77cc4581b9e6e4d21c734526dba6e85ef4afcc",
       "packageName": "@base-ui/react"
     },
     {
       "path": "src/otp-field/root/OTPFieldRoot.tsrx",
       "origin": "adapted",
-      "sha256": "68ba7fe075b4492f1c8825343e5cc64f09f516dc43db6a99ce331e804827936b",
+      "sha256": "aeef6fc1d0ea1220e2cb42c4732c68aa9c6f8fa473386b669ce92e347ed7d50b",
       "packageName": "@base-ui/react"
     },
     {
@@ -3560,7 +3560,7 @@
     {
       "path": "src/select/item/SelectItem.tsrx",
       "origin": "adapted",
-      "sha256": "afed9e22cdc80b6640612952669a253e0e400c4ecde5aa247fd5c25248c0fe9d",
+      "sha256": "609038bffc947522e902277b3920b5b7fd1d774b2b6681e63076854cfbe93bb0",
       "packageName": "@base-ui/react"
     },
     {
@@ -3674,7 +3674,7 @@
     {
       "path": "src/select/value/SelectValue.tsrx",
       "origin": "adapted",
-      "sha256": "a9c230b143c9d5bbfd7afb2bbeb3a542772d2511437a4acf77b7ccd805ac32bc",
+      "sha256": "4e70c1398d1ed46c3c2468202b2497720db165fd5143ef9c0638e1774b64c054",
       "packageName": "@base-ui/react"
     },
     {
@@ -3740,7 +3740,7 @@
     {
       "path": "src/slider/thumb/SliderThumb.tsrx",
       "origin": "adapted",
-      "sha256": "6cfb8cde17bb4349021aafedd7ad8aedb4256624877667b02161d0a8ea536ac1",
+      "sha256": "ce6aedd6b86946be7581087b600a58292ad47ce7f724bcde81bfe942f5dab42d",
       "packageName": "@base-ui/react"
     },
     {

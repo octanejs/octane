@@ -7,7 +7,7 @@
 import { isShadowRoot, isHTMLElement } from '@floating-ui/utils/dom';
 import { floor } from '@floating-ui/utils';
 import { tabbable, type FocusableElement } from 'tabbable';
-import { useCallback, useLayoutEffect, useRef, type CSSProperties } from 'octane';
+import { useCallback, useLayoutEffect, useRef } from 'octane';
 import type { Dimensions } from '@floating-ui/dom';
 
 import { subSlot } from '../internal';
