@@ -524,6 +524,7 @@ Migration recipes, React idiom → Strong replacement:
 
 - Create a value once: `if (ref.current === null) ref.current = new Store();` → `const ref = useLazyRef(() => new Store());`
 - Render from a DOM measurement: `useLayoutEffect(() => setWidth(el.current.offsetWidth));` → `const width = useLayoutSnapshot(() => el.current?.offsetWidth ?? 0, { initial: 0 });`
+- Measure an element from a callback ref: `<span ref={(el) => { if (el) setWidth(el.offsetWidth); }}>` → `const width = useLayoutSnapshot(() => el.current?.offsetWidth ?? 0, { initial: 0 });`
 - Drop useMemo and useCallback: `const total = useMemo(() => sum(items), [items]);` → `const total = sum(items);`
 - Read the latest props from an effect: `const latest = useRef(onTick); latest.current = onTick;` → `const tick = useEffectEvent(onTick);`
 - Keep editable state in sync with a prop: `useEffect(() => setName(user.name), [user.name]);` → `const [name, setName] = useLinkedState(user.id, () => user.name);`
@@ -538,6 +539,7 @@ Every Strong diagnostic and its replacement:
 Effects, state, and dependencies:
 
 - `OCTANE_STRONG_EFFECT_STATE_UPDATE`: Derive the value during render, or use `useLinkedState` when state follows another value. When the effect copies a measurement of the committed DOM into state, render from `useLayoutSnapshot` instead. `requestAnimationFrame`, timers with a positive delay, and external subscription callbacks remain event-driven.
+- `OCTANE_STRONG_REF_STATE_UPDATE`: Pass a ref object to keep the element, and read it from effects and event handlers. When the callback copies a measurement of the element into state, render from `useLayoutSnapshot` instead. `requestAnimationFrame`, timers with a positive delay, and observer or listener callbacks the ref attaches remain event-driven.
 - `OCTANE_STRONG_EFFECT_DATA_FETCH`: Read asynchronous render data with `use()` or a query binding. For external synchronization, abort an `AbortController` whose `signal` is passed to the request, or set a flag declared in the effect from its cleanup and check it before the update.
 - `OCTANE_STRONG_EFFECT_HIDDEN_DEPENDENCY`: Read the render snapshot, or move the non-reactive read into a `useEffectEvent` callback. Octane never double-invokes effects, so first-run and `didInit` guards are unnecessary.
 - `OCTANE_STRONG_EFFECT_RESOURCE_LEAK`: Release it in the returned cleanup. Acquire resources for a snapshot in a separate effect.

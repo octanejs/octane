@@ -6,6 +6,7 @@ import {
 	useContext,
 	useEffect,
 	useLayoutEffect,
+	useLayoutSnapshot,
 	useReducer,
 	useState,
 	useSyncExternalStore,
@@ -453,6 +454,79 @@ export function NestedEffectUpdates(props) @{
 	<span id="nested-effect-step">{step as number}</span>
 }
 
+// A passive effect advances the step once per commit, and a layout effect
+// publishes one converging measurement of each committed step.
+export function PassiveStepLayoutMeasure(props: { limit: number }) @{
+	const [step, setStep] = useState(0);
+	const [measured, setMeasured] = useState(-1);
+	useEffect(() => {
+		if (step < props.limit) setStep(step + 1);
+	}, null);
+	useLayoutEffect(() => {
+		if (measured !== step) setMeasured(step);
+	}, null);
+	<span id="passive-layout-measure">{`${step}:${measured}`}</span>
+}
+
+// The passive effect advances only after each measurement commits, so every
+// step settles before the next one starts and no passive effect is left waiting.
+export function PassiveStepAfterMeasure(props: { limit: number }) @{
+	const [step, setStep] = useState(0);
+	const [measured, setMeasured] = useState(-1);
+	useLayoutEffect(() => {
+		if (measured !== step) setMeasured(step);
+	}, null);
+	useEffect(() => {
+		if (measured === step && step < props.limit) setStep(step + 1);
+	}, [measured]);
+	<span id="passive-after-measure">{`${step}:${measured}`}</span>
+}
+
+// The same cascade measured through useLayoutSnapshot, which publishes one
+// converging snapshot of each committed step.
+export function PassiveStepLayoutSnapshot(props: { limit: number }) @{
+	const [step, setStep] = useState(0);
+	const measured = useLayoutSnapshot(() => step * 10, { initial: -1 });
+	useEffect(() => {
+		if (step < props.limit) setStep(step + 1);
+	}, null);
+	<span id="passive-layout-snapshot">{`${step}:${measured}`}</span>
+}
+
+function PassiveStepMeasureChild(props: { step: number; publish: (width: number) => void }) @{
+	useLayoutEffect(() => {
+		props.publish(props.step * 10);
+	}, null);
+	<span>{props.step as number}</span>
+}
+
+// The same cascade with the measurement taken in a child and published to the
+// parent that owns the passive step.
+export function PassiveStepChildMeasure(props: { limit: number }) @{
+	const [step, setStep] = useState(0);
+	const [width, setWidth] = useState(-1);
+	useEffect(() => {
+		if (step < props.limit) setStep(step + 1);
+	}, null);
+	<div id="passive-child-measure" data-width={width as number}>
+		<PassiveStepMeasureChild step={step} publish={setWidth} />
+	</div>
+}
+
+// A passive effect schedules an update on every commit while a layout effect
+// never converges: the layout loop must still exhaust its budget.
+export function PassiveCascadeLayoutLoop() @{
+	const [step, setStep] = useState(0);
+	const [layout, setLayout] = useState(0);
+	useEffect(() => {
+		setStep((value: number) => value + 1);
+	}, null);
+	useLayoutEffect(() => {
+		setLayout((value: number) => value + 1);
+	}, null);
+	<span>{`${step}:${layout}`}</span>
+}
+
 // A registry owner whose members register/unregister from a layout effect, with a
 // plain-return switcher in between: flipping the switch DELETES the mounted member
 // while the switcher's own body is still on the render stack, so the member's layout
@@ -515,6 +589,15 @@ export function SynchronousPassiveEffectLoop() @{
 		flushSync(() => setStep(step + 1));
 	}, [step]);
 	<span>{step as number}</span>
+}
+
+// Each loop's flushSync commit queues the next passive effect before the other
+// loop schedules, so passive work is always waiting when a budget runs out.
+export function SynchronousPassiveEffectLoops() @{
+	<div>
+		<SynchronousPassiveEffectLoop />
+		<SynchronousPassiveEffectLoop />
+	</div>
 }
 
 export function RefCallbackLoop() @{
