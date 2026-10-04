@@ -579,6 +579,35 @@ describe('ReactUpdates update reconciliation', () => {
 		}
 	});
 
+	// React flushes pending passive effects before the next render at no higher
+	// than default priority (flushPassiveEffects), so their state updates never
+	// take the sync lane, even when that render is a flushSync. Sync act() drains
+	// through flushSync and must finish the cascade an ordinary flush finishes.
+	it('finishes a passive cascade with child layout measurements under synchronous act()', async () => {
+		const error = vi.spyOn(console, 'error').mockImplementation(() => {});
+		try {
+			for (const sync of [true, false]) {
+				const container = ownedContainer();
+				const root = createRoot(container);
+				try {
+					const render = () => root.render(Fixture.PassiveStepSplitMeasure, { limit: 60 });
+					await (sync ? act(render) : act(async () => render()));
+					const parent = container.querySelector('#passive-split-measure')!;
+					expect(parent.getAttribute('data-step')).toBe('60');
+					expect(parent.textContent).toBe('3030');
+					if (process.env.NODE_ENV !== 'production') {
+						expect(passiveDepthWarnings(error).length).toBeGreaterThan(0);
+					}
+					error.mockClear();
+				} finally {
+					removeRoot(root, container);
+				}
+			}
+		} finally {
+			error.mockRestore();
+		}
+	});
+
 	// Per ReactUpdates-test.js:1912 and React's nestedPassiveUpdateCount: a
 	// passive cascade past the limit yields between commits, so it converges and
 	// is reported with a development warning instead of an error.
@@ -674,12 +703,16 @@ describe('ReactUpdates update reconciliation', () => {
 		removeRoot(root, container);
 	});
 
-	// Per ReactUpdates-test.js:1965. Two sibling loops keep passive effects
-	// queued whenever either one exhausts its budget.
+	// Per ReactUpdates-test.js:1965. The loop must still throw when another loop
+	// runs beside or inside it, and when its budget runs out while passive
+	// effects are queued, either in its own flushSync or in a layout effect of
+	// the commit that flushSync started.
 	it('prevents infinite update loop triggered by synchronous updates in useEffect', async () => {
 		for (const Body of [
 			Fixture.SynchronousPassiveEffectLoop,
 			Fixture.SynchronousPassiveEffectLoops,
+			Fixture.SynchronousPassiveEffectLoopOverChild,
+			Fixture.SynchronousPassiveEffectLoopWithMeasure,
 		]) {
 			const container = ownedContainer();
 			const root = createRoot(container);
@@ -701,6 +734,34 @@ describe('ReactUpdates update reconciliation', () => {
 			await act(() => root.render(Fixture.RefCallbackLoop));
 		}).rejects.toThrow(/Maximum update depth exceeded/);
 		removeRoot(root, container);
+	});
+
+	// A commit that flushSync starts inside useEffect is an ordinary commit, so
+	// a callback ref looping there gets no more calls than it gets anywhere else.
+	it('stops a callback-ref loop flushed from useEffect at the usual limit', async () => {
+		const error = vi.spyOn(console, 'error').mockImplementation(() => {});
+		const refCalls: number[] = [];
+		try {
+			for (const Body of [
+				Fixture.CountedRefCallbackLoop,
+				Fixture.FlushSyncInEffectRefCallbackLoop,
+			]) {
+				let calls = 0;
+				const container = ownedContainer();
+				const root = createRoot(container);
+				try {
+					await expect(async () => {
+						await act(() => root.render(Body, { onRef: () => calls++ }));
+					}).rejects.toThrow(/Maximum update depth exceeded/);
+					refCalls.push(calls);
+				} finally {
+					removeRoot(root, container);
+				}
+			}
+			expect(refCalls[1]).toBe(refCalls[0]);
+		} finally {
+			error.mockRestore();
+		}
 	});
 
 	// Per ReactUpdates-test.js:1769. Function-component adaptation: a wide batch
