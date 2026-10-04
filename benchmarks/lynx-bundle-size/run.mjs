@@ -50,10 +50,16 @@ const FORBIDDEN_DOM = /\b(?:document|window|HTMLElement|MutationObserver)\b/;
 // runtime growth, and the weekly job that enforces them never reached this
 // check. Linux CI and macOS main-thread gzip differ by up to 2 bytes; the larger
 // value is the base. Raise them only in a separate budget pull request.
+//
+// 2026-10-04, from main 77504c160c: #1700 freezes a fresh root's decoded program
+// runs so a first mount takes the dense host record store again (create_10k
+// 1.93x -> 1.08x ReactLynx). That costs the main thread 141 raw bytes, +85 gzip
+// in preview (83,657 -> 83,742) and +73 in IFR (89,331 -> 89,404). The
+// background program shrank to 288,390 after the reset (#1652, #1662).
 const NO_WORKLET_BUDGET = Object.freeze({
-	previewMainGzip: 83_688,
-	ifrMainGzip: 89_362,
-	backgroundRaw: 294_677,
+	previewMainGzip: 83_774,
+	ifrMainGzip: 89_436,
+	backgroundRaw: 288_390,
 });
 
 function packageEntry(packageName) {

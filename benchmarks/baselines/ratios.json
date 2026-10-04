@@ -2556,6 +2556,38 @@
     "note": "Same-run scaling guard for commits queued synchronously during Element PAPI reentry. Matched 5-sample runs measured the cursor drain at 113.9 / 56.4 = 2.02x; the former front-shift drain measured 249.2 / 56.3 = 4.43x."
   },
   {
+    "suite": "lynx-render",
+    "op": "create_10k_rows_ms",
+    "target": "octane-lynx-first-screen",
+    "reference": "octane-lynx-cold",
+    "maxRatio": 9,
+    "note": "#1055 baseline ceiling for the universal path's main-thread first screen of 90,008 hosts on a cold page, against the same page's background-only mount. A 9-sample run measured 611.8 / 89.1 ms = 6.87x and quick runs 6.63x and 6.94x; most of it is the first-tree snapshot the readiness reply serializes (14.8 MB). The compiled Lynx backend is expected to lower this ceiling."
+  },
+  {
+    "suite": "lynx-render",
+    "op": "create_10k_rows_ms",
+    "target": "octane-lynx-adopt",
+    "reference": "octane-lynx-cold",
+    "maxRatio": 14,
+    "note": "#1055 baseline ceiling for the background's adoption of a 90,008-host first screen on a cold page, against the same page's background-only mount. A 9-sample run measured 937.0 / 89.1 ms = 10.52x and quick runs 9.89x and 10.79x. Adoption sends a per-host create batch and receives a full handle upsert instead of one compact program run. The compiled Lynx backend is expected to lower this ceiling."
+  },
+  {
+    "suite": "lynx-render",
+    "op": "create_10k_rows_bytes_to_main",
+    "target": "octane-lynx-adopt",
+    "reference": "octane-lynx-cold",
+    "maxRatio": 32,
+    "note": "Deterministic #1055 baseline: the adopting commit's wire bytes against a fresh mount's, both through the transport codec. Measured 12,826,707 / 408,485 = 31.40x. Any growth in the adoption payload breaches it; a smaller payload should lower it."
+  },
+  {
+    "suite": "lynx-render",
+    "op": "create_10k_rows_papi_calls",
+    "target": "octane-lynx-adopt",
+    "reference": "octane-lynx-cold",
+    "maxRatio": 1.35,
+    "note": "Deterministic #1055 baseline: Element PAPI calls while adopting a complete first screen, which creates no host, against a fresh mount that creates all 90,008. Measured 330,028 / 250,026 = 1.32x (per-host identity, parent, and equality checks plus attribute writes)."
+  },
+  {
     "suite": "lynx-bundle-size",
     "op": "bundle_gzip",
     "target": "octane-ifr",

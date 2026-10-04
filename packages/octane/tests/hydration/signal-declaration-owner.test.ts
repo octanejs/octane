@@ -79,30 +79,54 @@ async function mountClient(
 	text: string,
 	options: { dev: boolean; strong: boolean },
 	props: Record<string, unknown> = {},
+	// Plain modules the fixture imports, compiled against this render's runtime.
+	plainModules: Record<string, string> = {},
 ) {
 	vi.resetModules();
 	const client = await import('../../src/runtime.js');
 	const signals = await import('../../src/signals/index.js');
-	const { loadCompiledFixtureSource } = await import('../_server-fixture.js');
+	const { loadCompiledFixtureSource, loadPlainHookFixtureSource } =
+		await import('../_server-fixture.js');
+	const { drainProducers } = await import('../_fixtures/signals-async-controls.js');
+	const runtimeModules: Record<string, Record<string, unknown>> = { 'octane/signals': signals };
+	for (const [request, source] of Object.entries(plainModules))
+		runtimeModules[request] = loadPlainHookFixtureSource(source, {
+			id: `/src/${request.slice(2)}.ts`,
+			inlineHookMemo: false,
+			runtimeModules,
+		});
 	const module = loadCompiledFixtureSource(text, {
 		id: '/src/signal-declaration-owner.tsrx',
 		mode: 'client',
 		compileOptions: { dev: options.dev, strong: options.strong, hmr: false },
-		runtimeModules: { 'octane/signals': signals },
+		runtimeModules,
 	});
 	const requests: Array<(value: string) => void> = [];
 	const load = () => new Promise<string>((resolve) => requests.push(resolve));
 	const container = document.createElement('div');
 	const root = client.createRoot(container);
-	await client.act(() => root.render(module.App, { ...PROPS, ...props, load }));
+	await client.act(() => root.render(module.App, { ...PROPS, load, ...props }));
 	return {
 		requests,
+		signals,
 		texts: () => [...container.querySelectorAll('output')].map((node) => node.textContent),
 		settle: (value: string) => client.act(() => requests[0]!(value)),
+		settleAll: (value: string) =>
+			client.act(async () => {
+				for (const resolve of requests) resolve(value);
+				await drainProducers();
+			}),
 		click: (selector: string) =>
 			client.flushSync(() => container.querySelector<HTMLElement>(selector)!.click()),
+		// A click whose handler, query and boundary retry may finish asynchronously.
+		clickAndSettle: (selector: string) =>
+			client.act(async () => {
+				container.querySelector<HTMLElement>(selector)!.click();
+				await drainProducers();
+			}),
+		flush: () => client.act(drainProducers),
 		update: (next: Record<string, unknown>) =>
-			client.flushSync(() => root.render(module.App, { ...PROPS, ...props, ...next, load })),
+			client.flushSync(() => root.render(module.App, { ...PROPS, load, ...props, ...next })),
 		unmount: () => root.unmount(),
 	};
 }
@@ -300,4 +324,253 @@ describe('signal declarations read across their component template', () => {
 			view.unmount();
 		}
 	});
+});
+
+// A function a component body creates closes over the handles that body
+// declares. Wherever it runs, in a child's event or render, after an `await`,
+// or with no owner at all, it uses the declaring instance's cells. A handle
+// passed on as a value is still read in its reader's instance.
+describe('signal declarations used by the functions their body creates', () => {
+	function retrySource(button: string): string {
+		return `import { query$ } from 'octane/signals';
+function RetryButton(props) @{
+ <button onClick={() => props.retry()}>Retry</button>
+}
+export function App(props) @{
+ const result$ = query$(() => 1, props.load);
+ @try {
+  <output>{result$.get() as string}</output>
+ } @pending {
+  <i>waiting</i>
+ } @catch (_error, reset) {
+  ${button}
+ }
+}`;
+	}
+
+	const RETRIES = {
+		'native button': '<button onClick={() => { result$.reset(); reset(); }}>Retry</button>',
+		'forwarded callback': '<RetryButton retry={() => { result$.reset(); reset(); }} />',
+		'native button after await':
+			'<button onClick={async () => { await Promise.resolve(); result$.reset(); reset(); }}>Retry</button>',
+		'forwarded callback after await':
+			'<RetryButton retry={async () => { await Promise.resolve(); result$.reset(); reset(); }} />',
+	};
+
+	function failingFirstLoad() {
+		let calls = 0;
+		return vi.fn(() =>
+			++calls === 1 ? Promise.reject(new Error('first load failed')) : Promise.resolve('loaded'),
+		);
+	}
+
+	it.each(
+		MODES.flatMap((mode) =>
+			Object.entries(RETRIES).map(([kind, button]) => ({ kind, button, ...mode })),
+		),
+	)('retries the declaring query from a $kind ($name)', async ({ button, dev, strong }) => {
+		const load = failingFirstLoad();
+		const view = await mountClient(retrySource(button), { dev, strong }, { load });
+		try {
+			await view.flush();
+			expect(view.texts()).toEqual([]);
+			expect(load).toHaveBeenCalledTimes(1);
+			await view.clickAndSettle('button');
+			expect(view.texts()).toEqual(['loaded']);
+			expect(load).toHaveBeenCalledTimes(2);
+		} finally {
+			view.unmount();
+		}
+	});
+
+	// A custom hook in a plain module returns the callback; the component that
+	// called it owns the declaration.
+	it.each(MODES)(
+		'retries a hook-declared query from a forwarded callback ($name)',
+		async (mode) => {
+			const load = failingFirstLoad();
+			const view = await mountClient(
+				`import { useRetryableQuery$ } from './use-retryable-query';
+function RetryButton(props) @{
+ <button onClick={() => props.retry()}>Retry</button>
+}
+export function App(props) @{
+ const query = useRetryableQuery$(props.load);
+ @try {
+  <output>{query.result$.get() as string}</output>
+ } @pending {
+  <i>waiting</i>
+ } @catch (_error, reset) {
+  <RetryButton retry={() => { query.retry(); reset(); }} />
+ }
+}`,
+				mode,
+				{ load },
+				{
+					'./use-retryable-query': `import { query$ } from 'octane/signals';
+export function useRetryableQuery$(load: () => Promise<string>) {
+	const result$ = query$(() => 1, load);
+	return { result$, retry: () => result$.reset() };
+}`,
+				},
+			);
+			try {
+				await view.flush();
+				await view.clickAndSettle('button');
+				expect(view.texts()).toEqual(['loaded']);
+				expect(load).toHaveBeenCalledTimes(2);
+			} finally {
+				view.unmount();
+			}
+		},
+	);
+
+	// The child declares its own `result$` and also receives the parent's
+	// handle. Only the parent's callback closes over the parent's declaration.
+	it.each(MODES)(
+		'keeps a child declaration, handle prop and alias in the child ($name)',
+		async (mode) => {
+			const view = await mountClient(
+				`import { signal$ } from 'octane/signals';
+function Child(props) @{
+ const result$ = signal$('child');
+ <>
+  <output>{result$.get() as string}</output>
+  <output>{props.handle$.get() as string}</output>
+  <button class="own" onClick={() => result$.set('own')}>own</button>
+  <button class="write" onClick={() => props.write('written')}>write</button>
+  <button class="alias" onClick={() => { const result$ = props.handle$; result$.set('alias'); }}>alias</button>
+ </>
+}
+export function App(props) @{
+ const result$ = signal$('parent');
+ <>
+  <output>{result$.get() as string}</output>
+  <Child handle$={result$} write={(value) => result$.set(value)} />
+ </>
+}`,
+				mode,
+			);
+			try {
+				// Parent cell, child's own declaration, child's cell for the parent's handle.
+				expect(view.texts()).toEqual(['parent', 'child', 'parent']);
+				view.click('.own');
+				expect(view.texts()).toEqual(['parent', 'own', 'parent']);
+				view.click('.write');
+				expect(view.texts()).toEqual(['written', 'own', 'parent']);
+				view.click('.alias');
+				expect(view.texts()).toEqual(['written', 'own', 'alias']);
+			} finally {
+				view.unmount();
+			}
+		},
+	);
+
+	const GETTER = `import { query$ } from 'octane/signals';
+function Reader(props) @{
+ <output>{props.read() as string}</output>
+}
+export function App(props) @{
+ const record$ = query$(() => 'record', props.load);
+ @try {
+  <section><output>{record$.get() as string}</output><Reader read={() => record$.get()} /></section>
+ } @pending {
+  <i>waiting</i>
+ }
+}`;
+
+	it.each(MODES)(
+		'reads the declaring query when a child renders a callback ($name)',
+		async (mode) => {
+			const view = await mountClient(GETTER, mode);
+			try {
+				expect(view.requests).toHaveLength(1);
+				await view.settleAll('ready');
+				expect(view.texts()).toEqual(['ready', 'ready']);
+				expect(view.requests).toHaveLength(1);
+			} finally {
+				view.unmount();
+			}
+		},
+	);
+
+	it.each(MODES)(
+		'resumes the server query a child read through a callback ($name)',
+		async ({ dev, strong }) => {
+			await hydrateServerOutput(GETTER, { dev, strong, adoptsOutput: true });
+		},
+	);
+
+	// Producer closures keep reader ownership: a derived handle a child
+	// receives as a prop computes from the child's own query, while the
+	// parent's callback still reads the parent's derived value. A wrapped
+	// factory callee is still a producer.
+	const PRODUCERS = {
+		'a derived producer': 'derived$(() => record$.get())',
+		'a wrapped derived producer':
+			"(derived$ as typeof derived$)(() => record$.get(), { key: 'selected' })",
+	};
+
+	it.each(
+		MODES.flatMap((mode) =>
+			Object.entries(PRODUCERS).map(([kind, producer]) => ({ kind, producer, ...mode })),
+		),
+	)(
+		'keeps $kind reader-owned beside a forwarded callback ($name)',
+		async ({ producer, dev, strong }) => {
+			const view = await mountClient(
+				`import { derived$, query$ } from 'octane/signals';
+function Reader(props) @{
+ <>
+  <output>{props.selected$.get() as string}</output>
+  <output>{props.read() as string}</output>
+ </>
+}
+export function App(props) @{
+ const record$ = query$(() => 'record', props.load);
+ const selected$ = ${producer};
+ @try {
+  <section><output>{selected$.get() as string}</output><Reader selected$={selected$} read={() => selected$.get()} /></section>
+ } @pending {
+  <i>waiting</i>
+ }
+}`,
+				{ dev, strong },
+			);
+			try {
+				await view.settleAll('ready');
+				await view.settleAll('ready');
+				expect(view.texts()).toEqual(['ready', 'ready', 'ready']);
+				// The parent's query and the child's own derived cell's query.
+				expect(view.requests).toHaveLength(2);
+			} finally {
+				view.unmount();
+			}
+		},
+	);
+
+	// With no ambient owner the callback still uses the declaring instance,
+	// and once that instance unmounts it is fenced like the instance's own reads.
+	it.each(MODES)(
+		'reads the declaring cell from a kept callback until unmount ($name)',
+		async (mode) => {
+			let kept: (() => unknown) | undefined;
+			const view = await mountClient(
+				`import { useEffect } from 'octane';
+import { signal$ } from 'octane/signals';
+export function App(props) @{
+ const count$ = signal$(1);
+ useEffect(() => props.keep(() => count$.get()));
+ <button onClick={() => count$.set(count$.get() + 1)}><output>{count$.get() as string}</output></button>
+}`,
+				mode,
+				{ keep: (read: () => unknown) => void (kept = read) },
+			);
+			view.click('button');
+			expect(view.texts()).toEqual(['2']);
+			expect(kept!()).toBe(2);
+			view.unmount();
+			expect(() => kept!()).toThrow(view.signals.ScopeDisposedError);
+		},
+	);
 });

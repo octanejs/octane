@@ -119,16 +119,19 @@ function resolveOwner(owner: SignalOwner): Scope {
 		if (isScope(owner.documentOwner) && owner.documentOwner.retired) {
 			throw new ScopeDisposedError(owner.documentOwner.scopeKey);
 		}
-		let instances = documentInstances.get(owner.documentOwner);
-		if (!instances) documentInstances.set(owner.documentOwner, (instances = new Set()));
-		instances.add(owner.instanceOwner);
-		instanceDocuments.set(owner.instanceOwner, owner.documentOwner);
 		const documentKey = owner.documentOwner.scopeKey;
-		return resolveIdentity(
+		// Refuse a retired instance, which a kept callback can still name, before
+		// registering it with its document again.
+		const scope = resolveIdentity(
 			owner.instanceOwner,
 			`${documentKey}:instance:${owner.instanceKey}`,
 			owner,
 		);
+		let instances = documentInstances.get(owner.documentOwner);
+		if (!instances) documentInstances.set(owner.documentOwner, (instances = new Set()));
+		instances.add(owner.instanceOwner);
+		instanceDocuments.set(owner.instanceOwner, owner.documentOwner);
+		return scope;
 	}
 	return resolveIdentity(owner, owner.scopeKey, owner);
 }
@@ -359,10 +362,18 @@ function readerOwner(
 	return owner;
 }
 
+type DescriptorClass<T, H extends SignalHandle<T>> = new (
+	key: string,
+	kind: H['kind'],
+	create: (owner: Scope, declaring: number) => H,
+	site: string | undefined,
+	declared: Descriptor<T, H>,
+) => Descriptor<T, H>;
+
 /** @internal Shared owner resolution for statically selected signal factories. */
 export abstract class Descriptor<T, H extends SignalHandle<T>> implements OwnerBoundSignal<T> {
 	readonly [SIGNAL_HANDLE] = true as const;
-	private readonly cells = new WeakMap<Scope, H>();
+	private readonly cells: WeakMap<Scope, H>;
 	// Identity-only token: renderer owners never retain their renderer tree.
 	private readonly owner: SignalRendererOwnerIdentity | undefined;
 	/** The render invocation that evaluated this declaration in `owner`. */
@@ -370,6 +381,12 @@ export abstract class Descriptor<T, H extends SignalHandle<T>> implements OwnerB
 	/** A render's private presentation of a redeclared cell, until it is accepted or released. */
 	declare private view?: H;
 	declare private viewOwner?: Scope;
+	/**
+	 * The handle the declaring body's own functions use, created on their first
+	 * use (see __declared). It refers to itself. A field of every descriptor, so
+	 * the read path's check never changes or misses the descriptor's shape.
+	 */
+	private lexical: this | undefined;
 
 	constructor(
 		readonly key: string,
@@ -377,9 +394,40 @@ export abstract class Descriptor<T, H extends SignalHandle<T>> implements OwnerB
 		/** `declaring` is the invocation that evaluated the declaration of `owner`'s cell, or 0. */
 		private readonly create: (owner: Scope, declaring: number) => H,
 		private readonly site: string | undefined,
+		declared?: Descriptor<T, H>,
 	) {
-		this.owner = declarationOwner(site);
-		this.invocation = this.owner === undefined ? 0 : currentSignalDeclarationInvocation();
+		if (declared === undefined) {
+			this.cells = new WeakMap();
+			this.owner = declarationOwner(site);
+			this.invocation = this.owner === undefined ? 0 : currentSignalDeclarationInvocation();
+			this.lexical = undefined;
+		} else {
+			// One declaration: a use finds the cell its template already resolved,
+			// and a redeclaration it presents stages with the render that evaluated it.
+			this.cells = declared.cells;
+			this.owner = declared.owner;
+			this.invocation = declared.invocation;
+			this.lexical = this;
+		}
+	}
+
+	/** @internal See __declared. */
+	static declared<H>(handle$: H): H {
+		if (!(handle$ instanceof Descriptor) || handle$.owner === undefined) return handle$;
+		const declared: Descriptor<unknown, SignalHandle<unknown>> = handle$;
+		const Class = declared.constructor as DescriptorClass<unknown, SignalHandle<unknown>>;
+		return (declared.lexical ??= new Class(
+			declared.key,
+			declared.kind,
+			declared.create,
+			declared.site,
+			declared,
+		)) as H;
+	}
+
+	/** The owner a use resolves for: its reader, or for a lexical handle its declaring owner. */
+	private reader(): SignalOwner {
+		return this.lexical === this ? this.owner! : requireOwner();
 	}
 
 	[SIGNAL_OWNER_RESOLVE](owner: Scope): H {
@@ -412,7 +460,7 @@ export abstract class Descriptor<T, H extends SignalHandle<T>> implements OwnerB
 	}
 
 	protected resolve(): H {
-		const token = readerOwner(this.owner, requireOwner());
+		const token = readerOwner(this.owner, this.reader());
 		const owner = resolveDescriptorOwner(this.site, token);
 		// This path already normalized the owner. Retain its validation order,
 		// but do not repeat document/instance routing for every cached read.
@@ -435,7 +483,7 @@ export abstract class Descriptor<T, H extends SignalHandle<T>> implements OwnerB
 	}
 
 	[SIGNAL_BINDING_SUBSCRIBE](notify: () => void, onRetire?: () => void): () => void {
-		const run = captureSignalOwner(requireOwner());
+		const run = captureSignalOwner(this.reader());
 		return this.resolve()[SIGNAL_BINDING_SUBSCRIBE](
 			forwardNativeTransitionConsumer(notify, () => run(notify)),
 			onRetire === undefined ? undefined : () => run(onRetire),
@@ -444,7 +492,7 @@ export abstract class Descriptor<T, H extends SignalHandle<T>> implements OwnerB
 
 	[SIGNAL_BINDING_RETIRED](): boolean {
 		// Only the owner step can refuse; the cell a subscription resolved exists.
-		const token = readerOwner(this.owner, requireOwner());
+		const token = readerOwner(this.owner, this.reader());
 		const owner = resolveUnlessRetired(() => resolveDescriptorOwner(this.site, token));
 		return (
 			owner === undefined || this.resolvedCell(owner, token)[SIGNAL_BINDING_RETIRED]?.() === true
@@ -469,13 +517,25 @@ export abstract class Descriptor<T, H extends SignalHandle<T>> implements OwnerB
 	}
 
 	subscribe(notify: () => void): () => void {
-		const token = requireOwner();
+		const token = this.reader();
 		const scope = resolveDescriptorOwner(this.site, readerOwner(this.owner, token));
 		const run = captureSignalOwner(token);
 		return this[SIGNAL_OWNER_RESOLVE](scope).subscribe(
 			forwardNativeTransitionConsumer(notify, () => run(notify)),
 		);
 	}
+}
+
+/**
+ * @internal The receiver of a method call on a handle that a function nested in
+ * its declaring component or hook body closes over. Compiled code routes each
+ * such call on a body's const declaration through this, so the function
+ * resolves the cell its body declared wherever it runs: in a child's event or
+ * render, after `await`, or with no owner at all. The handle itself, passed on
+ * as a value, is still resolved by its reader. Producer closures keep theirs.
+ */
+export function __declared<H>(handle$: H): H {
+	return Descriptor.declared(handle$);
 }
 
 class SignalDescriptor<T> extends Descriptor<T, WritableSignal<T>> implements WritableSignal<T> {

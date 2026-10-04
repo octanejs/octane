@@ -753,6 +753,32 @@ the codec charge is reported as a separate, explained delta. New metrics have
 recorded baselines, and new ratio guards are committed. `bench.mjs --quick
 lynx-render --ratios` passes.
 
+**Result (2026-10-04).** Phase 1 shipped as above, with these differences:
+
+- **Variants, not op names.** The page-load phases are variants of the
+  `create_{1k,10k}_rows_ms` operations: `octane-lynx-cold`,
+  `octane-lynx-first-screen`, and `octane-lynx-adopt`. Ratio guards compare
+  targets on one operation, so naming them this way lets a guard compare each
+  phase with a cold background-only mount. A compiled variant joins the same
+  way.
+- **Fresh module instances.** Adoption is defined for a realm's first root,
+  and universal-core numbers roots with a module-level counter. So the
+  page-load variants import fresh module instances for every sample. They time
+  a cold page and run after every warm sample.
+- **Codec charge.** The codec was already charged (#885), so no separate delta
+  is reported.
+- **Retained heap.** Deferred.
+
+At 10,000 rows the first screen is 6.87× a cold background-only mount and
+adoption is 10.52×. The wire carries 14.8 MB of first-tree snapshot, a 12.8 MB
+per-host adopting batch, and a 22 MB handle acknowledgement, against 408 KB for
+a fresh mount. Adoption also makes 1.32× the Element PAPI calls of a mount that
+creates every host.
+
+These are the numbers Phases 2 to 4 have to beat. They are recorded in
+`benchmarks/lynx-render/README.md` and in four new ratio guards: two timing
+ceilings and two deterministic adoption guards.
+
 ### Phase 2: owner-kernel extraction and representation spike
 
 - Extract the owner kernel from `universal-core.ts` in behavior-neutral
