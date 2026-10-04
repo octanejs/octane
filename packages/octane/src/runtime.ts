@@ -39757,6 +39757,8 @@ export function errorBlock(
 	anchor?: Node | null,
 	env?: any[],
 ): () => void {
+	// Wait for a queued parent self-update's replay, as tryBlock does.
+	if (CURRENT_BLOCK?.pending && !CURRENT_BLOCK.crossRenderUpdate) return noop;
 	const parentBlock = parentScope.block;
 	const hydration = activeHydration();
 	let state = parentScope.slots[slotKey] as ErrorSlot | undefined;
@@ -40044,6 +40046,11 @@ export function tryBlock(
 	// JSX ErrorBoundary must not become a catch-only Suspense boundary.
 	propagateSuspense = false,
 ): () => void {
+	// Slot arguments can queue a parent self-update. Like every other slot, wait
+	// for the replay: mounting now would put this range before earlier siblings
+	// that share its anchor, and could commit @catch or @pending, or suspend the
+	// parent, from state the replay discards. Compiled callers ignore the reset.
+	if (CURRENT_BLOCK?.pending && !CURRENT_BLOCK.crossRenderUpdate) return noop;
 	// A catch arm handles application errors, not suspension. With no authored
 	// pending arm, leave the previous screen to an enclosing Suspense or root.
 	propagateSuspense ||= pendingBody === null;
