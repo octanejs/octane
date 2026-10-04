@@ -43286,6 +43286,37 @@ interface BranchSlot {
 	markerlessBefore: Node | null | undefined;
 }
 
+/**
+ * @internal The insertion anchor of a control-flow-only body's root that shares
+ * the body's end marker with a later sibling root. An empty @if/@switch arm, or
+ * a lite component rendering one, keeps no DOM of its own, so content it
+ * mounted later would land before that shared marker, after those siblings.
+ * When a client render creates the slot, mint it a comment of its own at its
+ * source position. The writer reads its anchor only while creating the slot,
+ * and a hydrating slot adopts the server's range, which already bounds it. A
+ * lite call returns without creating its scope while its parent's render is
+ * replaying (componentSlotLite), so it mints nothing until it does.
+ */
+export function ownSlotAnchor(
+	scope: Scope,
+	slotKey: number,
+	block: Block,
+	lite?: boolean,
+): Node | null {
+	const anchor = block.endMarker;
+	const parent = block.parentNode;
+	const hydration = activeHydration();
+	if (
+		scope.slots[slotKey] !== undefined ||
+		(hydration !== null && !hydration.inFreshRange(anchor, parent)) ||
+		(lite && CURRENT_BLOCK?.pending && !CURRENT_BLOCK.crossRenderUpdate)
+	)
+		return anchor;
+	const own = (STAGED_DOM?.view(document) ?? document).createComment('');
+	(STAGED_DOM?.view(parent) ?? parent).insertBefore(own, anchor);
+	return own;
+}
+
 /** True when a committed primary must survive a replacement that may suspend. */
 function preservesCommittedSuspense(block: Block): boolean {
 	for (let current: Block | null = block; current !== null; current = current.parentBlock) {
