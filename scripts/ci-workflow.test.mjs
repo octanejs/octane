@@ -197,6 +197,7 @@ describe('CI workflow aggregation', () => {
 		for (const suite of [
 			'benchmarks/lynx-table/stages/*.test.mjs',
 			'benchmarks/lynx-list/*.test.mjs',
+			'benchmarks/lynx-render/*.test.mjs',
 		]) {
 			assert.ok(benchWorkflow.includes(`node --test ${suite}`), suite);
 			assert.ok(workflowTests.includes(suite), suite);

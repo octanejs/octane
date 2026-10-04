@@ -52,6 +52,7 @@ jobs:
         run: |
           node --test benchmarks/lynx-table/stages/*.test.mjs
           node --test benchmarks/lynx-list/*.test.mjs
+          node --test benchmarks/lynx-render/*.test.mjs
 
       - name: Test UIbench measurement failures
         run: node --test benchmarks/uibench/run.test.mjs

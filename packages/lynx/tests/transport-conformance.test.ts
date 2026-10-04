@@ -13,8 +13,14 @@ import { afterEach, describe, expect, it } from 'vitest';
 
 import { createLynxRoot, type LynxRoot } from '../src/index.js';
 import { installLynxMainThread, type LynxMainThreadController } from '../src/main-thread.js';
-import type { LynxContextProxy, LynxContextProxyEvent } from '../src/core/protocol.js';
+import {
+	LYNX_COMPACT_ACKNOWLEDGEMENT,
+	LYNX_LAZY_PUBLIC_INSTANCES,
+	type LynxContextProxy,
+	type LynxContextProxyEvent,
+} from '../src/core/protocol.js';
 import { conformingContextProxy, unwire } from './_fixtures/lynx-wire.js';
+import { ProgramRowsFixture } from './_fixtures/program-rows.lynx.tsrx';
 
 const LYNX_SRC = fileURLToPath(new URL('../src', import.meta.url));
 
@@ -165,6 +171,82 @@ describe('Lynx transport conformance', () => {
 			// Both directions were exercised, not just the loud one.
 			expect(backgroundWire.conformance.bytes()).toBeGreaterThan(0);
 			expect(mainWire.conformance.bytes()).toBeGreaterThan(0);
+		});
+
+		// Decoding hands the receiver fresh, mutable data, and a fresh root's
+		// compact program mount takes the dense record store only for an
+		// immutable run. Losing it kept every row correct and made each first
+		// mount stage one record per host, roughly doubling create time, so the
+		// observable here is the dense path's own Element PAPI append.
+		it('mounts a decoded fresh program run through the dense record store', async () => {
+			dom = new JSDOM('<!doctype html><html><body></body></html>');
+			installLynxTestingEnv(globalThis, {
+				window: dom.window as unknown as Window & typeof globalThis,
+			});
+			const env = globalThis.lynxTestingEnv;
+
+			env.switchToMainThread();
+			const target = globalThis as unknown as {
+				__AppendElement(parent: unknown, child: unknown): unknown;
+				lynx: { getJSContext(): LynxContextProxy };
+			};
+			const append = target.__AppendElement;
+			let appended = 0;
+			target.__AppendElement = (parent, child) => {
+				appended++;
+				return append(parent, child);
+			};
+			const mainWire = conformingContextProxy(target.lynx.getJSContext());
+			main = installLynxMainThread({ context: mainWire.context });
+
+			env.switchToBackgroundThread();
+			const backgroundWire = conformingContextProxy(
+				(
+					globalThis as unknown as { lynx: { getJSContext(): LynxContextProxy } }
+				).lynx.getJSContext(),
+			);
+			root = createLynxRoot({ context: backgroundWire.context });
+
+			const rows = Array.from({ length: 8 }, (_, index) => ({
+				id: index + 1,
+				label: `Row ${index + 1}`,
+			}));
+			await root.render(ProgramRowsFixture, { rows, selected: 2 });
+			await root.flushTransport();
+
+			const commit = backgroundWire.conformance.crossings
+				.map(
+					(payload) =>
+						unwire(payload) as {
+							readonly type?: unknown;
+							readonly ack?: unknown;
+							readonly instances?: unknown;
+							readonly batch?: { readonly commands?: readonly { readonly op?: unknown }[] };
+						},
+				)
+				.find((message) => message.type === 'commit');
+			// The positive control: this is the negotiated fresh compact mount of
+			// one program run, the only shape the dense store accepts. Compact
+			// acknowledgement needs at least 16 hosts, hence eight rows.
+			expect(commit).toMatchObject({
+				ack: LYNX_COMPACT_ACKNOWLEDGEMENT,
+				instances: LYNX_LAZY_PUBLIC_INSTANCES,
+			});
+			expect(commit?.batch?.commands?.map((command) => command.op)).toContain('mount-template-run');
+			expect(main.diagnostics()).toEqual([]);
+			const document = dom.window.document;
+			expect(
+				[...document.querySelectorAll('#program-rows > view')].map((row) => [
+					row.id,
+					row.getAttribute('class'),
+					row.textContent,
+				]),
+			).toEqual(
+				rows.map((row) => [`row-${row.id}`, row.id === 2 ? 'row danger' : 'row', row.label]),
+			);
+			// Each row's view, text, and raw text, appended natively by the dense
+			// mount. The per-host fallback inserts every one of them instead.
+			expect(appended).toBe(rows.length * 3);
 		});
 
 		// The engine lifecycle entry is the one inbound path whose sender is the
