@@ -2,12 +2,44 @@ import { describe, expect, it } from 'vitest';
 import { compile } from 'octane/compiler';
 import * as ServerRuntime from 'octane/server';
 import { act, mount } from './_helpers';
+import { loadCompiledFixtureSource } from './_server-fixture';
 import {
 	ConditionalGetters,
 	ReducerGetter,
 	RenderPhaseNullableReducerGetter,
 	StateGetter,
 } from './_fixtures/state-getter.tsrx';
+
+// `function … @{}` bodies that sit inside another statement rather than at
+// module top level: a memo-wrapped component expression, a template function
+// declared inside a component, and one passed as a component prop. Each is
+// compiled as its own component body.
+const getterBody = `
+	const [count, setCount, getCount] = useState(1);
+	const [total, dispatch, getTotal] = useReducer((sum: number, n: number) => sum + n, 10);
+	const [source, setSource] = useState('a');
+	const [label, setLabel, getLabel] = useLinkedState(source, (value: string) => value.toUpperCase());
+	props.bind({ setCount, dispatch, setSource, setLabel, getCount, getTotal, getLabel });
+	<output>{\`\${count}:\${total}:\${label}\` as string}</output>
+`;
+const nestedComponentGetterSource = `
+	import { memo, useLinkedState, useReducer, useState } from 'octane';
+
+	export const Memoized = memo(function Memoized(props) @{ ${getterBody} });
+
+	export function Outer(props) @{
+		function Inner() @{ ${getterBody} }
+		<Inner />
+	}
+
+	function Host(props) @{
+		<props.Panel bind={props.bind} />
+	}
+
+	export function PanelProp(props) @{
+		<Host bind={props.bind} Panel={function Panel(props) @{ ${getterBody} }} />
+	}
+`;
 
 function evalServer(source: string, filename: string): Record<string, any> {
 	let code = compile(source, filename, { mode: 'server' }).code;
@@ -104,6 +136,54 @@ describe('state getter runtime semantics', () => {
 		expect(observed).toEqual([empty, expected]);
 		expect(r.find('#nullable-reducer').textContent).toBe(expected);
 		r.unmount();
+	});
+
+	describe.each([
+		{ build: 'dev', dev: true },
+		{ build: 'prod', dev: false },
+	])('getters in nested component bodies ($build compile)', ({ dev }) => {
+		const load = (mode: 'client' | 'server') =>
+			loadCompiledFixtureSource(nestedComponentGetterSource, {
+				id: 'nested-component-getters.tsrx',
+				mode,
+				compileOptions: { dev, hmr: false },
+			});
+
+		it.each(['Memoized', 'Outer', 'PanelProp'])(
+			'%s reads committed state through its getters',
+			(name) => {
+				let api: any;
+				const r = mount(load('client')[name], { bind: (value: any) => (api = value) });
+				expect(r.find('output').textContent).toBe('1:10:A');
+				expect([api.getCount(), api.getTotal(), api.getLabel()]).toEqual([1, 10, 'A']);
+
+				act(() => {
+					api.setCount(2);
+					api.dispatch(5);
+					api.setLabel('local');
+				});
+				expect(r.find('output').textContent).toBe('2:15:local');
+				expect([api.getCount(), api.getTotal(), api.getLabel()]).toEqual([2, 15, 'local']);
+
+				// A new linked source replaces the local override; the other hooks keep theirs.
+				act(() => api.setSource('b'));
+				expect(r.find('output').textContent).toBe('2:15:B');
+				expect([api.getCount(), api.getTotal(), api.getLabel()]).toEqual([2, 15, 'B']);
+				r.unmount();
+			},
+		);
+
+		it.each(['Memoized', 'Outer', 'PanelProp'])(
+			'%s renders its getter-backed state on the server',
+			(name) => {
+				let api: any;
+				const { html } = ServerRuntime.renderToString(load('server')[name], {
+					bind: (value: any) => (api = value),
+				});
+				expect(html).toContain('1:10:A');
+				expect([api.getCount(), api.getTotal(), api.getLabel()]).toEqual([1, 10, 'A']);
+			},
+		);
 	});
 
 	it('tracks the converged render-phase state on the server', () => {

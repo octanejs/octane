@@ -20604,11 +20604,17 @@ function rewriteHookCalls(node, ctx, componentName, localRoot = false) {
 	function rewriteHookCallNode(n) {
 		// First-class subtemplates have their own compileFunctionBody pass. Leave
 		// their contents untouched here so hook sites are slotted exactly once and
-		// conservatively retain the globally composable helper ABI.
+		// conservatively retain the globally composable helper ABI. That covers
+		// every `@{}` function rewriteJsxValues compiles on its own, before or
+		// after that compile, including `memo(function X() @{ … })` and a
+		// `function F() @{ … }` declared in a body: a second pass would append a
+		// second slot and would read the getter-helper callee as an authored alias
+		// of the base hook.
 		if (
 			n.type === 'Tsrx' ||
 			n.type === 'Tsx' ||
-			(n.type === 'ArrowFunctionExpression' && n.body?.type === 'JSXCodeBlock')
+			n._octaneCompiledTemplate === true ||
+			(isFunctionNode(n) && n.body?.type === 'JSXCodeBlock')
 		) {
 			return n;
 		}
@@ -23279,7 +23285,13 @@ function rewriteJsxValues(node, ctx, eagerMapCallbackRoots = false, eagerMapCall
 				// A missing fold marks a module-level callback, whose names only this
 				// function's closure can reach.
 				const compiled = withNestedTemplateScope(n, ctx, compile, lower == null);
-				return functionExpressionFromDeclaration({ ...compiled, id: n.id ?? null }, n);
+				// The body pass above slotted this function's hooks. The server's
+				// expression-position hook pass (tsrxExprNode) runs over JSX-lowered
+				// prop values afterwards and must leave the compiled body alone.
+				return {
+					...functionExpressionFromDeclaration({ ...compiled, id: n.id ?? null }, n),
+					_octaneCompiledTemplate: true,
+				};
 			} finally {
 				ctx._pendingWarm = previousWarm;
 			}
