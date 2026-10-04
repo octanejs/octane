@@ -83,8 +83,10 @@ function User() @{
 ## How it works
 
 - The router core under `src/lib/router/` is vendored verbatim from
-  react-router 8.2.0 (`scripts/vendor-remix-router.mjs`; two documented
-  Octane integration deviations; hand-edits prohibited).
+  react-router 8.2.0 (`scripts/vendor-remix-router.mjs`; hand-edits
+  prohibited). The script applies three documented deviations: two Octane
+  integration points, and edits to unused declarations so the source
+  typechecks under an application's `noUnusedLocals` and `noUnusedParameters`.
 - `RouterProvider` preserves upstream's exact commit paths — `startTransition`
   wrapping, the `flushSync` option, and the ViewTransition dance (dormant until
   Phase E) — on octane's `useState`/`useLayoutEffect`/`useOptimistic`/
