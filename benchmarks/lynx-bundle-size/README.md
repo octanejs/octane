@@ -41,11 +41,17 @@ the production reachable-module owner weights. That proportional raw
 attribution is for prioritization; only an isolated production build delta may
 be described as gzip ownership.
 
-`inventory-budgets.json` freezes total, thread-section, and owner-slice raw
-budgets plus total gzip budgets on the issue #57 first-screen template-range
-candidate over exact base `dcf94cfc8`, which includes the merged dense-clear
-teardown. The ledger keeps the older #706/#707 entries, pre-existing mainline
-drift, and the candidate's controlled size tax separate because compressed
+`inventory-budgets.json` holds total, thread-section, and owner-slice raw
+budgets plus total and thread-section gzip budgets. Each is a ratchet at the
+measured production bytes plus 32, the same rule as the
+[size budgets](../README.md#size-budgets), last re-baselined on main
+`c60eef1342` (2026-10-04). Only the weekly bench enforces them, so raise one in
+a separate budget pull request that names the bytes and the pull requests that
+spent them. `OCTANE_INVENTORY_CALIBRATE=1` skips every gate, and
+`OCTANE_INVENTORY_OUTPUT=<file>` writes the full payload for recalibration.
+Owner slices are proportional, so an owner's slice also moves when another
+owner grows or shrinks. The ledger keeps the older #706/#707 entries, mainline
+drift, and the #57 candidate's controlled size tax separate because compressed
 deltas are not additive.
 
 The checked execution report is
