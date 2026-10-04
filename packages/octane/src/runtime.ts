@@ -43286,6 +43286,42 @@ interface BranchSlot {
 	markerlessBefore: Node | null | undefined;
 }
 
+/**
+ * @internal The insertion anchor of a control-flow-only body's root that shares
+ * the body's end marker with a later sibling root. An empty @if/@switch arm, or
+ * a lite component rendering one, keeps no DOM of its own, so content it
+ * mounted later would land before that shared marker, after those siblings.
+ * When a client render creates the slot, mint it a comment of its own at its
+ * source position. The writer reads its anchor only while creating the slot,
+ * and a hydrating slot adopts the server's range, which already bounds it.
+ *
+ * A render that schedules its own update mid-body replays before its slots
+ * settle: component calls return without creating anything, and a branch slot
+ * is created but renders no arm. Nothing is minted until the replay, which
+ * reaches every slot in source order; a branch slot created in the meantime
+ * takes its own anchor then, before it renders, unless it adopted a server
+ * range.
+ */
+export function ownSlotAnchor(scope: Scope, slotKey: number, block: Block): Node | null {
+	const anchor = block.endMarker;
+	const parent = block.parentNode;
+	const hydration = activeHydration();
+	const slot = scope.slots[slotKey] as BranchSlot | undefined;
+	if (
+		(slot !== undefined && (slot.branch !== -1 || slot.start !== null)) ||
+		(hydration !== null && !hydration.inFreshRange(anchor, parent)) ||
+		(CURRENT_BLOCK?.pending && !CURRENT_BLOCK.crossRenderUpdate)
+	)
+		return anchor;
+	const own = (STAGED_DOM?.view(document) ?? document).createComment('');
+	(STAGED_DOM?.view(parent) ?? parent).insertBefore(own, anchor);
+	if (slot !== undefined) {
+		journalRootProperty(slot, 'anchor', slot.anchor);
+		slot.anchor = own;
+	}
+	return own;
+}
+
 /** True when a committed primary must survive a replacement that may suspend. */
 function preservesCommittedSuspense(block: Block): boolean {
 	for (let current: Block | null = block; current !== null; current = current.parentBlock) {

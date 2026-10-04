@@ -1595,6 +1595,7 @@ const NATIVE_READ_RUNTIME_HELPERS = new Set([
 ]);
 const INTERNAL_CLIENT_RUNTIME_HELPERS = new Set([
 	'__createCompiledContext',
+	'ownSlotAnchor',
 	'isContext',
 	'bindPresentationView',
 	'beginPresentationHydration',
@@ -26736,6 +26737,27 @@ function planJsx(
 	const hasStaticRoot = jsxNodes.some(
 		(n) => !isConstructNode(n) && !(n.type === 'Element' && isComponentTag(n)),
 	);
+	// The roots of a control-flow-only body share `__block.endMarker`, and each
+	// inserts before it. A root that can keep no DOM of its own, an @if/@switch
+	// taking an empty arm or a lite component whose body root can (makeCompCall's
+	// anchorlessAppendSafe), would then mount later content after every later
+	// sibling. Unless it is the last root, its slot gets an anchor of its own
+	// when a client render creates it (`ownAnchor`, see slotAnchorNodeFor). The
+	// template is unchanged, so hydration is too: a hydrating slot adopts the
+	// server's range. @for, @try, <Activity>, and every other component lowering
+	// mint their own boundary.
+	const sharedAnchor = !hasStaticRoot && jsxNodes.length > 1;
+	const rootRecord = (n) => {
+		if (n.type === 'Element') return compCalls[compCalls.length - 1];
+		const kind = n.type === 'FoldedDirective' ? n.kind : n.type;
+		return kind === 'IfStatement' || kind === 'if'
+			? ifCalls[ifCalls.length - 1]
+			: kind === 'SwitchStatement' || kind === 'switch'
+				? ctx._switchCalls[ctx._switchCalls.length - 1]
+				: null;
+	};
+	const losesPosition = (n, record) =>
+		record !== null && (n.type !== 'Element' || !record.anchorlessAppendSafe);
 	const rootTemplate = createTemplateIr();
 	let htmlIdx = 0;
 	// Text-adjacency classification of the root nodes (see textAdjacencyKind):
@@ -26812,6 +26834,10 @@ function planJsx(
 		}
 		if (coalesceChildRoot && compCalls.length > 0) {
 			compCalls[compCalls.length - 1].coalesceRange = true;
+		}
+		if (sharedAnchor && rootI < jsxNodes.length - 1) {
+			const record = rootRecord(node);
+			if (losesPosition(node, record)) record.ownAnchor = true;
 		}
 		// Advance the child index only when the node actually contributed template
 		// HTML (an element / text / `<!>` anchor). Component calls and un-anchored
@@ -27649,6 +27675,19 @@ function planJsx(
 			: !isElHost(c.elVar)
 				? b.member(b.id('__block'), 'endMarker')
 				: null;
+	// A root that shares `__block.endMarker` with later siblings and can keep no
+	// DOM of its own (planJsx's `ownAnchor`): the @if/@switch and lite component
+	// writers read the anchor only to create the slot, so ownSlotAnchor mints the
+	// slot a comment of its own then.
+	const slotAnchorNodeFor = (c, anchorKey) =>
+		c.ownAnchor
+			? b.call(
+					requireRuntimeForContext(ctx, 'ownSlotAnchor'),
+					b.id('__s'),
+					b.literal(c.slotIndex),
+					b.id('__block'),
+				)
+			: anchorNodeFor(c, anchorKey);
 	// Host expression for a construct's slot call — the bag-stashed host element,
 	// or the block's own parentNode for bagless (control-flow-only) bodies.
 	const hostNodeFor = (key) =>
@@ -27917,7 +27956,7 @@ function planJsx(
 		const hostExpr = hostNodeFor(`_ifHost$${ic.id}`);
 		// Anchor selection — see anchorNodeFor. env is positional AFTER anchor —
 		// backfill an `undefined` anchor slot.
-		const ifAnchor = anchorNodeFor(ic, 'ifAnchor');
+		const ifAnchor = slotAnchorNodeFor(ic, 'ifAnchor');
 		let ifEnv = envNodeFor(ic, !ic.activity);
 		let condition = ic.condExpr;
 		let conditionDeclaration = null;
@@ -28279,7 +28318,9 @@ function planJsx(
 			ctx.runtimeNeeded.add(
 				liteMemo ? 'componentSlotLite' : cc.voidComponent ? 'componentSlotVoid' : 'componentSlot',
 			);
-			const memoAnchor = anchorNodeFor(cc, 'compAnchor');
+			const memoAnchor = liteMemo
+				? slotAnchorNodeFor(cc, 'compAnchor')
+				: anchorNodeFor(cc, 'compAnchor');
 			const trailing = liteMemo
 				? optionalCallArgs(b.literal(cc.invocationSite), memoAnchor)
 				: optionalCallArgs(
@@ -28370,7 +28411,7 @@ function planJsx(
 			ctx.runtimeNeeded.add('componentSlotLite');
 			// Anchor — same rules as componentSlot (see anchorNodeFor); the
 			// endMarker case keeps the lite range inside the owning block.
-			const liteAnchor = anchorNodeFor(cc, 'compAnchor');
+			const liteAnchor = slotAnchorNodeFor(cc, 'compAnchor');
 			pushAfterStmt(
 				cc.id,
 				org,
@@ -28506,7 +28547,7 @@ function planJsx(
 		for (const arm of sc.caseRecords ?? []) registerClauseOrigin(ctx, arm.keyword, [arm.helper]);
 		// Anchor selection — see anchorNodeFor (mirrors ifBlock, including the
 		// __block.endMarker fallback for a body that is ONLY a @switch).
-		const switchAnchor = anchorNodeFor(sc, 'switchAnchor');
+		const switchAnchor = slotAnchorNodeFor(sc, 'switchAnchor');
 		const swEnv = envNodeFor(sc);
 		const trailing = [];
 		if (switchAnchor) trailing.push(switchAnchor);
