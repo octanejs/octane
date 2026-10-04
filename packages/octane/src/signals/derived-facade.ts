@@ -24,12 +24,12 @@ export function __derivedAt<T>(
 	return new DerivedDescriptor(
 		key,
 		'derived',
-		(owner) => {
+		(owner, declaring) => {
 			const wrapped = compute.length
 				? (context: Parameters<DerivedCompute<T>>[0]) =>
 						runWithSignalOwner(owner, () => compute(context))
 				: () => runWithSignalOwner(owner, () => (compute as () => ReturnType<DerivedCompute<T>>)());
-			return createDeclaredDerivedCell(owner, key, wrapped, options, sequence, captures);
+			return createDeclaredDerivedCell(owner, key, wrapped, options, sequence, captures, declaring);
 		},
 		site,
 	);

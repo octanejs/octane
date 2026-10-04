@@ -51,11 +51,14 @@ export abstract class RedeclarableBinding<D> {
 	/** The renderer discarded the render that staged this definition. */
 	protected discardDefinition(): void {}
 
-	/** Record the declaration that created this cell, the first in its render. */
-	declared(sequence: number, captures?: readonly unknown[]): void {
+	/**
+	 * Record the declaration that created this cell, the first in its render.
+	 * `declaring` is the invocation that evaluated it; see `redeclare`.
+	 */
+	declared(sequence: number, captures?: readonly unknown[], declaring = 0): void {
 		this.sequence = sequence;
 		this.captures = captures;
-		this.presented = currentSignalDeclarationInvocation();
+		this.presented = renderInvocation(currentSignalDeclarationInvocation(), declaring);
 	}
 
 	/**
@@ -71,14 +74,26 @@ export abstract class RedeclarableBinding<D> {
 	 * `captures` lists the render values a compiled closure captured. When each
 	 * is unchanged, the closure computes exactly what the committed one does, so
 	 * the render presents the committed cell without staging or evaluating it.
+	 *
+	 * `declaring` is the render invocation that evaluated this declaration, when
+	 * the cell belongs to that render's owner. A directive arm or inline row of
+	 * that owner only reads the declaration: the owner's render stages it, so an
+	 * arm attempt that suspends and is discarded cannot discard a declaration
+	 * whose render commits. Without it, the reading render stages it.
 	 */
-	redeclare(definition: D, sequence: number, captures?: readonly unknown[]): ScopedNode {
+	redeclare(
+		definition: D,
+		sequence: number,
+		captures?: readonly unknown[],
+		declaring = 0,
+	): ScopedNode {
 		// A stale handler or an earlier render's handle presents the committed cell.
 		if (sequence <= this.sequence || definition === this.committedDefinition()) return this.node;
 		const staged = this.staged;
 		// The first declaration in one render wins; an aliasing second one shares
 		// it. Equal captures present the committed cell without opening a stage.
-		const invocation = currentSignalDeclarationInvocation();
+		const current = currentSignalDeclarationInvocation();
+		const invocation = renderInvocation(current, declaring);
 		if (invocation === 0 || staged?.invocation !== invocation) {
 			if (sameCaptures(this.captures, captures)) {
 				this.presented = invocation;
@@ -86,7 +101,7 @@ export abstract class RedeclarableBinding<D> {
 			}
 			if (invocation !== 0 && this.presented === invocation) return this.node;
 		}
-		const stage = currentSignalDeclarationStage();
+		const stage = currentSignalDeclarationStage(invocation === current ? undefined : invocation);
 		if (stage === undefined) {
 			// Work belonging to a render still awaiting acceptance reads its view.
 			if (staged !== undefined && sequence >= staged.sequence) return staged.view ?? this.node;
@@ -124,6 +139,11 @@ export abstract class RedeclarableBinding<D> {
 	protected forgetStaged(): void {
 		this.staged = undefined;
 	}
+}
+
+/** The render a declaration belongs to, or 0 when no render is reading it. */
+function renderInvocation(current: number, declaring: number): number {
+	return current === 0 || declaring === 0 ? current : declaring;
 }
 
 function sameCaptures(
