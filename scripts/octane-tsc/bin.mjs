@@ -7,7 +7,7 @@ import path from 'node:path';
 import * as jsonc from 'jsonc-parser';
 
 const tsc = path.join(
-	path.dirname(createRequire(import.meta.url).resolve('typescript/package.json')),
+	path.dirname(createRequire(import.meta.url).resolve('typescript-native/package.json')),
 	'bin/tsc',
 );
 

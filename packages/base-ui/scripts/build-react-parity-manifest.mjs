@@ -143,9 +143,7 @@ for (const name of ['base-ui', 'base-ui-utils']) {
 				kind: 'typescript',
 				compiler: pristine ? 'tsc' : 'tsrx-tsc',
 				project,
-				...(pristine
-					? { compilerBins: [`${prefix}/node_modules/typescript-pristine-native/bin/tsc`] }
-					: {}),
+				...(pristine ? { compilerBins: [`${prefix}/node_modules/typescript-native/bin/tsc`] } : {}),
 			},
 			files: [
 				evidence(project, 'test', [{ id: `types:${id}`, testName, fullName: testName }]),
