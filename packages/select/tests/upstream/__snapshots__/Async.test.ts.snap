@@ -66,6 +66,7 @@ exports[`defaults - snapshot 1`] = `
       </div>
       <!--/comp-->
       <!--/if-->
+      <!---->
       <!--comp-->
       <div
         class=" css-1g48xl4-IndicatorsContainer"
