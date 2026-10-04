@@ -394,6 +394,147 @@ describe('behavior-only roots', () => {
 		container.remove();
 	});
 
+	for (const attribute of ['className', 'htmlFor']) {
+		it(`hands off an aliased unbound host attribute (${attribute}, prod Strong)`, async () => {
+			const source = [
+				"import { unbound } from 'octane/behavior';",
+				"export function Host(props) @{ 'use dom bindings';",
+				`  <label data-mode={props.mode} ${attribute}={unbound((props.value$?.get() ?? props.value).text)}>{unbound(props.children)}</label>`,
+				'}',
+				'export function App(props) @{',
+				'  <Host mode={props.mode} value$={props.value$} value={props.value}><span>{props.label as string}</span></Host>',
+				'}',
+			].join('\n');
+			const initial = {
+				mode: 'server',
+				value$: undefined,
+				value: { text: 'initial' },
+				label: 'server child',
+			};
+			const fixture = authoredPresentation('Host', initial, false, source, {}, { strong: true });
+			container.innerHTML = renderToString(fixture.server.App, initial).html;
+			const label = container.querySelector('label')!;
+			const child = label.firstElementChild;
+			const name = attribute === 'className' ? 'class' : 'for';
+			const errors: unknown[] = [];
+			const binding = fixture.attach(label, fixture.state);
+			try {
+				fixture.publish({ mode: 'early' });
+				expect(label.getAttribute('data-mode')).toBe('early');
+				const client = fixture.loadClient();
+				hydratedRoot = hydrateRoot(
+					container,
+					client.App,
+					{ ...initial, mode: 'hydrated' },
+					{
+						bindingLeases: [binding],
+						onUncaughtError: (error: unknown) => errors.push(error),
+					},
+				);
+				await act(() => {});
+				expect(errors).toEqual([]);
+				expect(container.querySelector('label')).toBe(label);
+				expect(label.firstElementChild).toBe(child);
+				expect(label.getAttribute(name)).toBe('initial');
+				expect(label.getAttribute('data-mode')).toBe('hydrated');
+				expect(fixture.cleanup).toHaveBeenCalledOnce();
+				await act(() =>
+					hydratedRoot!.render(client.App, {
+						...initial,
+						mode: 'updated',
+						value: { text: 'updated' },
+					}),
+				);
+				expect(label.getAttribute(name)).toBe('updated');
+				expect(label.getAttribute('data-mode')).toBe('updated');
+			} finally {
+				hydratedRoot?.unmount();
+				hydratedRoot = undefined;
+				binding.dispose();
+			}
+		});
+	}
+
+	for (const dev of [false, true]) {
+		for (const strong of [false, true]) {
+			for (const useSignal of [false, true]) {
+				it(`hands off an unbound host and keeps updates live (${dev ? 'dev' : 'prod'}, ${strong ? 'Strong' : 'ordinary'}, ${useSignal ? 'signal' : 'snapshot'})`, async () => {
+					const source = [
+						"import { unbound } from 'octane/behavior';",
+						"export function Host(props) @{ 'use dom bindings';",
+						'  <section class={props.className} hidden={unbound(!!(props.value$?.get() ?? props.value).hidden)}>{unbound(props.children)}</section>',
+						'}',
+						'export function App(props) @{',
+						'  <Host className={props.className} value$={props.value$} value={props.value}><span>{props.label as string}</span></Host>',
+						'}',
+					].join('\n');
+					const scope = createScope({ scopeKey: 'host-unbound-value' });
+					const signal = scope.signal$('value', { hidden: false });
+					const initial = {
+						className: 'server',
+						value$: useSignal ? signal : undefined,
+						value: { hidden: false },
+						label: 'server child',
+					};
+					const fixture = authoredPresentation('Host', initial, dev, source, {}, { strong });
+					container.innerHTML = renderToString(fixture.server.App, initial).html;
+					const section = container.querySelector('section')!;
+					const child = section.firstElementChild;
+					const errors: unknown[] = [];
+					const binding = fixture.attach(section, fixture.state);
+					try {
+						fixture.publish({ className: 'early' });
+						expect(section.className).toBe('early');
+						const client = fixture.loadClient();
+						hydratedRoot = hydrateRoot(
+							container,
+							client.App,
+							{ ...initial, className: 'hydrated' },
+							{
+								bindingLeases: [binding],
+								signalOwner: scope,
+								onUncaughtError: (error: unknown) => errors.push(error),
+							},
+						);
+						await act(() => {});
+						expect(errors).toEqual([]);
+						expect(container.querySelector('section')).toBe(section);
+						expect(section.firstElementChild).toBe(child);
+						expect(section.className).toBe('hydrated');
+						expect(section.hidden).toBe(false);
+						expect(fixture.cleanup).toHaveBeenCalledOnce();
+						fixture.publish({ className: 'retired' });
+						binding.refresh();
+						expect(section.className).toBe('hydrated');
+						if (useSignal) {
+							await act(() => signal.set({ hidden: true }));
+							expect(section.hidden).toBe(true);
+						}
+						await act(() =>
+							hydratedRoot!.render(client.App, {
+								...initial,
+								className: 'updated',
+								value: { hidden: true },
+								label: 'updated child',
+							}),
+						);
+						expect(errors).toEqual([]);
+						expect(container.querySelector('section')).toBe(section);
+						expect(section.firstElementChild).toBe(child);
+						expect(section.className).toBe('updated');
+						expect(section.hidden).toBe(true);
+						expect(section.textContent).toBe('updated child');
+					} finally {
+						hydratedRoot?.unmount();
+						hydratedRoot = undefined;
+						binding.dispose();
+						scope.dispose();
+					}
+				});
+			}
+		}
+	}
+
 	for (const dev of [false, true]) {
 		for (const styles of ['provider', 'single property', 'multiple properties', 'native reads']) {
 			it(`hands off a host with a known unbound provider spread and ${styles} styles (${dev ? 'dev' : 'prod'})`, () => {
