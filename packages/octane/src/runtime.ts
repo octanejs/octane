@@ -11794,6 +11794,7 @@ class LiteBlockImpl {
 	declare parentNode: Node;
 	declare endMarker: Node | null;
 	declare parentBlock: Block;
+	declare memoInChain: boolean;
 	declare $$ctxValues: Map<Context<any>, any> | null;
 	declare idState: RootIdState;
 	// Signal-instance fields exist on every Block stand-in: signal key walks
@@ -11811,6 +11812,7 @@ class LiteBlockImpl {
 		this.parentNode = parentNode;
 		this.endMarker = endMarker;
 		this.parentBlock = parentBlock;
+		this.memoInChain = parentBlock.memoInChain;
 		this.$$ctxValues = null;
 		this.idState = parentBlock.idState;
 		this.signalInstanceParent = null;
@@ -38468,37 +38470,18 @@ function ctxBailDepsClean(block: Block): boolean {
  * itself never re-runs, matching React's `['App','Consumer']` (no 'Indirection').
  */
 function refreshContextConsumers(block: Block): void {
-	const slots = block._slots;
-	if (slots !== null) {
-		for (let i = 0, n = slots.length; i < n; i++) {
-			const s = slots[i];
-			const k = s.__kind;
-			if (k === 'forBlockSlot') {
-				const items = s.items as Map<any, Block>;
-				for (const item of items.values()) refreshBlockForContext(item);
-				if (s.emptyBlock) refreshBlockForContext(s.emptyBlock);
-			} else if (s.block) {
-				// componentSlotSlot | ifBlockSlot | switchBlockSlot | activityBlockSlot
-				// | trySlotSlot | portalSlotSlot | childSlot (single-child mode) — each
-				// holds a single child Block.
-				refreshBlockForContext(s.block);
-			} else if (s.__kind === 'childSlot' && s.forSlot) {
-				// childSlot in ARRAY mode: the keyed list lives in an EMBEDDED forSlot
-				// (state.block is null), e.g. a memo boundary whose children are an
-				// array of elements. Without this arm the consumers under it were
-				// stranded by the bail.
-				const items = s.forSlot.items as Map<any, Block>;
-				for (const item of items.values()) refreshBlockForContext(item);
-			} else if (s.__kind === 'childSlot' && s.portal !== null && s.portal.block !== null) {
-				// childSlot in PORTAL mode: the content Block lives in the EMBEDDED
-				// PortalSlot (state.block is null), e.g. a memo boundary whose
-				// value-position child is `createPortal(...)`. The `s.block` arm above
-				// covers only the compiler fast path's standalone portalSlotSlot; without
-				// this arm, consumers inside a value-position portal were stranded.
-				refreshBlockForContext(s.portal.block);
-			}
-		}
+	forEachSubtreeChild(block, refreshContextSubtree, false);
+}
+
+function refreshContextSubtree(scope: Scope): void {
+	if (scope.block === scope) {
+		refreshBlockForContext(scope as Block);
+		return;
 	}
+	// A lightweight component has no Block slot of its own. Its descendants still
+	// carry the memo ancestry and context dependencies, so cross the scope proxy and
+	// continue through the same live-child taxonomy used by other subtree walks.
+	forEachSubtreeChild(scope, refreshContextSubtree, false);
 }
 
 // React.memo's bail, shared by BOTH same-component update paths (componentSlot for
