@@ -75,12 +75,13 @@ export interface DerivedBindingLifecycle {
 	resume(): void;
 	dispose(): void;
 	forkCandidate?(target: ScopedNode, frame: SignalCandidateFrame): CandidateProducer | undefined;
-	declared(sequence: number, captures?: readonly unknown[]): void;
+	declared(sequence: number, captures?: readonly unknown[], declaring?: number): void;
 	/** A later render's declaration of this cell, with a computation that may capture new values. */
 	redeclare(
 		compute: DerivedCompute<any>,
 		sequence: number,
 		captures?: readonly unknown[],
+		declaring?: number,
 	): ScopedNode;
 	supersede(): void;
 }
@@ -398,16 +399,18 @@ export class ScopeImpl implements Scope, GraphOwner {
 		Binding: DerivedBindingFactory<T>,
 		sequence = 0,
 		captures?: readonly unknown[],
+		declaring = 0,
 	): DerivedSignal<T> {
 		if (typeof compute !== 'function') throw new TypeError(formatClientError(122));
 		const [node, created] = this.declaredNode<T>(key, 'derived');
 		if (!created) {
 			// A later render may declare the same cell with a new computation.
 			const binding = this.derivedBindings?.get(node);
-			return (binding?.redeclare(compute, sequence, captures) ?? node) as DerivedSignal<T>;
+			return (binding?.redeclare(compute, sequence, captures, declaring) ??
+				node) as DerivedSignal<T>;
 		}
 		const binding = new Binding(this, node, compute, options);
-		binding.declared(sequence, captures);
+		binding.declared(sequence, captures, declaring);
 		(this.derivedBindings ??= new Map()).set(node, binding);
 		this.initializeRetention(node);
 		this.consumeSeed(key);
@@ -421,6 +424,7 @@ export class ScopeImpl implements Scope, GraphOwner {
 		unique = false,
 		sequence = 0,
 		captures?: readonly unknown[],
+		declaring = 0,
 	): Resource<T> {
 		if (typeof describe !== 'function') throw new TypeError(formatClientError(137));
 		let node: ScopedNode<T>;
@@ -430,7 +434,8 @@ export class ScopeImpl implements Scope, GraphOwner {
 			if (!created) {
 				// A later render may declare the same cell with a new description.
 				const binding = this.resources?.get(declared) as ResourceBinding<T> | undefined;
-				return (binding?.redeclare(describe, sequence, captures) ?? declared) as Resource<T>;
+				return (binding?.redeclare(describe, sequence, captures, declaring) ??
+					declared) as Resource<T>;
 			}
 			node = declared;
 		}
@@ -439,7 +444,7 @@ export class ScopeImpl implements Scope, GraphOwner {
 		this.initializeRetention(node);
 		signalBatch(() => {
 			const binding = initialize(this, node, describe, seed, retained);
-			binding.declared(sequence, captures);
+			binding.declared(sequence, captures, declaring);
 			(this.resources ??= new Map()).set(node, binding);
 			refreshNode(node);
 			// A selection bound before this declaration ran may already hold results.
@@ -853,9 +858,18 @@ export function createDerivedCellWith<T>(
 	Binding: DerivedBindingFactory<T>,
 	sequence = 0,
 	captures?: readonly unknown[],
+	declaring = 0,
 ): DerivedSignal<T> {
 	if (!(owner instanceof ScopeImpl)) throw new TypeError(formatClientError(149));
-	return owner.createDerivedDeclaration(key, compute, options, Binding, sequence, captures);
+	return owner.createDerivedDeclaration(
+		key,
+		compute,
+		options,
+		Binding,
+		sequence,
+		captures,
+		declaring,
+	);
 }
 
 let declarationSequence = 0;
@@ -879,9 +893,18 @@ export function createResourceCellWith<T>(
 	unique = false,
 	sequence = 0,
 	captures?: readonly unknown[],
+	declaring = 0,
 ): Resource<T> {
 	if (!(owner instanceof ScopeImpl)) throw new TypeError(formatClientError(150));
-	return owner.createResourceDeclaration(key, describe, initialize, unique, sequence, captures);
+	return owner.createResourceDeclaration(
+		key,
+		describe,
+		initialize,
+		unique,
+		sequence,
+		captures,
+		declaring,
+	);
 }
 
 export function adoptResourceValue<T>(

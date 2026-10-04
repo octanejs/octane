@@ -20,7 +20,11 @@ import {
 } from './graph.js';
 import { readEarlySignalValue } from './early-values.js';
 import { currentSignalDeclarationPath } from './declaration-path.js';
-import { NATIVE_DOM_VALUE, forwardNativeTransitionConsumer } from './read-protocol.js';
+import {
+	NATIVE_DOM_VALUE,
+	currentSignalDeclarationInvocation,
+	forwardNativeTransitionConsumer,
+} from './read-protocol.js';
 import { isSignalHandle } from './handle-protocol.js';
 
 export { isSignalHandle, isWritableSignal } from './handle-protocol.js';
@@ -361,7 +365,7 @@ function readerOwner(
 type DescriptorClass<T, H extends SignalHandle<T>> = new (
 	key: string,
 	kind: H['kind'],
-	create: (owner: Scope) => H,
+	create: (owner: Scope, declaring: number) => H,
 	site: string | undefined,
 	declared: Descriptor<T, H>,
 ) => Descriptor<T, H>;
@@ -372,6 +376,8 @@ export abstract class Descriptor<T, H extends SignalHandle<T>> implements OwnerB
 	private readonly cells: WeakMap<Scope, H>;
 	// Identity-only token: renderer owners never retain their renderer tree.
 	private readonly owner: SignalRendererOwnerIdentity | undefined;
+	/** The render invocation that evaluated this declaration in `owner`. */
+	private readonly invocation: number;
 	/** A render's private presentation of a redeclared cell, until it is accepted or released. */
 	declare private view?: H;
 	declare private viewOwner?: Scope;
@@ -385,18 +391,22 @@ export abstract class Descriptor<T, H extends SignalHandle<T>> implements OwnerB
 	constructor(
 		readonly key: string,
 		readonly kind: H['kind'],
-		private readonly create: (owner: Scope) => H,
+		/** `declaring` is the invocation that evaluated the declaration of `owner`'s cell, or 0. */
+		private readonly create: (owner: Scope, declaring: number) => H,
 		private readonly site: string | undefined,
 		declared?: Descriptor<T, H>,
 	) {
 		if (declared === undefined) {
 			this.cells = new WeakMap();
 			this.owner = declarationOwner(site);
+			this.invocation = this.owner === undefined ? 0 : currentSignalDeclarationInvocation();
 			this.lexical = undefined;
 		} else {
-			// One declaration: a use finds the cell its template already resolved.
+			// One declaration: a use finds the cell its template already resolved,
+			// and a redeclaration it presents stages with the render that evaluated it.
 			this.cells = declared.cells;
 			this.owner = declared.owner;
+			this.invocation = declared.invocation;
 			this.lexical = this;
 		}
 	}
@@ -422,10 +432,16 @@ export abstract class Descriptor<T, H extends SignalHandle<T>> implements OwnerB
 
 	[SIGNAL_OWNER_RESOLVE](owner: Scope): H {
 		requireSite(this.site);
-		return this.resolvedCell(resolveDescriptorOwner(this.site, readerOwner(this.owner, owner)));
+		const token = readerOwner(this.owner, owner);
+		return this.resolvedCell(resolveDescriptorOwner(this.site, token), token);
 	}
 
-	private resolvedCell(target: Scope): H {
+	/**
+	 * `token` is the owner the reader resolved. Only the declaring owner's cell
+	 * belongs to the render that evaluated this declaration; a component that
+	 * received the handle declares its own cell in its own render.
+	 */
+	private resolvedCell(target: Scope, token: SignalOwner): H {
 		let cell = this.cells.get(target);
 		if (!cell) {
 			// An accepted view resolves to its canonical cell from now on. A render
@@ -434,7 +450,7 @@ export abstract class Descriptor<T, H extends SignalHandle<T>> implements OwnerB
 			const view = this.view;
 			if (view !== undefined && this.viewOwner === target && !isRetiredDeclarationView(view))
 				return view;
-			cell = this.create(target);
+			cell = this.create(target, token === this.owner ? this.invocation : 0);
 			if (isDeclarationView(cell)) {
 				this.view = cell;
 				this.viewOwner = target;
@@ -449,7 +465,7 @@ export abstract class Descriptor<T, H extends SignalHandle<T>> implements OwnerB
 		// This path already normalized the owner. Retain its validation order,
 		// but do not repeat document/instance routing for every cached read.
 		requireSite(this.site);
-		return this.resolvedCell(owner);
+		return this.resolvedCell(owner, token);
 	}
 
 	get(): T {
@@ -476,10 +492,11 @@ export abstract class Descriptor<T, H extends SignalHandle<T>> implements OwnerB
 
 	[SIGNAL_BINDING_RETIRED](): boolean {
 		// Only the owner step can refuse; the cell a subscription resolved exists.
-		const owner = resolveUnlessRetired(() =>
-			resolveDescriptorOwner(this.site, readerOwner(this.owner, this.reader())),
+		const token = readerOwner(this.owner, this.reader());
+		const owner = resolveUnlessRetired(() => resolveDescriptorOwner(this.site, token));
+		return (
+			owner === undefined || this.resolvedCell(owner, token)[SIGNAL_BINDING_RETIRED]?.() === true
 		);
-		return owner === undefined || this.resolvedCell(owner)[SIGNAL_BINDING_RETIRED]?.() === true;
 	}
 
 	[SIGNAL_BINDING_IDENTITY]() {
@@ -614,13 +631,14 @@ export function __derivedScalarAt<T>(
 	return new DerivedDescriptor(
 		key,
 		'derived',
-		(owner) =>
+		(owner, declaring) =>
 			createDeclaredScalarCell(
 				owner,
 				key,
 				() => runWithSignalOwner(owner, () => (compute as () => T)()),
 				sequence,
 				captures,
+				declaring,
 			),
 		site,
 	);

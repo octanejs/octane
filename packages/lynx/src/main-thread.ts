@@ -471,10 +471,12 @@ function acknowledgementHandles<Node extends LynxElementRef>(
 function freezeValidatedIntrinsicRun(
 	run: Extract<UniversalHostBatch['commands'][number], { readonly op: 'mount-template-run' }>,
 ): void {
-	// MessagePort structured-clones worker payloads and drops every frozen
-	// descriptor. Restore immutability only after the complete receive-boundary
-	// validator has rejected hostile prototypes, accessors, symbols, and scalars.
-	// The program is a tiny shared shape; its flat values are frozen in place.
+	// The transport codec's JSON round trip, like a MessagePort structured clone,
+	// drops every frozen descriptor. Restore immutability only after the complete
+	// receive-boundary validator has rejected hostile prototypes, accessors,
+	// symbols, and scalars. The decoded run is receiver-local and unshared, so
+	// freezing it cannot affect the sender. The program is a tiny shared shape;
+	// its flat values are frozen in place.
 	const program = run.program;
 	for (const node of program.nodes) {
 		Object.freeze(node.props);
@@ -2121,6 +2123,25 @@ export function installLynxMainThread<Node extends LynxElementRef = LynxElementR
 			try {
 				freezeValidatedIntrinsicRun(incrementalRun);
 				postFirstTreeIncrementalCompact = true;
+			} catch (error) {
+				reject(identity, error);
+				return;
+			}
+		}
+		// A fresh root's negotiated compact mount reaches the dense host record
+		// store only with an immutable run, and every decoded run arrives mutable.
+		// Without this, each first mount of a program run stages one record per
+		// host instead.
+		if (
+			active === null &&
+			firstTree === null &&
+			message.ack === LYNX_COMPACT_ACKNOWLEDGEMENT &&
+			message.instances === LYNX_LAZY_PUBLIC_INSTANCES
+		) {
+			try {
+				for (const command of message.batch.commands) {
+					if (command.op === 'mount-template-run') freezeValidatedIntrinsicRun(command);
+				}
 			} catch (error) {
 				reject(identity, error);
 				return;

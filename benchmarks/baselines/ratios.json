@@ -2521,7 +2521,7 @@
     "target": "octane-lynx",
     "reference": "react-lynx",
     "maxRatio": 1.8,
-    "note": "Same-run compiled ReactLynx guard on an identical 9,008-host tree with 2,000 verified native handlers. A 21-sample run measured Octane 3.67 ms vs ReactLynx 3.85 ms (0.95x); the wider bound tolerates sub-5-ms timing and GC noise."
+    "note": "Same-run compiled ReactLynx guard on an identical 9,008-host tree with 2,000 verified native handlers. A 21-sample run measured Octane 3.67 ms vs ReactLynx 3.85 ms (0.95x) before #885 charged Octane its JSON transport encoding; on 2026-10-03 one measured 3.86 ms vs 3.38 ms (1.14x). The weekly 2.31x/2.16x breach was the decoded first mount losing the dense record store; the wider bound tolerates sub-5-ms timing and GC noise."
   },
   {
     "suite": "lynx-render",
@@ -2529,7 +2529,7 @@
     "target": "octane-lynx",
     "reference": "react-lynx",
     "maxRatio": 1.4,
-    "note": "Same-run production ReactLynx parity guard on an identical 90,008-host tree with 20,000 verified native handlers. One 21-sample run measured Octane 43.76 ms vs ReactLynx 45.57 ms (0.96x); structural gates also require one compiled run and 15 total mount commands."
+    "note": "Same-run production ReactLynx parity guard on an identical 90,008-host tree with 20,000 verified native handlers. One 21-sample run measured Octane 43.76 ms vs ReactLynx 45.57 ms (0.96x) before #885 charged Octane its JSON transport encoding; on 2026-10-03 one measured 46.67 ms vs 41.41 ms (1.13x), after restoring the dense first mount whose loss read 1.41x/1.43x weekly. Structural gates also require one compiled run and 15 total mount commands."
   },
   {
     "suite": "lynx-render",

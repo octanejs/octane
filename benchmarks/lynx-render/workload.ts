@@ -21,7 +21,10 @@ import {
 	LYNX_TRANSPORT_RENDERER,
 } from '../../packages/lynx/src/core/protocol.js';
 import type { LynxElementEventListener } from '../../packages/lynx/src/core/papi.js';
-import { decodeLynxTransportValue } from '../../packages/lynx/src/core/transport-codec.js';
+import {
+	decodeLynxTransportValue,
+	encodeLynxTransportValue,
+} from '../../packages/lynx/src/core/transport-codec.js';
 import { BenchApp, EmptyApp, type BenchRow } from './src/App.lynx.tsrx';
 
 interface FakeNode {
@@ -373,36 +376,53 @@ export function runReentrantCommits(count: number): ReentrantCommitResult {
 		context: contexts.main,
 		onDiagnostic: (error) => diagnostics.push(error),
 	});
+	// Both directions carry the transport codec's string, exactly as the
+	// production background transport sends and receives it: the receiver
+	// rejects a raw object, so dispatching one would measure nothing.
 	contexts.background.addEventListener(LYNX_MAIN_TO_BACKGROUND_EVENT, (event) => {
-		const type = (event.data as { readonly type?: unknown }).type;
+		if (typeof event.data !== 'string') {
+			diagnostics.push(
+				new TypeError(`Main thread replied with ${typeof event.data}, not a string.`),
+			);
+			return;
+		}
+		const type = (decodeLynxTransportValue(event.data) as { readonly type?: unknown }).type;
 		if (type === 'ack') acknowledgements++;
 		else if (type === 'complete') completions++;
 	});
-	const dispatchCommit = (version: number, commands: readonly Record<string, unknown>[]): void => {
-		contexts.background.dispatchEvent({
-			type: LYNX_BACKGROUND_TO_MAIN_EVENT,
-			data: {
-				protocol: LYNX_TRANSPORT_PROTOCOL_VERSION,
-				renderer: LYNX_TRANSPORT_RENDERER,
-				root: 1,
-				version,
-				type: 'commit',
-				batch: { renderer: LYNX_TRANSPORT_RENDERER, version, commands },
-			},
+	const encodeCommit = (version: number, commands: readonly Record<string, unknown>[]): string =>
+		encodeLynxTransportValue({
+			protocol: LYNX_TRANSPORT_PROTOCOL_VERSION,
+			renderer: LYNX_TRANSPORT_RENDERER,
+			root: 1,
+			version,
+			type: 'commit',
+			batch: { renderer: LYNX_TRANSPORT_RENDERER, version, commands },
 		});
+	const dispatchCommit = (data: string): void => {
+		contexts.background.dispatchEvent({ type: LYNX_BACKGROUND_TO_MAIN_EVENT, data });
 	};
-	dispatchCommit(1, [
-		{ op: 'create', id: 1, type: 'view', props: { id: 'initial' } },
-		{ op: 'insert', parent: null, id: 1, before: null },
-	]);
+	dispatchCommit(
+		encodeCommit(1, [
+			{ op: 'create', id: 1, type: 'view', props: { id: 'initial' } },
+			{ op: 'insert', parent: null, id: 1, before: null },
+		]),
+	);
+	// Encoding is the sender's cost, so the burst is encoded before the timer
+	// starts and the interval stays the receiver's queue drain.
+	const queued: string[] = [];
+	for (let index = 0; index < count; index++) {
+		queued.push(
+			encodeCommit(index + 3, [{ op: 'update', id: 1, props: { id: `queued-${index}` } }]),
+		);
+	}
+	const outer = encodeCommit(2, [{ op: 'update', id: 1, props: { id: 'outer' } }]);
 	papi.onSetId = () => {
 		papi.onSetId = null;
-		for (let index = 0; index < count; index++) {
-			dispatchCommit(index + 3, [{ op: 'update', id: 1, props: { id: `queued-${index}` } }]);
-		}
+		for (const data of queued) dispatchCommit(data);
 	};
 	const started = performance.now();
-	dispatchCommit(2, [{ op: 'update', id: 1, props: { id: 'outer' } }]);
+	dispatchCommit(outer);
 	const durationMs = performance.now() - started;
 	const finalVersion = main.activeIdentity()?.version;
 	const finalId = papi.rootChildId();
