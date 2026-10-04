@@ -56,10 +56,14 @@ const FORBIDDEN_DOM = /\b(?:document|window|HTMLElement|MutationObserver)\b/;
 // 1.93x -> 1.08x ReactLynx). That costs the main thread 141 raw bytes, +85 gzip
 // in preview (83,657 -> 83,742) and +73 in IFR (89,331 -> 89,404). The
 // background program shrank to 288,390 after the reset (#1652, #1662).
+//
+// 2026-10-04, from main 78ec8326a0: #1714 moved the universal hook cells into
+// the owner kernel, which adds 8 raw bytes to the background program
+// (288,390 -> 288,398). The main-thread caps are unchanged.
 const NO_WORKLET_BUDGET = Object.freeze({
 	previewMainGzip: 83_774,
 	ifrMainGzip: 89_436,
-	backgroundRaw: 288_390,
+	backgroundRaw: 288_398,
 });
 
 function packageEntry(packageName) {
