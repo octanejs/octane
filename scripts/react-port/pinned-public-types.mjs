@@ -7,8 +7,28 @@ import {
 	publicCompatibilityDeclarations,
 	publicCompatibilityExport,
 } from './public-compatibility.mjs';
+// Classic TypeScript only parses upstream sources and resolves their entries
+// below; every program node, symbol and type is TypeScript 7's.
 import ts from 'typescript';
 import { validateUpstreamLock, verifyPristineTree } from './materialize-lib.mjs';
+import {
+	declarationsOf,
+	hasModifier,
+	IndexKind,
+	is,
+	isTypeScriptLibraryFile,
+	isTypeScriptLibraryNode,
+	namingSymbolOf,
+	ObjectFlags,
+	primaryDeclarationOf,
+	SignatureKind,
+	SymbolFlags,
+	SyntaxKind,
+	targetOf,
+	TypeFlags,
+	typeArgumentsOf,
+	unionMembers,
+} from './native-types.mjs';
 
 // An upstream declaration is an authority only after its complete source tree
 // has matched the immutable inventory. No package-local list of allowed `any`
@@ -123,29 +143,27 @@ export function pinnedPublicExport(entries, program, checker, specifier, name) {
 	let symbol = source && checker.getSymbolAtLocation(source);
 	for (const part of (compatibility?.path ?? name).split('.')) {
 		if (!symbol) return undefined;
-		if (symbol.flags & ts.SymbolFlags.Alias) symbol = checker.getAliasedSymbol(symbol);
+		if (symbol.flags & SymbolFlags.Alias) symbol = checker.getAliasedSymbol(symbol);
 		symbol = checker.getExportsOfModule(symbol).find((entry) => entry.name === part);
 	}
 	if (compatibility?.constraintIndex !== undefined) {
-		if (symbol?.flags & ts.SymbolFlags.Alias) symbol = checker.getAliasedSymbol(symbol);
-		const declaration = symbol?.declarations?.find(
+		if (symbol?.flags & SymbolFlags.Alias) symbol = checker.getAliasedSymbol(symbol);
+		const declaration = declarationsOf(symbol).find(
 			(node) => node.typeParameters?.[compatibility.constraintIndex]?.constraint,
 		);
 		const constraint = declaration?.typeParameters?.[compatibility.constraintIndex]?.constraint;
 		if (!constraint) return undefined;
 		const type = checker.getTypeFromTypeNode(constraint);
-		const projection = checker.getIndexTypeOfType(type, ts.IndexKind.String);
+		const projection = checker.getIndexTypeOfType(type, IndexKind.String);
 		if (!projection) return undefined;
 		return {
-			flags: ts.SymbolFlags.Transient,
+			flags: SymbolFlags.Transient,
 			name,
-			declarations: projection.aliasSymbol?.declarations ?? projection.symbol?.declarations ?? [],
+			// Declaration handles, like a TypeScript 7 symbol's.
+			declarations:
+				projection.getAliasSymbol()?.declarations ?? projection.getSymbol()?.declarations ?? [],
 			projectedPublicType: projection,
-			projectedPublicArguments:
-				projection.aliasTypeArguments ??
-				(projection.objectFlags & ts.ObjectFlags.Reference
-					? checker.getTypeArguments(projection)
-					: []),
+			projectedPublicArguments: typeArgumentsOf(projection, checker),
 		};
 	}
 	return symbol;
@@ -153,27 +171,29 @@ export function pinnedPublicExport(entries, program, checker, specifier, name) {
 
 export function publicSymbolType(symbol, checker) {
 	if (symbol.projectedPublicType) return symbol.projectedPublicType;
-	if (symbol.flags & ts.SymbolFlags.Alias) symbol = checker.getAliasedSymbol(symbol);
-	const declaration = symbol.valueDeclaration ?? symbol.declarations?.[0];
-	return symbol.flags & (ts.SymbolFlags.TypeAlias | ts.SymbolFlags.Interface)
+	if (symbol.flags & SymbolFlags.Alias) symbol = checker.getAliasedSymbol(symbol);
+	const declaration = primaryDeclarationOf(symbol);
+	return symbol.flags & (SymbolFlags.TypeAlias | SymbolFlags.Interface)
 		? checker.getDeclaredTypeOfSymbol(symbol)
 		: checker.getTypeOfSymbolAtLocation(symbol, declaration);
 }
 
+// Keys both classic upstream nodes and TypeScript 7 program nodes, whose
+// `SyntaxKind` numbering differs: either way only the source file has no parent.
 function memberKey(node, file = node.getSourceFile().fileName) {
 	const names = [];
-	for (let parent = node; parent && !ts.isSourceFile(parent); parent = parent.parent) {
+	for (let parent = node; parent?.parent; parent = parent.parent) {
 		if (parent.name) names.unshift(parent.name.getText());
 	}
 	return `${file}#${names.join('.')}`;
 }
 
 function name(type) {
-	return type?.aliasSymbol?.name ?? type?.symbol?.name;
+	return namingSymbolOf(type)?.name;
 }
 
 function declarationFiles(type) {
-	return [...(type?.aliasSymbol?.declarations ?? []), ...(type?.symbol?.declarations ?? [])].map(
+	return [...declarationsOf(type?.getAliasSymbol?.()), ...declarationsOf(type?.getSymbol?.())].map(
 		(node) => node.getSourceFile().fileName.replaceAll('\\', '/'),
 	);
 }
@@ -190,19 +210,17 @@ function rendererElement(type) {
 function reactRenderable(type, checker, depth = 0) {
 	// Declaration emit can expand ReactNode while preserving its exact union.
 	// Recover the canonical symbol only through a real React element declaration.
-	if (type?.isUnion?.()) {
-		const parts = [...type.types];
+	const members = unionMembers(type);
+	if (members) {
+		const parts = [...members];
 		const seen = new Set();
 		for (let index = 0; index < parts.length; index++) {
 			const part = parts[index];
 			if (seen.has(part)) continue;
 			seen.add(part);
-			if (part.isUnion?.()) parts.push(...part.types);
-			parts.push(
-				...(part.aliasTypeArguments ??
-					(part.objectFlags & ts.ObjectFlags.Reference ? checker.getTypeArguments(part) : [])),
-			);
-			const declaration = (part.aliasSymbol ?? part.symbol)?.declarations?.find((node) =>
+			parts.push(...(unionMembers(part) ?? []));
+			parts.push(...typeArgumentsOf(part, checker));
+			const declaration = declarationsOf(namingSymbolOf(part)).find((node) =>
 				/\/@types\/react\/index\.d\.ts$/.test(node.getSourceFile().fileName.replaceAll('\\', '/')),
 			);
 			if (!declaration) continue;
@@ -213,15 +231,15 @@ function reactRenderable(type, checker, depth = 0) {
 			const canonical = checker.getDeclaredTypeOfSymbol(symbol);
 			if (
 				checker.isTypeAssignableTo(canonical, type) &&
-				type.types.every((member) => {
-					if (member.flags & (ts.TypeFlags.Any | ts.TypeFlags.Unknown)) return false;
+				members.every((member) => {
+					if (member.flags & (TypeFlags.Any | TypeFlags.Unknown)) return false;
 					if (checker.isTypeAssignableTo(member, canonical)) return true;
 					const args =
-						member.objectFlags & ts.ObjectFlags.Reference ? checker.getTypeArguments(member) : [];
+						member.objectFlags & ObjectFlags.Reference ? checker.getTypeArguments(member) : [];
 					return (
 						depth < 4 &&
-						member.symbol?.name === 'Promise' &&
-						member.symbol.declarations?.some((node) => node.getSourceFile().hasNoDefaultLib) &&
+						member.getSymbol()?.name === 'Promise' &&
+						declarationsOf(member.getSymbol()).some(isTypeScriptLibraryNode) &&
 						args.length === 1 &&
 						reactRenderable(args[0], checker, depth + 1)
 					);
@@ -239,15 +257,15 @@ function reactRenderable(type, checker, depth = 0) {
 
 function declaresReactNode(node, checker) {
 	if (!node) return false;
-	if (ts.isParenthesizedTypeNode(node)) return declaresReactNode(node.type, checker);
-	if (ts.isUnionTypeNode(node))
+	if (is.isParenthesizedTypeNode(node)) return declaresReactNode(node.type, checker);
+	if (is.isUnionTypeNode(node))
 		return node.types.some((child) => declaresReactNode(child, checker));
-	if (!ts.isTypeReferenceNode(node)) return false;
+	if (!is.isTypeReferenceNode(node)) return false;
 	let symbol = checker.getSymbolAtLocation(node.typeName);
-	if (symbol?.flags & ts.SymbolFlags.Alias) symbol = checker.getAliasedSymbol(symbol);
+	if (symbol?.flags & SymbolFlags.Alias) symbol = checker.getAliasedSymbol(symbol);
 	return (
 		symbol?.name === 'ReactNode' &&
-		symbol.declarations?.some((declaration) =>
+		declarationsOf(symbol).some((declaration) =>
 			/\/@types\/react\/index\.d\.ts$/.test(
 				declaration.getSourceFile().fileName.replaceAll('\\', '/'),
 			),
@@ -256,67 +274,63 @@ function declaresReactNode(node, checker) {
 }
 
 function corresponding(type, witness, checker) {
-	if (!witness?.isUnion?.() || type.isUnion?.()) return witness;
-	if (witness.types.includes(type)) return type;
+	const witnessMembers = unionMembers(witness);
+	if (!witnessMembers || unionMembers(type)) return witness;
+	if (witnessMembers.includes(type)) return type;
 	const score = (actual, expected, depth) => {
 		if (actual === expected) return 100;
-		if (actual.isLiteral?.() && expected.isLiteral?.())
+		if (actual.isLiteralType() && expected.isLiteralType())
 			return actual.value === expected.value ? 100 : -100;
 		let result = actual.flags === expected.flags ? 1 : 0;
 		const objectLike = (type) =>
-			Boolean(type.flags & ts.TypeFlags.Object || type.isIntersection?.());
+			Boolean(type.flags & TypeFlags.Object || type.isIntersectionType());
 		if (objectLike(actual) && objectLike(expected)) {
 			result += 2;
 			for (const property of checker.getPropertiesOfType(actual)) {
 				const original = checker.getPropertyOfType(expected, property.name);
-				const declaration = property.valueDeclaration ?? property.declarations?.[0];
+				const declaration = primaryDeclarationOf(property);
 				if (!original || !declaration) continue;
 				const left = checker.getTypeOfSymbolAtLocation(property, declaration);
 				const right = checker.getTypeOfSymbolAtLocation(
 					original,
-					original.valueDeclaration ?? original.declarations?.[0] ?? declaration,
+					primaryDeclarationOf(original) ?? declaration,
 				);
 				const callable = (value) =>
-					value.isUnion?.()
-						? value.types.some(callable)
-						: checker.getSignaturesOfType(value, ts.SignatureKind.Call).length > 0;
+					unionMembers(value)
+						? unionMembers(value).some(callable)
+						: checker.getSignaturesOfType(value, SignatureKind.Call).length > 0;
 				// Optional callback props distinguish otherwise identical intersection
 				// branches (for example a string header versus a render callback).
 				if (callable(left) !== callable(right)) result -= 20;
-				if (left.isLiteral?.() && right.isLiteral?.())
+				if (left.isLiteralType() && right.isLiteralType())
 					result += left.value === right.value ? 20 : -100;
 				if (
-					Boolean(property.flags & ts.SymbolFlags.Optional) ===
-					Boolean(original.flags & ts.SymbolFlags.Optional)
+					Boolean(property.flags & SymbolFlags.Optional) ===
+					Boolean(original.flags & SymbolFlags.Optional)
 				)
 					result += 3;
 				else result -= 3;
 				if (
-					Boolean(left.flags & ts.TypeFlags.Undefined) !==
-					Boolean(right.flags & ts.TypeFlags.Undefined)
+					Boolean(left.flags & TypeFlags.Undefined) !== Boolean(right.flags & TypeFlags.Undefined)
 				)
 					result -= 20;
 			}
 		}
 		if (name(actual) && name(actual) === name(expected)) result += 10;
-		const calls = checker.getSignaturesOfType(actual, ts.SignatureKind.Call);
-		const otherCalls = checker.getSignaturesOfType(expected, ts.SignatureKind.Call);
+		const calls = checker.getSignaturesOfType(actual, SignatureKind.Call);
+		const otherCalls = checker.getSignaturesOfType(expected, SignatureKind.Call);
 		if (calls.length && !otherCalls.length) return -1_000_000;
 		if (
 			calls.length &&
 			otherCalls.length &&
-			calls[0].parameters.length === otherCalls[0].parameters.length
+			calls[0].getParameters().length === otherCalls[0].getParameters().length
 		)
 			result += 10;
 		// Intersection aliases retain generic arguments too. Ignoring them makes
 		// Options<Error> and Options<unknown> tie, rejecting an unchanged union.
 		if (depth && objectLike(actual) && objectLike(expected)) {
-			const args =
-				actual.aliasTypeArguments ??
-				(actual.objectFlags & ts.ObjectFlags.Reference ? checker.getTypeArguments(actual) : []);
-			const others =
-				expected.aliasTypeArguments ??
-				(expected.objectFlags & ts.ObjectFlags.Reference ? checker.getTypeArguments(expected) : []);
+			const args = typeArgumentsOf(actual, checker);
+			const others = typeArgumentsOf(expected, checker);
 			for (const [i, argument] of args.entries())
 				if (others[i]) result += 100 * score(argument, others[i], depth - 1);
 			if (!args.length && !others.length) {
@@ -327,7 +341,7 @@ function corresponding(type, witness, checker) {
 		}
 		return result;
 	};
-	const ranked = witness.types
+	const ranked = witnessMembers
 		.map((candidate) => ({ candidate, score: score(type, candidate, 2) }))
 		.sort((a, b) => b.score - a.score);
 	return ranked[0].score > (ranked[1]?.score ?? 0)
@@ -341,10 +355,10 @@ function corresponding(type, witness, checker) {
 function referenceTargets(type, checker, seen = new Set()) {
 	if (!type || seen.has(type)) return [];
 	seen.add(type);
-	if (type.flags & (ts.TypeFlags.Null | ts.TypeFlags.Undefined)) return [];
-	if (type.isUnion?.()) {
+	if (type.flags & (TypeFlags.Null | TypeFlags.Undefined)) return [];
+	if (unionMembers(type)) {
 		const targets = [];
-		for (const part of type.types) {
+		for (const part of unionMembers(type)) {
 			const nested = referenceTargets(part, checker, seen);
 			if (nested === null) return null;
 			targets.push(...nested);
@@ -361,12 +375,12 @@ function referenceTargets(type, checker, seen = new Set()) {
 		name(type) === 'bivarianceHack' &&
 		files.some((file) => /\/@types\/react\/index\.d\.ts$/.test(file))
 	) {
-		const signature = checker.getSignaturesOfType(type, ts.SignatureKind.Call)[0];
-		const parameter = signature?.parameters[0];
-		const declaration = parameter?.valueDeclaration ?? parameter?.declarations?.[0];
+		const signature = checker.getSignaturesOfType(type, SignatureKind.Call)[0];
+		const parameter = signature?.getParameters()[0];
+		const declaration = primaryDeclarationOf(parameter);
 		return declaration ? [checker.getTypeOfSymbolAtLocation(parameter, declaration)] : null;
 	}
-	if (name(type) === 'ReadonlyArray' && files.some((file) => /\/typescript\/lib\/lib\./.test(file)))
+	if (name(type) === 'ReadonlyArray' && files.some(isTypeScriptLibraryFile))
 		return referenceTargets(checker.getTypeArguments(type)[0], checker, seen);
 	return null;
 }
@@ -392,23 +406,23 @@ export function newOpaquePublicType(
 		}
 		return null;
 	}
-	if (type.flags & (ts.TypeFlags.Any | ts.TypeFlags.Unknown)) {
+	if (type.flags & (TypeFlags.Any | TypeFlags.Unknown)) {
 		if (
 			witness &&
-			((witness.flags & ts.TypeFlags.Any && witness.intrinsicName !== 'error') ||
-				(type.flags & ts.TypeFlags.Unknown &&
-					(witness.flags & ts.TypeFlags.Unknown ||
+			((witness.flags & TypeFlags.Any && witness.intrinsicName !== 'error') ||
+				(type.flags & TypeFlags.Unknown &&
+					(witness.flags & TypeFlags.Unknown ||
 						reactRenderable(witness, checker) ||
 						declaresReactNode(options.witnessTypeNode, checker))))
 		)
 			return null;
 		return `${trail} [${checker.typeToString(type)} versus ${witness ? checker.typeToString(witness) : 'missing witness'}; witness=${name(witness)}]`;
 	}
-	if (witness?.flags & ts.TypeFlags.Any && witness.intrinsicName !== 'error') return null;
+	if (witness?.flags & TypeFlags.Any && witness.intrinsicName !== 'error') return null;
 	if (
 		rendererElement(type) &&
 		(reactRenderable(witness, checker) ||
-			(witness?.isUnion?.() && witness.types.some((part) => reactRenderable(part, checker))))
+			unionMembers(witness)?.some((part) => reactRenderable(part, checker)))
 	)
 		return null;
 	if (type === witness) return null;
@@ -429,7 +443,7 @@ export function newOpaquePublicType(
 		}
 		return null;
 	}
-	if (type.flags & ts.TypeFlags.TypeParameter && !(witness?.flags & ts.TypeFlags.TypeParameter)) {
+	if (type.flags & TypeFlags.TypeParameter && !(witness?.flags & TypeFlags.TypeParameter)) {
 		const constraint = checker.getBaseConstraintOfType(type);
 		return constraint && constraint !== type
 			? newOpaquePublicType(constraint, witness, checker, seen, `${trail}.constraint`, options)
@@ -449,52 +463,48 @@ export function newOpaquePublicType(
 			...options,
 			witnessTypeNode,
 		});
-	if (type.flags & ts.TypeFlags.TypeParameter) {
+	if (type.flags & TypeFlags.TypeParameter) {
 		for (const [label, get] of [
 			['constraint', (t) => checker.getBaseConstraintOfType(t)],
 			['default', (t) => checker.getDefaultFromTypeParameter(t)],
 		]) {
-			if (label === 'default' && !(witness?.flags & ts.TypeFlags.TypeParameter)) continue;
+			if (label === 'default' && !(witness?.flags & TypeFlags.TypeParameter)) continue;
 			const failure = check(
 				get(type),
-				witness?.flags & ts.TypeFlags.TypeParameter ? get(witness) : witness,
+				witness?.flags & TypeFlags.TypeParameter ? get(witness) : witness,
 				label,
 			);
 			if (failure) return failure;
 		}
 	}
-	const arguments_ =
-		type.aliasTypeArguments ??
-		(type.objectFlags & ts.ObjectFlags.Reference ? checker.getTypeArguments(type) : []);
-	const expectedArguments =
-		witness?.aliasTypeArguments ??
-		(witness?.objectFlags & ts.ObjectFlags.Reference ? checker.getTypeArguments(witness) : []);
+	const arguments_ = typeArgumentsOf(type, checker);
+	const expectedArguments = witness ? typeArgumentsOf(witness, checker) : [];
 	// Published declarations may inline a named source type. Generic arguments
 	// correspond only when both sides retain the same generic representation;
 	// otherwise compare the instantiated public members below.
+	const target = targetOf(type);
 	const sameGeneric =
 		witness &&
-		((name(type) && name(type) === name(witness)) ||
-			(type.target && type.target === witness.target));
+		((name(type) && name(type) === name(witness)) || (target && target === targetOf(witness)));
 	for (const [i, argument] of (sameGeneric ? arguments_ : []).entries()) {
-		const parameter = type.target?.typeParameters?.[i];
+		const parameter = target?.getTypeParameters?.()?.[i];
 		if (
 			!expectedArguments[i] &&
-			parameter?.symbol?.declarations?.some((node) => node.getSourceFile().hasNoDefaultLib) &&
+			declarationsOf(parameter?.getSymbol?.()).some(isTypeScriptLibraryNode) &&
 			argument === checker.getDefaultFromTypeParameter(parameter)
 		)
 			continue;
 		const failure = check(argument, expectedArguments[i], `argument${i}`);
 		if (failure) return failure;
 	}
-	const sameDeclaration =
-		(type.aliasSymbol ?? type.symbol) &&
-		(type.aliasSymbol ?? type.symbol) === (witness?.aliasSymbol ?? witness?.symbol);
+	const sameDeclaration = namingSymbolOf(type) && namingSymbolOf(type) === namingSymbolOf(witness);
 	const nativePlatform = declarationFiles(type).some(
 		(file) =>
 			/\/octane\/(?:src|dist)\/(?:runtime\.ts|jsx-runtime\.d\.ts|public-types\.ts|index\.ts)$/.test(
 				file,
-			) || /\/node_modules\/(?:@types\/node\/|typescript\/lib\/lib\.)/.test(file),
+			) ||
+			/\/node_modules\/@types\/node\//.test(file) ||
+			isTypeScriptLibraryFile(file),
 	);
 	// Reused platform declarations retain their own contract. Inspect supplied
 	// generic arguments above, so a binding cannot hide new erasure inside
@@ -504,22 +514,22 @@ export function newOpaquePublicType(
 		(sameDeclaration && declarationFiles(type).some((file) => file.includes('/node_modules/')))
 	)
 		return null;
-	if (type.isUnion?.()) {
-		for (const child of type.types) {
+	if (unionMembers(type)) {
+		for (const child of unionMembers(type)) {
 			const failure = check(child, corresponding(child, witness, checker), 'union');
 			if (failure) return failure;
 		}
 		return null;
 	}
-	for (const kind of [ts.SignatureKind.Call, ts.SignatureKind.Construct]) {
+	for (const kind of [SignatureKind.Call, SignatureKind.Construct]) {
 		const signatures = checker.getSignaturesOfType(type, kind);
 
 		const expected = witness ? checker.getSignaturesOfType(witness, kind) : [];
 		for (const [index, signature] of signatures.entries()) {
 			const matching = expected.filter(
 				(candidate) =>
-					candidate.parameters.length === signature.parameters.length &&
-					(candidate.typeParameters?.length ?? 0) === (signature.typeParameters?.length ?? 0),
+					candidate.getParameters().length === signature.getParameters().length &&
+					candidate.getTypeParameters().length === signature.getTypeParameters().length,
 			);
 			const counterpart = matching.length === 1 ? matching[0] : expected[index];
 			for (const [i, parameter] of (signature.getTypeParameters() ?? []).entries()) {
@@ -534,17 +544,16 @@ export function newOpaquePublicType(
 				checker.getReturnTypeOfSignature(signature),
 				counterpart && checker.getReturnTypeOfSignature(counterpart),
 				`signature${index}.return`,
-				counterpart?.declaration?.type,
+				counterpart?.declaration?.resolve()?.type,
 			);
 			if (failure) return failure;
-			for (const [i, parameter] of signature.parameters.entries()) {
-				const declaration = parameter.valueDeclaration ?? parameter.declarations?.[0];
+			for (const [i, parameter] of signature.getParameters().entries()) {
+				const declaration = primaryDeclarationOf(parameter);
 				if (!declaration) continue;
 				const parameterType = checker.getTypeOfSymbolAtLocation(parameter, declaration);
-				if (parameterType.flags & ts.TypeFlags.Unknown) continue;
-				const expectedParameter = counterpart?.parameters[i];
-				const expectedDeclaration =
-					expectedParameter?.valueDeclaration ?? expectedParameter?.declarations?.[0];
+				if (parameterType.flags & TypeFlags.Unknown) continue;
+				const expectedParameter = counterpart?.getParameters()[i];
+				const expectedDeclaration = primaryDeclarationOf(expectedParameter);
 				const failure = check(
 					parameterType,
 					expectedDeclaration &&
@@ -555,10 +564,10 @@ export function newOpaquePublicType(
 			}
 		}
 	}
-	if (type.flags & ts.TypeFlags.Object || type.isIntersection?.()) {
-		if (type.objectFlags & (ts.ObjectFlags.Class | ts.ObjectFlags.Interface)) {
+	if (type.flags & TypeFlags.Object || type.isIntersectionType()) {
+		if (type.objectFlags & (ObjectFlags.Class | ObjectFlags.Interface)) {
 			const expectedBases =
-				witness?.objectFlags & (ts.ObjectFlags.Class | ts.ObjectFlags.Interface)
+				witness?.objectFlags & (ObjectFlags.Class | ObjectFlags.Interface)
 					? checker.getBaseTypes(witness)
 					: [];
 			for (const [i, base] of checker.getBaseTypes(type).entries()) {
@@ -567,18 +576,18 @@ export function newOpaquePublicType(
 			}
 		}
 		for (const property of checker.getPropertiesOfType(type)) {
-			const declarations = property.declarations ?? [];
+			const declarations = declarationsOf(property);
 			if (
 				declarations.some(
 					(node) =>
-						ts.getCombinedModifierFlags(node) &
-						(ts.ModifierFlags.Private | ts.ModifierFlags.Protected),
+						hasModifier(node, SyntaxKind.PrivateKeyword) ||
+						hasModifier(node, SyntaxKind.ProtectedKeyword),
 				)
 			)
 				continue;
 			const declaration =
-				declarations.find((node) => !node.getSourceFile().hasNoDefaultLib) ??
-				(declarations.length ? undefined : property.valueDeclaration);
+				declarations.find((node) => !isTypeScriptLibraryNode(node)) ??
+				(declarations.length ? undefined : primaryDeclarationOf(property));
 			if (!declaration) continue;
 			if (options.internalMembers?.has(memberKey(declaration))) continue;
 			const expected = witness && checker.getPropertyOfType(witness, property.name);
@@ -600,7 +609,7 @@ export function newOpaquePublicType(
 				if (failure) return failure;
 				continue;
 			}
-			const expectedDeclaration = expected?.valueDeclaration ?? expected?.declarations?.[0];
+			const expectedDeclaration = primaryDeclarationOf(expected);
 			const failure = check(
 				checker.getTypeOfSymbolAtLocation(property, declaration),
 				expected && checker.getTypeOfSymbolAtLocation(expected, expectedDeclaration ?? declaration),
@@ -615,7 +624,7 @@ export function newOpaquePublicType(
 				checker
 					.getIndexInfosOfType(witness)
 					.find((other) => other.keyType.flags === info.keyType.flags);
-			const failure = check(info.type, expected?.type, 'index');
+			const failure = check(info.valueType, expected?.valueType, 'index');
 			if (failure) return failure;
 		}
 	}
@@ -623,20 +632,20 @@ export function newOpaquePublicType(
 }
 
 export function newOpaquePublicSymbol(symbol, witness, checker, options = {}) {
-	if (symbol.flags & ts.SymbolFlags.Alias) symbol = checker.getAliasedSymbol(symbol);
-	if (witness?.flags & ts.SymbolFlags.Alias) witness = checker.getAliasedSymbol(witness);
-	for (const declaration of symbol.declarations ?? []) {
+	if (symbol.flags & SymbolFlags.Alias) symbol = checker.getAliasedSymbol(symbol);
+	if (witness?.flags & SymbolFlags.Alias) witness = checker.getAliasedSymbol(witness);
+	const witnessDeclarations = declarationsOf(witness);
+	for (const declaration of declarationsOf(symbol)) {
 		// Callable generics are checked per public signature below. Matching every
 		// overload to the first declaration mispairs constraints and includes the
 		// implementation signature, which is not part of the exported contract.
-		if (ts.isFunctionDeclaration(declaration)) continue;
-		const candidates =
-			witness?.declarations?.filter(
-				(candidate) =>
-					candidate.kind === declaration.kind ||
-					((ts.isInterfaceDeclaration(declaration) || ts.isTypeAliasDeclaration(declaration)) &&
-						(ts.isInterfaceDeclaration(candidate) || ts.isTypeAliasDeclaration(candidate))),
-			) ?? [];
+		if (is.isFunctionDeclaration(declaration)) continue;
+		const candidates = witnessDeclarations.filter(
+			(candidate) =>
+				candidate.kind === declaration.kind ||
+				((is.isInterfaceDeclaration(declaration) || is.isTypeAliasDeclaration(declaration)) &&
+					(is.isInterfaceDeclaration(candidate) || is.isTypeAliasDeclaration(candidate))),
+		);
 		const parameters = declaration.typeParameters ?? [];
 		const sameArity = candidates.filter(
 			(candidate) => (candidate.typeParameters?.length ?? 0) === parameters.length,
@@ -651,11 +660,15 @@ export function newOpaquePublicSymbol(symbol, witness, checker, options = {}) {
 			candidates[0];
 
 		for (const [i, parameter] of (declaration.typeParameters ?? []).entries()) {
-			for (const key of ['constraint', 'default']) {
-				if (!parameter[key]) continue;
-				const expected = original?.typeParameters?.[i]?.[key];
+			// TypeScript 7 names a type parameter's default `defaultType`.
+			for (const [key, field] of [
+				['constraint', 'constraint'],
+				['default', 'defaultType'],
+			]) {
+				if (!parameter[field]) continue;
+				const expected = original?.typeParameters?.[i]?.[field];
 				const failure = newOpaquePublicType(
-					checker.getTypeFromTypeNode(parameter[key]),
+					checker.getTypeFromTypeNode(parameter[field]),
 					key === 'default' && witness?.projectedPublicArguments?.[i]
 						? witness.projectedPublicArguments[i]
 						: expected && checker.getTypeFromTypeNode(expected),

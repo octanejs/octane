@@ -6,9 +6,21 @@ import { createRequire } from 'node:module';
 import path from 'node:path';
 import * as jsonc from 'jsonc-parser';
 
-export const NATIVE_TSC = path.join(
-	path.dirname(createRequire(import.meta.url).resolve('typescript-native/package.json')),
-	'bin/tsc',
+const nativePackage = createRequire(import.meta.url).resolve('typescript-native/package.json');
+
+export const NATIVE_TSC = path.join(path.dirname(nativePackage), 'bin/tsc');
+
+/**
+ * Where the native compiler's own `lib.*.d.ts` files live: its platform package,
+ * not the `typescript-native` package. Declarations there are TypeScript's.
+ */
+export const NATIVE_LIBRARY_DIRECTORY = path.join(
+	path.dirname(
+		createRequire(nativePackage).resolve(
+			`@typescript/typescript-${process.platform}-${process.arch}/package.json`,
+		),
+	),
+	'lib',
 );
 
 /**

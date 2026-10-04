@@ -1,7 +1,6 @@
 #!/usr/bin/env node
 import { readFileSync, writeFileSync, mkdirSync, unlinkSync } from 'node:fs';
 import path from 'node:path';
-import ts from 'typescript';
 import { createTypeEvidenceProgram } from './type-program.mjs';
 import { concretePublicSpecifiers } from './public-exports.mjs';
 import { publicCompatibilityExport } from './public-compatibility.mjs';
@@ -10,6 +9,18 @@ import {
 	pinnedPublicExport,
 	publicSymbolType,
 } from './pinned-public-types.mjs';
+import {
+	declarationsOf,
+	is,
+	isTypeScriptLibraryNode,
+	namingSymbolOf,
+	primaryDeclarationOf,
+	SignatureKind,
+	SymbolFlags,
+	TypeFlags,
+	TypeFormatFlags,
+	unionMembers,
+} from './native-types.mjs';
 
 const directory = path.resolve(process.argv[2]);
 const manifest = JSON.parse(readFileSync(path.join(directory, 'package.json'), 'utf8'));
@@ -27,8 +38,10 @@ const imports = specifiers.flatMap((specifier, index) => [
 ]);
 
 function argumentsFor(symbol) {
-	const declaration = symbol.declarations?.find((node) => node.typeParameters?.length);
-	const required = (declaration?.typeParameters ?? []).filter((parameter) => !parameter.default);
+	const declaration = declarationsOf(symbol).find((node) => node.typeParameters?.length);
+	const required = (declaration?.typeParameters ?? []).filter(
+		(parameter) => !parameter.defaultType,
+	);
 	if (!required.length) return '';
 	const arguments_ = required.map((parameter) => {
 		const constraint = parameter.constraint?.getText();
@@ -60,12 +73,13 @@ function argumentsFor(symbol) {
 	return `<${arguments_.join(', ')}>`;
 }
 
+const project = path.join(directory, 'tsconfig.json');
+const programs = [];
 try {
 	writeFileSync(probe, imports.join('\n'));
-	const config = ts.readConfigFile(path.join(directory, 'tsconfig.json'), ts.sys.readFile);
-	const parsed = ts.parseJsonConfigFileContent(config.config, ts.sys, directory);
-	const program = createTypeEvidenceProgram([probe, ...entries.values()], parsed.options);
-	const checker = program.getTypeChecker();
+	const evidence = createTypeEvidenceProgram([probe, ...entries.values()], project);
+	programs.push(evidence);
+	const { program, checker } = evidence;
 	const assertions = [];
 	const output = [
 		'/** @jsxImportSource octane */',
@@ -93,11 +107,8 @@ try {
 				: originals.get(symbol.name);
 			if (!original)
 				throw new Error(`Export absent from the pinned npm contract: ${specifier}.${symbol.name}`);
-			const resolved =
-				symbol.flags & ts.SymbolFlags.Alias ? checker.getAliasedSymbol(symbol) : symbol;
-			const typeOnly = Boolean(
-				resolved.flags & (ts.SymbolFlags.TypeAlias | ts.SymbolFlags.Interface),
-			);
+			const resolved = symbol.flags & SymbolFlags.Alias ? checker.getAliasedSymbol(symbol) : symbol;
+			const typeOnly = Boolean(resolved.flags & (SymbolFlags.TypeAlias | SymbolFlags.Interface));
 			const arguments_ = typeOnly ? argumentsFor(resolved) : '';
 			const native = `${typeOnly ? '' : 'typeof '}Native${index}.${symbol.name}${arguments_}`;
 			const upstreamArguments = arguments_.replaceAll(
@@ -108,19 +119,17 @@ try {
 			const upstreamPath = compatibility?.path ?? symbol.name;
 			const upstream = `${typeOnly ? '' : 'typeof '}Upstream${upstreamIndex}.${upstreamPath}${upstreamArguments}`;
 			const type = publicSymbolType(original, checker);
-			const context = (type.aliasSymbol ?? type.symbol)?.name === 'Context';
-			const callable =
-				!context && checker.getSignaturesOfType(type, ts.SignatureKind.Call).length > 0;
+			const context = namingSymbolOf(type)?.name === 'Context';
+			const callable = !context && checker.getSignaturesOfType(type, SignatureKind.Call).length > 0;
 			const right = callable
 				? `${compatibility?.additionalArity === undefined ? '' : `${compatibility.additionalArity} | `}Parameters<${upstream}>['length']`
 				: `keyof ${upstream}`;
 			const originalSymbol =
-				original.flags & ts.SymbolFlags.Alias ? checker.getAliasedSymbol(original) : original;
-			const originalDeclaration =
-				originalSymbol.valueDeclaration ?? originalSymbol.declarations?.[0];
+				original.flags & SymbolFlags.Alias ? checker.getAliasedSymbol(original) : original;
+			const originalDeclaration = primaryDeclarationOf(originalSymbol);
 			const platformQuery =
 				originalDeclaration?.type &&
-				ts.isTypeQueryNode(originalDeclaration.type) &&
+				is.isTypeQueryNode(originalDeclaration.type) &&
 				originalDeclaration.type.exprName.getText();
 			const platform =
 				typeof platformQuery === 'string' && /^React(?:\.[A-Za-z]+)?$/.test(platformQuery)
@@ -141,11 +150,12 @@ try {
 		probe,
 		[...imports, ...assertions.map(({ id, right }) => `type Witness${id} = ${right};`)].join('\n'),
 	);
-	const witnessProgram = createTypeEvidenceProgram([probe, ...entries.values()], parsed.options);
-	const witnessChecker = witnessProgram.getTypeChecker();
-	const witnesses = witnessProgram
+	const witnessEvidence = createTypeEvidenceProgram([probe, ...entries.values()], project);
+	programs.push(witnessEvidence);
+	const witnessChecker = witnessEvidence.checker;
+	const witnesses = witnessEvidence.program
 		.getSourceFile(probe)
-		.statements.filter(ts.isTypeAliasDeclaration);
+		.statements.filter(is.isTypeAliasDeclaration);
 	const keySets = new Map();
 	const syntheticKeys = new Set([
 		'nativeEvent',
@@ -155,7 +165,7 @@ try {
 	]);
 	for (const assertion of assertions) {
 		const witness = witnessChecker.getTypeFromTypeNode(witnesses[assertion.id].type);
-		const parts = witness.isUnion?.() ? witness.types : [witness];
+		const parts = unionMembers(witness) ?? [witness];
 		const filtered = parts.filter((part) => {
 			if (part.value === '$$typeof' || (assertion.context && part.value !== 'Provider'))
 				return false;
@@ -167,15 +177,15 @@ try {
 		if (
 			filtered.some(
 				(part) =>
-					part.flags & (ts.TypeFlags.Any | ts.TypeFlags.Unknown) ||
-					(!part.isLiteral?.() &&
+					part.flags & (TypeFlags.Any | TypeFlags.Unknown) ||
+					(!part.isLiteralType() &&
 						!(
 							part.flags &
-							(ts.TypeFlags.Never |
-								ts.TypeFlags.String |
-								ts.TypeFlags.Number |
-								ts.TypeFlags.ESSymbol |
-								ts.TypeFlags.UniqueESSymbol)
+							(TypeFlags.Never |
+								TypeFlags.String |
+								TypeFlags.Number |
+								TypeFlags.ESSymbol |
+								TypeFlags.UniqueESSymbol)
 						)),
 			)
 		) {
@@ -186,10 +196,10 @@ try {
 		const expected =
 			filtered
 				.map((part) =>
-					part.flags & ts.TypeFlags.UniqueESSymbol &&
-					part.symbol?.declarations?.some((node) => node.getSourceFile().hasNoDefaultLib)
-						? `typeof Symbol.${part.symbol.name}`
-						: witnessChecker.typeToString(part, undefined, ts.TypeFormatFlags.NoTruncation),
+					part.flags & TypeFlags.UniqueESSymbol &&
+					declarationsOf(part.getSymbol()).some(isTypeScriptLibraryNode)
+						? `typeof Symbol.${part.getSymbol().name}`
+						: witnessChecker.typeToString(part, undefined, TypeFormatFlags.NoTruncation),
 				)
 				.sort()
 				.join(' | ') || 'never';
@@ -242,5 +252,6 @@ try {
 	} else writeFileSync(destination, source);
 	console.log(`${manifest.name}: ${specifiers.length} entries, ${count} public export assertions`);
 } finally {
+	for (const evidence of programs) evidence.close();
 	unlinkSync(probe);
 }
