@@ -257,3 +257,49 @@ test('an unchanged pull request reports no regressions', () => {
 	assert.match(body, /🟢 No budget breaches, no added work, and no timing changes beyond ±3%\./);
 	assert.match(body, /No changes across 1 measured values\./);
 });
+
+test('lynx-render is reported only when a pull request selected it, and never fails', () => {
+	const bundle = {
+		'bundle-size': suite('bundle-size', [{ name: 'octane-tsrx', ops: { js_gzip: bytes(1000) } }]),
+	};
+	const unselected = analyzeReport({
+		suites: ['bundle-size', 'lynx-render'],
+		base: bundle,
+		head: { ...bundle, 'lynx-render': null },
+	});
+	assert.deepEqual(unselected.failures, []);
+	assert.doesNotMatch(unselected.body, /Lynx dual-thread render/);
+
+	const lynx = (bytesToMain, renderMs) =>
+		suite('lynx-render', [
+			{
+				name: 'octane-lynx-adopt',
+				ops: {
+					create_10k_rows_ms: timed(renderMs),
+					create_10k_rows_bytes_to_main: bytes(bytesToMain),
+				},
+			},
+			{ name: 'react-lynx', ops: { create_10k_rows_ms: timed(50) } },
+		]);
+	const grown = analyzeReport({
+		suites: ['lynx-render'],
+		base: { 'lynx-render': lynx(1000, 700) },
+		head: { 'lynx-render': lynx(1500, 900) },
+	});
+	assert.deepEqual(grown.failures, []);
+	assert.match(grown.body, /🔴 lynx-render: 1 counter\(s\) increased \(report only\)/);
+	assert.match(
+		grown.body,
+		/\| octane-lynx-adopt \| create_10k_rows_bytes_to_main \| 1,000 \| 1,500 \|/,
+	);
+	assert.doesNotMatch(grown.body, /\| react-lynx \|/);
+
+	const failed = analyzeReport({
+		suites: ['lynx-render'],
+		base: { 'lynx-render': lynx(1000, 700) },
+		head: { 'lynx-render': { ...suite('lynx-render', []), failed: 'adoption re-created hosts' } },
+	});
+	assert.deepEqual(failed.failures, []);
+	assert.match(failed.body, /⚠️ lynx-render failed on this pull request \(report only\)/);
+	assert.match(failed.body, /adoption re-created hosts/);
+});
