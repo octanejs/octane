@@ -11,6 +11,7 @@ export { isSignalHandle, isWritableSignal } from './handle-protocol.js';
 // Compiled declarations list method-call captures through the hook helper.
 export { __methodDep } from '../method-dep.js';
 export {
+	__declared,
 	__derivedScalarAt,
 	__signalAt,
 	__startSignalReads,

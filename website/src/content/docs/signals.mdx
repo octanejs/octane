@@ -36,6 +36,37 @@ state on the server**. Roots in one document can share them; separate requests
 do not share mutable cells. Compiled browser modules can use them without a
 renderer root. Server reads and writes require a request owner.
 
+Declarations inside a component or custom hook belong to that component
+instance, and its `@try`, `@if` and `@for` blocks share them. A child that
+receives a handle as a prop reads its own cell. A function the component creates
+**keeps the component's cells** wherever it runs: an event handler a child
+calls, an effect, or code after `await`. Once the component unmounts, a call
+through such a function throws `ScopeDisposedError`.
+
+```tsrx
+import { query$ } from 'octane/signals';
+
+function RetryButton(props) @{
+	<button onClick={() => props.retry()}>Retry</button>
+}
+
+export function Profile(props) @{
+	const user$ = query$(() => props.id, props.loadUser);
+	@try {
+		<output>{user$.get() as string}</output>
+	} @pending {
+		<span>Loading</span>
+	} @catch (_error, reset) {
+		<RetryButton
+			retry={() => {
+				user$.reset();
+				reset();
+			}}
+		/>
+	}
+}
+```
+
 An optional trailing options object supplies an explicit key:
 `signal$('', { key: 'draft' })` or
 `derived$(() => quantity$.get() * 12, { key: 'total' })`. Uncompiled declarations
