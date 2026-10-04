@@ -22,6 +22,12 @@ function removeRoot(root: Root, container: HTMLElement): void {
 	container.remove();
 }
 
+function passiveDepthWarnings(error: { mock: { calls: unknown[][] } }): unknown[][] {
+	return error.mock.calls.filter((call) =>
+		String(call[0]).startsWith('Maximum update depth exceeded. Check the dependencies of effects'),
+	);
+}
+
 beforeEach(() => {
 	Fixture.resetRenderPhaseBases();
 });
@@ -535,6 +541,79 @@ describe('ReactUpdates update reconciliation', () => {
 		removeRoot(root, container);
 	});
 
+	// React resets nestedUpdateCount whenever a commit leaves no sync work
+	// (ReactFiberWorkLoop commitRootImpl), so each passive-driven commit gets a
+	// fresh budget for the layout updates it causes. Only the passive cascade
+	// itself is reported, and that is a development warning.
+	it('gives each passive-driven commit a fresh layout-update budget', async () => {
+		const error = vi.spyOn(console, 'error').mockImplementation(() => {});
+		const container = ownedContainer();
+		const root = createRoot(container);
+		const expectCascadeWarning = () => {
+			if (process.env.NODE_ENV !== 'production') {
+				expect(passiveDepthWarnings(error).length).toBeGreaterThan(0);
+			}
+			error.mockClear();
+		};
+		try {
+			await act(() => root.render(Fixture.PassiveStepLayoutMeasure, { limit: 60 }));
+			expect(container.querySelector('#passive-layout-measure')!.textContent).toBe('60:60');
+			expectCascadeWarning();
+
+			await act(() => root.render(Fixture.PassiveStepAfterMeasure, { limit: 60 }));
+			expect(container.querySelector('#passive-after-measure')!.textContent).toBe('60:60');
+			expectCascadeWarning();
+
+			await act(() => root.render(Fixture.PassiveStepLayoutSnapshot, { limit: 60 }));
+			expect(container.querySelector('#passive-layout-snapshot')!.textContent).toBe('60:600');
+			expectCascadeWarning();
+
+			await act(() => root.render(Fixture.PassiveStepChildMeasure, { limit: 60 }));
+			const child = container.querySelector('#passive-child-measure')!;
+			expect(child.textContent).toBe('60');
+			expect(child.getAttribute('data-width')).toBe('600');
+			expectCascadeWarning();
+		} finally {
+			error.mockRestore();
+			removeRoot(root, container);
+		}
+	});
+
+	// Per ReactUpdates-test.js:1912 and React's nestedPassiveUpdateCount: a
+	// passive cascade past the limit yields between commits, so it converges and
+	// is reported with a development warning instead of an error.
+	it('warns about a long passive cascade without stopping it', async () => {
+		const error = vi.spyOn(console, 'error').mockImplementation(() => {});
+		const container = ownedContainer();
+		const root = createRoot(container);
+		try {
+			await act(() => root.render(Fixture.NestedEffectUpdates, { limit: 60 }));
+			expect(container.querySelector('#nested-effect-step')!.textContent).toBe('60');
+			expect(passiveDepthWarnings(error)).toHaveLength(
+				process.env.NODE_ENV !== 'production' ? 1 : 0,
+			);
+		} finally {
+			error.mockRestore();
+			removeRoot(root, container);
+		}
+	});
+
+	// A passive update on every commit must not refresh the budget of a layout
+	// effect that never converges.
+	it('still bounds a layout loop that runs alongside a passive cascade', async () => {
+		const error = vi.spyOn(console, 'error').mockImplementation(() => {});
+		const container = ownedContainer();
+		const root = createRoot(container);
+		try {
+			await expect(async () => {
+				await act(() => root.render(Fixture.PassiveCascadeLayoutLoop));
+			}).rejects.toThrow(/Maximum update depth exceeded/);
+		} finally {
+			error.mockRestore();
+			removeRoot(root, container);
+		}
+	});
+
 	// A deletion's layout destroy is commit-phase work (React's
 	// commitDeletionEffects), even though Octane discovers the deletion while the
 	// deleting parent's body is still on the render stack. An update it schedules
@@ -595,14 +674,23 @@ describe('ReactUpdates update reconciliation', () => {
 		removeRoot(root, container);
 	});
 
-	// Per ReactUpdates-test.js:1965.
+	// Per ReactUpdates-test.js:1965. Two sibling loops keep passive effects
+	// queued whenever either one exhausts its budget.
 	it('prevents infinite update loop triggered by synchronous updates in useEffect', async () => {
-		const container = ownedContainer();
-		const root = createRoot(container);
-		await expect(async () => {
-			await act(() => root.render(Fixture.SynchronousPassiveEffectLoop));
-		}).rejects.toThrow(/Maximum update depth exceeded/);
-		removeRoot(root, container);
+		for (const Body of [
+			Fixture.SynchronousPassiveEffectLoop,
+			Fixture.SynchronousPassiveEffectLoops,
+		]) {
+			const container = ownedContainer();
+			const root = createRoot(container);
+			try {
+				await expect(async () => {
+					await act(() => root.render(Body));
+				}).rejects.toThrow(/Maximum update depth exceeded/);
+			} finally {
+				removeRoot(root, container);
+			}
+		}
 	});
 
 	// Per ReactUpdates-test.js:2010 (stable), :2266 (canary).
