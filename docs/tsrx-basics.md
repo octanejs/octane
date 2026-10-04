@@ -872,7 +872,9 @@ resource, or on a `<style>` inside `<head>`, is an error
 
 See the [Strong compiler check reference](./strong-compiler-checks.md) for
 effect data flow, dependency inference, automatic memoization, keyed lists,
-compatibility APIs, and trusted HTML.
+compatibility APIs, and trusted HTML. The
+[Strong mode guide](https://octanejs.dev/docs/strong-mode) covers adopting it in
+an existing app and replacing the React idioms it rejects.
 
 Strong mode is an optional immutable render-snapshot contract with compiler
 checks for state, refs, Effect Events, and detectable impure render calls. It is
@@ -942,11 +944,19 @@ These patterns become compile errors:
   (`OCTANE_STRONG_RENDER_AMBIENT_READ`), including `typeof` guards and known
   browser handle aliases. Reading `globalThis` properties also reports this
   error, except for known standard language builtins. Read a subscribed snapshot
-  or move the read into an event, effect, or lazy state initializer.
-- Assigning to a `useRef` object's `current` during render.
+  or move the read into an event, effect, or lazy state initializer. A
+  `useLazyRef` factory may read it too, but its `current` cannot be rendered.
+- Assigning to a `useRef` object's `current` during render
+  (`OCTANE_STRONG_RENDER_REF_WRITE`), including React's lazy initialization
+  `if (ref.current === null) ref.current = create()`. Create a value once with
+  `useLazyRef(() => create())`, and read the latest props from an effect with
+  `useEffectEvent`.
 - Reading a `useRef` object's `current` during render
   (`OCTANE_STRONG_RENDER_REF_READ`). Pass the ref to a `ref` prop as usual; read
   its current value in an event or effect, or use state for render output.
+  Render a DOM measurement from `useLayoutSnapshot` rather than reading the
+  element during render or copying the measurement into state from a layout
+  effect.
 - Writing through a ref to children, a class, an attribute, or a `style`
   property that the template renders on that element
   (`OCTANE_STRONG_MANAGED_DOM_WRITE`), or writing raw HTML to an element Octane

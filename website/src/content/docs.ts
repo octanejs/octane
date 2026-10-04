@@ -11,6 +11,7 @@ import CoreApis from './docs/core-apis.mdx';
 import Signals from './docs/signals.mdx';
 import Styling from './docs/styling.mdx';
 import TsrxVsTsx from './docs/tsrx-vs-tsx.mdx';
+import StrongMode from './docs/strong-mode.mdx';
 import DifferencesFromReact from './docs/differences-from-react.mdx';
 import Lynx from './docs/lynx.mdx';
 import ReactCompat from './docs/react-compat.mdx';
@@ -35,6 +36,7 @@ const components: Record<string, DocEntry['component']> = {
 	signals: Signals,
 	styling: Styling,
 	'tsrx-vs-tsx': TsrxVsTsx,
+	'strong-mode': StrongMode,
 	'differences-from-react': DifferencesFromReact,
 	lynx: Lynx,
 	'react-compat': ReactCompat,

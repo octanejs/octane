@@ -18,6 +18,13 @@ import {
 import { analyzeStrongWriteOnlyState } from './strong-write-only-state.js';
 import { analyzeStrongExternalStore } from './strong-external-store.js';
 import { createStrongRenderPolicy } from './strong-render-policy.js';
+import {
+	collectLazyRefIdioms,
+	lazyRefSuggestion,
+	manualMemoSuggestion,
+	readsLayout,
+	strongDocsUrl,
+} from './strong-fixes.js';
 
 export {
 	STRONG_EFFECT_DATA_FETCH,
@@ -195,6 +202,7 @@ export const STRONG_RENDER_STATE_GETTER_CALL = 'OCTANE_STRONG_RENDER_STATE_GETTE
 export const STRONG_RENDER_MODULE_STATE_READ = 'OCTANE_STRONG_RENDER_MODULE_STATE_READ';
 export const STRONG_RENDER_AMBIENT_READ = 'OCTANE_STRONG_RENDER_AMBIENT_READ';
 export const STRONG_EFFECT_STATE_UPDATE = 'OCTANE_STRONG_EFFECT_STATE_UPDATE';
+export const STRONG_REF_STATE_UPDATE = 'OCTANE_STRONG_REF_STATE_UPDATE';
 export const STRONG_RENDER_REF_WRITE = 'OCTANE_STRONG_RENDER_REF_WRITE';
 export const STRONG_RENDER_REF_READ = 'OCTANE_STRONG_RENDER_REF_READ';
 export const STRONG_RENDER_SNAPSHOT_MUTATION = 'OCTANE_STRONG_RENDER_SNAPSHOT_MUTATION';
@@ -1728,12 +1736,66 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 	}
 
 	function reportSetter(node, phase) {
-		const effect = phase === 'effect';
-		const code = effect ? STRONG_EFFECT_STATE_UPDATE : STRONG_RENDER_STATE_UPDATE;
-		const message = effect
-			? 'Strong mode does not allow synchronous state updates inside effect setup. startTransition, a useTransition start function, queueMicrotask, Promise.resolve().then, a zero-delay setTimeout, and awaiting a value that is not a pending promise all run before the next paint, so they count as setup too. Derive the value during render or use useLinkedState when state follows another value.'
-			: 'Strong mode does not allow state updates during render. Use useLinkedState when state needs to reset or change with another value.';
-		report(code, node, message, [{ hook: 'useLinkedState' }]);
+		if (phase !== 'effect') {
+			report(
+				STRONG_RENDER_STATE_UPDATE,
+				node,
+				'Strong mode does not allow state updates during render. Use useLinkedState when state needs to reset or change with another value.',
+				[{ hook: 'useLinkedState', message: 'Follow the source value with useLinkedState.' }],
+			);
+			return;
+		}
+		// Copying a measurement of the committed DOM into state is the job
+		// useLayoutSnapshot does without a second render pass. The read may sit
+		// in the effect's own setup, or in the function the update runs in: a
+		// helper setup calls, or a microtask or transition callback that still
+		// counts as setup. A setter passed directly as the callback runs in no
+		// function of its own, so the enclosing component's reads do not count.
+		const effect = currentEffect;
+		const measures =
+			effect !== null &&
+			!effect.snapshot &&
+			((effect.callback?.kind === 'callback' && measuresLayout(effect.callback.node)) ||
+				(currentFunction !== effect.caller && measuresLayout(currentFunction)));
+		if (effect?.ref === true) {
+			report(
+				STRONG_REF_STATE_UPDATE,
+				node,
+				measures
+					? 'Strong mode does not allow synchronous state updates in a callback ref. Octane calls it while the element commits, before paint, like layout effect setup, and this one copies a DOM measurement into state. Pass a ref object and render from the measurement with useLayoutSnapshot(() => measure(), { initial }) instead: it measures after layout and re-renders before paint only when the value changes.'
+					: 'Strong mode does not allow synchronous state updates in a callback ref. Octane calls it while the element commits, before paint, like layout effect setup, so startTransition, queueMicrotask, Promise.resolve().then, and a zero-delay setTimeout count too. Pass a ref object to keep the element, and read it from effects and event handlers. Render from a DOM measurement with useLayoutSnapshot.',
+				[
+					measures
+						? {
+								hook: 'useLayoutSnapshot',
+								message:
+									'Replace the state and the callback ref with a ref object and useLayoutSnapshot.',
+							}
+						: { hook: 'useRef', message: 'Keep the element in a ref object.' },
+				],
+			);
+			return;
+		}
+		if (measures) {
+			report(
+				STRONG_EFFECT_STATE_UPDATE,
+				node,
+				'Strong mode does not allow synchronous state updates inside effect setup. This effect copies a DOM measurement into state. Render from the measurement with useLayoutSnapshot(() => measure(), { initial }) instead: it measures after layout and re-renders before paint only when the value changes.',
+				[
+					{
+						hook: 'useLayoutSnapshot',
+						message: 'Replace the state and the effect with useLayoutSnapshot.',
+					},
+				],
+			);
+			return;
+		}
+		report(
+			STRONG_EFFECT_STATE_UPDATE,
+			node,
+			'Strong mode does not allow synchronous state updates inside effect setup. startTransition, a useTransition start function, queueMicrotask, Promise.resolve().then, a zero-delay setTimeout, and awaiting a value that is not a pending promise all run before the next paint, so they count as setup too. Derive the value during render or use useLinkedState when state follows another value. Render from a DOM measurement with useLayoutSnapshot.',
+			[{ hook: 'useLinkedState', message: 'Derive the value, or follow it with useLinkedState.' }],
+		);
 	}
 
 	function reportStateGetterCall(node) {
@@ -1900,19 +1962,51 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 		);
 	}
 
+	const layoutReaders = new WeakMap();
+	function measuresLayout(fn) {
+		if (fn == null) return false;
+		let reads = layoutReaders.get(fn);
+		if (reads === undefined) layoutReaders.set(fn, (reads = readsLayout(fn)));
+		return reads;
+	}
+
+	// React's lazy ref idiom reads and writes `current` during render. Both
+	// reports name useLazyRef; only the first carries the edit, so applying
+	// every suggestion in a file rewrites the idiom once.
+	let lazyRefIdioms = null;
+	const suggestedLazyRefs = new Set();
+	function reportLazyRef(code, node) {
+		lazyRefIdioms ??= collectLazyRefIdioms(ast);
+		const idiom = lazyRefIdioms.get(unwrap(node));
+		if (idiom === undefined) return false;
+		const suggestion = suggestedLazyRefs.has(idiom)
+			? { message: 'Create the value once with useLazyRef.' }
+			: lazyRefSuggestion(idiom, ast, source);
+		suggestedLazyRefs.add(idiom);
+		report(
+			code,
+			node,
+			`Strong mode does not allow initializing ${idiom.name}.current during render. Use useLazyRef(() => value) in place of useRef: it creates the value once, when the ref's hook cell is created.`,
+			[{ hook: 'useLazyRef', ...suggestion }],
+		);
+		return true;
+	}
+
 	function reportRef(node) {
+		if (reportLazyRef(STRONG_RENDER_REF_WRITE, node)) return;
 		report(
 			STRONG_RENDER_REF_WRITE,
 			node,
-			'Strong mode does not allow writing to useRef.current during render. Move the write to an event or effect, or express the value as state.',
+			'Strong mode does not allow writing to useRef.current during render. Move the write to an event or effect, or express the value as state. To create a value once, use useLazyRef(() => value).',
 		);
 	}
 
 	function reportRefRead(node) {
+		if (reportLazyRef(STRONG_RENDER_REF_READ, node)) return;
 		report(
 			STRONG_RENDER_REF_READ,
 			node,
-			'Strong mode does not allow reading useRef.current during render. Read the ref in an event or effect, or use state or useLinkedState for values that drive render output.',
+			'Strong mode does not allow reading useRef.current during render. Read the ref in an event or effect, or use state or useLinkedState for values that drive render output. Render from a DOM measurement with useLayoutSnapshot.',
 		);
 	}
 
@@ -4362,6 +4456,7 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 		const record = {
 			node,
 			owner: renderOwner,
+			caller: currentFunction,
 			callback,
 			reads: new Set(),
 			writes: new Set(),
@@ -4400,6 +4495,45 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 			record,
 			callback?.kind === 'callback' && callback.node.async === true,
 		);
+	}
+
+	// Octane calls a host element's callback ref while the element commits,
+	// before paint, so its state updates follow the effect setup rules. Only
+	// those are checked: a ref has no dependency list, and the cleanup and
+	// effect-chain checks belong to effects.
+	function visitHostRef(expression, scope) {
+		const node = unwrap(expression);
+		if (node?.type === 'ArrayExpression') {
+			for (const element of node.elements ?? []) {
+				if (element !== null && element.type !== 'SpreadElement') visitHostRef(element, scope);
+			}
+			return;
+		}
+		const callback = callableValue(node, scope);
+		if (callback === null) return;
+		const enclosingEffect = currentEffect;
+		const enclosingOwnsWrites = effectOwnsWrites;
+		const enclosingCollectReads = collectEffectReads;
+		const record = {
+			node,
+			caller: currentFunction,
+			callback,
+			writes: new Set(),
+			snapshot: false,
+			ref: true,
+		};
+		const enclosingPolicy = effectPolicy.enterEffect(record);
+		currentEffect = record;
+		effectOwnsWrites = true;
+		collectEffectReads = false;
+		try {
+			visitCallable(callback, node, 'effect');
+		} finally {
+			currentEffect = enclosingEffect;
+			effectOwnsWrites = enclosingOwnsWrites;
+			collectEffectReads = enclosingCollectReads;
+			effectPolicy.exitEffect(enclosingPolicy);
+		}
 	}
 
 	// Synchronous effect setup must not read inputs that dependency inference
@@ -5027,7 +5161,23 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 				) {
 					reportModuleStateRead(name);
 				}
-				break;
+				for (const key in node) {
+					if (!SKIP_KEYS.has(key) && !key.startsWith('_octane')) visit(node[key], scope, phase);
+				}
+				// A component decides when to call a ref prop. A host element's ref
+				// runs when the element commits, wherever its JSX was created.
+				if (
+					!member &&
+					(name?.type === 'JSXNamespacedName' ||
+						(name?.type === 'JSXIdentifier' && /^[a-z]|-/.test(name.name)))
+				) {
+					for (const attribute of node.attributes ?? []) {
+						if (attribute.type === 'JSXAttribute' && attribute.name?.name === 'ref') {
+							visitHostRef(attribute.value?.expression, scope);
+						}
+					}
+				}
+				return;
 			}
 			case 'JSXSpreadAttribute':
 				visit(node.argument, scope, phase);
@@ -6140,8 +6290,12 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 		...analyzeStrongExternalStore(ast, strongHookAnalysis, stateDiagnostic),
 	);
 	for (const policy of analyzeStrongHookPolicies(ast, options)) {
+		const suggestions =
+			policy.hook === 'useMemo' || policy.hook === 'useCallback'
+				? [manualMemoSuggestion(policy.node, policy.hook, source)]
+				: [];
 		diagnostics.push({
-			...diagnostic(policy.code, filename, policy.node, policy.message),
+			...diagnostic(policy.code, filename, policy.node, policy.message, suggestions),
 			severity: policy.severity,
 		});
 	}
@@ -6155,6 +6309,17 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 	return { enabled, diagnostics, nativeChangeAnalysis, strongHookAnalysis };
 }
 
+/**
+ * A build error is the documentation an author reads first, so a Strong code
+ * names the page that explains it and shows the replacement.
+ *
+ * @param {string} code
+ * @param {string} message
+ */
+export function withStrongDocs(code, message) {
+	return code.startsWith('OCTANE_STRONG_') ? `${message} See ${strongDocsUrl(code)}` : message;
+}
+
 /** Throw the first Strong-mode violation using the original authored location. */
 export function assertStrongMode(ast, source, filename, options) {
 	if (options?.strong !== true && !source.includes('use strong')) return;
@@ -6164,7 +6329,7 @@ export function assertStrongMode(ast, source, filename, options) {
 	const { code, message } = violation;
 	const { line, column } = violation.start;
 	const error = new SyntaxError(
-		`${filename ?? '<anonymous>'}:${line}:${column + 1}: [${code}] ${message}`,
+		`${filename ?? '<anonymous>'}:${line}:${column + 1}: [${code}] ${withStrongDocs(code, message)}`,
 	);
 	error.code = code;
 	error.filename = filename;

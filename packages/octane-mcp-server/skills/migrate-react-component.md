@@ -50,6 +50,15 @@ locals, early returns) stays above it.
 | `React.lazy(() => import(...))` | `lazy()` works as-is (and also accepts a bare component from the loader) |
 | `defaultProps` | parameter defaults / destructuring defaults |
 
+## If the target module is Strong
+
+A module with `"use strong"`, or an app with `compiler: { strong: true }`,
+rejects several React idioms that compile elsewhere: `useMemo`/`useCallback`,
+lazy `ref.current` initialization, measuring into state from
+`useLayoutEffect`, and state updates in effect setup among them. Convert the
+component first, then follow the `migrate-to-strong` skill and look up each
+`OCTANE_STRONG_*` code with `octane_strong_explain`.
+
 ## Text holes
 
 A dynamic text hole needs `{expr as string}` unless the compiler can prove the

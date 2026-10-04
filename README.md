@@ -241,6 +241,8 @@ Octane itself. Good places to start:
   for SPA compilation and full-stack SSR.
 - [TSRX vs TSX/JSX](https://octanejs.dev/docs/tsrx-vs-tsx): when to reach for
   each dialect and what TSRX unlocks.
+- [Strong mode](https://octanejs.dev/docs/strong-mode): the opt-in pure-render
+  contract, how to adopt it, and every diagnostic it reports.
 - [Differences from React](https://octanejs.dev/docs/differences-from-react): the
   deliberate divergences, and why everything else matching React is the point.
 - [Publishing libraries](https://octanejs.dev/docs/publishing-libraries): package
@@ -264,6 +266,8 @@ In this repository:
   [deferred hydration](./docs/deferred-hydration.md): the full references.
 - [Differences from React](./docs/differences-from-react.md): the divergence
   contract.
+- [Strong compiler checks](./docs/strong-compiler-checks.md): every Strong-mode
+  diagnostic, its replacement, and the coverage baseline.
 - [ReactCompat](./docs/react-compat.md): React inside Octane, including compiler
   ownership, context mapping, boundaries, SSR, and hydration; links to the
   opposite `OctaneCompat` direction.

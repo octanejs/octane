@@ -1,4 +1,5 @@
-// Snapshot the repository's own binding and error-code catalogs into a single
+// Snapshot the repository's own binding, error-code, and Strong diagnostic
+// catalogs into a single
 // JSON file that ships inside @octanejs/cli.
 //
 // The CLI runs against arbitrary user projects, so it cannot read this
@@ -13,6 +14,11 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { format, resolveConfig } from 'prettier';
 import { KNOWN_BINDINGS } from '../packages/octane-mcp-server/src/bridge.js';
+import {
+	STRONG_DIAGNOSTICS,
+	STRONG_RECIPES,
+} from '../packages/octane/src/compiler/strong-diagnostics.js';
+import { strongDocsUrl } from '../packages/octane/src/compiler/strong-fixes.js';
 import { readEcosystemCatalogs } from './workspace-packages.mjs';
 
 const REPO = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -67,12 +73,36 @@ function buildErrorCodes() {
 	);
 }
 
+function buildStrongDiagnostics() {
+	return {
+		diagnostics: Object.fromEntries(
+			STRONG_DIAGNOSTICS.map((entry) => [
+				entry.code,
+				{
+					severity: entry.severity,
+					detects: entry.detects,
+					replacement: entry.replacement,
+					url: strongDocsUrl(entry.code),
+				},
+			]),
+		),
+		recipes: STRONG_RECIPES.map((recipe) => ({
+			id: recipe.id,
+			title: recipe.title,
+			react: recipe.react,
+			strong: recipe.strong,
+			codes: recipe.codes,
+		})),
+	};
+}
+
 const data = {
 	bindings: buildBindings(),
 	reactPackages: Object.fromEntries(
 		Object.entries(KNOWN_BINDINGS).sort(([a], [b]) => a.localeCompare(b)),
 	),
 	errorCodes: buildErrorCodes(),
+	strongDiagnostics: buildStrongDiagnostics(),
 };
 
 // Formatted through prettier, because generated baselines share the repo-wide
@@ -100,6 +130,7 @@ if (process.argv.includes('--check')) {
 	console.log(
 		`Wrote ${path.relative(REPO, OUTPUT)}: ${data.bindings.length} bindings, ` +
 			`${Object.keys(data.reactPackages).length} React packages, ` +
-			`${Object.keys(data.errorCodes).length} error codes.`,
+			`${Object.keys(data.errorCodes).length} error codes, ` +
+			`${Object.keys(data.strongDiagnostics.diagnostics).length} Strong diagnostics.`,
 	);
 }

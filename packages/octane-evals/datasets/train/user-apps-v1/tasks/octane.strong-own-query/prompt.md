@@ -4,7 +4,7 @@
 compiler rejects it:
 
 ```text
-src/App.tsrx:8:19: [OCTANE_STRONG_OWN_MARKUP_QUERY] Strong mode does not allow `document.getElementById()` to find the `#search-input` <input> this component renders. Attach a ref instead: `const element = useRef(null)`, `ref={element}` on the <input>, then use `element.current` in the effect or event. Portal targets and markup rendered elsewhere stay queryable.
+src/App.tsrx:8:19: [OCTANE_STRONG_OWN_MARKUP_QUERY] Strong mode does not allow `document.getElementById()` to find the `#search-input` <input> this component renders. Attach a ref instead: `const element = useRef(null)`, `ref={element}` on the <input>, then use `element.current` in the effect or event. Portal targets and markup rendered elsewhere stay queryable. See https://octanejs.dev/docs/strong-mode#octane-strong-own-markup-query
 ```
 
 Fix the component so it compiles in Strong mode and meets these requirements:

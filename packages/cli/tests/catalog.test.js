@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from 'vitest';
-import { parseErrorReference } from '../src/commands/explain.js';
+import { parseErrorReference, parseStrongReference } from '../src/commands/explain.js';
 import { BINDINGS, resolveBinding } from '../src/data/index.js';
 import { createFixture, runCli } from './helpers/fixture.js';
 
@@ -91,6 +91,40 @@ describe('octane explain', () => {
 		const result = await runCli(['explain', '4242'], { exec: noExec });
 		expect(result.exitCode).toBe(1);
 		expect(result.stderr).toMatch(/Unknown Octane error code 4242/);
+	});
+	it('finds a Strong code in a full code, a short code, a compile error, or its docs link', () => {
+		const code = 'OCTANE_STRONG_RENDER_REF_READ';
+		expect(parseStrongReference(code)).toBe(code);
+		expect(parseStrongReference('render_ref_read')).toBe(code);
+		expect(
+			parseStrongReference(
+				`src/App.tsrx:4:7: [${code}] Strong mode does not allow reading useRef.current during render.`,
+			),
+		).toBe(code);
+		expect(
+			parseStrongReference('https://octanejs.dev/docs/strong-mode#octane-strong-render-ref-read'),
+		).toBe(code);
+		expect(parseStrongReference('3')).toBe(null);
+	});
+
+	it('explains a Strong diagnostic with its replacement and migration recipes', async () => {
+		const report = (
+			await runCli(['explain', 'OCTANE_STRONG_RENDER_REF_WRITE', '--json'], { exec: noExec })
+		).json();
+
+		expect(report.code).toBe('OCTANE_STRONG_RENDER_REF_WRITE');
+		expect(report.replacement).toContain('useLazyRef');
+		expect(report.url).toBe('https://octanejs.dev/docs/strong-mode#octane-strong-render-ref-write');
+		expect(report.recipes.map((/** @type {{ id: string }} */ recipe) => recipe.id)).toEqual([
+			'lazy-ref',
+			'latest-ref',
+		]);
+	});
+
+	it('fails clearly on an unknown Strong code', async () => {
+		const result = await runCli(['explain', 'OCTANE_STRONG_NOT_A_RULE'], { exec: noExec });
+		expect(result.exitCode).toBe(1);
+		expect(result.stderr).toMatch(/Unknown Strong diagnostic OCTANE_STRONG_NOT_A_RULE/);
 	});
 });
 

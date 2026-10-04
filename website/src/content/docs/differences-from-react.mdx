@@ -106,25 +106,28 @@ valid.
 Strong mode opts into immutable render snapshots and helps catch detectable
 state, ref, and purity violations. Enable it for a single module with `"use strong"` before its
 imports, or across your application with `compiler: { strong: true }` in
-`octane.config.ts`.
+`octane.config.ts`. The [Strong mode guide](/docs/strong-mode) covers adoption,
+replacements for the React idioms it rejects, and every diagnostic.
 
 The compiler rejects state updates during render, synchronous state updates
-while an effect is being set up, and writes to `ref.current` during render. It
-follows provable calls through `useCallback`, `useEffectEvent`, and functions
-returned by analyzable `useMemo` factories. Calling a statically known Effect
-Event during render or including it in explicit hook dependencies is also an
-error. These hooks remain supported, and other explicit dependency lists retain
-their existing meaning.
+while an effect is being set up, and reads and writes of `ref.current` during
+render. It follows provable calls through local helpers and `useEffectEvent`.
+Calling a statically known Effect Event during render or including it in explicit
+hook dependencies is also an error. The compiler owns memoization in a Strong
+module, so `useMemo` and `useCallback` are errors, and an explicit dependency list
+that differs from the inferred inputs is an error; an equivalent one is a hint.
 
-Use `useLinkedState` when editable state should follow a changing prop. Event
-handlers, genuinely deferred callbacks, effect cleanup, effects that synchronize
-external systems, and normal DOM or timer refs remain supported. Installed
-dependencies keep their existing behavior unless they opt in themselves.
+Use `useLinkedState` when editable state should follow a changing prop,
+`useLazyRef` to create a ref's value once, and `useLayoutSnapshot` to render from a
+DOM measurement. Event handlers, genuinely deferred callbacks, effect cleanup,
+effects that synchronize external systems, and normal DOM or timer refs remain
+supported. Installed dependencies keep their existing behavior unless they opt in
+themselves.
 
 Strong also rejects render-time mutations of provable state snapshots and
 direct reads of known clocks or random sources, such as `Date.now()` and
-`Math.random()`. Events, effects, and lazy state initializers may obtain these
-values. The checks follow supported aliases and synchronous helpers, but cannot
+`Math.random()`. Events, effects, lazy state initializers, and `useLazyRef`
+factories may obtain these values. The checks follow supported aliases and synchronous helpers, but cannot
 prove arbitrary imported code pure.
 
 Default compatibility mode conservatively reevaluates method calls: a stable

@@ -102,6 +102,33 @@ text-host wiring that appears to mean “every edit.” It leaves component call
 selects, checkboxes/radios, dynamic input types, and explicitly intentional native
 text commits alone.
 
+APIs that map one-to-one but whose usual React idioms Strong mode rejects
+(`useRef`, `useLayoutEffect`, `useMemo`, `useCallback`) carry a `strong` note
+naming the replacement, and the plan gains one conditional step for ports that
+will compile in Strong mode.
+
+### `octane_strong_explain`
+
+Explains a Strong mode diagnostic. Call it when a compile error or an
+`octane analyze` finding has an `OCTANE_STRONG_*` code, or when migrating a
+module to Strong mode. With `code` (full, such as
+`OCTANE_STRONG_RENDER_REF_READ`, or short, such as `RENDER_REF_READ`, in any
+case), it returns the code's severity, what it detects, the replacement, the
+docs URL, the Octane primitives involved, and every migration recipe that names
+it, with before/after code. With `recipe` (such as `lazy-ref`), it returns that
+recipe. With neither, it returns the index of codes by section and the recipe
+list. An unknown code returns an error that lists the closest codes.
+
+```json
+{ "code": "RENDER_REF_READ" }
+```
+
+The text comes from `src/strong-diagnostics.json`, which
+`pnpm strong:diagnostics` generates from the compiler's catalog
+(`packages/octane/src/compiler/strong-diagnostics.js`). The hosted server at
+`mcp.octanejs.dev` serves the same text through the `@octanejs/mcp-server/strong`
+export.
+
 ### `octane_bindings`
 
 Returns the map of React packages with maintained `@octanejs/*` ports. The map
@@ -117,6 +144,9 @@ Returns a skill by name. Bundled skills (shipped with this package):
 - `build-octane-software`: production engineering, performance, validation,
   and adversarial self-review gates for Octane code.
 - `migrate-react-component`: React JSX to `.tsrx` conversion reference.
+- `migrate-to-strong`: moving a module or app to Strong mode, from
+  `octane analyze --strong-preview` through the coverage baseline, with the
+  React idiom replacements and the non-fixes to avoid.
 - `react-divergences`: Octane's intentional differences from React.
 - `setup-ssr`: server rendering and hydration setup.
 

@@ -87,6 +87,17 @@ rather than in a correctness test.
 3. Add changeset unless docs/test-only.
 4. Consider ecosystem binding impacts and aliases in `vitest.config.js`.
 
+## Strong diagnostics
+
+A new or changed `OCTANE_STRONG_*` code, or a new hook that replaces a pattern
+Strong rejects, belongs in `packages/octane/src/compiler/strong-diagnostics.js`.
+Add its entry, and a recipe when it replaces a React idiom, then run
+`pnpm strong:diagnostics`. That regenerates the website reference, llms.txt,
+`docs/strong-compiler-checks.md`, and the MCP server's copy, and
+`strong-diagnostics-catalog.test.ts` fails on a code without an entry or a
+recipe the compiler does not accept. The message should name the replacement
+API; the compile error is the documentation an agent reads first.
+
 ## Validation
 
 - New/changed targeted tests.

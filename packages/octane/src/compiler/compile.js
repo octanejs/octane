@@ -108,7 +108,7 @@ import {
 import { assertNoLiveClientOnlyImports } from './client-only-server.js';
 import { nsForChildren, nsForSelf } from './jsx-namespace.js';
 import { analyzeNativeChangeDiagnostics } from './native-change-diagnostics.js';
-import { assertStrongMode } from './strong-mode.js';
+import { analyzeStrongMode, assertStrongMode } from './strong-mode.js';
 import { applyStrongAutomaticMemo } from './strong-auto-memo.js';
 import {
 	assertNativeReadDiagnostics,
@@ -10423,26 +10423,93 @@ export function compileForBundler(source, filename, options) {
 	return { result, ...metadata };
 }
 
-function compileAuthored(source, filename, options, bundlerMetadata) {
-	const mode = (options && options.mode) || 'client';
-	if (mode !== 'client' && mode !== 'server') {
-		throw new Error(`Unknown compile mode "${mode}" — expected 'client' or 'server'.`);
-	}
-	const cleanFilename = cleanCompileFilename(filename);
-	let analyzedAst = markParserSensitiveHosts(
+// Everything compilation validates before Strong analysis, shared with
+// diagnostic collection so both see the same authored tree and options.
+function prepareAuthoredAst(source, cleanFilename, options) {
+	const ast = markParserSensitiveHosts(
 		declareBareForBindings(
 			normalizeAuthoredJsxLiterals(parseModule(source, cleanFilename)),
 			source,
 			cleanFilename,
 		),
 	);
-	analyzeTsrx(analyzedAst, cleanFilename);
-	assertForOfHeaders(analyzedAst, source, cleanFilename);
-	assertTemplateJumps(analyzedAst, source, cleanFilename);
-	adoptParserAst(analyzedAst);
-	assertNoLegacyContextProviders(analyzedAst, source, cleanFilename);
-	options = nativeReadOptions(analyzedAst, options);
-	assertNativeReadDiagnostics(analyzedAst, source, cleanFilename, options);
+	analyzeTsrx(ast, cleanFilename);
+	assertForOfHeaders(ast, source, cleanFilename);
+	assertTemplateJumps(ast, source, cleanFilename);
+	adoptParserAst(ast);
+	assertNoLegacyContextProviders(ast, source, cleanFilename);
+	options = nativeReadOptions(ast, options);
+	assertNativeReadDiagnostics(ast, source, cleanFilename, options);
+	return { ast, options };
+}
+
+/**
+ * Report every diagnostic a module produces instead of stopping at the first
+ * error. `compile()` throws the first Strong violation, so a migration would
+ * otherwise surface one finding per run.
+ *
+ * Strong analysis runs on the same prepared tree compilation uses. Ordinary
+ * compilation then runs unchanged on the original source and options, so its
+ * own validation and warnings are kept rather than reimplemented. When Strong
+ * analysis found an error, compilation would throw exactly that first
+ * violation from the same tree, so it is skipped; code generation never runs
+ * for such a module, and diagnostics it alone would raise are absent. Any other
+ * compilation failure is returned as `error`.
+ *
+ * @param {string} source
+ * @param {string} filename
+ * @param {any} [options] the options `compile()` would receive
+ * @returns {{ diagnostics: any[], error: unknown }}
+ */
+export function collectDiagnostics(source, filename, options) {
+	/** @type {any[]} */
+	const diagnostics = [];
+	const seen = new Set();
+	const add = (diagnostic) => {
+		const key = `${diagnostic.code}:${diagnostic.start?.offset}:${diagnostic.end?.offset}`;
+		if (seen.has(key)) return;
+		seen.add(key);
+		diagnostics.push(diagnostic);
+	};
+	const cleanFilename = cleanCompileFilename(filename);
+	if (options?.strong === true || source.includes('use strong')) {
+		let prepared = null;
+		try {
+			prepared = prepareAuthoredAst(source, cleanFilename, options);
+		} catch {
+			// Compilation below reports the same failure in its own terms.
+		}
+		if (prepared !== null) {
+			let strong = null;
+			try {
+				strong = analyzeStrongMode(prepared.ast, source, cleanFilename, prepared.options);
+			} catch {
+				// Compilation runs the same analysis and returns the failure.
+			}
+			for (const diagnostic of strong?.diagnostics ?? []) add(diagnostic);
+		}
+	}
+	if (diagnostics.some((diagnostic) => diagnostic.severity === 'error')) {
+		return { diagnostics, error: null };
+	}
+	let error = null;
+	try {
+		for (const diagnostic of compile(source, filename, options).diagnostics ?? []) add(diagnostic);
+	} catch (thrown) {
+		error = thrown;
+	}
+	return { diagnostics, error };
+}
+
+function compileAuthored(source, filename, options, bundlerMetadata) {
+	const mode = (options && options.mode) || 'client';
+	if (mode !== 'client' && mode !== 'server') {
+		throw new Error(`Unknown compile mode "${mode}" — expected 'client' or 'server'.`);
+	}
+	const cleanFilename = cleanCompileFilename(filename);
+	const prepared = prepareAuthoredAst(source, cleanFilename, options);
+	let analyzedAst = prepared.ast;
+	options = prepared.options;
 	const strongAnalysis = assertStrongMode(analyzedAst, source, cleanFilename, options);
 	const strongModeEnabled = strongAnalysis?.enabled === true;
 	analyzedAst = markKnownAttributeSpreads(analyzedAst, options?.knownAttributeSpreads);

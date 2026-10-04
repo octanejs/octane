@@ -8,6 +8,7 @@ import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { z } from 'zod';
 import { bridgeReport, KNOWN_BINDINGS, KNOWN_BINDING_PACKAGE_DIRS } from './bridge.js';
+import { explainStrong, STRONG_EXPLAIN_TOOL } from './strong.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const PACKAGE_ROOT = resolve(dirname(__filename), '..');
@@ -21,6 +22,7 @@ export const BUNDLED_SKILLS = {
 	'bridge-react-package': 'skills/bridge-react-package.md',
 	'build-octane-software': 'skills/build-octane-software.md',
 	'migrate-react-component': 'skills/migrate-react-component.md',
+	'migrate-to-strong': 'skills/migrate-to-strong.md',
 	'react-divergences': 'skills/react-divergences.md',
 	'setup-ssr': 'skills/setup-ssr.md',
 };
@@ -507,7 +509,7 @@ function registerUserTools(server, repoRoot, repoMode) {
 		{
 			title: 'Octane skill',
 			description:
-				'Fetch an Octane agent skill by name. Call when starting work the skill covers: build-octane-software for engineering gates, bridge-react-package for porting a React library, migrate-react-component for JSX to .tsrx, react-divergences before assuming React behavior, setup-ssr for server rendering.' +
+				'Fetch an Octane agent skill by name. Call when starting work the skill covers: build-octane-software for engineering gates, bridge-react-package for porting a React library, migrate-react-component for JSX to .tsrx, migrate-to-strong for moving modules to Strong mode, react-divergences before assuming React behavior, setup-ssr for server rendering.' +
 				(repoMode ? ' Repo skills cover octane maintainer workflows.' : ''),
 			inputSchema: {
 				name: z.enum(Object.keys(skills)),
@@ -572,6 +574,22 @@ function registerUserTools(server, repoRoot, repoMode) {
 				projectRoot: input.projectRoot,
 			});
 			return text(JSON.stringify(report, null, 2));
+		},
+	);
+
+	server.registerTool(
+		STRONG_EXPLAIN_TOOL.name,
+		{
+			title: STRONG_EXPLAIN_TOOL.title,
+			description: STRONG_EXPLAIN_TOOL.description,
+			inputSchema: {
+				code: z.string().optional().describe(STRONG_EXPLAIN_TOOL.codeDescription),
+				recipe: z.string().optional().describe(STRONG_EXPLAIN_TOOL.recipeDescription),
+			},
+		},
+		async (input) => {
+			const { ok, text: body } = explainStrong(input);
+			return ok ? text(body) : { ...text(body), isError: true };
 		},
 	);
 

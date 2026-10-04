@@ -4,7 +4,7 @@
 compiler rejects it:
 
 ```text
-src/App.tsrx:9:3: [OCTANE_STRONG_MANAGED_DOM_WRITE] Strong mode does not allow `textContent` on the <h1> whose children the template renders; Octane owns that child list. Render the content as its children from state or props. Keep refs for reading, focus, measurement, and DOM the template does not render.
+src/App.tsrx:9:3: [OCTANE_STRONG_MANAGED_DOM_WRITE] Strong mode does not allow `textContent` on the <h1> whose children the template renders; Octane owns that child list. Render the content as its children from state or props. Keep refs for reading, focus, measurement, and DOM the template does not render. See https://octanejs.dev/docs/strong-mode#octane-strong-managed-dom-write
 ```
 
 Fix the component so it compiles in Strong mode and meets these requirements:

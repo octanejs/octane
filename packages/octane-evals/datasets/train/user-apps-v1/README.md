@@ -1,6 +1,6 @@
 # Octane user-apps v1
 
-This is a public training corpus of thirty-five realistic requests to build or
+This is a public training corpus of thirty-seven realistic requests to build or
 repair small Octane applications. It evaluates framework usage from a
 consumer's perspective—not changes to Octane's source repository.
 
@@ -42,29 +42,42 @@ pnpm --filter @octanejs/evals test:user-app-starters
 
 ## Strong mode repairs
 
-The fourteen `octane.strong-*` tasks share the `octane.strong-repair` family and
+The sixteen `octane.strong-*` tasks share the `octane.strong-repair` family and
 the `repair` capability. Each starter opts into Strong mode with `"use strong"`
 and fails to compile, and its prompt quotes the compiler's exact error. A
 passing answer must do two things. It must compile in Strong mode, and the
 grader compiles it with `strong: true`, so deleting the directive does not help.
 It must also remove the bug that the diagnostic predicts, which the grader
-checks with server-rendered HTML, prop updates, races, or cleanup.
+checks with server-rendered HTML, prop updates, races, cleanup, construction
+counts, or the first frame the browser would paint.
 
 Each task also records the workarounds agents reach for under
 `negatives/<name>/src/App.tsrx`. Every workaround must fail its grader.
 `strong-repair-negatives.json` records whether each one is already
 `rejected-by-strong` or still `compiles-keeps-bug`. The second group is the
 compiler's backlog of missing checks, and each entry is a candidate compiler
-fixture.
+fixture unless Strong allows the pattern on purpose. For example, Strong treats
+a timer with a positive delay as event-driven, so only the grader can show that
+it paints a stale frame.
 
 Valid answers that differ from the reference live under
 `alternatives/<name>/src/App.tsrx` and must pass, so a grader cannot quietly
-reject a correct fix. Server checks run the server build in a separate realm
-that has Node's server globals and no browser bindings. As on a real server,
-`window` is undeclared and `globalThis.window` is `undefined`.
+reject a correct fix. An alternative can be legal without being the preferred
+repair, such as measuring in an animation frame instead of with
+`useLayoutSnapshot`. Such an alternative's header comment says why it passes
+and which repair is preferred. Server checks run the server build in a separate realm that has
+Node's server globals and no browser bindings. As on a real server, `window` is
+undeclared and `globalThis.window` is `undefined`.
+
+jsdom has no layout, so a measurement grader gives each element a fixed width
+per character of its text. It then runs the browser's rendering step itself:
+microtasks, animation-frame callbacks, and `ResizeObserver` entries. It reads
+the result where the browser would paint, so a value that arrives later, such
+as from a timer, misses that frame.
 
 ```bash
-# Check prompts, starters, references, and every workaround, then refresh the ledger.
+# Check prompts, starters, references, and every workaround, then refresh the
+# ledger and any prompt that quotes an older wording of its starter's error.
 pnpm --filter @octanejs/evals strong-repair:verify
 ```
 

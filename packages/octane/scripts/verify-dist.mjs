@@ -582,7 +582,12 @@ export const REQUIRED_PUBLIC_VALUE_EXPORTS = {
 	],
 	// No `octane` here: the Vite plugin would drag this browser-facing subpath's
 	// module graph into `node:fs`/`node:path`. It stays on `./compiler/vite`.
-	'./compiler': ['__analyzeNativeChangeDiagnostics', 'compile', 'compileToVolarMappings'],
+	'./compiler': [
+		'__analyzeNativeChangeDiagnostics',
+		'collectDiagnostics',
+		'compile',
+		'compileToVolarMappings',
+	],
 	'./compiler/bundler': [
 		'CLIENT_REFERENCE_MANIFEST_FILENAME',
 		'CLIENT_REFERENCE_MANIFEST_VERSION',

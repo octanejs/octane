@@ -75,11 +75,15 @@
         "octane.strong-shuffle"
       ],
       "locale-formatting": ["octane.strong-date-format"],
-      "effect-state-update": ["octane.strong-derived-name", "octane.strong-save-counter"],
+      "effect-state-update": [
+        "octane.strong-derived-name",
+        "octane.strong-save-counter",
+        "octane.strong-measured-width"
+      ],
       "effect-data-fetch": ["octane.strong-user-fetch"],
       "ambient-read": ["octane.strong-viewport-width"],
       "snapshot-mutation": ["octane.strong-sorted-tags"],
-      "ref-read": ["octane.strong-click-tally"]
+      "ref-read": ["octane.strong-click-tally", "octane.strong-lazy-ref"]
     }
   },
   "tasks": [
@@ -533,6 +537,30 @@
       "createdAt": "2026-09-30",
       "publishedAt": "2026-09-30",
       "tags": ["strong-mode", "effect-state-update", "async", "state-updates"]
+    },
+    {
+      "taskId": "octane.strong-lazy-ref",
+      "familyId": "octane.strong-repair",
+      "title": "Repair a Strong-mode draft history",
+      "suite": "octane",
+      "capability": "repair",
+      "difficulty": "standard",
+      "sourcePath": "docs/strong-compiler-checks.md",
+      "createdAt": "2026-10-03",
+      "publishedAt": "2026-10-03",
+      "tags": ["strong-mode", "ref-read", "lazy-ref", "native-events", "ssr"]
+    },
+    {
+      "taskId": "octane.strong-measured-width",
+      "familyId": "octane.strong-repair",
+      "title": "Repair a Strong-mode label width",
+      "suite": "octane",
+      "capability": "repair",
+      "difficulty": "standard",
+      "sourcePath": "docs/strong-compiler-checks.md",
+      "createdAt": "2026-10-03",
+      "publishedAt": "2026-10-03",
+      "tags": ["strong-mode", "effect-state-update", "layout-measurement", "refs", "ssr"]
     }
   ]
 }

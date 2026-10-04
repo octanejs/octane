@@ -8,6 +8,7 @@ import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
 import { createMcpServer } from '../src/mcp/create-server.ts';
 import { BINDING_CATEGORIES, BINDING_STATUSES } from '../src/content/bindings.ts';
 import { COMMUNITY_BINDING_GROUPS } from '../../website/src/content/community-bindings.ts';
+import { explainStrong, STRONG_CATALOG } from '@octanejs/mcp-server/strong';
 
 let client: Client;
 let cleanup: () => Promise<void>;
@@ -47,6 +48,79 @@ describe('remote MCP server', () => {
 			'octane_docs_read',
 			'octane_docs_search',
 			'octane_skill',
+			'octane_strong_explain',
+		]);
+	});
+
+	it('octane_strong_explain serves the same text as the stdio server', async () => {
+		const { tools } = await client.listTools();
+		const tool = tools.find((entry) => entry.name === 'octane_strong_explain');
+		expect(tool?.description).toContain('OCTANE_STRONG_');
+		expect(tool?.annotations?.readOnlyHint).toBe(true);
+
+		for (const args of [{}, { code: 'RENDER_REF_READ' }, { recipe: 'layout-measurement' }]) {
+			const result = await client.callTool({ name: 'octane_strong_explain', arguments: args });
+			expect(result.isError).toBeFalsy();
+			expect(firstText(result)).toBe(explainStrong(args).text);
+		}
+		const entry = firstText(
+			await client.callTool({
+				name: 'octane_strong_explain',
+				arguments: { code: 'octane_strong_render_ref_read' },
+			}),
+		);
+		expect(entry).toMatch(/^# OCTANE_STRONG_RENDER_REF_READ\n/);
+		expect(entry).toContain('https://octanejs.dev/docs/strong-mode#octane-strong-render-ref-read');
+		expect(entry).toContain('useLazyRef(() => new Store())');
+
+		for (const { code } of STRONG_CATALOG.diagnostics) {
+			const result = await client.callTool({ name: 'octane_strong_explain', arguments: { code } });
+			expect(firstText(result).startsWith(`# ${code}\n`)).toBe(true);
+		}
+
+		const unknown = await client.callTool({
+			name: 'octane_strong_explain',
+			arguments: { code: 'RENDER_REF_RAED' },
+		});
+		expect(unknown.isError).toBe(true);
+		expect(firstText(unknown)).toContain('`OCTANE_STRONG_RENDER_REF_READ`');
+	});
+
+	it('octane_compile reports every Strong finding with docs links', async () => {
+		const { tools } = await client.listTools();
+		const compile = tools.find((tool) => tool.name === 'octane_compile');
+		expect(Object.keys(compile?.inputSchema.properties ?? {})).toContain('strong');
+
+		const result = await client.callTool({
+			name: 'octane_compile',
+			arguments: {
+				filename: 'input.tsx',
+				strong: true,
+				source: `export function Stamp() {
+	const now = Date.now();
+	const roll = Math.random();
+	return <span>{String(now + roll)}</span>;
+}
+`,
+			},
+		});
+		const payload = JSON.parse(firstText(result));
+		expect(payload.ok).toBe(false);
+		expect(payload.error.code).toBe('OCTANE_STRONG_RENDER_IMPURE_CALL');
+		expect(
+			payload.diagnostics.map((finding: { code: string; url: string }) => [
+				finding.code,
+				finding.url,
+			]),
+		).toEqual([
+			[
+				'OCTANE_STRONG_RENDER_IMPURE_CALL',
+				'https://octanejs.dev/docs/strong-mode#octane-strong-render-impure-call',
+			],
+			[
+				'OCTANE_STRONG_RENDER_IMPURE_CALL',
+				'https://octanejs.dev/docs/strong-mode#octane-strong-render-impure-call',
+			],
 		]);
 	});
 

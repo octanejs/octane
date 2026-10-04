@@ -19,7 +19,7 @@ and the REST extras are `ServerRoute`s, the landing page at `/` is one SSR
   ```
   Tools: `octane_docs_search`, `octane_docs_read`, `octane_compile`,
   `octane_bindings`, `octane_bindings_status`, `octane_bridge_scan`,
-  `octane_skill`. Resources: `octane://docs/{slug}`, `octane://skills/{name}`,
+  `octane_skill`, `octane_strong_explain`. Resources: `octane://docs/{slug}`, `octane://skills/{name}`,
   `octane://bindings`.
 - `GET /v1/docs`, `GET /v1/docs/:slug`, `GET /v1/bindings` — the same
   knowledge as versioned JSON for agents without an MCP client.
@@ -36,7 +36,8 @@ Everything the server serves is snapshotted at **build time** via Vite `?raw`
 and `import.meta.glob` imports (`src/content/`): the website docs MDX
 (`website/src/content/docs/*.mdx` + the `docs-meta.ts` registry), the repo
 deep dives (`docs/ssr.md`, `docs/differences-from-react.md`), every binding's
-`status.json`, the `@octanejs/mcp-server` skills, and `llms.txt`. The deployed
+`status.json`, the `@octanejs/mcp-server` skills and Strong diagnostic
+catalog, and `llms.txt`. The deployed
 function does zero filesystem reads; search runs on the same
 sectionizer/ranking as the website's search dialog
 (`website/src/lib/docs-search-core.ts`). The repo-mode tools of the stdio

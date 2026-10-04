@@ -265,6 +265,42 @@ describe('bridgeReportFromSource', () => {
 		expect(report.plan.join('\n')).toContain('forwardRef');
 	});
 
+	it('names the Strong replacement for React idioms Strong mode rejects', () => {
+		const report = bridgeReportFromSource(`
+			import { useCallback, useLayoutEffect, useMemo, useRef, useState } from 'react';
+			export function Label({ items, onPick }) {
+				const cache = useRef(null);
+				if (cache.current === null) cache.current = new Map();
+				const total = useMemo(() => items.length, [items]);
+				const pick = useCallback(() => onPick(total), [onPick, total]);
+				const [width, setWidth] = useState(0);
+				useLayoutEffect(() => setWidth(cache.current.size));
+				return null;
+			}
+		`);
+		const strong = Object.fromEntries(report.apis.map((row) => [row.name, row.strong]));
+		expect(strong.useRef).toContain('useLazyRef');
+		expect(strong.useLayoutEffect).toContain('useLayoutSnapshot');
+		expect(strong.useMemo).toContain('OCTANE_STRONG_MANUAL_MEMO');
+		expect(strong.useCallback).toContain('OCTANE_STRONG_MANUAL_MEMO');
+		expect(strong.useState).toBeUndefined();
+		// These APIs still map one-to-one, so the port is not blocked on them.
+		for (const name of ['useRef', 'useLayoutEffect', 'useMemo', 'useCallback']) {
+			expect(report.apis.find((row) => row.name === name).status).toBe('same');
+		}
+		expect(report.verdict).toBe('bridgeable');
+		const step = report.plan.filter((entry) => entry.includes('Strong mode'));
+		expect(step).toHaveLength(1);
+		expect(step[0]).toContain('useLazyRef');
+		expect(step[0]).toContain('octane_strong_explain');
+
+		const plain = bridgeReportFromSource(`
+			import { useState } from 'react';
+			export function Counter() { const [n] = useState(0); return n; }
+		`);
+		expect(plain.plan.join('\n')).not.toContain('Strong mode');
+	});
+
 	it('reports class components as bridgeable with mandatory rewrites', () => {
 		const report = bridgeReportFromSource(`
 			import React from 'react';

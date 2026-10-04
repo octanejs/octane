@@ -25,7 +25,7 @@ pnpm dlx @octanejs/cli doctor
 | `octane analyze` | Compile the project and report every Octane compiler diagnostic, with its code and suggested edit. |
 | `octane add <package>` | Install a binding, by its own name or by the React package it ports, and print its divergences. |
 | `octane bindings [query]` | List and search the `@octanejs/*` bindings. |
-| `octane explain <error>` | Decode a runtime error code, including the minified production message. |
+| `octane explain <error>` | Decode a runtime error code, including the minified production message, or explain a Strong diagnostic such as `OCTANE_STRONG_RENDER_REF_READ`. |
 | `octane info` | Environment and project details worth pasting into a bug report. |
 | `octane mcp add` | Register the Octane MCP server with Claude Code, Codex, Cursor, or VS Code. |
 
@@ -66,15 +66,19 @@ Anything else is reported with the exact remedy rather than guessed at.
 ## `octane analyze`
 
 Where `doctor` checks how the project is wired, `analyze` checks the code. It
-compiles every `.tsrx` through the project's own `octane` and reports what the
-compiler found, so the results are exactly what a build would warn about, and
-new compiler diagnostics show up here without a CLI change.
+compiles every `.tsrx`, and every `.tsx` whose JSX goes to Octane, through the
+project's own `octane` and reports what the compiler found, so the results are
+exactly what a build would warn about, and new compiler diagnostics show up here
+without a CLI change. Every Strong violation in a file is reported, not only the
+first one the build stops at.
 
 ```bash
-octane analyze                              # every .tsrx in the project
+octane analyze                              # every Octane module in the project
 octane analyze src/App.tsrx                 # just these
 octane analyze --code OCTANE_HYDRATE_SPLIT_STYLE
 octane analyze --strict                     # warnings fail the run too
+octane analyze --strong-preview             # what Strong mode would reject, by code
+octane analyze --fix                        # apply the compiler's suggested edits
 ```
 
 ```
@@ -89,7 +93,27 @@ the run. Exit code is `3` when anything error-severity was found, or when
 `--strict` and there were warnings.
 
 Modules that `compiler.strong` in `octane.config.ts` reaches are analyzed in
-Strong mode, as the build compiles them.
+Strong mode, as the build compiles them. A `.tsx` module whose leading
+`@jsxImportSource` pragma, or the tsconfig's `jsxImportSource`, names another
+library is left out unless you name it.
+
+### Migrating to Strong mode
+
+`--strong-preview` compiles every module as if Strong mode were on, reports what
+it would reject, and ends with a count per code. Findings in modules that are not
+Strong yet do not fail the run, so it works as an inventory before you opt in.
+
+`--fix` applies the edits the compiler suggests and then reports what remains:
+React's lazy ref initialization (`if (ref.current === null) ref.current = …`)
+becomes `useLazyRef`, `useMemo(() => value, deps)` becomes `value`, and
+`useCallback(fn, deps)` becomes `fn`. With `--dry-run` it reports the fixes
+without writing them. Under `--json`, each finding with a fix carries its
+`edits` as `{ start, end, text }` offsets into the file.
+
+`octane explain <CODE>` prints what a Strong diagnostic detects, its
+replacement, and the migration recipes for it. It also accepts a pasted compile
+error or its docs link. Every code is documented at
+[octanejs.dev/docs/strong-mode](https://octanejs.dev/docs/strong-mode#diagnostic-reference).
 
 ### Strong coverage
 

@@ -524,7 +524,9 @@ The tuple also supports the same optional latest-value getter as `useState`.
 Strong modules also require inferred dependencies, compiler-owned memoization,
 keyed template lists in `.tsrx`, and branded HTML values. Standard keyed JSX
 mapping remains supported in `.tsx`. See the
-[Strong compiler checks and migration table](./strong-compiler-checks.md).
+[Strong compiler checks and migration table](./strong-compiler-checks.md), and the
+[Strong mode guide](https://octanejs.dev/docs/strong-mode) for adopting it in an
+existing app.
 
 Strong mode opts into the immutable render-snapshot contract above and adds
 compile-time checks for detectable violations. Opt into one module with a
@@ -542,7 +544,13 @@ in compatibility mode unless their own source opts in.
 
 A Strong module cannot call a state updater during render or synchronously while
 setting up an effect, and it cannot read or assign to a `useRef` object's
-`current` during render (`OCTANE_STRONG_RENDER_REF_READ` for reads). It also
+`current` during render (`OCTANE_STRONG_RENDER_REF_READ` for reads,
+`OCTANE_STRONG_RENDER_REF_WRITE` for writes). React's lazy initialization,
+`if (ref.current === null) ref.current = create()`, does both: create the value
+once with `useLazyRef(() => create())` instead. A layout effect that copies a DOM
+measurement into state is a synchronous update in effect setup
+(`OCTANE_STRONG_EFFECT_STATE_UPDATE`): render the measurement from
+`useLayoutSnapshot(measure, { initial })` instead. It also
 rejects calling a known third-tuple state getter during render
 (`OCTANE_STRONG_RENDER_STATE_GETTER_CALL`): the getter can observe scheduled
 state that differs from the render snapshot. Read the state tuple's first member

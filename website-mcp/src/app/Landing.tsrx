@@ -12,7 +12,11 @@ const TOOLS = [
 		'Per-binding parity status: upstream version, surface, divergences, SSR.',
 	],
 	['octane_bridge_scan', 'Scan pasted React source for a compatibility report and migration plan.'],
-	['octane_skill', 'Task guides: bridging packages, migrating components, SSR setup.'],
+	['octane_skill', 'Task guides: bridging packages, migrating components, Strong mode, SSR setup.'],
+	[
+		'octane_strong_explain',
+		'Explain an OCTANE_STRONG_* diagnostic: what it detects, its replacement, and recipes.',
+	],
 ];
 
 const ENDPOINTS = [
