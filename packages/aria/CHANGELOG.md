@@ -1,5 +1,37 @@
 # @octanejs/aria
 
+## 0.0.57
+
+### Patch Changes
+
+- 40aaf4a: Remove unused imports and locals from published source, so these packages
+  typecheck in an application that enables `noUnusedLocals`.
+
+  These packages ship TypeScript and `.tsrx` source rather than declaration files,
+  so `skipLibCheck` does not exempt them: the application's compiler checks our
+  modules with the application's own options. Importing `linkOptions` from
+  `@octanejs/tanstack-router` under `noUnusedLocals`, for example, reported six
+  errors for imports in `link.ts` and `routeHookTypes.ts` that nothing read
+  (#1694). Runtime behavior is unchanged.
+
+  The brand fields on Base UI's `AlertDialogHandle` and `DrawerHandle`, and the
+  `ctx` constructor property on OpenTUI's `SpanRenderable`, are now `protected`
+  instead of `private`. A protected member keeps the handles nominally typed, as
+  the private one did, and the constructor still assigns `ctx`, but the compiler no
+  longer reports either as unused.
+- 4af5e05: Prefix unused parameters and type parameters in published source with `_`, so
+  these packages typecheck in an application that enables `noUnusedParameters`.
+
+  These packages ship TypeScript and `.tsrx` source rather than declaration files,
+  so `skipLibCheck` does not exempt them: the application's compiler checks our
+  modules with the application's own options. Importing `createScale` from
+  `@octanejs/visx/scale` under `noUnusedParameters`, for example, reported the unused
+  `DiscreteInput` and `ThresholdInput` type parameters on its overloads (#1694).
+
+  Only names change. No parameter or type parameter is removed, so call sites,
+  explicit type arguments, and each function's `length` are unchanged, and runtime
+  behavior is unchanged.
+
 ## 0.0.56
 
 ### Patch Changes

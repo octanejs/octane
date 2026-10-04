@@ -1,5 +1,114 @@
 # octane
 
+## 0.9.1
+
+### Patch Changes
+
+- ff77a8a: Preserve early form submissions when an already-aborted behavior registration is followed by a live replacement.
+- f852068: `collectDiagnostics` no longer prepares and analyzes a module a second time when Strong accepts it. It continues compiling from the tree that Strong analysis already checked, so `octane analyze` costs about the same as `compile()` on Strong modules instead of up to 1.26 times as much. It reports the same diagnostics and errors as before.
+- 77504c1: Cancel a component's superseded `query$` request when only a pending `@try` arm reads it.
+
+  A `query$` declared in a component and read with `.get()` inside that component's
+  `@try`/`@pending` boundary kept its previous request live after the component
+  committed a new selection. The arm's suspended attempt discarded the new
+  declaration, so the old request's `AbortSignal` stayed un-aborted until the
+  component unmounted. The component's commit now selects the new request and
+  aborts or closes the obsolete one, for promise and stream queries alike. An
+  asynchronous `derived$` read the same way now adopts the committed computation
+  for its next dependency-driven restart instead of keeping the previous render's
+  closure.
+- 252ad4f: Propagate Context updates through hookless lightweight component scopes below memo boundaries.
+- 483cd31: Build a JSX `<ErrorBoundary>` fallback from the committed render after a parent render rolls back.
+
+  When a parent re-rendered an `<ErrorBoundary>` with new props and a later sibling
+  then suspended the root, the root render rolled back and the screen kept the
+  committed props. The boundary still held the abandoned render's captured values, so
+  a descendant that threw afterwards got a fallback built from props that never
+  committed. It now gets the committed render's fallback, for an element or a
+  `(error, reset) => …` render prop, after an urgent update or a suspended
+  `startTransition`.
+- 4601dd3: A function a component or hook creates now uses the signal cells that body
+  declared, wherever the function runs. Previously a Retry callback passed to a
+  child button reset a cell in the child, so a failed `query$` stayed in its
+  `@catch` arm and its loader ran again for nothing. The same happened to a
+  callback a child calls while rendering, which started a second query, and to
+  code after `await`, which resolved a document-level cell.
+
+  The compiler routes method calls such as `result$.reset()` on a body's `const`
+  declarations, inside the functions that body creates, through the declaring
+  instance, arm or row. Once that owner retires, such a call throws
+  `ScopeDisposedError`. A handle passed to a child as a prop still resolves in the
+  child's own instance, and `signal$`, `derived$`, `query$` and Scope producer
+  closures keep their reader ownership.
+- 8b03ce3: Keep sibling `@if`, `@switch`, and component slots in source order at the root
+  of a fragment body.
+
+  A body made only of directives and component calls, such as a component's root
+  fragment, an `@if` or `@switch` arm, a `@try` body, or a `@for` row, has no
+  template, so every slot in it inserted before the body's shared end marker. An
+  `@if` or `@switch` taking an empty arm, or a hookless component rendering one,
+  keeps no DOM of its own. When it later rendered content, that content landed
+  after every later sibling: `<>@if (a) {<span/>} @if (b) {<em/>}</>` rendered
+  `<em>` before `<span>` once `a` turned on. A slot emptied while a later sibling
+  rendered could also throw `NotFoundError` after that sibling unmounted.
+
+  The compiler now marks each such slot that has a later sibling, and the slot
+  gets a comment of its own at its source position when a client render creates
+  it. Hydration is unchanged: a hydrating slot adopts the server's range.
+- c16fe6d: A `function … @{ … }` component that is not a top-level declaration now has its hooks slotted once. This covers `memo(function X() @{ … })`, a `function F() @{ … }` declared inside a component or helper, one held in an object or array, and, on the server, one passed as a component prop. The compiler used to rewrite these bodies twice. When such a body destructured the third member of `useState`, `useReducer` or `useLinkedState`, the module failed to load with `SyntaxError: Identifier '_$__useStateWithGetter' has already been declared`, or the `useReducer`/`useLinkedState` equivalent. Bodies without a getter loaded, but their built-in hooks took a second, unused slot.
+- f9fd9a5: Hydrate each `@if` and `@switch` into its own server range when a component's first render updates its own state while it evaluates a slot's arguments. The replayed render no longer reports a mismatch and rebuilds the server markup.
+- 322162c: Let a `@try` wait for its component's replay when that render updated its own state.
+
+  A non-Strong component can update its own state while it evaluates a slot's
+  arguments, such as a child's props or an `@if` condition. That render then
+  replays before its slots settle, and every other slot waits for the replay. A
+  `@try`, or an imported JSX `<ErrorBoundary>`, instead mounted during the
+  discarded pass. In a fragment body its earlier siblings then rendered after it.
+  Its body also rendered from state the replay discards: a throw there committed
+  the `@catch` arm, and a suspension showed `@pending` or suspended the whole
+  render. Hydration adopted the boundary's server range out of order and rebuilt
+  the component. The boundary now waits for the replay, and renders once from the
+  settled state.
+- 8489303: Remove an `@if` or `@switch` arm's content when a deferred hydration retry
+  resumed a component inside it.
+
+  A `<Hydrate>` boundary whose captures change while it is pending builds new
+  content on the client. If an arm in that content suspends before inserting
+  anything, the next retry renders the suspended component first, then its
+  parents. The arm still treated the component's output as its siblings' content,
+  so closing the arm later, in that retry or after it, left the output in the
+  document. The retry now marks that output as the arm's own.
+- 01ec8d7: Keep a Suspense boundary pending, and on its committed inputs, when the root
+  render that revealed it is rolled back.
+
+  A parent update can reveal a pending boundary and then roll back because a later
+  sibling suspends the root. The rollback restored the fallback on screen, but the
+  boundary still recorded its primary as visible, so `@pending` stayed up for good
+  and no later update revealed it. The boundary's record now rolls back with the
+  render, so the next commit, or its own data resolving, reveals it as before.
+
+  Rollback also restores the boundary's inputs. Previously, a boundary that
+  retried after the rollback rendered the abandoned props: for example its own
+  promise settled, a child suspended or threw, or a JSX `<Suspense>` or
+  `<ErrorBoundary>` rebuilt its children, fallback or catch arm. It now renders
+  the props of the committed screen.
+- 4c7ae9b: Keep a replaced sibling's content when an `@if` or `@switch` arm that suspended
+  inside a Suspense primary is superseded.
+
+  An arm that suspends before inserting anything owns no DOM. It used to remember
+  the node in front of it, which belongs to a sibling. A keyed component, keyed
+  `@for` row, or `@if`/`@else` arm beside it can replace that node, or stage its
+  replacement right after it, before the arm renders again. A later update that
+  dropped the arm then swept the sibling's new content away. In
+  `@try { <Child key={id} /> @if (wait) { <Hold /> } }`, rendering A, then B with a
+  pending promise, then A again left the boundary without a child (#1698). A retry
+  that resolved after such a replacement also bounded its content from a detached
+  node, so its content outlived the arm.
+
+  A pending arm with no DOM now reads its bound from its insertion anchor when it
+  renders again. A retry that inserts content and then suspends again owns that
+  content, the same as a first mount.
+
 ## 0.9.0
 
 ### Minor Changes
