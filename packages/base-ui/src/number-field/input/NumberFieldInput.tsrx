@@ -1,6 +1,5 @@
 'use client';
 import * as React from 'octane';
-import type { SafeReact } from '@octanejs/base-ui-utils/safeReact';
 import { warn } from '@octanejs/base-ui-utils/warn';
 import { useIsoLayoutEffect } from '@octanejs/base-ui-utils/useIsoLayoutEffect';
 import { formatNumber } from '@octanejs/base-ui-utils/formatNumber';

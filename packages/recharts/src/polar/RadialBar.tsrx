@@ -6,7 +6,6 @@ import type {
 	MutableRefObject,
 	NativeMouseEvent,
 	NativeTouchEvent,
-	OctaneElement,
 	OctaneNode,
 } from '../util/OctaneTypes.ts';
 import * as React from 'octane';

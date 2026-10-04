@@ -34,7 +34,7 @@ import {
 } from './utils';
 import { createPortal, isChildrenBlock } from 'octane';
 import { filterDOMProps } from '../upstream-exports/react-aria/filterDOMProps';
-import type { forwardRefType, GlobalDOMAttributes } from '@react-types/shared';
+import type { GlobalDOMAttributes } from '@react-types/shared';
 import { mergeProps } from '../upstream-exports/react-aria/mergeProps';
 import {
 	type QueuedToast,
@@ -42,7 +42,7 @@ import {
 	type ToastState,
 	useToastQueue,
 } from '../upstream-exports/react-stately/useToastState';
-import React, {
+import {
 	createContext,
 	type ForwardedRef,
 	forwardRef,

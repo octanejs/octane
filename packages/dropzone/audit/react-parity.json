@@ -88,7 +88,7 @@
         {
           "path": "packages/dropzone/audit/transformation-ledger.json",
           "role": "support",
-          "sha256": "553d3ff351cc2bd5b9ab847c26452fd66bfbec4447a7db01c0d470c588cac903"
+          "sha256": "9ff94d0ec567169b5c267b908f8fbe6b9c2c114c0ad637f2aa990e9d0ffd3809"
         },
         {
           "path": "scripts/react-parity/react-dropzone-evidence.mjs",

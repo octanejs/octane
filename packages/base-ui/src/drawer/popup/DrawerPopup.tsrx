@@ -1,7 +1,6 @@
 'use client';
 import * as React from 'octane';
 import { error } from '@octanejs/base-ui-utils/error';
-import type { SafeReact } from '@octanejs/base-ui-utils/safeReact';
 import type { InteractionType } from '@octanejs/base-ui-utils/useEnhancedClickHandler';
 import { useIsoLayoutEffect } from '@octanejs/base-ui-utils/useIsoLayoutEffect';
 import { useStableCallback } from '@octanejs/base-ui-utils/useStableCallback';

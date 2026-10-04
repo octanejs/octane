@@ -1,7 +1,6 @@
 'use client';
 import * as React from 'octane';
 import { error } from '@octanejs/base-ui-utils/error';
-import type { SafeReact } from '@octanejs/base-ui-utils/safeReact';
 import type { FieldRootState } from '../root/FieldRoot.tsrx';
 import { useFieldRootContext } from '../../internals/field-root-context/FieldRootContext';
 import { fieldValidityMapping } from '../../internals/field-constants/constants';

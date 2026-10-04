@@ -3,11 +3,7 @@
 // that lowers to an element descriptor, which the Decorators portal renders into
 // the <hr> element Lexical created. This is the first decorator node, so it
 // exercises the full decorator portal-map.
-import {
-	$isHorizontalRuleNode,
-	HorizontalRuleNode as BaseHorizontalRuleNode,
-	INSERT_HORIZONTAL_RULE_COMMAND,
-} from '@lexical/extension';
+import { HorizontalRuleNode as BaseHorizontalRuleNode } from '@lexical/extension';
 import { useLexicalComposerContext } from './LexicalComposerContext';
 import { useLexicalNodeSelection } from './useLexicalNodeSelection';
 import {

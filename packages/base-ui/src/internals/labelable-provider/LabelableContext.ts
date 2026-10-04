@@ -2,7 +2,6 @@
 'use client';
 import * as React from 'octane';
 import { NOOP } from '../noop';
-import type { HTMLProps } from '../types';
 
 export interface LabelableContext {
 	/**

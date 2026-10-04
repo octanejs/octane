@@ -20,7 +20,6 @@ import { getSliderThumbId, sliderData } from './utils';
 import { mergeProps } from '../utils/mergeProps';
 import { withSlot } from 'octane';
 import React, {
-	type ChangeEvent,
 	type InputHTMLAttributes,
 	type LabelHTMLAttributes,
 	useCallback,

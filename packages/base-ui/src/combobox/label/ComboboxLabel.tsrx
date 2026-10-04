@@ -1,7 +1,6 @@
 'use client';
 import * as React from 'octane';
 import { error } from '@octanejs/base-ui-utils/error';
-import type { SafeReact } from '@octanejs/base-ui-utils/safeReact';
 import type { BaseUIComponentProps } from '../../internals/types';
 import { useRenderElement } from '../../internals/useRenderElement.tsrx';
 import type { FieldRoot } from '../../field/root/FieldRoot.tsrx';

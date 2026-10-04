@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef } from 'octane';
 import { useDrawerContext } from './context';
-import { assignStyle, chain, isVertical, reset } from './helpers';
+import { assignStyle, chain, isVertical } from './helpers';
 import { BORDER_RADIUS, TRANSITIONS, WINDOW_TOP_OFFSET } from './constants';
 import { subSlot } from './internal';
 
