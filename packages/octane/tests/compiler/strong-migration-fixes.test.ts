@@ -333,6 +333,49 @@ describe('collectDiagnostics', () => {
 		expect(broken.error).toBeInstanceOf(Error);
 	});
 
+	it('agrees with compile() on a module Strong accepts, in every mode', () => {
+		const hinted = `"use strong";
+import { useEffect, useState } from 'octane';
+import { observe } from './external';
+export function Loop({ value }) @{
+	useEffect(() => { observe(value); }, [value]);
+	<div />
+}
+`;
+		// Slotting this module's hooks fails after Strong analysis passes it.
+		const slotted = hinted.replace(
+			'\t<div />',
+			'\tfor (const item of [1, 2]) {\n\t\tconst [current] = useState(item);\n\t}\n\t<div />',
+		);
+		for (const options of [
+			{ mode: 'client', dev: true },
+			{ mode: 'client', dev: false },
+			{ mode: 'server', dev: true },
+			{ mode: 'server', dev: false },
+		] as const) {
+			const { diagnostics } = compile(hinted, '/src/Loop.tsrx', options);
+			expect(diagnostics.map((diagnostic: Diagnostic) => diagnostic.code)).toEqual([
+				'OCTANE_STRONG_EXPLICIT_DEPENDENCIES',
+			]);
+			expect(collectDiagnostics(hinted, '/src/Loop.tsrx', options)).toEqual({
+				diagnostics,
+				error: null,
+			});
+
+			// The hint stays beside the failure compile() throws.
+			let thrown: unknown;
+			try {
+				compile(slotted, '/src/Loop.tsrx', options);
+			} catch (error) {
+				thrown = error;
+			}
+			expect(String(thrown)).toContain('`useState` is called inside a `for…of` loop');
+			const collected = collectDiagnostics(slotted, '/src/Loop.tsrx', options);
+			expect(collected.diagnostics).toEqual(diagnostics);
+			expect(String(collected.error)).toBe(String(thrown));
+		}
+	});
+
 	it('links a thrown Strong error to its documentation', () => {
 		expect(() => compile(`"use strong";\n${CLOCK}`, '/src/App.tsx')).toThrow(
 			'See https://octanejs.dev/docs/strong-mode#octane-strong-render-impure-call',
