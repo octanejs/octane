@@ -1,4 +1,4 @@
-// Vendored from react-router@8.2.0 packages/react-router/lib/router/router.ts — unmodified.
+// Vendored from react-router@8.2.0 packages/react-router/lib/router/router.ts — unmodified except: unread static-handler future local → removed (consumer noUnusedLocals); unused parameters i/message → `_`-prefixed (consumer noUnusedParameters).
 // Re-vendor with `node scripts/vendor-remix-router.mjs`; never hand-edit.
 import type { History, Location, Path, To } from './history';
 import {
@@ -3823,11 +3823,6 @@ export function createStaticHandler(
 	let mapRouteProperties: MapRoutePropertiesFunction = _mapRouteProperties
 		? _mapRouteProperties
 		: () => ({});
-	// Currently unused in the static handler, but available for additional flags in the future
-	// eslint-disable-next-line @typescript-eslint/no-unused-vars
-	let future: FutureConfig = {
-		...opts?.future,
-	};
 
 	// Leverage the existing mapRouteProperties logic to execute instrumentRoute
 	// (if it exists) on all routes in the application
@@ -5465,7 +5460,7 @@ function isSameRoute(newRoute: RouteObject, existingRoute: RouteObject): boolean
 	// Otherwise, we look to see if every child in the new route is already
 	// represented in the existing route's children
 	return (
-		newRoute.children?.every((aChild, i) =>
+		newRoute.children?.every((aChild, _i) =>
 			existingRoute.children?.some((bChild) => isSameRoute(aChild, bChild)),
 		) ?? false
 	);
@@ -6792,7 +6787,7 @@ function getInternalRouterError(
 		routeId,
 		method,
 		type,
-		message,
+		message: _message,
 	}: {
 		pathname?: string;
 		routeId?: string;

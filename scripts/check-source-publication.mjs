@@ -174,16 +174,8 @@ export const SOURCE_PUBLICATION_DEBT = {
 		'@octanejs/vite-plugin',
 		'create-octane',
 	],
-	// The router core is vendored byte-close from react-router (see
-	// scripts/vendor-remix-router.mjs, which forbids hand edits), and upstream
-	// keeps unused locals and type-level tests in it. The fix belongs in the
-	// vendoring script. Follow-up of #1694.
-	[RULES.unusedLocals]: ['@octanejs/remix-router'],
-	// Unused parameters and type parameters in the same vendored router core.
-	// Elsewhere a `_` prefix silences both without changing a call site or a
-	// type argument position, but here it is a hand edit, so this too belongs in
-	// the vendoring script. Follow-up of #1694.
-	[RULES.unusedParameters]: ['@octanejs/remix-router'],
+	[RULES.unusedLocals]: [],
+	[RULES.unusedParameters]: [],
 };
 
 const CHECKERS = new Set(['octane-tsc', 'tsgo', 'tsrx-tsc', 'tsc']);
