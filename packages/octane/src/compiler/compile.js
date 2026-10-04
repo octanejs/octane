@@ -3865,6 +3865,14 @@ function hoistStrongRenderCalculations(jsxNodes, ctx, immutableStates) {
 			}
 			const name = attribute.name.name;
 			if (name === 'key' || name === 'ref' || name === 'children') return attribute;
+			// The host handoff prepares unbound fields through the ordinary renderer.
+			// Hoisting one outside that preparation makes its writer ineligible.
+			if (
+				!component &&
+				ctx.presentationHydration?.host &&
+				ctx.presentationHydration.unboundAttributes.has(normalizeJsxAttrName(name).toLowerCase())
+			)
+				return attribute;
 			if (!component && /^on[A-Z]/.test(name)) return attribute;
 			if (attribute.value?.type !== 'JSXExpressionContainer') return attribute;
 			const value = visitContainer(attribute.value);
