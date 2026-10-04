@@ -1,6 +1,6 @@
 {
   "name": "@octanejs/dnd-kit",
-  "version": "0.1.53",
+  "version": "0.1.54",
   "license": "MIT",
   "type": "module",
   "engines": {
@@ -51,7 +51,7 @@
     "@dnd-kit/state": "catalog:default"
   },
   "peerDependencies": {
-    "octane": "workspace:^0.8.0"
+    "octane": "workspace:^0.9.0"
   },
   "devDependencies": {
     "@dnd-kit/helpers": "catalog:default",

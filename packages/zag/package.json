@@ -1,6 +1,6 @@
 {
   "name": "@octanejs/zag",
-  "version": "0.0.25",
+  "version": "0.0.26",
   "license": "MIT",
   "type": "module",
   "engines": {
@@ -52,7 +52,7 @@
     "@zag-js/utils": "catalog:default"
   },
   "peerDependencies": {
-    "octane": "workspace:^0.8.0"
+    "octane": "workspace:^0.9.0"
   },
   "devDependencies": {
     "@tsrx/react": "catalog:default",
