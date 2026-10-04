@@ -1,6 +1,6 @@
 /** @jsxImportSource @octanejs/three/intrinsics */
 import { type ThreeElements, type ThreeRef, useFrame } from '@octanejs/three';
-import { useMemo, useRef, useState } from '@octanejs/three/renderer';
+import { useMemo, useRef } from '@octanejs/three/renderer';
 import { createContext, useContext } from 'octane';
 import * as THREE from 'three';
 import { MarchingCubes as MarchingCubesImpl } from 'three-stdlib';

@@ -25,7 +25,7 @@ import type { GlobalDOMAttributes } from '@react-types/shared';
 import { InternalColorThumbContext } from './ColorThumb';
 import { LabelContext } from './Label';
 import type { Orientation } from '@react-types/shared';
-import React, { createContext, type ForwardedRef, forwardRef } from '../compat/react';
+import { createContext, type ForwardedRef, forwardRef } from '../compat/react';
 import { SliderOutputContext, SliderStateContext, SliderTrackContext } from './Slider';
 import { useLocale } from '../upstream-exports/react-aria/I18nProvider';
 

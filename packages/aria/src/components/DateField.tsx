@@ -43,14 +43,14 @@ import {
 import { FieldErrorContext } from './FieldError';
 import { filterDOMProps } from '../upstream-exports/react-aria/filterDOMProps';
 import { FormContext } from './Form';
-import type { forwardRefType, GlobalDOMAttributes } from '@react-types/shared';
+import type { GlobalDOMAttributes } from '@react-types/shared';
 import { Group, GroupContext } from './Group';
 import { HiddenDateInput } from './HiddenDateInput';
 import type { HoverEvents } from '@react-types/shared';
 import { Input, InputContext } from './Input';
 import { LabelContext } from './Label';
 import { mergeProps } from '../upstream-exports/react-aria/mergeProps';
-import React, {
+import {
 	cloneElement,
 	createContext,
 	type ForwardedRef,

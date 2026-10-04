@@ -1,4 +1,3 @@
-import * as React from 'octane';
 import type { ActiveShape, ShapeAnimationProps, SymbolType } from './types';
 import type { ScatterPointItem } from '../cartesian/Scatter.tsrx';
 import { type InnerSymbolsProp, Symbols } from '../shape/Symbols.tsrx';

@@ -43,7 +43,7 @@ import type { GlobalDOMAttributes, InputDOMProps, ValidationResult } from '@reac
 import { GroupContext } from './Group';
 import { InputContext } from './Input';
 import { LabelContext } from './Label';
-import React, {
+import {
 	createContext,
 	type ForwardedRef,
 	forwardRef,

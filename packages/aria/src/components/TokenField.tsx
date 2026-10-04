@@ -30,7 +30,7 @@ import {
 import { createHideableComponent } from '../collections/Hidden';
 import { FieldInputContext } from './Autocomplete';
 import { filterDOMProps } from '../upstream-exports/react-aria/filterDOMProps';
-import type { forwardRefType, GlobalDOMAttributes } from '@react-types/shared';
+import type { GlobalDOMAttributes } from '@react-types/shared';
 import { type HoverProps, useHover } from '../upstream-exports/react-aria/useHover';
 import { LabelContext } from './Label';
 import { mergeProps } from '../upstream-exports/react-aria/mergeProps';

@@ -1,16 +1,19 @@
 import assert from 'node:assert/strict';
-import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, realpathSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
 
 import {
 	findSourcePublicationViolations,
+	findUnusedDeclarationViolations,
 	parseJsonc,
 	partitionAgainstDebt,
 	RULES,
 	SOURCE_PUBLICATION_DEBT,
 } from './check-source-publication.mjs';
+import { parseUnusedDeclarations } from './consumer-unused-declarations.mjs';
+import { REPO_ROOT } from './workspace-packages.mjs';
 
 function writeJson(file, value) {
 	mkdirSync(path.dirname(file), { recursive: true });
@@ -304,6 +307,130 @@ test('the committed allowlist only names rules this check reports', () => {
 	for (const ids of Object.values(SOURCE_PUBLICATION_DEBT)) {
 		assert.deepEqual([...ids], [...new Set(ids)]);
 	}
+});
+
+/**
+ * Source-published packages outside the repository. The check still compiles
+ * them from inside it, where octane-tsc resolves the `.tsrx` content mapper.
+ */
+function createSourcePackages(packages) {
+	const root = realpathSync(mkdtempSync(path.join(tmpdir(), 'unused-declarations-')));
+	return packages.map(({ dir, files = ['src'], sources }) => {
+		const directory = path.join(root, dir);
+		for (const [relative, contents] of Object.entries(sources)) {
+			const file = path.join(directory, relative);
+			mkdirSync(path.dirname(file), { recursive: true });
+			writeFileSync(file, contents);
+		}
+		const name = `@demo/${dir}`;
+		return { dir, directory, name, manifest: { name, files } };
+	});
+}
+
+test('unused declarations in shipped .ts and .tsrx fail the consumer flag that rejects them', () => {
+	const packages = createSourcePackages([
+		{
+			dir: 'binding',
+			sources: {
+				'src/index.ts': [
+					"import { helper, leftover } from './helper.ts';",
+					"import { fromDependency } from '../../dependency/src/index.ts';",
+					"import { outside } from '../outside.ts';",
+					'export function run(value: number, ignored: string) {',
+					'\treturn helper(value) + fromDependency + outside;',
+					'}',
+					'',
+				].join('\n'),
+				'src/helper.ts':
+					'export const helper = (value: number) => value;\nexport const leftover = 1;\n',
+				'src/View.tsrx': [
+					"import type { OctaneNode } from 'octane';",
+					'export function View() @{',
+					'\t<div />',
+					'}',
+					'',
+				].join('\n'),
+				// Outside `src`, so the package does not ship it.
+				'outside.ts': 'const unreadOutside = 1;\nexport const outside = 2;\n',
+			},
+		},
+		{
+			dir: 'dependency',
+			sources: {
+				'src/index.ts': 'const unreadInDependency = 1;\nexport const fromDependency = 3;\n',
+			},
+		},
+	]);
+
+	const violations = findUnusedDeclarationViolations(REPO_ROOT, packages);
+	const reported = (rule, id) => {
+		const violation = violations.find((entry) => entry.rule === rule && entry.id === id);
+		return [...(violation?.detail ?? '').matchAll(/TS\d+ '([^']+)'/g)].map((match) => match[1]);
+	};
+
+	assert.deepEqual(
+		violations.map(({ rule, id }) => [rule, id]),
+		[
+			[RULES.unusedLocals, '@demo/binding'],
+			[RULES.unusedLocals, '@demo/dependency'],
+			[RULES.unusedParameters, '@demo/binding'],
+		],
+	);
+	assert.deepEqual(reported(RULES.unusedLocals, '@demo/binding').sort(), [
+		'OctaneNode',
+		'leftover',
+	]);
+	assert.deepEqual(reported(RULES.unusedLocals, '@demo/dependency'), ['unreadInDependency']);
+	assert.deepEqual(reported(RULES.unusedParameters, '@demo/binding'), ['ignored']);
+});
+
+test('a package that ships only JavaScript gives the consumer flags nothing to compile', () => {
+	const packages = createSourcePackages([
+		{
+			dir: 'javascript',
+			sources: {
+				'src/index.js': 'const unread = 1;\nexport const value = 2;\n',
+				'src/index.d.ts': 'export declare const value: number;\n',
+			},
+		},
+	]);
+
+	assert.deepEqual(findUnusedDeclarationViolations(REPO_ROOT, packages), []);
+});
+
+test('a consumer program that failed to build fails the check instead of passing', () => {
+	assert.deepEqual(
+		parseUnusedDeclarations(
+			[
+				"packages/demo/src/index.ts(3,10): error TS6133: 'leftover' is declared but its value is never read.",
+				"packages/demo/src/index.ts(4,1): error TS2304: Cannot find name 'process'.",
+				'packages/demo/src/index.ts(5,1): error TS2322: Type A is not assignable to type B.',
+				"  Type 'string' is not assignable to type 'number'.",
+				'',
+			].join('\n'),
+			REPO_ROOT,
+		),
+		[
+			{
+				file: 'packages/demo/src/index.ts',
+				line: 3,
+				column: 10,
+				code: 6133,
+				message: "'leftover' is declared but its value is never read.",
+			},
+		],
+	);
+	assert.throws(
+		() => parseUnusedDeclarations("error TS18003: No inputs were found in config file 'x'."),
+		/could not build the consumer program/,
+	);
+	assert.throws(
+		() =>
+			parseUnusedDeclarations(
+				"node_modules/.cache/x/tsconfig.json(1,9): error TS100031: The content mapper package '@tsrx/content-mapper' could not be resolved.",
+			),
+		/could not build the consumer program/,
+	);
 });
 
 test('tsconfig files with comments and trailing commas are read, not skipped', () => {

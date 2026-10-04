@@ -4,7 +4,6 @@ import * as React from 'octane';
 import { isHTMLElement } from '@floating-ui/utils/dom';
 import { useStableCallback } from '@octanejs/base-ui-utils/useStableCallback';
 import { error } from '@octanejs/base-ui-utils/error';
-import type { SafeReact } from '@octanejs/base-ui-utils/safeReact';
 import { useIsoLayoutEffect } from '@octanejs/base-ui-utils/useIsoLayoutEffect';
 import { makeEventPreventable, mergeProps } from '../../merge-props';
 import { useCompositeRootContext } from '../composite/root/CompositeRootContext';

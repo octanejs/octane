@@ -2,7 +2,6 @@
 import * as React from 'octane';
 import { useStableCallback } from '@octanejs/base-ui-utils/useStableCallback';
 import { useRefWithInit } from '@octanejs/base-ui-utils/useRefWithInit';
-import type { HTMLProps } from '../types';
 import { useBaseUiId } from '../useBaseUiId';
 import { LabelableContext, useLabelableContext } from './LabelableContext';
 

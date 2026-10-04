@@ -3,7 +3,6 @@ import {
 	applyProps,
 	createPortal,
 	extend,
-	type ThreeElement,
 	useFrame,
 	useThree,
 } from '@octanejs/three';

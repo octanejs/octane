@@ -33,7 +33,7 @@ import {
 import intlMessages from '../intl/react-aria-components/index';
 import { isFocusable } from '../upstream-exports/react-aria/private/utils/isFocusable';
 import { mergeProps } from '../upstream-exports/react-aria/mergeProps';
-import React, { createContext, type ForwardedRef, forwardRef, useRef } from '../compat/react';
+import { createContext, type ForwardedRef, forwardRef, useRef } from '../compat/react';
 import { TextContext } from './Text';
 import { useButton } from '../upstream-exports/react-aria/useButton';
 import { useClipboard } from '../upstream-exports/react-aria/useClipboard';

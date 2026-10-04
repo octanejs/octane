@@ -12,7 +12,6 @@ import {
 	IStyleSheetContext,
 	IStyleSheetManager,
 	IStylisContext,
-	mainSheet,
 	StyleSheetConsumer,
 	StyleSheetContext,
 	StyleSheetManager,

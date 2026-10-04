@@ -3,12 +3,7 @@ import * as React from 'octane';
 import { useIsoLayoutEffect } from '@octanejs/base-ui-utils/useIsoLayoutEffect';
 import { useSelectRootContext, useSelectRootPropsContext } from '../root/SelectRootContext';
 import { useCompositeListItem } from '../../internals/composite/list/useCompositeListItem';
-import type {
-	BaseUIComponentProps,
-	BaseUIEvent,
-	HTMLProps,
-	NonNativeButtonProps,
-} from '../../internals/types';
+import type { BaseUIComponentProps, HTMLProps, NonNativeButtonProps } from '../../internals/types';
 import { useRenderElement } from '../../internals/useRenderElement.tsrx';
 import { SelectItemContext } from './SelectItemContext';
 import { useButton } from '../../internals/use-button';

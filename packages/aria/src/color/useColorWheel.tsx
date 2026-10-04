@@ -26,12 +26,7 @@ import type {
 import { focusWithoutScrolling } from '../utils/focusWithoutScrolling';
 import { getEventTarget } from '../utils/shadowdom/DOMFunctions';
 import { mergeProps } from '../utils/mergeProps';
-import React, {
-	type ChangeEvent,
-	type InputHTMLAttributes,
-	useCallback,
-	useRef,
-} from '../compat/react';
+import React, { type InputHTMLAttributes, useCallback, useRef } from '../compat/react';
 import { useFormReset } from '../utils/useFormReset';
 import { useGlobalListeners } from '../utils/useGlobalListeners';
 import { useKeyboard } from '../interactions/useKeyboard';

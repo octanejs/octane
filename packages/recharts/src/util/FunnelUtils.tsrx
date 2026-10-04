@@ -1,4 +1,3 @@
-import * as React from 'octane';
 import type { Props as FunnelProps, FunnelTrapezoidItem } from '../cartesian/Funnel.tsrx';
 import { Trapezoid } from '../shape/Trapezoid.tsrx';
 import type { ShapeAnimationProps } from './types';
@@ -11,8 +10,6 @@ export type FunnelTrapezoidProps =
 		option: Exclude<FunnelProps['shape'], undefined> | FunnelProps['activeShape'];
 		isActive: boolean;
 	} & ShapeAnimationProps & FunnelTrapezoidItem;
-
-type FunnelTrapezoidShapeProps = Omit<FunnelTrapezoidProps, 'option'>;
 
 export function FunnelTrapezoid({ option, ...shapeProps }: FunnelTrapezoidProps) {
 	return <Shape option={option} DefaultShape={defaultFunnelShape} shapeProps={shapeProps} />;

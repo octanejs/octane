@@ -1,11 +1,10 @@
 // Default-Tailwind breadcrumb flavor (package canonical) — user-supplied
 // styling, class strings verbatim. Octane adaptations: lucide-react →
 // @octanejs/lucide, radix-ui Slot → @octanejs/radix (@if asChild);
-// BreadcrumbSeparator's `children ?? icon` fallback composes with
-// createElement (opaque children beside a descriptor default).
+// BreadcrumbSeparator keeps upstream's `children ?? icon` fallback.
 import { Slot } from '@octanejs/radix';
 import { ChevronRightIcon, MoreHorizontalIcon } from '@octanejs/lucide';
-import { createElement, type OctaneNode } from 'octane';
+import type { OctaneNode } from 'octane';
 
 import { cn } from 'cn';
 

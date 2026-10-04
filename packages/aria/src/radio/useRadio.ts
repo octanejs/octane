@@ -82,17 +82,7 @@ export function useRadio(...args: any[]): RadioAria {
 	const state = user[1] as RadioGroupState;
 	const ref = user[2] as RefObject<HTMLInputElement | null>;
 
-	let {
-		value,
-		'aria-label': ariaLabel,
-		'aria-labelledby': ariaLabelledby,
-		onPressStart,
-		onPressEnd,
-		onPressChange,
-		onPress,
-		onPressUp,
-		onClick,
-	} = props;
+	let { value, onPressStart, onPressEnd, onPressChange, onPress, onPressUp, onClick } = props;
 	const isDisabled = props.isDisabled || state.isDisabled;
 
 	let checked = state.selectedValue === value;

@@ -8,7 +8,6 @@ import {
 	Heading,
 	ModalOverlay as ModalOverlayPrimitive,
 	Modal as ModalPrimitive,
-	type DialogProps as AlertDialogPrimitiveProps,
 	type DialogTriggerProps as AlertDialogTriggerPrimitiveProps,
 	type ModalOverlayProps as ModalOverlayPrimitiveProps,
 } from '@octanejs/aria/components';

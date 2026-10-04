@@ -17,6 +17,10 @@
  *     The file ships unchecked.
  *   - Publishing a `.js` module with no sibling `.d.ts`. The consumer gets
  *     `any` (or an error under `noImplicitAny`) for our public API.
+ *   - Leaving an unused import, local, or parameter in shipped source. A
+ *     consumer's `noUnusedLocals` or `noUnusedParameters` reports it in their
+ *     program, and `skipLibCheck` does not help (issue #1694). Unlike the rules
+ *     above, this one compiles each package; see consumer-unused-declarations.mjs.
  *
  * Only the first rule is about what the root typecheck chain runs, so only it is
  * driven by parsing that chain. The other two tsconfig rules are about the file
@@ -31,6 +35,7 @@
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { findUnusedDeclarations, formatFinding } from './consumer-unused-declarations.mjs';
 import { getPublishablePackages, REPO_ROOT } from './workspace-packages.mjs';
 
 export const RULES = {
@@ -38,6 +43,8 @@ export const RULES = {
 	nodeTypes: 'node-types-in-validation-tsconfig',
 	excluded: 'excluded-shipped-source',
 	untypedJavaScript: 'untyped-published-javascript',
+	unusedLocals: 'unused-locals-in-shipped-source',
+	unusedParameters: 'unused-parameters-in-shipped-source',
 };
 
 /**
@@ -166,6 +173,26 @@ export const SOURCE_PUBLICATION_DEBT = {
 		'@octanejs/tanstack-start',
 		'@octanejs/vite-plugin',
 		'create-octane',
+	],
+	// The router core is vendored byte-close from react-router (see
+	// scripts/vendor-remix-router.mjs, which forbids hand edits), and upstream
+	// keeps unused locals and type-level tests in it. The fix belongs in the
+	// vendoring script. Follow-up of #1694.
+	[RULES.unusedLocals]: ['@octanejs/remix-router'],
+	// Unused parameters, and unused type parameters on exported generics. A `_`
+	// prefix silences both without changing a call site or a type argument
+	// position. Follow-up of #1694.
+	[RULES.unusedParameters]: [
+		'@octanejs/aria',
+		'@octanejs/base-ui',
+		'@octanejs/base-ui-utils',
+		'@octanejs/lexical',
+		'@octanejs/recharts',
+		'@octanejs/remix-router',
+		'@octanejs/select',
+		'@octanejs/spring',
+		'@octanejs/styled-components',
+		'@octanejs/visx',
 	],
 };
 
@@ -458,6 +485,47 @@ export function findSourcePublicationViolations(
 	);
 }
 
+const COMPILED_SOURCE = /\.(?:[cm]?ts|tsx|tsrx)$/;
+const DECLARATION_FILE = /\.d\.[cm]?ts$/;
+
+/**
+ * Compile every package that ships `.ts` or `.tsrx` source under a consumer's
+ * `noUnusedLocals` and `noUnusedParameters`. A package that ships only
+ * JavaScript and declaration files gives a consumer's compiler nothing to check
+ * against either flag.
+ */
+export function findUnusedDeclarationViolations(
+	repo = REPO_ROOT,
+	packages = getPublishablePackages(),
+) {
+	const compiled = packages.filter(
+		(pkg) =>
+			shipsSource(pkg) &&
+			collectSourceFiles(path.join(pkg.directory, 'src')).some(
+				(file) => COMPILED_SOURCE.test(file) && !DECLARATION_FILE.test(file),
+			),
+	);
+	const violations = [];
+	for (const { pkg, locals, parameters } of findUnusedDeclarations(compiled, repo)) {
+		for (const [rule, flag, findings] of [
+			[RULES.unusedLocals, 'noUnusedLocals', locals],
+			[RULES.unusedParameters, 'noUnusedParameters', parameters],
+		]) {
+			if (!findings.length) continue;
+			violations.push({
+				rule,
+				id: pkg.name,
+				detail: `${findings.length} unused declaration(s) fail a consumer's ${flag}:\n${findings
+					.map((finding) => `      ${formatFinding(finding)}`)
+					.join('\n')}`,
+			});
+		}
+	}
+	return violations.sort(
+		(left, right) => left.rule.localeCompare(right.rule) || left.id.localeCompare(right.id),
+	);
+}
+
 export function partitionAgainstDebt(violations, debt = SOURCE_PUBLICATION_DEBT) {
 	const allowed = new Map(Object.entries(debt).map(([rule, ids]) => [rule, new Set(ids)]));
 	const unexpected = [];
@@ -482,7 +550,7 @@ function report(violations, label) {
 }
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
-	const violations = findSourcePublicationViolations();
+	const violations = [...findSourcePublicationViolations(), ...findUnusedDeclarationViolations()];
 	if (process.argv.includes('--all')) {
 		// Regenerating SOURCE_PUBLICATION_DEBT: every violation, allowlisted or not.
 		report(violations, true);

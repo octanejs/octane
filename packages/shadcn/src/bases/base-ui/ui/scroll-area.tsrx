@@ -1,6 +1,5 @@
 // Adapted from shadcn/ui 4.21.0 (7c9eaba1), Base UI with the Nova style.
 // MIT: see LICENSE.upstream. Octane uses native events and refs as props.
-import * as React from 'octane';
 import { ScrollArea as ScrollAreaPrimitive } from '@octanejs/base-ui/scroll-area';
 import { cn } from 'cn';
 

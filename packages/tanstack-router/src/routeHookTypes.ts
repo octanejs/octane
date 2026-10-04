@@ -1,7 +1,6 @@
 import type { StructuralSharingOption, ValidateSelected } from './structuralSharing';
 import type {
 	AnyRouter,
-	FromPathOption,
 	MakeRouteMatch,
 	MakeRouteMatchUnion,
 	RegisteredRouter,
@@ -11,14 +10,10 @@ import type {
 	ResolveUseSearch,
 	RouterState,
 	StrictOrFrom,
-	ThrowConstraint,
-	ThrowOrOptional,
 	UseLoaderDataResult,
 	UseLoaderDepsResult,
-	UseNavigateResult,
 	UseParamsResult,
 	UseRouteContextBaseOptions,
-	UseRouteContextOptions,
 	UseRouteContextResult,
 	UseSearchResult,
 } from '@tanstack/router-core';

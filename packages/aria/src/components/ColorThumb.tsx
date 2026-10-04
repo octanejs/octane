@@ -5,7 +5,7 @@ import type { Color } from '../upstream-exports/react-stately/Color';
 import { filterDOMProps } from '../upstream-exports/react-aria/filterDOMProps';
 import type { GlobalDOMAttributes, HoverEvents, RefObject } from '@react-types/shared';
 import { mergeProps } from '../upstream-exports/react-aria/mergeProps';
-import React, {
+import {
 	createContext,
 	type ForwardedRef,
 	forwardRef,

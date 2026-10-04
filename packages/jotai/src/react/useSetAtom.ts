@@ -3,7 +3,7 @@
 // writes. The setter is memoized per [store, atom].
 import { useCallback } from 'octane';
 import type { ExtractAtomArgs, ExtractAtomResult, WritableAtom } from 'jotai/vanilla';
-import { useStore, type Store } from './store';
+import { useStore } from './store';
 import { splitSlot, subSlot } from '../internal';
 
 // The consumer's bundler substitutes the whole `process.env.NODE_ENV` expression

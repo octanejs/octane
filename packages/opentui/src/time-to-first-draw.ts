@@ -1,4 +1,3 @@
-import type { TimeToFirstDrawRenderable } from '@opentui/core';
 import {
 	defineUniversalComponent,
 	universalPlan,

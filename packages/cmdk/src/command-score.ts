@@ -39,8 +39,6 @@ var SCORE_CONTINUE_MATCH = 1,
 	// This will not change the order of suggestions based on SCORE_* until
 	// 1000 characters are inserted between matches.
 	PENALTY_CASE_MISMATCH = 0.9999,
-	// Match higher for letters closer to the beginning of the word
-	PENALTY_DISTANCE_FROM_START = 0.9,
 	// If the word has more characters than the user typed, it should
 	// be penalised slightly.
 	//

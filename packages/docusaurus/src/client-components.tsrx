@@ -1,4 +1,4 @@
-import { createContext, useContext, type ComponentBody, type OctaneNode } from 'octane';
+import { createContext, useContext, type ComponentBody } from 'octane';
 import {
 	Outlet,
 	RouterProvider,

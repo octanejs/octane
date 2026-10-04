@@ -129,8 +129,6 @@ const [SelectNativeOptionsProvider, useSelectNativeOptionsContext] =
  * SelectProvider
  * -----------------------------------------------------------------------------------------------*/
 
-const PROVIDER_NAME = 'SelectProvider';
-
 export function Provider(props: any): any {
 	const slot = S('Select.Provider');
 	const {
@@ -571,8 +569,6 @@ interface SelectContentContextValue {
 const [SelectContentProvider, useSelectContentContext] =
 	createSelectContext<SelectContentContextValue>(CONTENT_NAME);
 
-const CONTENT_IMPL_NAME = 'SelectContentImpl';
-
 function ContentImpl(props: any): any {
 	const slot = S('Select.ContentImpl');
 	const {
@@ -884,8 +880,6 @@ function ContentImpl(props: any): any {
 /* -------------------------------------------------------------------------------------------------
  * SelectItemAlignedPosition
  * -----------------------------------------------------------------------------------------------*/
-
-const ITEM_ALIGNED_POSITION_NAME = 'SelectItemAlignedPosition';
 
 function ItemAlignedPosition(props: any): any {
 	const slot = S('Select.ItemAlignedPosition');

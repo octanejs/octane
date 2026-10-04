@@ -14,7 +14,6 @@ import {
 	deepEqual,
 	exactPathTest,
 	functionalUpdate,
-	hasKeys,
 	isDangerousProtocol,
 	preloadWarning,
 	removeTrailingSlash,

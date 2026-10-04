@@ -1,5 +1,4 @@
 import type { ComponentType, OctaneElement, SVGProps } from '../util/OctaneTypes.ts';
-import * as React from 'octane';
 import { cloneElement, createElement, isValidElement } from 'octane';
 import { clsx } from 'clsx';
 import {

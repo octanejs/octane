@@ -21,8 +21,6 @@ import { usePrevious } from './use-previous';
 import { useSize } from './use-size';
 import { useControllableState } from './useControllableState';
 
-type Direction = 'ltr' | 'rtl';
-
 const PAGE_KEYS = ['PageUp', 'PageDown'];
 const ARROW_KEYS = ['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'];
 

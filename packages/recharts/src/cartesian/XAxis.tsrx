@@ -1,4 +1,3 @@
-import type { OctaneElement } from '../util/OctaneTypes.ts';
 import type {
 	AxisInterval,
 	AxisTick,

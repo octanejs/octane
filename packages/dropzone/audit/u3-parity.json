@@ -3,7 +3,7 @@
     "upstream": "upstream/src/index.tsx",
     "upstreamSha256": "4fc4ce4feb05906e4362ef35b927f13c750134b1d1605ec038c0cc7395fc3d41",
     "runtime": "src/index.tsrx",
-    "runtimeSha256": "164322eb48340c89b11a515d61e440827df64de88166d9f361a33500d144b0a2",
+    "runtimeSha256": "b9aba2d175acd8917c51a5894955ae01cdf8458ca89e8b1ee39caf5a2f4cd97f",
     "types": "src/types.ts",
     "typesSha256": "47be4da150fd4d1e537c3a5cdec4b51af4c5fba1cdf52565304831a5408d0b29",
     "transforms": [

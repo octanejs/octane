@@ -1,6 +1,5 @@
 import type { CSSProperties } from 'octane';
 import type { OctaneNode } from '../util/OctaneTypes.ts';
-import * as React from 'octane';
 import { useCallback, useEffect, useRef, useState } from 'octane';
 import { noop } from '../util/DataUtils';
 import { resolveDefaultProps } from '../util/resolveDefaultProps';

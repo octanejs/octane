@@ -1,5 +1,4 @@
 import type { OctaneElement } from '../util/OctaneTypes.ts';
-import * as React from 'octane';
 import { isNumber } from '../util/DataUtils';
 import { Curve, type BaseLineType, type Props as CurveProps } from '../shape/Curve.tsrx';
 import type { CartesianLayout, LayoutType, ShapeAnimationProps } from '../util/types';

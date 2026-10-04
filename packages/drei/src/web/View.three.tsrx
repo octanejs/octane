@@ -1,6 +1,6 @@
 /** @jsxImportSource @octanejs/three/intrinsics */
 import { context as threeContext, createPortal, type RootState, type ThreeRef, useFrame, useThree } from '@octanejs/three';
-import { useCallback, useContext, useEffect, useImperativeHandle, useLayoutEffect, useRef, useState } from '@octanejs/three/renderer';
+import { useCallback, useContext, useEffect, useLayoutEffect, useRef, useState } from '@octanejs/three/renderer';
 import { type OctaneNode } from 'octane';
 import * as THREE from 'three';
 

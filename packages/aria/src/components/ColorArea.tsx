@@ -19,7 +19,7 @@ import { filterDOMProps } from '../upstream-exports/react-aria/filterDOMProps';
 import type { GlobalDOMAttributes } from '@react-types/shared';
 import { InternalColorThumbContext } from './ColorThumb';
 import { mergeProps } from '../upstream-exports/react-aria/mergeProps';
-import React, { createContext, type ForwardedRef, forwardRef, useRef } from '../compat/react';
+import { createContext, type ForwardedRef, forwardRef, useRef } from '../compat/react';
 
 export interface ColorAreaRenderProps {
 	/**

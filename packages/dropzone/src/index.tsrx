@@ -30,11 +30,9 @@ import {
 	TOO_MANY_FILES_REJECTION,
 } from './utils/index.ts';
 import type {
-	DropEvent,
 	DropzoneInputProps,
 	DropzoneOptions,
 	DropzoneProps,
-	DropzoneRef,
 	DropzoneRootProps,
 	DropzoneState,
 	FileError,

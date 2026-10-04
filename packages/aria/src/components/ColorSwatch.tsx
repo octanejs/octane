@@ -17,7 +17,7 @@ import type { Color } from '../upstream-exports/react-stately/Color';
 import { filterDOMProps } from '../upstream-exports/react-aria/filterDOMProps';
 import type { GlobalDOMAttributes } from '@react-types/shared';
 import { mergeProps } from '../upstream-exports/react-aria/mergeProps';
-import React, { createContext, type ForwardedRef, forwardRef } from '../compat/react';
+import { createContext, type ForwardedRef, forwardRef } from '../compat/react';
 
 export interface ColorSwatchRenderProps {
 	/** The color of the swatch. */

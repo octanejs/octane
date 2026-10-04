@@ -13,7 +13,6 @@ import type {
 	OnChangeValue,
 	Options,
 	OptionsOrGroups,
-	PropsValue,
 } from './types';
 import { cleanValue, valueTernary } from './utils';
 import type { PublicBaseSelectProps } from './select.tsrx';

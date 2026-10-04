@@ -1,11 +1,6 @@
 import type { RegisteredCell } from '../context/CellsContext.ts';
 import type { CellPropsFor } from '../component/Cell.ts';
-import type {
-	MutableRefObject,
-	NativeMouseEvent,
-	OctaneElement,
-	OctaneNode,
-} from '../util/OctaneTypes.ts';
+import type { MutableRefObject, NativeMouseEvent, OctaneNode } from '../util/OctaneTypes.ts';
 import type { Octane } from 'octane/jsx-runtime';
 
 type Key = Octane.Key;

@@ -14,7 +14,6 @@ import Ref from './Ref.js';
 import { setRef } from './refs.js';
 import { convertDataUriParameterObject, dataURItoBytes, isDataURI } from './utils.js';
 import type {
-	Annotations,
 	DocumentContextValue,
 	DocumentProps,
 	DocumentRenderProps,
@@ -25,7 +24,6 @@ import type {
 	PageRenderProps,
 	Source,
 	StructTreeNode,
-	TextItem,
 	ThumbnailProps,
 } from './types.js';
 

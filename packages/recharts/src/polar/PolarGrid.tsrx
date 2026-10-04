@@ -1,6 +1,5 @@
 import type { FunctionComponent, SVGProps } from '../util/OctaneTypes.ts';
 import { clsx } from 'clsx';
-import * as React from 'octane';
 
 import { polarToCartesian } from '../util/PolarUtils';
 import type { AxisId } from '../state/cartesianAxisSlice';
