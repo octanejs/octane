@@ -527,21 +527,21 @@ function declaredUses(ast, lexical, owners, trusted) {
 			for (const child of node) visit(child, producer);
 			return;
 		}
+		const callee =
+			node.type === 'CallExpression' || node.type === 'OptionalCallExpression'
+				? unwrapExpression(node.callee)
+				: null;
+		// Parentheses and type assertions around a factory still make a producer.
 		if (
-			(node.type === 'CallExpression' || node.type === 'OptionalCallExpression') &&
-			(trusted(node) !== null ||
-				((node.callee?.type === 'MemberExpression' ||
-					node.callee?.type === 'OptionalMemberExpression') &&
-					SIGNAL_FACTORIES.has(propertyName(node.callee))))
+			callee != null &&
+			(trusted(callee === node.callee ? node : { ...node, callee }) !== null ||
+				((callee.type === 'MemberExpression' || callee.type === 'OptionalMemberExpression') &&
+					SIGNAL_FACTORIES.has(propertyName(callee))))
 		) {
 			visit(node.callee, producer);
 			visit(node.arguments, true);
 			return;
 		}
-		const callee =
-			node.type === 'CallExpression' || node.type === 'OptionalCallExpression'
-				? unwrapExpression(node.callee)
-				: null;
 		if (
 			!producer &&
 			(callee?.type === 'MemberExpression' || callee?.type === 'OptionalMemberExpression')

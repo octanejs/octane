@@ -503,10 +503,21 @@ export function App(props) @{
 
 	// Producer closures keep reader ownership: a derived handle a child
 	// receives as a prop computes from the child's own query, while the
-	// parent's callback still reads the parent's derived value.
-	it.each(MODES)(
-		'keeps derived producers reader-owned beside a forwarded callback ($name)',
-		async (mode) => {
+	// parent's callback still reads the parent's derived value. A wrapped
+	// factory callee is still a producer.
+	const PRODUCERS = {
+		'a derived producer': 'derived$(() => record$.get())',
+		'a wrapped derived producer':
+			"(derived$ as typeof derived$)(() => record$.get(), { key: 'selected' })",
+	};
+
+	it.each(
+		MODES.flatMap((mode) =>
+			Object.entries(PRODUCERS).map(([kind, producer]) => ({ kind, producer, ...mode })),
+		),
+	)(
+		'keeps $kind reader-owned beside a forwarded callback ($name)',
+		async ({ producer, dev, strong }) => {
 			const view = await mountClient(
 				`import { derived$, query$ } from 'octane/signals';
 function Reader(props) @{
@@ -517,14 +528,14 @@ function Reader(props) @{
 }
 export function App(props) @{
  const record$ = query$(() => 'record', props.load);
- const selected$ = derived$(() => record$.get());
+ const selected$ = ${producer};
  @try {
   <section><output>{selected$.get() as string}</output><Reader selected$={selected$} read={() => selected$.get()} /></section>
  } @pending {
   <i>waiting</i>
  }
 }`,
-				mode,
+				{ dev, strong },
 			);
 			try {
 				await view.settleAll('ready');
