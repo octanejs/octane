@@ -184,7 +184,7 @@ See also: [`docs/apollo-client-port-plan.md`](apollo-client-port-plan.md)
 
 ## @octanejs/aria
 
-[`packages/aria`](../packages/aria) `0.0.56` — ports `react-aria@3.51.0`. Status data: [`packages/aria/status.json`](../packages/aria/status.json).
+[`packages/aria`](../packages/aria) `0.0.57` — ports `react-aria@3.51.0`. Status data: [`packages/aria/status.json`](../packages/aria/status.json).
 
 The `@octanejs/aria/components` entry point matches the complete named public surface of `react-aria-components@1.20.0`: 286 runtime exports and 327 type exports, checked in both directions with no missing or extra names. This includes TokenField, PreviewTrigger, calendar/date/time, color, drag-and-drop, DropZone/FileTrigger, toast, data hooks, and virtualized layout APIs in addition to the previously ported primitives, overlays, collections, Tree, and Table. The root behavior-hook and `/stately` entries remain curated React Aria 3.51.0 / React Stately 3.49.0 surfaces rather than separate full-export claims.
 
@@ -223,7 +223,7 @@ Scope/evidence last checked: 2026-08-20.
 
 ## @octanejs/base-ui
 
-[`packages/base-ui`](../packages/base-ui) `0.1.60` — ports `@base-ui/react@1.8.0`. Status data: [`packages/base-ui/status.json`](../packages/base-ui/status.json).
+[`packages/base-ui`](../packages/base-ui) `0.1.61` — ports `@base-ui/react@1.8.0`. Status data: [`packages/base-ui/status.json`](../packages/base-ui/status.json).
 
 All 79 upstream export entries are implemented, including Select, Combobox, Autocomplete, Drawer, Navigation Menu, OTP Field, Scroll Area, Toolbar, and the remaining parts of existing components.
 
@@ -243,7 +243,7 @@ See also: [`docs/base-ui-migration-plan.md`](base-ui-migration-plan.md), [`packa
 
 ## @octanejs/base-ui-utils
 
-[`packages/base-ui-utils`](../packages/base-ui-utils) `0.1.8` — ports `@base-ui/utils@0.4.0`. Status data: [`packages/base-ui-utils/status.json`](../packages/base-ui-utils/status.json).
+[`packages/base-ui-utils`](../packages/base-ui-utils) `0.1.9` — ports `@base-ui/utils@0.4.0`. Status data: [`packages/base-ui-utils/status.json`](../packages/base-ui-utils/status.json).
 
 All 45 published Base UI utility entries and 85 entry/export pairs match the pinned 0.4.0 release.
 
@@ -314,7 +314,7 @@ Scope/evidence last checked: 2026-08-20.
 
 ## @octanejs/cmdk
 
-[`packages/cmdk`](../packages/cmdk) `0.1.44` — ports `cmdk@1.1.1`. Status data: [`packages/cmdk/status.json`](../packages/cmdk/status.json).
+[`packages/cmdk`](../packages/cmdk) `0.1.45` — ports `cmdk@1.1.1`. Status data: [`packages/cmdk/status.json`](../packages/cmdk/status.json).
 
 Complete against the published `cmdk@1.1.1` public surface: `Command` (the root itself) and the `CommandRoot` named export, `Command.Input`, `Command.List`, `Command.Item`, `Command.Group`, `Command.Separator`, `Command.Dialog`, `Command.Empty`, `Command.Loading`, the flat `CommandX` aliases, `useCommandState`, and `defaultFilter` — with the DOM-authoritative store and item/group registration, `useValue` text-content inference, `onInput`-driven search, score filtering plus item and group DOM sorting, keyboard navigation (arrows/Home/End/vim/Enter), controlled `value`/`onValueChange`/`loop`/`shouldFilter`/custom `filter`/`forceMount`, the `--cmdk-list-height` ResizeObserver, and a Radix-backed `Command.Dialog`. `asChild` is the one unsupported prop (see divergences).
 
@@ -463,7 +463,7 @@ Scope/evidence last checked: 2026-08-03.
 
 ## @octanejs/drei
 
-[`packages/drei`](../packages/drei) `0.0.28` — ports `@react-three/drei@10.7.7`. Status data: [`packages/drei/status.json`](../packages/drei/status.json).
+[`packages/drei`](../packages/drei) `0.0.29` — ports `@react-three/drei@10.7.7`. Status data: [`packages/drei/status.json`](../packages/drei/status.json).
 
 Complete port of the pinned @react-three/drei 10.7.7 public web API (commit b8b99fd4ca1dfb8d821335671320512daa6efea4): 379 source exports and 217 runtime exports are accounted for by the executable crosswalk, with 299 parity assertions across 105 test files.
 
@@ -479,7 +479,7 @@ See also: [`packages/drei/README.md`](../packages/drei/README.md), [`packages/dr
 
 ## @octanejs/dropzone
 
-[`packages/dropzone`](../packages/dropzone) `0.0.25` — ports `react-dropzone@20.0.0`. Status data: [`packages/dropzone/status.json`](../packages/dropzone/status.json).
+[`packages/dropzone`](../packages/dropzone) `0.0.26` — ports `react-dropzone@20.0.0`. Status data: [`packages/dropzone/status.json`](../packages/dropzone/status.json).
 
 Exact mapped port of the react-dropzone 20.0.0 root runtime and type namespace at canonical commit 01fc05c5996bf615caf812627f7491375e647c7d. The binding preserves the default Dropzone component, useDropzone, ErrorCode, all public types, root package conditions, and ./package.json export. Runtime coverage executes 218 pristine canonical React cases plus 109 adapted, differential, SSR, hydration, browser, and evidence cases.
 
@@ -568,7 +568,7 @@ Scope/evidence last checked: 2026-08-02.
 
 ## @octanejs/floating-ui
 
-[`packages/floating-ui`](../packages/floating-ui) `0.1.60` — ports `@floating-ui/react@0.27.19`. Status data: [`packages/floating-ui/status.json`](../packages/floating-ui/status.json).
+[`packages/floating-ui`](../packages/floating-ui) `0.1.61` — ports `@floating-ui/react@0.27.19`. Status data: [`packages/floating-ui/status.json`](../packages/floating-ui/status.json).
 
 Complete @floating-ui/react 0.27.19 export surface: positioning (`useFloating`, ref-aware `arrow`, and the framework-neutral middleware re-exports), floating tree and list primitives, every interaction hook, portals/overlays/focus management/arrows/composites, transitions, both delay-group APIs, and the deprecated `inner`/`useInnerOffset` pair. Runtime parity is executable and bounded: 276 adapted assertions pass compatibly, 25 remain executable expected-failure negative controls, and 6 upstream-declared skips are non-evidence.
 
@@ -673,7 +673,7 @@ Scope/evidence last checked: 2026-08-02.
 
 ## @octanejs/image-crop
 
-[`packages/image-crop`](../packages/image-crop) `0.0.16` — ports `react-image-crop@11.1.2`. Status data: [`packages/image-crop/status.json`](../packages/image-crop/status.json).
+[`packages/image-crop`](../packages/image-crop) `0.0.17` — ports `react-image-crop@11.1.2`. Status data: [`packages/image-crop/status.json`](../packages/image-crop/status.json).
 
 ReactCrop, default and Component aliases, crop types, aspect/centering/conversion/containment/nudge utilities, browser canvas/image helpers, pointer and keyboard crop interactions, selection addons, circular masks, rule-of-thirds overlays, and stylesheet compatibility exports.
 
@@ -752,7 +752,7 @@ Scope/evidence last checked: 2026-07-30.
 
 ## @octanejs/jotai
 
-[`packages/jotai`](../packages/jotai) `0.1.57` — ports `jotai@3.0.0`. Status data: [`packages/jotai/status.json`](../packages/jotai/status.json).
+[`packages/jotai`](../packages/jotai) `0.1.58` — ports `jotai@3.0.0`. Status data: [`packages/jotai/status.json`](../packages/jotai/status.json).
 
 Jotai 3 runtime surface: imported vanilla atoms, stores, utilities and internals; ported Provider, useStore, useAtom, useSetAtom, useAtomValue, useAtomValueRaw, useAtomValueRawSync and four hook utilities.
 
@@ -768,7 +768,7 @@ Scope/evidence last checked: 2026-09-12.
 
 ## @octanejs/lexical
 
-[`packages/lexical`](../packages/lexical) `0.2.3` — ports `@lexical/react@0.51.0`. Status data: [`packages/lexical/status.json`](../packages/lexical/status.json).
+[`packages/lexical`](../packages/lexical) `0.2.4` — ports `@lexical/react@0.51.0`. Status data: [`packages/lexical/status.json`](../packages/lexical/status.json).
 
 The 49 `@lexical/react` entry points represented by this port cover composer + contexts, the editable surface, plain/rich text, the plugin/menu set with its `*Utils` and `LexicalMenuOption` entries, and the `useLexical*` hooks including the `@lexical/a11y`-backed accessibility hooks. The 0.51.0 React extension subsystem, collaboration plugin, and tree view remain excluded as itemized in UPSTREAM.md.
 
@@ -970,7 +970,7 @@ Scope/evidence last checked: 2026-09-03.
 
 ## @octanejs/opentui
 
-[`packages/opentui`](../packages/opentui) `0.0.14` — ports `@opentui/react@0.5.8`. Status data: [`packages/opentui/status.json`](../packages/opentui/status.json).
+[`packages/opentui`](../packages/opentui) `0.0.15` — ports `@opentui/react@0.5.8`. Status data: [`packages/opentui/status.json`](../packages/opentui/status.json).
 
 Technical-preview OpenTUI 0.5.8 renderer: renderer-local TSRX intrinsics for the complete built-in catalogue and text modifiers, custom `extend()` renderables, component-plus-props roots, OpenTUI prop/style/event application, refs and retained visibility, same-renderer `RootRenderable` portals, terminal error fallback, `act`/`flushSync`, all public hooks, `TimeToFirstDraw`, the core slot/plugin registry adapted to universal renderables, and an FFI-backed test utility. Native behavioral coverage exercises terminal frames, state and prop updates, host identity, keyboard and resize hooks, multi-argument select callbacks, subscription cleanup, portals, slots, errors, and teardown under Bun.
 
@@ -992,7 +992,7 @@ Scope/evidence last checked: 2026-08-25.
 
 ## @octanejs/pdf
 
-[`packages/pdf`](../packages/pdf) `0.0.25` — ports `react-pdf@10.4.1`. Status data: [`packages/pdf/status.json`](../packages/pdf/status.json).
+[`packages/pdf`](../packages/pdf) `0.0.26` — ports `react-pdf@10.4.1`. Status data: [`packages/pdf/status.json`](../packages/pdf/status.json).
 
 Complete against the documented react-pdf 10.4.1 root contract: Document, Page, Thumbnail, Outline, all three context hooks, PasswordResponses, pdfjs, all ten root types, both documented layer styles, and the unchanged PDF.js worker import.
 
@@ -1062,7 +1062,7 @@ See also: [`docs/sanity-react-port-research.md`](sanity-react-port-research.md)
 
 ## @octanejs/radix
 
-[`packages/radix`](../packages/radix) `0.1.60` — ports `radix-ui@1.6.4`. Status data: [`packages/radix/status.json`](../packages/radix/status.json).
+[`packages/radix`](../packages/radix) `0.1.61` — ports `radix-ui@1.6.4`. Status data: [`packages/radix/status.json`](../packages/radix/status.json).
 
 Surface-present against the unified `radix-ui@1.6.4` component exports. Sixteen repo-authored differential cases compare representative primitives and interactions against the real package; the complete 38-file canonical upstream suite is preserved but not adapted, so the binding remains recorded-unverified.
 
@@ -1137,7 +1137,7 @@ See also: [`docs/react-map-gl-port-plan.md`](react-map-gl-port-plan.md), [`packa
 
 ## @octanejs/recharts
 
-[`packages/recharts`](../packages/recharts) `0.1.59` — ports `recharts@3.9.2`. Status data: [`packages/recharts/status.json`](../packages/recharts/status.json).
+[`packages/recharts`](../packages/recharts) `0.1.60` — ports `recharts@3.9.2`. Status data: [`packages/recharts/status.json`](../packages/recharts/status.json).
 
 Broad runtime support across cartesian, polar, hierarchical, tooltip, legend, responsive-container, shape, and chart-state surfaces. `Brush` and `Treemap` remain intentionally unsupported.
 
@@ -1190,7 +1190,7 @@ Scope/evidence last checked: 2026-08-02.
 
 ## @octanejs/remix-router
 
-[`packages/remix-router`](../packages/remix-router) `0.1.55` — ports `react-router@8.2.0`. Status data: [`packages/remix-router/status.json`](../packages/remix-router/status.json).
+[`packages/remix-router`](../packages/remix-router) `0.1.56` — ports `react-router@8.2.0`. Status data: [`packages/remix-router/status.json`](../packages/remix-router/status.json).
 
 All planned port phases are shipped and the pinned runtime export namespace is complete: the framework-agnostic router core, data/declarative/DOM/mutation/guard layers, static SSR, and cookie/session runtime are implemented on Octane. Framework-mode and RSC names remain throwing scope stubs. Selected vendored-core suites, local conformance, and nine exact shared-fixture scenarios provide bounded evidence rather than exhaustive React parity.
 
@@ -1303,7 +1303,7 @@ See also: [`docs/sanity-react-port-research.md`](sanity-react-port-research.md)
 
 ## @octanejs/select
 
-[`packages/select`](../packages/select) `0.1.10` — ports `react-select@5.10.2`. Status data: [`packages/select/status.json`](../packages/select/status.json).
+[`packages/select`](../packages/select) `0.1.11` — ports `react-select@5.10.2`. Status data: [`packages/select/status.json`](../packages/select/status.json).
 
 All six JavaScript entry points and all 20 runtime exports. Public TypeScript contracts are consumer-compiled across every entry point. Framework-neutral declarations and every entry-point Props member are checked fail-closed; renderer-owned component, instance, event, node, and style contracts are explicitly tracked as the adaptations below.
 
@@ -1319,7 +1319,7 @@ Scope/evidence last checked: 2026-08-03.
 
 ## @octanejs/shadcn
 
-[`packages/shadcn`](../packages/shadcn) `0.0.49` — ports `shadcn-ui/ui (component registry)@7c9eaba1c0a6404c990c144a654792e3313c650d + shadcn@4.21.0`. Status data: [`packages/shadcn/status.json`](../packages/shadcn/status.json).
+[`packages/shadcn`](../packages/shadcn) `0.0.50` — ports `shadcn-ui/ui (component registry)@7c9eaba1c0a6404c990c144a654792e3313c650d + shadcn@4.21.0`. Status data: [`packages/shadcn/status.json`](../packages/shadcn/status.json).
 
 Registry-first source binding with Radix (44 families, bare subpaths), React Aria (33, react-aria/<Family>), and Base UI (43, base-ui/<Family>) implementations. The registry emits base-nova (default), radix-nova, and aria-nova styles. The 4.21.0 update migrates class merging to cn@0.2.6 across all existing families while preserving tested Octane adaptations and local style choices. Base UI Select, Navigation Menu, and Scroll Area are transcribed from the release registry, resolved with its Nova style and Lucide icons, and target Base UI 1.8.0. The 44-family inventory is the current Octane scope, not the complete upstream registry: Base UI Sonner and additional upstream families such as Combobox remain outside it. Existing derived styles retain their unverified upstream-fidelity status.
 
@@ -1401,7 +1401,7 @@ See also: [`docs/sonner-port-plan.md`](sonner-port-plan.md)
 
 ## @octanejs/spring
 
-[`packages/spring`](../packages/spring) `0.0.25` — ports `@react-spring/web@10.1.2`. Status data: [`packages/spring/status.json`](../packages/spring/status.json).
+[`packages/spring`](../packages/spring) `0.0.26` — ports `@react-spring/web@10.1.2`. Status data: [`packages/spring/status.json`](../packages/spring/status.json).
 
 Stable React Spring web target at the package root and Parallax through the ./parallax subpath. The port provides spring values, controllers, interpolation, Octane hooks and render-prop components, animated DOM hosts, browser observers, SSR-safe initial rendering, and Parallax scrolling.
 
@@ -1458,7 +1458,7 @@ Scope/evidence last checked: 2026-08-02.
 
 ## @octanejs/styled-components
 
-[`packages/styled-components`](../packages/styled-components) `0.1.51` — ports `styled-components@6.4.3`. Status data: [`packages/styled-components/status.json`](../packages/styled-components/status.json).
+[`packages/styled-components`](../packages/styled-components) `0.1.52` — ports `styled-components@6.4.3`. Status data: [`packages/styled-components/status.json`](../packages/styled-components/status.json).
 
 Full v6 web API, ported from the upstream 6.4.3 sources: `styled` with every HTML/SVG tag shortcut, `.attrs`/`.withConfig` chaining, `css`, `keyframes`, `createGlobalStyle`, `createTheme`, `ThemeProvider`/`ThemeContext`/`ThemeConsumer`/`useTheme`/`withTheme`, `StyleSheetManager`/`StyleSheetContext`/`StyleSheetConsumer` (targets, namespaces, vendor prefixing, stylis plugins, `shouldForwardProp`), `ServerStyleSheet`, `isStyledComponent`, `version`, and `__PRIVATE__`. Component selectors, folding (`styled(Styled)`), transient `$` props, `as`/`forwardedAs`, and the grouped CSSOM sheet engine (with upstream `data-styled` rehydration) all behave as upstream. The React Native surface and the RSC-only `stylisPluginRSC` are not ported.
 
@@ -1496,7 +1496,7 @@ Scope/evidence last checked: 2026-07-09.
 
 ## @octanejs/swr
 
-[`packages/swr`](../packages/swr) `0.0.25` — ports `swr@2.4.2`. Status data: [`packages/swr/status.json`](../packages/swr/status.json).
+[`packages/swr`](../packages/swr) `0.0.26` — ports `swr@2.4.2`. Status data: [`packages/swr/status.json`](../packages/swr/status.json).
 
 Mapped port of SWR 2.4.2: root useSWR/config/cache/mutate/preload, infinite, immutable, remote mutation, subscription, _internal, and the published react-server condition branches. The harness executes the pinned pristine React suite plus selected adapted Octane cases, repo-authored adapted type probes, and differential/export oracles. Provenance remains recorded-unverified until the exhaustive adapted crosswalk lands.
 
@@ -1672,7 +1672,7 @@ See also: [`docs/tanstack-parity-audit.md`](tanstack-parity-audit.md)
 
 ## @octanejs/tanstack-router
 
-[`packages/tanstack-router`](../packages/tanstack-router) `0.2.1` — ports `@tanstack/react-router@1.170.41`. Status data: [`packages/tanstack-router/status.json`](../packages/tanstack-router/status.json).
+[`packages/tanstack-router`](../packages/tanstack-router) `0.2.2` — ports `@tanstack/react-router@1.170.41`. Status data: [`packages/tanstack-router/status.json`](../packages/tanstack-router/status.json).
 
 Octane's TanStack Router binding: typed route factories and hooks, the full Match pipeline and lifecycle, file routes with TSRX-aware generator integration, full Link navigation/preloading/masking behavior, blocking, Await/deferred hydration, scroll restoration, lazy routes, not-found handling, document/head assets, and client/server SSR entries.
 
@@ -1695,7 +1695,7 @@ See also: [`docs/tanstack-parity-audit.md`](tanstack-parity-audit.md)
 
 ## @octanejs/tanstack-router-ssr-query
 
-[`packages/tanstack-router-ssr-query`](../packages/tanstack-router-ssr-query) `0.1.1` — ports `@tanstack/react-router-ssr-query@1.167.3`. Status data: [`packages/tanstack-router-ssr-query/status.json`](../packages/tanstack-router-ssr-query/status.json).
+[`packages/tanstack-router-ssr-query`](../packages/tanstack-router-ssr-query) `0.1.2` — ports `@tanstack/react-router-ssr-query@1.167.3`. Status data: [`packages/tanstack-router-ssr-query/status.json`](../packages/tanstack-router-ssr-query/status.json).
 
 Surface-present for the pinned adapter's only runtime entrypoint (`Options` and `setupRouterSsrQueryIntegration`). The metadata-only `./package.json` subpath is intentionally omitted. A representative differential covers provider-backed SSR, existing-wrapper preservation, setup mutations, and the wrapping control; upstream has no runtime suite, and type evidence is the upstream source compile plus the adapted Octane compile, so verification remains recorded-unverified.
 
@@ -1955,7 +1955,7 @@ Scope/evidence last checked: 2026-08-02.
 
 ## @octanejs/vaul
 
-[`packages/vaul`](../packages/vaul) `0.0.27` — ports `vaul@1.1.2`. Status data: [`packages/vaul/status.json`](../packages/vaul/status.json).
+[`packages/vaul`](../packages/vaul) `0.0.28` — ports `vaul@1.1.2`. Status data: [`packages/vaul/status.json`](../packages/vaul/status.json).
 
 Drawer, Root, NestedRoot, Portal, Overlay, Content, Handle, public props, and style.css.
 
@@ -1969,7 +1969,7 @@ Scope/evidence last checked: 2026-08-02.
 
 ## @octanejs/visx
 
-[`packages/visx`](../packages/visx) `0.1.56` — ports `@visx/visx@4.0.0 + master@485c035`. Status data: [`packages/visx/status.json`](../packages/visx/status.json).
+[`packages/visx`](../packages/visx) `0.1.57` — ports `@visx/visx@4.0.0 + master@485c035`. Status data: [`packages/visx/status.json`](../packages/visx/status.json).
 
 Complete current Visx 4.x web runtime surface: the exact 35-namespace aggregate, all 40 feature entry points, and the eight public a11y/react, a11y/server, axis/react, scale/react, shape/react, theme/react, tooltip/floating, and voronoi/react subpaths. Released-only packages chord, delaunay, react-spring, sankey, and stats remain directly importable exactly as upstream specifies.
 
@@ -2096,7 +2096,7 @@ Scope/evidence last checked: 2026-08-15.
 
 ## @octanejs/xyflow
 
-[`packages/xyflow`](../packages/xyflow) `0.1.15` — ports `@xyflow/react@12.11.2`. Status data: [`packages/xyflow/status.json`](../packages/xyflow/status.json).
+[`packages/xyflow`](../packages/xyflow) `0.1.16` — ports `@xyflow/react@12.11.2`. Status data: [`packages/xyflow/status.json`](../packages/xyflow/status.json).
 
 ReactFlow, ReactFlowProvider, Handle, hooks (useReactFlow, useNodes, useEdges, …), change helpers, and node/edge utilities from @xyflow/react@12.11.2.
 

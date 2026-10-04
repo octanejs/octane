@@ -1,5 +1,32 @@
 # @octanejs/shadcn
 
+## 0.0.50
+
+### Patch Changes
+
+- 40aaf4a: Remove unused imports and locals from published source, so these packages
+  typecheck in an application that enables `noUnusedLocals`.
+
+  These packages ship TypeScript and `.tsrx` source rather than declaration files,
+  so `skipLibCheck` does not exempt them: the application's compiler checks our
+  modules with the application's own options. Importing `linkOptions` from
+  `@octanejs/tanstack-router` under `noUnusedLocals`, for example, reported six
+  errors for imports in `link.ts` and `routeHookTypes.ts` that nothing read
+  (#1694). Runtime behavior is unchanged.
+
+  The brand fields on Base UI's `AlertDialogHandle` and `DrawerHandle`, and the
+  `ctx` constructor property on OpenTUI's `SpanRenderable`, are now `protected`
+  instead of `private`. A protected member keeps the handles nominally typed, as
+  the private one did, and the constructor still assigns `ctx`, but the compiler no
+  longer reports either as unused.
+- Updated dependencies [40aaf4a]
+- Updated dependencies [4af5e05]
+  - @octanejs/aria@0.0.57
+  - @octanejs/base-ui@0.1.61
+  - @octanejs/radix@0.1.61
+  - @octanejs/lucide@0.1.54
+  - @octanejs/sonner@0.1.55
+
 ## 0.0.49
 
 ### Patch Changes

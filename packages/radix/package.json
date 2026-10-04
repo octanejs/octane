@@ -1,6 +1,6 @@
 {
   "name": "@octanejs/radix",
-  "version": "0.1.60",
+  "version": "0.1.61",
   "license": "MIT",
   "type": "module",
   "sideEffects": false,
