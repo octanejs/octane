@@ -50,6 +50,26 @@ export function ReplayedIfs(props: { a: boolean; b: boolean }) @{
 	</main>
 }
 
+function IfThenSwitch(props: { a: boolean; b: boolean }) @{
+	const settle = useSettle();
+	<>
+		@if (settle(props.a)) {
+			<span>{'a'}</span>
+		}
+		@switch (props.b) {
+			@case true: {
+				<span>{'b'}</span>
+			}
+		}
+	</>
+}
+
+export function ReplayedIfThenSwitch(props: { a: boolean; b: boolean }) @{
+	<main>
+		<IfThenSwitch a={props.a} b={props.b} />
+	</main>
+}
+
 function ComponentThenIf(props: { a: boolean; b: boolean }) @{
 	const settle = useSettle();
 	<>
@@ -67,7 +87,7 @@ export function ReplayedComponent(props: { a: boolean; b: boolean }) @{
 }
 
 // The update is scheduled while an earlier sibling's arguments are evaluated:
-// that call waits for the replay, while the later @if creates its slot now.
+// that call and the later @if both wait for the replay to create their slots.
 function LiteThenIf(props: { a: boolean; b: boolean }) @{
 	const settle = useSettle();
 	<>
