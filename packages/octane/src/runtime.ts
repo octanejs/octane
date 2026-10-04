@@ -43272,8 +43272,13 @@ interface BranchSlot {
 	branch: number;
 	block: Block | null;
 	/**
-	 * Sibling immediately before a markerless arm's incomplete mount. `undefined`
-	 * means no pending mount; `null` means the pending arm started at the parent edge.
+	 * Where a markerless arm's incomplete mount starts. `undefined` means no
+	 * pending mount. `null` is a client arm that threw before inserting anything:
+	 * it owns no DOM, so it retains no bound. Siblings can replace or remove the
+	 * node that preceded it, or stage a replacement right after that node, before
+	 * it renders again (renderMarkerlessArm). A node is the start comment that a
+	 * held hydrating arm owns (holdMarkerlessBranch), or the sibling before a
+	 * hydrating arm whose attempt is discarded.
 	 */
 	markerlessBefore: Node | null | undefined;
 }
@@ -43379,6 +43384,34 @@ function finalizeMarkerlessBranch(
 	} else delimitMarkerlessBranch(state, domParent, block, marker, first, after, contentEnd);
 }
 
+/**
+ * Render a client markerless arm that owns no DOM yet: a first mount, or a
+ * retry of an arm that threw before inserting anything. Its content starts
+ * after whatever precedes its insertion anchor now. An arm that throws before
+ * inserting anything stays unfinalized (`markerlessBefore === null`) so its
+ * retry finalizes it. One that already inserted content owns that DOM now:
+ * finalize it so teardown can remove it (a discarded keyed item otherwise
+ * strands the partial row).
+ */
+function renderMarkerlessArm(
+	state: BranchSlot,
+	domParent: Node,
+	block: Block,
+	marker: string,
+): void {
+	const after = block.endMarker;
+	const before = after ? domNode(after).previousSibling : domNode(domParent).lastChild;
+	state.markerlessBefore = null;
+	try {
+		renderBlock(block);
+	} catch (error) {
+		if ((before ? getNextSibling(before) : getFirstChild(domParent)) !== after)
+			finalizeMarkerlessBranch(state, domParent, block, marker, before, after);
+		throw error;
+	}
+	finalizeMarkerlessBranch(state, domParent, block, marker, before, after);
+}
+
 /** Bound a markerless arm's content, from `first` up to `contentEnd`, with a marker pair. */
 function delimitMarkerlessBranch(
 	state: BranchSlot,
@@ -43472,7 +43505,16 @@ function renderBranchSlot(
 		if (ROOT_RENDER_TRANSACTION !== null && (state.branch !== -1 || hydration !== null)) {
 			const previousBlock = state.block;
 			if (state.markerlessBefore !== undefined && previousBlock !== null) {
-				journalRootSlot(state, domParent, state.markerlessBefore, previousBlock.endMarker);
+				// A client arm without DOM (null) owns only the empty range before its
+				// anchor; the content in front of that belongs to its siblings.
+				const end = previousBlock.endMarker;
+				journalRootSlot(
+					state,
+					domParent,
+					state.markerlessBefore ??
+						(end === null ? domNode(domParent).lastChild : domNode(end).previousSibling),
+					end,
+				);
 			} else if (state.start !== null) {
 				// An owned pair can itself be replaced by an explicit boundary's
 				// completed WIP; borrowed parent markers stay outside this range.
@@ -43531,14 +43573,16 @@ function renderBranchSlot(
 			// The first arm suspended before it could publish a stable boundary. Its
 			// end marker is only the insertion anchor, so normal `.nextSibling`
 			// positioning would mount a superseding arm after the following static
-			// sibling and leave partially-inserted DOM behind. Tear down the aborted
-			// scope without range removal, then sweep exactly its provisional range.
-			// A held hydrating arm's range ends where its own content does: later
+			// sibling. Tear down the aborted scope without range removal, then sweep
+			// exactly its provisional range. A client arm owns no DOM, so it sweeps
+			// nothing: what precedes its anchor is its siblings' content, which may
+			// include a replacement staged after the node that preceded the arm. A
+			// held hydrating arm's range ends where its own content does: later
 			// siblings' server nodes lie between that and the insertion anchor.
 			const pending = state.block;
 			const heldEnd = hydration?.heldBranchEnd(markerlessBefore, domParent, pending.endMarker);
 			provisionalAfter = heldEnd === undefined ? pending.endMarker : heldEnd;
-			let node = markerlessBefore ? getNextSibling(markerlessBefore) : getFirstChild(domParent);
+			let node = markerlessBefore === null ? provisionalAfter : getNextSibling(markerlessBefore);
 			state.block = null;
 			state.markerlessBefore = undefined;
 			unmountBlock(pending, false);
@@ -43933,9 +43977,6 @@ function renderBranchSlot(
 			// Markerless client mount — pick the boundary by what the branch renders.
 			// This applies both on first mount and after an anchor-only empty arm:
 			// a single host can self-mark without first manufacturing a pair.
-			const before = after
-				? (STAGED_DOM?.view(after) ?? after).previousSibling
-				: (STAGED_DOM?.view(domParent) ?? domParent).lastChild;
 			// Hydrating, the server rendered no range for this slot but other
 			// content at the cursor, and later siblings may still adopt the server
 			// nodes after that. The branch takes the cursor's place: its content
@@ -43943,7 +43984,6 @@ function renderBranchSlot(
 			// leaves the cursor, not at `after`.
 			const cursor =
 				hydration !== null && !state.borrowed ? hydration.markerlessCursor(domParent, after) : null;
-			const contentBefore = cursor === null ? before : domNode(cursor).previousSibling;
 			const b = createBlock(
 				'control-flow',
 				parentBlock,
@@ -43955,56 +43995,54 @@ function renderBranchSlot(
 				env,
 			);
 			state.block = b;
-			state.markerlessBefore = before;
-			let contentEnd: Node | null | undefined;
-			try {
-				if (cursor === null) renderBlock(b);
-				else contentEnd = hydration!.renderMarkerless(b, cursor);
-			} catch (error) {
-				// A branch that throws before inserting anything stays unfinalized so
-				// a same-branch retry finalizes it. One that already inserted its
-				// root owns that DOM now: finalize it so teardown can remove it (a
-				// discarded keyed item otherwise strands the partial row). Hydrating,
-				// that is a root rebuilt in the cursor's place; a branch whose
-				// content is still server nodes is held (holdMarkerlessBranch).
-				const rebuilt = cursor === null ? null : hydration!.freshAfter(contentBefore, domParent);
-				if (
-					cursor === null
-						? (before ? getNextSibling(before) : getFirstChild(domParent)) !== after
-						: rebuilt !== null && rebuilt !== cursor
-				)
-					finalizeMarkerlessBranch(
-						state,
-						domParent,
-						b,
-						marker,
-						contentBefore,
-						after,
-						cursor === null ? after : hydration!.markerlessEnd(contentBefore, domParent, after),
-					);
-				else if (cursor !== null && hydration!.replaces(cursor)) {
-					// The branch rebuilt its root over the node at the cursor, which
-					// stays until that root commits in its place. A pair around the
-					// node bounds the branch, so a retry of this same block puts its
-					// root there and a branch change removes the node with the branch.
-					// The node itself cannot bound the branch: it is removed when the
-					// root commits.
-					state.markerlessBefore = undefined;
-					hydration!.save(domParent);
-					delimitMarkerlessBranch(
-						state,
-						domParent,
-						b,
-						marker,
-						cursor,
-						after,
-						hydration!.markerlessEnd(contentBefore, domParent, after),
-					);
-				} else if (cursor !== null)
-					hydration!.holdMarkerlessBranch(state, domParent, marker, contentBefore, after, error);
-				throw error;
+			if (cursor === null) renderMarkerlessArm(state, domParent, b, marker);
+			else {
+				const contentBefore = domNode(cursor).previousSibling;
+				state.markerlessBefore = after
+					? domNode(after).previousSibling
+					: domNode(domParent).lastChild;
+				let contentEnd: Node | null | undefined;
+				try {
+					contentEnd = hydration!.renderMarkerless(b, cursor);
+				} catch (error) {
+					// Hydrating, a root rebuilt in the cursor's place is content the branch
+					// owns now (see renderMarkerlessArm); a branch whose content is still
+					// server nodes is held (holdMarkerlessBranch).
+					const rebuilt = hydration!.freshAfter(contentBefore, domParent);
+					if (rebuilt !== null && rebuilt !== cursor)
+						finalizeMarkerlessBranch(
+							state,
+							domParent,
+							b,
+							marker,
+							contentBefore,
+							after,
+							hydration!.markerlessEnd(contentBefore, domParent, after),
+						);
+					else if (hydration!.replaces(cursor)) {
+						// The branch rebuilt its root over the node at the cursor, which
+						// stays until that root commits in its place. A pair around the
+						// node bounds the branch, so a retry of this same block puts its
+						// root there and a branch change removes the node with the branch.
+						// The node itself cannot bound the branch: it is removed when the
+						// root commits.
+						state.markerlessBefore = undefined;
+						hydration!.save(domParent);
+						delimitMarkerlessBranch(
+							state,
+							domParent,
+							b,
+							marker,
+							cursor,
+							after,
+							hydration!.markerlessEnd(contentBefore, domParent, after),
+						);
+					} else
+						hydration!.holdMarkerlessBranch(state, domParent, marker, contentBefore, after, error);
+					throw error;
+				}
+				finalizeMarkerlessBranch(state, domParent, b, marker, contentBefore, after, contentEnd);
 			}
-			finalizeMarkerlessBranch(state, domParent, b, marker, contentBefore, after, contentEnd);
 			replaceSharedBlockBoundary(
 				parentBlock,
 				oldBlockStart,
@@ -44037,21 +44075,24 @@ function renderBranchSlot(
 		if (state.block.extra !== env) journalRootProperty(state.block, 'extra', state.block.extra);
 		state.block.body = body!;
 		state.block.extra = env;
-		renderBlock(state.block);
-		const markerlessBefore = state.markerlessBefore;
-		if (markerlessBefore !== undefined) {
-			const after = state.block.endMarker;
-			const end = hydration?.heldBranchEnd(markerlessBefore, domParent, after);
-			finalizeMarkerlessBranch(
-				state,
-				domParent,
-				state.block,
-				marker,
-				markerlessBefore,
-				after,
-				end === undefined ? after : end,
-			);
-			if (end !== undefined) hydration!.dropHeldStart(markerlessBefore!, domParent);
+		if (state.markerlessBefore === null) renderMarkerlessArm(state, domParent, state.block, marker);
+		else {
+			renderBlock(state.block);
+			const markerlessBefore = state.markerlessBefore;
+			if (markerlessBefore !== undefined) {
+				const after = state.block.endMarker;
+				const end = hydration?.heldBranchEnd(markerlessBefore, domParent, after);
+				finalizeMarkerlessBranch(
+					state,
+					domParent,
+					state.block,
+					marker,
+					markerlessBefore,
+					after,
+					end === undefined ? after : end,
+				);
+				if (end !== undefined) hydration!.dropHeldStart(markerlessBefore!, domParent);
+			}
 		}
 	}
 	// Hydration consumed the whole outer control-flow slot, not only the active

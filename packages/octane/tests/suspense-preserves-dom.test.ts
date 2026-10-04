@@ -1,5 +1,9 @@
+import { readFileSync } from 'node:fs';
 import { describe, expect, it, vi } from 'vitest';
+import { startTransition, type ComponentBody } from '../src/index.js';
 import { act, mount, nextPaint } from './_helpers';
+import { loadCompiledFixtureSource } from './_server-fixture.js';
+import type { SupersededArmProps } from './_fixtures/suspense-superseded-arm.tsrx';
 import {
 	ConditionalArmRootSuspensionApp,
 	DescriptorRootSuspensionAfterSiblingApp,
@@ -884,3 +888,145 @@ describe('Suspense preserves committed host DOM', () => {
 		expect(log).toEqual(['cleanup:old']);
 	});
 });
+
+const supersededArmPath = 'packages/octane/tests/_fixtures/suspense-superseded-arm.tsrx';
+
+// Strong development and production output reach these runtime paths through
+// different emitted code, so the fixture compiles explicitly in both modes.
+function loadSupersededArmFixture(dev: boolean) {
+	return loadCompiledFixtureSource<typeof import('./_fixtures/suspense-superseded-arm.tsrx')>(
+		readFileSync(supersededArmPath, 'utf8'),
+		{
+			id: supersededArmPath,
+			mode: 'client',
+			compileOptions: { strong: true, dev, hmr: false },
+		},
+	);
+}
+
+type Priority = 'urgent' | 'transition';
+
+function mountSupersededArm(App: ComponentBody<SupersededArmProps>) {
+	const mounted = mount(App, { selection: 'A' });
+	return {
+		mounted,
+		render(props: SupersededArmProps, priority: Priority = 'urgent') {
+			return act(() => {
+				if (priority === 'transition') startTransition(() => mounted.root.render(App, props));
+				else mounted.root.render(App, props);
+			});
+		},
+		content() {
+			return mounted
+				.findAll('b, span, i, p')
+				.map((node) => `${node.localName}:${node.textContent}`);
+		},
+	};
+}
+
+for (const dev of [true, false]) {
+	describe(`a pending arm superseded beside a replaced sibling (${dev ? 'dev' : 'prod'})`, () => {
+		const fixture = loadSupersededArmFixture(dev);
+		const siblings = {
+			'keyed component': fixture.KeyedComponentSibling,
+			'keyed @for row': fixture.KeyedForSibling,
+			'@if/@else arm': fixture.BranchSibling,
+		};
+		const orders: Array<[Priority, Priority]> = [
+			['urgent', 'urgent'],
+			['urgent', 'transition'],
+			['transition', 'transition'],
+			['transition', 'urgent'],
+		];
+
+		for (const [sibling, App] of Object.entries(siblings)) {
+			for (const [pendingPriority, finalPriority] of orders) {
+				for (const final of ['A', 'C']) {
+					it(`keeps the ${sibling} when a ${finalPriority} update to ${final} supersedes a ${pendingPriority} suspended B`, async () => {
+						const app = mountSupersededArm(App);
+						try {
+							expect(app.content()).toEqual(['b:A', 'span:A']);
+							await app.render({ selection: 'B', wait: new Promise(() => {}) }, pendingPriority);
+							if (pendingPriority === 'urgent') {
+								expect(app.mounted.find('b').textContent).toBe('B');
+								expect(app.mounted.find('p').textContent).toBe('pending');
+							} else {
+								// The boundary holds its committed primary instead.
+								expect(app.mounted.findAll('p')).toHaveLength(0);
+								expect(app.mounted.find('span').textContent).toBe('A');
+							}
+
+							await app.render({ selection: final }, finalPriority);
+							expect(app.content()).toEqual([`b:${final}`, `span:${final}`]);
+						} finally {
+							app.mounted.unmount();
+						}
+					});
+				}
+			}
+		}
+
+		for (const sibling of ['keyed component', '@if/@else arm'] as const) {
+			it(`bounds a still-suspended arm after the ${sibling} before it is replaced`, async () => {
+				const app = mountSupersededArm(siblings[sibling]);
+				const pending = deferred<void>();
+				try {
+					await app.render({ selection: 'B', wait: pending.promise });
+					expect(app.mounted.find('p').textContent).toBe('pending');
+					// The replacement commits while the arm is still pending.
+					await app.render({ selection: 'C', wait: pending.promise });
+					expect(app.mounted.find('p').textContent).toBe('pending');
+
+					await act(() => pending.resolve());
+					expect(app.content()).toEqual(['b:C', 'span:C', 'i:ready']);
+					await app.render({ selection: 'D' });
+					expect(app.content()).toEqual(['b:D', 'span:D']);
+				} finally {
+					app.mounted.unmount();
+				}
+			});
+		}
+
+		it('rolls back a root update that superseded the arm, then applies the next update', () => {
+			const mounted = mount(fixture.RootGatedSibling, { selection: 'A' });
+			const content = () => mounted.html().replace(/<!--[^>]*-->/g, '');
+			try {
+				mounted.update(fixture.RootGatedSibling, { selection: 'B', wait: new Promise(() => {}) });
+				const pendingScreen = content();
+				expect(mounted.find('p').textContent).toBe('pending');
+
+				// The arm is superseded and A staged while the boundary stays pending on
+				// another arm. A later sibling then suspends the root, so the whole
+				// update is discarded.
+				const never = new Promise(() => {});
+				mounted.update(fixture.RootGatedSibling, { selection: 'A', second: never, gate: never });
+				expect(content()).toBe(pendingScreen);
+
+				mounted.update(fixture.RootGatedSibling, { selection: 'C' });
+				expect(mounted.findAll('b, span, i, p, u').map((node) => node.textContent)).toEqual([
+					'C',
+					'C',
+					'gate',
+				]);
+			} finally {
+				mounted.unmount();
+			}
+		});
+
+		it('removes the content an arm retry inserted before it suspended again', async () => {
+			const app = mountSupersededArm(fixture.PartialRetryArm);
+			const first = deferred<void>();
+			try {
+				await app.render({ selection: 'B', wait: first.promise, second: new Promise(() => {}) });
+				expect(app.mounted.find('p').textContent).toBe('pending');
+				await act(() => first.resolve());
+				expect(app.mounted.find('p').textContent).toBe('pending');
+
+				await app.render({ selection: 'C' });
+				expect(app.content()).toEqual(['b:C', 'span:C']);
+			} finally {
+				app.mounted.unmount();
+			}
+		});
+	});
+}
