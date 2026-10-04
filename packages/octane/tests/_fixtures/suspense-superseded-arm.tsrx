@@ -94,3 +94,30 @@ export function PartialRetryArm(props: SupersededArmProps) @{
 		}
 	</main>
 }
+
+function RootGate(props: { gate?: PromiseLike<unknown> }) @{
+	if (props.gate) use(props.gate);
+	<u>{'gate'}</u>
+}
+
+// A root update that supersedes the arm and then suspends outside the boundary
+// rolls back to the pending screen.
+export function RootGatedSibling(props: SupersededArmProps & { gate?: PromiseLike<unknown> }) @{
+	<main>
+		<b>{props.selection as string}</b>
+		@try {
+			<>
+				<SelectionChild key={props.selection} selection={props.selection} />
+				@if (props.wait) {
+					<WaitFor wait={props.wait} label="ready" />
+				}
+				@if (props.second) {
+					<WaitFor wait={props.second} label="second" />
+				}
+			</>
+		} @pending {
+			<p>{'pending'}</p>
+		}
+		<RootGate gate={props.gate} />
+	</main>
+}

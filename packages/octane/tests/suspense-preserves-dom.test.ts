@@ -987,6 +987,32 @@ for (const dev of [true, false]) {
 			});
 		}
 
+		it('rolls back a root update that superseded the arm, then applies the next update', () => {
+			const mounted = mount(fixture.RootGatedSibling, { selection: 'A' });
+			const content = () => mounted.html().replace(/<!--[^>]*-->/g, '');
+			try {
+				mounted.update(fixture.RootGatedSibling, { selection: 'B', wait: new Promise(() => {}) });
+				const pendingScreen = content();
+				expect(mounted.find('p').textContent).toBe('pending');
+
+				// The arm is superseded and A staged while the boundary stays pending on
+				// another arm. A later sibling then suspends the root, so the whole
+				// update is discarded.
+				const never = new Promise(() => {});
+				mounted.update(fixture.RootGatedSibling, { selection: 'A', second: never, gate: never });
+				expect(content()).toBe(pendingScreen);
+
+				mounted.update(fixture.RootGatedSibling, { selection: 'C' });
+				expect(mounted.findAll('b, span, i, p, u').map((node) => node.textContent)).toEqual([
+					'C',
+					'C',
+					'gate',
+				]);
+			} finally {
+				mounted.unmount();
+			}
+		});
+
 		it('removes the content an arm retry inserted before it suspended again', async () => {
 			const app = mountSupersededArm(fixture.PartialRetryArm);
 			const first = deferred<void>();

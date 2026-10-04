@@ -43513,8 +43513,16 @@ function renderBranchSlot(
 		if (ROOT_RENDER_TRANSACTION !== null && (state.branch !== -1 || hydration !== null)) {
 			const previousBlock = state.block;
 			if (state.markerlessBefore !== undefined && previousBlock !== null) {
-				// A client arm without DOM (null) journals from the parent's first child.
-				journalRootSlot(state, domParent, state.markerlessBefore, previousBlock.endMarker);
+				// A client arm without DOM (null) owns only the empty range before its
+				// anchor; the content in front of that belongs to its siblings.
+				const end = previousBlock.endMarker;
+				journalRootSlot(
+					state,
+					domParent,
+					state.markerlessBefore ??
+						(end === null ? domNode(domParent).lastChild : domNode(end).previousSibling),
+					end,
+				);
 			} else if (state.start !== null) {
 				// An owned pair can itself be replaced by an explicit boundary's
 				// completed WIP; borrowed parent markers stay outside this range.
