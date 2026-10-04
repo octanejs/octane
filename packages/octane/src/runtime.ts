@@ -16245,6 +16245,36 @@ function createHydrateSlot(
 	return state;
 }
 
+/**
+ * Resume `source`, a preserved activation's leaf that suspended inside
+ * client-built DOM. A client arm around it that suspended before inserting
+ * anything has no bound and reads its range from its insertion anchor
+ * (pendingArmBefore), so mark where the content the leaf inserts at that
+ * anchor starts on each such arm's block: that content is the arm's own.
+ */
+function resumeFreshHydrateSource(source: Block): void {
+	const anchor = source.endMarker;
+	const parent = source.parentNode;
+	const before = anchor ? domNode(anchor).previousSibling : domNode(parent).lastChild;
+	try {
+		renderBlock(source);
+	} finally {
+		const first = before ? getNextSibling(before) : getFirstChild(parent);
+		for (
+			let arm = source.parentBlock;
+			first !== anchor &&
+			arm?.kind === 'control-flow' &&
+			!arm.mounted &&
+			arm.startMarker === null &&
+			arm.endMarker === anchor;
+			arm = arm.parentBlock
+		) {
+			journalRootProperty(arm, 'startMarker', null);
+			arm.startMarker = first;
+		}
+	}
+}
+
 function activateHydrateBoundary(state: HydrateSlot): void {
 	if (state.start === null || state.end === null) return;
 	const block = state.block;
@@ -16306,7 +16336,7 @@ function activateHydrateBoundary(state: HydrateSlot): void {
 			const source = preserved.source;
 			hydration.node = preserved.cursor;
 			try {
-				if (preserved.fresh) hydration.suspend(() => renderBlock(source));
+				if (preserved.fresh) hydration.suspend(() => resumeFreshHydrateSource(source));
 				else hydration.renderSuspended(source);
 			} catch (error) {
 				if (!isSuspenseException(error)) throw error;
@@ -43314,7 +43344,9 @@ interface BranchSlot {
 	 * pending mount. `null` is a client arm that threw before inserting anything:
 	 * it owns no DOM, so it retains no bound. Siblings can replace or remove the
 	 * node that preceded it, or stage a replacement right after that node, before
-	 * it renders again (renderMarkerlessArm). A node is the start comment that a
+	 * it renders again (renderMarkerlessArm). A hydration retry that resumes a
+	 * leaf inside it records where that leaf's content starts on the arm block's
+	 * `startMarker` instead (pendingArmBefore). A node is the start comment that a
 	 * held hydrating arm owns (holdMarkerlessBranch), or the sibling before a
 	 * hydrating arm whose attempt is discarded.
 	 */
@@ -43459,9 +43491,22 @@ function finalizeMarkerlessBranch(
 }
 
 /**
+ * The node before the content of a client arm without a bound
+ * (`markerlessBefore === null`). It inserted nothing, so that is whatever
+ * precedes its insertion anchor now, unless a hydration retry resumed a leaf
+ * inside it: what that leaf inserted is the arm's own and starts at the arm
+ * block's `startMarker` (resumeFreshHydrateSource).
+ */
+function pendingArmBefore(block: Block, domParent: Node): Node | null {
+	const first = block.startMarker;
+	const node = first !== null && domNode(first).parentNode === domParent ? first : block.endMarker;
+	return node ? domNode(node).previousSibling : domNode(domParent).lastChild;
+}
+
+/**
  * Render a client markerless arm that owns no DOM yet: a first mount, or a
  * retry of an arm that threw before inserting anything. Its content starts
- * after whatever precedes its insertion anchor now. An arm that throws before
+ * after whatever precedes it now (pendingArmBefore). An arm that throws before
  * inserting anything stays unfinalized (`markerlessBefore === null`) so its
  * retry finalizes it. One that already inserted content owns that DOM now:
  * finalize it so teardown can remove it (a discarded keyed item otherwise
@@ -43474,7 +43519,7 @@ function renderMarkerlessArm(
 	marker: string,
 ): void {
 	const after = block.endMarker;
-	const before = after ? domNode(after).previousSibling : domNode(domParent).lastChild;
+	const before = pendingArmBefore(block, domParent);
 	state.markerlessBefore = null;
 	try {
 		renderBlock(block);
@@ -43579,15 +43624,13 @@ function renderBranchSlot(
 		if (ROOT_RENDER_TRANSACTION !== null && (state.branch !== -1 || hydration !== null)) {
 			const previousBlock = state.block;
 			if (state.markerlessBefore !== undefined && previousBlock !== null) {
-				// A client arm without DOM (null) owns only the empty range before its
-				// anchor; the content in front of that belongs to its siblings.
-				const end = previousBlock.endMarker;
+				// A client arm without a bound (null) owns only its own range before
+				// its anchor; the content in front of that belongs to its siblings.
 				journalRootSlot(
 					state,
 					domParent,
-					state.markerlessBefore ??
-						(end === null ? domNode(domParent).lastChild : domNode(end).previousSibling),
-					end,
+					state.markerlessBefore ?? pendingArmBefore(previousBlock, domParent),
+					previousBlock.endMarker,
 				);
 			} else if (state.start !== null) {
 				// An owned pair can itself be replaced by an explicit boundary's
@@ -43648,15 +43691,19 @@ function renderBranchSlot(
 			// end marker is only the insertion anchor, so normal `.nextSibling`
 			// positioning would mount a superseding arm after the following static
 			// sibling. Tear down the aborted scope without range removal, then sweep
-			// exactly its provisional range. A client arm owns no DOM, so it sweeps
-			// nothing: what precedes its anchor is its siblings' content, which may
-			// include a replacement staged after the node that preceded the arm. A
-			// held hydrating arm's range ends where its own content does: later
+			// exactly its provisional range. A client arm without a bound sweeps only
+			// what a resumed leaf inserted inside it, from its block's `startMarker`
+			// (pendingArmBefore): what precedes that is its siblings' content, which
+			// may include a replacement staged after the node that preceded the arm.
+			// A held hydrating arm's range ends where its own content does: later
 			// siblings' server nodes lie between that and the insertion anchor.
 			const pending = state.block;
 			const heldEnd = hydration?.heldBranchEnd(markerlessBefore, domParent, pending.endMarker);
 			provisionalAfter = heldEnd === undefined ? pending.endMarker : heldEnd;
-			let node = markerlessBefore === null ? provisionalAfter : getNextSibling(markerlessBefore);
+			let node =
+				markerlessBefore === null
+					? (pending.startMarker ?? provisionalAfter)
+					: getNextSibling(markerlessBefore);
 			state.block = null;
 			state.markerlessBefore = undefined;
 			unmountBlock(pending, false);
