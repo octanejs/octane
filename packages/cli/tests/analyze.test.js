@@ -1,7 +1,7 @@
 import { execFile } from 'node:child_process';
-import { existsSync, mkdirSync, readFileSync, symlinkSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, symlinkSync } from 'node:fs';
 import path from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import { promisify } from 'node:util';
 import { afterEach, describe, expect, it } from 'vitest';
 import { createFixture, runCli } from './helpers/fixture.js';
@@ -113,13 +113,24 @@ export function Hint({ value }) @{
 	it('reports a file that will not parse as an error, and keeps going', async () => {
 		const result = await analyze({
 			'src/Broken.tsrx': 'export function Broken() @{ <div> }\n',
-			'src/Fine.tsrx': "export function Fine() @{ <div>{'ok' as string}</div> }\n",
+			'src/Bad.tsrx':
+				'export function Bad() @{\n\t<input type="text" value={\'a\' as string} onChange={() => {}} />\n}\n',
 		});
 
 		const report = result.json();
-		expect(report.summary).toEqual({ errors: 1, warnings: 0, hints: 0 });
+		expect(report.summary).toEqual({ errors: 1, warnings: 1, hints: 0 });
 		expect(report.analyzed).toBe(2);
-		expect(report.findings[0].code).toBe('OCTANE_PARSE_ERROR');
+		// The next file's findings survive the parse failure before it.
+		expect(report.findings).toEqual([
+			expect.objectContaining({
+				file: expect.stringMatching(/Broken\.tsrx$/),
+				code: 'OCTANE_PARSE_ERROR',
+			}),
+			expect.objectContaining({
+				file: expect.stringMatching(/Bad\.tsrx$/),
+				code: 'OCTANE_NATIVE_TEXT_ONCHANGE',
+			}),
+		]);
 		expect(result.exitCode).toBe(3);
 	});
 
@@ -257,6 +268,33 @@ describe('octane analyze Strong coverage', () => {
 		]);
 		expect(report.findings[0].message).toMatch(/^Strong mode does not allow/);
 		expect((await run(loose.root)).json().findings).toEqual([]);
+	});
+
+	it('applies compiler.strong to Octane .tsx found by default, not to React .tsx', async () => {
+		const effectUpdate =
+			"import { useState, useEffect } from 'octane';\n" +
+			'export function App({ value }) {\n' +
+			'  const [current, setCurrent] = useState(0);\n' +
+			'  useEffect(() => { setCurrent(value); });\n' +
+			'  return <p>{current}</p>;\n' +
+			'}\n';
+		const { root } = app({
+			...CONFIG_STRONG,
+			// tsconfig hands .tsx to React; only the pragma claims Island for Octane.
+			'tsconfig.json': { compilerOptions: { jsx: 'react-jsx', jsxImportSource: 'react' } },
+			'src/Host.tsx': effectUpdate,
+			'src/Island.tsx': `/** @jsxImportSource octane */\n${effectUpdate}`,
+		});
+
+		const report = (await run(root)).json();
+		expect(report.analyzed).toBe(1);
+		expect(report.findings).toEqual([
+			expect.objectContaining({
+				file: 'src/Island.tsx',
+				code: 'OCTANE_STRONG_EFFECT_STATE_UPDATE',
+				line: 5,
+			}),
+		]);
 	});
 
 	it('records every Octane module that compiles without Strong mode', async () => {
@@ -492,21 +530,26 @@ describe('octane analyze Strong migration', () => {
 		expect(result.exitCode).toBe(3);
 	});
 
-	it('still reports a compile error that stops a Strong module before analysis', async () => {
+	it('keeps Strong findings when code generation then fails', async () => {
 		const result = await analyze({
 			'src/Loop.tsrx':
 				'"use strong";\n' +
-				"import { useState } from 'octane';\n" +
-				'export function Loop() @{\n' +
+				"import { useEffect, useState } from 'octane';\n" +
+				"import { observe } from './external';\n" +
+				'export function Loop({ value }) @{\n' +
+				'\tuseEffect(() => { observe(value); }, [value]);\n' +
 				'\tfor (const item of [1, 2]) {\n' +
-				'\t\tconst [value] = useState(item);\n' +
+				'\t\tconst [current] = useState(item);\n' +
 				'\t}\n' +
 				'\t<div />\n' +
 				'}\n',
 		});
 
+		// Strong analysis passes the module with a hint, and slotting its hooks
+		// then throws. Neither hides the other.
 		expect(result.json().findings).toEqual([
-			expect.objectContaining({ code: 'OCTANE_COMPILE_ERROR', line: 5 }),
+			expect.objectContaining({ code: 'OCTANE_STRONG_EXPLICIT_DEPENDENCIES', severity: 'hint' }),
+			expect.objectContaining({ code: 'OCTANE_COMPILE_ERROR', line: 7 }),
 		]);
 	});
 
@@ -572,29 +615,33 @@ describe('octane analyze Strong migration', () => {
 	});
 
 	it('falls back to the first error with an older compiler that cannot collect', async () => {
-		// An installed octane from before collectDiagnostics: only compile(),
-		// which throws the first Strong violation the way that compiler did.
+		// An installed octane from before collectDiagnostics exposes only
+		// compile(). The real compile() stands in for it, so the fallback reports
+		// the error that compile() actually throws.
 		const { root } = project({
 			'node_modules/octane/package.json': {
 				name: 'octane',
 				type: 'module',
 				exports: { './compiler': './compiler.js' },
 			},
-			'src/Clock.tsrx': 'export function Clock() @{ <span /> }\n',
-		});
-		writeFileSync(
-			path.join(root, 'node_modules/octane/compiler.js'),
-			'export function compile(source, filename) {\n' +
-				'\tconst error = new SyntaxError(`${filename}:2:15: [OCTANE_STRONG_RENDER_IMPURE_CALL] Strong mode does not allow nondeterministic calls during render.`);\n' +
-				'\terror.loc = { line: 2, column: 14 };\n' +
-				'\tthrow error;\n' +
+			'node_modules/octane/compiler.js': `export { compile } from ${JSON.stringify(
+				pathToFileURL(path.join(OCTANE, 'src/compiler/index.js')).href,
+			)};\n`,
+			'src/Clock.tsrx':
+				'"use strong";\n' +
+				'export function Clock() @{\n' +
+				'  const now = Date.now();\n' +
+				'  const seed = Math.random();\n' +
+				'  <span>{(String(now) + String(seed)) as string}</span>\n' +
 				'}\n',
-		);
+		});
 
 		const result = await runCli(['analyze', '--cwd', root, '--json']);
+		// Both clock reads are violations, but compile() throws only the first.
 		expect(result.json().findings).toEqual([
-			expect.objectContaining({ code: 'OCTANE_STRONG_RENDER_IMPURE_CALL', line: 2, column: 15 }),
+			expect.objectContaining({ code: 'OCTANE_STRONG_RENDER_IMPURE_CALL', line: 3, column: 15 }),
 		]);
+		expect(result.exitCode).toBe(3);
 		// The report must not read as complete when it cannot be.
 		const text = await runCli(['analyze', '--cwd', root]);
 		expect(text.stdout + text.stderr).toContain('reports only the first error in each file');

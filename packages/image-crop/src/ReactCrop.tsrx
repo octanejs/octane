@@ -126,7 +126,6 @@ export function ReactCrop(props: ReactCropProps): OctaneNode {
 	const componentRef = useRef<HTMLDivElement | null>(null);
 	const mediaRef = useRef<HTMLDivElement | null>(null);
 	const resizeObserverRef = useRef<ResizeObserver | undefined>(undefined);
-	const initChangeCalledRef = useRef(false);
 	const instanceIdRef = useRef<string | null>(null);
 	const previousCropRef = useRef<Crop | undefined>(props.crop);
 	const docListenersRef = useRef<

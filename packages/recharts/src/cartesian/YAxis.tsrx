@@ -1,4 +1,4 @@
-import type { OctaneElement, SVGProps } from '../util/OctaneTypes.ts';
+import type { SVGProps } from '../util/OctaneTypes.ts';
 import type {
 	AxisDomainTypeInput,
 	AxisInterval,

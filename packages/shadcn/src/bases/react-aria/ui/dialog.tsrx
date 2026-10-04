@@ -5,7 +5,6 @@ import {
 	Heading,
 	ModalOverlay as ModalOverlayPrimitive,
 	Modal as ModalPrimitive,
-	type DialogProps as DialogPrimitiveProps,
 	type DialogTriggerProps as DialogTriggerPrimitiveProps,
 	type ModalOverlayProps as ModalOverlayPrimitiveProps,
 } from '@octanejs/aria/components';

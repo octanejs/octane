@@ -50,10 +50,20 @@ export function createDeclaredDerivedCell<T>(
 	options?: DerivedOptions,
 	sequence?: number,
 	captures?: readonly unknown[],
+	declaring?: number,
 ): DerivedSignal<T> {
 	// Only a bundle that creates these cells carries their candidate producer.
 	installDerivedCandidates();
-	return createDerivedCellWith(owner, key, compute, options, DerivedBinding, sequence, captures);
+	return createDerivedCellWith(
+		owner,
+		key,
+		compute,
+		options,
+		DerivedBinding,
+		sequence,
+		captures,
+		declaring,
+	);
 }
 
 interface AttemptDependency {

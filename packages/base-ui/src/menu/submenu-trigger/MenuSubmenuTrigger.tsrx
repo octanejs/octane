@@ -2,7 +2,6 @@
 import * as React from 'octane';
 import { isElementDisabled } from '@octanejs/base-ui-utils/isElementDisabled';
 import { warn } from '@octanejs/base-ui-utils/warn';
-import type { SafeReact } from '@octanejs/base-ui-utils/safeReact';
 import { EMPTY_OBJECT } from '@octanejs/base-ui-utils/empty';
 import { platform } from '@octanejs/base-ui-utils/platform';
 import { useStableCallback } from '@octanejs/base-ui-utils/useStableCallback';

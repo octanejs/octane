@@ -51,13 +51,13 @@ import { DialogContext, OverlayTriggerStateContext } from './Dialog';
 import { FieldErrorContext } from './FieldError';
 import { filterDOMProps } from '../upstream-exports/react-aria/filterDOMProps';
 import { FormContext } from './Form';
-import type { forwardRefType, GlobalDOMAttributes } from '@react-types/shared';
+import type { GlobalDOMAttributes } from '@react-types/shared';
 import { GroupContext } from './Group';
 import { HiddenDateInput } from './HiddenDateInput';
 import { LabelContext } from './Label';
 import { mergeProps } from '../upstream-exports/react-aria/mergeProps';
 import { PopoverContext } from './Popover';
-import React, { createContext, type ForwardedRef, forwardRef, useRef } from '../compat/react';
+import { createContext, type ForwardedRef, forwardRef, useRef } from '../compat/react';
 import { TextContext } from './Text';
 import { useFocusRing } from '../upstream-exports/react-aria/useFocusRing';
 

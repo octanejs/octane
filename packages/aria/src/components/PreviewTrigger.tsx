@@ -23,7 +23,7 @@ import type { OverlayTriggerState } from '../upstream-exports/react-stately/useO
 import { OverlayTriggerStateContext } from './Dialog';
 import { PopoverContext } from './Popover';
 import { Provider } from './utils';
-import React, { type JSX, useMemo, useRef } from '../compat/react';
+import { type JSX, useMemo, useRef } from '../compat/react';
 import { useTooltipTriggerState } from '../upstream-exports/react-stately/useTooltipTriggerState';
 
 export interface PreviewTriggerProps extends AriaPreviewTriggerProps {

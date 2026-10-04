@@ -63,7 +63,11 @@ function nativeScriptBytes(script) {
 function ownerOf(identifier) {
 	const value = identifier.replaceAll('\\', '/');
 	if (value.includes('/benchmarks/lynx-table/app/src/')) return 'fixture-app';
-	if (value.includes('/packages/octane/src/universal-core')) return 'universal-runtime';
+	// The owner kernel is extracted from the universal core (#1055) and is
+	// attributed with it until a renderer other than the universal one ships it.
+	if (/\/packages\/octane\/src\/(?:universal-core|owner-kernel\/)/.test(value)) {
+		return 'universal-runtime';
+	}
 	if (/\/packages\/lynx\/src\/core\/(?:host-driver|papi)/.test(value)) {
 		return 'host-driver-papi';
 	}

@@ -1,6 +1,6 @@
 /** @jsxImportSource @octanejs/three/intrinsics */
 import { type ThreeElements, type ThreeRef, useFrame, useInstanceHandle, useThree } from '@octanejs/three';
-import { useCallback, useEffect, useImperativeHandle, useLayoutEffect, useMemo, useRef, useState, type RefObject } from '@octanejs/three/renderer';
+import { useEffect, useImperativeHandle, useLayoutEffect, useMemo, useRef, useState, type RefObject } from '@octanejs/three/renderer';
 import { createContext, type OctaneNode, useContext } from 'octane';
 import { easing, misc } from 'maath';
 import * as THREE from 'three';

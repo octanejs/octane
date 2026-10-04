@@ -2,7 +2,6 @@ import type { SVGProps } from '../util/OctaneTypes.ts';
 /**
  * @fileOverview Render a group of error bar
  */
-import * as React from 'octane';
 
 import { Layer } from '../container/Layer.tsrx';
 import type { EasingInput, DataKey, RectangleCoordinate } from '../util/types';

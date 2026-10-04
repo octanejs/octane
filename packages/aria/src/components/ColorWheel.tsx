@@ -22,7 +22,7 @@ import {
 import { filterDOMProps } from '../upstream-exports/react-aria/filterDOMProps';
 import type { GlobalDOMAttributes } from '@react-types/shared';
 import { InternalColorThumbContext } from './ColorThumb';
-import React, {
+import {
 	createContext,
 	type ForwardedRef,
 	forwardRef,

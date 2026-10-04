@@ -1,4 +1,3 @@
-import * as React from 'octane';
 import { useLayoutEffect, useRef } from 'octane';
 import type { AxisDomain, BaseAxisProps, ScaleType } from '../util/types';
 import {
