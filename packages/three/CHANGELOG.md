@@ -1,5 +1,30 @@
 # @octanejs/three
 
+## 0.1.53
+
+### Patch Changes
+
+- 425a32a: Make in-place updates of a keyed list of Three meshes faster. Updating 1,000 retained mesh positions now takes about 0.7–0.8× the time React Three Fiber does on the Three benchmark, down from parity. The per-item comparison and validation work now runs in small functions the JavaScript engine optimizes as hot code. A full garbage collection no longer discards the optimized code that reads frozen host batches, so the first commit after one stays fast. Behavior is unchanged.
+- Updated dependencies [1aa7696]
+- Updated dependencies [8e68622]
+- Updated dependencies [c1a8faf]
+- Updated dependencies [12c32ec]
+- Updated dependencies [1066cf6]
+- Updated dependencies [00f8304]
+- Updated dependencies [00f8304]
+- Updated dependencies [dfff293]
+- Updated dependencies [00cb8a5]
+- Updated dependencies [39006d3]
+- Updated dependencies [16d6090]
+- Updated dependencies [949894d]
+- Updated dependencies [39cf382]
+- Updated dependencies [6651f44]
+- Updated dependencies [6651f44]
+- Updated dependencies [425a32a]
+- Updated dependencies [02e6726]
+- Updated dependencies [414e192]
+  - octane@0.9.0
+
 ## 0.1.52
 
 ### Patch Changes

@@ -1,5 +1,15 @@
 # @octanejs/cli
 
+## 0.2.0
+
+### Minor Changes
+
+- 6651f44: `octane analyze` reports every Strong violation in a file instead of the first, and analyzes `.tsx` modules whose JSX goes to Octane by default. `--strong-preview` compiles every module as if Strong mode were on and counts what it would reject by code, without failing on modules that are not Strong yet. `--fix` applies the compiler's suggested edits, such as React's lazy ref initialization to `useLazyRef` and `useMemo`/`useCallback` to plain declarations. `octane explain` also explains Strong diagnostic codes, with their replacements and migration recipes.
+
+### Patch Changes
+
+- 6651f44: Strong mode now rejects a synchronous state update in a host element's callback ref with `OCTANE_STRONG_REF_STATE_UPDATE`. Octane calls a callback ref while the element commits, before paint, so the check follows the effect setup rules. It covers inline and local functions, a state setter passed as the ref, and functions in a `ref={[...]}` list. When the callback copies a DOM measurement into state, the error names `useLayoutSnapshot`. Updates the ref defers to `requestAnimationFrame`, a timer with a positive delay, or an observer or event listener stay legal, and a component's `ref` prop is not checked. `octane explain` and the MCP server's `octane_strong_explain` describe the new code and its migration recipe.
+
 ## 0.1.0
 
 ### Minor Changes

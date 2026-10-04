@@ -1,6 +1,6 @@
 {
   "name": "@octanejs/rsbuild-plugin",
-  "version": "0.1.58",
+  "version": "0.1.59",
   "license": "MIT",
   "type": "module",
   "engines": {
