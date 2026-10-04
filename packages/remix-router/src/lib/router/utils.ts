@@ -1,8 +1,7 @@
-// Vendored from react-router@8.2.0 packages/react-router/lib/router/utils.ts — unmodified except: React types → local ../react-types shim; route descriptors → octane createElement; build-time __DEV__ constant → NODE_ENV check.
+// Vendored from react-router@8.2.0 packages/react-router/lib/router/utils.ts — unmodified except: React types → local ../react-types shim; route descriptors → octane createElement; build-time __DEV__ constant → NODE_ENV check; type-level _tests alias and its Equal/Expect import → removed (consumer noUnusedLocals); unread private error/internal fields → protected (consumer noUnusedLocals).
 // Re-vendor with `node scripts/vendor-remix-router.mjs`; never hand-edit.
 import type * as React from '../react-types';
 import { createElement } from 'octane';
-import type { Equal, Expect } from '../types/utils';
 import type { Location, Path, To } from './history';
 import { invariant, parsePath, warning } from './history';
 import {
@@ -803,32 +802,6 @@ type _ParseParams<path extends string> =
 
 // prettier-ignore
 export type PathParam<path extends string> = (keyof ParseParams<path>) & string;
-
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
-type _tests = [
-	// PathParam
-	Expect<Equal<PathParam<'/a/b/*'>, '*'>>,
-	Expect<Equal<PathParam<':a'>, 'a'>>,
-	Expect<Equal<PathParam<'/a/:b'>, 'b'>>,
-	Expect<Equal<PathParam<'/a/blahblahblah:b'>, never>>,
-	Expect<Equal<PathParam<'/:a/:b'>, 'a' | 'b'>>,
-	Expect<Equal<PathParam<'/:a/b/:c/*'>, 'a' | 'c' | '*'>>,
-	Expect<Equal<PathParam<'/:lang.xml'>, 'lang'>>,
-	Expect<Equal<PathParam<'/:lang?.xml'>, 'lang'>>,
-
-	// ParseParams
-	Expect<Equal<ParseParams<'/a/b/*'>, { '*': string }>>,
-	Expect<Equal<ParseParams<':a'>, { a: string }>>,
-	Expect<Equal<ParseParams<'/a/:b'>, { b: string }>>,
-	Expect<Equal<ParseParams<'/a/blahblahblah:b'>, {}>>,
-	Expect<Equal<Simplify<ParseParams<'/:a/:b'>>, { a: string; b: string }>>,
-	Expect<Equal<Simplify<ParseParams<'/:a/b/:c/*'>>, { a: string; c: string; '*': string }>>,
-	Expect<Equal<ParseParams<'/:lang.xml'>, { lang: string }>>,
-	Expect<Equal<ParseParams<'/:lang?.xml'>, { lang?: string | null | undefined }>>,
-	Expect<Equal<Simplify<ParseParams<'/:a/:a'>>, { a: string }>>,
-	Expect<Equal<Simplify<ParseParams<'/:a/:a?'>>, { a: string }>>,
-	Expect<Equal<Simplify<ParseParams<'/:a?/:a?'>>, { a?: string | null | undefined }>>,
-];
 
 // Attempt to parse the given string segment. If it fails, then just return the
 // plain string type as a default fallback. Otherwise, return the union of the
@@ -2088,8 +2061,8 @@ export class ErrorResponseImpl implements ErrorResponse {
 	status: number;
 	statusText: string;
 	data: any;
-	private error?: Error;
-	private internal: boolean;
+	protected error?: Error;
+	protected internal: boolean;
 
 	constructor(status: number, statusText: string | undefined, data: any, internal = false) {
 		this.status = status;

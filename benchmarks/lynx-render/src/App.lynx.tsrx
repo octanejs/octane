@@ -10,12 +10,19 @@ export interface BenchAppProps {
 }
 
 /**
+ * Component executions on this thread's copy of the module. The harness reads
+ * it only after a timing sample ends, as a deterministic work counter.
+ */
+export const renderCounts = { app: 0 };
+
+/**
  * Row shape used by the Vue-Lynx unified benchmark matrix: a keyed list of
  * rows, each with an id cell, a tappable label cell, and a tappable remove
  * cell. The tap handlers are ordinary background `bind*` props so the suite
  * measures the same host-command volume a click-driven run would produce.
  */
 export function BenchApp(props: BenchAppProps) @{
+	renderCounts.app++;
 	const [selected, setSelected] = useState(0);
 	const [removed, setRemoved] = useState(0);
 

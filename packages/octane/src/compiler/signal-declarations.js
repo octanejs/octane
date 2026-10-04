@@ -476,6 +476,96 @@ function callOpenParen(node, source) {
 // evaluation of the module makes every edited declaration differ once.
 const HMR_REVISION = '_$signalRevision';
 
+// The runtime helper a declared use calls (see __declared in signals/facade.ts).
+const DECLARED_USE = '__declared';
+
+/**
+ * Method calls, inside functions a component or hook body creates, on that
+ * body's own const declarations. The function closes over the declaration, so
+ * the call resolves the declaring owner's cell wherever the function later
+ * runs: in a child it was passed to, or with no owner after an `await`. A
+ * handle used as a value, such as a prop, is still resolved by its reader, and
+ * so are producer closures. Those are the arguments of a declaration or of an
+ * explicit Scope factory, and they run in the owner whose cell they compute.
+ * Returns each call's receiver identifier, mapped to `trusted`'s value for its
+ * declaration.
+ */
+function declaredUses(ast, lexical, owners, trusted) {
+	const declarations = new Map();
+	const uses = new Map();
+	const seen = new WeakSet();
+	const declare = (node) => {
+		if (node === null || typeof node !== 'object' || seen.has(node)) return;
+		seen.add(node);
+		if (Array.isArray(node)) {
+			for (const child of node) declare(child);
+			return;
+		}
+		if (node.type === 'VariableDeclaration' && node.kind === 'const' && node.declare !== true) {
+			for (const declarator of node.declarations ?? []) {
+				const init = unwrapExpression(declarator.init);
+				const value = declarator.id?.type === 'Identifier' && init ? trusted(init) : null;
+				const depth = owners.get(init)?.length ?? 1;
+				if (value === null || depth === 1) continue;
+				const scope = lexical.nodeScopes.get(node);
+				let names = declarations.get(scope);
+				if (names === undefined) declarations.set(scope, (names = new Map()));
+				names.set(declarator.id.name, { depth, value });
+			}
+		}
+		for (const key in node) {
+			if (!AST_METADATA.has(key) && !key.startsWith('_octane')) declare(node[key]);
+		}
+	};
+	declare(ast);
+	if (declarations.size === 0) return uses;
+	const visited = new WeakSet();
+	const visit = (node, producer) => {
+		if (node === null || typeof node !== 'object' || visited.has(node)) return;
+		visited.add(node);
+		if (Array.isArray(node)) {
+			for (const child of node) visit(child, producer);
+			return;
+		}
+		const callee =
+			node.type === 'CallExpression' || node.type === 'OptionalCallExpression'
+				? unwrapExpression(node.callee)
+				: null;
+		// Parentheses and type assertions around a factory still make a producer.
+		if (
+			callee != null &&
+			(trusted(callee === node.callee ? node : { ...node, callee }) !== null ||
+				((callee.type === 'MemberExpression' || callee.type === 'OptionalMemberExpression') &&
+					SIGNAL_FACTORIES.has(propertyName(callee))))
+		) {
+			visit(node.callee, producer);
+			visit(node.arguments, true);
+			return;
+		}
+		if (
+			!producer &&
+			(callee?.type === 'MemberExpression' || callee?.type === 'OptionalMemberExpression')
+		) {
+			const object = unwrapExpression(callee.object);
+			if (object?.type === 'Identifier') {
+				const binding = lexical.resolveBinding(
+					lexical.nodeScopes.get(object) ?? lexical.rootScope,
+					object.name,
+				);
+				const declaration =
+					binding === null ? undefined : declarations.get(binding.scope)?.get(object.name);
+				if (declaration !== undefined && (owners.get(object)?.length ?? 0) > declaration.depth)
+					uses.set(object, declaration.value);
+			}
+		}
+		for (const key in node) {
+			if (!AST_METADATA.has(key) && !key.startsWith('_octane')) visit(node[key], producer);
+		}
+	};
+	visit(ast, false);
+	return uses;
+}
+
 /**
  * Give owner-facade signal declarations a client/server-stable authored site.
  * Existing explicit Scope methods are deliberately outside this transform.
@@ -588,10 +678,16 @@ export function lowerSignalDeclarations(ast, filename, options) {
 	collect(ast);
 	if (!changed) return ast;
 	const captures = analyzeSignalCaptures(ast, declarations);
+	// Only a declaration inside a function can be used from a nested one.
+	const uses =
+		declarations.length === 0 ? new Map() : declaredUses(ast, lexical, owners, trustedFactory);
 	const revision =
 		options?.hmr && captures.size > 0 ? b.id(allocateName(usedNames, HMR_REVISION)) : null;
 
 	let lowered = mapAst(ast, (node) => {
+		const use = uses.get(node);
+		if (use !== undefined)
+			return inheritHookMemoOrigin(b.call(use.helper(DECLARED_USE), { ...node }), node);
 		const trusted = trustedFactory(node);
 		if (trusted === null) return null;
 		const site = signalSite(cleanFilename, owners.get(node) ?? ['module'], node);
@@ -692,6 +788,40 @@ export function signalDeclarationSourceEdits(ast, filename, source, options) {
 		}
 		return helper.local;
 	};
+	// The factory a call declares through a trusted import, and how to name its
+	// lowered helpers, or null for any other call.
+	const trustedFactory = (node) => {
+		if (node.type !== 'CallExpression' && node.type !== 'OptionalCallExpression') return null;
+		const callee = node.callee;
+		const scope = lexical.nodeScopes.get(callee) ?? lexical.rootScope;
+		if (callee?.type === 'Identifier') {
+			const record = namedImports.get(callee.name);
+			const binding = lexical.resolveBinding(scope, callee.name);
+			if (
+				record !== undefined &&
+				binding?.scope === lexical.rootScope &&
+				binding.importSource?.value === record.source
+			) {
+				return { factory: record.factory, helper: (imported) => helperFor(record, imported) };
+			}
+		} else if (
+			(callee?.type === 'MemberExpression' || callee?.type === 'OptionalMemberExpression') &&
+			callee.object?.type === 'Identifier'
+		) {
+			const member = propertyName(callee);
+			const importSource = namespaceImports.get(callee.object.name);
+			const binding = lexical.resolveBinding(scope, callee.object.name);
+			if (
+				SIGNAL_FACTORIES.has(member) &&
+				importSource !== undefined &&
+				binding?.scope === lexical.rootScope &&
+				binding.importSource?.value === importSource
+			) {
+				return { factory: member, helper: (imported) => `${callee.object.name}.${imported}` };
+			}
+		}
+		return null;
+	};
 	const edits = [];
 	const declarations = [];
 	const seen = new WeakSet();
@@ -702,65 +832,38 @@ export function signalDeclarationSourceEdits(ast, filename, source, options) {
 			for (const child of node) visit(child);
 			return;
 		}
-		if (node.type === 'CallExpression' || node.type === 'OptionalCallExpression') {
-			const callee = node.callee;
-			const scope = lexical.nodeScopes.get(callee) ?? lexical.rootScope;
-			let replacement = null;
-			let factory = null;
-			let helper = null;
-			if (callee?.type === 'Identifier') {
-				const record = namedImports.get(callee.name);
-				const binding = lexical.resolveBinding(scope, callee.name);
-				if (
-					record !== undefined &&
-					binding?.scope === lexical.rootScope &&
-					binding.importSource?.value === record.source
-				) {
-					factory = record.factory;
-					helper = (imported) => helperFor(record, imported);
-				}
-			} else if (
-				(callee?.type === 'MemberExpression' || callee?.type === 'OptionalMemberExpression') &&
-				callee.object?.type === 'Identifier'
-			) {
-				const member = propertyName(callee);
-				const importSource = namespaceImports.get(callee.object.name);
-				const binding = lexical.resolveBinding(scope, callee.object.name);
-				if (
-					SIGNAL_FACTORIES.has(member) &&
-					importSource !== undefined &&
-					binding?.scope === lexical.rootScope &&
-					binding.importSource?.value === importSource
-				) {
-					factory = member;
-					helper = (imported) => `${callee.object.name}.${imported}`;
-				}
-			}
-			if (factory !== null) replacement = helper(declarationHelper(factory, node));
-			if (replacement !== null) {
-				const opening = callOpenParen(node, source);
-				if (opening === -1) return;
-				const pure = pureSignalDeclaration(factory, node);
-				if ((owners.get(node)?.length ?? 1) > 1) declarations.push({ node, factory, helper });
-				edits.push({
-					pos: callee.start,
-					end: callee.end,
-					text: `${pure ? '/* @__PURE__ */ ' : ''}${replacement}`,
-				});
-				const first = node.arguments?.[0];
-				const site = signalSite(cleanFilename, owners.get(node) ?? ['module'], node);
-				edits.push({
-					pos: opening,
-					end: opening + 1,
-					text: `(${JSON.stringify(site)}${first === undefined ? '' : ', '}`,
-				});
-			}
+		const trusted = trustedFactory(node);
+		if (trusted !== null) {
+			const { factory, helper } = trusted;
+			const replacement = helper(declarationHelper(factory, node));
+			const opening = callOpenParen(node, source);
+			if (opening === -1) return;
+			const pure = pureSignalDeclaration(factory, node);
+			if ((owners.get(node)?.length ?? 1) > 1) declarations.push({ node, factory, helper });
+			edits.push({
+				pos: node.callee.start,
+				end: node.callee.end,
+				text: `${pure ? '/* @__PURE__ */ ' : ''}${replacement}`,
+			});
+			const first = node.arguments?.[0];
+			const site = signalSite(cleanFilename, owners.get(node) ?? ['module'], node);
+			edits.push({
+				pos: opening,
+				end: opening + 1,
+				text: `(${JSON.stringify(site)}${first === undefined ? '' : ', '}`,
+			});
 		}
 		for (const key in node) {
 			if (!AST_METADATA.has(key) && !key.startsWith('_octane')) visit(node[key]);
 		}
 	};
 	visit(ast);
+	if (declarations.length > 0) {
+		for (const [identifier, { helper }] of declaredUses(ast, lexical, owners, trustedFactory)) {
+			edits.push({ pos: identifier.start, text: `${helper(DECLARED_USE)}(` });
+			edits.push({ pos: identifier.end, text: ')' });
+		}
+	}
 	const captures = analyzeSignalCaptures(ast, declarations);
 	const revision = options?.hmr && captures.size > 0 ? allocateName(usedNames, HMR_REVISION) : null;
 	for (const { node, factory, helper } of declarations) {

@@ -7,6 +7,11 @@
  * native engine. The fake PAPI is deliberately cheap so the measurement is
  * Octane's own per-node CPU cost rather than native element allocation. This
  * makes no native paint, layout, or device claim.
+ *
+ * First-screen scenarios take the separately compiled main-thread layer
+ * (`main-workload.ts`) and install its receiver instead, so the main thread
+ * paints with its own specialization of the fixture before the background
+ * adopts the tree.
  */
 import { createLynxRoot, type LynxRoot } from '../../packages/lynx/src/index.js';
 import { installLynxMainThread } from '../../packages/lynx/src/main-thread.js';
@@ -25,7 +30,11 @@ import {
 	decodeLynxTransportValue,
 	encodeLynxTransportValue,
 } from '../../packages/lynx/src/core/transport-codec.js';
-import { BenchApp, EmptyApp, type BenchRow } from './src/App.lynx.tsrx';
+import { BenchApp, EmptyApp, renderCounts, type BenchRow } from './src/App.lynx.tsrx';
+import type * as MainThreadLayerModule from './main-workload.ts';
+
+/** The compiled main-thread layer module, imported by the runner. */
+export type MainThreadLayerBundle = typeof MainThreadLayerModule;
 
 interface FakeNode {
 	readonly sign: number;
@@ -52,7 +61,7 @@ type Listener = (event: LynxContextProxyEvent) => void;
  * the other end's listeners, matching the direction the real dual-thread
  * ContextProxy uses without introducing scheduling noise into the timings.
  */
-function createContextPair(): ContextPair {
+export function createContextPair(): ContextPair {
 	const backgroundListeners = new Map<string, Listener[]>();
 	const mainListeners = new Map<string, Listener[]>();
 	const messages: LynxContextProxyEvent[] = [];
@@ -89,6 +98,15 @@ export class FakeElementPAPI {
 	flushes = 0;
 	createdElements = 0;
 	onSetId: ((node: FakeNode, value: string | null) => void) | null = null;
+	/**
+	 * Element PAPI calls by name, or null when not counting. Counting wraps every
+	 * global, so the runner enables it only for untimed validation runs.
+	 */
+	readonly calls: Map<string, number> | null;
+
+	constructor(options: { readonly countCalls?: boolean } = {}) {
+		this.calls = options.countCalls === true ? new Map() : null;
+	}
 
 	private create(type: string, text = ''): FakeNode {
 		const sign = this.nextSign++;
@@ -110,6 +128,20 @@ export class FakeElementPAPI {
 
 	/** Element PAPI globals consumed by `createLynxElementPAPI`. */
 	globals(): Record<string, unknown> {
+		const globals = this.uncountedGlobals();
+		const calls = this.calls;
+		if (calls === null) return globals;
+		for (const [name, value] of Object.entries(globals)) {
+			if (typeof value !== 'function') continue;
+			globals[name] = (...args: unknown[]) => {
+				calls.set(name, (calls.get(name) ?? 0) + 1);
+				return (value as (...args: unknown[]) => unknown)(...args);
+			};
+		}
+		return globals;
+	}
+
+	private uncountedGlobals(): Record<string, unknown> {
 		return {
 			__CreatePage: (_componentId: string, _cssId: number) => this.create('page'),
 			__CreateElement: (type: string) => this.create(type),
@@ -252,12 +284,31 @@ export class FakeElementPAPI {
 		);
 		return page?.children[0]?.id ?? null;
 	}
+
+	/** Every host reachable from the page, depth first, as element identities. */
+	reachableNodes(): FakeNode[] {
+		const page = [...this.nodes.values()].find(
+			(node) => node.type === 'page' && node.parent === null,
+		);
+		const nodes: FakeNode[] = [];
+		const stack = page === undefined ? [] : [page];
+		while (stack.length !== 0) {
+			const node = stack.pop()!;
+			nodes.push(node);
+			for (let index = node.children.length - 1; index >= 0; index--) {
+				stack.push(node.children[index]!);
+			}
+		}
+		return nodes;
+	}
 }
 
 export interface Harness {
 	readonly papi: FakeElementPAPI;
 	readonly root: LynxRoot;
 	readonly main: ReturnType<typeof installLynxMainThread>;
+	/** The compiled main-thread layer, when the harness paints a first screen. */
+	readonly mainLayer: MainThreadLayerModule.MainThreadLayer | null;
 	readonly diagnostics: Error[];
 	/** Background globals, including the engine's `lynxCoreInject.tt` hook. */
 	readonly backgroundTarget: Record<string, unknown>;
@@ -266,9 +317,15 @@ export interface Harness {
 	dispose(): Promise<void>;
 }
 
-export function createHarness(): Harness {
+export interface HarnessOptions {
+	/** Install the compiled main-thread layer's receiver, which can paint a first screen. */
+	readonly mainLayer?: MainThreadLayerBundle;
+	readonly countCalls?: boolean;
+}
+
+export function createHarness(options: HarnessOptions = {}): Harness {
 	const contexts = createContextPair();
-	const papi = new FakeElementPAPI();
+	const papi = new FakeElementPAPI({ countCalls: options.countCalls });
 	const diagnostics: Error[] = [];
 	const emitter = {
 		addListener() {},
@@ -279,11 +336,12 @@ export function createHarness(): Harness {
 		...papi.globals(),
 		lynx: { getJSContext: () => contexts.main },
 	};
-	const main = installLynxMainThread({
-		target: mainTarget,
-		context: contexts.main,
-		onDiagnostic: (error) => diagnostics.push(error),
-	});
+	const onDiagnostic = (error: Error) => diagnostics.push(error);
+	const mainLayer =
+		options.mainLayer?.installMainThreadLayer(mainTarget, contexts.main, onDiagnostic) ?? null;
+	const main =
+		mainLayer?.controller ??
+		installLynxMainThread({ target: mainTarget, context: contexts.main, onDiagnostic });
 	const backgroundTarget = {
 		// The engine's private background event injection. Carrying it on the
 		// harness target keeps each run's engine hooks off the global object.
@@ -308,6 +366,7 @@ export function createHarness(): Harness {
 		papi,
 		root,
 		main,
+		mainLayer,
 		diagnostics,
 		backgroundTarget: backgroundTarget as unknown as Record<string, unknown>,
 		transportMessages: contexts.messages,
@@ -335,6 +394,36 @@ export interface RunResult {
 	readonly privateSelectors: number;
 	readonly diagnostics: readonly string[];
 	readonly transport: LynxTransportMetrics;
+	/** Wire traffic inside the timed interval only. */
+	readonly wire: LynxWireMetrics;
+	/** Fixture component executions inside the timed interval, per thread. */
+	readonly renders: { readonly background: number; readonly main: number };
+	/** Element PAPI calls inside the timed interval, when the run counted them. */
+	readonly papiCalls: Readonly<Record<string, number>> | null;
+}
+
+/** Messages and UTF-8 bytes each direction carried, all through the codec. */
+export interface LynxWireMetrics {
+	readonly framesToMain: number;
+	readonly framesToBackground: number;
+	readonly bytesToMain: number;
+	readonly bytesToBackground: number;
+}
+
+export interface RunOptions {
+	/** Count Element PAPI calls. Adds work inside the timer, so never on a timing sample. */
+	readonly countCalls?: boolean;
+}
+
+export interface AdoptionResult extends RunResult {
+	/** Hosts the background created while adopting a complete first screen. */
+	readonly hostsCreatedDuringAdoption: number;
+	/** Every first-screen host is still the reachable host at the same position. */
+	readonly retainedIdentity: boolean;
+	/** Visible-tree checksum of the first screen before adoption began. */
+	readonly firstScreenChecksum: number;
+	/** A native tap on the adopted tree reached its background handler. */
+	readonly adoptedTapHandled: boolean;
 }
 
 /** Structural mount work, measured only after the wall-clock timer stops. */
@@ -508,83 +597,192 @@ async function settle(harness: Harness): Promise<void> {
 	for (let turn = 0; turn < 8; turn++) await Promise.resolve();
 }
 
+const utf8 = new TextEncoder();
+
+function wireMetrics(messages: readonly LynxContextProxyEvent[]): LynxWireMetrics {
+	let framesToMain = 0;
+	let framesToBackground = 0;
+	let bytesToMain = 0;
+	let bytesToBackground = 0;
+	for (const event of messages) {
+		const bytes = typeof event.data === 'string' ? utf8.encode(event.data).length : 0;
+		if (event.type === LYNX_BACKGROUND_TO_MAIN_EVENT) {
+			framesToMain++;
+			bytesToMain += bytes;
+		} else if (event.type === LYNX_MAIN_TO_BACKGROUND_EVENT) {
+			framesToBackground++;
+			bytesToBackground += bytes;
+		}
+	}
+	return { framesToMain, framesToBackground, bytesToMain, bytesToBackground };
+}
+
+/**
+ * Work counters for one timed interval. `start()` runs just before the timer and
+ * every read happens after it stops, so no counter is maintained inside it
+ * beyond the opt-in Element PAPI call counts.
+ */
+function intervalCounters(harness: Harness, main: MainThreadLayerBundle | undefined) {
+	let messageMark = 0;
+	let backgroundRenders = 0;
+	let mainRenders = 0;
+	return {
+		start() {
+			messageMark = harness.transportMessages.length;
+			backgroundRenders = renderCounts.app;
+			mainRenders = main?.mainRenderCount() ?? 0;
+			harness.papi.calls?.clear();
+		},
+		finish(durationMs: number): RunResult {
+			return {
+				durationMs,
+				createdElements: harness.papi.createdElements,
+				checksum: harness.papi.checksum(),
+				reachableChecksum: harness.papi.reachableChecksum(),
+				eventTokens: harness.papi.eventTokens().length,
+				privateSelectors: harness.papi.privateRefSelectors(),
+				diagnostics: harness.diagnostics.map((error) => error.message),
+				transport: transportMetrics(harness),
+				wire: wireMetrics(harness.transportMessages.slice(messageMark)),
+				renders: {
+					background: renderCounts.app - backgroundRenders,
+					main: (main?.mainRenderCount() ?? 0) - mainRenders,
+				},
+				papiCalls: harness.papi.calls === null ? null : Object.fromEntries(harness.papi.calls),
+			};
+		},
+	};
+}
+
 /** Empty-startup target: root construction, readiness, and one empty commit. */
-export async function runEmptyStartup(): Promise<RunResult> {
-	const harness = createHarness();
+export async function runEmptyStartup(options: RunOptions = {}): Promise<RunResult> {
+	const harness = createHarness(options);
+	const counters = intervalCounters(harness, undefined);
+	counters.start();
 	const started = performance.now();
 	await harness.root.render(EmptyApp, {});
 	await settle(harness);
-	const durationMs = performance.now() - started;
-	const result: RunResult = {
-		durationMs,
-		createdElements: harness.papi.createdElements,
-		checksum: harness.papi.checksum(),
-		reachableChecksum: harness.papi.reachableChecksum(),
-		eventTokens: harness.papi.eventTokens().length,
-		privateSelectors: harness.papi.privateRefSelectors(),
-		diagnostics: harness.diagnostics.map((error) => error.message),
-		transport: transportMetrics(harness),
-	};
+	const result = counters.finish(performance.now() - started);
 	await harness.dispose();
 	return result;
 }
 
 /** Create-rows target: one mount of `count` keyed rows through the full path. */
-export async function runCreateRows(count: number): Promise<RunResult> {
-	const harness = createHarness();
+export async function runCreateRows(count: number, options: RunOptions = {}): Promise<RunResult> {
+	const harness = createHarness(options);
 	const rows = makeRows(count);
+	const counters = intervalCounters(harness, undefined);
+	counters.start();
 	const started = performance.now();
 	await harness.root.render(BenchApp, { rows });
 	await settle(harness);
-	const durationMs = performance.now() - started;
-	const result: RunResult = {
-		durationMs,
-		createdElements: harness.papi.createdElements,
-		checksum: harness.papi.checksum(),
-		reachableChecksum: harness.papi.reachableChecksum(),
-		eventTokens: harness.papi.eventTokens().length,
-		privateSelectors: harness.papi.privateRefSelectors(),
-		diagnostics: harness.diagnostics.map((error) => error.message),
-		transport: transportMetrics(harness),
-	};
+	const result = counters.finish(performance.now() - started);
 	await harness.dispose();
 	return result;
 }
 
-/** Time the first native selection after an already-settled keyed-row mount. */
-export async function runUpdateRows(count: number): Promise<RunResult> {
-	const harness = createHarness();
-	await harness.root.render(BenchApp, { rows: makeRows(count) });
-	await settle(harness);
-	const token = harness.papi.eventTokens()[0];
+function publishTap(harness: Harness, token: string, row: number, timestamp: number): void {
 	const publishEvent = (
 		harness.backgroundTarget as { lynxCoreInject?: { tt?: { publishEvent?: unknown } } }
 	).lynxCoreInject?.tt?.publishEvent as ((handler: unknown, event: unknown) => unknown) | undefined;
-	if (token === undefined || typeof publishEvent !== 'function') {
+	if (typeof publishEvent !== 'function') {
+		throw new Error('Octane Lynx benchmark requires the background publishEvent receiver.');
+	}
+	publishEvent(token, {
+		type: 'tap',
+		timestamp,
+		target: { id: `row-${row}`, uid: row, dataset: {} },
+		currentTarget: { id: `row-${row}`, uid: row, dataset: {} },
+	});
+}
+
+/** Time the first native selection after an already-settled keyed-row mount. */
+export async function runUpdateRows(count: number, options: RunOptions = {}): Promise<RunResult> {
+	const harness = createHarness(options);
+	await harness.root.render(BenchApp, { rows: makeRows(count) });
+	await settle(harness);
+	const token = harness.papi.eventTokens()[0];
+	if (token === undefined) {
 		await harness.dispose();
 		throw new Error('Octane Lynx update benchmark requires a mounted native tap handler.');
 	}
+	const counters = intervalCounters(harness, undefined);
+	counters.start();
 	const started = performance.now();
-	publishEvent(token, {
-		type: 'tap',
-		timestamp: 1,
-		target: { id: 'row-1', uid: 1, dataset: {} },
-		currentTarget: { id: 'row-1', uid: 1, dataset: {} },
-	});
+	publishTap(harness, token, 1, 1);
 	await settle(harness);
-	const durationMs = performance.now() - started;
-	const result: RunResult = {
-		durationMs,
-		createdElements: harness.papi.createdElements,
-		checksum: harness.papi.checksum(),
-		reachableChecksum: harness.papi.reachableChecksum(),
-		eventTokens: harness.papi.eventTokens().length,
-		privateSelectors: harness.papi.privateRefSelectors(),
-		diagnostics: harness.diagnostics.map((error) => error.message),
-		transport: transportMetrics(harness),
-	};
+	const result = counters.finish(performance.now() - started);
 	await harness.dispose();
 	return result;
+}
+
+/**
+ * First-screen target: the main thread's synchronous paint of `count` keyed
+ * rows with its own specialization of the fixture, through to the release of
+ * the readiness handshake Rspeedy performs right after the main entry runs.
+ */
+export async function runFirstScreen(
+	count: number,
+	main: MainThreadLayerBundle,
+	options: RunOptions = {},
+): Promise<RunResult> {
+	const harness = createHarness({ ...options, mainLayer: main });
+	const rows = makeRows(count);
+	const counters = intervalCounters(harness, main);
+	counters.start();
+	const started = performance.now();
+	harness.mainLayer!.renderFirstScreen(rows);
+	harness.main.markFirstScreenSyncReady();
+	const result = counters.finish(performance.now() - started);
+	await harness.dispose();
+	return result;
+}
+
+/**
+ * Adoption target: after an untimed first screen, the background's first
+ * render of the same rows through acknowledgement, which must take over the
+ * painted hosts instead of creating new ones. One native tap afterwards, also
+ * untimed, proves the adopted tree routes events to background handlers.
+ */
+export async function runAdoption(
+	count: number,
+	main: MainThreadLayerBundle,
+	options: RunOptions = {},
+): Promise<AdoptionResult> {
+	const harness = createHarness({ ...options, mainLayer: main });
+	const rows = makeRows(count);
+	harness.mainLayer!.renderFirstScreen(rows);
+	harness.main.markFirstScreenSyncReady();
+	const firstScreenNodes = harness.papi.reachableNodes();
+	const firstScreenChecksum = harness.papi.reachableChecksum();
+	const createdBefore = harness.papi.createdElements;
+	const counters = intervalCounters(harness, main);
+	counters.start();
+	const started = performance.now();
+	await harness.root.render(BenchApp, { rows });
+	await settle(harness);
+	const result = counters.finish(performance.now() - started);
+	const adoptedNodes = harness.papi.reachableNodes();
+	const retainedIdentity =
+		adoptedNodes.length === firstScreenNodes.length &&
+		adoptedNodes.every((node, index) => node === firstScreenNodes[index]);
+	const token = harness.papi.eventTokens()[0];
+	let adoptedTapHandled = false;
+	if (token !== undefined) {
+		publishTap(harness, token, 1, 1);
+		await settle(harness);
+		adoptedTapHandled = harness.papi.reachableChecksum() !== result.reachableChecksum;
+	}
+	const diagnostics = harness.diagnostics.map((error) => error.message);
+	await harness.dispose();
+	return {
+		...result,
+		diagnostics,
+		hostsCreatedDuringAdoption: result.createdElements - createdBefore,
+		retainedIdentity,
+		firstScreenChecksum,
+		adoptedTapHandled,
+	};
 }
 
 /**
