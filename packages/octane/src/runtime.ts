@@ -39806,6 +39806,9 @@ export function errorBlock(
 		registerSlot(parentScope, newState);
 		state = newState;
 	} else {
+		// The env tuple carries the parent render's captured values, including the
+		// fallback's. A descendant's later throw must not read a rolled-back render's.
+		if (state.env !== env) journalRootProperty(state, 'env', state.env);
 		state.tryBody = tryBody;
 		state.catchBody = catchBody;
 		state.env = env;
