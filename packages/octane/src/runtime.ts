@@ -43363,29 +43363,21 @@ interface BranchSlot {
  * and a hydrating slot adopts the server's range, which already bounds it.
  *
  * A render that schedules its own update mid-body replays before its slots
- * settle: component calls return without creating anything, and a branch slot
- * is created but renders no arm. Nothing is minted until the replay, which
- * reaches every slot in source order; a branch slot created in the meantime
- * takes its own anchor then, before it renders, unless it adopted a server
- * range.
+ * settle, and its slot writers create nothing until then. Nothing is minted
+ * until the replay either, which reaches every slot in source order.
  */
 export function ownSlotAnchor(scope: Scope, slotKey: number, block: Block): Node | null {
 	const anchor = block.endMarker;
 	const parent = block.parentNode;
 	const hydration = activeHydration();
-	const slot = scope.slots[slotKey] as BranchSlot | undefined;
 	if (
-		(slot !== undefined && (slot.branch !== -1 || slot.start !== null)) ||
+		scope.slots[slotKey] !== undefined ||
 		(hydration !== null && !hydration.inFreshRange(anchor, parent)) ||
 		(CURRENT_BLOCK?.pending && !CURRENT_BLOCK.crossRenderUpdate)
 	)
 		return anchor;
 	const own = (STAGED_DOM?.view(document) ?? document).createComment('');
 	(STAGED_DOM?.view(parent) ?? parent).insertBefore(own, anchor);
-	if (slot !== undefined) {
-		journalRootProperty(slot, 'anchor', slot.anchor);
-		slot.anchor = own;
-	}
 	return own;
 }
 
@@ -43615,9 +43607,6 @@ function renderBranchSlot(
 	// the same staleness a per-render closure had).
 	env?: any[],
 ): void {
-	// A condition/discriminant can queue a parent self-update while its call
-	// arguments are evaluated. Preserve the previous branch for the replay.
-	if (CURRENT_BLOCK?.pending && !CURRENT_BLOCK.crossRenderUpdate) return;
 	const parentBlock = parentScope.block;
 	const hydration = activeHydration();
 	if (next !== state.branch) {
@@ -44255,13 +44244,18 @@ export function ifBlock(
 	// Hoisted-helper env tuple (compiled-output Phase 2) — see renderBranchSlot.
 	env?: any[],
 ): void {
+	// Evaluating this call's or an earlier slot's arguments can queue the
+	// component's own update, and the render then replays. Leave the slot to the
+	// replay, which keeps any previous branch and reaches every slot in source
+	// order. A slot created now would adopt, when hydrating, the server range of
+	// an earlier sibling that this pass skipped.
+	if (CURRENT_BLOCK?.pending && !CURRENT_BLOCK.crossRenderUpdate) return;
 	let state = parentScope.slots[slotKey] as IfSlot | undefined;
 	if (
 		slotKey === 0 &&
 		parentScope !== RETURNED_OUTPUT_SCOPE &&
 		(state as any)?.returnedOutput === true
 	) {
-		if (CURRENT_BLOCK?.pending && !CURRENT_BLOCK.crossRenderUpdate) return;
 		if (state!.__kind === 'ifBlockSlot') {
 			setReturnedOutputOwner(state, false);
 		} else {
@@ -45209,13 +45203,14 @@ export function switchBlock(
 	// Hoisted-helper env tuple (compiled-output Phase 2) — see renderBranchSlot.
 	env?: any[],
 ): void {
+	// Leave the slot to a pending replay, as ifBlock does.
+	if (CURRENT_BLOCK?.pending && !CURRENT_BLOCK.crossRenderUpdate) return;
 	let state = parentScope.slots[slotKey] as SwitchSlot | undefined;
 	if (
 		slotKey === 0 &&
 		parentScope !== RETURNED_OUTPUT_SCOPE &&
 		(state as any)?.returnedOutput === true
 	) {
-		if (CURRENT_BLOCK?.pending && !CURRENT_BLOCK.crossRenderUpdate) return;
 		if (state!.__kind === 'switchBlockSlot') {
 			setReturnedOutputOwner(state, false);
 		} else {

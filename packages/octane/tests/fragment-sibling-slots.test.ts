@@ -122,26 +122,59 @@ describe.each(compiles)('fragment sibling slots (dev: $dev, strong: $strong)', (
 });
 
 // A render that updates its own state replays before its slots settle. Each
-// slot still gets its source position, whichever pass creates it.
+// slot still gets its source position, whichever pass creates it, and a
+// hydrating slot adopts its own server range rather than an earlier sibling's.
+const REPLAY_SHAPES = [
+	'ReplayedIfs',
+	'ReplayedIfThenSwitch',
+	'ReplayedComponent',
+	'ReplayedLiteBeforeIf',
+	'ReplayedComponentBeforeIf',
+] as const;
+// `a` empties while `b` stays empty, then fills before `b`.
+const EMPTY_THEN_FILL: Props[] = [
+	{ a: true, b: false },
+	{ a: false, b: false },
+	{ a: false, b: true },
+	{ a: true, b: true },
+];
+
 describe.each(compiles.filter((options) => !options.strong))(
 	'fragment sibling slots in a replayed render (dev: $dev)',
 	(options) => {
+		const compileOptions = { ...options, hmr: false };
 		const client = loadCompiledFixtureSource(REPLAY_SOURCE, {
 			id: REPLAY_FILE,
 			mode: 'client',
-			compileOptions: { ...options, hmr: false },
+			compileOptions,
+		});
+		const server = loadCompiledFixtureSource(REPLAY_SOURCE, {
+			id: REPLAY_FILE,
+			mode: 'server',
+			compileOptions,
 		});
 
-		it.each([
-			'ReplayedIfs',
-			'ReplayedComponent',
-			'ReplayedLiteBeforeIf',
-			'ReplayedComponentBeforeIf',
-		])('%s', (shape) => {
-			const container = document.createElement('div');
+		let container: HTMLElement;
+		let unmount: (() => void) | null;
+		let errors: ReturnType<typeof vi.spyOn>;
+
+		beforeEach(() => {
+			container = document.createElement('div');
 			document.body.appendChild(container);
-			const root = createRoot(container);
-			try {
+			unmount = null;
+			errors = vi.spyOn(console, 'error');
+		});
+
+		afterEach(() => {
+			unmount?.();
+			container.remove();
+			errors.mockRestore();
+		});
+
+		describe.each(REPLAY_SHAPES)('%s', (shape) => {
+			it('mounts', () => {
+				const root = createRoot(container);
+				unmount = () => root.unmount();
 				for (const states of [FILL_BEFORE, REFILL_AFTER]) {
 					for (const props of states) {
 						flushSync(() => root.render(client[shape], props));
@@ -149,10 +182,35 @@ describe.each(compiles.filter((options) => !options.strong))(
 					}
 					flushSync(() => root.render(client[shape], { a: false, b: false }));
 				}
-			} finally {
-				root.unmount();
-				container.remove();
-			}
+				expect(errors).not.toHaveBeenCalled();
+			});
+
+			// A fresh root, so the hydrating render is the one that replays.
+			it.each([
+				['refills an emptied earlier slot after its later sibling unmounts', REFILL_AFTER],
+				['fills an empty earlier slot before its later sibling', FILL_BEFORE],
+				['empties an earlier slot, then fills it before its later sibling', EMPTY_THEN_FILL],
+			])('hydrates, then %s', async (_, states) => {
+				container.innerHTML = renderToString(server[shape], states[0]).html;
+				const serverSpans = [...container.querySelectorAll('span')];
+				const recoverable: unknown[] = [];
+				const root = hydrateRoot(container, client[shape], states[0], {
+					onRecoverableError: (error: unknown) => recoverable.push(error),
+				});
+				unmount = () => root.unmount();
+				flushSync(() => {});
+				await act(async () => {});
+				expect(recoverable).toEqual([]);
+				const spans = [...container.querySelectorAll('span')];
+				expect(spans).toHaveLength(serverSpans.length);
+				spans.forEach((span, i) => expect(span).toBe(serverSpans[i]));
+				expect(container.querySelector('main')!.textContent).toBe(view(states[0]));
+				for (const props of states.slice(1)) {
+					flushSync(() => root.render(client[shape], props));
+					expect(container.querySelector('main')!.textContent).toBe(view(props));
+				}
+				expect(errors).not.toHaveBeenCalled();
+			});
 		});
 	},
 );
