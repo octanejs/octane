@@ -6,6 +6,7 @@
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
 import { bridgeReportFromSource } from '@octanejs/mcp-server/bridge';
+import { explainStrong, STRONG_EXPLAIN_TOOL } from '@octanejs/mcp-server/strong';
 import { DOC_SLUGS, docBySlug } from '../content/docs.ts';
 import { search } from '../content/search.ts';
 import {
@@ -99,7 +100,7 @@ export function registerRemoteTools(server: McpServer): void {
 		{
 			title: 'Compile Octane source',
 			description:
-				"Compile/validate source with the real Octane compiler. Paste .tsrx (directive blocks, @{ } bodies) or standard .tsx/.jsx; a successful result includes runnable compiled JS plus nonfatal warnings with codes and authored ranges. Fatal parse/compile failures return an error with line/column and a code frame. Use mode 'server' for SSR output.",
+				'Compile/validate source with the real Octane compiler. Paste .tsrx (directive blocks, @{ } bodies) or standard .tsx/.jsx; a successful result includes runnable compiled JS plus nonfatal warnings with codes and authored ranges. Fatal parse/compile failures return an error with line/column and a code frame. Use mode \'server\' for SSR output. Set strong (or start the module with "use strong") to check Strong mode: a failed Strong compile also returns every finding in `diagnostics`, each with its code, location, docs url, and suggestions, some carrying source edits (offsets into the pasted source). Explain a code with octane_strong_explain.',
 			inputSchema: {
 				source: z.string().min(1).max(200_000),
 				filename: z
@@ -109,12 +110,35 @@ export function registerRemoteTools(server: McpServer): void {
 					.describe('The extension selects the dialect: .tsrx enables directive blocks/@{ }.'),
 				mode: z.enum(['client', 'server']).default('client'),
 				dev: z.boolean().default(false),
+				strong: z
+					.boolean()
+					.optional()
+					.describe(
+						'Compile in Strong mode, as `compiler: { strong: true }` would, and report every Strong finding rather than only the first.',
+					),
 				autoMemo: z.boolean().optional(),
 				parallelUse: z.boolean().optional(),
 			},
 			annotations: READ_ONLY,
 		},
 		async (input) => json(runCompile(input)),
+	);
+
+	server.registerTool(
+		STRONG_EXPLAIN_TOOL.name,
+		{
+			title: STRONG_EXPLAIN_TOOL.title,
+			description: STRONG_EXPLAIN_TOOL.description,
+			inputSchema: {
+				code: z.string().max(500).optional().describe(STRONG_EXPLAIN_TOOL.codeDescription),
+				recipe: z.string().max(200).optional().describe(STRONG_EXPLAIN_TOOL.recipeDescription),
+			},
+			annotations: READ_ONLY,
+		},
+		async (input) => {
+			const { ok, text: body } = explainStrong(input);
+			return ok ? text(body) : { ...text(body), isError: true };
+		},
 	);
 
 	server.registerTool(
@@ -183,7 +207,7 @@ export function registerRemoteTools(server: McpServer): void {
 		{
 			title: 'Octane skill',
 			description:
-				'Return an Octane agent skill by name: bridging React packages, migrating React components to .tsrx, intentional React divergences, and SSR setup.',
+				'Return an Octane agent skill by name: bridging React packages, migrating React components to .tsrx, migrating modules to Strong mode, intentional React divergences, and SSR setup.',
 			inputSchema: {
 				name: z.enum(SKILL_NAMES),
 			},

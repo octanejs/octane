@@ -1,5 +1,5 @@
 import { execFile } from 'node:child_process';
-import { existsSync, mkdirSync, readFileSync, symlinkSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, symlinkSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { promisify } from 'node:util';
@@ -440,5 +440,163 @@ describe('octane analyze Strong coverage', () => {
 		const result = await run(root, ['--strong-baseline', 'init', '--dry-run']);
 		expect(result.exitCode).toBe(0);
 		expect(existsSync(path.join(root, 'octane-strong-baseline.json'))).toBe(false);
+	});
+});
+
+describe('octane analyze Strong migration', () => {
+	/**
+	 * @param {Record<string, string | object>} files
+	 */
+	function app(files) {
+		const created = project(files);
+		mkdirSync(path.join(created.root, 'node_modules'), { recursive: true });
+		symlinkSync(OCTANE, path.join(created.root, 'node_modules/octane'), 'dir');
+		return created;
+	}
+
+	/**
+	 * @param {string} root
+	 * @param {string[]} [extra]
+	 */
+	const run = (root, extra = []) => runCli(['analyze', '--cwd', root, ...extra, '--json']);
+
+	const CLOCK =
+		'"use strong";\n' +
+		'export function Clock() {\n' +
+		'  const now = Date.now();\n' +
+		'  const seed = Math.random();\n' +
+		'  return <span>{now}:{seed}</span>;\n' +
+		'}\n';
+
+	const CART =
+		"import { useMemo, useRef, useState } from 'octane';\n" +
+		'class Store { add() {} }\n' +
+		'export function Cart({ items }: { items: number[] }) {\n' +
+		'  const store = useRef<Store | null>(null);\n' +
+		'  if (store.current === null) store.current = new Store();\n' +
+		'  const total = useMemo(() => items.reduce((a, b) => a + b, 0), [items]);\n' +
+		'  const [open] = useState(false);\n' +
+		'  return <button onClick={() => store.current?.add()}>{String(total) + String(open)}</button>;\n' +
+		'}\n';
+
+	it('reports every Strong violation in a file, not only the first', async () => {
+		const result = await analyze({ 'src/Clock.tsx': CLOCK });
+
+		expect(result.json().findings).toEqual([
+			expect.objectContaining({ code: 'OCTANE_STRONG_RENDER_IMPURE_CALL', line: 3 }),
+			expect.objectContaining({ code: 'OCTANE_STRONG_RENDER_IMPURE_CALL', line: 4 }),
+		]);
+		expect(result.json().findings[0].url).toBe(
+			'https://octanejs.dev/docs/strong-mode#octane-strong-render-impure-call',
+		);
+		expect(result.exitCode).toBe(3);
+	});
+
+	it('still reports a compile error that stops a Strong module before analysis', async () => {
+		const result = await analyze({
+			'src/Loop.tsrx':
+				'"use strong";\n' +
+				"import { useState } from 'octane';\n" +
+				'export function Loop() @{\n' +
+				'\tfor (const item of [1, 2]) {\n' +
+				'\t\tconst [value] = useState(item);\n' +
+				'\t}\n' +
+				'\t<div />\n' +
+				'}\n',
+		});
+
+		expect(result.json().findings).toEqual([
+			expect.objectContaining({ code: 'OCTANE_COMPILE_ERROR', line: 5 }),
+		]);
+	});
+
+	it("analyzes Octane .tsx by default and leaves another framework's .tsx alone", async () => {
+		const { root } = app({
+			'tsconfig.json': { compilerOptions: { jsx: 'preserve', jsxImportSource: 'octane' } },
+			'src/Clock.tsx': CLOCK,
+			// Strong would reject this, but its JSX belongs to React.
+			'src/Host.tsx': `/** @jsxImportSource react */\n${CLOCK}`,
+		});
+
+		const report = (await run(root)).json();
+		expect(report.analyzed).toBe(1);
+		expect(new Set(report.findings.map((/** @type {{ file: string }} */ f) => f.file))).toEqual(
+			new Set(['src/Clock.tsx']),
+		);
+	});
+
+	it('previews what Strong would reject without failing the run', async () => {
+		const { root } = app({ 'src/Cart.tsx': CART });
+
+		const result = await run(root, ['--strong-preview']);
+		expect(result.exitCode).toBe(0);
+		expect(result.json().strongPreview).toEqual({
+			findings: 3,
+			modules: 1,
+			byCode: {
+				OCTANE_STRONG_MANUAL_MEMO: 1,
+				OCTANE_STRONG_RENDER_REF_READ: 1,
+				OCTANE_STRONG_RENDER_REF_WRITE: 1,
+			},
+		});
+		expect(result.json().findings.every((/** @type {{ preview?: true }} */ f) => f.preview)).toBe(
+			true,
+		);
+		// Without the preview the module is not Strong, so there is nothing to report.
+		expect((await run(root)).json().findings).toEqual([]);
+	});
+
+	it('applies the suggested rewrites with --fix, and writes nothing under --dry-run', async () => {
+		const { root } = app({ 'src/Cart.tsx': CART });
+		const file = path.join(root, 'src/Cart.tsx');
+
+		const dry = await run(root, ['--strong-preview', '--fix', '--dry-run']);
+		expect(dry.json().fixed).toEqual({ findings: 2, files: ['src/Cart.tsx'] });
+		expect(readFileSync(file, 'utf8')).toBe(CART);
+
+		const result = await run(root, ['--strong-preview', '--fix']);
+		expect(result.json().fixed).toEqual({ findings: 2, files: ['src/Cart.tsx'] });
+		expect(readFileSync(file, 'utf8')).toBe(
+			"import { useState, useLazyRef } from 'octane';\n" +
+				'class Store { add() {} }\n' +
+				'export function Cart({ items }: { items: number[] }) {\n' +
+				'  const store = useLazyRef(() => new Store());\n' +
+				'  const total = items.reduce((a, b) => a + b, 0);\n' +
+				'  const [open] = useState(false);\n' +
+				'  return <button onClick={() => store.current?.add()}>{String(total) + String(open)}</button>;\n' +
+				'}\n',
+		);
+		// What remains is reported from the rewritten module: nothing.
+		expect(result.json().findings).toEqual([]);
+		expect(result.json().strongPreview.findings).toBe(0);
+	});
+
+	it('falls back to the first error with an older compiler that cannot collect', async () => {
+		// An installed octane from before collectDiagnostics: only compile(),
+		// which throws the first Strong violation the way that compiler did.
+		const { root } = project({
+			'node_modules/octane/package.json': {
+				name: 'octane',
+				type: 'module',
+				exports: { './compiler': './compiler.js' },
+			},
+			'src/Clock.tsrx': 'export function Clock() @{ <span /> }\n',
+		});
+		writeFileSync(
+			path.join(root, 'node_modules/octane/compiler.js'),
+			'export function compile(source, filename) {\n' +
+				'\tconst error = new SyntaxError(`${filename}:2:15: [OCTANE_STRONG_RENDER_IMPURE_CALL] Strong mode does not allow nondeterministic calls during render.`);\n' +
+				'\terror.loc = { line: 2, column: 14 };\n' +
+				'\tthrow error;\n' +
+				'}\n',
+		);
+
+		const result = await runCli(['analyze', '--cwd', root, '--json']);
+		expect(result.json().findings).toEqual([
+			expect.objectContaining({ code: 'OCTANE_STRONG_RENDER_IMPURE_CALL', line: 2, column: 15 }),
+		]);
+		// The report must not read as complete when it cannot be.
+		const text = await runCli(['analyze', '--cwd', root]);
+		expect(text.stdout + text.stderr).toContain('reports only the first error in each file');
 	});
 });

@@ -4,7 +4,7 @@
 compiler rejects it:
 
 ```text
-src/App.tsrx:7:2: [OCTANE_STRONG_RENDER_SNAPSHOT_MUTATION] Strong mode does not allow mutating a state snapshot during render. Derive a local copy, or pass a new value to the state updater from an event.
+src/App.tsrx:7:2: [OCTANE_STRONG_RENDER_SNAPSHOT_MUTATION] Strong mode does not allow mutating a state snapshot during render. Derive a local copy, or pass a new value to the state updater from an event. See https://octanejs.dev/docs/strong-mode#octane-strong-render-snapshot-mutation
 ```
 
 Fix the component so it compiles in Strong mode and meets these requirements:

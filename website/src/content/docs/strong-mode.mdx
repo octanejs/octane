@@ -1,0 +1,912 @@
+---
+title: Strong mode
+---
+
+<div className="doc-hero">
+	<p className="doc-eyebrow">Opt-in render contract</p>
+	<h1>Strong mode</h1>
+	<p className="doc-lede">
+		{
+			'Strong mode is an opt-in compiler contract: rendering reads immutable snapshots and has no side effects. The compiler reports the violations it can prove and takes over memoization. Adopt it one module at a time.'
+		}
+	</p>
+</div>
+
+<h2 id="what-strong-mode-checks">What Strong mode checks</h2>
+
+A Strong module makes two promises about rendering:
+
+- **Render reads immutable snapshots.** Props, state, and context are the values for
+  this render. Rendering does not change them, and it does not read data that can
+  change without a new render, such as `ref.current`, a state getter, a reassigned
+  module variable, or a browser global.
+- **Rendering is pure.** The same inputs produce the same output. Rendering does not
+  update state, schedule work, or read a clock or random source.
+
+The compiler reports each violation it can prove as an `OCTANE_STRONG_*` compile error.
+It also checks effects: a synchronous state update in effect setup, a request whose late
+result can overwrite a newer one, and a listener or timer that cleanup never releases.
+The [diagnostic reference](#diagnostic-reference) lists every code with its replacement.
+
+In return, the compiler owns memoization. It caches eligible calculations and callbacks
+from the inputs it infers, so a Strong module writes plain declarations: `useMemo` and
+`useCallback` are compile errors (`OCTANE_STRONG_MANUAL_MEMO`). Dependency arrays are
+inferred, so omit them. An explicit array that differs from the inferred inputs, or that
+the compiler cannot prove equivalent, is an error; an equivalent array is a hint
+(`OCTANE_STRONG_EXPLICIT_DEPENDENCIES`).
+
+Code outside render works as before. Event handlers update state, effects synchronize
+external systems and release what they acquire in cleanup, and refs hold DOM nodes and
+timers for events and effects to use.
+
+Strong is off by default. Compatibility mode keeps React's rules, including manual memo
+hooks and explicit dependency arrays, so an app can opt in one module at a time. The
+setting applies to the application's own modules: installed dependencies keep their own
+mode unless their source opts in.
+
+`"use strong"` is also an author assertion. Production client builds memoize every
+user-authored render operation on the assumption that it is pure, including calls the
+compiler cannot inspect. The analysis is bounded: it follows local aliases, helpers, and
+known callbacks, and it assumes an unknown call is pure rather than giving up. Do not
+hide a ref read, state getter, mutable module variable, live store, clock, or randomness
+behind a function. Keep that code in a compatibility module, or pass a snapshot into the
+Strong component.
+
+[Differences from React](/docs/differences-from-react#strong-mode) describes the
+memoization contract in detail. The replacements on this page use hooks from
+[Core APIs](/docs/core-apis), including `useLinkedState`, `useLazyRef`, and
+`useLayoutSnapshot`.
+
+<h2 id="enable-strong-mode">Enable Strong mode</h2>
+
+To try it in one module, put `"use strong"` at the top of the file, before imports.
+Comments and other directives may come first:
+
+```tsx
+'use strong';
+
+import { useLinkedState } from 'octane';
+
+export function ProfileEditor({ user }) {
+	const [name, setName] = useLinkedState(user.id, () => user.name);
+	return <input value={name} onInput={(event) => setName(event.currentTarget.value)} />;
+}
+```
+
+A `.tsx` file that starts with an `@jsxImportSource` pragma keeps the pragma first. The
+directive covers only its own module. Placed anywhere else, such as after an import, it
+enables nothing and reports `OCTANE_STRONG_DIRECTIVE_PLACEMENT`.
+
+To make every application-owned module Strong, set `compiler.strong` in
+`octane.config.ts`:
+
+```ts
+// octane.config.ts
+export default {
+	compiler: {
+		strong: true,
+	},
+};
+```
+
+The Vite and Rsbuild integrations read this file. Each bundler plugin also accepts
+`strong: true` as an option, and an explicit plugin option wins over the config file. A
+standalone Rspack setup does not load `octane.config.ts`, so it needs the plugin option;
+see [Build tools](/docs/build-tools#strong-mode). `octane analyze` reads
+`octane.config.ts` but cannot see an inline plugin option, so keep the setting in the
+config file where you can.
+
+Type checking selects Strong JSX types for Strong `.tsrx` modules automatically, so
+`dangerouslySetInnerHTML` needs a value from `trustHTML`. The `"use strong"` string
+cannot change TypeScript's JSX types for a `.tsx` module: set `jsxImportSource` to
+`octane/strong` in its tsconfig, or start the file with
+`/** @jsxImportSource octane/strong */`.
+
+<h2 id="adopt-strong-mode">Adopt it in an existing app</h2>
+
+Move an existing app over in steps:
+
+1. **Take inventory.** `octane analyze --strong-preview` reports what Strong would report
+   for modules that are not Strong yet, grouped by code. Those findings do not fail the
+   run. The report shows which React idioms the app relies on and which modules are
+   already clean.
+2. **Apply the mechanical rewrites.** `octane analyze --strong-preview --fix` applies the
+   edits the compiler can make on its own: React's lazy ref initialization becomes
+   `useLazyRef`, and `useMemo` and `useCallback` calls become plain declarations. Without
+   `--strong-preview`, `--fix` only rewrites modules that are already Strong. Add
+   `--dry-run` to list the fixes without writing them.
+3. **Opt modules in.** Add `"use strong"` to one module at a time, starting with the ones
+   the preview reports clean. Fix each finding with the
+   [migration recipes](#migration-recipes) and the
+   [diagnostic reference](#diagnostic-reference). Each Strong compile error ends with a
+   link to its entry on this page, `octane analyze` lists every finding in a file rather
+   than only the first, and `octane explain OCTANE_STRONG_RENDER_REF_READ` prints an
+   entry in the terminal.
+4. **Keep what you converted.** `octane analyze --strong-baseline init` writes
+   `octane-strong-baseline.json`, listing every module that is not Strong yet. While the
+   file exists, `octane analyze` fails when a module leaves Strong mode or a new module
+   is added without it. Run `octane analyze --strong-baseline update` as modules convert.
+   It only removes names, so a new exception is a reviewed edit to the file.
+5. **Switch the app on.** When every application module is Strong, set
+   `compiler: { strong: true }` in `octane.config.ts`. New modules are then Strong
+   without the directive. Dependencies and separate workspace packages keep their own
+   mode, so opt their modules in with the directive.
+
+Coding agents can follow the same steps. The Octane MCP server, registered with
+[`octane mcp add`](/docs/cli#mcp), has an `octane_strong_explain` tool that returns a
+code's entry and a `migrate-to-strong` skill that walks through this workflow. Tools can
+call `collectDiagnostics(source, filename, { strong: true })` from `octane/compiler` to
+get every diagnostic for one module.
+
+<h2 id="migration-recipes">Migration recipes</h2>
+
+Each recipe pairs a React idiom that Strong rejects with its replacement. The first
+version reports the listed codes in a Strong module; the second compiles.
+
+{/* strong-diagnostics:recipes:start (generated by `pnpm strong:diagnostics` from packages/octane/src/compiler/strong-diagnostics.js) */}
+
+<h3 id="recipe-lazy-ref">Create a value once</h3>
+
+React: `if (ref.current === null) ref.current = new Store();`
+
+Strong: `const ref = useLazyRef(() => new Store());`
+
+Reports [`OCTANE_STRONG_RENDER_REF_READ`](#octane-strong-render-ref-read) and [`OCTANE_STRONG_RENDER_REF_WRITE`](#octane-strong-render-ref-write).
+
+```tsx
+'use strong';
+import { useRef } from 'octane';
+import { Store } from './store';
+
+export function Cart() {
+	const store = useRef<Store | null>(null);
+	if (store.current === null) store.current = new Store();
+	return <button onClick={() => store.current?.add()}>Add</button>;
+}
+```
+
+```tsx
+'use strong';
+import { useLazyRef } from 'octane';
+import { Store } from './store';
+
+export function Cart() {
+	const store = useLazyRef(() => new Store());
+	return <button onClick={() => store.current.add()}>Add</button>;
+}
+```
+
+`useLazyRef` runs its factory once, when the hook cell is created, and keeps the ref on later renders. The factory follows the rules of a lazy `useState` initializer. `octane analyze --fix` applies this rewrite when the `useRef` declaration directly precedes the `if`.
+
+<h3 id="recipe-layout-measurement">Render from a DOM measurement</h3>
+
+React: `useLayoutEffect(() => setWidth(el.current.offsetWidth));`
+
+Strong: `const width = useLayoutSnapshot(() => el.current?.offsetWidth ?? 0, { initial: 0 });`
+
+Reports [`OCTANE_STRONG_EFFECT_STATE_UPDATE`](#octane-strong-effect-state-update).
+
+```tsx
+'use strong';
+import { useLayoutEffect, useRef, useState } from 'octane';
+
+export function Label({ text }: { text: string }) {
+	const el = useRef<HTMLSpanElement>(null);
+	const [width, setWidth] = useState(0);
+	useLayoutEffect(() => {
+		setWidth(el.current?.offsetWidth ?? 0);
+	});
+	return <span ref={el}>{text + ' (' + width + 'px)'}</span>;
+}
+```
+
+```tsx
+'use strong';
+import { useLayoutSnapshot, useRef } from 'octane';
+
+export function Label({ text }: { text: string }) {
+	const el = useRef<HTMLSpanElement>(null);
+	const width = useLayoutSnapshot(() => el.current?.offsetWidth ?? 0, { initial: 0 });
+	return <span ref={el}>{text + ' (' + width + 'px)'}</span>;
+}
+```
+
+`useLayoutSnapshot` measures after each commit and re-renders before paint only when the value changes. `initial` is the value for the first render and for server rendering. It does not observe later resizes: subscribe to those with an observer in an effect.
+
+<h3 id="recipe-ref-measurement">Measure an element from a callback ref</h3>
+
+React: `<span ref={(el) => { if (el) setWidth(el.offsetWidth); }}>`
+
+Strong: `const width = useLayoutSnapshot(() => el.current?.offsetWidth ?? 0, { initial: 0 });`
+
+Reports [`OCTANE_STRONG_REF_STATE_UPDATE`](#octane-strong-ref-state-update).
+
+```tsx
+'use strong';
+import { useState } from 'octane';
+
+export function Label({ text }: { text: string }) {
+	const [width, setWidth] = useState(0);
+	return (
+		<span
+			ref={(el) => {
+				if (el) setWidth(el.offsetWidth);
+			}}
+		>
+			{text + ' (' + width + 'px)'}
+		</span>
+	);
+}
+```
+
+```tsx
+'use strong';
+import { useLayoutSnapshot, useRef } from 'octane';
+
+export function Label({ text }: { text: string }) {
+	const el = useRef<HTMLSpanElement>(null);
+	const width = useLayoutSnapshot(() => el.current?.offsetWidth ?? 0, { initial: 0 });
+	return <span ref={el}>{text + ' (' + width + 'px)'}</span>;
+}
+```
+
+A callback ref runs while the element commits, so a state update there renders the component a second time before paint. `useLayoutSnapshot` reads the element after layout on every commit and re-renders only when the measurement changes. To follow resizes that happen without a commit, attach a `ResizeObserver` from the ref or an effect; its callback may update state.
+
+<h3 id="recipe-manual-memo">Drop useMemo and useCallback</h3>
+
+React: `const total = useMemo(() => sum(items), [items]);`
+
+Strong: `const total = sum(items);`
+
+Reports [`OCTANE_STRONG_MANUAL_MEMO`](#octane-strong-manual-memo).
+
+```tsx
+'use strong';
+import { useCallback, useMemo } from 'octane';
+
+export function Total({ items, onPick }: { items: number[]; onPick: (total: number) => void }) {
+	const total = useMemo(() => items.reduce((sum, item) => sum + item, 0), [items]);
+	const pick = useCallback(() => onPick(total), [onPick, total]);
+	return <button onClick={pick}>{String(total)}</button>;
+}
+```
+
+```tsx
+'use strong';
+export function Total({ items, onPick }: { items: number[]; onPick: (total: number) => void }) {
+	const total = items.reduce((sum, item) => sum + item, 0);
+	const pick = () => onPick(total);
+	return <button onClick={pick}>{String(total)}</button>;
+}
+```
+
+Strong production builds memoize render calculations from their inputs, and eligible callbacks keep a stable identity in every build until their inferred inputs change. `octane analyze --fix` applies this rewrite.
+
+<h3 id="recipe-latest-ref">Read the latest props from an effect</h3>
+
+React: `const latest = useRef(onTick); latest.current = onTick;`
+
+Strong: `const tick = useEffectEvent(onTick);`
+
+Reports [`OCTANE_STRONG_RENDER_REF_WRITE`](#octane-strong-render-ref-write).
+
+```tsx
+'use strong';
+import { useEffect, useRef } from 'octane';
+
+export function Ticker({ onTick }: { onTick: () => void }) {
+	const latest = useRef(onTick);
+	latest.current = onTick;
+	useEffect(() => {
+		const id = setInterval(() => latest.current(), 1000);
+		return () => clearInterval(id);
+	}, []);
+	return <span>Ticking</span>;
+}
+```
+
+```tsx
+'use strong';
+import { useEffect, useEffectEvent } from 'octane';
+
+export function Ticker({ onTick }: { onTick: () => void }) {
+	const tick = useEffectEvent(onTick);
+	useEffect(() => {
+		const id = setInterval(() => tick(), 1000);
+		return () => clearInterval(id);
+	});
+	return <span>Ticking</span>;
+}
+```
+
+An Effect Event always calls the latest `onTick` without making the effect depend on it.
+
+<h3 id="recipe-prop-state">Keep editable state in sync with a prop</h3>
+
+React: `useEffect(() => setName(user.name), [user.name]);`
+
+Strong: `const [name, setName] = useLinkedState(user.id, () => user.name);`
+
+Reports [`OCTANE_STRONG_EFFECT_STATE_UPDATE`](#octane-strong-effect-state-update).
+
+```tsx
+'use strong';
+import { useEffect, useState } from 'octane';
+
+export function NameField({ user }: { user: { id: string; name: string } }) {
+	const [name, setName] = useState('');
+	useEffect(() => {
+		setName(user.name);
+	});
+	return <input value={name} onInput={(event) => setName(event.currentTarget.value)} />;
+}
+```
+
+```tsx
+'use strong';
+import { useLinkedState } from 'octane';
+
+export function NameField({ user }: { user: { id: string; name: string } }) {
+	const [name, setName] = useLinkedState(user.id, () => user.name);
+	return <input value={name} onInput={(event) => setName(event.currentTarget.value)} />;
+}
+```
+
+`useLinkedState` resets the editable value in the same render whenever its source changes, so there is no frame with the stale value.
+
+<h3 id="recipe-browser-state">Render live browser state</h3>
+
+React: `const wide = window.innerWidth > 800;`
+
+Strong: `const wide = useSyncExternalStore(subscribe, getWide, () => false);`
+
+Reports [`OCTANE_STRONG_RENDER_AMBIENT_READ`](#octane-strong-render-ambient-read).
+
+```tsx
+'use strong';
+export function Layout() {
+	const wide = window.innerWidth > 800;
+	return <main class={wide ? 'wide' : 'narrow'}>Content</main>;
+}
+```
+
+```tsx
+'use strong';
+import { useSyncExternalStore } from 'octane';
+
+function subscribe(notify: () => void) {
+	window.addEventListener('resize', notify);
+	return () => window.removeEventListener('resize', notify);
+}
+
+function getWide() {
+	return window.innerWidth > 800;
+}
+
+export function Layout() {
+	const wide = useSyncExternalStore(subscribe, getWide, () => false);
+	return <main class={wide ? 'wide' : 'narrow'}>Content</main>;
+}
+```
+
+The server snapshot is rendered on the server and during hydration, so both agree.
+
+<h3 id="recipe-random-id">Generate an element ID</h3>
+
+React: `const id = 'field-' + Math.random();`
+
+Strong: `const id = useId();`
+
+Reports [`OCTANE_STRONG_RENDER_IMPURE_CALL`](#octane-strong-render-impure-call).
+
+```tsx
+'use strong';
+export function Field({ label }: { label: string }) {
+	const id = 'field-' + Math.random().toString(36).slice(2);
+	return (
+		<label for={id}>
+			{label}
+			<input id={id} />
+		</label>
+	);
+}
+```
+
+```tsx
+'use strong';
+import { useId } from 'octane';
+
+export function Field({ label }: { label: string }) {
+	const id = useId();
+	return (
+		<label for={id}>
+			{label}
+			<input id={id} />
+		</label>
+	);
+}
+```
+
+`useId` is stable across renders and matches between server and client.
+
+<h3 id="recipe-effect-fetch">Load data in an effect</h3>
+
+React: `useEffect(() => { load(id).then(setData); }, [id]);`
+
+Strong: `let ignore = false; load(id).then((p) => { if (!ignore) setName(p.name); }); return () => { ignore = true; };`
+
+Reports [`OCTANE_STRONG_EFFECT_DATA_FETCH`](#octane-strong-effect-data-fetch).
+
+```tsx
+'use strong';
+import { useEffect, useState } from 'octane';
+import { load } from './api';
+
+export function Profile({ id }: { id: string }) {
+	const [name, setName] = useState('');
+	useEffect(() => {
+		load(id).then((profile) => setName(profile.name));
+	});
+	return <p>{name}</p>;
+}
+```
+
+```tsx
+'use strong';
+import { useEffect, useState } from 'octane';
+import { load } from './api';
+
+export function Profile({ id }: { id: string }) {
+	const [name, setName] = useState('');
+	useEffect(() => {
+		let ignore = false;
+		load(id).then((profile) => {
+			if (!ignore) setName(profile.name);
+		});
+		return () => {
+			ignore = true;
+		};
+	});
+	return <p>{name}</p>;
+}
+```
+
+Without the flag, a slow response for an old `id` can overwrite a newer one. For data the render needs, `use()` or a query binding avoids the effect entirely.
+
+<h3 id="recipe-force-update">Re-render when an external store changes</h3>
+
+React: `const [, forceUpdate] = useReducer((x) => x + 1, 0);`
+
+Strong: `const value = useSyncExternalStore(store.subscribe, store.get, store.get);`
+
+Reports [`OCTANE_STRONG_WRITE_ONLY_STATE`](#octane-strong-write-only-state).
+
+```tsx
+'use strong';
+import { useEffect, useReducer } from 'octane';
+import { store } from './store';
+
+export function Count() {
+	const [, forceUpdate] = useReducer((x: number) => x + 1, 0);
+	useEffect(() => store.subscribe(() => forceUpdate()));
+	return <span>{String(store.get())}</span>;
+}
+```
+
+```tsx
+'use strong';
+import { useSyncExternalStore } from 'octane';
+import { store } from './store';
+
+export function Count() {
+	const count = useSyncExternalStore(store.subscribe, store.get, store.get);
+	return <span>{String(count)}</span>;
+}
+```
+
+`useSyncExternalStore` re-checks the snapshot after commit, so a change between render and subscription is not lost.
+
+<h3 id="recipe-trusted-html">Render trusted HTML</h3>
+
+React: `dangerouslySetInnerHTML={{ __html: html }}`
+
+Strong: `dangerouslySetInnerHTML={trustHTML(sanitize(html))}`
+
+Reports [`OCTANE_STRONG_UNTRUSTED_HTML`](#octane-strong-untrusted-html).
+
+```tsx
+'use strong';
+import { sanitize } from './sanitize';
+
+export function Article({ html }: { html: string }) {
+	return <article dangerouslySetInnerHTML={{ __html: sanitize(html) }} />;
+}
+```
+
+```tsx
+'use strong';
+import { trustHTML } from 'octane';
+import { sanitize } from './sanitize';
+
+export function Article({ html }: { html: string }) {
+	return <article dangerouslySetInnerHTML={trustHTML(sanitize(html))} />;
+}
+```
+
+`trustHTML` marks the value as trusted; it does not sanitize. Call it only on sanitized or already trusted HTML.
+
+{/* strong-diagnostics:recipes:end */}
+
+<h2 id="diagnostic-reference">Diagnostic reference</h2>
+
+Every code Strong can report, grouped by area, with what it detects and what replaces
+the rejected pattern. An error fails the build; the coverage codes fail `octane analyze`.
+A hint never fails a build or `octane analyze --strict`. `octane analyze --code <CODE>` narrows a run to one code.
+
+{/* strong-diagnostics:reference:start (generated by `pnpm strong:diagnostics` from packages/octane/src/compiler/strong-diagnostics.js) */}
+
+<h3 id="diagnostics-effects">Effects, state, and dependencies</h3>
+
+<h4 id="octane-strong-effect-state-update">
+	<code>OCTANE_STRONG_EFFECT_STATE_UPDATE</code>
+</h4>
+
+Effect setup calls a state updater synchronously. This includes updaters and callbacks returned by same-module custom hooks, and callbacks that run before the next paint: `startTransition`, a `useTransition` start function, `queueMicrotask`, `.then`/`.catch`/`.finally` on `Promise.resolve(value)` or `Promise.reject()`, `setTimeout` without a positive delay, and code after an `await` that resumes without waiting on any path, such as `await null` or `await (flag ? load() : null)`.
+
+**Replacement.** Derive the value during render, or use `useLinkedState` when state follows another value. When the effect copies a measurement of the committed DOM into state, render from `useLayoutSnapshot` instead. `requestAnimationFrame`, timers with a positive delay, and external subscription callbacks remain event-driven.
+
+<h4 id="octane-strong-ref-state-update">
+	<code>OCTANE_STRONG_REF_STATE_UPDATE</code>
+</h4>
+
+A host element's callback ref calls a state updater synchronously: an inline or local function, a state setter passed as the ref, or a function in a `ref={[...]}` list. Octane calls a callback ref while the element commits, before paint, so it follows the effect setup rules, and callbacks that run before the next paint, such as `startTransition`, `queueMicrotask`, and `setTimeout` without a positive delay, count too. A component's `ref` prop is not checked, because the component decides when to call it.
+
+**Replacement.** Pass a ref object to keep the element, and read it from effects and event handlers. When the callback copies a measurement of the element into state, render from `useLayoutSnapshot` instead. `requestAnimationFrame`, timers with a positive delay, and observer or listener callbacks the ref attaches remain event-driven.
+
+<h4 id="octane-strong-effect-data-fetch">
+	<code>OCTANE_STRONG_EFFECT_DATA_FETCH</code>
+</h4>
+
+A state update runs after an `await`, or in a `.then`, `.catch`, or `.finally` callback, of work the effect started, and the returned cleanup does not provably cancel or ignore it. An async effect callback returns a promise, so it cannot return cleanup.
+
+**Replacement.** Read asynchronous render data with `use()` or a query binding. For external synchronization, abort an `AbortController` whose `signal` is passed to the request, or set a flag declared in the effect from its cleanup and check it before the update.
+
+<h4 id="octane-strong-effect-hidden-dependency">
+	<code>OCTANE_STRONG_EFFECT_HIDDEN_DEPENDENCY</code>
+</h4>
+
+Synchronous effect setup calls a state getter, reads `current` from a value ref, or reads a reassigned module `let` or `var`. None of these is an inferred dependency, so the effect does not re-run when they change.
+
+**Replacement.** Read the render snapshot, or move the non-reactive read into a `useEffectEvent` callback. Octane never double-invokes effects, so first-run and `didInit` guards are unnecessary.
+
+<h4 id="octane-strong-effect-resource-leak">
+	<code>OCTANE_STRONG_EFFECT_RESOURCE_LEAK</code>
+</h4>
+
+Effect setup acquires a platform listener, timer, observer, connection, or geolocation watch that the returned cleanup does not release. A `useLayoutSnapshot` measurement is checked like effect setup, but its return value is the snapshot, so it can never release one.
+
+**Replacement.** Release it in the returned cleanup. Acquire resources for a snapshot in a separate effect.
+
+<h4 id="octane-strong-layout-snapshot-async">
+	<code>OCTANE_STRONG_LAYOUT_SNAPSHOT_ASYNC</code>
+</h4>
+
+A `useLayoutSnapshot` measurement is an `async` or generator function. It returns a new promise or iterator on every commit, so the snapshot never converges.
+
+**Replacement.** Return the measurement synchronously, and read asynchronous render data with `use()` or a query binding.
+
+<h4 id="octane-strong-effect-chain">
+	<code>OCTANE_STRONG_EFFECT_CHAIN</code>
+</h4>
+
+An effect reads state written by another effect's own execution or promise continuation in the same component.
+
+**Replacement.** Derive the value during render, use `useLinkedState`, or combine the external synchronization in one effect. External subscription and timer callbacks remain event-driven updates.
+
+<h4 id="octane-strong-unlinked-prop-state">
+	<code>OCTANE_STRONG_UNLINKED_PROP_STATE</code>
+</h4>
+
+An eager `useState` initializer or two-argument `useReducer` initial state is derived from component props.
+
+**Replacement.** Use `useLinkedState(source, reconcile)` for state that follows a source. Use `useState(() => initialValue)` or an explicit third `useReducer` initializer for a deliberate initial capture.
+
+<h4 id="octane-strong-explicit-dependencies">
+	<code>OCTANE_STRONG_EXPLICIT_DEPENDENCIES</code>
+</h4>
+
+An explicit dependency argument differs from the compiler's inferred inputs, or cannot be proven equivalent. An array the compiler proves equivalent is reported as a **hint** instead, and its authored behavior is preserved.
+
+**Replacement.** Omit the dependency argument.
+
+<h4 id="octane-strong-untracked-effect">
+	<code>OCTANE_STRONG_UNTRACKED_EFFECT</code>
+</h4>
+
+A built-in dependency hook receives `null` dependencies, or omits them while its callback reads a binding declared after the hook, or a variable the component assigns after the hook or from a nested function. Inference cannot read that value where the hook is called, so the hook would run on every render.
+
+**Replacement.** Omit the argument so the compiler tracks reactive inputs. Declare and finish assigning what the hook reads before calling it, or keep a changing value in state or a ref.
+
+<h4 id="octane-strong-manual-memo">
+	<code>OCTANE_STRONG_MANUAL_MEMO</code>
+</h4>
+
+A call to Octane's `useMemo` or `useCallback`, including known import aliases.
+
+**Replacement.** Write a normal calculation or callback declaration and let Strong compilation cache eligible declarations. `octane analyze --fix` rewrites `useMemo(() => value, deps)` to `value` and `useCallback(fn, deps)` to `fn`.
+
+<h4 id="octane-strong-effect-event-dependency">
+	<code>OCTANE_STRONG_EFFECT_EVENT_DEPENDENCY</code>
+</h4>
+
+A statically known Effect Event is listed in an explicit hook dependency array.
+
+**Replacement.** Remove it. Effect Events are non-reactive, so they never belong in dependencies.
+
+<h4 id="octane-strong-automatic-memo-unsupported">
+	<code>OCTANE_STRONG_AUTOMATIC_MEMO_UNSUPPORTED</code>
+</h4>
+
+A module compiled through the `manualSlots` integration option has a declaration Strong compilation would cache. That option cannot allocate the extra hook slots the cache needs.
+
+**Replacement.** Compile the module through the normal Octane integration, or keep it in compatibility mode.
+
+<h3 id="diagnostics-state">State values, updaters, and subscriptions</h3>
+
+<h4 id="octane-strong-impure-updater">
+	<code>OCTANE_STRONG_IMPURE_UPDATER</code>
+</h4>
+
+A `useState` or `useLinkedState` updater, a `useReducer` reducer, or a `useOptimistic` reducer calls `fetch`, schedules a timer, microtask, or promise callback, updates state, calls a state getter or Effect Event, reads or writes `useRef.current`, reads a browser global or reassigned module variable, or calls `Date.now()`, `Math.random()`, `performance.now()`, or `new Date()`. Octane can run updaters and reducers more than once.
+
+**Replacement.** Do the side effect or nondeterministic read in the event handler, effect, or Action, and pass its result in: `const now = Date.now(); setValue((current) => current + now)`.
+
+<h4 id="octane-strong-snapshot-mutation">
+	<code>OCTANE_STRONG_SNAPSHOT_MUTATION</code>
+</h4>
+
+A state value is mutated outside render: in an event handler, effect, cleanup, deferred callback, or an updater or reducer's own state argument. Covers assignments, updates, `delete`, destructuring targets, `Object.assign` and `Reflect.set`-style targets, array mutators on state initialized with an array literal, and `Map`/`Set` mutators on state created with `new Map()` or `new Set()`.
+
+**Replacement.** Pass a new value, for example `setItems([...items, item])` or `setItems((current) => [...current, item])`. Keep mutable objects in `useRef`, or create one with `useLazyRef`.
+
+<h4 id="octane-strong-stale-state-update">
+	<code>OCTANE_STRONG_STALE_STATE_UPDATE</code>
+</h4>
+
+After an `await`, or in a timer or promise callback, a setter or dispatch argument reads the render snapshot of the same state, including through a local computed from it, a copied alias, or a closure.
+
+**Replacement.** Use the updater form, `setValue((current) => current + 1)`, compute from the state a reducer receives, or read the latest value with the state getter (the third tuple member).
+
+<h4 id="octane-strong-write-only-state">
+	<code>OCTANE_STRONG_WRITE_ONLY_STATE</code>
+</h4>
+
+A state tuple whose value is elided, unused, or read only to compute its own next value, whose getter is absent or unused, and whose setter is used. This is the force-update pattern, including `useReducer((x) => x + 1, 0)` and `useState(0)[1]`.
+
+**Replacement.** Subscribe with `useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot)` and render its snapshot, or remove the unused state.
+
+<h4 id="octane-strong-uncached-store-snapshot">
+	<code>OCTANE_STRONG_UNCACHED_STORE_SNAPSHOT</code>
+</h4>
+
+Every return of a `useSyncExternalStore` `getSnapshot` or `getServerSnapshot` provably allocates: an object or array literal, `.map()`, `.filter()`, or another array copy, `Object.keys()`-style results, a standard constructor, or a same-module function or local constant that does so.
+
+**Replacement.** Return a value the store keeps, such as its current state object, or read each field with its own `useSyncExternalStore` call.
+
+<h3 id="diagnostics-render">Render snapshots and determinism</h3>
+
+<h4 id="octane-strong-render-state-update">
+	<code>OCTANE_STRONG_RENDER_STATE_UPDATE</code>
+</h4>
+
+A `useState`, `useReducer`, or `useLinkedState` updater is called during render, including inside callbacks that known array methods run synchronously.
+
+**Replacement.** Update state in an event handler, or use `useLinkedState` when state needs to reset or change with another value.
+
+<h4 id="octane-strong-render-state-getter-call">
+	<code>OCTANE_STRONG_RENDER_STATE_GETTER_CALL</code>
+</h4>
+
+A known third-tuple state getter is called during render. It can return scheduled state that differs from the render snapshot.
+
+**Replacement.** Render from the first tuple member. Call the getter in an event, effect, or deferred callback for the latest scheduled state.
+
+<h4 id="octane-strong-render-ref-read">
+	<code>OCTANE_STRONG_RENDER_REF_READ</code>
+</h4>
+
+A `useRef` or `useLazyRef` object's `current` is read during render, including React's lazy initialization test `if (ref.current === null)`.
+
+**Replacement.** Read the ref in an event or effect, or render from state or `useLinkedState`. Create a value once with `useLazyRef(() => value)`, and render from a DOM measurement with `useLayoutSnapshot`. Pass the ref itself to a `ref` prop as usual.
+
+<h4 id="octane-strong-render-ref-write">
+	<code>OCTANE_STRONG_RENDER_REF_WRITE</code>
+</h4>
+
+A `useRef` object's `current` is assigned during render, including React's lazy initialization `ref.current = create()` and `ref.current ??= create()`, and the latest-value pattern `latest.current = value`.
+
+**Replacement.** Create a value once with `useLazyRef(() => create())`. Read the latest props or state from an effect with `useEffectEvent`. Otherwise move the write to an event or effect, or express the value as state. `octane analyze --fix` rewrites the lazy initialization idiom.
+
+<h4 id="octane-strong-render-module-state-read">
+	<code>OCTANE_STRONG_RENDER_MODULE_STATE_READ</code>
+</h4>
+
+A reassigned module-scope `let` or `var` is read during render. It can change without a witnessed render input.
+
+**Replacement.** Move the changing value into state or context, or pass an immutable snapshot as a prop.
+
+<h4 id="octane-strong-render-ambient-read">
+	<code>OCTANE_STRONG_RENDER_AMBIENT_READ</code>
+</h4>
+
+Unshadowed `window`, `document`, `localStorage`, `sessionStorage`, `navigator`, `location`, or `matchMedia` is read during render, including `typeof` guards and constant browser handle aliases, and `globalThis` properties other than standard language builtins.
+
+**Replacement.** Subscribe with `useSyncExternalStore` and a server snapshot for live browser state. Read a one-time value in an effect or a lazy `useState` initializer; lazy initializers also run during server rendering, so guard browser APIs there and keep server and client output the same.
+
+<h4 id="octane-strong-render-snapshot-mutation">
+	<code>OCTANE_STRONG_RENDER_SNAPSHOT_MUTATION</code>
+</h4>
+
+A provable state snapshot is mutated during render.
+
+**Replacement.** Derive a local copy, or pass a new value to the state updater from an event.
+
+<h4 id="octane-strong-retained-row-mutation">
+	<code>OCTANE_STRONG_RETAINED_ROW_MUTATION</code>
+</h4>
+
+A retained keyed `@for` row mutates a binding declared outside that row. A retained row does not re-run when its item is unchanged.
+
+**Replacement.** Build mutable data before the `@for`, or derive each row only from its item. Fresh setup-local and row-local scratch data remain valid.
+
+<h4 id="octane-strong-render-impure-call">
+	<code>OCTANE_STRONG_RENDER_IMPURE_CALL</code>
+</h4>
+
+Unshadowed `Date.now()`, `Math.random()`, `performance.now()`, `Date()`, `new Date()`, `crypto.randomUUID()`, or `crypto.getRandomValues()` during render, including inside callbacks that known array methods run synchronously. A `key` or `@for` key built from one of these gets its own message.
+
+**Replacement.** Read time or randomness in an event handler or effect and store the result in state, or pass it in as a prop. Use `useId()` for element IDs. Give each list item a stable ID from its data, such as `item.id`.
+
+<h4 id="octane-strong-render-locale-format">
+	<code>OCTANE_STRONG_RENDER_LOCALE_FORMAT</code>
+</h4>
+
+During render, `toLocaleString()`, `toLocaleDateString()`, or `toLocaleTimeString()` on a provable `Date` without both a locale and a visible `timeZone` option; `toString()` or `toTimeString()` on a provable `Date`; an `Intl` service constructed without a locale (a `DateTimeFormat` also needs a `timeZone`); or a call on a module-level formatter created that way.
+
+**Replacement.** Pass an explicit locale and time zone, for example `toLocaleString('en-US', { timeZone: 'UTC' })` or `new Intl.DateTimeFormat(locale, { timeZone })`. Otherwise format in an event or effect and render the stored text.
+
+<h4 id="octane-strong-render-side-effect">
+	<code>OCTANE_STRONG_RENDER_SIDE_EFFECT</code>
+</h4>
+
+Unshadowed `setTimeout()`, `setInterval()`, `queueMicrotask()`, `requestAnimationFrame()`, or `requestIdleCallback()` during render, directly, on `window` or `globalThis`, or through an unreassigned alias. Lazy state and ref initializers are part of render for this check.
+
+**Replacement.** Schedule the work from an event handler, or from an effect that cancels it in cleanup. Defining a callback that schedules later stays valid; calling it during render does not.
+
+<h4 id="octane-strong-render-effect-event-call">
+	<code>OCTANE_STRONG_RENDER_EFFECT_EVENT_CALL</code>
+</h4>
+
+A statically known `useEffectEvent` result is called during render.
+
+**Replacement.** Call it from an effect, or from a later event or subscription callback.
+
+<h3 id="diagnostics-templates">Lists, templates, and compatibility APIs</h3>
+
+<h4 id="octane-strong-map-jsx">
+	<code>OCTANE_STRONG_MAP_JSX</code>
+</h4>
+
+In `.tsrx`, a `.map()` callback returns JSX, including known local callback aliases.
+
+**Replacement.** Use `@for` with a stable item key. Data-only mapping and keyed JSX mapping in `.tsx` remain valid.
+
+<h4 id="octane-strong-index-key">
+	<code>OCTANE_STRONG_INDEX_KEY</code>
+</h4>
+
+An `@for` key uses the loop position as its identity, including arithmetic or text derived from the index.
+
+**Replacement.** Use an item ID that survives insertion, removal, and reordering. Looking up an item ID, such as `items[index].id`, remains valid.
+
+<h4 id="octane-strong-hook-locality">
+	<code>OCTANE_STRONG_HOOK_LOCALITY</code>
+</h4>
+
+In `.tsrx`, a built-in hook value, or an effect that depends on it, is declared outside the sole nested `@{…}` block that uses it.
+
+**Replacement.** Move the hook into that block, before the JSX or local effect that uses its value. Hooks used only by conditional, keyed, switch, or try arms may stay in the parent scope to keep that lifetime.
+
+<h4 id="octane-strong-event-handler-locality">
+	<code>OCTANE_STRONG_EVENT_HANDLER_LOCALITY</code>
+</h4>
+
+In `.tsrx`, a named native event handler is declared outside the sole deeper nested `@{…}` block that contains its direct `onX` use.
+
+**Replacement.** Move the handler into that block, before the JSX that uses it, or inline it.
+
+<h4 id="octane-strong-directive-placement">
+	<code>OCTANE_STRONG_DIRECTIVE_PLACEMENT</code>
+</h4>
+
+`"use strong"` appears somewhere other than the module's directive prologue, such as inside a function or after an import. It applies to a whole module, so the misplaced directive enables nothing.
+
+**Replacement.** Move `"use strong"` to the top of the file, before imports or other code.
+
+<h4 id="octane-strong-suppression-prop">
+	<code>OCTANE_STRONG_SUPPRESSION_PROP</code>
+</h4>
+
+A DOM intrinsic uses `suppressHydrationWarning` or `suppressNativeChangeWarning`, including statically visible object spreads.
+
+**Replacement.** Fix the mismatch or use the intended native event. Component props with these names are unaffected.
+
+<h4 id="octane-native-text-onchange">
+	<code>OCTANE_NATIVE_TEXT_ONCHANGE</code>
+</h4>
+
+A native text `onChange` handler, which fires on blur rather than per edit. The compatibility-mode warning is an error in Strong mode.
+
+**Replacement.** Use `onInput` for per-edit changes. Native checkbox, radio, and select `onChange` semantics stay valid.
+
+<h4 id="octane-strong-compat-import">
+	<code>OCTANE_STRONG_COMPAT_IMPORT</code>
+</h4>
+
+Imports or known namespace accesses for `flushSync`, `unstable_batchedUpdates`, or `StrictMode` from `octane`.
+
+**Replacement.** Use normal Octane scheduling and component semantics.
+
+<h3 id="diagnostics-dom">DOM ownership and trusted HTML</h3>
+
+<h4 id="octane-strong-managed-dom-write">
+	<code>OCTANE_STRONG_MANAGED_DOM_WRITE</code>
+</h4>
+
+A write through a ref to what the template owns on its element: its children, its class, an attribute it sets, or a `style` property it sets.
+
+**Replacement.** Render the value from state or props in the template.
+
+<h4 id="octane-strong-raw-html-write">
+	<code>OCTANE_STRONG_RAW_HTML_WRITE</code>
+</h4>
+
+`innerHTML`, `outerHTML`, `insertAdjacentHTML()`, or `setHTMLUnsafe()` on an element Octane renders.
+
+**Replacement.** Use `dangerouslySetInnerHTML={trustHTML(html)}` for trusted or already sanitized HTML.
+
+<h4 id="octane-strong-own-markup-query">
+	<code>OCTANE_STRONG_OWN_MARKUP_QUERY</code>
+</h4>
+
+`document.getElementById()`, `querySelector()`, `querySelectorAll()`, or `getElementsByClassName()` with a literal selector that matches a literal `id` or class rendered by the same component.
+
+**Replacement.** Attach a ref to the element and use `ref.current` in the event or effect.
+
+<h4 id="octane-strong-untrusted-html">
+	<code>OCTANE_STRONG_UNTRUSTED_HTML</code>
+</h4>
+
+A visibly raw value is passed to a Strong DOM intrinsic's `dangerouslySetInnerHTML`.
+
+**Replacement.** Pass `trustHTML(html)` after applying the application's sanitization policy. `trustHTML` marks trust and does not sanitize.
+
+<h3 id="diagnostics-coverage">Coverage</h3>
+
+<h4 id="octane-strong-coverage-regression">
+	<code>OCTANE_STRONG_COVERAGE_REGRESSION</code>
+</h4>
+
+`octane analyze` with an `octane-strong-baseline.json`: a module compiles without Strong mode and is not listed. It is new, or it lost its directive or moved out of `compiler.strong`'s reach.
+
+**Replacement.** Add `"use strong"` before its imports, or enable `compiler.strong`, and fix what Strong then reports.
+
+<h4 id="octane-strong-coverage-stale">
+	<code>OCTANE_STRONG_COVERAGE_STALE</code>
+</h4>
+
+A module listed in `octane-strong-baseline.json` is now Strong, no longer exists, or is no longer compiled by Octane. A stale name would let that module leave Strong mode again unnoticed.
+
+**Replacement.** Run `octane analyze --strong-baseline update`.
+
+{/* strong-diagnostics:reference:end */}

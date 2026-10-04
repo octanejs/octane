@@ -301,10 +301,10 @@ reading the latest value inside an async or delayed callback.
 
 <h3 id="strong-mode">Enforce render snapshots with Strong mode</h3>
 
-Strong mode is an optional immutable render-snapshot and pure-render contract
-with compiler checks. Add `"use strong"` before a module's
-imports to try it one file at a time, or set `compiler: { strong: true }` in
-`octane.config.ts` to cover your application.
+Strong mode is an opt-in compiler contract: a module promises that rendering reads
+immutable snapshots and has no side effects, and the compiler reports the violations it
+can prove. Add `"use strong"` before a module's imports to try it one file at a time,
+or set `compiler: { strong: true }` in `octane.config.ts` to cover your application.
 
 ```tsx
 'use strong';
@@ -317,33 +317,15 @@ export function ProfileEditor({ user }) {
 }
 ```
 
-A Strong module cannot update state while rendering, update state synchronously
-while setting up an effect, or write `ref.current` while rendering. The compiler
-also follows provable calls through `useCallback`, `useEffectEvent`, and functions
-returned by analyzable `useMemo` factories. A statically known Effect Event cannot
-be called during render or listed in explicit hook dependencies. These hooks
-remain supported, and other explicit dependency lists keep their existing meaning.
+A Strong module cannot update state or read or write `ref.current` while rendering, or
+update state synchronously while setting up an effect. The compiler caches eligible
+calculations and callbacks itself, so `useMemo` and `useCallback` are compile errors, and dependency
+arrays are inferred: an explicit array that differs from the inferred inputs is an
+error, and an equivalent one is a hint. Event handlers still update state, and effects
+still synchronize external systems.
 
-Strong also rejects detectable state-snapshot mutations and direct clock or
-random reads during render. Lazy state and ref initialization may still obtain
-an initial value. Production client builds assume every user-authored render
-operation is pure, regardless of whether its callee is local, imported, a
-static or computed member, produced by another call, constructor-like, tagged,
-or receives callbacks. `use*` spelling is not a memoization veto or a Rules of
-Hooks check. Unknown calls that the compiler cannot inspect remain the author's
-responsibility; they do not make a Strong region fall back. See
-[Strong mode and memoization](/docs/differences-from-react#strong-mode).
-
-Do not hide ref contents, a state getter, mutable module or global data, a live
-external store, a clock, randomness, mutation, or another changing source behind
-a stable function or receiver. Keep that consumer in compatibility mode, or pass
-an actual snapshot into a separate Strong component.
-
-Event handlers can still update state. Genuinely deferred callbacks, effect
-cleanup, effects that synchronize external systems, and refs for DOM nodes or
-timers are still valid. Use `useLinkedState` when editable state should follow an
-input; it returns the right value immediately without an effect or a render-time
-setter.
+[Strong mode](/docs/strong-mode) covers enabling it, adopting it in an existing app,
+replacements for the React idioms it rejects, and every diagnostic.
 
 <details className="deep-dive">
 	<summary>Octane deep dive: state getters and conditional hooks</summary>
@@ -494,7 +476,9 @@ export function CacheButton() @{
 ```
 
 The factory initializes the ref when its cell is created; later renders keep the
-same ref and do not recreate its value. `useRef(callback)` stores the callback
+same ref and do not recreate its value. In [Strong mode](/docs/strong-mode#recipe-lazy-ref),
+it replaces React's `if (ref.current === null) ref.current = create()` idiom, which reads
+and writes the ref during render. `useRef(callback)` stores the callback
 itself, as in React. A `useLazyRef` factory can also return a function to store
 as the ref value.
 
@@ -646,7 +630,9 @@ always calls the latest committed body; do not add Effect Events to dependency a
 </h3>
 
 Use `useLayoutSnapshot` when rendered output depends on a measurement of the
-committed DOM:
+committed DOM. In [Strong mode](/docs/strong-mode#recipe-layout-measurement), it replaces
+a layout effect that copies a measurement into state, which Strong rejects as a state
+update in effect setup:
 
 ```tsrx
 import { useLayoutSnapshot, useRef } from 'octane';
@@ -1520,6 +1506,10 @@ handlers; return here when you have a specific problem to solve.
 				<span>Keep a DOM node or mutable value without rendering.</span>
 			</li>
 			<li>
+				<code>useLazyRef</code>
+				<span>Create a ref's value once, from a factory.</span>
+			</li>
+			<li>
 				<code>useEffect</code>
 				<span>Synchronize with an external system after paint.</span>
 			</li>
@@ -1746,5 +1736,7 @@ Try these small changes in the counter example:
 - [Quick start](/docs/quick-start) — install Octane and run your first app.
 - [TSRX vs TSX/JSX](/docs/tsrx-vs-tsx) — choose an authoring format and learn the
   `.tsrx` control-flow syntax.
+- [Strong mode](/docs/strong-mode) — opt into compiler-checked pure rendering, one
+  module at a time.
 - [Integrations and bindings](/docs/bindings) — connect an app framework or use
   first-party Octane ports of popular libraries.

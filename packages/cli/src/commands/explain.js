@@ -29,6 +29,69 @@ export function parseErrorReference(input) {
 }
 
 /**
+ * Find a Strong compiler diagnostic in what the user pasted: the code itself,
+ * the code without its `OCTANE_STRONG_` prefix, a whole compile error, or its
+ * documentation link.
+ *
+ * @param {string} input
+ * @returns {string | null} the full code, whether or not it is known
+ */
+export function parseStrongReference(input) {
+	const code = /\bOCTANE_[A-Z0-9_]+\b/i.exec(input);
+	if (code) return code[0].toUpperCase();
+	const anchor = /#(octane-[a-z0-9-]+)/i.exec(input);
+	if (anchor) return anchor[1].toUpperCase().replaceAll('-', '_');
+	const short = /^\s*([A-Z][A-Z0-9]*(?:_[A-Z0-9]+)+)\s*$/i.exec(input);
+	return short ? `OCTANE_STRONG_${short[1].toUpperCase()}` : null;
+}
+
+/**
+ * @param {import('../kernel/context.js').Ctx} ctx
+ * @param {string} code
+ */
+function explainStrong(ctx, code) {
+	const entry = DATA.strongDiagnostics?.diagnostics?.[code];
+	if (!entry) {
+		throw new CliError(`Unknown Strong diagnostic ${code}.`, {
+			hint: 'Upgrade @octanejs/cli if the code is newer, or see https://octanejs.dev/docs/strong-mode#diagnostic-reference',
+		});
+	}
+	/** @typedef {{ id: string, title: string, react: string, strong: string, codes: string[] }} Recipe */
+	/** @type {Recipe[]} */
+	const recipes = (DATA.strongDiagnostics.recipes ?? []).filter((/** @type {Recipe} */ recipe) =>
+		recipe.codes.includes(code),
+	);
+
+	ctx.ui.intro(code);
+	ctx.ui.log('');
+	ctx.ui.log(`  ${entry.detects}`);
+	ctx.ui.log('');
+	ctx.ui.log(`  ${ctx.ui.colors.bold('Replacement:')} ${entry.replacement}`);
+	for (const recipe of recipes) {
+		ctx.ui.log('');
+		ctx.ui.log(`  ${ctx.ui.colors.bold(recipe.title)}`);
+		ctx.ui.log(`    ${ctx.ui.colors.dim('React: ')} ${recipe.react}`);
+		ctx.ui.log(`    ${ctx.ui.colors.dim('Strong:')} ${recipe.strong}`);
+	}
+	if (entry.severity === 'hint') {
+		ctx.ui.log('');
+		ctx.ui.log(`  ${ctx.ui.colors.dim('severity: hint')}`);
+	}
+	ctx.ui.outro(entry.url);
+
+	return {
+		json: {
+			code,
+			severity: entry.severity,
+			detects: entry.detects,
+			replacement: entry.replacement,
+			recipes,
+			url: entry.url,
+		},
+	};
+}
+
+/**
  * @param {string} template
  * @param {string[]} args
  * @returns {string}
@@ -40,8 +103,9 @@ function fill(template, args) {
 
 export default defineCommand({
 	description:
-		'Look up an Octane runtime error. Accepts a bare code, or the whole minified\n' +
-		'message a production build prints, arguments included.',
+		'Look up an Octane runtime error or Strong compiler diagnostic. Accepts a bare\n' +
+		'code, the whole minified message a production build prints, arguments\n' +
+		'included, or a Strong code such as OCTANE_STRONG_RENDER_REF_READ.',
 	positionals: [
 		{ name: 'error', description: 'An error code, URL, or pasted message.', required: true },
 	],
@@ -49,6 +113,13 @@ export default defineCommand({
 	async run(ctx, input) {
 		const raw = input.positionals.join(' ').trim();
 		if (!raw) throw usageError('Nothing to explain.', 'Try: octane explain 3');
+
+		// Runtime errors are numbered and Strong diagnostics are named, so a
+		// pasted message names at most one kind.
+		const strong = parseStrongReference(raw);
+		if (strong !== null && (/\bOCTANE_/i.test(raw) || parseErrorReference(raw) === null)) {
+			return explainStrong(ctx, strong);
+		}
 
 		const reference = parseErrorReference(raw);
 		if (!reference) {

@@ -35,7 +35,7 @@ import {
 } from '@tsrx/core';
 import { buildFatSegments, decodeSourceMappings } from './fat-segments.js';
 import { analyzeNativeChangeDiagnostics } from './native-change-diagnostics.js';
-import { analyzeStrongMode } from './strong-mode.js';
+import { analyzeStrongMode, withStrongDocs } from './strong-mode.js';
 import { analyzeNativeReadDiagnostics, nativeReadOptions } from './native-read-diagnostics.js';
 import { jsxImportSourcePragmaModule } from './pragma.js';
 import { inheritHookMemoOrigin } from './inline-hook-memo.js';
@@ -585,7 +585,7 @@ export function compileToVolarMappings(source, filename, options) {
 		for (const diagnostic of [...(strongDiagnostics ?? []), ...nativeReadDiagnostics]) {
 			if (diagnostic.severity !== 'error') continue;
 			collectCompileError(
-				diagnostic.message,
+				withStrongDocs(diagnostic.code, diagnostic.message),
 				diagnostic.filename ?? null,
 				{
 					start: diagnostic.start.offset,

@@ -4,7 +4,7 @@
 compiler rejects it:
 
 ```text
-src/App.tsrx:15:7: [OCTANE_STRONG_RENDER_LOCALE_FORMAT] Strong mode does not allow `toLocaleDateString()` without an explicit locale and time zone during render; the server and the browser can format the same date differently and break hydration. Pass both, for example `toLocaleDateString('en-US', { timeZone: 'UTC' })`, or format in an event or effect and render the stored text.
+src/App.tsrx:15:7: [OCTANE_STRONG_RENDER_LOCALE_FORMAT] Strong mode does not allow `toLocaleDateString()` without an explicit locale and time zone during render; the server and the browser can format the same date differently and break hydration. Pass both, for example `toLocaleDateString('en-US', { timeZone: 'UTC' })`, or format in an event or effect and render the stored text. See https://octanejs.dev/docs/strong-mode#octane-strong-render-locale-format
 ```
 
 Fix the component so it compiles in Strong mode and meets these requirements:

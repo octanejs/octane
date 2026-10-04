@@ -4,7 +4,7 @@
 compiler rejects it:
 
 ```text
-src/App.tsrx:6:22: [OCTANE_STRONG_RENDER_IMPURE_CALL] Strong mode does not allow generating random IDs or bytes during render. Use useId() for element IDs; create other random values in an event handler and store them in state.
+src/App.tsrx:6:22: [OCTANE_STRONG_RENDER_IMPURE_CALL] Strong mode does not allow generating random IDs or bytes during render. Use useId() for element IDs; create other random values in an event handler and store them in state. See https://octanejs.dev/docs/strong-mode#octane-strong-render-impure-call
 ```
 
 Fix the component so it compiles in Strong mode and meets these requirements:

@@ -94,7 +94,7 @@ const FETCH_MESSAGE = `Strong mode does not allow fetch in a state updater or re
 const SCHEDULE_MESSAGE = `Strong mode does not allow scheduling work in a state updater or reducer. ${REPLAY} Schedule timers, microtasks, and promise callbacks from the event handler or an effect.`;
 const UPDATER_MUTATION_MESSAGE = `Strong mode does not allow a state updater or reducer to mutate the state it receives. ${REPLAY} Return a new value instead, for example (current) => [...current, item].`;
 export const SNAPSHOT_MUTATION_MESSAGE =
-	'Strong mode does not allow mutating a state value outside render. Passing the same object back to its setter does not re-render, and the change rewrites the snapshot that transitions and useOptimistic revert to. Pass a new value instead, for example setItems([...items, item]) or setItems((current) => [...current, item]). Keep mutable objects in useRef.';
+	'Strong mode does not allow mutating a state value outside render. Passing the same object back to its setter does not re-render, and the change rewrites the snapshot that transitions and useOptimistic revert to. Pass a new value instead, for example setItems([...items, item]) or setItems((current) => [...current, item]). Keep mutable objects in useRef, or create one with useLazyRef.';
 const STALE_MESSAGE =
 	'Strong mode does not allow a deferred state update computed from the render snapshot of the same state. After an await, or in a timer or promise callback, other updates may already have changed it. Use the updater form, setValue((current) => current + 1), or read the latest value with the state getter (the third tuple member).';
 const STALE_REDUCER_MESSAGE =
