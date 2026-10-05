@@ -22,6 +22,7 @@ import { readEarlySignalValue } from './early-values.js';
 import { currentSignalDeclarationPath } from './declaration-path.js';
 import {
 	NATIVE_DOM_VALUE,
+	SIGNAL_SAME_CAPTURE,
 	currentSignalDeclarationInvocation,
 	forwardNativeTransitionConsumer,
 } from './read-protocol.js';
@@ -434,6 +435,34 @@ export abstract class Descriptor<T, H extends SignalHandle<T>> implements OwnerB
 		requireSite(this.site);
 		const token = readerOwner(this.owner, owner);
 		return this.resolvedCell(resolveDescriptorOwner(this.site, token), token);
+	}
+
+	/**
+	 * A body declares its derived$ and query$ again on every render, so a closure
+	 * that captures one captures a new descriptor each time. It still reads the
+	 * cell the committed closure reads, unless this render presents a redeclared
+	 * definition of that cell through a private view. Compared by identity, every
+	 * such closure would run again on every render, and a result that never
+	 * compares equal (a pending read, a new error or object) would make its
+	 * readers render, and declare it, again without end.
+	 */
+	[SIGNAL_SAME_CAPTURE](committed: unknown, owner: object): boolean {
+		if (
+			this.site === undefined ||
+			!(committed instanceof Descriptor) ||
+			committed.constructor !== this.constructor ||
+			committed.key !== this.key ||
+			committed.site !== this.site ||
+			committed.owner !== this.owner
+		)
+			return false;
+		try {
+			// Resolving declares this render's definition of the captured cell, as
+			// the closure's own read would.
+			return !isDeclarationView(this[SIGNAL_OWNER_RESOLVE](owner as Scope));
+		} catch {
+			return false;
+		}
 	}
 
 	/**

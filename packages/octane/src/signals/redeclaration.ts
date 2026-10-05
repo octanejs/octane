@@ -1,7 +1,9 @@
 import type { ScopedNode } from './graph.js';
 import {
+	SIGNAL_SAME_CAPTURE,
 	currentSignalDeclarationInvocation,
 	currentSignalDeclarationStage,
+	type SignalCapture,
 	type SignalDeclarationStage,
 } from './read-protocol.js';
 import { activeCandidate } from './transition-state.js';
@@ -95,7 +97,7 @@ export abstract class RedeclarableBinding<D> {
 		const current = currentSignalDeclarationInvocation();
 		const invocation = renderInvocation(current, declaring);
 		if (invocation === 0 || staged?.invocation !== invocation) {
-			if (sameCaptures(this.captures, captures)) {
+			if (sameCaptures(this.owner, this.captures, captures)) {
 				this.presented = invocation;
 				return this.node;
 			}
@@ -147,11 +149,23 @@ function renderInvocation(current: number, declaring: number): number {
 }
 
 function sameCaptures(
+	owner: object,
 	committed: readonly unknown[] | undefined,
 	captures: readonly unknown[] | undefined,
 ): boolean {
 	if (!committed || !captures || committed.length !== captures.length) return false;
-	for (let index = 0; index < captures.length; index++)
-		if (!Object.is(committed[index], captures[index])) return false;
+	for (let index = 0; index < captures.length; index++) {
+		const capture = captures[index];
+		if (
+			!Object.is(committed[index], capture) &&
+			!(
+				typeof capture === 'object' &&
+				capture !== null &&
+				SIGNAL_SAME_CAPTURE in capture &&
+				(capture as SignalCapture)[SIGNAL_SAME_CAPTURE](committed[index], owner)
+			)
+		)
+			return false;
+	}
 	return true;
 }

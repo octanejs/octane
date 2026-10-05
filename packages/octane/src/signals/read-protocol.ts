@@ -7,6 +7,16 @@ import type { ScopedNode } from './graph.js';
 export const SIGNAL_DEPENDENT_NODE: unique symbol = Symbol('octane.signalDependent');
 export type SignalDependencyNotify = (() => void) & { [SIGNAL_DEPENDENT_NODE]?: ScopedNode };
 
+/**
+ * Implemented by handles a compiled declaration can capture: whether a closure
+ * that reads this handle in `owner` reads the same cell as one that captured
+ * `committed`, so the committed definition still applies (see redeclaration).
+ */
+export const SIGNAL_SAME_CAPTURE: unique symbol = Symbol('octane.signalSameCapture');
+export interface SignalCapture {
+	[SIGNAL_SAME_CAPTURE](committed: unknown, owner: object): boolean;
+}
+
 /** Only presentation subscriptions participate; public subscribers are never replayed. */
 export const NATIVE_TRANSITION_CONSUMER: unique symbol = Symbol('octane.transitionConsumer');
 
