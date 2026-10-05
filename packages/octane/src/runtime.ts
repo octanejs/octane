@@ -1139,8 +1139,15 @@ function scopeSignalOwner(scope: Scope | null): SignalOwner | undefined {
 				CHILDREN_SIGNAL_OWNER
 			];
 			if (children?.documentOwner === documentOwner) identity.enclosingOwner = children;
-			else if (parent !== null && !(parent instanceof LiteBlockImpl))
-				identity.enclosingOwner = scopeSignalOwner(parent) as SignalRendererOwnerIdentity;
+			else {
+				// A stand-in records the scope its component is registered on.
+				if (parent instanceof LiteBlockImpl)
+					parent =
+						parent.signalInstanceParent?.children?.find((child) => child.scope.block === parent)
+							?.scope ?? null;
+				if (parent !== null)
+					identity.enclosingOwner = scopeSignalOwner(parent) as SignalRendererOwnerIdentity;
+			}
 			// A retry owner must not keep an abandoned renderer tree alive. This
 			// existing opaque identity object is also its own facade-state token.
 			identity.instanceOwner = identity;

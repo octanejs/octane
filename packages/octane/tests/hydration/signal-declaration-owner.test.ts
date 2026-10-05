@@ -512,6 +512,33 @@ export function App(props) @{
 		},
 	);
 
+	// A hookless child renders value JSX through a renderer below its DOM
+	// stand-in. A nested block there still reads the handle in the child's cell.
+	it.each(MODES)(
+		"reads a handle prop in a hookless child's value JSX from the child's cell ($name)",
+		async ({ dev, strong }) => {
+			const view = await mountClient(
+				`import { signal$ } from 'octane/signals';
+function Child(props) @{
+ const view = props.show ? <div>@{ const label = 'write'; <button title={label} onClick={() => props.handle$.set('written')}><output>{props.handle$.get() as string}</output></button> }</div> : null;
+ <article><output>{props.handle$.get() as string}</output>{view}</article>
+}
+export function App(props) @{
+ const result$ = signal$('parent');
+ <main><output>{result$.get() as string}</output><Child show={props.show} handle$={result$} /></main>
+}`,
+				{ dev, strong },
+			);
+			try {
+				expect(view.texts()).toEqual(['parent', 'parent', 'parent']);
+				view.click('button');
+				expect(view.texts()).toEqual(['parent', 'written', 'written']);
+			} finally {
+				view.unmount();
+			}
+		},
+	);
+
 	// A nested block keeps an instance of its own for what it declares, so its
 	// query is seeded from the server's request like a component's.
 	it.each(MODES)('resumes a query a nested block declares ($name)', async ({ dev, strong }) => {
