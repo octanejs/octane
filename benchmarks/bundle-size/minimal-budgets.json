@@ -50,8 +50,8 @@
     "brotli": 28429
   },
   "context": {
-    "raw": 109525,
-    "gzip": 36258,
+    "raw": 109256,
+    "gzip": 36196,
     "brotli": 32212
   },
   "hydrate-root": {
@@ -62,12 +62,12 @@
   "deferred-hydration": {
     "raw": 238535,
     "gzip": 75406,
-    "brotli": 65391
+    "brotli": 65371
   },
   "suspense-transition": {
     "raw": 165505,
-    "gzip": 53167,
-    "brotli": 46866
+    "gzip": 53165,
+    "brotli": 46819
   },
   "server-hooks": {
     "raw": 509,
@@ -77,7 +77,7 @@
   "server-render": {
     "raw": 65201,
     "gzip": 22499,
-    "brotli": 20504
+    "brotli": 20486
   },
   "component-owned-effects": {
     "raw": 81941,
@@ -111,8 +111,8 @@
   },
   "binding-aria-esbuild": {
     "raw": 8635,
-    "gzip": 3363,
-    "brotli": 3236
+    "gzip": 3361,
+    "brotli": 3234
   },
   "binding-motion-vite": {
     "raw": 63981,
@@ -157,7 +157,7 @@
   "binding-apollo-client-vite": {
     "raw": 359820,
     "gzip": 112809,
-    "brotli": 98767
+    "brotli": 98678
   },
   "binding-apollo-client-esbuild": {
     "raw": 362749,
