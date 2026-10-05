@@ -1144,6 +1144,21 @@ export function promoteDeclarationView(view: ScopedNode, node: ScopedNode): void
 	if (record === undefined || record.retired || record.canonical !== node) return;
 	queued.delete(view);
 	const state = view.state;
+	// A settled view waiter cannot represent a current pending result. Re-read
+	// the accepted definition before presenting it to committed consumers.
+	const viewWakeup = view.wakeup;
+	const settledPending =
+		state?.snapshot.status === 'pending' &&
+		viewWakeup !== undefined &&
+		viewWakeup.promise === state.waiting &&
+		viewWakeup.settled;
+	// A pending view may also have been invalidated by one of its graph
+	// dependencies before acceptance; preserve that evidence on the cell.
+	const invalidatedPending =
+		state?.snapshot.status === 'pending'
+			? view.flags & (ReactiveFlags.Dirty | ReactiveFlags.Pending)
+			: 0;
+	const retryPending = Boolean(invalidatedPending || settledPending);
 	const currentChanged = state !== undefined && !sameViewResult(node, view, state);
 	while (node.deps) graph.unlink(node.deps, node);
 	for (let link = view.deps; link; link = link.nextDep) graph.link(link.dep, node, ++trackingCycle);
@@ -1177,15 +1192,18 @@ export function promoteDeclarationView(view: ScopedNode, node: ScopedNode): void
 	node.lastState = view.lastState;
 	node.hasLast = view.hasLast;
 	if (node.state && node.state.snapshot.status !== 'ready') retainOwners(node);
-	if (!currentChanged && retainedChanged) node.revision++;
+	if (!currentChanged && (retainedChanged || retryPending)) node.revision++;
 	releaseRetainedOwners(view);
 	// A view nobody read has no state to install; the cell evaluates its new definition.
 	const unevaluated = state === undefined;
 	node.flags =
-		ReactiveFlags.Mutable | ReactiveFlags.Watching | (unevaluated ? ReactiveFlags.Dirty : 0);
+		ReactiveFlags.Mutable |
+		ReactiveFlags.Watching |
+		invalidatedPending |
+		(unevaluated || settledPending ? ReactiveFlags.Dirty : 0);
 	// Committed consumers learn the accepted state first. The render's own
 	// consumers already presented it; move them without another notification.
-	if ((currentChanged || retainedChanged || unevaluated) && node.subs) {
+	if (!retryPending && (currentChanged || retainedChanged || unevaluated) && node.subs) {
 		graph.propagate(node.subs, executionDepth !== 0);
 		graph.shallowPropagate(node.subs);
 	}
@@ -1200,7 +1218,13 @@ export function promoteDeclarationView(view: ScopedNode, node: ScopedNode): void
 	}
 	record.promoted = true;
 	record.viewRevision = view.revision;
-	record.canonicalRevision = node.revision;
+	record.canonicalRevision = retryPending ? NaN : node.revision;
+	// The accepted render presented an invalidated pending result; its moved
+	// consumers must retry against the current definition as well.
+	if (retryPending && node.subs) {
+		graph.propagate(node.subs, executionDepth !== 0);
+		graph.shallowPropagate(node.subs);
+	}
 }
 
 /** Discard a view nobody accepted. Its remaining consumers belong to discarded renders. */
