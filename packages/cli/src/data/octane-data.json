@@ -3523,6 +3523,11 @@
       "message": "Structural hydration leases do not support @try regions.",
       "runtime": ["client"],
       "status": "active"
+    },
+    "338": {
+      "message": "Hydration mismatch: a server-rendered range had no closing marker, so the client rendered the boundary or root that contains it instead. Something changed the server HTML after rendering, for example an HTML minifier or proxy that strips comments.",
+      "runtime": ["client"],
+      "status": "active"
     }
   },
   "strongDiagnostics": {
