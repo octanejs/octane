@@ -22,6 +22,7 @@ function frames(output: string): Record<string, string> {
 		if: `@try { @if (props.show) { ${output} } } @pending { <i>waiting</i> }`,
 		for: `@try { <ul>@for (const item of props.items; key item) { <li>${output}</li> }</ul> } @pending { <i>waiting</i> }`,
 		switch: `@try { @switch (props.mode) { @case 'a': { ${output} } @default: { <b>other</b> } } } @pending { <i>waiting</i> }`,
+		renderprop: `@try { <Render render={() => @{ const label = 'x'; <p title={label}>${output}</p> }} /> } @pending { <i>waiting</i> }`,
 	};
 }
 
@@ -33,6 +34,9 @@ function source(body: string, nested: boolean, imports = 'derived$, query$'): st
 import { ${imports} } from 'octane/signals';
 function Boom() @{
  throw new Error('boom');
+}
+function Render(props) @{
+ <div>{props.render}</div>
 }
 ${
 	nested
@@ -290,6 +294,48 @@ describe('signal declarations read across their component template', () => {
 				strong,
 				adoptsOutput: shape !== 'catch',
 			});
+		},
+	);
+
+	// A render prop renders inside the component it is passed to, yet reads a
+	// handle it closes over as the row that declared it. That row's derived
+	// value reads the component's query, which the server must still announce
+	// for the browser to resume.
+	const ROW_RENDER_PROP = source(
+		`
+ const record$ = query$(() => 'record', props.load);
+ @try {
+  <ul>
+   @for (const item of props.items; key item) {
+    const selected$ = derived$(() => record$.get());
+    <li><Render render={() => @{ const label = item; <p title={label}><output>{selected$.get() as string}</output></p> }} /></li>
+   }
+  </ul>
+ } @pending {
+  <i>waiting</i>
+ }`,
+		false,
+	);
+
+	it.each(MODES)(
+		"starts one query for a row's derived value read by a render prop ($name)",
+		async ({ dev, strong }) => {
+			const view = await mountClient(ROW_RENDER_PROP, { dev, strong });
+			try {
+				expect(view.requests).toHaveLength(1);
+				await view.settle('ready');
+				expect(view.texts()).toEqual(['ready', 'ready']);
+				expect(view.requests).toHaveLength(1);
+			} finally {
+				view.unmount();
+			}
+		},
+	);
+
+	it.each(MODES)(
+		"resumes the server query a row's derived value reads through a render prop ($name)",
+		async ({ dev, strong }) => {
+			await hydrateServerOutput(ROW_RENDER_PROP, { dev, strong, adoptsOutput: true });
 		},
 	);
 

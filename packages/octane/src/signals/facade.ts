@@ -27,6 +27,7 @@ import {
 	forwardNativeTransitionConsumer,
 } from './read-protocol.js';
 import { isSignalHandle } from './handle-protocol.js';
+import { runAsDeclaredServerSignalReader as readAsDeclared } from './query-attempt-observer.js';
 
 export { isSignalHandle, isWritableSignal } from './handle-protocol.js';
 import {
@@ -497,8 +498,13 @@ export abstract class Descriptor<T, H extends SignalHandle<T>> implements OwnerB
 		return this.resolvedCell(owner, token);
 	}
 
+	// A lexical use reads as its declaring owner, so a server render also
+	// observes the query attempts its reads start under that owner (see
+	// readAsDeclared). The other read paths keep their direct call.
 	get(): T {
-		return this.resolve().get();
+		return this.lexical === this
+			? readAsDeclared(this.owner!, () => this.resolve().get())
+			: this.resolve().get();
 	}
 
 	[NATIVE_DOM_VALUE](): T {
@@ -508,7 +514,9 @@ export abstract class Descriptor<T, H extends SignalHandle<T>> implements OwnerB
 	}
 
 	[SIGNAL_BINDING_READ](): T {
-		return readBinding(this.resolve());
+		return this.lexical === this
+			? readAsDeclared(this.owner!, () => readBinding(this.resolve()))
+			: readBinding(this.resolve());
 	}
 
 	[SIGNAL_BINDING_SUBSCRIBE](notify: () => void, onRetire?: () => void): () => void {
@@ -538,11 +546,15 @@ export abstract class Descriptor<T, H extends SignalHandle<T>> implements OwnerB
 	latest(): T | undefined;
 	latest<F>(fallback: F): T | F;
 	latest<F>(fallback?: F): T | F | undefined {
-		return this.resolve().latest(fallback);
+		return this.lexical === this
+			? readAsDeclared(this.owner!, () => this.resolve().latest(fallback))
+			: this.resolve().latest(fallback);
 	}
 
 	snapshot(): SignalSnapshot<T> {
-		return this.resolve().snapshot();
+		return this.lexical === this
+			? readAsDeclared(this.owner!, () => this.resolve().snapshot())
+			: this.resolve().snapshot();
 	}
 
 	subscribe(notify: () => void): () => void {
