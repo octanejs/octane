@@ -199,14 +199,25 @@ export interface NativeSerializedScope {
 export type NativeAdoptionResolver = (owner: NativeAdoptionOwner) => AdoptionFrame | undefined;
 let nativeAdoptionResolver: NativeAdoptionResolver | null = null;
 
+/**
+ * Brands hydration control-flow errors, this one and the renderer's refused
+ * early presentation, so that a boundary can pass one through without naming
+ * either class, which a bundle that never hydrates would then retain.
+ */
+export const ADOPTION_CONTROL: unique symbol = /* @__PURE__ */ Symbol('octane.adoptionControl');
+
 /** Internal hydration control flow, never an application error-boundary value. */
 export class NativeAdoptionMiss extends Error {
+	// Assigned in the constructor: a computed class field would keep the class in
+	// every bundle, since a bundler cannot drop a class whose keys it must evaluate.
+	declare readonly [ADOPTION_CONTROL]: true;
 	readonly scopeKey: string;
 	readonly nodeKey: string;
 	readonly read: 'value' | 'latest' | 'snapshot';
 
 	constructor(scopeKey: string, nodeKey: string, read: 'value' | 'latest' | 'snapshot' = 'value') {
 		super(formatClientError(194, read, scopeKey, nodeKey));
+		this[ADOPTION_CONTROL] = true;
 		this.name = 'NativeAdoptionMiss';
 		this.scopeKey = scopeKey;
 		this.nodeKey = nodeKey;

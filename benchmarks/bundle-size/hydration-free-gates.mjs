@@ -7,9 +7,13 @@ import assert from 'node:assert/strict';
 // The oracle is the bundle's source map, not identifier names: a production
 // minifier mangles names and inlines single-use functions (oxc inlines them;
 // esbuild renames collisions), so a name search can pass while the code is still
-// shipped. Every generated segment maps back to its original line, so a
-// declaration is retained exactly when some segment maps inside its source
-// range. Every entry is checked three ways, so the list cannot go stale:
+// shipped. Every generated segment maps back to its original line and column,
+// so a declaration is retained exactly when some segment maps inside its source
+// range. Columns matter: a minifier that joins adjacent variable statements, and
+// then removes a declarator that its constant folding made unused, keeps that
+// declarator's statement as the joined statement's shell, so the surviving
+// declarators' `var` keyword still maps to the removed one's line. Every entry
+// is checked three ways, so the list cannot go stale:
 // - it is still a top-level declaration of the source file it names;
 // - a hydrating control bundle maps into it under the same build settings,
 //   which proves the oracle can see it;
@@ -147,10 +151,12 @@ function lineAt(lineStarts, offset) {
 }
 
 /**
- * Resolve every deny-listed declaration to its 0-based [startLine, endLine]
- * range in its source file. `parse(text, source)` returns an ESTree Program
- * whose offsets index `text`. A name that is no longer a top-level declaration
- * of its file fails with the reason, so a rename cannot silently pass.
+ * Resolve every deny-listed declaration to its 0-based range in its source
+ * file, from [startLine, startColumn] up to [endLine, endColumn] (exclusive).
+ * A variable's range is its declarator, without the statement's keyword.
+ * `parse(text, source)` returns an ESTree Program whose offsets index `text`.
+ * A name that is no longer a top-level declaration of its file fails with the
+ * reason, so a rename cannot silently pass.
  */
 export function resolveDeclarationRanges(readSource, parse, denied = HYDRATION_ONLY_DECLARATIONS) {
 	const files = new Map();
@@ -182,7 +188,14 @@ export function resolveDeclarationRanges(readSource, parse, denied = HYDRATION_O
 			true,
 			`${entry.source}: parser offsets do not locate ${entry.name}`,
 		);
-		ranges.push({ ...entry, startLine, endLine: lineAt(file.lineStarts, span.end - 1) });
+		const endLine = lineAt(file.lineStarts, span.end - 1);
+		ranges.push({
+			...entry,
+			startLine,
+			startColumn: span.start - file.lineStarts[startLine],
+			endLine,
+			endColumn: span.end - file.lineStarts[endLine],
+		});
 	}
 	if (missing.length !== 0) {
 		throw new assert.AssertionError({
@@ -200,12 +213,14 @@ const BASE64_VALUES = new Int8Array(128).fill(-1);
 for (let index = 0; index < BASE64.length; index++) BASE64_VALUES[BASE64.charCodeAt(index)] = index;
 
 /**
- * Decode a source map v3 `mappings` string into the [sourceIndex, originalLine]
- * of every segment that has a source. Lines are 0-based.
+ * Decode a source map v3 `mappings` string into the [sourceIndex, originalLine,
+ * originalColumn] of every segment that has a source. Lines and columns are
+ * 0-based.
  */
-export function* mappedSourceLines(mappings) {
+export function* mappedSourcePositions(mappings) {
 	let sourceIndex = 0;
 	let originalLine = 0;
+	let originalColumn = 0;
 	let index = 0;
 	const fields = [0, 0, 0, 0, 0];
 	while (index < mappings.length) {
@@ -232,7 +247,8 @@ export function* mappedSourceLines(mappings) {
 		if (count >= 4) {
 			sourceIndex += fields[1];
 			originalLine += fields[2];
-			yield [sourceIndex, originalLine];
+			originalColumn += fields[3];
+			yield [sourceIndex, originalLine, originalColumn];
 		}
 	}
 }
@@ -255,11 +271,15 @@ export function retainedDeclarations(map, ranges) {
 	});
 	const retained = new Set();
 	if (bySource.size === 0) return retained;
-	for (const [sourceIndex, line] of mappedSourceLines(map.mappings)) {
+	for (const [sourceIndex, line, column] of mappedSourcePositions(map.mappings)) {
 		const fileRanges = bySource.get(sourceIndex);
 		if (fileRanges === undefined) continue;
 		for (const range of fileRanges) {
-			if (line >= range.startLine && line <= range.endLine) retained.add(range.name);
+			if (
+				(line > range.startLine || (line === range.startLine && column >= range.startColumn)) &&
+				(line < range.endLine || (line === range.endLine && column < range.endColumn))
+			)
+				retained.add(range.name);
 		}
 	}
 	return retained;

@@ -8,7 +8,7 @@ import {
 	deniedRangesFor,
 	HYDRATION_ONLY_DECLARATIONS,
 	HYDRATION_ONLY_MODULES,
-	mappedSourceLines,
+	mappedSourcePositions,
 	resolveDeclarationRanges,
 	retainedDeclarations,
 	topLevelDeclarations,
@@ -49,17 +49,24 @@ test('top-level declarations include exports and destructuring and ignore nested
 	);
 });
 
-test('a deny-listed declaration resolves to its exact source lines', () => {
+test('a deny-listed declaration resolves to its exact source range', () => {
 	assert.deepEqual(
 		fixtureRanges([
 			{ name: 'currentHydration', source: 'runtime.ts' },
 			{ name: 'hydrationOnly', source: 'runtime.ts' },
 			{ name: 'Capability', source: 'runtime.ts' },
-		]).map(({ name, startLine, endLine }) => [name, startLine, endLine]),
+		]).map(({ name, startLine, startColumn, endLine, endColumn }) => [
+			name,
+			startLine,
+			startColumn,
+			endLine,
+			endColumn,
+		]),
 		[
-			['currentHydration', 0, 0],
-			['hydrationOnly', 3, 6],
-			['Capability', 13, 15],
+			// A variable's range is its declarator, after the statement's keyword.
+			['currentHydration', 0, 4, 0, 42],
+			['hydrationOnly', 3, 0, 6, 1],
+			['Capability', 13, 7, 15, 1],
 		],
 	);
 });
@@ -125,20 +132,21 @@ test('esbuild is held to every hydration body but not to the foldOnly state cell
 	);
 });
 
-test('source map segments decode to their source index and original line', () => {
-	// AAAA: source 0, line 0. AACA: line +1. EAAE: same line. A: no source.
-	// gBAAgB: column 16 with a multi-digit VLQ, still line 1. ACAA: source 1.
+test('source map segments decode to their source index and original position', () => {
+	// AAAA: source 0, line 0, column 0. AACA: line +1. EAAE: original column +2.
+	// A: no source. gBAAgB: original column +16 with a multi-digit VLQ, still
+	// line 1. ACAA: source 1.
 	assert.deepEqual(
-		[...mappedSourceLines('AAAA;AACA,EAAE,A;gBAAgB,ACAA')],
+		[...mappedSourcePositions('AAAA;AACA,EAAE,A;gBAAgB,ACAA')],
 		[
-			[0, 0],
-			[0, 1],
-			[0, 1],
-			[0, 1],
-			[1, 1],
+			[0, 0, 0],
+			[0, 1, 0],
+			[0, 1, 2],
+			[0, 1, 18],
+			[1, 1, 18],
 		],
 	);
-	assert.throws(() => [...mappedSourceLines('AA!A')], /invalid source map/);
+	assert.throws(() => [...mappedSourcePositions('AA!A')], /invalid source map/);
 });
 
 test('retention follows the source map, so inlined code still counts and dropped code does not', () => {
@@ -161,12 +169,33 @@ test('retention follows the source map, so inlined code still counts and dropped
 	assert.deepEqual([...retainedDeclarations(map('ACEA'), ranges)], []);
 	assert.deepEqual([...retainedDeclarations(map('ACOA,ACCA'), ranges)], []);
 	// Windows separators and absolute paths resolve below packages/octane/src.
+	// ACAI: line 0, column 4, the declarator `currentHydration = null`.
 	assert.deepEqual(
-		[...retainedDeclarations(map('ACAA', 'C:\\r\\packages\\octane\\src\\runtime.ts'), ranges)],
+		[...retainedDeclarations(map('ACAI', 'C:\\r\\packages\\octane\\src\\runtime.ts'), ranges)],
 		['currentHydration'],
 	);
 	// A deny-listed source that is not in the map retains nothing.
-	assert.deepEqual([...retainedDeclarations(map('ACAA', 'src/runtime.ts'), ranges)], []);
+	assert.deepEqual([...retainedDeclarations(map('ACAI', 'src/runtime.ts'), ranges)], []);
+});
+
+test('a joined statement keyword does not retain the declarator a minifier removed from it', () => {
+	// oxc joins `let removed = null;` with a later surviving variable statement,
+	// then drops `removed` once constant folding leaves it unused. The joined
+	// statement keeps the first statement's position, so its `var` keyword maps
+	// to column 0 of `removed`'s line while the surviving declarator maps to its
+	// own line: `var kept = null;`.
+	const source = ['let removed = null;', 'function f() {}', 'let kept = null;'].join('\n');
+	const ranges = resolveDeclarationRanges(() => source, parse, [
+		{ name: 'removed', source: 'runtime.ts' },
+		{ name: 'kept', source: 'runtime.ts' },
+	]);
+	const map = (mappings) => ({ sources: ['../../packages/octane/src/runtime.ts'], mappings });
+	// AAAA: `var` -> line 0, column 0. IAEI: `kept` -> line 2, column 4.
+	assert.deepEqual([...retainedDeclarations(map('AAAA,IAEI'), ranges)], ['kept']);
+	// A retained `removed` maps its own declarator: line 0, column 4.
+	assert.deepEqual([...retainedDeclarations(map('AAAI'), ranges)], ['removed']);
+	// The trailing `;` after a declarator is outside it as well.
+	assert.deepEqual([...retainedDeclarations(map('AAAmB'), ranges)], []);
 });
 
 test('a real production source map retains the kept declaration and not the dropped one', async () => {

@@ -55,9 +55,9 @@ export function readEarlySignalValue(
 	binding: SignalBindingIdentity,
 ): EarlyValue | undefined {
 	const ownerDocument = documentForOwner(owner);
-	return ownerDocument === undefined
-		? undefined
-		: DOCUMENT_VALUES.get(ownerDocument)?.get(bindingKey(owner, binding));
+	if (ownerDocument === undefined) return undefined;
+	installEarlyControlBridge();
+	return DOCUMENT_VALUES.get(ownerDocument)?.get(bindingKey(owner, binding));
 }
 
 function parseControlBindings(control: Element): {
@@ -150,6 +150,7 @@ export function hasHydrationControlSignalWriter(
 
 /** @internal Carry edit authority across module handoff, even after editing back to SSR. */
 export function readEarlyHydrationControlRevision(control: Element): number {
+	installEarlyControlBridge();
 	return EARLY_CONTROL_REVISIONS.get(control) ?? 0;
 }
 
@@ -160,6 +161,8 @@ export function clearEarlyHydrationControlRevision(control: Element): void {
 
 /** @internal Module capture replaces the inline writer for this document. */
 export function claimEarlyHydrationControlCapture(ownerDocument: Document): void {
+	// Publish what the inline writer queued before the module capture takes over.
+	installEarlyControlBridge();
 	CLAIMED_CONTROL_DOCUMENTS.add(ownerDocument);
 }
 
@@ -171,9 +174,17 @@ function publishEarlyHydrationControlSignalValues(control: Element, revision: nu
 	publishHydrationControlSignalValues(control, revision);
 }
 
-// A streaming shell can capture native input before the client module evaluates.
-// Claim its bounded element queue as soon as this engine-free bridge loads.
-if (typeof globalThis !== 'undefined') {
+/**
+ * @internal A streaming shell can capture native input before the client module
+ * evaluates: until this bridge is installed, its inline writer queues each
+ * edited control's latest revision (`__octaneEarlySignalControls.q`). Claim that
+ * bounded queue and publish later edits directly. hydrateRoot and every reader
+ * of early values install it first, and no top-level statement does, so a
+ * client that never hydrates or reads them keeps none of this bridge.
+ * Idempotent: a repeat installs the same writer and finds the queue empty.
+ */
+export function installEarlyControlBridge(): void {
+	if (typeof globalThis === 'undefined') return;
 	const host = globalThis as typeof globalThis & {
 		__octaneEarlySignalControls?: EarlyControlMailbox;
 		__octanePublishSignalControl?: (control: Element, revision: number) => void;
