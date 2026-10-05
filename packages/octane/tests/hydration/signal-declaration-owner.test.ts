@@ -565,7 +565,31 @@ export function App(props) @{
 		},
 		'a recursive function declaration shared with a callback': {
 			setup:
-				'function compute$(depth = 1) { return depth > 0 ? compute$(depth - 1) : record$.get(); }',
+				'function compute$(_context, depth = 1) { return depth > 0 ? compute$(_context, depth - 1) : record$.get(); }',
+			value: 'derived$(compute$)',
+			callback: 'compute$',
+		},
+		'a recursive const arrow shared with a callback': {
+			setup:
+				'const compute$ = (_context, depth = 1) => depth > 0 ? compute$(_context, depth - 1) : record$.get();',
+			value: 'derived$(compute$)',
+			callback: 'compute$',
+		},
+		'a recursive const function shared with a callback': {
+			setup:
+				'const compute$ = function (_context, depth = 1) { return depth > 0 ? compute$(_context, depth - 1) : record$.get(); };',
+			value: 'derived$(compute$)',
+			callback: 'compute$',
+		},
+		'a recursive named function expression with its own binding': {
+			setup:
+				'const compute$ = function compute$(_context, depth = 1) { return depth > 0 ? compute$(_context, depth - 1) : record$.get(); };',
+			value: 'derived$(compute$)',
+			callback: 'compute$',
+		},
+		'a recursive const with a shadowed parameter and shorthand reference': {
+			setup:
+				"const compute$ = (_context, depth = 1) => { const { compute$: again } = { compute$ }; const offset = ((compute$) => compute$())(() => ''); return depth > 0 ? offset + again(_context, depth - 1) : record$.get(); };",
 			value: 'derived$(compute$)',
 			callback: 'compute$',
 		},
@@ -680,9 +704,17 @@ export function App(props) @{
 		},
 	);
 
-	it.each(MODES)(
-		'hydrates two named-producer readers and preserves their declaring callback on update ($name)',
-		async ({ dev, strong }) => {
+	it.each(
+		MODES.flatMap((mode) =>
+			[
+				'a named producer shared with a callback',
+				'a recursive const arrow shared with a callback',
+				'a recursive const function shared with a callback',
+			].map((kind) => ({ ...mode, kind })),
+		),
+	)(
+		'hydrates two named-producer readers and preserves their declaring callback on update ($name, $kind)',
+		async ({ dev, strong, kind }) => {
 			vi.resetModules();
 			const server = await import('../../src/runtime.server.js');
 			const client = await import('../../src/runtime.js');
@@ -694,7 +726,7 @@ export function App(props) @{
 				await import('../_server-stream.js');
 			const { drainProducers } = await import('../_fixtures/signals-async-controls.js');
 			const text = producerSource(
-				PRODUCERS['a named producer shared with a callback'],
+				PRODUCERS[kind as keyof typeof PRODUCERS],
 				2,
 				'<small>{props.label as string}</small>',
 			);
@@ -769,6 +801,16 @@ export function App(props) @{
 			{ ...mode, body: 'return record$.get();', kind: 'direct' },
 			{
 				...mode,
+				body: 'return depth > 0 ? compute$(_context, depth - 1) : record$.get();',
+				kind: 'recursive const',
+			},
+			{
+				...mode,
+				body: "const { compute$: again } = { compute$ }; const offset = ((compute$) => compute$())(() => ''); return depth > 0 ? offset + again(_context, depth - 1) : record$.get();",
+				kind: 'recursive const shorthand',
+			},
+			{
+				...mode,
 				body: 'const inner$ = derived$(() => record$.get()); return inner$.get();',
 				kind: 'nested declaration',
 			},
@@ -797,7 +839,7 @@ export function App(props) @{
 					'./use-selection': `import { derived$, query$ } from 'octane/signals';
 export function useSelection$(load) {
  const record$ = query$(() => 'record', load);
- const compute$ = () => { ${mode.body} };
+ const compute$ = (_context, depth = 1) => { ${mode.body} };
  const selected$ = derived$(compute$);
  return { selected$, compute$ };
 }`,

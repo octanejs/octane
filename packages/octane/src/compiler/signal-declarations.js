@@ -636,14 +636,17 @@ function declaredUses(ast, lexical, owners, trusted, usedNames) {
 	return { uses, producers, producerArguments };
 }
 
-// A function declaration's recursive self binding lives in its parameter
-// scope, distinct from the outer binding. Keep recursion within its producer
-// version; a named function expression already owns its unchanged inner name.
+// Keep recursive references within a producer copy. A function declaration's
+// id lives in its parameter scope; a const id lives in its declaring scope.
+// A named function expression already owns its unchanged inner name, so a
+// same-spelled reference to that inner binding must not be renamed.
 function producerSelfReference(node, parent, key, declaration, lexical) {
 	if (
-		declaration.type !== 'FunctionDeclaration' ||
 		node.type !== 'Identifier' ||
 		node.name !== declaration.id.name ||
+		// The AST walker visits both fields even if a parser shares a shorthand
+		// identifier between key and value. Only the value is ours to rename.
+		(parent?.type === 'Property' && key === 'key' && !parent.computed) ||
 		!isIdentifierReference(node, parent, key, lexical)
 	)
 		return false;
@@ -793,6 +796,28 @@ export function lowerSignalDeclarations(ast, filename, options) {
 		const listed = captures.get(original);
 		if (listed !== undefined) captures.set(copy, listed);
 	};
+	const copyProducer = (fn, declaration, name) =>
+		mapAst(
+			fn,
+			(child, parent, key) => {
+				// Expanding a renamed shorthand value keeps the authored property
+				// name, including when another local later destructures this object.
+				if (
+					child.type === 'Property' &&
+					child.shorthand &&
+					producerSelfReference(child.value, child, 'value', declaration, lexical)
+				)
+					return {
+						...child,
+						shorthand: false,
+						value: inheritHookMemoOrigin(b.id(name), child.value),
+					};
+				if (producerSelfReference(child, parent, key, declaration, lexical))
+					return inheritHookMemoOrigin(b.id(name), child);
+				return copyReaderUse(child, fn) ? { ...child } : null;
+			},
+			inheritCallAnalysis,
+		);
 
 	let lowered = mapAst(ast, (node) => {
 		const producer = producerArguments.get(node);
@@ -805,11 +830,7 @@ export function lowerSignalDeclarations(ast, filename, options) {
 				list ??= node.declarations.slice(0, node.declarations.indexOf(declarator));
 				list.push(declarator);
 				if (name !== undefined) {
-					const init = mapAst(
-						declarator.init,
-						(child) => (copyReaderUse(child, declarator.init) ? { ...child } : null),
-						inheritCallAnalysis,
-					);
+					const init = copyProducer(declarator.init, declarator, name);
 					list.push({ ...declarator, id: inheritHookMemoOrigin(b.id(name), declarator.id), init });
 				}
 			}
@@ -823,15 +844,7 @@ export function lowerSignalDeclarations(ast, filename, options) {
 				list ??= node.body.slice(0, node.body.indexOf(statement));
 				list.push(statement);
 				if (name !== undefined) {
-					const copy = mapAst(
-						statement,
-						(child, parent, key) => {
-							if (producerSelfReference(child, parent, key, statement, lexical))
-								return inheritHookMemoOrigin(b.id(name), child);
-							return copyReaderUse(child, statement) ? { ...child } : null;
-						},
-						inheritCallAnalysis,
-					);
+					const copy = copyProducer(statement, statement, name);
 					list.push({ ...copy, id: inheritHookMemoOrigin(b.id(name), statement.id) });
 				}
 			}
@@ -1025,14 +1038,20 @@ export function signalDeclarationSourceEdits(ast, filename, source, options) {
 		for (const [declaration, name] of producers) {
 			const fn = declaration.type === 'FunctionDeclaration' ? declaration : declaration.init;
 			const rename = [];
-			if (declaration.type === 'FunctionDeclaration') {
+			if (declaration.type === 'FunctionDeclaration')
 				rename.push({ pos: declaration.id.start, end: declaration.id.end, text: name });
-				mapAst(fn, (child, parent, key) => {
-					if (producerSelfReference(child, parent, key, declaration, lexical))
-						rename.push({ pos: child.start, end: child.end, text: name });
-					return null;
-				});
-			}
+			mapAst(fn, (child, parent, key) => {
+				if (producerSelfReference(child, parent, key, declaration, lexical))
+					rename.push({
+						pos: child.start,
+						end: child.end,
+						text:
+							parent?.type === 'Property' && parent.shorthand && key === 'value'
+								? `${child.name}: ${name}`
+								: name,
+					});
+				return null;
+			});
 			producerCopies.push({ declaration, fn, name, rename });
 		}
 		for (const [identifier, { helper }] of uses) {
