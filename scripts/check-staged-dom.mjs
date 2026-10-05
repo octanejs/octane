@@ -61,6 +61,9 @@ const NATIVE_OPERATIONS = new Map(
 		// retire detached anchors only after a root replacement has been accepted.
 		hydrateRootWithOutputHandler: ['call:contains'],
 		beginPresentationHydration: ['read:nextSibling'],
+		// A moved host's lease compares the hydration cursor's native parent
+		// against the server site it recorded before any preparation.
+		supersedeDisplacedHost: ['read:parentNode'],
 		// These proofs and rollback guards compare the early owner's live range,
 		// not the renderer's projected tree. A stale candidate cannot authorize
 		// restoring or publishing over newer early DOM.
