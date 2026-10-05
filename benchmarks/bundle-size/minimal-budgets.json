@@ -55,14 +55,14 @@
     "brotli": 32212
   },
   "hydrate-root": {
-    "raw": 175067,
+    "raw": 175053,
     "gzip": 55523,
     "brotli": 48675
   },
   "deferred-hydration": {
     "raw": 238535,
     "gzip": 75406,
-    "brotli": 65371
+    "brotli": 65324
   },
   "suspense-transition": {
     "raw": 165505,
