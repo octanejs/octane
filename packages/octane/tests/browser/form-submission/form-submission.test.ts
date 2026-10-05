@@ -610,6 +610,49 @@ for (const production of [false, true]) {
 				expect(state.deliveries[0].fields[0]).toEqual(['draft', 'accepted']);
 				expect(state.nativeSubmissions).toBe(1);
 				expect(submissions).toEqual([]);
+				// The island hydrates over the form whose controls shadow its methods.
+				await page.waitForFunction(() => {
+					const { hydrated, errors } = window.__formSubmission.state();
+					return hydrated === 1 || errors.length > 0;
+				});
+				expect(await page.evaluate(() => window.__formSubmission.state())).toMatchObject({
+					hydrated: 1,
+					errors: [],
+					inputSame: true,
+				});
+			});
+
+			it('delivers a held command after its island hydrates over controls that shadow form methods', async () => {
+				const { page, submissions, load } = await openPage('controls', '?hold');
+				await page.evaluate(() => {
+					(document.querySelector('#draft-input') as HTMLInputElement).value = 'accepted';
+					HTMLFormElement.prototype.requestSubmit.call(
+						document.querySelector('#command-form') as HTMLFormElement,
+						document.querySelector('#save-button') as HTMLButtonElement,
+					);
+				});
+				await load();
+				// Hydrate the island before delivery is released. Hydration must adopt
+				// the form whose controls are named getAttribute, matches and so on,
+				// rather than rebuild it and discard the command it accepted.
+				await page.evaluate(() => (document.querySelector('#draft-input') as HTMLElement).click());
+				await page.waitForFunction(() => {
+					const { hydrated, errors } = window.__formSubmission.state();
+					return hydrated === 1 || errors.length > 0;
+				});
+				expect(await page.evaluate(() => window.__formSubmission.state())).toMatchObject({
+					hydrated: 1,
+					errors: [],
+					inputSame: true,
+					deliveries: [],
+				});
+				await page.evaluate(() => window.__formSubmission.release());
+				await page.waitForFunction(() => window.__formSubmission.state().deliveries.length === 1);
+				const state = await page.evaluate(() => window.__formSubmission.state());
+				expect(state.deliveries[0]).toMatchObject({ early: true, original: true, immutable: true });
+				expect(state.deliveries[0].fields[0]).toEqual(['draft', 'accepted']);
+				expect(state.nativeSubmissions).toBe(1);
+				expect(submissions).toEqual([]);
 			});
 
 			for (const scope of ['container', 'form'] as const) {
