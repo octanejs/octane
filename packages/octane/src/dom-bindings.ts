@@ -1058,10 +1058,12 @@ export function __adoptBindings<Props>(
 		handle[BINDING_HANDOFF] = () => {
 			if (handoff !== undefined) return handoff;
 			// Hydration mismatch recovery may remove stale server content beside the
-			// host without moving it. Any other change of neighbor is a different site.
+			// host without moving it. Any other change of neighbor is a different site,
+			// including one made before a hydration claimed this lease.
 			const adjacent = (recorded: Node | null, previous: boolean): boolean =>
 				sibling(host, previous) === recorded ||
-				(recorded !== null &&
+				((handoff!.owner !== undefined || disposed) &&
+					recorded !== null &&
 					recorded.parentNode === null &&
 					repairedServerParents.has(host.parentNode!));
 			return (handoff = {

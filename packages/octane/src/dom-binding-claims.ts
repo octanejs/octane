@@ -8,5 +8,5 @@ export const domBindingClaims = /* @__PURE__ */ new WeakMap<
 
 // Parents whose children hydration mismatch recovery changed. An early-bound
 // host in one of them can lose a stale server neighbor without having moved.
-// hydrateRoot clears a leased host's parent first, so only its own repair counts.
+// Only a lease that hydration has claimed or retired honors it (dom-bindings).
 export const repairedServerParents = /* @__PURE__ */ new WeakSet<Node>();
