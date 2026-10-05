@@ -49211,6 +49211,9 @@ function hydrateRootWithOutputHandler(
 	const bindingLeases = rootOptions?.bindingLeases?.map((handle) => {
 		const capability = handle as BindingHandle & Partial<BindingHandoffCapability>;
 		const lease = capability[BINDING_HANDOFF]?.();
+		// A repair excuses only the hydration that made it (HydrationCapability.save).
+		const parent = lease?.root.parentNode;
+		if (parent != null) repairedServerParents.delete(parent);
 		if (
 			lease === undefined ||
 			!lease.active() ||

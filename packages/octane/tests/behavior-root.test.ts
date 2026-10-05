@@ -635,6 +635,59 @@ describe('behavior-only roots', () => {
 	}
 
 	for (const dev of [false, true]) {
+		it(`refuses an early host whose neighbor was removed after an earlier hydration repaired its parent (${dev ? 'dev' : 'prod'})`, async () => {
+			const source = [
+				"import { unbound } from 'octane/behavior';",
+				"export function Host(props) @{ 'use dom bindings';",
+				'  <button data-state={props.label}>{unbound(props.children)}</button>',
+				'}',
+				'export function App(props) @{ <Host label={props.label}><span>Hello</span></Host> }',
+			].join('\n');
+			const fixture = authoredPresentation('Host', { label: 'server' }, dev, source);
+			const client = fixture.loadClient();
+			const html = renderToString(fixture.server.App, { label: 'server' }).html;
+			const render = () => {
+				container.innerHTML = html;
+				const button = container.querySelector('button')!;
+				const extra = document.createElement('script');
+				extra.type = 'application/json';
+				extra.textContent = '{}';
+				button.after(extra);
+				return { button, extra };
+			};
+			// The first hydration repairs the container by removing the stale root
+			// remainder. That repair must not excuse a later, external change.
+			render();
+			const recoverable = vi.fn();
+			hydratedRoot = hydrateRoot(
+				container,
+				client.App,
+				{ label: 'server' },
+				{
+					onRecoverableError: recoverable,
+				},
+			);
+			await act(() => {});
+			expect(recoverable).toHaveBeenCalledOnce();
+			hydratedRoot.unmount();
+			hydratedRoot = undefined;
+			const { button, extra } = render();
+			const binding = fixture.attach(button, fixture.state);
+			try {
+				extra.remove();
+				expect(() =>
+					hydrateRoot(container, client.App, { label: 'hydrated' }, { bindingLeases: [binding] }),
+				).toThrow(/active fixed native views|Minified Octane error #77;/);
+				expect(fixture.cleanup).not.toHaveBeenCalled();
+				fixture.publish({ label: 'still early' });
+				expect(button.getAttribute('data-state')).toBe('still early');
+			} finally {
+				binding.dispose();
+			}
+		});
+	}
+
+	for (const dev of [false, true]) {
 		for (const styles of ['provider', 'single property', 'multiple properties', 'native reads']) {
 			it(`hands off a host with a known unbound provider spread and ${styles} styles (${dev ? 'dev' : 'prod'})`, () => {
 				const externalStyle =
