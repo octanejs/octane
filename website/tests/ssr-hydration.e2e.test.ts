@@ -24,11 +24,10 @@ import { encodePlaygroundHash } from '../src/lib/playground-hash.ts';
 import { PLAYGROUND_REACT_VERSION } from '../src/lib/playground-sandbox.ts';
 import { LYNX_EXAMPLES } from '../src/content/lynx-examples.ts';
 import {
-	getFreePort,
 	spawnServer as spawnServerIn,
+	startServerOnFreePort,
 	stopServer,
 	waitForReadyState,
-	waitForServer,
 } from './support/server-process.ts';
 
 const WEBSITE = join(process.cwd(), 'website');
@@ -968,20 +967,27 @@ describe('website dev-SSR → hydration (real browser)', { concurrent: false }, 
 		// restores the ordering globalSetup used to guarantee, without putting the
 		// other ~90 projects back behind the build.
 		await waitForReadyState(inject('productionReadyFile'), 460_000);
-		DEV_PORT = await getFreePort();
 		// Fresh optimize-deps cache → prove the declared dependency graph handles
 		// a deterministic cold start without an "Outdated Optimize Dep" reload.
+		// Removed before the port is reserved, so no work sits between releasing
+		// the reservation and spawning the server that binds it.
 		rmSync(join(WEBSITE, 'node_modules/.vite'), { recursive: true, force: true });
-		server = spawnServer([
-			'exec',
-			'vite',
-			'--configLoader',
-			'runner',
-			'--port',
-			String(DEV_PORT),
-			'--strictPort',
-		]);
-		await waitForServer(server, `http://localhost:${DEV_PORT}/`, 60_000);
+		// Assigned as it spawns, so afterAll stops the child even if this hook
+		// times out while the server is still starting.
+		DEV_PORT = await startServerOnFreePort(
+			(port) =>
+				(server = spawnServer([
+					'exec',
+					'vite',
+					'--configLoader',
+					'runner',
+					'--port',
+					String(port),
+					'--strictPort',
+				])),
+			(port) => `http://localhost:${port}/`,
+			60_000,
+		);
 		// Answering a request does not mean the client module graph is compiled:
 		// Vite transforms it on demand, and the route cases below run four-at-a-time.
 		// Warm their route-specific graphs serially under the setup budget so the
@@ -2450,6 +2456,81 @@ describe(
 						await marked(),
 						'the hover highlight was cleared while the pointer never moved',
 					).toContain('@if');
+					expect(errors).toEqual([]);
+				} finally {
+					await page.close();
+				}
+			},
+			30_000,
+		);
+
+		// The playground writes its workspace into the URL hash 400ms after an
+		// example switch or an edit, and the router turns that write into a
+		// navigation. Its scroll restoration used to end every one of those by
+		// putting each element scrolled since the previous navigation back where
+		// it was when this one started — the editors included. A scroll made
+		// while the router loaded the new hash was undone, so the control-flow
+		// probe above could find a keyword and then click whatever line the
+		// restore moved under the pointer. Scroll the source editor inside that
+		// load, then require the scroll to survive it.
+		it.concurrent(
+			'playground keeps editor scroll through its own URL hash update',
+			async () => {
+				const { page, errors } = await loadRoute(PREVIEW_ORIGIN, '/playground');
+				try {
+					await page.waitForSelector('.pg-grid.ready', { timeout: PLAYWRIGHT_ACTION_TIMEOUT });
+					// The restore only covers elements that scrolled since the previous
+					// navigation, so scroll the source editor first.
+					await page.evaluate(async () => {
+						const scroller = document.querySelectorAll('.pg-editor .cm-scroller')[0];
+						const scrolled = new Promise((resolve) =>
+							scroller.addEventListener('scroll', resolve, { once: true }),
+						);
+						scroller.scrollTop = 120;
+						await scrolled;
+					});
+					// Armed before the switch: the hash write lands 400ms after it.
+					const armed = page.evaluate(() => {
+						const router = (window as any).__TSR_ROUTER__;
+						const scroller = document.querySelectorAll('.pg-editor .cm-scroller')[0];
+						return new Promise<{ hash: string; before: number; set: number; after: number }>(
+							(resolve, reject) => {
+								let before = -1;
+								let set = -1;
+								const stopBefore = router.subscribe('onBeforeLoad', () => {
+									stopBefore();
+									// After every listener of this event, so after the
+									// router's own snapshot of the scroll positions.
+									queueMicrotask(() => {
+										before = scroller.scrollTop;
+										scroller.scrollTop = before + 200;
+										set = scroller.scrollTop;
+									});
+								});
+								const stopRendered = router.subscribe('onRendered', () => {
+									stopRendered();
+									requestAnimationFrame(() =>
+										requestAnimationFrame(() =>
+											resolve({
+												hash: location.hash,
+												before,
+												set,
+												after: scroller.scrollTop,
+											}),
+										),
+									);
+								});
+								setTimeout(() => reject(new Error('the hash write never navigated')), 10_000);
+							},
+						);
+					});
+					await page.selectOption('.pg-select', 'suspense');
+					const result = await armed;
+					expect(result.hash.length, 'the example switch wrote no hash').toBeGreaterThan(1);
+					expect(result.set, 'the source editor did not scroll').not.toBe(result.before);
+					expect(result.after, 'the hash navigation restored the source editor scroll').toBe(
+						result.set,
+					);
 					expect(errors).toEqual([]);
 				} finally {
 					await page.close();

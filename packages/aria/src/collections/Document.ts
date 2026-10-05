@@ -84,7 +84,7 @@ export class ElementNode<T> {
 		return this.node as Mutable<CollectionNode<T>>;
 	}
 
-	setProps<E extends Element>(
+	setProps<_E extends Element>(
 		obj: { [key: string]: any },
 		ref: any,
 		CollectionNodeClass: CollectionNodeClass<any>,

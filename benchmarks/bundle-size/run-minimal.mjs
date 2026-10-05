@@ -1,5 +1,12 @@
 // Production public-import reachability: build and execute each independent
 // feature entry before publishing deterministic byte totals and budget peers.
+//
+//   node run-minimal.mjs [scenario...]                  report bytes and budget peers
+//   node run-minimal.mjs --budgets [scenario...]        fail when a scenario exceeds its budget
+//   node run-minimal.mjs --write-budgets [scenario...]  reset budgets to measured + headroom
+//
+// Pull request CI runs `--budgets` over every scenario. `--write-budgets` is for
+// a dedicated budget pull request only (CONTRIBUTING.md, "Size budgets").
 process.env.NODE_ENV = 'production';
 
 import assert from 'node:assert/strict';
@@ -13,7 +20,7 @@ import { octane } from 'octane/compiler/vite';
 import { build as buildVite } from 'vite';
 import { appComponent, clientEntry } from '../../packages/cli/src/commands/init/templates.js';
 import { verifyScenario } from './verify-reachability.mjs';
-import { selectMinimalScenarios, verifyByteBudget } from './minimal-gates.mjs';
+import { ratchetBudget, selectMinimalScenarios, verifyByteBudget } from './minimal-gates.mjs';
 
 const directory = path.dirname(fileURLToPath(import.meta.url));
 const repository = path.resolve(directory, '../..');
@@ -39,6 +46,19 @@ const existingScenarios = [
 	['binding-vanilla', 'ts'],
 	['binding-hooks', 'tsrx'],
 ];
+// Renderer clients that never hydrate. A @try boundary must not retain the
+// streamed-boundary sentinel validator that only a hydrating mount consults.
+const streamClaimFreeClientScenarios = new Set([
+	'cli-spa-starter',
+	'root-static-specialized',
+	'root-chained-jsx',
+	'root-static',
+	'root-static-local',
+	'hooks-state',
+	'prop-attributes',
+	'context',
+	'suspense-transition',
+]);
 const signalFreeClientScenarios = new Set([
 	'cli-spa-starter',
 	'root-static-specialized',
@@ -51,6 +71,17 @@ const signalFreeClientScenarios = new Set([
 	'hydrate-root',
 	'deferred-hydration',
 	'suspense-transition',
+]);
+// Renderer clients that never hydrate and render no binding view. A dynamic
+// text hole must not retain the hydration range-marker validator for them.
+const markerFreeClientScenarios = new Set([
+	'cli-spa-starter',
+	'root-chained-jsx',
+	'prop-attributes',
+	'context',
+	'suspense-transition',
+	'binding-mantine-hooks',
+	'binding-usehooks-ts',
 ]);
 const bindingScenarios = [
 	{
@@ -125,6 +156,13 @@ const scenarios = [
 		})),
 	),
 ];
+const nativeArrayGuardExports = new Set([
+	'mapSlot',
+	'compilerCacheMappedArray',
+	'compilerCacheImmutableArrayFilter',
+]);
+// A bare intrinsic read, not a call such as `Array.prototype.map.call(...)`.
+const nativeArraySnapshot = /Array\.prototype\.(?:map|filter)(?![\w$.(])|Symbol\.species/;
 const productionDefines = {
 	__OCTANE_PROFILE_ENABLED__: 'false',
 	'process.env.NODE_ENV': JSON.stringify('production'),
@@ -217,10 +255,11 @@ assert.deepEqual(
 	'minimal-import budgets must cover every scenario exactly once',
 );
 
-const { selectedScenarios, enforceBudgets } = selectMinimalScenarios(
+const { selectedScenarios, enforceBudgets, writeBudgets } = selectMinimalScenarios(
 	process.argv.slice(2),
 	scenarios,
 );
+const measuredBudgets = {};
 
 const payload = { suite: 'bundle-reachability', iterations: 1, targets: [] };
 
@@ -359,11 +398,19 @@ async function buildScenario(scenario, entry) {
 		.filter(([, module]) => module.renderedLength > 0)
 		.map(([id]) => id);
 	const runtimeModule = modules.find((id) => id.endsWith('/packages/octane/src/runtime.ts'));
+	const serverRuntimeModule = modules.find((id) =>
+		id.endsWith('/packages/octane/src/runtime.server.ts'),
+	);
+	const streamModule = modules.find((id) => id.endsWith('/packages/octane/src/stream-protocol.ts'));
 	return {
 		code: chunk.code,
 		modules,
 		emittedModules,
 		runtimeExports: runtimeModule ? chunk.modules[runtimeModule].renderedExports : [],
+		serverRuntimeExports: serverRuntimeModule
+			? chunk.modules[serverRuntimeModule].renderedExports
+			: [],
+		streamExports: streamModule ? chunk.modules[streamModule].renderedExports : [],
 	};
 }
 
@@ -377,6 +424,8 @@ try {
 			modules,
 			emittedModules = modules,
 			runtimeExports,
+			serverRuntimeExports = [],
+			streamExports = [],
 		} = await buildScenario(scenario, entry);
 		for (const [label, pattern] of forbidden) {
 			if (serverScenario && label === 'server runtime') continue;
@@ -394,6 +443,17 @@ try {
 				`${name}: signal-free client retained the concrete native transition implementation`,
 			);
 		}
+		// hydrate-root is the control: a hydrating client keeps the validator, so
+		// its export name still identifies it.
+		if (streamClaimFreeClientScenarios.has(id) || id === 'hydrate-root') {
+			assert.equal(
+				streamExports.includes('isRendererStreamBoundaryTemplate'),
+				id === 'hydrate-root',
+				id === 'hydrate-root'
+					? `${name}: the streamed-boundary validator was renamed; update this reachability check`
+					: `${name}: a client that never hydrates retained the streamed-boundary validator`,
+			);
+		}
 		if (id === 'prop-attributes') {
 			assert.deepEqual(
 				emittedModules.filter((module) =>
@@ -405,11 +465,38 @@ try {
 				`${name}: statically named attribute bindings retained the generic attribute or control-restore writers`,
 			);
 		}
+		if (markerFreeClientScenarios.has(id)) {
+			assert.deepEqual(
+				emittedModules.filter((module) =>
+					module.endsWith('/packages/octane/src/dom-binding-protocol.ts'),
+				),
+				[],
+				`${name}: a client that never hydrates retained the binding-marker validator`,
+			);
+		}
 		const hasRuntime = modules.some((module) => module.endsWith('/packages/octane/src/runtime.ts'));
 		const hasServerRuntime = modules.some((module) =>
 			module.endsWith('/packages/octane/src/runtime.server.ts'),
 		);
 		const hasVanillaStore = modules.some((id) => /\/node_modules\/zustand\//.test(id));
+		// Both runtimes snapshot native array intrinsics at load for their mapped
+		// list guards. A bundle that renders none of those guards must drop the
+		// snapshots instead of keeping their reads as dead statements.
+		if (
+			scenario.bundler === 'vite' &&
+			!scenario.package &&
+			(hasRuntime || hasServerRuntime) &&
+			![...runtimeExports, ...serverRuntimeExports].some((name) =>
+				nativeArrayGuardExports.has(name),
+			)
+		) {
+			const snapshot = nativeArraySnapshot.exec(code)?.[0];
+			assert.equal(
+				snapshot,
+				undefined,
+				`${name}: a bundle that never maps a list retained the native array snapshot \`${snapshot}\``,
+			);
+		}
 		if (serverScenario) {
 			assert.equal(hasServerRuntime, true, `${name}: public server import omitted its runtime`);
 			assert.equal(hasRuntime, false, `${name}: unrelated client runtime reached server entry`);
@@ -420,6 +507,24 @@ try {
 					`${name}: unrelated DOM namespace tables reached isolated server helpers`,
 				);
 			}
+			// The async-identity encoder reads an ASCII unit table built at module
+			// load. A bundle without the encoder must drop the table; server-render
+			// keeps the encoder, so it proves the pattern still matches.
+			const encodesIdentities = serverRuntimeExports.includes('encodeAsyncIdentityString');
+			if (id === 'server-render') {
+				assert.equal(
+					encodesIdentities,
+					true,
+					`${name}: the async-identity encoder was renamed or left server rendering; update this reachability check`,
+				);
+			}
+			assert.equal(
+				/\.toString\(16\)\.padStart\(4,\s*["']0["']\)/.test(code),
+				encodesIdentities,
+				encodesIdentities
+					? `${name}: the async-identity encoder no longer formats code units; update this reachability check`
+					: `${name}: a server bundle that never encodes an async identity retained its ASCII unit table`,
+			);
 		} else if (
 			id === 'capture-only' ||
 			id === 'behavior-root' ||
@@ -491,8 +596,9 @@ try {
 			}).length,
 		};
 		const budget = budgets[name];
-		const budgetEnforced = enforceBudgets || id === 'behavior-root';
+		const budgetEnforced = enforceBudgets || (id === 'behavior-root' && !writeBudgets);
 		verifyByteBudget(name, measured, budget, budgetEnforced);
+		if (writeBudgets) measuredBudgets[name] = ratchetBudget(measured, budget);
 		payload.targets.push({
 			name,
 			ops: Object.fromEntries(
@@ -520,6 +626,16 @@ try {
 		console.log(
 			`${name.padEnd(32)} raw ${String(measured.raw).padStart(6)}  ` +
 				`gzip ${String(measured.gzip).padStart(5)}  brotli ${String(measured.brotli).padStart(5)}`,
+		);
+	}
+	if (writeBudgets) {
+		// Keep the committed key order so a rewrite diffs only the changed values.
+		const next = Object.fromEntries(
+			Object.entries(budgets).map(([name, budget]) => [name, measuredBudgets[name] ?? budget]),
+		);
+		fs.writeFileSync(budgetFile, JSON.stringify(next, null, 2) + '\n');
+		console.log(
+			`wrote ${Object.keys(measuredBudgets).length} budget(s) as measured + headroom (raw/gzip 32, brotli 256) to ${path.relative(repository, budgetFile)}`,
 		);
 	}
 } catch (error) {

@@ -31,11 +31,11 @@ function useScale<Output = DefaultOutput>(config: PickScaleConfig<'quantize', Ou
 
 function useScale<Output = DefaultOutput, DiscreteInput extends StringLike = StringLike, ThresholdInput extends DefaultThresholdInput = DefaultThresholdInput>(config: PickScaleConfig<'threshold', Output, DiscreteInput, ThresholdInput>): PickD3Scale<'threshold', Output, DiscreteInput, ThresholdInput>;
 
-function useScale<Output = DefaultOutput, DiscreteInput extends StringLike = StringLike, ThresholdInput extends DefaultThresholdInput = DefaultThresholdInput>(config: PickScaleConfig<'ordinal', Output, DiscreteInput>): PickD3Scale<'ordinal', Output, DiscreteInput>;
+function useScale<Output = DefaultOutput, DiscreteInput extends StringLike = StringLike, _ThresholdInput extends DefaultThresholdInput = DefaultThresholdInput>(config: PickScaleConfig<'ordinal', Output, DiscreteInput>): PickD3Scale<'ordinal', Output, DiscreteInput>;
 
-function useScale<Output = DefaultOutput, DiscreteInput extends StringLike = StringLike, ThresholdInput extends DefaultThresholdInput = DefaultThresholdInput>(config: PickScaleConfig<'point', Output, DiscreteInput>): PickD3Scale<'point', Output, DiscreteInput>;
+function useScale<Output = DefaultOutput, DiscreteInput extends StringLike = StringLike, _ThresholdInput extends DefaultThresholdInput = DefaultThresholdInput>(config: PickScaleConfig<'point', Output, DiscreteInput>): PickD3Scale<'point', Output, DiscreteInput>;
 
-function useScale<Output = DefaultOutput, DiscreteInput extends StringLike = StringLike, ThresholdInput extends DefaultThresholdInput = DefaultThresholdInput>(config: PickScaleConfig<'band', Output, DiscreteInput>): PickD3Scale<'band', Output, DiscreteInput>;
+function useScale<Output = DefaultOutput, DiscreteInput extends StringLike = StringLike, _ThresholdInput extends DefaultThresholdInput = DefaultThresholdInput>(config: PickScaleConfig<'band', Output, DiscreteInput>): PickD3Scale<'band', Output, DiscreteInput>;
 
 function useScale<Output = DefaultOutput>(config: PickScaleConfig<'radial', Output>): PickD3Scale<'radial', Output>;
 

@@ -210,12 +210,16 @@ async function measureMount(browser, url) {
 }
 
 // A single bump is one text-node update for a signal framework — far below
-// performance.now()'s effective resolution. So each timed sample loops BUMP_REPS
-// bumps and divides, giving a stable per-bump time that's meaningful at 2-decimal
-// precision (instead of rounding to 0.00ms). Standard micro-benchmark practice.
-const BUMP_REPS = 50;
+// performance.now()'s effective resolution. Chromium clamps the clock of a page
+// that is not cross-origin isolated to 100 µs, and the cheapest bumps cost about
+// 0.5 µs. So each timed sample loops a calibrated number of bumps and divides:
+// the batch doubles from 50 until one batch spans BUMP_SAMPLE_MS, keeping every
+// target's samples at least 200 ticks long and amortizing the slower first
+// bumps after each sample's gc(). A fixed 50 left TSRX samples at zero or one
+// tick; a fixed count large enough for TSRX made cascading targets slow.
+const BUMP_SAMPLE_MS = 20;
 
-// BUMP — mount once, time per-bump cost (BUMP_REPS bumps per sample) in a tight
+// BUMP — mount once, time per-bump cost (calibrated bumps per sample) in a tight
 // in-page loop with gc() before each sample.
 async function measureBump(browser, url, idx) {
 	const { ctx, page } = await freshPage(browser, url);
@@ -224,29 +228,35 @@ async function measureBump(browser, url, idx) {
 		if (result && typeof result.then === 'function') await result;
 	});
 	await sleep(50);
-	const samples = await page.evaluate(
-		async ({ idx, REPS, WARMUP, ITER, YIELD_MS }) => {
+	const { samples, reps } = await page.evaluate(
+		async ({ idx, SAMPLE_MS, WARMUP, ITER, YIELD_MS }) => {
 			const fn = window['__bumpAt' + idx];
 			if (typeof fn !== 'function') throw new Error('missing __bumpAt' + idx);
 			const gc = window.gc || (() => {});
+			const batch = async (count) => {
+				const t0 = performance.now();
+				for (let k = 0; k < count; k++) {
+					const r = fn();
+					if (r && typeof r.then === 'function') await r;
+				}
+				return performance.now() - t0;
+			};
+			let reps = 50;
+			while (reps < 1 << 20 && (await batch(reps)) < SAMPLE_MS) reps *= 2;
 			const out = [];
 			for (let i = 0; i < WARMUP + ITER; i++) {
 				gc();
 				void document.body?.offsetHeight;
-				const t0 = performance.now();
-				for (let k = 0; k < REPS; k++) {
-					const r = fn();
-					if (r && typeof r.then === 'function') await r;
-				}
-				const dt = (performance.now() - t0) / REPS;
+				const dt = (await batch(reps)) / reps;
 				if (i >= WARMUP) out.push(dt);
 				await new Promise((r) => setTimeout(r, YIELD_MS));
 			}
-			return out;
+			return { samples: out, reps };
 		},
-		{ idx, REPS: BUMP_REPS, WARMUP, ITER, YIELD_MS },
+		{ idx, SAMPLE_MS: BUMP_SAMPLE_MS, WARMUP, ITER, YIELD_MS },
 	);
 	await ctx.close();
+	console.error(`    ${reps} bumps per sample`);
 	return summarize(samples);
 }
 

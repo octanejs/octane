@@ -9,7 +9,10 @@ import { AsyncLocalStorage } from 'node:async_hooks';
 import { createRequire } from 'node:module';
 
 import { octane as octaneCompiler } from 'octane/compiler/vite';
-import { INDEPENDENT_HYDRATION_MANIFEST_FILENAME } from 'octane/compiler/bundler';
+import {
+	INDEPENDENT_HYDRATION_MANIFEST_FILENAME,
+	analyzeIslandsShell,
+} from 'octane/compiler/bundler';
 import {
 	createServerCallHost,
 	handleRpcRequest as handleServerRpcRequest,
@@ -37,6 +40,7 @@ import {
 	SERVER_ONLY_ADAPTER_IDS,
 	create_adapter_browser_stub_source,
 	create_client_entry_source,
+	create_islands_entry_source,
 	to_vite_root_import,
 	write_project_generated_file,
 } from './project-codegen.js';
@@ -45,7 +49,7 @@ import { createClientBuildState } from './client-build.js';
 
 import { patch_global_fetch, is_rpc_request } from '@ripple-ts/adapter/rpc';
 
-import { get_route_entry_path } from './routes.js';
+import { get_route_entry_export_name, get_route_entry_path } from './routes.js';
 
 // Re-export route classes + config helpers (public API surface).
 export { RenderRoute, ServerRoute } from './routes.js';
@@ -75,6 +79,9 @@ export {
 
 const VIRTUAL_HYDRATE_ID = 'virtual:octane-hydrate';
 const RESOLVED_VIRTUAL_HYDRATE_ID = '\0virtual:octane-hydrate';
+// `hydrate: 'islands'` routes boot from this renderer-free entry instead.
+const VIRTUAL_ISLANDS_ID = 'virtual:octane-islands';
+const RESOLVED_VIRTUAL_ISLANDS_ID = '\0virtual:octane-islands';
 const requireFromPlugin = createRequire(import.meta.url);
 // Mirrors octane/compiler/vite's full-compiler surface. Keeping this list in
 // sync is especially important for production `module server` discovery.
@@ -216,6 +223,163 @@ function has_route_config(config) {
 }
 
 /**
+ * @param {ResolvedOctaneConfig | null} config
+ * @returns {boolean}
+ */
+function has_islands_route(config) {
+	return (
+		config?.router.routes.some((route) => route.type === 'render' && route.hydrate === 'islands') ??
+		false
+	);
+}
+
+/**
+ * Every rendered document of this app is an islands-only page.
+ * @param {ResolvedOctaneConfig | null} config
+ * @returns {boolean}
+ */
+function has_only_islands_routes(config) {
+	const routes = config?.router.routes.filter((route) => route.type === 'render') ?? [];
+	return routes.length > 0 && routes.every((route) => route.hydrate === 'islands');
+}
+
+/**
+ * Check every islands-only route's shell for client work. The shell's modules
+ * never load in the browser, so every component it renders outside its
+ * independent islands must be static server output. A build fails on the
+ * first problem; dev reports each one and keeps serving.
+ *
+ * @param {(source: string, importer: string) => Promise<{ id: string, external?: boolean | 'absolute' | 'relative' } | null>} resolve
+ * @param {string} projectRoot
+ * @param {ResolvedOctaneConfig} config
+ * @param {(message: string) => void} report
+ * @param {(file: string, exports: string[] | null, values: boolean) => ReturnType<typeof analyzeIslandsShell>} [analyze]
+ */
+async function checkIslandsShells(
+	resolve,
+	projectRoot,
+	config,
+	report,
+	analyze = (file, exports, values) =>
+		analyzeIslandsShell(fs.readFileSync(file, 'utf-8'), file, exports, { values }),
+) {
+	// Checked exports per module: a rendered export by name, a value passed into
+	// JSX as `?name`, which a rendered check of the same export also covers.
+	/** @type {Map<string, Set<string> | null>} */
+	const checked = new Map();
+	for (const route of config.router.routes) {
+		if (route.type !== 'render' || route.hydrate !== 'islands') continue;
+		const fail = (/** @type {string} */ message) =>
+			report(
+				`[@octanejs/vite-plugin] RenderRoute ${JSON.stringify(route.path)} uses hydrate: 'islands', but ${message}`,
+			);
+		if (config.rootBoundary.pending || config.rootBoundary.catch)
+			fail('the configured root boundaries need a hydrated root.');
+		const exportName = get_route_entry_export_name(route.entry);
+		/** @type {Array<[string, string[] | null, boolean]>} */
+		const pending = [];
+		for (const [
+			modulePath,
+			exports,
+		] of /** @type {Array<[string | undefined, string[] | null]>} */ ([
+			[get_route_entry_path(route.entry), exportName ? [exportName] : null],
+			[route.layout, null],
+		])) {
+			if (modulePath)
+				pending.push([
+					path.resolve(projectRoot, modulePath.startsWith('/') ? `.${modulePath}` : modulePath),
+					exports,
+					false,
+				]);
+		}
+		while (pending.length > 0) {
+			const [file, exports, values] = /** @type {[string, string[] | null, boolean]} */ (
+				pending.shift()
+			);
+			const keys = exports?.map((name) => (values ? `?${name}` : name));
+			const seen = checked.get(file);
+			if (
+				seen === null ||
+				(keys !== undefined &&
+					keys.every((key) => seen?.has(key) || (key[0] === '?' && seen?.has(key.slice(1)))))
+			)
+				continue;
+			checked.set(file, keys === undefined ? null : new Set([...(seen ?? []), ...keys]));
+			if (!is_octane_module_path(file)) {
+				// A plain module has no JSX; a value it exports (a string, an asset
+				// URL) renders nothing interactive.
+				if (!values) fail(`its shell renders ${file}, which Octane cannot check.`);
+				continue;
+			}
+			const result = analyze(file, exports, values);
+			if (result.problems.length > 0) {
+				const [problem] = result.problems;
+				fail(
+					`its shell needs client work at ${path.relative(projectRoot, file)}:${problem.line}:${problem.column}: ${problem.message}.`,
+				);
+			}
+			for (const component of result.components) {
+				const resolved = await resolve(component.source, file);
+				if (!resolved || resolved.external) {
+					if (!component.value)
+						fail(`its shell renders ${component.source}, which Octane cannot check.`);
+				} else
+					pending.push([
+						resolved.id.split('?')[0],
+						[component.exportName],
+						component.value === true,
+					]);
+			}
+		}
+	}
+}
+
+/**
+ * Dev serves an islands-only route whatever its shell does, so an interactive
+ * shell would be silently inert there. Warn once per problem, from the same
+ * check the build enforces, re-analyzing a module only when it changes.
+ *
+ * @param {ViteDevServer} server
+ * @param {string} projectRoot
+ */
+function createIslandsShellWarnings(server, projectRoot) {
+	/** @type {Map<string, { mtimeMs: number, result: ReturnType<typeof analyzeIslandsShell> }>} */
+	const analyses = new Map();
+	/** @type {Set<string>} */
+	let warned = new Set();
+	/** @param {ResolvedOctaneConfig} config */
+	return async (config) => {
+		/** @type {Set<string>} */
+		const current = new Set();
+		await checkIslandsShells(
+			async (source, importer) =>
+				(await server.environments.ssr.pluginContainer.resolveId(source, importer)) ?? null,
+			projectRoot,
+			config,
+			(message) => current.add(message),
+			(file, exports, values) => {
+				const key = `${file}\0${exports?.join(',') ?? '*'}\0${values}`;
+				const mtimeMs = fs.statSync(file).mtimeMs;
+				const cached = analyses.get(key);
+				if (cached?.mtimeMs === mtimeMs) return cached.result;
+				const result = analyzeIslandsShell(fs.readFileSync(file, 'utf-8'), file, exports, {
+					values,
+				});
+				analyses.set(key, { mtimeMs, result });
+				return result;
+			},
+		);
+		for (const message of current)
+			if (!warned.has(message))
+				server.config.logger.warn(
+					`${message} A production build fails until the shell is static.`,
+					{ timestamp: true },
+				);
+		warned = current;
+	};
+}
+
+/**
  * Every module path the server can name in #__octane_data — page entries,
  * layouts, the preHydrate hook, and root boundaries. The generated hydrate
  * entry maps each as a LITERAL `() => import('/src/…')`. Production needs the
@@ -297,6 +461,8 @@ export function octane(inlineOptions = {}) {
 	let staticEntries = [];
 	/** @type {Record<string, string>} Static module path → emitted client chunk file */
 	let staticEntryFiles = Object.create(null);
+	/** @type {string | null} Emitted renderer-free entry for islands-only routes */
+	let islandsEntryFile = null;
 	/** @type {Set<string>} Vite-root paths of modules containing `module server` */
 	const serverModuleModules = new Set();
 	/** @type {ViteDevServer | undefined} */
@@ -304,8 +470,10 @@ export function octane(inlineOptions = {}) {
 	const clientBuild = createClientBuildState((buildId) => {
 		if (!devServer) return;
 		const clientGraph = devServer.environments.client.moduleGraph;
-		const entry = clientGraph.getModuleById(RESOLVED_VIRTUAL_HYDRATE_ID);
-		if (entry) clientGraph.invalidateModule(entry);
+		for (const id of [RESOLVED_VIRTUAL_HYDRATE_ID, RESOLVED_VIRTUAL_ISLANDS_ID]) {
+			const entry = clientGraph.getModuleById(id);
+			if (entry) clientGraph.invalidateModule(entry);
+		}
 		devServer.ws.send('octane:independent-hydration', { buildId, enabled: false });
 		devServer.ws.send({ type: 'full-reload' });
 	});
@@ -437,8 +605,27 @@ export function octane(inlineOptions = {}) {
 								return { relative: true };
 							}
 						};
+						// Only the renderer consumes the signal Action frame. Islands-only
+						// documents load signals without it, so this condition moves the
+						// frame and its candidate producers from the signal modules into the
+						// renderer (octane's action-capability.ts). Either placement is
+						// complete; it chooses which pages pay, so mixed apps keep the default.
+						/** @type {UserConfig['resolve']} */
+						let resolve;
+						if (has_only_islands_routes(buildOctaneConfig)) {
+							const { defaultClientConditions } = await import('vite');
+							// Vite concatenates plugin conditions onto the user's own, and
+							// replaces its defaults only when none were configured.
+							resolve = {
+								conditions: [
+									...(userConfig.resolve?.conditions ? [] : defaultClientConditions),
+									'octane-islands',
+								],
+							};
+						}
 						return {
 							...base,
+							...(resolve ? { resolve } : null),
 							build: buildConfig,
 							experimental: {
 								...userConfig.experimental,
@@ -458,7 +645,7 @@ export function octane(inlineOptions = {}) {
 		 * generated hydrate entry maps them as STATIC dynamic imports Rollup can
 		 * chunk and hash.
 		 */
-		buildStart() {
+		async buildStart() {
 			if (!isBuild || isSSRBuild || !has_route_config(buildOctaneConfig)) return;
 			clientBuildWritten = false;
 			clientBuild.begin();
@@ -473,6 +660,21 @@ export function octane(inlineOptions = {}) {
 				name: 'octane-hydrate',
 				preserveSignature: 'strict',
 			});
+			islandsEntryFile = null;
+			if (has_islands_route(buildOctaneConfig)) {
+				await checkIslandsShells(
+					(source, importer) => this.resolve(source, importer, { skipSelf: true }),
+					root,
+					/** @type {ResolvedOctaneConfig} */ (buildOctaneConfig),
+					(message) => this.error(message),
+				);
+				this.emitFile({
+					type: 'chunk',
+					id: VIRTUAL_ISLANDS_ID,
+					name: 'octane-islands',
+					preserveSignature: 'strict',
+				});
+			}
 		},
 
 		writeBundle() {
@@ -483,8 +685,60 @@ export function octane(inlineOptions = {}) {
 		 * Preserve the source-to-file relation that Vite's manifest cannot express
 		 * when Rolldown promotes a dynamic route entry into a shared chunk.
 		 */
-		generateBundle(_options, bundle) {
+		async generateBundle(_options, bundle) {
 			if (!isBuild || isSSRBuild || !has_route_config(buildOctaneConfig)) return;
+			if (has_islands_route(buildOctaneConfig)) {
+				const islandsEntry = Object.values(bundle).find(
+					(output) =>
+						output.type === 'chunk' && output.facadeModuleId === RESOLVED_VIRTUAL_ISLANDS_ID,
+				);
+				if (!islandsEntry || islandsEntry.type !== 'chunk') {
+					this.error('The Octane islands entry must retain its own emitted facade.');
+				}
+				islandsEntryFile = islandsEntry.fileName;
+				// Fail closed: an islands-only page loads this entry, the hydration
+				// modules it imports lazily, and its preHydrate hook. None may reach the
+				// renderer; an island that needs it loads it through its own chunk.
+				const renderer = new Set();
+				for (const request of ['octane', 'octane/internal/client']) {
+					const resolved = await this.resolve(request, undefined, { skipSelf: true });
+					if (resolved) renderer.add(resolved.id);
+				}
+				const preHydrate = /** @type {ResolvedOctaneConfig} */ (buildOctaneConfig).router
+					.preHydrate;
+				const roots = [RESOLVED_VIRTUAL_ISLANDS_ID];
+				if (preHydrate) {
+					const resolved = await this.resolve(preHydrate, undefined, { skipSelf: true });
+					if (resolved) roots.push(resolved.id);
+				}
+				const seen = new Set();
+				/** @type {string[]} */
+				const chain = [];
+				/** @param {string} id @returns {boolean} */
+				const reaches = (id) => {
+					if (seen.has(id)) return false;
+					seen.add(id);
+					chain.push(id);
+					if (renderer.has(id)) return true;
+					const info = this.getModuleInfo(id);
+					for (const imported of [
+						...(info?.importedIds ?? []),
+						...(info?.dynamicallyImportedIds ?? []),
+					])
+						if (reaches(imported)) return true;
+					chain.pop();
+					return false;
+				};
+				for (const id of roots) {
+					if (reaches(id)) {
+						this.error(
+							"An islands-only route's bootstrap reaches the Octane renderer through " +
+								chain.join(' -> ') +
+								'. Keep its preHydrate hook free of renderer imports.',
+						);
+					}
+				}
+			}
 			const hydrationEntry = Object.values(bundle).find(
 				(output) =>
 					output.type === 'chunk' && output.facadeModuleId === RESOLVED_VIRTUAL_HYDRATE_ID,
@@ -547,6 +801,9 @@ export function octane(inlineOptions = {}) {
 			if (id === VIRTUAL_HYDRATE_ID) {
 				return RESOLVED_VIRTUAL_HYDRATE_ID;
 			}
+			if (id === VIRTUAL_ISLANDS_ID) {
+				return RESOLVED_VIRTUAL_ISLANDS_ID;
+			}
 			return null;
 		},
 
@@ -578,6 +835,25 @@ export function octane(inlineOptions = {}) {
 					create_client_entry_source({
 						configPath: to_vite_root_import(getOctaneConfigPath(root), root),
 						staticEntries: entries,
+						clientBuildId: clientBuild.buildId,
+						devClientBuild: !isBuild,
+					}),
+				);
+				return fs.readFileSync(file, 'utf-8');
+			}
+			if (id === RESOLVED_VIRTUAL_ISLANDS_ID) {
+				// The shell's modules never load on an islands-only page. The preHydrate
+				// hook is its only static entry; islands resolve through their manifest.
+				const loaded = isBuild
+					? buildOctaneConfig
+					: (octaneConfig ?? (await loadStartupConfig(root))?.config ?? null);
+				const preHydrate = loaded?.router.preHydrate;
+				const file = write_project_generated_file(
+					config,
+					'islands-entry.js',
+					create_islands_entry_source({
+						configPath: to_vite_root_import(getOctaneConfigPath(root), root),
+						staticEntries: preHydrate ? [preHydrate] : [],
 						clientBuildId: clientBuild.buildId,
 						devClientBuild: !isBuild,
 					}),
@@ -625,6 +901,7 @@ export function octane(inlineOptions = {}) {
 			let initPromise = null;
 			/** @type {number} */
 			let lastConfigErrorMtimeMs = 0;
+			const warnIslandsShells = createIslandsShellWarnings(vite, root);
 
 			async function ensureConfigLoaded() {
 				if (octaneConfig && router) return;
@@ -737,6 +1014,10 @@ export function octane(inlineOptions = {}) {
 							next();
 							return;
 						}
+						if (freshMatch.route.type === 'render' && freshMatch.route.hydrate === 'islands') {
+							// A shell module that fails to parse reports through its SSR load.
+							await warnIslandsShells(octaneConfig).catch(() => {});
+						}
 
 						const request = nodeRequestToWebRequest(req, res);
 						const context = createContext(request, freshMatch.params);
@@ -827,8 +1108,10 @@ export function octane(inlineOptions = {}) {
 					(modules.length > 0 || is_octane_module_path(file))
 				) {
 					clientBuild.invalidate(file);
-					const entry = this.environment.moduleGraph.getModuleById(RESOLVED_VIRTUAL_HYDRATE_ID);
-					if (entry) this.environment.moduleGraph.invalidateModule(entry);
+					for (const id of [RESOLVED_VIRTUAL_HYDRATE_ID, RESOLVED_VIRTUAL_ISLANDS_ID]) {
+						const entry = this.environment.moduleGraph.getModuleById(id);
+						if (entry) this.environment.moduleGraph.invalidateModule(entry);
+					}
 					const ssrModules = server.environments.ssr?.moduleGraph.getModulesByFile(file);
 					if (ssrModules)
 						for (const mod of ssrModules) server.environments.ssr.moduleGraph.invalidateModule(mod);
@@ -969,6 +1252,10 @@ export function octane(inlineOptions = {}) {
 					clientAssetMap,
 					clientBuild: completedClientBuild,
 					independentHydrationManifest,
+					islandsEntry:
+						islandsEntryFile === null
+							? null
+							: hydrationEntryUrl(islandsEntryFile, path.join(root, 'index.html'), config),
 					...(webWorkerServer ? { mode: 'webworker' } : null),
 					// The virtual entry has no filesystem importer, so resolve app-core
 					// from this package before handing source to Vite. This also works

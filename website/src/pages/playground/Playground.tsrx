@@ -32,6 +32,7 @@
 // the default sources auto-run as before.
 import { useState, useRef, useEffect } from 'octane';
 import type { CompileDiagnostic } from 'octane/compiler';
+import { useNavigate } from '@octanejs/tanstack-router';
 import type {
 	PlaygroundLang,
 	PlaygroundOutputTarget,
@@ -98,6 +99,7 @@ for (const example of EXAMPLES) {
 
 export function Playground() @{
 	useTitle('Octane — Playground');
+	const navigate = useNavigate();
 	const [lang, setLang] = useState<PlaygroundLang>('tsrx');
 	const [view, setView] = useState<'preview' | 'compiled'>('preview');
 	// Which compiler artifact the right pane shows.
@@ -911,10 +913,16 @@ export function Playground() @{
 				}, COMPILE_DEBOUNCE_MS);
 			};
 
-			// replaceState (not router.navigate) — only the hash on the current
-			// entry changes; the router observes it through its history wrapper
-			// without remounting the route. While a shared payload is still
-			// gated, the URL keeps the sender's link untouched.
+			// Only the hash on the current entry changes, and the route stays
+			// mounted. This is a router navigation either way: the router's history
+			// wrapper turns a bare history.replaceState into one too, and every
+			// navigation by default ends in scroll restoration, which puts each
+			// element scrolled since the last navigation back where it was when
+			// this one started. Here those are the editors, so a scroll made while
+			// the router loaded the new hash was undone. `resetScroll: false`
+			// leaves every scroll position alone, and the payload names no
+			// element to scroll to. While a shared payload is still gated, the
+			// URL keeps the sender's link untouched.
 			const updateHash = () => {
 				window.clearTimeout(hashDebounceId);
 				hashDebounceId = window.setTimeout(() => {
@@ -926,7 +934,14 @@ export function Playground() @{
 						files: wsFiles,
 					});
 					if (!encoded) return;
-					window.history.replaceState(null, '', '#' + encoded);
+					void navigate({
+						to: '.',
+						search: true,
+						hash: encoded,
+						replace: true,
+						resetScroll: false,
+						hashScrollIntoView: false,
+					});
 					try {
 						window.sessionStorage.setItem(
 							OWN_HASH_STORAGE_KEY,

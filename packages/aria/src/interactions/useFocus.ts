@@ -20,7 +20,7 @@ import { useSyntheticBlurEvent } from './utils';
 
 // octane adaptation: native-event handler props (upstream: FocusEvents<Target> from
 // '@react-types/shared'). The Target parameter is kept for signature parity.
-export interface FocusEvents<Target = FocusableElement> {
+export interface FocusEvents<_Target = FocusableElement> {
 	/** Handler that is called when the element receives focus. */
 	onFocus?: (e: FocusEvent) => void;
 	/** Handler that is called when the element loses focus. */
@@ -30,7 +30,7 @@ export interface FocusEvents<Target = FocusableElement> {
 }
 
 // octane adaptation: minimal structural DOMAttributes (upstream's drags React attribute types).
-export type DOMAttributes<T = FocusableElement> = Record<string, any>;
+export type DOMAttributes<_T = FocusableElement> = Record<string, any>;
 
 export interface FocusProps<Target = FocusableElement> extends FocusEvents<Target> {
 	/** Whether the focus events should be disabled. */

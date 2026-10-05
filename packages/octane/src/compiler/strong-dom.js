@@ -1,5 +1,6 @@
 import { ATTRIBUTE_ALIASES } from '../dom-tables.js';
 import { analyzeStrongHookBindings } from './hook-deps.js';
+import { REF_HOOKS } from './hook-names.js';
 import { createRendererRegionResolver } from './renderer-boundaries.js';
 
 export const STRONG_MANAGED_DOM_WRITE = 'OCTANE_STRONG_MANAGED_DOM_WRITE';
@@ -248,7 +249,7 @@ export function analyzeStrongDOM(ast, source, filename, options = {}) {
 			if (pattern === decl.id) {
 				declarations.set(binding, { init: decl.init, current: false });
 				const init = unwrap(decl.init);
-				if (init?.type === 'CallExpression' && callNames.get(init) === 'useRef') {
+				if (init?.type === 'CallExpression' && REF_HOOKS.has(callNames.get(init))) {
 					const record = { boundary: undefined, attachments: [], escaped: false };
 					refs.set(binding, record);
 					refDeclarators.set(decl, record);

@@ -234,6 +234,68 @@ default; pass `{ sourceEqual, valueEqual }` as a third argument when you need
 something else. Like `useState`, `useLinkedState` supports an optional third
 tuple item, `getValue`.
 
+## Lazy ref initialization
+
+When a mutable ref needs an expensive initial value, pass a factory to
+`useLazyRef`:
+
+```ts
+const cache = useLazyRef(() => new Map<string, string>());
+```
+
+Subsequent renders keep the same ref and do not rerun the factory.
+`useRef(callback)` stores the callback itself; a lazy factory may also return a
+function to store it as the ref value. The factory runs during render, and can
+run again when work is abandoned or retried, on remount, and separately for
+server rendering and hydration. Keep it free of side effects; use an effect for
+resources needing cleanup. Strong mode checks it like a lazy `useState`
+initializer, so it may read a clock, randomness, or browser state but may not
+schedule work. The experimental Valdi writer's existing adapter ABI does not
+support this hook.
+
+## Measurements after layout
+
+Use `useLayoutSnapshot` when rendered output depends on a measurement of the
+committed DOM. The first render uses the supplied initial value; Octane measures
+after the element and its ref are committed and updates the snapshot when the
+measurement changes.
+
+```tsx
+import { useLayoutSnapshot, useRef } from 'octane';
+
+export function MeasuredContent() @{
+	const content = useRef<HTMLDivElement | null>(null);
+	const height = useLayoutSnapshot(() => content.current?.offsetHeight ?? 0, {
+		initial: 0,
+	});
+
+	<section>
+		<div ref={content}>Content to measure</div>
+		<p>{'Height: ' + height}</p>
+	</section>
+}
+```
+
+The measurement runs after each committed render of the component that reaches
+the hook, before the browser paints. It does not run during server rendering;
+the server and the first hydration render both use `initial`, or `undefined`
+when no initial value is supplied. Snapshots are compared with `Object.is` by
+default. For measurements that return a new object, supply `equal` to compare
+their contents and avoid repeated updates.
+
+The measurement runs in the component's layout phase, in hook order. A
+`useLayoutEffect` declared after it in the same component runs after the
+measurement, so DOM it changes is not measured until the next commit. Call
+`useLayoutSnapshot` after layout effects that change the DOM it measures.
+
+The callback is for measurement, not acquiring resources or setting up
+subscriptions. The hook does not observe later changes to layout by itself. For
+changes such as resizing or scrolling that happen independently of the
+component's commits, have an observer or event callback update state so the
+component commits again; that commit measures again. This hook is available for
+the DOM renderer; the experimental universal and Valdi renderers do not support
+it.
+
 ## Conditional hooks
 
 Unlike React, a hook can sit behind a guard or after an early `return`:
@@ -810,7 +872,9 @@ resource, or on a `<style>` inside `<head>`, is an error
 
 See the [Strong compiler check reference](./strong-compiler-checks.md) for
 effect data flow, dependency inference, automatic memoization, keyed lists,
-compatibility APIs, and trusted HTML.
+compatibility APIs, and trusted HTML. The
+[Strong mode guide](https://octanejs.dev/docs/strong-mode) covers adopting it in
+an existing app and replacing the React idioms it rejects.
 
 Strong mode is an optional immutable render-snapshot contract with compiler
 checks for state, refs, Effect Events, and detectable impure render calls. It is
@@ -880,11 +944,19 @@ These patterns become compile errors:
   (`OCTANE_STRONG_RENDER_AMBIENT_READ`), including `typeof` guards and known
   browser handle aliases. Reading `globalThis` properties also reports this
   error, except for known standard language builtins. Read a subscribed snapshot
-  or move the read into an event, effect, or lazy state initializer.
-- Assigning to a `useRef` object's `current` during render.
+  or move the read into an event, effect, or lazy state initializer. A
+  `useLazyRef` factory may read it too, but its `current` cannot be rendered.
+- Assigning to a `useRef` object's `current` during render
+  (`OCTANE_STRONG_RENDER_REF_WRITE`), including React's lazy initialization
+  `if (ref.current === null) ref.current = create()`. Create a value once with
+  `useLazyRef(() => create())`, and read the latest props from an effect with
+  `useEffectEvent`.
 - Reading a `useRef` object's `current` during render
   (`OCTANE_STRONG_RENDER_REF_READ`). Pass the ref to a `ref` prop as usual; read
   its current value in an event or effect, or use state for render output.
+  Render a DOM measurement from `useLayoutSnapshot` rather than reading the
+  element during render or copying the measurement into state from a layout
+  effect.
 - Writing through a ref to children, a class, an attribute, or a `style`
   property that the template renders on that element
   (`OCTANE_STRONG_MANAGED_DOM_WRITE`), or writing raw HTML to an element Octane
@@ -929,6 +1001,10 @@ These patterns become compile errors:
   or constructing an `Intl` formatter without an explicit locale (and, for
   `DateTimeFormat`, a `timeZone`) (`OCTANE_STRONG_RENDER_LOCALE_FORMAT`). Server
   and browser output would differ.
+- Calling `setTimeout`, `setInterval`, `queueMicrotask`,
+  `requestAnimationFrame`, or `requestIdleCallback` during render, including in
+  a lazy state initializer (`OCTANE_STRONG_RENDER_SIDE_EFFECT`). Schedule work
+  from an event handler, or from an effect that cancels it in cleanup.
 - Declaring a built-in hook value outside the sole nested `@{…}` block that
   uses it (`OCTANE_STRONG_HOOK_LOCALITY`).
 - Declaring a named callback outside the sole nested `@{…}` block containing
@@ -961,8 +1037,8 @@ export function ViewportWidth() @{
 ```
 
 Browser reads in event handlers, effects, and deferred callbacks remain valid.
-Lazy `useState` and `useReducer` initializers may capture an initial browser
-value, but they still run during server rendering. Guard browser APIs there and
+Lazy `useState`, `useReducer`, and `useLazyRef` initializers may capture an
+initial browser value, but they still run during server rendering. Guard browser APIs there and
 ensure server and client initial output agrees. A `typeof window` guard in an
 ordinary render expression still reads ambient state and is rejected.
 

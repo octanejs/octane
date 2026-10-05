@@ -37,6 +37,7 @@ import {
 	getContextNonce,
 	nonceAttribute,
 	prepareStreamingHydrationTemplate,
+	replaceHydrationEntrySource,
 	splitSsrTemplate,
 	validateSsrTemplate,
 } from './html-template.js';
@@ -287,6 +288,21 @@ function prepareClientBuild(manifest) {
 }
 
 /**
+ * The normalized no-nonce template and its prepared splits, for one bootstrap.
+ * @param {string} template
+ */
+function createTemplateSet(template) {
+	const normalized = applyHydrationNonce(template, null);
+	/** @type {ReturnType<typeof prepareSsrTemplate> | undefined} */
+	let early;
+	return {
+		template,
+		split: prepareSsrTemplate(normalized),
+		early: () => (early ??= prepareSsrTemplate(normalized, true)),
+	};
+}
+
+/**
  * @param {ServerManifest} manifest
  * @param {RenderRoute} route
  * @param {string | undefined} entryPath
@@ -315,7 +331,9 @@ function prepareRouteAssetHead(manifest, route, entryPath) {
 	}
 	// Only the page chunk was already eager; do not promote layout, fallback,
 	// or island JavaScript while making their server-rendered CSS available.
-	const entryAssets = entryPath ? clientAssets?.[entryPath] : undefined;
+	// An islands-only route never loads its page chunk at all.
+	const entryAssets =
+		entryPath && route.hydrate !== 'islands' ? clientAssets?.[entryPath] : undefined;
 	if (entryAssets?.js) {
 		tags.push(`<link rel="modulepreload" href="/${entryAssets.js}">`);
 	}
@@ -351,10 +369,24 @@ export function createHandler(manifest, deps) {
 	// the integration's HTML transform and survives source hashing. Prepare the
 	// normalized no-nonce template once: this is the common request path, and its
 	// static fragments are identical for every request handled by this manifest.
-	const normalizedTemplate = applyHydrationNonce(htmlTemplate, null);
-	const splitHydrationTemplate = prepareSsrTemplate(normalizedTemplate);
-	/** @type {ReturnType<typeof prepareSsrTemplate> | undefined} */
-	let splitEarlyHydrationTemplate;
+	const fullTemplate = createTemplateSet(htmlTemplate);
+	// An islands-only route serves the same document with the renderer-free
+	// entry, so its shell's JavaScript is never requested.
+	const islandsTemplate = manifest.routes.some(
+		(route) => route.type === 'render' && route.hydrate === 'islands',
+	)
+		? createTemplateSet(
+				replaceHydrationEntrySource(
+					htmlTemplate,
+					manifest.islandsEntry ??
+						(() => {
+							throw new Error(
+								"[octane] RenderRoute hydrate: 'islands' requires a client build with an islands entry.",
+							);
+						})(),
+				),
+			)
+		: null;
 
 	// RPC lookup for statically imported `module server` functions
 	// (compiler hash → server function).
@@ -538,7 +570,9 @@ export function createHandler(manifest, deps) {
 			if (preparedRoute) preparedRoute.assetHead = assetHead;
 		}
 		const headContent = assetHead === '' ? dataScript : assetHead + '\n' + dataScript;
-		const noncedTemplate = nonce === null ? null : applyHydrationNonce(htmlTemplate, nonce);
+		const templates =
+			route.hydrate === 'islands' ? (islandsTemplate ?? fullTemplate) : fullTemplate;
+		const noncedTemplate = nonce === null ? null : applyHydrationNonce(templates.template, nonce);
 
 		const status = route.status ?? 200;
 		const headers = { 'Content-Type': 'text/html; charset=utf-8' };
@@ -560,9 +594,7 @@ export function createHandler(manifest, deps) {
 			const completeHead = headContent + hoistedHead;
 			if (noncedTemplate !== null)
 				return prepareSsrTemplate(noncedTemplate, earlyHydration)(completeHead);
-			if (!earlyHydration) return splitHydrationTemplate(completeHead);
-			splitEarlyHydrationTemplate ??= prepareSsrTemplate(normalizedTemplate, true);
-			return splitEarlyHydrationTemplate(completeHead);
+			return (earlyHydration ? templates.early() : templates.split)(completeHead);
 		};
 
 		if (manifest.render === 'buffered') {

@@ -10,6 +10,7 @@ import {
 	bindSignalChild,
 	bindSignalValue,
 	childSlot,
+	createElement,
 	createElementAt,
 	createElementFromConfig,
 	createRoot,
@@ -697,6 +698,249 @@ Pass.defaultProps = { label: 'default' };`,
 		expect(container.textContent).toBe('scalar again');
 		expect(token).toBeNull();
 		owner.dispose();
+	});
+
+	it('updates a signal-capable text hole beside siblings in place through every value kind', async () => {
+		// The earlier prop-bound class makes the module signal-capable, so the later
+		// `{props.value}` hole compiles to bindSignalChild rather than textHoleUpdate.
+		const app = loadCompiledFixtureSource(
+			`function Tag({ kind }) @{ <i class={kind}>{'t'}</i> }
+export function App(props) @{ <p>{'n:'}{props.value}<Tag kind="x" /></p> }`,
+			{ id: '/src/signal-capable-text-hole.tsrx', mode: 'client', compileOptions: { hmr: false } },
+		);
+		const container = document.createElement('div');
+		document.body.appendChild(container);
+		const owner = createScope({ scopeKey: 'signal-capable-text-hole' });
+		const text$ = owner.signal$('text', 's1');
+		const paragraph = () => container.querySelector('p')!;
+		const render = (value: unknown) => flushSync(() => root!.render(app.App, { value }));
+		const mutations = new MutationObserver(() => {});
+		const records = () => mutations.takeRecords();
+
+		root = createRoot(container);
+		root.render(app.App, { value: 1 });
+		expect(paragraph().textContent).toBe('n:1t');
+		const hole = [...paragraph().childNodes].find((node) => node.nodeValue === '1')!;
+		mutations.observe(paragraph(), { characterData: true, childList: true, subtree: true });
+
+		render(2);
+		expect(paragraph().textContent).toBe('n:2t');
+		expect(hole.nodeValue).toBe('2');
+		expect(records().map((record) => [record.type, record.target])).toEqual([
+			['characterData', hole],
+		]);
+
+		render(2);
+		expect(records()).toEqual([]);
+
+		render(true);
+		expect(paragraph().textContent).toBe('n:t');
+		render(3);
+		expect(paragraph().textContent).toBe('n:3t');
+		render(createElement('em', null, 'e'));
+		expect(paragraph().textContent).toBe('n:et');
+		expect(paragraph().querySelector('em')?.nextElementSibling?.tagName).toBe('I');
+		render(4);
+		expect(paragraph().textContent).toBe('n:4t');
+
+		render(text$);
+		expect(paragraph().textContent).toBe('n:s1t');
+		text$.set('s2');
+		await Promise.resolve();
+		expect(paragraph().textContent).toBe('n:s2t');
+		render(5);
+		expect(paragraph().textContent).toBe('n:5t');
+		text$.set('s3');
+		await Promise.resolve();
+		expect(paragraph().textContent).toBe('n:5t');
+		mutations.disconnect();
+		owner.dispose();
+	});
+
+	it('writes a signal-capable text hole that a pending render pass skipped', () => {
+		// An earlier hole updates this component's own state mid-render, so the
+		// rest of that pass skips its writes. The repeated pass renders the same
+		// value and must still write it.
+		const app = loadCompiledFixtureSource(
+			`import { useState } from 'octane';
+function Tag({ kind }) @{ <i class={kind}>{'t'}</i> }
+export function App(props) @{
+	const [seen, setSeen] = useState(0);
+	const sync = () => {
+		if (seen < props.version) setSeen(props.version);
+		return '';
+	};
+	<p>{sync() as string}{'n:'}{props.value}<Tag kind="x" /></p>
+}`,
+			{ id: '/src/pending-text-hole.tsrx', mode: 'client', compileOptions: { hmr: false } },
+		);
+		const container = document.createElement('div');
+		document.body.appendChild(container);
+		root = createRoot(container);
+		root.render(app.App, { value: 'a', version: 0 });
+		expect(container.textContent).toBe('n:at');
+		flushSync(() => root!.render(app.App, { value: 'b', version: 1 }));
+		expect(container.textContent).toBe('n:bt');
+	});
+
+	it('leaves a signal-capable only-child text hole alone until its value changes', async () => {
+		// The prop-bound class makes `{props.value}` a signal-capable only-child
+		// hole. As in React, an unchanged primitive leaves the DOM alone, so an
+		// outside edit survives it; a changed value rewrites the same Text node.
+		const app = loadCompiledFixtureSource(
+			`function Tag({ kind }) @{ <i class={kind}>{'t'}</i> }
+export function App(props) @{ <div><p>{props.value}</p><Tag kind="x" /></div> }`,
+			{ id: '/src/only-child-text-hole.tsrx', mode: 'client', compileOptions: { hmr: false } },
+		);
+		const container = document.createElement('div');
+		document.body.appendChild(container);
+		const owner = createScope({ scopeKey: 'only-child-text-hole' });
+		const text$ = owner.signal$('text', 's1');
+		const paragraph = () => container.querySelector('p')!;
+		const render = (value: unknown) => flushSync(() => root!.render(app.App, { value }));
+		const mutations = new MutationObserver(() => {});
+		const records = () => mutations.takeRecords();
+
+		root = createRoot(container);
+		root.render(app.App, { value: 1 });
+		const hole = paragraph().firstChild as Text;
+		expect(hole.nodeValue).toBe('1');
+		mutations.observe(paragraph(), { characterData: true, childList: true, subtree: true });
+
+		hole.nodeValue = 'edited';
+		records();
+		render(1);
+		expect(paragraph().textContent).toBe('edited');
+		expect(records()).toEqual([]);
+
+		render(2);
+		expect(paragraph().firstChild).toBe(hole);
+		expect(hole.nodeValue).toBe('2');
+		expect(records().map((record) => [record.type, record.target])).toEqual([
+			['characterData', hole],
+		]);
+		render(2);
+		expect(records()).toEqual([]);
+		render('2');
+		expect(paragraph().childNodes.length).toBe(1);
+		expect(paragraph().firstChild).toBe(hole);
+
+		render(true);
+		expect(paragraph().childNodes.length).toBe(0);
+		render(3);
+		expect(paragraph().textContent).toBe('3');
+		render(createElement('em', null, 'e'));
+		expect(paragraph().innerHTML).toBe('<em>e</em>');
+		render(4);
+		expect(paragraph().textContent).toBe('4');
+
+		render(text$);
+		expect(paragraph().childNodes.length).toBe(1);
+		expect(paragraph().textContent).toBe('s1');
+		text$.set('s2');
+		await Promise.resolve();
+		expect(paragraph().textContent).toBe('s2');
+		render(5);
+		expect(paragraph().childNodes.length).toBe(1);
+		expect(paragraph().textContent).toBe('5');
+		text$.set('s3');
+		await Promise.resolve();
+		expect(paragraph().textContent).toBe('5');
+		render(5);
+		expect(paragraph().textContent).toBe('5');
+		render(text$);
+		expect(paragraph().childNodes.length).toBe(1);
+		expect(paragraph().textContent).toBe('s3');
+		render(6);
+		expect(paragraph().textContent).toBe('6');
+		mutations.disconnect();
+		owner.dispose();
+	});
+
+	it('keeps a hydrated signal-capable only-child text hole on its server Text node', () => {
+		const source = `function Tag({ kind }) @{ <i class={kind}>{'t'}</i> }
+export function App(props) @{ <div><p>{props.value}</p><Tag kind="x" /></div> }`;
+		const id = '/src/hydrated-only-child-text-hole.tsrx';
+		const server = loadCompiledFixtureSource(source, { id, mode: 'server' });
+		const client = loadCompiledFixtureSource(source, {
+			id,
+			mode: 'client',
+			compileOptions: { hmr: false },
+		});
+		const container = document.createElement('div');
+		document.body.appendChild(container);
+		container.innerHTML = renderToString(server.App, { value: 'a' }).html;
+		const hole = container.querySelector('p')!.firstChild as Text;
+		flushSync(() => {
+			root = hydrateRoot(container, client.App, { value: 'a' });
+		});
+		const paragraph = container.querySelector('p')!;
+		expect(paragraph.firstChild).toBe(hole);
+		for (const value of ['a', 'b', 'b', 7, 'c']) {
+			flushSync(() => root!.render(client.App, { value }));
+			expect(paragraph.childNodes.length).toBe(1);
+			expect(paragraph.firstChild).toBe(hole);
+			expect(hole.nodeValue).toBe(String(value));
+		}
+	});
+
+	it.each(['<b>x</b>', '<!--c-->', '<b>x</b>tail'])(
+		'updates the Text node a hydrated only-child text hole appended after server %s',
+		(serverContent) => {
+			// Hydration keeps server content the hole did not claim ahead of the
+			// Text node it appends, so that node is not the host's first child.
+			const client = loadCompiledFixtureSource(
+				`function Tag({ kind }) @{ <i class={kind}>{'t'}</i> }
+export function App(props) @{ <div><p>{props.value}</p><Tag kind="x" /></div> }`,
+				{
+					id: '/src/mismatched-only-child-text-hole.tsrx',
+					mode: 'client',
+					compileOptions: { hmr: false },
+				},
+			);
+			const container = document.createElement('div');
+			document.body.appendChild(container);
+			container.innerHTML = `<div><p>${serverContent}</p><i class="x">t</i></div>`;
+			flushSync(() => {
+				root = hydrateRoot(container, client.App, { value: 'a' }, { onRecoverableError() {} });
+			});
+			const paragraph = container.querySelector('p')!;
+			const hole = paragraph.lastChild as Text;
+			expect(hole.nodeValue).toBe('a');
+			const server = [...paragraph.childNodes].slice(0, -1);
+			for (const value of ['a', 'b', 'b', 'c', '', 'd', 'e']) {
+				flushSync(() => root!.render(client.App, { value }));
+				server.forEach((node, index) => expect(paragraph.childNodes[index]).toBe(node));
+				expect(paragraph.childNodes.length).toBe(server.length + (value === '' ? 0 : 1));
+				if (value !== '') expect(paragraph.lastChild!.nodeValue).toBe(value);
+			}
+		},
+	);
+
+	it('rejects raw HTML beside an unchanged signal-capable only-child text value', () => {
+		const app = loadCompiledFixtureSource(
+			`function Tag({ kind }) @{ <i class={kind}>{'t'}</i> }
+export function App(props) @{ <div><p {...props.attrs}>{props.value}</p><Tag kind="x" /></div> }`,
+			{
+				id: '/src/raw-html-only-child-text-hole.tsrx',
+				mode: 'client',
+				compileOptions: { hmr: false },
+			},
+		);
+		const container = document.createElement('div');
+		document.body.appendChild(container);
+		root = createRoot(container);
+		root.render(app.App, { value: 'a', attrs: {} });
+		flushSync(() => root!.render(app.App, { value: 'a', attrs: {} }));
+		expect(container.querySelector('p')!.textContent).toBe('a');
+		expect(() =>
+			flushSync(() =>
+				root!.render(app.App, {
+					value: 'a',
+					attrs: { dangerouslySetInnerHTML: { __html: '<b>x</b>' } },
+				}),
+			),
+		).toThrow();
 	});
 
 	it('publishes an authoritative storage candidate into an active writable binding', () => {

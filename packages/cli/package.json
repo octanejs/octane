@@ -1,6 +1,6 @@
 {
   "name": "@octanejs/cli",
-  "version": "0.0.12",
+  "version": "0.2.0",
   "type": "module",
   "engines": {
     "node": ">=22.22.2"

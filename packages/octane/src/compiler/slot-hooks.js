@@ -18,7 +18,11 @@ import { parseModule, builders as b } from '@tsrx/core';
 import { parseModule as parseFallbackModule } from '#octane/compiler-parser';
 import { findRootFactoryImports, proveVoidRoots } from './void-roots.js';
 import { HOOK_NAMES, collectNestedBindingNames, hookSlotHash } from './compile.js';
-import { NATIVE_SIGNAL_HOOK_NAMES } from './hook-names.js';
+import {
+	INITIAL_VALUE_HOOKS,
+	NATIVE_SIGNAL_HOOK_NAMES,
+	SPREAD_PATH_SLOT_HOOKS,
+} from './hook-names.js';
 import { METHOD_DEP_IMPORT, annotateHookCalls, analyzeStrongMemoCandidates } from './hook-deps.js';
 import { inlinePlainHookMemos } from './plain-hook-memo.js';
 import { assertStrongMode } from './strong-mode.js';
@@ -301,24 +305,6 @@ const STATE_GETTER_HELPERS = {
 	useLinkedState: '__useLinkedStateWithGetter',
 	useReducer: '__useReducerWithGetter',
 };
-
-function collectIdentifierNames(root) {
-	const names = new Set();
-	const walk = (node) => {
-		if (node == null || typeof node !== 'object') return;
-		if (Array.isArray(node)) {
-			for (const child of node) walk(child);
-			return;
-		}
-		if (node.type === 'Identifier' && typeof node.name === 'string') names.add(node.name);
-		for (const key in node) {
-			if (key === 'type' || key === 'loc' || key === 'start' || key === 'end') continue;
-			walk(node[key]);
-		}
-	};
-	walk(root);
-	return names;
-}
 
 function allocSlotName(st, preferred) {
 	let name = preferred;
@@ -1260,7 +1246,7 @@ function walk(node, owner, st) {
 				});
 			}
 			if (
-				(imported === 'useState' || imported === 'useRef') &&
+				SPREAD_PATH_SLOT_HOOKS.has(imported) &&
 				node.arguments.some((arg) => arg.type === 'SpreadElement')
 			) {
 				const open = callOpenParen(node, st.source);
@@ -1276,24 +1262,29 @@ function walk(node, owner, st) {
 				// offsets, preserving arbitrary TS syntax byte-for-byte. Method-call
 				// dependencies are the one synthesized form: the helper call's root is
 				// a bare identifier and its name a JSON string, so no arbitrary TS
-				// syntax needs reprinting there either.
-				const deps = emitInferredDependencies(inferred.dependencies, st);
+				// syntax needs reprinting there either. A null inference runs the hook
+				// on every render.
+				const deps =
+					inferred.dependencies === null
+						? 'null'
+						: `[${emitInferredDependencies(inferred.dependencies, st)}]`;
 				if (inferred.replaceDependency) {
 					const argument = node.arguments[inferred.depsIndex];
-					st.edits.push({ pos: argument.start, end: argument.end, text: `[${deps}]` });
+					st.edits.push({ pos: argument.start, end: argument.end, text: deps });
 					st.edits.push({ pos: node.end - 1, text: `${strongCallSeparator(node, st)}${sym}` });
 				} else {
 					st.edits.push({
 						pos: st.strong ? node.end - 1 : node.arguments[node.arguments.length - 1].end,
-						text: `${st.strong ? strongCallSeparator(node, st) : ', '}[${deps}], ${sym}`,
+						text: `${st.strong ? strongCallSeparator(node, st) : ', '}${deps}, ${sym}`,
 					});
 				}
 			} else if (node.arguments.length === 0) {
-				// State/ref initializers may themselves be Symbols. Reserve their
-				// authored position even when empty; other hooks keep their ABI.
+				// State/ref initial values may themselves be Symbols, and a lazy ref's
+				// factory owns the same position. Reserve it even when empty; other
+				// hooks keep their ABI.
 				st.edits.push({
 					pos: node.end - 1,
-					text: imported === 'useState' || imported === 'useRef' ? `undefined, ${sym}` : sym,
+					text: INITIAL_VALUE_HOOKS.has(imported) ? `undefined, ${sym}` : sym,
 				});
 			} else {
 				// `useState(0)` → `useState(0, _h$N)` — insert AFTER the last arg's end so
@@ -1459,7 +1450,9 @@ export function slotHooks(source, id, options) {
 	// Native signal reads exist only for the DOM client and server renderers.
 	const signalHookSites =
 		(options?.renderer?.target ?? 'dom') === 'dom' && options?.universalRuntime == null;
-	const signalLowering = signalDeclarationSourceEdits(ast, id, source);
+	const signalLowering = signalDeclarationSourceEdits(ast, id, source, {
+		hmr: environment === 'client' && Boolean(options?.hmr),
+	});
 	const pureCalls = collectPureFactoryCalls(
 		ast,
 		source,
@@ -1567,7 +1560,9 @@ export function slotHooks(source, id, options) {
 		decls: [],
 		parallelHelpers: new Map(),
 		provenContextBindings: collectProvenContextBindings(ast),
-		usedNames: collectIdentifierNames(ast),
+		// Signal lowering has already reserved its generated locals as well as
+		// authored names, so subsequent helpers must allocate from the same set.
+		usedNames: signalLowering.usedNames,
 		slotBaseName: null,
 		hookSlotsName: null,
 		voidRootNames: new Map(),
@@ -1678,7 +1673,8 @@ export function slotHooks(source, id, options) {
 		slotBase +
 		st.decls.join('\n') +
 		'\n' +
-		signalActivation;
+		signalActivation +
+		signalLowering.prelude;
 	if (activation !== null || signalLowering.usesSignals) {
 		// Plain modules may read global signals or render during evaluation.
 		// Their document capability and any render slots must already exist.

@@ -45,17 +45,41 @@ export interface SignalDeclarationStage {
 	settle(callback: (discarded: boolean) => void): void;
 }
 
-let declarationStageResolver: (() => SignalDeclarationStage | undefined) | undefined;
+let declarationStageResolver:
+	((declaring?: number) => SignalDeclarationStage | undefined) | undefined;
 
-/** A renderer reports its speculative render; no resolver means declarations apply at once. */
+/**
+ * A renderer reports its speculative render; no resolver means declarations
+ * apply at once. `declaring` names the invocation that evaluated the
+ * declaration; while that invocation is still rendering, its stage applies.
+ */
 export function registerSignalDeclarationStage(
-	resolver: () => SignalDeclarationStage | undefined,
+	resolver: (declaring?: number) => SignalDeclarationStage | undefined,
 ): void {
 	declarationStageResolver = resolver;
 }
 
-export function currentSignalDeclarationStage(): SignalDeclarationStage | undefined {
-	return declarationStageResolver?.();
+export function currentSignalDeclarationStage(
+	declaring?: number,
+): SignalDeclarationStage | undefined {
+	return declarationStageResolver?.(declaring);
+}
+
+let declarationInvocation = 0;
+
+/**
+ * A number unique to the render invocation evaluating declarations, or 0
+ * outside one. Unlike its stage, reading it allocates nothing.
+ */
+export function currentSignalDeclarationInvocation(): number {
+	return declarationInvocation;
+}
+
+/** The renderer enters an invocation, or restores the one it returns to. */
+export function setSignalDeclarationInvocation(invocation: number): number {
+	const previous = declarationInvocation;
+	declarationInvocation = invocation;
+	return previous;
 }
 
 let nativeActionResolver: (() => SignalCandidateFrame | undefined) | undefined;

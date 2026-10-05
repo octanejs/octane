@@ -113,10 +113,10 @@ const NON_CONTRAST_BASELINE: Record<string, readonly DeferredFinding[]> = {
 	// API reference tables plus the tab panel — same deferred class.
 	...forRoute('/docs/core-apis', [
 		{ ruleId: 'scrollable-region-focusable', nodeSelector: '#\\:in-1\\:-panel' },
-		{ ruleId: 'scrollable-region-focusable', nodeSelector: '.table-scroll:nth-child(106)' },
-		{ ruleId: 'scrollable-region-focusable', nodeSelector: '.table-scroll:nth-child(130)' },
-		{ ruleId: 'scrollable-region-focusable', nodeSelector: '.table-scroll:nth-child(135)' },
-		{ ruleId: 'scrollable-region-focusable', nodeSelector: '.table-scroll:nth-child(195)' },
+		{ ruleId: 'scrollable-region-focusable', nodeSelector: '.table-scroll:nth-child(114)' },
+		{ ruleId: 'scrollable-region-focusable', nodeSelector: '.table-scroll:nth-child(138)' },
+		{ ruleId: 'scrollable-region-focusable', nodeSelector: '.table-scroll:nth-child(143)' },
+		{ ruleId: 'scrollable-region-focusable', nodeSelector: '.table-scroll:nth-child(203)' },
 	]),
 	// CodeMirror: the contenteditable surface has no accessible field name and
 	// its scroller is not focusable. Editor chrome, not site styles.
@@ -124,13 +124,8 @@ const NON_CONTRAST_BASELINE: Record<string, readonly DeferredFinding[]> = {
 		{ ruleId: 'aria-input-field-name', nodeSelector: 'div[contenteditable="true"]' },
 		{ ruleId: 'scrollable-region-focusable', nodeSelector: '.ͼ4 > .cm-scroller' },
 	]),
-	// The header links's styling does not distinguish it from body text, and
-	// the heatmap's overflow region again.
+	// The heatmap's overflow region again. Intro links are visibly underlined.
 	...forRoute('/benchmarks', [
-		{
-			ruleId: 'link-in-text-block',
-			nodeSelector: '.benchpage-sub > a[target="_blank"][rel="noreferrer"]',
-		},
 		{ ruleId: 'scrollable-region-focusable', nodeSelector: '.bx-heat-scroll' },
 	]),
 	// The devtools filter input is unlabeled.

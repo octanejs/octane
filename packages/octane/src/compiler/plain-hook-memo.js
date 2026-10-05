@@ -6,6 +6,7 @@ import { builders as b, clone_ast_node as cloneAstNode, withDeferredImports } fr
 import { print as esrapPrint } from 'esrap';
 import esrapTsx from 'esrap/languages/tsx';
 import { METHOD_DEP_IMPORT } from './hook-deps.js';
+import { INITIAL_VALUE_HOOKS, SPREAD_PATH_SLOT_HOOKS } from './hook-names.js';
 import { nativeReadActivationIndex } from './native-read-codegen.js';
 import { signalHookCallSite } from './signal-declarations.js';
 import { adaptManualHookProviders } from './manual-hooks.js';
@@ -117,10 +118,12 @@ function allocateHookSlot(state, origin, hookNames = null) {
 		slot = pure(b.call(requireHelper(state, 'signalHookSite'), slot, b.literal(site)));
 	}
 	state.slotDeclarations.push(inheritHookMemoOrigin(b.const(name, slot), origin));
-	return b.id(name, origin);
+	return { ...b.id(name, origin), _octaneCompilerSlot: true };
 }
 
-function inferredDependencyArray(inferred, state, origin) {
+// A null inference runs the hook on every render.
+function inferredDependencyList(inferred, state, origin) {
+	if (inferred.dependencies === null) return inheritHookMemoOrigin(b.literal(null), origin);
 	return inheritHookMemoOrigin(
 		b.array(
 			inferred.dependencies.map((dependency) =>
@@ -131,7 +134,9 @@ function inferredDependencyArray(inferred, state, origin) {
 							b.literal(dependency.method.name),
 							...(dependency.method.guarded ? [b.literal(true)] : []),
 						)
-					: cloneAstNode(dependency.node),
+					: dependency.stable === true
+						? { ...cloneAstNode(dependency.node), _octaneStableRead: true }
+						: cloneAstNode(dependency.node),
 			),
 		),
 		origin,
@@ -216,7 +221,7 @@ function slotBaseHooks(ast, state, options) {
 		const mapped = mapChildren(node, visit);
 		const args = mapped.arguments.slice();
 		if (inferred !== undefined) {
-			args.splice(inferred.depsIndex, 0, inferredDependencyArray(inferred, state, node));
+			args.splice(inferred.depsIndex, 0, inferredDependencyList(inferred, state, node));
 		}
 		let callee = mapped.callee;
 		if (options.getterCalls.has(node) && options.stateGetterHelpers[imported]) {
@@ -227,7 +232,7 @@ function slotBaseHooks(ast, state, options) {
 		}
 		if (slot !== null) {
 			if (
-				(imported === 'useState' || imported === 'useRef') &&
+				SPREAD_PATH_SLOT_HOOKS.has(imported) &&
 				args.some((arg) => arg.type === 'SpreadElement')
 			) {
 				const fn = mapped.typeArguments
@@ -244,7 +249,7 @@ function slotBaseHooks(ast, state, options) {
 					arguments: [slot, fn, ...args],
 				};
 			}
-			if (args.length === 0 && (imported === 'useState' || imported === 'useRef'))
+			if (args.length === 0 && INITIAL_VALUE_HOOKS.has(imported))
 				args.push(b.id('undefined', node));
 			args.push(slot);
 		}
@@ -411,19 +416,8 @@ export function inlinePlainHookMemos(ast, source, id, options) {
 	// The existing parallel-use pass has its own grouping and warm behavior.
 	// Keep those modules entirely on that path until both transforms share AST.
 	if (!hasMemo || hasUse) return null;
-	// esrap does not print an import's `phase`; without the wrapper an authored
-	// `import.defer()` would reprint as an eager `import()`.
-	const visitors = withDeferredImports(
-		esrapTsx({
-			comments: collectComments(ast),
-			getLeadingComments: (node) =>
-				node.__octanePure ||
-				(node.type === 'CallExpression' && options.pureCalls?.get(node.start) === node.end)
-					? PURE_COMMENTS
-					: undefined,
-		}),
-	);
-	if (!canPrintProgram(ast, visitors)) return null;
+	const print = createPlainProgramPrinter(ast, options.pureCalls);
+	if (print === null) return null;
 	const state = {
 		filename: id,
 		nativeReads: options.nativeReads === true,
@@ -489,23 +483,48 @@ export function inlinePlainHookMemos(ast, source, id, options) {
 						...transformed.body.slice(start),
 					],
 	};
-	// Check the Program as printed: the hook lowering above can replace an
-	// authored shape that esrap would misprint.
-	if (!printsFaithfully(program)) return null;
-	// One TS-preserving print, with real mappings. Never feed this generated code
-	// back through the surgical pass or parse it into a second compiler pipeline.
-	try {
-		const printed = esrapPrint(program, visitors, {
-			sourceMapSource: id,
-			sourceMapContent: source,
-		});
-		return { code: printed.code, map: printed.map };
-	} catch {
-		// A parser can support a TypeScript shape before its esrap visitor does.
-		// Unsupported authored syntax must remain the host toolchain's input,
-		// rather than becoming a production-only compiler error.
-		return null;
-	}
+	return print(program, source, id);
+}
+
+/**
+ * The tier's single print of a Program, or null for one it must not print:
+ * esrap has no visitor for some authored node, or misprints one. The authored
+ * Program decides the visitors and comments; `program` may have replaced some
+ * of its shapes.
+ */
+export function createPlainProgramPrinter(ast, pureCalls) {
+	// esrap does not print an import's `phase`; without the wrapper an authored
+	// `import.defer()` would reprint as an eager `import()`.
+	const visitors = withDeferredImports(
+		esrapTsx({
+			comments: collectComments(ast),
+			getLeadingComments: (node) =>
+				node.__octanePure ||
+				(node.type === 'CallExpression' && pureCalls?.get(node.start) === node.end)
+					? PURE_COMMENTS
+					: undefined,
+		}),
+	);
+	if (!canPrintProgram(ast, visitors)) return null;
+	return (program, source, id) => {
+		// Check the Program as printed: the hook lowering can replace an authored
+		// shape that esrap would misprint.
+		if (!printsFaithfully(program)) return null;
+		// One TS-preserving print, with real mappings. Never feed this generated code
+		// back through the surgical pass or parse it into a second compiler pipeline.
+		try {
+			const printed = esrapPrint(program, visitors, {
+				sourceMapSource: id,
+				sourceMapContent: source,
+			});
+			return { code: printed.code, map: printed.map };
+		} catch {
+			// A parser can support a TypeScript shape before its esrap visitor does.
+			// Unsupported authored syntax must remain the host toolchain's input,
+			// rather than becoming a production-only compiler error.
+			return null;
+		}
+	};
 }
 import {
 	hookMethodName,

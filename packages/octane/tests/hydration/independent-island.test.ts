@@ -6,8 +6,15 @@ import {
 } from '../../src/hydration/independent-island.js';
 import { hasPendingWork } from '../../src/index.js';
 import { renderToString } from '../../src/runtime.server.js';
-import { createScope } from 'octane/signals';
+import { createResource, createScope, query } from 'octane/signals';
 import { evaluateCompiledFixtureCode } from '../_server-fixture.js';
+import * as DomBindingIsland from '../../src/dom-binding-island.js';
+import * as DomBindingPrograms from '../../src/dom-binding-program.js';
+import * as DomBindingSignals from '../../src/dom-binding-signals.js';
+import {
+	formatDomBindingIslandRequest,
+	HYDRATE_ISLAND_RENDERER_QUERY,
+} from '../../src/compiler/dom-binding-request.js';
 import {
 	createIndependentHydrateManifest,
 	serializeIndependentHydrateManifest,
@@ -947,6 +954,300 @@ function Unrelated() {
 		first.remove();
 		second.remove();
 	});
+
+	// An island whose only child is a zero-argument binding view activates
+	// through that view's own program; any other child keeps the renderer.
+	it.each([false, true].flatMap((dev) => [true, false].map((bindings) => ({ dev, bindings }))))(
+		'selects the island activator from its child view module (%j)',
+		async ({ dev, bindings }) => {
+			const app = `import { Hydrate } from 'octane';
+import { interaction } from 'octane/hydration';
+import { Counter } from './Counter.tsrx';
+export function App() @{
+  <main>
+    <Hydrate independent when={interaction({ events: 'click' })}>
+      <Counter />
+    </Hydrate>
+  </main>
+}`;
+			const counter = `import { useLayoutEffect } from 'octane';
+import { count$, mounted } from './state';
+export function Counter() @{
+  ${bindings ? "'use dom bindings';" : ''}
+  useLayoutEffect(() => mounted(), []);
+  <section>
+    <button type="button" onClick={() => count$.set((count) => count + 1)}>{count$}</button>
+    @if (count$.get() > 2) {
+      <p>many</p>
+    }
+  </section>
+}`;
+			const appFile = '/project/src/App.tsrx';
+			const counterFile = '/project/src/Counter.tsrx';
+			const scope = createScope({ scopeKey: `binding-island-${dev}-${bindings}` });
+			const count$ = scope.signal$('count', 1);
+			const mounted = vi.fn();
+			const state = { './state': { count$, mounted } };
+			const counterServer = evaluateCompiledFixtureCode(
+				compile(counter, counterFile, { mode: 'server', dev }).code,
+				counterFile,
+				'server',
+				state,
+			);
+			const server = evaluateCompiledFixtureCode(
+				compile(app, appFile, { mode: 'server', dev }).code,
+				appFile,
+				'server',
+				{ './Counter.tsrx': counterServer },
+			);
+			// Resolve the island's module requests exactly as a bundler would.
+			const islandRequest = formatDomBindingIslandRequest('./Counter.tsrx', {
+				exportName: 'Counter',
+				host: appFile,
+				boundary: '0',
+			});
+			const rendererRequest = `./App.tsrx?octane-hydrate=0&${HYDRATE_ISLAND_RENDERER_QUERY}=1`;
+			const clientModule = (
+				source: string,
+				id: string,
+				modules: Record<string, Record<string, unknown>>,
+			) =>
+				evaluateCompiledFixtureCode(
+					compile(source, id, { mode: 'client', dev }).code,
+					id,
+					'client',
+					modules,
+				);
+			const selected = clientModule(
+				counter,
+				counterFile + islandRequest.slice('./Counter.tsrx'.length),
+				bindings
+					? {
+							'./Counter.tsrx?octane-bindings=Counter': clientModule(
+								counter,
+								counterFile + '?octane-bindings=Counter',
+								{
+									...state,
+									'octane/dom-binding-program': DomBindingPrograms,
+									'octane/dom-binding-signals': DomBindingSignals,
+								},
+							),
+							'octane/dom-binding-island': DomBindingIsland,
+						}
+					: {
+							[rendererRequest]: clientModule(
+								app,
+								appFile + rendererRequest.slice('./App.tsrx'.length),
+								{ './Counter.tsrx': clientModule(counter, counterFile, state) },
+							),
+						},
+			);
+			const entry = clientModule(app, appFile + '?octane-hydrate=0', { [islandRequest]: selected });
+			const host = document.createElement('div');
+			host.innerHTML = renderToString(server.App, undefined, {
+				signalOwner: scope,
+				independentHydration: {
+					buildId: 'binding-island-build',
+					resolve: (moduleId) => ({ moduleId, styles: [] }),
+				},
+			}).html;
+			document.body.append(host);
+			const serverButton = host.querySelector('button')!;
+			const errors: unknown[] = [];
+			const cleanup = bootstrapIndependentHydration(host, {
+				buildId: 'binding-island-build',
+				signalOwner: scope,
+				loadStyles() {},
+				loadModule: async () => entry,
+				onError: (error) => errors.push(error),
+			});
+			try {
+				serverButton.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
+				await vi.waitFor(() => expect(scope.get(count$)).toBe(2));
+				await vi.waitFor(() => expect(mounted).toHaveBeenCalledOnce());
+				expect(host.querySelector('button')).toBe(serverButton);
+				await vi.waitFor(() => expect(serverButton.textContent).toBe('2'));
+				serverButton.click();
+				await vi.waitFor(() => expect(host.querySelector('p')?.textContent).toBe('many'));
+				expect(serverButton.textContent).toBe('3');
+				expect(errors).toEqual([]);
+			} finally {
+				cleanup();
+				scope.dispose();
+				host.remove();
+			}
+		},
+	);
+
+	// A view whose first preparation suspends keeps the server DOM, which has
+	// no listeners yet. Input captured before activation and input that arrives
+	// before the data both wait for that commit, then replay in order. An island
+	// disposed before it commits drops that input instead.
+	it.each(
+		[false, true].flatMap((dev) =>
+			[true, false].flatMap((bindings) =>
+				[false, true].map((disposed) => ({ dev, bindings, disposed })),
+			),
+		),
+	)(
+		'replays input that reaches an island while its first render is pending (%j)',
+		async ({ dev, bindings, disposed }) => {
+			const app = `import { Hydrate } from 'octane';
+import { interaction } from 'octane/hydration';
+import { Answer } from './Answer.tsrx';
+export function App() @{
+  <main>
+    <Hydrate independent when={interaction({ events: 'click' })}>
+      <Answer />
+    </Hydrate>
+  </main>
+}`;
+			const answer = `import { answer$, log } from './state';
+export function Answer() @{
+  ${bindings ? "'use dom bindings';" : ''}
+  <section>
+    <p>{answer$.get() as string}</p>
+    <button type="button" data-first onClick={() => log('first')}>first</button>
+    <button type="button" data-second onClick={() => log('second')}>second</button>
+  </section>
+}`;
+			const appFile = '/project/src/App.tsrx';
+			const answerFile = '/project/src/Answer.tsrx';
+			const variant = `${dev}-${bindings}-${disposed}`;
+			const scope = createScope({ scopeKey: `pending-binding-island-${variant}` });
+			const events: string[] = [];
+			const log = (event: string) => events.push(event);
+			let resolveClient!: (value: string) => void;
+			const clientAnswer = new Promise<string>((resolve) => {
+				resolveClient = resolve;
+			});
+			const loadServer = query(`pending-island-server-${variant}`, (_argument: undefined) =>
+				Promise.resolve('server'),
+			);
+			const loadClient = query(
+				`pending-island-client-${variant}`,
+				(_argument: undefined) => clientAnswer,
+			);
+			const serverState = {
+				'./state': { answer$: createResource(scope, 'server', () => loadServer(undefined)), log },
+			};
+			const clientState = {
+				'./state': { answer$: createResource(scope, 'client', () => loadClient(undefined)), log },
+			};
+			const answerServer = evaluateCompiledFixtureCode(
+				compile(answer, answerFile, { mode: 'server', dev }).code,
+				answerFile,
+				'server',
+				serverState,
+			);
+			const server = evaluateCompiledFixtureCode(
+				compile(app, appFile, { mode: 'server', dev }).code,
+				appFile,
+				'server',
+				{ './Answer.tsrx': answerServer },
+			);
+			const islandRequest = formatDomBindingIslandRequest('./Answer.tsrx', {
+				exportName: 'Answer',
+				host: appFile,
+				boundary: '0',
+			});
+			const rendererRequest = `./App.tsrx?octane-hydrate=0&${HYDRATE_ISLAND_RENDERER_QUERY}=1`;
+			const clientModule = (
+				source: string,
+				id: string,
+				modules: Record<string, Record<string, unknown>>,
+			) =>
+				evaluateCompiledFixtureCode(
+					compile(source, id, { mode: 'client', dev }).code,
+					id,
+					'client',
+					modules,
+				);
+			const selected = clientModule(
+				answer,
+				answerFile + islandRequest.slice('./Answer.tsrx'.length),
+				bindings
+					? {
+							'./Answer.tsrx?octane-bindings=Answer': clientModule(
+								answer,
+								answerFile + '?octane-bindings=Answer',
+								{
+									...clientState,
+									'octane/dom-binding-program': DomBindingPrograms,
+									'octane/dom-binding-signals': DomBindingSignals,
+								},
+							),
+							'octane/dom-binding-island': DomBindingIsland,
+						}
+					: {
+							[rendererRequest]: clientModule(
+								app,
+								appFile + rendererRequest.slice('./App.tsrx'.length),
+								{ './Answer.tsrx': clientModule(answer, answerFile, clientState) },
+							),
+						},
+			);
+			const entry = clientModule(app, appFile + '?octane-hydrate=0', { [islandRequest]: selected });
+			const render = () =>
+				renderToString(server.App, undefined, {
+					signalOwner: scope,
+					independentHydration: {
+						buildId: 'pending-island-build',
+						resolve: (moduleId) => ({ moduleId, styles: [] }),
+					},
+				}).html;
+			// The server's data settles before it renders the island.
+			render();
+			await settle();
+			const host = document.createElement('div');
+			host.innerHTML = render();
+			document.body.append(host);
+			const first = host.querySelector<HTMLButtonElement>('[data-first]')!;
+			const second = host.querySelector<HTMLButtonElement>('[data-second]')!;
+			expect(host.querySelector('p')!.textContent).toBe('server');
+			const errors: unknown[] = [];
+			let loaded = 0;
+			const cleanup = bootstrapIndependentHydration(host, {
+				buildId: 'pending-island-build',
+				signalOwner: scope,
+				loadStyles() {},
+				loadModule: async () => {
+					loaded++;
+					return entry;
+				},
+				onError: (error) => errors.push(error),
+			});
+			try {
+				first.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
+				await vi.waitFor(() => expect(loaded).toBe(1));
+				await settle();
+				// Activated, still waiting for the client's data.
+				second.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
+				await settle();
+				expect(events).toEqual([]);
+				if (disposed) {
+					cleanup();
+					resolveClient('client');
+					await settle();
+					await settle();
+					expect(events).toEqual([]);
+					expect(errors).toEqual([]);
+					return;
+				}
+				resolveClient('client');
+				await vi.waitFor(() => expect(host.querySelector('p')!.textContent).toBe('client'));
+				await vi.waitFor(() => expect(events).toEqual(['first', 'second']));
+				expect(host.querySelector('[data-first]')).toBe(first);
+				first.click();
+				expect(events).toEqual(['first', 'second', 'first']);
+				expect(errors).toEqual([]);
+			} finally {
+				cleanup();
+				scope.dispose();
+				host.remove();
+			}
+		},
+	);
 
 	it('escapes inert sidecar delimiters without losing capture data', () => {
 		const manifest = createIndependentHydrateManifest(

@@ -27,7 +27,7 @@ import {
 	type ListBoxRenderProps,
 } from './ListBox';
 import { parseColor } from '../upstream-exports/react-stately/Color';
-import React, {
+import {
 	createContext,
 	type ForwardedRef,
 	forwardRef,

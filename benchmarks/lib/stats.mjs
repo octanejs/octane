@@ -168,3 +168,45 @@ export function timingStatForJson(stat, options = {}) {
 	if (Number.isFinite(stat.opsPerSec)) out.opsPerSec = stat.opsPerSec;
 	return out;
 }
+
+// Paired A/B comparison. Sample i of `base` and sample i of `head` were taken
+// back to back in one browser, so drift on a shared runner moves both sides of a
+// pair together and cancels in their ratio. Returns the median head/base ratio
+// with a percentile-bootstrap 95% confidence interval over the pairs. The
+// bootstrap makes no normality assumption, and its fixed seed makes one set of
+// samples always produce the same interval.
+export function pairedRatio(base, head, { resamples = 2000, seed = 0x9e3779b9 } = {}) {
+	const before = finiteNumbers(base);
+	const after = finiteNumbers(head);
+	if (before.length !== after.length || before.length < 2) {
+		throw new Error(`paired comparison needs equal sample counts of at least 2`);
+	}
+	// performance.now() can read 0 for a sub-tick sample; keep every log finite.
+	const floor = (value) => Math.max(value, 1e-3);
+	const logs = before.map((value, i) => Math.log(floor(after[i]) / floor(value)));
+	const median = (values) => {
+		const sorted = Float64Array.from(values).sort();
+		const middle = sorted.length >> 1;
+		return sorted.length % 2 ? sorted[middle] : (sorted[middle - 1] + sorted[middle]) / 2;
+	};
+	let state = seed >>> 0;
+	const random = () => {
+		state = (state + 0x6d2b79f5) | 0;
+		let value = Math.imul(state ^ (state >>> 15), 1 | state);
+		value = (value + Math.imul(value ^ (value >>> 7), 61 | value)) ^ value;
+		return ((value ^ (value >>> 14)) >>> 0) / 4294967296;
+	};
+	const medians = new Float64Array(resamples);
+	const draw = new Float64Array(logs.length);
+	for (let r = 0; r < resamples; r++) {
+		for (let i = 0; i < logs.length; i++) draw[i] = logs[Math.floor(random() * logs.length)];
+		medians[r] = median(draw);
+	}
+	medians.sort();
+	return {
+		ratio: Math.exp(median(logs)),
+		low: Math.exp(medians[Math.floor(resamples * 0.025)]),
+		high: Math.exp(medians[Math.ceil(resamples * 0.975) - 1]),
+		pairs: logs.length,
+	};
+}

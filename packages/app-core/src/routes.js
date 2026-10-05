@@ -82,6 +82,9 @@ export class RenderRoute {
 	/** @type {number | undefined} */
 	status;
 
+	/** @type {'full' | 'islands'} */
+	hydrate;
+
 	/**
 	 * @param {RenderRouteOptions} options
 	 */
@@ -95,6 +98,7 @@ export class RenderRoute {
 		this.layout = options.layout;
 		this.before = options.before ?? [];
 		this.status = options.status;
+		this.hydrate = options.hydrate ?? 'full';
 	}
 }
 

@@ -208,7 +208,11 @@ export function createThreePortalTarget(
 export interface ThreeHostEnvironment {
 	/** Called once after an accepted host batch, without requiring WebGL. */
 	invalidate?(): void;
-	/** Set false to omit accepted batches from the public diagnostic history. */
+	/**
+	 * Set false to omit accepted batches from the public diagnostic history.
+	 * Roots created by `createRoot` (and therefore `Canvas` and the testing
+	 * harness) set it false so a long-lived scene does not retain every batch.
+	 */
 	recordCommits?: boolean;
 	/** Root state associated with a configured managed scene. */
 	readonly store?: RootStore;
@@ -534,48 +538,74 @@ function prepareDirectLeafMountBatch(
 	};
 }
 
+/**
+ * Per-command checks for the update-only fast path. Each update runs the
+ * enclosing loop once, so keeping its body in a function called per command
+ * lets the engine optimize it as the hot code it is.
+ */
+function isDirectMeshUpdate(
+	command: UniversalHostCommand,
+	instance: ThreeHostInstance,
+	scene: THREE.Scene,
+	index: number,
+): boolean {
+	if (command.op !== 'update' || command.id !== instance.id) return false;
+	const object = instance.object;
+	const props = command.props;
+	if (
+		object.parent !== scene ||
+		scene.children[index] !== object ||
+		object.visible !== true ||
+		object.position.fromArray !== THREE_VECTOR3_FROM_ARRAY ||
+		!isDirectMeshProps(props)
+	) {
+		return false;
+	}
+	if ((instance.props as DirectMeshProps).name === props.name) return true;
+	const nameDescriptor = Object.getOwnPropertyDescriptor(object, 'name');
+	return (
+		nameDescriptor !== undefined && 'value' in nameDescriptor && nameDescriptor.writable === true
+	);
+}
+
+function applyDirectMeshUpdate(instance: ThreeHostInstance, next: DirectMeshProps): void {
+	const previous = instance.props as DirectMeshProps;
+	instance.props = next;
+	if (previous.name !== next.name) instance.object.name = next.name;
+	const previousPosition = previous.position;
+	const nextPosition = next.position;
+	if (
+		previousPosition[0] !== nextPosition[0] ||
+		previousPosition[1] !== nextPosition[1] ||
+		previousPosition[2] !== nextPosition[2]
+	) {
+		instance.object.position.fromArray(nextPosition);
+	}
+}
+
 function prepareUpdateOnlyBatch(
 	container: ThreeHostContainer,
 	batch: UniversalHostBatch,
 ): UniversalPreparedHostBatch | null {
-	if (batch.commands.length === 0) return null;
+	const commands = batch.commands;
+	const count = commands.length;
+	if (count === 0) return null;
 
 	const state = container[THREE_DRIVER_STATE];
 	const instances = state.directInstances;
+	const scene = container.scene;
 	if (
 		instances === null ||
-		batch.commands.length !== state.rootChildren.length ||
-		batch.commands.length !== instances.length ||
-		state.rootChildren.length !== state.instances.size ||
-		container.scene.children.length !== state.rootChildren.length ||
-		container.scene.parent !== null
+		count !== state.rootChildren.length ||
+		count !== instances.length ||
+		count !== state.instances.size ||
+		scene.children.length !== count ||
+		scene.parent !== null
 	) {
 		return null;
 	}
-	for (let index = 0; index < batch.commands.length; index++) {
-		const command = batch.commands[index];
-		if (command.op !== 'update') return null;
-		const instance = instances[index];
-		if (command.id !== instance.id) return null;
-		if (
-			instance.object.parent !== container.scene ||
-			container.scene.children[index] !== instance.object ||
-			instance.object.visible !== true ||
-			instance.object.position.fromArray !== THREE_VECTOR3_FROM_ARRAY
-		) {
-			return null;
-		}
-		if (!isDirectMeshProps(command.props)) return null;
-		if ((instance.props as DirectMeshProps).name !== command.props.name) {
-			const nameDescriptor = Object.getOwnPropertyDescriptor(instance.object, 'name');
-			if (
-				nameDescriptor === undefined ||
-				!('value' in nameDescriptor) ||
-				nameDescriptor.writable !== true
-			) {
-				return null;
-			}
-		}
+	for (let index = 0; index < count; index++) {
+		if (!isDirectMeshUpdate(commands[index], instances[index], scene, index)) return null;
 	}
 
 	let status: 'prepared' | 'applied' | 'aborted' = 'prepared';
@@ -585,24 +615,13 @@ function prepareUpdateOnlyBatch(
 			status = 'applied';
 			let failed = false;
 			let firstError: unknown;
-			for (let index = 0; index < instances.length; index++) {
+			for (let index = 0; index < count; index++) {
 				try {
-					const instance = instances[index];
-					const previous = instance.props as DirectMeshProps;
-					const next = (
-						batch.commands[index] as Extract<UniversalHostCommand, { readonly op: 'update' }>
-					).props as DirectMeshProps;
-					instance.props = next;
-					if (previous.name !== next.name) instance.object.name = next.name;
-					const previousPosition = previous.position;
-					const nextPosition = next.position;
-					if (
-						previousPosition[0] !== nextPosition[0] ||
-						previousPosition[1] !== nextPosition[1] ||
-						previousPosition[2] !== nextPosition[2]
-					) {
-						instance.object.position.fromArray(nextPosition);
-					}
+					applyDirectMeshUpdate(
+						instances[index],
+						(commands[index] as Extract<UniversalHostCommand, { readonly op: 'update' }>)
+							.props as DirectMeshProps,
+					);
 				} catch (error) {
 					if (!failed) {
 						failed = true;

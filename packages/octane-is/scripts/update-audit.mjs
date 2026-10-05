@@ -131,7 +131,7 @@ await write(`${base}/audit/react-parity.json`, {
 			node: '>=22',
 			platform: 'any',
 			arch: 'any',
-			packageManager: 'pnpm@12.8.2',
+			packageManager: 'pnpm@12.9.1',
 			lockfile: 'pnpm-lock.yaml',
 			lockfileSha256: digest('pnpm-lock.yaml'),
 		},

@@ -4,7 +4,7 @@
 compiler rejects it:
 
 ```text
-src/App.tsrx:4:16: [OCTANE_STRONG_RENDER_AMBIENT_READ] Strong mode does not allow reading browser globals during render. Use useSyncExternalStore with a server snapshot for live browser state, or read it in an effect or a lazy state initializer. Lazy initializers still need to handle server rendering.
+src/App.tsrx:4:16: [OCTANE_STRONG_RENDER_AMBIENT_READ] Strong mode does not allow reading browser globals during render. Use useSyncExternalStore with a server snapshot for live browser state, or read it in an effect or a lazy state initializer. Lazy initializers still need to handle server rendering. See https://octanejs.dev/docs/strong-mode#octane-strong-render-ambient-read
 ```
 
 Fix the component so it compiles in Strong mode and meets these requirements:

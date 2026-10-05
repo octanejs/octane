@@ -63,7 +63,7 @@ export const TEXT_SEPARATOR = `<!--${HYDRATION_TEXT_SEP}-->`;
  */
 export { SUSPENSE_SCRIPT_ATTR } from './stream-protocol.js';
 // A resolved server arm can hydrate independently if client data suspends.
-export const SUSPENSE_RESOLVED_COMMENT = 'oct-suspense:';
+export { SUSPENSE_RESOLVED_COMMENT } from './hydration-markers.js';
 export const SUSPENSE_RESOLVED_SEED_ATTR = 'data-octane-suspense-seeds';
 export const SUSPENSE_RESOLVED_NATIVE_ATTR = 'data-octane-suspense-signals';
 
@@ -152,7 +152,7 @@ export { STREAM_SCRIPT_ATTR } from './stream-protocol.js';
  *  inline `$OCTRH` call hoists its tags into document.head. */
 export const STREAM_RESOURCE_ATTR = 'data-oct-fr';
 /** Comment-data prefix left in a swapped boundary for hydration seed scoping. */
-export const STREAM_SEED_COMMENT = 'oct-seed:';
+export { STREAM_SEED_COMMENT } from './hydration-markers.js';
 
 // ---------------------------------------------------------------------------
 // Attribute value-type tables — React parity where the FUNCTIONAL outcome

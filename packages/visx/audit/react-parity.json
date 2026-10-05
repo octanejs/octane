@@ -39,9 +39,9 @@
       "node": ">=22",
       "platform": "any",
       "arch": "any",
-      "packageManager": "pnpm@12.8.2",
+      "packageManager": "pnpm@12.9.1",
       "lockfile": "pnpm-lock.yaml",
-      "lockfileSha256": "ad10048b8f6cc4d92333219ecd2b9dd8ed45c19bafb49dca9c7191e0b06bad84"
+      "lockfileSha256": "600939b38442c7a37f54d4a2886e804fceb57654cd39a2f673c890b54aef3273"
     }
   },
   "lanes": [

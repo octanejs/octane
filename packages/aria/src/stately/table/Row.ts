@@ -10,7 +10,7 @@ import type { CellElement, CellRenderer } from './Cell';
 import type { CollectionBuilderContext } from './useTableState';
 import type { PartialNode } from '../collections/types';
 
-export type RowElement<T> = any;
+export type RowElement<_T> = any;
 export interface RowProps<T> extends LinkDOMProps {
 	/**
 	 * A list of child item objects used when dynamically rendering row children. Requires the feature
@@ -30,7 +30,7 @@ export interface RowProps<T> extends LinkDOMProps {
 	textValue?: string; // ???
 }
 
-function Row<T>(props: RowProps<T>): any {
+function Row<T>(_props: RowProps<T>): any {
 	return null;
 }
 

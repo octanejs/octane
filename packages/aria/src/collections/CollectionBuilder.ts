@@ -215,7 +215,7 @@ function useSSRCollectionNode<T extends Element>(
 	return createElement(NodeClass.type, { ref: itemRef, children });
 }
 
-export function createLeafComponent<T, P extends object, E extends Element>(
+export function createLeafComponent<T, P extends object, _E extends Element>(
 	CollectionNodeClass: CollectionNodeClass<any> | string,
 	render: (props: P, ref: any, node?: Node<T>) => any,
 ): (props: P & { ref?: any }) => any {
@@ -250,7 +250,7 @@ export function createLeafComponent<T, P extends object, E extends Element>(
 	return Result;
 }
 
-export function createBranchComponent<T, P extends { children?: any }, E extends Element>(
+export function createBranchComponent<T, P extends { children?: any }, _E extends Element>(
 	CollectionNodeClass: CollectionNodeClass<any> | string,
 	render: (props: P, ref: any, node: Node<T>) => any,
 	useChildren: (props: P, slot?: symbol) => any = useCollectionChildren,

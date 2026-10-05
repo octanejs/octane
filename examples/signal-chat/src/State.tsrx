@@ -38,6 +38,8 @@ export const tools$ = query$<LabConfig, ToolFrame>(
 
 export const draft$ = signal$('');
 export const draftLength$ = derived$(() => String(draft$.get().length));
+// The composer's activation effect flips this; the server renders it false.
+export const composerReady$ = signal$(false);
 export const answerActivity$ = derived$(() => {
 	const snapshot = answer$.snapshot();
 	return `${snapshot.status} · ${snapshot.connection}${snapshot.refreshing ? ' · refreshing' : ''}${

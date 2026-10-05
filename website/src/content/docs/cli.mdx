@@ -103,9 +103,11 @@ octane doctor --only deps.octane-duplicates --only ts.jsx-import-source
 <h2 id="analyze">octane analyze</h2>
 
 Where `doctor` checks how the project is wired, `analyze` checks the code. It
-compiles every `.tsrx` through the project's own `octane` and reports what the
-compiler found, so the output is exactly what a build would warn about, and new
-compiler diagnostics appear here without a CLI change.
+compiles every `.tsrx`, and every `.tsx` whose JSX goes to Octane, through the
+project's own `octane` and reports what the compiler found, so the output is
+exactly what a build would warn about, and new compiler diagnostics appear here
+without a CLI change. Every Strong violation in a file is reported, not only the
+first one a build stops at.
 
 ```bash
 octane analyze
@@ -121,6 +123,13 @@ as well as errors, and a file that will not parse is reported as an error
 without stopping the rest of the run. Modules that `compiler.strong` in
 `octane.config.ts` reaches are analyzed in Strong mode, as the build compiles
 them.
+
+`--strong-preview` compiles every module as if Strong mode were on and ends with
+a count of what it would reject, by code. Findings in modules that are not Strong
+yet do not fail the run. `--fix` applies the compiler's suggested edits, such as
+React's lazy ref initialization to `useLazyRef` and `useMemo(() => value, deps)`
+to `value`, then reports what remains; add `--dry-run` to see the fixes without
+writing them. See [Adopt it in an existing app](/docs/strong-mode#adopt-strong-mode).
 
 `--strong-baseline init` records every module that compiles without Strong mode
 in `octane-strong-baseline.json`. While that file exists, every run fails on a
@@ -215,6 +224,14 @@ you get the full development text back:
 
 ```bash
 octane explain 'Minified Octane error #3; visit https://octanejs.dev/errors/3?args[]=%7Bfoo%3A%201%7D'
+```
+
+Given a Strong diagnostic code, a pasted compile error, or its docs link, it
+prints what the code detects, its replacement, and the matching migration
+recipes:
+
+```bash
+octane explain OCTANE_STRONG_RENDER_REF_READ
 ```
 
 <h2 id="mcp">octane mcp</h2>

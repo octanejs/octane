@@ -4,30 +4,24 @@
 // and host driver with the real Octane compiler, then drives them through a
 // identical cheap fake Element PAPI. ReactLynx runs its published production
 // Snapshot compiler, runtime, background render, and real main-thread patch.
-// This makes no native paint, layout, adoption, or device claim.
+// Octane's one-shot first-screen phases run its separately compiled main-thread
+// layer. This makes no native paint, layout, or device claim.
 process.env.NODE_ENV = 'production';
 
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
-import { build } from 'vite';
 
-import { octane } from '../../packages/octane/src/compiler/vite.js';
-import { lynxRenderers } from '../../packages/lynx/src/config.runtime.js';
+import { buildLynxRenderWorkload, measureLynxRenderFixtureBytes } from './build.mjs';
 import { createReactWorkload } from './react-workload.mjs';
 
-const ROOT = import.meta.dirname;
-const REPO = path.resolve(ROOT, '../..');
 const rawIterations = process.argv[2] ?? '5';
 const iterations = Number(rawIterations);
 
 if (!Number.isSafeInteger(iterations) || iterations <= 0) {
 	throw new TypeError(`iterations must be a positive safe integer, received ${rawIterations}.`);
 }
-
-const LYNX_SOURCE = path.join(REPO, 'packages/lynx/src');
-const OCTANE_SOURCE = path.join(REPO, 'packages/octane/src');
 
 function timingStat(samples) {
 	const sorted = [...samples].sort((first, second) => first - second);
@@ -48,66 +42,55 @@ function timingStat(samples) {
 	};
 }
 
+// A deterministic work counter. It deliberately carries no `score`, which marks
+// a timing stat for the pull request report, so the report lists it exactly.
+function countStat(value) {
+	return { median: value, min: value, samples: 1 };
+}
+
 const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'octane-lynx-render-'));
 let payload;
 let reactWorkload;
 
 try {
-	await build({
-		configFile: false,
-		root: REPO,
-		logLevel: 'silent',
-		resolve: {
-			alias: [
-				{ find: /^@octanejs\/lynx$/, replacement: path.join(LYNX_SOURCE, 'index.ts') },
-				{
-					find: /^@octanejs\/lynx\/intrinsics\/jsx-runtime$/,
-					replacement: path.join(LYNX_SOURCE, 'intrinsics.ts'),
-				},
-				{ find: /^@octanejs\/lynx\/(.*)$/, replacement: `${LYNX_SOURCE}/$1.ts` },
-				{
-					find: /^octane\/universal\/native$/,
-					replacement: path.join(OCTANE_SOURCE, 'universal-native.ts'),
-				},
-				{ find: /^octane\/universal$/, replacement: path.join(OCTANE_SOURCE, 'universal.ts') },
-				{ find: /^octane$/, replacement: path.join(OCTANE_SOURCE, 'index.ts') },
-			],
-		},
-		plugins: [octane({ renderers: lynxRenderers, ssr: false })],
-		define: { 'process.env.NODE_ENV': '"production"' },
-		build: {
-			write: true,
-			minify: 'esbuild',
-			target: 'node22',
-			lib: {
-				entry: path.join(ROOT, 'workload.ts'),
-				formats: ['es'],
-				fileName: 'workload',
-			},
-			outDir: tempDir,
-			emptyOutDir: false,
-			rollupOptions: { external: [] },
-		},
-	});
-
-	const workload = await import(pathToFileURL(path.join(tempDir, 'workload.js')).href);
+	const bundles = await buildLynxRenderWorkload(tempDir);
+	const workload = await import(pathToFileURL(bundles.background).href);
 	reactWorkload = await createReactWorkload(workload, tempDir);
+
+	// A Lynx page evaluates each thread's bundle once and creates one root, and
+	// the first screen's adoption handshake is defined for that first root. The
+	// one-shot variants therefore get fresh module instances for every sample:
+	// they measure a cold page load, including first execution of the code
+	// they reach, and are not comparable with the warm `octane-lynx` mounts.
+	// They run only after every warm sample: each retains its module instances
+	// and allocates the large adoption messages, which would otherwise land
+	// garbage collection inside the warm ratio-guarded timings.
+	let instance = 0;
+	const freshLayers = async () => {
+		instance++;
+		const [background, main] = await Promise.all([
+			import(`${pathToFileURL(bundles.background).href}?instance=${instance}`),
+			import(`${pathToFileURL(bundles.main).href}?instance=${instance}`),
+		]);
+		return { background, main };
+	};
 
 	const failures = [];
 	const targets = new Map();
-	const record = (name, op, value) => {
+	const targetOf = (name) => {
 		let target = targets.get(name);
 		if (target === undefined) targets.set(name, (target = { ops: new Map(), meta: {} }));
+		return target;
+	};
+	const record = (name, op, value) => {
+		const target = targetOf(name);
 		let samples = target.ops.get(op);
 		if (samples === undefined) target.ops.set(op, (samples = []));
 		samples.push(value);
 		return target;
 	};
+	const recordCounter = (name, op, value) => targetOf(name).ops.set(op, value);
 
-	const frameworks = [
-		{ name: 'octane-lynx', workload },
-		{ name: 'react-lynx', workload: reactWorkload },
-	];
 	const cases = [
 		{ op: 'empty_startup_ms', rows: null, createdElements: 2, eventTokens: 0 },
 		{ op: 'create_1k_rows_ms', rows: 1_000, createdElements: 9_008, eventTokens: 2_000 },
@@ -115,9 +98,166 @@ try {
 		{ op: 'update_1k_rows_ms', rows: 1_000, createdElements: 9_008, eventTokens: 2_000 },
 		{ op: 'update_10k_rows_ms', rows: 10_000, createdElements: 90_008, eventTokens: 20_000 },
 	];
+	const createCases = cases.filter((scenario) => scenario.op.startsWith('create_'));
+
+	// Every Octane mount of the keyed rows ships one compiled program run.
+	function expectProgramRun(name, scenario, result) {
+		const transport = result.transport;
+		if (transport?.templateCommands < scenario.rows) {
+			failures.push(
+				`${name} ${scenario.op}: mounted ${transport.templateCommands} compiled templates, expected at least ${scenario.rows}.`,
+			);
+		}
+		if (transport?.templateNodes < scenario.rows * 9) {
+			failures.push(
+				`${name} ${scenario.op}: compiled templates created ${transport.templateNodes} hosts, expected at least ${scenario.rows * 9}.`,
+			);
+		}
+		if (
+			transport?.programCommands !== scenario.rows ||
+			transport?.programRuns !== 1 ||
+			transport?.sharedPrograms !== 1
+		) {
+			failures.push(
+				`${name} ${scenario.op}: mounted ${transport?.programCommands ?? 0} rows in ${transport?.programRuns ?? 0} runs from ${transport?.sharedPrograms ?? 0} shared definitions, expected ${scenario.rows} rows, one run, and one definition.`,
+			);
+		}
+		if (transport?.commands > 24) {
+			failures.push(
+				`${name} ${scenario.op}: emitted ${transport.commands} wire commands for one program run of ${scenario.rows} rows.`,
+			);
+		}
+		if (transport?.compactAcknowledgements !== 1) {
+			failures.push(
+				`${name} ${scenario.op}: received ${transport?.compactAcknowledgements ?? 0} compact acknowledgements, expected one.`,
+			);
+		}
+		if (result.privateSelectors > 8) {
+			failures.push(
+				`${name} ${scenario.op}: eagerly installed ${result.privateSelectors} renderer-private selectors on a ref-free tree.`,
+			);
+		}
+	}
+
+	// The main thread paints every host itself and sends nothing to the
+	// background until the background asks.
+	function expectFirstScreen(name, scenario, result) {
+		if (result.renders.main !== 1 || result.renders.background !== 0) {
+			failures.push(
+				`${name} ${scenario.op}: rendered the app ${result.renders.main} time(s) on main and ${result.renders.background} on background, expected once on main only.`,
+			);
+		}
+		if (result.wire.framesToMain !== 0) {
+			failures.push(
+				`${name} ${scenario.op}: the background sent ${result.wire.framesToMain} frame(s) during the main-thread first screen.`,
+			);
+		}
+	}
+
+	// Adoption keeps every first-screen host and routes its events to the
+	// background. A mismatch silently re-creates the tree, so it is a failure.
+	function expectAdoption(name, scenario, result) {
+		if (result.hostsCreatedDuringAdoption !== 0) {
+			failures.push(
+				`${name} ${scenario.op}: created ${result.hostsCreatedDuringAdoption} hosts while adopting a complete first screen, expected none.`,
+			);
+		}
+		if (!result.retainedIdentity) {
+			failures.push(`${name} ${scenario.op}: adoption replaced first-screen host identities.`);
+		}
+		if (result.firstScreenChecksum !== result.reachableChecksum) {
+			failures.push(`${name} ${scenario.op}: adoption changed the visible first-screen tree.`);
+		}
+		if (!result.adoptedTapHandled) {
+			failures.push(
+				`${name} ${scenario.op}: a native tap on the adopted tree did not reach its background handler.`,
+			);
+		}
+		if (result.renders.background !== 1 || result.renders.main !== 0) {
+			failures.push(
+				`${name} ${scenario.op}: rendered the app ${result.renders.background} time(s) on background and ${result.renders.main} on main while adopting, expected once on background only.`,
+			);
+		}
+	}
+
+	// Each variant names its renderer path, the scenarios it runs, and the
+	// structural expectations a sample must meet before its time counts.
+	const runOctane = (background, scenario, options) => {
+		if (scenario.rows === null) return background.runEmptyStartup(options);
+		return scenario.op.startsWith('update_')
+			? background.runUpdateRows(scenario.rows, options)
+			: background.runCreateRows(scenario.rows, options);
+	};
+	// Counters must not depend on what ran before: the warm bundle's listener
+	// identities, and so its wire bytes, grow with every root it has created.
+	// Each Octane variant therefore counts its work once on a fresh page.
+	const variants = [
+		{
+			name: 'octane-lynx',
+			phase: 'warm',
+			cases,
+			run: (scenario, options) => runOctane(workload, scenario, options),
+			async count(scenario) {
+				const { background } = await freshLayers();
+				return runOctane(background, scenario, { countCalls: true });
+			},
+			expect(name, scenario, result) {
+				if (scenario.rows !== null) expectProgramRun(name, scenario, result);
+			},
+		},
+		{
+			name: 'react-lynx',
+			phase: 'warm',
+			cases,
+			run(scenario) {
+				if (scenario.rows === null) return reactWorkload.runEmptyStartup();
+				return scenario.op.startsWith('update_')
+					? reactWorkload.runUpdateRows(scenario.rows)
+					: reactWorkload.runCreateRows(scenario.rows);
+			},
+		},
+		{
+			// The background-only mount on a cold page: the reference for the
+			// first screen and adoption, which a page load pays instead.
+			name: 'octane-lynx-cold',
+			phase: 'cold',
+			cases: createCases,
+			async run(scenario, options) {
+				const { background } = await freshLayers();
+				return background.runCreateRows(scenario.rows, options);
+			},
+			count: (scenario) => coldVariant('octane-lynx-cold').run(scenario, { countCalls: true }),
+			expect: expectProgramRun,
+		},
+		{
+			name: 'octane-lynx-first-screen',
+			phase: 'cold',
+			cases: createCases,
+			async run(scenario, options) {
+				const { background, main } = await freshLayers();
+				return background.runFirstScreen(scenario.rows, main, options);
+			},
+			count: (scenario) =>
+				coldVariant('octane-lynx-first-screen').run(scenario, { countCalls: true }),
+			expect: expectFirstScreen,
+		},
+		{
+			name: 'octane-lynx-adopt',
+			phase: 'cold',
+			cases: createCases,
+			async run(scenario, options) {
+				const { background, main } = await freshLayers();
+				return background.runAdoption(scenario.rows, main, options);
+			},
+			count: (scenario) => coldVariant('octane-lynx-adopt').run(scenario, { countCalls: true }),
+			expect: expectAdoption,
+		},
+	];
+	const coldVariant = (name) => variants.find((variant) => variant.name === name);
 	const referenceChecksums = new Map();
 
-	function validate(name, scenario, result) {
+	function validate(variant, scenario, result) {
+		const name = variant.name;
 		if (result.diagnostics.length !== 0) {
 			failures.push(`${name} ${scenario.op}: ${result.diagnostics.join(' | ')}`);
 		}
@@ -131,43 +271,7 @@ try {
 				`${name} ${scenario.op}: installed ${result.eventTokens} events, expected ${scenario.eventTokens}.`,
 			);
 		}
-		if (name === 'octane-lynx' && scenario.rows !== null) {
-			const transport = result.transport;
-			if (transport?.templateCommands < scenario.rows) {
-				failures.push(
-					`${name} ${scenario.op}: mounted ${transport.templateCommands} compiled templates, expected at least ${scenario.rows}.`,
-				);
-			}
-			if (transport?.templateNodes < scenario.rows * 9) {
-				failures.push(
-					`${name} ${scenario.op}: compiled templates created ${transport.templateNodes} hosts, expected at least ${scenario.rows * 9}.`,
-				);
-			}
-			if (
-				transport?.programCommands !== scenario.rows ||
-				transport?.programRuns !== 1 ||
-				transport?.sharedPrograms !== 1
-			) {
-				failures.push(
-					`${name} ${scenario.op}: mounted ${transport?.programCommands ?? 0} rows in ${transport?.programRuns ?? 0} runs from ${transport?.sharedPrograms ?? 0} shared definitions, expected ${scenario.rows} rows, one run, and one definition.`,
-				);
-			}
-			if (transport?.commands > 24) {
-				failures.push(
-					`${name} ${scenario.op}: emitted ${transport.commands} wire commands for one program run of ${scenario.rows} rows.`,
-				);
-			}
-			if (transport?.compactAcknowledgements !== 1) {
-				failures.push(
-					`${name} ${scenario.op}: received ${transport?.compactAcknowledgements ?? 0} compact acknowledgements, expected one.`,
-				);
-			}
-			if (result.privateSelectors > 8) {
-				failures.push(
-					`${name} ${scenario.op}: eagerly installed ${result.privateSelectors} renderer-private selectors on a ref-free tree.`,
-				);
-			}
-		}
+		variant.expect?.(name, scenario, result);
 		const reference = referenceChecksums.get(scenario.op);
 		if (reference === undefined) referenceChecksums.set(scenario.op, result.reachableChecksum);
 		else if (reference !== result.reachableChecksum) {
@@ -177,6 +281,63 @@ try {
 		}
 	}
 
+	// Work counters for one untimed run: wire traffic, component executions, and
+	// Element PAPI calls inside the interval the timer would cover.
+	function recordCounters(variant, scenario, result) {
+		const prefix = scenario.op.replace(/_ms$/, '');
+		recordCounter(
+			variant.name,
+			`${prefix}_frames`,
+			result.wire.framesToMain + result.wire.framesToBackground,
+		);
+		recordCounter(variant.name, `${prefix}_bytes_to_main`, result.wire.bytesToMain);
+		recordCounter(variant.name, `${prefix}_bytes_to_background`, result.wire.bytesToBackground);
+		recordCounter(
+			variant.name,
+			`${prefix}_component_renders`,
+			result.renders.background + result.renders.main,
+		);
+		let papiCalls = 0;
+		for (const calls of Object.values(result.papiCalls)) papiCalls += calls;
+		recordCounter(variant.name, `${prefix}_papi_calls`, papiCalls);
+		const meta = targetOf(variant.name).meta;
+		(meta.papiCalls ??= {})[scenario.op] = result.papiCalls;
+	}
+
+	// Warm every variant of a phase once per scenario and reject
+	// allocation-only/no-op runs before recording any of its timing samples.
+	async function samplePhase(phase) {
+		const members = variants.filter((variant) => variant.phase === phase);
+		for (const scenario of cases) {
+			for (const variant of members) {
+				if (!variant.cases.includes(scenario)) continue;
+				validate(variant, scenario, await variant.run(scenario, {}));
+			}
+		}
+		for (let iteration = 0; iteration < iterations; iteration++) {
+			for (const scenario of cases) {
+				// Alternating variant order limits steady-state/JIT and GC bias.
+				const ordered = iteration % 2 === 0 ? members : [...members].reverse();
+				for (const variant of ordered) {
+					if (!variant.cases.includes(scenario)) continue;
+					const result = await variant.run(scenario, {});
+					validate(variant, scenario, result);
+					const target = record(variant.name, scenario.op, result.durationMs);
+					target.meta[scenario.op] = {
+						createdElements: result.createdElements,
+						eventTokens: result.eventTokens,
+						privateSelectors: result.privateSelectors,
+						checksum: result.checksum,
+						reachableChecksum: result.reachableChecksum,
+						...(result.transport === undefined ? null : { transport: result.transport }),
+					};
+				}
+			}
+		}
+	}
+
+	await samplePhase('warm');
+	const reentrantCommitCases = [10_000, 20_000];
 	function validateReentrantCommits(count, result) {
 		const target = `octane-lynx-reentrant-${count / 1_000}k`;
 		if (result.diagnostics.length !== 0) {
@@ -193,43 +354,6 @@ try {
 			);
 		}
 	}
-
-	function run(framework, scenario) {
-		if (scenario.rows === null) return framework.workload.runEmptyStartup();
-		return scenario.op.startsWith('update_')
-			? framework.workload.runUpdateRows(scenario.rows)
-			: framework.workload.runCreateRows(scenario.rows);
-	}
-
-	// Warm both production-compiled frameworks once per scenario and reject
-	// allocation-only/no-op runs before recording any timing sample.
-	for (const scenario of cases) {
-		for (const framework of frameworks) {
-			validate(framework.name, scenario, await run(framework, scenario));
-		}
-	}
-
-	for (let iteration = 0; iteration < iterations; iteration++) {
-		for (const scenario of cases) {
-			// Alternating framework order limits steady-state/JIT and GC bias.
-			const ordered = iteration % 2 === 0 ? frameworks : [...frameworks].reverse();
-			for (const framework of ordered) {
-				const result = await run(framework, scenario);
-				validate(framework.name, scenario, result);
-				const target = record(framework.name, scenario.op, result.durationMs);
-				target.meta[scenario.op] = {
-					createdElements: result.createdElements,
-					eventTokens: result.eventTokens,
-					privateSelectors: result.privateSelectors,
-					checksum: result.checksum,
-					reachableChecksum: result.reachableChecksum,
-					...(result.transport === undefined ? null : { transport: result.transport }),
-				};
-			}
-		}
-	}
-
-	const reentrantCommitCases = [10_000, 20_000];
 	for (const count of reentrantCommitCases) {
 		validateReentrantCommits(count, workload.runReentrantCommits(count));
 	}
@@ -253,6 +377,10 @@ try {
 		}
 	}
 
+	const frameworks = [
+		{ name: 'octane-lynx', workload },
+		{ name: 'react-lynx', workload: reactWorkload },
+	];
 	let referenceClick;
 	for (const framework of frameworks) {
 		const click = await framework.workload.runClick(100);
@@ -290,12 +418,45 @@ try {
 	targets.get('react-lynx').meta.version = reactWorkload.version;
 	targets.get('react-lynx').meta.backend = 'production-compiled-snapshot';
 
+	await samplePhase('cold');
+
+	// Count work once per Octane variant and scenario. Counting wraps every
+	// Element PAPI global, so it never shares a run with a timing sample.
+	for (const scenario of cases) {
+		for (const variant of variants) {
+			if (!variant.cases.includes(scenario) || variant.count === undefined) continue;
+			const result = await variant.count(scenario);
+			validate(variant, scenario, result);
+			recordCounters(variant, scenario, result);
+		}
+	}
+
+	// Minified bytes of the fixture graph per thread, deterministic for a commit.
+	const bytesTarget = targetOf('octane-lynx-bytes');
+	for (const [thread, sizes] of Object.entries(await measureLynxRenderFixtureBytes(tempDir))) {
+		const prefix = thread === 'main-thread' ? 'main' : thread;
+		for (const [metric, value] of Object.entries(sizes)) {
+			bytesTarget.ops.set(`${prefix}_${metric}`, value);
+		}
+	}
+
 	payload = {
 		suite: 'lynx-render',
 		iterations,
+		environment: {
+			node: process.version,
+			platform: `${process.platform}-${process.arch}`,
+			cpu: os.cpus()[0]?.model ?? 'unknown',
+			reactLynx: reactWorkload.version,
+		},
 		targets: [...targets].map(([name, target]) => ({
 			name,
-			ops: Object.fromEntries([...target.ops].map(([op, samples]) => [op, timingStat(samples)])),
+			ops: Object.fromEntries(
+				[...target.ops].map(([op, value]) => [
+					op,
+					Array.isArray(value) ? timingStat(value) : countStat(value),
+				]),
+			),
 			meta: target.meta,
 		})),
 		...(failures.length === 0 ? null : { failed: failures.join(' | ') }),
@@ -304,8 +465,10 @@ try {
 	for (const target of payload.targets) {
 		for (const [op, stat] of Object.entries(target.ops)) {
 			console.log(
-				`${target.name} ${op}: median ${stat.median.toFixed(1)}ms ` +
-					`(min ${stat.min.toFixed(1)}ms, rme ${stat.rme.toFixed(1)}%)`,
+				typeof stat.score === 'number'
+					? `${target.name} ${op}: median ${stat.median.toFixed(1)}ms ` +
+							`(min ${stat.min.toFixed(1)}ms, rme ${stat.rme.toFixed(1)}%)`
+					: `${target.name} ${op}: ${stat.median.toLocaleString('en-US')}`,
 			);
 		}
 		if (target.name === 'octane-lynx') {
@@ -343,7 +506,7 @@ try {
 } finally {
 	reactWorkload?.dispose();
 	if (!process.env.LYNX_BENCH_KEEP_BUNDLE) fs.rmSync(tempDir, { recursive: true, force: true });
-	else console.log(`bundle: ${path.join(tempDir, 'workload.js')}`);
+	else console.log(`bundles: ${tempDir}`);
 }
 
 if (process.env.BENCH_JSON) {

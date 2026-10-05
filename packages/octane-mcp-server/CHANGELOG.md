@@ -1,5 +1,24 @@
 # @octanejs/mcp-server
 
+## 0.3.0
+
+### Minor Changes
+
+- 6651f44: Add the `octane_strong_explain` tool and the `migrate-to-strong` skill. Given an `OCTANE_STRONG_*` code, in full or without its prefix and in any case, the tool returns what the diagnostic detects, its replacement, its docs URL, and before/after recipes for the React idiom it rejects. Given a recipe id such as `lazy-ref`, it returns that recipe, and with no arguments it returns the index of codes and recipes. An unknown code returns an error that lists the closest codes. The skill walks an agent through migrating a module or app to Strong mode, from `octane analyze --strong-preview` to the coverage baseline, and lists the changes that only hide a diagnostic. Bridge reports now name the Strong mode replacement for `useRef`, `useLayoutEffect`, `useMemo`, and `useCallback`. The new `@octanejs/mcp-server/strong` export serves the same explanations to other hosts.
+
+### Patch Changes
+
+- 6651f44: Strong mode now rejects a synchronous state update in a host element's callback ref with `OCTANE_STRONG_REF_STATE_UPDATE`. Octane calls a callback ref while the element commits, before paint, so the check follows the effect setup rules. It covers inline and local functions, a state setter passed as the ref, and functions in a `ref={[...]}` list. When the callback copies a DOM measurement into state, the error names `useLayoutSnapshot`. Updates the ref defers to `requestAnimationFrame`, a timer with a positive delay, or an observer or event listener stay legal, and a component's `ref` prop is not checked. `octane explain` and the MCP server's `octane_strong_explain` describe the new code and its migration recipe.
+
+## 0.2.35
+
+### Patch Changes
+
+- 1c44df5: Require Strong effect cleanup to actually cancel or ignore asynchronous state updates. `OCTANE_STRONG_EFFECT_DATA_FETCH` now covers any state update after an `await` or in a `.then`, `.catch`, or `.finally` callback of effect-owned work, not only `fetch`. The returned cleanup must abort an `AbortController` whose `signal` reaches the request, or assign a flag declared in the effect that guards the update after the last `await`. Empty, opaque, and unconnected cleanups, component- or module-scoped flags, and ref flags are errors. Compatibility modules and emitted code are unchanged.
+- f151614: Add `OCTANE_STRONG_EFFECT_HIDDEN_DEPENDENCY`. Strong effect setup may no longer call a state getter, read `current` from a value ref, or read a reassigned module `let` or `var`, because none of them is an inferred dependency. Refs attached with `ref=` or passed to a call, component, or hook remain readable, and reads in cleanup, deferred callbacks, and `useEffectEvent` callbacks remain valid. Compatibility modules and emitted code are unchanged.
+- f151614: Add `OCTANE_STRONG_EFFECT_RESOURCE_LEAK`. Platform resources acquired in Strong effect setup must be released by the returned cleanup: event listeners on browser targets, `matchMedia` lists, attached elements, and connections (by matching `removeEventListener` or an aborted signal), `on<event>` handler properties, intervals and self-rescheduling timers, `ResizeObserver`, `IntersectionObserver`, `MutationObserver`, and `PerformanceObserver`, `WebSocket`, `EventSource`, and `BroadcastChannel`, and geolocation watches. User objects' subscriptions stay legal. Compatibility modules and emitted code are unchanged.
+- 1c44df5: Close zero-delay and custom-hook bypasses of Strong's synchronous effect update check. `OCTANE_STRONG_EFFECT_STATE_UPDATE` now treats callbacks that run before the next paint as effect setup: `startTransition`, a `useTransition` start function, `queueMicrotask`, `.then`/`.catch`/`.finally` on `Promise.resolve(value)` or `Promise.reject()`, `setTimeout` without a positive delay, and code after an `await` that resumes without waiting on any path, such as `await null` or `await (flag ? load() : null)`. It also follows state tuples, updaters, callbacks, and `useTransition` tuples and start functions returned by same-module custom hooks, giving each hook call its own state, in `.tsrx`, `.tsx`, and plain TypeScript modules. `requestAnimationFrame`, timers with a positive delay, and external subscription callbacks remain event-driven. Compatibility modules and emitted code are unchanged.
+
 ## 0.2.34
 
 ### Patch Changes

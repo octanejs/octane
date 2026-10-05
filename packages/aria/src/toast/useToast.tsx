@@ -53,7 +53,7 @@ export function useToast<T>(
 	props: AriaToastProps<T>,
 	state: ToastState<T>,
 	// eslint-disable-next-line @typescript-eslint/no-unused-vars
-	ref: RefObject<FocusableElement | null>,
+	_ref: RefObject<FocusableElement | null>,
 ): ToastAria {
 	let { key, timer, timeout } = props.toast;
 

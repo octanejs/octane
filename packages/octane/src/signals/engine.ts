@@ -4,10 +4,8 @@ import { ScopeDisposedError, SignalFrameError, SignalSerializationError } from '
 import { scopeStreams, type ScopeStreams } from './scope-streams.js';
 import {
 	ScopedNode,
-	CandidateUnsupportedError,
 	assertAlive,
 	assertWritable,
-	declarationViewFork,
 	derivedState,
 	endSignalBatch,
 	inspectNativeNode,
@@ -77,9 +75,15 @@ export interface DerivedBindingLifecycle {
 	resume(): void;
 	dispose(): void;
 	forkCandidate?(target: ScopedNode, frame: SignalCandidateFrame): CandidateProducer | undefined;
-	declared(sequence: number): void;
+	declared(sequence: number, captures?: readonly unknown[], declaring?: number): void;
 	/** A later render's declaration of this cell, with a computation that may capture new values. */
-	redeclare(compute: DerivedCompute<any>, sequence: number): ScopedNode;
+	redeclare(
+		compute: DerivedCompute<any>,
+		sequence: number,
+		captures?: readonly unknown[],
+		declaring?: number,
+	): ScopedNode;
+	supersede(): void;
 }
 
 type DerivedBindingFactory<T> = new (
@@ -205,6 +209,15 @@ export class ScopeImpl implements Scope, GraphOwner {
 	streams: ScopeStreams | undefined = undefined;
 	derivedBindings: Map<ScopedNode, DerivedBindingLifecycle> | undefined = undefined;
 	frames: Set<AdoptionFrameImpl> | undefined = undefined;
+	/** Holds a writable or asynchronous derived cell that new render inputs cannot re-select. */
+	unkeyedState = false;
+
+	/** An attempt that never committed restarts with new inputs and keeps these cells. */
+	supersede(): void {
+		if (this.resources) for (const binding of this.resources.values()) binding.supersede();
+		if (this.derivedBindings)
+			for (const binding of this.derivedBindings.values()) binding.supersede();
+	}
 	private readonly seedEntries: Map<string, DecodedSeedEntry> | undefined;
 	private readonly traceLimit: number;
 	private events: SignalTraceEvent[] | undefined = undefined;
@@ -379,50 +392,25 @@ export class ScopeImpl implements Scope, GraphOwner {
 		return node as DerivedSignal<T>;
 	}
 
-	/** Candidate state is private; the ordinary node/binding maps stay untouched. */
-	forkCandidate(
-		node: ScopedNode,
-		target: ScopedNode,
-		frame: SignalCandidateFrame,
-	): CandidateProducer | undefined {
-		// A render's private declaration view forks like the cell it presents.
-		const view = this.nodes.get(node.key) === node ? undefined : declarationViewFork(node);
-		if (
-			(this.nodes.get(node.key) !== node && view === undefined) ||
-			this.readBarrier ||
-			this.frames?.size
-		) {
-			throw new CandidateUnsupportedError(formatClientError(135));
-		}
-		if (view !== undefined) return view(target, frame);
-		const resource = this.resources?.get(node);
-		if (resource) return resource.forkCandidate(target);
-		const binding = this.derivedBindings?.get(node);
-		if (binding) {
-			if (!binding.forkCandidate) {
-				throw new CandidateUnsupportedError(formatClientError(136));
-			}
-			return binding.forkCandidate(target, frame);
-		}
-		target.compute = node.compute;
-	}
-
 	createDerivedDeclaration<T>(
 		key: string,
 		compute: DerivedCompute<T>,
 		options: DerivedOptions | undefined,
 		Binding: DerivedBindingFactory<T>,
 		sequence = 0,
+		captures?: readonly unknown[],
+		declaring = 0,
 	): DerivedSignal<T> {
 		if (typeof compute !== 'function') throw new TypeError(formatClientError(122));
 		const [node, created] = this.declaredNode<T>(key, 'derived');
 		if (!created) {
 			// A later render may declare the same cell with a new computation.
 			const binding = this.derivedBindings?.get(node);
-			return (binding?.redeclare(compute, sequence) ?? node) as DerivedSignal<T>;
+			return (binding?.redeclare(compute, sequence, captures, declaring) ??
+				node) as DerivedSignal<T>;
 		}
 		const binding = new Binding(this, node, compute, options);
-		binding.declared(sequence);
+		binding.declared(sequence, captures, declaring);
 		(this.derivedBindings ??= new Map()).set(node, binding);
 		this.initializeRetention(node);
 		this.consumeSeed(key);
@@ -435,6 +423,8 @@ export class ScopeImpl implements Scope, GraphOwner {
 		initialize: typeof initializeResource,
 		unique = false,
 		sequence = 0,
+		captures?: readonly unknown[],
+		declaring = 0,
 	): Resource<T> {
 		if (typeof describe !== 'function') throw new TypeError(formatClientError(137));
 		let node: ScopedNode<T>;
@@ -444,7 +434,8 @@ export class ScopeImpl implements Scope, GraphOwner {
 			if (!created) {
 				// A later render may declare the same cell with a new description.
 				const binding = this.resources?.get(declared) as ResourceBinding<T> | undefined;
-				return (binding?.redeclare(describe, sequence) ?? declared) as Resource<T>;
+				return (binding?.redeclare(describe, sequence, captures, declaring) ??
+					declared) as Resource<T>;
 			}
 			node = declared;
 		}
@@ -453,7 +444,7 @@ export class ScopeImpl implements Scope, GraphOwner {
 		this.initializeRetention(node);
 		signalBatch(() => {
 			const binding = initialize(this, node, describe, seed, retained);
-			binding.declared(sequence);
+			binding.declared(sequence, captures, declaring);
 			(this.resources ??= new Map()).set(node, binding);
 			refreshNode(node);
 			// A selection bound before this declaration ran may already hold results.
@@ -738,11 +729,27 @@ class AdoptionFrameImpl implements AdoptionFrame {
 		return new AdoptionFrameImpl(this.data);
 	}
 
-	read(node: ScopedNode, read: SignalReadMode): NodeState {
+	read(node: ScopedNode, read: SignalReadMode): NodeState | undefined {
 		this.assertActive();
 		const seed =
 			this.data.entries.get(seedKey(node.key, read)) ??
 			(read === 'value' ? undefined : this.data.entries.get(seedKey(node.key)));
+		// A resource seed holds the request the server resolved. When the client
+		// selects another one (its props or state differ from the server's), that
+		// history cannot present it. Hydration then reads the node live, exactly
+		// like a request the server never seeded: the client loads its own
+		// selection and adoption reconciles the server output. An explicit frame
+		// has no live fallback.
+		if (
+			node.kind === 'async' &&
+			read !== 'latest' &&
+			seed?.entry.kind === 'async' &&
+			seed.entry.available !== false &&
+			!this.data.owner.resources?.get(node)?.acceptsSeed(seed.entry)
+		) {
+			if (getNativeAdoptionResolver()) return undefined;
+			throw new SignalFrameError(formatClientError(145, node.key));
+		}
 		const sourceKey = seedKey(node.key, read);
 		let source = this.sources.get(sourceKey);
 		if (!source) {
@@ -790,12 +797,6 @@ class AdoptionFrameImpl implements AdoptionFrame {
 			return {
 				snapshot: { status: 'pending', refreshing: false, connection: 'none', complete: false },
 			};
-		}
-		if (node.kind === 'async' && read !== 'latest') {
-			const binding = this.data.owner.resources?.get(node);
-			if (!binding?.acceptsSeed(seed.entry)) {
-				throw new SignalFrameError(formatClientError(145, node.key));
-			}
 		}
 		return seedState(seed);
 	}
@@ -856,9 +857,19 @@ export function createDerivedCellWith<T>(
 	options: DerivedOptions | undefined,
 	Binding: DerivedBindingFactory<T>,
 	sequence = 0,
+	captures?: readonly unknown[],
+	declaring = 0,
 ): DerivedSignal<T> {
 	if (!(owner instanceof ScopeImpl)) throw new TypeError(formatClientError(149));
-	return owner.createDerivedDeclaration(key, compute, options, Binding, sequence);
+	return owner.createDerivedDeclaration(
+		key,
+		compute,
+		options,
+		Binding,
+		sequence,
+		captures,
+		declaring,
+	);
 }
 
 let declarationSequence = 0;
@@ -881,9 +892,19 @@ export function createResourceCellWith<T>(
 	initialize: typeof initializeResource,
 	unique = false,
 	sequence = 0,
+	captures?: readonly unknown[],
+	declaring = 0,
 ): Resource<T> {
 	if (!(owner instanceof ScopeImpl)) throw new TypeError(formatClientError(150));
-	return owner.createResourceDeclaration(key, describe, initialize, unique, sequence);
+	return owner.createResourceDeclaration(
+		key,
+		describe,
+		initialize,
+		unique,
+		sequence,
+		captures,
+		declaring,
+	);
 }
 
 export function adoptResourceValue<T>(

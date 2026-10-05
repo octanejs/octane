@@ -46,6 +46,8 @@ benchmarks/memo-wall/
 ├── svelte/       # Vite app, dev :5278 (fine-grained creation/text probes)
 ├── run.mjs        # Playwright harness — drives all targets, enforces the gates
 ├── work.mjs       # untimed Chromium precise-call-coverage work gates
+├── bail-compare.mjs  # own-prop lookups per bailed row (ratio guard)
+├── survivor-work.mjs # journal slots and calls per bailed wall-B row (ratio guards)
 ├── package.json   # umbrella: `pnpm bench`
 └── README.md
 ```
@@ -86,8 +88,9 @@ how `<Row>` is put on screen:
 - **wall B — value-position**: a plain-`.ts` helper (`src/wall-b.ts`) builds
   `createElement(Row, props)` descriptors that reach the DOM through a
   `{rows}` children hole → `childSlot`'s keyed de-opt list → the **childSlot
-  arm** of `tryMemoBail`. This is the shape every `@octanejs/*` binding
-  produces. Both dialects cache the imported helper's result against its input
+  arm** of `tryMemoBail`, which a surviving row whose descriptor names the same
+  component takes straight from the keyed survivor visit. This is the shape
+  every `@octanejs/*` binding produces. Both dialects cache the imported helper's result against its input
   and reuse the compiler-proven immutable renderable region, refreshing existing
   context consumers directly when a Provider changes. When the input changes,
   fresh descriptors still exercise memo bailouts on prop VALUES, not object
@@ -134,6 +137,15 @@ updates still refresh exactly 1000 leaves. Returned-JSX wrapper descriptor
 counts have upper ceilings rather than exact requirements.
 Mount and one-change A/B also carry exact compiled-work gates.
 
+`survivor-work.mjs` runs in every suite run and feeds two ratio guards with the
+per-row cost of wall B's one-change shape: a compiled memo row, a plain-JS
+`createElement` helper and a `{rows}` hole, at 128 and 256 rows, with one row
+changed. The difference between the two sizes gives the root-journal slots
+(budget 0) and the jitless production-bundle calls (budget 26) each bailed row
+adds. Render probes, host identity and the changed row's text are checked in
+the same run. Pass a runtime source path to compare another revision:
+`node survivor-work.mjs /path/to/runtime.ts`.
+
 The React Row/Inner/Leaf counters likewise make those component bodies impure,
 so React Compiler conservatively leaves them alone; the explicit `memo`
 boundaries still provide the row semantics. The proving-ground optimization is
@@ -153,12 +165,16 @@ eligible and are visible in the generated `react/compiler-runtime` cache code.
 | `ctx_through_wall_B`      | same, wall B                              | 0 row, 0 inner, **1000 leaf**    |
 
 All ops commit synchronously (`flushSync` inside the `window.__op` hooks); the
-harness first calibrates each target/operation to an 8ms batch, then forces
+harness first calibrates each target/operation to a 20ms batch, then forces
 `gc()` before every sample and divides the batch by its repetition count. This
-keeps auto-memoized and fine-grained regions above the browser timer's
-resolution without making slower memo-wall targets run oversized batches.
-Default 20 iterations (+5 warmup); `node run.mjs 50` for longer. The chosen
-repetition counts are recorded in each target's result metadata.
+keeps auto-memoized and fine-grained regions far above the browser timer's
+100µs resolution without making slower memo-wall targets run oversized batches.
+Targets are paired: for each operation every target's page is open at once, and
+each sample round visits all of them in a rotating order, so the two sides of a
+ratio guard share the runner's state. `mount` takes one fresh page per sample,
+paired the same way. Default 20 iterations (+5 warmup); `node run.mjs 50` for
+longer. The chosen repetition counts are recorded in each target's result
+metadata.
 
 Native **Preact** (`:5267`) uses `memo` and core context. **Svelte 5** (`:5278`)
 reports compiler-granular behavior: component-creation probes run once, context

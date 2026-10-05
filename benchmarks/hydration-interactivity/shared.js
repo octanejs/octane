@@ -35,10 +35,18 @@ export function startHydrationBootstrap(loadClient, initializeCapture) {
 	};
 
 	window.__hydrationInteractivity = status;
-	document.addEventListener(
+	// Count what the browser dispatched, ahead of any page code. A framework's
+	// document-level capture may defer a pre-hydration `input` (Octane's
+	// `interaction()` stops it and replays an untrusted clone after hydrating),
+	// so observe at window capture and skip replayed clones.
+	window.addEventListener(
 		'input',
 		(event) => {
-			if (event.target instanceof HTMLInputElement && event.target.id === 'hydration-input') {
+			if (
+				event.isTrusted &&
+				event.target instanceof HTMLInputElement &&
+				event.target.id === 'hydration-input'
+			) {
 				status.firstNativeInputAt ||= performance.now();
 				status.nativeInputCount++;
 			}

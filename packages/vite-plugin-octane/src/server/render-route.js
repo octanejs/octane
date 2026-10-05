@@ -52,6 +52,83 @@ import {
  *     client-renders the affected boundaries.
  */
 
+const CSS_REQUEST = /\.(?:css|less|sass|scss|styl|stylus|pcss|postcss|sss)(?:$|\?)/;
+
+/** @param {string} value */
+function escapeAttribute(value) {
+	return value.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;');
+}
+
+/**
+ * Stylesheets imported anywhere in the already-loaded SSR graph of the shell.
+ * @param {ViteDevServer} vite
+ * @param {Array<string | undefined>} roots
+ * @returns {string[]}
+ */
+function collectDevStylesheets(vite, roots) {
+	const graph = vite.environments?.ssr?.moduleGraph ?? vite.moduleGraph;
+	/** @type {Set<string>} */
+	const styles = new Set();
+	const seen = new Set();
+	/** @param {any} module */
+	const visit = (module) => {
+		if (!module || seen.has(module)) return;
+		seen.add(module);
+		if (typeof module.url === 'string' && CSS_REQUEST.test(module.url)) {
+			styles.add(module.url);
+			return;
+		}
+		for (const imported of module.importedModules ?? []) visit(imported);
+	};
+	for (const root of roots) {
+		if (!root) continue;
+		const file = join(vite.config.root, root.startsWith('/') ? `.${root}` : root);
+		for (const module of graph.getModulesByFile(file) ?? []) visit(module);
+	}
+	return [...styles];
+}
+
+/** @type {WeakMap<ViteDevServer, Set<string>>} */
+const reportedShellWitnesses = new WeakMap();
+
+/**
+ * An islands-only route's shell never loads in the browser. The build checks
+ * its source; this checks what a dev render actually reached outside the
+ * route's independent islands, through aliases, helpers, and packages the
+ * source check cannot follow, and warns once per construct and site.
+ *
+ * @param {ViteDevServer} vite
+ * @param {RenderRoute} route
+ * @returns {NonNullable<import('octane/server').RenderOptions['shellWitness']>}
+ */
+function createShellWitnessReporter(vite, route) {
+	const seen = reportedShellWitnesses.get(vite) ?? new Set();
+	reportedShellWitnesses.set(vite, seen);
+	return (witness) => {
+		const at = witness.location
+			? ` at ${witness.location}`
+			: witness.component
+				? ` in ${witness.component}`
+				: '';
+		const on = witness.tag ? ` on <${witness.tag}>` : '';
+		const what =
+			witness.kind === 'effect'
+				? `${witness.name}()${at}`
+				: witness.kind === 'signal'
+					? `a live signal binding${on}${at}`
+					: witness.kind === 'control'
+						? `a controlled "${witness.name}"${on}${at}`
+						: `${JSON.stringify(witness.name)}${on}${at}`;
+		const message =
+			`[@octanejs/vite-plugin] RenderRoute ${JSON.stringify(route.path)} uses hydrate: 'islands', ` +
+			`but its shell rendered ${what} outside an independent <Hydrate>. The shell's code never ` +
+			'loads in the browser, so this never runs there; move it into an independent island.';
+		if (seen.has(message)) return;
+		seen.add(message);
+		vite.config.logger.warn(message, { timestamp: true });
+	};
+}
+
 /**
  * @param {RenderRoute} route
  * @param {Context} context
@@ -162,7 +239,17 @@ export async function handleRenderRoute(
 			clientBuild,
 			streamedSignals,
 		});
-		const headContent = `<script id="__octane_data" type="application/json"${nonceAttribute(nonce)}>${routeData}</script>`;
+		const islands = route.hydrate === 'islands';
+		// An islands-only shell never runs its module in the browser, so the CSS it
+		// imports must be linked like a production route's stylesheets.
+		const shellStyles = islands
+			? collectDevStylesheets(vite, [entryPath, route.layout])
+					.map((href) => `<link rel="stylesheet" href="${escapeAttribute(href)}">`)
+					.join('\n')
+			: '';
+		const headContent =
+			(shellStyles === '' ? '' : shellStyles + '\n') +
+			`<script id="__octane_data" type="application/json"${nonceAttribute(nonce)}>${routeData}</script>`;
 
 		// Load and process index.html template.
 		const templatePath = join(vite.config.root, 'index.html');
@@ -174,7 +261,11 @@ export async function handleRenderRoute(
 		// Validate the raw SSR template and inject the request-nonced hydrate entry.
 		// The one required head marker is consumed AFTER the render, once the
 		// hoisted metadata is in hand, validation still happens up front here.
-		const html = injectHydrationEntry(template, '/@id/virtual:octane-hydrate', nonce);
+		const html = injectHydrationEntry(
+			template,
+			islands ? '/@id/virtual:octane-islands' : '/@id/virtual:octane-hydrate',
+			nonce,
+		);
 
 		// Start the render. This await resolves at SHELL-ready (so a synchronous
 		// render error still falls into the catch below and produces the dev 500
@@ -201,6 +292,7 @@ export async function handleRenderRoute(
 			onHeadReady(/** @type {string} */ head) {
 				hoistedHead = head;
 			},
+			...(islands ? { shellWitness: createShellWitnessReporter(vite, route) } : {}),
 			signal: context.request.signal,
 			onError(/** @type {unknown} */ error) {
 				if (error instanceof Error) vite.ssrFixStacktrace(error);

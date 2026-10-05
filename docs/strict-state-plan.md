@@ -50,9 +50,11 @@ module opts in. No package compatibility declaration or exception list is needed
 Vite, Rspack, and Rsbuild also accept `strong: true` in their plugin options.
 
 Opted-in modules reject statically provable updater calls during render or
-synchronous effect setup, along with render-time `ref.current` writes. The
-analysis follows synchronous calls through `useCallback`, `useEffectEvent`, and
-functions returned by analyzable `useMemo` factories. Statically known Effect
+effect setup, along with render-time `ref.current` writes. The compiler also treats
+certain scheduled callbacks as effect setup, including `queueMicrotask` and
+zero-delay `setTimeout`. The analysis follows synchronous calls
+through `useCallback`, `useEffectEvent`, and functions returned by analyzable
+`useMemo` factories. Statically known Effect
 Event calls during render (`OCTANE_STRONG_RENDER_EFFECT_EVENT_CALL`) and Effect
 Events in explicit hook dependency lists
 (`OCTANE_STRONG_EFFECT_EVENT_DEPENDENCY`) are also errors. Effect Events remain supported. Strong now rejects manual memo hooks and
@@ -60,10 +62,11 @@ non-equivalent explicit dependency lists; equivalent arrays retain their
 behavior and produce a redundancy hint. See the
 [complete current compiler checks](./strong-compiler-checks.md).
 Synchronously evaluated state initializers, linked-state reconcilers, and
-linked-state equality callbacks are render contexts too. Genuinely deferred
-callbacks and effect cleanup remain valid. There is no runtime phase guard,
-hook-cell policy, runtime-only enforcement, cleanup ban, or `stateWrites`
-configuration in the shipped model.
+linked-state equality callbacks are render contexts too. Event-driven callbacks
+remain valid subject to the other Strong diagnostics; effect cleanup has no
+blanket state-update ban. There is no runtime phase guard, hook-cell policy,
+runtime-only enforcement, cleanup ban, or `stateWrites` configuration in the
+shipped model.
 
 Strong mode also asserts pure rendering over immutable snapshots for production
 call memoization, with bounded state-snapshot mutation and nondeterministic-call
@@ -187,8 +190,8 @@ writes could not hide behind same-value sets or run updater side effects first.
 ## 3. Rule table (strict semantics)
 
 This table describes the **proposed runtime-backed contract**, not the complete
-shipped Strong-mode feature set. In particular, cleanup restrictions, callback-ref
-restrictions, runtime guards, and hook-cell policies are not implemented.
+shipped Strong-mode feature set. In particular, cleanup restrictions, runtime
+guards, and hook-cell policies are not implemented.
 
 | Context                                                                        | Policy                                                                              |
 | ------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------- |
@@ -198,7 +201,7 @@ restrictions, runtime guards, and hook-cell policies are not implemented.
 | `useInsertionEffect` setup                                                     | Hard error                                                                          |
 | Effect setup frames (`useEffect`, `useLayoutEffect`) — any sync call depth     | Proposed runtime hard error; only statically provable setup writes are rejected today |
 | Effect cleanup frames — all effect kinds, update and unmount                   | Hard error                                                                          |
-| Callback refs during commit                                                    | Same policy as layout-effect setup; `useLayoutSnapshot` covers measurement (§9 OQ)  |
+| Callback refs during commit                                                    | Same policy as layout-effect setup; `useLayoutSnapshot` covers measurement. Only statically provable host callback-ref writes are rejected today (`OCTANE_STRONG_REF_STATE_UPDATE`) |
 | DOM event handlers, actions, form actions                                      | Allowed, batched                                                                    |
 | Callbacks executing on a later causal turn — async continuations, timers, observers, subscription notifications, deliberate deferral (`queueMicrotask`/`setTimeout`, §7) | Allowed, no wrapper required (§2)                                                   |
 | Subscription callbacks replayed synchronously during effect setup              | Hard error — still the commit cascade; read the initial value as a snapshot (§2)    |
@@ -287,6 +290,11 @@ nothing forces a migration date.
 
 ### 5.1 Compiler
 
+> **Historical:** The descriptions of shipped compiler analysis and sanctioned
+> deferral in this section predate the current checks. The compiler now rejects
+> certain scheduled effect-originated updates, including `queueMicrotask`. See [Effects, state, and dependencies](./strong-compiler-checks.md#effects-state-and-dependencies)
+> for the current contract.
+
 The shipped Strong-mode compiler already identifies setters and dispatchers from
 tuple positions, tracks local aliases and helpers, distinguishes synchronous
 render/effect-setup execution from deferred callbacks, and reports stable
@@ -352,10 +360,10 @@ consult a strict/compat hook-cell policy.
 
 ## 6. Replacement primitives
 
-Only `useLinkedState`, the existing state getter, and already established hooks
-such as `useSyncExternalStore` are shipped Octane APIs in this section.
-`useLayoutSnapshot`, a core `useHydrated`, and `useSource` are retained future
-ideas, not current exports.
+`useLinkedState` and `useLayoutSnapshot`, the existing state getter, and
+established hooks such as `useSyncExternalStore` are shipped Octane APIs in this
+section. A core `useHydrated` and `useSource` remain future ideas, not current
+exports.
 
 ### 6.1 `useLinkedState(source, reconcile, options?)` — shipped
 
@@ -388,7 +396,7 @@ const [selection, setSelection, getSelection] = useLinkedState(
   overrode it since" idiom that controlled/uncontrolled widget internals
   hand-roll today.
 
-### 6.2 `useLayoutSnapshot(measure, options?)` — future proposal
+### 6.2 `useLayoutSnapshot(measure, options?)` — shipped
 
 Replaces: "measure the DOM after commit, then set state" — physically
 legitimate (the DOM did not exist earlier), which argues for a managed
@@ -400,18 +408,15 @@ const height = useLayoutSnapshot(() => ref.current?.offsetHeight, {
 });
 ```
 
-- `measure` would run at layout timing after commit (post-mutation, pre-paint).
-- The result would be compared with the previous snapshot — `Object.is` by default,
+- `measure` runs at layout timing after the component commits its DOM and refs,
+  before paint. It runs when a committed render reaches the hook.
+- The result is compared with the previous snapshot — `Object.is` by default,
   `options.equal` for rect-like shapes — and only a change schedules the
-  re-render in which the hook returns the new value. The equality guard being
-  **built in** removes the single most common infinite-loop bug in React
-  apps; the convergence budget is bounded with dev source attribution.
-- First render and SSR would return `options.initial` (else `undefined`);
-  `measure` would never run on the server.
-- Continuous observation (`ResizeObserver`, scroll) would stay in callbacks,
-  which are legal transition sites; the primitive would cover commit-coupled
-  measurement
-  only.
+  re-render in which the hook returns the new value.
+- First render and SSR return `options.initial` (else `undefined`);
+  `measure` never runs on the server.
+- Continuous observation (`ResizeObserver`, scroll) stays in callbacks; the
+  primitive covers commit-coupled measurement only.
 
 ### 6.3 Core `useHydrated()` — future proposal
 
@@ -450,6 +455,11 @@ keep `useEffect`.
 
 ## 7. Deferral is the escape hatch
 
+> **Historical:** This proposed escape hatch did not remain the shipped policy.
+> The `queueMicrotask` example below is rejected by the current Strong compiler.
+> See [Effects, state, and dependencies](./strong-compiler-checks.md#effects-state-and-dependencies)
+> for supported event-driven updates and the complete current checks.
+
 The causal-turn rule (§2) is the **permanent semantic floor**, and
 deliberately deferring a write to a later turn is **sanctioned**, not a
 loophole:
@@ -476,9 +486,9 @@ like any other callback-turn transition. What deferral gives up is only the
 `setTimeout` instead of the intended primitive gets working code, not an
 error. The response to that is quality pressure, not prohibition:
 
-- fix-its and docs route the common cases to shipped `useLinkedState` and
-  actions, with `useLayoutSnapshot` and `useSource` remaining possible future
-  primitives;
+- fix-its and docs route the common cases to shipped `useLinkedState`,
+  `useLayoutSnapshot`, and actions, with `useSource` remaining a possible future
+  primitive;
 - possible future evaluation could monitor whether agent output drifts toward
   deferral instead of those primitives; no continuous phase-4 monitor is
   currently implemented.
@@ -502,8 +512,8 @@ The original staged rollout was **not executed**. Current status is:
 
 | Historical milestone | What actually shipped or remains proposed |
 | -------------------- | ---------------------------------------- |
-| Report-only diagnostics, repository inventory, and codemods | Not implemented; they were not prerequisites for opt-in Strong mode. |
-| Replacement primitives | `useLinkedState` shipped in [#366](https://github.com/octanejs/octane/pull/366); `useLayoutSnapshot`, a core `useHydrated`, and `useSource` remain proposals. |
+| Report-only diagnostics, repository inventory, and codemods | Not prerequisites for opt-in Strong mode. Added later as `octane analyze --strong-preview` (what Strong would report, grouped by code) and `octane analyze --fix` (lazy-ref and manual-memo rewrites). |
+| Replacement primitives | `useLinkedState` shipped in [#366](https://github.com/octanejs/octane/pull/366) and `useLayoutSnapshot` is available; a core `useHydrated` and `useSource` remain proposals. |
 | Render-context enforcement | Opt-in compiler diagnostics shipped in [#376](https://github.com/octanejs/octane/pull/376); runtime phase guards and per-cell policy did not. |
 | Effect setup and cleanup | Provable synchronous setup updates are compiler errors in opted-in modules; cleanup restrictions remain unimplemented. |
 | Dependency compatibility | Package containment is automatic; no manifest flag, compatibility exception list, or consumer approval is required. |
@@ -522,9 +532,13 @@ and rollout decisions.
   distinguish compiled call sites from symbol-ranged binding boundaries in
   prod compiles) vs. an explicit registration table. Needs a perf-neutral
   answer on the two-item `useState` fast path.
-- **Future callback-ref policy**: strict error (measurement belongs to
-  `useLayoutSnapshot`) or event-like allowance (attach *is* a DOM event of
-  sorts)? The shipped compiler does not impose the proposed callback-ref ban.
+- **Callback-ref policy (settled 2026-10-03)**: strict error, not an event-like
+  allowance. A host callback ref runs in the commit cascade, so the compiler
+  checks its state updates like layout-effect setup
+  (`OCTANE_STRONG_REF_STATE_UPDATE`), and measurement belongs to
+  `useLayoutSnapshot`. Work the ref defers to a later turn (frames, positive
+  timers, observers, listeners) stays legal, and a component's `ref` prop is
+  unchecked because the component decides when to call it.
 - **Linked-state adoption**: composite sources already use `Object.is` unless a
   `sourceEqual` comparator is supplied; prior source/value and transition
   generation behavior are implemented. Remaining work concerns migrating real

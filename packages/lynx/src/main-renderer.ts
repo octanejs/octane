@@ -1528,6 +1528,11 @@ export function useRef<T>(initial: T, _slot?: unknown): { current: T } {
 	return { current: initial };
 }
 
+export function useLazyRef<T>(factory: () => T, _slot?: unknown): { current: T } {
+	currentOwner();
+	return { current: factory() };
+}
+
 export function useId(_slot?: unknown): string {
 	const attempt = currentAttempt();
 	const index = attempt.nextUniversalId++;

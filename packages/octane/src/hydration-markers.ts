@@ -17,14 +17,8 @@ export const SIGNAL_CONTROL_ATTR = 'data-octane-signal-control';
 export const HYDRATE_ID_ATTR = 'data-octane-hydrate-id';
 /** Serialized strategy kind (`visible`, `idle`, `dynamic`, …). */
 export const HYDRATE_WHEN_ATTR = 'data-octane-hydrate-when';
-/**
- * Serialized built-in strategy parameters. An independent island reads these
- * because its lexical parent (which evaluated `when`) never runs on the client.
- */
-export const HYDRATE_IDLE_TIMEOUT_ATTR = 'data-octane-hydrate-timeout';
-export const HYDRATE_VISIBLE_MARGIN_ATTR = 'data-octane-hydrate-root-margin';
-export const HYDRATE_VISIBLE_THRESHOLD_ATTR = 'data-octane-hydrate-threshold';
-export const HYDRATE_MEDIA_ATTR = 'data-octane-hydrate-media';
+// The built-in strategy parameters an independent wrapper serializes live in
+// `hydration/strategy-attributes.ts`, so the client reaches them only on demand.
 /** Number of `useId()` slots consumed while rendering the deferred child. */
 export const HYDRATE_ID_COUNT_ATTR = 'data-octane-hydrate-id-count';
 /** Direct-child JSON script carrying this boundary's `use()` seed slice. */
@@ -59,6 +53,13 @@ export const HYDRATION_FOR_ARM_INDEX = HYDRATION_FOR_PREFIX.length;
  * catch DOM as try-body content.
  */
 export const TRY_CATCH_COMMENT = 'oct-catch:';
+
+/** Leads a resolved `@try` arm whose server render reserved sequential IDs. */
+export const SUSPENSE_RESOLVED_COMMENT = 'oct-suspense:';
+/** Comment-data prefix left in a swapped boundary for hydration seed scoping. */
+export const STREAM_SEED_COMMENT = 'oct-seed:';
+/** A server arm with untransportable demand is mounted fresh within its own range. */
+export const NATIVE_SIGNAL_FRESH_COMMENT = 'oct-native-fresh:';
 
 /**
  * Serialize one `useId()` value. The client regenerates the id the server

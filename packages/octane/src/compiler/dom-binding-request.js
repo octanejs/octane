@@ -76,6 +76,52 @@ export function parseDomBindingRequest(id) {
 	return { exportName: values[0], mount: mounting.length === 1, props, fixedProps };
 }
 
+/**
+ * An independent island whose only child is an imported component asks that
+ * component's module for its activator. The module answers with a renderer-free
+ * binding activator when the export is a zero-argument binding view, and
+ * otherwise forwards to the host's ordinary renderer island module.
+ */
+export const DOM_BINDING_ISLAND_QUERY = 'octane-island';
+const DOM_BINDING_ISLAND_HOST_QUERY = 'octane-island-host';
+const DOM_BINDING_ISLAND_BOUNDARY_QUERY = 'octane-island-boundary';
+/** Selects the renderer activator of a Hydrate boundary that delegates its selection. */
+export const HYDRATE_ISLAND_RENDERER_QUERY = 'octane-island-renderer';
+
+export function parseDomBindingIslandRequest(id) {
+	const question = id.indexOf('?');
+	if (question === -1) return null;
+	const query = new URLSearchParams(id.slice(question + 1).split('#')[0]);
+	const values = query.getAll(DOM_BINDING_ISLAND_QUERY);
+	if (values.length === 0) return null;
+	const hosts = query.getAll(DOM_BINDING_ISLAND_HOST_QUERY);
+	const boundaries = query.getAll(DOM_BINDING_ISLAND_BOUNDARY_QUERY);
+	if (
+		values.length !== 1 ||
+		!/^[A-Za-z_$][\w$]*$/.test(values[0]) ||
+		hosts.length !== 1 ||
+		hosts[0] === '' ||
+		boundaries.length !== 1 ||
+		!/^\d+(?:\.\d+)*$/.test(boundaries[0]) ||
+		query.has(DOM_BINDINGS_QUERY)
+	)
+		error(id, `invalid ${DOM_BINDING_ISLAND_QUERY} island query`);
+	return { exportName: values[0], host: hosts[0], boundary: boundaries[0] };
+}
+
+export function formatDomBindingIslandRequest(source, { exportName, host, boundary }) {
+	return `${source}?${DOM_BINDING_ISLAND_QUERY}=${encodeURIComponent(exportName)}&${DOM_BINDING_ISLAND_HOST_QUERY}=${encodeURIComponent(host)}&${DOM_BINDING_ISLAND_BOUNDARY_QUERY}=${encodeURIComponent(boundary)}`;
+}
+
+export function isHydrateIslandRendererRequest(id) {
+	const question = id.indexOf('?');
+	return (
+		question !== -1 &&
+		new URLSearchParams(id.slice(question + 1).split('#')[0]).get(HYDRATE_ISLAND_RENDERER_QUERY) ===
+			'1'
+	);
+}
+
 export function formatDomBindingRequest(
 	source,
 	{ exportName, mount = false, props = null, fixedProps = null },

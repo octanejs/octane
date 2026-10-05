@@ -1,6 +1,6 @@
 {
   "name": "octane",
-  "version": "0.7.1",
+  "version": "0.9.1",
   "license": "MIT",
   "type": "module",
   "sideEffects": [
@@ -31,6 +31,30 @@
     "#octane/compiler-parser": {
       "node": "./src/compiler/parser.node.js",
       "default": "./src/compiler/parser.browser.js"
+    },
+    "#octane/signal-actions/graph": {
+      "octane-islands": "./src/signals/action-capability-elsewhere.ts",
+      "default": "./src/signals/action-capability.ts"
+    },
+    "#octane/signal-actions/renderer": {
+      "octane-islands": "./src/signals/action-capability-renderer.ts",
+      "default": "./src/signals/action-capability-elsewhere.ts"
+    },
+    "#octane/signal-actions/bindings": {
+      "octane-islands": "./src/signals/action-capability-elsewhere.ts",
+      "default": "./src/signals/candidate-producers.ts"
+    },
+    "#octane/dist/signal-actions/graph": {
+      "octane-islands": "./dist/signals/action-capability-elsewhere.js",
+      "default": "./dist/signals/action-capability.js"
+    },
+    "#octane/dist/signal-actions/renderer": {
+      "octane-islands": "./dist/signals/action-capability-renderer.js",
+      "default": "./dist/signals/action-capability-elsewhere.js"
+    },
+    "#octane/dist/signal-actions/bindings": {
+      "octane-islands": "./dist/signals/action-capability-elsewhere.js",
+      "default": "./dist/signals/candidate-producers.js"
     }
   },
   "exports": {
@@ -42,9 +66,11 @@
     "./react": "./src/react/index.ts",
     "./hydration": "./src/hydration/index.ts",
     "./hydration/streamed-signals": "./src/hydration/streamed-signals.ts",
+    "./hydration/independent-strategies": "./src/hydration/independent-strategies.ts",
     "./behavior": "./src/behavior-root.ts",
     "./dom-bindings": "./src/dom-bindings.ts",
     "./dom-binding-program": "./src/dom-binding-program.ts",
+    "./dom-binding-island": "./src/dom-binding-island.ts",
     "./dom-binding-classes": "./src/dom-binding-classes.ts",
     "./dom-binding-signals": "./src/dom-binding-signals.ts",
     "./dom-binding-controls": "./src/dom-binding-controls.ts",
@@ -93,6 +119,18 @@
       "#octane/compiler-parser": {
         "node": "./dist/compiler/parser.node.js",
         "default": "./dist/compiler/parser.browser.js"
+      },
+      "#octane/dist/signal-actions/graph": {
+        "octane-islands": "./dist/signals/action-capability-elsewhere.js",
+        "default": "./dist/signals/action-capability.js"
+      },
+      "#octane/dist/signal-actions/renderer": {
+        "octane-islands": "./dist/signals/action-capability-renderer.js",
+        "default": "./dist/signals/action-capability-elsewhere.js"
+      },
+      "#octane/dist/signal-actions/bindings": {
+        "octane-islands": "./dist/signals/action-capability-elsewhere.js",
+        "default": "./dist/signals/candidate-producers.js"
       }
     },
     "exports": {
@@ -138,6 +176,11 @@
         "node": "./dist/node/hydration/streamed-signals.js",
         "default": "./dist/hydration/streamed-signals.js"
       },
+      "./hydration/independent-strategies": {
+        "types": "./dist/hydration/independent-strategies.d.ts",
+        "node": "./dist/node/hydration/independent-strategies.js",
+        "default": "./dist/hydration/independent-strategies.js"
+      },
       "./behavior": {
         "types": "./dist/behavior-root.d.ts",
         "node": "./dist/node/behavior-root.js",
@@ -152,6 +195,11 @@
         "types": "./dist/dom-binding-program.d.ts",
         "node": "./dist/node/dom-binding-program.js",
         "default": "./dist/dom-binding-program.js"
+      },
+      "./dom-binding-island": {
+        "types": "./dist/dom-binding-island.d.ts",
+        "node": "./dist/node/dom-binding-island.js",
+        "default": "./dist/dom-binding-island.js"
       },
       "./dom-binding-classes": {
         "types": "./dist/dom-binding-classes.d.ts",

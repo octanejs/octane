@@ -2353,4 +2353,60 @@ describe('parallel use() — adjacent async component trees', () => {
 		expect(resources.calls).toHaveLength(8);
 		r.unmount();
 	});
+
+	it('starts Strong siblings whose props are inline calculations in the first attempt', async () => {
+		// Strong caches an inline prop calculation like a named const. The warm
+		// plan runs outside the parent's body, so it still has to reach the
+		// second panel through the authored prop expression.
+		const client = loadCompiledFixtureSource(
+			`
+				'use strong';
+				import { use } from 'octane';
+
+				function nextVersion(version: number): number {
+					return version + 1;
+				}
+
+				function Panel(props) @{
+					const value = use(props.load(props.name, props.version));
+					<span class="strong-calculated-panel">{value as string}</span>
+				}
+
+				function Panels(props) @{
+					<main>
+						<Panel name="first" load={props.load} version={nextVersion(props.version)} />
+						<Panel name="second" load={props.load} version={nextVersion(props.version)} />
+					</main>
+				}
+
+				export function App(props) @{
+					<>
+						@try {
+							<Panels load={props.load} version={props.version} />
+						} @pending {
+							<span class="strong-calculated-pending">loading</span>
+						}
+					</>
+				}
+			`,
+			{
+				id: 'strong-calculated-warm-panels.tsrx',
+				mode: 'client',
+				compileOptions: { hmr: false, dev: false },
+			},
+		);
+		const resources = resourceFetcher();
+		const root = mount(client.App, { load: resources.load, version: 0 });
+
+		expect([...resources.calls].sort()).toEqual(['first:1', 'second:1']);
+		expect(root.find('.strong-calculated-pending').textContent).toBe('loading');
+
+		await act(() => resources.settle('first', 1));
+		await act(() => resources.settle('second', 1));
+		expect(
+			root.findAll('.strong-calculated-panel').map((node: Element) => node.textContent),
+		).toEqual(['first-v1', 'second-v1']);
+		expect(resources.calls).toHaveLength(2);
+		root.unmount();
+	});
 });

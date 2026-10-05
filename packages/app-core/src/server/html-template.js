@@ -63,6 +63,28 @@ export function injectHydrationEntry(html, source, nonce) {
 }
 
 /**
+ * Point the template's one hydration bootstrap at another built entry. An
+ * islands-only route serves the same document with the renderer-free entry.
+ * @param {string} html
+ * @param {string} source
+ */
+export function replaceHydrationEntrySource(html, source) {
+	let replaced = 0;
+	const result = html.replace(/<script\b[^>]*>/gi, (tag) => {
+		if (!/\sdata-octane-hydrate(?:\s|=|>)/i.test(tag)) return tag;
+		replaced++;
+		return tag.replace(
+			/(\ssrc\s*=\s*)(?:"[^"]*"|'[^']*'|[^\s>]+)/i,
+			(_match, prefix) => `${prefix}"${escapeAttribute(source)}"`,
+		);
+	});
+	if (replaced !== 1 || result === html) {
+		throw new Error('[octane] Islands-only routes require one external hydration bootstrap entry.');
+	}
+	return result;
+}
+
+/**
  * Split a validated template around its one SSR body marker.
  * @param {string} html
  */

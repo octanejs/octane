@@ -1,7 +1,19 @@
+import { readFileSync } from 'node:fs';
 import { describe, expect, it, vi } from 'vitest';
+import * as ServerRuntime from 'octane/server';
 import { act, flushEffects, mount } from './_helpers';
+import { loadPlainHookFixtureSource, loadServerFixture } from './_server-fixture';
 import { flushSync } from '../src/index.js';
+import { ShadowedNestedRowEffect, ShadowedRowEffect } from './_fixtures/for-shadowed-effects.tsrx';
 import {
+	ShadowedNestedRowEffectStrong,
+	ShadowedRowEffectStrong,
+} from './_fixtures/for-shadowed-effects-strong.tsrx';
+import {
+	CallbackReadsItself,
+	CallbackReadsLaterConst,
+	CallbackReadsLaterVar,
+	CallbackReadsReassignedLet,
 	CaptureFreeEffect,
 	CaptureFreeMemo,
 	EffectFromDerivedValue,
@@ -13,11 +25,16 @@ import {
 	EffectFromProps,
 	EffectFromReferencedCallback,
 	EffectFromState,
+	EffectReadsLaterConst,
+	EffectReadsLaterVar,
+	EffectReadsLetAssignedBefore,
+	EffectReadsReassignedLet,
 	EffectWithStableHookResults,
 	EffectWithConvergingUpdate,
 	EffectWithFreshFunction,
 	EffectWithFreshObject,
 	ExternalHookDependencies,
+	ExternalHookLaterDeclaration,
 	MemoFromComputedPath,
 	MemoFromInstanceMethodCall,
 	MemoFromNestedScope,
@@ -27,6 +44,7 @@ import {
 	MemoFromPrototypeMethodCall,
 	MemoFromReferencedFactory,
 	MemoFromState,
+	MemoReadsLaterConst,
 	MemoWithManyDependencies,
 	ObjectIsDependencies,
 	StoreFieldEffect,
@@ -63,6 +81,66 @@ function createStore(initial: string) {
 }
 
 describe('inferred useEffect dependencies — behavior', () => {
+	it.each([
+		['compatibility', ShadowedNestedRowEffect],
+		['Strong', ShadowedNestedRowEffectStrong],
+	] as const)(
+		'tracks destructured bindings in nested keyed rows in %s mode',
+		(_label, Component) => {
+			const entries: string[] = [];
+			const log = (entry: string) => entries.push(entry);
+			const r = mount(Component, {
+				groups: [{ id: 'group', items: [{ id: 'row', value: 'a' }] }],
+				log,
+			});
+			flushEffects();
+			expect(entries).toEqual(['run:a']);
+			r.update(Component, { groups: [{ id: 'group', items: [{ id: 'row', value: 'b' }] }], log });
+			flushEffects();
+			expect(entries).toEqual(['run:a', 'cleanup:a', 'run:b']);
+			r.unmount();
+			flushEffects();
+			expect(entries).toEqual(['run:a', 'cleanup:a', 'run:b', 'cleanup:b']);
+		},
+	);
+
+	it.each([
+		['compatibility', ShadowedRowEffect],
+		['Strong', ShadowedRowEffectStrong],
+	] as const)(
+		'tracks a shadowing keyed row and the outer empty value in %s mode',
+		(_label, Component) => {
+			const entries: string[] = [];
+			const log = (entry: string) => entries.push(entry);
+			const first = { id: '1', value: 'first' };
+			const replacement = { id: '1', value: 'second' };
+			const r = mount(Component, { items: [], log, emptyValue: 'a', noise: 0 });
+			flushEffects();
+			expect(entries).toEqual(['empty:outer:a']);
+			r.update(Component, { items: [], log, emptyValue: 'a', noise: 1 });
+			flushEffects();
+			expect(entries).toEqual(['empty:outer:a']);
+			r.update(Component, { items: [], log, emptyValue: 'b', noise: 1 });
+			flushEffects();
+			expect(entries).toEqual(['empty:outer:a', 'empty-cleanup:outer:a', 'empty:outer:b']);
+			r.update(Component, { items: [first], log, emptyValue: 'b', noise: 1 });
+			flushEffects();
+			expect(entries.slice(-2)).toEqual(['empty-cleanup:outer:b', 'run:first']);
+			r.update(Component, { items: [replacement], log, emptyValue: 'b', noise: 1 });
+			flushEffects();
+			expect(entries.slice(-2)).toEqual(['cleanup:first', 'run:second']);
+			r.update(Component, { items: [replacement], log, emptyValue: 'b', noise: 2 });
+			flushEffects();
+			expect(entries.slice(-2)).toEqual(['cleanup:first', 'run:second']);
+			r.update(Component, { items: [], log, emptyValue: 'c', noise: 2 });
+			flushEffects();
+			expect(entries.slice(-2)).toEqual(['cleanup:second', 'empty:outer:c']);
+			r.unmount();
+			flushEffects();
+			expect(entries.at(-1)).toBe('empty-cleanup:outer:c');
+		},
+	);
+
 	it('ignores unrelated props and refreshes the captured value with ordered cleanup', () => {
 		const entries: string[] = [];
 		const log = (entry: string) => entries.push(entry);
@@ -750,5 +828,145 @@ describe('inferred dependencies with subscribed stores', () => {
 		expect(log).toHaveBeenCalledTimes(2);
 		r.unmount();
 		flushEffects();
+	});
+});
+
+// Reading a later `let`, `const` or `class` where the hook is called throws, and
+// a later `var` is still undefined there, so a list holding it never changes.
+// A variable assigned after the call holds its earlier value there. The compiler
+// infers `null` instead, and the hook runs on every render.
+describe('inferred dependencies that read a later declaration', () => {
+	it('runs a useEffect that reads a later const on every render', () => {
+		const entries: string[] = [];
+		const log = (entry: string) => entries.push(entry);
+		const r = mount(EffectReadsLaterConst, { log, prefix: 'a', noise: 0 });
+		flushEffects();
+		expect(entries).toEqual(['run:a']);
+
+		r.update(EffectReadsLaterConst, { log, prefix: 'a', noise: 1 });
+		flushEffects();
+		expect(entries).toEqual(['run:a', 'cleanup:a', 'run:a']);
+
+		r.update(EffectReadsLaterConst, { log, prefix: 'b', noise: 2 });
+		flushEffects();
+		expect(entries).toEqual(['run:a', 'cleanup:a', 'run:a', 'cleanup:a', 'run:b']);
+
+		r.unmount();
+		flushEffects();
+		expect(entries.at(-1)).toBe('cleanup:b');
+	});
+
+	it.each([
+		['a useCallback that reads a later const', CallbackReadsLaterConst],
+		['a useMemo whose result reads a later const', MemoReadsLaterConst],
+		['a useCallback that calls itself', CallbackReadsItself],
+	] as const)('refreshes %s', (_label, Component) => {
+		const r = mount(Component, { prefix: 'a' });
+		expect(r.find('.value').textContent).toBe('a');
+
+		r.update(Component, { prefix: 'b' });
+		expect(r.find('.value').textContent).toBe('b');
+		r.unmount();
+	});
+
+	it('reruns a useEffect that reads a later var when it changes', () => {
+		const log = vi.fn();
+		const r = mount(EffectReadsLaterVar, { log, prefix: 'a', noise: 0 });
+		flushEffects();
+		expect(log).toHaveBeenLastCalledWith('run:a');
+
+		r.update(EffectReadsLaterVar, { log, prefix: 'b', noise: 1 });
+		flushEffects();
+		expect(log).toHaveBeenLastCalledWith('run:b');
+		r.unmount();
+		flushEffects();
+	});
+
+	it('refreshes a useCallback that reads a later var', () => {
+		const r = mount(CallbackReadsLaterVar, { prefix: 'a' });
+		expect(r.find('.value').textContent).toBe('a');
+
+		r.update(CallbackReadsLaterVar, { prefix: 'b' });
+		expect(r.find('.value').textContent).toBe('b');
+		r.unmount();
+	});
+
+	it('reruns a useEffect whose captured let is assigned after the call', () => {
+		const log = vi.fn();
+		const r = mount(EffectReadsReassignedLet, { log, a: 'a', b: '', noise: 0 });
+		flushEffects();
+		expect(log).toHaveBeenLastCalledWith('run:a');
+
+		r.update(EffectReadsReassignedLet, { log, a: 'a', b: 'b', noise: 1 });
+		flushEffects();
+		expect(log).toHaveBeenLastCalledWith('run:b');
+		r.unmount();
+		flushEffects();
+	});
+
+	it('refreshes a useCallback whose captured let is assigned after the call', () => {
+		const r = mount(CallbackReadsReassignedLet, { a: 'a', b: '' });
+		expect(r.find('.value').textContent).toBe('a');
+
+		r.update(CallbackReadsReassignedLet, { a: 'a', b: 'b' });
+		expect(r.find('.value').textContent).toBe('b');
+		r.unmount();
+	});
+
+	it('keeps tracking a let assigned before the call', () => {
+		const log = vi.fn();
+		const r = mount(EffectReadsLetAssignedBefore, { log, a: 'a', b: 'b', noise: 0 });
+		flushEffects();
+		expect(log.mock.calls).toEqual([['run:b']]);
+
+		r.update(EffectReadsLetAssignedBefore, { log, a: 'a', b: 'b', noise: 1 });
+		flushEffects();
+		expect(log.mock.calls).toEqual([['run:b']]);
+
+		r.update(EffectReadsLetAssignedBefore, { log, a: 'a', b: 'c', noise: 2 });
+		flushEffects();
+		expect(log.mock.calls).toEqual([['run:b'], ['run:c']]);
+		r.unmount();
+		flushEffects();
+	});
+
+	it('refreshes hooks that read a later const in a plain TypeScript custom hook', () => {
+		const log = vi.fn();
+		const r = mount(ExternalHookLaterDeclaration, { log, prefix: 'a', noise: 0 });
+		flushEffects();
+		expect(r.find('.value').textContent).toBe('A/A');
+		expect(log).toHaveBeenLastCalledWith('run:A');
+
+		r.update(ExternalHookLaterDeclaration, { log, prefix: 'b', noise: 1 });
+		flushEffects();
+		expect(r.find('.value').textContent).toBe('B/B');
+		expect(log).toHaveBeenLastCalledWith('run:B');
+		r.unmount();
+		flushEffects();
+	});
+
+	it.each([false, true])('server-renders hooks that read a later binding (dev: %s)', (dev) => {
+		const fixtures = 'packages/octane/tests/_fixtures';
+		const external = loadPlainHookFixtureSource(
+			readFileSync(`${fixtures}/auto-hook-deps-external.ts`, 'utf8'),
+			{ id: `/${fixtures}/auto-hook-deps-external.ts`, mode: 'server', inlineHookMemo: !dev },
+		);
+		const server = loadServerFixture(`${fixtures}/auto-hook-deps-behavior.tsrx`, {
+			compileOptions: { dev, hmr: false },
+			runtimeModules: { './auto-hook-deps-external.ts': external },
+		});
+		const render = (name: string, props: Record<string, unknown>) => {
+			const container = document.createElement('div');
+			container.innerHTML = ServerRuntime.renderToString(server[name], props).html;
+			return container.querySelector('.value')?.textContent;
+		};
+		for (const name of [
+			'CallbackReadsLaterConst',
+			'MemoReadsLaterConst',
+			'CallbackReadsItself',
+			'CallbackReadsLaterVar',
+		])
+			expect(render(name, { prefix: 'a' })).toBe('a');
+		expect(render('ExternalHookLaterDeclaration', { prefix: 'a', log() {}, noise: 0 })).toBe('A/A');
 	});
 });

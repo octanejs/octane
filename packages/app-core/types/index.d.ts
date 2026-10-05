@@ -26,8 +26,16 @@ export class RenderRoute {
 	layout?: string;
 	before: Middleware[];
 	status?: number;
+	hydrate: RenderRouteHydration;
 	constructor(options: RenderRouteOptions);
 }
+
+/**
+ * `'full'` hydrates the route's component tree. `'islands'` ships only the
+ * independent `<Hydrate>` islands: the shell stays server-rendered HTML and its
+ * JavaScript never loads.
+ */
+export type RenderRouteHydration = 'full' | 'islands';
 
 export class ServerRoute {
 	readonly type: 'server';
@@ -77,6 +85,12 @@ export interface RenderRouteOptions {
 	 * catch-all route so the SSR'd not-found page reports its real status.
 	 */
 	status?: number;
+	/**
+	 * `'islands'` serves an immutable server-rendered shell and activates only its
+	 * independent `<Hydrate>` islands. The build rejects a shell with client work.
+	 * Defaults to `'full'`.
+	 */
+	hydrate?: RenderRouteHydration;
 }
 
 export interface ServerRouteOptions {

@@ -1,4 +1,8 @@
 export { trustHTML, type TrustedHTML } from '../trusted-html.js';
+export type {
+	LayoutSnapshotOptions,
+	LayoutSnapshotOptionsWithInitial,
+} from '../layout-snapshot-types.js';
 export { createResizeObserver } from '../resize-observer.js';
 /**
  * `octane/server` — server-rendering entry.
@@ -96,6 +100,7 @@ export {
 	type NativeSignalReference,
 	type RenderOptions,
 	type ServerRenderNode,
+	type ShellWitness,
 	type StreamOptions,
 	type StreamInjectionSource,
 	setSsrSuspenseTimeout,
@@ -114,11 +119,13 @@ export {
 	type LinkedStateOptions,
 	useEffect,
 	useLayoutEffect,
+	useLayoutSnapshot,
 	useInsertionEffect,
 	useImperativeHandle,
 	useMemo,
 	useCallback,
 	useRef,
+	useLazyRef,
 	useId,
 	useEffectEvent,
 	useTransition,

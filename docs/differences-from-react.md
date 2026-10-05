@@ -118,6 +118,7 @@ change between renders:
 | `useEffectEvent` results | Omitted because Effect Events are non-reactive |
 | Imports and unreassigned module-scope `const`/`function`/`class` | Omitted as program-lifetime identities |
 | A local `const` naming one of those stable values, or a literal | Omitted |
+| A local binding initialized after the hook call, such as a later `const` or `var`, or the `const` that receives the hook's own result. Also a local variable assigned after the call, or from a nested function | No list: `null` runs the hook on every render, as an omitted array does in React. Strong mode reports it instead |
 
 A member read through a stable module binding, such as `CONFIG.mode`, is also
 omitted. Mutating such an object in place is therefore not witnessed by a
@@ -279,6 +280,16 @@ stay on the conservative setup path. Their context subscriptions, state cells,
 suspension points, and effect lifecycles remain outside ordinary projection
 caches.
 
+An eligible expression that the template evaluates on every render (a host
+child hole, a host attribute, or a component prop) gets the same cache as that
+expression named by a `const` in setup. `<output>{total.toFixed(2)}</output>`
+recomputes only when `total` changes, as it does under React Compiler.
+Expressions in `@if`, `@for`, `@switch`, and `@try` arms, component children,
+and built-in boundaries still evaluate only when they render. Expressions that
+contain JSX, event handlers, refs, and keys keep their own lowering. A
+component that returns JSX gets the cache only after an authored hook call, so
+a hookless one remains an ordinary function.
+
 For an eligible operation, the cache guard witnesses the callable and its
 receiver as well as explicit arguments. A derived receiver such as
 `factory().read(input)` is represented by the factory, its receiver, and its
@@ -409,7 +420,10 @@ let freshLabels = formatRows(rows); // Not cached: `let` is an escape hatch.
 
 An eligible `const` keeps the same identity until its tracked component-local
 inputs change. This lets a region key on the identity of a derived value instead
-of seeing a new array or object on every render.
+of seeing a new array or object on every render. Caching follows a chain: in
+`const labels = formatRows(rows); const view = wrapRows(labels);` with only
+`view` in the template, `labels` is cached too, so `view` is rebuilt only when
+`rows` changes.
 
 The same callee rule governs declaration caching. In compatibility mode, the virtualizer call must stay
 live because its window can move while the virtualizer object keeps the same
@@ -510,7 +524,9 @@ The tuple also supports the same optional latest-value getter as `useState`.
 Strong modules also require inferred dependencies, compiler-owned memoization,
 keyed template lists in `.tsrx`, and branded HTML values. Standard keyed JSX
 mapping remains supported in `.tsx`. See the
-[Strong compiler checks and migration table](./strong-compiler-checks.md).
+[Strong compiler checks and migration table](./strong-compiler-checks.md), and the
+[Strong mode guide](https://octanejs.dev/docs/strong-mode) for adopting it in an
+existing app.
 
 Strong mode opts into the immutable render-snapshot contract above and adds
 compile-time checks for detectable violations. Opt into one module with a
@@ -528,7 +544,13 @@ in compatibility mode unless their own source opts in.
 
 A Strong module cannot call a state updater during render or synchronously while
 setting up an effect, and it cannot read or assign to a `useRef` object's
-`current` during render (`OCTANE_STRONG_RENDER_REF_READ` for reads). It also
+`current` during render (`OCTANE_STRONG_RENDER_REF_READ` for reads,
+`OCTANE_STRONG_RENDER_REF_WRITE` for writes). React's lazy initialization,
+`if (ref.current === null) ref.current = create()`, does both: create the value
+once with `useLazyRef(() => create())` instead. A layout effect that copies a DOM
+measurement into state is a synchronous update in effect setup
+(`OCTANE_STRONG_EFFECT_STATE_UPDATE`): render the measurement from
+`useLayoutSnapshot(measure, { initial })` instead. It also
 rejects calling a known third-tuple state getter during render
 (`OCTANE_STRONG_RENDER_STATE_GETTER_CALL`): the getter can observe scheduled
 state that differs from the render snapshot. Read the state tuple's first member
@@ -566,10 +588,14 @@ non-idempotent globals such as `Date.now()`, `Math.random()`, and
 `crypto.randomUUID()` (`OCTANE_STRONG_RENDER_IMPURE_CALL`), including inside
 callbacks that known array methods run synchronously. These checks follow
 supported aliases and synchronous helpers; they do not prove arbitrary method
-bodies or imported code pure. Lazy state initialization may obtain an initial
-timestamp or random value. Locale- and time-zone-dependent formatting of a
+bodies or imported code pure. Lazy state and `useLazyRef` initialization may
+obtain an initial timestamp or random value. Locale- and time-zone-dependent formatting of a
 provable `Date` or an `Intl` service during render reports
 `OCTANE_STRONG_RENDER_LOCALE_FORMAT`; pass an explicit locale and `timeZone`.
+Scheduling work during render with `setTimeout`, `setInterval`,
+`queueMicrotask`, `requestAnimationFrame`, or `requestIdleCallback` reports
+`OCTANE_STRONG_RENDER_SIDE_EFFECT`, including in a lazy initializer; schedule
+from an event handler or an effect.
 State values stay immutable outside render too
 (`OCTANE_STRONG_SNAPSHOT_MUTATION`), updaters and reducers follow the render
 checks because Octane may replay them (`OCTANE_STRONG_IMPURE_UPDATER`), and a
@@ -591,8 +617,9 @@ imports. Those values still have to satisfy the render-snapshot contract.
 
 For changing browser state, use `useSyncExternalStore` with a server snapshot
 and render its returned snapshot. Browser reads in its snapshot callbacks,
-events, effects, and deferred callbacks remain supported. Lazy `useState` and
-`useReducer` initializers may also read browser state for an initial value. They
+events, effects, and deferred callbacks remain supported. Lazy `useState`,
+`useReducer`, and `useLazyRef` initializers may also read browser state for an
+initial value. They
 still run during server rendering: guard unavailable browser APIs and ensure the
 server and client agree on initial output. A `typeof window` guard inside an
 ordinary render calculation does not make the calculation snapshot-safe.
@@ -912,10 +939,11 @@ What differs is the event API and synthesis layer:
 - `onFocus`/`onBlur` use the browser's bubbling `focusin`/`focusout` events,
   including capture variants; the event object retains that native type.
 - Removing a focused host can make the browser dispatch `focusout` while the
-  removal is in progress. The removed hosts, and any host whose component has
-  unmounted, start no handler for it, but still-mounted ancestors receive it.
-  React suppresses every event during its commit, including those ancestors'
-  handlers.
+  removal is in progress, and so can a deletion cleanup that moves focus. Every
+  host the deletion removes starts no handler for it, including hosts of child
+  components the teardown has not reached yet, but still-mounted ancestors
+  receive it. React suppresses every event during its commit, including those
+  ancestors' handlers.
 - There are no synthetic `onChange`/`onBeforeInput`/`onSelect` polyfills — use
   the native events (`onInput` etc.).
 - Root listeners are non-passive. `preventDefault()` in `onWheel` or
@@ -1709,6 +1737,16 @@ function Search({ ref }) @{
 
 A ref may be a callback, a `{ current }` object, or an array of refs as shown
 above.
+
+Octane also supports lazy initialization of a mutable ref with
+`useLazyRef(() => createValue())`. Plain `useRef(callback)` retains React-compatible
+behavior and stores the callback itself. The lazy factory runs during render, so
+abandoned work, retries, remounts, and separate server and hydration renders can
+invoke it again; keep it free of side effects and use an effect for resources
+requiring cleanup. Strong mode checks the factory like a lazy `useState`
+initializer: it may read a clock, randomness, or browser state for the initial
+value, but it may not schedule work. The experimental Valdi writer's existing
+adapter ABI does not support this hook.
 
 ### Fragment refs
 

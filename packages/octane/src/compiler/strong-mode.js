@@ -3,6 +3,7 @@ import {
 	analyzeStrongHookPolicies,
 	collectReassignedBindings,
 } from './hook-deps.js';
+import { REF_HOOKS } from './hook-names.js';
 import { createRendererRegionResolver } from './renderer-boundaries.js';
 import { analyzeStrongHTML } from './strong-html.js';
 import { analyzeStrongDOM } from './strong-dom.js';
@@ -17,6 +18,13 @@ import {
 import { analyzeStrongWriteOnlyState } from './strong-write-only-state.js';
 import { analyzeStrongExternalStore } from './strong-external-store.js';
 import { createStrongRenderPolicy } from './strong-render-policy.js';
+import {
+	collectLazyRefIdioms,
+	lazyRefSuggestion,
+	manualMemoSuggestion,
+	readsLayout,
+	strongDocsUrl,
+} from './strong-fixes.js';
 
 export {
 	STRONG_EFFECT_DATA_FETCH,
@@ -43,11 +51,13 @@ const LOCAL_VALUE_HOOKS = new Set([
 	'useMemo',
 	'useCallback',
 	'useRef',
+	'useLazyRef',
 	'useId',
 	'useEffectEvent',
 	'useDeferredValue',
 	'useTransition',
 	'useSyncExternalStore',
+	'useLayoutSnapshot',
 	'useActionState',
 	'useFormState',
 	'useFormStatus',
@@ -192,6 +202,7 @@ export const STRONG_RENDER_STATE_GETTER_CALL = 'OCTANE_STRONG_RENDER_STATE_GETTE
 export const STRONG_RENDER_MODULE_STATE_READ = 'OCTANE_STRONG_RENDER_MODULE_STATE_READ';
 export const STRONG_RENDER_AMBIENT_READ = 'OCTANE_STRONG_RENDER_AMBIENT_READ';
 export const STRONG_EFFECT_STATE_UPDATE = 'OCTANE_STRONG_EFFECT_STATE_UPDATE';
+export const STRONG_REF_STATE_UPDATE = 'OCTANE_STRONG_REF_STATE_UPDATE';
 export const STRONG_RENDER_REF_WRITE = 'OCTANE_STRONG_RENDER_REF_WRITE';
 export const STRONG_RENDER_REF_READ = 'OCTANE_STRONG_RENDER_REF_READ';
 export const STRONG_RENDER_SNAPSHOT_MUTATION = 'OCTANE_STRONG_RENDER_SNAPSHOT_MUTATION';
@@ -200,6 +211,7 @@ export const STRONG_RENDER_IMPURE_CALL = 'OCTANE_STRONG_RENDER_IMPURE_CALL';
 export const STRONG_RENDER_EFFECT_EVENT_CALL = 'OCTANE_STRONG_RENDER_EFFECT_EVENT_CALL';
 export const STRONG_EFFECT_EVENT_DEPENDENCY = 'OCTANE_STRONG_EFFECT_EVENT_DEPENDENCY';
 export const STRONG_EFFECT_CHAIN = 'OCTANE_STRONG_EFFECT_CHAIN';
+export const STRONG_LAYOUT_SNAPSHOT_ASYNC = 'OCTANE_STRONG_LAYOUT_SNAPSHOT_ASYNC';
 export const STRONG_UNLINKED_PROP_STATE = 'OCTANE_STRONG_UNLINKED_PROP_STATE';
 export const STRONG_DIRECTIVE_PLACEMENT = 'OCTANE_STRONG_DIRECTIVE_PLACEMENT';
 export const STRONG_HOOK_LOCALITY = 'OCTANE_STRONG_HOOK_LOCALITY';
@@ -1618,6 +1630,10 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 		filename,
 		options,
 	});
+	function isGlobalObject(node, scope) {
+		const object = ambientReference(node, scope);
+		return object === GLOBAL_OBJECT_BINDING || object === AMBIENT_GLOBAL_BINDINGS.get('window');
+	}
 	const renderPolicy = createStrongRenderPolicy({
 		ast,
 		moduleScope,
@@ -1628,6 +1644,7 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 		unwrap,
 		staticPrimitiveValue,
 		isReassigned,
+		isGlobalObject,
 	});
 	const effectPolicy = createStrongEffectPolicy({
 		ast,
@@ -1651,10 +1668,7 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 		callableValue,
 		staticPrimitiveValue,
 		ambientPropertyKey,
-		isGlobalObject(node, scope) {
-			const object = ambientReference(node, scope);
-			return object === GLOBAL_OBJECT_BINDING || object === AMBIENT_GLOBAL_BINDINGS.get('window');
-		},
+		isGlobalObject,
 		fetchFunction,
 		hookOf: (state) => importedHook(rootState(state)?.callee, moduleScope),
 	});
@@ -1722,12 +1736,66 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 	}
 
 	function reportSetter(node, phase) {
-		const effect = phase === 'effect';
-		const code = effect ? STRONG_EFFECT_STATE_UPDATE : STRONG_RENDER_STATE_UPDATE;
-		const message = effect
-			? 'Strong mode does not allow synchronous state updates inside effect setup. startTransition, a useTransition start function, queueMicrotask, Promise.resolve().then, a zero-delay setTimeout, and awaiting a value that is not a pending promise all run before the next paint, so they count as setup too. Derive the value during render or use useLinkedState when state follows another value.'
-			: 'Strong mode does not allow state updates during render. Use useLinkedState when state needs to reset or change with another value.';
-		report(code, node, message, [{ hook: 'useLinkedState' }]);
+		if (phase !== 'effect') {
+			report(
+				STRONG_RENDER_STATE_UPDATE,
+				node,
+				'Strong mode does not allow state updates during render. Use useLinkedState when state needs to reset or change with another value.',
+				[{ hook: 'useLinkedState', message: 'Follow the source value with useLinkedState.' }],
+			);
+			return;
+		}
+		// Copying a measurement of the committed DOM into state is the job
+		// useLayoutSnapshot does without a second render pass. The read may sit
+		// in the effect's own setup, or in the function the update runs in: a
+		// helper setup calls, or a microtask or transition callback that still
+		// counts as setup. A setter passed directly as the callback runs in no
+		// function of its own, so the enclosing component's reads do not count.
+		const effect = currentEffect;
+		const measures =
+			effect !== null &&
+			!effect.snapshot &&
+			((effect.callback?.kind === 'callback' && measuresLayout(effect.callback.node)) ||
+				(currentFunction !== effect.caller && measuresLayout(currentFunction)));
+		if (effect?.ref === true) {
+			report(
+				STRONG_REF_STATE_UPDATE,
+				node,
+				measures
+					? 'Strong mode does not allow synchronous state updates in a callback ref. Octane calls it while the element commits, before paint, like layout effect setup, and this one copies a DOM measurement into state. Pass a ref object and render from the measurement with useLayoutSnapshot(() => measure(), { initial }) instead: it measures after layout and re-renders before paint only when the value changes.'
+					: 'Strong mode does not allow synchronous state updates in a callback ref. Octane calls it while the element commits, before paint, like layout effect setup, so startTransition, queueMicrotask, Promise.resolve().then, and a zero-delay setTimeout count too. Pass a ref object to keep the element, and read it from effects and event handlers. Render from a DOM measurement with useLayoutSnapshot.',
+				[
+					measures
+						? {
+								hook: 'useLayoutSnapshot',
+								message:
+									'Replace the state and the callback ref with a ref object and useLayoutSnapshot.',
+							}
+						: { hook: 'useRef', message: 'Keep the element in a ref object.' },
+				],
+			);
+			return;
+		}
+		if (measures) {
+			report(
+				STRONG_EFFECT_STATE_UPDATE,
+				node,
+				'Strong mode does not allow synchronous state updates inside effect setup. This effect copies a DOM measurement into state. Render from the measurement with useLayoutSnapshot(() => measure(), { initial }) instead: it measures after layout and re-renders before paint only when the value changes.',
+				[
+					{
+						hook: 'useLayoutSnapshot',
+						message: 'Replace the state and the effect with useLayoutSnapshot.',
+					},
+				],
+			);
+			return;
+		}
+		report(
+			STRONG_EFFECT_STATE_UPDATE,
+			node,
+			'Strong mode does not allow synchronous state updates inside effect setup. startTransition, a useTransition start function, queueMicrotask, Promise.resolve().then, a zero-delay setTimeout, and awaiting a value that is not a pending promise all run before the next paint, so they count as setup too. Derive the value during render or use useLinkedState when state follows another value. Render from a DOM measurement with useLayoutSnapshot.',
+			[{ hook: 'useLinkedState', message: 'Derive the value, or follow it with useLinkedState.' }],
+		);
 	}
 
 	function reportStateGetterCall(node) {
@@ -1894,19 +1962,51 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 		);
 	}
 
+	const layoutReaders = new WeakMap();
+	function measuresLayout(fn) {
+		if (fn == null) return false;
+		let reads = layoutReaders.get(fn);
+		if (reads === undefined) layoutReaders.set(fn, (reads = readsLayout(fn)));
+		return reads;
+	}
+
+	// React's lazy ref idiom reads and writes `current` during render. Both
+	// reports name useLazyRef; only the first carries the edit, so applying
+	// every suggestion in a file rewrites the idiom once.
+	let lazyRefIdioms = null;
+	const suggestedLazyRefs = new Set();
+	function reportLazyRef(code, node) {
+		lazyRefIdioms ??= collectLazyRefIdioms(ast);
+		const idiom = lazyRefIdioms.get(unwrap(node));
+		if (idiom === undefined) return false;
+		const suggestion = suggestedLazyRefs.has(idiom)
+			? { message: 'Create the value once with useLazyRef.' }
+			: lazyRefSuggestion(idiom, ast, source);
+		suggestedLazyRefs.add(idiom);
+		report(
+			code,
+			node,
+			`Strong mode does not allow initializing ${idiom.name}.current during render. Use useLazyRef(() => value) in place of useRef: it creates the value once, when the ref's hook cell is created.`,
+			[{ hook: 'useLazyRef', ...suggestion }],
+		);
+		return true;
+	}
+
 	function reportRef(node) {
+		if (reportLazyRef(STRONG_RENDER_REF_WRITE, node)) return;
 		report(
 			STRONG_RENDER_REF_WRITE,
 			node,
-			'Strong mode does not allow writing to useRef.current during render. Move the write to an event or effect, or express the value as state.',
+			'Strong mode does not allow writing to useRef.current during render. Move the write to an event or effect, or express the value as state. To create a value once, use useLazyRef(() => value).',
 		);
 	}
 
 	function reportRefRead(node) {
+		if (reportLazyRef(STRONG_RENDER_REF_READ, node)) return;
 		report(
 			STRONG_RENDER_REF_READ,
 			node,
-			'Strong mode does not allow reading useRef.current during render. Read the ref in an event or effect, or use state or useLinkedState for values that drive render output.',
+			'Strong mode does not allow reading useRef.current during render. Read the ref in an event or effect, or use state or useLinkedState for values that drive render output. Render from a DOM measurement with useLayoutSnapshot.',
 		);
 	}
 
@@ -1916,7 +2016,27 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 		if (object?.type === 'SequenceExpression') {
 			return isRefObject(object.expressions?.[object.expressions.length - 1], scope);
 		}
-		return object?.type === 'CallExpression' && importedHook(object.callee, scope) === 'useRef';
+		return object?.type === 'CallExpression' && REF_HOOKS.has(importedHook(object.callee, scope));
+	}
+
+	// The argument a call receives at `position`, seen through literal array
+	// spreads: `useState(...[init])` passes `init` exactly as `useState(init)`
+	// does. An opaque spread at or before the position hides it.
+	function argumentAt(args, position) {
+		let current = 0;
+		for (const argument of args ?? []) {
+			if (argument.type !== 'SpreadElement') {
+				if (current++ === position) return argument;
+				continue;
+			}
+			const array = unwrap(argument.argument);
+			if (array?.type !== 'ArrayExpression') return null;
+			for (const element of array.elements) {
+				if (element?.type === 'SpreadElement') return null;
+				if (current++ === position) return element;
+			}
+		}
+		return null;
 	}
 
 	function readCurrentRef(member, scope) {
@@ -2838,7 +2958,11 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 				visit(body, functionScope, phase);
 				// An expression body returns its value, so it can supply the cleanup
 				// exactly like a block body's return statement.
-				if (currentEffect !== null && effectCallbackIsCurrent(currentEffect.callback)) {
+				if (
+					currentEffect !== null &&
+					!currentEffect.snapshot &&
+					effectCallbackIsCurrent(currentEffect.callback)
+				) {
 					markEffectCleanup(body, functionScope);
 				}
 				if (returnCollector?.fn === node) {
@@ -3012,7 +3136,7 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 				bind(declaration.id, stateTuple);
 			} else if (
 				initial?.type === 'CallExpression' &&
-				importedHook(initial.callee, scope) === 'useRef'
+				REF_HOOKS.has(importedHook(initial.callee, scope))
 			) {
 				bind(declaration.id, { kind: 'ref', declaration: declaration.id });
 			} else if (declarationKind === 'const' && transitionStart(initial, scope)) {
@@ -3032,7 +3156,7 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 					value?.kind === 'callback' ||
 					value?.kind === 'callback-choice' ||
 					value?.kind === 'effect-event' ||
-					value?.kind === 'linked-options' ||
+					value?.kind === 'comparator-options' ||
 					value?.kind === 'linked-key' ||
 					value?.kind === 'constant' ||
 					value?.kind === 'transition-start' ||
@@ -3060,10 +3184,10 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 					initial?.type === 'ConditionalExpression' ||
 					initial?.type === 'LogicalExpression' ||
 					initial?.type === 'SequenceExpression') &&
-				linkedStateOptionsExpression(initial, scope)
+				hookComparatorOptionsExpression(initial, scope)
 			) {
 				target.bindings.set(declaration.id.name, {
-					kind: 'linked-options',
+					kind: 'comparator-options',
 					node: initial,
 					scope,
 				});
@@ -3697,7 +3821,7 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 				return TRUTHY_VALUE;
 			}
 			if (binding?.kind === 'callback-choice') return binding.value;
-			if (binding?.kind === 'linked-options') {
+			if (binding?.kind === 'comparator-options') {
 				if (activeCallbacks.has(binding.node)) return UNKNOWN_VALUE;
 				activeCallbacks.add(binding.node);
 				try {
@@ -4324,33 +4448,92 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 		return effectPolicy.joinFlow(consequent, alternate);
 	}
 
-	function visitEffect(node, scope) {
+	function visitEffect(node, scope, snapshot = false) {
 		const enclosingEffect = currentEffect;
 		const enclosingOwnsWrites = effectOwnsWrites;
+		const enclosingCollectReads = collectEffectReads;
 		const callback = callableValue(node.arguments?.[0], scope);
 		const record = {
 			node,
 			owner: renderOwner,
+			caller: currentFunction,
 			callback,
 			reads: new Set(),
 			writes: new Set(),
+			snapshot,
 		};
+		if (
+			snapshot &&
+			callback?.kind === 'callback' &&
+			(callback.node.async === true || callback.node.generator === true)
+		) {
+			// A promise or iterator is a new object on every commit, so Object.is
+			// never settles the snapshot and it re-renders until the depth limit.
+			report(
+				STRONG_LAYOUT_SNAPSHOT_ASYNC,
+				callback.node,
+				'Strong mode requires useLayoutSnapshot to measure synchronously. An async or generator callback returns a new object on every commit, so the snapshot never converges. Return the measurement directly, and read asynchronous render data with use() or a query binding.',
+			);
+		}
 		const enclosingPolicy = effectPolicy.enterEffect(record);
 		currentEffect = record;
 		effectOwnsWrites = true;
+		if (snapshot) collectEffectReads = false;
 		effectRecords.push(record);
 		try {
-			visitExplicitStateDependencies(node.arguments?.[1], scope, record.reads);
+			if (!snapshot) visitExplicitStateDependencies(node.arguments?.[1], scope, record.reads);
 			visitCallable(callback, unwrap(node.arguments?.[0]), 'effect');
+			if (snapshot)
+				visitHookComparators(node.arguments?.[1], scope, 'effect', undefined, undefined, true);
 		} finally {
 			currentEffect = enclosingEffect;
 			effectOwnsWrites = enclosingOwnsWrites;
+			collectEffectReads = enclosingCollectReads;
 			effectPolicy.exitEffect(enclosingPolicy);
 		}
 		effectPolicy.finishEffect(
 			record,
 			callback?.kind === 'callback' && callback.node.async === true,
 		);
+	}
+
+	// Octane calls a host element's callback ref while the element commits,
+	// before paint, so its state updates follow the effect setup rules. Only
+	// those are checked: a ref has no dependency list, and the cleanup and
+	// effect-chain checks belong to effects.
+	function visitHostRef(expression, scope) {
+		const node = unwrap(expression);
+		if (node?.type === 'ArrayExpression') {
+			for (const element of node.elements ?? []) {
+				if (element !== null && element.type !== 'SpreadElement') visitHostRef(element, scope);
+			}
+			return;
+		}
+		const callback = callableValue(node, scope);
+		if (callback === null) return;
+		const enclosingEffect = currentEffect;
+		const enclosingOwnsWrites = effectOwnsWrites;
+		const enclosingCollectReads = collectEffectReads;
+		const record = {
+			node,
+			caller: currentFunction,
+			callback,
+			writes: new Set(),
+			snapshot: false,
+			ref: true,
+		};
+		const enclosingPolicy = effectPolicy.enterEffect(record);
+		currentEffect = record;
+		effectOwnsWrites = true;
+		collectEffectReads = false;
+		try {
+			visitCallable(callback, node, 'effect');
+		} finally {
+			currentEffect = enclosingEffect;
+			effectOwnsWrites = enclosingOwnsWrites;
+			collectEffectReads = enclosingCollectReads;
+			effectPolicy.exitEffect(enclosingPolicy);
+		}
 	}
 
 	// Synchronous effect setup must not read inputs that dependency inference
@@ -4654,11 +4837,11 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 		else visitCallable(value, origin, phase, args);
 	}
 
-	function visitSynchronousHookCallback(value, scope, phase, stateInitializer = false) {
+	function visitSynchronousHookCallback(value, scope, phase, lazyInitializer = false) {
 		const checkImpureCalls = currentFunctionChecksImpureCalls;
-		// Lazy state initialization may read a clock, randomness, or browser state. Keep its
-		// existing state/ref/Effect Event checks at the synchronous render phase.
-		if (stateInitializer) currentFunctionChecksImpureCalls = false;
+		// Lazy state and ref initialization may read a clock, randomness, or browser state.
+		// Keep its existing state/ref/Effect Event checks at the synchronous render phase.
+		if (lazyInitializer) currentFunctionChecksImpureCalls = false;
 		try {
 			visitCallable(callableValue(value, scope), unwrap(value), phase);
 		} finally {
@@ -4690,16 +4873,14 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 		}
 	}
 
-	function visitStateCallback(node, hook, index, setters, scope) {
-		const args = node.arguments ?? [];
-		if (args.slice(0, index + 1).some((argument) => argument.type === 'SpreadElement')) return;
-		const callback = callableValue(args[index], scope);
+	function visitStateCallback(node, hook, value, setters, scope) {
+		const callback = callableValue(value, scope);
 		if (callback === null) return;
-		const origin = unwrap(args[index]);
+		const origin = unwrap(value);
 		if (hook === 'useReducer') {
 			visitPureCallback(callback, origin, [stateTupleBinding(node, scope).snapshot, OTHER_BINDING]);
 		} else if (hook === 'useOptimistic') {
-			const passthrough = snapshotBinding(args[0], scope) ?? OTHER_BINDING;
+			const passthrough = snapshotBinding(argumentAt(node.arguments, 0), scope) ?? OTHER_BINDING;
 			visitPureCallback(callback, origin, [passthrough, OTHER_BINDING]);
 		} else {
 			for (const setter of setters) {
@@ -4744,7 +4925,7 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 		}
 	}
 
-	function linkedStateComparatorName(property, scope) {
+	function hookComparatorName(property, scope, snapshot = false) {
 		if (property?.type !== 'Property' || property.kind !== 'init') return null;
 		const key = unwrap(property.key);
 		const name =
@@ -4753,17 +4934,23 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 					? key.name
 					: key?.value
 				: staticPrimitiveValue(key, scope);
-		return name === 'sourceEqual' || name === 'valueEqual' ? name : null;
+		return snapshot
+			? name === 'equal'
+				? name
+				: null
+			: name === 'sourceEqual' || name === 'valueEqual'
+				? name
+				: null;
 	}
 
-	function linkedStateOptionsExpression(value, scope) {
+	function hookComparatorOptionsExpression(value, scope) {
 		const options = unwrap(value);
 		if (options?.type === 'Identifier') {
-			return resolve(scope, options.name)?.kind === 'linked-options';
+			return resolve(scope, options.name)?.kind === 'comparator-options';
 		}
 		if (options?.type === 'SequenceExpression') {
 			const expressions = options.expressions ?? [];
-			return linkedStateOptionsExpression(expressions[expressions.length - 1], scope);
+			return hookComparatorOptionsExpression(expressions[expressions.length - 1], scope);
 		}
 		if (options?.type === 'ConditionalExpression' || options?.type === 'LogicalExpression') {
 			const logical = options.type === 'LogicalExpression';
@@ -4773,27 +4960,35 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 			return (
 				((branches & 1) !== 0 &&
 					(!logical || options.operator !== '&&') &&
-					linkedStateOptionsExpression(logical ? options.left : options.consequent, scope)) ||
+					hookComparatorOptionsExpression(logical ? options.left : options.consequent, scope)) ||
 				((branches & 2) !== 0 &&
-					linkedStateOptionsExpression(logical ? options.right : options.alternate, scope))
+					hookComparatorOptionsExpression(logical ? options.right : options.alternate, scope))
 			);
 		}
 		return (
 			options?.type === 'ObjectExpression' &&
 			(options.properties ?? []).some((property) =>
 				property.type === 'SpreadElement'
-					? linkedStateOptionsExpression(property.argument, scope)
-					: linkedStateComparatorName(property, scope) !== null,
+					? hookComparatorOptionsExpression(property.argument, scope)
+					: hookComparatorName(property, scope) !== null ||
+						hookComparatorName(property, scope, true) !== null,
 			)
 		);
 	}
 
-	function visitLinkedStateComparators(value, parentScope, phase, overridden, activeOptions) {
+	function visitHookComparators(
+		value,
+		parentScope,
+		phase,
+		overridden,
+		activeOptions,
+		snapshot = false,
+	) {
 		let options = unwrap(value);
 		let scope = parentScope;
 		if (options?.type === 'Identifier') {
 			const binding = resolve(scope, options.name);
-			if (binding?.kind !== 'linked-options') return;
+			if (binding?.kind !== 'comparator-options') return;
 			options = binding.node;
 			scope = binding.scope;
 		}
@@ -4812,12 +5007,13 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 		try {
 			if (options.type === 'SequenceExpression') {
 				const expressions = options.expressions ?? [];
-				visitLinkedStateComparators(
+				visitHookComparators(
 					expressions[expressions.length - 1],
 					scope,
 					phase,
 					overridden,
 					activeOptions,
+					snapshot,
 				);
 				return;
 			}
@@ -4830,19 +5026,20 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 					logical && options.operator === '&&' ? null : logical ? options.left : options.consequent;
 				const second = logical ? options.right : options.alternate;
 				if (branches !== 3) {
-					visitLinkedStateComparators(
+					visitHookComparators(
 						branches === 1 ? first : second,
 						scope,
 						phase,
 						overridden,
 						activeOptions,
+						snapshot,
 					);
 					return;
 				}
 				const firstOverrides = new Set(overridden);
 				const secondOverrides = new Set(overridden);
-				visitLinkedStateComparators(first, scope, phase, firstOverrides, activeOptions);
-				visitLinkedStateComparators(second, scope, phase, secondOverrides, activeOptions);
+				visitHookComparators(first, scope, phase, firstOverrides, activeOptions, snapshot);
+				visitHookComparators(second, scope, phase, secondOverrides, activeOptions, snapshot);
 				for (const name of firstOverrides) {
 					if (secondOverrides.has(name)) overridden.add(name);
 				}
@@ -4852,13 +5049,22 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 			for (let index = properties.length - 1; index >= 0; index--) {
 				const property = properties[index];
 				if (property.type === 'SpreadElement') {
-					visitLinkedStateComparators(property.argument, scope, phase, overridden, activeOptions);
+					visitHookComparators(
+						property.argument,
+						scope,
+						phase,
+						overridden,
+						activeOptions,
+						snapshot,
+					);
 					continue;
 				}
-				const name = linkedStateComparatorName(property, scope);
+				const name = hookComparatorName(property, scope, snapshot);
 				if (name !== null && !overridden.has(name)) {
 					overridden.add(name);
-					visitSynchronousHookCallback(property.value, scope, phase);
+					if (snapshot)
+						visitCallable(callableValue(property.value, scope), unwrap(property.value), 'effect');
+					else visitSynchronousHookCallback(property.value, scope, phase);
 				}
 			}
 		} finally {
@@ -4955,7 +5161,23 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 				) {
 					reportModuleStateRead(name);
 				}
-				break;
+				for (const key in node) {
+					if (!SKIP_KEYS.has(key) && !key.startsWith('_octane')) visit(node[key], scope, phase);
+				}
+				// A component decides when to call a ref prop. A host element's ref
+				// runs when the element commits, wherever its JSX was created.
+				if (
+					!member &&
+					(name?.type === 'JSXNamespacedName' ||
+						(name?.type === 'JSXIdentifier' && /^[a-z]|-/.test(name.name)))
+				) {
+					for (const attribute of node.attributes ?? []) {
+						if (attribute.type === 'JSXAttribute' && attribute.name?.name === 'ref') {
+							visitHostRef(attribute.value?.expression, scope);
+						}
+					}
+				}
+				return;
 			}
 			case 'JSXSpreadAttribute':
 				visit(node.argument, scope, phase);
@@ -5003,7 +5225,11 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 			}
 			case 'ReturnStatement': {
 				visit(node.argument, scope, phase);
-				if (currentEffect !== null && effectCallbackIsCurrent(currentEffect.callback)) {
+				if (
+					currentEffect !== null &&
+					!currentEffect.snapshot &&
+					effectCallbackIsCurrent(currentEffect.callback)
+				) {
 					markEffectCleanup(node.argument, scope);
 				}
 				if (returnCollector?.fn === currentFunction) {
@@ -5375,7 +5601,11 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 						? 1
 						: hook === 'useReducer'
 							? 2
-							: hook === 'useState' || hook === 'useMemo' || EFFECT_HOOKS.has(hook)
+							: hook === 'useState' ||
+								  hook === 'useMemo' ||
+								  hook === 'useLazyRef' ||
+								  hook === 'useLayoutSnapshot' ||
+								  EFFECT_HOOKS.has(hook)
 								? 0
 								: -1;
 				const updaterSetters =
@@ -5396,11 +5626,34 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 					hook === null && pureCallbackIndex === -1 && executionPhase === 'render'
 						? renderPolicy.arrayCallbackIndex(callee, scope)
 						: -1;
+				// The hook and updater callbacks visited below with their own phase. visitEffect,
+				// which also checks useLayoutSnapshot, still reads its callback by syntactic
+				// position.
+				const synchronousCallback =
+					synchronousCallbackIndex === -1
+						? null
+						: EFFECT_HOOKS.has(hook) || hook === 'useLayoutSnapshot'
+							? (node.arguments?.[synchronousCallbackIndex] ?? null)
+							: argumentAt(node.arguments, synchronousCallbackIndex);
+				const pureCallback =
+					pureCallbackIndex === -1 ? null : argumentAt(node.arguments, pureCallbackIndex);
+				const ownsCallback = (value) =>
+					value != null &&
+					(value === synchronousCallback || value === pureCallback) &&
+					FUNCTION_TYPES.has(unwrap(value)?.type);
 				for (let index = 0; index < (node.arguments?.length ?? 0); index++) {
 					const argument = node.arguments[index];
-					if (
-						(index !== synchronousCallbackIndex &&
-							index !== pureCallbackIndex &&
+					const array = argument.type === 'SpreadElement' ? unwrap(argument.argument) : null;
+					if (array?.type === 'ArrayExpression' && array.elements.some(ownsCallback)) {
+						// A literal spread's other elements evaluate here, in order.
+						let elementPhase = executionPhase;
+						for (const element of array.elements) {
+							if (element === null) continue;
+							if (!ownsCallback(element)) visit(element, scope, elementPhase);
+							elementPhase = phaseAfter(element, elementPhase);
+						}
+					} else if (
+						(!ownsCallback(argument) &&
 							(index !== arrayCallbackIndex || unwrap(argument)?.generator === true) &&
 							!(index === 0 && component !== null)) ||
 						!FUNCTION_TYPES.has(unwrap(argument)?.type)
@@ -5418,8 +5671,8 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 						ARRAY_CALLBACK_ARGUMENTS,
 					);
 				}
-				if (pureCallbackIndex !== -1) {
-					visitStateCallback(node, hook, pureCallbackIndex, updaterSetters, scope);
+				if (pureCallback !== null) {
+					visitStateCallback(node, hook, pureCallback, updaterSetters, scope);
 				}
 				if (hook === null) {
 					if (executionPhase === 'deferred') {
@@ -5460,6 +5713,12 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 					visitEffect(node, scope);
 					return;
 				}
+				if (hook === 'useLayoutSnapshot') {
+					// The callback runs at layout time. Apply effect ownership checks,
+					// but its return is data and its options are not dependencies.
+					visitEffect(node, scope, true);
+					return;
+				}
 				if (
 					hook === 'useReducer' &&
 					executionPhase === 'render' &&
@@ -5468,7 +5727,7 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 					propProjection(node.arguments?.[1], scope)
 				)
 					unlinkedPropInitializers.add(unwrap(node.arguments[1]));
-				if (hook === 'useState' || hook === 'useMemo') {
+				if (hook === 'useState' || hook === 'useMemo' || hook === 'useLazyRef') {
 					if (
 						hook === 'useState' &&
 						executionPhase === 'render' &&
@@ -5478,20 +5737,20 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 						unlinkedPropInitializers.add(unwrap(node.arguments[0]));
 					}
 					visitSynchronousHookCallback(
-						node.arguments?.[0],
+						synchronousCallback,
 						scope,
 						executionPhase,
-						hook === 'useState',
+						hook !== 'useMemo',
 					);
 					return;
 				}
 				if (hook === 'useReducer') {
-					visitSynchronousHookCallback(node.arguments?.[2], scope, executionPhase, true);
+					visitSynchronousHookCallback(synchronousCallback, scope, executionPhase, true);
 					return;
 				}
 				if (hook === 'useLinkedState') {
-					visitSynchronousHookCallback(node.arguments?.[1], scope, executionPhase);
-					visitLinkedStateComparators(node.arguments?.[2], scope, executionPhase);
+					visitSynchronousHookCallback(synchronousCallback, scope, executionPhase);
+					visitHookComparators(node.arguments?.[2], scope, executionPhase);
 					return;
 				}
 				if (component !== null) {
@@ -5512,6 +5771,16 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 				if (executionPhase === 'render' && currentFunctionChecksImpureCalls) {
 					if (impureStandardCall(callee, scope)) reportImpureCall(callee);
 					renderPolicy.call(node, callee, scope, !insidePureCallback);
+				}
+				// Lazy initializers skip the impure-call checks above but still run in
+				// render, so they may not schedule work either. Updaters and reducers
+				// report scheduling through the state policy instead.
+				if (
+					executionPhase === 'render' &&
+					currentFunctionChecksRenderReads &&
+					!insidePureCallback
+				) {
+					renderPolicy.schedule(callee, scope);
 				}
 				const mutation = statePolicy.snapshotMutation(callee, node.arguments, scope);
 				if (mutation !== null) reportSnapshotMutationIn(mutation, executionPhase);
@@ -6021,8 +6290,12 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 		...analyzeStrongExternalStore(ast, strongHookAnalysis, stateDiagnostic),
 	);
 	for (const policy of analyzeStrongHookPolicies(ast, options)) {
+		const suggestions =
+			policy.hook === 'useMemo' || policy.hook === 'useCallback'
+				? [manualMemoSuggestion(policy.node, policy.hook, source)]
+				: [];
 		diagnostics.push({
-			...diagnostic(policy.code, filename, policy.node, policy.message),
+			...diagnostic(policy.code, filename, policy.node, policy.message, suggestions),
 			severity: policy.severity,
 		});
 	}
@@ -6036,6 +6309,17 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 	return { enabled, diagnostics, nativeChangeAnalysis, strongHookAnalysis };
 }
 
+/**
+ * A build error is the documentation an author reads first, so a Strong code
+ * names the page that explains it and shows the replacement.
+ *
+ * @param {string} code
+ * @param {string} message
+ */
+export function withStrongDocs(code, message) {
+	return code.startsWith('OCTANE_STRONG_') ? `${message} See ${strongDocsUrl(code)}` : message;
+}
+
 /** Throw the first Strong-mode violation using the original authored location. */
 export function assertStrongMode(ast, source, filename, options) {
 	if (options?.strong !== true && !source.includes('use strong')) return;
@@ -6045,7 +6329,7 @@ export function assertStrongMode(ast, source, filename, options) {
 	const { code, message } = violation;
 	const { line, column } = violation.start;
 	const error = new SyntaxError(
-		`${filename ?? '<anonymous>'}:${line}:${column + 1}: [${code}] ${message}`,
+		`${filename ?? '<anonymous>'}:${line}:${column + 1}: [${code}] ${withStrongDocs(code, message)}`,
 	);
 	error.code = code;
 	error.filename = filename;

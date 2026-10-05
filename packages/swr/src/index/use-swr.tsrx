@@ -282,21 +282,20 @@ export const useSWRHandler = <Data = any, Error = any>(
 	const hydrationRef = useRef<boolean | null>(null);
 	// Note: the conditionally hook call is fine because the environment
 	// `IS_SERVER` never changes.
-	const _ =
-		!IS_SERVER &&
-			// getServerSnapshot is only called during hydration
-			// eslint-disable-next-line react-hooks/rules-of-hooks
-			useSyncExternalStore(
-				sub,
-				() => {
-					hydrationRef.current = false;
-					return hydrationRef;
-				},
-				() => {
-					hydrationRef.current = true;
-					return hydrationRef;
-				},
-			);
+	!IS_SERVER &&
+		// getServerSnapshot is only called during hydration
+		// eslint-disable-next-line react-hooks/rules-of-hooks
+		useSyncExternalStore(
+			sub,
+			() => {
+				hydrationRef.current = false;
+				return hydrationRef;
+			},
+			() => {
+				hydrationRef.current = true;
+				return hydrationRef;
+			},
+		);
 	const isHydration = hydrationRef.current;
 	// During the initial SSR render, warn if the key has no data pre-fetched via:
 	// - fallback data

@@ -4,6 +4,7 @@ import { recordActivation } from './measurements.ts';
 import { history$ } from './State.tsrx';
 
 export function History() @{
+	'use dom bindings';
 	useLayoutEffect(() => recordActivation('history'), []);
 	<section class="history" aria-label="Recent conversations">
 		<header class="panel-header">

@@ -48,6 +48,8 @@ export interface ClientEntryOptions {
 }
 
 export function create_client_entry_source(options?: ClientEntryOptions): string;
+/** The renderer-free entry for `hydrate: 'islands'` routes; it never imports `octane`. */
+export function create_islands_entry_source(options?: ClientEntryOptions): string;
 
 export interface ServerEntryOptions {
 	routes: Route[];
@@ -64,6 +66,8 @@ export interface ServerEntryOptions {
 	independentHydrationManifest?: import('@octanejs/app-core/production').IndependentHydrationBuildManifest;
 	/** Optional JSON manifest resolved beside the built server entry. */
 	independentHydrationManifestFile?: string;
+	/** Template URL of the renderer-free bootstrap for `hydrate: 'islands'` routes. */
+	islandsEntry?: string | null;
 	/** Stable application module ID to emitted bundler import specifier. */
 	moduleImports?: Record<string, string>;
 	resolveImport?: (id: string) => string;

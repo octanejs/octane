@@ -184,6 +184,7 @@ export const REQUIRED_PUBLIC_VALUE_EXPORTS = {
 		'useImperativeHandle',
 		'useInsertionEffect',
 		'useLayoutEffect',
+		'useLazyRef',
 		'useMemo',
 		'useOptimistic',
 		'useReducer',
@@ -214,6 +215,7 @@ export const REQUIRED_PUBLIC_VALUE_EXPORTS = {
 		'bootstrapStreamedSignalResults',
 		'installSignalDocumentLifecycle',
 	],
+	'./hydration/independent-strategies': ['independentHydrationStrategies'],
 	'./behavior': ['adoptBindings', 'mountBindings', 'attachBehaviorRoot', 'unbound'],
 	'./dom-bindings': ['__adoptBindings', '__adoptScalarBindings', '__bindingURL', '__mountBindings'],
 	'./dom-binding-program': [
@@ -223,8 +225,14 @@ export const REQUIRED_PUBLIC_VALUE_EXPORTS = {
 		'__activateBindingAdapters',
 		'__methodDep',
 	],
+	'./dom-binding-island': ['__createBindingIslandActivator'],
 	'./dom-binding-classes': ['__bindingClassReceipt', 'createBindingClassGroup'],
-	'./dom-binding-signals': ['__assertBindingSnapshot', '__createBindingSignals'],
+	'./dom-binding-signals': [
+		'__assertBindingSnapshot',
+		'__createBindingReads',
+		'__createBindingSignals',
+		'__trackBindingRead',
+	],
 	'./dom-binding-controls': ['__createBindingControls'],
 	'./dom-binding-styles': ['__createBindingStyles'],
 	'./dom-binding-projections': ['__createBindingProjections'],
@@ -343,6 +351,7 @@ export const REQUIRED_PUBLIC_VALUE_EXPORTS = {
 		'useImperativeHandle',
 		'useInsertionEffect',
 		'useLayoutEffect',
+		'useLazyRef',
 		'useMemo',
 		'useOptimistic',
 		'useReducer',
@@ -497,6 +506,7 @@ export const REQUIRED_PUBLIC_VALUE_EXPORTS = {
 		'useImperativeHandle',
 		'useInsertionEffect',
 		'useLayoutEffect',
+		'useLazyRef',
 		'useMemo',
 		'useOptimistic',
 		'useReducer',
@@ -558,6 +568,7 @@ export const REQUIRED_PUBLIC_VALUE_EXPORTS = {
 		'useImperativeHandle',
 		'useInsertionEffect',
 		'useLayoutEffect',
+		'useLazyRef',
 		'useMemo',
 		'useOptimistic',
 		'useReducer',
@@ -571,7 +582,12 @@ export const REQUIRED_PUBLIC_VALUE_EXPORTS = {
 	],
 	// No `octane` here: the Vite plugin would drag this browser-facing subpath's
 	// module graph into `node:fs`/`node:path`. It stays on `./compiler/vite`.
-	'./compiler': ['__analyzeNativeChangeDiagnostics', 'compile', 'compileToVolarMappings'],
+	'./compiler': [
+		'__analyzeNativeChangeDiagnostics',
+		'collectDiagnostics',
+		'compile',
+		'compileToVolarMappings',
+	],
 	'./compiler/bundler': [
 		'CLIENT_REFERENCE_MANIFEST_FILENAME',
 		'CLIENT_REFERENCE_MANIFEST_VERSION',
@@ -735,6 +751,38 @@ export async function verifyDist(pkgDir) {
 		throw new Error(
 			`octane dist verify: publishConfig.exports targets missing from the build:\n` +
 				missing.map((p) => `  ${p}`).join('\n'),
+		);
+	}
+
+	// Published modules import the `#octane/dist/` twin of a source `#octane/` key
+	// (build-runtime.mjs). The repository and the tarball must resolve it alike.
+	const distImports = Object.keys(pkg.imports ?? {}).filter((key) =>
+		key.startsWith('#octane/dist/'),
+	);
+	const importDrift = distImports.filter((key) => {
+		const targets = new Set();
+		collectExportTargets(pkg.imports[key], targets);
+		return (
+			JSON.stringify(pkg.imports[key]) !== JSON.stringify(pkg.publishConfig.imports?.[key]) ||
+			[...targets].some((target) => !existsSync(join(pkgDir, target)))
+		);
+	});
+	const sourceImports = distImports.map((key) => `#octane/${key.slice('#octane/dist/'.length)}`);
+	const unrewritten = readdirSync(dist, { recursive: true })
+		.filter((file) => /\.c?js$/.test(file))
+		.filter((file) => {
+			const code = readFileSync(join(dist, file), 'utf8');
+			return sourceImports.some((key) => code.includes(`'${key}'`) || code.includes(`"${key}"`));
+		});
+	if (importDrift.length > 0 || unrewritten.length > 0) {
+		throw new Error(
+			`octane dist verify: package imports do not resolve to dist:\n` +
+				[
+					...importDrift.map(
+						(key) => `  ${key} differs from publishConfig or names a missing file`,
+					),
+					...unrewritten.map((file) => `  dist/${file} imports a source-only #octane key`),
+				].join('\n'),
 		);
 	}
 

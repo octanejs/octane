@@ -116,6 +116,26 @@ export async function loadStrongPolicy(project, { required }) {
 }
 
 /**
+ * The installed compiler's leading `@jsxImportSource` scanner, for deciding
+ * which `.tsx` modules are Octane JSX when no Strong policy was loaded. `null`
+ * when the installed octane predates it.
+ *
+ * @param {string} root
+ * @returns {Promise<Pick<StrongPolicy, 'jsxPragma'> | null>}
+ */
+export async function loadJsxPragma(root) {
+	try {
+		const require = createRequire(path.join(root, 'noop.js'));
+		const bundler = await import(pathToFileURL(require.resolve('octane/compiler/bundler')).href);
+		return typeof bundler.findLeadingJsxImportSourcePragma === 'function'
+			? { jsxPragma: bundler.findLeadingJsxImportSourcePragma }
+			: null;
+	} catch {
+		return null;
+	}
+}
+
+/**
  * An import of octane or one of its subpaths, capturing its clause. The clause
  * may span lines but never reaches into the next `import`, so a semicolon-free
  * module cannot borrow a later import's specifier.
@@ -166,7 +186,7 @@ function isOctaneJsxSource(source) {
  * @param {string} absolute
  * @param {string} source
  * @param {string | undefined} jsxImportSource from tsconfig
- * @param {StrongPolicy} policy
+ * @param {Pick<StrongPolicy, 'jsxPragma'>} policy
  */
 export function isOctaneModule(absolute, source, jsxImportSource, policy) {
 	if (absolute.endsWith('.d.ts')) return false;

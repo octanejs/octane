@@ -111,6 +111,11 @@ a:hover {
 ::selection {
 	background: rgba(255, 65, 90, 0.45);
 }
+/* Browser link-to-text highlights should follow the site's palette, too. */
+::target-text {
+	background: var(--accent);
+	color: var(--on-accent);
+}
 pre.shiki {
 	background: var(--code-bg) !important;
 	border: 1px solid var(--border);

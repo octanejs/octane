@@ -308,6 +308,7 @@ test('ordinary client roots tree-shake native transitions and require emitted-by
 		'signals/transition-candidate.ts',
 		'signals/transition-action.ts',
 		'signals/transition-coordinator.ts',
+		'signals/candidate-producers.ts',
 	]) {
 		verifyTransitionBoundary(scenario('ordinary-client'), [
 			...ordinary,
@@ -457,6 +458,165 @@ export function mount(parent) { const root = createRoot(parent); root.render(Vie
 		host.remove();
 	}
 	verifyTransitionBoundary(scenario('ordinary-client'), ordinary.inputs);
+});
+
+// Only the renderer consumes the signal Action frame and transition coordinator,
+// but no import edge loads code only when both renderer and graph are present.
+// package.json places it with the graph by default and with the renderer under
+// `octane-islands`, which documents that load signals without the renderer use.
+// The frame's candidate producers for resources and derived cells follow it:
+// by default the binding modules that create those cells carry them.
+test('the octane-islands condition moves signal Actions from signal bundles into the renderer', async (t) => {
+	const directory = path.resolve('packages/octane');
+	const bundle = async (contents, conditions) => {
+		const result = await build({
+			stdin: { contents, resolveDir: directory },
+			bundle: true,
+			write: false,
+			minify: true,
+			metafile: true,
+			format: 'esm',
+			platform: 'browser',
+			target: 'es2022',
+			legalComments: 'none',
+			tsconfigRaw: { compilerOptions: {} },
+			define: { 'process.env.NODE_ENV': '"production"', __OCTANE_PROFILE_ENABLED__: 'false' },
+			...(conditions ? { conditions } : null),
+		});
+		const output = Object.values(result.metafile.outputs)[0];
+		const bytes = (name) =>
+			Object.entries(output.inputs)
+				.filter(([input]) => input.endsWith(`/src/signals/${name}.ts`))
+				.reduce((total, [, input]) => total + input.bytesInOutput, 0);
+		return {
+			code: result.outputFiles[0].text,
+			action: bytes('transition-action'),
+			coordinator: bytes('transition-coordinator'),
+			producers: bytes('candidate-producers'),
+		};
+	};
+	const signalBundles = BUNDLE_CASES.filter(
+		(entry) =>
+			(entry.id === 'engine' || entry.rendererFree) &&
+			!entry.graphFree &&
+			!entry.compilePlain &&
+			entry.platform === 'browser',
+	);
+	assert.ok(
+		['engine', 'streamed-signals-bootstrap'].every((id) =>
+			signalBundles.some((entry) => entry.id === id),
+		),
+	);
+	for (const entry of signalBundles) {
+		const graphPlaced = await bundle(entrySource(entry));
+		assert.ok(
+			graphPlaced.action > 0 && graphPlaced.coordinator > 0,
+			`${entry.id}: the default build keeps signal Actions with the graph.`,
+		);
+		// The engine entry imports the module that creates resources but creates none.
+		if (entry.id === 'engine')
+			assert.equal(graphPlaced.producers, 0, 'engine: kept a producer for cells it never creates.');
+		const islands = await bundle(entrySource(entry), ['octane-islands']);
+		assert.equal(islands.action, 0, `${entry.id}: an islands signal bundle kept the Action frame.`);
+		assert.equal(
+			islands.coordinator,
+			0,
+			`${entry.id}: an islands signal bundle kept the transition coordinator.`,
+		);
+		assert.equal(
+			islands.producers,
+			0,
+			`${entry.id}: an islands signal bundle kept the candidate producers.`,
+		);
+	}
+	const cells = `export { createScope, createResource, derived$, query } from 'octane/signals';`;
+	assert.ok(
+		(await bundle(cells)).producers > 0,
+		'A default bundle that creates resources and derived cells must carry their producers.',
+	);
+	assert.equal((await bundle(cells, ['octane-islands'])).producers, 0);
+	const ordinary = entrySource(scenario('ordinary-client'));
+	const rendererOnly = await bundle(ordinary);
+	assert.deepEqual(
+		[rendererOnly.action, rendererOnly.coordinator, rendererOnly.producers],
+		[0, 0, 0],
+	);
+	const islandsRenderer = await bundle(ordinary, ['octane-islands']);
+	assert.ok(
+		islandsRenderer.action > 0 && islandsRenderer.coordinator > 0 && islandsRenderer.producers > 0,
+		'An islands build must carry signal Actions and their candidate producers with the renderer.',
+	);
+
+	// Both placements stay complete. The renderer is loaded first, and its Action
+	// imports signals only after it awaited. No component reads them natively. A
+	// declared derived cell and a query resource stage through their own producers.
+	const lateSignals = `import { startTransition } from 'octane';
+export function lateSignalAction() {
+ let release;
+ const released = new Promise((resolve) => { release = resolve; });
+ let ready;
+ let action;
+ const state = new Promise((resolve, reject) => { ready = { resolve, reject }; });
+ startTransition(() => {
+  action = (async () => {
+   const { createResource, createScope, derived$, query, runWithSignalOwner } = await import('octane/signals');
+   const scope = createScope({ scopeKey: 'late-islands-action' });
+   const count = scope.signal$('count', 0);
+   const doubled = scope.derived$('doubled', () => count.get() * 2);
+   const tripled$ = derived$(() => count.get() * 3, { key: 'tripled' });
+   const tripled = () => runWithSignalOwner(scope, () => tripled$.get());
+   const lookup = query('late-islands-lookup', (value) => value * 10);
+   const looked = createResource(scope, 'looked', () => lookup(count.get()));
+   try { looked.get(); } catch (pending) { await pending; }
+   const notifications = [];
+   const stop = count.subscribe(() => notifications.push(count.get()));
+   let staged;
+   startTransition(() => {
+    count.set(2);
+    staged = [count.get(), doubled.get(), tripled()];
+    try { looked.get(); } catch (pending) { if (typeof pending?.then !== 'function') throw pending; }
+   });
+   ready.resolve({ scope, count, tripled, looked, notifications, staged, stop });
+   await released;
+  })();
+  action.catch((error) => ready.reject(error));
+  return action;
+ });
+ return { state, release: () => { release(); return action; } };
+}`;
+	for (const conditions of [undefined, ['octane-islands']]) {
+		const label = conditions ? 'renderer placement' : 'graph placement';
+		const { code } = await bundle(lateSignals, conditions);
+		const api = await import('data:text/javascript;base64,' + Buffer.from(code).toString('base64'));
+		const pending = api.lateSignalAction();
+		const state = await pending.state;
+		try {
+			assert.deepEqual(state.staged, [2, 4, 6], `${label}: the transition scope reads its writes.`);
+			assert.deepEqual(
+				[state.count.get(), state.tripled(), state.looked.get()],
+				[0, 0, 0],
+				`${label}: the write published before the Action settled.`,
+			);
+			assert.deepEqual(state.notifications, [], label);
+			await pending.release();
+			const deadline = performance.now() + 2_000;
+			while (
+				(state.notifications.length === 0 || state.looked.latest() !== 20) &&
+				performance.now() < deadline
+			)
+				await new Promise((resolve) => setTimeout(resolve, 1));
+			assert.deepEqual(
+				[state.count.get(), state.tripled(), state.looked.latest()],
+				[2, 6, 20],
+				label,
+			);
+			assert.deepEqual(state.notifications, [2], label);
+		} finally {
+			state.stop();
+			state.scope.dispose();
+		}
+		t.diagnostic(`${label}: late signals staged and published once`);
+	}
 });
 
 for (const id of ['ordinary-client', 'ordinary-server']) {
@@ -1087,6 +1247,166 @@ export function activate(container) { return hydrateRoot(container, Island, {});
 		assert.equal(button.textContent, '5');
 		host.remove();
 	}
+});
+
+// An independent island whose only child is a zero-argument binding view selects
+// that view's program as its activator (#1514). Its chunk must not reach the
+// renderer; the same island over an ordinary component still activates with it.
+test('independent islands over binding views activate without the renderer', async (t) => {
+	const directory = import.meta.dirname;
+	const app = `import { Hydrate } from 'octane';
+import { interaction } from 'octane/hydration';
+import { Panel } from './island-panel.tsrx';
+export function App() @{
+ <main><Hydrate independent when={interaction()}><Panel /></Hydrate></main>
+}`;
+	const panel = (bindings) => `import { useLayoutEffect } from 'octane';
+import { count$, increment, mounted } from './island-state.tsrx';
+export function Panel() @{
+ ${bindings ? "'use dom bindings';" : ''}
+ useLayoutEffect(() => mounted(), []);
+ <section>
+  <button type="button" onClick={increment}>{count$}</button>
+  @if (count$.get() > 2) { <p>many</p> }
+ </section>
+}`;
+	const state = `import { signal$ } from 'octane/signals';
+export const count$ = signal$(1);
+export let activations = 0;
+export function mounted() { activations++; }
+export function increment() { count$.set((n) => n + 1); }`;
+	const options = { dev: false, hmr: false };
+	const renderer = /packages\/octane\/src\/(?:runtime(?:\.server)?\.ts|internal\/client\.ts)$/;
+	const bundle = async (entry, bindings, mode = 'client') => {
+		const sources = {
+			'island-app.tsrx': app,
+			'island-panel.tsrx': panel(bindings),
+			'island-state.tsrx': state,
+		};
+		const result = await build({
+			stdin: {
+				contents: compile(entry, path.join(directory, 'island-entry.tsrx'), { ...options, mode })
+					.code,
+				resolveDir: directory,
+			},
+			bundle: true,
+			metafile: true,
+			write: false,
+			minify: true,
+			treeShaking: true,
+			format: 'esm',
+			platform: mode === 'server' ? 'node' : 'browser',
+			target: 'es2022',
+			legalComments: 'none',
+			tsconfigRaw: { compilerOptions: {} },
+			define: { 'process.env.NODE_ENV': '"production"', __OCTANE_PROFILE_ENABLED__: 'false' },
+			plugins: [
+				{
+					name: 'binding-island',
+					setup(plugin) {
+						plugin.onResolve({ filter: /island-(?:app|panel|state)\.tsrx(?:\?.*)?$/ }, (args) => ({
+							path: path.resolve(args.resolveDir, args.path),
+							namespace: 'binding-island',
+						}));
+						plugin.onLoad({ filter: /.*/, namespace: 'binding-island' }, ({ path: id }) => ({
+							// Compile the requested id, so every island query selects its module.
+							contents: compile(sources[path.basename(id.split('?')[0])], id, { ...options, mode })
+								.code,
+							loader: 'js',
+							resolveDir: directory,
+						}));
+					},
+				},
+			],
+		});
+		const code = result.outputFiles[0].text;
+		return {
+			api: await import('data:text/javascript;base64,' + Buffer.from(code).toString('base64')),
+			gzip: gzipSync(code, { level: 9 }).length,
+			resolved: Object.keys(result.metafile.inputs),
+		};
+	};
+	const window = new Window();
+	const globals = new Map();
+	for (const name of [
+		'window',
+		'document',
+		'Node',
+		'Element',
+		'HTMLElement',
+		'Comment',
+		'Text',
+		'Event',
+		'MouseEvent',
+		'MutationObserver',
+	]) {
+		globals.set(name, Object.getOwnPropertyDescriptor(globalThis, name));
+		Object.defineProperty(globalThis, name, {
+			configurable: true,
+			value: name === 'window' ? window : window[name],
+		});
+	}
+	t.after(() => {
+		for (const [name, descriptor] of globals) {
+			if (descriptor) Object.defineProperty(globalThis, name, descriptor);
+			else delete globalThis[name];
+		}
+		window.close();
+	});
+
+	const sizes = {};
+	for (const bindings of [true, false]) {
+		const server = await bundle(
+			`import { App } from './island-app.tsrx';
+import { renderToString } from 'octane/server';
+export function render() {
+ return renderToString(App, undefined, {
+  independentHydration: { buildId: 'island', resolve: (moduleId) => ({ moduleId, styles: [] }) },
+ }).html;
+}`,
+			bindings,
+			'server',
+		);
+		// The island chunk is exactly what the bootstrap loads for this boundary.
+		const island = await bundle(
+			`export { default } from './island-app.tsrx?octane-hydrate=0';
+export { activations, count$ } from './island-state.tsrx';`,
+			bindings,
+		);
+		const reached = island.resolved.filter((id) => renderer.test(id));
+		if (bindings) assert.deepEqual(reached, [], 'A binding-view island reached the renderer.');
+		// Control: the ordinary component's island still loads the renderer, so the
+		// check above cannot pass because the pattern stopped matching.
+		else assert.ok(reached.length > 0, 'An ordinary island did not load the renderer.');
+		sizes[bindings ? 'binding' : 'renderer'] = island.gzip;
+
+		const host = window.document.createElement('div');
+		host.innerHTML = server.api.render();
+		window.document.body.append(host);
+		const element = host.querySelector('[data-octane-hydrate-id]');
+		const sidecar = element.querySelector('script[data-octane-independent]');
+		const manifest = JSON.parse(sidecar.textContent);
+		sidecar.remove();
+		const button = host.querySelector('button');
+		assert.equal(button.textContent, '1');
+		const root = await island.api.default({ element, manifest, captures: [], intents: [] });
+		try {
+			assert.equal(island.api.activations, 1);
+			assert.ok(host.querySelector('button') === button);
+			button.click();
+			button.click();
+			assert.equal(island.api.count$.get(), 3);
+			// The renderer control only proves activation; its commits are scheduled.
+			if (bindings) {
+				assert.equal(button.textContent, '3');
+				assert.equal(host.querySelector('p')?.textContent, 'many');
+			}
+		} finally {
+			root?.unmount();
+		}
+		host.remove();
+	}
+	t.diagnostic(JSON.stringify(sizes));
 });
 
 test('list-free programs omit list costs while imported legacy lists remain live', async (t) => {

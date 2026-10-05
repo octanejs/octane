@@ -27,7 +27,10 @@
 //
 // Cold ops are mean-scored (scoreMode:'mean'): every sample is a genuine cold
 // workerd process + isolate; the steady-window default would discard them as
-// warmup. Note miniflare cold start is a LOCAL approximation of Cloudflare's
+// warmup. Cold samples are PAIRED: every target first gets one untimed spawn
+// (the first workerd launch of a run also pages in the binary, which used to
+// land on whichever target ran first), then each round spawns every target
+// once in a rotating order, so runner drift moves both sides of a ratio. Note miniflare cold start is a LOCAL approximation of Cloudflare's
 // (workerd process spawn included; Cloudflare pre-warms deployments and
 // caches compiled scripts platform-side), so treat absolute values as
 // comparative, not production predictions.
@@ -50,6 +53,7 @@ import { Miniflare } from 'miniflare';
 import { scoreOf, summarizeSamples, timingStatForJson } from '../lib/stats.mjs';
 import { countMatches, semanticHtmlForVerification, verifyStream } from '../lib/stream-verify.mjs';
 import { now } from '../lib/http-timing.mjs';
+import { roundOrder } from '../lib/paired.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const DIST = path.join(__dirname, 'dist');
@@ -192,25 +196,56 @@ async function timedDispatch(worker, urlPath, collectBody = false) {
 const results = [];
 const failures = [];
 
+// One cold sample: a fresh Miniflare (workerd process + isolate + full script
+// parse), all-fast scenario so the staggered data schedule doesn't floor TTFB.
+async function coldSample(job) {
+	const worker = makeWorker(job.script);
+	try {
+		const t0 = now();
+		await worker.ready;
+		const tReady = now();
+		const r = await timedDispatch(worker, job.urlFor('all-fast'));
+		if (r.status !== 200) throw new Error(`cold request returned HTTP ${r.status}`);
+		return { ready: tReady - t0, firstByte: r.ttfbMs };
+	} finally {
+		await worker.dispose();
+	}
+}
+
+const jobs = [];
 for (const t of selected) {
 	const script =
 		t.kind === 'app'
 			? path.join(__dirname, t.dir, 'dist/server/worker.js')
 			: path.join(DIST, t.name, 'worker.js');
-	const scriptDir = path.dirname(script);
-	const urlFor = (scenario) => (t.kind === 'app' ? `/${scenario}` : `/?scenario=${scenario}`);
 	if (!fs.existsSync(script)) {
 		failures.push(`${t.name}: missing build output ${script} (run without --no-build first)`);
 		console.error(`  ✗ ${failures[failures.length - 1]}`);
 		continue;
 	}
-	const target = { name: t.name, ops: {}, meta: {} };
+	const urlFor = (scenario) => (t.kind === 'app' ? `/${scenario}` : `/?scenario=${scenario}`);
+	jobs.push({
+		t,
+		script,
+		urlFor,
+		target: { name: t.name, ops: {}, meta: {} },
+		cold: { spawnToReady: [], readyToFirstByte: [], spawnToFirstByte: [] },
+		failed: false,
+	});
+}
+const fail = (job, err) => {
+	job.failed = true;
+	failures.push(`${job.t.name}: ${err.message}`);
+	console.error(`  ✗ ${err.message}`);
+};
+
+// 1) deploy-relevant script size (the whole outDir — vite may emit assets
+//    chunks beside worker.js; workerd loads them all).
+for (const job of jobs) {
 	try {
-		// 1) deploy-relevant script size (the whole outDir — vite may emit
-		//    assets chunks beside worker.js; workerd loads them all).
 		let raw = 0;
 		let gz = 0;
-		for (const entry of fs.readdirSync(scriptDir, {
+		for (const entry of fs.readdirSync(path.dirname(job.script), {
 			withFileTypes: true,
 			recursive: true,
 		})) {
@@ -219,38 +254,54 @@ for (const t of selected) {
 			raw += content.length;
 			gz += gzipSync(content, { level: 9 }).length;
 		}
-		target.ops.worker_script_bytes = sizeOp(raw);
-		target.ops.worker_script_gzip_bytes = sizeOp(gz);
+		job.target.ops.worker_script_bytes = sizeOp(raw);
+		job.target.ops.worker_script_gzip_bytes = sizeOp(gz);
+	} catch (err) {
+		fail(job, err);
+	}
+}
 
-		// 2) cold isolate starts: fresh Miniflare (workerd process + isolate +
-		//    full script parse) per sample, all-fast scenario so the staggered
-		//    data schedule doesn't floor TTFB.
-		console.error(`running ${t.name}/cold (${ITER} fresh workerd spawns)…`);
-		const spawnToReady = [];
-		const readyToFirstByte = [];
-		const spawnToFirstByte = [];
-		for (let i = 0; i < ITER; i++) {
-			const worker = makeWorker(script);
-			try {
-				const t0 = now();
-				await worker.ready;
-				const tReady = now();
-				const r = await timedDispatch(worker, urlFor('all-fast'));
-				if (r.status !== 200) throw new Error(`cold request returned HTTP ${r.status}`);
-				spawnToReady.push(tReady - t0);
-				readyToFirstByte.push(r.ttfbMs);
-				spawnToFirstByte.push(tReady - t0 + r.ttfbMs);
-			} finally {
-				await worker.dispose();
-			}
+// 2) cold isolate starts, paired across targets: one untimed priming spawn per
+//    target, then ITER rounds of one spawn per target in a rotating order.
+console.error(
+	`running cold starts (${ITER} paired rounds of ${jobs.length} fresh workerd spawns)…`,
+);
+for (const job of jobs) {
+	try {
+		await coldSample(job);
+	} catch (err) {
+		fail(job, err);
+	}
+}
+for (let i = 0; i < ITER; i++) {
+	for (const job of roundOrder(
+		jobs.filter((j) => !j.failed),
+		i,
+	)) {
+		try {
+			const { ready, firstByte } = await coldSample(job);
+			job.cold.spawnToReady.push(ready);
+			job.cold.readyToFirstByte.push(firstByte);
+			job.cold.spawnToFirstByte.push(ready + firstByte);
+		} catch (err) {
+			fail(job, err);
 		}
-		target.ops.cold_spawn_to_ready = summarizeCold(spawnToReady);
-		target.ops.cold_ready_to_first_byte = summarizeCold(readyToFirstByte);
-		target.ops.cold_spawn_to_first_byte = summarizeCold(spawnToFirstByte);
+	}
+}
+for (const job of jobs) {
+	if (job.failed) continue;
+	job.target.ops.cold_spawn_to_ready = summarizeCold(job.cold.spawnToReady);
+	job.target.ops.cold_ready_to_first_byte = summarizeCold(job.cold.readyToFirstByte);
+	job.target.ops.cold_spawn_to_first_byte = summarizeCold(job.cold.spawnToFirstByte);
+}
 
+for (const job of jobs) {
+	if (job.failed) continue;
+	const { t, target, urlFor } = job;
+	try {
 		// 3) warm per scenario: one workerd, warmups, verify pass (shared
 		//    correctness gate on the wire output), then timed requests.
-		const worker = makeWorker(script);
+		const worker = makeWorker(job.script);
 		try {
 			await worker.ready;
 			for (const scenario of ['staggered', 'all-fast']) {
@@ -313,8 +364,7 @@ for (const t of selected) {
 		target.meta.nodeVersion = process.version;
 		results.push(target);
 	} catch (err) {
-		failures.push(`${t.name}: ${err.message}`);
-		console.error(`  ✗ ${err.message}`);
+		fail(job, err);
 	}
 }
 

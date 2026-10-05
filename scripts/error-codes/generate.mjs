@@ -181,6 +181,7 @@ const CLIENT_ONLY_MODULES = new Set([
 	'dom-binding-claims.ts',
 	'dom-binding-classes.ts',
 	'dom-binding-controls.ts',
+	'dom-binding-island.ts',
 	'dom-binding-program.ts',
 	'dom-binding-projections.ts',
 	'dom-binding-signals.ts',

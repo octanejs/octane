@@ -1,9 +1,4 @@
-import type {
-	MutableRefObject,
-	OctaneElement,
-	OctaneNode,
-	RefObject,
-} from '../util/OctaneTypes.ts';
+import type { MutableRefObject, OctaneNode, RefObject } from '../util/OctaneTypes.ts';
 import type { CurveType, Props as CurveProps } from '../shape/Curve.tsrx';
 import type { LineDrawShapeProps } from './LineDrawShape.tsrx';
 import type { CartesianLabelListEntry, ImplicitLabelListType } from '../component/LabelList.tsrx';

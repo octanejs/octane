@@ -301,10 +301,10 @@ reading the latest value inside an async or delayed callback.
 
 <h3 id="strong-mode">Enforce render snapshots with Strong mode</h3>
 
-Strong mode is an optional immutable render-snapshot and pure-render contract
-with compiler checks. Add `"use strong"` before a module's
-imports to try it one file at a time, or set `compiler: { strong: true }` in
-`octane.config.ts` to cover your application.
+Strong mode is an opt-in compiler contract: a module promises that rendering reads
+immutable snapshots and has no side effects, and the compiler reports the violations it
+can prove. Add `"use strong"` before a module's imports to try it one file at a time,
+or set `compiler: { strong: true }` in `octane.config.ts` to cover your application.
 
 ```tsx
 'use strong';
@@ -317,33 +317,15 @@ export function ProfileEditor({ user }) {
 }
 ```
 
-A Strong module cannot update state while rendering, update state synchronously
-while setting up an effect, or write `ref.current` while rendering. The compiler
-also follows provable calls through `useCallback`, `useEffectEvent`, and functions
-returned by analyzable `useMemo` factories. A statically known Effect Event cannot
-be called during render or listed in explicit hook dependencies. These hooks
-remain supported, and other explicit dependency lists keep their existing meaning.
+A Strong module cannot update state or read or write `ref.current` while rendering, or
+update state synchronously while setting up an effect. The compiler caches eligible
+calculations and callbacks itself, so `useMemo` and `useCallback` are compile errors, and dependency
+arrays are inferred: an explicit array that differs from the inferred inputs is an
+error, and an equivalent one is a hint. Event handlers still update state, and effects
+still synchronize external systems.
 
-Strong also rejects detectable state-snapshot mutations and direct clock or
-random reads during render. Lazy state initialization may still obtain an
-initial value. Production client builds assume every user-authored render
-operation is pure, regardless of whether its callee is local, imported, a
-static or computed member, produced by another call, constructor-like, tagged,
-or receives callbacks. `use*` spelling is not a memoization veto or a Rules of
-Hooks check. Unknown calls that the compiler cannot inspect remain the author's
-responsibility; they do not make a Strong region fall back. See
-[Strong mode and memoization](/docs/differences-from-react#strong-mode).
-
-Do not hide ref contents, a state getter, mutable module or global data, a live
-external store, a clock, randomness, mutation, or another changing source behind
-a stable function or receiver. Keep that consumer in compatibility mode, or pass
-an actual snapshot into a separate Strong component.
-
-Event handlers can still update state. Genuinely deferred callbacks, effect
-cleanup, effects that synchronize external systems, and refs for DOM nodes or
-timers are still valid. Use `useLinkedState` when editable state should follow an
-input; it returns the right value immediately without an effect or a render-time
-setter.
+[Strong mode](/docs/strong-mode) covers enabling it, adopting it in an existing app,
+replacements for the React idioms it rejects, and every diagnostic.
 
 <details className="deep-dive">
 	<summary>Octane deep dive: state getters and conditional hooks</summary>
@@ -475,6 +457,39 @@ export function SearchBox() @{
 Refs are ordinary props in Octane, so your own component can accept `ref` directly.
 There is no `forwardRef` wrapper. A host element can also receive several refs at once,
 for example `ref={[inputRef, measurementRef]}`.
+
+<h3 id="use-lazy-ref">
+	Initialize a ref lazily with <code>useLazyRef</code>
+</h3>
+
+For a value that is expensive to create and needs mutable ref semantics, pass a
+factory to `useLazyRef`:
+
+```tsrx
+import { useLazyRef } from 'octane';
+
+export function CacheButton() @{
+	const cache = useLazyRef(() => new Map<string, string>());
+
+	<button onClick={() => cache.current.set('greeting', 'hello')}>{'Cache'}</button>
+}
+```
+
+The factory initializes the ref when its cell is created; later renders keep the
+same ref and do not recreate its value. In [Strong mode](/docs/strong-mode#recipe-lazy-ref),
+it replaces React's `if (ref.current === null) ref.current = create()` idiom, which reads
+and writes the ref during render. `useRef(callback)` stores the callback
+itself, as in React. A `useLazyRef` factory can also return a function to store
+as the ref value.
+
+The factory runs during render, before a commit. It may run again for abandoned
+or retried renders, on remount, and independently during server rendering and
+hydration. Keep it free of side effects; use an effect for subscriptions and
+other work requiring cleanup. In Strong mode, the factory follows the rules of a
+lazy `useState` initializer: it may read a clock, randomness, or browser state,
+but it may not schedule work. The ref's `current` is read or changed from an
+event or effect, not during render. The experimental Valdi writer's existing
+adapter ABI does not support this hook.
 
 ### Synchronize an external system with `useEffect`
 
@@ -610,6 +625,50 @@ callback that an effect can call without reconnecting when its captures change. 
 wrapper identity is fresh on each render, but a wrapper registered by a committed effect
 always calls the latest committed body; do not add Effect Events to dependency arrays.
 
+<h3 id="use-layout-snapshot">
+	Measure committed layout with <code>useLayoutSnapshot</code>
+</h3>
+
+Use `useLayoutSnapshot` when rendered output depends on a measurement of the
+committed DOM. In [Strong mode](/docs/strong-mode#recipe-layout-measurement), it replaces
+a layout effect that copies a measurement into state, which Strong rejects as a state
+update in effect setup:
+
+```tsrx
+import { useLayoutSnapshot, useRef } from 'octane';
+
+export function MeasuredContent() @{
+	const content = useRef<HTMLDivElement | null>(null);
+	const height = useLayoutSnapshot(() => content.current?.offsetHeight ?? 0, {
+		initial: 0,
+	});
+
+	<section>
+		<div ref={content}>Content to measure</div>
+		<p>{'Height: ' + height}</p>
+	</section>
+}
+```
+
+The callback measures after the DOM and refs are committed, before paint, on each
+committed render of the component that reaches the hook. The server and first
+hydration render use `initial`, or `undefined` if it is omitted; `initial` is used
+only when the hook is first mounted. Snapshots are compared with `Object.is` by
+default. Supply `equal(previous, next)` for a custom comparison, such as comparing
+the fields of a new object. Without an initial value, `previous` may be `undefined`.
+Only an unequal measurement triggers an update, which may cause another measurement.
+Make sure the calculation converges; an oscillating measurement reaches the update
+depth limit.
+
+The callback is for synchronous measurement, not setting state or acquiring
+resources. It runs in hook order with the component's other layout effects, so
+call `useLayoutSnapshot` after any `useLayoutEffect` that changes the DOM it
+measures. The hook does not observe layout changes on its own. For changes that
+can occur without a component commit, such as resizing, have an observer callback
+update state so the component commits again; that commit measures again.
+`useLayoutSnapshot` is available for the DOM renderer; the experimental universal
+and Valdi renderers do not support it.
+
 <h3 id="createResizeObserver">
 	Measure resizes with <code>createResizeObserver</code>
 </h3>
@@ -655,8 +714,9 @@ queued entry. The observer can be reused after disconnect. Pass an owning window
 constructor as the second argument when needed, for example
 `createResizeObserver(callback, iframe.contentWindow.ResizeObserver)`.
 
-If the first measurement must happen before paint, measure synchronously in
-`useLayoutEffect` before installing the observer. Effects do not run during SSR,
+If rendered output needs its first measurement before paint, render it from
+[`useLayoutSnapshot`](#use-layout-snapshot) and have the observer callback update
+state only to request a commit, which measures again. Effects do not run during SSR,
 and importing the helper does not initialize browser resources. The helper uses
 the native observer available in that window; it does not polyfill missing
 `ResizeObserver` support.
@@ -1446,12 +1506,20 @@ handlers; return here when you have a specific problem to solve.
 				<span>Keep a DOM node or mutable value without rendering.</span>
 			</li>
 			<li>
+				<code>useLazyRef</code>
+				<span>Create a ref's value once, from a factory.</span>
+			</li>
+			<li>
 				<code>useEffect</code>
 				<span>Synchronize with an external system after paint.</span>
 			</li>
 			<li>
 				<code>useLayoutEffect</code>
 				<span>Measure or adjust layout before paint.</span>
+			</li>
+			<li>
+				<code>useLayoutSnapshot</code>
+				<span>Render from a committed layout measurement before paint.</span>
 			</li>
 			<li>
 				<code>createResizeObserver</code>
@@ -1668,5 +1736,7 @@ Try these small changes in the counter example:
 - [Quick start](/docs/quick-start) — install Octane and run your first app.
 - [TSRX vs TSX/JSX](/docs/tsrx-vs-tsx) — choose an authoring format and learn the
   `.tsrx` control-flow syntax.
+- [Strong mode](/docs/strong-mode) — opt into compiler-checked pure rendering, one
+  module at a time.
 - [Integrations and bindings](/docs/bindings) — connect an app framework or use
   first-party Octane ports of popular libraries.

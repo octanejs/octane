@@ -16,6 +16,11 @@ name: Bench
 
 on:
   workflow_dispatch:
+    inputs:
+      suites:
+        description: "Space-separated suite names to run (default: every suite)"
+        required: false
+        default: ""
   schedule:
     # Mondays 06:00 UTC.
     - cron: "0 6 * * 1"
@@ -47,6 +52,7 @@ jobs:
         run: |
           node --test benchmarks/lynx-table/stages/*.test.mjs
           node --test benchmarks/lynx-list/*.test.mjs
+          node --test benchmarks/lynx-render/*.test.mjs
 
       - name: Test UIbench measurement failures
         run: node --test benchmarks/uibench/run.test.mjs
@@ -66,7 +72,10 @@ jobs:
       # iterations; --ratios enforces the committed ratio guards and fails the job
       # on any breach. Absolute baselines are intentionally not compared here.
       - name: Run benchmarks (quick, ratio guards)
-        run: node benchmarks/bench.mjs --quick --ratios
+        env:
+          BENCH_SUITES: ${{ inputs.suites }}
+        # BENCH_SUITES is unquoted on purpose: each word is one suite argument.
+        run: node benchmarks/bench.mjs --quick --ratios $BENCH_SUITES
 
       - name: Upload results
         if: always()

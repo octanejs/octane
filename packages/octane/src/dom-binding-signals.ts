@@ -1,13 +1,16 @@
 import { formatClientError } from './error-codes.client.generated.js';
 import { captureSignalOwner, currentSignalOwner } from './signals/owner-context.js';
+import { __prepareBindingSources, __retiredBindingSource } from './dom-binding-styles.js';
 import {
 	forwardNativeTransitionConsumer,
 	setNativeReadObserver,
+	type NativeReadSource,
 	type NativeTransitionPresentation,
 } from './signals/read-protocol.js';
 import {
 	SIGNAL_HANDLE,
 	SIGNAL_BINDING_READ,
+	SIGNAL_BINDING_RETIRED,
 	SIGNAL_BINDING_SUBSCRIBE,
 	type SignalHandle,
 } from './signals/types.js';
@@ -21,6 +24,8 @@ export interface BindingSignalConnection {
 	preview(value: unknown): BindingPreparedValue;
 	/** Optional whole-style writer, present only on the selected style capability. */
 	write?(value: unknown): void;
+	/** Error path only: whether the owner of a source this connection observes retired. */
+	retired(): boolean;
 	dispose(preservePresentation?: boolean): void;
 }
 
@@ -50,6 +55,159 @@ export function __assertBindingSnapshot<T>(read: () => T): T {
 		throw Object.assign(new TypeError(formatClientError(308)), { code: 'OCTANE_DOM_BINDINGS' });
 	if (failed) throw failure;
 	return value!;
+}
+
+let bindingReads: Map<NativeReadSource, number> | null = null;
+
+/**
+ * @internal An imported signal read inside a subscribed program projection. The
+ * program's read capability supplies the collection window; reads that throw
+ * (a pending or failed async value) are still reported before they throw.
+ */
+export function __trackBindingRead<T>(read: () => T): T {
+	const reads = bindingReads;
+	if (reads === null) return read();
+	const previous = setNativeReadObserver((source, version) => {
+		// The first witness wins, so a later mixed read cannot pass validation.
+		if (!reads.has(source)) reads.set(source, version);
+		previous?.(source, version);
+	});
+	try {
+		return read();
+	} finally {
+		setNativeReadObserver(previous);
+	}
+}
+
+export interface BindingReadTracker {
+	/** Run one preparation, collecting the sources its compiler-wrapped reads observe. */
+	prepare<T>(run: () => T): T;
+	/** Sources the current preparation has observed so far. */
+	size(): number;
+	/** A committed preparation owns exactly the sources it read. */
+	publish(): void;
+	/** Stage a transition preparation without releasing the published sources. */
+	preview(): NativeTransitionPresentation;
+	/**
+	 * A preparation threw. Keep the last DOM and wait on every source it reached,
+	 * plus the published ones: a pending value retries when it settles, and a
+	 * later failure is reported. Returns false for a failure before the first
+	 * commit, which the caller throws.
+	 */
+	fail(error: unknown, committed: boolean): boolean;
+	/** Error path only: whether the owner of a subscribed source retired. */
+	retired(): boolean;
+	dispose(): void;
+}
+
+/**
+ * @internal Query-selected capability for programs whose projections read
+ * imported signals. Any observed source change refreshes the whole program,
+ * exactly like a `BindingSource` notification.
+ */
+export function __createBindingReads(notify: () => void): BindingReadTracker {
+	const owner = currentSignalOwner();
+	const run = owner === null ? <T>(callback: () => T): T => callback() : captureSignalOwner(owner);
+	const subscriptions = new Map<NativeReadSource, () => void>();
+	const waits = new WeakSet<object>();
+	let reads = new Map<NativeReadSource, number>();
+	let disposed = false;
+	const acquire = (source: NativeReadSource): void => {
+		let live = true;
+		const stop = run(() =>
+			source.subscribe(
+				forwardNativeTransitionConsumer(notify, () => {
+					if (live && !disposed) notify();
+				}),
+			),
+		);
+		if (typeof stop !== 'function') throw new TypeError(formatClientError(304));
+		const cleanup = (): void => {
+			live = false;
+			stop();
+		};
+		if (disposed) cleanup();
+		else subscriptions.set(source, cleanup);
+	};
+	const add = (): boolean => {
+		let changed = false;
+		for (const [source, version] of reads) {
+			if (disposed) break;
+			if (!subscriptions.has(source)) acquire(source);
+			// A write between the read and its subscription has no notification.
+			if (source.getVersion() !== version) changed = true;
+		}
+		return changed;
+	};
+	return {
+		prepare(run) {
+			const outer = bindingReads;
+			bindingReads = reads = new Map();
+			try {
+				return run();
+			} finally {
+				bindingReads = outer;
+			}
+		},
+		size: () => reads.size,
+		publish() {
+			for (const [source, stop] of subscriptions) {
+				if (reads.has(source)) continue;
+				subscriptions.delete(source);
+				stop();
+			}
+			if (add()) notify();
+		},
+		fail(error, committed) {
+			if (add()) notify();
+			if (
+				error !== null &&
+				(typeof error === 'object' || typeof error === 'function') &&
+				typeof (error as PromiseLike<unknown>).then === 'function'
+			) {
+				// A read reports its source before it suspends; only an opaque
+				// thenable needs its own wake-up.
+				if (reads.size === 0 && !waits.has(error)) {
+					waits.add(error);
+					const retry = (): void => {
+						if (!disposed) notify();
+					};
+					(error as PromiseLike<unknown>).then(retry, retry);
+				}
+				return true;
+			}
+			if (!committed) return false;
+			const report = (globalThis as { reportError?: (error: unknown) => void }).reportError;
+			if (typeof report === 'function') report(error);
+			else
+				queueMicrotask(() => {
+					throw error;
+				});
+			return true;
+		},
+		preview() {
+			return __prepareBindingSources(reads, subscriptions, notify, () => !disposed, run);
+		},
+		retired: () => __retiredBindingSource(subscriptions),
+		dispose() {
+			if (disposed) return;
+			disposed = true;
+			let failed = false;
+			let failure: unknown;
+			for (const stop of subscriptions.values()) {
+				try {
+					stop();
+				} catch (error) {
+					if (!failed) {
+						failed = true;
+						failure = error;
+					}
+				}
+			}
+			subscriptions.clear();
+			if (failed) throw failure;
+		},
+	};
 }
 
 /** @internal Query-selected capability; captures the existing owner, never creates a graph. */
@@ -82,6 +240,16 @@ export function __createBindingSignals() {
 			return {
 				get,
 				dispose,
+				// Only a subscribed handle is observed. Its own owner retiring wakes
+				// this connection, and the read that follows throws.
+				retired(): boolean {
+					try {
+						return !!unsubscribe && run(() => handle![SIGNAL_BINDING_RETIRED]?.()) === true;
+					} catch {
+						// An unresolvable handle is not proof of retirement; report.
+						return false;
+					}
+				},
 				preview(next): BindingPreparedValue {
 					const nextHandle = isSignal(next) ? next : undefined;
 					const ticket = generation;

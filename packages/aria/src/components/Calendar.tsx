@@ -66,7 +66,6 @@ import {
 import type {
 	DOMAttributes,
 	FocusableElement,
-	forwardRefType,
 	GlobalDOMAttributes,
 	HoverEvents,
 } from '@react-types/shared';

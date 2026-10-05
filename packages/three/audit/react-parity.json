@@ -27,9 +27,9 @@
       "node": ">=22",
       "platform": "any",
       "arch": "any",
-      "packageManager": "pnpm@12.8.2",
+      "packageManager": "pnpm@12.9.1",
       "lockfile": "pnpm-lock.yaml",
-      "lockfileSha256": "ad10048b8f6cc4d92333219ecd2b9dd8ed45c19bafb49dca9c7191e0b06bad84"
+      "lockfileSha256": "600939b38442c7a37f54d4a2886e804fceb57654cd39a2f673c890b54aef3273"
     }
   },
   "lanes": [
@@ -137,7 +137,7 @@
         {
           "path": "packages/three/tests/hooks.test.ts",
           "role": "test",
-          "sha256": "4a8b86de71e2efb52e380be2ef481f6ae16f0d1aebd0ce654961b5871d7cb967",
+          "sha256": "aae7a0d04cdf0edafaf3fa214c50b06742caf050107a17788639fc1348f843a8",
           "cases": [
             {
               "id": "adapted:three-build-graph",
@@ -294,7 +294,7 @@
         {
           "path": "packages/three/typetests/renderer-local.test.ts",
           "role": "support",
-          "sha256": "effaff52eb7cc8acfbc6e9fa9ea98fff5a02e1e7f3fd98ba209173338b9a6fb0"
+          "sha256": "5f4dcea1d6fab8ab013fd0c14162780a659760a51539e6bad43d425cb1d4c5d1"
         },
         {
           "path": "packages/three/typetests/subpath-api.test.ts",

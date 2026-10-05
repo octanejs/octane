@@ -132,6 +132,29 @@ describe('Rsbuild build.target mapping', () => {
 		}
 	}, 30_000);
 
+	// The renderer-free islands entry is Vite-only so far; never hydrate the shell instead.
+	it('rejects islands-only routes it cannot serve', async () => {
+		writeApp(root, JSON.stringify('es2022'));
+		write(
+			root,
+			'octane.config.ts',
+			`import { defineConfig, RenderRoute } from '@octanejs/rsbuild-plugin';
+export default defineConfig({
+	router: { routes: [new RenderRoute({ path: '/', entry: '/src/Page.tsrx', hydrate: 'islands' })] },
+});
+`,
+		);
+		await expect(
+			(async () => {
+				const instance = await createRsbuild({
+					cwd: root,
+					rsbuildConfig: { plugins: [pluginOctane({ hmr: false })] },
+				});
+				await instance.initConfigs({ action: 'build' });
+			})(),
+		).rejects.toThrow(/RenderRoute "\/" uses hydrate: 'islands'/);
+	});
+
 	it('converts esbuild-style browser targets for SWC and Rspack runtime generation', async () => {
 		writeApp(root, JSON.stringify(['chrome100', 'firefox100']));
 		const instance = await createRsbuild({

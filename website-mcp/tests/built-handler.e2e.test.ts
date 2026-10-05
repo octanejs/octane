@@ -115,6 +115,7 @@ describe('built MCP handler', () => {
 			'octane_docs_read',
 			'octane_docs_search',
 			'octane_skill',
+			'octane_strong_explain',
 		]);
 	});
 
@@ -141,6 +142,18 @@ describe('built MCP handler', () => {
 		const payload = JSON.parse(call.result.content[0].text);
 		expect(payload.ok).toBe(true);
 		expect(payload.code).toContain('X');
+	});
+
+	it('explains a Strong diagnostic from the bundled catalog', async () => {
+		const call = await rpc(
+			'tools/call',
+			{ name: 'octane_strong_explain', arguments: { code: 'RENDER_REF_READ' } },
+			5,
+		);
+		const text = call.result.content[0].text as string;
+		expect(text).toMatch(/^# OCTANE_STRONG_RENDER_REF_READ\n/);
+		expect(text).toContain('useLazyRef');
+		expect(text).toContain('https://octanejs.dev/docs/strong-mode#recipe-lazy-ref');
 	});
 
 	it('serves the REST surface', async () => {

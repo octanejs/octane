@@ -170,9 +170,10 @@ requirements, and optional fallbacks.
 
 <h2 id="strong-mode">Strong mode</h2>
 
-Strong mode opts into immutable render snapshots and asks the compiler to reject
-detectable state, ref, Effect Event, and purity violations. It is off by default,
-so you can try it in one file:
+[Strong mode](/docs/strong-mode) is an opt-in compiler contract for pure rendering over
+immutable snapshots. That guide covers what it checks and how to adopt it; this section
+covers where the build reads the setting. It is off by default, so you can try it in
+one file:
 
 ```tsx
 'use strong';
@@ -218,157 +219,15 @@ new OctaneRspackPlugin({ strong: true }); // Rspack
 pluginOctane({ strong: true }); // Rsbuild
 ```
 
-An explicit plugin option wins over `octane.config.ts`. Application-wide mode
-does not change installed dependencies; a dependency can opt in with its own
-`"use strong"` directive.
+An explicit plugin option wins over `octane.config.ts`. `octane analyze` reads
+`octane.config.ts` but not inline plugin options, so keep the setting in the config
+file when CI runs `octane analyze`. Application-wide mode does not change installed
+dependencies; a dependency can opt in with its own `"use strong"` directive.
 
-The complete check reference is in
-[Strong compiler checks](https://github.com/octanejs/octane/blob/main/docs/strong-compiler-checks.md).
-It covers effect data flow, eager prop-derived state, explicit and null
-dependencies, manual memo hooks, JSX list mapping in `.tsrx`, index keys, suppression props,
-trusted HTML, and compatibility imports. Equivalent explicit dependency arrays
-produce hints; conflicting arrays produce errors.
-Strong `.tsx` modules retain standard keyed JSX mapping.
-
-A Strong module cannot:
-
-- Call a state setter or reducer dispatcher while rendering.
-- Call one synchronously while an effect is being set up
-  (`OCTANE_STRONG_EFFECT_STATE_UPDATE`), including through a same-module custom
-  hook's returned updater and through `startTransition`, a `useTransition` start
-  function, `queueMicrotask`, `Promise.resolve().then`, a zero-delay
-  `setTimeout`, or awaiting a non-promise.
-- Update state after an `await` or promise callback in an effect unless the
-  returned cleanup aborts the request's `AbortController` or sets a flag the
-  update checks (`OCTANE_STRONG_EFFECT_DATA_FETCH`).
-- Call a state getter, read an unattached ref's `current`, or read a reassigned
-  module variable in synchronous effect setup
-  (`OCTANE_STRONG_EFFECT_HIDDEN_DEPENDENCY`). Read the snapshot or use
-  `useEffectEvent`.
-- Add a platform event listener, interval, observer, connection, or geolocation
-  watch in effect setup without releasing it in the returned cleanup
-  (`OCTANE_STRONG_EFFECT_RESOURCE_LEAK`).
-- Call a known third-tuple state getter while rendering
-  (`OCTANE_STRONG_RENDER_STATE_GETTER_CALL`). Render from the state snapshot;
-  use the getter in events, effects, or deferred work.
-- Read a reassigned module-scope `let` or `var` while rendering
-  (`OCTANE_STRONG_RENDER_MODULE_STATE_READ`). Put changing values in state or
-  context, or pass an immutable snapshot as a prop.
-- Read unshadowed `window`, `document`, `localStorage`, `sessionStorage`,
-  `navigator`, `location`, or `matchMedia` while rendering
-  (`OCTANE_STRONG_RENDER_AMBIENT_READ`). This includes `typeof` guards, known
-  browser handle aliases, and `globalThis` property reads except known standard
-  language builtins. Computed `globalThis` properties whose names are unknown
-  also report the error. Render a snapshot from
-  `useSyncExternalStore` with a server snapshot, or read browser state in an
-  event, effect, or lazy state initializer.
-- Assign to a ref's `current` value while rendering.
-- Read a `useRef` object's `current` while rendering
-  (`OCTANE_STRONG_RENDER_REF_READ`). Keep refs as `ref` props and read them in
-  events or effects; use state for values that drive render output.
-- Write through a ref to children, a class, an attribute, or a `style` property
-  that the template sets on that element (`OCTANE_STRONG_MANAGED_DOM_WRITE`), or
-  write raw HTML to a rendered element (`OCTANE_STRONG_RAW_HTML_WRITE`).
-- Query the document for a literal `id` or class the same component renders
-  (`OCTANE_STRONG_OWN_MARKUP_QUERY`); attach a ref instead.
-- Call a statically known `useEffectEvent` result during render
-  (`OCTANE_STRONG_RENDER_EFFECT_EVENT_CALL`).
-- Include a statically known Effect Event in explicit hook dependencies
-  (`OCTANE_STRONG_EFFECT_EVENT_DEPENDENCY`).
-- Mutate a provable state snapshot while rendering
-  (`OCTANE_STRONG_RENDER_SNAPSHOT_MUTATION`).
-- Mutate a binding declared outside a retained keyed `@for` row from that row
-  (`OCTANE_STRONG_RETAINED_ROW_MUTATION`). Fresh setup-local and row-local
-  scratch data remain valid.
-- Read a known clock or random source directly while rendering, such as
-  `Date.now()`, `Math.random()`, or `crypto.randomUUID()`
-  (`OCTANE_STRONG_RENDER_IMPURE_CALL`), including in callbacks that known array
-  methods such as `map` run synchronously. Lazy state initialization may still
-  capture an initial timestamp or random value. Use `useId()` for element IDs
-  and a stable item ID for keys.
-- Format a provable `Date` or `Intl` value while rendering without an explicit
-  locale and time zone (`OCTANE_STRONG_RENDER_LOCALE_FORMAT`).
-- Declare a built-in hook value or its dependent effect outside the sole nested
-  `@{…}` block that uses it (`OCTANE_STRONG_HOOK_LOCALITY`).
-- Declare a named native event handler outside the sole deeper nested `@{…}`
-  block containing its direct `onX` use (`OCTANE_STRONG_EVENT_HANDLER_LOCALITY`).
-
-Browser reads in external-store snapshot callbacks, events, effects, deferred
-callbacks, and lazy `useState` or `useReducer` initializers remain supported.
-Lazy initializers still run during server rendering: guard browser APIs and
-ensure server and client initial output agrees. The check respects shadowed
-names, scalar module snapshots, the `globalThis` object itself, and known
-standard language builtins such as `globalThis.JSON`. It does not generally
-prove aliases obtained through defaults, returned values, containers, arbitrary
-deeper properties, or imports safe; those still need to satisfy the snapshot
-contract.
-
-A nested `@{…}` can place hooks and named event handlers beside the JSX that
-uses them:
-
-```tsx
-"use strong";
-
-import { useState } from 'octane';
-
-export function Counter() @{
-	<div>@{
-		const [count, setCount] = useState(0);
-		const onClick = () => setCount(count + 1);
-		<button {onClick}>{count as string}</button>
-	}</div>
-}
-```
-
-An inline `onClick` is valid too. Hooks and effects used only by an `@if`, keyed
-`@for`, `@switch`, or `@try` arm may remain in their parent scope. Moving a hook
-into an arm or nested block changes its lifetime; each keyed row can have its
-own state. These locality checks apply to opted-in modules; `strong: true` in
-the app config enables them for all application-owned modules.
-
-These checks follow provable synchronous calls through local helpers and
-`useEffectEvent` results. Effect Events are non-reactive; leave them out of
-dependency lists. Strong uses automatic declaration caching and inferred
-dependencies. Manual memo hooks and conflicting arrays are errors; equivalent
-arrays retain their behavior and produce a redundancy hint.
-
-Factories with unknown return values or complex control flow remain opaque.
-Dependency checks follow literal arrays, including statically selected or spread
-literals; they do not assume an aliased or externally produced array is unchanged.
-
-`"use strong"` is also an author assertion that rendering is referentially
-transparent: the same witnessed inputs produce the same output, and render work
-has no application-visible side effects. Production client builds condition
-memoization on that assertion for every user-authored render operation, including
-local, imported, member, computed, and call-produced callees; calls with callback
-arguments; construction; and tagged templates. A name beginning with `use` does
-not change this contract or reintroduce Rules of Hooks. Actual hooks still belong
-in component or custom-hook setup, where the compiler assigns their slots and
-preserves context, state, suspension, and effect lifecycles. Recognition uses
-built-in import provenance, including optional calls, and lexically resolved
-same-module custom-hook declarations or function-valued module bindings, not a
-`use*` naming heuristic. Transitive and cyclic hook paths reach a fixed point.
-Memo guards witness a callable, its receiver, and explicit arguments; derived
-receivers are represented by their producing operation and inputs rather than a
-transient result identity. Guards
-at component and ordinary-list projection boundaries compare inputs with
-`Object.is`, distinguishing signed zero while stabilizing `NaN`; a certified
-keyed-selection operand retains authored strict equality.
-
-The compiler checks the violations it can prove, but the analysis is deliberately
-bounded: an unknown call is assumed pure instead of disabling Strong memoization.
-Do not hide a ref read, state getter, mutable module or global, live external
-store, clock, random source, mutation, or other changing state behind a stable
-receiver or function. Keep live library accessors in compatibility mode, or pass
-an actual subscribed snapshot into a separate Strong component. Compatibility
-reevaluates a live accessor only when the scope containing it runs; it does not
-subscribe an unchanged child or make a stable live object snapshot-safe. See
-[the memoization contract](/docs/differences-from-react#strong-mode).
-
-Use `useLinkedState` when state should reset or adjust after an input changes.
-Event handlers may update state normally. Genuinely deferred callbacks, effect
-cleanup, effects that connect to external systems, and refs for DOM nodes, timers,
-or event callbacks remain allowed when they run outside rendering.
+Strong compilation adds caches for eligible hook inputs in development and production,
+and production client builds memoize render work on the assumption that it is pure. Opting in therefore changes generated code, and a render expression can run
+a different number of times across production, development, HMR, and profiling builds.
+Do not rely on render evaluation counts.
 
 <h2 id="mixed-toolchains">Mixed toolchains and file ownership</h2>
 

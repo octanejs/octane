@@ -1,9 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import * as signals from 'octane/signals';
 import { act, createRoot, startTransition } from 'octane';
+import { renderToString } from 'octane/server';
 import { createSignalOwnerLifecycle } from '../src/signals/facade.js';
+import * as universal from '../src/universal.js';
 import { mount } from './_helpers.js';
-import { loadCompiledFixtureSource } from './_server-fixture.js';
+import { loadCompiledFixtureSource, loadPlainHookFixtureSource } from './_server-fixture.js';
 
 // The octane project covers the dev compile; octane-prod covers prod and strong.
 const modes =
@@ -308,6 +310,226 @@ export function App(props) @{
 	});
 });
 
+describe.each([
+	{ dev: false, strong: false },
+	{ dev: false, strong: true },
+	{ dev: true, strong: false },
+	{ dev: true, strong: true },
+])('method captures in signals and effects (%j)', (mode) => {
+	const source = `import { useLayoutEffect } from 'octane';
+import { derived$ } from 'octane/signals';
+const _$__methodDep = 'outer';
+export function App(props) @{
+ const _$__methodDep$ = 'inner';
+ const _$__derivedAt = 'signal';
+ const value$ = derived$(() => props.calculate());
+ useLayoutEffect(() => props.notify());
+ <p>{String(value$.get()) + ':' + _$__methodDep + ':' + _$__methodDep$ + ':' + _$__derivedAt}</p>
+}`;
+
+	it('renders and updates with both method captures and authored names', () => {
+		const id = '/method-captures.tsrx';
+		const options = {
+			id,
+			compileOptions: { ...mode, hmr: false },
+			runtimeModules: { 'octane/signals': signals },
+		};
+		const server = loadCompiledFixtureSource<any>(source, { ...options, mode: 'server' });
+		const client = loadCompiledFixtureSource<any>(source, { ...options, mode: 'client' });
+		const calls: string[] = [];
+		class Model {
+			constructor(readonly value: string) {}
+			calculate() {
+				return this.value;
+			}
+			notify() {
+				calls.push(this.value);
+			}
+		}
+		expect(renderToString(server.App, new Model('server')).html).toContain(
+			'server:outer:inner:signal',
+		);
+		const root = mount(client.App, new Model('first'));
+		try {
+			expect(root.find('p').textContent).toBe('first:outer:inner:signal');
+			root.update(client.App, new Model('second'));
+			expect(root.find('p').textContent).toBe('second:outer:inner:signal');
+			expect(calls).toEqual(['first', 'second']);
+		} finally {
+			root.unmount();
+		}
+	});
+
+	it('renders captures declared by a plain JavaScript hook', () => {
+		const hook = `import { useLayoutEffect } from 'octane';
+import { derived$ } from 'octane/signals';
+const _$__methodDep$1 = 'outer';
+export function useProjection$(props) {
+ const _$__methodDep$ = 'inner';
+ const value$ = derived$(() => props.calculate() + ':' + _$__methodDep$1 + ':' + _$__methodDep$);
+ useLayoutEffect(() => props.notify());
+ return value$;
+}`;
+		const app = `import { useProjection$ } from './projection';
+export function App(props) @{ const value$ = useProjection$(props); <p>{value$.get()}</p> }`;
+		const calls: string[] = [];
+		class Model {
+			constructor(readonly value: string) {}
+			calculate() {
+				return this.value;
+			}
+			notify() {
+				calls.push(this.value);
+			}
+		}
+		const loadApp = (environment: 'client' | 'server') => {
+			const projection = loadPlainHookFixtureSource(mode.strong ? `"use strong";\n${hook}` : hook, {
+				id: '/projection.js',
+				mode: environment,
+				inlineHookMemo: false,
+				hmr: environment === 'client' && mode.dev,
+				runtimeModules: { 'octane/signals': signals },
+			});
+			return loadCompiledFixtureSource<any>(app, {
+				id: '/projection-app.tsrx',
+				mode: environment,
+				compileOptions: { ...mode, hmr: false },
+				runtimeModules: { './projection': projection },
+			});
+		};
+		const server = loadApp('server');
+		const client = loadApp('client');
+		expect(renderToString(server.App, new Model('server')).html).toContain('server:outer:inner');
+		const root = mount(client.App, new Model('first'));
+		try {
+			expect(root.find('p').textContent).toBe('first:outer:inner');
+			root.update(client.App, new Model('second'));
+			expect(root.find('p').textContent).toBe('second:outer:inner');
+			expect(calls).toEqual(['first', 'second']);
+		} finally {
+			root.unmount();
+		}
+	});
+
+	it('tracks a replaced own method even when a local has the same generated name', () => {
+		const source = `import { useLayoutEffect } from 'octane';
+export function App(props) @{
+ const _$__methodDep = () => 42;
+ useLayoutEffect(() => props.notify());
+ <p>{String(_$__methodDep())}</p>
+}`;
+		const { App } = loadCompiledFixtureSource<any>(source, {
+			id: '/method-shadow.tsrx',
+			mode: 'client',
+			compileOptions: { ...mode, hmr: false },
+		});
+		const calls: string[] = [];
+		const props = {
+			notify: () => {
+				calls.push('first');
+			},
+		};
+		const root = mount(App, props);
+		try {
+			props.notify = () => {
+				calls.push('second');
+			};
+			root.update(App, props);
+			expect(root.find('p').textContent).toBe('42');
+			expect(calls).toEqual(['first', 'second']);
+		} finally {
+			root.unmount();
+		}
+	});
+
+	it.each([
+		["import { query$ as select$ } from 'octane/signals';", 'select$'],
+		["import * as signalApi from 'octane/signals';", 'signalApi.query$'],
+	])('tracks a query selector and an effect with %s', async (importStatement, factory) => {
+		const source = `import { useLayoutEffect } from 'octane';
+${importStatement}
+export function App(props) @{
+ const query$ = ${factory}(() => props.select(), async value => value.toUpperCase());
+ const snapshot = props.includeQuery ? query$.snapshot() : null;
+ useLayoutEffect(() => props.notify());
+ <p>{(snapshot ? (snapshot.status === 'ready' ? snapshot.value : snapshot.status) : 'server') as string}</p>
+}`;
+		const options = {
+			id: '/method-query.tsrx',
+			compileOptions: { ...mode, hmr: false },
+			runtimeModules: { 'octane/signals': signals },
+		};
+		const server = loadCompiledFixtureSource<any>(source, { ...options, mode: 'server' });
+		const client = loadCompiledFixtureSource<any>(source, { ...options, mode: 'client' });
+		const calls: string[] = [];
+		class Model {
+			constructor(
+				readonly value: string,
+				readonly includeQuery = true,
+			) {}
+			select() {
+				return this.value;
+			}
+			notify() {
+				calls.push(this.value);
+			}
+		}
+		expect(renderToString(server.App, new Model('server', false)).html).toContain('server');
+		const root = mount(client.App, new Model('first'));
+		try {
+			await act(async () => {});
+			expect(root.find('p').textContent).toBe('FIRST');
+			root.update(client.App, new Model('second'));
+			await act(async () => {});
+			expect(root.find('p').textContent).toBe('SECOND');
+			expect(calls).toEqual(['first', 'second']);
+		} finally {
+			root.unmount();
+		}
+	});
+
+	it.each(['octane', 'octane/universal'])(
+		'tracks method changes in a non-DOM renderer imported from %s',
+		(runtime) => {
+			const source = `import { useLayoutEffect } from '${runtime}';
+export function App(props) @{
+ const _$__methodDep = () => 42;
+ useLayoutEffect(() => props.notify());
+ <view value={_$__methodDep()} />
+}`;
+			const { App } = loadCompiledFixtureSource<any>(source, {
+				id: '/method-shadow.object.tsrx',
+				mode: 'client',
+				compileOptions: {
+					...mode,
+					hmr: false,
+					renderer: { id: 'object', module: 'octane/universal', target: 'universal', text: 'host' },
+				},
+				runtimeModules: { 'octane/universal': universal },
+			});
+			const events: string[] = [];
+			const container = universal.createObjectContainer();
+			const root = universal.createUniversalRoot(container, universal.createObjectDriver());
+			try {
+				root.render(App, {
+					notify: () => {
+						events.push('first');
+					},
+				});
+				root.render(App, {
+					notify: () => {
+						events.push('second');
+					},
+				});
+				expect(container.children[0].props.value).toBe(42);
+				expect(events).toEqual(['first', 'second']);
+			} finally {
+				root.unmount();
+			}
+		},
+	);
+});
+
 // Strong mode rejects render-phase state updates at compile time, so this
 // pattern exists only in the dev and prod compiles.
 describe.each(modes.filter((mode) => !mode.strong))(
@@ -564,6 +786,251 @@ export function App(props) @{
 			expect(view()).toEqual(['b2', 'B2']);
 			root.update(App, { label: 'c' });
 			expect(view()).toEqual(['c2', 'C2']);
+		} finally {
+			root.unmount();
+		}
+	});
+
+	const localDerivedEqualCaptures = load<any>(
+		`import { useEffect } from 'octane';
+import { derived$, query$ } from 'octane/signals';
+export function App(props) @{
+ const d$ = derived$(() => ({ v: props.v }));
+ const q$ = query$(() => props.v, props.load);
+ const value = d$.get();
+ const s = q$.snapshot();
+ useEffect(() => {
+  props.effects.push(value);
+ });
+ <p>{(String(value.v) + ':' + s.status) as string}</p>
+}`,
+		'/local-derived-equal-captures.tsrx',
+		mode,
+	);
+	it('keeps a derived value whose captured values are unchanged', async () => {
+		const { App } = localDerivedEqualCaptures;
+		const effects: Array<{ v: number }> = [];
+		const loads: number[] = [];
+		const loader = (v: number) => {
+			loads.push(v);
+			return new Promise<number>(() => {});
+		};
+		const root = mount(App, { v: 1, tick: 0, effects, load: loader });
+		try {
+			for (let tick = 1; tick < 4; tick++) {
+				await act(() => root.update(App, { v: 1, tick, effects, load: loader }));
+			}
+			// Equal captures keep the committed value, so an effect on it stays put.
+			expect(root.find('p').textContent).toBe('1:pending');
+			expect(effects.map((value) => value.v)).toEqual([1]);
+			await act(() => root.update(App, { v: 2, tick: 4, effects, load: loader }));
+			expect(root.find('p').textContent).toBe('2:pending');
+			expect(effects.map((value) => value.v)).toEqual([1, 2]);
+			expect(loads).toEqual([1, 2]);
+		} finally {
+			root.unmount();
+		}
+	});
+
+	const localDerivedSharedKey = load<any>(
+		`import { derived$ } from 'octane/signals';
+export function App(props) @{
+ const first$ = derived$(() => 'first:' + props.a, { key: 'shared' });
+ const second$ = derived$(() => 'second:' + props.b, { key: 'shared' });
+ <p>{(first$.get() + '|' + second$.get()) as string}</p>
+}`,
+		'/local-derived-shared-key.tsrx',
+		mode,
+	);
+	it('presents the first declaration of a shared key in every render', async () => {
+		const { App } = localDerivedSharedKey;
+		const root = mount(App, { a: 1, b: 2 });
+		const text = () => root.find('p').textContent;
+		try {
+			expect(text()).toBe('first:1|first:1');
+			for (const props of [
+				{ a: 1, b: 2 },
+				{ a: 1, b: 3 },
+				{ a: 2, b: 3 },
+				{ a: 2, b: 3 },
+			]) {
+				await act(() => root.update(App, props));
+				expect(text()).toBe(`first:${props.a}|first:${props.a}`);
+			}
+		} finally {
+			root.unmount();
+		}
+	});
+
+	// A captured constant declared after the declaration is read by its closure,
+	// not when the declaration runs.
+	const laterConstHook = loadPlainHookFixtureSource<any>(
+		`import { derived$ } from 'octane/signals';
+export function usePrefixed$(label: string, initial: string) {
+	const label$ = derived$(() => prefix + label);
+	const prefix = initial;
+	return label$;
+}`,
+		{
+			id: '/local-derived-later-const.ts',
+			mode: 'client',
+			inlineHookMemo: !mode.dev,
+			runtimeModules: { 'octane/signals': signals },
+		},
+	);
+	const laterConstUser = loadCompiledFixtureSource<any>(
+		`import { usePrefixed$ } from './local-derived-later-const';
+export function App(props) @{
+ const label$ = usePrefixed$(props.label, props.prefix);
+ <p>{label$.get() as string}</p>
+}`,
+		{
+			id: '/local-derived-later-const-user.tsrx',
+			mode: 'client',
+			compileOptions: { ...mode, hmr: false },
+			runtimeModules: { 'octane/signals': signals, './local-derived-later-const': laterConstHook },
+		},
+	);
+	it('declares a derived value that captures a constant declared after it', async () => {
+		const { App } = laterConstUser;
+		const root = mount(App, { prefix: '>', label: 'a' });
+		try {
+			expect(root.find('p').textContent).toBe('>a');
+			await act(() => root.update(App, { prefix: '#', label: 'a' }));
+			expect(root.find('p').textContent).toBe('#a');
+		} finally {
+			root.unmount();
+		}
+	});
+
+	// A closure reads its bindings when it runs, after the body has finished.
+	// A later var, a later assignment, or a binding whose own initializer holds
+	// the declaration is not the value at the declaration.
+	const lateBindingHooks = loadPlainHookFixtureSource<any>(
+		`import { derived$ } from 'octane/signals';
+export function useLaterVar$(next: string) {
+	const label$ = derived$(() => prefix);
+	var prefix = next;
+	return label$;
+}
+export function useReassigned$(first: string, last: string) {
+	let value = first;
+	const label$ = derived$(() => value);
+	value = last;
+	return label$;
+}
+export function useCount$(items: string[]) {
+	const api = { count$: derived$(() => api.items.length), items };
+	return api.count$;
+}`,
+		{
+			id: '/local-derived-late-bindings.ts',
+			mode: 'client',
+			inlineHookMemo: !mode.dev,
+			runtimeModules: { 'octane/signals': signals },
+		},
+	);
+	const lateBindingUser = loadCompiledFixtureSource<any>(
+		`import { useCount$, useLaterVar$, useReassigned$ } from './local-derived-late-bindings';
+export function App(props) @{
+ const later$ = useLaterVar$(props.next);
+ const reassigned$ = useReassigned$('first', props.last);
+ const count$ = useCount$(props.items);
+ <p>{(later$.get() + '|' + reassigned$.get() + '|' + String(count$.get())) as string}</p>
+}`,
+		{
+			id: '/local-derived-late-bindings-user.tsrx',
+			mode: 'client',
+			compileOptions: { ...mode, hmr: false },
+			runtimeModules: {
+				'octane/signals': signals,
+				'./local-derived-late-bindings': lateBindingHooks,
+			},
+		},
+	);
+	it('follows a later var, a later assignment, and its own initializer', async () => {
+		const { App } = lateBindingUser;
+		const root = mount(App, { next: '>', last: 'a', items: ['x'] });
+		try {
+			expect(root.find('p').textContent).toBe('>|a|1');
+			await act(() => root.update(App, { next: '#', last: 'b', items: ['x', 'y'] }));
+			expect(root.find('p').textContent).toBe('#|b|2');
+		} finally {
+			root.unmount();
+		}
+	});
+
+	const localDerivedKeyedSignal = load<any>(
+		`import { derived$, signal$ } from 'octane/signals';
+export function App(props) @{
+ const count$ = signal$(props.start, { key: props.name });
+ const label$ = derived$(() => 'n' + count$.get());
+ <p>
+  <b>{label$}</b>
+  <button onClick={() => count$.set(count$.get() + 1)}>{'+'}</button>
+ </p>
+}`,
+		'/local-derived-keyed-signal.tsrx',
+		mode,
+	);
+	it('follows a captured signal handle whose key selects another cell', async () => {
+		const { App } = localDerivedKeyedSignal;
+		const root = mount(App, { name: 'a', start: 1 });
+		try {
+			expect(root.find('b').textContent).toBe('n1');
+			await act(() => root.click('button'));
+			expect(root.find('b').textContent).toBe('n2');
+			await act(() => root.update(App, { name: 'b', start: 10 }));
+			expect(root.find('b').textContent).toBe('n10');
+			// A cell's first declaration keeps its initial value.
+			await act(() => root.update(App, { name: 'a', start: 5 }));
+			expect(root.find('b').textContent).toBe('n2');
+		} finally {
+			root.unmount();
+		}
+	});
+
+	const plainHook = loadPlainHookFixtureSource<any>(
+		`import { derived$ } from 'octane/signals';
+export function useLabel$(label: string) {
+	return derived$(() => ({ label }));
+}`,
+		{
+			id: '/local-derived-plain-hook.ts',
+			mode: 'client',
+			inlineHookMemo: !mode.dev,
+			runtimeModules: { 'octane/signals': signals },
+		},
+	);
+	const plainHookUser = loadCompiledFixtureSource<any>(
+		`import { useEffect } from 'octane';
+import { useLabel$ } from './local-derived-plain-hook';
+export function App(props) @{
+ const value = useLabel$(props.label).get();
+ useEffect(() => {
+  props.effects.push(value);
+ });
+ <p>{value.label as string}</p>
+}`,
+		{
+			id: '/local-derived-plain-hook-user.tsrx',
+			mode: 'client',
+			compileOptions: { ...mode, hmr: false },
+			runtimeModules: { 'octane/signals': signals, './local-derived-plain-hook': plainHook },
+		},
+	);
+	it("keeps a plain-module hook's derived value whose captured values are unchanged", async () => {
+		const { App } = plainHookUser;
+		const effects: Array<{ label: string }> = [];
+		const root = mount(App, { label: 'a', tick: 0, effects });
+		try {
+			for (let tick = 1; tick < 4; tick++) {
+				await act(() => root.update(App, { label: 'a', tick, effects }));
+			}
+			expect(effects.map((value) => value.label)).toEqual(['a']);
+			await act(() => root.update(App, { label: 'b', tick: 4, effects }));
+			expect(root.find('p').textContent).toBe('b');
+			expect(effects.map((value) => value.label)).toEqual(['a', 'b']);
 		} finally {
 			root.unmount();
 		}

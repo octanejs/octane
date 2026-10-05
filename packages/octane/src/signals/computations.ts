@@ -2,7 +2,6 @@ import { formatClientError } from '../error-codes.client.generated.js';
 import { createDerivedCellWith } from './engine.js';
 import {
 	ScopedNode,
-	CandidateUnsupportedError,
 	assertAlive,
 	attachObserver,
 	createDeclarationView,
@@ -27,11 +26,12 @@ import {
 	untrackCommitted,
 	type NodeState,
 	type GraphOwner,
-	type CandidateProducer,
 	type SignalCandidateFrame,
 } from './graph.js';
 import { SIGNAL_DEPENDENT_NODE, type SignalDependencyNotify } from './read-protocol.js';
 import { RedeclarableBinding } from './redeclaration.js';
+import { candidateHooks } from './transition-state.js';
+import { installDerivedCandidates } from '#octane/signal-actions/bindings';
 import {
 	SIGNAL_OWNER_RESOLVE,
 	type DerivedCompute,
@@ -49,8 +49,21 @@ export function createDeclaredDerivedCell<T>(
 	compute: DerivedCompute<T>,
 	options?: DerivedOptions,
 	sequence?: number,
+	captures?: readonly unknown[],
+	declaring?: number,
 ): DerivedSignal<T> {
-	return createDerivedCellWith(owner, key, compute, options, DerivedBinding, sequence);
+	// Only a bundle that creates these cells carries their candidate producer.
+	installDerivedCandidates();
+	return createDerivedCellWith(
+		owner,
+		key,
+		compute,
+		options,
+		DerivedBinding,
+		sequence,
+		captures,
+		declaring,
+	);
 }
 
 interface AttemptDependency {
@@ -121,10 +134,12 @@ function resolveHandle<T>(handle$: SignalHandle<T>, owner: Scope): ScopedNode<T>
 }
 
 export class DerivedBinding<T> extends RedeclarableBinding<DerivedCompute<T>> {
-	private current: DerivedAttempt<T> | undefined;
-	private compute: DerivedCompute<T> | undefined;
-	private frozen = false;
-	private candidate: SignalCandidateFrame | undefined;
+	// Members that are not private are also used by an Action frame's producer
+	// (candidate-producers.ts), which forks and publishes this binding.
+	current: DerivedAttempt<T> | undefined;
+	compute: DerivedCompute<T> | undefined;
+	frozen = false;
+	candidate: SignalCandidateFrame | undefined;
 	/** The latest evaluation produced asynchronous work rather than a value. */
 	private asynchronous = false;
 	/** A later render's computation, evaluated privately until that render is accepted. */
@@ -138,7 +153,7 @@ export class DerivedBinding<T> extends RedeclarableBinding<DerivedCompute<T>> {
 		readonly owner: Scope & GraphOwner,
 		readonly node: ScopedNode<T>,
 		compute: DerivedCompute<T>,
-		private readonly options?: DerivedOptions,
+		readonly options?: DerivedOptions,
 	) {
 		super();
 		this.compute = compute;
@@ -197,7 +212,7 @@ export class DerivedBinding<T> extends RedeclarableBinding<DerivedCompute<T>> {
 		}
 		this.releaseView();
 		const node: ScopedNode<T> = createDeclarationView(this.node, (target, frame) =>
-			binding.forkCandidate(target, frame),
+			candidateHooks.derived!.call(binding, target, frame),
 		);
 		const binding: DerivedBinding<T> = new DerivedBinding(this.owner, node, compute, this.options);
 		this.view = { node, binding };
@@ -255,75 +270,6 @@ export class DerivedBinding<T> extends RedeclarableBinding<DerivedCompute<T>> {
 		});
 	}
 
-	forkCandidate(target: ScopedNode<T>, frame: SignalCandidateFrame): CandidateProducer {
-		if (this.frozen || this.owner.readBarrier || !this.compute) {
-			throw new CandidateUnsupportedError(formatClientError(110));
-		}
-		const fork = new DerivedBinding(this.owner, target, this.compute, this.options);
-		fork.candidate = frame;
-		return {
-			dispose: () => fork.dispose(),
-			dependencies: () => fork.current?.dependencies.keys() ?? [],
-			prepare: () => {
-				const state = target.state;
-				// A caught error is an authoritative presentation, just like a ready
-				// value. Unhandled reads still report the authored error to the frame.
-				if (state?.snapshot.status !== 'ready' && state?.snapshot.status !== 'error')
-					return state?.waiting
-						? { status: 'pending', waiting: state.waiting }
-						: { status: 'invalid' };
-				const current = fork.current;
-				const previous = this.current;
-				return {
-					status: 'ready',
-					receipt: {
-						validate: () =>
-							!this.owner.retired &&
-							this.owner.readBarrier === undefined &&
-							this.compute !== undefined &&
-							this.current === previous &&
-							fork.current === current &&
-							target.state === state &&
-							(!current || (current.binding === fork && fork.validDependencies(current))),
-						publish: () => {
-							// Transfer producer authority without aborting the old attempt or
-							// invoking authored code while canonical graph state is installing.
-							this.current = current;
-							if (current) current.binding = this;
-							this.node.invalidateAttempt = current ? () => this.invalidateGraph() : undefined;
-							fork.current = undefined;
-							fork.candidate = undefined;
-							target.invalidateAttempt = undefined;
-							return () => {
-								if (previous !== this.current) this.stop(previous);
-							};
-						},
-						accept: () => {
-							if (!current) return;
-							const dependencies = [...current.dependencies.values()];
-							const releases: (() => void)[] = [];
-							current.dependencies.clear();
-							for (const dependency of dependencies) {
-								releases.push(dependency.unsubscribe);
-								dependency.node = frame.canonical(dependency.node);
-								dependency.revision = dependency.node.revision;
-								// Canonical states and revisions are installed. Subscribe without
-								// refresh/evaluation, and acquire every lease before releasing any.
-								dependency.unsubscribe = attachObserver(
-									dependency.node,
-									DerivedBinding.notify(current),
-									true,
-								);
-								current.dependencies.set(dependency.node, dependency);
-							}
-							for (const release of releases) release();
-						},
-					},
-				};
-			},
-		};
-	}
-
 	private static context<T>(current: DerivedAttempt<T>): DerivedContext {
 		return {
 			get signal() {
@@ -338,7 +284,7 @@ export class DerivedBinding<T> extends RedeclarableBinding<DerivedCompute<T>> {
 		};
 	}
 
-	private static notify<T>(current: DerivedAttempt<T>): SignalDependencyNotify {
+	static notify<T>(current: DerivedAttempt<T>): SignalDependencyNotify {
 		const notify: SignalDependencyNotify = () => current.binding?.invalidate(current);
 		// Explicit reads are graph leases too. Discovery follows their dependent
 		// identity without evaluating the computation or replaying this callback.
@@ -423,7 +369,7 @@ export class DerivedBinding<T> extends RedeclarableBinding<DerivedCompute<T>> {
 		return this.validDependencies(current);
 	}
 
-	private validDependencies(current: DerivedAttempt<T>): boolean {
+	validDependencies(current: DerivedAttempt<T>): boolean {
 		for (const dependency of current.dependencies.values()) {
 			if (dependency.node.owner.retired || dependency.node.revision !== dependency.revision) {
 				return false;
@@ -482,6 +428,8 @@ export class DerivedBinding<T> extends RedeclarableBinding<DerivedCompute<T>> {
 			return derivedValueState(this.node, result as T);
 		}
 		this.asynchronous = true;
+		// Captured render values alone never restart this work.
+		this.owner.unkeyedState = true;
 		current ??= attempt(this);
 		this.current = current;
 		this.node.invalidateAttempt = () => this.invalidateGraph();
@@ -656,14 +604,14 @@ export class DerivedBinding<T> extends RedeclarableBinding<DerivedCompute<T>> {
 		});
 	}
 
-	private invalidateGraph(): void {
+	invalidateGraph(): void {
 		const current = this.current;
 		if (!current) return;
 		this.stop(current);
 		if (this.current === current) this.current = undefined;
 	}
 
-	private stop(current: DerivedAttempt<T> | undefined, cancel = true): void {
+	stop(current: DerivedAttempt<T> | undefined, cancel = true): void {
 		if (!current) return;
 		const active = current.active;
 		const controller = current.controller;

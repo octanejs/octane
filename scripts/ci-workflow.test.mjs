@@ -48,6 +48,7 @@ const vercelPreviewWorkflow = readFileSync(
 	path.join(REPO, '.github/workflows/vercel-preview.yml'),
 	'utf8',
 );
+const benchWorkflow = readFileSync(path.join(REPO, '.github/workflows/bench.yml'), 'utf8');
 const prBenchWorkflow = readFileSync(path.join(REPO, '.github/workflows/pr-bench.yml'), 'utf8');
 const prBenchCommentWorkflow = readFileSync(
 	path.join(REPO, '.github/workflows/pr-bench-comment.yml'),
@@ -164,29 +165,43 @@ describe('CI workflow aggregation', () => {
 		assert.doesNotMatch(shard, /input-otp\/tests\/browser\/\*\*\/\*\.spec\.ts/);
 	});
 
-	test('gates the renderer-free behavior bundle once per full CI run', () => {
+	// Every scenario and every complete Octane application, not a chosen few:
+	// unenforced budgets drifted over their limits with no pull request failing.
+	test('enforces every committed bundle budget once per full CI run', () => {
 		assert.match(
 			jobSource('test_shard'),
-			/- name: Verify renderer-free behavior bundle\n\s+if: matrix\.shard == '1\/4'\n\s+run: node benchmarks\/bundle-size\/run-minimal\.mjs behavior-root/,
+			/- name: Verify every bundle budget\n\s+if: matrix\.shard == '1\/4'\n\s+run: \|\n\s+node benchmarks\/bundle-size\/run-minimal\.mjs --budgets\n\s+node benchmarks\/bundle-size\/run\.mjs --budgets octane-tsrx octane-jsx\n/,
+		);
+		assert.doesNotMatch(jobSource('test_shard'), /run-minimal\.mjs --budgets \S/);
+		for (const suite of [
+			'benchmarks/bundle-size/minimal-gates.test.mjs',
+			'benchmarks/bundle-size/budget-raises.test.mjs',
+		]) {
+			assert.ok(packageJson.scripts['ci:workflow:test'].split(' ').includes(suite), suite);
+		}
+	});
+
+	test('checks that budget raises land alone against the change itself', () => {
+		const lint = jobSource('lint_checks');
+		assert.match(lint, /fetch-depth: 0/);
+		assert.match(
+			lint,
+			/BUDGET_BASE: \$\{\{ github\.event_name == 'pull_request' && 'HEAD\^1' \|\| github\.event\.before \}\}\n\s+run: node benchmarks\/bundle-size\/budget-raises\.mjs --base "\$BUDGET_BASE"/,
 		);
 	});
 
-	test('enforces recovered signal-free application budgets once per full CI run', () => {
-		assert.match(
-			jobSource('test_shard'),
-			/- name: Verify signal-free application bundle budgets\n\s+if: matrix\.shard == '1\/4'\n\s+run: node benchmarks\/bundle-size\/run-minimal\.mjs --budgets root-static-local root-chained-jsx hooks-state prop-attributes context/,
-		);
-		assert.match(
-			packageJson.scripts['ci:workflow:test'],
-			/benchmarks\/bundle-size\/minimal-gates\.test\.mjs/,
-		);
-	});
-
-	test('gates binding reachability into the octane namespace once per full CI run', () => {
-		assert.match(
-			jobSource('test_shard'),
-			/- name: Verify Apollo binding keeps octane tree-shakeable\n\s+if: matrix\.shard == '1\/4'\n\s+run: node benchmarks\/bundle-size\/run-minimal\.mjs binding-apollo-client/,
-		);
+	test('checks the weekly Bench job Lynx fixture contracts on every pull request', () => {
+		// Bench runs these before its ratio guards. A Lynx source change that
+		// broke them only on the weekly schedule kept every guard from running.
+		const workflowTests = packageJson.scripts['ci:workflow:test'].split(' ');
+		for (const suite of [
+			'benchmarks/lynx-table/stages/*.test.mjs',
+			'benchmarks/lynx-list/*.test.mjs',
+			'benchmarks/lynx-render/*.test.mjs',
+		]) {
+			assert.ok(benchWorkflow.includes(`node --test ${suite}`), suite);
+			assert.ok(workflowTests.includes(suite), suite);
+		}
 	});
 
 	test('runs and reports tests only on Node 24 while retaining the Node 22 engine baseline', () => {
@@ -1668,15 +1683,67 @@ describe('Pull request benchmark report', () => {
 				),
 			);
 		}
-		assert.ok(prBenchWorkflow.includes('for round in base:1 head:1 head:2 base:2; do'));
-		assert.ok(prBenchWorkflow.includes('TARGETS: ${{ env.JS_FRAMEWORK_TARGETS }}'));
 		assert.ok(
 			prBenchWorkflow.includes(
-				'--results-dir="$RESULTS/$side-js-${round##*:}" --servers=octane-tsrx-jsbench,octane-jsx-jsbench js-framework',
+				'node benchmarks/js-framework/pair.mjs --base-tree="$BASE_TREE" \\\n' +
+					'            --base-json="$RESULTS/base/js-framework.json" \\\n' +
+					'            --head-json="$RESULTS/head/js-framework.json"',
 			),
 		);
-		assert.ok(prBenchWorkflow.includes('--base="$RESULTS/base" --head="$RESULTS/head" --rounds=2'));
-		assert.match(packageJson.scripts['ci:workflow:test'], /benchmarks\/pr-report\.test\.mjs/);
+		assert.ok(prBenchWorkflow.includes('--base="$RESULTS/base" --head="$RESULTS/head"'));
+		for (const suite of ['benchmarks/pr-report.test.mjs', 'benchmarks/lib/stats.test.mjs']) {
+			assert.ok(packageJson.scripts['ci:workflow:test'].split(' ').includes(suite), suite);
+		}
+	});
+
+	// The pull request's recorded base trails main once other merges land, so a
+	// delta against it included their changes (#1560, #1578, #1594).
+	test("compares against the merge commit's first parent", () => {
+		assert.match(prBenchWorkflow, /fetch-depth: 2\n/);
+		assert.match(prBenchWorkflow, /base=\$\(git rev-parse HEAD\^1\)\n/);
+		assert.match(prBenchWorkflow, /git worktree add --detach "\$RUNNER_TEMP\/base" "\$base"/);
+		assert.doesNotMatch(
+			prBenchWorkflow,
+			/^\s+BASE_SHA: \$\{\{ github\.event\.pull_request\.base\.sha/m,
+		);
+	});
+
+	// #1055: the Lynx compiler backend is judged against this suite, so a pull
+	// request touching the Lynx path sees its numbers without being gated by them.
+	test('reports lynx-render, path-filtered, without gating on it', () => {
+		const step = prBenchWorkflow.slice(
+			prBenchWorkflow.indexOf('- name: Benchmark lynx-render (report only)'),
+			prBenchWorkflow.indexOf('- name: Render report'),
+		);
+		assert.match(step, /git diff --name-only HEAD\^1 HEAD \| grep -qE "\$lynx_paths"/);
+		for (const prefix of [
+			'packages/lynx/',
+			'packages/rspeedy-plugin-octane/',
+			'benchmarks/lynx-render/',
+		]) {
+			assert.ok(step.includes(prefix), prefix);
+		}
+		for (const results of ['base', 'head']) {
+			assert.ok(
+				step.includes(
+					`node benchmarks/bench.mjs --quick --results-dir="$RESULTS/${results}" lynx-render`,
+				),
+				results,
+			);
+		}
+		assert.equal(step.match(/\|\| echo "::warning::/g)?.length, 2);
+	});
+
+	test('fails after uploading the report when a gate fails', () => {
+		const render = prBenchWorkflow.indexOf('- name: Render report');
+		const upload = prBenchWorkflow.indexOf('- name: Upload report');
+		const fail = prBenchWorkflow.indexOf('- name: Fail on a budget breach');
+		assert.ok(render !== -1 && render < upload && upload < fail);
+		assert.match(prBenchWorkflow, /--out="\$RESULTS\/report\/report\.md" \|\| status=\$\?/);
+		assert.match(
+			prBenchWorkflow,
+			/if: steps\.bytes\.outputs\.status != '0' \|\| steps\.report\.outputs\.status != '0'/,
+		);
 	});
 
 	test('posts the report from the default branch without running pull request code', () => {

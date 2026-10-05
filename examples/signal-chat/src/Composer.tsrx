@@ -1,7 +1,8 @@
-import { useLayoutEffect, useState } from 'octane';
+import { useLayoutEffect } from 'octane';
 import {
 	answerActivity$,
 	answer$,
+	composerReady$,
 	draft$,
 	draftLength$,
 	resumeResponse,
@@ -11,12 +12,12 @@ import {
 import { recordActivation } from './measurements.ts';
 
 export function Composer() @{
-	const [ready, setReady] = useState(false);
+	'use dom bindings';
 	useLayoutEffect(() => {
-		setReady(true);
+		composerReady$.set(true);
 		recordActivation('composer');
 	}, []);
-	<section class="composer" aria-label="Composer" data-composer-ready={ready}>
+	<section class="composer" aria-label="Composer" data-composer-ready={composerReady$}>
 		<form
 			onSubmit={(event: SubmitEvent) => {
 				event.preventDefault();

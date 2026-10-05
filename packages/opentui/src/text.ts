@@ -10,7 +10,7 @@ export type TextNodeKey = (typeof textNodeKeys)[number];
 
 export class SpanRenderable extends TextNodeRenderable {
 	constructor(
-		private readonly ctx: RenderContext | null,
+		protected readonly ctx: RenderContext | null,
 		options: TextNodeOptions,
 	) {
 		super(options);

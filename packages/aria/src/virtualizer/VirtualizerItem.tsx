@@ -14,7 +14,7 @@
 
 import type { Direction } from '@react-types/shared';
 import { LayoutInfo } from '../upstream-exports/react-stately/useVirtualizerState';
-import React, { type CSSProperties, type JSX, type ReactNode, useRef } from '../compat/react';
+import { type CSSProperties, type JSX, type ReactNode, useRef } from '../compat/react';
 import { useLocale } from '../i18n/I18nProvider';
 import { useVirtualizerItem, type VirtualizerItemOptions } from './useVirtualizerItem';
 

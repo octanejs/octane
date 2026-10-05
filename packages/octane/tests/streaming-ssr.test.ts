@@ -24,6 +24,7 @@ import {
 	NestedStreamSeedScopes,
 	ReasonBoundary,
 	ReplayedStreamBoundary,
+	RootBoundary,
 	Siblings,
 	StyledBoundary,
 } from './_fixtures/ssr-suspense.tsrx';
@@ -920,6 +921,9 @@ describe('renderToPipeableStream — chunk protocol', () => {
 			'[b;v;0;0',
 			'[b;v;0;12',
 			'[b;v;0;-1',
+			'[b;v;0;y',
+			'[b;v;0;y0',
+			'[b;v;0;y2',
 			'[b;v;0;k;s:"a;b"',
 			'[b;v;0;k;n:1',
 			'[b;v;0;k;s:"\u2028"',
@@ -940,6 +944,8 @@ describe('renderToPipeableStream — chunk protocol', () => {
 			'[b;v;0;x',
 			'[b;v;0;01',
 			'[b;v;0;-2',
+			'[b;v;0;y3',
+			'[b;v;0;y01',
 			'[b;v;0;k',
 			'[b;v;0;k;s:',
 			'[b;v;0;k;x:1',
@@ -2204,6 +2210,34 @@ describe('streamed page → swap runtime → hydration (end to end)', () => {
 			expect(container.querySelector('.id-ok')?.textContent).toBe('client-ready');
 		} finally {
 			errSpy.mockRestore();
+			root.unmount();
+			render.abort(new Error('test complete'));
+			await c.ended;
+		}
+	});
+
+	it('keeps the client fallback when a root-level pending shell is claimed', async () => {
+		const d = deferred<string>();
+		const c = collector();
+		const render = ServerRT.renderToPipeableStream(server.RootBoundary, { promise: d.promise });
+		render.pipe(c.dest);
+		container.innerHTML = c.chunks[0];
+		activate(container);
+		expect(container.querySelector('template[data-oct-b]')).not.toBeNull();
+
+		// The boundary is the root's whole output. Claiming it for the client must
+		// not let the root discard the client-mounted fallback as stale server DOM.
+		const client = deferred<string>();
+		const root = hydrateRoot(container, RootBoundary as any, { promise: client.promise });
+		try {
+			flushSync(() => {});
+			expect(container.querySelector('template[data-oct-b]')).toBeNull();
+			expect(container.querySelectorAll('.root-loading')).toHaveLength(1);
+
+			await act(() => client.resolve('client-ready'));
+			expect(container.querySelector('.root-loading')).toBeNull();
+			expect(container.querySelector('.root-ok')?.textContent).toBe('client-ready');
+		} finally {
 			root.unmount();
 			render.abort(new Error('test complete'));
 			await c.ended;

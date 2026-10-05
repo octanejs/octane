@@ -77,6 +77,11 @@ function validate_render_route(route) {
 	if (status !== undefined && (typeof status !== 'number' || !Number.isInteger(status))) {
 		throw new Error('[octane] RenderRoute `status` must be an integer.');
 	}
+
+	const hydrate = /** @type {{ hydrate?: unknown }} */ (route).hydrate;
+	if (hydrate !== undefined && hydrate !== 'full' && hydrate !== 'islands') {
+		throw new Error("[octane] RenderRoute `hydrate` must be 'full' or 'islands'.");
+	}
 }
 
 /**

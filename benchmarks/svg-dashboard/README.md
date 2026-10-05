@@ -47,11 +47,16 @@ frameworks contribute only binding + reconciliation machinery.
 | `series_toggle` | structural add/remove + y-domain rescale of surviving paths + keyed tick relabel |
 | `style_spread_pulse` | style objects with unitless SVG props + `data-*` spread bags on 200 edges |
 
-Op sizing: each timed body batches enough semantic repetition (ticks, frames,
-cycles — never loop-and-divide) that every flavor's median clears ~1–1.5 ms;
-below that, Chromium's 0.1 ms timer granularity dominates and the runner's
-compare gate refuses to call a sub-ms move a regression. Batch sizes are the
-constants at the top of `run.mjs`.
+Op sizing: each op's batch is a fixed amount of semantic repetition (ticks,
+frames, cycles), and its median is reported per batch. A timed sample repeats
+the batch a per-target calibrated number of times, about 20 ms of work, and
+divides: a single ~1.5 ms batch sat within 15 ticks of Chromium's 0.1 ms timer
+and let one sample's JIT or GC jitter decide a guard. Batch sizes are the
+constants at the top of `run.mjs`; `meta.batchesPerSample` records the repeats.
+
+The timed pass pairs targets: every target's measure page is open at once in
+one browser, and each sample round visits all of them in a rotating order, so
+the two sides of a ratio guard share the runner's state.
 
 ## Correctness gates (all untimed, all fatal)
 
@@ -79,6 +84,23 @@ Deterministic counters: `censusDomNodes` fields plus `svg_elements_full`,
 across flavors in `baselines/ratios.json`. `production_calls_tick` counts one
 octane `__tick()` in a separate `--jitless` Chromium (15,449 at introduction)
 with a hard ceiling in `run.mjs`.
+
+`work.mjs` (the runner's untimed `work` pass) rebuilds the octane fixture
+without minification and counts named production calls under jitless
+Chromium precise coverage. `App` hands `Viewport` its dashboard subtrees as
+deferred JSX values, so each ui commit classifies the identical `defs` value
+and the four children of the `layers` Fragment again, and every field it reads
+from a deferred value runs an accessor that resolves the value's record. The
+gate sums those accessor calls over 16 `tooltip_swarm` commits and 8 `pan_zoom`
+commits and guards each sum against a reviewed budget (`*_scoped_reads`, max
+ratio 1). It reports `renderBlock`, `childSlot` and `deoptItemBody` calls as
+structural controls, checks every commit's tooltip and viewport state against
+the shared ops replay, and fails if a dashboard subtree is remounted.
+
+| commits | reads before read-once classification | reads after |
+| --- | ---: | ---: |
+| 16 `tooltip_swarm` | 1,408 | 404 |
+| 8 `pan_zoom` | 680 | 184 |
 
 Comment and whitespace/empty text nodes are **reported, never asserted
 equal**: octane emits loop/portal markers (255 comments at mount), svelte

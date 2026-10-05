@@ -38,7 +38,7 @@ function manifest(lockfile = 'pnpm-lock.yaml') {
 				node: '>=22',
 				platform: 'any',
 				arch: 'any',
-				packageManager: 'pnpm@12.8.2',
+				packageManager: 'pnpm@12.9.1',
 				lockfile,
 				lockfileSha256: '0'.repeat(64),
 			},

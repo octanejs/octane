@@ -6,7 +6,7 @@ kinds of data live here, and they are enforced very differently:
 ## `ratios.json` — paired ratio guards (the CI gate)
 
 A flat array of guards, each
-`{ suite, op, target, reference, maxRatio?, minRatio?, note }`. For a given
+`{ suite, op, target, reference, maxRatio?, minRatio?, note, waiver? }`. For a given
 suite result the runner computes `target.score / reference.score` (falling back
 to `median` for older records). Both sides are measured on the **same machine in
 the same run**, which cancels much shared variation, and the runner **fails if it
@@ -19,6 +19,18 @@ bounds include headroom over paired measurements (see each guard's `note`) so
 ordinary run-to-run noise does not trip them; deterministic byte/count bounds can
 be much tighter. Together they catch structural regressions such as Octane
 falling off a fast path or shipped output retaining an optional feature graph.
+
+Every breach is triaged as a fix or a rebaseline; none is left standing, or
+the next one would be invisible. Rebaseline a guard only when the change behind
+it is intended, and say so in its `note`. When the change is a regression that
+needs a product fix, give the guard a dated waiver while the fix lands:
+
+```json
+"waiver": { "reason": "<cause, owner, and tracking link>", "expires": "YYYY-MM-DD" }
+```
+
+The run prints a waived breach without failing, and fails again once the date
+passes, so a known regression cannot quietly become the new floor.
 
 To propose refreshed guard values from a real run:
 

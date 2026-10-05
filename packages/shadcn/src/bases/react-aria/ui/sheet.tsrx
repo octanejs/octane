@@ -9,7 +9,6 @@ import {
 	Dialog as SheetPrimitive,
 	DialogTrigger as SheetTriggerPrimitive,
 	type ModalOverlayProps as ModalOverlayPrimitiveProps,
-	type DialogProps as SheetPrimitiveProps,
 	type DialogTriggerProps as SheetTriggerPrimitiveProps,
 } from '@octanejs/aria/components';
 import type { HeadingProps } from '@octanejs/aria/components';

@@ -424,19 +424,17 @@ jobs:
 
       # Real builds, packed consumers, browser suites, and the ordinary suite
       # all use the repository's Node 24 CI execution target.
-      - name: Verify renderer-free behavior bundle
+      #
+      # Every committed byte budget is a ratchet at measured + 32 bytes, so a
+      # change that grows any public-import scenario or complete Octane
+      # application by more than that fails here. Each reachability build also
+      # runs its executable and reachability gates: the renderer-free behavior
+      # bundle, and an Apollo binding that must keep `octane` tree-shakeable.
+      - name: Verify every bundle budget
         if: matrix.shard == '1/4'
-        run: node benchmarks/bundle-size/run-minimal.mjs behavior-root
-
-      - name: Verify signal-free application bundle budgets
-        if: matrix.shard == '1/4'
-        run: node benchmarks/bundle-size/run-minimal.mjs --budgets root-static-local root-chained-jsx hooks-state prop-attributes context
-
-      # A binding that tests `in` against, or indexes, the `octane` namespace
-      # materializes every public export and undoes root specialization.
-      - name: Verify Apollo binding keeps octane tree-shakeable
-        if: matrix.shard == '1/4'
-        run: node benchmarks/bundle-size/run-minimal.mjs binding-apollo-client
+        run: |
+          node benchmarks/bundle-size/run-minimal.mjs --budgets
+          node benchmarks/bundle-size/run.mjs --budgets octane-tsrx octane-jsx
 
       - name: Run tests
         # WEBSITE_DOCS_SPEC is excluded through the environment, not `--exclude`:
@@ -888,6 +886,14 @@ jobs:
       - name: Validate CI workflow behavior
         run: pnpm ci:workflow:test
 
+      # A raised byte budget lands in its own pull request with the bytes and
+      # the reason (CONTRIBUTING.md, "Size budgets"). A pull request is compared
+      # with its merge commit's first parent, a push with the previous commit.
+      - name: Check that byte budget raises land alone
+        env:
+          BUDGET_BASE: ${{ github.event_name == 'pull_request' && 'HEAD^1' || github.event.before }}
+        run: node benchmarks/bundle-size/budget-raises.mjs --base "$BUDGET_BASE"
+
       # A committed test must execute and pass. Intentional framework
       # divergences are ordinary assertions; missing environment prerequisites
       # fail with setup instructions instead of silently turning CI green.
@@ -963,6 +969,12 @@ jobs:
       # error code, or `octane bindings`/`octane explain` go stale on npm.
       - name: Check CLI data snapshot is current
         run: pnpm cli:data:check
+
+      # The Strong diagnostic catalog in the compiler renders the website page,
+      # docs/strong-compiler-checks.md, llms.txt, and the MCP server's copy. A
+      # new code or changed replacement must regenerate all of them together.
+      - name: Check Strong diagnostic documentation is current
+        run: pnpm strong:diagnostics:check
 
       # The CLI page's file trees and the create-octane README describe what
       # `octane create` writes. The snapshot they are drawn from comes from

@@ -170,6 +170,17 @@ export function createDeclaredScalarCell<T>(
 	key: string,
 	compute: DerivedCompute<T>,
 	sequence?: number,
+	captures?: readonly unknown[],
+	declaring?: number,
 ): DerivedSignal<T> {
-	return createDerivedCellWith(owner, key, compute, undefined, ScalarBinding, sequence);
+	return createDerivedCellWith(
+		owner,
+		key,
+		compute,
+		undefined,
+		ScalarBinding,
+		sequence,
+		captures,
+		declaring,
+	);
 }

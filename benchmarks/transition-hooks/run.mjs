@@ -722,7 +722,8 @@ const WORK_MODEL = {
 	click_renders: [1, 0],
 	click_runtime_functions: [1, 0],
 	click_runtime_arrays: [11, 0],
-	click_runtime_objects: [4, 0],
+	// The delegated-dispatch frame pool allocates its first frame on the first event.
+	click_runtime_objects: [4, 1],
 	click_runtime_constructors: [1, 0],
 	urgent_renders: [4, 0],
 	urgent_runtime_functions: [4, 0],

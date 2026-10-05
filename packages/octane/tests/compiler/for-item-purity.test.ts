@@ -341,6 +341,42 @@ describe('@for item-body purity with module and global reads', () => {
 		expect(code).toContain('_$compilerMemoRegion');
 	});
 
+	// Every console operation returns undefined, so the receiver of a
+	// statement-position diagnostic call never reaches row output. Strong mode
+	// admits the call itself; its arguments remain ordinary row reads.
+	it.each<[string, string, string, number]>([
+		['a row-only body', '', "console.log('row', item.id);", PURE],
+		['a parent capture', '', "console.log('row', item.id);", DEP_ELIGIBLE],
+		['a module let in its arguments', "let mode = 'a';", 'console.log(mode);', 0],
+		['a module let console', 'let console = { log() {} };', "console.log('row');", 0],
+	])('admits a Strong console diagnostic call in %s', (name, prelude, call, expected) => {
+		const capture = name === 'a parent capture';
+		const flags = appListFlags(
+			compile(
+				`
+				${prelude}
+				export function App(props) @{
+					const prefix = props.prefix;
+					<ul>@for (const item of props.items; key item.id) {
+						${call}
+						<li>{${capture ? 'prefix + ' : ''}item.label as string}</li>
+					}</ul>
+				}
+			`,
+				'App.tsrx',
+				{ hmr: false, dev: false, strong: true },
+			).code,
+		);
+		expect(flags).toHaveLength(1);
+		expect(flags[0]! & (PURE | DEP_ELIGIBLE)).toBe(expected);
+	});
+
+	it('keeps a compatibility-mode console call live', () => {
+		const flags = compileList("console.log('row', item.id); <li>{item.label as string}</li>");
+		expect(flags).toHaveLength(1);
+		expect(flags[0]! & (PURE | DEP_ELIGIBLE)).toBe(0);
+	});
+
 	it('keeps PURE for a destructured header whose fields the body reads', () => {
 		const flags = appListFlags(
 			compile(

@@ -7,12 +7,12 @@ import { selectUnfilteredCartesianItems } from './axisSelectors';
 import type { CartesianGraphicalItemSettings } from '../graphicalItemsSlice';
 import { selectBarRectangles } from './barSelectors';
 
-const pickStackId = (state: RechartsRootState, stackId: NormalizedStackId): NormalizedStackId =>
+const pickStackId = (_state: RechartsRootState, stackId: NormalizedStackId): NormalizedStackId =>
 	stackId;
 
 const pickIsPanorama = (
-	state: RechartsRootState,
-	stackId: NormalizedStackId,
+	_state: RechartsRootState,
+	_stackId: NormalizedStackId,
 	isPanorama: boolean,
 ): boolean => isPanorama;
 

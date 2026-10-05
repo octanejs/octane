@@ -167,7 +167,7 @@ export function useHover(...args: any[]): HoverResult {
 				setHovered(true);
 			};
 
-			let triggerHoverEnd = (event: any, pointerType: any) => {
+			let triggerHoverEnd = (_event: any, pointerType: any) => {
 				let target = state.target;
 				state.pointerType = '';
 				state.target = null;

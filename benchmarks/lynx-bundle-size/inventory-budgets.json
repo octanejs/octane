@@ -1,40 +1,40 @@
 {
   "artifacts": {
-    "web": { "raw": 501574, "gzip": 137369 },
-    "lynx": { "raw": 488917, "gzip": 165395 }
+    "web": { "raw": 519403, "gzip": 144218 },
+    "lynx": { "raw": 506731, "gzip": 173144 }
   },
   "sections": {
-    "main": { "raw": 215695, "gzip": 60980 },
-    "background": { "raw": 281753, "gzip": 76045 }
+    "main": { "raw": 220618, "gzip": 62798 },
+    "background": { "raw": 294665, "gzip": 81186 }
   },
   "owners": {
     "web": {
-      "compiler-output-app": 142009,
-      "build-wrapper-main": 95043,
-      "universal-runtime": 78640,
-      "host-driver-papi": 41301,
-      "protocol-transport": 35153,
-      "lynx-runtime-other": 33032,
-      "first-screen-adoption": 34513,
-      "public-state-worklets": 29271,
-      "fixture-app": 11188,
-      "generated-wrapper": 255,
-      "octane-runtime-other": 978,
-      "third-party-runtime": 191
+      "compiler-output-app": 150952,
+      "build-wrapper-main": 93876,
+      "universal-runtime": 84862,
+      "host-driver-papi": 39525,
+      "protocol-transport": 39059,
+      "lynx-runtime-other": 31751,
+      "first-screen-adoption": 34257,
+      "public-state-worklets": 28106,
+      "fixture-app": 12579,
+      "generated-wrapper": 276,
+      "octane-runtime-other": 4296,
+      "third-party-runtime": 216
     },
     "lynx": {
-      "compiler-output-app": 138426,
-      "build-wrapper-main": 92644,
-      "universal-runtime": 76655,
-      "host-driver-papi": 40259,
-      "protocol-transport": 34265,
-      "lynx-runtime-other": 32199,
-      "first-screen-adoption": 33642,
-      "public-state-worklets": 28532,
-      "fixture-app": 10905,
-      "generated-wrapper": 249,
-      "octane-runtime-other": 954,
-      "third-party-runtime": 187
+      "compiler-output-app": 147269,
+      "build-wrapper-main": 91586,
+      "universal-runtime": 82792,
+      "host-driver-papi": 38562,
+      "protocol-transport": 38107,
+      "lynx-runtime-other": 30977,
+      "first-screen-adoption": 33422,
+      "public-state-worklets": 27421,
+      "fixture-app": 12273,
+      "generated-wrapper": 270,
+      "octane-runtime-other": 4192,
+      "third-party-runtime": 212
     }
   },
   "controlledLedger": [
@@ -76,6 +76,17 @@
         "ifrMain": "85724 -> 87566 (+2.15%)"
       },
       "decision": "accepted size tax for 13.2% public and 11.8% all-row 10k FCP improvements; 30k all-row improved 9.3%"
+    },
+    {
+      "owner": "mainline through c60eef1342",
+      "status": "merged baseline",
+      "controlledGzipDelta": {
+        "rows0Web": "137369 -> 144186",
+        "rows0Lynx": "165395 -> 173112",
+        "rows0LynxMain": "60980 -> 62766",
+        "rows0LynxBackground": "76045 -> 81154"
+      },
+      "decision": "re-baselined the budgets frozen at #765 to measured + 32; the merged growth is attributed per pull request in results/production-inventory.md and is not a candidate size tax"
     }
   ]
 }

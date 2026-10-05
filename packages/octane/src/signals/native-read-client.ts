@@ -5,7 +5,11 @@ import {
 	validateNativeReadWitness,
 	type NativeReadWitness,
 } from './native-read-collector.js';
-import { NATIVE_TRANSITION_CONSUMER, type NativeReadSource } from './read-protocol.js';
+import {
+	NATIVE_TRANSITION_CONSUMER,
+	setSignalDeclarationInvocation,
+	type NativeReadSource,
+} from './read-protocol.js';
 import { inspectNativeReadWitness } from './native-read-inspection.js';
 
 interface NativeReadHost {
@@ -50,6 +54,12 @@ interface RenderFrame {
 	candidates: Map<Scope, Candidate> | null;
 	/** Renderer data scoped to this one invocation, such as a declaration stage. */
 	invocationData: unknown;
+	/** This invocation's declaration number; nested invocations have larger ones. */
+	invocation: number;
+	/** The renderer capture this invocation renders into, which a nested one may replace. */
+	capture: object | null;
+	/** The declaration invocation this one interrupted, restored when it ends. */
+	outerInvocation: number;
 }
 
 type CandidateSet = Map<Consumer, Candidate>;
@@ -80,6 +90,7 @@ export function createNativeReadDriver(host: NativeReadHost) {
 	const captures = new WeakMap<object, CandidateSet>();
 	const frames: RenderFrame[] = [];
 	let depth = 0;
+	let invocations = 0;
 	let publications: WeakMap<object, Publication> | null = null;
 	let ownerPublications: WeakMap<PublicationOwner, Publication> | null = null;
 	let unpublishedRefs: WeakMap<object, UnpublishedRef> | null = null;
@@ -297,11 +308,17 @@ export function createNativeReadDriver(host: NativeReadHost) {
 				collectorToken: -1,
 				candidates: null,
 				invocationData: null,
+				invocation: 0,
+				capture: null,
+				outerInvocation: 0,
 			});
 			frame.block = block;
 			frame.collectorToken = collector.beginRender(block);
 			frame.candidates = null;
 			frame.invocationData = null;
+			frame.invocation = ++invocations;
+			frame.capture = host.capture();
+			frame.outerInvocation = setSignalDeclarationInvocation(invocations);
 			// Parameters precede compiler body scopes. Start with the actual Block
 			// owner, and retire prior reads even when this invocation no longer
 			// enters an instrumented body or reads a native source.
@@ -328,9 +345,12 @@ export function createNativeReadDriver(host: NativeReadHost) {
 				}
 			} finally {
 				collector.endRender(frame.collectorToken);
+				setSignalDeclarationInvocation(frame.outerInvocation);
 				frame.block = null;
 				frame.candidates = null;
 				frame.invocationData = null;
+				// A reused frame must not retain a settled capture's commit work.
+				frame.capture = null;
 				depth--;
 			}
 		},
@@ -342,6 +362,21 @@ export function createNativeReadDriver(host: NativeReadHost) {
 		invocation(block: Block): { invocationData: unknown } | undefined {
 			const frame = frames[depth - 1];
 			return frame !== undefined && frame.block === block ? frame : undefined;
+		},
+		/**
+		 * The invocation numbered `id` while it is still rendering, such as the
+		 * component whose directive arm is rendering now, or undefined once it
+		 * has ended. Frames deeper in the stack began later and number higher.
+		 */
+		enclosingInvocation(
+			id: number,
+		): { invocationData: unknown; readonly capture: object | null } | undefined {
+			for (let index = depth - 1; index >= 0; index--) {
+				const frame = frames[index];
+				if (frame.invocation <= id)
+					return frame.invocation === id && frame.block !== null ? frame : undefined;
+			}
+			return undefined;
 		},
 		beginScope(scope: Scope, block: Block): number {
 			if (collector.isDetached()) return collector.beginScope(scope);

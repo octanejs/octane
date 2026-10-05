@@ -4,7 +4,7 @@
 compiler rejects it:
 
 ```text
-src/App.tsrx:9:3: [OCTANE_STRONG_RAW_HTML_WRITE] Strong mode does not allow `innerHTML` on the <article> that Octane renders. Use `dangerouslySetInnerHTML={trustHTML(html)}` on it; trustHTML() marks trusted or already sanitized HTML and does not sanitize it.
+src/App.tsrx:9:3: [OCTANE_STRONG_RAW_HTML_WRITE] Strong mode does not allow `innerHTML` on the <article> that Octane renders. Use `dangerouslySetInnerHTML={trustHTML(html)}` on it; trustHTML() marks trusted or already sanitized HTML and does not sanitize it. See https://octanejs.dev/docs/strong-mode#octane-strong-raw-html-write
 ```
 
 Fix the component so it compiles in Strong mode and meets these requirements:

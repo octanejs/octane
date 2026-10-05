@@ -145,6 +145,8 @@ export function planBindingProgram(fn, render, context) {
 	let hostOperations = false;
 	let initialOperations = false;
 	let lists = false;
+	let tries = false;
+	let mounts = (context.effects?.length ?? 0) > 0;
 	let styles = false;
 	let projectionsEnabled = false;
 	let nextSite = 0;
@@ -227,6 +229,16 @@ export function planBindingProgram(fn, render, context) {
 				body: annotate(node.body),
 				empty: annotate(node.empty),
 			};
+		} else if (node.type === 'JSXTryExpression' || node.type === 'TryStatement') {
+			next = {
+				...node,
+				_octaneBindingSite: metadata(),
+				block: annotate(node.block),
+				pending: annotate(node.pending),
+				handler: node.handler
+					? { ...node.handler, body: annotate(node.handler.body) }
+					: node.handler,
+			};
 		} else if (node.type === 'BlockStatement') {
 			next = { ...node, body: annotate(node.body) };
 		} else if (node.type === 'JSXCodeBlock' && node.body.length === 0) {
@@ -260,7 +272,44 @@ export function planBindingProgram(fn, render, context) {
 		if (!context.annotationsOnly) assertProjection(expression);
 	};
 	const regionMarker = (site, arm) => `<!--[b;${id};${site};${arm}--><!--]-->`;
-	const compileFragment = (rawNodes, names, namespace = 0, ancestors = []) => {
+	const compileFragment = (
+		authoredNodes,
+		outerNames,
+		namespace = 0,
+		ancestors = [],
+		effects = null,
+	) => {
+		// Arm-local `const` declarations precede the arm's output. They extend this
+		// fragment's environment once per preparation instead of being repeated in
+		// every projection that reads them.
+		const declarations = [];
+		const rawNodes = [];
+		for (const node of authoredNodes) {
+			if (node?.type !== 'VariableDeclaration') {
+				rawNodes.push(node);
+				continue;
+			}
+			if (rawNodes.some(significant))
+				fail(node, 'binding declarations must precede the output of their block');
+			if (
+				node.kind !== 'const' ||
+				node.declarations.some(
+					(declaration) => declaration.id.type !== 'Identifier' || !declaration.init,
+				)
+			)
+				fail(node, 'binding blocks support only const declarations with one identifier');
+			for (const declaration of node.declarations) {
+				const init = unwrap(declaration.init);
+				// Local callbacks are native adapters, checked where they are used.
+				if (!['ArrowFunctionExpression', 'FunctionExpression'].includes(init?.type))
+					validate(declaration.init);
+				declarations.push(declaration);
+			}
+		}
+		const names =
+			declarations.length === 0
+				? outerNames
+				: [...outerNames, ...declarations.map((declaration) => declaration.id.name)];
 		// Only this fragment's writers determine its entry capability. Conditional
 		// arms and caller slots are checked when their concrete ranges are entered.
 		let structural = true;
@@ -404,6 +453,44 @@ export function planBindingProgram(fn, render, context) {
 				appendTemplatePart(html, regionMarker(site, '-1'), 'anchor');
 				return html;
 			}
+			if (node.type === 'TryStatement') {
+				tries = true;
+				// Structural handoff cannot transfer a selected `@try` arm.
+				structural = false;
+				const site = node._octaneBindingSite?.site;
+				if (site === undefined) fail(node, 'binding @try is missing its authored site');
+				if (node.finalizer) fail(node.finalizer, 'binding @try does not support finally');
+				const handler = node.handler;
+				for (const parameter of [handler?.param, handler?.resetParam])
+					if (parameter && parameter.type !== 'Identifier')
+						fail(parameter, 'binding @catch parameters must be identifiers');
+				const arms = [
+					compileFragment(blockNodes(node.block), names, ns, parents).fragment,
+					node.pending?.body?.length
+						? compileFragment(node.pending.body, names, ns, parents).fragment
+						: b.literal(null),
+					handler
+						? compileFragment(
+								handler.body.body,
+								[...names, handler.param?.name ?? null, handler.resetParam?.name ?? null],
+								ns,
+								parents,
+							).fragment
+						: b.literal(null),
+				];
+				const index = nodes.length;
+				appendNode([parent, 'region', String(site)]);
+				regions.push(
+					object({
+						node: b.literal(index),
+						kind: b.literal('try'),
+						arms: b.array(arms),
+					}),
+				);
+				const html = createTemplateIr();
+				appendTemplatePart(html, regionMarker(site, 'y'), 'anchor');
+				return html;
+			}
 			if (node.type === 'ForOfStatement') {
 				lists = true;
 				structural = false;
@@ -522,6 +609,8 @@ export function planBindingProgram(fn, render, context) {
 					projectionsEnabled ||= child.projectionsEnabled;
 					for (const program of child.childPrograms) childPrograms.add(program);
 					lists ||= child.lists;
+					tries ||= child.tries;
+					mounts ||= child.mounts;
 					for (const dependency of child.dependencies)
 						if (!dependencies.includes(dependency)) dependencies.push(dependency);
 					for (const hoist of child.hoists) if (!hoists.includes(hoist)) hoists.push(hoist);
@@ -886,6 +975,24 @@ export function planBindingProgram(fn, render, context) {
 			nodes: data(nodes),
 			bindings: data(bindings),
 			project: project(names, b.array(values), fn, projections),
+			...(declarations.length
+				? {
+						scope: origin(
+							b.arrow(
+								[environment(outerNames)],
+								projectionBody(
+									b.array(declarations.map((declaration) => b.id(declaration.id.name))),
+									expressions,
+									declarations.map((declaration) =>
+										origin(b.const(declaration.id, declaration.init), declaration),
+									),
+								),
+							),
+							declarations[0],
+						),
+					}
+				: {}),
+			...(effects?.length ? { effects: project(names, b.array(effects), fn, [], true) } : {}),
 			regions: b.array(regions),
 			...(restSites.length ? { restSites: b.array(restSites) } : {}),
 			...(signalIndices.length ? { signalIndices: data(signalIndices) } : {}),
@@ -941,7 +1048,14 @@ export function planBindingProgram(fn, render, context) {
 		}
 		return { fragment: object(properties), structural };
 	};
-	const { fragment: root, structural } = compileFragment([annotated], parameterNames);
+	for (const effect of context.effects ?? []) if (!context.annotationsOnly) assertAdapter(effect);
+	const { fragment: root, structural } = compileFragment(
+		[annotated],
+		parameterNames,
+		0,
+		[],
+		context.effects,
+	);
 	for (const [call, value] of unbound) replacements.set(call, value);
 	const finalRender = mapCow(
 		annotated,
@@ -992,6 +1106,8 @@ export function planBindingProgram(fn, render, context) {
 		hostOperations,
 		initialOperations,
 		lists,
+		tries,
+		mounts,
 		styles,
 		projectionsEnabled,
 		structural: structural && !controls,

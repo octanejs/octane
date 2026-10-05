@@ -10,7 +10,7 @@ Run the deterministic public compiled consumer:
 node --test benchmarks/scoped-signals/stable-event-authority.test.mjs
 ```
 
-It compiles a frozen adopted TSRX AST in development and production, with matching `NODE_ENV`, and bundles the worktree's authored public entrypoints. One hundred keyed rows contain four native buttons, dynamic scalar text/title and an uncontrolled input. The observer counts actual WeakMap writes; independent controls assert the latest callback arguments, changed captures, reordered host/input identity, typed draft value and cleanup.
+It compiles a frozen adopted TSRX AST in development and production, with matching `NODE_ENV`, and bundles the worktree's authored public entrypoints. One hundred keyed rows contain four native buttons, dynamic scalar text/title and an uncontrolled input. The observer counts actual authority writes; independent controls assert the latest callback arguments, changed captures, reordered host/input identity, typed draft value and cleanup. Authority now lives in each host's `$$signalOwner` property rather than a weak map, so the observer counts writes through an accessor on `Element.prototype`; the expected counts below are unchanged.
 
 Matched against main `9291944a2091cdfc3f5a7a5223c8f7fdef50cc48`:
 

@@ -39,6 +39,10 @@ Use this to investigate performance regressions, benchmark results, scheduler/re
      a quick smoke result with a full result.
    - Treat a delta inside observed variance as inconclusive. Prefer ratio guards
      and deterministic counters when wall-clock noise is larger than the claim.
+   - The pull request benchmark gates js-framework production calls and DOM
+     mutations per operation against the merge commit's first parent: any
+     increase fails it. Wall time there is a paired report, called slower or
+     faster only when its 95% interval lies beyond ±3%.
 
 4. **Diagnose**
    - Runtime hot paths: scheduler queues, effect flushing, keyed reconciliation, event delegation, context propagation, refs.
@@ -58,6 +62,24 @@ Use this to investigate performance regressions, benchmark results, scheduler/re
      it does not, look for a harness or measurement error.
    - Re-run the final candidate after self-review changes. Never report a stale
      intermediate measurement as the final result.
+
+## Size budgets and the pull request gates
+
+- Every byte budget in `benchmarks/bundle-size/` (`minimal-budgets.json`,
+  `app-budgets.json`, `jsx-budgets.json`) is the measured production bytes plus
+  32 for raw and gzip, and CI enforces all of them. Brotli gets 256 because it
+  can grow when code is removed; judge growth by raw and gzip. Check a change with
+  `node benchmarks/bundle-size/run-minimal.mjs --budgets` and
+  `node benchmarks/bundle-size/run.mjs --budgets octane-tsrx octane-jsx`; pass
+  scenario or target names to narrow a run while iterating.
+- Never raise a budget in a feature or fix pull request, including to absorb your
+  own growth. Shrink the change, typically by moving hydration-only or
+  feature-only code behind the capability that owns it, or ask for a separate
+  budget pull request that changes only budget files and prose and names the
+  bytes and the reason. `benchmarks/bundle-size/budget-raises.mjs` fails CI on a
+  raise that travels with other changes.
+- When a change saves bytes, lower the budget in the same pull request with
+  `--write-budgets` for the scenarios it improved, and report the delta.
 
 ## Report template
 

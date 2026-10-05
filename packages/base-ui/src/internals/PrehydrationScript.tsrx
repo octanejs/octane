@@ -1,5 +1,4 @@
 'use client';
-import * as React from 'octane';
 import { useIsHydrating } from '../utils/useIsHydrating';
 import { useCSPContext } from './csp-context/CSPContext.tsrx';
 

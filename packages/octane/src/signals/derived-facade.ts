@@ -7,10 +7,13 @@ import type { DerivedCompute, DerivedOptions, DerivedSignal, SignalOptions } fro
 
 // General derived values may start async work. Scalar compiler output imports
 // only the shared facade, even when a separate cold entry uses this factory.
+// The compiler lists the render values `compute` captures; a render that
+// captured the committed values keeps the committed computation.
 export function __derivedAt<T>(
 	site: string | undefined,
 	compute: DerivedCompute<T>,
 	options?: DerivedOptions & SignalOptions,
+	captures?: readonly unknown[],
 ): DerivedSignal<T> {
 	if (typeof compute !== 'function') throw new TypeError(formatClientError(122));
 	const explicit = signalOptionsKey(options);
@@ -21,12 +24,12 @@ export function __derivedAt<T>(
 	return new DerivedDescriptor(
 		key,
 		'derived',
-		(owner) => {
+		(owner, declaring) => {
 			const wrapped = compute.length
 				? (context: Parameters<DerivedCompute<T>>[0]) =>
 						runWithSignalOwner(owner, () => compute(context))
 				: () => runWithSignalOwner(owner, () => (compute as () => ReturnType<DerivedCompute<T>>)());
-			return createDeclaredDerivedCell(owner, key, wrapped, options, sequence);
+			return createDeclaredDerivedCell(owner, key, wrapped, options, sequence, captures, declaring);
 		},
 		site,
 	);

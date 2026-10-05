@@ -81,7 +81,9 @@ describe('Core APIs documentation', () => {
 		for (const id of [
 			'use-linked-state',
 			'strong-mode',
+			'use-lazy-ref',
 			'use-sync-external-store',
+			'use-layout-snapshot',
 			'hydrate-when',
 			'hydrate-split',
 			'hydrate-prefetch',
@@ -155,9 +157,20 @@ describe('Core APIs documentation', () => {
 				(row) => row.querySelector(':scope > code')?.textContent === 'attachBehaviorRoot',
 			),
 		).toBe(true);
-		expect(
-			apiRows.some((row) => row.querySelector(':scope > code')?.textContent === 'useLinkedState'),
-		).toBe(true);
+		for (const api of ['useLinkedState', 'useLazyRef', 'useLayoutSnapshot']) {
+			expect(
+				apiRows.some((row) => row.querySelector(':scope > code')?.textContent === api),
+				api,
+			).toBe(true);
+		}
+		// The Strong summary and the replacement hooks link to the Strong guide.
+		for (const href of [
+			'/docs/strong-mode',
+			'/docs/strong-mode#recipe-lazy-ref',
+			'/docs/strong-mode#recipe-layout-measurement',
+		]) {
+			expect(container.querySelector(`.prose a[href="${href}"]`), href).toBeTruthy();
+		}
 
 		const active = container.querySelector(
 			'a.sidebar-link[href="/docs/core-apis"][data-status="active"]',

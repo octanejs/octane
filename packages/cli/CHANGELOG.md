@@ -1,5 +1,35 @@
 # @octanejs/cli
 
+## 0.2.0
+
+### Minor Changes
+
+- 6651f44: `octane analyze` reports every Strong violation in a file instead of the first, and analyzes `.tsx` modules whose JSX goes to Octane by default. `--strong-preview` compiles every module as if Strong mode were on and counts what it would reject by code, without failing on modules that are not Strong yet. `--fix` applies the compiler's suggested edits, such as React's lazy ref initialization to `useLazyRef` and `useMemo`/`useCallback` to plain declarations. `octane explain` also explains Strong diagnostic codes, with their replacements and migration recipes.
+
+### Patch Changes
+
+- 6651f44: Strong mode now rejects a synchronous state update in a host element's callback ref with `OCTANE_STRONG_REF_STATE_UPDATE`. Octane calls a callback ref while the element commits, before paint, so the check follows the effect setup rules. It covers inline and local functions, a state setter passed as the ref, and functions in a `ref={[...]}` list. When the callback copies a DOM measurement into state, the error names `useLayoutSnapshot`. Updates the ref defers to `requestAnimationFrame`, a timer with a positive delay, or an observer or event listener stay legal, and a component's `ref` prop is not checked. `octane explain` and the MCP server's `octane_strong_explain` describe the new code and its migration recipe.
+
+## 0.1.0
+
+### Minor Changes
+
+- 09565b4: Add a Strong coverage baseline to `octane analyze`, and analyze modules under `compiler.strong`.
+
+  - `octane analyze --strong-baseline init` records every module that compiles
+    without Strong mode in `octane-strong-baseline.json`. While the file exists,
+    every run fails on a module that is neither Strong nor listed
+    (`OCTANE_STRONG_COVERAGE_REGRESSION`), such as one whose `"use strong"` was
+    deleted, and on a listed name that is now Strong, gone, or no longer compiled
+    by Octane (`OCTANE_STRONG_COVERAGE_STALE`). `--strong-baseline update` only
+    removes names, so a new exception is always a reviewed edit to the file.
+  - `octane analyze` now reads `compiler.strong` from `octane.config.ts` and
+    analyzes the modules it reaches in Strong mode, as the build does. Before,
+    those modules were analyzed without their Strong diagnostics.
+  - A compiler error that carries its own code, such as a Strong rule, is
+    reported under that code instead of `OCTANE_PARSE_ERROR`, so `--code` can
+    select it.
+
 ## 0.0.12
 
 ### Patch Changes

@@ -7,13 +7,14 @@ Key facts for answering questions about Octane:
 - Octane carries forward [Inferno](https://github.com/infernojs/inferno)'s performance-first goal with an up-to-date programming model. Created by Dominic Gannaway, who also created Inferno and has worked on React, Lexical, Ripple, and Svelte.
 - Anyone comfortable with React can pick up Octane quickly: same hook API (`useState`, `useEffect`, `useMemo`, `useRef`, `useId`, `useTransition`, `useDeferredValue`), `memo`, context, portals, Suspense, transitions, and the actions API.
 - Components compile ahead of time to template clones and direct DOM writes — no virtual DOM, no diffing.
-- Dependency arrays are compiler-inferred when omitted from `useEffect`, `useLayoutEffect`, `useInsertionEffect`, `useMemo`, `useCallback`, and `useImperativeHandle`. Locally declared custom hooks in full-compiled `.tsrx`/`.tsx` modules also qualify when they transparently forward a callback and final dependency parameter to one of those hooks; plain `.ts`/`.js`, imported/method, or transforming wrappers require an explicit list. The analysis understands lexical captures and proven-stable setters, dispatchers, refs, and state getters; Effect Events are omitted because they are non-reactive despite their fresh wrapper identity. Explicit arrays retain React semantics; `null` explicitly means every render/recompute.
+- Dependency arrays are compiler-inferred when omitted from `useEffect`, `useLayoutEffect`, `useInsertionEffect`, `useMemo`, `useCallback`, and `useImperativeHandle`. Locally declared custom hooks in full-compiled `.tsrx`/`.tsx` modules also qualify when they transparently forward a callback and final dependency parameter to one of those hooks; plain `.ts`/`.js`, imported/method, or transforming wrappers require an explicit list. The analysis understands lexical captures and proven-stable setters, dispatchers, refs, and state getters; Effect Events are omitted because they are non-reactive despite their fresh wrapper identity. Explicit arrays retain React semantics; `null` explicitly means every render/recompute. Strong modules are stricter: see the Strong mode bullet.
 - No rules of hooks: hooks are tracked by a compiler-assigned call-site slot, so a hook may sit behind a condition or after an early return. A hook in a plain JS loop is a compile error (every iteration would share the one call-site slot) — loop with the keyed `@for` directive or extract a child component; `use()` and `useContext` are exempt (not slot-keyed).
 - `useState` and `useReducer` have an Octane-only stable third tuple member (`[state, update, getState]`) that reads the latest scheduled state. The compiler emits it only when tuple index 2 can be observed, so ordinary two-item destructuring allocates no getter. Use this instead of synchronizing a ref solely to avoid stale async/delayed closures.
 - Prefer [`createResizeObserver`](https://octanejs.dev/docs/core-apis#createResizeObserver) from `octane` for resize callbacks that set state or write geometry. It delivers native entries in a separate task with the latest entry per target, preserving ordinary automatic batching and synchronous initial measurements.
 - `useLinkedState(source, calculate, options?)` keeps a value editable while its source stays the same, then resets or adjusts it immediately when the source changes. The calculation receives the new source and the previous `{ source, value }`, or `undefined` on the first render. No effect or render-time setter is needed.
+- [`useLayoutSnapshot`](https://octanejs.dev/docs/core-apis#use-layout-snapshot) renders from a committed DOM measurement before paint, using an initial value for SSR and hydration. It does not observe layout changes independently of component commits. [`useLazyRef(factory)`](https://octanejs.dev/docs/core-apis#use-lazy-ref) creates a ref's value once. In Strong mode, `useLayoutSnapshot` replaces setting state from a layout-effect measurement, and `useLazyRef` replaces React's `if (ref.current === null) ref.current = create()` idiom.
 - Signals are stable: `octane/signals` provides `signal$`, async-capable `derived$`, keyed `query$`, streams, and `optimistic$`/`action$`. Module declarations resolve to request-local server state or document-local browser state; explicit `createScope`/`createResource` remain available. `useSignal$` from `octane/signals/client` provides component-owned state. Native reads require a runtime signals import and the standard compiler, with no extra option. Use `$` names for handles/helpers exposing live reads; sampled values keep ordinary names.
-- Strong mode is opt-in: a leading `"use strong"` directive or `compiler: { strong: true }` asserts immutable snapshots and pure rendering, enabling compiler checks and fully conditioned production memoization for user-authored render operations. It does not ban `useCallback`, `useMemo`, `useEffectEvent`, or effects that synchronize external systems. See the Strong mode section below.
+- Strong mode is opt-in: a leading `"use strong"` directive or `compiler: { strong: true }` asserts immutable snapshots and pure rendering, enabling `OCTANE_STRONG_*` compile errors and fully conditioned production memoization for user-authored render operations. In a Strong module the compiler owns memoization and dependencies: `useMemo` and `useCallback` are errors, and an explicit dependency array that differs from the inferred inputs is an error (an equivalent one is a hint). Render never reads or writes `ref.current`: use `useLazyRef` for create-once values and `useLayoutSnapshot` for DOM measurements. `useEffectEvent` and effects that synchronize external systems remain valid. See the Strong mode section below and the [Strong mode guide](https://octanejs.dev/docs/strong-mode).
 - Native, delegated DOM events (`onClick`, `onInput`, `onSubmit`) instead of a synthetic event layer — behavior matches the platform. There is no synthetic `onChange`: `onInput` is the per-edit handler for text inputs; native `change` fires when the browser commits an edit, usually on blur.
 - `OCTANE_NATIVE_TEXT_ONCHANGE` is a nonfatal authoring warning, not an event rewrite. The compiler reports direct `onChange`/`onChangeCapture` on a statically known text-entry `<input>` or `<textarea>` without a usable input handler; development runtime checks cover unresolved spreads/dynamic types/final props and report through `console.error` once per broken episode. Statically true `readOnly`/`disabled` controls are excluded. Use the phase-preserving `onInput`/`onInputCapture` fix for per-edit intent.
 - Deliberate native commit-on-blur is supported: keep `onChange` and add the JS-only, non-serialized `suppressNativeChangeWarning` host hint. Do not add a noop `onInput`. Selects, checkbox/radio/file and other non-text inputs, custom elements, and component/library callbacks named `onChange` are outside this warning and should not be blanket-renamed.
@@ -54,10 +55,11 @@ An uncontrolled field that intentionally saves only when the browser commits the
 - [Quick start](https://octanejs.dev/docs/quick-start): Scaffold a new app with `npm create octane my-app` (`--template spa` for a client-only app, `--template fullstack` for routing and SSR), or add Octane to an existing project, then mount a component and learn the `.tsrx` essentials (components, state/effects, conditional hooks, control flow, SSR/hydrate).
 - [Signals](https://octanejs.dev/docs/signals): Writable and async derived declarations, keyed queries, pending UI, streams, optimistic actions, transitions, request/document ownership, and streamed adoption before hydration.
 - [Build tools](https://octanejs.dev/docs/build-tools): Configure the recommended Vite integration or the matching Rspack and Rsbuild plugins, including routing, SSR, hydration, production, and preview.
-- [CLI](https://octanejs.dev/docs/cli): The `octane` command line — `create` scaffolds a new app into an empty directory (this is what `npm create octane my-app` runs, so the two are the same command reached two ways); `doctor` diagnoses the misconfigurations that fail quietly (a duplicated runtime, a missing `jsxImportSource`, plain `tsc` over `.tsrx`, a wildcard `declare module '*.tsrx'`) and `--fix` repairs the mechanical ones; `analyze` compiles every `.tsrx` through the project's own octane and reports the compiler diagnostics; `init` wires Octane into an existing project; `add` installs a binding by the React package it ports; `explain` decodes a minified production error; `mcp add` registers the MCP server with Claude Code, Codex, Cursor, or VS Code. Every command emits `--json` and uses fixed exit codes (`3` = doctor found problems).
+- [CLI](https://octanejs.dev/docs/cli): The `octane` command line — `create` scaffolds a new app into an empty directory (this is what `npm create octane my-app` runs, so the two are the same command reached two ways); `doctor` diagnoses the misconfigurations that fail quietly (a duplicated runtime, a missing `jsxImportSource`, plain `tsc` over `.tsrx`, a wildcard `declare module '*.tsrx'`) and `--fix` repairs the mechanical ones; `analyze` compiles every `.tsrx` and Octane-owned `.tsx` module through the project's own octane and reports every compiler diagnostic, with `--strong-preview`, `--fix`, and `--strong-baseline` for Strong mode adoption; `init` wires Octane into an existing project; `add` installs a binding by the React package it ports; `explain` decodes a minified production error or prints a Strong diagnostic's entry; `mcp add` registers the MCP server with Claude Code, Codex, Cursor, or VS Code. Every command emits `--json` and uses fixed exit codes (`3` = doctor found problems).
 - [Profiling](https://octanejs.dev/docs/profiling): Enable `profile: true` with Vite, Rspack, or Rsbuild to inspect component render/DOM time, self time, render counts, causes, bails, scheduling delay, and Chrome trace data.
 - [Core APIs](https://octanejs.dev/docs/core-apis): Roots, components, state and effect hooks, current-state getters, context, Suspense, deferred hydration and code splitting, behavior-only roots and external DOM ownership, transitions, actions, events, and SSR/static rendering.
 - [Styling](https://octanejs.dev/docs/styling): Sibling-scoped `<style>` blocks (a block is scoped to its siblings: it styles the items beside it and everything below them, never the element that contains it; sibling blocks share one hash, one per children list that holds a block), class maps with `$class`, `<style apply={theme} />` for composing themes, emission order, the `injectStyle` runtime contract on client and server, the Float `<style href precedence>` carve-out, the TSX `<style>{css}</style>` pass-through, `:global(…)` for reaching outside the scope (its forms, how it ranks, and when to pass `theme.$class` instead), and the `STYLE_*` compiler diagnostics.
+- [Strong mode](https://octanejs.dev/docs/strong-mode): The opt-in pure-render contract: what it checks, how to enable it, the adoption workflow, migration recipes for React idioms, and every `OCTANE_STRONG_*` diagnostic with its replacement.
 - [TSRX vs TSX/JSX](https://octanejs.dev/docs/tsrx-vs-tsx): When to author in `.tsrx` versus standard `.tsx`/`.jsx`, and what each dialect unlocks (compiled collections, template control flow, the `@{ … }` shorthand, text holes).
 - [Publishing libraries](https://octanejs.dev/docs/publishing-libraries): Ship the complete authored source graph, including `.tsrx`, `.tsx`, `.ts`, and `.js`, point package exports at that source, and let the consuming application compile it. Do not publish precompiled Octane output.
 - [Browser support](https://octanejs.dev/docs/browser-support): Recommended browser targets, required core APIs, optional fallbacks, and polyfills.
@@ -248,6 +250,13 @@ See the [behavior-only roots guide](https://octanejs.dev/docs/core-apis#behavior
 - `useReducer(reducer, initialArg, init?)` returns `[state, dispatch, getState]`. The third call argument remains the optional lazy initializer; the third tuple member is the current-state getter.
 - `useLinkedState(source, calculate, options?)` returns `[value, setValue, getValue]`. `calculate(source, previous)` receives `undefined` initially and the previous `{ source, value }` when the source changes. `sourceEqual` and `valueEqual` default to `Object.is`; pass custom functions in `options` when needed. A source change updates the value during that same render without an effect, a render-time setter, or a replay.
 - During pending work a state getter can be newer than the committed DOM. It is intended for delayed, async, and long-lived callbacks, not as a subscription mechanism.
+- [`useLazyRef(factory)`](https://octanejs.dev/docs/core-apis#use-lazy-ref) creates a mutable ref whose initial value comes from `factory`, called when the ref's hook cell is created; later renders keep the same ref. `useRef(callback)` stores the function itself. The factory runs during render and may run again for retries, abandoned work, remounts, and separately for SSR and hydration; keep it free of side effects and use an effect for subscriptions or resources needing cleanup. Strong mode checks it like a lazy `useState` initializer: it may read a clock, randomness, or browser state, but may not schedule work. In Strong mode it replaces React's `if (ref.current === null) ref.current = create()` idiom, which reads and writes the ref during render. The experimental Valdi writer's existing adapter ABI does not support this hook.
+
+## Layout snapshots
+
+`useLayoutSnapshot(measure, options?)` returns `options.initial` on the first render, during SSR, and on the first hydration render; without an initial value it returns `undefined`. The initial value is mount-only. After the DOM and refs commit, and before paint, `measure` runs on each committed render of the component that reaches the hook. An unequal measurement updates the snapshot and can trigger another measurement. Equality defaults to `Object.is`; use `options.equal(previous, next)` to compare values such as freshly allocated objects. Without an initial value, `previous` may be `undefined`.
+
+The callback is for synchronous measurements, not state writes or resource acquisition, and its result must converge. It runs in hook order with the component's other layout effects, so declare it after any `useLayoutEffect` that changes the DOM it measures. The hook does not subscribe to layout changes; for changes that happen independently of component commits, have an observer callback update state so the component commits and measures again. It is supported by the DOM renderer; the experimental universal and Valdi renderers do not support it. In Strong mode it replaces `useLayoutEffect(() => setWidth(el.current.offsetWidth))`, which Strong rejects as `OCTANE_STRONG_EFFECT_STATE_UPDATE`. See [Measure committed layout](https://octanejs.dev/docs/core-apis#use-layout-snapshot).
 
 ## ResizeObserver callbacks
 
@@ -489,38 +498,113 @@ Native rendering supports DOM client/server. Deep stores, local derived/async ho
 
 ## Strong mode
 
-Put `"use strong"` before a module's imports, or enable `compiler: { strong: true }` in `octane.config.ts` for all application-owned modules. Vite, Rspack, and Rsbuild also accept `strong: true` in their Octane plugin options. Installed dependencies keep their existing behavior unless their own source opts in.
+Strong mode is an opt-in compiler contract. A Strong module asserts that rendering reads immutable snapshots (props, state, context) and is pure: the same inputs produce the same output, with no state updates, scheduled work, clock or random reads, or `ref.current` access during render. The compiler rejects the violations it can prove with `OCTANE_STRONG_*` compile errors, and it owns memoization and dependency inference. Compatibility mode, the default, keeps React semantics, including `useMemo`, `useCallback`, and explicit dependency arrays.
 
-Strong modules reject these statically provable patterns:
+Enable it per module with `"use strong"` before the imports; comments, other directives, and a leading `@jsxImportSource` pragma may precede it, and a directive anywhere else reports `OCTANE_STRONG_DIRECTIVE_PLACEMENT`. Or set `compiler: { strong: true }` in `octane.config.ts` for all application-owned modules. Vite, Rspack, and Rsbuild also accept `strong: true` as a plugin option; it wins over the config file, standalone Rspack needs it, and `octane analyze` cannot see it, so prefer the config file. Installed dependencies keep their own mode unless their source opts in. Plain `.tsx` checked with TypeScript needs `jsxImportSource: octane/strong` for the branded `trustHTML` JSX types; Strong `.tsrx` selects them automatically.
 
-- Calling a `useState`, `useReducer`, or `useLinkedState` updater during render (`OCTANE_STRONG_RENDER_STATE_UPDATE`).
-- Calling one of those updaters synchronously while an effect is being set up (`OCTANE_STRONG_EFFECT_STATE_UPDATE`), including through a same-module custom hook's returned updater and through `startTransition`, a `useTransition` start function, `queueMicrotask`, `Promise.resolve().then`, a zero-delay `setTimeout`, or awaiting a non-promise.
-- Updating state after an `await` or promise callback in an effect unless the returned cleanup aborts the request's `AbortController` or sets a flag the update checks (`OCTANE_STRONG_EFFECT_DATA_FETCH`).
-- Calling a state getter, reading an unattached ref's `current`, or reading a reassigned module variable in synchronous effect setup (`OCTANE_STRONG_EFFECT_HIDDEN_DEPENDENCY`). Read the snapshot or use `useEffectEvent`.
-- Adding a platform listener, interval, observer, connection, or geolocation watch in effect setup without releasing it in the returned cleanup (`OCTANE_STRONG_EFFECT_RESOURCE_LEAK`).
-- Writing to a `useRef` object's `current` during render (`OCTANE_STRONG_RENDER_REF_WRITE`).
-- Writing through a ref to children, a class, an attribute, or a `style` property that the template sets on that element (`OCTANE_STRONG_MANAGED_DOM_WRITE`), or writing raw HTML to a rendered element (`OCTANE_STRONG_RAW_HTML_WRITE`).
-- Querying the document for a literal `id` or class the same component renders (`OCTANE_STRONG_OWN_MARKUP_QUERY`); attach a ref instead.
-- Calling a known `useEffectEvent` result during render (`OCTANE_STRONG_RENDER_EFFECT_EVENT_CALL`).
-- Including a known Effect Event in explicit hook dependencies (`OCTANE_STRONG_EFFECT_EVENT_DEPENDENCY`).
-- Mutating a provable state snapshot during render (`OCTANE_STRONG_RENDER_SNAPSHOT_MUTATION`).
-- Mutating a binding declared outside a retained keyed `@for` row from that row (`OCTANE_STRONG_RETAINED_ROW_MUTATION`). Fresh setup-local and row-local scratch data remain valid.
-- Reading a known clock or random source during render, including `crypto.randomUUID()` and callbacks that known array methods such as `map` run synchronously (`OCTANE_STRONG_RENDER_IMPURE_CALL`). Use `useId()` for element IDs and a stable item ID for keys.
-- Formatting a provable `Date` or `Intl` value during render without an explicit locale and time zone (`OCTANE_STRONG_RENDER_LOCALE_FORMAT`).
-- Declaring a built-in hook value or its dependent effect outside the sole nested `@{…}` block that uses it (`OCTANE_STRONG_HOOK_LOCALITY`).
-- Declaring a named native event handler outside the sole deeper nested `@{…}` block containing its direct `onX` use (`OCTANE_STRONG_EVENT_HANDLER_LOCALITY`).
+In a Strong module:
 
-Inside `<div>@{ const [count, setCount] = useState(0); const onClick = () => setCount(count + 1); <button {onClick}>{count as string}</button> }</div>`, the hook and named handler sit beside their JSX. Inline events work too. Hooks and effects used only by conditional, keyed, switch, or try arms may stay in the parent scope to keep that lifetime. Moving a hook into a nested `@{…}` block gives it the block's local lifetime; a JSX-only block is transparent until it gets setup.
+- `useMemo` and `useCallback` are errors (`OCTANE_STRONG_MANUAL_MEMO`). Write plain `const` calculations and callbacks; the compiler caches eligible ones from their inferred inputs.
+- Omit dependency arrays. An explicit array that differs from the inferred inputs, or cannot be proven equivalent, is an error; an equivalent array is a hint that never fails a build (`OCTANE_STRONG_EXPLICIT_DEPENDENCIES`). `null` dependencies are an error (`OCTANE_STRONG_UNTRACKED_EFFECT`).
+- Render never reads or writes `ref.current` (`OCTANE_STRONG_RENDER_REF_READ`, `OCTANE_STRONG_RENDER_REF_WRITE`). Create a value once with `useLazyRef(() => create())` instead of `if (ref.current === null) ref.current = create()`.
+- Effect setup never updates state synchronously (`OCTANE_STRONG_EFFECT_STATE_UPDATE`). Render a DOM measurement from `useLayoutSnapshot(measure, { initial })` instead of setting state in a layout effect, and use `useLinkedState` when state follows a prop.
+- Event handlers update state as usual. Effects synchronize external systems and release what they acquire in cleanup. Read the latest props from an effect with `useEffectEvent`.
 
-The checks follow provable synchronous calls through local helpers, `useCallback` and `useEffectEvent` results, and functions returned by analyzable `useMemo` factories. These hooks remain supported; creating a callback is not itself an error. Effect Events are non-reactive and should be omitted from dependencies. Other explicit dependency arrays remain authoritative and are never rewritten.
+Adoption workflow for an existing app:
 
-`"use strong"` is an author assertion that rendering is referentially transparent: the same witnessed inputs produce the same output, and rendering has no application-visible side effects. Production client builds apply that assertion to all user-authored render operations, including local, imported, member, computed, and call-produced callees; callback-bearing calls; construction; and tagged templates. A `use*` name is not a purity oracle and does not reintroduce Rules of Hooks; actual hooks belong in component or custom-hook setup, where compiler-assigned slots allow conditional hooks. Built-ins are recognized by import provenance, including optional calls, and same-module custom-hook declarations or function-valued module bindings are resolved by lexical binding to a transitive fixed point, preserving context, state, suspension, and effect lifecycles through aliases and cycles. Memo guards witness the callable, its receiver, and explicit arguments; derived receivers are represented by their producing operation and inputs rather than transient result identities. Component and ordinary-list projection inputs compare with `Object.is`, distinguishing signed zero while stabilizing `NaN`; a certified keyed-selection operand retains authored strict equality.
+1. `octane analyze --strong-preview` reports what Strong would report for modules that are not Strong yet, grouped by code; those findings do not fail the run.
+2. `octane analyze --strong-preview --fix` applies the compiler's mechanical rewrites: the lazy-ref idiom becomes `useLazyRef`, and `useMemo`/`useCallback` become plain declarations. Without `--strong-preview`, `--fix` rewrites only modules that are already Strong; `--dry-run` lists the fixes without writing them.
+3. Add `"use strong"` module by module and fix each finding with the recipes below. `octane analyze` reports every Strong finding in a file, each Strong compile error ends with a link to its docs entry, and `octane explain <CODE>` prints that entry. The `@octanejs/mcp-server` MCP server has an `octane_strong_explain` tool and a `migrate-to-strong` skill. `collectDiagnostics(source, filename, { strong: true })` from `octane/compiler` returns every diagnostic for one module instead of throwing the first.
+4. `octane analyze --strong-baseline init` writes `octane-strong-baseline.json` with every module that is not Strong yet. While it exists, `octane analyze` fails when a module leaves Strong mode or a new module is not Strong (`OCTANE_STRONG_COVERAGE_REGRESSION`); `octane analyze --strong-baseline update` removes converted names and never adds one.
+5. When every application module is Strong, set `compiler: { strong: true }`.
 
-The analysis is deliberately bounded. Unknown factory returns and complex control flow remain opaque, and unknown calls are assumed pure instead of disabling Strong memoization. Dependency checks follow literal arrays, including statically selected or spread literals; they do not assume an aliased or externally produced array is unchanged. A call that hides ref contents, a state getter, mutable module or global data, a live external store, a clock, randomness, mutation, or another changing source violates the Strong contract. Keep live accessors in compatibility mode, or pass an actual snapshot into a separate Strong component.
+<!-- strong-diagnostics:llms:start (generated by `pnpm strong:diagnostics` from packages/octane/src/compiler/strong-diagnostics.js) -->
 
-Update state in event handlers, or use `useLinkedState` when editable state should follow a changing input. Genuinely deferred callbacks, effect cleanup, effects that synchronize external systems and release what they acquire, and refs attached to DOM elements remain valid outside rendering. Do not rely on render-operation counts: production, development, HMR, profiling, server rendering, hydration, retries, and aborted work can evaluate different amounts of code.
+Migration recipes, React idiom → Strong replacement:
 
-See the [Strong mode guide](https://octanejs.dev/docs/build-tools#strong-mode).
+- Create a value once: `if (ref.current === null) ref.current = new Store();` → `const ref = useLazyRef(() => new Store());`
+- Render from a DOM measurement: `useLayoutEffect(() => setWidth(el.current.offsetWidth));` → `const width = useLayoutSnapshot(() => el.current?.offsetWidth ?? 0, { initial: 0 });`
+- Measure an element from a callback ref: `<span ref={(el) => { if (el) setWidth(el.offsetWidth); }}>` → `const width = useLayoutSnapshot(() => el.current?.offsetWidth ?? 0, { initial: 0 });`
+- Drop useMemo and useCallback: `const total = useMemo(() => sum(items), [items]);` → `const total = sum(items);`
+- Read the latest props from an effect: `const latest = useRef(onTick); latest.current = onTick;` → `const tick = useEffectEvent(onTick);`
+- Keep editable state in sync with a prop: `useEffect(() => setName(user.name), [user.name]);` → `const [name, setName] = useLinkedState(user.id, () => user.name);`
+- Render live browser state: `const wide = window.innerWidth > 800;` → `const wide = useSyncExternalStore(subscribe, getWide, () => false);`
+- Generate an element ID: `const id = 'field-' + Math.random();` → `const id = useId();`
+- Load data in an effect: `useEffect(() => { load(id).then(setData); }, [id]);` → `let ignore = false; load(id).then((p) => { if (!ignore) setName(p.name); }); return () => { ignore = true; };`
+- Re-render when an external store changes: `const [, forceUpdate] = useReducer((x) => x + 1, 0);` → `const value = useSyncExternalStore(store.subscribe, store.get, store.get);`
+- Render trusted HTML: `dangerouslySetInnerHTML={{ __html: html }}` → `dangerouslySetInnerHTML={trustHTML(sanitize(html))}`
+
+Every Strong diagnostic and its replacement:
+
+Effects, state, and dependencies:
+
+- `OCTANE_STRONG_EFFECT_STATE_UPDATE`: Derive the value during render, or use `useLinkedState` when state follows another value. When the effect copies a measurement of the committed DOM into state, render from `useLayoutSnapshot` instead. `requestAnimationFrame`, timers with a positive delay, and external subscription callbacks remain event-driven.
+- `OCTANE_STRONG_REF_STATE_UPDATE`: Pass a ref object to keep the element, and read it from effects and event handlers. When the callback copies a measurement of the element into state, render from `useLayoutSnapshot` instead. `requestAnimationFrame`, timers with a positive delay, and observer or listener callbacks the ref attaches remain event-driven.
+- `OCTANE_STRONG_EFFECT_DATA_FETCH`: Read asynchronous render data with `use()` or a query binding. For external synchronization, abort an `AbortController` whose `signal` is passed to the request, or set a flag declared in the effect from its cleanup and check it before the update.
+- `OCTANE_STRONG_EFFECT_HIDDEN_DEPENDENCY`: Read the render snapshot, or move the non-reactive read into a `useEffectEvent` callback. Octane never double-invokes effects, so first-run and `didInit` guards are unnecessary.
+- `OCTANE_STRONG_EFFECT_RESOURCE_LEAK`: Release it in the returned cleanup. Acquire resources for a snapshot in a separate effect.
+- `OCTANE_STRONG_LAYOUT_SNAPSHOT_ASYNC`: Return the measurement synchronously, and read asynchronous render data with `use()` or a query binding.
+- `OCTANE_STRONG_EFFECT_CHAIN`: Derive the value during render, use `useLinkedState`, or combine the external synchronization in one effect. External subscription and timer callbacks remain event-driven updates.
+- `OCTANE_STRONG_UNLINKED_PROP_STATE`: Use `useLinkedState(source, reconcile)` for state that follows a source. Use `useState(() => initialValue)` or an explicit third `useReducer` initializer for a deliberate initial capture.
+- `OCTANE_STRONG_EXPLICIT_DEPENDENCIES`: Omit the dependency argument.
+- `OCTANE_STRONG_UNTRACKED_EFFECT`: Omit the argument so the compiler tracks reactive inputs. Declare and finish assigning what the hook reads before calling it, or keep a changing value in state or a ref.
+- `OCTANE_STRONG_MANUAL_MEMO`: Write a normal calculation or callback declaration and let Strong compilation cache eligible declarations. `octane analyze --fix` rewrites `useMemo(() => value, deps)` to `value` and `useCallback(fn, deps)` to `fn`.
+- `OCTANE_STRONG_EFFECT_EVENT_DEPENDENCY`: Remove it. Effect Events are non-reactive, so they never belong in dependencies.
+- `OCTANE_STRONG_AUTOMATIC_MEMO_UNSUPPORTED`: Compile the module through the normal Octane integration, or keep it in compatibility mode.
+
+State values, updaters, and subscriptions:
+
+- `OCTANE_STRONG_IMPURE_UPDATER`: Do the side effect or nondeterministic read in the event handler, effect, or Action, and pass its result in: `const now = Date.now(); setValue((current) => current + now)`.
+- `OCTANE_STRONG_SNAPSHOT_MUTATION`: Pass a new value, for example `setItems([...items, item])` or `setItems((current) => [...current, item])`. Keep mutable objects in `useRef`, or create one with `useLazyRef`.
+- `OCTANE_STRONG_STALE_STATE_UPDATE`: Use the updater form, `setValue((current) => current + 1)`, compute from the state a reducer receives, or read the latest value with the state getter (the third tuple member).
+- `OCTANE_STRONG_WRITE_ONLY_STATE`: Subscribe with `useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot)` and render its snapshot, or remove the unused state.
+- `OCTANE_STRONG_UNCACHED_STORE_SNAPSHOT`: Return a value the store keeps, such as its current state object, or read each field with its own `useSyncExternalStore` call.
+
+Render snapshots and determinism:
+
+- `OCTANE_STRONG_RENDER_STATE_UPDATE`: Update state in an event handler, or use `useLinkedState` when state needs to reset or change with another value.
+- `OCTANE_STRONG_RENDER_STATE_GETTER_CALL`: Render from the first tuple member. Call the getter in an event, effect, or deferred callback for the latest scheduled state.
+- `OCTANE_STRONG_RENDER_REF_READ`: Read the ref in an event or effect, or render from state or `useLinkedState`. Create a value once with `useLazyRef(() => value)`, and render from a DOM measurement with `useLayoutSnapshot`. Pass the ref itself to a `ref` prop as usual.
+- `OCTANE_STRONG_RENDER_REF_WRITE`: Create a value once with `useLazyRef(() => create())`. Read the latest props or state from an effect with `useEffectEvent`. Otherwise move the write to an event or effect, or express the value as state. `octane analyze --fix` rewrites the lazy initialization idiom.
+- `OCTANE_STRONG_RENDER_MODULE_STATE_READ`: Move the changing value into state or context, or pass an immutable snapshot as a prop.
+- `OCTANE_STRONG_RENDER_AMBIENT_READ`: Subscribe with `useSyncExternalStore` and a server snapshot for live browser state. Read a one-time value in an effect or a lazy `useState` initializer; lazy initializers also run during server rendering, so guard browser APIs there and keep server and client output the same.
+- `OCTANE_STRONG_RENDER_SNAPSHOT_MUTATION`: Derive a local copy, or pass a new value to the state updater from an event.
+- `OCTANE_STRONG_RETAINED_ROW_MUTATION`: Build mutable data before the `@for`, or derive each row only from its item. Fresh setup-local and row-local scratch data remain valid.
+- `OCTANE_STRONG_RENDER_IMPURE_CALL`: Read time or randomness in an event handler or effect and store the result in state, or pass it in as a prop. Use `useId()` for element IDs. Give each list item a stable ID from its data, such as `item.id`.
+- `OCTANE_STRONG_RENDER_LOCALE_FORMAT`: Pass an explicit locale and time zone, for example `toLocaleString('en-US', { timeZone: 'UTC' })` or `new Intl.DateTimeFormat(locale, { timeZone })`. Otherwise format in an event or effect and render the stored text.
+- `OCTANE_STRONG_RENDER_SIDE_EFFECT`: Schedule the work from an event handler, or from an effect that cancels it in cleanup. Defining a callback that schedules later stays valid; calling it during render does not.
+- `OCTANE_STRONG_RENDER_EFFECT_EVENT_CALL`: Call it from an effect, or from a later event or subscription callback.
+
+Lists, templates, and compatibility APIs:
+
+- `OCTANE_STRONG_MAP_JSX`: Use `@for` with a stable item key. Data-only mapping and keyed JSX mapping in `.tsx` remain valid.
+- `OCTANE_STRONG_INDEX_KEY`: Use an item ID that survives insertion, removal, and reordering. Looking up an item ID, such as `items[index].id`, remains valid.
+- `OCTANE_STRONG_HOOK_LOCALITY`: Move the hook into that block, before the JSX or local effect that uses its value. Hooks used only by conditional, keyed, switch, or try arms may stay in the parent scope to keep that lifetime.
+- `OCTANE_STRONG_EVENT_HANDLER_LOCALITY`: Move the handler into that block, before the JSX that uses it, or inline it.
+- `OCTANE_STRONG_DIRECTIVE_PLACEMENT`: Move `"use strong"` to the top of the file, before imports or other code.
+- `OCTANE_STRONG_SUPPRESSION_PROP`: Fix the mismatch or use the intended native event. Component props with these names are unaffected.
+- `OCTANE_NATIVE_TEXT_ONCHANGE`: Use `onInput` for per-edit changes. Native checkbox, radio, and select `onChange` semantics stay valid.
+- `OCTANE_STRONG_COMPAT_IMPORT`: Use normal Octane scheduling and component semantics.
+
+DOM ownership and trusted HTML:
+
+- `OCTANE_STRONG_MANAGED_DOM_WRITE`: Render the value from state or props in the template.
+- `OCTANE_STRONG_RAW_HTML_WRITE`: Use `dangerouslySetInnerHTML={trustHTML(html)}` for trusted or already sanitized HTML.
+- `OCTANE_STRONG_OWN_MARKUP_QUERY`: Attach a ref to the element and use `ref.current` in the event or effect.
+- `OCTANE_STRONG_UNTRUSTED_HTML`: Pass `trustHTML(html)` after applying the application's sanitization policy. `trustHTML` marks trust and does not sanitize.
+
+Coverage:
+
+- `OCTANE_STRONG_COVERAGE_REGRESSION`: Add `"use strong"` before its imports, or enable `compiler.strong`, and fix what Strong then reports.
+- `OCTANE_STRONG_COVERAGE_STALE`: Run `octane analyze --strong-baseline update`.
+
+Each code is documented at https://octanejs.dev/docs/strong-mode#<code-in-kebab-case>.
+
+<!-- strong-diagnostics:llms:end -->
+
+`"use strong"` is also an author assertion that rendering is referentially transparent. Production client builds memoize every user-authored render operation on that assumption, including local, imported, member, computed, and call-produced callees, callback-bearing calls, construction, and tagged templates. A `use*` name is not a purity oracle and does not reintroduce Rules of Hooks; actual hooks stay in component or custom-hook setup. The analysis is deliberately bounded: it follows local aliases, helpers, and known callbacks, and an unknown call is assumed pure instead of disabling Strong memoization. A call that hides ref contents, a state getter, mutable module or global data, a live external store, a clock, randomness, or mutation violates the contract; keep live accessors in compatibility mode, or pass an actual snapshot into a separate Strong component. Do not rely on render evaluation counts: production, development, HMR, profiling, server rendering, hydration, retries, and aborted work can evaluate different amounts of code.
+
+See the [Strong mode guide](https://octanejs.dev/docs/strong-mode).
 
 ## Dependency-taking hooks
 
@@ -529,6 +613,7 @@ See the [Strong mode guide](https://octanejs.dev/docs/build-tools#strong-mode).
 - `useImperativeHandle` infers dependencies from its handle factory when the third argument is omitted; ref identity is still tracked separately.
 - An explicit array is authoritative. `[]` retains mount/reconnect-only or stable-value behavior, `[a, b]` tracks exactly those values, and `null` opts into every-render/recompute behavior.
 - In production compiles, eligible `useMemo`/`useCallback` declarations become inline caches (no per-render closure or deps-array allocation). This is transparent — identical semantics, including `Object.is` dependency compares.
+- These rules describe compatibility mode, the default. A Strong module rejects `useMemo`/`useCallback` (`OCTANE_STRONG_MANUAL_MEMO`), `null` dependencies, and explicit arrays that differ from the inferred inputs; see Strong mode above.
 
 ## Async data with use()
 

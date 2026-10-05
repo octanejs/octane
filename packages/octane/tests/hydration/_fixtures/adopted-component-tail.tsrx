@@ -80,3 +80,43 @@ export function ListItem(props: { server?: boolean }) {
 		<p>{'after'}</p>
 	</div>;
 }
+
+function ServerPair() @{
+	<>
+		<i>{'ok'}</i>
+		<b>{'b'}</b>
+	</>
+}
+
+function ServerShape() @{
+	<>
+		<i>{'ok'}</i>
+		<b>{'b'}</b>
+		<s class="foreign">{'f'}</s>
+	</>
+}
+
+function ClientShape(props: { inner?: boolean }) @{
+	@if (props.inner) {
+		<>
+			<i>{'ok'}</i>
+			<b>{'b'}</b>
+		</>
+	}
+}
+
+// A component whose identity differs on the client, and whose body is a
+// branch the server rendered no range for: the branch's template adopts the
+// frame's first hosts in place.
+export function BranchBody(props: { server?: 'tail' | 'same'; inner?: boolean }) {
+	const Shape =
+		props.server === 'tail'
+			? ServerShape
+			: props.server === 'same'
+				? ServerPair
+				: ClientShape;
+	return <div>
+		<Shape inner={props.inner} />
+		<p>{'after'}</p>
+	</div>;
+}
