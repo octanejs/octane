@@ -233,7 +233,7 @@ export const HOME_SUMMARY: BenchCard = {
 	format: 'x',
 	ceilings: {
 		'bundle-size': {
-			'octane-tsrx': 3.982187056386752,
+			'octane-tsrx': 3.982280065901111,
 			preact: 0.29139574845256916,
 			solid: 0.9500824085923075,
 			svelte: 0.8113549272737944,

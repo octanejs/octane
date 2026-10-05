@@ -231,18 +231,18 @@
           "samples": 1
         },
         "full_fw_raw": {
-          "median": 559309,
-          "min": 559309,
+          "median": 559306,
+          "min": 559306,
           "samples": 1
         },
         "full_fw_gzip": {
-          "median": 167506,
-          "min": 167506,
+          "median": 167510,
+          "min": 167510,
           "samples": 1
         },
         "full_fw_brotli": {
-          "median": 140871,
-          "min": 140871,
+          "median": 140962,
+          "min": 140962,
           "samples": 1
         }
       },
@@ -374,18 +374,18 @@
           "samples": 1
         },
         "full_fw_raw": {
-          "median": 559309,
-          "min": 559309,
+          "median": 559306,
+          "min": 559306,
           "samples": 1
         },
         "full_fw_gzip": {
-          "median": 167506,
-          "min": 167506,
+          "median": 167510,
+          "min": 167510,
           "samples": 1
         },
         "full_fw_brotli": {
-          "median": 140871,
-          "min": 140871,
+          "median": 140962,
+          "min": 140962,
           "samples": 1
         }
       },
@@ -2321,8 +2321,8 @@
           "samples": 1
         },
         "bindings_fw_gzip": {
-          "median": 113121,
-          "min": 113121,
+          "median": 113155,
+          "min": 113155,
           "samples": 1
         },
         "bindings_fw_brotli": {
@@ -2336,8 +2336,8 @@
           "samples": 1
         },
         "bindings_js_gzip": {
-          "median": 228694,
-          "min": 228694,
+          "median": 228729,
+          "min": 228729,
           "samples": 1
         },
         "bindings_js_brotli": {
