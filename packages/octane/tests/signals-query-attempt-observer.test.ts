@@ -1,9 +1,12 @@
 import { expect, it } from 'vitest';
 import {
+	__declared,
+	__queryAt,
 	createResource,
 	createScope,
 	query,
 	runWithSignalOwner,
+	type Scope,
 	type SignalRendererOwnerIdentity,
 } from 'octane/signals';
 import {
@@ -105,4 +108,61 @@ it('mirrors each current server stream attempt once and fences a retry', async (
 	await expect(complete).resolves.toEqual({ done: true, value: undefined });
 	observed[2]!.release();
 	documentOwner.dispose();
+});
+
+// A function a body creates reads its handles as their declaring owner, so a
+// server render observes that read under the declaring owner even where the
+// function renders inside an owner that does not enclose it, such as a render
+// prop. Another request rendering the same function may not announce it.
+it("observes a lexical read under its declaring owner, only in the declaring owner's request", async () => {
+	// Two requests' documents share the default key; only identity tells them apart.
+	const document = createScope({ scopeKey: 'document:declared-read' });
+	const otherDocument = createScope({ scopeKey: 'document:declared-read' });
+	const renderer = (documentOwner: Scope, instanceKey: string): SignalRendererOwnerIdentity => ({
+		scopeKey: documentOwner.scopeKey,
+		documentOwner,
+		instanceOwner: {},
+		instanceKey,
+	});
+	const declaring = renderer(document, 'declaring');
+	const observed: ServerSignalQueryAttempt[] = [];
+	const render = <T>(owner: SignalRendererOwnerIdentity, callback: () => T): T =>
+		runWithServerSignalQueryAttemptObserver(
+			owner,
+			(attempt) => observed.push(attempt),
+			createServerSignalQueryAttemptObservations,
+			() => runWithSignalOwner(owner, callback),
+		);
+	// A server cell observes its attempt when it first computes, so each
+	// reader below starts the attempt of its own declaration.
+	const declare = (site: string) =>
+		render(declaring, () =>
+			__queryAt(
+				site,
+				() => 'selected',
+				async () => 'value',
+			),
+		);
+
+	const otherRequest$ = __declared(declare('i:other-request'));
+	expect(
+		render(renderer(otherDocument, 'render-prop'), () => otherRequest$.snapshot().status),
+	).toBe('pending');
+	expect(observed).toEqual([]);
+
+	const record$ = declare('i:declared-read');
+	render(renderer(document, 'render-prop'), () => __declared(record$).snapshot());
+	expect(observed).toHaveLength(1);
+	expect(observed[0]).toMatchObject({
+		ownerKey: document.scopeKey,
+		instanceKey: declaring.instanceKey,
+		nodeKey: 'i:declared-read',
+		attempt: 1,
+		kind: 'promise',
+	});
+	await drainProducers();
+	expect(render(declaring, () => record$.get())).toBe('value');
+	observed[0]!.release();
+	document.dispose();
+	otherDocument.dispose();
 });
