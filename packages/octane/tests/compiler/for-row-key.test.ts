@@ -48,6 +48,16 @@ const rows: Record<string, [template: string, key: string]> = {
 		`function Row(p) @{ <li>{p.row.name as string}</li> } export function Rows(props) @{ <ul>@for (const row of props.rows<H>) { <Row<A> row={row}/> }</ul> }`,
 		'row.id',
 	],
+	// A keyed Fragment elsewhere in a template is a descriptor boundary; as a row
+	// root its key is the row key, so the row keeps its inlined children.
+	'Fragment root': [
+		`import { Fragment } from 'octane'; export function Rows(props) @{ <ul>@for (const row of props.rows<H>) { <Fragment<A>><li>{row.name as string}</li><li>{props.render(row)}</li></Fragment> }</ul> }`,
+		'row.id',
+	],
+	'Fragment root keyed outside the row': [
+		`import { Fragment } from 'octane'; export function Rows(props) @{ <ul>@for (const row of props.rows<H>) { <Fragment<A>><li>{row.name as string}</li></Fragment> }</ul> }`,
+		'props.prefix + row.id',
+	],
 	// A key may read neither the row's declarations nor anything they shadow,
 	// but a name bound in a scope of its own is not a row declaration.
 	'key callback parameter shadowing a body const': [

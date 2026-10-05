@@ -22117,17 +22117,18 @@ function isStaticReturnedFragmentComponent(node, ctx) {
 // children become renderable holes. The result is a self-contained fragment whose
 // only inputs are its props — compilable as an ordinary renderer.
 //
-// The renderer builds a keyed, `noscript`/document, or parser-repaired host as a
-// descriptor (isDescriptorBuiltHost), and a descriptor child must be a value: a
-// FoldedDirective or template-only component placeholder under it would be
-// dropped. Inside such a host (`inDescriptor`), directives, components, and child
-// `@{}` blocks lower to value holes here in the owning component, as a `@{}` body
-// and the server lower them. Misreading a template host as a descriptor host costs
-// only the template fast path; the reverse drops children.
+// The renderer builds a keyed, `noscript`/document, or parser-repaired host, and
+// a keyed Fragment, as a descriptor (isDescriptorBuiltElement), and a descriptor
+// child must be a value: a FoldedDirective or template-only component
+// placeholder under it would be dropped. Inside such a host (`inDescriptor`),
+// directives, components, and child `@{}` blocks lower to value holes here in
+// the owning component, as a `@{}` body and the server lower them. Misreading a
+// template host as a descriptor host costs only the template fast path; the
+// reverse drops children.
 function extractFragment(node, ctx, holeProps, parentNs = 'html', inDescriptor = false) {
 	const descriptor =
 		inDescriptor ||
-		(node.type === 'JSXElement' && isDescriptorBuiltHost(node, parentNs === 'svg', ctx));
+		(node.type === 'JSXElement' && isDescriptorBuiltElement(node, parentNs === 'svg', ctx));
 	const attrs = node.attributes || node.openingElement?.attributes || [];
 	const newAttrs = [];
 	const mergedFragmentSpread = isFragmentLongForm(node, ctx) && hasJsxSpreadAttribute(node);
@@ -25130,12 +25131,11 @@ function rewriteImperativeHeadElements(node, ctx, namespace = 'html', inNoscript
 // A JSXElement that normalizeChildren lowers with jsxElementToCreateElement
 // instead of the template compiler, so its whole subtree becomes descriptor
 // values. extractFragment uses the same test to keep that subtree's children in
-// value form.
-function isDescriptorBuiltHost(node, inSvg, ctx) {
-	return (
-		!isComponentTag(node) &&
-		(hasJsxAttribute(node, 'key') || (!inSvg && requiresImperativeHostTree(node, ctx)))
-	);
+// value form. A keyed long-form Fragment is one: inlining its children would
+// drop the key, and the descriptor's keyed slot remounts them when it changes.
+function isDescriptorBuiltElement(node, inSvg, ctx) {
+	if (isComponentTag(node)) return isFragmentLongForm(node, ctx) && hasJsxAttribute(node, 'key');
+	return hasJsxAttribute(node, 'key') || (!inSvg && requiresImperativeHostTree(node, ctx));
 }
 
 /**
@@ -25237,8 +25237,10 @@ function normalizeChildren(
 			// Routing this BEFORE the
 			// generic Element branch is required — `Fragment` would otherwise
 			// hit `isComponentTag` and route through `componentSlot`, which
-			// has no notion of marker pairs.
-			if (isFragmentLongForm(n, ctx)) {
+			// has no notion of marker pairs. A keyed Fragment is a reconciliation
+			// boundary instead, so it takes the descriptor branch below; the
+			// lexical-nesting walk (no imperative lowering) still sees through it.
+			if (isFragmentLongForm(n, ctx) && !(allowImperative && hasJsxAttribute(n, 'key'))) {
 				const attributes = n.openingElement.attributes || [];
 				const refAttr = attributes.find(
 					(a) =>
@@ -25285,7 +25287,7 @@ function normalizeChildren(
 			// Keys need a reconciliation boundary. Parser-sensitive host trees need
 			// imperative construction so HTML repair cannot change binding paths.
 			// The shared descriptor path provides both without taxing ordinary templates.
-			if (ctx && allowImperative && isDescriptorBuiltHost(n, inSvg, ctx)) {
+			if (ctx && allowImperative && isDescriptorBuiltElement(n, inSvg, ctx)) {
 				out.push(
 					inheritOriginLoc(
 						{
@@ -33889,12 +33891,12 @@ function forRowKeyAttribute(node, ctx) {
 // A `key` on the only output root of an @for body names the row, never a
 // separate element: a valued key is the row key above, and the root cannot
 // change identity inside a row that shares it. Leaving the key on the root
-// would give it a boundary that only repeats the row key: an intrinsic root
-// lowers to a keyed descriptor instead of the native template, and a component
-// root loses the row memo and its shared single-root range. Remove it so the
-// row compiles exactly as the header spelling does. Like a header key, the
-// reconciler reads it; an input that changes while rows render takes effect at
-// the next reconcile. Keyed elements below the root keep their own boundaries.
+// would give it a boundary that only repeats the row key: an intrinsic root or
+// a Fragment lowers to a keyed descriptor instead of the native template, and a
+// component root loses the row memo and its shared single-root range. Remove it
+// so the row compiles exactly as the header spelling does. Like a header key,
+// the reconciler reads it; an input that changes while rows render takes effect
+// at the next reconcile. Keyed elements below the root keep their own boundaries.
 function forItemTemplateBody(node, ctx) {
 	const body = node.body.body;
 	if (ctx._universalRuntimeUnit != null) return body;
@@ -33907,8 +33909,7 @@ function forItemTemplateBody(node, ctx) {
 	if (
 		(root?.type !== 'Element' && root?.type !== 'JSXElement') ||
 		(!isPlainHostRoot(root) && !isComponentTag(root)) ||
-		isActivityLongForm(root, ctx) ||
-		isFragmentLongForm(root, ctx)
+		isActivityLongForm(root, ctx)
 	)
 		return body;
 	const attrs = root.attributes || root.openingElement?.attributes || [];
