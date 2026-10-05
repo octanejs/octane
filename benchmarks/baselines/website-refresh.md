@@ -80,7 +80,7 @@ Those changes are outside the measured 0.8.0 release snapshot.
 
 `local/bundle-size.json` no longer comes from the 0.8.0 release source. It was
 re-recorded from `main` at
-[`0d6ef67e96`](https://github.com/octanejs/octane/commit/0d6ef67e96) when the
+[`9c84293179`](https://github.com/octanejs/octane/commit/9c84293179) when the
 bundle-size harness moved from Vite's `minify: 'esbuild'` to Vite 8's default
 `'oxc'` minifier, so each fixture measures what an ordinary Vite application
 ships. Every framework keeps identical build settings (`minify: 'oxc'`,
@@ -91,7 +91,7 @@ ships. Every framework keeps identical build settings (`minify: 'oxc'`,
 - Reproduce with `node benchmarks/bench.mjs --record bundle-size`.
 
 Every framework ships fewer bytes under Oxc, by different amounts. Rows total
-gzip moves from 39,749 to 37,822 bytes for Octane (−4.8%), from 18,325 to 15,233
+gzip moves from 39,805 to 37,868 bytes for Octane (−4.9%), from 18,325 to 15,233
 for Svelte 5 (−16.9%) and from 63,308 to 62,401 for React 19 (−1.4%), measured
 from the same source. The home page's bundle-size ratios therefore move with the
 methodology, as well as with Octane's own changes since the previous record.
