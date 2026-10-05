@@ -1117,22 +1117,69 @@ export function useSelection$(load) {
 			[
 				{ kind: 'derived', next: 'derived$(compute$)' },
 				{ kind: 'query', next: 'query$(compute$, async (selection) => selection)' },
-			].map((scenario) => ({ ...mode, ...scenario })),
+			].flatMap((scenario) =>
+				[
+					{
+						syntax: 'const arrow',
+						declaration: 'const compute$ = () =>',
+						formal: false,
+						local: false,
+					},
+					{
+						syntax: 'function declaration',
+						declaration: 'function compute$()',
+						formal: false,
+						local: false,
+					},
+					{
+						syntax: 'function declaration with a shadowing formal',
+						declaration:
+							'function compute$(_context, { compute$ } = { compute$: () => ({ value: "formal" }) })',
+						formal: true,
+						local: false,
+					},
+					{
+						syntax: 'TSRX-local function declaration',
+						declaration: 'function compute$()',
+						formal: false,
+						local: true,
+					},
+					{
+						syntax: 'TSRX-local declaration with a shadowing formal',
+						declaration: 'function compute$(_context, [compute$] = [() => ({ value: "formal" })])',
+						formal: true,
+						local: true,
+					},
+				].flatMap((shape) =>
+					['producer', 'callback'].map((handoff) => ({ ...mode, ...scenario, ...shape, handoff })),
+				),
+			),
 		),
 	)(
-		'passes a plain named producer to a nested $kind without changing its callback owner ($name)',
+		'passes a plain $syntax to a nested $kind through its $handoff without changing its callback owner ($name)',
 		async (mode) => {
+			const selection = `import { derived$, query$ } from 'octane/signals';
+export function useSelection$(load) {
+ const record$ = query$(() => 'record', load);
+ ${mode.declaration} {
+  const value = record$.get();
+  return { value, next$: value === '${mode.handoff === 'producer' ? 'reader' : 'parent'}' ? ${mode.next} : null };
+ };
+ const selected$ = derived$(compute$);
+ return { selected$, compute$ };
+}`;
 			const view = await mountClient(
-				`import { useSelection$ } from './use-selection';
+				`${mode.local ? selection : "import { useSelection$ } from './use-selection';"}
 function Handoff(props) @{
  <output>{props.next$.get().value as string}</output>
 }
 function Reader(props) @{
- const result = props.selected$.get();
+ const producer = props.selected$.get();
+ const callback = props.read();
  <>
-  <output>{result.value as string}</output>
-  <output>{props.read().value as string}</output>
-  @if (result.next$) { <Handoff next$={result.next$} /> }
+  <output>{producer.value as string}</output>
+  <output>{callback.value as string}</output>
+  @if (${mode.handoff}.next$) { <Handoff next$={${mode.handoff}.next$} /> }
  </>
 }
 export function App(props) @{
@@ -1143,28 +1190,24 @@ export function App(props) @{
 }`,
 				mode,
 				{},
-				{
-					'./use-selection': `import { derived$, query$ } from 'octane/signals';
-export function useSelection$(load) {
- const record$ = query$(() => 'record', load);
- const compute$ = () => {
-  const value = record$.get();
-  return { value, next$: value === 'reader' ? ${mode.next} : null };
- };
- const selected$ = derived$(compute$);
- return { selected$, compute$ };
-}`,
-				},
+				mode.local ? {} : { './use-selection': selection },
 			);
 			try {
 				await view.settle('parent');
 				expect(view.requests).toHaveLength(2);
 				await view.settle('reader', 1);
-				expect(view.requests).toHaveLength(3);
-				await view.settle('handoff', 2);
+				if (!mode.formal) {
+					expect(view.requests).toHaveLength(3);
+					await view.settle('handoff', 2);
+				}
 				await view.flush();
-				expect(view.texts()).toEqual(['parent', 'reader', 'parent', 'handoff']);
-				expect(view.requests).toHaveLength(3);
+				expect(view.texts()).toEqual([
+					'parent',
+					'reader',
+					'parent',
+					mode.formal ? 'formal' : 'handoff',
+				]);
+				expect(view.requests).toHaveLength(mode.formal ? 2 : 3);
 			} finally {
 				view.unmount();
 			}

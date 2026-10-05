@@ -519,11 +519,27 @@ function declaredUses(ast, lexical, owners, trusted, usedNames) {
 			return;
 		}
 		if (node.type === 'FunctionDeclaration' && node.id != null && node.body != null) {
-			scopeNames(functions, lexical.nodeScopes.get(node)).set(node.id.name, {
+			const candidate = {
 				fn: node,
 				id: node.id,
 				declaration: node,
+			};
+			scopeNames(functions, lexical.nodeScopes.get(node)).set(node.id.name, candidate);
+			// Declarations also own their name inside the function. A same-named
+			// formal shares that lexical scope, but denotes its parameter instead.
+			const inner = lexical.nodeScopes.get(node.id);
+			let shadowed = false;
+			mapAst(node.params, (child) => {
+				if (
+					child.type === 'Identifier' &&
+					child.name === node.id.name &&
+					lexical.bindingNodes.has(child) &&
+					lexical.nodeScopes.get(child) === inner
+				)
+					shadowed = true;
+				return null;
 			});
+			if (!shadowed) scopeNames(functions, inner).set(node.id.name, candidate);
 		} else if (
 			node.type === 'VariableDeclaration' &&
 			node.kind === 'const' &&
@@ -552,7 +568,7 @@ function declaredUses(ast, lexical, owners, trusted, usedNames) {
 		}
 	};
 	declare(ast);
-	if (declarations.size === 0) return { uses, producers, producerArguments };
+	if (declarations.size === 0) return { uses, producers, producerArguments, functions };
 	const visited = new WeakSet();
 	const visit = (node, producer) => {
 		if (node === null || typeof node !== 'object' || visited.has(node)) return;
@@ -633,14 +649,14 @@ function declaredUses(ast, lexical, owners, trusted, usedNames) {
 		}
 		producerArguments.set(argument, { name, declaration });
 	}
-	return { uses, producers, producerArguments };
+	return { uses, producers, producerArguments, functions };
 }
 
 // Keep recursive references within a producer copy. A function declaration's
 // id lives in its parameter scope; a const id lives in its declaring scope.
 // A named function expression already owns its unchanged inner name, so a
 // same-spelled reference to that inner binding must not be renamed.
-function producerSelfReference(node, parent, key, declaration, lexical) {
+function producerSelfReference(node, parent, key, declaration, lexical, functions) {
 	if (
 		node.type !== 'Identifier' ||
 		node.name !== declaration.id.name ||
@@ -654,7 +670,7 @@ function producerSelfReference(node, parent, key, declaration, lexical) {
 		lexical.nodeScopes.get(node) ?? lexical.rootScope,
 		node.name,
 	);
-	return binding?.scope === lexical.nodeScopes.get(declaration.id);
+	return functions.get(binding?.scope)?.get(node.name)?.declaration === declaration;
 }
 
 /**
@@ -772,9 +788,14 @@ export function lowerSignalDeclarations(ast, filename, options) {
 	if (!changed) return ast;
 	const captures = analyzeSignalCaptures(ast, declarations);
 	// Only a declaration inside a function can be used from a nested one.
-	const { uses, producers, producerArguments } =
+	const { uses, producers, producerArguments, functions } =
 		declarations.length === 0
-			? { uses: new Map(), producers: new Map(), producerArguments: new Map() }
+			? {
+					uses: new Map(),
+					producers: new Map(),
+					producerArguments: new Map(),
+					functions: new Map(),
+				}
 			: declaredUses(ast, lexical, owners, trustedFactory, usedNames);
 	const revision =
 		options?.hmr && captures.size > 0 ? b.id(allocateName(usedNames, HMR_REVISION)) : null;
@@ -805,14 +826,14 @@ export function lowerSignalDeclarations(ast, filename, options) {
 				if (
 					child.type === 'Property' &&
 					child.shorthand &&
-					producerSelfReference(child.value, child, 'value', declaration, lexical)
+					producerSelfReference(child.value, child, 'value', declaration, lexical, functions)
 				)
 					return {
 						...child,
 						shorthand: false,
 						value: inheritHookMemoOrigin(b.id(name), child.value),
 					};
-				if (producerSelfReference(child, parent, key, declaration, lexical))
+				if (producerSelfReference(child, parent, key, declaration, lexical, functions))
 					return inheritHookMemoOrigin(b.id(name), child);
 				return copyReaderUse(child, fn) ? { ...child } : null;
 			},
@@ -1026,7 +1047,7 @@ export function signalDeclarationSourceEdits(ast, filename, source, options) {
 	};
 	visit(ast);
 	if (declarations.length > 0) {
-		const { uses, producers, producerArguments } = declaredUses(
+		const { uses, producers, producerArguments, functions } = declaredUses(
 			ast,
 			lexical,
 			owners,
@@ -1045,7 +1066,7 @@ export function signalDeclarationSourceEdits(ast, filename, source, options) {
 				// A self-reference in that position needs exactly that one edit.
 				if (
 					!producerArguments.has(child) &&
-					producerSelfReference(child, parent, key, declaration, lexical)
+					producerSelfReference(child, parent, key, declaration, lexical, functions)
 				)
 					rename.push({
 						pos: child.start,
