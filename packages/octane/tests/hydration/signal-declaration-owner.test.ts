@@ -582,7 +582,11 @@ export function App(props) @{
 		},
 	};
 
-	function producerSource(producer: (typeof PRODUCERS)[keyof typeof PRODUCERS], readers = 1) {
+	function producerSource(
+		producer: (typeof PRODUCERS)[keyof typeof PRODUCERS],
+		readers = 1,
+		beforeReaders = '',
+	) {
 		return `import { derived$, query$ } from 'octane/signals';
 function Reader(props) @{
  <>
@@ -595,7 +599,7 @@ export function App(props) @{
  ${producer.setup}
  const selected$ = ${producer.value};
  @try {
-  <section><output>{record$.get() as string}</output>${Array.from(
+  <section><output>{record$.get() as string}</output>${beforeReaders}${Array.from(
 		{ length: readers },
 		() => `<Reader selected$={selected$} read={${producer.callback}} />`,
 	).join('')}</section>
@@ -677,13 +681,86 @@ export function App(props) @{
 	);
 
 	it.each(MODES)(
-		'hydrates a named producer and its declaring callback ($name)',
+		'hydrates two named-producer readers and preserves their declaring callback on update ($name)',
 		async ({ dev, strong }) => {
-			await hydrateServerOutput(
-				producerSource(PRODUCERS['a named producer shared with a callback']),
-				{ dev, strong, adoptsOutput: true },
+			vi.resetModules();
+			const server = await import('../../src/runtime.server.js');
+			const client = await import('../../src/runtime.js');
+			const signals = await import('../../src/signals/index.js');
+			const { bootstrapStreamedSignalHydration } =
+				await import('../../src/hydration/streamed-signals.js');
+			const { loadCompiledFixtureSource } = await import('../_server-fixture.js');
+			const { activateStreamedMarkup, resetStreamRuntimeGlobals } =
+				await import('../_server-stream.js');
+			const { drainProducers } = await import('../_fixtures/signals-async-controls.js');
+			const text = producerSource(
+				PRODUCERS['a named producer shared with a callback'],
 				2,
+				'<small>{props.label as string}</small>',
 			);
+			const options = {
+				id: '/src/signal-declaration-owner.tsrx',
+				compileOptions: { dev, strong, hmr: false },
+				runtimeModules: { 'octane/signals': signals },
+			};
+			const serverModule = loadCompiledFixtureSource(text, { ...options, mode: 'server' });
+			const clientModule = loadCompiledFixtureSource(text, { ...options, mode: 'client' });
+			const results = ['parent', 'left', 'right'];
+			let next = 0;
+			const serverLoad = vi.fn(async () => results[next++]);
+			const browserLoad = vi.fn(async () => 'browser');
+			const streamedSignals = {
+				buildId: 'signal-declaration-owner',
+				documentId: 'signal-declaration-owner',
+			};
+			const container = document.createElement('div');
+			document.body.append(container);
+			let root: ReturnType<typeof client.hydrateRoot> | undefined;
+			let hydration: ReturnType<typeof bootstrapStreamedSignalHydration> | undefined;
+			try {
+				const output = await server.prerender(
+					serverModule.App,
+					{ ...PROPS, load: serverLoad, label: 'initial' },
+					{ streamedSignals },
+				);
+				expect(serverLoad).toHaveBeenCalledTimes(3);
+				container.innerHTML = output.html;
+				activateStreamedMarkup(container);
+				const nodes = [...container.querySelectorAll('output')];
+				const label = container.querySelector('small')!;
+				const expected = ['parent', 'left', 'parent', 'right', 'parent'];
+				expect(nodes.map((node) => node.textContent)).toEqual(expected);
+				expect(label.textContent).toBe('initial');
+				const errors: unknown[] = [];
+				hydration = bootstrapStreamedSignalHydration(streamedSignals);
+				const props = { ...PROPS, load: browserLoad, label: 'initial' };
+				root = client.hydrateRoot(container, clientModule.App, props, {
+					signalOwner: hydration.signalOwner,
+					onRecoverableError: (error) => errors.push(error),
+					onUncaughtError: (error) => errors.push(error),
+				});
+				await drainProducers();
+				client.flushSync(() => {});
+				expect(browserLoad).not.toHaveBeenCalled();
+				expect(errors).toEqual([]);
+				expect([...container.querySelectorAll('output')]).toEqual(nodes);
+				expect(container.querySelector('small')).toBe(label);
+				expect(nodes.map((node) => node.textContent)).toEqual(expected);
+
+				client.flushSync(() => root!.render(clientModule.App, { ...props, label: 'updated' }));
+				await drainProducers();
+				expect(container.querySelector('small')).toBe(label);
+				expect(label.textContent).toBe('updated');
+				expect([...container.querySelectorAll('output')]).toEqual(nodes);
+				expect(nodes.map((node) => node.textContent)).toEqual(expected);
+				expect(browserLoad).not.toHaveBeenCalled();
+				expect(errors).toEqual([]);
+			} finally {
+				root?.unmount();
+				hydration?.dispose();
+				container.remove();
+				resetStreamRuntimeGlobals();
+			}
 		},
 	);
 
