@@ -1837,6 +1837,30 @@ let HYDRATION_DIAGNOSTIC_HOLDS = 0;
 let HELD_HYDRATION_DIAGNOSTICS: Array<() => void> | null = null;
 
 /**
+ * The render error that is unwinding while a hydration runs, and the hydration
+ * that was adopting server DOM where it was thrown: null for content built on
+ * the client, such as a fallback owner's client render. The innermost
+ * renderBlock it unwinds through records it (noteHydrationThrow), and a catch
+ * arm, or the end of the outermost hydration, ends it (clearHydrationThrow).
+ * React's throwException tells a hydrating thrower the same way: only an error
+ * thrown while a hydration adopts fails that hydration (renderTryBody), and an
+ * error from client-rendered content reaches a catch arm as in a client render.
+ */
+const NO_HYDRATION_THROW = {};
+let HYDRATION_THROWN: unknown = NO_HYDRATION_THROW;
+let HYDRATION_THROWN_BY: HydrationCapability | null = null;
+
+function noteHydrationThrow(error: unknown, by: HydrationCapability | null): void {
+	HYDRATION_THROWN = error;
+	HYDRATION_THROWN_BY = by;
+}
+
+function clearHydrationThrow(): void {
+	HYDRATION_THROWN = NO_HYDRATION_THROW;
+	HYDRATION_THROWN_BY = null;
+}
+
+/**
  * DEV-only: log a hydration-mismatch warning unless a try body holds it, then
  * wait for its root attempt's commit. An attempt that is rolled back is
  * retried, and the retry repeats the warning. Nothing is logged under captures
@@ -3713,8 +3737,13 @@ interface RootRenderOwner {
 	bindingLeases?: Set<BindingHandoff>;
 	controlLeases?: Map<Element, ControlHandoff | undefined>;
 	preservePresentation?: boolean;
-	/** The next mount replaces a failed hydration (clearRootContainer). */
-	hydrationFallback?: boolean;
+	/**
+	 * Installed while the client render that replaces a failed hydration has
+	 * yet to commit (installHydrationFallback). A mount calls it with `false`
+	 * where it would clear the container, so the server DOM stays until it
+	 * commits, and with `true` when it ends in an uncaught error.
+	 */
+	hydrationFallback?: (failed: boolean) => void;
 	bindingContainer?: Node;
 	adopt?: (block: Block) => void;
 	retry: () => void;
@@ -3753,6 +3782,12 @@ interface RootRenderTransaction {
 	hydrating?: boolean;
 	/** Collectively validated before a native candidate published canonical state. */
 	nativeAdmitted?: boolean;
+	/**
+	 * A catch arm caught an error in this render (setTryBranch). The client
+	 * render that replaces a failed hydration then commits without reporting
+	 * that failure, as React's does.
+	 */
+	caught?: boolean;
 }
 
 interface RootRenderFrame {
@@ -11012,6 +11047,10 @@ export function renderBlock(block: Block): void {
 			}
 		}
 	} catch (error) {
+		// The innermost block an error unwinds through while hydrating records
+		// whether it was thrown while adopting server DOM (HYDRATION_THROWN).
+		if (currentHydration !== null && HYDRATION_THROWN !== error)
+			noteHydrationThrow(error, hydration);
 		const updates = renderPhaseUpdates as Map<RenderPhaseCell, RenderPhaseSnapshot> | null;
 		if (updates !== null) {
 			for (const [cell, snapshot] of updates) {
@@ -16350,6 +16389,7 @@ function activateHydrateBoundary(state: HydrateSlot): void {
 		setNativeAdoptionResolver(previousNative);
 		WIP_CAPTURE = previousCapture;
 		currentHydration = previousHydration;
+		if (previousHydration === null) clearHydrationThrow();
 	}
 	if (nativeRecovery !== undefined) {
 		// The exact historical demand changed between server output and island
@@ -16359,8 +16399,7 @@ function activateHydrateBoundary(state: HydrateSlot): void {
 		// control flow. Captures that changed before a dormant island activated
 		// legitimately differ from the server's, so its fallback reports nothing,
 		// as React reports nothing for an update that reaches a dehydrated
-		// boundary.
-		if (!hydration.staleServerValues) noteRecoverableHydrationError(() => nativeRecovery!, block);
+		// boundary. Nor does one whose client render catches an error.
 		hydration.discardSeeds();
 		state.serverPreserved = false;
 		state.initialCaptures = null;
@@ -16378,6 +16417,7 @@ function activateHydrateBoundary(state: HydrateSlot): void {
 		const recoveryNative = setNativeAdoptionResolver(null);
 		currentHydration = null;
 		WIP_CAPTURE = recoveryCapture;
+		let caught = false;
 		try {
 			markHydrationDiscard(
 				block.idState.renderOwner,
@@ -16387,7 +16427,7 @@ function activateHydrateBoundary(state: HydrateSlot): void {
 			);
 			resetScopeChildren(block);
 			block.deoptNode = null;
-			renderBlock(block);
+			caught = catchesInHydrationFallback(() => renderBlock(block));
 		} catch (error) {
 			discardOffscreenCapture(recoveryCapture);
 			throw error;
@@ -16396,6 +16436,8 @@ function activateHydrateBoundary(state: HydrateSlot): void {
 			currentHydration = recoveryHydration;
 			setNativeAdoptionResolver(recoveryNative);
 		}
+		if (!caught && !hydration.staleServerValues)
+			noteRecoverableHydrationError(() => nativeRecovery!, block);
 		spliceOffscreenCapture(recoveryCapture);
 		return;
 	}
@@ -19492,6 +19534,13 @@ class HydrationCapability {
 	 * Render a hydrating try body under a diagnostic hold. When the boundary
 	 * `catches` and the body throws an application error, the catch arm
 	 * replaces the region, so the hold drops what the body reported.
+	 *
+	 * An error thrown while this hydration adopted the body's server DOM
+	 * (HYDRATION_THROWN), where the server's body did not throw (it would have
+	 * rendered its catch arm, which a replay adopts, or seeded the rejection),
+	 * fails the hydration of the nearest fallback owner, as React's does, even
+	 * though the catch arm would catch it. That owner renders on the client,
+	 * where a repeated throw reaches the catch arm.
 	 */
 	renderTryBody(block: Block, catches: boolean): void {
 		const mark = this.holdDiagnostics();
@@ -19504,6 +19553,17 @@ class HydrationCapability {
 				!isHostContextRequest(error) &&
 				!isSuspenseException(error) &&
 				!isAdoptionControl(error);
+			if (
+				caught &&
+				HYDRATION_THROWN === error &&
+				HYDRATION_THROWN_BY === this &&
+				!this.isRejection(error)
+			) {
+				clearHydrationThrow();
+				const failure = new HydrationMismatch(formatClientError(340));
+				(failure as Error & { cause?: unknown }).cause = error;
+				throw failure;
+			}
 			throw error;
 		} finally {
 			this.releaseDiagnostics(mark, caught);
@@ -20729,7 +20789,9 @@ class HydrationCapability {
 			if (remainder === undefined) {
 				const fragment = template;
 				this.mismatch(
-					componentSourceLoc(this.rootBlock.body),
+					process.env.NODE_ENV !== 'production'
+						? componentSourceLoc(this.rootBlock.body)
+						: undefined,
 					() => `a fragment starting with ${describeHydrationNode(getFirstChild(fragment))}`,
 					cursor,
 				);
@@ -38883,9 +38945,15 @@ function endDetachedBoundaryRender(frame: RootRenderFrame | null): void {
 // Single mutation point for boundary branches. The bare assignment is the hot
 // path; the devtools probe is fully behind the profile gate (dead-code
 // eliminated in non-profile builds), so this adds only a boolean-guarded call
-// over the plain assignment and no allocation/closure when unobserved.
+// over the plain assignment and no allocation/closure when unobserved. A catch
+// arm ends the caught error's unwinding (HYDRATION_THROWN) and marks the root
+// render as one that caught an error (RootRenderTransaction.caught).
 function setTryBranch(slot: TrySlot | ErrorSlot, next: -1 | 0 | 1 | 2): void {
 	slot.branch = next;
+	if (next === 0 && slot.catchBody !== null) {
+		clearHydrationThrow();
+		if (ROOT_RENDER_TRANSACTION !== null) ROOT_RENDER_TRANSACTION.caught = true;
+	}
 	if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__) {
 		if (next === -1) {
 			__devtoolsClearBoundary(slot);
@@ -39773,6 +39841,33 @@ function finishInitialSuspenseHydration(
 	if (hydration.hasAdjacentRangePair) hydration.coalesce();
 }
 
+/**
+ * Render a fallback owner (a Suspense arm or a Hydrate island) on the client
+ * after its hydration failed. Returns whether a catch arm caught an error in
+ * that render: as React's boundaries do, the owner then reports the caught
+ * error alone, not its failed hydration (RootRenderTransaction.caught). An
+ * error that escapes the render was thrown by client-rendered content, never
+ * while hydrating (HYDRATION_THROWN).
+ */
+function catchesInHydrationFallback(render: () => void): boolean {
+	const transaction = ROOT_RENDER_TRANSACTION;
+	const caughtBefore = transaction?.caught === true;
+	if (transaction !== null) transaction.caught = false;
+	let caught = false;
+	try {
+		render();
+	} catch (error) {
+		noteHydrationThrow(error, null);
+		throw error;
+	} finally {
+		if (transaction !== null) {
+			caught = transaction.caught === true;
+			transaction.caught = caught || caughtBefore;
+		}
+	}
+	return caught;
+}
+
 function renderInitialSuspenseHydration(state: TrySlot, initial: InitialSuspenseHydration): void {
 	state.pendingThenable = null;
 	state.idState.next = initial.idStart;
@@ -39856,6 +39951,7 @@ function renderInitialSuspenseHydration(state: TrySlot, initial: InitialSuspense
 		WIP_CAPTURE = previousCapture;
 		currentHydration = previousHydration;
 		if (previousHydration !== null) previousHydration.node = getNextSibling(state.end);
+		else clearHydrationThrow();
 	}
 	if (!failed) {
 		if (state.retrySignalOwners !== undefined) clearSignalRetryOwners(state);
@@ -39902,14 +39998,15 @@ function renderInitialSuspenseHydration(state: TrySlot, initial: InitialSuspense
 		// weak marker owner: a discarded enclosing attempt restores the marker
 		// and hydrates the arm from it again, and a commit drops both together.
 		removeRange(getNextSibling(state.start), state.end);
-		noteRecoverableHydrationError(() => failure, state.parentBlock);
 		currentHydration = null;
+		let caught = false;
 		try {
-			mountTry(state);
+			caught = catchesInHydrationFallback(() => mountTry(state));
 		} finally {
 			currentHydration = previousHydration;
 			if (previousHydration !== null) previousHydration.node = getNextSibling(state.end);
 		}
+		if (!caught) noteRecoverableHydrationError(() => failure, state.parentBlock);
 		return;
 	}
 	if (isAdoptionControl(failure) || isHostContextRequest(failure)) throw failure;
@@ -47569,25 +47666,38 @@ function isDocumentResource(node: Node): boolean {
 }
 
 /**
- * A root that replaces a failed hydration clears its container as React does:
- * `<html>`, `<head>` and `<body>` keep their document resources, and keep
- * those elements themselves, clearing them the same way.
+ * The server nodes that a root replacing a failed hydration discards, as
+ * React's clearContainer does: `<html>`, `<head>` and `<body>` keep their
+ * document resources and are themselves kept, cleared the same way. Any other
+ * element keeps the renderer's scoped-CSS sidecars, which style the client
+ * tree as they styled the server's. A document keeps its doctype.
  */
-function clearContainerSparingly(container: Node): void {
-	for (let node = getFirstChild(container); node !== null;) {
-		const next = getNextSibling(node);
-		if (isDocumentSingleton(node)) clearContainerSparingly(node);
-		else if (!isDocumentResource(node))
-			(STAGED_DOM?.view(container) ?? container).removeChild(node);
-		node = next;
+function hydrationFallbackNodes(container: RootContainer): Node[] {
+	const nodes: Node[] = [];
+	if (isDocumentSingleton(container)) collectSparingly(container, nodes);
+	else
+		for (let node = getFirstChild(container); node !== null; node = getNextSibling(node))
+			if (container.nodeType === 9 ? node.nodeType !== 10 : !isRendererHydrationStyle(node))
+				nodes.push(node);
+	return nodes;
+}
+
+function collectSparingly(parent: Node, nodes: Node[]): void {
+	for (let node = getFirstChild(parent); node !== null; node = getNextSibling(node)) {
+		if (isDocumentSingleton(node)) collectSparingly(node, nodes);
+		else if (!isDocumentResource(node)) nodes.push(node);
 	}
 }
 
-function clearRootContainer(container: RootContainer, hydrationFallback = false): void {
-	if (hydrationFallback && isDocumentSingleton(container)) {
-		clearContainerSparingly(container);
-		return;
+/** Remove each of `nodes` that is still attached. */
+function removeNodes(nodes: readonly Node[]): void {
+	for (const node of nodes) {
+		const parent = (STAGED_DOM?.view(node) ?? node).parentNode;
+		if (parent !== null) (STAGED_DOM?.view(parent) ?? parent).removeChild(node);
 	}
+}
+
+function clearRootContainer(container: RootContainer): void {
 	if (container.nodeType !== 9) {
 		(
 			STAGED_DOM?.view(container as Element | DocumentFragment) ??
@@ -47930,8 +48040,10 @@ function makeRoot(
 				start = (STAGED_DOM?.view(document) ?? document).createComment('root');
 				end = (STAGED_DOM?.view(document) ?? document).createComment('/root');
 				(STAGED_DOM?.view(container) ?? container).append(start, end);
+			} else if (renderOwner.hydrationFallback !== undefined) {
+				renderOwner.hydrationFallback(false);
 			} else {
-				clearRootContainer(container, renderOwner.hydrationFallback);
+				clearRootContainer(container);
 			}
 			rootBlock = createBlock(
 				'root',
@@ -47949,6 +48061,10 @@ function makeRoot(
 			rootBlock.idState = idState;
 			renderOwner.current = rootBlock;
 			createdInRootRender(rootBlock);
+			// The root shares its container with a failed hydration's server DOM
+			// until it commits. A rollback must not clear the container: the
+			// fallback's journal restores exactly the server nodes instead.
+			if (renderOwner.hydrationFallback !== undefined) preserveRootCreatedDom(rootBlock);
 			registerRootErrorHandlers(rootBlock, errorOptions);
 			registerRootDisposer(rootBlock);
 			if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__) {
@@ -47999,6 +48115,7 @@ function makeRoot(
 					// render, so the option must not behave differently from a scheduled
 					// render's unhandled error.
 					if (rootBlock !== null && !rootBlock.disposed) unmountBlock(rootBlock);
+					renderOwner.hydrationFallback?.(true);
 					if (!reportUncaughtError(mountedRoot, unhandled)) throw unhandled;
 					return;
 				}
@@ -48304,6 +48421,48 @@ export function __createVoidRoot(container: RootContainer, options?: RootOptions
 export function __voidRootProps(type: ComponentBody, props: any): any {
 	applyElementDefaultProps(type, props);
 	return props;
+}
+
+/**
+ * A root whose hydration failed renders on the client instead, as React's
+ * does, and the server DOM stays on screen until that render commits: the
+ * render mounts after the server nodes, and its commit removes them (see
+ * hydrationFallbackNodes), publishes the mismatch's development `diagnostic`,
+ * and reports `failure` to onRecoverableError once. A render that suspends,
+ * or that a newer root render replaces, leaves the server DOM exactly as it
+ * was. A render that throws to a catch arm commits without the report, and
+ * one that ends in an uncaught error discards the server DOM unreported, both
+ * as React's do. A document cannot hold a second root element, so its render
+ * removes the server nodes up front, and a rollback restores them.
+ */
+function installHydrationFallback(
+	owner: RootRenderOwner,
+	container: RootContainer,
+	failure: Error,
+	diagnostic: string | undefined,
+	report: ((error: unknown) => void) | undefined,
+): void {
+	owner.hydrationFallback = (failed) => {
+		const nodes = hydrationFallbackNodes(container);
+		if (failed) {
+			owner.hydrationFallback = undefined;
+			removeNodes(nodes);
+			return;
+		}
+		const transaction = ROOT_RENDER_TRANSACTION!;
+		// Rolling back a render that never commits restores exactly these nodes.
+		journalRootRange(container, null, null);
+		if (container.nodeType === 9) removeNodes(nodes);
+		(transaction.commit ??= []).push(() => {
+			owner.hydrationFallback = undefined;
+			nodes.forEach(retireEventHostTree);
+			removeNodes(nodes);
+			if (process.env.NODE_ENV !== 'production' && diagnostic !== undefined)
+				console.error(diagnostic);
+			if (report !== undefined && transaction.caught !== true)
+				queueMicrotask(() => invokeRootErrorHandler(report, failure));
+		});
+	};
 }
 
 /**
@@ -48655,25 +48814,23 @@ function hydrateRootWithOutputHandler(
 		} finally {
 			setNativeAdoptionResolver(previousNative);
 			currentHydration = previousHydration;
+			if (previousHydration === null) clearHydrationThrow();
 			endRootRender(frame);
 			if (!inFlush && ROOT_RENDER_TRANSACTION === null) commitRootRenders();
 		}
 		if (nativeRecovery !== undefined && !owner.disposed) {
-			if (
-				process.env.NODE_ENV !== 'production' &&
-				nativeRecovery instanceof HydrationMismatch &&
-				nativeRecovery.diagnostic !== undefined
-			)
-				console.error(nativeRecovery.diagnostic);
-			noteRecoverableHydrationError(() => nativeRecovery!, rootBlock);
+			installHydrationFallback(
+				owner,
+				container,
+				nativeRecovery,
+				process.env.NODE_ENV !== 'production' && nativeRecovery instanceof HydrationMismatch
+					? nativeRecovery.diagnostic
+					: undefined,
+				currentHydration?.staleServerValues === true ? undefined : rootOptions?.onRecoverableError,
+			);
 			idState.next = rootOptions?.identifierSeed ?? 0;
-			owner.hydrationFallback = true;
-			try {
-				if (isElementDescriptor(bodyOrElement)) root.render(bodyOrElement);
-				else root.render(body, props);
-			} finally {
-				owner.hydrationFallback = undefined;
-			}
+			if (isElementDescriptor(bodyOrElement)) root.render(bodyOrElement);
+			else root.render(body, props);
 			return;
 		}
 		if (!completed) return;

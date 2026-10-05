@@ -310,6 +310,7 @@ type ClientErrorArguments = {
 	337: [];
 	338: [];
 	339: [];
+	340: [];
 };
 
 export function formatClientError<Code extends keyof ClientErrorArguments>(
@@ -1344,6 +1345,11 @@ export function formatClientError<Code extends keyof ClientErrorArguments>(
 			case 339:
 				return formatDevErrorMessage(
 					"Hydration failed because the server rendered HTML didn't match the client. As a result this tree will be regenerated on the client.",
+					args,
+				);
+			case 340:
+				return formatDevErrorMessage(
+					'There was an error while hydrating, so the nearest Suspense boundary, Hydrate island, or the root rendered on the client instead.',
 					args,
 				);
 			default:

@@ -3533,6 +3533,11 @@
       "message": "Hydration failed because the server rendered HTML didn't match the client. As a result this tree will be regenerated on the client.",
       "runtime": ["client"],
       "status": "active"
+    },
+    "340": {
+      "message": "There was an error while hydrating, so the nearest Suspense boundary, Hydrate island, or the root rendered on the client instead.",
+      "runtime": ["client"],
+      "status": "active"
     }
   },
   "strongDiagnostics": {

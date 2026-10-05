@@ -49,6 +49,33 @@ export interface PageProps {
 	outer?: unknown;
 	/** Updates the page from a later sibling's render. */
 	update?: boolean;
+	/** Makes the Flaky body throw on its first render, the one that hydrates. */
+	once?: { thrown: boolean };
+}
+
+function throwOnce(once: { thrown: boolean } | undefined): string {
+	if (once !== undefined && !once.thrown) {
+		once.thrown = true;
+		throw new Error('hydration only');
+	}
+	return 'ok';
+}
+
+function OnceLeaf(props: { once?: { thrown: boolean } }) @{
+	<i>{throwOnce(props.once) as string}</i>
+}
+
+// Its body throws while hydrating, and not when it renders again.
+export function Flaky(props: PageProps) @{
+	<div>
+		<h1>{'before'}</h1>
+		@try {
+			<OnceLeaf once={props.once} />
+		} @catch (error: unknown) {
+			<p class="caught">{String(error) as string}</p>
+		}
+		<button onClick={props.onAfter}>{'after'}</button>
+	</div>
 }
 
 export function Clone(props: PageProps) @{

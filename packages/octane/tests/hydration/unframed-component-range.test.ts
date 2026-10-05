@@ -104,6 +104,11 @@ describe.each([
 	function expectReportedOnce(recoverable: unknown[]): void {
 		expect(recoverable).toHaveLength(1);
 		expect((recoverable[0] as Error).message).toMatch(HYDRATION_FAILED);
+		expectDiagnosedOnce();
+	}
+
+	/** A development compile may add one warning that locates the mismatch. */
+	function expectDiagnosedOnce(): void {
 		const logged = warnings();
 		expect(logged.length).toBeLessThanOrEqual(dev ? 1 : 0);
 		for (const message of logged)
@@ -162,11 +167,14 @@ describe.each([
 			html: '<u>u</u><i>x</i><em>e</em>',
 			island: false,
 		},
+		// The root's client render throws to the @catch arm, so, as in React, it
+		// reports that caught error alone, not its failed hydration.
 		{
 			shape: 'a component before a caught @try',
 			name: 'CaughtBranch',
 			html: '<u>u</u><i>x</i><s>boom</s>',
 			island: false,
+			caught: true,
 		},
 		// The static range's content exists only in the server HTML: a client
 		// render of `<Hydrate split={false} when={never()}>` renders no children
@@ -183,13 +191,16 @@ describe.each([
 			html: '<u>u</u><i>x</i>',
 			island: false,
 		},
-	])('client-renders the owner of $shape', async ({ name, html, island }) => {
+	])('client-renders the owner of $shape', async ({ name, html, island, caught }) => {
 		const { outer, content, recoverable } = await hydrate(name);
 
 		expect(markup(container.querySelector('section')!)).toBe(html);
 		for (const node of content) expect(node.isConnected).toBe(false);
 		expect(outer.isConnected).toBe(island);
-		expectReportedOnce(recoverable);
+		if (caught) {
+			expect(recoverable).toEqual([]);
+			expectDiagnosedOnce();
+		} else expectReportedOnce(recoverable);
 	});
 
 	it('adopts every node when the server rendered the same arm', async () => {

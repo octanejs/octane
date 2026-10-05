@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "nextCode": 340,
+  "nextCode": 341,
   "codes": {
     "1": {
       "message": "Maximum update depth exceeded. Octane limits the number of nested updates to prevent infinite loops.",
@@ -2032,6 +2032,12 @@
     },
     "339": {
       "message": "Hydration failed because the server rendered HTML didn't match the client. As a result this tree will be regenerated on the client.",
+      "argumentCount": 0,
+      "runtime": ["client"],
+      "status": "active"
+    },
+    "340": {
+      "message": "There was an error while hydrating, so the nearest Suspense boundary, Hydrate island, or the root rendered on the client instead.",
       "argumentCount": 0,
       "runtime": ["client"],
       "status": "active"

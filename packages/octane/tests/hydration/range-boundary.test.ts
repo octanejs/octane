@@ -447,9 +447,11 @@ describe('hydration range boundary', () => {
 
 	// The server rendered the owner's content in another range than the client's,
 	// with no Suspense boundary of its own: the root renders on the client, as
-	// React's does, and reports that once. The client render then fails into
-	// the error fallback, which shows once it resumes. The renderer's own style
-	// stays in the container throughout.
+	// React's does. The client render then fails into the error fallback, which
+	// shows once it resumes. As in React, whose root reports its failed
+	// hydration only when the client render that replaces it catches no error,
+	// onRecoverableError reports nothing. The renderer's own style stays in the
+	// container throughout.
 	it('renders the root on the client when the server rendered a partial owner, then shows the error fallback', async () => {
 		container.innerHTML = ServerRuntime.renderToString(server.ServerPartialOwner).html;
 		const button = container.querySelector('#range-boundary-counter') as HTMLButtonElement;
@@ -479,13 +481,7 @@ describe('hydration range boundary', () => {
 		expect(button.isConnected).toBe(false);
 		expect(container.contains(style)).toBe(true);
 		expect(container.querySelector('#range-boundary-error')).toBeNull();
-		expect(recoverable).toEqual([
-			expect.objectContaining({
-				message: expect.stringMatching(
-					/^Hydration failed because the server rendered HTML didn't match the client\./,
-				),
-			}),
-		]);
+		expect(recoverable).toEqual([]);
 		await act(() => {
 			fallbackDeferred.ready = true;
 			resolve();
@@ -494,7 +490,7 @@ describe('hydration range boundary', () => {
 		expect(container.querySelector('#range-boundary-error')?.textContent).toBe('failed');
 		expect(container.contains(style)).toBe(true);
 		expect(portalTarget.textContent).toBe('');
-		expect(recoverable).toHaveLength(1);
+		expect(recoverable).toEqual([]);
 		root.unmount();
 		expect(container.querySelector('#range-boundary-error')).toBeNull();
 	});

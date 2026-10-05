@@ -167,6 +167,118 @@ describe.each([true, false])('suspended root that falls back during hydration (d
 		expect(recoverable).toHaveLength(expected.recoverable);
 	});
 
+	// React leaves the server DOM alone until the client render commits, so it
+	// is never detached meanwhile: a focused server input keeps its focus.
+	it('never detaches the server DOM while the client render is pending', async () => {
+		const resume = suspend('RootForm');
+		const input = container.querySelector('input')!;
+		input.focus();
+		const served = serverNodes();
+		const removed: Node[] = [];
+		const observer = new MutationObserver((records) => {
+			for (const record of records) removed.push(...record.removedNodes);
+		});
+		observer.observe(container, { childList: true, subtree: true });
+		const recoverable: unknown[] = [];
+		try {
+			hydrate('RootForm', recoverable);
+			await act(() => {});
+			for (const record of observer.takeRecords()) removed.push(...record.removedNodes);
+
+			expect(removed.filter((node) => served.includes(node))).toEqual([]);
+			expect(document.activeElement).toBe(input);
+			expect(recoverable).toEqual([]);
+		} finally {
+			observer.disconnect();
+		}
+
+		await resume();
+		expect(input.isConnected).toBe(false);
+		expect(recoverable).toHaveLength(1);
+	});
+
+	/** Suspend the client's gate; returns the resolver to run inside act. */
+	function gatePromise(): () => Promise<void> {
+		let resolve!: () => void;
+		const promise = new Promise<void>((done) => {
+			resolve = done;
+		});
+		client.gate.thrown = promise;
+		return () =>
+			act(async () => {
+				client.gate.thrown = undefined;
+				resolve();
+				await promise;
+			});
+	}
+
+	// A <body> container keeps its document resources, as React's
+	// clearContainerSparingly does, and its server content until the commit.
+	it('keeps a body container’s server content until the commit, then keeps its resources', async () => {
+		const doc = document.implementation.createHTMLDocument('fallback');
+		server.gate.thrown = undefined;
+		doc.body.innerHTML =
+			renderToString(server.RootBody, { server: true }).html +
+			'<script type="application/json" id="data">{}</script>';
+		const serverMain = doc.querySelector('main')!;
+		const script = doc.getElementById('data')!;
+		const resume = gatePromise();
+		const recoverable: unknown[] = [];
+		root = hydrateRoot(
+			doc.body,
+			client.RootBody,
+			{},
+			{
+				onRecoverableError: (reason) => recoverable.push(reason),
+			},
+		);
+		flushSync(() => {});
+		await act(() => {});
+
+		expect(doc.querySelector('main')).toBe(serverMain);
+		expect(doc.querySelector('b.server')!.isConnected).toBe(true);
+		expect(recoverable).toEqual([]);
+
+		await resume();
+		expect(serverMain.isConnected).toBe(false);
+		expect(doc.querySelector('main')!.innerHTML.replace(/<!--[^]*?-->/g, '')).toBe('<i>ok</i>');
+		expect(script.isConnected).toBe(true);
+		expect(recoverable).toHaveLength(1);
+		expect(structural()).toHaveLength(dev ? 1 : 0);
+	});
+
+	// A document cannot hold the client's root element beside the server's, but
+	// a pending client render still leaves the server's document in place.
+	it('keeps a document’s server content until the client render commits', async () => {
+		server.gate.thrown = undefined;
+		const html = renderToString(server.RootDocument, { server: true }).html;
+		const doc = new DOMParser().parseFromString('<!DOCTYPE html>' + html, 'text/html');
+		const serverRoot = doc.documentElement;
+		const serverBranch = doc.querySelector('b.server')!;
+		const resume = gatePromise();
+		const recoverable: unknown[] = [];
+		root = hydrateRoot(
+			doc,
+			client.RootDocument,
+			{},
+			{
+				onRecoverableError: (reason) => recoverable.push(reason),
+			},
+		);
+		flushSync(() => {});
+		await act(() => {});
+
+		expect(doc.documentElement).toBe(serverRoot);
+		expect(serverBranch.isConnected).toBe(true);
+		expect(recoverable).toEqual([]);
+
+		await resume();
+		expect(serverBranch.isConnected).toBe(false);
+		expect(doc.body.textContent).toBe('ok');
+		expect(doc.doctype).not.toBeNull();
+		expect(recoverable).toHaveLength(1);
+	});
+
 	// Each kind of mismatch before the root suspends: an arm of a boundary that
 	// falls back on its own, a renderable or only-child hole over server text,
 	// list shapes the server rendered differently, and a lite call's template in

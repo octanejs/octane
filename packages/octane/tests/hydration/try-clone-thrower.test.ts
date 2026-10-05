@@ -211,6 +211,24 @@ describe('hydrateRoot — a try body throws to its catch arm where the server re
 		root.unmount();
 	});
 
+	// The body throws only on the client while its inner @try arm hydrates, so
+	// that arm fails and renders on the client, where the error repeats. As in
+	// React, an error from client-rendered content reaches the outer catch arm
+	// as any client error does: only the outer region is replaced.
+	it('a client-only throw in an inner @try arm renders the outer catch arm without a report', async () => {
+		const { root, hosts, onAfter, recovered, caught } = await hydrateServerHtml(
+			'Uncaught',
+			{},
+			{ value: 'x' },
+		);
+		expect(visible()).toBe(CATCH_ARM);
+		expectAdoptedHosts(hosts, onAfter);
+		expect(caught).toEqual(['x']);
+		expect(recovered).toEqual([]);
+		expect(mismatches()).toEqual([]);
+		root.unmount();
+	});
+
 	it('a passthrough boundary above the range owner renders the root on the client and reports only the caught error', async () => {
 		container.innerHTML = ServerRT.renderToString(server.ServerSelection).html;
 		const served = container.querySelector('b')!;
@@ -298,6 +316,28 @@ describe('hydrateRoot — a try body that does not reach its catch arm still rep
 		expectClientRoot(hosts, onAfter);
 		expect(caught).toEqual([]);
 		expectStructuralReport(recovered);
+		root.unmount();
+	});
+
+	// A body that throws only while hydrating fails the root's hydration even
+	// though its catch arm would catch the error. As in React, the client render
+	// completes without throwing, so the root reports its failed hydration, with
+	// the thrown error as the cause, and the catch arm never renders.
+	it('a body that throws only while hydrating renders the root on the client and reports the error', async () => {
+		const { root, hosts, onAfter, recovered, caught } = await hydrateServerHtml(
+			'Flaky',
+			{},
+			{ once: { thrown: false } },
+		);
+		expect(visible()).toBe('<div><h1>before</h1><i>ok</i><button>after</button></div>');
+		expectClientRoot(hosts, onAfter);
+		expect(caught).toEqual([]);
+		expect(recovered).toEqual([expect.any(Error)]);
+		expect((recovered[0] as Error).message).toMatch(/^There was an error while hydrating/);
+		expect((recovered[0] as Error & { cause?: unknown }).cause).toEqual(
+			new Error('hydration only'),
+		);
+		expect(mismatches()).toEqual([]);
 		root.unmount();
 	});
 
