@@ -25,6 +25,27 @@ describe('Strong mode configuration', () => {
 	});
 });
 
+describe('proxy trust configuration', () => {
+	it('keeps proxy trust opt-in by default', () => {
+		expect(resolveOctaneConfig({}).server.trustProxy).toBe(false);
+	});
+
+	it.each([true, false])('preserves server.trustProxy=%s', (trustProxy) => {
+		expect(resolveOctaneConfig({ server: { trustProxy } }).server.trustProxy).toBe(trustProxy);
+	});
+
+	it.each(['false', 'true', 1, null])('rejects non-boolean server.trustProxy=%j', (trustProxy) => {
+		expect(() =>
+			resolveOctaneConfig({
+				server: {
+					// @ts-expect-error JavaScript configuration still receives runtime validation.
+					trustProxy,
+				},
+			}),
+		).toThrow('[octane] server.trustProxy must be a boolean when provided.');
+	});
+});
+
 describe('adapter server targets', () => {
 	it('accepts the node server target without custom runtime primitives', () => {
 		const adapter = { serverTarget: 'node' as const };

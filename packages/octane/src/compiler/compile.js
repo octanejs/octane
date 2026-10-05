@@ -575,10 +575,32 @@ function attrBindingUpdateHelper(bind, inlineBindingGuards = false) {
 	}
 }
 
+// Whether a module may receive a signal handle in an opaque expression such as
+// `{row.label as string}`. Any import from `octane/signals` opts a module in,
+// including a type-only `SignalHandle` import (see nativeReadOptions); so
+// does the `opaqueSignalHandles` option, for untyped components that render
+// handles from a lazily loaded signals engine. Every other module binds only
+// `$`-named handle syntax, so its plain holes never retain the signal binding
+// runtime.
+function canCarrySignalHandle(
+	ctx,
+	node,
+	conservativeResult = false,
+	retainLocalCapability = false,
+) {
+	return canCarryDirectSignalHandle(
+		node,
+		conservativeResult,
+		retainLocalCapability,
+		ctx.nativeReads !== true && ctx.opaqueSignalHandles !== true,
+	);
+}
+
 function canCarryDirectSignalHandle(
 	node,
 	conservativeResult = false,
 	retainLocalCapability = false,
+	syntacticOnly = false,
 ) {
 	if (
 		!node ||
@@ -589,25 +611,54 @@ function canCarryDirectSignalHandle(
 	) {
 		return false;
 	}
+	// Type-only wrappers, matching isDirectSignalHandleExpression's unwrapping, so
+	// `$` syntax nested in `??`/`?:`/`&&` binds whichever wrapper surrounds it.
 	if (
 		node.type === 'TSAsExpression' ||
 		node.type === 'TSTypeAssertion' ||
 		node.type === 'TSNonNullExpression' ||
+		node.type === 'TSSatisfiesExpression' ||
+		node.type === 'TSInstantiationExpression' ||
 		node.type === 'ParenthesizedExpression' ||
 		node.type === 'ChainExpression'
 	) {
-		return canCarryDirectSignalHandle(node.expression, conservativeResult, retainLocalCapability);
+		return canCarryDirectSignalHandle(
+			node.expression,
+			conservativeResult,
+			retainLocalCapability,
+			syntacticOnly,
+		);
 	}
 	if (node.type === 'ConditionalExpression') {
 		return (
-			canCarryDirectSignalHandle(node.consequent, conservativeResult, retainLocalCapability) ||
-			canCarryDirectSignalHandle(node.alternate, conservativeResult, retainLocalCapability)
+			canCarryDirectSignalHandle(
+				node.consequent,
+				conservativeResult,
+				retainLocalCapability,
+				syntacticOnly,
+			) ||
+			canCarryDirectSignalHandle(
+				node.alternate,
+				conservativeResult,
+				retainLocalCapability,
+				syntacticOnly,
+			)
 		);
 	}
 	if (node.type === 'LogicalExpression') {
 		return (
-			canCarryDirectSignalHandle(node.left, conservativeResult, retainLocalCapability) ||
-			canCarryDirectSignalHandle(node.right, conservativeResult, retainLocalCapability)
+			canCarryDirectSignalHandle(
+				node.left,
+				conservativeResult,
+				retainLocalCapability,
+				syntacticOnly,
+			) ||
+			canCarryDirectSignalHandle(
+				node.right,
+				conservativeResult,
+				retainLocalCapability,
+				syntacticOnly,
+			)
 		);
 	}
 	if (node.type === 'SequenceExpression') {
@@ -615,8 +666,10 @@ function canCarryDirectSignalHandle(
 			node.expressions.at(-1),
 			conservativeResult,
 			retainLocalCapability,
+			syntacticOnly,
 		);
 	}
+	if (syntacticOnly) return isDirectSignalHandleExpression(node);
 	if (
 		!conservativeResult &&
 		(node.type === 'CallExpression' || node.type === 'OptionalCallExpression') &&
@@ -750,11 +803,11 @@ function domSignalTarget(options) {
 }
 
 function markDirectSignalBinding(binding, ctx, origin, kind) {
-	if (!canCarryDirectSignalHandle(binding.expr)) {
+	if (!canCarrySignalHandle(ctx, binding.expr)) {
 		// Newly certified locals still retain the prior potential capability:
 		// opaque events can import instance models after their first mount. A
 		// primitive result removes this adapter, not structural owner identity.
-		if (canCarryDirectSignalHandle(binding.expr, false, true)) {
+		if (canCarrySignalHandle(ctx, binding.expr, false, true)) {
 			ctx.signalBindingsUsed = true;
 			if (isDirectSignalHandleExpression(binding.expr)) ctx.signalBindingsEager = true;
 		}
@@ -770,8 +823,8 @@ function markDirectSignalBinding(binding, ctx, origin, kind) {
 }
 
 function ssrSignalValue(node, ctx, origin, capability = false) {
-	if (!(capability ? canCarryDirectSignalHandle(node) : isDirectSignalHandleExpression(node))) {
-		if (capability && canCarryDirectSignalHandle(node, false, true)) ctx.signalBindingsUsed = true;
+	if (!(capability ? canCarrySignalHandle(ctx, node) : isDirectSignalHandleExpression(node))) {
+		if (capability && canCarrySignalHandle(ctx, node, false, true)) ctx.signalBindingsUsed = true;
 		return node;
 	}
 	ctx.signalBindingsUsed = true;
@@ -10554,6 +10607,9 @@ function compileAuthored(source, filename, options, bundlerMetadata, analyzed = 
 		source.includes('use dom bindings') ||
 		source.includes('adoptBindings') ||
 		source.includes('mountBindings');
+	// Binding views receive their props from behavior roots, which publish
+	// signal handles, so the module admits handles in opaque holes.
+	if (hasDomBindings) options = { ...options, __signalModuleImport: true };
 	let bindingConstants;
 	// Binding plans classify authored child expressions before signal lowering or
 	// JSX extraction. Use the same source-bound proof pass here, exactly once;
@@ -11125,6 +11181,8 @@ function compileInternal(
 		autoMemo: autoMemoEnabled,
 		strongMemo: strongMemoEnabled,
 		nativeReads: options?.nativeReads === true,
+		opaqueSignalHandles:
+			options?.opaqueSignalHandles === true || options?.__signalModuleImport === true,
 		nativeModuleStyles: options?.nativeReads === true && hasModuleStyleMaps(ast.body),
 		signalHookSites: domSignalTarget(options),
 		// A split Hydrate query module is invoked as the existing server-rendered
@@ -12584,6 +12642,8 @@ function compileServer(
 		compilerNameSuffixes: null,
 		mode: 'server',
 		nativeReads: options?.nativeReads === true,
+		opaqueSignalHandles:
+			options?.opaqueSignalHandles === true || options?.__signalModuleImport === true,
 		nativeModuleStyles: options?.nativeReads === true && hasModuleStyleMaps(ast.body),
 		signalHookSites: domSignalTarget(options),
 		hmr: false, // SSR never hot-swaps in place; client/server production slot shapes stay aligned
@@ -14005,8 +14065,8 @@ function ssrEmitElement(node, ctx, name, inlinedSubs, parentNs, cssHash, compone
 	let directSignalControlSite = null;
 	let directSignalControlValues = false;
 	const markDirectControl = (expression, origin) => {
-		const carriesHandle = canCarryDirectSignalHandle(expression);
-		if (!carriesHandle && !canCarryDirectSignalHandle(expression, false, true)) return expression;
+		const carriesHandle = canCarrySignalHandle(ctx, expression);
+		if (!carriesHandle && !canCarrySignalHandle(ctx, expression, false, true)) return expression;
 		const site = firstSpreadIdx === -1 ? directSignalSite(ctx, node, 'input') : hostSignalSite;
 		if (directSignalControlSite === null) {
 			if (directAttributeIdentities.has('data-octane-input')) {
@@ -22057,17 +22117,18 @@ function isStaticReturnedFragmentComponent(node, ctx) {
 // children become renderable holes. The result is a self-contained fragment whose
 // only inputs are its props — compilable as an ordinary renderer.
 //
-// The renderer builds a keyed, `noscript`/document, or parser-repaired host as a
-// descriptor (isDescriptorBuiltHost), and a descriptor child must be a value: a
-// FoldedDirective or template-only component placeholder under it would be
-// dropped. Inside such a host (`inDescriptor`), directives, components, and child
-// `@{}` blocks lower to value holes here in the owning component, as a `@{}` body
-// and the server lower them. Misreading a template host as a descriptor host costs
-// only the template fast path; the reverse drops children.
+// The renderer builds a keyed, `noscript`/document, or parser-repaired host, and
+// a keyed Fragment, as a descriptor (isDescriptorBuiltElement), and a descriptor
+// child must be a value: a FoldedDirective or template-only component
+// placeholder under it would be dropped. Inside such a host (`inDescriptor`),
+// directives, components, and child `@{}` blocks lower to value holes here in
+// the owning component, as a `@{}` body and the server lower them. Misreading a
+// template host as a descriptor host costs only the template fast path; the
+// reverse drops children.
 function extractFragment(node, ctx, holeProps, parentNs = 'html', inDescriptor = false) {
 	const descriptor =
 		inDescriptor ||
-		(node.type === 'JSXElement' && isDescriptorBuiltHost(node, parentNs === 'svg', ctx));
+		(node.type === 'JSXElement' && isDescriptorBuiltElement(node, parentNs === 'svg', ctx));
 	const attrs = node.attributes || node.openingElement?.attributes || [];
 	const newAttrs = [];
 	const mergedFragmentSpread = isFragmentLongForm(node, ctx) && hasJsxSpreadAttribute(node);
@@ -25070,12 +25131,11 @@ function rewriteImperativeHeadElements(node, ctx, namespace = 'html', inNoscript
 // A JSXElement that normalizeChildren lowers with jsxElementToCreateElement
 // instead of the template compiler, so its whole subtree becomes descriptor
 // values. extractFragment uses the same test to keep that subtree's children in
-// value form.
-function isDescriptorBuiltHost(node, inSvg, ctx) {
-	return (
-		!isComponentTag(node) &&
-		(hasJsxAttribute(node, 'key') || (!inSvg && requiresImperativeHostTree(node, ctx)))
-	);
+// value form. A keyed long-form Fragment is one: inlining its children would
+// drop the key, and the descriptor's keyed slot remounts them when it changes.
+function isDescriptorBuiltElement(node, inSvg, ctx) {
+	if (isComponentTag(node)) return isFragmentLongForm(node, ctx) && hasJsxAttribute(node, 'key');
+	return hasJsxAttribute(node, 'key') || (!inSvg && requiresImperativeHostTree(node, ctx));
 }
 
 /**
@@ -25177,8 +25237,10 @@ function normalizeChildren(
 			// Routing this BEFORE the
 			// generic Element branch is required — `Fragment` would otherwise
 			// hit `isComponentTag` and route through `componentSlot`, which
-			// has no notion of marker pairs.
-			if (isFragmentLongForm(n, ctx)) {
+			// has no notion of marker pairs. A keyed Fragment is a reconciliation
+			// boundary instead, so it takes the descriptor branch below; the
+			// lexical-nesting walk (no imperative lowering) still sees through it.
+			if (isFragmentLongForm(n, ctx) && !(allowImperative && hasJsxAttribute(n, 'key'))) {
 				const attributes = n.openingElement.attributes || [];
 				const refAttr = attributes.find(
 					(a) =>
@@ -25225,7 +25287,7 @@ function normalizeChildren(
 			// Keys need a reconciliation boundary. Parser-sensitive host trees need
 			// imperative construction so HTML repair cannot change binding paths.
 			// The shared descriptor path provides both without taxing ordinary templates.
-			if (ctx && allowImperative && isDescriptorBuiltHost(n, inSvg, ctx)) {
+			if (ctx && allowImperative && isDescriptorBuiltElement(n, inSvg, ctx)) {
 				out.push(
 					inheritOriginLoc(
 						{
@@ -27364,10 +27426,11 @@ function planJsx(
 			// Const-seeded straight into the bag factory args — no mount statement.
 			if (cc.isChild && !noTemplate) {
 				bag.constField(`_chv$${cc.id}`, 'null');
-				// An only-child hole's first render must reach childTextHole even for
-				// `undefined`: while hydrating, that call reconciles the host's server
-				// children, which no other binding owns.
-				bag.constField(`_chp$${cc.id}`, cc.onlyChildText ? 'unset' : 'undefined');
+				// A hole's first render must reach its text-hole helper even for
+				// `undefined`: while hydrating, that call reconciles the server
+				// children (an only child) or range (a sibling or whole-output hole)
+				// that no other binding owns.
+				bag.constField(`_chp$${cc.id}`, 'unset');
 			}
 		},
 	});
@@ -30709,8 +30772,8 @@ function emitElementHtml(
 		appendTemplatePart(attrTemplate, ` data-octane-input="${escapeAttr(site)}"`, 'attribute', null);
 	};
 	const markDirectControl = (binding, expression, origin) => {
-		const carriesHandle = canCarryDirectSignalHandle(expression);
-		if (!carriesHandle && !canCarryDirectSignalHandle(expression, false, true)) return binding;
+		const carriesHandle = canCarrySignalHandle(ctx, expression);
+		if (!carriesHandle && !canCarrySignalHandle(ctx, expression, false, true)) return binding;
 		const site = directSignalSite(ctx, node, 'input');
 		ensureDirectControlSite(site);
 		ctx.signalBindingsUsed = true;
@@ -31484,7 +31547,7 @@ function emitElementHtml(
 			firstSpreadIdx !== -1 ||
 			hasDirectSignalStyle ||
 			hostClientSources.some(
-				(source) => !source.spread && canCarryDirectSignalHandle(source.binding.expr),
+				(source) => !source.spread && canCarrySignalHandle(ctx, source.binding.expr),
 			);
 		if (signalHostSources) {
 			ctx.signalBindingsUsed = true;
@@ -31645,8 +31708,8 @@ function emitElementHtml(
 		let signalCapable = false;
 		for (const part of textareaParts) {
 			if (part.kind === 'static') continue;
-			if (canCarryDirectSignalHandle(part.expr)) signalCapable = true;
-			else if (canCarryDirectSignalHandle(part.expr, false, true)) ctx.signalBindingsUsed = true;
+			if (canCarrySignalHandle(ctx, part.expr)) signalCapable = true;
+			else if (canCarrySignalHandle(ctx, part.expr, false, true)) ctx.signalBindingsUsed = true;
 			if (isDirectSignalHandleExpression(part.expr)) ctx.signalBindingsEager = true;
 		}
 		if (signalCapable) ctx.signalBindingsUsed = true;
@@ -33828,12 +33891,12 @@ function forRowKeyAttribute(node, ctx) {
 // A `key` on the only output root of an @for body names the row, never a
 // separate element: a valued key is the row key above, and the root cannot
 // change identity inside a row that shares it. Leaving the key on the root
-// would give it a boundary that only repeats the row key: an intrinsic root
-// lowers to a keyed descriptor instead of the native template, and a component
-// root loses the row memo and its shared single-root range. Remove it so the
-// row compiles exactly as the header spelling does. Like a header key, the
-// reconciler reads it; an input that changes while rows render takes effect at
-// the next reconcile. Keyed elements below the root keep their own boundaries.
+// would give it a boundary that only repeats the row key: an intrinsic root or
+// a Fragment lowers to a keyed descriptor instead of the native template, and a
+// component root loses the row memo and its shared single-root range. Remove it
+// so the row compiles exactly as the header spelling does. Like a header key,
+// the reconciler reads it; an input that changes while rows render takes effect
+// at the next reconcile. Keyed elements below the root keep their own boundaries.
 function forItemTemplateBody(node, ctx) {
 	const body = node.body.body;
 	if (ctx._universalRuntimeUnit != null) return body;
@@ -33846,8 +33909,7 @@ function forItemTemplateBody(node, ctx) {
 	if (
 		(root?.type !== 'Element' && root?.type !== 'JSXElement') ||
 		(!isPlainHostRoot(root) && !isComponentTag(root)) ||
-		isActivityLongForm(root, ctx) ||
-		isFragmentLongForm(root, ctx)
+		isActivityLongForm(root, ctx)
 	)
 		return body;
 	const attrs = root.attributes || root.openingElement?.attributes || [];
