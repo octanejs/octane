@@ -11104,6 +11104,8 @@ export function renderBlock(block: Block): void {
 		(!hydration.owns(block) ||
 			(block.kind === 'dynamic' && block.endMarker !== null && hydration.rebuilds(block.endMarker)))
 	) {
+		// The nested client build renders this block, so it takes the retry visit.
+		SIGNAL_RETRY_VISIT = retryVisit;
 		hydration.suspend(() => renderBlock(block));
 		return;
 	}
