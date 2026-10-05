@@ -707,10 +707,15 @@ describe('behavior-only roots', () => {
 
 	for (const dev of [false, true]) {
 		for (const server of ['stale', 'externally removed'] as const) {
+			// Stale server content beside the host is a mismatch, found before the
+			// next sibling suspends: with no boundary, the root renders on the
+			// client. As in React, it keeps showing the server DOM until that render
+			// commits, and the early host's lease ends with the server DOM the
+			// commit discards, even if other code removed the stale node meanwhile.
 			const name =
 				server === 'stale'
-					? 'hands off an early host beside stale server content after hydration resumes'
-					: 'refuses an early host whose server neighbor was removed while hydration was suspended';
+					? 'discards an early host with the root when stale server content beside it falls back across a suspension'
+					: 'discards an early host with the root when the stale content is removed while the fallback is pending';
 			it(`${name} (${dev ? 'dev' : 'prod'})`, async () => {
 				const source = [
 					"import { useLayoutEffect } from 'octane';",
@@ -763,9 +768,10 @@ describe('behavior-only roots', () => {
 						},
 					);
 					await act(() => {});
-					// The suspended attempt rolled back its recovery, restoring the stale
-					// neighbor. Removing that neighbor now is not hydration's repair.
+					// The fallback is pending: the server DOM, early host included, stays.
+					expect(container.querySelector('button')).toBe(button);
 					expect(extra.isConnected).toBe(true);
+					expect(recoverable).not.toHaveBeenCalled();
 					expect(onCommit).not.toHaveBeenCalled();
 					expect(fixture.cleanup).not.toHaveBeenCalled();
 					if (server === 'externally removed') extra.remove();
@@ -774,27 +780,18 @@ describe('behavior-only roots', () => {
 						release();
 						await pending;
 					});
-					expect(container.querySelector('button')).toBe(button);
-					if (server === 'externally removed') {
-						// No hydrateRoot caller remains to receive the refusal.
-						expect(uncaught).toHaveBeenCalledOnce();
-						expect(String(uncaught.mock.calls[0]![0])).toMatch(
-							/supported fixed native view|Minified Octane error #75;/,
-						);
-						expect(onCommit).not.toHaveBeenCalled();
-						expect(fixture.cleanup).not.toHaveBeenCalled();
-						fixture.publish({ label: 'still early' });
-						expect(button.getAttribute('data-state')).toBe('still early');
-						return;
-					}
 					expect(uncaught).not.toHaveBeenCalled();
 					expect(recoverable).toHaveBeenCalledOnce();
+					expect(button.isConnected).toBe(false);
 					expect(extra.isConnected).toBe(false);
-					expect(button.getAttribute('data-state')).toBe('hydrated');
+					const live = container.querySelector('button')!;
+					expect(live.textContent).toBe('Hello');
+					expect(live.getAttribute('data-state')).toBe('hydrated');
 					expect(onCommit).toHaveBeenCalledOnce();
+					// The early owner's lease ends once, with its server DOM.
 					expect(fixture.cleanup).toHaveBeenCalledOnce();
 					fixture.publish({ label: 'retired' });
-					expect(button.getAttribute('data-state')).toBe('hydrated');
+					expect(live.getAttribute('data-state')).toBe('hydrated');
 				} finally {
 					hydratedRoot?.unmount();
 					hydratedRoot = undefined;
