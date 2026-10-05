@@ -24,7 +24,7 @@ import type {
 	LayoutSnapshotOptions,
 	LayoutSnapshotOptionsWithInitial,
 } from './layout-snapshot-types.js';
-import { domBindingClaims } from './dom-binding-claims.js';
+import { domBindingClaims, repairedServerParents } from './dom-binding-claims.js';
 import { DOMStage } from './dom-stage.js';
 import { __normalizeBindingStyle } from './dom-binding-styles.js';
 import type { BindingHandle } from './dom-bindings.js';
@@ -19420,6 +19420,8 @@ class HydrationCapability {
 	 * own rollback, once, within its arm's range when `parent` is the arm's parent.
 	 */
 	save(parent: Node): void {
+		// An early-bound host losing a server neighbor here has not moved.
+		repairedServerParents.add(parent);
 		if (inRootHydrationAttempt()) journalRootChildren(parent);
 		if (!this.speculative || (this.saved ??= new Set()).has(parent)) return;
 		this.saved.add(parent);

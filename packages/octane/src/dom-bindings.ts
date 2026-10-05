@@ -1,6 +1,6 @@
 import { formatClientError } from './error-codes.client.generated.js';
 import { normalizeClass } from './class-names.js';
-import { domBindingClaims } from './dom-binding-claims.js';
+import { domBindingClaims, repairedServerParents } from './dom-binding-claims.js';
 import { sanitizeURL } from './sanitize-url.js';
 import { STREAM_SCRIPT_ATTR, SUSPENSE_SCRIPT_ATTR } from './stream-protocol.js';
 import { NATIVE_SIGNAL_SEED_ATTR } from './signals/native-read-seeds.js';
@@ -1057,6 +1057,15 @@ export function __adoptBindings<Props>(
 		let handoff: BindingHandoff | undefined;
 		handle[BINDING_HANDOFF] = () => {
 			if (handoff !== undefined) return handoff;
+			// Hydration mismatch recovery may remove stale server content beside the
+			// host without moving it. Any other change of neighbor is a different site,
+			// including one made before a hydration claimed this lease.
+			const adjacent = (recorded: Node | null, previous: boolean): boolean =>
+				sibling(host, previous) === recorded ||
+				((handoff!.owner !== undefined || disposed) &&
+					recorded !== null &&
+					recorded.parentNode === null &&
+					repairedServerParents.has(host.parentNode!));
 			return (handoff = {
 				id: descriptor.id,
 				root: host,
@@ -1079,8 +1088,8 @@ export function __adoptBindings<Props>(
 					host.parentNode !== null &&
 					host.ownerDocument === document &&
 					ancestry.every(([node, parent]) => node.parentNode === parent) &&
-					sibling(host, true) === previousSibling &&
-					sibling(host, false) === nextSibling &&
+					adjacent(previousSibling, true) &&
+					adjacent(nextSibling, false) &&
 					host.getAttribute('data-octane-bindings') === descriptor.id,
 				active: () => !disposed,
 				retire: (publish) => dispose(undefined, publish, true),
