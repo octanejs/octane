@@ -155,6 +155,48 @@ describe('benchmark card bars', () => {
 		empty.forEach((row) => expect(row.querySelector('.bench-val')!.textContent!.trim()).toBe('—'));
 	});
 
+	it('extends a bundle-size bar to its whole-API ceiling only where tree-shaking leaves a gap', async () => {
+		const bundleSize = FRAMEWORK_CARDS.find((c) => c.id === 'bundle-size')!;
+		const row = bundleSize.rows[0];
+		const ceilings = bundleSize.ceilings![row.op as string];
+		const { container, opButton } = await mountCard(bundleSize);
+
+		fireEvent.click(opButton(row.op as string));
+
+		await waitFor(() =>
+			expect(opButton(row.op as string).getAttribute('aria-pressed')).toBe('true'),
+		);
+		const ranged: string[] = [];
+		const single: string[] = [];
+		for (const series of numericSeries(bundleSize, 0)) {
+			const value = row[series.key] as number;
+			const ceiling = ceilings[series.key];
+			// Ranges whose ends round to the same kB stay single bars.
+			(Math.round(ceiling / 1024) > Math.round(value / 1024) ? ranged : single).push(series.key);
+		}
+		// The fixtures leave both kinds of framework on the card.
+		expect(ranged.length).toBeGreaterThan(0);
+		expect(single.length).toBeGreaterThan(0);
+
+		const rows = Array.from(container.querySelectorAll('.bench-row:not(.bench-row-empty)'));
+		const labelOf = (key: string) => rows.find((r) => r.getAttribute('data-series') === key)!;
+		for (const key of ranged) {
+			const bar = labelOf(key);
+			expect(bar.querySelector('.bench-fill-range'), key).not.toBeNull();
+			expect(bar.querySelector('.bench-val')!.textContent, key).toMatch(/kB–\d+ kB$/);
+		}
+		for (const key of single) {
+			const bar = labelOf(key);
+			expect(bar.querySelector('.bench-fill-range'), key).toBeNull();
+			expect(bar.querySelector('.bench-val')!.textContent, key).not.toContain('–');
+		}
+		// The exact ceilings stay readable without the hatching.
+		const tableRows = Array.from(container.querySelectorAll('tbody th'), (th) =>
+			th.textContent!.trim(),
+		);
+		expect(tableRows).toContain(row.op + ', whole client API');
+	});
+
 	it('charts a single-series card as one bar per operation, with no picker', async () => {
 		const single = OCTANE_CARDS.find((c) => c.series.length === 1)!;
 		const { container, barLabels } = await mountCard(single);

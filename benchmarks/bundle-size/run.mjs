@@ -32,6 +32,17 @@
 // which no other set contains, while `bindings_fw_*` tracks the runtime those
 // bindings reach.
 //
+// The fixtures are small, so a framework that tree-shakes ships only the part
+// of its runtime they reach. Each framework therefore also reports a ceiling:
+// every export of every framework entry point its fixtures import (the
+// specifiers are recorded while the fixtures build, not hand-listed), retained
+// so nothing can be shaken away. `full_fw_*` is that runtime's bytes. A fixture
+// row's `app_*` plus `full_fw_*` is what the same application ships once it
+// uses the rest of the API, which is the upper end the website draws beside
+// each fixture's measured total. A framework that cannot tree-shake shows
+// almost no gap. The ceiling has no budget: the reachability scenarios in
+// run-minimal.mjs gate individual public imports.
+//
 // Run:
 //   node benchmarks/bundle-size/run.mjs                      every target, report only
 //   node benchmarks/bundle-size/run.mjs --budgets octane-tsrx octane-jsx
@@ -115,6 +126,8 @@ const SETS = [
 		root: BINDINGS_APP,
 		prefix: 'bindings_',
 		targets: ['octane-tsrx'],
+		// Its imports are binding packages, not framework entry points.
+		ceiling: false,
 	},
 ];
 const APP_BUDGET_FILE = path.join(__dirname, 'app-budgets.json');
@@ -163,9 +176,82 @@ function* walk(dir) {
 	}
 }
 
+function measure(name, outDir) {
+	const sums = {
+		app: { raw: 0, gzip: 0, brotli: 0 },
+		fw: { raw: 0, gzip: 0, brotli: 0 },
+	};
+	const files = [];
+	for (const file of walk(outDir)) {
+		if (!file.endsWith('.js') && !file.endsWith('.mjs')) continue;
+		const buf = fs.readFileSync(file);
+		const bucket = /^(framework|rolldown-runtime)-.+\.m?js$/.test(path.basename(file))
+			? 'fw'
+			: 'app';
+		sums[bucket].raw += buf.length;
+		sums[bucket].gzip += gz(buf);
+		sums[bucket].brotli += br(buf);
+		files.push({ file: path.relative(outDir, file), bucket, bytes: buf.length });
+	}
+	if (sums.app.raw === 0 || sums.fw.raw === 0) {
+		console.error(`✗ ${name}: app/framework split produced an empty bucket in ${outDir}`);
+		process.exit(1);
+	}
+	return { sums, files };
+}
+
+// Framework modules (node_modules, the octane workspace runtime, and `\0`
+// virtuals). Shared by the chunk split and the entry-point recorder.
+const isFrameworkModule = (id) => {
+	const clean = id.split('?')[0];
+	return (
+		id.startsWith('\0') ||
+		clean.includes('node_modules') ||
+		clean.includes(`${path.sep}packages${path.sep}octane${path.sep}`)
+	);
+};
+
+const buildOutput = {
+	// App modules stay in the entry chunk; the framework runtime + virtual
+	// helpers are forced into a chunk named "framework". Rolldown may emit
+	// its own virtual runtime as a sibling `rolldown-runtime` asset; the
+	// file-name classifier in measure() charges both to framework overhead. Vite 8
+	// is rolldown-based: `manualChunks` is ignored, `codeSplitting` is
+	// the supported API. Framework is matched POSITIVELY (node_modules,
+	// the octane workspace runtime — pnpm resolves it to packages/octane,
+	// never node_modules — and `\0` virtuals) so the index.html entry
+	// proxy module stays in the entry chunk with the app code.
+	codeSplitting: { groups: [{ name: 'framework', test: isFrameworkModule }] },
+};
+
+// Records each bare framework specifier an application module imports, keyed by
+// the resolved file, so the ceiling build reaches the exact files (and export
+// conditions) the fixture build chose.
+function recordFrameworkEntries(entries) {
+	return {
+		name: 'bundle-size:record-framework-entries',
+		enforce: 'pre',
+		async resolveId(source, importer, options) {
+			if (
+				!importer ||
+				isFrameworkModule(importer) ||
+				/^[./\0]/.test(source) ||
+				source.startsWith('vite/')
+			)
+				return null;
+			const resolved = await this.resolve(source, importer, { ...options, skipSelf: true });
+			if (resolved && !resolved.external) entries.set(source, resolved.id);
+			return null;
+		},
+	};
+}
+
 const val = (bytes) => ({ median: bytes, min: bytes, samples: 1 });
 const targets = [];
 const byName = new Map(); // merge every app set's ops per framework name
+// Per framework: the first fixture root (its config builds the ceiling) and
+// every framework entry point its fixtures import.
+const ceilings = new Map();
 
 for (const set of SETS)
 	for (const name of set.targets.filter(selected)) {
@@ -173,70 +259,30 @@ for (const set of SETS)
 		const outDir = path.join(OUT_ROOT, set.prefix + name);
 		const setLabel = set.prefix ? path.basename(set.root) + '/' : '';
 		console.log(`building ${setLabel}${name} (production, normalized minify)…`);
+		let ceiling = ceilings.get(name);
+		if (set.ceiling !== false && ceiling === undefined) {
+			ceiling = { root: appRoot, entries: new Map() };
+			ceilings.set(name, ceiling);
+		}
 		const result = await build({
 			root: appRoot,
 			logLevel: 'warn',
+			plugins: set.ceiling === false ? [] : [recordFrameworkEntries(ceiling.entries)],
 			build: {
 				outDir,
 				emptyOutDir: true,
 				minify: 'esbuild',
 				target: 'esnext',
-				rollupOptions: {
-					output: {
-						// App modules stay in the entry chunk; the framework runtime + virtual
-						// helpers are forced into a chunk named "framework". Rolldown may emit
-						// its own virtual runtime as a sibling `rolldown-runtime` asset; the
-						// file-name classifier below charges both to framework overhead. Vite 8
-						// is rolldown-based: `manualChunks` is ignored, `codeSplitting` is
-						// the supported API. Framework is matched POSITIVELY (node_modules,
-						// the octane workspace runtime — pnpm resolves it to packages/octane,
-						// never node_modules — and `\0` virtuals) so the index.html entry
-						// proxy module stays in the entry chunk with the app code.
-						codeSplitting: {
-							groups: [
-								{
-									name: 'framework',
-									test: (id) => {
-										const clean = id.split('?')[0];
-										return (
-											id.startsWith('\0') ||
-											clean.includes('node_modules') ||
-											clean.includes(`${path.sep}packages${path.sep}octane${path.sep}`)
-										);
-									},
-								},
-							],
-						},
-					},
-				},
+				rollupOptions: { output: buildOutput },
 			},
 		});
 
-		const sums = {
-			app: { raw: 0, gzip: 0, brotli: 0 },
-			fw: { raw: 0, gzip: 0, brotli: 0 },
-		};
-		const files = [];
-		for (const file of walk(outDir)) {
-			if (!file.endsWith('.js') && !file.endsWith('.mjs')) continue;
-			const buf = fs.readFileSync(file);
-			const bucket = /^(framework|rolldown-runtime)-.+\.m?js$/.test(path.basename(file))
-				? 'fw'
-				: 'app';
-			sums[bucket].raw += buf.length;
-			sums[bucket].gzip += gz(buf);
-			sums[bucket].brotli += br(buf);
-			files.push({ file: path.relative(outDir, file), bucket, bytes: buf.length });
-		}
+		const { sums, files } = measure(name, outDir);
 		const total = {
 			raw: sums.app.raw + sums.fw.raw,
 			gzip: sums.app.gzip + sums.fw.gzip,
 			brotli: sums.app.brotli + sums.fw.brotli,
 		};
-		if (total.raw === 0 || sums.app.raw === 0 || sums.fw.raw === 0) {
-			console.error(`✗ ${name}: app/framework split produced an empty bucket in ${outDir}`);
-			process.exit(1);
-		}
 		console.log(
 			`  ${setLabel}${name}: total gz ${total.gzip}  app gz ${sums.app.gzip}  fw gz ${sums.fw.gzip}`,
 		);
@@ -301,6 +347,43 @@ for (const set of SETS)
 		});
 		entry.meta.files.push(...files.map((f) => ({ ...f, set: px || 'js' })));
 	}
+
+for (const [name, { root, entries }] of ceilings) {
+	const specifiers = [...entries.keys()].sort();
+	assert.notEqual(specifiers.length, 0, `${name}: its fixtures imported no framework entry point`);
+	const outDir = path.join(OUT_ROOT, 'ceiling_' + name);
+	const source = path.join(OUT_ROOT, 'ceiling-entries', name + '.js');
+	fs.mkdirSync(path.dirname(source), { recursive: true });
+	// A retained namespace keeps every export, so nothing can be shaken away.
+	fs.writeFileSync(
+		source,
+		specifiers
+			.map((s, i) => `import * as m${i} from ${JSON.stringify(entries.get(s))};\n`)
+			.join('') +
+			`globalThis.__bundleSizeCeiling = [${specifiers.map((_, i) => 'm' + i).join(', ')}];\n`,
+	);
+	console.log(`building ${name} ceiling (${specifiers.join(', ')})…`);
+	await build({
+		root,
+		logLevel: 'warn',
+		build: {
+			outDir,
+			emptyOutDir: true,
+			minify: 'esbuild',
+			target: 'esnext',
+			rollupOptions: { input: source, output: buildOutput },
+		},
+	});
+	const { sums } = measure(name + ' ceiling', outDir);
+	console.log(`  ${name} ceiling: fw gz ${sums.fw.gzip}`);
+	const entry = byName.get(name);
+	entry.meta.ceiling = specifiers;
+	Object.assign(entry.ops, {
+		full_fw_raw: val(sums.fw.raw),
+		full_fw_gzip: val(sums.fw.gzip),
+		full_fw_brotli: val(sums.fw.brotli),
+	});
+}
 function appendBudgetOperations(operations, budget, name, prefix = '') {
 	assert.deepEqual(
 		Object.keys(budget).sort(),
