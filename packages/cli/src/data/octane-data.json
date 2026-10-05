@@ -2111,7 +2111,7 @@
     "54": {
       "message": "Hydration mismatch: the client rendered text where the server rendered none; the client text was built fresh.",
       "runtime": ["client"],
-      "status": "active"
+      "status": "retired"
     },
     "55": {
       "message": "Hydration mismatch: the server rendered a different child shape where the client renders a component; the stale range was discarded and the component was built on the client.",
@@ -2146,12 +2146,12 @@
     "61": {
       "message": "Hydration mismatch: the server-rendered text differed from the client; the text was updated to the client value.",
       "runtime": ["client"],
-      "status": "active"
+      "status": "retired"
     },
     "62": {
       "message": "Hydration mismatch: the server rendered extra children in a text element; the stale children were discarded.",
       "runtime": ["client"],
-      "status": "active"
+      "status": "retired"
     },
     "63": {
       "message": "Target container is not a DOM element. Pass an Element, Document, or DocumentFragment. If document.body is null after document hydration, update the existing document root or render a document shell containing <body>.",

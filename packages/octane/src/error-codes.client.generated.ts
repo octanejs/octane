@@ -43,10 +43,7 @@ type ClientErrorArguments = {
 	46: [unknown, unknown];
 	49: [];
 	50: [];
-	54: [];
 	58: [];
-	61: [];
-	62: [];
 	63: [];
 	64: [];
 	66: [];
@@ -458,23 +455,8 @@ export function formatClientError<Code extends keyof ClientErrorArguments>(
 				);
 			case 50:
 				return formatDevErrorMessage('Unclosed server-rendered Fragment descriptor.', args);
-			case 54:
-				return formatDevErrorMessage(
-					'Hydration mismatch: the client rendered text where the server rendered none; the client text was built fresh.',
-					args,
-				);
 			case 58:
 				return formatDevErrorMessage('Unsupported native-read compiler/runtime version.', args);
-			case 61:
-				return formatDevErrorMessage(
-					'Hydration mismatch: the server-rendered text differed from the client; the text was updated to the client value.',
-					args,
-				);
-			case 62:
-				return formatDevErrorMessage(
-					'Hydration mismatch: the server rendered extra children in a text element; the stale children were discarded.',
-					args,
-				);
 			case 63:
 				return formatDevErrorMessage(
 					'Target container is not a DOM element. Pass an Element, Document, or DocumentFragment. If document.body is null after document hydration, update the existing document root or render a document shell containing <body>.',

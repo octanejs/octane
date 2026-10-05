@@ -324,7 +324,7 @@
       "message": "Hydration mismatch: the client rendered text where the server rendered none; the client text was built fresh.",
       "argumentCount": 0,
       "runtime": ["client"],
-      "status": "active"
+      "status": "retired"
     },
     "55": {
       "message": "Hydration mismatch: the server rendered a different child shape where the client renders a component; the stale range was discarded and the component was built on the client.",
@@ -360,13 +360,13 @@
       "message": "Hydration mismatch: the server-rendered text differed from the client; the text was updated to the client value.",
       "argumentCount": 0,
       "runtime": ["client"],
-      "status": "active"
+      "status": "retired"
     },
     "62": {
       "message": "Hydration mismatch: the server rendered extra children in a text element; the stale children were discarded.",
       "argumentCount": 0,
       "runtime": ["client"],
-      "status": "active"
+      "status": "retired"
     },
     "59": {
       "message": "%s requires an active server component.",

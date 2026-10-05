@@ -1793,32 +1793,30 @@ function componentSourceLoc(body: unknown): string | undefined {
 }
 
 // ---------------------------------------------------------------------------
-// Hydration VALUE-mismatch reporting (P2). When the server-rendered text/attribute
-// at a dynamic site differs from the client's computed value, the runtime PATCHES the
-// DOM to the client value (React-recoverable; runs in dev AND prod) and, in dev, warns
-// with a source location. `suppressHydrationWarning` on the owning element (React's
-// shallow semantics) suppresses BOTH: the warning is skipped and the SERVER value is
-// kept (the documented escape hatch for intentional server/client differences).
+// Hydration VALUE differences, as in React. A server text that differs from the
+// client's does not match the client render (HydrationMismatch), while the
+// server's attributes, class, style and raw HTML are kept, never patched:
+// development lists what differs in one warning per hydration pass, and
+// production compares nothing. `suppressHydrationWarning` on the owning element
+// (React's shallow semantics) keeps a differing server text and silences the
+// attribute warning. It never keeps a structural difference.
 // ---------------------------------------------------------------------------
 
 /**
  * Has the owning element opted out of hydration-mismatch handling? The compiler stamps a
  * non-enumerable-ish `__oct_suppress` JS property (NOT a DOM attribute — it isn't
  * serialized) on elements written as `<el suppressHydrationWarning>`. Read in dev AND prod
- * because suppression changes the recovery (keep the server value), not just the warning.
+ * because suppression keeps a differing server text, which otherwise does not match.
  */
 function isHydrationSuppressed(el: Node | null): boolean {
 	return el !== null && (el as any).__oct_suppress === true;
 }
 
 /**
- * Shared preamble for hydration VALUE-mismatch write sites. Most class/style paths
- * only pay the server-value comparison when suppression or a dev source location
- * requires it. Attributes additionally compare in production because HTML parser
- * normalization can affect either the server or client value. Returns the disposition:
- *   0 — plain apply: after any site-required comparison, the client write patches/recovers.
- *   1 — suppressed: compare, and on divergence KEEP the server value (skip the write).
- *   2 — dev-warn: compare, warn on divergence, then apply the client value.
+ * How development reports a server value that hydration keeps at `el`:
+ *   0 — not at all: production-compiled code records no source location.
+ *   1 — not at all: the element suppresses hydration warnings.
+ *   2 — in the pass's warning (HydrationCapability.settleValues).
  */
 function hydrationMismatchMode(el: Element): 0 | 1 | 2 {
 	if (isHydrationSuppressed(el)) return 1;
@@ -1840,10 +1838,9 @@ let HELD_HYDRATION_DIAGNOSTICS: Array<() => void> | null = null;
 
 /**
  * DEV-only: log a hydration-mismatch warning unless a try body holds it, then
- * wait for its root attempt's commit. That attempt's rollback undoes its
- * structural recovery and value repairs, so the retry repeats the warning.
- * Nothing is logged under captures that changed before a dormant boundary
- * activated (staleServerValues).
+ * wait for its root attempt's commit. An attempt that is rolled back is
+ * retried, and the retry repeats the warning. Nothing is logged under captures
+ * that changed before a dormant boundary activated (staleServerValues).
  */
 function logHydrationMismatch(message: string): void {
 	if (
@@ -1852,42 +1849,6 @@ function logHydrationMismatch(message: string): void {
 	)
 		return;
 	if (currentHydration?.awaitsCommit(() => console.error(message)) !== true) console.error(message);
-}
-
-/**
- * DEV-only hydration-mismatch warning. Gated on `loc` being non-empty — the dev source
- * location (`el.__oct_loc` / `siteLoc(...)`) only exists in `dev`-compiled output, so in
- * production `loc` is empty and this no-ops (the patch/recovery already ran regardless).
- */
-function warnHydrationValueMismatch(
-	loc: string | undefined,
-	what: string,
-	serverVal: unknown,
-	clientVal: unknown,
-): void {
-	if (process.env.NODE_ENV === 'production') return; // build-time stripped
-	if (!loc) return;
-	logHydrationMismatch(
-		`Octane hydration mismatch at ${loc}: server rendered ${what} ` +
-			`${JSON.stringify(serverVal)} but the client rendered ${JSON.stringify(clientVal)}. ` +
-			`The client value was used. If this difference is intentional (e.g. a timestamp or ` +
-			`random id), add suppressHydrationWarning to the element.`,
-	);
-}
-
-function warnHydrationKeptServerValue(
-	loc: string | undefined,
-	what: string,
-	serverVal: unknown,
-	clientVal: unknown,
-): void {
-	if (process.env.NODE_ENV === 'production' || !loc) return;
-	logHydrationMismatch(
-		`Octane hydration mismatch at ${loc}: server rendered ${what} ` +
-			`${JSON.stringify(serverVal)} but the client rendered ${JSON.stringify(clientVal)}. ` +
-			'The server value was kept. If this difference is intentional, add ' +
-			'suppressHydrationWarning to the element.',
-	);
 }
 
 /** DEV-only human-readable description of the server node at the cursor (for warnings). */
@@ -1927,16 +1888,17 @@ function warnHydrationStructuralMismatch(
 }
 
 /**
- * DEV-only: an adopted node's static attributes or nested static markup differ from the client
- * template. As in React, the server's markup is kept and nothing is patched; production does not
- * compare these at all, so this never changes what hydration does.
+ * DEV-only: React's one warning per hydration pass for the server attributes, static markup and
+ * raw HTML that hydration kept where the client's differ, one line each. Nothing is patched, and
+ * production compares none of them, so this never changes what hydration does.
  */
-function warnHydrationStaticDifference(loc: string | undefined, actual: Node): void {
+function warnHydrationUnpatched(lines: readonly string[]): void {
 	if (process.env.NODE_ENV === 'production') return; // build-time stripped
 	logHydrationMismatch(
-		`Octane hydration${loc ? ` at ${loc}` : ''}: a tree hydrated but some attributes or static ` +
-			`markup of the server rendered ${describeHydrationNode(actual)} didn't match the client. ` +
-			`This won't be patched up.`,
+		`Octane hydration mismatch: a tree hydrated but some attributes of the server rendered ` +
+			`HTML didn't match the client. This won't be patched up. If a difference is intentional ` +
+			`(e.g. a timestamp or random id), add suppressHydrationWarning to the element.\n  ` +
+			lines.join('\n  '),
 	);
 }
 
@@ -16349,8 +16311,7 @@ function activateHydrateBoundary(state: HydrateSlot): void {
 			if (adoptedSlot?.__kind === 'trySlotSlot') {
 				hydration.claimRootRemainder(getNextSibling(adoptedSlot.end));
 			}
-			hydration.flushClassWrites();
-			hydration.flushTextWarnings();
+			hydration.settleValues();
 			hydration.finishRoot();
 			completed = true;
 		}
@@ -19120,16 +19081,17 @@ interface HydratedLiteRange {
 	end: Comment;
 }
 
-interface PendingHydrationClassWrite {
+/** The class an adopted element's last hydrating writer set (keepsClass). */
+interface PendingHydrationClass {
 	next: string | null;
+	/** Whether an absent class attribute reads as ''. */
 	absentIsEmpty: boolean;
-	useAttribute: boolean;
-	remove: boolean;
 }
 
-interface PendingHydrationTextWarning {
-	loc: string | undefined;
+/** A server text whose comparison waits for the pass's render-phase updates (keepsText). */
+interface PendingHydrationText {
 	server: string | null;
+	loc: string | undefined;
 }
 
 let currentHydration: HydrationCapability | null = null;
@@ -19211,9 +19173,10 @@ function skipFoldedHeadPrefix(container: RootContainer, node: Node | null): Node
 class HydrationCapability {
 	/**
 	 * Parent captures changed before this dormant boundary activated, so the
-	 * server HTML predates the client's state. Recovery still runs, but reports
-	 * nothing (noteRecoverableHydrationError, logHydrationMismatch), and no server
-	 * value is kept (keepsServerValue).
+	 * server HTML predates the client's state. Any difference from it, a text or
+	 * attribute value included (unpatched), does not match the client render,
+	 * and the boundary's fallback reports nothing (noteRecoverableHydrationError,
+	 * logHydrationMismatch).
 	 */
 	staleServerValues = false;
 	depth = 0;
@@ -19255,8 +19218,15 @@ class HydrationCapability {
 	private rootCleanupBoundary: Node | null = null;
 	readonly deferredActivities: Array<() => void> = [];
 	readonly liteRanges = new WeakMap<Scope, HydratedLiteRange>();
-	readonly classWrites = new Map<Element, PendingHydrationClassWrite>();
-	private readonly textWarnings = new Map<Text, PendingHydrationTextWarning>();
+	/** Development, or stale captures: classes compared once the pass ends (settleValues). */
+	private classes: Map<Element, PendingHydrationClass> | null = null;
+	/** Server texts compared once the pass's render-phase updates settle (keepsText). */
+	private pendingTexts: Map<Text, PendingHydrationText> | null = null;
+	/**
+	 * DEV-only: the server values this pass kept where the client's differ, by
+	 * their warning line, with the node each belongs to (settleValues).
+	 */
+	private unpatchedValues: Map<string, Node> | null = null;
 	/**
 	 * The first node of the adopted range whose claim is open (beginClaim),
 	 * until the template that renders that range's content adopts it.
@@ -19303,11 +19273,10 @@ class HydrationCapability {
 	/**
 	 * Whether this attempt is discarded if it suspends: the initial adoption of
 	 * a Suspense arm the server resolved, which keeps showing that server arm
-	 * until an attempt commits. Recovery records the nodes it changes (`save`)
-	 * and the server values it overwrites (`repaired`), so that a discarded
-	 * attempt leaves the server arm as it was, and the attempt that commits
-	 * finds and reports each mismatch once. The attempt's diagnostics wait in
-	 * its hold (HYDRATION_DIAGNOSTIC_HOLDS) meanwhile.
+	 * until an attempt commits. Recovery records the nodes it changes (`save`),
+	 * so that a discarded attempt leaves the server arm as it was, and the
+	 * attempt that commits finds and reports each mismatch once. The attempt's
+	 * diagnostics wait in its hold (HYDRATION_DIAGNOSTIC_HOLDS) meanwhile.
 	 */
 	speculative = false;
 	/** The parents whose children this attempt recorded. */
@@ -19943,20 +19912,25 @@ class HydrationCapability {
 	/**
 	 * Adopt the text of a binding-view text hole whose server range `posNode`
 	 * opens: the range's one text node, or a new one when the server rendered it
-	 * empty. Any other range content does not match the template. Null when
-	 * `posNode` opens no range, so bindingText builds one.
+	 * empty. The text compares as any server text does (keepsText). Any other
+	 * range content does not match the template. Null when `posNode` opens no
+	 * range, so bindingText builds one.
 	 */
 	adoptBindingText(posNode: Node | null, text: string): Text | null {
 		if (!isBlockOpen(posNode)) return null;
 		const close = this.close(posNode);
 		const existing = getNextSibling(posNode);
+		const host = domNode(posNode).parentNode;
 		if (existing !== close && existing?.nodeType === 3 && getNextSibling(existing) === close) {
-			if ((STAGED_DOM?.view(existing) ?? existing).nodeValue !== text)
+			const server = (STAGED_DOM?.view(existing) ?? existing).nodeValue;
+			if (!this.keepsText(host, existing, server, text, (host as any)?.__oct_loc))
 				(STAGED_DOM?.view(existing) ?? existing).nodeValue = text;
 			return existing as Text;
 		}
 		if (existing !== close) throw new TypeError(formatClientError(72));
-		const node = (STAGED_DOM?.view(document) ?? document).createTextNode(text);
+		// An empty range is the server's empty text.
+		const keep = text !== '' && this.keepsText(host, null, '', text, (host as any)?.__oct_loc);
+		const node = (STAGED_DOM?.view(document) ?? document).createTextNode(keep ? '' : text);
 		domNode((STAGED_DOM?.view(close) ?? close).parentNode)!.insertBefore(node, close);
 		return node;
 	}
@@ -20316,74 +20290,67 @@ class HydrationCapability {
 		);
 	}
 
-	recordTextMismatch(node: Text, loc: string | undefined, server: string | null): void {
-		if (process.env.NODE_ENV === 'production' && ROOT_ERROR_HANDLERS === null) return;
-		// Nor is the placeholder of a template that mismatch recovery cloned fresh:
-		// its host holds the client template's text, and the rebuild has already
-		// been reported structurally.
-		if (this.freshNodes.has(domNode(node).parentNode!)) return;
-		if (!this.textWarnings.has(node)) this.textWarnings.set(node, { loc, server });
-	}
-
-	flushTextWarnings(): void {
-		for (const [node, pending] of this.textWarnings) {
-			// A render-phase replay can replace the first attempt's text node before
-			// hydration converges. Detached attempts are not observable output and must
-			// not publish a mismatch after the final live tree has matched the server.
-			if (!domNode(this.rootBlock.parentNode).contains(node)) continue;
-			const client = (STAGED_DOM?.view(node) ?? node).nodeValue;
-			if (pending.server !== client) {
-				noteRecoverableHydrationError(() => new Error(formatClientError(61)), this.rootBlock);
-				if (process.env.NODE_ENV !== 'production')
-					warnHydrationValueMismatch(pending.loc, 'text', pending.server, client);
-			}
-		}
-		this.textWarnings.clear();
-	}
-
 	/**
-	 * Hydration is about to overwrite the server's value of a text node (`name`
-	 * null) or an attribute. A speculative attempt records it for rollback. A
-	 * freshly cloned node holds the client template's value, not the server's,
-	 * so it has nothing to restore.
+	 * Whether the server's text `server` stays where the client renders `text`
+	 * in `host`, at `node`, the server's Text node (null when the server
+	 * rendered no text there, its form of empty text). It does when the two are
+	 * equal once the HTML parser's normalization is undone, and under the
+	 * host's suppressHydrationWarning, as in React. False when the client's
+	 * text is written instead: in a host the client built, which holds the
+	 * client template, and in a `<textarea>`, whose text is its default value,
+	 * which React sets to the client's. Any other difference does not match the
+	 * client render, nor does any difference from stale server values
+	 * (staleServerValues), unless a render-phase update renders the text again
+	 * before the pass ends: React renders a component that updates itself while
+	 * it renders again before it compares the output, so the text that render
+	 * settles on decides (settleValues). Meanwhile the node holds the client's
+	 * text, and a discarded attempt restores the server's. A method, so that
+	 * bundles which never hydrate do not retain it.
 	 */
-	repaired(target: Node, name: string | null): void {
+	keepsText(
+		host: Node | null,
+		node: Node | null,
+		server: string | null,
+		text: string,
+		loc: string | undefined,
+	): boolean {
+		if (server === text || isTextParserNormalizedMatch(server, text)) return true;
 		if (
-			!this.speculative ||
-			this.freshNodes.has(name === null ? domNode(target).parentNode! : target)
+			host !== null &&
+			(this.freshNodes.has(host) ||
+				(host.nodeType === 1 && (host as Element).localName === 'textarea'))
 		)
-			return;
-		let node: any = STAGED_DOM?.view(target) ?? target;
-		// Reading by qualified name also finds a namespaced attribute.
-		const value: string | null = name === null ? node.nodeValue : node.getAttribute(name);
-		(this.undo ??= []).push(() => {
-			node = STAGED_DOM?.view(target) ?? target;
-			if (name === null) node.nodeValue = value;
-			// Removal by qualified name also finds a namespaced attribute.
-			else if (value === null) node.removeAttribute(name);
-			else {
-				const ns = attrNamespace(name);
-				if (ns === null) node.setAttribute(name, value);
-				else node.setAttributeNS(ns, name, value);
-			}
-		});
+			return false;
+		if (!this.staleServerValues && isHydrationSuppressed(host)) return true;
+		if (node !== null && node.nodeType === 3 && this.rendersAgain()) {
+			const pending = (this.pendingTexts ??= new Map());
+			if (!pending.has(node as Text)) pending.set(node as Text, { server, loc });
+			if (inRootHydrationAttempt()) journalText(node as Text, server);
+			if (this.speculative)
+				(this.undo ??= []).push(() => {
+					(STAGED_DOM?.view(node) ?? node).nodeValue = server;
+				});
+			return false;
+		}
+		if (PRESENTATION_HYDRATION?.revision !== undefined) presentationMiss();
+		this.mismatch(
+			loc || (host as any)?.__oct_loc,
+			() => (text === '' ? 'nothing' : `text ${JSON.stringify(text)}`),
+			node,
+		);
 	}
 
 	/**
-	 * Runs before hydration overwrites a server value: `node`'s text, or its
-	 * `attribute`. An attempt that suspends is retried over the server DOM, so
-	 * it keeps the value for the retry to find, repair, and report: a root's
-	 * hydrating attempt journals it, and a speculative arm records it
-	 * (repaired). A freshly cloned template holds the client template's value,
-	 * not the server's, so it has nothing to restore.
+	 * Whether the block rendering now, or an ancestor of it in this pass, has an
+	 * update queued, which renders it again before the pass ends
+	 * (drainHydrationRenderPhaseUpdates).
 	 */
-	private journalRepair(node: Node, attribute: string | null): void {
-		this.repaired(node, attribute);
-		if (!inRootHydrationAttempt()) return;
-		if (attribute !== null) {
-			if (!this.freshNodes.has(node)) journalAttr(node as Element, attribute);
-		} else if (!this.freshNodes.has(domNode(node).parentNode!))
-			journalText(node as Text, (STAGED_DOM?.view(node as Text) ?? (node as Text)).nodeValue);
+	private rendersAgain(): boolean {
+		for (let block = CURRENT_BLOCK; block !== null; block = block.parentBlock) {
+			if (block.pending) return true;
+			if (block === this.rootBlock) return false;
+		}
+		return false;
 	}
 
 	/**
@@ -20507,40 +20474,32 @@ class HydrationCapability {
 	}
 
 	/**
-	 * Whether `el` keeps the server's value where the client's differs:
-	 * suppressHydrationWarning keeps it, unless there is no server value worth
-	 * keeping. A clone that mismatch recovery built fresh holds the client
-	 * template, and the rebuild was already reported. Under captures that changed
-	 * before a dormant boundary activated, the server value predates the client's.
+	 * `el`, an adopted element, keeps the server's `what` (an attribute, its
+	 * class or style, or its raw HTML), `server`, where the client renders
+	 * `client`: as in React, hydration never patches it. Development lists the
+	 * difference in the pass's one warning (settleValues), unless `el`
+	 * suppresses hydration warnings. Stale server values do not match the
+	 * client render instead (staleServerValues).
 	 */
-	keepsServerValue(el: Node | null): boolean {
-		return isHydrationSuppressed(el) && !this.freshNodes.has(el!) && !this.staleServerValues;
+	private unpatched(el: Element, what: string, server: unknown, client: unknown): void {
+		if (this.staleServerValues)
+			this.mismatch((el as any).__oct_loc, () => `${what} ${JSON.stringify(client)}`, el);
+		if (process.env.NODE_ENV !== 'production' && hydrationMismatchMode(el) === 2)
+			(this.unpatchedValues ??= new Map()).set(
+				`${(el as any).__oct_loc}: ${what}: the server rendered ${JSON.stringify(server)}, ` +
+					`the client ${JSON.stringify(client)}`,
+				el,
+			);
 	}
 
 	/**
-	 * `el`'s server `dangerouslySetInnerHTML` content differs from the client's
-	 * `next`. React keeps the server's, and so does hydration unless it predates
-	 * the client's state (staleServerValues): then replace it in place, as text
-	 * repairs do. An attempt that is discarded restores the server's children
-	 * for its retry (save), where a client write deferred to the root's commit
-	 * would still run. Returns whether it replaced them. A method, so that
-	 * bundles which never hydrate do not retain it.
+	 * `el`'s server `dangerouslySetInnerHTML` content, `server`, differs from
+	 * the client's `expected`. React keeps the server's, and so does hydration
+	 * (unpatched). A method, so that bundles which never hydrate do not retain
+	 * it.
 	 */
-	repairHTML(el: Element, next: string, server: string, expected: string): boolean {
-		if (!this.staleServerValues) {
-			if (process.env.NODE_ENV !== 'production' && !this.keepsServerValue(el))
-				warnHydrationKeptServerValue(
-					(el as any).__oct_loc,
-					'`dangerouslySetInnerHTML` content',
-					server,
-					expected,
-				);
-			return false;
-		}
-		this.save(el);
-		if (el.localName === 'script') (STAGED_DOM?.view(el) ?? el).textContent = next;
-		else (STAGED_DOM?.view(el) ?? el).innerHTML = next;
-		return true;
+	keepHTML(el: Element, server: string, expected: string): void {
+		this.unpatched(el, '`dangerouslySetInnerHTML` content', server, expected);
 	}
 
 	/**
@@ -20777,7 +20736,11 @@ class HydrationCapability {
 			template !== null &&
 			!hydrationStaticMatches(cursor, template, partialStyles)
 		)
-			warnHydrationStaticDifference(loc, cursor);
+			(this.unpatchedValues ??= new Map()).set(
+				`${loc ? loc + ': ' : ''}static attributes or markup of the server's ` +
+					describeHydrationNode(cursor),
+				cursor,
+			);
 		if (claimsRoot)
 			this.claimRootRemainder(
 				framedRemainder === undefined ? (unframedRemainder ?? null) : framedRemainder,
@@ -20879,23 +20842,24 @@ class HydrationCapability {
 		return !this.isClose(next);
 	}
 
+	/**
+	 * Adopt the text of an only-child text hole of `el`: the server's one Text
+	 * node, which compares as keepsText decides, or a new one when the server
+	 * rendered `el` empty. What an early host binding published there is the
+	 * server's text now.
+	 */
 	htext(el: Node, text: string, loc?: string): Text {
 		const first = getFirstChild(el);
 		if (first !== null && first.nodeType === 3) {
+			const next = getNextSibling(first);
+			if (next !== null) this.unclaimedText(el, next, null, loc);
 			const server = (STAGED_DOM?.view(first as Text) ?? (first as Text)).nodeValue;
 			if (
 				server !== text &&
 				domBindingClaims.get(el as Element)?.get('#text') !== server &&
-				!isTextParserNormalizedMatch(server, text)
-			) {
-				if (!this.keepsServerValue(el)) {
-					this.recordTextMismatch(first as Text, loc || (el as any).__oct_loc, server);
-					this.journalRepair(first, null);
-					(STAGED_DOM?.view(first as Text) ?? (first as Text)).nodeValue = text;
-				}
-			}
-			const next = getNextSibling(first);
-			if (next !== null) this.discardUnclaimedText(el, next, null, loc);
+				!this.keepsText(el, first, server, text, loc)
+			)
+				(STAGED_DOM?.view(first as Text) ?? (first as Text)).nodeValue = text;
 			return first as Text;
 		}
 		// A sole primitive can be framed by the server (e.g. a spread or ternary
@@ -20911,51 +20875,33 @@ class HydrationCapability {
 				return this.htext(el, text, loc);
 			}
 		}
-		// Anything else the server rendered here is content the text cannot adopt.
-		if (first !== null) this.discardUnclaimedText(el, first, text, loc);
-		const created = (STAGED_DOM?.view(document) ?? document).createTextNode(text);
+		if (first !== null) this.unclaimedText(el, first, text, loc);
+		const keep = text !== '' && this.keepsText(el, null, '', text, loc);
+		const created = (STAGED_DOM?.view(document) ?? document).createTextNode(keep ? '' : text);
 		(STAGED_DOM?.view(el) ?? el).appendChild(created);
 		return created;
 	}
 
 	/**
-	 * Remove the server content in `el`, an only-child text host, from `from` to
-	 * its end. The hole adopts at most one leading Text node there, so anything
-	 * else is server content the client renders nothing for, and later updates
-	 * would land beside it. Reports the recovery where the client expected
-	 * `text` (nothing when it is '', or, when null, the end of the Text node it
-	 * adopted). suppressHydrationWarning silences the report but still discards:
-	 * the server content is not a text value to keep.
+	 * `from`, in `el`, an only-child text host, starts server content that is
+	 * not the one Text node the hole adopts: nothing the client renders, and a
+	 * structural difference that suppressHydrationWarning does not keep. The
+	 * client expected `text` there (nothing when it is '', or, when null, the
+	 * end of the Text node it adopted).
 	 */
-	private discardUnclaimedText(
-		el: Node,
-		from: ChildNode,
-		text: string | null,
-		loc: string | undefined,
-	): void {
+	private unclaimedText(el: Node, from: ChildNode, text: string | null, loc?: string): never {
 		if (PRESENTATION_HYDRATION?.revision !== undefined) presentationMiss();
-		this.save(el);
-		if (!isHydrationSuppressed(el)) {
-			noteRecoverableHydrationError(() => new Error(formatClientError(62)), this.rootBlock);
-			if (process.env.NODE_ENV !== 'production') {
-				// Name a server range by the content it frames.
-				const inner = this.isOpen(from) ? getNextSibling(from) : null;
-				warnHydrationStructuralMismatch(
-					loc || (el as any).__oct_loc,
-					text === null
-						? 'the end of the text element'
-						: text === ''
-							? 'nothing'
-							: `text ${JSON.stringify(text)}`,
-					describeHydrationNode(inner ?? from),
-				);
-			}
-		}
-		for (let node: ChildNode | null = from; node !== null;) {
-			const next = getNextSibling(node);
-			(STAGED_DOM?.view(el) ?? el).removeChild(node);
-			node = next;
-		}
+		this.mismatch(
+			loc || (el as any).__oct_loc,
+			() =>
+				text === null
+					? 'the end of the text element'
+					: text === ''
+						? 'nothing'
+						: `text ${JSON.stringify(text)}`,
+			// Name a server range by the content it frames.
+			(this.isOpen(from) ? getNextSibling(from) : null) ?? from,
+		);
 	}
 
 	/**
@@ -21001,21 +20947,28 @@ class HydrationCapability {
 	 * htext's counterpart for an only-child hole whose first hydrating value
 	 * renders nothing (`null`, `undefined`, a boolean, or `''`). The server
 	 * serializes that as no children, or as an empty `<!--[--><!--]-->` frame,
-	 * which unwraps like htext's text-only frame. Anything else is server content
-	 * the client renders no node for, so a later value would land beside it.
-	 * Discard it and report the recovery as htext reports extra children.
-	 * A textarea's text is its default value, which its value props own.
+	 * which unwraps like htext's text-only frame. A lone server Text node is
+	 * the server's text, which compares as keepsText decides, and the hole
+	 * adopts it. Anything else is server content the client renders no node
+	 * for. A textarea's text is its default value, which its value props own.
+	 * Returns the Text node the hole adopted, if any.
 	 */
-	hempty(el: Node, loc?: string): void {
+	hempty(el: Node, loc?: string): Text | null {
 		const first = getFirstChild(el);
-		if (first === null || (el as Element).localName === 'textarea') return;
+		if (first === null || (el as Element).localName === 'textarea' || this.freshNodes.has(el))
+			return null;
 		const next = getNextSibling(first);
 		if (this.isOpen(first) && this.isClose(next) && getNextSibling(next) === null) {
 			(STAGED_DOM?.view(first) ?? first).remove();
 			(STAGED_DOM?.view(next) ?? next).remove();
-			return;
+			return null;
 		}
-		this.discardUnclaimedText(el, first, '', loc);
+		if (first.nodeType === 3 && next === null) {
+			if (!this.keepsText(el, first, (STAGED_DOM?.view(first) ?? first).nodeValue, '', loc))
+				(STAGED_DOM?.view(first) ?? first).nodeValue = '';
+			return first as Text;
+		}
+		this.unclaimedText(el, first, '', loc);
 	}
 
 	htextSwap(posNode: Node | null, text: string): Text {
@@ -21028,42 +20981,19 @@ class HydrationCapability {
 			domNode((STAGED_DOM?.view(posNode) ?? posNode).parentNode!)!.replaceChild(empty, posNode);
 			posNode = empty;
 		}
+		const host = (STAGED_DOM?.view(posNode) ?? posNode)?.parentNode ?? null;
 		if (posNode !== null && posNode.nodeType === 3) {
 			const server = (STAGED_DOM?.view(posNode as Text) ?? (posNode as Text)).nodeValue;
-			if (server !== text && !isTextParserNormalizedMatch(server, text)) {
-				const host = (STAGED_DOM?.view(posNode) ?? posNode).parentNode;
-				// A fresh mismatch clone's template `<!>` reads as the server's empty
-				// slot, swapped for '' above, and takes the client's text.
-				if (!this.keepsServerValue(host)) {
-					this.recordTextMismatch(posNode as Text, host && (host as any).__oct_loc, server);
-					this.journalRepair(posNode, null);
-					(STAGED_DOM?.view(posNode as Text) ?? (posNode as Text)).nodeValue = text;
-				}
-			}
+			// A client-built template's `<!>` reads as the server's empty slot,
+			// swapped for '' above, and takes the client's text.
+			if (server !== text && !this.keepsText(host, posNode, server, text, (host as any)?.__oct_loc))
+				(STAGED_DOM?.view(posNode as Text) ?? (posNode as Text)).nodeValue = text;
 			return posNode as Text;
 		}
-		const host = (STAGED_DOM?.view(posNode) ?? posNode)?.parentNode ?? null;
-		const suppressed = isHydrationSuppressed(host);
-		// A non-empty client text binding where the server has no text node is a
-		// structural mismatch, just like an extra client element. Build the client
-		// text so recovery succeeds, but publish the normal dev diagnostic. A
-		// suppressed host keeps the absent server value by installing only an empty
-		// tracking node (keepsServerValue); later real commits can update that node
-		// normally.
-		const keep = this.keepsServerValue(host);
-		if (text !== '' && !keep) {
-			if (host !== null) this.save(host);
-			if (!suppressed) {
-				noteRecoverableHydrationError(() => new Error(formatClientError(54)));
-				if (process.env.NODE_ENV !== 'production') {
-					warnHydrationStructuralMismatch(
-						host && (host as any).__oct_loc,
-						`text ${JSON.stringify(text)}`,
-						describeHydrationNode(posNode),
-					);
-				}
-			}
-		}
+		// No server text node stands here: the server rendered the hole empty. A
+		// host that keeps that installs an empty tracking node, which later
+		// commits update normally.
+		const keep = text !== '' && this.keepsText(host, posNode, '', text, (host as any)?.__oct_loc);
 		const created = (STAGED_DOM?.view(document) ?? document).createTextNode(keep ? '' : text);
 		if (posNode !== null && (STAGED_DOM?.view(posNode) ?? posNode).parentNode !== null) {
 			domNode((STAGED_DOM?.view(posNode) ?? posNode).parentNode!).insertBefore(created, posNode);
@@ -21093,10 +21023,17 @@ class HydrationCapability {
 		return cursor;
 	}
 
+	/**
+	 * Whether a hydrating writer sets `el`'s attribute `name` to `next`. Only in
+	 * an element the client built. An adopted element keeps the server's value,
+	 * as in React (unpatched): development compares it, and production compares
+	 * nothing unless the server values are stale (staleServerValues). Values the
+	 * HTML parser normalized compare equal, and so does what an early host
+	 * binding published there.
+	 */
 	allowAttribute(el: Element, name: string, next: string | null): boolean {
-		// Parser normalization is symmetric: the server DOM may contain U+FFFD even
-		// when the client value does not. Read once in production too so either side's
-		// CR/NUL/replacement artifacts can compare equal before the normal patch path.
+		if (this.isFresh(el)) return true;
+		if (process.env.NODE_ENV === 'production' && !this.staleServerValues) return false;
 		// Read through the prototype: a form's named control can shadow its method.
 		const ns = attrNamespace(name);
 		const server = ns
@@ -21107,95 +21044,49 @@ class HydrationCapability {
 			: STAGED_DOM
 				? STAGED_DOM.view(el).getAttribute(name)
 				: Element.prototype.getAttribute.call(el, name);
-		// Adoption already owns the desired value, including an absent attribute.
-		// Keep the ordinary setter from repeating a same-value DOM mutation.
-		if (server === next) return false;
-		if (domBindingClaims.get(el)?.get(name) === server) return false;
-		if (next !== null && isAttributeParserNormalizedMatch(server, next)) return false;
-		// A clone that mismatch recovery built fresh holds the client template, not
-		// server output: the rebuild was already reported, so the client value
-		// applies silently.
-		if (this.isFresh(el)) return true;
-		if (this.keepsServerValue(el)) return false;
-		if (process.env.NODE_ENV !== 'production' && hydrationMismatchMode(el) === 2)
-			warnHydrationValueMismatch((el as any).__oct_loc, `attribute \`${name}\``, server, next);
-		this.repaired(el, name);
-		return true;
-	}
-
-	allowClass(el: Element, next: string | null, absentIsEmpty = false): boolean {
-		const mode = hydrationMismatchMode(el);
-		const rawServer = (STAGED_DOM?.view(el) ?? el).getAttribute('class');
-		const server = absentIsEmpty && rawServer === null ? '' : rawServer;
-		if (server === next) return true;
-		if (domBindingClaims.get(el)?.get('class') === rawServer) return false;
-		// Fresh mismatch clones apply the client class silently, as in allowAttribute.
-		if (mode === 0 || this.isFresh(el)) return true;
-		if (this.keepsServerValue(el)) return false;
 		if (
-			process.env.NODE_ENV !== 'production' &&
-			mode === 2 &&
-			// Class writes flush after the render. A boundary whose body adopted
-			// `el` and then threw to its catch arm has removed it since.
-			domNode(this.rootBlock.parentNode).contains(el)
+			server !== next &&
+			domBindingClaims.get(el)?.get(name) !== server &&
+			!(next !== null && isAttributeParserNormalizedMatch(server, next))
 		)
-			warnHydrationValueMismatch((el as any).__oct_loc, 'attribute `class`', server, next);
+			this.unpatched(el, `attribute \`${name}\``, server, next);
+		return false;
+	}
+
+	/**
+	 * Whether hydration keeps `el`'s server class where a writer sets `next`
+	 * (`absentIsEmpty`: an absent class attribute reads as ''). An adopted
+	 * element keeps it, as it keeps attributes (allowAttribute). A direct
+	 * binding and spreads can all write one element's class, and only the last
+	 * writer's value is the client's, so the comparison waits for the end of
+	 * the pass (settleValues).
+	 */
+	keepsClass(el: Element, next: string | null, absentIsEmpty: boolean): boolean {
+		if (this.isFresh(el)) return false;
+		if (process.env.NODE_ENV !== 'production' || this.staleServerValues)
+			(this.classes ??= new Map()).set(el, { next, absentIsEmpty });
 		return true;
 	}
 
-	queueClass(
-		el: Element,
-		next: string | null,
-		absentIsEmpty: boolean,
-		useAttribute: boolean,
-		remove: boolean,
-	): void {
-		// Class can be authored by any combination of direct bindings and spreads.
-		// During hydration only the last writer is observable: the server has already
-		// serialized that final value, so replaying intermediate writers would produce
-		// false mismatch warnings and transient DOM mutations on the adopted element.
-		this.classWrites.set(el, { next, absentIsEmpty, useAttribute, remove });
-	}
-
-	flushClassWrites(): void {
-		try {
-			for (const [el, write] of this.classWrites) {
-				const rawTarget = write.remove ? null : write.next;
-				// The common hydration-parity path performs no DOM write at all. Besides
-				// avoiding work, this keeps MutationObserver consumers from seeing a class
-				// value that never existed in either the server or final client output.
-				if ((STAGED_DOM?.view(el) ?? el).getAttribute('class') === rawTarget) continue;
-				if (!this.allowClass(el, write.next, write.absentIsEmpty)) continue;
-				this.journalRepair(el, 'class');
-				if (write.remove) (STAGED_DOM?.view(el) ?? el).removeAttribute('class');
-				else if (write.useAttribute)
-					(STAGED_DOM?.view(el) ?? el).setAttribute('class', write.next!);
-				else (STAGED_DOM?.view(el as any) ?? (el as any)).className = write.next!;
-			}
-		} finally {
-			this.classWrites.clear();
-		}
-	}
-
-	applyStyle(
+	/**
+	 * Whether hydration keeps `el`'s server style where a writer sets the
+	 * complete style `value`, or the fixed declarations `entries`, after the
+	 * static declarations `staticCss`. An adopted element keeps it, as it keeps
+	 * attributes (allowAttribute). Comparing canonical cssText, through a
+	 * detached CSSOM, treats equivalent spellings (`#fff` and rgb(), compact
+	 * whitespace) as equal, while it still finds reordered, missing, added and
+	 * empty declarations.
+	 */
+	keepsStyle(
 		el: HTMLElement | SVGElement,
 		value: any,
-		_prev: any,
 		staticCss?: string,
 		entries?: readonly unknown[],
 	): boolean {
-		if (this.keepsServerValue(el)) return true;
+		if (this.isFresh(el)) return false;
+		if (process.env.NODE_ENV === 'production' && !this.staleServerValues) return true;
 		const style = (STAGED_DOM?.view(el as HTMLElement) ?? (el as HTMLElement)).style;
-		const hadStyleAttribute = (STAGED_DOM?.view(el) ?? el).hasAttribute('style');
-		const before = style.cssText;
-		// A hydration write describes the COMPLETE client style, while `prev` is
-		// only the client compiler's uninitialized slot value. Diffing against that
-		// slot leaves server-only declarations behind (`{width: 1}` -> `{}` / null)
-		// and cannot observe declaration-order differences. First serialize the
-		// complete client value through detached CSSOM. Comparing canonical cssText
-		// preserves the server's original attribute bytes when declarations are
-		// semantically and order-equivalent (`#fff` vs rgb(), compact whitespace),
-		// while still detecting reordered, missing, added, and empty styles.
+		const server = style.cssText;
 		const expectedStyle = domNode(
 			(STAGED_DOM?.view(document) ?? document).createElement('div'),
 		).style;
@@ -21208,8 +21099,7 @@ class HydrationCapability {
 					applyStyleProperty(el, expectedStyle, entries[i] as string, entry);
 			}
 		}
-		// Preserve only the actual last publication of a live scalar binding.
-		// External mutations still follow normal hydration diagnostics and repair.
+		// A declaration that an early host binding published is the server's now.
 		const claims = domBindingClaims.get(el);
 		if (claims !== undefined) {
 			for (const [channel, published] of claims) {
@@ -21223,20 +21113,58 @@ class HydrationCapability {
 			}
 		}
 		const expected = expectedStyle.cssText;
-		const expectsStyleAttribute = expected !== '';
-		if (before === expected && hadStyleAttribute === expectsStyleAttribute) return true;
-
-		this.journalRepair(el, 'style');
-		if (expectsStyleAttribute) style.cssText = expected;
-		else (STAGED_DOM?.view(el) ?? el).removeAttribute('style');
 		if (
-			process.env.NODE_ENV !== 'production' &&
-			hydrationMismatchMode(el) === 2 &&
-			!this.isFresh(el)
-		) {
-			warnHydrationValueMismatch((el as any).__oct_loc, 'style', before, expected);
-		}
+			server !== expected ||
+			(STAGED_DOM?.view(el) ?? el).hasAttribute('style') !== (expected !== '')
+		)
+			this.unpatched(el, 'style', server, expected);
 		return true;
+	}
+
+	/**
+	 * Runs once a pass adopted its content and its render-phase updates
+	 * settled. Compares the texts those updates rendered again (keepsText) and
+	 * the class each adopted element's last writer set (keepsClass), then
+	 * publishes development's one warning per pass, as React's, for the server
+	 * values the pass kept where the client's differ (unpatched). A boundary
+	 * whose body adopted a node and then threw to its catch arm has removed it
+	 * since, and it is not compared.
+	 */
+	settleValues(): void {
+		const root = domNode(this.rootBlock.parentNode);
+		const texts = this.pendingTexts;
+		if (texts !== null) {
+			this.pendingTexts = null;
+			for (const [node, { server, loc }] of texts) {
+				const text = (STAGED_DOM?.view(node) ?? node).nodeValue!;
+				if (text !== server && !isTextParserNormalizedMatch(server, text) && root.contains(node))
+					this.mismatch(
+						loc || (domNode(node).parentNode as any)?.__oct_loc,
+						() => `text ${JSON.stringify(text)}`,
+						(STAGED_DOM?.view(document) ?? document).createTextNode(server ?? ''),
+					);
+			}
+		}
+		const classes = this.classes;
+		if (classes !== null) {
+			this.classes = null;
+			for (const [el, { next, absentIsEmpty }] of classes) {
+				// Read through the prototype: a form's named control can shadow its method.
+				const raw = STAGED_DOM
+					? STAGED_DOM.view(el).getAttribute('class')
+					: Element.prototype.getAttribute.call(el, 'class');
+				const server = absentIsEmpty && raw === null ? '' : raw;
+				if (server !== next && domBindingClaims.get(el)?.get('class') !== raw && root.contains(el))
+					this.unpatched(el, 'attribute `class`', server, next);
+			}
+		}
+		if (process.env.NODE_ENV === 'production') return;
+		const unpatched = this.unpatchedValues;
+		if (unpatched === null) return;
+		this.unpatchedValues = null;
+		const lines: string[] = [];
+		for (const [line, node] of unpatched) if (root.contains(node)) lines.push(line);
+		if (lines.length !== 0) warnHydrationUnpatched(lines);
 	}
 
 	coalesce(): void {
@@ -23367,7 +23295,7 @@ function bindDirectSignal(
 	}
 	if (handle === null && prior === null) {
 		if (kind === 'attribute' && previous === value) {
-			// An undefined cache slot has not yet reconciled an adopted server attribute.
+			// An undefined cache slot has not yet compared an adopted server attribute.
 			const hydration = value === undefined ? activeHydration() : null;
 			if (hydration === null || hydration.isFresh(target)) return previous;
 		}
@@ -23723,7 +23651,10 @@ export function setHTML(el: Element, value: any): void {
 			el.localName === 'script'
 				? normalizeScriptTextForHydration(escapeInlineScriptContentForHydration(next))
 				: normalizeHTMLForHydration(el, next);
-		if (server !== expected && !hydration.repairHTML(el, next, server, expected)) return;
+		if (server !== expected) {
+			hydration.keepHTML(el, server, expected);
+			return;
+		}
 		if (el.localName !== 'script') {
 			const host = STAGED_DOM?.view(el as any) ?? (el as any);
 			journalRootProperty(el, DANGER_HTML_VALUE, host[DANGER_HTML_VALUE]);
@@ -25080,10 +25011,8 @@ export function setAttribute(el: Element, name: string, value: any): void {
 	// toString() runs exactly once across validation, hydration comparison, and
 	// the final write. The same helper is used by compiler-baked and SSR attrs.
 	if (next !== null) next = sanitizeURLAttribute(el.localName, name, next);
-	// Hydration compares the final coerced value before writing: exact and parser-normalized
-	// matches preserve the server attribute. A divergence patches to the client value and
-	// warns in dev, unless `suppressHydrationWarning` keeps the server value instead.
-	// The capability guard keeps these DOM reads out of ordinary client updates.
+	// An adopted element keeps its server attribute; development compares it with the final
+	// coerced value. The capability guard keeps that read out of ordinary client updates.
 	const hydration = activeHydration();
 	if (hydration !== null && !hydration.allowAttribute(el, name, next)) return;
 	const ns = attrNamespace(name);
@@ -25241,8 +25170,8 @@ export function setURLAttribute(el: Element, name: string, value: unknown): void
  * compiler restricts this helper to lowercase data names, which are applied as
  * unnamespaced attributes in HTML, SVG, and MathML, so it needs none of the
  * generic attribute alias/property routing tables. Hydration still goes through
- * the capability boundary so mismatch recovery and `suppressHydrationWarning`
- * remain identical to setAttribute.
+ * the capability boundary, so the server value and `suppressHydrationWarning`
+ * behave as in setAttribute.
  */
 export function setStringData(el: Element, name: string, value: unknown): void {
 	const t = typeof value;
@@ -25513,10 +25442,7 @@ export function setClassName(el: Element, value: unknown): void {
 	// compare below sees the value we actually write).
 	const cls = normalizeClass(value);
 	const hydration = activeHydration();
-	if (hydration !== null) {
-		hydration.queueClass(el, cls, true, false, value == null || value === false);
-		return;
-	}
+	if (hydration !== null && hydration.keepsClass(el, cls, true)) return;
 	// Fast path on HTMLElement. For SVG/MathML hosts the compiler emits
 	// setAttribute(el, 'class', normalizeClass(...)) directly — never routes here —
 	// because SVGElement.className is a read-only SVGAnimatedString and assignment
@@ -25539,10 +25465,7 @@ export function setClassName(el: Element, value: unknown): void {
 export function setClassAttr(el: Element, value: unknown): void {
 	const cls = value == null || value === false ? null : normalizeClass(value);
 	const hydration = activeHydration();
-	if (hydration !== null) {
-		hydration.queueClass(el, cls, false, true, cls === null);
-		return;
-	}
+	if (hydration !== null && hydration.keepsClass(el, cls, false)) return;
 	if (TRANSITION_JOURNAL !== null) journalAttr(el, 'class');
 	if (cls === null) (STAGED_DOM?.view(el) ?? el).removeAttribute('class');
 	else (STAGED_DOM?.view(el) ?? el).setAttribute('class', cls);
@@ -25590,12 +25513,10 @@ export function canSplitStyleProperties(): boolean {
 
 export function setStyle(el: HTMLElement | SVGElement, value: any, prev: any): void {
 	const style = (STAGED_DOM?.view(el as HTMLElement) ?? (el as HTMLElement)).style;
-	// Hydration treats the authored style as a complete value: rebuild it once so
-	// server-only declarations and an empty server style attribute cannot survive.
-	// In dev, compare the before/after cssText and diagnose a real difference;
-	// `suppressHydrationWarning` keeps the complete server style unchanged.
+	// An adopted element keeps its server style; development compares it with the
+	// complete authored style.
 	const hydration = activeHydration();
-	if (hydration !== null && hydration.applyStyle(el, value, prev)) return;
+	if (hydration !== null && hydration.keepsStyle(el, value)) return;
 	// The whole style attribute, not the individual declarations applyStyleValue
 	// is about to touch: restoring the attribute text restores every one of them.
 	if (TRANSITION_JOURNAL !== null) journalAttr(el, 'style');
@@ -25605,8 +25526,8 @@ export function setStyle(el: HTMLElement | SVGElement, value: any, prev: any): v
 
 /**
  * Update one dynamic declaration after a compiler-baked static style prefix.
- * Hydration still compares the complete style, while aborted transitions
- * restore the entire attribute rather than only this declaration.
+ * Hydration's comparison still covers the complete style, while aborted
+ * transitions restore the entire attribute rather than only this declaration.
  * @internal
  */
 export function setStyleProperty(
@@ -25617,10 +25538,7 @@ export function setStyleProperty(
 	previous: any,
 ): void {
 	const hydration = activeHydration();
-	if (hydration !== null) {
-		hydration.applyStyle(el, { [name]: value }, undefined, staticCss);
-		return;
-	}
+	if (hydration !== null && hydration.keepsStyle(el, { [name]: value }, staticCss)) return;
 	const remove = value == null || typeof value === 'boolean';
 	// The compiler seeds each binding with its private scope, distinguishing a
 	// genuinely absent initial longhand from a preserved suspended-mount retry.
@@ -25658,10 +25576,7 @@ export function setStyleProperties(
 	staticCss: string,
 ): void {
 	const hydration = activeHydration();
-	if (hydration !== null) {
-		hydration.applyStyle(el, null, undefined, staticCss, entries);
-		return;
-	}
+	if (hydration !== null && hydration.keepsStyle(el, null, staticCss, entries)) return;
 	const style = (STAGED_DOM?.view(el as HTMLElement) ?? (el as HTMLElement)).style;
 	let journaled = false;
 	for (let i = 0; i < entries.length; i += 2) {
@@ -34502,10 +34417,20 @@ function reconcileDeoptChildren(el: Element, children: any, ownerBlock: Block): 
 		const n = owned[i];
 		if (keep === null || !keep.has(n)) {
 			const hydration = activeHydration();
-			if (hydration !== null && !hydration.isFresh(el)) {
-				hydration.save(el);
-				noteRecoverableHydrationError(() => new Error(formatClientError(62)), ownerBlock);
-			}
+			// A server node that no client child adopted is content the client
+			// renders nothing for. With scripting enabled, the parser keeps a
+			// `<noscript>`'s server content as text, which React never hydrates.
+			if (
+				hydration !== null &&
+				(n as any).$$deoptKey === undefined &&
+				el.localName !== 'noscript' &&
+				!hydration.isFresh(el)
+			)
+				hydration.mismatch(
+					process.env.NODE_ENV !== 'production' ? (el as any).__oct_loc : undefined,
+					() => `the end of <${el.localName}>`,
+					n,
+				);
 			// A speculative attempt's own record restores this removal if the
 			// attempt is discarded; a deferred removal would still run at commit.
 			if (journal && hydration?.speculative !== true) {
@@ -37370,10 +37295,23 @@ export function childSlot(
 		// Adopt the server text sitting between our adopted markers. (An empty hole
 		// has no text node, but `str !== ''` here means the server emitted one.)
 		const n = hydration.node;
+		const loc = process.env.NODE_ENV !== 'production' ? siteLoc(parentScope, slotKey) : undefined;
 		if (n !== null && n !== state.end && n.nodeType === 3) {
 			state.text = n as Text;
 			hydration.node = getNextSibling(n);
-			updateTextValue(n as Text, str);
+			if (!hydration.keepsText(domParent, n, (STAGED_DOM?.view(n) ?? n).nodeValue, str, loc))
+				updateTextValue(n as Text, str);
+			return;
+		}
+		// An adopted range without text is what the server rendered for empty text.
+		if (
+			adoptedRange &&
+			getNextSibling(state.start!) === state.end &&
+			hydration.keepsText(domParent, null, '', str, loc)
+		) {
+			const tn = (STAGED_DOM?.view(document) ?? document).createTextNode('');
+			(STAGED_DOM?.view(domParent) ?? domParent).insertBefore(tn, state.end);
+			state.text = tn;
 			return;
 		}
 	}
@@ -37569,8 +37507,9 @@ export function childTextHole(
 					? (value as string)
 					: String(value);
 		if (str === '') {
-			if (cachedNode !== null) (STAGED_DOM?.view(cachedNode) ?? cachedNode).remove();
-			else activeHydration()?.hempty(domParent, siteLoc(parentScope, slotKey));
+			if (cachedNode === null)
+				return activeHydration()?.hempty(domParent, siteLoc(parentScope, slotKey)) ?? null;
+			(STAGED_DOM?.view(cachedNode) ?? cachedNode).remove();
 			return null;
 		}
 		if (cachedNode !== null) {
@@ -39701,8 +39640,7 @@ function renderInitialSuspenseHydration(state: TrySlot, initial: InitialSuspense
 		}
 		renderBlock(block);
 		drainHydrationRenderPhaseUpdates(block);
-		hydration.flushClassWrites();
-		hydration.flushTextWarnings();
+		hydration.settleValues();
 		hydration.settle(previousHydration);
 		state.hasResolved = true;
 	} catch (error) {
@@ -48484,8 +48422,7 @@ function hydrateRootWithOutputHandler(
 				hydration.suspend(() => {
 					for (const activate of hydration.deferredActivities) activate();
 				});
-			hydration.flushClassWrites();
-			hydration.flushTextWarnings();
+			hydration.settleValues();
 			completed = true;
 		} catch (error) {
 			if (error instanceof PresentationAdoptionMiss) {
