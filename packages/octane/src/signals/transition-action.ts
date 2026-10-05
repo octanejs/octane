@@ -702,6 +702,8 @@ export class SignalActionFrame {
 		while (entry.target.deps) bridge.graph.unlink(entry.target.deps, entry.target);
 		while (entry.target.subs) bridge.graph.unlink(entry.target.subs);
 		bridge.releaseRetention(entry.target);
+		// A thenable the target threw must not retain it, or its owner, once released.
+		if (entry.target.wakeup) entry.target.wakeup.node = undefined;
 		entry.target.compute = undefined;
 	}
 

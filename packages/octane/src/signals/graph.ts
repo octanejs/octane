@@ -115,6 +115,10 @@ export interface NodeState<T = unknown> {
 interface Wakeup {
 	readonly promise: Promise<void>;
 	resolve(): void;
+	/** The thenable the latest evaluation threw, if one did. */
+	thrown?: object;
+	/** The node waiting on that thenable, held only until the wait ends. */
+	node?: ScopedNode;
 }
 
 type Work = ScopedNode | SignalObserver | (() => void);
@@ -130,6 +134,7 @@ let retirementError: ScopeDisposedError | undefined;
 let historicalReader:
 	((node: ScopedNode, read: SignalReadMode) => NodeState | undefined) | undefined;
 const queued = new Set<Work>();
+const settledThrown = new WeakSet<object>();
 const noActivity = {};
 const retainedOwners = new WeakMap<ScopedNode, ReadonlySet<GraphOwner>>();
 const retainedNodes = new WeakMap<GraphOwner, Set<ScopedNode>>();
@@ -431,7 +436,29 @@ function createWakeup(): Wakeup {
 	const promise = new Promise<void>((done) => {
 		resolve = done;
 	});
-	return { promise, resolve };
+	const wakeup: Wakeup = {
+		promise,
+		resolve() {
+			wakeup.node = undefined;
+			resolve();
+		},
+	};
+	return wakeup;
+}
+
+/**
+ * A pending read's waiting promise settles once its value may have changed, and
+ * its readers then read it again. A computation's thrown thenable settling is
+ * such a change, so the node waiting on it evaluates again rather than present
+ * the same pending read with a waiting promise that has already settled.
+ */
+function settleThrown(wakeup: Wakeup, thrown: object): void {
+	settledThrown.add(thrown);
+	// A later evaluation waits on another thenable.
+	if (wakeup.thrown !== thrown) return;
+	const node = wakeup.node;
+	if (node === undefined) wakeup.resolve();
+	else signalBatch(() => invalidateNode(node));
 }
 
 export class ScopedNode<T = any> implements SignalHandle<T>, ReactiveNode {
@@ -729,8 +756,17 @@ function evaluate(node: ScopedNode): boolean {
 	} catch (error) {
 		if (isThenable(error)) {
 			const wakeup = (node.wakeup ??= createWakeup());
-			// The waiting promise retains only its tiny wakeup, not the node or owner.
-			Promise.resolve(error).then(wakeup.resolve, wakeup.resolve);
+			// The thenable retains the node only while the node waits on it.
+			wakeup.node = node;
+			if (wakeup.thrown !== error) {
+				wakeup.thrown = error;
+				// A thenable that already settled cannot report a change: rethrowing it
+				// waits for a dependency instead of evaluating again on every microtask.
+				if (!settledThrown.has(error)) {
+					const settle = () => settleThrown(wakeup, error);
+					Promise.resolve(error).then(settle, settle);
+				}
+			}
 			next = pendingState(wakeup.promise);
 		} else {
 			next = errorState(error);
@@ -796,9 +832,11 @@ function commitState<T>(node: ScopedNode<T>, next: NodeState<T>): void {
 	} else if (node.lastState?.owners) {
 		retainOwners(node);
 	}
-	if (next.snapshot.status !== 'pending') {
-		previous?.resolveWaiting?.();
-		node.wakeup?.resolve();
+	if (next.snapshot.status !== 'pending') previous?.resolveWaiting?.();
+	// A node waits on its wakeup only while its state presents it; a thenable it
+	// threw earlier no longer decides its value. Readers of that read look again.
+	if (node.wakeup && next.waiting !== node.wakeup.promise) {
+		node.wakeup.resolve();
 		node.wakeup = undefined;
 	}
 }
@@ -1079,6 +1117,9 @@ export function isRetiredDeclarationView(node: unknown): boolean {
 function retireDeclarationView(view: ScopedNode, record: DeclarationView): void {
 	record.retired = true;
 	queued.delete(view);
+	// A retired view never evaluates again. Its readers still wake when the
+	// thenable it threw settles, without that thenable retaining the view.
+	if (view.wakeup) view.wakeup.node = undefined;
 	view.compute = undefined;
 	view.invalidateAttempt = undefined;
 	while (view.deps) graph.unlink(view.deps, view);
@@ -1094,9 +1135,10 @@ function retireDeclarationView(view: ScopedNode, record: DeclarationView): void 
  *
  * Two pending results never share a waiting promise: each node waits on its own
  * wakeup. The cell's wakeup follows the thenable its own evaluation threw, which
- * is the view's only when the cell is current and read what the view read. Any
- * other wakeup could resolve while the cell stays clean and pending, retrying
- * suspended readers without end, so such a view publishes its own.
+ * is the view's only when the cell is current, read what the view read, and
+ * threw the same thenable. A computation can throw a thenable it did not read,
+ * such as a promise from props. Any other wakeup could resolve while the cell
+ * waits on something else, so such a view publishes its own.
  */
 function sameViewResult(node: ScopedNode, view: ScopedNode, state: NodeState): boolean {
 	const committed = node.state;
@@ -1106,6 +1148,7 @@ function sameViewResult(node: ScopedNode, view: ScopedNode, state: NodeState): b
 		committed.snapshot.status !== 'pending' ||
 		state.snapshot.status !== 'pending' ||
 		node.flags & (ReactiveFlags.Dirty | ReactiveFlags.Pending) ||
+		node.wakeup?.thrown !== view.wakeup?.thrown ||
 		!sameState(committed, { ...state, waiting: committed.waiting })
 	)
 		return false;
@@ -1130,7 +1173,17 @@ export function promoteDeclarationView(view: ScopedNode, node: ScopedNode): void
 		node.hasLast !== view.hasLast ||
 		!Object.is(node.last, view.last) ||
 		(view.lastState ? !sameState(node.lastState, view.lastState) : node.lastState !== undefined);
-	if (currentChanged) commitState(node, state);
+	if (currentChanged) {
+		commitState(node, state);
+		// The cell now presents the view's pending read, so it waits on whatever
+		// the view's evaluation threw.
+		const wakeup = view.wakeup;
+		if (wakeup && state.waiting === wakeup.promise) {
+			view.wakeup = undefined;
+			node.wakeup = wakeup;
+			wakeup.node = node;
+		}
+	}
 	if (node.lastState?.owners !== view.lastState?.owners) releaseRetainedOwners(node);
 	node.last = view.last;
 	node.lastState = view.lastState;
