@@ -39440,10 +39440,11 @@ export function getTransitionFallbackTimeout(): number {
 	return TRANSITION_FALLBACK_TIMEOUT_MS;
 }
 
-// React's retry-only commit heuristic is global, but its pending commits belong
-// to individual roots. Rendering a retry still happens promptly (including
-// discovering dependent requests); only publishing its completed work waits.
-const SUSPENSE_RETRY_THROTTLE_MS = 300;
+// The retry-only commit window is global, but pending commits belong to
+// individual roots. Octane uses 100ms (React uses 300ms). Rendering a retry
+// still happens promptly, including discovering dependent requests; only
+// publishing its completed work waits.
+const SUSPENSE_RETRY_THROTTLE_MS = 100;
 let mostRecentSuspenseCommit = -Infinity;
 interface SuspenseRetryError {
 	error: unknown;

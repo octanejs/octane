@@ -1445,7 +1445,8 @@ Other consequences:
   general commit deferral.
 - Fallback-visible boundaries whose retries fully stage reveal together,
   including refs and layout effects.
-- Retry-only Suspense reveals follow React's shared 300ms fallback window.
+- Retry-only Suspense reveals use a shared 100ms fallback window (React uses
+  300ms). Ready content can therefore appear sooner after a fallback is shown.
   Showing or filling a fallback advances the window, and retries wait if more
   than 10ms remains. Urgent updates and active `act()` scopes bypass this delay.
   A committed fallback inside hidden Activity contributes to the window;

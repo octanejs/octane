@@ -195,8 +195,9 @@ The stable and canary work loops implement this policy
 ([stable](https://github.com/facebook/react/blob/6117d7cca4906492c51fe6a03381e35adfd86e7d/packages/react-reconciler/src/ReactFiberWorkLoop.js#L1424-L1487),
 [canary](https://github.com/facebook/react/blob/b740af2510de1e19fcb399abb862af26ff95ac80/packages/react-reconciler/src/ReactFiberWorkLoop.js#L1489-L1552)).
 
-**Octane behavior:** a shared recent-fallback timestamp coordinates retry-only
-work, with one coalesced retry timer per root. Actual fallback show/fill commits
+**Octane behavior:** Octane intentionally uses a shorter 100ms window. A shared
+recent-fallback timestamp coordinates retry-only work, with one coalesced retry
+timer per root. Actual fallback show/fill commits
 advance the timestamp; rendering the same fallback again does not. A later
 fallback commit in a different root does not move an already scheduled timer.
 Committed fallbacks under a hidden `<Activity>` also advance the timestamp;
@@ -211,7 +212,8 @@ time-sliced work loop.
 **Evidence:**
 [differential/suspense-timing.test.ts](../tests/differential/suspense-timing.test.ts)
 drives the same fixture and clock against React and Octane, outside `act()` for
-timing assertions. Existing `act()`-driven nested-reveal tests remain useful for
+timing assertions, with each renderer's documented window as its deadline.
+Existing `act()`-driven nested-reveal tests remain useful for
 eventual output but are not evidence that production retry commits are immediate.
 
 ---
@@ -621,7 +623,7 @@ Suspense behavior has been implemented:
 - Urgent-supersedes-transition discard.
 - Transition shell retention has no fallback deadline by default. A finite
   `setTransitionFallbackTimeout` is an explicit Octane extension (see #8).
-- Retry-only reveals respect the shared 300ms fallback window outside `act()`;
+- Retry-only reveals respect Octane's shared 100ms fallback window outside `act()`;
   urgent updates and active `act()` scopes do not wait (see #5). An outer reveal
   may include resolved content and a still-pending inner fallback in one commit,
   but promise resolution alone does not guarantee that commit is immediate.
