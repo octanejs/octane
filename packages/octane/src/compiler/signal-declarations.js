@@ -1041,7 +1041,12 @@ export function signalDeclarationSourceEdits(ast, filename, source, options) {
 			if (declaration.type === 'FunctionDeclaration')
 				rename.push({ pos: declaration.id.start, end: declaration.id.end, text: name });
 			mapAst(fn, (child, parent, key) => {
-				if (producerSelfReference(child, parent, key, declaration, lexical))
+				// Factory argument edits are replayed into the copy already.
+				// A self-reference in that position needs exactly that one edit.
+				if (
+					!producerArguments.has(child) &&
+					producerSelfReference(child, parent, key, declaration, lexical)
+				)
 					rename.push({
 						pos: child.start,
 						end: child.end,
