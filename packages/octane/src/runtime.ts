@@ -22074,13 +22074,16 @@ class HydrationCapability {
 		// Parser normalization is symmetric: the server DOM may contain U+FFFD even
 		// when the client value does not. Read once in production too so either side's
 		// CR/NUL/replacement artifacts can compare equal before the normal patch path.
+		// Read through the prototype: a form's named control can shadow its method.
 		const ns = attrNamespace(name);
 		const server = ns
 			? (STAGED_DOM?.view(el) ?? el).getAttributeNS(
 					ns,
 					name.indexOf(':') >= 0 ? name.slice(name.indexOf(':') + 1) : name,
 				)
-			: (STAGED_DOM?.view(el) ?? el).getAttribute(name);
+			: STAGED_DOM
+				? STAGED_DOM.view(el).getAttribute(name)
+				: Element.prototype.getAttribute.call(el, name);
 		// Adoption already owns the desired value, including an absent attribute.
 		// Keep the ordinary setter from repeating a same-value DOM mutation.
 		if (server === next) return false;
