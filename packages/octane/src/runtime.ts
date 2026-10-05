@@ -19474,8 +19474,9 @@ class HydrationCapability {
 	 * own rollback, once, within its arm's range when `parent` is the arm's parent.
 	 */
 	save(parent: Node): void {
-		// An early-bound host losing a server neighbor here has not moved.
-		repairedServerParents.add(parent);
+		// An early-bound host losing a server neighbor here has not moved. A
+		// rolled-back attempt restored that neighbor, so its mark goes with it.
+		this.remember(repairedServerParents, parent);
 		if (inRootHydrationAttempt()) journalRootChildren(parent);
 		if (!this.speculative || (this.saved ??= new Set()).has(parent)) return;
 		this.saved.add(parent);
@@ -49679,11 +49680,7 @@ function hydrateRootWithOutputHandler(
 				withRefDetachSuppression(refs, () => unmountBlock(attempted, false));
 				queueMicrotask(() => {
 					if (owner.disposed || owner.current !== attempted) return;
-					try {
-						adopt();
-					} catch (error) {
-						if (!reportUncaughtError(rootBlock, error)) throw error;
-					}
+					retry();
 				});
 			};
 		}
@@ -49734,9 +49731,7 @@ function hydrateRootWithOutputHandler(
 				collectVisibleSubtreeRefs(rootBlock, refs);
 				withRefDetachSuppression(refs, () => unmountBlock(rootBlock, false));
 				if (error.retry && error.lease?.active()) {
-					retryPresentationMiss(error, () => {
-						if (!owner.disposed) adopt();
-					});
+					retryPresentationMiss(error, retry);
 				} else {
 					owner.preservePresentation = true;
 					root.unmount();
@@ -49786,7 +49781,16 @@ function hydrateRootWithOutputHandler(
 			queueMicrotask(flush);
 		}
 	};
-	owner.retry = adopt;
+	// Only the first attempt has a hydrateRoot caller to receive a refused lease.
+	// A resumed or retried attempt reports it to the root instead.
+	const retry = (): void => {
+		try {
+			adopt();
+		} catch (error) {
+			if (!reportUncaughtError(rootBlock, error)) throw error;
+		}
+	};
+	owner.retry = retry;
 	adopt();
 	return root;
 }
