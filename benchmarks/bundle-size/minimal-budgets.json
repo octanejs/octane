@@ -26,12 +26,12 @@
   },
   "root-chained-jsx": {
     "raw": 80710,
-    "gzip": 26686,
+    "gzip": 26725,
     "brotli": 23980
   },
   "root-static": {
     "raw": 205679,
-    "gzip": 65565,
+    "gzip": 65606,
     "brotli": 57106
   },
   "root-static-local": {
@@ -41,7 +41,7 @@
   },
   "hooks-state": {
     "raw": 90737,
-    "gzip": 30149,
+    "gzip": 30193,
     "brotli": 27087
   },
   "prop-attributes": {
@@ -51,7 +51,7 @@
   },
   "context": {
     "raw": 105140,
-    "gzip": 34821,
+    "gzip": 34855,
     "brotli": 31087
   },
   "hydrate-root": {
@@ -157,7 +157,7 @@
   "binding-apollo-client-vite": {
     "raw": 360906,
     "gzip": 113218,
-    "brotli": 98767
+    "brotli": 99141
   },
   "binding-apollo-client-esbuild": {
     "raw": 363812,
