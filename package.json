@@ -7,7 +7,7 @@
   },
   "author": "Dominic Gannaway",
   "license": "MIT",
-  "packageManager": "pnpm@11.15.1",
+  "packageManager": "pnpm@12.9.1",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/octanejs/octane.git"

@@ -721,7 +721,7 @@ describe('CI workflow aggregation', () => {
 
 		assert.match(combined, new RegExp(`^    name: ${title.replace(/[()]/g, '\\$&')}$`, 'm'));
 		assert.doesNotMatch(combined, /^    strategy:|matrix\./m);
-		assert.equal([...combined.matchAll(/pnpm install --prod false --frozen-lockfile/g)].length, 1);
+		assert.equal([...combined.matchAll(/pnpm install --prod=false --frozen-lockfile/g)].length, 1);
 		assert.equal([...combined.matchAll(/oven-sh\/setup-bun/g)].length, 1);
 		assert.equal([...combined.matchAll(/playwright install --with-deps chromium/g)].length, 1);
 		assert.match(combined, /playwright install --with-deps chromium(?:\n|$)/);
