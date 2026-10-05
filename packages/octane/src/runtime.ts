@@ -19328,6 +19328,12 @@ class HydrationCapability {
 	private readonly unframedRootRanges = new WeakMap<Node, Node>();
 	/** Unframed claims whose render suspended, by the block that claimed (renderUnframed). */
 	private unframedClaims: WeakMap<Block, UnframedClaim> | null = null;
+	/**
+	 * Server ranges that mismatch recovery left for a later sibling in an
+	 * element's children, by open marker, to the block whose template holds
+	 * that element (lend).
+	 */
+	private lent: Map<Node, Block> | null = null;
 	/** Adopted ranges whose first render suspended, by block, with its slot (renderClaimed). */
 	private suspendedClaims: WeakMap<Block, readonly [Scope, number]> | null = null;
 	/** Fragments that rebuildFragment built, by root, until drainFrag places them. */
@@ -19634,7 +19640,9 @@ class HydrationCapability {
 	 * range's place, but not a later sibling's range, unless `stale` is
 	 * client-built: the rebuild that built it already reported and discarded
 	 * the server's. A discard that reaches the end of the enclosing server
-	 * range reports once for that range (firstAtRangeEnd).
+	 * range reports once for that range (firstAtRangeEnd). A discard that
+	 * stops at a server range lends it to that later sibling (lend): when the
+	 * stale nodes pushed the call's own range along, no sibling claims it.
 	 */
 	renderUnframed<T>(
 		render: (target: T) => void,
@@ -19691,6 +19699,7 @@ class HydrationCapability {
 					// The discard stops at `anchor`, at a later sibling's range or
 					// boundary, or at the end of the enclosing server range, which may
 					// be `anchor` itself.
+					this.lend(node, claim.scope.block);
 					if (!isBlockClose(node) || this.firstAtRangeEnd(node)) {
 						noteRecoverableHydrationError(() => new Error(formatClientError(55)));
 						if (process.env.NODE_ENV !== 'production') {
@@ -19843,7 +19852,8 @@ class HydrationCapability {
 	 * `end` means nothing is left, and anything less certain is left in place.
 	 * (A root rebuilt as the range's whole content already took the rest of
 	 * the range when it committed: insertRoot.) The slot at `scope`'s `slotKey`
-	 * owns the range.
+	 * owns the range. The owner has rendered, so the ranges lent to its
+	 * elements go first (settleLent).
 	 */
 	settleClaim(
 		owner: Scope,
@@ -19852,6 +19862,7 @@ class HydrationCapability {
 		scope: Scope,
 		slotKey: number,
 	): void {
+		this.settleLent(owner.block);
 		const cursor = this.node;
 		if (cursor === end || this.abandoned) return;
 		if (from === undefined) {
@@ -20140,6 +20151,7 @@ class HydrationCapability {
 		) {
 			this.hasAdjacentRangePair = true;
 		}
+		this.claimLent(open, found);
 		return found;
 	}
 
@@ -20507,9 +20519,12 @@ class HydrationCapability {
 	 * client now renders: after its first fill adopts the client's items, the
 	 * cursor sits on the first unconsumed server item (or at `end`). Discard
 	 * everything between the cursor and `end` so the extra server items don't
-	 * linger. Only when the cursor precedes `end`; stops AT `end`.
+	 * linger. Only when the cursor precedes `end`; stops AT `end`. The items
+	 * have rendered, so the ranges lent to their elements go first
+	 * (settleLent).
 	 */
 	discardLeftoverItems(end: Node): void {
+		this.settleLent(end);
 		const from = this.node;
 		if (from === end) return;
 		let node = from;
@@ -20573,6 +20588,7 @@ class HydrationCapability {
 		let claimed: Node | null | undefined;
 		try {
 			renderBlock(block);
+			this.settleLent(block);
 			if (this.arm === block && this.armSlots === block.slots.length) parked = this.armTail;
 		} finally {
 			claimed = this.endClaim(outerClaim);
@@ -21197,6 +21213,7 @@ class HydrationCapability {
 				);
 			this.rebuiltTail = this.node;
 			this.rebuiltRange = null;
+			if (block !== undefined) this.lend(this.node, block);
 			// The rebuilt root can be a range's whole content: what the server
 			// rendered after the node it replaces is then the range's tail. A
 			// markerless branch (claimOwner) has no range: its claim alone ends it.
@@ -21477,6 +21494,76 @@ class HydrationCapability {
 		this.node = end;
 	}
 
+	/**
+	 * Mismatch recovery left `start` for a later sibling to claim: the server
+	 * node after those it discarded (renderUnframed) or after the one a rebuilt
+	 * root replaces (adopt). A range's owner removes what no later sibling
+	 * claimed once the range's content has rendered (settleClaim,
+	 * sweepRebuiltTail, finishRoot), but an element's children have no end of
+	 * their own. So when `start` opens a server range there, record it for the
+	 * block whose template holds that element: the first block from `block` up
+	 * whose content does not sit directly in it. Every later sibling claims
+	 * while that block renders, so the hydration-only step that follows its
+	 * render settles it (settleLent): settleClaim for a block that adopted a
+	 * range, renderAdoptedArm for an arm, discardLeftoverItems for a list's
+	 * items, and finishRoot for the root. A block with markers there is in a
+	 * range, whose owner settles it.
+	 */
+	private lend(start: Node | null, block: Block): void {
+		if (start?.nodeType !== 8 || domNode(start as Comment).data !== HYDRATION_START) return;
+		const parent = domNode(start).parentNode;
+		let owner: Block | null = block;
+		while (owner !== null && owner.parentNode === parent) {
+			if (owner.startMarker != null) return;
+			owner = owner.parentBlock;
+		}
+		if (owner !== null) (this.lent ??= new Map()).set(start, owner);
+	}
+
+	/**
+	 * A slot claimed `open`, which `close` ends (close). When `open` was lent,
+	 * the range after it is lent in turn: stale nodes push every later server
+	 * range in an element along by one, so each sibling claims the range
+	 * before its own, and the last is left over.
+	 */
+	private claimLent(open: Node, close: Node): void {
+		const lent = this.lent;
+		const owner = lent?.get(open);
+		if (owner === undefined) return;
+		lent!.delete(open);
+		const next = getNextSibling(close);
+		if (next?.nodeType === 8 && domNode(next as Comment).data === HYDRATION_START)
+			lent!.set(next, owner);
+	}
+
+	/**
+	 * `owner` finished rendering, or every item of the list that `owner` ends
+	 * did, so no later sibling is left to claim the ranges lent to it. What
+	 * they hold is server content the client renders nothing for, such as the
+	 * server's render of a call whose recovery rebuilt it before them. Remove
+	 * them without a second report, unless they hold something a recovery
+	 * built.
+	 */
+	private settleLent(owner: Block | Node): void {
+		const lent = this.lent;
+		if (lent === null) return;
+		for (const [start, block] of lent) {
+			if (block !== owner && block.forSlot?.end !== owner) continue;
+			lent.delete(start);
+			const parent = domNode(start).parentNode;
+			if (parent === null) continue;
+			const end = this.close(start);
+			let node: Node | null = start;
+			while (node !== null && node !== end && !this.freshNodes.has(node))
+				node = getNextSibling(node);
+			if (node !== end) continue;
+			if (this.node === start) this.node = getNextSibling(end);
+			this.save(parent);
+			removeHydrationRange(start, end);
+		}
+		if (lent.size === 0) this.lent = null;
+	}
+
 	/** The fresh root that took the place of the node after `before` in `parent`. */
 	freshAfter(before: Node | null, parent: Node): Node | null {
 		const node = before === null ? getFirstChild(parent) : getNextSibling(before);
@@ -21684,9 +21771,13 @@ class HydrationCapability {
 		}
 	}
 
-	/** Remove server siblings left after the root's complete client shape was adopted. */
+	/**
+	 * Remove server siblings left after the root's complete client shape was
+	 * adopted, and the ranges lent to the root's elements (settleLent).
+	 */
 	finishRoot(): void {
 		if (this.abandoned) return;
+		this.settleLent(this.rootBlock);
 		let remainder = this.rootRemainder === undefined ? this.node : this.rootRemainder;
 		// Cursor-based adoption may stop on an owned range marker, and mismatch
 		// recovery can append fresh replacement roots after stale server siblings.
