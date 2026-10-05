@@ -168,11 +168,15 @@ describe('CI workflow aggregation', () => {
 	// Every scenario and every complete Octane application, not a chosen few:
 	// unenforced budgets drifted over their limits with no pull request failing.
 	test('enforces every committed bundle budget once per full CI run', () => {
+		const shard = jobSource('test_shard');
 		assert.match(
-			jobSource('test_shard'),
-			/- name: Verify every bundle budget\n\s+if: matrix\.shard == '1\/4'\n\s+run: \|\n\s+node benchmarks\/bundle-size\/run-minimal\.mjs --budgets\n\s+node benchmarks\/bundle-size\/run\.mjs --budgets octane-tsrx octane-jsx\n/,
+			shard,
+			/- name: Checkout code\n\s+uses: actions\/checkout@[^\n]+\n\s+with:\n\s+# Only the budget shard compares against an earlier commit\.\n\s+fetch-depth: \$\{\{ matrix\.shard == '1\/4' && '0' \|\| '1' \}\}\n/,
 		);
-		assert.doesNotMatch(jobSource('test_shard'), /run-minimal\.mjs --budgets \S/);
+		assert.match(
+			shard,
+			/- name: Verify every bundle budget\n\s+if: matrix\.shard == '1\/4'\n\s+env:\n\s+BUDGET_BASE: \$\{\{ github\.event_name == 'pull_request' && 'HEAD\^1' \|\| github\.event\.before \}\}\n\s+run: \|\n\s+node benchmarks\/bundle-size\/run-minimal\.mjs --budgets --ratchet\n\s+node benchmarks\/bundle-size\/run\.mjs --budgets --ratchet octane-tsrx octane-jsx\n/,
+		);
 		for (const suite of [
 			'benchmarks/bundle-size/minimal-gates.test.mjs',
 			'benchmarks/bundle-size/budget-raises.test.mjs',
