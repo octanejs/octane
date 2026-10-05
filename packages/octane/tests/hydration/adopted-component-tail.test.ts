@@ -170,22 +170,26 @@ describe.each([
 		},
 	);
 
-	// The client component's body is a branch the server rendered no range for,
-	// whose template adopts the frame's hosts in place when they match.
-	it('adopts every root of a branch with no server range when its DOM matches the frame', async () => {
+	// OCTANE DIVERGENCE: the client component's body is a branch the server
+	// rendered no range for. Octane's control-flow ranges are part of its
+	// hydration protocol, so a branch without one is a structural mismatch even
+	// where its elements match the frame's hosts; React, which has no range
+	// markers, adopts them. The root renders on the client and reports once.
+	it('client-renders the root for a branch with no server range, even when its DOM matches the frame', async () => {
 		render('BranchBody', { server: 'same' });
-		const adopted = [...container.querySelectorAll('i, b, p')];
+		const serverNodes = [...container.querySelectorAll('*')];
 
 		const recoverable = await hydrate(client.BranchBody, { inner: true });
 
 		expect(markup(container.firstElementChild!)).toBe('<i>ok</i><b>b</b><p>after</p>');
-		expectSame(container.querySelectorAll('i, b, p'), adopted);
-		expect(recoverable).toEqual([]);
-		expect(warnings()).toEqual([]);
+		expect(serverNodes.filter((node) => node.isConnected)).toEqual([]);
+		expect(recoverable).toEqual([expect.stringMatching(MISMATCH)]);
+		expect(warnings()).toHaveLength(dev ? 1 : 0);
 
+		const after = container.querySelector('p');
 		await act(async () => root!.render(client.BranchBody, { inner: false }));
 		expect(markup(container.firstElementChild!)).toBe('<p>after</p>');
-		expect(container.querySelector('p')).toBe(adopted[adopted.length - 1]);
+		expect(container.querySelector('p')).toBe(after);
 	});
 
 	it('client-renders the root when server content follows the roots of a branch with no server range', async () => {

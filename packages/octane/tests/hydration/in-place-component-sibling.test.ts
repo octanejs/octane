@@ -211,12 +211,15 @@ describe('hydrateRoot — a lite component that renders nothing before one adopt
 	});
 });
 
-// A branch with no server range of its own, inside a component adopted in
-// place, owns every root it adopted there: switching it off removes them all,
-// and the next component keeps its server range. As above, only the
-// development compile renders this hookless call against the cursor.
+// OCTANE DIVERGENCE: a component adopted in place whose body is a branch the
+// server rendered no range for. Octane's control-flow ranges are part of its
+// hydration protocol, so the branch without one is a structural mismatch even
+// where its elements match; React, which has no range markers, adopts them.
+// The root renders on the client and reports once, and the client-built
+// branch then owns exactly what it rendered. As above, only the development
+// compile renders this hookless call against the cursor.
 describe('hydrateRoot — a branch in a component adopted in place', () => {
-	it('owns every root it adopted', async () => {
+	it('renders the root on the client and then owns every root it rendered', async () => {
 		const client = clients.development;
 		const props = { on: true, shown: true, z: 'z' };
 		const { host, serverNodes, recoverable } = await hydrate(
@@ -226,17 +229,18 @@ describe('hydrateRoot — a branch in a component adopted in place', () => {
 			props,
 		);
 
-		expect(container.firstElementChild).toBe(host);
-		expect(markup(host)).toBe('<em>x</em><b>b</b><em>z</em>');
-		expect(host.children).toHaveLength(3);
-		serverNodes.forEach((node, i) => expect(host.children[i]).toBe(node));
-		expect(recoverable).toEqual([]);
-		expect(warnings()).toEqual([]);
+		expect(host.isConnected).toBe(false);
+		expect(serverNodes.filter((node) => node.isConnected)).toEqual([]);
+		const live = container.firstElementChild!;
+		expect(markup(live)).toBe('<em>x</em><b>b</b><em>z</em>');
+		expect(recoverable).toEqual([expect.stringMatching(MISMATCH)]);
+		expect(warnings()).toHaveLength(1);
 
+		const last = live.children[2];
 		flushSync(() => root!.render(client.BranchArm, { ...props, shown: false }));
-		expect(markup(host)).toBe('<em>z</em>');
-		expect(host.children[0]).toBe(serverNodes[2]);
+		expect(markup(live)).toBe('<em>z</em>');
+		expect(live.children[0]).toBe(last);
 		flushSync(() => root!.render(client.BranchArm, props));
-		expect(markup(host)).toBe('<em>x</em><b>b</b><em>z</em>');
+		expect(markup(live)).toBe('<em>x</em><b>b</b><em>z</em>');
 	});
 });

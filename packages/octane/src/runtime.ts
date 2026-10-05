@@ -11168,6 +11168,7 @@ export function renderBlock(block: Block): void {
 			}
 			if (++retries > RENDER_PHASE_UPDATE_LIMIT) throw new Error(formatClientError(9));
 		}
+		if (hydration !== null) hydration.settleUnclaimed(block);
 		if (
 			signalDocumentEnabled &&
 			(block as any).__trySlot?.tryBlock === block &&
@@ -12088,6 +12089,7 @@ export function componentSlotLite<P>(
 			let open: Node | null = hydration.node;
 			if (open === null || (STAGED_DOM?.view(open) ?? open).parentNode !== host)
 				open = getFirstChild(host);
+			hydration.takeUnclaimed(open);
 			if (open !== null && hydration.isOpen(open)) {
 				adoptedOpen = open;
 				endMarker = hydration.close(open);
@@ -12171,6 +12173,7 @@ export function componentSlotLite<P>(
 				comp(props, scope, undefined);
 			} else runWithSignalOwner(owner, () => comp(props, scope, undefined));
 		} else comp(props, scope, undefined);
+		if (hydration !== null) hydration.settleUnclaimed(scope);
 		if (!scope.mounted) scope.mounted = true;
 	} catch (error) {
 		profileDidThrow = true;
@@ -19584,6 +19587,14 @@ class HydrationCapability {
 	/** The named call that renders in place of inPlace: its scope and slot (rootMismatch). */
 	private inPlaceCall: Scope | null = null;
 	private inPlaceCallKey = 0;
+	/**
+	 * The server node an appended call left where it rendered nothing, for the
+	 * next call appended to the same host, with the scope whose template holds
+	 * that host and the call's slot (settleUnclaimed).
+	 */
+	private unclaimed: Node | null = null;
+	private unclaimedScope: Scope | null = null;
+	private unclaimedKey = 0;
 	/** Where the server nodes a template adopted at inPlace end; undefined until one does. */
 	private inPlaceEnd: Node | null | undefined = undefined;
 	/** The server node at the last root of a fragment adopted at inPlace, when that root is a hole. */
@@ -19941,7 +19952,10 @@ class HydrationCapability {
 	 * them as the server's range would have. A body that renders nothing
 	 * leaves `root` to the next sibling at the cursor, as React does, but a
 	 * template hole's walk found `root` for this call alone (`positional`):
-	 * nothing else claims it. Anything else that adopts nothing there, or
+	 * nothing else claims it. An appended call's next sibling is the next call
+	 * appended to the same host, and when none claims `root` the host ends
+	 * with server content the client never rendered (settleUnclaimed).
+	 * Anything else that adopts nothing there, or
 	 * anything at all where the server rendered nothing more (`root` null),
 	 * does not match the server. The call's site names a root that does not
 	 * match (`named`; rootMismatch). In a client-built region (`root`
@@ -19980,6 +19994,29 @@ class HydrationCapability {
 		}
 		if (positional || getNextSibling(start) !== end || this.node !== root)
 			this.slotMismatch(scope, slotKey, 'a component range', root);
+		if (named && root !== null) {
+			this.unclaimed = root;
+			this.unclaimedScope = scope;
+			this.unclaimedKey = slotKey;
+		}
+	}
+
+	/** A call appended to a host takes over `cursor`, the server node it hydrates from. */
+	takeUnclaimed(cursor: Node | null): void {
+		if (cursor === this.unclaimed) this.unclaimed = this.unclaimedScope = null;
+	}
+
+	/**
+	 * `scope`'s body rendered. A server node that an appended call in its
+	 * template left, and no later call appended to that host claimed, is server
+	 * content the client renders nothing for: as React finds when it completes
+	 * the host, the nearest fallback owner renders on the client.
+	 */
+	settleUnclaimed(scope: Scope): void {
+		const node = this.unclaimed;
+		if (node === null || this.unclaimedScope !== scope) return;
+		this.unclaimed = this.unclaimedScope = null;
+		this.slotMismatch(scope, this.unclaimedKey, 'a component range', node);
 	}
 
 	/**
@@ -21128,20 +21165,25 @@ class HydrationCapability {
 	 * server's content (unpatched) and records nothing, so the next render that
 	 * passes an `__html` object rewrites it, even with the same string (setHTML).
 	 * Production therefore compares nothing, unless the server values are stale
-	 * (staleServerValues); development compares only to warn. The comparison
-	 * parses the client's HTML in the element's context, so that spellings the
-	 * parser canonicalizes compare equal, as in React. A method, so that bundles
-	 * which never hydrate drop the normalizers.
+	 * (staleServerValues), where the raw strings suffice: a spelling difference
+	 * only renders that rare pass on the client. Development compares only to
+	 * warn, and parses the client's HTML in the element's context, so that
+	 * spellings the parser canonicalizes compare equal, as in React. So the
+	 * normalizers never reach a production bundle.
 	 */
 	adoptHTML(el: Element, next: string): void {
-		if (process.env.NODE_ENV === 'production' && !this.staleServerValues) return;
 		const script = el.localName === 'script';
 		const server = script
 			? ((STAGED_DOM?.view(el) ?? el).textContent ?? '')
 			: (STAGED_DOM?.view(el) ?? el).innerHTML;
-		const expected = script
-			? normalizeScriptTextForHydration(escapeInlineScriptContentForHydration(next))
-			: normalizeHTMLForHydration(el, next);
+		const expected =
+			process.env.NODE_ENV === 'production'
+				? this.staleServerValues
+					? next
+					: server
+				: script
+					? normalizeScriptTextForHydration(escapeInlineScriptContentForHydration(next))
+					: normalizeHTMLForHydration(el, next);
 		if (server !== expected)
 			this.unpatched(el, '`dangerouslySetInnerHTML` content', server, expected);
 	}
@@ -33304,6 +33346,7 @@ function componentSlotImpl(
 			if (c === null || (STAGED_DOM?.view(c) ?? c).parentNode !== domParent)
 				c = getFirstChild(domParent);
 			hydrationCursor = c;
+			hydration.takeUnclaimed(c);
 			if (c !== null && hydration.isOpen(c)) open = c;
 		}
 		if (inherited) {

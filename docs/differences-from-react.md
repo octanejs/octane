@@ -1884,6 +1884,9 @@ As in React:
   until the client next changes it. Development logs one "won't be patched up"
   warning per hydration pass; production compares nothing. A `<textarea>`'s
   text takes the client's value.
+- `dangerouslySetInnerHTML` keeps the server's HTML in the same way, and
+  production compares nothing. The next render that passes an `__html` object
+  rewrites it, even with the same string.
 - Texts that match after the HTML parser's normalization (CRLF to LF,
   stripped `\u0000` and `\uFFFD`) count as a match, and the server text stays.
   `suppressHydrationWarning` keeps the server text one level deep. It never
@@ -1910,7 +1913,18 @@ before it activated (a dormant `<Hydrate>` island) falls back without a
 report when its server content differs, as React reports nothing for an
 update that reaches a dehydrated boundary.
 
-Development compares a template's static structure and attributes and warns
+Two differences are intentional. Matching React exactly would mean shipping
+and running a structural comparison of everything hydration adopts, which is
+the work compiled templates exist to avoid.
+
+First, control-flow ranges are part of the hydration protocol, as React's
+Suspense markers are part of React's. A client `@if` or `@switch` branch whose
+server output has no range of its own is a structural mismatch and falls
+back, even where the elements inside it match; React, which has no range
+markers, adopts them. The markers do not record which arm rendered, so an arm
+whose elements match the server's arm adopts them, as in React.
+
+Second, development compares a template's static structure and attributes and warns
 about differences, but development-only comparisons never cause a fallback,
 so development and production adopt the same DOM. Production validates a
 template root's node type and tag, together with its dynamic binding and range
