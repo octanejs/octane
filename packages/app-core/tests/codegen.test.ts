@@ -1,6 +1,7 @@
 // @vitest-environment node
 import { runInNewContext } from 'node:vm';
 import { createRequire } from 'node:module';
+import { EventEmitter } from 'node:events';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { build, transform } from 'esbuild';
 import { Window } from 'happy-dom';
@@ -33,6 +34,8 @@ import {
 	generateServerManifestEntry,
 	normalize_module_reference,
 } from '../src/codegen.js';
+import { resolveOctaneConfig } from '../src/config.js';
+import * as nodeBridge from '../src/server/node-http.js';
 
 afterEach(() => vi.unstubAllGlobals());
 
@@ -763,6 +766,77 @@ describe('bundler-neutral app codegen', () => {
 		};
 		expect(() => execute(null)).toThrow('Completed client build metadata is required');
 		expect(execute(clientBuild)).toEqual(clientBuild);
+	});
+
+	it('applies server.trustProxy to the production nodeHandler request', async () => {
+		const source = generateServerEntry({ routes: [], octaneConfigPath: '/app/config.js' });
+		const { code } = await transform(source, {
+			format: 'cjs',
+			define: { 'import.meta.url': JSON.stringify('file:///build/server/entry.js') },
+		});
+		const require = createRequire(import.meta.url);
+		const loadNodeHandler = (server: { trustProxy?: boolean }) => {
+			const module = {
+				exports: {} as { nodeHandler?: (req: unknown, res: unknown) => Promise<void> },
+			};
+			runInNewContext(code, {
+				module,
+				console,
+				require(id: string) {
+					if (id === 'node:fs') return { readFileSync: () => '' };
+					if (id.startsWith('node:')) return require(id);
+					if (id === '/app/config.js') return { server };
+					if (id === '@octanejs/app-core/production') {
+						return {
+							resolveOctaneConfig,
+							createHandler: () => (request: Request) => new Response(request.url),
+						};
+					}
+					if (id === '@octanejs/app-core/node') return nodeBridge;
+					return {};
+				},
+			});
+			return module.exports.nodeHandler!;
+		};
+		const requestUrlSeenBy = async (nodeHandler: (req: unknown, res: unknown) => Promise<void>) => {
+			const chunks: Buffer[] = [];
+			const res = Object.assign(new EventEmitter(), {
+				statusCode: 0,
+				headersSent: false,
+				destroyed: false,
+				writableEnded: false,
+				setHeader() {},
+				write(chunk: Uint8Array) {
+					chunks.push(Buffer.from(chunk));
+					return true;
+				},
+				end() {
+					this.writableEnded = true;
+				},
+			});
+			const req = Object.assign(new EventEmitter(), {
+				method: 'GET',
+				url: '/sign-in?next=%2F',
+				headers: {
+					host: 'upstream.internal:3000',
+					'x-forwarded-proto': 'https',
+					'x-forwarded-host': 'app.example.com',
+				},
+				aborted: false,
+				destroyed: false,
+				complete: true,
+			});
+			await nodeHandler(req, res);
+			expect(res.statusCode).toBe(200);
+			return Buffer.concat(chunks).toString('utf8');
+		};
+
+		expect(await requestUrlSeenBy(loadNodeHandler({}))).toBe(
+			'http://upstream.internal:3000/sign-in?next=%2F',
+		);
+		expect(await requestUrlSeenBy(loadNodeHandler({ trustProxy: true }))).toBe(
+			'https://app.example.com/sign-in?next=%2F',
+		);
 	});
 
 	it('loads an optional independent Hydrate manifest beside a production server entry', () => {

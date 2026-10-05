@@ -469,13 +469,15 @@ export const handler = createHandler(
 	},
 );
 
+const nodeRequestOptions = { trustProxy: octaneConfig.server.trustProxy };
+
 /**
  * Node-style (req, res) wrapper — for serverless platforms whose functions
  * speak Node HTTP (e.g. Vercel's Node runtime).
  */
 export async function nodeHandler(req, res) {
 	try {
-		const response = await handler(nodeRequestToWebRequest(req, res));
+		const response = await handler(nodeRequestToWebRequest(req, res, nodeRequestOptions));
 		await sendWebResponse(res, response);
 	} catch (error) {
 		console.error('[octane] Request error:', error);
@@ -503,7 +505,7 @@ if (isMainModule) {
 	const staticDir = join(__dirname, '../client');
 	const server = octaneConfig.adapter?.serve
 		? octaneConfig.adapter.serve(handler, { static: { dir: staticDir } })
-		: createNodeServer(handler, { staticDir });
+		: createNodeServer(handler, { staticDir, trustProxy: octaneConfig.server.trustProxy });
 	server.listen(port);
 	console.log('[octane] Production server listening on port ' + port);
 }

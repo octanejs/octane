@@ -203,6 +203,10 @@ export function resolveOctaneConfig(raw, options = {}) {
 
 	validate_root_boundary(raw.rootBoundary);
 
+	if (raw.server?.trustProxy !== undefined && typeof raw.server.trustProxy !== 'boolean') {
+		throw new Error('[octane] server.trustProxy must be a boolean when provided.');
+	}
+
 	if (
 		raw.server?.render !== undefined &&
 		raw.server.render !== 'streaming' &&

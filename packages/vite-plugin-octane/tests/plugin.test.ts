@@ -939,6 +939,52 @@ export default {
 		}
 	}, 30_000);
 
+	it('takes the dev request origin from a trusted proxy when server.trustProxy is enabled', async () => {
+		const root = await mkdtemp(join(tmpdir(), 'octane-vite-trust-proxy-'));
+		await mkdir(join(root, 'node_modules'));
+		await symlink(join(REPO_ROOT, 'packages/octane'), join(root, 'node_modules/octane'), 'dir');
+		await writeFile(join(root, 'index.html'), '<main>shell</main>');
+		await writeFile(
+			join(root, 'octane.config.ts'),
+			`export default {
+	server: { trustProxy: true },
+	router: {
+		routes: [
+			{
+				type: 'server',
+				path: '/origin',
+				methods: ['GET'],
+				before: [],
+				after: [],
+				handler: (context) => new Response(context.url.href),
+			},
+		],
+	},
+};
+`,
+		);
+		const server = await createServer({
+			root,
+			configFile: false,
+			logLevel: 'silent',
+			plugins: [octane({ hmr: false })],
+			server: { host: '127.0.0.1', port: 0, hmr: false, ws: false },
+		});
+		try {
+			await server.listen();
+			const address = server.httpServer?.address();
+			if (!address || typeof address !== 'object') throw new Error('no dev server address');
+			const response = await fetch(`http://127.0.0.1:${address.port}/origin?next=%2F`, {
+				headers: { 'X-Forwarded-Proto': 'https', 'X-Forwarded-Host': 'app.example.com' },
+			});
+			expect(response.status).toBe(200);
+			expect(await response.text()).toBe('https://app.example.com/origin?next=%2F');
+		} finally {
+			await server.close();
+			await rm(root, { recursive: true, force: true });
+		}
+	}, 30_000);
+
 	it('SSR-loads a manifest-discovered raw binding without app build shims', async () => {
 		const root = await mkdtemp(join(tmpdir(), 'octane-vite-raw-binding-'));
 		let server: Awaited<ReturnType<typeof createServer>> | null = null;

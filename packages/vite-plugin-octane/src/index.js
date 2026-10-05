@@ -1019,7 +1019,9 @@ export function octane(inlineOptions = {}) {
 							await warnIslandsShells(octaneConfig).catch(() => {});
 						}
 
-						const request = nodeRequestToWebRequest(req, res);
+						const request = nodeRequestToWebRequest(req, res, {
+							trustProxy: octaneConfig.server.trustProxy,
+						});
 						const context = createContext(request, freshMatch.params);
 						Object.defineProperty(context, 'clientBuild', { get: () => clientBuild.metadata() });
 						const globalMiddlewares = octaneConfig.middlewares;
@@ -1488,7 +1490,7 @@ export function defineConfig(/** @type {OctaneConfigOptions} */ options) {
  */
 async function handleRpcRequest(req, res, vite, trustProxy, config) {
 	try {
-		const webRequest = nodeRequestToWebRequest(req, res);
+		const webRequest = nodeRequestToWebRequest(req, res, { trustProxy });
 		const asyncContext = getDevAsyncContext(config);
 		const signalOwners = await loadDevSignalRequestHooks(vite);
 

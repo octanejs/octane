@@ -54,7 +54,7 @@ export interface ServerManifest {
 	/** Layout module path → module namespace */
 	layouts: Record<string, Record<string, unknown>>;
 	middlewares: Middleware[];
-	/** Trust X-Forwarded-* headers when deriving origin for RPC fetch */
+	/** Trust X-Forwarded-Proto/Host when deriving the request origin */
 	trustProxy?: boolean;
 	/** Validated `module server` origin and body-size policy. */
 	rpc?: Partial<ResolvedOctaneConfig['server']['rpc']>;

@@ -128,17 +128,56 @@ function shouldGzip(request, status, headers, hasBody) {
 	return encodingQuality(getRequestHeader(request, 'accept-encoding'), 'gzip') > 0;
 }
 
+// A host name, IPv4, or bracketed IPv6 authority with an optional port. No URL
+// delimiter can pass, so a forwarded host never reaches the path or userinfo.
+const FORWARDED_HOST = /^(?:[a-z0-9_-]+(?:\.[a-z0-9_-]+)*|\[[0-9a-f:.]+\])(?::\d{1,5})?$/i;
+
+/**
+ * @param {import('node:http').IncomingMessage} request
+ * @param {string} name
+ */
+function firstForwardedValue(request, name) {
+	const value = getRequestHeader(request, name);
+	if (value === null) return '';
+	const comma = value.indexOf(',');
+	return (comma === -1 ? value : value.slice(0, comma)).trim();
+}
+
+/**
+ * The scheme and authority a request target resolves against. Forwarded
+ * headers are client-controlled unless a trusted proxy overwrites them, so they
+ * apply only on opt-in, and a malformed one keeps the direct connection's value.
+ * @param {import('node:http').IncomingMessage} request
+ * @param {boolean} trustProxy
+ */
+function requestBase(request, trustProxy) {
+	const host = request.headers.host || 'localhost';
+	if (!trustProxy) return `http://${host}`;
+	const proto = firstForwardedValue(request, 'x-forwarded-proto').toLowerCase();
+	const scheme = proto === 'https' || proto === 'http' ? proto : 'http';
+	const forwardedHost = firstForwardedValue(request, 'x-forwarded-host');
+	const forwardedBase = `${scheme}://${forwardedHost}`;
+	return FORWARDED_HOST.test(forwardedHost) && URL.canParse(forwardedBase)
+		? forwardedBase
+		: `${scheme}://${host}`;
+}
+
 /**
  * Convert a Node.js IncomingMessage to a Web Request. Passing its response
  * keeps request.signal active through streaming and cancels it on disconnect.
  * Without a response, cancellation only covers interrupted request uploads.
+ * With `trustProxy`, the URL's scheme and host come from the first
+ * `X-Forwarded-Proto` and `X-Forwarded-Host` entries when they are valid.
  * @param {import('node:http').IncomingMessage} nodeRequest
  * @param {import('node:http').ServerResponse} [nodeResponse]
+ * @param {{ trustProxy?: boolean }} [options]
  * @returns {Request}
  */
-export function nodeRequestToWebRequest(nodeRequest, nodeResponse) {
-	const host = nodeRequest.headers.host || 'localhost';
-	const url = new URL(nodeRequest.url || '/', `http://${host}`);
+export function nodeRequestToWebRequest(nodeRequest, nodeResponse, options) {
+	const url = new URL(
+		nodeRequest.url || '/',
+		requestBase(nodeRequest, options?.trustProxy === true),
+	);
 
 	const headers = new Headers();
 	for (const [key, value] of Object.entries(nodeRequest.headers)) {
@@ -500,11 +539,12 @@ function serveStaticFileFromRoot(req, res, staticDir, configuredRoot) {
  * when octane.config.ts has no adapter — an adapter's `serve()` replaces it.
  *
  * @param {(request: Request) => Response | Promise<Response>} handler
- * @param {{ staticDir?: string }} [options]
+ * @param {{ staticDir?: string, trustProxy?: boolean }} [options]
  * @returns {{ listen: (port?: number) => import('node:http').Server, close: () => void }}
  */
 export function createNodeServer(handler, options = {}) {
 	const staticDir = options.staticDir;
+	const requestOptions = { trustProxy: options.trustProxy === true };
 	/** @type {string | null} */
 	let configuredRoot = null;
 	try {
@@ -523,7 +563,7 @@ export function createNodeServer(handler, options = {}) {
 			) {
 				return;
 			}
-			const response = await handler(nodeRequestToWebRequest(req, res));
+			const response = await handler(nodeRequestToWebRequest(req, res, requestOptions));
 			await sendWebResponseForRequest(res, response, req);
 		})().catch((error) => {
 			console.error('[octane] Request error:', error);

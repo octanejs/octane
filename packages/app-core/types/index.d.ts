@@ -482,7 +482,10 @@ export interface OctaneConfigOptions {
 	server?: {
 		/**
 		 * Trust `X-Forwarded-Proto` / `X-Forwarded-Host` when deriving the
-		 * request origin. Enable only behind a trusted reverse proxy.
+		 * request origin: the request URL (`Context.url`) on the built-in Node
+		 * servers and dev servers, and the server-function origin check. Uses the
+		 * first entry of each header and ignores a malformed one. Enable only when
+		 * a trusted proxy overwrites both headers; clients can set them otherwise.
 		 * @default false
 		 */
 		trustProxy?: boolean;
