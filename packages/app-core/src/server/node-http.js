@@ -174,10 +174,7 @@ function requestBase(request, trustProxy) {
  * @returns {Request}
  */
 export function nodeRequestToWebRequest(nodeRequest, nodeResponse, options) {
-	const url = new URL(
-		nodeRequest.url || '/',
-		requestBase(nodeRequest, options?.trustProxy === true),
-	);
+	const url = nodeRequestUrl(nodeRequest, options);
 
 	const headers = new Headers();
 	for (const [key, value] of Object.entries(nodeRequest.headers)) {
@@ -247,6 +244,33 @@ export function nodeRequestToWebRequest(nodeRequest, nodeResponse, options) {
 		nodeResponse?.once('finish', cleanup);
 	}
 	return request;
+}
+
+/**
+ * The URL a Node request targets, as `nodeRequestToWebRequest` builds it: the
+ * request target on the origin from `requestBase`.
+ * @param {import('node:http').IncomingMessage} nodeRequest
+ * @param {{ trustProxy?: boolean }} [options]
+ * @returns {URL}
+ */
+export function nodeRequestUrl(nodeRequest, options) {
+	const { origin } = new URL(requestBase(nodeRequest, options?.trustProxy === true));
+	return resolveRequestTarget(nodeRequest.url || '/', origin);
+}
+
+const ABSOLUTE_FORM_TARGET = /^https?:\/\//i;
+
+/**
+ * Origin-form targets are joined to the origin, never resolved against it:
+ * URL resolution reads a leading `//` or `/\` as another host. An http(s)
+ * absolute-form target keeps its own origin (RFC 9112 section 3.2.2). Any
+ * other target, such as `*` or another scheme, becomes a path under the root.
+ * @param {string} target
+ * @param {string} origin
+ */
+function resolveRequestTarget(target, origin) {
+	if (ABSOLUTE_FORM_TARGET.test(target)) return new URL(target);
+	return new URL(target.startsWith('/') ? origin + target : `${origin}/${target}`);
 }
 
 /**
@@ -453,7 +477,9 @@ function serveStaticFileFromRoot(req, res, staticDir, configuredRoot) {
 	const method = (req.method || 'GET').toUpperCase();
 	if (method !== 'GET' && method !== 'HEAD') return false;
 
-	const pathname = decodeURIComponent(new URL(req.url || '/', 'http://localhost').pathname);
+	const pathname = decodeURIComponent(
+		resolveRequestTarget(req.url || '/', 'http://localhost').pathname,
+	);
 	// Resolve inside staticDir only — a `..` escape must not leave the client dir.
 	const filePath = path.normalize(path.join(staticDir, pathname));
 	if (!filePath.startsWith(path.normalize(staticDir + path.sep))) return false;

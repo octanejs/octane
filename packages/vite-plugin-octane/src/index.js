@@ -26,7 +26,7 @@ import { handleRenderRoute } from './server/render-route.js';
 import { handleServerRoute } from './server/server-route.js';
 import { HYDRATION_NONCE_PLACEHOLDER, injectHydrationEntry } from './server/html-template.js';
 import { generateServerEntry } from './server/virtual-entry.js';
-import { nodeRequestToWebRequest, sendWebResponse } from './server/node-http.js';
+import { nodeRequestToWebRequest, nodeRequestUrl, sendWebResponse } from './server/node-http.js';
 import { ENTRY_FILENAME } from './constants.js';
 import {
 	getOctaneConfigPath,
@@ -966,7 +966,7 @@ export function octane(inlineOptions = {}) {
 						return;
 					}
 
-					const url = new URL(req.url || '/', `http://${req.headers.host || 'localhost'}`);
+					const url = nodeRequestUrl(req);
 					const method = req.method || 'GET';
 
 					// RPC requests for `module server` declarations.

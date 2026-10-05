@@ -629,6 +629,14 @@ these headers themselves. On Worker and other Web-standard hosts the platform
 builds the URL, so there the option only affects the server-function origin
 check.
 
+The Node bridge, its static file layer, and the Vite and Rsbuild dev servers
+read the request target the same way (`nodeRequestUrl` from
+`@octanejs/app-core/node`). A target that starts with `/` is the whole path and
+query on that origin, so `//evil.example/x` stays a path and never names
+another host. An `http://` or `https://` absolute-form target
+keeps its own scheme and host, as RFC 9112 requires. Any other target, such as
+`*`, becomes a path under the root.
+
 ### Islands-only routes
 
 A route whose interactive parts are all independent

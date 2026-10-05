@@ -940,6 +940,10 @@ document.querySelector('#root')!.textContent = typeof Counter;
 				headers: { 'X-Forwarded-Proto': 'https', 'X-Forwarded-Host': 'app.example.com' },
 			});
 			expect((await proxiedResponse.json()).origin).toBe('https://app.example.com');
+			// The whole path is //evil.example/api/health, which no route matches.
+			const hostShapedPath = await fetch(`${origin}//evil.example/api/health`);
+			expect(hostShapedPath.status).toBe(404);
+			expect(await hostShapedPath.text()).not.toContain('"integration":"rsbuild"');
 
 			write(
 				root,

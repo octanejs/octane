@@ -985,6 +985,54 @@ export default {
 		}
 	}, 30_000);
 
+	it('routes a dev request by its whole path when it starts with //', async () => {
+		const root = await mkdtemp(join(tmpdir(), 'octane-vite-request-target-'));
+		await mkdir(join(root, 'node_modules'));
+		await symlink(join(REPO_ROOT, 'packages/octane'), join(root, 'node_modules/octane'), 'dir');
+		await writeFile(join(root, 'index.html'), '<main>shell</main>');
+		await writeFile(
+			join(root, 'octane.config.ts'),
+			`export default {
+	router: {
+		routes: [
+			{
+				type: 'server',
+				path: '/*rest',
+				methods: ['GET'],
+				before: [],
+				after: [],
+				handler: (context) =>
+					Response.json({ url: context.url.href, rest: context.params.rest }),
+			},
+		],
+	},
+};
+`,
+		);
+		const server = await createServer({
+			root,
+			configFile: false,
+			logLevel: 'silent',
+			plugins: [octane({ hmr: false })],
+			server: { host: '127.0.0.1', port: 0, hmr: false, ws: false },
+		});
+		try {
+			await server.listen();
+			const address = server.httpServer?.address();
+			if (!address || typeof address !== 'object') throw new Error('no dev server address');
+			const origin = `http://127.0.0.1:${address.port}`;
+			const response = await fetch(`${origin}//evil.example/x?next=%2F`);
+			expect(response.status).toBe(200);
+			expect(await response.json()).toEqual({
+				url: `${origin}//evil.example/x?next=%2F`,
+				rest: '/evil.example/x',
+			});
+		} finally {
+			await server.close();
+			await rm(root, { recursive: true, force: true });
+		}
+	}, 30_000);
+
 	it('SSR-loads a manifest-discovered raw binding without app build shims', async () => {
 		const root = await mkdtemp(join(tmpdir(), 'octane-vite-raw-binding-'));
 		let server: Awaited<ReturnType<typeof createServer>> | null = null;
