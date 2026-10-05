@@ -317,6 +317,7 @@ type ClientErrorArguments = {
 	336: [unknown];
 	337: [];
 	338: [];
+	339: [];
 };
 
 export function formatClientError<Code extends keyof ClientErrorArguments>(
@@ -1386,6 +1387,11 @@ export function formatClientError<Code extends keyof ClientErrorArguments>(
 			case 338:
 				return formatDevErrorMessage(
 					'Hydration mismatch: a server-rendered range had no closing marker, so the client rendered the boundary or root that contains it instead. Something changed the server HTML after rendering, for example an HTML minifier or proxy that strips comments.',
+					args,
+				);
+			case 339:
+				return formatDevErrorMessage(
+					"Hydration failed because the server rendered HTML didn't match the client. As a result this tree will be regenerated on the client.",
 					args,
 				);
 			default:

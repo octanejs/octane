@@ -1922,33 +1922,47 @@ function warnHydrationStructuralMismatch(
 	if (!loc) return;
 	logHydrationMismatch(
 		`Octane hydration mismatch at ${loc}: the client expected ${expected} but the server ` +
-			`rendered ${actual}. The mismatched subtree was rebuilt on the client.`,
+			`rendered ${actual}. The nearest Suspense or Hydrate boundary, or the root, will be ` +
+			`regenerated on the client.`,
 	);
 }
 
 /**
- * Does the adopted server node match the template's shape? PROD compares nodeType + element
- * tag ONLY (React parity: prod React hydration doesn't attribute-validate either) — tag-level
- * and text-level mismatches still detect and recover, while same-tag branches differing only
- * in static attributes/nested static markup go undetected (kept as the server rendered them).
- *
- * DEV additionally compares the template's STATIC attributes (baked into the template by both
- * client + server from the same JSX, so a differing/absent one means a DIFFERENT branch —
- * e.g. `@switch` cases all `<span>` but with a different `class`). DYNAMIC attrs are NOT in
- * the template, so they aren't checked here — a value divergence on those is handled by
- * `setAttribute` (P2). A compiler-specialized mixed style bakes only its static prefix;
- * its exact template path is supplied separately so that one style attribute waits for
- * the complete-value hydration check without weakening other static comparisons.
- *
- * DEV then recurses into the NESTED STATIC element structure, catching same-root branches that
- * differ only in nested static markup (`<div><span/></div>` vs `<div><p/></div>`). The recursion
- * BAILS (treats as a match) the moment a comment (a `<!>` hole placeholder / `<!--[-->` marker)
- * or a text↔element shift appears: template holes don't align 1:1 with server content (a text
- * hole is 0-or-1 node; a control-flow hole is a marker range), so anything hole-bearing can't
- * be compared positionally and is left to the per-site recovery. This makes the check safe
- * (never false-flags a hole-bearing template) while still catching pure-static divergences.
+ * DEV-only: an adopted node's static attributes or nested static markup differ from the client
+ * template. As in React, the server's markup is kept and nothing is patched; production does not
+ * compare these at all, so this never changes what hydration does.
  */
-function hydrationNodeMatches(
+function warnHydrationStaticDifference(loc: string | undefined, actual: Node): void {
+	if (process.env.NODE_ENV === 'production') return; // build-time stripped
+	logHydrationMismatch(
+		`Octane hydration${loc ? ` at ${loc}` : ''}: a tree hydrated but some attributes or static ` +
+			`markup of the server rendered ${describeHydrationNode(actual)} didn't match the client. ` +
+			`This won't be patched up.`,
+	);
+}
+
+/**
+ * Does the adopted server node match the template's shape? Node type and element tag decide,
+ * in development and production alike: as in React, the server's attributes are kept rather
+ * than compared, and a tag or node-type difference is a mismatch that falls back to the
+ * client (HydrationMismatch). Development additionally warns about static differences.
+ */
+function hydrationNodeMatches(server: Node, template: Node): boolean {
+	if (server.nodeType !== template.nodeType) return false;
+	if (server.nodeType !== 1) return true;
+	return (server as Element).localName === (template as Element).localName;
+}
+
+/**
+ * DEV ONLY: does an adopted node also match the template's STATIC attributes and nested static
+ * element structure? A difference never causes a fallback (production cannot see it); it is
+ * reported like React's "won't be patched up" warning and the server's markup is kept. A
+ * compiler-specialized mixed style bakes only its static prefix; its exact template path is
+ * supplied so that one style attribute waits for the complete-value check. The recursion treats
+ * a comment (a `<!>` hole placeholder or marker) or a text/element shift as a match, because
+ * template holes do not align 1:1 with server content.
+ */
+function hydrationStaticMatches(
 	server: Node,
 	template: Node,
 	partialStyles?: string,
@@ -1959,10 +1973,6 @@ function hydrationNodeMatches(
 	const s = server as Element;
 	const t = template as Element;
 	if (s.localName !== t.localName) return false;
-	// PROD stops at the root tag: no attribute compare, no static-structure walk
-	// (build-time stripped; the happy adoption path must stay allocation- and
-	// DOM-read-free beyond this single localName check).
-	if (process.env.NODE_ENV === 'production') return true;
 	const tAttrs = (STAGED_DOM?.view(t) ?? t).attributes;
 	for (let i = 0; i < tAttrs.length; i++) {
 		const a = tAttrs[i];
@@ -1989,7 +1999,7 @@ function hydrationNodeMatches(
 		if (sc.nodeType !== tc.nodeType) return true; // text↔element shift — ambiguous, stop
 		if (
 			tc.nodeType === 1 &&
-			!hydrationNodeMatches(
+			!hydrationStaticMatches(
 				sc,
 				tc,
 				partialStyles,
@@ -2028,13 +2038,13 @@ function fragmentRootMatches(
 	partialStyles?: string,
 ): boolean {
 	let root: Node | null = getFirstChild(fragment)!;
-	if (root.nodeType !== 8) return hydrationNodeMatches(server, root, partialStyles, '0');
+	if (root.nodeType !== 8) return hydrationNodeMatches(server, root);
 	if (hydration.passthroughRoot) return true;
 	let holes = 0;
 	for (; root !== null && root.nodeType === 8; holes++) root = getNextSibling(root);
 	if (root === null || root.nodeType !== 1) return true;
 	const at = hydration.sibling(server, holes);
-	return at !== null && hydrationNodeMatches(at, root, partialStyles, String(holes));
+	return at !== null && hydrationNodeMatches(at, root);
 }
 
 /** Remove the server nodes from `start` to `end` (inclusive). Used to discard a divergent range. */
@@ -20239,6 +20249,21 @@ class HydrationCapability {
 	}
 
 	/**
+	 * The server DOM at the cursor does not match the client render. Nothing is
+	 * repaired here: the nearest fallback owner discards its server DOM and
+	 * renders on the client (see HydrationMismatch), as React does.
+	 */
+	mismatch(loc: string | undefined, expected: () => string, actual: Node | null): never {
+		if (process.env.NODE_ENV !== 'production')
+			warnHydrationStructuralMismatch(
+				loc ?? componentSourceLoc(CURRENT_BLOCK?.body) ?? CURRENT_SCOPE?.locFile,
+				expected(),
+				describeHydrationNode(actual),
+			);
+		throw new HydrationMismatch();
+	}
+
+	/**
 	 * A slot for the range `start`…`end` that a list item or a returning
 	 * component adopted, lent to the child slot that renders its value, so that
 	 * the value hydrates inside that range rather than claiming a range of its
@@ -21000,8 +21025,7 @@ class HydrationCapability {
 			// A template comment is a dynamic logical hole. Its server form may be
 			// text or a marker range, so only static text/element roots compare shape.
 			if (expected.nodeType !== 8) {
-				if (!hydrationNodeMatches(actual, expected, partialStyles, String(childIndex)))
-					return undefined;
+				if (!hydrationNodeMatches(actual, expected)) return undefined;
 			} else if (bounded === true && getNextSibling(expected) === null) {
 				// In place of another component's markup, the server may have
 				// rendered nothing for a last root that is a hole, and the node there
@@ -21112,22 +21136,7 @@ class HydrationCapability {
 		// consuming that boundary, so its owner can advance the outer cursor.
 		if (isFragment && isBlockClose(cursor)) {
 			if (PRESENTATION_HYDRATION?.revision !== undefined) presentationMiss();
-			this.save(domNode(cursor).parentNode!);
-			if (claimsRoot)
-				this.claimRootRemainder(
-					framedRemainder === undefined ? (unframedRemainder ?? null) : framedRemainder,
-				);
-			if (template === null) template = resolveLazyTemplate(lazy!);
-			if (this.firstAtRangeEnd(cursor)) {
-				noteRecoverableHydrationError(() => new Error(formatClientError(51)));
-				if (process.env.NODE_ENV !== 'production')
-					warnHydrationStructuralMismatch(
-						loc ?? componentSourceLoc(CURRENT_BLOCK?.body) ?? CURRENT_SCOPE?.locFile,
-						'a non-empty fragment',
-						describeHydrationNode(cursor),
-					);
-			}
-			return this.freshClone(template);
+			this.mismatch(loc, () => 'a non-empty fragment', cursor);
 		}
 		// A synthetic fragment wrapper has no server counterpart. At a root, compare
 		// its logical static roots before returning the virtual adoption view; otherwise
@@ -21138,105 +21147,44 @@ class HydrationCapability {
 			const remainder = this.fragmentRemainder(template, cursor, partialStyles);
 			if (remainder === undefined) {
 				const fragment = template;
-				this.abandonRoot(
-					process.env.NODE_ENV !== 'production'
-						? () => [
-								componentSourceLoc(this.rootBlock.body),
-								`a fragment starting with ${describeHydrationNode(getFirstChild(fragment))}`,
-								describeHydrationNode(cursor),
-							]
-						: undefined,
+				this.mismatch(
+					componentSourceLoc(this.rootBlock.body),
+					() => `a fragment starting with ${describeHydrationNode(getFirstChild(fragment))}`,
+					cursor,
 				);
-				return this.freshClone(template);
 			}
 			this.claimRootRemainder(framedRemainder === undefined ? remainder : framedRemainder);
 		}
 		if (cursor === null) {
 			if (PRESENTATION_HYDRATION?.revision !== undefined) presentationMiss();
-			const target = CURRENT_SCOPE?.block.parentNode;
-			if (target != null) this.save(target);
-			if (claimsRoot) this.claimRootRemainder(null);
-			if (template === null) template = resolveLazyTemplate(lazy!);
-			return this.freshClone(template);
+			this.mismatch(loc, () => describeHydrationNode(template ?? resolveLazyTemplate(lazy!)), null);
 		}
 		if (
 			!isFragment &&
 			(template !== null
-				? !hydrationNodeMatches(cursor, template, partialStyles)
+				? !hydrationNodeMatches(cursor, template)
 				: !lazyRootMatches(cursor, lazy!))
 		) {
-			// renderUnframed reports and discards the server nodes there once the
-			// body has run: a body that throws leaves them to its boundary.
-			if (pendingClaims && cursor === this.inPlace && this.inPlaceUnframed) {
-				this.inPlace = null;
-				return this.freshClone(template ?? resolveLazyTemplate(lazy!));
-			}
 			if (PRESENTATION_HYDRATION?.revision !== undefined) presentationMiss();
-			const parent = domNode(cursor).parentNode!;
-			this.save(parent);
-			if (template === null) template = resolveLazyTemplate(lazy!);
-			const atRangeEnd = isBlockClose(cursor);
-			// A retry over a node whose replacement never committed already reported
-			// it, and a range end reports once (firstAtRangeEnd).
-			if (cursor !== this.replaced && (!atRangeEnd || this.firstAtRangeEnd(cursor))) {
-				this.reportStructural();
-				if (process.env.NODE_ENV !== 'production' && loc)
-					warnHydrationStructuralMismatch(
-						loc,
-						describeHydrationNode(template),
-						describeHydrationNode(cursor),
-					);
-			}
-			if (atRangeEnd) return this.freshClone(template);
-			// Recovery discards only a node this template renders into. The compiled
-			// mount inserts into its scope's block, which for a lite component is
-			// its lite host rather than CURRENT_BLOCK's parent. A cursor left
-			// outside that parent (an earlier claim ran off the end of its host) is
-			// an ancestor's adopted content, possibly the host itself; removing it
-			// would blank the region the block is about to be inserted into.
-			const block = CURRENT_SCOPE?.block;
-			const target = block?.parentNode;
-			if (!claimsRoot && target != null && parent !== target) {
-				this.save(target);
-				return this.freshClone(template);
-			}
-			// Step past the mismatched node, which stays until the rebuilt root
-			// commits in its place (insertRoot). Server nodes after it may still
-			// belong to later client siblings, so the root goes before them rather
-			// than at its block's end.
-			this.node = getNextSibling(isBlockOpen(cursor) ? this.close(cursor) : cursor);
-			this.replaced = cursor;
-			this.reachedRangeEnd(this.node);
-			if (claimsRoot)
-				this.claimRootRemainder(
-					framedRemainder === undefined ? (unframedRemainder ?? null) : framedRemainder,
-				);
-			this.rebuiltTail = this.node;
-			this.rebuiltRange = null;
-			if (block !== undefined) this.lend(this.node, block);
-			// The rebuilt root can be a range's whole content: what the server
-			// rendered after the node it replaces is then the range's tail. A
-			// markerless branch (claimOwner) has no range: its claim alone ends it.
-			if (cursor === this.claimFrom) {
-				this.claimRoots(cursor, null);
-				if (this.claimFrom === null && CURRENT_SCOPE!.block !== this.claimOwner)
-					this.rebuiltRange = domNode(cursor).previousSibling;
-			}
-			return (this.rebuiltRoot = this.freshClone(template));
+			this.mismatch(
+				loc,
+				() => describeHydrationNode(template ?? resolveLazyTemplate(lazy!)),
+				cursor,
+			);
 		}
 		if (isFragment) {
 			// In place of a server node, nothing frames the fragment's server nodes:
-			// compare every root to find where they end. One that does not match is
-			// rebuilt, now for a lite call, or once the body has run in
-			// renderUnframed, which leaves the server nodes to a body that throws.
+			// compare every root to find where they end.
 			if (pendingClaims && cursor === this.inPlace) {
 				const fragment = template ?? resolveLazyTemplate(lazy!);
 				const remainder = this.fragmentRemainder(fragment, cursor, partialStyles, true);
 				this.inPlace = null;
 				if (remainder === undefined)
-					return this.inPlaceUnframed
-						? this.freshClone(fragment)
-						: this.rebuildFragment(fragment, cursor, loc);
+					this.mismatch(
+						loc,
+						() => `a fragment starting with ${describeHydrationNode(getFirstChild(fragment))}`,
+						cursor,
+					);
 				this.inPlaceEnd = remainder;
 				if (cursor === this.claimFrom) this.claimRoots(cursor, fragment);
 				return { __oct_vfrag: true, firstChild: cursor } as unknown as Node;
@@ -21257,8 +21205,19 @@ class HydrationCapability {
 				if (cursor !== this.claimFrom || this.claimRoots(cursor, template ?? lazy!) || claimsRoot)
 					return { __oct_vfrag: true, firstChild: cursor } as unknown as Node;
 			}
-			return this.rebuildFragment(template ?? resolveLazyTemplate(lazy!), cursor, loc);
+			const fragment = template ?? resolveLazyTemplate(lazy!);
+			this.mismatch(
+				loc,
+				() => `a fragment starting with ${describeHydrationNode(getFirstChild(fragment))}`,
+				cursor,
+			);
 		}
+		if (
+			process.env.NODE_ENV !== 'production' &&
+			template !== null &&
+			!hydrationStaticMatches(cursor, template, partialStyles)
+		)
+			warnHydrationStaticDifference(loc, cursor);
 		if (claimsRoot)
 			this.claimRootRemainder(
 				framedRemainder === undefined ? (unframedRemainder ?? null) : framedRemainder,
@@ -23728,23 +23687,33 @@ function findMatchingClose(open: Node, matches: WeakMap<Node, Comment>): Comment
 }
 
 /**
+ * Hydration found server DOM that does not match the client render. As in
+ * React, nothing is repaired in place: the nearest fallback owner whose own
+ * range is intact (a Suspense arm, a Hydrate island, or else the root)
+ * discards its attempt and its server DOM, renders on the client instead, and
+ * reports this error once as recoverable. It is the native adoption miss
+ * control flow, which application boundaries already pass through and every
+ * hydration owner already recovers from, so client-only bundles are unchanged.
+ */
+class HydrationMismatch extends NativeAdoptionMiss {
+	constructor(message = formatClientError(339)) {
+		super('', '');
+		this.name = 'HydrationMismatch';
+		this.message = message;
+	}
+}
+
+/**
  * A server range has no closing marker. The server closes every range it
  * opens, so something changed its HTML after rendering, for example a
  * minifier or proxy that strips comments. No close in the parent can be
- * trusted then, and no extent guessed for the range is safe: one that ends too
- * late discards static template content after it, one that ends too early
- * leaves server nodes no slot claims. The nearest owner whose own range is
- * intact, a Suspense or Hydrate boundary or else the root, discards its
- * attempt and renders on the client instead, reporting this error as
- * recoverable. It is the same control flow as a native adoption miss, which
- * application boundaries already pass through and every hydration owner
- * already recovers from; extending it keeps client-only bundles unchanged.
+ * trusted then, and no extent guessed for the range is safe, so the nearest
+ * intact owner falls back like any other mismatch.
  */
-class UnclosedHydrationRange extends NativeAdoptionMiss {
+class UnclosedHydrationRange extends HydrationMismatch {
 	constructor() {
-		super('', '');
+		super(formatClientError(338));
 		this.name = 'UnclosedHydrationRange';
-		this.message = formatClientError(338);
 	}
 }
 
@@ -40829,10 +40798,11 @@ function renderInitialSuspenseHydration(state: TrySlot, initial: InitialSuspense
 		return;
 	}
 	initialSuspenseHydrations?.delete(state);
-	if (failure instanceof UnclosedHydrationRange) {
-		// The arm's own close matched before this attempt, so the damaged range
-		// lies inside it: render the arm on the client, as a Hydrate boundary
-		// does, rather than fail a root that may have committed already.
+	if (failure instanceof HydrationMismatch) {
+		// The arm's own close matched before this attempt, so the mismatch lies
+		// inside it: as React does for a Suspense boundary, discard its server DOM
+		// and render it on the client rather than fail a root that may have
+		// committed already.
 		const parent = domNode(state.domParent);
 		journalRootChildren(parent);
 		previousHydration?.save(parent);

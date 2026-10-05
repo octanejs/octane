@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "nextCode": 339,
+  "nextCode": 340,
   "codes": {
     "1": {
       "message": "Maximum update depth exceeded. Octane limits the number of nested updates to prevent infinite loops.",
@@ -2026,6 +2026,12 @@
     },
     "338": {
       "message": "Hydration mismatch: a server-rendered range had no closing marker, so the client rendered the boundary or root that contains it instead. Something changed the server HTML after rendering, for example an HTML minifier or proxy that strips comments.",
+      "argumentCount": 0,
+      "runtime": ["client"],
+      "status": "active"
+    },
+    "339": {
+      "message": "Hydration failed because the server rendered HTML didn't match the client. As a result this tree will be regenerated on the client.",
       "argumentCount": 0,
       "runtime": ["client"],
       "status": "active"
