@@ -8,7 +8,13 @@ import { Window } from 'happy-dom';
 import { describe, expect, it } from 'vitest';
 import { createOctaneCompiler } from '../src/compiler/bundler.js';
 
-async function runConsumer(view: string, entry: string, dev = false, extension = 'ts') {
+async function runConsumer(
+	view: string,
+	entry: string,
+	dev = false,
+	extension = 'ts',
+	compilerOptions: Record<string, unknown> = {},
+) {
 	const directory = mkdtempSync(join(tmpdir(), 'octane-local-root-'));
 	const window = new Window({
 		url: 'https://octane.test/',
@@ -16,7 +22,7 @@ async function runConsumer(view: string, entry: string, dev = false, extension =
 	});
 	window.document.body.innerHTML = '<div id="host"></div>';
 	try {
-		const compiler = createOctaneCompiler({ root: directory, dev, hmr: false });
+		const compiler = createOctaneCompiler({ root: directory, dev, hmr: false, ...compilerOptions });
 		const component = compiler.transform(view, join(directory, 'View.tsrx'), {
 			collectVoidComponentExports: true,
 		});
@@ -128,8 +134,10 @@ export async function run() {
  const inputValue=input.value, retained=span===host.querySelector('span') && input===host.querySelector('input') && spare.value==='typed';
  root.unmount(); value.set('disposed'); scope.dispose(); return {before,after,inputValue,retained,cleaned:host.childNodes.length===0};
 }`;
+		// The untyped view renders handles from a lazily loaded engine, so it opts
+		// in through the compiler option.
 		for (const dev of [false, true]) {
-			expect(await runConsumer(view, entry, dev)).toEqual({
+			expect(await runConsumer(view, entry, dev, 'ts', { opaqueSignalHandles: true })).toEqual({
 				before: 'first',
 				after: 'second',
 				inputValue: 'second',

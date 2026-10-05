@@ -513,6 +513,8 @@ const TEMPLATE_INVOCATION_SITE = 't:';
 // Compiled children are part of the template that authored them, not of the
 // component rendering them. markChildrenBlock records the owner that template
 // renders in, and the children's owner links to it (runtime.ts does the same).
+// The key is local to this runtime copy, since an owner belongs to the request
+// state of the copy that created it.
 const CHILDREN_SIGNAL_OWNER: unique symbol = Symbol() as any;
 let SIGNAL_COMPONENT_INSTANCE_KEY: ServerSignalInstanceKey = '';
 let SERVER_SIGNAL_OWNER_ACTIVE = false;

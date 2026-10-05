@@ -93,6 +93,16 @@ export interface CompileOptions {
 	knownAttributeSpreads?: readonly KnownAttributeSpread[];
 	/** Opt in to fixed primitive child props by name. Keep text and IDs live to share extracted programs. */
 	domBindingFixedProps?: readonly string[];
+	/**
+	 * Bind signal handles that reach opaque holes, such as `{row.label as string}`,
+	 * in every module. By default only modules with an import from
+	 * `octane/signals` (a type-only `SignalHandle` import is enough), and
+	 * `$`-named expressions anywhere, bind handles, so plain apps do not ship the
+	 * signal binding runtime. Enable it for untyped components that render
+	 * handles from a lazily loaded signals engine.
+	 * @default false
+	 */
+	opaqueSignalHandles?: boolean;
 	/** Optional exact attribute-expression proofs; used only by the Valdi target. */
 	valdiWriterFacts?: ValdiWriterFacts;
 	/**

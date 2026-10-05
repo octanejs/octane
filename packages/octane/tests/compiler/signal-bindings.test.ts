@@ -232,7 +232,8 @@ export function App() @{ <input value={draft$.get()} /> }`,
 
 	it('keeps prop-passed capabilities available without eager signal activation', () => {
 		const { code } = compile(
-			`export function Field(props) @{
+			`import 'octane/signals';
+			export function Field(props) @{
 				const label = props.label;
 				<label title={label}>{label as string}</label>
 			}`,
@@ -244,8 +245,72 @@ export function App() @{ <input value={draft$.get()} /> }`,
 		expect(code).not.toContain('enableSignalBindings(1)');
 	});
 
+	it('compiles opaque holes in signal-free modules with plain writers', () => {
+		const source = `export function Field(props) @{
+			const label = props.label;
+			<label title={label} class={props.tone}>
+				{label as string}
+				<input value={props.draft} />
+				<textarea>{props.note as string}</textarea>
+			</label>
+		}`;
+		for (const dev of [false, true]) {
+			const client = compile(source, '/src/plain-holes.tsrx', { dev, hmr: false }).code;
+			expect(client).not.toMatch(/bindSignal|enableSignalBindings|data-octane-input/);
+			const server = compile(source, '/src/plain-holes.tsrx', {
+				dev,
+				hmr: false,
+				mode: 'server',
+			}).code;
+			expect(server).not.toMatch(/ssrSignal|enableServerSignalBindings|data-octane-input/);
+		}
+		// A type-only signals import, or the compiler option, admits opaque handles.
+		const typed = compile(
+			`import type { SignalHandle } from 'octane/signals';\n${source}`,
+			'/src/typed-holes.tsrx',
+			{ hmr: false },
+		).code;
+		expect(typed).toContain('bindSignalText');
+		expect(typed).toContain('bindSignalAttribute');
+		const opaque = compile(source, '/src/plain-holes.tsrx', {
+			hmr: false,
+			opaqueSignalHandles: true,
+		}).code;
+		expect(opaque).toContain('bindSignalText');
+		expect(opaque).toContain('bindSignalAttribute');
+		expect(
+			compile(source, '/src/plain-holes.tsrx', {
+				hmr: false,
+				mode: 'server',
+				opaqueSignalHandles: true,
+			}).code,
+		).toContain('ssrSignalValue');
+		// `$`-named handle syntax still binds without the import, on both sides.
+		const suffixed = `export function Field(props) @{
+			<label title={props.label$}>{(props.fallback ?? props.count$) as string}</label>
+		}`;
+		const client = compile(suffixed, '/src/suffixed-holes.tsrx', { hmr: false }).code;
+		expect(client).toContain('bindSignalAttribute');
+		expect(client).toContain('bindSignalText');
+		// Any type-only wrapper around nested `$` syntax keeps the binding.
+		for (const wrapped of ['satisfies string', 'as string']) {
+			const code = compile(
+				`export function Field(props) @{ <b title={(props.fallback ?? props.title$) ${wrapped}}>{'x'}</b> }`,
+				'/src/wrapped-holes.tsrx',
+				{ hmr: false },
+			).code;
+			expect(code, wrapped).toContain('bindSignalAttribute');
+		}
+		const server = compile(suffixed, '/src/suffixed-holes.tsrx', {
+			hmr: false,
+			mode: 'server',
+		}).code;
+		expect(server).toContain('ssrSignalValue');
+	});
+
 	it('passes each prop-driven attribute binding its statically selected writer', () => {
-		const source = `export function Link(props) @{
+		const source = `import 'octane/signals';
+		export function Link(props) @{
 			<a title={props.label} href={props.href} data-id={props.id} aria-label={props.label} hidden={props.hidden}>{'x'}</a>
 		}`;
 		const prod = compile(source, '/src/signal-writer.tsrx', { dev: false, hmr: false }).code;
@@ -331,8 +396,8 @@ export function App() @{ <input value={draft$.get()} /> }`,
 		}).code;
 		expect(server).not.toContain('enableServerSignalBindings');
 		const scalar = `export function App(props) @{ <p>{props.label as string}</p> }`;
-		expect(compile(scalar, '/src/potential-signal.tsrx', { mode: 'server' }).code).toContain(
-			'enableServerSignalBindings(1, true)',
+		expect(compile(scalar, '/src/potential-signal.tsrx', { mode: 'server' }).code).not.toContain(
+			'enableServerSignalBindings',
 		);
 		const native = compile(`import 'octane/signals';\n${scalar}`, '/src/native-signal.tsrx', {
 			mode: 'server',
