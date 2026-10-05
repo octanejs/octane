@@ -43,11 +43,7 @@ type ClientErrorArguments = {
 	46: [unknown, unknown];
 	49: [];
 	50: [];
-	51: [];
-	52: [];
-	53: [];
 	54: [];
-	55: [];
 	58: [];
 	61: [];
 	62: [];
@@ -462,29 +458,9 @@ export function formatClientError<Code extends keyof ClientErrorArguments>(
 				);
 			case 50:
 				return formatDevErrorMessage('Unclosed server-rendered Fragment descriptor.', args);
-			case 51:
-				return formatDevErrorMessage(
-					'Hydration mismatch: the server-rendered node did not match the client render; the mismatched subtree was rebuilt on the client.',
-					args,
-				);
-			case 52:
-				return formatDevErrorMessage(
-					'Hydration mismatch: root adoption was abandoned after a server/client shape divergence; the root was rebuilt on the client.',
-					args,
-				);
-			case 53:
-				return formatDevErrorMessage(
-					'Hydration mismatch: the server rendered more root content than the client; the stale remainder was discarded.',
-					args,
-				);
 			case 54:
 				return formatDevErrorMessage(
 					'Hydration mismatch: the client rendered text where the server rendered none; the client text was built fresh.',
-					args,
-				);
-			case 55:
-				return formatDevErrorMessage(
-					'Hydration mismatch: the server rendered a different child shape where the client renders a component; the stale range was discarded and the component was built on the client.',
 					args,
 				);
 			case 58:
