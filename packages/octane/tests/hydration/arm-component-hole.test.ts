@@ -7,9 +7,11 @@ import { loadCompiledFixtureSource, loadServerFixture } from '../_server-fixture
 
 // The server rendered another @if arm whose static roots match the client
 // arm's, but where the client arm calls a component, the server's arm has its
-// own element. The server HTML does not match the client, and no Suspense arm
-// encloses the @if, so, as in React 19, the whole root renders on the client
-// and reports once: nothing the server rendered stays on screen, and the
+// own element. The call has no server range of its own, so, as in React 19,
+// which compares only the DOM, it adopts that element in place when it renders
+// exactly it. Otherwise the server HTML does not match the client, and no
+// Suspense arm encloses the @if, so the whole root renders on the client and
+// reports once: nothing the server rendered stays on screen, and the
 // client-rendered arms keep updating in place.
 
 const FIXTURE = join(
@@ -197,19 +199,24 @@ describe.each([
 		},
 	);
 
-	// OCTANE DIVERGENCE: React adopts this server HTML, because the server's
-	// <u> coincides with the root the client's call renders and React emits no
-	// markers for components or conditionals. Octane frames the call in a
-	// server range, which the server's other arm does not have, so its markup
-	// differs structurally and the root renders on the client.
-	it('client-renders the root where the other arm’s node at the hole has the call’s tag', async () => {
+	// As in React, which compares only the DOM, the call without a server range
+	// of its own adopts the server's <u> in place: it renders exactly that node.
+	it('adopts the other arm’s node at the hole when the call renders exactly it', async () => {
 		const s = await hydrate('AdoptLast', { tail: 't', server: true }, { tail: 't' });
 
+		const expectServerNodes = () => {
+			const live = [...container.querySelectorAll('*')];
+			expect(live).toHaveLength(s.nodes.length);
+			live.forEach((node, i) => expect(node).toBe(s.nodes[i]));
+		};
 		expect(markup(s.host())).toBe('<i>t</i><u>z</u>');
-		expectRootFellBack(s);
+		expectServerNodes();
+		expect(s.recoverable).toEqual([]);
+		expect(warnings()).toEqual([]);
 
 		s.render({ tail: 'w' });
 		expect(markup(s.host())).toBe('<i>w</i><u>z</u>');
+		expectServerNodes();
 	});
 
 	it.each([

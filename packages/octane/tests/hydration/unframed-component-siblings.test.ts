@@ -7,10 +7,12 @@ import { loadCompiledFixtureSource, loadServerFixture } from '../_server-fixture
 import { hydrationMarkerSummary } from './_marker-summary.js';
 
 // The server rendered plain elements where the client calls a component. As
-// in React, which compares only the DOM, that is a mismatch unless the calls
-// render exactly the server's elements: nothing is repaired in place, the root
-// renders on the client and reports once, each component's effects run once,
-// and the hydration markers stay balanced.
+// in React, which compares only the DOM, the calls adopt those elements in
+// place, and it is a mismatch unless they render exactly the server's
+// elements: nothing is repaired in place, the root renders on the client and
+// reports once, each component's effects run once, and the hydration markers
+// stay balanced. A call that renders nothing leaves the server's element to
+// the next call, whose own content then differs from it.
 
 const FIXTURE = join(
 	process.cwd(),
@@ -61,11 +63,26 @@ function definitionOf(name: string): string {
 	return `${FILE}:${index + 1}:0`;
 }
 
+/** `FILE:line:column` of `text` in the template of `function name(`. */
+function templateSite(name: string, text: string): string {
+	const from = LINES.findIndex((line) => line.startsWith(`function ${name}(`));
+	const index = LINES.findIndex((line, at) => at > from && line.includes(text));
+	if (from < 0 || index < 0) throw new Error(`fixture function ${name} has no ${text}`);
+	return `${FILE}:${index + 1}:${LINES[index].indexOf(text)}`;
+}
+
+/** The next call's text differs from the server's element it adopted in place. */
+const nextCallText = () =>
+	`Octane hydration mismatch at ${templateSite('Leaf', 'props.v')}: the client expected ` +
+	'text "z" but the server rendered text "x". The nearest Suspense or Hydrate boundary, or ' +
+	'the root, will be regenerated on the client.';
+
 const LATER_RANGE = [
 	{
 		built: 'a component that renders nothing',
 		name: 'EmptyThenRange',
-		report: missingRange('EmptyThenRange', '<Empty log={props.log} />'),
+		// The call renders nothing, so the next one adopts the server's element.
+		report: nextCallText,
 		mounted: ['Empty'],
 		html: '<em>z</em>',
 		serverHtml: '<em>x</em><em>z</em>',
@@ -82,7 +99,7 @@ const LATER_RANGE = [
 	{
 		built: 'the first component call in an element',
 		name: 'HostEmptyFirst',
-		report: missingRange('HostEmptyFirst', '<Empty log={props.log} />'),
+		report: nextCallText,
 		mounted: ['Empty'],
 		html: '<section><em>z</em></section>',
 		serverHtml: '<section><em>x</em><em>z</em></section>',

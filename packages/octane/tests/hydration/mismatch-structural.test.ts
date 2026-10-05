@@ -1833,3 +1833,173 @@ describe.each([
 		}
 	});
 });
+
+// A template whose root element matches the server's, but whose server element
+// lacks the nodes the template's compiled walk reaches, does not match the
+// client render, as in React, which finds the missing node: nothing is adopted
+// in place, the nearest Suspense boundary or else the root renders on the
+// client and reports once. An error thrown while hydrating fails the root the
+// same way, as React's throwException makes it: the root renders on the
+// client, reporting a recoverable error, and an error its client render throws
+// again is uncaught, with no recoverable report.
+describe.each([
+	{ name: 'development compile', dev: true },
+	{ name: 'production compile', dev: false },
+])('hydrateRoot — server nodes that a template walk does not find ($name)', ({ dev }) => {
+	const WALK = join(
+		process.cwd(),
+		'packages/octane/tests/hydration/_fixtures/walk-missing-nodes.tsrx',
+	);
+	const server = serverModule(WALK, 'walk-missing-nodes.tsrx');
+	const client = dev
+		? devClientModule(WALK, 'walk-missing-nodes.tsrx')
+		: prodClientModule(WALK, 'walk-missing-nodes.tsrx');
+	let container: HTMLElement;
+	let errSpy: ReturnType<typeof vi.spyOn>;
+	let root: ReturnType<typeof hydrateRoot> | null;
+
+	beforeEach(() => {
+		container = document.createElement('div');
+		document.body.appendChild(container);
+		errSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+		root = null;
+	});
+
+	afterEach(() => {
+		root?.unmount();
+		client.failNext(0);
+		container.remove();
+		errSpy.mockRestore();
+	});
+
+	/**
+	 * Server-render `name`, empty the server element `emptied` names, and
+	 * hydrate it. Returns the server's content and the root's error reports.
+	 */
+	async function hydrate(name: string, props: Record<string, unknown>, emptied?: string) {
+		container.innerHTML = ServerRT.renderToString(server[name], props).html;
+		if (emptied !== undefined) container.querySelector(emptied)!.replaceChildren();
+		const serverNodes = contentNodes(container);
+		const recovered: unknown[] = [];
+		const uncaught: unknown[] = [];
+		root = hydrateRoot(container, client[name], props, {
+			onRecoverableError: (error) => recovered.push(error),
+			onUncaughtError: (error) => uncaught.push(error),
+		});
+		flushSync(() => {});
+		await act(async () => {});
+		return { serverNodes, recovered, uncaught };
+	}
+
+	/** The client render of `name` with `props`, for comparison. */
+	function clientMarkup(name: string, props: Record<string, unknown>): string {
+		const fresh = document.createElement('div');
+		const freshRoot = createRoot(fresh);
+		flushSync(() => freshRoot.render(client[name], props));
+		const out = markup(fresh);
+		freshRoot.unmount();
+		return out;
+	}
+
+	it.each([
+		{ shape: 'an element with a bound attribute', name: 'Link', props: { url: '/x' } },
+		{ shape: 'an element with a text hole', name: 'Bold', props: { t: 'hi' } },
+	])(
+		'renders the root on the client where the server root lacks $shape',
+		async ({ name, props }) => {
+			const s = await hydrate(name, props, 'div');
+
+			expect(survivors(s.serverNodes)).toEqual([]);
+			expect(markup(container)).toBe(clientMarkup(name, props));
+			expect(s.uncaught).toEqual([]);
+			expect(s.recovered).toHaveLength(1);
+			expect(String((s.recovered[0] as Error).message)).toMatch(MISMATCH);
+
+			// The client-rendered tree updates like any other.
+			flushSync(() => root!.render(client[name], { url: '/y', t: 'yo' }));
+			expect(markup(container)).toBe(clientMarkup(name, { url: '/y', t: 'yo' }));
+		},
+	);
+
+	it('renders the root on the client where a nested server element lacks the walked element', async () => {
+		const s = await hydrate('Deep', { url: '/x' }, 'p');
+
+		expect(survivors(s.serverNodes)).toEqual([]);
+		expect(markup(container)).toBe(clientMarkup('Deep', { url: '/x' }));
+		expect(container.querySelector('#deep')!.getAttribute('href')).toBe('/x');
+		expect(s.uncaught).toEqual([]);
+		expect(s.recovered).toHaveLength(1);
+	});
+
+	it('renders only the boundary on the client where its server element lacks the walked element', async () => {
+		container.innerHTML = ServerRT.renderToString(server.InBoundary, { url: '/x' }).html;
+		const h1 = container.querySelector('h1')!;
+		const div = container.querySelector('main div')!;
+		div.replaceChildren();
+		const recovered: unknown[] = [];
+		root = hydrateRoot(
+			container,
+			client.InBoundary,
+			{ url: '/x' },
+			{
+				onRecoverableError: (error) => recovered.push(error),
+			},
+		);
+		flushSync(() => {});
+		await act(async () => {});
+
+		expect(container.querySelector('h1')).toBe(h1);
+		expect(div.isConnected).toBe(false);
+		expect(container.querySelector('#first')!.getAttribute('href')).toBe('/x');
+		expect(recovered).toHaveLength(1);
+		expect(String((recovered[0] as Error).message)).toMatch(MISMATCH);
+	});
+
+	it('renders the root on the client when a component throws while hydrating', async () => {
+		container.innerHTML = ServerRT.renderToString(server.Thrower, {}).html;
+		const serverNodes = contentNodes(container);
+		client.failNext(1);
+		const recovered: unknown[] = [];
+		const uncaught: unknown[] = [];
+		root = hydrateRoot(
+			container,
+			client.Thrower,
+			{},
+			{
+				onRecoverableError: (error) => recovered.push(error),
+				onUncaughtError: (error) => uncaught.push(error),
+			},
+		);
+		flushSync(() => {});
+		await act(async () => {});
+
+		expect(survivors(serverNodes)).toEqual([]);
+		expect(markup(container)).toBe('<div><i>ok</i><b>tail</b></div>');
+		expect(uncaught).toEqual([]);
+		expect(recovered).toHaveLength(1);
+		expect(String((recovered[0] as Error).message)).toMatch(/^There was an error while hydrating/);
+		expect(((recovered[0] as Error).cause as Error).message).toBe('hydrating render failed');
+	});
+
+	it('reports only the uncaught error when the client render throws again', async () => {
+		container.innerHTML = ServerRT.renderToString(server.Thrower, {}).html;
+		client.failNext(2);
+		const recovered: unknown[] = [];
+		const uncaught: unknown[] = [];
+		root = hydrateRoot(
+			container,
+			client.Thrower,
+			{},
+			{
+				onRecoverableError: (error) => recovered.push(error),
+				onUncaughtError: (error) => uncaught.push(error),
+			},
+		);
+		flushSync(() => {});
+		await act(async () => {});
+
+		expect(uncaught).toHaveLength(1);
+		expect((uncaught[0] as Error).message).toBe('hydrating render failed');
+		expect(recovered).toEqual([]);
+	});
+});
