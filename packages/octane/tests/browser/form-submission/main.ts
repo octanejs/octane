@@ -24,6 +24,8 @@ const root = attachBehaviorRoot(
 	{ formSubmissions: captureFormSubmissions() },
 );
 const captures: SubmissionPayload[] = [];
+const payloadFiles = new WeakMap<SubmissionPayload, Array<readonly [string, File]>>();
+const deliveredFiles: Array<Array<readonly [string, File]>> = [];
 const deliveries: Array<
 	SubmissionPayload & { original: boolean; submitterSame: boolean; trusted: boolean }
 > = [];
@@ -71,6 +73,10 @@ function register(id = 'save'): void {
 						Object.isFrozen(submission.form) &&
 						(submission.submitter === null || Object.isFrozen(submission.submitter))),
 			});
+			payloadFiles.set(
+				payload,
+				entries.filter((entry): entry is readonly [string, File] => typeof entry[1] !== 'string'),
+			);
 			captures.push(payload);
 			return payload;
 		},
@@ -82,6 +88,7 @@ function register(id = 'save'): void {
 		},
 		handleEvent(event, _element, _context, payload) {
 			const index = window.__formObservation.events.indexOf(event);
+			deliveredFiles.push(payloadFiles.get(payload) ?? []);
 			deliveries.push({
 				...payload,
 				original: index !== -1,
@@ -132,6 +139,22 @@ const stopHydration = bootstrapIndependentHydration(container, {
 const harness = {
 	release,
 	register,
+	fileFrozen(index = 0) {
+		return (deliveredFiles[index] ?? []).map(([, file]) => Object.isFrozen(file));
+	},
+	async files(index = 0) {
+		return Promise.all(
+			(deliveredFiles[index] ?? []).map(async ([field, file]) => ({
+				field,
+				name: file.name,
+				webkitRelativePath: file.webkitRelativePath,
+				size: file.size,
+				type: file.type,
+				lastModified: file.lastModified,
+				contents: await file.text(),
+			})),
+		);
+	},
 	disposeRegistration() {
 		registration?.dispose();
 	},
