@@ -71,8 +71,8 @@ jobs:
 
       - name: Install dependencies
         run: |
-          pnpm install --prod false --frozen-lockfile
-          pnpm --dir "$BASE_TREE" install --prod false --frozen-lockfile
+          pnpm install --prod=false --frozen-lockfile
+          pnpm --dir "$BASE_TREE" install --prod=false --frozen-lockfile
 
       # The merge commit's harness drives both trees, so only its browser is needed.
       - name: Install Playwright Chromium

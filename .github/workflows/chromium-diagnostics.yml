@@ -39,7 +39,7 @@ jobs:
           cache: pnpm
       - name: Install dependencies
         timeout-minutes: 10
-        run: pnpm install --prod false --frozen-lockfile
+        run: pnpm install --prod=false --frozen-lockfile
       - name: Install Chromium
         timeout-minutes: 10
         run: |

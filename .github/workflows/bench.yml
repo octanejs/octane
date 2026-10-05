@@ -46,7 +46,7 @@ jobs:
         run: node --test benchmarks/lib/precise-work.test.mjs
 
       - name: Install dependencies
-        run: pnpm install --prod false --frozen-lockfile
+        run: pnpm install --prod=false --frozen-lockfile
 
       - name: Test Lynx diagnostic fixture contracts
         run: |
