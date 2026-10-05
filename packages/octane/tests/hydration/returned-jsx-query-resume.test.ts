@@ -286,10 +286,11 @@ describe('query reads in returned JSX through hydration', () => {
 		'restarts a suspended first attempt for new children, then retries it without reloading (dev: %s)',
 		async (dev) => {
 			// New children supersede the suspended attempt: it loads the new
-			// selection and never shows the abandoned one. The restarted attempt
-			// then retries with unchanged children and keeps its query. The server
-			// HTML predates the client's update, so, as React client-renders a
-			// dehydrated boundary an update reaches, that is not reported.
+			// selection and never shows the abandoned one. The server HTML
+			// predates the client's update, so, as React client-renders a
+			// dehydrated boundary an update reaches, the boundary renders on the
+			// client, shows its fallback while the new selection loads, and
+			// reports nothing. Its retry with unchanged children keeps its query.
 			const pending = new Map<string, (value: string) => void>();
 			const browserLoad = vi.fn(
 				(id: string) => new Promise<string>((resolve) => pending.set(id, resolve)),
@@ -307,9 +308,12 @@ describe('query reads in returned JSX through hydration', () => {
 					setId('c');
 					await drain();
 					expect(browserLoad.mock.calls.map(([id]) => id)).toEqual(['b', 'c']);
+					expect(container.querySelector('output')).toBeNull();
+					expect(container.querySelector('i')!.textContent).toBe('waiting');
 					pending.get('b')!('browser b');
 					await drain();
-					expect(container.querySelector('output')!.textContent).not.toBe('browser b');
+					expect(container.querySelector('output')).toBeNull();
+					expect(container.querySelector('i')!.textContent).toBe('waiting');
 					pending.get('c')!('browser c');
 					await drain();
 					expect(uncaught).toEqual([]);

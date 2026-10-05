@@ -1910,6 +1910,7 @@ function warnHydrationStructuralMismatch(
 	loc: string | undefined,
 	expected: string,
 	actual: string,
+	log = true,
 ): string | undefined {
 	if (process.env.NODE_ENV === 'production') return; // build-time stripped
 	if (!loc) return;
@@ -1917,7 +1918,7 @@ function warnHydrationStructuralMismatch(
 		`Octane hydration mismatch at ${loc}: the client expected ${expected} but the server ` +
 		`rendered ${actual}. The nearest Suspense or Hydrate boundary, or the root, will be ` +
 		`regenerated on the client.`;
-	logHydrationMismatch(message);
+	if (log) logHydrationMismatch(message);
 	return message;
 }
 
@@ -15562,6 +15563,13 @@ function createHydrateBoundaryBody(
 			}
 			renderChild(state, scope, extra);
 		} catch (error) {
+			if (
+				isSuspenseException(error) &&
+				currentHydration?.deferred != null &&
+				state.serverPreserved &&
+				!state.hydrated
+			)
+				throw new DeferredHydrationSuspension(error.thenable);
 			const hydration = activeHydration();
 			if (
 				!state.serverPreserved ||
@@ -16334,6 +16342,8 @@ function activateHydrateBoundary(state: HydrateSlot): void {
 	if (preserved === undefined) {
 		if (state.seedRaw !== null) hydration.seeds = hydration.parseSeeds(state.seedRaw);
 		hydration.protectRootAnchor(state.end);
+		hydration.defers = hydration.undoable = true;
+		hydration.idStart = block.idState.next;
 	}
 	const previousHydration = currentHydration;
 	const previousCapture = WIP_CAPTURE;
@@ -16350,6 +16360,7 @@ function activateHydrateBoundary(state: HydrateSlot): void {
 	const previousNative = setNativeAdoptionResolver(hydration.nativeAdoption?.resolve ?? null);
 	let completed = false;
 	let nativeRecovery: NativeAdoptionMiss | undefined;
+	let restart: DeferredHydrationSuspension | undefined;
 	try {
 		if (preserved === undefined && state.nativeSeedRaw !== undefined) {
 			hydration.nativeAdoption = ownNativeAdoption(
@@ -16380,6 +16391,7 @@ function activateHydrateBoundary(state: HydrateSlot): void {
 			}
 		}
 		renderBlock(block);
+		if (hydration.deferred !== null) hydration.claimDeferred();
 		drainHydrationRenderPhaseUpdates(block, true);
 		// Suspended initial adoption intentionally leaves its real server arm and
 		// cursor untouched. Sweep only after that same arm eventually commits.
@@ -16397,7 +16409,8 @@ function activateHydrateBoundary(state: HydrateSlot): void {
 			hydration.finishRoot();
 			completed = true;
 		}
-	} catch (error) {
+	} catch (thrown) {
+		const error = hydration.failure(thrown);
 		// A rejected parked promise can throw while its unfinished source retries.
 		// Discard the same uncommitted work as an explicit boundary unmount before
 		// the enclosing error boundary tears down its partially mounted children.
@@ -16413,13 +16426,33 @@ function activateHydrateBoundary(state: HydrateSlot): void {
 				return;
 			}
 			throw error;
-		} else if (error instanceof NativeAdoptionMiss) nativeRecovery = error;
+		} else if (error instanceof DeferredHydrationSuspension) restart = error;
+		else if (error instanceof NativeAdoptionMiss) nativeRecovery = error;
 		else throw error;
 	} finally {
 		setNativeAdoptionResolver(previousNative);
 		WIP_CAPTURE = previousCapture;
 		currentHydration = previousHydration;
 		if (previousHydration === null) clearHydrationThrow();
+	}
+	if (restart !== undefined) {
+		// As a suspended Suspense arm does, the island keeps its server DOM, with
+		// nothing reported, and its retry adopts it afresh.
+		hydration.rollback();
+		discardHydratePresentation(state, capture);
+		block.idState.next = hydration.idStart;
+		const generation = state.activationGeneration;
+		resumeOnSettle(restart.thenable, () => {
+			if (
+				state.block.disposed ||
+				!state.activationRequested ||
+				state.activationGeneration !== generation
+			)
+				return;
+			state.serverActivationStarted = false;
+			scheduleRender(state.parentBlock);
+		});
+		return;
 	}
 	if (nativeRecovery !== undefined) {
 		// The exact historical demand changed between server output and island
@@ -16473,6 +16506,7 @@ function activateHydrateBoundary(state: HydrateSlot): void {
 	}
 	if (completed) {
 		state.initialCaptures = null;
+		hydration.keepChanges();
 		hydration.passSeeds(previousHydration);
 		releasePreservedHydrateActivation(state);
 		spliceOffscreenCapture(capture);
@@ -19340,6 +19374,18 @@ class HydrationCapability {
 	private claimEnd: Node | null | undefined = undefined;
 	/** The last suspension thrown out of a client-built subtree (suspend). */
 	freshSuspension: SuspenseException | null = null;
+	/**
+	 * Whether a template's adoption may defer the mismatch it finds
+	 * (adoptOrDefer): set by an owner that discards an attempt that suspends and
+	 * starts the next one afresh.
+	 */
+	defers = false;
+	/** Whether a template adoption is running (adoptOrDefer). */
+	private adopting = false;
+	/** The mismatch a template's adoption deferred; the attempt renders on the client meanwhile. */
+	deferred: HydrationMismatch | null = null;
+	/** Whether the client render since `deferred` started a template with a host (claimBefore). */
+	private deferredHost = false;
 	/** Skip component-frame adoption until the declared container owner. */
 	passthroughRanges = false;
 	/**
@@ -19380,6 +19426,14 @@ class HydrationCapability {
 	 * (HYDRATION_DIAGNOSTIC_HOLDS) meanwhile.
 	 */
 	speculative = false;
+	/**
+	 * Whether a Hydrate island's attempt records the server nodes it changes
+	 * (`save`), as a speculative one does: one that suspends after a deferred
+	 * mismatch (adoptOrDefer) is discarded, and its retry adopts afresh.
+	 */
+	undoable = false;
+	/** The island's first ID, which a discarded attempt's retry starts from again. */
+	idStart = 0;
 	/** The parents whose children this attempt recorded. */
 	private saved: Set<Node> | null = null;
 	/** Restores what this attempt changed in the server DOM, newest last. */
@@ -19410,10 +19464,10 @@ class HydrationCapability {
 	 */
 	save(parent: Node): void {
 		if (inRootHydrationAttempt()) journalRootChildren(parent);
-		if (!this.speculative || (this.saved ??= new Set()).has(parent)) return;
+		if ((!this.speculative && !this.undoable) || (this.saved ??= new Set()).has(parent)) return;
 		this.saved.add(parent);
 		const arm = this.rootBlock;
-		const ranged = parent === domNode(arm.startMarker!).parentNode;
+		const ranged = arm.startMarker !== null && parent === domNode(arm.startMarker).parentNode;
 		const before = ranged ? arm.startMarker : null;
 		const after = ranged ? arm.endMarker : null;
 		const nodes = collectRootRange(parent, before, after);
@@ -19470,9 +19524,15 @@ class HydrationCapability {
 	/** The attempt is discarded: restore the server nodes it changed. */
 	rollback(): void {
 		const undo = this.undo;
-		this.speculative = false;
+		this.speculative = this.undoable = false;
 		this.saved = this.undo = null;
 		if (undo !== null) for (let i = undo.length - 1; i >= 0; i--) undo[i]();
+	}
+
+	/** An island's attempt completed: it keeps the server nodes it changed. */
+	keepChanges(): void {
+		this.undoable = false;
+		this.saved = this.undo = null;
 	}
 
 	isActive(): boolean {
@@ -19587,6 +19647,12 @@ class HydrationCapability {
 				!isHostContextRequest(error) &&
 				!isSuspenseException(error) &&
 				!isAdoptionControl(error);
+			if (caught && this.deferred !== null) {
+				// A deferred mismatch's diagnostic is not the catch arm's to drop.
+				caught = false;
+				clearHydrationThrow();
+				throw this.failure(error);
+			}
 			if (
 				caught &&
 				HYDRATION_THROWN === error &&
@@ -20229,11 +20295,15 @@ class HydrationCapability {
 	mismatch(loc: string | undefined, expected: () => string, actual: Node | null): never {
 		const error = new HydrationMismatch();
 		if (process.env.NODE_ENV !== 'production') {
+			// A mismatch that a template's adoption defers is reported only when the
+			// render reaches it (claimDeferred).
 			const message = warnHydrationStructuralMismatch(
 				loc || componentSourceLoc(CURRENT_BLOCK?.body) || CURRENT_SCOPE?.locFile,
 				expected(),
 				describeHydrationNode(actual),
+				!this.adopting,
 			);
+			if (this.adopting) error.warning = message;
 			// A root's attempt publishes its diagnostics when it commits, which this
 			// mismatch prevents if the root is what falls back (hydrateRoot).
 			if (inRootHydrationAttempt() && !this.staleServerValues) error.diagnostic = message;
@@ -20757,6 +20827,26 @@ class HydrationCapability {
 	}
 
 	/**
+	 * Hydrating, the server rendered no node where `el`'s de-opt children render
+	 * `child`: as React does for a missing node, the nearest fallback owner
+	 * renders on the client. An element the client built holds client children
+	 * only, and the parser keeps a `<noscript>`'s server content as text, which
+	 * React never hydrates. A method, so that bundles which never hydrate do not
+	 * retain it.
+	 */
+	missingDeoptChild(el: Element, child: unknown): void {
+		if (!this.isActive() || this.isFresh(el) || el.localName === 'noscript') return;
+		this.mismatch(
+			process.env.NODE_ENV !== 'production' ? (el as any).__oct_loc : undefined,
+			() =>
+				isHostDescriptor(child)
+					? `<${String((child as ElementDescriptor).type)}>`
+					: `text ${JSON.stringify(String(child))}`,
+			null,
+		);
+	}
+
+	/**
 	 * `el`'s server `dangerouslySetInnerHTML` content, `server`, differs from
 	 * the client's `expected`. React keeps the server's, and so does hydration
 	 * (unpatched). A method, so that bundles which never hydrate do not retain
@@ -20874,7 +20964,11 @@ class HydrationCapability {
 	}
 
 	clone<T extends Node>(template: T, loc?: string, partialStyles?: string): T {
-		return this.adopt(template, null, loc, partialStyles) as T;
+		return (
+			this.defers
+				? this.adoptOrDefer(template, null, loc, partialStyles)
+				: this.adopt(template, null, loc, partialStyles)
+		) as T;
 	}
 
 	/**
@@ -20885,7 +20979,111 @@ class HydrationCapability {
 	 * claims).
 	 */
 	cloneLazy(lazy: LazyTemplateRecord, loc?: string): Node {
-		return this.adopt(null, lazy, loc);
+		return this.defers ? this.adoptOrDefer(null, lazy, loc) : this.adopt(null, lazy, loc);
+	}
+
+	/**
+	 * Adopt a template, or defer the mismatch its adoption finds.
+	 *
+	 * React runs a component's whole body, every expression of the JSX it
+	 * returns included, before it hydrates any host that JSX renders, so a body
+	 * that suspends keeps the server HTML even where that host would not have
+	 * matched. A compiled body adopts its template's roots first and evaluates
+	 * its holes after. So when the adoption fails, the body continues on the
+	 * client: it gets a fresh copy of the template and renders, with the rest of
+	 * this attempt, into detached DOM, until React's order would reach a host
+	 * (claimDeferred). A suspension before then wins, and the attempt keeps the
+	 * server DOM as any suspended attempt does; its retry meets the mismatch
+	 * again. Only an owner that discards a suspended attempt and starts the next
+	 * one afresh enables this (`defers`).
+	 */
+	private adoptOrDefer(
+		template: Node | null,
+		lazy: LazyTemplateRecord | null,
+		loc?: string,
+		partialStyles?: string,
+	): Node {
+		this.adopting = true;
+		try {
+			return this.adopt(template, lazy, loc, partialStyles);
+		} catch (error) {
+			if (!(error instanceof HydrationMismatch)) throw error;
+			const scope = CURRENT_SCOPE;
+			if (scope === null) {
+				if (process.env.NODE_ENV !== 'production' && error.warning !== undefined)
+					logHydrationMismatch(error.warning);
+				throw error;
+			}
+			const parsed = template ?? resolveLazyTemplate(lazy!);
+			this.deferred = error;
+			this.deferredHost = startsWithHost(parsed);
+			// The rest of the attempt renders on the client, reading its seeds as
+			// this hydration would.
+			this.replayDepth = ++this.depth;
+			// The body's DOM context: what it inserts lands in detached DOM, which
+			// the discarded attempt drops, never in the server's. A root render's
+			// rollback restores it.
+			const block = scope.block;
+			const parent = domNode(block.parentNode);
+			journalRootProperty(block, 'parentNode', block.parentNode);
+			journalRootProperty(block, 'endMarker', block.endMarker);
+			block.parentNode =
+				parent.nodeType === 1
+					? parent.cloneNode(false)
+					: (STAGED_DOM?.view(document) ?? document).createDocumentFragment();
+			if (block.block === block) {
+				journalRootProperty(block, 'startMarker', block.startMarker);
+				block.startMarker = null;
+			}
+			block.endMarker = null;
+			return domNode(parsed).cloneNode(true);
+		} finally {
+			this.adopting = false;
+		}
+	}
+
+	/**
+	 * The client render that continues after a deferred mismatch reaches
+	 * `template`'s clone. React would have hydrated the host that the previous
+	 * template started with by now, and found the mismatch there.
+	 */
+	claimBefore(template: Node): void {
+		if (this.deferredHost) this.claimDeferred();
+		this.deferredHost = startsWithHost(template);
+	}
+
+	/** A template's holes ran after a deferred mismatch (commitBag); see claimBefore. */
+	claimAfterHoles(): void {
+		if (this.deferredHost) this.claimDeferred();
+	}
+
+	/** The render reached the deferred mismatch, or the attempt ended without suspending. */
+	claimDeferred(): never {
+		throw this.takeDeferred();
+	}
+
+	/** The deferred mismatch, now reported. */
+	private takeDeferred(): HydrationMismatch {
+		const error = this.deferred!;
+		this.deferred = null;
+		if (process.env.NODE_ENV !== 'production' && error.warning !== undefined)
+			logHydrationMismatch(error.warning);
+		return error;
+	}
+
+	/**
+	 * What fails the attempt when `error` escapes it, or a catch arm in it. Only
+	 * a suspension comes before a deferred mismatch: an application error that
+	 * the client render throws after it fails the fallback owner as the mismatch,
+	 * and that owner's client render throws it again, as React's does.
+	 */
+	failure(error: unknown): unknown {
+		return this.deferred === null ||
+			isSuspenseException(error) ||
+			isAdoptionControl(error) ||
+			isHostContextRequest(error)
+			? error
+			: this.takeDeferred();
 	}
 
 	/** `template` is null only in prod lazy mode (then `lazy` is set) — every cold path resolves it. */
@@ -21628,16 +21826,23 @@ export function clone<T extends Node>(node: T, loc?: string, partialStyles?: str
 			return hydration.cloneLazy(lazy, loc) as unknown as T;
 		}
 		const parsed = resolveLazyTemplate(lazy);
-		return (
-			hydration === null
-				? (STAGED_DOM?.view(parsed) ?? parsed).cloneNode(true)
-				: hydration.clone(parsed, loc, partialStyles)
-		) as T;
+		if (hydration !== null) return hydration.clone(parsed, loc, partialStyles) as T;
+		// A template the client render after a deferred mismatch clones (adoptOrDefer).
+		if (currentHydration?.deferred != null) currentHydration.claimBefore(parsed);
+		return (STAGED_DOM?.view(parsed) ?? parsed).cloneNode(true) as T;
 	}
-	const hydration = activeHydration();
-	return hydration === null
-		? ((STAGED_DOM?.view(node) ?? node).cloneNode(true) as T)
-		: hydration.clone(node, loc, partialStyles);
+	const hydration = currentHydration;
+	if (hydration !== null) {
+		if (hydration.isActive()) return hydration.clone(node, loc, partialStyles);
+		if (hydration.deferred !== null) hydration.claimBefore(node);
+	}
+	return (STAGED_DOM?.view(node) ?? node).cloneNode(true) as T;
+}
+
+/** Whether a template starts with a host, an element or text, rather than a hole. */
+function startsWithHost(template: Node): boolean {
+	const first = (template as any).__oct_frag === true ? getFirstChild(template) : template;
+	return first !== null && first.nodeType !== 8;
 }
 
 /**
@@ -21675,10 +21880,12 @@ export function drainFrag(root: Node, parent: Node, anchor: Node | null): void {
  * literal (still real values, 1-char keys) through `bagOf`.
  */
 function commitBag<T>(scope: Scope, root: Node | null, bag: T): T {
+	const hydration = currentHydration;
+	// The body's holes ran after a deferred hydration mismatch (adoptOrDefer).
+	if (hydration !== null && hydration.deferred !== null) hydration.claimAfterHoles();
 	if (root !== null) {
 		const block = scope.block;
-		const hydration = activeHydration();
-		if (hydration !== null) hydration.insertRoot(root, block);
+		if (hydration !== null && hydration.isActive()) hydration.insertRoot(root, block);
 		else {
 			const parent = block.parentNode;
 			(STAGED_DOM?.view(parent) ?? parent).insertBefore(root, block.endMarker);
@@ -23036,6 +23243,8 @@ function findMatchingClose(open: Node, matches: WeakMap<Node, Comment>): Comment
 class HydrationMismatch extends NativeAdoptionMiss {
 	/** DEV-only: the warning that a root's fallback publishes, as its attempt never commits. */
 	declare diagnostic: string | undefined;
+	/** DEV-only: the warning of a deferred mismatch, logged when the render reaches it. */
+	declare warning: string | undefined;
 	constructor(message = formatClientError(339)) {
 		super('', '');
 		this.name = 'HydrationMismatch';
@@ -23054,6 +23263,20 @@ class UnclosedHydrationRange extends HydrationMismatch {
 	constructor() {
 		super(formatClientError(338));
 		this.name = 'UnclosedHydrationRange';
+	}
+}
+
+/**
+ * A Hydrate island's attempt suspended on `thenable` after a template's
+ * adoption deferred a mismatch (adoptOrDefer). That attempt rendered on the
+ * client since, so it cannot resume where it suspended: the island discards
+ * it, keeping its server DOM, and adopts afresh once `thenable` settles. Like
+ * a mismatch, it passes every boundary inside the island (isAdoptionControl).
+ */
+class DeferredHydrationSuspension extends NativeAdoptionMiss {
+	constructor(readonly thenable: TrackedThenable<unknown>) {
+		super('', '');
+		this.name = 'DeferredHydrationSuspension';
 	}
 }
 
@@ -34680,6 +34903,9 @@ function reconcileDeoptChildren(el: Element, children: any, ownerBlock: Block): 
 	// so just build + append each child. Skips the keyed-match Map / Set / reorder
 	// bookkeeping below, which is the hot path for large initial mounts.
 	if (firstChild === null) {
+		// Hydrating, an adopted host with no server children cannot hold these.
+		if (next.length !== 0 && currentHydration !== null)
+			currentHydration.missingDeoptChild(el, next[0]);
 		saveDeoptChildren(el);
 		for (let i = 0; i < next.length; i++) {
 			const node = reconcileDeoptNode(null, next[i], ownerBlock, childNs);
@@ -34774,7 +35000,12 @@ function reconcileDeoptChildren(el: Element, children: any, ownerBlock: Block): 
 					unstamped[up],
 				);
 		}
-		if (prev === null && up < unstamped.length) prev = unstamped[up++];
+		if (prev === null) {
+			if (up < unstamped.length) prev = unstamped[up++];
+			// The server rendered fewer children than the client.
+			else if (hydrationOwnsUnstamped === true && !singleton)
+				currentHydration!.missingDeoptChild(el, child);
+		}
 		const node = reconcileDeoptNode(prev, child, ownerBlock, childNs);
 		if (node !== null) {
 			(node as any).$$deoptKey = key;
@@ -35394,12 +35625,19 @@ function hostElementBody(d: ElementDescriptor, block: Block): void {
 		hydration.node = savedCursor;
 		return;
 	}
-	if (el === null && hydration !== null && hydration.node !== null) {
+	if (
+		el === null &&
+		hydration !== null &&
+		(hydration.node !== null || !hydration.isFresh(block.parentNode))
+	) {
 		// STRUCTURAL mismatch: the server rendered something other than this host element at
-		// the cursor (different tag, a component's `<!--[-->…<!--]-->` range, text, …).
+		// the cursor (different tag, a component's `<!--[-->…<!--]-->` range, text, …), or
+		// nothing at all.
 		hydration.mismatch(
 			process.env.NODE_ENV !== 'production'
-				? (domNode(hydration.node).parentNode as any)?.__oct_loc || runtimeHostSiteLoc(block)
+				? (hydration.node === null
+						? (block.parentNode as any).__oct_loc
+						: (domNode(hydration.node).parentNode as any)?.__oct_loc) || runtimeHostSiteLoc(block)
 				: undefined,
 			() => `<${String(d.type)}>`,
 			hydration.node,
@@ -35514,11 +35752,13 @@ function hostStringTagBody(d: ElementDescriptor, block: Block): void {
 			hydration.node = savedCursor;
 			return;
 		}
-		if (hydration !== null && hydration.node !== null) {
+		if (hydration !== null && (hydration.node !== null || !hydration.isFresh(block.parentNode))) {
 			// STRUCTURAL mismatch, as in hostElementBody.
 			hydration.mismatch(
 				process.env.NODE_ENV !== 'production'
-					? (domNode(hydration.node).parentNode as any)?.__oct_loc
+					? hydration.node === null
+						? (block.parentNode as any).__oct_loc
+						: (domNode(hydration.node).parentNode as any)?.__oct_loc
 					: undefined,
 				() => `<${tag}>`,
 				hydration.node,
@@ -39588,6 +39828,9 @@ export function tryBlock(
 	const hydration = activeHydration();
 	let state = parentScope.slots[slotKey] as TrySlot | undefined;
 	let supersedesInputs = false;
+	// A boundary whose hydration has not finished yet.
+	let initial = state === undefined ? undefined : initialSuspenseHydrations?.get(state);
+	let updated = false;
 	if (state === undefined) {
 		let start: Comment;
 		let end: Comment;
@@ -39663,9 +39906,14 @@ export function tryBlock(
 		registerSlot(parentScope, newState);
 		state = newState;
 	} else {
-		supersedesInputs =
-			(state.branch === 2 || state.retrySignalOwners !== undefined) &&
+		const retains = state.branch === 2 || state.retrySignalOwners !== undefined;
+		const changed =
+			(retains || initial !== undefined) &&
 			(state.tryBody !== tryBody || (state.env !== env && depsChanged(state.env, env)));
+		supersedesInputs = retains && changed;
+		// New inputs, not the retry its wakeable scheduled, reached a boundary
+		// whose hydration is suspended: as React does, it renders on the client.
+		updated = initial !== undefined && changed;
 		if (supersedesInputs) supersedeSignalRetryOwners(state);
 		// A boundary can retry after its parent's render rolls back, e.g. when the
 		// wakeable it was pending on settles. It must render the committed inputs.
@@ -39689,13 +39937,12 @@ export function tryBlock(
 		state.env = env;
 	}
 	const s = state;
-	let initial = initialSuspenseHydrations?.get(s);
 	if (initial === undefined && hydration !== null && s.branch === -1 && !s.propagateSuspense) {
 		initial = takeInitialSuspenseHydration(s, hydration) ?? undefined;
 		if (initial !== undefined) (initialSuspenseHydrations ??= new WeakMap()).set(s, initial);
 	}
 	if (initial !== undefined) {
-		initialSuspenseHydrationRenderer!(s, initial);
+		initialSuspenseHydrationRenderer!(s, initial, updated);
 	} else if (s.passthrough) {
 		renderPassthroughTry(s);
 		return s.reset;
@@ -40028,24 +40275,69 @@ function catchesInHydrationFallback(render: () => void): boolean {
  * DOM was discarded (catchesInHydrationFallback). It is a dehydrated boundary
  * meanwhile (DEHYDRATED_TRY).
  */
-function renderDehydratedTry(state: TrySlot): boolean {
+function renderDehydratedTry(state: TrySlot, claimsRetryOwners = false): boolean {
 	const previous = DEHYDRATED_TRY;
 	DEHYDRATED_TRY = state;
 	try {
-		return catchesInHydrationFallback(() => mountTry(state));
+		return catchesInHydrationFallback(() => mountTry(state, claimsRetryOwners));
 	} finally {
 		DEHYDRATED_TRY = previous;
 	}
 }
 
-function renderInitialSuspenseHydration(state: TrySlot, initial: InitialSuspenseHydration): void {
+/**
+ * Discard the server DOM of a Suspense arm whose hydration failed or was
+ * overtaken by an update, and render the arm on the client, as React does for
+ * a dehydrated boundary. Returns whether a catch arm caught an error in that
+ * render (renderDehydratedTry).
+ */
+function clientRenderDehydratedTry(state: TrySlot, outer: HydrationCapability | null): boolean {
+	initialSuspenseHydrations?.delete(state);
+	const parent = domNode(state.domParent);
+	journalRootChildren(parent);
+	outer?.save(parent);
+	markHydrationDiscard(
+		state.parentBlock.idState.renderOwner,
+		parent,
+		getNextSibling(state.start),
+		state.end,
+	);
+	// This removes the arm's metadata too. Leave a streamed payload with its
+	// weak marker owner: a discarded enclosing attempt restores the marker
+	// and hydrates the arm from it again, and a commit drops both together.
+	removeRange(getNextSibling(state.start), state.end);
+	currentHydration = null;
+	try {
+		return renderDehydratedTry(state, true);
+	} finally {
+		currentHydration = outer;
+		if (outer !== null) outer.node = getNextSibling(state.end);
+		// Owners that the client render did not claim retire, unless it suspended
+		// and retains its own for the retry.
+		if (state.branch !== 2 && state.retrySignalOwners !== undefined) clearSignalRetryOwners(state);
+	}
+}
+
+function renderInitialSuspenseHydration(
+	state: TrySlot,
+	initial: InitialSuspenseHydration,
+	updated = false,
+): void {
 	state.pendingThenable = null;
+	if (updated) {
+		// New inputs reached the arm while its hydration was suspended. The
+		// server HTML predates them, so, as React client-renders a dehydrated
+		// boundary that an update reaches, the arm renders on the client from
+		// client data, reporting nothing, and its obsolete wakeable is ignored.
+		clientRenderDehydratedTry(state, currentHydration);
+		return;
+	}
 	state.idState.next = initial.idStart;
 	const block = createTryBody(state, initial.start, initial.end);
 	state.block = block;
 	setTryBranch(state, 1);
 	const hydration = new HydrationCapability(block, getNextSibling(initial.start), null);
-	hydration.speculative = true;
+	hydration.speculative = hydration.defers = true;
 	if (initial.seedRaw !== null) hydration.seeds = hydration.parseSeeds(initial.seedRaw);
 	// This capability owns one exact arm, never the surrounding root siblings.
 	hydration.claimRootRemainder(initial.end);
@@ -40074,13 +40366,14 @@ function renderInitialSuspenseHydration(state: TrySlot, initial: InitialSuspense
 			setNativeAdoptionResolver(hydration.nativeAdoption.resolve);
 		}
 		renderBlock(block);
+		if (hydration.deferred !== null) hydration.claimDeferred();
 		drainHydrationRenderPhaseUpdates(block, true);
 		hydration.settleValues();
 		hydration.settle(previousHydration);
 		state.hasResolved = true;
 	} catch (error) {
 		failed = true;
-		failure = error;
+		failure = hydration.failure(error);
 		if (isSuspenseException(error)) suspended = error.thenable;
 		// The next attempt, or the server catch arm adopted below, finds the
 		// server arm as the server rendered it: undo this attempt's changes.
@@ -40090,7 +40383,12 @@ function renderInitialSuspenseHydration(state: TrySlot, initial: InitialSuspense
 		const refs: SuspenseRefEntry[] = [];
 		collectVisibleSubtreeRefs(block, refs);
 		const previousRetained = RETAINED_SIGNAL_OWNERS;
-		if (suspended !== null && state.parentBlock.idState.renderOwner?.signalOwner !== undefined) {
+		// A retry, or the client render that replaces a mismatched attempt, claims
+		// the attempt's query owners rather than loading them again.
+		if (
+			(suspended !== null || failure instanceof HydrationMismatch) &&
+			state.parentBlock.idState.renderOwner?.signalOwner !== undefined
+		) {
 			retainSignalRetryScope(block, block, state, true);
 			// An item which threw before linking itself into the list still lives
 			// in the root creation journal, not yet in the reconciler's item chain.
@@ -40155,28 +40453,8 @@ function renderInitialSuspenseHydration(state: TrySlot, initial: InitialSuspense
 		// inside it: as React does for a Suspense boundary, discard its server DOM
 		// and render it on the client rather than fail a root that may have
 		// committed already.
-		const parent = domNode(state.domParent);
-		journalRootChildren(parent);
-		previousHydration?.save(parent);
-		markHydrationDiscard(
-			state.parentBlock.idState.renderOwner,
-			parent,
-			getNextSibling(state.start),
-			state.end,
-		);
-		// This removes the arm's metadata too. Leave a streamed payload with its
-		// weak marker owner: a discarded enclosing attempt restores the marker
-		// and hydrates the arm from it again, and a commit drops both together.
-		removeRange(getNextSibling(state.start), state.end);
-		currentHydration = null;
-		let caught = false;
-		try {
-			caught = renderDehydratedTry(state);
-		} finally {
-			currentHydration = previousHydration;
-			if (previousHydration !== null) previousHydration.node = getNextSibling(state.end);
-		}
-		if (!caught) noteRecoverableHydrationError(() => failure, state.parentBlock);
+		if (!clientRenderDehydratedTry(state, previousHydration))
+			noteRecoverableHydrationError(() => failure, state.parentBlock);
 		return;
 	}
 	if (isAdoptionControl(failure) || isHostContextRequest(failure)) throw failure;
@@ -40232,8 +40510,12 @@ interface UnfinishedArm {
 	caught: boolean;
 }
 
-function mountTry(state: TrySlot): void {
-	if (state.retrySignalOwners !== undefined) clearSignalRetryOwners(state);
+/**
+ * Mount the try body afresh. `claimsRetryOwners`: the query owners that a
+ * discarded hydration attempt retained stay for this render to claim.
+ */
+function mountTry(state: TrySlot, claimsRetryOwners = false): void {
+	if (!claimsRetryOwners && state.retrySignalOwners !== undefined) clearSignalRetryOwners(state);
 	cancelSuspenseRetry(state);
 	HIDDEN_REVEAL_ACTIONS?.delete(state);
 	const wasPending = state.branch === 2;
@@ -43048,9 +43330,11 @@ function markerlessBranchRoots(
 }
 
 /**
- * Publish the DOM boundary of a markerless arm after its body finally
- * completes. Its content lies after `before` and before `after`, where its
- * root slots were anchored.
+ * Publish the DOM boundary of a markerless arm. Its content lies after
+ * `before` and before `after`, where its root slots were anchored. A body that
+ * threw (`complete` false) has not reached its later slots, so the element it
+ * inserted may be the first of several roots: only a completed body can
+ * self-mark with it.
  */
 function finalizeMarkerlessBranch(
 	state: BranchSlot,
@@ -43059,6 +43343,7 @@ function finalizeMarkerlessBranch(
 	marker: string,
 	before: Node | null,
 	after: Node | null,
+	complete: boolean,
 ): void {
 	state.unfinalized = false;
 	if (state.borrowed && state.start === null) return;
@@ -43069,6 +43354,7 @@ function finalizeMarkerlessBranch(
 	// One current element is not a sole root when an empty sibling slot can
 	// later produce more output at the same provisional insertion anchor.
 	if (
+		complete &&
 		last !== null &&
 		first === last &&
 		first.nodeType === 1 &&
@@ -43114,10 +43400,10 @@ function renderMarkerlessArm(
 		renderBlock(block);
 	} catch (error) {
 		if ((before ? getNextSibling(before) : getFirstChild(domParent)) !== after)
-			finalizeMarkerlessBranch(state, domParent, block, marker, before, after);
+			finalizeMarkerlessBranch(state, domParent, block, marker, before, after, false);
 		throw error;
 	}
-	finalizeMarkerlessBranch(state, domParent, block, marker, before, after);
+	finalizeMarkerlessBranch(state, domParent, block, marker, before, after, true);
 }
 
 /** Bound a markerless arm's content, from `first` up to `after`, with a marker pair. */
@@ -48925,6 +49211,8 @@ function hydrateRootWithOutputHandler(
 		idState.next = rootOptions?.identifierSeed ?? 0;
 		const firstNode = skipFoldedHeadPrefix(container, getFirstChild(container));
 		const hydration = new HydrationCapability(rootBlock, firstNode, seeds);
+		// A suspended attempt rolls back, and its retry adopts afresh.
+		hydration.defers = true;
 		if (bindingLeases?.length) {
 			const attempted = rootBlock;
 			hydration.retryPresentation = () => {
@@ -48971,6 +49259,7 @@ function hydrateRootWithOutputHandler(
 				hydration.node = getNextSibling(firstNode);
 			}
 			renderBlock(rootBlock);
+			if (hydration.deferred !== null) hydration.claimDeferred();
 			drainHydrationRenderPhaseUpdates(rootBlock, true);
 			// Mount empty server Activities only after every adopted sibling has
 			// consumed its server ID and seed positions.
@@ -48980,7 +49269,8 @@ function hydrateRootWithOutputHandler(
 				});
 			hydration.settleValues();
 			completed = true;
-		} catch (error) {
+		} catch (thrown) {
+			const error = hydration.failure(thrown);
 			if (error instanceof PresentationAdoptionMiss) {
 				rollbackRootRender(owner.transaction!);
 				const refs: SuspenseRefEntry[] = [];

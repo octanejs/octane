@@ -21,7 +21,16 @@ const FIXTURE = join(
 );
 type Fixture = typeof import('./_fixtures/suspended-clone-mismatch.tsrx');
 type Component =
-	'GateBranch' | 'GateForm' | 'GateNested' | 'GateEmptyList' | 'GateLongerList' | 'GateDetached';
+	| 'GateBranch'
+	| 'GateHostFirst'
+	| 'GateLeafFirst'
+	| 'GateMarkThenLeaf'
+	| 'GateSetupFirst'
+	| 'GateForm'
+	| 'GateNested'
+	| 'GateEmptyList'
+	| 'GateLongerList'
+	| 'GateDetached';
 
 const server = loadServerFixture<Fixture>(FIXTURE, { id: 'suspended-clone-mismatch.tsrx' });
 
@@ -124,6 +133,64 @@ describe.each([true, false])('suspended @try arm with a hydration mismatch (dev=
 			expect(reported[0]).toContain('suspended-clone-mismatch.tsrx');
 			expect(reported[0]).toContain('but the server rendered <b>');
 		} else expect(reported).toEqual([]);
+	});
+
+	// React runs a component's body before it hydrates the hosts that body
+	// renders. The leaf that leads the client's fragment suspends before any of
+	// its hosts is compared, so the server arm stays; the root that holds the
+	// leaf is compared first, so the arm renders on the client at once.
+	it('keeps the server arm while a fragment’s leading leaf is pending', async () => {
+		const expected = await control('GateLeafFirst');
+		expect(expected.html).toBe('<div><i>ok</i><em>x</em></div>');
+		expect(expected.recoverable).toBe(1);
+
+		const resume = serve('GateLeafFirst');
+		const serverArm = container.querySelector('b.server');
+		const recoverable: unknown[] = [];
+		hydrate('GateLeafFirst', recoverable);
+		await act(() => {});
+
+		expect(container.querySelector('b.server')).toBe(serverArm);
+		expect(markup()).toBe('<div><b class="server">server</b></div>');
+		expect(structural()).toEqual([]);
+		expect(recoverable).toEqual([]);
+
+		await resume();
+		expect(markup()).toBe(expected.html);
+		expect(structural()).toEqual(expected.structural);
+		expect(recoverable).toHaveLength(1);
+	});
+
+	it.each([
+		['the root that holds the pending leaf', 'GateHostFirst', '<section><i>ok</i></section>'],
+		[
+			'the root that holds a leaf pending before its template',
+			'GateSetupFirst',
+			'<section><i>ok</i></section>',
+		],
+		[
+			'a host rendered before the pending leaf',
+			'GateMarkThenLeaf',
+			'<s>client</s><i>ok</i><em>x</em>',
+		],
+	] as const)('renders the arm on the client when %s differs', async (_, component, html) => {
+		const expected = await control(component);
+		expect(expected.html).toBe(`<div>${html}</div>`);
+		expect(expected.recoverable).toBe(1);
+
+		const resume = serve(component);
+		const serverArm = container.querySelector('b.server')!;
+		const recoverable: unknown[] = [];
+		hydrate(component, recoverable);
+		await act(() => {});
+
+		expect(serverArm.isConnected).toBe(false);
+		expect(container.querySelector('p')!.textContent).toBe('pending');
+
+		await resume();
+		expect(markup()).toBe(expected.html);
+		expect(structural()).toEqual(expected.structural);
+		expect(recoverable).toHaveLength(1);
 	});
 
 	// <s> differs from the server's <b> before the leaf suspends: the arm renders

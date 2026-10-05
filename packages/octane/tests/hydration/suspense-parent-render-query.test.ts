@@ -7,10 +7,12 @@ import '../_fixtures/signals-async-controls.js';
 import '../../src/hydration/streamed-signals.js';
 
 // A hydrating Suspense boundary whose first client attempt is waiting for the
-// browser's own load keeps that load when its parent renders again. The load
-// resolves to a different text than the server rendered, so, as in React, the
-// boundary then discards its server content and renders on the client,
-// reporting the mismatch once, while the parent outside it keeps its DOM.
+// browser's own load keeps that load when its parent renders again. The parent's
+// render gives the boundary new children, so, as React 19 does for an update
+// that reaches a boundary whose hydration is suspended, the boundary discards
+// its server content and renders on the client, showing its fallback until the
+// load resolves and reporting nothing, while the parent outside it keeps its
+// DOM.
 
 const FIELD = {
 	id: '/src/field.tsx',
@@ -132,25 +134,18 @@ describe('a hydrating JSX Suspense across parent renders', () => {
 					await drain();
 				}
 				expect(browserLoad.mock.calls.map(([id]) => id)).toEqual(['b']);
-				expect(serverOutput.textContent).toBe('server a');
+				expect(serverOutput.isConnected).toBe(false);
+				expect(container.querySelector('main i')!.textContent).toBe('waiting');
 				expect(recoverable).toEqual([]);
 				pending.get('b')!('browser b');
 				await drain();
-				// The browser's text differs from the server's: the boundary falls back.
-				expect(serverOutput.isConnected).toBe(false);
-				expect(recoverable).toEqual([
-					expect.objectContaining({
-						message: expect.stringMatching(/^Hydration failed because the server rendered HTML/),
-					}),
-				]);
-				// Its client render reads the browser's data, loading it again if it must.
-				pending.get('b')!('browser b');
-				await drain();
+				// The client render reveals the browser's data.
 				expect(container.querySelector('output')!.textContent).toBe('browser b');
+				expect(container.querySelector('main i')).toBeNull();
 				expect(container.querySelector('main')).toBe(main);
 				expect(main.dataset.tick).toBe('3');
-				expect(browserLoad.mock.calls.every(([id]) => id === 'b')).toBe(true);
-				expect(recoverable).toHaveLength(1);
+				expect(browserLoad.mock.calls.map(([id]) => id)).toEqual(['b']);
+				expect(recoverable).toEqual([]);
 				expect(uncaught).toEqual([]);
 			} finally {
 				root?.unmount();
