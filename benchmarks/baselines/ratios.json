@@ -1273,24 +1273,24 @@
     "op": "app_gzip",
     "target": "octane-jsx",
     "reference": "octane-tsrx",
-    "maxRatio": 1.24,
-    "note": "TSX/TSRX application gzip under CI Node 24 on 2026-08-08: 2915 / 2372 = 1.229x. The July fixture snapshot is obsolete; an independent exact TSRX application-byte budget prevents runtime savings from hiding generated-code growth."
+    "maxRatio": 1.25,
+    "note": "Rows TSX/TSRX application gzip under Node 24 on 2026-10-05 with Vite 8's default Oxc minifier: 2860 / 2334 = 1.225x. Re-cut at about 1.5% headroom when the bundle-size harness moved from `minify: 'esbuild'` (2936 / 2435 = 1.206x) to Vite's default minifier. An independent exact TSRX application-byte budget prevents runtime savings from hiding generated-code growth."
   },
   {
     "suite": "bundle-size",
     "op": "js_gzip",
     "target": "octane-tsrx",
     "reference": "ripple",
-    "maxRatio": 2.82,
-    "note": "Rows total gzip versus Ripple under CI Node 24 on 2026-10-03: 41978 / 15029 = 2.793x, after the 2026-09-30 to 2026-10-02 runtime growth (review A1/A2, fixes in flight). Absolute bytes are ratcheted by benchmarks/bundle-size/app-budgets.json at measured + 32, so this ratio only tracks the gap."
+    "maxRatio": 2.62,
+    "note": "Rows total gzip versus Ripple under Node 24 on 2026-10-05 with Vite 8's default Oxc minifier: 37822 / 14697 = 2.573x. Re-cut at about 1.5% headroom when the bundle-size harness moved from `minify: 'esbuild'` (39749 / 15029 = 2.645x) to Vite's default minifier. Absolute bytes are ratcheted by benchmarks/bundle-size/app-budgets.json at measured + 32, so this ratio only tracks the gap."
   },
   {
     "suite": "bundle-size",
     "op": "js_gzip",
     "target": "octane-tsrx",
     "reference": "solid",
-    "maxRatio": 2.76,
-    "note": "Rows total gzip versus Solid under CI Node 24 on 2026-10-03: 41978 / 15399 = 2.726x, after the 2026-09-30 to 2026-10-02 runtime growth (review A1/A2, fixes in flight). Absolute bytes are ratcheted by benchmarks/bundle-size/app-budgets.json at measured + 32, so this ratio only tracks the gap."
+    "maxRatio": 2.61,
+    "note": "Rows total gzip versus Solid under Node 24 on 2026-10-05 with Vite 8's default Oxc minifier: 37822 / 14718 = 2.570x. Re-cut at about 1.5% headroom when the bundle-size harness moved from `minify: 'esbuild'` (39749 / 15399 = 2.581x) to Vite's default minifier. Absolute bytes are ratcheted by benchmarks/bundle-size/app-budgets.json at measured + 32, so this ratio only tracks the gap."
   },
   {
     "suite": "codegen-size",
@@ -1572,120 +1572,120 @@
     "op": "app_gzip",
     "target": "octane-tsrx",
     "reference": "ripple",
-    "maxRatio": 1.06,
-    "note": "Rows application gzip versus Ripple under CI Node 24 on 2026-09-21: 2581 / 2480 = 1.041x. Ceiling re-committed under the pinned CI Node 24 on 2026-09-21 after uniform runtime growth: packages/octane/src/runtime.ts source grew 1157028 -> 1793553 bytes across 116 runtime-touching main commits since the 2026-08-16 ceilings, while void-root specialization is verified intact (__createVoidRoot emitted, createRoot absent). This replaces the obsolete August fixture snapshot; the independent exact application-byte budget still rejects Octane code growth."
+    "maxRatio": 0.98,
+    "note": "Rows application gzip versus Ripple under Node 24 on 2026-10-05 with Vite 8's default Oxc minifier: 2334 / 2438 = 0.957x. Re-cut at about 1.5% headroom when the bundle-size harness moved from `minify: 'esbuild'` (2435 / 2480 = 0.982x) to Vite's default minifier. The independent exact application-byte budget still rejects Octane code growth."
   },
   {
     "suite": "bundle-size",
     "op": "app_gzip",
     "target": "octane-tsrx",
     "reference": "solid",
-    "maxRatio": 1.31,
-    "note": "Rows application gzip versus Solid under CI Node 24 on 2026-09-21: 2581 / 1991 = 1.296x. Ceiling re-committed under the pinned CI Node 24 on 2026-09-21 after uniform runtime growth: packages/octane/src/runtime.ts source grew 1157028 -> 1793553 bytes across 116 runtime-touching main commits since the 2026-08-16 ceilings, while void-root specialization is verified intact (__createVoidRoot emitted, createRoot absent). This replaces the obsolete August fixture snapshot; the independent exact application-byte budget still rejects Octane code growth."
+    "maxRatio": 1.23,
+    "note": "Rows application gzip versus Solid under Node 24 on 2026-10-05 with Vite 8's default Oxc minifier: 2334 / 1941 = 1.202x. Re-cut at about 1.5% headroom when the bundle-size harness moved from `minify: 'esbuild'` (2435 / 1991 = 1.223x) to Vite's default minifier. The independent exact application-byte budget still rejects Octane code growth."
   },
   {
     "suite": "bundle-size",
     "op": "todo_app_gzip",
     "target": "octane-tsrx",
     "reference": "solid",
-    "maxRatio": 1.99,
-    "note": "TodoMVC application gzip versus Solid under CI Node 24 on 2026-09-21: 2528 / 1289 = 1.961x. Ceiling re-committed under the pinned CI Node 24 on 2026-09-21 after uniform runtime growth: packages/octane/src/runtime.ts source grew 1157028 -> 1793553 bytes across 116 runtime-touching main commits since the 2026-08-16 ceilings, while void-root specialization is verified intact (__createVoidRoot emitted, createRoot absent). This replaces the obsolete August fixture snapshot; the independent exact application-byte budget still rejects Octane code growth."
+    "maxRatio": 1.83,
+    "note": "TodoMVC application gzip versus Solid under Node 24 on 2026-10-05 with Vite 8's default Oxc minifier: 2222 / 1239 = 1.793x. Re-cut at about 1.5% headroom when the bundle-size harness moved from `minify: 'esbuild'` (2330 / 1289 = 1.808x) to Vite's default minifier. The independent exact application-byte budget still rejects Octane code growth."
   },
   {
     "suite": "bundle-size",
     "op": "todo_app_gzip",
     "target": "octane-tsrx",
     "reference": "ripple",
-    "maxRatio": 1.28,
-    "note": "TodoMVC application gzip versus Ripple on 2026-08-08: CI Node 24 measures 2071 / 1645 = 1.259x and supported Node 26 measures 2067 / 1624 = 1.273x. This replaces the obsolete July fixture snapshot; the independent exact application-byte budget still rejects Octane code growth."
+    "maxRatio": 1.11,
+    "note": "TodoMVC application gzip versus Ripple under Node 24 on 2026-10-05 with Vite 8's default Oxc minifier: 2222 / 2046 = 1.086x. Re-cut at about 1.5% headroom when the bundle-size harness moved from `minify: 'esbuild'` (2330 / 2105 = 1.107x) to Vite's default minifier. The independent exact application-byte budget still rejects Octane code growth."
   },
   {
     "suite": "bundle-size",
     "op": "chat_app_gzip",
     "target": "octane-tsrx",
     "reference": "solid",
-    "maxRatio": 1.45,
-    "note": "Chat-stream application gzip versus Solid under CI Node 24 on 2026-09-21: 3007 / 2102 = 1.431x. Ceiling re-committed under the pinned CI Node 24 on 2026-09-21 after uniform runtime growth: packages/octane/src/runtime.ts source grew 1157028 -> 1793553 bytes across 116 runtime-touching main commits since the 2026-08-16 ceilings, while void-root specialization is verified intact (__createVoidRoot emitted, createRoot absent). This replaces the obsolete August fixture snapshot; the independent exact application-byte budget still rejects Octane code growth."
+    "maxRatio": 1.34,
+    "note": "Chat-stream application gzip versus Solid under Node 24 on 2026-10-05 with Vite 8's default Oxc minifier: 2715 / 2067 = 1.313x. Re-cut at about 1.5% headroom when the bundle-size harness moved from `minify: 'esbuild'` (2769 / 2102 = 1.317x) to Vite's default minifier. The independent exact application-byte budget still rejects Octane code growth."
   },
   {
     "suite": "bundle-size",
     "op": "chat_app_gzip",
     "target": "octane-tsrx",
     "reference": "ripple",
-    "maxRatio": 1.2,
-    "note": "Chat-stream application gzip versus Ripple under CI Node 24 on 2026-09-21: 3007 / 2542 = 1.183x. Ceiling re-committed under the pinned CI Node 24 on 2026-09-21 after uniform runtime growth: packages/octane/src/runtime.ts source grew 1157028 -> 1793553 bytes across 116 runtime-touching main commits since the 2026-08-16 ceilings, while void-root specialization is verified intact (__createVoidRoot emitted, createRoot absent). This replaces the obsolete August fixture snapshot; the independent exact application-byte budget still rejects Octane code growth."
+    "maxRatio": 1.11,
+    "note": "Chat-stream application gzip versus Ripple under Node 24 on 2026-10-05 with Vite 8's default Oxc minifier: 2715 / 2493 = 1.089x. Re-cut at about 1.5% headroom when the bundle-size harness moved from `minify: 'esbuild'` (2769 / 2542 = 1.089x) to Vite's default minifier. The independent exact application-byte budget still rejects Octane code growth."
   },
   {
     "suite": "bundle-size",
     "op": "js_gzip",
     "target": "octane-tsrx",
     "reference": "svelte",
-    "maxRatio": 2.32,
-    "note": "Rows total gzip versus Svelte 5 under CI Node 24 on 2026-10-03: 41978 / 18325 = 2.291x, after the 2026-09-30 to 2026-10-02 runtime growth (review A1/A2, fixes in flight). Absolute bytes are ratcheted by benchmarks/bundle-size/app-budgets.json at measured + 32, so this ratio only tracks the gap."
+    "maxRatio": 2.53,
+    "note": "Rows total gzip versus Svelte 5 under Node 24 on 2026-10-05 with Vite 8's default Oxc minifier: 37822 / 15233 = 2.483x. Re-cut at about 1.5% headroom when the bundle-size harness moved from `minify: 'esbuild'` (39749 / 18325 = 2.169x) to Vite's default minifier. Svelte's framework bytes shrink 17–19% under Oxc while Octane's shrink 4–5%, so the ceiling rises without Octane growth. Absolute bytes are ratcheted by benchmarks/bundle-size/app-budgets.json at measured + 32, so this ratio only tracks the gap."
   },
   {
     "suite": "bundle-size",
     "op": "app_gzip",
     "target": "octane-tsrx",
     "reference": "svelte",
-    "maxRatio": 1.14,
-    "note": "Rows application gzip versus Svelte 5 under CI Node 24 on 2026-09-21: 2581 / 2300 = 1.122x. Ceiling re-committed under the pinned CI Node 24 on 2026-09-21 after uniform runtime growth: packages/octane/src/runtime.ts source grew 1157028 -> 1793553 bytes across 116 runtime-touching main commits since the 2026-08-16 ceilings, while void-root specialization is verified intact (__createVoidRoot emitted, createRoot absent). This replaces the obsolete August fixture snapshot; the independent exact application-byte budget still rejects Octane code growth."
+    "maxRatio": 1.05,
+    "note": "Rows application gzip versus Svelte 5 under Node 24 on 2026-10-05 with Vite 8's default Oxc minifier: 2334 / 2257 = 1.034x. Re-cut at about 1.5% headroom when the bundle-size harness moved from `minify: 'esbuild'` (2435 / 2300 = 1.059x) to Vite's default minifier. The independent exact application-byte budget still rejects Octane code growth."
   },
   {
     "suite": "bundle-size",
     "op": "todo_js_gzip",
     "target": "octane-tsrx",
     "reference": "svelte",
-    "maxRatio": 2.57,
-    "note": "TodoMVC total gzip versus Svelte 5 under CI Node 24 on 2026-10-03: 46993 / 18530 = 2.536x, after the 2026-09-30 to 2026-10-02 runtime growth (review A1/A2, fixes in flight). Absolute bytes are ratcheted by benchmarks/bundle-size/app-budgets.json at measured + 32, so this ratio only tracks the gap."
+    "maxRatio": 2.73,
+    "note": "TodoMVC total gzip versus Svelte 5 under Node 24 on 2026-10-05 with Vite 8's default Oxc minifier: 41295 / 15385 = 2.684x. Re-cut at about 1.5% headroom when the bundle-size harness moved from `minify: 'esbuild'` (43410 / 18530 = 2.343x) to Vite's default minifier. Svelte's framework bytes shrink 17–19% under Oxc while Octane's shrink 4–5%, so the ceiling rises without Octane growth. Absolute bytes are ratcheted by benchmarks/bundle-size/app-budgets.json at measured + 32, so this ratio only tracks the gap."
   },
   {
     "suite": "bundle-size",
     "op": "todo_app_gzip",
     "target": "octane-tsrx",
     "reference": "svelte",
-    "maxRatio": 1.69,
-    "note": "TodoMVC application gzip versus Svelte 5 under CI Node 24 on 2026-09-21: 2528 / 1511 = 1.673x. Ceiling re-committed under the pinned CI Node 24 on 2026-09-21 after uniform runtime growth: packages/octane/src/runtime.ts source grew 1157028 -> 1793553 bytes across 116 runtime-touching main commits since the 2026-08-16 ceilings, while void-root specialization is verified intact (__createVoidRoot emitted, createRoot absent). This replaces the obsolete August fixture snapshot; the independent exact application-byte budget still rejects Octane code growth."
+    "maxRatio": 1.57,
+    "note": "TodoMVC application gzip versus Svelte 5 under Node 24 on 2026-10-05 with Vite 8's default Oxc minifier: 2222 / 1440 = 1.543x. Re-cut at about 1.5% headroom when the bundle-size harness moved from `minify: 'esbuild'` (2330 / 1511 = 1.542x) to Vite's default minifier. The independent exact application-byte budget still rejects Octane code growth."
   },
   {
     "suite": "bundle-size",
     "op": "chat_js_gzip",
     "target": "octane-tsrx",
     "reference": "svelte",
-    "maxRatio": 2.48,
-    "note": "Chat-stream total gzip versus Svelte 5 under CI Node 24 on 2026-10-03: 46937 / 19164 = 2.449x, after the 2026-09-30 to 2026-10-02 runtime growth (review A1/A2, fixes in flight). Absolute bytes are ratcheted by benchmarks/bundle-size/app-budgets.json at measured + 32, so this ratio only tracks the gap."
+    "maxRatio": 2.6,
+    "note": "Chat-stream total gzip versus Svelte 5 under Node 24 on 2026-10-05 with Vite 8's default Oxc minifier: 41094 / 16050 = 2.560x. Re-cut at about 1.5% headroom when the bundle-size harness moved from `minify: 'esbuild'` (43126 / 19164 = 2.250x) to Vite's default minifier. Svelte's framework bytes shrink 17–19% under Oxc while Octane's shrink 4–5%, so the ceiling rises without Octane growth. Absolute bytes are ratcheted by benchmarks/bundle-size/app-budgets.json at measured + 32, so this ratio only tracks the gap."
   },
   {
     "suite": "bundle-size",
     "op": "chat_app_gzip",
     "target": "octane-tsrx",
     "reference": "svelte",
-    "maxRatio": 1.34,
-    "note": "Chat-stream application gzip versus Svelte 5 under CI Node 24 on 2026-09-21: 3007 / 2279 = 1.319x. Ceiling re-committed under the pinned CI Node 24 on 2026-09-21 after uniform runtime growth: packages/octane/src/runtime.ts source grew 1157028 -> 1793553 bytes across 116 runtime-touching main commits since the 2026-08-16 ceilings, while void-root specialization is verified intact (__createVoidRoot emitted, createRoot absent). This replaces the obsolete August fixture snapshot; the independent exact application-byte budget still rejects Octane code growth."
+    "maxRatio": 1.24,
+    "note": "Chat-stream application gzip versus Svelte 5 under Node 24 on 2026-10-05 with Vite 8's default Oxc minifier: 2715 / 2230 = 1.217x. Re-cut at about 1.5% headroom when the bundle-size harness moved from `minify: 'esbuild'` (2769 / 2279 = 1.215x) to Vite's default minifier. The independent exact application-byte budget still rejects Octane code growth."
   },
   {
     "suite": "bundle-size",
     "op": "weather_js_gzip",
     "target": "octane-tsrx",
     "reference": "react",
-    "maxRatio": 0.91,
-    "note": "Weather app total gzip versus React 19 under CI Node 24 on 2026-09-21: 61107 / 68143 = 0.897x. Ceiling re-committed under the pinned CI Node 24 on 2026-09-21 after uniform runtime growth: packages/octane/src/runtime.ts source grew 1157028 -> 1793553 bytes across 116 runtime-touching main commits since the 2026-08-16 ceilings, while void-root specialization is verified intact (__createVoidRoot emitted, createRoot absent). The August ceiling predates that growth; exact application, framework, and total budgets independently reject future growth."
+    "maxRatio": 0.81,
+    "note": "Weather app total gzip versus React 19 under Node 24 on 2026-10-05 with Vite 8's default Oxc minifier: 53075 / 67127 = 0.791x. Re-cut at about 1.5% headroom when the bundle-size harness moved from `minify: 'esbuild'` (55385 / 68143 = 0.813x) to Vite's default minifier. Absolute bytes are ratcheted by benchmarks/bundle-size/app-budgets.json at measured + 32, so this ratio only tracks the gap."
   },
   {
     "suite": "bundle-size",
     "op": "weather_app_gzip",
     "target": "octane-tsrx",
     "reference": "react",
-    "maxRatio": 1.6,
-    "note": "Weather app APP-CODE production gzip vs React 19, including each port's shared weather service and formatting modules. The current record measured 7802 / 5291 = 1.475x on 2026-07-18; the 1.6x ceiling bounds compiled app growth separately from framework runtime."
+    "maxRatio": 1.06,
+    "note": "Weather app application gzip versus React 19 under Node 24 on 2026-10-05 with Vite 8's default Oxc minifier: 7869 / 7547 = 1.043x. Re-cut at about 1.5% headroom when the bundle-size harness moved from `minify: 'esbuild'` (8110 / 7625 = 1.064x) to Vite's default minifier. The independent exact application-byte budget still rejects Octane code growth."
   },
   {
     "suite": "bundle-size",
     "op": "weather_fw_gzip",
     "target": "octane-tsrx",
     "reference": "react",
-    "maxRatio": 0.87,
-    "note": "Weather app framework gzip versus React 19 under CI Node 24 on 2026-09-21: 51897 / 60518 = 0.858x. Ceiling re-committed under the pinned CI Node 24 on 2026-09-21 after uniform runtime growth: packages/octane/src/runtime.ts source grew 1157028 -> 1793553 bytes across 116 runtime-touching main commits since the 2026-08-16 ceilings, while void-root specialization is verified intact (__createVoidRoot emitted, createRoot absent). The August ceiling predates that growth; exact application, framework, and total budgets independently reject future growth."
+    "maxRatio": 0.78,
+    "note": "Weather app framework gzip versus React 19 under Node 24 on 2026-10-05 with Vite 8's default Oxc minifier: 45206 / 59580 = 0.759x. Re-cut at about 1.5% headroom when the bundle-size harness moved from `minify: 'esbuild'` (47275 / 60518 = 0.781x) to Vite's default minifier. Absolute bytes are ratcheted by benchmarks/bundle-size/app-budgets.json at measured + 32, so this ratio only tracks the gap."
   },
   {
     "suite": "bundle-size",
