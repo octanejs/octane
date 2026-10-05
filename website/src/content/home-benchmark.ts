@@ -234,13 +234,11 @@ export const HOME_SUMMARY: BenchCard = {
 	ceilings: {
 		'bundle-size': {
 			'octane-tsrx': 3.732901016660736,
-			react: 1.3384254402684395,
 			preact: 0.26728363674552413,
 			solid: 0.8925251846436945,
 			svelte: 0.7714595403146449,
 			ripple: 0.6694945217904689,
 			'vue-vapor': 1.8391887969455243,
-			inferno: 0.2309182690156334,
 		},
 	},
 };

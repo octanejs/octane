@@ -76,14 +76,16 @@ interface BarItem {
 	ink: FillInk;
 }
 
-// A ceiling that prints the same as its value would read "10 kB–10 kB", so the
-// bar stays a single value.
+// A ceiling at or below its value would draw a negative-width range, and one
+// that prints the same reads "10 kB–10 kB", so either stays a single value.
 function rangeEnd(
 	value: number,
 	ceiling: number | undefined,
 	format: (value: unknown) => string,
 ): number | undefined {
-	return ceiling !== undefined && format(ceiling) !== format(value) ? ceiling : undefined;
+	return ceiling !== undefined && ceiling > value && format(ceiling) !== format(value)
+		? ceiling
+		: undefined;
 }
 
 function geomeanRatio(pairs: Array<[number, number]>): number {

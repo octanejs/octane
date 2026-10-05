@@ -61,10 +61,12 @@ interface BarItem {
 	ink: FillInk;
 }
 
-// A ceiling that prints the same as its value would read "0.23×–0.23×", so
-// the bar stays a single value.
+// A ceiling at or below its value would draw a negative-width range, and one
+// that prints the same reads "0.23×–0.23×", so either stays a single value.
 function rangeEnd(value: number, ceiling: number | undefined): number | undefined {
-	return ceiling !== undefined && fmtX(ceiling) !== fmtX(value) ? ceiling : undefined;
+	return ceiling !== undefined && ceiling > value && fmtX(ceiling) !== fmtX(value)
+		? ceiling
+		: undefined;
 }
 
 function barText(item: BarItem): string {

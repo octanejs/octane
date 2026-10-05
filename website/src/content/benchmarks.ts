@@ -428,7 +428,12 @@ export const FRAMEWORK_CARDS: BenchCard[] = [
 ];
 
 // Each fixture's application bytes plus its framework's whole client runtime
-// (`full_fw_gzip`, measured by benchmarks/bundle-size/run.mjs).
+// (`full_fw_gzip`, measured by benchmarks/bundle-size/run.mjs). The runtime is a
+// separate build, so a framework that cannot tree-shake lands within a few
+// hundred bytes of the fixture, either side. Below this ratio of whole runtime
+// to fixture runtime the gap is build noise, not tree-shaking, and the bar
+// stays a single value.
+const MIN_TREE_SHAKING_RATIO = 1.1;
 {
 	const card = FRAMEWORK_CARDS.find((c) => c.id === 'bundle-size')!;
 	const byName = new Map((bundleSize as SuiteBaseline).targets.map((t) => [t.name, t.ops]));
@@ -445,8 +450,11 @@ export const FRAMEWORK_CARDS: BenchCard[] = [
 		for (const s of card.series) {
 			const ops = byName.get(s.key);
 			const app = ops?.[prefix + 'app_gzip'];
+			const shipped = ops?.[prefix + 'fw_gzip'];
 			const runtime = ops?.full_fw_gzip;
-			if (app && runtime) ceiling[s.key] = statValue(app) + statValue(runtime);
+			if (!app || !shipped || !runtime) continue;
+			if (statValue(runtime) < statValue(shipped) * MIN_TREE_SHAKING_RATIO) continue;
+			ceiling[s.key] = statValue(app) + statValue(runtime);
 		}
 		card.ceilings[row.op] = ceiling;
 	}
