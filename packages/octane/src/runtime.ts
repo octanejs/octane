@@ -572,6 +572,12 @@ type SignalInstanceKey =
 // `.tsrx` body has no such renderer. The compiler and runtime.server.ts spell it
 // the same way.
 const RENDERER_INVOCATION_SITE = 'r:';
+// A render function rendered as a child, such as a compiled nested `@{ … }`
+// block, carries this invocation site. Its scope keeps its own instance for the
+// declarations it evaluates, but it is part of the template that renders it, so
+// it reads other handles the way that template does (see scopeSignalOwner).
+// runtime.server.ts spells it the same way.
+const TEMPLATE_INVOCATION_SITE = 't:';
 // Parent links, root namespaces, and keyed item identities are lifetime-stable.
 // Keep their recipe until a real owner is needed: scalar-only components avoid
 // ancestor walks, visited sets, key coercion, and JSON strings altogether. The
@@ -1107,9 +1113,28 @@ function scopeSignalOwner(scope: Scope | null): SignalOwner | undefined {
 			};
 			// Directive arms and inline rows own only the declarations they evaluate,
 			// and retire them on removal. A captured declaration of the enclosing
-			// component still resolves to that component's cell.
-			const parent = instanceKey === undefined ? (scope.parent ?? scope.block.parentBlock) : null;
-			if (parent !== null && !(parent instanceof LiteBlockImpl))
+			// component still resolves to that component's cell. A nested `@{ … }`
+			// block keeps an instance of its own for its declarations, and a fragment
+			// renderer carries the instance of the scope it renders for (the server
+			// renders it in that scope's owner). Both link to their template the same
+			// way. A renderer, even one inside a block, keeps its parent's key. A block
+			// adds a key segment and links to the scope that rendered it, which for a
+			// lightweight component is its scope rather than the DOM stand-in its
+			// blocks hang off.
+			let parent = scope.parent ?? scope.block.parentBlock;
+			if (
+				instanceKey !== undefined &&
+				parent !== null &&
+				resolveSignalInstanceKey(parent) !== instanceKey
+			)
+				parent =
+					scope.signalInstanceSite === TEMPLATE_INVOCATION_SITE ? scope.signalInstanceParent : null;
+			// A stand-in records the scope its component is registered on.
+			if (parent instanceof LiteBlockImpl)
+				parent =
+					parent.signalInstanceParent?.children?.find((child) => child.scope.block === parent)
+						?.scope ?? null;
+			if (parent !== null)
 				identity.enclosingOwner = scopeSignalOwner(parent) as SignalRendererOwnerIdentity;
 			// A retry owner must not keep an abandoned renderer tree alive. This
 			// existing opaque identity object is also its own facade-state token.
@@ -38094,6 +38119,10 @@ export function childSlot(
 		let signalInstanceKey: SignalInstanceKey | undefined;
 		if (SIGNAL_BINDINGS_ENABLED || signalDocumentEnabled) {
 			const key = componentDescriptor?.key;
+			// A render function rendered here is part of this template. Compiled
+			// children belong to the template that authored them instead, so they
+			// keep the plain child identity.
+			if (isBodyFn && !isChildrenBlock(comp)) invocationSite = TEMPLATE_INVOCATION_SITE;
 			signalInstanceKey = {
 				parentScope,
 				invocationSite: componentDescriptor?.__octaneInvocationSite ?? invocationSite,

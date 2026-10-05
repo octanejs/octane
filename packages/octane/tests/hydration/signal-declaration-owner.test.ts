@@ -3,10 +3,11 @@ import { describe, expect, it, vi } from 'vitest';
 // still loads a fresh runtime graph and fixture helper after resetModules().
 import '../_server-fixture.js';
 
-// A component's directive arms, nested boundaries and keyed rows are part of
-// its template, not separate feature instances. A query declared by the
-// component and read again from any of them is one declaration and selection:
-// one browser request, or the server's request resumed during hydration.
+// A component's directive arms, nested boundaries, keyed rows and nested
+// `@{ … }` blocks are part of its template, not separate feature instances. A
+// query declared by the component and read again from any of them is one
+// declaration and selection: one browser request, or the server's request
+// resumed during hydration.
 const READ = {
 	direct: 'record$.get() as string',
 	derived: 'selected$.get() as string',
@@ -22,6 +23,9 @@ function frames(output: string): Record<string, string> {
 		if: `@try { @if (props.show) { ${output} } } @pending { <i>waiting</i> }`,
 		for: `@try { <ul>@for (const item of props.items; key item) { <li>${output}</li> }</ul> } @pending { <i>waiting</i> }`,
 		switch: `@try { @switch (props.mode) { @case 'a': { ${output} } @default: { <b>other</b> } } } @pending { <i>waiting</i> }`,
+		// Setup makes each block its own render scope rather than transparent grouping.
+		block: `@try { <div>@{ const label = 'block'; <p title={label}>${output}</p> }</div> } @pending { <i>waiting</i> }`,
+		'row block': `@try { <ul>@for (const item of props.items; key item) { <li>@{ const label = item; <p title={label}>${output}</p> }</li> }</ul> } @pending { <i>waiting</i> }`,
 	};
 }
 
@@ -133,7 +137,8 @@ async function mountClient(
 
 async function hydrateServerOutput(
 	text: string,
-	options: { dev: boolean; strong: boolean; adoptsOutput: boolean },
+	// `loads` counts the distinct queries the server starts, one by default.
+	options: { dev: boolean; strong: boolean; adoptsOutput: boolean; loads?: number },
 ) {
 	vi.resetModules();
 	const server = await import('../../src/runtime.server.js');
@@ -168,7 +173,7 @@ async function hydrateServerOutput(
 			{ ...PROPS, load: serverLoad },
 			{ streamedSignals },
 		);
-		expect(serverLoad).toHaveBeenCalledTimes(1);
+		expect(serverLoad).toHaveBeenCalledTimes(options.loads ?? 1);
 		container.innerHTML = output.html;
 		activateStreamedMarkup(container);
 		const outputs = [...container.querySelectorAll('output')];
@@ -324,6 +329,258 @@ describe('signal declarations read across their component template', () => {
 			view.unmount();
 		}
 	});
+
+	// A nested block with state of its own reads the component's derived value.
+	// It must neither start a second load nor compute from a second count$ cell
+	// that never saw the component's update.
+	it.each(MODES)(
+		"computes a nested block's read from the component's cells ($name)",
+		async ({ dev, strong }) => {
+			const view = await mountClient(
+				`import { useState } from 'octane';
+import { derived$, query$, signal$ } from 'octane/signals';
+export function App(props) @{
+ const count$ = signal$(1);
+ const source$ = query$(() => 'source', props.load);
+ const label$ = derived$(() => count$.get() + source$.get());
+ const state = label$.snapshot();
+ <section>
+  <button id="count" onClick={() => count$.set(count$.get() + 1)}><output>{String(count$.get())}</output></button>
+  <output>{state.status === 'ready' ? String(state.value) : state.status}</output>
+  @{
+   const [tick, setTick] = useState(0);
+   const read = label$.snapshot();
+   <button id="reader" onClick={() => setTick(tick + 1)}><output>{\`\${read.status === 'ready' ? read.value : read.status} \${tick}\`}</output></button>
+  }
+ </section>
+}`,
+				{ dev, strong },
+			);
+			try {
+				expect(view.requests).toHaveLength(1);
+				view.click('#count');
+				view.click('#reader');
+				expect(view.texts()).toEqual(['2', 'pending', 'pending 1']);
+				await view.settleAll('value');
+				expect(view.texts()).toEqual(['2', '2value', '2value 1']);
+				expect(view.requests).toHaveLength(1);
+			} finally {
+				view.unmount();
+			}
+		},
+	);
+
+	// The block still owns what it declares: its signal retires with the block,
+	// while the component's signal keeps its cell across the remount.
+	it.each(MODES)(
+		'keeps nested block declarations scoped to the block ($name)',
+		async ({ dev, strong }) => {
+			const view = await mountClient(
+				source(
+					`
+ const count$ = signal$(0);
+ <>
+  <button class="component" onClick={() => count$.set(count$.get() + 1)}><output>{String(count$.get())}</output></button>
+  @if (props.show) {
+   <div>
+    @{
+     const local$ = signal$(0);
+     <button class="block" onClick={() => local$.set(local$.get() + 1)}><output>{\`\${count$.get()}:\${local$.get()}\`}</output></button>
+    }
+   </div>
+  }
+ </>`,
+					false,
+					'signal$',
+				),
+				{ dev, strong },
+			);
+			try {
+				view.click('.component');
+				view.click('.block');
+				expect(view.texts()).toEqual(['1', '1:1']);
+				view.update({ show: false });
+				expect(view.texts()).toEqual(['1']);
+				view.update({ show: true });
+				expect(view.texts()).toEqual(['1', '1:0']);
+			} finally {
+				view.unmount();
+			}
+		},
+	);
+
+	// A child resolves a handle it receives in its own instance, and its nested
+	// block is part of the child's template. A child rendered inside the
+	// parent's nested block is still an instance of its own.
+	it.each(MODES)(
+		"reads a handle prop in a child's nested block from the child's cell ($name)",
+		async ({ dev, strong }) => {
+			const view = await mountClient(
+				`import { signal$ } from 'octane/signals';
+function Child(props) @{
+ <>
+  <output>{props.handle$.get() as string}</output>
+  @{
+   const label = 'write';
+   <button title={label} onClick={() => props.handle$.set('written')}><output>{props.handle$.get() as string}</output></button>
+  }
+ </>
+}
+export function App(props) @{
+ const result$ = signal$('parent');
+ <>
+  <output>{result$.get() as string}</output>
+  @{
+   const label = 'child';
+   <section title={label}><Child handle$={result$} /></section>
+  }
+ </>
+}`,
+				{ dev, strong },
+			);
+			try {
+				expect(view.texts()).toEqual(['parent', 'parent', 'parent']);
+				view.click('button');
+				expect(view.texts()).toEqual(['parent', 'written', 'written']);
+			} finally {
+				view.unmount();
+			}
+		},
+	);
+
+	// A hookless child renders value JSX through a renderer below its DOM
+	// stand-in. A nested block there still reads the handle in the child's cell.
+	it.each(MODES)(
+		"reads a handle prop in a hookless child's value JSX from the child's cell ($name)",
+		async ({ dev, strong }) => {
+			const view = await mountClient(
+				`import { signal$ } from 'octane/signals';
+function Child(props) @{
+ const view = props.show ? <div>@{ const label = 'write'; <button title={label} onClick={() => props.handle$.set('written')}><output>{props.handle$.get() as string}</output></button> }</div> : null;
+ <article><output>{props.handle$.get() as string}</output>{view}</article>
+}
+export function App(props) @{
+ const result$ = signal$('parent');
+ <main><output>{result$.get() as string}</output><Child show={props.show} handle$={result$} /></main>
+}`,
+				{ dev, strong },
+			);
+			try {
+				expect(view.texts()).toEqual(['parent', 'parent', 'parent']);
+				view.click('button');
+				expect(view.texts()).toEqual(['parent', 'written', 'written']);
+			} finally {
+				view.unmount();
+			}
+		},
+	);
+
+	// A nested block keeps an instance of its own for what it declares, so its
+	// query is seeded from the server's request like a component's.
+	it.each(MODES)('resumes a query a nested block declares ($name)', async ({ dev, strong }) => {
+		await hydrateServerOutput(
+			source(
+				`
+ const record$ = query$(() => 'record', props.load);
+ @try {
+  <div>
+   <output>{record$.get() as string}</output>
+   @{
+    const own$ = query$(() => 'own', props.load);
+    const selected$ = derived$(() => record$.get());
+    <p><output>{own$.get() as string}</output><output>{selected$.get() as string}</output></p>
+   }
+  </div>
+ } @pending {
+  <i>waiting</i>
+ }`,
+				false,
+			),
+			{ dev, strong, adoptsOutput: true, loads: 2 },
+		);
+	});
+
+	// Returned JSX renders through a fragment renderer, which carries the
+	// instance of the component it renders for. A nested block inside it still
+	// reads that component's cells, at the root or below another component.
+	function returnedSource(setup: string, nested: boolean): string {
+		return `import { query$ } from 'octane/signals';
+${nested ? 'export function App(props) @{\n <main><Feature {...props} /></main>\n}\nfunction Feature(props) {' : 'export function App(props) {'}
+ const record$ = query$(() => 'record', props.load);
+ const state = record$.${setup};
+ return <section>
+  <output>{${setup === 'get()' ? 'state' : 'state.status'} as string}</output>
+  @{
+   const label = 'block';
+   <p title={label}><output>{record$.get() as string}</output></p>
+  }
+ </section>;
+}`;
+	}
+
+	it.each(MODES.flatMap((mode) => [false, true].map((nested) => ({ ...mode, nested }))))(
+		'starts one query for a nested block in returned JSX (nested: $nested, $name)',
+		async ({ dev, strong, nested }) => {
+			const view = await mountClient(returnedSource('snapshot()', nested), { dev, strong });
+			try {
+				expect(view.requests).toHaveLength(1);
+				await view.settle('ready');
+				expect(view.texts()).toEqual(['ready', 'ready']);
+				expect(view.requests).toHaveLength(1);
+			} finally {
+				view.unmount();
+			}
+		},
+	);
+
+	// JSX a block evaluates as a value renders through renderers that carry the
+	// block's instance. A nested block inside them reads the block's declarations.
+	function valueSource(setup: string): string {
+		return `import { query$ } from 'octane/signals';
+export function App(props) @{
+ <section>
+  @{
+   const own$ = query$(() => 'own', props.load);
+   const state = own$.${setup};
+   const view = props.show ? <div>@{ const label = 'inner'; <p title={label}><output>{own$.get() as string}</output></p> }</div> : null;
+   <article><output>{${setup === 'get()' ? 'state' : 'state.status'} as string}</output>{view}</article>
+  }
+ </section>
+}`;
+	}
+
+	it.each(MODES)(
+		"starts one query for a block nested in its block's value JSX ($name)",
+		async ({ dev, strong }) => {
+			const view = await mountClient(valueSource('snapshot()'), { dev, strong });
+			try {
+				expect(view.requests).toHaveLength(1);
+				await view.settle('ready');
+				expect(view.texts()).toEqual(['ready', 'ready']);
+				expect(view.requests).toHaveLength(1);
+			} finally {
+				view.unmount();
+			}
+		},
+	);
+
+	it.each(MODES)(
+		"resumes the server query for a block nested in its block's value JSX ($name)",
+		async ({ dev, strong }) => {
+			await hydrateServerOutput(valueSource('get()'), { dev, strong, adoptsOutput: true });
+		},
+	);
+
+	it.each(MODES.flatMap((mode) => [false, true].map((nested) => ({ ...mode, nested }))))(
+		'resumes the server query for a nested block in returned JSX (nested: $nested, $name)',
+		async ({ dev, strong, nested }) => {
+			await hydrateServerOutput(returnedSource('get()', nested), {
+				dev,
+				strong,
+				adoptsOutput: true,
+			});
+		},
+	);
 });
 
 // A function a component body creates closes over the handles that body
