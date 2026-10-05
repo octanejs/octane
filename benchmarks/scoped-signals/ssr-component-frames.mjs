@@ -45,6 +45,9 @@ export function renderStatic(items,produce){return renderToStaticMarkup(List,{it
 			mode: 'server',
 			dev,
 			hmr: false,
+			// Rows receive handles through an opaque prop in a module without a
+			// signals import, which binds them only with this option.
+			opaqueSignalHandles: true,
 		});
 	} finally {
 		for (const [flag, saved] of savedFlags) {

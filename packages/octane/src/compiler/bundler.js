@@ -587,6 +587,7 @@ class OctaneBundlerCompiler {
 			strong: options.strong === true,
 			knownAttributeSpreads: options.knownAttributeSpreads,
 			domBindingFixedProps: options.domBindingFixedProps,
+			opaqueSignalHandles: options.opaqueSignalHandles === true,
 			universalRuntime: normalizeUniversalRuntime(options.universalRuntime),
 		};
 		this.renderers = normalizeRendererConfig(options.renderers);
@@ -1349,6 +1350,10 @@ class OctaneBundlerCompiler {
 							domBindingFixedProps:
 								options.domBindingFixedProps ?? this.defaults.domBindingFixedProps,
 						}
+					: null),
+				...(renderer.target === 'dom' &&
+				(options.opaqueSignalHandles ?? this.defaults.opaqueSignalHandles) === true
+					? { opaqueSignalHandles: true }
 					: null),
 				profile,
 				profileFilename,

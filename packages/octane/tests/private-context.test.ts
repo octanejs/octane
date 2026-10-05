@@ -253,7 +253,8 @@ export function App(props) @{ <Theme value={props.value}>{props.dynamic ? () => 
 	});
 
 	it('keeps opaque model handles live after scalar provider values', async () => {
-		const module = client();
+		// The untyped fixture receives handles from a lazily loaded engine.
+		const module = client({ opaqueSignalHandles: true });
 		const host = container();
 		const root = createRoot(host);
 		root.render(module.App, { value: 'ordinary' });

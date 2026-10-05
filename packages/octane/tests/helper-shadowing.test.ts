@@ -110,8 +110,15 @@ describe('helper shadowing — user bindings named after runtime helpers', () =>
 			}
 			expect(authored).toEqual({ useState: 'useState', flushSync: 'fs' });
 			expect(generated.size).toBeGreaterThan(0);
+			// The authored state setter deliberately shares the runtime `setText`
+			// helper's name; a bare call to it is the user's binding, not a helper.
+			const userBindings = new Set(['setText']);
 			const visit = (node: ts.Node): void => {
-				if (ts.isCallExpression(node) && ts.isIdentifier(node.expression))
+				if (
+					ts.isCallExpression(node) &&
+					ts.isIdentifier(node.expression) &&
+					!userBindings.has(node.expression.text)
+				)
 					expect(generated.has(node.expression.text)).toBe(false);
 				ts.forEachChild(node, visit);
 			};

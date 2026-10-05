@@ -10,10 +10,10 @@ import { MessageChannel } from 'node:worker_threads';
 
 const filename = path.resolve('benchmarks/scoped-signals/split-hydrate-consumer.tsrx');
 
-async function bundle(source) {
+async function bundle(source, options = {}) {
 	const result = await build({
 		stdin: {
-			contents: compile(source, filename, { dev: false, hmr: false }).code,
+			contents: compile(source, filename, { dev: false, hmr: false, ...options }).code,
 			resolveDir: path.dirname(filename),
 			loader: 'js',
 		},
@@ -26,7 +26,7 @@ async function bundle(source) {
 						namespace: 'authored-hydrate-query',
 					}));
 					build.onLoad({ filter: /.*/, namespace: 'authored-hydrate-query' }, (args) => ({
-						contents: compile(source, args.path, { dev: false, hmr: false }).code,
+						contents: compile(source, args.path, { dev: false, hmr: false, ...options }).code,
 						loader: 'js',
 						resolveDir: path.dirname(filename),
 					}));
@@ -143,7 +143,9 @@ test('split templates retain opaque handles after a late model-engine import', a
  flushSync(()=>value.set('second'));const snapshot={plain,first,text:span.textContent,title:span.title,value:input.value,identity:span===host.querySelector('span')&&input===host.querySelector('input')};
  root.unmount();flushSync(()=>value.set('retired'));scope.dispose();return {...snapshot,cleaned:host.childNodes.length===0};
  }`;
-	const code = await bundle(source);
+	// The untyped template renders handles from a late engine import, so both the
+	// module and its split query module opt in.
+	const code = await bundle(source, { opaqueSignalHandles: true });
 	const window = new Window({ settings: { enableJavaScriptEvaluation: true } }),
 		channels = [];
 	class ConsumerMessageChannel extends MessageChannel {

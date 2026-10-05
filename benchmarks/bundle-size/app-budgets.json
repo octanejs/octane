@@ -1,87 +1,87 @@
 {
   "rows": {
     "app": {
-      "raw": 7544,
-      "gzip": 2594,
-      "brotli": 2482
+      "raw": 7167,
+      "gzip": 2467,
+      "brotli": 2374
     },
     "framework": {
-      "raw": 118215,
-      "gzip": 39006,
-      "brotli": 34495
+      "raw": 113103,
+      "gzip": 37339,
+      "brotli": 33220
     },
     "total": {
-      "raw": 125727,
-      "gzip": 41567,
-      "brotli": 36721
+      "raw": 120238,
+      "gzip": 39774,
+      "brotli": 35338
     }
   },
   "todo": {
     "app": {
-      "raw": 5142,
-      "gzip": 2507,
-      "brotli": 2373
+      "raw": 4843,
+      "gzip": 2362,
+      "brotli": 2245
     },
     "framework": {
-      "raw": 136320,
-      "gzip": 44241,
-      "brotli": 39087
+      "raw": 126147,
+      "gzip": 41089,
+      "brotli": 36375
     },
     "total": {
-      "raw": 141430,
-      "gzip": 46718,
-      "brotli": 41207
+      "raw": 130958,
+      "gzip": 43422,
+      "brotli": 38364
     }
   },
   "chat": {
     "app": {
-      "raw": 6685,
-      "gzip": 3009,
-      "brotli": 2891
+      "raw": 6022,
+      "gzip": 2800,
+      "brotli": 2705
     },
     "framework": {
-      "raw": 133897,
-      "gzip": 43663,
-      "brotli": 38598
+      "raw": 123607,
+      "gzip": 40357,
+      "brotli": 35752
     },
     "total": {
-      "raw": 140550,
-      "gzip": 46642,
-      "brotli": 41207
+      "raw": 129597,
+      "gzip": 43158,
+      "brotli": 38211
     }
   },
   "weather": {
     "app": {
-      "raw": 26711,
-      "gzip": 9066,
-      "brotli": 7812
+      "raw": 22770,
+      "gzip": 8141,
+      "brotli": 7152
     },
     "framework": {
-      "raw": 150591,
-      "gzip": 49018,
-      "brotli": 42995
+      "raw": 145397,
+      "gzip": 47302,
+      "brotli": 41633
     },
     "total": {
-      "raw": 177270,
-      "gzip": 58053,
-      "brotli": 50571
+      "raw": 168135,
+      "gzip": 55412,
+      "brotli": 48529
     }
   },
   "bindings": {
     "app": {
-      "raw": 355953,
-      "gzip": 121757,
-      "brotli": 101927
+      "raw": 354842,
+      "gzip": 121403,
+      "brotli": 101791
     },
     "framework": {
-      "raw": 364430,
-      "gzip": 119282,
-      "brotli": 103857
+      "raw": 360502,
+      "gzip": 118118,
+      "brotli": 102645
     },
     "total": {
-      "raw": 720351,
-      "gzip": 241005,
-      "brotli": 205571
+      "raw": 715312,
+      "gzip": 239491,
+      "brotli": 204207
     }
   }
 }

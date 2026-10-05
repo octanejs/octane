@@ -1,10 +1,15 @@
 import { createElement, type OctaneNode } from 'octane';
+import type { SignalHandle } from 'octane/signals';
 
 // Textarea content is RCDATA: the HTML parser keeps markup and comments inside
 // it as literal text. Its children therefore fold into one text value on both
 // sides, with no template placeholder and no server hydration marker.
 
-export function MixedText(props: { value: any }) @{
+// Parts may be signal handles. Typing them with the signals import opts this
+// module's opaque holes into handle bindings.
+type Part = string | number | SignalHandle<string> | OctaneNode;
+
+export function MixedText(props: { value: Part }) @{
 	<section>
 		<textarea>hello {props.value as string}</textarea>
 	</section>
@@ -16,7 +21,7 @@ export function MixedChild(props: { value: any }) @{
 	</section>
 }
 
-export function TwoChildren(props: { value: any; other: any }) @{
+export function TwoChildren(props: { value: Part; other: Part }) @{
 	<section>
 		<textarea>
 			{props.value}

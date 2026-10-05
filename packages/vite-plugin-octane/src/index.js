@@ -429,7 +429,7 @@ function collect_hydrate_module_paths(config) {
  * it). An explicit `profile` (true or false) always takes precedence over
  * `devtools`.
  *
- * @param {{ hmr?: boolean, profile?: boolean, devtools?: boolean, strong?: boolean, textTypes?: import('octane/compiler/vite').OctaneVitePluginOptions['textTypes'], knownAttributeSpreads?: import('octane/compiler/vite').OctaneVitePluginOptions['knownAttributeSpreads'], domBindingFixedProps?: import('octane/compiler/vite').OctaneVitePluginOptions['domBindingFixedProps'], exclude?: string[], requireDirective?: boolean, renderers?: import('@octanejs/app-core').ExperimentalRendererConfigOptions, cssModuleConstants?: import('octane/compiler/vite').OctaneVitePluginOptions['cssModuleConstants'] }} [inlineOptions]
+ * @param {{ hmr?: boolean, profile?: boolean, devtools?: boolean, strong?: boolean, textTypes?: import('octane/compiler/vite').OctaneVitePluginOptions['textTypes'], knownAttributeSpreads?: import('octane/compiler/vite').OctaneVitePluginOptions['knownAttributeSpreads'], domBindingFixedProps?: import('octane/compiler/vite').OctaneVitePluginOptions['domBindingFixedProps'], opaqueSignalHandles?: boolean, exclude?: string[], requireDirective?: boolean, renderers?: import('@octanejs/app-core').ExperimentalRendererConfigOptions, cssModuleConstants?: import('octane/compiler/vite').OctaneVitePluginOptions['cssModuleConstants'] }} [inlineOptions]
  * @returns {Plugin[]}
  */
 export function octane(inlineOptions = {}) {
@@ -1388,6 +1388,7 @@ export function octane(inlineOptions = {}) {
 	 *   textTypes?: import('octane/compiler/vite').OctaneVitePluginOptions['textTypes'],
 	 *   knownAttributeSpreads?: import('octane/compiler/vite').OctaneVitePluginOptions['knownAttributeSpreads'],
 	 *   domBindingFixedProps?: import('octane/compiler/vite').OctaneVitePluginOptions['domBindingFixedProps'],
+	 *   opaqueSignalHandles?: boolean,
 	 *   exclude?: string[],
 	 *   requireDirective?: boolean,
 	 *   renderers?: import('@octanejs/app-core').ExperimentalRendererConfigOptions,
@@ -1412,6 +1413,9 @@ export function octane(inlineOptions = {}) {
 	}
 	if (inlineOptions.domBindingFixedProps !== undefined) {
 		compilerOptions.domBindingFixedProps = inlineOptions.domBindingFixedProps;
+	}
+	if (inlineOptions.opaqueSignalHandles !== undefined) {
+		compilerOptions.opaqueSignalHandles = inlineOptions.opaqueSignalHandles;
 	}
 	if (inlineOptions.exclude !== undefined) compilerOptions.exclude = inlineOptions.exclude;
 	if (inlineOptions.requireDirective !== undefined) {

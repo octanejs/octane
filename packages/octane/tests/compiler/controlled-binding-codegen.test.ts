@@ -20,6 +20,7 @@ function runtimeImports(source: string): Set<string> {
 describe('controlled binding specialization', () => {
 	it('recognizes opaque checked handles without relaxing default-value ownership', () => {
 		const imports = runtimeImports(`
+			import type { SignalHandle } from 'octane/signals';
 			export function Form(props) @{
 				<>
 					<input defaultValue={props.inputDefault} />
@@ -38,6 +39,7 @@ describe('controlled binding specialization', () => {
 
 	it('recognizes opaque handles on conflicting, spread, select, or dynamic-type hosts', () => {
 		const imports = runtimeImports(`
+			import type { SignalHandle } from 'octane/signals';
 			export function Form(props) @{
 				<>
 					<input value={props.value} defaultValue={props.inputDefault} />
@@ -53,6 +55,19 @@ describe('controlled binding specialization', () => {
 		expect(imports).toContain('bindSignalHostPropSources');
 		expect(imports).not.toContain('setDefaultValueUncontrolled');
 		expect(imports).not.toContain('setCheckedCheckable');
+	});
+
+	it('keeps lean checked helpers for opaque values in signal-free modules', () => {
+		const imports = runtimeImports(`
+			export function Form(props) @{
+				<>
+					<input type="checkbox" checked={props.box} />
+					<input type="radio" checked={props.radio} />
+				</>
+			}
+		`);
+		expect(imports).toContain('setCheckedCheckable');
+		expect(imports).not.toContain('bindSignalChecked');
 	});
 
 	it('keeps lean scalar helpers when the value and whole host prove their ownership', () => {

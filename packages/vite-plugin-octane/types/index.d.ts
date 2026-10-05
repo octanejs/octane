@@ -23,6 +23,8 @@ export interface OctanePluginOptions {
 	knownAttributeSpreads?: OctaneVitePluginOptions['knownAttributeSpreads'];
 	/** Opt in to fixed primitive child props by name; keep text and IDs live for sharing. */
 	domBindingFixedProps?: OctaneVitePluginOptions['domBindingFixedProps'];
+	/** Bind signal handles in opaque holes of modules that do not import `octane/signals`. */
+	opaqueSignalHandles?: OctaneVitePluginOptions['opaqueSignalHandles'];
 	/**
 	 * Path fragments the compiler's plain `.ts`/`.js` hook-slotting pass must
 	 * skip. Prefer package manifest `octane.hookSlots.manual` declarations.

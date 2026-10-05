@@ -12,6 +12,7 @@ export const options = {
 	requireDirective: true,
 	exclude: ['/host-owned/'],
 	domBindingFixedProps: ['variant', 'radius'],
+	opaqueSignalHandles: true,
 	renderers: {
 		registry: {
 			object: {

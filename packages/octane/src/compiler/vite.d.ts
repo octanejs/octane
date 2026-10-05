@@ -92,6 +92,15 @@ export interface OctaneVitePluginOptions {
 	/** Opt in to fixed primitive child props by name. Keep text and IDs live to share extracted programs. */
 	domBindingFixedProps?: readonly string[];
 	/**
+	 * Bind signal handles that reach opaque holes in every module. By default
+	 * only modules with an import from `octane/signals` (a type-only
+	 * `SignalHandle` import is enough) do, so plain apps do not ship the signal
+	 * binding runtime. Enable it for untyped components that render handles from
+	 * a lazily loaded signals engine.
+	 * @default false
+	 */
+	opaqueSignalHandles?: boolean;
+	/**
 	 * @experimental Infer primitive child text from a TypeScript project in
 	 * one-shot production builds. Serve and watched builds retain syntax
 	 * inference. A relative tsconfig is resolved from the Vite project root.

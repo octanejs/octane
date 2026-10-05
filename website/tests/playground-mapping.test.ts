@@ -830,7 +830,7 @@ describe('Form actions example — attributes with no baked HTML', () => {
 			'disabled',
 			'disabled={status.pending}',
 			{
-				client: ['_$bindSignalAttribute', "'disabled'"],
+				client: ['_$setBooleanAttributeIfChanged', "'disabled'"],
 				server: ['_$ssrAttr', '"disabled"'],
 			},
 		],
@@ -867,9 +867,10 @@ describe('Form actions example — attributes with no baked HTML', () => {
 // its props through a grouped collector. Each source row's name literal names
 // the authored attribute; a direct control instead maps to its binding call.
 // Server-side, `<textarea>`/`<select>` values become content/projection calls
-// and signal-capable controls also emit named writer records. Both are useful
-// navigation targets. A textarea cascade's two writers share one content call,
-// so its names alias the same output group. Every target must still resolve
+// (in a module that imports `octane/signals`, signal-capable controls also emit
+// named writer records). Both are useful navigation targets. A textarea
+// cascade's two writers share one content call, so its names alias the same
+// output group. Every target must still resolve
 // back to the authored names instead of their value expressions.
 describe('grouped prop lowerings — commit sources and content positions', () => {
 	const SOURCE = `export default function App(props: {
@@ -901,21 +902,21 @@ describe('grouped prop lowerings — commit sources and content positions', () =
 			'the value writer of a textarea cascade',
 			'value',
 			'<textarea value={',
-			{ client: ["'value'"], server: ['"value"', '_$ssrTextareaValue'] },
+			{ client: ["'value'"], server: ['_$ssrTextareaValue'] },
 		],
 		[
 			// Both writers feed one positional call on the server, so this name
-			// aliases the controlled writer's content and binding-record targets.
+			// aliases the controlled writer's content target.
 			'the default writer of a textarea cascade',
 			'defaultValue',
 			'{props.bio} defaultValue={',
-			{ client: ["'defaultValue'"], server: ['"value"', '_$ssrTextareaValue'] },
+			{ client: ["'defaultValue'"], server: ['_$ssrTextareaValue'] },
 		],
 		[
 			'a select value driving option projection',
 			'value',
 			'<select value={',
-			{ client: ['_$bindSignalValue'], server: ['"value"', '_$ssrSelectScope'] },
+			{ client: ['_$setSelectValue'], server: ['_$ssrSelectScope'] },
 		],
 	];
 
@@ -935,6 +936,55 @@ describe('grouped prop lowerings — commit sources and content positions', () =
 			expect(pair!.source.map((range) => textAt(SOURCE, range))).toEqual([attr]);
 			// Which tokens, not how many: one attribute legitimately writes on both
 			// the mount and the update path.
+			expect([...new Set(pair!.output.map((range) => textAt(code, range)))].sort()).toEqual(
+				[...expected[mode]].sort(),
+			);
+			for (const range of pair!.output) {
+				expect(mapsBack(mapping, SOURCE, range.from + 1, attr)).toBe(true);
+			}
+		});
+	});
+});
+
+// A module that imports `octane/signals` keeps signal-capable controls: their
+// named writer records are navigation targets too, beside the content calls.
+describe('grouped prop lowerings — signal-capable controls', () => {
+	const SOURCE = `import 'octane/signals';
+export default function App(props: { bio: string; fallback: string; tone: string }) @{
+	<form>
+		<textarea value={props.bio} defaultValue={props.fallback} />
+		<select value={props.tone}><option value="a">A</option></select>
+	</form>
+}
+`;
+
+	type Row = [string, string, string, Record<'client' | 'server', string[]>];
+	const ROWS: Row[] = [
+		[
+			'the value writer of a textarea cascade',
+			'value',
+			'<textarea value={',
+			{ client: ["'value'"], server: ['"value"', '_$ssrTextareaValue'] },
+		],
+		[
+			'a select value driving option projection',
+			'value',
+			'<select value={',
+			{ client: ['_$bindSignalValue'], server: ['"value"', '_$ssrSelectScope'] },
+		],
+	];
+
+	describe.each([
+		['client', 'client' as const],
+		['server', 'server' as const],
+	])('%s output', (_label, mode) => {
+		const { code, mapping } = runtimeArtifact(SOURCE, mode);
+
+		it.each(ROWS)('resolves %s in both directions', (_name, attr, anchor, expected) => {
+			const at = SOURCE.indexOf(anchor) + anchor.indexOf(attr);
+			const pair = mapping.pairFromSource(at + 1);
+			expect(pair, `${attr} resolved to nothing`).not.toBeNull();
+			expect(pair!.source.map((range) => textAt(SOURCE, range))).toEqual([attr]);
 			expect([...new Set(pair!.output.map((range) => textAt(code, range)))].sort()).toEqual(
 				[...expected[mode]].sort(),
 			);

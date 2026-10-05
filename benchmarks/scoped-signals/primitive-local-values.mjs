@@ -29,10 +29,12 @@ function View(props) @{
  <main>@for(const item of props.items;key item.id){<Row item={item} read={props.read}/>}</main>
 }
 export function render(items,read,options){return renderToString(View,{items,read},options);}`;
+	// Opaque locals carry handles only where opaque handles are admitted.
 	const compiled = compile(authored, '/benchmark/PrimitiveLocalSSR.tsrx', {
 		mode: 'server',
 		dev,
 		hmr: false,
+		opaqueSignalHandles: true,
 	});
 	const runtime = await readFile(path.join(source, 'runtime.server.ts'), 'utf8');
 	let observedRuntime = runtime;
@@ -212,10 +214,12 @@ export function click$(){
 	let modelCode;
 	try {
 		for (const flag of flags) process.env[flag] = '1';
+		// The view renders late instance-model handles without a signals import.
 		code = compile(authored, '/benchmark/PrimitiveLocalEvents.tsrx', {
 			mode: 'client',
 			dev,
 			hmr: false,
+			opaqueSignalHandles: true,
 		}).code;
 		modelCode = compile(model, '/benchmark/PrimitiveLocalModel.ts', {
 			mode: 'client',

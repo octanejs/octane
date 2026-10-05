@@ -46,6 +46,9 @@ export function mount(parent,props) {
 				mode: 'client',
 				dev,
 				hmr: false,
+				// Authority is measured for handle-capable rows; a module without a
+				// signals import publishes none unless it opts in.
+				opaqueSignalHandles: true,
 			},
 		);
 	} finally {

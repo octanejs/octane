@@ -756,10 +756,11 @@ export function Link(props) @{
 }
 `;
 	for (const dev of [true, false]) {
+		// The untyped fixture receives handles through ordinary props, so it opts in.
 		const compiled = loadCompiledFixtureSource<{ Link: (props: any) => unknown }>(source, {
 			id: `/attribute-writers-${dev}.tsrx`,
 			mode: 'client',
-			compileOptions: { dev, hmr: false },
+			compileOptions: { dev, hmr: false, opaqueSignalHandles: true },
 		});
 		const read = (link: HTMLAnchorElement) => [
 			link.getAttribute('title'),

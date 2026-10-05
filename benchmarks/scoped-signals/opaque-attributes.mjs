@@ -38,7 +38,13 @@ export function mount(parent) {
 	let compiled;
 	try {
 		for (const flag of flags) process.env[flag] = '1';
-		compiled = compile(authored, fixtureId, { mode: 'client', dev, hmr: false });
+		// The fixture passes real handles through opaque attributes, so it opts in.
+		compiled = compile(authored, fixtureId, {
+			mode: 'client',
+			dev,
+			hmr: false,
+			opaqueSignalHandles: true,
+		});
 	} finally {
 		for (const [flag, previous] of previousFlags) {
 			if (previous === undefined) delete process.env[flag];

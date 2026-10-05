@@ -5,7 +5,13 @@ import { Window } from 'happy-dom';
 import { describe, expect, it } from 'vitest';
 import { compile } from '../src/compiler/compile.js';
 
-async function consume(source: string, dev = false, strong = false, target = 'esnext') {
+async function consume(
+	source: string,
+	dev = false,
+	strong = false,
+	target = 'esnext',
+	compileOptions: Record<string, unknown> = {},
+) {
 	const window = new Window({
 		url: 'https://octane.test/',
 		settings: { enableJavaScriptEvaluation: true },
@@ -14,7 +20,8 @@ async function consume(source: string, dev = false, strong = false, target = 'es
 	try {
 		const result = await build({
 			stdin: {
-				contents: compile(source, 'consumer.tsrx', { dev, hmr: false, strong }).code,
+				contents: compile(source, 'consumer.tsrx', { dev, hmr: false, strong, ...compileOptions })
+					.code,
 				resolveDir: resolve(import.meta.dirname, '..'),
 				loader: 'ts',
 			},
@@ -40,6 +47,8 @@ async function consume(source: string, dev = false, strong = false, target = 'es
 const IMPORTS = "import {createRoot, flushSync} from 'octane';\n";
 const VIEW = 'function View(props) @{ <main>{props.label as string}<input /></main> }\n';
 
+// Untyped views that render handles from a lazily loaded engine opt in.
+const LATE_ENGINE = { opaqueSignalHandles: true };
 describe('same-file production roots', () => {
 	it.each([false, true])(
 		'preserves props, state, survivor identity and cleanup (Strong: %s)',
@@ -85,7 +94,7 @@ export async function run() {
  root.unmount(); value.set('disposed'); scope.dispose(); return {before,after,inputValue,retained,cleaned:host.childNodes.length===0};
 }`;
 		for (const dev of [false, true])
-			expect(await consume(source, dev)).toEqual({
+			expect(await consume(source, dev, false, 'esnext', LATE_ENGINE)).toEqual({
 				before: 'first',
 				after: 'second',
 				inputValue: 'second',
@@ -217,7 +226,7 @@ export async function run(){const host=document.querySelector('#host');host.inne
  const result={adopted,before,after:span.textContent,inputValue:input.value,same:input===host.querySelector('input'),draft:spare.value};
  root.unmount();value.set('disposed');scope.dispose();return {...result,cleaned:host.childNodes.length===0};}`;
 		for (const dev of [false, true])
-			expect(await consume(source, dev)).toEqual({
+			expect(await consume(source, dev, false, 'esnext', LATE_ENGINE)).toEqual({
 				adopted: true,
 				before: 'first',
 				after: 'second',

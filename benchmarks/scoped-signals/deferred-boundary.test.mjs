@@ -114,7 +114,12 @@ export async function run(host) {
  root.unmount();flushSync(()=>value.set('retired'));scope.dispose();
  return {...snapshot,cleaned:host.childNodes.length===0};
 }`;
-	const contents = compile(source, 'late-deferred-template.tsrx', { dev: false, hmr: false }).code;
+	// The untyped template renders handles from a late engine import, so it opts in.
+	const contents = compile(source, 'late-deferred-template.tsrx', {
+		dev: false,
+		hmr: false,
+		opaqueSignalHandles: true,
+	}).code;
 	const result = await build({
 		stdin: { contents, resolveDir: path.resolve('packages/octane') },
 		bundle: true,
