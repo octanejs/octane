@@ -1,5 +1,9 @@
-import { flushSync, hydrateRoot } from '../../../src/index.js';
-import { initializeHydrationEventCapture, interaction } from '../../../src/hydration/index.js';
+import { act, flushSync, hydrateRoot } from '../../../src/index.js';
+import {
+	condition,
+	initializeHydrationEventCapture,
+	interaction,
+} from '../../../src/hydration/index.js';
 import {
 	createHydrationInteractionEvent,
 	HYDRATION_INTERACTION_EVENT_CASES,
@@ -12,6 +16,7 @@ import {
 	DeferredHydrationPressLifecycle,
 } from '../../hydration/_fixtures/deferred-hydration-event-replay.tsrx';
 import { ActivationSuspendingEditorHydration } from '../../hydration/_fixtures/deferred-hydration-contract.tsrx';
+import { NestedInteractionHydration } from '../../hydration/_fixtures/deferred-hydration.tsrx';
 
 type OriginalEventOutcome = {
 	type: string;
@@ -67,6 +72,90 @@ type BrowserPressState = {
 	replays: BrowserPressEvent[];
 	scrollY: number;
 };
+
+type BrowserNestedState = {
+	order: string[];
+	targetSame: boolean;
+	text: string | null;
+};
+
+let nestedMount:
+	| {
+			state(): BrowserNestedState;
+			dispatchTextClick(): void;
+			unmount(): Promise<boolean>;
+	  }
+	| undefined;
+
+const nestedHarness = {
+	async mount({ html, foreign, shadow }: { html: string; foreign: boolean; shadow: boolean }) {
+		await this.unmount();
+		let frame: HTMLIFrameElement | undefined;
+		if (foreign) {
+			frame = document.createElement('iframe');
+			frame.id = 'nested-hydration-frame';
+			document.body.prepend(frame);
+		}
+		const ownerDocument = frame?.contentDocument ?? document;
+		const host = ownerDocument.createElement('div');
+		host.id = 'nested-hydration-host';
+		ownerDocument.body.prepend(host);
+		const container = shadow ? host.attachShadow({ mode: 'open' }) : host;
+		container.innerHTML = html;
+		const target = container.querySelector('#interaction-target')!;
+		const order: string[] = [];
+		// The runtime and component stay in the parent window, including for iframe roots.
+		const root = hydrateRoot(container, NestedInteractionHydration, {
+			outerWhen: condition(false),
+			innerWhen: interaction({ events: 'click' }),
+			onOuterHydrated: () => order.push('outer hydrated'),
+			onInnerHydrated: () => order.push('inner hydrated'),
+			onTargetClick: () => order.push('target click'),
+		});
+		nestedMount = {
+			state() {
+				return {
+					order: order.slice(),
+					targetSame: container.querySelector('#interaction-target') === target,
+					text: target.textContent,
+				};
+			},
+			dispatchTextClick() {
+				const text = target.firstChild;
+				if (text?.nodeType !== 3) throw new Error('Expected the original button text node');
+				text.dispatchEvent(
+					new ownerDocument.defaultView!.MouseEvent('click', {
+						bubbles: true,
+						cancelable: true,
+						composed: true,
+					}),
+				);
+			},
+			async unmount() {
+				await act(() => root.unmount());
+				const removed =
+					!target.isConnected && container.querySelector('#interaction-target') === null;
+				host.remove();
+				frame?.remove();
+				return removed;
+			},
+		};
+		return this.settle();
+	},
+	async settle() {
+		await act(() => {});
+		return nestedMount!.state();
+	},
+	dispatchTextClick() {
+		nestedMount!.dispatchTextClick();
+	},
+	async unmount() {
+		const mounted = nestedMount;
+		nestedMount = undefined;
+		return mounted ? mounted.unmount() : true;
+	},
+};
+window.__deferredHydrationNested = nestedHarness;
 
 const PRESS_EVENTS = ['pointerdown', 'pointermove', 'pointerup', 'pointercancel'] as const;
 
@@ -272,6 +361,7 @@ window.__deferredHydrationEventReplay = {
 
 declare global {
 	interface Window {
+		__deferredHydrationNested: typeof nestedHarness;
 		__deferredHydrationEventReplay: {
 			state(): BrowserReplayState;
 			unmount(): void;

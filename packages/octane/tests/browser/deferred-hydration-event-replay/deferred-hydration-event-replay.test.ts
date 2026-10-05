@@ -4,7 +4,7 @@ import { devices, launchBrowser } from '../../../../../test-utils/playwright-bro
 import { createServer, type Plugin, type ViteDevServer } from 'vite';
 import { renderToString } from 'octane/server';
 import { octane } from 'octane/compiler/vite';
-import { interaction } from 'octane/hydration';
+import { condition, interaction } from 'octane/hydration';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { loadServerFixture } from '../../_server-fixture.js';
@@ -17,12 +17,15 @@ import {
 import type { HydrationReplayRecord } from '../../hydration/_hydration-interaction-event-matrix.js';
 import * as client from '../../hydration/_fixtures/deferred-hydration-event-replay.tsrx';
 import * as editorClient from '../../hydration/_fixtures/deferred-hydration-contract.tsrx';
+import * as nestedClient from '../../hydration/_fixtures/deferred-hydration.tsrx';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const FIXTURE = 'packages/octane/tests/hydration/_fixtures/deferred-hydration-event-replay.tsrx';
 const serverFixture = loadServerFixture<typeof client>(FIXTURE);
 const EDITOR_FIXTURE = 'packages/octane/tests/hydration/_fixtures/deferred-hydration-contract.tsrx';
 const editorServerFixture = loadServerFixture<typeof editorClient>(EDITOR_FIXTURE);
+const NESTED_FIXTURE = 'packages/octane/tests/hydration/_fixtures/deferred-hydration.tsrx';
+const nestedServerFixture = loadServerFixture<typeof nestedClient>(NESTED_FIXTURE);
 
 function expectedBrowserReplayMetadata(
 	testCase: (typeof HYDRATION_INTERACTION_EVENT_CASES)[number],
@@ -33,6 +36,7 @@ function expectedBrowserReplayMetadata(
 let server: ViteDevServer;
 let browser: Browser;
 let baseUrl: string;
+let nestedHtml: string;
 let page: Page | undefined;
 let pageFailures: string[] = [];
 
@@ -45,6 +49,10 @@ beforeAll(async () => {
 	}).html;
 	const pressHtml = renderToString(serverFixture.DeferredHydrationPressLifecycle, {
 		when: interaction({ events: ['pointerdown', 'pointermove', 'pointerup', 'pointercancel'] }),
+	}).html;
+	nestedHtml = renderToString(nestedServerFixture.NestedInteractionHydration, {
+		outerWhen: condition(false),
+		innerWhen: interaction({ events: 'click' }),
 	}).html;
 	const shellPlugin: Plugin = {
 		name: 'deferred-hydration-event-replay-shell',
@@ -73,7 +81,8 @@ beforeAll(async () => {
 afterEach(async () => {
 	const failures = pageFailures.slice();
 	try {
-		await page?.evaluate(() => {
+		await page?.evaluate(async () => {
+			await window.__deferredHydrationNested?.unmount();
 			window.__deferredHydrationPress?.unmount();
 			window.__deferredHydrationEditor?.unmount();
 			window.__deferredHydrationEventReplay?.unmount();
@@ -181,6 +190,53 @@ describe.sequential('deferred hydration event replay in a real browser', () => {
 			});
 		}
 		expect(state.hash).toBe('');
+	});
+});
+
+describe.sequential('nested interaction hydration across documents and shadow roots', () => {
+	const hydratedOrder = ['outer hydrated', 'inner hydrated', 'target click'];
+
+	async function mountNested(page: Page, foreign: boolean, shadow: boolean) {
+		const state = await page.evaluate(
+			(options) => window.__deferredHydrationNested.mount(options),
+			{ html: nestedHtml, foreign, shadow },
+		);
+		expect(state).toEqual({ order: [], targetSame: true, text: 'Open reviews' });
+		const scope = foreign ? page.frameLocator('#nested-hydration-frame') : page;
+		return scope.getByRole('button', { name: 'Open reviews', exact: true });
+	}
+
+	async function expectNestedState(page: Page, order: string[]) {
+		const state = await page.evaluate(() => window.__deferredHydrationNested.settle());
+		expect(state).toEqual({ order, targetSame: true, text: 'Open reviews' });
+	}
+
+	for (const foreign of [false, true]) {
+		for (const shadow of [false, true]) {
+			const location = `${foreign ? 'iframe' : 'parent document'} ${shadow ? 'open ShadowRoot' : 'light DOM'}`;
+			it(`hydrates both boundaries once and preserves the SSR target on native clicks in ${location}`, async () => {
+				const page = await openPage();
+				const button = await mountNested(page, foreign, shadow);
+
+				await button.click();
+				await expectNestedState(page, hydratedOrder);
+				await button.click();
+				await expectNestedState(page, [...hydratedOrder, 'target click']);
+				expect(await page.evaluate(() => window.__deferredHydrationNested.unmount())).toBe(true);
+			});
+		}
+	}
+
+	it('finds the nested boundary from a foreign text-node event target in an open ShadowRoot', async () => {
+		const page = await openPage();
+		const button = await mountNested(page, true, true);
+
+		// Text nodes are valid synthetic EventTargets, unlike a native button click's element target.
+		await page.evaluate(() => window.__deferredHydrationNested.dispatchTextClick());
+		await expectNestedState(page, hydratedOrder);
+		await button.click();
+		await expectNestedState(page, [...hydratedOrder, 'target click']);
+		expect(await page.evaluate(() => window.__deferredHydrationNested.unmount())).toBe(true);
 	});
 });
 

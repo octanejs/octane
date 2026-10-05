@@ -217,7 +217,8 @@ function formSubmissionBootstrapJs(): string {
 		'try{activate(r);var s=e.submitter||null,fields=[],fm=Object.freeze({id:attr(f,"id")||"",action:prop(f,"action"),method:prop(f,"method"),' +
 		'enctype:prop(f,"enctype"),target:prop(f,"target"),noValidate:prop(f,"noValidate")}),sm=s?Object.freeze({id:attr(s,"id")||"",name:s.name,value:s.value,type:s.type,' +
 		'formAction:attr(s,"formaction"),formMethod:attr(s,"formmethod"),formEnctype:attr(s,"formenctype"),formTarget:attr(s,"formtarget"),formNoValidate:attr(s,"formnovalidate")!==null}):null,' +
-		'data=s?new F(f,s):new F(f);data.forEach(function(v,n){if(typeof v!=="string")v=Object.freeze(new B([v],v.name,{type:v.type,lastModified:v.lastModified}));' +
+		'data=s?new F(f,s):new F(f);data.forEach(function(v,n){if(typeof v!=="string"){var p=v.webkitRelativePath,c=new B([v],v.name,{type:v.type,lastModified:v.lastModified});' +
+		'if(p)Object.defineProperty(c,"webkitRelativePath",{value:p});v=Object.freeze(c);}' +
 		'fields.push(Object.freeze([n,v]));});' +
 		'r.snapshot=Object.freeze({fields:Object.freeze(fields),form:fm,submitter:sm});' +
 		'}catch(error){release(f);throw error;}finally{depth--;u.flush();}}' +

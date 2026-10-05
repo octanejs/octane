@@ -249,7 +249,7 @@ describe('packed TSRX source consumers', () => {
 	};
 	const toolingVersions = {
 		nodeTypes: '24.13.3',
-		packageManager: 'pnpm@11.15.1',
+		packageManager: 'pnpm@12.9.1',
 		tsrxTypeScriptPlugin: '0.3.116',
 		typescript: '5.9.3',
 	};
@@ -270,7 +270,7 @@ describe('packed TSRX source consumers', () => {
 			typescript: '5.9.3',
 		});
 		assert.equal(manifest.private, true);
-		assert.equal(manifest.packageManager, 'pnpm@11.15.1');
+		assert.equal(manifest.packageManager, 'pnpm@12.9.1');
 	});
 
 	test('rejects a published binding omitted from the packed archive set', () => {

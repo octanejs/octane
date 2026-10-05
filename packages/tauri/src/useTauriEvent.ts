@@ -22,7 +22,9 @@ export interface UseTauriEventOptions {
 }
 
 function targetKey(target: string | TauriEventTarget | undefined): string | undefined {
-	if (target === undefined || typeof target === 'string') return target;
+	if (target === undefined) return target;
+	// Tauri treats strings as AnyLabel targets, not target kinds.
+	if (typeof target === 'string') return `AnyLabel:${target}`;
 	return 'label' in target ? `${target.kind}:${target.label}` : target.kind;
 }
 

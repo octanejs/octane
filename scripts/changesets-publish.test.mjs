@@ -50,7 +50,7 @@ test('stale registry data does not crash recovery when pnpm reports an existing 
 				path.join(root, 'package.json'),
 				JSON.stringify({
 					name: 'changesets-publish-regression',
-					packageManager: 'pnpm@11.15.1',
+					packageManager: 'pnpm@12.9.1',
 					private: true,
 				}),
 			),

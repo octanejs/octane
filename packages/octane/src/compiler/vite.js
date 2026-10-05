@@ -284,11 +284,69 @@ function verifyCssModuleProofs(context, state) {
 	}
 }
 
+function createProofWaitGraph() {
+	return { waits: new Map(), cut: new Set() };
+}
+
+function proofWaitKey(importer, id) {
+	return `${importer}\0${id}`;
+}
+
+// The pending waits from `from` that reach `to`, as wait keys, or null.
+function proofWaitPath(graph, from, to, visited = new Set()) {
+	if (from === to) return [];
+	if (visited.has(from)) return null;
+	visited.add(from);
+	for (const target of graph.waits.get(from)?.keys() ?? []) {
+		const path = proofWaitPath(graph, target, to, visited);
+		if (path !== null) {
+			path.push(proofWaitKey(from, target));
+			return path;
+		}
+	}
+	return null;
+}
+
+// `this.load()` settles only after the loaded module's transforms finish, so a
+// proof load from A to B while B's transform proves A is a deadlock: each
+// transform awaits the other. Record every pending proof load as a wait-for
+// edge, and refuse the one that would close a cycle. A cut wait resolves to
+// null and its import keeps ordinary component dispatch.
+//
+// Every edge on the closed cycle is cut, including waits already pending, so a
+// ring of components compiles the same way whichever member the build reaches
+// first. Overlapping cycles can still keep a proof on a chord, depending on
+// which cycle closes first; a completed proof is sound either way. An import
+// outside every cycle never closes one, so it always keeps its proof.
+async function loadProofModule(context, graph, importer, id) {
+	const key = proofWaitKey(importer, id);
+	if (graph.cut.has(key)) return null;
+	const cycle = proofWaitPath(graph, id, importer);
+	if (cycle !== null) {
+		graph.cut.add(key);
+		for (const wait of cycle) graph.cut.add(wait);
+		return null;
+	}
+	let targets = graph.waits.get(importer);
+	if (targets === undefined) graph.waits.set(importer, (targets = new Map()));
+	targets.set(id, (targets.get(id) ?? 0) + 1);
+	try {
+		const loaded = await context.load({ id, resolveDependencies: false });
+		return graph.cut.has(key) ? null : loaded;
+	} finally {
+		const count = targets.get(id) - 1;
+		if (count > 0) targets.set(id, count);
+		else targets.delete(id);
+		if (targets.size === 0) graph.waits.delete(importer);
+	}
+}
+
 async function loadImportMetadata(
 	context,
 	imports,
 	importer,
 	metadataKey,
+	proofWaits,
 	{ failLoud = false } = {},
 ) {
 	if (typeof context.resolve !== 'function' || typeof context.load !== 'function') return new Set();
@@ -327,7 +385,7 @@ async function loadImportMetadata(
 				// Avoid recursively walking the dependency graph merely to classify one
 				// imported JSX binding. A pre-transform snapshot is handled below by the
 				// live-graph and exact-filesystem fallbacks.
-				loadedModuleInfo = await context.load({ id: resolved.id, resolveDependencies: false });
+				loadedModuleInfo = await loadProofModule(context, proofWaits, importer, resolved.id);
 			} catch (error) {
 				if (failLoud)
 					throw new Error(
@@ -338,6 +396,7 @@ async function loadImportMetadata(
 					);
 				return;
 			}
+			if (loadedModuleInfo === null) return;
 			// Rollup/Vite may return the pre-transform ModuleInfo snapshot from
 			// `this.load()` while publishing transform metadata to the live graph
 			// record. Read that record after the awaited load without touching the
@@ -372,8 +431,8 @@ async function loadImportMetadata(
 	return proven;
 }
 
-async function loadVoidComponentImports(context, imports, importer) {
-	return loadImportMetadata(context, imports, importer, VOID_EXPORTS_META);
+async function loadVoidComponentImports(context, imports, importer, proofWaits) {
+	return loadImportMetadata(context, imports, importer, VOID_EXPORTS_META, proofWaits);
 }
 
 async function readDescriptorSourceAnalysis(id, descriptorSourceCache) {
@@ -697,6 +756,9 @@ export function octane(options = {}) {
 	// CSS naming/virtual providers can differ between them, so never key a proof
 	// merely by its path or share a previous build's final-module snapshot.
 	const cssModuleProofStates = new Map();
+	// Each environment has its own module graph, so its proof loads form their
+	// own wait-for graph.
+	const proofWaitGraphs = new Map();
 	let textTypeProject = null;
 	let createTextTypeProject = null;
 	let typedTextEnabled = false;
@@ -763,6 +825,12 @@ export function octane(options = {}) {
 		}
 		return state;
 	};
+	const proofWaitGraph = (context, environment) => {
+		const key = context.environment ?? environment;
+		let graph = proofWaitGraphs.get(key);
+		if (graph === undefined) proofWaitGraphs.set(key, (graph = createProofWaitGraph()));
+		return graph;
+	};
 	// Rollup's one-shot build graph can safely load an unresolved virtual module
 	// to collect its transform metadata. Vite's dev plugin container cannot: a
 	// transform awaiting `this.load()` for a virtual dependency can wait on the
@@ -792,6 +860,7 @@ export function octane(options = {}) {
 		descriptorExportCache.clear();
 		descriptorGraphCache.clear();
 		cssModuleProofStates.clear();
+		proofWaitGraphs.clear();
 		projectRoot = nodePath.resolve(root);
 		compiler = createOctaneCompiler({
 			_descriptorPreflightAuthority: DESCRIPTOR_PREFLIGHT_AUTHORITY,
@@ -932,11 +1001,18 @@ export function octane(options = {}) {
 			}
 		},
 		buildStart() {
-			if (this.environment === undefined) cssModuleProofStates.clear();
-			else cssModuleProofStates.delete(this.environment);
+			if (this.environment === undefined) {
+				cssModuleProofStates.clear();
+				proofWaitGraphs.clear();
+			} else {
+				cssModuleProofStates.delete(this.environment);
+				proofWaitGraphs.delete(this.environment);
+			}
 		},
 		buildEnd(error) {
 			if (error) releaseTextTypeProject();
+			if (this.environment === undefined) proofWaitGraphs.clear();
+			else proofWaitGraphs.delete(this.environment);
 			const keys = this.environment === undefined ? ['client', 'server'] : [this.environment];
 			for (const key of keys) {
 				const state = cssModuleProofStates.get(key);
@@ -1177,7 +1253,7 @@ export function octane(options = {}) {
 				return transformWithProof(null);
 			}
 			return Promise.all([
-				loadVoidComponentImports(this, voidImports, id),
+				loadVoidComponentImports(this, voidImports, id, proofWaitGraph(this, environment)),
 				loadDescriptorChildrenImports(
 					this,
 					descriptorImports,

@@ -35,9 +35,9 @@
       "node": ">=22",
       "platform": "any",
       "arch": "any",
-      "packageManager": "pnpm@11.15.1",
+      "packageManager": "pnpm@12.9.1",
       "lockfile": "pnpm-lock.yaml",
-      "lockfileSha256": "3f39999b0276323a3672468741c11e50784f82431ce69bc6ce0bfeef8086cfb7"
+      "lockfileSha256": "600939b38442c7a37f54d4a2886e804fceb57654cd39a2f673c890b54aef3273"
     }
   },
   "lanes": [
@@ -62,7 +62,7 @@
         {
           "path": "packages/base-ui/scripts/build-react-parity-manifest.mjs",
           "role": "support",
-          "sha256": "777405405a1d2e3385dda5caa0af93d7d2141a45adeecc333e9dfbad83824541"
+          "sha256": "0b50076f63bce447c18fb94bf123e51c5494d9e5b08610051387df30ec4de7e7"
         },
         {
           "path": "packages/base-ui/scripts/build-runtime-inventories.mjs",
@@ -174,7 +174,7 @@
         {
           "path": "packages/base-ui/scripts/build-react-parity-manifest.mjs",
           "role": "support",
-          "sha256": "777405405a1d2e3385dda5caa0af93d7d2141a45adeecc333e9dfbad83824541"
+          "sha256": "0b50076f63bce447c18fb94bf123e51c5494d9e5b08610051387df30ec4de7e7"
         },
         {
           "path": "packages/base-ui/scripts/build-runtime-inventories.mjs",
@@ -244,7 +244,7 @@
         {
           "path": "packages/base-ui/scripts/build-react-parity-manifest.mjs",
           "role": "support",
-          "sha256": "777405405a1d2e3385dda5caa0af93d7d2141a45adeecc333e9dfbad83824541"
+          "sha256": "0b50076f63bce447c18fb94bf123e51c5494d9e5b08610051387df30ec4de7e7"
         },
         {
           "path": "packages/base-ui/scripts/build-runtime-inventories.mjs",
@@ -319,7 +319,7 @@
         {
           "path": "packages/base-ui/scripts/build-react-parity-manifest.mjs",
           "role": "support",
-          "sha256": "777405405a1d2e3385dda5caa0af93d7d2141a45adeecc333e9dfbad83824541"
+          "sha256": "0b50076f63bce447c18fb94bf123e51c5494d9e5b08610051387df30ec4de7e7"
         },
         {
           "path": "packages/base-ui/scripts/build-runtime-inventories.mjs",
@@ -409,7 +409,7 @@
         {
           "path": "packages/base-ui/scripts/build-react-parity-manifest.mjs",
           "role": "support",
-          "sha256": "777405405a1d2e3385dda5caa0af93d7d2141a45adeecc333e9dfbad83824541"
+          "sha256": "0b50076f63bce447c18fb94bf123e51c5494d9e5b08610051387df30ec4de7e7"
         },
         {
           "path": "packages/base-ui/scripts/build-runtime-inventories.mjs",
@@ -508,7 +508,7 @@
         {
           "path": "packages/base-ui/scripts/build-react-parity-manifest.mjs",
           "role": "support",
-          "sha256": "777405405a1d2e3385dda5caa0af93d7d2141a45adeecc333e9dfbad83824541"
+          "sha256": "0b50076f63bce447c18fb94bf123e51c5494d9e5b08610051387df30ec4de7e7"
         }
       ]
     },
@@ -546,7 +546,7 @@
         {
           "path": "packages/base-ui/scripts/build-react-parity-manifest.mjs",
           "role": "support",
-          "sha256": "777405405a1d2e3385dda5caa0af93d7d2141a45adeecc333e9dfbad83824541"
+          "sha256": "0b50076f63bce447c18fb94bf123e51c5494d9e5b08610051387df30ec4de7e7"
         }
       ]
     }

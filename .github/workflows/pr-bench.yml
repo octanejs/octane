@@ -61,7 +61,7 @@ jobs:
           git worktree add --detach "$RUNNER_TEMP/base" "$base"
 
       - name: Install pnpm
-        uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271 # v6
+        uses: pnpm/action-setup@d9184bf108216479bc5a137cc391f4d7b14c870b # v6.1.0
 
       - name: Setup Node.js
         uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
@@ -71,8 +71,8 @@ jobs:
 
       - name: Install dependencies
         run: |
-          pnpm install --prod false --frozen-lockfile
-          pnpm --dir "$BASE_TREE" install --prod false --frozen-lockfile
+          pnpm install --prod=false --frozen-lockfile
+          pnpm --dir "$BASE_TREE" install --prod=false --frozen-lockfile
 
       # The merge commit's harness drives both trees, so only its browser is needed.
       - name: Install Playwright Chromium

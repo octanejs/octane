@@ -14,7 +14,7 @@ import { earlySignalBootstrapScript, renderToString } from 'octane/server';
 import { launchBrowser } from '../../../../../test-utils/playwright-browser.js';
 import { loadServerFixture } from '../../_server-fixture.js';
 import type { EarlyFormSubmissionMailbox } from '../../../src/form-submission.js';
-import { mkdtemp, rm } from 'node:fs/promises';
+import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { basename, dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -44,6 +44,10 @@ for (const production of [false, true]) {
 
 			beforeAll(async () => {
 				scratch = await mkdtemp(join(tmpdir(), 'octane-form-submission-'));
+				for (const folder of ['first', 'second']) {
+					await mkdir(join(scratch, 'upload', folder), { recursive: true });
+					await writeFile(join(scratch, 'upload', folder, 'note.txt'), `${folder} contents`);
+				}
 				const fixture = loadServerFixture<typeof FormFixture>(join(HERE, 'Form.tsrx'), {
 					id: join(HERE, 'Form.tsrx'),
 					compileOptions: { dev: !production, hmr: false },
@@ -505,6 +509,105 @@ for (const production of [false, true]) {
 					submitterSame: true,
 					immutable: true,
 				});
+				expect(state.nativeSubmissions).toBe(1);
+				expect(submissions).toEqual([]);
+				expect(await page.evaluate(() => window.__formSubmission.files())).toEqual([
+					{
+						field: 'attachment',
+						name: 'original.txt',
+						webkitRelativePath: '',
+						size: 8,
+						type: 'text/plain',
+						lastModified: expect.any(Number),
+						contents: 'accepted',
+					},
+				]);
+			});
+
+			it('preserves accepted directory file paths and contents while behavior delivery waits', async () => {
+				const { page, submissions, load } = await openPage('controls', '?hold');
+				await page.locator('#attachment-input').evaluate((input) => {
+					input.setAttribute('webkitdirectory', '');
+				});
+				await page.locator('#attachment-input').setInputFiles(join(scratch, 'upload'));
+				const accepted = await page.evaluate(async () => {
+					const form = document.querySelector('#command-form') as HTMLFormElement;
+					return Promise.all(
+						Array.from(new FormData(form))
+							.filter((entry): entry is [string, File] => typeof entry[1] !== 'string')
+							.map(async ([field, file]) => ({
+								field,
+								name: file.name,
+								webkitRelativePath: file.webkitRelativePath,
+								size: file.size,
+								type: file.type,
+								lastModified: file.lastModified,
+								contents: await file.text(),
+							})),
+					);
+				});
+				accepted.sort((a, b) => a.webkitRelativePath.localeCompare(b.webkitRelativePath));
+				expect(accepted).toMatchObject([
+					{
+						field: 'attachment',
+						name: 'note.txt',
+						webkitRelativePath: 'upload/first/note.txt',
+						size: 14,
+						type: 'text/plain',
+						contents: 'first contents',
+					},
+					{
+						field: 'attachment',
+						name: 'note.txt',
+						webkitRelativePath: 'upload/second/note.txt',
+						size: 15,
+						type: 'text/plain',
+						contents: 'second contents',
+					},
+				]);
+				const originalFilesFrozen = await page.evaluate(() => {
+					const input = document.querySelector('#attachment-input') as HTMLInputElement;
+					const files = Array.from(input.files!);
+					(document.querySelector('#draft-input') as HTMLInputElement).value = 'accepted';
+					HTMLFormElement.prototype.requestSubmit.call(
+						document.querySelector('#command-form') as HTMLFormElement,
+						document.querySelector('#save-button') as HTMLButtonElement,
+					);
+					return files.map((file) => Object.isFrozen(file));
+				});
+				expect(originalFilesFrozen).toEqual([false, false]);
+				await page.evaluate(() => {
+					(document.querySelector('#attachment-input') as HTMLInputElement).value = '';
+					(document.querySelector('#draft-input') as HTMLInputElement).value = 'changed';
+				});
+				expect(
+					await page
+						.locator('#attachment-input')
+						.evaluate((input: HTMLInputElement) => input.files?.length),
+				).toBe(0);
+				await load();
+				expect(await page.evaluate(() => window.__formSubmission.state())).toMatchObject({
+					captures: [{ early: true, immutable: true }],
+					deliveries: [],
+				});
+				await page.evaluate(() => window.__formSubmission.release());
+				await page.waitForFunction(() => window.__formSubmission.state().deliveries.length === 1);
+				const delivered = await page.evaluate(() => window.__formSubmission.files());
+				delivered.sort((a, b) => a.webkitRelativePath.localeCompare(b.webkitRelativePath));
+				expect(delivered).toEqual(accepted);
+				expect(await page.evaluate(() => window.__formSubmission.fileFrozen())).toEqual([
+					true,
+					true,
+				]);
+				const state = await page.evaluate(() => window.__formSubmission.state());
+				expect(state.deliveries[0]).toMatchObject({
+					early: true,
+					original: true,
+					submitterSame: true,
+					trusted: true,
+					immutable: true,
+				});
+				expect(state.deliveries[0].fields[0]).toEqual(['draft', 'accepted']);
 				expect(state.nativeSubmissions).toBe(1);
 				expect(submissions).toEqual([]);
 			});
