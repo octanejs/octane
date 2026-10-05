@@ -1,7 +1,7 @@
 // @ts-check
 import { createHandler } from '@octanejs/app-core/production';
 import { createRouter, is_rpc_request } from '@octanejs/app-core';
-import { nodeRequestToWebRequest, sendWebResponse } from '@octanejs/app-core/node';
+import { nodeRequestToWebRequest, nodeRequestUrl, sendWebResponse } from '@octanejs/app-core/node';
 
 import { isRsbuildOwnedUrl } from './html.js';
 
@@ -90,8 +90,7 @@ export function createOctaneDevMiddleware(options) {
 
 	return async function octaneDevMiddleware(request, response, next) {
 		try {
-			const host = request.headers.host ?? 'localhost';
-			const url = new URL(request.url ?? '/', `http://${host}`);
+			const url = nodeRequestUrl(request);
 			// Internal and public URLs do not depend on a successful client
 			// compilation. Yield them immediately so an initial compile error does
 			// not turn the error overlay, HMR transport, or favicon into an SSR 500.
@@ -146,7 +145,11 @@ export function createOctaneDevMiddleware(options) {
 				handlerCache.set(typedBundle.manifest, cached);
 			}
 
-			const webResponse = await cached.handler(nodeRequestToWebRequest(request, response));
+			const webResponse = await cached.handler(
+				nodeRequestToWebRequest(request, response, {
+					trustProxy: typedBundle.manifest.trustProxy,
+				}),
+			);
 			await sendWebResponse(response, webResponse);
 		} catch (error) {
 			options.logError?.('Dev SSR request failed', error);

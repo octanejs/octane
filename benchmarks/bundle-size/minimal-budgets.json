@@ -15,59 +15,59 @@
     "brotli": 4477
   },
   "cli-spa-starter": {
-    "raw": 113386,
-    "gzip": 38318,
-    "brotli": 33778
+    "raw": 110204,
+    "gzip": 37315,
+    "brotli": 32780
   },
   "root-static-specialized": {
-    "raw": 75462,
-    "gzip": 25181,
-    "brotli": 22684
+    "raw": 78843,
+    "gzip": 26237,
+    "brotli": 23518
   },
   "root-chained-jsx": {
-    "raw": 82613,
-    "gzip": 27390,
-    "brotli": 24649
+    "raw": 80879,
+    "gzip": 26780,
+    "brotli": 23980
   },
   "root-static": {
-    "raw": 201681,
-    "gzip": 64291,
-    "brotli": 56053
+    "raw": 205816,
+    "gzip": 65606,
+    "brotli": 57106
   },
   "root-static-local": {
-    "raw": 75465,
-    "gzip": 25167,
-    "brotli": 22734
+    "raw": 78846,
+    "gzip": 26221,
+    "brotli": 23526
   },
   "hooks-state": {
-    "raw": 87535,
-    "gzip": 29170,
-    "brotli": 26231
+    "raw": 90906,
+    "gzip": 30251,
+    "brotli": 27087
   },
   "prop-attributes": {
-    "raw": 93954,
-    "gzip": 31195,
-    "brotli": 27970
+    "raw": 91385,
+    "gzip": 30332,
+    "brotli": 27138
   },
   "context": {
-    "raw": 107030,
-    "gzip": 35518,
-    "brotli": 31709
+    "raw": 105312,
+    "gzip": 34923,
+    "brotli": 31087
   },
   "hydrate-root": {
-    "raw": 175067,
-    "gzip": 55523,
-    "brotli": 48675
+    "raw": 171048,
+    "gzip": 54277,
+    "brotli": 47517
   },
   "deferred-hydration": {
-    "raw": 238535,
-    "gzip": 75406,
-    "brotli": 65391
+    "raw": 234724,
+    "gzip": 74278,
+    "brotli": 64222
   },
   "suspense-transition": {
-    "raw": 163795,
-    "gzip": 52678,
-    "brotli": 46433
+    "raw": 161548,
+    "gzip": 51875,
+    "brotli": 45614
   },
   "server-hooks": {
     "raw": 509,
@@ -75,14 +75,14 @@
     "brotli": 512
   },
   "server-render": {
-    "raw": 65201,
-    "gzip": 22499,
+    "raw": 65531,
+    "gzip": 22629,
     "brotli": 20504
   },
   "component-owned-effects": {
-    "raw": 79980,
-    "gzip": 26468,
-    "brotli": 23830
+    "raw": 83355,
+    "gzip": 27533,
+    "brotli": 24745
   },
   "binding-vanilla": {
     "raw": 680,
@@ -90,19 +90,19 @@
     "brotli": 618
   },
   "binding-hooks": {
-    "raw": 86055,
-    "gzip": 28878,
-    "brotli": 25981
+    "raw": 89422,
+    "gzip": 29968,
+    "brotli": 26804
   },
   "binding-base-ui-vite": {
-    "raw": 211750,
-    "gzip": 67783,
-    "brotli": 59120
+    "raw": 216072,
+    "gzip": 69235,
+    "brotli": 60203
   },
   "binding-base-ui-esbuild": {
-    "raw": 209763,
-    "gzip": 67771,
-    "brotli": 59077
+    "raw": 213990,
+    "gzip": 69162,
+    "brotli": 60249
   },
   "binding-aria-vite": {
     "raw": 7963,
@@ -125,14 +125,14 @@
     "brotli": 21224
   },
   "binding-radix-vite": {
-    "raw": 213666,
-    "gzip": 68367,
-    "brotli": 59609
+    "raw": 217988,
+    "gzip": 69807,
+    "brotli": 60712
   },
   "binding-radix-esbuild": {
-    "raw": 211638,
-    "gzip": 68356,
-    "brotli": 59668
+    "raw": 215865,
+    "gzip": 69747,
+    "brotli": 60695
   },
   "binding-floating-ui-vite": {
     "raw": 11095,
@@ -145,33 +145,33 @@
     "brotli": 4377
   },
   "binding-mantine-hooks-vite": {
-    "raw": 94447,
-    "gzip": 31407,
-    "brotli": 28157
+    "raw": 92726,
+    "gzip": 30808,
+    "brotli": 27560
   },
   "binding-mantine-hooks-esbuild": {
-    "raw": 94098,
-    "gzip": 31558,
-    "brotli": 28300
+    "raw": 92349,
+    "gzip": 30972,
+    "brotli": 27728
   },
   "binding-apollo-client-vite": {
-    "raw": 356920,
-    "gzip": 111900,
-    "brotli": 97913
+    "raw": 361078,
+    "gzip": 113267,
+    "brotli": 99141
   },
   "binding-apollo-client-esbuild": {
-    "raw": 359915,
-    "gzip": 114125,
-    "brotli": 99768
+    "raw": 363980,
+    "gzip": 115516,
+    "brotli": 100776
   },
   "binding-usehooks-ts-vite": {
-    "raw": 95228,
-    "gzip": 31636,
-    "brotli": 28343
+    "raw": 93507,
+    "gzip": 31065,
+    "brotli": 27781
   },
   "binding-usehooks-ts-esbuild": {
-    "raw": 94863,
-    "gzip": 31776,
-    "brotli": 28477
+    "raw": 93115,
+    "gzip": 31185,
+    "brotli": 27896
   }
 }

@@ -610,6 +610,12 @@ type SignalInstanceKey =
 // `.tsrx` body has no such renderer. The compiler and runtime.server.ts spell it
 // the same way.
 const RENDERER_INVOCATION_SITE = 'r:';
+// A render function rendered as a child, such as a compiled nested `@{ … }`
+// block, carries this invocation site. Its scope keeps its own instance for the
+// declarations it evaluates, but it is part of the template that renders it, so
+// it reads other handles the way that template does (see scopeSignalOwner).
+// runtime.server.ts spells it the same way.
+const TEMPLATE_INVOCATION_SITE = 't:';
 // Parent links, root namespaces, and keyed item identities are lifetime-stable.
 // Keep their recipe until a real owner is needed: scalar-only components avoid
 // ancestor walks, visited sets, key coercion, and JSON strings altogether. The
@@ -857,6 +863,101 @@ function collectRetiredSignalRetryOwners(
 	if (node.children !== undefined)
 		for (const child of node.children.values())
 			collectRetiredSignalRetryOwners(child, cache, retired, keep);
+}
+
+// Component, child and branch slots hold one occupant at a time, so a newer
+// attempt that renders one there proves every retained occupant with another
+// component, key or arm replaced. Try slots keep a primary beside their
+// fallback and list rows prune by key (trackSignalRetryListKeys); neither is
+// proven here.
+function signalRetrySoleKind(kind: unknown): boolean {
+	return (
+		kind === 'componentSlotSlot' ||
+		kind === 'childSlot' ||
+		kind === 'ifBlockSlot' ||
+		kind === 'switchBlockSlot'
+	);
+}
+
+function collectReplacedSignalRetryOccupants(
+	node: SignalRetryNode | undefined,
+	identity: unknown[],
+	cache: SignalRetryOwners,
+	retired: SignalRendererOwnerIdentity[],
+): void {
+	for (const token of identity) {
+		const children = node?.children;
+		if (children === undefined) return;
+		node = children.get(token);
+		for (const [key, child] of children) {
+			if (child === node) continue;
+			children.delete(key);
+			collectRetiredSignalRetryOwners(child, cache, retired);
+		}
+	}
+}
+
+interface SignalRetryVisit {
+	scope: Scope;
+	cache: SignalRetryOwners;
+	path: unknown[];
+}
+// Set when a fresh scope consults a retry cache; its render takes it.
+let SIGNAL_RETRY_VISIT: SignalRetryVisit | null = null;
+
+function takeSignalRetryVisit(scope: Scope): SignalRetryVisit | null {
+	const visit = SIGNAL_RETRY_VISIT;
+	SIGNAL_RETRY_VISIT = null;
+	return visit?.scope === scope ? visit : null;
+}
+
+// A fresh scope's first render proves what this attempt renders where it has
+// been. Its own path ends in the occupant identity of its parent's slot when
+// that segment is ['slot', index, kind, branch, component, key]; item and
+// scope segments cannot place a sole kind there. Every slot it created holds
+// this attempt's occupant: a fresh slot records its identity before anything
+// it renders can suspend, so this holds for one still rendering too. A
+// completed render that created no slot at an index renders nothing there; a
+// suspended one may not have reached it yet.
+function pruneSignalRetryVisit(visit: SignalRetryVisit, suspended: boolean): void {
+	const { scope, cache, path } = visit;
+	const retired: SignalRendererOwnerIdentity[] = [];
+	const tail = path.length - 4;
+	if (path[tail - 2] === 'slot' && signalRetrySoleKind(path[tail]))
+		collectReplacedSignalRetryOccupants(
+			signalRetryNode(cache, path.slice(0, tail), false),
+			path.slice(tail),
+			cache,
+			retired,
+		);
+	const slots = signalRetryNode(cache, path, false)?.children?.get('slot')?.children;
+	if (slots !== undefined) {
+		for (const [index, node] of slots) {
+			const slot = scope.slots[index as number];
+			if (slot === null || typeof slot !== 'object') {
+				if (suspended) continue;
+				slots.delete(index);
+				collectRetiredSignalRetryOwners(node, cache, retired);
+			} else if (signalRetrySoleKind(slot.__kind)) {
+				collectReplacedSignalRetryOccupants(
+					node,
+					slot.forSlot != null
+						? ['item']
+						: [
+								slot.__kind,
+								slot.branch,
+								slot.currentIsBodyFn ? undefined : slot.currentComp,
+								slot.prevKey,
+							],
+					cache,
+					retired,
+				);
+			}
+		}
+	}
+	// Remove every path/claim before abort callbacks can reenter rendering.
+	// A cache cleared meanwhile already retired its owners; retiring is idempotent.
+	for (const owner of retired) retireRendererSignalOwner(owner);
 }
 
 function trackSignalRetryListKeys<T>(
@@ -1115,6 +1216,7 @@ function scopeSignalOwner(scope: Scope | null): SignalOwner | undefined {
 		const boundary = signalRetryBoundary(scope.block);
 		const cache = boundary?.retrySignalOwners ?? root?.retrySignalOwners;
 		const retryRoot = boundary?.retrySignalOwners !== undefined ? boundary.tryBlock : root?.current;
+		let visit: SignalRetryVisit | null = null;
 		if (cache !== undefined && !retired && !scope.block.disposed && retryRoot != null) {
 			const path = signalRetryPath(scope, retryRoot);
 			const node = path === null ? undefined : signalRetryNode(cache, path, false);
@@ -1123,6 +1225,7 @@ function scopeSignalOwner(scope: Scope | null): SignalOwner | undefined {
 				node.owner = undefined;
 				cache.owners.delete(owner);
 			}
+			if (path !== null && !scope.mounted) visit = { scope, cache, path };
 		}
 		if (owner === undefined || owner.documentOwner !== documentOwner) {
 			const instanceKey = resolveSignalInstanceKey(scope);
@@ -1145,9 +1248,28 @@ function scopeSignalOwner(scope: Scope | null): SignalOwner | undefined {
 			};
 			// Directive arms and inline rows own only the declarations they evaluate,
 			// and retire them on removal. A captured declaration of the enclosing
-			// component still resolves to that component's cell.
-			const parent = instanceKey === undefined ? (scope.parent ?? scope.block.parentBlock) : null;
-			if (parent !== null && !(parent instanceof LiteBlockImpl))
+			// component still resolves to that component's cell. A nested `@{ … }`
+			// block keeps an instance of its own for its declarations, and a fragment
+			// renderer carries the instance of the scope it renders for (the server
+			// renders it in that scope's owner). Both link to their template the same
+			// way. A renderer, even one inside a block, keeps its parent's key. A block
+			// adds a key segment and links to the scope that rendered it, which for a
+			// lightweight component is its scope rather than the DOM stand-in its
+			// blocks hang off.
+			let parent = scope.parent ?? scope.block.parentBlock;
+			if (
+				instanceKey !== undefined &&
+				parent !== null &&
+				resolveSignalInstanceKey(parent) !== instanceKey
+			)
+				parent =
+					scope.signalInstanceSite === TEMPLATE_INVOCATION_SITE ? scope.signalInstanceParent : null;
+			// A stand-in records the scope its component is registered on.
+			if (parent instanceof LiteBlockImpl)
+				parent =
+					parent.signalInstanceParent?.children?.find((child) => child.scope.block === parent)
+						?.scope ?? null;
+			if (parent !== null)
 				identity.enclosingOwner = scopeSignalOwner(parent) as SignalRendererOwnerIdentity;
 			// A retry owner must not keep an abandoned renderer tree alive. This
 			// existing opaque identity object is also its own facade-state token.
@@ -1155,6 +1277,7 @@ function scopeSignalOwner(scope: Scope | null): SignalOwner | undefined {
 			owner = Object.freeze(identity);
 		}
 		SCOPE_SIGNAL_OWNERS.set(scope, owner);
+		if (visit !== null) SIGNAL_RETRY_VISIT = visit;
 		// A queued native bubble handler may outlive deletion and first enable
 		// signals afterwards. Its invocation must remain retired, not fall back
 		// to a document owner or create fresh instance state.
@@ -11135,6 +11258,7 @@ function captureRenderPhaseUpdate(cell: RenderPhaseCell, key: RenderPhaseSnapsho
 }
 
 export function renderBlock(block: Block): void {
+	let retryVisit: SignalRetryVisit | null = null;
 	if (signalDocumentEnabled || block.idState.renderOwner?.signalOwner !== undefined) {
 		const owner = scopeSignalOwner(block);
 		if (owner !== undefined) STREAMED_SIGNAL_OWNER_ACTIVATOR?.(owner);
@@ -11142,6 +11266,7 @@ export function renderBlock(block: Block): void {
 			runWithSignalOwner(owner, () => renderBlock(block));
 			return;
 		}
+		retryVisit = takeSignalRetryVisit(block);
 	}
 	const hydration = hydrating ? activeHydration() : null;
 	// A replacement dynamic range owns client DOM even while its parent adopts
@@ -11152,6 +11277,8 @@ export function renderBlock(block: Block): void {
 		(!hydration.owns(block) ||
 			(block.kind === 'dynamic' && block.endMarker !== null && hydration.rebuilds(block.endMarker)))
 	) {
+		// The nested client build renders this block, so it takes the retry visit.
+		SIGNAL_RETRY_VISIT = retryVisit;
 		hydration.suspend(() => renderBlock(block));
 		return;
 	}
@@ -11169,6 +11296,7 @@ export function renderBlock(block: Block): void {
 			if (++retries > RENDER_PHASE_UPDATE_LIMIT) throw new Error(formatClientError(9));
 		}
 		if (hydration !== null) hydration.settleUnclaimed(block);
+		if (retryVisit !== null) pruneSignalRetryVisit(retryVisit, false);
 		if (
 			signalDocumentEnabled &&
 			(block as any).__trySlot?.tryBlock === block &&
@@ -11196,6 +11324,8 @@ export function renderBlock(block: Block): void {
 			}
 			if (!block.crossRenderUpdate) block.pending = false;
 		}
+		// Prune before a discarded item retains this attempt's owners.
+		if (retryVisit !== null && isSuspenseException(error)) pruneSignalRetryVisit(retryVisit, true);
 		// A fresh item is linked only after its body succeeds. A boundary can
 		// catch this throw and commit fallback without rolling back the root, so
 		// the creation journal alone cannot clean up this otherwise-orphaned item.
@@ -12163,19 +12293,24 @@ export function componentSlotLite<P>(
 	let claimed: Node | null | undefined;
 	const outerClaim =
 		adoptedOpen === null ? undefined : hydration!.beginClaim(getNextSibling(adoptedOpen));
+	let retryVisit: SignalRetryVisit | null = null;
 	try {
 		if (signalDocumentEnabled || scope.block.idState.renderOwner?.signalOwner !== undefined) {
 			// Same owner-resolution order as runWithBlockSignalOwner, but the
 			// per-mount closure only exists when the owner actually changes.
 			const owner = scopeSignalOwner(scope);
 			if (owner !== undefined) STREAMED_SIGNAL_OWNER_ACTIVATOR?.(owner);
+			// A lite body renders in place, so its first render prunes here.
+			retryVisit = takeSignalRetryVisit(scope);
 			if (owner === undefined || currentSignalOwner() === owner) {
 				comp(props, scope, undefined);
 			} else runWithSignalOwner(owner, () => comp(props, scope, undefined));
 		} else comp(props, scope, undefined);
 		if (hydration !== null) hydration.settleUnclaimed(scope);
+		if (retryVisit !== null) pruneSignalRetryVisit(retryVisit, false);
 		if (!scope.mounted) scope.mounted = true;
 	} catch (error) {
+		if (retryVisit !== null && isSuspenseException(error)) pruneSignalRetryVisit(retryVisit, true);
 		profileDidThrow = true;
 		profileThrown = error;
 		throw error;
@@ -22365,7 +22500,24 @@ function commitBag<T>(scope: Scope, root: Node | null, bag: T): T {
  * *slot* renders `true` as empty (React parity for renderable children).
  */
 function coerceText(value: unknown): string {
+	if (process.env.NODE_ENV !== 'production' && isSignalHandle(value)) devWarnPlainTextHandle();
 	return value == null || value === false ? '' : typeof value === 'string' ? value : String(value);
+}
+
+let DEV_PLAIN_TEXT_HANDLE_WARNED = false;
+
+// Only a module with an import from `octane/signals` compiles opaque text holes
+// as handle bindings; elsewhere just `$`-named expressions bind. A handle that
+// reaches a plain hole would otherwise render as "[object Object]" silently.
+function devWarnPlainTextHandle(): void {
+	if (DEV_PLAIN_TEXT_HANDLE_WARNED) return;
+	DEV_PLAIN_TEXT_HANDLE_WARNED = true;
+	console.error(
+		'Octane: a signal handle reached a text hole in a module that does not import ' +
+			'`octane/signals`, so it rendered as a plain value. Type the prop with ' +
+			"`import type { SignalHandle } from 'octane/signals'`, give it a `$` suffix, read it " +
+			'with `.get()`, or enable the `opaqueSignalHandles` compiler option.',
+	);
 }
 
 /**
@@ -24534,13 +24686,23 @@ export function bindSignalChecked(
  * the call site; these helpers allocate nothing and never index a bag dynamically.
  * Controlled form properties deliberately do not use this identity guard.
  */
+// An identical raw value needs no write, except a first `undefined` over an
+// adopted server element: its cache slot has not yet reconciled the server
+// attribute, which the writer removes. The direct-signal path does the same.
+function attributeUnchanged(previous: unknown, value: unknown, el: Element): boolean {
+	if (previous !== value) return false;
+	if (value !== undefined) return true;
+	const hydration = activeHydration();
+	return hydration === null || hydration.isFresh(el);
+}
+
 export function setAttributeIfChanged(
 	value: unknown,
 	previous: unknown,
 	el: Element,
 	name: string,
 ): unknown {
-	if (previous === value) return previous;
+	if (attributeUnchanged(previous, value, el)) return previous;
 	setAttribute(el, name, value);
 	return value;
 }
@@ -24551,7 +24713,7 @@ export function setPlainAttributeIfChanged(
 	el: Element,
 	name: string,
 ): unknown {
-	if (previous === value) return previous;
+	if (attributeUnchanged(previous, value, el)) return previous;
 	setPlainAttribute(el, name, value);
 	return value;
 }
@@ -24562,7 +24724,7 @@ export function setURLAttributeIfChanged(
 	el: Element,
 	name: string,
 ): unknown {
-	if (previous === value) return previous;
+	if (attributeUnchanged(previous, value, el)) return previous;
 	setURLAttribute(el, name, value);
 	return value;
 }
@@ -24573,7 +24735,7 @@ export function setStringDataIfChanged(
 	el: Element,
 	name: string,
 ): unknown {
-	if (previous === value) return previous;
+	if (attributeUnchanged(previous, value, el)) return previous;
 	setStringData(el, name, value);
 	return value;
 }
@@ -24584,7 +24746,7 @@ export function setBooleanAttributeIfChanged(
 	el: Element,
 	name: string,
 ): unknown {
-	if (previous === value) return previous;
+	if (attributeUnchanged(previous, value, el)) return previous;
 	setBooleanAttribute(el, name, value);
 	return value;
 }
@@ -24595,19 +24757,19 @@ export function setAriaAttributeIfChanged(
 	el: Element,
 	name: string,
 ): unknown {
-	if (previous === value) return previous;
+	if (attributeUnchanged(previous, value, el)) return previous;
 	setAriaAttribute(el, name, value);
 	return value;
 }
 
 export function setClassNameIfChanged(value: unknown, previous: unknown, el: Element): unknown {
-	if (previous === value) return previous;
+	if (attributeUnchanged(previous, value, el)) return previous;
 	setClassName(el, value);
 	return value;
 }
 
 export function setClassAttrIfChanged(value: unknown, previous: unknown, el: Element): unknown {
-	if (previous === value) return previous;
+	if (attributeUnchanged(previous, value, el)) return previous;
 	setClassAttr(el, value);
 	return value;
 }
@@ -38058,6 +38220,10 @@ export function childSlot(
 		let signalInstanceKey: SignalInstanceKey | undefined;
 		if (SIGNAL_BINDINGS_ENABLED || signalDocumentEnabled) {
 			const key = componentDescriptor?.key;
+			// A render function rendered here is part of this template. Compiled
+			// children belong to the template that authored them instead, so they
+			// keep the plain child identity.
+			if (isBodyFn && !isChildrenBlock(comp)) invocationSite = TEMPLATE_INVOCATION_SITE;
 			signalInstanceKey = {
 				parentScope,
 				invocationSite: componentDescriptor?.__octaneInvocationSite ?? invocationSite,
@@ -39285,10 +39451,11 @@ export function getTransitionFallbackTimeout(): number {
 	return TRANSITION_FALLBACK_TIMEOUT_MS;
 }
 
-// React's retry-only commit heuristic is global, but its pending commits belong
-// to individual roots. Rendering a retry still happens promptly (including
-// discovering dependent requests); only publishing its completed work waits.
-const SUSPENSE_RETRY_THROTTLE_MS = 300;
+// The retry-only commit window is global, but pending commits belong to
+// individual roots. Octane uses 100ms (React uses 300ms). Rendering a retry
+// still happens promptly, including discovering dependent requests; only
+// publishing its completed work waits.
+const SUSPENSE_RETRY_THROTTLE_MS = 100;
 let mostRecentSuspenseCommit = -Infinity;
 interface SuspenseRetryError {
 	error: unknown;
@@ -49727,11 +49894,7 @@ function hydrateRootWithOutputHandler(
 				withRefDetachSuppression(refs, () => unmountBlock(attempted, false));
 				queueMicrotask(() => {
 					if (owner.disposed || owner.current !== attempted) return;
-					try {
-						adopt();
-					} catch (error) {
-						if (!reportUncaughtError(rootBlock, error)) throw error;
-					}
+					retry();
 				});
 			};
 		}
@@ -49782,9 +49945,7 @@ function hydrateRootWithOutputHandler(
 				collectVisibleSubtreeRefs(rootBlock, refs);
 				withRefDetachSuppression(refs, () => unmountBlock(rootBlock, false));
 				if (error.retry && error.lease?.active()) {
-					retryPresentationMiss(error, () => {
-						if (!owner.disposed) adopt();
-					});
+					retryPresentationMiss(error, retry);
 				} else {
 					owner.preservePresentation = true;
 					root.unmount();
@@ -49843,7 +50004,16 @@ function hydrateRootWithOutputHandler(
 			queueMicrotask(flush);
 		}
 	};
-	owner.retry = adopt;
+	// Only the first attempt has a hydrateRoot caller to receive a refused lease.
+	// A resumed or retried attempt reports it to the root instead.
+	const retry = (): void => {
+		try {
+			adopt();
+		} catch (error) {
+			if (!reportUncaughtError(rootBlock, error)) throw error;
+		}
+	};
+	owner.retry = retry;
 	adopt();
 	return root;
 }
