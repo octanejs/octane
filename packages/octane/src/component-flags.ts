@@ -9,6 +9,18 @@ type FlaggedComponent = {
 /** The component owns a load-bearing runtime/SSR boundary range. */
 export const COMPONENT_FLAG_BOUNDARY = 1 << 0;
 
+/**
+ * A server built-in renders its compiled children inline, in its own frame, as
+ * part of the template that authored them, and declares no signals of its own.
+ */
+export const COMPONENT_FLAG_AUTHOR_CHILDREN = 1 << 1;
+
+/**
+ * Both flags above. Built-in definitions pass this one constant: a computed
+ * argument would keep their pure definitions from being removed when unused.
+ */
+export const COMPONENT_FLAGS_AUTHOR_BOUNDARY = (1 << 0) | (1 << 1);
+
 /** Attach an immutable capability bitmask without retaining concrete component identities. */
 export function markComponentFlags<T extends Function>(
 	component: T,

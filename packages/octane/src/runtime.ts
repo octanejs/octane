@@ -1231,7 +1231,17 @@ function scopeSignalOwner(scope: Scope | null): SignalOwner | undefined {
 				parent =
 					parent.signalInstanceParent?.children?.find((child) => child.scope.block === parent)
 						?.scope ?? null;
-			if (parent !== null)
+			// Compiled children instead link to the owner of the template that authored
+			// them (see markChildrenBlock), whichever component renders them. A context
+			// provider renders them inline in its own block and declares nothing
+			// itself, so it links the same way. Only a block has a body; the recorded
+			// owner can be any owner, and only a renderer of this document links.
+			const body = (scope as Block).body as any;
+			const children = (body?.$$kind === CONTEXT_TAG ? (scope as Block).props?.children : body)?.[
+				CHILDREN_SIGNAL_OWNER
+			];
+			if (children?.documentOwner === documentOwner) identity.enclosingOwner = children;
+			else if (parent !== null)
 				identity.enclosingOwner = scopeSignalOwner(parent) as SignalRendererOwnerIdentity;
 			// A retry owner must not keep an abandoned renderer tree alive. This
 			// existing opaque identity object is also its own facade-state token.
@@ -14939,6 +14949,14 @@ const CHILDREN_BODY: unique symbol = Symbol.for('octane.childrenBody') as any;
 // its enclosing closure, so a dormant boundary can tell a changed capture from a
 // fresh function with the same captures without calling the body.
 const CHILDREN_CAPTURES: unique symbol = Symbol.for('octane.childrenCaptures') as any;
+// Compiled children render inside the component that receives them, but they
+// are part of the template that authored them, as `.tsx` children evaluated by
+// their parent are. markChildrenBlock records the signal owner that template
+// renders in, and scopeSignalOwner links the children's owner to it. A render
+// runs in an owner identity, which never retains its renderer tree. Unlike
+// CHILDREN_BLOCK, the key is local to this runtime copy: another copy's owner
+// belongs to another document owner, which scopeSignalOwner never links.
+const CHILDREN_SIGNAL_OWNER: unique symbol = Symbol() as any;
 
 /**
  * Compiler-emitted: attach markerless single-host-root metadata while a fresh
@@ -14967,6 +14985,8 @@ export function markChildrenBlock<T>(
 		// client output supplies a source-body token for auto-memo or Hydrate captures.
 		if (body !== undefined) (fn as any)[CHILDREN_BODY] = body;
 		if (captures !== undefined) (fn as any)[CHILDREN_CAPTURES] = captures;
+		if (activeSynchronousSignalOwner !== null || activeSignalOwnerEnvironment !== undefined)
+			(fn as any)[CHILDREN_SIGNAL_OWNER] = currentExplicitSignalOwner();
 	}
 	return fn;
 }
@@ -15703,6 +15723,16 @@ function createHydrateBoundaryBody(
 		// Runtime-owned effect bodies receive their dependency tuple as arguments.
 		useEffect(notifyHydrateBoundary as EffectFn, [state, scope], HYDRATE_NOTIFY_SLOT);
 	};
+	// The children render in this internal try body but belong to the template
+	// that authored them (see markChildrenBlock), so the body's signal owner links
+	// to that template's owner once created (see scopeSignalOwner). A split
+	// boundary's children are written between its tags: that template renders it.
+	Object.defineProperty(contentBody, CHILDREN_SIGNAL_OWNER, {
+		get: () =>
+			state.props.__load === undefined
+				? (state.props.children as any)?.[CHILDREN_SIGNAL_OWNER]
+				: scopeSignalOwner(state.parentBlock.signalInstanceParent),
+	});
 	return (_props, scope) => {
 		tryBlock(
 			scope,
