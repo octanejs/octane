@@ -611,10 +611,14 @@ function canCarryDirectSignalHandle(
 	) {
 		return false;
 	}
+	// Type-only wrappers, matching isDirectSignalHandleExpression's unwrapping, so
+	// `$` syntax nested in `??`/`?:`/`&&` binds whichever wrapper surrounds it.
 	if (
 		node.type === 'TSAsExpression' ||
 		node.type === 'TSTypeAssertion' ||
 		node.type === 'TSNonNullExpression' ||
+		node.type === 'TSSatisfiesExpression' ||
+		node.type === 'TSInstantiationExpression' ||
 		node.type === 'ParenthesizedExpression' ||
 		node.type === 'ChainExpression'
 	) {

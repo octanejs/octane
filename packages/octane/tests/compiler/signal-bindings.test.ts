@@ -292,6 +292,15 @@ export function App() @{ <input value={draft$.get()} /> }`,
 		const client = compile(suffixed, '/src/suffixed-holes.tsrx', { hmr: false }).code;
 		expect(client).toContain('bindSignalAttribute');
 		expect(client).toContain('bindSignalText');
+		// Any type-only wrapper around nested `$` syntax keeps the binding.
+		for (const wrapped of ['satisfies string', 'as string']) {
+			const code = compile(
+				`export function Field(props) @{ <b title={(props.fallback ?? props.title$) ${wrapped}}>{'x'}</b> }`,
+				'/src/wrapped-holes.tsrx',
+				{ hmr: false },
+			).code;
+			expect(code, wrapped).toContain('bindSignalAttribute');
+		}
 		const server = compile(suffixed, '/src/suffixed-holes.tsrx', {
 			hmr: false,
 			mode: 'server',
