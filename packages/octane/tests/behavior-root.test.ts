@@ -536,6 +536,105 @@ describe('behavior-only roots', () => {
 	}
 
 	for (const dev of [false, true]) {
+		for (const placement of ['nested', 'root'] as const) {
+			for (const server of ['matching', 'stale', 'externally removed'] as const) {
+				const name = {
+					matching: 'hands off an early host beside matching server content',
+					stale: 'hands off an early host beside stale server content',
+					'externally removed': 'refuses an early host whose server neighbor was removed',
+				}[server];
+				it(`${name} (${placement}, ${dev ? 'dev' : 'prod'})`, async () => {
+					const host = '<Host label={props.label}><span>Hello</span></Host>';
+					const source = [
+						"import { useLayoutEffect } from 'octane';",
+						"import { unbound } from 'octane/behavior';",
+						"export function Host(props) @{ 'use dom bindings';",
+						'  <button data-state={props.label}>{unbound(props.children)}</button>',
+						'}',
+						'export function App(props) @{',
+						'  props.onRender();',
+						'  useLayoutEffect(() => { props.onCommit(); }, []);',
+						// Recovery removes a nested host's stale neighbor at the end of its
+						// component range, and a root host's at the end of the root.
+						placement === 'nested' ? `  <section>${host}</section>` : `  ${host}`,
+						'}',
+					].join('\n');
+					let renders = 0;
+					const onCommit = vi.fn();
+					const initial = {
+						label: 'server',
+						onCommit,
+						// Retries run as microtasks, so a hydration that never converges
+						// would starve the event loop and the test timeout. Fail instead.
+						onRender: () => {
+							if (++renders > 20) throw new Error('Hydration did not converge.');
+						},
+					};
+					const fixture = authoredPresentation('Host', { label: 'server' }, dev, source);
+					container.innerHTML = renderToString(fixture.server.App, initial).html;
+					const button = container.querySelector('button')!;
+					const child = button.firstElementChild;
+					// Server content the client does not render, adopted as the host's neighbor.
+					const extra = document.createElement('script');
+					extra.type = 'application/json';
+					extra.textContent = '{}';
+					if (server !== 'matching') button.after(extra);
+					const binding = fixture.attach(button, fixture.state);
+					const recoverable = vi.fn();
+					const uncaught = vi.fn();
+					try {
+						fixture.publish({ label: 'early' });
+						expect(button.getAttribute('data-state')).toBe('early');
+						const client = fixture.loadClient();
+						const hydrate = () =>
+							hydrateRoot(
+								container,
+								client.App,
+								{ ...initial, label: 'hydrated' },
+								{
+									bindingLeases: [binding],
+									onRecoverableError: recoverable,
+									onUncaughtError: uncaught,
+								},
+							);
+						if (server === 'externally removed') {
+							// Only hydration's own recovery may change the adopted site; any
+							// other change refuses the lease and leaves the early owner live.
+							extra.remove();
+							expect(hydrate).toThrow(/active fixed native views|Minified Octane error #77;/);
+							expect(fixture.cleanup).not.toHaveBeenCalled();
+							fixture.publish({ label: 'still early' });
+							expect(button.getAttribute('data-state')).toBe('still early');
+							return;
+						}
+						hydratedRoot = hydrate();
+						await act(() => {});
+						expect(uncaught).not.toHaveBeenCalled();
+						expect(recoverable).toHaveBeenCalledTimes(server === 'stale' ? 1 : 0);
+						expect(extra.isConnected).toBe(false);
+						expect(container.querySelector('button')).toBe(button);
+						expect(button.firstElementChild).toBe(child);
+						expect(button.getAttribute('data-state')).toBe('hydrated');
+						expect(onCommit).toHaveBeenCalledOnce();
+						expect(fixture.cleanup).toHaveBeenCalledOnce();
+						fixture.publish({ label: 'retired' });
+						expect(button.getAttribute('data-state')).toBe('hydrated');
+						await act(() => hydratedRoot!.render(client.App, { ...initial, label: 'updated' }));
+						expect(uncaught).not.toHaveBeenCalled();
+						expect(container.querySelector('button')).toBe(button);
+						expect(button.getAttribute('data-state')).toBe('updated');
+						expect(onCommit).toHaveBeenCalledOnce();
+					} finally {
+						hydratedRoot?.unmount();
+						hydratedRoot = undefined;
+						binding.dispose();
+					}
+				});
+			}
+		}
+	}
+
+	for (const dev of [false, true]) {
 		for (const styles of ['provider', 'single property', 'multiple properties', 'native reads']) {
 			it(`hands off a host with a known unbound provider spread and ${styles} styles (${dev ? 'dev' : 'prod'})`, () => {
 				const externalStyle =

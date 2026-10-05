@@ -5,3 +5,7 @@ export const domBindingClaims = /* @__PURE__ */ new WeakMap<
 	Element,
 	Map<string, string | null | undefined>
 >();
+
+// Parents whose children hydration mismatch recovery changed. An early-bound
+// host in one of them can lose a stale server neighbor without having moved.
+export const repairedServerParents = /* @__PURE__ */ new WeakSet<Node>();
