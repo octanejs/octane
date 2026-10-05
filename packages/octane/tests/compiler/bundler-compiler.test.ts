@@ -995,8 +995,8 @@ export function Pair(props) @{ 'use dom bindings'; <section>
 		expect(canonicalModuleId(resolve('/external/App.tsrx') + '?raw', root)).toBe(
 			'../external/App.tsrx',
 		);
-		expect(canonicalModuleId(String.raw`C:\external\App.tsrx`, String.raw`C:\project`)).toBe(
-			'C:/external/App.tsrx',
+		expect(canonicalModuleId(String.raw`D:\external\App.tsrx`, String.raw`C:\project`)).toBe(
+			'D:/external/App.tsrx',
 		);
 		expect(canonicalModuleId('#nitro/virtual/polyfills', root)).toBe('#nitro/virtual/polyfills');
 	});
