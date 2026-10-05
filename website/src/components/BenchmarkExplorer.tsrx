@@ -55,8 +55,24 @@ interface BarItem {
 	key: string;
 	label: string;
 	value: number;
+	/** Upper end of the bar's range, when it extends past `value`. */
+	ceiling?: number;
 	color: string;
 	ink: FillInk;
+}
+
+// A ceiling at or below its value would draw a negative-width range, and one
+// that prints the same reads "0.23×–0.23×", so either stays a single value.
+function rangeEnd(value: number, ceiling: number | undefined): number | undefined {
+	return ceiling !== undefined && ceiling > value && fmtX(ceiling) !== fmtX(value)
+		? ceiling
+		: undefined;
+}
+
+function barText(item: BarItem): string {
+	return item.ceiling === undefined
+		? fmtX(item.value)
+		: fmtX(item.value) + '–' + fmtX(item.ceiling);
 }
 
 export function BenchmarkExplorer(props: { card: BenchCard }) @{
@@ -95,13 +111,14 @@ export function BenchmarkExplorer(props: { card: BenchCard }) @{
 				key: s.key,
 				label: s.label,
 				value,
+				ceiling: rangeEnd(value, card.ceilings?.[row.op as string]?.[s.key]),
 				color: s.color,
 				ink: inkOnFill(s.color),
 			});
 			else missing.push({ key: s.key, label: s.label });
 		}
 		present.sort((a, b) => a.value - b.value);
-		const scaleMax = Math.max(1, ...present.map((i) => i.value)) * 1.1;
+		const scaleMax = Math.max(1, ...present.map((i) => i.ceiling ?? i.value)) * 1.1;
 		return { present, missing, refFraction: 1 / scaleMax, scaleMax };
 		// Explicit deps: `selected` is read only via `.has()` inside the loop, which
 		// the compiler's inference misses, so a toggle would otherwise leave the bars
@@ -417,7 +434,28 @@ export function BenchmarkExplorer(props: { card: BenchCard }) @{
 				transform: translate(-100%, -50%);
 				padding-right: 0.45rem;
 			}
-			.bx-row:hover .bx-fill {
+			/* The rest of a range: same hue, hatched, so it reads as "up to" rather
+			   than as a second measurement. */
+			.bx-fill-range {
+				position: absolute;
+				top: 0;
+				height: 100%;
+				border-radius: 0 0.35rem 0.35rem 0;
+				opacity: 0.45;
+				background-image: repeating-linear-gradient(
+					135deg,
+					transparent 0 4px,
+					rgba(0, 0, 0, 0.35) 4px 6px
+				);
+				transition:
+					left 0.3s ease,
+					width 0.3s ease;
+			}
+			.bx-fill-cut {
+				border-radius: 0;
+			}
+			.bx-row:hover .bx-fill,
+			.bx-row:hover .bx-fill-range {
 				filter: brightness(1.12);
 			}
 			.bx-row-empty .bx-row-label {
@@ -677,6 +715,7 @@ export function BenchmarkExplorer(props: { card: BenchCard }) @{
 			}
 			@media (prefers-reduced-motion: reduce) {
 				.bx-fill,
+				.bx-fill-range,
 				.bx-cell,
 				.bx-chip,
 				.bx-suite,
@@ -741,12 +780,14 @@ export function BenchmarkExplorer(props: { card: BenchCard }) @{
 								onMouseEnter={(e: MouseEvent) => show(e, {
 									fw: item.label,
 									suite,
-									primary: fmtX(item.value) + ' vs Octane',
-									secondary: item.value < 0.98
-										? 'faster than Octane'
-										: item.value > 1.02
-											? 'slower than Octane'
-											: 'matches Octane',
+									primary: barText(item) + ' vs Octane',
+									secondary: item.ceiling !== undefined
+										? 'up to ' + fmtX(item.ceiling) + ' using the whole client API'
+										: item.value < 0.98
+											? 'faster than Octane'
+											: item.value > 1.02
+												? 'slower than Octane'
+												: 'matches Octane',
 									fastest: '',
 								})}
 								onMouseLeave={hide}
@@ -754,20 +795,33 @@ export function BenchmarkExplorer(props: { card: BenchCard }) @{
 								<span class="bx-row-label">{item.label as string}</span>
 								<div class="bx-track">
 									<div
-										class="bx-fill"
+										class={['bx-fill', { 'bx-fill-cut': item.ceiling !== undefined }]}
 										style={'width:' + (item.value / bars.scaleMax) * 100 + '%;background:' +
 											item.color}
 									></div>
+									@if (item.ceiling !== undefined) {
+										<div
+											class="bx-fill-range"
+											style={'left:' + (item.value / bars.scaleMax) * 100 + '%;width:' +
+												((item.ceiling - item.value) / bars.scaleMax) * 100 +
+												'%;background-color:' +
+												item.color}
+										></div>
+									}
 									<span
 										class={[
 											'bx-val',
-											item.value / bars.scaleMax > 0.62 ? 'bx-val-in' : 'bx-val-out',
+											(item.ceiling ?? item.value) / bars.scaleMax > 0.62
+												? 'bx-val-in'
+												: 'bx-val-out',
 										]}
-										style={'left:' + (item.value / bars.scaleMax) * 100 + '%' +
-											(item.value / bars.scaleMax > 0.62
-												? ';color:' + item.ink.color + ';text-shadow:' + item.ink.shadow
+										style={'left:' + ((item.ceiling ?? item.value) / bars.scaleMax) * 100 + '%' +
+											((item.ceiling ?? item.value) / bars.scaleMax > 0.62
+												? item.ceiling === undefined
+													? ';color:' + item.ink.color + ';text-shadow:' + item.ink.shadow
+													: ';text-shadow:0 0 3px var(--panel)' // the hatched range is translucent, so the panel's ink reads on it
 												: '')}
-									>{fmtX(item.value) as string}</span>
+									>{barText(item) as string}</span>
 								</div>
 							</div>
 						}

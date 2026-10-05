@@ -155,6 +155,46 @@ describe('benchmark card bars', () => {
 		empty.forEach((row) => expect(row.querySelector('.bench-val')!.textContent!.trim()).toBe('—'));
 	});
 
+	it('extends a bundle-size bar to its whole-API ceiling only where tree-shaking leaves a gap', async () => {
+		const bundleSize = FRAMEWORK_CARDS.find((c) => c.id === 'bundle-size')!;
+		const { container, opButton } = await mountCard(bundleSize);
+		const bar = (key: string) =>
+			container.querySelector(`.bench-row:not(.bench-row-empty)[data-series="${key}"]`)!;
+
+		// React and Inferno ship their whole runtime in every fixture, so a
+		// separately built ceiling only differs by build noise (sometimes below the
+		// fixture, as in weather) and must never draw a range.
+		const ranged = new Set<string>();
+		for (const [index, row] of bundleSize.rows.entries()) {
+			fireEvent.click(opButton(row.op as string));
+			await waitFor(() =>
+				expect(opButton(row.op as string).getAttribute('aria-pressed')).toBe('true'),
+			);
+			for (const series of numericSeries(bundleSize, index)) {
+				const label = bar(series.key).querySelector('.bench-val')!.textContent!;
+				const range = bar(series.key).querySelector<HTMLElement>('.bench-fill-range');
+				if (range) {
+					ranged.add(series.key);
+					expect(parseFloat(range.style.width), `${row.op}/${series.key}`).toBeGreaterThan(0);
+					const [low, high] = label.split('–').map((part) => parseFloat(part));
+					expect(high, `${row.op}/${series.key}`).toBeGreaterThan(low);
+				} else {
+					expect(label, `${row.op}/${series.key}`).not.toContain('–');
+				}
+			}
+		}
+		expect(ranged.has('react')).toBe(false);
+		expect(ranged.has('inferno')).toBe(false);
+		for (const key of ['octane-tsrx', 'preact', 'solid', 'svelte']) {
+			expect(ranged.has(key), key).toBe(true);
+		}
+		// The exact ceilings stay readable without the hatching.
+		const tableRows = Array.from(container.querySelectorAll('tbody th'), (th) =>
+			th.textContent!.trim(),
+		);
+		expect(tableRows).toContain(bundleSize.rows[0].op + ', whole client API');
+	});
+
 	it('charts a single-series card as one bar per operation, with no picker', async () => {
 		const single = OCTANE_CARDS.find((c) => c.series.length === 1)!;
 		const { container, barLabels } = await mountCard(single);

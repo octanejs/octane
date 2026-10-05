@@ -83,6 +83,13 @@ export interface BenchCard {
 	iterations: number;
 	/** Value unit: absolute score milliseconds (default), bytes, or ×-vs-Octane ratio. */
 	format?: 'ms' | 'bytes' | 'x' | 'count';
+	/**
+	 * Upper end of a bar, by row `op` then series key. A bar runs from its row
+	 * value to its ceiling: bundle-size charts each fixture's shipped bytes and,
+	 * beyond them, the same application once it uses the framework's whole client
+	 * API, which is where tree-shaking stops paying.
+	 */
+	ceilings?: Record<string, Record<string, number>>;
 }
 
 // ---------------------------------------------------------------------------
@@ -408,7 +415,7 @@ export const FRAMEWORK_CARDS: BenchCard[] = [
 		bundleSize,
 		'bundle-size',
 		'bundle-size',
-		'Production shipped JavaScript bytes with normalized minification — total gzip across the rows, TodoMVC, chat and weather fixtures.',
+		'Production shipped JavaScript bytes with normalized minification — total gzip across the rows, TodoMVC, chat and weather fixtures. The solid bar is what each fixture ships; the lighter extension is the same application once it uses the framework’s whole client API, so a framework that tree-shakes shows a range.',
 		{
 			js_gzip: 'rows total gzip',
 			todo_js_gzip: 'TodoMVC total gzip',
@@ -419,6 +426,39 @@ export const FRAMEWORK_CARDS: BenchCard[] = [
 		'bytes',
 	),
 ];
+
+// Each fixture's application bytes plus its framework's whole client runtime
+// (`full_fw_gzip`, measured by benchmarks/bundle-size/run.mjs). The runtime is a
+// separate build, so a framework that cannot tree-shake lands within a few
+// hundred bytes of the fixture, either side. Below this ratio of whole runtime
+// to fixture runtime the gap is build noise, not tree-shaking, and the bar
+// stays a single value.
+const MIN_TREE_SHAKING_RATIO = 1.1;
+{
+	const card = FRAMEWORK_CARDS.find((c) => c.id === 'bundle-size')!;
+	const byName = new Map((bundleSize as SuiteBaseline).targets.map((t) => [t.name, t.ops]));
+	const prefixes: Record<string, string> = {
+		'rows total gzip': '',
+		'TodoMVC total gzip': 'todo_',
+		'chat total gzip': 'chat_',
+		'weather total gzip': 'weather_',
+	};
+	card.ceilings = {};
+	for (const row of card.rows) {
+		const prefix = prefixes[row.op];
+		const ceiling: Record<string, number> = {};
+		for (const s of card.series) {
+			const ops = byName.get(s.key);
+			const app = ops?.[prefix + 'app_gzip'];
+			const shipped = ops?.[prefix + 'fw_gzip'];
+			const runtime = ops?.full_fw_gzip;
+			if (!app || !shipped || !runtime) continue;
+			if (statValue(runtime) < statValue(shipped) * MIN_TREE_SHAKING_RATIO) continue;
+			ceiling[s.key] = statValue(app) + statValue(runtime);
+		}
+		card.ceilings[row.op] = ceiling;
+	}
+}
 
 // ssr-throughput's cross-framework half: targets are named `scenario/framework`
 // — regroup into rows per scenario with one column per framework.

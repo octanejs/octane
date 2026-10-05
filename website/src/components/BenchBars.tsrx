@@ -70,8 +70,28 @@ interface BarItem {
 	key: string;
 	label: string;
 	value: number;
+	/** Upper end of the bar's range, when it extends past `value`. */
+	ceiling?: number;
 	color: string;
 	ink: FillInk;
+}
+
+// A ceiling at or below its value would draw a negative-width range, and one
+// that prints the same reads "10 kB–10 kB", so either stays a single value.
+function rangeEnd(
+	value: number,
+	ceiling: number | undefined,
+	format: (value: unknown) => string,
+): number | undefined {
+	return ceiling !== undefined && ceiling > value && format(ceiling) !== format(value)
+		? ceiling
+		: undefined;
+}
+
+function geomeanRatio(pairs: Array<[number, number]>): number {
+	return Math.exp(
+		pairs.reduce((sum, [value, base]) => sum + Math.log(value / base), 0) / pairs.length,
+	);
 }
 
 interface BarView {
@@ -83,7 +103,7 @@ interface BarView {
 function barView(present: BarItem[], missing: BarView['missing']): BarView {
 	present.sort((a, b) => a.value - b.value);
 	let max = 0;
-	for (const item of present) max = Math.max(max, item.value);
+	for (const item of present) max = Math.max(max, item.ceiling ?? item.value);
 	// 1.05 headroom keeps the longest bar off the card edge; an all-zero row
 	// (sub-timer-resolution scores) falls back to 1 so fractions stay finite.
 	return { present, missing, scaleMax: max > 0 ? max * 1.05 : 1 };
@@ -136,24 +156,34 @@ export function BenchBars(props: { card: BenchCard }) @{
 		if (op === OVERALL_OP) {
 			// Rows where either side is missing or zero (unsupported combinations,
 			// sub-timer-resolution scores) drop out of that series' mean.
+			// A ceiling is also relative to the reference series' row value, so
+			// every range shares the one 1× baseline.
 			const reference = card.series[0];
 			for (const s of card.series) {
-				const ratios: number[] = [];
+				const ratios: Array<[number, number]> = [];
+				const ceilingRatios: Array<[number, number]> = [];
 				for (const row of card.rows) {
 					const base = row[reference.key];
 					const value = row[s.key];
 					if (typeof base === 'number' && base > 0 && typeof value === 'number' && value > 0) {
-						ratios.push(value / base);
+						ratios.push([value, base]);
+						const ceiling = card.ceilings?.[row.op]?.[s.key];
+						if (ceiling) ceilingRatios.push([ceiling, base]);
 					}
 				}
-				if (ratios.length > 0) present.push({
-					key: s.key,
-					label: shortLabel(s.label),
-					value: Math.exp(ratios.reduce((sum, r) => sum + Math.log(r), 0) / ratios.length),
-					color: s.color,
-					ink: inkOnFill(s.color),
-				});
-				else missing.push({ key: s.key, label: shortLabel(s.label) });
+				if (ratios.length > 0) {
+					const value = geomeanRatio(ratios);
+					present.push({
+						key: s.key,
+						label: shortLabel(s.label),
+						value,
+						ceiling: ceilingRatios.length === ratios.length
+							? rangeEnd(value, geomeanRatio(ceilingRatios), fmtX)
+							: undefined,
+						color: s.color,
+						ink: inkOnFill(s.color),
+					});
+				} else missing.push({ key: s.key, label: shortLabel(s.label) });
 			}
 			return barView(present, missing);
 		}
@@ -164,6 +194,7 @@ export function BenchBars(props: { card: BenchCard }) @{
 				key: s.key,
 				label: shortLabel(s.label),
 				value,
+				ceiling: rangeEnd(value, card.ceilings?.[row.op as string]?.[s.key], format),
 				color: s.color,
 				ink: inkOnFill(s.color),
 			});
@@ -172,6 +203,19 @@ export function BenchBars(props: { card: BenchCard }) @{
 		return barView(present, missing);
 	});
 	const valueFormat = overall ? fmtX : format;
+	const barText = (item: BarItem) => item.ceiling === undefined
+		? valueFormat(item.value)
+		: valueFormat(item.value) + '–' + valueFormat(item.ceiling);
+	const ceilingRows =
+		card.ceilings
+			? card.rows.map(
+					(row) => ({
+						op: row.op as string,
+						label: row.op as string + ', whole client API',
+						values: card.ceilings![row.op as string] ?? {},
+					}),
+				)
+			: [];
 
 	<>
 		<style>
@@ -293,7 +337,28 @@ export function BenchBars(props: { card: BenchCard }) @{
 				transform: translate(-100%, -50%);
 				padding-right: 0.45rem;
 			}
-			.bench-row:hover .bench-fill {
+			/* The rest of a range: same hue, hatched, so it reads as "up to" rather
+			   than as a second measurement. */
+			.bench-fill-range {
+				position: absolute;
+				top: 0;
+				height: 100%;
+				border-radius: 0 0.35rem 0.35rem 0;
+				opacity: 0.45;
+				background-image: repeating-linear-gradient(
+					135deg,
+					transparent 0 4px,
+					rgba(0, 0, 0, 0.35) 4px 6px
+				);
+				transition:
+					left 0.3s ease,
+					width 0.3s ease;
+			}
+			.bench-fill-cut {
+				border-radius: 0;
+			}
+			.bench-row:hover .bench-fill,
+			.bench-row:hover .bench-fill-range {
 				filter: brightness(1.12);
 			}
 			.bench-row-empty .bench-row-label,
@@ -353,6 +418,7 @@ export function BenchBars(props: { card: BenchCard }) @{
 			}
 			@media (prefers-reduced-motion: reduce) {
 				.bench-fill,
+				.bench-fill-range,
 				.bench-val,
 				.bench-op {
 					transition: none;
@@ -384,23 +450,36 @@ export function BenchBars(props: { card: BenchCard }) @{
 			}
 			<div class="bench-plot" aria-hidden="true">
 				@for (const item of bars.present; key item.key) {
-					<div class="bench-row">
+					<div class="bench-row" data-series={item.key}>
 						<span class="bench-row-label" title={item.label}>{item.label as string}</span>
 						<div class="bench-track">
 							<div
-								class="bench-fill"
+								class={['bench-fill', { 'bench-fill-cut': item.ceiling !== undefined }]}
 								style={'width:' + (item.value / bars.scaleMax) * 100 + '%;background:' + item.color}
 							></div>
+							@if (item.ceiling !== undefined) {
+								<div
+									class="bench-fill-range"
+									style={'left:' + (item.value / bars.scaleMax) * 100 + '%;width:' +
+										((item.ceiling - item.value) / bars.scaleMax) * 100 +
+										'%;background-color:' +
+										item.color}
+								></div>
+							}
 							<span
 								class={[
 									'bench-val',
-									item.value / bars.scaleMax > 0.62 ? 'bench-val-in' : 'bench-val-out',
+									(item.ceiling ?? item.value) / bars.scaleMax > 0.62
+										? 'bench-val-in'
+										: 'bench-val-out',
 								]}
-								style={'left:' + (item.value / bars.scaleMax) * 100 + '%' +
-									(item.value / bars.scaleMax > 0.62
-										? ';color:' + item.ink.color + ';text-shadow:' + item.ink.shadow
+								style={'left:' + ((item.ceiling ?? item.value) / bars.scaleMax) * 100 + '%' +
+									((item.ceiling ?? item.value) / bars.scaleMax > 0.62
+										? item.ceiling === undefined
+											? ';color:' + item.ink.color + ';text-shadow:' + item.ink.shadow
+											: ';text-shadow:0 0 3px var(--panel)' // the hatched range is translucent, so the panel's ink reads on it
 										: '')}
-							>{valueFormat(item.value) as string}</span>
+							>{barText(item) as string}</span>
 						</div>
 					</div>
 				}
@@ -419,6 +498,11 @@ export function BenchBars(props: { card: BenchCard }) @{
 						' — lower is better'}
 				</p>
 			}
+			@if (card.ceilings) {
+				<p
+					class="bench-plot-note"
+				>{'hatched: the same application using the framework’s whole client API'}</p>
+			}
 			<details class="bench-table">
 				<summary>{tableCaption as string}</summary>
 				<table>
@@ -436,6 +520,14 @@ export function BenchBars(props: { card: BenchCard }) @{
 								<th scope="row">{row.op as string}</th>
 								@for (const s of card.series; key s.key) {
 									<td>{format(row[s.key])}</td>
+								}
+							</tr>
+						}
+						@for (const row of ceilingRows; key row.op) {
+							<tr>
+								<th scope="row">{row.label as string}</th>
+								@for (const s of card.series; key s.key) {
+									<td>{format(row.values[s.key])}</td>
 								}
 							</tr>
 						}
