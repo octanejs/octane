@@ -345,3 +345,42 @@ export function App(props: Props) @{
 		}
 	},
 );
+
+// A hookless same-module wrapper renders as a lite scope, not a Block.
+const liteWrappers = {
+	hole: `{props.show ? <Field id="inner" load={props.load}/> : null}`,
+	arm: `@if (props.show) { <Field id="inner" load={props.load}/> }`,
+};
+
+it.each((['hole', 'arm'] as const).flatMap((kind) => [false, true].map((dev) => ({ kind, dev }))))(
+	'retires a pending query that a lite wrapper stops rendering ($kind, dev=$dev)',
+	async ({ kind, dev }) => {
+		const App = compileTsrx(
+			`lite-${kind}`,
+			`type Props = { show: boolean; load: Load };
+function Wrap(props: Props) @{ <section>${liteWrappers[kind]}<Field id="outer" load={props.load}/></section> }
+export function App(props: Props) @{
+	<Suspense fallback={<i>waiting</i>}><Wrap show={props.show} load={props.load}/></Suspense>
+}`,
+			dev,
+		);
+		const { pending, load } = requests();
+		const container = document.createElement('div');
+		document.body.append(container);
+		const root = createRoot(container);
+		try {
+			await act(() => root.render(App, { show: true, load }));
+			expect(pending.map(({ id }) => id)).toEqual(['inner']);
+			const inner = pending[0]!;
+			await act(() => root.render(App, { show: false, load }));
+			expect(container.querySelector('i')?.textContent).toBe('waiting');
+			expect(pending.map(({ id }) => id)).toEqual(['inner', 'outer']);
+			expect(inner.signal.aborted).toBe(true);
+			await act(() => pending[1]!.resolve('outer result'));
+			expect(container.querySelector('section')?.textContent).toBe('outer result');
+		} finally {
+			root.unmount();
+			container.remove();
+		}
+	},
+);

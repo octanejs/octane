@@ -864,8 +864,14 @@ interface SignalRetryVisit {
 	cache: SignalRetryOwners;
 	path: unknown[];
 }
-// Set when a fresh scope consults a retry cache; its renderBlock takes it.
+// Set when a fresh scope consults a retry cache; its render takes it.
 let SIGNAL_RETRY_VISIT: SignalRetryVisit | null = null;
+
+function takeSignalRetryVisit(scope: Scope): SignalRetryVisit | null {
+	const visit = SIGNAL_RETRY_VISIT;
+	SIGNAL_RETRY_VISIT = null;
+	return visit?.scope === scope ? visit : null;
+}
 
 // A fresh scope's first render proves what this attempt renders where it has
 // been. Its own path ends in the occupant identity of its parent's slot when
@@ -1181,7 +1187,7 @@ function scopeSignalOwner(scope: Scope | null): SignalOwner | undefined {
 				node.owner = undefined;
 				cache.owners.delete(owner);
 			}
-			if (path !== null && !scope.block.mounted) visit = { scope, cache, path };
+			if (path !== null && !scope.mounted) visit = { scope, cache, path };
 		}
 		if (owner === undefined || owner.documentOwner !== documentOwner) {
 			const instanceKey = resolveSignalInstanceKey(scope);
@@ -11114,10 +11120,7 @@ export function renderBlock(block: Block): void {
 			runWithSignalOwner(owner, () => renderBlock(block));
 			return;
 		}
-		if (SIGNAL_RETRY_VISIT !== null) {
-			if (SIGNAL_RETRY_VISIT.scope === block) retryVisit = SIGNAL_RETRY_VISIT;
-			SIGNAL_RETRY_VISIT = null;
-		}
+		retryVisit = takeSignalRetryVisit(block);
 	}
 	const hydration = activeHydration();
 	// A replacement dynamic range owns client DOM even while its parent adopts
@@ -12152,18 +12155,23 @@ export function componentSlotLite<P>(
 	let claimed: Node | null | undefined;
 	const outerClaim =
 		adoptedOpen === null ? undefined : hydration!.beginClaim(getNextSibling(adoptedOpen));
+	let retryVisit: SignalRetryVisit | null = null;
 	try {
 		if (signalDocumentEnabled || scope.block.idState.renderOwner?.signalOwner !== undefined) {
 			// Same owner-resolution order as runWithBlockSignalOwner, but the
 			// per-mount closure only exists when the owner actually changes.
 			const owner = scopeSignalOwner(scope);
 			if (owner !== undefined) STREAMED_SIGNAL_OWNER_ACTIVATOR?.(owner);
+			// A lite body renders in place, so its first render prunes here.
+			retryVisit = takeSignalRetryVisit(scope);
 			if (owner === undefined || currentSignalOwner() === owner) {
 				comp(props, scope, undefined);
 			} else runWithSignalOwner(owner, () => comp(props, scope, undefined));
 		} else comp(props, scope, undefined);
+		if (retryVisit !== null) pruneSignalRetryVisit(retryVisit, false);
 		if (!scope.mounted) scope.mounted = true;
 	} catch (error) {
+		if (retryVisit !== null && isSuspenseException(error)) pruneSignalRetryVisit(retryVisit, true);
 		profileDidThrow = true;
 		profileThrown = error;
 		throw error;
