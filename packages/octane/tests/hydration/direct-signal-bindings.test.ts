@@ -51,7 +51,7 @@ describe('opaque host attribute updates', () => {
 			const source = `export function App(props) ${ext === 'tsrx' ? '@' : ''}{ ${ext === 'tsx' ? 'return ' : ''}${markup}${ext === 'tsx' ? ';' : ''} }`;
 			const options = {
 				id: `/src/opaque-attributes.${ext}`,
-				compileOptions: { dev, hmr: false, strong },
+				compileOptions: { opaqueSignalHandles: true, dev, hmr: false, strong },
 			};
 			const client = loadCompiledFixtureSource(source, { ...options, mode: 'client' });
 			const container = document.createElement('div');
@@ -150,7 +150,10 @@ describe('opaque host attribute updates', () => {
 		'reconciles an absent client attribute when adopting server output (%j)',
 		async ({ dev, ext }) => {
 			const source = `export function App(props) ${ext === 'tsrx' ? '@' : ''}{ ${ext === 'tsx' ? 'return ' : ''}<section title={props.value}><input defaultValue="draft"/></section>${ext === 'tsx' ? ';' : ''} }`;
-			const options = { id: `/src/absent-attribute.${ext}`, compileOptions: { dev, hmr: false } };
+			const options = {
+				id: `/src/absent-attribute.${ext}`,
+				compileOptions: { opaqueSignalHandles: true, dev, hmr: false },
+			};
 			const client = loadCompiledFixtureSource(source, { ...options, mode: 'client' });
 			const server = loadCompiledFixtureSource(source, { ...options, mode: 'server' });
 			const container = document.createElement('div');
@@ -191,7 +194,7 @@ describe('opaque host attribute updates', () => {
 			const client = loadCompiledFixtureSource(source, {
 				id: '/src/revealed-attribute.tsrx',
 				mode: 'client',
-				compileOptions: { dev, hmr: false },
+				compileOptions: { opaqueSignalHandles: true, dev, hmr: false },
 			});
 			const owner = createScope({ scopeKey: `revealed-attribute-${dev}-${callable}` });
 			const label = owner.signal$('label', 'revealed');
@@ -253,7 +256,7 @@ describe('signal-valued props from ordinary modules', () => {
 			}`;
 			const options = {
 				id: `/src/primitive-values.${ext}`,
-				compileOptions: { dev, hmr: false },
+				compileOptions: { opaqueSignalHandles: true, dev, hmr: false },
 			};
 			const client = loadCompiledFixtureSource(source, { ...options, mode: 'client' });
 			const reads: string[] = [];
@@ -316,7 +319,7 @@ describe('signal-valued props from ordinary modules', () => {
 export function App(props) ${ext === 'tsrx' ? '@' : ''}{ ${ext === 'tsx' ? 'return ' : ''}${markup}${ext === 'tsx' ? ';' : ''} }`;
 			const options = {
 				id: `/src/pass-through-value.${ext}`,
-				compileOptions: { dev, hmr: false },
+				compileOptions: { opaqueSignalHandles: true, dev, hmr: false },
 				runtimeModules: { './value-barrel': { passThrough: (value: unknown) => value } },
 			};
 			const client = loadCompiledFixtureSource(source, { ...options, mode: 'client' });
@@ -376,6 +379,84 @@ export function App(props) ${ext === 'tsrx' ? '@' : ''}{ ${ext === 'tsx' ? 'retu
 			}
 		},
 	);
+});
+
+describe('opaque signal handles are opt-in per module', () => {
+	// A text hole and an attribute in a child that receives the handle through
+	// an ordinary prop, so neither hole names a `$` binding.
+	const label = (
+		value: string,
+	) => `function Label(props) @{ <p title={${value}}>{${value} as string}</p> }
+export function App(props) @{ <main><Label value={props.value} /></main> }`;
+
+	// Each case loads a cold module graph so the development report, which fires
+	// once per runtime instance, cannot be consumed by an earlier case.
+	async function renderLive(source: string, id: string, compileOptions: Record<string, unknown>) {
+		vi.resetModules();
+		const runtime = await import('../../src/runtime.js');
+		const signals = await import('../../src/signals/index.js');
+		const fixtures = await import('../_server-fixture.js');
+		const app = fixtures.loadCompiledFixtureSource(source, {
+			id,
+			mode: 'client',
+			compileOptions: { hmr: false, ...compileOptions },
+		});
+		const owner = signals.createScope({ scopeKey: id });
+		const value$ = owner.signal$('value', 'first');
+		const container = document.createElement('div');
+		document.body.append(container);
+		const root = runtime.createRoot(container);
+		try {
+			runtime.flushSync(() => root.render(app.App, { value: value$ }));
+			const paragraph = container.querySelector('p')!;
+			const before = [paragraph.textContent, paragraph.title];
+			runtime.flushSync(() => value$.set('second'));
+			return { before, after: [paragraph.textContent, paragraph.title] };
+		} finally {
+			root.unmount();
+			container.remove();
+			owner.dispose();
+		}
+	}
+
+	it.each(
+		[false, true].flatMap((dev) => [
+			{ dev, how: 'signals import' },
+			{ dev, how: 'type-only signals import' },
+			{ dev, how: 'compiler option' },
+			{ dev, how: '$-named prop' },
+		]),
+	)('binds a handle live through a $how (dev=$dev)', async ({ dev, how }) => {
+		const source =
+			how === 'signals import'
+				? `import 'octane/signals';\n${label('props.value')}`
+				: how === 'type-only signals import'
+					? `import type { SignalHandle } from 'octane/signals';\n${label('props.value')}`
+					: how === '$-named prop'
+						? label('props.value$').replace('value={props.value}', 'value$={props.value}')
+						: label('props.value');
+		const result = await renderLive(source, `/src/opaque-${how.replace(/\W/g, '')}-${dev}.tsrx`, {
+			dev,
+			...(how === 'compiler option' ? { opaqueSignalHandles: true } : null),
+		});
+		expect(result).toEqual({ before: ['first', 'first'], after: ['second', 'second'] });
+	});
+
+	it('leaves opaque holes plain in other modules and reports the handle', async () => {
+		const error = vi.spyOn(console, 'error').mockImplementation(() => {});
+		try {
+			const result = await renderLive(label('props.value'), '/src/opaque-plain.tsrx', {});
+			// Without the opt-in nothing subscribes: the hole never shows the value.
+			expect(result.before[0]).not.toBe('first');
+			expect(result.after[0]).toBe(result.before[0]);
+			const reports = error.mock.calls.filter((call) =>
+				String(call[0]).includes('opaqueSignalHandles'),
+			);
+			expect(reports).toHaveLength(1);
+		} finally {
+			error.mockRestore();
+		}
+	});
 });
 
 describe('direct signal child bindings', () => {
@@ -468,7 +549,7 @@ export function App(props) @{ <main>@for (const item of props.items; key item) {
 				const client = loadCompiledFixtureSource(source, {
 					id,
 					mode: 'client',
-					compileOptions: { dev },
+					compileOptions: { opaqueSignalHandles: true, dev },
 				});
 				const container = document.createElement('div');
 				document.body.append(container);
@@ -494,7 +575,7 @@ export function App(props) @{ <main>@for (const item of props.items; key item) {
 					const server = loadCompiledFixtureSource(source, {
 						id,
 						mode: 'server',
-						compileOptions: { dev },
+						compileOptions: { opaqueSignalHandles: true, dev },
 					});
 					container.innerHTML = renderToString(server.App, props).html;
 					serverTexts = [...container.querySelectorAll('output')].map((node) => node.firstChild!);
@@ -556,7 +637,7 @@ export function App(props) @{ <main>${mapped ? '{props.ids.map((id) => <Row key=
 				const id = `/src/keyed-historical-owner-${dev}-${mapped}.tsrx`;
 				const options = {
 					id,
-					compileOptions: { dev },
+					compileOptions: { opaqueSignalHandles: true, dev },
 					runtimeModules: { 'octane/signals': Signals },
 				};
 				const server = loadCompiledFixtureSource(source, { ...options, mode: 'server' });
@@ -706,7 +787,11 @@ Pass.defaultProps = { label: 'default' };`,
 		const app = loadCompiledFixtureSource(
 			`function Tag({ kind }) @{ <i class={kind}>{'t'}</i> }
 export function App(props) @{ <p>{'n:'}{props.value}<Tag kind="x" /></p> }`,
-			{ id: '/src/signal-capable-text-hole.tsrx', mode: 'client', compileOptions: { hmr: false } },
+			{
+				id: '/src/signal-capable-text-hole.tsrx',
+				mode: 'client',
+				compileOptions: { opaqueSignalHandles: true, hmr: false },
+			},
 		);
 		const container = document.createElement('div');
 		document.body.appendChild(container);
@@ -772,7 +857,11 @@ export function App(props) @{
 	};
 	<p>{sync() as string}{'n:'}{props.value}<Tag kind="x" /></p>
 }`,
-			{ id: '/src/pending-text-hole.tsrx', mode: 'client', compileOptions: { hmr: false } },
+			{
+				id: '/src/pending-text-hole.tsrx',
+				mode: 'client',
+				compileOptions: { opaqueSignalHandles: true, hmr: false },
+			},
 		);
 		const container = document.createElement('div');
 		document.body.appendChild(container);
@@ -790,7 +879,11 @@ export function App(props) @{
 		const app = loadCompiledFixtureSource(
 			`function Tag({ kind }) @{ <i class={kind}>{'t'}</i> }
 export function App(props) @{ <div><p>{props.value}</p><Tag kind="x" /></div> }`,
-			{ id: '/src/only-child-text-hole.tsrx', mode: 'client', compileOptions: { hmr: false } },
+			{
+				id: '/src/only-child-text-hole.tsrx',
+				mode: 'client',
+				compileOptions: { opaqueSignalHandles: true, hmr: false },
+			},
 		);
 		const container = document.createElement('div');
 		document.body.appendChild(container);
@@ -865,7 +958,7 @@ export function App(props) @{ <div><p>{props.value}</p><Tag kind="x" /></div> }`
 		const client = loadCompiledFixtureSource(source, {
 			id,
 			mode: 'client',
-			compileOptions: { hmr: false },
+			compileOptions: { opaqueSignalHandles: true, hmr: false },
 		});
 		const container = document.createElement('div');
 		document.body.appendChild(container);
@@ -895,7 +988,7 @@ export function App(props) @{ <div><p>{props.value}</p><Tag kind="x" /></div> }`
 				{
 					id: '/src/mismatched-only-child-text-hole.tsrx',
 					mode: 'client',
-					compileOptions: { hmr: false },
+					compileOptions: { opaqueSignalHandles: true, hmr: false },
 				},
 			);
 			const container = document.createElement('div');
@@ -924,7 +1017,7 @@ export function App(props) @{ <div><p {...props.attrs}>{props.value}</p><Tag kin
 			{
 				id: '/src/raw-html-only-child-text-hole.tsrx',
 				mode: 'client',
-				compileOptions: { hmr: false },
+				compileOptions: { opaqueSignalHandles: true, hmr: false },
 			},
 		);
 		const container = document.createElement('div');
@@ -981,7 +1074,7 @@ export function App(props) @{ <div><p {...props.attrs}>{props.value}</p><Tag kin
 			const client = loadCompiledFixtureSource(source, {
 				id,
 				mode: 'client',
-				compileOptions: { dev },
+				compileOptions: { opaqueSignalHandles: true, dev },
 			});
 			const owner = createScope({ scopeKey: id });
 			const a$ = owner.signal$('a', 'alpha');
@@ -992,7 +1085,7 @@ export function App(props) @{ <div><p {...props.attrs}>{props.value}</p><Tag kin
 				const server = loadCompiledFixtureSource(source, {
 					id,
 					mode: 'server',
-					compileOptions: { dev },
+					compileOptions: { opaqueSignalHandles: true, dev },
 				});
 				container.innerHTML = renderToString(server.App, { value: initial }).html;
 				root = hydrateRoot(container, client.App, { value: initial }, { signalOwner: owner });
@@ -1062,7 +1155,7 @@ export function Guarded(props) @{
     @catch (error) { <p>{error.message as string}</p> }
   </section>
 }`,
-				{ id, mode: 'client', compileOptions: { dev } },
+				{ id, mode: 'client', compileOptions: { opaqueSignalHandles: true, dev } },
 			);
 			const owner = createScope({ scopeKey: id });
 			const value$ = owner.signal$('value', 'initial');
@@ -1128,7 +1221,7 @@ export function App(props) @{
 			const client = loadCompiledFixtureSource(source, {
 				id,
 				mode: 'client',
-				compileOptions: { dev },
+				compileOptions: { opaqueSignalHandles: true, dev },
 				runtimeModules: { 'octane/signals': Signals },
 			});
 			const owner = Object.freeze({ scopeKey: id });
@@ -1185,7 +1278,7 @@ export function App(props) @{
 			const client = loadCompiledFixtureSource(source, {
 				id,
 				mode: 'client',
-				compileOptions: { dev },
+				compileOptions: { opaqueSignalHandles: true, dev },
 				runtimeModules: { 'octane/signals': Signals },
 			});
 			const owner = Object.freeze({ scopeKey: id });
@@ -1249,7 +1342,7 @@ export function App(props) @{
 			const client = loadCompiledFixtureSource(source, {
 				id,
 				mode: 'client',
-				compileOptions: { dev },
+				compileOptions: { opaqueSignalHandles: true, dev },
 				runtimeModules: { 'octane/signals': Signals },
 			});
 			const owner = Object.freeze({ scopeKey: id });
@@ -1303,7 +1396,7 @@ export function App(props) @{
 }`;
 			const options = {
 				id: `/src/signal-control-diagnostic-${dev}-${spread}-${tag}.tsrx`,
-				compileOptions: { dev },
+				compileOptions: { opaqueSignalHandles: true, dev },
 				runtimeModules: { 'octane/signals': Signals },
 			};
 			const client = loadCompiledFixtureSource(source, { ...options, mode: 'client' });
@@ -1353,7 +1446,7 @@ export function App() @{ <div><p>Prefix {first$} suffix</p><p>{first$}{last$}</p
 			const id = `/src/adjacent-signal-text-${dev}.tsrx`;
 			const options = {
 				id,
-				compileOptions: { dev },
+				compileOptions: { opaqueSignalHandles: true, dev },
 				runtimeModules: { 'octane/signals': Signals },
 			};
 			const server = loadCompiledFixtureSource(source, { ...options, mode: 'server' });
@@ -1396,7 +1489,7 @@ export function App() @{ <select><option value="first">First</option><option val
 			const client = loadCompiledFixtureSource(source, {
 				id,
 				mode: 'client',
-				compileOptions: { dev },
+				compileOptions: { opaqueSignalHandles: true, dev },
 				runtimeModules: { 'octane/signals': Signals },
 			});
 			const container = document.createElement('div');
@@ -1439,7 +1532,7 @@ export function App(props) @{
 }`;
 			const options = {
 				id: `/src/early-edit-adoption-${dev}-${spread}-${live}-${edit.length}.tsrx`,
-				compileOptions: { dev, strong: true },
+				compileOptions: { opaqueSignalHandles: true, dev, strong: true },
 				runtimeModules: { 'octane/signals': Signals },
 			};
 			const server = loadCompiledFixtureSource(source, { ...options, mode: 'server' });
@@ -1509,7 +1602,7 @@ export function App() @{
 }`;
 			const options = {
 				id: `/src/spread-children-${dev}.tsrx`,
-				compileOptions: { dev },
+				compileOptions: { opaqueSignalHandles: true, dev },
 				runtimeModules: { 'octane/signals': Signals },
 			};
 			const server = loadCompiledFixtureSource(source, { ...options, mode: 'server' });
@@ -1546,7 +1639,7 @@ export const value$ = signal$(1);
 export function App() @{ <div><p>{value$.get() as number}</p></div> }`;
 			const options = {
 				id: `/src/markerless-native-number-${dev}.tsrx`,
-				compileOptions: { dev },
+				compileOptions: { opaqueSignalHandles: true, dev },
 				runtimeModules: { 'octane/signals': Signals },
 			};
 			const server = loadCompiledFixtureSource(source, { ...options, mode: 'server' });
@@ -1573,7 +1666,7 @@ export const child$ = signal$('signal');
 export function App(props) @{ <main><section {...props.fields} /></main> }`;
 			const options = {
 				id: `/src/spread-child-mode-${dev}.tsrx`,
-				compileOptions: { dev },
+				compileOptions: { opaqueSignalHandles: true, dev },
 				runtimeModules: { 'octane/signals': Signals },
 			};
 			const server = loadCompiledFixtureSource(source, { ...options, mode: 'server' });
@@ -1615,7 +1708,7 @@ export function App() @{
 }`;
 			const options = {
 				id: `/src/adoption-race-${spread}.tsrx`,
-				compileOptions: { dev: false },
+				compileOptions: { opaqueSignalHandles: true, dev: false },
 				runtimeModules: { 'octane/signals': Signals },
 			};
 			const server = loadCompiledFixtureSource(source, { ...options, mode: 'server' });
@@ -1662,7 +1755,7 @@ export function App(props) @{
 }`;
 			const options = {
 				id: `/src/adoption-rollback-${spread}.tsrx`,
-				compileOptions: { dev: false },
+				compileOptions: { opaqueSignalHandles: true, dev: false },
 				runtimeModules: { 'octane/signals': Signals },
 			};
 			const server = loadCompiledFixtureSource(source, { ...options, mode: 'server' });
@@ -1719,7 +1812,7 @@ describe('mixed live text, attributes, and form controls', () => {
 export function App(props) ${ext === 'tsrx' ? '@' : ''}{ ${ext === 'tsx' ? 'return ' : ''}${markup}${ext === 'tsx' ? ';' : ''} }`;
 			const options = {
 				id: `/src/mixed-channels.${ext}`,
-				compileOptions: { dev, hmr: false, strong },
+				compileOptions: { opaqueSignalHandles: true, dev, hmr: false, strong },
 				runtimeModules: { './forwarded-values': { forward: (value: unknown) => value } },
 			};
 			const client = loadCompiledFixtureSource(source, { ...options, mode: 'client' });
@@ -1813,7 +1906,10 @@ export function App(props) ${ext === 'tsrx' ? '@' : ''}{ ${ext === 'tsx' ? 'retu
 
 it('retains adopted text from another document during live updates', async () => {
 	const source = `export function App(props) @{ <p>{props.value as string}</p> }`;
-	const options = { id: '/src/adopted-document-text.tsrx', compileOptions: { dev: false } };
+	const options = {
+		id: '/src/adopted-document-text.tsrx',
+		compileOptions: { opaqueSignalHandles: true, dev: false },
+	};
 	const client = loadCompiledFixtureSource(source, { ...options, mode: 'client' });
 	const server = loadCompiledFixtureSource(source, { ...options, mode: 'server' });
 	const iframe = document.createElement('iframe');

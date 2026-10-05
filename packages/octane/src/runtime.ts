@@ -22578,7 +22578,24 @@ function commitBag<T>(scope: Scope, root: Node | null, bag: T): T {
  * *slot* renders `true` as empty (React parity for renderable children).
  */
 function coerceText(value: unknown): string {
+	if (process.env.NODE_ENV !== 'production' && isSignalHandle(value)) devWarnPlainTextHandle();
 	return value == null || value === false ? '' : typeof value === 'string' ? value : String(value);
+}
+
+let DEV_PLAIN_TEXT_HANDLE_WARNED = false;
+
+// Only a module with an import from `octane/signals` compiles opaque text holes
+// as handle bindings; elsewhere just `$`-named expressions bind. A handle that
+// reaches a plain hole would otherwise render as "[object Object]" silently.
+function devWarnPlainTextHandle(): void {
+	if (DEV_PLAIN_TEXT_HANDLE_WARNED) return;
+	DEV_PLAIN_TEXT_HANDLE_WARNED = true;
+	console.error(
+		'Octane: a signal handle reached a text hole in a module that does not import ' +
+			'`octane/signals`, so it rendered as a plain value. Type the prop with ' +
+			"`import type { SignalHandle } from 'octane/signals'`, give it a `$` suffix, read it " +
+			'with `.get()`, or enable the `opaqueSignalHandles` compiler option.',
+	);
 }
 
 /**
@@ -24628,13 +24645,23 @@ export function bindSignalChecked(
  * the call site; these helpers allocate nothing and never index a bag dynamically.
  * Controlled form properties deliberately do not use this identity guard.
  */
+// An identical raw value needs no write, except a first `undefined` over an
+// adopted server element: its cache slot has not yet reconciled the server
+// attribute, which the writer removes. The direct-signal path does the same.
+function attributeUnchanged(previous: unknown, value: unknown, el: Element): boolean {
+	if (previous !== value) return false;
+	if (value !== undefined) return true;
+	const hydration = activeHydration();
+	return hydration === null || hydration.isFresh(el);
+}
+
 export function setAttributeIfChanged(
 	value: unknown,
 	previous: unknown,
 	el: Element,
 	name: string,
 ): unknown {
-	if (previous === value) return previous;
+	if (attributeUnchanged(previous, value, el)) return previous;
 	setAttribute(el, name, value);
 	return value;
 }
@@ -24645,7 +24672,7 @@ export function setPlainAttributeIfChanged(
 	el: Element,
 	name: string,
 ): unknown {
-	if (previous === value) return previous;
+	if (attributeUnchanged(previous, value, el)) return previous;
 	setPlainAttribute(el, name, value);
 	return value;
 }
@@ -24656,7 +24683,7 @@ export function setURLAttributeIfChanged(
 	el: Element,
 	name: string,
 ): unknown {
-	if (previous === value) return previous;
+	if (attributeUnchanged(previous, value, el)) return previous;
 	setURLAttribute(el, name, value);
 	return value;
 }
@@ -24667,7 +24694,7 @@ export function setStringDataIfChanged(
 	el: Element,
 	name: string,
 ): unknown {
-	if (previous === value) return previous;
+	if (attributeUnchanged(previous, value, el)) return previous;
 	setStringData(el, name, value);
 	return value;
 }
@@ -24678,7 +24705,7 @@ export function setBooleanAttributeIfChanged(
 	el: Element,
 	name: string,
 ): unknown {
-	if (previous === value) return previous;
+	if (attributeUnchanged(previous, value, el)) return previous;
 	setBooleanAttribute(el, name, value);
 	return value;
 }
@@ -24689,19 +24716,19 @@ export function setAriaAttributeIfChanged(
 	el: Element,
 	name: string,
 ): unknown {
-	if (previous === value) return previous;
+	if (attributeUnchanged(previous, value, el)) return previous;
 	setAriaAttribute(el, name, value);
 	return value;
 }
 
 export function setClassNameIfChanged(value: unknown, previous: unknown, el: Element): unknown {
-	if (previous === value) return previous;
+	if (attributeUnchanged(previous, value, el)) return previous;
 	setClassName(el, value);
 	return value;
 }
 
 export function setClassAttrIfChanged(value: unknown, previous: unknown, el: Element): unknown {
-	if (previous === value) return previous;
+	if (attributeUnchanged(previous, value, el)) return previous;
 	setClassAttr(el, value);
 	return value;
 }
@@ -40939,8 +40966,10 @@ function renderInitialSuspenseHydration(state: TrySlot, initial: InitialSuspense
 		const parent = domNode(state.domParent);
 		journalRootChildren(parent);
 		previousHydration?.save(parent);
+		// This removes the arm's metadata too. Leave a streamed payload with its
+		// weak marker owner: a discarded enclosing attempt restores the marker
+		// and hydrates the arm from it again, and a commit drops both together.
 		removeRange(getNextSibling(state.start), state.end);
-		initial.consume?.();
 		noteRecoverableHydrationError(() => failure, state.parentBlock);
 		currentHydration = null;
 		try {

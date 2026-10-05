@@ -15,9 +15,9 @@
     "brotli": 4477
   },
   "cli-spa-starter": {
-    "raw": 115524,
-    "gzip": 39019,
-    "brotli": 34172
+    "raw": 108976,
+    "gzip": 36863,
+    "brotli": 32497
   },
   "root-static-specialized": {
     "raw": 77425,
@@ -25,9 +25,9 @@
     "brotli": 22997
   },
   "root-chained-jsx": {
-    "raw": 84753,
-    "gzip": 28069,
-    "brotli": 25064
+    "raw": 79465,
+    "gzip": 26301,
+    "brotli": 23699
   },
   "root-static": {
     "raw": 204593,
@@ -45,29 +45,29 @@
     "brotli": 26520
   },
   "prop-attributes": {
-    "raw": 96102,
-    "gzip": 31857,
-    "brotli": 28429
+    "raw": 89971,
+    "gzip": 29838,
+    "brotli": 26740
   },
   "context": {
-    "raw": 109525,
-    "gzip": 36258,
-    "brotli": 32212
+    "raw": 103895,
+    "gzip": 34442,
+    "brotli": 30707
   },
   "hydrate-root": {
-    "raw": 175067,
-    "gzip": 55523,
-    "brotli": 48675
+    "raw": 169866,
+    "gzip": 53864,
+    "brotli": 47232
   },
   "deferred-hydration": {
-    "raw": 238535,
-    "gzip": 75406,
-    "brotli": 65391
+    "raw": 233383,
+    "gzip": 73794,
+    "brotli": 63955
   },
   "suspense-transition": {
-    "raw": 165505,
-    "gzip": 53167,
-    "brotli": 46866
+    "raw": 160348,
+    "gzip": 51464,
+    "brotli": 45311
   },
   "server-hooks": {
     "raw": 509,
@@ -145,14 +145,14 @@
     "brotli": 4377
   },
   "binding-mantine-hooks-vite": {
-    "raw": 96585,
-    "gzip": 32053,
-    "brotli": 28562
+    "raw": 91312,
+    "gzip": 30321,
+    "brotli": 27178
   },
   "binding-mantine-hooks-esbuild": {
-    "raw": 96188,
-    "gzip": 32200,
-    "brotli": 28742
+    "raw": 90961,
+    "gzip": 30484,
+    "brotli": 27360
   },
   "binding-apollo-client-vite": {
     "raw": 359820,
@@ -165,13 +165,13 @@
     "brotli": 100390
   },
   "binding-usehooks-ts-vite": {
-    "raw": 97366,
-    "gzip": 32303,
-    "brotli": 28819
+    "raw": 92093,
+    "gzip": 30567,
+    "brotli": 27437
   },
   "binding-usehooks-ts-esbuild": {
-    "raw": 96954,
-    "gzip": 32446,
-    "brotli": 28903
+    "raw": 91727,
+    "gzip": 30701,
+    "brotli": 27577
   }
 }
