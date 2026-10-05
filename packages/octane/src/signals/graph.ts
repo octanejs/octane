@@ -1191,13 +1191,17 @@ export function promoteDeclarationView(view: ScopedNode, node: ScopedNode): void
 	if (node.state && node.state.snapshot.status !== 'ready') retainOwners(node);
 	if (!currentChanged && retainedChanged) node.revision++;
 	releaseRetainedOwners(view);
-	// A view nobody read has no state to install; the cell evaluates its new definition.
+	// A view nobody read has no state to install; the cell evaluates its new
+	// definition. One invalidated since its render, such as by the thenable it
+	// threw settling, passes that on rather than presenting a stale result.
 	const unevaluated = state === undefined;
-	node.flags =
-		ReactiveFlags.Mutable | ReactiveFlags.Watching | (unevaluated ? ReactiveFlags.Dirty : 0);
+	const stale = unevaluated
+		? ReactiveFlags.Dirty
+		: view.flags & (ReactiveFlags.Dirty | ReactiveFlags.Pending);
+	node.flags = ReactiveFlags.Mutable | ReactiveFlags.Watching | stale;
 	// Committed consumers learn the accepted state first. The render's own
 	// consumers already presented it; move them without another notification.
-	if ((currentChanged || retainedChanged || unevaluated) && node.subs) {
+	if ((currentChanged || retainedChanged || stale) && node.subs) {
 		graph.propagate(node.subs, executionDepth !== 0);
 		graph.shallowPropagate(node.subs);
 	}
