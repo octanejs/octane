@@ -15813,11 +15813,12 @@ function installHydrateInteraction(state: HydrateSlot, strategy: HydrationStrate
 
 	const onIntent = (event: Event) => {
 		if (wasEarlyHydrationIntentHandled(event) || hydrateBoundaryReleased(state)) return;
-		const rawTarget = event.target;
-		let target =
-			rawTarget instanceof Element
-				? rawTarget
-				: rawTarget instanceof Node
+		// Constructors belong to each window; iframe nodes need realm-neutral checks.
+		const rawTarget = eventPathNode(event.target);
+		const target =
+			rawTarget?.nodeType === 1
+				? (rawTarget as Element)
+				: rawTarget !== null
 					? (STAGED_DOM?.view(rawTarget) ?? rawTarget).parentElement
 					: null;
 		let marker: Element | null =
