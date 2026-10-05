@@ -15613,6 +15613,16 @@ function createHydrateBoundaryBody(
 		// Runtime-owned effect bodies receive their dependency tuple as arguments.
 		useEffect(notifyHydrateBoundary as EffectFn, [state, scope], HYDRATE_NOTIFY_SLOT);
 	};
+	// The children render in this internal try body but belong to the template
+	// that authored them (see markChildrenBlock), so the body's signal owner links
+	// to that template's owner once created (see scopeSignalOwner). A split
+	// boundary's children are written between its tags: that template renders it.
+	Object.defineProperty(contentBody, CHILDREN_SIGNAL_OWNER, {
+		get: () =>
+			state.props.__load === undefined
+				? (state.props.children as any)?.[CHILDREN_SIGNAL_OWNER]
+				: scopeSignalOwner(state.parentBlock.signalInstanceParent),
+	});
 	return (_props, scope) => {
 		tryBlock(
 			scope,

@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
+import { compile } from 'octane/compiler';
 // Compile-tooling setup is separate from the behavior checks. Each scenario
 // still loads a fresh runtime graph and fixture helper after resetModules().
 import '../_server-fixture.js';
@@ -38,14 +39,28 @@ function frames(output: string): Record<string, string> {
 		// An alias keeps the component form the compiler would otherwise inline.
 		ErrorBoundary: `@try { <Boundary fallback={<b>error</b>}>${output}</Boundary> } @pending { <i>waiting</i> }`,
 		provider: `@try { <Context value="provided">${output}</Context> } @pending { <i>waiting</i> }`,
+		// A Hydrate boundary renders its children in a frame of its own: inline
+		// (split={false}), from the module the compiler splits them into, or on the
+		// server only for a permanently static boundary. Forwarded children still
+		// belong to their author, and a split boundary inside another component's
+		// children to the template rendering it.
+		Hydrate: `<Hydrate when={load()} split={false}>${output}</Hydrate>`,
+		'Hydrate row': `<Hydrate when={load()} split={false}><ul>@for (const item of props.items; key item) { <li>${output}</li> }</ul></Hydrate>`,
+		'forwarded Hydrate': `<HydrateWrapper>${output}</HydrateWrapper>`,
+		'split Hydrate': `<Hydrate when={load()}>${output}</Hydrate>`,
+		'split Hydrate children': `<Card><Hydrate when={load()}>${output}</Hydrate></Card>`,
+		'static Hydrate': `<Hydrate split={false} when={never()}>${output}</Hydrate>`,
 	};
 }
 
 const SHAPES = Object.keys(frames(''));
+// The browser never renders a permanently static boundary's children.
+const CLIENT_SHAPES = SHAPES.filter((shape) => shape !== 'static Hydrate');
 
 // Builds a module whose declaring component is the root or a nested child.
 function source(body: string, nested: boolean, imports = 'derived$, query$'): string {
-	return `import { createContext, ErrorBoundary, Suspense, useEffect, ViewTransition } from 'octane';
+	return `import { createContext, ErrorBoundary, Hydrate, Suspense, useEffect, ViewTransition } from 'octane';
+import { load, never } from 'octane/hydration';
 import { ${imports} } from 'octane/signals';
 const Context = createContext('');
 const Boundary = ErrorBoundary;
@@ -57,6 +72,9 @@ function Card(props) @{
 }
 function Wrapper(props) @{
  <section><Card>{props.children}</Card></section>
+}
+function HydrateWrapper(props) @{
+ <Hydrate when={load()} split={false} children={props.children} />
 }
 ${
 	nested
@@ -91,13 +109,48 @@ const MODES =
 			]
 		: [{ name: 'dev', dev: true, strong: false }];
 
-const CASES = MODES.flatMap((mode) =>
-	(['direct', 'derived'] as const).flatMap((read) =>
-		SHAPES.flatMap((shape) => [false, true].map((nested) => ({ ...mode, read, shape, nested }))),
-	),
-);
+function cases(shapes: string[]) {
+	return MODES.flatMap((mode) =>
+		(['direct', 'derived'] as const).flatMap((read) =>
+			shapes.flatMap((shape) => [false, true].map((nested) => ({ ...mode, read, shape, nested }))),
+		),
+	);
+}
+
+const CASES = cases(SHAPES);
+const CLIENT_CASES = cases(CLIENT_SHAPES);
 
 const PROPS = { show: true, items: ['first', 'second'], mode: 'a' };
+
+// Compiles the browser module against the current runtime graph. A split
+// <Hydrate> boundary imports its children from a module the compiler selects
+// from the same source, so the loader provides that module for the request.
+async function loadClientModule(
+	text: string,
+	options: { dev: boolean; strong: boolean },
+	runtimeModules: Record<string, Record<string, unknown>>,
+) {
+	const { evaluateCompiledFixtureCode } = await import('../_server-fixture.js');
+	const id = '/src/signal-declaration-owner.tsrx';
+	const compileOptions = {
+		dev: options.dev,
+		strong: options.strong,
+		hmr: false,
+		mode: 'client' as const,
+	};
+	const { code } = compile(text, id, compileOptions);
+	const modules = { ...runtimeModules };
+	for (const [, , request, query] of code.matchAll(
+		/import\((['"])(\.\/signal-declaration-owner\.tsrx\?(octane-hydrate=\d+))\1\)/g,
+	))
+		modules[request!] ??= evaluateCompiledFixtureCode(
+			compile(text, `${id}?${query}`, compileOptions).code,
+			id,
+			'client',
+			runtimeModules,
+		);
+	return evaluateCompiledFixtureCode(code, id, 'client', modules);
+}
 
 async function mountClient(
 	text: string,
@@ -109,8 +162,7 @@ async function mountClient(
 	vi.resetModules();
 	const client = await import('../../src/runtime.js');
 	const signals = await import('../../src/signals/index.js');
-	const { loadCompiledFixtureSource, loadPlainHookFixtureSource } =
-		await import('../_server-fixture.js');
+	const { loadPlainHookFixtureSource } = await import('../_server-fixture.js');
 	const { drainProducers } = await import('../_fixtures/signals-async-controls.js');
 	const runtimeModules: Record<string, Record<string, unknown>> = { 'octane/signals': signals };
 	for (const [request, source] of Object.entries(plainModules))
@@ -119,12 +171,7 @@ async function mountClient(
 			inlineHookMemo: false,
 			runtimeModules,
 		});
-	const module = loadCompiledFixtureSource(text, {
-		id: '/src/signal-declaration-owner.tsrx',
-		mode: 'client',
-		compileOptions: { dev: options.dev, strong: options.strong, hmr: false },
-		runtimeModules,
-	});
+	const module = await loadClientModule(text, options, runtimeModules);
 	const requests: Array<(value: string) => void> = [];
 	const load = () => new Promise<string>((resolve) => requests.push(resolve));
 	const container = document.createElement('div');
@@ -158,12 +205,21 @@ async function mountClient(
 async function hydrateServerOutput(
 	text: string,
 	// `loads` counts the distinct queries the server starts, one by default.
-	options: { dev: boolean; strong: boolean; adoptsOutput: boolean; loads?: number },
+	// A `deferred` fixture's `props.when` holds its Hydrate boundaries dormant
+	// until a parent update activates them.
+	options: {
+		dev: boolean;
+		strong: boolean;
+		adoptsOutput: boolean;
+		loads?: number;
+		deferred?: boolean;
+	},
 ) {
 	vi.resetModules();
 	const server = await import('../../src/runtime.server.js');
 	const client = await import('../../src/runtime.js');
 	const signals = await import('../../src/signals/index.js');
+	const { condition } = await import('../../src/hydration/index.js');
 	const { bootstrapStreamedSignalHydration } =
 		await import('../../src/hydration/streamed-signals.js');
 	const { loadCompiledFixtureSource } = await import('../_server-fixture.js');
@@ -176,7 +232,7 @@ async function hydrateServerOutput(
 		runtimeModules: { 'octane/signals': signals },
 	};
 	const serverModule = loadCompiledFixtureSource(text, { ...compileOptions, mode: 'server' });
-	const clientModule = loadCompiledFixtureSource(text, { ...compileOptions, mode: 'client' });
+	const clientModule = await loadClientModule(text, options, compileOptions.runtimeModules);
 	const serverLoad = vi.fn(async () => 'server result');
 	const browserLoad = vi.fn(async () => 'browser result');
 	const streamedSignals = {
@@ -190,7 +246,7 @@ async function hydrateServerOutput(
 	try {
 		const output = await server.prerender(
 			serverModule.App,
-			{ ...PROPS, load: serverLoad },
+			{ ...PROPS, load: serverLoad, when: condition(true) },
 			{ streamedSignals },
 		);
 		expect(serverLoad).toHaveBeenCalledTimes(options.loads ?? 1);
@@ -201,18 +257,16 @@ async function hydrateServerOutput(
 		expect(new Set(outputs.map((node) => node.textContent))).toEqual(new Set(['server result']));
 		const errors: unknown[] = [];
 		hydration = bootstrapStreamedSignalHydration(streamedSignals);
-		root = client.hydrateRoot(
-			container,
-			clientModule.App,
-			{ ...PROPS, load: browserLoad },
-			{
-				signalOwner: hydration.signalOwner,
-				onRecoverableError: (error) => errors.push(error),
-				onUncaughtError: (error) => errors.push(error),
-			},
-		);
+		const props = { ...PROPS, load: browserLoad, when: condition(!options.deferred) };
+		root = client.hydrateRoot(container, clientModule.App, props, {
+			signalOwner: hydration.signalOwner,
+			onRecoverableError: (error) => errors.push(error),
+			onUncaughtError: (error) => errors.push(error),
+		});
 		await drainProducers();
 		client.flushSync(() => {});
+		if (options.deferred)
+			await client.act(() => root!.render(clientModule.App, { ...props, when: condition(true) }));
 		expect(browserLoad).not.toHaveBeenCalled();
 		const hydrated = [...container.querySelectorAll('output')];
 		if (options.adoptsOutput) expect(hydrated).toEqual(outputs);
@@ -229,7 +283,7 @@ async function hydrateServerOutput(
 }
 
 describe('signal declarations read across their component template', () => {
-	it.each(CASES)(
+	it.each(CLIENT_CASES)(
 		'starts one query for setup and $shape $read reads (nested: $nested, $name)',
 		async ({ dev, strong, read, shape, nested }) => {
 			const view = await mountClient(source(capturedRead(read, shape, 'snapshot()'), nested), {
@@ -315,6 +369,25 @@ describe('signal declarations read across their component template', () => {
 				strong,
 				adoptsOutput: shape !== 'catch',
 			});
+		},
+	);
+
+	// A dormant Hydrate boundary keeps its server HTML until a parent update
+	// activates it. Its children then read the cells the component resumed.
+	it.each(MODES.flatMap((mode) => [false, true].map((split) => ({ ...mode, split }))))(
+		'activates a deferred Hydrate boundary on the component cells (split: $split, $name)',
+		async ({ dev, strong, split }) => {
+			await hydrateServerOutput(
+				source(
+					`
+ const record$ = query$(() => 'record', props.load);
+ const selected$ = derived$(() => record$.get());
+ const state = record$.get();
+ <Hydrate when={props.when}${split ? '' : ' split={false}'}><output>{record$.get() as string}</output><output>{selected$.get() as string}</output></Hydrate>`,
+					false,
+				),
+				{ dev, strong, adoptsOutput: true, deferred: true },
+			);
 		},
 	);
 
@@ -526,6 +599,37 @@ function Child(props) @{
 export function App(props) @{
  const result$ = signal$('parent');
  <main><output>{result$.get() as string}</output><Child show={props.show} handle$={result$} /></main>
+}`,
+				{ dev, strong },
+			);
+			try {
+				expect(view.texts()).toEqual(['parent', 'parent', 'parent']);
+				view.click('button');
+				expect(view.texts()).toEqual(['parent', 'written', 'written']);
+			} finally {
+				view.unmount();
+			}
+		},
+	);
+
+	// The Hydrate children a child writes are part of the child's template, so
+	// they read a handle prop from the child's cell like its other output.
+	it.each(MODES.flatMap((mode) => [false, true].map((split) => ({ ...mode, split }))))(
+		"reads a handle prop in a child's Hydrate children from the child's cell (split: $split, $name)",
+		async ({ dev, strong, split }) => {
+			const view = await mountClient(
+				`import { Hydrate } from 'octane';
+import { load } from 'octane/hydration';
+import { signal$ } from 'octane/signals';
+function Child(props) @{
+ <article>
+  <output>{props.handle$.get() as string}</output>
+  <Hydrate when={load()}${split ? '' : ' split={false}'}><button onClick={() => props.handle$.set('written')}><output>{props.handle$.get() as string}</output></button></Hydrate>
+ </article>
+}
+export function App(props) @{
+ const result$ = signal$('parent');
+ <main><output>{result$.get() as string}</output><Child handle$={result$} /></main>
 }`,
 				{ dev, strong },
 			);

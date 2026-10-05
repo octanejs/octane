@@ -5929,7 +5929,7 @@ const PermanentStaticHydrate = /* @__PURE__ */ markComponentFlags(
 			PERMANENT_STATIC_HYDRATE_DEPTH--;
 		}
 	},
-	COMPONENT_FLAG_BOUNDARY,
+	COMPONENT_FLAGS_AUTHOR_BOUNDARY,
 	'PermanentStaticHydrate',
 );
 
@@ -6034,7 +6034,7 @@ const hydrate = /* @__PURE__ */ markComponentFlags(
 			),
 		);
 	},
-	COMPONENT_FLAG_BOUNDARY,
+	COMPONENT_FLAGS_AUTHOR_BOUNDARY,
 	'Hydrate',
 );
 
@@ -8356,7 +8356,7 @@ function childrenSignalOwner(body: unknown): SignalRendererOwnerIdentity | undef
 // A context provider or boundary built-in renders compiled children inline in
 // its own frame, so its owner links to their author's. The client renders a
 // boundary's children in a slot or try body of their own instead, which links
-// the same way (see scopeSignalOwner).
+// the same way (see scopeSignalOwner and createHydrateBoundaryBody).
 function authorChildrenSignalOwner(
 	comp: unknown,
 	props: { children?: unknown } | null | undefined,
