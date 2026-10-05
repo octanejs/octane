@@ -586,9 +586,10 @@ would repair a placement before hydration (for example, a `<div>` inside a
 `<p>`), Octane reports both authored locations in the server console. The check
 targets parser repairs rather than the complete HTML content model, never adds
 diagnostics to returned markup, and is removed from production compilation.
-Hydration recovers from such a repair in development and production: the
-client rebuilds the element in place of the nodes the parser split out and
-reports the recovery through `onRecoverableError`.
+Hydration treats such a repair as a mismatch in development and production:
+the nearest Suspense or `<Hydrate>` boundary around it, or else the root,
+renders on the client instead of adopting the server HTML, and
+`onRecoverableError` reports it once.
 
 On the server, page and layout props also receive `state`, the same
 request-scoped `Context.state` Map middleware populated. It is deliberately not
