@@ -181,6 +181,20 @@ describe('CI workflow aggregation', () => {
 		}
 	});
 
+	// A createRoot-only client must ship no hydration code under either bundler.
+	test('verifies once per full CI run that client-only bundles retain no hydration code', () => {
+		assert.match(
+			jobSource('test_shard'),
+			/- name: Verify client-only bundles retain no hydration code\n\s+if: matrix\.shard == '1\/4'\n\s+run: node benchmarks\/bundle-size\/run-hydration-free\.mjs\n/,
+		);
+		assert.doesNotMatch(jobSource('test_shard'), /run-hydration-free\.mjs \S/);
+		assert.ok(
+			packageJson.scripts['ci:workflow:test']
+				.split(' ')
+				.includes('benchmarks/bundle-size/hydration-free-gates.test.mjs'),
+		);
+	});
+
 	test('checks that budget raises land alone against the change itself', () => {
 		const lint = jobSource('lint_checks');
 		assert.match(lint, /fetch-depth: 0/);
