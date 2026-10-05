@@ -111,6 +111,11 @@ The `@for` header is always a `for…of`. A `for…in` or a C-style
 `(init; test; update)` header is a compile error: iterate `Object.keys(obj)` or
 a built index array instead.
 
+To remount a subtree when a value changes, key it as in React: wrap it in
+`<Fragment key={value}>…</Fragment>`, or key its only element or component. A
+new key resets the state, effects, and caught `@try` errors inside. Do not use
+a single-item `@for (const x of [value]; key x)` for this.
+
 ## Refs
 
 Refs are passed as props, React-19 style: `ref={cb}`, `ref={obj}`, or multi-ref
