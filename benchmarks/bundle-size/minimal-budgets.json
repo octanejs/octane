@@ -75,8 +75,8 @@
     "brotli": 512
   },
   "server-render": {
-    "raw": 65107,
-    "gzip": 22463,
+    "raw": 65201,
+    "gzip": 22499,
     "brotli": 20504
   },
   "component-owned-effects": {
