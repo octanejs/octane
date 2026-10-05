@@ -5,13 +5,12 @@ import { act, flushSync, hydrateRoot } from '../../src/index.js';
 import * as ServerRT from 'octane/server';
 import { loadCompiledFixtureSource, loadServerFixture } from '../_server-fixture';
 
-// A deferred boundary whose retry suspends inside a component keeps that
-// attempt's blocks and later resumes the suspended one first. Here the parent
-// opens a row the boundary adopted from the server while the boundary is
-// pending, so the retry builds the row's @if arm and suspends in it. The next
-// retry must resume that arm's component, not a hookless sibling whose scope
-// has no Block of its own. The server HTML predates the captures, so nothing
-// is reported, and every server node the boundary adopted keeps its identity.
+// A deferred boundary whose retry suspends keeps the server HTML on screen.
+// Here the parent opens a row the boundary adopted from the server while the
+// boundary is pending, and the row's @if arm suspends in turn. The server HTML
+// predates the captures, so nothing is reported, as React reports nothing for
+// an update that reaches a dehydrated boundary: once every read settles, the
+// boundary shows the client's rows and keeps updating them.
 
 const FIXTURE = join(
 	process.cwd(),
@@ -94,10 +93,6 @@ describe.each([
 		}).html;
 		const section = container.querySelector('section')!;
 		const html = markup(section);
-		const row = section.querySelector('s');
-		const u = section.querySelector('u');
-		const q = section.querySelector('q');
-		const em = section.querySelector('em');
 		const leaf = pending();
 		const gate = pending();
 		const slow = pending();
@@ -124,18 +119,16 @@ describe.each([
 		await act(async () => slow.resolve('S'));
 
 		const rows = items.map((item) => (item === 'x' ? '<s>x<i>S</i></s>' : `<s>${item}</s>`));
-		expect(markup(section)).toBe(`${rows.join('')}<u>x</u><q>g</q><em>e</em>`);
-		expect(section.querySelector('i')!.parentNode).toBe(row);
-		expect(section.querySelector('u')).toBe(u);
-		expect(section.querySelector('q')).toBe(q);
-		expect(section.querySelector('em')).toBe(em);
+		const live = container.querySelector('section')!;
+		expect(markup(live)).toBe(`${rows.join('')}<u>x</u><q>g</q><em>e</em>`);
+		expect(live.querySelector('i')!.parentNode!.textContent).toBe('xS');
 		expectNoDiagnostics();
 
-		// The hydrated boundary keeps updating the nodes it adopted.
+		// The boundary keeps updating the nodes it shows.
+		const em = live.querySelector('em');
 		await act(async () => root!.render(client[probe], { ...promises, items: ['x'] }));
-		expect(markup(section)).toBe('<s>x</s><u>x</u><q>g</q><em>e</em>');
-		expect(section.querySelector('s')).toBe(row);
-		expect(section.querySelector('em')).toBe(em);
+		expect(markup(live)).toBe('<s>x</s><u>x</u><q>g</q><em>e</em>');
+		expect(live.querySelector('em')).toBe(em);
 		expectNoDiagnostics();
 	});
 });

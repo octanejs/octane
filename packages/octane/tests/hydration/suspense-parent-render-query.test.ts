@@ -7,7 +7,10 @@ import '../_fixtures/signals-async-controls.js';
 import '../../src/hydration/streamed-signals.js';
 
 // A hydrating Suspense boundary whose first client attempt is waiting for the
-// browser's own load keeps that load when its parent renders again.
+// browser's own load keeps that load when its parent renders again. The load
+// resolves to a different text than the server rendered, so, as in React, the
+// boundary then discards its server content and renders on the client,
+// reporting the mismatch once, while the parent outside it keeps its DOM.
 
 const FIELD = {
 	id: '/src/field.tsx',
@@ -90,7 +93,8 @@ describe('a hydrating JSX Suspense across parent renders', () => {
 			const streamedSignals = { buildId: 'parent-render', documentId: 'parent-render' };
 			const container = document.createElement('div');
 			document.body.append(container);
-			const errors: unknown[] = [];
+			const recoverable: unknown[] = [];
+			const uncaught: unknown[] = [];
 			let setTick: ((update: (tick: number) => number) => void) | undefined;
 			let root: ReturnType<typeof client.hydrateRoot> | undefined;
 			let hydration: ReturnType<typeof bootstrapStreamedSignalHydration> | undefined;
@@ -115,22 +119,39 @@ describe('a hydrating JSX Suspense across parent renders', () => {
 					{ id: 'b', load: browserLoad, bind: (update: typeof setTick) => (setTick = update) },
 					{
 						signalOwner: hydration.signalOwner,
-						onRecoverableError: (error) => errors.push(error),
-						onUncaughtError: (error) => errors.push(error),
+						onRecoverableError: (error) => recoverable.push(error),
+						onUncaughtError: (error) => uncaught.push(error),
 					},
 				);
 				await drain();
+				const main = container.querySelector('main')!;
+				const serverOutput = container.querySelector('output')!;
 				expect(browserLoad.mock.calls.map(([id]) => id)).toEqual(['b']);
 				for (let i = 0; i < 3; i++) {
 					client.flushSync(() => setTick!((tick) => tick + 1));
 					await drain();
 				}
 				expect(browserLoad.mock.calls.map(([id]) => id)).toEqual(['b']);
+				expect(serverOutput.textContent).toBe('server a');
+				expect(recoverable).toEqual([]);
+				pending.get('b')!('browser b');
+				await drain();
+				// The browser's text differs from the server's: the boundary falls back.
+				expect(serverOutput.isConnected).toBe(false);
+				expect(recoverable).toEqual([
+					expect.objectContaining({
+						message: expect.stringMatching(/^Hydration failed because the server rendered HTML/),
+					}),
+				]);
+				// Its client render reads the browser's data, loading it again if it must.
 				pending.get('b')!('browser b');
 				await drain();
 				expect(container.querySelector('output')!.textContent).toBe('browser b');
-				expect(browserLoad).toHaveBeenCalledTimes(1);
-				expect(errors.filter((error) => !String(error).includes('Hydration mismatch'))).toEqual([]);
+				expect(container.querySelector('main')).toBe(main);
+				expect(main.dataset.tick).toBe('3');
+				expect(browserLoad.mock.calls.every(([id]) => id === 'b')).toBe(true);
+				expect(recoverable).toHaveLength(1);
+				expect(uncaught).toEqual([]);
 			} finally {
 				root?.unmount();
 				hydration?.dispose();

@@ -201,12 +201,13 @@ export function Uncaught(props: PageProps) @{
 }
 
 function Update(props: { set?: (show: boolean) => void }) @{
-	// Updates the parent during render, which hydration drains in place.
+	// Updates the parent during render; the update applies after the hydration
+	// it interrupts.
 	if (props.set !== undefined) props.set(true);
 	<span>{'update'}</span>
 }
 
-// The drained update re-renders a hydrating try body that mounts the Leaf arm.
+// The update switches a hydrated try body to the Leaf arm.
 export function Rerender(props: PageProps) @{
 	const [show, setShow] = useState(false);
 	<div>
