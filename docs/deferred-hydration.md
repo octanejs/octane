@@ -772,6 +772,14 @@ the normal host bindings publish before refs. Nullable attributes are removed
 using their normal DOM semantics; `tabIndex` uses its canonical `tabindex`
 attribute without changing descendant control ownership.
 
+A host moved elsewhere inside the root while its boundary is pending is never
+adopted at its new position. When the boundary resumes, hydration reports the
+missing host as a recoverable mismatch and renders its own host at the original
+site. Committing that replacement retires the moved host's early binding, as an
+accepted transfer would. The moved element keeps its last published values, and
+neither owner writes to it again. A resumed attempt that suspends or is
+discarded leaves the early binding live.
+
 If retirement cleanup invalidates the host after acceptance, its successor
 writers and pending host refs are revoked. This does not roll back cleanup or
 retire independently owned children. A later explicit root render against that
