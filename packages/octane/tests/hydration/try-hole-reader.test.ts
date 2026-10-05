@@ -94,10 +94,13 @@ describe('hydrateRoot — use() in a template hole rejected on the server', () =
 
 	// The adopted catch arm's text differs from the client's, which is a
 	// mismatch as anywhere else: its fallback owner renders on the client from
-	// client data and reports once. A `@try` with `@pending` is that owner, so
-	// the host around it stays; an `@catch`-only `@try` or an <ErrorBoundary> is
-	// not a hydration boundary, so the root renders on the client. The client's
-	// read rejects too, so the client render reaches the same catch arm.
+	// client data. A `@try` with `@pending` is that owner, so the host around it
+	// stays; an `@catch`-only `@try` or an <ErrorBoundary> is not a hydration
+	// boundary, so the root renders on the client. The client's read suspends,
+	// then rejects too, so the client render reaches the same catch arm. As in
+	// React, a boundary reports the mismatch when it commits its `@pending` arm,
+	// then the caught error; a root, which commits nothing until the caught
+	// error, reports only that.
 	it.each(READERS)(
 		'client-renders the fallback owner of a catch arm whose text differs, for a reader %s',
 		async (_, name) => {
@@ -116,9 +119,11 @@ describe('hydrateRoot — use() in a template hole rejected on the server', () =
 			const boundary = name === 'CatchArm' || name === 'SameRootArm' || name === 'SetupCatchArm';
 			expect(container.querySelector('div') === div).toBe(boundary);
 			expect(caught).toEqual(['x']);
-			expect(recovered.map((error) => (error as Error).message)).toEqual([
-				expect.stringMatching(/^Hydration failed because the server rendered (HTML|text)/),
-			]);
+			expect(recovered.map((error) => (error as Error).message)).toEqual(
+				boundary
+					? [expect.stringMatching(/^Hydration failed because the server rendered (HTML|text)/)]
+					: [],
+			);
 			const logged = mismatches();
 			expect(logged.length).toBeLessThanOrEqual(DEV ? 1 : 0);
 			root.unmount();

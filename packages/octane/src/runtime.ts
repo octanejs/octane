@@ -190,6 +190,7 @@ import {
 	isForBindingOpenComment,
 } from './dom-binding-protocol.js';
 import {
+	CLIENT_RENDER_ARM_COMMENT,
 	formatUseId,
 	HYDRATION_FOR_ARM_INDEX,
 	HYDRATION_FOR_PREFIX,
@@ -1713,7 +1714,11 @@ function releaseNativeAdoptions(): void {
 	for (const adoption of pending) adoption.release();
 }
 
-/** Only the renderer-owned arm is replaced; surrounding adopted hosts survive. */
+/**
+ * Only the renderer-owned arm is replaced; surrounding adopted hosts survive.
+ * So is an arm the server could not finish (CLIENT_RENDER_ARM_COMMENT), which
+ * the boundary also reports (HydrationCapability.beginUnfinishedArm).
+ */
 function takeNativeFreshArm(
 	hydration: HydrationCapability | null,
 	cursor: Node | null,
@@ -1722,8 +1727,13 @@ function takeNativeFreshArm(
 ): RootIdState | null {
 	if (hydration === null || cursor?.nodeType !== 8) return null;
 	const value = (STAGED_DOM?.view(cursor as Comment) ?? (cursor as Comment)).data;
-	if (!value.startsWith(NATIVE_SIGNAL_FRESH_COMMENT)) return null;
-	const rawCount = value.slice(NATIVE_SIGNAL_FRESH_COMMENT.length);
+	if (
+		!value.startsWith(NATIVE_SIGNAL_FRESH_COMMENT) &&
+		!value.startsWith(CLIENT_RENDER_ARM_COMMENT)
+	)
+		return null;
+	// Each prefix ends at its only colon.
+	const rawCount = value.slice(value.indexOf(':') + 1);
 	if (!/^(?:0|[1-9]\d*)$/.test(rawCount)) return null;
 	const count = Number(rawCount);
 	if (!Number.isSafeInteger(count)) return null;
@@ -6975,16 +6985,27 @@ function componentName(block: Block): string {
 	return body.displayName || body.name || 'Unknown';
 }
 
+/** DEV-only: the body that each hookless child's scope renders (componentSlotLite). */
+const LITE_BODIES: WeakMap<Scope, ComponentBody> | null =
+	process.env.NODE_ENV === 'production' ? null : /* @__PURE__ */ new WeakMap();
+
 function warnCrossComponentRenderUpdate(target: Block, source: Block): void {
 	if (process.env.NODE_ENV === 'production') return;
+	// A hookless child renders in its parent's block, under its own scope.
+	const lite =
+		CURRENT_SCOPE !== null && CURRENT_SCOPE !== source
+			? LITE_BODIES!.get(CURRENT_SCOPE)
+			: undefined;
+	const body = lite ?? source.body;
 	const warnings = (CROSS_RENDER_WARNINGS ??= new WeakMap());
 	let sources = warnings.get(target.body);
 	if (sources === undefined) warnings.set(target.body, (sources = new WeakSet()));
-	if (sources.has(source.body)) return;
-	sources.add(source.body);
+	if (sources.has(body)) return;
+	sources.add(body);
 	console.error(
 		`Cannot update a component (\`${componentName(target)}\`) while rendering a different component ` +
-			`(\`${componentName(source)}\`). Move the update out of the rendering component body.`,
+			`(\`${componentName(lite === undefined ? source : ({ body } as Block))}\`). ` +
+			'Move the update out of the rendering component body.',
 	);
 }
 
@@ -7033,9 +7054,11 @@ function scheduleRender(block: Block, flushed?: boolean): void {
 	// are mutation-phase callbacks — React runs them in commitDeletionEffects — so
 	// an update they schedule for a surviving component is legal, not a render-phase
 	// cross-component update.
+	// A hookless child renders inside its parent's block (componentSlotLite), with
+	// its own scope: a parent setter it calls is another component's update too.
 	const renderPhaseOther =
 		CURRENT_BLOCK !== null &&
-		!renderPhaseSelf &&
+		(!renderPhaseSelf || CURRENT_SCOPE !== block) &&
 		TRANSITION_LISTENER_PUBLISH_DEPTH === 0 &&
 		EFFECT_EVENT_LIFECYCLE_DEPTH === 0;
 	if (renderPhaseOther) {
@@ -7132,8 +7155,14 @@ function belongsToBlockTree(block: Block, root: Block): boolean {
  * throwaway value against converged server HTML and publishes a false mismatch.
  * Drain only this root's queued descendants, leaving pre-existing work for other
  * roots in the ordinary scheduler queue.
+ *
+ * While `hydrating`, an update that a render scheduled for another component
+ * (crossRenderUpdate) stays queued too. The server ignores such an update, so
+ * its HTML shows the state before it, as React's does, and React applies it
+ * only after the hydration it interrupted commits: replaying it here would
+ * hydrate the updated output against server DOM that never rendered it.
  */
-function drainHydrationRenderPhaseUpdates(root: Block): void {
+function drainHydrationRenderPhaseUpdates(root: Block, hydrating = false): void {
 	let renders: Map<Block, number> | null = null;
 	let read = 0;
 	let write = 0;
@@ -7143,7 +7172,7 @@ function drainHydrationRenderPhaseUpdates(root: Block): void {
 		// append more target (or foreign) work, which belongs to this same pass.
 		while (read < QUEUE.length) {
 			const block = QUEUE[read++];
-			if (!belongsToBlockTree(block, root)) {
+			if (!belongsToBlockTree(block, root) || (hydrating && block.crossRenderUpdate)) {
 				QUEUE[write++] = block;
 				continue;
 			}
@@ -11973,6 +12002,7 @@ export function componentSlotLite<P>(
 			else endMarker = hydration.parkAtHole((inPlace = anchor));
 		}
 		scope.block = new LiteBlockImpl(host, endMarker, parentScope.block) as unknown as Block;
+		if (process.env.NODE_ENV !== 'production') LITE_BODIES!.set(scope, comp as ComponentBody);
 		stampSignalInstance(scope, parentScope, invocationSite);
 		if (adoptedOpen !== null && adoptedClose !== null) {
 			hydration!.liteRanges.set(scope, {
@@ -16350,7 +16380,7 @@ function activateHydrateBoundary(state: HydrateSlot): void {
 			}
 		}
 		renderBlock(block);
-		drainHydrationRenderPhaseUpdates(block);
+		drainHydrationRenderPhaseUpdates(block, true);
 		// Suspended initial adoption intentionally leaves its real server arm and
 		// cursor untouched. Sweep only after that same arm eventually commits.
 		if (state.hydrated) {
@@ -19426,11 +19456,15 @@ class HydrationCapability {
 	/**
 	 * The boundary falls back: restore the thenables this attempt's seeds
 	 * settled, so that the client render reads client data, as React's does.
+	 * `mark` keeps the outcomes written before it, by content outside a
+	 * boundary that falls back within this hydration (fallBackServerCatch).
 	 */
-	discardSeeds(): void {
+	discardSeeds(mark = 0): void {
 		const seeded = this.seeded;
-		this.seeded = null;
-		if (seeded !== null) for (let i = seeded.length - 1; i >= 0; i--) seeded[i]();
+		if (seeded === null) return;
+		for (let i = seeded.length - 1; i >= mark; i--) seeded[i]();
+		if (mark === 0) this.seeded = null;
+		else seeded.length = mark;
 	}
 
 	/** The attempt is discarded: restore the server nodes it changed. */
@@ -19919,6 +19953,7 @@ class HydrationCapability {
 			trySeeds: Number(counts[1]),
 			catchSeeds: Number(counts[2]),
 			seedEnd: 0,
+			seeded: this.seeded?.length ?? 0,
 		};
 	}
 
@@ -19991,6 +20026,111 @@ class HydrationCapability {
 	/** Later siblings read the seeds after the boundary, whichever arm rendered. */
 	skipServerCatchSeeds(caught: ServerCatch): void {
 		if (this.seeds !== null) this.seedCursor = Math.min(caught.seedEnd, this.seeds.length);
+	}
+
+	/**
+	 * Switch `state` to `caught`, the server's catch arm, which it adopts, for
+	 * the replayed body's `error`. Returns a mismatch in that arm when `state`
+	 * is a Suspense boundary (a `@try` with `@pending`), which owns it
+	 * (fallBackServerCatch); a catch-only boundary passes it to the next owner.
+	 */
+	adoptServerCatch(state: TrySlot, caught: ServerCatch, error: unknown): HydrationMismatch | null {
+		this.settleServerCatch(caught, state, true);
+		try {
+			switchToCatch(state, error, true, caught.start, caught.end);
+		} catch (failure) {
+			if (state.pendingBody === null || !(failure instanceof HydrationMismatch)) throw failure;
+			return failure;
+		}
+		return null;
+	}
+
+	/**
+	 * Start the client render of `state`'s arm, which `cursor` leads, when the
+	 * server could not finish it (CLIENT_RENDER_ARM_COMMENT). Returns what
+	 * endUnfinishedArm and reportUnfinishedArm need, or null for another fresh
+	 * arm. The boundary is dehydrated meanwhile (DEHYDRATED_TRY), and catches in
+	 * its render are its own (as catchesInHydrationFallback).
+	 */
+	beginUnfinishedArm(state: TrySlot, cursor: Node | null): UnfinishedArm | null {
+		if (
+			cursor?.nodeType !== 8 ||
+			!(STAGED_DOM?.view(cursor as Comment) ?? (cursor as Comment)).data.startsWith(
+				CLIENT_RENDER_ARM_COMMENT,
+			)
+		)
+			return null;
+		const arm: UnfinishedArm = {
+			state,
+			dehydrated: DEHYDRATED_TRY,
+			caughtBefore: ROOT_RENDER_TRANSACTION?.caught === true,
+			caught: false,
+		};
+		DEHYDRATED_TRY = state;
+		if (ROOT_RENDER_TRANSACTION !== null) ROOT_RENDER_TRANSACTION.caught = false;
+		return arm;
+	}
+
+	/** End the render that beginUnfinishedArm started, whether or not it threw. */
+	endUnfinishedArm(arm: UnfinishedArm): void {
+		DEHYDRATED_TRY = arm.dehydrated;
+		const transaction = ROOT_RENDER_TRANSACTION;
+		if (transaction === null) return;
+		arm.caught = transaction.caught === true;
+		transaction.caught = arm.caught || arm.caughtBefore;
+	}
+
+	/**
+	 * Report that the boundary of `arm`, which the server could not finish,
+	 * rendered on the client, as React reports a boundary its server marked
+	 * errored, unless a catch arm caught an error in that render, which React
+	 * reports alone.
+	 */
+	reportUnfinishedArm(arm: UnfinishedArm): void {
+		if (!arm.caught)
+			noteRecoverableHydrationError(() => new Error(formatClientError(341)), arm.state.parentBlock);
+	}
+
+	/**
+	 * A Suspense boundary found that `caught`, the server's catch arm it was
+	 * adopting, does not match the client's. As React does for a boundary whose
+	 * hydration fails, it discards the attempt and its server DOM, renders on
+	 * the client from client data (the attempt's seeds are discarded), and
+	 * reports `failure` once, unless that render catches an error
+	 * (catchesInHydrationFallback). The enclosing hydration continues past the
+	 * boundary. Called after mountTry restored its seed scope.
+	 */
+	fallBackServerCatch(state: TrySlot, caught: ServerCatch, failure: HydrationMismatch): void {
+		this.discardSeeds(caught.seeded);
+		const attempt = state.block;
+		state.block = state.tryBlock = null;
+		if (attempt !== null) {
+			// None of the attempt's refs or effects committed. Dispose its scopes
+			// without detaching the server nodes, which are discarded below.
+			const refs: SuspenseRefEntry[] = [];
+			collectVisibleSubtreeRefs(attempt, refs);
+			withRefDetachSuppression(refs, () => unmountBlock(attempt, false));
+			if (state.parentBlock.disposed || state.block !== null) return;
+		}
+		const parent = domNode(state.domParent);
+		journalRootChildren(parent);
+		this.save(parent);
+		markHydrationDiscard(
+			state.parentBlock.idState.renderOwner,
+			parent,
+			getNextSibling(state.start),
+			state.end,
+		);
+		removeRange(getNextSibling(state.start), state.end);
+		currentHydration = null;
+		let caughtError = false;
+		try {
+			caughtError = renderDehydratedTry(state);
+		} finally {
+			currentHydration = this;
+			this.node = getNextSibling(state.end);
+		}
+		if (!caughtError) noteRecoverableHydrationError(() => failure, state.parentBlock);
 	}
 
 	/**
@@ -20451,11 +20591,12 @@ class HydrationCapability {
 	/**
 	 * Whether the block rendering now, or an ancestor of it in this pass, has an
 	 * update queued, which renders it again before the pass ends
-	 * (drainHydrationRenderPhaseUpdates).
+	 * (drainHydrationRenderPhaseUpdates). An update from another component's
+	 * render waits for the commit instead.
 	 */
 	private rendersAgain(): boolean {
 		for (let block = CURRENT_BLOCK; block !== null; block = block.parentBlock) {
-			if (block.pending) return true;
+			if (block.pending && !block.crossRenderUpdate) return true;
 			if (block === this.rootBlock) return false;
 		}
 		return false;
@@ -38507,8 +38648,15 @@ function findHiddenOwnerWithSuspenseRetries(
 		: findScheduledVisibilityOwner(block, false);
 }
 
+/**
+ * The boundary whose hydration failed, while its client render runs. Like
+ * React's dehydrated boundary, it already counts as showing a fallback, so the
+ * `@pending` arm that render shows does not restart the retry throttle.
+ */
+let DEHYDRATED_TRY: TrySlot | null = null;
+
 function recordSuspenseCommit(state: TrySlot): void {
-	if (state.parentBlock.disposed) return;
+	if (state.parentBlock.disposed || state === DEHYDRATED_TRY) return;
 	if (WIP_CAPTURE !== null) {
 		PUBLISH_SUSPENSE_COMMIT ??= recordSuspenseCommit;
 		(WIP_CAPTURE.suspenseCommits ??= new Set()).add(state);
@@ -39375,6 +39523,7 @@ function switchErrorToCatchInner(
 	);
 	caught.idState = state.idState;
 	state.block = caught;
+	let control = false;
 	try {
 		if (!adopting && !state.passthrough && hydration !== null) {
 			hydration.suspend(() => renderBlock(caught));
@@ -39383,6 +39532,12 @@ function switchErrorToCatchInner(
 		}
 	} catch (nextError) {
 		if (forwardFallbackSuspension(caught, nextError)) return;
+		// An adopted server catch arm that does not match fails the nearest
+		// fallback owner, as any mismatch does (see switchToCatchInner).
+		if (isAdoptionControl(nextError)) {
+			control = true;
+			throw nextError;
+		}
 		const rethrowsReason = rejection && Object.is(nextError, caughtError);
 		if (state.block !== null) {
 			unmountBlock(state.block, !(adopting && rethrowsReason));
@@ -39396,7 +39551,7 @@ function switchErrorToCatchInner(
 		if (parent !== null) parent(propagated);
 		else console.error('catch body threw, no outer tryBlock:', nextError);
 	} finally {
-		if (reportInline) enqueueInlineCaughtError(state);
+		if (reportInline && !control) enqueueInlineCaughtError(state);
 	}
 }
 
@@ -39868,6 +40023,21 @@ function catchesInHydrationFallback(render: () => void): boolean {
 	return caught;
 }
 
+/**
+ * Render a Suspense arm whose hydration failed on the client, after its server
+ * DOM was discarded (catchesInHydrationFallback). It is a dehydrated boundary
+ * meanwhile (DEHYDRATED_TRY).
+ */
+function renderDehydratedTry(state: TrySlot): boolean {
+	const previous = DEHYDRATED_TRY;
+	DEHYDRATED_TRY = state;
+	try {
+		return catchesInHydrationFallback(() => mountTry(state));
+	} finally {
+		DEHYDRATED_TRY = previous;
+	}
+}
+
 function renderInitialSuspenseHydration(state: TrySlot, initial: InitialSuspenseHydration): void {
 	state.pendingThenable = null;
 	state.idState.next = initial.idStart;
@@ -39904,7 +40074,7 @@ function renderInitialSuspenseHydration(state: TrySlot, initial: InitialSuspense
 			setNativeAdoptionResolver(hydration.nativeAdoption.resolve);
 		}
 		renderBlock(block);
-		drainHydrationRenderPhaseUpdates(block);
+		drainHydrationRenderPhaseUpdates(block, true);
 		hydration.settleValues();
 		hydration.settle(previousHydration);
 		state.hasResolved = true;
@@ -40001,7 +40171,7 @@ function renderInitialSuspenseHydration(state: TrySlot, initial: InitialSuspense
 		currentHydration = null;
 		let caught = false;
 		try {
-			caught = catchesInHydrationFallback(() => mountTry(state));
+			caught = renderDehydratedTry(state);
 		} finally {
 			currentHydration = previousHydration;
 			if (previousHydration !== null) previousHydration.node = getNextSibling(state.end);
@@ -40047,6 +40217,19 @@ interface ServerCatch {
 	trySeeds: number;
 	catchSeeds: number;
 	seedEnd: number;
+	/** How many seeded outcomes the hydration held before this arm (discardSeeds). */
+	seeded: number;
+}
+
+/** A boundary arm that the server could not finish, while it renders on the client. */
+interface UnfinishedArm {
+	state: TrySlot;
+	/** The enclosing dehydrated boundary, restored when the render ends. */
+	dehydrated: TrySlot | null;
+	/** Whether the root's render had caught an error before this arm rendered. */
+	caughtBefore: boolean;
+	/** Whether a catch arm caught an error in this arm's render. */
+	caught: boolean;
 }
 
 function mountTry(state: TrySlot): void {
@@ -40129,7 +40312,9 @@ function mountTry(state: TrySlot): void {
 		};
 	}
 	const freshIds = takeNativeFreshArm(hydration, adoptCursor, state.end, state.idState);
+	let unfinished: UnfinishedArm | null = null;
 	if (freshIds !== null) {
+		unfinished = hydration!.beginUnfinishedArm(state, adoptCursor);
 		state.idState = freshIds;
 		freshBoundary = true;
 		adoptCursor = state.end;
@@ -40184,6 +40369,8 @@ function mountTry(state: TrySlot): void {
 	// The entire newly mounted arm, including its pending/catch path, is outside
 	// adoption. A live child must not borrow an ancestor's historical data.
 	if (freshBoundary) hydration!.depth++;
+	// A mismatch in the server's catch arm of a Suspense boundary, which owns it.
+	let armFailure: HydrationMismatch | null = null;
 	try {
 		if (caught !== null) {
 			hydration!.replayCaughtTry(b, caught);
@@ -40218,8 +40405,6 @@ function mountTry(state: TrySlot): void {
 			// The server's catch arm sits beside a replayed body, or, for a seeded
 			// rejection, inside the adopted range this body was rendering.
 			const rejection = caught === null && hydration?.isRejection(err) === true;
-			const catchStart = caught?.start ?? (rejection ? bStart : undefined);
-			const catchEnd = caught?.end ?? (rejection ? bEnd : undefined);
 			if (state.tryBlock) {
 				// Tear down the aborted try render's bookkeeping, preserving a range it
 				// shares with the catch arm for adoption.
@@ -40227,8 +40412,15 @@ function mountTry(state: TrySlot): void {
 				state.tryBlock = null;
 				state.block = null;
 			}
-			if (caught !== null) hydration!.settleServerCatch(caught, state, true);
-			switchToCatch(state, err, true, catchStart, catchEnd);
+			if (caught !== null) armFailure = hydration!.adoptServerCatch(state, caught, err);
+			else
+				switchToCatch(
+					state,
+					err,
+					true,
+					rejection ? bStart : undefined,
+					rejection ? bEnd : undefined,
+				);
 		}
 	} finally {
 		if (caught !== null) hydration!.skipServerCatchSeeds(caught);
@@ -40238,7 +40430,11 @@ function mountTry(state: TrySlot): void {
 			hydration!.seeds = prevSeeds;
 			hydration!.seedCursor = prevSeedCursor;
 		}
+		if (unfinished !== null) hydration!.endUnfinishedArm(unfinished);
 	}
+	if (armFailure !== null) hydration!.fallBackServerCatch(state, caught!, armFailure);
+	// An error that escaped to an outer catch arm reports nothing either.
+	else if (unfinished !== null) hydration!.reportUnfinishedArm(unfinished);
 }
 
 /**
@@ -42599,6 +42795,7 @@ function switchToCatchInner(
 		// so adoption stays local without treating the catch as a fresh render.
 		hydration.rootBlock = b;
 	}
+	let control = false;
 	try {
 		// A client-fresh catch build during hydration must not read the adoption
 		// cursor — the server rendered the try arm here, so adopting would consume
@@ -42607,6 +42804,13 @@ function switchToCatchInner(
 		else renderBlock(b);
 	} catch (e2) {
 		if (forwardFallbackSuspension(b, e2)) return;
+		// The server's catch arm, adopted here, does not match the client's: the
+		// nearest fallback owner discards this attempt with its server DOM, as for
+		// any other mismatch (adoptServerCatch), and renders on the client.
+		if (isAdoptionControl(e2)) {
+			control = true;
+			throw e2;
+		}
 		// Catch body itself threw — bubble to next enclosing tryBlock.
 		const rethrowsHydrationReason = hydrationRejection && Object.is(e2, caughtError);
 		const preserveAdoptedRange = adopting && rethrowsHydrationReason;
@@ -42638,7 +42842,7 @@ function switchToCatchInner(
 		if (parent) parent(propagated);
 		else console.error('catch body threw, no outer tryBlock:', e2);
 	} finally {
-		if (reportInline) enqueueInlineCaughtError(state);
+		if (reportInline && !control) enqueueInlineCaughtError(state);
 	}
 }
 
@@ -48767,7 +48971,7 @@ function hydrateRootWithOutputHandler(
 				hydration.node = getNextSibling(firstNode);
 			}
 			renderBlock(rootBlock);
-			drainHydrationRenderPhaseUpdates(rootBlock);
+			drainHydrationRenderPhaseUpdates(rootBlock, true);
 			// Mount empty server Activities only after every adopted sibling has
 			// consumed its server ID and seed positions.
 			if (hydration.deferredActivities.length !== 0)

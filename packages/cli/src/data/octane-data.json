@@ -3538,6 +3538,11 @@
       "message": "There was an error while hydrating, so the nearest Suspense boundary, Hydrate island, or the root rendered on the client instead.",
       "runtime": ["client"],
       "status": "active"
+    },
+    "341": {
+      "message": "The server could not finish this Suspense boundary, because it suspended during a synchronous render such as renderToString, which cannot wait for data. Switched to client rendering.",
+      "runtime": ["client"],
+      "status": "active"
     }
   },
   "strongDiagnostics": {

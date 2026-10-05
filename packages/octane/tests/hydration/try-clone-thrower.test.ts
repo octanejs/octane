@@ -105,6 +105,34 @@ function expectMismatchDiagnostic() {
 	);
 }
 
+/** Pages whose later child updates the page while it renders, by try body kind. */
+const RERENDERS = [
+	['@try', 'Rerender'],
+	['compiled <ErrorBoundary>', 'RerenderBoundary'],
+	['@try, from a child with state,', 'RerenderStateful'],
+] as const;
+
+/**
+ * The development runtime's warning, as React's, that a child updated the page
+ * while it rendered. It warns once per pair of components.
+ */
+function expectCrossRenderWarning(name: (typeof RERENDERS)[number][1]) {
+	const child = name === 'RerenderStateful' ? 'StatefulUpdate' : 'Update';
+	expect(
+		consoleError.mock.calls
+			.map(([message]) => String(message))
+			.filter((message) => message.startsWith('Cannot update a component')),
+	).toEqual(
+		process.env.NODE_ENV !== 'production'
+			? [
+					expect.stringContaining(
+						`Cannot update a component (\`${name}\`) while rendering a different component (\`${child}\`)`,
+					),
+				]
+			: [],
+	);
+}
+
 function expectStructuralReport(recovered: unknown[]) {
 	expect(recovered).toEqual([expect.any(Error)]);
 	expect((recovered[0] as Error).message).toMatch(MISMATCH);
@@ -253,13 +281,12 @@ describe('hydrateRoot — a try body throws to its catch arm where the server re
 		root.unmount();
 	});
 
-	// An update that a hydrating render schedules applies after the hydration
-	// it interrupts, as in React: the server output hydrates first, then the
-	// update replaces only the arm it changes.
-	it.each([
-		['@try', 'Rerender'],
-		['compiled <ErrorBoundary>', 'RerenderBoundary'],
-	] as const)(
+	// An update that a hydrating render schedules for another component, here
+	// the parent, applies after the hydration it interrupts, as in React: the
+	// server, which ignores such an update, rendered the state before it, so the
+	// server output hydrates first, then the update replaces only the arm it
+	// changes. A child without state of its own is another component too.
+	it.each(RERENDERS)(
 		'applies an update scheduled while hydrating a %s body, which throws, after hydrating',
 		async (_, name) => {
 			const { root, hosts, onAfter, recovered, caught } = await hydrateServerHtml(
@@ -275,6 +302,7 @@ describe('hydrateRoot — a try body throws to its catch arm where the server re
 			expect(caught).toEqual(['x']);
 			expect(recovered).toEqual([]);
 			expect(mismatches()).toEqual([]);
+			expectCrossRenderWarning(name);
 			root.unmount();
 		},
 	);
@@ -433,10 +461,7 @@ describe('hydrateRoot — a try body that does not reach its catch arm still rep
 		root.unmount();
 	});
 
-	it.each([
-		['@try', 'Rerender'],
-		['compiled <ErrorBoundary>', 'RerenderBoundary'],
-	] as const)(
+	it.each(RERENDERS)(
 		'applies an update scheduled while hydrating a %s body, which completes, after hydrating',
 		async (_, name) => {
 			const { root, hosts, onAfter, recovered, caught } = await hydrateServerHtml(

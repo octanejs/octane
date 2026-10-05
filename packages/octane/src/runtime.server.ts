@@ -39,6 +39,7 @@ import {
 	type BindingKey,
 } from './dom-binding-protocol.js';
 import {
+	CLIENT_RENDER_ARM_COMMENT,
 	formatUseId,
 	HYDRATION_FOR_EMPTY,
 	HYDRATION_FOR_ITEMS,
@@ -6567,6 +6568,11 @@ export function addTransitionType(_type: string): void {}
  * error during render swaps to the fallback; a suspension rethrows so an outer
  * `<Suspense>`/`@pending` handles it (matching the client ErrorBoundary's explicit
  * suspension propagation). `reset` is a server no-op (no re-render).
+ *
+ * Routed through ssrTry, like the compiled catch-only boundary, so a caught arm
+ * carries the same catch marker and seed counts: the client's ErrorBoundary
+ * (a catch-only tryBlock) replays the body and adopts the fallback the server
+ * rendered instead of mistaking it for the body's content.
  */
 export const ErrorBoundary = /* @__PURE__ */ markComponentFlags(
 	function ErrorBoundary(
@@ -6574,24 +6580,20 @@ export const ErrorBoundary = /* @__PURE__ */ markComponentFlags(
 		scope: SSRScope,
 	): string {
 		return ssrHtml(
-			ssrBlock(
-				(() => {
-					try {
-						return withAsyncIdentity('error-boundary', 'content', () =>
-							ssrBlock(ssrChildrenHtml(props.children, scope)),
-						);
-					} catch (e) {
-						e = normalizeThrownServerThenable(e);
-						if (ssrIsSuspense(e)) throw e; // let an outer Suspense render its pending arm
-						const fb =
-							typeof props.fallback === 'function'
-								? (props.fallback as (err: unknown, reset: () => void) => unknown)(e, NOOP)
-								: props.fallback;
-						return withAsyncIdentity('error-boundary', 'catch', () =>
-							ssrBlock(ssrChild(fb, scope)),
-						);
-					}
-				})(),
+			ssrTry(
+				scope,
+				'jsx-error-boundary',
+				(_arg, s) => ssrChildrenHtml(props.children, s),
+				null,
+				(error, s, reset) =>
+					ssrChild(
+						typeof props.fallback === 'function'
+							? (props.fallback as (err: unknown, reset: () => void) => unknown)(error, reset)
+							: props.fallback,
+						s,
+					),
+				FRAME?.namespace ?? 'html',
+				true,
 			),
 		);
 	},
@@ -10803,6 +10805,8 @@ export function ssrTry(
 	};
 	if (entry !== undefined) enterBoundaryIds(0);
 	let nativeFresh = false;
+	// A fresh arm the server could not finish, which the client reports once.
+	let clientArm = false;
 	const nativeFailureStart = NATIVE_SERVER_FAILURES;
 	const nativeFreshArm = (inner: string): string => {
 		if (!MARKERS || !nativeFresh) return inner;
@@ -10811,7 +10815,13 @@ export function ssrTry(
 		// use() cursor. Its original useId range remains reserved by the marker.
 		rewindSerial(serialStart, isolationStart);
 		const idCount = Math.max(0, ID_COUNTER - (boundaryIds ? 0 : outerIdCounter));
-		return '<!--' + NATIVE_SIGNAL_FRESH_COMMENT + idCount + '-->' + inner;
+		return (
+			'<!--' +
+			(clientArm ? CLIENT_RENDER_ARM_COMMENT : NATIVE_SIGNAL_FRESH_COMMENT) +
+			idCount +
+			'-->' +
+			inner
+		);
 	};
 	const pendingForm = (): string => {
 		// A ViewTransition at the top of the FALLBACK arm exits when the boundary
@@ -11039,6 +11049,13 @@ export function ssrTry(
 					} else {
 						ID_COUNTER = entry.pendingIdOffset;
 					}
+				} else if (PERMANENT_STATIC_HYDRATE_DEPTH === 0 && bindingMarker === undefined) {
+					// A buffered render cannot finish this boundary in this pass. If the
+					// pass ships (renderToString cannot wait; prerender retries instead),
+					// its @pending arm goes out marked for a client render, as React
+					// marks a boundary it could not finish (`<!--$!-->`). A
+					// presentation-binding view adopts its pending arm instead.
+					nativeFresh = clientArm = true;
 				}
 				return pendingForm();
 			}

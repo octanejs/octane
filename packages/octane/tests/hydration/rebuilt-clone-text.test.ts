@@ -80,13 +80,15 @@ describe.each([
 		const outer = container.firstElementChild!;
 		const serverNodes = [...container.querySelectorAll('*')];
 		const recoverable: string[] = [];
+		const caught: unknown[] = [];
 		root = hydrateRoot(container, client[name], clientProps, {
 			onRecoverableError: (error: unknown) => recoverable.push((error as Error).message),
+			onCaughtError: (error: unknown) => caught.push(error),
 		});
 		flushSync(() => {});
 		// Recoverable reports are delivered after the hydration burst.
 		await act(async () => {});
-		return { outer, serverNodes, recoverable };
+		return { outer, serverNodes, recoverable, caught };
 	}
 
 	/** The dev warning for the Leaf's `<i>` where the server rendered `actual`. */
@@ -149,7 +151,47 @@ describe.each([
 
 		expect(markup(container.firstElementChild!)).toBe('<i>ok</i>');
 		expect(container.firstElementChild).toBe(outer);
-		expect(recoverable).toHaveLength(1);
+		expect(recoverable).toEqual([expect.stringMatching(/^The server could not finish/)]);
+	});
+
+	// As React's boundary does, the arm that the server left pending does not
+	// restart the throttle on revealing Suspense content when its client render
+	// shows `@pending`: it already counted as pending. Its data resolving
+	// outside act() reveals it at once, and the boundary reports once.
+	it('reveals the @try arm that the server left pending as soon as its client data resolves', async () => {
+		// The throttle is global: let an earlier test's reveal leave its window.
+		await new Promise((resolve) => setTimeout(resolve, 320));
+		container.innerHTML = ServerRT.renderToString(server.TryReader, {
+			value: new Promise<never>(() => {}),
+		}).html;
+		const outer = container.firstElementChild!;
+		const recoverable: string[] = [];
+		root = hydrateRoot(
+			container,
+			client.TryReader,
+			{ value: Promise.resolve('ok') },
+			{ onRecoverableError: (error: unknown) => recoverable.push((error as Error).message) },
+		);
+		expect(markup(outer)).toBe('<p>pending</p>');
+		await new Promise((resolve) => setTimeout(resolve, 0));
+
+		expect(markup(outer)).toBe('<i>ok</i>');
+		expect(container.firstElementChild).toBe(outer);
+		expect(recoverable).toEqual([expect.stringMatching(/^The server could not finish/)]);
+	});
+
+	// As in React, a client render that catches an error reports that alone.
+	it('reports only the caught error when the @try arm that the server left pending throws on the client', async () => {
+		const { outer, recoverable, caught } = await hydrate(
+			'TryCatchBranch',
+			{ value: new Promise<never>(() => {}) },
+			{ value: 'x' },
+		);
+
+		expect(markup(container.firstElementChild!)).toBe('<b>x</b>');
+		expect(container.firstElementChild).toBe(outer);
+		expect(caught).toEqual(['x']);
+		expect(recoverable).toEqual([]);
 	});
 
 	it('reports once when the owner of a sibling text hole falls back', async () => {

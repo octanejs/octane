@@ -311,6 +311,7 @@ type ClientErrorArguments = {
 	338: [];
 	339: [];
 	340: [];
+	341: [];
 };
 
 export function formatClientError<Code extends keyof ClientErrorArguments>(
@@ -1350,6 +1351,11 @@ export function formatClientError<Code extends keyof ClientErrorArguments>(
 			case 340:
 				return formatDevErrorMessage(
 					'There was an error while hydrating, so the nearest Suspense boundary, Hydrate island, or the root rendered on the client instead.',
+					args,
+				);
+			case 341:
+				return formatDevErrorMessage(
+					'The server could not finish this Suspense boundary, because it suspended during a synchronous render such as renderToString, which cannot wait for data. Switched to client rendering.',
 					args,
 				);
 			default:

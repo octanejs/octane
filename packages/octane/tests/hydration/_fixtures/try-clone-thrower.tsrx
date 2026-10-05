@@ -234,6 +234,13 @@ function Update(props: { set?: (show: boolean) => void }) @{
 	<span>{'update'}</span>
 }
 
+// The same, from a child that has state of its own.
+function StatefulUpdate(props: { set?: (show: boolean) => void }) @{
+	const [label] = useState('update');
+	if (props.set !== undefined) props.set(true);
+	<span>{label as string}</span>
+}
+
 // The update switches a hydrated try body to the Leaf arm.
 export function Rerender(props: PageProps) @{
 	const [show, setShow] = useState(false);
@@ -249,6 +256,24 @@ export function Rerender(props: PageProps) @{
 			<p class="caught">{String(error) as string}</p>
 		}
 		<Update set={props.update ? setShow : undefined} />
+		<button onClick={props.onAfter}>{'after'}</button>
+	</div>
+}
+
+export function RerenderStateful(props: PageProps) @{
+	const [show, setShow] = useState(false);
+	<div>
+		<h1>{'before'}</h1>
+		@try {
+			@if (show) {
+				<Leaf value={props.value} />
+			} @else {
+				<b class="server">{'server'}</b>
+			}
+		} @catch (error: unknown) {
+			<p class="caught">{String(error) as string}</p>
+		}
+		<StatefulUpdate set={props.update ? setShow : undefined} />
 		<button onClick={props.onAfter}>{'after'}</button>
 	</div>
 }

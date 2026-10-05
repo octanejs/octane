@@ -268,7 +268,9 @@ optional `head` and `signals` fields:
 
 A single **synchronous** pass, no awaiting. A Suspense boundary that suspends
 renders its `@pending` fallback; synchronously-resolved `use()` still seeds. Use
-`prerender` when you need the data awaited.
+`prerender` when you need the data awaited. As with React's `renderToString`,
+`hydrateRoot` renders a boundary the server left pending on the client, keeping
+the server DOM around it, and reports it once through `onRecoverableError`.
 
 ### `renderToStaticMarkup(component, props?, options?) => RenderResult` — `octane/server`
 
