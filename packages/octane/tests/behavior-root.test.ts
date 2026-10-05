@@ -688,6 +688,105 @@ describe('behavior-only roots', () => {
 	}
 
 	for (const dev of [false, true]) {
+		for (const server of ['stale', 'externally removed'] as const) {
+			const name =
+				server === 'stale'
+					? 'hands off an early host beside stale server content after hydration resumes'
+					: 'refuses an early host whose server neighbor was removed while hydration was suspended';
+			it(`${name} (${dev ? 'dev' : 'prod'})`, async () => {
+				const source = [
+					"import { useLayoutEffect } from 'octane';",
+					"import { unbound } from 'octane/behavior';",
+					"export function Host(props) @{ 'use dom bindings';",
+					'  <button data-state={props.label}>{unbound(props.children)}</button>',
+					'}',
+					'export const gate = { pending: undefined };',
+					'function read() { if (gate.pending !== undefined) throw gate.pending; return "done"; }',
+					'function Gate() @{ <i>{read()}</i> }',
+					'export function App(props) @{',
+					'  props.onRender();',
+					'  useLayoutEffect(() => { props.onCommit(); }, []);',
+					'  <section><Host label={props.label}><span>Hello</span></Host><Gate /></section>',
+					'}',
+				].join('\n');
+				let renders = 0;
+				const onCommit = vi.fn();
+				const initial = {
+					label: 'server',
+					onCommit,
+					onRender: () => {
+						if (++renders > 20) throw new Error('Hydration did not converge.');
+					},
+				};
+				const fixture = authoredPresentation('Host', { label: 'server' }, dev, source);
+				container.innerHTML = renderToString(fixture.server.App, initial).html;
+				const button = container.querySelector('button')!;
+				const extra = document.createElement('script');
+				extra.type = 'application/json';
+				extra.textContent = '{}';
+				button.after(extra);
+				const binding = fixture.attach(button, fixture.state);
+				const recoverable = vi.fn();
+				const uncaught = vi.fn();
+				try {
+					fixture.publish({ label: 'early' });
+					const client = fixture.loadClient();
+					let release!: () => void;
+					const pending = new Promise<void>((resolve) => (release = resolve));
+					client.gate.pending = pending;
+					hydratedRoot = hydrateRoot(
+						container,
+						client.App,
+						{ ...initial, label: 'hydrated' },
+						{
+							bindingLeases: [binding],
+							onRecoverableError: recoverable,
+							onUncaughtError: uncaught,
+						},
+					);
+					await act(() => {});
+					// The suspended attempt rolled back its recovery, restoring the stale
+					// neighbor. Removing that neighbor now is not hydration's repair.
+					expect(extra.isConnected).toBe(true);
+					expect(onCommit).not.toHaveBeenCalled();
+					expect(fixture.cleanup).not.toHaveBeenCalled();
+					if (server === 'externally removed') extra.remove();
+					client.gate.pending = undefined;
+					await act(async () => {
+						release();
+						await pending;
+					});
+					expect(container.querySelector('button')).toBe(button);
+					if (server === 'externally removed') {
+						// No hydrateRoot caller remains to receive the refusal.
+						expect(uncaught).toHaveBeenCalledOnce();
+						expect(String(uncaught.mock.calls[0]![0])).toMatch(
+							/supported fixed native view|Minified Octane error #75;/,
+						);
+						expect(onCommit).not.toHaveBeenCalled();
+						expect(fixture.cleanup).not.toHaveBeenCalled();
+						fixture.publish({ label: 'still early' });
+						expect(button.getAttribute('data-state')).toBe('still early');
+						return;
+					}
+					expect(uncaught).not.toHaveBeenCalled();
+					expect(recoverable).toHaveBeenCalledOnce();
+					expect(extra.isConnected).toBe(false);
+					expect(button.getAttribute('data-state')).toBe('hydrated');
+					expect(onCommit).toHaveBeenCalledOnce();
+					expect(fixture.cleanup).toHaveBeenCalledOnce();
+					fixture.publish({ label: 'retired' });
+					expect(button.getAttribute('data-state')).toBe('hydrated');
+				} finally {
+					hydratedRoot?.unmount();
+					hydratedRoot = undefined;
+					binding.dispose();
+				}
+			});
+		}
+	}
+
+	for (const dev of [false, true]) {
 		for (const styles of ['provider', 'single property', 'multiple properties', 'native reads']) {
 			it(`hands off a host with a known unbound provider spread and ${styles} styles (${dev ? 'dev' : 'prod'})`, () => {
 				const externalStyle =
