@@ -48,7 +48,6 @@ type ClientErrorArguments = {
 	53: [];
 	54: [];
 	55: [];
-	56: [];
 	58: [];
 	61: [];
 	62: [];
@@ -486,11 +485,6 @@ export function formatClientError<Code extends keyof ClientErrorArguments>(
 			case 55:
 				return formatDevErrorMessage(
 					'Hydration mismatch: the server rendered a different child shape where the client renders a component; the stale range was discarded and the component was built on the client.',
-					args,
-				);
-			case 56:
-				return formatDevErrorMessage(
-					'Hydration mismatch: the server rendered more list items than the client; the extra server items were discarded.',
 					args,
 				);
 			case 58:
