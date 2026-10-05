@@ -827,6 +827,101 @@ function collectRetiredSignalRetryOwners(
 			collectRetiredSignalRetryOwners(child, cache, retired, keep);
 }
 
+// Component, child and branch slots hold one occupant at a time, so a newer
+// attempt that renders one there proves every retained occupant with another
+// component, key or arm replaced. Try slots keep a primary beside their
+// fallback and list rows prune by key (trackSignalRetryListKeys); neither is
+// proven here.
+function signalRetrySoleKind(kind: unknown): boolean {
+	return (
+		kind === 'componentSlotSlot' ||
+		kind === 'childSlot' ||
+		kind === 'ifBlockSlot' ||
+		kind === 'switchBlockSlot'
+	);
+}
+
+function collectReplacedSignalRetryOccupants(
+	node: SignalRetryNode | undefined,
+	identity: unknown[],
+	cache: SignalRetryOwners,
+	retired: SignalRendererOwnerIdentity[],
+): void {
+	for (const token of identity) {
+		const children = node?.children;
+		if (children === undefined) return;
+		node = children.get(token);
+		for (const [key, child] of children) {
+			if (child === node) continue;
+			children.delete(key);
+			collectRetiredSignalRetryOwners(child, cache, retired);
+		}
+	}
+}
+
+interface SignalRetryVisit {
+	scope: Scope;
+	cache: SignalRetryOwners;
+	path: unknown[];
+}
+// Set when a fresh scope consults a retry cache; its render takes it.
+let SIGNAL_RETRY_VISIT: SignalRetryVisit | null = null;
+
+function takeSignalRetryVisit(scope: Scope): SignalRetryVisit | null {
+	const visit = SIGNAL_RETRY_VISIT;
+	SIGNAL_RETRY_VISIT = null;
+	return visit?.scope === scope ? visit : null;
+}
+
+// A fresh scope's first render proves what this attempt renders where it has
+// been. Its own path ends in the occupant identity of its parent's slot when
+// that segment is ['slot', index, kind, branch, component, key]; item and
+// scope segments cannot place a sole kind there. Every slot it created holds
+// this attempt's occupant: a fresh slot records its identity before anything
+// it renders can suspend, so this holds for one still rendering too. A
+// completed render that created no slot at an index renders nothing there; a
+// suspended one may not have reached it yet.
+function pruneSignalRetryVisit(visit: SignalRetryVisit, suspended: boolean): void {
+	const { scope, cache, path } = visit;
+	const retired: SignalRendererOwnerIdentity[] = [];
+	const tail = path.length - 4;
+	if (path[tail - 2] === 'slot' && signalRetrySoleKind(path[tail]))
+		collectReplacedSignalRetryOccupants(
+			signalRetryNode(cache, path.slice(0, tail), false),
+			path.slice(tail),
+			cache,
+			retired,
+		);
+	const slots = signalRetryNode(cache, path, false)?.children?.get('slot')?.children;
+	if (slots !== undefined) {
+		for (const [index, node] of slots) {
+			const slot = scope.slots[index as number];
+			if (slot === null || typeof slot !== 'object') {
+				if (suspended) continue;
+				slots.delete(index);
+				collectRetiredSignalRetryOwners(node, cache, retired);
+			} else if (signalRetrySoleKind(slot.__kind)) {
+				collectReplacedSignalRetryOccupants(
+					node,
+					slot.forSlot != null
+						? ['item']
+						: [
+								slot.__kind,
+								slot.branch,
+								slot.currentIsBodyFn ? undefined : slot.currentComp,
+								slot.prevKey,
+							],
+					cache,
+					retired,
+				);
+			}
+		}
+	}
+	// Remove every path/claim before abort callbacks can reenter rendering.
+	// A cache cleared meanwhile already retired its owners; retiring is idempotent.
+	for (const owner of retired) retireRendererSignalOwner(owner);
+}
+
 function trackSignalRetryListKeys<T>(
 	parent: Block,
 	state: ForSlot,
@@ -1083,6 +1178,7 @@ function scopeSignalOwner(scope: Scope | null): SignalOwner | undefined {
 		const boundary = signalRetryBoundary(scope.block);
 		const cache = boundary?.retrySignalOwners ?? root?.retrySignalOwners;
 		const retryRoot = boundary?.retrySignalOwners !== undefined ? boundary.tryBlock : root?.current;
+		let visit: SignalRetryVisit | null = null;
 		if (cache !== undefined && !retired && !scope.block.disposed && retryRoot != null) {
 			const path = signalRetryPath(scope, retryRoot);
 			const node = path === null ? undefined : signalRetryNode(cache, path, false);
@@ -1091,6 +1187,7 @@ function scopeSignalOwner(scope: Scope | null): SignalOwner | undefined {
 				node.owner = undefined;
 				cache.owners.delete(owner);
 			}
+			if (path !== null && !scope.mounted) visit = { scope, cache, path };
 		}
 		if (owner === undefined || owner.documentOwner !== documentOwner) {
 			const instanceKey = resolveSignalInstanceKey(scope);
@@ -1142,6 +1239,7 @@ function scopeSignalOwner(scope: Scope | null): SignalOwner | undefined {
 			owner = Object.freeze(identity);
 		}
 		SCOPE_SIGNAL_OWNERS.set(scope, owner);
+		if (visit !== null) SIGNAL_RETRY_VISIT = visit;
 		// A queued native bubble handler may outlive deletion and first enable
 		// signals afterwards. Its invocation must remain retired, not fall back
 		// to a document owner or create fresh instance state.
@@ -11014,6 +11112,7 @@ function captureRenderPhaseUpdate(cell: RenderPhaseCell, key: RenderPhaseSnapsho
 }
 
 export function renderBlock(block: Block): void {
+	let retryVisit: SignalRetryVisit | null = null;
 	if (signalDocumentEnabled || block.idState.renderOwner?.signalOwner !== undefined) {
 		const owner = scopeSignalOwner(block);
 		if (owner !== undefined) STREAMED_SIGNAL_OWNER_ACTIVATOR?.(owner);
@@ -11021,6 +11120,7 @@ export function renderBlock(block: Block): void {
 			runWithSignalOwner(owner, () => renderBlock(block));
 			return;
 		}
+		retryVisit = takeSignalRetryVisit(block);
 	}
 	const hydration = activeHydration();
 	// A replacement dynamic range owns client DOM even while its parent adopts
@@ -11031,6 +11131,8 @@ export function renderBlock(block: Block): void {
 		(!hydration.owns(block) ||
 			(block.kind === 'dynamic' && block.endMarker !== null && hydration.rebuilds(block.endMarker)))
 	) {
+		// The nested client build renders this block, so it takes the retry visit.
+		SIGNAL_RETRY_VISIT = retryVisit;
 		hydration.suspend(() => renderBlock(block));
 		return;
 	}
@@ -11047,6 +11149,7 @@ export function renderBlock(block: Block): void {
 			}
 			if (++retries > RENDER_PHASE_UPDATE_LIMIT) throw new Error(formatClientError(9));
 		}
+		if (retryVisit !== null) pruneSignalRetryVisit(retryVisit, false);
 		if (
 			signalDocumentEnabled &&
 			(block as any).__trySlot?.tryBlock === block &&
@@ -11071,6 +11174,8 @@ export function renderBlock(block: Block): void {
 			}
 			if (!block.crossRenderUpdate) block.pending = false;
 		}
+		// Prune before a discarded item retains this attempt's owners.
+		if (retryVisit !== null && isSuspenseException(error)) pruneSignalRetryVisit(retryVisit, true);
 		// A fresh item is linked only after its body succeeds. A boundary can
 		// catch this throw and commit fallback without rolling back the root, so
 		// the creation journal alone cannot clean up this otherwise-orphaned item.
@@ -12050,18 +12155,23 @@ export function componentSlotLite<P>(
 	let claimed: Node | null | undefined;
 	const outerClaim =
 		adoptedOpen === null ? undefined : hydration!.beginClaim(getNextSibling(adoptedOpen));
+	let retryVisit: SignalRetryVisit | null = null;
 	try {
 		if (signalDocumentEnabled || scope.block.idState.renderOwner?.signalOwner !== undefined) {
 			// Same owner-resolution order as runWithBlockSignalOwner, but the
 			// per-mount closure only exists when the owner actually changes.
 			const owner = scopeSignalOwner(scope);
 			if (owner !== undefined) STREAMED_SIGNAL_OWNER_ACTIVATOR?.(owner);
+			// A lite body renders in place, so its first render prunes here.
+			retryVisit = takeSignalRetryVisit(scope);
 			if (owner === undefined || currentSignalOwner() === owner) {
 				comp(props, scope, undefined);
 			} else runWithSignalOwner(owner, () => comp(props, scope, undefined));
 		} else comp(props, scope, undefined);
+		if (retryVisit !== null) pruneSignalRetryVisit(retryVisit, false);
 		if (!scope.mounted) scope.mounted = true;
 	} catch (error) {
+		if (retryVisit !== null && isSuspenseException(error)) pruneSignalRetryVisit(retryVisit, true);
 		profileDidThrow = true;
 		profileThrown = error;
 		throw error;
