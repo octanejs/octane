@@ -40836,8 +40836,10 @@ function renderInitialSuspenseHydration(state: TrySlot, initial: InitialSuspense
 		const parent = domNode(state.domParent);
 		journalRootChildren(parent);
 		previousHydration?.save(parent);
+		// This removes the arm's metadata too. Leave a streamed payload with its
+		// weak marker owner: a discarded enclosing attempt restores the marker
+		// and hydrates the arm from it again, and a commit drops both together.
 		removeRange(getNextSibling(state.start), state.end);
-		initial.consume?.();
 		noteRecoverableHydrationError(() => failure, state.parentBlock);
 		currentHydration = null;
 		try {

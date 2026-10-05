@@ -1,4 +1,4 @@
-import { Hydrate } from 'octane';
+import { Hydrate, use } from 'octane';
 import type { OctaneNode } from 'octane';
 import { unbound } from 'octane/behavior';
 import type { HydrateWhen } from 'octane/hydration';
@@ -97,6 +97,61 @@ export function SuspendedParent(props: ParentProps) @{
 			<p>{'pending'}</p>
 		}
 		<i>{'y'}</i>
+	</section>
+}
+
+export interface StreamedProps extends ParentProps {
+	gate: { pending: boolean; promise: Promise<void> };
+	load: () => Promise<string>;
+}
+
+function waitFor(gate: StreamedProps['gate']): string {
+	if (gate.pending) throw gate.promise;
+	return 'y';
+}
+
+function Later(props: { gate: StreamedProps['gate'] }) @{
+	<i>{waitFor(props.gate)}</i>
+}
+
+// The damaged range sits in a streamed Suspense arm beside the arm's server
+// data. Later suspends the attempt that encloses the arm after the arm has
+// recovered: an outer Suspense arm's attempt, or the root's.
+function StreamedArm(props: StreamedProps) @{
+	const value = use(props.load());
+	<div>
+		<output>{value}</output>
+		<PlainButton label={props.label} onPress={props.onPress}>
+			<span>{'Hello'}</span>
+		</PlainButton>
+	</div>
+}
+
+export function StreamedInSuspense(props: StreamedProps) @{
+	<section>
+		@try {
+			<article>
+				@try {
+					<StreamedArm {...props} />
+				} @pending {
+					<p>{'loading'}</p>
+				}
+				<Later gate={props.gate} />
+			</article>
+		} @pending {
+			<p>{'outer loading'}</p>
+		}
+	</section>
+}
+
+export function StreamedInRoot(props: StreamedProps) @{
+	<section>
+		@try {
+			<StreamedArm {...props} />
+		} @pending {
+			<p>{'loading'}</p>
+		}
+		<Later gate={props.gate} />
 	</section>
 }
 
