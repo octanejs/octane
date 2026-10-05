@@ -1085,17 +1085,47 @@ function retireDeclarationView(view: ScopedNode, record: DeclarationView): void 
 	view.flags = ReactiveFlags.Mutable | ReactiveFlags.Watching;
 }
 
+/**
+ * Whether committed readers could tell the view's result from the cell's. A
+ * render that redeclares a cell on every pass presents the same pending read or
+ * error through a new view each time, and publishing it would render those
+ * readers, and redeclare the cell, again without end. An equal result keeps the
+ * cell's own snapshot instead.
+ *
+ * Two pending results never share a waiting promise: each node waits on its own
+ * wakeup. The cell's wakeup follows the thenable its own evaluation threw, which
+ * is the view's only when the cell is current and read what the view read. Any
+ * other wakeup could resolve while the cell stays clean and pending, retrying
+ * suspended readers without end, so such a view publishes its own.
+ */
+function sameViewResult(node: ScopedNode, view: ScopedNode, state: NodeState): boolean {
+	const committed = node.state;
+	if (committed === undefined) return false;
+	if (sameState(committed, state)) return true;
+	if (
+		committed.snapshot.status !== 'pending' ||
+		state.snapshot.status !== 'pending' ||
+		node.flags & (ReactiveFlags.Dirty | ReactiveFlags.Pending) ||
+		!sameState(committed, { ...state, waiting: committed.waiting })
+	)
+		return false;
+	let link = node.deps;
+	for (let read = view.deps; read; read = read.nextDep) {
+		if (link === undefined || link.dep !== read.dep) return false;
+		link = link.nextDep;
+	}
+	return link === undefined;
+}
+
 /** The caller has already transferred producer authority from the view's binding. */
 export function promoteDeclarationView(view: ScopedNode, node: ScopedNode): void {
 	const record = declarationViews?.get(view);
 	if (record === undefined || record.retired || record.canonical !== node) return;
 	queued.delete(view);
+	const state = view.state;
+	const currentChanged = state !== undefined && !sameViewResult(node, view, state);
 	while (node.deps) graph.unlink(node.deps, node);
 	for (let link = view.deps; link; link = link.nextDep) graph.link(link.dep, node, ++trackingCycle);
-	const state = view.state;
-	const currentChanged =
-		state !== undefined &&
-		(node.state?.snapshot !== state.snapshot || !sameState(node.state, state));
 	const retainedChanged =
 		node.hasLast !== view.hasLast ||
 		!Object.is(node.last, view.last) ||
