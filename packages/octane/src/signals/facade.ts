@@ -458,9 +458,13 @@ export abstract class Descriptor<T, H extends SignalHandle<T>> implements OwnerB
 		)
 			return false;
 		try {
-			// Resolving declares this render's definition of the captured cell, as
-			// the closure's own read would.
-			return !isDeclarationView(this[SIGNAL_OWNER_RESOLVE](owner as Scope));
+			const token = readerOwner(this.owner, owner as Scope);
+			const target = resolveDescriptorOwner(this.site, token) as ScopeImpl;
+			// An alias may have read the cell even if this descriptor did not.
+			// Without a cell, reevaluate the closure: it may still guard this read,
+			// and keeping its old capture would select stale props on first use.
+			if (!target.nodes.has(this.key)) return false;
+			return !isDeclarationView(this.resolvedCell(target, token));
 		} catch {
 			return false;
 		}
