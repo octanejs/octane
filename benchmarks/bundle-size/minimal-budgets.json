@@ -67,7 +67,7 @@
   "suspense-transition": {
     "raw": 166446,
     "gzip": 53523,
-    "brotli": 46866
+    "brotli": 47180
   },
   "server-hooks": {
     "raw": 509,
@@ -132,7 +132,7 @@
   "binding-radix-esbuild": {
     "raw": 215596,
     "gzip": 69631,
-    "brotli": 60411
+    "brotli": 60695
   },
   "binding-floating-ui-vite": {
     "raw": 11095,
