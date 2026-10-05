@@ -1,5 +1,5 @@
-import { TauriUnavailableError } from '@octanejs/tauri';
-import { emit } from '@tauri-apps/api/event';
+import { TauriUnavailableError, type UseTauriEventOptions } from '@octanejs/tauri';
+import { emit, listen, type EventTarget as TauriEventTarget } from '@tauri-apps/api/event';
 import { clearMocks, mockIPC } from '@tauri-apps/api/mocks';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { BareEventReader, EventBoundary, ReportingEventReader } from '../_fixtures/commands.tsrx';
@@ -45,7 +45,169 @@ function deferredEventPlugin() {
 	};
 }
 
+function targetEventPlugin(deferred = false) {
+	const active = new Map<number, TauriEventTarget>();
+	const pendingListens: Array<() => void> = [];
+	mockIPC((cmd, args: any) => {
+		if (cmd === 'plugin:event|listen') {
+			const subscribe = () => {
+				active.set(args.handler, args.target);
+				return args.handler;
+			};
+			return deferred
+				? new Promise<number>((resolve) => pendingListens.push(() => resolve(subscribe())))
+				: subscribe();
+		}
+		if (cmd === 'plugin:event|unlisten') active.delete(args.eventId);
+		return null;
+	});
+	return {
+		targets: () => [...active.values()],
+		settleAll() {
+			for (const settle of pendingListens.splice(0)) settle();
+		},
+	};
+}
+
+type Target = NonNullable<UseTauriEventOptions['target']>;
+const targetChanges: Array<[string, Target, Target, TauriEventTarget, TauriEventTarget]> = [
+	[
+		'Any object to label',
+		{ kind: 'Any' },
+		'Any',
+		{ kind: 'Any' },
+		{ kind: 'AnyLabel', label: 'Any' },
+	],
+	[
+		'Any label to object',
+		'Any',
+		{ kind: 'Any' },
+		{ kind: 'AnyLabel', label: 'Any' },
+		{ kind: 'Any' },
+	],
+	[
+		'App object to label',
+		{ kind: 'App' },
+		'App',
+		{ kind: 'App' },
+		{ kind: 'AnyLabel', label: 'App' },
+	],
+	[
+		'App label to object',
+		'App',
+		{ kind: 'App' },
+		{ kind: 'AnyLabel', label: 'App' },
+		{ kind: 'App' },
+	],
+	[
+		'Window object to colon label',
+		{ kind: 'Window', label: 'main' },
+		'Window:main',
+		{ kind: 'Window', label: 'main' },
+		{ kind: 'AnyLabel', label: 'Window:main' },
+	],
+	[
+		'colon label to Window object',
+		'Window:main',
+		{ kind: 'Window', label: 'main' },
+		{ kind: 'AnyLabel', label: 'Window:main' },
+		{ kind: 'Window', label: 'main' },
+	],
+	[
+		'ordinary labels',
+		'first',
+		'second',
+		{ kind: 'AnyLabel', label: 'first' },
+		{ kind: 'AnyLabel', label: 'second' },
+	],
+];
+
 describe('useTauriEvent', () => {
+	it('uses the SDK host target distinction between string labels and target kinds', async () => {
+		const plugin = targetEventPlugin();
+		for (const [, initial, next, initialHost, nextHost] of targetChanges) {
+			for (const [target, expected] of [
+				[initial, initialHost],
+				[next, nextHost],
+			] as const) {
+				const stop = await listen('tick', () => {}, { target });
+				try {
+					expect(plugin.targets()).toEqual([expected]);
+				} finally {
+					await stop();
+					await flush();
+					expect(plugin.targets()).toEqual([]);
+				}
+			}
+		}
+	});
+
+	it.each(targetChanges)(
+		'retargets the host subscription for %s',
+		async (_name, initial, next, initialHost, nextHost) => {
+			const plugin = targetEventPlugin();
+			const onTick = vi.fn();
+			const result = mount(EventBoundary, { event: 'tick', target: initial, nonce: 0, onTick });
+			try {
+				await flush();
+				expect(plugin.targets()).toEqual([initialHost]);
+				result.update(EventBoundary, { event: 'tick', target: next, nonce: 1, onTick });
+				await flush();
+				expect(result.find('#reader').textContent).toBe('1');
+				expect(plugin.targets()).toEqual([nextHost]);
+			} finally {
+				result.unmount();
+				await flush();
+				expect(plugin.targets()).toEqual([]);
+			}
+		},
+	);
+
+	it.each<[string, Target, Target]>([
+		['string to object', 'main', { kind: 'AnyLabel', label: 'main' }],
+		['object to string', { kind: 'AnyLabel', label: 'main' }, 'main'],
+	])(
+		'preserves the requested host scope for equivalent labels (%s)',
+		async (_name, initial, next) => {
+			const plugin = targetEventPlugin();
+			const onTick = vi.fn();
+			const result = mount(EventBoundary, { event: 'tick', target: initial, onTick });
+			try {
+				await flush();
+				expect(plugin.targets()).toEqual([{ kind: 'AnyLabel', label: 'main' }]);
+				result.update(EventBoundary, { event: 'tick', target: next, nonce: 1, onTick });
+				await flush();
+				expect(result.find('#reader').textContent).toBe('1');
+				expect(plugin.targets()).toEqual([{ kind: 'AnyLabel', label: 'main' }]);
+			} finally {
+				result.unmount();
+				await flush();
+				expect(plugin.targets()).toEqual([]);
+			}
+		},
+	);
+
+	it('releases the old target when its listen resolves after retargeting', async () => {
+		const plugin = targetEventPlugin(true);
+		const onTick = vi.fn();
+		const result = mount(EventBoundary, { event: 'tick', target: { kind: 'Any' }, onTick });
+		try {
+			await flush();
+			expect(plugin.targets()).toEqual([]);
+			result.update(EventBoundary, { event: 'tick', target: 'Any', nonce: 1, onTick });
+			await flush();
+			expect(result.find('#reader').textContent).toBe('1');
+			plugin.settleAll();
+			await flush();
+			expect(plugin.targets()).toEqual([{ kind: 'AnyLabel', label: 'Any' }]);
+		} finally {
+			result.unmount();
+			plugin.settleAll();
+			await flush();
+			expect(plugin.targets()).toEqual([]);
+		}
+	});
+
 	it('delivers payloads to the current handler', async () => {
 		mockIPC(() => {}, { shouldMockEvents: true });
 		const onTick = vi.fn();
