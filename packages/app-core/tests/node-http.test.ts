@@ -10,10 +10,15 @@ import {
 import { createServer, request } from 'node:http';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { once } from 'node:events';
+import { EventEmitter, once } from 'node:events';
 import { createGunzip, gunzipSync } from 'node:zlib';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
-import { createNodeServer, sendWebResponse, serveStaticFile } from '../src/server/node-http.js';
+import {
+	createNodeServer,
+	nodeRequestToWebRequest,
+	sendWebResponse,
+	serveStaticFile,
+} from '../src/server/node-http.js';
 
 describe('serveStaticFile cache policy', () => {
 	let root: string;
@@ -596,5 +601,205 @@ describe('built-in Node server response headers', () => {
 			}).listen(0),
 		);
 		await expectCookieHeaders(origin);
+	});
+});
+
+describe('Node request origin behind a proxy', () => {
+	const trusted = { trustProxy: true };
+	const proxied = {
+		host: 'upstream.internal:3000',
+		'x-forwarded-proto': 'https',
+		'x-forwarded-host': 'app.example.com',
+	};
+
+	function requestUrl(
+		target: string,
+		headers: Record<string, string | string[]>,
+		options?: { trustProxy?: boolean },
+	) {
+		const incoming = Object.assign(new EventEmitter(), {
+			headers,
+			method: 'GET',
+			url: target,
+			aborted: false,
+			destroyed: false,
+			complete: true,
+		});
+		return nodeRequestToWebRequest(incoming as any, undefined, options).url;
+	}
+
+	it('keeps the direct connection origin unless trustProxy is enabled', () => {
+		const direct = 'http://upstream.internal:3000/sign-in?next=%2Fhome';
+		expect(requestUrl('/sign-in?next=%2Fhome', proxied)).toBe(direct);
+		expect(requestUrl('/sign-in?next=%2Fhome', proxied, { trustProxy: false })).toBe(direct);
+	});
+
+	it('takes the scheme and host from a trusted proxy', () => {
+		expect(requestUrl('/sign-in?next=%2Fhome', proxied, trusted)).toBe(
+			'https://app.example.com/sign-in?next=%2Fhome',
+		);
+		expect(
+			requestUrl(
+				'/api/auth/sign-in',
+				{ host: 'flowdular-test.vercel.app', 'x-forwarded-proto': 'https' },
+				trusted,
+			),
+		).toBe('https://flowdular-test.vercel.app/api/auth/sign-in');
+		expect(
+			requestUrl(
+				'/',
+				{ ...proxied, 'x-forwarded-proto': 'HTTPS', 'x-forwarded-host': 'app.example.com:443' },
+				trusted,
+			),
+		).toBe('https://app.example.com/');
+		expect(
+			requestUrl('/', { ...proxied, 'x-forwarded-host': 'app.example.com:8443' }, trusted),
+		).toBe('https://app.example.com:8443/');
+		expect(
+			requestUrl(
+				'/',
+				{ host: 'upstream', 'x-forwarded-proto': 'http', 'x-forwarded-host': '[2001:db8::1]:8080' },
+				trusted,
+			),
+		).toBe('http://[2001:db8::1]:8080/');
+	});
+
+	it('reads only the first entry of a multi-valued forwarded header', () => {
+		expect(
+			requestUrl(
+				'/',
+				{
+					host: 'upstream',
+					'x-forwarded-proto': 'https, http',
+					'x-forwarded-host': ' app.example.com , upstream',
+				},
+				trusted,
+			),
+		).toBe('https://app.example.com/');
+		expect(
+			requestUrl(
+				'/',
+				{
+					host: 'upstream',
+					'x-forwarded-proto': ['https', 'http'],
+					'x-forwarded-host': ['app.example.com', 'upstream'],
+				},
+				trusted,
+			),
+		).toBe('https://app.example.com/');
+		expect(
+			requestUrl(
+				'/',
+				{
+					host: 'upstream',
+					'x-forwarded-proto': ', https',
+					'x-forwarded-host': ', app.example.com',
+				},
+				trusted,
+			),
+		).toBe('http://upstream/');
+	});
+
+	it.each(['ftp', 'https:', 'https://evil.example', 'javascript', ''])(
+		'ignores the forwarded scheme %j',
+		(proto) => {
+			expect(
+				requestUrl('/a/b?c=1', { host: 'app.example.com', 'x-forwarded-proto': proto }, trusted),
+			).toBe('http://app.example.com/a/b?c=1');
+		},
+	);
+
+	it.each([
+		'evil.example/admin',
+		'evil.example?admin=1',
+		'evil.example#admin',
+		'user@evil.example',
+		'evil.example\\admin',
+		'evil example',
+		'évil.example',
+		'evil.example:',
+		'evil.example:99999',
+		'999.0.0.1',
+		'[::::]',
+		'[2001:db8::1',
+		'',
+	])('ignores the forwarded host %j without changing the path', (host) => {
+		expect(
+			requestUrl(
+				'/a/b?c=1',
+				{ host: 'app.example.com', 'x-forwarded-proto': 'https', 'x-forwarded-host': host },
+				trusted,
+			),
+		).toBe('https://app.example.com/a/b?c=1');
+	});
+
+	it.each(['/', '/a/b?c=1&d=%2F', '/%7Euser/a%20b?q=a+b', '/a/./b/../c', '/a//b', '*'])(
+		'keeps the path and query of %j under a trusted proxy',
+		(target) => {
+			const direct = new URL(requestUrl(target, { host: 'upstream.internal:3000' }));
+			const forwarded = new URL(requestUrl(target, proxied, trusted));
+			expect(forwarded.origin).toBe('https://app.example.com');
+			expect(forwarded.pathname + forwarded.search).toBe(direct.pathname + direct.search);
+		},
+	);
+
+	it('applies trustProxy to every request the built-in server handles', async () => {
+		const seen = async (options: { trustProxy?: boolean }) => {
+			const transport = createNodeServer((request) => new Response(request.url), options);
+			const listener = transport.listen(0);
+			await once(listener, 'listening');
+			const address = listener.address();
+			if (!address || typeof address === 'string') throw new Error('Node test server has no port');
+			try {
+				return await new Promise<{ status: number; port: number; body: string }>(
+					(resolve, reject) => {
+						const client = request(
+							{
+								host: '127.0.0.1',
+								port: address.port,
+								path: '/api/auth/sign-in?next=%2F',
+								method: 'POST',
+								agent: false,
+								// Raw header lines: Node joins the repeated forwarded headers.
+								headers: [
+									'Host',
+									`127.0.0.1:${address.port}`,
+									'X-Forwarded-Proto',
+									'https',
+									'X-Forwarded-Proto',
+									'http',
+									'X-Forwarded-Host',
+									'app.example.com',
+									'Content-Length',
+									'0',
+								],
+							},
+							(response) => {
+								let body = '';
+								response.setEncoding('utf8');
+								response.on('data', (chunk: string) => (body += chunk));
+								response.on('end', () =>
+									resolve({ status: response.statusCode ?? 0, port: address.port, body }),
+								);
+								response.on('error', reject);
+							},
+						);
+						client.on('error', reject);
+						client.end();
+					},
+				);
+			} finally {
+				const closed = once(listener, 'close');
+				transport.close();
+				await closed;
+			}
+		};
+
+		const direct = await seen({});
+		expect(direct.status).toBe(200);
+		expect(direct.body).toBe(`http://127.0.0.1:${direct.port}/api/auth/sign-in?next=%2F`);
+		const forwarded = await seen(trusted);
+		expect(forwarded.status).toBe(200);
+		expect(forwarded.body).toBe('https://app.example.com/api/auth/sign-in?next=%2F');
 	});
 });
