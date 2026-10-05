@@ -1088,11 +1088,19 @@ function onlyUses(ast, analysis, records, scopeRecords, local, omitted) {
 	return [...edges].filter(([, { from, to }]) => !reaches(to, from)).map(([call]) => call);
 }
 
-// Constructors and tag functions run code no call record names.
+// Constructors, tags and property reads can run code no call record names.
+// In particular an accessor (including one behind a Proxy) may call a hook;
+// two callers must not share that hook's slot.
 function evaluatesOpaqueCode(node) {
 	if (node === null || typeof node !== 'object') return false;
 	if (Array.isArray(node)) return node.some(evaluatesOpaqueCode);
-	if (node.type === 'NewExpression' || node.type === 'TaggedTemplateExpression') return true;
+	if (
+		node.type === 'NewExpression' ||
+		node.type === 'TaggedTemplateExpression' ||
+		node.type === 'MemberExpression' ||
+		node.type === 'OptionalMemberExpression'
+	)
+		return true;
 	for (const key in node) {
 		if (!AST_META_KEYS.has(key) && evaluatesOpaqueCode(node[key])) return true;
 	}
