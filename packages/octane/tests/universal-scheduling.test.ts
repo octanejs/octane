@@ -25,9 +25,11 @@ import {
 	useState,
 	useTransition,
 	type ObjectHostContainer,
+	type ObjectHostInstance,
 	type UniversalAsyncCommitTransport,
 	type UniversalRenderable,
 } from '../src/universal.js';
+import { CatchEffects, NestedCatchEffects } from './_fixtures/universal-catch-effects.object.tsrx';
 
 interface Deferred<T> {
 	readonly promise: Promise<T>;
@@ -1202,6 +1204,9 @@ describe('universal root error callbacks', () => {
 		return {
 			container,
 			root,
+			flushTurns(turns = 20) {
+				for (let count = 0; scheduled.length > 0 && count < turns; count++) scheduled.shift()!();
+			},
 			flushNext() {
 				const callback = scheduled.shift();
 				if (callback === undefined) throw new Error('Expected scheduled universal work.');
@@ -1227,6 +1232,196 @@ describe('universal root error callbacks', () => {
 		});
 		return { Scene, handles };
 	}
+
+	function findHost(
+		parent: { children: readonly ObjectHostInstance[] },
+		type: string,
+	): ObjectHostInstance | undefined {
+		for (const child of parent.children) {
+			if (child.type === type) return child;
+			const nested = findHost(child, type);
+			if (nested !== undefined) return nested;
+		}
+	}
+
+	function catchEffectsRoot() {
+		const caught: string[] = [];
+		const uncaught: string[] = [];
+		const lifecycle: string[] = [];
+		const mounted = errorCallbackRoot({
+			onCaughtError: (error) => caught.push(String(error)),
+			onUncaughtError: (error) => uncaught.push(String(error)),
+		});
+		return {
+			...mounted,
+			caught,
+			uncaught,
+			log: (entry: string) => lifecycle.push(entry),
+			cleanup() {
+				mounted.root.unmount();
+				mounted.flushAll();
+				expect(mounted.container.children).toEqual([]);
+				expect(
+					lifecycle
+						.filter((entry) => entry.startsWith('cleanup:'))
+						.map((entry) => entry.slice(8))
+						.sort(),
+				).toEqual(
+					lifecycle
+						.filter((entry) => entry.startsWith('mount:'))
+						.map((entry) => entry.slice(6))
+						.sort(),
+				);
+			},
+		};
+	}
+
+	it.each(['layout', 'passive', 'render'] as const)(
+		'routes a catch fallback %s error to its enclosing boundary',
+		(fallbackMode) => {
+			const run = catchEffectsRoot();
+			try {
+				run.root.render(NestedCatchEffects, { bodyMode: 'render', fallbackMode, log: run.log });
+				run.flushTurns();
+				expect(findHost(run.container, 'outer-fallback')?.props.error).toBe('Error: fallback');
+				expect(findHost(run.container, 'inner-fallback')).toBeUndefined();
+				expect(run.caught).toEqual(['Error: primary', 'Error: fallback']);
+				expect(run.uncaught).toEqual([]);
+				run.flushAll();
+				expect(run.caught).toEqual(['Error: primary', 'Error: fallback']);
+			} finally {
+				run.cleanup();
+			}
+		},
+	);
+
+	it.each(['layout', 'passive'] as const)(
+		'still catches a %s error in the normal body locally',
+		(bodyMode) => {
+			const run = catchEffectsRoot();
+			try {
+				run.root.render(NestedCatchEffects, { bodyMode, fallbackMode: 'none', log: run.log });
+				run.flushAll();
+				expect(findHost(run.container, 'inner-fallback')?.props.error).toBe('Error: primary');
+				expect(findHost(run.container, 'outer-fallback')).toBeUndefined();
+				expect(run.caught).toEqual(['Error: primary']);
+				expect(run.uncaught).toEqual([]);
+			} finally {
+				run.cleanup();
+			}
+		},
+	);
+
+	it.each(['layout', 'passive'] as const)(
+		'reports an uncaught fallback %s error without re-entering its own catch',
+		(fallbackMode) => {
+			const run = catchEffectsRoot();
+			try {
+				run.root.render(CatchEffects, { bodyMode: 'render', fallbackMode, log: run.log });
+				run.flushTurns();
+				expect(run.caught).toEqual(['Error: primary']);
+				expect(run.uncaught).toEqual(['Error: fallback']);
+				run.flushAll();
+				expect(run.uncaught).toEqual(['Error: fallback']);
+			} finally {
+				run.cleanup();
+			}
+		},
+	);
+
+	it.each(['layout', 'passive'] as const)(
+		'keeps sibling body %s errors in the same boundary before its fallback commits',
+		(bodyMode) => {
+			const run = catchEffectsRoot();
+			try {
+				run.root.render(NestedCatchEffects, {
+					bodyMode,
+					fallbackMode: 'none',
+					sibling: true,
+					log: run.log,
+				});
+				run.flushAll();
+				expect(findHost(run.container, 'inner-fallback')?.props.error).toBe('Error: sibling');
+				expect(findHost(run.container, 'outer-fallback')).toBeUndefined();
+				expect(run.caught).toEqual(['Error: primary', 'Error: sibling']);
+				expect(run.uncaught).toEqual([]);
+			} finally {
+				run.cleanup();
+			}
+		},
+	);
+
+	it.each(['layout-cleanup', 'passive-cleanup'] as const)(
+		'routes a catch fallback %s error to its enclosing boundary',
+		(fallbackMode) => {
+			const run = catchEffectsRoot();
+			try {
+				run.root.render(NestedCatchEffects, { bodyMode: 'render', fallbackMode, log: run.log });
+				run.flushAll();
+				expect(findHost(run.container, 'inner-fallback')?.props.error).toBe('Error: primary');
+				run.root.render(NestedCatchEffects, {
+					bodyMode: 'render',
+					fallbackMode: 'none',
+					log: run.log,
+				});
+				run.flushTurns();
+				expect(findHost(run.container, 'outer-fallback')?.props.error).toBe('Error: fallback');
+				expect(findHost(run.container, 'inner-fallback')).toBeUndefined();
+				expect(run.caught).toEqual(['Error: primary', 'Error: fallback']);
+				expect(run.uncaught).toEqual([]);
+				run.flushAll();
+				expect(run.caught).toEqual(['Error: primary', 'Error: fallback']);
+			} finally {
+				run.cleanup();
+			}
+		},
+	);
+
+	it.each(['layout-cleanup', 'passive-cleanup'] as const)(
+		'still catches a %s error in the normal body locally',
+		(bodyMode) => {
+			const run = catchEffectsRoot();
+			try {
+				run.root.render(NestedCatchEffects, { bodyMode, fallbackMode: 'none', log: run.log });
+				run.flushAll();
+				run.root.render(NestedCatchEffects, {
+					bodyMode: 'none',
+					fallbackMode: 'none',
+					log: run.log,
+				});
+				run.flushAll();
+				expect(findHost(run.container, 'inner-fallback')?.props.error).toBe('Error: primary');
+				expect(findHost(run.container, 'outer-fallback')).toBeUndefined();
+				expect(run.caught).toEqual(['Error: primary']);
+				expect(run.uncaught).toEqual([]);
+			} finally {
+				run.cleanup();
+			}
+		},
+	);
+
+	it('recovers through the public catch reset after a body effect error', () => {
+		const run = catchEffectsRoot();
+		try {
+			run.root.render(NestedCatchEffects, {
+				bodyMode: 'passive',
+				fallbackMode: 'none',
+				log: run.log,
+			});
+			run.flushAll();
+			const fallback = findHost(run.container, 'inner-fallback')!;
+			expect(fallback.props.error).toBe('Error: primary');
+			run.root.render(NestedCatchEffects, { bodyMode: 'none', fallbackMode: 'none', log: run.log });
+			run.container.dispatchEvent(fallback, 'press', undefined);
+			run.flushAll();
+			expect(findHost(run.container, 'inner-fallback')).toBeUndefined();
+			expect(findHost(run.container, 'content')?.props.name).toBe('primary');
+			expect(run.caught).toEqual(['Error: primary']);
+			expect(run.uncaught).toEqual([]);
+		} finally {
+			run.cleanup();
+		}
+	});
 
 	it('onUncaughtError consumes an unhandled scheduled render error and keeps the root recoverable', () => {
 		const errors: unknown[] = [];

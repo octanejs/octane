@@ -7722,8 +7722,14 @@ function reportUniversalUncaughtError(root: UniversalRootImpl<any, any>, err: un
 }
 
 function routeUniversalOwnerError(owner: UniversalOwnerRecord, error: unknown): boolean {
-	for (let current = owner.parent; current !== null; current = current.parent) {
-		if (!current.isBoundary || current.disposed) continue;
+	for (
+		let child = owner, current = owner.parent;
+		current !== null;
+		child = current, current = current.parent
+	) {
+		// The direct child's key identifies the lexical arm, even while a boundary
+		// has a pending error or a replacement draft. A catch cannot catch itself.
+		if (!current.isBoundary || current.disposed || child.key === 'catch') continue;
 		current.boundaryThenable = null;
 		current.boundaryError = error;
 		current.hasBoundaryError = true;
