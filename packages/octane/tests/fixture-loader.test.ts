@@ -10,7 +10,7 @@
  */
 import { describe, expect, it } from 'vitest';
 import { mount } from './_helpers.js';
-import { loadCompiledFixtureSource } from './_server-fixture.js';
+import { evaluateCompiledFixtureCode, loadCompiledFixtureSource } from './_server-fixture.js';
 
 // Two exported components where the second renders the first by name; both
 // are single-root, so the compiled module tail references both names.
@@ -45,6 +45,19 @@ describe('loadCompiledFixtureSource', () => {
 			},
 		);
 		expect(mod.readValue()).toBe(42);
+	});
+
+	it('evaluates a bundled chunk whose exports are one trailing list', () => {
+		const mod = evaluateCompiledFixtureCode(
+			"import { useState } from 'octane';\n" +
+				'function read() { return typeof useState; }\nconst answer = 42;\n' +
+				'export { answer as default, read };\n',
+			'/src/bundled-chunk.js',
+			'client',
+			undefined,
+		);
+		expect(mod.default).toBe(42);
+		expect(mod.read()).toBe('function');
 	});
 
 	it('rejects an external import that was not explicitly supplied', () => {
