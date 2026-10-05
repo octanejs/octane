@@ -186,10 +186,12 @@ test('immutable primitive locals omit optional value adapters in client and SSR 
 				for (const extension of ['tsrx', 'tsx']) {
 					for (const { setup, primitive, prefix = '' } of cases) {
 						const source = `${prefix}\nexport function View(props) ${extension === 'tsrx' ? '@' : ''}{${setup}${extension === 'tsx' ? 'return ' : ''}<section><output title={value}>{value as string}</output><input value={value}/></section>${extension === 'tsx' ? ';' : ''}}`;
+						// Opaque locals carry handles only where opaque handles are admitted.
 						const { code } = compile(source, `/project/primitive-local-values.${extension}`, {
 							mode,
 							dev,
 							hmr: false,
+							opaqueSignalHandles: true,
 						});
 						const calls = optimizationCalls(code);
 						const description = `${mode}/${dev}/${extension}: ${setup}`;
