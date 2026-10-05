@@ -16,6 +16,7 @@ import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } 
 import {
 	createNodeServer,
 	nodeRequestToWebRequest,
+	nodeRequestUrl,
 	sendWebResponse,
 	serveStaticFile,
 } from '../src/server/node-http.js';
@@ -56,6 +57,17 @@ describe('serveStaticFile cache policy', () => {
 
 	it('keeps root public files revalidatable', () => {
 		expect(cacheControl('/robots.txt')).toBe('public, max-age=0, must-revalidate');
+	});
+
+	it('keeps a leading //host in the static file path', () => {
+		const serve = (url: string) =>
+			serveStaticFile(
+				{ method: 'HEAD', url } as any,
+				{ statusCode: 0, setHeader: vi.fn(), end: vi.fn() } as any,
+				root,
+			);
+		expect(serve('//evil.example/robots.txt')).toBe(false);
+		expect(serve('/robots.txt')).toBe(true);
 	});
 });
 
@@ -801,5 +813,88 @@ describe('Node request origin behind a proxy', () => {
 		const forwarded = await seen(trusted);
 		expect(forwarded.status).toBe(200);
 		expect(forwarded.body).toBe('https://app.example.com/api/auth/sign-in?next=%2F');
+	});
+});
+
+describe('Node request targets', () => {
+	function incoming(target: string, host = 'app.example:3000') {
+		return Object.assign(new EventEmitter(), {
+			headers: { host },
+			method: 'GET',
+			url: target,
+			aborted: false,
+			destroyed: false,
+			complete: true,
+		}) as any;
+	}
+
+	function requestUrl(target: string, host?: string) {
+		const url = nodeRequestToWebRequest(incoming(target, host)).url;
+		expect(nodeRequestUrl(incoming(target, host)).href).toBe(url);
+		return url;
+	}
+
+	it.each([
+		['//evil.example/x', 'http://app.example:3000//evil.example/x'],
+		['///x', 'http://app.example:3000///x'],
+		['//evil.example?x', 'http://app.example:3000//evil.example?x'],
+		['/\\evil.example/x', 'http://app.example:3000//evil.example/x'],
+		[
+			'//user@evil.example:8080/x?next=%2F',
+			'http://app.example:3000//user@evil.example:8080/x?next=%2F',
+		],
+		['/%2F%2Fevil.example', 'http://app.example:3000/%2F%2Fevil.example'],
+		['/%5Cevil.example/x', 'http://app.example:3000/%5Cevil.example/x'],
+		['/sign-in?next=//evil.example/x', 'http://app.example:3000/sign-in?next=//evil.example/x'],
+		['/a//b/?q=1&r=%2F', 'http://app.example:3000/a//b/?q=1&r=%2F'],
+	])('keeps the origin-form target %j as a path on the Host origin', (target, expected) => {
+		expect(requestUrl(target)).toBe(expected);
+	});
+
+	it.each([
+		['https://abs.example/p?q=1', 'https://abs.example/p?q=1'],
+		['HTTP://Abs.Example/p', 'http://abs.example/p'],
+		['https://app.example//evil.example/x', 'https://app.example//evil.example/x'],
+	])('keeps the origin of the http(s) absolute-form target %j', (target, expected) => {
+		expect(requestUrl(target)).toBe(expected);
+	});
+
+	it.each([
+		['*', 'http://app.example:3000/*'],
+		['ftp://evil.example/x', 'http://app.example:3000/ftp://evil.example/x'],
+	])('reads the target %j as a path under the root', (target, expected) => {
+		expect(requestUrl(target)).toBe(expected);
+	});
+
+	it('takes only the host from the Host header', () => {
+		expect(requestUrl('/x?y=1', 'app.example/admin')).toBe('http://app.example/x?y=1');
+	});
+
+	it('keeps the whole path on the origin from a trusted proxy', () => {
+		const proxied = incoming('//evil.example/x?next=%2F', 'upstream.internal:3000');
+		Object.assign(proxied.headers, {
+			'x-forwarded-proto': 'https',
+			'x-forwarded-host': 'app.example.com',
+		});
+		const expected = 'https://app.example.com//evil.example/x?next=%2F';
+		expect(nodeRequestToWebRequest(proxied, undefined, { trustProxy: true }).url).toBe(expected);
+		expect(nodeRequestUrl(proxied, { trustProxy: true }).href).toBe(expected);
+	});
+
+	it('gives the built-in server handler the whole request path', async () => {
+		const transport = createNodeServer((request) => new Response(request.url));
+		const listener = transport.listen(0);
+		await once(listener, 'listening');
+		const address = listener.address();
+		if (!address || typeof address === 'string') throw new Error('Node test server has no port');
+		try {
+			const origin = `http://127.0.0.1:${address.port}`;
+			const response = await fetch(`${origin}//evil.example/x?next=%2F`);
+			expect(await response.text()).toBe(`${origin}//evil.example/x?next=%2F`);
+		} finally {
+			const closed = once(listener, 'close');
+			transport.close();
+			await closed;
+		}
 	});
 });
