@@ -514,6 +514,12 @@ policy applies to Vite, Rsbuild, and generated Node or Web Worker servers.
 - Server-compiled components are string emitters: static HTML interleaved with
   helper calls for dynamic holes, wrapped in `<!--[-->`/`<!--]-->` hydration
   markers that the client cursor walks during `hydrateRoot`.
+- The server closes every range it opens. When something removes a closing
+  marker before the page hydrates, such as an HTML minifier or proxy that
+  strips comments, the client cannot tell where that range ends. The nearest
+  Suspense or `<Hydrate>` boundary around it, or else the root, renders on the
+  client instead of adopting the server HTML, and `onRecoverableError` reports
+  it once (error #338). Keep comments when minifying server-rendered HTML.
 - `<Activity mode="visible">` renders its children normally. A hidden Activity
   does not evaluate or serialize its children on the server; hydratable output
   retains only an empty internal range so `hydrateRoot` can build the preserved

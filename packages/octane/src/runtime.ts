@@ -16389,8 +16389,10 @@ function activateHydrateBoundary(state: HydrateSlot): void {
 	}
 	if (nativeRecovery !== undefined) {
 		// The exact historical demand changed between server output and island
-		// activation. Roll back every uncommitted child before mounting this one
-		// island live; an application @catch must never receive this control flow.
+		// activation, or the island's server HTML lost a range marker
+		// (UnclosedHydrationRange). Roll back every uncommitted child before
+		// mounting this one island live; an application @catch must never receive
+		// this control flow.
 		noteRecoverableHydrationError(() => nativeRecovery!, block);
 		state.serverPreserved = false;
 		state.initialCaptures = null;
@@ -23574,11 +23576,14 @@ function isEmptyTextSlot(node: Node | null): node is Comment {
  * Returns the open marker to adopt, or null when there's nothing to adopt (a
  * genuine fresh client mount, e.g. the server rendered the slot empty).
  */
-/** From a block-open `<!--[-->`, the matching `<!--]-->` (depth-tracked). */
+/**
+ * From a block-open `<!--[-->`, the matching `<!--]-->` (depth-tracked).
+ * Throws UnclosedHydrationRange when the parent ends first.
+ */
 function findMatchingClose(open: Node, matches: WeakMap<Node, Comment>): Comment {
 	let nested: Comment[] | null = null;
-	let node: Node = getNextSibling(open) as Node;
-	for (;;) {
+	let node: Node | null = getNextSibling(open);
+	while (node !== null) {
 		if (node.nodeType === 8) {
 			const data = (STAGED_DOM?.view(node as Comment) ?? (node as Comment)).data;
 			let close = data === HYDRATION_END;
@@ -23602,7 +23607,29 @@ function findMatchingClose(open: Node, matches: WeakMap<Node, Comment>): Comment
 				(nested ??= []).push(node as Comment);
 			}
 		}
-		node = getNextSibling(node) as Node;
+		node = getNextSibling(node);
+	}
+	throw new UnclosedHydrationRange();
+}
+
+/**
+ * A server range has no closing marker. The server closes every range it
+ * opens, so something changed its HTML after rendering, for example a
+ * minifier or proxy that strips comments. No close in the parent can be
+ * trusted then, and no extent guessed for the range is safe: one that ends too
+ * late discards static template content after it, one that ends too early
+ * leaves server nodes no slot claims. The nearest owner whose own range is
+ * intact, a Suspense or Hydrate boundary or else the root, discards its
+ * attempt and renders on the client instead, reporting this error as
+ * recoverable. It is the same control flow as a native adoption miss, which
+ * application boundaries already pass through and every hydration owner
+ * already recovers from; extending it keeps client-only bundles unchanged.
+ */
+class UnclosedHydrationRange extends NativeAdoptionMiss {
+	constructor() {
+		super('', '');
+		this.name = 'UnclosedHydrationRange';
+		this.message = formatClientError(338);
 	}
 }
 
@@ -40687,6 +40714,25 @@ function renderInitialSuspenseHydration(state: TrySlot, initial: InitialSuspense
 		return;
 	}
 	initialSuspenseHydrations?.delete(state);
+	if (failure instanceof UnclosedHydrationRange) {
+		// The arm's own close matched before this attempt, so the damaged range
+		// lies inside it: render the arm on the client, as a Hydrate boundary
+		// does, rather than fail a root that may have committed already.
+		const parent = domNode(state.domParent);
+		journalRootChildren(parent);
+		previousHydration?.save(parent);
+		removeRange(getNextSibling(state.start), state.end);
+		initial.consume?.();
+		noteRecoverableHydrationError(() => failure, state.parentBlock);
+		currentHydration = null;
+		try {
+			mountTry(state);
+		} finally {
+			currentHydration = previousHydration;
+			if (previousHydration !== null) previousHydration.node = getNextSibling(state.end);
+		}
+		return;
+	}
 	if (isAdoptionControl(failure) || isHostContextRequest(failure)) throw failure;
 	const adoptServerCatch = hydration.isRejection(failure);
 	// A server rejection already rendered the catch arm in this range. Adopt
@@ -49468,21 +49514,6 @@ function hydrateRootWithOutputHandler(
 				});
 			};
 		}
-		if (
-			firstNode?.nodeType === 8 &&
-			(STAGED_DOM?.view(firstNode as Comment) ?? (firstNode as Comment)).data ===
-				(body as ComponentBody & { [BINDING_VIEW_ROOT]?: string })[BINDING_VIEW_ROOT]
-		) {
-			// A marked entry view has one compiler-owned root pair, even when its
-			// authored output is initially empty. Only that exact entry may consume
-			// it: an unmarked parent may begin with a marked child's own range.
-			rootBlock.startMarker = firstNode;
-			rootBlock.endMarker = hydration.close(firstNode);
-			// A sole child component must not claim this entry's own closing marker
-			// as an unmatched sibling for finishRoot() to remove.
-			hydration.claimRootRemainder(getNextSibling(rootBlock.endMarker));
-			hydration.node = getNextSibling(firstNode);
-		}
 		if (nativeManifest !== undefined)
 			hydration.nativeAdoption = ownNativeAdoption(rootBlock, nativeManifest);
 		hydration.passthroughRoot = hydration.passthroughRanges =
@@ -49495,6 +49526,22 @@ function hydrateRootWithOutputHandler(
 		let completed = false;
 		let nativeRecovery: NativeAdoptionMiss | undefined;
 		try {
+			if (
+				firstNode?.nodeType === 8 &&
+				(STAGED_DOM?.view(firstNode as Comment) ?? (firstNode as Comment)).data ===
+					(body as ComponentBody & { [BINDING_VIEW_ROOT]?: string })[BINDING_VIEW_ROOT]
+			) {
+				// A marked entry view has one compiler-owned root pair, even when its
+				// authored output is initially empty. Only that exact entry may consume
+				// it: an unmarked parent may begin with a marked child's own range. Its
+				// close is matched inside the attempt, which recovers a missing one.
+				rootBlock.startMarker = firstNode;
+				rootBlock.endMarker = hydration.close(firstNode);
+				// A sole child component must not claim this entry's own closing marker
+				// as an unmatched sibling for finishRoot() to remove.
+				hydration.claimRootRemainder(getNextSibling(rootBlock.endMarker));
+				hydration.node = getNextSibling(firstNode);
+			}
 			renderBlock(rootBlock);
 			drainHydrationRenderPhaseUpdates(rootBlock);
 			// Mount empty server Activities only after every adopted sibling has

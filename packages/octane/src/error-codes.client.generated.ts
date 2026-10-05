@@ -316,6 +316,7 @@ type ClientErrorArguments = {
 	331: [];
 	336: [unknown];
 	337: [];
+	338: [];
 };
 
 export function formatClientError<Code extends keyof ClientErrorArguments>(
@@ -1380,6 +1381,11 @@ export function formatClientError<Code extends keyof ClientErrorArguments>(
 			case 337:
 				return formatDevErrorMessage(
 					'Structural hydration leases do not support @try regions.',
+					args,
+				);
+			case 338:
+				return formatDevErrorMessage(
+					'Hydration mismatch: a server-rendered range had no closing marker, so the client rendered the boundary or root that contains it instead. Something changed the server HTML after rendering, for example an HTML minifier or proxy that strips comments.',
 					args,
 				);
 			default:

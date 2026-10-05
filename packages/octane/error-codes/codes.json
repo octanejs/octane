@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "nextCode": 338,
+  "nextCode": 339,
   "codes": {
     "1": {
       "message": "Maximum update depth exceeded. Octane limits the number of nested updates to prevent infinite loops.",
@@ -2020,6 +2020,12 @@
     },
     "337": {
       "message": "Structural hydration leases do not support @try regions.",
+      "argumentCount": 0,
+      "runtime": ["client"],
+      "status": "active"
+    },
+    "338": {
+      "message": "Hydration mismatch: a server-rendered range had no closing marker, so the client rendered the boundary or root that contains it instead. Something changed the server HTML after rendering, for example an HTML minifier or proxy that strips comments.",
       "argumentCount": 0,
       "runtime": ["client"],
       "status": "active"
