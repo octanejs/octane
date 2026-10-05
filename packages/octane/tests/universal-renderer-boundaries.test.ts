@@ -659,7 +659,7 @@ describe('compiler-owned renderer child regions', () => {
 			let mounted: ReturnType<typeof mount> | undefined;
 			try {
 				mounted = mount(ProjectedBoundaryApp, { root, resource: resource.promise });
-				await vi.advanceTimersByTimeAsync(100);
+				await vi.advanceTimersByTimeAsync(20);
 				resource.resolve('staged scene');
 				await resource.promise;
 				await flushBridgeWork();
@@ -677,7 +677,7 @@ describe('compiler-owned renderer child regions', () => {
 					expect(container.children).toHaveLength(1);
 					expect(container.children[0].props.value).toBe('new owner');
 				} else {
-					await vi.advanceTimersByTimeAsync(199);
+					await vi.advanceTimersByTimeAsync(79);
 					expect(mounted.find('.projected-pending').textContent).toBe('pending');
 					expect(container.children).toEqual([]);
 					await vi.advanceTimersByTimeAsync(1);

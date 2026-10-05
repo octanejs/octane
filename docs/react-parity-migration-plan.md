@@ -658,8 +658,8 @@ while an Action is in flight.
 - **#5 reveal throttling — prior dismissal superseded (2026-08-21).** An
   `act()`-driven immediate reveal is not a production-timing oracle: React
   explicitly bypasses the retry delay in that scope. Retry-only commits use a
-  shared 300ms recent-fallback window, while already-visible transition content
-  is held without a timeout. See the corrected
+  shared recent-fallback window: 100ms in Octane and 300ms in React, while
+  already-visible transition content is held without a timeout. See the corrected
   [retry-timing audit](../packages/octane/audit/SUSPENSE_DIVERGENCE.md#5-retry-reveal-throttling--distinct-from-transition-shell-retention)
   and the same-fixture React/Octane tests in
   `packages/octane/tests/differential/suspense-timing.test.ts`.

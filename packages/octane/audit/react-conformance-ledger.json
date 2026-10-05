@@ -24483,7 +24483,7 @@
       "classification": "adaptable",
       "owner": "runtime",
       "workstream": "React reconciler residual audit",
-      "rationale": "Public-DOM adaptation of the bounded nested fallback wait, compared against ReactDOM 19.2.7 with both Octane compile modes. When the parent resolves at 100ms but nested data stays pending, its content and the inner fallback reveal at 300ms rather than waiting indefinitely. The nested content then observes the new retry window when it resolves.",
+      "rationale": "Public-DOM adaptation of the bounded nested fallback wait, compared against ReactDOM 19.2.7 with both Octane compile modes. When the parent resolves early but nested data stays pending, its content and the inner fallback reveal at the retry deadline (100ms in Octane, 300ms in React). The nested content then observes the new retry window when it resolves.",
       "evidence": [
         {
           "file": "packages/octane/tests/differential/suspense-timing.test.ts",
@@ -70263,7 +70263,7 @@
       "evidence": [
         {
           "file": "packages/octane/tests/differential/suspense-timing.test.ts",
-          "testName": "keeps a fallback visible when data resolves at 100ms, then reveals at 300ms",
+          "testName": "keeps a fallback visible until its retry window, then reveals ready content",
           "modes": ["client", "production-compile"]
         },
         {

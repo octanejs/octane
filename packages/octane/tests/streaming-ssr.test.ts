@@ -706,7 +706,7 @@ describe('renderToPipeableStream — chunk protocol', () => {
 					};
 					// Observe only connected, visible controls: a completed primary may
 					// already exist hidden alongside the fallback while its commit waits.
-					const beforeUpdate = await observeAfter(100);
+					const beforeUpdate = await observeAfter(20);
 					if (withSibling) {
 						expect(container.querySelector('#stream-sibling-pending')?.textContent).toBe(
 							'Loading sibling',
@@ -729,14 +729,14 @@ describe('renderToPipeableStream — chunk protocol', () => {
 					// primary visible, or authorize replay into its loading control.
 					expect(onHydrated).not.toHaveBeenCalled();
 					expect(onClick).not.toHaveBeenCalled();
-					expect([beforeUpdate, await observeAfter(199), await observeAfter(1)]).toEqual([
-						{ time: 100, content: ['Loading streamed content'], hydrated: 0, clicks: 0 },
-						{ time: 299, content: ['Loading streamed content'], hydrated: 0, clicks: 0 },
-						{ time: 300, content: [recoveredValue], hydrated: 1, clicks: 1 },
+					expect([beforeUpdate, await observeAfter(79), await observeAfter(1)]).toEqual([
+						{ time: 20, content: ['Loading streamed content'], hydrated: 0, clicks: 0 },
+						{ time: 99, content: ['Loading streamed content'], hydrated: 0, clicks: 0 },
+						{ time: 100, content: [recoveredValue], hydrated: 1, clicks: 1 },
 					]);
 					expect(deliveries).toEqual([
-						{ event: 'hydrated', time: 300, value: recoveredValue },
-						{ event: 'click', time: 300, value: recoveredValue },
+						{ event: 'hydrated', time: 100, value: recoveredValue },
+						{ event: 'click', time: 100, value: recoveredValue },
 					]);
 				} else {
 					await act(() => clientValue.resolve('Client recovery'));
