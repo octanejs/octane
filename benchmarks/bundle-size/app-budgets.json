@@ -19,7 +19,7 @@
   "todo": {
     "app": {
       "raw": 4843,
-      "gzip": 2364,
+      "gzip": 2362,
       "brotli": 2245
     },
     "framework": {
@@ -46,7 +46,7 @@
     },
     "total": {
       "raw": 129597,
-      "gzip": 43125,
+      "gzip": 43158,
       "brotli": 38211
     }
   },
@@ -71,7 +71,7 @@
     "app": {
       "raw": 354842,
       "gzip": 121403,
-      "brotli": 101812
+      "brotli": 101791
     },
     "framework": {
       "raw": 360502,
