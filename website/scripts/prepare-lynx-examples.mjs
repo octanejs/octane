@@ -122,6 +122,7 @@ function siteOrigin() {
 	// changed.
 	if (process.env.VERCEL_ENV === 'production') return 'https://octanejs.dev';
 	if (process.env.VERCEL_URL) return `https://${process.env.VERCEL_URL}`;
+	if (process.env.WORKERS_CI_BRANCH === 'main') return 'https://octanejs.dev';
 	return null;
 }
 

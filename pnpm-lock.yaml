@@ -11055,6 +11055,9 @@ importers:
       '@modelcontextprotocol/sdk':
         specifier: ^1.21.0
         version: 1.29.0(supports-color@10.2.2)(zod@4.4.3)
+      '@octanejs/adapter-cloudflare':
+        specifier: workspace:*
+        version: link:../packages/adapter-cloudflare
       '@octanejs/adapter-vercel':
         specifier: workspace:*
         version: link:../packages/adapter-vercel
@@ -11071,6 +11074,9 @@ importers:
         specifier: ^4.4.3
         version: 4.4.3
     devDependencies:
+      miniflare:
+        specifier: catalog:default
+        version: 4.20260714.0(bufferutil@4.1.0)(utf-8-validate@5.0.10)
       typescript:
         specifier: catalog:default
         version: 5.9.3
