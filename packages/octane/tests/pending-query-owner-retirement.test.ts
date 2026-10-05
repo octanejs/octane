@@ -303,3 +303,45 @@ export function App(props: { ownerKey: string; load: Load }) @{
 		}
 	},
 );
+
+it.each([false, true])(
+	'keeps a pending query in a hole its owner has not reached until the attempt completes (dev=%s)',
+	async (dev) => {
+		const App = compileTsrx(
+			'later-use',
+			`type Props = { show: boolean; wait: Promise<string> | null; load: Load };
+function Owner(props: Props) @{
+	<section>
+		{props.show ? <Field id="inner" load={props.load}/> : null}
+		<i>{(props.wait === null ? 'open' : use(props.wait)) as string}</i>
+	</section>
+}
+export function App(props: Props) @{
+	<Suspense fallback={<u>waiting</u>}><Owner {...props}/></Suspense>
+}`,
+			dev,
+		);
+		const { pending, load } = requests();
+		let open!: (value: string) => void;
+		const wait = new Promise<string>((resolve) => (open = resolve));
+		const container = document.createElement('div');
+		document.body.append(container);
+		const root = createRoot(container);
+		try {
+			await act(() => root.render(App, { show: true, wait: null, load }));
+			expect(pending.map(({ id }) => id)).toEqual(['inner']);
+			// Owner's text binding suspends before its render reaches the hole.
+			await act(() => root.render(App, { show: false, wait, load }));
+			expect(container.querySelector('u')?.textContent).toBe('waiting');
+			expect(pending[0]!.signal.aborted).toBe(false);
+			// The completed attempt renders no Field there.
+			await act(() => open('opened'));
+			expect(container.querySelector('section')?.textContent).toBe('opened');
+			expect(pending).toHaveLength(1);
+			expect(pending[0]!.signal.aborted).toBe(true);
+		} finally {
+			root.unmount();
+			container.remove();
+		}
+	},
+);

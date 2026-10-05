@@ -865,7 +865,8 @@ let SIGNAL_RETRY_VISIT: SignalRetryVisit | null = null;
 // been. Its own path ends in the occupant identity of its parent's slot when
 // that segment is ['slot', index, kind, branch, component, key]; item and
 // scope segments cannot place a sole kind there. Every slot it created holds
-// this attempt's occupant, except one still rendering when it suspended. A
+// this attempt's occupant: a fresh slot records its identity before anything
+// it renders can suspend, so this holds for one still rendering too. A
 // completed render that created no slot at an index renders nothing there; a
 // suspended one may not have reached it yet.
 function pruneSignalRetryVisit(visit: SignalRetryVisit, suspended: boolean): void {
@@ -880,8 +881,6 @@ function pruneSignalRetryVisit(visit: SignalRetryVisit, suspended: boolean): voi
 			retired,
 		);
 	const slots = signalRetryNode(cache, path, false)?.children?.get('slot')?.children;
-	const created = scope._slots;
-	const rendering = suspended ? created?.[created.length - 1] : undefined;
 	if (slots !== undefined) {
 		for (const [index, node] of slots) {
 			const slot = scope.slots[index as number];
@@ -889,7 +888,7 @@ function pruneSignalRetryVisit(visit: SignalRetryVisit, suspended: boolean): voi
 				if (suspended) continue;
 				slots.delete(index);
 				collectRetiredSignalRetryOwners(node, cache, retired);
-			} else if (slot !== rendering && signalRetrySoleKind(slot.__kind)) {
+			} else if (signalRetrySoleKind(slot.__kind)) {
 				collectReplacedSignalRetryOccupants(
 					node,
 					slot.forSlot != null
