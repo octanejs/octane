@@ -2237,16 +2237,13 @@ describe('Vercel preview workflow', () => {
 		assert.match(writtenComments.at(-1).body, /URL pending/);
 	});
 
-	test('keeps production automatic and delegates labeled previews to the Vercel GitHub App', () => {
+	test('disables automatic Git deployments for both websites', () => {
 		for (const config of [websiteVercelConfig, mcpVercelConfig]) {
-			assert.deepEqual(config.git.deploymentEnabled, {
-				'*': false,
-				'**': false,
-				main: true,
-				'deploy-preview-pr-*': true,
-			});
+			assert.equal(config.git.deploymentEnabled, false);
 		}
+	});
 
+	test('publishes labeled preview branches and reports their deployment status', () => {
 		assert.match(
 			vercelPreviewWorkflow,
 			/on:\n {2}pull_request_target:\n {4}types: \[labeled, unlabeled, closed\]/,
