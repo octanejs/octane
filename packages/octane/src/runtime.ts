@@ -1431,10 +1431,15 @@ function scheduleNativeRead(target: Block): void {
 	// Native reads belong to a versioned publication frame. Invalidating an
 	// already-held primary retries that frame coherently; it does not supersede
 	// the user's transition like an urgent hook/store update.
-	const retainPriority = SCHEDULED_VISIBILITY_DRIVER?.holdsNativeRead(target) === true;
+	const retainPriority = !!SCHEDULED_VISIBILITY_DRIVER?.holdsNativeRead(target);
 	if (retainPriority) TRANSITION_DEPTH++;
 	try {
-		scheduleRender(target);
+		// A notification delivered during a flush, such as an accepted render
+		// publishing its redeclared derived$ or query$, is a consequence of that
+		// flush. Like an update from a layout effect, it spends the flush's
+		// nested-update budget, so a render whose acceptance changes what it reads
+		// fails with the depth error instead of rendering again without end.
+		scheduleRender(target, inFlush);
 	} finally {
 		if (retainPriority) TRANSITION_DEPTH--;
 	}
@@ -6912,23 +6917,38 @@ function inNestedUpdateCallback(): boolean {
 class MaximumUpdateDepthError extends Error {}
 
 // Development attribution for a block whose nested-update budget was spent by a
-// layout snapshot that changed on every pass. Tagged with its update chain so a
-// later, unrelated loop on the same block keeps the generic message.
-let LAYOUT_SNAPSHOT_DIVERGENCE: WeakMap<
+// layout snapshot that changed on every pass, or by signals its accepted renders
+// changed (cell null). Tagged with its update chain so a later, unrelated loop
+// on the same block keeps the generic message.
+let UPDATE_DEPTH_CAUSES: WeakMap<
 	Block,
-	{ cell: object; chain: number; message: string }
+	{ cell: object | null; chain: number; message: string }
 > | null = null;
 
 function maximumUpdateDepthError(block?: Block): Error {
 	const error = new MaximumUpdateDepthError(formatClientError(1));
 	if (process.env.NODE_ENV !== 'production' && block !== undefined) {
-		const divergence = LAYOUT_SNAPSHOT_DIVERGENCE?.get(block);
-		if (divergence !== undefined) {
-			LAYOUT_SNAPSHOT_DIVERGENCE!.delete(block);
-			if (divergence.chain === block.nestedUpdateChain) error.message += ` ${divergence.message}`;
+		const cause = UPDATE_DEPTH_CAUSES?.get(block);
+		if (cause !== undefined) {
+			UPDATE_DEPTH_CAUSES!.delete(block);
+			if (cause.chain === block.nestedUpdateChain) error.message += ` ${cause.message}`;
 		}
 	}
 	return error;
+}
+
+function attributeSignalUpdateDepth(block: Block): void {
+	const source = componentSourceLoc(block.body);
+	(UPDATE_DEPTH_CAUSES ??= new WeakMap()).set(block, {
+		cell: null,
+		chain: block.nestedUpdateChain,
+		message:
+			`Signals read by ${componentName(block)}${source ? ` (${source})` : ''} changed every time ` +
+			'its render was accepted. A component-local derived$ or query$ runs again on every render ' +
+			'when it captures a value created during render, such as an inline object or function, and ' +
+			'a result that never compares equal, such as a new object or error, notifies its readers ' +
+			'again. Create the captured value outside the component or keep it stable across renders.',
+	});
 }
 
 let CROSS_RENDER_WARNINGS: WeakMap<ComponentBody, WeakSet<ComponentBody>> | null = null;
@@ -6959,7 +6979,8 @@ function warnCrossComponentRenderUpdate(target: Block, source: Block): void {
 	);
 }
 
-function scheduleRender(block: Block): void {
+/** `flushed`: a signal notification delivered during a flush (see scheduleNativeRead). */
+function scheduleRender(block: Block, flushed?: boolean): void {
 	if (block.disposed) return;
 	if (process.env.NODE_ENV !== 'production' && CURRENT_EFFECT_PHASE === INSERTION) {
 		console.error(
@@ -7035,7 +7056,7 @@ function scheduleRender(block: Block): void {
 		// passive effect calls from a post-paint or act() drain still does: its
 		// callback runs before inFlush is set.
 		countPassiveUpdate(block);
-	} else if (inNestedUpdateCallback()) {
+	} else if (flushed || inNestedUpdateCallback()) {
 		NESTED_UPDATE_SCHEDULED = true;
 		if (block.nestedUpdateChain !== NESTED_UPDATE_CHAIN_ID) {
 			block.nestedUpdateChain = NESTED_UPDATE_CHAIN_ID;
@@ -7058,6 +7079,7 @@ function scheduleRender(block: Block): void {
 			} else {
 				HELD_PASSIVE_CHAIN = -1;
 				block.nestedUpdateError = true;
+				if (process.env.NODE_ENV !== 'production' && flushed) attributeSignalUpdateDepth(block);
 			}
 		}
 	} else if (CURRENT_BLOCK === null) {
@@ -13767,7 +13789,7 @@ function countLayoutSnapshotChange(cell: object, block: Block): void {
 	// the nested-update budget. The generic depth error reports it.
 	if (++record.count === NESTED_UPDATE_LIMIT) {
 		const source = componentSourceLoc(block.body);
-		(LAYOUT_SNAPSHOT_DIVERGENCE ??= new WeakMap()).set(block, {
+		(UPDATE_DEPTH_CAUSES ??= new WeakMap()).set(block, {
 			cell,
 			chain: NESTED_UPDATE_CHAIN_ID,
 			message: `useLayoutSnapshot in ${componentName(block)}${source ? ` (${source})` : ''} did not converge.`,
@@ -13779,8 +13801,7 @@ function settleLayoutSnapshot(cell: object, block: Block): void {
 	const record = LAYOUT_SNAPSHOT_CHANGES?.get(cell);
 	if (record === undefined) return;
 	LAYOUT_SNAPSHOT_CHANGES!.delete(cell);
-	if (LAYOUT_SNAPSHOT_DIVERGENCE?.get(block)?.cell === cell)
-		LAYOUT_SNAPSHOT_DIVERGENCE.delete(block);
+	if (UPDATE_DEPTH_CAUSES?.get(block)?.cell === cell) UPDATE_DEPTH_CAUSES.delete(block);
 }
 
 /** Read a value from the committed layout and publish changes before paint. */
