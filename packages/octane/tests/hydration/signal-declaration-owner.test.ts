@@ -114,7 +114,7 @@ async function mountClient(
 		requests,
 		signals,
 		texts: () => [...container.querySelectorAll('output')].map((node) => node.textContent),
-		settle: (value: string) => client.act(() => requests[0]!(value)),
+		settle: (value: string, index = 0) => client.act(() => requests[index]!(value)),
 		settleAll: (value: string) =>
 			client.act(async () => {
 				for (const resolve of requests) resolve(value);
@@ -529,6 +529,30 @@ export function App(props) @{
 			value: 'derived$(compute$)',
 			callback: 'compute$',
 		},
+		'a nested named producer inside an arrow': {
+			setup:
+				'const compute$ = () => { const inner$ = () => record$.get(); return derived$(inner$).get(); };',
+			value: 'derived$(compute$)',
+			callback: '() => record$.get()',
+		},
+		'a nested named producer inside a declaration': {
+			setup:
+				'function compute$() { function inner$() { return record$.get(); } return derived$(inner$).get(); }',
+			value: 'derived$(compute$)',
+			callback: '() => record$.get()',
+		},
+		'an outside producer read by an arrow and forwarded as a callback': {
+			setup:
+				'const inner$ = () => record$.get(); const compute$ = () => { record$.get(); return derived$(inner$).get(); };',
+			value: 'derived$(compute$)',
+			callback: 'inner$',
+		},
+		'an outside producer read by a declaration and forwarded as a callback': {
+			setup:
+				'function inner$() { return record$.get(); } function compute$() { record$.get(); return derived$(inner$).get(); }',
+			value: 'derived$(compute$)',
+			callback: 'inner$',
+		},
 		'a named query selector shared with a callback': {
 			setup: 'const compute$ = () => record$.get();',
 			value: 'query$(compute$, async (selection) => selection)',
@@ -558,7 +582,7 @@ export function App(props) @{
 		},
 	};
 
-	function producerSource(producer: (typeof PRODUCERS)[keyof typeof PRODUCERS]) {
+	function producerSource(producer: (typeof PRODUCERS)[keyof typeof PRODUCERS], readers = 1) {
 		return `import { derived$, query$ } from 'octane/signals';
 function Reader(props) @{
  <>
@@ -571,7 +595,10 @@ export function App(props) @{
  ${producer.setup}
  const selected$ = ${producer.value};
  @try {
-  <section><output>{record$.get() as string}</output><Reader selected$={selected$} read={${producer.callback}} /></section>
+  <section><output>{record$.get() as string}</output>${Array.from(
+		{ length: readers },
+		() => `<Reader selected$={selected$} read={${producer.callback}} />`,
+	).join('')}</section>
  } @pending {
   <i>waiting</i>
  }
@@ -585,13 +612,17 @@ export function App(props) @{
 	)(
 		'keeps $kind reader-owned beside a forwarded callback ($name)',
 		async ({ producer, dev, strong }) => {
-			const view = await mountClient(producerSource(producer), { dev, strong });
+			const view = await mountClient(producerSource(producer, 2), { dev, strong });
 			try {
-				await view.settleAll('ready');
-				await view.settleAll('ready');
-				expect(view.texts()).toEqual(['ready', 'ready', 'ready']);
-				// The parent's query and the child's own derived cell's query.
-				expect(view.requests).toHaveLength(2);
+				await view.settle('parent');
+				await view.settle('left', 1);
+				// Each reader must start its own query, even when a nested
+				// producer is compiled inside the producer it receives.
+				expect(view.requests).toHaveLength(3);
+				await view.settle('right', 2);
+				await view.flush();
+				expect(view.texts()).toEqual(['parent', 'left', 'parent', 'right', 'parent']);
+				expect(view.requests).toHaveLength(3);
 			} finally {
 				view.unmount();
 			}

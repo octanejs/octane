@@ -396,17 +396,18 @@ function lexicalOwners(root) {
 	return owners;
 }
 
-function mapAst(node, replace, parent = null, key = null) {
+function mapAst(node, replace, onCopy = null, parent = null, key = null) {
 	if (node === null || typeof node !== 'object') return node;
 	if (Array.isArray(node)) {
 		let out = null;
 		for (let i = 0; i < node.length; i++) {
-			const mapped = mapAst(node[i], replace, parent, key);
+			const mapped = mapAst(node[i], replace, onCopy, parent, key);
 			if (out === null && mapped !== node[i]) out = node.slice(0, i);
 			if (out !== null) out.push(mapped);
 		}
 		return out ?? node;
 	}
+	const original = node;
 	const replacement = replace(node, parent, key);
 	if (replacement !== null) node = replacement;
 	let out = null;
@@ -414,13 +415,15 @@ function mapAst(node, replace, parent = null, key = null) {
 		if (AST_METADATA.has(key) || key.startsWith('_octane')) continue;
 		const child = node[key];
 		if (child === null || typeof child !== 'object') continue;
-		const mapped = mapAst(child, replace, node, key);
+		const mapped = mapAst(child, replace, onCopy, node, key);
 		if (mapped !== child) {
 			out ??= { ...node };
 			out[key] = mapped;
 		}
 	}
-	return out ?? node;
+	const result = out ?? node;
+	if (result !== original) onCopy?.(result, original);
+	return result;
 }
 
 function propertyName(member) {
@@ -562,9 +565,7 @@ function declaredUses(ast, lexical, owners, trusted, usedNames) {
 			node.type === 'CallExpression' || node.type === 'OptionalCallExpression'
 				? unwrapExpression(node.callee)
 				: null;
-		// Parentheses and type assertions around a factory still make a producer.
-		const imported =
-			callee == null ? null : trusted(callee === node.callee ? node : { ...node, callee });
+		const imported = callee == null ? null : trusted(node);
 		const factory =
 			callee == null
 				? null
@@ -630,7 +631,7 @@ function declaredUses(ast, lexical, owners, trusted, usedNames) {
 			name = allocateName(usedNames, `_$${id.name}Producer$`);
 			producers.set(declaration, name);
 		}
-		producerArguments.set(argument, name);
+		producerArguments.set(argument, { name, declaration });
 	}
 	return { uses, producers, producerArguments };
 }
@@ -707,7 +708,9 @@ export function lowerSignalDeclarations(ast, filename, options) {
 	// lowered helpers, or null for any other call.
 	function trustedFactory(node) {
 		if (node.type !== 'CallExpression' && node.type !== 'OptionalCallExpression') return null;
-		const callee = node.callee;
+		// Parentheses and type assertions preserve the trusted import and its
+		// declaration, as well as the ownership of its producer arguments.
+		const callee = unwrapExpression(node.callee);
 		const scope = lexical.nodeScopes.get(callee) ?? lexical.rootScope;
 		if (callee?.type === 'Identifier') {
 			const record = namedImports.get(callee.name);
@@ -772,10 +775,28 @@ export function lowerSignalDeclarations(ast, filename, options) {
 			: declaredUses(ast, lexical, owners, trustedFactory, usedNames);
 	const revision =
 		options?.hmr && captures.size > 0 ? b.id(allocateName(usedNames, HMR_REVISION)) : null;
+	const copyReaderUse = (child, fn) => {
+		const declaration = producerArguments.get(child)?.declaration;
+		// A declaration copied within this producer is already reader-owned.
+		// An outside declaration still needs its separate producer version.
+		return (
+			uses.has(child) ||
+			(declaration !== undefined && declaration.start >= fn.start && declaration.end <= fn.end)
+		);
+	};
+	const inheritCallAnalysis = (copy, original) => {
+		if (original.type !== 'CallExpression' && original.type !== 'OptionalCallExpression') return;
+		// A copied call still declares the same authored site. Keep its owner
+		// and captures when replacing an argument rebuilt the call's ancestors.
+		const owner = owners.get(original);
+		if (owner !== undefined) owners.set(copy, owner);
+		const listed = captures.get(original);
+		if (listed !== undefined) captures.set(copy, listed);
+	};
 
 	let lowered = mapAst(ast, (node) => {
 		const producer = producerArguments.get(node);
-		if (producer !== undefined) return inheritHookMemoOrigin(b.id(producer), node);
+		if (producer !== undefined) return inheritHookMemoOrigin(b.id(producer.name), node);
 		if (node.type === 'VariableDeclaration') {
 			let list = null;
 			for (const declarator of node.declarations) {
@@ -784,7 +805,11 @@ export function lowerSignalDeclarations(ast, filename, options) {
 				list ??= node.declarations.slice(0, node.declarations.indexOf(declarator));
 				list.push(declarator);
 				if (name !== undefined) {
-					const init = mapAst(declarator.init, (child) => (uses.has(child) ? { ...child } : null));
+					const init = mapAst(
+						declarator.init,
+						(child) => (copyReaderUse(child, declarator.init) ? { ...child } : null),
+						inheritCallAnalysis,
+					);
 					list.push({ ...declarator, id: inheritHookMemoOrigin(b.id(name), declarator.id), init });
 				}
 			}
@@ -798,11 +823,15 @@ export function lowerSignalDeclarations(ast, filename, options) {
 				list ??= node.body.slice(0, node.body.indexOf(statement));
 				list.push(statement);
 				if (name !== undefined) {
-					const copy = mapAst(statement, (child, parent, key) => {
-						if (producerSelfReference(child, parent, key, statement, lexical))
-							return inheritHookMemoOrigin(b.id(name), child);
-						return uses.has(child) ? { ...child } : null;
-					});
+					const copy = mapAst(
+						statement,
+						(child, parent, key) => {
+							if (producerSelfReference(child, parent, key, statement, lexical))
+								return inheritHookMemoOrigin(b.id(name), child);
+							return copyReaderUse(child, statement) ? { ...child } : null;
+						},
+						inheritCallAnalysis,
+					);
 					list.push({ ...copy, id: inheritHookMemoOrigin(b.id(name), statement.id) });
 				}
 			}
@@ -915,7 +944,7 @@ export function signalDeclarationSourceEdits(ast, filename, source, options) {
 	// lowered helpers, or null for any other call.
 	const trustedFactory = (node) => {
 		if (node.type !== 'CallExpression' && node.type !== 'OptionalCallExpression') return null;
-		const callee = node.callee;
+		const callee = unwrapExpression(node.callee);
 		const scope = lexical.nodeScopes.get(callee) ?? lexical.rootScope;
 		if (callee?.type === 'Identifier') {
 			const record = namedImports.get(callee.name);
@@ -991,7 +1020,7 @@ export function signalDeclarationSourceEdits(ast, filename, source, options) {
 			trustedFactory,
 			usedNames,
 		);
-		for (const [argument, name] of producerArguments)
+		for (const [argument, { name }] of producerArguments)
 			edits.push({ pos: argument.start, end: argument.end, text: name });
 		for (const [declaration, name] of producers) {
 			const fn = declaration.type === 'FunctionDeclaration' ? declaration : declaration.init;
