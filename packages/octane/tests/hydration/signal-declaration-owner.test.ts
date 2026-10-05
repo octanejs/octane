@@ -81,6 +81,7 @@ async function mountClient(
 	props: Record<string, unknown> = {},
 	// Plain modules the fixture imports, compiled against this render's runtime.
 	plainModules: Record<string, string> = {},
+	withExplicitScope = false,
 ) {
 	vi.resetModules();
 	const client = await import('../../src/runtime.js');
@@ -105,7 +106,10 @@ async function mountClient(
 	const load = () => new Promise<string>((resolve) => requests.push(resolve));
 	const container = document.createElement('div');
 	const root = client.createRoot(container);
-	await client.act(() => root.render(module.App, { ...PROPS, load, ...props }));
+	const scope = withExplicitScope
+		? signals.createScope({ scopeKey: 'explicit-producer' })
+		: undefined;
+	await client.act(() => root.render(module.App, { ...PROPS, load, scope, ...props }));
 	return {
 		requests,
 		signals,
@@ -127,13 +131,17 @@ async function mountClient(
 		flush: () => client.act(drainProducers),
 		update: (next: Record<string, unknown>) =>
 			client.flushSync(() => root.render(module.App, { ...PROPS, load, ...props, ...next })),
-		unmount: () => root.unmount(),
+		unmount: () => {
+			root.unmount();
+			scope?.dispose();
+		},
 	};
 }
 
 async function hydrateServerOutput(
 	text: string,
 	options: { dev: boolean; strong: boolean; adoptsOutput: boolean },
+	requests = 1,
 ) {
 	vi.resetModules();
 	const server = await import('../../src/runtime.server.js');
@@ -168,7 +176,7 @@ async function hydrateServerOutput(
 			{ ...PROPS, load: serverLoad },
 			{ streamedSignals },
 		);
-		expect(serverLoad).toHaveBeenCalledTimes(1);
+		expect(serverLoad).toHaveBeenCalledTimes(requests);
 		container.innerHTML = output.html;
 		activateStreamedMarkup(container);
 		const outputs = [...container.querySelectorAll('output')];
@@ -506,20 +514,52 @@ export function App(props) @{
 	// parent's callback still reads the parent's derived value. A wrapped
 	// factory callee is still a producer.
 	const PRODUCERS = {
-		'a derived producer': 'derived$(() => record$.get())',
-		'a wrapped derived producer':
-			"(derived$ as typeof derived$)(() => record$.get(), { key: 'selected' })",
+		'a derived producer': {
+			setup: '',
+			value: 'derived$(() => record$.get())',
+			callback: '() => selected$.get()',
+		},
+		'a wrapped derived producer': {
+			setup: '',
+			value: "(derived$ as typeof derived$)(() => record$.get(), { key: 'selected' })",
+			callback: '() => selected$.get()',
+		},
+		'a named producer shared with a callback': {
+			setup: 'const compute$ = () => record$.get();',
+			value: 'derived$(compute$)',
+			callback: 'compute$',
+		},
+		'a named query selector shared with a callback': {
+			setup: 'const compute$ = () => record$.get();',
+			value: 'query$(compute$, async (selection) => selection)',
+			callback: 'compute$',
+		},
+		'a function declaration shared with a callback': {
+			setup: 'function compute$() { return record$.get(); }',
+			value: 'derived$(compute$)',
+			callback: 'compute$',
+		},
+		'a recursive function declaration shared with a callback': {
+			setup:
+				'function compute$(depth = 1) { return depth > 0 ? compute$(depth - 1) : record$.get(); }',
+			value: 'derived$(compute$)',
+			callback: 'compute$',
+		},
+		'a named function expression shared with a callback': {
+			setup: 'const compute$ = function read$() { return record$.get(); };',
+			value: 'derived$(compute$)',
+			callback: 'compute$',
+		},
+		'a named producer called in a shadowing block': {
+			setup: 'const compute$ = () => record$.get();',
+			value:
+				"(() => { const record$ = query$(() => 'shadow', props.load); return derived$(compute$); })()",
+			callback: 'compute$',
+		},
 	};
 
-	it.each(
-		MODES.flatMap((mode) =>
-			Object.entries(PRODUCERS).map(([kind, producer]) => ({ kind, producer, ...mode })),
-		),
-	)(
-		'keeps $kind reader-owned beside a forwarded callback ($name)',
-		async ({ producer, dev, strong }) => {
-			const view = await mountClient(
-				`import { derived$, query$ } from 'octane/signals';
+	function producerSource(producer: (typeof PRODUCERS)[keyof typeof PRODUCERS]) {
+		return `import { derived$, query$ } from 'octane/signals';
 function Reader(props) @{
  <>
   <output>{props.selected$.get() as string}</output>
@@ -528,15 +568,24 @@ function Reader(props) @{
 }
 export function App(props) @{
  const record$ = query$(() => 'record', props.load);
- const selected$ = ${producer};
+ ${producer.setup}
+ const selected$ = ${producer.value};
  @try {
-  <section><output>{selected$.get() as string}</output><Reader selected$={selected$} read={() => selected$.get()} /></section>
+  <section><output>{record$.get() as string}</output><Reader selected$={selected$} read={${producer.callback}} /></section>
  } @pending {
   <i>waiting</i>
  }
-}`,
-				{ dev, strong },
-			);
+}`;
+	}
+
+	it.each(
+		MODES.flatMap((mode) =>
+			Object.entries(PRODUCERS).map(([kind, producer]) => ({ kind, producer, ...mode })),
+		),
+	)(
+		'keeps $kind reader-owned beside a forwarded callback ($name)',
+		async ({ producer, dev, strong }) => {
+			const view = await mountClient(producerSource(producer), { dev, strong });
 			try {
 				await view.settleAll('ready');
 				await view.settleAll('ready');
@@ -549,6 +598,139 @@ export function App(props) @{
 		},
 	);
 
+	it.each(
+		MODES.flatMap((mode) =>
+			['() => record$.get()', 'compute$'].map((producer) => ({ ...mode, producer })),
+		),
+	)(
+		'keeps an explicit scope $producer reader-owned when created by an event ($name)',
+		async ({ producer, dev, strong }) => {
+			const view = await mountClient(
+				`import { useState } from 'octane';
+import { query$ } from 'octane/signals';
+function Reader(props) @{
+ <>
+ <output>{props.selected$.get() as string}</output>
+ <output>{props.read() as string}</output>
+ </>
+}
+export function App(props) @{
+ const record$ = query$(() => 'record', props.load);
+ const compute$ = () => record$.get();
+ const [selected$, setSelected] = useState(null);
+ <section>
+ <button onClick={() => setSelected(props.scope.derived$('selection', ${producer}))}>create</button>
+ @try {
+  <div><output>{record$.get() as string}</output>
+   @if (selected$) { <Reader selected$={selected$} read={compute$} /> }
+  </div>
+ } @pending { <i>waiting</i> }
+ </section>
+}`,
+				{ dev, strong },
+				{},
+				{},
+				true,
+			);
+			try {
+				await view.settleAll('ready');
+				view.click('button');
+				await view.settleAll('ready');
+				await view.settleAll('ready');
+				expect(view.texts()).toEqual(['ready', 'ready', 'ready']);
+				expect(view.requests).toHaveLength(2);
+			} finally {
+				view.unmount();
+			}
+		},
+	);
+
+	it.each(MODES)(
+		'hydrates a named producer and its declaring callback ($name)',
+		async ({ dev, strong }) => {
+			await hydrateServerOutput(
+				producerSource(PRODUCERS['a named producer shared with a callback']),
+				{ dev, strong, adoptsOutput: true },
+				2,
+			);
+		},
+	);
+
+	it.each(
+		MODES.flatMap((mode) => [
+			{ ...mode, body: 'return record$.get();', kind: 'direct' },
+			{
+				...mode,
+				body: 'const inner$ = derived$(() => record$.get()); return inner$.get();',
+				kind: 'nested declaration',
+			},
+		]),
+	)(
+		'keeps a $kind plain-hook named producer separate from its forwarded callback ($name)',
+		async (mode) => {
+			const view = await mountClient(
+				`
+import { useSelection$ } from './use-selection';
+function Reader(props) @{
+ <>
+  <output>{props.selected$.get() as string}</output>
+  <output>{props.read() as string}</output>
+ </>
+}
+export function App(props) @{
+ const { selected$, compute$ } = useSelection$(props.load);
+ @try {
+  <section><output>{selected$.get() as string}</output><Reader selected$={selected$} read={compute$} /></section>
+ } @pending { <i>waiting</i> }
+}`,
+				mode,
+				{},
+				{
+					'./use-selection': `import { derived$, query$ } from 'octane/signals';
+export function useSelection$(load) {
+ const record$ = query$(() => 'record', load);
+ const compute$ = () => { ${mode.body} };
+ const selected$ = derived$(compute$);
+ return { selected$, compute$ };
+}`,
+				},
+			);
+			try {
+				await view.settleAll('ready');
+				await view.settleAll('ready');
+				expect(view.texts()).toEqual(['ready', 'ready', 'ready']);
+				expect(view.requests).toHaveLength(2);
+			} finally {
+				view.unmount();
+			}
+		},
+	);
+
+	it.each(MODES)(
+		'preserves a function stored as signal data beside a named producer ($name)',
+		async (mode) => {
+			const view = await mountClient(
+				`import { derived$, query$, signal$ } from 'octane/signals';
+export function App(props) @{
+ const record$ = query$(() => 'record', props.load);
+ const compute$ = () => record$.get();
+ const saved$ = signal$(compute$);
+ const selected$ = derived$(compute$);
+ @try {
+  <section><output>{selected$.get() as string}</output>
+  <output>{String(saved$.get() === compute$)}</output></section>
+ } @pending { <i>waiting</i> }
+}`,
+				mode,
+			);
+			try {
+				await view.settleAll('ready');
+				expect(view.texts()).toEqual(['ready', 'true']);
+			} finally {
+				view.unmount();
+			}
+		},
+	);
 	// With no ambient owner the callback still uses the declaring instance,
 	// and once that instance unmounts it is fenced like the instance's own reads.
 	it.each(MODES)(

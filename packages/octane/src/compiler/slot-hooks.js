@@ -1685,34 +1685,25 @@ export function slotHooks(source, id, options) {
 			text: `;${block.replace(/\n/g, ' ')}${activation === null ? '' : `${activation}(1); `}`,
 		});
 	}
-	// Assemble disjoint edits once instead of copying the growing module for
-	// every insertion. Descending, stable order retains the existing rule that
-	// later insertions at the same offset appear before earlier insertions.
-	st.edits.sort((a, b) => b.pos - a.pos);
-	const chunks = [];
-	let cursor = source.length;
-	let overlaps = false;
-	for (const edit of st.edits) {
-		const end = edit.end ?? edit.pos;
-		if (end > cursor) {
-			overlaps = true;
-			break;
-		}
-		chunks.push(source.slice(end, cursor), edit.text);
-		cursor = edit.pos;
+	// Producer twins receive every ordinary lowering within the declaration
+	// (nested signal sites and hook slots included), but not lexical-owner reads.
+	// Materialize inner copies first if a producer contains another producer.
+	for (const { declaration, fn, name, rename } of signalLowering.producerCopies.sort(
+		(a, b) => a.fn.end - a.fn.start - (b.fn.end - b.fn.start),
+	)) {
+		const edits = st.edits.filter(
+			(edit) =>
+				!signalLowering.lexicalEdits.has(edit) &&
+				edit.pos >= fn.start &&
+				(edit.end ?? edit.pos) <= fn.end,
+		);
+		const copy = applySourceEdits(source, [...edits, ...rename], fn.start, fn.end);
+		st.edits.push({
+			pos: declaration.end,
+			text: declaration.type === 'FunctionDeclaration' ? `;${copy}` : `, ${name} = ${copy}`,
+		});
 	}
-	let code;
-	if (overlaps) {
-		// Overlapping replacements refer to the already edited text. Preserve
-		// that sequential behavior, including insertion/replacement ties.
-		code = source;
-		for (const edit of st.edits) {
-			code = code.slice(0, edit.pos) + edit.text + code.slice(edit.end ?? edit.pos);
-		}
-	} else {
-		chunks.push(source.slice(0, cursor));
-		code = chunks.reverse().join('');
-	}
+	let code = applySourceEdits(source, st.edits);
 	if (activation === null && !signalLowering.usesSignals)
 		code = code.endsWith('\n') ? code + block : code + '\n' + block;
 	return {
@@ -1721,4 +1712,35 @@ export function slotHooks(source, id, options) {
 		...(signalLowering.usesSignals || nativeReadActivation ? { streamedSignals: true } : null),
 		...strongHints,
 	};
+}
+
+function applySourceEdits(source, edits, start = 0, end = source.length) {
+	// Assemble disjoint edits once instead of copying the growing module for
+	// every insertion. Descending, stable order retains the existing rule that
+	// later insertions at the same offset appear before earlier insertions.
+	edits.sort((a, b) => b.pos - a.pos);
+	const chunks = [];
+	let cursor = end;
+	let overlaps = false;
+	for (const edit of edits) {
+		const end = edit.end ?? edit.pos;
+		if (end > cursor) {
+			overlaps = true;
+			break;
+		}
+		chunks.push(source.slice(end, cursor), edit.text);
+		cursor = edit.pos;
+	}
+	if (overlaps) {
+		// Overlapping replacements refer to the already edited text. Preserve
+		// that sequential behavior, including insertion/replacement ties.
+		let code = source.slice(start, end);
+		for (const edit of edits) {
+			code =
+				code.slice(0, edit.pos - start) + edit.text + code.slice((edit.end ?? edit.pos) - start);
+		}
+		return code;
+	}
+	chunks.push(source.slice(start, cursor));
+	return chunks.reverse().join('');
 }
