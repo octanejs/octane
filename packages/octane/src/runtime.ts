@@ -572,6 +572,12 @@ type SignalInstanceKey =
 // `.tsrx` body has no such renderer. The compiler and runtime.server.ts spell it
 // the same way.
 const RENDERER_INVOCATION_SITE = 'r:';
+// A render function rendered as a child, such as a compiled nested `@{ … }`
+// block, carries this invocation site. Its scope keeps its own instance for the
+// declarations it evaluates, but it is part of the template that renders it, so
+// it reads other handles the way that template does (see scopeSignalOwner).
+// runtime.server.ts spells it the same way.
+const TEMPLATE_INVOCATION_SITE = 't:';
 // Parent links, root namespaces, and keyed item identities are lifetime-stable.
 // Keep their recipe until a real owner is needed: scalar-only components avoid
 // ancestor walks, visited sets, key coercion, and JSON strings altogether. The
@@ -1107,9 +1113,28 @@ function scopeSignalOwner(scope: Scope | null): SignalOwner | undefined {
 			};
 			// Directive arms and inline rows own only the declarations they evaluate,
 			// and retire them on removal. A captured declaration of the enclosing
-			// component still resolves to that component's cell.
-			const parent = instanceKey === undefined ? (scope.parent ?? scope.block.parentBlock) : null;
-			if (parent !== null && !(parent instanceof LiteBlockImpl))
+			// component still resolves to that component's cell. A nested `@{ … }`
+			// block keeps an instance of its own for its declarations, and a fragment
+			// renderer carries the instance of the scope it renders for (the server
+			// renders it in that scope's owner). Both link to their template the same
+			// way. A renderer, even one inside a block, keeps its parent's key. A block
+			// adds a key segment and links to the scope that rendered it, which for a
+			// lightweight component is its scope rather than the DOM stand-in its
+			// blocks hang off.
+			let parent = scope.parent ?? scope.block.parentBlock;
+			if (
+				instanceKey !== undefined &&
+				parent !== null &&
+				resolveSignalInstanceKey(parent) !== instanceKey
+			)
+				parent =
+					scope.signalInstanceSite === TEMPLATE_INVOCATION_SITE ? scope.signalInstanceParent : null;
+			// A stand-in records the scope its component is registered on.
+			if (parent instanceof LiteBlockImpl)
+				parent =
+					parent.signalInstanceParent?.children?.find((child) => child.scope.block === parent)
+						?.scope ?? null;
+			if (parent !== null)
 				identity.enclosingOwner = scopeSignalOwner(parent) as SignalRendererOwnerIdentity;
 			// A retry owner must not keep an abandoned renderer tree alive. This
 			// existing opaque identity object is also its own facade-state token.
@@ -22475,7 +22500,24 @@ function commitBag<T>(scope: Scope, root: Node | null, bag: T): T {
  * *slot* renders `true` as empty (React parity for renderable children).
  */
 function coerceText(value: unknown): string {
+	if (process.env.NODE_ENV !== 'production' && isSignalHandle(value)) devWarnPlainTextHandle();
 	return value == null || value === false ? '' : typeof value === 'string' ? value : String(value);
+}
+
+let DEV_PLAIN_TEXT_HANDLE_WARNED = false;
+
+// Only a module with an import from `octane/signals` compiles opaque text holes
+// as handle bindings; elsewhere just `$`-named expressions bind. A handle that
+// reaches a plain hole would otherwise render as "[object Object]" silently.
+function devWarnPlainTextHandle(): void {
+	if (DEV_PLAIN_TEXT_HANDLE_WARNED) return;
+	DEV_PLAIN_TEXT_HANDLE_WARNED = true;
+	console.error(
+		'Octane: a signal handle reached a text hole in a module that does not import ' +
+			'`octane/signals`, so it rendered as a plain value. Type the prop with ' +
+			"`import type { SignalHandle } from 'octane/signals'`, give it a `$` suffix, read it " +
+			'with `.get()`, or enable the `opaqueSignalHandles` compiler option.',
+	);
 }
 
 /**
@@ -24525,13 +24567,23 @@ export function bindSignalChecked(
  * the call site; these helpers allocate nothing and never index a bag dynamically.
  * Controlled form properties deliberately do not use this identity guard.
  */
+// An identical raw value needs no write, except a first `undefined` over an
+// adopted server element: its cache slot has not yet reconciled the server
+// attribute, which the writer removes. The direct-signal path does the same.
+function attributeUnchanged(previous: unknown, value: unknown, el: Element): boolean {
+	if (previous !== value) return false;
+	if (value !== undefined) return true;
+	const hydration = activeHydration();
+	return hydration === null || hydration.isFresh(el);
+}
+
 export function setAttributeIfChanged(
 	value: unknown,
 	previous: unknown,
 	el: Element,
 	name: string,
 ): unknown {
-	if (previous === value) return previous;
+	if (attributeUnchanged(previous, value, el)) return previous;
 	setAttribute(el, name, value);
 	return value;
 }
@@ -24542,7 +24594,7 @@ export function setPlainAttributeIfChanged(
 	el: Element,
 	name: string,
 ): unknown {
-	if (previous === value) return previous;
+	if (attributeUnchanged(previous, value, el)) return previous;
 	setPlainAttribute(el, name, value);
 	return value;
 }
@@ -24553,7 +24605,7 @@ export function setURLAttributeIfChanged(
 	el: Element,
 	name: string,
 ): unknown {
-	if (previous === value) return previous;
+	if (attributeUnchanged(previous, value, el)) return previous;
 	setURLAttribute(el, name, value);
 	return value;
 }
@@ -24564,7 +24616,7 @@ export function setStringDataIfChanged(
 	el: Element,
 	name: string,
 ): unknown {
-	if (previous === value) return previous;
+	if (attributeUnchanged(previous, value, el)) return previous;
 	setStringData(el, name, value);
 	return value;
 }
@@ -24575,7 +24627,7 @@ export function setBooleanAttributeIfChanged(
 	el: Element,
 	name: string,
 ): unknown {
-	if (previous === value) return previous;
+	if (attributeUnchanged(previous, value, el)) return previous;
 	setBooleanAttribute(el, name, value);
 	return value;
 }
@@ -24586,19 +24638,19 @@ export function setAriaAttributeIfChanged(
 	el: Element,
 	name: string,
 ): unknown {
-	if (previous === value) return previous;
+	if (attributeUnchanged(previous, value, el)) return previous;
 	setAriaAttribute(el, name, value);
 	return value;
 }
 
 export function setClassNameIfChanged(value: unknown, previous: unknown, el: Element): unknown {
-	if (previous === value) return previous;
+	if (attributeUnchanged(previous, value, el)) return previous;
 	setClassName(el, value);
 	return value;
 }
 
 export function setClassAttrIfChanged(value: unknown, previous: unknown, el: Element): unknown {
-	if (previous === value) return previous;
+	if (attributeUnchanged(previous, value, el)) return previous;
 	setClassAttr(el, value);
 	return value;
 }
@@ -38067,6 +38119,10 @@ export function childSlot(
 		let signalInstanceKey: SignalInstanceKey | undefined;
 		if (SIGNAL_BINDINGS_ENABLED || signalDocumentEnabled) {
 			const key = componentDescriptor?.key;
+			// A render function rendered here is part of this template. Compiled
+			// children belong to the template that authored them instead, so they
+			// keep the plain child identity.
+			if (isBodyFn && !isChildrenBlock(comp)) invocationSite = TEMPLATE_INVOCATION_SITE;
 			signalInstanceKey = {
 				parentScope,
 				invocationSite: componentDescriptor?.__octaneInvocationSite ?? invocationSite,

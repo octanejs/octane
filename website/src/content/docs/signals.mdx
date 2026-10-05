@@ -79,6 +79,15 @@ Each module that consumes native reads needs a **runtime import** from
 type-only import or a `$` name alone does not enable native-read compilation.
 Use `import 'octane/signals'` in a component that only receives handles as props.
 
+Rendering a handle directly, as in `{props.label as string}` or
+`title={props.label}`, binds it to the DOM when the rendering module has **any
+import** from `octane/signals`. A type-only
+`import type { SignalHandle } from 'octane/signals'` is enough and does not enable
+native reads. `$`-named expressions such as `{props.label$}` bind in every module.
+Elsewhere an ordinary hole renders a plain value, so apps that never pass handles
+do not ship the binding runtime. For untyped components that render handles from a
+lazily loaded signals engine, set the `opaqueSignalHandles` compiler option.
+
 <h2 id="local-state">Start with local state</h2>
 
 `useSignal$` creates a writable signal owned by a component's hook slot. Read it

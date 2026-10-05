@@ -504,6 +504,10 @@ type ServerSignalInstanceKey = string | Frame;
 // and keep the enclosing owner and pending list keys (runtime.ts spells the
 // same constant; the client renders the same JSX through such renderers).
 const RENDERER_INVOCATION_SITE = 'r:';
+// A render function rendered as a child, such as a compiled nested `@{ … }`
+// block, keeps its own instance for its declarations. Its owner records the
+// owner it renders inside, as an inline row's does (runtime.ts spells it the same).
+const TEMPLATE_INVOCATION_SITE = 't:';
 let SIGNAL_COMPONENT_INSTANCE_KEY: ServerSignalInstanceKey = '';
 let SERVER_SIGNAL_OWNER_ACTIVE = false;
 let SIGNAL_CONTROL_SITE = '';
@@ -2454,7 +2458,15 @@ function ssrChildValue(
 	if (typeof v === 'function')
 		// Bare body/children functions can be recreated every parent pass. The
 		// client treats this as one child-slot body, not component-type identity.
-		return ssrComponent(scope, v as ServerComponent, {}, undefined, undefined, true);
+		return ssrComponent(
+			scope,
+			v as ServerComponent,
+			{},
+			undefined,
+			undefined,
+			true,
+			templateInvocationSite(v),
+		);
 	if (typeof v === 'object') {
 		if ((v as any).$$kind === ELEMENT_TAG) {
 			const d = v as ElementDescriptor;
@@ -2906,6 +2918,7 @@ function ssrDescriptorPart(v: unknown, scope: SSRScope): string {
 			undefined,
 			undefined,
 			isChildrenBlock(v),
+			templateInvocationSite(v),
 		);
 		SSR_DESCRIPTOR_TEXT_TAIL = false;
 		return html;
@@ -5193,6 +5206,7 @@ function serverSignalOwner(
 	_frame: Frame | null,
 	rowInstanceKey?: string,
 	enclosingKeys?: ServerSignalListKeys | null,
+	enclosingOwner?: SignalRendererOwnerIdentity,
 ): SignalRendererOwnerIdentity | undefined {
 	// An async continuation can compose cached compiled HTML outside a render pass.
 	// Only an active pass may assign a request-owned signal instance.
@@ -5229,7 +5243,8 @@ function serverSignalOwner(
 			instanceOwner: Object.freeze({}),
 			instanceKey,
 		};
-		if (rowInstanceKey !== undefined && enclosingKeys !== undefined) {
+		if (enclosingOwner !== undefined) identity.enclosingOwner = enclosingOwner;
+		else if (rowInstanceKey !== undefined && enclosingKeys !== undefined) {
 			// Match the client: an inline row records the owner it renders inside,
 			// so captured handles from that owner do not start a request per row.
 			// Server arms already render in their component's owner.
@@ -5356,6 +5371,8 @@ function renderComponentFramed(
 	// A fragment renderer's frame continues the list keys pending at its call
 	// site; `undefined` starts a component's own list scope.
 	rendererListKeys?: ServerSignalListKeys | null,
+	// The owner a template block renders inside (see TEMPLATE_INVOCATION_SITE).
+	enclosingOwner?: SignalRendererOwnerIdentity,
 ): string {
 	const previous = captureServerComponentContext();
 	const parentScope = parent ?? previous.scope;
@@ -5392,7 +5409,7 @@ function renderComponentFramed(
 		HOOK_PASS = hookPass;
 		try {
 			ACTIVE_PU_WARM_PLANS.length = warmPlanCheckpoint;
-			previous.owner = serverSignalOwner(frame);
+			previous.owner = serverSignalOwner(frame, undefined, undefined, enclosingOwner);
 			if (previous.owner === undefined) {
 				out = comp(props ?? {}, scope, undefined);
 			} else if (
@@ -5630,6 +5647,10 @@ export function ssrComponent(
 			signalInstanceKey,
 			bindingMarker,
 			renderer ? SIGNAL_LIST_KEYS : undefined,
+			// Only an enabled pass has instance declarations to resolve through it.
+			invocationSite === TEMPLATE_INVOCATION_SITE && typeof signalInstanceKey === 'string'
+				? serverSignalOwner(pf)
+				: undefined,
 		);
 	} finally {
 		if (identityScoped !== true) ASYNC_SCOPE = previousIdentityScope;
@@ -8302,6 +8323,13 @@ export function descriptorChildren<T>(component: T): T {
  */
 export function isChildrenBlock(value: unknown): boolean {
 	return typeof value === 'function' && (value as any)[CHILDREN_BLOCK] === true;
+}
+
+// Mirrors the client's childSlot: a render function rendered as a child is part
+// of the template rendering it, except compiled children, which belong to the
+// template that authored them.
+function templateInvocationSite(body: unknown): string | undefined {
+	return isChildrenBlock(body) ? undefined : TEMPLATE_INVOCATION_SITE;
 }
 
 // ---------------------------------------------------------------------------

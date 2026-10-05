@@ -80,7 +80,20 @@ export function nativeReadOptions(ast, options) {
 			(node.specifiers.length === 0 ||
 				node.specifiers.some((specifier) => specifier.importKind !== 'type')),
 	);
-	return { ...options, nativeReads };
+	// Recorded from the authored parse: later preparation (dom bindings, renderer
+	// boundaries) can rewrite the module and drop its type-only imports.
+	return { ...options, nativeReads, __signalModuleImport: importsSignalModule(ast) };
+}
+
+/**
+ * Any import from a signals entry, including a type-only `SignalHandle`
+ * import, marks a module that expects handles in ordinary props. It admits
+ * handle bindings in opaque holes without enabling native reads.
+ */
+export function importsSignalModule(ast) {
+	return ast.body.some(
+		(node) => node.type === 'ImportDeclaration' && SIGNAL_MODULES.has(node.source?.value),
+	);
 }
 
 export function assertNativeReadOptions(options) {
