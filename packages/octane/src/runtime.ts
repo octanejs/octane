@@ -24,7 +24,7 @@ import type {
 	LayoutSnapshotOptions,
 	LayoutSnapshotOptionsWithInitial,
 } from './layout-snapshot-types.js';
-import { domBindingClaims, repairedServerParents } from './dom-binding-claims.js';
+import { domBindingClaims } from './dom-binding-claims.js';
 import { DOMStage } from './dom-stage.js';
 import { __normalizeBindingStyle } from './dom-binding-styles.js';
 import type { BindingHandle } from './dom-bindings.js';
@@ -3750,6 +3750,8 @@ interface RootRenderOwner {
 	/** Immutable initial-response history, borrowed by deferred and streamed adoptions. */
 	initialDocumentSignals?: ScopeSeed;
 	bindingLeases?: Set<BindingHandoff>;
+	/** Repaired sites belong only to this root's offered binding leases. */
+	bindingRepairedParents?: WeakSet<Node>;
 	controlLeases?: Map<Element, ControlHandoff | undefined>;
 	preservePresentation?: boolean;
 	bindingContainer?: Node;
@@ -19451,7 +19453,8 @@ class HydrationCapability {
 	save(parent: Node): void {
 		// An early-bound host losing a server neighbor here has not moved. A
 		// rolled-back attempt restored that neighbor, so its mark goes with it.
-		this.remember(repairedServerParents, parent);
+		const repairedParents = this.rootBlock.idState.renderOwner?.bindingRepairedParents;
+		if (repairedParents !== undefined) this.remember(repairedParents, parent);
 		if (inRootHydrationAttempt()) journalRootChildren(parent);
 		if (!this.speculative || (this.saved ??= new Set()).has(parent)) return;
 		this.saved.add(parent);
@@ -49583,7 +49586,11 @@ function hydrateRootWithOutputHandler(
 	if (bindingLeases !== undefined) {
 		owner.bindingLeases = new Set(bindingLeases);
 		owner.bindingContainer = container;
-		for (const lease of bindingLeases) claimBindingHandoff(lease, owner);
+		const repairedParents = (owner.bindingRepairedParents = new WeakSet<Node>());
+		for (const lease of bindingLeases) {
+			claimBindingHandoff(lease, owner);
+			lease.repairedParents = repairedParents;
+		}
 	}
 	const adopt = (): void => {
 		if (owner.disposed) return;

@@ -786,6 +786,112 @@ describe('behavior-only roots', () => {
 		}
 	}
 
+	for (const { dev, strong } of [
+		{ dev: false, strong: false },
+		{ dev: true, strong: false },
+		{ dev: false, strong: true },
+	]) {
+		for (const [priorRepair, externalRemoval] of [
+			[false, true],
+			[true, false],
+			[true, true],
+		] as const) {
+			it(`keeps repairs scoped to a reused container's hydration (prior repair: ${priorRepair}, external removal: ${externalRemoval}, ${strong ? 'strong' : dev ? 'dev' : 'prod'})`, async () => {
+				const source = [
+					"import { useLayoutEffect } from 'octane';",
+					"import { unbound } from 'octane/behavior';",
+					"export function Host(props) @{ 'use dom bindings';",
+					'  <button data-state={props.label}>{unbound(props.children)}</button>',
+					'}',
+					'export function Prime() @{ <span>Prime</span> }',
+					'export const gate = { pending: undefined };',
+					'function read() { if (gate.pending !== undefined) throw gate.pending; return "done"; }',
+					'function Gate() @{ <i>{read()}</i> }',
+					'export function App(props) @{',
+					'  useLayoutEffect(() => { props.onCommit(); });',
+					'  <><Host label={props.label}><span>Hello</span></Host><Gate /></>',
+					'}',
+				].join('\n');
+				const onCommit = vi.fn();
+				const initial = { label: 'server', onCommit };
+				const fixture = authoredPresentation(
+					'Host',
+					{ label: 'server' },
+					dev,
+					source,
+					{},
+					{ strong },
+				);
+				const client = fixture.loadClient();
+				if (priorRepair) {
+					container.innerHTML = renderToString(fixture.server.Prime, {}).html;
+					const stale = document.createElement('script');
+					container.append(stale);
+					const recoverable = vi.fn();
+					hydratedRoot = hydrateRoot(
+						container,
+						client.Prime,
+						{},
+						{ onRecoverableError: recoverable },
+					);
+					await act(() => {});
+					expect(stale.isConnected).toBe(false);
+					expect(recoverable).toHaveBeenCalledOnce();
+					hydratedRoot.unmount();
+					hydratedRoot = undefined;
+				}
+				container.innerHTML = renderToString(fixture.server.App, initial).html;
+				const button = container.querySelector('button')!;
+				const extra = document.createElement('script');
+				extra.type = 'application/json';
+				button.after(extra);
+				const binding = fixture.attach(button, fixture.state);
+				const uncaught = vi.fn();
+				try {
+					let release!: () => void;
+					const pending = new Promise<void>((resolve) => (release = resolve));
+					client.gate.pending = pending;
+					hydratedRoot = hydrateRoot(container, client.App, initial, {
+						bindingLeases: [binding],
+						onRecoverableError: vi.fn(),
+						onUncaughtError: uncaught,
+					});
+					await act(() => {});
+					expect(extra.isConnected).toBe(true);
+					expect(onCommit).not.toHaveBeenCalled();
+					expect(fixture.cleanup).not.toHaveBeenCalled();
+					if (externalRemoval) extra.remove();
+					client.gate.pending = undefined;
+					await act(async () => {
+						release();
+						await pending;
+					});
+					expect(container.querySelector('button')).toBe(button);
+					if (externalRemoval) {
+						expect(uncaught).toHaveBeenCalledOnce();
+						expect(String(uncaught.mock.calls[0]![0])).toMatch(
+							/supported fixed native view|Minified Octane error #75;/,
+						);
+						expect(onCommit).not.toHaveBeenCalled();
+						expect(fixture.cleanup).not.toHaveBeenCalled();
+						fixture.publish({ label: 'still early' });
+						expect(button.getAttribute('data-state')).toBe('still early');
+					} else {
+						expect(uncaught).not.toHaveBeenCalled();
+						expect(onCommit).toHaveBeenCalledOnce();
+						expect(fixture.cleanup).toHaveBeenCalledOnce();
+						fixture.publish({ label: 'retired' });
+						expect(button.getAttribute('data-state')).toBe('server');
+					}
+				} finally {
+					hydratedRoot?.unmount();
+					hydratedRoot = undefined;
+					binding.dispose();
+				}
+			});
+		}
+	}
+
 	for (const dev of [false, true]) {
 		for (const styles of ['provider', 'single property', 'multiple properties', 'native reads']) {
 			it(`hands off a host with a known unbound provider spread and ${styles} styles (${dev ? 'dev' : 'prod'})`, () => {

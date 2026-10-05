@@ -1,6 +1,6 @@
 import { formatClientError } from './error-codes.client.generated.js';
 import { normalizeClass } from './class-names.js';
-import { domBindingClaims, repairedServerParents } from './dom-binding-claims.js';
+import { domBindingClaims } from './dom-binding-claims.js';
 import { sanitizeURL } from './sanitize-url.js';
 import { STREAM_SCRIPT_ATTR, SUSPENSE_SCRIPT_ATTR } from './stream-protocol.js';
 import { NATIVE_SIGNAL_SEED_ATTR } from './signals/native-read-seeds.js';
@@ -1067,7 +1067,7 @@ export function __adoptBindings<Props>(
 				((handoff!.owner !== undefined || disposed) &&
 					recorded !== null &&
 					recorded.parentNode === null &&
-					repairedServerParents.has(host.parentNode!));
+					handoff!.repairedParents?.has(host.parentNode!) === true);
 			return (handoff = {
 				id: descriptor.id,
 				root: host,
