@@ -146,7 +146,11 @@ export function createOctaneDevMiddleware(options) {
 				handlerCache.set(typedBundle.manifest, cached);
 			}
 
-			const webResponse = await cached.handler(nodeRequestToWebRequest(request, response));
+			const webResponse = await cached.handler(
+				nodeRequestToWebRequest(request, response, {
+					trustProxy: typedBundle.manifest.trustProxy,
+				}),
+			);
 			await sendWebResponse(response, webResponse);
 		} catch (error) {
 			options.logError?.('Dev SSR request failed', error);

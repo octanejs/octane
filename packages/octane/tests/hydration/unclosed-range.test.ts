@@ -6,6 +6,12 @@ import * as BehaviorRuntime from 'octane/behavior';
 import { load } from 'octane/hydration';
 import * as ServerRT from 'octane/server';
 import { loadCompiledFixtureSource, loadServerFixture } from '../_server-fixture';
+import {
+	activateStreamedMarkup,
+	collectReadableStream,
+	deferred,
+	resetStreamRuntimeGlobals,
+} from '../_server-stream';
 import * as client from './_fixtures/unclosed-range.tsrx';
 
 // The server closes every range it opens, but an HTML minifier or proxy that
@@ -79,6 +85,7 @@ describe.each([
 		root?.unmount();
 		vi.unstubAllEnvs();
 		container.remove();
+		resetStreamRuntimeGlobals();
 		errSpy.mockRestore();
 	});
 
@@ -186,6 +193,66 @@ describe.each([
 		container.querySelector('button')!.click();
 		expect(onPress).toHaveBeenCalledOnce();
 	});
+
+	it.each([
+		{ owner: 'an enclosing Suspense arm', name: 'StreamedInSuspense' },
+		{ owner: 'the root', name: 'StreamedInRoot' },
+	])(
+		"replays a streamed arm's server data after $owner discards the attempt that recovered it",
+		async ({ name }) => {
+			const serverData = deferred<string>();
+			const streaming = collectReadableStream(server[name], {
+				label: 'a',
+				gate: { pending: false, promise: Promise.resolve() },
+				load: () => serverData.promise,
+			});
+			await Promise.resolve();
+			serverData.resolve('data');
+			const { html, chunks, errors } = await streaming;
+			expect(errors).toEqual([]);
+			// The arm streamed: the shell held its fallback.
+			expect(chunks[0]).toContain('<p>loading</p>');
+			container.innerHTML = html;
+			activateStreamedMarkup(container);
+			const expected = markup(container);
+			expect(expected).toContain('<output>data</output>');
+			stripClose(container);
+
+			const onPress = vi.fn();
+			const gate = deferred<void>();
+			const clientData = deferred<string>();
+			const props = {
+				label: 'a',
+				onPress,
+				gate: { pending: true, promise: gate.promise },
+				load: () => clientData.promise,
+			};
+			const { recoverable, uncaught } = await hydrate(name, props);
+			// The arm recovered, then Later suspended the attempt around it. That
+			// attempt was discarded with its report and the arm's removal.
+			expect(recoverable).toEqual([]);
+			expect(markup(container)).toBe(expected);
+
+			await act(async () => {
+				props.gate.pending = false;
+				gate.resolve();
+				await gate.promise;
+			});
+			// The retry hydrates the arm with its streamed data again, so it finds
+			// the damaged range without waiting on the client's own request.
+			expect(recoverable).toEqual([expect.stringMatching(UNCLOSED)]);
+
+			await act(async () => {
+				clientData.resolve('data');
+				await clientData.promise;
+			});
+			expect(uncaught).toEqual([]);
+			expect(recoverable).toEqual([expect.stringMatching(UNCLOSED)]);
+			expect(markup(container)).toBe(expected);
+			container.querySelector('button')!.click();
+			expect(onPress).toHaveBeenCalledOnce();
+		},
+	);
 });
 
 describe('Hydrate — a server range without its closing marker', () => {
