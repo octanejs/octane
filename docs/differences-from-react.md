@@ -1894,8 +1894,9 @@ As in React:
   `suppressHydrationWarning` keeps the server text one level deep. It never
   hides a structural mismatch.
 - The root's container and `<html>`, `<head>` and `<body>` skip server
-  elements that do not match, such as ones a browser extension inserted, and
-  leave them in place, together with any server content after the client's.
+  elements that do not match, and comments, such as ones a browser extension
+  inserted, and leave them in place, together with any server content after
+  the client's. A text node there is a mismatch.
 - A root that falls back clears its container. A `<head>` or `<body>`
   container keeps its scripts, styles and stylesheet links. Octane has no
   host singletons, so unlike React a `Document` or `<html>` container does

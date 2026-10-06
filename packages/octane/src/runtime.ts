@@ -1912,6 +1912,9 @@ function takeNativeFreshArm(
 	const count = Number(rawCount);
 	if (!Number.isSafeInteger(count)) return null;
 	reserveHydrationIds(ids, count);
+	// An attempt that is discarded, such as a root's that suspends, restores the
+	// server arm, so the page keeps showing it and the retry finds its marker.
+	hydration.save(domNode(cursor).parentNode!);
 	removeRange(cursor, end);
 	hydration.node = end;
 	return {
@@ -21837,8 +21840,10 @@ class HydrationCapability {
 	/**
 	 * Among the root container's children and those of `<html>`, `<head>` and
 	 * `<body>`, React skips server elements that do not match, which third-party
-	 * scripts and extensions insert there, and leaves them in place. Returns the
-	 * first later sibling element that the template matches, or null.
+	 * scripts and extensions insert there, and leaves them in place. It skips
+	 * every comment too but its own boundary markers, and range markers are
+	 * Octane's. A text node ends the search, as it ends React's. Returns the
+	 * first sibling element from `cursor` on that the template matches, or null.
 	 */
 	private skipForeign(
 		cursor: Node,
@@ -21847,7 +21852,6 @@ class HydrationCapability {
 	): Node | null {
 		const parent = domNode(cursor).parentNode;
 		if (
-			cursor.nodeType !== 1 ||
 			parent === null ||
 			!(
 				(parent === this.rootBlock.parentNode && this.rootBlock.kind === 'root') ||
@@ -21855,9 +21859,12 @@ class HydrationCapability {
 			)
 		)
 			return null;
-		for (let node = getNextSibling(cursor); node?.nodeType === 1; node = getNextSibling(node))
-			if (template !== null ? hydrationNodeMatches(node, template) : lazyRootMatches(node, lazy!))
-				return node;
+		for (let node: Node | null = cursor; node; node = getNextSibling(node)) {
+			if (node.nodeType === 1) {
+				if (template !== null ? hydrationNodeMatches(node, template) : lazyRootMatches(node, lazy!))
+					return node;
+			} else if (node.nodeType !== 8 || isBlockOpen(node) || isBlockClose(node)) return null;
+		}
 		return null;
 	}
 
@@ -35779,8 +35786,10 @@ function reconcileDeoptChildren(el: Element, children: any, ownerBlock: Block): 
 	let up = 0;
 	const result: Node[] = [];
 	// Hydrating `<html>`, `<head>` or `<body>`, React skips server elements of
-	// another tag and leaves them, and what follows the client's children, in
-	// place (HydrationCapability.skipForeign).
+	// another tag, and comments, and leaves them, and what follows the client's
+	// children, in place (HydrationCapability.skipForeign). Host descriptor
+	// children render no range markers, so every comment here is foreign, and
+	// isHostElementOfType matches no comment.
 	const singleton = hydrating ? hydrationOwnsUnstamped === true && isDocumentSingleton(el) : false;
 	for (let i = 0; i < next.length; i++) {
 		const child = next[i];
@@ -35794,7 +35803,7 @@ function reconcileDeoptChildren(el: Element, children: any, ownerBlock: Block): 
 			let at = up;
 			while (
 				at < unstamped.length &&
-				unstamped[at].nodeType === 1 &&
+				unstamped[at].nodeType !== 3 &&
 				!isHostElementOfType(unstamped[at] as Element, child.type)
 			)
 				at++;
