@@ -129,9 +129,10 @@ Member reads inside a conditional branch, after a possible early exit,
 protected by exception handling, or skipped by an optional chain preserve that
 protection. An optional chain skips the arguments and computed keys after its
 optional link: `run?.(options.label)` and `value?.[options.key]` read
-`options` only once the receiver exists. Compiler-memoized `use()` arguments
-and server-rendered prop creations apply the same optional-chain rule to their
-dependencies. For one-level reads,
+`options` only once the receiver exists. Compiler-memoized `use()` arguments,
+including those in plain `.ts`/`.js` hook modules, and server-rendered prop
+creations apply the same optional-chain rule to their dependencies. For
+one-level reads,
 the inferred array inspects an own property descriptor: a data property tracks
 its value, while an accessor or inherited property tracks its receiver without
 invoking a getter. An absent property tracks `undefined`. Failed reflection

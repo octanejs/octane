@@ -83,3 +83,30 @@ Project settings in the Vercel dashboard (domain: `mcp.octanejs.dev`):
 | Node.js Version  | 22.x or 24.x                                                                |
 
 No environment variables are required.
+
+## Deploy (Cloudflare Workers)
+
+Cloudflare Workers Builds sets `WORKERS_CI`, which switches
+[octane.config.ts](octane.config.ts) to `@octanejs/adapter-cloudflare`. The
+build then adds `dist/server/worker.js`, and [wrangler.jsonc](wrangler.jsonc)
+serves `dist/client` through Workers Static Assets. The adapter choice is baked
+in at build time through the `define` in [vite.config.ts](vite.config.ts),
+because the config is bundled into the Worker and a Worker has no build
+environment to read.
+
+Workers Builds settings (Worker `octane-website-mcp`, domain `mcp.octanejs.dev`):
+
+| Setting         | Value                                      |
+| --------------- | ------------------------------------------ |
+| Root directory  | `/` (pnpm installs the whole workspace)    |
+| Build command   | `pnpm --filter website-mcp build`          |
+| Deploy command  | `cd website-mcp && pnpm exec wrangler deploy`  |
+| Build variables | `NODE_VERSION=24`                          |
+
+Run the Cloudflare build locally:
+
+```bash
+WORKERS_CI=1 pnpm --filter website-mcp build
+cd website-mcp && pnpm exec wrangler dev
+```
+
