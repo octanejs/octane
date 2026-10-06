@@ -16400,7 +16400,7 @@ function createHydrateSlot(
 	const expected = kept ?? (STAGED_DOM?.view(document) ?? document).createElement('div');
 	const wrapper = (hydration === null ? expected : hydration.clone(expected)) as HTMLDivElement;
 	initializeHydrationEventCapture(wrapper.ownerDocument);
-	let serverPreserved =
+	const serverPreserved =
 		kept !== null ||
 		(hydration !== null &&
 			!hydration.isFresh(wrapper) &&
@@ -16462,12 +16462,22 @@ function createHydrateSlot(
 			(STAGED_DOM?.view(nativeSeed) ?? nativeSeed).remove();
 		}
 	} else {
-		// An adopted wrapper without the boundary's own marker range is not safe to
-		// hydrate: stale server children would otherwise remain beside the fresh
-		// client range. Recover as a client-only mount inside the persistent wrapper.
+		// The server opens every ordinary wrapper with the boundary's own range. An
+		// adopted element without one is not this boundary's server output: the
+		// server rendered something else here, a mismatch that the enclosing owner
+		// falls back for, discarding this element, as React's parent does for a
+		// Suspense boundary whose server marker is missing.
 		if (serverPreserved) {
-			serverPreserved = false;
-			(STAGED_DOM?.view(wrapper) ?? wrapper).replaceChildren();
+			// DEV: the nearest component that renders the island names the mismatch.
+			let loc: string | undefined;
+			if (process.env.NODE_ENV !== 'production')
+				for (
+					let block = parentBlock.parentBlock;
+					block !== null && loc === undefined;
+					block = block.parentBlock
+				)
+					loc = componentSourceLoc(block.body);
+			hydration!.mismatch(loc, () => 'a Hydrate boundary range', getFirstChild(wrapper));
 		}
 		start = (STAGED_DOM?.view(document) ?? document).createComment('hydrate');
 		end = (STAGED_DOM?.view(document) ?? document).createComment('/hydrate');
@@ -16704,8 +16714,9 @@ function activateHydrateBoundary(state: HydrateSlot): void {
 	}
 	if (restart !== undefined) {
 		// As a suspended Suspense arm does, the island keeps its server DOM, with
-		// nothing reported, and its retry adopts it afresh.
+		// nothing reported, and its retry adopts it afresh, seeding afresh too.
 		hydration.rollback();
+		hydration.discardSeeds();
 		discardHydratePresentation(state, capture);
 		block.idState.next = hydration.idStart;
 		const generation = state.activationGeneration;
@@ -21112,7 +21123,7 @@ class HydrationCapability {
 			const pending = (this.pendingTexts ??= new Map());
 			if (!pending.has(node as Text)) pending.set(node as Text, { server, loc });
 			if (inRootHydrationAttempt()) journalText(node as Text, server);
-			if (this.speculative)
+			if (this.speculative || this.undoable)
 				(this.undo ??= []).push(() => {
 					(STAGED_DOM?.view(node) ?? node).nodeValue = server;
 				});
@@ -41117,10 +41128,10 @@ function renderInitialSuspenseHydration(
 		// reports what it finds. An attempt that found a mismatch is final: the
 		// arm renders on the client, and its diagnostics describe why.
 		hydration.releaseDiagnostics(diagnostics, failed && !(failure instanceof HydrationMismatch));
-		// The arm's client render reads client data. Seeds an attempt that is
-		// retried or replaced settled stay with the enclosing hydration, whose
-		// own fallback discards them.
-		if (failure instanceof HydrationMismatch) hydration.discardSeeds();
+		// The arm's client render reads client data, and a retry seeds afresh.
+		// Seeds an attempt that a catch arm replaces settled stay with the
+		// enclosing hydration, whose own fallback discards them.
+		if (failure instanceof HydrationMismatch || suspended !== null) hydration.discardSeeds();
 		else if (failed) hydration.passSeeds(previousHydration);
 		setNativeAdoptionResolver(previousNative);
 		WIP_CAPTURE = previousCapture;
