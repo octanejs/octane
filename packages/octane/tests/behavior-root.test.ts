@@ -381,6 +381,41 @@ describe('behavior-only roots', () => {
 		return root;
 	}
 
+	/**
+	 * Hydrates and unmounts a root in `container` that falls back: it finds a
+	 * text mismatch, so with no boundary it discards the server DOM and renders
+	 * on the client.
+	 */
+	async function fallBackOnce(dev: boolean, strong: boolean): Promise<void> {
+		const source = 'export function Prime(props) @{ <section>{props.text as string}</section> }';
+		const options = { id: '/src/prime.tsrx', compileOptions: { dev, hmr: false, strong } };
+		const server = loadCompiledFixtureSource(source, { ...options, mode: 'server' });
+		const client = loadCompiledFixtureSource(source, { ...options, mode: 'client' });
+		container.innerHTML = renderToString(server.Prime, { text: 'server' }).html;
+		const section = container.querySelector('section')!;
+		const recoverable = vi.fn();
+		const root = hydrateRoot(
+			container,
+			client.Prime,
+			{ text: 'client' },
+			{ onRecoverableError: recoverable },
+		);
+		await act(() => {});
+		expect(recoverable).toHaveBeenCalledOnce();
+		expect(section.isConnected).toBe(false);
+		expect(container.querySelector('section')!.textContent).toBe('client');
+		root.unmount();
+	}
+
+	// Each early host handoff across a suspension also runs with Strong
+	// compilation, and in a container whose previous root fell back: that root
+	// is gone, so it must not change how a later root treats its sites (#1777).
+	const suspendedHandoffModes = [false, true].flatMap((dev) =>
+		[false, true].flatMap((strong) => [false, true].map((reused) => ({ dev, strong, reused }))),
+	);
+	const suspendedHandoffMode = ({ dev, strong, reused }: (typeof suspendedHandoffModes)[number]) =>
+		(dev ? 'dev' : 'prod') + (strong ? ', Strong' : '') + (reused ? ', reused container' : '');
+
 	beforeEach(() => {
 		container = document.createElement('main');
 		document.body.appendChild(container);
@@ -705,7 +740,8 @@ describe('behavior-only roots', () => {
 		});
 	}
 
-	for (const dev of [false, true]) {
+	for (const mode of suspendedHandoffModes) {
+		const { dev, strong, reused } = mode;
 		for (const server of ['unchanged', 'externally removed'] as const) {
 			// As in React, hydration skips a third-party node beside a root-level
 			// host and leaves it in place, so it is no mismatch. Removing it while
@@ -717,7 +753,7 @@ describe('behavior-only roots', () => {
 				server === 'unchanged'
 					? 'hands off an early host after suspended hydration when its root neighbor is unchanged'
 					: 'reports a changed early host after suspended hydration when its root neighbor is removed';
-			it(`${name} (${dev ? 'dev' : 'prod'})`, async () => {
+			it(`${name} (${suspendedHandoffMode(mode)})`, async () => {
 				const source = [
 					"import { useLayoutEffect } from 'octane';",
 					"import { unbound } from 'octane/behavior';",
@@ -728,7 +764,7 @@ describe('behavior-only roots', () => {
 					'function read() { if (gate.pending !== undefined) throw gate.pending; return "done"; }',
 					'export function App(props) @{',
 					'  props.onRender();',
-					'  useLayoutEffect(() => { props.onCommit(); }, []);',
+					'  useLayoutEffect(() => { props.onCommit(); });',
 					'  <Host label={read() && props.label}><span>Hello</span></Host>',
 					'}',
 				].join('\n');
@@ -741,7 +777,15 @@ describe('behavior-only roots', () => {
 						if (++renders > 20) throw new Error('Hydration did not converge.');
 					},
 				};
-				const fixture = authoredPresentation('Host', { label: 'server' }, dev, source);
+				const fixture = authoredPresentation(
+					'Host',
+					{ label: 'server' },
+					dev,
+					source,
+					{},
+					{ strong },
+				);
+				if (reused) await fallBackOnce(dev, strong);
 				container.innerHTML = renderToString(fixture.server.App, initial).html;
 				const button = container.querySelector('button')!;
 				const extra = document.createElement('script');
@@ -876,7 +920,8 @@ describe('behavior-only roots', () => {
 		});
 	}
 
-	for (const dev of [false, true]) {
+	for (const mode of suspendedHandoffModes) {
+		const { dev, strong, reused } = mode;
 		for (const server of ['stale', 'externally removed'] as const) {
 			// Stale server content beside the host is a mismatch, found before the
 			// next sibling suspends: with no boundary, the root renders on the
@@ -887,7 +932,7 @@ describe('behavior-only roots', () => {
 				server === 'stale'
 					? 'discards an early host with the root when stale server content beside it falls back across a suspension'
 					: 'discards an early host with the root when the stale content is removed while the fallback is pending';
-			it(`${name} (${dev ? 'dev' : 'prod'})`, async () => {
+			it(`${name} (${suspendedHandoffMode(mode)})`, async () => {
 				const source = [
 					"import { useLayoutEffect } from 'octane';",
 					"import { unbound } from 'octane/behavior';",
@@ -899,7 +944,7 @@ describe('behavior-only roots', () => {
 					'function Gate() @{ <i>{read()}</i> }',
 					'export function App(props) @{',
 					'  props.onRender();',
-					'  useLayoutEffect(() => { props.onCommit(); }, []);',
+					'  useLayoutEffect(() => { props.onCommit(); });',
 					'  <section><Host label={props.label}><span>Hello</span></Host><Gate /></section>',
 					'}',
 				].join('\n');
@@ -912,7 +957,15 @@ describe('behavior-only roots', () => {
 						if (++renders > 20) throw new Error('Hydration did not converge.');
 					},
 				};
-				const fixture = authoredPresentation('Host', { label: 'server' }, dev, source);
+				const fixture = authoredPresentation(
+					'Host',
+					{ label: 'server' },
+					dev,
+					source,
+					{},
+					{ strong },
+				);
+				if (reused) await fallBackOnce(dev, strong);
 				container.innerHTML = renderToString(fixture.server.App, initial).html;
 				const button = container.querySelector('button')!;
 				const extra = document.createElement('script');
