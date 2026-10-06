@@ -1895,11 +1895,12 @@ As in React:
 - The root's container and `<html>`, `<head>` and `<body>` skip server
   elements that do not match, such as ones a browser extension inserted, and
   leave them in place, together with any server content after the client's.
-- A root that falls back clears its container. An `<html>`, `<head>` or
-  `<body>` container keeps its scripts, styles and stylesheet links. A
-  `Document` container is cleared apart from its doctype: Octane has no host
-  singletons, so unlike React it does not keep the document's existing
-  `<html>`, `<head>` and `<body>` elements.
+- A root that falls back clears its container. A `<head>` or `<body>`
+  container keeps its scripts, styles and stylesheet links. Octane has no
+  host singletons, so unlike React a `Document` or `<html>` container does
+  not keep its existing `<html>`, `<head>` and `<body>` elements, or the
+  scripts, styles and stylesheet links inside them: the client render's own
+  elements replace them. A `Document` keeps its doctype.
 - A suspension while hydrating keeps the server HTML; it never causes a
   fallback.
 

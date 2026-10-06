@@ -48822,7 +48822,7 @@ function assertValidRootContainer(container: unknown): asserts container is Root
 	}
 }
 
-/** `<html>`, `<head>` and `<body>`, which a document keeps (clearContainerSparingly). */
+/** `<html>`, `<head>` and `<body>`, React's document host singletons. */
 function isDocumentSingleton(node: Node): boolean {
 	if (node.nodeType !== 1) return false;
 	const name = (node as Element).localName;
@@ -48845,26 +48845,27 @@ function isDocumentResource(node: Node): boolean {
 
 /**
  * The server nodes that a root replacing a failed hydration discards, as
- * React's clearContainer does: `<html>`, `<head>` and `<body>` keep their
- * document resources and are themselves kept, cleared the same way. Any other
- * element keeps the renderer's scoped-CSS sidecars, which style the client
- * tree as they styled the server's. A document keeps its doctype.
+ * React's clearContainer does: a `<head>` or `<body>` container keeps its
+ * document resources, and any other element keeps the renderer's scoped-CSS
+ * sidecars, which style the client tree as they styled the server's. A
+ * document keeps only its doctype. React keeps a document's `<html>`, `<head>`
+ * and `<body>` for its host singletons to reuse. Octane has none, so the
+ * client render brings its own, and an `<html>` container discards the
+ * server's `<head>` and `<body>` as a document discards its `<html>`.
  */
 function hydrationFallbackNodes(container: RootContainer): Node[] {
 	const nodes: Node[] = [];
-	if (isDocumentSingleton(container)) collectSparingly(container, nodes);
-	else
-		for (let node = getFirstChild(container); node !== null; node = getNextSibling(node))
-			if (container.nodeType === 9 ? node.nodeType !== 10 : !isRendererHydrationStyle(node))
-				nodes.push(node);
+	const name = (container as Element).localName;
+	for (let node = getFirstChild(container); node !== null; node = getNextSibling(node))
+		if (
+			container.nodeType === 9
+				? node.nodeType !== 10
+				: name === 'head' || name === 'body'
+					? !isDocumentResource(node)
+					: !isRendererHydrationStyle(node)
+		)
+			nodes.push(node);
 	return nodes;
-}
-
-function collectSparingly(parent: Node, nodes: Node[]): void {
-	for (let node = getFirstChild(parent); node !== null; node = getNextSibling(node)) {
-		if (isDocumentSingleton(node)) collectSparingly(node, nodes);
-		else if (!isDocumentResource(node)) nodes.push(node);
-	}
 }
 
 /** Remove each of `nodes` that is still attached. */
@@ -49591,8 +49592,10 @@ export function __voidRootProps(type: ComponentBody, props: any): any {
  * or that a newer root render replaces, leaves the server DOM exactly as it
  * was. A render that throws to a catch arm commits without the report, and
  * one that ends in an uncaught error discards the server DOM unreported, both
- * as React's do. A document cannot hold a second root element, so its render
- * removes the server nodes up front, and a rollback restores them.
+ * as React's do. A document cannot hold a second root element, nor an
+ * `<html>` container a second `<head>` or `<body>`, so their render removes
+ * the server nodes up front, and a rollback restores them. The head entries
+ * that render places in `document.head` then land in the client's `<head>`.
  */
 function installHydrationFallback(
 	owner: RootRenderOwner,
@@ -49611,7 +49614,7 @@ function installHydrationFallback(
 		const transaction = ROOT_RENDER_TRANSACTION!;
 		// Rolling back a render that never commits restores exactly these nodes.
 		journalRootRange(container, null, null);
-		if (container.nodeType === 9) removeNodes(nodes);
+		if (container.nodeType === 9 || (container as Element).localName === 'html') removeNodes(nodes);
 		(transaction.commit ??= []).push(() => {
 			owner.hydrationFallback = undefined;
 			nodes.forEach(retireEventHostTree);
@@ -50431,7 +50434,11 @@ export function preinitModule(
 // deduped across the whole page, stylesheet groups ordered by precedence
 // (first-encounter group order, appended within a group), and RETAINED after
 // unmount — unloading a stylesheet or re-running a script is never safe, so
-// React never removes resources and neither does Octane. Suspend-until-loaded
+// React never removes resources and neither does Octane. The one exception is
+// a root that replaces a failed hydration: it discards the resources in the
+// server DOM it clears (hydrationFallbackNodes), as React's clearContainer
+// does for an element container, and since the dedupe state still counts
+// them, its client render does not insert them again. Suspend-until-loaded
 // ("suspensey" commit) is deliberately out of scope. The first client call
 // seeds dedupe state from SSR-emitted tags (data-precedence / data-oct-res),
 // so hydration never duplicates.

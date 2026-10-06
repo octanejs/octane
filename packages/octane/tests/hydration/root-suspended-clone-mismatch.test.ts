@@ -279,6 +279,57 @@ describe.each([true, false])('suspended root that falls back during hydration (d
 		expect(recoverable).toHaveLength(1);
 	});
 
+	// React 19 reuses an <html> container's <head> and <body> as host
+	// singletons and keeps the scripts, styles and stylesheet links in them
+	// (react-dom 19.2.7 probe: one head and one body, both the server's). Octane
+	// has no host singletons, so the client's <head> and <body> replace the
+	// server's, as a Document container's client <html> replaces the server's.
+	it.each([false, true])(
+		'replaces an html container’s head and body with the client’s (suspended=%s)',
+		async (suspended) => {
+			server.gate.thrown = undefined;
+			const html = renderToString(server.RootHtml, { server: true }).html;
+			const doc = new DOMParser().parseFromString(
+				'<!DOCTYPE html><html>' + html + '</html>',
+				'text/html',
+			);
+			doc.head.insertAdjacentHTML('beforeend', '<link rel="stylesheet" href="/third.css">');
+			doc.body.insertAdjacentHTML('beforeend', '<script type="application/json">{}</script>');
+			const serverHead = doc.head;
+			const serverBody = doc.body;
+			const resume = suspended ? gatePromise() : undefined;
+			const recoverable: unknown[] = [];
+			root = hydrateRoot(
+				doc.documentElement,
+				client.RootHtml,
+				{},
+				{
+					onRecoverableError: (reason) => recoverable.push(reason),
+				},
+			);
+			flushSync(() => {});
+			await act(() => {});
+
+			if (resume !== undefined) {
+				expect(doc.head).toBe(serverHead);
+				expect(doc.body).toBe(serverBody);
+				expect(doc.querySelectorAll('head, body')).toHaveLength(2);
+				expect(doc.body.textContent).toBe('serverok{}');
+				expect(recoverable).toEqual([]);
+				await resume();
+			}
+
+			expect(doc.querySelectorAll('head')).toHaveLength(1);
+			expect(doc.querySelectorAll('body')).toHaveLength(1);
+			expect(doc.head).not.toBe(serverHead);
+			expect(doc.body).not.toBe(serverBody);
+			expect(doc.body.textContent).toBe('clientok');
+			expect(doc.head.querySelectorAll('meta[name="side"]')).toHaveLength(1);
+			expect(doc.querySelector('link, script')).toBeNull();
+			expect(recoverable).toHaveLength(1);
+		},
+	);
+
 	// Each kind of mismatch before the root suspends: an arm of a boundary that
 	// falls back on its own, a renderable or only-child hole over server text,
 	// list shapes the server rendered differently, and a lite call's template in

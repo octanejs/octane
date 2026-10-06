@@ -145,6 +145,20 @@ export function RootBody(props: { server?: boolean }) @{
 	</main>
 }
 
+// Rendered into an <html> container, whose text differs on the client before
+// the root reaches GateLeaf.
+export function RootHtml(props: { server?: boolean }) @{
+	<>
+		<head>
+			<meta name="side" content="root" />
+		</head>
+		<body>
+			<p>{(props.server ? 'server' : 'client') as string}</p>
+			<GateLeaf />
+		</body>
+	</>
+}
+
 // A whole document whose body differs on the client.
 export function RootDocument(props: { server?: boolean }) @{
 	<html>
