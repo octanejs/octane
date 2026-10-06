@@ -169,6 +169,14 @@ export function evaluateCompiledFixtureCode<T extends CompiledFixtureModule>(
 				? match
 				: `__exports.default = __runtimeModules[${JSON.stringify(request)}].default;`,
 	);
+	// A split `<Hydrate>` child loads its compiler-selected module on demand.
+	code = code.replace(
+		/\bimport\(\s*(['"])([^'"]+)\1\s*\)/g,
+		(match: string, _quote: string, request: string) =>
+			runtimeModules === undefined || !Object.hasOwn(runtimeModules, request)
+				? match
+				: `Promise.resolve(__runtimeModules[${JSON.stringify(request)}])`,
+	);
 	// A bundled chunk declares its exports in one local list. Register them at
 	// the end, like the function exports above.
 	const listedExports: string[] = [];

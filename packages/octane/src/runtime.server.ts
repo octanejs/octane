@@ -168,7 +168,9 @@ import {
 } from './html-tree-validation.js';
 import { sanitizeURL, sanitizeURLAttribute } from './sanitize-url.js';
 import {
+	COMPONENT_FLAG_AUTHOR_CHILDREN,
 	COMPONENT_FLAG_BOUNDARY,
+	COMPONENT_FLAGS_AUTHOR_BOUNDARY,
 	hasComponentFlags,
 	markComponentFlags,
 } from './component-flags.js';
@@ -509,6 +511,12 @@ const RENDERER_INVOCATION_SITE = 'r:';
 // block, keeps its own instance for its declarations. Its owner records the
 // owner it renders inside, as an inline row's does (runtime.ts spells it the same).
 const TEMPLATE_INVOCATION_SITE = 't:';
+// Compiled children are part of the template that authored them, not of the
+// component rendering them. markChildrenBlock records the owner that template
+// renders in, and the children's owner links to it (runtime.ts does the same).
+// The key is local to this runtime copy, since an owner belongs to the request
+// state of the copy that created it.
+const CHILDREN_SIGNAL_OWNER: unique symbol = Symbol() as any;
 let SIGNAL_COMPONENT_INSTANCE_KEY: ServerSignalInstanceKey = '';
 let SERVER_SIGNAL_OWNER_ACTIVE = false;
 let SIGNAL_CONTROL_SITE = '';
@@ -5649,9 +5657,13 @@ export function ssrComponent(
 			bindingMarker,
 			renderer ? SIGNAL_LIST_KEYS : undefined,
 			// Only an enabled pass has instance declarations to resolve through it.
-			invocationSite === TEMPLATE_INVOCATION_SITE && typeof signalInstanceKey === 'string'
-				? serverSignalOwner(pf)
-				: undefined,
+			typeof signalInstanceKey !== 'string'
+				? undefined
+				: invocationSite === TEMPLATE_INVOCATION_SITE
+					? serverSignalOwner(pf)
+					: invocationSite === undefined
+						? childrenSignalOwner(comp)
+						: authorChildrenSignalOwner(comp, props),
 		);
 	} finally {
 		if (identityScoped !== true) ASYNC_SCOPE = previousIdentityScope;
@@ -5920,7 +5932,7 @@ const PermanentStaticHydrate = /* @__PURE__ */ markComponentFlags(
 			PERMANENT_STATIC_HYDRATE_DEPTH--;
 		}
 	},
-	COMPONENT_FLAG_BOUNDARY,
+	COMPONENT_FLAGS_AUTHOR_BOUNDARY,
 	'PermanentStaticHydrate',
 );
 
@@ -6025,7 +6037,7 @@ const hydrate = /* @__PURE__ */ markComponentFlags(
 			),
 		);
 	},
-	COMPONENT_FLAG_BOUNDARY,
+	COMPONENT_FLAGS_AUTHOR_BOUNDARY,
 	'Hydrate',
 );
 
@@ -6066,7 +6078,7 @@ export const Suspense = /* @__PURE__ */ markComponentFlags(
 			),
 		);
 	},
-	COMPONENT_FLAG_BOUNDARY,
+	COMPONENT_FLAGS_AUTHOR_BOUNDARY,
 	'Suspense',
 	SUSPENSE_TAG,
 );
@@ -6571,7 +6583,7 @@ export const ViewTransition = /* @__PURE__ */ markComponentFlags(
 		const annotated = vtSsrAnnotate(inner, attrs);
 		return ssrHtml(ssrBlock(props.scope === 'element' ? vtSsrAnnotateScope(annotated) : annotated));
 	},
-	COMPONENT_FLAG_BOUNDARY,
+	COMPONENT_FLAGS_AUTHOR_BOUNDARY,
 	'ViewTransition',
 );
 
@@ -6618,7 +6630,7 @@ export const ErrorBoundary = /* @__PURE__ */ markComponentFlags(
 			),
 		);
 	},
-	COMPONENT_FLAG_BOUNDARY,
+	COMPONENT_FLAGS_AUTHOR_BOUNDARY,
 	'ErrorBoundary',
 );
 
@@ -8309,6 +8321,11 @@ export function flushSync<T>(fn: () => T): T {
 export function markChildrenBlock<T>(fn: T): T {
 	if (typeof fn === 'function') {
 		(fn as any)[CHILDREN_BLOCK] = true;
+		if (SERVER_SIGNAL_OWNER_ACTIVE) {
+			const owner = currentSignalOwner();
+			if (owner !== null && isRendererSignalOwner(owner))
+				(fn as any)[CHILDREN_SIGNAL_OWNER] = owner;
+		}
 	}
 	return fn;
 }
@@ -8332,6 +8349,28 @@ export function isChildrenBlock(value: unknown): boolean {
 // template that authored them.
 function templateInvocationSite(body: unknown): string | undefined {
 	return isChildrenBlock(body) ? undefined : TEMPLATE_INVOCATION_SITE;
+}
+
+// The owner of the template that authored compiled children, recorded by
+// markChildrenBlock (runtime.ts records the same owner).
+function childrenSignalOwner(body: unknown): SignalRendererOwnerIdentity | undefined {
+	return isChildrenBlock(body) ? (body as any)[CHILDREN_SIGNAL_OWNER] : undefined;
+}
+
+// A context provider or boundary built-in renders compiled children inline in
+// its own frame, so its owner links to their author's. The client renders a
+// boundary's children in a slot or try body of their own instead, which links
+// the same way (see scopeSignalOwner and createHydrateBoundaryBody).
+function authorChildrenSignalOwner(
+	comp: unknown,
+	props: { children?: unknown } | null | undefined,
+): SignalRendererOwnerIdentity | undefined {
+	const owner = childrenSignalOwner(props?.children);
+	return owner !== undefined &&
+		((comp as any).$$kind === CONTEXT_TAG ||
+			hasComponentFlags(comp, COMPONENT_FLAG_AUTHOR_CHILDREN))
+		? owner
+		: undefined;
 }
 
 // ---------------------------------------------------------------------------
