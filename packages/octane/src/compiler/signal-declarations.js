@@ -5,6 +5,7 @@ import {
 	cloneDependency,
 	collectReassignedBindings,
 	isInvariantLiteral,
+	methodDepFlags,
 } from './hook-deps.js';
 import { inheritHookMemoOrigin } from './inline-hook-memo.js';
 import { normalizeTextTypeFilename } from './text-type-facts.js';
@@ -239,14 +240,14 @@ function analyzeSignalCaptures(ast, declarations) {
 function captureExpression(dependency, helper) {
 	if (!dependency.method) return cloneDependency(dependency.node);
 	const origin = dependency.node;
-	const { root, name, guarded } = dependency.method;
+	const { root, name } = dependency.method;
 	return inheritHookMemoOrigin(
 		{
 			...b.call(
 				helper(),
 				{ ...root },
 				b.literal(name, JSON.stringify(name)),
-				...(guarded ? [b.literal(true, 'true')] : []),
+				...methodDepFlags(dependency.method).map((flag) => b.literal(flag, String(flag))),
 			),
 			start: origin.start,
 			end: origin.end,
@@ -258,8 +259,8 @@ function captureExpression(dependency, helper) {
 
 function captureSource(dependency, source, helper) {
 	if (!dependency.method) return source.slice(dependency.node.start, dependency.node.end);
-	const { root, name, guarded } = dependency.method;
-	return `${helper()}(${root.name}, ${JSON.stringify(name)}${guarded ? ', true' : ''})`;
+	const { root, name } = dependency.method;
+	return `${helper()}(${[root.name, JSON.stringify(name), ...methodDepFlags(dependency.method)].join(', ')})`;
 }
 
 // Parser expression ranges omit grouping parentheses. Append at the call

@@ -163,18 +163,20 @@ describe('useMemo', () => {
 	});
 
 	it('infers dependencies for a local custom memo hook', () => {
-		const compute = vi.fn((value: string) => value.toUpperCase());
+		const computeSpy = vi.fn((value: string) => value.toUpperCase());
+		// An arrow callback cannot see `props` as its receiver, so it tracks only itself.
+		const compute = (value: string) => computeSpy(value);
 		const r = mount(CustomMemoDeps, { compute, value: 'a', noise: 0 });
 		expect(r.find('.value').textContent).toBe('A');
-		expect(compute).toHaveBeenCalledTimes(1);
+		expect(computeSpy).toHaveBeenCalledTimes(1);
 
 		r.update(CustomMemoDeps, { compute, value: 'a', noise: 1 });
 		expect(r.find('.value').textContent).toBe('A');
-		expect(compute).toHaveBeenCalledTimes(1);
+		expect(computeSpy).toHaveBeenCalledTimes(1);
 
 		r.update(CustomMemoDeps, { compute, value: 'b', noise: 2 });
 		expect(r.find('.value').textContent).toBe('B');
-		expect(compute).toHaveBeenCalledTimes(2);
+		expect(computeSpy).toHaveBeenCalledTimes(2);
 		r.unmount();
 	});
 
@@ -329,36 +331,38 @@ describe('useEffect', () => {
 	});
 
 	it('re-fires when deps change', async () => {
-		const cb = vi.fn();
+		const cbSpy = vi.fn();
+		const cb = (value: unknown) => cbSpy(value);
 		const r = mount(EffectDeps, { cb, n: 1 });
 		await nextPaint();
-		expect(cb).toHaveBeenLastCalledWith(1);
-		expect(cb).toHaveBeenCalledTimes(1);
+		expect(cbSpy).toHaveBeenLastCalledWith(1);
+		expect(cbSpy).toHaveBeenCalledTimes(1);
 		r.update(EffectDeps, { cb, n: 1 });
 		await nextPaint();
-		expect(cb).toHaveBeenCalledTimes(1); // unchanged deps
+		expect(cbSpy).toHaveBeenCalledTimes(1); // unchanged deps
 		r.update(EffectDeps, { cb, n: 2 });
 		await nextPaint();
-		expect(cb).toHaveBeenCalledTimes(2);
-		expect(cb).toHaveBeenLastCalledWith(2);
+		expect(cbSpy).toHaveBeenCalledTimes(2);
+		expect(cbSpy).toHaveBeenLastCalledWith(2);
 		r.unmount();
 	});
 
 	it('infers dependencies for a local custom effect hook', async () => {
-		const cb = vi.fn();
+		const cbSpy = vi.fn();
+		const cb = (value: unknown) => cbSpy(value);
 		const r = mount(CustomEffectDeps, { cb, value: 'a', noise: 0 });
 		await nextPaint();
-		expect(cb).toHaveBeenLastCalledWith('a');
-		expect(cb).toHaveBeenCalledTimes(1);
+		expect(cbSpy).toHaveBeenLastCalledWith('a');
+		expect(cbSpy).toHaveBeenCalledTimes(1);
 
 		r.update(CustomEffectDeps, { cb, value: 'a', noise: 1 });
 		await nextPaint();
-		expect(cb).toHaveBeenCalledTimes(1);
+		expect(cbSpy).toHaveBeenCalledTimes(1);
 
 		r.update(CustomEffectDeps, { cb, value: 'b', noise: 2 });
 		await nextPaint();
-		expect(cb).toHaveBeenLastCalledWith('b');
-		expect(cb).toHaveBeenCalledTimes(2);
+		expect(cbSpy).toHaveBeenLastCalledWith('b');
+		expect(cbSpy).toHaveBeenCalledTimes(2);
 		r.unmount();
 	});
 

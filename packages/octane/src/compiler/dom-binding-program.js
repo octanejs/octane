@@ -1,5 +1,6 @@
 /** Compiler-owned presentation programs; authored views never execute in the browser. */
 import { builders as b, strongHash } from '@tsrx/core';
+import { methodDepFlags } from './hook-deps.js';
 import { inheritHookMemoOrigin as origin } from './inline-hook-memo.js';
 import {
 	createTemplateIr,
@@ -740,7 +741,12 @@ export function planBindingProgram(fn, render, context) {
 						);
 					}
 					return origin(
-						b.call(b.id(methodDependency), record.method.root, b.literal(record.method.name)),
+						b.call(
+							b.id(methodDependency),
+							record.method.root,
+							b.literal(record.method.name),
+							...methodDepFlags(record.method).map((flag) => b.literal(flag)),
+						),
 						record.node,
 					);
 				});

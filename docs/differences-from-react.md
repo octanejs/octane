@@ -138,24 +138,31 @@ its value, while an accessor or inherited property tracks its receiver without
 invoking a getter. An absent property tracks `undefined`. Failed reflection
 probes track the receiver, leaving the
 authored callback responsible for the read and its exception handling. Thus a
-guarded `props.onChange(...)` still tracks a stable own callback when the props
-container changes, while method getters stay behind their authored guard.
+guarded `props.onChange(...)` still tracks a stable own arrow callback when the
+props container changes, while method getters stay behind their authored guard.
 Null and undefined receivers use separate module-local markers, so a failed receiver
 read does not compare equal to a successful own-data read of null or undefined.
 These markers are created once per module, rather than once per probe.
-These guarded probes allocate a property descriptor; ordinary unguarded
-one-level method calls retain the allocation-free comparison below.
+These guarded probes allocate a property descriptor; unguarded one-level
+method calls read the property directly.
 
-A one-level method call tracks the value that can change between renders. The
-compiled array selects that value on each render, based on where the method
-lives:
+A one-level method call reads both the method and the receiver it passes as
+`this`. The compiled array selects the value that can change between renders
+on each render, based on the method:
 
-- An own function property tracks itself: `props.onChange(...)` tracks
-  `props.onChange`.
-- An inherited method tracks its receiver: `count.toFixed(2)` tracks `count`,
-  because `Number.prototype.toFixed` is one function for every number.
+- An own arrow function tracks itself: `props.onChange(...)` tracks
+  `props.onChange` when it is an arrow, because an arrow cannot see the
+  receiver it is called on.
+- Any other method can read `this`, so it tracks its receiver, as React
+  Compiler does for every method call. `count.toFixed(2)` tracks `count`,
+  because `Number.prototype.toFixed` is one function for every number, and
+  `source.read()` tracks `source` when `read` is an ordinary `function` or a
+  method, even if several objects share that one function.
 - An absent handler in an optional call tracks a stable `undefined`:
   `props.onReady?.()` does not re-run its hook until a handler is passed.
+
+The arrow check reads the function's source text. Where an engine does not
+expose source text, every own function tracks its receiver.
 
 Deeper calls such as `cart.items.push(x)` track their receiver path
 (`cart.items`), unchanged.

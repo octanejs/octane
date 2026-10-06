@@ -60,6 +60,7 @@ import {
 	collectReassignedBindings,
 	followsOptionalLink,
 	isInvariantLiteral,
+	methodDepFlags,
 } from './hook-deps.js';
 import {
 	analyzeInlineMemoCall,
@@ -18164,11 +18165,15 @@ export function collectDepPaths(expr, coarsenDepRoots, isModuleBound, methodDep)
 		if (probe) {
 			(probes ??= new Map()).set(key, deps.length);
 			const name = staticDepMemberName(node);
+			// A guarded read, never a call: an own function value is its own
+			// dependency because no receiver reaches it.
 			node = b.call(
 				methodDep(),
 				node.object,
 				b.literal(name, JSON.stringify(name)),
-				b.literal(true, 'true'),
+				...methodDepFlags({ guarded: true, read: true }).map((flag) =>
+					b.literal(flag, String(flag)),
+				),
 			);
 		}
 		deps.push(guarded(node));

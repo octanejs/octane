@@ -209,6 +209,21 @@ export function InlineRefPresentation(props: {
 	<input title={props.title} ref={(node) => props.onAttach(node)} />
 }
 
+export function GuardedInlineRefPresentation(props: {
+	enabled: boolean;
+	handler: () => void;
+	onAttach(element: Element | null, handler: () => void): void;
+	title: string;
+}) @{
+	'use dom bindings';
+	<input
+		title={props.title}
+		ref={(node) => {
+			if (props.enabled) props.onAttach(node, props.handler);
+		}}
+	/>
+}
+
 export function SignalRowPresentation(props: {
 	items: readonly {
 		id: string;
