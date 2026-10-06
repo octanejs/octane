@@ -311,6 +311,10 @@ Snapshots also expose `refreshing`, `connection`, `complete`, and an optional
 `requestKey`. A ready value can still be refreshing or streaming. `undefined`,
 `null`, `false`, and empty strings are valid values, not pending sentinels.
 
+A synchronous derived computation can also throw a thenable to wait on it. It
+stays pending until the thenable settles, then runs again. Throwing a thenable
+that has already settled waits for a signal it reads to change instead.
+
 Use a derived signal to retain one coherent result:
 
 ```ts

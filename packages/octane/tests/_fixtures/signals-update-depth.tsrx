@@ -1,6 +1,6 @@
 /** @jsxImportSource octane */
 import { useState } from 'octane';
-import { derived$, query$, signal$ } from 'octane/signals';
+import { derived$, query$, signal$, type SignalHandle } from 'octane/signals';
 
 export type LoopProps = { onRender: () => void };
 
@@ -101,4 +101,64 @@ export function StalePendingChain({ load, onWait }: WaitProps) @{
 			{label.status === 'ready' ? label.value : label.status}
 		</output>
 	</section>
+}
+
+function AsyncReader(props: { source$: SignalHandle<string> }) @{
+	const result$ = derived$(async ({ read }) => await read(props.source$));
+	const result = result$.snapshot();
+	<output id="reader">
+		{result.status === 'ready' ? result.value : result.status}
+	</output>
+}
+
+export type Load = { readonly promise: Promise<void>; value?: string };
+
+export type ThrownProps = {
+	ready$: SignalHandle<boolean>;
+	load: Load;
+	onWait: (waiting: unknown) => void;
+};
+
+// #1763: a redeclared definition throws a different thenable than the one it
+// replaced, while reading the same signal, and a child reads it asynchronously.
+export function SwitchedThrownChain(props: ThrownProps) @{
+	const value$ = derived$(() => {
+		if (!props.ready$.get() || props.load.value === undefined) throw props.load.promise;
+		return props.load.value;
+	});
+	const read = () => {
+		try {
+			value$.get();
+		} catch (waiting) {
+			props.onWait(waiting);
+		}
+	};
+	const value = value$.snapshot();
+	<section>
+		<button id="read" onClick={read}>{'Read'}</button>
+		<output id="value">
+			{value.status === 'ready' ? value.value : value.status}
+		</output>
+		<AsyncReader source$={value$} />
+	</section>
+}
+
+export type AsyncSwitchProps = {
+	replaced: Promise<void>;
+	result: Promise<string>;
+	started: boolean;
+	onAttempt: (signal: AbortSignal) => void;
+};
+
+// A redeclared definition starts asynchronous work in place of a thrown thenable.
+export function ThrownThenAsync(props: AsyncSwitchProps) @{
+	const value$ = derived$(({ signal }) => {
+		if (!props.started) throw props.replaced;
+		props.onAttempt(signal);
+		return props.result;
+	});
+	const value = value$.snapshot();
+	<output id="value">
+		{value.status === 'ready' ? value.value : value.status}
+	</output>
 }
