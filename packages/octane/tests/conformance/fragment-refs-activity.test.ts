@@ -48,6 +48,28 @@ function renderGroup(mode: 'visible' | 'hidden') {
 }
 
 describe('Fragment refs and Activity visibility', () => {
+	// Pins the Activity reveal routing Fragment refs through the live-ref trampoline, which publishes child ownership before the callback runs.
+	it('publishes Fragment child ownership before a revealed callback ref runs', () => {
+		const fragmentRef: { current: FragmentInstance | null } = { current: null };
+		const wrappedRef: { current: FragmentInstance | null } = { current: null };
+		const owned: boolean[] = [];
+		const innerRef = {
+			get current(): FragmentInstance | null {
+				return null;
+			},
+			set current(instance: FragmentInstance | null) {
+				if (instance === null) return;
+				const child = document.getElementById('activity-nested') as FragmentHost;
+				owned.push(child.reactFragments?.has(instance) === true);
+			},
+		};
+		const props = { mode: 'hidden' as const, fragmentRef, innerRef, wrappedRef };
+		mounted = mount(ActivityFragmentGroup, props);
+		expect(owned).toEqual([]);
+		mounted.update(ActivityFragmentGroup, { ...props, mode: 'visible' });
+		expect(owned).toEqual([true]);
+	});
+
 	it('defers initially hidden Fragment refs until their Activity reveals', () => {
 		const fragmentRef: { current: FragmentInstance | null } = { current: null };
 		const innerRef: { current: FragmentInstance | null } = { current: null };

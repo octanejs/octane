@@ -45255,7 +45255,7 @@ function queueCurrentActivityRefs(activity: ActivitySlot): void {
 		if (record !== undefined && !record.hidden && record.connected === entry.ref) continue;
 		queueRefAttach(
 			entry.scope,
-			entry.el instanceof FragmentInstance ? attachLiveFragmentRef : entry.ref,
+			activeFragments.has(entry.el as FragmentInstance) ? attachLiveFragmentRef : entry.ref, // instanceof would retain FragmentInstance in Activity-only bundles
 			entry.el,
 		);
 	}
