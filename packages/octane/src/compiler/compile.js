@@ -58,6 +58,7 @@ import {
 	analyzeHookDependencies,
 	applyHookDependencies,
 	collectReassignedBindings,
+	followsOptionalLink,
 	isInvariantLiteral,
 } from './hook-deps.js';
 import {
@@ -1549,6 +1550,7 @@ function requireRuntimeForContext(ctx, name) {
 	ctx.runtimeNeeded.add(name);
 	if (
 		name === 'isContext' ||
+		name === METHOD_DEP_IMPORT ||
 		HOOK_MEMO_RUNTIME_HELPERS.has(name) ||
 		NATIVE_READ_RUNTIME_HELPERS.has(name)
 	) {
@@ -18105,40 +18107,69 @@ function depPathKey(node) {
 // deferred: a module-bound root keeps its precise path as `root?.prop`, and an
 // ambient global (not bound in the enclosing scope chain) contributes no dep at
 // all, because it may not exist in this environment (`window` under SSR).
+// An argument or computed key after an optional link (`run?.(options.label)`,
+// `value?.[options.key]`) is skipped during render rather than deferred: its
+// member reads use `methodDep()`'s guarded descriptor probe, which neither
+// throws on a nullish receiver nor invokes a getter the render never reaches.
 // `isModuleBound` is a scope-aware `(name) => boolean` from
 // `moduleBoundCheckForDeps`, resolving through the expression's enclosing scope
 // chain so that sibling-function parameters never leak into the decision.
-function collectDepPaths(expr, coarsenDepRoots = null, isModuleBound = null) {
+function collectDepPaths(expr, coarsenDepRoots, isModuleBound, methodDep) {
 	const deps = [];
 	const seen = new Set();
 	const lexical = createLexicalAnalysis(expr);
 	let guards = null;
 	let nextGuard = 0;
 	let deferred = 0;
+	let skipped = 0;
+	// Dependency index of each skipped-read probe, keyed like its plain read.
+	// Any other read of the same path already reads its member at render, so it
+	// replaces the probe with that more precise member dependency.
+	/** @type {Map<string, number> | undefined} */
+	let probes;
 	let ownArguments = 0;
 	const isFree = (node, parent, key) =>
 		isIdentifierReference(node, parent, key, lexical) &&
 		!lexical.isBound(lexical.nodeScopes.get(node) ?? lexical.rootScope, node.name) &&
 		!(ownArguments > 0 && node.name === 'arguments');
 	const deferredAmbient = (name) =>
-		deferred > 0 && (isModuleBound === null || !isModuleBound(name));
-	const push = (node, key) => {
+		(deferred > 0 || skipped > 0) && (isModuleBound === null || !isModuleBound(name));
+	const guarded = (node) => {
+		for (let guard = guards; guard !== null; guard = guard.parent) {
+			node = b.conditional(guard.test, node, b.void0);
+		}
+		return node;
+	};
+	const push = (node, key, probe = false) => {
 		if (coarsenDepRoots !== null) {
 			const member = depPathMember(node);
 			if (member?.object.type === 'Identifier' && coarsenDepRoots.has(member.object.name)) {
 				node = b.id(member.object.name);
 				key = depPathKey(node);
+				probe = false;
 			}
 		}
 		if (guards !== null) key += `:guard:${guards.id}`;
-		if (seen.has(key)) return;
-		seen.add(key);
-		if (guards !== null) {
-			for (let guard = guards; guard !== null; guard = guard.parent) {
-				node = b.conditional(guard.test, node, b.void0);
+		if (seen.has(key)) {
+			const index = probe ? undefined : probes?.get(key);
+			if (index !== undefined) {
+				probes.delete(key);
+				deps[index] = guarded(node);
 			}
+			return;
 		}
-		deps.push(node);
+		seen.add(key);
+		if (probe) {
+			(probes ??= new Map()).set(key, deps.length);
+			const name = staticDepMemberName(node);
+			node = b.call(
+				methodDep(),
+				node.object,
+				b.literal(name, JSON.stringify(name)),
+				b.literal(true, 'true'),
+			);
+		}
+		deps.push(guarded(node));
 	};
 	walk(expr, null, null);
 	return deps;
@@ -18292,27 +18323,42 @@ function collectDepPaths(expr, coarsenDepRoots = null, isModuleBound = null) {
 				}
 				break;
 			}
+			case 'CallExpression':
+				if (n.arguments.length === 0 || !followsOptionalLink(n)) break;
+				walk(n.callee, n, 'callee');
+				skipped++;
+				for (const argument of n.arguments) walk(argument, n, 'arguments');
+				skipped--;
+				return;
 			case 'MemberExpression': {
 				const propertyName = staticDepMemberName(n);
 				if (n.object.type === 'Identifier' && propertyName !== null) {
 					if (isFree(n.object, n, 'object') && !deferredAmbient(n.object.name)) {
+						// A deferred read keeps its `root?.prop` form even after an
+						// optional link; only a skipped render read becomes a probe.
+						const probe = skipped > 0 && deferred === 0;
 						const member = b.member(
 							b.id(n.object.name),
 							n.computed
 								? b.literal(propertyName, JSON.stringify(propertyName))
 								: b.id(propertyName),
 							n.computed,
-							n.optional === true || deferred > 0,
+							!probe && (n.optional === true || deferred > 0),
 						);
 						// Optional MemberExpressions must remain inside a ChainExpression.
 						// Besides keeping the synthesized tree valid ESTree, the wrapper
 						// preserves optional-evaluation semantics through later AST passes.
 						const dep = member.optional ? { type: 'ChainExpression', expression: member } : member;
-						push(dep, depPathKey(dep));
+						push(dep, depPathKey(dep), probe);
 					}
 					return;
 				}
-				break;
+				if (!n.computed || !followsOptionalLink(n)) break;
+				walk(n.object, n, 'object');
+				skipped++;
+				walk(n.property, n, 'property');
+				skipped--;
+				return;
 			}
 		}
 		forEachRuntimeAstChild(n, (child, childKey) => walk(child, n, childKey));
@@ -18567,7 +18613,9 @@ function makeCreationMemoCall(
 	// promise — and the derived creation would never refresh when its upstream
 	// promise does. Coarsen member deps rooted at render-created locals to the
 	// bare identifier (dedup follows).
-	const deps = collectDepPaths(expr, coarsenDepRoots, moduleBoundCheckForDeps(ctx, expr));
+	const deps = collectDepPaths(expr, coarsenDepRoots, moduleBoundCheckForDeps(ctx, expr), () =>
+		requireRuntimeForContext(ctx, METHOD_DEP_IMPORT),
+	);
 	// Server mirror: `puMemo` — keyed CROSS-PASS creation cache (a fresh
 	// SSRScope per pass makes client useMemo semantics useless there).
 	const memoHelper = ctx.nativeReads
@@ -19277,7 +19325,9 @@ function parallelUseWalkJsx(nodes, ctx, componentName, creations, warmChildren, 
 				kind: 'useMemo',
 				node: expr,
 			});
-			const deps = collectDepPaths(expr, null, moduleBoundCheckForDeps(ctx, expr));
+			const deps = collectDepPaths(expr, null, moduleBoundCheckForDeps(ctx, expr), () =>
+				requireRuntimeForContext(ctx, METHOD_DEP_IMPORT),
+			);
 			const memoAlias = requireRuntimeForContext(ctx, ctx.nativeReads ? 'nativePuMemo' : 'puMemo');
 			changed = true;
 			// The minted prop-memo wrapper maps to the authored prop expression.
