@@ -5085,9 +5085,62 @@ function forSlotParkable(state: ForSlot): boolean {
  * window — the first record is the pre-render one, which is the one to go back
  * to.
  */
-function journalForSlot(state: ForSlot): false {
+/**
+ * A keyed list's rollback record for one journal window. The full form copies
+ * the chain, and the key Map's order where it differs, before a reconcile
+ * relinks rows wholesale. The link form serves the shapes that relink a bounded
+ * set of rows (inserts, removals, a small displacement): it keeps the old head
+ * and the old `nextSibling` of each row whose `nextSibling` it rewrites, and
+ * rollback walks the old chain forward through those links (fullForSlotRecord).
+ * Restoring the chain rewrites every `prevSibling` and index from position, so
+ * neither form records those. A wholesale change later in the same window, or
+ * a record for an inner window, converts the link form to the full form first.
+ */
+interface ForSlotRecord {
+	empty: Block | null;
+	chain: Block[] | null;
+	mapOrder: Block[] | null;
+	head: Block | null;
+	links: Map<Block, Block | null> | null;
+	/** `state.inOrder` when the record was taken. */
+	inOrder: boolean;
+	/** The Map's order before a link-form removal, when not chain order. */
+	prior: Block[] | null;
+	/** Development only: the full form, checked against the link form. */
+	check?: Block[][];
+}
+
+/**
+ * Each journal log's newest link record per list. Keyed by the log, so the
+ * records (which reference removed rows) go when a committed log is dropped,
+ * and a later log never sees an earlier one's.
+ */
+const SLOT_RECORDS = new WeakMap<any[], Map<ForSlot, ForSlotRecord>>();
+
+/**
+ * Ensure the current window can restore this list to its shape before the
+ * window's first change. Without `link`, the caller is about to relink rows
+ * wholesale, so the record takes, or converts to, the full form. With `link`,
+ * the window's record comes back for the caller to record the old
+ * `nextSibling` of each row whose `nextSibling` it rewrites in `record.links`
+ * (a full record has no `links` and needs none). Null when hydration adoption
+ * journals the range instead. One call either way, like the single snapshot
+ * function this replaces.
+ */
+function journalForSlot(state: ForSlot, link?: boolean): ForSlotRecord | null {
 	const seen = TRANSITION_JOURNAL_BAGS!;
-	if ((seen.get(state) ?? -1) >= TRANSITION_JOURNAL_CHECKPOINT) return false;
+	let records = SLOT_RECORDS.get(TRANSITION_JOURNAL!);
+	const current = records?.get(state) ?? null;
+	if ((seen.get(state) ?? -1) >= TRANSITION_JOURNAL_CHECKPOINT) {
+		if (link) return current;
+		if (current !== null && current.links !== null) fullForSlotRecord(state, current);
+		return null;
+	}
+	// An enclosing window's link record stops gathering links here.
+	if (current !== null) {
+		if (current.links !== null) fullForSlotRecord(state, current);
+		records!.delete(state);
+	}
 	seen.set(state, TRANSITION_JOURNAL!.length);
 	if (
 		ROOT_RENDER_TRANSACTION !== null &&
@@ -5105,32 +5158,86 @@ function journalForSlot(state: ForSlot): false {
 		// theirs individually before reconcileKeyed moves them.
 		for (let b: Block | null = state.head; b !== null; b = b.nextSibling)
 			TRANSITION_JOURNAL!.push(JOURNAL_PROP, b, 'itemIndex', b.itemIndex);
-		return false;
+		return null;
 	}
-	// Rollback also restores each row's itemIndex from its chain position: every
-	// reconcile leaves a row's index equal to its position, and reconcileKeyed
-	// records the shape before it writes the first survivor index.
-	const chain: Block[] = [];
-	for (let b: Block | null = state.head; b !== null; b = b.nextSibling) {
-		chain.push(b);
+	let chain: Block[] | null = null;
+	let mapOrder: Block[] | null = null;
+	if (!link) {
+		chain = [];
+		for (let b: Block | null = state.head; b !== null; b = b.nextSibling) chain.push(b);
+		// The key Map keeps insertion order through earlier reorders. Preserve that
+		// order for context refresh only when it differs from the linked DOM order.
+		// Spreading the values takes the engine's bulk copy; a list reordered before
+		// differs at its first rows, so the comparison usually stops at once.
+		const keyOrder = [...state.items.values()];
+		if (keyOrder.length !== chain.length) mapOrder = keyOrder;
+		for (let i = 0; mapOrder === null && i < keyOrder.length; i++)
+			if (keyOrder[i] !== chain[i]) mapOrder = keyOrder;
 	}
-	// The key Map keeps insertion order through earlier reorders. Preserve that
-	// order for context refresh only when it differs from the linked DOM order.
-	// Spreading the values takes the engine's bulk copy; a list reordered before
-	// differs at its first rows, so the comparison usually stops at once.
-	const keyOrder = [...state.items.values()];
-	let mapOrder: Block[] | null = keyOrder.length === chain.length ? null : keyOrder;
-	for (let i = 0; mapOrder === null && i < keyOrder.length; i++)
-		if (keyOrder[i] !== chain[i]) mapOrder = keyOrder;
-	const snapshot = {
+	const record: ForSlotRecord = {
 		empty: state.emptyBlock,
+		chain,
 		mapOrder,
+		head: state.head,
+		links: link ? new Map() : null,
+		inOrder: state.inOrder,
+		prior: null,
 	};
+	if (link) {
+		if (process.env.NODE_ENV !== 'production') record.check = forSlotShape(state);
+		if (records === undefined) SLOT_RECORDS.set(TRANSITION_JOURNAL!, (records = new Map()));
+		records.set(state, record);
+	}
+	const owner = records;
 	journalUndo(() => {
-		restoreForSlot(state, snapshot, chain);
-		TRANSITION_JOURNAL_BAGS!.delete(state);
+		if (record.links !== null) fullForSlotRecord(state, record);
+		restoreForSlot(state, record, record.chain);
+		seen.delete(state);
+		if (owner?.get(state) === record) owner.delete(state);
 	});
-	return false;
+	return link ? record : null;
+}
+
+/** Development check: the chain, and the Map's order where it differs. */
+function forSlotShape(state: ForSlot): Block[][] {
+	const chain: Block[] = [];
+	for (let b: Block | null = state.head; b !== null; b = b.nextSibling) chain.push(b);
+	const keyOrder = [...state.items.values()];
+	return keyOrder.length === chain.length && keyOrder.every((block, i) => block === chain[i])
+		? [chain]
+		: [chain, keyOrder];
+}
+
+/** Convert a link record to the full form: the shape when it was taken. */
+function fullForSlotRecord(state: ForSlot, record: ForSlotRecord): void {
+	const links = record.links!;
+	record.links = null;
+	// The old head and the recorded nextSiblings reach every old row: a row whose
+	// nextSibling was not rewritten still holds it.
+	const chain: Block[] = [];
+	for (let b = record.head; b !== null; b = links.has(b) ? links.get(b)! : b.nextSibling)
+		chain.push(b);
+	record.chain = chain;
+	// Without a removal the Map has only gained fresh rows' keys, which the old
+	// chain excludes; a removal from a Map out of chain order kept its order.
+	if (!record.inOrder) {
+		const kept = new Set(chain);
+		const mapOrder: Block[] = [];
+		for (const block of record.prior ?? state.items.values())
+			if (kept.has(block)) mapOrder.push(block);
+		record.mapOrder = mapOrder;
+	}
+	if (process.env.NODE_ENV !== 'production') {
+		const [expectedChain, expectedMap = expectedChain] = record.check!;
+		const restoredMap = record.mapOrder ?? chain;
+		if (
+			expectedChain.length !== chain.length ||
+			expectedChain.some((block, i) => block !== chain[i]) ||
+			expectedMap.length !== restoredMap.length ||
+			expectedMap.some((block, i) => block !== restoredMap[i])
+		)
+			throw new Error(formatClientError(343));
+	}
 }
 
 /**
@@ -5140,6 +5247,12 @@ function journalForSlot(state: ForSlot): false {
  */
 function journalForOwnedListClear(state: ForSlot): void {
 	const seen = TRANSITION_JOURNAL_BAGS!;
+	const records = SLOT_RECORDS.get(TRANSITION_JOURNAL!);
+	const current = records?.get(state);
+	if (current !== undefined) {
+		if (current.links !== null) fullForSlotRecord(state, current);
+		records!.delete(state);
+	}
 	const oldItems = state.items;
 	seen.set(state, TRANSITION_JOURNAL!.length);
 	const snapshot = {
@@ -5154,6 +5267,7 @@ function journalForOwnedListClear(state: ForSlot): void {
 		seen.delete(state);
 	});
 	state.items = new Map();
+	state.inOrder = true;
 }
 
 /** Put a keyed list back the way it was, rows and order together. */
@@ -5181,8 +5295,10 @@ function restoreForSlot(state: ForSlot, snapshot: any, chain: Block[] | null): v
 	state.head = chain === null ? snapshot.head : (chain[0] ?? null);
 	state.tail = chain === null ? snapshot.tail : (chain[chain.length - 1] ?? null);
 	state.size = chain === null ? snapshot.size : chain.length;
-	if (preservedMap !== null) state.items = preservedMap;
-	else {
+	if (preservedMap !== null) {
+		state.items = preservedMap;
+		state.inOrder = false;
+	} else {
 		const originalChain = chain!;
 		state.items.clear();
 		for (let i = 0; i < originalChain.length; i++) {
@@ -5196,6 +5312,7 @@ function restoreForSlot(state: ForSlot, snapshot: any, chain: Block[] | null): v
 			const block = keyOrder[i];
 			state.items.set(block.key, block);
 		}
+		state.inOrder = keyOrder === originalChain;
 	}
 	// Collect the committed ranges before removing speculative nodes. An
 	// earlier window may have parked rows that a later sweep detached, so use
@@ -37258,6 +37375,7 @@ function renderPreparedChildList(
 			// Non-null: an anchorless slot was promoted to markers above.
 			end: state.end!,
 			items: new Map(),
+			inOrder: true,
 			head: null,
 			tail: null,
 			size: 0,
@@ -45973,6 +46091,11 @@ interface ForSlot {
 	start: Comment;
 	end: Comment;
 	items: Map<any, Block>; // key → item Block (O(1) survivor lookup)
+	// Whether `items` iterates in chain order: true for an empty Map and after an
+	// in-order fill, append or removal; a reorder or a middle insert clears it.
+	// Only while it holds can a rollback that deleted keys rebuild the Map from
+	// the restored chain (journalForSlot).
+	inOrder: boolean;
 	head: Block | null; // first item Block in DOM order
 	tail: Block | null; // last item Block in DOM order
 	size: number; // count of item Blocks
@@ -46125,6 +46248,7 @@ export function forBlock<T>(
 			start,
 			end,
 			items: new Map(),
+			inOrder: true,
 			head: null,
 			tail: null,
 			size: 0,
@@ -47185,7 +47309,11 @@ function reconcileKeyed<T>(
 	// unchanged lists do not allocate a second O(N) representation every render.
 	// A survivor's index moves only with that order, so the first index write
 	// takes the capture too, which restores every row's index on rollback.
+	// Index writes and the bounded relinks (inserts, removals, a small
+	// displacement) take the link form and record the rows they relink; a
+	// wholesale relink takes the full form (journalForSlot).
 	let journalShape = TRANSITION_JOURNAL !== null;
+	let record: ForSlotRecord | null = null;
 
 	// Fast path: empty → fill — the linear first-fill pass (callers on the
 	// first-mount path dispatch to it directly and skip this function entirely).
@@ -47223,6 +47351,7 @@ function reconcileKeyed<T>(
 		state.head = null;
 		state.tail = null;
 		state.size = 0;
+		state.inOrder = true;
 		return;
 	}
 
@@ -47249,7 +47378,10 @@ function reconcileKeyed<T>(
 			block.body !== itemBody ||
 			block.itemIndex !== prefixLen
 		) {
-			if (journalShape && block.itemIndex !== prefixLen) journalShape = journalForSlot(state);
+			if (journalShape && block.itemIndex !== prefixLen) {
+				record = journalForSlot(state, true);
+				journalShape = false;
+			}
 			updateSurvivor(block, newItem, prefixLen, itemBody, pure, lite, indexIndependent, state.env);
 		}
 		oldFirst = block.nextSibling!;
@@ -47271,7 +47403,10 @@ function reconcileKeyed<T>(
 		const block = oldLast;
 		// Same stable-survivor skip as the prefix walk (see above).
 		if (!pure || block.props !== newItem || block.body !== itemBody || block.itemIndex !== newEnd) {
-			if (journalShape && block.itemIndex !== newEnd) journalShape = journalForSlot(state);
+			if (journalShape && block.itemIndex !== newEnd) {
+				record = journalForSlot(state, true);
+				journalShape = false;
+			}
 			updateSurvivor(block, newItem, newEnd, itemBody, pure, lite, indexIndependent, state.env);
 		}
 		oldLast = block.prevSibling!;
@@ -47296,7 +47431,13 @@ function reconcileKeyed<T>(
 
 	// Case: old middle empty, new middle non-empty → only inserts.
 	if (oldRemain === 0) {
-		if (journalShape) journalForSlot(state);
+		if (journalShape) record = journalForSlot(state, true);
+		// Only `beforeMiddle` gets a new nextSibling; new keys append to the Map,
+		// which a middle insert leaves out of chain order.
+		const links = record !== null ? record.links : null;
+		if (links !== null && beforeMiddle !== null && !links.has(beforeMiddle))
+			links.set(beforeMiddle, beforeMiddle.nextSibling);
+		if (afterMiddle !== null) state.inOrder = false;
 		const anchor: Node = afterMiddle ? afterMiddle.startMarker! : state.end;
 		let prev: Block | null = beforeMiddle;
 		for (let i = prefixLen; i <= newEnd; i++) {
@@ -47332,7 +47473,16 @@ function reconcileKeyed<T>(
 
 	// Case: new middle empty, old middle non-empty → only removes.
 	if (prefixLen > newEnd) {
-		if (journalShape) journalForSlot(state);
+		if (journalShape) record = journalForSlot(state, true);
+		// The removed run keeps its own links; only `beforeMiddle` gets a new
+		// nextSibling. Deleted keys go back to their Map positions by chain order,
+		// or by the Map's order kept here when that differs.
+		const links = record !== null ? record.links : null;
+		if (links !== null) {
+			if (!record!.inOrder) record!.prior ??= [...oldItems.values()];
+			if (beforeMiddle !== null && !links.has(beforeMiddle))
+				links.set(beforeMiddle, beforeMiddle.nextSibling);
+		}
 		let cur: Block | null = oldFirst;
 		let removed = 0;
 		while (cur !== afterMiddle) {
@@ -47378,8 +47528,9 @@ function reconcileKeyed<T>(
 			cur = cur.nextSibling!;
 		}
 		if (!anySurvivors) {
-			if (journalShape) journalForSlot(state);
+			if (journalShape || (record !== null && record.links !== null)) journalForSlot(state);
 			batchClearItems(state, oldItems);
+			state.inOrder = true;
 			state.head = null;
 			state.tail = null;
 			state.size = 0;
@@ -47437,7 +47588,11 @@ function reconcileKeyed<T>(
 			const next: Block | null = cur!.nextSibling!;
 			const newRelIdx = newKeysToIdx.get(cur!.key);
 			if (newRelIdx === undefined) {
-				if (journalShape) journalShape = journalForSlot(state);
+				if (journalShape || (record !== null && record.links !== null)) {
+					journalForSlot(state);
+					journalShape = false;
+					record = null;
+				}
 				if (itemRemovalDefers()) parkItemForHold(cur!);
 				else unmountBlock(cur!);
 				oldItems.delete(cur!.key);
@@ -47456,7 +47611,10 @@ function reconcileKeyed<T>(
 					cur!.body !== itemBody ||
 					cur!.itemIndex !== newIdx
 				) {
-					if (journalShape && cur!.itemIndex !== newIdx) journalShape = journalForSlot(state);
+					if (journalShape && cur!.itemIndex !== newIdx) {
+						record = journalForSlot(state, true);
+						journalShape = false;
+					}
 					updateSurvivor(cur!, newItem, newIdx, itemBody, pure, lite, indexIndependent, state.env);
 				}
 			}
@@ -47501,7 +47659,7 @@ function reconcileKeyed<T>(
 
 		// The remaining middle needs a move or an insertion. Pure survivor
 		// updates above may have completed first, but have not changed the chain.
-		if (journalShape) journalForSlot(state);
+		state.inOrder = false;
 
 		// ── Small-displacement shortcut. When every old item survived AND only a
 		// small number of positions actually changed (≤ K_DISP), we can compute
@@ -47531,6 +47689,19 @@ function reconcileKeyed<T>(
 				}
 			}
 			if (dCount <= K_DISP) {
+				if (journalShape) record = journalForSlot(state, true);
+				// Before the first write, record each row whose nextSibling this
+				// shortcut rewrites: every displaced row and the row it lands after,
+				// the new middle's last row, and `beforeMiddle`.
+				const links = record !== null ? record.links : null;
+				if (links !== null) {
+					const touched: (Block | null)[] = [beforeMiddle, oldItems.get(newKeys[newMidLen - 1])!];
+					for (let j = 0; j < dCount; j++) {
+						const i = _disp[j];
+						touched.push(oldItems.get(newKeys[i])!, i > 0 ? oldItems.get(newKeys[i - 1])! : null);
+					}
+					for (const b of touched) if (b !== null && !links.has(b)) links.set(b, b.nextSibling);
+				}
 				const endAnchor: Node = afterMiddle ? afterMiddle.startMarker! : state.end;
 				// Move right-to-left. Positions to the right of the rightmost
 				// displaced index are identity-mapped and have stable startMarkers;
@@ -47588,6 +47759,7 @@ function reconcileKeyed<T>(
 			}
 		}
 
+		if (journalShape || (record !== null && record.links !== null)) journalForSlot(state);
 		// Place survivors first, then mount new rows in authored order. Reversing
 		// mounts reverses their ref/layout/effect order even when the DOM is right.
 		const middleEndAnchor: Node = afterMiddle ? afterMiddle.startMarker! : state.end;

@@ -313,6 +313,7 @@ type ClientErrorArguments = {
 	340: [];
 	341: [];
 	342: [];
+	343: [];
 };
 
 export function formatClientError<Code extends keyof ClientErrorArguments>(
@@ -1362,6 +1363,11 @@ export function formatClientError<Code extends keyof ClientErrorArguments>(
 			case 342:
 				return formatDevErrorMessage(
 					'A descriptor carried a function form action, but no element factory installed form actions. This is a bug in the Octane compiler.',
+					args,
+				);
+			case 343:
+				return formatDevErrorMessage(
+					'A keyed list rollback record restored a different shape than it recorded. This is a bug in Octane.',
 					args,
 				);
 			default:

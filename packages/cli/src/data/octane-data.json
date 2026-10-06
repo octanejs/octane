@@ -3548,6 +3548,11 @@
       "message": "A descriptor carried a function form action, but no element factory installed form actions. This is a bug in the Octane compiler.",
       "runtime": ["client"],
       "status": "active"
+    },
+    "343": {
+      "message": "A keyed list rollback record restored a different shape than it recorded. This is a bug in Octane.",
+      "runtime": ["client"],
+      "status": "active"
     }
   },
   "strongDiagnostics": {
