@@ -705,6 +705,45 @@ export function Page(props) { return createElement('p', null, useLabel(props) as
 		},
 	);
 
+	it.each([false, true])(
+		'keeps a skipped read of a stable own function quiet across fresh containers (dev=%s)',
+		async (dev) => {
+			// A batched use() memoizes its argument. The probe reads
+			// `options.format` without calling it, so a rebuilt container that
+			// keeps the same ordinary function is not a change.
+			const { Page } = loadPlainHookFixtureSource(
+				`import { createElement, use } from 'octane';
+function useLabel({ run, options, load }) {
+  const first = use(load('first'));
+  const label = use(load(run?.(options.format) ?? 'idle'));
+  return first + ':' + label;
+}
+export function Page(props) { return createElement('p', null, useLabel(props) as string); }`,
+				{ id: '/src/PlainUseFunctionRead.ts', mode: 'client', hmr: dev, inlineHookMemo: true },
+			);
+			const loader = requestLoader();
+			const loads: unknown[] = [];
+			const load = (argument: unknown) => {
+				loads.push(argument);
+				return loader(argument);
+			};
+			function format() {}
+			const run = (value: unknown) => typeof value;
+			const rendered = mount(Page, { run, options: { format }, load });
+			try {
+				await act(async () => {});
+				expect(rendered.find('p').textContent).toBe('first:function');
+				const settled = loads.length;
+				await act(() => rendered.update(Page, { run, options: { format }, load }));
+				await act(async () => {});
+				expect(rendered.find('p').textContent).toBe('first:function');
+				expect(loads.slice(settled)).toEqual([]);
+			} finally {
+				rendered.unmount();
+			}
+		},
+	);
+
 	it.each(
 		[false, true].flatMap((dev) =>
 			(['client', 'server'] as const).flatMap((mode) =>
