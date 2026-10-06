@@ -40620,7 +40620,14 @@ export function tryBlock(
 		if (initial !== undefined) (initialSuspenseHydrations ??= new WeakMap()).set(s, initial);
 	}
 	if (initial !== undefined) {
-		initialSuspenseHydrationRenderer!(s, initial);
+		initialSuspenseHydrationRenderer!(
+			s,
+			initial,
+			createTryBody,
+			setTryBranch,
+			mountTry,
+			switchToCatch,
+		);
 	} else if (s.passthrough) {
 		renderPassthroughTry(s);
 		return s.reset;
@@ -40921,12 +40928,19 @@ function finishInitialSuspenseHydration(
 	if (hydration.hasAdjacentRangePair) hydration.coalesce();
 }
 
-function renderInitialSuspenseHydration(state: TrySlot, initial: InitialSuspenseHydration): void {
+function renderInitialSuspenseHydration(
+	state: TrySlot,
+	initial: InitialSuspenseHydration,
+	createBody: typeof createTryBody, // passed by tryBlock so hydration without Suspense does not ship the boundary
+	setBranch: typeof setTryBranch,
+	mount: typeof mountTry,
+	catchError: typeof switchToCatch,
+): void {
 	state.pendingThenable = null;
 	state.idState.next = initial.idStart;
-	const block = createTryBody(state, initial.start, initial.end);
+	const block = createBody(state, initial.start, initial.end);
 	state.block = block;
-	setTryBranch(state, 1);
+	setBranch(state, 1);
 	const hydration = new HydrationCapability(block, getNextSibling(initial.start), null);
 	hydration.speculative = true;
 	if (initial.seedRaw !== null) hydration.seeds = hydration.parseSeeds(initial.seedRaw);
@@ -41041,7 +41055,7 @@ function renderInitialSuspenseHydration(state: TrySlot, initial: InitialSuspense
 		noteRecoverableHydrationError(() => failure, state.parentBlock);
 		currentHydration = null;
 		try {
-			mountTry(state);
+			mount(state);
 		} finally {
 			currentHydration = previousHydration;
 			if (previousHydration !== null) previousHydration.node = getNextSibling(state.end);
@@ -41057,7 +41071,7 @@ function renderInitialSuspenseHydration(state: TrySlot, initial: InitialSuspense
 	const outerHydration = currentHydration;
 	if (adoptServerCatch) currentHydration = hydration;
 	try {
-		switchToCatch(
+		catchError(
 			state,
 			failure,
 			true,

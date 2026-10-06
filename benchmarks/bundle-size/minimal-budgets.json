@@ -55,9 +55,9 @@
     "brotli": 31087
   },
   "hydrate-root": {
-    "raw": 171048,
-    "gzip": 54277,
-    "brotli": 47517
+    "raw": 141217,
+    "gzip": 45357,
+    "brotli": 40055
   },
   "deferred-hydration": {
     "raw": 234724,
@@ -66,7 +66,7 @@
   },
   "suspense-transition": {
     "raw": 161548,
-    "gzip": 51875,
+    "gzip": 51867,
     "brotli": 45614
   },
   "server-hooks": {
@@ -111,8 +111,8 @@
   },
   "binding-aria-esbuild": {
     "raw": 8635,
-    "gzip": 3363,
-    "brotli": 3236
+    "gzip": 3361,
+    "brotli": 3235
   },
   "binding-motion-vite": {
     "raw": 63981,
@@ -157,7 +157,7 @@
   "binding-apollo-client-vite": {
     "raw": 361078,
     "gzip": 113267,
-    "brotli": 99141
+    "brotli": 99135
   },
   "binding-apollo-client-esbuild": {
     "raw": 363980,

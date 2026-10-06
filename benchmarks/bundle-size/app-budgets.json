@@ -2,7 +2,7 @@
   "rows": {
     "app": {
       "raw": 7167,
-      "gzip": 2467,
+      "gzip": 2465,
       "brotli": 2374
     },
     "framework": {
@@ -47,14 +47,14 @@
     "total": {
       "raw": 130834,
       "gzip": 43622,
-      "brotli": 38611
+      "brotli": 38603
     }
   },
   "weather": {
     "app": {
       "raw": 22770,
       "gzip": 8141,
-      "brotli": 7152
+      "brotli": 7148
     },
     "framework": {
       "raw": 146634,
