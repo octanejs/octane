@@ -1554,6 +1554,17 @@ and remains sequential.
 - **Creations are memoized per call site**: `use(fetchA(id))` compiles to a
   slot-keyed memo with member-path deps (`[fetchA, id]`), so replays never mint
   fresh promises and refetch happens exactly when inputs change.
+- **A one-level method call is tracked by where its method lives**:
+  `use(load(count.toFixed(1)))` tracks `count`, because an inherited method
+  is one function for every receiver. A getter also tracks its receiver. An own
+  function tracks only itself, whether it is an arrow or not, so
+  `use(props.load(id))` keeps its request when the parent rebuilds `props`
+  around the same `load`. Inferred hook dependencies differ here: an own
+  non-arrow function there tracks its receiver. A `use()` memo keyed on a
+  rebuilt `props` would start a fresh request on every parent render and every
+  boundary retry. So an own `function` shared by several objects, called as
+  `source.read()`, is not witnessed when only `source` changes. Pass the value
+  it reads as an argument instead.
 - **Fetch trees warm across components**: a suspended body prefetches
   descendants whose reachability and props are provably independent of the
   suspended data (compiled `__warm` plans, depth-capped recursion), so a nested
