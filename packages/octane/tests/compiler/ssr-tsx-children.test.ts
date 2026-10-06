@@ -42,7 +42,7 @@ function runtimeImports(code: string, names: readonly string[]): Set<string> {
 
 function descriptorFactories(code: string): Map<string, number> {
 	return new Map([
-		...[...runtimeImports(code, ['createElement', 'createScopedElement'])].map(
+		...[...runtimeImports(code, ['createElement', 'createHostElement', 'createScopedElement'])].map(
 			(name) => [name, 0] as const,
 		),
 		...[...runtimeImports(code, ['createElementAt', 'createElementFromConfig'])].map(

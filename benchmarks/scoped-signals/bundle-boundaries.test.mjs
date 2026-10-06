@@ -543,7 +543,15 @@ test('the octane-islands condition moves signal Actions from signal bundles into
 		[rendererOnly.action, rendererOnly.coordinator, rendererOnly.producers],
 		[0, 0, 0],
 	);
-	const islandsRenderer = await bundle(ordinary, ['octane-islands']);
+	// A renderer that reaches no transition runs no Action, so neither placement
+	// carries the frame. The transition engine carries it in an islands build.
+	const islandsRendererOnly = await bundle(ordinary, ['octane-islands']);
+	assert.deepEqual(
+		[islandsRendererOnly.action, islandsRendererOnly.coordinator, islandsRendererOnly.producers],
+		[0, 0, 0],
+	);
+	const transitions = `export { createRoot, startTransition } from 'octane';`;
+	const islandsRenderer = await bundle(transitions, ['octane-islands']);
 	assert.ok(
 		islandsRenderer.action > 0 && islandsRenderer.coordinator > 0 && islandsRenderer.producers > 0,
 		'An islands build must carry signal Actions and their candidate producers with the renderer.',
