@@ -34,8 +34,8 @@
  * (the optional call spellings `root?.m(...)` / `root.m?.(...)`) also fall
  * through to the receiver branch instead of throwing. Compiled dependency
  * arrays evaluate this helper on every render. The ordinary method-call path
- * stays allocation-free except for the source text of a prototype-less own
- * function, which is the only reflection that tells an arrow from a method.
+ * stays allocation-free except for the source text of an own function, which
+ * is the only reflection that tells an arrow from a method.
  * Guarded reads instead inspect an own descriptor so data properties retain
  * precise dependencies without invoking accessors. A guarded plain read
  * (`read`) calls nothing, so an own function value is its own dependency there.
@@ -81,26 +81,16 @@ export function __methodDep(
 
 // An arrow's source text starts with its parameters, after an optional
 // `async`: a parenthesized list, or one identifier followed by `=>`. Every
-// other function starts with `function`, `class`, or a method's property key.
+// other function starts with `function`, `class`, or a method's property key,
+// and a bound, native, or proxied function reads as `function … [native code]`.
 // Anything this does not recognize counts as a method, which only costs a
-// spurious recompute.
-const ARROW_HEAD = /^(?:async\s*\(|(?:async\s+)?[\w$]+\s*=>)/;
+// spurious recompute. A method named `async` also reads as `async(`, so the
+// name check runs only after the pattern matched.
+const ARROW_HEAD = /^(?:async\s*)?(?:\(|[\w$]+\s*=>)/;
 
 function ownMethodDep(receiver: object, method: unknown): unknown {
-	if (typeof method !== 'function') return method;
-	// Ordinary functions, classes, and generators own a `prototype`. Arrows,
-	// methods, bound and native functions do not; of those, only the source
-	// text separates an arrow. A method named `async` reads as `async(`. An
-	// exotic function whose reflection throws counts as a method, leaving any
-	// exception to the authored call.
-	try {
-		if (hasOwnProp.call(method, 'prototype')) return receiver;
-		const source = Function.prototype.toString.call(method);
-		return source.charCodeAt(0) === 40 /* ( */ ||
-			(ARROW_HEAD.test(source) && method.name !== 'async')
-			? method
-			: receiver;
-	} catch {
-		return receiver;
-	}
+	return typeof method === 'function' &&
+		!(ARROW_HEAD.test(Function.prototype.toString.call(method)) && method.name !== 'async')
+		? receiver
+		: method;
 }
