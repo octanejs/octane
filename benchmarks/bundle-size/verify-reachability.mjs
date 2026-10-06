@@ -33,6 +33,11 @@ const EXPECTED_SNAPSHOTS = Object.freeze({
 		text: 'Octane',
 		cleaned: true,
 	},
+	'root-callback-local': {
+		before: 'first',
+		after: 'second',
+		cleaned: true,
+	},
 	'root-descriptor': {
 		text: 'Octane',
 		cleaned: true,

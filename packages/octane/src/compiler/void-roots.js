@@ -52,7 +52,9 @@ const directCall = (member, call) =>
  * own octane import, in one of three shapes:
  * - `const root = factory(...)` in a function body, or at module scope when the
  *   declaration is not exported, where every reference is a direct
- *   `root.render(...)`/`root.unmount()` call in the declaring scope;
+ *   `root.render(...)`/`root.unmount()` call. A call may sit in a closure that
+ *   outlives the declaring function: each target is resolved from the call's
+ *   own scope, so the complete set of render targets is still static;
  * - `factory(...).render(...)`, whose root value never reaches a binding; or
  * - a discarded `hydrateRoot(...)` expression statement.
  * Each render target, and hydration's initial target, must be a module-scope
@@ -201,8 +203,9 @@ export function proveVoidRoots(ast, { factories, component, skip }) {
 	if (directEval)
 		for (const names of declared.values()) for (const root of names.values()) root.valid = false;
 	else if (declared.size > 0) {
-		const inspect = (node, parent, key, grandparent) => {
+		const inspect = (node, parent, key, grandparent, skipped) => {
 			if (node === null || typeof node !== 'object') return;
+			if (skip?.(node)) skipped = true;
 			if (
 				(node.type === 'Identifier' || node.type === 'JSXIdentifier') &&
 				isIdentifierReference(node, parent, key, analysis)
@@ -218,20 +221,24 @@ export function proveVoidRoots(ast, { factories, component, skip }) {
 				}
 				const scope = analysis.resolveBinding(nodeScope, node.name)?.scope;
 				const root = declared.get(scope)?.get(node.name);
+				// A skipped region belongs to the caller's own lowering, so a use there
+				// is never proven.
 				if (
 					root !== undefined &&
 					!(
 						node.type === 'Identifier' &&
 						key === 'object' &&
-						nodeScope === root.scope &&
+						!skipped &&
 						classify(root, parent, grandparent)
 					)
 				)
 					root.valid = false;
 			}
-			forEachRuntimeAstChild(node, (child, childKey) => inspect(child, node, childKey, parent));
+			forEachRuntimeAstChild(node, (child, childKey) =>
+				inspect(child, node, childKey, parent, skipped),
+			);
 		};
-		inspect(ast, null, null, null);
+		inspect(ast, null, null, null, false);
 	}
 	return roots
 		.filter((root) => root.valid && (root.hydrated || root.components.length > 0))

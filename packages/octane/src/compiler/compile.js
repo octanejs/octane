@@ -11591,7 +11591,8 @@ function compileInternal(
 					? true
 					: undefined;
 			},
-			// Roots created while a component renders stay on the generic path.
+			// Roots created or used inside a component body stay on the generic
+			// path: component lowering still reads each body's authored nodes.
 			skip: (node) => node.type === 'JSXCodeBlock' || components.has(node),
 		})) {
 			callees.set(root.callee, root.helper);

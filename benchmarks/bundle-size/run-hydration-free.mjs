@@ -74,6 +74,7 @@ const clients = [
 	...[
 		['root-static', 'tsrx'],
 		['root-static-local', 'tsrx'],
+		['root-callback-local', 'tsrx'],
 		['root-static-specialized', 'ts'],
 		['root-chained-jsx', 'tsx'],
 		['hooks-state', 'tsrx'],

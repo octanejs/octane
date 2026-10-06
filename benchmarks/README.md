@@ -441,7 +441,10 @@ component, and verifies `unmount`; its broader reachable runtime is
 real and must not be disguised as the specialized entry. `root-static-local`
 keeps the original same-file compiled render/unmount control and its existing
 static-root ceiling, so losing that specialization fails independently of the
-escaped generic contract. `prop-attributes` binds opaque props to named
+escaped generic contract. `root-callback-local` keeps a private root inside a
+controller whose retained `replace` and `dispose` callbacks are its only later
+uses, so render and unmount calls that outlive the creating function stay
+specialized. `prop-attributes` binds opaque props to named
 attributes and text in a module with no signals import. Those opaque values are
 potential signal bindings, so the fixture pins that they keep the narrow scalar
 writers and never retain the generic attribute route with its form-control
@@ -449,7 +452,7 @@ writers and DOM routing tables.
 
 `bundle-size/minimal-budgets.json` supplies explicit raw, gzip, and brotli byte
 ceilings for every feature. Each scenario publishes its committed ceiling as a
-same-run `*-budget` reference target, so one hundred and five `maxRatio: 1`
+same-run `*-budget` reference target, so one hundred and eight `maxRatio: 1`
 entries in `baselines/ratios.json` also enforce all three metrics in the
 weekly/manual Bench CI workflow. An unknown or empty scenario name fails instead
 of skipping the builds.

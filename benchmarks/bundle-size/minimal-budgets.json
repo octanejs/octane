@@ -39,6 +39,11 @@
     "gzip": 23680,
     "brotli": 21377
   },
+  "root-callback-local": {
+    "raw": 74239,
+    "gzip": 24227,
+    "brotli": 21950
+  },
   "hooks-state": {
     "raw": 84053,
     "gzip": 27677,

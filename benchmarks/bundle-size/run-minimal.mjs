@@ -41,6 +41,7 @@ const existingScenarios = [
 	['root-chained-jsx', 'tsx'],
 	['root-static', 'tsrx'],
 	['root-static-local', 'tsrx'],
+	['root-callback-local', 'tsrx'],
 	['hooks-state', 'tsrx'],
 	['prop-attributes', 'tsrx'],
 	['context', 'tsrx'],
@@ -61,6 +62,7 @@ const streamClaimFreeClientScenarios = new Set([
 	'root-chained-jsx',
 	'root-static',
 	'root-static-local',
+	'root-callback-local',
 	'hooks-state',
 	'prop-attributes',
 	'context',
@@ -72,6 +74,7 @@ const signalFreeClientScenarios = new Set([
 	'root-chained-jsx',
 	'root-static',
 	'root-static-local',
+	'root-callback-local',
 	'hooks-state',
 	'prop-attributes',
 	'context',
@@ -556,6 +559,7 @@ try {
 			id === 'root-static-specialized' ||
 			id === 'root-chained-jsx' ||
 			id === 'root-static-local' ||
+			id === 'root-callback-local' ||
 			id === 'cli-spa-starter' ||
 			(id === 'binding-apollo-client' && scenario.bundler === 'vite')
 		) {
