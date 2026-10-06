@@ -15688,6 +15688,9 @@ function preserveSuspendedHydrateActivation(
 	suspension: SuspenseException,
 ): void {
 	const thenable = suspension.thenable;
+	// A resume would render a suspended call without a server range of its own
+	// outside renderUnframed: the island adopts afresh instead.
+	if (hydration.unframedSuspended) throw new DeferredHydrationSuspension(thenable);
 	const suspendedBlock = findSuspendedHydrateBlock(state.block, thenable);
 	const activation: PreservedHydrateActivation = {
 		hydration,
@@ -19804,8 +19807,8 @@ class HydrationCapability {
 	depth = 0;
 	/**
 	 * Depth of a render that adopts nothing but still consumes positional seeds:
-	 * a server-caught try body's replay, or a call without a server range in a
-	 * client-built region (renderUnframed).
+	 * a server-caught try body's replay, or the client render that continues
+	 * after a deferred mismatch (adoptOrDefer).
 	 */
 	replayDepth = -1;
 	seedCursor = 0;
@@ -19872,6 +19875,16 @@ class HydrationCapability {
 	private claimEnd: Node | null | undefined = undefined;
 	/** The last suspension thrown out of a client-built subtree (suspend). */
 	freshSuspension: SuspenseException | null = null;
+	/**
+	 * Whether this attempt suspended in the body of a call without a server
+	 * range of its own (renderUnframed). A Hydrate island resumes an attempt
+	 * where it suspended, through the suspended block alone, which would render
+	 * that body without the node it adopts in place, or against server nodes
+	 * that are not there: such an attempt is discarded instead, and its retry
+	 * adopts afresh (DeferredHydrationSuspension), as React retries a
+	 * dehydrated boundary.
+	 */
+	unframedSuspended = false;
 	/**
 	 * Whether a template's adoption may defer the mismatch it finds
 	 * (adoptOrDefer): set by an owner that discards an attempt that suspends and
@@ -20166,16 +20179,16 @@ class HydrationCapability {
 	 * they match (renderUnframed): the node a template hole's walk found (the
 	 * anchor, when it is an element or text), or else the cursor. Returns that
 	 * node, before which the call's fresh markers go, or null when the server
-	 * rendered nothing more there. A client-built `cursor` has no server
-	 * content to match: returns undefined, and the call renders before
-	 * `anchor`.
+	 * rendered nothing more there. A client-built `cursor` is an earlier
+	 * sibling's, past the server nodes it adopted: the server rendered nothing
+	 * more there either.
 	 */
-	unframedRoot(scope: Scope, cursor: Node | null, anchor: Node | null): Node | null | undefined {
+	unframedRoot(scope: Scope, cursor: Node | null, anchor: Node | null): Node | null {
 		const root =
 			anchor !== null && anchor.nodeType !== 8 && anchor !== scope.block.endMarker
 				? anchor
 				: cursor;
-		return root !== null && this.freshNodes.has(root) ? undefined : root;
+		return root !== null && this.freshNodes.has(root) ? null : root;
 	}
 
 	/**
@@ -20192,39 +20205,30 @@ class HydrationCapability {
 	 * Anything else that adopts nothing there, or
 	 * anything at all where the server rendered nothing more (`root` null),
 	 * does not match the server. The call's site names a root that does not
-	 * match (`named`; rootMismatch). In a client-built region (`root`
-	 * undefined), the body adopts nothing but still consumes its positional
-	 * seeds.
+	 * match (`named`; rootMismatch). A body that suspends leaves this render
+	 * to the retry, which must render it here again (unframedSuspended).
 	 */
 	renderUnframed<T>(
 		render: (target: T) => void,
 		target: T,
 		start: Node,
 		end: Node,
-		root: Node | null | undefined,
+		root: Node | null,
 		positional: boolean,
 		named: boolean,
 		scope: Scope,
 		slotKey: number,
 	): void {
-		if (root === undefined) {
-			const previousReplay = this.replayDepth;
-			const previousNative = setNativeAdoptionResolver(null);
-			this.replayDepth = ++this.depth;
-			try {
-				render(target);
-			} finally {
-				this.depth--;
-				this.replayDepth = previousReplay;
-				setNativeAdoptionResolver(previousNative);
-			}
-			return;
-		}
 		this.node = root;
-		if (root === null) render(target);
-		else if (this.renderInPlace(render, target, root, true, named ? scope : null, slotKey)) {
-			domNode(domNode(end).parentNode!).insertBefore(end, this.node);
-			return;
+		try {
+			if (root === null) render(target);
+			else if (this.renderInPlace(render, target, root, true, named ? scope : null, slotKey)) {
+				domNode(domNode(end).parentNode!).insertBefore(end, this.node);
+				return;
+			}
+		} catch (error) {
+			if (isSuspenseException(error)) this.unframedSuspended = true;
+			throw error;
 		}
 		if (positional || getNextSibling(start) !== end || this.node !== root)
 			this.slotMismatch(scope, slotKey, 'a component range', root);
@@ -23985,10 +23989,12 @@ class UnclosedHydrationRange extends HydrationMismatch {
 
 /**
  * A Hydrate island's attempt suspended on `thenable` after a template's
- * adoption deferred a mismatch (adoptOrDefer). That attempt rendered on the
- * client since, so it cannot resume where it suspended: the island discards
- * it, keeping its server DOM, and adopts afresh once `thenable` settles. Like
- * a mismatch, it passes every boundary inside the island (isAdoptionControl).
+ * adoption deferred a mismatch (adoptOrDefer), so that it rendered on the
+ * client since, or in the body of a call without a server range of its own
+ * (unframedSuspended). Either way it cannot resume where it suspended: the
+ * island discards it, keeping its server DOM, and adopts afresh once
+ * `thenable` settles. Like a mismatch, it passes every boundary inside the
+ * island (isAdoptionControl).
  */
 class DeferredHydrationSuspension extends NativeAdoptionMiss {
 	constructor(readonly thenable: TrackedThenable<unknown>) {
@@ -33517,10 +33523,10 @@ function componentSlotImpl(
 	let state = parentScope.slots[slotKey] as CompSlot | undefined;
 	let hydrationCursor: Node | null = null;
 	// Hydrating without the call's server range (`unframedCall`): the server
-	// node its body adopts in place, null where the server rendered nothing
-	// more, or undefined in a client-built region (unframedRoot).
+	// node its body adopts in place, or null where the server rendered nothing
+	// more (unframedRoot).
 	let unframedCall = false;
-	let unframed: Node | null | undefined;
+	let unframed!: Node | null;
 	// The call's site names a mismatch at its server node: an anchorless call,
 	// or one at the node a template hole's walk found (renderUnframed).
 	let unframedNamed = false;
@@ -40509,7 +40515,7 @@ function switchErrorToCatchInner(
 		if (state.parentBlock.disposed || state.block !== null) return;
 	}
 	// A replay that adopts nothing still reads rejection seeds (a server-caught
-	// try body, or renderUnframed).
+	// try body, or the client render after a deferred mismatch).
 	const rejection = hydrating ? currentHydration!.isRejection(error) === true : false;
 	const caughtError = rejection ? error.reason : error;
 	state.hasResolved = false;
@@ -43808,7 +43814,7 @@ function switchToCatchInner(
 	// then expose the original decoded reason only to the boundary that actually
 	// owns a catch arm (including primitive and null rejection reasons). A
 	// replay that adopts nothing still reads rejection seeds (a server-caught try
-	// body, or renderUnframed).
+	// body, or the client render after a deferred mismatch).
 	const hydrationRejection = hydrating ? currentHydration!.isRejection(err) === true : false;
 	const caughtError = hydrationRejection ? err.reason : err;
 	setTryBranch(state, 0);
