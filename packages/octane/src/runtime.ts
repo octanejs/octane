@@ -4850,11 +4850,19 @@ function journalInputSelection(input: HTMLInputElement | HTMLTextAreaElement): v
  * A controlled input keeps three things in step: the live DOM property, the
  * default mirror used by form.reset()/SSR, and its last projected value record.
  * Capture all three after arming the element but before changing any of them.
+ * Hydration never writes an `adopted` control's live value, and restoring it
+ * through its setter would mark the control dirty, so its record leaves it out.
  */
-function journalControlled(el: Element, prop: string, defaultProp: string): void {
+function journalControlled(
+	el: Element,
+	prop: string,
+	defaultProp: string,
+	adopted?: boolean,
+): void {
 	if (prop === 'value') journalInputSelection(el as HTMLInputElement | HTMLTextAreaElement);
 	const log = TRANSITION_JOURNAL!;
-	log.push(JOURNAL_PROP, el, prop, (STAGED_DOM?.view(el as any) ?? (el as any))[prop]);
+	if (!adopted)
+		log.push(JOURNAL_PROP, el, prop, (STAGED_DOM?.view(el as any) ?? (el as any))[prop]);
 	log.push(
 		JOURNAL_PROP,
 		el,
@@ -30849,8 +30857,15 @@ export function setValue(el: Element, value: unknown): void {
 		HYDRATION_DRIVER!.presentationMiss(false);
 	const input = el as HTMLInputElement | HTMLTextAreaElement;
 	const ctrl = armControlled(el);
-	if (TRANSITION_JOURNAL !== null) journalControlled(el, 'value', 'defaultValue');
 	const first = !ctrl.sawV;
+	// Hydration ADOPTS the live value with no warnings: as in React's
+	// initInput/initTextarea, only the attribute mirror below takes the client
+	// value. An unedited control follows it, and the dirty-value flag keeps
+	// pre-hydration user input until the element's first real commit or
+	// discrete event. A fresh structural replacement is client-built and needs
+	// normal projection.
+	const adopted = hydrating && first ? activeHydration()?.isFresh(el) === false : false;
+	if (TRANSITION_JOURNAL !== null) journalControlled(el, 'value', 'defaultValue', adopted);
 	ctrl.sawV = true;
 	if (value == null) {
 		if (process.env.NODE_ENV !== 'production' && !first && ctrl.v !== UNCONTROLLED)
@@ -30866,14 +30881,7 @@ export function setValue(el: Element, value: unknown): void {
 		ctrl.v = value;
 		if (process.env.NODE_ENV !== 'production')
 			queueDevFormDiagnostic(el, CURRENT_SCOPE ?? undefined);
-		// Hydration ADOPTS the live value with no warnings: as in React's
-		// initInput/initTextarea, only the attribute mirror below takes the
-		// client value. An unedited control follows it, and the dirty-value flag
-		// keeps pre-hydration user input until the element's first real commit
-		// or discrete event. A fresh structural replacement is client-built and
-		// needs normal projection.
-		const hydration = hydrating ? activeHydration() : null;
-		if (hydration === null || hydration.isFresh(el)) {
+		if (!adopted) {
 			// PROPERTY first (React initInput order): the write marks the control
 			// DIRTY, so the attribute write below — and any later defaultValue
 			// binding — can never drag the live value along.
@@ -30936,16 +30944,15 @@ function setCheckedState(input: HTMLInputElement, value: unknown, ctrl: Controll
 		ctrl.c = b;
 		if (process.env.NODE_ENV !== 'production')
 			queueDevFormDiagnostic(input, CURRENT_SCOPE ?? undefined);
-		const hydration = hydrating ? activeHydration() : null;
 		// PROPERTY first (marks checkedness dirty — see setValue), then the
 		// attribute baseline (React's cascade: checked wins over defaultChecked).
 		// Hydration re-assigns the live (server or user) selection instead, as
 		// React's initInput does, which separates it from the server default,
 		// including for a later controlled → default flip.
 		(STAGED_DOM?.view(input) ?? input).checked =
-			hydration === null || hydration.isFresh(input)
-				? b
-				: (STAGED_DOM?.view(input) ?? input).checked;
+			hydrating && activeHydration()?.isFresh(input) === false
+				? (STAGED_DOM?.view(input) ?? input).checked
+				: b;
 		if ((STAGED_DOM?.view(input) ?? input).defaultChecked !== b)
 			(STAGED_DOM?.view(input) ?? input).defaultChecked = b;
 		ctrl.sawDC = true;
@@ -31222,8 +31229,7 @@ export function setDefaultValueUncontrolled(el: Element, value: unknown): void {
 export function setDefaultChecked(el: Element, value: unknown): void {
 	const ctrl = armControlled(el);
 	const input = el as HTMLInputElement;
-	const hydration = hydrating ? activeHydration() : null;
-	const adopted = hydration !== null && !hydration.isFresh(el);
+	const adopted = hydrating ? activeHydration()?.isFresh(el) === false : false;
 	const first = !ctrl.sawDC;
 	if (first) {
 		if (TRANSITION_JOURNAL !== null) {

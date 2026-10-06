@@ -1,8 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { flushSync, hydrateRoot } from 'octane';
+import { EXTERNAL_HYDRATION_PROMISE, act, flushSync, hydrateRoot } from 'octane';
 import * as Server from 'octane/server';
 import { loadServerFixture } from '../_server-fixture.js';
-import { Controls } from './_fixtures/form-control-value-mismatch.tsrx';
+import { Controls, SuspendingControls } from './_fixtures/form-control-value-mismatch.tsrx';
 
 // A form control's value or checked state that differs between the server and
 // the client is not a hydration mismatch: the server nodes are adopted with no
@@ -15,7 +15,7 @@ import { Controls } from './_fixtures/form-control-value-mismatch.tsrx';
 
 const server = loadServerFixture(
 	'packages/octane/tests/hydration/_fixtures/form-control-value-mismatch.tsrx',
-) as { Controls: unknown };
+) as { Controls: unknown; SuspendingControls: unknown };
 
 const SERVER_PROPS = { side: 'server', on: true };
 const CLIENT_PROPS = { side: 'client', on: false };
@@ -145,6 +145,50 @@ describe('hydrating a form control value the client renders differently', () => 
 		expect(input.value).toBe('client');
 		expect(textarea.value).toBe('client');
 		expect(checkbox.checked).toBe(false);
+	});
+
+	it('projects the client value after a suspended hydration attempt retries', async () => {
+		// An external thenable carries no server seed, so the attempt suspends after
+		// adopting the controls, rolls back, and adopts them again on its retry.
+		const ready = (value: PromiseLike<string>) =>
+			Object.assign(value, { [EXTERNAL_HYDRATION_PROMISE]: true as const });
+		const { html } = Server.renderToString(
+			server.SuspendingControls as never,
+			{
+				...SERVER_PROPS,
+				ready: Object.assign(ready(Promise.resolve('ready')), {
+					status: 'fulfilled',
+					value: 'ready',
+				}),
+			} as never,
+		);
+		container.innerHTML = html;
+		const served = fields();
+		let resolve!: (value: string) => void;
+		const pending = ready(new Promise<string>((next) => (resolve = next)));
+
+		root = hydrateRoot(
+			container,
+			SuspendingControls,
+			{ ...CLIENT_PROPS, ready: pending },
+			{ onRecoverableError: (error: unknown) => recoverable.push(error) },
+		);
+		flushSync(() => {});
+		await act(async () => resolve('ready'));
+
+		const { input, textarea, checkbox, defaultCheckbox } = fields();
+		expect(input).toBe(served.input);
+		expect(textarea).toBe(served.textarea);
+		expect(container.querySelector('#ready')!.textContent).toBe('ready');
+		expect(recoverable).toEqual([]);
+		expect(input.value).toBe('client');
+		expect(input.getAttribute('value')).toBe('client');
+		expect(textarea.value).toBe('client');
+		expect(textarea.textContent).toBe('client');
+		expect(checkbox.hasAttribute('checked')).toBe(false);
+		expect(checkbox.checked).toBe(true);
+		expect(defaultCheckbox.hasAttribute('checked')).toBe(false);
+		expect(defaultCheckbox.checked).toBe(true);
 	});
 
 	it('writes nothing to the DOM when the client renders the server values', () => {
