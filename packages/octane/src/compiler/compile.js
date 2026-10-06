@@ -18114,7 +18114,9 @@ function depPathKey(node) {
 // `isModuleBound` is a scope-aware `(name) => boolean` from
 // `moduleBoundCheckForDeps`, resolving through the expression's enclosing scope
 // chain so that sibling-function parameters never leak into the decision.
-function collectDepPaths(expr, coarsenDepRoots, isModuleBound, methodDep) {
+// Plain hook modules memoize their use() arguments through this same policy
+// (slot-hooks.js `collectParallelUseDependencies`).
+export function collectDepPaths(expr, coarsenDepRoots, isModuleBound, methodDep) {
 	const deps = [];
 	const seen = new Set();
 	const lexical = createLexicalAnalysis(expr);
