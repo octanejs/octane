@@ -18073,26 +18073,28 @@ function depPathMember(node) {
 	return expression?.type === 'MemberExpression' ? expression : null;
 }
 
+// Erased TypeScript wrappers leave the binding and key a member reads:
+// `props!.load`, `(props as T).load`, and `props['load' as const]` all read
+// `props.load`.
+function depPathRoot(member) {
+	const root = unwrapTsExpr(member?.object);
+	return root?.type === 'Identifier' ? root : null;
+}
+
 function staticDepMemberName(node) {
 	const member = depPathMember(node);
 	if (member === null) return null;
 	if (!member.computed && member.property.type === 'Identifier') return member.property.name;
-	if (
-		member.computed &&
-		member.property.type === 'Literal' &&
-		typeof member.property.value === 'string'
-	) {
-		return member.property.value;
-	}
-	return null;
+	const property = member.computed ? unwrapTsExpr(member.property) : null;
+	return property?.type === 'Literal' && typeof property.value === 'string' ? property.value : null;
 }
 
 function depPathKey(node) {
 	if (node.type === 'Identifier') return `identifier:${node.name}`;
-	const member = depPathMember(node);
+	const root = depPathRoot(depPathMember(node));
 	const propertyName = staticDepMemberName(node);
-	return member !== null && member.object.type === 'Identifier' && propertyName !== null
-		? `member:${member.object.name}:${JSON.stringify(propertyName)}`
+	return root !== null && propertyName !== null
+		? `member:${root.name}:${JSON.stringify(propertyName)}`
 		: null;
 }
 
@@ -18341,11 +18343,12 @@ export function collectDepPaths(expr, coarsenDepRoots, isModuleBound, methodDep)
 			}
 			case 'CallExpression': {
 				const callee = depPathMember(unwrapTsExpr(n.callee));
+				const root = depPathRoot(callee);
 				const name = staticDepMemberName(callee);
-				if (callee?.object.type === 'Identifier' && name !== null) {
-					if (isFree(callee.object, callee, 'object') && !deferredAmbient(callee.object.name)) {
+				if (root !== null && name !== null) {
+					if (isFree(root, callee, 'object') && !deferredAmbient(root.name)) {
 						const member = b.member(
-							b.id(callee.object.name),
+							b.id(root.name),
 							callee.computed ? b.literal(name, JSON.stringify(name)) : b.id(name),
 							callee.computed,
 						);
@@ -18364,13 +18367,14 @@ export function collectDepPaths(expr, coarsenDepRoots, isModuleBound, methodDep)
 			}
 			case 'MemberExpression': {
 				const propertyName = staticDepMemberName(n);
-				if (n.object.type === 'Identifier' && propertyName !== null) {
-					if (isFree(n.object, n, 'object') && !deferredAmbient(n.object.name)) {
+				const root = depPathRoot(n);
+				if (root !== null && propertyName !== null) {
+					if (isFree(root, n, 'object') && !deferredAmbient(root.name)) {
 						// A deferred read keeps its `root?.prop` form even after an
 						// optional link; only a skipped render read becomes a probe.
 						const probe = skipped > 0 && deferred === 0;
 						const member = b.member(
-							b.id(n.object.name),
+							b.id(root.name),
 							n.computed
 								? b.literal(propertyName, JSON.stringify(propertyName))
 								: b.id(propertyName),

@@ -636,6 +636,11 @@ class Labelled {
 const labelled = (name: string) => new Labelled(name);
 const identity = (value: unknown) => value;
 
+// Erased TypeScript wrappers leave the receiver and key a call reads unchanged.
+const calleeSpellings = ['%r.%m', '%r!.%m', '(%r as any).%m', "%r['%m' as const]"];
+const spellCallee = (spelling: string, root: string, name: string) =>
+	spelling.replace('%r', root).replace('%m', name);
+
 const methodCallShapes: {
 	name: string;
 	expression: string;
@@ -647,6 +652,22 @@ const methodCallShapes: {
 		steps: [
 			[{ count: 1 }, '1.0'],
 			[{ count: 2 }, '2.0'],
+		],
+	},
+	{
+		name: 'asserted receiver',
+		expression: 'load((count as number).toFixed(1))',
+		steps: [
+			[{ count: 1 }, '1.0'],
+			[{ count: 2 }, '2.0'],
+		],
+	},
+	{
+		name: 'asserted method key',
+		expression: "load(item!['label' as const]())",
+		steps: [
+			[{ item: labelled('one') }, 'one'],
+			[{ item: labelled('two') }, 'two'],
 		],
 	},
 	{
@@ -742,15 +763,22 @@ describe('use() method-call dependencies', () => {
 	it.each(
 		[false, true].flatMap((dev) =>
 			['tsrx', 'ts'].flatMap((ext) =>
-				(['arrow', 'function'] as const).map((kind) => ({ dev, ext, kind })),
+				(['arrow', 'function'] as const).flatMap((kind) =>
+					calleeSpellings.map((spelling) => ({
+						dev,
+						ext,
+						kind,
+						callee: spellCallee(spelling, 'item', 'label'),
+					})),
+				),
 			),
 		),
 	)(
-		'keeps the memo when a rebuilt receiver carries the same own $kind ($ext, dev=$dev)',
-		async ({ dev, ext, kind }) => {
+		'keeps the memo when a rebuilt receiver carries the same own $kind: $callee() ($ext, dev=$dev)',
+		async ({ dev, ext, kind, callee }) => {
 			// An own function keeps its identity, so a fresh container around the
 			// same function is not a change.
-			const { Page } = loadCreationFixture(methodCallSource('load(item.label())', ext), {
+			const { Page } = loadCreationFixture(methodCallSource(`load(${callee}())`, ext), {
 				id: '/project/OwnMethodCreationDependency',
 				ext,
 				mode: 'client',
@@ -783,18 +811,22 @@ describe('use() method-call dependencies', () => {
 		},
 	);
 
-	it.each([false, true])(
-		'starts a function loader prop once under a retried boundary (dev=%s)',
-		async (dev) => {
+	it.each(
+		[false, true].flatMap((dev) =>
+			calleeSpellings.map((spelling) => ({ dev, callee: spellCallee(spelling, 'props', 'load') })),
+		),
+	)(
+		'starts a function loader prop once under a retried boundary: $callee() (dev=$dev)',
+		async ({ dev, callee }) => {
 			// The boundary's retry rebuilds the child's props. A loader that may
 			// read `this` still keeps its identity, or each retry would start a
 			// fresh request and suspend again.
 			const { Page } = loadCreationFixture(
 				`import { use } from 'octane';
-function Child(props) @{ const value = use(props.load('child', props.version)); <span>{value as string}</span> }
+function Child(props) @{ const value = use(${callee}('child', props.version)); <span>{value as string}</span> }
 export function Page(props) @{
   @try {
-    const own = use(props.load('parent', props.version));
+    const own = use(${callee}('parent', props.version));
     <p>{own as string}<Child load={props.load} version={props.version} /></p>
   } @pending {
     <p>{'pending'}</p>
