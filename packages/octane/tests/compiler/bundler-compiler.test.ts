@@ -993,12 +993,28 @@ export function Pair(props) @{ 'use dom bindings'; <section>
 			'/src/App.tsrx',
 		);
 		expect(canonicalModuleId(resolve('/external/App.tsrx') + '?raw', root)).toBe(
-			resolve('/external/App.tsrx'),
+			'../external/App.tsrx',
 		);
-		expect(canonicalModuleId(String.raw`C:\external\App.tsrx`, String.raw`C:\project`)).toBe(
-			'C:/external/App.tsrx',
+		expect(canonicalModuleId(String.raw`D:\external\App.tsrx`, String.raw`C:\project`)).toBe(
+			'D:/external/App.tsrx',
 		);
 		expect(canonicalModuleId('#nitro/virtual/polyfills', root)).toBe('#nitro/virtual/polyfills');
+	});
+
+	// A checkout-path-dependent ID changed every component site hash in files
+	// outside the Vite root, so identical source built to different bytes.
+	it('compiles files outside the root identically from any checkout location', () => {
+		const source =
+			"function Inner() @{ <span>{'inner'}</span> }\nexport function Card() @{ <div><Inner /></div> }";
+		const build = (checkout: string) =>
+			createOctaneCompiler({ root: `${checkout}/apps/web` }).transform(
+				source,
+				`${checkout}/packages/ui/src/Card.tsrx`,
+				{ environment: 'client' },
+			)?.code;
+
+		expect(build('/checkout-a')).toContain('c:');
+		expect(build('/checkout-a')).toBe(build('/tmp/elsewhere/checkout-b'));
 	});
 
 	it('uses the shared canonical module id for client/server head ownership', () => {
