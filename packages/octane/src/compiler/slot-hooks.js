@@ -23,7 +23,12 @@ import {
 	NATIVE_SIGNAL_HOOK_NAMES,
 	SPREAD_PATH_SLOT_HOOKS,
 } from './hook-names.js';
-import { METHOD_DEP_IMPORT, annotateHookCalls, analyzeStrongMemoCandidates } from './hook-deps.js';
+import {
+	METHOD_DEP_IMPORT,
+	annotateHookCalls,
+	analyzeStrongMemoCandidates,
+	methodDepFlags,
+} from './hook-deps.js';
 import { inlinePlainHookMemos } from './plain-hook-memo.js';
 import { assertStrongMode } from './strong-mode.js';
 import { unsupportedStrongAutomaticMemo } from './strong-auto-memo.js';
@@ -1138,7 +1143,7 @@ function emitInferredDependencies(dependencies, st) {
 	return dependencies
 		.map((dependency) =>
 			dependency.method
-				? `${requireParallelHelper(st, METHOD_DEP_IMPORT)}(${dependency.method.root.name}, ${JSON.stringify(dependency.method.name)}${dependency.method.guarded ? ', true' : ''})`
+				? `${requireParallelHelper(st, METHOD_DEP_IMPORT)}(${[dependency.method.root.name, JSON.stringify(dependency.method.name), ...methodDepFlags(dependency.method)].join(', ')})`
 				: st.source.slice(dependency.node.start, dependency.node.end),
 		)
 		.join(', ');
