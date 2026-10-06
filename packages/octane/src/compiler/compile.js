@@ -18082,26 +18082,28 @@ function depPathMember(node) {
 	return expression?.type === 'MemberExpression' ? expression : null;
 }
 
+// Erased TypeScript wrappers leave the binding and key a member reads:
+// `props!.load`, `(props as T).load`, and `props['load' as const]` all read
+// `props.load`.
+function depPathRoot(member) {
+	const root = unwrapTsExpr(member?.object);
+	return root?.type === 'Identifier' ? root : null;
+}
+
 function staticDepMemberName(node) {
 	const member = depPathMember(node);
 	if (member === null) return null;
 	if (!member.computed && member.property.type === 'Identifier') return member.property.name;
-	if (
-		member.computed &&
-		member.property.type === 'Literal' &&
-		typeof member.property.value === 'string'
-	) {
-		return member.property.value;
-	}
-	return null;
+	const property = member.computed ? unwrapTsExpr(member.property) : null;
+	return property?.type === 'Literal' && typeof property.value === 'string' ? property.value : null;
 }
 
 function depPathKey(node) {
 	if (node.type === 'Identifier') return `identifier:${node.name}`;
-	const member = depPathMember(node);
+	const root = depPathRoot(depPathMember(node));
 	const propertyName = staticDepMemberName(node);
-	return member !== null && member.object.type === 'Identifier' && propertyName !== null
-		? `member:${member.object.name}:${JSON.stringify(propertyName)}`
+	return root !== null && propertyName !== null
+		? `member:${root.name}:${JSON.stringify(propertyName)}`
 		: null;
 }
 
@@ -18121,6 +18123,14 @@ function depPathKey(node) {
 // `value?.[options.key]`) is skipped during render rather than deferred: its
 // member reads use `methodDep()`'s guarded descriptor probe, which neither
 // throws on a nullish receiver nor invokes a getter the render never reaches.
+// A one-level member CALLED as a method (`count.toFixed(1)`) passes its
+// receiver as `this`, and an inherited method is one function for every
+// receiver, so it uses that same descriptor probe: an inherited method,
+// accessor, or primitive receiver tracks the receiver. Unlike an inferred hook
+// dependency (hook-deps.js `addMethodCall`), an own function of any kind keeps
+// its identity. `props.load(id)` with a `function` loader must not depend on
+// `props`: a parent render or a retried boundary rebuilds it, and each fresh
+// promise would suspend again without end.
 // `isModuleBound` is a scope-aware `(name) => boolean` from
 // `moduleBoundCheckForDeps`, resolving through the expression's enclosing scope
 // chain so that sibling-function parameters never leak into the decision.
@@ -18152,13 +18162,16 @@ export function collectDepPaths(expr, coarsenDepRoots, isModuleBound, methodDep)
 		}
 		return node;
 	};
-	const push = (node, key, probe = false) => {
+	// A skipped read or a method call depends on the guarded descriptor probe
+	// of its one-level member. Its `read` flag keeps an own function's
+	// identity. Only a skipped read yields to a later plain read of its path.
+	const push = (node, key, probe = false, call = false) => {
 		if (coarsenDepRoots !== null) {
 			const member = depPathMember(node);
 			if (member?.object.type === 'Identifier' && coarsenDepRoots.has(member.object.name)) {
 				node = b.id(member.object.name);
 				key = depPathKey(node);
-				probe = false;
+				probe = call = false;
 			}
 		}
 		if (guards !== null) key += `:guard:${guards.id}`;
@@ -18171,8 +18184,8 @@ export function collectDepPaths(expr, coarsenDepRoots, isModuleBound, methodDep)
 			return;
 		}
 		seen.add(key);
-		if (probe) {
-			(probes ??= new Map()).set(key, deps.length);
+		if (probe) (probes ??= new Map()).set(key, deps.length);
+		if (probe || call) {
 			const name = staticDepMemberName(node);
 			// A guarded read, never a call: an own function value is its own
 			// dependency because no receiver reaches it.
@@ -18339,22 +18352,40 @@ export function collectDepPaths(expr, coarsenDepRoots, isModuleBound, methodDep)
 				}
 				break;
 			}
-			case 'CallExpression':
-				if (n.arguments.length === 0 || !followsOptionalLink(n)) break;
-				walk(n.callee, n, 'callee');
-				skipped++;
+			case 'CallExpression': {
+				const callee = depPathMember(unwrapTsExpr(n.callee));
+				const root = depPathRoot(callee);
+				const name = staticDepMemberName(callee);
+				if (root !== null && name !== null) {
+					if (isFree(root, callee, 'object') && !deferredAmbient(root.name)) {
+						const member = b.member(
+							b.id(root.name),
+							callee.computed ? b.literal(name, JSON.stringify(name)) : b.id(name),
+							callee.computed,
+						);
+						// Distinct from the plain-read key: `x.m` read as a value
+						// elsewhere still contributes its own member dependency.
+						push(member, `${depPathKey(member)}()`, false, true);
+					}
+				} else {
+					walk(n.callee, n, 'callee');
+				}
+				const skips = n.arguments.length > 0 && followsOptionalLink(n);
+				if (skips) skipped++;
 				for (const argument of n.arguments) walk(argument, n, 'arguments');
-				skipped--;
+				if (skips) skipped--;
 				return;
+			}
 			case 'MemberExpression': {
 				const propertyName = staticDepMemberName(n);
-				if (n.object.type === 'Identifier' && propertyName !== null) {
-					if (isFree(n.object, n, 'object') && !deferredAmbient(n.object.name)) {
+				const root = depPathRoot(n);
+				if (root !== null && propertyName !== null) {
+					if (isFree(root, n, 'object') && !deferredAmbient(root.name)) {
 						// A deferred read keeps its `root?.prop` form even after an
 						// optional link; only a skipped render read becomes a probe.
 						const probe = skipped > 0 && deferred === 0;
 						const member = b.member(
-							b.id(n.object.name),
+							b.id(root.name),
 							n.computed
 								? b.literal(propertyName, JSON.stringify(propertyName))
 								: b.id(propertyName),

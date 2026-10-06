@@ -452,8 +452,9 @@ function canRewriteParallelUseArg(root) {
 // only perform reads the authored argument performs: reads it defers
 // (callbacks, unreplayable guards, `??`/`||`/`&&` right sides) keep `root?.prop`
 // for bound roots and drop ambient globals, and reads it skips after an
-// optional link use the guarded `__methodDep` probe. Each free name resolves
-// through the argument's enclosing scopes, analyzed once per module.
+// optional link and one-level method calls use the guarded `__methodDep`
+// probe. Each free name resolves through the argument's enclosing scopes,
+// analyzed once per module.
 function collectParallelUseDependencies(arg, st) {
 	const lexical = (st.moduleLexical ??= createLexicalAnalysis(st.moduleAst));
 	const scope = lexical.nodeScopes.get(arg);

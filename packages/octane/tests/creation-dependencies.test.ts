@@ -606,6 +606,255 @@ ${sourceFor('props.load(props.run?.(store.value) ?? store.value)', ext, 'argumen
 	);
 });
 
+// A batch of two statement-level use() calls memoizes each argument. A
+// one-level method call passes its receiver as `this`, and an inherited method
+// is one function for every receiver, so only the receiver can witness the
+// change.
+function methodCallSource(expression: string, ext: string) {
+	const uses = `const first = use(load('first')); const label = use(${expression});`;
+	if (ext === 'ts') {
+		return `import { createElement, use } from 'octane';
+export function Page({ count, item, run, load }) { ${uses} return createElement('p', null, first + ':' + label); }`;
+	}
+	return `import { use } from 'octane';
+export function Page({ count, item, run, load }) ${
+		ext === 'tsrx'
+			? `@{ ${uses} <p>{(first + ':' + label) as string}</p> }`
+			: `{ ${uses} return <p>{(first + ':' + label) as string}</p>; }`
+	}`;
+}
+
+class Labelled {
+	name: string;
+	constructor(name: string) {
+		this.name = name;
+	}
+	label() {
+		return this.name;
+	}
+}
+const labelled = (name: string) => new Labelled(name);
+const identity = (value: unknown) => value;
+
+// Erased TypeScript wrappers leave the receiver and key a call reads unchanged.
+const calleeSpellings = ['%r.%m', '%r!.%m', '(%r as any).%m', "%r['%m' as const]"];
+const spellCallee = (spelling: string, root: string, name: string) =>
+	spelling.replace('%r', root).replace('%m', name);
+
+const methodCallShapes: {
+	name: string;
+	expression: string;
+	steps: [Record<string, unknown>, string][];
+}[] = [
+	{
+		name: 'inherited method',
+		expression: 'load(count.toFixed(1))',
+		steps: [
+			[{ count: 1 }, '1.0'],
+			[{ count: 2 }, '2.0'],
+		],
+	},
+	{
+		name: 'asserted receiver',
+		expression: 'load((count as number).toFixed(1))',
+		steps: [
+			[{ count: 1 }, '1.0'],
+			[{ count: 2 }, '2.0'],
+		],
+	},
+	{
+		name: 'asserted method key',
+		expression: "load(item!['label' as const]())",
+		steps: [
+			[{ item: labelled('one') }, 'one'],
+			[{ item: labelled('two') }, 'two'],
+		],
+	},
+	{
+		name: 'class method',
+		expression: 'load(item.label())',
+		steps: [
+			[{ item: labelled('one') }, 'one'],
+			[{ item: labelled('two') }, 'two'],
+		],
+	},
+	{
+		name: 'computed method key',
+		expression: "load(item['label']())",
+		steps: [
+			[{ item: labelled('one') }, 'one'],
+			[{ item: labelled('two') }, 'two'],
+		],
+	},
+	{
+		name: 'optional receiver',
+		expression: "load(item?.label() ?? 'none')",
+		steps: [
+			[{ item: undefined }, 'none'],
+			[{ item: labelled('one') }, 'one'],
+			[{ item: labelled('two') }, 'two'],
+		],
+	},
+	{
+		name: 'optional call',
+		expression: "load(item.label?.() ?? 'none')",
+		steps: [
+			[{ item: { name: 'absent' } }, 'none'],
+			[{ item: labelled('one') }, 'one'],
+			[{ item: labelled('two') }, 'two'],
+		],
+	},
+	{
+		name: 'skipped optional-call argument',
+		expression: "load(run?.(item.label()) ?? 'idle')",
+		steps: [
+			[{ run: undefined, item: undefined }, 'idle'],
+			[{ run: identity, item: labelled('one') }, 'one'],
+			[{ run: identity, item: labelled('two') }, 'two'],
+		],
+	},
+	{
+		name: 'callback body',
+		expression: 'load(() => item.label())',
+		steps: [
+			[{ item: labelled('one') }, 'one'],
+			[{ item: labelled('two') }, 'two'],
+		],
+	},
+];
+
+describe('use() method-call dependencies', () => {
+	it.each(
+		[false, true].flatMap((dev) =>
+			(['client', 'server'] as const).flatMap((mode) =>
+				exts.flatMap((ext) => methodCallShapes.map((shape) => ({ ...shape, dev, mode, ext }))),
+			),
+		),
+	)(
+		'refreshes a $name when its receiver changes ($mode, $ext, dev=$dev)',
+		async ({ expression, steps, dev, mode, ext }) => {
+			const { Page } = loadCreationFixture(methodCallSource(expression, ext), {
+				id: '/project/MethodCallCreationDependency',
+				ext,
+				mode,
+				dev,
+			});
+			const load = requestLoader();
+			let rendered: ReturnType<typeof mount> | null = null;
+			try {
+				for (const [props, label] of steps) {
+					if (mode === 'server') {
+						expect((await prerender(Page, { ...props, load })).html).toContain(
+							`<p>first:${label}</p>`,
+						);
+						continue;
+					}
+					if (rendered === null) rendered = mount(Page, { ...props, load });
+					else await act(() => rendered!.update(Page, { ...props, load }));
+					await act(async () => {});
+					expect(rendered.find('p').textContent).toBe(`first:${label}`);
+				}
+			} finally {
+				rendered?.unmount();
+			}
+		},
+	);
+
+	it.each(
+		[false, true].flatMap((dev) =>
+			['tsrx', 'ts'].flatMap((ext) =>
+				(['arrow', 'function'] as const).flatMap((kind) =>
+					calleeSpellings.map((spelling) => ({
+						dev,
+						ext,
+						kind,
+						callee: spellCallee(spelling, 'item', 'label'),
+					})),
+				),
+			),
+		),
+	)(
+		'keeps the memo when a rebuilt receiver carries the same own $kind: $callee() ($ext, dev=$dev)',
+		async ({ dev, ext, kind, callee }) => {
+			// An own function keeps its identity, so a fresh container around the
+			// same function is not a change.
+			const { Page } = loadCreationFixture(methodCallSource(`load(${callee}())`, ext), {
+				id: '/project/OwnMethodCreationDependency',
+				ext,
+				mode: 'client',
+				dev,
+			});
+			const loader = requestLoader();
+			const loads: unknown[] = [];
+			const load = (argument: unknown) => {
+				loads.push(argument);
+				return loader(argument);
+			};
+			const label =
+				kind === 'arrow'
+					? () => 'own'
+					: function () {
+							return 'own';
+						};
+			const rendered = mount(Page, { item: { label }, load });
+			try {
+				await act(async () => {});
+				expect(rendered.find('p').textContent).toBe('first:own');
+				const settled = loads.length;
+				await act(() => rendered.update(Page, { item: { label }, load }));
+				await act(async () => {});
+				expect(rendered.find('p').textContent).toBe('first:own');
+				expect(loads.slice(settled)).toEqual([]);
+			} finally {
+				rendered.unmount();
+			}
+		},
+	);
+
+	it.each(
+		[false, true].flatMap((dev) =>
+			calleeSpellings.map((spelling) => ({ dev, callee: spellCallee(spelling, 'props', 'load') })),
+		),
+	)(
+		'starts a function loader prop once under a retried boundary: $callee() (dev=$dev)',
+		async ({ dev, callee }) => {
+			// The boundary's retry rebuilds the child's props. A loader that may
+			// read `this` still keeps its identity, or each retry would start a
+			// fresh request and suspend again.
+			const { Page } = loadCreationFixture(
+				`import { use } from 'octane';
+function Child(props) @{ const value = use(${callee}('child', props.version)); <span>{value as string}</span> }
+export function Page(props) @{
+  @try {
+    const own = use(${callee}('parent', props.version));
+    <p>{own as string}<Child load={props.load} version={props.version} /></p>
+  } @pending {
+    <p>{'pending'}</p>
+  }
+}`,
+				{ id: '/project/RetriedLoaderCreationDependency', ext: 'tsrx', mode: 'client', dev },
+			);
+			const started: string[] = [];
+			function load(name: string, version: number) {
+				started.push(name);
+				if (started.length > 10) throw new Error(`restarted: ${started.join(', ')}`);
+				return Promise.resolve(`${name}:${version}`);
+			}
+			const rendered = mount(Page, { load, version: 1 });
+			try {
+				for (let i = 0; i < 4; i++) await act(async () => {});
+				expect(rendered.find('p').textContent).toBe('parent:1child:1');
+				await act(() => rendered.update(Page, { load, version: 1 }));
+				await act(async () => {});
+				expect(rendered.find('p').textContent).toBe('parent:1child:1');
+				expect(started).toEqual(['parent', 'child']);
+			} finally {
+				rendered.unmount();
+			}
+		},
+	);
+});
+
 // A plain hook module's memoized use() argument evaluates its dependency array
 // on every render, so the array may only read what the authored argument reads.
 const plainUseShapes = [
