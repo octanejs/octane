@@ -63,11 +63,13 @@ function memoContextFixture(
 describe('native conditions preserve dormant server content', () => {
 	let container: HTMLElement;
 	let root: Root | undefined;
+	let recoverable: unknown[];
 	const scopes: Scope[] = [];
 	let nextScopeKey = 0;
 	beforeEach(() => {
 		container = document.createElement('div');
 		document.body.appendChild(container);
+		recoverable = [];
 	});
 	afterEach(() => {
 		root?.unmount();
@@ -137,24 +139,39 @@ describe('native conditions preserve dormant server content', () => {
 		expect(probe.onEffect).not.toHaveBeenCalled();
 		expect(probe.onCleanup).not.toHaveBeenCalled();
 	}
-	async function assertLive(probe: ActivationReceipts, label = 'server label:closed') {
+	/**
+	 * The boundary is live. Captures that changed before it activated give it
+	 * output the server never rendered, and a dormant boundary never renders its
+	 * stale captures to compare them. As React does for an update that reaches a
+	 * dehydrated boundary it cannot hydrate, the boundary then renders on the
+	 * client instead of adopting the server's button, and reports nothing.
+	 */
+	async function assertLive(
+		probe: ActivationReceipts,
+		label = 'server label:closed',
+		rendered: 'adopted' | 'client' = 'adopted',
+	) {
 		await vi.waitFor(async () => {
 			await act(() => {});
 			expect(probe.onHydrated).toHaveBeenCalled();
 		});
-		expect(container.querySelector('#deferred-action')).toBe(probe.button);
-		expect(probe.button.textContent).toBe(label);
+		const button = container.querySelector<HTMLButtonElement>('#deferred-action')!;
+		if (rendered === 'adopted') expect(button).toBe(probe.button);
+		else expect(probe.button.isConnected).toBe(false);
+		expect(button.textContent).toBe(label);
 		expect(probe.onHydrated).toHaveBeenCalledOnce();
 		expect(probe.onEffect).toHaveBeenCalledOnce();
 		expect(probe.onCleanup).not.toHaveBeenCalled();
-		await act(() => probe.button.click());
+		await act(() => button.click());
 		expect(probe.onClick).toHaveBeenCalledOnce();
+		expect(recoverable).toEqual([]);
 	}
 	it('keeps a false native predicate dormant across native value publication', async () => {
 		const probe = setup$();
 		await act(() => {
 			root = hydrateRoot(container, client.NativeConditionDemand, probe.props, {
 				signalOwner: probe.scope,
+				onRecoverableError: (error: unknown) => recoverable.push(error),
 			});
 		});
 		await ready();
@@ -179,6 +196,7 @@ describe('native conditions preserve dormant server content', () => {
 		await act(() => {
 			root = hydrateRoot(container, client.NativeConditionDemand, probe.props, {
 				signalOwner: probe.scope,
+				onRecoverableError: (error: unknown) => recoverable.push(error),
 			});
 		});
 		await ready();
@@ -199,6 +217,7 @@ describe('native conditions preserve dormant server content', () => {
 		await act(() => {
 			root = hydrateRoot(container, client.NativeConditionDemand, probe.props, {
 				signalOwner: probe.scope,
+				onRecoverableError: (error: unknown) => recoverable.push(error),
 			});
 		});
 		await ready();
@@ -220,6 +239,7 @@ describe('native conditions preserve dormant server content', () => {
 		await act(() => {
 			root = hydrateRoot(container, client.NativeConditionDemand, probe.props, {
 				signalOwner: probe.scope,
+				onRecoverableError: (error: unknown) => recoverable.push(error),
 			});
 		});
 		await ready();
@@ -242,6 +262,7 @@ describe('native conditions preserve dormant server content', () => {
 		await act(() => {
 			root = hydrateRoot(container, client.NativeConditionDemand, probe.props, {
 				signalOwner: probe.scope,
+				onRecoverableError: (error: unknown) => recoverable.push(error),
 			});
 		});
 		await ready();
@@ -253,7 +274,7 @@ describe('native conditions preserve dormant server content', () => {
 				onClick: onLatestClick,
 			}),
 		);
-		await assertLive({ ...probe, onClick: onLatestClick }, 'latest label:closed');
+		await assertLive({ ...probe, onClick: onLatestClick }, 'latest label:closed', 'client');
 		expect(probe.onClick).not.toHaveBeenCalled();
 	});
 	it('opens preserved content for a genuine parent render with unchanged child capture', async () => {
@@ -261,6 +282,7 @@ describe('native conditions preserve dormant server content', () => {
 		await act(() => {
 			root = hydrateRoot(container, client.NativeConditionDemand, probe.props, {
 				signalOwner: probe.scope,
+				onRecoverableError: (error: unknown) => recoverable.push(error),
 			});
 		});
 		await ready();
@@ -276,6 +298,7 @@ describe('native conditions preserve dormant server content', () => {
 		await act(() => {
 			root = hydrateRoot(container, client.NativeConditionDemand, probe.props, {
 				signalOwner: probe.scope,
+				onRecoverableError: (error: unknown) => recoverable.push(error),
 			});
 		});
 		await ready();
@@ -283,13 +306,14 @@ describe('native conditions preserve dormant server content', () => {
 		await act(() =>
 			root!.render(client.NativeConditionDemand, { ...probe.props, contextValue: 'still closed' }),
 		);
-		await assertLive(probe, 'server label:still closed');
+		await assertLive(probe, 'server label:still closed', 'client');
 	});
 	it('opens changed context when a false native predicate has also queued a refresh', async () => {
 		const probe = setup$({ context: 'both' });
 		await act(() => {
 			root = hydrateRoot(container, client.NativeConditionDemand, probe.props, {
 				signalOwner: probe.scope,
+				onRecoverableError: (error: unknown) => recoverable.push(error),
 			});
 		});
 		await ready();
@@ -298,7 +322,7 @@ describe('native conditions preserve dormant server content', () => {
 			probe.scope.set(probe.gate$, { open: false, revision: 1 });
 			root!.render(client.NativeConditionDemand, { ...probe.props, contextValue: 'still closed' });
 		});
-		await assertLive(probe, 'server label:still closed');
+		await assertLive(probe, 'server label:still closed', 'client');
 	});
 	it('opens memo-wrapped preserved content for changed context with unchanged boundary props', async () => {
 		const receipts = setupReceipts(document.createElement('button'));
@@ -311,7 +335,12 @@ describe('native conditions preserve dormant server content', () => {
 		container.innerHTML = renderToString(serverFixture.App, { value: 'closed' }).html;
 		receipts.button = container.querySelector('#deferred-action') as HTMLButtonElement;
 		await act(() => {
-			root = hydrateRoot(container, clientFixture.App, { value: 'closed' });
+			root = hydrateRoot(
+				container,
+				clientFixture.App,
+				{ value: 'closed' },
+				{ onRecoverableError: (error: unknown) => recoverable.push(error) },
+			);
 		});
 		await ready();
 		expect(container.querySelector('#deferred-action')).toBe(receipts.button);
@@ -319,6 +348,6 @@ describe('native conditions preserve dormant server content', () => {
 		expect(receipts.onHydrated).not.toHaveBeenCalled();
 		expect(receipts.onEffect).not.toHaveBeenCalled();
 		await act(() => root!.render(clientFixture.App, { value: 'still closed' }));
-		await assertLive(receipts, 'server label:still closed');
+		await assertLive(receipts, 'server label:still closed', 'client');
 	});
 });

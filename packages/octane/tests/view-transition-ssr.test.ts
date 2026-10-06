@@ -1124,6 +1124,9 @@ describe('ReactDOMFizzViewTransition (ported)', () => {
 		}
 	});
 
+	// As in React, hydration keeps the server's style rather than patching it:
+	// an authored static style that differs is reported only by a development
+	// build, as a difference that won't be patched up, and the host is adopted.
 	it.each([false, true])(
 		'checks authored static scope styles during hydration (mismatch=%s)',
 		(mismatch) => {
@@ -1133,10 +1136,15 @@ describe('ReactDOMFizzViewTransition (ported)', () => {
 			const root = hydrateRoot(container, StaticScopeStyleApp, {});
 			try {
 				const hydrated = container.querySelector<HTMLElement>('#static-scope-style')!;
-				expect(hydrated === host).toBe(!mismatch);
-				expect(hydrated.style.color).toBe('red');
+				expect(hydrated).toBe(host);
+				expect(hydrated.style.color).toBe(mismatch ? 'blue' : 'red');
 				expect(hydrated.style.getPropertyValue('view-transition-scope')).toBe('none');
 				expect(hydrated.style.getPropertyPriority('view-transition-scope')).toBe('important');
+				if (mismatch && process.env.NODE_ENV !== 'production') {
+					expect(errorSpy).toHaveBeenCalledWith(
+						expect.stringContaining("This won't be patched up"),
+					);
+				}
 			} finally {
 				root.unmount();
 				if (mismatch) errorSpy.mockClear();

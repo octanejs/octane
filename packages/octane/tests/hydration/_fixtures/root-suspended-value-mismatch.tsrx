@@ -1,5 +1,5 @@
-// Roots without a Suspense boundary whose first hydrating attempt repairs a
-// server text, attribute, or style value and then suspends at GateLeaf while
+// Roots without a Suspense boundary whose server text, attribute, or style
+// value differs from the client's before GateLeaf, which suspends while
 // `gate.promise` is pending.
 import { createElement, type OctaneNode } from 'octane';
 
@@ -67,7 +67,7 @@ export function RootClass(props: { label: string }) @{
 }
 
 // Raw HTML keeps the server's content, so every attempt that compares it
-// finds the mismatch.
+// finds the difference.
 export function RootHtml(props: { label: string }) @{
 	<div>
 		<span dangerouslySetInnerHTML={{ __html: props.label }} />
@@ -75,8 +75,8 @@ export function RootHtml(props: { label: string }) @{
 	</div>
 }
 
-// A resolved arm adopts with its own hydration capability and commits its
-// repairs before the root suspends after it.
+// A resolved @try/@pending arm is its own fallback owner, before the GateLeaf
+// that suspends the root.
 export function RootArmText(props: { label: string }) @{
 	<div>
 		@try {
@@ -130,8 +130,8 @@ export function RootXlinkValue(props: { label: string }) @{
 	</div>
 }
 
-// The server rendered the other @if arm, so hydration rebuilds the `<span>`
-// from the client template before the root suspends.
+// The server rendered the other @if arm, before the GateLeaf that suspends the
+// root.
 export function RootRebuilt(props: { label: string }) @{
 	<div>
 		@if (props.label === 'server') {
@@ -151,8 +151,8 @@ function hole(label: string): OctaneNode {
 	return label === 'server' ? 'server' : createElement(Label, { text: label });
 }
 
-// The renderable hole discards the server's text and clones Label's template
-// before the root suspends.
+// The server rendered text where the client's renderable hole renders Label,
+// before the GateLeaf that suspends the root.
 export function RootHoleClone(props: { label: string }) @{
 	<section>
 		{hole(props.label)}
@@ -169,8 +169,8 @@ function Checked(props: { label: string }) @{
 	<em>{check(props.label) as string}</em>
 }
 
-// The client's try body adopts the server's `<span>`, then throws to its catch
-// arm, which replaces the body before the root suspends.
+// The client's try body matches the server's `<span>`, then throws to its
+// catch arm, before the GateLeaf that suspends the root.
 export function RootCaughtBody(props: { label: string }) @{
 	<div>
 		@try {

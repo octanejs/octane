@@ -16,18 +16,62 @@ function ids(root: ParentNode, selector: string): string[] {
 	return Array.from(root.querySelector(selector)!.children, (child) => child.id);
 }
 
-// Per ReactDOMServerIntegrationReconnecting-test.js, stable/canary (identical):
-// the public contract is a diagnostic plus recovery to the client style.
+// Per ReactDOMServerIntegrationReconnecting-test.js, stable/canary (identical),
+// asserting React 19's outcomes. A text or structural mismatch renders the root
+// on the client: the server's element is replaced and onRecoverableError fires
+// once. An attribute or style mismatch is never patched: the adopted element
+// keeps the server's value, with a development diagnostic and no recoverable
+// error. suppressHydrationWarning keeps the server's text and attributes one
+// level deep and never hides a structural mismatch.
+type Reports = { recoverable: unknown[] };
+const reporting = {
+	createState: (): Reports => ({ recoverable: [] }),
+	rootOptions: ({ state }: { state: Reports }) => ({
+		onRecoverableError: (error: unknown) => state.recoverable.push(error),
+	}),
+};
+
+/** The root rendered on the client: `before` was replaced, and one error was reported. */
+async function expectRootFallback(before: Element | null | undefined, state: Reports) {
+	// Recoverable errors are delivered after the hydrating render.
+	await Promise.resolve();
+	expect(before).toBeInstanceOf(Element);
+	expect(before!.isConnected).toBe(false);
+	expect(state.recoverable).toHaveLength(1);
+}
+
+/**
+ * The development runtime's one "won't be patched up" diagnostic for static
+ * markup that differs, which it publishes for either compile.
+ */
+function unpatchedStaticMarkup(diagnostics: readonly string[]) {
+	expect(diagnostics).toEqual([
+		expect.stringMatching(/won't be patched up[^]*static attributes or markup of the server's/),
+	]);
+}
+
+/** The server's element was adopted without a recoverable error. */
+async function expectAdopted(
+	before: Element | null | undefined,
+	actual: Element | null,
+	state: Reports,
+) {
+	await Promise.resolve();
+	expect(actual).toBe(before);
+	expect(state.recoverable).toEqual([]);
+}
+
 // Per ReactDOMServerIntegrationReconnecting-test.js:174.
 matrix.itRenders('should error reconnecting added style values', {
 	component: 'AddedStyleValues',
 	modes: ['hydrate-mismatch'],
+	...reporting,
 	mismatch: clientFlagMismatch,
 	captureBeforeHydrate: (container) => container.querySelector('#added-style-values'),
-	assertCommon({ root, before }) {
+	async assertCommon({ root, before, state }) {
 		const element = root.querySelector('#added-style-values') as HTMLElement;
-		expect(element).toBe(before);
-		expect(element.style.width).toBe('1px');
+		await expectAdopted(before, element, state);
+		expect(element.style.width).toBe('');
 	},
 });
 
@@ -47,15 +91,23 @@ matrix.itRenders('should reconnect a div with a number and string version of num
 });
 
 // Per ReactDOMServerIntegrationReconnecting-test.js:387.
+// OCTANE DIVERGENCE: hydration validates a template root's node type and tag
+// and its dynamic sites, not every static descendant, so two static templates
+// that share a root tag are not told apart. The server's static markup is
+// kept, and only the development runtime diagnoses the difference.
 matrix.itRenders('can not deeply ignore reconnecting reordered children', {
 	component: 'DeepReorderedChildrenServer',
 	modes: ['hydrate-mismatch'],
+	...reporting,
 	mismatch: {
 		serverComponent: 'DeepReorderedChildrenServer',
 		clientComponent: 'DeepReorderedChildrenClient',
+		diagnostics: unpatchedStaticMarkup,
 	},
-	assertCommon({ root }) {
-		expect(ids(root, '#deep-reordered section')).toEqual(['deep-second', 'deep-first']);
+	captureBeforeHydrate: (container) => container.querySelector('#deep-reordered'),
+	async assertCommon({ root, before, state }) {
+		await expectAdopted(before, root.querySelector('#deep-reordered'), state);
+		expect(ids(root, '#deep-reordered section')).toEqual(['deep-first', 'deep-second']);
 	},
 });
 
@@ -98,10 +150,11 @@ matrix.itRenders('should error reconnecting different numbers', {
 		serverProps: () => ({ value: 2 }),
 		clientProps: () => ({ value: 3 }),
 	},
+	...reporting,
 	captureBeforeHydrate: (container) => container.querySelector('#different-numbers'),
-	assertCommon({ root, before }) {
-		expect(root.querySelector('#different-numbers')).toBe(before);
-		expect(before?.textContent).toBe('3');
+	async assertCommon({ root, before, state }) {
+		await expectRootFallback(before, state);
+		expect(root.querySelector('#different-numbers')!.textContent).toBe('3');
 	},
 });
 
@@ -130,11 +183,12 @@ matrix.itRenders('should error reconnecting added style attribute', {
 	component: 'AddedStyleAttribute',
 	modes: ['hydrate-mismatch'],
 	mismatch: clientFlagMismatch,
+	...reporting,
 	captureBeforeHydrate: (container) => container.querySelector('#added-style-attribute'),
-	assertCommon({ root, before }) {
+	async assertCommon({ root, before, state }) {
 		const element = root.querySelector('#added-style-attribute') as HTMLElement;
-		expect(element).toBe(before);
-		expect(element.style.width).toBe('1px');
+		await expectAdopted(before, element, state);
+		expect(element.style.width).toBe('');
 	},
 });
 
@@ -160,14 +214,15 @@ matrix.itRenders(
 	{
 		component: 'WhitespaceBetweenChildren',
 		modes: ['hydrate-mismatch'],
+		...reporting,
 		mismatch: {
 			serverProps: () => ({ gap: '      ' }),
 			clientProps: () => ({ gap: '' }),
 		},
 		captureBeforeHydrate: (container) => container.querySelector('#whitespace-children'),
-		assertCommon({ root, before }) {
-			expect(root.querySelector('#whitespace-children')).toBe(before);
-			expect(before?.textContent).toBe('AB');
+		async assertCommon({ root, before, state }) {
+			await expectRootFallback(before, state);
+			expect(root.querySelector('#whitespace-children')!.textContent).toBe('AB');
 		},
 	},
 );
@@ -177,11 +232,14 @@ matrix.itRenders('can not deeply ignore errors reconnecting different attribute 
 	component: 'DeepAttributeMismatch',
 	modes: ['hydrate-mismatch'],
 	mismatch: clientFlagMismatch,
+	...reporting,
 	captureBeforeHydrate: (container) => container.querySelector('#deep-attribute'),
-	assertCommon({ root, before }) {
-		expect(root.querySelector('#deep-attribute')).toBe(before);
-		expect(root.querySelector('#client-child')).not.toBeNull();
-		expect(root.querySelector('#server-child')).toBeNull();
+	async assertCommon({ root, before, state }) {
+		// Suppression is one level deep: the child's differing id is diagnosed
+		// and, like any attribute, kept from the server.
+		await expectAdopted(before, root.querySelector('#deep-attribute'), state);
+		expect(root.querySelector('#server-child')).not.toBeNull();
+		expect(root.querySelector('#client-child')).toBeNull();
 	},
 });
 
@@ -223,9 +281,10 @@ matrix.itRenders('should error reconnecting different element types of children'
 	component: 'DifferentChildType',
 	modes: ['hydrate-mismatch'],
 	mismatch: clientFlagMismatch,
+	...reporting,
 	captureBeforeHydrate: (container) => container.querySelector('#different-child-type'),
-	assertCommon({ root, before }) {
-		expect(root.querySelector('#different-child-type')).toBe(before);
+	async assertCommon({ root, before, state }) {
+		await expectRootFallback(before, state);
 		expect(root.querySelector('#client-child-type')).not.toBeNull();
 		expect(root.querySelector('#server-child-type')).toBeNull();
 	},
@@ -239,23 +298,30 @@ matrix.itRenders('should error reconnecting different number from text', {
 		serverProps: () => ({ value: 2 }),
 		clientProps: () => ({ value: '3' }),
 	},
+	...reporting,
 	captureBeforeHydrate: (container) => container.querySelector('#number-vs-text'),
-	assertCommon({ root, before }) {
-		expect(root.querySelector('#number-vs-text')).toBe(before);
-		expect(before?.textContent).toBe('3');
+	async assertCommon({ root, before, state }) {
+		await expectRootFallback(before, state);
+		expect(root.querySelector('#number-vs-text')!.textContent).toBe('3');
 	},
 });
 
 // Per ReactDOMServerIntegrationReconnecting-test.js:294.
+// OCTANE DIVERGENCE: two static templates that share a root tag are not told
+// apart (see :387 above), so the server's static children are kept.
 matrix.itRenders('should error reconnecting reordered children', {
 	component: 'ReorderedChildrenServer',
 	modes: ['hydrate-mismatch'],
+	...reporting,
 	mismatch: {
 		serverComponent: 'ReorderedChildrenServer',
 		clientComponent: 'ReorderedChildrenClient',
+		diagnostics: unpatchedStaticMarkup,
 	},
-	assertCommon({ root }) {
-		expect(ids(root, '#reordered-children')).toEqual(['reordered-second', 'reordered-first']);
+	captureBeforeHydrate: (container) => container.querySelector('#reordered-children'),
+	async assertCommon({ root, before, state }) {
+		await expectAdopted(before, root.querySelector('#reordered-children'), state);
+		expect(ids(root, '#reordered-children')).toEqual(['reordered-first', 'reordered-second']);
 	},
 });
 
@@ -264,11 +330,12 @@ matrix.itRenders('should error reconnecting empty style attribute', {
 	component: 'EmptyStyleAttribute',
 	modes: ['hydrate-mismatch'],
 	mismatch: clientFlagMismatch,
+	...reporting,
 	captureBeforeHydrate: (container) => container.querySelector('#empty-style-attribute'),
-	assertCommon({ root, before }) {
+	async assertCommon({ root, before, state }) {
 		const element = root.querySelector('#empty-style-attribute') as HTMLElement;
-		expect(element).toBe(before);
-		expect(element.getAttribute('style')).toBeNull();
+		await expectAdopted(before, element, state);
+		expect(element.style.width).toBe('1px');
 	},
 });
 
@@ -277,11 +344,12 @@ matrix.itRenders('should error reconnecting missing style attribute', {
 	component: 'MissingStyleAttribute',
 	modes: ['hydrate-mismatch'],
 	mismatch: clientFlagMismatch,
+	...reporting,
 	captureBeforeHydrate: (container) => container.querySelector('#missing-style-attribute'),
-	assertCommon({ root, before }) {
+	async assertCommon({ root, before, state }) {
 		const element = root.querySelector('#missing-style-attribute') as HTMLElement;
-		expect(element).toBe(before);
-		expect(element.getAttribute('style')).toBeNull();
+		await expectAdopted(before, element, state);
+		expect(element.style.width).toBe('1px');
 	},
 });
 
@@ -324,9 +392,11 @@ matrix.itRenders('should error reconnecting missing children', {
 	component: 'MissingChildren',
 	modes: ['hydrate-mismatch'],
 	mismatch: clientFlagMismatch,
+	...reporting,
 	captureBeforeHydrate: (container) => container.querySelector('#missing-children'),
-	assertCommon({ root, before }) {
-		expect(root.querySelector('#missing-children')).toBe(before);
+	async assertCommon({ root, before, state }) {
+		await expectRootFallback(before, state);
+		expect(root.querySelector('#missing-children')).not.toBeNull();
 		expect(root.querySelector('#missing-child')).toBeNull();
 	},
 });
@@ -339,10 +409,11 @@ matrix.itRenders('should error reconnecting different text in two code blocks', 
 		serverProps: () => ({ first: 'Text1', second: 'Text2' }),
 		clientProps: () => ({ first: 'Text1', second: 'Text3' }),
 	},
+	...reporting,
 	captureBeforeHydrate: (container) => container.querySelector('#adjacent-text-mismatch'),
-	assertCommon({ root, before }) {
-		expect(root.querySelector('#adjacent-text-mismatch')).toBe(before);
-		expect(before?.textContent).toBe('Text1Text3');
+	async assertCommon({ root, before, state }) {
+		await expectRootFallback(before, state);
+		expect(root.querySelector('#adjacent-text-mismatch')!.textContent).toBe('Text1Text3');
 	},
 });
 
@@ -367,14 +438,15 @@ matrix.itRenders(
 	{
 		component: 'WhitespaceBetweenChildren',
 		modes: ['hydrate-mismatch'],
+		...reporting,
 		mismatch: {
 			serverProps: () => ({ gap: ' ' }),
 			clientProps: () => ({ gap: '      ' }),
 		},
 		captureBeforeHydrate: (container) => container.querySelector('#whitespace-children'),
-		assertCommon({ root, before }) {
-			expect(root.querySelector('#whitespace-children')).toBe(before);
-			expect(before?.textContent).toBe('A      B');
+		async assertCommon({ root, before, state }) {
+			await expectRootFallback(before, state);
+			expect(root.querySelector('#whitespace-children')!.textContent).toBe('A      B');
 		},
 	},
 );
@@ -384,9 +456,10 @@ matrix.itRenders('can not ignore reconnecting more children', {
 	component: 'SuppressedMoreChildren',
 	modes: ['hydrate-mismatch'],
 	mismatch: clientFlagMismatch,
+	...reporting,
 	captureBeforeHydrate: (container) => container.querySelector('#suppressed-more-children'),
-	assertCommon({ root, before }) {
-		expect(root.querySelector('#suppressed-more-children')).toBe(before);
+	async assertCommon({ root, before, state }) {
+		await expectRootFallback(before, state);
 		expect(ids(root, '#suppressed-more-children')).toEqual(['more-first', 'more-second']);
 	},
 });
@@ -397,28 +470,35 @@ matrix.itRenders(
 	{
 		component: 'WhitespaceBetweenChildren',
 		modes: ['hydrate-mismatch'],
+		...reporting,
 		mismatch: {
 			serverProps: () => ({ gap: '' }),
 			clientProps: () => ({ gap: '      ' }),
 		},
 		captureBeforeHydrate: (container) => container.querySelector('#whitespace-children'),
-		assertCommon({ root, before }) {
-			expect(root.querySelector('#whitespace-children')).toBe(before);
-			expect(before?.textContent).toBe('A      B');
+		async assertCommon({ root, before, state }) {
+			await expectRootFallback(before, state);
+			expect(root.querySelector('#whitespace-children')!.textContent).toBe('A      B');
 		},
 	},
 );
 
 // Per ReactDOMServerIntegrationReconnecting-test.js:375.
+// OCTANE DIVERGENCE: two static templates that share a root tag are not told
+// apart (see :387 above), so the server's static children are kept.
 matrix.itRenders('can not ignore reconnecting reordered children', {
 	component: 'SuppressedReorderedChildrenServer',
 	modes: ['hydrate-mismatch'],
+	...reporting,
 	mismatch: {
 		serverComponent: 'SuppressedReorderedChildrenServer',
 		clientComponent: 'SuppressedReorderedChildrenClient',
+		diagnostics: unpatchedStaticMarkup,
 	},
-	assertCommon({ root }) {
-		expect(ids(root, '#suppressed-reordered')).toEqual(['suppressed-second', 'suppressed-first']);
+	captureBeforeHydrate: (container) => container.querySelector('#suppressed-reordered'),
+	async assertCommon({ root, before, state }) {
+		await expectAdopted(before, root.querySelector('#suppressed-reordered'), state);
+		expect(ids(root, '#suppressed-reordered')).toEqual(['suppressed-first', 'suppressed-second']);
 	},
 });
 
@@ -480,9 +560,11 @@ matrix.itRenders('can distinguish an empty component from a dom node', {
 		serverComponent: 'DomNodeRoot',
 		clientComponent: 'EmptyChildRoot',
 	},
+	...reporting,
 	captureBeforeHydrate: (container) => container.querySelector('#empty-vs-node'),
-	assertCommon({ root, before }) {
-		expect(root.querySelector('#empty-vs-node')).toBe(before);
+	async assertCommon({ root, before, state }) {
+		await expectRootFallback(before, state);
+		expect(root.querySelector('#empty-vs-node')).not.toBeNull();
 		expect(root.querySelector('#server-dom-node')).toBeNull();
 	},
 });
@@ -525,9 +607,10 @@ matrix.itRenders('can not ignore reconnecting fewer children', {
 	component: 'SuppressedFewerChildren',
 	modes: ['hydrate-mismatch'],
 	mismatch: clientFlagMismatch,
+	...reporting,
 	captureBeforeHydrate: (container) => container.querySelector('#suppressed-fewer-children'),
-	assertCommon({ root, before }) {
-		expect(root.querySelector('#suppressed-fewer-children')).toBe(before);
+	async assertCommon({ root, before, state }) {
+		await expectRootFallback(before, state);
 		expect(ids(root, '#suppressed-fewer-children')).toEqual(['fewer-first']);
 	},
 });

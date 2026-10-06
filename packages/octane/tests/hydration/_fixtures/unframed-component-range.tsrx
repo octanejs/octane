@@ -179,6 +179,165 @@ export function FragChildBranch(props: { server?: boolean; leaf: Promise<string>
 	</div>
 }
 
+// The server's arm rendered exactly the elements that the client's suspending
+// fragment component renders once its data arrives, without a component range.
+export function MatchBranch(props: { server?: boolean; leaf: Promise<string> }) @{
+	<div>
+		<Hydrate split={false} when={load()}>
+			<section>
+				@if (props.server) {
+					<>
+						<u>{'z'}</u>
+						<i>{'x'}</i>
+						<Em />
+					</>
+				} @else {
+					<>
+						<Frag leaf={props.leaf} />
+						<Em />
+					</>
+				}
+			</section>
+		</Hydrate>
+	</div>
+}
+
+// The same, with the suspending read in a child of the component.
+export function MatchChildBranch(props: { server?: boolean; leaf: Promise<string> }) @{
+	<div>
+		<Hydrate split={false} when={load()}>
+			<section>
+				@if (props.server) {
+					<>
+						<u>{'z'}</u>
+						<i>{'x'}</i>
+						<Em />
+					</>
+				} @else {
+					<>
+						<FragChild leaf={props.leaf} />
+						<Em />
+					</>
+				}
+			</section>
+		</Hydrate>
+	</div>
+}
+
+// The first shape without a boundary.
+export function MatchRoot(props: { server?: boolean; leaf: Promise<string> }) @{
+	<div>
+		<section>
+			@if (props.server) {
+				<>
+					<u>{'z'}</u>
+					<i>{'x'}</i>
+					<Em />
+				</>
+			} @else {
+				<>
+					<Frag leaf={props.leaf} />
+					<Em />
+				</>
+			}
+		</section>
+	</div>
+}
+
+// The client's arm calls the suspending fragment component, which finds the
+// server's elements instead of its range, only after the component around it
+// suspends first, inside its own adopted server range.
+function Gate(props: { server?: boolean; gate: Promise<string>; leaf: Promise<string> }) @{
+	if (!props.server) use(props.gate);
+	@if (props.server) {
+		<>
+			<u>{'z'}</u>
+			<i>{'x'}</i>
+		</>
+	} @else {
+		<Frag leaf={props.leaf} />
+	}
+}
+
+export function GateBranch(props: {
+	server?: boolean;
+	gate: Promise<string>;
+	leaf: Promise<string>;
+}) @{
+	<div>
+		<Hydrate split={false} when={load()}>
+			<section>
+				<Gate server={props.server} gate={props.gate} leaf={props.leaf} />
+				<Em />
+			</section>
+		</Hydrate>
+	</div>
+}
+
+// The server rendered nothing where the client's suspending component renders.
+export function EmptyBranch(props: { server?: boolean; leaf: Promise<string> }) @{
+	<div>
+		<Hydrate split={false} when={load()}>
+			@if (props.server) {
+				<section></section>
+			} @else {
+				<section>
+					<Frag leaf={props.leaf} />
+				</section>
+			}
+		</Hydrate>
+	</div>
+}
+
+function Lead() @{
+	<b>{'a'}</b>
+}
+
+function Late(props: { leaf: Promise<string> }) @{
+	<p>{use(props.leaf) as string}</p>
+}
+
+function Tail() @{
+	<p>{'z'}</p>
+}
+
+// Every child of the host is a call, and the first call adopts the server's
+// only element, so the server rendered nothing for the second.
+export function LateBranch(props: { server?: boolean; leaf: Promise<string> }) @{
+	<div>
+		<Hydrate split={false} when={load()}>
+			@if (props.server) {
+				<section>
+					<b>{'a'}</b>
+				</section>
+			} @else {
+				<section>
+					<Lead />
+					<Late leaf={props.leaf} />
+				</section>
+			}
+		</Hydrate>
+	</div>
+}
+
+// The same, with a second call that renders without suspending.
+export function TailCallBranch(props: { server?: boolean }) @{
+	<div>
+		<Hydrate split={false} when={load()}>
+			@if (props.server) {
+				<section>
+					<b>{'a'}</b>
+				</section>
+			} @else {
+				<section>
+					<Lead />
+					<Tail />
+				</section>
+			}
+		</Hydrate>
+	</div>
+}
+
 function Thrower(): never {
 	throw new Error('boom');
 }

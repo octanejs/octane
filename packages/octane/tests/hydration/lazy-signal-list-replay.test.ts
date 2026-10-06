@@ -98,7 +98,7 @@ describe('pending lazy child list adoption replay', () => {
 			expect(onMount).not.toHaveBeenCalled();
 		});
 		for (const kept of [0, 1]) {
-			it(`${dev ? 'development' : 'production'} still reports and removes actual extra server rows (${kept} kept)`, async () => {
+			it(`${dev ? 'development' : 'production'} renders the island on the client for extra server rows (${kept} kept)`, async () => {
 				const serverView: View = {
 					reversed: false,
 					loading: false,
@@ -127,9 +127,12 @@ describe('pending lazy child list adoption replay', () => {
 				expect(uncaught).not.toHaveBeenCalled();
 				expect(recoverable).toHaveBeenCalledOnce();
 				expect(recoverable.mock.calls[0]![0]).toBeInstanceOf(Error);
-				expect(container.querySelector('[data-row="a"]')).toBe(kept ? first : null);
+				// The Hydrate island discards its server rows, matching ones included.
+				expect(first!.isConnected).toBe(false);
 				expect(extra!.isConnected).toBe(false);
-				expect(container.querySelectorAll('[data-row]')).toHaveLength(kept);
+				expect(
+					Array.from(container.querySelectorAll('[data-row]'), (row) => row.textContent),
+				).toEqual(kept ? ['First'] : []);
 			});
 		}
 		for (const name of ['Sections', 'Adjacent']) {

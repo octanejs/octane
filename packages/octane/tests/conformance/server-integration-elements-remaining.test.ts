@@ -33,6 +33,7 @@ interface SimpleCase {
 	createState?: () => any;
 	assertCommon(observation: SimpleObservation): void;
 	assertByMode?: Record<string, (observation: SimpleObservation) => void>;
+	hydrationDiagnostics?: Partial<Record<SimpleObservation['mode'], 'none' | 'hydration-mismatch'>>;
 }
 
 function renders(title: string, spec: SimpleCase): void {
@@ -49,10 +50,19 @@ function byId(root: ParentNode, id: string): Element {
 	return element!;
 }
 
-function expectEmptyRoot(root: ParentNode): void {
+/**
+ * A root that renders nothing. Hydrating it over mismatched server markup
+ * leaves the server node it cannot match directly in the root container in
+ * place, as React leaves third-party nodes there, and reports nothing.
+ */
+function expectEmptyRoot({ mode, root }: SimpleObservation): void {
+	if (mode === 'hydrate-mismatch') {
+		expect(root.children).toHaveLength(1);
+		expect(root.querySelector('#wrong-server-tree')?.textContent).toBe('wrong');
+		return;
+	}
 	expect(root.textContent).toBe('');
 	expect(root.querySelector('*')).toBeNull();
-	expect(root.querySelector('#wrong-server-tree')).toBeNull();
 }
 
 // ReactDOMServerIntegrationBasic-test.js:43.
@@ -704,17 +714,15 @@ it('normalizes replacement characters when checking hydration parser differences
 // ReactDOMServerIntegrationElements-test.js:919.
 renders('renders a function returning null', {
 	component: 'NullRoot',
-	assertCommon({ root }) {
-		expectEmptyRoot(root);
-	},
+	assertCommon: expectEmptyRoot,
+	hydrationDiagnostics: { 'hydrate-mismatch': 'none' },
 });
 
 // ReactDOMServerIntegrationElements-test.js:933.
 renders('renders a function returning undefined', {
 	component: 'UndefinedRoot',
-	assertCommon({ root }) {
-		expectEmptyRoot(root);
-	},
+	assertCommon: expectEmptyRoot,
+	hydrationDiagnostics: { 'hydrate-mismatch': 'none' },
 });
 
 // ReactDOMServerIntegrationFragment-test.js:41.

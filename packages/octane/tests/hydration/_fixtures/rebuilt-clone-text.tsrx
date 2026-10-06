@@ -1,4 +1,4 @@
-import { useState } from 'octane';
+import { use, useState } from 'octane';
 
 function read(value: unknown): string {
 	if (value !== undefined) throw value;
@@ -47,6 +47,34 @@ export function TryBranch(props: { server?: boolean; value?: unknown }) @{
 			} @else {
 				<Leaf value={props.value} />
 			}
+		} @pending {
+			<p>{'pending'}</p>
+		}
+	</div>
+}
+
+// The same with a catch arm, which a client Leaf that throws reaches.
+export function TryCatchBranch(props: { value?: unknown }) @{
+	<div>
+		@try {
+			<Leaf value={props.value} />
+		} @pending {
+			<p>{'pending'}</p>
+		} @catch (error: unknown) {
+			<b>{String(error) as string}</b>
+		}
+	</div>
+}
+
+function Reader(props: { value: Promise<string> }) @{
+	<i>{use(props.value) as string}</i>
+}
+
+// A reader whose client value suspends before it resolves.
+export function TryReader(props: { value: Promise<string> }) @{
+	<div>
+		@try {
+			<Reader value={props.value} />
 		} @pending {
 			<p>{'pending'}</p>
 		}

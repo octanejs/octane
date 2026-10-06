@@ -349,17 +349,24 @@ describe('clsx class composition — hydration parity', () => {
 		return serverElement;
 	}
 
-	async function hydrateStaticFallbackMismatch(
+	/**
+	 * Hydrates over a server anchor whose class differs from the client's. As in
+	 * React 19, hydration never patches an attribute: the server's class stays,
+	 * unwritten, and a development compile warns once that it won't be patched
+	 * up. The next client change to the class writes it.
+	 */
+	async function hydrateClassMismatch(
 		serverProps: Record<string, unknown>,
 		clientProps: Record<string, unknown>,
 		expectedServerClass: string,
 		tamperedClass?: string,
-	): Promise<Element> {
+	): Promise<{ serverAnchor: Element; root: ReturnType<typeof hydrateRoot> }> {
 		const { html } = await ServerRT.renderToString(server.ExplicitThenSpreadClass, serverProps);
 		container.innerHTML = html;
 		const serverAnchor = container.querySelector('a')!;
 		expect(serverAnchor.getAttribute('class')).toBe(expectedServerClass);
 		if (tamperedClass !== undefined) serverAnchor.setAttribute('class', tamperedClass);
+		const keptClass = serverAnchor.getAttribute('class');
 
 		const observer = new MutationObserver(() => {});
 		observer.observe(serverAnchor, {
@@ -368,7 +375,10 @@ describe('clsx class composition — hydration parity', () => {
 			attributeOldValue: true,
 		});
 
-		hydrateRoot(container, client.ExplicitThenSpreadClass, clientProps);
+		const recoverable: unknown[] = [];
+		const root = hydrateRoot(container, client.ExplicitThenSpreadClass, clientProps, {
+			onRecoverableError: (error) => recoverable.push(error),
+		});
 		flushSync(() => {});
 		const classMutations = observer.takeRecords();
 		observer.disconnect();
@@ -376,11 +386,12 @@ describe('clsx class composition — hydration parity', () => {
 		const warnings = errSpy.mock.calls
 			.map((c) => String(c[0]))
 			.filter((m) => m.includes('hydration'));
-		expect(warnings).toHaveLength(PROD_COMPILE ? 0 : 1);
+		expect(warnings).toEqual(PROD_COMPILE ? [] : [expect.stringContaining("won't be patched up")]);
 		expect(container.querySelector('a')).toBe(serverAnchor);
-		expect(serverAnchor.getAttribute('class')).toBe('story-title');
-		expect(classMutations).toHaveLength(1);
-		return serverAnchor;
+		expect(serverAnchor.getAttribute('class')).toBe(keptClass);
+		expect(classMutations).toHaveLength(0);
+		expect(recoverable).toEqual([]);
+		return { serverAnchor, root };
 	}
 
 	it('adopts a composed array class with no mismatch', async () => {
@@ -424,7 +435,7 @@ describe('clsx class composition — hydration parity', () => {
 		expect(serverAnchor.getAttribute('data-style-src')).toBe('title-link');
 	});
 
-	it('warns and restores the static class when the client spread removes server class', async () => {
+	it('keeps the server class when the client spread removes it, until the class next changes', async () => {
 		const serverProps = {
 			href: '/story',
 			attrs: { className: ['spread', { active: true }], 'data-style-src': 'title-link' },
@@ -433,20 +444,31 @@ describe('clsx class composition — hydration parity', () => {
 			href: '/story',
 			attrs: { 'data-style-src': 'title-link' },
 		};
-		const serverAnchor = await hydrateStaticFallbackMismatch(
+		const { serverAnchor, root } = await hydrateClassMismatch(
 			serverProps,
 			clientProps,
 			'spread active',
 		);
+		expect(serverAnchor.getAttribute('class')).toBe('spread active');
 		expect(serverAnchor.getAttribute('data-style-src')).toBe('title-link');
+
+		flushSync(() =>
+			root.render(client.ExplicitThenSpreadClass, {
+				href: '/story',
+				attrs: { className: 'next', 'data-style-src': 'title-link' },
+			}),
+		);
+		expect(container.querySelector('a')).toBe(serverAnchor);
+		expect(serverAnchor.getAttribute('class')).toBe('next');
 	});
 
-	it('warns and restores the static class when matching server markup was tampered', async () => {
+	it('keeps a tampered server class when the markup otherwise matches', async () => {
 		const props = {
 			href: '/story',
 			attrs: { 'data-style-src': 'title-link' },
 		};
-		await hydrateStaticFallbackMismatch(props, props, 'story-title', 'tampered');
+		const { serverAnchor } = await hydrateClassMismatch(props, props, 'story-title', 'tampered');
+		expect(serverAnchor.getAttribute('class')).toBe('tampered');
 	});
 
 	it('adopts the effective class when an explicit class follows a spread', async () => {

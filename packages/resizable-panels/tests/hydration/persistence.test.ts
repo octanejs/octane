@@ -2,6 +2,7 @@ import { drainPassiveEffects, flushSync, hydrateRoot } from 'octane';
 import { describe, expect, it, vi } from 'vitest';
 import { flushEffects } from '../../../octane/tests/_helpers';
 import { renderHydrationFixture } from '../../../octane/tests/_hydration-ssr';
+import type { LayoutStorage } from '@octanejs/resizable-panels';
 import { PersistenceHydrationFixture } from '../_fixtures/persistence-hydration.tsrx';
 
 async function settle(): Promise<void> {
@@ -14,13 +15,21 @@ async function settle(): Promise<void> {
 }
 
 describe('react-resizable-panels persistence hydration', () => {
+	// The server reads the same storage as the client, as a cookie- or
+	// database-backed LayoutStorage does. As in React, hydration never patches
+	// an attribute, so a layout the server did not render stays as rendered.
+	function serverStorage(values: Map<string, string>): LayoutStorage {
+		return { getItem: (key) => values.get(key) ?? null, setItem: () => {} };
+	}
+
 	it('adopts server markup, restores storage, and saves through live events', async () => {
+		const values = new Map([['react-resizable-panels:hydrated', '{"left":40,"right":60}']]);
 		const serverResult = await renderHydrationFixture(
 			'react-resizable-panels',
 			'packages/resizable-panels/tests/_fixtures/persistence-hydration.tsrx',
 			'PersistenceHydrationFixture',
+			{ storage: serverStorage(values) },
 		);
-		const values = new Map([['react-resizable-panels:hydrated', '{"left":40,"right":60}']]);
 		const storage = {
 			getItem: vi.fn((key: string) => values.get(key) ?? null),
 			setItem: vi.fn((key: string, value: string) => values.set(key, value)),
@@ -59,8 +68,14 @@ describe('react-resizable-panels persistence hydration', () => {
 			getItem: vi.fn((key: string) => legacyValues.get(key) ?? null),
 			setItem: vi.fn((key: string, value: string) => legacyValues.set(key, value)),
 		};
+		const legacyServerResult = await renderHydrationFixture(
+			'react-resizable-panels',
+			'packages/resizable-panels/tests/_fixtures/persistence-hydration.tsrx',
+			'PersistenceHydrationFixture',
+			{ storage: serverStorage(legacyValues) },
+		);
 		const legacyContainer = document.createElement('div');
-		legacyContainer.innerHTML = serverResult.html;
+		legacyContainer.innerHTML = legacyServerResult.html;
 		document.body.appendChild(legacyContainer);
 		const legacyServerButton = legacyContainer.querySelector('button');
 		const legacyError = vi.spyOn(console, 'error').mockImplementation(() => {});

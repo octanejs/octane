@@ -29,6 +29,101 @@ export function GateBranch(props: { server?: boolean }) @{
 	</div>
 }
 
+// A component whose single root holds the suspending leaf: React hydrates the
+// root before the leaf's body runs.
+function GateRoot() @{
+	<section>
+		<GateLeaf />
+	</section>
+}
+
+// The leaf suspends before it renders its template.
+function GateSetupLeaf() @{
+	const text = read(gate.promise);
+	<i>{text as string}</i>
+}
+
+function GateSetupRoot() @{
+	<section>
+		<GateSetupLeaf />
+	</section>
+}
+
+export function GateSetupFirst(props: { server?: boolean }) @{
+	<div>
+		@try {
+			@if (props.server) {
+				<b class="server">{'server'}</b>
+			} @else {
+				<GateSetupRoot />
+			}
+		} @pending {
+			<p>{'pending'}</p>
+		}
+	</div>
+}
+
+// A fragment component whose first child is the suspending leaf: React runs the
+// leaf's body before it hydrates any host of the fragment.
+function GateFirst() @{
+	<>
+		<GateLeaf />
+		<em>{'x'}</em>
+	</>
+}
+
+// A fragment component whose first child renders a host without suspending,
+// before the suspending leaf.
+function GateMarkFirst() @{
+	<>
+		<ClientMark />
+		<GateLeaf />
+		<em>{'x'}</em>
+	</>
+}
+
+export function GateMarkThenLeaf(props: { server?: boolean }) @{
+	<div>
+		@try {
+			@if (props.server) {
+				<b class="server">{'server'}</b>
+			} @else {
+				<GateMarkFirst />
+			}
+		} @pending {
+			<p>{'pending'}</p>
+		}
+	</div>
+}
+
+export function GateHostFirst(props: { server?: boolean }) @{
+	<div>
+		@try {
+			@if (props.server) {
+				<b class="server">{'server'}</b>
+			} @else {
+				<GateRoot />
+			}
+		} @pending {
+			<p>{'pending'}</p>
+		}
+	</div>
+}
+
+export function GateLeafFirst(props: { server?: boolean }) @{
+	<div>
+		@try {
+			@if (props.server) {
+				<b class="server">{'server'}</b>
+			} @else {
+				<GateFirst />
+			}
+		} @pending {
+			<p>{'pending'}</p>
+		}
+	</div>
+}
+
 export function GateForm(props: { server?: boolean }) @{
 	<div>
 		@try {

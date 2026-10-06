@@ -2,10 +2,8 @@ import { use, useState } from 'octane';
 
 // Each client component renders a single root where the server rendered more
 // in that component's range, from the same source, starting with an element
-// that does not match the root. The client rebuilds the root over that
-// element, and the rest of the server's content in the range is stale. The
-// last two exports are controls: the client claims more of the range after a
-// rebuilt root.
+// of another tag than the root. In the last two exports, the client renders
+// more of the range after that root.
 
 function Em() @{
 	<em>{'e'}</em>
@@ -27,8 +25,8 @@ function StatePara() @{
 	<p>{value as string}</p>
 }
 
-// A lite component adopts the range the server rendered for the other arm's
-// first component.
+// A lite component stands where the server rendered the other arm's first
+// component.
 export function Branch(props: { server?: boolean }) @{
 	<section>
 		@if (props.server) {
@@ -45,7 +43,7 @@ export function Branch(props: { server?: boolean }) @{
 	</section>
 }
 
-// A component with hooks adopts it in a full component frame.
+// The same, for a component with hooks.
 export function StateBranch(props: { server?: boolean }) @{
 	<section>
 		@if (props.server) {
@@ -137,8 +135,7 @@ function SuspendedPara(props: { value: Promise<string> }) @{
 	</p>
 }
 
-// A child of the rebuilt root suspends, so the attempt that rebuilt it is
-// discarded and its retry rebuilds the root again.
+// A child of the mismatched root suspends.
 export function SuspendedBranch(props: { server?: boolean; value: Promise<string> }) @{
 	<section>
 		@try {
@@ -174,8 +171,7 @@ function ParaEm() @{
 	</>
 }
 
-// Control: a later call claims its own server range after the rebuilt root,
-// which is no range's whole content.
+// A later call has its own server range after the mismatched root.
 export function ClaimedTail(props: { server?: boolean }) {
 	const Arm = props.server ? BoldEmTail : ParaEm;
 	return <section>
@@ -198,8 +194,7 @@ function ParaThenEm() @{
 	</>
 }
 
-// Control: the range's template adopts an element after a hole whose call
-// rebuilt its root.
+// The range's template renders an element after the mismatched hole.
 export function HoleThenElement(props: { server?: boolean }) {
 	const Arm = props.server ? BoldEmInline : ParaThenEm;
 	return <section>
@@ -207,9 +202,8 @@ export function HoleThenElement(props: { server?: boolean }) {
 	</section>;
 }
 
-// Control: a branch the server rendered no range for rebuilds its root over
-// the first node of another arm's range, whose next node a later call claims.
-// The branch's content ends with its claim, not with that range.
+// A branch the server rendered no range for stands over the first node of
+// another arm's range.
 export function MarkerlessRebuilt(props: { server?: boolean; inner?: boolean }) @{
 	<section>
 		@if (props.server) {

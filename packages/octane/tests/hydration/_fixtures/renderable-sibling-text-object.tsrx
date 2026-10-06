@@ -1,7 +1,7 @@
 // A renderable `{expr}` hole beside other children, whose server value was text
 // but whose client value is an element, a list, or a portal. The server frames
 // the hole's bare text in a `<!--[-->…<!--]-->` range, which none of those
-// values can adopt, so hydration must discard it.
+// values can adopt, so the server HTML does not match the client.
 import { Fragment, Hydrate, createElement, createPortal, use, type OctaneNode } from 'octane';
 import type { HydrationStrategy } from 'octane/hydration';
 
@@ -100,8 +100,8 @@ function pick(kind: Kind, v: string, target: Element | undefined): OctaneNode {
 	}
 }
 
-// The trailing host hydrates after the hole, so it fails if the hole's recovery
-// gives up on the rest of the root.
+// The trailing host follows the hole, so it shows whether the hole's owner fell
+// back as a whole.
 export function Hole(props: HoleProps) @{
 	<section>
 		{pick(props.kind, props.v, props.target)}

@@ -5,11 +5,11 @@ import { act, flushSync, hydrateRoot } from '../../src/index.js';
 import * as ServerRT from 'octane/server';
 import { loadCompiledFixtureSource, loadServerFixture } from '../_server-fixture';
 
-// An @if or @switch slot adopts the server's range for its arm even when the
-// server rendered a different arm, as long as that range starts with what the
-// client arm renders. Whatever the server left after the client arm's content
-// is stale: hydration removes it and reports the mismatch once, while the
-// nodes the arm adopted keep their identity.
+// The server rendered a different @if or @switch arm, whose content starts
+// with what the client arm renders and continues with more nodes. The server
+// HTML has a tail the client does not render, inside an element, which React
+// 19 treats as a mismatch. No Suspense arm encloses the branch, so the whole
+// root renders on the client and reports once.
 
 const FIXTURE = join(
 	process.cwd(),
@@ -28,6 +28,10 @@ function siteOf(after: string, directive: string): string {
 	return `${FILE}:${index + 1}:${LINES[index].indexOf(directive)}`;
 }
 
+function escape(text: string): string {
+	return text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
 /** Element and text markup, ignoring hydration comments. */
 function markup(node: Element): string {
 	const copy = node.cloneNode(true) as Element;
@@ -38,10 +42,16 @@ function markup(node: Element): string {
 	return copy.innerHTML;
 }
 
-function tail(site: string, actual: string): string {
-	return (
-		`Octane hydration mismatch at ${site}: the client expected the end of the branch but the ` +
-		`server rendered ${actual}. The mismatched subtree was rebuilt on the client.`
+/** The development warning for the server node `actual` after the branch's content. */
+function tail(site: string, actual: string) {
+	return expect.stringMatching(
+		new RegExp(
+			'^' +
+				escape(
+					`Octane hydration mismatch at ${site}: the client expected the end of the branch ` +
+						`but the server rendered ${actual}.`,
+				),
+		),
 	);
 }
 
@@ -49,16 +59,16 @@ describe.each([
 	{ name: 'development compile', dev: true, runtime: 'development' },
 	{ name: 'production compile', dev: false, runtime: 'development' },
 	{ name: 'production compile and runtime', dev: false, runtime: 'production' },
-])('hydrateRoot — the server tail of an adopted branch ($name)', ({ dev, runtime }) => {
+])('hydrateRoot — a server tail after a branch’s client content ($name)', ({ dev, runtime }) => {
 	const server = loadServerFixture(FIXTURE, { id: FILE });
 	const loadClient = () =>
 		loadCompiledFixtureSource(SOURCE, { id: FILE, mode: 'client', compileOptions: { dev } });
 	const client = loadClient();
 	// A production runtime reports the error code instead of the message.
-	const TAIL =
+	const HYDRATION_FAILED =
 		runtime === 'production'
-			? /^Minified Octane error #51;/
-			: /the mismatched subtree was rebuilt on the client/;
+			? /^Minified Octane error #339;/
+			: /^Hydration failed because the server rendered HTML didn't match the client/;
 	let container: HTMLElement;
 	let root: { unmount(): void } | null;
 	let errSpy: ReturnType<typeof vi.spyOn>;
@@ -83,8 +93,10 @@ describe.each([
 			.map((call: unknown[]) => String(call[0]))
 			.filter((message: string) => message.includes('hydration mismatch'));
 
-	function render(name: string, props: Record<string, unknown>): void {
+	/** The server render's elements. */
+	function render(name: string, props: Record<string, unknown>): Element[] {
 		container.innerHTML = ServerRT.renderToString(server[name], props).html;
+		return [...container.querySelectorAll('*')];
 	}
 
 	async function hydrate(component: unknown): Promise<string[]> {
@@ -103,6 +115,13 @@ describe.each([
 		return recoverable;
 	}
 
+	/** The root fell back: none of the server's elements is still connected. */
+	function expectRootFellBack(serverNodes: Element[], recoverable: string[]): void {
+		expect(serverNodes.length).toBeGreaterThan(0);
+		for (const node of serverNodes) expect(node.isConnected).toBe(false);
+		expect(recoverable).toEqual([expect.stringMatching(HYDRATION_FAILED)]);
+	}
+
 	it.each([
 		{ shape: 'a sole component', name: 'SoleComponent', html: '<i>ok</i>' },
 		{ shape: 'a single root', name: 'SingleRoot', html: '<i>ok</i>' },
@@ -117,30 +136,23 @@ describe.each([
 			name: 'HelperFragment',
 			html: '<div><i>ok</i><b>b</b></div>',
 		},
-	])('removes the stale tail after $shape', async ({ name, html }) => {
-		render(name, { server: true });
-		const adopted = [...container.querySelectorAll('i, b:not(.foreign)')];
-		const stale = [...container.querySelectorAll('.foreign')];
-		expect(stale.length).toBeGreaterThan(0);
+	])('client-renders the root for a server tail after $shape', async ({ name, html }) => {
+		const serverNodes = render(name, { server: true });
 
 		const recoverable = await hydrate(client[name]);
 
 		expect(markup(container.firstElementChild!)).toBe(html);
-		expect([...container.querySelectorAll('i, b')]).toEqual(adopted);
-		for (const node of stale) expect(node.isConnected).toBe(false);
-		expect(recoverable).toEqual([expect.stringMatching(TAIL)]);
+		expectRootFellBack(serverNodes, recoverable);
 		expect(warnings()).toEqual(dev ? [tail(siteOf(`function ${name}(`, '@if'), '<s>')] : []);
 	});
 
-	it('removes the stale tail of an adopted @switch case', async () => {
-		render('SwitchBranch', { server: true });
-		const adopted = container.querySelector('i')!;
+	it('client-renders the root for a server tail after a @switch case', async () => {
+		const serverNodes = render('SwitchBranch', { server: true });
 
 		const recoverable = await hydrate(client.SwitchBranch);
 
 		expect(markup(container.firstElementChild!)).toBe('<i>ok</i>');
-		expect(container.querySelector('i')).toBe(adopted);
-		expect(recoverable).toEqual([expect.stringMatching(TAIL)]);
+		expectRootFellBack(serverNodes, recoverable);
 		expect(warnings()).toEqual(
 			dev ? [tail(siteOf('function SwitchBranch(', '@switch'), '<s>')] : [],
 		);
@@ -149,17 +161,18 @@ describe.each([
 	it.each([
 		{ branch: 'an inner', name: 'NestedBranch', directive: '@if (props.server)' },
 		{ branch: 'an outer', name: 'OuterBranch', directive: '@if (props.server)' },
-	])('removes only the tail of $branch branch of two nested ones', async ({ name, directive }) => {
-		render(name, { server: true });
-		const adopted = [...container.querySelectorAll('i, b, u')];
+	])(
+		'client-renders the root for a server tail of $branch branch of two nested ones',
+		async ({ name, directive }) => {
+			const serverNodes = render(name, { server: true });
 
-		const recoverable = await hydrate(client[name]);
+			const recoverable = await hydrate(client[name]);
 
-		expect(markup(container.firstElementChild!)).toBe('<i>ok</i><b>b</b><u>u</u>');
-		expect([...container.querySelectorAll('i, b, u')]).toEqual(adopted);
-		expect(recoverable).toEqual([expect.stringMatching(TAIL)]);
-		expect(warnings()).toEqual(dev ? [tail(siteOf(`function ${name}(`, directive), '<s>')] : []);
-	});
+			expect(markup(container.firstElementChild!)).toBe('<i>ok</i><b>b</b><u>u</u>');
+			expectRootFellBack(serverNodes, recoverable);
+			expect(warnings()).toEqual(dev ? [tail(siteOf(`function ${name}(`, directive), '<s>')] : []);
+		},
+	);
 
 	it.each([
 		{ shape: 'a fragment arm', name: 'StaticFragment', html: '<i>ok</i><b>b</b>' },
@@ -189,20 +202,15 @@ describe.each([
 		},
 	);
 
-	// The client's last component adopts the server's `<s>` in place, and the
+	// The client's last component renders what the server's `<s>` is, and the
 	// server's `<u>` after it is the tail.
-	it('keeps a server node that a component adopted without its range', async () => {
-		render('UnframedComponent', { server: true });
-		const strike = container.querySelector('s')!;
-		const stale = container.querySelector('u')!;
+	it('client-renders the root for a server tail after a component’s matching node', async () => {
+		const serverNodes = render('UnframedComponent', { server: true });
 
 		const recoverable = await hydrate(client.UnframedComponent);
 
 		expect(markup(container.firstElementChild!)).toBe('<b>b</b><s>s</s>');
-		expect(container.querySelector('s')).toBe(strike);
-		expect(strike.isConnected).toBe(true);
-		expect(stale.isConnected).toBe(false);
-		expect(recoverable).toEqual([expect.stringMatching(TAIL)]);
+		expectRootFellBack(serverNodes, recoverable);
 		expect(warnings()).toEqual(
 			dev ? [tail(siteOf('function UnframedComponent(', '@if'), '<u>')] : [],
 		);

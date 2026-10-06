@@ -7,10 +7,10 @@ import { loadCompiledFixtureSource, loadServerFixture } from '../_server-fixture
 
 // A lite component renders into its lite host, the element its call site sits
 // in, which need not be the parent of the enclosing block's range. When its
-// single-root template does not match the server node at the cursor inside
-// that host, hydration discards the server node and builds the template in its
-// place, reporting the mismatch once, as it does for any other block. A cursor
-// outside the host is not the call's to discard.
+// single-root template does not match the server node inside that host, the
+// server HTML does not match the client. No Suspense arm or island encloses
+// the call, so, as in React 19, the whole root renders on the client and
+// reports once, and the client-rendered arms keep switching.
 
 const FIXTURE = join(
 	process.cwd(),
@@ -27,6 +27,10 @@ function siteOf(after: string, text: string): string {
 	const index = LINES.findIndex((line, i) => i > start && line.includes(text));
 	if (index < 0) throw new Error(`fixture has no ${text} after ${after}`);
 	return `${FILE}:${index + 1}:${LINES[index].indexOf(text)}`;
+}
+
+function escape(text: string): string {
+	return text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
 /** Element and text markup, ignoring hydration comments. */
@@ -51,10 +55,10 @@ describe.each([
 		compileOptions: { dev },
 	});
 	// A production runtime reports the error code instead of the message.
-	const MISMATCH =
+	const HYDRATION_FAILED =
 		runtime === 'production'
-			? /^Minified Octane error #51;/
-			: /the server-rendered node did not match the client render/;
+			? /^Minified Octane error #339;/
+			: /^Hydration failed because the server rendered HTML didn't match the client/;
 	let container: HTMLElement;
 	let root: { render(component: unknown, props?: unknown): void; unmount(): void } | null;
 	let errSpy: ReturnType<typeof vi.spyOn>;
@@ -79,8 +83,10 @@ describe.each([
 			.map((call: unknown[]) => String(call[0]))
 			.filter((message: string) => message.includes('hydration mismatch'));
 
-	function render(name: string, props: Record<string, unknown>): void {
+	/** The server render's elements. */
+	function render(name: string, props: Record<string, unknown>): Element[] {
 		container.innerHTML = ServerRT.renderToString(server[name], props).html;
+		return [...container.querySelectorAll('*')];
 	}
 
 	async function hydrate(name: string, props: Record<string, unknown>): Promise<string[]> {
@@ -102,6 +108,22 @@ describe.each([
 		}
 		return steps;
 	}
+
+	/** The development warning for the `<Para />` call where the server rendered `<u>`. */
+	const callMismatch = (name: string) =>
+		dev
+			? [
+					expect.stringMatching(
+						new RegExp(
+							'^' +
+								escape(
+									`Octane hydration mismatch at ${siteOf(`function ${name}(`, '<Para />')}: the ` +
+										'client expected a component range but the server rendered <u>.',
+								),
+						),
+					),
+				]
+			: [];
 
 	it.each([
 		{
@@ -125,67 +147,32 @@ describe.each([
 			server: '<hr><em>e</em><u>u</u>',
 			client: '<hr><em>e</em><p>p</p>',
 		},
+		{
+			shape: 'its host, where no call before it moved into the host',
+			name: 'HostCursor',
+			host: '#r > section',
+			server: '<hr><u>u</u><s>s</s>',
+			client: '<hr><p>p</p><s>s</s>',
+		},
 	])(
-		'discards the server node a lite call in $shape does not match, and reports it once',
-		async ({ name, host: hostSelector, server: serverHtml, client: clientHtml }) => {
-			render(name, { on: false });
-			const host = container.querySelector(hostSelector)!;
-			const u = host.querySelector('u')!;
-			const adopted = [...host.children].filter((el) => el !== u);
-			expect(markup(host)).toBe(serverHtml);
+		'client-renders the root when a lite call in $shape does not match the server node',
+		async ({ name, host, server: serverHtml, client: clientHtml }) => {
+			const serverNodes = render(name, { on: false });
+			expect(markup(container.querySelector(host)!)).toBe(serverHtml);
 
 			const recoverable = await hydrate(name, { on: true });
 
-			expect(container.querySelector(hostSelector)).toBe(host);
-			expect(markup(host)).toBe(clientHtml);
-			expect(u.isConnected).toBe(false);
-			// The server nodes around the mismatch stay adopted.
-			expect([...host.children].filter((el) => el.localName !== 'p')).toEqual(adopted);
-			expect(recoverable).toEqual([expect.stringMatching(MISMATCH)]);
-			expect(warnings()).toEqual(
-				dev
-					? [
-							`Octane hydration mismatch at ${siteOf('function Para(', '<p>')}: the client ` +
-								'expected <p> but the server rendered <u>. The mismatched subtree was ' +
-								'rebuilt on the client.',
-						]
-					: [],
-			);
+			expect(markup(container.querySelector(host)!)).toBe(clientHtml);
+			expect(serverNodes.filter((node) => node.isConnected)).toEqual([]);
+			expect(recoverable).toEqual([expect.stringMatching(HYDRATION_FAILED)]);
+			expect(warnings()).toEqual(callMismatch(name));
 
-			// The rebuilt arm still switches like a client-rendered one.
-			expect(await toggle(name, hostSelector)).toEqual([serverHtml, clientHtml]);
+			// The client-rendered arm still switches.
+			expect(await toggle(name, host)).toEqual([serverHtml, clientHtml]);
 			expect(recoverable).toHaveLength(1);
 			expect(warnings()).toHaveLength(dev ? 1 : 0);
 		},
 	);
-
-	// The cursor sits outside the lite host's children, so recovery cannot tell
-	// which server node the call replaces. It must not remove the host itself.
-	it('keeps the host when a lite call finds the cursor on it', async () => {
-		render('HostCursor', { on: false });
-		const section = container.querySelector('section')!;
-		const [hr, , s] = [...section.children];
-		expect(markup(section)).toBe('<hr><u>u</u><s>s</s>');
-
-		const recoverable = await hydrate('HostCursor', { on: true });
-
-		expect(container.querySelector('#r > section')).toBe(section);
-		expect(section.querySelector('hr')).toBe(hr);
-		expect(section.querySelector('s')).toBe(s);
-		const p = section.querySelector('p');
-		expect(p?.textContent).toBe('p');
-		expect(p?.previousElementSibling).toBe(hr);
-		expect(recoverable).toEqual([expect.stringMatching(MISMATCH)]);
-		expect(warnings()).toEqual(
-			dev ? [expect.stringContaining(`at ${siteOf('function Para(', '<p>')}: `)] : [],
-		);
-
-		expect(await toggle('HostCursor', '#r > section')).toEqual([
-			'<hr><u>u</u><s>s</s>',
-			'<hr><p>p</p><s>s</s>',
-		]);
-		expect(recoverable).toHaveLength(1);
-	});
 
 	it.each(
 		['SectionArm', 'FragmentArm', 'LastChild', 'HostCursor'].flatMap((name) => [

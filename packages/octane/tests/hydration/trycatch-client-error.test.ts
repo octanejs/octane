@@ -16,12 +16,13 @@ import {
 // The server rendered a @try's SUCCESS arm, but on the client the try body throws
 // during hydration (the live report: a route module failed to import on a hot dev
 // server, so the router's CatchBoundary had to mount its error UI mid-hydration).
-// The boundary must switch to its @catch arm without crashing and without eating
-// DOM outside the slot: previously a rethrowing inner @catch made the outer
+// As in React, an error thrown while hydrating fails the hydration of the
+// nearest fallback owner, here the root, which renders on the client, where the
+// @catch arm catches the repeated throw. That must not crash or lose the content
+// around the boundary: previously a rethrowing inner @catch made the outer
 // boundary switch arms synchronously while the frames between them were still
 // mounting (stale anchors → an insertBefore NotFoundError that REPLACED the real
-// error and blanked the page), and the client-built catch arm consumed the
-// misaligned adoption cursor (false structural mismatches + sibling DOM swept).
+// error and blanked the page).
 
 const FIXTURE = join(
 	process.cwd(),
@@ -198,13 +199,18 @@ describe('hydrateRoot — JSX error boundaries', () => {
 		root.unmount();
 	});
 
-	it('replaces client-failed server content without disturbing siblings, then recovers on reset', async () => {
+	// The body throws only on the client, so it throws while hydrating. As in
+	// React, that fails the root's hydration even though the boundary would
+	// catch it: the root renders on the client, where the boundary catches the
+	// repeated throw, and its reset then renders the body beside the
+	// client-rendered siblings.
+	it('renders the root on the client for a body that throws only on the client, then recovers on reset', async () => {
 		const { html } = await ServerRT.renderToString(server.JsxBoundaryPage, {
 			state: { failed: false },
 		});
 		container.innerHTML = html;
-		const before = container.querySelector('#jsx-before');
-		const after = container.querySelector('#jsx-after');
+		const serverBefore = container.querySelector('#jsx-before')!;
+		const serverAfter = container.querySelector('#jsx-after')!;
 		const state = { failed: true };
 
 		const root = hydrateRoot(container, JsxBoundaryPage, { state });
@@ -212,8 +218,12 @@ describe('hydrateRoot — JSX error boundaries', () => {
 		const fallback = container.querySelector('#jsx-boundary-error') as HTMLButtonElement;
 		expect(fallback.textContent).toBe('caught:boom');
 		expect(container.querySelector('#ok')).toBeNull();
-		expect(container.querySelector('#jsx-before')).toBe(before);
-		expect(container.querySelector('#jsx-after')).toBe(after);
+		expect(serverBefore.isConnected).toBe(false);
+		expect(serverAfter.isConnected).toBe(false);
+		const before = container.querySelector('#jsx-before');
+		const after = container.querySelector('#jsx-after');
+		expect(before!.textContent).toBe('before');
+		expect(after!.textContent).toBe('after');
 		flushSync(() => fallback.click());
 		expect(container.querySelector('#ok')?.textContent).toBe('ok:0');
 		expect(container.querySelector('#jsx-boundary-error')).toBeNull();

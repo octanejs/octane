@@ -538,10 +538,11 @@ describe('hmr — runtime wrapper', () => {
 		}
 	});
 
-	it('refreshes a root that hydration rebuilt before an adopted server sibling', async () => {
-		// The server rendered the other arm, so hydration rebuilds the Leaf's root
-		// where the server `<b>` stood and adopts the `<em>` after it. The hook
-		// keeps Leaf a component with a Block of its own, which a handoff resets.
+	it('refreshes a component in a root that fell back from hydration', async () => {
+		// The server rendered the other arm, a mismatch with no boundary around
+		// it, so the whole root renders on the client, as in React 19, and none
+		// of the server's nodes stay. The hook keeps Leaf a component with a
+		// Block of its own, which a handoff resets.
 		const source = (label: string) => `
 			import { useState } from 'octane';
 			export function Leaf() @{
@@ -572,27 +573,29 @@ describe('hmr — runtime wrapper', () => {
 		const container = document.createElement('div');
 		container.innerHTML = renderToString(server.App, { server: true }).html;
 		document.body.appendChild(container);
-		const em = container.querySelector('em');
+		const serverNodes = [...container.querySelectorAll('*')];
 		const errSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
 		const hot = webpackHotModule(filename);
+		const recoverable: unknown[] = [];
 		const root = hydrateRoot(
 			container,
 			await hot.load(source('v1')),
 			{},
 			{
-				onRecoverableError: () => {},
+				onRecoverableError: (error) => recoverable.push(error),
 			},
 		);
 		const children = () => Array.from(container.firstElementChild!.children, (el) => el.outerHTML);
 		try {
 			flushSync(() => {});
 			expect(children()).toEqual(['<i>v1</i>', '<em>e</em>']);
-			expect(container.querySelector('em')).toBe(em);
+			expect(serverNodes.filter((node) => node.isConnected)).toEqual([]);
 
 			await hot.load(source('v2'));
 			flushSync(() => {});
 			expect(hot.invalidated).toBe(false);
 			expect(children()).toEqual(['<i>v2</i>', '<em>e</em>']);
+			expect(recoverable).toHaveLength(1);
 		} finally {
 			root.unmount();
 			container.remove();
@@ -600,10 +603,10 @@ describe('hmr — runtime wrapper', () => {
 		}
 	});
 
-	it('refreshes a root that hydration built after its server range ended', async () => {
-		// The server arm ends after its Em; the client's adds a Leaf, so hydration
-		// builds the Leaf's root at that arm's end. The arm's closing marker is
-		// not that root, so a handoff resets the Leaf alone.
+	it('refreshes a component that a hydration fallback rendered past the server arm', async () => {
+		// The server arm ends after its Em; the client's adds a Leaf, a mismatch
+		// with no boundary around it, so the whole root renders on the client.
+		// A handoff then resets the Leaf alone.
 		const source = (label: string) => `
 			import { useState } from 'octane';
 			export function Leaf() @{
@@ -633,25 +636,29 @@ describe('hmr — runtime wrapper', () => {
 		const container = document.createElement('div');
 		container.innerHTML = renderToString(server.App, { server: true }).html;
 		document.body.appendChild(container);
+		const serverNodes = [...container.querySelectorAll('*')];
 		const errSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
 		const hot = webpackHotModule(filename);
+		const recoverable: unknown[] = [];
 		const root = hydrateRoot(
 			container,
 			await hot.load(source('v1')),
 			{},
 			{
-				onRecoverableError: () => {},
+				onRecoverableError: (error) => recoverable.push(error),
 			},
 		);
 		const children = () => Array.from(container.firstElementChild!.children, (el) => el.outerHTML);
 		try {
 			flushSync(() => {});
 			expect(children()).toEqual(['<em>e</em>', '<i>v1</i>']);
+			expect(serverNodes.filter((node) => node.isConnected)).toEqual([]);
 
 			await hot.load(source('v2'));
 			flushSync(() => {});
 			expect(hot.invalidated).toBe(false);
 			expect(children()).toEqual(['<em>e</em>', '<i>v2</i>']);
+			expect(recoverable).toHaveLength(1);
 		} finally {
 			root.unmount();
 			container.remove();

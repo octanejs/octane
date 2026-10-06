@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi, type MockInstance } from 'vitest';
 import { prerender } from 'octane/static';
-import { flushSync, hydrateRoot } from '../../src/index.js';
+import { act, flushSync, hydrateRoot } from '../../src/index.js';
 import { loadServerFixture } from '../_server-fixture.js';
 import * as Client from './_fixtures/try-hole-reader.tsrx';
 
@@ -8,8 +8,9 @@ import * as Client from './_fixtures/try-hole-reader.tsrx';
 // hole reads the server's rejection seed. Where the server's read rejected,
 // its boundary rendered the @catch arm, so that clone meets the catch arm. The
 // boundary must adopt the server's catch arm, as it does for a reader that
-// calls use() in setup, and report only real value differences in it.
-// Recoverable errors publish in dev and prod; console diagnostics in dev only.
+// calls use() in setup. A text difference in that arm is a mismatch like any
+// other. Recoverable errors publish in dev and prod; console diagnostics in
+// dev only.
 
 const server = loadServerFixture('packages/octane/tests/hydration/_fixtures/try-hole-reader.tsrx');
 const DEV = process.env.OCTANE_TEST_COMPILE_MODE !== 'prod';
@@ -37,7 +38,12 @@ afterEach(() => {
 	consoleError.mockRestore();
 });
 
-async function hydrateCaught(name: PageName, serverLabel: string, clientLabel: string) {
+async function hydrateCaught(
+	name: PageName,
+	serverLabel: string,
+	clientLabel: string,
+	clientValue: Promise<string> = pending<string>(),
+) {
 	container.innerHTML = (
 		await prerender(server[name], { label: serverLabel, value: Promise.reject('x') })
 	).html;
@@ -49,7 +55,7 @@ async function hydrateCaught(name: PageName, serverLabel: string, clientLabel: s
 	const root = hydrateRoot(
 		container,
 		Client[name],
-		{ label: clientLabel, value: pending<string>() },
+		{ label: clientLabel, value: clientValue },
 		{
 			onCaughtError: (error: unknown) => caught.push(error),
 			onRecoverableError: (error: unknown) => recovered.push(error),
@@ -86,27 +92,40 @@ describe('hydrateRoot — use() in a template hole rejected on the server', () =
 		root.unmount();
 	});
 
+	// The adopted catch arm's text differs from the client's, which is a
+	// mismatch as anywhere else: its fallback owner renders on the client from
+	// client data. A `@try` with `@pending` is that owner, so the host around it
+	// stays; an `@catch`-only `@try` or an <ErrorBoundary> is not a hydration
+	// boundary, so the root renders on the client. The client's read suspends,
+	// then rejects too, so the client render reaches the same catch arm. As in
+	// React, a boundary reports the mismatch when it commits its `@pending` arm,
+	// then the caught error; a root, which commits nothing until the caught
+	// error, reports only that.
 	it.each(READERS)(
-		'reports only the value differences in the adopted catch arm for a reader %s',
+		'client-renders the fallback owner of a catch arm whose text differs, for a reader %s',
 		async (_, name) => {
-			const { root, div, em, caught, recovered } = await hydrateCaught(name, 'server', 'client');
+			const rejected = Promise.reject('x');
+			rejected.catch(() => {});
+			const { root, div, em, caught, recovered } = await hydrateCaught(
+				name,
+				'server',
+				'client',
+				rejected,
+			);
+			await act(async () => {});
 
 			expect(visible()).toBe('<div><em title="client">client</em></div>');
-			expect(container.querySelector('div')).toBe(div);
-			expect(container.querySelector('em')).toBe(em);
+			expect(em.isConnected).toBe(false);
+			const boundary = name === 'CatchArm' || name === 'SameRootArm' || name === 'SetupCatchArm';
+			expect(container.querySelector('div') === div).toBe(boundary);
 			expect(caught).toEqual(['x']);
-			// A text value mismatch is recoverable (#61); an attribute one only warns.
-			expect(recovered.map(String)).toEqual([
-				expect.stringMatching(/the server-rendered text differed from the client|error #61;/),
-			]);
-			expect(mismatches()).toEqual(
-				DEV
-					? [
-							expect.stringContaining('server rendered attribute `title` "server"'),
-							expect.stringContaining('server rendered text "server"'),
-						]
+			expect(recovered.map((error) => (error as Error).message)).toEqual(
+				boundary
+					? [expect.stringMatching(/^Hydration failed because the server rendered (HTML|text)/)]
 					: [],
 			);
+			const logged = mismatches();
+			expect(logged.length).toBeLessThanOrEqual(DEV ? 1 : 0);
 			root.unmount();
 		},
 	);

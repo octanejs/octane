@@ -288,24 +288,43 @@ describe.each([true, false])('hydrating a server-rendered @catch arm (dev=%s)', 
 		root.unmount();
 	});
 
-	it.each(
-		['RootSiblingStatic', 'RootSiblingComponent', 'HostSibling'].flatMap((name) => [
-			[name, true, false],
-			[name, false, true],
-		]),
-	)(
-		'%s keeps its sibling when the slot rebuilds (server threw: %s)',
-		async (name, server_, client_) => {
+	it.each(['RootSiblingStatic', 'RootSiblingComponent', 'HostSibling'])(
+		'%s keeps its sibling when the client retries into the try body the server caught',
+		async (name) => {
 			container.innerHTML = ServerRT.renderToString(server[name], {
-				state: { failed: server_ },
+				state: { failed: true },
 			}).html;
 			const after = container.querySelector('.after')!;
 
-			const { root, recoverable } = await hydrate(name, { state: { failed: client_ } });
+			const { root, recoverable, caught } = await hydrate(name, { state: { failed: false } });
 			expect(container.querySelector('.after')).toBe(after);
 			expect(container.querySelectorAll('.after')).toHaveLength(1);
-			expect(container.querySelectorAll('button')).toHaveLength(client_ ? 1 : 0);
-			expect(container.querySelectorAll('p:not(.after)')).toHaveLength(client_ ? 0 : 1);
+			expect(container.querySelectorAll('button')).toHaveLength(0);
+			expect(container.querySelectorAll('p:not(.after)')).toHaveLength(1);
+			expect(caught).toEqual([]);
+			expectQuiet(recoverable);
+			root.unmount();
+		},
+	);
+
+	// Only the client's try body throws, so it throws while hydrating. As in
+	// React, that fails the root's hydration even though the catch arm would
+	// catch it: the root renders on the client, where the catch arm catches the
+	// repeated throw, and only that caught error is reported.
+	it.each(['RootSiblingStatic', 'RootSiblingComponent', 'HostSibling'])(
+		'%s renders the root on the client when only the client’s try body throws',
+		async (name) => {
+			container.innerHTML = ServerRT.renderToString(server[name], {
+				state: { failed: false },
+			}).html;
+			const after = container.querySelector('.after')!;
+
+			const { root, recoverable, caught } = await hydrate(name, { state: { failed: true } });
+			expect(after.isConnected).toBe(false);
+			expect(container.querySelectorAll('.after')).toHaveLength(1);
+			expect(container.querySelectorAll('button')).toHaveLength(1);
+			expect(container.querySelectorAll('p:not(.after)')).toHaveLength(0);
+			expect(caught).toEqual(['failed']);
 			expectQuiet(recoverable);
 			root.unmount();
 		},

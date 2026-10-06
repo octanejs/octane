@@ -43,15 +43,7 @@ type ClientErrorArguments = {
 	46: [unknown, unknown];
 	49: [];
 	50: [];
-	51: [];
-	52: [];
-	53: [];
-	54: [];
-	55: [];
-	56: [];
 	58: [];
-	61: [];
-	62: [];
 	63: [];
 	64: [];
 	66: [];
@@ -317,6 +309,9 @@ type ClientErrorArguments = {
 	336: [unknown];
 	337: [];
 	338: [];
+	339: [];
+	340: [];
+	341: [];
 };
 
 export function formatClientError<Code extends keyof ClientErrorArguments>(
@@ -462,48 +457,8 @@ export function formatClientError<Code extends keyof ClientErrorArguments>(
 				);
 			case 50:
 				return formatDevErrorMessage('Unclosed server-rendered Fragment descriptor.', args);
-			case 51:
-				return formatDevErrorMessage(
-					'Hydration mismatch: the server-rendered node did not match the client render; the mismatched subtree was rebuilt on the client.',
-					args,
-				);
-			case 52:
-				return formatDevErrorMessage(
-					'Hydration mismatch: root adoption was abandoned after a server/client shape divergence; the root was rebuilt on the client.',
-					args,
-				);
-			case 53:
-				return formatDevErrorMessage(
-					'Hydration mismatch: the server rendered more root content than the client; the stale remainder was discarded.',
-					args,
-				);
-			case 54:
-				return formatDevErrorMessage(
-					'Hydration mismatch: the client rendered text where the server rendered none; the client text was built fresh.',
-					args,
-				);
-			case 55:
-				return formatDevErrorMessage(
-					'Hydration mismatch: the server rendered a different child shape where the client renders a component; the stale range was discarded and the component was built on the client.',
-					args,
-				);
-			case 56:
-				return formatDevErrorMessage(
-					'Hydration mismatch: the server rendered more list items than the client; the extra server items were discarded.',
-					args,
-				);
 			case 58:
 				return formatDevErrorMessage('Unsupported native-read compiler/runtime version.', args);
-			case 61:
-				return formatDevErrorMessage(
-					'Hydration mismatch: the server-rendered text differed from the client; the text was updated to the client value.',
-					args,
-				);
-			case 62:
-				return formatDevErrorMessage(
-					'Hydration mismatch: the server rendered extra children in a text element; the stale children were discarded.',
-					args,
-				);
 			case 63:
 				return formatDevErrorMessage(
 					'Target container is not a DOM element. Pass an Element, Document, or DocumentFragment. If document.body is null after document hydration, update the existing document root or render a document shell containing <body>.',
@@ -1386,6 +1341,21 @@ export function formatClientError<Code extends keyof ClientErrorArguments>(
 			case 338:
 				return formatDevErrorMessage(
 					'Hydration mismatch: a server-rendered range had no closing marker, so the client rendered the boundary or root that contains it instead. Something changed the server HTML after rendering, for example an HTML minifier or proxy that strips comments.',
+					args,
+				);
+			case 339:
+				return formatDevErrorMessage(
+					"Hydration failed because the server rendered HTML didn't match the client. As a result this tree will be regenerated on the client.",
+					args,
+				);
+			case 340:
+				return formatDevErrorMessage(
+					'There was an error while hydrating, so the nearest Suspense boundary, Hydrate island, or the root rendered on the client instead.',
+					args,
+				);
+			case 341:
+				return formatDevErrorMessage(
+					'The server could not finish this Suspense boundary, because it suspended during a synchronous render such as renderToString, which cannot wait for data. Switched to client rendering.',
 					args,
 				);
 			default:

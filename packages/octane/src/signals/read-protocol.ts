@@ -199,19 +199,64 @@ export interface NativeSerializedScope {
 export type NativeAdoptionResolver = (owner: NativeAdoptionOwner) => AdoptionFrame | undefined;
 let nativeAdoptionResolver: NativeAdoptionResolver | null = null;
 
+/**
+ * Brands hydration control-flow errors, this one and the renderer's refused
+ * early presentation, so that a boundary can pass one through without naming
+ * either class, which a bundle that never hydrates would then retain.
+ */
+export const ADOPTION_CONTROL: unique symbol = /* @__PURE__ */ Symbol('octane.adoptionControl');
+/** Brands NativeAdoptionMiss alone, for signal state that must recognize it. */
+const NATIVE_ADOPTION_MISS: unique symbol = /* @__PURE__ */ Symbol('octane.nativeAdoptionMiss');
+
 /** Internal hydration control flow, never an application error-boundary value. */
 export class NativeAdoptionMiss extends Error {
+	// Assigned in the constructor: a computed class field would keep the class in
+	// every bundle, since a bundler cannot drop a class whose keys it must evaluate.
+	declare readonly [ADOPTION_CONTROL]: true;
+	declare readonly [NATIVE_ADOPTION_MISS]: true;
 	readonly scopeKey: string;
 	readonly nodeKey: string;
 	readonly read: 'value' | 'latest' | 'snapshot';
 
 	constructor(scopeKey: string, nodeKey: string, read: 'value' | 'latest' | 'snapshot' = 'value') {
 		super(formatClientError(194, read, scopeKey, nodeKey));
+		this[ADOPTION_CONTROL] = this[NATIVE_ADOPTION_MISS] = true;
 		this.name = 'NativeAdoptionMiss';
 		this.scopeKey = scopeKey;
 		this.nodeKey = nodeKey;
 		this.read = read;
 	}
+}
+
+/**
+ * Whether `error` is a NativeAdoptionMiss (or a subclass). Signal state tests
+ * the brand, so a bundle that never hydrates keeps no class.
+ */
+export function isNativeAdoptionMiss(error: unknown): boolean {
+	return (
+		(error as { [NATIVE_ADOPTION_MISS]?: true } | null | undefined)?.[NATIVE_ADOPTION_MISS] === true
+	);
+}
+
+let nativeAdoptionMissClass: typeof NativeAdoptionMiss | undefined;
+
+/**
+ * The miss a signal read throws while an installed resolver cannot serve it.
+ * Only a hydration pass installs a resolver, and hydration first calls
+ * supplyNativeAdoptionMiss, so the class stays out of bundles that never
+ * hydrate, although every signal read can reach this function.
+ */
+export function nativeAdoptionMiss(
+	scopeKey: string,
+	nodeKey: string,
+	read: 'value' | 'latest' | 'snapshot',
+): NativeAdoptionMiss {
+	return new nativeAdoptionMissClass!(scopeKey, nodeKey, read);
+}
+
+/** Hydration only, before it installs any resolver. */
+export function supplyNativeAdoptionMiss(): void {
+	nativeAdoptionMissClass = NativeAdoptionMiss;
 }
 
 export function getNativeAdoptionResolver(): NativeAdoptionResolver | null {

@@ -2012,7 +2012,7 @@
       "evidence": [
         {
           "file": "packages/octane/tests/conformance/hydration-mismatch.test.ts",
-          "testName": "warns + adds a client-only attribute (Per :287)",
+          "testName": "does not add a client-only attribute (Per :287)",
           "modes": ["hydrate-mismatch"]
         }
       ]
@@ -8011,19 +8011,19 @@
     },
     {
       "caseId": "react-case-v1:1ab14ead49eed0951de5",
-      "status": "documented",
+      "status": "covered",
       "risk": "high",
       "sourceFile": "packages/react-dom/src/__tests__/ReactDOMHydrationDiff-test.js",
       "title": "warns when client and server render different attributes",
       "baselines": ["canary", "stable"],
-      "classification": "divergence",
+      "classification": "adaptable",
       "owner": "runtime + SSR + hydration",
       "workstream": "React DOM residual audit",
-      "rationale": "Octane deliberately patches an adopted attribute to the client value after a hydration mismatch; React warns but retains the server attribute. The executable test pins Octane\u2019s final-DOM contract and diagnostic.",
+      "rationale": "As in React 19, an adopted element keeps its server attributes after a hydration mismatch, with a development-only warning. The executable test pins the final DOM and the diagnostic.",
       "evidence": [
         {
           "file": "packages/octane/tests/conformance/hydration-mismatch.test.ts",
-          "testName": "warns + patches attributes to the client values (Per :245)",
+          "testName": "keeps the server values of differing attributes and warns (Per :245)",
           "modes": ["server-string", "hydrate-mismatch", "production-compile"]
         }
       ]
@@ -14029,7 +14029,7 @@
       "evidence": [
         {
           "file": "packages/octane/tests/conformance/hydration-mismatch.test.ts",
-          "testName": "keeps the server value + no warning (Per :132)",
+          "testName": "keeps the server text + no warning (Per :132)",
           "modes": ["hydrate-mismatch"]
         }
       ]
@@ -19032,7 +19032,7 @@
       "evidence": [
         {
           "file": "packages/octane/tests/conformance/hydration-mismatch.test.ts",
-          "testName": "component-form \u2194 bare-form reconnects clean since M3 (Per :76)",
+          "testName": "component-form ↔ bare-form reconnects clean (Per :76)",
           "modes": ["hydrate-match"]
         }
       ]
@@ -35534,7 +35534,7 @@
       "evidence": [
         {
           "file": "packages/octane/tests/conformance/hydration-mismatch.test.ts",
-          "testName": "warns + patches an inline style difference (Per :419)",
+          "testName": "keeps the server inline style (Per :419)",
           "modes": ["hydrate-mismatch"]
         }
       ]
@@ -35883,7 +35883,7 @@
       "evidence": [
         {
           "file": "packages/octane/tests/conformance/hydration-mismatch.test.ts",
-          "testName": "warns + patches attributes to the client values (Per :245)",
+          "testName": "keeps the server values of differing attributes and warns (Per :245)",
           "modes": ["hydrate-mismatch"]
         }
       ]
@@ -40012,7 +40012,7 @@
       "evidence": [
         {
           "file": "packages/octane/tests/conformance/hydration-mismatch.test.ts",
-          "testName": "warns + removes a server-only attribute (Per :331)",
+          "testName": "does not remove a server-only attribute (Per :331)",
           "modes": ["hydrate-mismatch"]
         }
       ]
@@ -46524,7 +46524,7 @@
       "evidence": [
         {
           "file": "packages/octane/tests/conformance/hydration-mismatch.test.ts",
-          "testName": "warns + patches to the client text (Per ReactDOMHydrationDiff-test.js:119)",
+          "testName": "renders the client text (Per ReactDOMHydrationDiff-test.js:119)",
           "modes": ["hydrate-mismatch"]
         }
       ]
@@ -48150,7 +48150,7 @@
       "evidence": [
         {
           "file": "packages/octane/tests/conformance/hydration-mismatch.test.ts",
-          "testName": "dangerouslySetInnerHTML difference warns and keeps server html (Per :196)",
+          "testName": "keeps the server html of a dangerouslySetInnerHTML difference (Per :196)",
           "modes": ["server-string", "hydrate-mismatch", "production-compile"]
         }
       ]
@@ -48445,11 +48445,11 @@
       "classification": "adaptable",
       "owner": "SSR + hydration",
       "workstream": "Fizz streaming",
-      "rationale": "Distinct hydration mismatch source sites each publish one diagnostic in the same render, rather than collapsing the whole render to one message.",
+      "rationale": "As in React 19, a boundary with several mismatched source sites renders on the client once and reports one recoverable error, rather than one per site.",
       "evidence": [
         {
           "file": "packages/octane/tests/conformance/fizz-readiness-hydration.test.ts",
-          "testName": "publishes one hydration mismatch diagnostic per mismatched source site",
+          "testName": "renders a boundary with several mismatched texts on the client once",
           "modes": ["server-stream", "hydrate-match", "production-compile"]
         }
       ]
@@ -60640,7 +60640,7 @@
       "evidence": [
         {
           "file": "packages/octane/tests/conformance/hydration-mismatch.test.ts",
-          "testName": "warns for differing text beside an escaped nbsp entity (Per :155)",
+          "testName": "detects differing text beside an escaped nbsp entity (Per :155)",
           "modes": ["hydrate-mismatch", "production-compile"]
         }
       ]
@@ -62853,7 +62853,7 @@
       "evidence": [
         {
           "file": "packages/octane/tests/conformance/server-integration-matrix.test.ts",
-          "testName": "removes a trailing server sibling after adopting a matching host root",
+          "testName": "leaves a trailing server sibling in the root container after adopting a matching host root",
           "modes": ["hydrate-mismatch", "production-compile"]
         }
       ]
@@ -69366,7 +69366,7 @@
       "evidence": [
         {
           "file": "packages/octane/tests/conformance/hydration-mismatch.test.ts",
-          "testName": "suppressHydrationWarning on an attribute keeps the server value + no warning (Per :144)",
+          "testName": "keeps the server value of an attribute + no warning (Per :144)",
           "modes": ["hydrate-mismatch"]
         }
       ]
@@ -70792,7 +70792,7 @@
       "evidence": [
         {
           "file": "packages/octane/tests/conformance/hydration-mismatch.test.ts",
-          "testName": "different element type is rebuilt (Per Reconnecting:104)",
+          "testName": "different element type (Per Reconnecting:104)",
           "modes": ["hydrate-match", "hydrate-mismatch", "production-compile"]
         }
       ]
@@ -72310,7 +72310,7 @@
       "evidence": [
         {
           "file": "packages/octane/tests/conformance/hydration-mismatch.test.ts",
-          "testName": "warns + patches to the client text (Per ReactDOMHydrationDiff-test.js:119)",
+          "testName": "renders the client text (Per ReactDOMHydrationDiff-test.js:119)",
           "modes": ["server-string", "hydrate-mismatch", "production-compile"]
         }
       ]

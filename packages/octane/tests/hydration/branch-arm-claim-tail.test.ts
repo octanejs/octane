@@ -7,13 +7,15 @@ import { condition, load } from 'octane/hydration';
 import * as ServerRT from 'octane/server';
 import { loadCompiledFixtureSource, loadServerFixture } from '../_server-fixture';
 
-// The server rendered a branch arm that holds more than the arm the client
-// adopts its range for. Every component the client's arm renders claims its
-// framed server range, and each claim parks the hydration cursor past it, so
-// the server content after the last claim is content no client node claims.
-// Hydration discards it and reports the mismatch once, keeping every node the
-// client adopted. Content the client did adopt after a claim (its template's
-// trailing host, or a component's root) stays.
+// The server rendered a branch arm that holds more than the client's arm, or
+// less: server content after the last node the client renders, or a node the
+// client renders that the server's arm ends before. As in React, an unhydrated
+// server tail inside an element is a mismatch, and nothing is repaired in
+// place: with no Suspense boundary around the branch, the root renders on the
+// client (no server node survives); inside a @try/@pending arm, only the arm
+// does. onRecoverableError fires once, also when a pending component holds the
+// first attempt and the mismatch is found when it resumes. Arms whose content
+// matches the server's adopt it without a report.
 
 const FIXTURE = join(
 	process.cwd(),
@@ -21,15 +23,6 @@ const FIXTURE = join(
 );
 const FILE = 'branch-arm-claim-tail.tsrx';
 const SOURCE = readFileSync(FIXTURE, 'utf8');
-const LINES = SOURCE.split('\n');
-
-/** `line:column` of the first `directive` after the line containing `text`. */
-function siteLoc(text: string, directive: string): string {
-	const from = LINES.findIndex((line) => line.includes(text));
-	if (from < 0) throw new Error(`fixture has no line containing ${text}`);
-	const index = LINES.findIndex((line, i) => i > from && line.includes(directive));
-	return `${index + 1}:${LINES[index].indexOf(directive)}`;
-}
 
 /** Element and text markup, ignoring hydration comments. */
 function markup(node: Element): string {
@@ -41,25 +34,20 @@ function markup(node: Element): string {
 	return copy.innerHTML;
 }
 
-/** The elements the client adopted, without the server's trailing `<u>`. */
-function withoutTail(adopted: Element[]): Element[] {
-	return adopted.filter((element) => element.localName !== 'u');
-}
-
 /** `actual` holds exactly the `expected` nodes: the same objects, in order. */
 function expectSame(actual: ArrayLike<Node>, expected: readonly Node[]): void {
 	expect(actual).toHaveLength(expected.length);
 	Array.from(actual).forEach((node, i) => expect(node).toBe(expected[i]));
 }
 
-const DISCARDED =
-	'Hydration mismatch: the server-rendered node did not match the client render; ' +
-	'the mismatched subtree was rebuilt on the client.';
+const MISMATCH = /^Hydration failed because the server rendered HTML didn't match the client\./;
+const WARNING =
+	/^Octane hydration mismatch at branch-arm-claim-tail\.tsrx:\d+:\d+: the client expected .+ but the server rendered .+\. The nearest Suspense or Hydrate boundary, or the root, will be regenerated on the client\.$/;
 
 describe.each([
 	{ name: 'development compile', dev: true },
 	{ name: 'production compile', dev: false },
-])('hydrateRoot — server content after an adopted arm’s last claim ($name)', ({ dev }) => {
+])('hydrateRoot — a branch arm whose server content has another length ($name)', ({ dev }) => {
 	const server = loadServerFixture(FIXTURE, { id: FILE });
 	const client = loadCompiledFixtureSource(SOURCE, {
 		id: FILE,
@@ -88,10 +76,11 @@ describe.each([
 			.map((call: unknown[]) => String(call[0]))
 			.filter((message: string) => message.includes('hydration mismatch'));
 
-	const report = (component: string, directive = '@if', actual = '<u>') =>
-		`Octane hydration mismatch at ${FILE}:${siteLoc(`function ${component}(`, directive)}: ` +
-		`the client expected the end of the branch but the server rendered ${actual}. The ` +
-		`mismatched subtree was rebuilt on the client.`;
+	function expectOneReport(recoverable: string[]): void {
+		expect(recoverable).toEqual([expect.stringMatching(MISMATCH)]);
+		// Only a development compile knows the template's source location.
+		expect(warnings()).toEqual(dev ? [expect.stringMatching(WARNING)] : []);
+	}
 
 	async function hydrate(name: string, serverProps: object, clientProps: object) {
 		container.innerHTML = ServerRT.renderToString(server[name], serverProps).html;
@@ -108,155 +97,153 @@ describe.each([
 	}
 
 	it.each([
-		{ shape: 'hookless components', name: 'Y', kept: '<s>s</s><b>a</b>' },
-		{ shape: 'a sole component', name: 'SoleComponent', kept: '<s>s</s>' },
-		{ shape: 'a component with hooks', name: 'HookedArm', kept: '<s>s</s><em>h</em>' },
-	])('discards the server tail after $shape and reports it once', async ({ name, kept }) => {
-		const { div, adopted, recoverable } = await hydrate(name, { server: true }, {});
+		{ shape: 'a tail after hookless components', name: 'Y', html: '<s>s</s><b>a</b>' },
+		{ shape: 'a tail after a sole component', name: 'SoleComponent', html: '<s>s</s>' },
+		{
+			shape: 'a tail after a component with hooks',
+			name: 'HookedArm',
+			html: '<s>s</s><em>h</em>',
+		},
+		{
+			shape: 'a tail after a nested branch',
+			name: 'NestedBranch',
+			html: '<s>s</s><b>a</b>',
+			props: { inner: true },
+		},
+		{
+			shape: 'a tail after the roots of an @if with no server range',
+			name: 'MarkerlessArm',
+			html: '<s>s</s><b>a</b>',
+			props: { inner: true },
+		},
+		{
+			shape: 'a tail after the roots of a @switch with no server range',
+			name: 'MarkerlessSwitch',
+			html: '<s>s</s><b>a</b>',
+			props: { inner: true },
+		},
+		{
+			shape: 'a tail after the roots of an @if inside another, with no server range',
+			name: 'MarkerlessNested',
+			html: '<s>s</s><b>a</b>',
+			props: { inner: true },
+		},
+		{
+			shape: 'an arm that ends before the client’s second root',
+			name: 'MarkerlessShortArm',
+			html: '<s>s</s><b>a</b>',
+			props: { inner: true },
+		},
+		{
+			shape: 'a first host of another tag and a tail',
+			name: 'RebuiltBeforeClaim',
+			html: '<em>e</em><s>s</s>',
+		},
+	])('renders the root on the client for $shape', async ({ name, html, props = {} }) => {
+		const { div, adopted, recoverable } = await hydrate(name, { server: true, ...props }, props);
 
-		expect(markup(div)).toBe(kept);
-		expect(Array.from(div.children)).toEqual(withoutTail(adopted));
-		expect(recoverable).toEqual([DISCARDED]);
-		expect(warnings()).toEqual(dev ? [report(name)] : []);
+		expect(div.isConnected).toBe(false);
+		expect(adopted.filter((node) => node.isConnected)).toEqual([]);
+		expect(markup(container)).toBe(`<div>${html}</div>`);
+		expectOneReport(recoverable);
 	});
 
-	it('discards the server tail of a @switch case', async () => {
+	it('renders the root on the client for a tail in a @switch case', async () => {
 		const { div, adopted, recoverable } = await hydrate('Switched', { k: 'server' }, { k: 'x' });
 
-		expect(markup(div)).toBe('<s>s</s><b>a</b>');
-		expect(Array.from(div.children)).toEqual(withoutTail(adopted));
-		expect(recoverable).toEqual([DISCARDED]);
-		expect(warnings()).toEqual(dev ? [report('Switched', '@switch')] : []);
+		expect(div.isConnected).toBe(false);
+		expect(adopted.filter((node) => node.isConnected)).toEqual([]);
+		expect(markup(container)).toBe('<div><s>s</s><b>a</b></div>');
+		expectOneReport(recoverable);
 	});
 
-	it('discards the server tail after a nested branch', async () => {
-		const { div, adopted, recoverable } = await hydrate(
-			'NestedBranch',
-			{ server: true, inner: true },
-			{ inner: true },
-		);
-
-		expect(markup(div)).toBe('<s>s</s><b>a</b>');
-		expect(Array.from(div.children)).toEqual(withoutTail(adopted));
-		expect(recoverable).toEqual([DISCARDED]);
-		expect(warnings()).toEqual(dev ? [report('NestedBranch')] : []);
-	});
-
-	it('adopts the arm the server rendered without a report', async () => {
-		const { div, adopted, recoverable } = await hydrate('Y', {}, {});
-
-		expect(markup(div)).toBe('<s>s</s><b>a</b>');
-		expect(Array.from(div.children)).toEqual(adopted);
-		expect(recoverable).toEqual([]);
-		expect(warnings()).toEqual([]);
-	});
-
-	it.each([
-		{
-			shape: 'a host its template adopted after its last component',
-			name: 'SameContent',
-			kept: '<s>s</s><b>a</b><u>tail</u>',
-		},
-		{
-			shape: 'a component root adopted after a claim',
-			name: 'AdoptedAfterClaim',
-			kept: '<s>s</s><i>u</i>',
-		},
-	])('keeps $shape', async ({ name, kept }) => {
-		const { div, adopted, recoverable } = await hydrate(name, { server: true }, {});
-
-		expect(markup(div)).toBe(kept);
-		expect(Array.from(div.children)).toEqual(adopted);
-		expect(recoverable).toEqual([]);
-		expect(warnings()).toEqual([]);
-	});
-
-	// A branch the server rendered no range for ends after every root its
-	// template adopted in place, not after the first: the arm keeps them all,
-	// and the branch owns them.
-	it.each([
-		{ branch: 'an @if', name: 'MarkerlessArm' },
-		{ branch: 'a @switch', name: 'MarkerlessSwitch' },
-		{ branch: 'an @if inside another', name: 'MarkerlessNested' },
-	])(
-		'discards only the server tail after the roots of $branch with no server range',
-		async ({ name }) => {
-			const { div, adopted, recoverable } = await hydrate(name, { server: true }, { inner: true });
-
-			expect(markup(div)).toBe('<s>s</s><b>a</b>');
-			expectSame(div.children, withoutTail(adopted));
-			expect(recoverable).toEqual([DISCARDED]);
-			expect(warnings()).toEqual(dev ? [report(name)] : []);
+	it.each(['MarkerlessArm', 'MarkerlessSwitch', 'MarkerlessNested', 'MarkerlessShortArm'])(
+		'updates the client-rendered branch of %s',
+		async (name) => {
+			await hydrate(name, { server: true, inner: true }, { inner: true });
+			const div = container.firstElementChild!;
 
 			flushSync(() => root!.render(client[name], { inner: false }));
 			expect(markup(div)).toBe('');
 			flushSync(() => root!.render(client[name], { inner: true }));
 			expect(markup(div)).toBe('<s>s</s><b>a</b>');
+			expect(container.firstElementChild).toBe(div);
 		},
 	);
 
-	it('keeps every root of a branch with no server range when the server rendered no more', async () => {
+	it('adopts the arm the server rendered without a report', async () => {
+		const { div, adopted, recoverable } = await hydrate('Y', {}, {});
+
+		expect(markup(div)).toBe('<s>s</s><b>a</b>');
+		expectSame(div.children, adopted);
+		expect(recoverable).toEqual([]);
+		expect(warnings()).toEqual([]);
+	});
+
+	it.each([
+		{
+			shape: 'a host its template renders after its last component',
+			name: 'SameContent',
+			kept: '<s>s</s><b>a</b><u>tail</u>',
+		},
+		{
+			shape: 'a component root after another component',
+			name: 'AdoptedAfterClaim',
+			kept: '<s>s</s><i>u</i>',
+		},
+	])('adopts $shape that the server rendered inline', async ({ name, kept }) => {
+		const { div, adopted, recoverable } = await hydrate(name, { server: true }, {});
+
+		expect(container.firstElementChild).toBe(div);
+		expect(markup(div)).toBe(kept);
+		expectSame(div.children, adopted);
+		expect(recoverable).toEqual([]);
+		expect(warnings()).toEqual([]);
+	});
+
+	// OCTANE DIVERGENCE: Octane's control-flow ranges are part of its hydration
+	// protocol, as React's Suspense markers are part of React's. A client @if
+	// whose server output has no range of its own is a structural mismatch even
+	// when the elements inside it match, so the root renders on the client where
+	// React, which compiles @if to a plain expression, would adopt.
+	it('renders the root on the client for a branch with no server range around matching hosts', async () => {
 		const { div, adopted, recoverable } = await hydrate(
 			'MarkerlessSameArm',
 			{ server: true },
 			{ inner: true },
 		);
 
-		expect(markup(div)).toBe('<s>s</s><b>a</b>');
-		expectSame(div.children, adopted);
-		expect(recoverable).toEqual([]);
-		expect(warnings()).toEqual([]);
+		expect(div.isConnected).toBe(false);
+		expect(adopted.filter((node) => node.isConnected)).toEqual([]);
+		expect(markup(container)).toBe('<div><s>s</s><b>a</b></div>');
+		expect(recoverable).toEqual([expect.stringMatching(MISMATCH)]);
 
 		flushSync(() => root!.render(client.MarkerlessSameArm, { inner: false }));
-		expect(markup(div)).toBe('');
+		expect(markup(container.firstElementChild!)).toBe('');
 	});
 
-	// Its roots outnumber what the server rendered before the arm's end, so
-	// the branch is built on the client in place of the server's content.
-	it('rebuilds a branch with no server range whose roots the server’s arm ends before', async () => {
-		const { div, recoverable } = await hydrate(
-			'MarkerlessShortArm',
-			{ server: true },
-			{ inner: true },
-		);
-
-		expect(markup(div)).toBe('<s>s</s><b>a</b>');
-		expect(recoverable).toEqual([DISCARDED]);
-
-		flushSync(() => root!.render(client.MarkerlessShortArm, { inner: false }));
-		expect(markup(div)).toBe('');
-	});
-
-	it('keeps a root that recovery rebuilt in the arm while discarding the tail', async () => {
-		const { div, adopted, recoverable } = await hydrate('RebuiltBeforeClaim', { server: true }, {});
-		const claimed = adopted.find((element) => element.localName === 's');
-
-		// Where the rebuilt root goes relative to adopted siblings is a separate
-		// contract; this one is that it survives and the tail does not.
-		expect(div.querySelector('s')).toBe(claimed);
-		expect(div.querySelector('em')?.textContent).toBe('e');
-		expect(div.querySelector('u')).toBeNull();
-		expect(div.querySelector('i')).toBeNull();
-		expect(div.children).toHaveLength(2);
-		// One root reports its recoverable mismatches once per hydration burst.
-		expect(recoverable).toHaveLength(1);
-		if (dev) expect(warnings()).toContain(report('RebuiltBeforeClaim'));
-		else expect(warnings()).toEqual([]);
-	});
-
+	// A pending component before the tail suspends the attempt first, and a
+	// suspension keeps the server HTML; a tail before a pending sibling ends its
+	// branch's range first, so the mismatch is found before the suspension.
 	it.each([
-		{ attempt: 'the root', name: 'TailThenChild', wrap: (html: string) => html },
 		{
-			attempt: 'a @try boundary',
-			name: 'TryTailThenChild',
-			wrap: (html: string) => `<section>${html}</section>`,
+			shape: 'a tail before a pending sibling',
+			name: 'TailThenChild',
+			html: '<s>s</s><b>a</b><p>child</p>',
+			suspendsFirst: false,
 		},
-	])('reports the tail once when a pending sibling replays $attempt', async ({ name, wrap }) => {
+		{
+			shape: 'a tail after a pending component',
+			name: 'PendingInArm',
+			html: '<s>s</s><p>child</p>',
+			suspendsFirst: true,
+		},
+	])('renders the root on the client once for $shape', async ({ name, html, suspendsFirst }) => {
 		container.innerHTML = ServerRT.renderToString(server[name], {
 			server: true,
 			Child: server.Tail,
 		}).html;
-		const kept = Array.from(container.querySelectorAll('s, b'));
+		const serverNodes = Array.from(container.querySelectorAll('*'));
 		const recoverable: string[] = [];
 		let deliver!: (module: { default: ComponentBody }) => void;
 		const Child = lazy(
@@ -270,29 +257,40 @@ describe.each([
 				{ onRecoverableError: (error: unknown) => recoverable.push((error as Error).message) },
 			);
 		});
+		if (suspendsFirst) {
+			expect(serverNodes.every((node) => node.isConnected)).toBe(true);
+			expect(recoverable).toEqual([]);
+		}
+
 		await act(async () => deliver({ default: client.Tail }));
 
-		expect(markup(container.firstElementChild!)).toBe(wrap('<s>s</s><b>a</b><p>child</p>'));
-		expect(Array.from(container.querySelectorAll('s, b'))).toEqual(kept);
-		expect(recoverable).toEqual([DISCARDED]);
-		expect(warnings()).toEqual(dev ? [report(name)] : []);
+		expect(markup(container)).toBe(`<div>${html}</div>`);
+		expect(serverNodes.filter((node) => node.isConnected)).toEqual([]);
+		expectOneReport(recoverable);
 	});
 
 	it.each([
-		{ attempt: 'the root', name: 'PendingInArm', wrap: (html: string) => html },
 		{
-			attempt: 'a @try boundary',
+			shape: 'a tail before a pending sibling',
+			name: 'TryTailThenChild',
+			html: '<s>s</s><b>a</b><p>child</p>',
+			suspendsFirst: false,
+		},
+		{
+			shape: 'a tail after a pending component',
 			name: 'TryPendingInArm',
-			wrap: (html: string) => `<section>${html}</section>`,
+			html: '<s>s</s><p>child</p>',
+			suspendsFirst: true,
 		},
 	])(
-		'discards the tail once when the arm’s last component suspends $attempt',
-		async ({ name, wrap }) => {
+		'renders only the @try arm on the client once for $shape',
+		async ({ name, html, suspendsFirst }) => {
 			container.innerHTML = ServerRT.renderToString(server[name], {
 				server: true,
 				Child: server.Tail,
 			}).html;
-			const kept = Array.from(container.querySelectorAll('s, p'));
+			const div = container.firstElementChild!;
+			const armNodes = Array.from(div.querySelectorAll('*'));
 			const recoverable: string[] = [];
 			let deliver!: (module: { default: ComponentBody }) => void;
 			const Child = lazy(
@@ -306,22 +304,29 @@ describe.each([
 					{ onRecoverableError: (error: unknown) => recoverable.push((error as Error).message) },
 				);
 			});
+			if (suspendsFirst) {
+				expect(armNodes.every((node) => node.isConnected)).toBe(true);
+				expect(recoverable).toEqual([]);
+			}
+
 			await act(async () => deliver({ default: client.Tail }));
 
-			expect(markup(container.firstElementChild!)).toBe(wrap('<s>s</s><p>child</p>'));
-			expect(Array.from(container.querySelectorAll('s, p'))).toEqual(kept);
-			expect(recoverable).toEqual([DISCARDED]);
-			expect(warnings()).toEqual(dev ? [report(name)] : []);
+			expect(container.firstElementChild).toBe(div);
+			expect(markup(div)).toBe(`<section>${html}</section>`);
+			expect(armNodes.filter((node) => node.isConnected)).toEqual([]);
+			expectOneReport(recoverable);
 		},
 	);
 
 	// Captures that changed before a dormant boundary activated legitimately
-	// differ from the server's: discard the tail, but report nothing.
-	it('discards a dormant boundary’s tail without reporting when its captures changed', async () => {
+	// differ from the server's. As React reports nothing for an update that
+	// reaches a dehydrated boundary, the island renders on the client silently.
+	it('renders a dormant island on the client without reporting when its captures changed', async () => {
 		const serverProps = { server: true, when: condition(false) };
 		container.innerHTML = ServerRT.renderToString(server.DormantTail, serverProps).html;
+		const div = container.firstElementChild!;
 		const section = container.querySelector('section')!;
-		const kept = Array.from(section.children).slice(0, 2);
+		const islandNodes = [section, ...section.querySelectorAll('*')];
 		const recoverable: string[] = [];
 		const active = hydrateRoot(container, client.DormantTail, serverProps, {
 			onRecoverableError: (error: unknown) => recoverable.push((error as Error).message),
@@ -333,9 +338,9 @@ describe.each([
 		await act(() => active.render(client.DormantTail, { when: load() }));
 		await act(async () => {});
 
-		expect(container.querySelector('section')).toBe(section);
-		expect(markup(section)).toBe('<s>s</s><b>a</b>');
-		expect(Array.from(section.children)).toEqual(kept);
+		expect(container.firstElementChild).toBe(div);
+		expect(markup(container.querySelector('section')!)).toBe('<s>s</s><b>a</b>');
+		expect(islandNodes.filter((node) => node.isConnected)).toEqual([]);
 		expect(recoverable).toEqual([]);
 		expect(warnings()).toEqual([]);
 	});

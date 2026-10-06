@@ -1,5 +1,5 @@
 import { loadCompiledFixtureSource } from '../_server-fixture.js';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { act, flushSync, hydrateRoot } from '../../src/index.js';
@@ -151,34 +151,43 @@ describe('hydrateRoot — <Activity>', () => {
 		root.unmount();
 	});
 
-	it('keeps a preserved hydration arm hidden until its Activity becomes visible', async () => {
+	/** Server-renders the arm with "server", then hydrates it hidden and suspended. */
+	function hydrateSuspendedHiddenArm() {
 		const { html } = ServerRT.renderToString(server.ActivitySuspenseHydration, {
 			mode: 'visible',
 			suspend: false,
 			promise: Promise.resolve('unused'),
 		});
 		container.innerHTML = html;
-		const serverContent = container.querySelector('#activity-resumed-content');
-		expect(serverContent?.textContent).toBe('server');
+		const serverContent = container.querySelector('#activity-resumed-content') as HTMLElement;
+		expect(serverContent.textContent).toBe('server');
 
 		let resolve!: (value: string) => void;
 		const promise = new Promise<string>((done) => (resolve = done));
-		const root = hydrateRoot(container, ActivitySuspenseHydration, {
-			mode: 'hidden',
-			suspend: true,
-			promise,
-		});
+		const recoverable = vi.fn();
+		const root = hydrateRoot(
+			container,
+			ActivitySuspenseHydration,
+			{ mode: 'hidden', suspend: true, promise },
+			{ onRecoverableError: recoverable },
+		);
 		flushSync(() => {});
 
 		expect(container.querySelector('#activity-resume-pending')).toBeNull();
 		expect(container.querySelector('#activity-resumed-content')).toBe(serverContent);
-		expect((serverContent as HTMLElement).style.display).toBe('none');
-		await act(() => resolve('client'));
+		expect(serverContent.style.display).toBe('none');
+		return { root, promise, resolve, recoverable, serverContent };
+	}
+
+	it('keeps a preserved hydration arm hidden until its Activity becomes visible', async () => {
+		const { root, promise, resolve, recoverable, serverContent } = hydrateSuspendedHiddenArm();
+		await act(() => resolve('server'));
 
 		const resumed = container.querySelector('#activity-resumed-content') as HTMLElement;
 		expect(resumed).toBe(serverContent);
-		expect(resumed.textContent).toBe('client');
+		expect(resumed.textContent).toBe('server');
 		expect(resumed.style.display).toBe('none');
+		expect(recoverable).not.toHaveBeenCalled();
 
 		root.render(ActivitySuspenseHydration, {
 			mode: 'visible',
@@ -188,6 +197,37 @@ describe('hydrateRoot — <Activity>', () => {
 		flushSync(() => {});
 		expect(container.querySelector('#activity-resumed-content')).toBe(resumed);
 		expect(resumed.style.display).toBe('');
+		root.unmount();
+	});
+
+	it('client-renders a mismatched hydration arm hidden until its Activity becomes visible', async () => {
+		const { root, promise, resolve, recoverable, serverContent } = hydrateSuspendedHiddenArm();
+		const errors = vi.spyOn(console, 'error').mockImplementation(() => {});
+		try {
+			// The resumed arm renders "client" where the server rendered "server",
+			// so the arm discards its server DOM and renders on the client, still
+			// hidden, and reports once.
+			await act(() => resolve('client'));
+		} finally {
+			errors.mockRestore();
+		}
+
+		const rendered = container.querySelector('#activity-resumed-content') as HTMLElement;
+		expect(rendered).not.toBe(serverContent);
+		expect(serverContent.isConnected).toBe(false);
+		expect(rendered.textContent).toBe('client');
+		expect(rendered.style.display).toBe('none');
+		expect(recoverable).toHaveBeenCalledOnce();
+
+		root.render(ActivitySuspenseHydration, {
+			mode: 'visible',
+			suspend: true,
+			promise,
+		});
+		flushSync(() => {});
+		expect(container.querySelector('#activity-resumed-content')).toBe(rendered);
+		expect(rendered.style.display).toBe('');
+		expect(recoverable).toHaveBeenCalledOnce();
 		root.unmount();
 	});
 });

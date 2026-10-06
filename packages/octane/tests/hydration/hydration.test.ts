@@ -105,7 +105,10 @@ describe('hydrateRoot — no mismatch (DOM adopted, not rebuilt)', () => {
 		}
 	});
 
-	it('removes a server data attribute when the client value is nullish', async () => {
+	// As in React, hydration never patches an attribute: the server's value stays
+	// until the client next changes that prop, and only a development build
+	// warns that it won't be patched up.
+	it('keeps a server attribute the client renders nullish until the client changes it', async () => {
 		const warn = vi.spyOn(console, 'error').mockImplementation(() => {});
 		try {
 			for (const value of [null, undefined]) {
@@ -116,12 +119,18 @@ describe('hydrateRoot — no mismatch (DOM adopted, not rebuilt)', () => {
 				const root = hydrateRoot(container, StringData, { value });
 				flushSync(() => {});
 				expect(container.querySelector('#string-data')).toBe(element);
-				expect(element!.hasAttribute('data-state')).toBe(false);
+				expect(element!.getAttribute('data-state')).toBe('server');
 				if (process.env.OCTANE_TEST_COMPILE_MODE === 'prod') {
 					expect(warn).not.toHaveBeenCalled();
 				} else {
-					expect(warn.mock.calls.flat().join(' ')).toContain('attribute `data-state`');
+					const warning = warn.mock.calls.flat().join(' ');
+					expect(warning).toContain("This won't be patched up");
+					expect(warning).toContain('data-state');
 				}
+				flushSync(() => root.render(StringData, { value: 'next' }));
+				expect(element!.getAttribute('data-state')).toBe('next');
+				flushSync(() => root.render(StringData, { value }));
+				expect(element!.hasAttribute('data-state')).toBe(false);
 				root.unmount();
 			}
 			for (const spread of [false, true]) {
@@ -159,20 +168,27 @@ describe('hydrateRoot — no mismatch (DOM adopted, not rebuilt)', () => {
 					listeners.mockRestore();
 					expect(registeredAbsentEvent).toBe(false);
 					flushSync(() => {});
+					// The server's attributes stay through hydration and a render that
+					// leaves those props unchanged.
 					expect(container.querySelector('button')).toBe(button);
+					expect(button.disabled).toBe(true);
+					expect(button.className).toBe('off');
+					expect(button.getAttribute('formaction')).toBe(spread ? '/submit' : null);
+					expect(button.getAttribute('aria-disabled')).toBe('true');
+					expect(button.getAttribute('data-visually-disabled')).toBe('');
+					expect(button.getAttribute('data-server-owned')).toBe('keep');
+					flushSync(() => root.render(client.Action, { ...props, title: 'Updated' }));
+					expect(button.disabled).toBe(true);
+					expect(button.getAttribute('aria-disabled')).toBe('true');
+					flushSync(() => root.render(client.Action, initial));
+					expect(button.getAttribute('aria-disabled')).toBe('true');
+					flushSync(() => root.render(client.Action, props));
 					expect(button.disabled).toBe(false);
 					expect(button.className).toBe('');
 					expect(button.getAttribute('formaction')).toBe(null);
 					expect(button.getAttribute('aria-disabled')).toBe(expected);
 					expect(button.getAttribute('data-visually-disabled')).toBe(expected);
 					expect(button.getAttribute('data-server-owned')).toBe('keep');
-					flushSync(() => root.render(client.Action, { ...props, title: 'Updated' }));
-					expect(button.getAttribute('aria-disabled')).toBe(expected);
-					flushSync(() => root.render(client.Action, initial));
-					expect(button.getAttribute('aria-disabled')).toBe('true');
-					flushSync(() => root.render(client.Action, props));
-					expect(button.getAttribute('aria-disabled')).toBe(expected);
-					expect(button.getAttribute('data-visually-disabled')).toBe(expected);
 					root.unmount();
 					const mounted = createRoot(container);
 					mounted.render(client.Action, props);
@@ -194,7 +210,7 @@ describe('hydrateRoot — no mismatch (DOM adopted, not rebuilt)', () => {
 		}
 	});
 
-	it('patches and reports a mismatched string-valued data attribute', async () => {
+	it('keeps and reports a mismatched string-valued data attribute', async () => {
 		const { html } = ServerRT.renderToString(server.StringData, { value: 'server' });
 		container.innerHTML = html;
 		const element = container.querySelector('#string-data');
@@ -203,12 +219,18 @@ describe('hydrateRoot — no mismatch (DOM adopted, not rebuilt)', () => {
 			const root = hydrateRoot(container, StringData, { value: 'client' });
 			flushSync(() => {});
 			expect(container.querySelector('#string-data')).toBe(element);
-			expect(element!.getAttribute('data-state')).toBe('client');
+			expect(element!.getAttribute('data-state')).toBe('server');
 			if (process.env.OCTANE_TEST_COMPILE_MODE === 'prod') {
 				expect(warn).not.toHaveBeenCalled();
 			} else {
-				expect(warn.mock.calls.flat().join(' ')).toContain('attribute `data-state`');
+				const warning = warn.mock.calls.flat().join(' ');
+				expect(warning).toContain("This won't be patched up");
+				expect(warning).toContain('data-state');
 			}
+			// The next client change patches the adopted element.
+			flushSync(() => root.render(StringData, { value: 'next' }));
+			expect(container.querySelector('#string-data')).toBe(element);
+			expect(element!.getAttribute('data-state')).toBe('next');
 			root.unmount();
 		} finally {
 			warn.mockRestore();

@@ -283,6 +283,14 @@ resolves to either one at render time makes server rendering throw. Use
 Activation adopts the matching server DOM in template and JSX-returning
 components, preserving edits made to uncontrolled inputs before activation.
 
+A parent root that falls back for a hydration mismatch elsewhere keeps its
+independent widgets. Its client render takes each widget's server wrapper,
+matched by boundary ID, in place of an empty one, so the widget keeps its DOM
+and state, whether it already activated or activates later. The IDs match
+when the client render calls `useId` as often as the server did before the
+widget. A widget whose ID no longer matches is discarded with the rest of the
+server DOM, and the client render leaves its new wrapper empty.
+
 When an independent boundary's only child is a prop-less component imported
 from a project `.tsrx` module, and that component is a zero-argument
 `'use dom bindings'` view, the island activates through the view's binding
@@ -773,12 +781,13 @@ using their normal DOM semantics; `tabIndex` uses its canonical `tabindex`
 attribute without changing descendant control ownership.
 
 A host moved elsewhere inside the root while its boundary is pending is never
-adopted at its new position. When the boundary resumes, hydration reports the
-missing host as a recoverable mismatch and renders its own host at the original
-site. Committing that replacement retires the moved host's early binding, as an
-accepted transfer would. The moved element keeps its last published values, and
-neither owner writes to it again. A resumed attempt that suspends or is
-discarded leaves the early binding live.
+adopted at its new position. When the boundary resumes, the host is missing from
+its site, which is a hydration mismatch: the boundary discards its server DOM
+and renders on the client. Committing that fallback ends the early binding of
+every host whose server site was in the discarded DOM, the moved one included:
+its cleanup runs once, the moved element keeps its last published values, and
+neither owner writes to it again. An attempt that is discarded before it
+commits leaves the early binding live.
 
 If retirement cleanup invalidates the host after acceptance, its successor
 writers and pending host refs are revoked. This does not roll back cleanup or
@@ -1077,16 +1086,21 @@ When a mounted parent updates a dormant boundary, activation uses the latest
 captures for child state, events, refs, and effects. Octane never renders the
 child with its earlier captures, in development or production. If the captures
 or provided context values changed before activation, the server HTML predates
-the client's own state: activation repairs attributes, class, style, and text
-without a hydration warning or `onRecoverableError`, including values that
-`suppressHydrationWarning` or `dangerouslySetInnerHTML` would otherwise keep
-from the server. Content the newer captures add or swap in, such as another
-component, a new list row, or a hole's new value, mounts on the client beside
-the adopted server nodes. A boundary nested inside such a boundary is treated
-the same way. When the captures are unchanged, for example after a parent
-re-render with equal values, a server/client mismatch is still reported as
-usual. A mismatch that a capture change corrects before activation is repaired
-without a report.
+the client's own state. When it differs from the client render, attributes,
+class, style, and text included, and values that `suppressHydrationWarning` or
+`dangerouslySetInnerHTML` would otherwise keep from the server, the boundary
+renders on the client without a hydration warning or `onRecoverableError`, as
+React reports nothing for an update that reaches a dehydrated boundary. A
+boundary nested inside such a boundary is treated the same way. When the
+captures are unchanged, for example after a parent re-render with equal
+values, a server/client mismatch is still reported as usual.
+
+A `<Hydrate>` boundary is a hydration fallback boundary, like Suspense. When
+its server HTML does not match the client render, it discards its server DOM
+and renders on the client, while the rest of the page keeps its server DOM.
+`onRecoverableError` reports it once, the `use()` values it read from the
+server's seeds are discarded so that it renders from client data, and
+interaction intent captured on the discarded DOM is not replayed.
 
 Treat `when` as boundary configuration rather than a strategy state machine. If
 the intended meaning of a boundary changes, give `Hydrate` a new `key` to start

@@ -183,16 +183,17 @@ describe('public root containers and test environment', () => {
 		expect(onRecoverableError).not.toHaveBeenCalled();
 		root.unmount();
 	});
-	it('reports surplus children removed from nested descriptor hosts', async () => {
+	it('renders the root on the client for surplus children of a nested descriptor host', async () => {
 		vi.spyOn(console, 'error').mockImplementation(() => {});
 		const container = document.createElement('div');
 		container.innerHTML = renderToString(server.NestedChildren, { label: 'same' }).html;
 		container.querySelector('div')!.appendChild(document.createElement('em'));
-		const span = container.querySelector('span');
+		const span = container.querySelector('span')!;
 		const onRecoverableError = vi.fn();
 		const root = hydrateRoot(container, NestedChildren, { label: 'same' }, { onRecoverableError });
 		expect(container.querySelector('em')).toBeNull();
-		expect(container.querySelector('span')).toBe(span);
+		expect(container.querySelector('span')!.textContent).toBe('same');
+		expect(span.isConnected).toBe(false);
 		await Promise.resolve();
 		expect(onRecoverableError).toHaveBeenCalledOnce();
 		root.unmount();

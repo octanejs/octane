@@ -65,7 +65,9 @@ function setup(gateInChild: boolean, secondGate?: AdoptionGate, gatePromise?: Pr
 	input.value = 'user draft';
 	input.focus();
 	input.setSelectionRange(2, 6);
-	props.data = new Promise(() => {});
+	// The client's own data arrives only if a test resolves it.
+	let resolveData!: (value: string) => void;
+	props.data = new Promise((resolve) => (resolveData = resolve));
 	props.siblingData = new Promise(() => {});
 	waiting.value.pending = true;
 	if (secondGate) secondGate.pending = true;
@@ -74,8 +76,22 @@ function setup(gateInChild: boolean, secondGate?: AdoptionGate, gatePromise?: Pr
 		root?.unmount();
 		container.remove();
 	});
-	root = hydrateRoot(container, InitialAdoptionScreen, props);
-	return { props, container, input, sibling, id, siblingId, waiting, root };
+	const recoverable: unknown[] = [];
+	root = hydrateRoot(container, InitialAdoptionScreen, props, {
+		onRecoverableError: (error) => recoverable.push(error),
+	});
+	return {
+		props,
+		container,
+		input,
+		sibling,
+		id,
+		siblingId,
+		waiting,
+		root,
+		recoverable,
+		resolveData,
+	};
 }
 
 describe.each([false, true])('initial suspended hydration (gate in child: %s)', (gateInChild) => {
@@ -125,30 +141,50 @@ describe.each([false, true])('initial suspended hydration (gate in child: %s)', 
 		expect(vi.mocked(props.onRef).mock.calls.map(([node]) => node)).toEqual([input, null]);
 	});
 
-	it('accepts new props and ignores an obsolete wakeable', async () => {
-		const { props, container, input, waiting, root } = setup(gateInChild);
+	// New props reach the boundary while its hydration waits on the old gate, so
+	// it cannot hydrate with them. As React does, it renders on the client from
+	// the client's data instead of the server's seeds, reports nothing, and the
+	// abandoned attempt's wakeable no longer matters. The sibling outside the
+	// boundary stays adopted.
+	it('renders the boundary on the client for new props and ignores an obsolete wakeable', async () => {
+		const { props, container, input, sibling, waiting, root, recoverable } = setup(gateInChild);
 		const replacement = gate();
 		await act(() =>
 			root.render(InitialAdoptionScreen, {
 				...props,
 				gate: replacement.value,
 				label: 'replacement',
+				data: fulfilled('client data'),
 			}),
 		);
-		expect(container.querySelector('input')).toBe(input);
+		expect(input.isConnected).toBe(false);
+		expect(container.querySelector('input')!.value).toBe('server draft');
 		expect(container.querySelector('[data-adopted-label]')!.textContent).toBe('replacement');
+		expect(container.querySelector('output')!.textContent).toBe('client data');
+		expect(container.querySelector('aside button')).toBe(sibling);
 		expect(props.onLifecycle).toHaveBeenCalledExactlyOnceWith('mount:replacement');
+		expect(recoverable).toEqual([]);
 		await act(() => waiting.resolve());
 		expect(container.querySelector('[data-adopted-label]')!.textContent).toBe('replacement');
 		expect(props.onLifecycle).toHaveBeenCalledOnce();
+		expect(recoverable).toEqual([]);
 	});
 
+	// The retry throws, so the boundary renders on the client, which throws
+	// again. That render reads the client's data, not the seeds of the
+	// attempts it replaces: a gate in the child throws only once the data the
+	// content reads before it arrives.
 	it('routes a rejected retry to the error boundary and preserves its sibling', async () => {
-		const { props, container, sibling, waiting } = setup(gateInChild);
+		const { props, container, sibling, waiting, resolveData } = setup(gateInChild);
 		await act(() => {
 			waiting.value.error = new Error('unavailable');
 			waiting.resolve();
 		});
+		if (gateInChild) {
+			expect(container.querySelector('[role="alert"]')).toBeNull();
+			expect(container.querySelector('main')!.textContent).toContain('Loading');
+			await act(() => resolveData('client data'));
+		}
 		expect(container.querySelector('[role="alert"]')!.textContent).toBe('unavailable');
 		expect(container.querySelector('input')).toBeNull();
 		expect(container.querySelector('aside button')).toBe(sibling);

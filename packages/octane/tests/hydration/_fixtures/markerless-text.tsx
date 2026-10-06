@@ -48,3 +48,7 @@ export function SpreadButtonPair({ first, second }: { first: OctaneNode; second:
 export function ConditionalChild(props: { on: boolean; label: string }) {
 	return <div>{props.on ? <b>yes</b> : props.label}</div>;
 }
+
+export function SuppressedConditionalChild(props: { on: boolean; label: string }) {
+	return <div suppressHydrationWarning>{props.on ? <b>yes</b> : props.label}</div>;
+}

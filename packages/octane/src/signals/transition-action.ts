@@ -8,9 +8,9 @@ import type {
 } from './graph.js';
 import { ScopeDisposedError, SignalFrameError } from './errors.js';
 import {
-	NativeAdoptionMiss,
 	NATIVE_TRANSITION_CONSUMER,
 	SIGNAL_DEPENDENT_NODE,
+	isNativeAdoptionMiss,
 	type NativeReadSource,
 	type NativeTransitionConsumer,
 	type NativeTransitionNotify,
@@ -432,7 +432,7 @@ export class SignalActionFrame {
 			else if (
 				error instanceof ScopeDisposedError ||
 				error instanceof SignalFrameError ||
-				error instanceof NativeAdoptionMiss
+				isNativeAdoptionMiss(error)
 			)
 				invalid ??= 'stale';
 			else if (!handled) {

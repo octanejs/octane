@@ -9,11 +9,9 @@ import { loadCompiledFixtureSource, loadServerFixture } from '../_server-fixture
 // root with the server node at the cursor. When that root is a hole (here a
 // component call, text hole, renderable hole, nested block or boundary in an
 // @if arm), the server node cannot decide: the first static root after the
-// holes does. When
-// the server rendered the other arm there, the arm's fragment is rebuilt on the
-// client with one report, as when its first root is static, instead of
-// adopting the other arm's nodes as its own roots: that lost the fragment's
-// static roots, and gave the hole's component a server node as its anchor.
+// holes does. When the server rendered the other arm there, the server HTML
+// does not match the client. No Suspense arm encloses the @if, so, as in
+// React 19, the whole root renders on the client and reports once.
 
 const FIXTURE = join(
 	process.cwd(),
@@ -56,12 +54,11 @@ describe.each([
 	'hydrateRoot — an @if arm fragment that starts with a hole ($compile compile, $runtime runtime)',
 	({ compile, runtime }) => {
 		const client = clients[compile];
-		// The production runtime checks a lazy template against its source, and
-		// reports the error code instead of the message.
-		const STRUCTURAL =
+		// The production runtime reports the error code instead of the message.
+		const HYDRATION_FAILED =
 			runtime === 'production'
-				? /^Minified Octane error #51;/
-				: /the mismatched subtree was rebuilt on the client/;
+				? /^Minified Octane error #339;/
+				: /^Hydration failed because the server rendered HTML didn't match the client/;
 
 		let container: HTMLElement;
 		let root: ReturnType<typeof hydrateRoot> | null;
@@ -94,7 +91,7 @@ describe.each([
 			clientProps: Record<string, unknown>,
 		): Promise<{ host: Element; serverNodes: Element[]; recoverable: string[] }> {
 			container.innerHTML = ServerRT.renderToString(server[name], serverProps).html;
-			const serverNodes = [...container.firstElementChild!.querySelectorAll('*')];
+			const serverNodes = [...container.querySelectorAll('*')];
 			const recoverable: string[] = [];
 			root = hydrateRoot(container, client[name], clientProps, {
 				onRecoverableError: (error: unknown) => recoverable.push((error as Error).message),
@@ -105,36 +102,39 @@ describe.each([
 			return { host: container.firstElementChild!, serverNodes, recoverable };
 		}
 
-		/** The dev warning for an else-arm fragment rebuilt where the server rendered `actual`. */
-		const rebuilt = (actual: string) =>
+		/** The root fell back: none of the server's elements is still connected. */
+		function expectRootFellBack(serverNodes: Element[], recoverable: string[]): void {
+			expect(serverNodes.length).toBeGreaterThan(0);
+			for (const node of serverNodes) expect(node.isConnected).toBe(false);
+			expect(recoverable).toEqual([expect.stringMatching(HYDRATION_FAILED)]);
+		}
+
+		/**
+		 * The dev warning for the client's else-arm fragment, at the first node of
+		 * the server's then-arm: its <b>.
+		 */
+		const mismatch = () =>
 			compile === 'development' && runtime === 'development'
 				? [
 						expect.stringMatching(
 							new RegExp(
 								`^${escape(`Octane hydration mismatch at ${FILE}`)}.*: ` +
-									escape(
-										'the client expected a fragment with <i> after its leading holes but the ' +
-											`server rendered ${actual}. The mismatched subtree was rebuilt on the client.`,
-									) +
-									'$',
+									`the client expected .+ but the server rendered ${escape('<b>.')}`,
 							),
 						),
 					]
 				: [];
 
-		it('rebuilds the fragment over another arm whose nodes differ from its static roots', async () => {
+		it('client-renders the root over another arm whose nodes differ from its static roots', async () => {
 			const { host, serverNodes, recoverable } = await hydrate(
 				'ArmHoleFirst',
 				{ server: true },
 				{},
 			);
-			const [b, em] = serverNodes;
 
 			expect(markup(host)).toBe('<u>z</u><i>x</i>');
-			expect(b.isConnected).toBe(false);
-			expect(em.isConnected).toBe(false);
-			expect(recoverable).toEqual([expect.stringMatching(STRUCTURAL)]);
-			expect(warnings()).toEqual(rebuilt('<em>'));
+			expectRootFellBack(serverNodes, recoverable);
+			expect(warnings()).toEqual(mismatch());
 
 			flushSync(() => root!.render(client.ArmHoleFirst, { server: true }));
 			expect(markup(host)).toBe('<b class="server">server</b><em>e</em>');
@@ -143,20 +143,16 @@ describe.each([
 			expect(recoverable).toHaveLength(1);
 		});
 
-		it('rebuilds the fragment over another arm that ends before its static roots', async () => {
+		it('client-renders the root over another arm that ends before its static roots', async () => {
 			const { host, serverNodes, recoverable } = await hydrate(
 				'ShortArmHoleFirst',
 				{ server: true },
 				{},
 			);
-			const [b] = serverNodes;
 
 			expect(markup(host)).toBe('<u>z</u><i>x</i>');
-			expect(b.isConnected).toBe(false);
-			expect(recoverable).toEqual([expect.stringMatching(STRUCTURAL)]);
-			expect(warnings()).toEqual(
-				rebuilt('the end of the parent block (fewer nodes than expected)'),
-			);
+			expectRootFellBack(serverNodes, recoverable);
+			expect(warnings()).toEqual(mismatch());
 
 			flushSync(() => root!.render(client.ShortArmHoleFirst, { server: true }));
 			expect(markup(host)).toBe('<b class="server">server</b>');
@@ -164,8 +160,8 @@ describe.each([
 			expect(markup(host)).toBe('<u>z</u><i>x</i>');
 		});
 
-		it('remounts the keyed component of a rebuilt fragment when its key changes', async () => {
-			const { host, recoverable } = await hydrate(
+		it('remounts the keyed component of a client-rendered fragment when its key changes', async () => {
+			const { host, serverNodes, recoverable } = await hydrate(
 				'KeyedArmHoleFirst',
 				{ server: true, k: 'a', tail: 't' },
 				{ k: 'a', tail: 't' },
@@ -173,8 +169,8 @@ describe.each([
 			const [u, i] = host.children;
 
 			expect(markup(host)).toBe('<u>a</u><i>t</i>');
-			expect(recoverable).toEqual([expect.stringMatching(STRUCTURAL)]);
-			expect(warnings()).toEqual(rebuilt('<em>'));
+			expectRootFellBack(serverNodes, recoverable);
+			expect(warnings()).toEqual(mismatch());
 
 			flushSync(() => root!.render(client.KeyedArmHoleFirst, { k: 'b', tail: 'w' }));
 			expect(markup(host)).toBe('<u>b</u><i>w</i>');
@@ -198,44 +194,24 @@ describe.each([
 			const { host, serverNodes, recoverable } = await hydrate(name, props, props);
 
 			expect(markup(host)).toBe(html);
-			expect([...host.querySelectorAll('*')]).toEqual(serverNodes);
+			expect([...container.querySelectorAll('*')]).toEqual(serverNodes);
 			expect(recoverable).toEqual([]);
 			expect(warnings()).toEqual([]);
 		});
 
-		/**
-		 * Each child of `host` is the server element at that index of
-		 * `serverNodes`, or one the client built (-1).
-		 */
-		function expectNodes(host: Element, serverNodes: Element[], expected: number[]): void {
-			const children = [...host.children];
-			expect(children).toHaveLength(expected.length);
-			expected.forEach((index, i) => {
-				if (index < 0) expect(serverNodes).not.toContain(children[i]);
-				else expect(children[i]).toBe(serverNodes[index]);
-			});
-		}
-
-		// One structural report: a component at the hole reports its range as
-		// rebuilt (55) where the production compile renders it without one.
-		const REBUILT =
-			runtime === 'production' ? /^Minified Octane error #5[15];/ : /built on the client/;
-
-		// An @if or @switch at a hole of the client's arm, where the server rendered
-		// the other arm: the hole's walk finds that arm's <s>, not a range of the
-		// slot's own, and the arm's static <b> matches the server's <b> after it.
-		// The slot takes the place of exactly that <s>, so the <b> stays the arm's.
-		it('renders a nested @if in place of the other arm’s node at its hole', async () => {
+		// An @if or @switch at a hole of the client's arm, where the server
+		// rendered the other arm's plain hosts. The client render keeps the arm's
+		// static <b> across later toggles of the nested block.
+		it('client-renders the root for a nested @if at the hole of the other arm', async () => {
 			const { host, serverNodes, recoverable } = await hydrate(
 				'NestedIfHoleFirst',
 				{ server: true },
 				{ inner: true },
 			);
-			const [, b, em] = serverNodes;
 
 			expect(markup(host)).toBe('<s>s</s><b>a</b><b>a</b><em>e</em>');
-			expectNodes(host, serverNodes, [-1, -1, 1, 2]);
-			expect(recoverable).toEqual([expect.stringMatching(STRUCTURAL)]);
+			expectRootFellBack(serverNodes, recoverable);
+			const [, , b, em] = host.children;
 
 			flushSync(() => root!.render(client.NestedIfHoleFirst, { inner: false }));
 			expect(markup(host)).toBe('<b>a</b><em>e</em>');
@@ -252,7 +228,6 @@ describe.each([
 				name: 'NestedIfHoleFirst',
 				props: { inner: false },
 				html: '<b>a</b><em>e</em>',
-				nodes: [1, 2],
 				next: { inner: true },
 				updated: '<s>s</s><b>a</b><b>a</b><em>e</em>',
 			},
@@ -260,7 +235,6 @@ describe.each([
 				name: 'NestedIfHoleMid',
 				props: { inner: true },
 				html: '<i>i</i><s>s</s><b>a</b><b>a</b><em>e</em>',
-				nodes: [0, -1, -1, 2, 3],
 				next: { inner: false },
 				updated: '<i>i</i><b>a</b><em>e</em>',
 			},
@@ -268,7 +242,6 @@ describe.each([
 				name: 'NestedIfHoleMid',
 				props: { inner: false },
 				html: '<i>i</i><b>a</b><em>e</em>',
-				nodes: [0, 2, 3],
 				next: { inner: true },
 				updated: '<i>i</i><s>s</s><b>a</b><b>a</b><em>e</em>',
 			},
@@ -276,23 +249,13 @@ describe.each([
 				name: 'NestedSwitchHoleFirst',
 				props: { inner: 'pair' },
 				html: '<s>s</s><b>a</b><b>a</b><em>e</em>',
-				nodes: [-1, -1, 1, 2],
 				next: { inner: 's' },
 				updated: '<s>s</s><b>a</b><em>e</em>',
 			},
 			{
 				name: 'NestedSwitchHoleFirst',
-				props: { inner: 's' },
-				html: '<s>s</s><b>a</b><em>e</em>',
-				nodes: [0, 1, 2],
-				next: { inner: 'p' },
-				updated: '<p>p</p><b>a</b><em>e</em>',
-			},
-			{
-				name: 'NestedSwitchHoleFirst',
 				props: { inner: 'p' },
 				html: '<p>p</p><b>a</b><em>e</em>',
-				nodes: [-1, 1, 2],
 				next: { inner: 'pair' },
 				updated: '<s>s</s><b>a</b><b>a</b><em>e</em>',
 			},
@@ -300,7 +263,6 @@ describe.each([
 				name: 'NestedSwitchHoleFirst',
 				props: { inner: 'component' },
 				html: '<s>s</s><b>a</b><b>a</b><em>e</em>',
-				nodes: [-1, -1, 1, 2],
 				next: { inner: 'none' },
 				updated: '<b>a</b><em>e</em>',
 			},
@@ -308,27 +270,41 @@ describe.each([
 				name: 'NestedSwitchHoleFirst',
 				props: { inner: 'none' },
 				html: '<b>a</b><em>e</em>',
-				nodes: [1, 2],
 				next: { inner: 'component' },
 				updated: '<s>s</s><b>a</b><b>a</b><em>e</em>',
 			},
 		])(
-			'renders $name with $props in place of the other arm’s node at its hole',
-			async ({ name, props, html, nodes, next, updated }) => {
+			'client-renders the root for $name with $props where the server rendered the other arm',
+			async ({ name, props, html, next, updated }) => {
 				const { host, serverNodes, recoverable } = await hydrate(name, { server: true }, props);
-				// Only an arm that is the other arm's node adopts it without a report.
-				const adopted = nodes.every((index) => index >= 0) && nodes.length === serverNodes.length;
 
 				expect(markup(host)).toBe(html);
-				expectNodes(host, serverNodes, nodes);
-				expect(recoverable).toEqual(adopted ? [] : [expect.stringMatching(REBUILT)]);
-				if (adopted) expect(warnings()).toEqual([]);
+				expectRootFellBack(serverNodes, recoverable);
 
 				flushSync(() => root!.render(client[name], next));
 				expect(markup(host)).toBe(updated);
-				expect(serverNodes.at(-1)!.isConnected).toBe(true);
-				expect(recoverable).toHaveLength(adopted ? 0 : 1);
+				expect(recoverable).toHaveLength(1);
 			},
 		);
+
+		// OCTANE DIVERGENCE: React adopts this server HTML, because its hosts
+		// (<s>, <b>, <em>) coincide with the client arm's and React emits no
+		// markers for conditionals. Octane frames every @switch in a server range,
+		// and the server's other arm has none where the client's @switch is, so
+		// its markup differs structurally and the root renders on the client.
+		it('client-renders the root for a nested @switch whose hosts coincide with the other arm', async () => {
+			const { host, serverNodes, recoverable } = await hydrate(
+				'NestedSwitchHoleFirst',
+				{ server: true },
+				{ inner: 's' },
+			);
+
+			expect(markup(host)).toBe('<s>s</s><b>a</b><em>e</em>');
+			expectRootFellBack(serverNodes, recoverable);
+
+			flushSync(() => root!.render(client.NestedSwitchHoleFirst, { inner: 'p' }));
+			expect(markup(host)).toBe('<p>p</p><b>a</b><em>e</em>');
+			expect(recoverable).toHaveLength(1);
+		});
 	},
 );

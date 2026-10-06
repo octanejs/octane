@@ -10,9 +10,9 @@ import { loadCompiledFixtureSource, loadServerFixture } from '../_server-fixture
 // markup frames none of its holes, so where the fragment holds a renderable
 // hole, the server rendered bare text for a text value, an element for an
 // element, and nothing for null. The hole adopts that node rather than adding
-// its own. A null hole that is the fragment's last root owns no server node, so
-// whatever the server rendered after the fragment's other roots is stale:
-// hydration removes it and reports it once.
+// its own. Whatever the server rendered after the fragment's roots is a
+// mismatch, as in React, which compares only the DOM: nothing is repaired in
+// place, the root renders on the client and reports once.
 
 const FIXTURE = join(
 	process.cwd(),
@@ -54,7 +54,8 @@ function expectSameNodes(actual: readonly Node[], expected: readonly Node[]) {
 function tail(site: string): string {
 	return (
 		`Octane hydration mismatch at ${site}: the client expected the end of the component but ` +
-		`the server rendered <s>. The mismatched subtree was rebuilt on the client.`
+		`the server rendered <s>. The nearest Suspense or Hydrate boundary, or the root, will be ` +
+		`regenerated on the client.`
 	);
 }
 
@@ -80,11 +81,11 @@ describe.each([
 		mode: 'client',
 		compileOptions: { dev },
 	});
-	// A production runtime reports the error code instead of the message.
+	// A production runtime reports the error code instead of React's message.
 	const MISMATCH =
 		runtime === 'production'
-			? /^Minified Octane error #51;/
-			: /the server-rendered node did not match the client render/;
+			? /^Minified Octane error #339;/
+			: /server rendered HTML didn't match the client/;
 	let container: HTMLElement;
 	let root: { render(component: unknown, props?: unknown): void; unmount(): void } | null;
 	let errSpy: ReturnType<typeof vi.spyOn>;
@@ -154,26 +155,26 @@ describe.each([
 	);
 
 	it.each(TAILS)(
-		'removes the server node after a fragment ending in $shape',
+		'client-renders the root when the server rendered more after a fragment ending in $shape',
 		async ({ name, html }) => {
 			const section = render(name, { server: true });
 			expect(markup(section)).toBe(`${html}<s class="tail">s</s>`);
-			const stale = section.querySelector('.tail')!;
-			const adopted = content(section).filter((node) => node !== stale);
+			const serverNodes = content(section);
 
 			const recoverable = await hydrate(name, {});
 
-			expect(markup(section)).toBe(html);
-			expectSameNodes(content(section), adopted);
-			expect(stale.isConnected).toBe(false);
+			const live = container.firstElementChild!;
+			expect(live).not.toBe(section);
+			expect(markup(live)).toBe(html);
+			expect(serverNodes.filter((node) => node.isConnected)).toEqual([]);
 			expect(recoverable).toEqual([expect.stringMatching(MISMATCH)]);
 			expect(warnings()).toEqual(dev ? [tail(armSite(name))] : []);
 
-			// The range the client settled still updates in place.
+			// The client-rendered content updates in place.
 			await act(async () => root!.render(client[name], { server: true }));
-			expect(markup(section)).toBe(`${html}<s class="tail">s</s>`);
+			expect(markup(live)).toBe(`${html}<s class="tail">s</s>`);
 			await act(async () => root!.render(client[name], {}));
-			expect(markup(section)).toBe(html);
+			expect(markup(live)).toBe(html);
 			expect(warnings()).toHaveLength(dev ? 1 : 0);
 		},
 	);

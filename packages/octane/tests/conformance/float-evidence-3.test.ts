@@ -394,7 +394,10 @@ describe('Float evidence (slice 3) — style-resource nonce and hoistable lifecy
 		}
 	});
 
-	it('adopts a hoisted title and reconciles omitted server attributes', async () => {
+	// React 19 does not hydrate a hoisted title in place: it adopts the head's
+	// title and sets the client's props on it, leaving attributes only the
+	// server rendered (ReactFiberConfigDOM hydrateHoistable, setInitialProperties).
+	it('adopts a hoisted title, writes the client attributes, and keeps server-only ones', async () => {
 		const result = await Server.renderToString(srv.TitleSpread, {
 			text: 'Owned',
 			attrs: { 'data-server-only': 'stale' },
@@ -413,8 +416,15 @@ describe('Float evidence (slice 3) — style-resource nonce and hoistable lifecy
 		try {
 			flushSync(() => {});
 			expect(document.head.querySelector('title')).toBe(title);
-			expect(title.hasAttribute('data-server-only')).toBe(false);
+			expect(title.textContent).toBe('Owned');
+			expect(title.getAttribute('data-server-only')).toBe('stale');
 			expect(title.getAttribute('data-client-only')).toBe('current');
+
+			flushSync(() =>
+				root.render(TitleSpread as any, { text: 'Owned', attrs: { 'data-client-only': 'next' } }),
+			);
+			expect(document.head.querySelector('title')).toBe(title);
+			expect(title.getAttribute('data-client-only')).toBe('next');
 		} finally {
 			root.unmount();
 		}

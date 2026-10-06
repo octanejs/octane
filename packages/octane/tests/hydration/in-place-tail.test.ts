@@ -8,9 +8,10 @@ import { loadCompiledFixtureSource, loadServerFixture } from '../_server-fixture
 // A component's server range can hold raw markup the server rendered for
 // another component, while the client's content there is a sequence of calls
 // with no server ranges of their own. Each call adopts its server node in
-// place, and the server markup after the last call's roots is stale:
-// hydration removes it and reports the mismatch once, while the nodes the
-// calls adopted keep their identity.
+// place, and the server markup after the last call's roots is an unhydrated
+// tail. As in React, that tail is a mismatch: with no Suspense boundary around
+// it, the root renders on the client, no server node survives, and the
+// mismatch is reported once.
 
 const FIXTURE = join(process.cwd(), 'packages/octane/tests/hydration/_fixtures/in-place-tail.tsrx');
 const FILE = 'in-place-tail.tsrx';
@@ -36,17 +37,11 @@ function markup(node: Element): string {
 	return copy.innerHTML;
 }
 
-function rebuilt(site: string): string {
+function mismatch(site: string, expected: string, actual: string): string {
 	return (
-		`Octane hydration mismatch at ${site}: the client expected <p> but the server rendered <b>. ` +
-		`The mismatched subtree was rebuilt on the client.`
-	);
-}
-
-function tail(site: string): string {
-	return (
-		`Octane hydration mismatch at ${site}: the client expected the end of the component but ` +
-		`the server rendered <s>. The mismatched subtree was rebuilt on the client.`
+		`Octane hydration mismatch at ${site}: the client expected ${expected} but the server ` +
+		`rendered ${actual}. The nearest Suspense or Hydrate boundary, or the root, will be ` +
+		`regenerated on the client.`
 	);
 }
 
@@ -97,8 +92,8 @@ describe.each([
 	// A production runtime reports the error code instead of the message.
 	const MISMATCH =
 		runtime === 'production'
-			? /^Minified Octane error #51;/
-			: /the server-rendered node did not match the client render/;
+			? /^Minified Octane error #339;/
+			: /^Hydration failed because the server rendered HTML didn't match the client\./;
 	let container: HTMLElement;
 	let root: { render(component: unknown, props?: unknown): void; unmount(): void } | null;
 	let errSpy: ReturnType<typeof vi.spyOn>;
@@ -140,44 +135,42 @@ describe.each([
 	}
 
 	it.each(SHAPES)(
-		'removes the server tail after $shape',
+		'renders the root on the client over the server tail after $shape',
 		async ({ name, client: clientHtml, server: serverHtml, site }) => {
 			const section = render(name, { server: true });
 			expect(markup(section)).toBe(serverHtml);
-			const adopted = [...section.querySelectorAll('p, em, i')];
-			const stale = section.querySelector('.tail')!;
+			const serverElements = [...container.querySelectorAll('*')];
 
 			const recoverable = await hydrate(name, {});
 
-			expect(markup(section)).toBe(clientHtml);
-			expect([...section.querySelectorAll('p, em, i')]).toEqual(adopted);
-			expect(stale.isConnected).toBe(false);
+			expect(markup(container)).toBe(`<section>${clientHtml}</section>`);
+			expect(serverElements.filter((element) => element.isConnected)).toEqual([]);
 			expect(recoverable).toEqual([expect.stringMatching(MISMATCH)]);
-			expect(warnings()).toEqual(dev ? [tail(site())] : []);
+			expect(warnings()).toEqual(dev ? [mismatch(site(), 'the end of the component', '<s>')] : []);
 
-			// The range the client settled still updates in place.
+			// The client-rendered tree updates like any other.
+			const live = container.querySelector('section')!;
 			await act(async () => root!.render(client[name], { server: true }));
-			expect(markup(section)).toBe(serverHtml);
+			expect(markup(live)).toBe(serverHtml);
 			await act(async () => root!.render(client[name], {}));
-			expect(markup(section)).toBe(clientHtml);
+			expect(markup(live)).toBe(clientHtml);
+			expect(recoverable).toHaveLength(1);
 			expect(warnings()).toHaveLength(dev ? 1 : 0);
 		},
 	);
 
-	it('removes the server tail after a call that adopted in place follows a rebuilt root', async () => {
+	it('renders the root on the client once when the first call finds another tag', async () => {
 		const section = render('RebuiltFirst', { server: true });
 		expect(markup(section)).toBe('<b class="server">b</b><em>e</em><s class="tail">s</s>');
-		const stale = [...section.querySelectorAll('.server, .tail')];
-		const adopted = section.querySelector('em')!;
+		const serverElements = [...container.querySelectorAll('*')];
 
 		const recoverable = await hydrate('RebuiltFirst', {});
 
-		expect(markup(section)).toBe('<p>p</p><em>e</em>');
-		expect(section.querySelector('em')).toBe(adopted);
-		for (const node of stale) expect(node.isConnected).toBe(false);
+		expect(markup(container)).toBe('<section><p>p</p><em>e</em></section>');
+		expect(serverElements.filter((element) => element.isConnected)).toEqual([]);
 		expect(recoverable).toEqual([expect.stringMatching(MISMATCH)]);
 		expect(warnings()).toEqual(
-			dev ? [rebuilt(siteOf('function Para(', '<p>')), tail(ARM('RebuiltFirst')())] : [],
+			dev ? [mismatch(siteOf('function Para(', '<p>'), '<p>', '<b>')] : [],
 		);
 	});
 

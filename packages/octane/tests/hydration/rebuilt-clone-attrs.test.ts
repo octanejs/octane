@@ -5,13 +5,14 @@ import { act, flushSync, hydrateRoot } from '../../src/index.js';
 import * as ServerRT from 'octane/server';
 import { loadCompiledFixtureSource, loadServerFixture } from '../_server-fixture';
 
-// When a template's root does not match the server node at the cursor,
-// hydration reports the structural mismatch and rebuilds that subtree on the
-// client. The rebuilt subtree is client DOM, so its dynamic attributes, class,
-// and style are ordinary client writes: they must not report a second, value
-// mismatch for the same recovery, and `suppressHydrationWarning` (which keeps a
-// SERVER value) must not drop them. A value mismatch on an adopted server
-// element still reports, and suppression still keeps the server value there.
+// When a template's root does not match the server node at the cursor, the
+// server HTML does not match, as in React: with no Suspense or Hydrate boundary
+// the root discards its server DOM, renders on the client, and reports once.
+// The client-rendered subtree's dynamic attributes, class, and style are
+// ordinary client writes: they are not value mismatches, and
+// `suppressHydrationWarning` (which keeps a SERVER value) does not drop them.
+// An adopted server element whose attribute, class, or style differs keeps the
+// server value until the client next changes it, and development warns once.
 
 const FIXTURE = join(
 	process.cwd(),
@@ -44,12 +45,12 @@ function markup(node: Element): string {
 	return out;
 }
 
-const STRUCTURAL = /the mismatched subtree was rebuilt on the client/;
+const MISMATCH = /^Hydration failed because the server rendered HTML didn't match the client\./;
 
 describe.each([
 	{ name: 'development compile', dev: true },
 	{ name: 'production compile', dev: false },
-])('hydrateRoot — attributes of a rebuilt template clone ($name)', ({ dev }) => {
+])('hydrateRoot — attributes of a client-rendered template clone ($name)', ({ dev }) => {
 	const server = loadServerFixture(FIXTURE, { id: FILE });
 	const client = loadCompiledFixtureSource(SOURCE, {
 		id: FILE,
@@ -57,7 +58,7 @@ describe.each([
 		compileOptions: { dev },
 	});
 	let container: HTMLElement;
-	let root: { unmount(): void } | null;
+	let root: { render(component: unknown, props: unknown): void; unmount(): void } | null;
 	let errSpy: ReturnType<typeof vi.spyOn>;
 
 	beforeEach(() => {
@@ -78,12 +79,13 @@ describe.each([
 			.map((call: unknown[]) => String(call[0]))
 			.filter((message: string) => message.includes('hydration mismatch'));
 
-	async function hydrate(
-		name: string,
-		serverProps: Record<string, unknown>,
-		clientProps: Record<string, unknown>,
-	): Promise<string[]> {
+	/** Server-render `name` into the container; returns the server's elements. */
+	function serve(name: string, serverProps: Record<string, unknown>): Element[] {
 		container.innerHTML = ServerRT.renderToString(server[name], serverProps).html;
+		return [...container.querySelectorAll('*')];
+	}
+
+	async function hydrate(name: string, clientProps: Record<string, unknown>): Promise<string[]> {
 		const recoverable: string[] = [];
 		root = hydrateRoot(container, client[name], clientProps, {
 			onRecoverableError: (error: unknown) => recoverable.push((error as Error).message),
@@ -96,7 +98,8 @@ describe.each([
 
 	const structural = (line: number) =>
 		`Octane hydration mismatch at ${FILE}:${line}:1: the client expected <i> but the server ` +
-		'rendered <b>. The mismatched subtree was rebuilt on the client.';
+		'rendered <b>. The nearest Suspense or Hydrate boundary, or the root, will be regenerated ' +
+		'on the client.';
 
 	it.each([
 		{
@@ -142,71 +145,64 @@ describe.each([
 			expected: '<i class="ok" style="color: red;" title="ok">t</i>',
 		},
 	])(
-		'reports only the structural rebuild of $site',
+		'renders $site on the client and reports only the structural mismatch',
 		async ({ name, clientProps, leaf, expected }) => {
-			const recoverable = await hydrate(name, { server: true }, clientProps);
+			const served = serve(name, { server: true });
+			const recoverable = await hydrate(name, clientProps);
 
 			expect(markup(container.firstElementChild!)).toBe(expected);
-			expect(recoverable).toEqual([expect.stringMatching(STRUCTURAL)]);
+			// No boundary: the root renders on the client, so no server node survives.
+			expect(served.filter((node) => node.isConnected)).toEqual([]);
+			expect(recoverable).toEqual([expect.stringMatching(MISMATCH)]);
 			expect(warnings()).toEqual(dev ? [structural(lineOf(leaf) + 1)] : []);
 		},
 	);
 
-	it('still reports attribute, class, and style values that differ on an adopted element', async () => {
-		container.innerHTML = ServerRT.renderToString(server.Attrs, {
-			text: 'server',
-			color: 'red',
-		}).html;
+	it('keeps the server attribute, class, and style of an adopted element until the client changes them', async () => {
+		serve('Attrs', { text: 'server', color: 'red' });
 		const adopted = container.querySelector('i')!;
-		const recoverable: string[] = [];
-		root = hydrateRoot(
-			container,
-			client.Attrs,
-			{ text: 'client', color: 'blue' },
-			{
-				onRecoverableError: (error: unknown) => recoverable.push((error as Error).message),
-			},
-		);
-		flushSync(() => {});
-		await act(async () => {});
+		const recoverable = await hydrate('Attrs', { text: 'client', color: 'blue' });
 
 		expect(container.querySelector('i')).toBe(adopted);
 		expect(markup(container.firstElementChild!)).toBe(
-			'<i class="client" style="color: blue;" title="client">t</i>',
+			'<i class="server" style="color:red;" title="server">t</i>',
 		);
 		expect(recoverable).toEqual([]);
-		const at = `Octane hydration mismatch at ${FILE}:${lineOf('<i title={props.text}')}:2: server rendered`;
-		const tail =
-			'The client value was used. If this difference is intentional (e.g. a timestamp or ' +
-			'random id), add suppressHydrationWarning to the element.';
-		expect([...warnings()].sort()).toEqual(
-			dev
-				? [
-						`${at} attribute \`class\` "server" but the client rendered "client". ${tail}`,
-						`${at} attribute \`title\` "server" but the client rendered "client". ${tail}`,
-						`${at} style "color: red;" but the client rendered "color: blue;". ${tail}`,
-					]
-				: [],
+		// Development warns once per pass, listing every value it kept.
+		const at = `${FILE}:${lineOf('<i title={props.text}')}:2`;
+		expect(warnings()).toEqual(dev ? [expect.stringContaining("This won't be patched up.")] : []);
+		if (dev) {
+			expect(warnings()[0]).toContain(
+				`${at}: attribute \`title\`: the server rendered "server", the client "client"`,
+			);
+			expect(warnings()[0]).toContain(
+				`${at}: attribute \`class\`: the server rendered "server", the client "client"`,
+			);
+			expect(warnings()[0]).toContain(
+				`${at}: style: the server rendered "color: red;", the client "color: blue;"`,
+			);
+		}
+
+		// The client's values are unchanged, so nothing is written.
+		flushSync(() => root!.render(client.Attrs, { text: 'client', color: 'blue' }));
+		expect(container.querySelector('i')).toBe(adopted);
+		expect(markup(container.firstElementChild!)).toBe(
+			'<i class="server" style="color:red;" title="server">t</i>',
 		);
+
+		// The next client change writes the new values onto the adopted element.
+		flushSync(() => root!.render(client.Attrs, { text: 'third', color: 'green' }));
+		expect(container.querySelector('i')).toBe(adopted);
+		expect(markup(container.firstElementChild!)).toBe(
+			'<i class="third" style="color: green;" title="third">t</i>',
+		);
+		expect(warnings()).toHaveLength(dev ? 1 : 0);
 	});
 
-	it('still keeps suppressed server values on an adopted element', async () => {
-		container.innerHTML = ServerRT.renderToString(server.SuppressedAttrs, {
-			text: 'server',
-			color: 'red',
-		}).html;
+	it('keeps suppressed server values on an adopted element without a warning', async () => {
+		serve('SuppressedAttrs', { text: 'server', color: 'red' });
 		const adopted = container.querySelector('i')!;
-		const recoverable: string[] = [];
-		root = hydrateRoot(
-			container,
-			client.SuppressedAttrs,
-			{ text: 'client', color: 'blue' },
-			{
-				onRecoverableError: (error: unknown) => recoverable.push((error as Error).message),
-			},
-		);
-		flushSync(() => {});
-		await act(async () => {});
+		const recoverable = await hydrate('SuppressedAttrs', { text: 'client', color: 'blue' });
 
 		expect(container.querySelector('i')).toBe(adopted);
 		expect(markup(container.firstElementChild!)).toBe(

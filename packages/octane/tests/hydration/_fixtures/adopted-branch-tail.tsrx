@@ -18,7 +18,7 @@ function Strike() @{
 
 // Each branch renders its `@else` arm on the client. The server renders the
 // `@if` arm, whose content starts with what the `@else` arm renders and ends
-// with a stale tail, so the client adopts the arm's range and leaves the tail.
+// with a tail that the client does not render.
 export function SoleComponent(props: { server?: boolean }) @{
 	<div>
 		@if (props.server) {
@@ -45,7 +45,7 @@ export function SingleRoot(props: { server?: boolean }) @{
 	</div>
 }
 
-// The stale tail ends with the same tag as the client's last root.
+// The tail ends with the same tag as the client's last root.
 export function StaticFragment(props: { server?: boolean }) @{
 	<div>
 		@if (props.server) {
@@ -141,8 +141,8 @@ export function OuterBranch(props: { server?: boolean }) @{
 	</div>
 }
 
-// The client's last component finds the server's `<s>` where it expects its
-// range and adopts it without one. That `<s>` is client content now.
+// The client's last component renders what the server's `<s>` is; the server's
+// `<u>` after it is the tail.
 export function UnframedComponent(props: { server?: boolean }) @{
 	<div>
 		@if (props.server) {

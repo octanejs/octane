@@ -25,7 +25,8 @@ type HydrationBinding =
 	| 'tanstack-pacer'
 	| 'tanstack-query'
 	| 'tanstack-virtual'
-	| 'tanstack-table';
+	| 'tanstack-table'
+	| 'tiptap';
 
 const repositoryRoot = resolve(import.meta.dirname, '../../..');
 
@@ -148,6 +149,13 @@ function bindingAliases(binding: HydrationBinding) {
 				find: /^@octanejs\/tanstack-store$/,
 				replacement: resolve(repositoryRoot, 'packages/tanstack-store/src/index.ts'),
 			},
+		];
+	}
+
+	if (binding === 'tiptap') {
+		return [
+			{ find: /^@octanejs\/tiptap$/, replacement: resolve(source, 'index.ts') },
+			{ find: /^@octanejs\/tiptap\/menus$/, replacement: resolve(source, 'menus/index.ts') },
 		];
 	}
 

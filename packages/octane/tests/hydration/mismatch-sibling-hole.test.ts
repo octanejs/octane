@@ -11,8 +11,10 @@ import { loadCompiledFixtureSource, loadServerFixture } from '../_server-fixture
 // is bare text. A list, a fragment, a keyed element, or a portal never
 // serializes as bare text, and neither does a component that returns an element
 // or a list, directly or through another component. When the server rendered
-// text but the client value is one of those, hydration must discard the text
-// and report it where the value is, without giving up on the rest of the root.
+// text but the client value is one of those, the server HTML does not match. As
+// in React 19, nothing is repaired in place: the nearest Suspense arm or
+// Hydrate island discards its server DOM and renders on the client, or else
+// the whole root does, and onRecoverableError fires once for it.
 
 const FIXTURE = join(
 	process.cwd(),
@@ -22,6 +24,8 @@ const FILE = 'renderable-sibling-text-object.tsrx';
 const SOURCE = readFileSync(FIXTURE, 'utf8');
 const LINES = SOURCE.split('\n');
 const HOLE = '{pick(props.kind, props.v, props.target)}';
+const HYDRATION_FAILED =
+	/^Hydration failed because the server rendered HTML didn't match the client/;
 
 /** 1-based line of the `nth` line containing `text`. */
 function lineOf(text: string, nth = 0): number {
@@ -44,6 +48,20 @@ function markup(node: Element): string {
 
 function textChildren(node: Node): Node[] {
 	return [...node.childNodes].filter((child) => child.nodeType === 3);
+}
+
+/** Every element and text node below `node`. */
+function contentNodes(node: Node): Node[] {
+	const walker = document.createTreeWalker(node, NodeFilter.SHOW_ELEMENT | NodeFilter.SHOW_TEXT);
+	const nodes: Node[] = [];
+	while (walker.nextNode()) nodes.push(walker.currentNode);
+	return nodes;
+}
+
+/** None of `nodes` is still in `container`: their owner rendered on the client. */
+function expectDiscarded(container: Node, nodes: readonly Node[]) {
+	expect(nodes.length).toBeGreaterThan(0);
+	for (const node of nodes) expect(container.contains(node)).toBe(false);
 }
 
 /** The same node objects, not merely equal ones. */
@@ -96,7 +114,10 @@ describe.each([
 		);
 	}
 
-	/** Exactly one report: the recoverable error always, the warning in DEV only. */
+	/**
+	 * Exactly one report for the one owner that fell back: the recoverable
+	 * error always, the development warning in DEV only.
+	 */
 	async function expectReported(
 		recovered: unknown[],
 		file: string,
@@ -105,7 +126,7 @@ describe.each([
 	) {
 		await Promise.resolve();
 		expect(recovered).toHaveLength(1);
-		expect(String((recovered[0] as Error).message)).toMatch(/hydration mismatch/i);
+		expect(String((recovered[0] as Error).message)).toMatch(HYDRATION_FAILED);
 		expect(warns()).toEqual(dev ? [mismatchWarning(file, line, expected)] : []);
 	}
 
@@ -137,13 +158,14 @@ describe.each([
 
 	// A component that returns an element or a list has no site of its own, so
 	// the warning names the component, even when another component returns it.
-	// A template component reports its mismatched root.
+	// A template component with an early return reports the range of its
+	// conditional output.
 	const RETURNED_VALUES = [
 		{ kind: 'returned', expected: '<p>', at: 'function Returned(' },
 		{ kind: 'returned-list', expected: 'a renderable list range', at: 'function ReturnedList(' },
 		{ kind: 'chain', expected: '<p>', at: 'function Returned(' },
 		{ kind: 'chain-list', expected: 'a renderable list range', at: 'function ReturnedList(' },
-		{ kind: 'returned-template', expected: '<p>', at: '<p class="guarded">' },
+		{ kind: 'returned-template', expected: 'a branch range', at: "if (props.v === '')" },
 	] as const;
 
 	describe.each([
@@ -174,9 +196,8 @@ describe.each([
 				v: 'A',
 				tail: 't',
 			}).html;
-			const tail = container.querySelector('b')!;
-			const tailText = tail.firstChild;
 			const serverElements = [...container.querySelectorAll('*')];
+			const serverNodes = contentNodes(container);
 			const serverMarkup = markup(host(container));
 			const serverText = textChildren(host(container))[0] ?? null;
 			const recovered: unknown[] = [];
@@ -188,9 +209,8 @@ describe.each([
 			);
 			flushSync(() => {});
 			return {
-				tail,
-				tailText,
 				serverElements,
+				serverNodes,
 				serverMarkup,
 				serverText,
 				recovered,
@@ -202,17 +222,17 @@ describe.each([
 			};
 		}
 
+		// No Suspense arm or island encloses the hole, so the root is the
+		// fallback owner: none of the server's nodes survive, including the
+		// sibling after the hole.
 		it.each([...HOLE_VALUES, ...RETURNED_VALUES])(
-			'discards server text for a client $kind value, reports it once, and keeps hydrating',
+			'client-renders the root for a client $kind value and reports it once',
 			async (value) => {
 				const { kind } = value;
-				const { tail, tailText, recovered, root, render, expected } = hydrate('text', kind);
+				const { serverNodes, recovered, root, render, expected } = hydrate('text', kind);
 				try {
 					expect(markup(host(container))).toBe(expected({ kind, v: 'A', tail: 't' }));
-					// The recovery stays local: the next child still adopts its server text.
-					expect(container.querySelector('b')).toBe(tail);
-					expectSameNodes(tail.childNodes, [tailText]);
-					expect(tail.textContent).toBe('t');
+					expectDiscarded(container, serverNodes);
 					await expectReported(
 						recovered,
 						FILE,
@@ -256,8 +276,8 @@ describe.each([
 		);
 
 		// A component may return text, also through another component: the
-		// server's text is its value, not stale. The component owns that text
-		// node, so a later value below the component replaces it.
+		// server's text is its value, not a mismatch. The component owns that
+		// text node, so a later value below the component replaces it.
 		it.each(['returned-text', 'chain-text'])(
 			'adopts server text that a %s value returns',
 			async (kind) => {
@@ -281,12 +301,13 @@ describe.each([
 		);
 	});
 
-	it('renders a portal into its target once the hole’s server text is gone', async () => {
+	it('renders a portal into its target when the root falls back over the hole’s server text', async () => {
 		container.innerHTML = ServerRT.renderToString(server.Hole, {
 			kind: 'text',
 			v: 'A',
 			tail: 't',
 		}).html;
+		const serverNodes = contentNodes(container);
 		const recovered: unknown[] = [];
 		const root = hydrateRoot(
 			container,
@@ -298,6 +319,7 @@ describe.each([
 		try {
 			expect(markup(container.querySelector('section')!)).toBe('<b>t</b>');
 			expect(markup(target)).toBe('<p class="x">A</p>');
+			expectDiscarded(container, serverNodes);
 			await Promise.resolve();
 			expect(recovered).toHaveLength(1);
 			flushSync(() => root.render(client.Hole, { kind: 'text', v: 'B', tail: 't', target }));
@@ -308,14 +330,17 @@ describe.each([
 		}
 	});
 
-	// A list item that suspends leaves the boundary to retry hydration, and the
-	// retry must neither report again nor keep the server's text.
-	it('reports once for a list whose item suspends during hydration', async () => {
+	// The mismatch lies inside an `@try` arm, so only that arm falls back: the
+	// host outside it keeps its server node. The client render of the arm
+	// suspends on the list item and reveals once it resolves, reporting once.
+	it('client-renders the @try arm once for a list whose item suspends', async () => {
 		container.innerHTML = ServerRT.renderToString(server.SuspendingHole, {
 			text: null,
 			v: 'A',
 		}).html;
-		const tail = container.querySelector('b')!;
+		const main = container.querySelector('main')!;
+		const section = container.querySelector('section')!;
+		const armNodes = [section, ...contentNodes(section)];
 		let resolve!: (text: string) => void;
 		const text = new Promise<string>((r) => (resolve = r));
 		const recovered: unknown[] = [];
@@ -331,10 +356,11 @@ describe.each([
 				resolve('R');
 				await text;
 			});
-			expect(markup(container.querySelector('section')!)).toBe(
-				'<p class="x">A</p><em class="waits">R</em><b>A</b>',
+			expect(container.querySelector('main')).toBe(main);
+			expect(markup(main)).toBe(
+				'<section><p class="x">A</p><em class="waits">R</em><b>A</b></section>',
 			);
-			expect(container.querySelector('b')).toBe(tail);
+			expectDiscarded(container, armNodes);
 			await expectReported(
 				recovered,
 				FILE,
@@ -346,9 +372,9 @@ describe.each([
 		}
 	});
 
-	// A component in a chain that suspends leaves the boundary to retry
-	// hydration against the server DOM the first attempt left. The retry still
-	// finds the server's text where the value begins.
+	// A component in a chain that suspends keeps the arm's server HTML until it
+	// resolves, as React keeps a dehydrated boundary. The retry then finds the
+	// server's text where the value begins.
 	describe('through a component chain that suspends', () => {
 		function hydrateChain(element: boolean) {
 			container.innerHTML = ServerRT.renderToString(server.SuspendingChain, {
@@ -356,6 +382,7 @@ describe.each([
 				v: 'A',
 				element,
 			}).html;
+			const main = container.querySelector('main')!;
 			const section = container.querySelector('section')!;
 			const serverText = textChildren(section)[0];
 			const tail = container.querySelector('b')!;
@@ -370,6 +397,7 @@ describe.each([
 			);
 			flushSync(() => {});
 			return {
+				main,
 				section,
 				serverText,
 				tail,
@@ -383,13 +411,17 @@ describe.each([
 			};
 		}
 
-		it('discards server text for an element and reports it once', async () => {
-			const { section, tail, recovered, root, resume } = hydrateChain(true);
+		it('keeps the server HTML while suspended, then client-renders the arm for an element', async () => {
+			const { main, section, serverText, tail, recovered, root, resume } = hydrateChain(true);
 			try {
-				await resume();
 				expect(container.querySelector('section')).toBe(section);
-				expect(markup(section)).toBe('<p class="x">A</p><b>A</b>');
-				expect(container.querySelector('b')).toBe(tail);
+				expect(markup(section)).toBe('A<b>A</b>');
+				expect(recovered).toEqual([]);
+
+				await resume();
+				expect(container.querySelector('main')).toBe(main);
+				expect(markup(main)).toBe('<section><p class="x">A</p><b>A</b></section>');
+				expectDiscarded(container, [section, serverText, tail]);
 				await expectReported(recovered, FILE, lineOf('function WaitsFor('), '<p>');
 			} finally {
 				root.unmount();
@@ -413,10 +445,14 @@ describe.each([
 		});
 	});
 
-	// Captures that changed before a dormant boundary activated legitimately
-	// differ from the server's: repair the hole, but report nothing.
+	// Captures that changed before a dormant island activated legitimately
+	// differ from the server's. Octane never renders the island with its
+	// earlier captures (docs/deferred-hydration.md), so, as React does for an
+	// update that reaches a dehydrated boundary it cannot hydrate first, the
+	// island renders on the client and nothing is reported. The host around
+	// the island keeps its server node.
 	it.each(['keyed', 'list', 'portal'])(
-		'repairs a dormant boundary whose value became a %s before activation without reporting',
+		'client-renders a dormant island whose value became a %s before activation, without reporting',
 		async (kind) => {
 			const serverProps = { when: condition(false), kind: 'text', v: 'A', tail: 't' };
 			container.innerHTML = ServerRT.renderToString(server.DormantHole, serverProps).html;
@@ -429,12 +465,15 @@ describe.each([
 			);
 			flushSync(() => {});
 			try {
+				const main = container.querySelector('main')!;
 				const section = container.querySelector('section')!;
+				const islandNodes = [section, ...contentNodes(section)];
 				expect(markup(section)).toBe('A<b>t</b>');
 				const props = { when: load(), kind, v: 'A', tail: 't', target };
 				await act(() => root.render(client.DormantHole, props));
-				expect(container.querySelector('section')).toBe(section);
-				expect(markup(section)).toBe(
+				expect(container.querySelector('main')).toBe(main);
+				expectDiscarded(container, islandNodes);
+				expect(markup(container.querySelector('section')!)).toBe(
 					clientMarkup(client.DormantHole, props, (node) => node.querySelector('section')!),
 				);
 				await Promise.resolve();
@@ -458,14 +497,13 @@ describe.each([
 			compileOptions: { dev },
 		});
 
-		it('discards server text for a client keyed element', async () => {
+		it('client-renders the root for a client keyed element', async () => {
 			container.innerHTML = ServerRT.renderToString(tsxServer.Hole, {
 				kind: 'text',
 				v: 'A',
 				tail: 't',
 			}).html;
-			const section = container.querySelector('section')!;
-			const tail = container.querySelector('b')!;
+			const serverNodes = contentNodes(container);
 			const recovered: unknown[] = [];
 			const root = hydrateRoot(
 				container,
@@ -475,9 +513,9 @@ describe.each([
 			);
 			flushSync(() => {});
 			try {
-				expect(container.querySelector('section')).toBe(section);
+				const section = container.querySelector('section')!;
 				expect(markup(section)).toBe('<p class="x">A</p><b>t</b>');
-				expect(container.querySelector('b')).toBe(tail);
+				expectDiscarded(container, serverNodes);
 				await expectReported(
 					recovered,
 					'renderable-sibling-text-object-tsx.tsx',
@@ -511,13 +549,12 @@ describe.each([
 		it.each([
 			{ kind: 'keyed element', value: () => createElement('p', { key: 'k', class: 'x' }, 'A') },
 			{ kind: 'list', value: () => [createElement('p', { key: 'a', class: 'x' }, 'A'), 'A'] },
-		])('discards server text for a client $kind', async ({ value }) => {
+		])('client-renders the root for a client $kind', async ({ value }) => {
 			container.innerHTML = ServerRT.renderToString(signalServer.Hole, {
 				value: 'A',
 				label: 't',
 			}).html;
-			const section = container.querySelector('section')!;
-			const tail = container.querySelector('i')!;
+			const serverNodes = contentNodes(container);
 			const recovered: unknown[] = [];
 			const props = { value: value(), label: 't' };
 			const root = hydrateRoot(container, signalClient.Hole, props, {
@@ -525,12 +562,12 @@ describe.each([
 			});
 			flushSync(() => {});
 			try {
-				expect(container.querySelector('section')).toBe(section);
+				const section = container.querySelector('section')!;
 				expect(markup(section)).toBe(
 					clientMarkup(signalClient.Hole, props, (node) => node.querySelector('section')!),
 				);
-				expect(container.querySelector('i')).toBe(tail);
-				expect(tail.textContent).toBe('t');
+				expect(container.querySelector('i')!.textContent).toBe('t');
+				expectDiscarded(container, serverNodes);
 				await expectReported(
 					recovered,
 					'renderable-sibling-text-object-signal.tsrx',

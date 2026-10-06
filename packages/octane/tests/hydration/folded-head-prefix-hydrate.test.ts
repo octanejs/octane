@@ -189,6 +189,37 @@ describe('hydrateRoot of a folded body-only render (head prefix in the container
 		expect(document.querySelector('title, meta[name="description"]')).toBeNull();
 	});
 
+	// A root that falls back clears its element container, the folded Float
+	// sheet included, and since the sheet stays counted, the client render does
+	// not insert it again. React 19 does the same (react-dom 19.2.7 probe, dev
+	// and prod: no stylesheet link remains in the document). The renderer's
+	// scoped-CSS sidecar stays, styling the client tree.
+	for (const dev of [true, false]) {
+		it(`discards the folded Float sheet with the server DOM of a root that falls back, as React does (dev compile: ${dev})`, async () => {
+			const id = 'folded-page-fallback.tsrx';
+			const server = load<PageModule>(PAGE_SOURCE, id, 'server', dev);
+			const client = load<PageModule>(PAGE_SOURCE, id, 'client', dev);
+			const { html, css } = ServerRT.renderToString(server.Page, { label: 'Server' });
+			container.innerHTML = css + html;
+			const serverMain = container.querySelector('main')!;
+			const serverSheet = container.querySelector('link[href="/folded-prefix.css"]')!;
+			const sidecar = container.querySelector('style[data-octane]')!;
+
+			const onRecoverableError = vi.fn();
+			const root = hydrateRoot(container, client.Page, { label: 'Client' }, { onRecoverableError });
+			flushSync(() => {});
+			await settleRecoverable();
+
+			expect(onRecoverableError).toHaveBeenCalledTimes(1);
+			expect(serverMain.isConnected).toBe(false);
+			expect(container.querySelector('p.label')!.textContent).toBe('Client');
+			expect(serverSheet.isConnected).toBe(false);
+			expect(document.querySelector('link[href="/folded-prefix.css"]')).toBeNull();
+			expect(sidecar.isConnected).toBe(true);
+			root.unmount();
+		});
+	}
+
 	it('adopts a streamed shell whose folded prefix precedes a resolved boundary', async () => {
 		const id = 'folded-streamed.tsrx';
 		const server = load<StreamedModule>(STREAMED_SOURCE, id, 'server', true);

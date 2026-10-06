@@ -6,11 +6,15 @@ import { condition, load } from 'octane/hydration';
 import * as ServerRT from 'octane/server';
 import { loadCompiledFixtureSource, loadServerFixture } from '../_server-fixture';
 
-// P3 — STRUCTURAL hydration mismatch: the server DOM's SHAPE differs from what the client
-// renders (a swapped @if/@switch branch, a changed tag, a different @for list length). The
-// runtime must NOT crash or silently corrupt the DOM: it warns (dev, with LOC) and rebuilds
-// the mismatched subtree on the client. We force the mismatch by server-rendering with one
-// set of props/branch and hydrating with another.
+// STRUCTURAL hydration mismatch: the server DOM's SHAPE differs from what the
+// client renders (a swapped @if/@switch branch, a changed tag, a different @for
+// list length, a renderable hole whose value changed kind). As in React 19,
+// nothing is repaired in place: the nearest Suspense boundary, `<Hydrate>`
+// island, or else the root discards its server DOM and renders on the client.
+// onRecoverableError fires once for it, a development build also warns with
+// the source location, and server nodes outside a failed boundary stay
+// adopted. We force the mismatch by server-rendering with one set of props and
+// hydrating with another.
 
 const CONTROL = join(process.cwd(), 'packages/octane/tests/hydration/_fixtures/control.tsrx');
 const FORLIST = join(process.cwd(), 'packages/octane/tests/hydration/_fixtures/forlist.tsrx');
@@ -21,7 +25,17 @@ const NESTEDSWAP = join(
 	process.cwd(),
 	'packages/octane/tests/hydration/_fixtures/nested-swap.tsrx',
 );
+const MIXEDFRAG = join(process.cwd(), 'packages/octane/tests/hydration/_fixtures/mixed-frag.tsrx');
+const FRAGMENTSTATICS = join(
+	process.cwd(),
+	'packages/octane/tests/hydration/_fixtures/fragment-statics.tsrx',
+);
 const TERNARY = join(process.cwd(), 'packages/octane/tests/_fixtures/ternary-mixed-arms.tsrx');
+
+/** The recoverable error a failed boundary or root reports in a development runtime. */
+const MISMATCH = /^Hydration failed because the server rendered HTML didn't match the client\./;
+/** The same error from a production runtime, which reports the code instead of the message. */
+const MINIFIED_MISMATCH = /^Minified Octane error #339;/;
 
 function serverModule(fixture: string, file: string): Record<string, any> {
 	return loadServerFixture(fixture, { id: file });
@@ -36,13 +50,48 @@ function devClientModule(fixture: string, file: string): Record<string, any> {
 }
 
 // PROD-compiled client module (dev: false → no `loc` argument to clone(), no
-// `__oct_loc` stamps): the structural detection + rebuild must still run — only
+// `__oct_loc` stamps): the mismatch and its fallback must still happen — only
 // the warning is dev-gated.
 function prodClientModule(fixture: string, file: string): Record<string, any> {
 	return loadCompiledFixtureSource(readFileSync(fixture, 'utf8'), { id: file, mode: 'client' });
 }
 
-describe('hydrateRoot — STRUCTURAL mismatch (detect + rebuild + cursor stays aligned)', () => {
+/** Element and text markup, ignoring hydration comments. */
+function markup(node: Element): string {
+	const copy = node.cloneNode(true) as Element;
+	const walker = document.createTreeWalker(copy, NodeFilter.SHOW_COMMENT);
+	const comments: Node[] = [];
+	while (walker.nextNode()) comments.push(walker.currentNode);
+	for (const comment of comments) comment.parentNode!.removeChild(comment);
+	return copy.innerHTML;
+}
+
+/** Every element and non-empty text node under `root`, in document order. */
+function contentNodes(root: Node): Node[] {
+	const nodes: Node[] = [];
+	const walker = document.createTreeWalker(root, NodeFilter.SHOW_ELEMENT | NodeFilter.SHOW_TEXT);
+	while (walker.nextNode()) {
+		const node = walker.currentNode;
+		if (node.nodeType === 1 || node.nodeValue !== '') nodes.push(node);
+	}
+	return nodes;
+}
+
+/** The nodes of `nodes` that are still in the document. */
+const survivors = (nodes: readonly Node[]) => nodes.filter((node) => node.isConnected);
+
+/** A location-bearing structural warning from `file` (development builds only). */
+function structuralWarning(file: string, expected = '.+', actual = '.+'): RegExp {
+	return new RegExp(
+		`^Octane hydration mismatch at [^ ]*${file.replace(/\./g, '\\.')}:\\d+:\\d+: ` +
+			`the client expected ${expected} but the server rendered ${actual}\\. The nearest ` +
+			`Suspense or Hydrate boundary, or the root, will be regenerated on the client\\.`,
+	);
+}
+
+const escape = (text: string) => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+describe('hydrateRoot — STRUCTURAL mismatch with no boundary renders the root on the client', () => {
 	const server = serverModule(CONTROL, 'control.tsrx');
 	const clientDev = devClientModule(CONTROL, 'control.tsrx');
 	let container: HTMLElement;
@@ -60,160 +109,236 @@ describe('hydrateRoot — STRUCTURAL mismatch (detect + rebuild + cursor stays a
 	const warns = () =>
 		errSpy.mock.calls.map((c) => String(c[0])).filter((m) => m.includes('hydration mismatch'));
 
-	it('@if branch swap: server <button>, client <span> → rebuilds the span, discards the button', async () => {
+	/** Hydrate `html` with `Component`, recording what the server rendered and every report. */
+	async function hydrateOver(html: string, Component: unknown, props: Record<string, unknown>) {
+		container.innerHTML = html;
+		const serverNodes = contentNodes(container);
+		const recovered: Error[] = [];
+		const root = hydrateRoot(container, Component as never, props as never, {
+			onRecoverableError: (error) => recovered.push(error as Error),
+		});
+		flushSync(() => {});
+		// Recoverable reports are delivered after the hydration burst.
+		await act(async () => {});
+		return { serverNodes, recovered, root };
+	}
+
+	it('@if branch swap: server <button>, client <span> → the root renders on the client', async () => {
 		const { html } = await ServerRT.renderToString(server.Toggle, { on: true });
 		expect(html).toContain('<button id="hit"');
-		container.innerHTML = html;
-
-		// Hydrate with on:false → the client takes the ELSE (span) branch.
-		hydrateRoot(container, clientDev.Toggle, { on: false });
-		flushSync(() => {});
-
-		const div = container.querySelector('#toggle')!;
-		// The span branch is present and the stale server button was discarded (not duplicated).
-		expect(div.querySelector('span.off')).not.toBeNull();
-		expect(div.querySelector('#hit')).toBeNull();
-		expect(div.textContent).toContain('off');
-		const w = warns();
-		expect(w.length).toBeGreaterThanOrEqual(1);
-		expect(w[0]).toContain('control.tsrx:');
+		const { serverNodes, recovered, root } = await hydrateOver(html, clientDev.Toggle, {
+			on: false,
+		});
+		try {
+			expect(markup(container)).toBe('<div id="toggle"><span class="off">off</span></div>');
+			expect(survivors(serverNodes)).toEqual([]);
+			expect(recovered.map((error) => error.message)).toEqual([expect.stringMatching(MISMATCH)]);
+			expect(warns()).toEqual([
+				expect.stringMatching(structuralWarning('control.tsrx', '.+', '<button>')),
+			]);
+		} finally {
+			root.unmount();
+		}
 	});
 
-	// The prod root-recovery paths skip the location lookup; dev must still name
-	// the root component and both sides of the divergence.
-	it('root recovery warns with the root location in dev', async () => {
-		const MIXEDFRAG = join(
-			process.cwd(),
-			'packages/octane/tests/hydration/_fixtures/mixed-frag.tsrx',
-		);
+	// React skips server nodes it cannot match directly inside the root
+	// container, so a third party's sibling stays where it was.
+	it('leaves an unmatched server sibling after the adopted root in place', async () => {
 		const { html } = await ServerRT.renderToString(server.Toggle, { on: true });
 		container.innerHTML = `${html}<p id="stale-tail">stale</p>`;
-		let root = hydrateRoot(container, clientDev.Toggle, { on: true });
+		const button = container.querySelector('#hit')!;
+		const tail = container.querySelector('#stale-tail')!;
+		const recovered: unknown[] = [];
+		const root = hydrateRoot(
+			container,
+			clientDev.Toggle,
+			{ on: true },
+			{ onRecoverableError: (error) => recovered.push(error) },
+		);
 		flushSync(() => {});
-		expect(container.querySelector('#stale-tail')).toBeNull();
-		expect(warns()).toEqual([
-			expect.stringMatching(
-				/^Octane hydration mismatch at [^ ]*control\.tsrx.*the client expected the end of the root but the server rendered <p>\./,
-			),
-		]);
-		root.unmount();
-
-		errSpy.mockClear();
-		container.innerHTML = '<section id="stale">server</section>';
-		root = hydrateRoot(container, devClientModule(MIXEDFRAG, 'mixed-frag.tsrx').MixedFrag, {});
-		flushSync(() => {});
-		expect(container.querySelector('#stale')).toBeNull();
-		expect(warns()).toEqual([
-			expect.stringMatching(
-				/^Octane hydration mismatch at [^ ]*mixed-frag\.tsrx.*the client expected a fragment starting with a comment but the server rendered <section>\./,
-			),
-		]);
-		root.unmount();
+		await act(async () => {});
+		try {
+			expect(container.querySelector('#hit')).toBe(button);
+			expect(container.querySelector('#stale-tail')).toBe(tail);
+			expect(markup(container)).toBe(
+				'<div id="toggle"><button id="hit" class="on">on:0</button></div><p id="stale-tail">stale</p>',
+			);
+			flushSync(() => (button as HTMLButtonElement).click());
+			expect(button.textContent).toBe('on:1');
+			expect(recovered).toEqual([]);
+			expect(warns()).toEqual([]);
+		} finally {
+			root.unmount();
+		}
 	});
 
-	it('@switch case swap (different tags): server <em>, client <strong> → rebuilds case b', async () => {
+	// The prod root fallback skips the location lookup; dev must still name the
+	// root component and both sides of the divergence.
+	it('a fragment root over unmatched server markup renders on the client and warns with the root location in dev', async () => {
+		const { serverNodes, recovered, root } = await hydrateOver(
+			'<section id="stale">server</section>',
+			devClientModule(MIXEDFRAG, 'mixed-frag.tsrx').MixedFrag,
+			{},
+		);
+		try {
+			expect(survivors(serverNodes)).toEqual([]);
+			expect(markup(container)).toBe('<div class="leaf">A</div><input type="text">');
+			expect(recovered.map((error) => error.message)).toEqual([expect.stringMatching(MISMATCH)]);
+			expect(warns()).toEqual([expect.stringMatching(structuralWarning('mixed-frag.tsrx'))]);
+		} finally {
+			root.unmount();
+		}
+	});
+
+	it('@switch case swap (different tags): server <em>, client <strong> → the root renders on the client', async () => {
 		const srv = serverModule(STRUCTURAL, 'structural.tsrx');
 		const cli = devClientModule(STRUCTURAL, 'structural.tsrx');
 		const { html } = await ServerRT.renderToString(srv.Pick, { k: 'a' });
 		expect(html).toContain('<em class="a">');
-		container.innerHTML = html;
-
-		hydrateRoot(container, cli.Pick, { k: 'b' });
-		flushSync(() => {});
-
-		const div = container.querySelector('#pick')!;
-		expect(div.querySelector('strong.b')).not.toBeNull();
-		expect(div.querySelector('em.a')).toBeNull();
-		expect(div.textContent).toContain('BBB');
-		expect(warns().length).toBeGreaterThanOrEqual(1);
+		const { serverNodes, recovered, root } = await hydrateOver(html, cli.Pick, { k: 'b' });
+		try {
+			expect(markup(container)).toBe('<div id="pick"><strong class="b">BBB</strong></div>');
+			expect(survivors(serverNodes)).toEqual([]);
+			expect(recovered).toHaveLength(1);
+			expect(warns()).toEqual([
+				expect.stringMatching(structuralWarning('structural.tsrx', '.+', '<em>')),
+			]);
+		} finally {
+			root.unmount();
+		}
 	});
 
-	it('@switch SAME-tag swap (static class differs): server <span class="a">, client class "b"', async () => {
-		// control.tsrx Pick: every case is a <span>, distinguished only by a STATIC class.
-		// The tag-only check would miss this; the static-attribute check catches it + rebuilds.
+	// Every case is a <span> distinguished only by a static class, so the tag
+	// matches. The class is kept as the server rendered it, but the case's text
+	// differs, and a text mismatch falls back like a structural one.
+	it('@switch same-tag swap: server <span class="a">AAA, client <span class="b">BBB → the text renders the root on the client', async () => {
 		const { html } = await ServerRT.renderToString(server.Pick, { k: 'a' });
 		expect(html).toContain('<span class="a">');
-		container.innerHTML = html;
-
-		hydrateRoot(container, clientDev.Pick, { k: 'b' });
-		flushSync(() => {});
-
-		const div = container.querySelector('#pick')!;
-		expect(div.querySelector('span.b')).not.toBeNull(); // rebuilt to the client branch
-		expect(div.querySelector('span.a')).toBeNull(); // stale server branch discarded
-		expect(div.textContent).toContain('BBB');
-		expect(warns().length).toBeGreaterThanOrEqual(1);
+		const { serverNodes, recovered, root } = await hydrateOver(html, clientDev.Pick, { k: 'b' });
+		try {
+			expect(markup(container)).toBe('<div id="pick"><span class="b">BBB</span></div>');
+			expect(survivors(serverNodes)).toEqual([]);
+			expect(recovered.map((error) => error.message)).toEqual([expect.stringMatching(MISMATCH)]);
+			expect(warns().length).toBeGreaterThanOrEqual(1);
+		} finally {
+			root.unmount();
+		}
 	});
 
-	it('host → component swap: server <p>, client <Inner> → rebuilds the component', async () => {
+	it('host → component swap: server <p>, client <Inner> → the root renders on the client', async () => {
 		const srv = serverModule(SWAP, 'swap.tsrx');
 		const cli = devClientModule(SWAP, 'swap.tsrx');
 		const { html } = await ServerRT.renderToString(srv.Swap, { host: true });
 		expect(html).toContain('<p class="host">');
-		container.innerHTML = html;
-
-		hydrateRoot(container, cli.Swap, { host: false });
-		flushSync(() => {});
-
-		const div = container.querySelector('#swap')!;
-		expect(div.querySelector('b.inner')).not.toBeNull(); // component rebuilt
-		expect(div.querySelector('p.host')).toBeNull(); // stale host discarded
-		expect(div.textContent).toContain('C');
-		expect(warns().length).toBeGreaterThanOrEqual(1);
+		const { serverNodes, recovered, root } = await hydrateOver(html, cli.Swap, { host: false });
+		try {
+			expect(markup(container)).toBe('<div id="swap"><b class="inner">C</b></div>');
+			expect(survivors(serverNodes)).toEqual([]);
+			expect(recovered).toHaveLength(1);
+			expect(warns()).toEqual([expect.stringMatching(structuralWarning('swap.tsrx', '.+', '<p>'))]);
+		} finally {
+			root.unmount();
+		}
 	});
 
-	it('component → host swap: server <Inner>, client <p> → rebuilds the host', async () => {
+	it('component → host swap: server <Inner>, client <p> → the root renders on the client', async () => {
 		const srv = serverModule(SWAP, 'swap.tsrx');
 		const cli = devClientModule(SWAP, 'swap.tsrx');
 		const { html } = await ServerRT.renderToString(srv.Swap, { host: false });
 		expect(html).toContain('<b class="inner">');
-		container.innerHTML = html;
-
-		hydrateRoot(container, cli.Swap, { host: true });
-		flushSync(() => {});
-
-		const div = container.querySelector('#swap')!;
-		expect(div.querySelector('p.host')).not.toBeNull(); // host rebuilt
-		expect(div.querySelector('b.inner')).toBeNull(); // stale component discarded
-		expect(div.textContent).toContain('H');
-		expect(warns().length).toBeGreaterThanOrEqual(1);
+		const { serverNodes, recovered, root } = await hydrateOver(html, cli.Swap, { host: true });
+		try {
+			expect(markup(container)).toBe('<div id="swap"><p class="host">H</p></div>');
+			expect(survivors(serverNodes)).toEqual([]);
+			expect(recovered).toHaveLength(1);
+			expect(warns()).toEqual([
+				expect.stringMatching(structuralWarning('swap.tsrx', '<p>', 'a control-flow block')),
+			]);
+		} finally {
+			root.unmount();
+		}
 	});
 
-	it('same-root, different NESTED static structure: server <span>, client <p> → rebuilds', async () => {
+	// OCTANE DIVERGENCE: an adopted template is matched by its root's node type
+	// and tag in development and production alike, so production never walks
+	// static template content. The nested static markup the server rendered is
+	// kept, and only a development build compares it, warning that it won't be
+	// patched up. React hydrates every element and would render the root on the
+	// client here.
+	it('same root, different NESTED static structure: keeps the server markup and warns in dev', async () => {
 		const srv = serverModule(NESTEDSWAP, 'nested-swap.tsrx');
 		const cli = devClientModule(NESTEDSWAP, 'nested-swap.tsrx');
 		const { html } = await ServerRT.renderToString(srv.NestedStatic, { x: true });
 		expect(html).toContain('<span class="s1">');
-		container.innerHTML = html;
-
-		// Both branches are `<section class="box">` — only the nested static markup differs.
-		hydrateRoot(container, cli.NestedStatic, { x: false });
-		flushSync(() => {});
-
-		const section = container.querySelector('section.box')!;
-		expect(section.querySelector('p.p1')).not.toBeNull(); // nested structure rebuilt
-		expect(section.querySelector('span.s1')).toBeNull(); // stale nested markup discarded
-		expect(section.textContent).toContain('two');
-		expect(warns().length).toBeGreaterThanOrEqual(1);
+		const { serverNodes, recovered, root } = await hydrateOver(html, cli.NestedStatic, {
+			x: false,
+		});
+		try {
+			expect(survivors(serverNodes)).toEqual(serverNodes);
+			expect(container.querySelector('section.box span.s1')?.textContent).toBe('one');
+			expect(recovered).toEqual([]);
+			expect(warns()).toEqual([expect.stringContaining("This won't be patched up")]);
+			flushSync(() => root.render(cli.NestedStatic, { x: true }));
+			expect(markup(container.querySelector('#ns')!)).toBe(
+				'<section class="box"><span class="s1">one</span></section>',
+			);
+		} finally {
+			root.unmount();
+		}
 	});
 
-	it('PROD build: @if branch swap rebuilds SILENTLY (recovery is not gated on the dev loc)', async () => {
-		// clone()'s structural check used to be gated on the dev-only `loc` argument,
-		// so prod builds silently adopted the WRONG server branch. The detection +
-		// rebuild now run in dev AND prod; only the warning needs `loc`.
+	// OCTANE DIVERGENCE (as above): a fragment has no wrapper, so the roots its
+	// adoption matches are checked one by one. Their static differences are kept
+	// and only warned about in development.
+	it.each([
+		{
+			name: 'a root fragment',
+			server: 'ServerRootFragment',
+			client: 'ClientRootFragment',
+			kept: '<h1 class="title">Heading</h1><section class="box"><span class="s1">one</span></section>',
+			listed: '<section>',
+		},
+		{
+			name: 'a fragment nested in a host',
+			server: 'ServerNestedFragment',
+			client: 'ClientNestedFragment',
+			kept: '<div id="nested"><b class="server">bold</b><i>italic</i></div>',
+			listed: '<b>',
+		},
+	])(
+		'$name with different static markup: keeps the server markup and warns in dev',
+		async ({ server: serverName, client: clientName, kept, listed }) => {
+			const srv = serverModule(FRAGMENTSTATICS, 'fragment-statics.tsrx');
+			const cli = devClientModule(FRAGMENTSTATICS, 'fragment-statics.tsrx');
+			const { html } = await ServerRT.renderToString(srv[serverName], {});
+			const { serverNodes, recovered, root } = await hydrateOver(html, cli[clientName], {});
+			try {
+				expect(markup(container)).toBe(kept);
+				expect(survivors(serverNodes)).toEqual(serverNodes);
+				expect(recovered).toEqual([]);
+				expect(warns()).toEqual([expect.stringContaining("This won't be patched up")]);
+				expect(warns()[0]).toContain(`static attributes or markup of the server's ${listed}`);
+			} finally {
+				root.unmount();
+			}
+		},
+	);
+
+	it('PROD build: @if branch swap renders the root on the client SILENTLY (no dev location needed)', async () => {
 		const clientProd = prodClientModule(CONTROL, 'control.tsrx');
 		const { html } = await ServerRT.renderToString(server.Toggle, { on: true });
 		expect(html).toContain('<button id="hit"');
-		container.innerHTML = html;
-
-		hydrateRoot(container, clientProd.Toggle, { on: false });
-		flushSync(() => {});
-
-		const div = container.querySelector('#toggle')!;
-		expect(div.querySelector('span.off')).not.toBeNull(); // rebuilt to the client branch
-		expect(div.querySelector('#hit')).toBeNull(); // stale server branch discarded
-		expect(div.textContent).toContain('off');
-		expect(warns()).toEqual([]); // prod: recovery without the dev warning
+		const { serverNodes, recovered, root } = await hydrateOver(html, clientProd.Toggle, {
+			on: false,
+		});
+		try {
+			expect(markup(container)).toBe('<div id="toggle"><span class="off">off</span></div>');
+			expect(survivors(serverNodes)).toEqual([]);
+			expect(recovered.map((error) => error.message)).toEqual([expect.stringMatching(MISMATCH)]);
+			expect(warns()).toEqual([]); // a production compile has no location to warn with
+		} finally {
+			root.unmount();
+		}
 	});
 
 	it('PROD build: matching branch adopts hosts without a false-positive mismatch', async () => {
@@ -263,7 +388,7 @@ describe('hydrateRoot — STRUCTURAL mismatch (detect + rebuild + cursor stays a
 		root.unmount();
 	});
 
-	it('@for list grow: server 2 items, client 3 → no crash, 3 items rendered, warns', async () => {
+	it('@for list grow: server 2 items, client 3 → the root renders all 3 on the client', async () => {
 		const srv = serverModule(FORLIST, 'forlist.tsrx');
 		const cli = devClientModule(FORLIST, 'forlist.tsrx');
 		const two = [
@@ -272,18 +397,22 @@ describe('hydrateRoot — STRUCTURAL mismatch (detect + rebuild + cursor stays a
 		];
 		const three = [...two, { id: 3, name: 'c' }];
 		const { html } = await ServerRT.renderToString(srv.List, { items: two, onPick: () => {} });
-		container.innerHTML = html;
-
-		hydrateRoot(container, cli.List, { items: three, onPick: () => {} });
-		flushSync(() => {});
-
-		const rows = container.querySelectorAll('li.row');
-		expect(rows.length).toBe(3); // the extra client item was built fresh (no crash)
-		expect(container.querySelector('#list')!.textContent).toContain('c');
-		expect(warns().length).toBeGreaterThanOrEqual(1);
+		const { serverNodes, recovered, root } = await hydrateOver(html, cli.List, {
+			items: three,
+			onPick: () => {},
+		});
+		try {
+			const names = [...container.querySelectorAll('span.name')].map((s) => s.textContent);
+			expect(names).toEqual(['a', 'b', 'c']);
+			expect(survivors(serverNodes)).toEqual([]);
+			expect(recovered).toHaveLength(1);
+			expect(warns()).toEqual([expect.stringMatching(structuralWarning('forlist.tsrx'))]);
+		} finally {
+			root.unmount();
+		}
 	});
 
-	it('@for list shrink: server 3 items, client 2 → leftover server row discarded', async () => {
+	it('@for list shrink: server 3 items, client 2 → the unhydrated server row renders the root on the client', async () => {
 		const srv = serverModule(FORLIST, 'forlist.tsrx');
 		const cli = devClientModule(FORLIST, 'forlist.tsrx');
 		const three = [
@@ -291,20 +420,23 @@ describe('hydrateRoot — STRUCTURAL mismatch (detect + rebuild + cursor stays a
 			{ id: 2, name: 'b' },
 			{ id: 3, name: 'c' },
 		];
-		const two = three.slice(0, 2);
 		const { html } = await ServerRT.renderToString(srv.List, { items: three, onPick: () => {} });
-		container.innerHTML = html;
-
-		hydrateRoot(container, cli.List, { items: two, onPick: () => {} });
-		flushSync(() => {});
-
-		const rows = container.querySelectorAll('li.row');
-		expect(rows.length).toBe(2); // the extra server row was removed
-		const names = [...container.querySelectorAll('span.name')].map((s) => s.textContent);
-		expect(names).toEqual(['a', 'b']); // the leftover 'c' row is gone
+		const { serverNodes, recovered, root } = await hydrateOver(html, cli.List, {
+			items: three.slice(0, 2),
+			onPick: () => {},
+		});
+		try {
+			const names = [...container.querySelectorAll('span.name')].map((s) => s.textContent);
+			expect(names).toEqual(['a', 'b']);
+			expect(container.querySelectorAll('li.row')).toHaveLength(2);
+			expect(survivors(serverNodes)).toEqual([]);
+			expect(recovered).toHaveLength(1);
+		} finally {
+			root.unmount();
+		}
 	});
 
-	it('@for list shrink stays interactive + reconciles afterwards (cursor aligned)', async () => {
+	it('@for list shrink: the client-rendered rows are interactive and reconcile afterwards', async () => {
 		const srv = serverModule(FORLIST, 'forlist.tsrx');
 		const cli = devClientModule(FORLIST, 'forlist.tsrx');
 		const picked: number[] = [];
@@ -313,23 +445,23 @@ describe('hydrateRoot — STRUCTURAL mismatch (detect + rebuild + cursor stays a
 			{ id: 2, name: 'b' },
 			{ id: 3, name: 'c' },
 		];
+		const onPick = (id: number) => picked.push(id);
 		const { html } = await ServerRT.renderToString(srv.List, { items: three, onPick: () => {} });
-		container.innerHTML = html;
-
-		hydrateRoot(container, cli.List, {
-			items: three.slice(0, 2),
-			onPick: (id: number) => picked.push(id),
-		});
-		flushSync(() => {});
-
-		// The surviving rows are interactive (handlers attached to the adopted nodes).
-		const btns = container.querySelectorAll<HTMLButtonElement>('button.pick');
-		expect(btns.length).toBe(2);
-		flushSync(() => btns[1].click());
-		expect(picked).toEqual([2]);
+		const { root } = await hydrateOver(html, cli.List, { items: three.slice(0, 2), onPick });
+		try {
+			const btns = container.querySelectorAll<HTMLButtonElement>('button.pick');
+			expect(btns.length).toBe(2);
+			flushSync(() => btns[1].click());
+			expect(picked).toEqual([2]);
+			flushSync(() => root.render(cli.List, { items: three, onPick }));
+			const names = [...container.querySelectorAll('span.name')].map((s) => s.textContent);
+			expect(names).toEqual(['a', 'b', 'c']);
+		} finally {
+			root.unmount();
+		}
 	});
 
-	it('@empty: server rendered items, client is empty → items discarded, @empty shown', async () => {
+	it('@empty: server rendered items, client is empty → the root renders @empty on the client', async () => {
 		const srv = serverModule(EMPTYFOR, 'emptyfor.tsrx');
 		const cli = devClientModule(EMPTYFOR, 'emptyfor.tsrx');
 		const { html } = await ServerRT.renderToString(srv.WithEmpty, {
@@ -339,36 +471,36 @@ describe('hydrateRoot — STRUCTURAL mismatch (detect + rebuild + cursor stays a
 			],
 		});
 		expect(html).toContain('<li class="row">');
-		container.innerHTML = html;
-
-		hydrateRoot(container, cli.WithEmpty, { items: [] });
-		flushSync(() => {});
-
-		const ul = container.querySelector('#we')!;
-		expect(ul.querySelector('li.empty')).not.toBeNull(); // @empty branch built
-		expect(ul.querySelectorAll('li.row').length).toBe(0); // server items discarded
-		expect(ul.textContent).toContain('No items yet');
+		const { serverNodes, recovered, root } = await hydrateOver(html, cli.WithEmpty, { items: [] });
+		try {
+			expect(markup(container)).toBe('<ul id="we"><li class="empty">No items yet</li></ul>');
+			expect(survivors(serverNodes)).toEqual([]);
+			expect(recovered).toHaveLength(1);
+		} finally {
+			root.unmount();
+		}
 	});
 
-	it('@empty: server rendered @empty, client has items → @empty discarded, items shown', async () => {
+	it('@empty: server rendered @empty, client has items → the root renders the items on the client', async () => {
 		const srv = serverModule(EMPTYFOR, 'emptyfor.tsrx');
 		const cli = devClientModule(EMPTYFOR, 'emptyfor.tsrx');
 		const { html } = await ServerRT.renderToString(srv.WithEmpty, { items: [] });
 		expect(html).toContain('<li class="empty">');
-		container.innerHTML = html;
-
-		hydrateRoot(container, cli.WithEmpty, {
+		const { serverNodes, recovered, root } = await hydrateOver(html, cli.WithEmpty, {
 			items: [
 				{ id: 1, name: 'a' },
 				{ id: 2, name: 'b' },
 			],
 		});
-		flushSync(() => {});
-
-		const ul = container.querySelector('#we')!;
-		expect(ul.querySelectorAll('li.row').length).toBe(2); // items built
-		expect(ul.querySelector('li.empty')).toBeNull(); // server @empty discarded
-		expect(ul.textContent).not.toContain('No items yet');
+		try {
+			expect(markup(container)).toBe(
+				'<ul id="we"><li class="row">a</li><li class="row">b</li></ul>',
+			);
+			expect(survivors(serverNodes)).toEqual([]);
+			expect(recovered).toHaveLength(1);
+		} finally {
+			root.unmount();
+		}
 	});
 });
 
@@ -376,12 +508,8 @@ describe('hydrateRoot — STRUCTURAL mismatch (detect + rebuild + cursor stays a
 // call time, so stubbing it around hydrateRoot exercises the build-time-stripped
 // production branches under vitest). In prod, an adoption root is validated by
 // nodeType + tag ONLY, answered from the template SOURCE, so the happy path never
-// parses a template; tag-level and text-level mismatches still detect + recover.
+// parses a template; tag-level and text-level mismatches still fall back.
 describe('hydrateRoot — PROD runtime validation (root nodeType+tag only, parse-free happy path)', () => {
-	const MIXEDFRAG = join(
-		process.cwd(),
-		'packages/octane/tests/hydration/_fixtures/mixed-frag.tsrx',
-	);
 	const server = serverModule(CONTROL, 'control.tsrx');
 	let container: HTMLElement;
 	let errSpy: ReturnType<typeof vi.spyOn>;
@@ -426,38 +554,58 @@ describe('hydrateRoot — PROD runtime validation (root nodeType+tag only, parse
 		expect(warns()).toEqual([]);
 	});
 
-	it('tag-level branch mismatch still detects + rebuilds (silently) in prod', async () => {
+	it('tag-level branch mismatch renders the root on the client and reports it minified in prod', async () => {
 		const clientProd = prodClientModule(CONTROL, 'control.tsrx');
 		const { html } = await ServerRT.renderToString(server.Toggle, { on: true });
 		expect(html).toContain('<button id="hit"');
 		container.innerHTML = html;
-		hydrateRoot(container, clientProd.Toggle, { on: false });
+		const serverNodes = contentNodes(container);
+		const recovered: Error[] = [];
+		const root = hydrateRoot(
+			container,
+			clientProd.Toggle,
+			{ on: false },
+			{ onRecoverableError: (error) => recovered.push(error as Error) },
+		);
 		flushSync(() => {});
-		const div = container.querySelector('#toggle')!;
-		expect(div.querySelector('span.off')).not.toBeNull(); // rebuilt to the client branch
-		expect(div.querySelector('#hit')).toBeNull(); // stale server branch discarded
-		expect(div.textContent).toContain('off');
-		expect(warns()).toEqual([]); // prod recovery is silent
+		await act(async () => {});
+		try {
+			expect(markup(container)).toBe('<div id="toggle"><span class="off">off</span></div>');
+			expect(survivors(serverNodes)).toEqual([]);
+			expect(recovered.map((error) => error.message)).toEqual([
+				expect.stringMatching(MINIFIED_MISMATCH),
+			]);
+			expect(warns()).toEqual([]);
+		} finally {
+			root.unmount();
+		}
 	});
 
-	it('same-tag attribute-only branch divergence is NOT detected in prod (server attrs kept; text holes still self-correct)', async () => {
-		// OCTANE DIVERGENCE (documented narrowing, React parity: prod React hydration
-		// does not attribute-validate either): prod validates an adoption root by
-		// nodeType + tag only, so @switch branches that share a tag and differ only in
-		// STATIC attributes adopt the server branch as-is. Dev still detects + rebuilds
-		// (see the SAME-tag swap test above). Text holes carry a compiler-seeded prev
-		// value, so text divergence self-corrects even in prod.
+	// Production matches an adopted root by tag, never by its static class; the
+	// case's differing text is what falls back.
+	it('same-tag branch divergence with differing text renders the root on the client in prod', async () => {
 		const clientProd = prodClientModule(CONTROL, 'control.tsrx');
 		const { html } = await ServerRT.renderToString(server.Pick, { k: 'a' });
 		expect(html).toContain('<span class="a">');
 		container.innerHTML = html;
-		const span = container.querySelector('#pick span')!;
-		hydrateRoot(container, clientProd.Pick, { k: 'b' });
+		const serverNodes = contentNodes(container);
+		const recovered: unknown[] = [];
+		const root = hydrateRoot(
+			container,
+			clientProd.Pick,
+			{ k: 'b' },
+			{ onRecoverableError: (error) => recovered.push(error) },
+		);
 		flushSync(() => {});
-		expect(container.querySelector('#pick span')).toBe(span); // adopted, not rebuilt
-		expect(span.className).toBe('a'); // server static attribute kept
-		expect(span.textContent).toBe('BBB'); // the text hole was still patched
-		expect(warns()).toEqual([]);
+		await act(async () => {});
+		try {
+			expect(markup(container)).toBe('<div id="pick"><span class="b">BBB</span></div>');
+			expect(survivors(serverNodes)).toEqual([]);
+			expect(recovered).toHaveLength(1);
+			expect(warns()).toEqual([]);
+		} finally {
+			root.unmount();
+		}
 	});
 
 	it('multi-root fragment component hydrates by adoption in prod', async () => {
@@ -475,10 +623,10 @@ describe('hydrateRoot — PROD runtime validation (root nodeType+tag only, parse
 		expect(warns()).toEqual([]);
 	});
 
-	// Root recovery (stale trailing siblings, an unframed root over stale markup,
-	// a fragment root whose statics diverge) still runs in prod, but its source
-	// location only feeds the dev warning. Prod must not stringify the root
-	// component's source to find a location nobody reads.
+	// A server sibling the root container cannot match stays in place, and a root
+	// that cannot adopt the server markup renders on the client. Either way the
+	// source location only feeds the dev warning: prod must not stringify the
+	// root component's source to find a location nobody reads.
 	it.each([
 		{
 			name: 'stale server siblings after the adopted root',
@@ -487,7 +635,10 @@ describe('hydrateRoot — PROD runtime validation (root nodeType+tag only, parse
 				'<p id="stale-tail">stale</p>',
 			body: () => prodClientModule(CONTROL, 'control.tsrx').Toggle,
 			props: { on: true },
-			expected: '<div id="toggle"><!--[--><button id="hit" class="on">on:0</button><!--]--></div>',
+			expected:
+				'<div id="toggle"><button id="hit" class="on">on:0</button></div><p id="stale-tail">stale</p>',
+			survives: true,
+			reports: 0,
 		},
 		{
 			name: 'an unframed string root over stale server markup',
@@ -497,39 +648,52 @@ describe('hydrateRoot — PROD runtime validation (root nodeType+tag only, parse
 					return 'client';
 				},
 			props: {},
-			expected: 'client<!---->',
+			expected: 'client',
+			survives: false,
+			reports: 1,
 		},
 		{
 			name: 'a fragment root whose statics do not match the server',
 			html: async () => '<section id="stale">server</section>',
 			body: () => prodClientModule(MIXEDFRAG, 'mixed-frag.tsrx').MixedFrag,
 			props: {},
-			expected: '<div class="leaf">A</div><!----><input type="text">',
+			expected: '<div class="leaf">A</div><input type="text">',
+			survives: false,
+			reports: 1,
 		},
-	])('recovers $name without reading the root source', async ({ html, body, props, expected }) => {
-		container.innerHTML = await html();
-		const Root = body();
-		const toString = vi.spyOn(Function.prototype, 'toString');
-		let rootSourceReads: number;
-		const root = hydrateRoot(container, Root, props);
-		try {
-			flushSync(() => {});
-			rootSourceReads = toString.mock.contexts.filter((context) => context === Root).length;
-		} finally {
-			toString.mockRestore();
-		}
-		expect(container.innerHTML).toBe(expected);
-		expect(container.querySelector('#stale, #stale-tail')).toBeNull();
-		expect(rootSourceReads).toBe(0);
-		expect(warns()).toEqual([]);
-		root.unmount();
-	});
+	])(
+		'hydrates $name without reading the root source',
+		async ({ html, body, props, expected, survives, reports }) => {
+			container.innerHTML = await html();
+			const serverNodes = contentNodes(container);
+			const Root = body();
+			const recovered: unknown[] = [];
+			const toString = vi.spyOn(Function.prototype, 'toString');
+			let rootSourceReads: number;
+			const root = hydrateRoot(container, Root, props, {
+				onRecoverableError: (error) => recovered.push(error),
+			});
+			try {
+				flushSync(() => {});
+				rootSourceReads = toString.mock.contexts.filter((context) => context === Root).length;
+			} finally {
+				toString.mockRestore();
+			}
+			await act(async () => {});
+			expect(markup(container)).toBe(expected);
+			expect(survivors(serverNodes)).toEqual(survives ? serverNodes : []);
+			expect(recovered).toHaveLength(reports);
+			expect(rootSourceReads).toBe(0);
+			expect(warns()).toEqual([]);
+			root.unmount();
+		},
+	);
 });
 
 // RDX-HYD-006 — adapted from TanStack/redact's
-// hydration-mismatch-recovery.test.tsx. Octane recovers its compiler-owned DOM
-// ranges in place rather than unwinding Redact checkpoints, so the observable
-// contract is identity outside the failed range plus live replacement content.
+// hydration-mismatch-recovery.test.tsx. A failed Suspense boundary renders on
+// the client without disturbing the server nodes outside it; with no boundary,
+// the whole root does. Either way the replacement content is live.
 describe.each([
 	{
 		name: 'development compile',
@@ -557,12 +721,23 @@ describe.each([
 		errSpy.mockRestore();
 	});
 
-	function expectDiagnostics(): void {
+	function expectDiagnostics(recovered: readonly unknown[]): void {
 		const messages = errSpy.mock.calls
 			.map((call) => String(call[0]))
 			.filter((message) => message.includes('hydration mismatch'));
-		if (shouldWarn) expect(messages.length).toBeGreaterThanOrEqual(1);
+		if (shouldWarn)
+			expect(messages).toEqual([expect.stringMatching(structuralWarning('structural.tsrx'))]);
 		else expect(messages).toEqual([]);
+		expect(recovered).toHaveLength(1);
+	}
+
+	function hydrate(Component: unknown) {
+		const recovered: unknown[] = [];
+		const root = hydrateRoot(container, Component as never, { isClient: true } as never, {
+			onRecoverableError: (error) => recovered.push(error),
+		});
+		flushSync(() => {});
+		return { recovered, root };
 	}
 
 	// Per Redact hydration-mismatch-recovery.test.tsx:53-64.
@@ -573,8 +748,8 @@ describe.each([
 		container.innerHTML = html;
 		const staleRoot = container.querySelector('#root-server')!;
 		const staleLeaf = container.querySelector('#root-stale')!;
-		const root = hydrateRoot(container, client.RootScopedRecovery, { isClient: true });
-		flushSync(() => {});
+		const { recovered, root } = hydrate(client.RootScopedRecovery);
+		await act(async () => {});
 
 		try {
 			expect(staleRoot.isConnected).toBe(false);
@@ -586,42 +761,37 @@ describe.each([
 			expect(action.textContent?.trim()).toBe('root:0');
 			flushSync(() => action.click());
 			expect(action.textContent?.trim()).toBe('root:1');
-			expectDiagnostics();
+			expectDiagnostics(recovered);
 		} finally {
 			root.unmount();
 		}
 	});
 
-	// Per Redact hydration-mismatch-recovery.test.tsx:262-297.
-	it('nearest-host recovery preserves outside objects and both outside and regenerated handlers', async () => {
+	// Per Redact hydration-mismatch-recovery.test.tsx:262-297. Without a Suspense
+	// boundary between them, a stable host does not contain the mismatch: as in
+	// React, the root renders on the client.
+	it('a mismatch beneath a stable host with no Suspense boundary renders the whole root on the client', async () => {
 		const { html } = await ServerRT.renderToString(server.HostScopedRecovery, {
 			isClient: false,
 		});
 		container.innerHTML = html;
-		const stableRoot = container.querySelector('#host-recovery-root')!;
-		const stableHeader = container.querySelector('#host-stable-header')!;
-		const stableScope = container.querySelector('#host-recovery-scope')!;
-		const stableFooter = container.querySelector('#host-stable-footer')!;
-		const outsideAction = container.querySelector<HTMLButtonElement>('#host-outside-action')!;
-		const staleRange = container.querySelector('#host-server-range')!;
-		const root = hydrateRoot(container, client.HostScopedRecovery, { isClient: true });
-		flushSync(() => {});
+		const serverNodes = contentNodes(container);
+		const { recovered, root } = hydrate(client.HostScopedRecovery);
+		await act(async () => {});
 
 		try {
-			expect(container.querySelector('#host-recovery-root')).toBe(stableRoot);
-			expect(container.querySelector('#host-stable-header')).toBe(stableHeader);
-			expect(container.querySelector('#host-recovery-scope')).toBe(stableScope);
-			expect(container.querySelector('#host-stable-footer')).toBe(stableFooter);
-			expect(container.querySelector('#host-outside-action')).toBe(outsideAction);
-			expect(staleRange.isConnected).toBe(false);
+			expect(survivors(serverNodes)).toEqual([]);
+			expect(container.querySelectorAll('#host-recovery-root')).toHaveLength(1);
+			expect(container.querySelector('#host-server-range')).toBeNull();
 			expect(container.querySelectorAll('#host-client-range')).toHaveLength(1);
 
 			const recoveredAction = container.querySelector<HTMLButtonElement>('#host-recovered-action')!;
+			const outsideAction = container.querySelector<HTMLButtonElement>('#host-outside-action')!;
 			flushSync(() => recoveredAction.click());
 			expect(recoveredAction.textContent?.trim()).toBe('inside:1');
 			flushSync(() => outsideAction.click());
 			expect(outsideAction.textContent?.trim()).toBe('outside:1');
-			expectDiagnostics();
+			expectDiagnostics(recovered);
 		} finally {
 			root.unmount();
 		}
@@ -638,8 +808,8 @@ describe.each([
 		const outsideAction = container.querySelector<HTMLButtonElement>('#suspense-outside-action')!;
 		const stableFooter = container.querySelector('#suspense-stable-footer')!;
 		const staleRange = container.querySelector('#suspense-server-range')!;
-		const root = hydrateRoot(container, client.SuspenseScopedRecovery, { isClient: true });
-		flushSync(() => {});
+		const { recovered, root } = hydrate(client.SuspenseScopedRecovery);
+		await act(async () => {});
 
 		try {
 			expect(container.querySelector('#suspense-recovery-root')).toBe(stableRoot);
@@ -657,7 +827,7 @@ describe.each([
 			expect(recoveredAction.textContent?.trim()).toBe('inside:1');
 			flushSync(() => outsideAction.click());
 			expect(outsideAction.textContent?.trim()).toBe('outside:1');
-			expectDiagnostics();
+			expectDiagnostics(recovered);
 		} finally {
 			root.unmount();
 		}
@@ -667,9 +837,10 @@ describe.each([
 // A renderable `{expr}` hole that is its host's only child renders markerless:
 // the server serializes a primitive as the host's bare text, and frames an
 // element, a component, or a list in a range the client's child slot adopts.
-// When the server rendered text but the client value is one of those, the host
-// holds nothing the value can adopt. The text must be discarded and reported
-// where the hole is, without giving up on the rest of the root.
+// When the server rendered text but the client value is one of those, or the
+// server rendered nothing for it, the server HTML does not match the client
+// render. With no boundary around it, the root renders on the client and the
+// mismatch is reported once.
 describe.each([
 	{ name: 'development compile', dev: true },
 	{ name: 'production compile', dev: false },
@@ -684,11 +855,6 @@ describe.each([
 		const client = dev
 			? devClientModule(OBJECT, 'renderable-text-object.tsrx')
 			: prodClientModule(OBJECT, 'renderable-text-object.tsrx');
-		// The hole's own line, so the warning cannot name a template inside its value.
-		const holeLine =
-			readFileSync(OBJECT, 'utf8')
-				.split('\n')
-				.findIndex((line) => line.includes('<div>{pick(props.kind, props.v)}</div>')) + 1;
 		let container: HTMLElement;
 		let errSpy: ReturnType<typeof vi.spyOn>;
 
@@ -707,16 +873,6 @@ describe.each([
 			errSpy.mock.calls
 				.map((call: unknown[]) => String(call[0]))
 				.filter((message: string) => message.includes('hydration mismatch'));
-
-		/** Element and text markup, ignoring hydration comments. */
-		function markup(node: Element): string {
-			const copy = node.cloneNode(true) as Element;
-			const walker = document.createTreeWalker(copy, NodeFilter.SHOW_COMMENT);
-			const comments: Node[] = [];
-			while (walker.nextNode()) comments.push(walker.currentNode);
-			for (const comment of comments) comment.parentNode!.removeChild(comment);
-			return copy.innerHTML;
-		}
 
 		/** The same node objects, not merely equal ones. */
 		function expectSameNodes(actual: ArrayLike<Node>, expected: readonly (Node | null)[]) {
@@ -741,23 +897,13 @@ describe.each([
 		}
 
 		/** Exactly one report: the recoverable error always, the warning in DEV only. */
-		async function expectReported(recovered: unknown[], file: string, line: number | null) {
-			await Promise.resolve();
+		async function expectReported(recovered: unknown[], file: string, actual: string) {
+			await act(async () => {});
 			expect(recovered).toHaveLength(1);
-			expect(String((recovered[0] as Error).message)).toMatch(/hydration mismatch/i);
-			if (!dev) {
-				expect(warns()).toEqual([]);
-				return;
-			}
-			expect(warns()).toEqual([
-				expect.stringMatching(
-					new RegExp(
-						`^Octane hydration mismatch at [^ ]*${file.replace(/\./g, '\\.')}:` +
-							`${line ?? '\\d+'}:\\d+: the client expected a renderable range but the ` +
-							`server rendered text "A"\\.`,
-					),
-				),
-			]);
+			expect(String((recovered[0] as Error).message)).toMatch(MISMATCH);
+			expect(warns()).toEqual(
+				dev ? [expect.stringMatching(structuralWarning(file, '.+', escape(actual)))] : [],
+			);
 		}
 
 		const OBJECT_KINDS = ['p', 'inner', 'list'] as const;
@@ -773,6 +919,7 @@ describe.each([
 					tail: 't',
 				}).html;
 				const div = container.querySelector('section > div')!;
+				const serverNodes = contentNodes(container);
 				const serverElements = [...div.querySelectorAll('*')];
 				const serverMarkup = markup(div);
 				const tail = container.querySelector('b')!;
@@ -787,6 +934,7 @@ describe.each([
 				flushSync(() => {});
 				return {
 					div,
+					serverNodes,
 					serverElements,
 					serverMarkup,
 					tail,
@@ -801,26 +949,25 @@ describe.each([
 			}
 
 			it.each(OBJECT_KINDS)(
-				'discards server text for a client %s value, reports it once, and keeps hydrating',
+				'renders the root on the client for a client %s value over server text, reporting it once',
 				async (kind) => {
-					const { div, tail, tailText, recovered, root, render, expected } = hydrate('text', kind);
+					const { serverNodes, recovered, root, render, expected } = hydrate('text', kind);
 					try {
-						expect(container.querySelector('section > div')).toBe(div);
+						expect(survivors(serverNodes)).toEqual([]);
+						const div = container.querySelector('section > div')!;
 						expect(markup(div)).toBe(expected({ kind, v: 'A', tail: 't' }));
-						// The recovery stays local: the next hole still adopts its server text.
-						expect(container.querySelector('b')).toBe(tail);
-						expectSameNodes(tail.childNodes, [tailText]);
-						expect(tail.textContent).toBe('t');
-						await expectReported(recovered, 'renderable-text-object.tsrx', holeLine);
+						expect(container.querySelector('b')!.textContent).toBe('t');
+						await expectReported(recovered, 'renderable-text-object.tsrx', 'text "A"');
 
+						// The client-rendered tree updates like any other.
 						render({ kind: 'text', v: 'B', tail: 'u' });
 						expect(markup(div)).toBe('B');
-						expect(tail.innerHTML).toBe('u');
+						expect(container.querySelector('b')!.innerHTML).toBe('u');
 						render({ kind, v: 'C', tail: 'u' });
 						expect(markup(div)).toBe(expected({ kind, v: 'C', tail: 'u' }));
 						render({ kind: 'text', v: 'D', tail: 'u' });
 						expect(markup(div)).toBe('D');
-						await Promise.resolve();
+						await act(async () => {});
 						expect(recovered).toHaveLength(1);
 					} finally {
 						root.unmount();
@@ -844,20 +991,21 @@ describe.each([
 				}
 			});
 
-			// A server that rendered nothing leaves nothing to discard, like a text
-			// hole whose server text is missing.
+			// A host the server left empty is missing the node the client renders
+			// into it, which React treats as a mismatch like any other.
 			it.each(OBJECT_KINDS)(
-				'builds a client %s value into a host the server left empty',
+				'renders the root on the client for a client %s value in a host the server left empty',
 				async (kind) => {
-					const { div, tail, tailText, recovered, root, expected } = hydrate('empty', kind);
+					const { serverNodes, tail, tailText, recovered, root, expected } = hydrate('empty', kind);
 					try {
-						expect(container.querySelector('section > div')).toBe(div);
-						expect(markup(div)).toBe(expected({ kind, v: 'A', tail: 't' }));
-						expect(container.querySelector('b')).toBe(tail);
-						expectSameNodes(tail.childNodes, [tailText]);
-						await Promise.resolve();
-						expect(recovered).toEqual([]);
-						expect(warns()).toEqual([]);
+						expect(survivors(serverNodes)).toEqual([]);
+						expect(markup(container.querySelector('section > div')!)).toBe(
+							expected({ kind, v: 'A', tail: 't' }),
+						);
+						expect(container.querySelector('b')).not.toBe(tail);
+						expect(tailText!.isConnected).toBe(false);
+						await act(async () => {});
+						expect(recovered).toHaveLength(1);
 					} finally {
 						root.unmount();
 					}
@@ -902,13 +1050,15 @@ describe.each([
 			}
 		});
 
-		// The boundary's next attempt finds the value's own client DOM where the
-		// server text was. Rebuilding it must neither report it nor duplicate it.
-		it('reports once and builds once when the client value suspends', async () => {
+		// Suspending while hydrating keeps the server HTML; when the value resolves,
+		// it does not match the server text, so the boundary renders on the client
+		// once while the server nodes outside it stay adopted.
+		it('renders the boundary on the client once when a suspended client value resolves to an element', async () => {
 			container.innerHTML = ServerRT.renderToString(server.SuspendingHole, {
 				text: null,
 				v: 'A',
 			}).html;
+			const main = container.querySelector('main')!;
 			const div = container.querySelector('section > div')!;
 			const tail = container.querySelector('b')!;
 			expect(div.textContent).toBe('A');
@@ -923,15 +1073,25 @@ describe.each([
 			);
 			flushSync(() => {});
 			try {
+				// While the client value is pending, the server HTML stays on screen.
+				await act(async () => {});
+				expect(container.querySelector('section > div')).toBe(div);
+				expect(div.textContent).toBe('A');
+				expect(container.querySelector('i')).toBeNull();
+				expect(recovered).toEqual([]);
 				await act(async () => {
 					resolve('R');
 					await text;
 				});
-				expect(container.querySelector('section > div')).toBe(div);
-				expect(markup(div)).toBe('<em class="waits">R</em>');
-				expect(container.querySelector('b')).toBe(tail);
-				expect(tail.textContent).toBe('A');
-				await expectReported(recovered, 'renderable-text-object.tsrx', null);
+				expect(container.querySelector('main')).toBe(main);
+				expect(div.isConnected).toBe(false);
+				expect(tail.isConnected).toBe(false);
+				expect(markup(container.querySelector('section > div')!)).toBe('<em class="waits">R</em>');
+				expect(container.querySelector('b')!.textContent).toBe('A');
+				expect(container.querySelectorAll('em.waits')).toHaveLength(1);
+				await act(async () => {});
+				expect(recovered).toHaveLength(1);
+				expect(String((recovered[0] as Error).message)).toMatch(MISMATCH);
 			} finally {
 				root.unmount();
 			}
@@ -949,14 +1109,13 @@ describe.each([
 				compileOptions: { dev },
 			});
 
-			it('discards server text for a client element value', async () => {
+			it('renders the root on the client for a client element value over server text', async () => {
 				container.innerHTML = ServerRT.renderToString(tsxServer.Hole, {
 					kind: 'text',
 					v: 'A',
 					tail: 't',
 				}).html;
-				const div = container.querySelector('section > div')!;
-				const tail = container.querySelector('b')!;
+				const serverNodes = contentNodes(container);
 				const recovered: unknown[] = [];
 				const root = hydrateRoot(
 					container,
@@ -966,11 +1125,11 @@ describe.each([
 				);
 				flushSync(() => {});
 				try {
-					expect(container.querySelector('section > div')).toBe(div);
+					expect(survivors(serverNodes)).toEqual([]);
+					const div = container.querySelector('section > div')!;
 					expect(markup(div)).toBe('<p class="x">A</p>');
-					expect(container.querySelector('b')).toBe(tail);
-					expect(tail.textContent).toBe('t');
-					await expectReported(recovered, 'renderable-text-object-tsx.tsx', null);
+					expect(container.querySelector('b')!.textContent).toBe('t');
+					await expectReported(recovered, 'renderable-text-object-tsx.tsx', 'text "A"');
 					flushSync(() => root.render(tsxClient.Hole, { kind: 'text', v: 'B', tail: 't' }));
 					expect(markup(div)).toBe('B');
 				} finally {
@@ -994,38 +1153,42 @@ describe.each([
 			it.each([
 				{ kind: 'element', value: () => createElement('p', { class: 'x' }, 'A') },
 				{ kind: 'list', value: () => [createElement('p', { key: 'a', class: 'x' }, 'A'), 'A'] },
-			])('discards server text for a client $kind value', async ({ value }) => {
-				container.innerHTML = ServerRT.renderToString(signalServer.Hole, {
-					value: 'A',
-					label: 't',
-				}).html;
-				const div = container.querySelector('section > div')!;
-				const tail = container.querySelector('i')!;
-				const recovered: unknown[] = [];
-				const props = { value: value(), label: 't' };
-				const root = hydrateRoot(container, signalClient.Hole, props, {
-					onRecoverableError: (error) => recovered.push(error),
-				});
-				flushSync(() => {});
-				try {
-					expect(container.querySelector('section > div')).toBe(div);
-					expect(markup(div)).toBe(clientMarkup(signalClient.Hole, props, 'section > div'));
-					expect(container.querySelector('i')).toBe(tail);
-					expect(tail.textContent).toBe('t');
-					await expectReported(recovered, 'renderable-text-object-signal.tsrx', null);
-					flushSync(() => root.render(signalClient.Hole, { value: 'B', label: 't' }));
-					expect(markup(div)).toBe('B');
-				} finally {
-					root.unmount();
-				}
-			});
+			])(
+				'renders the root on the client for a client $kind value over server text',
+				async ({ value }) => {
+					container.innerHTML = ServerRT.renderToString(signalServer.Hole, {
+						value: 'A',
+						label: 't',
+					}).html;
+					const serverNodes = contentNodes(container);
+					const recovered: unknown[] = [];
+					const props = { value: value(), label: 't' };
+					const root = hydrateRoot(container, signalClient.Hole, props, {
+						onRecoverableError: (error) => recovered.push(error),
+					});
+					flushSync(() => {});
+					try {
+						expect(survivors(serverNodes)).toEqual([]);
+						const div = container.querySelector('section > div')!;
+						expect(markup(div)).toBe(clientMarkup(signalClient.Hole, props, 'section > div'));
+						expect(container.querySelector('i')!.textContent).toBe('t');
+						await expectReported(recovered, 'renderable-text-object-signal.tsrx', 'text "A"');
+						flushSync(() => root.render(signalClient.Hole, { value: 'B', label: 't' }));
+						expect(markup(div)).toBe('B');
+					} finally {
+						root.unmount();
+					}
+				},
+			);
 		});
 
-		// Captures that changed before a dormant boundary activated legitimately
-		// differ from the server's: repair the hole, but report nothing.
-		it('repairs a dormant boundary whose value became an element before activation without reporting', async () => {
+		// Captures that changed before a dormant island activated legitimately
+		// differ from the server's: the island renders on the client, and its
+		// server output predating the client state is not reported as a mismatch.
+		it('renders a dormant island on the client without reporting when its value became an element before activation', async () => {
 			const serverProps = { when: condition(false), kind: 'text', v: 'A' };
 			container.innerHTML = ServerRT.renderToString(server.DormantHole, serverProps).html;
+			const main = container.querySelector('main')!;
 			const recovered: unknown[] = [];
 			const root = hydrateRoot(container, client.DormantHole, serverProps, {
 				onRecoverableError: (error) => recovered.push(error),
@@ -1035,13 +1198,15 @@ describe.each([
 				const div = container.querySelector('section > div')!;
 				expect(div.textContent).toBe('A');
 				await act(() => root.render(client.DormantHole, { when: load(), kind: 'p', v: 'A' }));
-				expect(container.querySelector('section > div')).toBe(div);
-				expect(markup(div)).toBe('<p class="x">A</p>');
-				await Promise.resolve();
+				expect(container.querySelector('main')).toBe(main);
+				expect(div.isConnected).toBe(false);
+				const live = container.querySelector('section > div')!;
+				expect(markup(live)).toBe('<p class="x">A</p>');
+				await act(async () => {});
 				expect(recovered).toEqual([]);
 				expect(warns()).toEqual([]);
 				flushSync(() => root.render(client.DormantHole, { when: load(), kind: 'text', v: 'B' }));
-				expect(markup(div)).toBe('B');
+				expect(markup(live)).toBe('B');
 			} finally {
 				root.unmount();
 			}
@@ -1052,10 +1217,10 @@ describe.each([
 // The server HTML below is a LEGACY shape for a sole-child mixed-arm-ternary hole:
 // an outer value pair wrapping one pair per keyed item. Today's client claims that
 // hole as an @if-lowered block whose branch hosts the keyed list, so every adopted
-// pair sits one nesting level off from where the client expects it. Recovery from
-// that misalignment must rebuild the subtree and never throw — stale server HTML
-// (an older octane version, a cached edge response) is exactly what the prod
-// recovery safety net exists for.
+// pair sits one nesting level off from where the client expects it. Hydration must
+// never throw over that misalignment — stale server HTML (an older octane version,
+// a cached edge response) is exactly what the fallback exists for — and must leave
+// a tree whose later updates keep working.
 describe.each([
 	{
 		name: 'development compile',
@@ -1095,7 +1260,7 @@ describe.each([
 		'<!--[--><!--[--><i>x</i><!--]--><!--[--><i>y</i><!--]--><!--]-->' +
 		'</div></div>';
 
-	it('legacy nested-pair list shape: rebuilds the keyed list and stays interactive', () => {
+	it('legacy nested-pair list shape: renders the keyed list and stays interactive', () => {
 		container.innerHTML = LEGACY_HTML;
 		const root = hydrateRoot(container, client.ForArm);
 		flushSync(() => {});
@@ -1105,7 +1270,7 @@ describe.each([
 				Array.from(container.querySelectorAll('.host i'), (n) => n.textContent);
 			expect(itemTexts()).toEqual(['x', 'y']);
 
-			// The rebuilt block must leave a coherent slot boundary behind: flip to the
+			// The tree must leave a coherent slot boundary behind: flip to the
 			// component arm and back to the keyed list through the live click handler.
 			const next = container.querySelector<HTMLButtonElement>('.next')!;
 			flushSync(() => next.click());
@@ -1121,10 +1286,10 @@ describe.each([
 	});
 
 	// The inline-ternary form of the same shape (arm rendering itself is owned
-	// by the compiler's ternary suites). This case pins only what RECOVERY
-	// owns: no throw, the stale server list fully discarded (never leaked into
-	// later arms), and a slot boundary the swaps can keep using.
-	it('legacy nested-pair list shape under the inline ternary: discards, never throws or leaks', () => {
+	// by the compiler's ternary suites). This case pins only what the fallback
+	// owns: no throw, the stale server list never leaked into later arms, and a
+	// slot boundary the swaps can keep using.
+	it('legacy nested-pair list shape under the inline ternary: never throws or leaks', () => {
 		container.innerHTML = LEGACY_HTML;
 		const root = hydrateRoot(container, client.MapArm);
 		flushSync(() => {});
@@ -1148,9 +1313,9 @@ describe.each([
 // A renderable `{expr}` hole that is its host's only child renders markerless:
 // the server serializes text as the host's bare text and every empty value
 // (`null`, `undefined`, a boolean, `''`) as no children at all. When the server
-// rendered text but the client value is empty, the client renders no node the
-// server text could belong to. It must be discarded and reported, not kept
-// beside every later value the hole renders.
+// rendered text but the client value is empty, the server text is content the
+// client render does not have: the root renders on the client and the mismatch
+// is reported once.
 describe.each([
 	{ name: 'development compile', dev: true },
 	{ name: 'production compile', dev: false },
@@ -1182,35 +1347,16 @@ describe.each([
 			.map((call: unknown[]) => String(call[0]))
 			.filter((message: string) => message.includes('hydration mismatch'));
 
-	/** Element and text markup, ignoring hydration comments. */
-	function markup(node: Element): string {
-		const copy = node.cloneNode(true) as Element;
-		const walker = document.createTreeWalker(copy, NodeFilter.SHOW_COMMENT);
-		const comments: Node[] = [];
-		while (walker.nextNode()) comments.push(walker.currentNode);
-		for (const comment of comments) comment.parentNode!.removeChild(comment);
-		return copy.innerHTML;
-	}
-
 	const texts = (node: Element) => [...node.childNodes].filter((child) => child.nodeType === 3);
 
 	/** Exactly one report: the recoverable error always, the warning in DEV only. */
 	async function expectReported(recovered: unknown[], file: string, actual: string) {
-		await Promise.resolve();
+		await act(async () => {});
 		expect(recovered).toHaveLength(1);
-		expect(String((recovered[0] as Error).message)).toMatch(/hydration mismatch/i);
-		if (!dev) {
-			expect(warns()).toEqual([]);
-			return;
-		}
-		expect(warns()).toEqual([
-			expect.stringMatching(
-				new RegExp(
-					`^Octane hydration mismatch at [^ ]*${file.replace(/\./g, '\\.')}:\\d+:\\d+: ` +
-						`the client expected nothing but the server rendered ${actual}\\.`,
-				),
-			),
-		]);
+		expect(String((recovered[0] as Error).message)).toMatch(MISMATCH);
+		expect(warns()).toEqual(
+			dev ? [expect.stringMatching(structuralWarning(file, '.+', escape(actual)))] : [],
+		);
 	}
 
 	const EMPTY_KINDS = ['undefined', null, 'false', 'true', 'empty'] as const;
@@ -1220,17 +1366,15 @@ describe.each([
 		{ where: 'in a nested component', name: 'NestedHole' },
 	])('$where', ({ name }) => {
 		it.each(EMPTY_KINDS)(
-			'discards server text for a client %j value, reports it once, and stays clean',
+			'renders the root on the client for a client %j value over server text, reporting it once',
 			async (kind) => {
 				container.innerHTML = ServerRT.renderToString(server[name], {
 					kind: 'text',
 					v: 'A',
 					tail: 't',
 				}).html;
-				const div = container.querySelector('section > div')!;
-				const tail = container.querySelector('b')!;
-				const [tailText] = texts(tail);
-				expect(div.textContent).toBe('A');
+				const serverNodes = contentNodes(container);
+				expect(container.querySelector('section > div')!.textContent).toBe('A');
 				const recovered: unknown[] = [];
 				const root = hydrateRoot(
 					container,
@@ -1242,11 +1386,10 @@ describe.each([
 				const render = (props: Record<string, unknown>) =>
 					flushSync(() => root.render(client[name], props));
 				try {
-					expect(container.querySelector('section > div')).toBe(div);
+					expect(survivors(serverNodes)).toEqual([]);
+					const div = container.querySelector('section > div')!;
+					const tail = container.querySelector('b')!;
 					expect(markup(div)).toBe('');
-					// The recovery stays local: the next hole still adopts its server text.
-					expect(container.querySelector('b')).toBe(tail);
-					expect(texts(tail)).toEqual([tailText]);
 					expect(tail.textContent).toBe('t');
 					await expectReported(recovered, 'renderable-empty-text.tsrx', 'text "A"');
 
@@ -1304,17 +1447,17 @@ describe.each([
 			compileOptions: { dev },
 		});
 
-		// The ternary child is framed by the server (`<!--[-->A<!--]-->`), so the
-		// discard must take the frame too.
+		// The ternary child is framed by the server (`<!--[-->A<!--]-->`); the
+		// framed text is content the empty client value does not have.
 		it.each([undefined, null, false, ''])(
-			'discards a framed server text for a client %j value',
+			'renders the root on the client for a client %j value over a framed server text',
 			async (label) => {
 				container.innerHTML = ServerRT.renderToString(tsxServer.ConditionalChild, {
 					on: false,
 					label: 'A',
 				}).html;
-				const div = container.querySelector('div')!;
-				expect(div.textContent).toBe('A');
+				const serverNodes = contentNodes(container);
+				expect(container.querySelector('div')!.textContent).toBe('A');
 				const recovered: unknown[] = [];
 				const root = hydrateRoot(
 					container,
@@ -1324,7 +1467,8 @@ describe.each([
 				);
 				flushSync(() => {});
 				try {
-					expect(container.querySelector('div')).toBe(div);
+					expect(survivors(serverNodes)).toEqual([]);
+					const div = container.querySelector('div')!;
 					expect(markup(div)).toBe('');
 					await expectReported(recovered, 'markerless-text.tsx', 'text "A"');
 					flushSync(() => root.render(tsxClient.ConditionalChild, { on: false, label: 'B' }));
@@ -1371,20 +1515,80 @@ describe.each([
 				}
 			},
 		);
+
+		// The framed server text is the host's text content, as a bare one is.
+		// React compares an empty string's text content, which the host's
+		// suppressHydrationWarning keeps until the text changes, but hydrates no
+		// child for any other empty value, and suppression keeps no unhydrated
+		// child.
+		function hydrateSuppressed(label: unknown) {
+			container.innerHTML = ServerRT.renderToString(tsxServer.SuppressedConditionalChild, {
+				on: false,
+				label: 'A',
+			}).html;
+			const serverNodes = contentNodes(container);
+			const div = container.querySelector('div')!;
+			expect(div.textContent).toBe('A');
+			const recovered: unknown[] = [];
+			const root = hydrateRoot(
+				container,
+				tsxClient.SuppressedConditionalChild,
+				{ on: false, label },
+				{ onRecoverableError: (error) => recovered.push(error) },
+			);
+			flushSync(() => {});
+			return { div, serverNodes, recovered, root };
+		}
+
+		it('keeps a framed server text in a suppressed host for an empty string', async () => {
+			const { div, serverNodes, recovered, root } = hydrateSuppressed('');
+			try {
+				expect(survivors(serverNodes)).toEqual(serverNodes);
+				expect(container.querySelector('div')).toBe(div);
+				expect(div.textContent).toBe('A');
+				await act(async () => {});
+				expect(recovered).toEqual([]);
+				expect(warns()).toEqual([]);
+				flushSync(() =>
+					root.render(tsxClient.SuppressedConditionalChild, { on: false, label: 'B' }),
+				);
+				expect(markup(div)).toBe('B');
+			} finally {
+				root.unmount();
+			}
+		});
+
+		it.each([undefined, null, false])(
+			'renders the root on the client for a client %j value over a framed server text in a suppressed host',
+			async (label) => {
+				const { serverNodes, recovered, root } = hydrateSuppressed(label);
+				try {
+					expect(survivors(serverNodes)).toEqual([]);
+					expect(markup(container.querySelector('div')!)).toBe('');
+					await act(async () => {});
+					expect(recovered).toHaveLength(1);
+					expect(String((recovered[0] as Error).message)).toMatch(MISMATCH);
+				} finally {
+					root.unmount();
+				}
+			},
+		);
 	});
 
 	// A direct-host @for row inlines its binding guards instead of calling the
 	// cached-value helper; its first render must reach the hole just the same.
-	it('discards server text for a client undefined value in a keyed @for row', async () => {
+	it('renders the root on the client for a client undefined value in a keyed @for row', async () => {
 		container.innerHTML = ServerRT.renderToString(server.ListHole, {
 			rows: [
 				{ id: 1, label: 'A' },
 				{ id: 2, label: 'B' },
 			],
 		}).html;
-		const items = [...container.querySelectorAll('li')];
-		const [kept] = texts(items[1]);
-		expect(items.map((item) => item.textContent)).toEqual(['A', 'B']);
+		const serverNodes = contentNodes(container);
+		expect([...container.querySelectorAll('li')].map((item) => item.textContent)).toEqual([
+			'A',
+			'B',
+		]);
 		const recovered: unknown[] = [];
 		const root = hydrateRoot(
 			container,
@@ -1399,9 +1603,9 @@ describe.each([
 		);
 		flushSync(() => {});
 		try {
-			expect([...container.querySelectorAll('li')]).toEqual(items);
-			expect(markup(items[0])).toBe('');
-			expect(texts(items[1])).toEqual([kept]);
+			expect(survivors(serverNodes)).toEqual([]);
+			const items = [...container.querySelectorAll('li')];
+			expect(items.map(markup)).toEqual(['', 'B']);
 			await expectReported(recovered, 'renderable-empty-text.tsrx', 'text "A"');
 			flushSync(() =>
 				root.render(client.ListHole, {
@@ -1430,14 +1634,14 @@ describe.each([
 			: prodClientModule(SIGNAL, 'renderable-empty-text-signal.tsrx');
 
 		it.each([undefined, null, false, true, ''])(
-			'discards server text for a client %j value',
+			'renders the root on the client for a client %j value over server text',
 			async (value) => {
 				container.innerHTML = ServerRT.renderToString(signalServer.Hole, {
 					value: 'A',
 					label: 't',
 				}).html;
-				const div = container.querySelector('section > div')!;
-				expect(div.textContent).toBe('A');
+				const serverNodes = contentNodes(container);
+				expect(container.querySelector('section > div')!.textContent).toBe('A');
 				const recovered: unknown[] = [];
 				const root = hydrateRoot(
 					container,
@@ -1447,7 +1651,8 @@ describe.each([
 				);
 				flushSync(() => {});
 				try {
-					expect(container.querySelector('section > div')).toBe(div);
+					expect(survivors(serverNodes)).toEqual([]);
+					const div = container.querySelector('section > div')!;
 					expect(markup(div)).toBe('');
 					expect(container.querySelector('i')!.textContent).toBe('t');
 					await expectReported(recovered, 'renderable-empty-text-signal.tsrx', 'text "A"');
@@ -1460,13 +1665,15 @@ describe.each([
 		);
 	});
 
-	// Captures that changed before a dormant boundary activated legitimately
-	// differ from the server's: repair the hole, but report nothing.
+	// Captures that changed before a dormant island activated legitimately
+	// differ from the server's: the island renders on the client, and its server
+	// output predating the client state is not reported as a mismatch.
 	it.each(EMPTY_KINDS)(
-		'repairs a dormant boundary whose value became %j before activation without reporting',
+		'renders a dormant island on the client without reporting when its value became %j before activation',
 		async (kind) => {
 			const serverProps = { when: condition(false), kind: 'text', v: 'A' };
 			container.innerHTML = ServerRT.renderToString(server.DormantHole, serverProps).html;
+			const main = container.querySelector('main')!;
 			const recovered: unknown[] = [];
 			const root = hydrateRoot(container, client.DormantHole, serverProps, {
 				onRecoverableError: (error) => recovered.push(error),
@@ -1476,13 +1683,15 @@ describe.each([
 				const div = container.querySelector('section > div')!;
 				expect(div.textContent).toBe('A');
 				await act(() => root.render(client.DormantHole, { when: load(), kind, v: 'A' }));
-				expect(container.querySelector('section > div')).toBe(div);
-				expect(markup(div)).toBe('');
-				await Promise.resolve();
+				expect(container.querySelector('main')).toBe(main);
+				expect(div.isConnected).toBe(false);
+				const live = container.querySelector('section > div')!;
+				expect(markup(live)).toBe('');
+				await act(async () => {});
 				expect(recovered).toEqual([]);
 				expect(warns()).toEqual([]);
 				flushSync(() => root.render(client.DormantHole, { when: load(), kind: 'text', v: 'B' }));
-				expect(markup(div)).toBe('B');
+				expect(markup(live)).toBe('B');
 			} finally {
 				root.unmount();
 			}
@@ -1491,10 +1700,9 @@ describe.each([
 });
 
 // A renderable `{expr}` hole whose server value was an element, a component, or
-// a list, but whose client value is text or empty. The hole adopts at most one
-// server text node; anything else the server rendered for it is content the
-// client cannot adopt. It must be discarded and reported like any other
-// structural recovery, not left on screen through every later render.
+// a list, but whose client value is text or empty. Whatever the server rendered
+// beyond what the client renders is a mismatch, so with no boundary around it
+// the root renders on the client and reports it once.
 describe.each([
 	{ name: 'development compile', dev: true },
 	{ name: 'production compile', dev: false },
@@ -1526,18 +1734,6 @@ describe.each([
 			.map((call: unknown[]) => String(call[0]))
 			.filter((message: string) => message.includes('hydration mismatch'));
 
-	/** Element and text markup, ignoring hydration comments. */
-	function markup(node: Element): string {
-		const copy = node.cloneNode(true) as Element;
-		const walker = document.createTreeWalker(copy, NodeFilter.SHOW_COMMENT);
-		const comments: Node[] = [];
-		while (walker.nextNode()) comments.push(walker.currentNode);
-		for (const comment of comments) comment.parentNode!.removeChild(comment);
-		return copy.innerHTML;
-	}
-
-	const escape = (text: string) => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-
 	/**
 	 * Exactly one report: the recoverable error always, the located warning in
 	 * DEV only. `actual` is omitted where the server content's description
@@ -1545,28 +1741,28 @@ describe.each([
 	 */
 	async function expectReported(
 		recovered: unknown[],
-		expected: string,
 		actual?: string,
 		file = 'renderable-text-swap.tsrx',
 	) {
-		await Promise.resolve();
+		await act(async () => {});
 		expect(recovered).toHaveLength(1);
-		expect(String((recovered[0] as Error).message)).toMatch(/hydration mismatch/i);
-		if (!dev) {
-			expect(warns()).toEqual([]);
-			return;
-		}
-		expect(warns()).toEqual([
-			expect.stringMatching(
-				new RegExp(
-					`^Octane hydration mismatch at [^ ]*${escape(file)}:\\d+:\\d+: ` +
-						`the client expected ${escape(expected)} but the server rendered ` +
-						`${actual === undefined ? '.+' : escape(actual)}\\.`,
-				),
-			),
-		]);
+		expect(String((recovered[0] as Error).message)).toMatch(MISMATCH);
+		expect(warns()).toEqual(
+			dev
+				? [
+						expect.stringMatching(
+							structuralWarning(file, '.+', actual === undefined ? '.+' : escape(actual)),
+						),
+					]
+				: [],
+		);
 	}
 
+	// OCTANE DIVERGENCE: where the hole is its host's only child and the client
+	// value is text, React compares only the host's whole textContent, so a
+	// server `<div><p>A</p></div>` passes for a client `<div>A</div>` and keeps
+	// the server element. Octane hydrates the hole's content and falls back on
+	// the element, as it does for every other shape.
 	describe.each([
 		{ shape: 'the only child of its host', name: 'Hole', host: 'section > div' },
 		{ shape: 'beside a sibling', name: 'SiblingHole', host: 'section' },
@@ -1577,73 +1773,54 @@ describe.each([
 
 		function hydrate(serverProps: Record<string, unknown>, props: Record<string, unknown>) {
 			container.innerHTML = ServerRT.renderToString(server[name], serverProps).html;
-			const parent = container.querySelector(host)!;
-			const tail = container.querySelector('i')!;
-			const serverTexts = [...parent.childNodes].filter((node) => node.nodeType === 3);
+			const serverNodes = contentNodes(container);
 			const recovered: unknown[] = [];
 			const root = hydrateRoot(container, client[name], props, {
 				onRecoverableError: (error) => recovered.push(error),
 			});
 			flushSync(() => {});
 			return {
-				parent,
-				tail,
-				serverTexts,
+				serverNodes,
 				recovered,
+				parent: () => container.querySelector(host)!,
 				render: (next: Record<string, unknown>) => flushSync(() => root.render(client[name], next)),
 				unmount: () => root.unmount(),
 			};
 		}
 
 		it.each([
-			{ from: 'p', to: 'text', text: 'A', client: 'text "A"', server: '<p>' },
-			{ from: 'inner', to: 'text', text: 'A', client: 'text "A"', server: '<b>' },
-			{ from: 'list', to: 'text', text: 'A', client: 'text "A"', server: undefined },
-			{ from: 'p', to: null, text: '', client: 'nothing', server: '<p>' },
-			{ from: 'p', to: 'undefined', text: '', client: 'nothing', server: '<p>' },
-			{ from: 'inner', to: null, text: '', client: 'nothing', server: '<b>' },
-			{ from: 'list', to: null, text: '', client: 'nothing', server: undefined },
-			{ from: 'textThenP', to: null, text: '', client: 'nothing', server: 'text "A"' },
+			{ from: 'p', to: 'text', text: 'A', server: '<p>' },
+			{ from: 'inner', to: 'text', text: 'A', server: '<b>' },
+			{ from: 'list', to: 'text', text: 'A', server: undefined },
+			{ from: 'p', to: null, text: '', server: '<p>' },
+			{ from: 'p', to: 'undefined', text: '', server: '<p>' },
+			{ from: 'inner', to: null, text: '', server: '<b>' },
+			{ from: 'list', to: null, text: '', server: undefined },
+			{ from: 'textThenP', to: null, text: '', server: 'text "A"' },
+			{ from: 'textThenP', to: 'text', text: 'A', server: '<p>' },
 		])(
-			'discards a server $from for a client $to value, reports it once, and stays clean',
-			async ({ from, to, text, client: clientDescription, server: serverDescription }) => {
+			'renders the root on the client for a server $from and a client $to value, reporting it once',
+			async ({ from, to, text, server: serverDescription }) => {
 				const s = hydrate({ kind: from, v: 'A', tail: 't' }, { kind: to, v: 'A', tail: 't' });
 				try {
-					expect(markup(s.parent)).toBe(text + tailHtml('t'));
-					expect(container.querySelector('i')).toBe(s.tail);
-					await expectReported(s.recovered, clientDescription, serverDescription);
+					expect(survivors(s.serverNodes)).toEqual([]);
+					const parent = s.parent();
+					expect(markup(parent)).toBe(text + tailHtml('t'));
+					await expectReported(s.recovered, serverDescription);
 
+					// The client-rendered tree updates like any other.
 					s.render({ kind: 'text', v: 'B', tail: 't' });
-					expect(markup(s.parent)).toBe('B' + tailHtml('t'));
+					expect(markup(parent)).toBe('B' + tailHtml('t'));
 					s.render({ kind: 'p', v: 'C', tail: 'u' });
-					expect(markup(s.parent)).toBe('<p class="x">C</p>' + tailHtml('u'));
+					expect(markup(parent)).toBe('<p class="x">C</p>' + tailHtml('u'));
 					s.render({ kind: null, v: 'C', tail: 'u' });
-					expect(markup(s.parent)).toBe(tailHtml('u'));
-					expect(container.querySelector('i')).toBe(s.tail);
-					expect(s.tail.textContent).toBe('u');
+					expect(markup(parent)).toBe(tailHtml('u'));
+					expect(container.querySelector('i')!.textContent).toBe('u');
 				} finally {
 					s.unmount();
 				}
 			},
 		);
-
-		it('keeps an adopted server text node and discards only the content after it', async () => {
-			const s = hydrate(
-				{ kind: 'textThenP', v: 'A', tail: 't' },
-				{ kind: 'text', v: 'A', tail: 't' },
-			);
-			try {
-				expect(markup(s.parent)).toBe('A' + tailHtml('t'));
-				const texts = () => [...s.parent.childNodes].filter((node) => node.nodeType === 3);
-				expect(texts()).toEqual([s.serverTexts[0]]);
-				await expectReported(s.recovered, 'the end of text "A"', '<p>');
-				s.render({ kind: 'text', v: 'B', tail: 't' });
-				expect(texts()).toEqual([s.serverTexts[0]]);
-				expect(s.serverTexts[0].nodeValue).toBe('B');
-			} finally {
-				s.unmount();
-			}
-		});
 
 		it.each([{ kind: 'text' }, { kind: null }, { kind: 'p' }, { kind: 'inner' }])(
 			'adopts a matching $kind value silently',
@@ -1698,14 +1875,14 @@ describe.each([
 			{ name: 'SiblingHole', host: 'section', to: 'text', expected: 'A<i>t</i>' },
 			{ name: 'SiblingHole', host: 'section', to: null, expected: '<i>t</i>' },
 		])(
-			'$name discards a server element for a client $to value',
+			'$name renders the root on the client for a server element and a client $to value',
 			async ({ name, host, to, expected }) => {
 				container.innerHTML = ServerRT.renderToString(tsxServer[name], {
 					kind: 'p',
 					v: 'A',
 					tail: 't',
 				}).html;
-				const tail = container.querySelector('i')!;
+				const serverNodes = contentNodes(container);
 				const recovered: unknown[] = [];
 				const root = hydrateRoot(
 					container,
@@ -1715,15 +1892,10 @@ describe.each([
 				);
 				flushSync(() => {});
 				try {
+					expect(survivors(serverNodes)).toEqual([]);
 					const parent = container.querySelector(host)!;
 					expect(markup(parent)).toBe(expected);
-					expect(container.querySelector('i')).toBe(tail);
-					await expectReported(
-						recovered,
-						to === null ? 'nothing' : 'text "A"',
-						'<p>',
-						'renderable-text-swap-tsx.tsx',
-					);
+					await expectReported(recovered, '<p>', 'renderable-text-swap-tsx.tsx');
 					flushSync(() => root.render(tsxClient[name], { kind: 'p', v: 'B', tail: 't' }));
 					expect(markup(parent)).toBe(expected.replace(/^A?/, '<p class="x">B</p>'));
 				} finally {
@@ -1733,11 +1905,13 @@ describe.each([
 		);
 	});
 
-	// Captures that changed before a dormant boundary activated legitimately
-	// differ from the server's: repair the hole, but report nothing.
-	it('repairs a dormant boundary updated before activation without reporting', async () => {
+	// Captures that changed before a dormant island activated legitimately
+	// differ from the server's: the island renders on the client, and its server
+	// output predating the client state is not reported as a mismatch.
+	it('renders a dormant island on the client without reporting when it was updated before activation', async () => {
 		const serverProps = { when: condition(false), kind: 'p', v: 'A' };
 		container.innerHTML = ServerRT.renderToString(server.DormantHole, serverProps).html;
+		const main = container.querySelector('main')!;
 		const recovered: unknown[] = [];
 		const root = hydrateRoot(container, client.DormantHole, serverProps, {
 			onRecoverableError: (error) => recovered.push(error),
@@ -1747,13 +1921,184 @@ describe.each([
 			const div = container.querySelector('section > div')!;
 			expect(markup(div)).toBe('<p class="x">A</p>');
 			await act(() => root.render(client.DormantHole, { when: load(), kind: 'text', v: 'A' }));
-			expect(container.querySelector('section > div')).toBe(div);
-			expect(markup(div)).toBe('A');
-			await Promise.resolve();
+			expect(container.querySelector('main')).toBe(main);
+			expect(div.isConnected).toBe(false);
+			expect(markup(container.querySelector('section > div')!)).toBe('A');
+			await act(async () => {});
 			expect(recovered).toEqual([]);
 			expect(warns()).toEqual([]);
 		} finally {
 			root.unmount();
 		}
+	});
+});
+
+// A template whose root element matches the server's, but whose server element
+// lacks the nodes the template's compiled walk reaches, does not match the
+// client render, as in React, which finds the missing node: nothing is adopted
+// in place, the nearest Suspense boundary or else the root renders on the
+// client and reports once. An error thrown while hydrating fails the root the
+// same way, as React's throwException makes it: the root renders on the
+// client, reporting a recoverable error, and an error its client render throws
+// again is uncaught, with no recoverable report.
+describe.each([
+	{ name: 'development compile', dev: true },
+	{ name: 'production compile', dev: false },
+])('hydrateRoot — server nodes that a template walk does not find ($name)', ({ dev }) => {
+	const WALK = join(
+		process.cwd(),
+		'packages/octane/tests/hydration/_fixtures/walk-missing-nodes.tsrx',
+	);
+	const server = serverModule(WALK, 'walk-missing-nodes.tsrx');
+	const client = dev
+		? devClientModule(WALK, 'walk-missing-nodes.tsrx')
+		: prodClientModule(WALK, 'walk-missing-nodes.tsrx');
+	let container: HTMLElement;
+	let errSpy: ReturnType<typeof vi.spyOn>;
+	let root: ReturnType<typeof hydrateRoot> | null;
+
+	beforeEach(() => {
+		container = document.createElement('div');
+		document.body.appendChild(container);
+		errSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+		root = null;
+	});
+
+	afterEach(() => {
+		root?.unmount();
+		client.failNext(0);
+		container.remove();
+		errSpy.mockRestore();
+	});
+
+	/**
+	 * Server-render `name`, empty the server element `emptied` names, and
+	 * hydrate it. Returns the server's content and the root's error reports.
+	 */
+	async function hydrate(name: string, props: Record<string, unknown>, emptied?: string) {
+		container.innerHTML = ServerRT.renderToString(server[name], props).html;
+		if (emptied !== undefined) container.querySelector(emptied)!.replaceChildren();
+		const serverNodes = contentNodes(container);
+		const recovered: unknown[] = [];
+		const uncaught: unknown[] = [];
+		root = hydrateRoot(container, client[name], props, {
+			onRecoverableError: (error) => recovered.push(error),
+			onUncaughtError: (error) => uncaught.push(error),
+		});
+		flushSync(() => {});
+		await act(async () => {});
+		return { serverNodes, recovered, uncaught };
+	}
+
+	/** The client render of `name` with `props`, for comparison. */
+	function clientMarkup(name: string, props: Record<string, unknown>): string {
+		const fresh = document.createElement('div');
+		const freshRoot = createRoot(fresh);
+		flushSync(() => freshRoot.render(client[name], props));
+		const out = markup(fresh);
+		freshRoot.unmount();
+		return out;
+	}
+
+	it.each([
+		{ shape: 'an element with a bound attribute', name: 'Link', props: { url: '/x' } },
+		{ shape: 'an element with a text hole', name: 'Bold', props: { t: 'hi' } },
+	])(
+		'renders the root on the client where the server root lacks $shape',
+		async ({ name, props }) => {
+			const s = await hydrate(name, props, 'div');
+
+			expect(survivors(s.serverNodes)).toEqual([]);
+			expect(markup(container)).toBe(clientMarkup(name, props));
+			expect(s.uncaught).toEqual([]);
+			expect(s.recovered).toHaveLength(1);
+			expect(String((s.recovered[0] as Error).message)).toMatch(MISMATCH);
+
+			// The client-rendered tree updates like any other.
+			flushSync(() => root!.render(client[name], { url: '/y', t: 'yo' }));
+			expect(markup(container)).toBe(clientMarkup(name, { url: '/y', t: 'yo' }));
+		},
+	);
+
+	it('renders the root on the client where a nested server element lacks the walked element', async () => {
+		const s = await hydrate('Deep', { url: '/x' }, 'p');
+
+		expect(survivors(s.serverNodes)).toEqual([]);
+		expect(markup(container)).toBe(clientMarkup('Deep', { url: '/x' }));
+		expect(container.querySelector('#deep')!.getAttribute('href')).toBe('/x');
+		expect(s.uncaught).toEqual([]);
+		expect(s.recovered).toHaveLength(1);
+	});
+
+	it('renders only the boundary on the client where its server element lacks the walked element', async () => {
+		container.innerHTML = ServerRT.renderToString(server.InBoundary, { url: '/x' }).html;
+		const h1 = container.querySelector('h1')!;
+		const div = container.querySelector('main div')!;
+		div.replaceChildren();
+		const recovered: unknown[] = [];
+		root = hydrateRoot(
+			container,
+			client.InBoundary,
+			{ url: '/x' },
+			{
+				onRecoverableError: (error) => recovered.push(error),
+			},
+		);
+		flushSync(() => {});
+		await act(async () => {});
+
+		expect(container.querySelector('h1')).toBe(h1);
+		expect(div.isConnected).toBe(false);
+		expect(container.querySelector('#first')!.getAttribute('href')).toBe('/x');
+		expect(recovered).toHaveLength(1);
+		expect(String((recovered[0] as Error).message)).toMatch(MISMATCH);
+	});
+
+	it('renders the root on the client when a component throws while hydrating', async () => {
+		container.innerHTML = ServerRT.renderToString(server.Thrower, {}).html;
+		const serverNodes = contentNodes(container);
+		client.failNext(1);
+		const recovered: unknown[] = [];
+		const uncaught: unknown[] = [];
+		root = hydrateRoot(
+			container,
+			client.Thrower,
+			{},
+			{
+				onRecoverableError: (error) => recovered.push(error),
+				onUncaughtError: (error) => uncaught.push(error),
+			},
+		);
+		flushSync(() => {});
+		await act(async () => {});
+
+		expect(survivors(serverNodes)).toEqual([]);
+		expect(markup(container)).toBe('<div><i>ok</i><b>tail</b></div>');
+		expect(uncaught).toEqual([]);
+		expect(recovered).toHaveLength(1);
+		expect(String((recovered[0] as Error).message)).toMatch(/^There was an error while hydrating/);
+		expect(((recovered[0] as Error).cause as Error).message).toBe('hydrating render failed');
+	});
+
+	it('reports only the uncaught error when the client render throws again', async () => {
+		container.innerHTML = ServerRT.renderToString(server.Thrower, {}).html;
+		client.failNext(2);
+		const recovered: unknown[] = [];
+		const uncaught: unknown[] = [];
+		root = hydrateRoot(
+			container,
+			client.Thrower,
+			{},
+			{
+				onRecoverableError: (error) => recovered.push(error),
+				onUncaughtError: (error) => uncaught.push(error),
+			},
+		);
+		flushSync(() => {});
+		await act(async () => {});
+
+		expect(uncaught).toHaveLength(1);
+		expect((uncaught[0] as Error).message).toBe('hydrating render failed');
+		expect(recovered).toEqual([]);
 	});
 });

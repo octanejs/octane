@@ -236,38 +236,77 @@ describe('hydrateRoot — only-child renderable text', () => {
 		}
 	});
 
-	it.each([false, true])(
-		'adopts mismatched spread text with suppressHydrationWarning=%s',
-		(suppressHydrationWarning) => {
-			const props = { children: 'Server', suppressHydrationWarning };
-			container.innerHTML = ServerRT.renderToString(server.SpreadButton, props).html;
-			const button = container.querySelector('button')!;
-			const text = Array.from(button.childNodes).find((node) => node.nodeType === 3)!;
-			const errors = vi.spyOn(console, 'error').mockImplementation(() => {});
+	// suppressHydrationWarning on the text's own host keeps the server text, as
+	// React does, until the client next changes it.
+	it('adopts mismatched spread text with suppressHydrationWarning=true', () => {
+		const props = { children: 'Server', suppressHydrationWarning: true };
+		container.innerHTML = ServerRT.renderToString(server.SpreadButton, props).html;
+		const button = container.querySelector('button')!;
+		const text = Array.from(button.childNodes).find((node) => node.nodeType === 3)!;
+		const errors = vi.spyOn(console, 'error').mockImplementation(() => {});
+		try {
+			const recoverable: unknown[] = [];
+			const root = hydrateRoot(
+				container,
+				SpreadButton,
+				{ ...props, children: 'Client' },
+				{ onRecoverableError: (error) => recoverable.push(error) },
+			);
 			try {
-				const root = hydrateRoot(container, SpreadButton, { ...props, children: 'Client' });
-				try {
-					flushSync(() => {});
-					expect(button.textContent).toBe(suppressHydrationWarning ? 'Server' : 'Client');
-					expect(button.contains(text)).toBe(true);
-					if (suppressHydrationWarning) {
-						expect(errors).not.toHaveBeenCalled();
-					} else if (process.env.OCTANE_TEST_COMPILE_MODE !== 'prod') {
-						expect(
-							errors.mock.calls.some(([message]) => String(message).includes('hydration mismatch')),
-						).toBe(true);
-					}
-					flushSync(() => root.render(SpreadButton, { ...props, children: 'Updated' }));
-					expect(button.textContent).toBe('Updated');
-					expect(button.contains(text)).toBe(true);
-				} finally {
-					root.unmount();
-				}
+				flushSync(() => {});
+				expect(container.querySelector('button')).toBe(button);
+				expect(button.textContent).toBe('Server');
+				expect(button.contains(text)).toBe(true);
+				expect(errors).not.toHaveBeenCalled();
+				expect(recoverable).toEqual([]);
+				flushSync(() => root.render(SpreadButton, { ...props, children: 'Updated' }));
+				expect(button.textContent).toBe('Updated');
+				expect(button.contains(text)).toBe(true);
 			} finally {
-				errors.mockRestore();
+				root.unmount();
 			}
-		},
-	);
+		} finally {
+			errors.mockRestore();
+		}
+	});
+
+	// Without suppressHydrationWarning the text does not match the client render:
+	// with no Suspense boundary, the root renders on the client and reports once.
+	it('renders the root on the client for mismatched spread text with suppressHydrationWarning=false', async () => {
+		const props = { children: 'Server', suppressHydrationWarning: false };
+		container.innerHTML = ServerRT.renderToString(server.SpreadButton, props).html;
+		const button = container.querySelector('button')!;
+		const errors = vi.spyOn(console, 'error').mockImplementation(() => {});
+		try {
+			const recoverable: unknown[] = [];
+			const root = hydrateRoot(
+				container,
+				SpreadButton,
+				{ ...props, children: 'Client' },
+				{ onRecoverableError: (error) => recoverable.push(error) },
+			);
+			try {
+				flushSync(() => {});
+				await Promise.resolve();
+				expect(button.isConnected).toBe(false);
+				const live = container.querySelector('button')!;
+				expect(live.textContent).toBe('Client');
+				expect(recoverable).toHaveLength(1);
+				if (process.env.OCTANE_TEST_COMPILE_MODE !== 'prod') {
+					expect(
+						errors.mock.calls.some(([message]) => String(message).includes('hydration mismatch')),
+					).toBe(true);
+				}
+				flushSync(() => root.render(SpreadButton, { ...props, children: 'Updated' }));
+				expect(container.querySelector('button')).toBe(live);
+				expect(live.textContent).toBe('Updated');
+			} finally {
+				root.unmount();
+			}
+		} finally {
+			errors.mockRestore();
+		}
+	});
 
 	it.each(['', false, true, undefined, 'Open'])(
 		'resumes children after raw HTML takes ownership of a hydrated host from %j',

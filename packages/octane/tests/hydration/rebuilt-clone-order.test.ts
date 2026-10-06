@@ -6,12 +6,15 @@ import * as ServerRT from 'octane/server';
 import { prerender } from 'octane/static';
 import { loadCompiledFixtureSource, loadServerFixture } from '../_server-fixture';
 
-// When a template's root does not match the server node at the cursor,
-// hydration reports the structural mismatch and rebuilds that subtree on the
-// client. The rebuilt root takes the place of the server node it replaced:
-// server siblings that later client siblings adopt stay after it, the range
-// that renders it owns it, and server output that nothing on the client claims
-// is removed as part of the same recovery.
+// Each fixture's server arm renders a `<b>` where the client's renders a
+// component whose template root is an `<i>`, followed by content the two
+// agree on. As in React, the wrong tag means the server HTML does not match:
+// nothing is repaired in place, and the nearest fallback owner discards its
+// server DOM and renders on the client, reporting once to onRecoverableError.
+// With no Suspense boundary that owner is the root, so no server node survives,
+// including the siblings both sides render. Inside a @try/@pending arm only the
+// arm renders on the client, from client data rather than the server's seeds,
+// and the host element around it keeps its identity.
 
 const FIXTURE = join(
 	process.cwd(),
@@ -19,14 +22,6 @@ const FIXTURE = join(
 );
 const FILE = 'rebuilt-clone-order.tsrx';
 const SOURCE = readFileSync(FIXTURE, 'utf8');
-const LINES = SOURCE.split('\n');
-
-/** 1-based line of the first fixture line containing `text`. */
-function lineOf(text: string): number {
-	const index = LINES.findIndex((line) => line.includes(text));
-	if (index < 0) throw new Error(`fixture has no line containing ${text}`);
-	return index + 1;
-}
 
 /** Element and text markup, ignoring hydration comments. */
 function markup(node: Element): string {
@@ -38,20 +33,14 @@ function markup(node: Element): string {
 	return copy.innerHTML;
 }
 
-const STRUCTURAL = /the mismatched subtree was rebuilt on the client/;
-
-/** The one dev diagnostic for a Leaf-shaped `<i>` rebuilt over the server `<b>`. */
-function rebuiltLeaf(component: string): string {
-	return (
-		`Octane hydration mismatch at ${FILE}:${lineOf(`function ${component}(`) + 1}:1: the client ` +
-		'expected <i> but the server rendered <b>. The mismatched subtree was rebuilt on the client.'
-	);
-}
+const MISMATCH = /^Hydration failed because the server rendered HTML didn't match the client\./;
+const STRUCTURAL =
+	/^Octane hydration mismatch at rebuilt-clone-order\.tsrx:\d+:\d+: the client expected .+ but the server rendered <b>\. The nearest Suspense or Hydrate boundary, or the root, will be regenerated on the client\.$/;
 
 describe.each([
 	{ name: 'development compile', dev: true },
 	{ name: 'production compile', dev: false },
-])('hydrateRoot — position of a rebuilt template clone ($name)', ({ dev }) => {
+])('hydrateRoot — a wrong-tag template root falls back to its owner ($name)', ({ dev }) => {
 	const server = loadServerFixture(FIXTURE, { id: FILE });
 	const client = loadCompiledFixtureSource(SOURCE, {
 		id: FILE,
@@ -91,151 +80,135 @@ describe.each([
 		await act(async () => {});
 	}
 
-	function expectOneRebuild(component: string): void {
-		expect(recoverable).toEqual([expect.stringMatching(STRUCTURAL)]);
-		expect(warnings()).toEqual(dev ? [rebuiltLeaf(component)] : []);
+	/** Every server element, to check which ones a fallback discarded. */
+	function serverElements(): Element[] {
+		return [...container.querySelectorAll('*')];
 	}
 
-	it('keeps an adopted server sibling after the rebuilt root', async () => {
-		container.innerHTML = ServerRT.renderToString(server.SiblingBranch, { server: true }).html;
-		const em = container.querySelector('em');
-		await hydrate('SiblingBranch', {});
+	function expectOneFallback(): void {
+		expect(recoverable).toEqual([expect.stringMatching(MISMATCH)]);
+		// Only a development compile knows the template's source location.
+		expect(warnings()).toEqual(dev ? [expect.stringMatching(STRUCTURAL)] : []);
+	}
 
-		expect(markup(container.firstElementChild!)).toBe('<i>ok</i><em>e</em>');
-		expect(container.querySelector('em')).toBe(em);
-		expectOneRebuild('Leaf');
+	it.each([
+		{
+			shape: 'an adopted-looking server sibling after it',
+			name: 'SiblingBranch',
+			props: {},
+			client: '<i>ok</i><em>e</em>',
+		},
+		{
+			shape: 'server output after it that the client does not render',
+			name: 'TailBranch',
+			props: {},
+			client: '<i>ok</i>',
+		},
+		{
+			shape: 'server output after it that a later client sibling renders',
+			name: 'AdoptedTailBranch',
+			props: {},
+			client: '<i>ok</i><p>p</p>',
+		},
+		{
+			shape: 'a renderable hole after it',
+			name: 'HoleBranch',
+			props: { text: 'tail' },
+			client: '<i>ok</i>tail',
+		},
+		{
+			shape: 'a sibling after the @switch that renders it',
+			name: 'SwitchSiblingBranch',
+			props: { k: 'a' },
+			client: '<i>ok</i><em>e</em>',
+		},
+	])('renders the root on the client with $shape', async ({ name, props, client: html }) => {
+		container.innerHTML = ServerRT.renderToString(server[name], { server: true, ...props }).html;
+		const before = serverElements();
+		await hydrate(name, props);
+
+		expect(markup(container)).toBe(`<div>${html}</div>`);
+		expect(before.filter((node) => node.isConnected)).toEqual([]);
+		expectOneFallback();
 	});
 
-	it('removes server output after the rebuilt root that nothing claims', async () => {
-		container.innerHTML = ServerRT.renderToString(server.TailBranch, { server: true }).html;
-		await hydrate('TailBranch', {});
-
-		expect(markup(container.firstElementChild!)).toBe('<i>ok</i>');
-		expectOneRebuild('Leaf');
-	});
-
-	it('keeps server output after the rebuilt root that a later sibling adopts', async () => {
-		container.innerHTML = ServerRT.renderToString(server.AdoptedTailBranch, { server: true }).html;
-		const p = container.querySelector('p');
-		await hydrate('AdoptedTailBranch', {});
-
-		expect(markup(container.firstElementChild!)).toBe('<i>ok</i><p>p</p>');
-		expect(container.querySelector('p')).toBe(p);
-		expectOneRebuild('Leaf');
-	});
-
-	it('keeps an adopted renderable hole after the rebuilt root', async () => {
-		container.innerHTML = ServerRT.renderToString(server.HoleBranch, {
-			server: true,
-			text: 'tail',
-		}).html;
-		await hydrate('HoleBranch', { text: 'tail' });
-
-		expect(markup(container.firstElementChild!)).toBe('<i>ok</i>tail');
-		expectOneRebuild('Leaf');
-	});
-
-	it('keeps the rebuilt root inside a @switch arm the server did not render', async () => {
+	it('renders the root on the client for a @switch the server did not render, which then updates', async () => {
 		container.innerHTML = ServerRT.renderToString(server.SwitchBranch, {
 			server: true,
 			k: 'a',
 		}).html;
+		const before = serverElements();
 		await hydrate('SwitchBranch', { k: 'a' });
 
-		expect(markup(container.firstElementChild!)).toBe('<i>ok</i>');
-		expectOneRebuild('Leaf');
+		expect(markup(container)).toBe('<div><i>ok</i></div>');
+		expect(before.filter((node) => node.isConnected)).toEqual([]);
+		expectOneFallback();
 
-		// The switch owns the rebuilt root, so another case replaces it.
 		flushSync(() => root!.render(client.SwitchBranch, { k: 'b' }));
-		expect(markup(container.firstElementChild!)).toBe('<u>z</u>');
+		expect(markup(container)).toBe('<div><u>z</u></div>');
 		flushSync(() => root!.render(client.SwitchBranch, { k: 'a' }));
-		expect(markup(container.firstElementChild!)).toBe('<i>ok</i>');
+		expect(markup(container)).toBe('<div><i>ok</i></div>');
+		expect(recoverable).toHaveLength(1);
 	});
 
-	it('keeps a server sibling out of a @switch arm that adopted its host in place', async () => {
+	// OCTANE DIVERGENCE: Octane's control-flow ranges are part of its hydration
+	// protocol, as React's Suspense markers are part of React's. A client @switch
+	// whose server output has no range of its own is a structural mismatch even
+	// though the elements inside it match, so the root renders on the client
+	// where React, which compiles @switch to a plain expression, would adopt.
+	it('renders the root on the client for a @switch the server did not render around matching elements', async () => {
 		container.innerHTML = ServerRT.renderToString(server.SwitchAdoptedHostBranch, {
 			server: true,
 			k: 'a',
 		}).html;
-		const u = container.querySelector('u');
-		const em = container.querySelector('em');
+		const before = serverElements();
 		await hydrate('SwitchAdoptedHostBranch', { k: 'a' });
 
-		expect(markup(container.firstElementChild!)).toBe('<u><s>s</s></u><em>e</em>');
-		expect(container.querySelector('u')).toBe(u);
-		expect(container.querySelector('em')).toBe(em);
+		expect(markup(container)).toBe('<div><u><s>s</s></u><em>e</em></div>');
+		expect(before.filter((node) => node.isConnected)).toEqual([]);
+		expect(recoverable).toEqual([expect.stringMatching(MISMATCH)]);
+		expect(warnings()).toHaveLength(dev ? 1 : 0);
 
-		// The switch owns only the `<u>` it adopted, so another case replaces it
-		// and leaves the `<em>` after it.
-		flushSync(() => root!.render(client.SwitchAdoptedHostBranch, { k: 'b' }));
-		expect(markup(container.firstElementChild!)).toBe('<b>d</b><em>e</em>');
-		expect(container.querySelector('em')).toBe(em);
-	});
-
-	it('keeps an adopted server sibling after a @switch arm the server did not render', async () => {
-		container.innerHTML = ServerRT.renderToString(server.SwitchSiblingBranch, {
-			server: true,
-			k: 'a',
-		}).html;
 		const em = container.querySelector('em');
-		await hydrate('SwitchSiblingBranch', { k: 'a' });
-
-		expect(markup(container.firstElementChild!)).toBe('<i>ok</i><em>e</em>');
-		expect(container.querySelector('em')).toBe(em);
-		expectOneRebuild('Leaf');
-
-		flushSync(() => root!.render(client.SwitchSiblingBranch, { k: 'b' }));
-		expect(markup(container.firstElementChild!)).toBe('<u>z</u><em>e</em>');
+		flushSync(() => root!.render(client.SwitchAdoptedHostBranch, { k: 'b' }));
+		expect(markup(container)).toBe('<div><b>d</b><em>e</em></div>');
 		expect(container.querySelector('em')).toBe(em);
 	});
 
-	it('resumes a suspended boundary without rebuilding the adopted sibling again', async () => {
-		const html = (
+	it('renders only the mismatched @try arm on the client, from client data', async () => {
+		container.innerHTML = (
 			await prerender(server.SeedBranch, {
 				server: true,
 				leaf: Promise.resolve('server leaf'),
 				sibling: Promise.resolve('server sibling'),
 			})
 		).html;
-		container.innerHTML = html;
+		const div = container.firstElementChild;
 		const em = container.querySelector('em');
+		expect(em!.textContent).toBe('server sibling');
 		let resolveLeaf!: (value: string) => void;
 		const leaf = new Promise<string>((resolve) => (resolveLeaf = resolve));
-		await hydrate('SeedBranch', { leaf, sibling: new Promise(() => {}) });
-		expect(container.querySelector('em')).toBe(em);
+		let resolveSibling!: (value: string) => void;
+		const sibling = new Promise<string>((resolve) => (resolveSibling = resolve));
+		await hydrate('SeedBranch', { leaf, sibling });
 
-		await act(async () => resolveLeaf('client leaf'));
+		// The arm's server DOM is gone; its client render waits for client data.
+		expect(container.firstElementChild).toBe(div);
+		expect(em!.isConnected).toBe(false);
+		expect(container.querySelector('p')!.textContent).toBe('pending');
+		expect(container.textContent).not.toContain('server');
+		expectOneFallback();
 
-		expect(markup(container.firstElementChild!)).toBe(
-			'<i><s>client leaf</s>ok</i><em>server sibling</em>',
-		);
-		expect(container.querySelector('em')).toBe(em);
-		expectOneRebuild('ReaderLeaf');
-	});
-	it('resumes a @switch arm that adopted the server node in place before suspending', async () => {
-		container.innerHTML = (
-			await prerender(server.AdoptedSwitchSeedBranch, {
-				server: true,
-				k: 'a',
-				leaf: Promise.resolve('unused'),
-				sibling: Promise.resolve('sibling'),
-			})
-		).html;
-		const u = container.querySelector('u');
-		let resolveLeaf!: (value: string) => void;
-		const leaf = new Promise<string>((resolve) => (resolveLeaf = resolve));
-		// The server seed settles this reader during hydration.
-		const sibling = new Promise<string>(() => {});
-		await hydrate('AdoptedSwitchSeedBranch', { k: 'a', leaf, sibling });
-		await act(async () => resolveLeaf('z'));
+		await act(async () => {
+			resolveLeaf('client leaf');
+			resolveSibling('client sibling');
+		});
 
-		expect(markup(container.firstElementChild!)).toBe('<em>sibling</em><u>z</u><em>e</em>');
-		expect(container.querySelector('u')).toBe(u);
-		expect(recoverable).toEqual([]);
-		expect(warnings()).toEqual([]);
-
-		// The switch owns the adopted `<u>`, so leaving the case removes it.
-		flushSync(() => root!.render(client.AdoptedSwitchSeedBranch, { k: 'b', leaf, sibling }));
-		expect(markup(container.firstElementChild!)).toBe('<em>sibling</em><em>e</em>');
+		expect(container.firstElementChild).toBe(div);
+		expect(container.querySelector('p')).toBeNull();
+		expect(markup(container.querySelector('i')!)).toBe('<s>client leaf</s>ok');
+		expect(container.querySelector('i')!.hasAttribute('style')).toBe(false);
+		expect(container.querySelector('em')!.textContent).toBe('client sibling');
+		expect(recoverable).toHaveLength(1);
 	});
 });

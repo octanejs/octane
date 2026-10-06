@@ -20,12 +20,12 @@ import {
 	SignalWriteError,
 } from './errors.js';
 import {
-	NativeAdoptionMiss,
 	NATIVE_DOM_VALUE,
 	getNativeCandidate,
 	forwardNativeTransitionConsumer,
 	getNativeReadObserver,
 	getNativeAdoptionResolver,
+	isNativeAdoptionMiss,
 	isNativeWriteGuarded,
 	reportNativeRead,
 	setNativeAdoptionResolver,
@@ -541,7 +541,7 @@ export class ScopedNode<T = any> implements SignalHandle<T>, ReactiveNode {
 			state.snapshot.status === 'error' &&
 			(state.snapshot.error instanceof ScopeDisposedError ||
 				state.snapshot.error instanceof SignalFrameError ||
-				state.snapshot.error instanceof NativeAdoptionMiss)
+				isNativeAdoptionMiss(state.snapshot.error))
 		) {
 			throw state.snapshot.error;
 		}
@@ -790,7 +790,7 @@ function commitState<T>(node: ScopedNode<T>, next: NodeState<T>): void {
 		next.snapshot.status === 'error' &&
 		(next.snapshot.error instanceof ScopeDisposedError ||
 			next.snapshot.error instanceof SignalFrameError ||
-			next.snapshot.error instanceof NativeAdoptionMiss)
+			isNativeAdoptionMiss(next.snapshot.error))
 	) {
 		releaseRetention(node);
 	} else if (node.lastState?.owners) {

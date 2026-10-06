@@ -6,13 +6,14 @@ import * as ServerRT from 'octane/server';
 import { loadCompiledFixtureSource, loadServerFixture } from '../_server-fixture';
 
 // When the server rendered another @if arm whose static roots match the
-// client arm's, the client adopts that arm's nodes through its template, and
-// the server node at a component call's hole is the other arm's element
-// rather than the component's range. The call takes the place of exactly that
-// node, whatever its body renders: more than one root, a fragment, nothing,
-// or a single root inside a host element. The development compile renders
-// these hookless calls through the lite component slot; the production
-// compile through the full one.
+// client arm's, the server node at a component call's hole is the other arm's
+// element rather than the component's output. As in React, which compares only
+// the DOM, that is a mismatch unless the call renders exactly that node:
+// nothing is repaired in place, the root renders on the client and reports
+// once, whatever the call's body renders (more than one root, a fragment,
+// nothing, or a single root inside a host element). The development compile
+// renders these hookless calls through the lite component slot; the
+// production compile through the full one.
 
 const FIXTURE = join(process.cwd(), 'packages/octane/tests/hydration/_fixtures/arm-lite-hole.tsrx');
 const FILE = 'arm-lite-hole.tsrx';
@@ -28,6 +29,12 @@ function siteOf(after: string, text: string): string {
 	return `${FILE}:${index + 1}:${LINES[index].indexOf(text)}`;
 }
 
+/** `actual` holds exactly the `expected` nodes: the same objects, in order. */
+function expectSameNodes(actual: ArrayLike<Node>, expected: readonly Node[]): void {
+	expect(actual).toHaveLength(expected.length);
+	Array.from(actual).forEach((node, i) => expect(node).toBe(expected[i]));
+}
+
 /** Element and text markup, ignoring hydration comments. */
 function markup(node: Element): string {
 	const copy = node.cloneNode(true) as Element;
@@ -38,52 +45,45 @@ function markup(node: Element): string {
 	return copy.innerHTML;
 }
 
-function structural(site: string, expected: string, actual: string): string {
-	return (
-		`Octane hydration mismatch at ${site}: the client expected ${expected} but the server ` +
-		`rendered ${actual}. The mismatched subtree was rebuilt on the client.`
-	);
-}
+/** React's recoverable hydration error. */
+const MISMATCH = /server rendered HTML didn't match the client/;
 
-/** The development compile's warning for a call whose server range is missing. */
-const missingRange = (component: string, call: string) => () => [
-	structural(siteOf(`function ${component}(`, call), 'a component range', '<b>'),
-];
+/** The development warning at the call in `component` whose output the server did not render. */
+const missingRange = (component: string, call: string) =>
+	`Octane hydration mismatch at ${siteOf(`function ${component}(`, call)}: the client expected ` +
+	'a component range but the server rendered <b>. The nearest Suspense or Hydrate boundary, ' +
+	'or the root, will be regenerated on the client.';
 
 const SHAPES = [
 	{
 		shape: 'a component with two roots',
 		name: 'PairArm',
+		call: '<Pair',
 		html: '<u>z</u><u>q</u><i>t</i>',
-		code: 55,
-		warnings: missingRange('PairArm', '<Pair'),
 		updated: '<u>z</u><u>q</u><i>w</i>',
 		otherArm: '<b class="server">server</b><i>w</i>',
 	},
 	{
 		shape: 'a component that renders a fragment',
 		name: 'FragArm',
+		call: '<Frag',
 		html: '<u>z</u><em>q</em><i>t</i>',
-		code: 55,
-		warnings: missingRange('FragArm', '<Frag'),
 		updated: '<u>z</u><em>q</em><i>w</i>',
 		otherArm: '<b class="server">server</b><i>w</i>',
 	},
 	{
 		shape: 'a component that renders nothing',
 		name: 'EmptyArm',
+		call: '<Empty',
 		html: '<i>t</i>',
-		code: 55,
-		warnings: missingRange('EmptyArm', '<Empty'),
 		updated: '<i>w</i>',
 		otherArm: '<b class="server">server</b><i>w</i>',
 	},
 	{
 		shape: 'a single-root component in a host element',
 		name: 'InHost',
+		call: '<Under',
 		html: '<p><u>z</u><i>t</i></p>',
-		code: 51,
-		warnings: () => [structural(siteOf('function Under(', '<u>'), '<u>', '<b>')],
 		updated: '<p><u>z</u><i>w</i></p>',
 		otherArm: '<p><b class="server">server</b><i>w</i></p>',
 	},
@@ -101,13 +101,8 @@ describe.each([
 		mode: 'client',
 		compileOptions: { dev },
 	});
-	// A production runtime reports the error code instead of the message.
-	const report = (code: number) =>
-		runtime === 'production'
-			? new RegExp(`^Minified Octane error #${code};`)
-			: code === 51
-				? /the server-rendered node did not match the client render/
-				: /the server rendered a different child shape where the client renders a component/;
+	// A production runtime reports the error code instead of React's message.
+	const report = runtime === 'production' ? /^Minified Octane error #339;/ : MISMATCH;
 	const devWarnings = dev && runtime === 'development';
 	let container: HTMLElement;
 	let root: { render(component: unknown, props?: unknown): void; unmount(): void } | null;
@@ -163,43 +158,44 @@ describe.each([
 	}
 
 	it.each(SHAPES)(
-		'keeps the shared roots and replaces the server node at $shape',
-		async ({ name, html, code, warnings: expected, updated, otherArm }) => {
+		'client-renders the root when the server node at $shape belongs to another arm',
+		async ({ name, call, html, updated, otherArm }) => {
 			const s = await hydrate(name, { server: true, tail: 't' }, { tail: 't' });
-			const shared = s.nodes.filter((node) => node.tagName === 'I' || node.tagName === 'P');
+			const live = () => container.firstElementChild!;
 
-			expect(markup(s.host)).toBe(html);
-			expect(shared.every((node) => node.isConnected)).toBe(true);
-			expect(s.stale).toHaveLength(1);
-			expect(s.stale[0].isConnected).toBe(false);
-			expect(s.recoverable).toEqual([expect.stringMatching(report(code))]);
-			expect(warnings()).toEqual(devWarnings ? expected() : []);
+			expect(live()).not.toBe(s.host);
+			expect(markup(live())).toBe(html);
+			expect(s.nodes.filter((node) => node.isConnected)).toEqual([]);
+			expect(s.recoverable).toEqual([expect.stringMatching(report)]);
+			expect(warnings()).toEqual(devWarnings ? [missingRange(name, call)] : []);
 
-			// The adopted roots keep updating in place.
+			// The client-rendered roots update in place.
+			const tail = live().querySelector('i');
 			s.render({ tail: 'w' });
-			expect(markup(s.host)).toBe(updated);
-			expect(shared.every((node) => node.isConnected)).toBe(true);
+			expect(markup(live())).toBe(updated);
+			expect(live().querySelector('i')).toBe(tail);
 
 			// The arm the call rendered in unmounts and mounts again cleanly.
 			s.render({ server: true, tail: 'w' });
-			expect(markup(s.host)).toBe(otherArm);
+			expect(markup(live())).toBe(otherArm);
 			s.render({ tail: 'w' });
-			expect(markup(s.host)).toBe(updated);
-			expect(warnings()).toHaveLength(devWarnings ? expected().length : 0);
+			expect(markup(live())).toBe(updated);
+			expect(warnings()).toHaveLength(devWarnings ? 1 : 0);
 		},
 	);
 
+	// React compares DOM only, and the call renders exactly the server's node.
 	it('adopts the server node at a hole in a host element when it matches the call', async () => {
 		const s = await hydrate('InHostAdopt', { server: true, tail: 't' }, { tail: 't' });
 
 		expect(markup(s.host)).toBe('<p><u>z</u><i>t</i></p>');
-		expect([...s.host.querySelectorAll('*')]).toEqual(s.nodes);
+		expectSameNodes(s.host.querySelectorAll('*'), s.nodes);
 		expect(s.recoverable).toEqual([]);
 		expect(warnings()).toEqual([]);
 
 		s.render({ tail: 'w' });
 		expect(markup(s.host)).toBe('<p><u>z</u><i>w</i></p>');
-		expect([...s.host.querySelectorAll('*')]).toEqual(s.nodes);
+		expectSameNodes(s.host.querySelectorAll('*'), s.nodes);
 	});
 
 	it.each([...SHAPES.map(({ name }) => name), 'InHostAdopt'])(
@@ -208,13 +204,13 @@ describe.each([
 			const s = await hydrate(name, { tail: 't' }, { tail: 't' });
 
 			expect(markup(s.host)).toBe(s.html);
-			expect([...s.host.querySelectorAll('*')]).toEqual(s.nodes);
+			expectSameNodes(s.host.querySelectorAll('*'), s.nodes);
 			expect(s.recoverable).toEqual([]);
 			expect(warnings()).toEqual([]);
 
 			s.render({ tail: 'w' });
 			expect(markup(s.host)).toBe(s.html.replace('<i>t</i>', '<i>w</i>'));
-			expect([...s.host.querySelectorAll('*')]).toEqual(s.nodes);
+			expectSameNodes(s.host.querySelectorAll('*'), s.nodes);
 		},
 	);
 });

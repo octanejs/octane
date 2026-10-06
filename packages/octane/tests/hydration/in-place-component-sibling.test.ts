@@ -5,14 +5,17 @@ import { act, flushSync, hydrateRoot } from '../../src/index.js';
 import * as ServerRT from 'octane/server';
 import { loadCompiledFixtureSource, loadServerFixture } from '../_server-fixture';
 
-// A component call that finds no server range of its own, because the server
-// rendered another @if/@switch arm there, renders its template against the
-// server element at the cursor and adopts that element in place when it
-// matches. Hydration must then continue after that element, wherever the
-// component's own holes left the cursor: the next component adopts its own
-// server range instead of the same element. The development compile renders
-// these calls through the lite component slot; the production compile through
-// the single-root component slot.
+// The server rendered another @if/@switch arm whose elements match the client
+// arm's. As in React, which hydrates elements regardless of which branch
+// produced them, the client arm adopts them silently. Its component call has
+// no server range of its own, so it renders its template against the server
+// element at the cursor and adopts that element in place. Hydration must then
+// continue after that element, wherever the component's own holes left the
+// cursor: the next component adopts its own server range instead of the same
+// element. Where the server's elements do differ, the root renders on the
+// client and reports it once. The development compile renders these calls
+// through the lite component slot; the production compile through the
+// single-root component slot.
 
 const FIXTURE = join(
 	process.cwd(),
@@ -39,7 +42,7 @@ function markup(node: Element): string {
 	return copy.innerHTML;
 }
 
-const STRUCTURAL = /the mismatched subtree was rebuilt on the client/;
+const MISMATCH = /^Hydration failed because the server rendered HTML didn't match the client\./;
 
 const server = loadServerFixture(FIXTURE, { id: FILE });
 const clients = {
@@ -119,6 +122,7 @@ describe.each([
 			{ on: true, z: 'z' },
 		);
 
+		expect(container.firstElementChild).toBe(host);
 		expect(markup(host)).toBe(`${first}<em>z</em>`);
 		expect(host.children).toHaveLength(2);
 		expect(host.children[0]).toBe(serverNodes[0]);
@@ -132,7 +136,7 @@ describe.each([
 		expect(host.children[1]).toBe(serverNodes[1]);
 	});
 
-	it('rebuilds the next component over the server content after the adopted element', async () => {
+	it('renders the root on the client when the server element after the adopted one differs', async () => {
 		const { host, serverNodes, recoverable } = await hydrate(
 			client,
 			'ShortArm',
@@ -140,32 +144,33 @@ describe.each([
 			{ on: true, z: 'z' },
 		);
 
-		expect(markup(host)).toBe('<em>x</em><em>z</em>');
-		expect(host.children[0]).toBe(serverNodes[0]);
-		expect(serverNodes[1].isConnected).toBe(false);
-		expect(recoverable).toEqual([expect.stringMatching(STRUCTURAL)]);
+		expect(host.isConnected).toBe(false);
+		expect(serverNodes.filter((node) => node.isConnected)).toEqual([]);
+		expect(markup(container.firstElementChild!)).toBe('<em>x</em><em>z</em>');
+		expect(recoverable).toEqual([expect.stringMatching(MISMATCH)]);
 		expect(warnings()).toEqual(
 			dev
 				? [
 						`Octane hydration mismatch at ${FILE}:${lineOf('function Leaf(') + 1}:1: the ` +
-							'client expected <em> but the server rendered <s>. The mismatched subtree ' +
-							'was rebuilt on the client.',
+							'client expected <em> but the server rendered <s>. The nearest Suspense or ' +
+							'Hydrate boundary, or the root, will be regenerated on the client.',
 					]
 				: [],
 		);
 	});
 
-	it('removes a returned single root rebuilt at the end of its server range', async () => {
-		const { host, serverNodes, recoverable } = await hydrate(
+	it('renders the root on the client for a returned single root the server did not render', async () => {
+		const { host, recoverable } = await hydrate(
 			client,
 			'MaybeThenSibling',
 			{ shown: false },
 			{ shown: true },
 		);
-		const p = serverNodes[0];
 
-		expect(markup(host)).toBe('<b>m</b><p>p</p>');
-		expect(recoverable).toEqual([expect.stringMatching(STRUCTURAL)]);
+		expect(host.isConnected).toBe(false);
+		const live = container.firstElementChild!;
+		expect(markup(live)).toBe('<b>m</b><p>p</p>');
+		expect(recoverable).toEqual([expect.stringMatching(MISMATCH)]);
 		expect(warnings()).toEqual(
 			dev
 				? [
@@ -176,11 +181,12 @@ describe.each([
 				: [],
 		);
 
+		const p = live.querySelector('p');
 		flushSync(() => root!.render(client.MaybeThenSibling, { shown: false }));
-		expect(markup(host)).toBe('<p>p</p>');
+		expect(markup(live)).toBe('<p>p</p>');
 		flushSync(() => root!.render(client.MaybeThenSibling, { shown: true }));
-		expect(markup(host)).toBe('<b>m</b><p>p</p>');
-		expect(host.querySelector('p')).toBe(p);
+		expect(markup(live)).toBe('<b>m</b><p>p</p>');
+		expect(live.querySelector('p')).toBe(p);
 	});
 });
 
@@ -196,6 +202,7 @@ describe('hydrateRoot — a lite component that renders nothing before one adopt
 			{ on: true, z: 'z' },
 		);
 
+		expect(container.firstElementChild).toBe(host);
 		expect(markup(host)).toBe('<em>x</em><em>z</em>');
 		expect(host.children).toHaveLength(2);
 		expect(host.children[0]).toBe(serverNodes[0]);
@@ -204,12 +211,15 @@ describe('hydrateRoot — a lite component that renders nothing before one adopt
 	});
 });
 
-// A branch with no server range of its own, inside a component adopted in
-// place, owns every root it adopted there: switching it off removes them all,
-// and the next component keeps its server range. As above, only the
-// development compile renders this hookless call against the cursor.
+// OCTANE DIVERGENCE: a component adopted in place whose body is a branch the
+// server rendered no range for. Octane's control-flow ranges are part of its
+// hydration protocol, so the branch without one is a structural mismatch even
+// where its elements match; React, which has no range markers, adopts them.
+// The root renders on the client and reports once, and the client-built
+// branch then owns exactly what it rendered. As above, only the development
+// compile renders this hookless call against the cursor.
 describe('hydrateRoot — a branch in a component adopted in place', () => {
-	it('owns every root it adopted', async () => {
+	it('renders the root on the client and then owns every root it rendered', async () => {
 		const client = clients.development;
 		const props = { on: true, shown: true, z: 'z' };
 		const { host, serverNodes, recoverable } = await hydrate(
@@ -219,16 +229,18 @@ describe('hydrateRoot — a branch in a component adopted in place', () => {
 			props,
 		);
 
-		expect(markup(host)).toBe('<em>x</em><b>b</b><em>z</em>');
-		expect(host.children).toHaveLength(3);
-		serverNodes.forEach((node, i) => expect(host.children[i]).toBe(node));
-		expect(recoverable).toEqual([]);
-		expect(warnings()).toEqual([]);
+		expect(host.isConnected).toBe(false);
+		expect(serverNodes.filter((node) => node.isConnected)).toEqual([]);
+		const live = container.firstElementChild!;
+		expect(markup(live)).toBe('<em>x</em><b>b</b><em>z</em>');
+		expect(recoverable).toEqual([expect.stringMatching(MISMATCH)]);
+		expect(warnings()).toHaveLength(1);
 
+		const last = live.children[2];
 		flushSync(() => root!.render(client.BranchArm, { ...props, shown: false }));
-		expect(markup(host)).toBe('<em>z</em>');
-		expect(host.children[0]).toBe(serverNodes[2]);
+		expect(markup(live)).toBe('<em>z</em>');
+		expect(live.children[0]).toBe(last);
 		flushSync(() => root!.render(client.BranchArm, props));
-		expect(markup(host)).toBe('<em>x</em><b>b</b><em>z</em>');
+		expect(markup(live)).toBe('<em>x</em><b>b</b><em>z</em>');
 	});
 });

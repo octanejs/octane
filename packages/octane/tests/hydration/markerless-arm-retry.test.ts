@@ -5,15 +5,20 @@ import { act, flushSync, hydrateRoot } from '../../src/index.js';
 import * as ServerRT from 'octane/server';
 import { loadCompiledFixtureSource, loadServerFixture } from '../_server-fixture';
 
-// A @switch or @if that the server rendered no range for mounts its arm in the
-// place of the server node at the hydration cursor. When that arm suspends
-// inside a deferred <Hydrate> boundary, the boundary retries the same arm, or a
-// case change replaces it, after its first attempt left it without a boundary
-// of its own. Either way the arm's content is what it adopted at the cursor:
-// the retry keeps those server nodes, another case replaces exactly them, and
-// the sibling after the switch adopts its own server nodes. The case change
-// happens before the boundary hydrates, so nothing is a mismatch. An arm that
-// does not suspend is bounded the same way.
+// The server renders each component's @if first arm and the client its @else
+// arm, whose @switch or @if has no server range of its own.
+//
+// OCTANE DIVERGENCE: Octane's control-flow ranges are part of its hydration
+// protocol, as React's Suspense markers are part of React's. A client branch
+// whose server output has no range is a structural mismatch even where the
+// elements inside it match, where React, which has no range markers, would
+// adopt them. As in React, nothing is repaired in place: the nearest fallback
+// owner discards its server DOM and renders on the client, reporting once.
+// Inside a deferred <Hydrate> boundary that owner is the island, so the
+// elements around it keep their identity; the arm renders from client data,
+// suspends until its value resolves, and the branch then owns exactly what it
+// rendered as later cases replace it. Without a boundary the root renders on
+// the client.
 
 const FIXTURE = join(
 	process.cwd(),
@@ -21,6 +26,9 @@ const FIXTURE = join(
 );
 const FILE = 'markerless-arm-retry.tsrx';
 const SOURCE = readFileSync(FIXTURE, 'utf8');
+const MISMATCH = /^Hydration failed because the server rendered HTML didn't match the client\./;
+const STRUCTURAL =
+	/^Octane hydration mismatch at markerless-arm-retry\.tsrx:\d+:\d+: the client expected .+ but the server rendered .+\. The nearest Suspense or Hydrate boundary, or the root, will be regenerated on the client\.$/;
 
 /** Element and text markup, ignoring hydration comments. */
 function markup(node: Element): string {
@@ -32,27 +40,19 @@ function markup(node: Element): string {
 	return copy.innerHTML;
 }
 
-/** The `<!--if-->` and `<!--switch-->` comments in `parent` that nothing closes. */
-function unclosed(parent: Element): Node[] {
-	const open: Node[] = [];
-	for (const node of Array.from(parent.childNodes)) {
-		const data = node.nodeType === 8 ? (node as Comment).data : '';
-		if (data === 'if' || data === 'switch') open.push(node);
-		else if (data === '/if' || data === '/switch') open.pop();
-	}
-	return open;
-}
-
-/** A parent's element and text children, in order. */
+/** A parent's element and text descendants, in order. */
 function content(parent: Element): Node[] {
-	return Array.from(parent.childNodes).filter((node) => node.nodeType !== 8);
+	const nodes: Node[] = [];
+	const walker = document.createTreeWalker(parent, NodeFilter.SHOW_ELEMENT | NodeFilter.SHOW_TEXT);
+	while (walker.nextNode()) nodes.push(walker.currentNode);
+	return nodes;
 }
 
 const SHAPES = [
-	{ arm: 'a single root it adopted', name: 'SingleRoot', html: '<u>z</u>' },
+	{ arm: 'a single root', name: 'SingleRoot', html: '<u>z</u>' },
 	{ arm: 'a single root under @if', name: 'IfArm', html: '<u>z</u>' },
-	{ arm: 'a root it suspended before cloning', name: 'BeforeClone', html: '<u>z</u>' },
-	{ arm: 'server text', name: 'TextArm', html: 'z' },
+	{ arm: 'a root it suspends before cloning', name: 'BeforeClone', html: '<u>z</u>' },
+	{ arm: 'text', name: 'TextArm', html: 'z' },
 	{ arm: 'two roots', name: 'MultiRoot', html: '<s>s</s><i>z</i>' },
 	{ arm: 'two roots after a sibling', name: 'LeadSibling', html: '<s>s</s><i>z</i>', lead: true },
 	{
@@ -97,19 +97,13 @@ describe.each([
 			.filter((message: string) => message.includes('hydration mismatch'));
 
 	const section = () => container.querySelector('section')!;
-	/** The server `<em>` that the sibling after the switch adopts. */
+	/** The `<em>` that the sibling after the branch renders. */
 	const tail = () => section().lastElementChild;
-
-	/** The section's element and text nodes are exactly the server's `nodes`. */
-	function expectAdopted(nodes: Node[]): void {
-		const current = content(section());
-		expect(current).toHaveLength(nodes.length);
-		current.forEach((node, i) => expect(node).toBe(nodes[i]));
-	}
+	const island = () => container.querySelector('[data-octane-hydrate-id]');
 
 	/**
 	 * Hydrate `name` with `props` over its server render of the @if's first arm.
-	 * Returns the server's element and text nodes and its last `<em>`.
+	 * Returns the server's outer element, island wrapper, and section content.
 	 */
 	async function hydrate(name: string, props: Record<string, unknown>) {
 		container.innerHTML = ServerRT.renderToString(server[name], {
@@ -117,7 +111,11 @@ describe.each([
 			k: 'a',
 			leaf: Promise.resolve('unused'),
 		}).html;
-		const served = { nodes: content(section()), em: tail() };
+		const served = {
+			outer: container.firstElementChild,
+			island: island(),
+			nodes: [section(), ...content(section())],
+		};
 		root = hydrateRoot(container, client[name], props, {
 			onRecoverableError: (error: unknown) => recoverable.push((error as Error).message),
 		});
@@ -138,20 +136,31 @@ describe.each([
 		flushSync(() => root!.render(client[name], { k, leaf }));
 	}
 
+	/** Only the island rendered on the client, reporting once. */
+	function expectIslandFallback(served: {
+		outer: Element | null;
+		island: Element | null;
+		nodes: Node[];
+	}) {
+		expect(container.firstElementChild).toBe(served.outer);
+		expect(island()).toBe(served.island);
+		expect(served.nodes.filter((node) => node.isConnected)).toEqual([]);
+		expect(recoverable).toEqual([expect.stringMatching(MISMATCH)]);
+		expect(warnings()).toEqual(dev ? [expect.stringMatching(STRUCTURAL)] : []);
+	}
+
 	describe.each(SHAPES)('an arm whose content is $arm', ({ name, html: arm, lead }) => {
 		const html = (lead ? '<em>e</em>' : '') + arm;
 		const lone = lead ? '<em>e</em>' : '';
-		it('keeps the server nodes when the boundary retries the arm', async () => {
-			const { leaf, resolveLeaf, nodes, em } = await hydratePending(name);
+		it('renders the island on the client and shows the arm once its value resolves', async () => {
+			const { leaf, resolveLeaf, ...served } = await hydratePending(name);
 			await act(async () => resolveLeaf('z'));
 
 			expect(markup(section())).toBe(html + '<em>e</em>');
-			expectAdopted(nodes);
-			expect(unclosed(section())).toEqual([]);
-			expect(recoverable).toEqual([]);
-			expect(warnings()).toEqual([]);
+			expectIslandFallback(served);
 
-			// The switch owns exactly what its arm adopted.
+			// The branch owns exactly what its arm rendered.
+			const em = tail();
 			render(name, 'b', leaf);
 			expect(markup(section())).toBe(lone + '<em>e</em>');
 			expect(tail()).toBe(em);
@@ -160,111 +169,115 @@ describe.each([
 			render(name, 'a', leaf);
 			expect(markup(section())).toBe(html + '<em>e</em>');
 			expect(tail()).toBe(em);
+			expect(recoverable).toHaveLength(1);
 		});
 
 		it.each([
 			{ k: 'b', next: '' },
 			{ k: 'c', next: '<b>c</b>' },
-		])('replaces the pending arm with case $k', async ({ k, next }) => {
-			const { leaf, resolveLeaf, em } = await hydratePending(name);
+		])('replaces the pending client arm with case $k', async ({ k, next }) => {
+			const { leaf, resolveLeaf, ...served } = await hydratePending(name);
 			render(name, k, leaf);
 			await act(async () => {});
 			await act(async () => resolveLeaf('z'));
 
 			expect(markup(section())).toBe(lone + next + '<em>e</em>');
-			expect(tail()).toBe(em);
-			expect(unclosed(section())).toEqual([]);
-			expect(recoverable).toEqual([]);
-			expect(warnings()).toEqual([]);
+			expectIslandFallback(served);
 
+			const em = tail();
 			render(name, 'a', leaf);
 			expect(markup(section())).toBe(html + '<em>e</em>');
 			render(name, k, leaf);
 			expect(markup(section())).toBe(lone + next + '<em>e</em>');
 			expect(tail()).toBe(em);
+			expect(recoverable).toHaveLength(1);
 		});
 	});
 
-	it('keeps the server nodes of an arm slot that first renders in the retry', async () => {
-		const { resolveLeaf, nodes } = await hydratePending('LaterSlot');
+	it('renders an arm component that first renders after the value resolves', async () => {
+		const { resolveLeaf, ...served } = await hydratePending('LaterSlot');
 		await act(async () => resolveLeaf('z'));
 
 		expect(markup(section())).toBe('<s>s</s><i>z</i><i>z</i><em>e</em>');
-		expectAdopted(nodes);
-		expect(recoverable).toEqual([]);
-		expect(warnings()).toEqual([]);
+		expectIslandFallback(served);
 	});
 
-	// The arm's last root is static. Neither the arm's first render nor its
-	// retry rests the cursor on that root, so only where its template's roots
-	// end says the arm owns it.
+	// The arm's last root is static, after the component that suspends.
 	const TRAILING = [
 		{ arm: 'an @if arm', name: 'TrailingRoot' },
-		{ arm: 'the body of a component the client adopted', name: 'TrailingFrame' },
+		{ arm: 'the body of a component whose identity differs on the client', name: 'TrailingFrame' },
 		{ arm: 'an @if arm that suspends before it clones', name: 'TrailingClone' },
 		{ arm: 'the body of a component in a descriptor list item', name: 'TrailingDescriptor' },
 		{ arm: 'the body of a component in a keyed @for row', name: 'TrailingRow' },
 	];
 
-	it.each(TRAILING)('keeps and owns the static last root of $arm', async ({ name }) => {
-		const { leaf, resolveLeaf, nodes, em } = await hydratePending(name);
-		await act(async () => resolveLeaf('z'));
+	it.each(TRAILING)(
+		'owns the static last root of $arm after the island falls back',
+		async ({ name }) => {
+			const { leaf, resolveLeaf, ...served } = await hydratePending(name);
+			await act(async () => resolveLeaf('z'));
 
-		expect(markup(section())).toBe('<s>s</s><i>z</i><b>b</b><em>e</em>');
-		expectAdopted(nodes);
-		expect(recoverable).toEqual([]);
-		expect(warnings()).toEqual([]);
+			expect(markup(section())).toBe('<s>s</s><i>z</i><b>b</b><em>e</em>');
+			expectIslandFallback(served);
 
-		render(name, 'c', leaf);
-		expect(markup(section())).toBe('<p>c</p><em>e</em>');
-		expect(tail()).toBe(em);
-		render(name, 'b', leaf);
-		expect(markup(section())).toBe('<em>e</em>');
-		render(name, 'a', leaf);
-		expect(markup(section())).toBe('<s>s</s><i>z</i><b>b</b><em>e</em>');
-		expect(tail()).toBe(em);
-	});
+			const em = tail();
+			render(name, 'c', leaf);
+			expect(markup(section())).toBe('<p>c</p><em>e</em>');
+			expect(tail()).toBe(em);
+			render(name, 'b', leaf);
+			expect(markup(section())).toBe('<em>e</em>');
+			render(name, 'a', leaf);
+			expect(markup(section())).toBe('<s>s</s><i>z</i><b>b</b><em>e</em>');
+			expect(tail()).toBe(em);
+		},
+	);
 
-	it.each(TRAILING)('replaces every root of $arm while it is pending', async ({ name }) => {
-		const { leaf, resolveLeaf, em } = await hydratePending(name);
-		render(name, 'c', leaf);
-		await act(async () => {});
-		await act(async () => resolveLeaf('z'));
+	it.each(TRAILING)(
+		'replaces every root of $arm while its client render is pending',
+		async ({ name }) => {
+			const { leaf, resolveLeaf, ...served } = await hydratePending(name);
+			render(name, 'c', leaf);
+			await act(async () => {});
+			await act(async () => resolveLeaf('z'));
 
-		expect(markup(section())).toBe('<p>c</p><em>e</em>');
-		expect(tail()).toBe(em);
-		expect(recoverable).toEqual([]);
-		expect(warnings()).toEqual([]);
+			expect(markup(section())).toBe('<p>c</p><em>e</em>');
+			expectIslandFallback(served);
 
-		render(name, 'a', leaf);
-		expect(markup(section())).toBe('<s>s</s><i>z</i><b>b</b><em>e</em>');
-		expect(tail()).toBe(em);
-	});
+			const em = tail();
+			render(name, 'a', leaf);
+			expect(markup(section())).toBe('<s>s</s><i>z</i><b>b</b><em>e</em>');
+			expect(tail()).toBe(em);
+		},
+	);
 
-	it('bounds an arm whose render ends inside its root', async () => {
-		const { nodes, em } = await hydrate('NestedTail', { k: 'a' });
+	// Without a boundary, the root renders on the client.
+	it.each([
+		{
+			arm: 'whose render ends inside its root',
+			name: 'NestedTail',
+			html: '<p><i>z</i></p><em>e</em>',
+			next: '<b>c</b><em>e</em>',
+		},
+		{
+			arm: 'that runs up to the end of its parent arm',
+			name: 'LastArm',
+			html: '<s>s</s><i>z</i>',
+			next: '<b>c</b>',
+		},
+	])('renders the root on the client for an arm $arm', async ({ name, html, next }) => {
+		const served = await hydrate(name, { k: 'a' });
 
-		expect(markup(section())).toBe('<p><i>z</i></p><em>e</em>');
-		expectAdopted(nodes);
-		expect(recoverable).toEqual([]);
-		expect(warnings()).toEqual([]);
+		expect(markup(section())).toBe(html);
+		expect(served.outer!.isConnected).toBe(false);
+		expect(served.nodes.filter((node) => node.isConnected)).toEqual([]);
+		expect(recoverable).toEqual([expect.stringMatching(MISMATCH)]);
+		expect(warnings()).toEqual(dev ? [expect.stringMatching(STRUCTURAL)] : []);
 
-		flushSync(() => root!.render(client.NestedTail, { k: 'c' }));
-		expect(markup(section())).toBe('<b>c</b><em>e</em>');
-		expect(tail()).toBe(em);
-	});
-
-	it('bounds an arm that runs up to the end of its parent arm', async () => {
-		const { nodes } = await hydrate('LastArm', { k: 'a' });
-
-		expect(markup(section())).toBe('<s>s</s><i>z</i>');
-		expectAdopted(nodes);
-		expect(recoverable).toEqual([]);
-		expect(warnings()).toEqual([]);
-
-		flushSync(() => root!.render(client.LastArm, { k: 'c' }));
-		expect(markup(section())).toBe('<b>c</b>');
-		flushSync(() => root!.render(client.LastArm, { k: 'a' }));
-		expect(markup(section())).toBe('<s>s</s><i>z</i>');
+		const rendered = section();
+		flushSync(() => root!.render(client[name], { k: 'c' }));
+		expect(markup(section())).toBe(next);
+		flushSync(() => root!.render(client[name], { k: 'a' }));
+		expect(markup(section())).toBe(html);
+		expect(section()).toBe(rendered);
 	});
 });

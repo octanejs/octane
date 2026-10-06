@@ -1,6 +1,6 @@
-// A component call that finds no server range of its own renders on the client
-// and discards the server nodes in its place. A server range after those nodes
-// belongs to a later sibling call, which must still be able to adopt it.
+// A component call that finds no server range of its own renders in place of
+// the server nodes there, adopting them when they match. A server range after
+// those nodes belongs to a later sibling call.
 import { useEffect } from 'octane';
 
 interface Props {

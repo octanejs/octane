@@ -19,7 +19,8 @@ import {
 // caught the rejection rendered its @catch arm in that place, plus a rejection
 // seed. The component must read that seed, and the boundary must adopt the
 // server's catch arm, exactly as it does for a template reader. A body that
-// renders where the server rendered something else still reports a mismatch.
+// renders where the server rendered something else is a mismatch, which with
+// no Suspense boundary around it renders the root on the client.
 // Recoverable errors publish in dev and prod; console diagnostics in dev only.
 
 const server = loadServerFixture(
@@ -152,19 +153,24 @@ describe('hydrateRoot — template-less use() reader rejected on the server', ()
 		root.unmount();
 	});
 
-	it('reports the missing range when the client body renders', async () => {
+	it('renders the root on the client where the server rendered a node in place of its range', async () => {
 		container.innerHTML = (await prerender(server.Branch, { server: true })).html;
 		const { h1, button } = serverNodes();
 		expect(container.querySelector('.server')).not.toBeNull();
 
 		const { root, caught, recovered } = await hydrate(Branch, { server: false });
 
+		// No boundary surrounds the mismatch, so no server node survives.
 		expect(container.querySelector('.server')).toBeNull();
 		expect(container.querySelector('div')!.textContent).toBe('beforeclientafter');
-		expect(container.querySelector('h1')).toBe(h1);
-		expect(container.querySelector('button')).toBe(button);
+		expect(h1!.isConnected).toBe(false);
+		expect(button!.isConnected).toBe(false);
 		expect(caught).toEqual([]);
-		expect(recovered).toHaveLength(1);
+		expect(recovered).toEqual([
+			expect.objectContaining({
+				message: expect.stringMatching(/^Hydration failed because the server rendered HTML/),
+			}),
+		]);
 		expect(consoleError.mock.calls.map(([message]) => message)).toEqual(
 			DEV
 				? [

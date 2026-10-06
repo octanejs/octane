@@ -340,7 +340,10 @@ describe.each([
 		}
 	});
 
-	it('repairs a URL changed after its adopted publication during hydration', () => {
+	// A value that is neither the client's nor the binding's publication is an
+	// ordinary attribute difference: as in React, hydration keeps it, and only
+	// development warns that it won't be patched up.
+	it('keeps a URL changed after its adopted publication during hydration', () => {
 		const { client, anchor, adopt } = links();
 		const model = source(linked);
 		const handle = adopt(model.state);
@@ -352,9 +355,14 @@ describe.each([
 			flushSync(() => {
 				root = hydrateRoot(document.body, client.Links, linked);
 			});
-			expect(anchor.getAttribute('href')).toBe('/a');
-			if (dev) expect(error).toHaveBeenCalled();
-			else expect(error).not.toHaveBeenCalled();
+			expect(anchor.getAttribute('href')).toBe('/unrelated');
+			if (dev) {
+				expect(error).toHaveBeenCalledOnce();
+				expect(String(error.mock.calls[0][0])).toContain("won't be patched up");
+				expect(String(error.mock.calls[0][0])).toContain(
+					'attribute `href`: the server rendered "/unrelated", the client "/a"',
+				);
+			} else expect(error).not.toHaveBeenCalled();
 		} finally {
 			handle.dispose();
 			root?.unmount();

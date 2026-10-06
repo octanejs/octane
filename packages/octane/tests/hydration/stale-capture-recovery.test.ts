@@ -6,11 +6,14 @@ import * as ServerRT from 'octane/server';
 import { loadCompiledFixtureSource, loadServerFixture } from '../_server-fixture';
 
 // When a dormant Hydrate boundary's captures change before it activates, the
-// server HTML predates the client's state. Activation recovers from it without
-// a hydration warning or onRecoverableError, and takes the client's values even
-// where a real mismatch would keep the server's: suppressHydrationWarning and
-// dangerouslySetInnerHTML. Each Plain* control renders the same tree without a
-// boundary, where the same difference is a real mismatch.
+// server HTML predates the client's state, and a dormant boundary never renders
+// its stale captures to compare them. As React does for an update that reaches
+// a dehydrated boundary it cannot hydrate, a boundary whose output differs
+// renders on the client with no hydration warning and no onRecoverableError,
+// and takes the client's values even where a real mismatch would keep the
+// server's: suppressHydrationWarning and dangerouslySetInnerHTML. Each Plain*
+// control renders the same tree without a boundary, where the same difference
+// is a real mismatch: the root renders on the client and reports.
 
 const FIXTURE = join(
 	process.cwd(),
@@ -29,9 +32,7 @@ function markup(node: Element): string {
 	return copy.innerHTML;
 }
 
-const MISMATCH = /^Hydration mismatch: /;
-const TEXT_CHILDREN = /the server rendered extra children in a text element/;
-const STRUCTURAL = /the mismatched subtree was rebuilt on the client/;
+const MISMATCH = /^Hydration failed because the server rendered HTML didn't match the client\./;
 
 describe.each([
 	{ name: 'development compile', dev: true },
@@ -91,8 +92,6 @@ describe.each([
 			serverProps: { label: 'server' },
 			clientProps: { label: 'client' },
 			html: '<section><b>x</b><i>x</i><b>y</b><i>y</i><b>z</b><i>z</i></section>',
-			report: MISMATCH,
-			warns: true,
 		},
 		{
 			site: 'a createElement list that shrank',
@@ -100,8 +99,6 @@ describe.each([
 			serverProps: { items: ['a', 'b'] },
 			clientProps: { items: ['a'] },
 			html: '<section><ul><li>a</li></ul></section>',
-			report: TEXT_CHILDREN,
-			warns: false,
 		},
 		{
 			site: 'a dynamic host tag that changed',
@@ -109,29 +106,37 @@ describe.each([
 			serverProps: { tag: 'b' },
 			clientProps: { tag: 'i' },
 			html: '<section><i>t</i></section>',
-			report: STRUCTURAL,
-			warns: true,
 		},
 	];
 
 	it.each(structural)(
-		'reports $site when the captures are unchanged',
-		async ({ name, serverProps, clientProps, html, report, warns }) => {
+		'renders the root on the client and reports $site when the captures are unchanged',
+		async ({ name, serverProps, clientProps, html }) => {
 			container.innerHTML = ServerRT.renderToString(server[`Plain${name}`], serverProps).html;
+			const served = [...container.querySelectorAll('*')];
 			await hydrate(`Plain${name}`, clientProps);
 
 			expect(markup(container.querySelector('section')!.parentElement!)).toBe(html);
-			expect(recoverable).toEqual([expect.stringMatching(report)]);
-			expect(warnings()).toHaveLength(dev && warns ? 1 : 0);
+			expect(served.filter((node) => node.isConnected)).toEqual([]);
+			expect(recoverable).toEqual([expect.stringMatching(MISMATCH)]);
+			expect(warnings()).toHaveLength(dev ? 1 : 0);
 		},
 	);
 
 	it.each(structural)(
-		'rebuilds $site without a report when the captures changed',
+		'renders $site on the client without a report when the captures changed',
 		async ({ name, serverProps, clientProps, html }) => {
-			await activate(`Dormant${name}`, serverProps, clientProps);
+			container.innerHTML = ServerRT.renderToString(server[`Dormant${name}`], serverProps).html;
+			const outer = container.firstElementChild;
+			const section = container.querySelector('section')!;
+			await hydrate(`Dormant${name}`, serverProps as Record<string, unknown>);
+			flushSync(() => root!.render(client[`Dormant${name}`], clientProps));
+			await act(async () => {});
 
 			expect(markup(container.querySelector('section')!.parentElement!)).toBe(html);
+			// Only the boundary renders on the client.
+			expect(container.firstElementChild).toBe(outer);
+			expect(section.isConnected).toBe(false);
 			expect(recoverable).toEqual([]);
 			expect(warnings()).toEqual([]);
 		},
@@ -143,7 +148,15 @@ describe.each([
 
 		expect(container.querySelector('article')!.innerHTML).toBe('<b>old</b>');
 		expect(recoverable).toEqual([]);
-		expect(warnings()).toEqual(dev ? [expect.stringContaining('The server value was kept')] : []);
+		expect(warnings()).toEqual(
+			dev
+				? [
+						expect.stringContaining(
+							'`dangerouslySetInnerHTML` content: the server rendered "<b>old</b>", the client "<i>new</i>"',
+						),
+					]
+				: [],
+		);
 	});
 
 	it('writes the newer dangerouslySetInnerHTML when the captures changed', async () => {
@@ -199,12 +212,13 @@ describe.each([
 		expect(values(em)).toEqual({ text: 'green', title: 'green', class: 'green', color: 'green' });
 	});
 
-	it('keeps the server HTML while a resolved arm that wrote the newer HTML is pending', async () => {
+	it('shows the pending arm while the newer HTML waits for a value in the same @try arm', async () => {
 		container.innerHTML = ServerRT.renderToString(server.DormantArmHTML, {
 			server: true,
 			html: '<b>old</b>',
 			leaf: Promise.resolve('z'),
 		}).html;
+		const outer = container.firstElementChild;
 		await hydrate('DormantArmHTML', {
 			server: true,
 			html: '<b>old</b>',
@@ -215,38 +229,51 @@ describe.each([
 		flushSync(() => root!.render(client.DormantArmHTML, { html: '<i>new</i>', leaf }));
 		await act(async () => {});
 
-		// The discarded attempt restored what it changed, as it does for text.
-		expect(markup(container.querySelector('section')!)).toBe(
-			'<article><b>old</b></article><u>z</u>',
-		);
+		// The arm's newer content suspends outside a transition, so its @pending
+		// arm shows until the value resolves.
+		expect(container.querySelector('p')!.textContent).toBe('pending');
 
 		await act(async () => resolve('y'));
 		expect(markup(container.querySelector('section')!)).toBe(
 			'<article><i>new</i></article><u>y</u>',
 		);
+		expect(container.firstElementChild).toBe(outer);
 		expect(recoverable).toEqual([]);
 		expect(warnings()).toEqual([]);
 	});
 
-	it('writes the newer text where a suppressed host lost its server text node', async () => {
+	// suppressHydrationWarning keeps a differing server text one level deep, but
+	// never a structural difference: an element where the client renders text
+	// does not match, so the root renders on the client and reports, as in React.
+	it('renders the root on the client where a suppressed host lost its server text node', async () => {
 		const html = (name: string) => {
 			container.innerHTML = ServerRT.renderToString(server[name], { v: 'red' }).html;
 			// Something outside Octane replaced the server's text with another node.
 			const em = container.querySelector('em')!;
 			em.replaceChild(document.createElement('s'), em.lastChild!);
+			return em;
 		};
 
-		html('PlainSwap');
+		const plain = html('PlainSwap');
 		await hydrate('PlainSwap', { v: 'red' });
-		expect(container.querySelector('em')!.textContent).toBe('b');
-		root!.unmount();
+		expect(plain.isConnected).toBe(false);
+		expect(container.querySelector('em')!.innerHTML).toBe('<b>b</b>red');
+		expect(recoverable).toEqual([expect.stringMatching(MISMATCH)]);
+		expect(warnings()).toHaveLength(dev ? 1 : 0);
+	});
 
-		root = null;
-		html('DormantSwap');
+	it('renders the dormant boundary on the client where a suppressed host lost its server text node', async () => {
+		container.innerHTML = ServerRT.renderToString(server.DormantSwap, { v: 'red' }).html;
+		const outer = container.firstElementChild;
+		// Something outside Octane replaced the server's text with another node.
+		const em = container.querySelector('em')!;
+		em.replaceChild(document.createElement('s'), em.lastChild!);
 		await hydrate('DormantSwap', { v: 'red' });
 		flushSync(() => root!.render(client.DormantSwap, { v: 'blue' }));
 		await act(async () => {});
-		expect(container.querySelector('em')!.textContent).toBe('bblue');
+		expect(em.isConnected).toBe(false);
+		expect(container.firstElementChild).toBe(outer);
+		expect(container.querySelector('em')!.innerHTML).toBe('<b>b</b>blue');
 		expect(recoverable).toEqual([]);
 		expect(warnings()).toEqual([]);
 	});

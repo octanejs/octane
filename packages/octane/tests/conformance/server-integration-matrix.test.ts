@@ -161,17 +161,31 @@ matrix.itRenders('diagnoses a mismatched renderable root through lazy', {
 	},
 });
 
-// Per ReactDOMHydrationDiff-test.js:944, "server renders an extra element in the end".
-matrix.itRenders('removes a trailing server sibling after adopting a matching host root', {
-	component: 'AttributeValues',
-	modes: ['hydrate-mismatch'],
-	mismatch: { mutateServerDom: appendTrailingServerNode },
-	captureBeforeHydrate: (container) => container.querySelector('#attribute-values'),
-	assertCommon({ root, before }) {
-		expect(root.querySelector('#attribute-values')).toBe(before);
-		expect(root.querySelector('#extra-server-root')).toBeNull();
+/** Captures the adopted root's first element and the third-party root sibling. */
+function captureRootAndExtra(selector: string) {
+	return (container: HTMLElement) => ({
+		first: container.querySelector(selector),
+		extra: container.querySelector('#extra-server-root'),
+	});
+}
+
+// Per ReactDOMHydrationDiff-test.js:944, "server renders an extra element in the end",
+// with the extra node directly in the root container: React 19 skips unmatched
+// siblings there and leaves them in place, as third-party nodes
+// (react-dom-client.development.js:22343), and reports nothing.
+matrix.itRenders(
+	'leaves a trailing server sibling in the root container after adopting a matching host root',
+	{
+		component: 'AttributeValues',
+		modes: ['hydrate-mismatch'],
+		mismatch: { mutateServerDom: appendTrailingServerNode, diagnostics: 'none' },
+		captureBeforeHydrate: captureRootAndExtra('#attribute-values'),
+		assertCommon({ root, before }) {
+			expect(root.querySelector('#attribute-values')).toBe(before!.first);
+			expect(root.querySelector('#extra-server-root')).toBe(before!.extra);
+		},
 	},
-});
+);
 
 // Per ReactDOMHydrationDiff-test.js:944, "server renders an extra element in the end".
 matrix.itRenders('preserves a rebuilt host root while removing all stale server siblings', {
@@ -185,34 +199,46 @@ matrix.itRenders('preserves a rebuilt host root while removing all stale server 
 	},
 });
 
-// Per ReactDOMHydrationDiff-test.js:1476, "server renders an extra Fragment node".
-matrix.itRenders('removes a trailing server sibling after adopting a matching fragment', {
-	component: 'NestedFragment',
-	modes: ['hydrate-mismatch'],
-	mismatch: { mutateServerDom: appendTrailingServerNode },
-	captureBeforeHydrate: (container) => container.querySelector('#fragment-first'),
-	assertCommon({ root, before }) {
-		expect(root.querySelector('#fragment-first')).toBe(before);
-		expect(root.querySelector('#extra-server-root')).toBeNull();
+// Per ReactDOMHydrationDiff-test.js:1476, "server renders an extra Fragment node",
+// with the extra node directly in the root container, which React 19 leaves
+// in place (react-dom-client.development.js:22343).
+matrix.itRenders(
+	'leaves a trailing server sibling in the root container after adopting a matching fragment',
+	{
+		component: 'NestedFragment',
+		modes: ['hydrate-mismatch'],
+		mismatch: { mutateServerDom: appendTrailingServerNode, diagnostics: 'none' },
+		captureBeforeHydrate: captureRootAndExtra('#fragment-first'),
+		assertCommon({ root, before }) {
+			expect(root.querySelector('#fragment-first')).toBe(before!.first);
+			expect(root.querySelector('#extra-server-root')).toBe(before!.extra);
+		},
 	},
-});
+);
 
-// Per ReactDOMHydrationDiff-test.js:944, "server renders an extra element in the end".
-matrix.itRenders('preserves an updatable primitive root while removing a trailing server sibling', {
-	component: 'PrimitiveRoot',
-	props: () => ({ mode: 'text', text: 'primitive text' }),
-	modes: ['hydrate-mismatch'],
-	mismatch: { mutateServerDom: appendTrailingServerNode },
-	assertCommon({ root, octaneRoot }) {
-		expect(root.textContent).toBe('primitive text');
-		expect(root.querySelector('#extra-server-root')).toBeNull();
+// Per ReactDOMHydrationDiff-test.js:944, "server renders an extra element in the end",
+// with the extra node directly in the root container, which React 19 leaves
+// in place (react-dom-client.development.js:22343).
+matrix.itRenders(
+	'keeps an updatable primitive root beside a trailing server sibling in the root container',
+	{
+		component: 'PrimitiveRoot',
+		props: () => ({ mode: 'text', text: 'primitive text' }),
+		modes: ['hydrate-mismatch'],
+		mismatch: { mutateServerDom: appendTrailingServerNode, diagnostics: 'none' },
+		captureBeforeHydrate: (container) => container.querySelector('#extra-server-root'),
+		assertCommon({ root, before, octaneRoot }) {
+			expect(root.textContent).toBe('primitive textextra');
+			expect(root.querySelector('#extra-server-root')).toBe(before);
 
-		flushSync(() => octaneRoot!.render(client.PrimitiveRoot, { mode: 'empty' }));
-		expect(root.textContent).toBe('');
-		flushSync(() => octaneRoot!.render(client.PrimitiveRoot, { mode: 'element' }));
-		expect(root.querySelector('#primitive-root-element')?.textContent).toBe('element');
+			flushSync(() => octaneRoot!.render(client.PrimitiveRoot, { mode: 'empty' }));
+			expect(root.textContent).toBe('extra');
+			flushSync(() => octaneRoot!.render(client.PrimitiveRoot, { mode: 'element' }));
+			expect(root.querySelector('#primitive-root-element')?.textContent).toBe('element');
+			expect(root.querySelector('#extra-server-root')).toBe(before);
+		},
 	},
-});
+);
 
 // Per ReactDOMServerIntegrationBasic-test.js:75, "a bigint".
 matrix.itRenders('renders a bigint', {
@@ -438,9 +464,16 @@ matrix.itRenders('preserves memo, callback, and ref hook cells across render ret
 		expect(root.querySelector('#render-phase-memo-callback-ref')?.textContent).toBe(
 			'HELLO, WORLD./HELLO, WORLD.',
 		);
+		// Each render pass computes each value once: the server render, then the
+		// hydration. A mismatch adds the root's client render after the
+		// hydration attempt that found it.
 		const onePass = ['hello', 'hello, world.'];
 		expect(state.computations).toEqual(
-			mode === 'hydrate-match' || mode === 'hydrate-mismatch' ? [...onePass, ...onePass] : onePass,
+			mode === 'hydrate-match'
+				? [...onePass, ...onePass]
+				: mode === 'hydrate-mismatch'
+					? [...onePass, ...onePass, ...onePass]
+					: onePass,
 		);
 	},
 });

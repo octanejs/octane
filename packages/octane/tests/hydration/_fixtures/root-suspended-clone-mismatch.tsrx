@@ -132,3 +132,43 @@ export function RootLiteHost(props: { server?: boolean }) @{
 		<GateLeaf />
 	</div>
 }
+
+// Rendered into a <body> container, beside a document resource that the
+// root's fallback keeps.
+export function RootBody(props: { server?: boolean }) @{
+	<main>
+		@if (props.server) {
+			<b class="server">{'server'}</b>
+		} @else {
+			<GateLeaf />
+		}
+	</main>
+}
+
+// Rendered into an <html> container, whose text differs on the client before
+// the root reaches GateLeaf.
+export function RootHtml(props: { server?: boolean }) @{
+	<>
+		<head>
+			<meta name="side" content="root" />
+		</head>
+		<body>
+			<p>{(props.server ? 'server' : 'client') as string}</p>
+			<GateLeaf />
+		</body>
+	</>
+}
+
+// A whole document whose body differs on the client.
+export function RootDocument(props: { server?: boolean }) @{
+	<html>
+		<head></head>
+		<body>
+			@if (props.server) {
+				<b class="server">{'server'}</b>
+			} @else {
+				<GateLeaf />
+			}
+		</body>
+	</html>
+}

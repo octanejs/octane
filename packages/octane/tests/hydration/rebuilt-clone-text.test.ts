@@ -5,11 +5,11 @@ import { act, flushSync, hydrateRoot } from '../../src/index.js';
 import * as ServerRT from 'octane/server';
 import { loadCompiledFixtureSource, loadServerFixture } from '../_server-fixture';
 
-// When a template's root does not match the server node at the cursor,
-// hydration reports the structural mismatch and rebuilds that subtree on the
-// client. The rebuilt subtree holds no server text, so its text holes must not
-// report a second, text mismatch for the same recovery, while a text mismatch
-// inside an adopted server element still reports.
+// When a template's root does not match the server node at the cursor, the
+// nearest fallback owner renders on the client, as in React 19. The client
+// render holds no server text, so its text holes report nothing more: one
+// failed owner reports once. A text mismatch inside an otherwise matching
+// element is a mismatch too, and falls back the same way.
 
 const FIXTURE = join(
 	process.cwd(),
@@ -18,6 +18,8 @@ const FIXTURE = join(
 const FILE = 'rebuilt-clone-text.tsrx';
 const SOURCE = readFileSync(FIXTURE, 'utf8');
 const LINES = SOURCE.split('\n');
+const HYDRATION_FAILED =
+	/^Hydration failed because the server rendered (HTML|text) didn't match the client/;
 
 /** 1-based line of the first fixture line containing `text`. */
 function lineOf(text: string): number {
@@ -36,13 +38,10 @@ function markup(node: Element): string {
 	return copy.innerHTML;
 }
 
-const STRUCTURAL = /the mismatched subtree was rebuilt on the client/;
-const TEXT = /server-rendered text differed from the client/;
-
 describe.each([
 	{ name: 'development compile', dev: true },
 	{ name: 'production compile', dev: false },
-])('hydrateRoot — text holes in a rebuilt template clone ($name)', ({ dev }) => {
+])('hydrateRoot — text holes in a mismatched template clone ($name)', ({ dev }) => {
 	const server = loadServerFixture(FIXTURE, { id: FILE });
 	const client = loadCompiledFixtureSource(SOURCE, {
 		id: FILE,
@@ -71,105 +70,149 @@ describe.each([
 			.map((call: unknown[]) => String(call[0]))
 			.filter((message: string) => message.includes('hydration mismatch'));
 
+	/** Hydrate over the server render; returns the server's elements and the reports. */
 	async function hydrate(
 		name: string,
 		serverProps: Record<string, unknown>,
 		clientProps: Record<string, unknown>,
-	): Promise<string[]> {
+	) {
 		container.innerHTML = ServerRT.renderToString(server[name], serverProps).html;
+		const outer = container.firstElementChild!;
+		const serverNodes = [...container.querySelectorAll('*')];
 		const recoverable: string[] = [];
+		const caught: unknown[] = [];
 		root = hydrateRoot(container, client[name], clientProps, {
 			onRecoverableError: (error: unknown) => recoverable.push((error as Error).message),
+			onCaughtError: (error: unknown) => caught.push(error),
 		});
 		flushSync(() => {});
 		// Recoverable reports are delivered after the hydration burst.
 		await act(async () => {});
-		return recoverable;
+		return { outer, serverNodes, recoverable, caught };
+	}
+
+	/** The dev warning for the Leaf's `<i>` where the server rendered `actual`. */
+	function structural(line: number, actual: string) {
+		return expect.stringMatching(
+			new RegExp(
+				`^Octane hydration mismatch at ${FILE}:${line}:1: the client expected <i> but the ` +
+					`server rendered ${actual}\\.`,
+			),
+		);
 	}
 
 	it.each([
-		{ site: 'an @if arm', name: 'Branch', serverProps: { server: true }, clientProps: {} },
+		{
+			site: 'an @if arm',
+			name: 'Branch',
+			serverProps: { server: true },
+			clientProps: {},
+			arm: false,
+		},
 		{
 			site: 'a @try body',
 			name: 'TryBranch',
 			serverProps: { server: true },
 			clientProps: {},
-		},
-		{
-			site: 'a server @pending arm',
-			name: 'TryBranch',
-			serverProps: { value: new Promise<never>(() => {}) },
-			clientProps: {},
-			actual: '<p>',
+			arm: true,
 		},
 		{
 			site: 'a render-phase update',
 			name: 'DrainBranch',
 			serverProps: {},
 			clientProps: { flip: true },
+			arm: false,
 		},
 	])(
-		'reports only the structural rebuild of an only-child text hole in $site',
-		async ({ name, serverProps, clientProps, actual = '<b>' }) => {
-			const recoverable = await hydrate(name, serverProps, clientProps);
+		'reports once when the owner of an only-child text hole in $site falls back',
+		async ({ name, serverProps, clientProps, arm }) => {
+			const { outer, serverNodes, recoverable } = await hydrate(name, serverProps, clientProps);
 
 			expect(markup(container.firstElementChild!)).toBe('<i>ok</i>');
-			expect(recoverable).toEqual([expect.stringMatching(STRUCTURAL)]);
-			expect(warnings()).toEqual(
-				dev
-					? [
-							`Octane hydration mismatch at ${FILE}:${lineOf('<i>{read(props.value)')}:1: the client ` +
-								`expected <i> but the server rendered ${actual}. The mismatched subtree was ` +
-								'rebuilt on the client.',
-						]
-					: [],
-			);
+			// An `@try` arm is the fallback owner, so the host around it stays;
+			// otherwise the root renders on the client.
+			const kept = arm ? [outer] : [];
+			expect(serverNodes.filter((node) => node.isConnected)).toEqual(kept);
+			expect(recoverable).toEqual([expect.stringMatching(HYDRATION_FAILED)]);
+			expect(warnings()).toEqual(dev ? [structural(lineOf('<i>{read(props.value)'), '<b>')] : []);
 		},
 	);
 
-	it('reports only the structural rebuild of a sibling text hole', async () => {
-		const recoverable = await hydrate('SiblingBranch', { server: true }, {});
-
-		expect(markup(container.firstElementChild!)).toBe('<i><u>x</u>ok</i>');
-		expect(recoverable).toEqual([expect.stringMatching(STRUCTURAL)]);
-		expect(warnings()).toEqual(
-			dev
-				? [
-						`Octane hydration mismatch at ${FILE}:${lineOf('function SiblingLeaf(') + 1}:1: the ` +
-							'client expected <i> but the server rendered <b>. The mismatched subtree was ' +
-							'rebuilt on the client.',
-					]
-				: [],
+	// renderToString cannot finish a suspended `@try`, so the server sent its
+	// `@pending` arm. React marks such a boundary for client rendering
+	// (`<!--$!-->`): the client renders only that boundary and reports once,
+	// and the host around it keeps its server node.
+	it('client-renders only the @try arm that the server left pending', async () => {
+		const { outer, recoverable } = await hydrate(
+			'TryBranch',
+			{ value: new Promise<never>(() => {}) },
+			{},
 		);
+
+		expect(markup(container.firstElementChild!)).toBe('<i>ok</i>');
+		expect(container.firstElementChild).toBe(outer);
+		expect(recoverable).toEqual([expect.stringMatching(/^The server could not finish/)]);
 	});
 
-	it('still reports server text that differs inside an adopted element', async () => {
-		container.innerHTML = ServerRT.renderToString(server.Label, { text: 'server' }).html;
-		const adopted = container.querySelector('i')!;
+	// As React's boundary does, the arm that the server left pending does not
+	// restart the throttle on revealing Suspense content when its client render
+	// shows `@pending`: it already counted as pending. Its data resolving
+	// outside act() reveals it at once, and the boundary reports once.
+	it('reveals the @try arm that the server left pending as soon as its client data resolves', async () => {
+		// The throttle is global: let an earlier test's reveal leave its window.
+		await new Promise((resolve) => setTimeout(resolve, 320));
+		container.innerHTML = ServerRT.renderToString(server.TryReader, {
+			value: new Promise<never>(() => {}),
+		}).html;
+		const outer = container.firstElementChild!;
 		const recoverable: string[] = [];
 		root = hydrateRoot(
 			container,
-			client.Label,
-			{ text: 'client' },
-			{
-				onRecoverableError: (error: unknown) => recoverable.push((error as Error).message),
-			},
+			client.TryReader,
+			{ value: Promise.resolve('ok') },
+			{ onRecoverableError: (error: unknown) => recoverable.push((error as Error).message) },
 		);
-		flushSync(() => {});
-		await act(async () => {});
+		expect(markup(outer)).toBe('<p>pending</p>');
+		await new Promise((resolve) => setTimeout(resolve, 0));
 
-		expect(container.querySelector('i')).toBe(adopted);
-		expect(markup(container.firstElementChild!)).toBe('<i>client</i>');
-		expect(recoverable).toEqual([expect.stringMatching(TEXT)]);
-		expect(warnings()).toEqual(
-			dev
-				? [
-						`Octane hydration mismatch at ${FILE}:${lineOf('<i>{props.text')}:2: server ` +
-							'rendered text "server" but the client rendered "client". The client value was ' +
-							'used. If this difference is intentional (e.g. a timestamp or random id), add ' +
-							'suppressHydrationWarning to the element.',
-					]
-				: [],
+		expect(markup(outer)).toBe('<i>ok</i>');
+		expect(container.firstElementChild).toBe(outer);
+		expect(recoverable).toEqual([expect.stringMatching(/^The server could not finish/)]);
+	});
+
+	// As in React, a client render that catches an error reports that alone.
+	it('reports only the caught error when the @try arm that the server left pending throws on the client', async () => {
+		const { outer, recoverable, caught } = await hydrate(
+			'TryCatchBranch',
+			{ value: new Promise<never>(() => {}) },
+			{ value: 'x' },
 		);
+
+		expect(markup(container.firstElementChild!)).toBe('<b>x</b>');
+		expect(container.firstElementChild).toBe(outer);
+		expect(caught).toEqual(['x']);
+		expect(recoverable).toEqual([]);
+	});
+
+	it('reports once when the owner of a sibling text hole falls back', async () => {
+		const { serverNodes, recoverable } = await hydrate('SiblingBranch', { server: true }, {});
+
+		expect(markup(container.firstElementChild!)).toBe('<i><u>x</u>ok</i>');
+		expect(serverNodes.filter((node) => node.isConnected)).toEqual([]);
+		expect(recoverable).toEqual([expect.stringMatching(HYDRATION_FAILED)]);
+		expect(warnings()).toEqual(dev ? [structural(lineOf('function SiblingLeaf(') + 1, '<b>')] : []);
+	});
+
+	it('client-renders the root for server text that differs inside a matching element', async () => {
+		const { serverNodes, recoverable } = await hydrate(
+			'Label',
+			{ text: 'server' },
+			{ text: 'client' },
+		);
+
+		expect(markup(container.firstElementChild!)).toBe('<i>client</i>');
+		expect(serverNodes.filter((node) => node.isConnected)).toEqual([]);
+		expect(recoverable).toEqual([expect.stringMatching(HYDRATION_FAILED)]);
+		expect(warnings().length).toBeLessThanOrEqual(dev ? 1 : 0);
 	});
 });

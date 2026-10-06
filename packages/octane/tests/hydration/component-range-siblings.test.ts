@@ -7,10 +7,10 @@ import { loadCompiledFixtureSource, loadServerFixture } from '../_server-fixture
 
 // A server range whose content differs from the client's, where the client
 // renders sibling component calls that each need a range of their own. The
-// first call finds the server's content where its range belongs, reports it,
-// and discards everything up to the end of the range. Every later sibling
-// then finds that end for the same reason: one recovery, reported once. A
-// mismatch in a separate range is a second recovery and still reports.
+// first call finds the server's content where its range belongs: the server
+// HTML does not match the client render, and with no Suspense boundary around
+// it the root renders on the client, as React's does. That is one fallback,
+// reported once, however many later siblings or ranges would also differ.
 
 const FIXTURE = join(
 	process.cwd(),
@@ -20,12 +20,11 @@ const FILE = 'component-range-siblings.tsrx';
 const SOURCE = readFileSync(FIXTURE, 'utf8');
 const LINES = SOURCE.split('\n');
 
-/** `FILE:line:column` of the first line reading exactly `call` in function `name`. */
-function site(name: string, call: string): string {
-	const from = LINES.findIndex((source) => source.startsWith(`function ${name}(`));
-	const index = LINES.findIndex((source, line) => line > from && source.trim() === call);
-	if (from < 0 || index < 0) throw new Error(`fixture function ${name} has no line ${call}`);
-	return `${FILE}:${index + 1}:${LINES[index].indexOf(call)}`;
+/** `FILE:line:column` of the fixture's component `name`, which a mismatch in its output names. */
+function definition(name: string): string {
+	const index = LINES.findIndex((source) => source.startsWith(`function ${name}(`));
+	if (index < 0) throw new Error(`fixture has no function ${name}`);
+	return `${FILE}:${index + 1}:0`;
 }
 
 /** Element and text markup, ignoring hydration comments. */
@@ -38,22 +37,21 @@ function markup(node: Element): string {
 	return copy.innerHTML;
 }
 
-const RANGE_REBUILT =
-	/the server rendered a different child shape where the client renders a component/;
-const RECOVERED = /^Hydration mismatch: /;
+const MISMATCH = /^Hydration failed because the server rendered HTML didn't match the client\./;
 const RANGE_END = 'the end of the parent block (fewer nodes than expected)';
 
 function diagnostic(loc: string, expected: string, server: string): string {
 	return (
 		`Octane hydration mismatch at ${loc}: the client expected ${expected} but the server ` +
-		`rendered ${server}. The mismatched subtree was rebuilt on the client.`
+		`rendered ${server}. The nearest Suspense or Hydrate boundary, or the root, will be ` +
+		`regenerated on the client.`
 	);
 }
 
 describe.each([
 	{ name: 'development compile', dev: true },
 	{ name: 'production compile', dev: false },
-])('hydrateRoot — sibling components in a mismatched server range ($name)', ({ dev }) => {
+])('hydrateRoot — sibling components over mismatched server content ($name)', ({ dev }) => {
 	const server = loadServerFixture(FIXTURE, { id: FILE });
 	const client = loadCompiledFixtureSource(SOURCE, {
 		id: FILE,
@@ -88,8 +86,7 @@ describe.each([
 		clientProps: Record<string, unknown>,
 	) {
 		container.innerHTML = ServerRT.renderToString(server[name], serverProps).html;
-		const after = container.querySelector('button.after')!;
-		const afterLabel = container.querySelector('small.after')!;
+		const serverElements = [...container.querySelectorAll('*')];
 		const recoverable: string[] = [];
 		root = hydrateRoot(container, client[name], clientProps, {
 			onRecoverableError: (error: unknown) => recoverable.push((error as Error).message),
@@ -97,7 +94,7 @@ describe.each([
 		flushSync(() => {});
 		// Recoverable reports are delivered after the hydration burst.
 		await act(async () => {});
-		return { after, afterLabel, recoverable };
+		return { serverElements, recoverable };
 	}
 
 	/** The markup a client render of the same props puts in the container. */
@@ -112,8 +109,8 @@ describe.each([
 		}
 	}
 
-	it('reports server text in place of two component ranges once', async () => {
-		const { after, afterLabel, recoverable } = await hydrate(
+	it('renders the root on the client once for server text in place of two component ranges', async () => {
+		const { serverElements, recoverable } = await hydrate(
 			'HoleSwap',
 			{ label: 'server' },
 			{ label: 'client' },
@@ -125,28 +122,22 @@ describe.each([
 				'<button class="inner2">inner2:0</button><small class="inner2">inner2</small>' +
 				'<button class="after">after:0</button><small class="after">after</small>',
 		);
-		expect(container.querySelector('button.after')).toBe(after);
-		expect(container.querySelector('small.after')).toBe(afterLabel);
-		expect(recoverable).toEqual([expect.stringMatching(RANGE_REBUILT)]);
+		expect(serverElements.filter((element) => element.isConnected)).toEqual([]);
+		expect(recoverable).toEqual([expect.stringMatching(MISMATCH)]);
 		expect(warnings()).toEqual(
 			dev
-				? [
-						diagnostic(
-							site('Wrapper', '<Tally name="inner" />'),
-							'a component range',
-							'text "server"',
-						),
-					]
+				? [diagnostic(definition('Tally'), 'a fragment starting with <button>', 'text "server"')]
 				: [],
 		);
 
-		// Both rebuilt components and the adopted one are live.
+		// Every client-rendered component is live.
 		const buttons = ['inner', 'inner2', 'after'].map((name) =>
 			container.querySelector<HTMLButtonElement>(`button.${name}`)!,
 		);
 		for (const button of buttons) flushSync(() => button.click());
 		expect(buttons.map((button) => button.textContent)).toEqual(['inner:1', 'inner2:1', 'after:1']);
 
+		const after = buttons[2];
 		flushSync(() => root!.render(client.HoleSwap, { label: 'server' }));
 		expect(markup(section)).toBe(
 			'server<button class="after">after:1</button><small class="after">after</small>',
@@ -158,6 +149,7 @@ describe.each([
 				'<button class="after">after:1</button><small class="after">after</small>',
 		);
 		expect(container.querySelector('button.after')).toBe(after);
+		expect(recoverable).toHaveLength(1);
 		expect(warnings()).toHaveLength(dev ? 1 : 0);
 	});
 
@@ -175,7 +167,7 @@ describe.each([
 			name: 'RootContent',
 			server: { value: 'server' },
 			client: { value: 'Wrapper' },
-			expected: 'a component range',
+			expected: 'a fragment starting with <button>',
 			actual: 'text "server"',
 		},
 		{
@@ -183,7 +175,7 @@ describe.each([
 			name: 'Arm',
 			server: { server: true },
 			client: { server: false },
-			expected: 'a component range',
+			expected: 'a fragment starting with <button>',
 			actual: '<b>',
 		},
 		{
@@ -191,11 +183,11 @@ describe.each([
 			name: 'Content',
 			server: { value: 'server' },
 			client: { value: 'TallyThenPlain' },
-			expected: 'a component range',
+			expected: 'a fragment starting with <button>',
 			actual: 'text "server"',
 		},
 		{
-			when: 'a component follows a rebuilt fragment clone',
+			when: 'the first component is a fragment clone',
 			name: 'Content',
 			server: { value: 'server' },
 			client: { value: 'PlainThenTally' },
@@ -207,11 +199,11 @@ describe.each([
 			name: 'Content',
 			server: { value: 'server' },
 			client: { value: 'TallyThenSingle' },
-			expected: 'a component range',
+			expected: 'a fragment starting with <button>',
 			actual: 'text "server"',
 		},
 		{
-			when: 'a component follows a rebuilt single-root clone',
+			when: 'the first component is a single-root clone',
 			name: 'Content',
 			server: { value: 'server' },
 			client: { value: 'SingleThenTally' },
@@ -223,18 +215,17 @@ describe.each([
 			name: 'Content',
 			server: { value: 'server' },
 			client: { value: 'TallyThenIf' },
-			expected: 'a component range',
+			expected: 'a fragment starting with <button>',
 			actual: 'text "server"',
 		},
 	])(
-		'reports once when $when',
+		'renders the root on the client and reports once when $when',
 		async ({ name, server: serverProps, client: clientProps, expected, actual }) => {
-			const { after, afterLabel, recoverable } = await hydrate(name, serverProps, clientProps);
+			const { serverElements, recoverable } = await hydrate(name, serverProps, clientProps);
 
 			expect(markup(container)).toBe(clientMarkup(name, clientProps));
-			expect(container.querySelector('button.after')).toBe(after);
-			expect(container.querySelector('small.after')).toBe(afterLabel);
-			expect(recoverable).toEqual([expect.stringMatching(RECOVERED)]);
+			expect(serverElements.filter((element) => element.isConnected)).toEqual([]);
+			expect(recoverable).toEqual([expect.stringMatching(MISMATCH)]);
 			expect(warnings()).toEqual(
 				dev
 					? [
@@ -251,8 +242,10 @@ describe.each([
 		},
 	);
 
-	it('reports each of two mismatched ranges', async () => {
-		const { after, recoverable } = await hydrate(
+	// The first mismatch already renders the root on the client, so the second
+	// range is never compared.
+	it('renders the root on the client once for two mismatched ranges', async () => {
+		const { serverElements, recoverable } = await hydrate(
 			'TwoHoles',
 			{ first: 'one', second: 'two' },
 			{ first: 'Wrapper', second: 'Wrapper' },
@@ -260,17 +253,11 @@ describe.each([
 
 		const props = { first: 'Wrapper', second: 'Wrapper' };
 		expect(markup(container)).toBe(clientMarkup('TwoHoles', props));
-		expect(container.querySelector('button.after')).toBe(after);
-		// One recoverable error per hydration burst, however many recoveries.
-		expect(recoverable).toEqual([expect.stringMatching(RANGE_REBUILT)]);
-		const loc = site('Wrapper', '<Tally name="inner" />');
+		expect(serverElements.filter((element) => element.isConnected)).toEqual([]);
+		expect(recoverable).toEqual([expect.stringMatching(MISMATCH)]);
+		const loc = definition('Tally');
 		expect(warnings()).toEqual(
-			dev
-				? [
-						diagnostic(loc, 'a component range', 'text "one"'),
-						diagnostic(loc, 'a component range', 'text "two"'),
-					]
-				: [],
+			dev ? [diagnostic(loc, 'a fragment starting with <button>', 'text "one"')] : [],
 		);
 	});
 

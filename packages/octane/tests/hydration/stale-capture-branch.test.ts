@@ -5,11 +5,13 @@ import { act, flushSync, hydrateRoot } from '../../src/index.js';
 import * as ServerRT from 'octane/server';
 import { loadCompiledFixtureSource, loadServerFixture } from '../_server-fixture';
 
-// When a Hydrate boundary's captures change before it activates, the server
-// HTML predates the client's state. A @switch whose case changed builds the new
-// case on the client and keeps the server siblings around it, without a
+// A Hydrate island is a hydration fallback boundary. When its captures change
+// before it activates, the server HTML predates the client's state: a @switch
+// whose case changed renders the island on the client, as React client-renders
+// a dehydrated boundary it cannot hydrate with the props it now has, without a
 // hydration warning or onRecoverableError. With unchanged captures, a case the
-// server did not render is still reported.
+// server did not render is a mismatch: the island renders on the client and
+// reports it once. Either way the server nodes outside the island stay.
 
 const FIXTURE = join(
 	process.cwd(),
@@ -28,12 +30,12 @@ function markup(node: Element): string {
 	return copy.innerHTML;
 }
 
-const STRUCTURAL = /the mismatched subtree was rebuilt on the client/;
+const MISMATCH = /^Hydration failed because the server rendered HTML didn't match the client\./;
 
 describe.each([
 	{ name: 'development compile', dev: true },
 	{ name: 'production compile', dev: false },
-])('hydrateRoot — a @switch case changed before its boundary activated ($name)', ({ dev }) => {
+])('hydrateRoot — a @switch case changed before its island activated ($name)', ({ dev }) => {
 	const server = loadServerFixture(FIXTURE, { id: FILE });
 	const client = loadCompiledFixtureSource(SOURCE, {
 		id: FILE,
@@ -79,70 +81,80 @@ describe.each([
 		await act(async () => {});
 	}
 
+	const section = () => container.querySelector('section')!;
+
 	it.each([
 		{ k: 'b', html: '<em>e</em>' },
 		{ k: 'c', html: '<b>c</b><em>e</em>' },
 	])(
-		'builds case $k over the adopted case a while the boundary is pending',
+		'renders the island on the client with case $k once the pending island resumes',
 		async ({ k, html }) => {
 			container.innerHTML = ServerRT.renderToString(server.Ranged, {
 				server: true,
 				k: 'a',
 				leaf: Promise.resolve('x'),
 			}).html;
-			const section = container.querySelector('section')!;
-			const em = container.querySelector('em');
+			const outer = container.firstElementChild!;
+			const serverSection = section();
+			const em = container.querySelector('em')!;
 			const leaf = pending();
 			await hydrate('Ranged', { k: 'a', leaf: leaf.promise });
-			expect(markup(section)).toBe('<u>z</u><em>e</em>');
+			expect(markup(serverSection)).toBe('<u>z</u><em>e</em>');
 
+			// While the island is pending, the server HTML stays.
 			flushSync(() => root!.render(client.Ranged, { k, leaf: leaf.promise }));
-			expect(markup(section)).toBe('<u>z</u><em>e</em>');
+			expect(section()).toBe(serverSection);
+			expect(markup(serverSection)).toBe('<u>z</u><em>e</em>');
 			await act(async () => leaf.resolve('x'));
 
-			expect(container.querySelector('section')).toBe(section);
-			expect(markup(section)).toBe(html);
-			expect(container.querySelector('em')).toBe(em);
+			expect(container.firstElementChild).toBe(outer);
+			expect(serverSection.isConnected).toBe(false);
+			expect(em.isConnected).toBe(false);
+			expect(markup(section())).toBe(html);
 			expect(recoverable).toEqual([]);
 			expect(warnings()).toEqual([]);
 
 			// The slot keeps working as a client branch afterwards.
+			const live = section();
+			const liveEm = container.querySelector('em');
 			flushSync(() => root!.render(client.Ranged, { k: 'a', leaf: leaf.promise }));
-			expect(markup(section)).toBe('<u>x</u><em>e</em>');
-			expect(container.querySelector('em')).toBe(em);
+			expect(section()).toBe(live);
+			expect(markup(live)).toBe('<u>x</u><em>e</em>');
+			expect(container.querySelector('em')).toBe(liveEm);
 		},
 	);
 
-	it('builds the changed case over the server case when the boundary activates', async () => {
+	it('renders a dormant island on the client with the changed case when it activates', async () => {
 		container.innerHTML = ServerRT.renderToString(server.Dormant, { k: 'a' }).html;
-		const section = container.querySelector('section')!;
-		const em = container.querySelector('em');
+		const outer = container.firstElementChild!;
+		const serverSection = section();
 		await hydrate('Dormant', { k: 'a' });
-		expect(markup(section)).toBe('<u>z</u><em>e</em>');
+		expect(markup(serverSection)).toBe('<u>z</u><em>e</em>');
 
 		flushSync(() => root!.render(client.Dormant, { k: 'c' }));
 		await act(async () => {});
 
-		expect(container.querySelector('section')).toBe(section);
-		expect(markup(section)).toBe('<b>c</b><em>e</em>');
-		expect(container.querySelector('em')).toBe(em);
+		expect(container.firstElementChild).toBe(outer);
+		expect(serverSection.isConnected).toBe(false);
+		expect(markup(section())).toBe('<b>c</b><em>e</em>');
 		expect(recoverable).toEqual([]);
 		expect(warnings()).toEqual([]);
 	});
 
-	it('still reports a case the server did not render when the captures are unchanged', async () => {
+	it('renders the island on the client and reports a case the server did not render when the captures are unchanged', async () => {
 		container.innerHTML = ServerRT.renderToString(server.Ranged, {
 			server: true,
 			k: 'a',
 			leaf: Promise.resolve('x'),
 		}).html;
-		const section = container.querySelector('section')!;
-		const em = container.querySelector('em');
+		const outer = container.firstElementChild!;
+		const serverSection = section();
 		await hydrate('Ranged', { k: 'c', leaf: pending().promise });
 
-		expect(markup(section)).toBe('<b>c</b><em>e</em>');
-		expect(container.querySelector('em')).toBe(em);
-		expect(recoverable).toEqual([expect.stringMatching(STRUCTURAL)]);
+		expect(container.firstElementChild).toBe(outer);
+		expect(serverSection.isConnected).toBe(false);
+		expect(markup(section())).toBe('<b>c</b><em>e</em>');
+		expect(recoverable).toEqual([expect.stringMatching(MISMATCH)]);
 		expect(warnings()).toEqual(
 			dev ? [expect.stringContaining('the client expected <b> but the server rendered <u>')] : [],
 		);

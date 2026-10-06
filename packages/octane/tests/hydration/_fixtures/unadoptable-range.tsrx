@@ -1,7 +1,6 @@
 // Renderable values whose server range holds what they cannot adopt: nothing,
-// text, or another element. Hydration discards it and builds the value on the
-// client, including when the value suspends and its boundary retries over what
-// the failed attempt left.
+// text, or another element, at the root and inside a @try/@pending arm whose
+// hydration may suspend first.
 import { Fragment, Hydrate, createElement, use, type OctaneNode } from 'octane';
 import type { HydrationStrategy } from 'octane/hydration';
 
@@ -72,8 +71,7 @@ function Returns(props: HoleProps): OctaneNode {
 	return pick(props.kind, props.v, props.text);
 }
 
-// The trailing host hydrates after the value, so it fails if the recovery gives
-// up on the rest of the root.
+// A trailing host follows the value.
 export function Hole(props: HoleProps) @{
 	<section>
 		{pick(props.kind, props.v, props.text)}

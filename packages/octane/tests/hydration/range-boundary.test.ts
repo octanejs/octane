@@ -406,48 +406,94 @@ describe('hydration range boundary', () => {
 		});
 	}
 
-	for (const failAfterOwner of [false, true]) {
-		it(`retains server content while an error fallback suspends after ${failAfterOwner ? 'partial owner adoption' : 'the owner'}`, async () => {
-			container.innerHTML = ServerRuntime.renderToString(
-				failAfterOwner ? server.ServerPartialOwner : server.ServerListSelection,
-			).html;
-			const button = container.querySelector('#range-boundary-counter') as HTMLButtonElement;
-			const style = document.createElement('style');
-			style.setAttribute('data-octane', '');
-			container.append(style);
-			let resolve!: () => void;
-			const fallbackDeferred = {
-				ready: false,
-				promise: new Promise<void>((done) => {
-					resolve = done;
-				}),
-			};
-			const root = hydrateRoot(
-				container,
-				BoundaryFailingSuspenseClient,
-				{
-					portalTarget,
-					fallbackDeferred,
-					failAfterOwner,
-					deferred: { failed: !failAfterOwner, ready: true, promise: Promise.resolve() },
-				},
-				{ onCaughtError: () => {} },
-			);
-			expect([...container.querySelectorAll('#range-boundary-counter')]).toEqual([button]);
-			expect(container.contains(style)).toBe(true);
-			expect(container.querySelector('#range-boundary-error')).toBeNull();
-			await act(() => {
-				fallbackDeferred.ready = true;
-				resolve();
-			});
-			expect(container.querySelector('#range-boundary-counter')).toBeNull();
-			expect(container.querySelector('#range-boundary-error')?.textContent).toBe('failed');
-			expect(container.contains(style)).toBe(true);
-			expect(portalTarget.textContent).toBe('');
-			root.unmount();
-			expect(container.querySelector('#range-boundary-error')).toBeNull();
+	it('retains server content while an error fallback suspends after the owner', async () => {
+		container.innerHTML = ServerRuntime.renderToString(server.ServerListSelection).html;
+		const button = container.querySelector('#range-boundary-counter') as HTMLButtonElement;
+		const style = document.createElement('style');
+		style.setAttribute('data-octane', '');
+		container.append(style);
+		let resolve!: () => void;
+		const fallbackDeferred = {
+			ready: false,
+			promise: new Promise<void>((done) => {
+				resolve = done;
+			}),
+		};
+		const root = hydrateRoot(
+			container,
+			BoundaryFailingSuspenseClient,
+			{
+				portalTarget,
+				fallbackDeferred,
+				failAfterOwner: false,
+				deferred: { failed: true, ready: true, promise: Promise.resolve() },
+			},
+			{ onCaughtError: () => {} },
+		);
+		expect([...container.querySelectorAll('#range-boundary-counter')]).toEqual([button]);
+		expect(container.contains(style)).toBe(true);
+		expect(container.querySelector('#range-boundary-error')).toBeNull();
+		await act(() => {
+			fallbackDeferred.ready = true;
+			resolve();
 		});
-	}
+		expect(container.querySelector('#range-boundary-counter')).toBeNull();
+		expect(container.querySelector('#range-boundary-error')?.textContent).toBe('failed');
+		expect(container.contains(style)).toBe(true);
+		expect(portalTarget.textContent).toBe('');
+		root.unmount();
+		expect(container.querySelector('#range-boundary-error')).toBeNull();
+	});
+
+	// The server rendered the owner's content in another range than the client's,
+	// with no Suspense boundary of its own: the root renders on the client, as
+	// React's does. The client render then fails into the error fallback, which
+	// shows once it resumes. As in React, whose root reports its failed
+	// hydration only when the client render that replaces it catches no error,
+	// onRecoverableError reports nothing. The renderer's own style stays in the
+	// container throughout.
+	it('renders the root on the client when the server rendered a partial owner, then shows the error fallback', async () => {
+		container.innerHTML = ServerRuntime.renderToString(server.ServerPartialOwner).html;
+		const button = container.querySelector('#range-boundary-counter') as HTMLButtonElement;
+		const style = document.createElement('style');
+		style.setAttribute('data-octane', '');
+		container.append(style);
+		let resolve!: () => void;
+		const fallbackDeferred = {
+			ready: false,
+			promise: new Promise<void>((done) => {
+				resolve = done;
+			}),
+		};
+		const recoverable: unknown[] = [];
+		const root = hydrateRoot(
+			container,
+			BoundaryFailingSuspenseClient,
+			{
+				portalTarget,
+				fallbackDeferred,
+				failAfterOwner: true,
+				deferred: { failed: false, ready: true, promise: Promise.resolve() },
+			},
+			{ onCaughtError: () => {}, onRecoverableError: (error) => recoverable.push(error) },
+		);
+		await act(() => {});
+		expect(button.isConnected).toBe(false);
+		expect(container.contains(style)).toBe(true);
+		expect(container.querySelector('#range-boundary-error')).toBeNull();
+		expect(recoverable).toEqual([]);
+		await act(() => {
+			fallbackDeferred.ready = true;
+			resolve();
+		});
+		expect(container.querySelector('#range-boundary-counter')).toBeNull();
+		expect(container.querySelector('#range-boundary-error')?.textContent).toBe('failed');
+		expect(container.contains(style)).toBe(true);
+		expect(portalTarget.textContent).toBe('');
+		expect(recoverable).toEqual([]);
+		root.unmount();
+		expect(container.querySelector('#range-boundary-error')).toBeNull();
+	});
 
 	it('retains wrappers and portals outside the selected server range', () => {
 		container.innerHTML = ServerRuntime.renderToString(server.ServerSelection).html;

@@ -2096,32 +2096,32 @@
     "51": {
       "message": "Hydration mismatch: the server-rendered node did not match the client render; the mismatched subtree was rebuilt on the client.",
       "runtime": ["client"],
-      "status": "active"
+      "status": "retired"
     },
     "52": {
       "message": "Hydration mismatch: root adoption was abandoned after a server/client shape divergence; the root was rebuilt on the client.",
       "runtime": ["client"],
-      "status": "active"
+      "status": "retired"
     },
     "53": {
       "message": "Hydration mismatch: the server rendered more root content than the client; the stale remainder was discarded.",
       "runtime": ["client"],
-      "status": "active"
+      "status": "retired"
     },
     "54": {
       "message": "Hydration mismatch: the client rendered text where the server rendered none; the client text was built fresh.",
       "runtime": ["client"],
-      "status": "active"
+      "status": "retired"
     },
     "55": {
       "message": "Hydration mismatch: the server rendered a different child shape where the client renders a component; the stale range was discarded and the component was built on the client.",
       "runtime": ["client"],
-      "status": "active"
+      "status": "retired"
     },
     "56": {
       "message": "Hydration mismatch: the server rendered more list items than the client; the extra server items were discarded.",
       "runtime": ["client"],
-      "status": "active"
+      "status": "retired"
     },
     "57": {
       "message": "prerenderToNodeStream requires a Node.js runtime with process.getBuiltinModule; use prerender() in non-Node environments.",
@@ -2146,12 +2146,12 @@
     "61": {
       "message": "Hydration mismatch: the server-rendered text differed from the client; the text was updated to the client value.",
       "runtime": ["client"],
-      "status": "active"
+      "status": "retired"
     },
     "62": {
       "message": "Hydration mismatch: the server rendered extra children in a text element; the stale children were discarded.",
       "runtime": ["client"],
-      "status": "active"
+      "status": "retired"
     },
     "63": {
       "message": "Target container is not a DOM element. Pass an Element, Document, or DocumentFragment. If document.body is null after document hydration, update the existing document root or render a document shell containing <body>.",
@@ -3526,6 +3526,21 @@
     },
     "338": {
       "message": "Hydration mismatch: a server-rendered range had no closing marker, so the client rendered the boundary or root that contains it instead. Something changed the server HTML after rendering, for example an HTML minifier or proxy that strips comments.",
+      "runtime": ["client"],
+      "status": "active"
+    },
+    "339": {
+      "message": "Hydration failed because the server rendered HTML didn't match the client. As a result this tree will be regenerated on the client.",
+      "runtime": ["client"],
+      "status": "active"
+    },
+    "340": {
+      "message": "There was an error while hydrating, so the nearest Suspense boundary, Hydrate island, or the root rendered on the client instead.",
+      "runtime": ["client"],
+      "status": "active"
+    },
+    "341": {
+      "message": "The server could not finish this Suspense boundary, because it suspended during a synchronous render such as renderToString, which cannot wait for data. Switched to client rendering.",
       "runtime": ["client"],
       "status": "active"
     }

@@ -15,7 +15,12 @@ const UNSAFE_URL = 'javascript:notfine';
 const SAFE_SERVER_URL = 'https://server.example/';
 
 type MatrixMode =
-	'client' | 'server-string' | 'server-stream' | 'hydrate-match' | 'hydrate-mismatch';
+	| 'client'
+	| 'server-string'
+	| 'server-stream'
+	| 'hydrate-match'
+	| 'hydrate-mismatch'
+	| 'hydrate-bad-markup';
 
 interface MatrixObservation {
 	mode: MatrixMode;
@@ -34,7 +39,7 @@ interface MatrixCase {
 	modes?: MatrixMode[];
 	/** Host context needed to parse the server HTML before hydration. */
 	containerTag?: string;
-	/** Some de-opt hydration routes patch without publishing the DEV diagnostic. */
+	/** Some hydration routes keep a differing attribute without the DEV diagnostic. */
 	expectMismatchWarning?: boolean;
 }
 
@@ -79,45 +84,116 @@ function assertServerObservation(
 	});
 }
 
-async function assertHydrationObservation(
-	entry: MatrixCase,
-	mode: 'hydrate-match' | 'hydrate-mismatch',
-): Promise<void> {
-	const serverProps = mode === 'hydrate-match' ? entry.props() : entry.mismatchServerProps();
-	const clientProps = entry.props();
-	const html = ServerRT.renderToString(server[entry.component], serverProps).html;
+function mismatchDiagnostics(error: ReturnType<typeof vi.spyOn>) {
+	const diagnostics = error.mock.calls.map((call: unknown[]) => call.map(String).join(' '));
+	return {
+		mismatch: diagnostics.filter((message: string) => message.includes('hydration mismatch')),
+		other: diagnostics.filter((message: string) => !message.includes('hydration mismatch')),
+	};
+}
+
+async function assertMatchingHydration(entry: MatrixCase): Promise<void> {
+	const props = entry.props();
+	const html = ServerRT.renderToString(server[entry.component], props).html;
 	const container = document.createElement(entry.containerTag ?? 'div');
 	container.innerHTML = html;
 	const before = container.firstElementChild;
 	const error = vi.spyOn(console, 'error').mockImplementation(() => {});
+	const recoverable: unknown[] = [];
 	let root: ReturnType<typeof ClientRT.hydrateRoot> | undefined;
 	try {
-		root = ClientRT.hydrateRoot(container, (client as any)[entry.component], clientProps);
+		const clientProps = entry.props();
+		root = ClientRT.hydrateRoot(container, (client as any)[entry.component], clientProps, {
+			onRecoverableError: (cause: unknown) => recoverable.push(cause),
+		});
 		ClientRT.flushSync(() => {});
-		// URL mismatch recovery must patch the adopted host, never rebuild it.
 		expect(container.firstElementChild).toBe(before);
 		entry.assert({
-			mode,
-			variant: mode,
+			mode: 'hydrate-match',
+			variant: 'hydrate-match',
 			root: container,
 			html: container.innerHTML,
-			serverProps,
+			serverProps: props,
 			clientProps,
 		});
-		const diagnostics = error.mock.calls.map((call) => call.map(String).join(' '));
-		const mismatchDiagnostics = diagnostics.filter((message) =>
-			message.includes('hydration mismatch'),
-		);
-		if (
-			mode === 'hydrate-match' ||
-			process.env.OCTANE_TEST_COMPILE_MODE === 'prod' ||
-			entry.expectMismatchWarning === false
-		) {
-			if (entry.expectMismatchWarning !== false) expect(mismatchDiagnostics).toHaveLength(0);
-		} else {
-			expect(mismatchDiagnostics.length).toBeGreaterThan(0);
+		await Promise.resolve();
+		expect(recoverable).toEqual([]);
+		const diagnostics = mismatchDiagnostics(error);
+		if (entry.expectMismatchWarning !== false) expect(diagnostics.mismatch).toEqual([]);
+		expect(diagnostics.other).toEqual([]);
+	} finally {
+		root?.unmount();
+		error.mockRestore();
+	}
+}
+
+/**
+ * The server rendered another URL than the client. As in React, hydration never
+ * patches an attribute: the adopted host keeps the server's value, so the
+ * client's value, sanitized or not, is never written while hydrating.
+ */
+async function assertAttributeMismatchHydration(entry: MatrixCase): Promise<void> {
+	const serverProps = entry.mismatchServerProps();
+	const html = ServerRT.renderToString(server[entry.component], serverProps).html;
+	const container = document.createElement(entry.containerTag ?? 'div');
+	container.innerHTML = html;
+	const before = container.firstElementChild;
+	const serverMarkup = container.innerHTML;
+	const error = vi.spyOn(console, 'error').mockImplementation(() => {});
+	const recoverable: unknown[] = [];
+	let root: ReturnType<typeof ClientRT.hydrateRoot> | undefined;
+	try {
+		root = ClientRT.hydrateRoot(container, (client as any)[entry.component], entry.props(), {
+			onRecoverableError: (cause: unknown) => recoverable.push(cause),
+		});
+		ClientRT.flushSync(() => {});
+		expect(container.firstElementChild).toBe(before);
+		expect(container.innerHTML).toBe(serverMarkup);
+		await Promise.resolve();
+		expect(recoverable).toEqual([]);
+		const diagnostics = mismatchDiagnostics(error);
+		if (process.env.OCTANE_TEST_COMPILE_MODE !== 'prod' && entry.expectMismatchWarning !== false) {
+			expect(diagnostics.mismatch).toEqual([expect.stringContaining("won't be patched up")]);
 		}
-		expect(diagnostics.filter((message) => !message.includes('hydration mismatch'))).toEqual([]);
+		expect(diagnostics.other).toEqual([]);
+	} finally {
+		root?.unmount();
+		error.mockRestore();
+	}
+}
+
+/**
+ * React's `clientRenderOnBadMarkup`: hydrating over markup that does not match
+ * renders the root on the client, which must sanitize the client's values like
+ * any other client render. The bad element's tag is one no fixture's root has.
+ */
+async function assertBadMarkupHydration(entry: MatrixCase): Promise<void> {
+	const container = document.createElement(entry.containerTag ?? 'div');
+	container.innerHTML =
+		entry.containerTag === 'frameset'
+			? '<frameset id="badIdWhichWillCauseMismatch"></frameset>'
+			: '<p id="badIdWhichWillCauseMismatch"></p>';
+	const bad = container.firstElementChild!;
+	const error = vi.spyOn(console, 'error').mockImplementation(() => {});
+	const recoverable: unknown[] = [];
+	let root: ReturnType<typeof ClientRT.hydrateRoot> | undefined;
+	try {
+		const clientProps = entry.props();
+		root = ClientRT.hydrateRoot(container, (client as any)[entry.component], clientProps, {
+			onRecoverableError: (cause: unknown) => recoverable.push(cause),
+		});
+		ClientRT.flushSync(() => {});
+		expect(bad.isConnected).toBe(false);
+		entry.assert({
+			mode: 'hydrate-bad-markup',
+			variant: 'hydrate-bad-markup',
+			root: container,
+			html: container.innerHTML,
+			clientProps,
+		});
+		await Promise.resolve();
+		expect(recoverable).toHaveLength(1);
+		expect(mismatchDiagnostics(error).other).toEqual([]);
 	} finally {
 		root?.unmount();
 		error.mockRestore();
@@ -127,13 +203,21 @@ async function assertHydrationObservation(
 /**
  * React's `itRenders` matrix, mapped to Octane's public APIs. Every portable
  * case runs a detached clean client render, all three buffered/static server
- * APIs, both stream APIs, matching hydration, and mismatched hydration where
- * an unsafe client value must still be sanitized before comparison/write.
+ * APIs, both stream APIs, matching hydration, hydration over a server render of
+ * another URL (whose value is kept), and hydration over bad markup, where the
+ * client-rendered root must still sanitize an unsafe client value.
  */
 async function expectInRenderMatrix(entry: MatrixCase): Promise<void> {
 	const modes =
 		entry.modes ??
-		(['client', 'server-string', 'server-stream', 'hydrate-match', 'hydrate-mismatch'] as const);
+		([
+			'client',
+			'server-string',
+			'server-stream',
+			'hydrate-match',
+			'hydrate-mismatch',
+			'hydrate-bad-markup',
+		] as const);
 	if (modes.includes('client')) {
 		const props = entry.props();
 		const rendered = renderDetached((client as any)[entry.component], props, entry.containerTag);
@@ -174,9 +258,9 @@ async function expectInRenderMatrix(entry: MatrixCase): Promise<void> {
 		assertServerObservation(entry, 'server-stream', 'renderToReadableStream', html, props);
 	}
 
-	if (modes.includes('hydrate-match')) await assertHydrationObservation(entry, 'hydrate-match');
-	if (modes.includes('hydrate-mismatch'))
-		await assertHydrationObservation(entry, 'hydrate-mismatch');
+	if (modes.includes('hydrate-match')) await assertMatchingHydration(entry);
+	if (modes.includes('hydrate-mismatch')) await assertAttributeMismatchHydration(entry);
+	if (modes.includes('hydrate-bad-markup')) await assertBadMarkupHydration(entry);
 }
 
 function urlCase(component: string, selector: string, name: string, url = UNSAFE_URL): MatrixCase {

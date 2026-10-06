@@ -6,34 +6,20 @@ import { condition, load } from 'octane/hydration';
 import * as ServerRT from 'octane/server';
 import { loadCompiledFixtureSource, loadServerFixture } from '../_server-fixture';
 
-// A list whose server content its client items cannot adopt: a renderable hole
-// whose server list the client renders as nothing, a bare server item where
-// the client's item needs a range of its own or has another tag, and fewer or
-// more server items than client items, in a hole and in compiled @for rows.
-// Hydration discards what the client cannot adopt, keeps every item it can,
-// builds the rest, and reports the mismatch once. A boundary that retries
-// after a suspension neither reports it again nor keeps or duplicates content.
+// A list inside a @try/@pending arm whose server content its client items do
+// not match: a renderable hole whose server list the client renders as
+// nothing, a bare server item where the client's item needs a range of its own
+// or has another tag, and fewer or more server items than client items, in a
+// hole and in compiled @for rows. As in React, nothing is repaired in place:
+// the arm discards its server DOM, matching items included, and renders on the
+// client, while the host element around the arm keeps its identity.
+// onRecoverableError fires once. An arm whose hydration suspends first keeps
+// its server DOM until it resumes, then falls back and reports once. Matching
+// content adopts silently.
 
 const FIXTURE = join(process.cwd(), 'packages/octane/tests/hydration/_fixtures/list-hole.tsrx');
 const FILE = 'list-hole.tsrx';
 const SOURCE = readFileSync(FIXTURE, 'utf8');
-const LINES = SOURCE.split('\n');
-
-/** 1-based line of the first fixture line containing `text`. */
-function lineOf(text: string): number {
-	const index = LINES.findIndex((line) => line.includes(text));
-	if (index === -1) throw new Error(`fixture has no line containing ${text}`);
-	return index + 1;
-}
-
-// Where each recovery reports: the hole itself for its whole value, and the
-// list's host for an item, which has no site of its own.
-const HOLE = lineOf('{pick(props.kind, props.v, props.text)}');
-const HOLE_HOST = lineOf('<section class="hole">');
-const ROWS_HOST = lineOf('<ul class="rows">');
-// A framed row's own bindings also stamp the list's host with their locations,
-// so the warning for a framed @for row may name any of them.
-const FRAMED_HOST = 0;
 
 /** Element and text markup, ignoring hydration comments. */
 function markup(node: Element): string {
@@ -53,8 +39,10 @@ function contentNodes(node: Element): Node[] {
 	return nodes;
 }
 
-function escapeRegExp(text: string): string {
-	return text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+/** The server's `<section>` in the arm, and every node below it. */
+function armNodes(container: Element): Node[] {
+	const section = container.querySelector('section')!;
+	return [section, ...contentNodes(section)];
 }
 
 /** A thenable `use()` reads synchronously, so the server renders its value. */
@@ -68,10 +56,39 @@ function deferred(): { promise: Promise<string>; resolve: (text: string) => void
 	return { promise, resolve };
 }
 
+const MISMATCH = /^Hydration failed because the server rendered HTML didn't match the client\./;
+const WARNING = new RegExp(
+	`^Octane hydration mismatch at [^ ]*${FILE.replace('.', '\\.')}:\\d+:\\d+: the client expected .+ ` +
+		'but the server rendered .+\\. The nearest Suspense or Hydrate boundary, or the root, will be ' +
+		'regenerated on the client\\.$',
+);
+
+// Hole cases whose server value the client value does not match.
+const HOLE_MISMATCHES = [
+	// The server rendered a list where the client renders none.
+	{ server: 'pi', client: 'null' },
+	{ server: 'pi', client: 'empty' },
+	{ server: 'pi', client: 'text' },
+	{ server: 'framed', client: 'null' },
+	{ server: 'framed', client: 'empty' },
+	{ server: 'text', client: 'null' },
+	{ server: 'pi', client: 'nothing' },
+	// A bare server item cannot be the client's item.
+	{ server: 'i', client: 'p' },
+	{ server: 'i', client: 'p-child' },
+	{ server: 'p3', client: 'p-child3' },
+	// The server rendered fewer items.
+	{ server: 'p', client: 'p3' },
+	{ server: 'p', client: 'p-child3' },
+	// The server rendered more items.
+	{ server: 'pi', client: 'p' },
+	{ server: 'p3', client: 'p' },
+];
+
 describe.each([
 	{ name: 'development compile', dev: true },
 	{ name: 'production compile', dev: false },
-])('hydrateRoot — list items that cannot adopt their server content ($name)', ({ dev }) => {
+])('hydrateRoot — list items that do not match their server content ($name)', ({ dev }) => {
 	const server = loadServerFixture(FIXTURE, { id: FILE });
 	const client = loadCompiledFixtureSource(SOURCE, {
 		id: FILE,
@@ -97,37 +114,12 @@ describe.each([
 			.map((call: unknown[]) => String(call[0]))
 			.filter((message: string) => message.includes('hydration mismatch'));
 
-	/**
-	 * Exactly one report: the recoverable error always, and in DEV one warning
-	 * naming `line` (0: any line). Leftover server items (`line` null) report
-	 * their discard without a warning; anything else reports a rebuild.
-	 */
-	async function expectReported(
-		recovered: unknown[],
-		line: number | null,
-		expected = '',
-		actual = '',
-	) {
+	/** Exactly one report: the recoverable error always, the warning in DEV. */
+	async function expectReported(recovered: unknown[]) {
 		await Promise.resolve();
 		expect(recovered).toHaveLength(1);
-		expect(String((recovered[0] as Error).message)).toMatch(
-			line === null
-				? /^Hydration mismatch: the server rendered more list items than the client/
-				: /^Hydration mismatch: the server-rendered node did not match the client render/,
-		);
-		expect(warns()).toEqual(
-			dev && line !== null
-				? [
-						expect.stringMatching(
-							new RegExp(
-								`^Octane hydration mismatch at [^ ]*${escapeRegExp(FILE)}:${line || '\\d+'}:\\d+: ` +
-									`the client expected ${escapeRegExp(expected)} but the server ` +
-									`rendered ${escapeRegExp(actual)}\\.`,
-							),
-						),
-					]
-				: [],
-		);
+		expect(String((recovered[0] as Error).message)).toMatch(MISMATCH);
+		expect(warns()).toEqual(dev ? [expect.stringMatching(WARNING)] : []);
 	}
 
 	async function expectSilent(recovered: unknown[]) {
@@ -167,160 +159,65 @@ describe.each([
 		return root;
 	}
 
-	/** Hydrates `client` over `server` and checks the result against a client render. */
-	async function hydrateOver(
+	/**
+	 * The arm rendered on the client: the `<main>` around it is the server's, but
+	 * none of the arm's server nodes survived, and its content is a client render's.
+	 */
+	async function expectArmFallback(
+		main: Element,
+		serverNodes: Node[],
 		component: string,
-		serverProps: Record<string, unknown>,
 		clientProps: Record<string, unknown>,
 	) {
-		serverRender(component, serverProps);
-		const section = container.querySelector('section')!;
-		const serverNodes = contentNodes(section);
-		const tail = container.querySelector('b')!;
-		const recovered: unknown[] = [];
-		const root = hydrate(component, clientProps, recovered);
-		expect(container.querySelector('section')).toBe(section);
-		expect(markup(section)).toBe(
+		expect(container.querySelector('main')).toBe(main);
+		expect(serverNodes.filter((node) => node.isConnected)).toEqual([]);
+		expect(markup(container.querySelector('section')!)).toBe(
 			await clientMarkup(component, { text: null, later: null, ...clientProps }),
 		);
-		expect(container.querySelector('b')).toBe(tail);
-		return { root, section, recovered, serverNodes };
 	}
 
-	describe('where the server rendered a list and the client renders none', () => {
-		it.each([
-			{ server: 'pi', client: 'null', expected: 'nothing', actual: '<p>' },
-			{ server: 'pi', client: 'empty', expected: 'nothing', actual: '<p>' },
-			{ server: 'pi', client: 'text', expected: 'text "A"', actual: '<p>' },
-			{ server: 'framed', client: 'null', expected: 'nothing', actual: 'a control-flow block' },
-			{ server: 'framed', client: 'empty', expected: 'nothing', actual: 'a control-flow block' },
-			{ server: 'text', client: 'null', expected: 'nothing', actual: 'text "A"' },
-		])(
-			'discards the $server server value for a $client value and reports it once',
-			async ({ server: kind, client: next, expected, actual }) => {
-				const { root, section, recovered } = await hydrateOver(
-					'Hole',
-					{ kind, v: 'A' },
-					{ kind: next, v: 'A' },
-				);
-				try {
-					await expectReported(recovered, HOLE, expected, actual);
-					flushSync(() => root.render(client.Hole, { kind: 'p', v: 'B', text: null, later: null }));
-					expect(markup(section)).toBe('<p>B</p><b>B</b>');
-				} finally {
-					root.unmount();
-				}
-			},
-		);
-
-		it('discards the server items for a list whose items render nothing', async () => {
-			const { root, recovered } = await hydrateOver(
-				'Hole',
-				{ kind: 'pi', v: 'A' },
-				{ kind: 'nothing', v: 'A' },
-			);
-			try {
-				await expectReported(recovered, HOLE_HOST, 'another list item', '<p>');
-			} finally {
-				root.unmount();
-			}
-		});
-	});
-
-	describe('where a bare server item cannot be the client item', () => {
-		it.each([
-			{ client: 'p', expected: '<p>' },
-			{ client: 'p-child', expected: 'another list item' },
-		])(
-			'builds the $client item over a bare <i> and reports it once',
-			async ({ client: next, expected }) => {
-				const { root, recovered } = await hydrateOver(
-					'Hole',
-					{ kind: 'i', v: 'A' },
-					{ kind: next, v: 'A' },
-				);
-				try {
-					expect(container.querySelector('i')).toBeNull();
-					await expectReported(recovered, HOLE_HOST, expected, '<i>');
-				} finally {
-					root.unmount();
-				}
-			},
-		);
-
-		it('keeps the items before it', async () => {
-			const { root, recovered, serverNodes } = await hydrateOver(
-				'Hole',
-				{ kind: 'p3', v: 'A' },
-				{ kind: 'p-child3', v: 'A' },
-			);
-			try {
-				expect(container.querySelector('p')).toBe(serverNodes[0]);
-				await expectReported(recovered, HOLE_HOST, 'another list item', '<p>');
-			} finally {
-				root.unmount();
-			}
-		});
-	});
-
-	describe('where the server rendered fewer items', () => {
-		it.each([
-			{ client: 'p3', expected: '<p>' },
-			{ client: 'p-child3', expected: 'another list item' },
-		])('keeps the server item, builds the rest of $client, and reports once', async (row) => {
-			serverRender('Hole', { kind: 'p', v: 'A' });
-			const first = container.querySelector('p')!;
+	it.each(HOLE_MISMATCHES)(
+		'renders the arm on the client for a $client value over a $server server value',
+		async ({ server: kind, client: next }) => {
+			serverRender('Hole', { kind, v: 'A' });
+			const main = container.querySelector('main')!;
+			const serverNodes = armNodes(container);
 			const recovered: unknown[] = [];
-			const root = hydrate('Hole', { kind: row.client, v: 'A' }, recovered);
+			const root = hydrate('Hole', { kind: next, v: 'A' }, recovered);
 			try {
-				expect(markup(container.querySelector('section')!)).toBe(
-					await clientMarkup('Hole', { kind: row.client, v: 'A', text: null, later: null }),
-				);
-				expect(container.querySelector('p')).toBe(first);
-				await expectReported(recovered, HOLE_HOST, row.expected, 'nothing');
+				await expectArmFallback(main, serverNodes, 'Hole', { kind: next, v: 'A' });
+				await expectReported(recovered);
+				// The client-rendered arm updates like any other.
+				flushSync(() => root.render(client.Hole, { kind: 'p', v: 'B', text: null, later: null }));
+				expect(markup(container.querySelector('section')!)).toBe('<p>B</p><b>B</b>');
+				expect(container.querySelector('main')).toBe(main);
 			} finally {
 				root.unmount();
 			}
-		});
+		},
+	);
 
-		it.each([
-			{ component: 'Rows', line: ROWS_HOST },
-			{ component: 'FramedRows', line: FRAMED_HOST },
-		])('keeps the server row and builds two more @for rows ($component)', async (row) => {
-			serverRender(row.component, { rows: ['a'] });
-			const first = container.querySelector('li')!;
+	it.each([
+		{ component: 'Rows', server: ['a'], client: ['a', 'b', 'c'] },
+		{ component: 'FramedRows', server: ['a'], client: ['a', 'b', 'c'] },
+		{ component: 'Rows', server: ['a', 'b', 'c'], client: ['a'] },
+		{ component: 'FramedRows', server: ['a', 'b', 'c'], client: ['a'] },
+	])(
+		'renders the arm on the client for $client.length @for rows over $server.length server rows ($component)',
+		async (row) => {
+			serverRender(row.component, { rows: row.server });
+			const main = container.querySelector('main')!;
+			const serverNodes = armNodes(container);
 			const recovered: unknown[] = [];
-			const root = hydrate(row.component, { rows: ['a', 'b', 'c'] }, recovered);
+			const root = hydrate(row.component, { rows: row.client }, recovered);
 			try {
-				expect(markup(container.querySelector('section')!)).toBe(
-					await clientMarkup(row.component, { rows: ['a', 'b', 'c'], text: null, later: null }),
-				);
-				expect(container.querySelector('li')).toBe(first);
-				await expectReported(recovered, row.line, 'another list item', 'nothing');
+				await expectArmFallback(main, serverNodes, row.component, { rows: row.client });
+				await expectReported(recovered);
 			} finally {
 				root.unmount();
 			}
-		});
-	});
-
-	describe('where the server rendered more items', () => {
-		it.each(['pi', 'p3'])(
-			'keeps the first server item of %s and discards the rest',
-			async (kind) => {
-				serverRender('Hole', { kind, v: 'A' });
-				const first = container.querySelector('p')!;
-				const recovered: unknown[] = [];
-				const root = hydrate('Hole', { kind: 'p', v: 'A' }, recovered);
-				try {
-					expect(markup(container.querySelector('section')!)).toBe('<p>A</p><b>A</b>');
-					expect(container.querySelector('p')).toBe(first);
-					await expectReported(recovered, null);
-				} finally {
-					root.unmount();
-				}
-			},
-		);
-	});
+		},
+	);
 
 	describe('where the server content matches', () => {
 		it.each([
@@ -332,12 +229,13 @@ describe.each([
 			['empty', 'nothing'],
 			['text', 'text'],
 		])('adopts a %s server value for a %s client value silently', async (kind, next) => {
-			const { root, section, recovered, serverNodes } = await hydrateOver(
-				'Hole',
-				{ kind, v: 'A' },
-				{ kind: next, v: 'A' },
-			);
+			serverRender('Hole', { kind, v: 'A' });
+			const section = container.querySelector('section')!;
+			const serverNodes = contentNodes(section);
+			const recovered: unknown[] = [];
+			const root = hydrate('Hole', { kind: next, v: 'A' }, recovered);
 			try {
+				expect(container.querySelector('section')).toBe(section);
 				const nodes = contentNodes(section);
 				expect(nodes).toHaveLength(serverNodes.length);
 				nodes.forEach((node, index) => expect(node).toBe(serverNodes[index]));
@@ -363,9 +261,10 @@ describe.each([
 		});
 	});
 
-	// The boundary retries hydration over what the failed attempt left: the
-	// items it built, the server content it discarded, or its partial items.
-	describe('when the boundary suspends', () => {
+	// The arm's hydration suspends, before or after it reaches the mismatch. A
+	// suspension never falls back by itself; once the arm resumes, the mismatch
+	// renders it on the client and reports once.
+	describe('when the arm suspends', () => {
 		it.each([
 			{
 				value: 'more items, the extra ones suspending',
@@ -373,9 +272,6 @@ describe.each([
 				server: { kind: 'p', v: 'A' },
 				client: { kind: 'p-child3', v: 'A' },
 				wait: 'text',
-				line: HOLE_HOST,
-				expected: 'another list item',
-				actual: 'nothing',
 			},
 			{
 				value: 'a suspending item over a bare server item',
@@ -383,9 +279,6 @@ describe.each([
 				server: { kind: 'i', v: 'A' },
 				client: { kind: 'p-child', v: 'A' },
 				wait: 'text',
-				line: HOLE_HOST,
-				expected: 'another list item',
-				actual: '<i>',
 			},
 			{
 				value: 'more @for rows, the extra ones suspending',
@@ -393,9 +286,6 @@ describe.each([
 				server: { rows: ['a'] },
 				client: { rows: ['a', 'b', 'c'] },
 				wait: 'text',
-				line: FRAMED_HOST,
-				expected: 'another list item',
-				actual: 'nothing',
 			},
 			{
 				value: 'a list the client renders as nothing, before a suspending sibling',
@@ -403,9 +293,6 @@ describe.each([
 				server: { kind: 'pi', v: 'A' },
 				client: { kind: 'null', v: 'A' },
 				wait: 'later',
-				line: HOLE,
-				expected: 'nothing',
-				actual: '<p>',
 			},
 			{
 				value: 'more items, before a suspending sibling',
@@ -413,9 +300,6 @@ describe.each([
 				server: { kind: 'p', v: 'A' },
 				client: { kind: 'p3', v: 'A' },
 				wait: 'later',
-				line: HOLE_HOST,
-				expected: '<p>',
-				actual: 'nothing',
 			},
 			{
 				value: 'a bare <i> for a <p>, before a suspending sibling',
@@ -423,9 +307,6 @@ describe.each([
 				server: { kind: 'i', v: 'A' },
 				client: { kind: 'p', v: 'A' },
 				wait: 'later',
-				line: HOLE_HOST,
-				expected: '<p>',
-				actual: '<i>',
 			},
 			{
 				value: 'more direct-host @for rows, before a suspending sibling',
@@ -433,9 +314,6 @@ describe.each([
 				server: { rows: ['a'] },
 				client: { rows: ['a', 'b', 'c'] },
 				wait: 'later',
-				line: ROWS_HOST,
-				expected: 'another list item',
-				actual: 'nothing',
 			},
 			{
 				value: 'more framed @for rows, before a suspending sibling',
@@ -443,9 +321,6 @@ describe.each([
 				server: { rows: ['a'] },
 				client: { rows: ['a', 'b', 'c'] },
 				wait: 'later',
-				line: FRAMED_HOST,
-				expected: 'another list item',
-				actual: 'nothing',
 			},
 			{
 				value: 'fewer items, before a suspending sibling',
@@ -453,18 +328,15 @@ describe.each([
 				server: { kind: 'pi', v: 'A' },
 				client: { kind: 'p', v: 'A' },
 				wait: 'later',
-				line: null,
-				expected: '',
-				actual: '',
 			},
-		])('reports once and builds once for $value', async (row) => {
+		])('renders the arm on the client once for $value', async (row) => {
 			// The server renders the suspending sibling's resolved value.
 			serverRender(row.component, {
 				...row.server,
 				later: row.wait === 'later' ? fulfilled('R') : null,
 			});
-			const section = container.querySelector('section')!;
-			const tail = container.querySelector('b')!;
+			const main = container.querySelector('main')!;
+			const serverNodes = armNodes(container);
 			const pending = deferred();
 			const recovered: unknown[] = [];
 			const root = hydrate(
@@ -477,17 +349,11 @@ describe.each([
 					pending.resolve('R');
 					await pending.promise;
 				});
-				expect(container.querySelector('section')).toBe(section);
-				expect(markup(section)).toBe(
-					await clientMarkup(row.component, {
-						text: null,
-						later: null,
-						...row.client,
-						[row.wait]: Promise.resolve('R'),
-					}),
-				);
-				expect(container.querySelector('b')).toBe(tail);
-				await expectReported(recovered, row.line, row.expected, row.actual);
+				await expectArmFallback(main, serverNodes, row.component, {
+					...row.client,
+					[row.wait]: Promise.resolve('R'),
+				});
+				await expectReported(recovered);
 			} finally {
 				root.unmount();
 			}
@@ -495,7 +361,9 @@ describe.each([
 	});
 
 	// Captures that changed before a dormant boundary activated legitimately
-	// differ from what the server rendered: repair the list without reporting.
+	// differ from what the server rendered. As React reports nothing for an
+	// update that reaches a dehydrated boundary, the arm renders on the client
+	// without a report.
 	describe('in a dormant boundary whose captures changed before activation', () => {
 		it.each([
 			{
@@ -508,7 +376,7 @@ describe.each([
 			{ component: 'DormantHole', server: { kind: 'pi', v: 'A' }, client: { kind: 'p', v: 'A' } },
 			{ component: 'DormantRows', server: { rows: ['a'] }, client: { rows: ['a', 'b', 'c'] } },
 			{ component: 'DormantRows', server: { rows: ['a', 'b', 'c'] }, client: { rows: ['a'] } },
-		])('repairs $component from $server to $client silently', async (row) => {
+		])('renders $component from $server to $client silently', async (row) => {
 			const serverProps = { when: condition(false), text: null, later: null, ...row.server };
 			container.innerHTML = ServerRT.renderToString(server[row.component], serverProps).html;
 			const recovered: unknown[] = [];
@@ -517,15 +385,15 @@ describe.each([
 			});
 			flushSync(() => {});
 			try {
-				const section = container.querySelector('section')!;
-				const tail = container.querySelector('b')!;
+				const host = container.firstElementChild!;
+				const serverNodes = armNodes(container);
 				const clientProps = { text: null, later: null, ...row.client };
 				await act(() => root.render(client[row.component], { ...clientProps, when: load() }));
-				expect(container.querySelector('section')).toBe(section);
-				expect(markup(section)).toBe(
+				expect(container.firstElementChild).toBe(host);
+				expect(serverNodes.filter((node) => node.isConnected)).toEqual([]);
+				expect(markup(container.querySelector('section')!)).toBe(
 					await clientMarkup(row.component === 'DormantHole' ? 'Hole' : 'FramedRows', clientProps),
 				);
-				expect(container.querySelector('b')).toBe(tail);
 				await expectSilent(recovered);
 			} finally {
 				root.unmount();
