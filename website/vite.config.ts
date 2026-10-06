@@ -27,6 +27,13 @@ function prepareShadcnRegistry(): void {
 
 prepareShadcnRegistry();
 
+// Nitro takes its preset from NITRO_PRESET, otherwise from the build host:
+// Vercel, or Cloudflare Workers Builds (which sets WORKERS_CI).
+const nitroPreset = process.env.NITRO_PRESET;
+const cloudflare = nitroPreset
+	? nitroPreset.startsWith('cloudflare')
+	: Boolean(process.env.WORKERS_CI);
+
 // Does any pre-bundled dependency resolve to a checkout OUTSIDE node_modules —
 // a `link:` override in pnpm-workspace.yaml pointing at a sibling repo?
 //
@@ -194,9 +201,20 @@ export default defineConfig({
 		}),
 		nitro({
 			// Emit .gz/.br siblings for static assets; Nitro's static handler
-			// negotiates them from Accept-Encoding at request time.
-			compressPublicAssets: { gzip: true, brotli: true },
-			plugins: ['./nitro-html-compress.mjs'],
+			// negotiates them from Accept-Encoding at request time. Cloudflare
+			// compresses at its edge and its asset server never serves the siblings.
+			compressPublicAssets: cloudflare ? false : { gzip: true, brotli: true },
+			// Workers re-encode any response that carries Content-Encoding, so this
+			// plugin's HTML would reach the browser compressed twice.
+			plugins: cloudflare ? [] : ['./nitro-html-compress.mjs'],
+			// The production Cloudflare preset resolves server code with `workerd`
+			// only (Nitro's own workerd dev runner adds `worker`). solid-js exports
+			// its server build under `worker`, so without it the TanStack devtools
+			// island links against solid's browser build and the SSR build fails.
+			exportConditions: cloudflare ? ['worker'] : [],
+			cloudflare: {
+				wrangler: { name: 'octane-website', compatibility_date: '2026-07-14' },
+			},
 			// Keep production on the runtime selected by the previous Vercel
 			// adapter instead of deriving it from whichever Node version builds.
 			vercel: {

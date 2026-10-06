@@ -24,6 +24,9 @@ examples/**/*.d.tsrx.ts
 # Vercel Build Output (@octanejs/adapter-vercel writes {root}/.vercel/output on build)
 .vercel/
 
+# Wrangler's local dev state and deploy redirect
+.wrangler/
+
 # Throwaway test project directories staged inside the workspace instead of
 # os.tmpdir() — `createTempProject(prefix, { insideWorkspace: true })`. Only the
 # workerd suites need this: workerd resolves module paths against the process

@@ -46,3 +46,36 @@ Project settings in the Vercel dashboard:
 | Node.js Version  | 22.x or 24.x                                |
 
 No environment variables are required.
+
+## Deploy (Cloudflare Workers)
+
+Nitro's `cloudflare-module` preset builds the site as a Worker with Workers
+Static Assets. Cloudflare Workers Builds sets `WORKERS_CI`, which makes Nitro
+pick that preset and makes [vite.config.ts](vite.config.ts) drop the Node-only
+HTML compression plugin and precompressed asset siblings (Cloudflare compresses
+at its edge). The build writes `.output/server/wrangler.json` plus a
+`.wrangler/deploy/config.json` redirect, so `wrangler` run from `website/` uses
+the generated config. The Worker name and compatibility date are pinned in the
+`cloudflare.wrangler` block of the Nitro options.
+
+Workers Builds settings (Worker `octane-website`):
+
+| Setting         | Value                                        |
+| --------------- | -------------------------------------------- |
+| Root directory  | `/` (pnpm installs the whole workspace)      |
+| Build command   | `pnpm --filter website build`                |
+| Deploy command  | `cd website && pnpm exec wrangler deploy`        |
+| Build variables | `NODE_VERSION=24`                            |
+
+Keep non-production branch builds off until PR previews move off Vercel. Once
+on, Workers Builds builds every branch pushed to the repository. Workers Paid is
+required, because the free plan's 10 ms CPU limit per request is too low for
+SSR. No runtime environment variables are required.
+
+Run the Cloudflare build locally:
+
+```bash
+NITRO_PRESET=cloudflare-module pnpm --filter website build
+cd website && pnpm exec wrangler dev
+```
+

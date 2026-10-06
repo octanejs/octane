@@ -13,13 +13,16 @@
   "dependencies": {
     "octane": "workspace:*",
     "@modelcontextprotocol/sdk": "^1.21.0",
+    "@octanejs/adapter-cloudflare": "workspace:*",
     "@octanejs/adapter-vercel": "workspace:*",
     "@octanejs/mcp-server": "workspace:*",
     "@octanejs/vite-plugin": "workspace:*",
     "zod": "^4.4.3"
   },
   "devDependencies": {
+    "miniflare": "catalog:default",
     "typescript": "catalog:default",
-    "vite": "catalog:default"
+    "vite": "catalog:default",
+    "wrangler": "catalog:default"
   }
 }

@@ -44,6 +44,7 @@
     "prettier": "catalog:default",
     "sucrase": "catalog:default",
     "typescript": "catalog:default",
-    "vite": "catalog:default"
+    "vite": "catalog:default",
+    "wrangler": "catalog:default"
   }
 }

@@ -5,11 +5,16 @@
 // modules (MCP SDK, compiler, docs snapshot) so loading this config stays
 // cheap in every mode (dev reloads it per matched request).
 import { defineConfig, RenderRoute } from '@octanejs/vite-plugin';
+import { cloudflare } from '@octanejs/adapter-cloudflare';
 import { vercel } from '@octanejs/adapter-vercel';
 import { serverRoutes } from './src/server/routes.ts';
 
 export default defineConfig({
-	adapter: vercel({ serverless: { runtime: 'nodejs24.x' } }),
+	// Cloudflare Workers Builds sets WORKERS_CI; every other build keeps the
+	// Vercel output.
+	adapter: process.env.WORKERS_CI
+		? cloudflare()
+		: vercel({ serverless: { runtime: 'nodejs24.x' } }),
 	router: {
 		routes: [
 			new RenderRoute({ path: '/', entry: ['Landing', '/src/app/Landing.tsrx'] }),
