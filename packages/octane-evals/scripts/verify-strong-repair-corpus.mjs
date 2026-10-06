@@ -100,9 +100,11 @@ for (const task of tasks) {
 // slot at once oversubscribed a 4-vCPU CI runner about eightfold, until each slot
 // took as long as the whole corpus. Slots never grow, so the largest start first.
 // All runs share one deadline, which keeps this script's worst case below the
-// timeout in tests/user-app-corpus.test.ts.
+// timeout in tests/user-app-corpus.test.ts. Grading time on the 4-vCPU CI runner
+// follows the runner's speed, which varies about twofold. The deadline is about
+// twice the slowest grading seen on main, which was about 95 seconds.
 const slotConcurrency = 2;
-const gradingTimeoutMs = 120_000;
+const gradingTimeoutMs = 180_000;
 const runningSlots = new Map();
 let gradingFailure;
 

@@ -14,10 +14,10 @@ const gradingCommandTimeoutMs = 20_000;
 // The verifier gives its nested Vitest run 60 seconds, so this wrapper must leave
 // enough time for that timeout to surface its own actionable error under CI load.
 const starterVerificationTimeoutMs = 70_000;
-// The verifier gives its Vitest runs a shared 120-second grading budget, so this
+// The verifier gives its Vitest runs a shared 180-second grading budget, so this
 // wrapper must leave enough time for that timeout to surface its own actionable
 // error under CI load.
-const strongRepairVerificationTimeoutMs = 150_000;
+const strongRepairVerificationTimeoutMs = 210_000;
 const STRONG_REPAIR_FAMILY = 'octane.strong-repair';
 
 interface UserAppCatalog {
@@ -243,7 +243,7 @@ describe('public user-app training corpus', () => {
 			timeout: strongRepairVerificationTimeoutMs,
 			killSignal: 'SIGKILL',
 		});
-	}, 160_000);
+	}, 220_000);
 
 	it('keeps every incomplete starter behaviorally unresolved', () => {
 		execFileSync(process.execPath, ['scripts/verify-user-app-starters.mjs'], {
