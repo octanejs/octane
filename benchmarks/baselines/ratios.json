@@ -194,6 +194,30 @@
   {
     "suite": "bundle-reachability",
     "op": "raw",
+    "target": "root-callback-local",
+    "reference": "root-callback-local-budget",
+    "maxRatio": 1,
+    "note": "A private compiled root rendered and unmounted only from retained controller callbacks; deterministic production raw bytes must not exceed the committed same-run budget."
+  },
+  {
+    "suite": "bundle-reachability",
+    "op": "gzip",
+    "target": "root-callback-local",
+    "reference": "root-callback-local-budget",
+    "maxRatio": 1,
+    "note": "A private compiled root rendered and unmounted only from retained controller callbacks; deterministic production gzip bytes must not exceed the committed same-run budget."
+  },
+  {
+    "suite": "bundle-reachability",
+    "op": "brotli",
+    "target": "root-callback-local",
+    "reference": "root-callback-local-budget",
+    "maxRatio": 1,
+    "note": "A private compiled root rendered and unmounted only from retained controller callbacks; deterministic production brotli bytes must not exceed the committed same-run budget."
+  },
+  {
+    "suite": "bundle-reachability",
+    "op": "raw",
     "target": "hooks-state",
     "reference": "hooks-state-budget",
     "maxRatio": 1,

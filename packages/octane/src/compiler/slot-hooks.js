@@ -147,8 +147,9 @@ function declaresHook(ast) {
 // A disposable expression or nonescaping local const root can omit return-value
 // reconciliation only when every render calls an imported compiled void body.
 // The adapter resolves each export's actual ABI; lexical binding identity keeps
-// shadows, aliases, closure captures and unknown future renders on the generic
-// path. Each candidate is one root and lists every relative import it renders.
+// shadows, aliases, escaping captures and unknown future renders on the generic
+// path, while a closure that only calls render/unmount stays proven. Each
+// candidate is one root and lists every relative import it renders.
 function collectVoidRootCandidates(ast) {
 	const factories = findRootFactoryImports(ast);
 	if (factories.size === 0) return [];
