@@ -966,7 +966,13 @@ and after discrete events (rejected edits snap back), IME composition is
 respected, radio groups restore as a group, `<select value>` projects options
 (single + multiple), and `defaultValue`/`defaultChecked` are the uncontrolled
 escape hatch. Hydration adopts pre-hydration user input, then the first
-commit/discrete event reasserts. `<textarea>` with children AND a
+commit/discrete event reasserts. As in React 19, a value or checked state the
+client renders differently from the server becomes the control's reset baseline
+(the `value` attribute, a textarea's content, the `checked` attribute). An
+unedited input or textarea follows it, and a checkbox or radio keeps its live
+state. React 19 replaces a pre-hydration textarea edit with the client's content
+even when server and client agree; Octane keeps the edit, as it does in an
+input. `<textarea>` with children AND a
 `value`/`defaultValue` prop is a compile error (the prop owns the content).
 
 Uncontrolled `defaultValue` updates change an input or textarea's reset baseline
