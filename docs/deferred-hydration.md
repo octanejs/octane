@@ -283,6 +283,14 @@ resolves to either one at render time makes server rendering throw. Use
 Activation adopts the matching server DOM in template and JSX-returning
 components, preserving edits made to uncontrolled inputs before activation.
 
+A parent root that falls back for a hydration mismatch elsewhere keeps its
+independent widgets. Its client render takes each widget's server wrapper,
+matched by boundary ID, in place of an empty one, so the widget keeps its DOM
+and state, whether it already activated or activates later. The IDs match
+when the client render calls `useId` as often as the server did before the
+widget. A widget whose ID no longer matches is discarded with the rest of the
+server DOM, and the client render leaves its new wrapper empty.
+
 When an independent boundary's only child is a prop-less component imported
 from a project `.tsrx` module, and that component is a zero-argument
 `'use dom bindings'` view, the island activates through the view's binding

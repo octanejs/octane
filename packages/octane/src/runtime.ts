@@ -3978,6 +3978,12 @@ interface RootRenderTransaction {
 	 * that failure, as React's does.
 	 */
 	caught?: boolean;
+	/**
+	 * The client render that replaces a failed hydration: the server's
+	 * independent island wrappers that no Hydrate in it has adopted yet
+	 * (keptHydrationIsland).
+	 */
+	keptIslands?: Element[];
 }
 
 interface RootRenderFrame {
@@ -16386,13 +16392,19 @@ function createHydrateSlot(
 	const parentBlock = scope.block;
 	const parentNode = parentBlock.parentNode;
 	const hydration = activeHydration();
-	const expected = (STAGED_DOM?.view(document) ?? document).createElement('div');
+	// The client render replacing a failed root hydration adopts an independent
+	// island's server wrapper as hydration would have: the island's own root
+	// still owns it, whether or not it has activated.
+	const kept =
+		hydrationStarted && props.__independent !== undefined ? keptHydrationIsland(boundaryId) : null;
+	const expected = kept ?? (STAGED_DOM?.view(document) ?? document).createElement('div');
 	const wrapper = (hydration === null ? expected : hydration.clone(expected)) as HTMLDivElement;
 	initializeHydrationEventCapture(wrapper.ownerDocument);
 	let serverPreserved =
-		hydration !== null &&
-		!hydration.isFresh(wrapper) &&
-		(STAGED_DOM?.view(wrapper) ?? wrapper).parentNode === parentNode;
+		kept !== null ||
+		(hydration !== null &&
+			!hydration.isFresh(wrapper) &&
+			(STAGED_DOM?.view(wrapper) ?? wrapper).parentNode === parentNode);
 	if (hydration !== null) hydration.insertRoot(wrapper, parentBlock);
 	else (STAGED_DOM?.view(parentNode) ?? parentNode).insertBefore(wrapper, parentBlock.endMarker);
 	if (!(STAGED_DOM?.view(wrapper) ?? wrapper).hasAttribute(HYDRATE_ID_ATTR))
@@ -16426,6 +16438,10 @@ function createHydrateSlot(
 			renderOwner: rootIds.renderOwner,
 		};
 		(STAGED_DOM?.view(wrapper) ?? wrapper).removeAttribute(HYDRATE_ID_COUNT_ATTR);
+		// A rolled-back attempt restores the count, so the attempt that replaces
+		// it, a retry or the fallback's client render adopting an independent
+		// wrapper, reserves the same IDs.
+		TRANSITION_JOURNAL?.push(JOURNAL_ATTR, wrapper, HYDRATE_ID_COUNT_ATTR, rawCount);
 	}
 	// An independent root may already have compacted its server ranges. The
 	// parent reserves its IDs but owns only the wrapper, never its child list or
@@ -16754,6 +16770,8 @@ function activateHydrateBoundary(state: HydrateSlot): void {
 			WIP_CAPTURE = previousCapture;
 			swapHydration(recoveryHydration);
 			setNativeAdoptionResolver(recoveryNative);
+			// Outside any hydration, an error that escaped the client render ends here.
+			if (recoveryHydration === null) clearHydrationThrow();
 		}
 		if (!caught && !hydration.staleServerValues)
 			noteRecoverableHydrationError(() => nativeRecovery!, block);
@@ -40998,7 +41016,9 @@ function clientRenderDehydratedTry(state: TrySlot, outer: HydrationCapability | 
 		return renderDehydratedTry(state, true);
 	} finally {
 		swapHydration(outer);
+		// Outside any hydration, an error that escaped the client render ends here.
 		if (outer !== null) outer.node = getNextSibling(state.end);
+		else clearHydrationThrow();
 		// Owners that the client render did not claim retire, unless it suspended
 		// and retains its own for the retry.
 		if (state.branch !== 2 && state.retrySignalOwners !== undefined) clearSignalRetryOwners(state);
@@ -48868,6 +48888,26 @@ function hydrationFallbackNodes(container: RootContainer): Node[] {
 	return nodes;
 }
 
+/**
+ * Take island `boundaryId`'s server wrapper for the client render replacing a
+ * failed hydration, which moves it into place. A rollback of that render puts
+ * it back where the server DOM had it. The island lives on its own root, so
+ * the render adopts it as hydration would have, and only an island the render
+ * no longer has is discarded with the server DOM (installHydrationFallback).
+ */
+function keptHydrationIsland(boundaryId: string): Element | null {
+	const islands = ROOT_RENDER_TRANSACTION?.keptIslands;
+	const index =
+		islands?.findIndex((island) => domNode(island).getAttribute(HYDRATE_ID_ATTR) === boundaryId) ??
+		-1;
+	if (index < 0) return null;
+	const wrapper = islands!.splice(index, 1)[0];
+	const parent = domNode(wrapper).parentNode!;
+	const next = domNode(wrapper).nextSibling;
+	journalUndo(() => domNode(parent).insertBefore(wrapper, next));
+	return wrapper;
+}
+
 /** Remove each of `nodes` that is still attached. */
 function removeNodes(nodes: readonly Node[]): void {
 	for (const node of nodes) {
@@ -49596,6 +49636,8 @@ export function __voidRootProps(type: ComponentBody, props: any): any {
  * `<html>` container a second `<head>` or `<body>`, so their render removes
  * the server nodes up front, and a rollback restores them. The head entries
  * that render places in `document.head` then land in the client's `<head>`.
+ * Each attempt restarts the root's IDs at `idSeed`, as the server's render
+ * started them, so the independent islands it keeps match by boundary id.
  */
 function installHydrationFallback(
 	owner: RootRenderOwner,
@@ -49603,6 +49645,8 @@ function installHydrationFallback(
 	failure: Error,
 	diagnostic: string | undefined,
 	report: ((error: unknown) => void) | undefined,
+	ids: RootIdState,
+	idSeed: number,
 ): void {
 	owner.hydrationFallback = (failed) => {
 		const nodes = hydrationFallbackNodes(container);
@@ -49612,13 +49656,24 @@ function installHydrationFallback(
 			return;
 		}
 		const transaction = ROOT_RENDER_TRANSACTION!;
+		const islands = Array.from(
+			(STAGED_DOM?.view(container) ?? container).querySelectorAll(
+				'[' + HYDRATE_INDEPENDENT_ATTR + ']',
+			),
+		);
+		const unadopted = (transaction.keptIslands = islands.slice());
+		ids.next = idSeed;
 		// Rolling back a render that never commits restores exactly these nodes.
 		journalRootRange(container, null, null);
 		if (container.nodeType === 9 || (container as Element).localName === 'html') removeNodes(nodes);
 		(transaction.commit ??= []).push(() => {
 			owner.hydrationFallback = undefined;
-			nodes.forEach(retireEventHostTree);
-			removeNodes(nodes);
+			// An island the client render adopted belongs to its tree now.
+			const discarded = nodes.filter(
+				(node) => !islands.includes(node as Element) || unadopted.includes(node as Element),
+			);
+			discarded.forEach(retireEventHostTree);
+			removeNodes(discarded);
 			if (process.env.NODE_ENV !== 'production' && diagnostic !== undefined)
 				console.error(diagnostic);
 			if (report !== undefined && transaction.caught !== true)
@@ -49990,8 +50045,9 @@ function hydrateRootWithOutputHandler(
 					? nativeRecovery.diagnostic
 					: undefined,
 				currentHydration?.staleServerValues === true ? undefined : rootOptions?.onRecoverableError,
+				idState,
+				rootOptions?.identifierSeed ?? 0,
 			);
-			idState.next = rootOptions?.identifierSeed ?? 0;
 			if (isElementDescriptor(bodyOrElement)) root.render(bodyOrElement);
 			else root.render(body, props);
 			return;
