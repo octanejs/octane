@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { hydrateRoot } from 'octane';
 import { prerender } from 'octane/static';
 import { act, mount } from './_helpers.js';
-import { loadCompiledFixtureSource } from './_server-fixture.js';
+import { loadCompiledFixtureSource, loadPlainHookFixtureSource } from './_server-fixture.js';
 
 const cases = [
 	{ name: 'erased assertion', expression: 'props.load(props.id as UserId)' },
@@ -188,7 +188,36 @@ const cases = [
 	},
 ];
 
+// `ts` is a plain hook module: slotHooks memoizes its use() arguments with the
+// same dependency policy as the component compiler.
+const exts = ['tsrx', 'tsx', 'ts'];
+const sitesFor = (mode: 'client' | 'server', ext: string) =>
+	mode === 'server' && ext !== 'ts' ? ['argument', 'prop'] : ['argument'];
+
+function loadCreationFixture<T extends Record<string, any> = Record<string, any>>(
+	source: string,
+	{ id, ext, mode, dev }: { id: string; ext: string; mode: 'client' | 'server'; dev: boolean },
+): T {
+	return ext === 'ts'
+		? loadPlainHookFixtureSource<T>(source, {
+				id: `${id}.ts`,
+				mode,
+				hmr: dev,
+				inlineHookMemo: true,
+			})
+		: loadCompiledFixtureSource<T>(source, {
+				id: `${id}.${ext}`,
+				mode,
+				compileOptions: { hmr: false, dev },
+			});
+}
+
 function sourceFor(expression: string, ext: string, site: string, setup = '') {
+	if (ext === 'ts') {
+		return `import { createElement, use } from 'octane';
+type UserId = string;
+export function Page(props) { ${setup} const value = use(${expression}); return createElement('p', null, value as string); }`;
+	}
 	const reader =
 		ext === 'tsrx'
 			? 'function Reader(props) @{ const value = use(props.request); <p>{value as string}</p> }'
@@ -217,10 +246,11 @@ function requestLoader() {
 }
 
 async function renderedText(source: string, ext: string, mode: 'client' | 'server', dev: boolean) {
-	const { Page } = loadCompiledFixtureSource(source, {
-		id: `/project/CreationDependencies.${ext}`,
+	const { Page } = loadCreationFixture(source, {
+		id: '/project/CreationDependencies',
+		ext,
 		mode,
-		compileOptions: { hmr: false, dev },
+		dev,
 	});
 	const request = requestLoader();
 	let loads = 0;
@@ -241,8 +271,8 @@ async function renderedText(source: string, ext: string, mode: 'client' | 'serve
 		const settledLoads = loads;
 		await act(() => rendered.update(Page, { ...props }));
 		expect(rendered.find('p').textContent).toBe('first');
-		// Equal member deps keep the template creation across a fresh props object.
-		if (ext === 'tsrx') expect(loads).toBe(settledLoads);
+		// Equal member deps keep the memoized creation across a fresh props object.
+		if (ext !== 'tsx') expect(loads).toBe(settledLoads);
 		await act(() => rendered.update(Page, { ...props, id: 'second' }));
 		expect(rendered.find('p').textContent).toBe('second');
 	} finally {
@@ -254,8 +284,8 @@ describe('async creation dependencies', () => {
 	it.each(
 		[false, true].flatMap((dev) =>
 			(['client', 'server'] as const).flatMap((mode) =>
-				['tsrx', 'tsx'].flatMap((ext) =>
-					(mode === 'server' ? ['argument', 'prop'] : ['argument']).flatMap((site) =>
+				exts.flatMap((ext) =>
+					sitesFor(mode, ext).flatMap((site) =>
 						cases.map((entry) => ({ ...entry, dev, mode, ext, site })),
 					),
 				),
@@ -273,8 +303,8 @@ describe('async creation dependencies', () => {
 	it.each(
 		[false, true].flatMap((dev) =>
 			(['client', 'server'] as const).flatMap((mode) =>
-				['tsrx', 'tsx'].flatMap((ext) =>
-					(mode === 'server' ? ['argument', 'prop'] : ['argument']).flatMap((site) =>
+				exts.flatMap((ext) =>
+					sitesFor(mode, ext).flatMap((site) =>
 						[false, true].map((member) => ({ dev, mode, ext, site, member })),
 					),
 				),
@@ -285,10 +315,11 @@ describe('async creation dependencies', () => {
 		async ({ dev, mode, ext, site, member }) => {
 			const globals = globalThis as Record<string, unknown>;
 			const expression = `props.load(typeof creationOptionalGlobal === 'undefined' ? props.id : creationOptionalGlobal${member ? '.value' : ''})`;
-			const { Page } = loadCompiledFixtureSource(sourceFor(expression, ext, site), {
-				id: `/project/PresentCreationDependency.${ext}`,
+			const { Page } = loadCreationFixture(sourceFor(expression, ext, site), {
+				id: '/project/PresentCreationDependency',
+				ext,
 				mode,
-				compileOptions: { hmr: false, dev },
+				dev,
 			});
 			const props = { id: 'fallback', load: requestLoader() };
 			const rendered = mode === 'client' ? mount(Page, props) : null;
@@ -323,8 +354,8 @@ describe('async creation dependencies', () => {
 	it.each(
 		[false, true].flatMap((dev) =>
 			(['client', 'server'] as const).flatMap((mode) =>
-				['tsrx', 'tsx'].flatMap((ext) =>
-					(mode === 'server' ? ['argument', 'prop'] : ['argument']).map((site) => ({
+				exts.flatMap((ext) =>
+					sitesFor(mode, ext).map((site) => ({
 						dev,
 						mode,
 						ext,
@@ -362,8 +393,8 @@ describe('async creation dependencies', () => {
 	it.each(
 		[false, true].flatMap((dev) =>
 			(['client', 'server'] as const).flatMap((mode) =>
-				['tsrx', 'tsx'].flatMap((ext) =>
-					(mode === 'server' ? ['argument', 'prop'] : ['argument']).flatMap((site) =>
+				exts.flatMap((ext) =>
+					sitesFor(mode, ext).flatMap((site) =>
 						[
 							"props.load((typeof creationAbsentGlobal === 'undefined' ? props.id : creationAbsentGlobal.value) + creationAbsentGlobal.value)",
 							"props.load(typeof creationAbsentGlobal !== 'undefined' ? creationAbsentGlobal.value : creationAbsentGlobal.value)",
@@ -376,10 +407,11 @@ describe('async creation dependencies', () => {
 	)(
 		'preserves authored missing-global errors ($mode, $ext, $site, dev=$dev)',
 		async ({ dev, mode, ext, site, expression }) => {
-			const { Page } = loadCompiledFixtureSource(sourceFor(expression, ext, site), {
-				id: `/project/UnguardedCreationDependency.${ext}`,
+			const { Page } = loadCreationFixture(sourceFor(expression, ext, site), {
+				id: '/project/UnguardedCreationDependency',
+				ext,
 				mode,
-				compileOptions: { hmr: false, dev },
+				dev,
 			});
 			const props = { id: 'fallback', load: requestLoader() };
 			if (mode === 'server') {
@@ -390,7 +422,7 @@ describe('async creation dependencies', () => {
 		},
 	);
 
-	it.each([false, true].flatMap((dev) => ['tsrx', 'tsx'].map((ext) => ({ dev, ext }))))(
+	it.each([false, true].flatMap((dev) => exts.map((ext) => ({ dev, ext }))))(
 		'adopts a guarded global fallback and refreshes its value ($ext, dev=$dev)',
 		async ({ dev, ext }) => {
 			const globals = globalThis as Record<string, unknown>;
@@ -399,12 +431,9 @@ describe('async creation dependencies', () => {
 				ext,
 				'argument',
 			);
-			const options = {
-				id: `/project/HydratedCreationDependency.${ext}`,
-				compileOptions: { hmr: false, dev },
-			};
-			const server = loadCompiledFixtureSource(source, { ...options, mode: 'server' });
-			const client = loadCompiledFixtureSource(source, { ...options, mode: 'client' });
+			const options = { id: '/project/HydratedCreationDependency', ext, dev };
+			const server = loadCreationFixture(source, { ...options, mode: 'server' });
+			const client = loadCreationFixture(source, { ...options, mode: 'client' });
 			const props = { id: 'fallback', load: requestLoader() };
 			const container = document.createElement('div');
 			container.innerHTML = (await prerender(server.Page, props)).html;
@@ -431,7 +460,7 @@ describe('async creation dependencies', () => {
 	it.each(
 		[false, true].flatMap((dev) =>
 			(['client', 'server'] as const).flatMap((mode) =>
-				['tsrx', 'tsx'].flatMap((ext) =>
+				exts.flatMap((ext) =>
 					[
 						"props.load(typeof creationOptionalGlobal !== 'undefined' && creationCheckReadiness() ? creationOptionalGlobal.value : props.id)",
 						"props.load((typeof creationOptionalGlobal !== 'undefined' && creationCheckReadiness()) && creationOptionalGlobal.value || props.id)",
@@ -473,10 +502,11 @@ describe('async creation dependencies', () => {
 			}
 			let rendered: ReturnType<typeof mount> | null = null;
 			try {
-				const { Page } = loadCompiledFixtureSource(sourceFor(expression, ext, 'argument'), {
-					id: `/project/AuthoredReadiness.${ext}`,
+				const { Page } = loadCreationFixture(sourceFor(expression, ext, 'argument'), {
+					id: '/project/AuthoredReadiness',
+					ext,
 					mode,
-					compileOptions: { hmr: false, dev },
+					dev,
 				});
 				// A fulfilled request isolates dependency evaluation from a retry
 				// after suspension, which may legitimately call authored code again.
@@ -502,23 +532,15 @@ describe('async creation dependencies', () => {
 		},
 	);
 
-	it.each([false, true])(
-		'refreshes a getter read both after an optional link and at render (dev=%s)',
-		async (dev) => {
+	it.each([false, true].flatMap((dev) => ['tsrx', 'ts'].map((ext) => ({ dev, ext }))))(
+		'refreshes a getter read both after an optional link and at render ($ext, dev=$dev)',
+		async ({ dev, ext }) => {
 			// The skipped read alone may not invoke the getter, but the fallback
 			// already reads it during render and must keep its value dependency.
-			const { Page, store } = loadCompiledFixtureSource(
-				`import { use } from 'octane';
-export const store = { current: 'first', get value() { return this.current; } };
-export function Page(props) @{
-  const value = use(props.load(props.run?.(store.value) ?? store.value));
-  <p>{value as string}</p>
-}`,
-				{
-					id: '/project/SkippedAndReadCreationDependency.tsrx',
-					mode: 'client',
-					compileOptions: { hmr: false, dev },
-				},
+			const { Page, store } = loadCreationFixture(
+				`export const store = { current: 'first', get value() { return this.current; } };
+${sourceFor('props.load(props.run?.(store.value) ?? store.value)', ext, 'argument')}`,
+				{ id: '/project/SkippedAndReadCreationDependency', ext, mode: 'client', dev },
 			);
 			const props = { load: requestLoader() };
 			const rendered = mount(Page, props);
@@ -535,17 +557,13 @@ export function Page(props) @{
 		},
 	);
 
-	it.each([false, true].flatMap((dev) => ['tsrx', 'tsx'].map((ext) => ({ dev, ext }))))(
+	it.each([false, true].flatMap((dev) => exts.map((ext) => ({ dev, ext }))))(
 		'refreshes a guarded global when its type changes ($ext, dev=$dev)',
 		async ({ dev, ext }) => {
 			const globals = globalThis as Record<string, unknown>;
-			const { Page } = loadCompiledFixtureSource(
+			const { Page } = loadCreationFixture(
 				sourceFor('props.load(typeof creationOptionalGlobal)', ext, 'argument'),
-				{
-					id: `/project/OptionalCreationDependency.${ext}`,
-					mode: 'client',
-					compileOptions: { hmr: false, dev },
-				},
+				{ id: '/project/OptionalCreationDependency', ext, mode: 'client', dev },
 			);
 			const props = { load: requestLoader() };
 			const rendered = mount(Page, props);
@@ -562,16 +580,12 @@ export function Page(props) @{
 		},
 	);
 
-	it.each([false, true].flatMap((dev) => ['tsrx', 'tsx'].map((ext) => ({ dev, ext }))))(
+	it.each([false, true].flatMap((dev) => exts.map((ext) => ({ dev, ext }))))(
 		'refreshes a request when its constructor changes ($ext, dev=$dev)',
 		async ({ dev, ext }) => {
-			const { Page } = loadCompiledFixtureSource(
+			const { Page } = loadCreationFixture(
 				sourceFor('new props.Request(props.id)', ext, 'argument'),
-				{
-					id: `/project/ConstructorCreationDependency.${ext}`,
-					mode: 'client',
-					compileOptions: { hmr: false, dev },
-				},
+				{ id: '/project/ConstructorCreationDependency', ext, mode: 'client', dev },
 			);
 			const load = requestLoader();
 			const request = (label: string) =>
@@ -585,6 +599,148 @@ export function Page(props) @{
 				expect(rendered.find('p').textContent).toBe('first:same');
 				await act(() => rendered.update(Page, { ...props, Request: request('second') }));
 				expect(rendered.find('p').textContent).toBe('second:same');
+			} finally {
+				rendered.unmount();
+			}
+		},
+	);
+});
+
+// A plain hook module's memoized use() argument evaluates its dependency array
+// on every render, so the array may only read what the authored argument reads.
+const plainUseShapes = [
+	{
+		name: 'optional-call argument',
+		expression: "load(run?.(options.label) ?? 'idle')",
+		idle: undefined,
+		active: (label: string) => label,
+		skipped: true,
+	},
+	{
+		name: 'optional computed key',
+		expression: "load(run?.[options.label] ?? 'idle')",
+		idle: undefined,
+		active: { first: 'first', second: 'second' },
+		skipped: true,
+	},
+	{
+		name: 'callback body',
+		expression: "load(() => (run ? options.label : 'idle'))",
+		idle: false,
+		active: true,
+		skipped: false,
+	},
+	{
+		name: 'conditional branch',
+		expression: "load(run ? options.label : 'idle')",
+		idle: false,
+		active: true,
+		skipped: false,
+	},
+	{
+		name: 'logical right side',
+		expression: "load((run && options.label) || 'idle')",
+		idle: false,
+		active: true,
+		skipped: false,
+	},
+	{
+		name: 'nullish right side',
+		expression: 'load(run ?? options.label)',
+		idle: 'idle',
+		active: undefined,
+		skipped: false,
+	},
+];
+
+describe('plain hook use() dependencies', () => {
+	it.each(
+		[false, true].flatMap((dev) =>
+			(['client', 'server'] as const).flatMap((mode) =>
+				plainUseShapes.map((shape) => ({ ...shape, dev, mode })),
+			),
+		),
+	)(
+		'reads only what the authored $name reads ($mode, dev=$dev)',
+		async ({ expression, idle, active, skipped, dev, mode }) => {
+			const { Page } = loadPlainHookFixtureSource(
+				`import { createElement, use } from 'octane';
+function useLabel({ run, options, load }) { const label = use(${expression}); return label; }
+export function Page(props) { return createElement('p', null, useLabel(props) as string); }`,
+				{ id: '/src/PlainUseDependencies.ts', mode, hmr: dev, inlineHookMemo: true },
+			);
+			const load = requestLoader();
+			const rendered =
+				mode === 'client' ? mount(Page, { run: idle, options: undefined, load }) : null;
+			async function expectText(props: { run: unknown; options: unknown }, text: string) {
+				if (rendered) {
+					await act(() => rendered.update(Page, { ...props, load }));
+					await act(async () => {});
+					expect(rendered.find('p').textContent).toBe(text);
+				} else {
+					expect((await prerender(Page, { ...props, load })).html).toContain(`<p>${text}</p>`);
+				}
+			}
+			try {
+				await expectText({ run: idle, options: undefined }, 'idle');
+				await expectText({ run: idle, options: null }, 'idle');
+				if (skipped) {
+					// The guarded descriptor probe never invokes a getter the
+					// authored argument skips.
+					const throwing = {
+						get label(): string {
+							throw new Error('skipped optional-chain read');
+						},
+					};
+					await expectText({ run: idle, options: throwing }, 'idle');
+				}
+				const options = { label: 'first' };
+				await expectText({ run: active, options }, 'first');
+				options.label = 'second';
+				await expectText({ run: active, options }, 'second');
+				await expectText({ run: idle, options: undefined }, 'idle');
+			} finally {
+				rendered?.unmount();
+			}
+		},
+	);
+
+	it.each(
+		[false, true].flatMap((dev) =>
+			(['client', 'server'] as const).flatMap((mode) =>
+				[
+					'() => first.length',
+					"props.run?.(first.length) ?? 'idle'",
+					"typeof first === 'string' ? first.length : 'idle'",
+					'typeof first',
+				].map((expression) => ({ dev, mode, expression })),
+			),
+		),
+	)(
+		'keeps a use() that reads an earlier result out of its batch: $expression ($mode, dev=$dev)',
+		async ({ dev, mode, expression }) => {
+			// Batched creations evaluate before the earlier use() declares its
+			// result, so a dependency on that result must start a new batch.
+			const { Page } = loadPlainHookFixtureSource(
+				`import { createElement, use } from 'octane';
+export function Page(props) {
+  const first = use(props.load('first'));
+  const second = use(props.load(${expression}));
+  return createElement('p', null, String(second));
+}`,
+				{ id: '/src/PlainUseBatchOrder.ts', mode, hmr: dev, inlineHookMemo: true },
+			);
+			const props = { load: requestLoader(), run: (value: unknown) => value };
+			const expected = expression === 'typeof first' ? 'string' : '5';
+			if (mode === 'server') {
+				expect((await prerender(Page, props)).html).toContain(`<p>${expected}</p>`);
+				return;
+			}
+			const rendered = mount(Page, props);
+			try {
+				await act(async () => {});
+				await act(async () => {});
+				expect(rendered.find('p').textContent).toBe(expected);
 			} finally {
 				rendered.unmount();
 			}
