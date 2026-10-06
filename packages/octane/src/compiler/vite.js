@@ -160,21 +160,20 @@ const PRINT_ONLY_AST_KEYS = new Set(['start', 'end', 'loc', 'range', 'comments',
 // after this plugin's pre-order transform, so a `.tsx` component's final code
 // never matches its compiled code byte for byte. A void-export proof must
 // survive that reprint, and still fail closed when a later transform changes
-// the program. Returns null when the code cannot be parsed here.
+// the program. Returns null when the code cannot be parsed or serialized here,
+// so an importer falls back to the generic paths instead of failing its build.
 function structuralCodeFingerprint(context, code) {
 	if (typeof context?.parse !== 'function') return null;
-	let program;
 	try {
-		program = context.parse(code);
+		const json = JSON.stringify(context.parse(code), function (key, value) {
+			if (PRINT_ONLY_AST_KEYS.has(key) || (key === 'raw' && this.type === 'Literal'))
+				return undefined;
+			return typeof value === 'bigint' ? `${value}n` : value;
+		});
+		return nodeCrypto.createHash('sha256').update(json).digest('base64url');
 	} catch {
 		return null;
 	}
-	const json = JSON.stringify(program, function (key, value) {
-		if (PRINT_ONLY_AST_KEYS.has(key) || (key === 'raw' && this.type === 'Literal'))
-			return undefined;
-		return typeof value === 'bigint' ? `${value}n` : value;
-	});
-	return nodeCrypto.createHash('sha256').update(json).digest('base64url');
 }
 
 const NO_PREFLIGHT_FACTS = Object.freeze([]);
