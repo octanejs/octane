@@ -35053,6 +35053,8 @@ export function hostComponent(
 	const block = scope.block;
 	let state = scope.slots[slot] as HostComponentSlot | undefined;
 	if (state === undefined) {
+		// Its props are arbitrary, so any of them can be a function form action.
+		enableDescriptorFormActions();
 		const el = (STAGED_DOM?.view(document) ?? document).createElement(tag);
 		// The children childSlot exclusively OWNS `el`'s content (owns-parent
 		// mode) — no `<!---->` insertion anchor needed (marker-elision M2).
