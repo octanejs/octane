@@ -7841,12 +7841,21 @@ function linkedStateHook<Source, Value>(
 	return [record.value, record.dispatch, getter];
 }
 
-export function useLinkedState<Source, Value>(
+// `Value` is the reconciler's return type and `Previous` the type of
+// `previous.value`; the client `useLinkedState` declaration explains the split.
+type LinkedStateValue<Value, Previous> = unknown extends Previous ? Value : Previous;
+type LinkedStateTuple<Value> = [
+	Value,
+	(next: Value | ((previous: Value) => Value)) => void,
+	() => Value,
+];
+
+export function useLinkedState<Source, Value extends Previous, Previous = Value>(
 	source: Source,
-	reconcile: (source: Source, previous: LinkedStatePrevious<Source, Value> | undefined) => Value,
-	options?: LinkedStateOptions<Source, Value>,
+	reconcile: (source: Source, previous: LinkedStatePrevious<Source, Previous> | undefined) => Value,
+	options?: LinkedStateOptions<Source, Previous>,
 	slot?: symbol,
-): [Value, (next: Value | ((previous: Value) => Value)) => void, () => Value];
+): LinkedStateTuple<LinkedStateValue<Value, Previous>>;
 export function useLinkedState<Source, Value>(
 	source: Source,
 	reconcile: (source: Source, previous: LinkedStatePrevious<Source, Value> | undefined) => Value,
@@ -7861,12 +7870,12 @@ export function useLinkedState<Source, Value>(
 }
 
 /** Compiler-emitted linked-state variant when its latest-value getter is observed. */
-export function __useLinkedStateWithGetter<Source, Value>(
+export function __useLinkedStateWithGetter<Source, Value extends Previous, Previous = Value>(
 	source: Source,
-	reconcile: (source: Source, previous: LinkedStatePrevious<Source, Value> | undefined) => Value,
-	options?: LinkedStateOptions<Source, Value>,
+	reconcile: (source: Source, previous: LinkedStatePrevious<Source, Previous> | undefined) => Value,
+	options?: LinkedStateOptions<Source, Previous>,
 	slot?: symbol,
-): [Value, (next: Value | ((previous: Value) => Value)) => void, () => Value];
+): LinkedStateTuple<LinkedStateValue<Value, Previous>>;
 export function __useLinkedStateWithGetter<Source, Value>(
 	source: Source,
 	reconcile: (source: Source, previous: LinkedStatePrevious<Source, Value> | undefined) => Value,
