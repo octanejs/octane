@@ -1,17 +1,17 @@
 {
   "app": {
     "raw": 8297,
-    "gzip": 2889,
-    "brotli": 2663
+    "gzip": 2890,
+    "brotli": 2655
   },
   "framework": {
-    "raw": 214940,
-    "gzip": 67268,
-    "brotli": 58452
+    "raw": 214942,
+    "gzip": 67253,
+    "brotli": 58455
   },
   "total": {
-    "raw": 223205,
-    "gzip": 70125,
-    "brotli": 60859
+    "raw": 223207,
+    "gzip": 70111,
+    "brotli": 60854
   }
 }
