@@ -5097,8 +5097,6 @@ function forSlotParkable(state: ForSlot): boolean {
  * a record for an inner window, converts the link form to the full form first.
  */
 interface ForSlotRecord {
-	/** The journal log this record's undo lives in. */
-	log: any[];
 	empty: Block | null;
 	chain: Block[] | null;
 	mapOrder: Block[] | null;
@@ -5113,6 +5111,13 @@ interface ForSlotRecord {
 }
 
 /**
+ * Each journal log's newest link record per list. Keyed by the log, so the
+ * records (which reference removed rows) go when a committed log is dropped,
+ * and a later log never sees an earlier one's.
+ */
+const SLOT_RECORDS = new WeakMap<any[], Map<ForSlot, ForSlotRecord>>();
+
+/**
  * Ensure the current window can restore this list to its shape before the
  * window's first change. Without `link`, the caller is about to relink rows
  * wholesale, so the record takes, or converts to, the full form. With `link`,
@@ -5124,16 +5129,18 @@ interface ForSlotRecord {
  */
 function journalForSlot(state: ForSlot, link?: boolean): ForSlotRecord | null {
 	const seen = TRANSITION_JOURNAL_BAGS!;
-	const current =
-		state.journal !== null && state.journal.log === TRANSITION_JOURNAL ? state.journal : null;
+	let records = SLOT_RECORDS.get(TRANSITION_JOURNAL!);
+	const current = records?.get(state) ?? null;
 	if ((seen.get(state) ?? -1) >= TRANSITION_JOURNAL_CHECKPOINT) {
 		if (link) return current;
 		if (current !== null && current.links !== null) fullForSlotRecord(state, current);
 		return null;
 	}
 	// An enclosing window's link record stops gathering links here.
-	if (current !== null && current.links !== null) fullForSlotRecord(state, current);
-	state.journal = null;
+	if (current !== null) {
+		if (current.links !== null) fullForSlotRecord(state, current);
+		records!.delete(state);
+	}
 	seen.set(state, TRANSITION_JOURNAL!.length);
 	if (
 		ROOT_RENDER_TRANSACTION !== null &&
@@ -5168,7 +5175,6 @@ function journalForSlot(state: ForSlot, link?: boolean): ForSlotRecord | null {
 			if (keyOrder[i] !== chain[i]) mapOrder = keyOrder;
 	}
 	const record: ForSlotRecord = {
-		log: TRANSITION_JOURNAL!,
 		empty: state.emptyBlock,
 		chain,
 		mapOrder,
@@ -5179,13 +5185,15 @@ function journalForSlot(state: ForSlot, link?: boolean): ForSlotRecord | null {
 	};
 	if (link) {
 		if (process.env.NODE_ENV !== 'production') record.check = forSlotShape(state);
-		state.journal = record;
+		if (records === undefined) SLOT_RECORDS.set(TRANSITION_JOURNAL!, (records = new Map()));
+		records.set(state, record);
 	}
+	const owner = records;
 	journalUndo(() => {
 		if (record.links !== null) fullForSlotRecord(state, record);
 		restoreForSlot(state, record, record.chain);
 		seen.delete(state);
-		if (state.journal === record) state.journal = null;
+		if (owner?.get(state) === record) owner.delete(state);
 	});
 	return link ? record : null;
 }
@@ -5239,10 +5247,12 @@ function fullForSlotRecord(state: ForSlot, record: ForSlotRecord): void {
  */
 function journalForOwnedListClear(state: ForSlot): void {
 	const seen = TRANSITION_JOURNAL_BAGS!;
-	const current = state.journal;
-	if (current !== null && current.log === TRANSITION_JOURNAL && current.links !== null)
-		fullForSlotRecord(state, current);
-	state.journal = null;
+	const records = SLOT_RECORDS.get(TRANSITION_JOURNAL!);
+	const current = records?.get(state);
+	if (current !== undefined) {
+		if (current.links !== null) fullForSlotRecord(state, current);
+		records!.delete(state);
+	}
 	const oldItems = state.items;
 	seen.set(state, TRANSITION_JOURNAL!.length);
 	const snapshot = {
@@ -37366,7 +37376,6 @@ function renderPreparedChildList(
 			end: state.end!,
 			items: new Map(),
 			inOrder: true,
-			journal: null,
 			head: null,
 			tail: null,
 			size: 0,
@@ -46087,8 +46096,6 @@ interface ForSlot {
 	// Only while it holds can a rollback that deleted keys rebuild the Map from
 	// the restored chain (journalForSlot).
 	inOrder: boolean;
-	// The newest journal record that still gathers links (journalForSlot), or null.
-	journal: ForSlotRecord | null;
 	head: Block | null; // first item Block in DOM order
 	tail: Block | null; // last item Block in DOM order
 	size: number; // count of item Blocks
@@ -46242,7 +46249,6 @@ export function forBlock<T>(
 			end,
 			items: new Map(),
 			inOrder: true,
-			journal: null,
 			head: null,
 			tail: null,
 			size: 0,
