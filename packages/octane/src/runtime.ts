@@ -20669,7 +20669,7 @@ class HydrationCapability {
 	adoptServerCatch(state: TrySlot, caught: ServerCatch, error: unknown): HydrationMismatch | null {
 		this.settleServerCatch(caught, state, true);
 		try {
-			switchToCatch(state, error, true, caught.start, caught.end);
+			TRY_OPS!.catchError(state, error, true, caught.start, caught.end);
 		} catch (failure) {
 			if (state.pendingBody === null || !(failure instanceof HydrationMismatch)) throw failure;
 			return failure;
@@ -40671,6 +40671,13 @@ export function tryBlock(
 	}
 	const parentBlock = parentScope.block;
 	const hydration = hydrating ? activeHydration() : null;
+	if (hydrationStarted && TRY_OPS === null)
+		TRY_OPS = {
+			createBody: createTryBody,
+			setBranch: setTryBranch,
+			mount: mountTry,
+			catchError: switchToCatch,
+		};
 	let state = parentScope.slots[slotKey] as TrySlot | undefined;
 	let supersedesInputs = false;
 	// A boundary whose hydration has not finished yet.
@@ -40988,6 +40995,20 @@ let initialStreamedPayloads: WeakMap<
 // the hydrator and its seed parser reachable in the shipped bundle.
 let initialSuspenseHydrationRenderer: typeof renderInitialSuspenseHydration | null = null;
 
+/**
+ * The boundary operations that hydration performs on a Suspense or @try arm.
+ * tryBlock, which alone creates a TrySlot, installs them once hydration has
+ * started, so hydrating bundles that render no boundary do not ship the
+ * boundary machinery that hydration would otherwise name directly.
+ */
+interface TryOps {
+	createBody: typeof createTryBody;
+	setBranch: typeof setTryBranch;
+	mount: typeof mountTry;
+	catchError: typeof switchToCatch;
+}
+let TRY_OPS: TryOps | null = null;
+
 function takeInitialSuspenseHydration(
 	state: TrySlot,
 	hydration: HydrationCapability,
@@ -41125,7 +41146,7 @@ function renderDehydratedTry(state: TrySlot, claimsRetryOwners = false): boolean
 	const previous = DEHYDRATED_TRY;
 	DEHYDRATED_TRY = state;
 	try {
-		return catchesInHydrationFallback(() => mountTry(state, claimsRetryOwners));
+		return catchesInHydrationFallback(() => TRY_OPS!.mount(state, claimsRetryOwners));
 	} finally {
 		DEHYDRATED_TRY = previous;
 	}
@@ -41181,9 +41202,9 @@ function renderInitialSuspenseHydration(
 		return;
 	}
 	state.idState.next = initial.idStart;
-	const block = createTryBody(state, initial.start, initial.end);
+	const block = TRY_OPS!.createBody(state, initial.start, initial.end);
 	state.block = block;
-	setTryBranch(state, 1);
+	TRY_OPS!.setBranch(state, 1);
 	const hydration = new HydrationCapability(block, getNextSibling(initial.start), null);
 	hydration.speculative = hydration.defers = true;
 	if (initial.seedRaw !== null) hydration.seeds = hydration.parseSeeds(initial.seedRaw);
@@ -41314,7 +41335,7 @@ function renderInitialSuspenseHydration(
 	const outerHydration = currentHydration;
 	if (adoptServerCatch) swapHydration(hydration);
 	try {
-		switchToCatch(
+		TRY_OPS!.catchError(
 			state,
 			failure,
 			true,
