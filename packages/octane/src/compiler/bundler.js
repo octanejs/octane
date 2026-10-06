@@ -146,17 +146,17 @@ function normalizeModulePath(file) {
 
 /**
  * Return the stable ID embedded in hook keys and dev source metadata. Files
- * inside the project root use a root-relative POSIX path so builds are portable;
- * external files retain their absolute path. Bundler query suffixes never enter
- * compiler output or cache keys.
+ * inside the project root use a root-relative POSIX path; files outside it use
+ * a `../`-relative path, so builds do not depend on the checkout location.
+ * Bundler query suffixes never enter compiler output or cache keys.
  */
 export function canonicalModuleId(id, projectRoot) {
 	const file = cleanModuleId(id);
 	if (!projectRoot || !nodePath.isAbsolute(file)) return normalizeModulePath(file);
 	const root = nodePath.resolve(projectRoot);
 	const relativeFile = nodePath.relative(root, file);
-	if (!isPathInside(root, file)) return normalizeModulePath(file);
-	return '/' + normalizeModulePath(relativeFile);
+	if (nodePath.isAbsolute(relativeFile)) return normalizeModulePath(file); // another Windows drive
+	return (isPathInside(root, file) ? '/' : '') + normalizeModulePath(relativeFile);
 }
 
 export function resolveOctaneRuntimeRequest(request, environment) {

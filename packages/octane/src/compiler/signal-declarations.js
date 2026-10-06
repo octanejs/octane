@@ -1,6 +1,11 @@
 import { builders as b, strongHash } from '@tsrx/core';
-import { createLexicalAnalysis } from './compile-universal.js';
-import { analyzeCallbackDependencies, cloneDependency, isInvariantLiteral } from './hook-deps.js';
+import { createLexicalAnalysis, isIdentifierReference } from './compile-universal.js';
+import {
+	analyzeCallbackDependencies,
+	cloneDependency,
+	collectReassignedBindings,
+	isInvariantLiteral,
+} from './hook-deps.js';
 import { inheritHookMemoOrigin } from './inline-hook-memo.js';
 import { normalizeTextTypeFilename } from './text-type-facts.js';
 
@@ -391,31 +396,34 @@ function lexicalOwners(root) {
 	return owners;
 }
 
-function mapAst(node, replace) {
+function mapAst(node, replace, onCopy = null, parent = null, key = null) {
 	if (node === null || typeof node !== 'object') return node;
 	if (Array.isArray(node)) {
 		let out = null;
 		for (let i = 0; i < node.length; i++) {
-			const mapped = mapAst(node[i], replace);
+			const mapped = mapAst(node[i], replace, onCopy, parent, key);
 			if (out === null && mapped !== node[i]) out = node.slice(0, i);
 			if (out !== null) out.push(mapped);
 		}
 		return out ?? node;
 	}
-	const replacement = replace(node);
+	const original = node;
+	const replacement = replace(node, parent, key);
 	if (replacement !== null) node = replacement;
 	let out = null;
 	for (const key in node) {
 		if (AST_METADATA.has(key) || key.startsWith('_octane')) continue;
 		const child = node[key];
 		if (child === null || typeof child !== 'object') continue;
-		const mapped = mapAst(child, replace);
+		const mapped = mapAst(child, replace, onCopy, node, key);
 		if (mapped !== child) {
 			out ??= { ...node };
 			out[key] = mapped;
 		}
 	}
-	return out ?? node;
+	const result = out ?? node;
+	if (result !== original) onCopy?.(result, original);
+	return result;
 }
 
 function propertyName(member) {
@@ -490,9 +498,18 @@ const DECLARED_USE = '__declared';
  * Returns each call's receiver identifier, mapped to `trusted`'s value for its
  * declaration.
  */
-function declaredUses(ast, lexical, owners, trusted) {
+function declaredUses(ast, lexical, owners, trusted, usedNames) {
 	const declarations = new Map();
 	const uses = new Map();
+	const functions = new Map();
+	const argumentsToCheck = [];
+	const producers = new Map();
+	const producerArguments = new Map();
+	const scopeNames = (map, scope) => {
+		let names = map.get(scope);
+		if (names === undefined) map.set(scope, (names = new Map()));
+		return names;
+	};
 	const seen = new WeakSet();
 	const declare = (node) => {
 		if (node === null || typeof node !== 'object' || seen.has(node)) return;
@@ -501,16 +518,49 @@ function declaredUses(ast, lexical, owners, trusted) {
 			for (const child of node) declare(child);
 			return;
 		}
-		if (node.type === 'VariableDeclaration' && node.kind === 'const' && node.declare !== true) {
+		if (node.type === 'FunctionDeclaration' && node.id != null && node.body != null) {
+			const candidate = {
+				fn: node,
+				id: node.id,
+				declaration: node,
+			};
+			scopeNames(functions, lexical.nodeScopes.get(node)).set(node.id.name, candidate);
+			// Declarations also own their name inside the function. A same-named
+			// formal shares that lexical scope, but denotes its parameter instead.
+			const inner = lexical.nodeScopes.get(node.id);
+			let shadowed = false;
+			mapAst(node.params, (child) => {
+				if (
+					child.type === 'Identifier' &&
+					child.name === node.id.name &&
+					lexical.bindingNodes.has(child) &&
+					lexical.nodeScopes.get(child) === inner
+				)
+					shadowed = true;
+				return null;
+			});
+			if (!shadowed) scopeNames(functions, inner).set(node.id.name, candidate);
+		} else if (
+			node.type === 'VariableDeclaration' &&
+			node.kind === 'const' &&
+			node.declare !== true
+		) {
 			for (const declarator of node.declarations ?? []) {
 				const init = unwrapExpression(declarator.init);
+				const scope = lexical.nodeScopes.get(node);
+				if (
+					declarator.id.type === 'Identifier' &&
+					(init?.type === 'ArrowFunctionExpression' || init?.type === 'FunctionExpression')
+				)
+					scopeNames(functions, scope).set(declarator.id.name, {
+						fn: init,
+						id: declarator.id,
+						declaration: declarator,
+					});
 				const value = declarator.id?.type === 'Identifier' && init ? trusted(init) : null;
 				const depth = owners.get(init)?.length ?? 1;
 				if (value === null || depth === 1) continue;
-				const scope = lexical.nodeScopes.get(node);
-				let names = declarations.get(scope);
-				if (names === undefined) declarations.set(scope, (names = new Map()));
-				names.set(declarator.id.name, { depth, value });
+				scopeNames(declarations, scope).set(declarator.id.name, { depth, value });
 			}
 		}
 		for (const key in node) {
@@ -518,7 +568,7 @@ function declaredUses(ast, lexical, owners, trusted) {
 		}
 	};
 	declare(ast);
-	if (declarations.size === 0) return uses;
+	if (declarations.size === 0) return { uses, producers, producerArguments, functions };
 	const visited = new WeakSet();
 	const visit = (node, producer) => {
 		if (node === null || typeof node !== 'object' || visited.has(node)) return;
@@ -531,15 +581,28 @@ function declaredUses(ast, lexical, owners, trusted) {
 			node.type === 'CallExpression' || node.type === 'OptionalCallExpression'
 				? unwrapExpression(node.callee)
 				: null;
-		// Parentheses and type assertions around a factory still make a producer.
-		if (
-			callee != null &&
-			(trusted(callee === node.callee ? node : { ...node, callee }) !== null ||
-				((callee.type === 'MemberExpression' || callee.type === 'OptionalMemberExpression') &&
-					SIGNAL_FACTORIES.has(propertyName(callee))))
-		) {
+		const imported = callee == null ? null : trusted(node);
+		const factory =
+			callee == null
+				? null
+				: (imported?.factory ??
+					(callee.type === 'MemberExpression' || callee.type === 'OptionalMemberExpression'
+						? propertyName(callee)
+						: null));
+		if (SIGNAL_FACTORIES.has(factory)) {
 			visit(node.callee, producer);
-			visit(node.arguments, true);
+			// Scope factories take an explicit key first. Facade factories do not.
+			const first = imported === null ? 1 : 0;
+			const count = factory === 'derived$' ? 1 : factory === 'query$' ? 2 : 0;
+			for (let i = 0; i < node.arguments.length; i++) {
+				const argument = node.arguments[i];
+				const isProducer = i >= first && i < first + count;
+				if (isProducer) {
+					const value = unwrapExpression(argument);
+					if (value?.type === 'Identifier') argumentsToCheck.push(value);
+				}
+				visit(argument, isProducer || producer);
+			}
 			return;
 		}
 		if (
@@ -563,7 +626,51 @@ function declaredUses(ast, lexical, owners, trusted) {
 		}
 	};
 	visit(ast, false);
-	return uses;
+	let reassigned;
+	for (const argument of argumentsToCheck) {
+		const binding = lexical.resolveBinding(
+			lexical.nodeScopes.get(argument) ?? lexical.rootScope,
+			argument.name,
+		);
+		const candidate =
+			binding === null ? undefined : functions.get(binding.scope)?.get(argument.name);
+		if (candidate === undefined) continue;
+		// Only functions that would otherwise bind a signal to its declaring owner
+		// need a second version. Place it at the declaration, preserving its lexical
+		// scope when a nested block shadows names at the factory call.
+		const { fn, id, declaration } = candidate;
+		if (![...uses.keys()].some((node) => node.start >= fn.start && node.end <= fn.end)) continue;
+		reassigned ??= collectReassignedBindings(ast);
+		if (reassigned.has(id)) continue;
+		let name = producers.get(declaration);
+		if (name === undefined) {
+			name = allocateName(usedNames, `_$${id.name}Producer$`);
+			producers.set(declaration, name);
+		}
+		producerArguments.set(argument, { name, declaration });
+	}
+	return { uses, producers, producerArguments, functions };
+}
+
+// Keep recursive references within a producer copy. A function declaration's
+// id lives in its parameter scope; a const id lives in its declaring scope.
+// A named function expression already owns its unchanged inner name, so a
+// same-spelled reference to that inner binding must not be renamed.
+function producerSelfReference(node, parent, key, declaration, lexical, functions) {
+	if (
+		node.type !== 'Identifier' ||
+		node.name !== declaration.id.name ||
+		// The AST walker visits both fields even if a parser shares a shorthand
+		// identifier between key and value. Only the value is ours to rename.
+		(parent?.type === 'Property' && key === 'key' && !parent.computed) ||
+		!isIdentifierReference(node, parent, key, lexical)
+	)
+		return false;
+	const binding = lexical.resolveBinding(
+		lexical.nodeScopes.get(node) ?? lexical.rootScope,
+		node.name,
+	);
+	return functions.get(binding?.scope)?.get(node.name)?.declaration === declaration;
 }
 
 /**
@@ -620,7 +727,9 @@ export function lowerSignalDeclarations(ast, filename, options) {
 	// lowered helpers, or null for any other call.
 	function trustedFactory(node) {
 		if (node.type !== 'CallExpression' && node.type !== 'OptionalCallExpression') return null;
-		const callee = node.callee;
+		// Parentheses and type assertions preserve the trusted import and its
+		// declaration, as well as the ownership of its producer arguments.
+		const callee = unwrapExpression(node.callee);
 		const scope = lexical.nodeScopes.get(callee) ?? lexical.rootScope;
 		if (callee?.type === 'Identifier') {
 			const record = namedImports.get(callee.name);
@@ -679,12 +788,89 @@ export function lowerSignalDeclarations(ast, filename, options) {
 	if (!changed) return ast;
 	const captures = analyzeSignalCaptures(ast, declarations);
 	// Only a declaration inside a function can be used from a nested one.
-	const uses =
-		declarations.length === 0 ? new Map() : declaredUses(ast, lexical, owners, trustedFactory);
+	const { uses, producers, producerArguments, functions } =
+		declarations.length === 0
+			? {
+					uses: new Map(),
+					producers: new Map(),
+					producerArguments: new Map(),
+					functions: new Map(),
+				}
+			: declaredUses(ast, lexical, owners, trustedFactory, usedNames);
 	const revision =
 		options?.hmr && captures.size > 0 ? b.id(allocateName(usedNames, HMR_REVISION)) : null;
+	const copyReaderUse = (child, fn) => {
+		const declaration = producerArguments.get(child)?.declaration;
+		// A declaration copied within this producer is already reader-owned.
+		// An outside declaration still needs its separate producer version.
+		return (
+			uses.has(child) ||
+			(declaration !== undefined && declaration.start >= fn.start && declaration.end <= fn.end)
+		);
+	};
+	const inheritCallAnalysis = (copy, original) => {
+		if (original.type !== 'CallExpression' && original.type !== 'OptionalCallExpression') return;
+		// A copied call still declares the same authored site. Keep its owner
+		// and captures when replacing an argument rebuilt the call's ancestors.
+		const owner = owners.get(original);
+		if (owner !== undefined) owners.set(copy, owner);
+		const listed = captures.get(original);
+		if (listed !== undefined) captures.set(copy, listed);
+	};
+	const copyProducer = (fn, declaration, name) =>
+		mapAst(
+			fn,
+			(child, parent, key) => {
+				// Expanding a renamed shorthand value keeps the authored property
+				// name, including when another local later destructures this object.
+				if (
+					child.type === 'Property' &&
+					child.shorthand &&
+					producerSelfReference(child.value, child, 'value', declaration, lexical, functions)
+				)
+					return {
+						...child,
+						shorthand: false,
+						value: inheritHookMemoOrigin(b.id(name), child.value),
+					};
+				if (producerSelfReference(child, parent, key, declaration, lexical, functions))
+					return inheritHookMemoOrigin(b.id(name), child);
+				return copyReaderUse(child, fn) ? { ...child } : null;
+			},
+			inheritCallAnalysis,
+		);
 
 	let lowered = mapAst(ast, (node) => {
+		const producer = producerArguments.get(node);
+		if (producer !== undefined) return inheritHookMemoOrigin(b.id(producer.name), node);
+		if (node.type === 'VariableDeclaration') {
+			let list = null;
+			for (const declarator of node.declarations) {
+				const name = producers.get(declarator);
+				if (name === undefined && list === null) continue;
+				list ??= node.declarations.slice(0, node.declarations.indexOf(declarator));
+				list.push(declarator);
+				if (name !== undefined) {
+					const init = copyProducer(declarator.init, declarator, name);
+					list.push({ ...declarator, id: inheritHookMemoOrigin(b.id(name), declarator.id), init });
+				}
+			}
+			if (list !== null) return { ...node, declarations: list };
+		}
+		if (node.type === 'BlockStatement' || node.type === 'JSXCodeBlock' || node.type === 'Program') {
+			let list = null;
+			for (const statement of node.body) {
+				const name = producers.get(statement);
+				if (name === undefined && list === null) continue;
+				list ??= node.body.slice(0, node.body.indexOf(statement));
+				list.push(statement);
+				if (name !== undefined) {
+					const copy = copyProducer(statement, statement, name);
+					list.push({ ...copy, id: inheritHookMemoOrigin(b.id(name), statement.id) });
+				}
+			}
+			if (list !== null) return { ...node, body: list };
+		}
 		const use = uses.get(node);
 		if (use !== undefined)
 			return inheritHookMemoOrigin(b.call(use.helper(DECLARED_USE), { ...node }), node);
@@ -792,7 +978,7 @@ export function signalDeclarationSourceEdits(ast, filename, source, options) {
 	// lowered helpers, or null for any other call.
 	const trustedFactory = (node) => {
 		if (node.type !== 'CallExpression' && node.type !== 'OptionalCallExpression') return null;
-		const callee = node.callee;
+		const callee = unwrapExpression(node.callee);
 		const scope = lexical.nodeScopes.get(callee) ?? lexical.rootScope;
 		if (callee?.type === 'Identifier') {
 			const record = namedImports.get(callee.name);
@@ -823,6 +1009,8 @@ export function signalDeclarationSourceEdits(ast, filename, source, options) {
 		return null;
 	};
 	const edits = [];
+	const lexicalEdits = new Set();
+	const producerCopies = [];
 	const declarations = [];
 	const seen = new WeakSet();
 	const visit = (node) => {
@@ -859,9 +1047,45 @@ export function signalDeclarationSourceEdits(ast, filename, source, options) {
 	};
 	visit(ast);
 	if (declarations.length > 0) {
-		for (const [identifier, { helper }] of declaredUses(ast, lexical, owners, trustedFactory)) {
-			edits.push({ pos: identifier.start, text: `${helper(DECLARED_USE)}(` });
-			edits.push({ pos: identifier.end, text: ')' });
+		const { uses, producers, producerArguments, functions } = declaredUses(
+			ast,
+			lexical,
+			owners,
+			trustedFactory,
+			usedNames,
+		);
+		for (const [argument, { name }] of producerArguments)
+			edits.push({ pos: argument.start, end: argument.end, text: name });
+		for (const [declaration, name] of producers) {
+			const fn = declaration.type === 'FunctionDeclaration' ? declaration : declaration.init;
+			const rename = [];
+			if (declaration.type === 'FunctionDeclaration')
+				rename.push({ pos: declaration.id.start, end: declaration.id.end, text: name });
+			mapAst(fn, (child, parent, key) => {
+				// Factory argument edits are replayed into the copy already.
+				// A self-reference in that position needs exactly that one edit.
+				if (
+					!producerArguments.has(child) &&
+					producerSelfReference(child, parent, key, declaration, lexical, functions)
+				)
+					rename.push({
+						pos: child.start,
+						end: child.end,
+						text:
+							parent?.type === 'Property' && parent.shorthand && key === 'value'
+								? `${child.name}: ${name}`
+								: name,
+					});
+				return null;
+			});
+			producerCopies.push({ declaration, fn, name, rename });
+		}
+		for (const [identifier, { helper }] of uses) {
+			const open = { pos: identifier.start, text: `${helper(DECLARED_USE)}(` };
+			const close = { pos: identifier.end, text: ')' };
+			edits.push(open, close);
+			lexicalEdits.add(open);
+			lexicalEdits.add(close);
 		}
 	}
 	const captures = analyzeSignalCaptures(ast, declarations);
@@ -880,6 +1104,8 @@ export function signalDeclarationSourceEdits(ast, filename, source, options) {
 	}
 	return {
 		edits,
+		lexicalEdits,
+		producerCopies,
 		imports: [...helpers.values()],
 		// Declared with the imports, ahead of any authored statement.
 		prelude: revision === null ? '' : `var ${revision} = {};`,
