@@ -27146,12 +27146,7 @@ function removeHostProp(el: Element, name: string, prevValue?: unknown): void {
 	} else {
 		const actionName = formActionAttributeName(el, name);
 		if (actionName !== null) {
-			setFormAction(
-				el as HTMLFormElement | HTMLButtonElement | HTMLInputElement,
-				actionName,
-				null,
-				prevValue,
-			);
+			setFormActionAttribute(el, actionName, null);
 			return;
 		}
 		const ev = eventSlot(name, el);
@@ -30273,9 +30268,44 @@ export function setFormAction(
 		(STAGED_DOM?.view(el) ?? el).removeAttribute(name);
 		return;
 	}
-	// Clearing the action must preserve the independently authored onSubmit.
+	setFormActionAttribute(el, name, value);
+}
+
+// A string or nullish action is the native attribute. Clearing the action must
+// preserve the independently authored onSubmit.
+function setFormActionAttribute(el: Element, name: string, value: unknown): void {
 	(STAGED_DOM?.view(el as any) ?? (el as any)).$$formAction = undefined;
 	setAttribute(el, name, value);
+}
+
+// Descriptor hosts (the de-opt renderer) receive a FUNCTION form action only
+// from an element factory that could carry one: public createElement,
+// createElementAt, or cloneElement, or compiled JSX whose props name
+// `action`/`formAction` or spread. Those install setFormAction here, so a bundle
+// whose descriptors cannot carry a function action does not retain the submit
+// driver and, through it, the transition engine.
+let DESCRIPTOR_FORM_ACTION: typeof setFormAction | null = null;
+
+/** @internal Installed by every element factory that can carry a function form action. */
+export function enableDescriptorFormActions(): void {
+	DESCRIPTOR_FORM_ACTION = setFormAction;
+}
+
+function setDescriptorFormAction(
+	el: HTMLFormElement | HTMLButtonElement | HTMLInputElement,
+	name: string,
+	value: unknown,
+	prev: unknown,
+): void {
+	if (DESCRIPTOR_FORM_ACTION !== null) {
+		DESCRIPTOR_FORM_ACTION(el, name, value, prev);
+		return;
+	}
+	if (process.env.NODE_ENV !== 'production' && typeof value === 'function')
+		throw new Error(
+			'Octane: a descriptor carried a function form action, but no element factory installed form actions.',
+		);
+	setFormActionAttribute(el, name, value);
 }
 
 function handleFormSubmit(
@@ -32868,6 +32898,23 @@ export function createElement<P>(
 	props?: P | null,
 	...children: any[]
 ): ElementDescriptor<P> {
+	enableDescriptorCapabilities();
+	return createElementFromConfig(undefined, type, props, children);
+}
+
+// Public factories accept arbitrary props, so they install every descriptor
+// capability a prop can select. Compiled JSX installs only what its props name.
+function enableDescriptorCapabilities(): void {
+	DESCRIPTOR_FORM_ACTION = setFormAction;
+	DESCRIPTOR_FRAGMENT_REF = fragmentRefDescriptor;
+}
+
+/** @internal Compiler-emitted host descriptor: its props were classified statically. */
+export function createHostElement<P>(
+	type: string,
+	props?: P | null,
+	...children: any[]
+): ElementDescriptor<P> {
 	return createElementFromConfig(undefined, type, props, children);
 }
 
@@ -32878,6 +32925,7 @@ export function createElementAt<P>(
 	props?: P | null,
 	...children: any[]
 ): ElementDescriptor<P> {
+	enableDescriptorCapabilities();
 	return createElementFromConfig(invocationSite, type, props, children);
 }
 
@@ -32987,6 +33035,7 @@ export function cloneElement<P>(
 	if (!isElementDescriptor(element)) {
 		throw new Error(formatClientError(4));
 	}
+	enableDescriptorCapabilities();
 	let scopedChildren: (() => unknown) | undefined;
 	let copiedGetter: (() => unknown) | undefined;
 	let props: any;
@@ -34834,7 +34883,7 @@ function noteDeoptRef(block: Block): void {
 function applyDeoptProp(el: Element, name: string, v: any, ownerBlock: Block): void {
 	const actionName = formActionAttributeName(el, name);
 	if (actionName !== null) {
-		setFormAction(el as HTMLFormElement, actionName, v, undefined);
+		setDescriptorFormAction(el as HTMLFormElement, actionName, v, undefined);
 		return;
 	}
 	if (name === 'ref') {
@@ -35110,7 +35159,7 @@ function applyHostProps(el: Element, props: any, scope: Scope, state: HostCompon
 			needsCheckedInitialization = false;
 		const actionName = formActionAttributeName(el, name);
 		if (actionName !== null) {
-			setFormAction(el as HTMLFormElement, actionName, v, prev?.[name]);
+			setDescriptorFormAction(el as HTMLFormElement, actionName, v, prev?.[name]);
 			continue;
 		}
 		if (name === 'suppressHydrationWarning') {
@@ -35289,6 +35338,26 @@ function fragmentDescriptorChildren(value: ElementDescriptor): any[] {
 	return Array.isArray(children) ? children : [children];
 }
 
+// A ref-bearing Fragment descriptor exists only when an element factory that
+// could carry the ref created it: public createElement, createElementAt, or
+// cloneElement, or compiled JSX that gives a Fragment (or a dynamic tag) a
+// `ref` or a spread. Those install the boundary here, so other bundles do not
+// retain FragmentInstance through the generic child renderer.
+let DESCRIPTOR_FRAGMENT_REF: typeof fragmentRefDescriptor | null = null;
+
+/** @internal Installed by every element factory that can give a Fragment a ref. */
+export function enableDescriptorFragmentRefs(): void {
+	DESCRIPTOR_FRAGMENT_REF = fragmentRefDescriptor;
+}
+
+function descriptorFragmentRef(value: ElementDescriptor): ElementDescriptor<ElementDescriptor> {
+	if (process.env.NODE_ENV !== 'production' && DESCRIPTOR_FRAGMENT_REF === null)
+		throw new Error(
+			'Octane: a Fragment descriptor carried a ref, but no element factory installed Fragment refs.',
+		);
+	return DESCRIPTOR_FRAGMENT_REF!(value);
+}
+
 /** Preserve a ref-bearing public Fragment descriptor as a real lifecycle boundary. */
 function fragmentRefDescriptor(value: ElementDescriptor): ElementDescriptor<ElementDescriptor> {
 	return {
@@ -35438,7 +35507,7 @@ function flattenReactChildContainer(
 		const item = children[i];
 		if (isFragmentDescriptor(item)) {
 			if (item.ref != null || hasOwnProp.call(item.props, 'ref')) {
-				outItems.push(fragmentRefDescriptor(item));
+				outItems.push(descriptorFragmentRef(item));
 				keyPrefix = appendScopedDeoptKey(
 					outKeys,
 					path,
@@ -35502,7 +35571,7 @@ function prepareDeoptList(
 	if (elementType === Fragment) {
 		if (value.ref != null || hasOwnProp.call(value.props, 'ref')) {
 			return {
-				items: [fragmentRefDescriptor(value)],
+				items: [descriptorFragmentRef(value)],
 				keys: [singleDeoptKey(value, value.key ?? 0)],
 			};
 		}
