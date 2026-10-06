@@ -8,9 +8,9 @@ import type {
 } from './graph.js';
 import { ScopeDisposedError, SignalFrameError } from './errors.js';
 import {
-	NativeAdoptionMiss,
 	NATIVE_TRANSITION_CONSUMER,
 	SIGNAL_DEPENDENT_NODE,
+	isNativeAdoptionMiss,
 	type NativeReadSource,
 	type NativeTransitionConsumer,
 	type NativeTransitionNotify,
@@ -432,7 +432,7 @@ export class SignalActionFrame {
 			else if (
 				error instanceof ScopeDisposedError ||
 				error instanceof SignalFrameError ||
-				error instanceof NativeAdoptionMiss
+				isNativeAdoptionMiss(error)
 			)
 				invalid ??= 'stale';
 			else if (!handled) {
@@ -702,6 +702,8 @@ export class SignalActionFrame {
 		while (entry.target.deps) bridge.graph.unlink(entry.target.deps, entry.target);
 		while (entry.target.subs) bridge.graph.unlink(entry.target.subs);
 		bridge.releaseRetention(entry.target);
+		// A thenable the target threw must not retain it, or its owner, once released.
+		if (entry.target.wakeup) entry.target.wakeup.node = undefined;
 		entry.target.compute = undefined;
 	}
 

@@ -5,13 +5,11 @@ import { act, flushSync, hydrateRoot } from '../../src/index.js';
 import * as ServerRT from 'octane/server';
 import { loadCompiledFixtureSource, loadServerFixture } from '../_server-fixture';
 
-// When a template's root does not match the server node at the cursor,
-// hydration reports the structural mismatch and rebuilds that subtree on the
-// client. The rebuilt subtree holds the client template's placeholder text, not
-// server output, so `suppressHydrationWarning` (which keeps the SERVER text)
-// has nothing to keep there: the client text must land, without a second
-// diagnostic for the same recovery. On an adopted server element, suppression
-// still keeps the server's text.
+// suppressHydrationWarning keeps an adopted element's server text where the
+// client's differs, one level deep, as in React. It never hides a structural
+// mismatch: when the server rendered another tag where a template with
+// suppressed text holes stands, the root still renders on the client (no server
+// node survives), shows the client's text, and reports the mismatch once.
 
 const FIXTURE = join(
 	process.cwd(),
@@ -40,12 +38,12 @@ function markup(node: Element): string {
 	return out;
 }
 
-const STRUCTURAL = /the mismatched subtree was rebuilt on the client/;
+const MISMATCH = /^Hydration failed because the server rendered HTML didn't match the client\./;
 
 describe.each([
 	{ name: 'development compile', dev: true },
 	{ name: 'production compile', dev: false },
-])('hydrateRoot — suppressed text holes in a rebuilt template clone ($name)', ({ dev }) => {
+])('hydrateRoot — suppressHydrationWarning and text holes ($name)', ({ dev }) => {
 	const server = loadServerFixture(FIXTURE, { id: FILE });
 	const client = loadCompiledFixtureSource(SOURCE, {
 		id: FILE,
@@ -74,12 +72,7 @@ describe.each([
 			.map((call: unknown[]) => String(call[0]))
 			.filter((message: string) => message.includes('hydration mismatch'));
 
-	async function hydrate(
-		name: string,
-		serverProps: Record<string, unknown>,
-		clientProps: Record<string, unknown>,
-	): Promise<string[]> {
-		container.innerHTML = ServerRT.renderToString(server[name], serverProps).html;
+	async function hydrate(name: string, clientProps: Record<string, unknown>): Promise<string[]> {
 		const recoverable: string[] = [];
 		root = hydrateRoot(container, client[name], clientProps, {
 			onRecoverableError: (error: unknown) => recoverable.push((error as Error).message),
@@ -115,38 +108,35 @@ describe.each([
 			leaf: 'function HoleLeaf(',
 			expected: '<i>ok</i>',
 		},
-	])('writes the client text of $site', async ({ name, leaf, expected }) => {
-		const recoverable = await hydrate(name, { server: true }, {});
+	])(
+		'renders the root on the client for a wrong tag where $site is suppressed',
+		async ({ name, leaf, expected }) => {
+			container.innerHTML = ServerRT.renderToString(server[name], { server: true }).html;
+			const before = [...container.querySelectorAll('*')];
+			const recoverable = await hydrate(name, {});
 
-		expect(markup(container.firstElementChild!)).toBe(expected);
-		expect(recoverable).toEqual([expect.stringMatching(STRUCTURAL)]);
-		expect(warnings()).toEqual(
-			dev
-				? [
-						`Octane hydration mismatch at ${FILE}:${lineOf(leaf) + 1}:1: the client expected ` +
-							'<i> but the server rendered <b>. The mismatched subtree was rebuilt on the client.',
-					]
-				: [],
-		);
-	});
+			expect(markup(container.firstElementChild!)).toBe(expected);
+			expect(before.filter((node) => node.isConnected)).toEqual([]);
+			expect(recoverable).toEqual([expect.stringMatching(MISMATCH)]);
+			expect(warnings()).toEqual(
+				dev
+					? [
+							`Octane hydration mismatch at ${FILE}:${lineOf(leaf) + 1}:1: the client expected ` +
+								'<i> but the server rendered <b>. The nearest Suspense or Hydrate boundary, or ' +
+								'the root, will be regenerated on the client.',
+						]
+					: [],
+			);
+		},
+	);
 
 	it.each([
 		{ site: 'an only-child text hole', name: 'Label', expected: '<i>server</i>' },
 		{ site: 'a sibling text hole', name: 'SiblingLabel', expected: '<i><u>x</u>server</i>' },
-	])('still keeps the server text of $site in an adopted element', async ({ name, expected }) => {
+	])('keeps the server text of $site in an adopted element', async ({ name, expected }) => {
 		container.innerHTML = ServerRT.renderToString(server[name], { text: 'server' }).html;
 		const adopted = container.querySelector('i')!;
-		const recoverable: string[] = [];
-		root = hydrateRoot(
-			container,
-			client[name],
-			{ text: 'client' },
-			{
-				onRecoverableError: (error: unknown) => recoverable.push((error as Error).message),
-			},
-		);
-		flushSync(() => {});
-		await act(async () => {});
+		const recoverable = await hydrate(name, { text: 'client' });
 
 		expect(container.querySelector('i')).toBe(adopted);
 		expect(markup(container.firstElementChild!)).toBe(expected);

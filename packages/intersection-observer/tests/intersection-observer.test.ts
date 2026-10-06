@@ -15,6 +15,7 @@ import {
 	EffectStaleCleanupProbe,
 	EffectSwapProbe,
 	HookProbe,
+	HookStateSwapProbe,
 	HookSwapProbe,
 	PlainInViewProbe,
 } from './_fixtures/probes.tsrx';
@@ -169,6 +170,33 @@ describe('Octane binding', () => {
 		const alternate = result.find('[data-testid="hook-swap"]');
 		mockIsIntersecting(alternate, false);
 		expect(onChange).not.toHaveBeenCalled();
+		result.unmount();
+	});
+
+	it('drops the previous target visibility and entry when useInView observes a replacement element', () => {
+		const result = mount(HookStateSwapProbe, { alternate: false });
+		flushEffects();
+		const initial = result.find('[data-testid="hook-state-swap"]');
+		mockIsIntersecting(initial, true);
+		flushEffects();
+		expect(initial.textContent).toBe('visible');
+		expect(initial.getAttribute('data-entry')).toBe('DIV');
+
+		result.update(HookStateSwapProbe, { alternate: true });
+		flushEffects();
+		const alternate = result.find('[data-testid="hook-state-swap"]');
+		expect(alternate).not.toBe(initial);
+		expect(alternate.textContent).toBe('hidden');
+		expect(alternate.hasAttribute('data-entry')).toBe(false);
+
+		mockIsIntersecting(alternate, false);
+		flushEffects();
+		expect(alternate.textContent).toBe('hidden');
+
+		mockIsIntersecting(alternate, true);
+		flushEffects();
+		expect(alternate.textContent).toBe('visible');
+		expect(alternate.getAttribute('data-entry')).toBe('SPAN');
 		result.unmount();
 	});
 

@@ -10,6 +10,7 @@
 // scenario, is allowed in any pull request.
 
 import { execFileSync } from 'node:child_process';
+import assert from 'node:assert/strict';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -68,6 +69,34 @@ function readAt(revision, file, cwd) {
 	}
 }
 
+export function inspectBudgetChange(
+	base,
+	head = 'HEAD',
+	repository = path.resolve(import.meta.dirname, '../..'),
+) {
+	assert(
+		base && !/^0+$/.test(base),
+		'budget ratchet requires a comparable --base commit (BUDGET_BASE)',
+	);
+	const mergeBase = git(['merge-base', base, head], repository).trim();
+	const changedFiles = git(['diff', '--name-only', mergeBase, head], repository)
+		.split('\n')
+		.filter(Boolean);
+	const raises = BUDGET_FILES.flatMap((file) =>
+		findBudgetRaises(file, readAt(mergeBase, file, repository), readAt(head, file, repository)),
+	);
+	return { raises, changedFiles };
+}
+
+// The CI mode keeps separately reviewed budget raises viable before the
+// consuming feature lands. It never disables the absolute ceiling.
+export function requireBudgetRatchet(args) {
+	if (!args.includes('--ratchet')) return false;
+	assert(args.includes('--budgets'), '--ratchet requires --budgets');
+	const change = inspectBudgetChange(process.env.BUDGET_BASE);
+	return change.raises.length === 0 || checkBudgetRaises(change).length > 0;
+}
+
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
 	const argument = (name) => {
 		const index = process.argv.indexOf(name);
@@ -79,15 +108,9 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
 		console.log('budget raises: no comparable base commit; nothing to check');
 		process.exit(0);
 	}
-	const repository = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
-	const mergeBase = git(['merge-base', base, head], repository).trim();
-	const changedFiles = git(['diff', '--name-only', mergeBase, head], repository)
-		.split('\n')
-		.filter(Boolean);
-	const raises = BUDGET_FILES.flatMap((file) =>
-		findBudgetRaises(file, readAt(mergeBase, file, repository), readAt(head, file, repository)),
-	);
-	const problems = checkBudgetRaises({ raises, changedFiles });
+	const change = inspectBudgetChange(base, head);
+	const { raises } = change;
+	const problems = checkBudgetRaises(change);
 	if (problems.length) {
 		console.error(problems.join('\n'));
 		process.exit(1);

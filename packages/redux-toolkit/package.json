@@ -1,6 +1,6 @@
 {
   "name": "@octanejs/redux-toolkit",
-  "version": "0.1.55",
+  "version": "0.1.56",
   "license": "MIT",
   "type": "module",
   "sideEffects": false,
@@ -43,7 +43,7 @@
     "reselect": "catalog:default"
   },
   "peerDependencies": {
-    "octane": "workspace:^0.9.0"
+    "octane": "workspace:^0.10.0"
   },
   "devDependencies": {
     "@tsrx/react": "catalog:default",

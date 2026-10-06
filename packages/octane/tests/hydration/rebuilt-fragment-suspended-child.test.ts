@@ -5,12 +5,12 @@ import { EXTERNAL_HYDRATION_PROMISE, act, flushSync, hydrateRoot } from '../../s
 import * as ServerRT from 'octane/server';
 import { loadCompiledFixtureSource, loadServerFixture } from '../_server-fixture';
 
-// A preserved <Hydrate> activation suspends on a child inside a component
-// whose fragment hydration adopts or rebuilds, then resumes when the data
-// arrives. The resumed child completes where it mounted: in the server's DOM
-// when the server rendered the same component, otherwise in the fragment the
-// client rebuilt. Either way the siblings after that component keep their
-// server nodes, and a mismatch is reported once.
+// A <Hydrate> island's child suspends inside a component where the server
+// rendered another component. The island is a fallback boundary: its server
+// HTML does not match, so it discards that DOM and renders on the client,
+// reporting once, while the host outside the island keeps its server node.
+// The outcome is the same whether the child's data is ready during hydration
+// or arrives later.
 
 const FIXTURE = join(
 	process.cwd(),
@@ -18,34 +18,29 @@ const FIXTURE = join(
 );
 const FILE = 'rebuilt-fragment-suspended-child.tsrx';
 const SOURCE = readFileSync(FIXTURE, 'utf8');
-
-const AFTER_HOLES =
-	'a fragment with <i> after its leading holes but the server rendered the end of the parent block';
+const HYDRATION_FAILED =
+	/^Hydration failed because the server rendered HTML didn't match the client/;
 
 const SHAPES = [
 	{
 		shape: 'a fragment that starts with the suspending child',
 		name: 'HoleFirstBranch',
 		html: '<u>z</u><i>x</i><em>e</em>',
-		expected: AFTER_HOLES,
 	},
 	{
 		shape: 'a fragment that starts with static markup',
 		name: 'StaticFirstBranch',
 		html: '<i>x</i><u>z</u><em>e</em>',
-		expected: 'a fragment starting with <i> but the server rendered <b>',
 	},
 	{
 		shape: 'a fragment whose suspending child renders a range',
 		name: 'FramedFirstBranch',
 		html: '<u>z</u><s>s</s><i>x</i><em>e</em>',
-		expected: AFTER_HOLES,
 	},
 	{
 		shape: 'a fragment whose static root after the child is text',
 		name: 'HoleThenTextBranch',
 		html: '<u>z</u>x<em>e</em>',
-		expected: 'a fragment starting with a comment but the server rendered <b>',
 	},
 ];
 
@@ -81,14 +76,13 @@ function pending() {
 describe.each([
 	{ name: 'development compile', dev: true },
 	{ name: 'production compile', dev: false },
-])('hydrateRoot — a suspended child of a hydrated fragment ($name)', ({ dev }) => {
+])('hydrateRoot — a suspended child of a mismatched <Hydrate> island ($name)', ({ dev }) => {
 	const server = loadServerFixture(FIXTURE, { id: FILE });
 	const client = loadCompiledFixtureSource(SOURCE, {
 		id: FILE,
 		mode: 'client',
 		compileOptions: { dev },
 	});
-	const MISMATCH = /the server-rendered node did not match the client render/;
 	let container: HTMLElement;
 	let root: { render(component: unknown, props?: unknown): void; unmount(): void } | null;
 	let recoverable: string[];
@@ -115,8 +109,12 @@ describe.each([
 
 	const section = () => container.querySelector('section')!;
 
-	function render(name: string, props: Record<string, unknown>): void {
+	/** The server render: the host around the island, and the island's content. */
+	function render(name: string, props: Record<string, unknown>) {
 		container.innerHTML = ServerRT.renderToString(server[name], props).html;
+		const outer = container.firstElementChild!;
+		const content = section();
+		return { outer, island: [content, ...content.querySelectorAll('*')] };
 	}
 
 	async function hydrate(name: string, props: Record<string, unknown>): Promise<void> {
@@ -127,53 +125,71 @@ describe.each([
 		await act(async () => {});
 	}
 
-	function rebuilt(expected: string) {
-		return expect.stringMatching(
-			new RegExp(
-				`^Octane hydration mismatch at ${escape(FILE)}\\b.*the client expected ${escape(expected)}`,
-			),
+	/**
+	 * Only the island fell back: the host around it is the server's, none of
+	 * the island's server elements is connected, and it reported once.
+	 */
+	function expectIslandFellBack(outer: Element, island: Element[]): void {
+		expect(container.firstElementChild).toBe(outer);
+		expect(island.length).toBeGreaterThan(0);
+		expect(island.filter((node) => node.isConnected).map((n) => n.outerHTML)).toEqual([]);
+		expect(recoverable).toEqual([expect.stringMatching(HYDRATION_FAILED)]);
+		expect(warnings()).toEqual(
+			dev
+				? [expect.stringMatching(new RegExp(`^Octane hydration mismatch at ${escape(FILE)}\\b`))]
+				: [],
 		);
 	}
 
 	it.each(SHAPES)(
-		'completes $shape in the fragment it rebuilt over another component',
-		async ({ name, html, expected }) => {
-			render(name, { server: true, leaf: fulfilled('unused') });
-			const bold = container.querySelector('b')!;
-			const em = container.querySelector('em')!;
+		'client-renders the island for $shape over another component once its child resolves',
+		async ({ name, html }) => {
+			const { outer, island } = render(name, { server: true, leaf: fulfilled('unused') });
 			const leaf = pending();
 
 			await hydrate(name, { leaf: leaf.promise });
-			// The sibling after the rebuilt fragment stays while the child is pending.
-			expect(section().querySelector('em')).toBe(em);
-
 			await act(async () => leaf.resolve('z'));
 
 			expect(markup(section())).toBe(html);
-			expect(section().querySelector('em')).toBe(em);
-			expect(bold.isConnected).toBe(false);
-			expect(recoverable).toEqual([expect.stringMatching(MISMATCH)]);
-			expect(warnings()).toEqual(dev ? [rebuilt(expected)] : []);
+			expectIslandFellBack(outer, island);
 
-			// The resumed child still updates in place.
+			// The client-rendered child updates in place.
+			const em = section().querySelector('em');
 			await act(async () => root!.render(client[name], { leaf: fulfilled('w') }));
 			expect(markup(section())).toBe(html.replace('<u>z</u>', '<u>w</u>'));
 			expect(section().querySelector('em')).toBe(em);
+			expect(recoverable).toHaveLength(1);
 		},
 	);
 
 	it.each(SHAPES)(
-		'rebuilds $shape over another component when its data is ready',
-		async ({ name, html, expected }) => {
-			render(name, { server: true, leaf: fulfilled('unused') });
-			const em = container.querySelector('em')!;
+		'client-renders the island for $shape over another component when its data is ready',
+		async ({ name, html }) => {
+			const { outer, island } = render(name, { server: true, leaf: fulfilled('unused') });
 
 			await hydrate(name, { leaf: fulfilled('z') });
 
 			expect(markup(section())).toBe(html);
-			expect(section().querySelector('em')).toBe(em);
-			expect(recoverable).toEqual([expect.stringMatching(MISMATCH)]);
-			expect(warnings()).toEqual(dev ? [rebuilt(expected)] : []);
+			expectIslandFellBack(outer, island);
+		},
+	);
+
+	// The suspending child comes before any host of the client's arm, so, as in
+	// React, hydration suspends before it can reach a mismatch: the island's
+	// server HTML stays on screen, and nothing is reported, until the data
+	// arrives.
+	it.each(SHAPES.filter(({ name }) => name !== 'StaticFirstBranch'))(
+		'keeps the island’s server HTML while the leading child of $shape is pending',
+		async ({ name }) => {
+			const { island } = render(name, { server: true, leaf: fulfilled('unused') });
+			const leaf = pending();
+
+			await hydrate(name, { leaf: leaf.promise });
+			expect(island.filter((node) => !node.isConnected).map((node) => node.outerHTML)).toEqual([]);
+			expect(recoverable).toEqual([]);
+
+			await act(async () => leaf.resolve('z'));
+			expect(recoverable).toHaveLength(1);
 		},
 	);
 
@@ -194,30 +210,12 @@ describe.each([
 		},
 	);
 
-	it('completes a child of a rebuilt root inside it, as when its data is ready', async () => {
-		// The server's range holds a node after the one the root replaced, with the
-		// tag the child starts with. The child is client-built inside the root and
-		// must not adopt it when it resumes.
-		const name = 'RebuiltRootBranch';
-		render(name, { server: true, leaf: fulfilled('unused') });
-		await hydrate(name, { leaf: fulfilled('z') });
-		const ready = markup(section());
-		root!.unmount();
-		recoverable = [];
-		errSpy.mockClear();
-
-		render(name, { server: true, leaf: fulfilled('unused') });
-		const leaf = pending();
-		await hydrate(name, { leaf: leaf.promise });
-		await act(async () => leaf.resolve('z'));
-
-		expect(markup(section().querySelector('p')!)).toBe('<em>z</em><s>s</s>');
-		expect(markup(section())).toBe(ready);
-		expect(recoverable).toEqual([expect.stringMatching(MISMATCH)]);
-		expect(warnings()).toHaveLength(dev ? 1 : 0);
-	});
-
 	it.each([
+		{
+			shape: 'a single root whose child starts with the next server tag',
+			name: 'RebuiltRootBranch',
+			html: '<p><em>z</em><s>s</s></p><em>e</em>',
+		},
 		{
 			shape: "a call that inherits its wrapper's range",
 			name: 'InheritedRootBranch',
@@ -239,95 +237,48 @@ describe.each([
 			html: '<p>z</p><em>e</em>',
 		},
 		{
-			shape: 'a component that suspends before the rebuilt root commits',
+			shape: 'a component that suspends inside its template',
 			name: 'InlineRootBranch',
 			html: '<p>z</p><em>e</em>',
 		},
 		{
-			shape: 'a component with hooks that suspends before the rebuilt root commits',
+			shape: 'a component with hooks that suspends inside its template',
 			name: 'StateInlineRootBranch',
 			html: '<p data-tag="p">z</p><em>e</em>',
 		},
+		{
+			shape: 'a lite component whose leading hole suspends',
+			name: 'RebuiltHoleBranch',
+			html: '<p><em>z</em><s>s</s></p><i>x</i><em>e</em>',
+		},
+		{
+			shape: 'a component with hooks whose leading hole suspends',
+			name: 'StateRebuiltHoleBranch',
+			html: '<p><em>z</em><s>s</s></p><i>x</i><em>e</em>',
+		},
+		{
+			shape: 'a fragment component that suspends before its template',
+			name: 'SetupFirstBranch',
+			html: '<u>z</u>x<em>e</em>',
+		},
 	])(
-		'completes a child of a root rebuilt as $shape, as when its data is ready',
+		'client-renders the island once for $shape, whether its data is ready or pending',
 		async ({ name, html }) => {
-			// The rebuilt root takes the rest of its range when it commits: before
-			// its child suspends, or in the resume, which claims the range again.
-			render(name, { server: true, leaf: fulfilled('unused') });
+			const ready = render(name, { server: true, leaf: fulfilled('unused') });
 			await hydrate(name, { leaf: fulfilled('z') });
-			const ready = markup(section());
+			expect(markup(section())).toBe(html);
+			expectIslandFellBack(ready.outer, ready.island);
 			root!.unmount();
 			recoverable = [];
 			errSpy.mockClear();
 
-			render(name, { server: true, leaf: fulfilled('unused') });
-			const em = section().lastElementChild!;
+			const later = render(name, { server: true, leaf: fulfilled('unused') });
 			const leaf = pending();
 			await hydrate(name, { leaf: leaf.promise });
 			await act(async () => leaf.resolve('z'));
 
 			expect(markup(section())).toBe(html);
-			expect(markup(section())).toBe(ready);
-			expect(section().lastElementChild).toBe(em);
-			expect(recoverable).toEqual([expect.stringMatching(MISMATCH)]);
-			expect(warnings()).toHaveLength(dev ? 1 : 0);
+			expectIslandFellBack(later.outer, later.island);
 		},
 	);
-
-	it.each([
-		{ wrapper: 'a lite component', name: 'RebuiltHoleBranch' },
-		{ wrapper: 'a component with hooks', name: 'StateRebuiltHoleBranch' },
-	])(
-		'keeps the root that $wrapper adopted after a hole whose call rebuilt its root, as when its data is ready',
-		async ({ name }) => {
-			render(name, { server: true, leaf: fulfilled('unused') });
-			await hydrate(name, { leaf: fulfilled('z') });
-			const ready = markup(section());
-			root!.unmount();
-			recoverable = [];
-			errSpy.mockClear();
-
-			render(name, { server: true, leaf: fulfilled('unused') });
-			const italic = container.querySelector('i')!;
-			const em = container.querySelector('em')!;
-			const leaf = pending();
-			await hydrate(name, { leaf: leaf.promise });
-			await act(async () => leaf.resolve('z'));
-
-			expect(markup(section())).toBe('<p><em>z</em><s>s</s></p><i>x</i><em>e</em>');
-			expect(markup(section())).toBe(ready);
-			expect(section().querySelector('i')).toBe(italic);
-			expect(section().lastElementChild).toBe(em);
-			expect(recoverable).toEqual([expect.stringMatching(MISMATCH)]);
-			expect(warnings()).toHaveLength(dev ? 1 : 0);
-		},
-	);
-
-	it('claims the range again for a component that suspended before its template did', async () => {
-		const name = 'SetupFirstBranch';
-		render(name, { server: true, leaf: fulfilled('unused') });
-		await hydrate(name, { leaf: fulfilled('z') });
-		const ready = markup(section());
-		const readyWarnings = warnings();
-		root!.unmount();
-		recoverable = [];
-		errSpy.mockClear();
-
-		render(name, { server: true, leaf: fulfilled('unused') });
-		const em = container.querySelector('em')!;
-		const leaf = pending();
-		await hydrate(name, { leaf: leaf.promise });
-		await act(async () => leaf.resolve('z'));
-
-		expect(markup(section())).toBe('<u>z</u>x<em>e</em>');
-		expect(markup(section())).toBe(ready);
-		expect(section().querySelector('em')).toBe(em);
-		expect(recoverable).toEqual([expect.stringMatching(MISMATCH)]);
-		// The resumed template rebuilds the fragment as a whole, as it does when its
-		// data is ready, rather than reporting each of its roots.
-		expect(warnings()).toEqual(readyWarnings);
-		expect(warnings()).toEqual(
-			dev ? [rebuilt('a fragment starting with a comment but the server rendered <b>')] : [],
-		);
-	});
 });

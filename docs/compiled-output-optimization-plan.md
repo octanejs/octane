@@ -524,7 +524,10 @@ Independent, individually-measurable items, roughly by value:
   `createRoot(target).render(ImportedComponent[, props])` bootstrap with the
   compiler-only `__createVoidRoot`. Vite resolves and loads the actual imported
   module through its module graph, then accepts Octane's direct-export metadata
-  only while a fingerprint of the final transformed code still matches. Alias
+  only while the final transformed code is still the program the compiler
+  emitted: byte for byte, or after a reprint that changes only positions,
+  literal spellings and comments. Vite's own TypeScript transform reprints every
+  `.tsx` module after Octane's, so `.tsx` components rely on the second form. Alias
   targets and virtual modules therefore prove their own contract; a raw disk
   lookalike is never evidence. Unknown files, re-exports, indirect calls,
   escaping roots, server/dev/HMR/profile builds, watch builds, downstream code

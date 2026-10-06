@@ -157,6 +157,27 @@ export function Pair() @{
 }
 `;
 
+function loadPair(
+	source: string,
+	mode: 'client' | 'server',
+	dev: boolean,
+	inlineHookMemo: boolean,
+) {
+	return loadCompiledFixtureSource(PAIR, {
+		id: '/src/pair.tsrx',
+		mode,
+		compileOptions: { hmr: false, dev },
+		runtimeModules: {
+			'./hooks': loadPlainHookFixtureSource(source, {
+				id: '/src/pair-hooks.ts',
+				mode,
+				hmr: dev,
+				inlineHookMemo,
+			}),
+		},
+	}).Pair;
+}
+
 describe('module-declared custom hooks in plain modules', () => {
 	afterEach(() => {
 		vi.restoreAllMocks();
@@ -212,20 +233,7 @@ describe('module-declared custom hooks in plain modules', () => {
 
 	for (const [shape, { source, boundaries }] of Object.entries(OMITTED_BOUNDARY_SHAPES)) {
 		it.each(MODES)(`keeps state separate for ${shape} (%j)`, ({ dev, inlineHookMemo }) => {
-			const load = (mode: 'client' | 'server') =>
-				loadCompiledFixtureSource(PAIR, {
-					id: '/src/pair.tsrx',
-					mode,
-					compileOptions: { hmr: false, dev },
-					runtimeModules: {
-						'./hooks': loadPlainHookFixtureSource(source, {
-							id: '/src/pair-hooks.ts',
-							mode,
-							hmr: dev,
-							inlineHookMemo,
-						}),
-					},
-				}).Pair;
+			const load = (mode: 'client' | 'server') => loadPair(source, mode, dev, inlineHookMemo);
 			expect(renderToString(load('server'), undefined).html).toBe(
 				'<div><button>d1</button><output>d0</output></div>',
 			);
@@ -243,6 +251,54 @@ describe('module-declared custom hooks in plain modules', () => {
 			const code = slotHooks(source, '/src/pair-hooks.ts', { dev: false, hmr: false })!.code;
 			expect(code.match(/withSlot\(/g)?.length ?? 0).toBe(boundaries);
 		});
+	}
+
+	for (const read of ['source.cell', 'source?.cell'] as const) {
+		const source = `${CELL}
+class CellSource {
+	constructor(readonly initial: string) {}
+	get cell(): Cell {
+		const [value, setValue] = useState(this.initial);
+		return [value, setValue];
+	}
+}
+function useCell(source: CellSource): Cell {
+	return ${read};
+}
+export default function usePair(): Cell[] {
+	return [useCell(new CellSource('d1')), useCell(new CellSource('d0'))];
+}`;
+		it.each(MODES)(
+			`hydrates and updates independent state read through ${read} (%j)`,
+			async ({ dev, inlineHookMemo }) => {
+				const container = document.createElement('div');
+				document.body.append(container);
+				const server = loadPair(source, 'server', dev, inlineHookMemo);
+				const client = loadPair(source, 'client', dev, inlineHookMemo);
+				container.innerHTML = renderToString(server, undefined).html;
+				const button = container.querySelector('button')!;
+				const output = container.querySelector('output')!;
+				expect(container.textContent).toBe('d1d0');
+				const recoverable: unknown[] = [];
+				let root: Root | undefined;
+				try {
+					await act(() => {
+						root = hydrateRoot(container, client, undefined, {
+							onRecoverableError: (error) => recoverable.push(error),
+						});
+					});
+					expect(recoverable).toEqual([]);
+					expect(container.textContent).toBe('d1d0');
+					expect(container.querySelector('button')).toBe(button);
+					expect(container.querySelector('output')).toBe(output);
+					flushSync(() => button.click());
+					expect(container.textContent).toBe('updatedd0');
+				} finally {
+					root?.unmount();
+					container.remove();
+				}
+			},
+		);
 	}
 
 	it.each(

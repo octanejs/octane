@@ -1088,11 +1088,19 @@ function onlyUses(ast, analysis, records, scopeRecords, local, omitted) {
 	return [...edges].filter(([, { from, to }]) => !reaches(to, from)).map(([call]) => call);
 }
 
-// Constructors and tag functions run code no call record names.
+// Constructors, tags and property reads can run code no call record names.
+// In particular an accessor (including one behind a Proxy) may call a hook;
+// two callers must not share that hook's slot.
 function evaluatesOpaqueCode(node) {
 	if (node === null || typeof node !== 'object') return false;
 	if (Array.isArray(node)) return node.some(evaluatesOpaqueCode);
-	if (node.type === 'NewExpression' || node.type === 'TaggedTemplateExpression') return true;
+	if (
+		node.type === 'NewExpression' ||
+		node.type === 'TaggedTemplateExpression' ||
+		node.type === 'MemberExpression' ||
+		node.type === 'OptionalMemberExpression'
+	)
+		return true;
 	for (const key in node) {
 		if (!AST_META_KEYS.has(key) && evaluatesOpaqueCode(node[key])) return true;
 	}
@@ -1484,12 +1492,34 @@ function hasOpaqueExecutionDirective(fn) {
 	return false;
 }
 
+// Whether a call or member sits after an optional link in its chain:
+// `f?.(x)`, `a?.b(x)`, `a?.[k]`, `a?.b.c[k]`. Its arguments or computed key run
+// only once every receiver before that link proved non-nullish, so dependency
+// collectors must treat them as skippable reads. A parenthesized chain is its
+// own ChainExpression and ends the walk: `(a?.b).c(x)` skips nothing.
+export function followsOptionalLink(node) {
+	for (let link = node; ;) {
+		if (link.optional === true) return true;
+		link = link.type === 'CallExpression' ? link.callee : link.object;
+		while (link?.type === 'TSNonNullExpression') link = link.expression;
+		if (link?.type !== 'CallExpression' && link?.type !== 'MemberExpression') return false;
+	}
+}
+
 // The `octane` runtime export inferred method-call dependencies compile to.
 // Both emitters alias it through their own collision-safe import allocators.
 export const METHOD_DEP_IMPORT = '__methodDep';
 
+// The literal flags after `(root, 'name')` in an emitted `__methodDep` call.
+// A guarded dependency probes the own descriptor rather than reading the
+// property, and a guarded plain read passes no receiver to a call, so its own
+// function value is compared by itself. Every emitter spells them this way.
+export function methodDepFlags(method) {
+	return method.guarded ? (method.read ? [true, true] : [true]) : [];
+}
+
 // The emitted dependency expression for a one-level method call:
-// `_$__methodDep(root, 'name')` — own property ? member value : receiver (see
+// `_$__methodDep(root, 'name')` — an own arrow function, else the receiver (see
 // the runtime helper's contract in src/method-dep.ts). The call node carries
 // the authored member's source range so source maps and the surgical pass's
 // offset expectations stay anchored to the authored expression, while the
@@ -1502,7 +1532,9 @@ function methodDepNode(dependency, helperLocal) {
 		b.id(helperLocal, dependency.node),
 		{ ...dependency.method.root },
 		b.literal(dependency.method.name, JSON.stringify(dependency.method.name), dependency.node),
-		...(dependency.method.guarded ? [b.literal(true, 'true', dependency.node)] : []),
+		...methodDepFlags(dependency.method).map((flag) =>
+			b.literal(flag, String(flag), dependency.node),
+		),
 	);
 	return {
 		...call,
@@ -1553,7 +1585,7 @@ function collectDependencies(expression, callbackScope, analysis) {
 			seen.add(key);
 			const dependency = { node: info.node, key, binding };
 			if (guarded) {
-				dependency.method = { root: info.root, name: info.name, guarded: true };
+				dependency.method = { root: info.root, name: info.name, guarded: true, read: true };
 				(guardedKeys ??= new Set()).add(key);
 			}
 			dependencies.push(dependency);
@@ -1563,9 +1595,10 @@ function collectDependencies(expression, callbackScope, analysis) {
 	}
 
 	// A one-level member CALLED as a method. The member value alone cannot
-	// witness a changed receiver when the method is inherited (issue #542:
-	// `count.toFixed` is `Number.prototype.toFixed` on every render), and the
-	// receiver alone would defeat memoization for own function properties on
+	// witness a changed receiver when every receiver shares the method: an
+	// inherited one (issue #542: `count.toFixed` is `Number.prototype.toFixed` on
+	// every render) or one own function placed on several objects (issue #1788).
+	// The receiver alone would defeat memoization for own arrow callbacks on
 	// per-render containers (`props.onChange(...)`). Record the pair and let the
 	// emitted `__methodDep(root, 'name')` helper pick the comparable value at
 	// runtime. Deeper callees (`a.b.c(...)`) never reach here: their receiver
@@ -1720,7 +1753,8 @@ function collectDependencies(expression, callbackScope, analysis) {
 						: null;
 				if (info) addMethodCall(info, guardedDepth > 0);
 				else walk(node.callee);
-				walk(node.arguments);
+				if (node.arguments.length > 0 && followsOptionalLink(node)) walkGuarded(node.arguments);
+				else walk(node.arguments);
 				return;
 			}
 			case 'ChainExpression': {
@@ -1743,7 +1777,8 @@ function collectDependencies(expression, callbackScope, analysis) {
 				if (info) addStaticMember(info, guardedDepth > 0);
 				else {
 					walk(node.object);
-					if (node.computed) walk(node.property);
+					if (node.computed && followsOptionalLink(node)) walkGuarded(node.property);
+					else if (node.computed) walk(node.property);
 				}
 				return;
 			}

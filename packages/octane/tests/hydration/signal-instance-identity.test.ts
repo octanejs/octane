@@ -71,7 +71,7 @@ export function App(props) @{
 }`;
 			const options = {
 				id: '/src/keyed-row-signals.tsrx',
-				compileOptions: { dev, strong, hmr: false },
+				compileOptions: { opaqueSignalHandles: true, dev, strong, hmr: false },
 				runtimeModules: { 'octane/signals': signals },
 			};
 			const serverModule = loadCompiledFixtureSource(source, { ...options, mode: 'server' });
@@ -179,7 +179,7 @@ export function App(props) @{
 			const { App } = loadCompiledFixtureSource(source, {
 				id: '/src/cold-inline-query.tsrx',
 				mode: 'server',
-				compileOptions: { dev, hmr: false },
+				compileOptions: { opaqueSignalHandles: true, dev, hmr: false },
 			});
 			const items = [
 				{ id: 'a', label: 'first' },
@@ -222,7 +222,7 @@ export function App(props) @{
 }`;
 			const options = {
 				id: '/src/cold-inline-handle.tsrx',
-				compileOptions: { dev, hmr: false },
+				compileOptions: { opaqueSignalHandles: true, dev, hmr: false },
 			};
 			const serverModule = loadCompiledFixtureSource(source, { ...options, mode: 'server' });
 			const clientModule = loadCompiledFixtureSource(source, { ...options, mode: 'client' });
@@ -274,7 +274,7 @@ export function App(props) @{
 }`;
 		const options = {
 			id: '/src/late-child-row-handles.tsrx',
-			compileOptions: { dev: false, hmr: false },
+			compileOptions: { opaqueSignalHandles: true, dev: false, hmr: false },
 		};
 		const serverModule = loadCompiledFixtureSource(source, { ...options, mode: 'server' });
 		const clientModule = loadCompiledFixtureSource(source, { ...options, mode: 'client' });
@@ -357,7 +357,7 @@ ${row}
 export function App(props) @{ <main>@try { <Row show={true} query={props.query}/> } @pending { <i>{'waiting'}</i> }</main> }`;
 			const options = {
 				id: '/src/returned-fragment-query.tsrx',
-				compileOptions: { dev, hmr: false },
+				compileOptions: { opaqueSignalHandles: true, dev, hmr: false },
 			};
 			const serverModule = loadCompiledFixtureSource(source, { ...options, mode: 'server' });
 			const clientModule = loadCompiledFixtureSource(source, { ...options, mode: 'client' });
@@ -425,7 +425,7 @@ export function App(props) @{
 		const { App } = loadCompiledFixtureSource(source, {
 			id: '/src/inline-selection-signals.tsrx',
 			mode: 'client',
-			compileOptions: { dev: false, strong: true, hmr: false },
+			compileOptions: { opaqueSignalHandles: true, dev: false, strong: true, hmr: false },
 			runtimeModules: { 'octane/signals': signals },
 		});
 		const items = [
@@ -482,7 +482,7 @@ export function App(props) @{
 }`;
 			const options = {
 				id: '/src/nested-inline-row-signals.tsrx',
-				compileOptions: { dev, hmr: false },
+				compileOptions: { opaqueSignalHandles: true, dev, hmr: false },
 				runtimeModules: { 'octane/signals': signals },
 			};
 			const serverModule = loadCompiledFixtureSource(source, { ...options, mode: 'server' });
@@ -598,7 +598,7 @@ export function App(props) @{
 			const { App } = loadCompiledFixtureSource(source, {
 				id: '/src/keyed-server-output.tsrx',
 				mode: 'server',
-				compileOptions: { dev, hmr: false },
+				compileOptions: { opaqueSignalHandles: true, dev, hmr: false },
 			});
 			const items = ['first', 'second'].map((label) => ({
 				label,
@@ -680,7 +680,7 @@ export function App(props) @{
 }`;
 			const options = {
 				id: '/src/nested-keyed-server-output.tsrx',
-				compileOptions: { dev, hmr: false },
+				compileOptions: { opaqueSignalHandles: true, dev, hmr: false },
 			};
 			const serverModule = loadCompiledFixtureSource(source, { ...options, mode: 'server' });
 			const clientModule = loadCompiledFixtureSource(source, { ...options, mode: 'client' });
@@ -862,7 +862,11 @@ export function App(props) @{
   <section><output>{props.value as string}</output><input value={props.value}/><div style={{ color: props.value }}/></section>
 }
 export function App(props) @{ <main>@for (const item of props.items; key item) { <Row value={props.produce(item)}/> }</main> }`;
-		const options = { id: '/src/cold-server-handle.tsrx', mode: 'server' as const };
+		const options = {
+			id: '/src/cold-server-handle.tsrx',
+			mode: 'server' as const,
+			compileOptions: { opaqueSignalHandles: true },
+		};
 		const { App } = loadCompiledFixtureSource(source, options);
 		const items = ['red', 'blue'];
 		expect(server.renderToString(App, { items, produce: (item: string) => item }).html).toContain(
@@ -1031,7 +1035,7 @@ export function App(props) @{
 }`;
 			const options = {
 				id: '/src/scoped-value-call-sites.tsrx',
-				compileOptions: { dev, hmr: false },
+				compileOptions: { opaqueSignalHandles: true, dev, hmr: false },
 				runtimeModules: { 'octane/signals': signals },
 			};
 			const serverModule = loadCompiledFixtureSource(source, { ...options, mode: 'server' });
@@ -1163,7 +1167,7 @@ ${row}
 export function App(props) @{ <main>@try { <Row show={props.show} load={props.load}/> } @pending { <i>waiting</i> }</main> }`;
 			const options = {
 				id: '/src/returned-signal-query.tsrx',
-				compileOptions: { dev, hmr: false },
+				compileOptions: { opaqueSignalHandles: true, dev, hmr: false },
 				runtimeModules: {
 					'octane/signals': signals,
 					'octane/signals/query': signals,
@@ -1258,7 +1262,7 @@ ${list}
 export function App(props) @{ <main>@try { <List ids={props.ids} load={props.load}/> } @pending { <i>waiting</i> }</main> }`;
 			const options = {
 				id: '/src/returned-keyed-query.tsrx',
-				compileOptions: { dev, hmr: false },
+				compileOptions: { opaqueSignalHandles: true, dev, hmr: false },
 				runtimeModules: {
 					'octane/signals': signals,
 					'octane/signals/query': signals,
@@ -1413,7 +1417,7 @@ export function App(props) @{ <main>@for (const k of ['a', 'b']; key k) { <Row r
 import { Leaf } from './leaf';
 ${source}`;
 			const load = (mode: 'client' | 'server') => {
-				const compileOptions = { dev, hmr: false };
+				const compileOptions = { dev, hmr: false, opaqueSignalHandles: true };
 				const runtimeModules = { 'octane/signals': signals };
 				const leaf = loadCompiledFixtureSource(RETURNED_JSX_LEAF, {
 					id: '/src/leaf.tsx',
@@ -1520,7 +1524,7 @@ export function App(props) { return <main><Suspense fallback={<i>waiting</i>}>{[
 import { Field } from './field';
 ${source}`;
 			const load = (mode: 'client' | 'server') => {
-				const compileOptions = { dev, hmr: false };
+				const compileOptions = { dev, hmr: false, opaqueSignalHandles: true };
 				const runtimeModules = {
 					'octane/signals': signals,
 					'octane/signals/query': signals,
@@ -1629,7 +1633,7 @@ export function App(props) @{
 }`;
 			const options = {
 				id: '/src/deferred-opaque-keyed-signals.tsrx',
-				compileOptions: { dev, hmr: false },
+				compileOptions: { opaqueSignalHandles: true, dev, hmr: false },
 				runtimeModules: { 'octane/signals': signals },
 			};
 			const serverModule = loadCompiledFixtureSource(source, { ...options, mode: 'server' });
@@ -1710,7 +1714,7 @@ export function App(props) @{
 			const serverModule = loadCompiledFixtureSource(source, {
 				id: '/src/transient-opaque-keyed-query.tsrx',
 				mode: 'server',
-				compileOptions: { dev, hmr: false },
+				compileOptions: { opaqueSignalHandles: true, dev, hmr: false },
 				runtimeModules: { 'octane/signals': signals },
 			});
 			const started: string[] = [];
@@ -1752,7 +1756,7 @@ export function App(props) @{
 }`;
 			const options = {
 				id: '/src/reverse-reveal-opaque-keyed-signals.tsrx',
-				compileOptions: { dev, hmr: false },
+				compileOptions: { opaqueSignalHandles: true, dev, hmr: false },
 			};
 			const serverModule = loadCompiledFixtureSource(source, { ...options, mode: 'server' });
 			const clientModule = loadCompiledFixtureSource(source, { ...options, mode: 'client' });
@@ -1863,7 +1867,7 @@ async function loadHooklessScenario(source: string, dev: boolean, leaf: boolean)
 	const client = await import('../../src/runtime.js');
 	const signals = await import('../../src/signals/index.js');
 	const { loadCompiledFixtureSource } = await import('../_server-fixture.js');
-	const compileOptions = { dev, hmr: false };
+	const compileOptions = { dev, hmr: false, opaqueSignalHandles: true };
 	const load = (mode: 'client' | 'server') => {
 		const runtimeModules: Record<string, CompiledFixtureModule> = { 'octane/signals': signals };
 		if (leaf) {

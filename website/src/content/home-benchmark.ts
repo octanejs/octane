@@ -209,13 +209,13 @@ export const HOME_SUMMARY: BenchCard = {
 		{
 			op: 'bundle-size',
 			'octane-tsrx': 1,
-			react: 1.3405723882945593,
-			preact: 0.1810754511033642,
-			solid: 0.33964520876128235,
-			svelte: 0.4187629313215917,
-			ripple: 0.3503025821453758,
-			'vue-vapor': 0.5428990033491582,
-			inferno: 0.22637908590352562,
+			react: 1.5439257693918926,
+			preact: 0.20706104691725358,
+			solid: 0.3797370966582253,
+			svelte: 0.4119924553031582,
+			ripple: 0.4019091300408152,
+			'vue-vapor': 0.5069052258351288,
+			inferno: 0.26014507274217175,
 		},
 		{
 			op: 'ssr-throughput',
@@ -231,22 +231,37 @@ export const HOME_SUMMARY: BenchCard = {
 	],
 	iterations: 0,
 	format: 'x',
+	ceilings: {
+		'bundle-size': {
+			'octane-tsrx': 4.237467314976693,
+			preact: 0.3076457906178743,
+			solid: 1.0030649221743568,
+			svelte: 0.8566011323033551,
+			ripple: 0.769245268269234,
+			'vue-vapor': 2.0900623128372025,
+		},
+	},
 };
 
-function geomeanVsOctane(card: BenchCard, key: string): number | undefined {
+// `ceiling` reads each row's upper end instead of its value, still divided by
+// Octane's row value, so a range shares the one 1× baseline.
+function geomeanVsOctane(card: BenchCard, key: string, ceiling = false): number | undefined {
 	const ratios: number[] = [];
 	for (const row of card.rows) {
 		const octane = row['octane-tsrx'];
-		const value = row[key];
-		if (typeof octane === 'number' && octane > 0 && typeof value === 'number' && value > 0) {
-			ratios.push(value / octane);
-		}
+		const measured = row[key];
+		if (typeof octane !== 'number' || octane <= 0 || typeof measured !== 'number' || measured <= 0)
+			continue;
+		const value = ceiling ? card.ceilings?.[row.op]?.[key] : measured;
+		if (value === undefined) return undefined; // a partial range would mix fixtures
+		ratios.push(value / octane);
 	}
 	if (ratios.length === 0) return undefined;
 	return Math.exp(ratios.reduce((sum, ratio) => sum + Math.log(ratio), 0) / ratios.length);
 }
 
 export function createHomeSummary(cards: BenchCard[]): BenchCard {
+	const ceilings: Record<string, Record<string, number>> = {};
 	const rows: BenchRow[] = cards.map((card) => {
 		const row: BenchRow = { op: card.id, 'octane-tsrx': 1 };
 		for (const series of SUMMARY_SERIES) {
@@ -254,7 +269,15 @@ export function createHomeSummary(cards: BenchCard[]): BenchCard {
 			const geomean = geomeanVsOctane(card, series.key);
 			if (geomean !== undefined) row[series.key] = geomean;
 		}
+		if (card.ceilings) {
+			const upper: Record<string, number> = {};
+			for (const series of SUMMARY_SERIES) {
+				const geomean = geomeanVsOctane(card, series.key, true);
+				if (geomean !== undefined) upper[series.key] = geomean;
+			}
+			ceilings[card.id] = upper;
+		}
 		return row;
 	});
-	return { ...HOME_SUMMARY, rows };
+	return { ...HOME_SUMMARY, rows, ceilings };
 }

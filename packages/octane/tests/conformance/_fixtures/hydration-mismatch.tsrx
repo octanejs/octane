@@ -144,7 +144,7 @@ export function ClientExtraEnd(props) @{
 
 // Server renders an extra element the client omits (Per :834). Natural octane idiom: a
 // single-branch `@if` whose condition is false on the client (so the client branch is a null
-// body — the server's content must be discarded).
+// body where the server rendered content).
 export function ServerExtraElement(props) @{
 	<div id="see">
 		@if (!props.isClient) {
@@ -229,8 +229,8 @@ export function BareForm(props) @{
 	</span>
 }
 
-// A text mismatch FOLLOWED by a stable, INTERACTIVE sibling — proves hydration continues
-// past a mismatch (no throw) and the following sibling still adopts + its handler fires.
+// A text mismatch FOLLOWED by a stable, INTERACTIVE sibling — the client-rendered root's
+// handlers work.
 export function MismatchThenButton(props) @{
 	const [n, setN] = useState(0);
 	<div id="mtb">

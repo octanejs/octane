@@ -155,10 +155,12 @@ function List(props) @{
 }
 export function render(items, produce) { return renderToString(List, {items, produce}); }
 import {renderToString} from 'octane/server';`;
+	// Rows receive real handles through an opaque prop, so the module opts in.
 	const contents = compile(app, path.join(directory, 'KeyedServerOutput.tsrx'), {
 		mode: 'server',
 		dev: false,
 		hmr: false,
+		opaqueSignalHandles: true,
 	}).code;
 	const bundle = await build({
 		stdin: {
@@ -541,7 +543,15 @@ test('the octane-islands condition moves signal Actions from signal bundles into
 		[rendererOnly.action, rendererOnly.coordinator, rendererOnly.producers],
 		[0, 0, 0],
 	);
-	const islandsRenderer = await bundle(ordinary, ['octane-islands']);
+	// A renderer that reaches no transition runs no Action, so neither placement
+	// carries the frame. The transition engine carries it in an islands build.
+	const islandsRendererOnly = await bundle(ordinary, ['octane-islands']);
+	assert.deepEqual(
+		[islandsRendererOnly.action, islandsRendererOnly.coordinator, islandsRendererOnly.producers],
+		[0, 0, 0],
+	);
+	const transitions = `export { createRoot, startTransition } from 'octane';`;
+	const islandsRenderer = await bundle(transitions, ['octane-islands']);
 	assert.ok(
 		islandsRenderer.action > 0 && islandsRenderer.coordinator > 0 && islandsRenderer.producers > 0,
 		'An islands build must carry signal Actions and their candidate producers with the renderer.',
@@ -2741,10 +2751,12 @@ test('extracted primitive values omit signal binding work without trusting casts
 export function App(props) {
 					return <span title={${expression}}>{${expression} as string}</span>;
 				}`;
+				// Opaque results can carry handles only where opaque handles are admitted.
 				const { code } = compile(source, `/project/primitive-binding.${extension}`, {
 					mode: 'client',
 					dev,
 					hmr: false,
+					opaqueSignalHandles: true,
 				});
 				// This is a compiler-cost guard: behavior is covered by public hydration
 				// and late writable-prop tests. Count the emitted runtime capabilities,

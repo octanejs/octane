@@ -75,16 +75,22 @@ function expectedBarCount(card: BenchCard): number {
 }
 
 function atStableChartPrecision(card: BenchCard) {
+	const stable = (value: unknown) =>
+		typeof value === 'number' ? Number(value.toPrecision(15)) : value;
 	return {
 		...card,
 		rows: card.rows.map((row) =>
+			Object.fromEntries(Object.entries(row).map(([key, value]) => [key, stable(value)])),
+		),
+		// Range ends are geometric means too, so they carry the same libc ULP noise.
+		ceilings:
+			card.ceilings &&
 			Object.fromEntries(
-				Object.entries(row).map(([key, value]) => [
-					key,
-					typeof value === 'number' ? Number(value.toPrecision(15)) : value,
+				Object.entries(card.ceilings).map(([op, ends]) => [
+					op,
+					Object.fromEntries(Object.entries(ends).map(([key, value]) => [key, stable(value)])),
 				]),
 			),
-		),
 	};
 }
 

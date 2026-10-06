@@ -1040,8 +1040,7 @@ export function __adoptBindings<Props>(
 			ancestry.push([node, node.parentNode]);
 		// Renderer seed/reveal sidecars are consumed before native hydration.
 		// Authored siblings still identify the exact host site across that cleanup.
-		const sibling = (node: Node, previous: boolean): Node | null => {
-			let next = previous ? node.previousSibling : node.nextSibling;
+		const skip = (next: Node | null, previous: boolean): Node | null => {
 			while (
 				next?.nodeType === 1 &&
 				(next as Element).localName === 'script' &&
@@ -1052,11 +1051,17 @@ export function __adoptBindings<Props>(
 				next = previous ? next.previousSibling : next.nextSibling;
 			return next;
 		};
+		const sibling = (node: Node, previous: boolean): Node | null =>
+			skip(previous ? node.previousSibling : node.nextSibling, previous);
+		const site = host.parentNode;
 		const previousSibling = sibling(host, true);
 		const nextSibling = sibling(host, false);
 		let handoff: BindingHandoff | undefined;
 		handle[BINDING_HANDOFF] = () => {
 			if (handoff !== undefined) return handoff;
+			// Any change of neighbor is a different site.
+			const adjacent = (recorded: Node | null, previous: boolean): boolean =>
+				sibling(host, previous) === recorded;
 			return (handoff = {
 				id: descriptor.id,
 				root: host,
@@ -1079,9 +1084,16 @@ export function __adoptBindings<Props>(
 					host.parentNode !== null &&
 					host.ownerDocument === document &&
 					ancestry.every(([node, parent]) => node.parentNode === parent) &&
-					sibling(host, true) === previousSibling &&
-					sibling(host, false) === nextSibling &&
+					adjacent(previousSibling, true) &&
+					adjacent(nextSibling, false) &&
 					host.getAttribute('data-octane-bindings') === descriptor.id,
+				// The authored node before the host still marks its site after the
+				// host leaves, including when an external clone now stands there.
+				displaced: (parent, node) =>
+					parent === site &&
+					node !== host &&
+					(node === null || node.parentNode === parent) &&
+					(node === null ? skip(parent.lastChild, true) : sibling(node, true)) === previousSibling,
 				active: () => !disposed,
 				retire: (publish) => dispose(undefined, publish, true),
 			});

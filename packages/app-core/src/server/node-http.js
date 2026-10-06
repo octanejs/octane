@@ -128,17 +128,53 @@ function shouldGzip(request, status, headers, hasBody) {
 	return encodingQuality(getRequestHeader(request, 'accept-encoding'), 'gzip') > 0;
 }
 
+// A host name, IPv4, or bracketed IPv6 authority with an optional port. No URL
+// delimiter can pass, so a forwarded host never reaches the path or userinfo.
+const FORWARDED_HOST = /^(?:[a-z0-9_-]+(?:\.[a-z0-9_-]+)*|\[[0-9a-f:.]+\])(?::\d{1,5})?$/i;
+
+/**
+ * @param {import('node:http').IncomingMessage} request
+ * @param {string} name
+ */
+function firstForwardedValue(request, name) {
+	const value = getRequestHeader(request, name);
+	if (value === null) return '';
+	const comma = value.indexOf(',');
+	return (comma === -1 ? value : value.slice(0, comma)).trim();
+}
+
+/**
+ * The scheme and authority a request target resolves against. Forwarded
+ * headers are client-controlled unless a trusted proxy overwrites them, so they
+ * apply only on opt-in, and a malformed one keeps the direct connection's value.
+ * @param {import('node:http').IncomingMessage} request
+ * @param {boolean} trustProxy
+ */
+function requestBase(request, trustProxy) {
+	const host = request.headers.host || 'localhost';
+	if (!trustProxy) return `http://${host}`;
+	const proto = firstForwardedValue(request, 'x-forwarded-proto').toLowerCase();
+	const scheme = proto === 'https' || proto === 'http' ? proto : 'http';
+	const forwardedHost = firstForwardedValue(request, 'x-forwarded-host');
+	const forwardedBase = `${scheme}://${forwardedHost}`;
+	return FORWARDED_HOST.test(forwardedHost) && URL.canParse(forwardedBase)
+		? forwardedBase
+		: `${scheme}://${host}`;
+}
+
 /**
  * Convert a Node.js IncomingMessage to a Web Request. Passing its response
  * keeps request.signal active through streaming and cancels it on disconnect.
  * Without a response, cancellation only covers interrupted request uploads.
+ * With `trustProxy`, the URL's scheme and host come from the first
+ * `X-Forwarded-Proto` and `X-Forwarded-Host` entries when they are valid.
  * @param {import('node:http').IncomingMessage} nodeRequest
  * @param {import('node:http').ServerResponse} [nodeResponse]
+ * @param {{ trustProxy?: boolean }} [options]
  * @returns {Request}
  */
-export function nodeRequestToWebRequest(nodeRequest, nodeResponse) {
-	const host = nodeRequest.headers.host || 'localhost';
-	const url = new URL(nodeRequest.url || '/', `http://${host}`);
+export function nodeRequestToWebRequest(nodeRequest, nodeResponse, options) {
+	const url = nodeRequestUrl(nodeRequest, options);
 
 	const headers = new Headers();
 	for (const [key, value] of Object.entries(nodeRequest.headers)) {
@@ -208,6 +244,33 @@ export function nodeRequestToWebRequest(nodeRequest, nodeResponse) {
 		nodeResponse?.once('finish', cleanup);
 	}
 	return request;
+}
+
+/**
+ * The URL a Node request targets, as `nodeRequestToWebRequest` builds it: the
+ * request target on the origin from `requestBase`.
+ * @param {import('node:http').IncomingMessage} nodeRequest
+ * @param {{ trustProxy?: boolean }} [options]
+ * @returns {URL}
+ */
+export function nodeRequestUrl(nodeRequest, options) {
+	const { origin } = new URL(requestBase(nodeRequest, options?.trustProxy === true));
+	return resolveRequestTarget(nodeRequest.url || '/', origin);
+}
+
+const ABSOLUTE_FORM_TARGET = /^https?:\/\//i;
+
+/**
+ * Origin-form targets are joined to the origin, never resolved against it:
+ * URL resolution reads a leading `//` or `/\` as another host. An http(s)
+ * absolute-form target keeps its own origin (RFC 9112 section 3.2.2). Any
+ * other target, such as `*` or another scheme, becomes a path under the root.
+ * @param {string} target
+ * @param {string} origin
+ */
+function resolveRequestTarget(target, origin) {
+	if (ABSOLUTE_FORM_TARGET.test(target)) return new URL(target);
+	return new URL(target.startsWith('/') ? origin + target : `${origin}/${target}`);
 }
 
 /**
@@ -390,10 +453,38 @@ const MIME_TYPES = {
 	'.map': 'application/json',
 };
 
+const BYTE_RANGE = /^bytes=(\d*)-(\d*)$/i;
+
+/**
+ * The one `bytes=` range of a non-empty file a request selects (RFC 9110
+ * section 14.1.2). `null` means the header is ignored and the whole file is
+ * served: several ranges, another unit, or a malformed or invalid range.
+ * `false` means the range is unsatisfiable.
+ *
+ * @param {string | undefined} header
+ * @param {number} size
+ * @returns {{ start: number, end: number } | false | null}
+ */
+function byteRange(header, size) {
+	const match = BYTE_RANGE.exec(header?.trim() ?? '');
+	if (!match) return null;
+	const [, first, last] = match;
+	if (first === '') {
+		if (last === '') return null;
+		const suffix = Number(last);
+		return suffix === 0 ? false : { start: Math.max(0, size - suffix), end: size - 1 };
+	}
+	const start = Number(first);
+	if (last !== '' && Number(last) < start) return null;
+	if (start >= size) return false;
+	return { start, end: last === '' ? size - 1 : Math.min(Number(last), size - 1) };
+}
+
 /**
  * Serve a static file from `staticDir` if the request path maps to one.
  * Hash-named build assets (Vite's /assets/ and Rsbuild's /static/) get
  * immutable caching; other files (favicon, robots.txt, …) revalidate.
+ * A GET for one byte range gets 206, or 416 past the end of the file.
  *
  * @param {import('node:http').IncomingMessage} req
  * @param {import('node:http').ServerResponse} res
@@ -414,7 +505,9 @@ function serveStaticFileFromRoot(req, res, staticDir, configuredRoot) {
 	const method = (req.method || 'GET').toUpperCase();
 	if (method !== 'GET' && method !== 'HEAD') return false;
 
-	const pathname = decodeURIComponent(new URL(req.url || '/', 'http://localhost').pathname);
+	const pathname = decodeURIComponent(
+		resolveRequestTarget(req.url || '/', 'http://localhost').pathname,
+	);
 	// Resolve inside staticDir only — a `..` escape must not leave the client dir.
 	const filePath = path.normalize(path.join(staticDir, pathname));
 	if (!filePath.startsWith(path.normalize(staticDir + path.sep))) return false;
@@ -450,21 +543,39 @@ function serveStaticFileFromRoot(req, res, staticDir, configuredRoot) {
 
 	try {
 		const ext = path.extname(filePath).toLowerCase();
+		// Range applies to GET only (RFC 9110 section 14.2). Static files send no
+		// validator, so no If-Range can match and that request gets the whole file.
+		// An empty file has no byte a 206 could carry.
+		const range =
+			method === 'GET' && stat.size > 0 && req.headers['if-range'] === undefined
+				? byteRange(req.headers.range, stat.size)
+				: null;
+		if (range === false) {
+			res.statusCode = 416;
+			res.setHeader('Content-Range', `bytes */${stat.size}`);
+			res.end();
+			return true;
+		}
 		const headers = new Headers({
 			'Content-Type': MIME_TYPES[ext] || 'application/octet-stream',
-			'Content-Length': String(stat.size),
+			'Content-Length': String(range ? range.end - range.start + 1 : stat.size),
 			'Cache-Control':
 				pathname.startsWith('/assets/') || pathname.startsWith('/static/')
 					? 'public, max-age=31536000, immutable'
 					: 'public, max-age=0, must-revalidate',
 		});
-		const gzip = shouldGzip(req, 200, headers, method !== 'HEAD');
+		const status = range ? 206 : 200;
+		// Ranges address the identity bytes: shouldGzip declines any request with a
+		// Range header, and a gzip body does not advertise ranges.
+		const gzip = shouldGzip(req, status, headers, method !== 'HEAD');
 		if (gzip) {
 			headers.set('Content-Encoding', 'gzip');
 			headers.delete('Content-Length');
 		}
 
-		res.statusCode = 200;
+		res.statusCode = status;
+		if (range) res.setHeader('Content-Range', `bytes ${range.start}-${range.end}/${stat.size}`);
+		if (!gzip) res.setHeader('Accept-Ranges', 'bytes');
 		res.setHeader('Content-Type', /** @type {string} */ (headers.get('Content-Type')));
 		const contentLength = headers.get('Content-Length');
 		if (contentLength !== null) res.setHeader('Content-Length', contentLength);
@@ -476,7 +587,12 @@ function serveStaticFileFromRoot(req, res, staticDir, configuredRoot) {
 		if (method === 'HEAD') {
 			res.end();
 		} else {
-			const source = fs.createReadStream(resolvedFile, { fd, autoClose: true });
+			const source = fs.createReadStream(resolvedFile, {
+				fd,
+				autoClose: true,
+				start: range?.start,
+				end: range?.end,
+			});
 			fd = -1; // The stream now owns and closes the descriptor.
 			if (gzip) {
 				pipeline(source, createGzip(), res, (error) => {
@@ -500,11 +616,12 @@ function serveStaticFileFromRoot(req, res, staticDir, configuredRoot) {
  * when octane.config.ts has no adapter — an adapter's `serve()` replaces it.
  *
  * @param {(request: Request) => Response | Promise<Response>} handler
- * @param {{ staticDir?: string }} [options]
+ * @param {{ staticDir?: string, trustProxy?: boolean }} [options]
  * @returns {{ listen: (port?: number) => import('node:http').Server, close: () => void }}
  */
 export function createNodeServer(handler, options = {}) {
 	const staticDir = options.staticDir;
+	const requestOptions = { trustProxy: options.trustProxy === true };
 	/** @type {string | null} */
 	let configuredRoot = null;
 	try {
@@ -523,7 +640,7 @@ export function createNodeServer(handler, options = {}) {
 			) {
 				return;
 			}
-			const response = await handler(nodeRequestToWebRequest(req, res));
+			const response = await handler(nodeRequestToWebRequest(req, res, requestOptions));
 			await sendWebResponseForRequest(res, response, req);
 		})().catch((error) => {
 			console.error('[octane] Request error:', error);

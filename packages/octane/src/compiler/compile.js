@@ -57,7 +57,9 @@ import {
 	analyzeHookDependencies,
 	applyHookDependencies,
 	collectReassignedBindings,
+	followsOptionalLink,
 	isInvariantLiteral,
+	methodDepFlags,
 } from './hook-deps.js';
 import {
 	analyzeInlineMemoCall,
@@ -574,10 +576,32 @@ function attrBindingUpdateHelper(bind, inlineBindingGuards = false) {
 	}
 }
 
+// Whether a module may receive a signal handle in an opaque expression such as
+// `{row.label as string}`. Any import from `octane/signals` opts a module in,
+// including a type-only `SignalHandle` import (see nativeReadOptions); so
+// does the `opaqueSignalHandles` option, for untyped components that render
+// handles from a lazily loaded signals engine. Every other module binds only
+// `$`-named handle syntax, so its plain holes never retain the signal binding
+// runtime.
+function canCarrySignalHandle(
+	ctx,
+	node,
+	conservativeResult = false,
+	retainLocalCapability = false,
+) {
+	return canCarryDirectSignalHandle(
+		node,
+		conservativeResult,
+		retainLocalCapability,
+		ctx.nativeReads !== true && ctx.opaqueSignalHandles !== true,
+	);
+}
+
 function canCarryDirectSignalHandle(
 	node,
 	conservativeResult = false,
 	retainLocalCapability = false,
+	syntacticOnly = false,
 ) {
 	if (
 		!node ||
@@ -588,25 +612,54 @@ function canCarryDirectSignalHandle(
 	) {
 		return false;
 	}
+	// Type-only wrappers, matching isDirectSignalHandleExpression's unwrapping, so
+	// `$` syntax nested in `??`/`?:`/`&&` binds whichever wrapper surrounds it.
 	if (
 		node.type === 'TSAsExpression' ||
 		node.type === 'TSTypeAssertion' ||
 		node.type === 'TSNonNullExpression' ||
+		node.type === 'TSSatisfiesExpression' ||
+		node.type === 'TSInstantiationExpression' ||
 		node.type === 'ParenthesizedExpression' ||
 		node.type === 'ChainExpression'
 	) {
-		return canCarryDirectSignalHandle(node.expression, conservativeResult, retainLocalCapability);
+		return canCarryDirectSignalHandle(
+			node.expression,
+			conservativeResult,
+			retainLocalCapability,
+			syntacticOnly,
+		);
 	}
 	if (node.type === 'ConditionalExpression') {
 		return (
-			canCarryDirectSignalHandle(node.consequent, conservativeResult, retainLocalCapability) ||
-			canCarryDirectSignalHandle(node.alternate, conservativeResult, retainLocalCapability)
+			canCarryDirectSignalHandle(
+				node.consequent,
+				conservativeResult,
+				retainLocalCapability,
+				syntacticOnly,
+			) ||
+			canCarryDirectSignalHandle(
+				node.alternate,
+				conservativeResult,
+				retainLocalCapability,
+				syntacticOnly,
+			)
 		);
 	}
 	if (node.type === 'LogicalExpression') {
 		return (
-			canCarryDirectSignalHandle(node.left, conservativeResult, retainLocalCapability) ||
-			canCarryDirectSignalHandle(node.right, conservativeResult, retainLocalCapability)
+			canCarryDirectSignalHandle(
+				node.left,
+				conservativeResult,
+				retainLocalCapability,
+				syntacticOnly,
+			) ||
+			canCarryDirectSignalHandle(
+				node.right,
+				conservativeResult,
+				retainLocalCapability,
+				syntacticOnly,
+			)
 		);
 	}
 	if (node.type === 'SequenceExpression') {
@@ -614,8 +667,10 @@ function canCarryDirectSignalHandle(
 			node.expressions.at(-1),
 			conservativeResult,
 			retainLocalCapability,
+			syntacticOnly,
 		);
 	}
+	if (syntacticOnly) return isDirectSignalHandleExpression(node);
 	if (
 		!conservativeResult &&
 		(node.type === 'CallExpression' || node.type === 'OptionalCallExpression') &&
@@ -749,11 +804,11 @@ function domSignalTarget(options) {
 }
 
 function markDirectSignalBinding(binding, ctx, origin, kind) {
-	if (!canCarryDirectSignalHandle(binding.expr)) {
+	if (!canCarrySignalHandle(ctx, binding.expr)) {
 		// Newly certified locals still retain the prior potential capability:
 		// opaque events can import instance models after their first mount. A
 		// primitive result removes this adapter, not structural owner identity.
-		if (canCarryDirectSignalHandle(binding.expr, false, true)) {
+		if (canCarrySignalHandle(ctx, binding.expr, false, true)) {
 			ctx.signalBindingsUsed = true;
 			if (isDirectSignalHandleExpression(binding.expr)) ctx.signalBindingsEager = true;
 		}
@@ -769,8 +824,8 @@ function markDirectSignalBinding(binding, ctx, origin, kind) {
 }
 
 function ssrSignalValue(node, ctx, origin, capability = false) {
-	if (!(capability ? canCarryDirectSignalHandle(node) : isDirectSignalHandleExpression(node))) {
-		if (capability && canCarryDirectSignalHandle(node, false, true)) ctx.signalBindingsUsed = true;
+	if (!(capability ? canCarrySignalHandle(ctx, node) : isDirectSignalHandleExpression(node))) {
+		if (capability && canCarrySignalHandle(ctx, node, false, true)) ctx.signalBindingsUsed = true;
 		return node;
 	}
 	ctx.signalBindingsUsed = true;
@@ -1495,6 +1550,7 @@ function requireRuntimeForContext(ctx, name) {
 	ctx.runtimeNeeded.add(name);
 	if (
 		name === 'isContext' ||
+		name === METHOD_DEP_IMPORT ||
 		HOOK_MEMO_RUNTIME_HELPERS.has(name) ||
 		NATIVE_READ_RUNTIME_HELPERS.has(name)
 	) {
@@ -1611,6 +1667,9 @@ const INTERNAL_CLIENT_RUNTIME_HELPERS = new Set([
 	'enableSignalBindings',
 	'createElementAt',
 	'createElementFromConfig',
+	'createHostElement',
+	'enableDescriptorFormActions',
+	'enableDescriptorFragmentRefs',
 	'isRenderCall',
 	'deferRecord',
 	'bindSignalText',
@@ -3864,6 +3923,14 @@ function hoistStrongRenderCalculations(jsxNodes, ctx, immutableStates) {
 			}
 			const name = attribute.name.name;
 			if (name === 'key' || name === 'ref' || name === 'children') return attribute;
+			// The host handoff prepares unbound fields through the ordinary renderer.
+			// Hoisting one outside that preparation makes its writer ineligible.
+			if (
+				!component &&
+				ctx.presentationHydration?.host &&
+				ctx.presentationHydration.unboundAttributes.has(normalizeJsxAttrName(name).toLowerCase())
+			)
+				return attribute;
 			if (!component && /^on[A-Z]/.test(name)) return attribute;
 			if (attribute.value?.type !== 'JSXExpressionContainer') return attribute;
 			const value = visitContainer(attribute.value);
@@ -10545,6 +10612,9 @@ function compileAuthored(source, filename, options, bundlerMetadata, analyzed = 
 		source.includes('use dom bindings') ||
 		source.includes('adoptBindings') ||
 		source.includes('mountBindings');
+	// Binding views receive their props from behavior roots, which publish
+	// signal handles, so the module admits handles in opaque holes.
+	if (hasDomBindings) options = { ...options, __signalModuleImport: true };
 	let bindingConstants;
 	// Binding plans classify authored child expressions before signal lowering or
 	// JSX extraction. Use the same source-bound proof pass here, exactly once;
@@ -11116,6 +11186,8 @@ function compileInternal(
 		autoMemo: autoMemoEnabled,
 		strongMemo: strongMemoEnabled,
 		nativeReads: options?.nativeReads === true,
+		opaqueSignalHandles:
+			options?.opaqueSignalHandles === true || options?.__signalModuleImport === true,
 		nativeModuleStyles: options?.nativeReads === true && hasModuleStyleMaps(ast.body),
 		signalHookSites: domSignalTarget(options),
 		// A split Hydrate query module is invoked as the existing server-rendered
@@ -11150,6 +11222,9 @@ function compileInternal(
 		hoistedHelpers: [], // statement NODES (sub-components, hook Symbols, key fns) + hook-slot-base markers
 		delegatedEvents: new Set(), // bubble event names seen in JSX — auto-emits delegateEvents(...)
 		capturedEvents: new Set(), // capture-phase event names (onXxxCapture) — auto-emits delegateCaptureEvents(...)
+		// Descriptor capabilities this module's JSX values can select (see
+		// classifyDescriptorCapabilities); each emits its installer once.
+		descriptorCapabilities: new Set(),
 		unownedDelegatedEvents: new Set(),
 		unownedCapturedEvents: new Set(),
 		cssInjections: [], // { hash, css } — one entry per component with a <style> block
@@ -12083,6 +12158,9 @@ function compileInternal(
 	// with no authored origin inherits the module's first located statement.
 	const moduleOrigin = ctx._moduleOrigin;
 	const delegateNodes = [];
+	for (const installer of [...ctx.descriptorCapabilities].sort()) {
+		delegateNodes.push(inheritOriginLoc(b.stmt(b.call(`_$${installer}`)), moduleOrigin));
+	}
 	if (ctx.delegatedEvents.size > 0) {
 		delegateNodes.push(
 			inheritOriginLoc(
@@ -12575,6 +12653,8 @@ function compileServer(
 		compilerNameSuffixes: null,
 		mode: 'server',
 		nativeReads: options?.nativeReads === true,
+		opaqueSignalHandles:
+			options?.opaqueSignalHandles === true || options?.__signalModuleImport === true,
 		nativeModuleStyles: options?.nativeReads === true && hasModuleStyleMaps(ast.body),
 		signalHookSites: domSignalTarget(options),
 		hmr: false, // SSR never hot-swaps in place; client/server production slot shapes stay aligned
@@ -13996,8 +14076,8 @@ function ssrEmitElement(node, ctx, name, inlinedSubs, parentNs, cssHash, compone
 	let directSignalControlSite = null;
 	let directSignalControlValues = false;
 	const markDirectControl = (expression, origin) => {
-		const carriesHandle = canCarryDirectSignalHandle(expression);
-		if (!carriesHandle && !canCarryDirectSignalHandle(expression, false, true)) return expression;
+		const carriesHandle = canCarrySignalHandle(ctx, expression);
+		if (!carriesHandle && !canCarrySignalHandle(ctx, expression, false, true)) return expression;
 		const site = firstSpreadIdx === -1 ? directSignalSite(ctx, node, 'input') : hostSignalSite;
 		if (directSignalControlSite === null) {
 			if (directAttributeIdentities.has('data-octane-input')) {
@@ -18001,26 +18081,28 @@ function depPathMember(node) {
 	return expression?.type === 'MemberExpression' ? expression : null;
 }
 
+// Erased TypeScript wrappers leave the binding and key a member reads:
+// `props!.load`, `(props as T).load`, and `props['load' as const]` all read
+// `props.load`.
+function depPathRoot(member) {
+	const root = unwrapTsExpr(member?.object);
+	return root?.type === 'Identifier' ? root : null;
+}
+
 function staticDepMemberName(node) {
 	const member = depPathMember(node);
 	if (member === null) return null;
 	if (!member.computed && member.property.type === 'Identifier') return member.property.name;
-	if (
-		member.computed &&
-		member.property.type === 'Literal' &&
-		typeof member.property.value === 'string'
-	) {
-		return member.property.value;
-	}
-	return null;
+	const property = member.computed ? unwrapTsExpr(member.property) : null;
+	return property?.type === 'Literal' && typeof property.value === 'string' ? property.value : null;
 }
 
 function depPathKey(node) {
 	if (node.type === 'Identifier') return `identifier:${node.name}`;
-	const member = depPathMember(node);
+	const root = depPathRoot(depPathMember(node));
 	const propertyName = staticDepMemberName(node);
-	return member !== null && member.object.type === 'Identifier' && propertyName !== null
-		? `member:${member.object.name}:${JSON.stringify(propertyName)}`
+	return root !== null && propertyName !== null
+		? `member:${root.name}:${JSON.stringify(propertyName)}`
 		: null;
 }
 
@@ -18036,40 +18118,86 @@ function depPathKey(node) {
 // deferred: a module-bound root keeps its precise path as `root?.prop`, and an
 // ambient global (not bound in the enclosing scope chain) contributes no dep at
 // all, because it may not exist in this environment (`window` under SSR).
+// An argument or computed key after an optional link (`run?.(options.label)`,
+// `value?.[options.key]`) is skipped during render rather than deferred: its
+// member reads use `methodDep()`'s guarded descriptor probe, which neither
+// throws on a nullish receiver nor invokes a getter the render never reaches.
+// A one-level member CALLED as a method (`count.toFixed(1)`) passes its
+// receiver as `this`, and an inherited method is one function for every
+// receiver, so it uses that same descriptor probe: an inherited method,
+// accessor, or primitive receiver tracks the receiver. Unlike an inferred hook
+// dependency (hook-deps.js `addMethodCall`), an own function of any kind keeps
+// its identity. `props.load(id)` with a `function` loader must not depend on
+// `props`: a parent render or a retried boundary rebuilds it, and each fresh
+// promise would suspend again without end.
 // `isModuleBound` is a scope-aware `(name) => boolean` from
 // `moduleBoundCheckForDeps`, resolving through the expression's enclosing scope
 // chain so that sibling-function parameters never leak into the decision.
-function collectDepPaths(expr, coarsenDepRoots = null, isModuleBound = null) {
+// Plain hook modules memoize their use() arguments through this same policy
+// (slot-hooks.js `collectParallelUseDependencies`).
+export function collectDepPaths(expr, coarsenDepRoots, isModuleBound, methodDep) {
 	const deps = [];
 	const seen = new Set();
 	const lexical = createLexicalAnalysis(expr);
 	let guards = null;
 	let nextGuard = 0;
 	let deferred = 0;
+	let skipped = 0;
+	// Dependency index of each skipped-read probe, keyed like its plain read.
+	// Any other read of the same path already reads its member at render, so it
+	// replaces the probe with that more precise member dependency.
+	/** @type {Map<string, number> | undefined} */
+	let probes;
 	let ownArguments = 0;
 	const isFree = (node, parent, key) =>
 		isIdentifierReference(node, parent, key, lexical) &&
 		!lexical.isBound(lexical.nodeScopes.get(node) ?? lexical.rootScope, node.name) &&
 		!(ownArguments > 0 && node.name === 'arguments');
 	const deferredAmbient = (name) =>
-		deferred > 0 && (isModuleBound === null || !isModuleBound(name));
-	const push = (node, key) => {
+		(deferred > 0 || skipped > 0) && (isModuleBound === null || !isModuleBound(name));
+	const guarded = (node) => {
+		for (let guard = guards; guard !== null; guard = guard.parent) {
+			node = b.conditional(guard.test, node, b.void0);
+		}
+		return node;
+	};
+	// A skipped read or a method call depends on the guarded descriptor probe
+	// of its one-level member. Its `read` flag keeps an own function's
+	// identity. Only a skipped read yields to a later plain read of its path.
+	const push = (node, key, probe = false, call = false) => {
 		if (coarsenDepRoots !== null) {
 			const member = depPathMember(node);
 			if (member?.object.type === 'Identifier' && coarsenDepRoots.has(member.object.name)) {
 				node = b.id(member.object.name);
 				key = depPathKey(node);
+				probe = call = false;
 			}
 		}
 		if (guards !== null) key += `:guard:${guards.id}`;
-		if (seen.has(key)) return;
-		seen.add(key);
-		if (guards !== null) {
-			for (let guard = guards; guard !== null; guard = guard.parent) {
-				node = b.conditional(guard.test, node, b.void0);
+		if (seen.has(key)) {
+			const index = probe ? undefined : probes?.get(key);
+			if (index !== undefined) {
+				probes.delete(key);
+				deps[index] = guarded(node);
 			}
+			return;
 		}
-		deps.push(node);
+		seen.add(key);
+		if (probe) (probes ??= new Map()).set(key, deps.length);
+		if (probe || call) {
+			const name = staticDepMemberName(node);
+			// A guarded read, never a call: an own function value is its own
+			// dependency because no receiver reaches it.
+			node = b.call(
+				methodDep(),
+				node.object,
+				b.literal(name, JSON.stringify(name)),
+				...methodDepFlags({ guarded: true, read: true }).map((flag) =>
+					b.literal(flag, String(flag)),
+				),
+			);
+		}
+		deps.push(guarded(node));
 	};
 	walk(expr, null, null);
 	return deps;
@@ -18223,27 +18351,60 @@ function collectDepPaths(expr, coarsenDepRoots = null, isModuleBound = null) {
 				}
 				break;
 			}
+			case 'CallExpression': {
+				const callee = depPathMember(unwrapTsExpr(n.callee));
+				const root = depPathRoot(callee);
+				const name = staticDepMemberName(callee);
+				if (root !== null && name !== null) {
+					if (isFree(root, callee, 'object') && !deferredAmbient(root.name)) {
+						const member = b.member(
+							b.id(root.name),
+							callee.computed ? b.literal(name, JSON.stringify(name)) : b.id(name),
+							callee.computed,
+						);
+						// Distinct from the plain-read key: `x.m` read as a value
+						// elsewhere still contributes its own member dependency.
+						push(member, `${depPathKey(member)}()`, false, true);
+					}
+				} else {
+					walk(n.callee, n, 'callee');
+				}
+				const skips = n.arguments.length > 0 && followsOptionalLink(n);
+				if (skips) skipped++;
+				for (const argument of n.arguments) walk(argument, n, 'arguments');
+				if (skips) skipped--;
+				return;
+			}
 			case 'MemberExpression': {
 				const propertyName = staticDepMemberName(n);
-				if (n.object.type === 'Identifier' && propertyName !== null) {
-					if (isFree(n.object, n, 'object') && !deferredAmbient(n.object.name)) {
+				const root = depPathRoot(n);
+				if (root !== null && propertyName !== null) {
+					if (isFree(root, n, 'object') && !deferredAmbient(root.name)) {
+						// A deferred read keeps its `root?.prop` form even after an
+						// optional link; only a skipped render read becomes a probe.
+						const probe = skipped > 0 && deferred === 0;
 						const member = b.member(
-							b.id(n.object.name),
+							b.id(root.name),
 							n.computed
 								? b.literal(propertyName, JSON.stringify(propertyName))
 								: b.id(propertyName),
 							n.computed,
-							n.optional === true || deferred > 0,
+							!probe && (n.optional === true || deferred > 0),
 						);
 						// Optional MemberExpressions must remain inside a ChainExpression.
 						// Besides keeping the synthesized tree valid ESTree, the wrapper
 						// preserves optional-evaluation semantics through later AST passes.
 						const dep = member.optional ? { type: 'ChainExpression', expression: member } : member;
-						push(dep, depPathKey(dep));
+						push(dep, depPathKey(dep), probe);
 					}
 					return;
 				}
-				break;
+				if (!n.computed || !followsOptionalLink(n)) break;
+				walk(n.object, n, 'object');
+				skipped++;
+				walk(n.property, n, 'property');
+				skipped--;
+				return;
 			}
 		}
 		forEachRuntimeAstChild(n, (child, childKey) => walk(child, n, childKey));
@@ -18498,7 +18659,9 @@ function makeCreationMemoCall(
 	// promise — and the derived creation would never refresh when its upstream
 	// promise does. Coarsen member deps rooted at render-created locals to the
 	// bare identifier (dedup follows).
-	const deps = collectDepPaths(expr, coarsenDepRoots, moduleBoundCheckForDeps(ctx, expr));
+	const deps = collectDepPaths(expr, coarsenDepRoots, moduleBoundCheckForDeps(ctx, expr), () =>
+		requireRuntimeForContext(ctx, METHOD_DEP_IMPORT),
+	);
 	// Server mirror: `puMemo` — keyed CROSS-PASS creation cache (a fresh
 	// SSRScope per pass makes client useMemo semantics useless there).
 	const memoHelper = ctx.nativeReads
@@ -19208,7 +19371,9 @@ function parallelUseWalkJsx(nodes, ctx, componentName, creations, warmChildren, 
 				kind: 'useMemo',
 				node: expr,
 			});
-			const deps = collectDepPaths(expr, null, moduleBoundCheckForDeps(ctx, expr));
+			const deps = collectDepPaths(expr, null, moduleBoundCheckForDeps(ctx, expr), () =>
+				requireRuntimeForContext(ctx, METHOD_DEP_IMPORT),
+			);
 			const memoAlias = requireRuntimeForContext(ctx, ctx.nativeReads ? 'nativePuMemo' : 'puMemo');
 			changed = true;
 			// The minted prop-memo wrapper maps to the authored prop expression.
@@ -22048,17 +22213,18 @@ function isStaticReturnedFragmentComponent(node, ctx) {
 // children become renderable holes. The result is a self-contained fragment whose
 // only inputs are its props — compilable as an ordinary renderer.
 //
-// The renderer builds a keyed, `noscript`/document, or parser-repaired host as a
-// descriptor (isDescriptorBuiltHost), and a descriptor child must be a value: a
-// FoldedDirective or template-only component placeholder under it would be
-// dropped. Inside such a host (`inDescriptor`), directives, components, and child
-// `@{}` blocks lower to value holes here in the owning component, as a `@{}` body
-// and the server lower them. Misreading a template host as a descriptor host costs
-// only the template fast path; the reverse drops children.
+// The renderer builds a keyed, `noscript`/document, or parser-repaired host, and
+// a keyed Fragment, as a descriptor (isDescriptorBuiltElement), and a descriptor
+// child must be a value: a FoldedDirective or template-only component
+// placeholder under it would be dropped. Inside such a host (`inDescriptor`),
+// directives, components, and child `@{}` blocks lower to value holes here in
+// the owning component, as a `@{}` body and the server lower them. Misreading a
+// template host as a descriptor host costs only the template fast path; the
+// reverse drops children.
 function extractFragment(node, ctx, holeProps, parentNs = 'html', inDescriptor = false) {
 	const descriptor =
 		inDescriptor ||
-		(node.type === 'JSXElement' && isDescriptorBuiltHost(node, parentNs === 'svg', ctx));
+		(node.type === 'JSXElement' && isDescriptorBuiltElement(node, parentNs === 'svg', ctx));
 	const attrs = node.attributes || node.openingElement?.attributes || [];
 	const newAttrs = [];
 	const mergedFragmentSpread = isFragmentLongForm(node, ctx) && hasJsxSpreadAttribute(node);
@@ -23748,6 +23914,64 @@ function autoMemoReturnedProviderChild(node, nameNode, ctx) {
 
 // Build a `createElement(Comp, { ...props })` CallExpression AST node from a
 // component Element node. Recurses into prop values so nested JSX values lower too.
+// What a value-position JSX tag can be at runtime: a host string, a Fragment, a
+// module function component, or anything (a local, a member, a dynamic
+// expression, or an import from another module). A tag counts as the octane
+// Fragment or as a component only when it provably resolves to that module
+// binding (an octane `Fragment` import, or an immutable module function): a
+// shadowing parameter or local can hold a host string.
+function descriptorTagKind(ctx, nameNode, componentTag) {
+	if (!componentTag) return 'host';
+	if (nameNode?.type !== 'Identifier' && nameNode?.type !== 'JSXIdentifier') return 'dynamic';
+	if (ctx.activityModuleAst == null || ctx.authoredModuleAst == null) return 'dynamic';
+	const name = nameNode.name;
+	let kind;
+	if (ctx.octaneImportLocals?.get(name) === 'Fragment') kind = 'fragment';
+	else {
+		const functions = (ctx.ssrImmutableModuleFunctions ??= collectImmutableModuleFunctions(
+			ctx.authoredModuleAst.body,
+		));
+		if (!functions.has(name)) return 'dynamic';
+		kind = 'component';
+	}
+	const lexical = (ctx.activityLexical ??= createLexicalAnalysis(ctx.activityModuleAst));
+	const scope = lexical.nodeScopes.get(nameNode);
+	if (scope === undefined) return 'dynamic';
+	return lexical.resolveBinding(scope, name)?.scope === lexical.rootScope ? kind : 'dynamic';
+}
+
+// Descriptor hosts reach a function form action, and Fragment descriptors a ref,
+// only through the element factory that built them. Compiled JSX names its props
+// statically, so it installs a capability only when a prop or spread can select
+// it; public factories install every capability themselves.
+function classifyDescriptorCapabilities(ctx, nameNode, componentTag, attrs) {
+	if (ctx.mode === 'server') return; // the server renders descriptors without installers
+	let spread = false;
+	let action = false;
+	let ref = false;
+	for (const attr of attrs) {
+		if (attr.type === 'SpreadAttribute' || attr.type === 'JSXSpreadAttribute') spread = true;
+		else if (attr.type === 'Attribute' || attr.type === 'JSXAttribute') {
+			const name = attr.name?.name ?? attr.name;
+			if (name === 'action' || name === 'formAction' || name === 'formaction') action = true;
+			else if (name === 'ref') ref = true;
+		}
+	}
+	if (!spread && !action && !ref) return;
+	const kind = descriptorTagKind(ctx, nameNode, componentTag);
+	if (kind === 'component') return; // props reach a component, never a host or Fragment
+	if (kind !== 'fragment' && (action || spread))
+		addDescriptorCapability(ctx, 'enableDescriptorFormActions');
+	if (kind !== 'host' && (ref || spread))
+		addDescriptorCapability(ctx, 'enableDescriptorFragmentRefs');
+}
+
+function addDescriptorCapability(ctx, installer) {
+	if (ctx.descriptorCapabilities.has(installer)) return;
+	ctx.descriptorCapabilities.add(installer);
+	ctx.runtimeNeeded.add(installer);
+}
+
 function jsxElementToCreateElement(node, ctx, eagerRoot = false) {
 	const nameNode = node.openingElement?.name || node.id;
 	const activity = isActivityLongForm(node, ctx);
@@ -23768,6 +23992,7 @@ function jsxElementToCreateElement(node, ctx, eagerRoot = false) {
 		rejectDangerouslySetInnerHTMLChildren(compNode.value, node, ctx);
 	}
 	const attrs = node.attributes || node.openingElement?.attributes || [];
+	classifyDescriptorCapabilities(ctx, nameNode, componentTag, attrs);
 	const properties = [];
 	for (const attr of attrs) {
 		if (
@@ -23995,7 +24220,9 @@ function jsxElementToCreateElement(node, ctx, eagerRoot = false) {
 			node,
 		);
 	} else {
-		ctx.runtimeNeeded.add(componentTag ? 'createElementFromConfig' : 'createElement');
+		// The server renders descriptors without the client capability installers.
+		const hostFactory = ctx.mode === 'server' ? 'createElement' : 'createHostElement';
+		ctx.runtimeNeeded.add(componentTag ? 'createElementFromConfig' : hostFactory);
 		// Remaining scaffolding (callee, props object, spread/diagnostic wrappers,
 		// static-content literals) maps to the authored JSX element.
 		descriptor = inheritOriginLoc(
@@ -24007,7 +24234,7 @@ function jsxElementToCreateElement(node, ctx, eagerRoot = false) {
 						propsNode,
 						...(loweredChildren.length ? [b.array(loweredChildren)] : []),
 					)
-				: b.call('_$createElement', compNode, propsNode, ...loweredChildren),
+				: b.call(`_$${hostFactory}`, compNode, propsNode, ...loweredChildren),
 			node,
 		);
 	}
@@ -25065,12 +25292,11 @@ function rewriteImperativeHeadElements(node, ctx, namespace = 'html', inNoscript
 // A JSXElement that normalizeChildren lowers with jsxElementToCreateElement
 // instead of the template compiler, so its whole subtree becomes descriptor
 // values. extractFragment uses the same test to keep that subtree's children in
-// value form.
-function isDescriptorBuiltHost(node, inSvg, ctx) {
-	return (
-		!isComponentTag(node) &&
-		(hasJsxAttribute(node, 'key') || (!inSvg && requiresImperativeHostTree(node, ctx)))
-	);
+// value form. A keyed long-form Fragment is one: inlining its children would
+// drop the key, and the descriptor's keyed slot remounts them when it changes.
+function isDescriptorBuiltElement(node, inSvg, ctx) {
+	if (isComponentTag(node)) return isFragmentLongForm(node, ctx) && hasJsxAttribute(node, 'key');
+	return hasJsxAttribute(node, 'key') || (!inSvg && requiresImperativeHostTree(node, ctx));
 }
 
 /**
@@ -25172,8 +25398,10 @@ function normalizeChildren(
 			// Routing this BEFORE the
 			// generic Element branch is required — `Fragment` would otherwise
 			// hit `isComponentTag` and route through `componentSlot`, which
-			// has no notion of marker pairs.
-			if (isFragmentLongForm(n, ctx)) {
+			// has no notion of marker pairs. A keyed Fragment is a reconciliation
+			// boundary instead, so it takes the descriptor branch below; the
+			// lexical-nesting walk (no imperative lowering) still sees through it.
+			if (isFragmentLongForm(n, ctx) && !(allowImperative && hasJsxAttribute(n, 'key'))) {
 				const attributes = n.openingElement.attributes || [];
 				const refAttr = attributes.find(
 					(a) =>
@@ -25220,7 +25448,7 @@ function normalizeChildren(
 			// Keys need a reconciliation boundary. Parser-sensitive host trees need
 			// imperative construction so HTML repair cannot change binding paths.
 			// The shared descriptor path provides both without taxing ordinary templates.
-			if (ctx && allowImperative && isDescriptorBuiltHost(n, inSvg, ctx)) {
+			if (ctx && allowImperative && isDescriptorBuiltElement(n, inSvg, ctx)) {
 				out.push(
 					inheritOriginLoc(
 						{
@@ -27359,10 +27587,11 @@ function planJsx(
 			// Const-seeded straight into the bag factory args — no mount statement.
 			if (cc.isChild && !noTemplate) {
 				bag.constField(`_chv$${cc.id}`, 'null');
-				// An only-child hole's first render must reach childTextHole even for
-				// `undefined`: while hydrating, that call reconciles the host's server
-				// children, which no other binding owns.
-				bag.constField(`_chp$${cc.id}`, cc.onlyChildText ? 'unset' : 'undefined');
+				// A hole's first render must reach its text-hole helper even for
+				// `undefined`: while hydrating, that call reconciles the server
+				// children (an only child) or range (a sibling or whole-output hole)
+				// that no other binding owns.
+				bag.constField(`_chp$${cc.id}`, 'unset');
 			}
 		},
 	});
@@ -30704,8 +30933,8 @@ function emitElementHtml(
 		appendTemplatePart(attrTemplate, ` data-octane-input="${escapeAttr(site)}"`, 'attribute', null);
 	};
 	const markDirectControl = (binding, expression, origin) => {
-		const carriesHandle = canCarryDirectSignalHandle(expression);
-		if (!carriesHandle && !canCarryDirectSignalHandle(expression, false, true)) return binding;
+		const carriesHandle = canCarrySignalHandle(ctx, expression);
+		if (!carriesHandle && !canCarrySignalHandle(ctx, expression, false, true)) return binding;
 		const site = directSignalSite(ctx, node, 'input');
 		ensureDirectControlSite(site);
 		ctx.signalBindingsUsed = true;
@@ -31479,7 +31708,7 @@ function emitElementHtml(
 			firstSpreadIdx !== -1 ||
 			hasDirectSignalStyle ||
 			hostClientSources.some(
-				(source) => !source.spread && canCarryDirectSignalHandle(source.binding.expr),
+				(source) => !source.spread && canCarrySignalHandle(ctx, source.binding.expr),
 			);
 		if (signalHostSources) {
 			ctx.signalBindingsUsed = true;
@@ -31640,8 +31869,8 @@ function emitElementHtml(
 		let signalCapable = false;
 		for (const part of textareaParts) {
 			if (part.kind === 'static') continue;
-			if (canCarryDirectSignalHandle(part.expr)) signalCapable = true;
-			else if (canCarryDirectSignalHandle(part.expr, false, true)) ctx.signalBindingsUsed = true;
+			if (canCarrySignalHandle(ctx, part.expr)) signalCapable = true;
+			else if (canCarrySignalHandle(ctx, part.expr, false, true)) ctx.signalBindingsUsed = true;
 			if (isDirectSignalHandleExpression(part.expr)) ctx.signalBindingsEager = true;
 		}
 		if (signalCapable) ctx.signalBindingsUsed = true;
@@ -33237,6 +33466,9 @@ function makeCompCall(
 	// The props object as a node; the call-site emit embeds it directly.
 	const propsExpr = staticFragmentRenderer?.props ?? inheritOriginLoc(b.object(propNodes), node);
 	if (descriptorConfig) {
+		// A keyed spread builds a descriptor whose tag may be a host string or a
+		// Fragment at runtime, so its props select descriptor capabilities too.
+		classifyDescriptorCapabilities(ctx, node.openingElement?.name || node.id, true, attrs);
 		ctx.runtimeNeeded.add('createElementFromConfig');
 		return {
 			id,
@@ -33823,12 +34055,12 @@ function forRowKeyAttribute(node, ctx) {
 // A `key` on the only output root of an @for body names the row, never a
 // separate element: a valued key is the row key above, and the root cannot
 // change identity inside a row that shares it. Leaving the key on the root
-// would give it a boundary that only repeats the row key: an intrinsic root
-// lowers to a keyed descriptor instead of the native template, and a component
-// root loses the row memo and its shared single-root range. Remove it so the
-// row compiles exactly as the header spelling does. Like a header key, the
-// reconciler reads it; an input that changes while rows render takes effect at
-// the next reconcile. Keyed elements below the root keep their own boundaries.
+// would give it a boundary that only repeats the row key: an intrinsic root or
+// a Fragment lowers to a keyed descriptor instead of the native template, and a
+// component root loses the row memo and its shared single-root range. Remove it
+// so the row compiles exactly as the header spelling does. Like a header key,
+// the reconciler reads it; an input that changes while rows render takes effect
+// at the next reconcile. Keyed elements below the root keep their own boundaries.
 function forItemTemplateBody(node, ctx) {
 	const body = node.body.body;
 	if (ctx._universalRuntimeUnit != null) return body;
@@ -33841,8 +34073,7 @@ function forItemTemplateBody(node, ctx) {
 	if (
 		(root?.type !== 'Element' && root?.type !== 'JSXElement') ||
 		(!isPlainHostRoot(root) && !isComponentTag(root)) ||
-		isActivityLongForm(root, ctx) ||
-		isFragmentLongForm(root, ctx)
+		isActivityLongForm(root, ctx)
 	)
 		return body;
 	const attrs = root.attributes || root.openingElement?.attributes || [];

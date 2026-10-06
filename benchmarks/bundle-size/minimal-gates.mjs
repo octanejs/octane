@@ -59,7 +59,8 @@ export function selectMinimalScenarios(args, scenarios) {
 	return { selectedScenarios, enforceBudgets, writeBudgets };
 }
 
-export function verifyByteBudget(name, measured, budget, enforce) {
+export function verifyByteBudget(name, measured, budget, enforce, requireTight = false) {
+	const tight = enforce && requireTight ? ratchetBudget(measured, budget) : null;
 	for (const metric of BYTE_METRICS) {
 		assert.equal(
 			Number.isSafeInteger(budget[metric]) && budget[metric] > 0,
@@ -72,6 +73,13 @@ export function verifyByteBudget(name, measured, budget, enforce) {
 				true,
 				`${name}: production ${metric} bytes ${measured[metric]} exceed committed budget ${budget[metric]}`,
 			);
+			if (tight !== null) {
+				assert.equal(
+					budget[metric] <= tight[metric],
+					true,
+					`${name}: ratchet ${metric} budget ${budget[metric]} to ${tight[metric]}; run the matching bundle command with --write-budgets`,
+				);
+			}
 		}
 	}
 }

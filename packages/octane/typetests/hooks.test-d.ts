@@ -71,6 +71,52 @@ useLinkedState(linkedUser, (source) => source.name, {
 	sourceEqual: () => 'equal',
 });
 
+// Declaring `previous` must not hide the reconciler's return type when nothing
+// else names the value type.
+type LinkedKey = { key: string };
+const [linkedChanged, setLinkedChanged] = useLinkedState(
+	{ key: 'sample' } as LinkedKey,
+	(source, previous) => previous !== undefined && source.key !== previous.source.key,
+	{ sourceEqual: (previous, next) => previous.key === next.key },
+);
+setLinkedChanged(false);
+// @ts-expect-error — the linked value is the reconciler's boolean.
+setLinkedChanged('changed');
+const [serverChanged] = useServerLinkedState(
+	{ key: 'sample' } as LinkedKey,
+	(source, previous) => previous !== undefined && source.key !== previous.source.key,
+);
+const [universalChanged] = useUniversalLinkedState(
+	{ key: 'sample' } as LinkedKey,
+	(source, previous) => previous !== undefined && source.key !== previous.source.key,
+);
+const linkedChangedFlags: boolean[] = [linkedChanged, serverChanged, universalChanged];
+
+// An annotated return type types `previous.value` before the body is checked.
+const [linkedCount] = useLinkedState(linkedUser, (_source, previous): number =>
+	previous === undefined ? 0 : previous.value + 1,
+);
+const linkedCountValue: number = linkedCount;
+
+// An annotated `previous` declares the linked value, even when the reconciler
+// returns a narrower type.
+type LinkedItem = { id: string };
+const [linkedSelection, setLinkedSelection] = useLinkedState(
+	linkedUser.id,
+	(_id, _previous: LinkedStatePrevious<string, LinkedItem | null> | undefined) => null,
+);
+setLinkedSelection({ id: 'item-1' });
+const linkedSelectionValue: LinkedItem | null = linkedSelection;
+
+useLinkedState(
+	linkedUser,
+	// @ts-expect-error — the reconciler's return must fit `previous.value`.
+	(source, previous: LinkedStatePrevious<LinkedUser, string> | undefined) =>
+		previous === undefined ? source.name.length : 0,
+);
+// @ts-expect-error — the reconciler's return must fit `previous.value`.
+useLinkedState<LinkedUser, string, number>(linkedUser, (source) => source.name);
+
 const [serverDraft] = useServerLinkedState(linkedUser, (source) => source.name);
 const [universalDraft] = useUniversalLinkedState(linkedUser, (source) => source.name);
 const compatibleDrafts: string[] = [

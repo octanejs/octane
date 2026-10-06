@@ -28,6 +28,20 @@ function listenError(port: number, host: string): Promise<string | undefined> {
 	});
 }
 
+// Resolves once the child has written to stderr. Nothing has read the stream
+// yet, so the write stays buffered there and reaches the helper under test as
+// soon as that helper attaches its own listener. A budget started any earlier
+// would also be timing Node's startup, which a loaded runner can stretch past
+// the whole budget before the child writes anything.
+async function stderrWritten(child: ChildProcess): Promise<void> {
+	while (child.stderr!.readableLength === 0) {
+		if (child.exitCode !== null || child.signalCode !== null) {
+			throw new Error('fixture exited before writing to stderr');
+		}
+		await new Promise((resolve) => setTimeout(resolve, 5));
+	}
+}
+
 // What Vite prints when `--strictPort` finds its port taken, then exits 1.
 const lostPortFixture = (port: number) =>
 	`process.stderr.write('Error: Port ${port} is already in use\\n'); process.exit(1);`;
@@ -37,10 +51,12 @@ const listeningFixture = (port: number) =>
 	createServer((_request, response) => response.writeHead(204).end()).listen(${port}, '127.0.0.1');`;
 
 describe('website integration process lifecycle', () => {
+	// A child that exits on its own only needs its budget to bound a hang, so the
+	// budget leaves room for Node's startup on a loaded runner.
 	it('reports the build output when a finite child fails', async () => {
 		const child = spawnFixture(`process.stderr.write('build sentinel\\n'); process.exit(7);`);
 
-		await expect(waitForChildExit(child, 'fixture build', 1_000)).rejects.toThrow(
+		await expect(waitForChildExit(child, 'fixture build', 5_000)).rejects.toThrow(
 			/fixture build exited with code 7[\s\S]*build sentinel/,
 		);
 	});
@@ -49,6 +65,7 @@ describe('website integration process lifecycle', () => {
 		const child = spawnFixture(
 			`process.stderr.write('still building\\n'); setInterval(() => {}, 1_000);`,
 		);
+		await stderrWritten(child);
 
 		await expect(waitForChildExit(child, 'fixture build', 100)).rejects.toThrow(
 			/fixture build did not finish within 100ms[\s\S]*still building/,
@@ -59,7 +76,7 @@ describe('website integration process lifecycle', () => {
 	it('reports server output when a child exits before listening', async () => {
 		const child = spawnFixture(`process.stderr.write('startup sentinel\\n'); process.exit(9);`);
 
-		await expect(waitForServer(child, 'http://127.0.0.1:1/', 1_000)).rejects.toThrow(
+		await expect(waitForServer(child, 'http://127.0.0.1:1/', 5_000)).rejects.toThrow(
 			/server for http:\/\/127\.0\.0\.1:1\/ exited with code 9[\s\S]*startup sentinel/,
 		);
 	});
@@ -70,6 +87,7 @@ describe('website integration process lifecycle', () => {
 		);
 
 		try {
+			await stderrWritten(child);
 			await expect(waitForServer(child, 'http://127.0.0.1:1/', 1_000)).rejects.toThrow(
 				/server at http:\/\/127\.0\.0\.1:1\/ never came up[\s\S]*startup stalled/,
 			);

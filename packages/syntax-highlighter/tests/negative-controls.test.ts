@@ -66,5 +66,7 @@ describe('react-syntax-highlighter negative controls', () => {
 			),
 		).toThrow('required parity lanes changed');
 		await rm(root, { recursive: true, force: true });
-	});
+		// The two generator checks run as child processes. They take about 2 s on
+		// a CI runner and passed 5 s on a loaded one.
+	}, 30_000);
 });

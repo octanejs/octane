@@ -288,20 +288,30 @@ describe('hydrateRoot — @for list (SSR Phase 6 / M2)', () => {
 		}
 	});
 
-	it('client-builds an extra row that suspends without adopting its partial element', async () => {
+	// The client renders one more row than the server: a structural mismatch
+	// inside the `@try` arm, so, as in React 19, that arm renders on the client
+	// and reports once, while the host around it keeps its server node.
+	it('client-renders the @try arm around an extra client row that suspends', async () => {
 		container.innerHTML = ServerRT.renderToString(server.SuspendingRows, {
 			rows: ['a'],
 			text: null,
 		}).html;
-		const tail = container.querySelector('b')!;
+		const main = container.querySelector('main')!;
+		const section = container.querySelector('section')!;
+		const armNodes = [section, ...section.querySelectorAll('*')];
 		let resolve!: (value: string) => void;
 		const text = new Promise<string>((done) => {
 			resolve = done;
 		});
-		// The client renders one more row than the server: a structural mismatch
-		// whose DEV warning is not the contract under test here.
+		// The DEV warning for the mismatch is not the contract under test here.
 		const errSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
-		const root = hydrateRoot(container, SuspendingRows, { rows: ['a', 'b'], text });
+		const recoverable: unknown[] = [];
+		const root = hydrateRoot(
+			container,
+			SuspendingRows,
+			{ rows: ['a', 'b'], text },
+			{ onRecoverableError: (error) => recoverable.push(error) },
+		);
 		try {
 			flushSync(() => {});
 			await act(async () => {
@@ -312,7 +322,9 @@ describe('hydrateRoot — @for list (SSR Phase 6 / M2)', () => {
 				'<li class="suspending-row">a</li>' +
 					'<li class="suspending-row">b<em class="suspending-detail">R</em></li>',
 			);
-			expect(container.querySelector('b')).toBe(tail);
+			expect(container.querySelector('main')).toBe(main);
+			expect(armNodes.filter((node) => node.isConnected)).toEqual([]);
+			expect(recoverable).toHaveLength(1);
 		} finally {
 			resolve('R');
 			root.unmount();

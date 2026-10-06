@@ -6264,12 +6264,21 @@ function universalLinkedStateHook<Source, Value>(
 	return [hook.value, hook.set, getter];
 }
 
-export function useLinkedState<Source, Value>(
+// `Value` is the reconciler's return type and `Previous` the type of
+// `previous.value`; the client `useLinkedState` declaration explains the split.
+type LinkedStateValue<Value, Previous> = unknown extends Previous ? Value : Previous;
+type LinkedStateTuple<Value> = [
+	Value,
+	(next: Value | ((previous: Value) => Value)) => void,
+	() => Value,
+];
+
+export function useLinkedState<Source, Value extends Previous, Previous = Value>(
 	source: Source,
-	reconcile: (source: Source, previous: LinkedStatePrevious<Source, Value> | undefined) => Value,
-	options?: LinkedStateOptions<Source, Value>,
+	reconcile: (source: Source, previous: LinkedStatePrevious<Source, Previous> | undefined) => Value,
+	options?: LinkedStateOptions<Source, Previous>,
 	slot?: unknown,
-): [Value, (next: Value | ((previous: Value) => Value)) => void, () => Value];
+): LinkedStateTuple<LinkedStateValue<Value, Previous>>;
 export function useLinkedState<Source, Value>(
 	source: Source,
 	reconcile: (source: Source, previous: LinkedStatePrevious<Source, Value> | undefined) => Value,
@@ -6283,12 +6292,12 @@ export function useLinkedState<Source, Value>(
 	];
 }
 
-export function __useLinkedStateWithGetter<Source, Value>(
+export function __useLinkedStateWithGetter<Source, Value extends Previous, Previous = Value>(
 	source: Source,
-	reconcile: (source: Source, previous: LinkedStatePrevious<Source, Value> | undefined) => Value,
-	options?: LinkedStateOptions<Source, Value>,
+	reconcile: (source: Source, previous: LinkedStatePrevious<Source, Previous> | undefined) => Value,
+	options?: LinkedStateOptions<Source, Previous>,
 	slot?: unknown,
-): [Value, (next: Value | ((previous: Value) => Value)) => void, () => Value];
+): LinkedStateTuple<LinkedStateValue<Value, Previous>>;
 export function __useLinkedStateWithGetter<Source, Value>(
 	source: Source,
 	reconcile: (source: Source, previous: LinkedStatePrevious<Source, Value> | undefined) => Value,
@@ -7722,8 +7731,14 @@ function reportUniversalUncaughtError(root: UniversalRootImpl<any, any>, err: un
 }
 
 function routeUniversalOwnerError(owner: UniversalOwnerRecord, error: unknown): boolean {
-	for (let current = owner.parent; current !== null; current = current.parent) {
-		if (!current.isBoundary || current.disposed) continue;
+	for (
+		let child = owner, current = owner.parent;
+		current !== null;
+		child = current, current = current.parent
+	) {
+		// The direct child's key identifies the lexical arm, even while a boundary
+		// has a pending error or a replacement draft. A catch cannot catch itself.
+		if (!current.isBoundary || current.disposed || child.key === 'catch') continue;
 		current.boundaryThenable = null;
 		current.boundaryError = error;
 		current.hasBoundaryError = true;

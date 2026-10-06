@@ -22,10 +22,12 @@ import { readEarlySignalValue } from './early-values.js';
 import { currentSignalDeclarationPath } from './declaration-path.js';
 import {
 	NATIVE_DOM_VALUE,
+	SIGNAL_SAME_CAPTURE,
 	currentSignalDeclarationInvocation,
 	forwardNativeTransitionConsumer,
 } from './read-protocol.js';
 import { isSignalHandle } from './handle-protocol.js';
+import { runAsDeclaredServerSignalReader as readAsDeclared } from './query-attempt-observer.js';
 
 export { isSignalHandle, isWritableSignal } from './handle-protocol.js';
 import {
@@ -437,6 +439,38 @@ export abstract class Descriptor<T, H extends SignalHandle<T>> implements OwnerB
 	}
 
 	/**
+	 * A body declares its derived$ and query$ again on every render, so a closure
+	 * that captures one captures a new descriptor each time. It still reads the
+	 * cell the committed closure reads, unless this render presents a redeclared
+	 * definition of that cell through a private view. Compared by identity, every
+	 * such closure would run again on every render, and a result that never
+	 * compares equal (a pending read, a new error or object) would make its
+	 * readers render, and declare it, again without end.
+	 */
+	[SIGNAL_SAME_CAPTURE](committed: unknown, owner: object): boolean {
+		if (
+			this.site === undefined ||
+			!(committed instanceof Descriptor) ||
+			committed.constructor !== this.constructor ||
+			committed.key !== this.key ||
+			committed.site !== this.site ||
+			committed.owner !== this.owner
+		)
+			return false;
+		try {
+			const token = readerOwner(this.owner, owner as Scope);
+			const target = resolveDescriptorOwner(this.site, token) as ScopeImpl;
+			// An alias may have read the cell even if this descriptor did not.
+			// Without a cell, reevaluate the closure: it may still guard this read,
+			// and keeping its old capture would select stale props on first use.
+			if (!target.nodes.has(this.key)) return false;
+			return !isDeclarationView(this.resolvedCell(target, token));
+		} catch {
+			return false;
+		}
+	}
+
+	/**
 	 * `token` is the owner the reader resolved. Only the declaring owner's cell
 	 * belongs to the render that evaluated this declaration; a component that
 	 * received the handle declares its own cell in its own render.
@@ -468,8 +502,13 @@ export abstract class Descriptor<T, H extends SignalHandle<T>> implements OwnerB
 		return this.resolvedCell(owner, token);
 	}
 
+	// A lexical use reads as its declaring owner, so a server render also
+	// observes the query attempts its reads start under that owner (see
+	// readAsDeclared). The other read paths keep their direct call.
 	get(): T {
-		return this.resolve().get();
+		return this.lexical === this
+			? readAsDeclared(this.owner!, () => this.resolve().get())
+			: this.resolve().get();
 	}
 
 	[NATIVE_DOM_VALUE](): T {
@@ -479,7 +518,9 @@ export abstract class Descriptor<T, H extends SignalHandle<T>> implements OwnerB
 	}
 
 	[SIGNAL_BINDING_READ](): T {
-		return readBinding(this.resolve());
+		return this.lexical === this
+			? readAsDeclared(this.owner!, () => readBinding(this.resolve()))
+			: readBinding(this.resolve());
 	}
 
 	[SIGNAL_BINDING_SUBSCRIBE](notify: () => void, onRetire?: () => void): () => void {
@@ -509,11 +550,15 @@ export abstract class Descriptor<T, H extends SignalHandle<T>> implements OwnerB
 	latest(): T | undefined;
 	latest<F>(fallback: F): T | F;
 	latest<F>(fallback?: F): T | F | undefined {
-		return this.resolve().latest(fallback);
+		return this.lexical === this
+			? readAsDeclared(this.owner!, () => this.resolve().latest(fallback))
+			: this.resolve().latest(fallback);
 	}
 
 	snapshot(): SignalSnapshot<T> {
-		return this.resolve().snapshot();
+		return this.lexical === this
+			? readAsDeclared(this.owner!, () => this.resolve().snapshot())
+			: this.resolve().snapshot();
 	}
 
 	subscribe(notify: () => void): () => void {

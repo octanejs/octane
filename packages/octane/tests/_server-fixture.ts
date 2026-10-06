@@ -169,6 +169,27 @@ export function evaluateCompiledFixtureCode<T extends CompiledFixtureModule>(
 				? match
 				: `__exports.default = __runtimeModules[${JSON.stringify(request)}].default;`,
 	);
+	// A split `<Hydrate>` child loads its compiler-selected module on demand.
+	code = code.replace(
+		/\bimport\(\s*(['"])([^'"]+)\1\s*\)/g,
+		(match: string, _quote: string, request: string) =>
+			runtimeModules === undefined || !Object.hasOwn(runtimeModules, request)
+				? match
+				: `Promise.resolve(__runtimeModules[${JSON.stringify(request)}])`,
+	);
+	// A bundled chunk declares its exports in one local list. Register them at
+	// the end, like the function exports above.
+	const listedExports: string[] = [];
+	code = code.replace(
+		/export\s*\{([^}]*)\}\s*;?(?!\s*from\b)/g,
+		(_match: string, names: string) => {
+			for (const specifier of names.split(',')) {
+				const [local, exported = local] = specifier.trim().split(/\s+as\s+/);
+				if (local !== '') listedExports.push(`__exports[${JSON.stringify(exported)}] = ${local};`);
+			}
+			return '';
+		},
+	);
 
 	if (/^\s*import\s/m.test(code) || /^\s*export\s/m.test(code)) {
 		throw new Error(
@@ -179,6 +200,7 @@ export function evaluateCompiledFixtureCode<T extends CompiledFixtureModule>(
 	for (const name of functionExports) {
 		code += `\n__exports.${name} = ${name};`;
 	}
+	for (const registration of listedExports) code += `\n${registration}`;
 
 	const evaluate = new Function(
 		'__runtime',

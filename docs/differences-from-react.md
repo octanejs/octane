@@ -125,31 +125,44 @@ omitted. Mutating such an object in place is therefore not witnessed by a
 dependency array; state that should drive rendering belongs in state, context,
 or a store rather than a module singleton.
 
-Member reads inside a conditional branch, after a possible early exit, or
-protected by exception handling preserve that protection. For one-level reads,
+Member reads inside a conditional branch, after a possible early exit,
+protected by exception handling, or skipped by an optional chain preserve that
+protection. An optional chain skips the arguments and computed keys after its
+optional link: `run?.(options.label)` and `value?.[options.key]` read
+`options` only once the receiver exists. Compiler-memoized `use()` arguments,
+including those in plain `.ts`/`.js` hook modules, and server-rendered prop
+creations apply the same optional-chain rule to their dependencies. For
+one-level reads,
 the inferred array inspects an own property descriptor: a data property tracks
 its value, while an accessor or inherited property tracks its receiver without
 invoking a getter. An absent property tracks `undefined`. Failed reflection
 probes track the receiver, leaving the
 authored callback responsible for the read and its exception handling. Thus a
-guarded `props.onChange(...)` still tracks a stable own callback when the props
-container changes, while method getters stay behind their authored guard.
+guarded `props.onChange(...)` still tracks a stable own arrow callback when the
+props container changes, while method getters stay behind their authored guard.
 Null and undefined receivers use separate module-local markers, so a failed receiver
 read does not compare equal to a successful own-data read of null or undefined.
 These markers are created once per module, rather than once per probe.
-These guarded probes allocate a property descriptor; ordinary unguarded
-one-level method calls retain the allocation-free comparison below.
+These guarded probes allocate a property descriptor; unguarded one-level
+method calls read the property directly.
 
-A one-level method call tracks the value that can change between renders. The
-compiled array selects that value on each render, based on where the method
-lives:
+A one-level method call reads both the method and the receiver it passes as
+`this`. The compiled array selects the value that can change between renders
+on each render, based on the method:
 
-- An own function property tracks itself: `props.onChange(...)` tracks
-  `props.onChange`.
-- An inherited method tracks its receiver: `count.toFixed(2)` tracks `count`,
-  because `Number.prototype.toFixed` is one function for every number.
+- An own arrow function tracks itself: `props.onChange(...)` tracks
+  `props.onChange` when it is an arrow, because an arrow cannot see the
+  receiver it is called on.
+- Any other method can read `this`, so it tracks its receiver, as React
+  Compiler does for every method call. `count.toFixed(2)` tracks `count`,
+  because `Number.prototype.toFixed` is one function for every number, and
+  `source.read()` tracks `source` when `read` is an ordinary `function` or a
+  method, even if several objects share that one function.
 - An absent handler in an optional call tracks a stable `undefined`:
   `props.onReady?.()` does not re-run its hook until a handler is passed.
+
+The arrow check reads the function's source text. Where an engine does not
+expose source text, every own function tracks its receiver.
 
 Deeper calls such as `cart.items.push(x)` track their receiver path
 (`cart.items`), unchanged.
@@ -966,7 +979,13 @@ and after discrete events (rejected edits snap back), IME composition is
 respected, radio groups restore as a group, `<select value>` projects options
 (single + multiple), and `defaultValue`/`defaultChecked` are the uncontrolled
 escape hatch. Hydration adopts pre-hydration user input, then the first
-commit/discrete event reasserts. `<textarea>` with children AND a
+commit/discrete event reasserts. As in React 19, a value or checked state the
+client renders differently from the server becomes the control's reset baseline
+(the `value` attribute, a textarea's content, the `checked` attribute). An
+unedited input or textarea follows it, and a checkbox or radio keeps its live
+state. React 19 replaces a pre-hydration textarea edit with the client's content
+even when server and client agree; Octane keeps the edit, as it does in an
+input. `<textarea>` with children AND a
 `value`/`defaultValue` prop is a compile error (the prop owns the content).
 
 Uncontrolled `defaultValue` updates change an input or textarea's reset baseline
@@ -1445,7 +1464,8 @@ Other consequences:
   general commit deferral.
 - Fallback-visible boundaries whose retries fully stage reveal together,
   including refs and layout effects.
-- Retry-only Suspense reveals follow React's shared 300ms fallback window.
+- Retry-only Suspense reveals use a shared 100ms fallback window (React uses
+  300ms). Ready content can therefore appear sooner after a fallback is shown.
   Showing or filling a fallback advances the window, and retries wait if more
   than 10ms remains. Urgent updates and active `act()` scopes bypass this delay.
   A committed fallback inside hidden Activity contributes to the window;
@@ -1534,6 +1554,17 @@ and remains sequential.
 - **Creations are memoized per call site**: `use(fetchA(id))` compiles to a
   slot-keyed memo with member-path deps (`[fetchA, id]`), so replays never mint
   fresh promises and refetch happens exactly when inputs change.
+- **A one-level method call is tracked by where its method lives**:
+  `use(load(count.toFixed(1)))` tracks `count`, because an inherited method
+  is one function for every receiver. A getter also tracks its receiver. An own
+  function tracks only itself, whether it is an arrow or not, so
+  `use(props.load(id))` keeps its request when the parent rebuilds `props`
+  around the same `load`. Inferred hook dependencies differ here: an own
+  non-arrow function there tracks its receiver. A `use()` memo keyed on a
+  rebuilt `props` would start a fresh request on every parent render and every
+  boundary retry. So an own `function` shared by several objects, called as
+  `source.read()`, is not witnessed when only `source` changes. Pass the value
+  it reads as an argument instead.
 - **Fetch trees warm across components**: a suspended body prefetches
   descendants whose reachability and props are provably independent of the
   suspended data (compiled `__warm` plans, depth-capped recursion), so a nested
@@ -1709,7 +1740,8 @@ passive-effect, or ref-attach channel), `onUncaughtError` (no boundary claimed
 it — providing the callback replaces the default report, which otherwise
 rethrows render errors out of the flush and `console.error`s effect-channel
 errors; the failed root's tree still unmounts), and `onRecoverableError`
-(hydration recovered from a structural mismatch — see the hydration section).
+(a hydration mismatch made the nearest fallback boundary, or the root, discard
+its server DOM and render on the client — see the hydration section).
 Each callback receives only the error: there is no `errorInfo`/`componentStack`
 second argument, matching the documented SSR `onError` shape (owner stacks are
 not part of Octane's API). Deletion-phase teardown errors (effect cleanups and
@@ -1867,32 +1899,85 @@ the failure; its owner must choose the transport response.
 
 ### Hydration
 
-Attribute mismatches recover to the **client** value; React keeps the server
-value. Octane warns and rebuilds a mismatched subtree in place rather than
-throwing.
+Mismatches are handled as React 19 handles them. Nothing is repaired in
+place. When the server's HTML differs structurally from the client render (a
+different tag, a missing node, or server content the client renders nothing
+for) or its text differs, the nearest fallback boundary discards its server
+DOM and renders on the client. The boundaries are Suspense and `@try` regions
+the server rendered with boundary markers, `<Hydrate>` islands, and, as the
+last resort, the root. Sibling boundaries keep hydrating. `onRecoverableError`
+fires once per boundary that falls back, in development and production, and a
+root's hydrating attempt reports only if it commits. `ErrorBoundary` and
+`@catch` are not hydration boundaries.
 
-`hydrateRoot`'s `onRecoverableError` option fires (dev AND prod) after a
-structural or text recovery — a rebuilt subtree, corrected text, or a discarded
-stale server range —
-coalesced to one report per root per microtask burst. Like React, which reports
-recoverable errors when a render commits, a root's hydrating attempt reports
-only if it commits. One that suspends leaves the server content untouched until
-a later attempt commits and reports the mismatch once; one that ends in an
-uncaught error reports nothing for the recovery it discarded. A suspended
-attempt also leaves the server's text and style values as rendered, so the
-attempt that commits reports each corrected text once and, in development, warns
-about each value mismatch once. A resolved `@try` arm does the same while its
-first hydrating attempt is suspended: its server content, text and attribute
-values included, stays as the server rendered it, and the attempt that commits
-rebuilds and reports each mismatch once. Any other boundary that retries
-hydration after suspending does not report content that an earlier attempt
-already rebuilt. A try body that throws to its `@catch` arm or `<ErrorBoundary>`
-fallback reports nothing for what it adopted before it threw, in development or
-production: the catch arm replaces that content, and where the server's body
-threw the same way, the server rendered its catch arm there. Octane recovers per site
-rather than client-rendering a whole boundary, so attribute-level value patches
-do not report: production React does not detect those at all, and reporting
-Octane's extra detection would make the channel incomparable.
+As in React:
+
+- Attributes are never patched. An adopted element keeps the server's value
+  until the client next changes it. Development logs one "won't be patched up"
+  warning per hydration pass; production compares nothing. A `<textarea>`'s
+  text takes the client's value.
+- `dangerouslySetInnerHTML` keeps the server's HTML in the same way, and
+  production compares nothing. The next render that passes an `__html` object
+  rewrites it, even with the same string.
+- Texts that match after the HTML parser's normalization (CRLF to LF,
+  stripped `\u0000` and `\uFFFD`) count as a match, and the server text stays.
+  `suppressHydrationWarning` keeps the server text one level deep. It never
+  hides a structural mismatch.
+- The root's container and `<html>`, `<head>` and `<body>` skip server
+  elements that do not match, and comments, such as ones a browser extension
+  inserted, and leave them in place, together with any server content after
+  the client's. A text node there is a mismatch.
+- A root that falls back clears its container. A `<head>` or `<body>`
+  container keeps its scripts, styles and stylesheet links. Octane has no
+  host singletons, so unlike React a `Document` or `<html>` container does
+  not keep its existing `<html>`, `<head>` and `<body>` elements, or the
+  scripts, styles and stylesheet links inside them: the client render's own
+  elements replace them. A `Document` keeps its doctype.
+- A suspension while hydrating keeps the server HTML; it never causes a
+  fallback.
+
+A boundary that falls back renders from client data. The `use()` values its
+attempt read from the server's seeds are discarded, and so is captured
+interaction intent whose target was in the discarded DOM. An early host
+binding (`adoptBindings`, a behavior root) whose server DOM lies in a
+boundary that falls back loses it: its lease ends when the fallback commits,
+its cleanup runs once, and it stops writing, even if its host was moved
+elsewhere while the boundary was pending. A boundary whose captures changed
+before it activated (a dormant `<Hydrate>` island) falls back without a
+report when its server content differs, as React reports nothing for an
+update that reaches a dehydrated boundary.
+
+Two differences are intentional. Matching React exactly would mean shipping
+and running a structural comparison of everything hydration adopts, which is
+the work compiled templates exist to avoid.
+
+First, control-flow ranges are part of the hydration protocol, as React's
+Suspense markers are part of React's. A client `@if` or `@switch` branch, or a
+catch-only `@try` or `ErrorBoundary`, whose server output has no range of its
+own is a structural mismatch and falls back, even where the elements inside
+it match; React, which has no markers for them, adopts them. (A `@try` with
+`@pending` is a Suspense boundary, so React falls back there too.) The markers
+do not record which arm rendered, so an arm whose elements match the server's
+arm adopts them, as in React.
+
+Second, development compares a template's static structure and attributes and warns
+about differences, but development-only comparisons never cause a fallback,
+so development and production adopt the same DOM. Production validates a
+template root's node type and tag, together with its dynamic binding and range
+sites, and does not walk arbitrary static descendants. Unlike React's full
+hydration walk, two static branches that share a root tag are not told apart:
+
+```html
+<!-- Server branch -->
+<span class="compact">...</span>
+
+<!-- Client branch -->
+<span class="expanded">...</span>
+```
+
+A `@try` body whose server render threw adopts the server's `@catch` arm
+rather than rendering the boundary on the client (template `@catch` also
+catches during SSR).
 
 A `<Hydrate>` boundary replays captured interaction events as constructed,
 untrusted copies that keep the captured event's `timeStamp`, including through
@@ -1923,23 +2008,6 @@ React.
 form POST requires React's server-action state serialization, which is part of
 the RSC model Octane does not implement (the matching `useActionState`
 `permalink` argument is accepted for signature parity and ignored).
-
-Production validates a template root's node type and tag, together with its
-dynamic binding and range sites. It does not walk arbitrary static descendants.
-Tag and text mismatches at inspected sites recover, but different static
-branches that share a tag may not be detected:
-
-```html
-<!-- Server branch -->
-<span class="compact">...</span>
-
-<!-- Client branch -->
-<span class="expanded">...</span>
-```
-
-Development recursively compares unambiguous static structure and attributes,
-warns, and rebuilds. It stops at dynamic holes, so unmatched static descendants
-outside an inspected range can remain. This is not React's full hydration walk.
 
 ## Hot module updates remount the edited component
 

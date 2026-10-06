@@ -205,7 +205,7 @@ const manifest = {
 			node: '>=22',
 			platform: 'any',
 			arch: 'any',
-			packageManager: 'pnpm@11.15.1',
+			packageManager: 'pnpm@12.9.1',
 			lockfile: 'pnpm-lock.yaml',
 			lockfileSha256: hashFile('pnpm-lock.yaml'),
 		},

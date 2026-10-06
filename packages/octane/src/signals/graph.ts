@@ -20,12 +20,12 @@ import {
 	SignalWriteError,
 } from './errors.js';
 import {
-	NativeAdoptionMiss,
 	NATIVE_DOM_VALUE,
 	getNativeCandidate,
 	forwardNativeTransitionConsumer,
 	getNativeReadObserver,
 	getNativeAdoptionResolver,
+	isNativeAdoptionMiss,
 	isNativeWriteGuarded,
 	reportNativeRead,
 	setNativeAdoptionResolver,
@@ -114,7 +114,12 @@ export interface NodeState<T = unknown> {
 
 interface Wakeup {
 	readonly promise: Promise<void>;
+	settled: boolean;
 	resolve(): void;
+	/** The thenable the latest evaluation threw, if one did. */
+	thrown?: object;
+	/** The node waiting on that thenable, held only until the wait ends. */
+	node?: ScopedNode;
 }
 
 type Work = ScopedNode | SignalObserver | (() => void);
@@ -130,6 +135,7 @@ let retirementError: ScopeDisposedError | undefined;
 let historicalReader:
 	((node: ScopedNode, read: SignalReadMode) => NodeState | undefined) | undefined;
 const queued = new Set<Work>();
+const settledThrown = new WeakSet<object>();
 const noActivity = {};
 const retainedOwners = new WeakMap<ScopedNode, ReadonlySet<GraphOwner>>();
 const retainedNodes = new WeakMap<GraphOwner, Set<ScopedNode>>();
@@ -431,7 +437,32 @@ function createWakeup(): Wakeup {
 	const promise = new Promise<void>((done) => {
 		resolve = done;
 	});
-	return { promise, resolve };
+	const wakeup: Wakeup = {
+		promise,
+		settled: false,
+		resolve() {
+			wakeup.node = undefined;
+			if (wakeup.settled) return;
+			wakeup.settled = true;
+			resolve();
+		},
+	};
+	return wakeup;
+}
+
+/**
+ * A pending read's waiting promise settles once its value may have changed, and
+ * its readers then read it again. A computation's thrown thenable settling is
+ * such a change, so the node waiting on it evaluates again rather than present
+ * the same pending read with a waiting promise that has already settled.
+ */
+function settleThrown(wakeup: Wakeup, thrown: object): void {
+	settledThrown.add(thrown);
+	// A later evaluation waits on another thenable.
+	if (wakeup.thrown !== thrown) return;
+	const node = wakeup.node;
+	if (node === undefined) wakeup.resolve();
+	else signalBatch(() => invalidateNode(node));
 }
 
 export class ScopedNode<T = any> implements SignalHandle<T>, ReactiveNode {
@@ -541,7 +572,7 @@ export class ScopedNode<T = any> implements SignalHandle<T>, ReactiveNode {
 			state.snapshot.status === 'error' &&
 			(state.snapshot.error instanceof ScopeDisposedError ||
 				state.snapshot.error instanceof SignalFrameError ||
-				state.snapshot.error instanceof NativeAdoptionMiss)
+				isNativeAdoptionMiss(state.snapshot.error))
 		) {
 			throw state.snapshot.error;
 		}
@@ -728,9 +759,19 @@ function evaluate(node: ScopedNode): boolean {
 		next = node.compute(node);
 	} catch (error) {
 		if (isThenable(error)) {
-			const wakeup = (node.wakeup ??= createWakeup());
-			// The waiting promise retains only its tiny wakeup, not the node or owner.
-			Promise.resolve(error).then(wakeup.resolve, wakeup.resolve);
+			const wakeup =
+				!node.wakeup || node.wakeup.settled ? (node.wakeup = createWakeup()) : node.wakeup;
+			// The thenable retains the node only while the node waits on it.
+			wakeup.node = node;
+			if (wakeup.thrown !== error) {
+				wakeup.thrown = error;
+				// A thenable that already settled cannot report a change: rethrowing it
+				// waits for a dependency instead of evaluating again on every microtask.
+				if (!settledThrown.has(error)) {
+					const settle = () => settleThrown(wakeup, error);
+					Promise.resolve(error).then(settle, settle);
+				}
+			}
 			next = pendingState(wakeup.promise);
 		} else {
 			next = errorState(error);
@@ -790,15 +831,17 @@ function commitState<T>(node: ScopedNode<T>, next: NodeState<T>): void {
 		next.snapshot.status === 'error' &&
 		(next.snapshot.error instanceof ScopeDisposedError ||
 			next.snapshot.error instanceof SignalFrameError ||
-			next.snapshot.error instanceof NativeAdoptionMiss)
+			isNativeAdoptionMiss(next.snapshot.error))
 	) {
 		releaseRetention(node);
 	} else if (node.lastState?.owners) {
 		retainOwners(node);
 	}
-	if (next.snapshot.status !== 'pending') {
-		previous?.resolveWaiting?.();
-		node.wakeup?.resolve();
+	if (next.snapshot.status !== 'pending') previous?.resolveWaiting?.();
+	// A node waits on its wakeup only while its state presents it; a thenable it
+	// threw earlier no longer decides its value. Readers of that read look again.
+	if (node.wakeup && next.waiting !== node.wakeup.promise) {
+		node.wakeup.resolve();
 		node.wakeup = undefined;
 	}
 }
@@ -1079,10 +1122,55 @@ export function isRetiredDeclarationView(node: unknown): boolean {
 function retireDeclarationView(view: ScopedNode, record: DeclarationView): void {
 	record.retired = true;
 	queued.delete(view);
+	// A retired view never evaluates again. Its readers still wake when the
+	// thenable it threw settles, without that thenable retaining the view.
+	if (view.wakeup) view.wakeup.node = undefined;
 	view.compute = undefined;
 	view.invalidateAttempt = undefined;
 	while (view.deps) graph.unlink(view.deps, view);
 	view.flags = ReactiveFlags.Mutable | ReactiveFlags.Watching;
+}
+
+/**
+ * Whether committed readers could tell the view's result from the cell's. A
+ * render that redeclares a cell on every pass presents the same pending read or
+ * error through a new view each time, and publishing it would render those
+ * readers, and redeclare the cell, again without end. An equal result keeps the
+ * cell's own snapshot instead.
+ *
+ * A pending view with a different waiter may keep the committed presentation
+ * if its wakeup is live, the committed cell is current, and dependency order
+ * and owner provenance match. The accepted view transfers its own waiter so
+ * subsequent reads do not follow the displaced pending source.
+ */
+function sameViewResult(node: ScopedNode, view: ScopedNode, state: NodeState): boolean {
+	const committed = node.state;
+	if (committed === undefined) return false;
+	if (sameState(committed, state)) return true;
+	if (
+		committed.snapshot.status !== 'pending' ||
+		state.snapshot.status !== 'pending' ||
+		node.flags & (ReactiveFlags.Dirty | ReactiveFlags.Pending) ||
+		!sameState(committed, { ...state, waiting: committed.waiting })
+	)
+		return false;
+	const previousWakeup = node.wakeup;
+	const viewWakeup = view.wakeup;
+	if (
+		!previousWakeup ||
+		!viewWakeup ||
+		previousWakeup.settled ||
+		viewWakeup.settled ||
+		committed.waiting !== previousWakeup.promise ||
+		state.waiting !== viewWakeup.promise
+	)
+		return false;
+	let link = node.deps;
+	for (let read = view.deps; read; read = read.nextDep) {
+		if (link === undefined || link.dep !== read.dep) return false;
+		link = link.nextDep;
+	}
+	return link === undefined;
 }
 
 /** The caller has already transferred producer authority from the view's binding. */
@@ -1090,31 +1178,71 @@ export function promoteDeclarationView(view: ScopedNode, node: ScopedNode): void
 	const record = declarationViews?.get(view);
 	if (record === undefined || record.retired || record.canonical !== node) return;
 	queued.delete(view);
+	const state = view.state;
+	// A settled view waiter cannot represent a current pending result. Re-read
+	// the accepted definition before presenting it to committed consumers.
+	const viewWakeup = view.wakeup;
+	const settledPending =
+		state?.snapshot.status === 'pending' &&
+		viewWakeup !== undefined &&
+		viewWakeup.promise === state.waiting &&
+		viewWakeup.settled;
+	// An evaluated view may also have been invalidated by one of its graph
+	// dependencies before acceptance, whatever it presented; preserve that
+	// evidence on the cell.
+	const invalidated =
+		state === undefined ? 0 : view.flags & (ReactiveFlags.Dirty | ReactiveFlags.Pending);
+	const retry = Boolean(invalidated || settledPending);
+	const currentChanged = state !== undefined && !sameViewResult(node, view, state);
 	while (node.deps) graph.unlink(node.deps, node);
 	for (let link = view.deps; link; link = link.nextDep) graph.link(link.dep, node, ++trackingCycle);
-	const state = view.state;
-	const currentChanged =
-		state !== undefined &&
-		(node.state?.snapshot !== state.snapshot || !sameState(node.state, state));
 	const retainedChanged =
 		node.hasLast !== view.hasLast ||
 		!Object.is(node.last, view.last) ||
 		(view.lastState ? !sameState(node.lastState, view.lastState) : node.lastState !== undefined);
-	if (currentChanged) commitState(node, state);
+	// Transfer the accepted view waiter and wake readers of the displaced state.
+	// The cell then waits on what the view's evaluation threw.
+	if (currentChanged) {
+		const previousWakeup = node.wakeup;
+		commitState(node, state);
+		if (state.snapshot.status === 'pending' && previousWakeup?.promise !== state.waiting) {
+			previousWakeup?.resolve();
+			node.wakeup = view.wakeup?.promise === state.waiting ? view.wakeup : undefined;
+			if (node.wakeup) {
+				view.wakeup = undefined;
+				node.wakeup.node = node;
+			}
+		}
+	} else if (
+		state?.snapshot.status === 'pending' &&
+		node.state?.snapshot.status === 'pending' &&
+		view.wakeup?.promise === state.waiting &&
+		node.wakeup !== view.wakeup
+	) {
+		const previousWakeup = node.wakeup;
+		node.state = { ...state, snapshot: node.state.snapshot };
+		node.wakeup = view.wakeup;
+		view.wakeup = undefined;
+		if (node.wakeup) node.wakeup.node = node;
+		previousWakeup?.resolve();
+	}
 	if (node.lastState?.owners !== view.lastState?.owners) releaseRetainedOwners(node);
 	node.last = view.last;
 	node.lastState = view.lastState;
 	node.hasLast = view.hasLast;
 	if (node.state && node.state.snapshot.status !== 'ready') retainOwners(node);
-	if (!currentChanged && retainedChanged) node.revision++;
+	if (!currentChanged && (retainedChanged || retry)) node.revision++;
 	releaseRetainedOwners(view);
 	// A view nobody read has no state to install; the cell evaluates its new definition.
 	const unevaluated = state === undefined;
 	node.flags =
-		ReactiveFlags.Mutable | ReactiveFlags.Watching | (unevaluated ? ReactiveFlags.Dirty : 0);
+		ReactiveFlags.Mutable |
+		ReactiveFlags.Watching |
+		invalidated |
+		(unevaluated || settledPending ? ReactiveFlags.Dirty : 0);
 	// Committed consumers learn the accepted state first. The render's own
 	// consumers already presented it; move them without another notification.
-	if ((currentChanged || retainedChanged || unevaluated) && node.subs) {
+	if (!retry && (currentChanged || retainedChanged || unevaluated) && node.subs) {
 		graph.propagate(node.subs, executionDepth !== 0);
 		graph.shallowPropagate(node.subs);
 	}
@@ -1129,7 +1257,13 @@ export function promoteDeclarationView(view: ScopedNode, node: ScopedNode): void
 	}
 	record.promoted = true;
 	record.viewRevision = view.revision;
-	record.canonicalRevision = node.revision;
+	record.canonicalRevision = retry ? NaN : node.revision;
+	// The accepted render presented an invalidated result; its moved consumers
+	// must retry against the current definition as well.
+	if (retry && node.subs) {
+		graph.propagate(node.subs, executionDepth !== 0);
+		graph.shallowPropagate(node.subs);
+	}
 }
 
 /** Discard a view nobody accepted. Its remaining consumers belong to discarded renders. */

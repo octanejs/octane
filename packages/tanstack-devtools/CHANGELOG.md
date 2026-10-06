@@ -1,5 +1,53 @@
 # @octanejs/tanstack-devtools
 
+## 0.0.55
+
+### Patch Changes
+
+- Updated dependencies [ed57b1e]
+- Updated dependencies [8aeb6c0]
+- Updated dependencies [6182678]
+- Updated dependencies [3fb1bec]
+- Updated dependencies [c15aa5a]
+- Updated dependencies [5cad0fa]
+- Updated dependencies [5041f00]
+- Updated dependencies [f7980e0]
+- Updated dependencies [97f1b8e]
+- Updated dependencies [fb404c2]
+- Updated dependencies [9bacb23]
+- Updated dependencies [2f88235]
+- Updated dependencies [8aeb6c0]
+- Updated dependencies [b353f54]
+- Updated dependencies [72cd60b]
+- Updated dependencies [91079dd]
+- Updated dependencies [393b75a]
+- Updated dependencies [f50c128]
+- Updated dependencies [ba46692]
+- Updated dependencies [f69215f]
+- Updated dependencies [9c84293]
+- Updated dependencies [e233e4a]
+- Updated dependencies [087cd77]
+- Updated dependencies [c3c0a3b]
+- Updated dependencies [262926c]
+- Updated dependencies [9dafaef]
+- Updated dependencies [35c0d1b]
+- Updated dependencies [21e0575]
+- Updated dependencies [8b97478]
+- Updated dependencies [ab9a043]
+- Updated dependencies [32e4f3f]
+- Updated dependencies [7a92ad2]
+- Updated dependencies [a2a0c41]
+- Updated dependencies [e03350a]
+- Updated dependencies [0d6ef67]
+- Updated dependencies [c213e87]
+- Updated dependencies [da6524e]
+- Updated dependencies [ace4737]
+- Updated dependencies [b77ab18]
+- Updated dependencies [1744e83]
+- Updated dependencies [023aa7d]
+- Updated dependencies [82a5f31]
+  - octane@0.10.0
+
 ## 0.0.54
 
 ### Patch Changes

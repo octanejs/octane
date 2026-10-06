@@ -26,7 +26,7 @@ import { handleRenderRoute } from './server/render-route.js';
 import { handleServerRoute } from './server/server-route.js';
 import { HYDRATION_NONCE_PLACEHOLDER, injectHydrationEntry } from './server/html-template.js';
 import { generateServerEntry } from './server/virtual-entry.js';
-import { nodeRequestToWebRequest, sendWebResponse } from './server/node-http.js';
+import { nodeRequestToWebRequest, nodeRequestUrl, sendWebResponse } from './server/node-http.js';
 import { ENTRY_FILENAME } from './constants.js';
 import {
 	getOctaneConfigPath,
@@ -429,7 +429,7 @@ function collect_hydrate_module_paths(config) {
  * it). An explicit `profile` (true or false) always takes precedence over
  * `devtools`.
  *
- * @param {{ hmr?: boolean, profile?: boolean, devtools?: boolean, strong?: boolean, textTypes?: import('octane/compiler/vite').OctaneVitePluginOptions['textTypes'], knownAttributeSpreads?: import('octane/compiler/vite').OctaneVitePluginOptions['knownAttributeSpreads'], domBindingFixedProps?: import('octane/compiler/vite').OctaneVitePluginOptions['domBindingFixedProps'], exclude?: string[], requireDirective?: boolean, renderers?: import('@octanejs/app-core').ExperimentalRendererConfigOptions, cssModuleConstants?: import('octane/compiler/vite').OctaneVitePluginOptions['cssModuleConstants'] }} [inlineOptions]
+ * @param {{ hmr?: boolean, profile?: boolean, devtools?: boolean, strong?: boolean, textTypes?: import('octane/compiler/vite').OctaneVitePluginOptions['textTypes'], knownAttributeSpreads?: import('octane/compiler/vite').OctaneVitePluginOptions['knownAttributeSpreads'], domBindingFixedProps?: import('octane/compiler/vite').OctaneVitePluginOptions['domBindingFixedProps'], opaqueSignalHandles?: boolean, exclude?: string[], requireDirective?: boolean, renderers?: import('@octanejs/app-core').ExperimentalRendererConfigOptions, cssModuleConstants?: import('octane/compiler/vite').OctaneVitePluginOptions['cssModuleConstants'] }} [inlineOptions]
  * @returns {Plugin[]}
  */
 export function octane(inlineOptions = {}) {
@@ -966,7 +966,7 @@ export function octane(inlineOptions = {}) {
 						return;
 					}
 
-					const url = new URL(req.url || '/', `http://${req.headers.host || 'localhost'}`);
+					const url = nodeRequestUrl(req);
 					const method = req.method || 'GET';
 
 					// RPC requests for `module server` declarations.
@@ -1019,7 +1019,9 @@ export function octane(inlineOptions = {}) {
 							await warnIslandsShells(octaneConfig).catch(() => {});
 						}
 
-						const request = nodeRequestToWebRequest(req, res);
+						const request = nodeRequestToWebRequest(req, res, {
+							trustProxy: octaneConfig.server.trustProxy,
+						});
 						const context = createContext(request, freshMatch.params);
 						Object.defineProperty(context, 'clientBuild', { get: () => clientBuild.metadata() });
 						const globalMiddlewares = octaneConfig.middlewares;
@@ -1388,6 +1390,7 @@ export function octane(inlineOptions = {}) {
 	 *   textTypes?: import('octane/compiler/vite').OctaneVitePluginOptions['textTypes'],
 	 *   knownAttributeSpreads?: import('octane/compiler/vite').OctaneVitePluginOptions['knownAttributeSpreads'],
 	 *   domBindingFixedProps?: import('octane/compiler/vite').OctaneVitePluginOptions['domBindingFixedProps'],
+	 *   opaqueSignalHandles?: boolean,
 	 *   exclude?: string[],
 	 *   requireDirective?: boolean,
 	 *   renderers?: import('@octanejs/app-core').ExperimentalRendererConfigOptions,
@@ -1412,6 +1415,9 @@ export function octane(inlineOptions = {}) {
 	}
 	if (inlineOptions.domBindingFixedProps !== undefined) {
 		compilerOptions.domBindingFixedProps = inlineOptions.domBindingFixedProps;
+	}
+	if (inlineOptions.opaqueSignalHandles !== undefined) {
+		compilerOptions.opaqueSignalHandles = inlineOptions.opaqueSignalHandles;
 	}
 	if (inlineOptions.exclude !== undefined) compilerOptions.exclude = inlineOptions.exclude;
 	if (inlineOptions.requireDirective !== undefined) {
@@ -1484,7 +1490,7 @@ export function defineConfig(/** @type {OctaneConfigOptions} */ options) {
  */
 async function handleRpcRequest(req, res, vite, trustProxy, config) {
 	try {
-		const webRequest = nodeRequestToWebRequest(req, res);
+		const webRequest = nodeRequestToWebRequest(req, res, { trustProxy });
 		const asyncContext = getDevAsyncContext(config);
 		const signalOwners = await loadDevSignalRequestHooks(vite);
 

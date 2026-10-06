@@ -26,6 +26,7 @@ import {
 	type HydrationReplayIntent,
 } from './event-capture.js';
 import { isHydrationLifecycleEvent } from './interaction-config.js';
+import { getNativeHydrationDOM } from './native-intent.js';
 import type { HydrationStrategy } from './types.js';
 
 export interface IndependentHydrateActivationContext {
@@ -303,6 +304,8 @@ export function bootstrapIndependentHydration(
 	const cleanups = new Map<Element, IndependentHydrateLifecycle>();
 	const selector = `script[type="application/json"][${INDEPENDENT_HYDRATE_MANIFEST_ATTR}]`;
 	const ownerDocument = root.nodeType === 9 ? (root as Document) : root.ownerDocument!;
+	// Mutated nodes can be forms, whose named controls shadow element methods.
+	const dom = getNativeHydrationDOM(ownerDocument);
 	initializeIndependentHydrationEventCapture(ownerDocument);
 	let disposed = false;
 	let paused = false;
@@ -350,10 +353,9 @@ export function bootstrapIndependentHydration(
 		}
 	};
 	const scan = (node: Node): void => {
-		if (node.nodeType !== 1) return;
-		const element = node as Element;
-		if (element.matches(selector)) register(element);
-		else for (const sidecar of element.querySelectorAll(selector)) register(sidecar);
+		if (!dom.element(node)) return;
+		if (dom.matches(node, selector)) register(node);
+		else for (const sidecar of dom.query(node, selector)) register(sidecar);
 	};
 	// Pay for observation only in the independent bootstrap. Streaming can add a
 	// sidecar after its boundary (and its first interaction) is already visible.
@@ -364,15 +366,15 @@ export function bootstrapIndependentHydration(
 			for (const record of records) {
 				if (record.type === 'characterData') {
 					const parent = record.target.parentElement;
-					if (parent?.matches(selector)) register(parent);
+					if (parent !== null && dom.matches(parent, selector)) register(parent);
 					continue;
 				}
-				if (record.target.nodeType === 1 && (record.target as Element).matches(selector)) {
-					register(record.target as Element);
+				if (dom.element(record.target) && dom.matches(record.target, selector)) {
+					register(record.target);
 				}
 				for (const node of record.addedNodes) scan(node);
 				for (const node of record.removedNodes) {
-					if (node.nodeType === 1 && !(node as Element).matches(selector)) removedBoundary = true;
+					if (dom.element(node) && !dom.matches(node, selector)) removedBoundary = true;
 				}
 			}
 			if (removedBoundary) {

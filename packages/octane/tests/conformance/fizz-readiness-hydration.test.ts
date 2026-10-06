@@ -235,23 +235,35 @@ describe('conformance: Fizz readiness and hydration behavior', () => {
 	});
 
 	// Per ReactDOMFizzServer-test.js:4740 (React 19.2.7).
-	// OCTANE DIVERGENCE: Diagnostics are source-site based rather than boundary
-	// aggregated, so each independently patched mismatch publishes one warning.
-	it('publishes one hydration mismatch diagnostic per mismatched source site', async () => {
+	it('renders a boundary with several mismatched texts on the client once', async () => {
 		const result = await collectPipeableStream(server.MultipleMismatchBoundary, {
 			text: 'initial',
 		});
 		const container = activate(result.html);
+		const host = container.querySelector('#multiple-mismatch-boundary');
+		const serverHeadings = Array.from(container.querySelectorAll('h2'));
 		const diagnostic = vi.spyOn(console, 'error').mockImplementation(() => {});
-		const root = hydrateRoot(container, client.MultipleMismatchBoundary, { text: 'replaced' });
+		const recoverable: unknown[] = [];
+		const root = hydrateRoot(
+			container,
+			client.MultipleMismatchBoundary,
+			{ text: 'replaced' },
+			{ onRecoverableError: (error: unknown) => recoverable.push(error) },
+		);
 		try {
 			flushSync(() => {});
-			expect(hydrationDiagnostics(diagnostic)).toHaveLength(expectedDiagnosticCount(3));
+			await flushResolution();
+			// The first mismatch discards the boundary's server content, so the
+			// later ones are never compared.
+			expect(hydrationDiagnostics(diagnostic)).toHaveLength(expectedDiagnosticCount(1));
+			expect(recoverable).toHaveLength(1);
 			expect(Array.from(container.querySelectorAll('h2'), (node) => node.textContent)).toEqual([
 				'replaced',
 				'replaced',
 				'replaced',
 			]);
+			expect(serverHeadings.some((node) => node.isConnected)).toBe(false);
+			expect(container.querySelector('#multiple-mismatch-boundary')).toBe(host);
 		} finally {
 			root.unmount();
 			diagnostic.mockRestore();

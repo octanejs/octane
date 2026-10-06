@@ -168,17 +168,35 @@ describe('CI workflow aggregation', () => {
 	// Every scenario and every complete Octane application, not a chosen few:
 	// unenforced budgets drifted over their limits with no pull request failing.
 	test('enforces every committed bundle budget once per full CI run', () => {
+		const shard = jobSource('test_shard');
 		assert.match(
-			jobSource('test_shard'),
-			/- name: Verify every bundle budget\n\s+if: matrix\.shard == '1\/4'\n\s+run: \|\n\s+node benchmarks\/bundle-size\/run-minimal\.mjs --budgets\n\s+node benchmarks\/bundle-size\/run\.mjs --budgets octane-tsrx octane-jsx\n/,
+			shard,
+			/- name: Checkout code\n\s+uses: actions\/checkout@[^\n]+\n\s+with:\n\s+# Only the budget shard compares against an earlier commit\.\n\s+fetch-depth: \$\{\{ matrix\.shard == '1\/4' && '0' \|\| '1' \}\}\n/,
 		);
-		assert.doesNotMatch(jobSource('test_shard'), /run-minimal\.mjs --budgets \S/);
+		assert.match(
+			shard,
+			/- name: Verify every bundle budget\n\s+if: matrix\.shard == '1\/4'\n\s+env:\n\s+BUDGET_BASE: \$\{\{ github\.event_name == 'pull_request' && 'HEAD\^1' \|\| github\.event\.before \}\}\n\s+run: \|\n\s+node benchmarks\/bundle-size\/run-minimal\.mjs --budgets --ratchet\n\s+node benchmarks\/bundle-size\/run\.mjs --budgets --ratchet octane-tsrx octane-jsx\n/,
+		);
 		for (const suite of [
 			'benchmarks/bundle-size/minimal-gates.test.mjs',
 			'benchmarks/bundle-size/budget-raises.test.mjs',
 		]) {
 			assert.ok(packageJson.scripts['ci:workflow:test'].split(' ').includes(suite), suite);
 		}
+	});
+
+	// A createRoot-only client must ship no hydration code under either bundler.
+	test('verifies once per full CI run that client-only bundles retain no hydration code', () => {
+		assert.match(
+			jobSource('test_shard'),
+			/- name: Verify client-only bundles retain no hydration code\n\s+if: matrix\.shard == '1\/4'\n\s+run: node benchmarks\/bundle-size\/run-hydration-free\.mjs\n/,
+		);
+		assert.doesNotMatch(jobSource('test_shard'), /run-hydration-free\.mjs \S/);
+		assert.ok(
+			packageJson.scripts['ci:workflow:test']
+				.split(' ')
+				.includes('benchmarks/bundle-size/hydration-free-gates.test.mjs'),
+		);
 	});
 
 	test('checks that budget raises land alone against the change itself', () => {
@@ -721,7 +739,7 @@ describe('CI workflow aggregation', () => {
 
 		assert.match(combined, new RegExp(`^    name: ${title.replace(/[()]/g, '\\$&')}$`, 'm'));
 		assert.doesNotMatch(combined, /^    strategy:|matrix\./m);
-		assert.equal([...combined.matchAll(/pnpm install --prod false --frozen-lockfile/g)].length, 1);
+		assert.equal([...combined.matchAll(/pnpm install --prod=false --frozen-lockfile/g)].length, 1);
 		assert.equal([...combined.matchAll(/oven-sh\/setup-bun/g)].length, 1);
 		assert.equal([...combined.matchAll(/playwright install --with-deps chromium/g)].length, 1);
 		assert.match(combined, /playwright install --with-deps chromium(?:\n|$)/);
@@ -2237,16 +2255,13 @@ describe('Vercel preview workflow', () => {
 		assert.match(writtenComments.at(-1).body, /URL pending/);
 	});
 
-	test('keeps production automatic and delegates labeled previews to the Vercel GitHub App', () => {
+	test('disables automatic Git deployments for both websites', () => {
 		for (const config of [websiteVercelConfig, mcpVercelConfig]) {
-			assert.deepEqual(config.git.deploymentEnabled, {
-				'*': false,
-				'**': false,
-				main: true,
-				'deploy-preview-pr-*': true,
-			});
+			assert.equal(config.git.deploymentEnabled, false);
 		}
+	});
 
+	test('publishes labeled preview branches and reports their deployment status', () => {
 		assert.match(
 			vercelPreviewWorkflow,
 			/on:\n {2}pull_request_target:\n {4}types: \[labeled, unlabeled, closed\]/,

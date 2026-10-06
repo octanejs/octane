@@ -339,11 +339,17 @@ describe('ViewTransition staged commits', () => {
 				scope.dispose();
 			}
 		}
+	});
 
-		// Use the canonical component with split={false}: a compiler-split import
-		// completes as legitimate urgent work and interrupts a held transition.
-		// With no such interruption, activation must preserve visible SSR until
-		// the browser opens this transition's mutation phase.
+	// An update that reaches a dormant island with changed captures renders
+	// the island on the client (docs/deferred-hydration.md), as React does for
+	// an update that reaches a dehydrated boundary it cannot hydrate first.
+	// Use the canonical component with split={false}: a compiler-split import
+	// completes as legitimate urgent work and interrupts a held transition.
+	// With no such interruption, activation must preserve visible SSR until
+	// the browser opens this transition's mutation phase.
+	it('keeps an island’s server DOM unchanged until the native update of the transition that activates it', async () => {
+		root.unmount();
 		const server = loadServerFixture<
 			typeof import('./_fixtures/view-transition-signal-controls.tsrx')
 		>('packages/octane/tests/_fixtures/view-transition-signal-controls.tsrx', {
@@ -357,11 +363,14 @@ describe('ViewTransition staged commits', () => {
 		}).html;
 		const preserved = container.querySelector('[data-presentation]')!;
 		const preservedText = preserved.querySelector('[data-binding-text]')!;
+		const recovered: unknown[] = [];
 		await act(() => {
-			root = hydrateRoot(container, StagingHydratedBinding, {
-				phase: 'before',
-				when,
-			});
+			root = hydrateRoot(
+				container,
+				StagingHydratedBinding,
+				{ phase: 'before', when },
+				{ onRecoverableError: (error: unknown) => recovered.push(error) },
+			);
 		});
 		const hydrationCapture = handles.length;
 		startTransition(() =>
@@ -375,13 +384,16 @@ describe('ViewTransition staged commits', () => {
 		expect(preservedText.textContent).toBe('before text');
 		expect(preserved.querySelector('[data-binding-arm]')!.localName).toBe('i');
 		await handles[hydrationCapture].update();
-		expect(container.querySelector('[data-presentation]')).toBe(preserved);
-		expect(preserved.querySelector('[data-binding-text]')).toBe(preservedText);
-		expect(preservedText.textContent).toBe('after text');
-		expect(preserved.querySelector('[data-binding-value]')!.textContent).toBe('after');
-		expect(preserved.querySelector('[data-binding-arm]')!.textContent).toBe('aftertail');
+		expect(preserved.isConnected).toBe(false);
+		const presentation = container.querySelector('[data-presentation]')!;
+		expect(presentation.querySelector('[data-binding-text]')!.textContent).toBe('after text');
+		expect(presentation.querySelector('[data-binding-value]')!.textContent).toBe('after');
+		expect(presentation.querySelector('[data-binding-arm]')!.localName).toBe('b');
+		expect(presentation.querySelector('[data-binding-arm]')!.textContent).toBe('aftertail');
 		handles[hydrationCapture].ready.resolve();
 		handles[hydrationCapture].finished.resolve();
+		await act(() => {});
+		expect(recovered).toEqual([]);
 		await act(() => root.unmount());
 	});
 
