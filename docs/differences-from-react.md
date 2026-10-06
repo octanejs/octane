@@ -1933,11 +1933,13 @@ and running a structural comparison of everything hydration adopts, which is
 the work compiled templates exist to avoid.
 
 First, control-flow ranges are part of the hydration protocol, as React's
-Suspense markers are part of React's. A client `@if` or `@switch` branch whose
-server output has no range of its own is a structural mismatch and falls
-back, even where the elements inside it match; React, which has no range
-markers, adopts them. The markers do not record which arm rendered, so an arm
-whose elements match the server's arm adopts them, as in React.
+Suspense markers are part of React's. A client `@if` or `@switch` branch, or a
+catch-only `@try` or `ErrorBoundary`, whose server output has no range of its
+own is a structural mismatch and falls back, even where the elements inside
+it match; React, which has no markers for them, adopts them. (A `@try` with
+`@pending` is a Suspense boundary, so React falls back there too.) The markers
+do not record which arm rendered, so an arm whose elements match the server's
+arm adopts them, as in React.
 
 Second, development compares a template's static structure and attributes and warns
 about differences, but development-only comparisons never cause a fallback,
