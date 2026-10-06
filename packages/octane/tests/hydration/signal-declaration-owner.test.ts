@@ -1074,6 +1074,18 @@ export function App(props) @{
 				"(() => { const record$ = query$(() => 'shadow', props.load); return derived$(compute$); })()",
 			callback: 'compute$',
 		},
+		// A namespace receiver behind parentheses or a type assertion is still the
+		// trusted import, so its factory's compute argument is still a producer.
+		'a named producer behind an asserted namespace receiver': {
+			setup: 'const compute$ = () => record$.get();',
+			value: '(Signals as typeof Signals).derived$(compute$)',
+			callback: 'compute$',
+		},
+		'an inline producer behind a parenthesized namespace receiver': {
+			setup: '',
+			value: '(Signals).derived$(() => record$.get())',
+			callback: '() => selected$.get()',
+		},
 	};
 
 	function producerSource(
@@ -1081,7 +1093,8 @@ export function App(props) @{
 		readers = 1,
 		beforeReaders = '',
 	) {
-		return `import { derived$, query$ } from 'octane/signals';
+		return `import * as Signals from 'octane/signals';
+import { derived$, query$ } from 'octane/signals';
 function Reader(props) @{
  <>
   <output>{props.selected$.get() as string}</output>

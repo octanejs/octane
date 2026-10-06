@@ -740,14 +740,16 @@ export function lowerSignalDeclarations(ast, filename, options) {
 			}
 			return { helper: (imported) => helperFor(record, imported), factory: record.factory };
 		}
-		if (
-			(callee?.type === 'MemberExpression' || callee?.type === 'OptionalMemberExpression') &&
-			callee.object?.type === 'Identifier'
-		) {
+		// A namespace receiver behind parentheses or a type assertion is still the import.
+		const receiver =
+			callee?.type === 'MemberExpression' || callee?.type === 'OptionalMemberExpression'
+				? unwrapExpression(callee.object)
+				: null;
+		if (receiver?.type === 'Identifier') {
 			const factory = propertyName(callee);
 			if (!SIGNAL_FACTORIES.has(factory)) return null;
-			const source = namespaceImports.get(callee.object.name);
-			const binding = lexical.resolveBinding(scope, callee.object.name);
+			const source = namespaceImports.get(receiver.name);
+			const binding = lexical.resolveBinding(scope, receiver.name);
 			if (
 				source === undefined ||
 				binding?.scope !== lexical.rootScope ||
@@ -756,7 +758,7 @@ export function lowerSignalDeclarations(ast, filename, options) {
 				return null;
 			}
 			return {
-				helper: (imported) => b.member(b.id(callee.object.name), imported),
+				helper: (imported) => b.member(b.id(receiver.name), imported),
 				factory,
 			};
 		}
@@ -990,20 +992,20 @@ export function signalDeclarationSourceEdits(ast, filename, source, options) {
 			) {
 				return { factory: record.factory, helper: (imported) => helperFor(record, imported) };
 			}
-		} else if (
-			(callee?.type === 'MemberExpression' || callee?.type === 'OptionalMemberExpression') &&
-			callee.object?.type === 'Identifier'
-		) {
+		} else if (callee?.type === 'MemberExpression' || callee?.type === 'OptionalMemberExpression') {
+			// A namespace receiver behind parentheses or a type assertion is still the import.
+			const receiver = unwrapExpression(callee.object);
+			if (receiver?.type !== 'Identifier') return null;
 			const member = propertyName(callee);
-			const importSource = namespaceImports.get(callee.object.name);
-			const binding = lexical.resolveBinding(scope, callee.object.name);
+			const importSource = namespaceImports.get(receiver.name);
+			const binding = lexical.resolveBinding(scope, receiver.name);
 			if (
 				SIGNAL_FACTORIES.has(member) &&
 				importSource !== undefined &&
 				binding?.scope === lexical.rootScope &&
 				binding.importSource?.value === importSource
 			) {
-				return { factory: member, helper: (imported) => `${callee.object.name}.${imported}` };
+				return { factory: member, helper: (imported) => `${receiver.name}.${imported}` };
 			}
 		}
 		return null;
