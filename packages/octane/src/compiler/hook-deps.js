@@ -1492,6 +1492,20 @@ function hasOpaqueExecutionDirective(fn) {
 	return false;
 }
 
+// Whether a call or member sits after an optional link in its chain:
+// `f?.(x)`, `a?.b(x)`, `a?.[k]`, `a?.b.c[k]`. Its arguments or computed key run
+// only once every receiver before that link proved non-nullish, so dependency
+// collectors must treat them as skippable reads. A parenthesized chain is its
+// own ChainExpression and ends the walk: `(a?.b).c(x)` skips nothing.
+export function followsOptionalLink(node) {
+	for (let link = node; ;) {
+		if (link.optional === true) return true;
+		link = link.type === 'CallExpression' ? link.callee : link.object;
+		while (link?.type === 'TSNonNullExpression') link = link.expression;
+		if (link?.type !== 'CallExpression' && link?.type !== 'MemberExpression') return false;
+	}
+}
+
 // The `octane` runtime export inferred method-call dependencies compile to.
 // Both emitters alias it through their own collision-safe import allocators.
 export const METHOD_DEP_IMPORT = '__methodDep';
@@ -1728,7 +1742,8 @@ function collectDependencies(expression, callbackScope, analysis) {
 						: null;
 				if (info) addMethodCall(info, guardedDepth > 0);
 				else walk(node.callee);
-				walk(node.arguments);
+				if (node.arguments.length > 0 && followsOptionalLink(node)) walkGuarded(node.arguments);
+				else walk(node.arguments);
 				return;
 			}
 			case 'ChainExpression': {
@@ -1751,7 +1766,8 @@ function collectDependencies(expression, callbackScope, analysis) {
 				if (info) addStaticMember(info, guardedDepth > 0);
 				else {
 					walk(node.object);
-					if (node.computed) walk(node.property);
+					if (node.computed && followsOptionalLink(node)) walkGuarded(node.property);
+					else if (node.computed) walk(node.property);
 				}
 				return;
 			}

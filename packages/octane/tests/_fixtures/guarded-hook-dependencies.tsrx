@@ -79,3 +79,21 @@ export function GuardedMethod({ item, enabled }) @{
 	});
 	<p>Ready</p>
 }
+
+export function GuardedOptionalCall({ run, options }) @{
+	const label = useMemo(() => run?.(options.label) ?? 'idle');
+	<p>{label as string}</p>
+}
+
+export function GuardedOptionalKey({ run, options }) @{
+	const label = useMemo(() => run?.[options.label] ?? 'idle');
+	<p>{label as string}</p>
+}
+
+function Label({ value }) @{
+	<p>{value as string}</p>
+}
+
+export function GuardedOptionalProp({ run, options }) @{
+	<Label value={run?.(options.label) ?? 'idle'} />
+}

@@ -12,9 +12,84 @@ import {
 	GuardedGetter,
 	GuardedMemo,
 	GuardedMethod,
+	GuardedOptionalCall,
+	GuardedOptionalKey,
 } from './_fixtures/guarded-hook-dependencies.tsrx';
 
+const optionalReceivers = {
+	call: (label: string) => `ran:${label}`,
+	key: { first: 'ran:first', second: 'ran:second' },
+};
+
+// `run?.(options.label)` and `run?.[options.label]` read `options.label` only
+// once `run` exists. The inferred dependency must not read it sooner.
+function expectOptionalChainSkipsReads(body: any, run: unknown) {
+	const throwing = {
+		get label(): string {
+			throw new Error('skipped optional-chain read');
+		},
+	};
+	const root = mount(body, { run: undefined, options: undefined });
+	try {
+		expect(root.container.textContent).toBe('idle');
+		root.update(body, { run: null, options: null });
+		expect(root.container.textContent).toBe('idle');
+		root.update(body, { run: undefined, options: throwing });
+		expect(root.container.textContent).toBe('idle');
+		const options = { label: 'first' };
+		root.update(body, { run, options });
+		expect(root.container.textContent).toBe('ran:first');
+		options.label = 'second';
+		root.update(body, { run, options });
+		expect(root.container.textContent).toBe('ran:second');
+		root.update(body, { run: undefined, options });
+		expect(root.container.textContent).toBe('idle');
+	} finally {
+		root.unmount();
+	}
+}
+
 describe('guarded inferred dependencies', () => {
+	it.each([
+		['call arguments', GuardedOptionalCall, optionalReceivers.call],
+		['computed keys', GuardedOptionalKey, optionalReceivers.key],
+	] as const)('leaves optional-chain %s unread while the receiver is absent', (_, body, run) => {
+		expectOptionalChainSkipsReads(body, run);
+	});
+
+	it.each([false, true])(
+		'leaves optional-chain reads unread in compiled and plain hooks (plain hook: %s)',
+		(plain) => {
+			for (const dev of [true, false]) {
+				for (const [shape, run] of Object.entries(optionalReceivers)) {
+					const read = shape === 'call' ? 'run?.(options.label)' : 'run?.[options.label]';
+					const setup = `import { useMemo } from 'octane';
+export function useRead({ run, options }) {
+  return useMemo(() => ${read} ?? 'idle');
+}`;
+					const hook = plain
+						? loadPlainHookFixtureSource(setup, {
+								id: `/src/OptionalChain${shape}.ts`,
+								inlineHookMemo: true,
+								hmr: dev,
+							})
+						: null;
+					const { App } = loadCompiledFixtureSource(
+						`${plain ? "import { useRead } from './hook';" : setup}
+export function App(props) @{ const value = useRead(props); <p>{value as string}</p> }`,
+						{
+							id: `/src/OptionalChain${shape}.tsrx`,
+							mode: 'client',
+							compileOptions: { hmr: false, dev },
+							runtimeModules: hook ? { './hook': hook } : {},
+						},
+					);
+					expectOptionalChainSkipsReads(App, run);
+				}
+			}
+		},
+	);
+
 	it.each([false, true])(
 		'distinguishes missing receivers from undefined and null data (plain hook: %s)',
 		(plain) => {
