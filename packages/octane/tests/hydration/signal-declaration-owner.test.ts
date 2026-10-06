@@ -162,6 +162,7 @@ async function mountClient(
 	props: Record<string, unknown> = {},
 	// Plain modules the fixture imports, compiled against this render's runtime.
 	plainModules: Record<string, string> = {},
+	withExplicitScope = false,
 ) {
 	vi.resetModules();
 	const client = await import('../../src/runtime.js');
@@ -180,12 +181,15 @@ async function mountClient(
 	const load = () => new Promise<string>((resolve) => requests.push(resolve));
 	const container = document.createElement('div');
 	const root = client.createRoot(container);
-	await client.act(() => root.render(module.App, { ...PROPS, load, ...props }));
+	const scope = withExplicitScope
+		? signals.createScope({ scopeKey: 'explicit-producer' })
+		: undefined;
+	await client.act(() => root.render(module.App, { ...PROPS, load, scope, ...props }));
 	return {
 		requests,
 		signals,
 		texts: () => [...container.querySelectorAll('output')].map((node) => node.textContent),
-		settle: (value: string) => client.act(() => requests[0]!(value)),
+		settle: (value: string, index = 0) => client.act(() => requests[index]!(value)),
 		settleAll: (value: string) =>
 			client.act(async () => {
 				for (const resolve of requests) resolve(value);
@@ -202,7 +206,10 @@ async function mountClient(
 		flush: () => client.act(drainProducers),
 		update: (next: Record<string, unknown>) =>
 			client.flushSync(() => root.render(module.App, { ...PROPS, load, ...props, ...next })),
-		unmount: () => root.unmount(),
+		unmount: () => {
+			root.unmount();
+			scope?.dispose();
+		},
 	};
 }
 
@@ -977,20 +984,104 @@ export function App(props) @{
 	// parent's callback still reads the parent's derived value. A wrapped
 	// factory callee is still a producer.
 	const PRODUCERS = {
-		'a derived producer': 'derived$(() => record$.get())',
-		'a wrapped derived producer':
-			"(derived$ as typeof derived$)(() => record$.get(), { key: 'selected' })",
+		'a derived producer': {
+			setup: '',
+			value: 'derived$(() => record$.get())',
+			callback: '() => selected$.get()',
+		},
+		'a wrapped derived producer': {
+			setup: '',
+			value: "(derived$ as typeof derived$)(() => record$.get(), { key: 'selected' })",
+			callback: '() => selected$.get()',
+		},
+		'a named producer shared with a callback': {
+			setup: 'const compute$ = () => record$.get();',
+			value: 'derived$(compute$)',
+			callback: 'compute$',
+		},
+		'a nested named producer inside an arrow': {
+			setup:
+				'const compute$ = () => { const inner$ = () => record$.get(); return derived$(inner$).get(); };',
+			value: 'derived$(compute$)',
+			callback: '() => record$.get()',
+		},
+		'a nested named producer inside a declaration': {
+			setup:
+				'function compute$() { function inner$() { return record$.get(); } return derived$(inner$).get(); }',
+			value: 'derived$(compute$)',
+			callback: '() => record$.get()',
+		},
+		'an outside producer read by an arrow and forwarded as a callback': {
+			setup:
+				'const inner$ = () => record$.get(); const compute$ = () => { record$.get(); return derived$(inner$).get(); };',
+			value: 'derived$(compute$)',
+			callback: 'inner$',
+		},
+		'an outside producer read by a declaration and forwarded as a callback': {
+			setup:
+				'function inner$() { return record$.get(); } function compute$() { record$.get(); return derived$(inner$).get(); }',
+			value: 'derived$(compute$)',
+			callback: 'inner$',
+		},
+		'a named query selector shared with a callback': {
+			setup: 'const compute$ = () => record$.get();',
+			value: 'query$(compute$, async (selection) => selection)',
+			callback: 'compute$',
+		},
+		'a function declaration shared with a callback': {
+			setup: 'function compute$() { return record$.get(); }',
+			value: 'derived$(compute$)',
+			callback: 'compute$',
+		},
+		'a recursive function declaration shared with a callback': {
+			setup:
+				'function compute$(_context, depth = 1) { return depth > 0 ? compute$(_context, depth - 1) : record$.get(); }',
+			value: 'derived$(compute$)',
+			callback: 'compute$',
+		},
+		'a recursive const arrow shared with a callback': {
+			setup:
+				'const compute$ = (_context, depth = 1) => depth > 0 ? compute$(_context, depth - 1) : record$.get();',
+			value: 'derived$(compute$)',
+			callback: 'compute$',
+		},
+		'a recursive const function shared with a callback': {
+			setup:
+				'const compute$ = function (_context, depth = 1) { return depth > 0 ? compute$(_context, depth - 1) : record$.get(); };',
+			value: 'derived$(compute$)',
+			callback: 'compute$',
+		},
+		'a recursive named function expression with its own binding': {
+			setup:
+				'const compute$ = function compute$(_context, depth = 1) { return depth > 0 ? compute$(_context, depth - 1) : record$.get(); };',
+			value: 'derived$(compute$)',
+			callback: 'compute$',
+		},
+		'a recursive const with a shadowed parameter and shorthand reference': {
+			setup:
+				"const compute$ = (_context, depth = 1) => { const { compute$: again } = { compute$ }; const offset = ((compute$) => compute$())(() => ''); return depth > 0 ? offset + again(_context, depth - 1) : record$.get(); };",
+			value: 'derived$(compute$)',
+			callback: 'compute$',
+		},
+		'a named function expression shared with a callback': {
+			setup: 'const compute$ = function read$() { return record$.get(); };',
+			value: 'derived$(compute$)',
+			callback: 'compute$',
+		},
+		'a named producer called in a shadowing block': {
+			setup: 'const compute$ = () => record$.get();',
+			value:
+				"(() => { const record$ = query$(() => 'shadow', props.load); return derived$(compute$); })()",
+			callback: 'compute$',
+		},
 	};
 
-	it.each(
-		MODES.flatMap((mode) =>
-			Object.entries(PRODUCERS).map(([kind, producer]) => ({ kind, producer, ...mode })),
-		),
-	)(
-		'keeps $kind reader-owned beside a forwarded callback ($name)',
-		async ({ producer, dev, strong }) => {
-			const view = await mountClient(
-				`import { derived$, query$ } from 'octane/signals';
+	function producerSource(
+		producer: (typeof PRODUCERS)[keyof typeof PRODUCERS],
+		readers = 1,
+		beforeReaders = '',
+	) {
+		return `import { derived$, query$ } from 'octane/signals';
 function Reader(props) @{
  <>
   <output>{props.selected$.get() as string}</output>
@@ -999,20 +1090,83 @@ function Reader(props) @{
 }
 export function App(props) @{
  const record$ = query$(() => 'record', props.load);
- const selected$ = ${producer};
+ ${producer.setup}
+ const selected$ = ${producer.value};
  @try {
-  <section><output>{selected$.get() as string}</output><Reader selected$={selected$} read={() => selected$.get()} /></section>
+  <section><output>{record$.get() as string}</output>${beforeReaders}${Array.from(
+		{ length: readers },
+		() => `<Reader selected$={selected$} read={${producer.callback}} />`,
+	).join('')}</section>
  } @pending {
   <i>waiting</i>
  }
+}`;
+	}
+
+	it.each(
+		MODES.flatMap((mode) =>
+			Object.entries(PRODUCERS).map(([kind, producer]) => ({ kind, producer, ...mode })),
+		),
+	)(
+		'keeps $kind reader-owned beside a forwarded callback ($name)',
+		async ({ producer, dev, strong }) => {
+			const view = await mountClient(producerSource(producer, 2), { dev, strong });
+			try {
+				await view.settle('parent');
+				await view.settle('left', 1);
+				// Each reader must start its own query, even when a nested
+				// producer is compiled inside the producer it receives.
+				expect(view.requests).toHaveLength(3);
+				await view.settle('right', 2);
+				await view.flush();
+				expect(view.texts()).toEqual(['parent', 'left', 'parent', 'right', 'parent']);
+				expect(view.requests).toHaveLength(3);
+			} finally {
+				view.unmount();
+			}
+		},
+	);
+
+	it.each(
+		MODES.flatMap((mode) =>
+			['() => record$.get()', 'compute$'].map((producer) => ({ ...mode, producer })),
+		),
+	)(
+		'keeps an explicit scope $producer reader-owned when created by an event ($name)',
+		async ({ producer, dev, strong }) => {
+			const view = await mountClient(
+				`import { useState } from 'octane';
+import { query$ } from 'octane/signals';
+function Reader(props) @{
+ <>
+ <output>{props.selected$.get() as string}</output>
+ <output>{props.read() as string}</output>
+ </>
+}
+export function App(props) @{
+ const record$ = query$(() => 'record', props.load);
+ const compute$ = () => record$.get();
+ const [selected$, setSelected] = useState(null);
+ <section>
+ <button onClick={() => setSelected(props.scope.derived$('selection', ${producer}))}>create</button>
+ @try {
+  <div><output>{record$.get() as string}</output>
+   @if (selected$) { <Reader selected$={selected$} read={compute$} /> }
+  </div>
+ } @pending { <i>waiting</i> }
+ </section>
 }`,
 				{ dev, strong },
+				{},
+				{},
+				true,
 			);
 			try {
 				await view.settleAll('ready');
+				view.click('button');
+				await view.settleAll('ready');
 				await view.settleAll('ready');
 				expect(view.texts()).toEqual(['ready', 'ready', 'ready']);
-				// The parent's query and the child's own derived cell's query.
 				expect(view.requests).toHaveLength(2);
 			} finally {
 				view.unmount();
@@ -1020,6 +1174,285 @@ export function App(props) @{
 		},
 	);
 
+	it.each(
+		MODES.flatMap((mode) =>
+			[
+				'a named producer shared with a callback',
+				'a recursive const arrow shared with a callback',
+				'a recursive const function shared with a callback',
+			].map((kind) => ({ ...mode, kind })),
+		),
+	)(
+		'hydrates two named-producer readers and preserves their declaring callback on update ($name, $kind)',
+		async ({ dev, strong, kind }) => {
+			vi.resetModules();
+			const server = await import('../../src/runtime.server.js');
+			const client = await import('../../src/runtime.js');
+			const signals = await import('../../src/signals/index.js');
+			const { bootstrapStreamedSignalHydration } =
+				await import('../../src/hydration/streamed-signals.js');
+			const { loadCompiledFixtureSource } = await import('../_server-fixture.js');
+			const { activateStreamedMarkup, resetStreamRuntimeGlobals } =
+				await import('../_server-stream.js');
+			const { drainProducers } = await import('../_fixtures/signals-async-controls.js');
+			const text = producerSource(
+				PRODUCERS[kind as keyof typeof PRODUCERS],
+				2,
+				'<small>{props.label as string}</small>',
+			);
+			const options = {
+				id: '/src/signal-declaration-owner.tsrx',
+				compileOptions: { dev, strong, hmr: false },
+				runtimeModules: { 'octane/signals': signals },
+			};
+			const serverModule = loadCompiledFixtureSource(text, { ...options, mode: 'server' });
+			const clientModule = loadCompiledFixtureSource(text, { ...options, mode: 'client' });
+			const results = ['parent', 'left', 'right'];
+			let next = 0;
+			const serverLoad = vi.fn(async () => results[next++]);
+			const browserLoad = vi.fn(async () => 'browser');
+			const streamedSignals = {
+				buildId: 'signal-declaration-owner',
+				documentId: 'signal-declaration-owner',
+			};
+			const container = document.createElement('div');
+			document.body.append(container);
+			let root: ReturnType<typeof client.hydrateRoot> | undefined;
+			let hydration: ReturnType<typeof bootstrapStreamedSignalHydration> | undefined;
+			try {
+				const output = await server.prerender(
+					serverModule.App,
+					{ ...PROPS, load: serverLoad, label: 'initial' },
+					{ streamedSignals },
+				);
+				expect(serverLoad).toHaveBeenCalledTimes(3);
+				container.innerHTML = output.html;
+				activateStreamedMarkup(container);
+				const nodes = [...container.querySelectorAll('output')];
+				const label = container.querySelector('small')!;
+				const expected = ['parent', 'left', 'parent', 'right', 'parent'];
+				expect(nodes.map((node) => node.textContent)).toEqual(expected);
+				expect(label.textContent).toBe('initial');
+				const errors: unknown[] = [];
+				hydration = bootstrapStreamedSignalHydration(streamedSignals);
+				const props = { ...PROPS, load: browserLoad, label: 'initial' };
+				root = client.hydrateRoot(container, clientModule.App, props, {
+					signalOwner: hydration.signalOwner,
+					onRecoverableError: (error) => errors.push(error),
+					onUncaughtError: (error) => errors.push(error),
+				});
+				await drainProducers();
+				client.flushSync(() => {});
+				expect(browserLoad).not.toHaveBeenCalled();
+				expect(errors).toEqual([]);
+				expect([...container.querySelectorAll('output')]).toEqual(nodes);
+				expect(container.querySelector('small')).toBe(label);
+				expect(nodes.map((node) => node.textContent)).toEqual(expected);
+
+				client.flushSync(() => root!.render(clientModule.App, { ...props, label: 'updated' }));
+				await drainProducers();
+				expect(container.querySelector('small')).toBe(label);
+				expect(label.textContent).toBe('updated');
+				expect([...container.querySelectorAll('output')]).toEqual(nodes);
+				expect(nodes.map((node) => node.textContent)).toEqual(expected);
+				expect(browserLoad).not.toHaveBeenCalled();
+				expect(errors).toEqual([]);
+			} finally {
+				root?.unmount();
+				hydration?.dispose();
+				container.remove();
+				resetStreamRuntimeGlobals();
+			}
+		},
+	);
+
+	it.each(
+		MODES.flatMap((mode) => [
+			{ ...mode, body: 'return record$.get();', kind: 'direct' },
+			{
+				...mode,
+				body: 'return depth > 0 ? compute$(_context, depth - 1) : record$.get();',
+				kind: 'recursive const',
+			},
+			{
+				...mode,
+				body: "const { compute$: again } = { compute$ }; const offset = ((compute$) => compute$())(() => ''); return depth > 0 ? offset + again(_context, depth - 1) : record$.get();",
+				kind: 'recursive const shorthand',
+			},
+			{
+				...mode,
+				body: 'const inner$ = derived$(() => record$.get()); return inner$.get();',
+				kind: 'nested declaration',
+			},
+		]),
+	)(
+		'keeps a $kind plain-hook named producer separate from its forwarded callback ($name)',
+		async (mode) => {
+			const view = await mountClient(
+				`
+import { useSelection$ } from './use-selection';
+function Reader(props) @{
+ <>
+  <output>{props.selected$.get() as string}</output>
+  <output>{props.read() as string}</output>
+ </>
+}
+export function App(props) @{
+ const { selected$, compute$ } = useSelection$(props.load);
+ @try {
+  <section><output>{selected$.get() as string}</output><Reader selected$={selected$} read={compute$} /></section>
+ } @pending { <i>waiting</i> }
+}`,
+				mode,
+				{},
+				{
+					'./use-selection': `import { derived$, query$ } from 'octane/signals';
+export function useSelection$(load) {
+ const record$ = query$(() => 'record', load);
+ const compute$ = (_context, depth = 1) => { ${mode.body} };
+ const selected$ = derived$(compute$);
+ return { selected$, compute$ };
+}`,
+				},
+			);
+			try {
+				await view.settleAll('ready');
+				await view.settleAll('ready');
+				expect(view.texts()).toEqual(['ready', 'ready', 'ready']);
+				expect(view.requests).toHaveLength(2);
+			} finally {
+				view.unmount();
+			}
+		},
+	);
+
+	it.each(
+		MODES.flatMap((mode) =>
+			[
+				{ kind: 'derived', next: 'derived$(compute$)' },
+				{ kind: 'query', next: 'query$(compute$, async (selection) => selection)' },
+			].flatMap((scenario) =>
+				[
+					{
+						syntax: 'const arrow',
+						declaration: 'const compute$ = () =>',
+						formal: false,
+						local: false,
+					},
+					{
+						syntax: 'function declaration',
+						declaration: 'function compute$()',
+						formal: false,
+						local: false,
+					},
+					{
+						syntax: 'function declaration with a shadowing formal',
+						declaration:
+							'function compute$(_context, { compute$ } = { compute$: () => ({ value: "formal" }) })',
+						formal: true,
+						local: false,
+					},
+					{
+						syntax: 'TSRX-local function declaration',
+						declaration: 'function compute$()',
+						formal: false,
+						local: true,
+					},
+					{
+						syntax: 'TSRX-local declaration with a shadowing formal',
+						declaration: 'function compute$(_context, [compute$] = [() => ({ value: "formal" })])',
+						formal: true,
+						local: true,
+					},
+				].flatMap((shape) =>
+					['producer', 'callback'].map((handoff) => ({ ...mode, ...scenario, ...shape, handoff })),
+				),
+			),
+		),
+	)(
+		'passes a plain $syntax to a nested $kind through its $handoff without changing its callback owner ($name)',
+		async (mode) => {
+			const selection = `import { derived$, query$ } from 'octane/signals';
+export function useSelection$(load) {
+ const record$ = query$(() => 'record', load);
+ ${mode.declaration} {
+  const value = record$.get();
+  return { value, next$: value === '${mode.handoff === 'producer' ? 'reader' : 'parent'}' ? ${mode.next} : null };
+ };
+ const selected$ = derived$(compute$);
+ return { selected$, compute$ };
+}`;
+			const view = await mountClient(
+				`${mode.local ? selection : "import { useSelection$ } from './use-selection';"}
+function Handoff(props) @{
+ <output>{props.next$.get().value as string}</output>
+}
+function Reader(props) @{
+ const producer = props.selected$.get();
+ const callback = props.read();
+ <>
+  <output>{producer.value as string}</output>
+  <output>{callback.value as string}</output>
+  @if (${mode.handoff}.next$) { <Handoff next$={${mode.handoff}.next$} /> }
+ </>
+}
+export function App(props) @{
+ const { selected$, compute$ } = useSelection$(props.load);
+ @try {
+  <section><output>{selected$.get().value as string}</output><Reader selected$={selected$} read={compute$} /></section>
+ } @pending { <i>waiting</i> }
+}`,
+				mode,
+				{},
+				mode.local ? {} : { './use-selection': selection },
+			);
+			try {
+				await view.settle('parent');
+				expect(view.requests).toHaveLength(2);
+				await view.settle('reader', 1);
+				if (!mode.formal) {
+					expect(view.requests).toHaveLength(3);
+					await view.settle('handoff', 2);
+				}
+				await view.flush();
+				expect(view.texts()).toEqual([
+					'parent',
+					'reader',
+					'parent',
+					mode.formal ? 'formal' : 'handoff',
+				]);
+				expect(view.requests).toHaveLength(mode.formal ? 2 : 3);
+			} finally {
+				view.unmount();
+			}
+		},
+	);
+
+	it.each(MODES)(
+		'preserves a function stored as signal data beside a named producer ($name)',
+		async (mode) => {
+			const view = await mountClient(
+				`import { derived$, query$, signal$ } from 'octane/signals';
+export function App(props) @{
+ const record$ = query$(() => 'record', props.load);
+ const compute$ = () => record$.get();
+ const saved$ = signal$(compute$);
+ const selected$ = derived$(compute$);
+ @try {
+  <section><output>{selected$.get() as string}</output>
+  <output>{String(saved$.get() === compute$)}</output></section>
+ } @pending { <i>waiting</i> }
+}`,
+				mode,
+			);
+			try {
+				await view.settleAll('ready');
+				expect(view.texts()).toEqual(['ready', 'true']);
+			} finally {
+				view.unmount();
+			}
+		},
+	);
 	// With no ambient owner the callback still uses the declaring instance,
 	// and once that instance unmounts it is fenced like the instance's own reads.
 	it.each(MODES)(
