@@ -44,7 +44,14 @@ export function endNativeEventBatch(
 	}
 	// Capture and bubble are separate native callbacks. Usually the bubble walk
 	// closes this lease on the same stack. A native listener can stop propagation
-	// below the delegation root, so mirror its existing capture-flush backstop.
+	// below the delegation root, so mirror the runtime's capture-flush backstop
+	// (finishCaptureDispatch). The browser checkpoints microtasks after every
+	// listener of an event it dispatches itself, so a microtask would publish the
+	// capture handlers' writes before the target and bubble handlers run: a
+	// subscribed component would re-render a controlled input to its old value
+	// before onInput could read the user's edit. Only a task runs after the whole
+	// trusted propagation. A script-dispatched event keeps the dispatching script
+	// on the stack, so its microtask still waits for the bubble segment.
 	const fallback = () => {
 		if (batch.depth !== 0 || batch.closed) return;
 		try {
@@ -53,11 +60,6 @@ export function endNativeEventBatch(
 			onError(error);
 		}
 	};
-	const target = event.target as HTMLInputElement | null;
-	const checkableChange =
-		event.type === 'change' &&
-		target?.localName === 'input' &&
-		(target.type === 'checkbox' || target.type === 'radio');
-	if (checkableChange) setTimeout(fallback, 0);
+	if (event.isTrusted) setTimeout(fallback, 0);
 	else queueMicrotask(fallback);
 }
