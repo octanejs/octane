@@ -983,7 +983,30 @@ export function App(props) @{
 	// receives as a prop computes from the child's own query, while the
 	// parent's callback still reads the parent's derived value. A wrapped
 	// factory callee is still a producer.
+	const WRAPPED_PRODUCERS = {
+		'a parenthesized namespace named derived producer': {
+			setup: 'const compute$ = () => record$.get();',
+			value: '(octane).derived$(compute$)',
+			callback: 'compute$',
+		},
+		'an asserted namespace inline derived producer': {
+			setup: 'const compute$ = () => record$.get();',
+			value: '(octane as typeof octane).derived$(() => record$.get())',
+			callback: 'compute$',
+		},
+		'an asserted namespace named query producer': {
+			setup: 'const compute$ = () => record$.get();',
+			value: '(octane as typeof octane).query$(compute$, async (selection) => selection)',
+			callback: 'compute$',
+		},
+		'a parenthesized namespace inline query producer': {
+			setup: 'const compute$ = () => record$.get();',
+			value: '(octane).query$(() => record$.get(), async (selection) => selection)',
+			callback: 'compute$',
+		},
+	};
 	const PRODUCERS = {
+		...WRAPPED_PRODUCERS,
 		'a derived producer': {
 			setup: '',
 			value: 'derived$(() => record$.get())',
@@ -1082,6 +1105,7 @@ export function App(props) @{
 		beforeReaders = '',
 	) {
 		return `import { derived$, query$ } from 'octane/signals';
+import * as octane from 'octane/signals';
 function Reader(props) @{
  <>
   <output>{props.selected$.get() as string}</output>
@@ -1129,14 +1153,21 @@ export function App(props) @{
 
 	it.each(
 		MODES.flatMap((mode) =>
-			['() => record$.get()', 'compute$'].map((producer) => ({ ...mode, producer })),
+			['() => record$.get()', 'compute$'].flatMap((producer) =>
+				['props.scope', '(octane as typeof octane)'].map((receiver) => ({
+					...mode,
+					producer,
+					receiver,
+				})),
+			),
 		),
 	)(
-		'keeps an explicit scope $producer reader-owned when created by an event ($name)',
-		async ({ producer, dev, strong }) => {
+		'keeps an explicit scope $producer reader-owned when created by an event ($receiver, $name)',
+		async ({ producer, receiver, dev, strong }) => {
 			const view = await mountClient(
 				`import { useState } from 'octane';
 import { query$ } from 'octane/signals';
+import * as octane from 'octane/signals';
 function Reader(props) @{
  <>
  <output>{props.selected$.get() as string}</output>
@@ -1144,11 +1175,12 @@ function Reader(props) @{
  </>
 }
 export function App(props) @{
+ const octane = props.scope;
  const record$ = query$(() => 'record', props.load);
  const compute$ = () => record$.get();
  const [selected$, setSelected] = useState(null);
  <section>
- <button onClick={() => setSelected(props.scope.derived$('selection', ${producer}))}>create</button>
+ <button onClick={() => setSelected(${receiver}.derived$('selection', ${producer}))}>create</button>
  @try {
   <div><output>{record$.get() as string}</output>
    @if (selected$) { <Reader selected$={selected$} read={compute$} /> }
@@ -1180,6 +1212,8 @@ export function App(props) @{
 				'a named producer shared with a callback',
 				'a recursive const arrow shared with a callback',
 				'a recursive const function shared with a callback',
+				'a parenthesized namespace named derived producer',
+				'an asserted namespace named query producer',
 			].map((kind) => ({ ...mode, kind })),
 		),
 	)(
@@ -1284,6 +1318,12 @@ export function App(props) @{
 				body: 'const inner$ = derived$(() => record$.get()); return inner$.get();',
 				kind: 'nested declaration',
 			},
+			...Object.entries(WRAPPED_PRODUCERS).map(([kind, producer]) => ({
+				...mode,
+				body: 'return record$.get();',
+				kind,
+				value: producer.value,
+			})),
 		]),
 	)(
 		'keeps a $kind plain-hook named producer separate from its forwarded callback ($name)',
@@ -1307,10 +1347,11 @@ export function App(props) @{
 				{},
 				{
 					'./use-selection': `import { derived$, query$ } from 'octane/signals';
+import * as octane from 'octane/signals';
 export function useSelection$(load) {
  const record$ = query$(() => 'record', load);
  const compute$ = (_context, depth = 1) => { ${mode.body} };
- const selected$ = derived$(compute$);
+ const selected$ = ${'value' in mode ? mode.value : 'derived$(compute$)'};
  return { selected$, compute$ };
 }`,
 				},

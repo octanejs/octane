@@ -740,14 +740,13 @@ export function lowerSignalDeclarations(ast, filename, options) {
 			}
 			return { helper: (imported) => helperFor(record, imported), factory: record.factory };
 		}
-		if (
-			(callee?.type === 'MemberExpression' || callee?.type === 'OptionalMemberExpression') &&
-			callee.object?.type === 'Identifier'
-		) {
+		if (callee?.type === 'MemberExpression' || callee?.type === 'OptionalMemberExpression') {
 			const factory = propertyName(callee);
 			if (!SIGNAL_FACTORIES.has(factory)) return null;
-			const source = namespaceImports.get(callee.object.name);
-			const binding = lexical.resolveBinding(scope, callee.object.name);
+			const object = unwrapExpression(callee.object);
+			if (object?.type !== 'Identifier') return null;
+			const source = namespaceImports.get(object.name);
+			const binding = lexical.resolveBinding(lexical.nodeScopes.get(object) ?? scope, object.name);
 			if (
 				source === undefined ||
 				binding?.scope !== lexical.rootScope ||
@@ -756,7 +755,7 @@ export function lowerSignalDeclarations(ast, filename, options) {
 				return null;
 			}
 			return {
-				helper: (imported) => b.member(b.id(callee.object.name), imported),
+				helper: (imported) => b.member(b.id(object.name), imported),
 				factory,
 			};
 		}
@@ -990,20 +989,19 @@ export function signalDeclarationSourceEdits(ast, filename, source, options) {
 			) {
 				return { factory: record.factory, helper: (imported) => helperFor(record, imported) };
 			}
-		} else if (
-			(callee?.type === 'MemberExpression' || callee?.type === 'OptionalMemberExpression') &&
-			callee.object?.type === 'Identifier'
-		) {
+		} else if (callee?.type === 'MemberExpression' || callee?.type === 'OptionalMemberExpression') {
 			const member = propertyName(callee);
-			const importSource = namespaceImports.get(callee.object.name);
-			const binding = lexical.resolveBinding(scope, callee.object.name);
+			if (!SIGNAL_FACTORIES.has(member)) return null;
+			const object = unwrapExpression(callee.object);
+			if (object?.type !== 'Identifier') return null;
+			const importSource = namespaceImports.get(object.name);
+			const binding = lexical.resolveBinding(lexical.nodeScopes.get(object) ?? scope, object.name);
 			if (
-				SIGNAL_FACTORIES.has(member) &&
 				importSource !== undefined &&
 				binding?.scope === lexical.rootScope &&
 				binding.importSource?.value === importSource
 			) {
-				return { factory: member, helper: (imported) => `${callee.object.name}.${imported}` };
+				return { factory: member, helper: (imported) => `${object.name}.${imported}` };
 			}
 		}
 		return null;
