@@ -353,4 +353,34 @@ describe('production descriptor capability reachability', () => {
 			}
 		});
 	});
+
+	it('installs submit interception when a parameter shadows the Fragment import', async () => {
+		const text = await bundleApp(
+			`import { Fragment } from 'octane';
+			export function Group(props: { children?: unknown }) @{
+				const group = <Fragment>{props.children}</Fragment>;
+				<div>{group}</div>
+			}
+			export function App({ Fragment, action }: { Fragment: any; action: () => void }) @{
+				const form = <Fragment action={action}><button>go</button></Fragment>;
+				<div>{form}</div>
+			}`,
+		);
+		expect(text).toMatch(/function handleFormSubmit\(/);
+
+		await withDom(async (window) => {
+			const { App, createRoot } = await load(text);
+			const calls: number[] = [];
+			const container = window.document.createElement('div');
+			window.document.body.append(container);
+			const root = createRoot(container);
+			try {
+				root.render(App, { Fragment: 'form', action: () => calls.push(1) });
+				expect(submit(window, container.querySelector('form')!)).toBe(true);
+				expect(calls).toEqual([1]);
+			} finally {
+				root.unmount();
+			}
+		});
+	});
 });
