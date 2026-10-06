@@ -4,10 +4,14 @@
 // (docs/compiled-output-optimization-plan.md, Phase 0a).
 //
 // Fairness: every target uses the same explicit production build settings
-// (minify: 'esbuild', target: 'esnext'). The inline config wins
-// over the app's config file for these keys; everything else (plugins, mode,
-// NODE_ENV) still comes from each app's own config, exactly like the news
-// suite's programmatic builds.
+// (minify: 'oxc', target: 'esnext'). The inline config wins over the app's
+// config file for these keys; everything else (plugins, mode, NODE_ENV) still
+// comes from each app's own config, exactly like the news suite's programmatic
+// builds. `'oxc'` is Vite 8's default client minifier, so each row measures what
+// an ordinary Vite application ships. It is named here because the fixture apps'
+// own configs choose `'esbuild'` for the timing suites. Vite's `'esbuild'` mode
+// turns Rolldown's own minifier off, and with it the dead-code elimination that
+// removes branches guarded by a never-written module flag.
 //
 // Only .js assets are summed; index.html and CSS are excluded. Weather's CSS is
 // shared byte-for-byte by every port, so including it would add the same constant
@@ -69,6 +73,8 @@ const CHAT_STREAM = path.resolve(__dirname, '../chat-stream');
 const WEATHER_APP = path.resolve(__dirname, '../weather-app');
 const BINDINGS_APP = path.join(__dirname, 'apps/bindings');
 const OUT_ROOT = path.join(__dirname, 'dist'); // gitignored (root .gitignore: dist)
+// Vite 8's default client minifier; see the fairness note above.
+const VITE_MINIFY = 'oxc';
 
 // Five app sets: js-framework rows, TodoMVC, chat-stream, weather-app, and the
 // Octane-only bindings application. The later sets are app-shaped size
@@ -258,7 +264,7 @@ for (const set of SETS)
 		const appRoot = path.join(set.root, name);
 		const outDir = path.join(OUT_ROOT, set.prefix + name);
 		const setLabel = set.prefix ? path.basename(set.root) + '/' : '';
-		console.log(`building ${setLabel}${name} (production, normalized minify)…`);
+		console.log(`building ${setLabel}${name} (production, ${VITE_MINIFY} minify)…`);
 		let ceiling = ceilings.get(name);
 		if (set.ceiling !== false && ceiling === undefined) {
 			ceiling = { root: appRoot, entries: new Map() };
@@ -271,7 +277,7 @@ for (const set of SETS)
 			build: {
 				outDir,
 				emptyOutDir: true,
-				minify: 'esbuild',
+				minify: VITE_MINIFY,
 				target: 'esnext',
 				rollupOptions: { output: buildOutput },
 			},
@@ -369,7 +375,7 @@ for (const [name, { root, entries }] of ceilings) {
 		build: {
 			outDir,
 			emptyOutDir: true,
-			minify: 'esbuild',
+			minify: VITE_MINIFY,
 			target: 'esnext',
 			rollupOptions: { input: source, output: buildOutput },
 		},

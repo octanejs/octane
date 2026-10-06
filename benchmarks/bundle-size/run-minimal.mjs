@@ -7,6 +7,11 @@
 //
 // Pull request CI runs `--budgets` over every scenario. `--write-budgets` is for
 // a dedicated budget pull request only (CONTRIBUTING.md, "Size budgets").
+//
+// Each bundler builds the way its users ship. Vite scenarios use Vite 8's
+// default client minifier (`'oxc'`); Vite's `'esbuild'` mode would turn off
+// Rolldown's own minifier and the dead-code elimination that comes with it.
+// esbuild scenarios represent esbuild users and keep esbuild's `minify: true`.
 process.env.NODE_ENV = 'production';
 
 import assert from 'node:assert/strict';
@@ -367,7 +372,7 @@ async function buildScenario(scenario, entry) {
 		define: productionDefines,
 		build: {
 			write: false,
-			minify: 'esbuild',
+			minify: 'oxc',
 			target: 'esnext',
 			lib: {
 				entry,
@@ -509,7 +514,8 @@ try {
 			}
 			// The async-identity encoder reads an ASCII unit table built at module
 			// load. A bundle without the encoder must drop the table; server-render
-			// keeps the encoder, so it proves the pattern still matches.
+			// keeps the encoder, so it proves the pattern still matches. Oxc prints
+			// string literals as template literals, so the quote may be a backtick.
 			const encodesIdentities = serverRuntimeExports.includes('encodeAsyncIdentityString');
 			if (id === 'server-render') {
 				assert.equal(
@@ -519,7 +525,7 @@ try {
 				);
 			}
 			assert.equal(
-				/\.toString\(16\)\.padStart\(4,\s*["']0["']\)/.test(code),
+				/\.toString\(16\)\.padStart\(4,\s*["'`]0["'`]\)/.test(code),
 				encodesIdentities,
 				encodesIdentities
 					? `${name}: the async-identity encoder no longer formats code units; update this reachability check`

@@ -75,3 +75,23 @@ Existing follow-ups are the separate
 [byte-budget refresh (#1638)](https://github.com/octanejs/octane/pull/1638) and
 [Three retained-mesh update optimization (#1665)](https://github.com/octanejs/octane/pull/1665).
 Those changes are outside the measured 0.8.0 release snapshot.
+
+## Later re-record: bundle size, 5 October 2026
+
+`local/bundle-size.json` no longer comes from the 0.8.0 release source. It was
+re-recorded from `main` at
+[`91079dde42`](https://github.com/octanejs/octane/commit/91079dde42) when the
+bundle-size harness moved from Vite's `minify: 'esbuild'` to Vite 8's default
+`'oxc'` minifier, so each fixture measures what an ordinary Vite application
+ships. Every framework keeps identical build settings (`minify: 'oxc'`,
+`target: 'esnext'`).
+
+- Apple M5 Max, macOS 27.0 (26A428), Node 24.18.0, pnpm 12.9.1, Vite 8.1.5,
+  frozen repository lockfile.
+- Reproduce with `node benchmarks/bench.mjs --record bundle-size`.
+
+Every framework ships fewer bytes under Oxc, by different amounts. Rows total
+gzip moves from 39,805 to 37,868 bytes for Octane (−4.9%), from 18,325 to 15,233
+for Svelte 5 (−16.9%) and from 63,308 to 62,401 for React 19 (−1.4%), measured
+from the same source. The home page's bundle-size ratios therefore move with the
+methodology, as well as with Octane's own changes since the previous record.
