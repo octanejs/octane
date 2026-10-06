@@ -1,5 +1,110 @@
 # @octanejs/vite-plugin
 
+## 0.3.0
+
+### Minor Changes
+
+- e233e4a: Stop shipping the signal binding runtime in apps that never pass signal
+  handles through ordinary props.
+
+  Since async signals landed, the compiler bound every opaque text, attribute,
+  control, and textarea hole, such as `{row.label as string}`, as a potential
+  signal handle in every module. Every app therefore carried the binding runtime
+  and stamped signal identities on every component. Now such a hole binds a
+  handle only in a module with an import from `octane/signals`; a type-only
+  `import type { SignalHandle } from 'octane/signals'` is enough and does not
+  enable native reads. Modules using DOM bindings keep binding handles, and
+  `$`-named expressions such as `{props.label$}` still bind everywhere.
+
+  This removes 1.7 to 3.3 kB gzip of runtime from the benchmark applications
+  (rows 38,991 → 37,307 bytes, TodoMVC 44,217 → 41,076, chat 43,638 → 40,347).
+
+  An untyped component that renders handles from a lazily loaded signals engine
+  can either type its props or set the new `opaqueSignalHandles` compiler option
+  (also accepted by `octane()` and `@octanejs/vite-plugin`) to keep the previous
+  behavior. In development, a handle that reaches a plain text hole logs an
+  error naming these fixes instead of silently rendering `[object Object]`.
+
+  Hydration through the ordinary writers now matches the signal-aware path it
+  replaces for these holes: a sibling or whole-output `{expr}` hole whose first
+  client value is `undefined` discards the server content it cannot adopt, and an
+  attribute whose first client value is `undefined` removes the server attribute.
+
+### Patch Changes
+
+- 1d5832e: Honour `server.trustProxy` in the request URL. Behind a proxy that terminates
+  TLS or rewrites `Host`, the Node bridge built every URL from `http://` and the
+  `Host` header, so `Context.url` named a different origin than the browser's and
+  same-origin checks rejected legitimate requests. With `server.trustProxy: true`,
+  `nodeHandler`, the built-in server, `octane-preview`, and the Vite and Rsbuild
+  dev servers take the scheme from the first `X-Forwarded-Proto` entry (`http` or
+  `https` only) and the host from the first `X-Forwarded-Host` entry (a plain
+  `host[:port]` only). A malformed value is ignored, and the path and query always
+  come from the request. `nodeRequestToWebRequest` and `createNodeServer` accept
+  the same `trustProxy` option. The default is unchanged.
+
+  `server.trustProxy` must now be a boolean, so a string such as `'false'` read
+  from an environment variable can no longer enable it.
+- 95090b1: Keep a request path that starts with `//` on the request's own host. The Node
+  bridge resolved the raw request target against the request origin, so a target
+  such as `//evil.example/x` (or `/\evil.example/x`) became host `evil.example`
+  and path `/x` in `Context.url`, and the Vite and Rsbuild dev servers routed it
+  as `/x`. An origin-form target now keeps its whole path and query on the
+  request origin (the `Host` header, or the trusted proxy's with
+  `server.trustProxy`) in `nodeRequestToWebRequest`, the built-in static file
+  layer, and both dev servers. An `http://` or `https://` absolute-form target
+  still keeps its own origin. An absolute-form target with any other scheme, such
+  as `ftp://`, becomes a path under the root instead of a foreign-scheme URL.
+  `@octanejs/app-core/node` exports `nodeRequestUrl`, the URL the bridge gives a
+  Node request.
+- Updated dependencies [ed57b1e]
+- Updated dependencies [8aeb6c0]
+- Updated dependencies [6182678]
+- Updated dependencies [3fb1bec]
+- Updated dependencies [c15aa5a]
+- Updated dependencies [5cad0fa]
+- Updated dependencies [5041f00]
+- Updated dependencies [f7980e0]
+- Updated dependencies [97f1b8e]
+- Updated dependencies [fb404c2]
+- Updated dependencies [9bacb23]
+- Updated dependencies [2f88235]
+- Updated dependencies [8aeb6c0]
+- Updated dependencies [b353f54]
+- Updated dependencies [72cd60b]
+- Updated dependencies [91079dd]
+- Updated dependencies [393b75a]
+- Updated dependencies [f50c128]
+- Updated dependencies [ba46692]
+- Updated dependencies [f69215f]
+- Updated dependencies [9c84293]
+- Updated dependencies [1d5832e]
+- Updated dependencies [95090b1]
+- Updated dependencies [e233e4a]
+- Updated dependencies [087cd77]
+- Updated dependencies [c3c0a3b]
+- Updated dependencies [262926c]
+- Updated dependencies [9dafaef]
+- Updated dependencies [35c0d1b]
+- Updated dependencies [21e0575]
+- Updated dependencies [8b97478]
+- Updated dependencies [ab9a043]
+- Updated dependencies [32e4f3f]
+- Updated dependencies [1de873c]
+- Updated dependencies [7a92ad2]
+- Updated dependencies [a2a0c41]
+- Updated dependencies [e03350a]
+- Updated dependencies [0d6ef67]
+- Updated dependencies [c213e87]
+- Updated dependencies [da6524e]
+- Updated dependencies [ace4737]
+- Updated dependencies [b77ab18]
+- Updated dependencies [1744e83]
+- Updated dependencies [023aa7d]
+- Updated dependencies [82a5f31]
+  - octane@0.10.0
+  - @octanejs/app-core@0.1.2
+
 ## 0.2.1
 
 ### Patch Changes

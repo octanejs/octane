@@ -1,6 +1,6 @@
 {
   "name": "@octanejs/alien-signals",
-  "version": "0.0.25",
+  "version": "0.0.26",
   "license": "MIT",
   "type": "module",
   "engines": {
@@ -47,7 +47,7 @@
     "alien-signals": "catalog:default"
   },
   "peerDependencies": {
-    "octane": "workspace:^0.9.0"
+    "octane": "workspace:^0.10.0"
   },
   "devDependencies": {
     "@happy-dom/global-registrator": "20.11.2",

@@ -1,5 +1,88 @@
 # @octanejs/app-core
 
+## 0.1.2
+
+### Patch Changes
+
+- 1d5832e: Honour `server.trustProxy` in the request URL. Behind a proxy that terminates
+  TLS or rewrites `Host`, the Node bridge built every URL from `http://` and the
+  `Host` header, so `Context.url` named a different origin than the browser's and
+  same-origin checks rejected legitimate requests. With `server.trustProxy: true`,
+  `nodeHandler`, the built-in server, `octane-preview`, and the Vite and Rsbuild
+  dev servers take the scheme from the first `X-Forwarded-Proto` entry (`http` or
+  `https` only) and the host from the first `X-Forwarded-Host` entry (a plain
+  `host[:port]` only). A malformed value is ignored, and the path and query always
+  come from the request. `nodeRequestToWebRequest` and `createNodeServer` accept
+  the same `trustProxy` option. The default is unchanged.
+
+  `server.trustProxy` must now be a boolean, so a string such as `'false'` read
+  from an environment variable can no longer enable it.
+- 95090b1: Keep a request path that starts with `//` on the request's own host. The Node
+  bridge resolved the raw request target against the request origin, so a target
+  such as `//evil.example/x` (or `/\evil.example/x`) became host `evil.example`
+  and path `/x` in `Context.url`, and the Vite and Rsbuild dev servers routed it
+  as `/x`. An origin-form target now keeps its whole path and query on the
+  request origin (the `Host` header, or the trusted proxy's with
+  `server.trustProxy`) in `nodeRequestToWebRequest`, the built-in static file
+  layer, and both dev servers. An `http://` or `https://` absolute-form target
+  still keeps its own origin. An absolute-form target with any other scheme, such
+  as `ftp://`, becomes a path under the root instead of a foreign-scheme URL.
+  `@octanejs/app-core/node` exports `nodeRequestUrl`, the URL the bridge gives a
+  Node request.
+- 1de873c: Serve byte ranges from the built-in static file server. Safari will not play a
+  `<video>` or `<audio>` from a server that ignores `Range`, so media served by
+  `createNodeServer` (the default production boot and `octane-preview`) did not
+  play there. A `GET` for one `bytes=` range (`first-last`, `first-` or the suffix
+  `-length`) now gets `206 Partial Content` with `Content-Range`, and a range that
+  starts past the end of the file gets `416` with `Content-Range: bytes */<size>`.
+  A ranged response is never gzip-compressed, and uncompressed static responses
+  send `Accept-Ranges: bytes`. Several ranges, another unit, an invalid range,
+  `If-Range` (static files send no validator to match), `HEAD`, and an empty file
+  still get the whole file.
+- Updated dependencies [ed57b1e]
+- Updated dependencies [8aeb6c0]
+- Updated dependencies [6182678]
+- Updated dependencies [3fb1bec]
+- Updated dependencies [c15aa5a]
+- Updated dependencies [5cad0fa]
+- Updated dependencies [5041f00]
+- Updated dependencies [f7980e0]
+- Updated dependencies [97f1b8e]
+- Updated dependencies [fb404c2]
+- Updated dependencies [9bacb23]
+- Updated dependencies [2f88235]
+- Updated dependencies [8aeb6c0]
+- Updated dependencies [b353f54]
+- Updated dependencies [72cd60b]
+- Updated dependencies [91079dd]
+- Updated dependencies [393b75a]
+- Updated dependencies [f50c128]
+- Updated dependencies [ba46692]
+- Updated dependencies [f69215f]
+- Updated dependencies [9c84293]
+- Updated dependencies [e233e4a]
+- Updated dependencies [087cd77]
+- Updated dependencies [c3c0a3b]
+- Updated dependencies [262926c]
+- Updated dependencies [9dafaef]
+- Updated dependencies [35c0d1b]
+- Updated dependencies [21e0575]
+- Updated dependencies [8b97478]
+- Updated dependencies [ab9a043]
+- Updated dependencies [32e4f3f]
+- Updated dependencies [7a92ad2]
+- Updated dependencies [a2a0c41]
+- Updated dependencies [e03350a]
+- Updated dependencies [0d6ef67]
+- Updated dependencies [c213e87]
+- Updated dependencies [da6524e]
+- Updated dependencies [ace4737]
+- Updated dependencies [b77ab18]
+- Updated dependencies [1744e83]
+- Updated dependencies [023aa7d]
+- Updated dependencies [82a5f31]
+  - octane@0.10.0
+
 ## 0.1.1
 
 ### Patch Changes

@@ -1,5 +1,203 @@
 # octane
 
+## 0.10.0
+
+### Minor Changes
+
+- 91079dd: Handle hydration mismatches the way React 19 does.
+
+  - **Fallback:** a structural or text mismatch is no longer repaired in place. The nearest Suspense boundary, `@try` boundary, `<Hydrate>` island, or the root discards its server DOM, renders on the client, and reports once through `onRecoverableError`.
+  - **Attributes and raw HTML:** attributes and `dangerouslySetInnerHTML` are never patched. Production compares nothing, and development warns.
+  - **Root:** a root keeps showing its server DOM until its client render commits. Its `<Hydrate independent>` widgets survive the fallback with their DOM and state.
+
+  Apps that only call `createRoot` no longer ship any hydration code. In production, `setHTML`'s `<script>` normalization is no longer needed and is gone (#1785).
+- e233e4a: Stop shipping the signal binding runtime in apps that never pass signal
+  handles through ordinary props.
+
+  Since async signals landed, the compiler bound every opaque text, attribute,
+  control, and textarea hole, such as `{row.label as string}`, as a potential
+  signal handle in every module. Every app therefore carried the binding runtime
+  and stamped signal identities on every component. Now such a hole binds a
+  handle only in a module with an import from `octane/signals`; a type-only
+  `import type { SignalHandle } from 'octane/signals'` is enough and does not
+  enable native reads. Modules using DOM bindings keep binding handles, and
+  `$`-named expressions such as `{props.label$}` still bind everywhere.
+
+  This removes 1.7 to 3.3 kB gzip of runtime from the benchmark applications
+  (rows 38,991 → 37,307 bytes, TodoMVC 44,217 → 41,076, chat 43,638 → 40,347).
+
+  An untyped component that renders handles from a lazily loaded signals engine
+  can either type its props or set the new `opaqueSignalHandles` compiler option
+  (also accepted by `octane()` and `@octanejs/vite-plugin`) to keep the previous
+  behavior. In development, a handle that reaches a plain text hole logs an
+  error naming these fixes instead of silently rendering `[object Object]`.
+
+  Hydration through the ordinary writers now matches the signal-aware path it
+  replaces for these holes: a sibling or whole-output `{expr}` hole whose first
+  client value is `undefined` discards the server content it cannot adopt, and an
+  attribute whose first client value is `undefined` removes the server attribute.
+
+### Patch Changes
+
+- ed57b1e: Stop shipping the Fragment ref implementation in applications that use `<Activity>` without `<Fragment ref>`. Revealing an Activity now recognises its Fragment refs by their live registration instead of an `instanceof` check, so the `FragmentInstance` class is bundled only when a Fragment ref exists.
+- 8aeb6c0: Resolve a component's `signal$`, `derived$` and `query$` handles to the component's own cells when the children it passes to another component read them, as `.tsx` children evaluated by the parent already did. Compiled `.tsrx` children previously got cells of their own in the component that rendered them, so `<Card>{record$.get()}</Card>` started a second request for the query, in the browser and on the server, and a derived read computed from signals the component never updated. The fix covers children rendered in a slot, forwarded through another component's children, or rendered by `<Suspense>`, `<ViewTransition>`, `<ErrorBoundary>` or a context provider, and keeps hydration resuming the server's request.
+- 6182678: Resume a `query$` on hydration when the server reads it only from a function the declaring body created, such as a render prop another component renders. The server now streams that query under the component that declared it, as the component's own read would. Previously the browser loaded the query again, or threw "The streamed signal selection bootstrap is missing or incompatible" when the page streamed no other query. A handle passed as a value, such as a prop, is still read in the receiving component's own instance.
+- 3fb1bec: Run a `derived$` computation again once the thenable it threw settles, instead
+  of leaving an async reader retrying the settled wait without end.
+
+  A synchronous `derived$` that throws a promise is pending until that promise
+  settles. Settling it woke the value's readers, but the computation never ran
+  again. An async `derived$` that awaited the value with `read()` then read the
+  same settled wait on every microtask, which froze the page. The computation now
+  runs again when the promise it threw settles, and readers that subscribe to the
+  value are notified. A computation that throws a promise that has already settled
+  stays pending until a signal it reads changes.
+- c15aa5a: Stop shipping form-action submission and Fragment refs to applications whose element descriptors cannot use them. Any renderable hole, such as a bare `{value}`, `{children}` or JSX stored in a variable, reaches the generic child renderer. That renderer used to keep the form submit driver (and through it the transition engine) and the `FragmentInstance` class in every such bundle, about 6.4 kB gzip. These now ship only when something can need them: the public `createElement`, `createElementAt` and `cloneElement` install both. Compiled JSX installs form actions when a host or dynamic tag has an `action`/`formAction` prop or a spread, and Fragment refs when a Fragment or dynamic tag has a `ref` or a spread.
+- 5cad0fa: Preserve directory-upload file paths in early form-submission snapshots while keeping accepted files detached and immutable.
+- 5041f00: Retire an early host binding when hydration replaces a host that was moved
+  inside the root while its boundary was pending.
+
+  Before, the boundary rendered a new host at the original site but left the
+  moved host's early binding subscribed, so later source notifications kept
+  writing to the moved element. Committing the replacement now runs that
+  binding's cleanup, as an accepted handoff would. The moved element keeps its
+  last published values. A resumed attempt that suspends again leaves the early
+  binding live until a replacement commits.
+- f7980e0: Hydration no longer loops when the next server node after an early-bound host (`adoptBindings`) is stale content. Hydration now removes that content, reports a recoverable error and keeps the adopted host, the same as it does when no early binding is installed. The lease is still refused when anything else changes a neighbor of the host.
+- 97f1b8e: Keep pending derived signal readers attached to the accepted computation when it is redeclared.
+- fb404c2: Hydrate a form whose controls are named after element methods, such as
+  `<input name="getAttribute">`.
+
+  A form exposes its named controls as properties, and they shadow methods like
+  `getAttribute` and `matches`. Hydration read the form's attributes through that
+  property and threw `getAttribute is not a function`, so the boundary rebuilt the
+  form on the client and dropped a submission accepted before hydration.
+  Independent hydration's mutation observer failed the same way on `matches`.
+  Both now call the element prototype's methods.
+- 9bacb23: Fragment `addEventListener` now follows `AbortSignal` like `EventTarget`. Aborting the signal ends the registration, so the same callback can be added again. A signal that is already aborted registers nothing, and the options are copied when the listener is added.
+- 2f88235: Keep each custom hook call's state independent when the hook reads through a getter or proxy, including during hydration.
+- 8aeb6c0: Resolve a component's `signal$`, `derived$` and `query$` handles to the component's own cells when the children it writes between `<Hydrate>` tags read them. `<Hydrate>` rendered those children in a frame of its own, in the browser and on the server, so `<Hydrate when={load()}>{record$.get()}</Hydrate>` started a second request for the query and a derived read computed from signals the component never updated. The fix covers inline boundaries (`split={false}`), the children the compiler splits into a module of their own, children forwarded into a boundary, deferred activation, and a permanently static `when={never()}` boundary on the server.
+- b353f54: Hydrating a form control now projects a value or checked state that the client renders differently from the server, as React 19 does. The client value becomes the control's reset baseline: the `value` attribute of an `<input>`, the content of a `<textarea>`, and the `checked` attribute of a checkbox or radio, whether controlled or set with `defaultChecked`. An input or textarea the user has not edited shows the client value, so a controlled control no longer displays the server's value while its state holds another. A value the user typed before hydration is kept until the control's first commit or discrete event, and a checkbox keeps its live checked state. A hydration whose values match the server's still writes nothing to the DOM.
+- 72cd60b: Fall back when hydration reaches a `@try` or `ErrorBoundary` that the server
+  did not render at that position.
+
+  Before, a boundary with no server range built fresh markers. When its try body
+  threw, the catch arm rendered beside the server nodes that stood there, so both
+  were visible and nothing was reported. Now the missing range is a mismatch, as
+  it is for an `@if` or `@switch` branch: the nearest Suspense boundary, `@try`
+  boundary, `<Hydrate>` island, or the root renders on the client, as in React 19.
+- 393b75a: Fix nested interaction hydration in same-origin iframe ShadowRoots when the runtime belongs to the parent window. Preserve server-rendered targets and replay the activating event once, including events dispatched on foreign text nodes.
+- f50c128: Re-run an inferred hook when the receiver of a one-level method call changes, even if the method is one own function shared by several objects. `useEffect(() => source.subscribe())` now moves its subscription to a new `source` that shares `subscribe`, and a memo calling `source.read()` recomputes. An own arrow function still tracks only itself, because it cannot read `this`, so `props.onChange(...)` with a stable arrow callback stays quiet when the props container is rebuilt. Any other own function, including `vi.fn()` mocks, now tracks its receiver, as React Compiler does for every method call.
+- ba46692: Keep queries in an unread derived branch lazy across renders. When the branch is first entered, it uses the latest captured selection and loader.
+- f69215f: Keep named derived and query producers reader-owned when they capture local
+  signals. The same function, when forwarded as a callback, continues to read the
+  declaring component's cell. This also preserves owner identity through SSR and
+  hydration.
+- 9c84293: Resolve a component's `signal$`, `derived$` and `query$` handles to the component's own cells when a nested `@{ … }` block reads them, as directive arms and keyed rows already do. The block previously got cells of its own, so it started a second request for each query and computed from signals the component never updated. The fix applies in the browser, on the server and during hydration, and covers a nested block in JSX a component returns. A nested block still owns, and retires, the declarations it makes itself.
+- 087cd77: Stop inferred hook dependencies, compiler-memoized `use()` arguments, and server-rendered prop creations from reading values an optional chain skips. `run?.(options.label)` and `value?.[options.key]` no longer throw when `run` or `value` is missing and `options` is undefined, and no longer call an `options.label` getter before the authored code would. When the receiver exists, the dependency still follows `options.label` as an own data property.
+- c3c0a3b: Abort a pending `query$` request when its owner is replaced or removed while a
+  Suspense boundary or `@try` is still pending.
+
+  Before, a retried attempt kept the old owner's request alive until the boundary
+  resolved. This happened when a child under a pending boundary changed only its
+  `key`, when an `@if` arm or component was swapped, or when a nested boundary
+  was removed while its outer boundary waited. A newer attempt that renders a
+  different component, key or arm in that place, or completes without it, now
+  retires the old owner and aborts its request. A place that attempt has not
+  reached yet keeps its request, and so does an owner that renders again with the
+  same identity.
+- 262926c: Memoize `use()` arguments in plain `.ts`/`.js` hook modules with the same
+  dependency rules as `.tsrx` components.
+
+  A plain module's dependency array read values its `use()` argument skips.
+  `use(load(run?.(options.label) ?? 'idle'))`, `use(load(() => options.label))`
+  and `use(load(ready ? options.label : 'idle'))` each threw when `options` was
+  undefined, and a `typeof window !== 'undefined'` guard read a bare `window`
+  during server rendering. Skipped reads now use the guarded descriptor probe,
+  deferred reads use `options?.label`, and typeof guards are replayed.
+- 9dafaef: Build files outside the Vite or Rspack root to the same bytes from any checkout location. Their compiler module ID is now relative to the root (`../packages/ui/src/Card.tsrx`) instead of the absolute host path. Every component and signal site hash in those files includes that ID, so moving a monorepo, or building in a different CI directory, produced different bundles from identical source. Workspace packages linked from outside the application root, such as Octane bindings in a monorepo, were affected.
+- 35c0d1b: Reduce the Suspense retry reveal window from 300ms to 100ms so ready content
+  spends less time behind a visible fallback. The default hold for already-visible
+  transition content remains indefinite.
+- 21e0575: Stop component-local `derived$` and `query$` chains from re-rendering without end
+  while a value they read is pending or rejected (#1735, #1736, #1737).
+
+  Every render declares a component's `derived$` and `query$` handles again, so a
+  declaration that read another local `derived$` or `query$` captured a new handle
+  each time. Its captured values never compared equal, so every render ran its
+  computation again. When that result could never equal the committed one (a query
+  still pending, a rejected query's error, a new object), accepting it re-rendered
+  its readers, whose render declared it again. `act()` reported that the scheduler
+  did not stabilize, and in a browser the tab stopped responding while the query
+  stayed pending or after it was rejected.
+
+  A captured handle now matches the accepted one when it resolves to the same cell.
+  It differs only when its key selects another cell or when the render presents a
+  redeclared definition of that cell, so a dependent still reads the definition its
+  render presents. A local computation that reads other local handles also no
+  longer runs again on renders that change none of its captured values.
+- 8b97478: Report a render loop driven by a component's own `derived$` or `query$` as a
+  "Maximum update depth exceeded" error instead of freezing the page.
+
+  A `derived$` or `query$` declared in a component body that captures a value the
+  body creates on every render, such as an inline object, runs again on every
+  render. If its result never compares equal, such as a new object, accepting each
+  render notified its readers, which rendered and declared it again. Those renders
+  started a fresh update each time, so the nested-update limit never applied:
+  `act()` reported that the scheduler did not stabilize, and outside `act()` the
+  page stopped responding with no error. Renders that a commit schedules through a
+  signal notification now count toward the update that caused them, so the cycle
+  fails with the update depth error, in production too. In development the message
+  names the component and the likely cause.
+
+  A redeclared result that equals the accepted one, the same error or a read still
+  waiting on the same pending dependencies, no longer notifies the cell's readers,
+  so a body that captures a new object while its query is pending or rejected now
+  settles instead of looping.
+- ab9a043: Re-evaluate a redeclared derived signal whose dependency changes while a held transition stages it, instead of committing its stale ready value.
+- 32e4f3f: Remove the server range that hydration left behind when a stale node, such as one a browser extension inserted, stood before a component's range in an element. The client rebuilt the component but kept the server's copy too, so the component's content appeared twice.
+- 7a92ad2: Preserve hydration handoff for unbound host attributes in production Strong mode.
+- a2a0c41: A hydration that suspends no longer lets outside code change the site of an early-bound host (`adoptBindings`). When the suspended attempt rolled back, it restored the stale server content it had removed beside the host, but the host's parent stayed marked as repaired. If other code then removed that content, the resumed attempt accepted the lease anyway and retired the early binding. Hydration now refuses the lease in that case and the early binding stays live. The refusal goes to the root's `onUncaughtError` instead of escaping as an unhandled error, because no `hydrateRoot` caller is left to catch it.
+- e03350a: Stop shipping Suspense hydration in applications that hydrate without Suspense. `hydrateRoot` no longer bundles the Suspense boundary machinery (`mountTry`, catch switching, Activity and hidden-reveal paths) unless the application renders a Suspense or `@try` boundary, which saves about 9 kB gzip on a minimal hydrating client.
+- 0d6ef67: Keep the `key` on a `<Fragment key={…}>` written in a `.tsrx` template, so a new
+  key remounts its children as it does in React.
+
+  The template compiler inlined a long-form Fragment's children and dropped its
+  key, both in a `@{ … }` body and in a directive arm such as `@try` or `@if`.
+  Changing the key therefore kept the children's state, effects, and a caught
+  `@try` error. A keyed Fragment now renders through the same keyed descriptor
+  boundary as a keyed host element, on the client, on the server, and during
+  hydration. This also covers a keyed Fragment with directive children in
+  returned JSX. Unkeyed Fragments still compile to their inlined children.
+- c213e87: Fix controlled inputs losing user edits when an `onXxxCapture` handler for the same event writes a signal that the form reads. A signal write in a capture handler is meant to publish with the rest of the event's handlers. For an event the browser dispatched itself, such as a keystroke, a tap or a drag, it published in the microtask checkpoint between the root's capture and bubble listeners instead. The form then re-rendered its controlled `value` to the old state before `onInput` could read the edit, so a range stayed at its old value and typed characters were dropped. Trusted events now keep the capture write until the bubble handlers have run, or, when a native listener stops propagation below the root, until the browser has finished dispatching the event. Script-dispatched events are unchanged.
+- da6524e: Specialize production roots and component calls over `.tsx` components the way `.tsrx` components already are. Vite's TypeScript transform reprints every `.tsx` module after Octane compiles it, so the Vite plugin's check that an imported component still has the compiled code it proved never passed for `.tsx`. Every `.tsx` app therefore shipped the generic root and component paths, about 30 kB gzip more than the same app in `.tsrx`. The check now accepts a reprint that changes only positions, literal spellings and comments, and still falls back to the generic paths when a later transform changes the program.
+- ace4737: Recover when server HTML loses a hydration range's closing marker instead of
+  failing the root.
+
+  Some HTML minifiers and proxies strip comments, and a range whose `<!--]-->` was
+  removed made hydration throw `Cannot read properties of null (reading
+  'nodeType')` and empty the container. Hydration now renders the nearest Suspense
+  or `<Hydrate>` boundary around the damaged range, or else the root, on the
+  client and reports one recoverable error through `onRecoverableError`. An
+  application `@catch` or `ErrorBoundary` does not receive it.
+- b77ab18: Route errors from universal catch fallback effects and cleanups to an enclosing boundary instead of repeatedly entering the same catch fallback.
+- 1744e83: Refresh a memoized `use()` argument when the receiver of an inherited method call changes. `use(load(count.toFixed(1)))` used to depend on `count.toFixed`, which is `Number.prototype.toFixed` for every number, so it kept showing the first `count`. It now tracks `count`, and the same applies to plain TypeScript hooks and server prop creations. An own function, arrow or not, still tracks only itself, so `use(props.load(id))` keeps its request when the parent rebuilds `props` around the same `load`.
+- 023aa7d: Production Vite builds no longer hang when components import and render each
+  other. Before compiling a production client module, the plugin loads each
+  imported component to check whether it can use a lighter child slot. Inside a
+  cycle (`A.tsrx` renders `B.tsrx`, which renders `A.tsrx`), each module's
+  transform waited for the other's, so the build never finished. That happened for
+  cycles of any length and for separate entry points into one cycle, even when
+  recursion was bounded at runtime.
+
+  The plugin now tracks which proof loads are waiting on which modules, and it
+  skips a load that would close a cycle. Every import on that cycle keeps ordinary
+  component dispatch, so a ring of components compiles the same way whichever
+  member the build reaches first. Imports outside a cycle keep the specialization,
+  including imports of a component that sits on one, and acyclic graphs compile
+  exactly as before.
+- 82a5f31: Keep reader ownership for a `derived$` or `query$` producer called through a namespace import behind a type assertion, such as `(Signals as typeof Signals).derived$(compute$)`. It now gets the same per-reader producer copy as a direct import.
+
 ## 0.9.1
 
 ### Patch Changes
