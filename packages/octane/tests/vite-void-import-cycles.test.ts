@@ -2,7 +2,7 @@ import { mkdirSync, mkdtempSync, realpathSync, rmSync, symlinkSync, writeFileSyn
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
-import { build, type Rolldown } from 'vite';
+import { build, type Plugin, type Rolldown } from 'vite';
 import { octane } from 'octane/compiler/vite';
 import { evaluateCompiledFixtureCode } from './_server-fixture.js';
 
@@ -56,7 +56,7 @@ function fixture(files: Record<string, string>) {
 	return root;
 }
 
-async function buildFixture(root: string, inputs: string[]) {
+async function buildFixture(root: string, inputs: string[], plugins: Plugin[] = []) {
 	const compiled: Record<string, string> = {};
 	let timer: ReturnType<typeof setTimeout> | undefined;
 	const deadline = new Promise<never>((_, reject) => {
@@ -73,6 +73,7 @@ async function buildFixture(root: string, inputs: string[]) {
 				logLevel: 'silent',
 				plugins: [
 					octane({ hmr: false }),
+					...plugins,
 					{
 						name: 'capture-compiled-modules',
 						transform(code, id) {
@@ -203,3 +204,60 @@ describe('production Vite void-component proofs across import cycles', { timeout
 		expect(outputs[2]).toEqual(outputs[0]);
 	});
 });
+
+// Vite's own TypeScript transform reprints every `.ts`/`.tsx` module after the
+// Octane pre-transform, so a `.tsx` component's final code never equals the
+// compiled code byte for byte. The proof compares the parsed program instead,
+// and still fails closed when a later transform changes that program.
+describe(
+	'production Vite void-component proofs for TypeScript modules',
+	{ timeout: 30_000 },
+	() => {
+		const files = {
+			// Branch returns of distinct host roots lower to a void body.
+			'A.tsx':
+				"import B from './B.tsx';\n" +
+				'export default function A({ depth }: { depth: number }) {\n' +
+				'\tif (depth < 0) return <p>none</p>;\n' +
+				'\treturn <main><span>A</span><B depth={depth} /></main>;\n' +
+				'}\n',
+			'B.tsx':
+				'export default function B({ depth }: { depth: number }) {\n' +
+				'\tif (depth > 9) return <p>deep</p>;\n' +
+				'\treturn <section>{String(depth)}</section>;\n' +
+				'}\n',
+			'entry.ts': `import { createRoot, flushSync } from 'octane';
+import A from './A.tsx';
+export function run(host) {
+	const root = createRoot(host);
+	root.render(A, { depth: 3 });
+	flushSync(() => {});
+	const text = host.textContent;
+	root.unmount();
+	return { text, empty: host.childNodes.length === 0 };
+}
+`,
+		};
+
+		it('proves void .tsx components after the TypeScript reprint', async () => {
+			const { compiled, chunks } = await buildFixture(fixture(files), ['entry.ts']);
+			expect(compiled['entry.ts']).toContain('__createVoidRoot');
+			expect(compiled['A.tsx']).toContain('componentSlotVoid(');
+			expect(run(chunks[0])).toEqual({ text: 'A3', empty: true });
+		});
+
+		it('keeps the generic paths when a later transform changes the component program', async () => {
+			const rewrite: Plugin = {
+				name: 'rewrite-component-program',
+				transform(code, id) {
+					if (id.endsWith('/A.tsx') || id.endsWith('/B.tsx'))
+						return `${code}\nexport const rewritten = true;\n`;
+				},
+			};
+			const { compiled, chunks } = await buildFixture(fixture(files), ['entry.ts'], [rewrite]);
+			expect(compiled['entry.ts']).not.toContain('__createVoidRoot');
+			expect(compiled['A.tsx']).not.toContain('componentSlotVoid(');
+			expect(run(chunks[0])).toEqual({ text: 'A3', empty: true });
+		});
+	},
+);
