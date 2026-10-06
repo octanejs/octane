@@ -460,7 +460,12 @@ Every committed byte budget, for each reachability scenario and each complete
 Octane application, is a ratchet: the measured production bytes plus 32 for raw
 and gzip. Full PR and main CI enforce all of them in test shard 1/4, so a change
 that grows any of these bundles by more than 32 raw or gzip bytes fails before
-merge. Brotli budgets get 256 bytes: brotli is not monotonic in code size, and a
+merge. CI also requires savings to be recorded: `--budgets --ratchet` rejects
+any cap above the result of `--write-budgets`. A separate budget-only raise
+with a valid comparison base can land in advance; its absolute ceilings are
+still enforced. The next feature change must record any unused headroom. Both
+the reachability and complete-application runners use this policy.
+Brotli budgets get 256 bytes: brotli is not monotonic in code size, and a
 change that only removed code has raised it by 120 bytes, so a tight brotli
 budget would fail reductions. The commands:
 
@@ -468,6 +473,10 @@ budget would fail reductions. The commands:
 node benchmarks/bundle-size/run-minimal.mjs --budgets
 node benchmarks/bundle-size/run.mjs --budgets octane-tsrx octane-jsx
 ```
+
+Run either command with `--write-budgets` instead of `--budgets` to record
+savings. To reproduce CI exactly, supply `BUDGET_BASE=<base-sha>` and add
+`--ratchet` alongside `--budgets`. A missing comparison base fails that mode.
 
 Positional arguments narrow either command to some scenarios or targets while
 you iterate.

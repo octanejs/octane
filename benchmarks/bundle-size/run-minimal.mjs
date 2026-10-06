@@ -5,8 +5,9 @@
 //   node run-minimal.mjs --budgets [scenario...]        fail when a scenario exceeds its budget
 //   node run-minimal.mjs --write-budgets [scenario...]  reset budgets to measured + headroom
 //
-// Pull request CI runs `--budgets` over every scenario. `--write-budgets` is for
-// a dedicated budget pull request only (CONTRIBUTING.md, "Size budgets").
+// Pull request CI runs `--budgets --ratchet` over every scenario.
+// `--write-budgets` records savings in a source change; any raise must land
+// alone (CONTRIBUTING.md, "Size budgets").
 //
 // Each bundler builds the way its users ship. Vite scenarios use Vite 8's
 // default client minifier (`'oxc'`); Vite's `'esbuild'` mode would turn off
@@ -26,6 +27,7 @@ import { build as buildVite } from 'vite';
 import { appComponent, clientEntry } from '../../packages/cli/src/commands/init/templates.js';
 import { verifyScenario } from './verify-reachability.mjs';
 import { ratchetBudget, selectMinimalScenarios, verifyByteBudget } from './minimal-gates.mjs';
+import { requireBudgetRatchet } from './budget-raises.mjs';
 
 const directory = path.dirname(fileURLToPath(import.meta.url));
 const repository = path.resolve(directory, '../..');
@@ -260,8 +262,10 @@ assert.deepEqual(
 	'minimal-import budgets must cover every scenario exactly once',
 );
 
+const args = process.argv.slice(2);
+const requireTight = requireBudgetRatchet(args);
 const { selectedScenarios, enforceBudgets, writeBudgets } = selectMinimalScenarios(
-	process.argv.slice(2),
+	args.filter((arg) => arg !== '--ratchet'),
 	scenarios,
 );
 const measuredBudgets = {};
@@ -603,7 +607,7 @@ try {
 		};
 		const budget = budgets[name];
 		const budgetEnforced = enforceBudgets || (id === 'behavior-root' && !writeBudgets);
-		verifyByteBudget(name, measured, budget, budgetEnforced);
+		verifyByteBudget(name, measured, budget, budgetEnforced, requireTight);
 		if (writeBudgets) measuredBudgets[name] = ratchetBudget(measured, budget);
 		payload.targets.push({
 			name,

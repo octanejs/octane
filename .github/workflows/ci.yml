@@ -409,6 +409,9 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          # Only the budget shard compares against an earlier commit.
+          fetch-depth: ${{ matrix.shard == '1/4' && '0' || '1' }}
 
       - name: Install pnpm
         uses: pnpm/action-setup@d9184bf108216479bc5a137cc391f4d7b14c870b # v6.1.0
@@ -432,9 +435,11 @@ jobs:
       # bundle, and an Apollo binding that must keep `octane` tree-shakeable.
       - name: Verify every bundle budget
         if: matrix.shard == '1/4'
+        env:
+          BUDGET_BASE: ${{ github.event_name == 'pull_request' && 'HEAD^1' || github.event.before }}
         run: |
-          node benchmarks/bundle-size/run-minimal.mjs --budgets
-          node benchmarks/bundle-size/run.mjs --budgets octane-tsrx octane-jsx
+          node benchmarks/bundle-size/run-minimal.mjs --budgets --ratchet
+          node benchmarks/bundle-size/run.mjs --budgets --ratchet octane-tsrx octane-jsx
 
       # A client that only calls createRoot never hydrates. Its production
       # bundle, under Vite's default minifier and under esbuild, must map no

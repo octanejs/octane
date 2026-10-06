@@ -64,7 +64,8 @@ import { gzipSync, brotliCompressSync, constants as zc } from 'node:zlib';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { BYTE_METRICS, ratchetBudget } from './minimal-gates.mjs';
+import { BYTE_METRICS, ratchetBudget, verifyByteBudget } from './minimal-gates.mjs';
+import { requireBudgetRatchet } from './budget-raises.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const JS_FRAMEWORK = path.resolve(__dirname, '../js-framework');
@@ -148,6 +149,7 @@ assert.deepEqual(
 );
 
 const args = process.argv.slice(2);
+const requireTight = requireBudgetRatchet(args);
 const enforceBudgets = args.includes('--budgets');
 const writeBudgets = args.includes('--write-budgets');
 assert.equal(
@@ -155,7 +157,9 @@ assert.equal(
 	false,
 	'--budgets checks the committed budgets and --write-budgets replaces them; pass one',
 );
-const requestedTargets = args.filter((arg) => arg !== '--budgets' && arg !== '--write-budgets');
+const requestedTargets = args.filter(
+	(arg) => arg !== '--budgets' && arg !== '--write-budgets' && arg !== '--ratchet',
+);
 const knownTargets = new Set(SETS.flatMap((set) => set.targets));
 for (const target of requestedTargets) {
 	assert.equal(knownTargets.has(target), true, `Unknown bundle-size target: ${target}`);
@@ -447,14 +451,13 @@ if (enforceBudgets) {
 	for (const { target, label, prefix, budget } of budgetedSets) {
 		const ops = byName.get(target).ops;
 		for (const [bucket, operation] of BUDGET_BUCKETS) {
-			for (const metric of BYTE_METRICS) {
-				const measured = ops[`${prefix}${operation}_${metric}`]?.median;
-				assert.equal(typeof measured, 'number', `${label}/${bucket}: missing ${metric} bytes`);
-				if (measured > budget[bucket][metric]) {
-					breaches.push(
-						`${label}/${bucket}: production ${metric} bytes ${measured} exceed committed budget ${budget[bucket][metric]}`,
-					);
-				}
+			const measured = Object.fromEntries(
+				BYTE_METRICS.map((metric) => [metric, ops[`${prefix}${operation}_${metric}`]?.median]),
+			);
+			try {
+				verifyByteBudget(`${label}/${bucket}`, measured, budget[bucket], true, requireTight);
+			} catch (error) {
+				breaches.push(error.message);
 			}
 		}
 	}
