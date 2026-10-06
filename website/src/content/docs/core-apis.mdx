@@ -299,6 +299,11 @@ On the first render, `previous` is `undefined`. When the source changes, it is
 Like `useState`, the hook also offers an optional third tuple item, `getValue`, for
 reading the latest value inside an async or delayed callback.
 
+In TypeScript, the linked value takes the calculation's return type. TypeScript types
+`previous` before it reads that return type, so a calculation that reads
+`previous.value` should declare its value type with a return annotation, for example
+`(nextItems, previous): Item | null => …`, or by annotating `previous`.
+
 <h3 id="strong-mode">Enforce render snapshots with Strong mode</h3>
 
 Strong mode is an opt-in compiler contract: a module promises that rendering reads

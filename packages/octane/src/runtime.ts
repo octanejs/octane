@@ -13516,6 +13516,8 @@ interface LinkedStateSlot<Source, Value> {
 }
 
 type LinkedStateTuple<Value> = [Value, StateSetter<Value>, () => Value];
+/** A known `previous.value` type, else the reconciler's return type. */
+type LinkedStateValue<Value, Previous> = unknown extends Previous ? Value : Previous;
 
 // A sibling may finish before another sibling suspends their shared boundary.
 // Keep linked-state publication and caught-error reports with their hidden owner
@@ -13608,13 +13610,25 @@ function publishHiddenRevealActions(boundary: ScheduledVisibilityOwner): void {
  * the same render instead of scheduling a render-phase setter/effect replay.
  * Publication uses the existing render/WIP transaction so a suspended subtree
  * cannot leak a speculative source or value into the previously committed tree.
+ *
+ * `Value` is the reconciler's return type and `Previous` is the type of
+ * `previous.value`. They are separate type parameters because contextually
+ * typing an unannotated `previous` fixes every type parameter its type names
+ * before the callback body supplies a return type, so one parameter for both
+ * became `unknown` whenever nothing else named it. `Previous` comes from an
+ * annotated `previous`, typed options, or explicit type arguments, and
+ * otherwise defaults to what `Value` has inferred so far. The linked value is
+ * `Previous` when that is known and falls back to `Value`, so an unannotated
+ * `previous.value` reads as `unknown` while the tuple keeps the returned type.
+ * `Value extends Previous` keeps every returned value storable as
+ * `previous.value`.
  */
-export function useLinkedState<Source, Value>(
+export function useLinkedState<Source, Value extends Previous, Previous = Value>(
 	source: Source,
-	reconcile: (source: Source, previous: LinkedStatePrevious<Source, Value> | undefined) => Value,
-	options?: LinkedStateOptions<Source, Value>,
+	reconcile: (source: Source, previous: LinkedStatePrevious<Source, Previous> | undefined) => Value,
+	options?: LinkedStateOptions<Source, Previous>,
 	slot?: symbol,
-): LinkedStateTuple<Value>;
+): LinkedStateTuple<LinkedStateValue<Value, Previous>>;
 export function useLinkedState<Source, Value>(
 	source: Source,
 	reconcile: (source: Source, previous: LinkedStatePrevious<Source, Value> | undefined) => Value,
@@ -13778,12 +13792,12 @@ export function useLinkedState<Source, Value>(
 }
 
 /** Compiler-selected linked-state variant when the current-value getter is observed. */
-export function __useLinkedStateWithGetter<Source, Value>(
+export function __useLinkedStateWithGetter<Source, Value extends Previous, Previous = Value>(
 	source: Source,
-	reconcile: (source: Source, previous: LinkedStatePrevious<Source, Value> | undefined) => Value,
-	options?: LinkedStateOptions<Source, Value>,
+	reconcile: (source: Source, previous: LinkedStatePrevious<Source, Previous> | undefined) => Value,
+	options?: LinkedStateOptions<Source, Previous>,
 	slot?: symbol,
-): LinkedStateTuple<Value>;
+): LinkedStateTuple<LinkedStateValue<Value, Previous>>;
 export function __useLinkedStateWithGetter<Source, Value>(
 	source: Source,
 	reconcile: (source: Source, previous: LinkedStatePrevious<Source, Value> | undefined) => Value,

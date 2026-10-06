@@ -234,6 +234,11 @@ default; pass `{ sourceEqual, valueEqual }` as a third argument when you need
 something else. Like `useState`, `useLinkedState` supports an optional third
 tuple item, `getValue`.
 
+In TypeScript, the linked value takes the calculation's return type. TypeScript
+types `previous` before it reads that return type, so a calculation that reads
+`previous.value` should declare its value type with a return annotation, for
+example `(nextItems, previous): Item | null => …`, or by annotating `previous`.
+
 ## Lazy ref initialization
 
 When a mutable ref needs an expensive initial value, pass a factory to
