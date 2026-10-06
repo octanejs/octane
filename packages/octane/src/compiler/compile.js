@@ -18178,6 +18178,8 @@ export function collectDepPaths(expr, coarsenDepRoots, isModuleBound, methodDep)
 		if (probe) (probes ??= new Map()).set(key, deps.length);
 		if (probe || call) {
 			const name = staticDepMemberName(node);
+			// A guarded read, never a call: an own function value is its own
+			// dependency because no receiver reaches it.
 			node = b.call(
 				methodDep(),
 				node.object,
