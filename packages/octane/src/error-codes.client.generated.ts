@@ -312,6 +312,7 @@ type ClientErrorArguments = {
 	339: [];
 	340: [];
 	341: [];
+	342: [];
 };
 
 export function formatClientError<Code extends keyof ClientErrorArguments>(
@@ -1356,6 +1357,11 @@ export function formatClientError<Code extends keyof ClientErrorArguments>(
 			case 341:
 				return formatDevErrorMessage(
 					'The server could not finish this Suspense boundary, because it suspended during a synchronous render such as renderToString, which cannot wait for data. Switched to client rendering.',
+					args,
+				);
+			case 342:
+				return formatDevErrorMessage(
+					'A descriptor carried a function form action, but no element factory installed form actions. This is a bug in the Octane compiler.',
 					args,
 				);
 			default:

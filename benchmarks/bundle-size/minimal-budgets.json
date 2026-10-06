@@ -30,9 +30,9 @@
     "brotli": 21904
   },
   "root-static": {
-    "raw": 163632,
-    "gzip": 51626,
-    "brotli": 45161
+    "raw": 163536,
+    "gzip": 51607,
+    "brotli": 45145
   },
   "root-static-local": {
     "raw": 72222,
