@@ -706,6 +706,177 @@ describe('behavior-only roots', () => {
 	}
 
 	for (const dev of [false, true]) {
+		for (const server of ['unchanged', 'externally removed'] as const) {
+			// As in React, hydration skips a third-party node beside a root-level
+			// host and leaves it in place, so it is no mismatch. Removing it while
+			// hydration is suspended still changes the early host's site, which
+			// refuses the lease when hydration resumes. No hydrateRoot caller remains
+			// to receive that refusal, so the root reports it once instead, and the
+			// early owner stays live.
+			const name =
+				server === 'unchanged'
+					? 'hands off an early host after suspended hydration when its root neighbor is unchanged'
+					: 'reports a changed early host after suspended hydration when its root neighbor is removed';
+			it(`${name} (${dev ? 'dev' : 'prod'})`, async () => {
+				const source = [
+					"import { useLayoutEffect } from 'octane';",
+					"import { unbound } from 'octane/behavior';",
+					"export function Host(props) @{ 'use dom bindings';",
+					'  <button data-state={props.label}>{unbound(props.children)}</button>',
+					'}',
+					'export const gate = { pending: undefined };',
+					'function read() { if (gate.pending !== undefined) throw gate.pending; return "done"; }',
+					'export function App(props) @{',
+					'  props.onRender();',
+					'  useLayoutEffect(() => { props.onCommit(); }, []);',
+					'  <Host label={read() && props.label}><span>Hello</span></Host>',
+					'}',
+				].join('\n');
+				let renders = 0;
+				const onCommit = vi.fn();
+				const initial = {
+					label: 'server',
+					onCommit,
+					onRender: () => {
+						if (++renders > 20) throw new Error('Hydration did not converge.');
+					},
+				};
+				const fixture = authoredPresentation('Host', { label: 'server' }, dev, source);
+				container.innerHTML = renderToString(fixture.server.App, initial).html;
+				const button = container.querySelector('button')!;
+				const extra = document.createElement('script');
+				extra.type = 'application/json';
+				extra.textContent = '{}';
+				button.after(extra);
+				const binding = fixture.attach(button, fixture.state);
+				const recoverable = vi.fn();
+				const uncaught = vi.fn();
+				try {
+					fixture.publish({ label: 'early' });
+					const client = fixture.loadClient();
+					let release!: () => void;
+					const pending = new Promise<void>((resolve) => (release = resolve));
+					client.gate.pending = pending;
+					hydratedRoot = hydrateRoot(
+						container,
+						client.App,
+						{ ...initial, label: 'hydrated' },
+						{
+							bindingLeases: [binding],
+							onRecoverableError: recoverable,
+							onUncaughtError: uncaught,
+						},
+					);
+					await act(() => {});
+					// The root-level sibling remains in place while hydration is pending.
+					expect(extra.isConnected).toBe(true);
+					expect(onCommit).not.toHaveBeenCalled();
+					expect(fixture.cleanup).not.toHaveBeenCalled();
+					if (server === 'externally removed') extra.remove();
+					client.gate.pending = undefined;
+					await act(async () => {
+						release();
+						await pending;
+					});
+					expect(container.querySelector('button')).toBe(button);
+					if (server === 'externally removed') {
+						expect(uncaught).toHaveBeenCalledOnce();
+						expect(String(uncaught.mock.calls[0]![0])).toMatch(
+							/supported fixed native view|Minified Octane error #75;/,
+						);
+						// A refused lease is not a mismatch: nothing falls back.
+						expect(recoverable).not.toHaveBeenCalled();
+						expect(onCommit).not.toHaveBeenCalled();
+						expect(fixture.cleanup).not.toHaveBeenCalled();
+						fixture.publish({ label: 'still early' });
+						expect(button.getAttribute('data-state')).toBe('still early');
+						return;
+					}
+					expect(uncaught).not.toHaveBeenCalled();
+					expect(recoverable).not.toHaveBeenCalled();
+					expect(extra.isConnected).toBe(true);
+					expect(button.getAttribute('data-state')).toBe('hydrated');
+					expect(onCommit).toHaveBeenCalledOnce();
+					expect(fixture.cleanup).toHaveBeenCalledOnce();
+					fixture.publish({ label: 'retired' });
+					expect(button.getAttribute('data-state')).toBe('hydrated');
+				} finally {
+					hydratedRoot?.unmount();
+					hydratedRoot = undefined;
+					binding.dispose();
+				}
+			});
+		}
+	}
+
+	for (const dev of [false, true]) {
+		// A branch that the early owner switched since the server rendered is not
+		// a mismatch: only the early owner can change that DOM back. Hydration
+		// keeps the early DOM, falls back nowhere and reports nothing, then adopts
+		// that DOM once a later publication renders the client's branch.
+		it(`waits for the early owner to publish the client's branch before handing off (${dev ? 'dev' : 'prod'})`, async () => {
+			const source = [
+				"export function Toggle(props) @{ 'use dom bindings';",
+				'  <div data-label={props.label}>',
+				'    @if (props.on) { <b>On</b> } @else { <i>Off</i> }',
+				'  </div>',
+				'}',
+				'export function App(props) @{ <Toggle on={props.on} label={props.label} /> }',
+			].join('\n');
+			const fixture = authoredPresentation('Toggle', { on: false, label: 'server' }, dev, source);
+			container.innerHTML = renderToString(fixture.server.App, { on: false, label: 'server' }).html;
+			const div = container.querySelector('div')!;
+			const binding = fixture.attach(div, fixture.state);
+			const recoverable = vi.fn();
+			const uncaught = vi.fn();
+			try {
+				fixture.publish({ on: true, label: 'early' });
+				const early = div.firstElementChild!;
+				expect(early.localName).toBe('b');
+				const client = fixture.loadClient();
+				hydratedRoot = hydrateRoot(
+					container,
+					client.App,
+					{ on: false, label: 'hydrated' },
+					{
+						bindingLeases: [binding],
+						onRecoverableError: recoverable,
+						onUncaughtError: uncaught,
+					},
+				);
+				await act(() => {});
+				expect(container.querySelector('div')).toBe(div);
+				expect(div.firstElementChild).toBe(early);
+				expect(div.getAttribute('data-label')).toBe('early');
+				expect(recoverable).not.toHaveBeenCalled();
+				expect(fixture.cleanup).not.toHaveBeenCalled();
+				fixture.publish({ on: false, label: 'early again' });
+				const off = div.firstElementChild!;
+				expect(off.localName).toBe('i');
+				await act(() => {});
+				expect(uncaught).not.toHaveBeenCalled();
+				expect(recoverable).not.toHaveBeenCalled();
+				expect(container.querySelector('div')).toBe(div);
+				expect(div.firstElementChild).toBe(off);
+				expect(div.getAttribute('data-label')).toBe('hydrated');
+				expect(fixture.cleanup).toHaveBeenCalledOnce();
+				fixture.publish({ on: true, label: 'retired' });
+				expect(div.firstElementChild).toBe(off);
+				expect(div.getAttribute('data-label')).toBe('hydrated');
+				await act(() => hydratedRoot!.render(client.App, { on: true, label: 'updated' }));
+				expect(container.querySelector('div')).toBe(div);
+				expect(div.innerHTML).toContain('<b>On</b>');
+				expect(div.getAttribute('data-label')).toBe('updated');
+				expect(uncaught).not.toHaveBeenCalled();
+			} finally {
+				hydratedRoot?.unmount();
+				hydratedRoot = undefined;
+				binding.dispose();
+			}
+		});
+	}
+
+	for (const dev of [false, true]) {
 		for (const server of ['stale', 'externally removed'] as const) {
 			// Stale server content beside the host is a mismatch, found before the
 			// next sibling suspends: with no boundary, the root renders on the
