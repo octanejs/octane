@@ -90,8 +90,14 @@ const ARROW_HEAD = /^(?:async\s*)?(?:\(|[\w$]+\s*=>)/;
 
 function ownMethodDep(receiver: object, method: unknown): unknown {
 	if (typeof method !== 'function') return method;
-	const source = Function.prototype.toString.call(method);
-	return ARROW_HEAD.test(source) && (source[0] === '(' || method.name !== 'async')
-		? method
-		: receiver;
+	// A probe that throws (a patched `toString`, a `name` getter) counts as a
+	// method, leaving any exception to the authored call.
+	try {
+		const source = Function.prototype.toString.call(method);
+		return ARROW_HEAD.test(source) && (source[0] === '(' || method.name !== 'async')
+			? method
+			: receiver;
+	} catch {
+		return receiver;
+	}
 }

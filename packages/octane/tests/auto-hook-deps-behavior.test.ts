@@ -1065,6 +1065,12 @@ export function useHook(props) {
   return useMemo(() => (props.enabled ? props.log(props.handler) : undefined));
 }`;
 
+// The test transform re-prints arrow parameters with parentheses, so arrows
+// whose source text is the subject come from the Function constructor.
+function arrowFromSource(source: string): (...args: unknown[]) => unknown {
+	return new Function(`return ${source}`)();
+}
+
 describe('inferred dependencies of an own method call', () => {
 	it.each([
 		['effect', EffectFromOwnMethod],
@@ -1148,13 +1154,9 @@ export function useHook(props) {
 		['arrow', () => () => {}],
 		['async arrow', () => async () => {}],
 		['arrow named async', () => ({ async: () => {} }).async],
-		// Prettier would parenthesize these parameters; the source text is the subject.
-		// prettier-ignore
-		['bare-parameter arrow', (): ((value: unknown) => unknown) => value => value],
-		// prettier-ignore
-		['minified arrow', (): ((value: unknown) => unknown) => v=>v],
-		// prettier-ignore
-		['async bare-parameter arrow', (): ((value: unknown) => Promise<unknown>) => async value => value],
+		['bare-parameter arrow', () => arrowFromSource('value => value')],
+		['minified arrow', () => arrowFromSource('v=>v')],
+		['async bare-parameter arrow', () => arrowFromSource('async value => value')],
 	] as const)(
 		'keeps an own %s callback inert while only the props container changes',
 		(_label, create) => {
@@ -1236,6 +1238,26 @@ export function useHook(props) {
 			}
 		},
 	);
+
+	it('tracks the receiver when probing an own callback throws', () => {
+		const runs: string[] = [];
+		const log = (entry: string) => void runs.push(entry);
+		// A bare-parameter arrow reaches the `name` check, whose getter throws.
+		const onPing = Object.defineProperty(arrowFromSource('value => value'), 'name', {
+			get() {
+				throw new Error('name probe');
+			},
+		});
+		const r = mount(EffectFromCallbackProp, { log, onPing, noise: 0 });
+		try {
+			flushEffects();
+			r.update(EffectFromCallbackProp, { log, onPing, noise: 1 });
+			flushEffects();
+			expect(runs).toEqual(['run', 'run']);
+		} finally {
+			r.unmount();
+		}
+	});
 
 	it.each([
 		['component', () => GuardedLayoutEffectFromOwnFunctionRead],
