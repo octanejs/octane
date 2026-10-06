@@ -20843,12 +20843,12 @@ class HydrationCapability {
 	}
 
 	/**
-	 * The open marker of the server range that an `@if`/`@switch` slot of
-	 * `scope` adopts on its first render at `anchor`, as resolveOpen finds it,
-	 * or null inside a range the client built (inFreshRange), whose slots
-	 * build on the client. The server frames every such slot, so anywhere else
-	 * a missing range means the server rendered something else there, such as
-	 * another arm of an enclosing `@if`.
+	 * The open marker of the server range that an `@if`/`@switch` slot or a
+	 * `@try`/ErrorBoundary boundary of `scope` adopts on its first render at
+	 * `anchor`, as resolveOpen finds it, or null inside a range the client built
+	 * (inFreshRange), whose slots build on the client. The server frames every
+	 * such slot, so anywhere else a missing range means the server rendered
+	 * something else there, such as another arm of an enclosing `@if`.
 	 */
 	branchOpen(anchor: Node | null, domParent: Node, scope: Scope, slotKey: number): Comment | null {
 		const open = this.resolveOpen(anchor, domParent);
@@ -40364,7 +40364,11 @@ export function errorBlock(
 	let state = parentScope.slots[slotKey] as ErrorSlot | undefined;
 	if (state === undefined) {
 		const passthrough = hydration?.passthroughRanges === true;
-		const open = passthrough ? null : (hydration?.resolveOpen(anchor, domParent) ?? null);
+		// As the server frames every boundary, a missing range is a mismatch,
+		// unless the client built the range around the slot (branchOpen).
+		const open = passthrough
+			? null
+			: (hydration?.branchOpen(anchor ?? null, domParent, parentScope, slotKey) ?? null);
 		let start: Comment;
 		let end: Comment;
 		if (passthrough) {
@@ -40373,7 +40377,7 @@ export function errorBlock(
 		} else if (open !== null) {
 			start = open;
 			end = hydration!.close(open);
-		} else if (hydration !== null && hydration.inFreshRange(anchor, domParent)) {
+		} else if (hydration !== null) {
 			return hydration.suspend(() =>
 				errorBlock(parentScope, slotKey, domParent, tryBody, catchBody, anchor, env),
 			);
@@ -40695,14 +40699,18 @@ export function tryBlock(
 		// the SOLE-hole case (a @try that is the only thing a component/arm renders —
 		// the router `Match` shape `<Context> @try {…}`), where the anchor is the
 		// enclosing scope's end marker and the cursor is parked on the @try's open.
-		const open = passthrough ? null : (hydration?.resolveOpen(anchor ?? null, domParent) ?? null);
+		// As the server frames every boundary, a missing range is a mismatch,
+		// unless the client built the range around the slot (branchOpen).
+		const open = passthrough
+			? null
+			: (hydration?.branchOpen(anchor ?? null, domParent, parentScope, slotKey) ?? null);
 		if (passthrough) {
 			start = (STAGED_DOM?.view(document) ?? document).createComment('passthrough-try');
 			end = (STAGED_DOM?.view(document) ?? document).createComment('/passthrough-try');
 		} else if (open !== null) {
 			start = open;
 			end = hydration!.close(open);
-		} else if (hydration !== null && hydration.inFreshRange(anchor, domParent)) {
+		} else if (hydration !== null) {
 			return hydration.suspend(() =>
 				tryBlock(
 					parentScope,
