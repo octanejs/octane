@@ -95,13 +95,13 @@
     "brotli": 24555
   },
   "binding-base-ui-vite": {
-    "raw": 195359,
-    "gzip": 61352,
+    "raw": 195535,
+    "gzip": 61444,
     "brotli": 53512
   },
   "binding-base-ui-esbuild": {
-    "raw": 210829,
-    "gzip": 68231,
+    "raw": 211005,
+    "gzip": 68303,
     "brotli": 59451
   },
   "binding-aria-vite": {
@@ -125,13 +125,13 @@
     "brotli": 21224
   },
   "binding-radix-vite": {
-    "raw": 197440,
-    "gzip": 61961,
+    "raw": 197565,
+    "gzip": 62029,
     "brotli": 54110
   },
   "binding-radix-esbuild": {
-    "raw": 212705,
-    "gzip": 68823,
+    "raw": 212830,
+    "gzip": 68875,
     "brotli": 59957
   },
   "binding-floating-ui-vite": {
@@ -155,13 +155,13 @@
     "brotli": 27258
   },
   "binding-apollo-client-vite": {
-    "raw": 337850,
-    "gzip": 103674,
+    "raw": 337970,
+    "gzip": 103709,
     "brotli": 90704
   },
   "binding-apollo-client-esbuild": {
-    "raw": 361017,
-    "gzip": 114612,
+    "raw": 361137,
+    "gzip": 114695,
     "brotli": 100190
   },
   "binding-usehooks-ts-vite": {
