@@ -7,10 +7,11 @@ import { loadCompiledFixtureSource, loadServerFixture } from '../_server-fixture
 
 // A component's server range can hold more than the client renders into it,
 // from the same source: a component whose identity differs on the client, or
-// a component that returns less. When the server's content starts with what
-// the client renders, the client adopts that prefix. Whatever the server left
-// after it is stale: hydration removes it and reports the mismatch once, while
-// the nodes the client adopted keep their identity.
+// a component that returns less. As in React, which compares only the DOM, the
+// server content after what the client renders is a mismatch even when the
+// server's content starts with it: nothing is repaired in place, the root
+// renders on the client and reports once. A component whose DOM matches the
+// server's adopts it, whatever component rendered it on the server.
 
 const FIXTURE = join(
 	process.cwd(),
@@ -55,7 +56,8 @@ function expectSame(actual: ArrayLike<Node>, expected: readonly Node[]): void {
 function tail(site: string): string {
 	return (
 		`Octane hydration mismatch at ${site}: the client expected the end of the component but ` +
-		`the server rendered <s>. The mismatched subtree was rebuilt on the client.`
+		`the server rendered <s>. The nearest Suspense or Hydrate boundary, or the root, will be ` +
+		`regenerated on the client.`
 	);
 }
 
@@ -98,11 +100,11 @@ describe.each([
 	const loadClient = () =>
 		loadCompiledFixtureSource(SOURCE, { id: FILE, mode: 'client', compileOptions: { dev } });
 	const client = loadClient();
-	// A production runtime reports the error code instead of the message.
+	// A production runtime reports the error code instead of React's message.
 	const MISMATCH =
 		runtime === 'production'
-			? /^Minified Octane error #51;/
-			: /the server-rendered node did not match the client render/;
+			? /^Minified Octane error #339;/
+			: /server rendered HTML didn't match the client/;
 	let container: HTMLElement;
 	let root: { render(component: unknown, props?: unknown): void; unmount(): void } | null;
 	let errSpy: ReturnType<typeof vi.spyOn>;
@@ -142,55 +144,70 @@ describe.each([
 		return recoverable;
 	}
 
-	it.each(SHAPES)('removes the stale tail of $shape', async ({ name, site }) => {
-		render(name, { server: true });
-		const adopted = [...container.querySelectorAll('i, p')];
-		const stale = container.querySelector('.foreign')!;
-		expect(stale).not.toBeNull();
+	it.each(SHAPES)(
+		'client-renders the root when the server rendered more in $shape',
+		async ({ name, site }) => {
+			render(name, { server: true });
+			const serverNodes = [...container.querySelectorAll('*')];
+			const stale = container.querySelector('.foreign')!;
+			expect(stale).not.toBeNull();
 
-		const recoverable = await hydrate(client[name], {});
+			const recoverable = await hydrate(client[name], {});
 
-		expect(markup(container.firstElementChild!)).toBe('<i>ok</i><p>after</p>');
-		expect([...container.querySelectorAll('i, p')]).toEqual(adopted);
-		expect(stale.isConnected).toBe(false);
-		expect(recoverable).toEqual([expect.stringMatching(MISMATCH)]);
-		expect(warnings()).toEqual(dev ? [tail(site())] : []);
+			expect(markup(container.firstElementChild!)).toBe('<i>ok</i><p>after</p>');
+			expect(serverNodes.filter((node) => node.isConnected)).toEqual([]);
+			expect(recoverable).toEqual([expect.stringMatching(MISMATCH)]);
+			expect(warnings()).toEqual(dev ? [tail(site())] : []);
 
-		// The range the client settled still updates in place.
-		await act(async () => root!.render(client[name], { server: true }));
-		expect(markup(container.firstElementChild!)).toBe(
-			'<i>ok</i><s class="foreign">f</s><p>after</p>',
-		);
-		expect(container.querySelector('p')).toBe(adopted[adopted.length - 1]);
-		expect(warnings()).toHaveLength(dev ? 1 : 0);
-	});
-
-	// The client component's body is a branch the server rendered no range for.
-	// The branch ends after every root its template adopted in place, so only
-	// the server's tail after them goes, and the branch owns them all.
-	it.each([
-		{ server: 'tail', stale: true },
-		{ server: 'same', stale: false },
-	] as const)(
-		'keeps every root of a branch with no server range in the frame (server: $server)',
-		async ({ server: serverShape, stale }) => {
-			render('BranchBody', { server: serverShape });
-			const adopted = [...container.querySelectorAll('i, b, p')];
-
-			const recoverable = await hydrate(client.BranchBody, { inner: true });
-
-			expect(markup(container.firstElementChild!)).toBe('<i>ok</i><b>b</b><p>after</p>');
-			expectSame(container.querySelectorAll('i, b, p'), adopted);
-			expect(recoverable).toEqual(stale ? [expect.stringMatching(MISMATCH)] : []);
-			expect(warnings()).toEqual(
-				dev && stale ? [tail(siteOf('function BranchBody(', '<Shape'))] : [],
+			// The client-rendered content updates in place.
+			const after = container.querySelector('p');
+			await act(async () => root!.render(client[name], { server: true }));
+			expect(markup(container.firstElementChild!)).toBe(
+				'<i>ok</i><s class="foreign">f</s><p>after</p>',
 			);
-
-			await act(async () => root!.render(client.BranchBody, { inner: false }));
-			expect(markup(container.firstElementChild!)).toBe('<p>after</p>');
-			expect(container.querySelector('p')).toBe(adopted[adopted.length - 1]);
+			expect(container.querySelector('p')).toBe(after);
+			expect(warnings()).toHaveLength(dev ? 1 : 0);
 		},
 	);
+
+	// OCTANE DIVERGENCE: the client component's body is a branch the server
+	// rendered no range for. Octane's control-flow ranges are part of its
+	// hydration protocol, so a branch without one is a structural mismatch even
+	// where its elements match the frame's hosts; React, which has no range
+	// markers, adopts them. The root renders on the client and reports once.
+	it('client-renders the root for a branch with no server range, even when its DOM matches the frame', async () => {
+		render('BranchBody', { server: 'same' });
+		const serverNodes = [...container.querySelectorAll('*')];
+
+		const recoverable = await hydrate(client.BranchBody, { inner: true });
+
+		expect(markup(container.firstElementChild!)).toBe('<i>ok</i><b>b</b><p>after</p>');
+		expect(serverNodes.filter((node) => node.isConnected)).toEqual([]);
+		expect(recoverable).toEqual([expect.stringMatching(MISMATCH)]);
+		expect(warnings()).toHaveLength(dev ? 1 : 0);
+
+		const after = container.querySelector('p');
+		await act(async () => root!.render(client.BranchBody, { inner: false }));
+		expect(markup(container.firstElementChild!)).toBe('<p>after</p>');
+		expect(container.querySelector('p')).toBe(after);
+	});
+
+	it('client-renders the root when server content follows the roots of a branch with no server range', async () => {
+		render('BranchBody', { server: 'tail' });
+		const serverNodes = [...container.querySelectorAll('*')];
+
+		const recoverable = await hydrate(client.BranchBody, { inner: true });
+
+		expect(markup(container.firstElementChild!)).toBe('<i>ok</i><b>b</b><p>after</p>');
+		expect(serverNodes.filter((node) => node.isConnected)).toEqual([]);
+		expect(recoverable).toEqual([expect.stringMatching(MISMATCH)]);
+		expect(warnings()).toHaveLength(dev ? 1 : 0);
+
+		const after = container.querySelector('p');
+		await act(async () => root!.render(client.BranchBody, { inner: false }));
+		expect(markup(container.firstElementChild!)).toBe('<p>after</p>');
+		expect(container.querySelector('p')).toBe(after);
+	});
 
 	it.each(
 		SHAPES.flatMap((shape) => [
@@ -213,7 +230,7 @@ describe.each([
 			createElement.mockRestore();
 
 			expect(markup(container.firstElementChild!)).toBe(html);
-			expect([...container.querySelectorAll('i, s, p')]).toEqual(adopted);
+			expectSame(container.querySelectorAll('i, s, p'), adopted);
 			expect(recoverable).toEqual([]);
 			expect(warnings()).toEqual([]);
 			if (runtime === 'production') expect(parsed).toEqual([]);

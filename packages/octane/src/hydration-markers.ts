@@ -60,6 +60,15 @@ export const SUSPENSE_RESOLVED_COMMENT = 'oct-suspense:';
 export const STREAM_SEED_COMMENT = 'oct-seed:';
 /** A server arm with untransportable demand is mounted fresh within its own range. */
 export const NATIVE_SIGNAL_FRESH_COMMENT = 'oct-native-fresh:';
+/**
+ * Leads the `@pending` arm of a boundary that a buffered server render could
+ * not finish (`<!--oct-client:N-->`, where N counts the `useId()` values the
+ * server reserved), because it suspended where a synchronous render such as
+ * renderToString cannot wait. As React does for a boundary its server marks
+ * errored (`<!--$!-->`), the client renders it fresh within its own range and
+ * reports it once.
+ */
+export const CLIENT_RENDER_ARM_COMMENT = 'oct-client:';
 
 /**
  * Serialize one `useId()` value. The client regenerates the id the server

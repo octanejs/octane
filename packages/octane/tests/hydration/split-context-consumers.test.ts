@@ -83,32 +83,45 @@ describe('Context providers across split hydration', { timeout: 15_000 }, () => 
 		expect(onEffect.mock.calls).toEqual([['mount'], ['cleanup']]);
 	});
 
-	it('adopts server UI and activates using the latest provider value', async () => {
+	it('adopts the server UI while dormant and activates using the latest provider value', async () => {
 		const onEffect = vi.fn(),
 			onHydrated = vi.fn();
+		const recoverable: unknown[] = [];
 		const props = { when: condition(false), value: 'server', onEffect, onHydrated };
 		container().innerHTML = renderToString(server.App, props).html;
+		const main = host.querySelector('main')!;
+		const readers = [...host.querySelectorAll('.split-context-eager')];
 		const editor = host.querySelector('#split-context-editor')!;
 		const value = host.querySelector('#split-context-value')!;
 		const input = host.querySelector<HTMLInputElement>('#split-context-draft')!;
-		const id = editor.getAttribute('data-runtime-id');
 		input.value = 'draft before activation';
-		input.focus();
-		input.setSelectionRange(2, 7);
-		root = hydrateRoot(host, client.App, props);
+		root = hydrateRoot(host, client.App, props, {
+			onRecoverableError: (error) => recoverable.push(error),
+		});
 		await act(() => {});
 		expect(onEffect).not.toHaveBeenCalled();
+		expect(host.querySelector('#split-context-value')).toBe(value);
 		expect(value.textContent).toBe('server');
+		expect(input.value).toBe('draft before activation');
+		// The provider value changed before the boundary activated. A dormant
+		// boundary never renders its stale captures to compare them, so, as React
+		// does for an update that reaches a dehydrated boundary it cannot hydrate,
+		// the boundary renders on the client with the latest value and reports
+		// nothing. Everything outside it stays adopted.
 		await act(() => root!.render(client.App, { ...props, when: load(), value: 'latest' }));
 		await vi.waitFor(() => expect(onHydrated).toHaveBeenCalledOnce(), SPLIT_CHILD_LOAD);
-		expect(host.querySelector('#split-context-editor')).toBe(editor);
-		expect(editor.getAttribute('data-runtime-id')).toBe(id);
-		expect(host.querySelector('#split-context-value')).toBe(value);
-		expect(value.textContent).toBe('latest');
-		expect(host.querySelector('#split-context-draft')).toBe(input);
-		expect(input.value).toBe('draft before activation');
-		expect(document.activeElement).toBe(input);
-		expect([input.selectionStart, input.selectionEnd]).toEqual([2, 7]);
+		expect(editor.isConnected).toBe(false);
+		expect(host.querySelector('#split-context-value')!.textContent).toBe('latest');
+		expect(host.querySelector('#split-context-value')!.getAttribute('title')).toBe('latest');
+		expect(host.querySelector('main')).toBe(main);
+		[...host.querySelectorAll('.split-context-eager')].forEach((reader, index) =>
+			expect(reader).toBe(readers[index]),
+		);
+		expect(onEffect.mock.calls).toEqual([['mount']]);
+		const button = host.querySelector<HTMLButtonElement>('#split-context-action')!;
+		await act(() => button.click());
+		expect(button.textContent).toBe('1');
+		expect(recoverable).toEqual([]);
 		root.unmount();
 		expect(onEffect.mock.calls).toEqual([['mount'], ['cleanup']]);
 		expect(host.childNodes.length).toBe(0);

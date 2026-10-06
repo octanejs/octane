@@ -6,11 +6,13 @@ import * as ServerRT from 'octane/server';
 import { loadCompiledFixtureSource, loadServerFixture } from '../_server-fixture';
 import { hydrationMarkerSummary } from './_marker-summary.js';
 
-// A component call that finds no server range of its own is built on the
-// client, and hydration discards the server nodes that stand in its place. A
-// server range after those nodes belongs to a later sibling call: that call
-// adopts it, the built component stays ahead of it, and the hydration markers
-// stay balanced. Each mismatch reports once.
+// The server rendered plain elements where the client calls a component. As
+// in React, which compares only the DOM, the calls adopt those elements in
+// place, and it is a mismatch unless they render exactly the server's
+// elements: nothing is repaired in place, the root renders on the client and
+// reports once, each component's effects run once, and the hydration markers
+// stay balanced. A call that renders nothing leaves the server's element to
+// the next call, whose own content then differs from it.
 
 const FIXTURE = join(
 	process.cwd(),
@@ -28,13 +30,6 @@ function site(name: string, text: string): string {
 	return `${FILE}:${index + 1}:${LINES[index].indexOf(text)}`;
 }
 
-/** 1-based line of the first fixture line containing `text`. */
-function lineOf(text: string): number {
-	const index = LINES.findIndex((line) => line.includes(text));
-	if (index < 0) throw new Error(`fixture has no line containing ${text}`);
-	return index + 1;
-}
-
 /** Element and text markup, ignoring hydration comments. */
 function markup(node: Element): string {
 	const copy = node.cloneNode(true) as Element;
@@ -45,25 +40,49 @@ function markup(node: Element): string {
 	return copy.innerHTML;
 }
 
-const RANGE_REBUILT =
-	/the server rendered a different child shape where the client renders a component/;
+/** React's recoverable hydration error. */
+const MISMATCH = /server rendered HTML didn't match the client/;
 
-/** Where Leaf's `<em>` reports, as a pattern. */
-const AT_LEAF = `at ${FILE.replace(/\./g, '\\.')}:${lineOf('<em>{props.v}</em>')}:\\d+: `;
-
-/** The built component's diagnostic: its missing range, against the server's `<em>`. */
-function missingRange(loc: string): string {
+/** The development warning at `loc`, against the server's `<em>`. */
+function mismatchAt(loc: string, expected: string): string {
 	return (
-		`Octane hydration mismatch at ${loc}: the client expected a component range but the ` +
-		'server rendered <em>. The mismatched subtree was rebuilt on the client.'
+		`Octane hydration mismatch at ${loc}: the client expected ${expected} but the server ` +
+		'rendered <em>. The nearest Suspense or Hydrate boundary, or the root, will be ' +
+		'regenerated on the client.'
 	);
 }
+
+/** The call's diagnostic: its missing range. */
+const missingRange = (name: string, call: string) => () =>
+	mismatchAt(site(name, call), 'a component range');
+
+/** `FILE:line:0` of the declaration `function name(`. */
+function definitionOf(name: string): string {
+	const index = LINES.findIndex((line) => line.startsWith(`function ${name}(`));
+	if (index < 0) throw new Error(`fixture has no function ${name}`);
+	return `${FILE}:${index + 1}:0`;
+}
+
+/** `FILE:line:column` of `text` in the template of `function name(`. */
+function templateSite(name: string, text: string): string {
+	const from = LINES.findIndex((line) => line.startsWith(`function ${name}(`));
+	const index = LINES.findIndex((line, at) => at > from && line.includes(text));
+	if (from < 0 || index < 0) throw new Error(`fixture function ${name} has no ${text}`);
+	return `${FILE}:${index + 1}:${LINES[index].indexOf(text)}`;
+}
+
+/** The next call's text differs from the server's element it adopted in place. */
+const nextCallText = () =>
+	`Octane hydration mismatch at ${templateSite('Leaf', 'props.v')}: the client expected ` +
+	'text "z" but the server rendered text "x". The nearest Suspense or Hydrate boundary, or ' +
+	'the root, will be regenerated on the client.';
 
 const LATER_RANGE = [
 	{
 		built: 'a component that renders nothing',
 		name: 'EmptyThenRange',
-		call: '<Empty log={props.log} />',
+		// The call renders nothing, so the next one adopts the server's element.
+		report: nextCallText,
 		mounted: ['Empty'],
 		html: '<em>z</em>',
 		serverHtml: '<em>x</em><em>z</em>',
@@ -71,7 +90,8 @@ const LATER_RANGE = [
 	{
 		built: 'a component with two roots',
 		name: 'PairThenRange',
-		call: '<Pair log={props.log} />',
+		// The call adopts in place, so its own fragment reports.
+		report: () => mismatchAt(definitionOf('Pair'), 'a fragment starting with <i>'),
 		mounted: ['Pair'],
 		html: '<i>a</i><i>b</i><em>z</em>',
 		serverHtml: '<em>x</em><b>y</b><em>z</em>',
@@ -79,7 +99,7 @@ const LATER_RANGE = [
 	{
 		built: 'the first component call in an element',
 		name: 'HostEmptyFirst',
-		call: '<Empty log={props.log} />',
+		report: nextCallText,
 		mounted: ['Empty'],
 		html: '<section><em>z</em></section>',
 		serverHtml: '<section><em>x</em><em>z</em></section>',
@@ -87,7 +107,7 @@ const LATER_RANGE = [
 	{
 		built: 'the first call in an element, to a hookless component',
 		name: 'HostLiteFirst',
-		call: '<Tag />',
+		report: missingRange('HostLiteFirst', '<Tag />'),
 		mounted: [],
 		html: '<section><b>t</b><em>z</em></section>',
 		serverHtml: '<section><em>x</em><em>z</em></section>',
@@ -126,9 +146,10 @@ describe.each([
 			.map((call: unknown[]) => String(call[0]))
 			.filter((message: string) => message.includes('hydration mismatch'));
 
-	/** Server-render the `@else` arm, then hydrate the first arm over it. */
-	async function hydrate(name: string, log: string[]) {
-		container.innerHTML = ServerRT.renderToString(server[name], { on: false, log: [] }).html;
+	/** Server-render the `@else` arm, unless already rendered, then hydrate the first arm over it. */
+	async function hydrate(name: string, log: string[], render = true) {
+		if (render)
+			container.innerHTML = ServerRT.renderToString(server[name], { on: false, log: [] }).html;
 		const serverZ = Array.from(container.querySelectorAll('em')).find(
 			(em) => em.textContent === 'z',
 		)!;
@@ -146,46 +167,39 @@ describe.each([
 	}
 
 	it.each(LATER_RANGE)(
-		"adopts a later sibling's server range after building $built",
-		async ({ name, call, mounted, html }) => {
+		'client-renders the root when $built stands where the server rendered an element',
+		async ({ name, report, mounted, html }) => {
 			const log: string[] = [];
 			const { div, serverZ, recoverable } = await hydrate(name, log);
 
 			expect(markup(div)).toBe(html);
-			expect(container.querySelector('em')).toBe(serverZ);
+			expect(serverZ.isConnected).toBe(false);
 			expect(() => hydrationMarkerSummary(container)).not.toThrow();
 			expect(log).toEqual(mounted);
-			expect(recoverable).toEqual([expect.stringMatching(RANGE_REBUILT)]);
-			expect(warnings()).toEqual(dev ? [missingRange(site(name, call))] : []);
+			expect(recoverable).toEqual([expect.stringMatching(MISMATCH)]);
+			expect(warnings()).toEqual(dev ? [report()] : []);
 		},
 	);
 
-	// Calls claim server ranges in order, so the sibling after the built
-	// component claims the range the server rendered for a later one.
-	it('gives the next sibling call the server range after the built component', async () => {
+	// React compares DOM only: a call that renders nothing, then the calls that
+	// render exactly the server's elements, adopt every one of them.
+	it('adopts the server elements when the calls render exactly them', async () => {
+		container.innerHTML = ServerRT.renderToString(server.EmptyFirst, {
+			on: false,
+			log: [],
+		}).html;
+		const serverNodes = [...container.querySelectorAll('*')];
 		const log: string[] = [];
-		const { div, serverZ, recoverable } = await hydrate('EmptyFirst', log);
+		const { div, recoverable } = await hydrate('EmptyFirst', log, false);
 
 		expect(markup(div)).toBe('<em>x</em><em>z</em>');
-		expect(container.querySelector('em')).toBe(serverZ);
+		const nodes = [...container.querySelectorAll('*')];
+		expect(nodes).toHaveLength(serverNodes.length);
+		nodes.forEach((node, i) => expect(node).toBe(serverNodes[i]));
 		expect(() => hydrationMarkerSummary(container)).not.toThrow();
 		expect(log).toEqual(['Empty']);
-		expect(recoverable).toEqual([expect.stringMatching(RANGE_REBUILT)]);
-		const reported = warnings();
-		expect(reported).toHaveLength(dev ? 3 : 0);
-		if (dev) {
-			expect(reported).toEqual(
-				expect.arrayContaining([
-					missingRange(site('EmptyFirst', '<Empty log={props.log} />')),
-					expect.stringMatching(
-						new RegExp(`${AT_LEAF}server rendered text "z" but the client rendered "x"`),
-					),
-					expect.stringMatching(
-						new RegExp(`${AT_LEAF}the client expected <em> but the server rendered`),
-					),
-				]),
-			);
-		}
+		expect(recoverable).toEqual([]);
+		expect(warnings()).toEqual([]);
 	});
 
 	it.each([{ name: 'EmptyFirst', serverHtml: '<em>x</em><em>z</em>' }, ...LATER_RANGE])(

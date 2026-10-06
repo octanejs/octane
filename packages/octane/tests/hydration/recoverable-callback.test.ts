@@ -1,11 +1,9 @@
-// React 19 root option parity: hydrateRoot's onRecoverableError. Octane recovers
-// hydration mismatches per site (patch/rebuild in place) rather than client-
-// rendering a whole boundary, so the callback contract is: fire (dev AND prod)
-// after hydration recovered from a STRUCTURAL server/client divergence —
-// rebuilt subtrees, discarded stale server ranges — coalesced to one report per
-// root per microtask burst. Attribute-level value patches do not report: React
-// production hydration does not detect those at all, so reporting them would
-// make Octane's extra detection a behavioral difference.
+// React 19 root option parity: hydrateRoot's onRecoverableError. As in React, a
+// hydration mismatch is never repaired in place: the nearest fallback owner (a
+// Suspense or @try arm, a Hydrate island, or else the root) discards its server
+// DOM and renders on the client, and the callback fires once per owner that
+// falls back, in development and production. Attribute differences keep the
+// server value and do not report: React production does not compare them.
 // The callback receives only the error (no errorInfo/componentStack), matching
 // the documented SSR onError shape.
 import { describe, it, expect, beforeEach, afterEach, vi, type MockInstance } from 'vitest';
@@ -51,21 +49,25 @@ describe('hydrateRoot — onRecoverableError', () => {
 	const cliDev = clientModule(SWAP, 'swap.tsrx', true);
 	const cliProd = clientModule(SWAP, 'swap.tsrx', false);
 
-	it('fires after a structural mismatch recovery (dev compile)', async () => {
+	it('fires after a structural mismatch client-renders the root (dev compile)', async () => {
 		const { html } = await ServerRT.renderToString(srv.Swap, { host: true });
 		container.innerHTML = html;
 		const onRecoverableError = vi.fn();
+		const serverHost = container.querySelector('#swap');
 		hydrateRoot(container, cliDev.Swap, { host: false }, { onRecoverableError });
 		flushSync(() => {});
-		// Recovery itself is synchronous; the report is delivered post-burst.
+		// The fallback is synchronous; the report is delivered after the burst.
 		await Promise.resolve();
 		expect(container.querySelector('b.inner')).not.toBeNull();
 		expect(container.querySelector('p.host')).toBeNull();
+		expect(serverHost!.isConnected).toBe(false);
 		expect(onRecoverableError).toHaveBeenCalledTimes(1);
-		expect(String((onRecoverableError.mock.calls[0][0] as Error).message)).toMatch(/hydration/i);
+		expect(String((onRecoverableError.mock.calls[0][0] as Error).message)).toMatch(
+			/server rendered HTML didn't match the client/,
+		);
 	});
 
-	it('fires in PROD compile too (recovery runs everywhere; only the warning is dev-only)', async () => {
+	it('fires in PROD compile too (the fallback runs everywhere; only the warning is dev-only)', async () => {
 		const { html } = await ServerRT.renderToString(srv.Swap, { host: true });
 		container.innerHTML = html;
 		const onRecoverableError = vi.fn();
@@ -76,9 +78,9 @@ describe('hydrateRoot — onRecoverableError', () => {
 		expect(onRecoverableError).toHaveBeenCalledTimes(1);
 	});
 
-	it('coalesces to one report per root per burst', async () => {
-		// Server renders BOTH divergent spots (host branch); the client flips the
-		// branch AND the inner label — still a single report for the burst.
+	it('reports a root fallback once', async () => {
+		// The server rendered the host branch and the client renders the component
+		// branch: the root falls back once, however much of it differs.
 		const { html } = await ServerRT.renderToString(srv.Swap, { host: true });
 		container.innerHTML = html;
 		const onRecoverableError = vi.fn();
@@ -111,7 +113,7 @@ describe('hydrateRoot — onRecoverableError', () => {
 		}
 	});
 
-	it('retains the recovery report when the root updates before callback delivery', async () => {
+	it('retains the fallback report when the root updates before callback delivery', async () => {
 		const { html } = await ServerRT.renderToString(srv.Swap, { host: true });
 		container.innerHTML = html;
 		const onRecoverableError = vi.fn();
@@ -123,7 +125,7 @@ describe('hydrateRoot — onRecoverableError', () => {
 		expect(onRecoverableError).toHaveBeenCalledTimes(1);
 	});
 
-	it('reports a throwing recovery callback without undoing the repaired DOM', async () => {
+	it('reports a throwing recovery callback without undoing the client-rendered DOM', async () => {
 		const { html } = await ServerRT.renderToString(srv.Swap, { host: true });
 		container.innerHTML = html;
 		const failure = new Error('recovery callback failed');
@@ -148,7 +150,7 @@ describe('hydrateRoot — onRecoverableError', () => {
 		expect(onRecoverableError).not.toHaveBeenCalled();
 	});
 
-	it('control: mismatch recovery without the option keeps current behavior', async () => {
+	it('control: a mismatch without the option still client-renders and warns in development', async () => {
 		const { html } = await ServerRT.renderToString(srv.Swap, { host: true });
 		container.innerHTML = html;
 		hydrateRoot(container, cliDev.Swap, { host: false });
@@ -159,9 +161,9 @@ describe('hydrateRoot — onRecoverableError', () => {
 	});
 });
 
-// Every structural recovery that discards server content reports, whichever
-// construct discarded it: an @if arm, a list's items or @empty arm, a branch
-// range the server encoded as something else, or a runtime host's content.
+// Every structural difference falls back and reports once, whichever construct
+// found it: an @if arm, a list's items or @empty arm, a branch range the server
+// encoded as something else, or a runtime host's content.
 describe.each([
 	{ name: 'development compile', dev: true },
 	{ name: 'production compile', dev: false },
@@ -235,15 +237,21 @@ describe.each([
 		},
 	])('reports $what once', async ({ name, from, to }) => {
 		container.innerHTML = ServerRT.renderToString(server[name], from).html;
+		const serverRoot = container.firstElementChild!;
 		const recovered: unknown[] = [];
 		const root = hydrateRoot(container, client[name], to, {
 			onRecoverableError: (error) => recovered.push(error),
 		});
 		flushSync(() => {});
 		try {
+			// No boundary encloses the difference, so the whole root renders on the
+			// client and no server element survives.
 			expect(markup(container)).toBe(clientMarkup(name, to));
+			expect(serverRoot.isConnected).toBe(false);
 			expect(await settledReports(recovered)).toHaveLength(1);
-			expect(String((recovered[0] as Error).message)).toMatch(/hydration mismatch/i);
+			expect(String((recovered[0] as Error).message)).toMatch(
+				/server rendered HTML didn't match the client/,
+			);
 		} finally {
 			root.unmount();
 		}
@@ -275,8 +283,8 @@ describe.each([
 		}
 	});
 
-	// A suspended boundary's next attempt finds the list's client arm while the
-	// list's server marker still names the server's arm: already reported.
+	// A boundary whose list arm differs falls back once, although the boundary
+	// also suspends on a sibling.
 	it.each([
 		{ from: ['a', 'b'], to: [] },
 		{ from: [], to: ['a', 'b'] },
@@ -310,67 +318,78 @@ describe.each([
 		},
 	);
 
-	// A root without a boundary keeps the server content while its hydrating
-	// attempt is suspended and reports only from the attempt that commits, which
-	// rediscards that content after the rollback restored it.
+	// A root without a boundary falls back to a client render, which suspends on
+	// the sibling. As in React, nothing commits while it is suspended, so the
+	// server content stays in place and the report waits for the commit that
+	// replaces it.
 	it.each([
 		{ name: 'RootRows', from: { rows: ['a', 'b'] }, to: { rows: [] } },
 		{ name: 'RootRows', from: { rows: [] }, to: { rows: ['a', 'b'] } },
 		{ name: 'RootBranch', from: { on: true }, to: { on: false } },
-	])('reports $name once from the root attempt that commits', async ({ name, from, to }) => {
-		container.innerHTML = ServerRT.renderToString(server[name], {
-			...from,
-			Tail: server.Tail,
-		}).html;
-		const serverMarkup = markup(container);
-		let deliver!: (module: { default: typeof client.Tail }) => void;
-		const Tail = lazy(() => new Promise<{ default: typeof client.Tail }>((r) => (deliver = r)));
-		const recovered: unknown[] = [];
-		const root = hydrateRoot(
-			container,
-			client[name],
-			{ ...to, Tail },
-			{ onRecoverableError: (error) => recovered.push(error) },
-		);
-		try {
-			await act(async () => {});
-			expect(markup(container)).toBe(serverMarkup);
-			expect(await settledReports(recovered)).toEqual([]);
-			await act(async () => deliver({ default: client.Tail }));
-			expect(markup(container)).toBe(clientMarkup(name, { ...to, Tail: client.Tail }));
-			expect(await settledReports(recovered)).toHaveLength(1);
-			if (dev) expect(warns()).toHaveLength(1);
-		} finally {
-			root.unmount();
-		}
-	});
+	])(
+		'keeps $name server content while the root fallback suspends and reports once at its commit',
+		async ({ name, from, to }) => {
+			container.innerHTML = ServerRT.renderToString(server[name], {
+				...from,
+				Tail: server.Tail,
+			}).html;
+			const serverMarkup = markup(container);
+			const serverRoot = container.firstElementChild!;
+			let deliver!: (module: { default: typeof client.Tail }) => void;
+			const Tail = lazy(() => new Promise<{ default: typeof client.Tail }>((r) => (deliver = r)));
+			const recovered: unknown[] = [];
+			const root = hydrateRoot(
+				container,
+				client[name],
+				{ ...to, Tail },
+				{ onRecoverableError: (error) => recovered.push(error) },
+			);
+			try {
+				await act(async () => {});
+				expect(markup(container)).toBe(serverMarkup);
+				expect(container.firstElementChild).toBe(serverRoot);
+				expect(await settledReports(recovered)).toEqual([]);
+				await act(async () => deliver({ default: client.Tail }));
+				expect(markup(container)).toBe(clientMarkup(name, { ...to, Tail: client.Tail }));
+				expect(serverRoot.isConnected).toBe(false);
+				expect(await settledReports(recovered)).toHaveLength(1);
+				if (dev) expect(warns()).toHaveLength(1);
+			} finally {
+				root.unmount();
+			}
+		},
+	);
 
 	// Captures that changed before a dormant boundary activated legitimately
-	// differ from the server's: recover, but report nothing.
+	// differ from the server's: the island renders on the client, but reports
+	// nothing.
 	it.each([
 		{ name: 'DormantRows', from: { rows: ['a', 'b'] }, to: { rows: [] } },
 		{ name: 'DormantRows', from: { rows: [] }, to: { rows: ['a', 'b'] } },
 		{ name: 'DormantBranch', from: { on: true }, to: { on: false } },
 		{ name: 'DormantHost', from: { text: true }, to: { text: false } },
-	])('repairs $name updated before activation without reporting', async ({ name, from, to }) => {
-		const serverProps = { when: condition(false), ...from };
-		container.innerHTML = ServerRT.renderToString(server[name], serverProps).html;
-		const recovered: unknown[] = [];
-		const root = hydrateRoot(container, client[name], serverProps, {
-			onRecoverableError: (error) => recovered.push(error),
-		});
-		flushSync(() => {});
-		try {
-			await act(() => root.render(client[name], { when: load(), ...to }));
-			// The boundary's own id differs between a hydrated and a fresh root.
-			const inner = '[data-octane-hydrate-id]';
-			expect(markup(container.querySelector(inner)!)).toBe(
-				clientMarkup(name, { when: load(), ...to }, inner),
-			);
-			expect(await settledReports(recovered)).toEqual([]);
-			expect(warns()).toEqual([]);
-		} finally {
-			root.unmount();
-		}
-	});
+	])(
+		'client-renders $name updated before activation without reporting',
+		async ({ name, from, to }) => {
+			const serverProps = { when: condition(false), ...from };
+			container.innerHTML = ServerRT.renderToString(server[name], serverProps).html;
+			const recovered: unknown[] = [];
+			const root = hydrateRoot(container, client[name], serverProps, {
+				onRecoverableError: (error) => recovered.push(error),
+			});
+			flushSync(() => {});
+			try {
+				await act(() => root.render(client[name], { when: load(), ...to }));
+				// The boundary's own id differs between a hydrated and a fresh root.
+				const inner = '[data-octane-hydrate-id]';
+				expect(markup(container.querySelector(inner)!)).toBe(
+					clientMarkup(name, { when: load(), ...to }, inner),
+				);
+				expect(await settledReports(recovered)).toEqual([]);
+				expect(warns()).toEqual([]);
+			} finally {
+				root.unmount();
+			}
+		},
+	);
 });
