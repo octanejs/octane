@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "nextCode": 342,
+  "nextCode": 343,
   "codes": {
     "1": {
       "message": "Maximum update depth exceeded. Octane limits the number of nested updates to prevent infinite loops.",
@@ -2044,6 +2044,12 @@
     },
     "341": {
       "message": "The server could not finish this Suspense boundary, because it suspended during a synchronous render such as renderToString, which cannot wait for data. Switched to client rendering.",
+      "argumentCount": 0,
+      "runtime": ["client"],
+      "status": "active"
+    },
+    "342": {
+      "message": "A descriptor carried a function form action, but no element factory installed form actions. This is a bug in the Octane compiler.",
       "argumentCount": 0,
       "runtime": ["client"],
       "status": "active"

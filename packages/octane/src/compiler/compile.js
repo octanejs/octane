@@ -1668,6 +1668,9 @@ const INTERNAL_CLIENT_RUNTIME_HELPERS = new Set([
 	'enableSignalBindings',
 	'createElementAt',
 	'createElementFromConfig',
+	'createHostElement',
+	'enableDescriptorFormActions',
+	'enableDescriptorFragmentRefs',
 	'isRenderCall',
 	'deferRecord',
 	'bindSignalText',
@@ -11220,6 +11223,9 @@ function compileInternal(
 		hoistedHelpers: [], // statement NODES (sub-components, hook Symbols, key fns) + hook-slot-base markers
 		delegatedEvents: new Set(), // bubble event names seen in JSX — auto-emits delegateEvents(...)
 		capturedEvents: new Set(), // capture-phase event names (onXxxCapture) — auto-emits delegateCaptureEvents(...)
+		// Descriptor capabilities this module's JSX values can select (see
+		// classifyDescriptorCapabilities); each emits its installer once.
+		descriptorCapabilities: new Set(),
 		unownedDelegatedEvents: new Set(),
 		unownedCapturedEvents: new Set(),
 		cssInjections: [], // { hash, css } — one entry per component with a <style> block
@@ -12153,6 +12159,9 @@ function compileInternal(
 	// with no authored origin inherits the module's first located statement.
 	const moduleOrigin = ctx._moduleOrigin;
 	const delegateNodes = [];
+	for (const installer of [...ctx.descriptorCapabilities].sort()) {
+		delegateNodes.push(inheritOriginLoc(b.stmt(b.call(`_$${installer}`)), moduleOrigin));
+	}
 	if (ctx.delegatedEvents.size > 0) {
 		delegateNodes.push(
 			inheritOriginLoc(
@@ -23875,6 +23884,64 @@ function autoMemoReturnedProviderChild(node, nameNode, ctx) {
 
 // Build a `createElement(Comp, { ...props })` CallExpression AST node from a
 // component Element node. Recurses into prop values so nested JSX values lower too.
+// What a value-position JSX tag can be at runtime: a host string, a Fragment, a
+// module function component, or anything (a local, a member, a dynamic
+// expression, or an import from another module). A tag counts as the octane
+// Fragment or as a component only when it provably resolves to that module
+// binding (an octane `Fragment` import, or an immutable module function): a
+// shadowing parameter or local can hold a host string.
+function descriptorTagKind(ctx, nameNode, componentTag) {
+	if (!componentTag) return 'host';
+	if (nameNode?.type !== 'Identifier' && nameNode?.type !== 'JSXIdentifier') return 'dynamic';
+	if (ctx.activityModuleAst == null || ctx.authoredModuleAst == null) return 'dynamic';
+	const name = nameNode.name;
+	let kind;
+	if (ctx.octaneImportLocals?.get(name) === 'Fragment') kind = 'fragment';
+	else {
+		const functions = (ctx.ssrImmutableModuleFunctions ??= collectImmutableModuleFunctions(
+			ctx.authoredModuleAst.body,
+		));
+		if (!functions.has(name)) return 'dynamic';
+		kind = 'component';
+	}
+	const lexical = (ctx.activityLexical ??= createLexicalAnalysis(ctx.activityModuleAst));
+	const scope = lexical.nodeScopes.get(nameNode);
+	if (scope === undefined) return 'dynamic';
+	return lexical.resolveBinding(scope, name)?.scope === lexical.rootScope ? kind : 'dynamic';
+}
+
+// Descriptor hosts reach a function form action, and Fragment descriptors a ref,
+// only through the element factory that built them. Compiled JSX names its props
+// statically, so it installs a capability only when a prop or spread can select
+// it; public factories install every capability themselves.
+function classifyDescriptorCapabilities(ctx, nameNode, componentTag, attrs) {
+	if (ctx.mode === 'server') return; // the server renders descriptors without installers
+	let spread = false;
+	let action = false;
+	let ref = false;
+	for (const attr of attrs) {
+		if (attr.type === 'SpreadAttribute' || attr.type === 'JSXSpreadAttribute') spread = true;
+		else if (attr.type === 'Attribute' || attr.type === 'JSXAttribute') {
+			const name = attr.name?.name ?? attr.name;
+			if (name === 'action' || name === 'formAction' || name === 'formaction') action = true;
+			else if (name === 'ref') ref = true;
+		}
+	}
+	if (!spread && !action && !ref) return;
+	const kind = descriptorTagKind(ctx, nameNode, componentTag);
+	if (kind === 'component') return; // props reach a component, never a host or Fragment
+	if (kind !== 'fragment' && (action || spread))
+		addDescriptorCapability(ctx, 'enableDescriptorFormActions');
+	if (kind !== 'host' && (ref || spread))
+		addDescriptorCapability(ctx, 'enableDescriptorFragmentRefs');
+}
+
+function addDescriptorCapability(ctx, installer) {
+	if (ctx.descriptorCapabilities.has(installer)) return;
+	ctx.descriptorCapabilities.add(installer);
+	ctx.runtimeNeeded.add(installer);
+}
+
 function jsxElementToCreateElement(node, ctx, eagerRoot = false) {
 	const nameNode = node.openingElement?.name || node.id;
 	const activity = isActivityLongForm(node, ctx);
@@ -23895,6 +23962,7 @@ function jsxElementToCreateElement(node, ctx, eagerRoot = false) {
 		rejectDangerouslySetInnerHTMLChildren(compNode.value, node, ctx);
 	}
 	const attrs = node.attributes || node.openingElement?.attributes || [];
+	classifyDescriptorCapabilities(ctx, nameNode, componentTag, attrs);
 	const properties = [];
 	for (const attr of attrs) {
 		if (
@@ -24122,7 +24190,9 @@ function jsxElementToCreateElement(node, ctx, eagerRoot = false) {
 			node,
 		);
 	} else {
-		ctx.runtimeNeeded.add(componentTag ? 'createElementFromConfig' : 'createElement');
+		// The server renders descriptors without the client capability installers.
+		const hostFactory = ctx.mode === 'server' ? 'createElement' : 'createHostElement';
+		ctx.runtimeNeeded.add(componentTag ? 'createElementFromConfig' : hostFactory);
 		// Remaining scaffolding (callee, props object, spread/diagnostic wrappers,
 		// static-content literals) maps to the authored JSX element.
 		descriptor = inheritOriginLoc(
@@ -24134,7 +24204,7 @@ function jsxElementToCreateElement(node, ctx, eagerRoot = false) {
 						propsNode,
 						...(loweredChildren.length ? [b.array(loweredChildren)] : []),
 					)
-				: b.call('_$createElement', compNode, propsNode, ...loweredChildren),
+				: b.call(`_$${hostFactory}`, compNode, propsNode, ...loweredChildren),
 			node,
 		);
 	}
@@ -33362,6 +33432,9 @@ function makeCompCall(
 	// The props object as a node; the call-site emit embeds it directly.
 	const propsExpr = staticFragmentRenderer?.props ?? inheritOriginLoc(b.object(propNodes), node);
 	if (descriptorConfig) {
+		// A keyed spread builds a descriptor whose tag may be a host string or a
+		// Fragment at runtime, so its props select descriptor capabilities too.
+		classifyDescriptorCapabilities(ctx, node.openingElement?.name || node.id, true, attrs);
 		ctx.runtimeNeeded.add('createElementFromConfig');
 		return {
 			id,
