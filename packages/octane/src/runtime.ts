@@ -30866,38 +30866,43 @@ export function setValue(el: Element, value: unknown): void {
 		ctrl.v = value;
 		if (process.env.NODE_ENV !== 'production')
 			queueDevFormDiagnostic(el, CURRENT_SCOPE ?? undefined);
-		// Hydration ADOPTS: the server already serialized this value, and
-		// pre-hydration user input survives until the element's first real
-		// commit or discrete event (React parity) — zero writes, no warnings. A
-		// fresh structural replacement is client-built and needs normal projection.
+		// Hydration ADOPTS the live value with no warnings: as in React's
+		// initInput/initTextarea, only the attribute mirror below takes the
+		// client value. An unedited control follows it, and the dirty-value flag
+		// keeps pre-hydration user input until the element's first real commit
+		// or discrete event. A fresh structural replacement is client-built and
+		// needs normal projection.
 		const hydration = hydrating ? activeHydration() : null;
-		if (hydration !== null && !hydration.isFresh(el)) return;
-		// PROPERTY first (React initInput order): the write marks the control
-		// DIRTY, so the attribute write below — and any later defaultValue
-		// binding — can never drag the live value along.
-		if ((STAGED_DOM?.view(input) ?? input).value !== s)
+		if (hydration === null || hydration.isFresh(el)) {
+			// PROPERTY first (React initInput order): the write marks the control
+			// DIRTY, so the attribute write below — and any later defaultValue
+			// binding — can never drag the live value along.
+			if ((STAGED_DOM?.view(input) ?? input).value !== s)
+				(STAGED_DOM?.view(input) ?? input).value = s;
+			// The value ATTRIBUTE mirrors the controlled value (React's
+			// attribute-syncing cascade: value wins over defaultValue).
+			(STAGED_DOM?.view(input) ?? input).defaultValue = s;
+			return;
+		}
+	} else {
+		if (process.env.NODE_ENV !== 'production' && ctrl.v === UNCONTROLLED)
+			devWarnControlledFlip(el, true);
+		const prev = ctrl.v;
+		ctrl.v = value;
+		if (process.env.NODE_ENV !== 'production')
+			queueDevFormDiagnostic(el, CURRENT_SCOPE ?? undefined);
+		// PROPERTY before attribute (React updateInput order), as on mount. A control
+		// a native form reset left NON-DIRTY follows its value attribute, so an
+		// attribute-first write would move the live value itself and make the
+		// property write below look unnecessary — leaving the control non-dirty
+		// (a later attribute change would drag the value again) where React's
+		// property write marks it dirty. Reachable whenever the commit lands after
+		// the reset button's default action, i.e. any script-dispatched click.
+		// IME: an UNCHANGED rendered value must not cancel an active composition;
+		// a genuinely changed one still wins (React: setState during composition).
+		if (!(ctrl.composing && Object.is(prev, value)) && valueNeedsWrite(input, value))
 			(STAGED_DOM?.view(input) ?? input).value = s;
-		// The value ATTRIBUTE mirrors the controlled value (React's
-		// attribute-syncing cascade: value wins over defaultValue).
-		(STAGED_DOM?.view(input) ?? input).defaultValue = s;
-		return;
 	}
-	if (process.env.NODE_ENV !== 'production' && ctrl.v === UNCONTROLLED)
-		devWarnControlledFlip(el, true);
-	const prev = ctrl.v;
-	ctrl.v = value;
-	if (process.env.NODE_ENV !== 'production') queueDevFormDiagnostic(el, CURRENT_SCOPE ?? undefined);
-	// PROPERTY before attribute (React updateInput order), as on mount. A control
-	// a native form reset left NON-DIRTY follows its value attribute, so an
-	// attribute-first write would move the live value itself and make the
-	// property write below look unnecessary — leaving the control non-dirty
-	// (a later attribute change would drag the value again) where React's
-	// property write marks it dirty. Reachable whenever the commit lands after
-	// the reset button's default action, i.e. any script-dispatched click.
-	// IME: an UNCHANGED rendered value must not cancel an active composition;
-	// a genuinely changed one still wins (React: setState during composition).
-	if (!(ctrl.composing && Object.is(prev, value)) && valueNeedsWrite(input, value))
-		(STAGED_DOM?.view(input) ?? input).value = s;
 	if ((STAGED_DOM?.view(input) ?? input).defaultValue !== s) {
 		// Replacing textarea child text between edits splits native Undo groups.
 		// Keep its Text node while mirroring the controlled reset baseline.
@@ -30932,17 +30937,17 @@ function setCheckedState(input: HTMLInputElement, value: unknown, ctrl: Controll
 		if (process.env.NODE_ENV !== 'production')
 			queueDevFormDiagnostic(input, CURRENT_SCOPE ?? undefined);
 		const hydration = hydrating ? activeHydration() : null;
-		if (hydration !== null && !hydration.isFresh(input)) {
-			// Keep the pre-hydration user selection while separating it from the
-			// server default, including a later controlled → default flip.
-			(STAGED_DOM?.view(input) ?? input).checked = (STAGED_DOM?.view(input) ?? input).checked;
-			ctrl.sawDC = true;
-			return;
-		}
 		// PROPERTY first (marks checkedness dirty — see setValue), then the
 		// attribute baseline (React's cascade: checked wins over defaultChecked).
-		(STAGED_DOM?.view(input) ?? input).checked = b;
-		(STAGED_DOM?.view(input) ?? input).defaultChecked = b;
+		// Hydration re-assigns the live (server or user) selection instead, as
+		// React's initInput does, which separates it from the server default,
+		// including for a later controlled → default flip.
+		(STAGED_DOM?.view(input) ?? input).checked =
+			hydration === null || hydration.isFresh(input)
+				? b
+				: (STAGED_DOM?.view(input) ?? input).checked;
+		if ((STAGED_DOM?.view(input) ?? input).defaultChecked !== b)
+			(STAGED_DOM?.view(input) ?? input).defaultChecked = b;
 		ctrl.sawDC = true;
 		return;
 	}
@@ -31227,19 +31232,16 @@ export function setDefaultChecked(el: Element, value: unknown): void {
 		}
 		ctrl.sawDC = true;
 	}
-	if (adopted) {
-		// Adopt the user's live choice, but separate it from the server's
-		// pristine default so a later baseline update cannot drag it along.
-		if (first)
-			(STAGED_DOM?.view(input) ?? input).checked = (STAGED_DOM?.view(input) ?? input).checked;
-		return;
-	}
+	// Adopt the user's live choice, separated from the server's pristine default
+	// so the client baseline below (React's initInput) cannot drag it along.
+	if (adopted && first)
+		(STAGED_DOM?.view(input) ?? input).checked = (STAGED_DOM?.view(input) ?? input).checked;
 	// A controlled `checked` owns the attribute baseline (React's cascade).
 	if (ctrl.c !== -1) return;
 	// React initInput marks the live checkedness dirty even when the initial
 	// default is absent. Otherwise, the browser would move a still-pristine
 	// checkbox whenever a later defaultChecked update changes its reset target.
-	if (first && !(DEFAULT_CHECKED_INITIALIZED in input)) {
+	if (!adopted && first && !(DEFAULT_CHECKED_INITIALIZED in input)) {
 		if (TRANSITION_JOURNAL !== null) {
 			TRANSITION_JOURNAL.push(
 				JOURNAL_PROP,
