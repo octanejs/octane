@@ -25,7 +25,7 @@ function HoleLeaf(props: { value: unknown }) @{
 }
 
 // The server renders the `<b>` arm and the client the leaf arm, so the leaf's
-// cloned `<i>` mismatches and is rebuilt on the client.
+// `<i>` does not match the server HTML.
 export function Branch(props: { server?: boolean }) @{
 	<div>
 		@if (props.server) {

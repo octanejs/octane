@@ -70,11 +70,16 @@ export function App(props) @{
 
 interface Scenario {
 	container: HTMLElement;
+	main: HTMLElement;
 	result: HTMLOutputElement;
-	errors: unknown[];
+	/** onRecoverableError reports: one per boundary or root that fell back. */
+	recoverable: Error[];
+	uncaught: unknown[];
 	setId: (id: string) => void;
 	drain: () => Promise<void>;
 }
+
+const MISMATCH = /^Hydration failed because the server rendered HTML didn't match the client\./;
 
 async function hydrateScenario(options: {
 	app: keyof typeof APPS;
@@ -137,9 +142,11 @@ async function hydrateScenario(options: {
 		expect(serverLoad.mock.calls.map(([id]) => id)).toEqual([options.serverId]);
 		container.innerHTML = output.html;
 		activateStreamedMarkup(container);
+		const main = container.querySelector('main')!;
 		const result = container.querySelector('output')!;
 		expect(result.textContent).toBe(`server ${options.serverId}`);
-		const errors: unknown[] = [];
+		const recoverable: Error[] = [];
+		const uncaught: unknown[] = [];
 		hydration = bootstrapStreamedSignalHydration(streamedSignals);
 		root = client.hydrateRoot(
 			container,
@@ -152,14 +159,16 @@ async function hydrateScenario(options: {
 			},
 			{
 				signalOwner: hydration.signalOwner,
-				onRecoverableError: (error) => errors.push(error),
-				onUncaughtError: (error) => errors.push(error),
+				onRecoverableError: (error) => recoverable.push(error as Error),
+				onUncaughtError: (error) => uncaught.push(error),
 			},
 		);
 		await options.run({
 			container,
+			main,
 			result,
-			errors,
+			recoverable,
+			uncaught,
 			setId: (id) => client.flushSync(() => setId!(id)),
 			drain: async () => {
 				await drainProducers();
@@ -173,10 +182,6 @@ async function hydrateScenario(options: {
 		container.remove();
 		resetStreamRuntimeGlobals();
 	}
-}
-
-function uncaught(errors: unknown[]): unknown[] {
-	return errors.filter((error) => !String(error).includes('Hydration mismatch'));
 }
 
 describe('query reads in returned JSX through hydration', () => {
@@ -193,9 +198,10 @@ describe('query reads in returned JSX through hydration', () => {
 				serverId: 'a',
 				clientId: 'a',
 				browserLoad,
-				run: async ({ container, result, errors, drain }) => {
+				run: async ({ container, result, recoverable, uncaught, drain }) => {
 					await drain();
-					expect(errors).toEqual([]);
+					expect(recoverable).toEqual([]);
+					expect(uncaught).toEqual([]);
 					expect(browserLoad).not.toHaveBeenCalled();
 					expect(container.querySelector('output')).toBe(result);
 					expect(result.textContent).toBe('server a');
@@ -211,7 +217,9 @@ describe('query reads in returned JSX through hydration', () => {
 		async ({ field, dev }) => {
 			// The browser selects 'b', which the server never resolved. The boundary
 			// retries its suspended first attempt with the same children, so the
-			// attempt keeps its query instead of starting another load.
+			// attempt keeps its query instead of starting another load. Its result
+			// differs from the server's text, so the boundary then renders on the
+			// client and reports that once.
 			const browserLoad = vi.fn(async (id: string) => `browser ${id}`);
 			await hydrateScenario({
 				app: 'tsx',
@@ -220,10 +228,14 @@ describe('query reads in returned JSX through hydration', () => {
 				serverId: 'a',
 				clientId: 'b',
 				browserLoad,
-				run: async ({ container, errors, drain }) => {
+				run: async ({ container, main, recoverable, uncaught, drain }) => {
 					await drain();
-					expect(uncaught(errors)).toEqual([]);
+					expect(uncaught).toEqual([]);
+					expect(recoverable.map((error) => error.message)).toEqual([
+						expect.stringMatching(MISMATCH),
+					]);
 					expect(browserLoad.mock.calls.map(([id]) => id)).toEqual(['b']);
+					expect(container.querySelector('main')).toBe(main);
 					expect(container.querySelector('output')!.textContent).toBe('browser b');
 				},
 			});
@@ -241,8 +253,9 @@ describe('query reads in returned JSX through hydration', () => {
 		async ({ app, field, dev }) => {
 			// The server seeded Field's query for 'a', under the same owner the
 			// browser adopts. The browser selects 'b', so that history cannot
-			// present it: the query loads 'b' as if unseeded, and adoption keeps
-			// the server's output node while reporting the changed text.
+			// present it: the query loads 'b' as if unseeded. The loaded text
+			// differs from the server's, so the nearest Suspense boundary, or the
+			// root without one, renders on the client and reports it once.
 			const browserLoad = vi.fn(async (id: string) => `browser ${id}`);
 			await hydrateScenario({
 				app,
@@ -251,13 +264,19 @@ describe('query reads in returned JSX through hydration', () => {
 				serverId: 'a',
 				clientId: 'b',
 				browserLoad,
-				run: async ({ container, result, errors, drain }) => {
+				run: async ({ container, main, result, recoverable, uncaught, drain }) => {
 					await drain();
-					expect(errors).not.toEqual([]);
-					expect(uncaught(errors)).toEqual([]);
-					expect(browserLoad.mock.calls.map(([id]) => id)).toEqual(['b']);
-					expect(container.querySelector('output')).toBe(result);
-					expect(result.textContent).toBe('browser b');
+					expect(uncaught).toEqual([]);
+					expect(recoverable.map((error) => error.message)).toEqual([
+						expect.stringMatching(MISMATCH),
+					]);
+					// Only the browser's own selection loads; the seed for 'a' never does.
+					expect(browserLoad.mock.calls.map(([id]) => id)).toContain('b');
+					expect(browserLoad.mock.calls.every(([id]) => id === 'b')).toBe(true);
+					expect(result.isConnected).toBe(false);
+					expect(main.isConnected).toBe(app !== 'unbounded');
+					expect(container.querySelectorAll('output')).toHaveLength(1);
+					expect(container.querySelector('output')!.textContent).toBe('browser b');
 				},
 			});
 		},
@@ -267,8 +286,11 @@ describe('query reads in returned JSX through hydration', () => {
 		'restarts a suspended first attempt for new children, then retries it without reloading (dev: %s)',
 		async (dev) => {
 			// New children supersede the suspended attempt: it loads the new
-			// selection and never shows the abandoned one. The restarted attempt
-			// then retries with unchanged children and keeps its query.
+			// selection and never shows the abandoned one. The server HTML
+			// predates the client's update, so, as React client-renders a
+			// dehydrated boundary an update reaches, the boundary renders on the
+			// client, shows its fallback while the new selection loads, and
+			// reports nothing. Its retry with unchanged children keeps its query.
 			const pending = new Map<string, (value: string) => void>();
 			const browserLoad = vi.fn(
 				(id: string) => new Promise<string>((resolve) => pending.set(id, resolve)),
@@ -280,19 +302,24 @@ describe('query reads in returned JSX through hydration', () => {
 				serverId: 'a',
 				clientId: 'b',
 				browserLoad,
-				run: async ({ container, errors, setId, drain }) => {
+				run: async ({ container, main, recoverable, uncaught, setId, drain }) => {
 					await drain();
 					expect(browserLoad.mock.calls.map(([id]) => id)).toEqual(['b']);
 					setId('c');
 					await drain();
 					expect(browserLoad.mock.calls.map(([id]) => id)).toEqual(['b', 'c']);
+					expect(container.querySelector('output')).toBeNull();
+					expect(container.querySelector('i')!.textContent).toBe('waiting');
 					pending.get('b')!('browser b');
 					await drain();
-					expect(container.querySelector('output')!.textContent).not.toBe('browser b');
+					expect(container.querySelector('output')).toBeNull();
+					expect(container.querySelector('i')!.textContent).toBe('waiting');
 					pending.get('c')!('browser c');
 					await drain();
-					expect(uncaught(errors)).toEqual([]);
+					expect(uncaught).toEqual([]);
+					expect(recoverable).toEqual([]);
 					expect(browserLoad).toHaveBeenCalledTimes(2);
+					expect(container.querySelector('main')).toBe(main);
 					expect(container.querySelector('output')!.textContent).toBe('browser c');
 				},
 			});

@@ -1,5 +1,5 @@
 import { formatClientError } from '../error-codes.client.generated.js';
-import { registerSignalOwnerDocument } from './early-values.js';
+import { associateSignalOwnerDocument } from './early-values.js';
 import { installDefaultSignalOwner } from './owner-context.js';
 import type { SignalOwner, SignalOwnerIdentity } from './types.js';
 
@@ -19,7 +19,7 @@ export function documentSignalOwner(container: Node): SignalOwnerIdentity {
 		owner = Object.freeze({ scopeKey: 'octane:document' });
 		documentOwners.set(ownerDocument, owner);
 	}
-	registerSignalOwnerDocument(owner, ownerDocument);
+	associateSignalOwnerDocument(owner, ownerDocument);
 	return owner;
 }
 

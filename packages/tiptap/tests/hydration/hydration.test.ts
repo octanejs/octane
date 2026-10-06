@@ -2,15 +2,19 @@ import type { Editor } from '@tiptap/core';
 import { flushSync, hydrateRoot } from 'octane';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
+import { renderHydrationFixture } from '../../../octane/tests/_hydration-ssr';
 import { DeferredEditor } from '../_fixtures/deferred-editor.tsrx';
 import { DeferredCustomViews } from '../_fixtures/deferred-custom-views.tsrx';
 import { flushEffects } from '../_helpers';
 
-// This is the server-visible shell while useEditor's server snapshot is null.
-// Hydration protocol comments are deliberately omitted: this contract protects
-// the authored shell nodes and their adoption, not marker spelling.
-const DEFERRED_CUSTOM_VIEWS_SHELL =
-	'<main id="deferred-custom-views"><h1 id="deferred-custom-title">Deferred custom editor</h1><output id="deferred-custom-status">deferred</output><output id="deferred-custom-text">deferred</output><output id="deferred-shell-clicks">shell:0</output><output id="deferred-menu-clicks">menu:0</output><button id="deferred-shell-action" type="button">shell action</button></main>';
+// The server-visible shell while useEditor's server snapshot is null, rendered
+// by Octane's server: its hydration markers are part of the protocol, so the
+// client adopts that output rather than hand-written markup.
+async function serverShell(fixture: string, exportName: string): Promise<string> {
+	return (
+		await renderHydrationFixture('tiptap', `packages/tiptap/tests/_fixtures/${fixture}`, exportName)
+	).html;
+}
 
 function settle(): void {
 	flushEffects();
@@ -31,11 +35,11 @@ afterEach(() => {
 });
 
 describe('@octanejs/tiptap hydration', () => {
-	it('adopts the deferred server host and mounts a live editor after hydration', () => {
+	it('adopts the deferred server host and mounts a live editor after hydration', async () => {
+		const html = await serverShell('deferred-editor.tsrx', 'DeferredEditor');
 		vi.useFakeTimers();
 		const container = document.createElement('div');
-		container.innerHTML =
-			'<main id="deferred-editor"><output id="deferred-status">deferred</output><output id="deferred-selection">deferred</output></main>';
+		container.innerHTML = html;
 		document.body.appendChild(container);
 		const serverMain = container.querySelector('main');
 		const serverStatus = container.querySelector('#deferred-status');
@@ -75,9 +79,10 @@ describe('@octanejs/tiptap hydration', () => {
 	});
 
 	it('adopts a deferred shell before mounting an interactive custom view and menu', async () => {
+		const html = await serverShell('deferred-custom-views.tsrx', 'DeferredCustomViews');
 		vi.useFakeTimers();
 		const container = document.createElement('div');
-		container.innerHTML = DEFERRED_CUSTOM_VIEWS_SHELL;
+		container.innerHTML = html;
 		document.body.appendChild(container);
 		const serverMain = container.querySelector('#deferred-custom-views');
 		const serverTitle = container.querySelector('#deferred-custom-title');

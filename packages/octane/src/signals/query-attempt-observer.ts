@@ -91,6 +91,31 @@ export function serverSignalQueryAttemptObserver(
 	return context;
 }
 
+/**
+ * @internal A function a body creates reads the handles it closes over as their
+ * declaring owner (see __declared), wherever it renders. A render prop renders
+ * inside the component it is passed to, whose owners need not enclose the
+ * declaring one, so observe that read under the declaring owner, as that
+ * owner's own render would. The walk up enclosing owners then starts there. A
+ * render for another request's document never announces the read.
+ */
+export function runAsDeclaredServerSignalReader<T>(
+	owner: SignalRendererOwnerIdentity,
+	read: () => T,
+): T {
+	const context = CURRENT_OBSERVER;
+	return context === undefined ||
+		context.owner === owner ||
+		context.owner.documentOwner !== owner.documentOwner
+		? read()
+		: runWithServerSignalQueryAttemptObserver(
+				owner,
+				context.observe,
+				context.createObservations,
+				read,
+			);
+}
+
 export function hasServerSignalQueryAttemptObserver(scopeKey: string): boolean {
 	return serverSignalQueryAttemptObserver(scopeKey) !== undefined;
 }

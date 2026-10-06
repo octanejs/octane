@@ -124,7 +124,7 @@ describe.each([false, true])('hydrateRoot — resolved @try siblings (dev=%s)', 
 		{ name: 'BoundaryThenPair', fail: false },
 		{ name: 'BoundaryThenPair', fail: true },
 	])(
-		'adopts the server nodes of a multi-root component after $name (client failure=$fail)',
+		'hydrates a multi-root component after $name (client failure=$fail)',
 		async ({ name, fail }) => {
 			container.innerHTML = ServerRT.renderToString(server[name], { fail: false }).html;
 			const section = container.querySelector('section')!;
@@ -142,13 +142,21 @@ describe.each([false, true])('hydrateRoot — resolved @try siblings (dev=%s)', 
 				);
 				flushSync(() => {});
 				await act(async () => {});
-				expect(markup(section)).toBe(
+				const current = container.querySelector('section')!;
+				expect(markup(current)).toBe(
 					`<button>${fail ? 'error' : 'inside'}</button><i>pair</i><s>s</s><button>after</button>`,
 				);
-				// Only the arm a client failure replaced is new.
-				expect([...section.querySelectorAll('*')]).toEqual(
-					fail ? [section.querySelector('button'), ...original.slice(1)] : original,
-				);
+				if (fail) {
+					// Only the client's try body throws, so it throws while hydrating.
+					// As in React, the root renders on the client, where the catch arm
+					// catches the repeated throw: no server node survives.
+					expect([section, ...original].filter((node) => node.isConnected)).toEqual([]);
+				} else {
+					const adopted = [...current.querySelectorAll('*')];
+					expect(current).toBe(section);
+					expect(adopted).toHaveLength(original.length);
+					adopted.forEach((node, index) => expect(node).toBe(original[index]));
+				}
 				expect(caught.mock.calls.map(([value]) => value.message)).toEqual(
 					fail ? ['synthetic client failure'] : [],
 				);

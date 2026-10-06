@@ -3,11 +3,13 @@ import { act, flushSync, hydrateRoot } from '../../src/index.js';
 import * as ServerRT from 'octane/server';
 import { loadCompiledFixtureSource } from '../_server-fixture';
 
-// A text hole that is its host's only child adopts at most one leading server
-// Text node. Any other server content in the host (an element, a comment, or
-// text after them) is nothing the client renders. Hydration must report it and
-// discard it, so the host holds only the client's text, and later updates
-// write that Text node instead of landing beside stale server content.
+// A text hole that is its host's only child adopts the host's server text. As
+// in React, which compares such a host's whole text content, any other server
+// content in the host (an element, a comment, or text around them) is a
+// mismatch: nothing is repaired in place, the root renders on the client and
+// reports once, and later updates write the client's Text node. Under the
+// host's suppressHydrationWarning, React keeps the server content as it is
+// until the client next changes the text.
 
 const SOURCE = `import { use } from 'octane';
 function Tag({ kind }) @{ <i class={kind}>{'t'}</i> }
@@ -38,6 +40,9 @@ const UNCLAIMED = [
 	{ server: '<!--c-->', actual: 'a comment' },
 	{ server: '<b>x</b>tail', actual: '<b>' },
 ] as const;
+
+/** React's recoverable hydration error. */
+const MISMATCH = /server rendered HTML didn't match the client/;
 
 describe.each([
 	{ mode: 'development compile', dev: true },
@@ -76,18 +81,25 @@ describe.each([
 
 	function hydrate(name: string, paragraph: string, props: Record<string, unknown>) {
 		container.innerHTML = `<div><p>${paragraph}</p><i class="x">t</i></div>`;
+		const serverP = container.querySelector('p')!;
 		const tag = container.querySelector('i')!;
-		const tagText = tag.firstChild;
-		const serverChildren = [...container.querySelector('p')!.childNodes];
+		const serverChildren = [...serverP.childNodes];
 		const recovered: unknown[] = [];
 		flushSync(() => {
 			root = hydrateRoot(container, client[name], props, {
 				onRecoverableError: (error) => recovered.push(error),
 			});
 		});
-		return { tag, tagText, serverChildren, recovered, p: container.querySelector('p')! };
+		return {
+			tag,
+			serverP,
+			serverChildren,
+			recovered,
+			p: () => container.querySelector('p')!,
+		};
 	}
 
+	/** One report, and in development one warning at the hole's line. */
 	async function expectReported(
 		recovered: unknown[],
 		line: number,
@@ -96,9 +108,7 @@ describe.each([
 	) {
 		await Promise.resolve();
 		expect(recovered).toHaveLength(1);
-		expect(String((recovered[0] as Error).message)).toMatch(
-			/^Hydration mismatch: the server rendered extra children in a text element/,
-		);
+		expect(String((recovered[0] as Error).message)).toMatch(MISMATCH);
 		if (!dev) {
 			expect(warns()).toEqual([]);
 			return;
@@ -113,57 +123,60 @@ describe.each([
 		]);
 	}
 
+	/** The client Text node that the hole renders takes every later value. */
+	function expectUpdatesClientText(name: string): void {
+		const p = container.querySelector('p')!;
+		const hole = p.firstChild as Text;
+		expect(hole.nodeType).toBe(3);
+		for (const value of ['b', 'b', 'c', 7, 'd']) {
+			flushSync(() => root!.render(client[name], { value }));
+			expect(p.childNodes).toHaveLength(1);
+			expect(p.firstChild).toBe(hole);
+			expect(hole.nodeValue).toBe(String(value));
+		}
+		flushSync(() => root!.render(client[name], { value: '' }));
+		expect(p.innerHTML).toBe('');
+		flushSync(() => root!.render(client[name], { value: 'e' }));
+		expect(p.innerHTML).toBe('e');
+	}
+
 	describe.each(ROUTES)('$route', ({ name, line }) => {
 		it.each(UNCLAIMED)(
-			'discards server $server, reports it once, and updates the client Text node',
+			'client-renders the root over server $server, reports it once, and updates the client Text node',
 			async ({ server: content, actual }) => {
-				const { p, tag, tagText, recovered } = hydrate(name, content, { value: 'a' });
-				expect(p.innerHTML).toBe('a');
-				const hole = p.firstChild as Text;
-				expect(hole.nodeType).toBe(3);
-				// The recovery stays local: the sibling host and its text are adopted.
-				expect(container.querySelector('i')).toBe(tag);
-				expect(tag.firstChild).toBe(tagText);
+				const { p, serverP, tag, recovered } = hydrate(name, content, { value: 'a' });
+				expect(p().innerHTML).toBe('a');
+				// No boundary encloses the host, so its sibling renders on the client too.
+				expect(serverP.isConnected).toBe(false);
+				expect(tag.isConnected).toBe(false);
+				expect(container.querySelector('i')!.textContent).toBe('t');
 				await expectReported(recovered, line, actual);
 
-				for (const value of ['b', 'b', 'c', 7, 'd']) {
-					flushSync(() => root!.render(client[name], { value }));
-					expect(p.childNodes).toHaveLength(1);
-					expect(p.firstChild).toBe(hole);
-					expect(hole.nodeValue).toBe(String(value));
-				}
-				flushSync(() => root!.render(client[name], { value: '' }));
-				expect(p.innerHTML).toBe('');
-				flushSync(() => root!.render(client[name], { value: 'e' }));
-				expect(p.innerHTML).toBe('e');
+				expectUpdatesClientText(name);
 				await Promise.resolve();
 				expect(recovered).toHaveLength(1);
 			},
 		);
 
-		it('keeps an adopted server Text node and discards only the content after it', async () => {
-			const { p, serverChildren, recovered } = hydrate(name, 'a<b>x</b>', { value: 'a' });
-			const hole = serverChildren[0];
-			expect(p.innerHTML).toBe('a');
-			expect(p.firstChild).toBe(hole);
+		it('client-renders the root when server content follows the server text', async () => {
+			const { p, serverP, tag, recovered } = hydrate(name, 'a<b>x</b>', { value: 'a' });
+			expect(p().innerHTML).toBe('a');
+			expect(serverP.isConnected).toBe(false);
+			expect(tag.isConnected).toBe(false);
 			await expectReported(recovered, line, '<b>', 'the end of the text element');
-			flushSync(() => root!.render(client[name], { value: 'b' }));
-			expect(p.childNodes).toHaveLength(1);
-			expect(p.firstChild).toBe(hole);
-			expect(hole.nodeValue).toBe('b');
+			expectUpdatesClientText(name);
 		});
 
-		// An empty value the server framed is nothing to report, as an empty host is.
-		it('builds the client text over an empty server frame silently', async () => {
-			const { p, recovered } = hydrate(name, '<!--[--><!--]-->', { value: 'a' });
-			expect(p.textContent).toBe('a');
-			const hole = [...p.childNodes].find((node) => node.nodeType === 3)!;
+		// The server rendered an empty value where the client renders text.
+		it('client-renders the root over an empty server frame and reports it once', async () => {
+			const { p, serverP, recovered } = hydrate(name, '<!--[--><!--]-->', { value: 'a' });
+			expect(p().textContent).toBe('a');
+			expect(serverP.isConnected).toBe(false);
 			await Promise.resolve();
-			expect(recovered).toEqual([]);
-			expect(warns()).toEqual([]);
+			expect(recovered).toHaveLength(1);
+			expect(String((recovered[0] as Error).message)).toMatch(MISMATCH);
 			flushSync(() => root!.render(client[name], { value: 'b' }));
-			expect(p.textContent).toBe('b');
-			expect(hole.nodeValue).toBe('b');
+			expect(p().textContent).toBe('b');
 		});
 
 		it('adopts matching server text silently', async () => {
@@ -187,64 +200,90 @@ describe.each([
 		});
 	});
 
-	// suppressHydrationWarning silences the report. The server content is still
-	// nothing the hole adopted, so the client text replaces it.
-	it.each(UNCLAIMED)(
-		'discards server $server silently in a suppressed host',
-		async ({ server: content }) => {
-			const { p, tag, recovered } = hydrate('Suppressed', content, { value: 'a' });
-			expect(p.innerHTML).toBe('a');
-			const hole = p.firstChild as Text;
+	// React compares a suppressed text host's text content not at all: the
+	// server content stays as it is, unreported, until the client next changes
+	// the text, which replaces it.
+	it.each([
+		...UNCLAIMED.map(({ server: content }) => ({ content, value: 'a' })),
+		{ content: 'x<b>y</b>', value: 'a' },
+		{ content: '<b>x</b>', value: '' },
+	])(
+		'keeps server $content in a suppressed host for $value until the text changes',
+		async ({ content, value }) => {
+			const { p, serverP, serverChildren, tag, recovered } = hydrate('Suppressed', content, {
+				value,
+			});
+			expect(p()).toBe(serverP);
+			expect(serverP.innerHTML).toBe(content);
+			expect(serverP.childNodes).toHaveLength(serverChildren.length);
+			serverChildren.forEach((node, i) => expect(serverP.childNodes[i]).toBe(node));
 			expect(container.querySelector('i')).toBe(tag);
 			await Promise.resolve();
 			expect(recovered).toEqual([]);
 			expect(warns()).toEqual([]);
 			flushSync(() => root!.render(client.Suppressed, { value: 'b' }));
-			expect(p.childNodes).toHaveLength(1);
-			expect(p.firstChild).toBe(hole);
-			expect(hole.nodeValue).toBe('b');
+			expect(serverP.innerHTML).toBe('b');
+			flushSync(() => root!.render(client.Suppressed, { value: 'c' }));
+			expect(serverP.innerHTML).toBe('c');
 		},
 	);
 
-	it.each([null, ''])(
-		'discards server content silently for a %j value in a suppressed host',
-		async (value) => {
-			const { p, recovered } = hydrate('Suppressed', '<b>x</b>', { value });
-			expect(p.innerHTML).toBe('');
+	// A null value renders no text, so the server's element is an unhydrated
+	// child, which suppression does not cover.
+	it('client-renders the root over server content for a null value in a suppressed host', async () => {
+		const { p, serverP, recovered } = hydrate('Suppressed', '<b>x</b>', { value: null });
+		expect(p().innerHTML).toBe('');
+		expect(serverP.isConnected).toBe(false);
+		await Promise.resolve();
+		expect(recovered).toHaveLength(1);
+		flushSync(() => root!.render(client.Suppressed, { value: 'b' }));
+		expect(p().innerHTML).toBe('b');
+	});
+
+	// The server frames a lone primitive in some positions. A text-only frame
+	// holds the server's text as a bare Text node does: React compares an empty
+	// string's text content, which suppression keeps, but hydrates no child for
+	// any other empty value, and suppression keeps no unhydrated child.
+	describe.each([
+		{ framing: 'bare', content: 'x' },
+		{ framing: 'framed', content: '<!--[-->x<!--]-->' },
+	])('$framing server text in a suppressed host', ({ content }) => {
+		it('keeps it for an empty string until the text changes', async () => {
+			const { p, serverP, tag, recovered } = hydrate('Suppressed', content, { value: '' });
+			expect(p()).toBe(serverP);
+			expect(serverP.textContent).toBe('x');
+			expect(container.querySelector('i')).toBe(tag);
 			await Promise.resolve();
 			expect(recovered).toEqual([]);
 			expect(warns()).toEqual([]);
 			flushSync(() => root!.render(client.Suppressed, { value: 'b' }));
-			expect(p.innerHTML).toBe('b');
-		},
-	);
+			expect(serverP.innerHTML).toBe('b');
+		});
 
-	// A text binding has no child slot to adopt a server range, so it discards
-	// the range and names what the range held.
-	it('discards a server range in a text binding and names its content', async () => {
-		const { p, recovered } = hydrate('Text', '<!--[--><b>x</b><!--]-->', { value: 'a' });
-		expect(p.innerHTML).toBe('a');
+		it.each([null, undefined, false])('client-renders the root for a %j value', async (value) => {
+			const { p, serverP, recovered } = hydrate('Suppressed', content, { value });
+			expect(p().innerHTML).toBe('');
+			expect(serverP.isConnected).toBe(false);
+			await Promise.resolve();
+			expect(recovered).toHaveLength(1);
+			expect(String((recovered[0] as Error).message)).toMatch(MISMATCH);
+			flushSync(() => root!.render(client.Suppressed, { value: 'b' }));
+			expect(p().innerHTML).toBe('b');
+		});
+	});
+
+	it('client-renders the root over a server range in a text binding and names its content', async () => {
+		const { p, serverP, recovered } = hydrate('Text', '<!--[--><b>x</b><!--]-->', {
+			value: 'a',
+		});
+		expect(p().innerHTML).toBe('a');
+		expect(serverP.isConnected).toBe(false);
 		await expectReported(recovered, lineOf('function Text('), '<b>');
 	});
 
-	// The server's leading text is still kept, as suppression keeps any text value.
-	it('keeps the server text and discards the content after it silently in a suppressed host', async () => {
-		const { p, serverChildren, recovered } = hydrate('Suppressed', 'x<b>y</b>', { value: 'a' });
-		const hole = serverChildren[0];
-		expect(p.innerHTML).toBe('x');
-		expect(p.firstChild).toBe(hole);
-		await Promise.resolve();
-		expect(recovered).toEqual([]);
-		expect(warns()).toEqual([]);
-		flushSync(() => root!.render(client.Suppressed, { value: 'b' }));
-		expect(p.childNodes).toHaveLength(1);
-		expect(p.firstChild).toBe(hole);
-		expect(hole.nodeValue).toBe('b');
-	});
-
-	// A root attempt that suspends rolls back to the server DOM, so its retry
-	// finds the same server content, discards it, and reports it once.
-	it('reports once when the root attempt suspends after discarding', async () => {
+	// The mismatch comes before the sibling suspends: the root renders on the
+	// client once the sibling's data arrives, and reports once.
+	it('reports once when the client render of the root suspends', async () => {
 		let resolve!: (text: string) => void;
 		const text = new Promise<string>((r) => (resolve = r));
 		container.innerHTML = '<div><p><b>x</b></p><em>R</em></div>';
@@ -262,7 +301,8 @@ describe.each([
 		});
 		const p = container.querySelector('p')!;
 		expect(p.innerHTML).toBe('a');
-		expect(container.querySelector('em')).toBe(em);
+		expect(container.querySelector('em')!.textContent).toBe('R');
+		expect(em.isConnected).toBe(false);
 		await expectReported(recovered, lineOf('<p>{props.value}</p><Wait'), '<b>');
 		const hole = p.firstChild as Text;
 		flushSync(() => root!.render(client.Suspending, { value: 'b', text }));
