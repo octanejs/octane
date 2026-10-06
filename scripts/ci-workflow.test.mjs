@@ -181,6 +181,20 @@ describe('CI workflow aggregation', () => {
 		}
 	});
 
+	// A createRoot-only client must ship no hydration code under either bundler.
+	test('verifies once per full CI run that client-only bundles retain no hydration code', () => {
+		assert.match(
+			jobSource('test_shard'),
+			/- name: Verify client-only bundles retain no hydration code\n\s+if: matrix\.shard == '1\/4'\n\s+run: node benchmarks\/bundle-size\/run-hydration-free\.mjs\n/,
+		);
+		assert.doesNotMatch(jobSource('test_shard'), /run-hydration-free\.mjs \S/);
+		assert.ok(
+			packageJson.scripts['ci:workflow:test']
+				.split(' ')
+				.includes('benchmarks/bundle-size/hydration-free-gates.test.mjs'),
+		);
+	});
+
 	test('checks that budget raises land alone against the change itself', () => {
 		const lint = jobSource('lint_checks');
 		assert.match(lint, /fetch-depth: 0/);
@@ -2237,16 +2251,13 @@ describe('Vercel preview workflow', () => {
 		assert.match(writtenComments.at(-1).body, /URL pending/);
 	});
 
-	test('keeps production automatic and delegates labeled previews to the Vercel GitHub App', () => {
+	test('disables automatic Git deployments for both websites', () => {
 		for (const config of [websiteVercelConfig, mcpVercelConfig]) {
-			assert.deepEqual(config.git.deploymentEnabled, {
-				'*': false,
-				'**': false,
-				main: true,
-				'deploy-preview-pr-*': true,
-			});
+			assert.equal(config.git.deploymentEnabled, false);
 		}
+	});
 
+	test('publishes labeled preview branches and reports their deployment status', () => {
 		assert.match(
 			vercelPreviewWorkflow,
 			/on:\n {2}pull_request_target:\n {4}types: \[labeled, unlabeled, closed\]/,

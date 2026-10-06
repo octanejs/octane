@@ -41,10 +41,19 @@ describe('authored host JSX', () => {
 				);
 				try {
 					flushSync(() => {});
-					expect(container.querySelector('p')).toBe(original);
-					expect(container.textContent).toBe(suppress === true ? 'server' : 'client');
 					await Promise.resolve();
-					expect(recovered.length > 0).toBe(suppress !== true);
+					if (suppress === true) {
+						// The parent's suppressHydrationWarning keeps the server text.
+						expect(container.querySelector('p')).toBe(original);
+						expect(container.textContent).toBe('server');
+						expect(recovered).toHaveLength(0);
+					} else {
+						// A text mismatch with no boundary client-renders the root, once.
+						expect(container.querySelector('p')).not.toBe(original);
+						expect(original!.isConnected).toBe(false);
+						expect(container.textContent).toBe('client');
+						expect(recovered).toHaveLength(1);
+					}
 				} finally {
 					root.unmount();
 					container.remove();
@@ -69,7 +78,7 @@ describe('authored host JSX', () => {
 			flushSync(() => {});
 			expect(container.textContent).toBe('client');
 			await Promise.resolve();
-			expect(recovered.length).toBeGreaterThan(0);
+			expect(recovered).toHaveLength(1);
 		} finally {
 			root.unmount();
 			container.remove();

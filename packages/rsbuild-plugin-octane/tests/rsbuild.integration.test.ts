@@ -83,7 +83,11 @@ async function build(root: string, rsbuildConfig: Record<string, unknown>) {
 	await instance.build();
 }
 
-function writeRoutedApp(root: string, render: 'buffered' | 'streaming' = 'buffered') {
+function writeRoutedApp(
+	root: string,
+	render: 'buffered' | 'streaming' = 'buffered',
+	{ trustProxy = false } = {},
+) {
 	const descriptorSlot = render === 'buffered';
 	write(root, 'public/favicon.svg', '<svg data-rsbuild-public="ready"></svg>\n');
 	write(
@@ -213,11 +217,12 @@ export default defineConfig({
 					ok: true,
 					integration: 'rsbuild',
 					rpc: is_rpc_request(context.url.pathname),
+					origin: context.url.origin,
 				})),
 			}),
 		],
 	},
-	server: { render: ${JSON.stringify(render)} },
+	server: { render: ${JSON.stringify(render)}, trustProxy: ${JSON.stringify(trustProxy)} },
 });
 `,
 	);
@@ -893,7 +898,7 @@ document.querySelector('#root')!.textContent = typeof Counter;
 	}, 180_000);
 
 	it('streams routed HTML and server routes through the Rsbuild Environment API in dev', async () => {
-		writeRoutedApp(root, 'streaming');
+		writeRoutedApp(root, 'streaming', { trustProxy: true });
 		const instance = await createRsbuild({
 			cwd: root,
 			rsbuildConfig: {
@@ -929,7 +934,16 @@ document.querySelector('#root')!.textContent = typeof Counter;
 				ok: true,
 				integration: 'rsbuild',
 				rpc: false,
+				origin,
 			});
+			const proxiedResponse = await fetch(`${origin}/api/health`, {
+				headers: { 'X-Forwarded-Proto': 'https', 'X-Forwarded-Host': 'app.example.com' },
+			});
+			expect((await proxiedResponse.json()).origin).toBe('https://app.example.com');
+			// The whole path is //evil.example/api/health, which no route matches.
+			const hostShapedPath = await fetch(`${origin}//evil.example/api/health`);
+			expect(hostShapedPath.status).toBe(404);
+			expect(await hostShapedPath.text()).not.toContain('"integration":"rsbuild"');
 
 			write(
 				root,

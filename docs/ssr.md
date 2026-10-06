@@ -268,7 +268,9 @@ optional `head` and `signals` fields:
 
 A single **synchronous** pass, no awaiting. A Suspense boundary that suspends
 renders its `@pending` fallback; synchronously-resolved `use()` still seeds. Use
-`prerender` when you need the data awaited.
+`prerender` when you need the data awaited. As with React's `renderToString`,
+`hydrateRoot` renders a boundary the server left pending on the client, keeping
+the server DOM around it, and reports it once through `onRecoverableError`.
 
 ### `renderToStaticMarkup(component, props?, options?) => RenderResult` — `octane/server`
 
@@ -586,9 +588,10 @@ would repair a placement before hydration (for example, a `<div>` inside a
 `<p>`), Octane reports both authored locations in the server console. The check
 targets parser repairs rather than the complete HTML content model, never adds
 diagnostics to returned markup, and is removed from production compilation.
-Hydration recovers from such a repair in development and production: the
-client rebuilds the element in place of the nodes the parser split out and
-reports the recovery through `onRecoverableError`.
+Hydration treats such a repair as a mismatch in development and production:
+the nearest Suspense or `<Hydrate>` boundary around it, or else the root,
+renders on the client instead of adopting the server HTML, and
+`onRecoverableError` reports it once.
 
 On the server, page and layout props also receive `state`, the same
 request-scoped `Context.state` Map middleware populated. It is deliberately not
@@ -613,6 +616,29 @@ the built-in Node bridge also waits for `drain` and cancels the render when the
 response socket closes. Its HTTP transport negotiates streaming gzip for
 eligible SSR and static text responses while preserving HEAD, partial,
 pre-encoded, `no-transform`, and non-compressible responses.
+
+The Node bridge builds each request URL from `http://` and the `Host` header,
+which describe the hop it received. Behind a proxy that terminates TLS or
+rewrites `Host` (Vercel Functions, nginx, a Kubernetes ingress), `Context.url`
+then names a different origin than the browser's, and same-origin checks reject
+legitimate requests. Set `server.trustProxy: true` when that proxy overwrites
+`X-Forwarded-Proto` and `X-Forwarded-Host`: `nodeHandler`, the built-in server,
+`octane-preview`, and the Vite and Rsbuild dev servers then take the URL's
+scheme and host from those headers. Only the first entry of each is read. A
+scheme other than `http` or `https`, or a host that is not a plain
+`host[:port]`, is ignored, and the path and query always come from the request.
+Leave it off when clients can reach the server directly, because they can set
+these headers themselves. On Worker and other Web-standard hosts the platform
+builds the URL, so there the option only affects the server-function origin
+check.
+
+The Node bridge, its static file layer, and the Vite and Rsbuild dev servers
+read the request target the same way (`nodeRequestUrl` from
+`@octanejs/app-core/node`). A target that starts with `/` is the whole path and
+query on that origin, so `//evil.example/x` stays a path and never names
+another host. An `http://` or `https://` absolute-form target
+keeps its own scheme and host, as RFC 9112 requires. Any other target, such as
+`*`, becomes a path under the root.
 
 ### Islands-only routes
 

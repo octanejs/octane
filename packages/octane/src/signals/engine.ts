@@ -27,10 +27,11 @@ import {
 	type SignalCandidateFrame,
 } from './graph.js';
 import {
-	NativeAdoptionMiss,
 	beginNativeWriteGuard,
 	endNativeWriteGuard,
 	getNativeAdoptionResolver,
+	isNativeAdoptionMiss,
+	nativeAdoptionMiss,
 	registerNativeBatchHooks,
 	reportNativeRead,
 	type NativeReadSource,
@@ -501,7 +502,7 @@ export class ScopeImpl implements Scope, GraphOwner {
 			current?.status === 'error' &&
 			(current.error instanceof ScopeDisposedError ||
 				current.error instanceof SignalFrameError ||
-				current.error instanceof NativeAdoptionMiss)
+				isNativeAdoptionMiss(current.error))
 		) {
 			throw current.error;
 		}
@@ -788,7 +789,7 @@ class AdoptionFrameImpl implements AdoptionFrame {
 		}
 		reportNativeRead(source, 0);
 		if (!seed || seed.entry.kind !== node.kind) {
-			if (getNativeAdoptionResolver()) throw new NativeAdoptionMiss(this.scopeKey, node.key, read);
+			if (getNativeAdoptionResolver()) throw nativeAdoptionMiss(this.scopeKey, node.key, read);
 			throw new SignalFrameError(formatClientError(144, node.key));
 		}
 		if (seed.entry.available === false) {
@@ -822,7 +823,7 @@ function readHistoricalNode(node: ScopedNode, read: SignalReadMode): NodeState |
 	if (!frame) {
 		const resolved = getNativeAdoptionResolver()?.(owner);
 		if (resolved) return resolved.run(() => readNode(node, read));
-		if (getNativeAdoptionResolver()) throw new NativeAdoptionMiss(owner.scopeKey, node.key, read);
+		if (getNativeAdoptionResolver()) throw nativeAdoptionMiss(owner.scopeKey, node.key, read);
 		throw new SignalFrameError(formatClientError(146, owner.scopeKey));
 	}
 	return frame.read(node, read);
