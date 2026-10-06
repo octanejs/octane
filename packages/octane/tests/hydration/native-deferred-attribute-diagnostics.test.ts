@@ -123,7 +123,14 @@ async function consumer(dev: boolean) {
 	};
 }
 
-async function scenario(dev: boolean, split: boolean, name: string) {
+// A dormant island activates with captures or a native value that changed since
+// the server rendered, so its control's attributes differ from the server's.
+// Nothing reports a mismatch, as React reports nothing for an update that
+// reaches a dehydrated boundary. A changed native value is a live binding: the
+// island adopts the server's control and the binding writes the new value. A
+// changed capture makes the server's attributes stale, and hydration never
+// patches an attribute, so the island renders on the client instead.
+async function scenario(dev: boolean, split: boolean, name: string, capturesChange: boolean) {
 	const view = await consumer(dev);
 	let root: any;
 	const external = name.startsWith('external');
@@ -176,11 +183,17 @@ async function scenario(dev: boolean, split: boolean, name: string) {
 			hidden: false,
 		};
 		await view.api.act(() => root.render(Component, latest));
-		expect(view.host.querySelector('#synthetic-control')).toBe(control);
-		expect(control.getAttribute('data-identity')).toBe(latest.identity);
-		expect(control.hidden).toBe(false);
+		const live = view.host.querySelector('#synthetic-control')! as HTMLButtonElement;
+		if (capturesChange) {
+			expect(live).not.toBe(control);
+			expect(control.isConnected).toBe(false);
+		} else {
+			expect(live).toBe(control);
+		}
+		expect(live.getAttribute('data-identity')).toBe(latest.identity);
+		expect(live.hidden).toBe(false);
 		expect(recoverable).toEqual([]);
-		expect(refs.filter(Boolean)).toEqual([control]);
+		expect(refs.filter(Boolean)).toEqual([live]);
 		expect(refs.filter((node) => node && node.ownerDocument !== view.window.document)).toEqual([]);
 		expect(effects).toEqual(['layout-mount', 'passive-mount']);
 		// Dev and prod render the child only live, inside native read collection:
@@ -188,13 +201,13 @@ async function scenario(dev: boolean, split: boolean, name: string) {
 		expect(renders.length).toBeGreaterThan(0);
 		expect(renders.every((render) => render.guarded && render.observer)).toBe(true);
 		// Every activation here follows changed captures or a changed native value,
-		// so the server HTML is repaired without reporting a mismatch.
+		// so nothing reports a mismatch.
 		expect(view.diagnostics).toEqual([]);
 		if (model) {
 			await view.api.act(() => model.hidden$.set(true));
-			expect(control.hidden).toBe(true);
+			expect(live.hidden).toBe(true);
 			await view.api.act(() => model.hidden$.set(false));
-			expect(control.hidden).toBe(false);
+			expect(live.hidden).toBe(false);
 		}
 		view.api.flushSync(() => root.unmount());
 		root = null;
@@ -222,11 +235,12 @@ async function scenario(dev: boolean, split: boolean, name: string) {
 for (const dev of [false, true])
 	describe(`${dev ? 'development' : 'production'} native deferred diagnostics`, () => {
 		for (const split of [false, true])
-			for (const name of [
-				'later-primitive',
-				'external-before-activation',
-				'external-only',
-				'corrected-initial',
+			for (const { name, capturesChange } of [
+				{ name: 'later-primitive', capturesChange: true },
+				{ name: 'external-before-activation', capturesChange: true },
+				{ name: 'external-only', capturesChange: false },
+				{ name: 'corrected-initial', capturesChange: true },
 			])
-				it(`${split ? 'split' : 'unsplit'} ${name}`, () => scenario(dev, split, name));
+				it(`${split ? 'split' : 'unsplit'} ${name}`, () =>
+					scenario(dev, split, name, capturesChange));
 	});

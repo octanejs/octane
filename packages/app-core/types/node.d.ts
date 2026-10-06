@@ -32,9 +32,23 @@ export function nodeRequestToWebRequest(
 export function sendWebResponse(nodeResponse: ServerResponse, webResponse: Response): Promise<void>;
 
 /**
+ * The URL `nodeRequestToWebRequest` gives a Node request, with the same
+ * `trustProxy` rule for its origin. An origin-form target keeps its whole path
+ * and query on that origin, so a path that starts with `//` or `/\` never names
+ * another host. An `http://` or `https://` absolute-form target keeps its own
+ * origin (RFC 9112). Any other target, such as `*`, becomes a path under the root.
+ */
+export function nodeRequestUrl(
+	nodeRequest: IncomingMessage,
+	options?: { trustProxy?: boolean },
+): URL;
+
+/**
  * Serve a static file from `staticDir` when the request path maps to one.
  * Vite's `/assets/*` and Rsbuild's `/static/*` hash-named output get immutable
- * caching; other files revalidate. Returns true when the request was handled.
+ * caching; other files revalidate. A GET for one byte range gets an
+ * uncompressed 206, or 416 past the end of the file; any other Range request
+ * gets the whole file. Returns true when the request was handled.
  */
 export function serveStaticFile(
 	req: IncomingMessage,

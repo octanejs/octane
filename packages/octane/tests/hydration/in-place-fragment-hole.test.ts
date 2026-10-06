@@ -5,14 +5,15 @@ import { act, flushSync, hydrateRoot } from '../../src/index.js';
 import * as ServerRT from 'octane/server';
 import { loadCompiledFixtureSource, loadServerFixture } from '../_server-fixture';
 
-// A component call that finds no server range of its own, because the server
-// rendered another @if arm there, adopts the server nodes at the cursor in
-// place when its template matches them. A component call that is a hole in
-// that template finds its server node by walking the adopted nodes, so it must
-// render in place of that node, not of the node at the hydration cursor, which
-// still sits on the template's first root. The server renders the hole's call
-// either framed by its own range or inline, as the other arm's raw markup. A
-// hole the server's element has no node for is still built and reported.
+// The server rendered another @if arm whose elements match the client arm's
+// exactly. As in React, which hydrates elements regardless of which component
+// or branch produced them, the client arm adopts those server nodes silently.
+// Its component call has no server range of its own, and a component call
+// that is a hole in that call's template finds its server node by walking the
+// adopted nodes. The server renders the hole's call either framed by its own
+// range or inline, as the other arm's raw markup. A hole the server's element
+// has no node for is a missing node: with no Suspense boundary, the root
+// renders on the client and reports it once.
 
 const FIXTURE = join(
 	process.cwd(),
@@ -31,7 +32,7 @@ function markup(node: Element): string {
 	return copy.innerHTML;
 }
 
-const STRUCTURAL = /the mismatched subtree was rebuilt on the client/;
+const MISMATCH = /^Hydration failed because the server rendered HTML didn't match the client\./;
 
 const server = loadServerFixture(FIXTURE, { id: FILE });
 const clients = {
@@ -124,6 +125,7 @@ describe.each([
 			{ on: true },
 		);
 
+		expect(container.firstElementChild).toBe(host);
 		const nodes = [...host.querySelectorAll('*')];
 		expect(markup(host)).toBe(html);
 		expect(nodes).toHaveLength(serverNodes.length);
@@ -141,19 +143,27 @@ describe.each([
 	it.each([
 		{ hole: 'a hookless call', name: 'HoleMissingElement' },
 		{ hole: 'a call with hooks', name: 'HoleMissingElementState' },
-	])('builds and reports $hole whose server element ends before it', async ({ name }) => {
-		const { host, serverNodes, recoverable } = await hydrate(
-			client,
-			name,
-			{ on: false },
-			{ on: true },
-		);
-		const [div, i, em] = serverNodes;
+	])(
+		'renders the root on the client for $hole whose server element ends before it',
+		async ({ name }) => {
+			const { host, serverNodes, recoverable } = await hydrate(
+				client,
+				name,
+				{ on: false },
+				{ on: true },
+			);
 
-		expect(markup(host)).toBe('<div><i>p</i><em>e</em></div><em>e</em>');
-		expect(host.children[0]).toBe(div);
-		expect(div.firstElementChild).toBe(i);
-		expect(host.children[1]).toBe(em);
-		expect(recoverable).toEqual([expect.stringMatching(STRUCTURAL)]);
-	});
+			expect(host.isConnected).toBe(false);
+			expect(serverNodes.filter((node) => node.isConnected)).toEqual([]);
+			expect(markup(container.firstElementChild!)).toBe('<div><i>p</i><em>e</em></div><em>e</em>');
+			expect(recoverable).toEqual([expect.stringMatching(MISMATCH)]);
+			expect(warnings()).toHaveLength(dev ? 1 : 0);
+
+			// Each arm renders over the other as usual afterwards.
+			flushSync(() => root!.render(client[name], { on: false }));
+			expect(markup(container.firstElementChild!)).toBe('<div><i>p</i></div><em>e</em>');
+			flushSync(() => root!.render(client[name], { on: true }));
+			expect(markup(container.firstElementChild!)).toBe('<div><i>p</i><em>e</em></div><em>e</em>');
+		},
+	);
 });

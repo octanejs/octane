@@ -3,6 +3,7 @@ import { createScope } from 'octane/signals';
 import { act, mount } from './_helpers.js';
 import {
 	ConsistentChain,
+	GuardedQuery,
 	LayoutActivatedSnapshot,
 	NestedSnapshot,
 	NewErrorChain,
@@ -26,6 +27,26 @@ function renderBound(): () => void {
 // handle still resolves to the same cell, or each render re-runs it and
 // publishes a result its readers render again.
 describe('local derived and query chains', () => {
+	it('does not load a captured query until its derived branch is read, using the latest selection', async () => {
+		const load = vi.fn(async (key: string) => 'result: ' + key);
+		const root = mount(GuardedQuery, { selection: 'first', load });
+		try {
+			expect(root.find('p').textContent).toBe('inactive');
+			expect(root.find('aside').textContent).toBe('ready');
+			await act(() => root.click('#tick'));
+			expect(root.find('output').textContent).toBe('1');
+			expect(load).not.toHaveBeenCalled();
+			await act(() => root.update(GuardedQuery, { selection: 'second', load }));
+			expect(root.find('p').textContent).toBe('inactive');
+			expect(load).not.toHaveBeenCalled();
+			await act(() => root.click('#open'));
+			expect(root.find('p').textContent).toBe('result: second');
+			expect(root.find('aside').textContent).toBe('ready');
+			expect(load.mock.calls.map(([key]) => key)).toEqual(['second']);
+		} finally {
+			root.unmount();
+		}
+	});
 	it('settles a derived chain that reads a pending nested snapshot (#1735)', async () => {
 		const calls: string[] = [];
 		const load = (key: string) => {

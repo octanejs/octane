@@ -5,12 +5,13 @@ import { act, flushSync, hydrateRoot } from '../../src/index.js';
 import * as ServerRT from 'octane/server';
 import { loadCompiledFixtureSource, loadServerFixture } from '../_server-fixture';
 
-// The server rendered other content where a client component call expects its
-// range, and later siblings' ranges follow that content. The client builds the
-// component where that content stood and discards it, but not the later
-// siblings' ranges: those siblings adopt their server nodes. A component that
-// suspends first leaves the server content on screen, and the attempt that
-// completes reports the mismatch once.
+// The server rendered other content where a client component call renders.
+// The server HTML does not match the client, so, as in React 19, the nearest
+// fallback owner discards its server DOM and renders on the client, reporting
+// once: a <Hydrate> island when one encloses the call, otherwise the root.
+// Everything outside the island keeps its server nodes. Where the server's
+// elements are exactly what the call renders, the call adopts them, whether
+// or not it suspended first.
 
 const FIXTURE = join(
 	process.cwd(),
@@ -18,28 +19,8 @@ const FIXTURE = join(
 );
 const FILE = 'unframed-component-range.tsrx';
 const SOURCE = readFileSync(FIXTURE, 'utf8');
-const LINES = SOURCE.split('\n');
-
-/**
- * `FILE:line:column` of the first line reading exactly `text` in export `name`,
- * in its client arm when `client` is set.
- */
-function site(name: string, text: string, client = false): string {
-	const declared = LINES.findIndex((source) => source.startsWith(`export function ${name}(`));
-	const from = client
-		? LINES.findIndex((source, line) => line > declared && source.trim() === '} @else {')
-		: declared;
-	const index = LINES.findIndex((source, line) => line > from && source.trim() === text);
-	if (from < 0 || index < 0) throw new Error(`fixture export ${name} has no line ${text}`);
-	return `${FILE}:${index + 1}:${LINES[index].indexOf(text)}`;
-}
-
-/** `FILE:line:0` of the declaration of component `name`. */
-function declaration(name: string): string {
-	const index = LINES.findIndex((source) => source.startsWith(`function ${name}(`));
-	if (index < 0) throw new Error(`fixture has no component ${name}`);
-	return `${FILE}:${index + 1}:0`;
-}
+const HYDRATION_FAILED =
+	/^Hydration failed because the server rendered HTML didn't match the client/;
 
 /** Element and text markup, ignoring hydration comments and boundary attributes. */
 function markup(node: Element): string {
@@ -51,20 +32,6 @@ function markup(node: Element): string {
 	for (const element of copy.querySelectorAll('[data-octane-hydrate-id]'))
 		for (const { name } of Array.from(element.attributes)) element.removeAttribute(name);
 	return copy.innerHTML;
-}
-
-const SERVER_ARM = '<b class="server">server</b><em>e</em>';
-
-// The development compile renders the hookless Pair through the lite slot,
-// which rebuilds its fragment where the server node stood.
-const PAIR_REBUILT = 'a fragment starting with <u>';
-
-/** A published structural mismatch diagnostic. */
-function rebuilt(loc: string, expected: string, server = '<b>'): string {
-	return (
-		`Octane hydration mismatch at ${loc}: the client expected ${expected} but the server ` +
-		`rendered ${server}. The mismatched subtree was rebuilt on the client.`
-	);
 }
 
 describe.each([
@@ -108,13 +75,10 @@ describe.each([
 			...props,
 			leaf: Promise.resolve('unused'),
 		}).html;
+		const outer = container.firstElementChild!;
 		const section = container.querySelector('section')!;
 		const nodes = Array.from(section.children);
-		const served = (tag: string) => {
-			const node = nodes.find((element) => element.localName === tag);
-			if (node === undefined) throw new Error(`the server rendered no <${tag}>`);
-			return node;
-		};
+		const content = [section, ...section.querySelectorAll('*')];
 		let resolve!: (value: string) => void;
 		const leaf = new Promise<string>((done) => (resolve = done));
 		const recoverable: unknown[] = [];
@@ -132,121 +96,205 @@ describe.each([
 				resolve('z');
 				await leaf;
 			});
-		return { section, nodes, served, recoverable, settle };
+		return { outer, section, nodes, content, recoverable, settle };
 	}
 
-	it.each([
-		{ shape: 'under a <Hydrate> boundary', name: 'FragBranch', call: '<Frag leaf={props.leaf} />' },
+	/**
+	 * Exactly one recoverable report. A development compile may add one warning
+	 * that locates the mismatch; a production compile adds none.
+	 */
+	function expectReportedOnce(recoverable: unknown[]): void {
+		expect(recoverable).toHaveLength(1);
+		expect((recoverable[0] as Error).message).toMatch(HYDRATION_FAILED);
+		expectDiagnosedOnce();
+	}
+
+	/** A development compile may add one warning that locates the mismatch. */
+	function expectDiagnosedOnce(): void {
+		const logged = warnings();
+		expect(logged.length).toBeLessThanOrEqual(dev ? 1 : 0);
+		for (const message of logged)
+			expect(message).toMatch(new RegExp(`^Octane hydration mismatch at ${FILE}:\\d+:\\d+: `));
+	}
+
+	const FRAG = '<u>z</u><i>x</i><em>e</em>';
+	const SUSPENDING = [
+		{ shape: 'under a <Hydrate> island', name: 'FragBranch', html: FRAG, island: true },
 		{
-			shape: 'whose child suspends',
+			shape: 'whose child suspends, under an island',
 			name: 'FragChildBranch',
-			call: '<FragChild leaf={props.leaf} />',
+			html: FRAG,
+			island: true,
 		},
-		{ shape: 'in the root', name: 'FragRoot', call: '<Frag leaf={props.leaf} />' },
-	])(
-		'keeps the server content while a component built in its place suspends $shape',
-		async ({ name, call }) => {
-			const { section, served, recoverable, settle } = await hydrate(name);
-			const bold = served('b');
-			const em = served('em');
+		{
+			shape: 'over another component’s range, under an island',
+			name: 'RangeBranch',
+			html: FRAG,
+			island: true,
+		},
+		{ shape: 'in the root', name: 'FragRoot', html: FRAG, island: false },
+		{
+			shape: 'where the server rendered nothing, under an island',
+			name: 'EmptyBranch',
+			html: '<u>z</u><i>x</i>',
+			island: true,
+		},
+		// The call before it adopted the server's last element.
+		{
+			shape: 'after the server’s last element, under an island',
+			name: 'LateBranch',
+			html: '<b>a</b><p>z</p>',
+			island: true,
+		},
+	];
+
+	it.each(SUSPENDING)(
+		'client-renders the owner once a component that suspends $shape resolves',
+		async ({ name, html, island }) => {
+			const { outer, content, recoverable, settle } = await hydrate(name);
+
+			await settle();
+			expect(markup(container.querySelector('section')!)).toBe(html);
+			for (const node of content) expect(node.isConnected).toBe(false);
+			// An island is the fallback owner: the host around it keeps its server node.
+			expect(outer.isConnected).toBe(island);
+			expectReportedOnce(recoverable);
+		},
+	);
+
+	// React suspends in the component before it reaches a host that could
+	// mismatch, so the server HTML stays on screen, and nothing is reported,
+	// until the data arrives and the retry finds the mismatch.
+	it.each(SUSPENDING)(
+		'keeps the server content while a component that suspends $shape is pending',
+		async ({ name }) => {
+			const { section, nodes, recoverable, settle } = await hydrate(name);
 
 			expect(container.querySelector('section')).toBe(section);
-			expect(section.querySelector('b')).toBe(bold);
-			expect(section.querySelector('em')).toBe(em);
+			expect(Array.from(section.children)).toEqual(nodes);
 			expect(recoverable).toEqual([]);
 			expect(warnings()).toEqual([]);
 
 			await settle();
-			expect(markup(section)).toBe('<u>z</u><i>x</i><em>e</em>');
-			expect(section.querySelector('em')).toBe(em);
 			expect(recoverable).toHaveLength(1);
-			expect(warnings()).toEqual(dev ? [rebuilt(site(name, call), 'a component range')] : []);
 		},
 	);
 
-	it('keeps the server content while a fragment rebuilt over another range suspends', async () => {
-		const { section, served, recoverable, settle } = await hydrate('RangeBranch');
-		const bold = served('b');
-		const em = served('em');
+	// The server rendered exactly the elements the component renders once its
+	// data arrives. React's retry hydrates them, as a render that never
+	// suspended would: nothing is replaced or reported.
+	it.each([
+		{ shape: 'under a <Hydrate> island', name: 'MatchBranch' },
+		{ shape: 'whose child suspends, under an island', name: 'MatchChildBranch' },
+		{ shape: 'in the root', name: 'MatchRoot' },
+	])(
+		'adopts the server elements of a component that suspends $shape once it resolves',
+		async ({ name }) => {
+			const { section, nodes, recoverable, settle } = await hydrate(name);
 
-		expect(markup(section)).toBe(SERVER_ARM);
-		expect(section.querySelector('b')).toBe(bold);
-		expect(section.querySelector('em')).toBe(em);
+			await settle();
+			expect(container.querySelector('section')).toBe(section);
+			expect(markup(section)).toBe(FRAG);
+			expect(section.children).toHaveLength(nodes.length);
+			nodes.forEach((node, index) => expect(section.children[index]).toBe(node));
+			expect(recoverable).toEqual([]);
+			expect(warnings()).toEqual([]);
+		},
+	);
+
+	// The component around the call suspends first, inside its own server
+	// range, and the call suspends only once the island retries.
+	it('adopts the server elements of a component that suspends after the island resumed', async () => {
+		container.innerHTML = ServerRT.renderToString(server.GateBranch, {
+			server: true,
+			gate: Promise.resolve('unused'),
+			leaf: Promise.resolve('unused'),
+		}).html;
+		const section = container.querySelector('section')!;
+		const nodes = Array.from(section.children);
+		let open!: (value: string) => void;
+		let resolve!: (value: string) => void;
+		const gate = new Promise<string>((done) => (open = done));
+		const leaf = new Promise<string>((done) => (resolve = done));
+		const recoverable: unknown[] = [];
+		root = hydrateRoot(
+			container,
+			client.GateBranch,
+			{ gate, leaf },
+			{ onRecoverableError: (error: unknown) => recoverable.push(error) },
+		);
+		flushSync(() => {});
+		await act(async () => {
+			open('y');
+			await gate;
+		});
+		await act(async () => {
+			resolve('z');
+			await leaf;
+		});
+
+		expect(container.querySelector('section')).toBe(section);
+		expect(markup(section)).toBe(FRAG);
+		expect(section.children).toHaveLength(nodes.length);
+		nodes.forEach((node, index) => expect(section.children[index]).toBe(node));
 		expect(recoverable).toEqual([]);
 		expect(warnings()).toEqual([]);
-
-		await settle();
-		expect(markup(section)).toBe('<u>z</u><i>x</i><em>e</em>');
-		expect(section.querySelector('em')).toBe(em);
-		expect(recoverable).toHaveLength(1);
-		expect(warnings()).toEqual(
-			dev ? [rebuilt(declaration('Frag'), 'a fragment starting with <u>')] : [],
-		);
 	});
 
 	it.each([
 		{
-			shape: 'a nested <Hydrate> boundary',
+			shape: 'a nested <Hydrate> island, under an island',
 			name: 'HydrateBranch',
-			call: '<Hydrate split={false} when={load()}>',
 			html: '<div><i>ok</i></div><em>e</em>',
-			sibling: 'em',
-			expected: 'a component range',
+			island: true,
 		},
 		{
 			shape: 'a fragment component',
 			name: 'PairBranch',
-			call: '<Pair />',
 			html: '<u>u</u><i>x</i><em>e</em>',
-			sibling: 'em',
-			expected: PAIR_REBUILT,
+			island: false,
 		},
+		// The root's client render throws to the @catch arm, so, as in React, it
+		// reports that caught error alone, not its failed hydration.
 		{
 			shape: 'a component before a caught @try',
 			name: 'CaughtBranch',
-			call: '<Pair />',
 			html: '<u>u</u><i>x</i><s>boom</s>',
-			sibling: 's',
-			expected: PAIR_REBUILT,
+			island: false,
+			caught: true,
 		},
+		// The static range's content exists only in the server HTML: a client
+		// render of `<Hydrate split={false} when={never()}>` renders no children
+		// (docs/deferred-hydration.md), so the root's fallback drops it.
 		{
 			shape: 'a component before a <Hydrate> that never hydrates',
 			name: 'StaticBranch',
-			call: '<Pair />',
-			html: '<u>u</u><i>x</i><s>static</s>',
-			sibling: 's',
-			expected: PAIR_REBUILT,
+			html: '<u>u</u><i>x</i>',
+			island: false,
 		},
-	])(
-		'builds $shape ahead of the sibling it leaves adopted',
-		async ({ name, call, html, sibling, expected }) => {
-			const { section, served, recoverable } = await hydrate(name);
-			const adopted = served(sibling);
-
-			expect(markup(section)).toBe(html);
-			expect(section.querySelector(sibling)).toBe(adopted);
-			expect(recoverable).toHaveLength(1);
-			expect(warnings()).toEqual(dev ? [rebuilt(site(name, call, true), expected)] : []);
+		{
+			shape: 'a component where the server’s arm continues',
+			name: 'TailBranch',
+			html: '<u>u</u><i>x</i>',
+			island: false,
 		},
-	);
+		// The call before it adopted the server's last element.
+		{
+			shape: 'a component after the server’s last element, under an island',
+			name: 'TailCallBranch',
+			html: '<b>a</b><p>z</p>',
+			island: true,
+		},
+	])('client-renders the owner of $shape', async ({ name, html, island, caught }) => {
+		const { outer, content, recoverable } = await hydrate(name);
 
-	it('discards a server range that no later sibling claims', async () => {
-		const { section, recoverable } = await hydrate('TailBranch');
-
-		expect(markup(section)).toBe('<u>u</u><i>x</i>');
-		expect(recoverable).toHaveLength(1);
-		expect(warnings()).toEqual(
-			dev
-				? [
-						rebuilt(site('TailBranch', '<Pair />'), PAIR_REBUILT),
-						rebuilt(
-							site('TailBranch', '@if (props.server) {'),
-							'the end of the branch',
-							'a control-flow block',
-						),
-					]
-				: [],
-		);
+		expect(markup(container.querySelector('section')!)).toBe(html);
+		for (const node of content) expect(node.isConnected).toBe(false);
+		expect(outer.isConnected).toBe(island);
+		if (caught) {
+			expect(recoverable).toEqual([]);
+			expectDiagnosedOnce();
+		} else expectReportedOnce(recoverable);
 	});
 
 	it('adopts every node when the server rendered the same arm', async () => {

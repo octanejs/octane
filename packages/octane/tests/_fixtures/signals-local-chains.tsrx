@@ -18,6 +18,28 @@ export type NestedProps = {
 	load: (key: string) => Promise<string>;
 };
 
+export function GuardedQuery(props: {
+	selection: string;
+	load: (key: string) => Promise<string>;
+}) @{
+	const active$ = signal$(false);
+	const [tick, setTick] = useState(0);
+	const source$ = query$(() => props.selection, props.load);
+	const label$ = derived$(() => ({ text: active$.get() ? source$.get() : 'inactive' }));
+	const details$ = derived$(() => ({ text: label$.get().text }));
+	const label = label$.snapshot();
+	const state = details$.snapshot();
+	<main>
+		<button id="tick" onClick={() => setTick(tick + 1)}>{'tick'}</button>
+		<button id="open" onClick={() => active$.set(true)}>{'open'}</button>
+		<output>{tick as string}</output>
+		<aside>{label.status}</aside>
+		<p>
+			{state.status === 'ready' ? state.value.text : 'loading'}
+		</p>
+	</main>
+}
+
 // #1735: an acyclic derived$ chain reads the snapshot of a derived$ that is
 // itself waiting on a pending query.
 export function NestedSnapshot(props: NestedProps) @{
