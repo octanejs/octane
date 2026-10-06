@@ -139,6 +139,71 @@ describe('early hydration control handoff', () => {
 		}
 	});
 
+	it('keeps edits the inline writer queued until the document owner joins or the module captures', async () => {
+		const keys = [
+			'__octaneEarlySignalControls',
+			'__octanePublishSignalControl',
+			'__octaneStreamedRenderer',
+			'__octaneStreamedSignalSelections',
+		];
+		const previous = keys.map((key) => Object.getOwnPropertyDescriptor(globalThis, key));
+		const shell = (scopeKey: string, nodeKey: string) => {
+			for (const key of keys) Reflect.deleteProperty(globalThis, key);
+			const shellDocument = document.implementation.createHTMLDocument('Streaming shell');
+			shellDocument.head.innerHTML = earlySignalBootstrapScript();
+			const control = shellDocument.createElement('input');
+			control.setAttribute(
+				'data-octane-signal-control',
+				JSON.stringify([1, scopeKey, [['', nodeKey, 'value']]]),
+			);
+			control.value = 'server';
+			shellDocument.body.append(control);
+			new Function(
+				'document',
+				'globalThis',
+				shellDocument.head.querySelector('script')!.textContent!,
+			)(shellDocument, globalThis);
+			return { shellDocument, control };
+		};
+		const edit = (control: HTMLInputElement, value: string) => {
+			control.value = value;
+			control.dispatchEvent(new InputEvent('input', { bubbles: true }));
+		};
+		try {
+			// The client module has loaded, but nothing has hydrated or claimed the
+			// queue yet. An edit now must reach the first cell created once the
+			// document's engine-free owner joins.
+			const { shellDocument, control } = shell('loaded-module-document', 'draft');
+			vi.resetModules();
+			await import('octane');
+			const signals = await import('../../src/signals/index.js');
+			const earlyValues = await import('../../src/signals/early-values.js');
+			edit(control, 'typed after module load');
+			const owner = { scopeKey: 'loaded-module-document' };
+			earlyValues.registerSignalOwnerDocument(owner, shellDocument);
+			const draft$ = signals.__signalAt('g:draft', 'server', { key: 'draft' });
+			expect(signals.runWithSignalOwner(owner, () => draft$.get())).toBe('typed after module load');
+
+			// The module's control capture claims the document before anything read
+			// the queue. The edit it queued still counts as an early edit.
+			const claimed = shell('claimed-document', 'note');
+			edit(claimed.control, 'typed before capture');
+			edit(claimed.control, 'server');
+			vi.resetModules();
+			const capture = await import('../../src/hydration/event-capture.js');
+			capture.initializeHydrationEventCapture(claimed.shellDocument);
+			expect(capture.snapshotHydrationControl(claimed.control)).toMatchObject({
+				value: 'server',
+			});
+			expect(capture.snapshotHydrationControl(claimed.control)!.editRevision).toBeGreaterThan(0);
+		} finally {
+			keys.forEach((key, index) => {
+				if (previous[index] === undefined) Reflect.deleteProperty(globalThis, key);
+				else Object.defineProperty(globalThis, key, previous[index]!);
+			});
+		}
+	});
+
 	it('seeds the same global writable cell from an edit before its module resolves', () => {
 		const documentOwner = Object.freeze({ scopeKey: 'early-document' });
 		const owner: SignalRendererOwnerIdentity = Object.freeze({

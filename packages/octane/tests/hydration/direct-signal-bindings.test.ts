@@ -147,7 +147,7 @@ describe('opaque host attribute updates', () => {
 	);
 
 	it.each([false, true].flatMap((dev) => ['tsrx', 'tsx'].map((ext) => ({ dev, ext }))))(
-		'reconciles an absent client attribute when adopting server output (%j)',
+		'keeps a server attribute the client omits until the client sets it (%j)',
 		async ({ dev, ext }) => {
 			const source = `export function App(props) ${ext === 'tsrx' ? '@' : ''}{ ${ext === 'tsx' ? 'return ' : ''}<section title={props.value}><input defaultValue="draft"/></section>${ext === 'tsx' ? ';' : ''} }`;
 			const options = {
@@ -164,21 +164,34 @@ describe('opaque host attribute updates', () => {
 			input.value = 'typed before hydration';
 			const diagnostic = vi.spyOn(console, 'error').mockImplementation(() => {});
 			let root: Root | undefined;
+			const recoverable: unknown[] = [];
 			try {
 				await act(() => {
 					root = hydrateRoot(
 						container,
 						client.App,
 						{ value: undefined },
-						{ onRecoverableError() {} },
+						{ onRecoverableError: (error) => recoverable.push(error) },
 					);
 				});
+				// As in React, hydration never patches an attribute: the server's stays.
 				expect(container.querySelector('section')).toBe(section);
-				expect(section.hasAttribute('title')).toBe(false);
+				expect(section.getAttribute('title')).toBe('server');
 				expect(container.querySelector('input')).toBe(input);
 				expect(input.value).toBe('typed before hydration');
+				expect(recoverable).toEqual([]);
+				expect(
+					diagnostic.mock.calls.filter(([message]) =>
+						String(message).includes("won't be patched up"),
+					),
+				).toHaveLength(dev ? 1 : 0);
+				await act(() => root!.render(client.App, { value: undefined }));
+				expect(section.getAttribute('title')).toBe('server');
+				await act(() => root!.render(client.App, { value: 'client' }));
+				expect(section.getAttribute('title')).toBe('client');
 				await act(() => root!.render(client.App, { value: undefined }));
 				expect(section.hasAttribute('title')).toBe(false);
+				expect(container.querySelector('section')).toBe(section);
 			} finally {
 				root?.unmount();
 				diagnostic.mockRestore();
@@ -335,15 +348,23 @@ export function App(props) ${ext === 'tsrx' ? '@' : ''}{ ${ext === 'tsx' ? 'retu
 					const input = container.querySelector('input')!;
 					input.value = 'entered before hydration';
 					input.focus();
-					input.setSelectionRange(2, 6);
 					owner.set(value, input.value);
+					const recoverable: unknown[] = [];
 					await act(() => {
-						root = hydrateRoot(container, client.App, { value }, { signalOwner: owner });
+						root = hydrateRoot(
+							container,
+							client.App,
+							{ value },
+							{ signalOwner: owner, onRecoverableError: (error) => recoverable.push(error) },
+						);
 					});
-					expect(container.querySelector('input')).toBe(input);
-					expect(input.value).toBe('entered before hydration');
-					expect(document.activeElement).toBe(input);
-					expect([input.selectionStart, input.selectionEnd]).toEqual([2, 6]);
+					// The signal changed before hydration, so the client's text differs from
+					// the server's: as in React, the root renders on the client from the
+					// signal's current value, and its bindings are live.
+					expect(input.isConnected).toBe(false);
+					expect(recoverable).toHaveLength(1);
+					expect(container.querySelector('p')!.textContent).toBe('entered before hydration');
+					expect(container.querySelector('input')!.value).toBe('entered before hydration');
 				} else {
 					root = createRoot(container);
 					root.render(client.App, { value: 'primitive' });
