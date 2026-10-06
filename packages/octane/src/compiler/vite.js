@@ -149,6 +149,33 @@ function compiledCodeFingerprint(code) {
 	return nodeCrypto.createHash('sha256').update(code).digest('base64url');
 }
 
+// AST fields that only record how a program was printed: positions and
+// comments. A literal's `raw` spelling is printing too (a template element's
+// raw text is not, because a tag can read it). Every other field is part of the
+// program itself.
+const PRINT_ONLY_AST_KEYS = new Set(['start', 'end', 'loc', 'range', 'comments', 'hashbang']);
+
+// A fingerprint of the program that code parses to, independent of how it is
+// printed. Vite's TypeScript transform reprints every `.ts` and `.tsx` module
+// after this plugin's pre-order transform, so a `.tsx` component's final code
+// never matches its compiled code byte for byte. A void-export proof must
+// survive that reprint, and still fail closed when a later transform changes
+// the program. Returns null when the code cannot be parsed or serialized here,
+// so an importer falls back to the generic paths instead of failing its build.
+function structuralCodeFingerprint(context, code) {
+	if (typeof context?.parse !== 'function') return null;
+	try {
+		const json = JSON.stringify(context.parse(code), function (key, value) {
+			if (PRINT_ONLY_AST_KEYS.has(key) || (key === 'raw' && this.type === 'Literal'))
+				return undefined;
+			return typeof value === 'bigint' ? `${value}n` : value;
+		});
+		return nodeCrypto.createHash('sha256').update(json).digest('base64url');
+	} catch {
+		return null;
+	}
+}
+
 const NO_PREFLIGHT_FACTS = Object.freeze([]);
 
 // Parser string values can be V8 slices of the whole authored source. Copy the
@@ -285,7 +312,24 @@ function verifyCssModuleProofs(context, state) {
 }
 
 function createProofWaitGraph() {
-	return { waits: new Map(), cut: new Set() };
+	// `structures` caches a loaded module's structural fingerprint by its byte
+	// fingerprint, so a component imported from many modules is parsed once.
+	return { waits: new Map(), cut: new Set(), structures: new Map() };
+}
+
+// Whether a void-export proof still describes the module's final code: the
+// exact compiled bytes, or the same program after a reprint.
+function voidExportsProofHolds(context, proofWaits, metadata, code) {
+	if (typeof code !== 'string') return false;
+	const fingerprint = compiledCodeFingerprint(code);
+	if (metadata.fingerprint === fingerprint) return true;
+	if (typeof metadata.structure !== 'string') return false;
+	let structure = proofWaits.structures.get(fingerprint);
+	if (structure === undefined) {
+		structure = structuralCodeFingerprint(context, code);
+		proofWaits.structures.set(fingerprint, structure);
+	}
+	return structure === metadata.structure;
 }
 
 function proofWaitKey(importer, id) {
@@ -416,8 +460,7 @@ async function loadImportMetadata(
 			}
 			if (
 				metadataKey === VOID_EXPORTS_META &&
-				(typeof loadedModuleInfo?.code !== 'string' ||
-					metadata.fingerprint !== compiledCodeFingerprint(loadedModuleInfo.code))
+				!voidExportsProofHolds(context, proofWaits, metadata, loadedModuleInfo?.code)
 			) {
 				return;
 			}
@@ -1200,9 +1243,15 @@ export function octane(options = {}) {
 					meta[INDEPENDENT_WIDGETS_META] = result.independentWidgets;
 				}
 				if (result.kind === 'compile' && Array.isArray(result.voidComponentExports)) {
+					const voidExports = result.voidComponentExports;
+					// Only a module with void exports can satisfy an importer's proof,
+					// so only it pays for the reprint-tolerant structural fingerprint.
+					const structure =
+						voidExports.length === 0 ? null : structuralCodeFingerprint(this, result.code);
 					meta[VOID_EXPORTS_META] = {
-						exports: result.voidComponentExports ?? [],
+						exports: voidExports,
 						fingerprint: compiledCodeFingerprint(result.code),
+						...(structure === null ? null : { structure }),
 					};
 				}
 				if (
