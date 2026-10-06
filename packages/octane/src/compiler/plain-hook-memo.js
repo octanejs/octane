@@ -5,7 +5,7 @@
 import { builders as b, clone_ast_node as cloneAstNode, withDeferredImports } from '@tsrx/core';
 import { print as esrapPrint } from 'esrap';
 import esrapTsx from 'esrap/languages/tsx';
-import { METHOD_DEP_IMPORT } from './hook-deps.js';
+import { METHOD_DEP_IMPORT, methodDepFlags } from './hook-deps.js';
 import { INITIAL_VALUE_HOOKS, SPREAD_PATH_SLOT_HOOKS } from './hook-names.js';
 import { nativeReadActivationIndex } from './native-read-codegen.js';
 import { signalHookCallSite } from './signal-declarations.js';
@@ -132,7 +132,7 @@ function inferredDependencyList(inferred, state, origin) {
 							requireHelper(state, METHOD_DEP_IMPORT, 'octane'),
 							cloneAstNode(dependency.method.root),
 							b.literal(dependency.method.name),
-							...(dependency.method.guarded ? [b.literal(true)] : []),
+							...methodDepFlags(dependency.method).map((flag) => b.literal(flag)),
 						)
 					: dependency.stable === true
 						? { ...cloneAstNode(dependency.node), _octaneStableRead: true }

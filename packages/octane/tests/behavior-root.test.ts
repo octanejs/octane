@@ -9403,18 +9403,22 @@ export function Answer() @{
 			failing.publish({ onInput: null }, false);
 			failing.attach(failedRange, failing.state).dispose({ preserveDOM: false });
 			const inlineOrder: string[] = [];
-			const inlineA = vi.fn((_element: Element | null) => {
+			const inlineASpy = vi.fn((_element: Element | null) => {
 				inlineOrder.push('attach A');
 				return () => {
 					inlineOrder.push('detach A');
 				};
 			});
-			const inlineB = vi.fn((_element: Element | null) => {
+			// An arrow callback cannot see `props` as its receiver, so the inline ref
+			// keeps it across unrelated publishes.
+			const inlineA = (element: Element | null) => inlineASpy(element);
+			const inlineBSpy = vi.fn((_element: Element | null) => {
 				inlineOrder.push('attach B');
 				return () => {
 					inlineOrder.push('detach B');
 				};
 			});
+			const inlineB = (element: Element | null) => inlineBSpy(element);
 			const inline = authoredPresentation(
 				'InlineRefPresentation',
 				{ title: 'First', onAttach: inlineA },
@@ -9427,17 +9431,46 @@ export function Answer() @{
 			const inlineHandle = inline.attach(inlineInput, inline.state);
 			try {
 				inline.publish({ title: 'Unrelated change' });
-				expect(inlineA).toHaveBeenCalledOnce();
+				expect(inlineASpy).toHaveBeenCalledOnce();
 				expect(inlineOrder).toEqual(['attach A']);
 				inline.publish({ onAttach: inlineB });
 				expect(inlineOrder).toEqual(['attach A', 'detach A', 'attach B']);
 				inline.publish({ title: 'Another unrelated change' });
-				expect(inlineB).toHaveBeenCalledOnce();
+				expect(inlineBSpy).toHaveBeenCalledOnce();
 				expect(inlineHost.querySelector('input')).toBe(inlineInput);
 			} finally {
 				inlineHandle.dispose();
 			}
 			expect(inlineOrder).toEqual(['attach A', 'detach A', 'attach B', 'detach B']);
+		});
+
+		it(`keeps a guarded inline ref on a stable own function (${dev ? 'dev' : 'prod'})`, () => {
+			// The guarded `props.handler` read passes no receiver, so an ordinary
+			// stable function keeps the ref attached across unrelated publishes.
+			const attached: unknown[] = [];
+			const onAttach = (element: Element | null, handler: () => void) => {
+				if (element) attached.push(handler);
+			};
+			function handler() {}
+			function replacement() {}
+			const guarded = authoredPresentation(
+				'GuardedInlineRefPresentation',
+				{ enabled: true, handler, onAttach, title: 'First' },
+				dev,
+			);
+			const host = document.createElement('section');
+			container.append(host);
+			host.innerHTML = guarded.html;
+			const handle = guarded.attach(host.querySelector('input')!, guarded.state);
+			try {
+				expect(attached).toEqual([handler]);
+				guarded.publish({ title: 'Unrelated change' });
+				expect(attached).toEqual([handler]);
+				guarded.publish({ handler: replacement });
+				expect(attached).toEqual([handler, replacement]);
+			} finally {
+				handle.dispose();
+			}
 		});
 
 		it(`subscribes imported signal reads in every accessor form (${dev ? 'dev' : 'prod'})`, () => {

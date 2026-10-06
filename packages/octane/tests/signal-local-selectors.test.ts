@@ -327,41 +327,72 @@ export function App(props) @{
  <p>{String(value$.get()) + ':' + _$__methodDep + ':' + _$__methodDep$ + ':' + _$__derivedAt}</p>
 }`;
 
-	it('renders and updates with both method captures and authored names', () => {
-		const id = '/method-captures.tsrx';
-		const options = {
-			id,
-			compileOptions: { ...mode, hmr: false },
-			runtimeModules: { 'octane/signals': signals },
-		};
-		const server = loadCompiledFixtureSource<any>(source, { ...options, mode: 'server' });
-		const client = loadCompiledFixtureSource<any>(source, { ...options, mode: 'client' });
-		const calls: string[] = [];
-		class Model {
-			constructor(readonly value: string) {}
-			calculate() {
-				return this.value;
-			}
-			notify() {
-				calls.push(this.value);
-			}
-		}
-		expect(renderToString(server.App, new Model('server')).html).toContain(
-			'server:outer:inner:signal',
-		);
-		const root = mount(client.App, new Model('first'));
-		try {
-			expect(root.find('p').textContent).toBe('first:outer:inner:signal');
-			root.update(client.App, new Model('second'));
-			expect(root.find('p').textContent).toBe('second:outer:inner:signal');
-			expect(calls).toEqual(['first', 'second']);
-		} finally {
-			root.unmount();
-		}
-	});
+	// Inherited class methods and own methods shared by spread copies both read
+	// `this`, so a new receiver must re-run the captures that call them.
+	const receiverShapes = [
+		[
+			'class instance',
+			(calls: string[]) => {
+				class Model {
+					constructor(readonly value: string) {}
+					calculate() {
+						return this.value;
+					}
+					notify() {
+						calls.push(this.value);
+					}
+				}
+				return (value: string) => new Model(value);
+			},
+		],
+		[
+			'shared own methods',
+			(calls: string[]) => {
+				const methods = {
+					calculate(this: { value: string }) {
+						return this.value;
+					},
+					notify(this: { value: string }) {
+						calls.push(this.value);
+					},
+				};
+				return (value: string) => ({ ...methods, value });
+			},
+		],
+	] as const;
 
-	it('renders captures declared by a plain JavaScript hook', () => {
-		const hook = `import { useLayoutEffect } from 'octane';
+	it.each(receiverShapes)(
+		'renders and updates with both method captures and authored names (%s)',
+		(_shape, createModel) => {
+			const id = '/method-captures.tsrx';
+			const options = {
+				id,
+				compileOptions: { ...mode, hmr: false },
+				runtimeModules: { 'octane/signals': signals },
+			};
+			const server = loadCompiledFixtureSource<any>(source, { ...options, mode: 'server' });
+			const client = loadCompiledFixtureSource<any>(source, { ...options, mode: 'client' });
+			const calls: string[] = [];
+			const model = createModel(calls);
+			expect(renderToString(server.App, model('server')).html).toContain(
+				'server:outer:inner:signal',
+			);
+			const root = mount(client.App, model('first'));
+			try {
+				expect(root.find('p').textContent).toBe('first:outer:inner:signal');
+				root.update(client.App, model('second'));
+				expect(root.find('p').textContent).toBe('second:outer:inner:signal');
+				expect(calls).toEqual(['first', 'second']);
+			} finally {
+				root.unmount();
+			}
+		},
+	);
+
+	it.each(receiverShapes)(
+		'renders captures declared by a plain JavaScript hook (%s)',
+		(_shape, createModel) => {
+			const hook = `import { useLayoutEffect } from 'octane';
 import { derived$ } from 'octane/signals';
 const _$__methodDep$1 = 'outer';
 export function useProjection$(props) {
@@ -370,46 +401,42 @@ export function useProjection$(props) {
  useLayoutEffect(() => props.notify());
  return value$;
 }`;
-		const app = `import { useProjection$ } from './projection';
+			const app = `import { useProjection$ } from './projection';
 export function App(props) @{ const value$ = useProjection$(props); <p>{value$.get()}</p> }`;
-		const calls: string[] = [];
-		class Model {
-			constructor(readonly value: string) {}
-			calculate() {
-				return this.value;
+			const calls: string[] = [];
+			const model = createModel(calls);
+			const loadApp = (environment: 'client' | 'server') => {
+				const projection = loadPlainHookFixtureSource(
+					mode.strong ? `"use strong";\n${hook}` : hook,
+					{
+						id: '/projection.js',
+						mode: environment,
+						inlineHookMemo: false,
+						hmr: environment === 'client' && mode.dev,
+						runtimeModules: { 'octane/signals': signals },
+					},
+				);
+				return loadCompiledFixtureSource<any>(app, {
+					id: '/projection-app.tsrx',
+					mode: environment,
+					compileOptions: { ...mode, hmr: false },
+					runtimeModules: { './projection': projection },
+				});
+			};
+			const server = loadApp('server');
+			const client = loadApp('client');
+			expect(renderToString(server.App, model('server')).html).toContain('server:outer:inner');
+			const root = mount(client.App, model('first'));
+			try {
+				expect(root.find('p').textContent).toBe('first:outer:inner');
+				root.update(client.App, model('second'));
+				expect(root.find('p').textContent).toBe('second:outer:inner');
+				expect(calls).toEqual(['first', 'second']);
+			} finally {
+				root.unmount();
 			}
-			notify() {
-				calls.push(this.value);
-			}
-		}
-		const loadApp = (environment: 'client' | 'server') => {
-			const projection = loadPlainHookFixtureSource(mode.strong ? `"use strong";\n${hook}` : hook, {
-				id: '/projection.js',
-				mode: environment,
-				inlineHookMemo: false,
-				hmr: environment === 'client' && mode.dev,
-				runtimeModules: { 'octane/signals': signals },
-			});
-			return loadCompiledFixtureSource<any>(app, {
-				id: '/projection-app.tsrx',
-				mode: environment,
-				compileOptions: { ...mode, hmr: false },
-				runtimeModules: { './projection': projection },
-			});
-		};
-		const server = loadApp('server');
-		const client = loadApp('client');
-		expect(renderToString(server.App, new Model('server')).html).toContain('server:outer:inner');
-		const root = mount(client.App, new Model('first'));
-		try {
-			expect(root.find('p').textContent).toBe('first:outer:inner');
-			root.update(client.App, new Model('second'));
-			expect(root.find('p').textContent).toBe('second:outer:inner');
-			expect(calls).toEqual(['first', 'second']);
-		} finally {
-			root.unmount();
-		}
-	});
+		},
+	);
 
 	it('tracks a replaced own method even when a local has the same generated name', () => {
 		const source = `import { useLayoutEffect } from 'octane';

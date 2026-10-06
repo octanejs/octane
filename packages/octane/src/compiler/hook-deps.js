@@ -1510,8 +1510,16 @@ export function followsOptionalLink(node) {
 // Both emitters alias it through their own collision-safe import allocators.
 export const METHOD_DEP_IMPORT = '__methodDep';
 
+// The literal flags after `(root, 'name')` in an emitted `__methodDep` call.
+// A guarded dependency probes the own descriptor rather than reading the
+// property, and a guarded plain read passes no receiver to a call, so its own
+// function value is compared by itself. Every emitter spells them this way.
+export function methodDepFlags(method) {
+	return method.guarded ? (method.read ? [true, true] : [true]) : [];
+}
+
 // The emitted dependency expression for a one-level method call:
-// `_$__methodDep(root, 'name')` — own property ? member value : receiver (see
+// `_$__methodDep(root, 'name')` — an own arrow function, else the receiver (see
 // the runtime helper's contract in src/method-dep.ts). The call node carries
 // the authored member's source range so source maps and the surgical pass's
 // offset expectations stay anchored to the authored expression, while the
@@ -1524,7 +1532,9 @@ function methodDepNode(dependency, helperLocal) {
 		b.id(helperLocal, dependency.node),
 		{ ...dependency.method.root },
 		b.literal(dependency.method.name, JSON.stringify(dependency.method.name), dependency.node),
-		...(dependency.method.guarded ? [b.literal(true, 'true', dependency.node)] : []),
+		...methodDepFlags(dependency.method).map((flag) =>
+			b.literal(flag, String(flag), dependency.node),
+		),
 	);
 	return {
 		...call,
@@ -1575,7 +1585,7 @@ function collectDependencies(expression, callbackScope, analysis) {
 			seen.add(key);
 			const dependency = { node: info.node, key, binding };
 			if (guarded) {
-				dependency.method = { root: info.root, name: info.name, guarded: true };
+				dependency.method = { root: info.root, name: info.name, guarded: true, read: true };
 				(guardedKeys ??= new Set()).add(key);
 			}
 			dependencies.push(dependency);
@@ -1585,9 +1595,10 @@ function collectDependencies(expression, callbackScope, analysis) {
 	}
 
 	// A one-level member CALLED as a method. The member value alone cannot
-	// witness a changed receiver when the method is inherited (issue #542:
-	// `count.toFixed` is `Number.prototype.toFixed` on every render), and the
-	// receiver alone would defeat memoization for own function properties on
+	// witness a changed receiver when every receiver shares the method: an
+	// inherited one (issue #542: `count.toFixed` is `Number.prototype.toFixed` on
+	// every render) or one own function placed on several objects (issue #1788).
+	// The receiver alone would defeat memoization for own arrow callbacks on
 	// per-render containers (`props.onChange(...)`). Record the pair and let the
 	// emitted `__methodDep(root, 'name')` helper pick the comparable value at
 	// runtime. Deeper callees (`a.b.c(...)`) never reach here: their receiver
