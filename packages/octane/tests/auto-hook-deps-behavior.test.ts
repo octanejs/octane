@@ -1147,6 +1147,7 @@ export function useHook(props) {
 	it.each([
 		['arrow', () => () => {}],
 		['async arrow', () => async () => {}],
+		['arrow named async', () => ({ async: () => {} }).async],
 		// Prettier would parenthesize these parameters; the source text is the subject.
 		// prettier-ignore
 		['bare-parameter arrow', (): ((value: unknown) => unknown) => value => value],

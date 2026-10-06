@@ -84,13 +84,14 @@ export function __methodDep(
 // other function starts with `function`, `class`, or a method's property key,
 // and a bound, native, or proxied function reads as `function … [native code]`.
 // Anything this does not recognize counts as a method, which only costs a
-// spurious recompute. A method named `async` also reads as `async(`, so the
-// name check runs only after the pattern matched.
+// spurious recompute. A method named `async` also reads as `async(`, so only a
+// parenthesized arrow skips the name check.
 const ARROW_HEAD = /^(?:async\s*)?(?:\(|[\w$]+\s*=>)/;
 
 function ownMethodDep(receiver: object, method: unknown): unknown {
-	return typeof method === 'function' &&
-		!(ARROW_HEAD.test(Function.prototype.toString.call(method)) && method.name !== 'async')
-		? receiver
-		: method;
+	if (typeof method !== 'function') return method;
+	const source = Function.prototype.toString.call(method);
+	return ARROW_HEAD.test(source) && (source[0] === '(' || method.name !== 'async')
+		? method
+		: receiver;
 }
