@@ -26,6 +26,10 @@ const NESTEDSWAP = join(
 	'packages/octane/tests/hydration/_fixtures/nested-swap.tsrx',
 );
 const MIXEDFRAG = join(process.cwd(), 'packages/octane/tests/hydration/_fixtures/mixed-frag.tsrx');
+const FRAGMENTSTATICS = join(
+	process.cwd(),
+	'packages/octane/tests/hydration/_fixtures/fragment-statics.tsrx',
+);
 const TERNARY = join(process.cwd(), 'packages/octane/tests/_fixtures/ternary-mixed-arms.tsrx');
 
 /** The recoverable error a failed boundary or root reports in a development runtime. */
@@ -282,6 +286,43 @@ describe('hydrateRoot — STRUCTURAL mismatch with no boundary renders the root 
 			root.unmount();
 		}
 	});
+
+	// OCTANE DIVERGENCE (as above): a fragment has no wrapper, so the roots its
+	// adoption matches are checked one by one. Their static differences are kept
+	// and only warned about in development.
+	it.each([
+		{
+			name: 'a root fragment',
+			server: 'ServerRootFragment',
+			client: 'ClientRootFragment',
+			kept: '<h1 class="title">Heading</h1><section class="box"><span class="s1">one</span></section>',
+			listed: '<section>',
+		},
+		{
+			name: 'a fragment nested in a host',
+			server: 'ServerNestedFragment',
+			client: 'ClientNestedFragment',
+			kept: '<div id="nested"><b class="server">bold</b><i>italic</i></div>',
+			listed: '<b>',
+		},
+	])(
+		'$name with different static markup: keeps the server markup and warns in dev',
+		async ({ server: serverName, client: clientName, kept, listed }) => {
+			const srv = serverModule(FRAGMENTSTATICS, 'fragment-statics.tsrx');
+			const cli = devClientModule(FRAGMENTSTATICS, 'fragment-statics.tsrx');
+			const { html } = await ServerRT.renderToString(srv[serverName], {});
+			const { serverNodes, recovered, root } = await hydrateOver(html, cli[clientName], {});
+			try {
+				expect(markup(container)).toBe(kept);
+				expect(survivors(serverNodes)).toEqual(serverNodes);
+				expect(recovered).toEqual([]);
+				expect(warns()).toEqual([expect.stringContaining("This won't be patched up")]);
+				expect(warns()[0]).toContain(`static attributes or markup of the server's ${listed}`);
+			} finally {
+				root.unmount();
+			}
+		},
+	);
 
 	it('PROD build: @if branch swap renders the root on the client SILENTLY (no dev location needed)', async () => {
 		const clientProd = prodClientModule(CONTROL, 'control.tsrx');

@@ -33,10 +33,24 @@ function valueKey(ownerKey: string, instanceKey: string, nodeKey: string): strin
 	return JSON.stringify([ownerKey, instanceKey, nodeKey]);
 }
 
-/** @internal Associate an engine-free signal owner with its browser document. */
-export function registerSignalOwnerDocument(owner: SignalOwner, ownerDocument: Document): void {
+/**
+ * @internal Associate a signal owner with its browser document, so that its
+ * cells find the early edits already published there. A renderer associates
+ * every owner it creates, including in clients that only call createRoot, so
+ * this claims nothing from the inline writer's queue.
+ */
+export function associateSignalOwnerDocument(owner: SignalOwner, ownerDocument: Document): void {
 	OWNER_DOCUMENTS.set(ownerObject(owner), ownerDocument);
 	if (rendererOwner(owner)) OWNER_DOCUMENTS.set(owner.documentOwner, ownerDocument);
+}
+
+/**
+ * @internal An engine-free owner joins its streamed document: associate it and
+ * claim the edits the inline writer queued, before any of its cells exists.
+ */
+export function registerSignalOwnerDocument(owner: SignalOwner, ownerDocument: Document): void {
+	associateSignalOwnerDocument(owner, ownerDocument);
+	installEarlyControlBridge();
 }
 
 function documentForOwner(owner: SignalOwner): Document | undefined {
@@ -55,9 +69,9 @@ export function readEarlySignalValue(
 	binding: SignalBindingIdentity,
 ): EarlyValue | undefined {
 	const ownerDocument = documentForOwner(owner);
-	if (ownerDocument === undefined) return undefined;
-	installEarlyControlBridge();
-	return DOCUMENT_VALUES.get(ownerDocument)?.get(bindingKey(owner, binding));
+	return ownerDocument === undefined
+		? undefined
+		: DOCUMENT_VALUES.get(ownerDocument)?.get(bindingKey(owner, binding));
 }
 
 function parseControlBindings(control: Element): {
@@ -178,9 +192,11 @@ function publishEarlyHydrationControlSignalValues(control: Element, revision: nu
  * @internal A streaming shell can capture native input before the client module
  * evaluates: until this bridge is installed, its inline writer queues each
  * edited control's latest revision (`__octaneEarlySignalControls.q`). Claim that
- * bounded queue and publish later edits directly. hydrateRoot and every reader
- * of early values install it first, and no top-level statement does, so a
- * client that never hydrates or reads them keeps none of this bridge.
+ * bounded queue and publish later edits directly. Only hydration entry points
+ * install it: hydrateRoot, a streamed document's owner registration
+ * (registerSignalOwnerDocument) and the module control capture. Signal cells
+ * only read what it published, so a client that only calls createRoot keeps
+ * none of this bridge, even when it declares signals.
  * Idempotent: a repeat installs the same writer and finds the queue empty.
  */
 export function installEarlyControlBridge(): void {

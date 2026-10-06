@@ -10477,8 +10477,9 @@ export function renderToStaticMarkup(
 // and leaves a `<!--oct-seed:id-->` comment where the template was; the client
 // `mountTry` sees the comment, scopes that boundary's seeds, and adopts the
 // swapped-in DOM byte-for-byte. A boundary still pending when the stream ends
-// (abort/error) keeps its template — hydration's structural-mismatch recovery
-// client-renders it (the standard degraded path).
+// (abort/error) keeps its template: hydration client-renders that boundary, as
+// React does for a boundary the server could not finish (the standard degraded
+// path).
 //
 // Intentional scope notes (documented divergences from React Fizz):
 //   - No selective hydration (octane has no synthetic event replay system).
@@ -11212,7 +11213,7 @@ export function ssrTry(
 // `<!--oct-seed:id-->` scoping comment. `id` is the full render-scoped opaque
 // key, so both document queries and the seed stash remain disjoint when output
 // from multiple streams is composed into one page. $OCTRX(id) marks the
-// boundary errored (hydration client-renders it via mismatch recovery). Error
+// boundary errored (hydration client-renders that boundary, as React does). Error
 // instructions that arrive before a queued parent reveal are retained until
 // insertion exposes their sentinel; transport order alone does not imply DOM
 // availability when an optional animation driver delays the parent swap. A

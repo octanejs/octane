@@ -46,8 +46,9 @@ const productionDefines = {
 };
 
 // Clients that never hydrate: the #1785 public-root probe under both bundlers,
-// every renderer feature fixture that run-minimal treats as hydration-free, and
-// a complete compiled application.
+// a signal-declaring root under both bundlers, every renderer feature fixture
+// that run-minimal treats as hydration-free, and a complete compiled
+// application.
 const clients = [
 	{
 		name: 'create-root-export-vite',
@@ -58,6 +59,17 @@ const clients = [
 		name: 'create-root-export-esbuild',
 		bundler: 'esbuild',
 		entry: path.join(probes, 'create-root-export.ts'),
+	},
+	{
+		name: 'create-root-signals-vite',
+		bundler: 'vite',
+		entry: path.join(probes, 'create-root-signals.tsrx'),
+	},
+	{
+		name: 'create-root-signals-esbuild',
+		bundler: 'esbuild',
+		entry: path.join(probes, 'create-root-signals.tsrx'),
+		compile: true,
 	},
 	...[
 		['root-static', 'tsrx'],

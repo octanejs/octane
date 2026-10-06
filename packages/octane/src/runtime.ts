@@ -251,6 +251,7 @@ import {
 	runNativeBatch,
 	setNativeCandidateResolver,
 	setNativeAdoptionResolver,
+	supplyNativeAdoptionMiss,
 	type SignalDeclarationStage,
 } from './signals/read-protocol.js';
 import { beginNativeEventBatch, endNativeEventBatch } from './signals/native-read-events.js';
@@ -285,10 +286,10 @@ export {
 	installStreamedSignalOwnerActivator,
 } from './signals/document-owner.js';
 import {
+	associateSignalOwnerDocument,
 	hasHydrationControlSignalWriter,
 	installEarlyControlBridge,
 	registerHydrationControlSignalWriter,
-	registerSignalOwnerDocument,
 } from './signals/early-values.js';
 import {
 	SIGNAL_BINDING_READ,
@@ -1283,7 +1284,7 @@ function scopeSignalOwner(scope: Scope | null): SignalOwner | undefined {
 		// to a document owner or create fresh instance state.
 		if (retired) retireRendererSignalOwner(owner);
 	}
-	registerSignalOwnerDocument(owner, scope.block.parentNode.ownerDocument!);
+	associateSignalOwnerDocument(owner, scope.block.parentNode.ownerDocument!);
 	return owner;
 }
 
@@ -2194,6 +2195,30 @@ function hydrationStaticMatches(
 }
 
 /**
+ * DEV ONLY: `server`, adopted for the template root `template` (the root at
+ * index `path` of a fragment template, or '' for a single root), keeps its
+ * static attributes and markup. Development lists a difference
+ * (hydrationStaticMatches) in the pass's one warning, which never changes what
+ * is adopted. Every caller checks for development first, so production bundles
+ * drop it.
+ */
+function unpatchedStatics(
+	hydration: HydrationCapability,
+	server: Node,
+	template: Node,
+	loc: string | undefined,
+	partialStyles: string | undefined,
+	path: string,
+): void {
+	if (!hydrationStaticMatches(server, template, partialStyles, path))
+		(hydration.unpatchedValues ??= new Map()).set(
+			`${loc ? loc + ': ' : ''}static attributes or markup of the server's ` +
+				describeHydrationNode(server),
+			server,
+		);
+}
+
+/**
  * Does the server node at the cursor match a nested fragment's FIRST logical
  * root? A leading template comment is a dynamic hole whose server form (text,
  * a marker range, or nothing) cannot decide a mismatch, as in fragmentRemainder.
@@ -2203,22 +2228,31 @@ function hydrationStaticMatches(
  * another fragment's server nodes would stand for this one's: a hole's slot
  * would take one of them as its anchor, and the static roots would never be
  * built. Matches when no static element root follows the leading holes, and
- * under a passthrough root (HydrationCapability.passthroughRoot).
+ * under a passthrough root (HydrationCapability.passthroughRoot). Development
+ * also lists the static differences of the root it compared
+ * (unpatchedStatics), which never change the match.
  */
 function fragmentRootMatches(
 	server: Node,
 	fragment: Node,
 	hydration: HydrationCapability,
-	partialStyles?: string,
+	loc: string | undefined,
+	partialStyles: string | undefined,
 ): boolean {
 	let root: Node | null = getFirstChild(fragment)!;
-	if (root.nodeType !== 8) return hydrationNodeMatches(server, root);
-	if (hydration.passthroughRoot) return true;
+	let at: Node | null = server;
 	let holes = 0;
-	for (; root !== null && root.nodeType === 8; holes++) root = getNextSibling(root);
-	if (root === null || root.nodeType !== 1) return true;
-	const at = hydration.sibling(server, holes);
-	return at !== null && hydrationNodeMatches(at, root);
+	if (root.nodeType === 8) {
+		if (hydration.passthroughRoot) return true;
+		for (; root !== null && root.nodeType === 8; holes++) root = getNextSibling(root);
+		if (root === null || root.nodeType !== 1) return true;
+		at = hydration.sibling(server, holes);
+		if (at === null) return false;
+	}
+	if (!hydrationNodeMatches(at, root)) return false;
+	if (process.env.NODE_ENV !== 'production')
+		unpatchedStatics(hydration, at, root, loc, partialStyles, String(holes));
+	return true;
 }
 
 type BlockKind = 'root' | 'control-flow' | 'dynamic' | 'portal';
@@ -15485,8 +15519,10 @@ let preservedHydrateActivationCount = 0;
  * HTML is the output of exactly these captures, so while the boundary activates
  * with equal captures a value mismatch is a genuine server/client divergence.
  * Once a mounted parent legitimately changes them, the server HTML predates the
- * client's own state: activation repairs attributes and text without reporting
- * them. Deciding this compares values and never runs a child render.
+ * client's own state: any attribute or text difference then makes the boundary
+ * fall back and render on the client, without reporting it
+ * (staleServerValues). Deciding this compares values and never runs a child
+ * render.
  */
 interface HydrateInitialCaptures {
 	props: InternalHydrateProps;
@@ -19478,9 +19514,9 @@ function templateRootCount(template: Node | LazyTemplateRecord): number {
 }
 
 /**
- * PROD hydration's adoption-root check — hydrationNodeMatches' prod narrowing
- * (nodeType + localName only) answered straight off the template SOURCE so the
- * happy adoption path never forces the template parse.
+ * PROD hydration's adoption-root check — hydrationNodeMatches (nodeType +
+ * localName only) answered straight off the template SOURCE so the happy
+ * adoption path never forces the template parse.
  */
 function lazyRootMatches(server: Node, lazy: LazyTemplateRecord): boolean {
 	const root = lazyRootDescriptor(lazy);
@@ -19492,8 +19528,9 @@ function lazyRootMatches(server: Node, lazy: LazyTemplateRecord): boolean {
 	// a difference means a different branch. No case-folding or `<image>`→`img`
 	// fallback: those "matches" only arise from INVALID markup (an SVG-only root
 	// misplaced in an HTML parent parses lowercased/rewritten) where adopting the
-	// wrong-namespace node would be a correctness break — a false mismatch fails
-	// safe (rebuild, exactly what the parsed-template compare did pre-narrowing).
+	// wrong-namespace node would be a correctness break. A false mismatch fails
+	// safe, exactly as the parsed-template compare does: the nearest boundary,
+	// or the root, renders on the client.
 	return (server as Element).localName === root;
 }
 
@@ -19629,10 +19666,13 @@ function swapHydration(next: HydrationCapability | null): HydrationCapability | 
 /**
  * Hydration entry points only: this runtime is about to hydrate, so install
  * the driver for hydration state that outlives a pass (HydrationDriver) and
- * set the sticky flag that guards it.
+ * set the sticky flag that guards it. Only a pass installs a native adoption
+ * resolver, under which a signal read the server did not serialize throws
+ * NativeAdoptionMiss, so the class is supplied here too.
  */
 function installHydrationDriver(): void {
 	startHydration();
+	supplyNativeAdoptionMiss();
 	HYDRATION_DRIVER ??= {
 		pendingHydrateOwner,
 		releaseNativeAdoptions,
@@ -19789,7 +19829,7 @@ class HydrationCapability {
 	 * DEV-only: the server values this pass kept where the client's differ, by
 	 * their warning line, with the node each belongs to (settleValues).
 	 */
-	private unpatchedValues: Map<string, Node> | null = null;
+	unpatchedValues: Map<string, Node> | null = null;
 	/**
 	 * The first node of the adopted range whose claim is open (beginClaim),
 	 * until the template that renders that range's content adopts it.
@@ -21363,7 +21403,10 @@ class HydrationCapability {
 		return (anchor != null && this.freshNodes.has(anchor)) || this.freshNodes.has(parent);
 	}
 
-	/** Keep a client-owned root anchor alive while stale server siblings are swept. */
+	/**
+	 * `node` anchors the root rather than being its content, so finishRoot does
+	 * not count it as a server sibling left over after the root's content.
+	 */
 	protectRootAnchor(node: Node): void {
 		this.rootCleanupBoundary = node;
 	}
@@ -21411,17 +21454,21 @@ class HydrationCapability {
 		template: Node,
 		cursor: Node | null,
 		// A fragment within an enclosing server range ends by that range's close.
-		bounded?: boolean,
+		bounded: boolean,
+		loc: string | undefined,
+		partialStyles: string | undefined,
 	): Node | null | undefined {
 		let expected = getFirstChild(template);
 		let actual = cursor;
-		while (expected !== null) {
-			if (actual === null || (bounded === true && isBlockClose(actual))) return undefined;
+		for (let index = 0; expected !== null; index++) {
+			if (actual === null || (bounded && isBlockClose(actual))) return undefined;
 			// A template comment is a dynamic logical hole. Its server form may be
 			// text or a marker range, so only static text/element roots compare shape.
 			if (expected.nodeType !== 8) {
 				if (!hydrationNodeMatches(actual, expected)) return undefined;
-			} else if (bounded === true && getNextSibling(expected) === null) {
+				if (process.env.NODE_ENV !== 'production')
+					unpatchedStatics(this, actual, expected, loc, partialStyles, String(index));
+			} else if (bounded && getNextSibling(expected) === null) {
 				// In place of another component's markup, the server may have
 				// rendered nothing for a last root that is a hole, and the node there
 				// follows the fragment. Only the hole's value tells (holeOpen).
@@ -21638,7 +21685,7 @@ class HydrationCapability {
 		// (Root claims happen once per hydrateRoot, so parsing here is cold.)
 		if (isFragment && claimsRoot) {
 			if (template === null) template = resolveLazyTemplate(lazy!);
-			const remainder = this.fragmentRemainder(template, cursor);
+			const remainder = this.fragmentRemainder(template, cursor, false, loc, partialStyles);
 			if (remainder === undefined) {
 				const fragment = template;
 				this.mismatch(
@@ -21683,7 +21730,7 @@ class HydrationCapability {
 			// compare every root to find where they end.
 			if (pendingClaims && cursor === this.inPlace) {
 				const fragment = template ?? resolveLazyTemplate(lazy!);
-				const remainder = this.fragmentRemainder(fragment, cursor, true);
+				const remainder = this.fragmentRemainder(fragment, cursor, true, loc, partialStyles);
 				if (remainder === undefined)
 					this.rootMismatch(
 						loc,
@@ -21701,13 +21748,13 @@ class HydrationCapability {
 			if (
 				claimsRoot ||
 				(template !== null
-					? fragmentRootMatches(cursor, template, this, partialStyles)
+					? fragmentRootMatches(cursor, template, this, loc, partialStyles)
 					: lazyFragmentRootMatches(cursor, lazy!, this))
 			) {
 				// A fragment that is a range's content must also fit in that range.
 				// Roots that outnumber what the server rendered there, such as holes
-				// with no static element root after them, belong to other content,
-				// and only a rebuild creates them.
+				// with no static element root after them, belong to other content:
+				// a mismatch, from which the nearest boundary, or the root, falls back.
 				if (cursor !== this.claimFrom || this.claimRoots(cursor, template ?? lazy!) || claimsRoot)
 					return { __oct_vfrag: true, firstChild: cursor } as unknown as Node;
 			}
@@ -21718,16 +21765,8 @@ class HydrationCapability {
 				cursor,
 			);
 		}
-		if (
-			process.env.NODE_ENV !== 'production' &&
-			template !== null &&
-			!hydrationStaticMatches(cursor, template, partialStyles)
-		)
-			(this.unpatchedValues ??= new Map()).set(
-				`${loc ? loc + ': ' : ''}static attributes or markup of the server's ` +
-					describeHydrationNode(cursor),
-				cursor,
-			);
+		if (process.env.NODE_ENV !== 'production' && template !== null)
+			unpatchedStatics(this, cursor, template, loc, partialStyles, '');
 		if (claimsRoot)
 			this.claimRootRemainder(
 				framedRemainder === undefined ? (unframedRemainder ?? null) : framedRemainder,
@@ -24721,7 +24760,7 @@ export function bindSignalChecked(
 function attributeUnchanged(previous: unknown, value: unknown, el: Element): boolean {
 	if (previous !== value) return false;
 	if (value !== undefined) return true;
-	const hydration = activeHydration();
+	const hydration = hydrating ? activeHydration() : null;
 	return hydration === null || hydration.isFresh(el);
 }
 
@@ -50055,7 +50094,9 @@ function hydrateRootWithOutputHandler(
 				process.env.NODE_ENV !== 'production' && nativeRecovery instanceof HydrationMismatch
 					? nativeRecovery.diagnostic
 					: undefined,
-				currentHydration?.staleServerValues === true ? undefined : rootOptions?.onRecoverableError,
+				// A root's server output never predates its client state
+				// (staleServerValues), so its fallback always reports.
+				rootOptions?.onRecoverableError,
 				idState,
 				rootOptions?.identifierSeed ?? 0,
 			);

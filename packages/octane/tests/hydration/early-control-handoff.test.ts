@@ -139,7 +139,7 @@ describe('early hydration control handoff', () => {
 		}
 	});
 
-	it('keeps edits the inline writer queued until the first reader or module capture', async () => {
+	it('keeps edits the inline writer queued until the document owner joins or the module captures', async () => {
 		const keys = [
 			'__octaneEarlySignalControls',
 			'__octanePublishSignalControl',
@@ -170,8 +170,9 @@ describe('early hydration control handoff', () => {
 			control.dispatchEvent(new InputEvent('input', { bubbles: true }));
 		};
 		try {
-			// The client module has loaded, but nothing has hydrated or read an early
-			// value yet. An edit now must reach the first cell created from it.
+			// The client module has loaded, but nothing has hydrated or claimed the
+			// queue yet. An edit now must reach the first cell created once the
+			// document's engine-free owner joins.
 			const { shellDocument, control } = shell('loaded-module-document', 'draft');
 			vi.resetModules();
 			await import('octane');

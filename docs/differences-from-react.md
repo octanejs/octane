@@ -1710,7 +1710,8 @@ passive-effect, or ref-attach channel), `onUncaughtError` (no boundary claimed
 it — providing the callback replaces the default report, which otherwise
 rethrows render errors out of the flush and `console.error`s effect-channel
 errors; the failed root's tree still unmounts), and `onRecoverableError`
-(hydration recovered from a structural mismatch — see the hydration section).
+(a hydration mismatch made the nearest fallback boundary, or the root, discard
+its server DOM and render on the client — see the hydration section).
 Each callback receives only the error: there is no `errorInfo`/`componentStack`
 second argument, matching the documented SSR `onError` shape (owner stacks are
 not part of Octane's API). Deletion-phase teardown errors (effect cleanups and

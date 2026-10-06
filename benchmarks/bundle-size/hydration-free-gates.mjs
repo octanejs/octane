@@ -30,7 +30,9 @@ import assert from 'node:assert/strict';
 // drainHydrationRenderPhaseUpdates (the first mount drains render-phase
 // updates), preserveRootCreatedDom, MAPPED_ITEM_ADOPTION, the deopt adopt queue,
 // isRendererHydrationStyle, and the root-container claim are also client paths
-// and are deliberately absent.
+// and are deliberately absent. Development-only hydration diagnostics, such as
+// adoptHTML's HTML normalizers, are absent too: no production bundle retains
+// them, so no hydrating control could prove the oracle sees them.
 export const HYDRATION_ONLY_DECLARATIONS = Object.freeze([
 	// The root-local hydration capability. Only hydration entry points construct
 	// it; it is the dispatch boundary for adoption code.
@@ -40,10 +42,6 @@ export const HYDRATION_ONLY_DECLARATIONS = Object.freeze([
 	{ name: 'currentHydration', source: 'runtime.ts', foldOnly: true },
 	{ name: 'activeHydration', source: 'runtime.ts', foldOnly: true },
 	{ name: 'seedHydration', source: 'runtime.ts', foldOnly: true },
-	// setHTML's adoption comparison (#1785).
-	{ name: 'normalizeHTMLForHydration', source: 'runtime.ts' },
-	{ name: 'normalizeScriptTextForHydration', source: 'runtime.ts' },
-	{ name: 'escapeInlineScriptContentForHydration', source: 'runtime.ts' },
 	// Early-presentation adoption. Binding and control leases exist only on
 	// hydrateRoot roots: createRoot rejects both options (client error 76).
 	{ name: 'PRESENTATION_HYDRATION', source: 'runtime.ts', foldOnly: true },
@@ -64,8 +62,9 @@ export const HYDRATION_ONLY_DECLARATIONS = Object.freeze([
 	{ name: 'NATIVE_ADOPTION_RELEASES', source: 'runtime.ts', foldOnly: true },
 	{ name: 'releaseNativeAdoptions', source: 'runtime.ts' },
 	{ name: 'NativeAdoptionMiss', source: 'signals/read-protocol.ts' },
-	// The streamed-shell control-capture bridge. A top-level statement installs
-	// it, so only a hydration entry point may install it.
+	// The streamed-shell control-capture bridge. Only hydration entry points
+	// install it; signal cells, which every client that declares signals ships,
+	// only read the values it published.
 	{ name: 'publishEarlyHydrationControlSignalValues', source: 'signals/early-values.ts' },
 ]);
 
