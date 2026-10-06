@@ -80,7 +80,7 @@ Those changes are outside the measured 0.8.0 release snapshot.
 
 `local/bundle-size.json` no longer comes from the 0.8.0 release source. It was
 re-recorded from `main` at
-[`03fb25a91e`](https://github.com/octanejs/octane/commit/03fb25a91e) when the
+[`91079dde42`](https://github.com/octanejs/octane/commit/91079dde42) when the
 bundle-size harness moved from Vite's `minify: 'esbuild'` to Vite 8's default
 `'oxc'` minifier, so each fixture measures what an ordinary Vite application
 ships. Every framework keeps identical build settings (`minify: 'oxc'`,

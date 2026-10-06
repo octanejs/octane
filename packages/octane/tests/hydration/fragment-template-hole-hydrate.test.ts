@@ -8,8 +8,8 @@ import { loadCompiledFixtureSource, type CompiledFixtureModule } from '../_serve
 // A multi-root (fragment) template has no server wrapper, so hydration adopts
 // its roots straight from the cursor. When the server rendered something else
 // in that position (the hole's text, or another component's roots), the
-// fragment must not adopt it. It reports the mismatch once and builds on the
-// client.
+// server HTML does not match the client. No Suspense arm encloses the hole, so,
+// as in React 19, the whole root renders on the client and reports once.
 
 const SOURCE = readFileSync(
 	join(process.cwd(), 'packages/octane/tests/hydration/_fixtures/fragment-template-hole.tsrx'),
@@ -71,44 +71,48 @@ const markup = (container: HTMLElement) => container.innerHTML.replace(/<!--.*?-
 
 const pair = (v: string) => `<section><p class="x">${v}</p><i>${v}</i><b>${v}</b></section>`;
 
+// `other` is a different fragment component, so the server rendered two other
+// roots in the hole's range instead of one text node.
+const MISMATCHES = [
+	{ server: 'text', client: 'pair' },
+	{ server: 'text', client: 'chain-pair' },
+	{ server: 'other', client: 'pair' },
+];
+
 for (const dev of [true, false]) {
 	describe(`hydrateRoot: fragment template in a renderable hole (dev compile: ${dev})`, () => {
-		// `other` is a different fragment component, so the server left two
-		// unclaimed roots in the hole's range instead of one text node.
-		it.each([
-			{ server: 'text', client: 'pair' },
-			{ server: 'text', client: 'chain-pair' },
-			{ server: 'other', client: 'pair' },
-		])(
-			'server $server, client $client: reports once and renders the client markup',
+		it.each(MISMATCHES)(
+			'server $server, client $client: client-renders the root and reports once',
 			async ({ server, client }) => {
 				const container = renderServer(dev, { kind: server, v: 'A' });
-				const serverB = container.querySelector('b')!;
+				const serverNodes = [...container.querySelectorAll('*')];
 
 				const result = await hydrate(container, dev, { kind: client, v: 'A' });
 				try {
 					expect(result.recoverable).toHaveLength(1);
-					expect(String(result.recoverable[0])).toContain(
-						'the server-rendered node did not match the client render',
+					expect(String((result.recoverable[0] as Error).message)).toMatch(
+						/^Hydration failed because the server rendered HTML didn't match the client/,
 					);
 					const reports = result.reports();
 					if (dev) {
 						expect(reports).toHaveLength(1);
-						expect(reports[0]).toContain('Octane hydration mismatch at');
-						expect(reports[0]).toContain('the client expected a fragment starting with <p>');
+						expect(reports[0]).toMatch(
+							/^Octane hydration mismatch at fragment-template-hole\.tsrx:/,
+						);
 					} else {
 						expect(reports).toEqual([]);
 					}
-					// The server's hole content is gone; the sibling is still adopted.
 					expect(markup(container)).toBe(pair('A'));
-					expect(container.querySelector('b')).toBe(serverB);
+					expect(serverNodes.filter((node) => node.isConnected)).toEqual([]);
 
-					// The rebuilt range stays live in both directions.
+					// The client-rendered range stays live in both directions.
+					const b = container.querySelector('b');
 					result.render({ kind: client, v: 'B' });
 					expect(markup(container)).toBe(pair('B'));
 					result.render({ kind: 'text', v: 'C' });
 					expect(markup(container)).toBe('<section>C<b>C</b></section>');
-					expect(container.querySelector('b')).toBe(serverB);
+					expect(container.querySelector('b')).toBe(b);
+					expect(result.recoverable).toHaveLength(1);
 				} finally {
 					result.unmount();
 				}
@@ -148,23 +152,22 @@ for (const dev of [true, false]) {
 // source, without parsing it. Stubbing NODE_ENV around hydrateRoot exercises
 // that build-time-stripped branch.
 describe('hydrateRoot: fragment template in a renderable hole (production runtime)', () => {
-	it.each([
-		{ server: 'text', client: 'pair' },
-		{ server: 'text', client: 'chain-pair' },
-		{ server: 'other', client: 'pair' },
-	])(
-		'server $server, client $client: recovers silently with one report',
+	it.each(MISMATCHES)(
+		'server $server, client $client: client-renders the root silently with one report',
 		async ({ server, client }) => {
 			const container = renderServer(false, { kind: server, v: 'A' });
-			const serverB = container.querySelector('b')!;
+			const serverNodes = [...container.querySelectorAll('*')];
 			vi.stubEnv('NODE_ENV', 'production');
 
 			const result = await hydrate(container, false, { kind: client, v: 'A' });
 			try {
 				expect(result.recoverable).toHaveLength(1);
+				expect(String((result.recoverable[0] as Error).message)).toMatch(
+					/^Minified Octane error #339;/,
+				);
 				expect(result.reports()).toEqual([]);
 				expect(markup(container)).toBe(pair('A'));
-				expect(container.querySelector('b')).toBe(serverB);
+				expect(serverNodes.filter((node) => node.isConnected)).toEqual([]);
 			} finally {
 				result.unmount();
 			}
