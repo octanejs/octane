@@ -3543,6 +3543,11 @@
       "message": "The server could not finish this Suspense boundary, because it suspended during a synchronous render such as renderToString, which cannot wait for data. Switched to client rendering.",
       "runtime": ["client"],
       "status": "active"
+    },
+    "342": {
+      "message": "A descriptor carried a function form action, but no element factory installed form actions. This is a bug in the Octane compiler.",
+      "runtime": ["client"],
+      "status": "active"
     }
   },
   "strongDiagnostics": {
