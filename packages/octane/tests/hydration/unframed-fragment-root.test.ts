@@ -9,9 +9,11 @@ import { loadCompiledFixtureSource, loadServerFixture } from '../_server-fixture
 // rendered another @if arm there, adopts the server nodes at the cursor in
 // place when its template matches them. When that template has several roots,
 // hydration must continue after all of them: the next component adopts its own
-// server range rather than the fragment's second root, and nothing discards
-// that range. The development compile renders these calls through the lite
-// component slot; the production compile through the full component slot.
+// server range rather than the fragment's second root. When the server arm
+// lacks one of the fragment's roots, the server HTML does not match and the
+// root renders on the client, as React's does. The development compile renders
+// these calls through the lite component slot; the production compile through
+// the full component slot.
 
 const FIXTURE = join(
 	process.cwd(),
@@ -100,18 +102,25 @@ describe.each([
 		},
 	);
 
-	it('rebuilds a fragment whose hole meets the end of the server arm', async () => {
-		const { host, recoverable } = await hydrate('HX');
-		const after = host.querySelector('u');
+	it('renders the root on the client when the server arm lacks a fragment root', async () => {
+		const { host, serverNodes, recoverable } = await hydrate('HX');
 
-		expect(markup(host)).toBe('<s>s</s><b>a</b><u>u</u>');
-		expect(recoverable).toHaveLength(1);
+		// G's `<A />` expects a `<b>` where the server rendered the `<u>` after the arm.
+		expect(host.isConnected).toBe(false);
+		expect(serverNodes.some((node) => node.isConnected)).toBe(false);
+		expect(markup(container)).toBe('<div><s>s</s><b>a</b><u>u</u></div>');
+		expect(recoverable).toEqual([
+			expect.stringMatching(/^Hydration failed because the server rendered HTML didn't match/),
+		]);
+		expect(warnings()).toHaveLength(dev ? 1 : 0);
 
+		const clientHost = container.firstElementChild!;
+		const after = clientHost.querySelector('u');
 		act(() => root!.render(client.HX, { server: true }));
-		expect(markup(host)).toBe('<s>s</s><u>u</u>');
+		expect(markup(clientHost)).toBe('<s>s</s><u>u</u>');
 		act(() => root!.render(client.HX, {}));
-		expect(markup(host)).toBe('<s>s</s><b>a</b><u>u</u>');
-		expect(host.querySelector('u')).toBe(after);
+		expect(markup(clientHost)).toBe('<s>s</s><b>a</b><u>u</u>');
+		expect(clientHost.querySelector('u')).toBe(after);
 	});
 
 	it('unmounts the adopted fragment with its arm', async () => {

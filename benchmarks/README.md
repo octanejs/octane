@@ -1,7 +1,9 @@
 # Octane benchmarks
 
 Benchmark Vite builds use `build.minify: 'esbuild'`. Untimed diagnostic builds
-that inspect function names or generated code keep minification disabled.
+that inspect function names or generated code keep minification disabled. The
+byte suites `bundle-size` and `bundle-reachability` instead build with Vite 8's
+default `'oxc'` minifier, because they measure what a Vite application ships.
 
 A set of self-contained benchmark suites, each a pnpm workspace of fixture apps
 (octane + reference frameworks) plus a Playwright/Node harness. Every suite can
@@ -348,7 +350,7 @@ internally, get their own baseline and guard namespace.
 | `tsrx-renderer-selection` | tsrx-renderer-selection | none (Node-only) | ordered filename-to-renderer classification with semantic checksums, comparing retained normalized config against equivalent raw revalidation |
 | `tsrx-native-change-analysis` | tsrx-native-change-analysis | none (Node-only) | native-onChange analysis plus client/server compilation for 500/4,000 hostless JSX sites, paired with an AST-identical marker control that conservatively forces the scan |
 | `tsrx-vite-preflight-parsing` | tsrx-vite-preflight-parsing | none (Node-only) | real production client/server Vite transforms with output/map/meta/dependency/classification checksums, exact-root adapter/authoritative parse counts for production, development, CSS, and shared-plugin multi-environment paths, host-owned TypeScript first/second client environment timings, plus shared-AST/reparsed classification controls |
-| `bundle-size` | bundle-size | none (builds) | shipped JS bytes: production builds of js-framework, TodoMVC, chat-stream, weather-app, and the Octane-only bindings app, normalized minify, raw/gzip/brotli |
+| `bundle-size` | bundle-size | none (builds) | shipped JS bytes: production builds of js-framework, TodoMVC, chat-stream, weather-app, and the Octane-only bindings app, Vite's default Oxc minifier for every framework, raw/gzip/brotli |
 | `bundle-reachability` | bundle-size | none (builds and executes in jsdom) | isolated public feature imports, exact production-bundle behavior, forbidden-module reachability, and committed raw/gzip/brotli budgets |
 | `three-renderer` | three | Octane Three, R3F, plain Three | 1,000-object lifecycle, reconstruction/disposal, frame subscribers, and raycast events |
 | `three-bundle-size` | three | none (builds, then checks in Chromium) | minimal/full-catalogue shipped JS bytes for Octane Three, R3F, and plain Three |
@@ -359,7 +361,9 @@ numbers). They are the regression gates for
 `docs/compiled-output-optimization-plan.md`: `codegen-size` is the seconds-fast
 per-commit signal (its corpus is FIXED — editing the corpus list invalidates the
 baseline, re-record when you change it), `bundle-size` is the cross-framework
-comparison (all targets built with `minify: 'esbuild'`).
+comparison (all targets built with Vite 8's default `minify: 'oxc'`; Vite's
+`'esbuild'` mode turns off Rolldown's minifier and the dead-code elimination
+that comes with it).
 The separate `codegen-size` CSS targets also build the real Rspack/CssExtract
 adapter with named exports and authenticated immutable default maps. They compare
 identical source with the option off/on, keep framework imports external for byte
@@ -406,7 +410,8 @@ hide Octane application or runtime growth.
 
 `bundle-reachability` builds twenty-four independent public-entry feature fixtures
 across thirty-two production builds with the production Octane compiler,
-disabled HMR/profiling, and normalized esbuild minification. The seven package
+disabled HMR/profiling, and each bundler's default production minifier: Vite's
+`'oxc'` and esbuild's `minify: true`. The seven package
 side-effect fixtures and the behavior-only fixture each run through both Vite
 and esbuild. Each measured IIFE
 executes unchanged in an isolated jsdom realm; its visible DOM, interaction,

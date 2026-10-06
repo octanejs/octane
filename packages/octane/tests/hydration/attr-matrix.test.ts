@@ -23,7 +23,8 @@ import {
 // The client template emitter and the SSR emitter each carry their own
 // per-attribute policy. Any attribute they treat differently shows up as a
 // hydration mismatch: the server markup and the client's idea of that markup
-// disagree, so hydration rebuilds instead of adopting.
+// disagree, so development warns, and a structural difference regenerates the
+// tree on the client instead of adopting it.
 
 const FIXTURE = join(process.cwd(), 'packages/octane/tests/hydration/_fixtures/attr-matrix.tsrx');
 
@@ -130,7 +131,9 @@ describe('client and SSR attribute policy agree', () => {
 			try {
 				root = hydrateRoot(container, HydratedAttributeValues, clientProps);
 				flushSync(() => {});
-				assertValues(clientProps);
+				// As in React, hydration adopts the elements and never patches their
+				// attributes: the server values stay until the client next changes them.
+				assertValues(serverProps);
 				const mismatch = error.mock.calls.some((args) =>
 					String(args[0]).includes('hydration mismatch'),
 				);

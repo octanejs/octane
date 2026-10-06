@@ -1,5 +1,5 @@
 // A renderable hole whose value is a list, and compiled @for lists, hydrated
-// over server content that the client's items cannot adopt: a list where the
+// over server content that the client's items do not match: a list where the
 // client renders nothing, a bare server item where the client's item needs a
 // range of its own or has another tag, and fewer or more server items than
 // client items.
@@ -79,8 +79,7 @@ function pick(kind: Kind, v: string, text: Promise<string> | null): OctaneNode {
 	}
 }
 
-// The trailing host hydrates after the value, so it fails if the recovery gives
-// up on the rest of the boundary.
+// A trailing host follows the value.
 export function Hole(props: HoleProps) @{
 	<main>
 		@try {

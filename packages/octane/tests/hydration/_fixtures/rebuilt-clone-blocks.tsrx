@@ -85,7 +85,7 @@ function UseEm(props: { value: Promise<string> }) @{
 }
 
 // Each Branch renders `<b>` on the server and a leaf on the client, so the
-// leaf's cloned `<i>` mismatches and is rebuilt on the client.
+// leaf's cloned `<i>` does not match the server's output.
 export function IfBranch(props: { server?: boolean }) @{
 	<div>
 		@if (props.server) {
@@ -146,8 +146,8 @@ export function BoundaryBranch(props: { server?: boolean }) @{
 	</div>
 }
 
-// After the rebuild, the cursor rests on server output that the leaf's @if arm
-// or @for range would match.
+// After the mismatched `<b>`, the server rendered output that the leaf's @if
+// arm or @for range would match.
 export function ForeignNodeBranch(props: { server?: boolean }) @{
 	<div>
 		@if (props.server) {
@@ -176,7 +176,7 @@ export function ForeignListBranch(props: { server?: boolean }) @{
 	</div>
 }
 
-// A server sibling after the rebuilt leaf is still adopted.
+// A server sibling after the mismatched leaf matches the client's.
 export function SiblingBranch(props: { server?: boolean }) @{
 	<div>
 		@if (props.server) {
@@ -230,8 +230,8 @@ function ComponentLeaf(props: ComponentProps) @{
 	</i>
 }
 
-// The rebuilt leaf's components have no server ranges, while the cursor rests
-// on the range the server rendered for the Tally that follows.
+// The leaf's components have no server ranges; the server rendered a range for
+// the Tally that follows.
 export function ComponentBranch(props: ComponentProps & { server?: boolean }) @{
 	<div>
 		@if (props.server) {
@@ -243,7 +243,7 @@ export function ComponentBranch(props: ComponentProps & { server?: boolean }) @{
 	</div>
 }
 
-// The server's seeds belong to its UseEm; the rebuilt leaf's @if arm has none.
+// The server's seeds belong to its UseEm; the client leaf's @if arm has none.
 export function SeedBranch(props: {
 	server?: boolean;
 	leaf: Promise<string>;

@@ -21,7 +21,7 @@ function BatchedSlow(props: { slow?: Promise<string> }) @{
 }
 
 function Pend(props: { server?: boolean; leaf: Promise<string> }) @{
-	<u>{(props.server ? 'z' : use(props.leaf)) as string}</u>
+	<u>{(props.server ? 'x' : use(props.leaf)) as string}</u>
 }
 
 function Gate(props: { server?: boolean; gate: Promise<string> }) @{

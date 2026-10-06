@@ -49,6 +49,33 @@ export interface PageProps {
 	outer?: unknown;
 	/** Updates the page from a later sibling's render. */
 	update?: boolean;
+	/** Makes the Flaky body throw on its first render, the one that hydrates. */
+	once?: { thrown: boolean };
+}
+
+function throwOnce(once: { thrown: boolean } | undefined): string {
+	if (once !== undefined && !once.thrown) {
+		once.thrown = true;
+		throw new Error('hydration only');
+	}
+	return 'ok';
+}
+
+function OnceLeaf(props: { once?: { thrown: boolean } }) @{
+	<i>{throwOnce(props.once) as string}</i>
+}
+
+// Its body throws while hydrating, and not when it renders again.
+export function Flaky(props: PageProps) @{
+	<div>
+		<h1>{'before'}</h1>
+		@try {
+			<OnceLeaf once={props.once} />
+		} @catch (error: unknown) {
+			<p class="caught">{String(error) as string}</p>
+		}
+		<button onClick={props.onAfter}>{'after'}</button>
+	</div>
 }
 
 export function Clone(props: PageProps) @{
@@ -201,12 +228,20 @@ export function Uncaught(props: PageProps) @{
 }
 
 function Update(props: { set?: (show: boolean) => void }) @{
-	// Updates the parent during render, which hydration drains in place.
+	// Updates the parent during render; the update applies after the hydration
+	// it interrupts.
 	if (props.set !== undefined) props.set(true);
 	<span>{'update'}</span>
 }
 
-// The drained update re-renders a hydrating try body that mounts the Leaf arm.
+// The same, from a child that has state of its own.
+function StatefulUpdate(props: { set?: (show: boolean) => void }) @{
+	const [label] = useState('update');
+	if (props.set !== undefined) props.set(true);
+	<span>{label as string}</span>
+}
+
+// The update switches a hydrated try body to the Leaf arm.
 export function Rerender(props: PageProps) @{
 	const [show, setShow] = useState(false);
 	<div>
@@ -221,6 +256,24 @@ export function Rerender(props: PageProps) @{
 			<p class="caught">{String(error) as string}</p>
 		}
 		<Update set={props.update ? setShow : undefined} />
+		<button onClick={props.onAfter}>{'after'}</button>
+	</div>
+}
+
+export function RerenderStateful(props: PageProps) @{
+	const [show, setShow] = useState(false);
+	<div>
+		<h1>{'before'}</h1>
+		@try {
+			@if (show) {
+				<Leaf value={props.value} />
+			} @else {
+				<b class="server">{'server'}</b>
+			}
+		} @catch (error: unknown) {
+			<p class="caught">{String(error) as string}</p>
+		}
+		<StatefulUpdate set={props.update ? setShow : undefined} />
 		<button onClick={props.onAfter}>{'after'}</button>
 	</div>
 }
