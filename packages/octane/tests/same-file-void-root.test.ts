@@ -376,6 +376,103 @@ export function run(){const host=document.querySelector('#host');host.innerHTML=
 	});
 });
 
+describe('void roots rendered from retained callbacks', () => {
+	const specialized = (source: string) =>
+		compile(source, 'consumer.tsrx', { dev: false, hmr: false }).code;
+
+	it.each(['createRoot', 'hydrateRoot'])(
+		'keeps state, drafts and cleanup for independent %s controllers after their creators return',
+		async (factory) => {
+			const hydrate = factory === 'hydrateRoot';
+			const source = `import {${factory},flushSync,useState,useLayoutEffect} from 'octane';
+let cleanups=0;
+function View(props) @{ const [count,update]=useState(0); useLayoutEffect(()=>()=>{cleanups++;},[]);
+ <main><button onClick={()=>update(count+1)}>{props.label + ':' + count as string}</button><input defaultValue="initial" /></main> }
+function attach(host,label) {
+ const root=${hydrate ? 'hydrateRoot(host,View,{label});' : 'createRoot(host); root.render(View,{label});'}
+ return { replace(label) { flushSync(()=>root.render(View,{label})); }, dispose() { root.unmount(); } };
+}
+export async function run() {
+ const host=document.querySelector('#host'), other=document.body.appendChild(document.createElement('div'));
+ ${hydrate ? `host.innerHTML='<main><button>a:0</button><input value="initial"></main>'; other.innerHTML='<main><button>b:0</button><input value="initial"></main>';` : ''}
+ const server=host.querySelector('button'), a=attach(host,'a'), b=attach(other,'b');
+ const button=host.querySelector('button'), input=host.querySelector('input');
+ input.value='typed'; button.click(); await Promise.resolve();
+ a.replace('next');
+ const updated={adopted:server===button,text:host.textContent,other:other.textContent,
+  same:button===host.querySelector('button') && input===host.querySelector('input') && input.value==='typed'};
+ a.dispose(); const disposed={cleanups,cleaned:host.childNodes.length===0,other:other.textContent};
+ b.replace('later'); const later=other.textContent; b.dispose();
+ return {updated,disposed,later,cleanups,cleaned:other.childNodes.length===0};
+}`;
+			expect(specialized(source)).toContain(
+				hydrate ? '__hydrateVoidRoot as' : '__createVoidRoot as',
+			);
+			for (const dev of [false, true])
+				expect(await consume(source, dev)).toEqual({
+					updated: { adopted: hydrate, text: 'next:1', other: 'b:0', same: true },
+					disposed: { cleanups: 1, cleaned: true, other: 'b:0' },
+					later: 'later:0',
+					cleanups: 2,
+					cleaned: true,
+				});
+		},
+	);
+
+	it('specializes a private module root rendered from exported callbacks', async () => {
+		const source = `${IMPORTS + VIEW}
+const root=createRoot(document.querySelector('#host'));
+root.render(View,{label:'first'});
+export function replace(label) { flushSync(()=>root.render(<View label={label} />)); }
+export function run() { const host=document.querySelector('#host'), input=host.querySelector('input'); input.value='typed';
+ replace('second'); const result={text:host.textContent,draft:host.querySelector('input').value};
+ root.unmount(); return {...result,cleaned:host.childNodes.length===0}; }`;
+		expect(specialized(source)).toContain('__createVoidRoot as');
+		for (const dev of [false, true])
+			expect(await consume(source, dev)).toEqual({ text: 'second', draft: 'typed', cleaned: true });
+	});
+
+	it.each([
+		['a parameter', 'replace(View) { root.render(View); }', "c.replace(()=>'ordinary')"],
+		['a parameter tag', 'replace(View) { root.render(<View />); }', "c.replace(()=>'ordinary')"],
+		['a block const', "replace() { const View=()=>'ordinary'; root.render(View); }", 'c.replace()'],
+		[
+			'a catch parameter',
+			"replace() { try { throw ()=>'ordinary'; } catch (View) { root.render(View); } }",
+			'c.replace()',
+		],
+		[
+			'a function declaration',
+			"replace() { function View() { return 'ordinary'; } root.render(View); }",
+			'c.replace()',
+		],
+	])(
+		'renders returned output when a callback target is shadowed by %s',
+		async (_label, method, call) => {
+			const source = `${IMPORTS + VIEW}
+function attach(host) { const root=createRoot(host); root.render(View,{label:'first'}); return { ${method}, dispose() { root.unmount(); } }; }
+export function run() { const host=document.querySelector('#host'), c=attach(host); flushSync(()=>${call});
+ const text=host.textContent; c.dispose(); return {text,cleaned:host.childNodes.length===0}; }`;
+			for (const dev of [false, true])
+				expect(await consume(source, dev)).toEqual({ text: 'ordinary', cleaned: true });
+		},
+	);
+
+	it('renders a module root from a component event handler', async () => {
+		const source = `${IMPORTS}
+function Toast(props) @{ <output>{props.label as string}</output> }
+const panel=document.body.appendChild(document.createElement('div'));
+const toast=createRoot(panel);
+toast.render(Toast,{label:'first'});
+function App() @{ <button onClick={()=>flushSync(()=>toast.render(Toast,{label:'clicked'}))}>{'open'}</button> }
+export function run() { const host=document.querySelector('#host'), app=createRoot(host); app.render(App);
+ host.querySelector('button').click(); const text=panel.textContent; toast.unmount(); app.unmount();
+ return {text,cleaned:panel.childNodes.length===0 && host.childNodes.length===0}; }`;
+		for (const dev of [false, true])
+			expect(await consume(source, dev)).toEqual({ text: 'clicked', cleaned: true });
+	});
+});
+
 describe('chained, module-scope and element-form void roots', () => {
 	const specialized = (source: string) =>
 		compile(source, 'consumer.tsrx', { dev: false, hmr: false }).code;
@@ -476,6 +573,16 @@ export async function run() { await Promise.resolve();
 			'eval-reachable named',
 			'const root=createRoot(host); root.render(View,{label:"first"}); eval("root");',
 		],
+		...[
+			['callback-returned', '() => root'],
+			['callback unknown-target', '() => root.render(() => "first")'],
+			['callback optional-call', '() => root.render?.(View)'],
+			['callback bound-method', '() => root.render.bind(root)'],
+			['callback member-write', '() => { root.render = () => {}; }'],
+		].map(([label, callback]) => [
+			label,
+			`function attach() { const root=createRoot(host); root.render(View,{label:"first"}); return ${callback}; } attach();`,
+		]),
 	])('leaves %s roots generic', (_label, body) => {
 		const code = specialized(
 			`import {createRoot} from 'octane';\nfunction View(props) @{ <main>{props.label as string}</main> }\nconst host=document.body;\n${body}`,

@@ -2974,8 +2974,23 @@ test('local void root specialization needs every lexical use and the loaded expo
 			false,
 		],
 		[
+			'retained render and unmount callbacks',
+			'export function run(el) { const root=createRoot(el); root.render(View); return {replace() { root.render(View); }, dispose: () => root.unmount()}; }',
+			true,
+		],
+		[
 			'callback escape',
-			'export function run(el) { const root=createRoot(el); root.render(View); return () => root.render(View); }',
+			'export function run(el) { const root=createRoot(el); root.render(View); return () => root; }',
+			false,
+		],
+		[
+			'callback unknown render target',
+			'export function run(el) { const root=createRoot(el); root.render(View); return () => root.render(Other); }',
+			false,
+		],
+		[
+			'callback component shadow',
+			'export function run(el) { const root=createRoot(el); root.render(View); return (View) => root.render(View); }',
 			false,
 		],
 		[
@@ -3252,12 +3267,28 @@ test('same-file root optimization proves complete lifetimes across bindings and 
 			'__hydrateVoidRoot',
 			true,
 		);
+		// Direct calls in closures that outlive the creator keep a closed set of
+		// render targets.
+		check(
+			createPrefix +
+				'export function mount(el) { const root=createRoot(el); root.render(View); return () => root.unmount(); }',
+			'__createVoidRoot',
+			true,
+		);
+		check(
+			hydratePrefix +
+				'export function mount(el){const root=hydrateRoot(el,View);return {replace(){root.render(View);},dispose:()=>root.unmount()};}',
+			'__hydrateVoidRoot',
+			true,
+		);
 		for (const body of [
 			'namespace N { export const root=createRoot(el); root.render(View); root.unmount(); }',
 			'class C { static { const root=createRoot(el); root.render(View); root.unmount(); } }',
 			'export function mount(el) { const root=createRoot(el); root.render(View); return root; }',
 			'export function mount(el, unknown) { const root=createRoot(el); root.render(View); root.render(unknown); }',
-			'export function mount(el) { const root=createRoot(el); root.render(View); return () => root.unmount(); }',
+			'export function mount(el) { const root=createRoot(el); root.render(View); return () => root; }',
+			'export function mount(el, unknown) { const root=createRoot(el); root.render(View); return () => root.render(unknown); }',
+			'export function mount(el) { const root=createRoot(el); root.render(View); return (View) => root.render(View); }',
 			'export function mount(el) { const root=createRoot(el); root["render"](View); root.unmount(); }',
 			'export function mount(el) { const root=createRoot(el); root.render(View); eval("root.render(1)"); }',
 			'function Outer() { function mount(el) { const root=createRoot(el); root.render(View); root.unmount(); } return <section/>; }',
@@ -3298,7 +3329,8 @@ test('same-file root optimization proves complete lifetimes across bindings and 
 		for (const body of [
 			'const root=hydrateRoot(el,View);root.render(unknown);root.unmount();',
 			'const root=hydrateRoot(el,View);return root;',
-			'const root=hydrateRoot(el,View);return()=>root.unmount();',
+			'const root=hydrateRoot(el,View);return()=>root;',
+			'const root=hydrateRoot(el,View);return()=>root.render(unknown);',
 			'const root=hydrateRoot(el,View);root["render"](View);',
 			'const root=hydrateRoot(el,View);root.render?.(View);',
 			'const root=hydrateRoot(el,View);const alias=root;alias.render(View);',
