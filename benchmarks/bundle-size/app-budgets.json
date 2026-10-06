@@ -70,7 +70,7 @@
   "bindings": {
     "app": {
       "raw": 347651,
-      "gzip": 115705,
+      "gzip": 115704,
       "brotli": 96447
     },
     "framework": {

@@ -4046,6 +4046,7 @@ interface RootRenderFrame {
 	depth: number;
 	parked: ParkedItem[] | null;
 	capture: OffscreenCapture | null;
+	discardStamp: number;
 }
 
 // A root can discover its first suspension after any earlier sibling write.
@@ -4054,6 +4055,16 @@ interface RootRenderFrame {
 // render. Separate root-local logs/captures also isolate interleaved roots in a
 // scheduler drain; an aborted root cannot drop another root's commit work.
 let ROOT_RENDER_TRANSACTION: RootRenderTransaction | null = null;
+/**
+ * The `createdStamp` of the Blocks the active root attempt discards whole on
+ * rollback (undoCreatedInRootRender), or -1. Inside the root window, a write
+ * such a Block makes into its own hosts and bag needs no undo entry. Hydration
+ * and adopted DOM (retainedCreated) keep every entry, because rollback keeps
+ * those hosts. Kept in step with the transaction by beginRootRender,
+ * endRootRender, preserveRootCreatedDom and hydrateRoot's hydrating mark, so a
+ * write tests one field instead of the transaction's shape.
+ */
+let ROOT_DISCARD_STAMP = -1;
 let ROOT_RENDER_TRANSACTIONS: RootRenderTransaction[] = [];
 let ROOT_RENDER_ROLLBACK = false;
 let NEXT_ROOT_RENDER_CREATED_STAMP = 0;
@@ -4106,9 +4117,14 @@ function beginRootRender(owner: RootRenderOwner | undefined): RootRenderFrame | 
 		depth: TRANSITION_JOURNAL_DEPTH,
 		parked: PARKED_ITEMS,
 		capture: WIP_CAPTURE,
+		discardStamp: ROOT_DISCARD_STAMP,
 	};
 	DEFERRED_LAYOUT_DRIVER?.recordRootTransaction(transaction);
 	ROOT_RENDER_TRANSACTION = transaction;
+	ROOT_DISCARD_STAMP =
+		transaction.hydrating === true || transaction.retainedCreated !== null
+			? -1
+			: transaction.createdStamp;
 	TRANSITION_JOURNAL = transaction.log;
 	TRANSITION_JOURNAL_BAGS = transaction.bags;
 	TRANSITION_JOURNAL_CHECKPOINT = 0;
@@ -4123,6 +4139,7 @@ function endRootRender(frame: RootRenderFrame | null): void {
 	if (frame === null) return;
 	frame.transaction.parked = PARKED_ITEMS;
 	ROOT_RENDER_TRANSACTION = frame.previous;
+	ROOT_DISCARD_STAMP = frame.discardStamp;
 	TRANSITION_JOURNAL = frame.log;
 	TRANSITION_JOURNAL_BAGS = frame.bags;
 	TRANSITION_JOURNAL_CHECKPOINT = frame.checkpoint;
@@ -4448,8 +4465,10 @@ function createdInRootRender(block: Block): void {
 
 /** An upgraded runtime descriptor can give a fresh Block existing host DOM. */
 function preserveRootCreatedDom(block: Block): void {
-	if (ROOT_RENDER_TRANSACTION !== null)
+	if (ROOT_RENDER_TRANSACTION !== null) {
 		(ROOT_RENDER_TRANSACTION.retainedCreated ??= new Set()).add(block);
+		ROOT_DISCARD_STAMP = -1;
+	}
 }
 
 function rollbackRootRender(transaction: RootRenderTransaction): void {
@@ -4793,19 +4812,11 @@ function cloneBindingBag(bag: any, arity: number): object {
 function journalBag(): void {
 	const scope = CURRENT_SCOPE;
 	if (scope === null) return;
-	const transaction = ROOT_RENDER_TRANSACTION;
 	// The root log discards a Block created in this transaction wholesale, even
 	// if it completed an earlier render in the same wave. Keep nested boundary
 	// windows and adopted DOM on the ordinary snapshot path: they can restore
 	// their content without discarding this scope.
-	if (
-		transaction !== null &&
-		!transaction.hydrating &&
-		transaction.retainedCreated === null &&
-		TRANSITION_JOURNAL_DEPTH === 1 &&
-		scope.block.createdStamp === transaction.createdStamp
-	)
-		return;
+	if (TRANSITION_JOURNAL_DEPTH === 1 && scope.block.createdStamp === ROOT_DISCARD_STAMP) return;
 	const bag = scope.slots[0];
 	if (bag === null || typeof bag !== 'object') return;
 	const arity = (bag as any)[BINDING_BAG_ARITY];
@@ -24518,7 +24529,8 @@ function writeDirectSignalAttribute(
 ): unknown {
 	const element = target as Element;
 	if (attributeKind === 'class') {
-		if (element.namespaceURI === HTML_NS) setClassName(element, value);
+		// A signal write can land while another scope renders.
+		if (element.namespaceURI === HTML_NS) setClassName(element, value, true);
 		else setClassAttr(element, value);
 	} else attributeKind!(element, name!, value);
 	return value;
@@ -26929,7 +26941,7 @@ import {
 } from './css.js';
 export { normalizeClass };
 
-export function setClassName(el: Element, value: unknown): void {
+export function setClassName(el: Element, value: unknown, foreign?: boolean): void {
 	// clsx-compose first so arrays / objects become a class string (and the hydration
 	// compare below sees the value we actually write).
 	const cls = normalizeClass(value);
@@ -26943,7 +26955,14 @@ export function setClassName(el: Element, value: unknown): void {
 	// an empty STRING still writes `class=""` — the differential rig pins that
 	// distinction against React). Same raw-value rule as setClassAttr: composition
 	// erases the null-vs-'' difference, so the check must be on `value`.
-	if (TRANSITION_JOURNAL !== null) journalAttr(el, 'class');
+	// A host of a Block the root attempt discards needs no undo (setEventHandler).
+	if (
+		TRANSITION_JOURNAL !== null &&
+		(foreign === true ||
+			TRANSITION_JOURNAL_DEPTH !== 1 ||
+			CURRENT_SCOPE?.block.createdStamp !== ROOT_DISCARD_STAMP)
+	)
+		journalAttr(el, 'class');
 	if (value == null || value === false) (STAGED_DOM?.view(el) ?? el).removeAttribute('class');
 	else (STAGED_DOM?.view(el as any) ?? (el as any)).className = cls;
 }
@@ -26972,7 +26991,7 @@ function setDeoptClass(el: Element, value: unknown): void {
 	if (el.namespaceURI === SVG_NS) {
 		setClassAttr(el, value);
 	} else {
-		setClassName(el, value);
+		setClassName(el, value, true);
 	}
 }
 
@@ -27281,7 +27300,7 @@ function removeHostProp(el: Element, name: string, prevValue?: unknown): void {
 			return;
 		}
 		const ev = eventSlot(name, el);
-		if (ev) setEventHandler(el, ev.key, null);
+		if (ev) setEventHandler(el, ev.key, null, true);
 		else setAttribute(el, name, null);
 	}
 }
@@ -28210,10 +28229,12 @@ export function setSpread(
 			} else if (!_delegated.has(ev.type)) {
 				delegateEvents([ev.type]);
 			}
+			// A spread can be republished by a signal while another scope renders.
 			setEventHandler(
 				el,
 				ev.key,
 				process.env.NODE_ENV !== 'production' ? devEventListener(k, v) : v,
+				true,
 			);
 			continue;
 		}
@@ -28742,9 +28763,18 @@ function retireHostRange(node: Node | null, last: Node | null): void {
 }
 
 /** Publish a native handler; compiled bundle updates omit the key to refresh only authority. */
-export function setEventHandler(el: Element, key?: string, handler?: any): void {
+export function setEventHandler(el: Element, key?: string, handler?: any, foreign?: boolean): void {
 	if (key !== undefined) {
-		if (TRANSITION_JOURNAL !== null) {
+		// A handler on a host of a Block the root attempt discards (ROOT_DISCARD_STAMP)
+		// needs no undo: compiled bindings write their own cloned hosts. `foreign`
+		// marks runtime callers that may write a host the current scope does not
+		// own, such as a signal-driven spread.
+		if (
+			TRANSITION_JOURNAL !== null &&
+			(foreign === true ||
+				TRANSITION_JOURNAL_DEPTH !== 1 ||
+				CURRENT_SCOPE?.block.createdStamp !== ROOT_DISCARD_STAMP)
+		) {
 			TRANSITION_JOURNAL.push(
 				JOURNAL_PROP,
 				el,
@@ -47963,13 +47993,16 @@ function deferRootOwnedListClear(state: ForSlot, certified: boolean = false): bo
 			(STAGED_DOM?.view(start) ?? start).previousSibling === null &&
 			getNextSibling(end) === null;
 		if (wholeParent) {
+			// This walk visits every cleared row: read the native getter directly
+			// instead of calling getNextSibling per row, unless a stage is active.
+			const read = STAGED_DOM === null ? nextSiblingGetter : undefined;
 			let node = getNextSibling(start);
 			for (let block = oldHead; block !== null; block = block.nextSibling) {
-				if (node !== block.startMarker) {
+				if (node === null || node !== block.startMarker) {
 					wholeParent = false;
 					break;
 				}
-				node = getNextSibling(node!);
+				node = read !== undefined ? read.call(node) : getNextSibling(node);
 			}
 			if (node !== end) wholeParent = false;
 		}
@@ -50342,6 +50375,7 @@ function hydrateRootWithOutputHandler(
 		const frame = beginRootRender(owner);
 		owner.transaction!.rootRequest = true;
 		owner.transaction!.hydrating = true;
+		ROOT_DISCARD_STAMP = -1;
 		createdInRootRender(rootBlock);
 		journalRootProperty(idState, 'next', idState.next);
 		// Every failed adoption discards its scopes, not the server DOM. Restart

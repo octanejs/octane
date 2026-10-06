@@ -57,7 +57,7 @@
   "hydrate-root": {
     "raw": 137703,
     "gzip": 44047,
-    "brotli": 38805
+    "brotli": 38747
   },
   "deferred-hydration": {
     "raw": 230967,
@@ -82,7 +82,7 @@
   "component-owned-effects": {
     "raw": 76695,
     "gzip": 25058,
-    "brotli": 22602
+    "brotli": 22600
   },
   "binding-vanilla": {
     "raw": 649,
@@ -172,6 +172,6 @@
   "binding-usehooks-ts-esbuild": {
     "raw": 91234,
     "gzip": 30605,
-    "brotli": 27494
+    "brotli": 27475
   }
 }
