@@ -176,6 +176,16 @@ const cases = [
 		setup: 'const missing = props.missing ?? null;',
 		expression: 'props.load(missing !== null ? missing.value : props.id)',
 	},
+	{
+		name: 'nullable local in a skipped optional-call argument',
+		setup: 'const missing = props.missing ?? null;',
+		expression: 'props.load(props.absent?.(missing.value) ?? props.id)',
+	},
+	{
+		name: 'nullable local in a skipped optional computed key',
+		setup: 'const missing = props.missing ?? null;',
+		expression: 'props.load(props.absent?.[missing.key] ?? props.id)',
+	},
 ];
 
 function sourceFor(expression: string, ext: string, site: string, setup = '') {
@@ -488,6 +498,39 @@ describe('async creation dependencies', () => {
 				rendered?.unmount();
 				delete globals.creationOptionalGlobal;
 				delete globals.creationCheckReadiness;
+			}
+		},
+	);
+
+	it.each([false, true])(
+		'refreshes a getter read both after an optional link and at render (dev=%s)',
+		async (dev) => {
+			// The skipped read alone may not invoke the getter, but the fallback
+			// already reads it during render and must keep its value dependency.
+			const { Page, store } = loadCompiledFixtureSource(
+				`import { use } from 'octane';
+export const store = { current: 'first', get value() { return this.current; } };
+export function Page(props) @{
+  const value = use(props.load(props.run?.(store.value) ?? store.value));
+  <p>{value as string}</p>
+}`,
+				{
+					id: '/project/SkippedAndReadCreationDependency.tsrx',
+					mode: 'client',
+					compileOptions: { hmr: false, dev },
+				},
+			);
+			const props = { load: requestLoader() };
+			const rendered = mount(Page, props);
+			try {
+				await act(async () => {});
+				expect(rendered.find('p').textContent).toBe('first');
+				store.current = 'second';
+				await act(() => rendered.update(Page, props));
+				await act(async () => {});
+				expect(rendered.find('p').textContent).toBe('second');
+			} finally {
+				rendered.unmount();
 			}
 		},
 	);

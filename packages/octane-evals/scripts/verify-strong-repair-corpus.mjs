@@ -32,7 +32,6 @@ const corpusRoot = join(packageRoot, 'datasets', 'train', 'user-apps-v1');
 const tasksRoot = join(corpusRoot, 'tasks');
 const ledgerPath = join(corpusRoot, 'strong-repair-negatives.json');
 const catalog = JSON.parse(readFileSync(join(corpusRoot, 'catalog.json'), 'utf8'));
-const slotTimeoutMs = 90_000;
 const { compile } = await import(
 	pathToFileURL(join(repositoryRoot, 'packages', 'octane', 'src', 'compiler', 'compile.js')).href
 );
@@ -96,7 +95,22 @@ for (const task of tasks) {
 }
 
 // A submission alias is keyed by task ID, so one Vitest run can grade at most one
-// negative per task. Independent slots run concurrently.
+// negative per task. Each run already spreads its graders across the CPUs, so a
+// second concurrent run only has to cover another run's startup. Starting every
+// slot at once oversubscribed a 4-vCPU CI runner about eightfold, until each slot
+// took as long as the whole corpus. Slots never grow, so the largest start first.
+// All runs share one deadline, which keeps this script's worst case below the
+// timeout in tests/user-app-corpus.test.ts.
+const slotConcurrency = 2;
+const gradingTimeoutMs = 120_000;
+const runningSlots = new Map();
+let gradingFailure;
+
+function stopGrading(error) {
+	gradingFailure ??= error;
+	for (const child of runningSlots.keys()) child.kill('SIGKILL');
+}
+
 function gradeSlot(entries) {
 	const aliasRoot = mkdtempSync(join(tmpdir(), 'octane-eval-strong-repair-'));
 	const reportPath = join(aliasRoot, 'report.json');
@@ -119,10 +133,10 @@ function gradeSlot(entries) {
 				stdio: 'ignore',
 			},
 		);
-		const timer = setTimeout(() => child.kill('SIGKILL'), slotTimeoutMs);
+		runningSlots.set(child, entries);
 		child.on('error', reject);
 		child.on('close', (_code, signal) => {
-			clearTimeout(timer);
+			runningSlots.delete(child);
 			try {
 				if (signal !== null) throw new Error(`Negative grading terminated by ${signal}.`);
 				const report = JSON.parse(readFileSync(reportPath, 'utf8'));
@@ -139,7 +153,33 @@ function gradeSlot(entries) {
 	});
 }
 
-const graded = (await Promise.all(slots.map(gradeSlot))).flat();
+const gradedSlots = [];
+let nextSlot = 0;
+const deadline = setTimeout(() => {
+	const unfinished = [...runningSlots.values()].map((entries) =>
+		entries.map(({ taskId, name }) => `${taskId}/${name}`).join(', '),
+	);
+	stopGrading(
+		new Error(
+			`Strong repair grading exceeded ${gradingTimeoutMs / 1000} seconds. Still grading:\n${unfinished.join('\n')}`,
+		),
+	);
+}, gradingTimeoutMs);
+await Promise.all(
+	Array.from({ length: Math.min(slotConcurrency, slots.length) }, async () => {
+		while (gradingFailure === undefined && nextSlot < slots.length) {
+			const index = nextSlot++;
+			try {
+				gradedSlots[index] = await gradeSlot(slots[index]);
+			} catch (error) {
+				stopGrading(error);
+			}
+		}
+	}),
+);
+clearTimeout(deadline);
+if (gradingFailure !== undefined) throw gradingFailure;
+const graded = gradedSlots.flat();
 const ledger = {};
 for (const { taskId, kind, name, directory, result } of graded) {
 	const key = `${taskId}/${name}`;
