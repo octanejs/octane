@@ -519,25 +519,25 @@ Targets: `packages/octane/src/runtime.ts`, `docs/ssr.md`.
 
 **Consumer-visible symptom.** Recovering one mismatched host or Suspense subtree could remount unaffected siblings, abandon the hydration cursor, or leave the regenerated subtree without live handlers.
 
-**Octane contract.** A structural hydration mismatch rebuilds only its owning failed range, preserves the object identity of unaffected siblings outside that range, and installs events on regenerated content.
+**Octane contract.** A structural hydration mismatch client-renders its nearest fallback boundary (a server-marked Suspense or @try boundary, or a &lt;Hydrate&gt; island), or the root, as React 19 does. Siblings outside that boundary keep their object identity, and regenerated content has live events.
 
 **Applicable modes:** `hydrate-mismatch`, `production-compile`, `real-browser`. **Observables:** `markup`, `node-identity`, `events`.
 
 **Octane references**
 
-- [packages/octane/tests/conformance/hydration-mismatch.test.ts](../packages/octane/tests/conformance/hydration-mismatch.test.ts) — “hydration continues past a mismatch: the next sibling adopts + is interactive” — Proves final content and sibling interactivity, but does not retain and compare the sibling object across the recovery.
-- [packages/octane/tests/hydration/mismatch-structural.test.ts](../packages/octane/tests/hydration/mismatch-structural.test.ts) — “nearest-host recovery preserves outside objects and both outside and regenerated handlers” — Runs under explicit development and production compilation and retains every stable host object.
+- [packages/octane/tests/conformance/hydration-mismatch.test.ts](../packages/octane/tests/conformance/hydration-mismatch.test.ts) — “leaves a client-rendered root interactive” — Proves the root’s client render replaces the server DOM and stays interactive; a root fallback keeps no server objects to compare.
+- [packages/octane/tests/hydration/mismatch-structural.test.ts](../packages/octane/tests/hydration/mismatch-structural.test.ts) — “a mismatch beneath a stable host with no Suspense boundary renders the whole root on the client” — As in React 19, a stable host does not contain a mismatch: without a Suspense boundary the root renders on the client, with both handlers live. Runs under development and production compilation.
 - [packages/octane/tests/hydration/mismatch-structural.test.ts](../packages/octane/tests/hydration/mismatch-structural.test.ts) — “Suspense-scoped recovery preserves outside objects and installs the regenerated handler” — Pins boundary-external identity and both surviving and regenerated handler delivery.
 - [packages/octane/tests/browser/suspense-hydration/suspense-hydration.test.ts](../packages/octane/tests/browser/suspense-hydration/suspense-hydration.test.ts) — “contains async hydration recovery and preserves an interactive outside sibling” — Real Chromium drives the streamed mismatch, surviving sibling, and regenerated action.
 
 **Executable evidence**
 
 - [root recovery leaves one clean client tree with a live replacement handler](../packages/octane/tests/hydration/mismatch-structural.test.ts) — modes: `hydrate-mismatch`, `production-compile`; observables: `markup`, `node-identity`, `events`
-- [nearest-host recovery preserves outside objects and both outside and regenerated handlers](../packages/octane/tests/hydration/mismatch-structural.test.ts) — modes: `hydrate-mismatch`, `production-compile`; observables: `markup`, `node-identity`, `events`
+- [a mismatch beneath a stable host with no Suspense boundary renders the whole root on the client](../packages/octane/tests/hydration/mismatch-structural.test.ts) — modes: `hydrate-mismatch`, `production-compile`; observables: `markup`, `node-identity`, `events`
 - [Suspense-scoped recovery preserves outside objects and installs the regenerated handler](../packages/octane/tests/hydration/mismatch-structural.test.ts) — modes: `hydrate-mismatch`, `production-compile`; observables: `markup`, `node-identity`, `events`
 - [contains async hydration recovery and preserves an interactive outside sibling](../packages/octane/tests/browser/suspense-hydration/suspense-hydration.test.ts) — modes: `hydrate-mismatch`, `real-browser`; observables: `markup`, `node-identity`, `events`
 
-**Rationale.** Octane's compiler-owned ranges recover in place rather than unwinding Redact checkpoints. The completed root, nearest-host, Suspense, production-compile, and Chromium matrix now proves the equivalent observable containment boundary and live event wiring.
+**Rationale.** Octane follows React 19 rather than Redact's nearest-host recovery: the nearest Suspense, @try or &lt;Hydrate&gt; boundary, or else the root, renders on the client. The root, Suspense, production-compile and Chromium matrix proves that containment boundary and live event wiring, and the host case pins React's whole-root outcome.
 
 
 ### memo-scheduling

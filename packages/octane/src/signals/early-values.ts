@@ -33,10 +33,24 @@ function valueKey(ownerKey: string, instanceKey: string, nodeKey: string): strin
 	return JSON.stringify([ownerKey, instanceKey, nodeKey]);
 }
 
-/** @internal Associate an engine-free signal owner with its browser document. */
-export function registerSignalOwnerDocument(owner: SignalOwner, ownerDocument: Document): void {
+/**
+ * @internal Associate a signal owner with its browser document, so that its
+ * cells find the early edits already published there. A renderer associates
+ * every owner it creates, including in clients that only call createRoot, so
+ * this claims nothing from the inline writer's queue.
+ */
+export function associateSignalOwnerDocument(owner: SignalOwner, ownerDocument: Document): void {
 	OWNER_DOCUMENTS.set(ownerObject(owner), ownerDocument);
 	if (rendererOwner(owner)) OWNER_DOCUMENTS.set(owner.documentOwner, ownerDocument);
+}
+
+/**
+ * @internal An engine-free owner joins its streamed document: associate it and
+ * claim the edits the inline writer queued, before any of its cells exists.
+ */
+export function registerSignalOwnerDocument(owner: SignalOwner, ownerDocument: Document): void {
+	associateSignalOwnerDocument(owner, ownerDocument);
+	installEarlyControlBridge();
 }
 
 function documentForOwner(owner: SignalOwner): Document | undefined {
@@ -150,6 +164,7 @@ export function hasHydrationControlSignalWriter(
 
 /** @internal Carry edit authority across module handoff, even after editing back to SSR. */
 export function readEarlyHydrationControlRevision(control: Element): number {
+	installEarlyControlBridge();
 	return EARLY_CONTROL_REVISIONS.get(control) ?? 0;
 }
 
@@ -160,6 +175,8 @@ export function clearEarlyHydrationControlRevision(control: Element): void {
 
 /** @internal Module capture replaces the inline writer for this document. */
 export function claimEarlyHydrationControlCapture(ownerDocument: Document): void {
+	// Publish what the inline writer queued before the module capture takes over.
+	installEarlyControlBridge();
 	CLAIMED_CONTROL_DOCUMENTS.add(ownerDocument);
 }
 
@@ -171,9 +188,19 @@ function publishEarlyHydrationControlSignalValues(control: Element, revision: nu
 	publishHydrationControlSignalValues(control, revision);
 }
 
-// A streaming shell can capture native input before the client module evaluates.
-// Claim its bounded element queue as soon as this engine-free bridge loads.
-if (typeof globalThis !== 'undefined') {
+/**
+ * @internal A streaming shell can capture native input before the client module
+ * evaluates: until this bridge is installed, its inline writer queues each
+ * edited control's latest revision (`__octaneEarlySignalControls.q`). Claim that
+ * bounded queue and publish later edits directly. Only hydration entry points
+ * install it: hydrateRoot, a streamed document's owner registration
+ * (registerSignalOwnerDocument) and the module control capture. Signal cells
+ * only read what it published, so a client that only calls createRoot keeps
+ * none of this bridge, even when it declares signals.
+ * Idempotent: a repeat installs the same writer and finds the queue empty.
+ */
+export function installEarlyControlBridge(): void {
+	if (typeof globalThis === 'undefined') return;
 	const host = globalThis as typeof globalThis & {
 		__octaneEarlySignalControls?: EarlyControlMailbox;
 		__octanePublishSignalControl?: (control: Element, revision: number) => void;

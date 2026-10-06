@@ -732,7 +732,10 @@ describe('style prop — mixed static and dynamic inline objects', () => {
 		}
 	});
 
-	it('rebuilds a hydrated branch that differs only in its fully static inline style', () => {
+	// Both arms render the same element, so the server's <div> matches the
+	// client's: as in React 19, only its attributes differ, and hydration keeps
+	// the server's style rather than patching it.
+	it('keeps the server style of a branch that differs only in its fully static inline style', () => {
 		const source = `
 			export function App(props) @{
 				@if (props.blue) {
@@ -751,16 +754,20 @@ describe('style prop — mixed static and dynamic inline objects', () => {
 		const original = container.querySelector('#mixed-inline-style-static-branch') as HTMLElement;
 		expect(original.style.color).toBe('red');
 		const warnings = vi.spyOn(console, 'error').mockImplementation(() => {});
+		const recoverable: unknown[] = [];
 		let root: ReturnType<typeof hydrateRoot> | undefined;
 
 		try {
-			root = hydrateRoot(container, client.App, { blue: true });
+			root = hydrateRoot(
+				container,
+				client.App,
+				{ blue: true },
+				{ onRecoverableError: (error) => recoverable.push(error) },
+			);
 			flushSync(() => {});
-			const replacement = container.querySelector(
-				'#mixed-inline-style-static-branch',
-			) as HTMLElement;
-			expect(replacement).not.toBe(original);
-			expect(replacement.style.color).toBe('blue');
+			expect(container.querySelector('#mixed-inline-style-static-branch')).toBe(original);
+			expect(original.style.color).toBe('red');
+			expect(recoverable).toEqual([]);
 		} finally {
 			root?.unmount();
 			warnings.mockRestore();
@@ -833,8 +840,10 @@ describe('style prop — mixed static and dynamic inline objects', () => {
 		{ shape: 'a null dynamic value', value: null, suppressed: false },
 		{ shape: 'an undefined dynamic value', value: undefined, suppressed: false },
 		{ shape: 'a suppressed dynamic mismatch', value: null, suppressed: true },
-	])('hydrates mixed inline style with $shape', ({ shape, value, suppressed }) => {
-		const source = `
+	])(
+		'keeps the server inline style when a mixed style hydrates with $shape',
+		({ shape, value, suppressed }) => {
+			const source = `
 			export function App(props) @{
 				<div
 					id="mixed-inline-style-mismatch"
@@ -845,40 +854,43 @@ describe('style prop — mixed static and dynamic inline objects', () => {
 				</div>
 			}
 		`;
-		const id = `mixed-inline-style-hydration-${shape.replaceAll(' ', '-')}.tsrx`;
-		const server = loadMixedInlineStyle(source, id, 'server');
-		const client = loadMixedInlineStyle(source, id, 'client');
-		const container = document.createElement('div');
-		container.innerHTML = ServerRuntime.renderToString(server.App, { color: 'red' }).html;
-		document.body.appendChild(container);
-		const element = container.querySelector('#mixed-inline-style-mismatch') as HTMLElement;
-		const warnings = vi.spyOn(console, 'error').mockImplementation(() => {});
-		let root: ReturnType<typeof hydrateRoot> | undefined;
+			const id = `mixed-inline-style-hydration-${shape.replaceAll(' ', '-')}.tsrx`;
+			const server = loadMixedInlineStyle(source, id, 'server');
+			const client = loadMixedInlineStyle(source, id, 'client');
+			const container = document.createElement('div');
+			container.innerHTML = ServerRuntime.renderToString(server.App, { color: 'red' }).html;
+			document.body.appendChild(container);
+			const element = container.querySelector('#mixed-inline-style-mismatch') as HTMLElement;
+			const warnings = vi.spyOn(console, 'error').mockImplementation(() => {});
+			let root: ReturnType<typeof hydrateRoot> | undefined;
 
-		try {
-			root = hydrateRoot(container, client.App, { color: value });
-			flushSync(() => {});
-			expect(container.querySelector('#mixed-inline-style-mismatch')).toBe(element);
-			expect(element.style.position).toBe('absolute');
-			expect(element.style.width).toBe('120px');
-			expect(element.style.color).toBe(suppressed ? 'red' : '');
-			if (suppressed) {
-				expect(
-					warnings.mock.calls.filter((args) => /hydrat|mismatch/i.test(String(args[0]))),
-				).toEqual([]);
+			try {
+				root = hydrateRoot(container, client.App, { color: value });
+				flushSync(() => {});
+				expect(container.querySelector('#mixed-inline-style-mismatch')).toBe(element);
+				expect(element.style.position).toBe('absolute');
+				expect(element.style.width).toBe('120px');
+				// As in React 19, hydration never patches an attribute: the server's
+				// color stays until the client next changes the style.
+				expect(element.style.color).toBe('red');
+				if (suppressed) {
+					expect(
+						warnings.mock.calls.filter((args) => /hydrat|mismatch/i.test(String(args[0]))),
+					).toEqual([]);
+				}
+
+				flushSync(() => root!.render(client.App, { color: 'blue' }));
+				expect(container.querySelector('#mixed-inline-style-mismatch')).toBe(element);
+				expect(element.style.position).toBe('absolute');
+				expect(element.style.width).toBe('120px');
+				expect(element.style.color).toBe('blue');
+			} finally {
+				root?.unmount();
+				warnings.mockRestore();
+				container.remove();
 			}
-
-			flushSync(() => root!.render(client.App, { color: 'blue' }));
-			expect(container.querySelector('#mixed-inline-style-mismatch')).toBe(element);
-			expect(element.style.position).toBe('absolute');
-			expect(element.style.width).toBe('120px');
-			expect(element.style.color).toBe('blue');
-		} finally {
-			root?.unmount();
-			warnings.mockRestore();
-			container.remove();
-		}
-	});
+		},
+	);
 });
 
 describe('style prop — dynamic object form (setStyle)', () => {
