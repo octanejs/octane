@@ -415,7 +415,7 @@ export const FRAMEWORK_CARDS: BenchCard[] = [
 		bundleSize,
 		'bundle-size',
 		'bundle-size',
-		'Production shipped JavaScript bytes with normalized minification — total gzip across the rows, TodoMVC, chat and weather fixtures. The solid bar is what each fixture ships; the lighter extension is the same application once it uses the framework’s whole client API, so a framework that tree-shakes shows a range.',
+		'Production shipped JavaScript bytes from Vite 8 builds with its default (Oxc) minifier, the same settings for every framework — total gzip across the rows, TodoMVC, chat and weather fixtures. The solid bar is what each fixture ships; the lighter extension is the same application once it uses the framework’s whole client API, so a framework that tree-shakes shows a range.',
 		{
 			js_gzip: 'rows total gzip',
 			todo_js_gzip: 'TodoMVC total gzip',
