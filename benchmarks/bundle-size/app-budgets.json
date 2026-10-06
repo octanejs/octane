@@ -70,18 +70,18 @@
   "bindings": {
     "app": {
       "raw": 347651,
-      "gzip": 115598,
-      "brotli": 96213
+      "gzip": 115705,
+      "brotli": 96552
     },
     "framework": {
-      "raw": 336762,
-      "gzip": 107846,
+      "raw": 337054,
+      "gzip": 107929,
       "brotli": 93902
     },
     "total": {
-      "raw": 684381,
-      "gzip": 223420,
-      "brotli": 189859
+      "raw": 684704,
+      "gzip": 223602,
+      "brotli": 190367
     }
   }
 }
