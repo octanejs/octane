@@ -64,7 +64,7 @@ Workers Builds settings (Worker `octane-website`):
 | --------------- | -------------------------------------------- |
 | Root directory  | `/` (pnpm installs the whole workspace)      |
 | Build command   | `pnpm --filter website build`                |
-| Deploy command  | `cd website && npx wrangler@4 deploy`        |
+| Deploy command  | `cd website && pnpm exec wrangler deploy`        |
 | Build variables | `NODE_VERSION=24`                            |
 
 Keep non-production branch builds off until PR previews move off Vercel. Once
@@ -76,6 +76,6 @@ Run the Cloudflare build locally:
 
 ```bash
 NITRO_PRESET=cloudflare-module pnpm --filter website build
-cd website && pnpm dlx wrangler@4 dev
+cd website && pnpm exec wrangler dev
 ```
 

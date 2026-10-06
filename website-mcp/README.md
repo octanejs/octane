@@ -100,13 +100,13 @@ Workers Builds settings (Worker `octane-website-mcp`, domain `mcp.octanejs.dev`)
 | --------------- | ------------------------------------------ |
 | Root directory  | `/` (pnpm installs the whole workspace)    |
 | Build command   | `pnpm --filter website-mcp build`          |
-| Deploy command  | `cd website-mcp && npx wrangler@4 deploy`  |
+| Deploy command  | `cd website-mcp && pnpm exec wrangler deploy`  |
 | Build variables | `NODE_VERSION=24`                          |
 
 Run the Cloudflare build locally:
 
 ```bash
 WORKERS_CI=1 pnpm --filter website-mcp build
-cd website-mcp && pnpm dlx wrangler@4 dev
+cd website-mcp && pnpm exec wrangler dev
 ```
 
