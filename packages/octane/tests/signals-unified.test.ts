@@ -1,3 +1,5 @@
+import { setFlagsFromString } from 'node:v8';
+import { runInNewContext } from 'node:vm';
 import { afterEach, describe, expect, it } from 'vitest';
 import {
 	createResource,
@@ -24,6 +26,7 @@ import {
 } from 'octane/signals';
 import { createSignalOwnerLifecycle } from '../src/signals/facade.js';
 import {
+	capturePending$,
 	controlledStream,
 	deferred,
 	drainProducers,
@@ -36,6 +39,18 @@ function owner(key: string): Scope {
 	const scope = createScope({ scopeKey: key });
 	scopes.push(scope);
 	return scope;
+}
+
+// A WeakRef keeps its target alive until the current job ends, so collect on
+// later macrotasks.
+async function collectGarbage(): Promise<void> {
+	setFlagsFromString('--expose-gc');
+	const gc = runInNewContext('gc') as () => void;
+	setFlagsFromString('--no-expose-gc');
+	for (let attempt = 0; attempt < 3; attempt++) {
+		await new Promise((resolve) => setTimeout(resolve, 0));
+		gc();
+	}
 }
 
 afterEach(() => {
@@ -325,6 +340,74 @@ describe('unified readonly derived declarations', () => {
 				complete: true,
 			});
 		}
+	});
+
+	// A pending read's waiting promise settles once its value may have changed.
+	// A thenable the computation threw settling is such a change.
+	it('evaluates a computation again once the thenable it threw settles (#1763)', async () => {
+		const load = deferred<void>();
+		let loaded: string | undefined;
+		const value$ = __derivedAt('module.ts#thrown-retry', () => {
+			if (loaded === undefined) throw load.promise;
+			return loaded;
+		});
+		const status$ = __derivedAt('module.ts#thrown-retry-status', () => value$.snapshot().status);
+		const scope = owner('document:thrown-retry');
+
+		expect(runWithSignalOwner(scope, () => status$.get())).toBe('pending');
+		loaded = 'loaded';
+		load.resolve();
+		await drainProducers();
+		expect(runWithSignalOwner(scope, () => status$.get())).toBe('ready');
+		expect(runWithSignalOwner(scope, () => value$.get())).toBe('loaded');
+	});
+
+	it('does not let a thenable that never settles retain a disposed owner', async () => {
+		const never = new Promise<void>(() => {});
+		// Kept out of the async frame so no strong local outlives the call.
+		const disposed = (() => {
+			const scope = createScope({ scopeKey: 'never-settles' });
+			const value$ = scope.derived$<string>('value', () => {
+				throw never;
+			});
+			expect(value$.snapshot().status).toBe('pending');
+			scope.dispose();
+			return new WeakRef(scope);
+		})();
+		await collectGarbage();
+		expect(disposed.deref()).toBeUndefined();
+		// The thenable itself is still reachable here.
+		expect(never).toBeInstanceOf(Promise);
+	});
+
+	it('keeps an async reader waiting on a computation that rethrows a settled thenable (#1763)', async () => {
+		const ready$ = __signalAt('module.ts#settled-ready', false);
+		const thrown = deferred<void>();
+		let evaluations = 0;
+		const value$ = __derivedAt('module.ts#settled-value', () => {
+			// Evaluating on every microtask would starve Vitest's timeout; fail instead.
+			if (++evaluations > 20) throw new Error('the computation kept evaluating without settling');
+			if (!ready$.get()) throw thrown.promise;
+			return 'ready';
+		});
+		const reader$ = __derivedAt('module.ts#settled-reader', async ({ read }) => read(value$));
+		const scope = owner('document:settled-thenable');
+
+		expect(runWithSignalOwner(scope, () => reader$.snapshot().status)).toBe('pending');
+		thrown.resolve();
+		// A reader retrying a settled wait starves timers, so yield only
+		// microtasks until the read below has shown whether one is spinning.
+		for (let turn = 0; turn < 10; turn++) await Promise.resolve();
+		const waiting = runWithSignalOwner(scope, () => capturePending$(() => value$.get()));
+		const settled = await Promise.race([
+			Promise.resolve(waiting).then(() => true),
+			drainProducers().then(() => false),
+		]);
+		expect(settled).toBe(false);
+		expect(runWithSignalOwner(scope, () => reader$.snapshot().status)).toBe('pending');
+		runWithSignalOwner(scope, () => ready$.set(true));
+		await drainProducers();
+		expect(runWithSignalOwner(scope, () => reader$.get())).toBe('ready');
 	});
 });
 

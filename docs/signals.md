@@ -233,6 +233,8 @@ Retain the operation if the application needs in-memory reconciliation after an 
 
 Snapshots also expose `refreshing`, `connection`, `complete`, and an optional request identity. Undefined, null, false, and empty strings are usable values, not pending sentinels. A stream can be ready while its producer is incomplete. Ready derived snapshots aggregate activity from their dependencies.
 
+A synchronous computation can also throw a thenable, as a resource reader does, to wait on it. The value is pending until that thenable settles; the computation then runs again and its readers are notified. A thenable that has already settled cannot report a change, so a computation that throws it again stays pending until a signal it reads changes.
+
 An async `derived$` attempt may use its context's `read(handle$)` for a dependency discovered after `await`. Changing any attempt dependency revokes publication, aborts the attempt signal, closes an active iterator, and starts a new attempt. A producer that ignores abort still cannot publish an obsolete resolution, rejection, yield, or completion. A Promise that resolves to an async iterable is unwrapped before any value is published.
 
 `latest` retains one complete _calculation result_, not an arbitrary mixture of old and new fields. Keep the identity and commands that belong to that result in the same projection. For example, a retained card for item 1 must not carry item 2's delete command while item 2 loads. A successfully calculated object can be retained while one of its next inputs is pending. Ordinary errors preserve that last result, but `latest` never hides a retired owner or an incompatible/released historical frame. Resource retry and UI error-boundary reset remain separate operations.

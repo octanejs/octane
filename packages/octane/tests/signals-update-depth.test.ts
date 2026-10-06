@@ -1,11 +1,16 @@
 import { describe, expect, it, vi } from 'vitest';
+import { createScope } from 'octane/signals';
 import { createRoot, flushSync } from '../src/index.js';
 import { act, mount } from './_helpers.js';
+import { deferred } from './_fixtures/signals-async-controls';
 import {
 	CapturedObjectChain,
 	CapturedQueryChain,
 	StalePendingChain,
 	SwitchedPendingChain,
+	SwitchedThrownChain,
+	ThrownThenAsync,
+	type Load,
 } from './_fixtures/signals-update-depth.tsrx';
 
 // A render loop driven by microtasks starves the timers Vitest's timeout needs.
@@ -210,6 +215,114 @@ describe('redeclared signals with an unchanged result', () => {
 			expect(load).toHaveBeenCalledOnce();
 		} finally {
 			view.dispose();
+		}
+	});
+
+	// #1763: the definitions read the same signal and throw different thenables.
+	it('waits on the thenable a redeclared definition throws, not the one it replaced', async () => {
+		const scope = createScope({ scopeKey: 'replaced-thrown' });
+		const ready$ = scope.signal$('ready', false);
+		const replaced = deferred<void>();
+		const replacement = deferred<void>();
+		let waiting: unknown;
+		const onWait = (thrown: unknown) => {
+			waiting = thrown;
+		};
+		const view = setup();
+		try {
+			const render = (load: Load) =>
+				flushSync(() => view.root.render(SwitchedThrownChain, { ready$, load, onWait }));
+			render({ promise: replaced.promise, value: 'ready' });
+			await settle();
+			expect(view.text('#reader')).toBe('pending');
+			render({ promise: replacement.promise, value: 'ready' });
+			await settle();
+			replaced.resolve();
+			// A reader retrying a settled wait starves timers, so yield only
+			// microtasks until the read below has shown whether one is spinning.
+			for (let turn = 0; turn < 10; turn++) await Promise.resolve();
+			view.click('#read');
+			expect(await settledAlready(waiting)).toBe(false);
+			expect(view.text('#value')).toBe('pending');
+			expect(view.text('#reader')).toBe('pending');
+			flushSync(() => ready$.set(true));
+			replacement.resolve();
+			await settle();
+			expect(view.errors).toEqual([]);
+			expect(view.text('#value')).toBe('ready');
+			expect(view.text('#reader')).toBe('ready');
+		} finally {
+			// Retiring the reader's owner also ends a read that is still spinning.
+			view.dispose();
+			scope.dispose();
+		}
+	});
+
+	it('keeps the asynchronous work a redeclared definition started when the replaced thenable settles', async () => {
+		const replaced = deferred<void>();
+		const result = deferred<string>();
+		const attempts: AbortSignal[] = [];
+		const onAttempt = (signal: AbortSignal) => attempts.push(signal);
+		const view = setup();
+		try {
+			const render = (started: boolean) =>
+				flushSync(() =>
+					view.root.render(ThrownThenAsync, {
+						replaced: replaced.promise,
+						result: result.promise,
+						started,
+						onAttempt,
+					}),
+				);
+			render(false);
+			await settle();
+			render(true);
+			await settle();
+			expect(attempts).toHaveLength(1);
+			replaced.resolve();
+			await settle();
+			expect(attempts).toHaveLength(1);
+			expect(attempts[0].aborted).toBe(false);
+			result.resolve('loaded');
+			await settle();
+			expect(view.errors).toEqual([]);
+			expect(view.text('#value')).toBe('loaded');
+		} finally {
+			view.dispose();
+		}
+	});
+
+	it('evaluates a redeclared definition again once the thenable it threw settles', async () => {
+		const scope = createScope({ scopeKey: 'replacement-thrown' });
+		const ready$ = scope.signal$('ready', true);
+		const replacement = deferred<void>();
+		const load: Load = { promise: replacement.promise };
+		let waiting: unknown;
+		const onWait = (thrown: unknown) => {
+			waiting = thrown;
+		};
+		const view = setup();
+		try {
+			const render = (load: Load) =>
+				flushSync(() => view.root.render(SwitchedThrownChain, { ready$, load, onWait }));
+			// The replaced definition's thenable never settles.
+			render({ promise: new Promise<void>(() => {}) });
+			await settle();
+			render(load);
+			await settle();
+			expect(view.text('#reader')).toBe('pending');
+			load.value = 'loaded';
+			replacement.resolve();
+			for (let turn = 0; turn < 10; turn++) await Promise.resolve();
+			view.click('#read');
+			expect(waiting).toBeUndefined();
+			await settle();
+			expect(view.errors).toEqual([]);
+			expect(view.text('#value')).toBe('loaded');
+			expect(view.text('#reader')).toBe('loaded');
+		} finally {
+			view.dispose();
+			scope.dispose();
 		}
 	});
 });
