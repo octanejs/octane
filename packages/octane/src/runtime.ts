@@ -2078,8 +2078,11 @@ function logHydrationMismatch(message: string): void {
 function describeHydrationNode(node: Node | null): string {
 	if (node === null) return 'nothing';
 	if (node.nodeType === 1) return `<${(node as Element).localName}>`;
-	if (node.nodeType === 3)
-		return `text ${JSON.stringify((STAGED_DOM?.view(node as Text) ?? (node as Text)).nodeValue)}`;
+	if (node.nodeType === 3) {
+		const text = (STAGED_DOM?.view(node as Text) ?? (node as Text)).nodeValue;
+		// An empty Text node stands for the server's empty text (newText).
+		return text ? `text ${JSON.stringify(text)}` : 'nothing';
+	}
 	if (node.nodeType === 8) {
 		if (isBlockOpen(node)) return 'a control-flow block';
 		if (isBlockClose(node)) return 'the end of the parent block (fewer nodes than expected)';
@@ -20802,10 +20805,22 @@ class HydrationCapability {
 		}
 		if (existing !== close) throw new TypeError(formatClientError(72));
 		// An empty range is the server's empty text.
-		const keep = text !== '' && this.keepsText(host, null, '', text, (host as any)?.__oct_loc);
-		const node = (STAGED_DOM?.view(document) ?? document).createTextNode(keep ? '' : text);
+		const node = this.newText(host, text, (host as any)?.__oct_loc);
 		domNode((STAGED_DOM?.view(close) ?? close).parentNode)!.insertBefore(node, close);
 		return node;
+	}
+
+	/**
+	 * The new Text node for the client's `text` where the server rendered no
+	 * text in `host`, its form of empty text: an empty node, which stands for
+	 * the server's and compares as any server text does (keepsText), and takes
+	 * the client's text where that is written. The caller inserts it.
+	 */
+	newText(host: Node | null, text: string, loc: string | undefined): Text {
+		const created = (STAGED_DOM?.view(document) ?? document).createTextNode('');
+		if (!this.keepsText(host, created, '', text, loc))
+			(STAGED_DOM?.view(created) ?? created).nodeValue = text;
+		return created;
 	}
 
 	resolveOpen(anchor: Node | null | undefined, domParent: Node): Comment | null {
@@ -21163,20 +21178,21 @@ class HydrationCapability {
 
 	/**
 	 * Whether the server's text `server` stays where the client renders `text`
-	 * in `host`, at `node`, the server's Text node (null when the server
-	 * rendered no text there, its form of empty text). It does when the two are
-	 * equal once the HTML parser's normalization is undone, and under the
-	 * host's suppressHydrationWarning, as in React. False when the client's
-	 * text is written instead: in a host the client built, which holds the
-	 * client template, and in a `<textarea>`, whose text is its default value,
-	 * which React sets to the client's. Any other difference does not match the
-	 * client render, nor does any difference from stale server values
-	 * (staleServerValues), unless a render-phase update renders the text again
-	 * before the pass ends: React renders a component that updates itself while
-	 * it renders again before it compares the output, so the text that render
-	 * settles on decides (settleValues). Meanwhile the node holds the client's
-	 * text, and a discarded attempt restores the server's. A method, so that
-	 * bundles which never hydrate do not retain it.
+	 * in `host`, at `node`, the server's Text node, or the empty one that
+	 * stands for the server's empty text where it rendered none (newText). It
+	 * does when the two are equal once the HTML parser's normalization is
+	 * undone, and under the host's suppressHydrationWarning, as in React. False
+	 * when the client's text is written instead: in a host the client built,
+	 * which holds the client template, and in a `<textarea>`, whose text is its
+	 * default value, which React sets to the client's. Any other difference
+	 * does not match the client render, nor does any difference from stale
+	 * server values (staleServerValues). Unless a render-phase update renders
+	 * the text again before the pass ends: React renders a component that
+	 * updates itself while it renders again before it compares the output, so
+	 * the text that render settles on decides, equal or not (settleValues).
+	 * Meanwhile the node holds the client's text, and a discarded attempt
+	 * restores the server's. A method, so that bundles which never hydrate do
+	 * not retain it.
 	 */
 	keepsText(
 		host: Node | null,
@@ -21185,15 +21201,19 @@ class HydrationCapability {
 		text: string,
 		loc: string | undefined,
 	): boolean {
-		if (server === text || isTextParserNormalizedMatch(server, text)) return true;
-		if (
-			host !== null &&
-			(this.freshNodes.has(host) ||
-				(host.nodeType === 1 && (host as Element).localName === 'textarea'))
-		)
-			return false;
-		if (!this.staleServerValues && isHydrationSuppressed(host)) return true;
-		if (node !== null && node.nodeType === 3 && this.rendersAgain()) {
+		const equal = server === text || isTextParserNormalizedMatch(server, text);
+		if (!equal) {
+			if (
+				host !== null &&
+				(this.freshNodes.has(host) ||
+					(host.nodeType === 1 && (host as Element).localName === 'textarea'))
+			)
+				return false;
+			if (!this.staleServerValues && isHydrationSuppressed(host)) return true;
+		}
+		// Every block with an update queued is in the queue, so an empty one spares
+		// the common pass rendersAgain's walk.
+		if (QUEUE.length !== 0 && node !== null && node.nodeType === 3 && this.rendersAgain()) {
 			const pending = (this.pendingTexts ??= new Map());
 			if (!pending.has(node as Text)) pending.set(node as Text, { server, loc });
 			if (inRootHydrationAttempt()) journalText(node as Text, server);
@@ -21201,8 +21221,9 @@ class HydrationCapability {
 				(this.undo ??= []).push(() => {
 					(STAGED_DOM?.view(node) ?? node).nodeValue = server;
 				});
-			return false;
+			return equal;
 		}
+		if (equal) return true;
 		this.mismatch(
 			loc || (host as any)?.__oct_loc,
 			() => (text === '' ? 'nothing' : `text ${JSON.stringify(text)}`),
@@ -21935,15 +21956,27 @@ class HydrationCapability {
 		)
 			return false;
 		const first = getFirstChild(el);
-		if (first === null) return false;
-		const next = getNextSibling(first);
-		if (first.nodeType === 3 && next === null) return false;
-		if (this.isOpen(first)) {
-			const end = next?.nodeType === 3 ? getNextSibling(next) : next;
-			if (this.isClose(end) && getNextSibling(end) === null) return false;
-		}
+		if (
+			first === null ||
+			(first.nodeType === 3 && getNextSibling(first) === null) ||
+			this.textFrameEnd(first) !== null
+		)
+			return false;
 		(KEPT_TEXT_CONTENT ??= new WeakSet()).add(el);
 		return true;
+	}
+
+	/**
+	 * The close of the frame `first` opens, when it is an exact text-only or
+	 * empty `<!--[-->…<!--]-->` frame around all of its host's content: a sole
+	 * primitive the server framed (e.g. a spread or ternary child), which is
+	 * the host's text as a bare one is.
+	 */
+	private textFrameEnd(first: Node | null): Comment | null {
+		if (!this.isOpen(first)) return null;
+		const child = getNextSibling(first);
+		const end = child?.nodeType === 3 ? getNextSibling(child) : child;
+		return this.isClose(end) && getNextSibling(end) === null ? end : null;
 	}
 
 	/**
@@ -21971,32 +22004,33 @@ class HydrationCapability {
 			const next = getNextSibling(first);
 			if (next !== null) this.unclaimedText(el, next, null, loc);
 			const server = (STAGED_DOM?.view(first as Text) ?? (first as Text)).nodeValue;
+			// An equal text stays, and still compares again when a render-phase
+			// update renders it again (keepsText).
 			if (
-				server !== text &&
-				domBindingClaims.get(el as Element)?.get('#text') !== server &&
+				(server === text || domBindingClaims.get(el as Element)?.get('#text') !== server) &&
 				!this.keepsText(el, first, server, text, loc)
 			)
 				(STAGED_DOM?.view(first as Text) ?? (first as Text)).nodeValue = text;
 			return first as Text;
 		}
-		// A sole primitive can be framed by the server (e.g. a spread or ternary
-		// child). Unwrap only an exact text-only or empty frame, then use the same
-		// adoption, mismatch and suppression behavior as bare text, without
-		// child-slot state.
-		if (this.isOpen(first)) {
-			const child = getNextSibling(first);
-			const end = child?.nodeType === 3 ? getNextSibling(child) : child;
-			if (this.isClose(end) && getNextSibling(end) === null) {
-				(STAGED_DOM?.view(first) ?? first).remove();
-				(STAGED_DOM?.view(end) ?? end).remove();
-				return this.htext(el, text, loc);
-			}
-		}
+		if (this.unframe(first)) return this.htext(el, text, loc);
 		if (first !== null) this.unclaimedText(el, first, text, loc);
-		const keep = text !== '' && this.keepsText(el, null, '', text, loc);
-		const created = (STAGED_DOM?.view(document) ?? document).createTextNode(keep ? '' : text);
+		const created = this.newText(el, text, loc);
 		(STAGED_DOM?.view(el) ?? el).appendChild(created);
 		return created;
+	}
+
+	/**
+	 * Unwrap the text frame `first` opens (textFrameEnd), if any, so that the
+	 * text hole adopts, compares and suppresses as for bare text, without
+	 * child-slot state (htext, hempty). Whether it did.
+	 */
+	private unframe(first: Node | null): boolean {
+		const end = this.textFrameEnd(first);
+		if (end === null) return false;
+		(STAGED_DOM?.view(first as Comment) ?? (first as Comment)).remove();
+		(STAGED_DOM?.view(end) ?? end).remove();
+		return true;
 	}
 
 	/**
@@ -22095,26 +22129,35 @@ class HydrationCapability {
 
 	/**
 	 * htext's counterpart for an only-child hole whose first hydrating value
-	 * renders nothing (`null`, `undefined`, a boolean, or `''`). The server
-	 * serializes that as no children, or as an empty `<!--[--><!--]-->` frame,
-	 * which unwraps like htext's text-only frame. A lone server Text node is
-	 * the server's text, which compares as keepsText decides, and the hole
-	 * adopts it. Anything else is server content the client renders no node
-	 * for. A textarea's text is its default value, which its value props own.
-	 * Returns the Text node the hole adopted, if any.
+	 * renders nothing: `''` (`text`), or `null`, `undefined` or a boolean. The
+	 * server serializes that as no children, or as an empty `<!--[--><!--]-->`
+	 * frame. A lone server Text node, bare or in a text-only frame, which both
+	 * unwrap as in htext, is the server's text, and the hole adopts it. For
+	 * `''` it compares as keepsText decides, as React compares the text content
+	 * of a host whose child is a string. For any other value React hydrates no
+	 * child there, so the text compares without the host's
+	 * suppressHydrationWarning, which keeps no unhydrated child. Anything else
+	 * is server content the client renders no node for. A textarea's text is
+	 * its default value, which its value props own. Returns the Text node the
+	 * hole adopted, if any.
 	 */
-	hempty(el: Node, loc?: string): Text | null {
+	hempty(el: Node, text: boolean, loc?: string): Text | null {
 		const first = getFirstChild(el);
 		if (first === null || (el as Element).localName === 'textarea' || this.freshNodes.has(el))
 			return null;
-		const next = getNextSibling(first);
-		if (this.isOpen(first) && this.isClose(next) && getNextSibling(next) === null) {
-			(STAGED_DOM?.view(first) ?? first).remove();
-			(STAGED_DOM?.view(next) ?? next).remove();
-			return null;
-		}
-		if (first.nodeType === 3 && next === null) {
-			if (!this.keepsText(el, first, (STAGED_DOM?.view(first) ?? first).nodeValue, '', loc))
+		if (this.unframe(first)) return this.hempty(el, text, loc);
+		if (first.nodeType === 3 && getNextSibling(first) === null) {
+			// With no host, keepsText applies no suppressHydrationWarning, and the
+			// hole already ruled out a host it would write the client's text into.
+			if (
+				!this.keepsText(
+					text ? el : null,
+					first,
+					(STAGED_DOM?.view(first) ?? first).nodeValue,
+					'',
+					loc,
+				)
+			)
 				(STAGED_DOM?.view(first) ?? first).nodeValue = '';
 			return first as Text;
 		}
@@ -22144,15 +22187,14 @@ class HydrationCapability {
 			const server = (STAGED_DOM?.view(posNode as Text) ?? (posNode as Text)).nodeValue;
 			// A client-built template's `<!>` reads as the server's empty slot,
 			// swapped for '' above, and takes the client's text.
-			if (server !== text && !this.keepsText(host, posNode, server, text, (host as any)?.__oct_loc))
+			if (!this.keepsText(host, posNode, server, text, (host as any)?.__oct_loc))
 				(STAGED_DOM?.view(posNode as Text) ?? (posNode as Text)).nodeValue = text;
 			return posNode as Text;
 		}
 		// No server text node stands here: the server rendered the hole empty. A
 		// host that keeps that installs an empty tracking node, which later
 		// commits update normally.
-		const keep = text !== '' && this.keepsText(host, posNode, '', text, (host as any)?.__oct_loc);
-		const created = (STAGED_DOM?.view(document) ?? document).createTextNode(keep ? '' : text);
+		const created = this.newText(host, text, (host as any)?.__oct_loc);
 		if (posNode !== null && (STAGED_DOM?.view(posNode) ?? posNode).parentNode !== null) {
 			domNode((STAGED_DOM?.view(posNode) ?? posNode).parentNode!).insertBefore(created, posNode);
 		}
@@ -38695,12 +38737,8 @@ export function childSlot(
 			return;
 		}
 		// An adopted range without text is what the server rendered for empty text.
-		if (
-			adoptedRange &&
-			getNextSibling(state.start!) === state.end &&
-			hydration.keepsText(domParent, null, '', str, loc)
-		) {
-			const tn = (STAGED_DOM?.view(document) ?? document).createTextNode('');
+		if (adoptedRange && getNextSibling(state.start!) === state.end) {
+			const tn = hydration.newText(domParent, str, loc);
 			(STAGED_DOM?.view(domParent) ?? domParent).insertBefore(tn, state.end);
 			state.text = tn;
 			return;
@@ -38907,7 +38945,7 @@ export function childTextHole(
 				// React treats a host whose child is a string or number as text content.
 				if ((vt === 'string' || vt === 'number') && hydration.keepsServerContent(domParent))
 					return null;
-				return hydration.hempty(domParent, siteLoc(parentScope, slotKey));
+				return hydration.hempty(domParent, vt === 'string', siteLoc(parentScope, slotKey));
 			}
 			(STAGED_DOM?.view(cachedNode) ?? cachedNode).remove();
 			return null;

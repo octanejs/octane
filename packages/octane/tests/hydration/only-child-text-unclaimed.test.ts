@@ -240,6 +240,38 @@ describe.each([
 		expect(p().innerHTML).toBe('b');
 	});
 
+	// The server frames a lone primitive in some positions. A text-only frame
+	// holds the server's text as a bare Text node does: React compares an empty
+	// string's text content, which suppression keeps, but hydrates no child for
+	// any other empty value, and suppression keeps no unhydrated child.
+	describe.each([
+		{ framing: 'bare', content: 'x' },
+		{ framing: 'framed', content: '<!--[-->x<!--]-->' },
+	])('$framing server text in a suppressed host', ({ content }) => {
+		it('keeps it for an empty string until the text changes', async () => {
+			const { p, serverP, tag, recovered } = hydrate('Suppressed', content, { value: '' });
+			expect(p()).toBe(serverP);
+			expect(serverP.textContent).toBe('x');
+			expect(container.querySelector('i')).toBe(tag);
+			await Promise.resolve();
+			expect(recovered).toEqual([]);
+			expect(warns()).toEqual([]);
+			flushSync(() => root!.render(client.Suppressed, { value: 'b' }));
+			expect(serverP.innerHTML).toBe('b');
+		});
+
+		it.each([null, undefined, false])('client-renders the root for a %j value', async (value) => {
+			const { p, serverP, recovered } = hydrate('Suppressed', content, { value });
+			expect(p().innerHTML).toBe('');
+			expect(serverP.isConnected).toBe(false);
+			await Promise.resolve();
+			expect(recovered).toHaveLength(1);
+			expect(String((recovered[0] as Error).message)).toMatch(MISMATCH);
+			flushSync(() => root!.render(client.Suppressed, { value: 'b' }));
+			expect(p().innerHTML).toBe('b');
+		});
+	});
+
 	it('client-renders the root over a server range in a text binding and names its content', async () => {
 		const { p, serverP, recovered } = hydrate('Text', '<!--[--><b>x</b><!--]-->', {
 			value: 'a',

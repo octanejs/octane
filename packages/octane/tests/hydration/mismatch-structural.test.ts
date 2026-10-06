@@ -1515,6 +1515,64 @@ describe.each([
 				}
 			},
 		);
+
+		// The framed server text is the host's text content, as a bare one is.
+		// React compares an empty string's text content, which the host's
+		// suppressHydrationWarning keeps until the text changes, but hydrates no
+		// child for any other empty value, and suppression keeps no unhydrated
+		// child.
+		function hydrateSuppressed(label: unknown) {
+			container.innerHTML = ServerRT.renderToString(tsxServer.SuppressedConditionalChild, {
+				on: false,
+				label: 'A',
+			}).html;
+			const serverNodes = contentNodes(container);
+			const div = container.querySelector('div')!;
+			expect(div.textContent).toBe('A');
+			const recovered: unknown[] = [];
+			const root = hydrateRoot(
+				container,
+				tsxClient.SuppressedConditionalChild,
+				{ on: false, label },
+				{ onRecoverableError: (error) => recovered.push(error) },
+			);
+			flushSync(() => {});
+			return { div, serverNodes, recovered, root };
+		}
+
+		it('keeps a framed server text in a suppressed host for an empty string', async () => {
+			const { div, serverNodes, recovered, root } = hydrateSuppressed('');
+			try {
+				expect(survivors(serverNodes)).toEqual(serverNodes);
+				expect(container.querySelector('div')).toBe(div);
+				expect(div.textContent).toBe('A');
+				await act(async () => {});
+				expect(recovered).toEqual([]);
+				expect(warns()).toEqual([]);
+				flushSync(() =>
+					root.render(tsxClient.SuppressedConditionalChild, { on: false, label: 'B' }),
+				);
+				expect(markup(div)).toBe('B');
+			} finally {
+				root.unmount();
+			}
+		});
+
+		it.each([undefined, null, false])(
+			'renders the root on the client for a client %j value over a framed server text in a suppressed host',
+			async (label) => {
+				const { serverNodes, recovered, root } = hydrateSuppressed(label);
+				try {
+					expect(survivors(serverNodes)).toEqual([]);
+					expect(markup(container.querySelector('div')!)).toBe('');
+					await act(async () => {});
+					expect(recovered).toHaveLength(1);
+					expect(String((recovered[0] as Error).message)).toMatch(MISMATCH);
+				} finally {
+					root.unmount();
+				}
+			},
+		);
 	});
 
 	// A direct-host @for row inlines its binding guards instead of calling the
