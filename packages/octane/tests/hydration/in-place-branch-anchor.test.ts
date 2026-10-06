@@ -7,13 +7,12 @@ import { loadCompiledFixtureSource, loadServerFixture } from '../_server-fixture
 import * as Swaps from './_fixtures/in-place-mismatch-swap.tsrx';
 import { selectCallee, selectFlip } from './_fixtures/in-place-mismatch-swap-callee.tsrx';
 
-// A single-root component call that finds no server range of its own renders
-// in place of the server node its parent template's walk found at the hole.
-// When the component's body is a branch, the branch bounds exactly the root it
-// renders there: an arm whose root does not match the server node rebuilds it
-// in the node's place, and one whose root matches adopts it. Either way the
-// server siblings stay adopted, and the branch keeps swapping arms and
-// unmounting with its caller.
+// A single-root component whose body is a branch, called where the server's arm
+// rendered another element. As in React, the server HTML does not match, and
+// nothing is rebuilt in place: with no Suspense or Hydrate boundary the root
+// discards its server DOM, renders on the client, and reports once. The
+// client-rendered branch then keeps swapping arms and unmounting with its
+// caller.
 
 const FIXTURE = join(
 	process.cwd(),
@@ -72,162 +71,162 @@ describe.each([
 	{ name: 'development compile', dev: true, runtime: 'development' },
 	{ name: 'production compile', dev: false, runtime: 'development' },
 	{ name: 'production compile and runtime', dev: false, runtime: 'production' },
-])('hydrateRoot — a branch at a single-root call rebuilt in place ($name)', ({ dev, runtime }) => {
-	const server = loadServerFixture(FIXTURE, { id: FILE });
-	const client = loadCompiledFixtureSource(SOURCE, {
-		id: FILE,
-		mode: 'client',
-		compileOptions: { dev },
-	});
-	// A production runtime reports the error code instead of the message.
-	const MISMATCH =
-		runtime === 'production'
-			? /^Minified Octane error #51;/
-			: /the server-rendered node did not match the client render/;
-	let container: HTMLElement;
-	let root: ReturnType<typeof hydrateRoot> | null;
-	let errSpy: ReturnType<typeof vi.spyOn>;
+])(
+	'hydrateRoot — a branch at a single-root call over another server element ($name)',
+	({ dev, runtime }) => {
+		const server = loadServerFixture(FIXTURE, { id: FILE });
+		const client = loadCompiledFixtureSource(SOURCE, {
+			id: FILE,
+			mode: 'client',
+			compileOptions: { dev },
+		});
+		// A production runtime reports the error code instead of the message.
+		const MISMATCH =
+			runtime === 'production'
+				? /^Minified Octane error #339;/
+				: /^Hydration failed because the server rendered HTML didn't match the client\./;
+		let container: HTMLElement;
+		let root: ReturnType<typeof hydrateRoot> | null;
+		let errSpy: ReturnType<typeof vi.spyOn>;
+		let recoverable: string[];
 
-	beforeEach(() => {
-		container = document.createElement('div');
-		document.body.appendChild(container);
-		root = null;
-		errSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
-		if (runtime === 'production') vi.stubEnv('NODE_ENV', 'production');
-	});
+		beforeEach(() => {
+			container = document.createElement('div');
+			document.body.appendChild(container);
+			root = null;
+			recoverable = [];
+			errSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+			if (runtime === 'production') vi.stubEnv('NODE_ENV', 'production');
+		});
 
-	afterEach(() => {
-		root?.unmount();
-		vi.unstubAllEnvs();
-		container.remove();
-		errSpy.mockRestore();
-	});
+		afterEach(() => {
+			root?.unmount();
+			vi.unstubAllEnvs();
+			container.remove();
+			errSpy.mockRestore();
+		});
 
-	it.each(CASES)(
-		'rebuilds the $arm arm in $shape over the server node',
-		async ({ name, html, server: serverHtml, leaf, leafFirst }) => {
-			container.innerHTML = ServerRT.renderToString(server[name], {
-				on: false,
-				leaf: leafFirst,
-			}).html;
-			const host = container.querySelector('#r')!;
-			expect(markup(host)).toBe(serverHtml);
-			const u = host.querySelector('u')!;
-			const hrs = [...host.querySelectorAll('hr')];
-			const recoverable: string[] = [];
-			root = hydrateRoot(container, client[name], { on: true, leaf: leafFirst } as never, {
+		async function hydrate(name: string, props: Record<string, unknown>): Promise<void> {
+			root = hydrateRoot(container, client[name], props as never, {
 				onRecoverableError: (error: unknown) => recoverable.push((error as Error).message),
 			});
 			flushSync(() => {});
 			// Recoverable reports are delivered after the hydration burst.
 			await act(async () => {});
+		}
 
-			const first = leafFirst ? leaf : '<p>f</p>';
-			const other = leafFirst ? '<p>f</p>' : leaf;
-			expect(container.querySelector('#r')).toBe(host);
-			expect(markup(host)).toBe(html(first));
-			expect(u.isConnected).toBe(false);
-			expect(hrs.every((hr) => hr.isConnected)).toBe(true);
-			expect(recoverable).toEqual([expect.stringMatching(MISMATCH)]);
+		const host = () => container.querySelector('#r')!;
 
-			// The branch swaps its arm in the rebuilt root's place.
-			flushSync(() => root!.render(client[name], { on: true, leaf: !leafFirst }));
-			expect(markup(host)).toBe(html(other));
-			flushSync(() => root!.render(client[name], { on: true, leaf: leafFirst }));
-			expect(markup(host)).toBe(html(first));
+		it.each(CASES)(
+			'renders the root on the client for the $arm arm in $shape',
+			async ({ name, html, server: serverHtml, leaf, leafFirst }) => {
+				container.innerHTML = ServerRT.renderToString(server[name], {
+					on: false,
+					leaf: leafFirst,
+				}).html;
+				expect(markup(host())).toBe(serverHtml);
+				const served = [...container.querySelectorAll('*')];
+				await hydrate(name, { on: true, leaf: leafFirst });
 
-			// The caller's arm unmounts the branch with the rest of its content.
-			flushSync(() => root!.render(client[name], { on: false, leaf: leafFirst }));
-			expect(markup(host)).toBe(serverHtml);
-			flushSync(() => root!.render(client[name], { on: true, leaf: !leafFirst }));
-			expect(markup(host)).toBe(html(other));
+				const first = leafFirst ? leaf : '<p>f</p>';
+				const other = leafFirst ? '<p>f</p>' : leaf;
+				expect(markup(host())).toBe(html(first));
+				expect(served.filter((node) => node.isConnected)).toEqual([]);
+				expect(recoverable).toEqual([expect.stringMatching(MISMATCH)]);
 
-			root!.unmount();
-			root = null;
-			expect(container.innerHTML).toBe('');
-		},
-	);
+				// The client-rendered branch swaps its arm in place.
+				const rendered = host();
+				flushSync(() => root!.render(client[name], { on: true, leaf: !leafFirst }));
+				expect(markup(host())).toBe(html(other));
+				flushSync(() => root!.render(client[name], { on: true, leaf: leafFirst }));
+				expect(markup(host())).toBe(html(first));
 
-	// Where the arm's root matches the server node, the branch adopts it in
-	// place and bounds it, so the other arm replaces it.
-	it.each([
-		{ arm: 'element', name: 'Match', tag: 'p', first: '<p>f</p>', other: '<b>l</b>', leaf: false },
-		{
-			arm: 'component',
-			name: 'MatchLeaf',
-			tag: 'b',
-			first: '<b>h</b>',
-			other: '<p>f</p>',
-			leaf: true,
-		},
-	])(
-		'adopts the server node that matches the $arm arm',
-		async ({ name, tag, first, other, leaf }) => {
-			container.innerHTML = ServerRT.renderToString(server[name], { on: false, leaf }).html;
-			const host = container.querySelector('#r')!;
-			const adopted = host.querySelector(tag)!;
-			const recoverable: string[] = [];
-			root = hydrateRoot(container, client[name], { on: true, leaf } as never, {
-				onRecoverableError: (error: unknown) => recoverable.push((error as Error).message),
-			});
-			flushSync(() => {});
-			await act(async () => {});
+				// The caller's arm unmounts the branch with the rest of its content.
+				flushSync(() => root!.render(client[name], { on: false, leaf: leafFirst }));
+				expect(markup(host())).toBe(serverHtml);
+				flushSync(() => root!.render(client[name], { on: true, leaf: !leafFirst }));
+				expect(markup(host())).toBe(html(other));
+				expect(host()).toBe(rendered);
+				expect(recoverable).toHaveLength(1);
+
+				root!.unmount();
+				root = null;
+				expect(container.innerHTML).toBe('');
+			},
+		);
+
+		// OCTANE DIVERGENCE: Octane's control-flow and component ranges are part of
+		// its hydration protocol, as React's Suspense markers are part of React's.
+		// The server's arm rendered the matching element without the branch's range
+		// around it, so this is a structural mismatch and the root renders on the
+		// client, where React, which has no range markers, would adopt the element.
+		it.each([
+			{ arm: 'element', name: 'Match', first: '<p>f</p>', other: '<b>l</b>', leaf: false },
+			{
+				arm: 'component',
+				name: 'MatchLeaf',
+				first: '<b>h</b>',
+				other: '<p>f</p>',
+				leaf: true,
+			},
+		])(
+			'renders the root on the client where the server rendered the $arm arm outside its range',
+			async ({ name, first, other, leaf }) => {
+				container.innerHTML = ServerRT.renderToString(server[name], { on: false, leaf }).html;
+				const served = [...container.querySelectorAll('*')];
+				await hydrate(name, { on: true, leaf });
+
+				const html = (node: string) => `<section><hr>${node}<hr></section>`;
+				expect(markup(host())).toBe(html(first));
+				expect(served.filter((node) => node.isConnected)).toEqual([]);
+				expect(recoverable).toEqual([expect.stringMatching(MISMATCH)]);
+
+				flushSync(() => root!.render(client[name], { on: true, leaf: !leaf }));
+				expect(markup(host())).toBe(html(other));
+				flushSync(() => root!.render(client[name], { on: true, leaf }));
+				expect(markup(host())).toBe(html(first));
+				flushSync(() => root!.render(client[name], { on: false, leaf }));
+				expect(markup(host())).toBe(html(first));
+				expect(recoverable).toHaveLength(1);
+
+				root!.unmount();
+				root = null;
+				expect(container.innerHTML).toBe('');
+			},
+		);
+
+		// The server's own output frames the branch, which adopts its range.
+		it.each([false, true])('adopts its own server output (leaf: %s)', async (leaf) => {
+			container.innerHTML = ServerRT.renderToString(server.Same, { on: true, leaf }).html;
+			const nodes = [...host().querySelectorAll('section, hr, p, b')];
+			await hydrate('Same', { on: true, leaf });
 
 			const html = (node: string) => `<section><hr>${node}<hr></section>`;
-			expect(markup(host)).toBe(html(first));
-			expect(host.querySelector(tag)).toBe(adopted);
+			expect(markup(host())).toBe(html(leaf ? '<b>l</b>' : '<p>f</p>'));
+			const hydrated = host().querySelectorAll('section, hr, p, b');
+			expect(hydrated).toHaveLength(nodes.length);
+			expect(nodes.every((node, i) => hydrated[i] === node)).toBe(true);
 			expect(recoverable).toEqual([]);
 
-			flushSync(() => root!.render(client[name], { on: true, leaf: !leaf }));
-			expect(markup(host)).toBe(html(other));
-			flushSync(() => root!.render(client[name], { on: true, leaf }));
-			expect(markup(host)).toBe(html(first));
-			flushSync(() => root!.render(client[name], { on: false, leaf }));
-			expect(markup(host)).toBe(html(first));
+			flushSync(() => root!.render(client.Same, { on: true, leaf: !leaf }));
+			expect(markup(host())).toBe(html(leaf ? '<p>f</p>' : '<b>l</b>'));
 
 			root!.unmount();
 			root = null;
 			expect(container.innerHTML).toBe('');
-		},
-	);
-
-	// The server's own output frames the branch, which adopts its range.
-	it.each([false, true])('adopts its own server output (leaf: %s)', async (leaf) => {
-		container.innerHTML = ServerRT.renderToString(server.Same, { on: true, leaf }).html;
-		const host = container.querySelector('#r')!;
-		const nodes = [...host.querySelectorAll('section, hr, p, b')];
-		const recoverable: string[] = [];
-		root = hydrateRoot(container, client.Same, { on: true, leaf } as never, {
-			onRecoverableError: (error: unknown) => recoverable.push((error as Error).message),
 		});
-		flushSync(() => {});
-		await act(async () => {});
+	},
+);
 
-		const html = (node: string) => `<section><hr>${node}<hr></section>`;
-		expect(markup(host)).toBe(html(leaf ? '<b>l</b>' : '<p>f</p>'));
-		const hydrated = host.querySelectorAll('section, hr, p, b');
-		expect(hydrated).toHaveLength(nodes.length);
-		expect(nodes.every((node, i) => hydrated[i] === node)).toBe(true);
-		expect(recoverable).toEqual([]);
-
-		flushSync(() => root!.render(client.Same, { on: true, leaf: !leaf }));
-		expect(markup(host)).toBe(html(leaf ? '<p>f</p>' : '<b>l</b>'));
-
-		root!.unmount();
-		root = null;
-		expect(container.innerHTML).toBe('');
-	});
-});
-
-// A cross-module call to a component that is proven to render one root, where
-// the server's arm rendered something else, renders the callee's root in place
-// of the server's node there. When the callee's body is a branch, the branch
-// later moves the callee's boundary onto a comment pair of its own, and a
-// render that reads a different component from the imported binding then
-// replaces that pair. The fixture is imported, so its import of the callee is
-// a live binding: the `octane` project compiles it for development and
-// `octane-prod` for production, where the production runtime runs it too.
-describe('hydrateRoot — a single-root cross-module call whose branch is rebuilt in place', () => {
+// A cross-module call to a component that is proven to render one root, inside
+// a @try/@pending arm whose server output rendered something else there. The
+// arm renders on the client alone, and its host element keeps its identity.
+// The callee's branch then flips, and a render that reads a different
+// component from the imported binding replaces it. The fixture is imported, so
+// its import of the callee is a live binding: the `octane` project compiles it
+// for development and `octane-prod` for production, where the production
+// runtime runs it too.
+describe('hydrateRoot — a single-root cross-module call in a mismatched @try arm', () => {
 	const SWAP_FIXTURE = join(
 		process.cwd(),
 		'packages/octane/tests/hydration/_fixtures/in-place-mismatch-swap.tsrx',
@@ -261,7 +260,7 @@ describe('hydrateRoot — a single-root cross-module call whose branch is rebuil
 				`<div id="r"><section title="${n}"><hr>${root}</section></div>`,
 		},
 		{
-			shape: 'a host element, adopting the server node in place',
+			shape: 'a host element, where the server rendered an element of the same tag',
 			name: 'SwapInPlace',
 			html: (n: string, root: string) =>
 				`<div id="r"><section title="${n}"><hr>${root}<hr></section></div>`,
@@ -294,12 +293,18 @@ describe('hydrateRoot — a single-root cross-module call whose branch is rebuil
 		'flips the branch and then swaps the callee in $shape',
 		async ({ name, html }) => {
 			container.innerHTML = ServerRT.renderToString(server[name], { on: false, n: 'a' }).html;
+			const host = container.querySelector('#r');
+			const section = container.querySelector('section')!;
+			const recoverable: unknown[] = [];
 			root = hydrateRoot(container, client[name], { on: true, n: 'a' } as never, {
-				onRecoverableError: () => {},
+				onRecoverableError: (error) => recoverable.push(error),
 			});
 			flushSync(() => {});
 			await act(async () => {});
 			expect(markup(container)).toBe(html('a', '<p>f</p>'));
+			expect(container.querySelector('#r')).toBe(host);
+			expect(section.isConnected).toBe(false);
+			expect(recoverable).toHaveLength(1);
 
 			selectFlip(true);
 			flushSync(() => root!.render(client[name], { on: true, n: 'b' }));
@@ -312,6 +317,7 @@ describe('hydrateRoot — a single-root cross-module call whose branch is rebuil
 			selectCallee(false);
 			flushSync(() => root!.render(client[name], { on: true, n: 'd' }));
 			expect(markup(container)).toBe(html('d', '<p>p</p>'));
+			expect(recoverable).toHaveLength(1);
 
 			root!.unmount();
 			root = null;

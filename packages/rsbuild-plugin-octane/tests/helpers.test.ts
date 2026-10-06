@@ -15,6 +15,7 @@ import * as appCore from '@octanejs/app-core';
 import { resolveOctaneConfig } from '@octanejs/app-core/config';
 import * as rsbuildPlugin from '../src/index.js';
 import { finalizeOctaneRsbuildOutput } from '../src/build.js';
+import { createOctaneDevMiddleware } from '../src/dev-server.js';
 import { isRsbuildOwnedUrl, markHydrationEntry } from '../src/html.js';
 import {
 	collectClientEntries,
@@ -292,5 +293,55 @@ describe('production output finalization', () => {
 			'Client asset metadata was not emitted',
 		);
 		expect(readFileSync(join(root, 'dist/client/index.html'), 'utf8')).toBe('<html>client</html>');
+	});
+});
+
+describe('Rsbuild dev middleware routing', () => {
+	async function passedToRsbuild(url: string) {
+		const middleware = createOctaneDevMiddleware({
+			server: {
+				environments: {
+					web: {
+						getStats: async () => ({
+							hasErrors: () => false,
+							hash: 'dev-build',
+							toJson: () => ({ assets: [] }),
+						}),
+						getTransformedHtml: async () => {
+							throw new Error('Octane claimed the request');
+						},
+					},
+					node: {
+						loadBundle: async () => ({
+							manifest: {
+								routes: [
+									new ServerRoute({ path: '/api/health', handler: () => new Response('ok') }),
+								],
+							},
+							rendererDeps: {},
+						}),
+					},
+				},
+			} as any,
+			clientEnvironment: 'web',
+			serverEnvironment: 'node',
+			clientEntry: 'index',
+			serverEntry: 'server',
+			logError: () => {},
+		});
+		const next = vi.fn();
+		const response = { headersSent: false, statusCode: 0, setHeader() {}, end() {} };
+		await middleware(
+			{ url, method: 'GET', headers: { host: '127.0.0.1:3000' } } as any,
+			response as any,
+			next,
+		);
+		return next.mock.calls.length === 1;
+	}
+
+	it('matches routes against the whole request path', async () => {
+		expect(await passedToRsbuild('/api/health')).toBe(false);
+		expect(await passedToRsbuild('//evil.example/api/health')).toBe(true);
+		expect(await passedToRsbuild('/\\evil.example/api/health')).toBe(true);
 	});
 });

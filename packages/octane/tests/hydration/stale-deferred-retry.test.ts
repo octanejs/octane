@@ -12,7 +12,9 @@ import { loadCompiledFixtureSource, loadServerFixture } from '../_server-fixture
 // rendered: a swapped component, a new keyed row, or a renderable hole's new
 // value. That content must not adopt or rebuild over a server node that
 // another block owns, including when it suspends and a later retry resumes
-// it. The server HTML predates the captures, so nothing is reported.
+// it. The server HTML predates the captures, so nothing is reported: as React
+// reports nothing for an update that reaches a dehydrated boundary, a retry
+// whose server DOM no longer matches renders the island on the client silently.
 
 const FIXTURE = join(
 	process.cwd(),
@@ -184,16 +186,21 @@ describe.each([
 		});
 
 		it('fills a list the server rendered empty', async () => {
-			const { nodes, leaf, slow } = await hydratePending('DynProbe', { k: 'a', items: [] });
+			const { nodes, leaf, slow, html } = await hydratePending('DynProbe', { k: 'a', items: [] });
 			const update = { k: 'a', leaf: leaf.promise, slow: slow.promise, items: ['q', 'r'] };
 			flushSync(() => root!.render(client.DynProbe, update));
+			expect(markup(nodes.section)).toBe(html);
 
 			await settle(leaf, slow);
 
-			expect(markup(nodes.section)).toBe(`<b>A</b>${rows(['q', 'r'])}<u>x</u><em>e</em>`);
-			expect(nodes.section.firstElementChild).toBe(nodes.first);
-			expect(nodes.section.querySelector('u')).toBe(nodes.u);
-			expect(nodes.section.querySelector('em')).toBe(nodes.em);
+			const section = container.querySelector('section')!;
+			expect(markup(section)).toBe(`<b>A</b>${rows(['q', 'r'])}<u>x</u><em>e</em>`);
+			expectNoDiagnostics();
+
+			await act(async () => root!.render(client.DynProbe, { ...update, items: ['r', 't'] }));
+			expect(markup(container.querySelector('section')!)).toBe(
+				`<b>A</b>${rows(['r', 't'])}<u>x</u><em>e</em>`,
+			);
 			expectNoDiagnostics();
 		});
 
@@ -214,6 +221,34 @@ describe.each([
 			expect(nodes.section.firstElementChild).toBe(nodes.first);
 			expect(nodes.section.querySelector('s')).toBe(nodes.rows.get('y'));
 			expect(nodes.section.querySelector('em')).toBe(nodes.em);
+			expectNoDiagnostics();
+		});
+
+		it('renders the island on the client and reports once when its retry finds other text', async () => {
+			const { nodes, leaf } = await hydratePending('DynProbe', { k: 'a', items: SERVER_ITEMS });
+			// The resumed leaf renders "w" where the server rendered "x".
+			await act(async () => leaf.resolve('w'));
+
+			const section = container.querySelector('section')!;
+			expect(section).not.toBe(nodes.section);
+			expect(nodes.section.isConnected).toBe(false);
+			expect(markup(section)).toBe(`<b>A</b>${rows(SERVER_ITEMS)}<u>w</u><em>e</em>`);
+			expect(recoverable).toHaveLength(1);
+		});
+
+		it('renders the island on the client silently when its retry finds other text after its captures changed', async () => {
+			const { nodes, leaf, slow } = await hydratePending('DynProbe', {
+				k: 'a',
+				items: SERVER_ITEMS,
+			});
+			const update = { k: 'b', leaf: leaf.promise, slow: slow.promise, items: SERVER_ITEMS };
+			flushSync(() => root!.render(client.DynProbe, update));
+			await act(async () => leaf.resolve('w'));
+
+			const section = container.querySelector('section')!;
+			expect(section).not.toBe(nodes.section);
+			expect(nodes.section.isConnected).toBe(false);
+			expect(markup(section)).toBe(`<i>B</i>${rows(SERVER_ITEMS)}<u>w</u><em>e</em>`);
 			expectNoDiagnostics();
 		});
 	});

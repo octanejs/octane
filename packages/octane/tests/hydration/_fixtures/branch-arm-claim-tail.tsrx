@@ -116,9 +116,8 @@ export function NestedBranch(props: { server?: boolean; inner: boolean }) @{
 	</div>
 }
 
-// The client's arm is a branch the server rendered no range for. Its template
-// adopts the server arm's hosts in place, after which the server's arm ends
-// with a host the client does not render.
+// The client's arm is a branch the server rendered no range for, and the
+// server's arm ends with a host the client does not render.
 export function MarkerlessArm(props: { server?: boolean; inner?: boolean }) @{
 	<div>
 		@if (props.server) {
@@ -216,8 +215,8 @@ export function MarkerlessShortArm(props: { server?: boolean; inner?: boolean })
 	</div>
 }
 
-// Both arms render the same content: the arm's template adopts the host that
-// follows its last component.
+// Both arms render the same content, including a host after the last
+// component.
 export function SameContent(props: { server?: boolean }) @{
 	<div>
 		@if (props.server) {
@@ -236,8 +235,8 @@ export function SameContent(props: { server?: boolean }) @{
 	</div>
 }
 
-// The client's last component adopts the server host after the first one's
-// range as its root.
+// The client's last component renders the host the server rendered inline
+// after the first one's range.
 export function AdoptedAfterClaim(props: { server?: boolean }) @{
 	<div>
 		@if (props.server) {
@@ -254,8 +253,8 @@ export function AdoptedAfterClaim(props: { server?: boolean }) @{
 	</div>
 }
 
-// The client's first component cannot adopt the server's first host, so
-// recovery rebuilds its root before the arm's last claim.
+// The client's first component renders another tag than the server's first
+// host, and the server's arm ends with a tail.
 export function RebuiltBeforeClaim(props: { server?: boolean }) @{
 	<div>
 		@if (props.server) {
@@ -273,7 +272,7 @@ export function RebuiltBeforeClaim(props: { server?: boolean }) @{
 	</div>
 }
 
-// A pending child after the branch holds the first attempt, which then replays.
+// A pending child follows the branch.
 export function TailThenChild(props: { server?: boolean; Child: ComponentBody }) @{
 	const Child = props.Child;
 	<div>
@@ -293,7 +292,7 @@ export function TailThenChild(props: { server?: boolean; Child: ComponentBody })
 	</div>
 }
 
-// Inside a boundary, the suspended attempt leaves what it built for the next one.
+// The same, inside a @try boundary.
 export function TryTailThenChild(props: { server?: boolean; Child: ComponentBody }) @{
 	const Child = props.Child;
 	<div>

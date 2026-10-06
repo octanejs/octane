@@ -39,6 +39,7 @@ import {
 	type BindingKey,
 } from './dom-binding-protocol.js';
 import {
+	CLIENT_RENDER_ARM_COMMENT,
 	formatUseId,
 	HYDRATION_FOR_EMPTY,
 	HYDRATION_FOR_ITEMS,
@@ -167,7 +168,9 @@ import {
 } from './html-tree-validation.js';
 import { sanitizeURL, sanitizeURLAttribute } from './sanitize-url.js';
 import {
+	COMPONENT_FLAG_AUTHOR_CHILDREN,
 	COMPONENT_FLAG_BOUNDARY,
+	COMPONENT_FLAGS_AUTHOR_BOUNDARY,
 	hasComponentFlags,
 	markComponentFlags,
 } from './component-flags.js';
@@ -508,6 +511,12 @@ const RENDERER_INVOCATION_SITE = 'r:';
 // block, keeps its own instance for its declarations. Its owner records the
 // owner it renders inside, as an inline row's does (runtime.ts spells it the same).
 const TEMPLATE_INVOCATION_SITE = 't:';
+// Compiled children are part of the template that authored them, not of the
+// component rendering them. markChildrenBlock records the owner that template
+// renders in, and the children's owner links to it (runtime.ts does the same).
+// The key is local to this runtime copy, since an owner belongs to the request
+// state of the copy that created it.
+const CHILDREN_SIGNAL_OWNER: unique symbol = Symbol() as any;
 let SIGNAL_COMPONENT_INSTANCE_KEY: ServerSignalInstanceKey = '';
 let SERVER_SIGNAL_OWNER_ACTIVE = false;
 let SIGNAL_CONTROL_SITE = '';
@@ -5648,9 +5657,13 @@ export function ssrComponent(
 			bindingMarker,
 			renderer ? SIGNAL_LIST_KEYS : undefined,
 			// Only an enabled pass has instance declarations to resolve through it.
-			invocationSite === TEMPLATE_INVOCATION_SITE && typeof signalInstanceKey === 'string'
-				? serverSignalOwner(pf)
-				: undefined,
+			typeof signalInstanceKey !== 'string'
+				? undefined
+				: invocationSite === TEMPLATE_INVOCATION_SITE
+					? serverSignalOwner(pf)
+					: invocationSite === undefined
+						? childrenSignalOwner(comp)
+						: authorChildrenSignalOwner(comp, props),
 		);
 	} finally {
 		if (identityScoped !== true) ASYNC_SCOPE = previousIdentityScope;
@@ -5919,7 +5932,7 @@ const PermanentStaticHydrate = /* @__PURE__ */ markComponentFlags(
 			PERMANENT_STATIC_HYDRATE_DEPTH--;
 		}
 	},
-	COMPONENT_FLAG_BOUNDARY,
+	COMPONENT_FLAGS_AUTHOR_BOUNDARY,
 	'PermanentStaticHydrate',
 );
 
@@ -6024,7 +6037,7 @@ const hydrate = /* @__PURE__ */ markComponentFlags(
 			),
 		);
 	},
-	COMPONENT_FLAG_BOUNDARY,
+	COMPONENT_FLAGS_AUTHOR_BOUNDARY,
 	'Hydrate',
 );
 
@@ -6065,7 +6078,7 @@ export const Suspense = /* @__PURE__ */ markComponentFlags(
 			),
 		);
 	},
-	COMPONENT_FLAG_BOUNDARY,
+	COMPONENT_FLAGS_AUTHOR_BOUNDARY,
 	'Suspense',
 	SUSPENSE_TAG,
 );
@@ -6570,7 +6583,7 @@ export const ViewTransition = /* @__PURE__ */ markComponentFlags(
 		const annotated = vtSsrAnnotate(inner, attrs);
 		return ssrHtml(ssrBlock(props.scope === 'element' ? vtSsrAnnotateScope(annotated) : annotated));
 	},
-	COMPONENT_FLAG_BOUNDARY,
+	COMPONENT_FLAGS_AUTHOR_BOUNDARY,
 	'ViewTransition',
 );
 
@@ -6588,6 +6601,11 @@ export function addTransitionType(_type: string): void {}
  * error during render swaps to the fallback; a suspension rethrows so an outer
  * `<Suspense>`/`@pending` handles it (matching the client ErrorBoundary's explicit
  * suspension propagation). `reset` is a server no-op (no re-render).
+ *
+ * Routed through ssrTry, like the compiled catch-only boundary, so a caught arm
+ * carries the same catch marker and seed counts: the client's ErrorBoundary
+ * (a catch-only tryBlock) replays the body and adopts the fallback the server
+ * rendered instead of mistaking it for the body's content.
  */
 export const ErrorBoundary = /* @__PURE__ */ markComponentFlags(
 	function ErrorBoundary(
@@ -6595,28 +6613,24 @@ export const ErrorBoundary = /* @__PURE__ */ markComponentFlags(
 		scope: SSRScope,
 	): string {
 		return ssrHtml(
-			ssrBlock(
-				(() => {
-					try {
-						return withAsyncIdentity('error-boundary', 'content', () =>
-							ssrBlock(ssrChildrenHtml(props.children, scope)),
-						);
-					} catch (e) {
-						e = normalizeThrownServerThenable(e);
-						if (ssrIsSuspense(e)) throw e; // let an outer Suspense render its pending arm
-						const fb =
-							typeof props.fallback === 'function'
-								? (props.fallback as (err: unknown, reset: () => void) => unknown)(e, NOOP)
-								: props.fallback;
-						return withAsyncIdentity('error-boundary', 'catch', () =>
-							ssrBlock(ssrChild(fb, scope)),
-						);
-					}
-				})(),
+			ssrTry(
+				scope,
+				'jsx-error-boundary',
+				(_arg, s) => ssrChildrenHtml(props.children, s),
+				null,
+				(error, s, reset) =>
+					ssrChild(
+						typeof props.fallback === 'function'
+							? (props.fallback as (err: unknown, reset: () => void) => unknown)(error, reset)
+							: props.fallback,
+						s,
+					),
+				FRAME?.namespace ?? 'html',
+				true,
 			),
 		);
 	},
-	COMPONENT_FLAG_BOUNDARY,
+	COMPONENT_FLAGS_AUTHOR_BOUNDARY,
 	'ErrorBoundary',
 );
 
@@ -8307,6 +8321,11 @@ export function flushSync<T>(fn: () => T): T {
 export function markChildrenBlock<T>(fn: T): T {
 	if (typeof fn === 'function') {
 		(fn as any)[CHILDREN_BLOCK] = true;
+		if (SERVER_SIGNAL_OWNER_ACTIVE) {
+			const owner = currentSignalOwner();
+			if (owner !== null && isRendererSignalOwner(owner))
+				(fn as any)[CHILDREN_SIGNAL_OWNER] = owner;
+		}
 	}
 	return fn;
 }
@@ -8330,6 +8349,28 @@ export function isChildrenBlock(value: unknown): boolean {
 // template that authored them.
 function templateInvocationSite(body: unknown): string | undefined {
 	return isChildrenBlock(body) ? undefined : TEMPLATE_INVOCATION_SITE;
+}
+
+// The owner of the template that authored compiled children, recorded by
+// markChildrenBlock (runtime.ts records the same owner).
+function childrenSignalOwner(body: unknown): SignalRendererOwnerIdentity | undefined {
+	return isChildrenBlock(body) ? (body as any)[CHILDREN_SIGNAL_OWNER] : undefined;
+}
+
+// A context provider or boundary built-in renders compiled children inline in
+// its own frame, so its owner links to their author's. The client renders a
+// boundary's children in a slot or try body of their own instead, which links
+// the same way (see scopeSignalOwner and createHydrateBoundaryBody).
+function authorChildrenSignalOwner(
+	comp: unknown,
+	props: { children?: unknown } | null | undefined,
+): SignalRendererOwnerIdentity | undefined {
+	const owner = childrenSignalOwner(props?.children);
+	return owner !== undefined &&
+		((comp as any).$$kind === CONTEXT_TAG ||
+			hasComponentFlags(comp, COMPONENT_FLAG_AUTHOR_CHILDREN))
+		? owner
+		: undefined;
 }
 
 // ---------------------------------------------------------------------------
@@ -10475,8 +10516,9 @@ export function renderToStaticMarkup(
 // and leaves a `<!--oct-seed:id-->` comment where the template was; the client
 // `mountTry` sees the comment, scopes that boundary's seeds, and adopts the
 // swapped-in DOM byte-for-byte. A boundary still pending when the stream ends
-// (abort/error) keeps its template — hydration's structural-mismatch recovery
-// client-renders it (the standard degraded path).
+// (abort/error) keeps its template: hydration client-renders that boundary, as
+// React does for a boundary the server could not finish (the standard degraded
+// path).
 //
 // Intentional scope notes (documented divergences from React Fizz):
 //   - No selective hydration (octane has no synthetic event replay system).
@@ -10831,6 +10873,8 @@ export function ssrTry(
 	};
 	if (entry !== undefined) enterBoundaryIds(0);
 	let nativeFresh = false;
+	// A fresh arm the server could not finish, which the client reports once.
+	let clientArm = false;
 	const nativeFailureStart = NATIVE_SERVER_FAILURES;
 	const nativeFreshArm = (inner: string): string => {
 		if (!MARKERS || !nativeFresh) return inner;
@@ -10839,7 +10883,13 @@ export function ssrTry(
 		// use() cursor. Its original useId range remains reserved by the marker.
 		rewindSerial(serialStart, isolationStart);
 		const idCount = Math.max(0, ID_COUNTER - (boundaryIds ? 0 : outerIdCounter));
-		return '<!--' + NATIVE_SIGNAL_FRESH_COMMENT + idCount + '-->' + inner;
+		return (
+			'<!--' +
+			(clientArm ? CLIENT_RENDER_ARM_COMMENT : NATIVE_SIGNAL_FRESH_COMMENT) +
+			idCount +
+			'-->' +
+			inner
+		);
 	};
 	const pendingForm = (): string => {
 		// A ViewTransition at the top of the FALLBACK arm exits when the boundary
@@ -11067,6 +11117,13 @@ export function ssrTry(
 					} else {
 						ID_COUNTER = entry.pendingIdOffset;
 					}
+				} else if (PERMANENT_STATIC_HYDRATE_DEPTH === 0 && bindingMarker === undefined) {
+					// A buffered render cannot finish this boundary in this pass. If the
+					// pass ships (renderToString cannot wait; prerender retries instead),
+					// its @pending arm goes out marked for a client render, as React
+					// marks a boundary it could not finish (`<!--$!-->`). A
+					// presentation-binding view adopts its pending arm instead.
+					nativeFresh = clientArm = true;
 				}
 				return pendingForm();
 			}
@@ -11195,7 +11252,7 @@ export function ssrTry(
 // `<!--oct-seed:id-->` scoping comment. `id` is the full render-scoped opaque
 // key, so both document queries and the seed stash remain disjoint when output
 // from multiple streams is composed into one page. $OCTRX(id) marks the
-// boundary errored (hydration client-renders it via mismatch recovery). Error
+// boundary errored (hydration client-renders that boundary, as React does). Error
 // instructions that arrive before a queued parent reveal are retained until
 // insertion exposes their sentinel; transport order alone does not imply DOM
 // availability when an optional animation driver delays the parent swap. A

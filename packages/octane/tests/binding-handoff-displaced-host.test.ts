@@ -205,26 +205,34 @@ describe.each([{ dev: false }, { dev: true }])(
 			expect(run.cleanups[1]).toHaveBeenCalledOnce();
 		});
 
-		it('keeps a moved host live until a resumed attempt that suspends again commits', async () => {
+		it('retires a moved host when its fallback commits the pending arm of a client render that suspends again', async () => {
 			const run = await setup();
 			await run.resume('a');
 			run.destination.append(run.buttons[1]!);
 			const again = gate();
+			// The moved host left its server site, so boundary b falls back. As in
+			// React, the fallback commits the pending arm while the client render
+			// suspends, and that commit discards the boundary's server DOM.
 			await run.resume('b', again.promise);
-			expect(run.replacement()).toBeUndefined();
-			expect(run.cleanups[1]).not.toHaveBeenCalled();
+			expect(container!.textContent).toContain('waiting b');
+			expect(run.cleanups[1]).toHaveBeenCalledOnce();
+			expect(run.recoverable).toHaveBeenCalledOnce();
 			await run.publish(1, 'pending early owner');
-			expect(run.buttons[1]!.getAttribute('data-state')).toBe('pending early owner');
+			expect(run.buttons[1]!.getAttribute('data-state')).toBe('ready');
 
 			run.view.client.gates.b = undefined;
 			await act(async () => {
 				again.release();
 				await again.promise;
 			});
-			expect(run.replacement()?.getAttribute('data-state')).toBe('ready');
+			const replacement = run.replacement()!;
+			expect(replacement.getAttribute('data-state')).toBe('ready');
+			expect(replacement.textContent).toBe('Second');
+			expect(container!.textContent).not.toContain('waiting b');
 			expect(run.cleanups[1]).toHaveBeenCalledOnce();
+			expect(run.recoverable).toHaveBeenCalledOnce();
 			await run.publish(1, 'late early owner');
-			expect(run.buttons[1]!.getAttribute('data-state')).toBe('pending early owner');
+			expect(run.buttons[1]!.getAttribute('data-state')).toBe('ready');
 			expect(run.destination.contains(run.buttons[1]!)).toBe(true);
 			expect(run.uncaught).not.toHaveBeenCalled();
 		});

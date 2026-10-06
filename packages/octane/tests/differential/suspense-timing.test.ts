@@ -2417,7 +2417,11 @@ describe.each<Runtime>(['react', 'octane'])('%s descriptor Suspense retries', (r
 });
 
 describe.each<Runtime>(['react', 'octane'])('%s Suspense retry timing', (runtime) => {
-	it('keeps a fallback visible when data resolves at 100ms, then reveals at 300ms', async () => {
+	// OCTANE DIVERGENCE: Octane keeps the shared retry policy but uses a 100ms
+	// window; React keeps its 300ms window. Test the public commit times directly.
+	const retryWindow = runtime === 'react' ? 300 : 100;
+
+	it('keeps a fallback visible until its retry window, then reveals ready content', async () => {
 		const resource = deferred();
 		const layouts: string[] = [];
 		const refs: Array<HTMLSpanElement | null> = [];
@@ -2430,13 +2434,13 @@ describe.each<Runtime>(['react', 'octane'])('%s Suspense retry timing', (runtime
 			},
 		});
 		expect(visible(root)).toBe('first loading');
-		await advance(100);
+		await advance(20);
 		resource.resolve('ready');
 		await advance();
 		expect(visible(root)).toBe('first loading');
 		expect(layouts).toEqual([]);
 		expect(refs).toEqual([]);
-		await advance(199);
+		await advance(retryWindow - 21);
 		expect(visible(root)).toBe('first loading');
 		await advance(1);
 		expect(visible(root)).toBe('ready');
@@ -2447,7 +2451,7 @@ describe.each<Runtime>(['react', 'octane'])('%s Suspense retry timing', (runtime
 	it('bypasses the retry delay when data resolves inside act', async () => {
 		const resource = deferred();
 		const root = mount(runtime, 'TimedBoundary', { promise: resource.promise, label: 'first' });
-		await advance(100);
+		await advance(20);
 		const beforeAct = performance.now();
 		await act(runtime, () => resource.resolve('ready'));
 		expect(performance.now()).toBe(beforeAct);
@@ -2457,16 +2461,16 @@ describe.each<Runtime>(['react', 'octane'])('%s Suspense retry timing', (runtime
 	it('does not drain an already scheduled retry merely by entering an empty act', async () => {
 		const resource = deferred();
 		const root = mount(runtime, 'TimedBoundary', { promise: resource.promise, label: 'first' });
-		await advance(100);
+		await advance(20);
 		resource.resolve('ready');
 		await advance();
 		await act(runtime, () => {});
 		expect(visible(root)).toBe('first loading');
-		await advance(200);
+		await advance(retryWindow - 20);
 		expect(visible(root)).toBe('ready');
 	});
 
-	it.each([290, 295, 300, 450])(
+	it.each([retryWindow - 10, retryWindow - 5, retryWindow, retryWindow + 150])(
 		'does not add another delay when data resolves at %ims',
 		async (elapsed) => {
 			const resource = deferred();
@@ -2481,7 +2485,7 @@ describe.each<Runtime>(['react', 'octane'])('%s Suspense retry timing', (runtime
 	it('still waits when more than 10ms of the window remains', async () => {
 		const resource = deferred();
 		const root = mount(runtime, 'TimedBoundary', { promise: resource.promise, label: 'first' });
-		await advance(289);
+		await advance(retryWindow - 11);
 		resource.resolve('ready');
 		await advance();
 		expect(visible(root)).toBe('first loading');
@@ -2493,12 +2497,12 @@ describe.each<Runtime>(['react', 'octane'])('%s Suspense retry timing', (runtime
 		const first = deferred();
 		const second = deferred();
 		const root = mount(runtime, 'TimedBoundary', { promise: first.promise, label: 'first' });
-		await advance(200);
+		await advance(40);
 		mount(runtime, 'TimedBoundary', { promise: second.promise, label: 'second' });
-		await advance(50);
+		await advance(20);
 		first.resolve('first ready');
 		await advance();
-		await advance(249);
+		await advance(retryWindow - 21);
 		expect(visible(root)).toBe('first loading');
 		await advance(1);
 		expect(visible(root)).toBe('first ready');
@@ -2508,12 +2512,12 @@ describe.each<Runtime>(['react', 'octane'])('%s Suspense retry timing', (runtime
 		const first = deferred();
 		const second = deferred();
 		const root = mount(runtime, 'TimedBoundary', { promise: first.promise, label: 'first' });
-		await advance(100);
+		await advance(20);
 		first.resolve('first ready');
 		await advance();
-		await advance(150);
+		await advance(40);
 		mount(runtime, 'TimedBoundary', { promise: second.promise, label: 'second' });
-		await advance(49);
+		await advance(retryWindow - 61);
 		expect(visible(root)).toBe('first loading');
 		await advance(1);
 		expect(visible(root)).toBe('first ready');
@@ -2526,7 +2530,7 @@ describe.each<Runtime>(['react', 'octane'])('%s Suspense retry timing', (runtime
 		const first = deferred();
 		const second = deferred();
 		const root = mount(runtime, 'TimedBoundary', { promise: first.promise, label: 'first' });
-		await advance(200);
+		await advance(40);
 		const hidden = mount(runtime, 'ActivityTimedBoundary', {
 			promise: second.promise,
 			label: 'second',
@@ -2534,12 +2538,12 @@ describe.each<Runtime>(['react', 'octane'])('%s Suspense retry timing', (runtime
 		});
 		await advance();
 		expect(visible(hidden)).toBe('');
-		await advance(50);
+		await advance(20);
 		first.resolve('first ready');
 		await advance();
-		await advance(50);
+		await advance(retryWindow - 60);
 		expect(visible(root)).toBe('first loading');
-		await advance(199);
+		await advance(39);
 		expect(visible(root)).toBe('first loading');
 		await advance(1);
 		expect(visible(root)).toBe('first ready');
@@ -2559,7 +2563,7 @@ describe.each<Runtime>(['react', 'octane'])('%s Suspense retry timing', (runtime
 		expect(visible(root)).toBe('');
 		root.update({ promise: resource.promise, label: 'first', mode: 'visible' });
 		expect(visible(root)).toBe('first loading');
-		await advance(100);
+		await advance(20);
 		resource.resolve('ready');
 		await advance();
 		expect(visible(root)).toBe('ready');
@@ -2576,12 +2580,12 @@ describe.each<Runtime>(['react', 'octane'])('%s Suspense retry timing', (runtime
 				label: 'second',
 				mode: 'visible',
 			});
-			await advance(200);
+			await advance(40);
 			activity.update({ promise: second.promise, label: 'second', mode });
-			await advance(50);
+			await advance(20);
 			first.resolve('first ready');
 			await advance();
-			await advance(49);
+			await advance(retryWindow - 61);
 			expect(visible(root)).toBe('first loading');
 			await advance(1);
 			expect(visible(root)).toBe('first ready');
@@ -2599,14 +2603,14 @@ describe.each<Runtime>(['react', 'octane'])('%s Suspense retry timing', (runtime
 		});
 		await advance();
 		expect(activity.container.querySelector('[data-fallback="second"]')).not.toBeNull();
-		await advance(200);
+		await advance(40);
 		activity.update({ promise: second.promise, label: 'second', mode: 'visible' });
 		await advance();
 		expect(visible(activity)).toBe('');
-		await advance(50);
+		await advance(20);
 		first.resolve('first ready');
 		await advance();
-		await advance(49);
+		await advance(retryWindow - 61);
 		expect(visible(root)).toBe('first loading');
 		await advance(1);
 		expect(visible(root)).toBe('first ready');
@@ -2619,15 +2623,15 @@ describe.each<Runtime>(['react', 'octane'])('%s Suspense retry timing', (runtime
 		const first = deferred();
 		const second = deferred();
 		const root = mount(runtime, 'TimedPair', { first: first.promise, second: second.promise });
-		await advance(350);
+		await advance(retryWindow + 50);
 		first.resolve('first ready');
 		await advance();
 		expect(visible(root)).toBe('first ready|second loading');
-		await advance(100);
+		await advance(20);
 		second.resolve('second ready');
 		await advance();
 		expect(visible(root)).toBe('first ready|second loading');
-		await advance(199);
+		await advance(retryWindow - 21);
 		expect(visible(root)).toBe('first ready|second loading');
 		await advance(1);
 		expect(visible(root)).toBe('first ready|second ready');
@@ -2636,13 +2640,13 @@ describe.each<Runtime>(['react', 'octane'])('%s Suspense retry timing', (runtime
 	it('does not restart the deadline when the same fallback rerenders', async () => {
 		const resource = deferred();
 		const root = mount(runtime, 'TimedBoundary', { promise: resource.promise, label: 'first' });
-		await advance(150);
+		await advance(20);
 		root.update({ promise: resource.promise, label: 'updated' });
 		expect(visible(root)).toBe('updated loading');
-		await advance(50);
+		await advance(20);
 		resource.resolve('ready');
 		await advance();
-		await advance(99);
+		await advance(retryWindow - 41);
 		expect(visible(root)).toBe('updated loading');
 		await advance(1);
 		expect(visible(root)).toBe('ready');
@@ -2659,15 +2663,15 @@ describe.each<Runtime>(['react', 'octane'])('%s Suspense retry timing', (runtime
 				layouts.push({ value, screen: visible(root) });
 			},
 		});
-		await advance(100);
+		await advance(20);
 		first.resolve('first ready');
 		await advance();
-		await advance(100);
+		await advance(20);
 		second.resolve('second ready');
 		await advance();
 		expect(visible(root)).toBe('first loading|second loading');
 		expect(layouts).toEqual([]);
-		await advance(99);
+		await advance(retryWindow - 41);
 		expect(visible(root)).toBe('first loading|second loading');
 		await advance(1);
 		expect(visible(root)).toBe('first ready|second ready');
@@ -2688,19 +2692,19 @@ describe.each<Runtime>(['react', 'octane'])('%s Suspense retry timing', (runtime
 				second: fulfilled('old second'),
 				nextSecond: second.promise,
 			});
-			await advance(100);
+			await advance(20);
 			first.resolve('first ready');
 			await advance();
 			expect(visible(root)).toBe('first loading|old second');
-			await advance(100);
+			await advance(20);
 			root.click('button');
 			expect(visible(root)).toBe('first loading|second loading');
-			await advance(50);
+			await advance(20);
 			if (resolveSecond) second.resolve('second ready');
 			await advance();
-			await advance(50);
+			await advance(retryWindow - 60);
 			expect(visible(root)).toBe('first loading|second loading');
-			await advance(199);
+			await advance(39);
 			expect(visible(root)).toBe('first loading|second loading');
 			await advance(1);
 			expect(visible(root)).toBe(
@@ -2718,10 +2722,10 @@ describe.each<Runtime>(['react', 'octane'])('%s Suspense retry timing', (runtime
 			label: 'first',
 			onLayout,
 		});
-		await advance(100);
+		await advance(20);
 		resource.resolve('stale');
 		await advance();
-		await advance(50);
+		await advance(20);
 		root.update({ promise: fulfilled('urgent'), label: 'first', onLayout });
 		expect(visible(root)).toBe('urgent');
 		expect(layouts).toEqual(['urgent']);
@@ -2740,12 +2744,12 @@ describe.each<Runtime>(['react', 'octane'])('%s Suspense retry timing', (runtime
 			label: 'first',
 			onLayout,
 		});
-		await advance(100);
+		await advance(20);
 		older.resolve('stale');
 		await advance();
-		await advance(50);
+		await advance(20);
 		root.update({ promise: newer.promise, label: 'first', onLayout });
-		await advance(150);
+		await advance(retryWindow - 40);
 		expect(visible(root)).toBe('first loading');
 		expect(layouts).toEqual([]);
 		await advance(50);
@@ -2761,13 +2765,13 @@ describe.each<Runtime>(['react', 'octane'])('%s Suspense retry timing', (runtime
 			promise: resource.promise,
 			label: 'first',
 		});
-		await advance(100);
+		await advance(20);
 		const error = new Error('request failed');
 		resource.reject(error);
 		await advance();
 		expect(visible(root)).toBe('first loading');
 		expect(root.caughtErrors).toEqual([]);
-		await advance(199);
+		await advance(retryWindow - 21);
 		expect(visible(root)).toBe('first loading');
 		await advance(1);
 		expect(visible(root)).toBe('request failed');
@@ -2785,14 +2789,14 @@ describe.each<Runtime>(['react', 'octane'])('%s Suspense retry timing', (runtime
 			{ promise: resource.promise, label: 'first' },
 			{ onUncaughtError: (error) => uncaught.push(error) },
 		);
-		await advance(100);
+		await advance(20);
 		const error = new Error('uncaught request failed');
 		resource.reject(error);
 		await advance();
 		expect(visible(root)).toBe('first loading');
 		expect(uncaught).toEqual([]);
 		expect(root.caughtErrors).toEqual([]);
-		await advance(199);
+		await advance(retryWindow - 21);
 		expect(visible(root)).toBe('first loading');
 		await advance(1);
 		expect(normaliseHtml(root.container.innerHTML)).toBe('');
@@ -2812,12 +2816,12 @@ describe.each<Runtime>(['react', 'octane'])('%s Suspense retry timing', (runtime
 				throw new Error('render failed');
 			},
 		});
-		await advance(100);
+		await advance(20);
 		resource.resolve('data');
 		await advance();
 		expect(visible(root)).toBe('first loading');
 		expect(root.caughtErrors).toEqual([]);
-		await advance(200);
+		await advance(retryWindow - 20);
 		expect(visible(root)).toBe('render failed');
 		expect(root.caughtErrors).toEqual([expect.objectContaining({ message: 'render failed' })]);
 	});
@@ -2828,10 +2832,10 @@ describe.each<Runtime>(['react', 'octane'])('%s Suspense retry timing', (runtime
 			promise: resource.promise,
 			label: 'first',
 		});
-		await advance(100);
+		await advance(20);
 		resource.reject(new Error('discarded error'));
 		await advance();
-		await advance(50);
+		await advance(20);
 		root.update({ promise: fulfilled('urgent'), label: 'first' });
 		expect(visible(root)).toBe('urgent');
 		await advance(1000);
@@ -2851,7 +2855,7 @@ describe.each<Runtime>(['react', 'octane'])('%s Suspense retry timing', (runtime
 				refs.push(node);
 			},
 		});
-		await advance(100);
+		await advance(20);
 		resource.resolve('discarded');
 		await advance();
 		root.unmount();
@@ -2871,17 +2875,17 @@ describe.each<Runtime>(['react', 'octane'])('%s Suspense retry timing', (runtime
 				initial: 'older initial',
 			});
 			if (phase === 'while pending') {
-				await advance(50);
+				await advance(20);
 				root.update({ promise: resource.promise, label: 'first', initial: 'current initial' });
-				await advance(50);
+				await advance(20);
 				resource.resolve('ready');
 				await advance();
-				await advance(200);
+				await advance(retryWindow - 40);
 			} else {
-				await advance(100);
+				await advance(20);
 				resource.resolve('ready');
 				await advance();
-				await advance(50);
+				await advance(20);
 				root.update({ promise: resource.promise, label: 'first', initial: 'current initial' });
 			}
 			expect(visible(root)).toBe('current initial:ready');
@@ -2915,12 +2919,12 @@ describe.each<Runtime>(['react', 'octane'])('%s Suspense retry timing', (runtime
 		input.focus();
 		expect(visible(root)).toBe('loading:1');
 		expect(document.activeElement).toBe(input);
-		await advance(100);
+		await advance(20);
 		older.resolve('discarded');
 		await advance();
-		await advance(50);
+		await advance(20);
 		root.update({ promise: newer.promise, label: 'first', initial: 'current initial' });
-		await advance(150);
+		await advance(retryWindow - 40);
 		expect(visible(root)).toBe('loading:1');
 		expect(root.container.querySelector('button')).toBe(button);
 		expect(root.container.querySelector('input')).toBe(input);
@@ -2938,14 +2942,14 @@ describe.each<Runtime>(['react', 'octane'])('%s Suspense retry timing', (runtime
 			label: 'first',
 			initial: 'committed initial',
 		});
-		await advance(100);
+		await advance(20);
 		root.update({ promise: resource.promise, label: 'first', initial: 'new prop' });
 		expect(visible(root)).toBe('first loading');
-		await advance(100);
+		await advance(20);
 		resource.resolve('new data');
 		await advance();
 		expect(visible(root)).toBe('first loading');
-		await advance(200);
+		await advance(retryWindow - 20);
 		expect(visible(root)).toBe('committed initial:new data');
 		expect(otherInitialValues(root)).toEqual([
 			'committed initial',
@@ -2968,16 +2972,16 @@ describe.each<Runtime>(['react', 'octane'])('%s Suspense retry timing', (runtime
 				return second.promise;
 			},
 		});
-		await advance(100);
+		await advance(20);
 		first.resolve('first ready');
 		await advance();
-		expect(started).toEqual([{ input: 'first ready', time: 100 }]);
+		expect(started).toEqual([{ input: 'first ready', time: 20 }]);
 		expect(visible(root)).toBe('outer loading');
-		await advance(50);
+		await advance(20);
 		second.resolve('second ready');
 		await advance();
 		expect(visible(root)).toBe('outer loading');
-		await advance(149);
+		await advance(retryWindow - 41);
 		expect(visible(root)).toBe('outer loading');
 		await advance(1);
 		expect(visible(root)).toBe('first ready|second ready');
@@ -2985,7 +2989,7 @@ describe.each<Runtime>(['react', 'octane'])('%s Suspense retry timing', (runtime
 
 	// Adapt ReactSuspense-test.internal.js:311's 290ms parent / 30ms sibling.
 	// Drain complete host turns instead of stopping mid-render on Scheduler logs:
-	// the parent's <=10ms cutoff reveals its inner fallback at 290ms, and filling
+	// the parent's <=10ms cutoff reveals its inner fallback, and filling
 	// that outer fallback starts the window that delays the ready sibling.
 	it('pushes out a fast nested sibling retry after the parent fallback is filled', async () => {
 		const first = deferred();
@@ -2995,7 +2999,7 @@ describe.each<Runtime>(['react', 'octane'])('%s Suspense retry timing', (runtime
 			loadSecond: () => second.promise,
 		});
 		expect(visible(root)).toBe('outer loading');
-		await advance(290);
+		await advance(retryWindow - 10);
 		first.resolve('first ready');
 		await advance();
 		expect(visible(root)).toBe('first ready|second loading');
@@ -3003,7 +3007,7 @@ describe.each<Runtime>(['react', 'octane'])('%s Suspense retry timing', (runtime
 		second.resolve('second ready');
 		await advance();
 		expect(visible(root)).toBe('first ready|second loading');
-		await advance(269);
+		await advance(retryWindow - 31);
 		expect(visible(root)).toBe('first ready|second loading');
 		await advance(1);
 		expect(visible(root)).toBe('first ready|second ready');
@@ -3016,19 +3020,19 @@ describe.each<Runtime>(['react', 'octane'])('%s Suspense retry timing', (runtime
 			first: first.promise,
 			loadSecond: () => second.promise,
 		});
-		await advance(100);
+		await advance(20);
 		first.resolve('first ready');
 		await advance();
 		expect(visible(root)).toBe('outer loading');
-		await advance(199);
+		await advance(retryWindow - 21);
 		expect(visible(root)).toBe('outer loading');
 		await advance(1);
 		expect(visible(root)).toBe('first ready|second loading');
-		await advance(100);
+		await advance(20);
 		second.resolve('second ready');
 		await advance();
 		expect(visible(root)).toBe('first ready|second loading');
-		await advance(200);
+		await advance(retryWindow - 20);
 		expect(visible(root)).toBe('first ready|second ready');
 	});
 
@@ -3045,16 +3049,16 @@ describe.each<Runtime>(['react', 'octane'])('%s Suspense retry timing', (runtime
 			onLayout: (value) => layouts.push(value),
 		});
 		expect(visible(root)).toBe('outer loading');
-		await advance(100);
+		await advance(20);
 		outer.resolve('gate');
 		await advance();
 		expect(visible(root)).toBe('outer loading');
 		root.click('button');
 		expect(visible(root)).toBe('gate|inner loading');
 		expect(layouts).toEqual([]);
-		await advance(100);
+		await advance(20);
 		inner.resolve('late');
-		await advance(300);
+		await advance(retryWindow);
 		expect(visible(root)).toBe('gate|early|late');
 		expect(layouts).toEqual(['early:early', 'late:late']);
 	});
@@ -3083,7 +3087,7 @@ describe.each<Runtime>(['react', 'octane'])('%s Suspense retry timing', (runtime
 		expect(visible(root)).toBe('inner loading|outer ready');
 		expect(calls).toEqual(['nested', null]);
 		inner.resolve('inner ready');
-		await advance(300);
+		await advance(retryWindow);
 		expect(visible(root)).toBe('nested|inner ready|outer ready');
 		expect(calls).toEqual(['nested', null, 'nested']);
 		const next = deferred();
@@ -3091,7 +3095,7 @@ describe.each<Runtime>(['react', 'octane'])('%s Suspense retry timing', (runtime
 		expect(visible(root)).toBe('inner loading|outer ready');
 		expect(calls).toEqual(['nested', null, 'nested', null]);
 		next.resolve('inner next');
-		await advance(300);
+		await advance(retryWindow);
 		expect(visible(root)).toBe('nested|inner next|outer ready');
 		expect(calls).toEqual(['nested', null, 'nested', null, 'nested']);
 		root.unmount();
@@ -3107,12 +3111,12 @@ describe.each<Runtime>(['react', 'octane'])('%s Suspense retry timing', (runtime
 			onLayout: (value) => layouts.push(value),
 		});
 		expect(visible(root)).toBe('resource loading');
-		await advance(100);
+		await advance(20);
 		resource.resolve('resource ready');
 		await advance();
 		expect(visible(root)).toBe('resource loading');
 		expect(layouts).toEqual([]);
-		await advance(200);
+		await advance(retryWindow - 20);
 		expect(visible(root)).toBe('resource ready');
 		expect(layouts).toEqual(['resource ready']);
 	});
@@ -3124,13 +3128,13 @@ describe.each<Runtime>(['react', 'octane'])('%s Suspense retry timing', (runtime
 			label: 'resource',
 		});
 		expect(visible(root)).toBe('resource loading');
-		await advance(100);
+		await advance(20);
 		const error = new Error('resource failed');
 		resource.reject(error);
 		await advance();
 		expect(visible(root)).toBe('resource loading');
 		expect(root.caughtErrors).toEqual([]);
-		await advance(200);
+		await advance(retryWindow - 20);
 		expect(visible(root)).toBe('resource failed');
 		expect(root.caughtErrors).toEqual([error]);
 	});

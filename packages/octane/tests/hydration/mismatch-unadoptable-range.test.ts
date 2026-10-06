@@ -7,10 +7,12 @@ import * as ServerRT from 'octane/server';
 import { loadCompiledFixtureSource, loadServerFixture } from '../_server-fixture';
 
 // A renderable value whose server range holds what the value cannot adopt:
-// nothing, text, or another element. Hydration builds the value on the client
-// and reports the mismatch once. When the value suspends, its Suspense boundary
-// retries hydration over what the failed attempt left, and the retry must
-// neither report the mismatch again nor keep or duplicate any of that content.
+// nothing, text, or another element. As in React, the server HTML does not
+// match, so nothing is repaired in place: with no Suspense boundary around the
+// value, the root renders on the client (no server node survives); inside a
+// @try/@pending arm, the arm does, and the host around it keeps its identity.
+// onRecoverableError fires once. An arm whose hydration suspends first keeps
+// its server DOM until it resumes, then falls back and reports once.
 
 const FIXTURE = join(
 	process.cwd(),
@@ -18,20 +20,12 @@ const FIXTURE = join(
 );
 const FILE = 'unadoptable-range.tsrx';
 const SOURCE = readFileSync(FIXTURE, 'utf8');
-const LINES = SOURCE.split('\n');
-
-/** 1-based line of the first fixture line containing `text`. */
-function lineOf(text: string): number {
-	const index = LINES.findIndex((line) => line.includes(text));
-	if (index === -1) throw new Error(`fixture has no line containing ${text}`);
-	return index + 1;
-}
-
-// Where each kind of value reports: the hole, the component returning the
-// value, and the host of a list whose item it is.
-const HOLE = lineOf('{pick(props.kind, props.v, props.text)}');
-const RETURNS = lineOf('function Returns(');
-const LIST_HOST = lineOf('<section>');
+const MISMATCH = /^Hydration failed because the server rendered HTML didn't match the client\./;
+const WARNING = new RegExp(
+	`^Octane hydration mismatch at [^ ]*${FILE.replace('.', '\\.')}:\\d+:\\d+: the client expected .+ ` +
+		'but the server rendered .+\\. The nearest Suspense or Hydrate boundary, or the root, will be ' +
+		'regenerated on the client\\.$',
+);
 
 /** Element and text markup, ignoring hydration comments. */
 function markup(node: Element): string {
@@ -43,8 +37,12 @@ function markup(node: Element): string {
 	return copy.innerHTML;
 }
 
-function escapeRegExp(text: string): string {
-	return text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+/** The element and text nodes below `node`, in document order, and `node` itself. */
+function subtree(node: Element): Node[] {
+	const walker = document.createTreeWalker(node, NodeFilter.SHOW_ELEMENT | NodeFilter.SHOW_TEXT);
+	const nodes: Node[] = [node];
+	while (walker.nextNode()) nodes.push(walker.currentNode);
+	return nodes;
 }
 
 describe.each([
@@ -77,28 +75,16 @@ describe.each([
 			.filter((message: string) => message.includes('hydration mismatch'));
 
 	/** Exactly one report: the recoverable error always, the warning in DEV only. */
-	async function expectReported(
-		recovered: unknown[],
-		line: number,
-		expected: string,
-		actual: string,
-	) {
+	async function expectReported(recovered: unknown[]) {
 		await Promise.resolve();
 		expect(recovered).toHaveLength(1);
-		expect(String((recovered[0] as Error).message)).toMatch(/hydration mismatch/i);
-		expect(warns()).toEqual(
-			dev
-				? [
-						expect.stringMatching(
-							new RegExp(
-								`^Octane hydration mismatch at [^ ]*${escapeRegExp(FILE)}:${line}:\\d+: ` +
-									`the client expected ${escapeRegExp(expected)} but the server ` +
-									`rendered ${escapeRegExp(actual)}\\.`,
-							),
-						),
-					]
-				: [],
-		);
+		expect(String((recovered[0] as Error).message)).toMatch(MISMATCH);
+		expect(warns()).toEqual(dev ? [expect.stringMatching(WARNING)] : []);
+	}
+
+	/** None of the section's server nodes survived. */
+	function expectDiscarded(serverNodes: Node[]) {
+		expect(serverNodes.filter((node) => node.isConnected)).toEqual([]);
 	}
 
 	/** The markup a client render of the same props puts in the `<section>`. */
@@ -122,28 +108,31 @@ describe.each([
 	}
 
 	describe('where the server rendered nothing', () => {
-		it.each(['list', 'keyed', 'fragment'])('builds a %s and reports it once', async (kind) => {
-			container.innerHTML = ServerRT.renderToString(server.Hole, {
-				kind: 'empty',
-				v: 'A',
-				text: null,
-			}).html;
-			const section = container.querySelector('section')!;
-			const tail = container.querySelector('b')!;
-			const recovered: unknown[] = [];
-			const props = { kind, v: 'A', text: null };
-			const root = hydrate(client.Hole, props, recovered);
-			try {
-				expect(container.querySelector('section')).toBe(section);
-				expect(markup(section)).toBe(clientMarkup(client.Hole, props));
-				expect(container.querySelector('b')).toBe(tail);
-				await expectReported(recovered, HOLE, 'a renderable list range', 'nothing');
-				flushSync(() => root.render(client.Hole, { kind: 'text', v: 'B', text: null }));
-				expect(markup(section)).toBe('B<b>B</b>');
-			} finally {
-				root.unmount();
-			}
-		});
+		it.each(['list', 'keyed', 'fragment'])(
+			'renders the root on the client for a %s',
+			async (kind) => {
+				container.innerHTML = ServerRT.renderToString(server.Hole, {
+					kind: 'empty',
+					v: 'A',
+					text: null,
+				}).html;
+				const serverNodes = subtree(container.querySelector('section')!);
+				const recovered: unknown[] = [];
+				const props = { kind, v: 'A', text: null };
+				const root = hydrate(client.Hole, props, recovered);
+				try {
+					expectDiscarded(serverNodes);
+					expect(markup(container.querySelector('section')!)).toBe(
+						clientMarkup(client.Hole, props),
+					);
+					await expectReported(recovered);
+					flushSync(() => root.render(client.Hole, { kind: 'text', v: 'B', text: null }));
+					expect(markup(container.querySelector('section')!)).toBe('B<b>B</b>');
+				} finally {
+					root.unmount();
+				}
+			},
+		);
 
 		it('adopts the empty range for a list that renders nothing', async () => {
 			container.innerHTML = ServerRT.renderToString(server.Hole, {
@@ -165,53 +154,50 @@ describe.each([
 			}
 		});
 
-		// A component that returned nothing lends its own range to its value,
-		// which has no site of its own, so the warning names the component.
-		it.each([
-			{ kind: 'list', expected: 'a renderable list range' },
-			{ kind: 'wait-p', expected: '<p>' },
-		])('builds the $kind a component returns and reports it once', async ({ kind, expected }) => {
-			container.innerHTML = ServerRT.renderToString(server.ReturnHole, {
-				kind: 'empty',
-				v: 'A',
-				text: null,
-			}).html;
-			const section = container.querySelector('section')!;
-			const tail = container.querySelector('b')!;
-			const recovered: unknown[] = [];
-			const props = { kind, v: 'A', text: null };
-			const root = hydrate(client.ReturnHole, props, recovered);
-			try {
-				expect(container.querySelector('section')).toBe(section);
-				expect(markup(section)).toBe(clientMarkup(client.ReturnHole, props));
-				expect(container.querySelector('b')).toBe(tail);
-				await expectReported(recovered, RETURNS, expected, 'nothing');
-			} finally {
-				root.unmount();
-			}
-		});
+		it.each(['list', 'wait-p'])(
+			'renders the root on the client for the %s a component returns',
+			async (kind) => {
+				container.innerHTML = ServerRT.renderToString(server.ReturnHole, {
+					kind: 'empty',
+					v: 'A',
+					text: null,
+				}).html;
+				const serverNodes = subtree(container.querySelector('section')!);
+				const recovered: unknown[] = [];
+				const props = { kind, v: 'A', text: null };
+				const root = hydrate(client.ReturnHole, props, recovered);
+				try {
+					expectDiscarded(serverNodes);
+					expect(markup(container.querySelector('section')!)).toBe(
+						clientMarkup(client.ReturnHole, props),
+					);
+					await expectReported(recovered);
+				} finally {
+					root.unmount();
+				}
+			},
+		);
 	});
 
 	// A list item whose value has component children adopts the range the
-	// server rendered for that item. The item has no site of its own, so the
-	// warning names the list's host.
+	// server rendered for that item.
 	it.each([
 		{ server: 'item-empty', actual: 'nothing' },
-		{ server: 'item-i', actual: '<i>' },
+		{ server: 'item-i', actual: 'an <i>' },
 	])(
-		'builds a list item where the server rendered $actual and reports it once',
-		async ({ server: kind, actual }) => {
+		'renders the root on the client for a list item where the server rendered $actual',
+		async ({ server: kind }) => {
 			container.innerHTML = ServerRT.renderToString(server.Hole, { kind, v: 'A', text: null }).html;
-			const section = container.querySelector('section')!;
-			const tail = container.querySelector('b')!;
+			const serverNodes = subtree(container.querySelector('section')!);
 			const recovered: unknown[] = [];
 			const props = { kind: 'item-p', v: 'A', text: null };
 			const root = hydrate(client.Hole, props, recovered);
 			try {
-				expect(container.querySelector('section')).toBe(section);
-				expect(markup(section)).toBe('<p class="x"><em class="now">A</em></p><b>A</b>');
-				expect(container.querySelector('b')).toBe(tail);
-				await expectReported(recovered, LIST_HOST, '<p>', actual);
+				expectDiscarded(serverNodes);
+				expect(markup(container.querySelector('section')!)).toBe(
+					'<p class="x"><em class="now">A</em></p><b>A</b>',
+				);
+				await expectReported(recovered);
 			} finally {
 				root.unmount();
 			}
@@ -225,9 +211,6 @@ describe.each([
 				component: 'SuspendingHole',
 				server: 'empty',
 				client: 'wait-list',
-				line: HOLE,
-				expected: 'a renderable list range',
-				actual: 'nothing',
 				html: '<p class="x">A</p><em class="waits">R</em><b>A</b>',
 			},
 			{
@@ -235,9 +218,6 @@ describe.each([
 				component: 'SuspendingHole',
 				server: 'text',
 				client: 'wait-p',
-				line: HOLE,
-				expected: '<p>',
-				actual: 'text "A"',
 				html: '<p class="x"><em class="waits">R</em></p><b>A</b>',
 			},
 			{
@@ -245,9 +225,6 @@ describe.each([
 				component: 'SuspendingHole',
 				server: 'item-empty',
 				client: 'item-p',
-				line: LIST_HOST,
-				expected: '<p>',
-				actual: 'nothing',
 				html: '<p class="x"><em class="waits">R</em></p><b>A</b>',
 			},
 			{
@@ -255,9 +232,6 @@ describe.each([
 				component: 'SuspendingReturnHole',
 				server: 'empty',
 				client: 'wait-list',
-				line: RETURNS,
-				expected: 'a renderable list range',
-				actual: 'nothing',
 				html: '<p class="x">A</p><em class="waits">R</em><b>A</b>',
 			},
 			{
@@ -265,9 +239,6 @@ describe.each([
 				component: 'SuspendingReturnHole',
 				server: 'text',
 				client: 'wait-list',
-				line: RETURNS,
-				expected: 'a renderable list range',
-				actual: 'text "A"',
 				html: '<p class="x">A</p><em class="waits">R</em><b>A</b>',
 			},
 			{
@@ -275,19 +246,16 @@ describe.each([
 				component: 'SuspendingReturnHole',
 				server: 'text',
 				client: 'wait-p',
-				line: RETURNS,
-				expected: '<p>',
-				actual: 'text "A"',
 				html: '<p class="x"><em class="waits">R</em></p><b>A</b>',
 			},
-		])('reports once and builds once for $value', async (row) => {
+		])('renders the arm on the client once for $value', async (row) => {
 			container.innerHTML = ServerRT.renderToString(server[row.component], {
 				kind: row.server,
 				v: 'A',
 				text: null,
 			}).html;
-			const section = container.querySelector('section')!;
-			const tail = container.querySelector('b')!;
+			const main = container.querySelector('main')!;
+			const serverNodes = subtree(container.querySelector('section')!);
 			let resolve!: (text: string) => void;
 			const text = new Promise<string>((r) => (resolve = r));
 			const recovered: unknown[] = [];
@@ -297,18 +265,20 @@ describe.each([
 					resolve('R');
 					await text;
 				});
-				expect(container.querySelector('section')).toBe(section);
-				expect(markup(section)).toBe(row.html);
-				expect(container.querySelector('b')).toBe(tail);
-				await expectReported(recovered, row.line, row.expected, row.actual);
+				expect(container.querySelector('main')).toBe(main);
+				expectDiscarded(serverNodes);
+				expect(markup(container.querySelector('section')!)).toBe(row.html);
+				await expectReported(recovered);
 			} finally {
 				root.unmount();
 			}
 		});
 
-		// The dormant boundary's retry runs after the activation that knew its
-		// captures had changed, so it must learn that from the first attempt.
-		it('repairs a dormant boundary whose value became a list before activation without reporting', async () => {
+		// Captures that changed before a dormant boundary activated legitimately
+		// differ from what the server rendered. As React reports nothing for an
+		// update that reaches a dehydrated boundary, the arm renders on the client
+		// without a report, also when its first attempt suspends.
+		it('renders the arm of a dormant boundary whose value became a list before activation without reporting', async () => {
 			const serverProps = { when: condition(false), kind: 'empty', v: 'A', text: null };
 			container.innerHTML = ServerRT.renderToString(server.DormantHole, serverProps).html;
 			const recovered: unknown[] = [];
@@ -316,8 +286,9 @@ describe.each([
 			let resolve!: (text: string) => void;
 			const text = new Promise<string>((r) => (resolve = r));
 			try {
+				const main = container.querySelector('main')!;
 				const section = container.querySelector('section')!;
-				const tail = container.querySelector('b')!;
+				const serverNodes = subtree(section);
 				expect(markup(section)).toBe('<b>A</b>');
 				await act(() =>
 					root.render(client.DormantHole, { when: load(), kind: 'wait-list', v: 'A', text }),
@@ -326,9 +297,11 @@ describe.each([
 					resolve('R');
 					await text;
 				});
-				expect(container.querySelector('section')).toBe(section);
-				expect(markup(section)).toBe('<p class="x">A</p><em class="waits">R</em><b>A</b>');
-				expect(container.querySelector('b')).toBe(tail);
+				expect(container.querySelector('main')).toBe(main);
+				expectDiscarded(serverNodes);
+				expect(markup(container.querySelector('section')!)).toBe(
+					'<p class="x">A</p><em class="waits">R</em><b>A</b>',
+				);
 				await Promise.resolve();
 				expect(recovered).toEqual([]);
 				expect(warns()).toEqual([]);

@@ -499,10 +499,11 @@ describe('DEV client invalid HTML nesting', () => {
 });
 
 // The browser parses the server's `<p><div>…</div></p>` as
-// `<p></p><div>…</div><p></p>` before hydration. The client builds the same
-// host imperatively, so hydration must recover to its single `<p>`, keep later
-// siblings bound to their own server nodes, and report the recovery like any
-// other structural mismatch.
+// `<p></p><div>…</div><p></p>` before hydration. The client builds the nested
+// host imperatively, so the parsed server HTML does not match it: as in React,
+// the root (these fixtures have no Suspense boundary) renders on the client
+// with its single `<p>` and reports once like any other structural mismatch,
+// and the client-rendered tree then updates normally.
 describe('hydrating parser-repaired HTML nesting', () => {
 	const server = productionCompile ? prod : dev;
 
@@ -574,19 +575,22 @@ describe('hydrating parser-repaired HTML nesting', () => {
 		}
 	});
 
-	it('keeps later siblings bound to their own server nodes', async () => {
-		errors();
+	it('renders later siblings on the client with the rest of the root', async () => {
+		const spy = errors();
 		const s = hydrate('RepairedSibling', RepairedSibling, { value: 'a', tone: 'one' }, 'i');
 		try {
 			const section = s.container.querySelector('section')!;
 			expect(markup(section)).toBe('<p class="repaired"><div>a</div></p><i class="one">tail</i>');
-			expect(section.querySelector('i')).toBe(s.serverNode);
+			// The server's sibling is discarded with the rest of the root.
+			expect(s.serverNode!.isConnected).toBe(false);
+			const sibling = section.querySelector('i');
 			await Promise.resolve();
 			expect(s.recovered).toHaveLength(1);
+			expectMismatchWarnings(spy);
 
 			s.render({ value: 'b', tone: 'two' });
 			expect(markup(section)).toBe('<p class="repaired"><div>b</div></p><i class="two">tail</i>');
-			expect(section.querySelector('i')).toBe(s.serverNode);
+			expect(section.querySelector('i')).toBe(sibling);
 		} finally {
 			s.unmount();
 		}

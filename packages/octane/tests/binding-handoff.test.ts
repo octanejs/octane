@@ -229,7 +229,7 @@ describe.each([
 		expect(span.firstChild).toBe(text);
 	});
 
-	it('keeps ordinary hydration diagnostics when DOM no longer matches the binding publication', () => {
+	it('hydrates like ordinary server DOM when the DOM no longer matches the binding publication', () => {
 		const view = fixture(dev, style);
 		document.body.innerHTML = view.html;
 		const button = document.body.querySelector('button')!;
@@ -237,12 +237,26 @@ describe.each([
 		view.publish({ label: 'Stop' });
 		button.setAttribute('aria-label', 'Unrelated mutation');
 		const warn = vi.spyOn(console, 'error').mockImplementation(() => {});
+		const recoverable = vi.fn();
 		flushSync(() => {
-			root = hydrateRoot(document.body, view.client.Status, view.initial);
+			root = hydrateRoot(document.body, view.client.Status, view.initial, {
+				onRecoverableError: recoverable,
+			});
 		});
-		expect(button.getAttribute('aria-label')).toBe('Send');
-		if (dev) expect(warn).toHaveBeenCalled();
-		else expect(warn).not.toHaveBeenCalled();
+		// As in React, hydration never patches an attribute: the element is
+		// adopted with the value it has, and development warns once.
+		expect(document.body.querySelector('button')).toBe(button);
+		expect(button.getAttribute('aria-label')).toBe('Unrelated mutation');
+		expect(recoverable).not.toHaveBeenCalled();
+		if (dev) {
+			expect(warn).toHaveBeenCalledOnce();
+			expect(String(warn.mock.calls[0]![0])).toContain("won't be patched up");
+		} else {
+			expect(warn).not.toHaveBeenCalled();
+		}
+		// The next client change to the prop writes it.
+		flushSync(() => root!.render(view.client.Status, { ...view.initial, label: 'Go' }));
+		expect(button.getAttribute('aria-label')).toBe('Go');
 	});
 
 	it('rejects non-scalar text before any publication and releases every binding claim', () => {
