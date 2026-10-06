@@ -46,7 +46,9 @@ export function nodeRequestUrl(
 /**
  * Serve a static file from `staticDir` when the request path maps to one.
  * Vite's `/assets/*` and Rsbuild's `/static/*` hash-named output get immutable
- * caching; other files revalidate. Returns true when the request was handled.
+ * caching; other files revalidate. A GET for one byte range gets an
+ * uncompressed 206, or 416 past the end of the file; any other Range request
+ * gets the whole file. Returns true when the request was handled.
  */
 export function serveStaticFile(
 	req: IncomingMessage,

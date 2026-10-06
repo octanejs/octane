@@ -487,13 +487,17 @@ describe('built-in Node server response compression', () => {
 			expect(response.headers.vary).toBeUndefined();
 		}
 
+		// The range is past the compression threshold, so only the Range header keeps it identity.
 		const ranged = await get('/assets/app-123.js', {
-			headers: { 'Accept-Encoding': 'gzip', Range: 'bytes=0-99' },
+			headers: { 'Accept-Encoding': 'gzip', Range: 'bytes=0-1099' },
 		});
-		expect(ranged.status).toBe(200);
+		expect(ranged.status).toBe(206);
 		expect(ranged.headers['content-encoding']).toBeUndefined();
-		expect(ranged.headers['content-length']).toBe(String(Buffer.byteLength(staticJavaScript)));
-		expect(ranged.body.toString()).toBe(staticJavaScript);
+		expect(ranged.headers['content-range']).toBe(
+			`bytes 0-1099/${Buffer.byteLength(staticJavaScript)}`,
+		);
+		expect(ranged.headers['content-length']).toBe('1100');
+		expect(ranged.body.toString()).toBe(staticJavaScript.slice(0, 1100));
 
 		const head = await get('/assets/app-123.js', {
 			method: 'HEAD',
@@ -502,6 +506,159 @@ describe('built-in Node server response compression', () => {
 		expect(head.headers['content-encoding']).toBeUndefined();
 		expect(head.headers['content-length']).toBe(String(Buffer.byteLength(staticJavaScript)));
 		expect(head.body).toHaveLength(0);
+	});
+});
+
+describe('built-in Node static file byte ranges', () => {
+	const media = Buffer.from(Array.from({ length: 1000 }, (_, index) => (index * 7) % 256));
+	const script = `export const value = ${JSON.stringify('compressible '.repeat(180))};\n`;
+	let root: string;
+	let origin: string;
+	let transport: ReturnType<typeof createNodeServer>;
+	let listener: import('node:http').Server;
+
+	beforeAll(async () => {
+		root = mkdtempSync(join(tmpdir(), 'octane-static-range-'));
+		mkdirSync(join(root, 'assets'), { recursive: true });
+		writeFileSync(join(root, 'assets/clip-abc.mp4'), media);
+		writeFileSync(join(root, 'assets/app-abc.js'), script);
+		writeFileSync(join(root, 'empty.txt'), '');
+
+		transport = createNodeServer(() => new Response('Not Found', { status: 404 }), {
+			staticDir: root,
+		});
+		listener = transport.listen(0);
+		await once(listener, 'listening');
+		const address = listener.address();
+		if (!address || typeof address === 'string') throw new Error('Node test server has no port');
+		origin = `http://127.0.0.1:${address.port}`;
+	});
+
+	afterAll(async () => {
+		const closed = once(listener, 'close');
+		transport.close();
+		await closed;
+		rmSync(root, { recursive: true, force: true });
+	});
+
+	function get(
+		pathname: string,
+		options: { method?: string; headers?: Record<string, string> } = {},
+	) {
+		return new Promise<{
+			status: number;
+			headers: import('node:http').IncomingHttpHeaders;
+			body: Buffer;
+		}>((resolve, reject) => {
+			const outgoing = request(
+				origin + pathname,
+				{
+					method: options.method ?? 'GET',
+					headers: { Connection: 'close', ...options.headers },
+				},
+				(response) => {
+					const chunks: Buffer[] = [];
+					response.on('data', (chunk) => chunks.push(Buffer.from(chunk)));
+					response.on('end', () => {
+						resolve({
+							status: response.statusCode ?? 0,
+							headers: response.headers,
+							body: Buffer.concat(chunks),
+						});
+					});
+				},
+			);
+			outgoing.on('error', reject);
+			outgoing.end();
+		});
+	}
+
+	it('serves one byte range as partial content with the asset headers', async () => {
+		const ranges = [
+			['bytes=0-1', 0, 1],
+			['bytes=100-199', 100, 199],
+			['bytes=990-', 990, 999],
+			['bytes=-10', 990, 999],
+			['bytes=995-5000', 995, 999],
+			['bytes=-5000', 0, 999],
+			['Bytes=0-0', 0, 0],
+		] as const;
+		for (const [range, start, end] of ranges) {
+			const response = await get('/assets/clip-abc.mp4', { headers: { Range: range } });
+			expect(response.status, range).toBe(206);
+			expect(response.headers['content-range'], range).toBe(`bytes ${start}-${end}/1000`);
+			expect(response.headers['content-length'], range).toBe(String(end - start + 1));
+			expect(response.headers['accept-ranges'], range).toBe('bytes');
+			expect(response.headers['content-type'], range).toBe('video/mp4');
+			expect(response.headers['cache-control'], range).toBe('public, max-age=31536000, immutable');
+			expect(response.body, range).toEqual(media.subarray(start, end + 1));
+		}
+	});
+
+	it('answers an unsatisfiable range with 416 and the file length', async () => {
+		for (const range of ['bytes=1000-', 'bytes=5000-6000', 'bytes=-0']) {
+			const response = await get('/assets/clip-abc.mp4', { headers: { Range: range } });
+			expect(response.status, range).toBe(416);
+			expect(response.headers['content-range'], range).toBe('bytes */1000');
+			expect(response.body, range).toHaveLength(0);
+			// The error describes this request, so it must not be cached as the asset.
+			expect(response.headers['cache-control'] ?? '', range).not.toContain('immutable');
+		}
+	});
+
+	it('serves the whole file for several ranges, other units, invalid ranges, and If-Range', async () => {
+		const requests: Record<string, string>[] = [
+			{ Range: 'bytes=0-1,4-5' },
+			{ Range: 'items=0-1' },
+			{ Range: 'bytes=5-2' },
+			{ Range: 'bytes=abc' },
+			{ Range: 'bytes=0-1', 'If-Range': '"v1"' },
+			{ Range: 'bytes=0-1', 'If-Range': 'Wed, 21 Oct 2037 07:28:00 GMT' },
+		];
+		for (const headers of requests) {
+			const label = JSON.stringify(headers);
+			const response = await get('/assets/clip-abc.mp4', { headers });
+			expect(response.status, label).toBe(200);
+			expect(response.headers['content-range'], label).toBeUndefined();
+			expect(response.headers['content-length'], label).toBe('1000');
+			expect(response.headers['accept-ranges'], label).toBe('bytes');
+			expect(response.body, label).toEqual(media);
+		}
+	});
+
+	it('describes the whole file to HEAD whatever the range', async () => {
+		const head = await get('/assets/clip-abc.mp4', {
+			method: 'HEAD',
+			headers: { Range: 'bytes=0-1' },
+		});
+		expect(head.status).toBe(200);
+		expect(head.headers['content-range']).toBeUndefined();
+		expect(head.headers['content-length']).toBe('1000');
+		expect(head.headers['accept-ranges']).toBe('bytes');
+		expect(head.headers['cache-control']).toBe('public, max-age=31536000, immutable');
+		expect(head.body).toHaveLength(0);
+	});
+
+	it('serves an empty file whole for any range', async () => {
+		for (const range of ['bytes=0-', 'bytes=-1', 'bytes=0-0']) {
+			const response = await get('/empty.txt', { headers: { Range: range } });
+			expect(response.status, range).toBe(200);
+			expect(response.headers['content-range'], range).toBeUndefined();
+			expect(response.headers['content-length'], range).toBe('0');
+			expect(response.body, range).toHaveLength(0);
+		}
+	});
+
+	it('advertises byte ranges only on uncompressed responses', async () => {
+		const compressed = await get('/assets/app-abc.js', { headers: { 'Accept-Encoding': 'gzip' } });
+		expect(compressed.headers['content-encoding']).toBe('gzip');
+		expect(compressed.headers['accept-ranges']).toBeUndefined();
+		expect(gunzipSync(compressed.body).toString()).toBe(script);
+
+		const identity = await get('/assets/app-abc.js');
+		expect(identity.headers['content-encoding']).toBeUndefined();
+		expect(identity.headers['accept-ranges']).toBe('bytes');
+		expect(identity.body.toString()).toBe(script);
 	});
 });
 

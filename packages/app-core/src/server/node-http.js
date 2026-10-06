@@ -453,10 +453,38 @@ const MIME_TYPES = {
 	'.map': 'application/json',
 };
 
+const BYTE_RANGE = /^bytes=(\d*)-(\d*)$/i;
+
+/**
+ * The one `bytes=` range of a non-empty file a request selects (RFC 9110
+ * section 14.1.2). `null` means the header is ignored and the whole file is
+ * served: several ranges, another unit, or a malformed or invalid range.
+ * `false` means the range is unsatisfiable.
+ *
+ * @param {string | undefined} header
+ * @param {number} size
+ * @returns {{ start: number, end: number } | false | null}
+ */
+function byteRange(header, size) {
+	const match = BYTE_RANGE.exec(header?.trim() ?? '');
+	if (!match) return null;
+	const [, first, last] = match;
+	if (first === '') {
+		if (last === '') return null;
+		const suffix = Number(last);
+		return suffix === 0 ? false : { start: Math.max(0, size - suffix), end: size - 1 };
+	}
+	const start = Number(first);
+	if (last !== '' && Number(last) < start) return null;
+	if (start >= size) return false;
+	return { start, end: last === '' ? size - 1 : Math.min(Number(last), size - 1) };
+}
+
 /**
  * Serve a static file from `staticDir` if the request path maps to one.
  * Hash-named build assets (Vite's /assets/ and Rsbuild's /static/) get
  * immutable caching; other files (favicon, robots.txt, …) revalidate.
+ * A GET for one byte range gets 206, or 416 past the end of the file.
  *
  * @param {import('node:http').IncomingMessage} req
  * @param {import('node:http').ServerResponse} res
@@ -515,21 +543,39 @@ function serveStaticFileFromRoot(req, res, staticDir, configuredRoot) {
 
 	try {
 		const ext = path.extname(filePath).toLowerCase();
+		// Range applies to GET only (RFC 9110 section 14.2). Static files send no
+		// validator, so no If-Range can match and that request gets the whole file.
+		// An empty file has no byte a 206 could carry.
+		const range =
+			method === 'GET' && stat.size > 0 && req.headers['if-range'] === undefined
+				? byteRange(req.headers.range, stat.size)
+				: null;
+		if (range === false) {
+			res.statusCode = 416;
+			res.setHeader('Content-Range', `bytes */${stat.size}`);
+			res.end();
+			return true;
+		}
 		const headers = new Headers({
 			'Content-Type': MIME_TYPES[ext] || 'application/octet-stream',
-			'Content-Length': String(stat.size),
+			'Content-Length': String(range ? range.end - range.start + 1 : stat.size),
 			'Cache-Control':
 				pathname.startsWith('/assets/') || pathname.startsWith('/static/')
 					? 'public, max-age=31536000, immutable'
 					: 'public, max-age=0, must-revalidate',
 		});
-		const gzip = shouldGzip(req, 200, headers, method !== 'HEAD');
+		const status = range ? 206 : 200;
+		// Ranges address the identity bytes: shouldGzip declines any request with a
+		// Range header, and a gzip body does not advertise ranges.
+		const gzip = shouldGzip(req, status, headers, method !== 'HEAD');
 		if (gzip) {
 			headers.set('Content-Encoding', 'gzip');
 			headers.delete('Content-Length');
 		}
 
-		res.statusCode = 200;
+		res.statusCode = status;
+		if (range) res.setHeader('Content-Range', `bytes ${range.start}-${range.end}/${stat.size}`);
+		if (!gzip) res.setHeader('Accept-Ranges', 'bytes');
 		res.setHeader('Content-Type', /** @type {string} */ (headers.get('Content-Type')));
 		const contentLength = headers.get('Content-Length');
 		if (contentLength !== null) res.setHeader('Content-Length', contentLength);
@@ -541,7 +587,12 @@ function serveStaticFileFromRoot(req, res, staticDir, configuredRoot) {
 		if (method === 'HEAD') {
 			res.end();
 		} else {
-			const source = fs.createReadStream(resolvedFile, { fd, autoClose: true });
+			const source = fs.createReadStream(resolvedFile, {
+				fd,
+				autoClose: true,
+				start: range?.start,
+				end: range?.end,
+			});
 			fd = -1; // The stream now owns and closes the descriptor.
 			if (gzip) {
 				pipeline(source, createGzip(), res, (error) => {
