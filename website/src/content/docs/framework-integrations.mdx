@@ -68,7 +68,7 @@ islands. The integration compiles every `.tsrx` file and any `.tsx` files you as
 Octane. It renders those components on the server and connects them to Astro’s `client:*`
 directives.
 
-<PackageInstall packages="octane @octanejs/astro" />
+<PackageInstall packages="octane @octanejs/astro @tsrx/oxc@0.16.0" />
 
 ```js
 // astro.config.mjs
@@ -100,7 +100,7 @@ Use `@octanejs/docusaurus` to keep Docusaurus’s configuration, plugins, routes
 data, and MDX while rendering the site with Octane. The package includes an Octane router,
 static rendering, hydration helpers, and a starter documentation theme.
 
-<PackageInstall packages="octane @octanejs/docusaurus @docusaurus/core@3.10.1" />
+<PackageInstall packages="octane @octanejs/docusaurus @docusaurus/core@3.10.1 @tsrx/oxc@0.16.0" />
 
 ```ts
 // vite.config.ts
@@ -124,7 +124,10 @@ Use `@octanejs/tanstack-start` for a full-stack Octane app built on TanStack Sta
 includes file-based routing, route splitting, server functions, streaming SSR, hydration,
 and the Vite setup for development and production. This website uses it.
 
-<PackageInstall packages="octane @octanejs/tanstack-start @octanejs/tanstack-router" dev="vite" />
+<PackageInstall
+	packages="octane @octanejs/tanstack-start @octanejs/tanstack-router @tsrx/oxc@0.16.0"
+	dev="vite"
+/>
 
 ```ts
 // vite.config.ts

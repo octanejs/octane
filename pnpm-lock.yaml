@@ -7281,9 +7281,6 @@ importers:
       '@tsrx/core':
         specifier: catalog:default
         version: 0.4.0(patch_hash=709228ff024f2bb39d3688aff373cff7e02517aea5bd7de2b0a17880a85c3e94)
-      '@tsrx/oxc':
-        specifier: catalog:default
-        version: 0.16.0(svelte@5.56.7)
       '@types/react':
         specifier: catalog:default
         version: 19.2.18
@@ -7312,6 +7309,9 @@ importers:
         specifier: ^2.3.2
         version: 2.3.2
     devDependencies:
+      '@tsrx/oxc':
+        specifier: catalog:default
+        version: 0.16.0(svelte@5.56.7)
       '@tsrx/react':
         specifier: catalog:default
         version: 0.3.7(react@19.2.7)
