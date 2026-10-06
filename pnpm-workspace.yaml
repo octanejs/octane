@@ -646,6 +646,18 @@ minimumReleaseAgeExclude:
 # parenthesized `<style>` apply target and source-phase import printing fixes in
 # @tsrx/core >= 0.5.5.
 patchedDependencies:
+  # Test a comment's blank-line condition only once the text before it is
+  # whitespace, the only case that reads it. In 0.5.x, comment attachment
+  # copied all the code from every node to the next comment, so parsing a
+  # large module with few comments was quadratic. Nitro re-bundles each SSR
+  # chunk through Octane's Vite plugin, whose preflight parses it, and the
+  # website's 5 MB docs chunk ran its production build past the 420 s limit.
+  # Not yet fixed upstream in tsrx-org/tsrx (checked through @tsrx/core 0.5.5).
+  # SCOPE: this does not ship in the published octane tarball; consumers resolve
+  # unpatched @tsrx/core until an upstream release is adopted. Guarded by
+  # packages/octane/tests/compiler/compiler-vite-options.test.ts. Drop when the
+  # adopted @tsrx/core no longer scans past non-whitespace text for blank lines.
+  '@tsrx/core@0.5.5': patches/@tsrx__core@0.5.5.patch
   # Verify Chromium request interception is live before a browser mock route is
   # added, and keep it on across files. The provider mocks through
   # context.route(); clearing mocks between files removes every route, and

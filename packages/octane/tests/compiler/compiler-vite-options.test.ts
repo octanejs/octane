@@ -1052,4 +1052,31 @@ export function Styled(props) @{ 'use dom bindings'; <div {...nativeAttrs(props.
 			expect(await transform(gated, source, `${ROOT}/src/App.tsx`, { ssr })).toBeNull();
 		}
 	});
+
+	// Nitro re-bundles each SSR chunk through the plugin, and a chunk can be
+	// megabytes of code with almost no comments. Parsing it must stay roughly
+	// linear: when every node scanned all the code up to the next comment, the
+	// website's production build ran past its 420 s limit. This 650 kB chunk
+	// takes about 0.7 s, and 12 s with that quadratic scan.
+	it('transforms a large generated server chunk without quadratic comment scans', async () => {
+		const plugin = octane({ hmr: false });
+		configure(plugin, 'build', { ssr: true });
+		const statements = Array.from(
+			{ length: 12_000 },
+			(_, index) => `export const value${index} = compute(${index}, 'label ${index}');`,
+		);
+		const chunk = `${statements.join('\n')}\n//# sourceMappingURL=chunk.js.map\n`;
+
+		const start = performance.now();
+		const output = await transform(
+			plugin,
+			chunk,
+			`${ROOT}/node_modules/.nitro/vite/services/ssr/assets/chunk.js`,
+			{ ssr: true },
+		);
+		const seconds = (performance.now() - start) / 1000;
+
+		expect(output).toBeNull();
+		expect(seconds).toBeLessThan(5);
+	}, 60_000);
 });
