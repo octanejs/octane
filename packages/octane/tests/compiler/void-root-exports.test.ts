@@ -65,6 +65,8 @@ describe('final-code void component exports', () => {
 			'clsx-class.tsrx': fixture('clsx-class.tsrx'),
 			// Presentation-view stamps.
 			'dom-presentation.tsrx': fixture('dom-presentation.tsrx'),
+			// An anonymous default component, beside an authored `_default` binding.
+			'anonymous-default-component.tsrx': fixture('anonymous-default-component.tsrx'),
 			'Shapes.tsrx': `import { memo } from 'octane';
 export function Plain() @{ <p>plain</p>; }
 export default function Default() @{ <p>default</p>; }
