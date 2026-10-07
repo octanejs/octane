@@ -65,8 +65,9 @@ describe('final-code void component exports', () => {
 			'clsx-class.tsrx': fixture('clsx-class.tsrx'),
 			// Presentation-view stamps.
 			'dom-presentation.tsrx': fixture('dom-presentation.tsrx'),
-			// An anonymous default component, beside an authored `_default` binding.
+			// Anonymous default components, beside an authored `_default` binding.
 			'anonymous-default-component.tsrx': fixture('anonymous-default-component.tsrx'),
+			'anonymous-default-arrow-component.tsrx': fixture('anonymous-default-arrow-component.tsrx'),
 			'Shapes.tsrx': `import { memo } from 'octane';
 export function Plain() @{ <p>plain</p>; }
 export default function Default() @{ <p>default</p>; }
@@ -91,6 +92,15 @@ export function Value() { return <p>value</p>; }`,
 		expect(
 			compileClient(sources['Shapes.tsrx'], '/project/src/Shapes.tsrx').voidComponentExports,
 		).toEqual(['Plain', 'default', 'Memoized', 'Branches', 'Arrow', 'Guarded']);
+		for (const name of [
+			'anonymous-default-component.tsrx',
+			'anonymous-default-arrow-component.tsrx',
+		]) {
+			expect(
+				compileClient(sources[name], `/project/src/${name}`).voidComponentExports,
+				name,
+			).toEqual(['default']);
+		}
 	});
 
 	it('follows transpiled output and rejects any export that can return a value', () => {
