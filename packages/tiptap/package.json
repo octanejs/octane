@@ -1,6 +1,6 @@
 {
   "name": "@octanejs/tiptap",
-  "version": "0.0.54",
+  "version": "0.0.55",
   "license": "MIT",
   "type": "module",
   "sideEffects": false,
@@ -60,7 +60,7 @@
     "@tiptap/extension-floating-menu": "catalog:default"
   },
   "peerDependencies": {
-    "octane": "workspace:^0.10.0"
+    "octane": "workspace:^0.11.0"
   },
   "devDependencies": {
     "@octanejs/testing-library": "workspace:*",

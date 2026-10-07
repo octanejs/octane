@@ -1444,8 +1444,8 @@
     "op": "minified",
     "target": "css-modules-client-proven",
     "reference": "css-modules-client-control",
-    "maxRatio": 0.84,
-    "note": "The production CSS-module client sentinel must retain a material minified-code reduction with stylesheet ownership preserved."
+    "maxRatio": 0.91,
+    "note": "The production CSS-module client sentinel must retain a material minified-code reduction with stylesheet ownership preserved. Rebaselined on 2026-10-07 at b8e55da03f: 2294 / 2582 = 0.888x, up from 3183 / 3890 = 0.818x at e233e4a11d^. e233e4a11d (#1762) binds opaque holes in modules without signals through plain writers, so each control class binding shrank from bindSignalAttribute (seven arguments plus a signal key) to setClassNameIfChanged. The 15 class bindings the proof removes fell from 755 to 352 minified bytes, which cut the saving from 707 to 288 B. The proof itself did not change: both commits fold the same 15 of 18 classes into byte-identical templates. The 0.91 ceiling leaves 55 B."
   },
   {
     "suite": "codegen-size",

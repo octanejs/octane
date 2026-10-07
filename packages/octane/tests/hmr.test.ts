@@ -150,16 +150,18 @@ function webpackHotModule(filename: string) {
 
 describe('hmr — runtime wrapper', () => {
 	it.each([
-		{ dialect: 'vite', name: 'App' },
-		{ dialect: 'webpack', name: 'App' },
-		{ dialect: 'vite', name: 'module' },
-		{ dialect: 'vite', name: '_$hmrModule' },
-		// An anonymous `export default function () @{…}` registers under its export.
-		{ dialect: 'vite', name: 'default' },
-		{ dialect: 'webpack', name: 'default' },
+		{ dialect: 'vite', name: 'App', declaration: 'function App(props)' },
+		{ dialect: 'webpack', name: 'App', declaration: 'function App(props)' },
+		{ dialect: 'vite', name: 'module', declaration: 'function module(props)' },
+		{ dialect: 'vite', name: '_$hmrModule', declaration: 'function _$hmrModule(props)' },
+		// Anonymous default components, function or arrow, register under their export.
+		{ dialect: 'vite', name: 'default', declaration: 'default function (props)' },
+		{ dialect: 'webpack', name: 'default', declaration: 'default function (props)' },
+		{ dialect: 'vite', name: 'default', declaration: 'default (props) =>' },
+		{ dialect: 'webpack', name: 'default', declaration: 'default (props) =>' },
 	] as const)(
-		'preserves state and live events for $name across consecutive $dialect replacements',
-		async ({ dialect, name }) => {
+		'preserves state and live events for export $declaration across consecutive $dialect replacements',
+		async ({ dialect, name, declaration }) => {
 			const data: Record<string, unknown> = {};
 			let dispose: Parameters<TestHotContext['dispose']>[0] | undefined;
 			let accept: Parameters<TestHotContext['accept']>[0];
@@ -173,7 +175,7 @@ describe('hmr — runtime wrapper', () => {
 				accept = undefined;
 				const App = await compileHmrComponent(
 					`import { useState } from 'octane';
-					 export ${name === 'default' ? 'default function' : `function ${name}`}(props) @{
+					 export ${declaration} @{
 					   const [count, setCount] = useState(0);
 					   ${incompatible ? "if (props.empty) return 'empty';" : ''}
 					   <main><p>version ${version}</p><button onClick={() => setCount(count + 1)}>{count as string}</button></main>

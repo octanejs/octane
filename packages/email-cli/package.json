@@ -1,6 +1,6 @@
 {
   "name": "@octanejs/email-cli",
-  "version": "0.0.12",
+  "version": "0.0.13",
   "license": "MIT",
   "type": "module",
   "engines": {
@@ -36,7 +36,7 @@
     "vite": "catalog:default"
   },
   "peerDependencies": {
-    "octane": "workspace:^0.10.0"
+    "octane": "workspace:^0.11.0"
   },
   "devDependencies": {
     "@types/node": "catalog:default",

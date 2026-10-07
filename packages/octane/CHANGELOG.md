@@ -1,5 +1,125 @@
 # octane
 
+## 0.11.0
+
+### Minor Changes
+
+- 8996380: Move `@tsrx/oxc` from a dependency to an optional peer. Projects that use the
+  Octane compiler in Node, including through Vite, Rspack, or Rsbuild, must
+  install `@tsrx/oxc@0.16.0` in the project using the compiler. Applications that
+  use only the Octane runtime do not need it.
+
+  The Octane CLI installs the compatible compiler peer when creating or setting
+  up an application.
+
+### Patch Changes
+
+- 8e16346: Compile `export default () => @{ … }` exactly like `export default function () @{ … }`.
+  An anonymous default-exported arrow component used to skip component lowering.
+  It had no HMR registration, so an edit could not hot-update it in place, and it
+  missed the production stamps a function component gets. An `async` arrow also
+  compiled with no diagnostic. The arrow form now hot-updates under its `default`
+  export, server-renders, hydrates, and specializes production roots that render
+  it. An `async` arrow is rejected with an error that names `default`.
+
+  `export default (function Name() @{ … })` no longer redeclares a module binding
+  that shares the component's name. The component gets a fresh module binding,
+  and its body still resolves `Name` to the component itself. If a parameter
+  default or computed key refers to `Name`, or the body also declares its own
+  `Name`, the compiler asks you to rename the function expression.
+- ceba949: Compile `export default function () @{ … }`. An anonymous default-exported
+  `@{}` component used to crash the compiler with `Cannot read properties of null
+  (reading 'name')` in client, server, and HMR builds. It now compiles exactly like
+  a named default component. It server-renders, hydrates, hot-updates under its
+  `default` export, and specializes production roots that render it. The
+  compiler gives it a module binding that no authored identifier uses, so the
+  component's function name is `_default`, as in Babel's output. An `async` or
+  generator anonymous component is rejected with an error that names `default`.
+- 0bb170c: Keep the specialized production root when a private root's later `render` or
+  `unmount` calls live in callbacks, for example a controller that returns
+  `replace()` and `dispose()` methods. Before, any use outside the function that
+  created the root fell back to the generic returned-value renderer, even though
+  the root never escaped.
+
+  Each call in a closure must still be a direct `root.render(...)` or
+  `root.unmount()` whose render target is a proven compiled component, resolved
+  from the call's own scope. Returning or passing the root, reading a method,
+  optional calls, unknown or shadowed targets, direct `eval`, `with`, and uses
+  inside a component body keep the generic root. A minimal controller entry drops
+  from about 52 KB to 24 KB gzip.
+- 50e18cc: Mount and clear rows with less undo bookkeeping. Every update records the bindings it writes so it can undo them if the render is abandoned. Event handlers and class names written into rows that the same render created no longer get undo entries, because abandoning the render discards those rows whole. Mounting 1,000 keyed rows makes 14% fewer calls and runs about 5% faster. Clearing a large list no longer makes a function call per row while it checks that the old rows are still in place.
+- e595a13: Swap and remove keyed rows faster. Every update keeps enough to put a keyed list back if the render is abandoned, and it used to copy the whole row list and its key order to do so, even for a two-row swap. Inserts, removals and small reorders now record only the few rows they relink, and rollback walks the old order back through them. In the js-framework benchmark, swapping two of 1,000 rows is 17% faster and removing a row 22% faster. Development builds also keep the full copy and check that the two agree.
+- 5722871: Infer `useLinkedState`'s value from the reconciler's return type when the
+  reconciler declares an unannotated `previous` parameter. The value was
+  previously `unknown`. An annotated `previous`, typed options, or explicit type
+  arguments still declare the value type. With none of them, `previous.value`
+  reads as `unknown`; annotate the return type when the reconciler reads it.
+- 8a9969c: Fix a component declared as `const X = function Name(props) @{ … }` that refers
+  to itself as `Name`, for example to render `<Name />` recursively from an `@if`,
+  `@for`, or `@switch` arm. The compiler binds such a component as `X` and dropped
+  `Name`, so client and server rendering threw a `ReferenceError`. When the module
+  also declared its own `Name`, the component silently rendered that one instead.
+  `Name` now refers to the component inside its body, as in JavaScript. The
+  compiler rejects the rare self-references it cannot alias: one in a parameter
+  default or computed key, or one in a component that also declares `Name` or `X`
+  inside itself. Components that never refer to themselves by their function name
+  compile exactly as before.
+- 995aa9a: Fix a client `ReferenceError` when a nested `@{}` function renders itself by its
+  own name from an `@if`, `@for`, `@switch`, or `@try` arm, as in
+  `memo(function Counter(props) @{ … @if (props.more) { <Counter /> } })`. The
+  client compiler moves those arms to module scope and passes each value they read
+  from the enclosing function as an argument. The function's own name was left
+  out. A function expression binds that name only inside itself, so the moved arm
+  could not resolve it. The same applied to a function declared in a nested block
+  inside a component. The arm now receives the name like any other local. Server
+  rendering was already correct, and client output now matches it for render and
+  hydration. Module-level component declarations compile exactly as before.
+- b8e55da: Rspack production client builds now specialize roots and component calls over
+  imported void components, as the Vite plugin already does. Before, a
+  `createRoot` or `hydrateRoot` root over a compiled `@{}` component imported from
+  another module kept the generic returned-value renderer. The issue's one-root
+  `hydrateRoot` app drops from about 86 KB to 52 KB gzip.
+
+  The plugin proves each import from the module graph after make, then compiles
+  the importer once more with the proof. An import is proven only when Octane
+  compiled it as a void export and the provider's final JavaScript, after SWC and
+  every later loader, still cannot return a value. The importer's final code must
+  also bind it to the same module and export. A loader that changes either keeps
+  the generic path. A proven module that changes later, such as through another
+  plugin's rebuild, fails the build. Watch, development, HMR and profiling builds
+  stay generic, as do builds with a custom `runtime`, `universalRuntime` or
+  `layerSpecializations`.
+
+  `octane/compiler/bundler` adds `analyzeCompiledModule(source, id)`, which reads
+  these facts from a module's final JavaScript for bundler adapters.
+- 7e1793f: Strong mode now follows a `useEffectEvent` callback that effect setup calls the
+  same way it follows a same-module helper. A disposer the callback returns counts
+  as the effect's cleanup once the effect returns it, so
+  `useLayoutEffect(() => start())` no longer reports
+  `OCTANE_STRONG_EFFECT_RESOURCE_LEAK` when `start` removes the listener it
+  added. The callback's parameters also name the call's arguments, so a target,
+  handler, or `AbortController` passed to it is matched against the cleanup. A
+  listener added to a target passed in without a release is now reported.
+  Handler, event type, target, and capture identity are still checked.
+- 8855e2f: On universal renderers (Lynx, Three, object), `export default (function Name() @{ … })`
+  no longer redeclares a module binding that shares the component's name. It also
+  no longer captures a read of `Name` that the module leaves unbound. The
+  component gets a fresh module binding and still hot-updates as `default`. Its
+  body still resolves `Name` to the component itself.
+- 7023961: Type-check static component elements in the scope they were written in. The
+  editor's virtual TSX, which `octane-tsc` also checks, moved an element with only
+  literal attributes and children to a module-level `const`. When that element
+  was a component, its tag was checked against the wrong binding:
+
+  - A named function expression that renders itself, such as
+    `export default (function Counter() @{ … <Counter nested /> … })` or
+    `memo(function Counter() @{ … })`, reported TS2604 or TS2304. It resolved to
+    a module binding with the same name, or to nothing.
+  - An `@if (Maybe) { <Maybe label="x" /> }` arm lost its narrowing.
+
+  Component elements now stay where they were written. Host-only static elements
+  name no binding and still hoist. Runtime output is unchanged.
+
 ## 0.10.0
 
 ### Minor Changes

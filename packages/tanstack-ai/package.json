@@ -1,6 +1,6 @@
 {
   "name": "@octanejs/tanstack-ai",
-  "version": "0.0.54",
+  "version": "0.0.55",
   "license": "MIT",
   "type": "module",
   "engines": {
@@ -37,7 +37,7 @@
     "@tanstack/ai-client": "catalog:default"
   },
   "peerDependencies": {
-    "octane": "workspace:^0.10.0"
+    "octane": "workspace:^0.11.0"
   },
   "devDependencies": {
     "@octanejs/testing-library": "workspace:*",

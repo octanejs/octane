@@ -1,6 +1,6 @@
 {
   "name": "@octanejs/three",
-  "version": "0.1.54",
+  "version": "0.1.55",
   "license": "MIT",
   "type": "module",
   "sideEffects": false,
@@ -55,7 +55,7 @@
   },
   "peerDependencies": {
     "@types/three": ">=0.156.0",
-    "octane": "workspace:^0.10.0",
+    "octane": "workspace:^0.11.0",
     "three": ">=0.156.0"
   },
   "peerDependenciesMeta": {

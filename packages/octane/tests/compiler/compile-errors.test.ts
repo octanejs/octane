@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { compile } from 'octane/compiler';
+import { parseModule } from '../../src/compiler/parser.node.js';
 
 // Compile-error coverage: pin the maintained rejection messages so future
 // parser/compiler edits can't silently drop a guard. Each test asserts
@@ -53,11 +54,102 @@ describe('compile errors — rejected authoring patterns', () => {
 	it.each([
 		['async', 'export default async function () @{ <div>{1}</div> }', /declared `async`/],
 		['generator', 'export default function* () @{ <div>{1}</div> }', /declared as a generator/],
+		['async arrow', 'export default async () => @{ <div>{1}</div> }', /declared `async`/],
 	])('names an anonymous %s default component by its export', (_kind, src, message) => {
 		for (const mode of ['client', 'server'] as const) {
 			expect(() => compile(src, 'anonymous-default.tsrx', { mode })).toThrow(message);
 			expect(() => compile(src, 'anonymous-default.tsrx', { mode })).toThrow(
 				/^Component `default` /,
+			);
+		}
+	});
+
+	// `export default (function Name() @{…})` binds `Name` only inside the
+	// component, so a module binding of `Name` is legal beside it.
+	it('compiles a parenthesized named default component beside a module binding of its name', () => {
+		const src = `const Name = 1;\nexport default (function Name() @{ <p>plain</p>; })`;
+		for (const options of [{ mode: 'client' }, { mode: 'server' }, { hmr: 'vite' }] as const) {
+			// Lowering must not redeclare the module's `Name`.
+			expect(() =>
+				parseModule(compile(src, 'named-default.tsrx', options).code, 'out.js'),
+			).not.toThrow();
+		}
+		// A self-reference reads the component through an alias that must not
+		// displace the body's directive prologue.
+		const strict = `const Name = 1;\nexport default (function Name() @{ 'use strict'; <p>{Name.name as string}</p>; })`;
+		for (const mode of ['client', 'server'] as const) {
+			const code = compile(strict, 'named-default.tsrx', { mode }).code;
+			expect(() => parseModule(code, 'out.js')).not.toThrow();
+			expect(code).toMatch(/\(__props, __s, __extra\) \{\s*'use strict';/);
+		}
+		const asyncSource = `const Name = 1;\nexport default (async function Name() @{ <p>{1}</p>; })`;
+		expect(() => compile(asyncSource, 'named-default.tsrx')).toThrow(
+			/^Component `Name` is declared `async`/,
+		);
+	});
+
+	// A self-reference reads the component through a body alias, which neither a
+	// parameter expression nor a body that redeclares the name can use safely.
+	it.each([
+		[
+			'in a parameter default',
+			'function Name({ x = Name.name }: { x?: string }) @{ <p>{x as string}</p>; }',
+			/^Component `Name` refers to itself by name in a parameter, /,
+		],
+		[
+			'in a computed parameter key',
+			'function Name({ [Name.name]: x }: Record<string, string>) @{ <p>{x as string}</p>; }',
+			/^Component `Name` refers to itself by name in a parameter, /,
+		],
+		[
+			'beside a body redeclaration',
+			`function Name() @{
+	const read = () => { const Name = 'inner'; return Name; };
+	<p>{read() as string}{Name.name as string}</p>;
+}`,
+			/^Component `Name` refers to itself by name while its body also declares `Name`, /,
+		],
+	])(
+		'rejects a colliding named default component that refers to itself %s',
+		(_where, fn, message) => {
+			const src = `const Name = 1;\nexport default (${fn})`;
+			for (const mode of ['client', 'server'] as const) {
+				expect(() => compile(src, 'named-default.tsrx', { mode })).toThrow(message);
+				expect(() => compile(src, 'named-default.tsrx', { mode })).toThrow(
+					/but its module also declares `Name`\. Rename the component's function expression\.$/,
+				);
+			}
+		},
+	);
+
+	// `const X = function Name() @{…}` binds the component as `X`, so a
+	// self-reference by `Name` reads it through the same body alias, which a
+	// declaration of `X` inside the component would shadow.
+	it.each([
+		[
+			'in a parameter default',
+			'function Name({ x = Name.name }: { x?: string }) @{ <p>{x as string}</p>; }',
+			/^Component `X` refers to itself as `Name` in a parameter, /,
+		],
+		[
+			'beside a body redeclaration',
+			`function Name() @{
+	const read = () => { const Name = 'inner'; return Name; };
+	<p>{read() as string}{Name.name as string}</p>;
+}`,
+			/^Component `X` refers to itself as `Name` while its body also declares `Name`, /,
+		],
+		[
+			'beside a parameter named like its binding',
+			'function Name(X: { label: string }) @{ <p>{X.label as string}{Name.name as string}</p>; }',
+			/^Component `X` refers to itself as `Name` while it also declares `X`, /,
+		],
+	])('rejects a const named component that refers to itself %s', (_where, fn, message) => {
+		const src = `export const X = ${fn};`;
+		for (const mode of ['client', 'server'] as const) {
+			expect(() => compile(src, 'named-const.tsrx', { mode })).toThrow(message);
+			expect(() => compile(src, 'named-const.tsrx', { mode })).toThrow(
+				/but only its function expression binds `Name`\. Rename the function expression to `X` and refer to the component by that name\.$/,
 			);
 		}
 	});
