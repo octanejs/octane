@@ -3622,7 +3622,6 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 		if (callShapes.has(unwrap(declaration.init))) {
 			bindDeclarationValue(declaration, declarationKind, scope);
 		}
-		checkRefPattern(declaration.id, declaration.init, scope, phase);
 		return visitPatternExpressions(
 			declaration.id,
 			scope,
@@ -4536,8 +4535,10 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 		}
 	}
 
-	// Synchronous effect setup must not read inputs that dependency inference
-	// cannot see. Effect Events are the declared non-reactive escape.
+	// Synchronous effect setup must not read a reassigned module variable: it
+	// hides the value from dependency inference and is shared by every instance.
+	// A ref's `current` and a state getter are deliberate non-reactive reads of
+	// one instance's latest value, so setup may use them as an event handler can.
 	function hiddenEffectRead(phase) {
 		return phase === 'effect' && currentEffect !== null && collectEffectReads;
 	}
@@ -4547,34 +4548,8 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 		if (!hiddenEffectRead(phase)) return;
 		const node = unwrap(target);
 		if (node?.type === 'Identifier' && mutableModuleRead(node.name, scope)) {
-			effectPolicy.hiddenDependency(node, 'module');
-		} else if (readCurrentRef(node, scope) && valueRefRead(node.object, scope)) {
-			effectPolicy.hiddenDependency(node, 'ref');
+			effectPolicy.hiddenDependency(node);
 		}
-	}
-
-	// Destructuring `current` from a value ref in effect setup reads it too.
-	function checkRefPattern(pattern, value, scope, phase) {
-		if (
-			hiddenEffectRead(phase) &&
-			pattern?.type === 'ObjectPattern' &&
-			pattern.properties?.some(
-				(property) =>
-					property.type === 'RestElement' ||
-					(property.computed
-						? staticPrimitiveValue(property.key, scope)
-						: (property.key?.name ?? property.key?.value)) === 'current',
-			) &&
-			valueRefRead(value, scope)
-		) {
-			effectPolicy.hiddenDependency(unwrap(value), 'ref');
-		}
-	}
-
-	function valueRefRead(object, scope) {
-		const node = unwrap(object);
-		const binding = node?.type === 'Identifier' ? resolve(scope, node.name) : null;
-		return binding?.kind === 'ref' && effectPolicy.isValueRef(binding.declaration);
 	}
 
 	function visitExplicitStateDependencies(expression, scope, dependencies) {
@@ -4792,7 +4767,6 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 			if (phase === 'render' || phase === 'effect') reportSetter(origin, phase);
 		} else if (value?.kind === 'getter') {
 			if (phase === 'render' && currentFunctionChecksRenderReads) reportStateGetterCall(origin);
-			else if (hiddenEffectRead(phase)) effectPolicy.hiddenDependency(origin, 'getter');
 		}
 	}
 
@@ -5124,7 +5098,7 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 					reportModuleStateRead(node);
 				}
 				if (readAccess && hiddenEffectRead(phase) && mutableModuleRead(node.name, scope)) {
-					effectPolicy.hiddenDependency(node, 'module');
+					effectPolicy.hiddenDependency(node);
 				}
 				return;
 			case 'JSXOpeningElement': {
@@ -5406,14 +5380,6 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 				if (readAccess && collectEffectReads && currentEffect !== null) {
 					const snapshot = snapshotBinding(node, scope);
 					if (snapshot?.state) currentEffect.reads.add(ownedState(snapshot.state));
-				}
-				if (
-					readAccess &&
-					hiddenEffectRead(phase) &&
-					readCurrentRef(node, scope) &&
-					valueRefRead(node.object, scope)
-				) {
-					effectPolicy.hiddenDependency(node, 'ref');
 				}
 				return;
 			}
@@ -5967,7 +5933,6 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 			case 'AssignmentExpression': {
 				if (node.left?.type === 'ArrayPattern' || node.left?.type === 'ObjectPattern') {
 					visit(node.right, scope, phase);
-					checkRefPattern(node.left, node.right, scope, phase);
 					visitPatternExpressions(
 						node.left,
 						scope,

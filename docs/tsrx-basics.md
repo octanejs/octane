@@ -931,10 +931,11 @@ These patterns become compile errors:
   effect, unless the returned cleanup aborts the request's `AbortController` or
   sets a flag the update checks (`OCTANE_STRONG_EFFECT_DATA_FETCH`). Read
   asynchronous render data with `use()` or a query binding.
-- Calling a state getter, reading `current` from a ref that is never attached or
-  passed anywhere, or reading a reassigned module variable in synchronous effect
-  setup (`OCTANE_STRONG_EFFECT_HIDDEN_DEPENDENCY`). Read the render snapshot, or
-  move the non-reactive read into a `useEffectEvent` callback.
+- Reading a reassigned module variable in synchronous effect setup
+  (`OCTANE_STRONG_EFFECT_HIDDEN_DEPENDENCY`). Keep the value in state, a prop, or
+  context, or move the non-reactive read into a `useEffectEvent` callback. An
+  effect may read and write a ref's `current` and call a state getter; neither
+  is a dependency.
 - Adding a platform event listener, interval, observer, connection, or
   geolocation watch in effect setup without releasing it in the returned cleanup
   (`OCTANE_STRONG_EFFECT_RESOURCE_LEAK`).

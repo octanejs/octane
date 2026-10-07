@@ -82,9 +82,9 @@ export const STRONG_DIAGNOSTICS = [
 		section: 'effects',
 		severity: 'error',
 		detects:
-			'Synchronous effect setup calls a state getter, reads `current` from a value ref, or reads a reassigned module `let` or `var`. None of these is an inferred dependency, so the effect does not re-run when they change.',
+			"Synchronous effect setup reads a reassigned module `let` or `var`. It is not an inferred dependency, so the effect does not re-run when it changes, and every instance shares it. Calling a state getter and reading or writing a ref's `current` in an effect stay legal; neither is a dependency.",
 		replacement:
-			'Read the render snapshot, or move the non-reactive read into a `useEffectEvent` callback. Octane never double-invokes effects, so first-run and `didInit` guards are unnecessary.',
+			'Keep the value in state, a prop, or context and read its snapshot, or move the non-reactive read into a `useEffectEvent` callback. Octane never double-invokes effects, so `didInit` guards are unnecessary.',
 		primitives: ['useEffectEvent'],
 	},
 	{

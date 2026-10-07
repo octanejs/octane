@@ -2,10 +2,10 @@
 // state provenance; this policy owns the questions it asks about effect setup:
 // which platform calls run their callback before the next paint, whether an
 // asynchronous state update is cancelled or ignored by the returned cleanup,
-// whether a platform resource acquired in setup is released, and which refs are
-// plain values rather than attached instances. Identity comes from the shared
-// lexical analysis, never from spelling. Nothing here annotates the parser tree
-// or changes emitted code.
+// whether a platform resource acquired in setup is released, and which refs hold
+// an element attached by an intrinsic element's `ref`. Identity comes from the
+// shared lexical analysis, never from spelling. Nothing here annotates the
+// parser tree or changes emitted code.
 
 import { REF_HOOKS } from './hook-names.js';
 
@@ -54,23 +54,10 @@ const OBSERVERS = new Set([
 	'PerformanceObserver',
 ]);
 const CLOSABLES = new Set(['WebSocket', 'EventSource', 'BroadcastChannel']);
-const DEPENDENCY_ARGUMENTS = new Map([
-	['useEffect', 1],
-	['useLayoutEffect', 1],
-	['useInsertionEffect', 1],
-	['useMemo', 1],
-	['useCallback', 1],
-	['useImperativeHandle', 2],
-]);
 const UNKNOWN = Symbol('unknown');
 
-const HIDDEN_MESSAGES = {
-	getter:
-		'Strong mode does not allow effect setup to call a state getter. The getter hides the state from dependency inference, so the effect does not re-run when it changes. Read the render snapshot instead, or move the non-reactive read into a useEffectEvent callback.',
-	ref: "Strong mode does not allow effect setup to read a value ref's current property. The ref hides the value from dependency inference, so the effect does not re-run when it changes. Read the render snapshot instead, or move the non-reactive read into a useEffectEvent callback. Octane never double-invokes effects, and an effect without reactive inputs runs once per mount, so first-run and didInit guards are unnecessary.",
-	module:
-		'Strong mode does not allow effect setup to read a reassigned module variable. The variable hides the value from dependency inference and is shared by every instance. Keep the value in state, a prop, or context and read its snapshot, or move the non-reactive read into a useEffectEvent callback. Octane never double-invokes effects, so didInit guards are unnecessary.',
-};
+const HIDDEN_MESSAGE =
+	'Strong mode does not allow effect setup to read a reassigned module variable. The variable hides the value from dependency inference and is shared by every instance. Keep the value in state, a prop, or context and read its snapshot, or move the non-reactive read into a useEffectEvent callback. Octane never double-invokes effects, so didInit guards are unnecessary.';
 const FETCH_MESSAGES = {
 	missing:
 		'Strong mode requires cleanup for a state update that runs after an await or promise callback in an effect. Read asynchronous render data with use() or a query binding. For external synchronization, pass an AbortController signal to the request and abort it in the returned cleanup, or set a flag in the cleanup and check it before this update.',
@@ -1070,9 +1057,8 @@ export function createStrongEffectPolicy({ ast, analysis, callNames, report }) {
 	}
 
 	// One module walk classifies every useRef binding: refs attached through a
-	// `ref` attribute of an intrinsic element are host refs, and any use other
-	// than a property access or a stable alias makes a ref an escaped instance.
-	// It also records which declaration or assignment target owns a call result.
+	// `ref` attribute of an intrinsic element are host refs. It also records
+	// which declaration or assignment target owns a call result.
 	function refs() {
 		if (references !== null) return references;
 		// Ownership keys must not depend on the call being visited.
@@ -1089,17 +1075,14 @@ export function createStrongEffectPolicy({ ast, analysis, callNames, report }) {
 		references = {
 			roots: new Set(),
 			aliases: new Map(),
-			declarations: new Map(),
-			escaped: new Set(),
 			host: new Set(),
 			owners: new WeakMap(),
 		};
-		const { roots, aliases, declarations, owners } = references;
+		const { roots, aliases, owners } = references;
 		const names = new Set();
 		const callbackAssignments = new WeakMap();
 		const callbackCandidates = new Map();
 		const refAttributes = [];
-		const attached = new Set();
 		const attachedHosts = new Set();
 		const invalidAttachments = new Set();
 		// A stored value may come from either arm of a conditional or logical
@@ -1124,7 +1107,6 @@ export function createStrongEffectPolicy({ ast, analysis, callNames, report }) {
 			if (decl.id?.type === 'Identifier' && binding && !binding.reassigned) {
 				if (init?.type === 'CallExpression' && REF_HOOKS.has(callNames.get(init))) {
 					roots.add(binding);
-					declarations.set(decl.id, binding);
 					names.add(binding.name);
 				}
 			}
@@ -1152,7 +1134,6 @@ export function createStrongEffectPolicy({ ast, analysis, callNames, report }) {
 				const root = target && (aliases.get(target) ?? (roots.has(target) ? target : null));
 				if (root) {
 					aliases.set(binding, root);
-					declarations.set(decl.id, root);
 					names.add(binding.name);
 					changed = true;
 				}
@@ -1192,10 +1173,8 @@ export function createStrongEffectPolicy({ ast, analysis, callNames, report }) {
 			attachCallbacks(expression, host);
 		}
 		checkCallbackUses();
-		for (const root of attached) {
-			if (invalidAttachments.has(root)) continue;
-			references.escaped.add(root);
-			if (attachedHosts.has(root)) references.host.add(root);
+		for (const root of attachedHosts) {
+			if (!invalidAttachments.has(root)) references.host.add(root);
 		}
 		return references;
 
@@ -1230,7 +1209,6 @@ export function createStrongEffectPolicy({ ast, analysis, callNames, report }) {
 			if (callback === null || callback.async || callback.generator) return;
 			const assignments = callbackRefs(callback);
 			for (const root of assignments.good) {
-				attached.add(root);
 				if (host) attachedHosts.add(root);
 				let candidate = callbackCandidates.get(callback);
 				if (!candidate) callbackCandidates.set(callback, (candidate = new Set()));
@@ -1450,55 +1428,7 @@ export function createStrongEffectPolicy({ ast, analysis, callNames, report }) {
 		let child = identifier;
 		let index = parents.length - 1;
 		while (index >= 0 && TRANSPARENT.has(parents[index].type)) child = parents[index--];
-		const parent = parents[index];
-		if (parent === undefined) return;
-		switch (parent.type) {
-			case 'MemberExpression':
-				// Reading or writing a property does not share the ref object.
-				if (parent.object === child || (parent.property === child && !parent.computed)) return;
-				break;
-			case 'Property':
-			case 'MethodDefinition':
-			case 'PropertyDefinition':
-				if (parent.key === child && !parent.computed && parent.shorthand !== true) return;
-				break;
-			case 'VariableDeclarator':
-				// A stable alias is classified with its root; destructuring reads properties.
-				if (parent.id === child || parent.id?.type === 'ObjectPattern') return;
-				if (references.declarations.has(parent.id)) return;
-				break;
-			case 'AssignmentExpression': {
-				// `({ current } = ref);` reads properties too, when its value is unused.
-				let at = index - 1;
-				while (at >= 0 && TRANSPARENT.has(parents[at].type)) at--;
-				if (
-					parent.right === child &&
-					parent.operator === '=' &&
-					parent.left?.type === 'ObjectPattern' &&
-					parents[at]?.type === 'ExpressionStatement'
-				) {
-					return;
-				}
-				break;
-			}
-			case 'LabeledStatement':
-			case 'BreakStatement':
-			case 'ContinueStatement':
-				return;
-			case 'ArrayExpression': {
-				// A dependency list is not a use of the ref's identity, even when it
-				// is parenthesized or cast.
-				let list = parent;
-				let at = index - 1;
-				while (at >= 0 && TRANSPARENT.has(parents[at].type)) list = parents[at--];
-				const call = parents[at];
-				const position = DEPENDENCY_ARGUMENTS.get(callNames.get(call));
-				if (position !== undefined && call.arguments?.[position] === list) return;
-				break;
-			}
-		}
 		if (hostRefPosition(parents, index, child)) references.host.add(root);
-		references.escaped.add(root);
 	}
 
 	// A ref given to an intrinsic element's `ref`: directly, in an array, as
@@ -1666,15 +1596,8 @@ export function createStrongEffectPolicy({ ast, analysis, callNames, report }) {
 		zeroDelayAwait(argument) {
 			return maySettle(argument);
 		},
-		// A useRef whose identity never leaves property accesses and stable
-		// aliases holds a plain value, not an attached element or instance.
-		isValueRef(declaration) {
-			const info = refs();
-			const root = info.declarations.get(declaration);
-			return root !== undefined && !info.escaped.has(root);
-		},
-		hiddenDependency(node, kind) {
-			report(STRONG_EFFECT_HIDDEN_DEPENDENCY, node, HIDDEN_MESSAGES[kind]);
+		hiddenDependency(node) {
+			report(STRONG_EFFECT_HIDDEN_DEPENDENCY, node, HIDDEN_MESSAGE);
 		},
 		// The stable initializer of a binding declared in the function that reads
 		// it, once that initializer has run on every path to the read: a `const`
