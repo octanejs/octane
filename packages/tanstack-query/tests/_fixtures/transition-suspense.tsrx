@@ -23,9 +23,7 @@ interface AppProps extends ReaderProps {
 
 function PendingProbe() @{
 	const [isPending] = useTransition();
-	<span id="pending">
-		{isPending ? 'pending' : 'idle'}
-	</span>
+	<span id="pending">{isPending ? 'pending' : 'idle'}</span>
 }
 
 function Reader(props: ReaderProps) @{
@@ -40,7 +38,9 @@ function Reader(props: ReaderProps) @{
 		queryFn: () => props.queryFn(value),
 		retry: false,
 	});
-	<span id="data" data-pending={isPending ? 'pending' : 'idle'}>{'data:' + q.data as string}</span>
+	<span id="data" data-pending={isPending ? 'pending' : 'idle'}>
+		{('data:' + q.data) as string}
+	</span>
 }
 
 // The same transition through useSuspenseQueries: the group's retained promise
@@ -59,7 +59,9 @@ function GroupedReader(props: ReaderProps) @{
 			},
 		],
 	});
-	<span id="data" data-pending={isPending ? 'pending' : 'idle'}>{'data:' + q.data as string}</span>
+	<span id="data" data-pending={isPending ? 'pending' : 'idle'}>
+		{('data:' + q.data) as string}
+	</span>
 }
 
 export function TransitionSuspenseApp(props: AppProps) @{
@@ -76,7 +78,7 @@ export function TransitionSuspenseApp(props: AppProps) @{
 			} @pending {
 				<span id="fallback">loading</span>
 			} @catch (e) {
-				<span id="caught">{'caught:' + (e as Error).message as string}</span>
+				<span id="caught">{('caught:' + (e as Error).message) as string}</span>
 			}
 		</div>
 	</QueryClientProvider>

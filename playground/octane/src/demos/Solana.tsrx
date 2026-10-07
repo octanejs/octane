@@ -25,9 +25,11 @@ function ClientProbe() @{
 
 	<div class="panel">
 		<h2 class="demo-title">{'Solana client context'}</h2>
-		<p
-			class="demo-blurb"
-		>{'Switches client identity without making network requests—stable for visual regression and profiling.'}</p>
+		<p class="demo-blurb">
+			{
+				'Switches client identity without making network requests—stable for visual regression and profiling.'
+			}
+		</p>
 		<dl class="metrics-grid">
 			<div>
 				<dt>{'Client'}</dt>
@@ -51,16 +53,12 @@ export function SolanaDemo() @{
 
 	<div>
 		<div class="row">
-			<button
-				class="btn"
-				disabled={selected === 'local'}
-				onClick={() => setSelected('local')}
-			>{'Use local validator'}</button>
-			<button
-				class="btn"
-				disabled={selected === 'devnet'}
-				onClick={() => setSelected('devnet')}
-			>{'Use devnet'}</button>
+			<button class="btn" disabled={selected === 'local'} onClick={() => setSelected('local')}>
+				{'Use local validator'}
+			</button>
+			<button class="btn" disabled={selected === 'devnet'} onClick={() => setSelected('devnet')}>
+				{'Use devnet'}
+			</button>
 		</div>
 		<ClientProvider client={client as never}>
 			<ClientProbe />

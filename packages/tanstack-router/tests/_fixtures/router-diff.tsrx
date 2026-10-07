@@ -19,9 +19,15 @@ function RootLayout() @{
 	<div class="app">
 		<nav>
 			{/* className (not class): the React oracle's Link only reads className */}
-			<Link to="/" className="nav-home">{'Home'}</Link>
-			<Link to="/about" className="nav-about">{'About'}</Link>
-			<Link to="/items/i1" className="nav-item">{'Item 1'}</Link>
+			<Link to="/" className="nav-home">
+				{'Home'}
+			</Link>
+			<Link to="/about" className="nav-about">
+				{'About'}
+			</Link>
+			<Link to="/items/i1" className="nav-item">
+				{'Item 1'}
+			</Link>
 		</nav>
 		<Outlet />
 	</div>

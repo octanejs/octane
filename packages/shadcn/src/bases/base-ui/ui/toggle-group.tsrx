@@ -77,9 +77,9 @@ export function ToggleGroup({
 		)}
 		{...props}
 	>
-		<ToggleGroupContext
-			value={{ variant, size, spacing, orientation }}
-		>{children}</ToggleGroupContext>
+		<ToggleGroupContext value={{ variant, size, spacing, orientation }}>
+			{children}
+		</ToggleGroupContext>
 	</ToggleGroupPrimitive>
 }
 

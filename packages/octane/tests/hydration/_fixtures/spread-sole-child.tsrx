@@ -22,9 +22,7 @@ export function SpreadTernaryTextarea(props: {
 	rest: Record<string, unknown>;
 }) @{
 	<section>
-		<textarea {...props.rest}>
-			{props.on ? props.value : 'fallback'}
-		</textarea>
+		<textarea {...props.rest}>{props.on ? props.value : 'fallback'}</textarea>
 	</section>
 }
 

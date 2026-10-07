@@ -61,7 +61,12 @@ export function DropdownMenuGroup(props: Record<string, unknown>) @{
 	<DropdownMenuPrimitive.Group data-slot="dropdown-menu-group" {...props} />
 }
 
-export function DropdownMenuItem({ className, inset, variant = 'default', ...props }: Props & {
+export function DropdownMenuItem({
+	className,
+	inset,
+	variant = 'default',
+	...props
+}: Props & {
 	inset?: boolean;
 	variant?: 'default' | 'destructive';
 }) @{
@@ -116,7 +121,12 @@ export function DropdownMenuRadioGroup(props: Record<string, unknown>) @{
 	<DropdownMenuPrimitive.RadioGroup data-slot="dropdown-menu-radio-group" {...props} />
 }
 
-export function DropdownMenuRadioItem({ className, children, inset, ...props }: Props & {
+export function DropdownMenuRadioItem({
+	className,
+	children,
+	inset,
+	...props
+}: Props & {
 	children?: OctaneNode;
 	inset?: boolean;
 }) {
@@ -172,7 +182,12 @@ export function DropdownMenuSub(props: Record<string, unknown>) @{
 	<DropdownMenuPrimitive.Sub data-slot="dropdown-menu-sub" {...props} />
 }
 
-export function DropdownMenuSubTrigger({ className, inset, children, ...props }: Props & {
+export function DropdownMenuSubTrigger({
+	className,
+	inset,
+	children,
+	...props
+}: Props & {
 	inset?: boolean;
 	children?: OctaneNode;
 }) {

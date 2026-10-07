@@ -11,10 +11,8 @@ const slide = keyframes`
 // `style[data-styled]` sheet. createGlobalStyle-only updates leave the
 // container unchanged and are covered by Octane conformance tests instead.
 const Mover = styled.div`
-  animation: ${slide} 2s infinite;
-  letter-spacing: ${(p: any) => (p.$wide
-	? '4px'
-	: '1px')};
+	animation: ${slide} 2s infinite;
+	letter-spacing: ${(p: any) => (p.$wide ? '4px' : '1px')};
 `;
 
 export function GlobalKeyframes() @{

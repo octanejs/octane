@@ -1592,6 +1592,34 @@ export function Scene() @{
 			}),
 		).toThrow(/forbids unbound global "document".*Default\.native\.tsrx:1:30/);
 
+		// Inside an enum, a member's name is in scope for the later initializers.
+		const enumMember = `enum Target {
+  document = 1,
+  next = document + 1,
+}
+export function Scene() @{
+  <view id={String(Target.next) as string} />
+}`;
+		expect(() =>
+			compile(enumMember, '/src/EnumMember.native.tsrx', {
+				hmr: false,
+				renderer: validationRenderer,
+			}),
+		).not.toThrow();
+		const enumGlobal = `enum Target {
+  first = 1,
+  next = document.title.length,
+}
+export function Scene() @{
+  <view id={String(Target.next) as string} />
+}`;
+		expect(() =>
+			compile(enumGlobal, '/src/EnumGlobal.native.tsrx', {
+				hmr: false,
+				renderer: validationRenderer,
+			}),
+		).toThrow(/forbids unbound global "document".*EnumGlobal\.native\.tsrx:3:9/);
+
 		expect(() =>
 			compile(`import value = window.module;`, '/src/Qualified.native.ts', {
 				hmr: false,

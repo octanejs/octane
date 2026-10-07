@@ -98,7 +98,7 @@ export function CatchRejection(props) @{
 		} @pending {
 			<div class="fallback">{'loading'}</div>
 		} @catch (err) {
-			<div class="error">{'caught: ' + err.message as string}</div>
+			<div class="error">{('caught: ' + err.message) as string}</div>
 		}
 	</>
 }
@@ -112,7 +112,9 @@ export function RetryFromCatch(props) @{
 		} @pending {
 			<div class="fallback">{'loading'}</div>
 		} @catch (err, reset) {
-			<button id="retry" onClick={reset}>{'retry: ' + err.message as string}</button>
+			<button id="retry" onClick={reset}>
+				{('retry: ' + err.message) as string}
+			</button>
 		}
 	</>
 }
@@ -124,7 +126,7 @@ export function TwoUses(props) @{
 		@try {
 			const a = use(props.a);
 			const b = use(props.b);
-			<div class="both">{a + '/' + b as string}</div>
+			<div class="both">{(a + '/' + b) as string}</div>
 		} @pending {
 			<div class="fallback">{'loading'}</div>
 		}
@@ -158,8 +160,10 @@ export function StateInsideTry(props) @{
 			const value = use(props.promise);
 			const [n, setN] = useState(0);
 			<div>
-				<span id="val">{value + ':' + n as string}</span>
-				<button id="inc" onClick={() => setN(n + 1)}>{'inc'}</button>
+				<span id="val">{(value + ':' + n) as string}</span>
+				<button id="inc" onClick={() => setN(n + 1)}>
+					{'inc'}
+				</button>
 			</div>
 		} @pending {
 			<div class="fallback">{'loading'}</div>
@@ -174,9 +178,12 @@ export function EffectAfterResolve(props) @{
 	<>
 		@try {
 			const value = use(props.promise);
-			useEffect((log) => {
-				log.push('mounted:' + value);
-			}, [props.log, value]);
+			useEffect(
+				(log) => {
+					log.push('mounted:' + value);
+				},
+				[props.log, value],
+			);
 			<div>{value as string}</div>
 		} @pending {
 			<div class="fallback">{'pending'}</div>
@@ -212,7 +219,7 @@ export function RejectVsPending(props) @{
 		} @pending {
 			<div class="fallback">{'p'}</div>
 		} @catch (err) {
-			<div class="caught">{'rejected: ' + err.message as string}</div>
+			<div class="caught">{('rejected: ' + err.message) as string}</div>
 		}
 	</>
 }
@@ -225,8 +232,10 @@ export function ReplayHookCache(props) @{
 			const [n, setN] = useState(0);
 			const value = use(props.promise);
 			<div>
-				<span id="val">{value + ':' + n as string}</span>
-				<button id="inc" onClick={() => setN(n + 1)}>{'inc'}</button>
+				<span id="val">{(value + ':' + n) as string}</span>
+				<button id="inc" onClick={() => setN(n + 1)}>
+					{'inc'}
+				</button>
 			</div>
 		} @pending {
 			<div class="fallback">{'loading'}</div>
@@ -245,16 +254,22 @@ export function EffectsSkippedForSuspended(props) @{
 		</li>
 		@try {
 			const v = use(props.promise);
-			useEffect((log) => {
-				log.push('B-mount');
-			}, [props.log, v]);
+			useEffect(
+				(log) => {
+					log.push('B-mount');
+				},
+				[props.log, v],
+			);
 			<li>
-				<span class="b">{'B:' + v as string}</span>
+				<span class="b">{('B:' + v) as string}</span>
 			</li>
 		} @pending {
-			useEffect((log) => {
-				log.push('fallback-mount');
-			}, [props.log]);
+			useEffect(
+				(log) => {
+					log.push('fallback-mount');
+				},
+				[props.log],
+			);
 			<li class="loading-li">{'Loading...'}</li>
 		}
 		<li>
@@ -270,10 +285,10 @@ export function NestedRevealOrder(props) @{
 		@try {
 			const a = use(props.a);
 			<div>
-				<span class="a-resolved">{'A:' + a as string}</span>
+				<span class="a-resolved">{('A:' + a) as string}</span>
 				@try {
 					const b = use(props.b);
-					<span class="b-resolved">{'B:' + b as string}</span>
+					<span class="b-resolved">{('B:' + b) as string}</span>
 				} @pending {
 					<span class="b-loading">{'B-loading'}</span>
 				}
@@ -291,7 +306,7 @@ function LeafA(props) @{
 	<>
 		@try {
 			const v = use(props.p);
-			<li class="leaf-a">{'A:' + v as string}</li>
+			<li class="leaf-a">{('A:' + v) as string}</li>
 		} @pending {
 			<li class="leaf-a-loading">{'A-loading'}</li>
 		}
@@ -302,7 +317,7 @@ function LeafB(props) @{
 	<>
 		@try {
 			const v = use(props.p);
-			<li class="leaf-b">{'B:' + v as string}</li>
+			<li class="leaf-b">{('B:' + v) as string}</li>
 		} @pending {
 			<li class="leaf-b-loading">{'B-loading'}</li>
 		}
@@ -330,7 +345,7 @@ export function ParallelInOneBoundary(props) @{
 			const [pa, pb] = useMemo(() => [props.startA(), props.startB()], [props.cacheKey]);
 			const a = use(pa);
 			const b = use(pb);
-			<div class="both">{a + '/' + b as string}</div>
+			<div class="both">{(a + '/' + b) as string}</div>
 		} @pending {
 			<div class="fallback">{'loading'}</div>
 		}
@@ -347,7 +362,7 @@ export function WaterfallBody(props) @{
 		@try {
 			const a = use(props.startA());
 			const b = use(props.startB());
-			<div class="both">{a + '/' + b as string}</div>
+			<div class="both">{(a + '/' + b) as string}</div>
 		} @pending {
 			<div class="fallback">{'loading'}</div>
 		}
@@ -365,7 +380,7 @@ export function ReplayChurnBody(props) @{
 			props.onAttempt();
 			const a = use(props.a);
 			const b = use(props.b);
-			<div class="both">{a + '/' + b as string}</div>
+			<div class="both">{(a + '/' + b) as string}</div>
 		} @pending {
 			<div class="fallback">{'loading'}</div>
 		}

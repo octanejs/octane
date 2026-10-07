@@ -8,22 +8,23 @@ import {
 } from 'octane';
 
 type FragmentReference = { current: FragmentInstance | null };
-const Activity = ActivitySentinel as unknown as
-	(props: {
-		mode: 'visible' | 'hidden';
-		children?: OctaneNode;
-	}) => null;
+const Activity = ActivitySentinel as unknown as (props: {
+	mode: 'visible' | 'hidden';
+	children?: OctaneNode;
+}) => null;
 
 export function ActivityDescriptorFragment(props: {
 	fragmentRef: FragmentReference;
 	mode: 'visible' | 'hidden';
 }) @{
 	<main id="descriptor-activity-host">
-		<Activity mode={props.mode}>{createElement(
-			Fragment,
-			{ ref: props.fragmentRef },
-			createElement('button', { id: 'descriptor-activity-child' }, 'activity'),
-		)}</Activity>
+		<Activity mode={props.mode}>
+			{createElement(
+				Fragment,
+				{ ref: props.fragmentRef },
+				createElement('button', { id: 'descriptor-activity-child' }, 'activity'),
+			)}
+		</Activity>
 	</main>
 }
 

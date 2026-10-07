@@ -23,16 +23,22 @@ Visit [Octane](https://octanejs.com).`;
 export function ReactMarkdownDemo() @{
 	<div>
 		<h2 class="demo-title">{'react-markdown on Octane'}</h2>
-		<p
-			class="demo-blurb"
-		>{'A source-compatible Markdown pipeline with controlled plugins and component mappings.'}</p>
+		<p class="demo-blurb">
+			{'A source-compatible Markdown pipeline with controlled plugins and component mappings.'}
+		</p>
 		<Markdown
 			rehypePlugins={[markCallouts]}
 			components={{
 				a({ children, node: _node, ...props }) {
-					return <a {...props} rel="noreferrer">{children}</a>;
+					return (
+						<a {...props} rel="noreferrer">
+							{children}
+						</a>
+					);
 				},
 			}}
-		>{source}</Markdown>
+		>
+			{source}
+		</Markdown>
 	</div>
 }

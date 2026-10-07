@@ -18,7 +18,9 @@ export function MapDiff(props: any) @{
 	const [markerLabel, setMarkerLabel] = useState('A');
 
 	<div>
-		<button id="relabel" onClick={() => setMarkerLabel('B')}>relabel</button>
+		<button id="relabel" onClick={() => setMarkerLabel('B')}>
+			relabel
+		</button>
 		<Map
 			mapLib={props.mapLib}
 			mapboxAccessToken="test-token"

@@ -11,38 +11,44 @@ function openRoute(event: MouseEvent, href: string, navigate: (href: string) => 
 }
 
 function HomeIcon() {
-	return <svg aria-hidden="true" viewBox="0 0 24 24">
-		<path d="M3.8 10.8 12 4l8.2 6.8v8.4a1 1 0 0 1-1 1h-4.6v-6.1H9.4v6.1H4.8a1 1 0 0 1-1-1Z" />
-	</svg>;
+	return (
+		<svg aria-hidden="true" viewBox="0 0 24 24">
+			<path d="M3.8 10.8 12 4l8.2 6.8v8.4a1 1 0 0 1-1 1h-4.6v-6.1H9.4v6.1H4.8a1 1 0 0 1-1-1Z" />
+		</svg>
+	);
 }
 
 function BookmarkIcon() {
-	return <svg aria-hidden="true" viewBox="0 0 24 24">
-		<path d="M6.3 4.2h11.4a1 1 0 0 1 1 1v15L12 16.4l-6.7 3.8v-15a1 1 0 0 1 1-1Z" />
-	</svg>;
+	return (
+		<svg aria-hidden="true" viewBox="0 0 24 24">
+			<path d="M6.3 4.2h11.4a1 1 0 0 1 1 1v15L12 16.4l-6.7 3.8v-15a1 1 0 0 1 1-1Z" />
+		</svg>
+	);
 }
 
 function PersonIcon() {
-	return <svg aria-hidden="true" viewBox="0 0 24 24">
-		<circle cx="12" cy="8.2" r="3.8" />
-		<path d="M4.7 20c.7-4.1 3.1-6.1 7.3-6.1s6.6 2 7.3 6.1" />
-	</svg>;
+	return (
+		<svg aria-hidden="true" viewBox="0 0 24 24">
+			<circle cx="12" cy="8.2" r="3.8" />
+			<path d="M4.7 20c.7-4.1 3.1-6.1 7.3-6.1s6.6 2 7.3 6.1" />
+		</svg>
+	);
 }
 
 function HeartIcon() {
-	return <svg aria-hidden="true" viewBox="0 0 24 24">
-		<path
-			d="M20.8 5.9c-2.3-2.5-6-1.4-8.8 1.8-2.8-3.2-6.5-4.3-8.8-1.8-2.6 2.8-.8 7.2 2.1 9.8L12 21l6.7-5.3c2.9-2.6 4.7-7 2.1-9.8Z"
-		/>
-	</svg>;
+	return (
+		<svg aria-hidden="true" viewBox="0 0 24 24">
+			<path d="M20.8 5.9c-2.3-2.5-6-1.4-8.8 1.8-2.8-3.2-6.5-4.3-8.8-1.8-2.6 2.8-.8 7.2 2.1 9.8L12 21l6.7-5.3c2.9-2.6 4.7-7 2.1-9.8Z" />
+		</svg>
+	);
 }
 
 function ReplyIcon() {
-	return <svg aria-hidden="true" viewBox="0 0 24 24">
-		<path
-			d="M20.2 11.5c0 4.1-3.7 7.4-8.2 7.4-1.1 0-2.2-.2-3.2-.5l-4.4 2 1.2-3.9a7 7 0 0 1-1.8-5c0-4.1 3.7-7.4 8.2-7.4s8.2 3.3 8.2 7.4Z"
-		/>
-	</svg>;
+	return (
+		<svg aria-hidden="true" viewBox="0 0 24 24">
+			<path d="M20.2 11.5c0 4.1-3.7 7.4-8.2 7.4-1.1 0-2.2-.2-3.2-.5l-4.4 2 1.2-3.9a7 7 0 0 1-1.8-5c0-4.1 3.7-7.4 8.2-7.4s8.2 3.3 8.2 7.4Z" />
+		</svg>
+	);
 }
 
 function NavItem({
@@ -87,7 +93,9 @@ function Avatar({
 		class={'avatar avatar-' + size}
 		style={{ backgroundColor: person.accent }}
 		aria-hidden="true"
-	>{person.initials as string}</span>
+	>
+		{person.initials as string}
+	</span>
 }
 
 function NoticeBar({
@@ -111,13 +119,17 @@ function NoticeBar({
 						class="small-button primary"
 						aria-label={'Retry ' + notice.title}
 						onClick={() => retryMutation(notice.id)}
-					>Retry</button>
+					>
+						Retry
+					</button>
 				}
 				<button
 					class="icon-button"
 					aria-label={'Dismiss ' + notice.title}
 					onClick={() => dismissNotice(notice.id)}
-				>×</button>
+				>
+					×
+				</button>
 			</div>
 		</div>
 	} @else {
@@ -130,7 +142,9 @@ function NoticeBar({
 				class="icon-button"
 				aria-label={'Dismiss ' + notice.title}
 				onClick={() => dismissNotice(notice.id)}
-			>×</button>
+			>
+				×
+			</button>
 		</div>
 	}
 }
@@ -163,7 +177,9 @@ function Composer({
 	>
 		<Avatar person={people.avery} />
 		<div class="composer-body">
-			<label for="composer-input" class="sr-only">What would you like to share?</label>
+			<label for="composer-input" class="sr-only">
+				What would you like to share?
+			</label>
 			<textarea
 				id="composer-input"
 				ref={editorRef}
@@ -184,22 +200,16 @@ function Composer({
 			<div class="composer-footer">
 				<p class="shortcut-hint">
 					<kbd>Ctrl/⌘</kbd>
-
 					<span>+</span>
-
 					<kbd>Enter</kbd>
-					to post ·
-					<kbd>Alt</kbd>
-
-					<span>+</span>
-					{' '}
-					<kbd>R</kbd>
+					to post ·<kbd>Alt</kbd>
+					<span>+</span> <kbd>R</kbd>
 					for a live update
 				</p>
 				<div class="composer-submit">
-					<span class={{ 'character-count': true, warning: remaining < 30 }}>{String(
-						remaining,
-					)}</span>
+					<span class={{ 'character-count': true, warning: remaining < 30 }}>
+						{String(remaining)}
+					</span>
 					<button class="post-button" type="submit" disabled={draft.trim().length === 0}>
 						Post
 					</button>
@@ -265,8 +275,9 @@ function PostCard({
 				</button>
 				<button
 					class={{ 'post-action': true, saved: post.saved }}
-					aria-label={(post.saved ? 'Remove bookmark from' : 'Bookmark') + ' post by ' +
-						author.name}
+					aria-label={
+						(post.saved ? 'Remove bookmark from' : 'Bookmark') + ' post by ' + author.name
+					}
 					aria-pressed={post.saved ? 'true' : 'false'}
 					onClick={() => toggleSave(post.id)}
 				>
@@ -335,7 +346,9 @@ function LoadingTimeline() @{
 
 function EmptyTimeline({ route, profile }: { route: Route; profile: Person }) @{
 	<section class="empty-state">
-		<div class="empty-illustration" aria-hidden="true">✦</div>
+		<div class="empty-illustration" aria-hidden="true">
+			✦
+		</div>
 		@if (route.kind === 'saved') {
 			<>
 				<h2>No saved posts yet</h2>
@@ -369,9 +382,7 @@ function RightRail({
 			<div class="side-heading">
 				<div>
 					<p class="eyebrow">Demo network</p>
-					<h2>
-						{online ? 'Connected' : 'Offline'}
-					</h2>
+					<h2>{online ? 'Connected' : 'Offline'}</h2>
 				</div>
 				<span class={{ 'connection-dot': true, online }}></span>
 			</div>
@@ -399,7 +410,9 @@ function RightRail({
 						<strong>{person.name as string}</strong>
 						<small>{'@' + handle}</small>
 					</span>
-					<span class="row-arrow" aria-hidden="true">→</span>
+					<span class="row-arrow" aria-hidden="true">
+						→
+					</span>
 				</a>
 			}
 		</section>
@@ -440,14 +453,15 @@ export function App() @{
 	const retryMutation = useThreadlineStore((state) => state.retryMutation);
 	const dismissNotice = useThreadlineStore((state) => state.dismissNotice);
 	const visiblePosts = postsForRoute(posts, route);
-	const profile =
-		route.kind === 'profile' ? personForHandle(route.handle) : people.avery;
+	const profile = route.kind === 'profile' ? personForHandle(route.handle) : people.avery;
 	const homeActive = route.kind === 'home';
 	const savedActive = route.kind === 'saved';
 	const profileActive = route.kind === 'profile' && route.handle === 'avery';
 
 	<div class="app-shell">
-		<a class="skip-link" href="#main-content">Skip to timeline</a>
+		<a class="skip-link" href="#main-content">
+			Skip to timeline
+		</a>
 		<header class="mobile-header">
 			<a class="brand" href="/" onClick={(event) => openRoute(event, '/', navigate)}>
 				<span aria-hidden="true">T</span>
@@ -517,15 +531,13 @@ export function App() @{
 			} @else {
 				<header class="timeline-header">
 					<div>
-						<p class="eyebrow">
-							{route.kind === 'saved' ? 'Your library' : 'Good morning, Avery'}
-						</p>
-						<h1>
-							{route.kind === 'saved' ? 'Saved posts' : 'Home timeline'}
-						</h1>
+						<p class="eyebrow">{route.kind === 'saved' ? 'Your library' : 'Good morning, Avery'}</p>
+						<h1>{route.kind === 'saved' ? 'Saved posts' : 'Home timeline'}</h1>
 					</div>
 					@if (route.kind === 'home') {
-						<button class="refresh-button" onClick={receiveLivePost}>Refresh</button>
+						<button class="refresh-button" onClick={receiveLivePost}>
+							Refresh
+						</button>
 					}
 				</header>
 			}
@@ -541,7 +553,9 @@ export function App() @{
 					<span aria-hidden="true">!</span>
 					<h2>We couldn’t load the timeline</h2>
 					<p>The deterministic demo service paused this request. Your route is safe.</p>
-					<button class="small-button primary" onClick={retryLoad}>Try again</button>
+					<button class="small-button primary" onClick={retryLoad}>
+						Try again
+					</button>
 				</section>
 			} @else if (visiblePosts.length === 0) {
 				<EmptyTimeline route={route} profile={profile} />

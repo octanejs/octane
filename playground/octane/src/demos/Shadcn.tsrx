@@ -183,7 +183,9 @@ export function ShadcnDemo() @{
 					<Button variant="destructive">{'Destructive'}</Button>
 					<Button variant="ghost">{'Ghost'}</Button>
 					<Button variant="link">{'Link'}</Button>
-					<Button variant="outline" disabled>{'Disabled'}</Button>
+					<Button variant="outline" disabled>
+						{'Disabled'}
+					</Button>
 				</CardContent>
 			</Card>
 
@@ -325,10 +327,9 @@ export function ShadcnDemo() @{
 							</AlertDialogHeader>
 							<AlertDialogFooter>
 								<AlertDialogCancel>{'Cancel'}</AlertDialogCancel>
-								<AlertDialogAction
-									variant="destructive"
-									onClick={() => setLastAction('deleted')}
-								>{'Delete'}</AlertDialogAction>
+								<AlertDialogAction variant="destructive" onClick={() => setLastAction('deleted')}>
+									{'Delete'}
+								</AlertDialogAction>
 							</AlertDialogFooter>
 						</AlertDialogContent>
 					</AlertDialog>
@@ -365,10 +366,12 @@ export function ShadcnDemo() @{
 							<DropdownMenuCheckboxItem
 								checked={statusBar}
 								onCheckedChange={(v: boolean) => setStatusBar(v)}
-							>{'Status bar'}</DropdownMenuCheckboxItem>
-							<DropdownMenuItem
-								onSelect={() => setLastAction('menu: profile')}
-							>{'Profile'}</DropdownMenuItem>
+							>
+								{'Status bar'}
+							</DropdownMenuCheckboxItem>
+							<DropdownMenuItem onSelect={() => setLastAction('menu: profile')}>
+								{'Profile'}
+							</DropdownMenuItem>
 						</DropdownMenuContent>
 					</DropdownMenu>
 					<Popover>
@@ -414,7 +417,9 @@ export function ShadcnDemo() @{
 								<PaginationPrevious href="#" />
 							</PaginationItem>
 							<PaginationItem>
-								<PaginationLink href="#" isActive>{'1'}</PaginationLink>
+								<PaginationLink href="#" isActive>
+									{'1'}
+								</PaginationLink>
 							</PaginationItem>
 							<PaginationItem>
 								<PaginationLink href="#">{'2'}</PaginationLink>
@@ -468,7 +473,9 @@ export function ShadcnDemo() @{
 					<Button
 						variant="outline"
 						onClick={() => toast.success('Saved', { description: 'Toast from the gallery.' })}
-					>{'Show toast'}</Button>
+					>
+						{'Show toast'}
+					</Button>
 				</CardContent>
 			</Card>
 
@@ -514,9 +521,9 @@ export function ShadcnDemo() @{
 					<Separator />
 					<div class="w-24">
 						<AspectRatio ratio={16 / 9}>
-							<div
-								class="flex size-full items-center justify-center rounded-md bg-muted text-xs"
-							>{'16:9'}</div>
+							<div class="flex size-full items-center justify-center rounded-md bg-muted text-xs">
+								{'16:9'}
+							</div>
 						</AspectRatio>
 					</div>
 					<ScrollArea className="h-16 rounded-md border p-2">
@@ -564,7 +571,9 @@ export function ShadcnDemo() @{
 					<Accordion type="single" collapsible>
 						<AccordionItem value="a">
 							<AccordionTrigger>{'Is it faithful?'}</AccordionTrigger>
-							<AccordionContent>{'Verbatim class strings from the shared sources.'}</AccordionContent>
+							<AccordionContent>
+								{'Verbatim class strings from the shared sources.'}
+							</AccordionContent>
 						</AccordionItem>
 						<AccordionItem value="b">
 							<AccordionTrigger>{'Does it SSR?'}</AccordionTrigger>
@@ -579,23 +588,25 @@ export function ShadcnDemo() @{
 				</CardHeader>
 				<CardContent>
 					<ContextMenu>
-						<ContextMenuTrigger
-							className="flex h-24 items-center justify-center rounded-md border border-dashed text-sm text-muted-foreground"
-						>{'Right-click here'}</ContextMenuTrigger>
+						<ContextMenuTrigger className="flex h-24 items-center justify-center rounded-md border border-dashed text-sm text-muted-foreground">
+							{'Right-click here'}
+						</ContextMenuTrigger>
 						<ContextMenuContent>
 							<ContextMenuLabel>{'Actions'}</ContextMenuLabel>
 							<ContextMenuItem onSelect={() => setLastAction('context: back')}>
 								{'Back'}
 								<ContextMenuShortcut>{'⌘['}</ContextMenuShortcut>
 							</ContextMenuItem>
-							<ContextMenuItem
-								onSelect={() => setLastAction('context: forward')}
-							>{'Forward'}</ContextMenuItem>
+							<ContextMenuItem onSelect={() => setLastAction('context: forward')}>
+								{'Forward'}
+							</ContextMenuItem>
 							<ContextMenuSeparator />
 							<ContextMenuCheckboxItem
 								checked={statusBar}
 								onCheckedChange={(next: boolean) => setStatusBar(next)}
-							>{'Show status bar'}</ContextMenuCheckboxItem>
+							>
+								{'Show status bar'}
+							</ContextMenuCheckboxItem>
 						</ContextMenuContent>
 					</ContextMenu>
 				</CardContent>
@@ -607,9 +618,9 @@ export function ShadcnDemo() @{
 				</CardHeader>
 				<CardContent>
 					<HoverCard>
-						<HoverCardTrigger
-							className="text-sm underline underline-offset-4"
-						>{'@octanejs'}</HoverCardTrigger>
+						<HoverCardTrigger className="text-sm underline underline-offset-4">
+							{'@octanejs'}
+						</HoverCardTrigger>
 						<HoverCardContent>
 							<p className="text-sm">{'Hover cards open on intent, not on click.'}</p>
 						</HoverCardContent>
@@ -631,9 +642,9 @@ export function ShadcnDemo() @{
 									<MenubarShortcut>{'⌘T'}</MenubarShortcut>
 								</MenubarItem>
 								<MenubarSeparator />
-								<MenubarItem
-									onSelect={() => setLastAction('menubar: print')}
-								>{'Print'}</MenubarItem>
+								<MenubarItem onSelect={() => setLastAction('menubar: print')}>
+									{'Print'}
+								</MenubarItem>
 							</MenubarContent>
 						</MenubarMenu>
 						<MenubarMenu>
@@ -671,9 +682,11 @@ export function ShadcnDemo() @{
 				<CardHeader>
 					<CardTitle>{'Sidebar'}</CardTitle>
 				</CardHeader>
-				<CardContent
-					className="text-sm text-muted-foreground"
-				>{'This playground’s own navigation IS the sidebar component — rail, mobile sheet, Cmd/Ctrl+B and the collapse cookie. A second SidebarProvider nested here would fight it for the same keyboard shortcut, so it is demonstrated by the shell instead of by a card. NOTE: the shell now runs the BASE UI sidebar (@octanejs/shadcn/base-ui/Sidebar), so what you are steering is that port, not the radix copy installed alongside this page.'}</CardContent>
+				<CardContent className="text-sm text-muted-foreground">
+					{
+						'This playground’s own navigation IS the sidebar component — rail, mobile sheet, Cmd/Ctrl+B and the collapse cookie. A second SidebarProvider nested here would fight it for the same keyboard shortcut, so it is demonstrated by the shell instead of by a card. NOTE: the shell now runs the BASE UI sidebar (@octanejs/shadcn/base-ui/Sidebar), so what you are steering is that port, not the radix copy installed alongside this page.'
+					}
+				</CardContent>
 			</Card>
 		</div>
 

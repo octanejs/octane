@@ -66,48 +66,52 @@ export function BlockWithFeedback({ children, className }: BlockWithFeedbackProp
 		setIsHovered(false);
 	}, []);
 
-	return <>
-		<div
-			ref={blockRef}
-			class={twMerge(
-				'relative doc-feedback-block',
-				isHovered && 'doc-feedback-block-highlighted',
-				className,
+	return (
+		<>
+			<div
+				ref={blockRef}
+				class={twMerge(
+					'relative doc-feedback-block',
+					isHovered && 'doc-feedback-block-highlighted',
+					className,
+				)}
+				onMouseEnter={handleMouseEnter}
+				onMouseLeave={handleMouseLeave}
+				data-feedback-wrapper="true"
+				style={{
+					anchorName: blockSelector
+						? `--feedback-${blockSelector.replace(/[^a-zA-Z0-9]/g, '-')}`
+						: undefined,
+				}}
+			>
+				{children}
+
+				{/* Floating button */}
+				{blockSelector && (
+					<div
+						class={twMerge(
+							'absolute top-0 right-0 -translate-y-full z-50 transition-opacity duration-200',
+							hasNote || isHovered ? 'opacity-100' : 'opacity-0',
+						)}
+					>
+						<DocFeedbackFloatingButton
+							onAddNote={handleAddNote}
+							onAddFeedback={handleAddFeedback}
+							onMouseEnter={handleMouseEnter}
+							onMouseLeave={handleMouseLeave}
+							hasNote={hasNote}
+							onShowNote={handleShowNote}
+						/>
+					</div>
+				)}
+			</div>
+
+			{/* Note display - inline in document flow */}
+			{note && blockSelector && (
+				<div class="my-4">
+					<DocFeedbackNote note={note} anchorName="" inline={true} />
+				</div>
 			)}
-			onMouseEnter={handleMouseEnter}
-			onMouseLeave={handleMouseLeave}
-			data-feedback-wrapper="true"
-			style={{
-				anchorName: blockSelector
-					? `--feedback-${blockSelector.replace(/[^a-zA-Z0-9]/g, '-')}`
-					: undefined,
-			}}
-		>
-			{children}
-
-			{/* Floating button */}
-			{blockSelector &&
-				<div
-					class={twMerge(
-						'absolute top-0 right-0 -translate-y-full z-50 transition-opacity duration-200',
-						hasNote || isHovered ? 'opacity-100' : 'opacity-0',
-					)}
-				>
-					<DocFeedbackFloatingButton
-						onAddNote={handleAddNote}
-						onAddFeedback={handleAddFeedback}
-						onMouseEnter={handleMouseEnter}
-						onMouseLeave={handleMouseLeave}
-						hasNote={hasNote}
-						onShowNote={handleShowNote}
-					/>
-				</div>}
-		</div>
-
-		{/* Note display - inline in document flow */}
-		{note && blockSelector &&
-			<div class="my-4">
-				<DocFeedbackNote note={note} anchorName="" inline={true} />
-			</div>}
-	</>;
+		</>
+	);
 }

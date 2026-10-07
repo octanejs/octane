@@ -39,7 +39,9 @@ export function FunctionalUpdaterQueue() @{
 				setN((p: number) => p + 1);
 				setN((p: number) => p + 1);
 			}}
-		>{'inc'}</button>
+		>
+			{'inc'}
+		</button>
 		<span id="out">{n as number}</span>
 	</div>
 }
@@ -60,21 +62,27 @@ export function MixedValueUpdater() @{
 				setN(5);
 				setN((p: number) => p + 1);
 			}}
-		>{'a'}</button>
+		>
+			{'a'}
+		</button>
 		<button
 			id="set5-then-7"
 			onClick={() => {
 				setN(5);
 				setN(7);
 			}}
-		>{'b'}</button>
+		>
+			{'b'}
+		</button>
 		<button
 			id="inc-then-set5"
 			onClick={() => {
 				setN((p: number) => p + 1);
 				setN(5);
 			}}
-		>{'c'}</button>
+		>
+			{'c'}
+		</button>
 		<span id="out">{n as number}</span>
 	</div>
 }
@@ -85,7 +93,9 @@ export function ObjectIsBailout() @{
 	_setN = setN;
 	_renderCount++;
 	<div>
-		<button id="same" onClick={() => setN(n)}>{'same'}</button>
+		<button id="same" onClick={() => setN(n)}>
+			{'same'}
+		</button>
 		<span id="out">{n as number}</span>
 	</div>
 }
@@ -97,9 +107,11 @@ export function NaNBailout() @{
 	_setN = setN;
 	_renderCount++;
 	<div>
-		<button id="nan" onClick={() => setN(NaN)}>{'nan'}</button>
+		<button id="nan" onClick={() => setN(NaN)}>
+			{'nan'}
+		</button>
 		<span id="out" class={Number.isNaN(n) ? 'isNaN' : 'notNaN'}>
-			{Number.isNaN(n) ? 'NaN' : n as number}
+			{Number.isNaN(n) ? 'NaN' : (n as number)}
 		</span>
 	</div>
 }
@@ -119,7 +131,9 @@ export function MultiSetterBatching() @{
 				setN(n + 1);
 				setM(m + 1);
 			}}
-		>{'both'}</button>
+		>
+			{'both'}
+		</button>
 		<span id="n">{n as number}</span>
 		<span id="m">{m as number}</span>
 	</div>
@@ -200,7 +214,9 @@ export function LazyInitOnce() @{
 	_setN = setN;
 	_renderCount++;
 	<div>
-		<button id="inc" onClick={() => setN(n + 1)}>{'inc'}</button>
+		<button id="inc" onClick={() => setN(n + 1)}>
+			{'inc'}
+		</button>
 		<span id="out">{n as number}</span>
 	</div>
 }
@@ -216,16 +232,23 @@ export function resetReducerCalls() {
 	_reducerCalls = 0;
 }
 export function ReducerSameRefBailout() @{
-	const [state, dispatch] = useReducer((s, action) => {
-		_reducerCalls++;
-		if (action === 'keep') return s; // same reference — still renders once
-		return { v: s.v + 1 };
-	}, { v: 0 });
+	const [state, dispatch] = useReducer(
+		(s, action) => {
+			_reducerCalls++;
+			if (action === 'keep') return s; // same reference — still renders once
+			return { v: s.v + 1 };
+		},
+		{ v: 0 },
+	);
 	_setN = dispatch;
 	_renderCount++;
 	<div>
-		<button id="keep" onClick={() => dispatch('keep')}>{'keep'}</button>
-		<button id="inc" onClick={() => dispatch('inc')}>{'inc'}</button>
+		<button id="keep" onClick={() => dispatch('keep')}>
+			{'keep'}
+		</button>
+		<button id="inc" onClick={() => dispatch('inc')}>
+			{'inc'}
+		</button>
 		<span id="out">{state.v as number}</span>
 	</div>
 }
@@ -233,11 +256,17 @@ export function ReducerSameRefBailout() @{
 // useReducer 3-arg lazy init form — React supports useReducer(reducer,
 // initialArg, init). octane accepts the same signature; this pins it.
 export function ReducerLazyInit(props) @{
-	const [n, dispatch] = useReducer((s, _a) => s + 1, props.seed, (seed) => seed * 10);
+	const [n, dispatch] = useReducer(
+		(s, _a) => s + 1,
+		props.seed,
+		(seed) => seed * 10,
+	);
 	_setN = dispatch;
 	_renderCount++;
 	<div>
-		<button id="inc" onClick={() => dispatch('inc')}>{'inc'}</button>
+		<button id="inc" onClick={() => dispatch('inc')}>
+			{'inc'}
+		</button>
 		<span id="out">{n as number}</span>
 	</div>
 }
@@ -250,7 +279,9 @@ export function ReducerLatestRef(props) @{
 	_setN = dispatch;
 	_renderCount++;
 	<div>
-		<button id="go" onClick={() => dispatch('go')}>{'go'}</button>
+		<button id="go" onClick={() => dispatch('go')}>
+			{'go'}
+		</button>
 		<span id="out">{n as number}</span>
 	</div>
 }

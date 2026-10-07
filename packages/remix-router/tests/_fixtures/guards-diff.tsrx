@@ -22,27 +22,33 @@ function GuardShell() @{
 	const self = unstable_useRoute();
 	<div>
 		<nav>
-			<Link id="to-home" to="/">Home</Link>
-			<Link id="to-away" to="/away?x=2">Away</Link>
+			<Link id="to-home" to="/">
+				Home
+			</Link>
+			<Link id="to-away" to="/away?x=2">
+				Away
+			</Link>
 		</nav>
 		<p id="b-state">{blocker.state}</p>
-		<button id="b-toggle" onClick={() => setShouldBlock((v) => !v)}>toggle</button>
+		<button id="b-toggle" onClick={() => setShouldBlock((v) => !v)}>
+			toggle
+		</button>
 		@if (blocker.state === 'blocked') {
 			<>
-				<button id="b-proceed" onClick={() => blocker.proceed()}>proceed</button>
-				<button id="b-reset" onClick={() => blocker.reset()}>reset</button>
+				<button id="b-proceed" onClick={() => blocker.proceed()}>
+					proceed
+				</button>
+				<button id="b-reset" onClick={() => blocker.reset()}>
+					reset
+				</button>
 			</>
 		}
 		<p id="rs-active">
 			{rs.active.location.pathname + '|' + rs.active.searchParams.toString() + '|' + rs.active.type}
 		</p>
 		<p id="rs-matches">{rs.active.matches.map((m) => m.id).join(',')}</p>
-		<p id="rs-pending">
-			{rs.pending ? rs.pending.state : '(idle)'}
-		</p>
-		<p id="route-handle">
-			{self ? String(self.handle) : '(none)'}
-		</p>
+		<p id="rs-pending">{rs.pending ? rs.pending.state : '(idle)'}</p>
+		<p id="route-handle">{self ? String(self.handle) : '(none)'}</p>
 		<main>
 			<Outlet />
 		</main>

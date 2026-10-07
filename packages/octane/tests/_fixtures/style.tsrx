@@ -10,36 +10,48 @@ export function StaticStringStyle() @{
 // Static object literal — serialized to a CSS string at compile time and
 // inlined into the template HTML (zero runtime work).
 export function StaticObjectStyle() @{
-	<div id="box" style={{ 'background-color': 'red', 'text-align': 'center' }}>{'hi'}</div>
+	<div id="box" style={{ 'background-color': 'red', 'text-align': 'center' }}>
+		{'hi'}
+	</div>
 }
 
 // Dynamic object style — goes through setStyle binding with per-property diff.
 export function DynamicObjectStyle(props) @{
-	<div id="dyn" style={props.s}>{'x'}</div>
+	<div id="dyn" style={props.s}>
+		{'x'}
+	</div>
 }
 
 // Dynamic string style — goes through setStyle cssText path.
 export function DynamicStringStyle(props) @{
-	<div id="ds" style={props.s}>{'y'}</div>
+	<div id="ds" style={props.s}>
+		{'y'}
+	</div>
 }
 
 // `!important` priority — caller writes value as "red !important", runtime
 // splits it and calls setProperty(name, value, 'important').
 export function ImportantStyle(props) @{
-	<div id="imp" style={props.s}>{'z'}</div>
+	<div id="imp" style={props.s}>
+		{'z'}
+	</div>
 }
 
 // CSS custom property (`--var`) — must go through setProperty (you can't
 // assign these via the camelCase shorthand).
 export function CustomPropStyle(props) @{
-	<div id="cp" style={props.s}>{'v'}</div>
+	<div id="cp" style={props.s}>
+		{'v'}
+	</div>
 }
 
 // Style inside a for-of loop — verifies per-row independent style updates.
 export function PerRowStyle(props) @{
 	<ul>
 		@for (const item of props.items; key item.id) {
-			<li class={'r-' + item.id} style={item.s}>{item.label as string}</li>
+			<li class={'r-' + item.id} style={item.s}>
+				{item.label as string}
+			</li>
 		}
 	</ul>
 }
@@ -147,8 +159,12 @@ export function ScopedToggle() @{
 	const [on, setOn] = useState(false);
 	<>
 		<div>
-			<button id="t" onClick={() => setOn(!on)}>{'toggle'}</button>
-			<span id="lbl" class={on ? 'on' : 'off'}>{'L'}</span>
+			<button id="t" onClick={() => setOn(!on)}>
+				{'toggle'}
+			</button>
+			<span id="lbl" class={on ? 'on' : 'off'}>
+				{'L'}
+			</span>
 		</div>
 		<style>
 			.on {
@@ -164,7 +180,9 @@ export function ScopedToggle() @{
 // Mixing `<style>` and dynamic inline `style={...}` on the same element.
 export function ScopedPlusInlineStyle(props) @{
 	<>
-		<div id="mix" class="base" style={props.s}>{'m'}</div>
+		<div id="mix" class="base" style={props.s}>
+			{'m'}
+		</div>
 		<style>
 			.base {
 				padding: 5px;
@@ -317,7 +335,9 @@ export function ScopedSpreadThenAuthored(props) @{
 				color: rgb(200, 0, 0);
 			}
 		</style>
-		<div {...props.attrs} class={props.cls}>{'x'}</div>
+		<div {...props.attrs} class={props.cls}>
+			{'x'}
+		</div>
 	</>
 }
 
@@ -329,6 +349,8 @@ export function ScopedAuthoredThenSpread(props) @{
 				color: rgb(200, 0, 0);
 			}
 		</style>
-		<div class={props.cls} {...props.attrs}>{'x'}</div>
+		<div class={props.cls} {...props.attrs}>
+			{'x'}
+		</div>
 	</>
 }

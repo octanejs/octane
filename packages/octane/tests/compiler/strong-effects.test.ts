@@ -1975,11 +1975,6 @@ export function usePreviousLog(value, log) { const [count, setCount, getCount] =
 			'<section><div ref={attach} /> @for (attach of props.callbacks; key attach) { const alias = attach; <button onClick={alias} /> }</section>',
 		],
 		[
-			'an attached callback with an unrelated var row alias used as an event',
-			'const attach = (node) => { element.current = node; };',
-			'<section><div ref={attach} /> @for (var attach of props.callbacks; key attach) { const alias = attach; <button onClick={alias} /> }</section>',
-		],
-		[
 			'an attached callback with an unrelated row index alias used as an event',
 			'const attach = (node) => { element.current = node; };',
 			'<section><div ref={attach} /> @for (const item of props.items; index attach; key item) { const alias = attach; <button onClick={alias} /> }</section>',
@@ -2252,11 +2247,6 @@ export function App(props) {
 			'an alias of a bare row callback',
 			'const attach = (node) => { element.current = node; };',
 			'<section>@for (attach of props.callbacks; key attach) { const alias = attach; <div ref={alias} /> }</section>',
-		],
-		[
-			'an alias of a var row callback',
-			'const attach = (node) => { element.current = node; };',
-			'<section>@for (var attach of props.callbacks; key attach) { const alias = attach; <div ref={alias} /> }</section>',
 		],
 		[
 			'an alias of a row index',

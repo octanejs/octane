@@ -22,7 +22,9 @@ export function HostedIslandEnvelope(props) @{
 
 function Counter(props) @{
 	const [count, setCount] = useState(0);
-	<button class="count" onClick={() => setCount(count + 1)}>{'count:' + count}</button>
+	<button class="count" onClick={() => setCount(count + 1)}>
+		{'count:' + count}
+	</button>
 }
 
 export function GreetingIsland(props) @{
@@ -74,7 +76,7 @@ export function TwoContextIsland() @{
 /** Suspends at the hosted root with NO local boundary — must escape to React. */
 export function SuspendingIsland(props) @{
 	const value = use(props.resource);
-	<p class="resolved">{'value:' + value as string}</p>
+	<p class="resolved">{('value:' + value) as string}</p>
 }
 
 /**
@@ -90,26 +92,26 @@ export function PendingFaultIsland(props) @{
 	}, []);
 	if (props.faults.length > 0) throw new Error(props.faults.shift());
 	const value = use(props.resource);
-	<p class="pf-resolved">{'value:' + value as string}</p>
+	<p class="pf-resolved">{('value:' + value) as string}</p>
 }
 
 /** Discovers the mirror context AND suspends in the same initial attempt (§6.2 step 7 / OQ15). */
 export function ThemedSuspendingIsland(props) @{
 	const theme = use(MirrorTheme);
 	const value = use(props.resource);
-	<p class="themed-resolved">{theme + ':' + value as string}</p>
+	<p class="themed-resolved">{(theme + ':' + value) as string}</p>
 }
 
 /** Two sequential dependencies: A settles, the retry suspends again on B. */
 export function ChainedIsland(props) @{
 	const first = use(props.first);
 	const second = use(props.second);
-	<p class="chained">{first as string + '+' + second as string}</p>
+	<p class="chained">{((first as string) + '+' + second) as string}</p>
 }
 
 function InnerAwait(props) @{
 	const value = use(props.resource);
-	<p class="resolved">{'value:' + value as string}</p>
+	<p class="resolved">{('value:' + value) as string}</p>
 }
 
 /** Local Octane boundary — the throw must be handled here, never reaching React. */
@@ -142,7 +144,9 @@ export function CleanupThrowIsland(props) @{
 
 /** React 19 passes `ref` through element props; the island treats it as an ordinary Octane ref prop. */
 export function RefIsland(props) @{
-	<section class="ref-island" ref={props.ref}>{'ref island'}</section>
+	<section class="ref-island" ref={props.ref}>
+		{'ref island'}
+	</section>
 }
 
 /** Calls a React state setter from an Octane layout effect during the hosted synchronous flush. */
@@ -162,7 +166,9 @@ export function RenderLogIsland(props) @{
 /** Exposes the island's Octane useId so identifier stability/distinctness is observable. */
 export function UseIdIsland() @{
 	const id = useId();
-	<p class="use-id" data-oid={id}>{'id island'}</p>
+	<p class="use-id" data-oid={id}>
+		{'id island'}
+	</p>
 }
 
 /** Effect faults on demand: layout setup and passive setup, keyed by props. */
@@ -181,7 +187,9 @@ export function StatefulSuspendingIsland(props) @{
 	const [count, setCount] = useState(0);
 	const value = use(props.resource);
 	<div class="ss-island">
-		<button class="ss-count" onClick={() => setCount(count + 1)}>{'count:' + count}</button>
-		<p class="ss-value">{'value:' + value as string}</p>
+		<button class="ss-count" onClick={() => setCount(count + 1)}>
+			{'count:' + count}
+		</button>
+		<p class="ss-value">{('value:' + value) as string}</p>
 	</div>
 }

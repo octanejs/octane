@@ -39,7 +39,7 @@ function Counter(props) @{
 	_bumpChild = () => setN(n + 1);
 	_goChild = () => setP(props.gate);
 	const v = use(p);
-	<div id="counter">{n + '/' + v as string + '/' + tag as string}</div>
+	<div id="counter">{(((n + '/' + v) as string) + '/' + tag) as string}</div>
 }
 
 function Sibling() @{

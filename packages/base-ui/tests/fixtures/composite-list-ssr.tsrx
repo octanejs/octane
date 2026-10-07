@@ -11,8 +11,10 @@ export function CompositeListFixture({
 }: {
 	elementsRef: RefObject<Array<HTMLElement | null>>;
 }) {
-	return <CompositeList elementsRef={elementsRef}>
-		<Item label="a" />
-		<Item label="b" />
-	</CompositeList>;
+	return (
+		<CompositeList elementsRef={elementsRef}>
+			<Item label="a" />
+			<Item label="b" />
+		</CompositeList>
+	);
 }

@@ -8,9 +8,7 @@ interface StoreProps {
 
 function PendingProbe() @{
 	const [isPending] = useTransition();
-	<span id="pending">
-		{isPending ? 'pending' : 'idle'}
-	</span>
+	<span id="pending">{isPending ? 'pending' : 'idle'}</span>
 }
 
 function Child(props: StoreProps) @{
@@ -18,7 +16,7 @@ function Child(props: StoreProps) @{
 	const [, start] = useTransition();
 	props.bindStart(start);
 	const v = use(props.promiseFor(value));
-	<span id="content">{'content-' + v as string}</span>
+	<span id="content">{('content-' + v) as string}</span>
 }
 
 export function HeldUrgentResuspend(props: StoreProps) @{
@@ -42,7 +40,7 @@ function StateChild(props: HeldStateProps) @{
 	const [, start] = useTransition();
 	props.bindSetters((next) => start(() => setValue(next)), setValue);
 	const resolved = use(props.promiseFor(value));
-	<span id="content">{'content-' + resolved as string}</span>
+	<span id="content">{('content-' + resolved) as string}</span>
 }
 
 export function HeldStateUrgentResuspend(props: HeldStateProps) @{
@@ -64,7 +62,7 @@ export function HeldUrgentBodyResuspend(props: StoreProps) @{
 		@try {
 			const value = useSyncExternalStore(props.store.subscribe, props.store.get);
 			const v = use(props.promiseFor(value));
-			<span id="content">{'content-' + v as string}</span>
+			<span id="content">{('content-' + v) as string}</span>
 		} @pending {
 			<span id="fallback">{'fallback'}</span>
 		}
@@ -78,7 +76,7 @@ export function FreshUrgentSuspend(props: {
 	<div>
 		@try {
 			const v = use(props.promiseFor(props.value));
-			<span id="content">{'content-' + v as string}</span>
+			<span id="content">{('content-' + v) as string}</span>
 		} @pending {
 			<span id="fallback">{'fallback'}</span>
 		}

@@ -32,28 +32,27 @@ function MutationChild({ value, onInput }: { value: number; onInput: () => void 
 
 function MutationParent({ value }: { value: number }) {
 	const [events, setEvents] = useState(0);
-	return <section>
-		<MutationChild value={value} onInput={() => setEvents((count) => count + 1)} />
-		<output>{events as number}</output>
-	</section>;
+	return (
+		<section>
+			<MutationChild value={value} onInput={() => setEvents((count) => count + 1)} />
+			<output>{events as number}</output>
+		</section>
+	);
 }
 
-it(
-	'commits native event updates from a child DOM mutation without render-phase diagnostics',
-	() => {
-		const error = vi.spyOn(console, 'error').mockImplementation(() => {});
-		const view = mount(MutationParent, { value: 0 });
-		try {
-			expect(view.find('output').textContent).toBe('0');
-			view.update(MutationParent, { value: 1 });
-			expect(view.find('output').textContent).toBe('1');
-			expect(error).not.toHaveBeenCalled();
-			view.update(MutationParent, { value: 2 });
-			expect(view.find('output').textContent).toBe('2');
-			expect(error).not.toHaveBeenCalled();
-		} finally {
-			view.unmount();
-			error.mockRestore();
-		}
-	},
-);
+it('commits native event updates from a child DOM mutation without render-phase diagnostics', () => {
+	const error = vi.spyOn(console, 'error').mockImplementation(() => {});
+	const view = mount(MutationParent, { value: 0 });
+	try {
+		expect(view.find('output').textContent).toBe('0');
+		view.update(MutationParent, { value: 1 });
+		expect(view.find('output').textContent).toBe('1');
+		expect(error).not.toHaveBeenCalled();
+		view.update(MutationParent, { value: 2 });
+		expect(view.find('output').textContent).toBe('2');
+		expect(error).not.toHaveBeenCalled();
+	} finally {
+		view.unmount();
+		error.mockRestore();
+	}
+});

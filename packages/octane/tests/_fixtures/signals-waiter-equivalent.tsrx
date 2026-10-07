@@ -16,18 +16,14 @@ export function EqualPending(props: {
 	props.onRender(value$, snapshot);
 	<main>
 		<button onClick={() => props.onEvent(value$, value$.snapshot())}>{'capture'}</button>
-		<p>
-			{snapshot.status === 'ready' ? snapshot.value : snapshot.status}
-		</p>
+		<p>{snapshot.status === 'ready' ? snapshot.value : snapshot.status}</p>
 	</main>
 }
 
 function PendingReader(props: { source$: SignalHandle<string> }) @{
 	const result$ = derived$(async ({ read }) => await read(props.source$));
 	const result = result$.snapshot();
-	<span>
-		{result.status === 'ready' ? result.value : result.status}
-	</span>
+	<span>{result.status === 'ready' ? result.value : result.status}</span>
 }
 
 export function EqualPendingChild(props: {
@@ -41,9 +37,7 @@ export function EqualPendingChild(props: {
 	});
 	const snapshot = value$.snapshot();
 	<main>
-		<p>
-			{snapshot.status === 'ready' ? snapshot.value : snapshot.status}
-		</p>
+		<p>{snapshot.status === 'ready' ? snapshot.value : snapshot.status}</p>
 		<PendingReader source$={value$} />
 	</main>
 }

@@ -23,15 +23,19 @@ export function FrameworkSelect({ libraryId }: { libraryId: LibraryId }) {
 	const selectedFramework = frameworkConfig.available.find(
 		(f) => f.value === frameworkConfig.selected,
 	);
-	return <Select
-		className="w-full"
-		icon={selectedFramework?.logo
-			? <img src={selectedFramework.logo} alt={selectedFramework.label} class="w-4 h-4" />
-			: undefined}
-		selected={frameworkConfig.selected}
-		available={frameworkConfig.available}
-		onSelect={frameworkConfig.onSelect}
-	/>;
+	return (
+		<Select
+			className="w-full"
+			icon={
+				selectedFramework?.logo ? (
+					<img src={selectedFramework.logo} alt={selectedFramework.label} class="w-4 h-4" />
+				) : undefined
+			}
+			selected={frameworkConfig.selected}
+			available={frameworkConfig.available}
+			onSelect={frameworkConfig.onSelect}
+		/>
+	);
 }
 
 // Let's use zustand to wrap the local storage logic. This way
@@ -40,15 +44,13 @@ export function FrameworkSelect({ libraryId }: { libraryId: LibraryId }) {
 export const useLocalCurrentFramework = create<{
 	currentFramework?: string;
 	setCurrentFramework: (framework: string) => void;
-}>(
-	(set) => ({
-		currentFramework: getLocalStorageItem('framework') || undefined,
-		setCurrentFramework: (framework: string) => {
-			setLocalStorageItem('framework', framework);
-			set({ currentFramework: framework });
-		},
-	}),
-);
+}>((set) => ({
+	currentFramework: getLocalStorageItem('framework') || undefined,
+	setCurrentFramework: (framework: string) => {
+		setLocalStorageItem('framework', framework);
+		set({ currentFramework: framework });
+	},
+}));
 
 /**
  * Get the stored framework preference from localStorage.
@@ -67,18 +69,20 @@ export function usePersistFrameworkPreference() {
 	const queryClient = useQueryClient();
 	const localCurrentFramework = useLocalCurrentFramework();
 
-	return useCallback((framework: string) => {
-		// Always update localStorage as fallback
-		localCurrentFramework.setCurrentFramework(framework);
-		queryClient.setQueryData(
-			currentUserQueryOptions.queryKey,
-			(user) => user ? { ...user, lastUsedFramework: framework } : user,
-		);
-		// Update DB for logged-in users (fire-and-forget)
-		if (userQuery.data) {
-			persistFrameworkToServer(framework);
-		}
-	}, [localCurrentFramework, queryClient, userQuery.data]);
+	return useCallback(
+		(framework: string) => {
+			// Always update localStorage as fallback
+			localCurrentFramework.setCurrentFramework(framework);
+			queryClient.setQueryData(currentUserQueryOptions.queryKey, (user) =>
+				user ? { ...user, lastUsedFramework: framework } : user,
+			);
+			// Update DB for logged-in users (fire-and-forget)
+			if (userQuery.data) {
+				persistFrameworkToServer(framework);
+			}
+		},
+		[localCurrentFramework, queryClient, userQuery.data],
+	);
 }
 
 function useFrameworkConfig({ frameworks }: { frameworks: Framework[] }) {
@@ -120,27 +124,31 @@ export function useCurrentFramework(frameworks: Framework[]) {
 	// Priority: URL params > DB (logged-in) > localStorage > 'react'
 	const userFramework = userQuery.data?.lastUsedFramework;
 	let framework =
-		paramsFramework || userFramework || localCurrentFramework.currentFramework ||
-			'react' as Framework;
+		paramsFramework ||
+		userFramework ||
+		localCurrentFramework.currentFramework ||
+		('react' as Framework);
 
 	framework = frameworks.includes(framework) ? framework : 'react';
 
-	const setFramework = useCallback((framework: string) => {
-		navigate({
-			params: { framework } as any,
-		});
-		// Always update localStorage as fallback
-		localCurrentFramework.setCurrentFramework(framework);
-		queryClient.setQueryData(
-			currentUserQueryOptions.queryKey,
-			(user) => user ? { ...user, lastUsedFramework: framework } : user,
-		);
+	const setFramework = useCallback(
+		(framework: string) => {
+			navigate({
+				params: { framework } as any,
+			});
+			// Always update localStorage as fallback
+			localCurrentFramework.setCurrentFramework(framework);
+			queryClient.setQueryData(currentUserQueryOptions.queryKey, (user) =>
+				user ? { ...user, lastUsedFramework: framework } : user,
+			);
 
-		// Update DB for logged-in users (fire-and-forget)
-		if (userQuery.data) {
-			persistFrameworkToServer(framework);
-		}
-	}, [localCurrentFramework, navigate, queryClient, userQuery.data]);
+			// Update DB for logged-in users (fire-and-forget)
+			if (userQuery.data) {
+				persistFrameworkToServer(framework);
+			}
+		},
+		[localCurrentFramework, navigate, queryClient, userQuery.data],
+	);
 
 	// NOTE: the react flavor passes NO dependency argument here (run after every
 	// render). Octane infers dependencies when the argument is omitted, so the

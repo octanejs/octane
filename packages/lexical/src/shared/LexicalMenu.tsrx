@@ -53,19 +53,21 @@ type DefaultMenuProps<TOption extends MenuOption> = {
 
 function DefaultMenu<TOption extends MenuOption>(props: DefaultMenuProps<TOption>) @{
 	<div class="typeahead-popover mentions-menu">
-		<ul>{props.options.map(
-			(option, i) => <MenuItem
-				key={option.key}
-				index={i}
-				isSelected={props.selectedIndex === i}
-				onClick={() => {
-					props.setHighlightedIndex(i);
-					props.selectOptionAndCleanUp(option);
-				}}
-				onMouseEnter={() => props.setHighlightedIndex(i)}
-				option={option}
-			/>,
-		)}</ul>
+		<ul>
+			{props.options.map((option, i) => (
+				<MenuItem
+					key={option.key}
+					index={i}
+					isSelected={props.selectedIndex === i}
+					onClick={() => {
+						props.setHighlightedIndex(i);
+						props.selectOptionAndCleanUp(option);
+					}}
+					onMouseEnter={() => props.setHighlightedIndex(i)}
+					option={option}
+				/>
+			))}
+		</ul>
 	</div>
 }
 
@@ -77,8 +79,12 @@ type LexicalMenuProps<TOption extends MenuOption> = {
 	options: TOption[];
 	shouldSplitNodeWithQuery?: boolean;
 	menuRenderFn?: MenuRenderFn<TOption>;
-	onSelectOption: (option: TOption, textNodeContainingQuery: | TextNode
-	| null, closeMenu: () => void, matchingString: string) => void;
+	onSelectOption: (
+		option: TOption,
+		textNodeContainingQuery: TextNode | null,
+		closeMenu: () => void,
+		matchingString: string,
+	) => void;
 	commandPriority?: CommandListenerPriority;
 	preselectFirstItem?: boolean;
 };
@@ -108,28 +114,34 @@ export function LexicalMenu<TOption extends MenuOption>(props: LexicalMenuProps<
 		}
 	}, [matchingString, preselectFirstItem]);
 
-	const selectOptionAndCleanUp = useCallback((selectedEntry: TOption) => {
-		editor.update(() => {
-			const textNodeContainingQuery =
-				resolution.match != null && shouldSplitNodeWithQuery
-					? $splitNodeContainingQuery(resolution.match)
-					: null;
-			onSelectOption(
-				selectedEntry,
-				textNodeContainingQuery,
-				close,
-				resolution.match ? resolution.match.matchingString : '',
-			);
-		});
-	}, [editor, shouldSplitNodeWithQuery, resolution.match, onSelectOption, close]);
+	const selectOptionAndCleanUp = useCallback(
+		(selectedEntry: TOption) => {
+			editor.update(() => {
+				const textNodeContainingQuery =
+					resolution.match != null && shouldSplitNodeWithQuery
+						? $splitNodeContainingQuery(resolution.match)
+						: null;
+				onSelectOption(
+					selectedEntry,
+					textNodeContainingQuery,
+					close,
+					resolution.match ? resolution.match.matchingString : '',
+				);
+			});
+		},
+		[editor, shouldSplitNodeWithQuery, resolution.match, onSelectOption, close],
+	);
 
-	const updateSelectedIndex = useCallback((index: number) => {
-		const rootElem = editor.getRootElement();
-		if (rootElem !== null) {
-			rootElem.setAttribute('aria-activedescendant', 'typeahead-item-' + index);
-			setHighlightedIndex(index);
-		}
-	}, [editor]);
+	const updateSelectedIndex = useCallback(
+		(index: number) => {
+			const rootElem = editor.getRootElement();
+			if (rootElem !== null) {
+				rootElem.setAttribute('aria-activedescendant', 'typeahead-item-' + index);
+				setHighlightedIndex(index);
+			}
+		},
+		[editor],
+	);
 
 	useEffect(() => {
 		return () => {
@@ -271,8 +283,10 @@ export function LexicalMenu<TOption extends MenuOption>(props: LexicalMenuProps<
 				KEY_ENTER_COMMAND,
 				(event) => {
 					if (
-						options === null || selectedIndex === null || options[selectedIndex] == null ||
-							event && event.shiftKey
+						options === null ||
+						selectedIndex === null ||
+						options[selectedIndex] == null ||
+						(event && event.shiftKey)
 					) {
 						return false;
 					}

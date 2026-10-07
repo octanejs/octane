@@ -15,8 +15,12 @@ const msgPromise = new Promise((res, rej) => {
 function Page() @{
 	const data = useLoaderData();
 	<div>
-		<button id="resolve" onClick={() => resolveMsg('hello')}>r</button>
-		<button id="reject" onClick={() => rejectMsg(new Error('await-fail'))}>x</button>
+		<button id="resolve" onClick={() => resolveMsg('hello')}>
+			r
+		</button>
+		<button id="reject" onClick={() => rejectMsg(new Error('await-fail'))}>
+			x
+		</button>
 		<Suspense fallback={<p class="fallback">waiting</p>}>
 			<Await resolve={data.msg} errorElement={<p class="await-err">failed</p>}>
 				{(value) => <p class="value">{'got:' + value}</p>}

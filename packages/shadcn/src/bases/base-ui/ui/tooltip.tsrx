@@ -40,22 +40,21 @@ export interface TooltipContentProps extends Record<string, unknown> {
 }
 
 /** Props routed to the Positioner rather than the popup. */
-export type BaseUiPositioningProps =
-	Pick<
-		TooltipPrimitive.Positioner.Props,
-		| 'side'
-		| 'sideOffset'
-		| 'align'
-		| 'alignOffset'
-		| 'anchor'
-		| 'positionMethod'
-		| 'collisionBoundary'
-		| 'collisionPadding'
-		| 'collisionAvoidance'
-		| 'arrowPadding'
-		| 'sticky'
-		| 'disableAnchorTracking'
-	>;
+export type BaseUiPositioningProps = Pick<
+	TooltipPrimitive.Positioner.Props,
+	| 'side'
+	| 'sideOffset'
+	| 'align'
+	| 'alignOffset'
+	| 'anchor'
+	| 'positionMethod'
+	| 'collisionBoundary'
+	| 'collisionPadding'
+	| 'collisionAvoidance'
+	| 'arrowPadding'
+	| 'sticky'
+	| 'disableAnchorTracking'
+>;
 
 export function TooltipContent({
 	className,
@@ -104,7 +103,8 @@ export function TooltipContent({
 					createElement(Fragment, { key: 'content', children }),
 					createElement(TooltipPrimitive.Arrow, {
 						key: 'arrow',
-						className: 'z-50 size-2.5 translate-y-[calc(-50%_-_2px)] rotate-45 rounded-[2px] bg-foreground fill-foreground',
+						className:
+							'z-50 size-2.5 translate-y-[calc(-50%_-_2px)] rotate-45 rounded-[2px] bg-foreground fill-foreground',
 					}),
 				],
 			}),

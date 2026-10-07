@@ -4,9 +4,7 @@ import { BrowserSelectFixture, type BrowserSelectOption } from './select-fixture
 
 delegateEvents(['focusin', 'focusout', 'keydown', 'mousedown', 'mousemove', 'mouseover']);
 
-const options: readonly BrowserSelectOption[] = [
-	{ label: 'One', value: '1' },
-];
+const options: readonly BrowserSelectOption[] = [{ label: 'One', value: '1' }];
 const callbacks = {
 	onChange() {},
 	onInputChange(value: string) {
@@ -40,21 +38,17 @@ window.__reactSelectScrollLocks = {
 		const roots = elements.map((element) => createRoot(element));
 		for (const root of roots) {
 			flushSync(() => {
-				root.render(
-					BrowserSelectFixture,
-					{
-						...callbacks,
-						menuIsOpen: true,
-						menuShouldBlockScroll: true,
-						options,
-					} as never,
-				);
+				root.render(BrowserSelectFixture, {
+					...callbacks,
+					menuIsOpen: true,
+					menuShouldBlockScroll: true,
+					options,
+				} as never);
 			});
 		}
 		await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
 		const locked = bodyStyle();
-		const removalOrder =
-			order === 'first-second' ? [0, 1] : [1, 0];
+		const removalOrder = order === 'first-second' ? [0, 1] : [1, 0];
 		flushSync(() => roots[removalOrder[0]!]!.render(() => null, {}));
 		await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
 		const afterFirst = bodyStyle();

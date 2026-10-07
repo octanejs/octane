@@ -14,5 +14,7 @@ export function DeferredContent(props: {
 		props.onEffect?.();
 		return () => props.onCleanup?.();
 	});
-	<button id="deferred-action" onClick={props.onClick}>{props.label + ':' + context}</button>
+	<button id="deferred-action" onClick={props.onClick}>
+		{props.label + ':' + context}
+	</button>
 }

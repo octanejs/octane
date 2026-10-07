@@ -18,7 +18,9 @@ export function TwoInputs(props: FragmentProps) @{
 export function DisabledThenButton(props: FragmentProps) @{
 	<div id="parent">
 		<Fragment ref={props.fragRef}>
-			<button id="bad" disabled>x</button>
+			<button id="bad" disabled>
+				x
+			</button>
 			<button id="good">y</button>
 		</Fragment>
 	</div>
@@ -61,7 +63,9 @@ export function NoFocusable(props: FragmentProps) @{
 export function ExplicitTabIndex(props: FragmentProps) @{
 	<div id="parent">
 		<Fragment ref={props.fragRef}>
-			<div id="tabbable" tabIndex={0}>tabbable</div>
+			<div id="tabbable" tabIndex={0}>
+				tabbable
+			</div>
 		</Fragment>
 	</div>
 }

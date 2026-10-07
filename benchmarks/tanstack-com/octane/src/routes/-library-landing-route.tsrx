@@ -75,7 +75,9 @@ export function LibraryNavbarTitle({ libraryId }: { libraryId: LandingLibraryId 
 	const libraryName = library.name.replace('TanStack ', '');
 	const gradientText = `inline-block text-transparent bg-clip-text bg-linear-to-r ${library.colorFrom} ${library.colorTo}`;
 
-	return <Link to="/$libraryId" params={{ libraryId: library.id }} className="whitespace-nowrap">
-		<span class={gradientText}>{libraryName as string}</span>
-	</Link>;
+	return (
+		<Link to="/$libraryId" params={{ libraryId: library.id }} className="whitespace-nowrap">
+			<span class={gradientText}>{libraryName as string}</span>
+		</Link>
+	);
 }

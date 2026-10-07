@@ -113,7 +113,7 @@ export function makeLifecycleRouter(initial: string, opts: LifecycleRouterOption
 		getParentRoute: () => rootRoute,
 		path: 'boom',
 		component: BoomPage,
-		errorComponent: opts.routeError ?? true ? RouteError : undefined,
+		errorComponent: (opts.routeError ?? true) ? RouteError : undefined,
 		onCatch: opts.onCatch,
 	});
 	const slowLoaderRoute = createRoute({
@@ -150,6 +150,6 @@ export function makeLifecycleRouter(initial: string, opts: LifecycleRouterOption
 		history: createMemoryHistory({ initialEntries: [initial] }),
 		defaultErrorComponent: opts.defaultError ? DefaultError : undefined,
 		defaultOnCatch: opts.defaultOnCatch,
-		defaultComponent: opts.defaultComponent ?? true ? DefaultComp : undefined,
+		defaultComponent: (opts.defaultComponent ?? true) ? DefaultComp : undefined,
 	});
 }

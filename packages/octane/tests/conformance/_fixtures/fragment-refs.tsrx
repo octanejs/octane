@@ -106,32 +106,39 @@ export function ReturnedNamespacedFragmentSpreadEvaluation(props: {
 	explicit: FragmentObject;
 	observe: (label: string, value: any) => any;
 }) {
-	return <Octane.Fragment
-		{...props.observe('first:expression', props.first)}
-		ref={props.observe('explicit', props.explicit)}
-		{...props.observe('last:expression', props.last)}
-	>
-		<span id="returned-namespace-ordered-spread-child">{props.observe(
-			'child',
-			'ordered spread',
-		) as string}</span>
-	</Octane.Fragment>;
+	return (
+		<Octane.Fragment
+			{...props.observe('first:expression', props.first)}
+			ref={props.observe('explicit', props.explicit)}
+			{...props.observe('last:expression', props.last)}
+		>
+			<span id="returned-namespace-ordered-spread-child">
+				{props.observe('child', 'ordered spread') as string}
+			</span>
+		</Octane.Fragment>
+	);
 }
 
 export function ReturnedAliasedFragmentObjectRef(props: { fragRef: FragmentObject }) {
-	return <Group ref={props.fragRef}>
-		<button id="returned-alias-child">{'returned alias'}</button>
-	</Group>;
+	return (
+		<Group ref={props.fragRef}>
+			<button id="returned-alias-child">{'returned alias'}</button>
+		</Group>
+	);
 }
 
 export function ReturnedNamespacedFragmentObjectRef(props: { fragRef: FragmentObject }) {
-	return <Octane.Fragment ref={props.fragRef}>
-		<button id="returned-namespace-child">{'returned namespace'}</button>
-	</Octane.Fragment>;
+	return (
+		<Octane.Fragment ref={props.fragRef}>
+			<button id="returned-namespace-child">{'returned namespace'}</button>
+		</Octane.Fragment>
+	);
 }
 
 function LocalRefTarget(props: { ref: HostObject }) @{
-	<button id="local-ref-target" ref={props.ref}>{'local component'}</button>
+	<button id="local-ref-target" ref={props.ref}>
+		{'local component'}
+	</button>
 }
 
 export function ShadowedFragmentAlias(props: { fragRef: HostObject }) @{
@@ -145,7 +152,7 @@ export function ShadowedFragmentNamespace(props: { fragRef: HostObject }) @{
 }
 
 export function ForeignFragmentAlias(props: { fragRef: FragmentObject }) @{
-	<ForeignGroup {...{ ref: props.fragRef } as object} />
+	<ForeignGroup {...({ ref: props.fragRef } as object)} />
 }
 
 function FragmentChildPassthrough(props: { children?: unknown }) {

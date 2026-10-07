@@ -25,10 +25,12 @@ export function AutoMemoOpaqueChild() @{
 }
 
 export function AutoMemoOpaqueReturned() {
-	return <>
-		<span class="returned-opaque-a">{'returned opaque a ' + autoMemoOpaqueVersion}</span>
-		<span class="returned-opaque-b">{'returned opaque b ' + autoMemoOpaqueVersion}</span>
-	</>;
+	return (
+		<>
+			<span class="returned-opaque-a">{'returned opaque a ' + autoMemoOpaqueVersion}</span>
+			<span class="returned-opaque-b">{'returned opaque b ' + autoMemoOpaqueVersion}</span>
+		</>
+	);
 }
 
 function CustomChildImpl() @{

@@ -51,12 +51,12 @@ exports[`SSR Phase 1 — basic fixtures > renders static markup, dynamic text, a
 
 exports[`SSR Phase 1 — ssr fixture (style / spread / innerHTML / components / hooks / css) > collects scoped CSS into the css field > Scoped 1`] = `
 {
-  "css": "<style data-octane="tsrx-f28ae18f">
-			.box.tsrx-f28ae18f {
+  "css": "<style data-octane="tsrx-30b2b153">
+			.box.tsrx-30b2b153 {
 				color: red;
 			}
 		</style>",
-  "html": "<div class="box tsrx-f28ae18f">scoped</div>",
+  "html": "<div class="box tsrx-30b2b153">scoped</div>",
 }
 `;
 

@@ -82,8 +82,8 @@ function MultiValueContainer(props: MultiValueContainerProps) @{
 	const innerProps = {
 		...props.innerProps,
 		style: {
-			...(props.innerProps?.style ?? {}) as Record<string, unknown>,
-			display: props.isMulti && props.hasValue || displayFlex ? 'flex' : 'grid',
+			...((props.innerProps?.style ?? {}) as Record<string, unknown>),
+			display: (props.isMulti && props.hasValue) || displayFlex ? 'flex' : 'grid',
 		},
 	};
 

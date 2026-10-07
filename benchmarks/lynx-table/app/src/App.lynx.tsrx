@@ -14,8 +14,7 @@ import type { RowData } from './data.js';
 // Mount-create ladder: BENCH_AUTOROWS=N builds a variant whose table is
 // already populated at mount, so create cost is measurable without taps.
 declare const __BENCH_AUTOROWS__: number;
-const INITIAL_ROWS: RowData[] =
-	__BENCH_AUTOROWS__ > 0 ? buildDataSeeded(__BENCH_AUTOROWS__) : [];
+const INITIAL_ROWS: RowData[] = __BENCH_AUTOROWS__ > 0 ? buildDataSeeded(__BENCH_AUTOROWS__) : [];
 
 // Count Row bodies only in the deterministic profile build. Normal browser
 // and production builds fold this branch away with their existing define.
@@ -34,8 +33,7 @@ function countRowRender(): void {
 const STORM_UPDATE_TICKS = 50;
 const STORM_SELECT_TICKS = 30;
 
-const _stormChannel =
-	typeof MessageChannel === 'function' ? new MessageChannel() : null;
+const _stormChannel = typeof MessageChannel === 'function' ? new MessageChannel() : null;
 let _stormPending: (() => void) | null = null;
 if (_stormChannel !== null) {
 	_stormChannel.port1.onmessage = () => {
@@ -74,8 +72,12 @@ function Row(props: RowProps) @{
 	countRowRender();
 	<view class={['row', props.isSelected && 'danger']}>
 		<text class="col-id">{String(props.row.id)}</text>
-		<text class="col-label" bindtap={() => props.onSelect(props.row.id)}>{props.row.label}</text>
-		<text class="col-remove" bindtap={() => props.onRemove(props.row.id)}>{'x'}</text>
+		<text class="col-label" bindtap={() => props.onSelect(props.row.id)}>
+			{props.row.label}
+		</text>
+		<text class="col-remove" bindtap={() => props.onRemove(props.row.id)}>
+			{'x'}
+		</text>
 	</view>
 }
 
@@ -86,8 +88,8 @@ export function App() @{
 	rowsRef.current = rows;
 	const selectedRef = useRef<number | undefined>(selected);
 	selectedRef.current = selected;
-	(globalThis as
-		typeof globalThis & {
+	(
+		globalThis as typeof globalThis & {
 			__LYNX_BENCH_SNAPSHOT__?: () => {
 				readonly rowCount: number;
 				readonly firstId: number | null;
@@ -97,7 +99,8 @@ export function App() @{
 				readonly firstLabel: string | null;
 				readonly selectedId: number | null;
 			};
-		}).__LYNX_BENCH_SNAPSHOT__ = () => {
+		}
+	).__LYNX_BENCH_SNAPSHOT__ = () => {
 		const current = rowsRef.current;
 		return {
 			rowCount: current.length,
@@ -176,11 +179,8 @@ export function App() @{
 	idsRef.current = rows.map((r) => r.id);
 
 	const stormUpdate = useCallback(() => {
-		runStorm(
-			STORM_UPDATE_TICKS,
-			(t) => setRows(
-				(prev) => prev.map((r, i) => (i % 10 === 0 ? { id: r.id, label: 'bench ' + t } : r)),
-			),
+		runStorm(STORM_UPDATE_TICKS, (t) =>
+			setRows((prev) => prev.map((r, i) => (i % 10 === 0 ? { id: r.id, label: 'bench ' + t } : r))),
 		);
 	}, []);
 

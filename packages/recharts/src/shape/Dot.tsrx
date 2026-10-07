@@ -19,14 +19,16 @@ export function Dot(props: Props) {
 	const { cx, cy, r, className } = props;
 	const layerClass = clsx('recharts-dot', className);
 	if (isNumber(cx) && isNumber(cy) && isNumber(r)) {
-		return <circle
-			{...svgPropertiesNoEvents(props)}
-			{...adaptEventHandlers(props)}
-			className={layerClass}
-			cx={cx}
-			cy={cy}
-			r={r}
-		/>;
+		return (
+			<circle
+				{...svgPropertiesNoEvents(props)}
+				{...adaptEventHandlers(props)}
+				className={layerClass}
+				cx={cx}
+				cy={cy}
+				r={r}
+			/>
+		);
 	}
 	return null;
 }

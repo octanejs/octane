@@ -32,16 +32,23 @@ export function Panel(props: PanelProps) @{
 	const stableProps = useStableObject({ disabled });
 	const elementRef = useRef<HTMLDivElement | null>(null);
 	const mergedRef = useMergedRefs(elementRef, elementRefProp);
-	const { getPanelStyles, id: groupId, orientation, registerPanel, updatePanelProps } =
-		useGroupContext();
+	const {
+		getPanelStyles,
+		id: groupId,
+		orientation,
+		registerPanel,
+		updatePanelProps,
+	} = useGroupContext();
 	const hasOnResize = onResizeUnstable != null;
-	const onResizeStable = useStableCallback((
-		panelSize: PanelSize,
-		_id: string | number | undefined,
-		prevPanelSize: PanelSize | undefined,
-	) => {
-		onResizeUnstable?.(panelSize, idProp, prevPanelSize);
-	});
+	const onResizeStable = useStableCallback(
+		(
+			panelSize: PanelSize,
+			_id: string | number | undefined,
+			prevPanelSize: PanelSize | undefined,
+		) => {
+			onResizeUnstable?.(panelSize, idProp, prevPanelSize);
+		},
+	);
 
 	useIsomorphicLayoutEffect(() => {
 		const element = elementRef.current;
@@ -63,7 +70,20 @@ export function Panel(props: PanelProps) @{
 			},
 		};
 		return registerPanel(registeredPanel);
-	}, [groupResizeBehavior, collapsedSize, collapsible, defaultSize, hasOnResize, id, idIsStable, maxSize, minSize, onResizeStable, registerPanel, stableProps]);
+	}, [
+		groupResizeBehavior,
+		collapsedSize,
+		collapsible,
+		defaultSize,
+		hasOnResize,
+		id,
+		idIsStable,
+		maxSize,
+		minSize,
+		onResizeStable,
+		registerPanel,
+		stableProps,
+	]);
 
 	useEffect(() => updatePanelProps(id, { disabled }), [disabled, id, updatePanelProps]);
 	usePanelImperativeHandle(id, panelRef);
@@ -77,41 +97,44 @@ export function Panel(props: PanelProps) @{
 		read,
 		read,
 	);
-	const panelStyles =
-		panelStylesString
-			? JSON.parse(panelStylesString) as Record<string, unknown>
-			: defaultSize !== undefined
-				? { flexGrow: undefined, flexShrink: undefined, flexBasis: defaultSize }
-				: { flexGrow: 1 };
+	const panelStyles = panelStylesString
+		? (JSON.parse(panelStylesString) as Record<string, unknown>)
+		: defaultSize !== undefined
+			? { flexGrow: undefined, flexShrink: undefined, flexBasis: defaultSize }
+			: { flexGrow: 1 };
 
-	return <div
-		{...rest}
-		data-disabled={disabled || undefined}
-		data-panel
-		data-testid={id}
-		id={id}
-		ref={mergedRef}
-		style={{
-			...PROHIBITED_CSS_PROPERTIES,
-			display: 'flex',
-			flexBasis: 0,
-			flexShrink: 1,
-			overflow: 'visible',
-			...panelStyles,
-		}}
-	>
+	return (
 		<div
-			className={className}
+			{...rest}
+			data-disabled={disabled || undefined}
+			data-panel
+			data-testid={id}
+			id={id}
+			ref={mergedRef}
 			style={{
-				maxHeight: '100%',
-				maxWidth: '100%',
-				flexGrow: 1,
-				overflow: 'auto',
-				...style,
-				touchAction: orientation === 'horizontal' ? 'pan-y' : 'pan-x',
+				...PROHIBITED_CSS_PROPERTIES,
+				display: 'flex',
+				flexBasis: 0,
+				flexShrink: 1,
+				overflow: 'visible',
+				...panelStyles,
 			}}
-		>{children}</div>
-	</div>;
+		>
+			<div
+				className={className}
+				style={{
+					maxHeight: '100%',
+					maxWidth: '100%',
+					flexGrow: 1,
+					overflow: 'auto',
+					...style,
+					touchAction: orientation === 'horizontal' ? 'pan-y' : 'pan-x',
+				}}
+			>
+				{children}
+			</div>
+		</div>
+	);
 }
 
 (Panel as { displayName?: string }).displayName = 'Panel';

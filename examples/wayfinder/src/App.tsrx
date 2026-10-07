@@ -47,9 +47,14 @@ function parseRoute(value: string): AppRoute {
 }
 
 function stopLinkNavigation(event: MouseEvent): boolean {
-	return event.defaultPrevented || event.button !== 0 || event.metaKey || event.ctrlKey ||
+	return (
+		event.defaultPrevented ||
+		event.button !== 0 ||
+		event.metaKey ||
+		event.ctrlKey ||
 		event.shiftKey ||
-		event.altKey;
+		event.altKey
+	);
 }
 
 const isStringArray = (value: unknown): value is string[] =>
@@ -112,7 +117,9 @@ function AppLink(props: AppLinkProps) @{
 			event.preventDefault();
 			props.navigate(props.href);
 		}}
-	>{props.children}</a>
+	>
+		{props.children}
+	</a>
 }
 
 function Mark() @{
@@ -135,7 +142,9 @@ function Header(props: HeaderProps) @{
 				<span>Wayfinder</span>
 			</AppLink>
 			<nav aria-label="Primary navigation">
-				<AppLink href="/" class="nav-link" navigate={props.navigate}>Explore</AppLink>
+				<AppLink href="/" class="nav-link" navigate={props.navigate}>
+					Explore
+				</AppLink>
 				<AppLink
 					href="/trips/lisbon?month=oct"
 					class="nav-link quick-link"
@@ -195,10 +204,9 @@ function DestinationCard(props: DestinationCardProps) @{
 		<div class="card-copy">
 			<p class="eyebrow">{props.destination.country}</p>
 			<h3>
-				<AppLink
-					href={`/trips/${props.destination.id}?month=oct`}
-					navigate={props.navigate}
-				>{props.destination.city}</AppLink>
+				<AppLink href={`/trips/${props.destination.id}?month=oct`} navigate={props.navigate}>
+					{props.destination.city}
+				</AppLink>
 			</h3>
 			<p>{props.destination.tagline}</p>
 			<p class="card-tags">{props.destination.bestFor.join(' · ') as string}</p>
@@ -313,7 +321,9 @@ function DiscoverPage(props: DiscoverPageProps) @{
 		</section>
 
 		@if (abortNotice !== '') {
-			<p class="request-notice" role="status">{abortNotice}</p>
+			<p class="request-notice" role="status">
+				{abortNotice}
+			</p>
 		}
 		@if (result.status === 'loading') {
 			<section class="collection-state" role="status" aria-live="polite">
@@ -544,9 +554,10 @@ function TripPage(props: TripPageProps) @{
 	const storageNoteReady = useRef(false);
 	const [noteStatus, setNoteStatus] = useState('');
 	const planningRun = useMemo(
-		() => destination === undefined
-			? null
-			: getPlanningRun(props.requestState, destination.id, props.month),
+		() =>
+			destination === undefined
+				? null
+				: getPlanningRun(props.requestState, destination.id, props.month),
 		[props.requestState, destination?.id, props.month],
 	);
 	useEffect(() => {
@@ -714,7 +725,9 @@ function TripPage(props: TripPageProps) @{
 					>
 						Save trip note
 					</button>
-					<p class="note-status" role="status">{noteStatus}</p>
+					<p class="note-status" role="status">
+						{noteStatus}
+					</p>
 				</div>
 			</section>
 		</main>
@@ -728,8 +741,8 @@ interface SavedPageProps {
 }
 
 function SavedPage(props: SavedPageProps) @{
-	const savedDestinations = DESTINATIONS.filter(
-		(destination) => props.saved.includes(destination.id),
+	const savedDestinations = DESTINATIONS.filter((destination) =>
+		props.saved.includes(destination.id),
 	);
 	<main id="main-content" class="saved-page">
 		<Head>
@@ -799,14 +812,12 @@ export function App(props: RenderRouteProps) @{
 
 	const toggleSaved = (destinationId: string) => {
 		setSaved((current) => {
-			const next =
-				current.includes(destinationId)
-					? current.filter((id) => id !== destinationId)
-					: [...current, destinationId];
+			const next = current.includes(destinationId)
+				? current.filter((id) => id !== destinationId)
+				: [...current, destinationId];
 			try {
 				localStorage.setItem(SAVED_STORAGE_KEY, JSON.stringify(next));
-			} catch {
-			}
+			} catch {}
 			return next;
 		});
 	};
@@ -837,7 +848,9 @@ export function App(props: RenderRouteProps) @{
 				twitter={{ card: 'summary_large_image' }}
 				robots={{ index: true, follow: true, maxImagePreview: 'large' }}
 			/>
-			<a class="skip-link" href="#main-content">Skip to main content</a>
+			<a class="skip-link" href="#main-content">
+				Skip to main content
+			</a>
 			<Header navigate={navigate} savedCount={saved.length} />
 			@if (route.name === 'discover') {
 				<DiscoverPage navigate={navigate} scenario={route.scenario} />

@@ -28,7 +28,9 @@ function StressRow(props) @{
 	if (props.item.broken && props.fail) {
 		throw new Error('Hello');
 	}
-	<div class="row" data-k={props.item.id as number}>{props.item.label as string}</div>
+	<div class="row" data-k={props.item.id as number}>
+		{props.item.label as string}
+	</div>
 }
 
 // Per ReactErrorBoundaries-test.internal.js:1978 — "doesn't get into
@@ -44,7 +46,7 @@ export function ReorderStress(props) @{
 				}
 			</div>
 		} @catch (err) {
-			<div class="caught">{'Caught an error: ' + err.message + '.' as string}</div>
+			<div class="caught">{('Caught an error: ' + err.message + '.') as string}</div>
 		}
 	</>
 }
@@ -65,7 +67,7 @@ export function AdditionsCase(props) @{
 				}
 			</div>
 		} @catch (err) {
-			<div class="caught">{'Caught an error: ' + err.message + '.' as string}</div>
+			<div class="caught">{('Caught an error: ' + err.message + '.') as string}</div>
 		}
 	</>
 }
@@ -100,7 +102,7 @@ export function RemovalsCase(props) @{
 				}
 			</div>
 		} @catch (err) {
-			<div class="caught">{'Caught an error: ' + err.message + '.' as string}</div>
+			<div class="caught">{('Caught an error: ' + err.message + '.') as string}</div>
 		}
 	</>
 }

@@ -21,7 +21,9 @@ const subscribe = () => () => {};
 
 // A cleared handler is no client work.
 export function Handler() @{
-	<button type="button" onClick={choose} onFocus={undefined}>{'Choose'}</button>
+	<button type="button" onClick={choose} onFocus={undefined}>
+		{'Choose'}
+	</button>
 }
 
 export function Ref() @{
@@ -46,7 +48,11 @@ export function Handle(props: { handle?: { current: unknown } }) @{
 }
 
 export function Store() @{
-	const value = useSyncExternalStore(subscribe, () => 'client', () => 'server');
+	const value = useSyncExternalStore(
+		subscribe,
+		() => 'client',
+		() => 'server',
+	);
 	<p>{value}</p>
 }
 
@@ -90,7 +96,9 @@ export function Action() @{
 }
 
 export function Spread(props: { extra: Record<string, unknown> }) @{
-	<button type="button" {...props.extra}>{'Spread'}</button>
+	<button type="button" {...props.extra}>
+		{'Spread'}
+	</button>
 }
 
 export function SpreadInput(props: { extra: Record<string, unknown> }) @{
@@ -113,7 +121,9 @@ export function DescriptorInput(props: { input: Record<string, unknown> }) @{
 export function Conditional(props: { open: boolean }) @{
 	<div>
 		@if (props.open) {
-			<button type="button" onClick={choose}>{'Close'}</button>
+			<button type="button" onClick={choose}>
+				{'Close'}
+			</button>
 		}
 	</div>
 }
@@ -122,7 +132,9 @@ export function Repeated(props: { items: string[] }) @{
 	<ul>
 		@for (const item of props.items; key item) {
 			<li>
-				<button type="button" onClick={choose}>{item}</button>
+				<button type="button" onClick={choose}>
+					{item}
+				</button>
 			</li>
 		}
 	</ul>
@@ -139,7 +151,9 @@ export function Static() @{
 export function Deferred(props: { data: Promise<string> }) @{
 	<main>
 		@try {
-			<button type="button" onClick={choose}>{use(props.data)}</button>
+			<button type="button" onClick={choose}>
+				{use(props.data)}
+			</button>
 		} @pending {
 			<p>{'Loading'}</p>
 		}

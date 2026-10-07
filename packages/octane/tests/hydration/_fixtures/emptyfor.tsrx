@@ -5,7 +5,9 @@ import { useState } from 'octane';
 // adopts correctly (Bugbot: "zero-item @for misaligns cursor").
 function Tail(props) @{
 	const [n, setN] = useState(0);
-	<button id="tail" onClick={() => setN(n + 1)}>{'tail:' + n as string}</button>
+	<button id="tail" onClick={() => setN(n + 1)}>
+		{('tail:' + n) as string}
+	</button>
 }
 
 export function FeedOrEmpty(props) @{

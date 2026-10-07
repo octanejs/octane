@@ -9,10 +9,9 @@ import { setupCoreRouterSsrQueryIntegration } from '@tanstack/router-ssr-query-c
 import type { RouterSsrQueryOptions } from '@tanstack/router-ssr-query-core';
 import type { AnyRouter } from '@octanejs/tanstack-router';
 
-export type Options<TRouter extends AnyRouter> =
-	RouterSsrQueryOptions<TRouter> & {
-		wrapQueryClient?: boolean;
-	};
+export type Options<TRouter extends AnyRouter> = RouterSsrQueryOptions<TRouter> & {
+	wrapQueryClient?: boolean;
+};
 
 export function setupRouterSsrQueryIntegration<TRouter extends AnyRouter>(opts: Options<TRouter>) {
 	setupCoreRouterSsrQueryIntegration(opts as any);
@@ -23,8 +22,10 @@ export function setupRouterSsrQueryIntegration<TRouter extends AnyRouter>(opts: 
 	const OGWrap = opts.router.options.Wrap || Fragment;
 
 	opts.router.options.Wrap = ({ children }: { children?: unknown }) => {
-		return <QueryClientProvider client={opts.queryClient}>
-			<OGWrap>{children}</OGWrap>
-		</QueryClientProvider>;
+		return (
+			<QueryClientProvider client={opts.queryClient}>
+				<OGWrap>{children}</OGWrap>
+			</QueryClientProvider>
+		);
 	};
 }

@@ -18,32 +18,30 @@ export const useStateWithDeps = <S = Record<string, any>,>(
 	// function, we mark the property as a dependency so if it is updated again
 	// in the future, we trigger a rerender.
 	// This is also known as dependency-tracking.
-	const stateDependenciesRef = useRef<Record<keyof S, boolean>>(
-		{
-			data: false,
-			error: false,
-			isValidating: false,
-		} as Record<keyof S, boolean>,
-	);
+	const stateDependenciesRef = useRef<Record<keyof S, boolean>>({
+		data: false,
+		error: false,
+		isValidating: false,
+	} as Record<keyof S, boolean>);
 
 	/**
- * Updates state and triggers re-render if necessary.
- * @param payload To change stateRef, pass the values explicitly to setState:
- * @example
- * ```js
- * setState({
- *   isValidating: false
- *   data: newData // set data to newData
- *   error: undefined // set error to undefined
- * })
- *
- * setState({
- *   isValidating: false
- *   data: undefined // set data to undefined
- *   error: err // set error to err
- * })
- * ```
- */
+	 * Updates state and triggers re-render if necessary.
+	 * @param payload To change stateRef, pass the values explicitly to setState:
+	 * @example
+	 * ```js
+	 * setState({
+	 *   isValidating: false
+	 *   data: newData // set data to newData
+	 *   error: undefined // set error to undefined
+	 * })
+	 *
+	 * setState({
+	 *   isValidating: false
+	 *   data: undefined // set data to undefined
+	 *   error: err // set error to err
+	 * })
+	 * ```
+	 */
 	const setState = useCallback((payload: Partial<S>) => {
 		let shouldRerender = false;
 

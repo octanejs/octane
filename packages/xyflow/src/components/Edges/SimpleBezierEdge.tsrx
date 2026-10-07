@@ -51,7 +51,13 @@ export function getSimpleBezierPath({
 	targetX,
 	targetY,
 	targetPosition = Position.Top,
-}: GetSimpleBezierPathParams): [path: string, labelX: number, labelY: number, offsetX: number, offsetY: number] {
+}: GetSimpleBezierPathParams): [
+	path: string,
+	labelX: number,
+	labelY: number,
+	offsetX: number,
+	offsetY: number,
+] {
 	const [sourceControlX, sourceControlY] = getControl({
 		pos: sourcePosition,
 		x1: sourceX,
@@ -88,53 +94,57 @@ export function getSimpleBezierPath({
 
 function createSimpleBezierEdge(params: { isInternal: boolean }) {
 	// eslint-disable-next-line react/display-name
-	return memo(({
-		id,
-		sourceX,
-		sourceY,
-		targetX,
-		targetY,
-		sourcePosition,
-		targetPosition,
-		label,
-		labelStyle,
-		labelShowBg,
-		labelBgStyle,
-		labelBgPadding,
-		labelBgBorderRadius,
-		style,
-		markerEnd,
-		markerStart,
-		interactionWidth,
-	}: SimpleBezierEdgeProps) => {
-		const [path, labelX, labelY] = getSimpleBezierPath({
+	return memo(
+		({
+			id,
 			sourceX,
 			sourceY,
-			sourcePosition,
 			targetX,
 			targetY,
+			sourcePosition,
 			targetPosition,
-		});
+			label,
+			labelStyle,
+			labelShowBg,
+			labelBgStyle,
+			labelBgPadding,
+			labelBgBorderRadius,
+			style,
+			markerEnd,
+			markerStart,
+			interactionWidth,
+		}: SimpleBezierEdgeProps) => {
+			const [path, labelX, labelY] = getSimpleBezierPath({
+				sourceX,
+				sourceY,
+				sourcePosition,
+				targetX,
+				targetY,
+				targetPosition,
+			});
 
-		const _id = params.isInternal ? undefined : id;
+			const _id = params.isInternal ? undefined : id;
 
-		return <BaseEdge
-			id={_id}
-			path={path}
-			labelX={labelX}
-			labelY={labelY}
-			label={label}
-			labelStyle={labelStyle}
-			labelShowBg={labelShowBg}
-			labelBgStyle={labelBgStyle}
-			labelBgPadding={labelBgPadding}
-			labelBgBorderRadius={labelBgBorderRadius}
-			style={style}
-			markerEnd={markerEnd}
-			markerStart={markerStart}
-			interactionWidth={interactionWidth}
-		/>;
-	});
+			return (
+				<BaseEdge
+					id={_id}
+					path={path}
+					labelX={labelX}
+					labelY={labelY}
+					label={label}
+					labelStyle={labelStyle}
+					labelShowBg={labelShowBg}
+					labelBgStyle={labelBgStyle}
+					labelBgPadding={labelBgPadding}
+					labelBgBorderRadius={labelBgBorderRadius}
+					style={style}
+					markerEnd={markerEnd}
+					markerStart={markerStart}
+					interactionWidth={interactionWidth}
+				/>
+			);
+		},
+	);
 }
 
 const SimpleBezierEdge = createSimpleBezierEdge({ isInternal: false });
@@ -142,9 +152,10 @@ const SimpleBezierEdgeInternal = createSimpleBezierEdge({ isInternal: true });
 
 (SimpleBezierEdge as typeof SimpleBezierEdge & { displayName?: string }).displayName =
 	'SimpleBezierEdge';
-(SimpleBezierEdgeInternal as
-	typeof SimpleBezierEdgeInternal & {
+(
+	SimpleBezierEdgeInternal as typeof SimpleBezierEdgeInternal & {
 		displayName?: string;
-	}).displayName = 'SimpleBezierEdgeInternal';
+	}
+).displayName = 'SimpleBezierEdgeInternal';
 
 export { SimpleBezierEdge, SimpleBezierEdgeInternal };

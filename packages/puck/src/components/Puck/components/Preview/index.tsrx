@@ -81,9 +81,7 @@ const FrameContent = ({
 		return <Frame document={document}>{children}</Frame>;
 	}
 
-	return <>
-		{children}
-	</>;
+	return <>{children}</>;
 };
 
 export const Preview = ({ id = 'puck-preview' }: { id?: string }) => {
@@ -94,21 +92,24 @@ export const Preview = ({ id = 'puck-preview' }: { id?: string }) => {
 	const iframe = useAppStore((s) => s.iframe);
 	const overrides = useAppStore((s) => s.overrides);
 	const metadata = useAppStore((s) => s.metadata);
-	const renderData = useAppStore((s) => s.state.ui.previewMode === 'edit' ? null : s.state.data);
+	const renderData = useAppStore((s) => (s.state.ui.previewMode === 'edit' ? null : s.state.data));
 
-	const Page = useCallback<FC<PageProps>>((pageProps) => {
-		// eslint-disable-next-line react-hooks/rules-of-hooks
-		const propsWithSlots = useSlots(config, { type: 'root', props: pageProps }, DropZoneEditPure);
+	const Page = useCallback<FC<PageProps>>(
+		(pageProps) => {
+			// eslint-disable-next-line react-hooks/rules-of-hooks
+			const propsWithSlots = useSlots(config, { type: 'root', props: pageProps }, DropZoneEditPure);
 
-		return config.root?.render
-			? config.root?.render({
+			return config.root?.render ? (
+				config.root?.render({
 					id: 'puck-root',
 					...propsWithSlots,
 				})
-			: <>
-					{propsWithSlots.children}
-				</>;
-	}, [config]);
+			) : (
+				<>{propsWithSlots.children}</>
+			);
+		},
+		[config],
+	);
 
 	const Frame = useMemo(() => overrides.iframe, [overrides]);
 
@@ -119,21 +120,22 @@ export const Preview = ({ id = 'puck-preview' }: { id?: string }) => {
 
 	useBubbleIframeEvents(ref);
 
-	const inner =
-		!renderData
-			? <Page
-					{...rootProps}
-					puck={{
-						renderDropZone: DropZonePure,
-						isEditing: true,
-						dragRef: null,
-						metadata,
-					}}
-					editMode={true}
-				>
-					<DropZonePure zone={rootDroppableId} />
-				</Page>
-			: <Render data={renderData} config={config} metadata={metadata} />;
+	const inner = !renderData ? (
+		<Page
+			{...rootProps}
+			puck={{
+				renderDropZone: DropZonePure,
+				isEditing: true,
+				dragRef: null,
+				metadata,
+			}}
+			editMode={true}
+		>
+			<DropZonePure zone={rootDroppableId} />
+		</Page>
+	) : (
+		<Render data={renderData} config={config} metadata={metadata} />
+	);
 
 	useEffect(() => {
 		if (!iframe.enabled) {
@@ -141,20 +143,21 @@ export const Preview = ({ id = 'puck-preview' }: { id?: string }) => {
 		}
 	}, [iframe.enabled]);
 
-	return <div
-		className={getClassName()}
-		id={id}
-		data-puck-preview
-		onClick={(e) => {
-			const el = e.target as Element;
+	return (
+		<div
+			className={getClassName()}
+			id={id}
+			data-puck-preview
+			onClick={(e) => {
+				const el = e.target as Element;
 
-			if (!el.hasAttribute('data-puck-component') && !el.hasAttribute('data-puck-dropzone')) {
-				dispatch({ type: 'setUi', ui: { itemSelector: null } });
-			}
-		}}
-	>
-		{iframe.enabled
-			? <AutoFrame
+				if (!el.hasAttribute('data-puck-component') && !el.hasAttribute('data-puck-dropzone')) {
+					dispatch({ type: 'setUi', ui: { itemSelector: null } });
+				}
+			}}
+		>
+			{iframe.enabled ? (
+				<AutoFrame
 					id="preview-frame"
 					className={getClassName('frame')}
 					data-rfd-iframe
@@ -168,11 +171,11 @@ export const Preview = ({ id = 'puck-preview' }: { id?: string }) => {
 				>
 					<FrameContent Frame={Frame}>{inner}</FrameContent>
 				</AutoFrame>
-			: <div
-					id="preview-frame"
-					className={getClassName('frame')}
-					ref={ref}
-					data-puck-entry
-				>{inner}</div>}
-	</div>;
+			) : (
+				<div id="preview-frame" className={getClassName('frame')} ref={ref} data-puck-entry>
+					{inner}
+				</div>
+			)}
+		</div>
+	);
 };

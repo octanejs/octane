@@ -65,7 +65,11 @@ function ActivePoint(activePointProps: {
 	} else {
 		dot = <Dot {...dotProps} />;
 	}
-	return <Layer className="recharts-active-dot" clipPath={clipPath}>{dot}</Layer>;
+	return (
+		<Layer className="recharts-active-dot" clipPath={clipPath}>
+			{dot}
+		</Layer>
+	);
 }
 
 export function ActivePoints(props: ActivePointsProps) {
@@ -82,20 +86,22 @@ export function ActivePoints(props: ActivePointsProps) {
 	if (points == null || activeDataPoints == null) {
 		return null;
 	}
-	const activePoint: PointType | undefined = points.find(
-		(p) => activeDataPoints.includes(p.payload),
+	const activePoint: PointType | undefined = points.find((p) =>
+		activeDataPoints.includes(p.payload),
 	);
 	if (isNullish(activePoint)) {
 		return null;
 	}
-	return <ZIndexLayer zIndex={zIndex}>
-		<ActivePoint
-			point={activePoint}
-			childIndex={Number(activeTooltipIndex)}
-			mainColor={mainColor}
-			dataKey={itemDataKey}
-			activeDot={activeDot}
-			clipPath={clipPath}
-		/>
-	</ZIndexLayer>;
+	return (
+		<ZIndexLayer zIndex={zIndex}>
+			<ActivePoint
+				point={activePoint}
+				childIndex={Number(activeTooltipIndex)}
+				mainColor={mainColor}
+				dataKey={itemDataKey}
+				activeDot={activeDot}
+				clipPath={clipPath}
+			/>
+		</ZIndexLayer>
+	);
 }

@@ -79,10 +79,10 @@ export function Group(props: GroupProps) @{
 		if (state) {
 			const dragActive =
 				interaction.state === 'active' &&
-					interaction.hitRegions.some((region) => region.group === group);
+				interaction.hitRegions.some((region) => region.group === group);
 			return {
 				flexGrow: state.layout[panelId] ?? 1,
-				pointerEvents: dragActive ? 'none' as const : undefined,
+				pointerEvents: dragActive ? ('none' as const) : undefined,
 			};
 		}
 		const initialSize = defaultLayout?.[panelId];
@@ -128,10 +128,11 @@ export function Group(props: GroupProps) @{
 				if (panel) panel.panelConstraints.disabled = next.disabled;
 				const group = getRegisteredGroup(id);
 				const state = getMountedGroupState(id);
-				if (group && state) updateMountedGroup(group, {
-					...state,
-					derivedPanelConstraints: calculatePanelConstraints(group),
-				});
+				if (group && state)
+					updateMountedGroup(group, {
+						...state,
+						derivedPanelConstraints: calculatePanelConstraints(group),
+					});
 			},
 			updateSeparatorProps(separatorId, next) {
 				const separator = valuesRef.current.separators.find(
@@ -151,7 +152,7 @@ export function Group(props: GroupProps) @{
 		let sortedDefaultLayout: Layout | undefined;
 		if (
 			stableProps.defaultLayout &&
-				Object.keys(stableProps.defaultLayout).length === values.panels.length
+			Object.keys(stableProps.defaultLayout).length === values.panels.length
 		) {
 			sortedDefaultLayout = {};
 			for (const panel of values.panels) {
@@ -189,26 +190,33 @@ export function Group(props: GroupProps) @{
 			for (const constraints of derivedPanelConstraints) {
 				const previousLayout = event.prev?.layout;
 				if (
-					constraints.collapsible && previousLayout &&
-						layoutNumbersEqual(constraints.collapsedSize, layout[constraints.panelId]) &&
-						!layoutNumbersEqual(constraints.collapsedSize, previousLayout[constraints.panelId])
+					constraints.collapsible &&
+					previousLayout &&
+					layoutNumbersEqual(constraints.collapsedSize, layout[constraints.panelId]) &&
+					!layoutNumbersEqual(constraints.collapsedSize, previousLayout[constraints.panelId])
 				) {
 					group.mutableState.expandedPanelSizes[constraints.panelId] =
 						previousLayout[constraints.panelId];
 				}
 			}
 			onLayoutChange(layout);
-			if (getInteractionState().state !== 'active') onLayoutChanged(
-				layout,
-				event.isUserInteraction,
-			);
+			if (getInteractionState().state !== 'active')
+				onLayoutChanged(layout, event.isUserInteraction);
 		});
 		return () => {
 			registeredGroupRef.current = null;
 			unmount();
 			unsubscribe();
 		};
-	}, [disabled, id, onLayoutChange, onLayoutChanged, orientation, panelOrSeparatorChangeSigil, stableProps]);
+	}, [
+		disabled,
+		id,
+		onLayoutChange,
+		onLayoutChanged,
+		orientation,
+		panelOrSeparatorChangeSigil,
+		stableProps,
+	]);
 
 	// Match upstream: prop updates only refresh mutable state; they do not reapply
 	// defaultLayout via setLayout (React leaves the live layout alone).
@@ -219,26 +227,30 @@ export function Group(props: GroupProps) @{
 		group.mutableState.disableCursor = !!disableCursor;
 	}, [defaultLayout, disableCursor]);
 
-	return <GroupContext value={context}>
-		<div
-			{...rest}
-			className={className}
-			data-group
-			data-testid={id}
-			id={id}
-			ref={mergedRef}
-			style={{
-				height: '100%',
-				width: '100%',
-				overflow: 'hidden',
-				...style,
-				display: 'flex',
-				flexDirection: orientation === 'horizontal' ? 'row' : 'column',
-				flexWrap: 'nowrap',
-				touchAction: orientation === 'horizontal' ? 'pan-y' : 'pan-x',
-			}}
-		>{children}</div>
-	</GroupContext>;
+	return (
+		<GroupContext value={context}>
+			<div
+				{...rest}
+				className={className}
+				data-group
+				data-testid={id}
+				id={id}
+				ref={mergedRef}
+				style={{
+					height: '100%',
+					width: '100%',
+					overflow: 'hidden',
+					...style,
+					display: 'flex',
+					flexDirection: orientation === 'horizontal' ? 'row' : 'column',
+					flexWrap: 'nowrap',
+					touchAction: orientation === 'horizontal' ? 'pan-y' : 'pan-x',
+				}}
+			>
+				{children}
+			</div>
+		</GroupContext>
+	);
 }
 
 (Group as { displayName?: string }).displayName = 'Group';

@@ -28,7 +28,9 @@ export function SvgStatic() @{
 	<svg id="chart" viewBox="0 0 100 100" class="chart">
 		<circle cx="50" cy="50" r="40" fill="red" />
 		<g class="labels">
-			<text x="50" y="55">{'hi'}</text>
+			<text x="50" y="55">
+				{'hi'}
+			</text>
 		</g>
 	</svg>
 }

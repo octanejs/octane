@@ -10,17 +10,16 @@ import { containerStyle } from '../../styles/utils';
 import type { FlowRendererProps } from '../FlowRenderer/index.tsrx';
 import type { ReactFlowState } from '../../types';
 
-type ZoomPaneProps =
-	Omit<
-		FlowRendererProps,
-		| 'deleteKeyCode'
-		| 'selectionKeyCode'
-		| 'multiSelectionKeyCode'
-		| 'noDragClassName'
-		| 'disableKeyboardA11y'
-	> & {
-		isControlledViewport: boolean;
-	};
+type ZoomPaneProps = Omit<
+	FlowRendererProps,
+	| 'deleteKeyCode'
+	| 'selectionKeyCode'
+	| 'multiSelectionKeyCode'
+	| 'noDragClassName'
+	| 'disableKeyboardA11y'
+> & {
+	isControlledViewport: boolean;
+};
 
 const selector = (s: ReactFlowState) => ({
 	userSelectionActive: s.userSelectionActive,
@@ -59,13 +58,16 @@ export function ZoomPane({
 
 	useResizeHandler(zoomPane);
 
-	const onTransformChange = useCallback((transform: Transform) => {
-		onViewportChange?.({ x: transform[0], y: transform[1], zoom: transform[2] });
+	const onTransformChange = useCallback(
+		(transform: Transform) => {
+			onViewportChange?.({ x: transform[0], y: transform[1], zoom: transform[2] });
 
-		if (!isControlledViewport) {
-			store.setState({ transform });
-		}
-	}, [onViewportChange, isControlledViewport]);
+			if (!isControlledViewport) {
+				store.setState({ transform });
+			}
+		},
+		[onViewportChange, isControlledViewport],
+	);
 
 	useEffect(() => {
 		if (zoomPane.current) {
@@ -75,9 +77,10 @@ export function ZoomPane({
 				maxZoom,
 				translateExtent,
 				viewport: defaultViewport,
-				onDraggingChange: (paneDragging) => store.setState(
-					(prevState) => (prevState.paneDragging === paneDragging ? prevState : { paneDragging }),
-				),
+				onDraggingChange: (paneDragging) =>
+					store.setState((prevState) =>
+						prevState.paneDragging === paneDragging ? prevState : { paneDragging },
+					),
 				onPanZoomStart: (event, vp) => {
 					const { onViewportChangeStart, onMoveStart } = store.getState();
 					onMoveStart?.(event, vp);
@@ -151,9 +154,9 @@ export function ZoomPane({
 		paneClickDistance,
 	]);
 
-	return <div
-		className="react-flow__renderer"
-		ref={zoomPane}
-		style={containerStyle}
-	>{children}</div>;
+	return (
+		<div className="react-flow__renderer" ref={zoomPane} style={containerStyle}>
+			{children}
+		</div>
+	);
 }

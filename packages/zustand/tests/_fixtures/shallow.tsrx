@@ -1,14 +1,12 @@
 import { create } from '@octanejs/zustand';
 import { useShallow } from '@octanejs/zustand/shallow';
 
-export const useObj = create(
-	(set) => ({
-		a: 0,
-		b: 0,
-		bumpA: () => set((s) => ({ a: s.a + 1 })),
-		bumpB: () => set((s) => ({ b: s.b + 1 })),
-	}),
-);
+export const useObj = create((set) => ({
+	a: 0,
+	b: 0,
+	bumpA: () => set((s) => ({ a: s.a + 1 })),
+	bumpB: () => set((s) => ({ b: s.b + 1 })),
+}));
 
 // Object-slice selector WITHOUT useShallow: returns a fresh object every call, so
 // the snapshot is never Object.is-equal → re-renders on EVERY store change (and

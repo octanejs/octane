@@ -40,7 +40,7 @@
       "arch": "any",
       "packageManager": "pnpm@12.9.1",
       "lockfile": "pnpm-lock.yaml",
-      "lockfileSha256": "e92f4520cd88a2593a0ecd555e0532b2e4e8bb1396c9558a09f0cbf3fbaa5917"
+      "lockfileSha256": "caea67fe61ab57f3e8cbd8a0e55f0e8b3014b3dd6815c6fe6e158095f291daeb"
     }
   },
   "lanes": [
@@ -421,7 +421,7 @@
         {
           "path": "packages/react-map-gl/tests/_fixtures/upstream-apps.tsrx",
           "role": "support",
-          "sha256": "0370152e58bb2e0de81a639cbaf337b03a9fd8ab8e451c75e9ccae521484a9fc"
+          "sha256": "689d69b61f502d294070fa3c06c0975c82d88f74ec8cbbb89cb380c07c326c57"
         }
       ]
     },
@@ -561,27 +561,27 @@
         {
           "path": "packages/react-map-gl/tests/_fixtures/differential/map-diff.tsrx",
           "role": "support",
-          "sha256": "22dc434d30277a4e71df593c4b4fcc83a84d074dca7f870c386e3f64a2c95c03"
+          "sha256": "a15a70d587272454d2db864df1d1167ad8a2c5802c322ceb9ead2be9bca4605f"
         },
         {
           "path": "packages/react-map-gl/tests/_fixtures/differential/source-layer-diff.tsrx",
           "role": "support",
-          "sha256": "25c6034063651d79110ab4db4aea894e5012c8ef407d0f0402d8195d2e0d82c6"
+          "sha256": "bdab0aab84164b307faa9aace51794ad91723c3ef7cdc5febb45153dbb673726"
         },
         {
           "path": "packages/react-map-gl/tests/_fixtures/differential/overlay-diff.tsrx",
           "role": "support",
-          "sha256": "acb27e3657c5ec2b560e4c1c0d102983f10caffdde2116dd3c1d29cbf384de2f"
+          "sha256": "9f8a8e02f73d4e7a0047a88af62e6efcca2f7baeaf16eb8ebfaf5a85991676da"
         },
         {
           "path": "packages/react-map-gl/tests/_fixtures/differential/use-map-diff.tsrx",
           "role": "support",
-          "sha256": "84b5dcef729f592bf9f64bd2b774a632e917a3402214968f2abd01c2e6b5a539"
+          "sha256": "96ae7210b5639db01f96aecbd9d5c50aaf7f20c226f8a8e9403e82303f2ab43d"
         },
         {
           "path": "packages/react-map-gl/tests/_fixtures/differential/use-control-diff.tsrx",
           "role": "support",
-          "sha256": "ec6c5bf38832663f18f5c9bff3fcd91ac9e9d5981d8dea6850d8cf7c589fbba2"
+          "sha256": "c2a6a5628acbdc51bada6e36ecdbf97946c6047708875ccc1a7d276940ef95ae"
         },
         {
           "path": "packages/react-map-gl/tests/_fixtures/differential/marker-children-diff.tsrx",

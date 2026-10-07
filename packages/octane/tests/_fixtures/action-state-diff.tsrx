@@ -11,7 +11,9 @@ export function VersionedActionForm(props: { gate: Promise<void> }) @{
 	}, 'init');
 	<form action={formAction}>
 		<input id="field" name="name" />
-		<button id="swap" type="button" onClick={() => setVersion('new')}>{'swap'}</button>
+		<button id="swap" type="button" onClick={() => setVersion('new')}>
+			{'swap'}
+		</button>
 		<span id="state">{state as string}</span>
 		<span id="pending">{(isPending ? 'pending' : 'idle') as string}</span>
 	</form>

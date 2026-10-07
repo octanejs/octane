@@ -29,7 +29,9 @@ function Toggling() @{
 			<Meta name="robots" content="noindex" />
 		}
 		<main>
-			<button id="drop" onClick={() => setExtra(false)}>drop</button>
+			<button id="drop" onClick={() => setExtra(false)}>
+				drop
+			</button>
 		</main>
 	</>
 }
@@ -41,7 +43,9 @@ function Renaming() @{
 		<Title text="Renaming" />
 		<Meta name={name} content="value" />
 		<main>
-			<button id="rename" onClick={() => setName('second')}>rename</button>
+			<button id="rename" onClick={() => setName('second')}>
+				rename
+			</button>
 		</main>
 	</>
 }
@@ -52,10 +56,18 @@ export function NavApp() @{
 		<Title text="Site default" />
 		<Link rel="icon" href="/favicon.ico" />
 		<nav>
-			<button id="to-home" onClick={() => setRoute('home')}>home</button>
-			<button id="to-article" onClick={() => setRoute('article')}>article</button>
-			<button id="to-toggling" onClick={() => setRoute('toggling')}>toggling</button>
-			<button id="to-renaming" onClick={() => setRoute('renaming')}>renaming</button>
+			<button id="to-home" onClick={() => setRoute('home')}>
+				home
+			</button>
+			<button id="to-article" onClick={() => setRoute('article')}>
+				article
+			</button>
+			<button id="to-toggling" onClick={() => setRoute('toggling')}>
+				toggling
+			</button>
+			<button id="to-renaming" onClick={() => setRoute('renaming')}>
+				renaming
+			</button>
 		</nav>
 		@switch (route) {
 			@case 'home': {

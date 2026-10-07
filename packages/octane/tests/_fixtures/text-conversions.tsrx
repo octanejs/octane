@@ -28,18 +28,12 @@ export function NestedString(props: { value: unknown; child: OctaneNode }) @{
 	</main>
 }
 
-export function ParameterString(props: {
-	String: (value: string) => OctaneNode;
-	value: string;
-}) @{
+export function ParameterString(props: { String: (value: string) => OctaneNode; value: string }) @{
 	const { String, value } = props;
 	<div id="parameter-string">{String(value)}</div>
 }
 
-export function LocalString(props: {
-	render: (value: string) => OctaneNode;
-	value: string;
-}) @{
+export function LocalString(props: { render: (value: string) => OctaneNode; value: string }) @{
 	const String = props.render;
 	<div id="local-string">{String(props.value)}</div>
 }

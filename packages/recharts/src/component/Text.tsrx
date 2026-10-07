@@ -34,8 +34,10 @@ interface TextProps {
 }
 export type Props = Omit<SVGProps<SVGTextElement>, 'textAnchor' | 'verticalAnchor'> & TextProps;
 type CalculateWordsByLinesProps = Pick<Props, 'maxLines' | 'children' | 'style' | 'breakAll'>;
-type GetWordsByLinesProps =
-	Pick<Props, 'width' | 'scaleToFit' | 'children' | 'style' | 'breakAll' | 'maxLines'>;
+type GetWordsByLinesProps = Pick<
+	Props,
+	'width' | 'scaleToFit' | 'children' | 'style' | 'breakAll' | 'maxLines'
+>;
 // Port of component/Text.tsx — the SVG text renderer with word wrapping,
 // maxLines binary-search truncation, scaleToFit, and rotation. Measurement
 // runs through the vendored getStringSize (0×0 under SSR, so SSR renders the
@@ -66,12 +68,10 @@ const calculateWordWidths = ({
 				words = children.toString().split(BREAKING_SPACES);
 			}
 		}
-		const wordsWithComputedWidth = words.map(
-			(word) => ({
-				word,
-				width: getStringSize(word, style).width,
-			}),
-		);
+		const wordsWithComputedWidth = words.map((word) => ({
+			word,
+			width: getStringSize(word, style).width,
+		}));
 		const spaceWidth = breakAll ? 0 : getStringSize(' ', style).width;
 		return { wordsWithComputedWidth, spaceWidth };
 	} catch {
@@ -84,8 +84,9 @@ export function isValidTextAnchor(value: string | undefined): value is TextAncho
 }
 
 export function isRenderableText(val: unknown): val is RenderableText {
-	return isNullish(val) || typeof val === 'string' || typeof val === 'number' ||
-		typeof val === 'boolean';
+	return (
+		isNullish(val) || typeof val === 'string' || typeof val === 'number' || typeof val === 'boolean'
+	);
 }
 
 const calculate = (
@@ -93,26 +94,28 @@ const calculate = (
 	lineWidth: number | string | undefined,
 	spaceWidth: number,
 	scaleToFit: boolean,
-): WordsWithWidth[] => words.reduce<WordsWithWidth[]>((result, { word, width }) => {
-	const currentLine = result[result.length - 1];
-	if (
-		currentLine && width != null &&
-			(lineWidth == null || scaleToFit ||
+): WordsWithWidth[] =>
+	words.reduce<WordsWithWidth[]>((result, { word, width }) => {
+		const currentLine = result[result.length - 1];
+		if (
+			currentLine &&
+			width != null &&
+			(lineWidth == null ||
+				scaleToFit ||
 				currentLine.width + width + spaceWidth < Number(lineWidth))
-	) {
-		// Word can be added to an existing line
-		currentLine.words.push(word);
-		currentLine.width += width + spaceWidth;
-	} else {
-		// Add first word to line or word is too long to scaleToFit on existing line
-		result.push({ words: [word], width });
-	}
-	return result;
-}, []);
+		) {
+			// Word can be added to an existing line
+			currentLine.words.push(word);
+			currentLine.width += width + spaceWidth;
+		} else {
+			// Add first word to line or word is too long to scaleToFit on existing line
+			result.push({ words: [word], width });
+		}
+		return result;
+	}, []);
 
-const findLongestLine = (words: ReadonlyArray<WordsWithWidth>) => words.reduce(
-	(a, b) => (a.width > b.width ? a : b),
-);
+const findLongestLine = (words: ReadonlyArray<WordsWithWidth>) =>
+	words.reduce((a, b) => (a.width > b.width ? a : b));
 
 const suffix = '…';
 
@@ -210,11 +213,8 @@ const calculateWordsByLines = (
 };
 
 const getWordsWithoutCalculate = (children: OctaneNode) => {
-	const words =
-		!isNullish(children) ? children.toString().split(BREAKING_SPACES) : [];
-	return [
-		{ words, width: undefined },
-	];
+	const words = !isNullish(children) ? children.toString().split(BREAKING_SPACES) : [];
+	return [{ words, width: undefined }];
 };
 
 export const getWordsByLines = ({
@@ -299,7 +299,12 @@ export function Text(outsideProps: Props) @{
 			break;
 		case 'middle':
 			startDy = reduceCSSCalc(
-				'calc(' + (wordsByLines.length - 1) / 2 + ' * -' + lineHeight + ' + (' + capHeight +
+				'calc(' +
+					(wordsByLines.length - 1) / 2 +
+					' * -' +
+					lineHeight +
+					' + (' +
+					capHeight +
 					' / 2))',
 			);
 			break;
@@ -330,15 +335,17 @@ export function Text(outsideProps: Props) @{
 		class={clsx('recharts-text', className)}
 		textAnchor={textAnchor}
 		fill={fill.includes('url') ? DEFAULT_FILL : fill}
-	>{wordsByLines.map((line, index) => {
-		const words = line.words.join(breakAll ? '' : ' ');
-		// duplicate words would cause duplicate keys — the index disambiguates
-		return <tspan
-			x={x}
-			dy={index === 0 ? startDy : lineHeight}
-			key={words + '-' + index}
-		>{words}</tspan>;
-	})}</text>
+	>
+		{wordsByLines.map((line, index) => {
+			const words = line.words.join(breakAll ? '' : ' ');
+			// duplicate words would cause duplicate keys — the index disambiguates
+			return (
+				<tspan x={x} dy={index === 0 ? startDy : lineHeight} key={words + '-' + index}>
+					{words}
+				</tspan>
+			);
+		})}
+	</text>
 }
 
 Text.displayName = 'Text';

@@ -45,13 +45,12 @@ interface State {
 function DraggableImpl(inputProps: Partial<DraggableProps>): ElementDescriptor {
 	const props = { ...defaults, ...inputProps } as Required<typeof defaults> & DraggableProps;
 	const [, rerender] = useState(0);
-	const child = Children.only(props.children) as
-		ElementDescriptor<{
-			class?: string;
-			className?: string;
-			style?: Record<string, unknown>;
-			ref?: unknown;
-		}>;
+	const child = Children.only(props.children) as ElementDescriptor<{
+		class?: string;
+		className?: string;
+		style?: Record<string, unknown>;
+		ref?: unknown;
+	}>;
 	const nodeRef = props.nodeRef;
 	const stateRef = useRef<State | null>(null);
 	if (!stateRef.current) {
@@ -75,8 +74,9 @@ function DraggableImpl(inputProps: Partial<DraggableProps>): ElementDescriptor {
 	const state = stateRef.current;
 	if (
 		props.position &&
-			(!state.prevPropsPosition || props.position.x !== state.prevPropsPosition.x ||
-				props.position.y !== state.prevPropsPosition.y)
+		(!state.prevPropsPosition ||
+			props.position.x !== state.prevPropsPosition.x ||
+			props.position.y !== state.prevPropsPosition.y)
 	) {
 		state.x = props.position.x;
 		state.y = props.position.y;
@@ -98,9 +98,13 @@ function DraggableImpl(inputProps: Partial<DraggableProps>): ElementDescriptor {
 	const onDrag = (event: DraggableEvent, coreData: DraggableData) => {
 		if (!state.dragging) return false;
 		const data = createDraggableData(model, coreData);
-		let x = data.x, y = data.y, slackX = 0, slackY = 0;
+		let x = data.x,
+			y = data.y,
+			slackX = 0,
+			slackY = 0;
 		if (props.bounds) {
-			const originalX = x, originalY = y;
+			const originalX = x,
+				originalY = y;
 			[x, y] = getBoundPosition(model, x + state.slackX, y + state.slackY);
 			slackX = state.slackX + originalX - x;
 			slackY = state.slackY + originalY - y;
@@ -135,29 +139,25 @@ function DraggableImpl(inputProps: Partial<DraggableProps>): ElementDescriptor {
 		x: canDragX(model) && movable ? state.x : valid.x,
 		y: canDragY(model) && movable ? state.y : valid.y,
 	};
-	const transform =
-		state.isElementSVG
-			? {
-					style: { ...child.props.style },
-					transform: createSVGTransform(position, props.positionOffset!),
-				}
-			: {
-					style: { ...child.props.style, ...createCSSTransform(position, props.positionOffset!) },
-					transform: null,
-				};
+	const transform = state.isElementSVG
+		? {
+				style: { ...child.props.style },
+				transform: createSVGTransform(position, props.positionOffset!),
+			}
+		: {
+				style: { ...child.props.style, ...createCSSTransform(position, props.positionOffset!) },
+				transform: null,
+			};
 	// Keep one stable host ref callback across drag re-renders. A fresh function each
 	// render would look like a ref swap to Octane and churn React-19 child cleanups.
 	type HostEl = HTMLElement | SVGElement;
 	type ChildRef = StructuralRef<HostEl> | null | undefined;
-	const forwardRefBag = useRef<
-		| {
-				callback: (value: HostEl | null) => void;
-				nodeRef: DraggableProps['nodeRef'];
-				childRef: ChildRef;
-				attached: HostEl | null;
-		  }
-		| null
-	>(null);
+	const forwardRefBag = useRef<{
+		callback: (value: HostEl | null) => void;
+		nodeRef: DraggableProps['nodeRef'];
+		childRef: ChildRef;
+		attached: HostEl | null;
+	} | null>(null);
 	if (!forwardRefBag.current) {
 		forwardRefBag.current = {
 			nodeRef,
@@ -220,12 +220,11 @@ function DraggableImpl(inputProps: Partial<DraggableProps>): ElementDescriptor {
 	});
 }
 
-const Draggable = DraggableImpl as
-	typeof DraggableImpl & {
-		displayName?: string;
-		defaultProps: DraggableProps;
-		propTypes?: Record<string, unknown>;
-	};
+const Draggable = DraggableImpl as typeof DraggableImpl & {
+	displayName?: string;
+	defaultProps: DraggableProps;
+	propTypes?: Record<string, unknown>;
+};
 Draggable.displayName = 'Draggable';
 Draggable.defaultProps = { ...DraggableCore.defaultProps, ...defaults } as DraggableProps;
 

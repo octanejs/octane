@@ -11,7 +11,9 @@ export function Greeting(props) @{
 // component updates in place (no remount) across parent re-renders.
 export function Counter(props) @{
 	const [n, setN] = useState(0);
-	<button class="counter" onClick={() => setN(n + 1)}>{'n:' + n + ' p:' + props.p}</button>
+	<button class="counter" onClick={() => setN(n + 1)}>
+		{'n:' + n + ' p:' + props.p}
+	</button>
 }
 
 // Host that mounts whatever component the test passes, inside a boundary.
@@ -23,7 +25,7 @@ export function LazyHost(props) @{
 		} @pending {
 			<div class="fallback">{'loading'}</div>
 		} @catch (err) {
-			<div class="error">{'caught: ' + err.message as string}</div>
+			<div class="error">{('caught: ' + err.message) as string}</div>
 		}
 	</>
 }
@@ -34,7 +36,9 @@ export function LazyUpdateHost(props) @{
 	const C = props.comp;
 	const [p, setP] = useState(0);
 	<>
-		<button id="bump" onClick={() => setP(p + 1)}>{'bump'}</button>
+		<button id="bump" onClick={() => setP(p + 1)}>
+			{'bump'}
+		</button>
 		@try {
 			<C p={p} />
 		} @pending {

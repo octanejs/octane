@@ -37,10 +37,8 @@ export default function ChatApp() @{
 		if (text === '') return;
 		const reply = nextReply();
 		flushSync(() => {
-			convs.value = convs.value.map(
-				(c, i) => i === active.value
-					? { ...c, messages: [...c.messages, userMessage(text), reply] }
-					: c,
+			convs.value = convs.value.map((c, i) =>
+				i === active.value ? { ...c, messages: [...c.messages, userMessage(text), reply] } : c,
 			);
 			streamingId.value = reply.id;
 			draft.value = '';
@@ -54,8 +52,8 @@ export default function ChatApp() @{
 		if (msg === undefined) return 0;
 		const done = Math.min(msg.total, msg.done + k);
 		flushSync(() => {
-			convs.value = convs.value.map(
-				(c, i) => i === active.value
+			convs.value = convs.value.map((c, i) =>
+				i === active.value
 					? { ...c, messages: c.messages.map((m) => (m.id === sid ? { ...m, done } : m)) }
 					: c,
 			);
@@ -63,12 +61,13 @@ export default function ChatApp() @{
 		});
 		return msg.total - done;
 	};
-	(window as any).__reset = () => flushSync(() => {
-		convs.value = initialConversations();
-		active.value = 0;
-		draft.value = '';
-		streamingId.value = null;
-	});
+	(window as any).__reset = () =>
+		flushSync(() => {
+			convs.value = initialConversations();
+			active.value = 0;
+			draft.value = '';
+			streamingId.value = null;
+		});
 
 	const conv = () => convs.value[active.value];
 
@@ -80,10 +79,14 @@ export default function ChatApp() @{
 					<button
 						class={c.id === active.value ? 'conv-tab active' : 'conv-tab'}
 						data-conv={'' + c.id}
-						onClick={() => flushSync(() => {
-							active.value = c.id;
-						})}
-					>{c.title}</button>
+						onClick={() =>
+							flushSync(() => {
+								active.value = c.id;
+							})
+						}
+					>
+						{c.title}
+					</button>
 				}
 			</nav>
 		</header>
@@ -109,14 +112,18 @@ export default function ChatApp() @{
 				class="prompt"
 				placeholder="Message…"
 				value={draft.value}
-				onInput={(e: Event) => flushSync(() => {
-					draft.value = (e.target as HTMLInputElement).value;
-				})}
+				onInput={(e: Event) =>
+					flushSync(() => {
+						draft.value = (e.target as HTMLInputElement).value;
+					})
+				}
 				onKeyDown={(e: KeyboardEvent) => {
 					if (e.key === 'Enter') send();
 				}}
 			/>
-			<button class="send" onClick={send}>{'Send'}</button>
+			<button class="send" onClick={send}>
+				{'Send'}
+			</button>
 		</footer>
 	</div>
 }
