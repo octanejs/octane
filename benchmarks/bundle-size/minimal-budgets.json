@@ -70,9 +70,9 @@
     "brotli": 60183
   },
   "hydrate-frame": {
-    "raw": 362888,
-    "gzip": 112367,
-    "brotli": 96288
+    "raw": 364034,
+    "gzip": 112855,
+    "brotli": 96616
   },
   "suspense-transition": {
     "raw": 138950,
