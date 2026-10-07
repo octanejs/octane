@@ -88,18 +88,39 @@ describe('compile errors — rejected authoring patterns', () => {
 		);
 	});
 
-	it('rejects a self-referencing named default component whose body redeclares its name', () => {
-		const src = `const Name = 1;
-export default (function Name() @{
+	// A self-reference reads the component through a body alias, which neither a
+	// parameter expression nor a body that redeclares the name can use safely.
+	it.each([
+		[
+			'in a parameter default',
+			'function Name({ x = Name.name }: { x?: string }) @{ <p>{x as string}</p>; }',
+			/^Component `Name` refers to itself by name in a parameter, /,
+		],
+		[
+			'in a computed parameter key',
+			'function Name({ [Name.name]: x }: Record<string, string>) @{ <p>{x as string}</p>; }',
+			/^Component `Name` refers to itself by name in a parameter, /,
+		],
+		[
+			'beside a body redeclaration',
+			`function Name() @{
 	const read = () => { const Name = 'inner'; return Name; };
 	<p>{read() as string}{Name.name as string}</p>;
-})`;
-		for (const mode of ['client', 'server'] as const) {
-			expect(() => compile(src, 'named-default.tsrx', { mode })).toThrow(
-				/^Component `Name` refers to itself by name, .*Rename the component's function expression\./,
-			);
-		}
-	});
+}`,
+			/^Component `Name` refers to itself by name while its body also declares `Name`, /,
+		],
+	])(
+		'rejects a colliding named default component that refers to itself %s',
+		(_where, fn, message) => {
+			const src = `const Name = 1;\nexport default (${fn})`;
+			for (const mode of ['client', 'server'] as const) {
+				expect(() => compile(src, 'named-default.tsrx', { mode })).toThrow(message);
+				expect(() => compile(src, 'named-default.tsrx', { mode })).toThrow(
+					/but its module also declares `Name`\. Rename the component's function expression\.$/,
+				);
+			}
+		},
+	);
 
 	it('rejects a generator (`function*`) component', () => {
 		const src = `export function* Gen() @{ <div>{1}</div> }`;

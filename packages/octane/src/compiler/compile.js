@@ -9130,11 +9130,17 @@ function bindDefaultComponent(ast) {
 		let block = component.body;
 		const unnamed = { ...component, id: null };
 		if (collectFreeIdentifiers(unnamed, []).has(self)) {
-			// A declaration of `Name` the free-identifier walk cannot place could
-			// collide with the alias, so reject instead of guessing its scope.
-			if (collectModuleBoundNames(unnamed).has(self)) {
+			// The alias lives in the body, so parameter defaults and computed keys
+			// cannot see it, and a declaration of `Name` the free-identifier walk
+			// cannot place could collide with it. Reject both instead of guessing.
+			const where = collectFreeIdentifiers({ ...unnamed, body: b.block([]) }, []).has(self)
+				? 'in a parameter'
+				: collectModuleBoundNames(unnamed).has(self)
+					? `while its body also declares \`${self}\``
+					: null;
+			if (where !== null) {
 				throw new Error(
-					`Component \`${self}\` refers to itself by name, but its module and its own body also declare \`${self}\`. Rename the component's function expression.`,
+					`Component \`${self}\` refers to itself by name ${where}, but its module also declares \`${self}\`. Rename the component's function expression.`,
 				);
 			}
 			// After any directive prologue, which must stay first in the body.

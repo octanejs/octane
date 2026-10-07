@@ -12,5 +12,6 @@ it. An `async` arrow is rejected with an error that names `default`.
 
 `export default (function Name() @{ … })` no longer redeclares a module binding
 that shares the component's name. The component gets a fresh module binding,
-and its body still resolves `Name` to the component itself. If the body also
-declares its own `Name`, the compiler asks you to rename the function expression.
+and its body still resolves `Name` to the component itself. If a parameter
+default or computed key refers to `Name`, or the body also declares its own
+`Name`, the compiler asks you to rename the function expression.
