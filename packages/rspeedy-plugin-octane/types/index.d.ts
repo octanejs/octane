@@ -80,6 +80,7 @@ export interface LynxToolchainLane {
 			| '@rsbuild/plugin-css-minimizer'
 			| '@rsdoctor/rspack-plugin'
 			| '@rspack/core'
+			| '@tsrx/oxc'
 			| 'typescript'
 			| 'webpack',
 			string

@@ -21,6 +21,9 @@ const SHARED_PACKAGES = Object.freeze({
 	'@rsbuild/core': '2.1.4',
 	'@rsbuild/plugin-css-minimizer': '2.0.0',
 	'@rsdoctor/rspack-plugin': '1.5.18',
+	// Octane's optional compiler parser peer: the plugin compiles components in
+	// Node, so every lane installs it at the version octane declares.
+	'@tsrx/oxc': '0.16.0',
 	typescript: '5.9.3',
 	webpack: '5.108.4',
 });
