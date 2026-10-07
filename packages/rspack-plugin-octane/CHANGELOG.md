@@ -1,5 +1,45 @@
 # @octanejs/rspack-plugin
 
+## 0.2.0
+
+### Minor Changes
+
+- b8e55da: Rspack production client builds now specialize roots and component calls over
+  imported void components, as the Vite plugin already does. Before, a
+  `createRoot` or `hydrateRoot` root over a compiled `@{}` component imported from
+  another module kept the generic returned-value renderer. The issue's one-root
+  `hydrateRoot` app drops from about 86 KB to 52 KB gzip.
+
+  The plugin proves each import from the module graph after make, then compiles
+  the importer once more with the proof. An import is proven only when Octane
+  compiled it as a void export and the provider's final JavaScript, after SWC and
+  every later loader, still cannot return a value. The importer's final code must
+  also bind it to the same module and export. A loader that changes either keeps
+  the generic path. A proven module that changes later, such as through another
+  plugin's rebuild, fails the build. Watch, development, HMR and profiling builds
+  stay generic, as do builds with a custom `runtime`, `universalRuntime` or
+  `layerSpecializations`.
+
+  `octane/compiler/bundler` adds `analyzeCompiledModule(source, id)`, which reads
+  these facts from a module's final JavaScript for bundler adapters.
+
+### Patch Changes
+
+- Updated dependencies [8e16346]
+- Updated dependencies [ceba949]
+- Updated dependencies [0bb170c]
+- Updated dependencies [50e18cc]
+- Updated dependencies [e595a13]
+- Updated dependencies [5722871]
+- Updated dependencies [8a9969c]
+- Updated dependencies [995aa9a]
+- Updated dependencies [8996380]
+- Updated dependencies [b8e55da]
+- Updated dependencies [7e1793f]
+- Updated dependencies [8855e2f]
+- Updated dependencies [7023961]
+  - octane@0.11.0
+
 ## 0.1.58
 
 ### Patch Changes

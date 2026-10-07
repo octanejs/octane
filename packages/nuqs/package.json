@@ -1,6 +1,6 @@
 {
   "name": "@octanejs/nuqs",
-  "version": "0.1.49",
+  "version": "0.1.50",
   "license": "MIT",
   "type": "module",
   "engines": {
@@ -42,7 +42,7 @@
     "@standard-schema/spec": "catalog:default"
   },
   "peerDependencies": {
-    "octane": "workspace:^0.10.0"
+    "octane": "workspace:^0.11.0"
   },
   "devDependencies": {
     "@octanejs/testing-library": "workspace:*",

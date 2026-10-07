@@ -1,6 +1,6 @@
 {
   "name": "@octanejs/tanstack-hotkeys",
-  "version": "0.0.52",
+  "version": "0.0.53",
   "license": "MIT",
   "type": "module",
   "engines": {
@@ -39,7 +39,7 @@
   },
   "peerDependencies": {
     "@octanejs/tanstack-store": "workspace:*",
-    "octane": "workspace:^0.10.0"
+    "octane": "workspace:^0.11.0"
   },
   "devDependencies": {
     "@octanejs/tanstack-store": "workspace:*",
