@@ -338,6 +338,30 @@
   {
     "suite": "bundle-reachability",
     "op": "raw",
+    "target": "hydrate-frame",
+    "reference": "hydrate-frame-budget",
+    "maxRatio": 1,
+    "note": "A server-rendered application frame hydrated with native signal reads, a keyed list, a resolved @try boundary, forwarded styles, a portal and a behavior island; deterministic production raw bytes must not exceed the committed same-run budget."
+  },
+  {
+    "suite": "bundle-reachability",
+    "op": "gzip",
+    "target": "hydrate-frame",
+    "reference": "hydrate-frame-budget",
+    "maxRatio": 1,
+    "note": "A server-rendered application frame hydrated with native signal reads, a keyed list, a resolved @try boundary, forwarded styles, a portal and a behavior island; deterministic production gzip bytes must not exceed the committed same-run budget."
+  },
+  {
+    "suite": "bundle-reachability",
+    "op": "brotli",
+    "target": "hydrate-frame",
+    "reference": "hydrate-frame-budget",
+    "maxRatio": 1,
+    "note": "A server-rendered application frame hydrated with native signal reads, a keyed list, a resolved @try boundary, forwarded styles, a portal and a behavior island; deterministic production brotli bytes must not exceed the committed same-run budget."
+  },
+  {
+    "suite": "bundle-reachability",
+    "op": "raw",
     "target": "suspense-transition",
     "reference": "suspense-transition-budget",
     "maxRatio": 1,
@@ -9302,6 +9326,22 @@
     "reference": "direct",
     "maxRatio": 0,
     "note": "Changing ordinary scalar style props uses fixed-field writers without additional native style body invocations; the observed handle control must update the same CSS and preserve identity."
+  },
+  {
+    "suite": "signal-dom-bindings",
+    "op": "style_blocks",
+    "target": "forwarded",
+    "reference": "direct",
+    "maxRatio": 0,
+    "note": "A forwarded string style and an unset one inside a native-capable module have no native read to own, so they allocate no presentation blocks (a production audit of a signed-out home page found 273 such Blocks in one hydration). Direct-handle controls exercise the observer; the forwarded target displays the same CSS and preserves the same host and child."
+  },
+  {
+    "suite": "signal-dom-bindings",
+    "op": "style_update_bodies",
+    "target": "forwarded",
+    "reference": "direct",
+    "maxRatio": 0,
+    "note": "Re-rendering forwarded string and unset styles writes them directly, without native style body invocations; the observed handle control must update the same CSS and preserve identity."
   },
   {
     "suite": "signal-dom-bindings",

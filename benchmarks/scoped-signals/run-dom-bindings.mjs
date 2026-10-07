@@ -79,7 +79,7 @@ try {
 		return build({
 			absWorkingDir: root,
 			stdin: {
-				contents: `export { DirectStyles, SampledStyles, PlainStyles } from './dom-bindings.tsrx'; export { createRoot, flushSync } from 'octane'; export { createScope } from 'octane/signals';`,
+				contents: `export { DirectStyles, SampledStyles, PlainStyles, ForwardedStyles } from './dom-bindings.tsrx'; export { createRoot, flushSync } from 'octane'; export { createScope } from 'octane/signals';`,
 				resolveDir: here,
 			},
 			bundle: true,
@@ -133,12 +133,22 @@ try {
 		value: { blocks: 0, bodies: 0 },
 	});
 	const observed = await import(pathToFileURL(observedFile).href);
+	const exportsByTarget = {
+		direct: 'DirectStyles',
+		sampled: 'SampledStyles',
+		plain: 'PlainStyles',
+		forwarded: 'ForwardedStyles',
+	};
+	// Ordinary prop targets re-render with each value; handle targets mount once.
+	const propsFor = (name, value, record, left$, right$) =>
+		name === 'forwarded'
+			? { style: `color: red; left: ${value}px; right: ${value + 1}px;`, record }
+			: name === 'plain'
+				? { left: value, right: value + 1, record }
+				: { left: 0, right: 0, left$, right$, record };
 	const targets = [];
-	for (const [name, Component] of [
-		['direct', api.DirectStyles],
-		['sampled', api.SampledStyles],
-		['plain', api.PlainStyles],
-	]) {
+	for (const [name, exportName] of Object.entries(exportsByTarget)) {
+		const Component = api[exportName];
 		const scope = api.createScope({ scopeKey: name });
 		const left$ = scope.signal$('left', 0);
 		const right$ = scope.signal$('right', 0);
@@ -148,15 +158,10 @@ try {
 		let calls = 0;
 		const timings = [];
 		try {
-			view.render(Component, {
-				left: 0,
-				right: 0,
-				left$,
-				right$,
-				record: () => {
-					calls++;
-				},
-			});
+			const record = () => {
+				calls++;
+			};
+			view.render(Component, propsFor(name, 0, record, left$, right$));
 			const host = container.querySelector('div');
 			const child = host.firstChild;
 			for (let round = 0; round < iterations + 2; round++) {
@@ -165,14 +170,8 @@ try {
 				for (let i = 1; i <= updates; i++) {
 					const value = round * updates + i;
 					api.flushSync(() => {
-						if (name === 'plain') {
-							view.render(Component, {
-								left: value,
-								right: value + 1,
-								record: () => {
-									calls++;
-								},
-							});
+						if (name === 'plain' || name === 'forwarded') {
+							view.render(Component, propsFor(name, value, record));
 							return;
 						}
 						left$.set(value);
@@ -194,20 +193,14 @@ try {
 			const observedContainer = document.createElement('div');
 			document.body.appendChild(observedContainer);
 			const observedView = observed.createRoot(observedContainer);
-			const observedComponent =
-				observed[
-					name === 'direct' ? 'DirectStyles' : name === 'sampled' ? 'SampledStyles' : 'PlainStyles'
-				];
+			const observedComponent = observed[exportName];
 			let styleWork;
 			try {
 				globalThis.__plainStyleWork = { blocks: 0, bodies: 0 };
-				observedView.render(observedComponent, {
-					left: 0,
-					right: 0,
-					left$: observedLeft$,
-					right$: observedRight$,
-					record: () => {},
-				});
+				observedView.render(
+					observedComponent,
+					propsFor(name, 0, () => {}, observedLeft$, observedRight$),
+				);
 				const initial = observedContainer.querySelector('div');
 				const initialChild = initial.firstChild;
 				const mountedStyleBlocks = globalThis.__plainStyleWork.blocks;
@@ -215,12 +208,11 @@ try {
 				for (let i = 1; i <= updates; i++)
 					observed.flushSync(() => {
 						const value = (iterations + 1) * updates + i;
-						if (name === 'plain')
-							observedView.render(observedComponent, {
-								left: value,
-								right: value + 1,
-								record: () => {},
-							});
+						if (name === 'plain' || name === 'forwarded')
+							observedView.render(
+								observedComponent,
+								propsFor(name, value, () => {}),
+							);
 						else {
 							observedLeft$.set(value);
 							observedRight$.set(value + 1);
