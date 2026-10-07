@@ -75,10 +75,17 @@ const PUBLIC_API_CALLEES = new Set([
 	'createComputed',
 	'createEffect',
 	'createSignalScope',
+	'batch',
+	'trigger',
 	'useSignal',
 	'useSignalValue',
+	'useDeferredSignalValue',
+	'useSignalSelector',
 	'useSetSignal',
 	'useSignalEffect',
+	'useSignalPassiveEffect',
+	'useSignalLayoutEffect',
+	'useSignalInsertionEffect',
 	'useSignalScope',
 	'useComputed',
 ]);
@@ -116,6 +123,49 @@ export function assertionGroups(source, fileName) {
 }
 
 /**
+ * Quote style and trailing commas are formatter output, not type surface.
+ * Reprinting string literals and comma-separated lists as synthesized nodes
+ * lets a Prettier-formatted adapted file match the pinned upstream spelling.
+ */
+function withCanonicalPresentation(node) {
+	const result = ts.transform(node, [
+		function canonicalize(context) {
+			function visit(child) {
+				if (ts.isStringLiteral(child)) return ts.factory.createStringLiteral(child.text);
+				const visited = ts.visitEachChild(child, visit, context);
+				if (ts.isCallExpression(visited) && visited.arguments.hasTrailingComma) {
+					return ts.factory.updateCallExpression(
+						visited,
+						visited.expression,
+						visited.typeArguments,
+						ts.factory.createNodeArray([...visited.arguments], false),
+					);
+				}
+				if (ts.isArrayLiteralExpression(visited) && visited.elements.hasTrailingComma) {
+					return ts.factory.updateArrayLiteralExpression(
+						visited,
+						ts.factory.createNodeArray([...visited.elements], false),
+					);
+				}
+				if (ts.isObjectLiteralExpression(visited) && visited.properties.hasTrailingComma) {
+					return ts.factory.updateObjectLiteralExpression(
+						visited,
+						ts.factory.createNodeArray([...visited.properties], false),
+					);
+				}
+				return visited;
+			}
+			return function visitRoot(root) {
+				return visit(root);
+			};
+		},
+	]);
+	const transformed = result.transformed[0];
+	result.dispose();
+	return transformed;
+}
+
+/**
  * Public-API call sites that must typecheck (not covered by @ts-expect-error).
  * Pins the positive type surface of the upstream typecheck suite one-for-one as
  * a multiset: repeated accepted shapes in distinct scenarios stay distinct, so
@@ -145,7 +195,10 @@ export function acceptedApiCalls(source, fileName) {
 			const line = sourceFile.getLineAndCharacterOfPosition(node.getStart(sourceFile)).line + 1;
 			if (!expectErrorLines.has(line)) {
 				calls.push(
-					printer.printNode(ts.EmitHint.Unspecified, node, sourceFile).replace(/\s+/g, ' ').trim(),
+					printer
+						.printNode(ts.EmitHint.Unspecified, withCanonicalPresentation(node), sourceFile)
+						.replace(/\s+/g, ' ')
+						.trim(),
 				);
 			}
 		}
@@ -256,11 +309,11 @@ function inventoryTypecheckPairs(root, config) {
 			'utf8',
 		);
 		const adaptedSource = readFileSync(resolve(root, config.adaptedRoot, entry.adapted), 'utf8');
+		// A pinned typecheck suite may carry no @ts-expect-error groups; its
+		// accepted public-API calls are then the whole type evidence, and the
+		// adapted counterpart must not add or drop a negative group either.
 		const upstreamGroups = assertionGroups(upstreamSource, entry.upstream);
 		const adaptedGroups = assertionGroups(adaptedSource, entry.adapted);
-		if (upstreamGroups.length === 0) {
-			throw new Error(`${entry.upstream}: upstream typecheck file has no assertion groups`);
-		}
 		if (JSON.stringify(upstreamGroups) !== JSON.stringify(adaptedGroups)) {
 			throw new Error(
 				`${entry.adapted}: assertion groups differ between pristine and adapted type suites`,

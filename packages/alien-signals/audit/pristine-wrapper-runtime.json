@@ -5,9 +5,9 @@
   "files": ["packages/alien-signals/tests/upstream-original.test.ts"],
   "tests": [
     {
-      "id": "runtime:51dba12b69f76316",
+      "id": "runtime:78130a7119fdf792",
       "file": "packages/alien-signals/tests/upstream-original.test.ts",
-      "fullName": "runs the pinned react-alien-signals 0.3.0 suite unchanged"
+      "fullName": "runs the pinned react-alien-signals 0.4.0 suite unchanged"
     }
   ]
 }

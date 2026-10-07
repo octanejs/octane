@@ -6,6 +6,7 @@ import test from 'node:test';
 
 import {
 	assertAdaptedSourceExecutable,
+	assertPerCaseTransitionStructure,
 	assertRuntimeCrosswalk,
 	assertRuntimeStructureCrosswalk,
 	fixtureFileFingerprint,
@@ -141,6 +142,84 @@ test('rejects a weakened expect receiver', function rejectsWeakenedReceiver() {
 	}, /runtime assertion drift/);
 });
 
+test('rejects an argument-free nullish matcher covered by the wrong DOM text', function rejectsWrongNullishText() {
+	const pristineSource = readFileSync(
+		resolve(root, 'packages/alien-signals/upstream/src/index.test.ts'),
+		'utf8',
+	);
+	const adaptedSource = readFileSync(
+		resolve(root, 'packages/alien-signals/tests/upstream-adapted.test.ts'),
+		'utf8',
+	);
+	const fixtureSource = readFileSync(
+		resolve(root, 'packages/alien-signals/tests/_fixtures/hooks.tsrx'),
+		'utf8',
+	);
+	assert.match(pristineSource, /toBeUndefined\(\)/);
+	const weakened = adaptedSource.replace(
+		"expect(result.find('#value').textContent).toBe('undefined');",
+		"expect(result.find('#value').textContent).toBe('null');",
+	);
+	assert.notEqual(weakened, adaptedSource);
+	assert.throws(function run() {
+		assertRuntimeStructureCrosswalk({
+			pristineSource,
+			adaptedSource: weakened,
+			fixtureSource,
+			repoRoot: root,
+		});
+	}, /runtime assertion drift/);
+});
+
+test('rejects replacing a renderHook handle receiver with a literal', function rejectsWeakenedHandleReceiver() {
+	const pristineSource = readFileSync(
+		resolve(root, 'packages/alien-signals/upstream/src/index.test.ts'),
+		'utf8',
+	);
+	const adaptedSource = readFileSync(
+		resolve(root, 'packages/alien-signals/tests/upstream-adapted.test.ts'),
+		'utf8',
+	);
+	const fixtureSource = readFileSync(
+		resolve(root, 'packages/alien-signals/tests/_fixtures/hooks.tsrx'),
+		'utf8',
+	);
+	assert.match(pristineSource, /expect\(hook\.result\.current\)\.toEqual\(\[2, 1\]\)/);
+	const weakened = adaptedSource.replace(
+		"expect(result.find('#values').textContent).toBe(JSON.stringify([2, 1]));",
+		'expect(JSON.stringify([2, 1])).toBe(JSON.stringify([2, 1]));',
+	);
+	assert.notEqual(weakened, adaptedSource);
+	assert.throws(function run() {
+		assertRuntimeStructureCrosswalk({
+			pristineSource,
+			adaptedSource: weakened,
+			fixtureSource,
+			repoRoot: root,
+		});
+	}, /runtime assertion drift/);
+});
+
+test('counts setter writes through a named renderHook handle', function countsHandleSetterWrites() {
+	const pristineSource = `import { act, renderHook } from '@testing-library/react';
+it('writes through a handle', () => {
+	const countSignal = createSignal(0);
+	const hook = renderHook(() => useSignal(countSignal));
+	act(() => {
+		hook.result.current[1](5);
+	});
+});
+`;
+	const adaptedSource = `it('writes through a handle', () => {
+	const countSignal = createSignal(0);
+	countSignal(5);
+});
+`;
+	assert.throws(function run() {
+		assertPerCaseTransitionStructure(pristineSource, adaptedSource, '');
+	}, /bypasses 1 hook-surface transition/);
+});
+
 test('rejects a missing Per citation', function rejectsMissingCitation() {
 	const pristineSource = readFileSync(
 		resolve(root, 'packages/alien-signals/upstream/src/index.test.ts'),
@@ -155,7 +234,7 @@ test('rejects a missing Per citation', function rejectsMissingCitation() {
 		'utf8',
 	);
 	const stripped = adaptedSource.replace(
-		"\t// Per src/index.test.ts:31\n\tit('should create a writable signal'",
+		"\t// Per src/index.test.ts:40\n\tit('should create a writable signal'",
 		"\tit('should create a writable signal'",
 	);
 	assert.notEqual(stripped, adaptedSource);

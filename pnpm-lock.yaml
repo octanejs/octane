@@ -757,8 +757,8 @@ catalogs:
       specifier: 1.42.0
       version: 1.42.0
     alien-signals:
-      specifier: 1.0.4
-      version: 1.0.4
+      specifier: 3.2.1
+      version: 3.2.1
     animejs:
       specifier: 4.5.0
       version: 4.5.0
@@ -5108,7 +5108,7 @@ importers:
     dependencies:
       alien-signals:
         specifier: catalog:default
-        version: 1.0.4
+        version: 3.2.1
     devDependencies:
       '@happy-dom/global-registrator':
         specifier: 20.11.2
@@ -7300,8 +7300,8 @@ importers:
         specifier: catalog:default
         version: 2.4.28
       alien-signals:
-        specifier: 3.2.0
-        version: 3.2.0
+        specifier: 3.2.1
+        version: 3.2.1
       csstype:
         specifier: catalog:default
         version: 3.2.3
@@ -22786,11 +22786,8 @@ packages:
   ajv@8.20.0:
     resolution: {integrity: sha512-Thbli+OlOj+iMPYFBVBfJ3OmCAnaSyNn4M1vz9T6Gka5Jt9ba/HIR56joy65tY6kx/FCF5VXNB819Y7/GUrBGA==}
 
-  alien-signals@1.0.4:
-    resolution: {integrity: sha512-DJqqQD3XcsaQcQ1s+iE2jDUZmmQpXwHiR6fCAim/w87luaW+vmLY8fMlrdkmRwzaFXhkxf3rqPCR59tKVv1MDw==}
-
-  alien-signals@3.2.0:
-    resolution: {integrity: sha512-5J9+NpCLHgic4xnZtI8SznvNagwJsZSvRFsAwoLlLw+Edaqa4upCiOC19P8Vx2DqmEvqK2qJBMtI8+9eXOEb/A==}
+  alien-signals@3.2.1:
+    resolution: {integrity: sha512-I8FjmltrfnDFoZedi5CG8DghVYNhzb/Ijluz7tCSJH0xpd0484Kowhbb1XDYOxfJpU1p5wnM2X54dA+IfGyD1g==}
 
   animejs@4.5.0:
     resolution: {integrity: sha512-NQimYX+lz8WaXonGS9zVVoviCIAjONeJayxacUditaivYLqyXgGjFKjuyl0aUUhFKm5MriX9ty1TGovNzoJQWA==}
@@ -51289,9 +51286,7 @@ snapshots:
       json-schema-traverse: 1.0.0
       require-from-string: 2.0.2
 
-  alien-signals@1.0.4: {}
-
-  alien-signals@3.2.0: {}
+  alien-signals@3.2.1: {}
 
   animejs@4.5.0(@types/three@0.172.0)(three@0.172.0):
     optionalDependencies:

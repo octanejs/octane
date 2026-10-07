@@ -113,15 +113,44 @@ test('rejects removing an adapted @ts-expect-error', async function rejectsRemov
 	}, /assertion groups differ/);
 });
 
-test('rejects removing the upstream-typecheck @ts-expect-error', async function rejectsTypecheckExpectError(t) {
+test('accepts the committed pair when quote style differs from upstream', async function acceptsCommittedPair(t) {
+	const value = await fixture();
+	t.after(function cleanup() {
+		return rm(value.root, { recursive: true, force: true });
+	});
+	const upstream = await readFile(join(value.typecheckRoot, 'src/index.test.ts'), 'utf8');
+	const adapted = await readFile(join(value.adaptedRoot, 'upstream-typecheck.test-d.ts'), 'utf8');
+	assert.match(upstream, /order\.push\("insertion"\)/, 'upstream must use double quotes');
+	assert.match(adapted, /order\.push\('insertion'\)/, 'adapted must use single quotes');
+	const inventory = buildTypeInventory(value.root, value.config);
+	assert.deepEqual(inventory.upstream[0].acceptedApiCalls, inventory.adapted[0].acceptedApiCalls);
+});
+
+test('rejects an accepted call whose string literal changed', async function rejectsChangedLiteral(t) {
 	const value = await fixture();
 	t.after(function cleanup() {
 		return rm(value.root, { recursive: true, force: true });
 	});
 	const file = join(value.adaptedRoot, 'upstream-typecheck.test-d.ts');
 	const source = await readFile(file, 'utf8');
-	assert.equal(source.includes('@ts-expect-error'), true, 'fixture must contain @ts-expect-error');
-	await writeFile(file, source.replace(/\s*\/\/\s*@ts-expect-error[^\n]*\n/, '\n'));
+	await writeFile(file, source.replace("order.push('insertion')", "order.push('mutation')"));
+	assert.throws(function run() {
+		buildTypeInventory(value.root, value.config);
+	}, /accepted API call inventory differs/);
+});
+
+test('rejects adding an @ts-expect-error group the pinned typecheck does not carry', async function rejectsAddedTypecheckExpectError(t) {
+	const value = await fixture();
+	t.after(function cleanup() {
+		return rm(value.root, { recursive: true, force: true });
+	});
+	const file = join(value.adaptedRoot, 'upstream-typecheck.test-d.ts');
+	const source = await readFile(file, 'utf8');
+	assert.doesNotMatch(source, /\/\/\s*@ts-expect-error/, 'pinned suite has no negative groups');
+	await writeFile(
+		file,
+		`${source}\n// @ts-expect-error computed signals are read-only\ncreateComputed(() => 1)(2);\n`,
+	);
 	assert.throws(function run() {
 		buildTypeInventory(value.root, value.config);
 	}, /assertion groups differ/);

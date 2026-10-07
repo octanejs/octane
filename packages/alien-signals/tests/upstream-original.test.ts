@@ -11,7 +11,7 @@ const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), '../../..');
 type Identity = { file: string; fullName: string; status?: string };
 
 // @parity-case pristine:alien-signals-original-suite
-it('runs the pinned react-alien-signals 0.3.0 suite unchanged', function runsPinnedAlienSignalsSuite() {
+it('runs the pinned react-alien-signals 0.4.0 suite unchanged', function runsPinnedAlienSignalsSuite() {
 	const expected = JSON.parse(
 		readFileSync(resolve(repoRoot, 'packages/alien-signals/audit/pristine-runtime.json'), 'utf8'),
 	).tests as Identity[];

@@ -2,10 +2,9 @@
  * Adapted counterpart of the upstream typecheck program
  * (`upstream/src/index.test.ts` under `upstream/tsconfig.json`).
  *
- * Pins both:
- * - the single `@ts-expect-error` assertion group at upstream line 392
- * - every accepted public-API call occurrence from the upstream type suite
- *   (multiset: duplicate shapes in distinct scenarios remain distinct)
+ * The pinned suite carries no `@ts-expect-error` groups, so this file pins
+ * every accepted public-API call occurrence from it (multiset: duplicate shapes
+ * in distinct scenarios remain distinct) and must not add a negative group.
  *
  * One helper per upstream scenario keeps local bindings so conflicting
  * top-level types are avoided while the mechanical accepted-call inventory
@@ -13,26 +12,28 @@
  */
 
 import {
+	batch,
 	createComputed,
 	createEffect,
 	createSignal,
 	createSignalScope,
+	trigger,
 	useComputed,
+	useDeferredSignalValue,
 	useSetSignal,
 	useSignal,
 	useSignalEffect,
+	useSignalInsertionEffect,
+	useSignalLayoutEffect,
+	useSignalPassiveEffect,
 	useSignalScope,
+	useSignalSelector,
 	useSignalValue,
 } from '@octanejs/alien-signals';
 
-type BunMatchers<T> = {
-	toBe(expected: Exclude<T, undefined>): void;
-};
-
-declare function expect<T>(actual: T): BunMatchers<T>;
-
 function shouldCreateAWritableSignal() {
-	createSignal(0);
+	const mySignal = createSignal(0);
+	mySignal(10);
 }
 
 function shouldCreateAndUpdateAComputedSignal() {
@@ -114,7 +115,7 @@ function shouldProperlyCleanupEffectsWhenScopeIsStopped() {
 	});
 }
 
-function useSignalShouldHandleFunctionalUpdates() {
+function useSignalShouldHandleFunctionalUpdatesCorrectly() {
 	const countSignal = createSignal(0);
 	useSignal(countSignal);
 }
@@ -130,7 +131,7 @@ function useComputedShouldNotEnterARenderLoop() {
 	useComputed(() => ({ count: countSignal() }), []);
 }
 
-function useComputedShouldReuseAcrossRerenders() {
+function useComputedShouldReuseComputedAcrossRerenders() {
 	const sig = createSignal(1);
 	let getterCalls = 0;
 	useComputed(() => {
@@ -139,17 +140,16 @@ function useComputedShouldReuseAcrossRerenders() {
 	}, []);
 }
 
-function useComputedShouldRebuildWhenDepsChange() {
+function useComputedShouldRebuildWhenDepsChange(offset: number) {
 	const sig = createSignal(1);
 	let getterCalls = 0;
-	let offset = 0;
 	useComputed(() => {
 		getterCalls++;
 		return sig() + offset;
 	}, [offset]);
 }
 
-function useSignalEffectShouldHandleCleanup() {
+function useSignalEffectShouldHandleCleanupCorrectly() {
 	const countSignal = createSignal(0);
 	const cleanupFn = function cleanup() {};
 	useSignalEffect(() => {
@@ -174,12 +174,7 @@ function shouldHandleMultipleSignalUpdates() {
 
 function shouldHandleUndefinedNullSignalValues() {
 	const signal = createSignal<number | undefined | null>(123);
-	const result = {
-		current: useSignal(signal),
-	};
-
-	// @ts-expect-error
-	expect(result.current[0]).toBe(undefined);
+	useSignal(signal);
 }
 
 function shouldHandleComputedDependenciesCorrectly() {
@@ -204,10 +199,13 @@ function shouldCleanupAllSubscriptionsOnUnmount() {
 function shouldHandleMultipleMountUnmountCycles() {
 	const signal = createSignal(0);
 	const effectFn = function effect() {};
-	useSignalEffect(() => {
-		signal();
-		effectFn();
-	});
+	function mount() {
+		useSignalEffect(() => {
+			signal();
+			effectFn();
+		});
+	}
+	mount();
 }
 
 function shouldHandleConcurrentUpdatesCorrectly() {
@@ -220,29 +218,83 @@ function shouldHandleConcurrentUpdatesCorrectly() {
 	useSignal(signal);
 }
 
-shouldCreateAWritableSignal();
-shouldCreateAndUpdateAComputedSignal();
-shouldCreateAndRunAnEffect();
-shouldCreateASignalScope();
-useSignalShouldReturnValueSetter();
-useSignalValueShouldReturnReadOnlyValue();
-useSetSignalShouldReturnSetterOnly();
-useSignalEffectShouldRegisterAnEffect();
-useSignalScopeShouldCreateAndManageScope();
-useComputedShouldReturnAComputedValue();
-shouldHandleNestedSignalUpdatesCorrectly();
-shouldHandleSignalUpdatesWithinEffects();
-shouldProperlyCleanupEffectsWhenScopeIsStopped();
-useSignalShouldHandleFunctionalUpdates();
-useComputedShouldUpdateWhenDependenciesChange();
-useComputedShouldNotEnterARenderLoop();
-useComputedShouldReuseAcrossRerenders();
-useComputedShouldRebuildWhenDepsChange();
-useSignalEffectShouldHandleCleanup();
-shouldHandleSignalUpdatesCorrectly();
-shouldHandleMultipleSignalUpdates();
-shouldHandleUndefinedNullSignalValues();
-shouldHandleComputedDependenciesCorrectly();
-shouldCleanupAllSubscriptionsOnUnmount();
-shouldHandleMultipleMountUnmountCycles();
-shouldHandleConcurrentUpdatesCorrectly();
+function batchesSignalNotificationsIntoOneRender() {
+	const first = createSignal(0);
+	const second = createSignal(0);
+	useSignalValue(first);
+	useSignalValue(second);
+}
+
+function batchesWritesIntoOnePropagation() {
+	const first = createSignal(1);
+	const second = createSignal(2);
+	const snapshots: number[] = [];
+	createEffect(() => {
+		snapshots.push(first() + second());
+	});
+	batch(() => {
+		first(10);
+		second(20);
+	});
+}
+
+function triggersDependentsAfterMutation() {
+	const items = createSignal<number[]>([]);
+	createComputed(() => items().length);
+	trigger(items);
+}
+
+function sharesSourceAcrossSubscribers() {
+	const count = createSignal(0);
+	useSignalValue(count);
+	useSignalValue(count);
+	useSignalValue(count);
+}
+
+function skipsRendersForUnchangedSlice() {
+	const state = createSignal({ selected: 1, unrelated: 1 });
+	const select = (value: { selected: number; unrelated: number }) => value.selected;
+	useSignalSelector(state, select);
+}
+
+function doesNotCreateScopeOnServer() {
+	const callback = function callback() {};
+	useSignalScope(callback, []);
+}
+
+function keepsSnapshotsConsistentInTransition() {
+	const count = createSignal(0);
+	useSignalValue(count);
+}
+
+function offersDeferredSnapshot() {
+	const count = createSignal(0);
+	useSignalValue(count);
+	useDeferredSignalValue(count);
+}
+
+function runsSignalEffectsInPhaseOrder() {
+	const order: string[] = [];
+	const source = createSignal(0);
+	const dependencies = [source] as const;
+	useSignalInsertionEffect(dependencies, () => {
+		order.push('insertion');
+	});
+	useSignalLayoutEffect(dependencies, () => {
+		order.push('layout');
+	});
+	useSignalPassiveEffect(dependencies, () => {
+		order.push('passive');
+	});
+}
+
+function cleansStoppedScopeOnce() {
+	const source = createSignal(0);
+	const cleanupEffect = function cleanup() {};
+	useSignalScope(() => {
+		createEffect(() => {
+			source();
+			return cleanupEffect;
+		});
+	}, []);
+}

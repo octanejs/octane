@@ -378,7 +378,7 @@
     "@types/react": "catalog:default",
     "@volar/language-core": "catalog:default",
     "@volar/typescript": "catalog:default",
-    "alien-signals": "3.2.0",
+    "alien-signals": "3.2.1",
     "csstype": "catalog:default",
     "devalue": "catalog:default",
     "es-module-lexer": "catalog:default",

@@ -4,7 +4,7 @@ import { resolveDemo } from '../catalog';
 import { AlienSignalsDemo } from './AlienSignals.tsrx';
 
 describe('Alien Signals playground demo', () => {
-	it('is catalogued and exercises writable, computed, and cleanup behavior', async () => {
+	it('is catalogued and exercises writable, computed, selector, and cleanup behavior', async () => {
 		const info = vi.spyOn(console, 'info').mockImplementation(() => {});
 		const demo = resolveDemo('alien-signals');
 		const result = mount(AlienSignalsDemo);
@@ -15,6 +15,7 @@ describe('Alien Signals playground demo', () => {
 			expect(demo.source).toContain("from '@octanejs/alien-signals'");
 			expect(result.find('#alien-signals-count').textContent).toBe('Count: 1');
 			expect(result.find('#alien-signals-doubled').textContent).toBe('Doubled: 2');
+			expect(result.find('#alien-signals-parity').textContent).toBe('Parity: odd');
 
 			expect(info).toHaveBeenCalledWith('[alien-signals] effect region mounted');
 			info.mockClear();
@@ -23,6 +24,7 @@ describe('Alien Signals playground demo', () => {
 			await nextPaint();
 			expect(result.find('#alien-signals-count').textContent).toBe('Count: 2');
 			expect(result.find('#alien-signals-doubled').textContent).toBe('Doubled: 4');
+			expect(result.find('#alien-signals-parity').textContent).toBe('Parity: even');
 			expect(result.find('#alien-signals-effect').textContent).toBe('Effect region is observing 2');
 			expect(info).not.toHaveBeenCalledWith('[alien-signals] effect cleanup');
 

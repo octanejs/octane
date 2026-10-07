@@ -127,6 +127,17 @@ function expandContract(contract) {
 	const matcher = contract.slice(0, separator);
 	const payload = contract.slice(separator + 1);
 	const expanded = new Set([contract]);
+	// Argument-free nullish matchers assert the same value as toBe(undefined/null).
+	if (matcher === 'toBeUndefined' && payload === '') {
+		expanded.add('toBe:undefined');
+		expanded.add('toEqual:undefined');
+		expanded.add('toBe:"undefined"');
+	}
+	if (matcher === 'toBeNull' && payload === '') {
+		expanded.add('toBe:null');
+		expanded.add('toEqual:null');
+		expanded.add('toBe:"null"');
+	}
 	if (matcher === 'toEqual' || matcher === 'toBe') {
 		if (payload === 'undefined' || payload === '"undefined"') {
 			expanded.add('toBe:undefined');
@@ -191,7 +202,11 @@ function normalizeReceiver(node, sourceFile) {
 	}
 	if (ts.isPropertyAccessExpression(node) || ts.isElementAccessExpression(node)) {
 		const text = node.getText(sourceFile).replace(/\s+/g, '');
-		if (text === 'result.current' || /^result\.current\[\d+\]$/.test(text)) return 'surface';
+		// `result.current`, a named handle's `hook.result.current`, and their
+		// tuple index or object member reads are the rendered hook surface.
+		if (/^(?:[A-Za-z_$][\w$]*\.)?result\.current(?:\[\d+\]|\.[A-Za-z_$][\w$]*)?$/.test(text)) {
+			return 'surface';
+		}
 		if (text.endsWith('.textContent')) return 'surface';
 	}
 	if (ts.isIdentifier(node)) {
@@ -330,12 +345,21 @@ function isResultCurrentAccess(node) {
 	if (ts.isElementAccessExpression(node)) {
 		return isResultCurrentAccess(node.expression);
 	}
+	if (
+		!ts.isPropertyAccessExpression(node) ||
+		!ts.isIdentifier(node.name) ||
+		node.name.text !== 'current'
+	) {
+		return false;
+	}
+	const owner = node.expression;
+	// `result.current` or a named renderHook handle's `hook.result.current`.
 	return (
-		ts.isPropertyAccessExpression(node) &&
-		ts.isIdentifier(node.expression) &&
-		node.expression.text === 'result' &&
-		ts.isIdentifier(node.name) &&
-		node.name.text === 'current'
+		(ts.isIdentifier(owner) && owner.text === 'result') ||
+		(ts.isPropertyAccessExpression(owner) &&
+			ts.isIdentifier(owner.expression) &&
+			ts.isIdentifier(owner.name) &&
+			owner.name.text === 'result')
 	);
 }
 

@@ -87,16 +87,30 @@ function decodeXmlAttribute(value) {
 // bun's console ledger is not a stable machine surface: bun 1.3 omits the
 // per-test `(pass)` lines entirely in some environments (for example when it
 // detects an AI-agent session via CLAUDECODE), so identities must come from
-// the JUnit report file instead.
+// the JUnit report file instead. The describe path comes from the enclosing
+// <testsuite> elements below the file-level suite: bun writes a nested case's
+// classname innermost-first with a double-escaped separator, so it is not a
+// stable path.
 export function parseJUnitIdentities(xml) {
 	const identities = [];
 	const portableFile = 'packages/alien-signals/upstream/src/index.test.ts';
-	const testcasePattern = /<testcase\b([^>]*?)(?:\/>|>([\s\S]*?)<\/testcase>)/g;
-	for (const match of xml.matchAll(testcasePattern)) {
-		const attributes = match[1];
-		const body = match[2] ?? '';
+	const suites = [];
+	const elementPattern =
+		/<testsuite\b([^>]*?)(\/?)>|<\/testsuite>|<testcase\b([^>]*?)(?:\/>|>([\s\S]*?)<\/testcase>)/g;
+	for (const match of xml.matchAll(elementPattern)) {
+		if (match[0] === '</testsuite>') {
+			suites.pop();
+			continue;
+		}
+		if (match[0].startsWith('<testsuite')) {
+			if (match[2] !== '/') {
+				suites.push(decodeXmlAttribute(/\bname="([^"]*)"/.exec(match[1])?.[1] ?? ''));
+			}
+			continue;
+		}
+		const attributes = match[3];
+		const body = match[4] ?? '';
 		const name = decodeXmlAttribute(/\bname="([^"]*)"/.exec(attributes)?.[1] ?? '');
-		const classname = decodeXmlAttribute(/\bclassname="([^"]*)"/.exec(attributes)?.[1] ?? '');
 		const status = /<failure\b|<error\b/.test(body)
 			? 'failed'
 			: /<skipped\b/.test(body)
@@ -104,7 +118,7 @@ export function parseJUnitIdentities(xml) {
 				: 'passed';
 		identities.push({
 			file: portableFile,
-			fullName: `${classname} ${name}`.replaceAll(' > ', ' ').trim(),
+			fullName: [...suites.slice(1), name].join(' ').trim(),
 			status,
 		});
 	}
