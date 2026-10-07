@@ -25,12 +25,12 @@
     "framework": {
       "raw": 116717,
       "gzip": 37369,
-      "brotli": 33152
+      "brotli": 33149
     },
     "total": {
       "raw": 121335,
       "gzip": 39589,
-      "brotli": 35037
+      "brotli": 35035
     }
   },
   "chat": {

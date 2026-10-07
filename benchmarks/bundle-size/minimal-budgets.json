@@ -27,7 +27,7 @@
   "root-chained-jsx": {
     "raw": 74369,
     "gzip": 24224,
-    "brotli": 21904
+    "brotli": 21886
   },
   "root-static": {
     "raw": 165342,
@@ -42,7 +42,7 @@
   "root-callback-local": {
     "raw": 74395,
     "gzip": 24264,
-    "brotli": 21950
+    "brotli": 21916
   },
   "hooks-state": {
     "raw": 84212,
@@ -112,7 +112,7 @@
   "binding-base-ui-esbuild": {
     "raw": 212813,
     "gzip": 68938,
-    "brotli": 59961
+    "brotli": 59952
   },
   "binding-aria-vite": {
     "raw": 7423,
