@@ -382,16 +382,19 @@
     "csstype": "catalog:default",
     "devalue": "catalog:default",
     "es-module-lexer": "catalog:default",
-    "esrap": "catalog:default",
-    "@tsrx/oxc": "catalog:default"
+    "esrap": "catalog:default"
   },
   "peerDependencies": {
+    "@tsrx/oxc": "catalog:default",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "typescript": "^5.9.3",
     "vite": "^8.0.16"
   },
   "peerDependenciesMeta": {
+    "@tsrx/oxc": {
+      "optional": true
+    },
     "react": {
       "optional": true
     },
@@ -406,6 +409,7 @@
     }
   },
   "devDependencies": {
+    "@tsrx/oxc": "catalog:default",
     "@tsrx/react": "catalog:default",
     "@types/react-dom": "catalog:default",
     "@wagmi/connectors": "catalog:default",

@@ -4,6 +4,7 @@ import { defineCommand } from '../../kernel/command.js';
 import { setCompilerOption } from '../../kernel/edit.js';
 import { CliError, EXIT } from '../../kernel/errors.js';
 import { PACKAGE_MANAGERS, PNPM_ALLOWED_BUILDS, installPackages } from '../../kernel/install.js';
+import { readInstalled } from '../../kernel/project.js';
 import {
 	MODES,
 	PRETTIER_CONFIG_FILES,
@@ -425,10 +426,16 @@ export async function applyInit(ctx, project, options) {
 	const declared = project.declaredDependencies;
 	const dependencies = integration.dependencies.filter((name) => !declared[name]);
 	const devDependencies = integration.devDependencies.filter((name) => !declared[name]);
+	const needsParser = !declared['@tsrx/oxc'];
 
 	ctx.ui.intro(options.title);
 
-	if (changes.length === 0 && dependencies.length === 0 && devDependencies.length === 0) {
+	if (
+		changes.length === 0 &&
+		dependencies.length === 0 &&
+		devDependencies.length === 0 &&
+		!needsParser
+	) {
 		ctx.ui.outro('Already set up. Run `octane doctor` to confirm.');
 		return { json: { ok: true, mode, changes: [], installed: [] } };
 	}
@@ -439,10 +446,11 @@ export async function applyInit(ctx, project, options) {
 			? changes.map((c) => `${c.file}  ${ctx.ui.colors.dim(c.summary)}`)
 			: ['nothing'],
 	);
-	if (dependencies.length + devDependencies.length > 0) {
+	if (dependencies.length + devDependencies.length > 0 || needsParser) {
 		ctx.ui.note('Will install', [
 			...dependencies,
 			...devDependencies.map((name) => `${name} (dev)`),
+			...(needsParser ? ['@tsrx/oxc (dev)'] : []),
 		]);
 	}
 
@@ -463,7 +471,10 @@ export async function applyInit(ctx, project, options) {
 	const warn = (/** @type {string[]} */ lines) => {
 		for (const line of lines) if (!manual.includes(line)) manual.push(line);
 	};
-	if (options.install !== false && dependencies.length + devDependencies.length > 0) {
+	if (
+		options.install !== false &&
+		(dependencies.length + devDependencies.length > 0 || needsParser)
+	) {
 		const spinner = ctx.ui.spinner(`Installing with ${installing.packageManager ?? 'npm'}`);
 		try {
 			for (const [names, dev] of [
@@ -477,6 +488,23 @@ export async function applyInit(ctx, project, options) {
 				});
 				warn(ran.warnings);
 				installed.push(.../** @type {string[]} */ (names));
+			}
+
+			if (needsParser) {
+				const octane = readInstalled(project.root, 'octane');
+				const range =
+					octane?.manifest.peerDependencies?.['@tsrx/oxc'] ??
+					octane?.manifest.dependencies?.['@tsrx/oxc'];
+				if (typeof range !== 'string' || range === '' || range.startsWith('catalog:')) {
+					manual.push('Install @tsrx/oxc at the range declared by octane.');
+				} else {
+					const ran = await installPackages(ctx, installing, [`@tsrx/oxc@${range}`], {
+						dev: true,
+						allowBuilds: PNPM_ALLOWED_BUILDS,
+					});
+					warn(ran.warnings);
+					installed.push('@tsrx/oxc');
+				}
 			}
 
 			// Now that the plugin is on disk it can say which TypeScript it runs
@@ -501,14 +529,17 @@ export async function applyInit(ctx, project, options) {
 			throw error;
 		}
 		spinner.stop(`Installed ${installed.length} package(s)`);
-	} else if (dependencies.length + devDependencies.length > 0) {
+	} else if (dependencies.length + devDependencies.length > 0 || needsParser) {
 		// The range lives in the plugin, which is not installed yet, so it cannot
 		// be quoted here. Naming the package without one would send people to the
 		// newest major, which `tsrx-tsc` cannot start under.
-		manual.push(
-			`Install: ${[...dependencies, ...devDependencies].join(' ')}`,
-			'then typescript, at the range @tsrx/typescript-plugin declares as its peer.',
-		);
+		if (dependencies.length + devDependencies.length > 0) {
+			manual.push(
+				`Install: ${[...dependencies, ...devDependencies].join(' ')}`,
+				'then typescript, at the range @tsrx/typescript-plugin declares as its peer.',
+			);
+		}
+		if (needsParser) manual.push('Install @tsrx/oxc at the range declared by octane.');
 	}
 
 	if (manual.length > 0) ctx.ui.note('Do this by hand', manual);

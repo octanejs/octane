@@ -8,6 +8,37 @@ import { Window } from 'happy-dom';
 import { describe, expect, it } from 'vitest';
 import { createOctaneCompiler } from '../src/compiler/bundler.js';
 
+function transformConsumer(
+	directory: string,
+	view: string,
+	entry: string,
+	dev = false,
+	extension = 'ts',
+	compilerOptions: Record<string, unknown> = {},
+) {
+	const compiler = createOctaneCompiler({ root: directory, dev, hmr: false, ...compilerOptions });
+	const component = compiler.transform(view, join(directory, 'View.tsrx'), {
+		collectVoidComponentExports: true,
+	});
+	if (component === null) throw new Error('Component did not compile');
+	const voidExports: readonly string[] =
+		'voidComponentExports' in component ? (component.voidComponentExports ?? []) : [];
+	const transformed = compiler.transform(entry, join(directory, `entry.${extension}`), {
+		isVoidComponentImport: (request: string, imported: string) =>
+			request === './View.tsrx' && voidExports.includes(imported),
+	});
+	return { component, code: transformed?.code ?? entry };
+}
+
+function specializedEntry(view: string, entry: string, extension = 'ts') {
+	const directory = mkdtempSync(join(tmpdir(), 'octane-local-root-'));
+	try {
+		return transformConsumer(directory, view, entry, false, extension).code;
+	} finally {
+		rmSync(directory, { recursive: true, force: true });
+	}
+}
+
 async function runConsumer(
 	view: string,
 	entry: string,
@@ -22,20 +53,17 @@ async function runConsumer(
 	});
 	window.document.body.innerHTML = '<div id="host"></div>';
 	try {
-		const compiler = createOctaneCompiler({ root: directory, dev, hmr: false, ...compilerOptions });
-		const component = compiler.transform(view, join(directory, 'View.tsrx'), {
-			collectVoidComponentExports: true,
-		});
-		if (component === null) throw new Error('Component did not compile');
-		const voidExports: readonly string[] =
-			'voidComponentExports' in component ? (component.voidComponentExports ?? []) : [];
-		const transformed = compiler.transform(entry, join(directory, `entry.${extension}`), {
-			isVoidComponentImport: (request: string, imported: string) =>
-				request === './View.tsrx' && voidExports.includes(imported),
-		});
+		const { component, code } = transformConsumer(
+			directory,
+			view,
+			entry,
+			dev,
+			extension,
+			compilerOptions,
+		);
 		const result = await build({
 			stdin: {
-				contents: transformed?.code ?? entry,
+				contents: code,
 				resolveDir: resolve(import.meta.dirname, '..'),
 				loader: extension === 'tsx' ? 'tsx' : 'ts',
 			},
@@ -146,6 +174,80 @@ export async function run() {
 			});
 		}
 	});
+
+	describe.each(['ts', 'tsx'])(
+		'roots rendered from retained callbacks in a %s entry',
+		(extension) => {
+			const view = `import {useState, useLayoutEffect} from 'octane';
+let cleanups = 0;
+export default function View(props) @{
+ const [count, update] = useState(0);
+ useLayoutEffect(() => () => { cleanups++; }, []);
+ <main><button onClick={() => update(count + 1)}>{props.label + ':' + count as string}</button><input defaultValue="initial" /></main>
+}
+export function cleanupCount() { return cleanups; }`;
+
+			it.each(['createRoot', 'hydrateRoot'])(
+				'keeps state, drafts and cleanup for independent %s controllers',
+				async (factory) => {
+					const hydrate = factory === 'hydrateRoot';
+					const entry = `import {${factory}, flushSync} from 'octane'; import View, {cleanupCount} from './View.tsrx';
+function attach(host, label) {
+ const root = ${hydrate ? 'hydrateRoot(host, View, {label});' : 'createRoot(host); root.render(View, {label});'}
+ return { replace(label) { flushSync(() => root.render(View, {label})); }, dispose() { root.unmount(); } };
+}
+export async function run() {
+ const host = document.querySelector('#host'), other = document.body.appendChild(document.createElement('div'));
+ ${hydrate ? `host.innerHTML = '<main><button>a:0</button><input value="initial"></main>'; other.innerHTML = '<main><button>b:0</button><input value="initial"></main>';` : ''}
+ const server = host.querySelector('button'), a = attach(host, 'a'), b = attach(other, 'b');
+ const button = host.querySelector('button'), input = host.querySelector('input');
+ input.value = 'typed'; button.click(); await Promise.resolve();
+ a.replace('next');
+ const updated = {adopted: server === button, text: host.textContent, other: other.textContent,
+  same: button === host.querySelector('button') && input === host.querySelector('input') && input.value === 'typed'};
+ a.dispose(); const disposed = {cleanups: cleanupCount(), cleaned: host.childNodes.length === 0, other: other.textContent};
+ b.replace('later'); const later = other.textContent; b.dispose();
+ return {updated, disposed, later, cleanups: cleanupCount(), cleaned: other.childNodes.length === 0};
+}`;
+					expect(specializedEntry(view, entry, extension)).toContain(
+						hydrate ? '__hydrateVoidRoot' : '__createVoidRoot',
+					);
+					for (const dev of [false, true]) {
+						expect(await runConsumer(view, entry, dev, extension)).toEqual({
+							updated: { adopted: hydrate, text: 'next:1', other: 'b:0', same: true },
+							disposed: { cleanups: 1, cleaned: true, other: 'b:0' },
+							later: 'later:0',
+							cleanups: 2,
+							cleaned: true,
+						});
+					}
+				},
+			);
+
+			it.each([
+				['a parameter', 'replace(View) { root.render(View); }', "c.replace(() => 'ordinary')"],
+				[
+					'a block const',
+					"replace() { const View = () => 'ordinary'; root.render(View); }",
+					'c.replace()',
+				],
+			])(
+				'renders returned output when a callback target is shadowed by %s',
+				async (_label, method, call) => {
+					const entry = `${IMPORTS}
+function attach(host) { const root = createRoot(host); root.render(View, {label:'first'}); return { ${method}, dispose() { root.unmount(); } }; }
+export function run() { const host = document.querySelector('#host'), c = attach(host); flushSync(() => ${call});
+ const text = host.textContent; c.dispose(); return {text, cleaned: host.childNodes.length === 0}; }`;
+					for (const dev of [false, true]) {
+						expect(await runConsumer(VIEW, entry, dev, extension)).toEqual({
+							text: 'ordinary',
+							cleaned: true,
+						});
+					}
+				},
+			);
+		},
+	);
 
 	it('keeps escaped roots reusable for renderable values', async () => {
 		const entry = `${IMPORTS}
