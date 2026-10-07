@@ -5,19 +5,27 @@ export function Classed(props) @{
 }
 
 export function WithAttrs(props) @{
-	<a href={props.url} title={props.title}>{'link'}</a>
+	<a href={props.url} title={props.title}>
+		{'link'}
+	</a>
 }
 
 export function StringDataAttribute(props) @{
-	<div id="string-data" data-label={'' + props.value}>{'data'}</div>
+	<div id="string-data" data-label={'' + props.value}>
+		{'data'}
+	</div>
 }
 
 export function RuntimeTypedDataAttribute(props) @{
-	<div id="runtime-data" data-label={props.value as string}>{'data'}</div>
+	<div id="runtime-data" data-label={props.value as string}>
+		{'data'}
+	</div>
 }
 
 export function DynamicAriaAttribute(props) @{
-	<div id="dynamic-aria" aria-label={props.value}>{'aria'}</div>
+	<div id="dynamic-aria" aria-label={props.value}>
+		{'aria'}
+	</div>
 }
 
 export function Clicker() @{
@@ -40,13 +48,17 @@ export function EventAfterSpread() @{
 	const [n, setN] = useState(0);
 	const attrs = { onClick: () => setN((value) => value + 100) };
 	const increment = () => setN((value) => value + 1);
-	<button {...attrs} onClick={increment}>{n as string}</button>
+	<button {...attrs} onClick={increment}>
+		{n as string}
+	</button>
 }
 
 export function DuplicateEventWriters() @{
 	const [n, setN] = useState(0);
 	const increment = () => setN((value) => value + 1);
-	<button onClick={() => setN(n + 100)} onClick={increment}>{n as string}</button>
+	<button onClick={() => setN(n + 100)} onClick={increment}>
+		{n as string}
+	</button>
 }
 
 export function ReassignedEventHandler() @{
@@ -63,7 +75,9 @@ export function ShadowedHookFactory() @{
 	const useState = () => [n, () => setN(n + 1)];
 	const [, update] = useState();
 	const handler = () => update();
-	<button id="shadowed-hook" onClick={handler}>{n as string}</button>
+	<button id="shadowed-hook" onClick={handler}>
+		{n as string}
+	</button>
 }
 
 export function RegexCallbackDependency() @{
@@ -87,8 +101,12 @@ export function DeferredEventArgument(props) @{
 	const build = props.build;
 	const bump = () => setN((current) => current + 1);
 	<div>
-		<button id="rerender" onClick={bump}>{n as string}</button>
-		<button id="refresh" onClick={() => setValue(build(n))}>{value as string}</button>
+		<button id="rerender" onClick={bump}>
+			{n as string}
+		</button>
+		<button id="refresh" onClick={() => setValue(build(n))}>
+			{value as string}
+		</button>
 	</div>
 }
 
@@ -101,9 +119,15 @@ export function MountStableHandlers() @{
 	const [log, setLog] = useState('none');
 	const [n, setN] = useState(0);
 	<div>
-		<button id="bump" onClick={() => setN((current) => current + 1)}>{n as string}</button>
-		<button id="stable" onClick={() => setLog(stableLabel())}>{'stable'}</button>
-		<button id="capturing" onClick={() => setLog('n=' + n)}>{'capturing'}</button>
+		<button id="bump" onClick={() => setN((current) => current + 1)}>
+			{n as string}
+		</button>
+		<button id="stable" onClick={() => setLog(stableLabel())}>
+			{'stable'}
+		</button>
+		<button id="capturing" onClick={() => setLog('n=' + n)}>
+			{'capturing'}
+		</button>
 		<output>{log as string}</output>
 	</div>
 }
@@ -115,10 +139,18 @@ export function StableNativeEventCallbacks(props) @{
 	const observed = () => setN((value) => value + 100);
 	props.observe(observed);
 	<div>
-		<button id="increment" onClick={increment}>{'increment'}</button>
-		<button id="add-ten-a" onClick={addTen}>{'add ten a'}</button>
-		<button id="add-ten-b" onClick={() => addTen()}>{'add ten b'}</button>
-		<button id="observed" onClick={observed}>{'observed'}</button>
+		<button id="increment" onClick={increment}>
+			{'increment'}
+		</button>
+		<button id="add-ten-a" onClick={addTen}>
+			{'add ten a'}
+		</button>
+		<button id="add-ten-b" onClick={() => addTen()}>
+			{'add ten b'}
+		</button>
+		<button id="observed" onClick={observed}>
+			{'observed'}
+		</button>
 		<output>{n as string}</output>
 	</div>
 }
@@ -131,18 +163,16 @@ export function FnSetter() @{
 			setN((c) => c + 1);
 			setN((c) => c + 1);
 		}}
-	>{n as string}</button>
+	>
+		{n as string}
+	</button>
 }
 
 // `aria-*` is ENUMERATED (React parity): boolean LITERALS must bake as the
 // strings "true"/"false" in the static template fast path — matching the
 // runtime setAttribute / ssrAttr handling of dynamic values.
 export function AriaStaticLiterals() @{
-	<div
-		id="aria-host"
-		aria-hidden={false}
-		aria-expanded={true}
-		aria-label="lbl"
-		hidden={false}
-	>{'aria'}</div>
+	<div id="aria-host" aria-hidden={false} aria-expanded={true} aria-label="lbl" hidden={false}>
+		{'aria'}
+	</div>
 }

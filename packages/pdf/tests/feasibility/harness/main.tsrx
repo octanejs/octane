@@ -79,17 +79,15 @@ function Probe() {
 					structTreeLayer: null,
 					viewport: annotationViewport,
 				};
-				await new pdfjs.AnnotationLayer(parameters as any).render(
-					{
-						annotations,
-						annotationStorage: pdf.annotationStorage,
-						div: annotationRef.current!,
-						linkService,
-						page,
-						renderForms: false,
-						viewport: annotationViewport,
-					} as any,
-				);
+				await new pdfjs.AnnotationLayer(parameters as any).render({
+					annotations,
+					annotationStorage: pdf.annotationStorage,
+					div: annotationRef.current!,
+					linkService,
+					page,
+					renderForms: false,
+					viewport: annotationViewport,
+				} as any);
 				setOutline((await pdf.getOutline())?.[0]?.title ?? '');
 				setStatus('ready');
 			} catch (error) {
@@ -107,19 +105,25 @@ function Probe() {
 		};
 	}, []);
 
-	return <section id="probe" data-status={status} data-worker={worker} data-outline={outline}>
-		<canvas id="page-canvas" ref={canvasRef} />
-		<div id="text-layer" ref={textRef} />
-		<div id="annotation-layer" ref={annotationRef} />
-	</section>;
+	return (
+		<section id="probe" data-status={status} data-worker={worker} data-outline={outline}>
+			<canvas id="page-canvas" ref={canvasRef} />
+			<div id="text-layer" ref={textRef} />
+			<div id="annotation-layer" ref={annotationRef} />
+		</section>
+	);
 }
 
 function App() {
 	const [visible, setVisible] = useState(true);
-	return <main>
-		<button id="toggle" type="button" onClick={() => setVisible(!visible)}>toggle</button>
-		{visible ? <Probe /> : null}
-	</main>;
+	return (
+		<main>
+			<button id="toggle" type="button" onClick={() => setVisible(!visible)}>
+				toggle
+			</button>
+			{visible ? <Probe /> : null}
+		</main>
+	);
 }
 
 const rootElement = document.getElementById('root');

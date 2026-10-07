@@ -20,9 +20,15 @@ function Layout() @{
 	const navigation = useNavigation();
 	<div data-state={navigation.state}>
 		<nav>
-			<Link class="nav-home" to="/">Home</Link>
-			<Link class="nav-slow" to="/slow">Slow</Link>
-			<button id="finish" onClick={() => finish('slow-data')}>go</button>
+			<Link class="nav-home" to="/">
+				Home
+			</Link>
+			<Link class="nav-slow" to="/slow">
+				Slow
+			</Link>
+			<button id="finish" onClick={() => finish('slow-data')}>
+				go
+			</button>
 		</nav>
 		<main>
 			<Outlet />

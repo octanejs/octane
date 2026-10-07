@@ -41,9 +41,9 @@ export function SpreadContextProvider(props: ContextProviderProps) @{
 export function ImportedContextProvider(props: ContextProviderProps) @{
 	// The authored JSX checker uses the DOM signature; this fixture compiles to
 	// the object renderer, whose context provider accepts the same authored props.
-	const Context = (props.native ? ImportedNativeContext : ImportedDomContext) as unknown as Context<
-		string
-	>;
+	const Context = (props.native
+		? ImportedNativeContext
+		: ImportedDomContext) as unknown as Context<string>;
 	<Context key={props.contextKey} value={props.value}>
 		<Consumer context={Context} initial={props.initial} />
 	</Context>

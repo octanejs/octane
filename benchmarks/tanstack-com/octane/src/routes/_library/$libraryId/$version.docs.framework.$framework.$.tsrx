@@ -84,23 +84,25 @@ function Docs() {
 	const branch = getBranch(library, version);
 	const location = useLocation();
 
-	return <DocContainer>
-		<Doc
-			key={filePath}
-			title={title}
-			content={content}
-			repo={library.repo}
-			branch={branch}
-			filePath={filePath}
-			colorFrom={library.colorFrom}
-			colorTo={library.colorTo}
-			textColor={library.textColor}
-			shouldRenderToc
-			libraryId={libraryId}
-			libraryVersion={version === 'latest' ? library.latestVersion : version}
-			pagePath={location.pathname}
-			config={config}
-			framework={framework}
-		/>
-	</DocContainer>;
+	return (
+		<DocContainer>
+			<Doc
+				key={filePath}
+				title={title}
+				content={content}
+				repo={library.repo}
+				branch={branch}
+				filePath={filePath}
+				colorFrom={library.colorFrom}
+				colorTo={library.colorTo}
+				textColor={library.textColor}
+				shouldRenderToc
+				libraryId={libraryId}
+				libraryVersion={version === 'latest' ? library.latestVersion : version}
+				pagePath={location.pathname}
+				config={config}
+				framework={framework}
+			/>
+		</DocContainer>
+	);
 }

@@ -18,15 +18,24 @@ import type { MenuOption, MenuRenderFn, MenuResolution, TriggerFn } from './shar
 export { MenuOption } from './LexicalMenuOption';
 export type { MenuRenderFn, MenuResolution, MenuTextMatch, TriggerFn } from './shared/menuShared';
 export { useDynamicPositioning } from './shared/useDynamicPositioning';
-export { getScrollParent, PUNCTUATION, SCROLL_TYPEAHEAD_OPTION_INTO_VIEW_COMMAND, useBasicTypeaheadTriggerMatch } from './LexicalTypeaheadMenuPluginUtils';
+export {
+	getScrollParent,
+	PUNCTUATION,
+	SCROLL_TYPEAHEAD_OPTION_INTO_VIEW_COMMAND,
+	useBasicTypeaheadTriggerMatch,
+} from './LexicalTypeaheadMenuPluginUtils';
 
 /**
  * Props for the {@link LexicalTypeaheadMenuPlugin} component.
  */
 export type TypeaheadMenuPluginProps<TOption extends MenuOption> = {
 	onQueryChange: (matchingString: string | null) => void;
-	onSelectOption: (option: TOption, textNodeContainingQuery: | TextNode
-	| null, closeMenu: () => void, matchingString: string) => void;
+	onSelectOption: (
+		option: TOption,
+		textNodeContainingQuery: TextNode | null,
+		closeMenu: () => void,
+		matchingString: string,
+	) => void;
 	options: TOption[];
 	triggerFn: TriggerFn;
 	menuRenderFn?: MenuRenderFn<TOption>;
@@ -77,12 +86,15 @@ export function LexicalTypeaheadMenuPlugin<TOption extends MenuOption>(
 		}
 	}, [onClose, resolution]);
 
-	const openTypeahead = useCallback((res: MenuResolution) => {
-		setResolution(res);
-		if (onOpen != null && resolution === null) {
-			onOpen(res);
-		}
-	}, [onOpen, resolution]);
+	const openTypeahead = useCallback(
+		(res: MenuResolution) => {
+			setResolution(res);
+			if (onOpen != null && resolution === null) {
+				onOpen(res);
+			}
+		},
+		[onOpen, resolution],
+	);
 
 	useEffect(() => {
 		const updateListener = () => {
@@ -101,8 +113,10 @@ export function LexicalTypeaheadMenuPlugin<TOption extends MenuOption>(
 				const selection = $getSelection();
 				const text = getQueryTextForSearch(editor);
 				if (
-					!$isRangeSelection(selection) || !selection.isCollapsed() || text === null ||
-						range === null
+					!$isRangeSelection(selection) ||
+					!selection.isCollapsed() ||
+					text === null ||
+					range === null
 				) {
 					closeUnlessComposing();
 					return;
@@ -111,7 +125,7 @@ export function LexicalTypeaheadMenuPlugin<TOption extends MenuOption>(
 				onQueryChange(match ? match.matchingString : null);
 				if (
 					match !== null &&
-						(ignoreEntityBoundary || !isSelectionOnEntityBoundary(editor, match.leadOffset))
+					(ignoreEntityBoundary || !isSelectionOnEntityBoundary(editor, match.leadOffset))
 				) {
 					const isRangePositioned = tryToPositionRange(
 						match.leadOffset,
@@ -120,8 +134,8 @@ export function LexicalTypeaheadMenuPlugin<TOption extends MenuOption>(
 						editor.getRootElement(),
 					);
 					if (isRangePositioned !== null) {
-						startTransition(
-							() => openTypeahead({ getRect: () => range.getBoundingClientRect(), match }),
+						startTransition(() =>
+							openTypeahead({ getRect: () => range.getBoundingClientRect(), match }),
 						);
 						return;
 					}
@@ -141,27 +155,30 @@ export function LexicalTypeaheadMenuPlugin<TOption extends MenuOption>(
 	]);
 
 	useEffect(
-		() => editor.registerEditableListener((isEditable) => {
-			if (!isEditable) {
-				closeTypeahead();
-			}
-		}),
+		() =>
+			editor.registerEditableListener((isEditable) => {
+				if (!isEditable) {
+					closeTypeahead();
+				}
+			}),
 		[editor, closeTypeahead],
 	);
 
 	if (resolution === null || editor === null || anchorElementRef.current === null) {
 		return null;
 	}
-	return <LexicalMenu
-		close={closeTypeahead}
-		resolution={resolution}
-		editor={editor}
-		anchorElementRef={anchorElementRef}
-		options={options}
-		menuRenderFn={menuRenderFn}
-		shouldSplitNodeWithQuery={true}
-		onSelectOption={onSelectOption}
-		commandPriority={commandPriority}
-		preselectFirstItem={preselectFirstItem}
-	/>;
+	return (
+		<LexicalMenu
+			close={closeTypeahead}
+			resolution={resolution}
+			editor={editor}
+			anchorElementRef={anchorElementRef}
+			options={options}
+			menuRenderFn={menuRenderFn}
+			shouldSplitNodeWithQuery={true}
+			onSelectOption={onSelectOption}
+			commandPriority={commandPriority}
+			preselectFirstItem={preselectFirstItem}
+		/>
+	);
 }

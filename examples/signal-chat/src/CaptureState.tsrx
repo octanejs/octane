@@ -18,16 +18,14 @@ export const timings$ = derived$(() => {
 		return { region, label: observation ? `${observation.at.toFixed(1)} ms` : '—' };
 	});
 });
-export const observationRows$ = derived$(
-	() => capture$.get().observations.map(
-		(entry, index) => ({
-			index,
-			at: entry.at.toFixed(1),
-			label: `${entry.region ?? 'document'} · ${entry.event}${
-				entry.revision === undefined ? '' : ` · r${entry.revision}`
-			}`,
-		}),
-	),
+export const observationRows$ = derived$(() =>
+	capture$.get().observations.map((entry, index) => ({
+		index,
+		at: entry.at.toFixed(1),
+		label: `${entry.region ?? 'document'} · ${entry.event}${
+			entry.revision === undefined ? '' : ` · r${entry.revision}`
+		}`,
+	})),
 );
 
 /** Poll the capture while the panel is active; returns its cleanup. */

@@ -10,7 +10,9 @@ export function SetterIdentity(props) @{
 	const [n, setN] = useState(0);
 	props.observe(setN);
 	<div>
-		<button id="bump" onClick={() => setN(n + 1)}>{n as string}</button>
+		<button id="bump" onClick={() => setN(n + 1)}>
+			{n as string}
+		</button>
 	</div>
 }
 
@@ -20,11 +22,14 @@ export function SetterIdentity(props) @{
 //    Adapted from ReactHooksWithNoopRenderer-test.js:1800.
 // ---------------------------------------------------------------------------
 export function EffectDepsObjectIs(props) @{
-	useEffect((log, label, count) => {
-		log.push('create ' + label + count);
-		return () => log.push('destroy ' + label + count);
-	}, [props.log, props.label, props.count]);
-	<div>{props.label + ':' + props.count as string}</div>
+	useEffect(
+		(log, label, count) => {
+			log.push('create ' + label + count);
+			return () => log.push('destroy ' + label + count);
+		},
+		[props.log, props.label, props.count],
+	);
+	<div>{(props.label + ':' + props.count) as string}</div>
 }
 
 // ---------------------------------------------------------------------------
@@ -32,14 +37,20 @@ export function EffectDepsObjectIs(props) @{
 //    Adapted from ReactHooksWithNoopRenderer-test.js:1885.
 // ---------------------------------------------------------------------------
 export function AllDestroysBeforeCreates(props) @{
-	useEffect((log, count) => {
-		log.push('Mount A ' + count);
-		return () => log.push('Unmount A ' + count);
-	}, [props.log, props.count]);
-	useEffect((log, count) => {
-		log.push('Mount B ' + count);
-		return () => log.push('Unmount B ' + count);
-	}, [props.log, props.count]);
+	useEffect(
+		(log, count) => {
+			log.push('Mount A ' + count);
+			return () => log.push('Unmount A ' + count);
+		},
+		[props.log, props.count],
+	);
+	useEffect(
+		(log, count) => {
+			log.push('Mount B ' + count);
+			return () => log.push('Unmount B ' + count);
+		},
+		[props.log, props.count],
+	);
 	<div>{props.count as string}</div>
 }
 
@@ -49,11 +60,14 @@ export function AllDestroysBeforeCreates(props) @{
 //    Adapted from ReactHooksWithNoopRenderer-test.js:1926.
 // ---------------------------------------------------------------------------
 function SibLeaf(props) @{
-	useEffect((log, label, count) => {
-		log.push('Mount ' + label + count);
-		return () => log.push('Unmount ' + label + count);
-	}, [props.log, props.label, props.count]);
-	<span class={'leaf-' + props.label}>{props.label + props.count as string}</span>
+	useEffect(
+		(log, label, count) => {
+			log.push('Mount ' + label + count);
+			return () => log.push('Unmount ' + label + count);
+		},
+		[props.log, props.label, props.count],
+	);
+	<span class={'leaf-' + props.label}>{(props.label + props.count) as string}</span>
 }
 
 export function SiblingCleanupOrder(props) @{
@@ -69,16 +83,22 @@ export function SiblingCleanupOrder(props) @{
 //    Adapted from ReactHooksWithNoopRenderer-test.js:3092 + 3124.
 // ---------------------------------------------------------------------------
 export function LayoutVsPassive(props) @{
-	useLayoutEffect((log, count) => {
-		// Synchronously observable: the <span> already shows `count`.
-		const el = document.querySelector('#layout-target');
-		log.push('layout ' + (el ? el.textContent : '<missing>') + ' (' + count + ')');
-		return () => log.push('cleanup layout ' + count);
-	}, [props.log, props.count]);
-	useEffect((log, count) => {
-		const el = document.querySelector('#layout-target');
-		log.push('passive ' + (el ? el.textContent : '<missing>') + ' (' + count + ')');
-		return () => log.push('cleanup passive ' + count);
-	}, [props.log, props.count]);
+	useLayoutEffect(
+		(log, count) => {
+			// Synchronously observable: the <span> already shows `count`.
+			const el = document.querySelector('#layout-target');
+			log.push('layout ' + (el ? el.textContent : '<missing>') + ' (' + count + ')');
+			return () => log.push('cleanup layout ' + count);
+		},
+		[props.log, props.count],
+	);
+	useEffect(
+		(log, count) => {
+			const el = document.querySelector('#layout-target');
+			log.push('passive ' + (el ? el.textContent : '<missing>') + ' (' + count + ')');
+			return () => log.push('cleanup passive ' + count);
+		},
+		[props.log, props.count],
+	);
 	<span id="layout-target">{props.count as string}</span>
 }

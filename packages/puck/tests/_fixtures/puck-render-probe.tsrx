@@ -23,33 +23,37 @@ const config: Config<{ HeadingBlock: Props; Columns: ColumnsProps }> = {
 				content: { type: 'slot' },
 			},
 			render: function renderColumns({ content: Content }) {
-				return <section class="columns">
-					<Content />
-				</section>;
+				return (
+					<section class="columns">
+						<Content />
+					</section>
+				);
 			},
 		},
 	},
 };
 
 export function PuckRenderProbe() {
-	return <div id="root">
-		<Render
-			config={config}
-			data={{
-				content: [
-					{ type: 'HeadingBlock', props: { title: 'Hello Puck' } },
-					{
-						type: 'Columns',
-						props: {
-							id: 'columns-1',
-							content: [
-								{ type: 'HeadingBlock', props: { id: 'heading-2', title: 'Inside a slot' } },
-							],
+	return (
+		<div id="root">
+			<Render
+				config={config}
+				data={{
+					content: [
+						{ type: 'HeadingBlock', props: { title: 'Hello Puck' } },
+						{
+							type: 'Columns',
+							props: {
+								id: 'columns-1',
+								content: [
+									{ type: 'HeadingBlock', props: { id: 'heading-2', title: 'Inside a slot' } },
+								],
+							},
 						},
-					},
-				],
-				root: { props: {} },
-			}}
-		/>
-	</div>;
+					],
+					root: { props: {} },
+				}}
+			/>
+		</div>
+	);
 }

@@ -6,9 +6,7 @@ function ConnectionProbe() @{
 	const connect = useConnect();
 	const connector = connect.connectors[0];
 	<div>
-		<span id="status">
-			{connect.isPending ? 'connecting' : connection.status}
-		</span>
+		<span id="status">{connect.isPending ? 'connecting' : connection.status}</span>
 		<span id="address">{connection.address ?? '-'}</span>
 		<span id="connect-mutation-status">{connect.status}</span>
 		<button

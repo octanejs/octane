@@ -7,11 +7,10 @@ export type ActionProbeOptions = {
 	postAwait?: boolean;
 };
 
-export type ActionProbeProps =
-	ActionProbeOptions & {
-		gate: Promise<void>;
-		record(label: string, event: Event): void;
-	};
+export type ActionProbeProps = ActionProbeOptions & {
+	gate: Promise<void>;
+	record(label: string, event: Event): void;
+};
 
 export function ContinuousActionProbe(props: ActionProbeProps) @{
 	const [moves, setMoves] = useState(0);
@@ -23,43 +22,46 @@ export function ContinuousActionProbe(props: ActionProbeProps) @{
 		else setMoves((value) => value + 1);
 		props.record('after', event);
 	};
-	const handlers =
-		props.phase === 'capture' ? { onMouseMoveCapture: move } : { onMouseMove: move };
+	const handlers = props.phase === 'capture' ? { onMouseMoveCapture: move } : { onMouseMove: move };
 	<section>
 		<button
 			data-start
-			onClick={() => start(async () => {
-				setSaved('started');
-				await props.gate;
-				setSaved('finished');
-			})}
-		>Start action</button>
-		<div data-move {...handlers}>Move here</div>
+			onClick={() =>
+				start(async () => {
+					setSaved('started');
+					await props.gate;
+					setSaved('finished');
+				})
+			}
+		>
+			Start action
+		</button>
+		<div data-move {...handlers}>
+			Move here
+		</div>
 		<output data-moves>{String(moves)}</output>
 		<output data-saved>{saved as string}</output>
-		<output data-pending>
-			{pending ? 'pending' : 'idle'}
-		</output>
+		<output data-pending>{pending ? 'pending' : 'idle'}</output>
 	</section>
 }
 
 export function PostAwaitActionProbe(props: ActionProbeProps) @{
 	const [saved, setSaved] = useState('initial');
 	const [pending, start] = useTransition();
-	const begin = (event: MouseEvent) => start(async () => {
-		await Promise.resolve();
-		setSaved('intermediate');
-		props.record('continuation', event);
-		await props.gate;
-		setSaved('finished');
-	});
-	const handlers =
-		props.phase === 'capture' ? { onClickCapture: begin } : { onClick: begin };
+	const begin = (event: MouseEvent) =>
+		start(async () => {
+			await Promise.resolve();
+			setSaved('intermediate');
+			props.record('continuation', event);
+			await props.gate;
+			setSaved('finished');
+		});
+	const handlers = props.phase === 'capture' ? { onClickCapture: begin } : { onClick: begin };
 	<section>
-		<button data-start {...handlers}>Start action</button>
+		<button data-start {...handlers}>
+			Start action
+		</button>
 		<output data-saved>{saved as string}</output>
-		<output data-pending>
-			{pending ? 'pending' : 'idle'}
-		</output>
+		<output data-pending>{pending ? 'pending' : 'idle'}</output>
 	</section>
 }

@@ -9,12 +9,10 @@ import { useToast } from '~/components/ToastProvider.tsrx';
 import { useCapabilities } from '~/hooks/useCapabilities';
 import { useCurrentUser } from '~/hooks/useCurrentUser';
 
-const LazyAuthenticatedUserMenu = lazy(
-	() => import('~/components/AuthenticatedUserMenu.tsrx').then(
-		(m) => ({
-			default: m.AuthenticatedUserMenu,
-		}),
-	),
+const LazyAuthenticatedUserMenu = lazy(() =>
+	import('~/components/AuthenticatedUserMenu.tsrx').then((m) => ({
+		default: m.AuthenticatedUserMenu,
+	})),
 );
 const adminCapabilities = new Set<string>(ADMIN_ACCESS_CAPABILITIES);
 
@@ -32,20 +30,22 @@ export function NavbarAuthControls({ className }: NavbarAuthControlsProps) {
 
 	const canApiKeys = !!user;
 
-	const loginButton = <Link
-		to="/login"
-		aria-label="Log In"
-		className={twMerge(
-			'flex shrink-0 items-center gap-1 rounded-md px-2 py-1.5 whitespace-nowrap',
-			'bg-black dark:bg-white text-white dark:text-black',
-			'hover:bg-gray-800 dark:hover:bg-gray-200',
-			'transition-colors duration-200 text-xs font-medium',
-			className,
-		)}
-	>
-		<User className="w-3.5 h-3.5" />
-		<span class="hidden min-[430px]:inline">Log In</span>
-	</Link>;
+	const loginButton = (
+		<Link
+			to="/login"
+			aria-label="Log In"
+			className={twMerge(
+				'flex shrink-0 items-center gap-1 rounded-md px-2 py-1.5 whitespace-nowrap',
+				'bg-black dark:bg-white text-white dark:text-black',
+				'hover:bg-gray-800 dark:hover:bg-gray-200',
+				'transition-colors duration-200 text-xs font-medium',
+				className,
+			)}
+		>
+			<User className="w-3.5 h-3.5" />
+			<span class="hidden min-[430px]:inline">Log In</span>
+		</Link>
+	);
 
 	const signOut = async () => {
 		await authClient.signOut();
@@ -58,18 +58,20 @@ export function NavbarAuthControls({ className }: NavbarAuthControlsProps) {
 		);
 	};
 
-	return <>
-		<AuthLoading>{loginButton}</AuthLoading>
-		<Unauthenticated>{loginButton}</Unauthenticated>
-		<Authenticated>
-			<Suspense fallback={loginButton}>
-				<LazyAuthenticatedUserMenu
-					user={user ?? null}
-					canAdmin={canAdmin}
-					canApiKeys={canApiKeys}
-					onSignOut={signOut}
-				/>
-			</Suspense>
-		</Authenticated>
-	</>;
+	return (
+		<>
+			<AuthLoading>{loginButton}</AuthLoading>
+			<Unauthenticated>{loginButton}</Unauthenticated>
+			<Authenticated>
+				<Suspense fallback={loginButton}>
+					<LazyAuthenticatedUserMenu
+						user={user ?? null}
+						canAdmin={canAdmin}
+						canApiKeys={canApiKeys}
+						onSignOut={signOut}
+					/>
+				</Suspense>
+			</Authenticated>
+		</>
+	);
 }

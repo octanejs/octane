@@ -8,9 +8,7 @@ export interface SwitchedPendingProps {
 function Reader(props: { source$: SignalHandle<string> }) @{
 	const result$ = derived$(async ({ read }) => await read(props.source$));
 	const result = result$.snapshot();
-	<span>
-		{result.status === 'ready' ? result.value : result.status}
-	</span>
+	<span>{result.status === 'ready' ? result.value : result.status}</span>
 }
 
 export function SwitchedPending(props: SwitchedPendingProps) @{
@@ -20,9 +18,7 @@ export function SwitchedPending(props: SwitchedPendingProps) @{
 	});
 	const current = value$.snapshot();
 	<main>
-		<p>
-			{current.status === 'ready' ? current.value : current.status}
-		</p>
+		<p>{current.status === 'ready' ? current.value : current.status}</p>
 		<Reader source$={value$} />
 	</main>
 }

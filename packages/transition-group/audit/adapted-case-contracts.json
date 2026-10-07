@@ -37,7 +37,7 @@
   "fixtures": [
     {
       "path": "packages/transition-group/tests/_fixtures/upstream-probes.tsrx",
-      "sha256": "de115d8930138ef0fc533b5b64fdd918df37110255920321e1b177c417af2687",
+      "sha256": "607df760cc907b097ca7498f509ab394c0b76141b9ecba4fb26c6cc7483f5773",
       "exports": [
         "CSSProbeProps",
         "CSSTransitionGroupProbe",

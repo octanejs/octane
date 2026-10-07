@@ -108,7 +108,9 @@ export function DefaultCheckedUpdate(props: { initial?: boolean; next: boolean }
 	const [baseline, setBaseline] = useState(props.initial);
 	<form>
 		<input id="update-dc" type="checkbox" defaultChecked={baseline} />
-		<button type="button" onClick={() => setBaseline(props.next)}>Change baseline</button>
+		<button type="button" onClick={() => setBaseline(props.next)}>
+			Change baseline
+		</button>
 	</form>
 }
 
@@ -116,6 +118,8 @@ export function SpreadDefaultCheckedRemoval() @{
 	const [included, setIncluded] = useState(true);
 	<form>
 		<input id="spread-dc" type="checkbox" {...(included ? { defaultChecked: true } : {})} />
-		<button type="button" onClick={() => setIncluded(false)}>Remove baseline prop</button>
+		<button type="button" onClick={() => setIncluded(false)}>
+			Remove baseline prop
+		</button>
 	</form>
 }

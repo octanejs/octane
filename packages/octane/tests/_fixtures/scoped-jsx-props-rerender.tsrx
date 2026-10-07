@@ -10,14 +10,14 @@ export const ScopedPropsTone = createContext('plain');
 
 function Counter({ label }: { label: string }) @{
 	const [count, setCount] = useState(0);
-	<button class="counter" data-label={label} onClick={() => setCount((value) => value + 1)}>{label +
-		':' +
-		count as string}</button>
+	<button class="counter" data-label={label} onClick={() => setCount((value) => value + 1)}>
+		{(label + ':' + count) as string}
+	</button>
 }
 
 function Toned({ label }: { label: string }) @{
 	const tone = useContext(ScopedPropsTone);
-	<span class="toned">{label + '/' + tone as string}</span>
+	<span class="toned">{(label + '/' + tone) as string}</span>
 }
 
 function Tip({ text }: { text: string }) @{
@@ -91,10 +91,12 @@ export function ScopedPropsOwner({ bind }: { bind: (controls: ScopedPropsControl
 	<ScopedPropsTone value={tone}>
 		<Shell
 			head={<Counter key={headKey} label={prefix + 'head'} />}
-			layers={<>
-				<Counter label={prefix + 'first'} />
-				<Toned label={prefix + 'second'} />
-			</>}
+			layers={
+				<>
+					<Counter label={prefix + 'first'} />
+					<Toned label={prefix + 'second'} />
+				</>
+			}
 			rows={order.map((id) => byId[id])}
 			loose={[looseX, looseY]}
 			tip={tip}

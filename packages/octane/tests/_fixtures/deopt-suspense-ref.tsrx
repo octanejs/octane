@@ -13,9 +13,11 @@ function Value(props: { promise: Promise<string> }) @{
 // inside a @try boundary next to a suspendable sibling. Hiding the boundary
 // must detach the descriptor's ref; the reveal must re-attach it.
 export function DeoptRefInBoundary(props: DeoptRefInBoundaryProps) @{
-	const host = <b id="deopt-target" ref={props.r}>
-		x
-	</b>;
+	const host = (
+		<b id="deopt-target" ref={props.r}>
+			x
+		</b>
+	);
 	<div class="wrap">
 		@try {
 			<div class="content">

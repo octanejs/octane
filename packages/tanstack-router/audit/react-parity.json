@@ -37,7 +37,7 @@
       "arch": "any",
       "packageManager": "pnpm@12.9.1",
       "lockfile": "pnpm-lock.yaml",
-      "lockfileSha256": "e92f4520cd88a2593a0ecd555e0532b2e4e8bb1396c9558a09f0cbf3fbaa5917"
+      "lockfileSha256": "caea67fe61ab57f3e8cbd8a0e55f0e8b3014b3dd6815c6fe6e158095f291daeb"
     }
   },
   "lanes": [
@@ -85,7 +85,7 @@
         {
           "path": "packages/tanstack-router/tests/_fixtures/router-diff.tsrx",
           "role": "support",
-          "sha256": "1ea73e640f57317ccdede12dcddac2abaf76010dc20d6889183e1ee39436a937"
+          "sha256": "630eba2115e7c374d904be7366649eec3ea9cdf748a6df9aaeba89659e3c27bf"
         }
       ]
     },

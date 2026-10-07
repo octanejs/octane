@@ -32,8 +32,8 @@ export function ZIndexLayer(props: ZIndexLayerProps) {
 	const lastPortalElementRef = useRef<Element | undefined>(undefined);
 	const registeredZIndexesRef = useRef(new Set<number>());
 	const dispatch = useAppDispatch();
-	const portalElement: Element | undefined = useAppSelector(
-		(state) => selectZIndexPortalElement(state, zIndex, isPanorama),
+	const portalElement: Element | undefined = useAppSelector((state) =>
+		selectZIndexPortalElement(state, zIndex, isPanorama),
 	);
 
 	useLayoutEffect(() => {

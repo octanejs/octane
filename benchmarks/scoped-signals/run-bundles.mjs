@@ -258,7 +258,7 @@ try {
 				entry: compilerEntry,
 				options: compilerOptions,
 				dependencies: Object.fromEntries(
-					['@tsrx/core', 'esrap', 'entities', 'es-module-lexer', '@tsrx/oxc'].map((name) => [
+					['@tsrx/core', 'esrap', 'es-module-lexer', '@tsrx/oxc'].map((name) => [
 						name,
 						packageEvidence(
 							createRequire(compilerEntry).resolve(

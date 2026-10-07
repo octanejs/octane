@@ -5,7 +5,7 @@ function A() @{
 }
 function Sus(props) @{
 	const v = use(props.promise);
-	<span id="content">{'B-' + v as string}</span>
+	<span id="content">{('B-' + v) as string}</span>
 }
 
 // switchBlock replace-suspend: a transition changes the discriminant 0→1, where case 1
@@ -14,10 +14,10 @@ export function SwitchSwap(props) @{
 	const [n, setN] = useState(0);
 	const [isPending, start] = useTransition();
 	<div>
-		<button id="go" onClick={() => start(() => setN(1))}>{'go'}</button>
-		<span id="pending">
-			{isPending ? 'pending' : 'idle'}
-		</span>
+		<button id="go" onClick={() => start(() => setN(1))}>
+			{'go'}
+		</button>
+		<span id="pending">{isPending ? 'pending' : 'idle'}</span>
 		@try {
 			@switch (n) {
 				@case 0: {

@@ -8,17 +8,19 @@ interface Tree {
 // A named function expression binds its own name only inside its body. An arm
 // hoisted out of that body must receive the name like any other local, or a
 // recursive self-render reads it free at module scope.
-export const RecursiveIf = memo(
-	function Counter(props: { depth: number; max: number; label: string }) @{
-		const [count, setCount] = useState(0);
-		<section>
-			<button onClick={() => setCount(count + 1)}>{`${props.label}${props.depth}:${count}`}</button>
-			@if (props.depth < props.max) {
-				<Counter depth={props.depth + 1} max={props.max} label={props.label} />
-			}
-		</section>
-	},
-);
+export const RecursiveIf = memo(function Counter(props: {
+	depth: number;
+	max: number;
+	label: string;
+}) @{
+	const [count, setCount] = useState(0);
+	<section>
+		<button onClick={() => setCount(count + 1)}>{`${props.label}${props.depth}:${count}`}</button>
+		@if (props.depth < props.max) {
+			<Counter depth={props.depth + 1} max={props.max} label={props.label} />
+		}
+	</section>
+});
 
 export const RecursiveFor = memo(function TreeNode(props: { node: Tree; suffix: string }) @{
 	const [count, setCount] = useState(0);

@@ -139,7 +139,7 @@ pnpm dlx @octanejs/cli init
 Or do it by hand:
 
 ```bash
-pnpm add octane @octanejs/vite-plugin @tsrx/oxc@0.16.0
+pnpm add octane @octanejs/vite-plugin @tsrx/oxc@0.18.0
 ```
 
 ```ts

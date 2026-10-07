@@ -127,21 +127,25 @@ export function SchedulerLifecycle(props: SchedulerLifecycleProps) {
 function ProviderValue(props: { id: string }) {
 	const options = useDefaultPacerOptions();
 	const context = usePacerContext();
-	return <output id={props.id}>
-		{String(options.debouncer?.wait) + ':' + String(context !== null)}
-	</output>;
+	return (
+		<output id={props.id}>
+			{String(options.debouncer?.wait) + ':' + String(context !== null)}
+		</output>
+	);
 }
 
 export function NestedPacerProviders(props: { wait: number }) {
-	return <main>
-		<ProviderValue id="unprovided" />
-		<PacerProvider defaultOptions={{ debouncer: { wait: props.wait } }}>
-			<ProviderValue id="outer" />
-			<PacerProvider defaultOptions={{ debouncer: { wait: 80 } }}>
-				<ProviderValue id="inner" />
+	return (
+		<main>
+			<ProviderValue id="unprovided" />
+			<PacerProvider defaultOptions={{ debouncer: { wait: props.wait } }}>
+				<ProviderValue id="outer" />
+				<PacerProvider defaultOptions={{ debouncer: { wait: 80 } }}>
+					<ProviderValue id="inner" />
+				</PacerProvider>
 			</PacerProvider>
-		</PacerProvider>
-	</main>;
+		</main>
+	);
 }
 
 export function SchedulerChildren(props: { kind: number; revision: number }) @{

@@ -32,37 +32,40 @@ export const IconButton = ({
 
 	const ElementType = href ? 'a' : 'button';
 
-	const el = <ElementType
-		className={getClassName({
-			primary: variant === 'primary',
-			secondary: variant === 'secondary',
-			disabled,
-			fullWidth,
-		})}
-		onClick={(e) => {
-			if (!onClick) return;
+	const el = (
+		<ElementType
+			className={getClassName({
+				primary: variant === 'primary',
+				secondary: variant === 'secondary',
+				disabled,
+				fullWidth,
+			})}
+			onClick={(e) => {
+				if (!onClick) return;
 
-			setLoading(true);
-			Promise.resolve(onClick(e)).then(() => {
-				setLoading(false);
-			});
-		}}
-		type={type}
-		disabled={disabled || loading}
-		tabIndex={tabIndex}
-		target={newTab ? '_blank' : undefined}
-		rel={newTab ? 'noreferrer' : undefined}
-		href={href}
-		title={title}
-	>
-		<span className={getClassName('title')}>{title}</span>
-		{children}
-		{loading &&
-			<>
-				&nbsp;&nbsp;
-				<Loader size={14} />
-			</>}
-	</ElementType>;
+				setLoading(true);
+				Promise.resolve(onClick(e)).then(() => {
+					setLoading(false);
+				});
+			}}
+			type={type}
+			disabled={disabled || loading}
+			tabIndex={tabIndex}
+			target={newTab ? '_blank' : undefined}
+			rel={newTab ? 'noreferrer' : undefined}
+			href={href}
+			title={title}
+		>
+			<span className={getClassName('title')}>{title}</span>
+			{children}
+			{loading && (
+				<>
+					&nbsp;&nbsp;
+					<Loader size={14} />
+				</>
+			)}
+		</ElementType>
+	);
 
 	return el;
 };

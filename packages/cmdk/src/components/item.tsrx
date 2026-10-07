@@ -28,23 +28,23 @@ export function Item(props: ItemProps) @{
 
 	const store = useStore()!;
 	const selected = useCmdk((s) => Boolean(s.value && s.value === value.current));
-	const render = useCmdk(
-		(s) => forceMount
+	const render = useCmdk((s) =>
+		forceMount
 			? true
 			: context.filter() === false
 				? true
 				: !s.search
 					? true
 					: // An item with no entry in `filtered.items` has never been
-					// scored — that is not the same as having scored zero, and
-					// treating it as zero deadlocks: the item renders null, so
-					// `ref.current` stays null, so `useValue` has no textContent to
-					// infer from, so it registers an empty value, which scores zero
-					// forever. Upstream reads string children synchronously; octane's
-					// compiled children are opaque, so the first render IS the
-					// registration. Rendering unscored items lets that first pass
-					// happen; the next filter pass hides it if it does not match.
-					s.filtered.items.has(id)
+						// scored — that is not the same as having scored zero, and
+						// treating it as zero deadlocks: the item renders null, so
+						// `ref.current` stays null, so `useValue` has no textContent to
+						// infer from, so it registers an empty value, which scores zero
+						// forever. Upstream reads string children synchronously; octane's
+						// compiled children are opaque, so the first render IS the
+						// registration. Rendering unscored items lets that first pass
+						// happen; the next filter pass hides it if it does not match.
+						s.filtered.items.has(id)
 						? (s.filtered.items.get(id) ?? 0) > 0
 						: true,
 	);
@@ -90,5 +90,7 @@ export function Item(props: ItemProps) @{
 		data-selected={Boolean(selected)}
 		onPointerMove={disabled || context.getDisablePointerSelection() ? undefined : select}
 		onClick={disabled ? undefined : onSelect}
-	>{children}</div>
+	>
+		{children}
+	</div>
 }

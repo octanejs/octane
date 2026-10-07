@@ -6,7 +6,9 @@
 export function FuzzList(props) @{
 	<div id="list">
 		@for (const item of props.items; key item.id) {
-			<span class="row" data-k={item.id as number}>{item.label as string}</span>
+			<span class="row" data-k={item.id as number}>
+				{item.label as string}
+			</span>
 		}
 	</div>
 }

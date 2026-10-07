@@ -42,10 +42,11 @@ export function HydrationBoundary(props: HydrationBoundaryProps) @{
 				} else {
 					const hydrationIsNewer =
 						dehydratedQuery.state.dataUpdatedAt > existingQuery.state.dataUpdatedAt ||
-							dehydratedQuery.promise && existingQuery.state.status !== 'pending' &&
-								existingQuery.state.fetchStatus !== 'fetching' &&
-								dehydratedQuery.dehydratedAt !== undefined &&
-								dehydratedQuery.dehydratedAt > existingQuery.state.dataUpdatedAt;
+						(dehydratedQuery.promise &&
+							existingQuery.state.status !== 'pending' &&
+							existingQuery.state.fetchStatus !== 'fetching' &&
+							dehydratedQuery.dehydratedAt !== undefined &&
+							dehydratedQuery.dehydratedAt > existingQuery.state.dataUpdatedAt);
 					if (hydrationIsNewer) {
 						existingQueries.push(dehydratedQuery);
 					}
@@ -70,7 +71,5 @@ export function HydrationBoundary(props: HydrationBoundaryProps) @{
 		}
 	}, [client, hydrationQueue]);
 
-	<>
-		{props.children}
-	</>
+	<>{props.children}</>
 }

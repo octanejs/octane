@@ -23,18 +23,19 @@ export interface PromotionProps {
 function PendingChild(props: PromotionProps) @{
 	const value$ = derived$(({ read }) => {
 		void read;
-		const ready =
-			props.resource.tracked ? props.resource.ready$.get() : props.resource.ready;
+		const ready = props.resource.tracked ? props.resource.ready$.get() : props.resource.ready;
 		if (!ready) throw props.resource.waiting;
 		return 'ready:' + props.version;
 	});
 	const status = value$.snapshot().status;
 	const run = captureSignalOwner(currentSignalOwner()!);
 	<button
-		onClick={() => props.capture({
-			get: () => run(() => value$.get()),
-			snapshot: () => run(() => value$.snapshot()),
-		})}
+		onClick={() =>
+			props.capture({
+				get: () => run(() => value$.get()),
+				snapshot: () => run(() => value$.snapshot()),
+			})
+		}
 	>
 		{props.version === 0 ? 'Short' : 'Much longer content here'}
 		<span>{status}</span>

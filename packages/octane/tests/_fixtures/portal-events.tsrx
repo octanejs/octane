@@ -8,14 +8,13 @@ export function BasicPortalClick(props) @{
 	const [count, setCount] = useState(0);
 	<div class="app-root">
 		<span class="count">{count as string}</span>
-		{createPortal(
-			() => @{
-				<div class="modal">
-					<button class="inside-btn" onClick={() => setCount(count + 1)}>{'inside'}</button>
-				</div>
-			},
-			props.target,
-		)}
+		{createPortal(() => @{
+			<div class="modal">
+				<button class="inside-btn" onClick={() => setCount(count + 1)}>
+					{'inside'}
+				</button>
+			</div>
+		}, props.target)}
 	</div>
 }
 
@@ -33,28 +32,23 @@ export function CrossPortalBubble(props) @{
 	<div class="app-root" onClick={() => setOuterCount(outerCount + 1)}>
 		<span class="inner-count">{innerCount as string}</span>
 		<span class="outer-count">{outerCount as string}</span>
-		{createPortal(
-			() => @{
-				<div class="modal">
-					<button
-						class="inside-btn"
-						onClick={() => setInnerCount(innerCount + 1)}
-					>{'inside'}</button>
-				</div>
-			},
-			props.target,
-		)}
+		{createPortal(() => @{
+			<div class="modal">
+				<button class="inside-btn" onClick={() => setInnerCount(innerCount + 1)}>
+					{'inside'}
+				</button>
+			</div>
+		}, props.target)}
 	</div>
 }
 
 /** Non-bubbling media events use the same logical portal ascent as clicks. */
 export function NonBubblingPortal(props) @{
-	<div class="app-root" onPlay={() => props.log('outer')}>{createPortal(
-		() => @{
+	<div class="app-root" onPlay={() => props.log('outer')}>
+		{createPortal(() => @{
 			<video class="inside-video" onPlay={() => props.log('inner')}></video>
-		},
-		props.target,
-	)}</div>
+		}, props.target)}
+	</div>
 }
 
 /**
@@ -71,14 +65,13 @@ export function StopPropagation(props) @{
 	<div class="app-root" onClick={() => setOuterCount(outerCount + 1)}>
 		<span class="inner-count">{innerCount as string}</span>
 		<span class="outer-count">{outerCount as string}</span>
-		{createPortal(
-			() => @{
-				<div class="modal">
-					<button class="inside-btn" onClick={inner}>{'inside'}</button>
-				</div>
-			},
-			props.target,
-		)}
+		{createPortal(() => @{
+			<div class="modal">
+				<button class="inside-btn" onClick={inner}>
+					{'inside'}
+				</button>
+			</div>
+		}, props.target)}
 	</div>
 }
 
@@ -93,18 +86,16 @@ export function TwoPortalsSameTarget(props) @{
 	<div class="app-root">
 		<span class="a-count">{aCount as string}</span>
 		<span class="b-count">{bCount as string}</span>
-		{createPortal(
-			() => @{
-				<button class="btn-a" onClick={() => setACount(aCount + 1)}>{'A'}</button>
-			},
-			props.target,
-		)}
-		{createPortal(
-			() => @{
-				<button class="btn-b" onClick={() => setBCount(bCount + 1)}>{'B'}</button>
-			},
-			props.target,
-		)}
+		{createPortal(() => @{
+			<button class="btn-a" onClick={() => setACount(aCount + 1)}>
+				{'A'}
+			</button>
+		}, props.target)}
+		{createPortal(() => @{
+			<button class="btn-b" onClick={() => setBCount(bCount + 1)}>
+				{'B'}
+			</button>
+		}, props.target)}
 	</div>
 }
 
@@ -112,12 +103,11 @@ export function TwoPortalsSameTarget(props) @{
 // it without inlining createPortal at conditional position (the TSRX compiler
 // only takes createPortal at JSX child position of an element).
 function PortalledButton(props) @{
-	<span class="portal-anchor">{createPortal(
-		() => @{
+	<span class="portal-anchor">
+		{createPortal(() => @{
 			<button class="inside-btn">{'inside'}</button>
-		},
-		props.target,
-	)}</span>
+		}, props.target)}
+	</span>
 }
 
 /**
@@ -129,7 +119,9 @@ function PortalledButton(props) @{
 export function TogglePortal(props) @{
 	const [open, setOpen] = useState(true);
 	<div class="app-root">
-		<button class="toggle" onClick={() => setOpen(!open)}>{'toggle'}</button>
+		<button class="toggle" onClick={() => setOpen(!open)}>
+			{'toggle'}
+		</button>
 		@if (open) {
 			<PortalledButton target={props.target} />
 		}

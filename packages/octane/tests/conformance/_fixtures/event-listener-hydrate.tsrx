@@ -29,7 +29,9 @@ export function ScrollHydrate(props: {
 				onScrollCapture={props.onScrollCapture}
 				onScrollEnd={props.onScrollEnd}
 				onScrollEndCapture={props.onScrollEndCapture}
-			>{'c'}</div>
+			>
+				{'c'}
+			</div>
 		</div>
 	</div>
 }

@@ -13,13 +13,13 @@ export const Route = createFileRoute('/_library')({
 function LibraryRoute() {
 	const layoutData = useMatches({
 		select: (matches) => {
-			const config = matches.map((match) => getConfigFromLoaderData(match.loaderData)).find(
-				isDefined,
-			);
+			const config = matches
+				.map((match) => getConfigFromLoaderData(match.loaderData))
+				.find(isDefined);
 			const version = matches.map((match) => getVersionFromParams(match.params)).find(isDefined);
 			const libraryId =
 				matches.map((match) => getLibraryIdFromParams(match.params)).find(isDefined) ??
-					getLibraryIdFromPathname(matches[matches.length - 1]?.pathname);
+				getLibraryIdFromPathname(matches[matches.length - 1]?.pathname);
 
 			return {
 				config,
@@ -30,8 +30,7 @@ function LibraryRoute() {
 		},
 	});
 
-	const library =
-		layoutData.libraryId ? findLibrary(layoutData.libraryId) : undefined;
+	const library = layoutData.libraryId ? findLibrary(layoutData.libraryId) : undefined;
 
 	if (!library || !layoutData.version) {
 		throw notFound();
@@ -39,21 +38,23 @@ function LibraryRoute() {
 
 	const config = layoutData.config ?? emptyConfig;
 
-	return <LibraryLayout
-		libraryId={library.id}
-		name={library.name.replace('TanStack ', '')}
-		version={layoutData.version === 'latest' ? library.latestVersion : layoutData.version}
-		colorFrom={library.accentColorFrom ?? library.colorFrom}
-		colorTo={library.accentColorTo ?? library.colorTo}
-		textColor={library.accentTextColor ?? library.textColor ?? ''}
-		config={config}
-		frameworks={library.frameworks}
-		versions={library.availableVersions}
-		repo={library.repo}
-		isLandingPage={layoutData.isLandingPage}
-	>
-		<Outlet />
-	</LibraryLayout>;
+	return (
+		<LibraryLayout
+			libraryId={library.id}
+			name={library.name.replace('TanStack ', '')}
+			version={layoutData.version === 'latest' ? library.latestVersion : layoutData.version}
+			colorFrom={library.accentColorFrom ?? library.colorFrom}
+			colorTo={library.accentColorTo ?? library.colorTo}
+			textColor={library.accentTextColor ?? library.textColor ?? ''}
+			config={config}
+			frameworks={library.frameworks}
+			versions={library.availableVersions}
+			repo={library.repo}
+			isLandingPage={layoutData.isLandingPage}
+		>
+			<Outlet />
+		</LibraryLayout>
+	);
 }
 
 function getLibraryIdFromParams(params: unknown): LibraryId | undefined {
@@ -72,29 +73,36 @@ function getLibraryIdFromParams(params: unknown): LibraryId | undefined {
 
 function getLibraryIdFromPathname(pathname: string | undefined): LibraryId | undefined {
 	const firstSegment = pathname?.split('/').filter(Boolean)[0];
-	const library =
-		firstSegment ? findLibrary(firstSegment) : undefined;
+	const library = firstSegment ? findLibrary(firstSegment) : undefined;
 
 	return library?.id;
 }
 
 function getConfigFromLoaderData(loaderData: unknown): ConfigSchema | undefined {
-	return typeof loaderData === 'object' && loaderData !== null && 'config' in loaderData &&
-	isConfigSchema(loaderData.config)
+	return typeof loaderData === 'object' &&
+		loaderData !== null &&
+		'config' in loaderData &&
+		isConfigSchema(loaderData.config)
 		? loaderData.config
 		: undefined;
 }
 
 function getVersionFromParams(params: unknown): string | undefined {
-	return typeof params === 'object' && params !== null && 'version' in params &&
-	typeof params.version === 'string'
+	return typeof params === 'object' &&
+		params !== null &&
+		'version' in params &&
+		typeof params.version === 'string'
 		? params.version
 		: undefined;
 }
 
 function isConfigSchema(config: unknown): config is ConfigSchema {
-	return typeof config === 'object' && config !== null && 'sections' in config &&
-		Array.isArray(config.sections);
+	return (
+		typeof config === 'object' &&
+		config !== null &&
+		'sections' in config &&
+		Array.isArray(config.sections)
+	);
 }
 
 function isDefined<T>(value: T | undefined): value is T {

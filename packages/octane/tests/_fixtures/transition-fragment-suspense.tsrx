@@ -33,16 +33,20 @@ function DerivedHistory({ value, resource, reducer, gateInChild }: HistoryProps)
 		else setState({ current: value, previous: history.current });
 	}
 	if (!gateInChild && resource) use(resource);
-	return <Fragment>
-		<output id="derived-history">{history.previous as string}</output>
-		{gateInChild && <HistoryGate resource={resource} />}
-	</Fragment>;
+	return (
+		<Fragment>
+			<output id="derived-history">{history.previous as string}</output>
+			{gateInChild && <HistoryGate resource={resource} />}
+		</Fragment>
+	);
 }
 
 export function SuspendedDerivedHistory(props: HistoryProps) {
-	return <Suspense fallback={<p id="loading">Loading</p>}>
-		<DerivedHistory {...props} />
-	</Suspense>;
+	return (
+		<Suspense fallback={<p id="loading">Loading</p>}>
+			<DerivedHistory {...props} />
+		</Suspense>
+	);
 }
 
 function SuspendedReplacement({
@@ -72,16 +76,23 @@ export function FragmentSuspenseTransition(props: {
 }) {
 	const [replacement, setReplacement] = useState(false);
 	const [, startTransition] = useTransition();
-	return <Fragment>
-		<button id="start" onClick={() => startTransition(() => setReplacement(true))}>Start</button>
-		<button id="cancel" onClick={() => setReplacement(false)}>Cancel</button>
-		<CurrentPortal target={props.target} />
-		<Suspense fallback={<p id="loading">Loading</p>}>
-			{replacement &&
-				<Wrapper>
-					<SuspendedReplacement promise={props.promise} attempted={props.attempted} />
-					<CurrentPortal target={props.target} />
-				</Wrapper>}
-		</Suspense>
-	</Fragment>;
+	return (
+		<Fragment>
+			<button id="start" onClick={() => startTransition(() => setReplacement(true))}>
+				Start
+			</button>
+			<button id="cancel" onClick={() => setReplacement(false)}>
+				Cancel
+			</button>
+			<CurrentPortal target={props.target} />
+			<Suspense fallback={<p id="loading">Loading</p>}>
+				{replacement && (
+					<Wrapper>
+						<SuspendedReplacement promise={props.promise} attempted={props.attempted} />
+						<CurrentPortal target={props.target} />
+					</Wrapper>
+				)}
+			</Suspense>
+		</Fragment>
+	);
 }

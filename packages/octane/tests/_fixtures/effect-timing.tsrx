@@ -25,11 +25,16 @@ export function PhaseOrder(props) @{
 
 // useLayoutEffect runs AFTER the DOM commit — it can read the committed DOM.
 export function LayoutReadsDom(props) @{
-	useLayoutEffect((onCommit) => {
-		const w = document.querySelector('#measured');
-		onCommit(w == null ? null : w.outerHTML);
-	}, [props.onCommit]);
-	<div id="measured" style="width: 100px">{'A'}</div>
+	useLayoutEffect(
+		(onCommit) => {
+			const w = document.querySelector('#measured');
+			onCommit(w == null ? null : w.outerHTML);
+		},
+		[props.onCommit],
+	);
+	<div id="measured" style="width: 100px">
+		{'A'}
+	</div>
 }
 
 // Layout fires synchronously inside flushSync; passive does not.
@@ -92,12 +97,15 @@ export function CoalescedPassiveArtifact(props: { label: string; log: string[] }
 const OPEN_EVENT = 'octane-test-open';
 
 function Listener(props) @{
-	useEffect((log) => {
-		log.push('attach');
-		const onOpen = () => log.push('received');
-		document.addEventListener(OPEN_EVENT, onOpen);
-		return () => document.removeEventListener(OPEN_EVENT, onOpen);
-	}, [props.log]);
+	useEffect(
+		(log) => {
+			log.push('attach');
+			const onOpen = () => log.push('received');
+			document.addEventListener(OPEN_EVENT, onOpen);
+			return () => document.removeEventListener(OPEN_EVENT, onOpen);
+		},
+		[props.log],
+	);
 	<span id="listener">{'on'}</span>
 }
 
@@ -113,14 +121,19 @@ function Gate(props) {
 
 export function PassiveBeforeCascadeRender(props) @{
 	const [open, setOpen] = useState(false);
-	useEffect((log, isOpen) => {
-		if (isOpen) {
-			log.push('dispatch');
-			document.dispatchEvent(new CustomEvent(OPEN_EVENT));
-		}
-	}, [props.log, open]);
+	useEffect(
+		(log, isOpen) => {
+			if (isOpen) {
+				log.push('dispatch');
+				document.dispatchEvent(new CustomEvent(OPEN_EVENT));
+			}
+		},
+		[props.log, open],
+	);
 	<div>
-		<button id="open" onClick={() => setOpen(true)}>{'open'}</button>
+		<button id="open" onClick={() => setOpen(true)}>
+			{'open'}
+		</button>
 		@if (open) {
 			<Gate log={props.log} />
 		}
@@ -133,18 +146,27 @@ export function PassiveBeforeCascadeRender(props) @{
 // their cleanups log "<name>:cleanup". On unmount React fires C:cleanup
 // before B:cleanup before A:cleanup.
 export function ManyPassiveEffects(props) @{
-	useEffect((log) => {
-		log.push('A:body');
-		return () => log.push('A:cleanup');
-	}, [props.log]);
-	useEffect((log) => {
-		log.push('B:body');
-		return () => log.push('B:cleanup');
-	}, [props.log]);
-	useEffect((log) => {
-		log.push('C:body');
-		return () => log.push('C:cleanup');
-	}, [props.log]);
+	useEffect(
+		(log) => {
+			log.push('A:body');
+			return () => log.push('A:cleanup');
+		},
+		[props.log],
+	);
+	useEffect(
+		(log) => {
+			log.push('B:body');
+			return () => log.push('B:cleanup');
+		},
+		[props.log],
+	);
+	useEffect(
+		(log) => {
+			log.push('C:body');
+			return () => log.push('C:cleanup');
+		},
+		[props.log],
+	);
 	<span>{'multi'}</span>
 }
 
@@ -160,14 +182,16 @@ export function LayoutBeforeObserver() {
 	useLayoutEffect(() => {
 		if (open && phase < 3) setPhase(phase + 1);
 	}, [open, phase]);
-	return <div>
-		<button onClick={() => setOpen(true)}>Open</button>
-		<div
-			data-testid="panel"
-			data-open={open ? '' : undefined}
-			style={{ height: phase === 3 ? '160px' : undefined }}
-		>
-			content
+	return (
+		<div>
+			<button onClick={() => setOpen(true)}>Open</button>
+			<div
+				data-testid="panel"
+				data-open={open ? '' : undefined}
+				style={{ height: phase === 3 ? '160px' : undefined }}
+			>
+				content
+			</div>
 		</div>
-	</div>;
+	);
 }

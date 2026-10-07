@@ -14,9 +14,11 @@ export function CommandMenu() @{
 
 	<div>
 		<h2 class="demo-title">{'Command menu (@octanejs/cmdk)'}</h2>
-		<p
-			class="demo-blurb"
-		>{'Fuzzy filtering with score ordering, grouped results, and full keyboard navigation. Selection is driven by the real DOM, not a virtual list.'}</p>
+		<p class="demo-blurb">
+			{
+				'Fuzzy filtering with score ordering, grouped results, and full keyboard navigation. Selection is driven by the real DOM, not a virtual list.'
+			}
+		</p>
 
 		<div class="row" style="margin-bottom: 12px; flex-wrap: wrap">
 			<button class="btn" onClick={() => setShowForceMount(!showForceMount)}>
@@ -25,7 +27,9 @@ export function CommandMenu() @{
 			<button class="btn" onClick={() => setLoop(!loop)}>
 				{loop ? 'Looping: on' : 'Looping: off'}
 			</button>
-			<button class="btn" onClick={() => setDialogOpen(true)}>{'Open as dialog'}</button>
+			<button class="btn" onClick={() => setDialogOpen(true)}>
+				{'Open as dialog'}
+			</button>
 		</div>
 
 		<div class="cmdk-shell">
@@ -35,10 +39,9 @@ export function CommandMenu() @{
 					<Command.Empty>{'No results found.'}</Command.Empty>
 
 					@if (showForceMount) {
-						<Command.Item
-							forceMount
-							onSelect={(v) => setPicked(v)}
-						>{'Always visible (forceMount)'}</Command.Item>
+						<Command.Item forceMount onSelect={(v) => setPicked(v)}>
+							{'Always visible (forceMount)'}
+						</Command.Item>
 					}
 
 					<Command.Group heading="Navigation">
@@ -50,10 +53,9 @@ export function CommandMenu() @{
 					<Command.Separator />
 
 					<Command.Group heading="Actions">
-						<Command.Item
-							keywords={['new', 'create']}
-							onSelect={(v) => setPicked(v)}
-						>{'Add a document'}</Command.Item>
+						<Command.Item keywords={['new', 'create']} onSelect={(v) => setPicked(v)}>
+							{'Add a document'}
+						</Command.Item>
 						<Command.Item onSelect={(v) => setPicked(v)}>{'Rename workspace'}</Command.Item>
 						<Command.Item disabled>{'Delete workspace (disabled)'}</Command.Item>
 					</Command.Group>
@@ -83,13 +85,17 @@ export function CommandMenu() @{
 						setPicked(v);
 						setDialogOpen(false);
 					}}
-				>{'Dialog: first action'}</Command.Item>
+				>
+					{'Dialog: first action'}
+				</Command.Item>
 				<Command.Item
 					onSelect={(v) => {
 						setPicked(v);
 						setDialogOpen(false);
 					}}
-				>{'Dialog: second action'}</Command.Item>
+				>
+					{'Dialog: second action'}
+				</Command.Item>
 			</Command.List>
 		</Command.Dialog>
 	</div>

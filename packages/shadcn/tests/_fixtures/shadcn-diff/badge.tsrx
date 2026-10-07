@@ -9,7 +9,9 @@ export function BadgeGallery() @{
 		<Badge variant="outline">Out</Badge>
 		<Badge variant="ghost">Ghost</Badge>
 		<Badge variant="link">Link</Badge>
-		<Badge variant="secondary" className="custom-badge px-4">Merged</Badge>
+		<Badge variant="secondary" className="custom-badge px-4">
+			Merged
+		</Badge>
 		<Badge
 			asChild
 			variant="outline"

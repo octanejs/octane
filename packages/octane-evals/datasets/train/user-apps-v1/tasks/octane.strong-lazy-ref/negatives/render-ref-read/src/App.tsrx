@@ -49,6 +49,8 @@ export function App({
 			onClick={() => {
 				setDraft(history.current.pop() ?? '');
 			}}
-		>{'Undo'}</button>
+		>
+			{'Undo'}
+		</button>
 	</form>
 }

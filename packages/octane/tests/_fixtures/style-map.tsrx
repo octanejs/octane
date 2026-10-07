@@ -10,20 +10,22 @@ import { useState } from 'octane';
 // rules end up in a `<style data-octane>` tag and apply to anyone
 // who renders with the hashed class.
 
-const styles = <style>
-	.red {
-		color: rgb(200, 0, 0);
-	}
-	.blue {
-		color: rgb(0, 0, 200);
-	}
-	.pad {
-		padding: 5px;
-	}
-</style>;
+const styles = (
+	<style>
+		.red {
+			color: rgb(200, 0, 0);
+		}
+		.blue {
+			color: rgb(0, 0, 200);
+		}
+		.pad {
+			padding: 5px;
+		}
+	</style>
+);
 
 export function Picker(props) @{
-	<div class={styles[props.kind]}>{'I am ' + props.kind as string}</div>
+	<div class={styles[props.kind]}>{('I am ' + props.kind) as string}</div>
 }
 
 export function Composed() @{
@@ -35,18 +37,20 @@ export function Composed() @{
 // `class` when the key changes.
 export function Switchable() @{
 	const [on, setOn] = useState(false);
-	<button class={on ? styles.blue : styles.red} onClick={() => setOn(!on)}>{(on
-		? 'blue'
-		: 'red') as string}</button>
+	<button class={on ? styles.blue : styles.red} onClick={() => setOn(!on)}>
+		{(on ? 'blue' : 'red') as string}
+	</button>
 }
 
 // Style map exported from the module — proves the `export const x = <style>...</style>`
 // shape also compiles. Other files can `import { palette } from './style-map'`.
-export const palette = <style>
-	.accent {
-		color: rgb(255, 165, 0);
-	}
-</style>;
+export const palette = (
+	<style>
+		.accent {
+			color: rgb(255, 165, 0);
+		}
+	</style>
+);
 
 export function Branded() @{
 	<span class={palette.accent}>{'branded'}</span>

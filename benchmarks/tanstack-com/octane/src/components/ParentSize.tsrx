@@ -32,7 +32,9 @@ export function ParentSize({ children, className }: ParentSizeProps) {
 		return () => resizeObserver.disconnect();
 	}, []);
 
-	return <div ref={containerRef} class={className} style={{ width: '100%', height: '100%' }}>
-		{size.width > 0 && children(size)}
-	</div>;
+	return (
+		<div ref={containerRef} class={className} style={{ width: '100%', height: '100%' }}>
+			{size.width > 0 && children(size)}
+		</div>
+	);
 }

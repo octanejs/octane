@@ -31,9 +31,11 @@ export function Nested() @{
 // array must ride the silent positional-key path (React never key-warns static
 // JSX children).
 export function ValueFragment() {
-	return <>
-		<p class="one">{'1'}</p>
-		{'\n'}
-		<p class="two">{'2'}</p>
-	</>;
+	return (
+		<>
+			<p class="one">{'1'}</p>
+			{'\n'}
+			<p class="two">{'2'}</p>
+		</>
+	);
 }

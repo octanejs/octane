@@ -23,6 +23,8 @@ export function App() @{
 				tags.sort();
 				setTags(tags);
 			}}
-		>{'Add tag'}</button>
+		>
+			{'Add tag'}
+		</button>
 	</section>
 }

@@ -70,45 +70,63 @@ function rangeLabel(range: SelectionRange): string {
 }
 
 function LoadingSheet() {
-	return <main class="state-page" aria-label="Loading Atlas forecast" aria-busy="true">
-		<div class="state-card state-card--loading">
-			<div class="loading-mark" aria-hidden="true">G</div>
-			<p class="eyebrow">Gridlab workspace</p>
-			<h1>Opening Atlas forecast</h1>
-			<p>Preparing 80 columns and 1,000 deterministic planning rows…</p>
-			<div class="loading-lines" aria-hidden="true">
-				<span></span>
-				<span></span>
-				<span></span>
+	return (
+		<main class="state-page" aria-label="Loading Atlas forecast" aria-busy="true">
+			<div class="state-card state-card--loading">
+				<div class="loading-mark" aria-hidden="true">
+					G
+				</div>
+				<p class="eyebrow">Gridlab workspace</p>
+				<h1>Opening Atlas forecast</h1>
+				<p>Preparing 80 columns and 1,000 deterministic planning rows…</p>
+				<div class="loading-lines" aria-hidden="true">
+					<span></span>
+					<span></span>
+					<span></span>
+				</div>
 			</div>
-		</div>
-	</main>;
+		</main>
+	);
 }
 
 function LoadFailure({ onRetry }: { onRetry: () => void }) {
-	return <main class="state-page">
-		<section class="state-card" role="alert">
-			<div class="state-icon" aria-hidden="true">!</div>
-			<p class="eyebrow">Atlas forecast</p>
-			<h1>Couldn’t open this workbook</h1>
-			<p>
-				The local fixture stopped before any cells were applied. Your browser data is unchanged.
-			</p>
-			<button class="primary-button" onClick={onRetry}>Retry opening workbook</button>
-		</section>
-	</main>;
+	return (
+		<main class="state-page">
+			<section class="state-card" role="alert">
+				<div class="state-icon" aria-hidden="true">
+					!
+				</div>
+				<p class="eyebrow">Atlas forecast</p>
+				<h1>Couldn’t open this workbook</h1>
+				<p>
+					The local fixture stopped before any cells were applied. Your browser data is unchanged.
+				</p>
+				<button class="primary-button" onClick={onRetry}>
+					Retry opening workbook
+				</button>
+			</section>
+		</main>
+	);
 }
 
 function EmptySheet({ onRestore }: { onRestore: () => void }) {
-	return <main class="state-page">
-		<section class="state-card" data-testid="empty-sheet">
-			<div class="empty-grid-mark" aria-hidden="true">＋</div>
-			<p class="eyebrow">Atlas forecast</p>
-			<h1>This sheet is empty</h1>
-			<p>Restore the deterministic planning rows to explore formulas and virtualized navigation.</p>
-			<button class="primary-button" onClick={onRestore}>Restore sample workbook</button>
-		</section>
-	</main>;
+	return (
+		<main class="state-page">
+			<section class="state-card" data-testid="empty-sheet">
+				<div class="empty-grid-mark" aria-hidden="true">
+					＋
+				</div>
+				<p class="eyebrow">Atlas forecast</p>
+				<h1>This sheet is empty</h1>
+				<p>
+					Restore the deterministic planning rows to explore formulas and virtualized navigation.
+				</p>
+				<button class="primary-button" onClick={onRestore}>
+					Restore sample workbook
+				</button>
+			</section>
+		</main>
+	);
 }
 
 export function App() @{
@@ -151,10 +169,13 @@ export function App() @{
 	);
 	const emptyScenarioRef = useRef(parametersRef.current.get('scenario') === 'empty');
 
-	const readRaw = useCallback((address: CellAddress) => {
-		const override = cellValues[cellKey(address)];
-		return override === undefined ? baseCellRaw(address) : override;
-	}, [cellValues]);
+	const readRaw = useCallback(
+		(address: CellAddress) => {
+			const override = cellValues[cellKey(address)];
+			return override === undefined ? baseCellRaw(address) : override;
+		},
+		[cellValues],
+	);
 
 	const runSync = useCallback(() => {
 		if (debounceTimerRef.current !== null) {
@@ -227,33 +248,36 @@ export function App() @{
 		debounceTimerRef.current = window.setTimeout(() => syncActionRef.current(), 180);
 	}, []);
 
-	const applyValues = useCallback((updates: Array<{ address: CellAddress; raw: string }>) => {
-		if (updates.length === 0) return;
-		const nextValues = { ...cellValuesRef.current };
-		for (const update of updates) {
-			nextValues[cellKey(update.address)] = update.raw.slice(0, MAX_CELL_TEXT_LENGTH);
-		}
-		cellValuesRef.current = nextValues;
-		setCellValues(nextValues);
-		const nextDirty = { ...dirtyVersionsRef.current };
-		for (const update of updates) {
-			nextDirty[cellKey(update.address)] = ++revisionRef.current;
-		}
-		dirtyVersionsRef.current = nextDirty;
-		setDirtyVersions(nextDirty);
-		const pending = Object.keys(nextDirty).length;
-		const stored = writeStoredCellValues(nextValues);
-		storageAvailableRef.current = stored;
-		if (!stored) {
-			setSyncState('storage-error');
-			setActivity('Local storage unavailable · keep this tab open');
-			return;
-		}
-		setActivity(
-			`${updates.length} cell${updates.length === 1 ? '' : 's'} updated · ${pending} pending`,
-		);
-		scheduleSync();
-	}, [scheduleSync]);
+	const applyValues = useCallback(
+		(updates: Array<{ address: CellAddress; raw: string }>) => {
+			if (updates.length === 0) return;
+			const nextValues = { ...cellValuesRef.current };
+			for (const update of updates) {
+				nextValues[cellKey(update.address)] = update.raw.slice(0, MAX_CELL_TEXT_LENGTH);
+			}
+			cellValuesRef.current = nextValues;
+			setCellValues(nextValues);
+			const nextDirty = { ...dirtyVersionsRef.current };
+			for (const update of updates) {
+				nextDirty[cellKey(update.address)] = ++revisionRef.current;
+			}
+			dirtyVersionsRef.current = nextDirty;
+			setDirtyVersions(nextDirty);
+			const pending = Object.keys(nextDirty).length;
+			const stored = writeStoredCellValues(nextValues);
+			storageAvailableRef.current = stored;
+			if (!stored) {
+				setSyncState('storage-error');
+				setActivity('Local storage unavailable · keep this tab open');
+				return;
+			}
+			setActivity(
+				`${updates.length} cell${updates.length === 1 ? '' : 's'} updated · ${pending} pending`,
+			);
+			scheduleSync();
+		},
+		[scheduleSync],
+	);
 
 	const loadSheet = useCallback(() => {
 		setLoadState('loading');
@@ -266,8 +290,9 @@ export function App() @{
 				return;
 			}
 			const emptyScenario = emptyScenarioRef.current;
-			const stored =
-				emptyScenario ? { status: 'empty' as const, cells: {} } : readStoredCellValues();
+			const stored = emptyScenario
+				? { status: 'empty' as const, cells: {} }
+				: readStoredCellValues();
 			cellValuesRef.current = stored.cells;
 			setCellValues(stored.cells);
 			storageAvailableRef.current = stored.status !== 'unavailable';
@@ -356,92 +381,111 @@ export function App() @{
 		});
 	}, []);
 
-	const selectAddress = useCallback((nextAddress: CellAddress, extend = false, align = 'auto') => {
-		const next = clampAddress(nextAddress);
-		setSelected(next);
-		if (!extend) setAnchor(next);
-		rowVirtualizer.scrollToIndex(next.row, { align: align as 'auto' | 'center' });
-		columnVirtualizer.scrollToIndex(next.column, { align: align as 'auto' | 'center' });
-		focusAddress(next);
-	}, [columnVirtualizer, focusAddress, rowVirtualizer]);
+	const selectAddress = useCallback(
+		(nextAddress: CellAddress, extend = false, align = 'auto') => {
+			const next = clampAddress(nextAddress);
+			setSelected(next);
+			if (!extend) setAnchor(next);
+			rowVirtualizer.scrollToIndex(next.row, { align: align as 'auto' | 'center' });
+			columnVirtualizer.scrollToIndex(next.column, { align: align as 'auto' | 'center' });
+			focusAddress(next);
+		},
+		[columnVirtualizer, focusAddress, rowVirtualizer],
+	);
 
-	const beginEditing = useCallback((address: CellAddress, initialValue?: string) => {
-		const next = clampAddress(address);
-		setSelected(next);
-		setAnchor(next);
-		setEditorDraft(initialValue === undefined ? readRaw(next) : initialValue);
-		setEditing(next);
-		requestAnimationFrame(() => {
-			const editor = cellElementsRef.current.get(cellKey(next))?.querySelector<HTMLInputElement>(
-				'input[data-cell-editor]',
-			);
-			editor?.focus();
-			editor?.select();
-		});
-	}, [readRaw]);
+	const beginEditing = useCallback(
+		(address: CellAddress, initialValue?: string) => {
+			const next = clampAddress(address);
+			setSelected(next);
+			setAnchor(next);
+			setEditorDraft(initialValue === undefined ? readRaw(next) : initialValue);
+			setEditing(next);
+			requestAnimationFrame(() => {
+				const editor = cellElementsRef.current
+					.get(cellKey(next))
+					?.querySelector<HTMLInputElement>('input[data-cell-editor]');
+				editor?.focus();
+				editor?.select();
+			});
+		},
+		[readRaw],
+	);
 
-	const commitEditing = useCallback((move?: CellAddress) => {
-		if (editing === null) return;
-		applyValues([
-			{ address: editing, raw: editorDraft },
-		]);
-		setEditing(null);
-		if (move) selectAddress(move);
-		else focusAddress(editing);
-	}, [applyValues, editing, editorDraft, focusAddress, selectAddress]);
+	const commitEditing = useCallback(
+		(move?: CellAddress) => {
+			if (editing === null) return;
+			applyValues([{ address: editing, raw: editorDraft }]);
+			setEditing(null);
+			if (move) selectAddress(move);
+			else focusAddress(editing);
+		},
+		[applyValues, editing, editorDraft, focusAddress, selectAddress],
+	);
 
 	const currentRange = selectionRange(anchor, selected);
 	const pendingCount = Object.keys(dirtyVersions).length;
 	const selectedDisplay = displayCell(selected, readRaw);
 	const selectedLabel = addressLabel(selected);
 
-	const copySelection = useCallback((event: ClipboardEvent) => {
-		if (event.target instanceof HTMLInputElement && event.target.hasAttribute('data-cell-editor')) {
-			return;
-		}
-		const lines: string[] = [];
-		for (let row = currentRange.startRow; row <= currentRange.endRow; row++) {
-			const values: string[] = [];
-			for (let column = currentRange.startColumn; column <= currentRange.endColumn; column++) {
-				values.push(readRaw({ row, column }));
+	const copySelection = useCallback(
+		(event: ClipboardEvent) => {
+			if (
+				event.target instanceof HTMLInputElement &&
+				event.target.hasAttribute('data-cell-editor')
+			) {
+				return;
 			}
-			lines.push(values.join('\t'));
-		}
-		const text = lines.join('\n');
-		event.clipboardData?.setData('text/plain', text);
-		event.preventDefault();
-		setActivity(`${rangeLabel(currentRange)} copied to clipboard`);
-	}, [currentRange, readRaw]);
+			const lines: string[] = [];
+			for (let row = currentRange.startRow; row <= currentRange.endRow; row++) {
+				const values: string[] = [];
+				for (let column = currentRange.startColumn; column <= currentRange.endColumn; column++) {
+					values.push(readRaw({ row, column }));
+				}
+				lines.push(values.join('\t'));
+			}
+			const text = lines.join('\n');
+			event.clipboardData?.setData('text/plain', text);
+			event.preventDefault();
+			setActivity(`${rangeLabel(currentRange)} copied to clipboard`);
+		},
+		[currentRange, readRaw],
+	);
 
-	const pasteSelection = useCallback((event: ClipboardEvent) => {
-		if (event.target instanceof HTMLInputElement && event.target.hasAttribute('data-cell-editor')) {
-			return;
-		}
-		const text = event.clipboardData?.getData('text/plain');
-		if (text === undefined || text === '') return;
-		event.preventDefault();
-		const rows = text.replace(/\r\n?/g, '\n').split('\n');
-		if (rows.at(-1) === '') rows.pop();
-		const updates: Array<{ address: CellAddress; raw: string }> = [];
-		let maxColumn = selected.column;
-		for (let rowOffset = 0; rowOffset < rows.length; rowOffset++) {
-			const values = rows[rowOffset].split('\t');
-			for (let columnOffset = 0; columnOffset < values.length; columnOffset++) {
-				const address = { row: selected.row + rowOffset, column: selected.column + columnOffset };
-				if (address.row >= ROW_COUNT || address.column >= COLUMN_COUNT) continue;
-				updates.push({ address, raw: values[columnOffset] });
-				maxColumn = Math.max(maxColumn, address.column);
+	const pasteSelection = useCallback(
+		(event: ClipboardEvent) => {
+			if (
+				event.target instanceof HTMLInputElement &&
+				event.target.hasAttribute('data-cell-editor')
+			) {
+				return;
 			}
-		}
-		if (updates.length === 0) return;
-		applyValues(updates);
-		const last = updates.at(-1)!.address;
-		const endpoint = { row: last.row, column: maxColumn };
-		setAnchor(selected);
-		setSelected(endpoint);
-		focusAddress(endpoint);
-		setActivity(`${updates.length} pasted cell${updates.length === 1 ? '' : 's'} from clipboard`);
-	}, [applyValues, focusAddress, selected]);
+			const text = event.clipboardData?.getData('text/plain');
+			if (text === undefined || text === '') return;
+			event.preventDefault();
+			const rows = text.replace(/\r\n?/g, '\n').split('\n');
+			if (rows.at(-1) === '') rows.pop();
+			const updates: Array<{ address: CellAddress; raw: string }> = [];
+			let maxColumn = selected.column;
+			for (let rowOffset = 0; rowOffset < rows.length; rowOffset++) {
+				const values = rows[rowOffset].split('\t');
+				for (let columnOffset = 0; columnOffset < values.length; columnOffset++) {
+					const address = { row: selected.row + rowOffset, column: selected.column + columnOffset };
+					if (address.row >= ROW_COUNT || address.column >= COLUMN_COUNT) continue;
+					updates.push({ address, raw: values[columnOffset] });
+					maxColumn = Math.max(maxColumn, address.column);
+				}
+			}
+			if (updates.length === 0) return;
+			applyValues(updates);
+			const last = updates.at(-1)!.address;
+			const endpoint = { row: last.row, column: maxColumn };
+			setAnchor(selected);
+			setSelected(endpoint);
+			focusAddress(endpoint);
+			setActivity(`${updates.length} pasted cell${updates.length === 1 ? '' : 's'} from clipboard`);
+		},
+		[applyValues, focusAddress, selected],
+	);
 
 	const clearSelection = useCallback(() => {
 		const updates: Array<{ address: CellAddress; raw: string }> = [];
@@ -453,59 +497,62 @@ export function App() @{
 		applyValues(updates);
 	}, [applyValues, currentRange]);
 
-	const handleCellKeyDown = useCallback((event: KeyboardEvent, address: CellAddress) => {
-		if (editing !== null || event.isComposing || composingRef.current) return;
-		let next: CellAddress | null = null;
-		switch (event.key) {
-			case 'ArrowUp':
-				next = { row: address.row - 1, column: address.column };
-				break;
-			case 'ArrowDown':
-				next = { row: address.row + 1, column: address.column };
-				break;
-			case 'ArrowLeft':
-				next = { row: address.row, column: address.column - 1 };
-				break;
-			case 'ArrowRight':
-				next = { row: address.row, column: address.column + 1 };
-				break;
-			case 'PageUp':
-				next = { row: address.row - 14, column: address.column };
-				break;
-			case 'PageDown':
-				next = { row: address.row + 14, column: address.column };
-				break;
-			case 'Home':
-				next = { row: event.ctrlKey || event.metaKey ? 0 : address.row, column: 0 };
-				break;
-			case 'End':
-				next = {
-					row: event.ctrlKey || event.metaKey ? ROW_COUNT - 1 : address.row,
-					column: COLUMN_COUNT - 1,
-				};
-				break;
-			case 'Enter':
-			case 'F2':
-				event.preventDefault();
-				beginEditing(address);
-				return;
-			case 'Backspace':
-			case 'Delete':
-				event.preventDefault();
-				clearSelection();
-				return;
-			default:
-				if (event.key.length === 1 && !event.ctrlKey && !event.metaKey && !event.altKey) {
+	const handleCellKeyDown = useCallback(
+		(event: KeyboardEvent, address: CellAddress) => {
+			if (editing !== null || event.isComposing || composingRef.current) return;
+			let next: CellAddress | null = null;
+			switch (event.key) {
+				case 'ArrowUp':
+					next = { row: address.row - 1, column: address.column };
+					break;
+				case 'ArrowDown':
+					next = { row: address.row + 1, column: address.column };
+					break;
+				case 'ArrowLeft':
+					next = { row: address.row, column: address.column - 1 };
+					break;
+				case 'ArrowRight':
+					next = { row: address.row, column: address.column + 1 };
+					break;
+				case 'PageUp':
+					next = { row: address.row - 14, column: address.column };
+					break;
+				case 'PageDown':
+					next = { row: address.row + 14, column: address.column };
+					break;
+				case 'Home':
+					next = { row: event.ctrlKey || event.metaKey ? 0 : address.row, column: 0 };
+					break;
+				case 'End':
+					next = {
+						row: event.ctrlKey || event.metaKey ? ROW_COUNT - 1 : address.row,
+						column: COLUMN_COUNT - 1,
+					};
+					break;
+				case 'Enter':
+				case 'F2':
 					event.preventDefault();
-					beginEditing(address, event.key);
-				}
-				return;
-		}
-		if (next !== null) {
-			event.preventDefault();
-			selectAddress(next, event.shiftKey);
-		}
-	}, [beginEditing, clearSelection, editing, selectAddress]);
+					beginEditing(address);
+					return;
+				case 'Backspace':
+				case 'Delete':
+					event.preventDefault();
+					clearSelection();
+					return;
+				default:
+					if (event.key.length === 1 && !event.ctrlKey && !event.metaKey && !event.altKey) {
+						event.preventDefault();
+						beginEditing(address, event.key);
+					}
+					return;
+			}
+			if (next !== null) {
+				event.preventDefault();
+				selectAddress(next, event.shiftKey);
+			}
+		},
+		[beginEditing, clearSelection, editing, selectAddress],
+	);
 
 	@if (loadState === 'loading') {
 		<LoadingSheet />
@@ -527,7 +574,9 @@ export function App() @{
 		<div class="app-shell" data-testid="gridlab-ready">
 			<header class="app-header">
 				<div class="brand-block">
-					<div class="brand-logo" aria-hidden="true">G</div>
+					<div class="brand-logo" aria-hidden="true">
+						G
+					</div>
 					<div>
 						<p class="brand-name">Gridlab</p>
 						<h1>Atlas forecast</h1>
@@ -547,24 +596,34 @@ export function App() @{
 						role="status"
 						aria-live="polite"
 						data-testid="sync-status"
-					>{syncLabel(syncState, pendingCount)}</div>
+					>
+						{syncLabel(syncState, pendingCount)}
+					</div>
 					@if (syncState === 'error') {
-						<button class="retry-button" onClick={runSync}>Retry sync</button>
+						<button class="retry-button" onClick={runSync}>
+							Retry sync
+						</button>
 					}
 				</div>
 			</header>
 
 			<div class="workbook-bar">
 				<div class="workbook-meta">
-					<span class="workbook-icon" aria-hidden="true">▦</span>
+					<span class="workbook-icon" aria-hidden="true">
+						▦
+					</span>
 					<div>
 						<strong>FY27 operating plan</strong>
 						<span>Private workspace · Local fixture</span>
 					</div>
 				</div>
 				<div class="sheet-tabs" role="tablist" aria-label="Workbook sheets">
-					<button role="tab" aria-selected="true">Forecast</button>
-					<button role="tab" aria-selected="false" disabled>Summary</button>
+					<button role="tab" aria-selected="true">
+						Forecast
+					</button>
+					<button role="tab" aria-selected="false" disabled>
+						Summary
+					</button>
 				</div>
 			</div>
 
@@ -591,14 +650,14 @@ export function App() @{
 						onInput={(event) => setNameDraft((event.target as HTMLInputElement).value)}
 					/>
 				</form>
-				<span class="formula-equals" aria-hidden="true">ƒx</span>
+				<span class="formula-equals" aria-hidden="true">
+					ƒx
+				</span>
 				<form
 					class="formula-box"
 					onSubmit={(event) => {
 						event.preventDefault();
-						applyValues([
-							{ address: selected, raw: formulaDraft },
-						]);
+						applyValues([{ address: selected, raw: formulaDraft }]);
 						focusAddress(selected);
 					}}
 				>
@@ -644,7 +703,9 @@ export function App() @{
 										width: column.size + 'px',
 										transform: 'translateX(' + column.start + 'px)',
 									}}
-								>{columnLabel(column.index) as string}</div>
+								>
+									{columnLabel(column.index) as string}
+								</div>
 							}
 						</div>
 					</div>
@@ -754,9 +815,9 @@ export function App() @{
 													composingRef.current = false;
 													setEditorDraft((event.target as HTMLInputElement).value);
 												}}
-												onInput={(event) => setEditorDraft(
-													(event.target as HTMLInputElement).value,
-												)}
+												onInput={(event) =>
+													setEditorDraft((event.target as HTMLInputElement).value)
+												}
 												onBlur={() => {
 													if (skipBlurCommitRef.current) {
 														skipBlurCommitRef.current = false;
@@ -795,21 +856,24 @@ export function App() @{
 			</main>
 
 			<footer class="status-bar">
-				<div role="status" aria-live="polite" data-testid="activity">{activity as string}</div>
+				<div role="status" aria-live="polite" data-testid="activity">
+					{activity as string}
+				</div>
 				<div class="status-hints">
 					<span>
 						<kbd>Enter</kbd>
 						edit
 					</span>
 					<span>
-						<kbd>Shift</kbd>
-						+ arrows select
+						<kbd>Shift</kbd>+ arrows select
 					</span>
 					<span>
 						<kbd>Ctrl/⌘ C</kbd>
 						copy
 					</span>
-					<strong>{ROW_COUNT.toLocaleString()} rows × {COLUMN_COUNT} columns</strong>
+					<strong>
+						{ROW_COUNT.toLocaleString()} rows × {COLUMN_COUNT} columns
+					</strong>
 				</div>
 			</footer>
 		</div>

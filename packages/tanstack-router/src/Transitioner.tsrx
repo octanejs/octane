@@ -33,19 +33,18 @@ export function useTransitioner() {
 	const router = useRouter() as any;
 	const [, forceRender] = useState<object>();
 
-	const acknowledgement: Array<any> = router._rendered ??= [];
+	const acknowledgement: Array<any> = (router._rendered ??= []);
 
-	router.startTransition = (fn: () => void, expected: unknown) => new Promise<boolean>((
-		resolve,
-	) => {
-		// A newer transition supersedes an unrendered older one.
-		settleOwner(acknowledgement, false);
-		acknowledgement.push(expected, resolve);
-		// Force `MatchesInner` to re-read: it renders `acknowledgement[0]` and
-		// settles this promise from a layout effect once that commit lands.
-		forceRender({});
-		startTransition(fn);
-	});
+	router.startTransition = (fn: () => void, expected: unknown) =>
+		new Promise<boolean>((resolve) => {
+			// A newer transition supersedes an unrendered older one.
+			settleOwner(acknowledgement, false);
+			acknowledgement.push(expected, resolve);
+			// Force `MatchesInner` to re-read: it renders `acknowledgement[0]` and
+			// settles this promise from a layout effect once that commit lands.
+			forceRender({});
+			startTransition(fn);
+		});
 
 	useLayoutEffect(() => {
 		const unsub = router.history.subscribe(() => router.load());
@@ -58,16 +57,14 @@ export function useTransitioner() {
 		// the swapped-in router's load.
 		router.updateLatestLocation?.();
 		const location = router.latestLocation;
-		const nextLocation = router.buildLocation(
-			{
-				to: location.pathname,
-				search: true,
-				params: true,
-				hash: true,
-				state: true,
-				_includeValidateSearch: true,
-			} as any,
-		);
+		const nextLocation = router.buildLocation({
+			to: location.pathname,
+			search: true,
+			params: true,
+			hash: true,
+			state: true,
+			_includeValidateSearch: true,
+		} as any);
 		if (trimPathRight(location.publicHref) !== trimPathRight(nextLocation.publicHref)) {
 			router.commitLocation({ ...nextLocation, replace: true, ignoreBlocker: true });
 			return unsub;
@@ -76,7 +73,7 @@ export function useTransitioner() {
 		const resolvedLocation = router.stores.resolvedLocation.get();
 		if (
 			resolvedLocation?.href === location.href &&
-				resolvedLocation.state.__TSR_key === location.state.__TSR_key
+			resolvedLocation.state.__TSR_key === location.state.__TSR_key
 		) {
 			// Already resolved (SSR hydration): emit `onRendered` for scroll
 			// restoration and devtools. The match tree has already committed by the

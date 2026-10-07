@@ -26,11 +26,16 @@ function Seed(props) {
 	const [editor] = useLexicalComposerContext();
 	useEffect(() => {
 		let key = '';
-		editor.update(() => {
-			const rule = $createHorizontalRuleNode();
-			$getRoot().clear().append($createParagraphNode().append($createTextNode('hello')), rule);
-			key = rule.getKey();
-		}, { discrete: true });
+		editor.update(
+			() => {
+				const rule = $createHorizontalRuleNode();
+				$getRoot()
+					.clear()
+					.append($createParagraphNode().append($createTextNode('hello')), rule);
+				key = rule.getKey();
+			},
+			{ discrete: true },
+		);
 		props.onSeeded(key);
 	}, [editor]);
 	return null;

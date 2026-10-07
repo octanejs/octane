@@ -12,13 +12,19 @@ import {
 
 export function BasicArray() {
 	return [
-		<div key="first" id="basic-first">text1</div>,
-		<span key="second" id="basic-second">text2</span>,
+		<div key="first" id="basic-first">
+			text1
+		</div>,
+		<span key="second" id="basic-second">
+			text2
+		</span>,
 	];
 }
 
 export const ArrowArrayRoot = () => [
-	<div key="arrow" id="arrow-root">arrow root</div>,
+	<div key="arrow" id="arrow-root">
+		arrow root
+	</div>,
 ];
 
 export function PrimitiveRoot(props) {
@@ -87,11 +93,13 @@ function MatrixOption(props) @{
 }
 
 export function ControlledSelectMarkup() {
-	return <select id="matrix-select" value="bar" defaultValue="baz" readOnly={true}>
-		<MatrixOption value="foo" />
-		<MatrixOption value="bar" />
-		<MatrixOption value="baz" />
-	</select>;
+	return (
+		<select id="matrix-select" value="bar" defaultValue="baz" readOnly={true}>
+			<MatrixOption value="foo" />
+			<MatrixOption value="bar" />
+			<MatrixOption value="baz" />
+		</select>
+	);
 }
 
 export function InitialState() @{
@@ -115,7 +123,9 @@ export function NestedContext() @{
 }
 
 export function HostRef(props) @{
-	<div id="matrix-ref" ref={props.refCallback}>ref target</div>
+	<div id="matrix-ref" ref={props.refCallback}>
+		ref target
+	</div>
 }
 
 function MemoBody(props) @{
@@ -125,18 +135,20 @@ function MemoBody(props) @{
 export const MemoComponent = memo(MemoBody);
 
 function MemoArrayBody() {
-	return [<div key="memo-array" id="memo-array-root">memo array root</div>];
+	return [
+		<div key="memo-array" id="memo-array-root">
+			memo array root
+		</div>,
+	];
 }
 
 export const MemoArrayRoot = memo(MemoArrayBody);
 
-export const LazyArrayRoot = lazy(
-	() => ({
-		then(resolve) {
-			resolve({ default: MemoArrayBody });
-		},
-	}),
-);
+export const LazyArrayRoot = lazy(() => ({
+	then(resolve) {
+		resolve({ default: MemoArrayBody });
+	},
+}));
 
 export function ObjectElement() @{
 	<object id="matrix-object" type="video/mp4" data="/example.webm" width={600} height={400}>
@@ -210,7 +222,9 @@ export function RenderPhaseMemoCallbackRef(props) @{
 	callbackWitness.current = { text, callback: capitalize };
 	if (count < 3) setCount(count + 1);
 	if (text === 'hello' && count === 2) setText('hello, world.');
-	<span id="render-phase-memo-callback-ref" ref={hostRef}>{capitalized + '/' + capitalize()}</span>
+	<span id="render-phase-memo-callback-ref" ref={hostRef}>
+		{capitalized + '/' + capitalize()}
+	</span>
 }
 
 // ReactDOMServerIntegrationNewContext-test.js public function-component
@@ -418,9 +432,15 @@ export function ReverseControlledTextareaMarkup() @{
 
 function FormOptions() @{
 	<>
-		<option id="form-option-foo" value="foo">Foo</option>
-		<option id="form-option-bar" value="bar">Bar</option>
-		<option id="form-option-baz" value="baz">Baz</option>
+		<option id="form-option-foo" value="foo">
+			Foo
+		</option>
+		<option id="form-option-bar" value="bar">
+			Bar
+		</option>
+		<option id="form-option-baz" value="baz">
+			Baz
+		</option>
 	</>
 }
 
@@ -467,16 +487,12 @@ export function ReverseControlledSelectMarkup() @{
 
 export function SelectDangerousOptions() @{
 	<select id="matrix-select-danger" defaultValue="baz" value="bar" readOnly>
-		<option
-			id="danger-option-foo"
-			value="foo"
-			dangerouslySetInnerHTML={{ __html: 'Foo' }}
-		>{undefined}</option>
-		<option
-			id="danger-option-bar"
-			value="bar"
-			dangerouslySetInnerHTML={{ __html: 'Bar' }}
-		>{null}</option>
+		<option id="danger-option-foo" value="foo" dangerouslySetInnerHTML={{ __html: 'Foo' }}>
+			{undefined}
+		</option>
+		<option id="danger-option-bar" value="bar" dangerouslySetInnerHTML={{ __html: 'Bar' }}>
+			{null}
+		</option>
 		<option id="danger-option-baz" dangerouslySetInnerHTML={{ __html: 'Baz' }} />
 	</select>
 }
@@ -485,9 +501,7 @@ export function SelectFlattenedOption() @{
 	<select id="matrix-select-flattened" value="bar" readOnly>
 		<option value="bar">
 			{'A '}
-			{'B'}
-			{' '}
-			{BigInt(5)}
+			{'B'} {BigInt(5)}
 		</option>
 	</select>
 }

@@ -64,18 +64,15 @@ export const Shadowed = function Leaf(props: { depth: number; max: number; label
 };
 
 // One declarator of several.
-export const offset = 1, Multi = function Counter(props: {
-	depth: number;
-	max: number;
-	label: string;
-}) @{
-	const [count, setCount] = useState(0);
-	<section>
-		<button
-			onClick={() => setCount(count + offset)}
-		>{`${props.label}${props.depth}:${count}`}</button>
-		@if (props.depth < props.max) {
-			<Counter depth={props.depth + 1} max={props.max} label={props.label} />
-		}
-	</section>
-};
+export const offset = 1,
+	Multi = function Counter(props: { depth: number; max: number; label: string }) @{
+		const [count, setCount] = useState(0);
+		<section>
+			<button
+				onClick={() => setCount(count + offset)}
+			>{`${props.label}${props.depth}:${count}`}</button>
+			@if (props.depth < props.max) {
+				<Counter depth={props.depth + 1} max={props.max} label={props.label} />
+			}
+		</section>
+	};

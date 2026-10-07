@@ -7,7 +7,11 @@ function subscribe(notify: () => void) {
 }
 
 export function App() @{
-	const width = useSyncExternalStore(subscribe, () => window.innerWidth, () => 1024);
+	const width = useSyncExternalStore(
+		subscribe,
+		() => window.innerWidth,
+		() => 1024,
+	);
 
 	<p>{`Width: ${width}px` as string}</p>
 }

@@ -30,7 +30,11 @@ export type { EmbedConfig, EmbedMatchResult } from './LexicalAutoEmbedPluginUtil
 type LexicalAutoEmbedPluginProps<TEmbedConfig extends EmbedConfig> = {
 	embedConfigs: TEmbedConfig[];
 	onOpenEmbedModalForConfig?: (embedConfig: TEmbedConfig) => void;
-	getMenuOptions: (activeEmbedConfig: TEmbedConfig, embedFn: () => void, dismissFn: () => void) => AutoEmbedOption[];
+	getMenuOptions: (
+		activeEmbedConfig: TEmbedConfig,
+		embedFn: () => void,
+		dismissFn: () => void,
+	) => AutoEmbedOption[];
 	menuRenderFn?: MenuRenderFn<AutoEmbedOption>;
 	menuCommandPriority?: CommandListenerPriority;
 };
@@ -55,24 +59,27 @@ export function LexicalAutoEmbedPlugin<TEmbedConfig extends EmbedConfig>(
 		setActiveEmbedConfig(null);
 	}, []);
 
-	const checkIfLinkNodeIsEmbeddable = useCallback(async (key: NodeKey) => {
-		const url = editor.read('latest', function () {
-			const linkNode = $getNodeByKey(key);
-			if ($isLinkNode(linkNode)) {
-				return linkNode.getURL();
+	const checkIfLinkNodeIsEmbeddable = useCallback(
+		async (key: NodeKey) => {
+			const url = editor.read('latest', function () {
+				const linkNode = $getNodeByKey(key);
+				if ($isLinkNode(linkNode)) {
+					return linkNode.getURL();
+				}
+			});
+			if (url === undefined) {
+				return;
 			}
-		});
-		if (url === undefined) {
-			return;
-		}
-		for (const embedConfig of embedConfigs) {
-			const urlMatch = await Promise.resolve(embedConfig.parseUrl(url));
-			if (urlMatch != null) {
-				setActiveEmbedConfig(embedConfig);
-				setNodeKey(key);
+			for (const embedConfig of embedConfigs) {
+				const urlMatch = await Promise.resolve(embedConfig.parseUrl(url));
+				if (urlMatch != null) {
+					setActiveEmbedConfig(embedConfig);
+					setNodeKey(key);
+				}
 			}
-		}
-	}, [editor, embedConfigs]);
+		},
+		[editor, embedConfigs],
+	);
 
 	useEffect(() => {
 		let isSingleTokenPaste = false;
@@ -89,7 +96,8 @@ export function LexicalAutoEmbedPlugin<TEmbedConfig extends EmbedConfig>(
 			editor.registerCommand(
 				PASTE_COMMAND,
 				(event) => {
-					isSingleTokenPaste = objectKlassEquals(event, ClipboardEvent) &&
+					isSingleTokenPaste =
+						objectKlassEquals(event, ClipboardEvent) &&
 						event.clipboardData !== null &&
 						/^\S+$/.test(event.clipboardData.getData('text/plain'));
 					if (isSingleTokenPaste) {
@@ -101,8 +109,8 @@ export function LexicalAutoEmbedPlugin<TEmbedConfig extends EmbedConfig>(
 				},
 				COMMAND_PRIORITY_BEFORE_EDITOR,
 			),
-			...[LinkNode, AutoLinkNode].map(
-				(Klass) => editor.registerMutationListener(Klass, listener, {
+			...[LinkNode, AutoLinkNode].map((Klass) =>
+				editor.registerMutationListener(Klass, listener, {
 					skipInitialization: true,
 				}),
 			),
@@ -126,32 +134,35 @@ export function LexicalAutoEmbedPlugin<TEmbedConfig extends EmbedConfig>(
 		);
 	}, [editor, embedConfigs, onOpenEmbedModalForConfig]);
 
-	const embedLinkViaActiveEmbedConfig = useCallback(async function () {
-		if (activeEmbedConfig != null && nodeKey != null) {
-			const linkNode = editor.read('latest', () => {
-				const node = $getNodeByKey(nodeKey);
-				if ($isLinkNode(node)) {
-					return node;
-				}
-				return null;
-			});
+	const embedLinkViaActiveEmbedConfig = useCallback(
+		async function () {
+			if (activeEmbedConfig != null && nodeKey != null) {
+				const linkNode = editor.read('latest', () => {
+					const node = $getNodeByKey(nodeKey);
+					if ($isLinkNode(node)) {
+						return node;
+					}
+					return null;
+				});
 
-			if ($isLinkNode(linkNode)) {
-				const result = await Promise.resolve(activeEmbedConfig.parseUrl(linkNode.__url));
-				if (result != null) {
-					editor.update(() => {
-						if (!$getSelection()) {
-							linkNode.selectEnd();
-						}
-						activeEmbedConfig.insertNode(editor, result);
-						if (linkNode.isAttached()) {
-							linkNode.remove();
-						}
-					});
+				if ($isLinkNode(linkNode)) {
+					const result = await Promise.resolve(activeEmbedConfig.parseUrl(linkNode.__url));
+					if (result != null) {
+						editor.update(() => {
+							if (!$getSelection()) {
+								linkNode.selectEnd();
+							}
+							activeEmbedConfig.insertNode(editor, result);
+							if (linkNode.isAttached()) {
+								linkNode.remove();
+							}
+						});
+					}
 				}
 			}
-		}
-	}, [activeEmbedConfig, editor, nodeKey]);
+		},
+		[activeEmbedConfig, editor, nodeKey],
+	);
 
 	const options = useMemo(() => {
 		return activeEmbedConfig != null && nodeKey != null
@@ -159,26 +170,27 @@ export function LexicalAutoEmbedPlugin<TEmbedConfig extends EmbedConfig>(
 			: [];
 	}, [activeEmbedConfig, embedLinkViaActiveEmbedConfig, getMenuOptions, nodeKey, reset]);
 
-	const onSelectOption = useCallback((
-		selectedOption: AutoEmbedOption,
-		targetNode: LexicalNode | null,
-		closeMenu: () => void,
-	) => {
-		editor.update(() => {
-			selectedOption.onSelect(targetNode);
-			closeMenu();
-		});
-	}, [editor]);
+	const onSelectOption = useCallback(
+		(selectedOption: AutoEmbedOption, targetNode: LexicalNode | null, closeMenu: () => void) => {
+			editor.update(() => {
+				selectedOption.onSelect(targetNode);
+				closeMenu();
+			});
+		},
+		[editor],
+	);
 
 	if (nodeKey == null) {
 		return null;
 	}
-	return <LexicalNodeMenuPlugin
-		nodeKey={nodeKey}
-		onClose={reset}
-		onSelectOption={onSelectOption}
-		options={options}
-		menuRenderFn={menuRenderFn}
-		commandPriority={menuCommandPriority}
-	/>;
+	return (
+		<LexicalNodeMenuPlugin
+			nodeKey={nodeKey}
+			onClose={reset}
+			onSelectOption={onSelectOption}
+			options={options}
+			menuRenderFn={menuRenderFn}
+			commandPriority={menuCommandPriority}
+		/>
+	);
 }

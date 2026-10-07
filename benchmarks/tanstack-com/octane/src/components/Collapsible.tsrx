@@ -14,10 +14,9 @@ type CollapsibleProps = {
 	className?: string;
 };
 
-type CollapsibleTriggerProps =
-	Record<string, any> & {
-		children?: any;
-	};
+type CollapsibleTriggerProps = Record<string, any> & {
+	children?: any;
+};
 
 type CollapsibleContentProps = {
 	children?: any;
@@ -63,11 +62,13 @@ export function Collapsible({
 	// React accepts render-prop children (`{({ open }) => ...}`); in octane a
 	// compiled children block is also a function, so distinguish the user render
 	// prop with isChildrenBlock.
-	return <CollapsibleContext value={value}>
-		<div className={className} data-collapsible>
-			{typeof children === 'function' && !isChildrenBlock(children) ? children(value) : children}
-		</div>
-	</CollapsibleContext>;
+	return (
+		<CollapsibleContext value={value}>
+			<div className={className} data-collapsible>
+				{typeof children === 'function' && !isChildrenBlock(children) ? children(value) : children}
+			</div>
+		</CollapsibleContext>
+	);
 }
 
 export function CollapsibleTrigger({
@@ -80,34 +81,40 @@ export function CollapsibleTrigger({
 }: CollapsibleTriggerProps) {
 	const { open, toggle } = useCollapsible();
 
-	return <button
-		{...props}
-		type={type}
-		aria-expanded={open}
-		onMouseDown={(e) => {
-			e.stopPropagation();
-			onMouseDown?.(e);
-		}}
-		onClick={(e) => {
-			e.stopPropagation();
-			toggle();
-			onClick?.(e);
-		}}
-		class={twMerge('cursor-pointer select-none', className)}
-		data-collapsible-trigger
-	>{children}</button>;
+	return (
+		<button
+			{...props}
+			type={type}
+			aria-expanded={open}
+			onMouseDown={(e) => {
+				e.stopPropagation();
+				onMouseDown?.(e);
+			}}
+			onClick={(e) => {
+				e.stopPropagation();
+				toggle();
+				onClick?.(e);
+			}}
+			class={twMerge('cursor-pointer select-none', className)}
+			data-collapsible-trigger
+		>
+			{children}
+		</button>
+	);
 }
 
 export function CollapsibleContent({ children, className }: CollapsibleContentProps) {
 	const { open } = useCollapsible();
 
-	return <div
-		class={twMerge(
-			'grid transition-[grid-template-rows] duration-200 ease-out',
-			open ? 'grid-rows-[1fr]' : 'grid-rows-[0fr]',
-			className,
-		)}
-	>
-		<div class="overflow-hidden">{children}</div>
-	</div>;
+	return (
+		<div
+			class={twMerge(
+				'grid transition-[grid-template-rows] duration-200 ease-out',
+				open ? 'grid-rows-[1fr]' : 'grid-rows-[0fr]',
+				className,
+			)}
+		>
+			<div class="overflow-hidden">{children}</div>
+		</div>
+	);
 }
