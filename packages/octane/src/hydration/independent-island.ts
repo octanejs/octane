@@ -86,9 +86,69 @@ export interface IndependentHydrateLifecycle {
 	resume(): void;
 }
 
+/** One island's claim on its document's next activation task. */
+interface ActivationTurn {
+	/** Captured input outranks automatic triggers; read whenever a turn is chosen. */
+	readonly urgent: () => boolean;
+	/** Activates, or returns false when the attempt no longer activates. */
+	readonly run: () => boolean;
+}
+
+// A document with an entry has activated an island in the current task. The
+// entry holds the islands waiting for later tasks.
+let activationQueues: WeakMap<Document, ActivationTurn[]> | undefined;
+
+function postActivationTask(callback: () => void): void {
+	const scheduler = (globalThis as { scheduler?: { postTask?(callback: () => void): unknown } })
+		.scheduler;
+	if (typeof scheduler?.postTask === 'function') scheduler.postTask(callback);
+	else if (typeof MessageChannel === 'function') {
+		const channel = new MessageChannel();
+		channel.port1.onmessage = () => {
+			channel.port1.close();
+			callback();
+		};
+		channel.port2.postMessage(null);
+	} else setTimeout(callback, 0);
+}
+
+function takeActivationTurn(ownerDocument: Document, waiting: ActivationTurn[]): void {
+	while (waiting.length !== 0) {
+		const urgent = waiting.findIndex((turn) => turn.urgent());
+		if (waiting.splice(urgent < 0 ? 0 : urgent, 1)[0].run()) {
+			postActivationTask(() => takeActivationTurn(ownerDocument, waiting));
+			return;
+		}
+	}
+	activationQueues!.delete(ownerDocument);
+}
+
+/**
+ * Activate at most one island per task in each document. Ready islands converge
+ * in one microtask checkpoint: repeated instances share a module, a shared
+ * stylesheet fires one `load`, and a back/forward-cache restore resumes them all.
+ * The first to arrive in a task runs at once; each later one gets its own task,
+ * captured input first, so the browser can deliver input and paint in between.
+ */
+function enterActivationGate(ownerDocument: Document, turn: ActivationTurn): void {
+	const queues = (activationQueues ??= new WeakMap());
+	const queue = queues.get(ownerDocument);
+	if (queue !== undefined) {
+		queue.push(turn);
+		return;
+	}
+	const waiting: ActivationTurn[] = [];
+	queues.set(ownerDocument, waiting);
+	// A stale or expired attempt does not use up this task.
+	if (turn.run() || waiting.length !== 0) {
+		postActivationTask(() => takeActivationTurn(ownerDocument, waiting));
+	} else queues.delete(ownerDocument);
+}
+
 /**
  * Register one compiler/bundler-proven island with the pre-root intent capture.
  * Loading this island never evaluates its lexical parent or a sibling module.
+ * Islands in one document that become ready together activate one per task.
  */
 export function registerIndependentHydrationIsland(
 	element: Element,
@@ -166,31 +226,53 @@ export function registerIndependentHydrationIsland(
 				if (typeof candidate !== 'function') {
 					throw new TypeError(formatClientError(217));
 				}
-				const replays = intents.splice(0);
-				const nativeAuthority =
-					replays.length !== 0 && replays.every((intent) => intent.current !== undefined);
-				for (let index = replays.length - 1; index >= 0; index--) {
-					if (
-						!isHydrationSelectionIntentCurrent(replays[index]) ||
-						!isNativeHydrationIntentCurrent(replays[index])
-					)
-						replays.splice(index, 1);
-				}
-				// An expired native command cannot complete activation or retire the
-				// island. Automatic triggers and ordinary selection behavior remain
-				// independent; a future valid command can start another attempt.
-				if (nativeAuthority && replays.length === 0 && !triggered) {
-					active = false;
-					return;
-				}
-				replayReady = true;
-				return (candidate as IndependentHydrateActivator)({
-					element,
-					manifest,
-					captures: manifest.captures.map((value) => decodeSignalValue(value)),
-					intents: replays,
-					...(signalOwner === undefined ? {} : { signalOwner }),
-					...(initialDocumentSignals === undefined ? {} : { initialDocumentSignals }),
+				// Wait for this document's activation turn while still loading. Until
+				// `replayReady`, input keeps joining `intents`, pause and dispose still
+				// cancel, and the `active` latch keeps a re-trigger from starting over.
+				return new Promise<Awaited<ReturnType<IndependentHydrateActivator>>>((resolve, reject) => {
+					enterActivationGate(element.ownerDocument, {
+						urgent: () => intents.length !== 0,
+						run: () => {
+							if (disposed || generation !== attempt) {
+								resolve();
+								return false;
+							}
+							try {
+								const replays = intents.splice(0);
+								const nativeAuthority =
+									replays.length !== 0 && replays.every((intent) => intent.current !== undefined);
+								for (let index = replays.length - 1; index >= 0; index--) {
+									if (
+										!isHydrationSelectionIntentCurrent(replays[index]) ||
+										!isNativeHydrationIntentCurrent(replays[index])
+									)
+										replays.splice(index, 1);
+								}
+								// An expired native command cannot complete activation or retire the
+								// island. Automatic triggers and ordinary selection behavior remain
+								// independent; a future valid command can start another attempt.
+								if (nativeAuthority && replays.length === 0 && !triggered) {
+									active = false;
+									resolve();
+									return false;
+								}
+								replayReady = true;
+								resolve(
+									(candidate as IndependentHydrateActivator)({
+										element,
+										manifest,
+										captures: manifest.captures.map((value) => decodeSignalValue(value)),
+										intents: replays,
+										...(signalOwner === undefined ? {} : { signalOwner }),
+										...(initialDocumentSignals === undefined ? {} : { initialDocumentSignals }),
+									}),
+								);
+							} catch (error) {
+								reject(error);
+							}
+							return true;
+						},
+					});
 				});
 			})
 			.then((value) => {

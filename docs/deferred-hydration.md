@@ -300,6 +300,24 @@ other component. Captured interactions replay once the program has adopted the
 server DOM. Delegated handlers run without restoring a custom signal owner, so
 keep the view's state in module or document signals.
 
+#### Activation pacing
+
+Each activation hydrates its widget synchronously, so widgets that become ready
+together take turns. In each document, the first widget to become ready in a
+task activates at once. Every widget after it activates in a later task of its
+own, so the browser can handle input and paint between them. Widgets become
+ready together when repeated instances share one module, when one stylesheet
+`load`, `IntersectionObserver` callback, or strategies chunk releases several of
+them, and when a back/forward-cache restore resumes every unfinished widget.
+
+A widget holding captured interactions takes the next turn ahead of the others.
+A widget waiting for its turn is still loading: it keeps capturing input, and
+pausing or disposing it cancels the activation. Turns are tasks from
+`scheduler.postTask` where the browser provides it, otherwise from a
+`MessageChannel`, otherwise from `setTimeout`. A custom host that calls
+`registerIndependentHydrationIsland` directly gets the same pacing. Pacing
+separates widgets; it does not split one widget's hydration into smaller tasks.
+
 #### Replaceable selections versus commands
 
 Independent widgets normally preserve every captured interaction in order. A

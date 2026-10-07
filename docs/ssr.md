@@ -661,7 +661,9 @@ lifecycle, registers the page's independent islands, and then runs
 `router.preHydrate`. The shell's CSS still ships with the route; its page chunk is
 not preloaded. An island whose only child is a zero-argument
 `'use dom bindings'` view activates without the renderer; any other island loads
-the renderer through its own chunk, as before.
+the renderer through its own chunk, as before. Islands that become ready together
+activate one per task, so input and paint are not held up behind all of them; see
+[activation pacing](./deferred-hydration.md#activation-pacing).
 
 When every `RenderRoute` uses `hydrate: 'islands'`, the production client build
 also resolves Octane with the `octane-islands` package condition. The signal
