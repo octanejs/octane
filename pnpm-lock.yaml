@@ -1869,6 +1869,9 @@ importers:
       esbuild:
         specifier: catalog:default
         version: 0.28.1
+      jsdom:
+        specifier: catalog:default
+        version: 30.0.1(@noble/hashes@2.2.0)
       octane:
         specifier: workspace:*
         version: link:../../packages/octane

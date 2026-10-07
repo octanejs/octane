@@ -369,6 +369,13 @@ adapter with named exports and authenticated immutable default maps. They compar
 identical source with the option off/on, keep framework imports external for byte
 measurement, and verify equal emitted CSS and full-runtime SSR output. Their
 same-run ratios catch an adapter that silently stops supplying compiler proofs.
+The `rspack-void-*` targets build the same adapter's imported void-root proofs
+with the runtime bundled, because the saving is the generic root renderer the
+minifier drops. Each control's post loader routes the root import through a
+re-export the adapter leaves unproven; every other module stays byte-identical,
+and both variants must render the same DOM in jsdom. The `hydrate` pair is the
+octanejs/octane#1839 shape, and the `tree` pair is `createRoot` over four imported
+void components with an update.
 `lynx-bundle-size` instead uses the pinned Rspeedy native encoder unchanged and
 bounds the incremental decoded/encoded cost of IFR against the equivalent
 background-rendered preview graph; its semantic checks remain source/build
