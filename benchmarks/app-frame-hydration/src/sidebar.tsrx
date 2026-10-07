@@ -113,8 +113,7 @@ export function Sidebar(props: {
 }) @{
 	// A section-level native read makes the whole sidebar a reader of the
 	// server's adopted value; the default frame keeps its reads in leaves.
-	const open =
-		props.liveSections ? sidebarOpen$.get() : true;
+	const open = props.liveSections ? sidebarOpen$.get() : true;
 	<aside class="sidebar" data-open={open ? 'true' : 'false'}>
 		<SidebarHeader />
 		@if (open) {

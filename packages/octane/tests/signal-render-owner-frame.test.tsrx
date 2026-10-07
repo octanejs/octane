@@ -201,8 +201,8 @@ describe('signal owner frame of a rendering Block', () => {
 		// held attempt in its owner as well.
 		log.length = 0;
 		const second = deferred();
-		await act(
-			() => startTransition(() => root.render(Suspending, { promise: second.promise, log })),
+		await act(() =>
+			startTransition(() => root.render(Suspending, { promise: second.promise, log })),
 		);
 		expect(host.textContent).toBe('first');
 		expect(currentSignalOwner()).toBe(ambient);

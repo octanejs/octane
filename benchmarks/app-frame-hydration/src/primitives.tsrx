@@ -32,7 +32,9 @@ export function Tooltip(props: { label?: string; side?: string; children?: Octan
 	>
 		{props.children}
 		@if (open && props.label) {
-			<span id={id} role="tooltip" class="tooltip-label">{props.label as string}</span>
+			<span id={id} role="tooltip" class="tooltip-label">
+				{props.label as string}
+			</span>
 		}
 	</span>
 }
@@ -90,11 +92,15 @@ export function Link(props: {
 	style?: Style;
 	children?: OctaneNode;
 }) @{
-	<a href={props.href} class={['link', props.class]} style={props.style}>{props.children}</a>
+	<a href={props.href} class={['link', props.class]} style={props.style}>
+		{props.children}
+	</a>
 }
 
 export function Badge(props: { value: string; style?: Style }) @{
-	<span class="badge" style={props.style}>{props.value}</span>
+	<span class="badge" style={props.style}>
+		{props.value}
+	</span>
 }
 
 export function Avatar(props: { initials: string; style?: Style }) @{

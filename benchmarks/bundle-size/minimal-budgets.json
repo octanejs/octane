@@ -56,7 +56,7 @@
   },
   "context": {
     "raw": 96419,
-    "gzip": 31420,
+    "gzip": 31418,
     "brotli": 28038
   },
   "hydrate-root": {
@@ -76,7 +76,7 @@
   },
   "suspense-transition": {
     "raw": 139115,
-    "gzip": 43913,
+    "gzip": 43912,
     "brotli": 38802
   },
   "server-hooks": {
@@ -166,7 +166,7 @@
   },
   "binding-apollo-client-vite": {
     "raw": 339750,
-    "gzip": 104325,
+    "gzip": 104323,
     "brotli": 91187
   },
   "binding-apollo-client-esbuild": {
