@@ -16,7 +16,7 @@ inside its own callback frame. A scope's resolved owner is also kept on the scop
 instead of in a `WeakMap`, so each lookup is a field read and live Blocks no
 longer occupy a weak table.
 
-On the new `app-frame-hydration` benchmark (about 1,940 Blocks, 4× CPU throttle,
+On the new `app-frame-hydration` benchmark (about 1,650 Blocks, 4× CPU throttle,
 Chromium), `renderBlock` entries fall from two to one per render, production calls
-fall by 4.4%, and hydration allocates 143 KB less. Paired with the previous
-runtime, cold hydration is 1.7% faster and warm hydration 3.8% faster.
+fall by 4.0%, and hydration allocates 161 KB less. Paired with the previous
+runtime, cold hydration is 1.8% faster and warm hydration 3.9% faster.

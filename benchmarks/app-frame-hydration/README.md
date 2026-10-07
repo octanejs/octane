@@ -6,12 +6,15 @@ the shape of a production app-frame hydration audit. Every module imports
 bindings and the document signal owner, and hydration runs with the native
 read driver active.
 
-The `frame` scenario creates about 1,940 Blocks on hydration:
+The `frame` scenario creates about 1,650 Blocks on hydration:
 
 - About 1,150 component Blocks, mostly icon, tooltip, button and link wrappers.
-- About 720 control-flow Blocks: `@if` arms plus about 270 runtime bindings for
-  `style={props.style}` props that callers leave undefined.
-- About 74 `@for` rows.
+- About 430 control-flow Blocks for `@if` arms.
+- 74 `@for` rows.
+
+About 270 of its wrappers also forward a `style={props.style}` prop that callers
+leave undefined. The audited frame had a Block for each of those bindings. Unset
+styles now write without one, so they add no Blocks here.
 
 Its native signal reads sit in leaf components. The `frame-live-sections`
 scenario renders the same frame with two section roots, the sidebar and the
