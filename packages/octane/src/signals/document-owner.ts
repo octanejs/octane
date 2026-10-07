@@ -1,6 +1,10 @@
 import { formatClientError } from '../error-codes.client.generated.js';
 import { associateSignalOwnerDocument } from './early-values.js';
-import { installDefaultSignalOwner } from './owner-context.js';
+import {
+	enterSynchronousSignalOwner,
+	installDefaultSignalOwner,
+	restoreSynchronousSignalOwner,
+} from './owner-context.js';
 import type { SignalOwner, SignalOwnerIdentity } from './types.js';
 
 const documentOwners = /* @__PURE__ */ new WeakMap<Document, SignalOwnerIdentity>();
@@ -8,6 +12,14 @@ let defaultInstalled = false;
 /** @internal Actual document capability, shared with an optional renderer. */
 export let signalDocumentEnabled = false;
 export let streamedSignalOwnerActivator: ((owner: SignalOwner) => void) | undefined;
+/**
+ * @internal Lets a renderer enter each Block's owner in place rather than
+ * through a callback frame. The document capability installs it, so renderers
+ * that never enable signals do not retain it.
+ */
+export let signalOwnerFrame:
+	| { enter: typeof enterSynchronousSignalOwner; restore: typeof restoreSynchronousSignalOwner }
+	| undefined;
 
 /** @internal Shared document identity for state-only and component consumers. */
 export function documentSignalOwner(container: Node): SignalOwnerIdentity {
@@ -29,6 +41,7 @@ export function enableSignalDocument(abi = 1): void {
 	signalDocumentEnabled = true;
 	if (defaultInstalled) return;
 	defaultInstalled = true;
+	signalOwnerFrame = { enter: enterSynchronousSignalOwner, restore: restoreSynchronousSignalOwner };
 	installDefaultSignalOwner(() =>
 		typeof document === 'undefined' ? null : documentSignalOwner(document),
 	);

@@ -1,13 +1,19 @@
-import { useState } from 'octane';
+import { StrictMode, useState } from 'octane';
 import {
 	createEffect,
 	type ReadableSignal,
+	type SignalEffectDependencies,
 	type WritableSignal,
 	useComputed,
+	useDeferredSignalValue,
 	useSetSignal,
 	useSignal,
 	useSignalEffect,
+	useSignalInsertionEffect,
+	useSignalLayoutEffect,
+	useSignalPassiveEffect,
 	useSignalScope,
+	useSignalSelector,
 	useSignalValue,
 } from '@octanejs/alien-signals';
 
@@ -195,21 +201,6 @@ export function ScopeProbe(props: {
 	<p id="scope-probe">{props.label}</p>
 }
 
-export function SyncStopScopeProbe(props: {
-	source: WritableSignal<number>;
-	log: (entry: string) => void;
-	stopRef: { current: () => void };
-}) @{
-	const stop = useSignalScope(() => {
-		createEffect(() => props.log('scope:' + props.source()));
-	});
-	// Cancel before commit so the scoped effect never starts.
-	stop();
-	props.stopRef.current = stop;
-
-	<p id="sync-stop-probe">ready</p>
-}
-
 export function EffectCounter(props: {
 	source: WritableSignal<number>;
 	onEffect: () => void;
@@ -283,6 +274,29 @@ export function LifecycleEffects(props: {
 	<p id="lifecycle">ready</p>
 }
 
+export function DependencyListEffects(props: {
+	source: WritableSignal<number>;
+	signals: SignalEffectDependencies;
+	label: string;
+	log: (entry: string) => void;
+}) @{
+	useSignalEffect(() => {
+		props.log('effect:' + props.label + ':' + props.source());
+		return () => props.log('effect-cleanup:' + props.label);
+	}, [props.label]);
+	useSignalScope(() => {
+		createEffect(() => props.log('scope:' + props.label + ':' + props.source()));
+	}, [props.label]);
+	useSignalLayoutEffect(
+		props.signals,
+		() => {
+			props.log('layout:' + props.label);
+		},
+		[props.label],
+	);
+	<p id="dependency-list-effects">ready</p>
+}
+
 export function ServerSignalView(props: {
 	source: WritableSignal<number>;
 	log: (entry: string) => void;
@@ -291,4 +305,77 @@ export function ServerSignalView(props: {
 	useSignalEffect(() => props.log('effect'));
 	useSignalScope(() => props.log('scope'));
 	<p id="server-signal">{value as string}</p>
+}
+
+export function BatchedReaders(props: {
+	first: WritableSignal<number>;
+	second: WritableSignal<number>;
+	onRender: () => void;
+}) @{
+	props.onRender();
+	const first = useSignalValue(props.first);
+	const second = useSignalValue(props.second);
+	<p id="values">{JSON.stringify([first, second])}</p>
+}
+
+export function SelectorReader(props: {
+	source: WritableSignal<{ selected: number; unrelated: number }>;
+	select: (value: { selected: number; unrelated: number }) => number;
+	onRender: () => void;
+}) @{
+	props.onRender();
+	const selected = useSignalSelector(props.source, props.select);
+	<p id="selected">{String(selected)}</p>
+}
+
+export function StrictSignalValueReader(props: { source: WritableSignal<number> }) @{
+	<StrictMode>
+		<SignalValueReader source={props.source} />
+	</StrictMode>
+}
+
+export function DeferredReader(props: { source: WritableSignal<number> }) @{
+	const current = useSignalValue(props.source);
+	const deferred = useDeferredSignalValue(props.source);
+	<div>
+		<p id="current">{String(current)}</p>
+		<p id="deferred">{String(deferred)}</p>
+	</div>
+}
+
+export function PhasedSignalEffects(props: {
+	dependencies: SignalEffectDependencies;
+	log: (entry: string) => void;
+}) @{
+	useSignalInsertionEffect(props.dependencies, () => {
+		props.log('insertion');
+	});
+	useSignalLayoutEffect(props.dependencies, () => {
+		props.log('layout');
+	});
+	useSignalPassiveEffect(props.dependencies, () => {
+		props.log('passive');
+	});
+	<p id="phased">ready</p>
+}
+
+export function ManualStopScope(props: {
+	source: WritableSignal<number>;
+	cleanupEffect: () => void;
+	onStop: (stop: () => void) => void;
+}) @{
+	const stop = useSignalScope(() => {
+		createEffect(() => {
+			props.source();
+			return props.cleanupEffect;
+		});
+	}, []);
+	props.onStop(stop);
+
+	<p id="manual-stop">ready</p>
+}
+
+export function ServerScopeProbe(props: { callback: () => void }) @{
+	useSignalScope(props.callback, []);
+	<p id="server-scope">ready</p>
 }

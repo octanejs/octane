@@ -164,5 +164,5 @@ test('accepts the committed paired type-oracle classification', async function a
 	t.after(function cleanup() {
 		return rm(root, { recursive: true, force: true });
 	});
-	assert.deepEqual(verifyAlienSignalsTestClassifications(root), { tests: 13 });
+	assert.deepEqual(verifyAlienSignalsTestClassifications(root), { tests: 12 });
 });
