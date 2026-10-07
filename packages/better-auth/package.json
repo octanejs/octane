@@ -44,7 +44,7 @@
     "nanostores": "1.5.3"
   },
   "peerDependencies": {
-    "octane": "workspace:^0.11.0"
+    "octane": "workspace:^0.10.0"
   },
   "devDependencies": {
     "@tsrx/react": "catalog:default",

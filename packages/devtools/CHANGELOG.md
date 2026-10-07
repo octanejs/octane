@@ -17,7 +17,7 @@
 - Updated dependencies [7e1793f]
 - Updated dependencies [8855e2f]
 - Updated dependencies [7023961]
-  - octane@0.11.0
+  - octane@0.10.1
 
 ## 0.0.48
 

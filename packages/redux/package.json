@@ -33,7 +33,7 @@
     "test": "vitest run"
   },
   "peerDependencies": {
-    "octane": "workspace:^0.11.0",
+    "octane": "workspace:^0.10.0",
     "redux": "^5.0.0"
   },
   "devDependencies": {

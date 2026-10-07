@@ -1,6 +1,6 @@
 # octane
 
-## 0.11.1
+## 0.10.2
 
 ### Patch Changes
 
@@ -15,9 +15,9 @@
   effect setup, and render-time ref reads and writes and state getter calls stay
   errors.
 
-## 0.11.0
+## 0.10.1
 
-### Minor Changes
+### Patch Changes
 
 - 8996380: Move `@tsrx/oxc` from a dependency to an optional peer. Projects that use the
   Octane compiler in Node, including through Vite, Rspack, or Rsbuild, must
@@ -26,8 +26,6 @@
 
   The Octane CLI installs the compatible compiler peer when creating or setting
   up an application.
-
-### Patch Changes
 
 - 8e16346: Compile `export default () => @{ … }` exactly like `export default function () @{ … }`.
   An anonymous default-exported arrow component used to skip component lowering.

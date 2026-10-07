@@ -41,7 +41,7 @@
     "@portabletext/types": "catalog:default"
   },
   "peerDependencies": {
-    "octane": "workspace:^0.11.0"
+    "octane": "workspace:^0.10.0"
   },
   "devDependencies": {
     "@portabletext/react": "catalog:default",

@@ -80,7 +80,7 @@
   },
   "peerDependencies": {
     "@docusaurus/core": "3.10.1",
-    "octane": "workspace:^0.11.0",
+    "octane": "workspace:^0.10.0",
     "vite": ">=7.0.0"
   },
   "peerDependenciesMeta": {

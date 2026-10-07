@@ -49,7 +49,7 @@
     "verify:upstream": "node scripts/upstream-inventory.mjs --check"
   },
   "peerDependencies": {
-    "octane": "workspace:^0.11.0"
+    "octane": "workspace:^0.10.0"
   },
   "dependencies": {
     "highlight.js": "^10.4.1",
