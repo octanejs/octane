@@ -2145,6 +2145,50 @@ export const Indirect = indirect(Host);
 		}
 	});
 
+	it('does not attribute a node_modules build cache to the package that installed it', () => {
+		const root = mkdtempSync(join(tmpdir(), 'octane-bundler-cache-'));
+		try {
+			const appManifest = join(root, 'package.json');
+			writeFileSync(
+				appManifest,
+				JSON.stringify({ name: 'app', private: true, dependencies: { octane: '*' } }),
+			);
+			const packageRoot = join(root, 'node_modules/raw-octane');
+			mkdirSync(join(packageRoot, 'src'), { recursive: true });
+			writeFileSync(
+				join(packageRoot, 'package.json'),
+				JSON.stringify({ name: 'raw-octane', peerDependencies: { octane: '*' } }),
+			);
+			// Nitro feeds the SSR build's chunks back through the bundler from here.
+			const chunks = join(root, 'node_modules/.nitro/vite/services/ssr/assets');
+			const cache = join(root, 'node_modules/.cache');
+			mkdirSync(chunks, { recursive: true });
+			mkdirSync(cache, { recursive: true });
+			const compiler = createOctaneCompiler({ root });
+
+			// Semantic control: the same module is slotted inside a package whose
+			// manifest declares Octane, and as application source.
+			expect(compiler.transform(HOOK, join(packageRoot, 'src/useCount.js'))?.kind).toBe('slots');
+			expect(compiler.transform(HOOK, join(root, 'src/useCount.js'))?.kind).toBe('slots');
+
+			for (const environment of ['client', 'server'] as const) {
+				const chunk = compiler.transform(HOOK, join(chunks, 'useCount-Dx1.js'), { environment });
+				expect(chunk?.kind ?? 'none', environment).toBe('none');
+				expect(chunk?.dependencies ?? [], environment).not.toContain(appManifest);
+			}
+			const loose = compiler.transform(HOOK, join(root, 'node_modules/useCount.js'));
+			expect(loose?.kind ?? 'none').toBe('none');
+			const cachedView = compiler.transform(
+				`export function App() { return <p>{'cached'}</p>; }`,
+				join(cache, 'App.tsx'),
+			);
+			expect(cachedView?.kind ?? 'none').toBe('none');
+			expect(cachedView?.dependencies ?? []).not.toContain(appManifest);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
 	it('uses portable source names in profile metadata', () => {
 		const fixtureRoot = mkdtempSync(join(tmpdir(), 'octane-profile-source-'));
 		try {
