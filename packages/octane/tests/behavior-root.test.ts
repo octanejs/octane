@@ -490,6 +490,81 @@ describe('behavior-only roots', () => {
 		});
 	}
 
+	// A forwarded style prop is usually unset or a string, which no native read
+	// owns. Taking over an early host must still publish it over the early style.
+	for (const dev of [false, true]) {
+		it(`hands off a forwarded unset or string style and keeps it live (${dev ? 'dev' : 'prod'})`, async () => {
+			const source = [
+				"import 'octane/signals';",
+				"import { unbound } from 'octane/behavior';",
+				"export function Host(props) @{ 'use dom bindings';",
+				'  <section class={props.className} style={props.style}>{unbound(props.children)}</section>',
+				'}',
+				'export function App(props) @{',
+				'  <Host className={props.className} style={props.style}><span>{props.label as string}</span></Host>',
+				'}',
+			].join('\n');
+			const scope = createScope({ scopeKey: `host-forwarded-style-${dev}` });
+			const color$ = scope.signal$('color', 'red');
+			try {
+				for (const style of [undefined, 'width: 2px;']) {
+					const initial = {
+						className: 'server',
+						style: undefined as unknown,
+						label: 'server child',
+					};
+					const fixture = authoredPresentation('Host', initial, dev, source);
+					container.innerHTML = renderToString(fixture.server.App, initial).html;
+					const section = container.querySelector('section')!;
+					const child = section.firstElementChild;
+					const errors: unknown[] = [];
+					const binding = fixture.attach(section, fixture.state);
+					try {
+						fixture.publish({ className: 'early', style: 'color: red;' });
+						expect(section.style.cssText).toBe('color: red;');
+						const client = fixture.loadClient();
+						hydratedRoot = hydrateRoot(
+							container,
+							client.App,
+							{ ...initial, className: 'hydrated', style },
+							{
+								bindingLeases: [binding],
+								onUncaughtError: (error: unknown) => errors.push(error),
+								onRecoverableError: (error: unknown) => errors.push(error),
+							},
+						);
+						await act(() => {});
+						expect(errors).toEqual([]);
+						expect(container.querySelector('section')).toBe(section);
+						expect(section.firstElementChild).toBe(child);
+						expect(section.className).toBe('hydrated');
+						expect(section.style.cssText).toBe(style ?? '');
+						expect(fixture.cleanup).toHaveBeenCalledOnce();
+						fixture.publish({ style: 'color: blue;' });
+						expect(section.style.cssText).toBe(style ?? '');
+						await act(() =>
+							hydratedRoot!.render(client.App, { ...initial, style: { color: color$ } }),
+						);
+						expect(section.style.cssText).toBe(`color: ${color$.get()};`);
+						await act(() => color$.set(color$.get() === 'red' ? 'blue' : 'red'));
+						expect(section.style.cssText).toBe(`color: ${color$.get()};`);
+						await act(() => hydratedRoot!.render(client.App, { ...initial, style: undefined }));
+						expect(section.style.cssText).toBe('');
+						await act(() => color$.set('green'));
+						expect(section.style.cssText).toBe('');
+						expect(container.querySelector('section')).toBe(section);
+					} finally {
+						hydratedRoot?.unmount();
+						hydratedRoot = undefined;
+						binding.dispose();
+					}
+				}
+			} finally {
+				scope.dispose();
+			}
+		});
+	}
+
 	for (const dev of [false, true]) {
 		for (const strong of [false, true]) {
 			for (const useSignal of [false, true]) {

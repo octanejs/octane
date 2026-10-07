@@ -75,11 +75,13 @@ filename; source drift during a run fails instead of publishing mixed evidence.
 
 ## Signal-valued DOM styles
 
-`run-dom-bindings.mjs` compiles and bundles three production components through the
+`run-dom-bindings.mjs` compiles and bundles four production components through the
 public entries. All update two CSS properties and preserve a child node. One
 passes signal handles directly; another samples them with `.get()` in setup.
 The plain-props lane uses numeric expressions in the same signal-capable module.
-Every sample checks the resulting CSS, host and child identity, and teardown.
+The forwarded lane passes the whole style as a string prop to the host and leaves
+the child's forwarded style unset, as components that forward an optional `style`
+do. Every sample checks the resulting CSS, host and child identity, and teardown.
 
 ```bash
 node benchmarks/bench.mjs --quick signal-dom-bindings
@@ -89,8 +91,9 @@ node benchmarks/scoped-signals/run-dom-bindings.mjs --quick --fault-component-re
 
 The ratio guards require zero component-setup calls for direct signal updates;
 the sampled control must execute setup for every update. The fault command
-deliberately adds component reads and must fail. Plain fixed-property styles must
-allocate no native presentation blocks or run native style update bodies. A
+deliberately adds component reads and must fail. Plain fixed-property styles, and
+forwarded string or unset styles, must allocate no native presentation blocks or
+run native style update bodies. A
 separate observed production bundle counts those sites after compilation; the
 direct-handle lane must exercise both observers. Its CSS and text must match the
 clean bundle, and both retain host/child identity and detach on unmount. Observed

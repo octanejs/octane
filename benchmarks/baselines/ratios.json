@@ -9305,6 +9305,22 @@
   },
   {
     "suite": "signal-dom-bindings",
+    "op": "style_blocks",
+    "target": "forwarded",
+    "reference": "direct",
+    "maxRatio": 0,
+    "note": "A forwarded string style and an unset one inside a native-capable module have no native read to own, so they allocate no presentation blocks (a production audit of a signed-out home page found 273 such Blocks in one hydration). Direct-handle controls exercise the observer; the forwarded target displays the same CSS and preserves the same host and child."
+  },
+  {
+    "suite": "signal-dom-bindings",
+    "op": "style_update_bodies",
+    "target": "forwarded",
+    "reference": "direct",
+    "maxRatio": 0,
+    "note": "Re-rendering forwarded string and unset styles writes them directly, without native style body invocations; the observed handle control must update the same CSS and preserve identity."
+  },
+  {
+    "suite": "signal-dom-bindings",
     "op": "mount_row_weak_writes",
     "target": "event-owner-rows",
     "reference": "event-owner-rows-work-budget",
