@@ -7,7 +7,7 @@ integration lives in `@octanejs/rsbuild-plugin`.
 ## Install
 
 ```sh
-pnpm add octane @tsrx/oxc@0.16.0
+pnpm add octane @tsrx/oxc@0.18.0
 pnpm add -D @rspack/core @octanejs/rspack-plugin
 ```
 
