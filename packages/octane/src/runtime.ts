@@ -22539,7 +22539,10 @@ class HydrationCapability {
 			}
 		}
 		// A declaration that an early host binding published is the server's now.
+		// Removing one can leave an empty style attribute behind, so the
+		// attribute's presence is no longer the server's either.
 		const claims = domBindingClaims.get(el);
+		let removed = false;
 		if (claims !== undefined) {
 			for (const [channel, published] of claims) {
 				if (!channel.startsWith('style:')) continue;
@@ -22547,14 +22550,15 @@ class HydrationCapability {
 				const value = style.getPropertyValue(property);
 				const priority = style.getPropertyPriority(property);
 				if ((value === '' ? null : value + (priority ? ' !important' : '')) !== published) continue;
-				if (value === '') expectedStyle.removeProperty(property);
-				else expectedStyle.setProperty(property, value, priority);
+				removed ||= value === '';
+				// An empty value removes the declaration.
+				expectedStyle.setProperty(property, value, priority);
 			}
 		}
 		const expected = expectedStyle.cssText;
 		if (
 			(server !== expected ||
-				(STAGED_DOM?.view(el) ?? el).hasAttribute('style') !== (expected !== '')) &&
+				(!expected && !removed && (STAGED_DOM?.view(el) ?? el).hasAttribute('style'))) &&
 			// So is a whole style that one published.
 			claims?.get('style') !== server
 		)

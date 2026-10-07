@@ -572,6 +572,33 @@ describe.each(
 			}
 		});
 
+		// Removing the only declaration leaves an empty `style=""` behind, as the
+		// renderer's own writer does. The early binding left it, not the server.
+		it.each([1, undefined])(
+			'keeps a style the early binding emptied without a report (hydrating %s)',
+			(opacity) => {
+				const { client, paragraph, handle } = adoptEarly(undefined);
+				expect(paragraph.getAttribute('style')).toBe('');
+				const recoverable = vi.fn();
+				const error = vi.spyOn(console, 'error').mockImplementation(() => {});
+				let root: ReturnType<typeof hydrateRoot> | undefined;
+				try {
+					flushSync(() => {
+						root = hydrateRoot(document.body, client.Badge, props(opacity), {
+							onRecoverableError: recoverable,
+						});
+					});
+					expect(document.querySelector('p')).toBe(paragraph);
+					expect(paragraph.getAttribute('style')).toBe('');
+					expect(recoverable).not.toHaveBeenCalled();
+					expect(error).not.toHaveBeenCalled();
+				} finally {
+					handle.dispose();
+					root?.unmount();
+				}
+			},
+		);
+
 		it.each([0.5, undefined])(
 			'applies the hydration-time style once the early publication (%s) releases',
 			(early) => {
@@ -632,28 +659,36 @@ describe.each(
 	},
 );
 
-// Only a whole style can be emptied as a whole. Its empty CSS text is the
-// publication, which hydration keeps like any other.
+// A single declaration's publication claims that declaration, not the style
+// attribute. When the early binding published one and something else removed
+// it, the empty attribute left behind is a server difference, as in React.
 describe.each([false, true].flatMap((dev) => [false, true].map((native) => ({ dev, native }))))(
-	'adopted whole style publication (dev=$dev, native=$native)',
+	'adopted style declaration publication (dev=$dev, native=$native)',
 	({ dev, native }) => {
 		afterEach(() => {
 			document.body.replaceChildren();
 			vi.restoreAllMocks();
 		});
 
-		const { props, adoptEarly } = adoptedStyleView(dev, native, 'forwarded');
+		const { props, adoptEarly } = adoptedStyleView(dev, native, 'literal');
 
-		it('keeps a style the early binding emptied without a report', () => {
-			const { client, paragraph, handle } = adoptEarly(undefined);
+		it('reports an empty style attribute that the early binding did not leave', () => {
+			const { client, paragraph, handle } = adoptEarly(0.5);
+			paragraph.style.removeProperty('opacity');
+			expect(paragraph.getAttribute('style')).toBe('');
 			const error = vi.spyOn(console, 'error').mockImplementation(() => {});
 			let root: ReturnType<typeof hydrateRoot> | undefined;
 			try {
 				flushSync(() => {
-					root = hydrateRoot(document.body, client.Badge, props(1));
+					root = hydrateRoot(document.body, client.Badge, props(undefined));
 				});
-				expect(paragraph.style.cssText).toBe('');
-				expect(error).not.toHaveBeenCalled();
+				expect(paragraph.getAttribute('style')).toBe('');
+				if (dev) {
+					expect(error).toHaveBeenCalledOnce();
+					expect(String(error.mock.calls[0]![0])).toContain("won't be patched up");
+				} else {
+					expect(error).not.toHaveBeenCalled();
+				}
 			} finally {
 				handle.dispose();
 				root?.unmount();
