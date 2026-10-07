@@ -923,13 +923,36 @@ export function octane(options = {}) {
 
 	// Parse authored source once, synchronously classify every applicable adapter
 	// concern, then let the AST fall out of scope before any graph loading begins.
-	// Compilation keeps its independent authoritative parser.
+	// Compilation keeps its independent authoritative parser. A module Octane
+	// will not compile reads only some of these facts, and is parsed only when
+	// one of them needs the AST.
 	const preflightFor = (authoredSource, id, server, specializeVoidRoots) => {
 		const environment = server ? 'server' : 'client';
 		const key = `${environment}\0${specializeCssModuleConstants}\0${specializeVoidRoots}\0${id}`;
 		const digest = compiledCodeFingerprint(authoredSource);
 		const cached = preflightCache.get(key);
 		if (cached !== undefined && cached.digest === digest) return cached;
+		const scope = compiler._preflightScope(authoredSource, id);
+		const compiled = scope === 'compile';
+		const voidImports = specializeVoidRoots && scope !== 'none';
+		// Only compilation reads JSX-tag candidates. A re-export candidate is kept
+		// only for a module absent from disk, which publishes it as barrel
+		// metadata; importers read a filesystem barrel directly.
+		const descriptorImports = compiled || !nodeFs.existsSync(cleanModuleId(id));
+		if (!compiled && !voidImports && !descriptorImports) {
+			const preflight = {
+				digest,
+				cssRequests: NO_PREFLIGHT_FACTS,
+				descriptorExportsReceipt: null,
+				descriptorImports: NO_PREFLIGHT_FACTS,
+				serverImportRequests: server
+					? retainedPreflightFacts(compiler.findServerImportRequests(authoredSource, id))
+					: NO_PREFLIGHT_FACTS,
+				voidImports: NO_PREFLIGHT_FACTS,
+			};
+			preflightCache.set(key, preflight);
+			return preflight;
+		}
 		let ast;
 		try {
 			ast = parseModule(authoredSource, id);
@@ -952,22 +975,27 @@ export function octane(options = {}) {
 		}
 		const preflight = {
 			digest,
-			cssRequests: specializeCssModuleConstants
-				? retainedPreflightFacts(
-						compiler.findCssModuleImportRequests(authoredSource, id, environment, ast),
+			cssRequests:
+				compiled && specializeCssModuleConstants
+					? retainedPreflightFacts(
+							compiler.findCssModuleImportRequests(authoredSource, id, environment, ast),
+						)
+					: NO_PREFLIGHT_FACTS,
+			descriptorExportsReceipt: compiled
+				? compiler._analyzeDescriptorChildrenExports(
+						DESCRIPTOR_PREFLIGHT_AUTHORITY,
+						authoredSource,
+						id,
+						ast,
 					)
+				: null,
+			descriptorImports: descriptorImports
+				? retainedPreflightFacts(findDescriptorChildrenImports(ast, id))
 				: NO_PREFLIGHT_FACTS,
-			descriptorExportsReceipt: compiler._analyzeDescriptorChildrenExports(
-				DESCRIPTOR_PREFLIGHT_AUTHORITY,
-				authoredSource,
-				id,
-				ast,
-			),
-			descriptorImports: retainedPreflightFacts(findDescriptorChildrenImports(ast, id)),
 			serverImportRequests: server
 				? retainedPreflightFacts(compiler.findServerImportRequests(ast, id))
 				: NO_PREFLIGHT_FACTS,
-			voidImports: specializeVoidRoots
+			voidImports: voidImports
 				? retainedPreflightFacts(findVoidComponentImports(ast, id))
 				: NO_PREFLIGHT_FACTS,
 		};
