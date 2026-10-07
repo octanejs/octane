@@ -122,6 +122,38 @@ describe('compile errors — rejected authoring patterns', () => {
 		},
 	);
 
+	// `const X = function Name() @{…}` binds the component as `X`, so a
+	// self-reference by `Name` reads it through the same body alias, which a
+	// declaration of `X` inside the component would shadow.
+	it.each([
+		[
+			'in a parameter default',
+			'function Name({ x = Name.name }: { x?: string }) @{ <p>{x as string}</p>; }',
+			/^Component `X` refers to itself as `Name` in a parameter, /,
+		],
+		[
+			'beside a body redeclaration',
+			`function Name() @{
+	const read = () => { const Name = 'inner'; return Name; };
+	<p>{read() as string}{Name.name as string}</p>;
+}`,
+			/^Component `X` refers to itself as `Name` while its body also declares `Name`, /,
+		],
+		[
+			'beside a parameter named like its binding',
+			'function Name(X: { label: string }) @{ <p>{X.label as string}{Name.name as string}</p>; }',
+			/^Component `X` refers to itself as `Name` while it also declares `X`, /,
+		],
+	])('rejects a const named component that refers to itself %s', (_where, fn, message) => {
+		const src = `export const X = ${fn};`;
+		for (const mode of ['client', 'server'] as const) {
+			expect(() => compile(src, 'named-const.tsrx', { mode })).toThrow(message);
+			expect(() => compile(src, 'named-const.tsrx', { mode })).toThrow(
+				/but only its function expression binds `Name`\. Rename the function expression to `X` and refer to the component by that name\.$/,
+			);
+		}
+	});
+
 	it('rejects a generator (`function*`) component', () => {
 		const src = `export function* Gen() @{ <div>{1}</div> }`;
 		expect(() => compile(src, 'gen-comp.tsrx')).toThrow(/generator/);

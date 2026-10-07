@@ -8957,7 +8957,23 @@ function arrowComponentToFunctionDecl(varDecl) {
 	) {
 		return null;
 	}
-	return componentFunctionDeclaration(d.id, init, varDecl);
+	let fn = init;
+	// `const X = function Name() @{…}` binds `Name` only inside the component,
+	// which the declaration binds as `X` alone.
+	if (init.id && init.id.name !== d.id.name) {
+		const binding = d.id.name;
+		const self = init.id.name;
+		const body = aliasComponentOwnName(
+			init,
+			binding,
+			(where) =>
+				new Error(
+					`Component \`${binding}\` refers to itself as \`${self}\` ${where}, but only its function expression binds \`${self}\`. Rename the function expression to \`${binding}\` and refer to the component by that name.`,
+				),
+		);
+		if (body !== init.body) fn = { ...init, body };
+	}
+	return componentFunctionDeclaration(d.id, fn, varDecl);
 }
 
 // The canonical FunctionDeclaration for an arrow/function-expression `@{…}`
@@ -8978,6 +8994,36 @@ function componentFunctionDeclaration(id, fn, origin) {
 	declaration.end = origin.end;
 	declaration.loc = origin.loc;
 	return declaration;
+}
+
+// A function-expression component `fn` binds its own name only inside itself,
+// and lowering binds the component as `binding` instead. When the component
+// refers to itself by name, alias the name to `binding` at the top of its
+// setup, so the reference reads the component as `<binding/>` there would. The
+// alias lives in the body, so parameter defaults and computed keys cannot see
+// it, and a declaration of either name the free-identifier walk cannot place
+// could collide with or shadow it. Reject those with `reject(where)` instead of
+// guessing. Returns the body, unchanged when the component never names itself.
+/** @param {any} fn @param {string} binding @param {(where: string) => Error} reject @returns {any} */
+function aliasComponentOwnName(fn, binding, reject) {
+	const self = fn.id.name;
+	const unnamed = { ...fn, id: null };
+	if (!collectFreeIdentifiers(unnamed, []).has(self)) return fn.body;
+	const declared = collectModuleBoundNames(unnamed);
+	const where = collectFreeIdentifiers({ ...unnamed, body: b.block([]) }, []).has(self)
+		? 'in a parameter'
+		: declared.has(self)
+			? `while its body also declares \`${self}\``
+			: declared.has(binding)
+				? `while it also declares \`${binding}\``
+				: null;
+	if (where !== null) throw reject(where);
+	// After any directive prologue, which must stay first in the body.
+	const setup = fn.body.body;
+	let at = 0;
+	while (at < setup.length && typeof setup[at].directive === 'string') at++;
+	const alias = b.const(self, b.id(binding));
+	return { ...fn.body, body: [...setup.slice(0, at), alias, ...setup.slice(at)] };
 }
 
 function functionExpressionFromDeclaration(declaration, origin = declaration) {
@@ -9127,29 +9173,14 @@ function bindDefaultComponent(ast) {
 			{ usedCompilerNames: collectIdentifierNames(ast), compilerNameSuffixes: null },
 			self,
 		);
-		let block = component.body;
-		const unnamed = { ...component, id: null };
-		if (collectFreeIdentifiers(unnamed, []).has(self)) {
-			// The alias lives in the body, so parameter defaults and computed keys
-			// cannot see it, and a declaration of `Name` the free-identifier walk
-			// cannot place could collide with it. Reject both instead of guessing.
-			const where = collectFreeIdentifiers({ ...unnamed, body: b.block([]) }, []).has(self)
-				? 'in a parameter'
-				: collectModuleBoundNames(unnamed).has(self)
-					? `while its body also declares \`${self}\``
-					: null;
-			if (where !== null) {
-				throw new Error(
+		const block = aliasComponentOwnName(
+			component,
+			name,
+			(where) =>
+				new Error(
 					`Component \`${self}\` refers to itself by name ${where}, but its module also declares \`${self}\`. Rename the component's function expression.`,
-				);
-			}
-			// After any directive prologue, which must stay first in the body.
-			const setup = block.body;
-			let at = 0;
-			while (at < setup.length && typeof setup[at].directive === 'string') at++;
-			const alias = b.const(self, b.id(name));
-			block = { ...block, body: [...setup.slice(0, at), alias, ...setup.slice(at)] };
-		}
+				),
+		);
 		declaration = { ...component, id: b.id(name), body: block };
 	}
 	const body = ast.body.slice();
