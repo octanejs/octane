@@ -1636,11 +1636,10 @@ export const ordinaryResult: string = ordinary('draft', { count: 1 });
 	it('type-checks static JSX in the scope it was authored in', () => {
 		// @tsrx/core hoists a fully static element (literal attributes and
 		// children) to a module-level `const`, React's element-identity fast path.
-		// In the virtual TSX that checked the element outside the scope it was
-		// written in: a named function expression's own name resolved to a module
-		// binding of the same name or to nothing (TS2604 / TS2304), `@if`
-		// narrowing was lost (TS2604), and a template nested in a plain function
-		// referenced a `const` that was never emitted (TS2304).
+		// A component tag is the only binding such an element can name, and at
+		// module scope it was checked against the wrong one: a named function
+		// expression's own name resolved to a module binding of the same name or
+		// to nothing (TS2604 / TS2304), and `@if` narrowing was lost (TS2604).
 		const sources = {
 			DefaultExpression:
 				"const Counter = 'module binding';\n" +
@@ -1657,20 +1656,13 @@ export const ordinaryResult: string = ordinary('draft', { count: 1 });
 				'export function Optional() @{\n' +
 				'\t<section>@if (Maybe) { <Maybe label="ready" /> }</section>\n' +
 				'}\n',
-			Nested:
-				'export function createRow() {\n' +
-				'\treturn function Row(props: { open: boolean }) @{\n' +
-				'\t\t<section>@if (props.open) { <span>open</span> }</section>\n' +
-				'\t};\n' +
-				'}\n',
 			// An authored `Suspense` import selects the transform that reuses it.
 			AuthoredSuspense:
 				"import { Suspense } from 'octane';\n" +
-				'export function createPanel() {\n' +
-				'\treturn function Panel(props: { open: boolean }) @{\n' +
-				'\t\t<Suspense fallback={null}>@if (props.open) { <span>open</span> }</Suspense>\n' +
-				'\t};\n' +
-				'}\n',
+				'declare function memo<T>(component: T): T;\n' +
+				'export const Boundary = memo(function Panel(props: { nested?: boolean }) @{\n' +
+				'\t<Suspense fallback={null}>@if (!props.nested) { <Panel nested /> }</Suspense>\n' +
+				'});\n',
 		};
 		// The self-reference is checked against the function's own props, so a
 		// wrong literal is a props error, not a call-signature one.

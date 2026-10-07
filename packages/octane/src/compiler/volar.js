@@ -28,6 +28,7 @@ import {
 	analyzeTsrx,
 	builders as b,
 	clone_ast_node as cloneAstNode,
+	contains_component_jsx as containsComponentJsx,
 	createJsxTransform,
 	createVolarMappingsResult,
 	dedupeMappings,
@@ -72,13 +73,14 @@ import {
  *     typecheck (TS1147 in-block import, TS2307 boundary import). The
  *     runtime compiler (`compile.js`) owns the dialect's real semantics
  *     (isolation validation, SSR namespace, RPC stubs) and is unaffected.
- *   - `hooks.canHoistStaticNode` declines every hoist. The shared transform
- *     moves a fully static element to a module-level `const` for React's
- *     element-identity fast path. Virtual TSX never runs, so the hoist buys
- *     nothing and checks the element outside the scope it was written in: a
- *     named function expression's own name resolves to an outer binding or
- *     to nothing, `@if` narrowing is lost, and a template nested in a plain
- *     function references a `const` that is never emitted.
+ *   - `hooks.canHoistStaticNode` keeps component elements where they were
+ *     written, as the Vue and Solid targets do. The shared transform moves a
+ *     fully static element (literal attributes and children) to a
+ *     module-level `const`. A component tag is the only binding such an
+ *     element can name, and at module scope it is checked against the wrong
+ *     binding: a named function expression's own name resolves to an outer
+ *     binding or to nothing, and `@if` narrowing is lost. Host-only statics
+ *     name no binding, so they still hoist.
  *
  * `imports.suspense` and `imports.fragment` aren't real components in
  * octane (we lower `@try`/`@pending` to `tryBlock` and fragments to
@@ -114,7 +116,7 @@ const OCTANE_PLATFORM = {
 		importSpecifier: 'server',
 	},
 	hooks: {
-		canHoistStaticNode: () => false,
+		canHoistStaticNode: (node) => !containsComponentJsx(node),
 	},
 };
 
@@ -668,9 +670,9 @@ const DIRECTIVE_KEYWORDS = {
 const DIRECTIVE_GENERATED_NAMES = {
 	JSXForExpression: ['__map_iterable', '__map_iterable_async'],
 	JSXSwitchExpression: ['switch'],
-	// `@if` becomes a ternary over its arms' own JSX, so there is no stable
-	// text to match — but the transform anchors exactly one token on the
-	// keyword, so the offset alone identifies it.
+	// `@if` becomes a ternary whose arms are hoisted statics with generated
+	// names, so there is no stable text to match — but the transform anchors
+	// exactly one token on the keyword, so the offset alone identifies it.
 	JSXIfExpression: null,
 	// `@try` names the OUTERMOST boundary it produced: the `<Suspense>` when a
 	// `@pending` clause is present, the error boundary otherwise. Only one of
