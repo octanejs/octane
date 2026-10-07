@@ -3,7 +3,8 @@ import {
 	acceptScopeStreamedResult,
 	bindScopeStreamedSelection,
 	createDeclaredSignalCell,
-	createScope,
+	createOwnerScope,
+	createSeededOwnerScope,
 	failScopeStreamedResult,
 	signalDeclarationSequence,
 	ScopeImpl,
@@ -48,7 +49,7 @@ import {
 	type DerivedOptions,
 	type DerivedSignal,
 	type OwnerBoundSignal,
-	type Scope,
+	type OwnerScope,
 	type ScopeSeed,
 	type SignalHandle,
 	type SignalOptions,
@@ -63,15 +64,15 @@ import type {
 	StreamedSignalResultFrame,
 } from '../streamed-signals-protocol.js';
 
-const identityScopes = new WeakMap<object, Scope>();
-const scopeOwners = new WeakMap<Scope, SignalOwner>();
+const identityScopes = new WeakMap<object, OwnerScope>();
+const scopeOwners = new WeakMap<OwnerScope, SignalOwner>();
 const retiredIdentities = new WeakSet<object>();
 const documentInstances = new WeakMap<object, Set<object>>();
 const instanceDocuments = new WeakMap<object, object>();
 const frozenDocuments = new WeakMap<object, Promise<void>>();
 
-function isScope(owner: SignalOwner): owner is Scope {
-	return typeof (owner as Scope).signal$ === 'function';
+function isScope(owner: SignalOwner): owner is OwnerScope {
+	return typeof (owner as OwnerScope).signal$ === 'function';
 }
 
 function isRendererOwner(owner: SignalOwner): owner is SignalRendererOwnerIdentity {
@@ -82,11 +83,11 @@ function isRendererOwner(owner: SignalOwner): owner is SignalRendererOwnerIdenti
 	);
 }
 
-function resolveIdentity(identity: object, scopeKey: string, owner: SignalOwner): Scope {
+function resolveIdentity(identity: object, scopeKey: string, owner: SignalOwner): OwnerScope {
 	if (retiredIdentities.has(identity)) throw new ScopeDisposedError(scopeKey);
 	let scope = identityScopes.get(identity);
 	if (!scope) {
-		scope = createScope({ scopeKey });
+		scope = createOwnerScope(scopeKey);
 		identityScopes.set(identity, scope);
 		scopeOwners.set(scope, owner);
 		const barrier = frozenDocuments.get(isRendererOwner(owner) ? owner.documentOwner : owner);
@@ -104,15 +105,15 @@ export function initializeDocumentSignalOwner(owner: SignalOwnerIdentity, seed: 
 	if (identityScopes.has(owner)) {
 		throw new Error(formatClientError(156));
 	}
-	// createScope validates and copies the seed before publishing any ownership.
-	const scope = createScope({ scopeKey: owner.scopeKey, seed });
+	// The owner scope validates and copies the seed before publishing any ownership.
+	const scope = createSeededOwnerScope(owner.scopeKey, seed);
 	const barrier = frozenDocuments.get(owner);
 	if (barrier !== undefined) (scope as ScopeImpl).readBarrier = barrier;
 	identityScopes.set(owner, scope);
 	scopeOwners.set(scope, owner);
 }
 
-function resolveOwner(owner: SignalOwner): Scope {
+function resolveOwner(owner: SignalOwner): OwnerScope {
 	if (isScope(owner)) return owner;
 	if (isRendererOwner(owner)) {
 		if (!isScope(owner.documentOwner) && retiredIdentities.has(owner.documentOwner)) {
@@ -138,7 +139,7 @@ function resolveOwner(owner: SignalOwner): Scope {
 	return resolveIdentity(owner, owner.scopeKey, owner);
 }
 
-function resolveDescriptorOwner(site: string | undefined, owner: SignalOwner): Scope {
+function resolveDescriptorOwner(site: string | undefined, owner: SignalOwner): OwnerScope {
 	if (isScope(owner)) owner = scopeOwners.get(owner) ?? owner;
 	if (!isRendererOwner(owner)) return resolveOwner(owner);
 	if (site?.startsWith('g:')) return resolveOwner(owner.documentOwner);
@@ -148,7 +149,7 @@ function resolveDescriptorOwner(site: string | undefined, owner: SignalOwner): S
 	return resolveOwner(owner);
 }
 
-function existingIdentityScope(identity: object): Scope | undefined {
+function existingIdentityScope(identity: object): OwnerScope | undefined {
 	if (retiredIdentities.has(identity)) return;
 	const scope = identityScopes.get(identity);
 	return scope?.retired ? undefined : scope;
@@ -158,7 +159,7 @@ function streamedScope(
 	owner: SignalOwner,
 	identity: StreamFrameIdentity,
 	create: boolean,
-): Scope | undefined {
+): OwnerScope | undefined {
 	if (isScope(owner)) {
 		return !owner.retired && identity.ownerKey === owner.scopeKey ? owner : undefined;
 	}
@@ -321,7 +322,7 @@ export function resolveUnlessRetired<T>(resolve: () => T): T | undefined {
 /** @internal Resolve a descriptor against an already selected signal scope. */
 export function resolveSignalHandleForScope<T>(
 	handle$: SignalHandle<T>,
-	owner: Scope,
+	owner: OwnerScope,
 ): SignalHandle<T> {
 	return SIGNAL_OWNER_RESOLVE in (handle$ as object)
 		? (handle$ as OwnerBoundSignal<T>)[SIGNAL_OWNER_RESOLVE](owner)
@@ -367,7 +368,7 @@ function readerOwner(
 type DescriptorClass<T, H extends SignalHandle<T>> = new (
 	key: string,
 	kind: H['kind'],
-	create: (owner: Scope, declaring: number) => H,
+	create: (owner: OwnerScope, declaring: number) => H,
 	site: string | undefined,
 	declared: Descriptor<T, H>,
 ) => Descriptor<T, H>;
@@ -375,14 +376,14 @@ type DescriptorClass<T, H extends SignalHandle<T>> = new (
 /** @internal Shared owner resolution for statically selected signal factories. */
 export abstract class Descriptor<T, H extends SignalHandle<T>> implements OwnerBoundSignal<T> {
 	readonly [SIGNAL_HANDLE] = true as const;
-	private readonly cells: WeakMap<Scope, H>;
+	private readonly cells: WeakMap<OwnerScope, H>;
 	// Identity-only token: renderer owners never retain their renderer tree.
 	private readonly owner: SignalRendererOwnerIdentity | undefined;
 	/** The render invocation that evaluated this declaration in `owner`. */
 	private readonly invocation: number;
 	/** A render's private presentation of a redeclared cell, until it is accepted or released. */
 	declare private view?: H;
-	declare private viewOwner?: Scope;
+	declare private viewOwner?: OwnerScope;
 	/**
 	 * The handle the declaring body's own functions use, created on their first
 	 * use (see __declared). It refers to itself. A field of every descriptor, so
@@ -394,7 +395,7 @@ export abstract class Descriptor<T, H extends SignalHandle<T>> implements OwnerB
 		readonly key: string,
 		readonly kind: H['kind'],
 		/** `declaring` is the invocation that evaluated the declaration of `owner`'s cell, or 0. */
-		private readonly create: (owner: Scope, declaring: number) => H,
+		private readonly create: (owner: OwnerScope, declaring: number) => H,
 		private readonly site: string | undefined,
 		declared?: Descriptor<T, H>,
 	) {
@@ -432,7 +433,7 @@ export abstract class Descriptor<T, H extends SignalHandle<T>> implements OwnerB
 		return this.lexical === this ? this.owner! : requireOwner();
 	}
 
-	[SIGNAL_OWNER_RESOLVE](owner: Scope): H {
+	[SIGNAL_OWNER_RESOLVE](owner: OwnerScope): H {
 		requireSite(this.site);
 		const token = readerOwner(this.owner, owner);
 		return this.resolvedCell(resolveDescriptorOwner(this.site, token), token);
@@ -458,7 +459,7 @@ export abstract class Descriptor<T, H extends SignalHandle<T>> implements OwnerB
 		)
 			return false;
 		try {
-			const token = readerOwner(this.owner, owner as Scope);
+			const token = readerOwner(this.owner, owner as OwnerScope);
 			const target = resolveDescriptorOwner(this.site, token) as ScopeImpl;
 			// An alias may have read the cell even if this descriptor did not.
 			// Without a cell, reevaluate the closure: it may still guard this read,
@@ -475,7 +476,7 @@ export abstract class Descriptor<T, H extends SignalHandle<T>> implements OwnerB
 	 * belongs to the render that evaluated this declaration; a component that
 	 * received the handle declares its own cell in its own render.
 	 */
-	private resolvedCell(target: Scope, token: SignalOwner): H {
+	private resolvedCell(target: OwnerScope, token: SignalOwner): H {
 		let cell = this.cells.get(target);
 		if (!cell) {
 			// An accepted view resolves to its canonical cell from now on. A render

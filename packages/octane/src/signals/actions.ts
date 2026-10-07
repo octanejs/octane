@@ -34,7 +34,7 @@ import {
 	type OptimisticOptions,
 	type OptimisticSignal,
 	type OwnerBoundSignal,
-	type Scope,
+	type OwnerScope,
 	type SignalAction,
 	type SignalHandle,
 	type SignalOwner,
@@ -57,7 +57,7 @@ const managers = new WeakMap<ScopedNode, OptimisticManager<unknown>>();
 
 class OptimisticManager<T> {
 	compareAuthority: OptimisticOptions<T>['compareAuthority'];
-	readonly owner: Scope;
+	readonly owner: OwnerScope;
 	readonly version$: OptimisticSignal<number>;
 	readonly view$: SignalHandle<T>;
 	readonly overlays: Overlay<T>[] = [];
@@ -250,7 +250,7 @@ class OptimisticDescriptor<T> implements OptimisticSignal<T>, OwnerBoundSignal<T
 		this.key = `optimistic:${source$.key}`;
 	}
 
-	[SIGNAL_OWNER_RESOLVE](owner: Scope): SignalHandle<T> {
+	[SIGNAL_OWNER_RESOLVE](owner: OwnerScope): SignalHandle<T> {
 		return this.manager(owner).view$;
 	}
 

@@ -2,14 +2,14 @@
 export * from './index.js';
 import { nativeLocalHook } from '../runtime.js';
 import { createLocalScope } from './engine.js';
-import type { Scope, WritableSignal } from './types.js';
+import type { OwnerScope, WritableSignal } from './types.js';
 
 interface LocalSignalCell<T> {
-	scope: Scope;
+	scope: OwnerScope;
 	signal$: WritableSignal<T>;
 }
 
-function disposeLocalSignal(cell: { scope: Scope }): void {
+function disposeLocalSignal(cell: { scope: OwnerScope }): void {
 	cell.scope.dispose();
 }
 

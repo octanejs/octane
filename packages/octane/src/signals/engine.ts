@@ -57,6 +57,7 @@ import type {
 	DerivedOptions,
 	QueryRequest,
 	Resource,
+	OwnerScope,
 	Scope,
 	ScopeInspection,
 	ScopeOptions,
@@ -222,12 +223,22 @@ export class ScopeImpl implements Scope, GraphOwner {
 		if (this.derivedBindings)
 			for (const binding of this.derivedBindings.values()) binding.supersede();
 	}
-	private readonly seedEntries: Map<string, DecodedSeedEntry> | undefined;
-	private readonly traceLimit: number;
-	private events: SignalTraceEvent[] | undefined = undefined;
-	private sequence = 0;
+	readonly seedEntries: Map<string, DecodedSeedEntry> | undefined;
+	readonly traceLimit: number;
+	events: SignalTraceEvent[] | undefined = undefined;
+	sequence = 0;
 	private lifetime = 0;
 	private disposed = false;
+	// Installed by installPublicScope, so only applications that can hold a
+	// scope (createScope, currentSignalOwner) ship these.
+	declare derived$: Scope['derived$'];
+	declare get: Scope['get'];
+	declare set: Scope['set'];
+	declare isPending: Scope['isPending'];
+	declare batch: Scope['batch'];
+	declare action: Scope['action'];
+	declare serialize: Scope['serialize'];
+	declare inspect: Scope['inspect'];
 	readBarrier: Promise<void> | undefined;
 
 	/** Internal document lifecycle: mark every owner before cancellation runs user code. */
@@ -269,16 +280,13 @@ export class ScopeImpl implements Scope, GraphOwner {
 
 	constructor(
 		private readonly key: string,
-		options: ScopeOptions,
-		readonly seedable = true,
+		readonly seedable: boolean,
+		seedEntries: Map<string, DecodedSeedEntry> | undefined,
+		traceLimit: number,
 	) {
 		requireKey(key, 'scopeKey');
-		const traceLimit = options.debug ? (options.debug.traceLimit ?? 256) : 0;
-		if (!Number.isInteger(traceLimit) || traceLimit < 0 || traceLimit > 10_000) {
-			throw new RangeError(formatClientError(131));
-		}
 		this.traceLimit = traceLimit;
-		this.seedEntries = options.seed ? decodeSeed(key, options.seed) : undefined;
+		this.seedEntries = seedEntries;
 	}
 
 	get scopeKey(): string {
@@ -293,11 +301,7 @@ export class ScopeImpl implements Scope, GraphOwner {
 		return this.disposed;
 	}
 
-	private createNode<T>(
-		key: string,
-		kind: ScopedNode['kind'],
-		allowDuringRead = false,
-	): ScopedNode<T> {
+	createNode<T>(key: string, kind: ScopedNode['kind'], allowDuringRead = false): ScopedNode<T> {
 		assertAlive(this);
 		// Component-local hook initialization is an allocation in its existing
 		// render lifetime, never a write to an already committed signal.
@@ -342,7 +346,7 @@ export class ScopeImpl implements Scope, GraphOwner {
 		return seed?.entry.available === false ? undefined : seed;
 	}
 
-	private initializeRetention(node: ScopedNode): void {
+	initializeRetention(node: ScopedNode): void {
 		const seed = this.retainedSeed(node.key);
 		if (!seed) return;
 		node.lastState = seedState(seed);
@@ -350,7 +354,7 @@ export class ScopeImpl implements Scope, GraphOwner {
 		node.hasLast = true;
 	}
 
-	private consumeSeed(key: string): void {
+	consumeSeed(key: string): void {
 		const seeds = this.seedEntries;
 		if (seeds)
 			for (const read of ['value', 'latest', 'snapshot'] as const) {
@@ -379,21 +383,6 @@ export class ScopeImpl implements Scope, GraphOwner {
 		node.hasLast = true;
 		this.consumeSeed(key);
 		return node as WritableSignal<T>;
-	}
-
-	derived$<T>(
-		key: string,
-		compute: (() => T) & (T extends PromiseLike<unknown> ? never : unknown),
-	): DerivedSignal<T> {
-		if (typeof compute !== 'function') throw new TypeError(formatClientError(122));
-		const node = this.createNode<T>(key, 'derived');
-		node.compute = (target) => derivedState(target, compute);
-		this.initializeRetention(node);
-		// Live derived values always reflect live inputs, including edits made
-		// before this node was created. Only an adoption frame reads historical
-		// computed values from a seed.
-		this.consumeSeed(key);
-		return node as DerivedSignal<T>;
 	}
 
 	createDerivedDeclaration<T>(
@@ -458,140 +447,15 @@ export class ScopeImpl implements Scope, GraphOwner {
 		return node as Resource<T>;
 	}
 
-	private own<T>(handle$: SignalHandle<T>): ScopedNode<T> {
-		assertAlive(this);
-		if (!(handle$ instanceof ScopedNode) || handle$.owner !== this) {
-			throw new TypeError(formatClientError(138));
-		}
-		return handle$;
-	}
-
-	get<T>(handle$: SignalHandle<T>): T {
-		const node = this.own(handle$);
-		return strictValue(readNode(node), node.key);
-	}
-
-	set<T>(handle$: WritableSignal<T>, value: T | ((previous: T) => T)): void {
-		this.own(handle$).set(value);
-	}
-
-	isPending(read: () => unknown): boolean {
-		assertAlive(this);
-		try {
-			read();
-			return false;
-		} catch (error) {
-			if (isThenable(error)) return true;
-			throw error;
-		}
-	}
-
-	batch<T>(write: () => T): T {
-		assertAlive(this);
-		return signalBatch(write);
-	}
-
-	action<F extends (...args: any[]) => any>(write: F): F {
-		if (typeof write !== 'function') throw new TypeError(formatClientError(139));
-		const owner = this;
-		return function (this: unknown, ...args: Parameters<F>): ReturnType<F> {
-			return owner.batch(() => write.apply(this, args));
-		} as F;
-	}
-
-	seedEntry(node: ScopedNode, read: SignalReadMode = 'value'): SignalSeedEntry | undefined {
-		const current = node.state?.snapshot;
-		if (
-			current?.status === 'error' &&
-			(current.error instanceof ScopeDisposedError ||
-				current.error instanceof SignalFrameError ||
-				isNativeAdoptionMiss(current.error))
-		) {
-			throw current.error;
-		}
-		const presented =
-			read === 'latest' && node.state?.snapshot.status !== 'ready' ? node.lastState : node.state;
-		// A producer's cancellation callback may serialize before graph teardown.
-		// Only still-live inputs may be copied into a new historical handoff.
-		if (presented?.owners) for (const owner of presented.owners) assertAlive(owner);
-		const snapshot = presented?.snapshot;
-		if (snapshot?.status !== 'ready') {
-			if (read !== 'latest') return undefined;
-			return {
-				key: node.key,
-				kind: node.kind,
-				read,
-				available: false,
-				value: ['undefined'],
-				complete: false,
-			};
-		}
-		const request = this.resources?.get(node)?.seedRequest(read === 'latest');
-		if (node.kind === 'async' && !request) return undefined;
-		return {
-			key: node.key,
-			kind: node.kind,
-			...(read !== 'value' ? { read } : {}),
-			value: encodeSignalValue(snapshot.value),
-			complete: snapshot.complete,
-			refreshing: snapshot.refreshing,
-			connection: snapshot.connection,
-			...(request ? { request } : {}),
-		};
-	}
-
-	serialize(): ScopeSeed {
-		assertAlive(this);
-		if (!this.seedable) throw new SignalSerializationError(formatClientError(140));
-		return untrack(() => {
-			const entries: SignalSeedEntry[] = [];
-			for (const node of this.nodes.values()) {
-				refreshNode(node);
-				const entry = this.seedEntry(node) ?? this.seedEntry(node, 'latest');
-				if (entry) entries.push(entry);
-			}
-			return { version: 1, scopeKey: this.scopeKey, entries };
-		});
-	}
-
-	/** Serialize an observed ready subgraph, without evaluating anything new. */
+	// Server native reads serialize, and hydration adopts, internal owner scopes
+	// too. Both reach these through the owner: their protocol modules load
+	// without signals, so importing the engine there would ship it, and run it
+	// on every server render, in applications that never create a signal.
 	serializeRead(
 		root: ScopedNode,
 		read: SignalReadMode,
 	): readonly NativeSerializedScope[] | undefined {
-		if (!root.owner.seedable) return [];
-		const rootEntry = this.seedEntry(root, read);
-		if (!rootEntry) return undefined;
-		const owners = new Map<ScopeImpl, SignalSeedEntry[]>();
-		const keys = new Map<string, ScopeImpl>();
-		const seen = new Set<ScopedNode>();
-		const pending = [root];
-		while (pending.length) {
-			const node = pending.pop()!;
-			if (seen.has(node)) continue;
-			seen.add(node);
-			const owner = node.owner as ScopeImpl;
-			assertAlive(owner);
-			if (!owner.seedable) continue;
-			const other = keys.get(owner.scopeKey);
-			if (other && other !== owner) {
-				throw new SignalFrameError(formatClientError(141));
-			}
-			keys.set(owner.scopeKey, owner);
-			const entry = node === root ? rootEntry : owner.seedEntry(node);
-			if (entry) {
-				let entries = owners.get(owner);
-				if (!entries) owners.set(owner, (entries = []));
-				entries.push(entry);
-			}
-			for (let link = node.deps; link; link = link.nextDep) {
-				if (link.dep instanceof ScopedNode) pending.push(link.dep);
-			}
-		}
-		return [...owners].map(([owner, entries]) => ({
-			owner,
-			seed: { version: 1, scopeKey: owner.scopeKey, entries },
-		}));
+		return serializeScopeRead(root, read);
 	}
 
 	beginAdoption(seed: ScopeSeed): AdoptionFrame {
@@ -606,58 +470,7 @@ export class ScopeImpl implements Scope, GraphOwner {
 	}
 
 	trace(type: SignalTraceEvent['type'], node?: ScopedNode): void {
-		if (!this.traceLimit) return;
-		const event: SignalTraceEvent = {
-			sequence: ++this.sequence,
-			type,
-			...(node ? { key: node.key, revision: node.revision } : {}),
-		};
-		const events = (this.events ??= []);
-		if (events.length === this.traceLimit) {
-			events[(event.sequence - 1) % this.traceLimit] = event;
-		} else {
-			events.push(event);
-		}
-	}
-
-	inspect(): ScopeInspection {
-		const events = this.events ?? [];
-		const traceStart =
-			this.traceLimit && events.length === this.traceLimit ? this.sequence % this.traceLimit : 0;
-		return {
-			scopeKey: this.scopeKey,
-			epoch: this.epoch,
-			retired: this.retired,
-			activeRequests: this.requests
-				? [...this.requests.values()].filter((entry) => entry.active).length
-				: 0,
-			adoptionLeases: this.frames?.size ?? 0,
-			nodes: [...this.nodes.values()].map((node) => {
-				const dependencies: { scopeKey: string; key: string }[] = [];
-				let subscribers = 0;
-				for (let link = node.deps; link; link = link.nextDep) {
-					if (link.dep instanceof ScopedNode) {
-						dependencies.push({ scopeKey: link.dep.owner.scopeKey, key: link.dep.key });
-					}
-				}
-				for (let link = node.subs; link; link = link.nextSub) subscribers++;
-				return {
-					key: node.key,
-					kind: node.kind,
-					status: node.state?.snapshot.status ?? 'unevaluated',
-					revision: node.revision,
-					subscribers,
-					retained: node.hasLast,
-					refreshing: node.state?.snapshot.refreshing ?? false,
-					connection: node.state?.snapshot.connection ?? 'none',
-					complete: node.state?.snapshot.complete ?? false,
-					dependencies,
-				};
-			}),
-			trace: events.map((event, index) => ({
-				...(traceStart ? events[(traceStart + index) % events.length]! : event),
-			})),
-		};
+		if (this.traceLimit !== 0) recordScopeTrace!(this, type, node);
 	}
 
 	dispose(): void {
@@ -871,18 +684,277 @@ function readHistoricalNode(node: ScopedNode, read: SignalReadMode): NodeState |
 	return frame.read(node, read);
 }
 
+/** One node's seed entry, for serialization and native-read handoff. */
+function scopeSeedEntry(
+	scope: ScopeImpl,
+	node: ScopedNode,
+	read: SignalReadMode = 'value',
+): SignalSeedEntry | undefined {
+	const current = node.state?.snapshot;
+	if (
+		current?.status === 'error' &&
+		(current.error instanceof ScopeDisposedError ||
+			current.error instanceof SignalFrameError ||
+			isNativeAdoptionMiss(current.error))
+	) {
+		throw current.error;
+	}
+	const presented =
+		read === 'latest' && node.state?.snapshot.status !== 'ready' ? node.lastState : node.state;
+	// A producer's cancellation callback may serialize before graph teardown.
+	// Only still-live inputs may be copied into a new historical handoff.
+	if (presented?.owners) for (const owner of presented.owners) assertAlive(owner);
+	const snapshot = presented?.snapshot;
+	if (snapshot?.status !== 'ready') {
+		if (read !== 'latest') return undefined;
+		return {
+			key: node.key,
+			kind: node.kind,
+			read,
+			available: false,
+			value: ['undefined'],
+			complete: false,
+		};
+	}
+	const request = scope.resources?.get(node)?.seedRequest(read === 'latest');
+	if (node.kind === 'async' && !request) return undefined;
+	return {
+		key: node.key,
+		kind: node.kind,
+		...(read !== 'value' ? { read } : {}),
+		value: encodeSignalValue(snapshot.value),
+		complete: snapshot.complete,
+		refreshing: snapshot.refreshing,
+		connection: snapshot.connection,
+		...(request ? { request } : {}),
+	};
+}
+
+function serializeScope(scope: ScopeImpl): ScopeSeed {
+	assertAlive(scope);
+	if (!scope.seedable) throw new SignalSerializationError(formatClientError(140));
+	return untrack(() => {
+		const entries: SignalSeedEntry[] = [];
+		for (const node of scope.nodes.values()) {
+			refreshNode(node);
+			const entry = scopeSeedEntry(scope, node) ?? scopeSeedEntry(scope, node, 'latest');
+			if (entry) entries.push(entry);
+		}
+		return { version: 1, scopeKey: scope.scopeKey, entries };
+	});
+}
+
+/** Serialize an observed ready subgraph, without evaluating anything new. */
+function serializeScopeRead(
+	root: ScopedNode,
+	read: SignalReadMode,
+): readonly NativeSerializedScope[] | undefined {
+	const scope = root.owner as ScopeImpl;
+	if (!scope.seedable) return [];
+	const rootEntry = scopeSeedEntry(scope, root, read);
+	if (!rootEntry) return undefined;
+	const owners = new Map<ScopeImpl, SignalSeedEntry[]>();
+	const keys = new Map<string, ScopeImpl>();
+	const seen = new Set<ScopedNode>();
+	const pending = [root];
+	while (pending.length) {
+		const node = pending.pop()!;
+		if (seen.has(node)) continue;
+		seen.add(node);
+		const owner = node.owner as ScopeImpl;
+		assertAlive(owner);
+		if (!owner.seedable) continue;
+		const other = keys.get(owner.scopeKey);
+		if (other && other !== owner) {
+			throw new SignalFrameError(formatClientError(141));
+		}
+		keys.set(owner.scopeKey, owner);
+		const entry = node === root ? rootEntry : scopeSeedEntry(owner, node);
+		if (entry) {
+			let entries = owners.get(owner);
+			if (!entries) owners.set(owner, (entries = []));
+			entries.push(entry);
+		}
+		for (let link = node.deps; link; link = link.nextDep) {
+			if (link.dep instanceof ScopedNode) pending.push(link.dep);
+		}
+	}
+	return [...owners].map(([owner, entries]) => ({
+		owner,
+		seed: { version: 1, scopeKey: owner.scopeKey, entries },
+	}));
+}
+
+// Installed by createScope when a scope records a debug trace.
+let recordScopeTrace:
+	((scope: ScopeImpl, type: SignalTraceEvent['type'], node?: ScopedNode) => void) | null = null;
+
+function recordTrace(scope: ScopeImpl, type: SignalTraceEvent['type'], node?: ScopedNode): void {
+	const event: SignalTraceEvent = {
+		sequence: ++scope.sequence,
+		type,
+		...(node ? { key: node.key, revision: node.revision } : {}),
+	};
+	const events = (scope.events ??= []);
+	if (events.length === scope.traceLimit) {
+		events[(event.sequence - 1) % scope.traceLimit] = event;
+	} else {
+		events.push(event);
+	}
+}
+
+function inspectScope(scope: ScopeImpl): ScopeInspection {
+	const events = scope.events ?? [];
+	const traceStart =
+		scope.traceLimit && events.length === scope.traceLimit ? scope.sequence % scope.traceLimit : 0;
+	return {
+		scopeKey: scope.scopeKey,
+		epoch: scope.epoch,
+		retired: scope.retired,
+		activeRequests: scope.requests
+			? [...scope.requests.values()].filter((entry) => entry.active).length
+			: 0,
+		adoptionLeases: scope.frames?.size ?? 0,
+		nodes: [...scope.nodes.values()].map((node) => {
+			const dependencies: { scopeKey: string; key: string }[] = [];
+			let subscribers = 0;
+			for (let link = node.deps; link; link = link.nextDep) {
+				if (link.dep instanceof ScopedNode) {
+					dependencies.push({ scopeKey: link.dep.owner.scopeKey, key: link.dep.key });
+				}
+			}
+			for (let link = node.subs; link; link = link.nextSub) subscribers++;
+			return {
+				key: node.key,
+				kind: node.kind,
+				status: node.state?.snapshot.status ?? 'unevaluated',
+				revision: node.revision,
+				subscribers,
+				retained: node.hasLast,
+				refreshing: node.state?.snapshot.refreshing ?? false,
+				connection: node.state?.snapshot.connection ?? 'none',
+				complete: node.state?.snapshot.complete ?? false,
+				dependencies,
+			};
+		}),
+		trace: events.map((event, index) => ({
+			...(traceStart ? events[(traceStart + index) % events.length]! : event),
+		})),
+	};
+}
+
+function ownScopeNode<T>(scope: ScopeImpl, handle$: SignalHandle<T>): ScopedNode<T> {
+	assertAlive(scope);
+	if (!(handle$ instanceof ScopedNode) || handle$.owner !== scope) {
+		throw new TypeError(formatClientError(138));
+	}
+	return handle$;
+}
+
+let publicScope = false;
+
+/**
+ * @internal Every scope an application can hold exposes the whole Scope
+ * surface. The runtime's owner scopes for `signal$` and friends reach
+ * application code only through createScope's scopes, currentSignalOwner and
+ * the public installSignalOwnerEnvironment, which all call this first, so an
+ * application that uses none of them ships none of it. The methods go on the
+ * shared prototype, which keeps every scope one shape.
+ */
+export function installPublicScope(): void {
+	if (publicScope) return;
+	publicScope = true;
+	const prototype = ScopeImpl.prototype;
+	prototype.derived$ = function <T>(
+		this: ScopeImpl,
+		key: string,
+		compute: (() => T) & (T extends PromiseLike<unknown> ? never : unknown),
+	): DerivedSignal<T> {
+		if (typeof compute !== 'function') throw new TypeError(formatClientError(122));
+		const node = this.createNode<T>(key, 'derived');
+		node.compute = (target) => derivedState(target, compute);
+		this.initializeRetention(node);
+		// Live derived values always reflect live inputs, including edits made
+		// before this node was created. Only an adoption frame reads historical
+		// computed values from a seed.
+		this.consumeSeed(key);
+		return node as DerivedSignal<T>;
+	};
+	prototype.get = function <T>(this: ScopeImpl, handle$: SignalHandle<T>): T {
+		const node = ownScopeNode(this, handle$);
+		return strictValue(readNode(node), node.key);
+	};
+	prototype.set = function <T>(
+		this: ScopeImpl,
+		handle$: WritableSignal<T>,
+		value: T | ((previous: T) => T),
+	): void {
+		ownScopeNode(this, handle$).set(value);
+	};
+	prototype.isPending = function (this: ScopeImpl, read: () => unknown): boolean {
+		assertAlive(this);
+		try {
+			read();
+			return false;
+		} catch (error) {
+			if (isThenable(error)) return true;
+			throw error;
+		}
+	};
+	prototype.batch = function <T>(this: ScopeImpl, write: () => T): T {
+		assertAlive(this);
+		return signalBatch(write);
+	};
+	prototype.action = function <F extends (...args: any[]) => any>(this: ScopeImpl, write: F): F {
+		if (typeof write !== 'function') throw new TypeError(formatClientError(139));
+		const owner = this;
+		return function (this: unknown, ...args: Parameters<F>): ReturnType<F> {
+			return owner.batch(() => write.apply(this, args));
+		} as F;
+	};
+	prototype.serialize = function (this: ScopeImpl) {
+		return serializeScope(this);
+	};
+	prototype.inspect = function (this: ScopeImpl) {
+		return inspectScope(this);
+	};
+}
+
 export function createScope(options: ScopeOptions): Scope {
 	if (!options || typeof options !== 'object') throw new TypeError(formatClientError(147));
-	return new ScopeImpl(options.scopeKey, options);
+	installPublicScope();
+	const key = options.scopeKey;
+	requireKey(key, 'scopeKey');
+	const traceLimit = options.debug ? (options.debug.traceLimit ?? 256) : 0;
+	if (!Number.isInteger(traceLimit) || traceLimit < 0 || traceLimit > 10_000) {
+		throw new RangeError(formatClientError(131));
+	}
+	if (traceLimit !== 0) recordScopeTrace = recordTrace;
+	return new ScopeImpl(
+		key,
+		true,
+		options.seed ? decodeSeed(key, options.seed) : undefined,
+		traceLimit,
+	);
+}
+
+/** @internal A runtime-created owner scope. */
+export function createOwnerScope(scopeKey: string): OwnerScope {
+	return new ScopeImpl(scopeKey, true, undefined, 0);
+}
+
+/** @internal A runtime-created owner scope holding the initial response's seed. */
+export function createSeededOwnerScope(scopeKey: string, seed: ScopeSeed): OwnerScope {
+	return new ScopeImpl(scopeKey, true, decodeSeed(scopeKey, seed), 0);
 }
 
 /** Only the native hook adapter may create a component-owned, non-serializable scope. */
-export function createLocalScope(scopeKey: string): Scope {
-	return new ScopeImpl(scopeKey, { scopeKey }, false);
+export function createLocalScope(scopeKey: string): OwnerScope {
+	return new ScopeImpl(scopeKey, false, undefined, 0);
 }
 
 export function createDeclaredSignalCell<T>(
-	owner: Scope,
+	owner: OwnerScope,
 	key: string,
 	initial: T,
 	preferInitial = false,
@@ -894,7 +966,7 @@ export function createDeclaredSignalCell<T>(
 // The caller selects the implementation. Importing the owner must not retain
 // asynchronous attempt machinery for compiler-proven scalar declarations.
 export function createDerivedCellWith<T>(
-	owner: Scope,
+	owner: OwnerScope,
 	key: string,
 	compute: DerivedCompute<T>,
 	options: DerivedOptions | undefined,
@@ -929,7 +1001,7 @@ export function signalDeclarationSequence(site: string | undefined): number {
 // Resource callers supply their implementation statically. Ownership, initial
 // seeds and lifecycle support must not retain a query producer by themselves.
 export function createResourceCellWith<T>(
-	owner: Scope,
+	owner: OwnerScope,
 	key: string,
 	describe: () => QueryRequest<T> | typeof skip,
 	initialize: typeof initializeResource,
@@ -961,7 +1033,7 @@ export function adoptResourceValue<T>(
 }
 
 /** @internal Return the concrete owner for a proven runtime handle. */
-export function getSignalScope(handle$: SignalHandle<unknown>): Scope | undefined {
+export function getSignalScope(handle$: SignalHandle<unknown>): OwnerScope | undefined {
 	return handle$ instanceof ScopedNode && handle$.owner instanceof ScopeImpl
 		? handle$.owner
 		: undefined;
@@ -977,7 +1049,10 @@ export function getResourceSelectionAuthority(handle$: SignalHandle<unknown>): o
  * @internal Bind receiver-owned selection authority before result delivery.
  * This is the only ingress that creates a scope's stream capability.
  */
-export function bindScopeStreamedSelection(owner: Scope, identity: StreamFrameIdentity): boolean {
+export function bindScopeStreamedSelection(
+	owner: OwnerScope,
+	identity: StreamFrameIdentity,
+): boolean {
 	if (!(owner instanceof ScopeImpl)) return false;
 	assertAlive(owner);
 	const node = owner.nodes.get(identity.nodeKey);
@@ -986,7 +1061,10 @@ export function bindScopeStreamedSelection(owner: Scope, identity: StreamFrameId
 }
 
 /** @internal Publish a receiver-validated result into an exact current request. */
-export function acceptScopeStreamedResult(owner: Scope, frame: StreamedSignalResultFrame): boolean {
+export function acceptScopeStreamedResult(
+	owner: OwnerScope,
+	frame: StreamedSignalResultFrame,
+): boolean {
 	if (!(owner instanceof ScopeImpl)) return false;
 	assertAlive(owner);
 	// Without a bound selection there is no request this frame could belong to.
@@ -995,7 +1073,7 @@ export function acceptScopeStreamedResult(owner: Scope, frame: StreamedSignalRes
 
 /** @internal Fail one exact streamed attempt after receiver timeout or rejection. */
 export function failScopeStreamedResult(
-	owner: Scope,
+	owner: OwnerScope,
 	identity: StreamFrameIdentity,
 	error: Error,
 ): boolean {

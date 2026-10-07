@@ -953,6 +953,156 @@ export function mount(parent) { const root = createRoot(parent); root.render(Rea
 	}
 });
 
+// Owner scopes the runtime creates serve compiled declarations. Only a scope an
+// application creates exposes serialization, inspection and the imperative
+// read/write methods, so createScope alone installs them.
+test('compiled signal declarations omit the public Scope surface until createScope', async () => {
+	const directory = path.resolve('packages/octane');
+	const state = `import { signal$, derived$ } from 'octane/signals';
+export const count$ = signal$(1);
+export const double$ = derived$(() => count$.get() * 2);`;
+	const bundle = async (entry) => {
+		const result = await build({
+			stdin: { contents: entry, resolveDir: directory },
+			bundle: true,
+			write: false,
+			minify: true,
+			format: 'esm',
+			platform: 'browser',
+			target: 'es2022',
+			legalComments: 'none',
+			tsconfigRaw: { compilerOptions: {} },
+			define: { 'process.env.NODE_ENV': '"production"', __OCTANE_PROFILE_ENABLED__: 'false' },
+			plugins: [
+				{
+					name: 'tsrx-scope-state',
+					setup(plugin) {
+						plugin.onResolve({ filter: /^\.\/state\.tsrx$/ }, () => ({
+							path: 'state.tsrx',
+							namespace: 'tsrx-scope-state',
+						}));
+						plugin.onLoad({ filter: /.*/, namespace: 'tsrx-scope-state' }, () => ({
+							contents: compile(state, path.join(directory, 'state.tsrx'), {
+								mode: 'client',
+								dev: false,
+								hmr: false,
+							}).code,
+							loader: 'js',
+							resolveDir: directory,
+						}));
+					},
+				},
+			],
+		});
+		const text = result.outputFiles[0].text;
+		return {
+			text,
+			api: await import('data:text/javascript;base64,' + Buffer.from(text).toString('base64')),
+		};
+	};
+	const owned = `import { count$, double$ } from './state.tsrx';
+import { runWithSignalOwner, retireSignalOwnerIdentity } from 'octane/signals';
+export function exercise() {
+  const owner = { scopeKey: 'owner-scope-surface' };
+  const read = (callback) => runWithSignalOwner(owner, callback);
+  try {
+    const initial = read(() => double$.get());
+    read(() => count$.set(4));
+    return [initial, read(() => double$.get())];
+  } finally { retireSignalOwnerIdentity(owner); }
+}`;
+	// Inspection field names survive minification, so their absence shows the
+	// public-only implementations were not retained.
+	const publicSurface = /adoptionLeases|activeRequests/;
+
+	const ownerOnly = await bundle(owned);
+	assert.deepEqual(ownerOnly.api.exercise(), [2, 8]);
+	assert.doesNotMatch(
+		ownerOnly.text,
+		publicSurface,
+		'A program without createScope retained the public Scope surface.',
+	);
+
+	// Runtime-created owners reach application code through currentSignalOwner
+	// and the public owner carrier. Each route, in its own program without
+	// createScope, still hands out the whole Scope.
+	const current =
+		await bundle(`import { currentSignalOwner, derived$, runWithSignalOwner } from 'octane/signals';
+export function probe() {
+  const owner = { scopeKey: 'probe' };
+  const selected$ = derived$(() => {
+    const active = currentSignalOwner();
+    return active && 'signal$' in active ? active.inspect().scopeKey : active?.scopeKey;
+  }, { key: 'selection' });
+  return runWithSignalOwner(owner, () => selected$.get());
+}`);
+	assert.equal(current.api.probe(), 'probe');
+	const carried =
+		await bundle(`import { derived$, installSignalOwnerEnvironment, runWithSignalOwner } from 'octane/signals';
+export function probe() {
+  const seen = [];
+  let active = null;
+  const enter = (owner, callback) => {
+    const previous = active;
+    active = owner;
+    try { return callback(); } finally { active = previous; }
+  };
+  const restore = installSignalOwnerEnvironment({
+    current: () => active,
+    run(owner, callback) {
+      if ('signal$' in owner) seen.push(owner.inspect().scopeKey);
+      return enter(owner, callback);
+    },
+    capture: (owner) => (callback) => enter(owner, callback),
+  });
+  try {
+    const value$ = derived$(() => 1, { key: 'carried-value' });
+    runWithSignalOwner({ scopeKey: 'carried' }, () => value$.get());
+    return seen;
+  } finally { restore(); }
+}`);
+	assert.deepEqual(carried.api.probe(), ['carried']);
+
+	// Control: one createScope call installs the whole surface, and the owner
+	// scopes the runtime creates keep working before and after it does.
+	const withScope = await bundle(`${owned}
+import { createScope } from 'octane/signals';
+export function publicScope() {
+  const scope = createScope({ scopeKey: 'public-scope-surface', debug: { traceLimit: 4 } });
+  try {
+    const value$ = scope.signal$('value', 2);
+    const doubled$ = scope.derived$('doubled', () => scope.get(value$) * 2);
+    scope.action(() => scope.set(value$, (value) => value + 1))();
+    scope.batch(() => scope.set(value$, (value) => value + 1));
+    return {
+      doubled: scope.get(doubled$),
+      pending: scope.isPending(() => scope.get(doubled$)),
+      seed: scope.serialize(),
+      inspection: scope.inspect(),
+    };
+  } finally { scope.dispose(); }
+}`);
+	assert.match(withScope.text, publicSurface);
+	assert.deepEqual(withScope.api.exercise(), [2, 8]);
+	const result = withScope.api.publicScope();
+	assert.equal(result.doubled, 8);
+	assert.equal(result.pending, false);
+	assert.equal(result.seed.scopeKey, 'public-scope-surface');
+	assert.deepEqual(
+		result.seed.entries.map((entry) => entry.key),
+		['value', 'doubled'],
+	);
+	assert.deepEqual(
+		result.inspection.nodes.map((node) => [node.key, node.status]),
+		[
+			['value', 'ready'],
+			['doubled', 'ready'],
+		],
+	);
+	assert.ok(result.inspection.trace.length > 0 && result.inspection.trace.length <= 4);
+	assert.deepEqual(withScope.api.exercise(), [2, 8]);
+});
+
 test('compiled structural adoption costs only its selected implementation', async (t) => {
 	const directory = import.meta.dirname;
 	const filename = path.join(directory, 'structural-boundary.tsrx');
