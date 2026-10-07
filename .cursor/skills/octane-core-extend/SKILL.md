@@ -20,7 +20,8 @@ Before editing, write down:
 
 - the consumer-observable contract and invariants;
 - affected execution modes (dev/prod, client/server, render/hydrate, error/abort);
-- hot paths and expected call frequency;
+- hot paths and expected call frequency: per render, node, item, event, signal
+  notification, or request, versus once per root or module;
 - a credible failing behavioral test for a bug, or a relevant benchmark baseline
   for an optimization.
 
@@ -55,6 +56,37 @@ sets the observation boundary and the harness to use.
 Exact render counts, allocation identity, and codegen size are optimization
 claims, so they belong in the benchmark ratio system with semantic controls
 rather than in a correctness test.
+
+## Hot-path rules
+
+The full rules, with the runtime code that already follows each one, are in
+`performance-audit`'s references: [V8 shapes](../performance-audit/references/v8-shapes.md),
+[DOM work](../performance-audit/references/dom-work.md), and
+[scheduling](../performance-audit/references/scheduling.md). The ones core
+changes break most often:
+
+- **Block and Scope shape.** A new field on `BlockImpl`, `ScopeImpl`, or
+  `LiteBlockImpl` is a `declare` field, initialized unconditionally in the
+  constructor with `null`, `undefined`, or `0` when it is feature-only. Never
+  write an undeclared field, even through `(block as any)`. Before #990, 13 such
+  writes forked the Block map until that PR declared and initialized their
+  fields. Per-call-site state goes in `scope.slots`,
+  not on the instance.
+- **Records.** Build hot records in one literal or constructor with every key,
+  in one order, across every allocation site. No `delete`, conditional spreads,
+  or per-instance `Object.freeze`. Keep numeric fields integral and arrays
+  packed.
+- **Reachability.** Never name a heavy function from a compiled hot path.
+  Optional features stay behind their driver or capability, and hydration-only
+  reads behind `hydrating` guards that fold.
+- **DOM.** The commit writes and does not read geometry. Measure in a batched
+  phase or after paint.
+- **Scheduling.** `scheduleRender` coalesces a synchronous burst into one
+  `queueMicrotask(flush)`. Do not add a render or commit per microtask hop,
+  value, item, or dispatch. Do not treat `await`, `queueMicrotask`, or
+  `requestAnimationFrame` as a yield, and do not add another ad-hoc task poster.
+  The microtask-batched contract in `docs/differences-from-react.md` §Scheduler
+  changes only through issue #1864's decisions, never in passing.
 
 ## Decide owner
 
@@ -105,7 +137,10 @@ API; the compile error is the documentation an agent reads first.
 - `pnpm typecheck` for API/compiler TS changes.
 - `pnpm test` for broad runtime/compiler changes when feasible.
 - The relevant benchmark suite before and after performance-sensitive changes,
-  using the same environment, warmup, iterations, and semantic controls.
+  using the same environment, warmup, iterations, and semantic controls. Run
+  only the owning suite locally; CI runs the wide ones.
+- The `perf-review` skill on the final diff (`node scripts/perf-review-scan.mjs`),
+  with every `must-fix` finding resolved and the report in the handoff.
 - `pnpm format:files <path...>` while iterating and
   `pnpm format:files:check <path...>` for a scoped check.
 
@@ -117,6 +152,11 @@ API; the compile error is the documentation an agent reads first.
 - Does it add React controlled-input behavior? If yes, likely intentional divergence violation.
 - Does keyed reconciliation preserve final DOM and survivor identity?
 - Are `tsrx` and `tsx/jsx` paths both considered?
+- Does it add a field, receiver map, or allocation to a per-render or per-node
+  path?
+- Can a burst of ready values, dispatches, or notifications now render or commit
+  once per microtask hop?
+- Does a hot or compiled path now reach code it did not reach before?
 
 ## Adversarial self-review
 
