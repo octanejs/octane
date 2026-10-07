@@ -39,12 +39,13 @@ import {
 	type DerivedOptions,
 	type DerivedSignal,
 	type OwnerBoundSignal,
+	type OwnerScope,
 	type Scope,
 	type SignalHandle,
 } from './types.js';
 
 export function createDeclaredDerivedCell<T>(
-	owner: Scope,
+	owner: OwnerScope,
 	key: string,
 	compute: DerivedCompute<T>,
 	options?: DerivedOptions,

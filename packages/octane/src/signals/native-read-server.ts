@@ -1,4 +1,6 @@
 import { createNativeReadCollector, type NativeReadWitness } from './native-read-collector.js';
+import { serializeScopeRead } from './engine.js';
+import { installNativeScopeSerializer } from './graph.js';
 import { setSignalDeclarationInvocation } from './read-protocol.js';
 import {
 	mergeNativeSeedReads,
@@ -30,6 +32,7 @@ export function createNativeServerReadDriver(
 	let passDepth = 0;
 	let base = 0;
 	let invocations = 0;
+	installNativeScopeSerializer(serializeScopeRead);
 	const collector = createNativeReadCollector((_owner, source, version) => {
 		const frame = frames[depth - 1];
 		if (frame === undefined) return;

@@ -80,7 +80,7 @@
     "brotli": 512
   },
   "server-render": {
-    "raw": 64064,
+    "raw": 64060,
     "gzip": 22063,
     "brotli": 20110
   },

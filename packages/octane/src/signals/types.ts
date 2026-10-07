@@ -219,8 +219,19 @@ export interface Scope {
 	dispose(): void;
 }
 
+/**
+ * @internal A scope the runtime creates. It lacks the members only
+ * createScope installs (installPublicScope), so internal code that reaches for
+ * one fails to typecheck instead of failing in applications that never call
+ * createScope.
+ */
+export type OwnerScope = Omit<
+	Scope,
+	'derived$' | 'get' | 'set' | 'isPending' | 'batch' | 'action' | 'serialize' | 'inspect'
+>;
+
 export interface OwnerBoundSignal<T> extends SignalHandle<T> {
-	readonly [SIGNAL_OWNER_RESOLVE]: (owner: Scope) => SignalHandle<T>;
+	readonly [SIGNAL_OWNER_RESOLVE]: (owner: OwnerScope) => SignalHandle<T>;
 }
 
 export interface SignalOwnerEnvironment {
