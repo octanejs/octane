@@ -445,9 +445,17 @@ export class ScopeImpl implements Scope, GraphOwner {
 		return node as Resource<T>;
 	}
 
-	// Hydration adopts server seeds into internal owner scopes too. The adoption
-	// state lives in hydration code that ships without signals, so it reaches
-	// this through the owner rather than importing the engine.
+	// Server native reads serialize, and hydration adopts, internal owner scopes
+	// too. Both reach these through the owner: their protocol modules load
+	// without signals, so importing the engine there would ship it, and run it
+	// on every server render, in applications that never create a signal.
+	serializeRead(
+		root: ScopedNode,
+		read: SignalReadMode,
+	): readonly NativeSerializedScope[] | undefined {
+		return serializeScopeRead(root, read);
+	}
+
 	beginAdoption(seed: ScopeSeed): AdoptionFrame {
 		assertAlive(this);
 		if (!this.seedable) throw new SignalFrameError(formatClientError(142));
@@ -695,11 +703,8 @@ function serializeScope(scope: ScopeImpl): ScopeSeed {
 	});
 }
 
-/**
- * @internal Serialize an observed ready subgraph, without evaluating anything
- * new. The native-read collector installs it (installNativeScopeSerializer).
- */
-export function serializeScopeRead(
+/** Serialize an observed ready subgraph, without evaluating anything new. */
+function serializeScopeRead(
 	root: ScopedNode,
 	read: SignalReadMode,
 ): readonly NativeSerializedScope[] | undefined {

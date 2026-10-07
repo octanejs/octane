@@ -59,6 +59,10 @@ export interface GraphOwner {
 	/** Holds a writable or asynchronous derived cell that new render inputs cannot re-select. */
 	unkeyedState?: boolean;
 	beginAdoption(seed: ScopeSeed): AdoptionFrame;
+	serializeRead(
+		node: ScopedNode,
+		read: SignalReadMode,
+	): readonly NativeSerializedScope[] | undefined;
 	trace(type: SignalTraceEvent['type'], node?: ScopedNode): void;
 }
 
@@ -620,22 +624,6 @@ export function inspectNativeNode(node: ScopedNode, read: SignalReadMode): Nativ
 	};
 }
 
-// Serializing what a render read happens only on the server, so the native-read
-// collector installs it (installNativeScopeSerializer); a client never ships it.
-let nativeScopeSerializer:
-	| ((node: ScopedNode, read: SignalReadMode) => readonly NativeSerializedScope[] | undefined)
-	| null = null;
-
-/** @internal The server's native-read collector serializes observed subgraphs. */
-export function installNativeScopeSerializer(
-	serializer: (
-		node: ScopedNode,
-		read: SignalReadMode,
-	) => readonly NativeSerializedScope[] | undefined,
-): void {
-	nativeScopeSerializer = serializer;
-}
-
 function createNativeSource(node: ScopedNode, read: SignalReadMode): NativeReadSource {
 	const view = declarationViews?.get(node);
 	return view === undefined ? createGraphSource(node, read) : createViewSource(node, view, read);
@@ -649,7 +637,7 @@ function createGraphSource(node: ScopedNode, read: SignalReadMode): NativeReadSo
 			return attachObserver(node, notify, true);
 		},
 		serialize: (revision) =>
-			node.revision === revision ? nativeScopeSerializer!(node, read) : undefined,
+			node.revision === revision ? node.owner.serializeRead(node, read) : undefined,
 		inspect: () => inspectNativeNode(node, read),
 	};
 }
