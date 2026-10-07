@@ -118,3 +118,44 @@ export function DeferredControlledSignalHydration(
 		<ControlledSignalHydration scope={props.scope} value$={props.value$} length$={props.length$} />
 	</Hydrate>
 }
+
+interface AdoptedRenderProps {
+	render: (name: string) => void;
+}
+
+function AdoptedLeaf(props: AdoptedRenderProps) @{
+	props.render('leaf');
+	<i>{'leaf'}</i>
+}
+
+// A section-level reader: rendering it again renders its children again too.
+export function AdoptedSection(props: NativeHydrationState & AdoptedRenderProps) @{
+	const value = props.scope.get(props.value$);
+	props.render('section:' + value);
+	<section>
+		<output>{value}</output>
+		<AdoptedLeaf render={props.render} />
+	</section>
+}
+
+// Only a targeted binding reads the signal; the component body does not.
+export function AdoptedBinding(props: NativeHydrationState & AdoptedRenderProps) @{
+	props.render('binding');
+	<output>{props.value$}</output>
+}
+
+function AdoptedResourceReader(props: { resource$: Resource<string> } & AdoptedRenderProps) @{
+	const value = props.resource$.get();
+	props.render('resource:' + value);
+	<output>{value}</output>
+}
+
+export function AdoptedResource(props: { resource$: Resource<string> } & AdoptedRenderProps) @{
+	<section>
+		@try {
+			<AdoptedResourceReader resource$={props.resource$} render={props.render} />
+		} @pending {
+			<i class="pending">{'waiting'}</i>
+		}
+	</section>
+}

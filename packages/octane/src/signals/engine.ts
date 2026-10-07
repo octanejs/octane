@@ -8,6 +8,7 @@ import {
 	assertWritable,
 	derivedState,
 	endSignalBatch,
+	historicalBindingRead,
 	inspectNativeNode,
 	isThenable,
 	readNode,
@@ -18,6 +19,7 @@ import {
 	signalBatch,
 	startSignalBatch,
 	strictValue,
+	unchangedLiveRead,
 	untrack,
 	type GraphOwner,
 	type CandidateProducer,
@@ -32,6 +34,7 @@ import {
 	getNativeAdoptionResolver,
 	isNativeAdoptionMiss,
 	nativeAdoptionMiss,
+	nativeReadRebase,
 	registerNativeBatchHooks,
 	reportNativeRead,
 	type NativeReadSource,
@@ -685,10 +688,31 @@ export class ScopeImpl implements Scope, GraphOwner {
 	}
 }
 
+/** The seed a historical read channel presents. */
+function presentedSeed(
+	entries: ReadonlyMap<string, DecodedSeedEntry>,
+	key: string,
+	read: SignalReadMode,
+): DecodedSeedEntry | undefined {
+	return (
+		entries.get(seedKey(key, read)) ?? (read === 'value' ? undefined : entries.get(seedKey(key)))
+	);
+}
+
+/** One historical read channel, and the subscribers its release notifies. */
+interface HistoricalSource extends NativeReadSource {
+	/** The node read through this channel, or null once another node shared its key. */
+	node: ScopedNode | null;
+	readonly read: SignalReadMode;
+	/** A targeted binding's read, kept apart from the render's read of the same channel. */
+	readonly binding: boolean;
+	readonly subscribers: Set<() => void>;
+}
+
 class AdoptionFrameImpl implements AdoptionFrame {
 	private ended = false;
-	private readonly sources = new Map<string, NativeReadSource>();
-	private readonly subscribers = new Set<() => void>();
+	/** Keyed by read channel; a targeted binding's channel is prefixed with `~`. */
+	private readonly sources = new Map<string, HistoricalSource>();
 
 	constructor(readonly data: FrameData) {
 		data.references++;
@@ -732,9 +756,7 @@ class AdoptionFrameImpl implements AdoptionFrame {
 
 	read(node: ScopedNode, read: SignalReadMode): NodeState | undefined {
 		this.assertActive();
-		const seed =
-			this.data.entries.get(seedKey(node.key, read)) ??
-			(read === 'value' ? undefined : this.data.entries.get(seedKey(node.key)));
+		const seed = presentedSeed(this.data.entries, node.key, read);
 		// A resource seed holds the request the server resolved. When the client
 		// selects another one (its props or state differ from the server's), that
 		// history cannot present it. Hydration then reads the node live, exactly
@@ -751,23 +773,28 @@ class AdoptionFrameImpl implements AdoptionFrame {
 			if (getNativeAdoptionResolver()) return undefined;
 			throw new SignalFrameError(formatClientError(145, node.key));
 		}
-		const sourceKey = seedKey(node.key, read);
-		let source = this.sources.get(sourceKey);
+		const binding = historicalBindingRead;
+		const channel = (binding ? '~' : '') + seedKey(node.key, read);
+		let source = this.sources.get(channel);
 		if (!source) {
+			const subscribers = new Set<() => void>();
 			source = {
+				node,
+				read,
+				binding,
+				subscribers,
 				getVersion: () => (this.ended ? 1 : 0),
 				subscribe: (notify) => {
 					this.assertActive();
-					this.subscribers.add(notify);
-					return () => this.subscribers.delete(notify);
+					subscribers.add(notify);
+					return () => subscribers.delete(notify);
 				},
 				inspect: () => {
 					// Look up metadata on demand instead of capturing the seed payload
 					// in a source that a renderer may still hold after lease release.
 					const presented = this.ended
 						? undefined
-						: (this.data.entries.get(sourceKey) ??
-							(read === 'value' ? undefined : this.data.entries.get(seedKey(node.key))));
+						: presentedSeed(this.data.entries, node.key, read);
 					return {
 						...inspectNativeNode(node, read),
 						status: presented
@@ -785,8 +812,8 @@ class AdoptionFrameImpl implements AdoptionFrame {
 					};
 				},
 			};
-			this.sources.set(sourceKey, source);
-		}
+			this.sources.set(channel, source);
+		} else if (source.node !== node) source.node = null;
 		reportNativeRead(source, 0);
 		if (!seed || seed.entry.kind !== node.kind) {
 			if (getNativeAdoptionResolver()) throw nativeAdoptionMiss(this.scopeKey, node.key, read);
@@ -805,14 +832,29 @@ class AdoptionFrameImpl implements AdoptionFrame {
 	release(): void {
 		if (this.ended) return;
 		this.ended = true;
-		this.data.owner.frames?.delete(this);
-		this.sources.clear();
-		if (--this.data.references === 0) this.data.entries.clear();
+		const { owner, entries } = this.data;
+		owner.frames?.delete(this);
+		const rebase = nativeReadRebase;
 		// Release changes only presentation validity. Callbacks schedule through
-		// the existing native owner; they never mutate the historical data.
-		const callbacks = [...this.subscribers];
-		this.subscribers.clear();
-		for (const notify of callbacks) untrack(notify);
+		// the existing native owner; they never mutate the historical data. A
+		// renderer may instead move an unchanged read live (NativeReadRebase).
+		for (const source of this.sources.values()) {
+			const callbacks = [...source.subscribers];
+			source.subscribers.clear();
+			const { node, read } = source;
+			const seed = rebase && node ? presentedSeed(entries, node.key, read) : undefined;
+			const release =
+				node && seed?.entry.kind === node.kind && seed.entry.available !== false
+					? {
+							historical: source,
+							binding: source.binding,
+							successor: () => unchangedLiveRead(node, read, seedState(seed)),
+						}
+					: undefined;
+			for (const notify of callbacks) if (!release || !rebase?.(notify, release)) untrack(notify);
+		}
+		this.sources.clear();
+		if (--this.data.references === 0) entries.clear();
 	}
 }
 

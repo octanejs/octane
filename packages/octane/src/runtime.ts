@@ -219,7 +219,11 @@ import {
 } from './stream-protocol.js';
 import { isRendererContext, registerClientRendererBridge } from './renderer-bridge.js';
 import { defineRemovedContextMembers, registerContext } from './context-identity.js';
-import { createNativeReadDriver, type NativeReadDriver } from './signals/native-read-client.js';
+import {
+	createNativeReadDriver,
+	rebaseNativeRead,
+	type NativeReadDriver,
+} from './signals/native-read-client.js';
 import {
 	validateNativeReadWitness,
 	type NativeReadWitness,
@@ -247,6 +251,7 @@ import {
 	NATIVE_TRANSITION_CONSUMER,
 	readNativeDomStyle,
 	registerNativeActionResolver,
+	registerNativeReadRebase,
 	registerSignalDeclarationStage,
 	runNativeBatch,
 	setNativeCandidateResolver,
@@ -1869,6 +1874,8 @@ function ownNativeAdoption(
 		manifest,
 		scope.block.idState.renderOwner?.initialDocumentSignals,
 	);
+	// Release moves an unchanged committed read live instead of rendering again.
+	registerNativeReadRebase(rebaseNativeRead);
 	registerHookCleanup(scope, () => {
 		adoption.release();
 		if (!ROOT_RENDER_ROLLBACK || scope.block.idState.renderOwner?.disposed) consume?.();
@@ -1877,7 +1884,8 @@ function ownNativeAdoption(
 		if (discarded) adoption.release();
 		else {
 			// Keep historical reads alive through the accepted ref/layout callbacks.
-			// Release then schedules ordinary live reconciliation as the next render.
+			// Release then schedules ordinary live reconciliation as the next render
+			// for each reader whose live value differs from what it presented.
 			(NATIVE_ADOPTION_RELEASES ??= []).push(adoption);
 			consume?.();
 		}

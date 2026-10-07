@@ -8,6 +8,7 @@ import {
 import {
 	NATIVE_TRANSITION_CONSUMER,
 	setSignalDeclarationInvocation,
+	type NativeReadRelease,
 	type NativeReadSource,
 } from './read-protocol.js';
 import { inspectNativeReadWitness } from './native-read-inspection.js';
@@ -41,6 +42,10 @@ interface Consumer {
 	pending: Set<Candidate>;
 }
 
+/** Lets a release find the consumer behind a subscription (rebaseNativeRead). */
+const CONSUMER: unique symbol = Symbol();
+type ConsumerNotify = (() => void) & { [CONSUMER]?: Consumer };
+
 interface Candidate extends NativeReadWitness {
 	consumer: Consumer;
 	reads: Map<NativeReadSource, number>;
@@ -63,6 +68,49 @@ interface RenderFrame {
 }
 
 type CandidateSet = Map<Consumer, Candidate>;
+
+/**
+ * Hydration registers this as the NativeReadRebase. A consumer whose committed
+ * render alone holds a released historical read moves it to the unchanged live
+ * successor, as if the render had read it live, and is not rendered again. A
+ * pending attempt that shares the lease revalidates and renders instead.
+ */
+export function rebaseNativeRead(notify: () => void, release: NativeReadRelease): boolean {
+	const consumer = (notify as ConsumerNotify)[CONSUMER];
+	if (consumer === undefined) return false;
+	const { historical } = release;
+	const committed = consumer.committed;
+	const subscription = consumer.subscriptions.get(historical);
+	if (
+		committed === null ||
+		consumer.block.disposed ||
+		subscription?.leases !== 1 ||
+		!committed.reads.has(historical)
+	)
+		return false;
+	let successor: ReturnType<NativeReadRelease['successor']>;
+	try {
+		successor = release.successor();
+	} catch {
+		// The consumer's own render reports whatever this read now throws.
+		return false;
+	}
+	if (successor === undefined) return false;
+	const { live, version } = successor;
+	if (!release.binding && !committed.reads.has(live)) {
+		committed.reads.set(live, version);
+		let current = consumer.subscriptions.get(live);
+		if (current === undefined) {
+			current = { leases: 0, dispose: live.subscribe(consumer.notify) };
+			consumer.subscriptions.set(live, current);
+		}
+		current.leases++;
+	}
+	committed.reads.delete(historical);
+	consumer.subscriptions.delete(historical);
+	subscription.dispose();
+	return true;
+}
 
 interface PublicationOwner {
 	generation: number;
@@ -149,6 +197,7 @@ export function createNativeReadDriver(host: NativeReadHost) {
 			};
 			consumers.set(scope, consumer);
 			const owned = consumer;
+			(owned.notify as ConsumerNotify)[CONSUMER] = owned;
 			if (host.prepare !== undefined) {
 				Object.assign(owned.notify, {
 					[NATIVE_TRANSITION_CONSUMER]: {
