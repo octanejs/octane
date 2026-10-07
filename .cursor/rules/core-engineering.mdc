@@ -31,6 +31,13 @@ not cleanup work for a later change.
 - Keep common paths direct. Avoid new allocations, closures, object-shape
   changes, polymorphic calls, scans, DOM reads/writes, serialization work, or
   scheduling hops per component/render/node unless measurement justifies them.
+- Hot classes (`BlockImpl`, `ScopeImpl`, `LiteBlockImpl`) declare every field
+  type-only and assign it unconditionally in the constructor. Nothing adds a
+  field after allocation, including through a cast. Hot literals keep one key
+  set and order across sites, with no `delete` or conditional spread.
+- A microtask, `await`, or animation frame is not a yield. Do not add a render
+  or commit per microtask hop. Coalesce first, then post a task through an
+  existing poster. The scheduling contract changes only through issue #1864.
 - Push rare behavior to cold branches and pay for optional features only when
   used. Do not penalize every component to simplify an uncommon case.
 - Consider the whole cost transfer: compiler time, generated code, parse and
@@ -44,6 +51,9 @@ not cleanup work for a later change.
 - Never claim a performance improvement without measurements. If representative
   measurement is impractical, say so, avoid the claim, and document the
   remaining performance risk.
+- Run the `perf-review` skill on the final diff. The rules it checks, and the
+  runtime code that follows them, are in the `performance-audit` skill's
+  references.
 
 ## Implement the smallest durable design
 
@@ -112,5 +122,6 @@ questions remain unreported.
 - Baseline and candidate benchmark commands/results for performance-sensitive
   changes, or an explicit explanation of why no trustworthy measurement exists.
 - Self-review findings that materially changed the implementation.
+- The `perf-review` report, with every `must-fix` finding resolved.
 - Residual risks, untested modes, and follow-up work. “All tests pass” is not a
   substitute for this evidence.

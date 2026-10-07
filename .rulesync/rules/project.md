@@ -39,6 +39,7 @@ trigger first arises, even if it is a later step you chose:
 - `octane-core-extend`: before editing `packages/octane/src`.
 - `performance-audit`: a change that can move render, SSR, hydration, compiler
   output, or bundle cost.
+- `perf-review`: a PR touching runtime, compiler output, or binding hot paths.
 - `update-bindings`: audit, maintain, or reduce existing bindings.
 - `octane-react-library-port`: new ports or copied React code.
 - `react-library-port`: legacy router.
@@ -140,8 +141,7 @@ pnpm format:check                  # optional repo-wide gate
 
 Before any push, run `pnpm sync` and commit its generated changes.
 
-Scoped typecheck and Prettier commands default to staged and unstaged Git diffs;
-explicit files or directories override that default. `format:files` writes and
+Explicit paths override the staged/unstaged default. `format:files` writes;
 `format:files:check` is read-only. Use repo-wide checks only when needed.
 
 `pnpm test` runs package prechecks, then one root Vitest invocation for every

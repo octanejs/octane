@@ -100,6 +100,8 @@ describe('classifyCiChange', () => {
 					'scripts/file-selection.mjs',
 					'scripts/format-files.mjs',
 					'scripts/format-files.test.mjs',
+					'scripts/perf-review-scan.mjs',
+					'scripts/perf-review-scan.test.mjs',
 					'scripts/typecheck-files.mjs',
 					'scripts/typecheck-files.test.mjs',
 				],

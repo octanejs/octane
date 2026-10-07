@@ -2,8 +2,9 @@
 name: performance-audit
 description: >-
   Audit or defend Octane performance. Use when a change can affect per-render,
-  per-node, compiler-output, SSR, hydration, or bundle cost, or when asked
-  whether something is fast enough.
+  per-node, scheduling, compiler-output, SSR, hydration, or bundle cost, or when
+  asked whether something is fast enough. Holds the V8-shape, DOM, and
+  scheduling rules hot-path code must follow.
 ---
 # Skill: Octane performance audit
 
@@ -14,6 +15,36 @@ Use this to investigate performance regressions, benchmark results, scheduler/re
 - Benchmark README in the affected `benchmarks/*` directory
 - `packages/octane/src/runtime.ts` comments for runtime-level changes
 - Existing benchmark scripts in `benchmarks/*/package.json` and `run.mjs`
+- The discipline reference for each dimension the change touches:
+  [V8 shapes and allocation](references/v8-shapes.md),
+  [DOM work](references/dom-work.md), and
+  [scheduling](references/scheduling.md)
+
+## Hot-path discipline
+
+These rules apply to code that runs per render, node, item, event, signal
+notification, or server request. Each reference cites the runtime code that
+already follows the rule.
+
+- **Shapes:** allocate hot records from one constructor or one literal site with
+  every field present, in a fixed order, as `BlockImpl` and the `bagN` factories
+  do. No `delete`, conditional keys, runtime class fields on hot classes, or
+  per-instance freezing. Keep call sites and return shapes monomorphic, numeric
+  fields integral, and arrays packed. Do not allocate closures, literals, rest
+  arrays, or iterators per item.
+- **Reachability:** never name a heavy function from a hot compiled path. Put
+  feature-only code behind the capability or driver that owns it.
+- **DOM:** read geometry before writing, never in the render walk, and never
+  interleaved with writes in a loop. Insert built subtrees once. Keep events
+  native and delegated. Write from resize callbacks only through
+  `createResizeObserver`.
+- **Scheduling:** a microtask, `await` of a settled value, or
+  `requestAnimationFrame` is not a yield. Do not add a render or commit per
+  microtask hop. Coalesce first, then yield by posting a task through an existing
+  poster. Leave the documented scheduler contract to issue #1864.
+
+Run the `perf-review` skill on the diff before handoff. It applies these rules
+to the change and lists the evidence each finding needs.
 
 ## Workflow
 
@@ -25,7 +56,15 @@ Use this to investigate performance regressions, benchmark results, scheduler/re
      proves both candidates perform the same work.
 
 2. **Choose harness**
-   - Existing benchmarks: `benchmarks/news`, `js-framework`, `recursive-context`, `signal-favoring`, `dbmon`.
+   - Existing benchmarks: `node benchmarks/bench.mjs --list` names every suite.
+     Common ones are `js-framework`, `dbmon`, `news`, `recursive-context`,
+     `signal-favoring`, and `todomvc`.
+   - Object shapes: `benchmarks/runtime-object-shapes` gates one map per record
+     family with `%HaveSameMap`. Tier and deopt traces:
+     `benchmarks/client-hot-paths/functions.mjs`.
+   - Scheduling: `scheduler-responsiveness`, `passive-scheduling`,
+     `effect-scheduling`, and the marker-task commit count in
+     [scheduling](references/scheduling.md).
    - Micro regression: focused Vitest with counters/logging.
    - Compiler output: inspect emitted JS from `compile.js`/Vite transform.
    - Browser-only perf: use Playwright or benchmark harness if available.
@@ -81,6 +120,24 @@ Use this to investigate performance regressions, benchmark results, scheduler/re
 - When a change saves bytes, lower the budget in the same pull request with
   `--write-budgets` for the scenarios it improved, and report the delta.
 
+## Evidence required for hot-path changes
+
+| Change | Evidence |
+| --- | --- |
+| Any runtime, compiler-output, or binding hot path | The pull request benchmark report (`.github/workflows/pr-bench.yml`): bytes against committed budgets, and js-framework production calls and DOM mutations per operation, where any increase fails. |
+| Bundle bytes | `node benchmarks/bundle-size/run-minimal.mjs --budgets <scenario>` and `run.mjs --budgets octane-tsrx octane-jsx` while iterating. CI's report rows are authoritative: brotli, and occasionally gzip or raw for path-dependent scenarios, can differ locally. |
+| A hot record's shape | `%HaveSameMap` across every construction mode, as `benchmarks/runtime-object-shapes` does, and `perf-review-scan` clean. |
+| Allocation or tiering | A scratch harness on the production bundle: pinned semi-space for bytes per call, `%GetOptimizationStatus` and `--trace-deopt` for tiers. |
+| Scheduling, commits, or effect timing | The marker-task commit count from [scheduling](references/scheduling.md), plus the relevant scheduling suite. |
+| User-visible latency claims | Event Timing in Chromium, maximum duration per `interactionId`, against React on the same app. Long-task entries are not evidence. |
+| Optimization claims in general | `node benchmarks/bench.mjs <suite> --ratios` for the suite that owns the scenario. |
+
+Run locally only the suite or scratch probe that owns the scenario, one suite at
+a time (`--quick` while iterating). Leave wide runs to CI: the full `pnpm test`,
+the full benchmark sweep, and end-to-end or browser suites. Parallel agent
+sessions share one machine, and a wide local run makes every timing on it
+noise.
+
 ## Report template
 
 ```md
@@ -92,6 +149,7 @@ Use this to investigate performance regressions, benchmark results, scheduler/re
 
 ## Findings
 - ...
+- `perf-review` result: ...
 
 ## Recommendation
 - ...
@@ -108,6 +166,10 @@ Use this to investigate performance regressions, benchmark results, scheduler/re
 ## Common pitfalls
 
 - jsdom is poor for layout/paint measurements.
+- A microtask-level change can look free in a benchmark that awaits each
+  operation, and still add a commit per hop under a burst. Count commits before
+  a marker task.
+- V8 trace flags piped to a busy parent lose records. Write traces to a file.
 - Differential `innerHTML` tests prove correctness, not performance.
 - React and Octane may perform different physical DOM move sets while producing identical final DOM.
 - Compiler output changes can shift runtime cost; inspect both layers.
