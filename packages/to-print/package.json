@@ -1,6 +1,6 @@
 {
   "name": "@octanejs/to-print",
-  "version": "0.0.17",
+  "version": "0.0.18",
   "description": "Octane binding for react-to-print 3.3.0.",
   "license": "MIT",
   "type": "module",
@@ -44,7 +44,7 @@
     "typecheck": "octane-tsc -p tsconfig.json"
   },
   "peerDependencies": {
-    "octane": "workspace:^0.10.0"
+    "octane": "workspace:^0.11.0"
   },
   "devDependencies": {
     "@octanejs/testing-library": "workspace:*",
