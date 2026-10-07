@@ -898,6 +898,11 @@ jobs:
       - name: Validate CI workflow behavior
         run: pnpm ci:workflow:test
 
+      # Skill-only changes can skip the main test shards. Keep MCP's catalog
+      # checks here so a new or removed skill cannot leave its registry stale.
+      - name: Validate MCP skill catalogs
+        run: pnpm exec vitest run --project octane-mcp-server packages/octane-mcp-server/src/index.test.js
+
       # A raised byte budget lands in its own pull request with the bytes and
       # the reason (CONTRIBUTING.md, "Size budgets"). A pull request is compared
       # with its merge commit's first parent, a push with the previous commit.

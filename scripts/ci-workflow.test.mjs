@@ -379,6 +379,10 @@ describe('CI workflow aggregation', () => {
 
 		assert.doesNotMatch(jobSource('lint_checks'), /outputs\.full_ci/);
 		assert.match(jobSource('lint_checks'), /run: pnpm ci:workflow:test/);
+		assert.match(
+			jobSource('lint_checks'),
+			/- name: Validate MCP skill catalogs\n\s+run: pnpm exec vitest run --project octane-mcp-server packages\/octane-mcp-server\/src\/index\.test\.js\n/,
+		);
 		assert.match(jobSource('lint'), /LINT_CHECKS_RESULT/);
 		assert.match(jobSource('typecheck'), /TYPECHECK_CHECKS_RESULT/);
 		assert.match(jobSource('test'), /\[ "\$FULL_CI" = false \]/);
