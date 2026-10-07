@@ -72,6 +72,13 @@ import {
  *     typecheck (TS1147 in-block import, TS2307 boundary import). The
  *     runtime compiler (`compile.js`) owns the dialect's real semantics
  *     (isolation validation, SSR namespace, RPC stubs) and is unaffected.
+ *   - `hooks.canHoistStaticNode` declines every hoist. The shared transform
+ *     moves a fully static element to a module-level `const` for React's
+ *     element-identity fast path. Virtual TSX never runs, so the hoist buys
+ *     nothing and checks the element outside the scope it was written in: a
+ *     named function expression's own name resolves to an outer binding or
+ *     to nothing, `@if` narrowing is lost, and a template nested in a plain
+ *     function references a `const` that is never emitted.
  *
  * `imports.suspense` and `imports.fragment` aren't real components in
  * octane (we lower `@try`/`@pending` to `tryBlock` and fragments to
@@ -105,6 +112,9 @@ const OCTANE_PLATFORM = {
 	serverModule: {
 		blockName: 'server',
 		importSpecifier: 'server',
+	},
+	hooks: {
+		canHoistStaticNode: () => false,
 	},
 };
 
@@ -333,6 +343,7 @@ function projectServerContextCalls(ast, filename) {
 const octaneTransformWithAuthoredSuspense = createJsxTransform({
 	...OCTANE_PLATFORM,
 	hooks: {
+		...OCTANE_PLATFORM.hooks,
 		createPendingBoundary(_content, _fallback, context) {
 			// Reuse the authored value binding without replacing its mapped import.
 			// Returning null keeps the shared boundary lowering; only its redundant
@@ -657,9 +668,9 @@ const DIRECTIVE_KEYWORDS = {
 const DIRECTIVE_GENERATED_NAMES = {
 	JSXForExpression: ['__map_iterable', '__map_iterable_async'],
 	JSXSwitchExpression: ['switch'],
-	// `@if` becomes a ternary whose arms are hoisted statics with generated
-	// names, so there is no stable text to match — but the transform anchors
-	// exactly one token on the keyword, so the offset alone identifies it.
+	// `@if` becomes a ternary over its arms' own JSX, so there is no stable
+	// text to match — but the transform anchors exactly one token on the
+	// keyword, so the offset alone identifies it.
 	JSXIfExpression: null,
 	// `@try` names the OUTERMOST boundary it produced: the `<Suspense>` when a
 	// `@pending` clause is present, the error boundary otherwise. Only one of
