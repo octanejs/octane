@@ -23,7 +23,6 @@ import { existsSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-const ROOT = fileURLToPath(new URL('../', import.meta.url));
 const RUNTIME = 'packages/octane/src/runtime.ts';
 const HOT_CLASSES = ['BlockImpl', 'ScopeImpl', 'LiteBlockImpl'];
 const CONTEXT_LINES = 25;
@@ -472,14 +471,21 @@ export function checkHotClasses(source, classes = HOT_CLASSES, file = RUNTIME) {
 	return findings;
 }
 
-function git(args) {
-	return execFileSync('git', args, { cwd: ROOT, encoding: 'utf8', maxBuffer: 256 * 1024 * 1024 });
+let ROOT;
+/** The checkout the command runs in, so the scan works from any subdirectory. */
+function root() {
+	return (ROOT ??= git(['rev-parse', '--show-toplevel'], process.cwd()).trim());
 }
 
-function resolveBase(ref) {
+function git(args, cwd = root()) {
+	return execFileSync('git', args, { cwd, encoding: 'utf8', maxBuffer: 256 * 1024 * 1024 });
+}
+
+/** Where `target` forked from `ref`, or from main when no ref is given. */
+function resolveBase(ref, target = 'HEAD') {
 	for (const candidate of [ref, 'origin/main', 'main'].filter(Boolean)) {
 		try {
-			return git(['merge-base', 'HEAD', candidate]).trim();
+			return git(['merge-base', target, candidate]).trim();
 		} catch {}
 	}
 	throw new Error('Could not resolve a base; pass --base <ref> or --diff <file>.');
@@ -502,7 +508,7 @@ function readOptions(argv) {
 function collect(options) {
 	if (options.diff !== undefined) {
 		const text = readFileSync(options.diff === '-' ? 0 : options.diff, 'utf8');
-		const runtime = path.join(ROOT, RUNTIME);
+		const runtime = path.join(root(), RUNTIME);
 		// The local checkout stands in for the diff's runtime.ts, so its shape is
 		// only an approximation of the reviewed head's.
 		return {
@@ -513,7 +519,7 @@ function collect(options) {
 	}
 	const unified = `--unified=${CONTEXT_LINES}`;
 	if (options.head !== undefined) {
-		const base = git(['merge-base', options.base ?? resolveBase(), options.head]).trim();
+		const base = resolveBase(options.base, options.head);
 		return {
 			text: git([
 				'diff',
@@ -536,10 +542,10 @@ function collect(options) {
 		'\n',
 	)) {
 		if (!file || !isScannedFile(file, options.only)) continue;
-		const lines = readFileSync(path.join(ROOT, file), 'utf8').split('\n');
+		const lines = readFileSync(path.join(root(), file), 'utf8').split('\n');
 		text += `\n+++ b/${file}\n@@ -0,0 +1,${lines.length} @@\n${lines.map((l) => '+' + l).join('\n')}\n`;
 	}
-	return { text, exact: true, runtime: () => readFileSync(path.join(ROOT, RUNTIME), 'utf8') };
+	return { text, exact: true, runtime: () => readFileSync(path.join(root(), RUNTIME), 'utf8') };
 }
 
 /** Fields a diff declares in runtime.ts, which a stand-in checkout may not have yet. */

@@ -1,8 +1,10 @@
 import assert from 'node:assert/strict';
-import { mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
+import { execFileSync } from 'node:child_process';
+import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
+import { fileURLToPath } from 'node:url';
 import {
 	checkHotClasses,
 	codeOnly,
@@ -297,5 +299,43 @@ test('a pasted PR diff may declare hot fields the local checkout does not have y
 	assert.deepEqual(
 		run(['--diff', file]).map((f) => [f.line, f.rule, f.message.split('`')[1]]),
 		[[12, 'hot-field-write', 'block.otherUndeclared']],
+	);
+});
+
+test('--head diffs a branch from where it forked, whatever the checkout is', () => {
+	const repo = mkdtempSync(path.join(tmpdir(), 'perf-review-head-'));
+	const git = (...args) =>
+		execFileSync('git', ['-c', 'user.name=t', '-c', 'user.email=t@t', ...args], {
+			cwd: repo,
+			encoding: 'utf8',
+		});
+	const commit = (file, text, message) => {
+		mkdirSync(path.dirname(path.join(repo, file)), { recursive: true });
+		writeFileSync(path.join(repo, file), text);
+		git('add', '-A');
+		git('commit', '-q', '-m', message);
+	};
+	git('init', '-q', '-b', 'main');
+	commit('packages/octane/src/runtime.ts', 'export {};\n', 'base');
+	git('branch', 'old');
+	// Main moves on after `old` forked; this commit is not part of `feature`'s change.
+	commit('packages/octane/src/main-only.ts', 'delete record.key;\n', 'main');
+	git('checkout', '-q', '-b', 'feature');
+	commit('packages/octane/src/feature.ts', 'queueMicrotask(next);\n', 'feature');
+	git('checkout', '-q', 'old');
+
+	const output = execFileSync(
+		process.execPath,
+		[
+			fileURLToPath(new URL('./perf-review-scan.mjs', import.meta.url)),
+			'--head',
+			'feature',
+			'--json',
+		],
+		{ cwd: path.join(repo, 'packages'), encoding: 'utf8' },
+	);
+	assert.deepEqual(
+		JSON.parse(output).map((f) => [f.file, f.rule]),
+		[['packages/octane/src/feature.ts', 'microtask-hop']],
 	);
 });
