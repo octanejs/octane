@@ -50,7 +50,7 @@ import {
 } from './slot-hooks.js';
 import { parseModule as parseAuthoredModule } from '#octane/compiler-parser';
 import { declaresStrongMode } from './strong-mode.js';
-import { rewriteServerRuntimeRequests } from './runtime-requests.js';
+import { lexStaticImportRequests, rewriteServerRuntimeRequests } from './runtime-requests.js';
 import { assertNativeReadOptions } from './native-read-diagnostics.js';
 import { findCssModuleImportRequests } from './css-module-imports.js';
 import {
@@ -267,6 +267,21 @@ function realPathOrSelf(dir) {
 
 function metadata(dependencies = [], missingDependencies = []) {
 	return { dependencies, missingDependencies };
+}
+
+const OCTANE_NO_SLOT = /\/\/\s*octane-no-slot\b/;
+
+function isPlainHelperSource(file) {
+	return (file.endsWith('.ts') || file.endsWith('.js')) && !file.endsWith('.d.ts');
+}
+
+function importsHookRuntime(code) {
+	return (
+		/from\s*['"]octane['"]/.test(code) ||
+		/from\s*['"]octane\/server['"]/.test(code) ||
+		/from\s*['"]octane\/signals\/(?:client|server)['"]/.test(code) ||
+		/from\s*['"]octane\/signals['"]/.test(code)
+	);
 }
 
 function addMetadata(target, source) {
@@ -873,6 +888,17 @@ class OctaneBundlerCompiler {
 		const cached = this.manifestRuleCache.get(dir);
 		if (cached !== undefined) return cached;
 
+		// Node's package scope lookup stops at a `node_modules` directory, so a
+		// file that reaches one without a manifest belongs to no package. That
+		// covers build caches such as `node_modules/.vite`, `.nitro`, and
+		// `.cache`, whose already-compiled output must not inherit the
+		// application manifest that installed them.
+		if (nodePath.basename(dir) === 'node_modules') {
+			const result = { rule: null, ...metadata() };
+			this.manifestRuleCache.set(dir, result);
+			return result;
+		}
+
 		const manifest = nodePath.join(dir, 'package.json');
 		let pkg = null;
 		try {
@@ -1277,7 +1303,49 @@ class OctaneBundlerCompiler {
 
 	/** Static requests adapters resolve before a server transform. */
 	findServerImportRequests(code, id) {
-		return findStaticRuntimeImportRequests(code, this._canonicalModuleId(id));
+		const filename = this._canonicalModuleId(id);
+		// Plain JavaScript spells every runtime request as module syntax, so the
+		// lexer reads them without a full parse. It can also report a Flow
+		// `import type`, which the client-only live-use check already skips.
+		if (typeof code === 'string' && /\.[cm]?js$/.test(filename)) {
+			const requests = lexStaticImportRequests(code, filename);
+			if (requests !== null) return requests;
+		}
+		return findStaticRuntimeImportRequests(code, filename);
+	}
+
+	/**
+	 * @internal How much of a module an adapter preflight must classify, decided
+	 * from its id, manifests, and text without parsing it. `'compile'`: Octane
+	 * may compile it, and compilation reads every authored fact. `'slots'`: a
+	 * plain module that may be hook-slotted, which reads only its void-component
+	 * imports. `'none'`: `transform` passes it through without reading any of
+	 * them. Server client-only classification and a virtual barrel's descriptor
+	 * re-exports apply to every module whatever its scope.
+	 */
+	_preflightScope(code, id) {
+		const file = cleanModuleId(id);
+		const collected = { dependencies: new Set(), missingDependencies: new Set() };
+		if (this._isFullCompileSource(file, collected)) return 'compile';
+		return isPlainHelperSource(file) && this._mayHookSlot(code, file, collected) ? 'slots' : 'none';
+	}
+
+	/**
+	 * The parse-free gates in front of plain `.ts`/`.js` hook slotting, in the
+	 * order `transform` applies them. A module failing one always passes
+	 * through; one passing them all can still be declined by the ownership,
+	 * manual-slot, and pragma checks that follow.
+	 */
+	_mayHookSlot(code, file, collected) {
+		return (
+			!OCTANE_NO_SLOT.test(code) &&
+			!this.exclude.some((path) => file.includes(path)) &&
+			// Manual factories can import only other binding helpers, so their
+			// escaping hooks still need a provider boundary. Unrelated helpers keep
+			// their cheap pass-through without collecting unused manifest watches.
+			(importsHookRuntime(code) || /(?:\b|_)use[A-Z]/.test(code)) &&
+			this._isInstalledOctaneSource(file, collected)
+		);
 	}
 
 	/** @internal Classify descriptor exports from a read-only AST into a reusable receipt. */
@@ -1477,8 +1545,7 @@ class OctaneBundlerCompiler {
 				: [];
 
 		const renderer = resolveRendererForFile(this.renderers, filename);
-		const plainHelperSource =
-			(file.endsWith('.ts') || file.endsWith('.js')) && !file.endsWith('.d.ts');
+		const plainHelperSource = isPlainHelperSource(file);
 		// Ownership is checked only where it can matter: outside the
 		// requireDirective gate every eligible module already compiles, and a
 		// project `.tsrx` is Octane's by extension — so only project `.tsx`
@@ -1662,28 +1729,19 @@ class OctaneBundlerCompiler {
 		}
 
 		if (plainHelperSource) {
-			if (/\/\/\s*octane-no-slot\b/.test(code)) return passThrough();
-			if (this.exclude.some((path) => file.includes(path))) {
+			if (!this._mayHookSlot(code, file, collected)) {
 				// Same conflict diagnostic as the full-compile gate: an ownership
 				// pragma inside an excluded path must not fail silent.
-				if (this.requireDirective) {
+				if (
+					this.requireDirective &&
+					!OCTANE_NO_SLOT.test(code) &&
+					this.exclude.some((path) => file.includes(path))
+				) {
 					this._warnExcludedPragmaConflict(file, filename, pragmaOwned);
 				}
 				return passThrough();
 			}
-			const nativeHookImport = /from\s*['"]octane\/signals\/(?:client|server)['"]/.test(code);
-			const hasHookRuntimeImport =
-				/from\s*['"]octane['"]/.test(code) ||
-				/from\s*['"]octane\/server['"]/.test(code) ||
-				nativeHookImport ||
-				/from\s*['"]octane\/signals['"]/.test(code);
-			// Manual factories can import only other binding helpers, so their
-			// escaping hooks still need a provider boundary. Unrelated helpers keep
-			// their cheap pass-through without collecting unused manifest watches.
-			if (!hasHookRuntimeImport && !/(?:\b|_)use[A-Z]/.test(code)) return passThrough();
-			if (!this._isInstalledOctaneSource(file, collected)) {
-				return passThrough();
-			}
+			const hasHookRuntimeImport = importsHookRuntime(code);
 			// Hook slotting is an Octane-ownership rewrite, so the ownership
 			// gate applies to it exactly as to full compilation: an unmarked
 			// project module stays with the host pipeline (with the forgotten-
