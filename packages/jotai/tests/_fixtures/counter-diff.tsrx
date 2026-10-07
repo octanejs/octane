@@ -15,7 +15,11 @@ export function Counter() @{
 	<div>
 		<span id="count">{count as string}</span>
 		<span id="double">{double as string}</span>
-		<button id="inc" onClick={() => setCount((c) => c + 1)}>inc</button>
-		<button id="reset" onClick={() => set(0)}>reset</button>
+		<button id="inc" onClick={() => setCount((c) => c + 1)}>
+			inc
+		</button>
+		<button id="reset" onClick={() => set(0)}>
+			reset
+		</button>
 	</div>
 }

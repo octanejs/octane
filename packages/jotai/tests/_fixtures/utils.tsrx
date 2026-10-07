@@ -17,8 +17,12 @@ export function ResetApp(props: { count: any }) @{
 	const reset = useResetAtom(props.count);
 	<div>
 		<span id="resv">{'v=' + v}</span>
-		<button id="set5" onClick={() => setV(5)}>{'5'}</button>
-		<button id="reset" onClick={() => reset()}>{'r'}</button>
+		<button id="set5" onClick={() => setV(5)}>
+			{'5'}
+		</button>
+		<button id="reset" onClick={() => reset()}>
+			{'r'}
+		</button>
 	</div>
 }
 
@@ -32,8 +36,12 @@ export function CallbackApp(props: { count: any }) @{
 		return get(props.count);
 	});
 	<div>
-		<button id="read" onClick={() => callbackResults.push(readCount())}>{'read'}</button>
-		<button id="write" onClick={() => callbackResults.push(writeCount(123))}>{'write'}</button>
+		<button id="read" onClick={() => callbackResults.push(readCount())}>
+			{'read'}
+		</button>
+		<button id="write" onClick={() => callbackResults.push(writeCount(123))}>
+			{'write'}
+		</button>
 	</div>
 }
 
@@ -46,7 +54,9 @@ export function HydrateApp(props: { values: any; count: any; options?: any }) @{
 	const v = useAtomValue(props.count, props.options);
 	<div>
 		<span id="hy">{'v=' + v + ' n=' + n}</span>
-		<button id="rerender" onClick={() => setN(n + 1)}>{'r'}</button>
+		<button id="rerender" onClick={() => setN(n + 1)}>
+			{'r'}
+		</button>
 	</div>
 }
 
@@ -55,7 +65,9 @@ export function ReducerApp(props: { count: any; reducer: any }) @{
 	const [state, dispatch] = useReducerAtom(props.count, props.reducer);
 	<div>
 		<span id="rv">{'v=' + state}</span>
-		<button id="dispatch-inc" onClick={() => dispatch({ type: 'inc' })}>{'+'}</button>
+		<button id="dispatch-inc" onClick={() => dispatch({ type: 'inc' })}>
+			{'+'}
+		</button>
 	</div>
 }
 
@@ -64,7 +76,9 @@ export function WithReducerApp(props: { count: any }) @{
 	const [v, dispatch] = useAtom(props.count);
 	<div>
 		<span id="wrv">{'v=' + v}</span>
-		<button id="wr-inc" onClick={() => dispatch({ type: 'inc' })}>{'+'}</button>
+		<button id="wr-inc" onClick={() => dispatch({ type: 'inc' })}>
+			{'+'}
+		</button>
 	</div>
 }
 
@@ -83,13 +97,15 @@ export function SplitApp(props: { listAtom: any; itemAtomsAtom: any }) @{
 		</ul>
 		<button
 			id="add"
-			onClick={() => setList(
-				(prev: any[]) => [
+			onClick={() =>
+				setList((prev: any[]) => [
 					...prev,
 					{ id: prev.length + 1, text: 'item' + (prev.length + 1), done: false },
-				],
-			)}
-		>{'add'}</button>
+				])
+			}
+		>
+			{'add'}
+		</button>
 	</div>
 }
 
@@ -99,6 +115,8 @@ function SplitItem(props: { itemAtom: any; remove: any }) @{
 		<span id={'t-' + item.id} onClick={() => setItem({ ...item, done: !item.done })}>
 			{item.text + (item.done ? ':done' : '')}
 		</span>
-		<button id={'rm-' + item.id} onClick={props.remove}>{'x'}</button>
+		<button id={'rm-' + item.id} onClick={props.remove}>
+			{'x'}
+		</button>
 	</li>
 }

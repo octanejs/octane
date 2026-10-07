@@ -13,7 +13,9 @@ export function CharacterLimitEditor(props) @{
 	<LexicalComposer
 		initialConfig={{
 			editorState: () => {
-				$getRoot().clear().append($createParagraphNode().append($createTextNode(props.text)));
+				$getRoot()
+					.clear()
+					.append($createParagraphNode().append($createTextNode(props.text)));
 			},
 			namespace: 'character-limit',
 			nodes: [OverflowNode],

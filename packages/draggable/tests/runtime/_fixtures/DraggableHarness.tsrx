@@ -1,9 +1,11 @@
 import Draggable, { type DraggableProps } from '@octanejs/draggable';
 
-export function DraggableHarness(props: DraggableProps & {
-	nodeRef: { current: HTMLDivElement | null };
-	childMouseDown?: (event: MouseEvent) => void;
-}) @{
+export function DraggableHarness(
+	props: DraggableProps & {
+		nodeRef: { current: HTMLDivElement | null };
+		childMouseDown?: (event: MouseEvent) => void;
+	},
+) @{
 	<Draggable {...props}>
 		<div
 			ref={props.nodeRef}
@@ -17,9 +19,11 @@ export function DraggableHarness(props: DraggableProps & {
 	</Draggable>
 }
 
-export function SvgDraggableHarness(props: DraggableProps & {
-	nodeRef: { current: SVGSVGElement | null };
-}) @{
+export function SvgDraggableHarness(
+	props: DraggableProps & {
+		nodeRef: { current: SVGSVGElement | null };
+	},
+) @{
 	<Draggable {...props} nodeRef={props.nodeRef as unknown as { current: HTMLElement | null }}>
 		<svg ref={props.nodeRef} data-svg="yes" style={{ fill: 'red' }}>
 			<circle cx="2" cy="2" r="2" />
@@ -33,14 +37,18 @@ export function BareDraggableHarness(props: DraggableProps) @{
 	</Draggable>
 }
 
-export function ChildRefDraggableHarness(props: DraggableProps & {
-	nodeRef: { current: HTMLDivElement | null };
-	childRef: | { current: HTMLDivElement | null }
-	| ((value: HTMLDivElement | null) => void | (() => void))
-	| ReadonlyArray<
-			{ current: HTMLDivElement | null } | ((value: HTMLDivElement | null) => void | (() => void))
-	  >;
-}) @{
+export function ChildRefDraggableHarness(
+	props: DraggableProps & {
+		nodeRef: { current: HTMLDivElement | null };
+		childRef:
+			| { current: HTMLDivElement | null }
+			| ((value: HTMLDivElement | null) => void | (() => void))
+			| ReadonlyArray<
+					| { current: HTMLDivElement | null }
+					| ((value: HTMLDivElement | null) => void | (() => void))
+			  >;
+	},
+) @{
 	<Draggable {...props}>
 		<div ref={props.childRef} class="child" data-kept="yes">
 			drag

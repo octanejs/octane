@@ -15,7 +15,9 @@ export function CapturedObjectChain(props: LoopProps) @{
 	const d$ = derived$(() => ({ v: base$.get(), opts }));
 	const v$ = derived$(() => d$.get().v);
 	<section>
-		<button id="tick" onClick={() => setTick(tick + 1)}>{'Tick'}</button>
+		<button id="tick" onClick={() => setTick(tick + 1)}>
+			{'Tick'}
+		</button>
 		<output>{`${tick}:${v$.get()}`}</output>
 	</section>
 }
@@ -43,7 +45,9 @@ export function CapturedQueryChain(props: QueryProps) @{
 		return result.status === 'ready' ? result.value : result.status;
 	});
 	<section>
-		<button id="tick" onClick={() => setTick(tick + 1)}>{'Tick'}</button>
+		<button id="tick" onClick={() => setTick(tick + 1)}>
+			{'Tick'}
+		</button>
 		<output>{`${tick}:${shown$.get()}`}</output>
 	</section>
 }
@@ -56,7 +60,11 @@ export type WaitProps = {
 // A redeclared definition waits on a different pending query than the one it
 // replaced, and the replaced query, still read here, can settle first. The
 // event handler reads the component's committed cell.
-export function SwitchedPendingChain({ select, load, onWait }: WaitProps & {
+export function SwitchedPendingChain({
+	select,
+	load,
+	onWait,
+}: WaitProps & {
 	select: { key: string };
 }) @{
 	const a$ = query$(() => 'a', load);
@@ -71,11 +79,11 @@ export function SwitchedPendingChain({ select, load, onWait }: WaitProps & {
 	};
 	const value = value$.snapshot();
 	<section>
-		<button id="read" onClick={read}>{'Read'}</button>
+		<button id="read" onClick={read}>
+			{'Read'}
+		</button>
 		<output id="a">{a$.snapshot().status}</output>
-		<output id="value">
-			{value.status === 'ready' ? value.value : value.status}
-		</output>
+		<output id="value">{value.status === 'ready' ? value.value : value.status}</output>
 	</section>
 }
 
@@ -95,20 +103,20 @@ export function StalePendingChain({ load, onWait }: WaitProps) @{
 	};
 	const label = label$.snapshot();
 	<section>
-		<button id="count" onClick={() => count$.set(count$.get() + 1)}>{String(count$.get())}</button>
-		<button id="read" onClick={read}>{'Read'}</button>
-		<output id="value">
-			{label.status === 'ready' ? label.value : label.status}
-		</output>
+		<button id="count" onClick={() => count$.set(count$.get() + 1)}>
+			{String(count$.get())}
+		</button>
+		<button id="read" onClick={read}>
+			{'Read'}
+		</button>
+		<output id="value">{label.status === 'ready' ? label.value : label.status}</output>
 	</section>
 }
 
 function AsyncReader(props: { source$: SignalHandle<string> }) @{
 	const result$ = derived$(async ({ read }) => await read(props.source$));
 	const result = result$.snapshot();
-	<output id="reader">
-		{result.status === 'ready' ? result.value : result.status}
-	</output>
+	<output id="reader">{result.status === 'ready' ? result.value : result.status}</output>
 }
 
 export type Load = { readonly promise: Promise<void>; value?: string };
@@ -135,10 +143,10 @@ export function SwitchedThrownChain(props: ThrownProps) @{
 	};
 	const value = value$.snapshot();
 	<section>
-		<button id="read" onClick={read}>{'Read'}</button>
-		<output id="value">
-			{value.status === 'ready' ? value.value : value.status}
-		</output>
+		<button id="read" onClick={read}>
+			{'Read'}
+		</button>
+		<output id="value">{value.status === 'ready' ? value.value : value.status}</output>
 		<AsyncReader source$={value$} />
 	</section>
 }
@@ -158,7 +166,5 @@ export function ThrownThenAsync(props: AsyncSwitchProps) @{
 		return props.result;
 	});
 	const value = value$.snapshot();
-	<output id="value">
-		{value.status === 'ready' ? value.value : value.status}
-	</output>
+	<output id="value">{value.status === 'ready' ? value.value : value.status}</output>
 }

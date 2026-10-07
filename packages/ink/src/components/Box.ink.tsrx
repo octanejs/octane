@@ -6,22 +6,22 @@ import { type DOMElement } from '../dom.js';
 import { accessibilityContext } from './AccessibilityContext.js';
 import { backgroundContext as BackgroundContext } from './BackgroundContext.js';
 
-export type Props =
-	Except<Styles, 'textWrap'> & {
-		readonly children?: UniversalRenderable;
-		readonly ref?: ((value: DOMElement | null) => void) | { current: DOMElement | null } | null;
-		/**
+export type Props = Except<Styles, 'textWrap'> & {
+	readonly children?: UniversalRenderable;
+	readonly ref?: ((value: DOMElement | null) => void) | { current: DOMElement | null } | null;
+	/**
 A label for the element for screen readers.
 */
-		readonly 'aria-label'?: string;
-		/**
+	readonly 'aria-label'?: string;
+	/**
 Hide the element from screen readers.
 */
-		readonly 'aria-hidden'?: boolean;
-		/**
+	readonly 'aria-hidden'?: boolean;
+	/**
 The role of the element.
 */
-		readonly 'aria-role'?: | 'button'
+	readonly 'aria-role'?:
+		| 'button'
 		| 'checkbox'
 		| 'combobox'
 		| 'list'
@@ -39,21 +39,21 @@ The role of the element.
 		| 'textbox'
 		| 'timer'
 		| 'toolbar';
-		/**
+	/**
 The state of the element.
 */
-		readonly 'aria-state'?: {
-			readonly busy?: boolean;
-			readonly checked?: boolean;
-			readonly disabled?: boolean;
-			readonly expanded?: boolean;
-			readonly multiline?: boolean;
-			readonly multiselectable?: boolean;
-			readonly readonly?: boolean;
-			readonly required?: boolean;
-			readonly selected?: boolean;
-		};
+	readonly 'aria-state'?: {
+		readonly busy?: boolean;
+		readonly checked?: boolean;
+		readonly disabled?: boolean;
+		readonly expanded?: boolean;
+		readonly multiline?: boolean;
+		readonly multiselectable?: boolean;
+		readonly readonly?: boolean;
+		readonly required?: boolean;
+		readonly selected?: boolean;
 	};
+};
 
 /**
 `<Box>` is an essential Ink component to build your layout. It's like `<div style="display: flex">` in the browser.
@@ -74,25 +74,27 @@ const Box = ({
 		return null;
 	}
 
-	const boxElement = <ink-box
-		ref={ref}
-		style={{
-			flexWrap: 'nowrap',
-			flexDirection: 'row',
-			flexGrow: 0,
-			flexShrink: 1,
-			...style,
-			backgroundColor,
-			overflowX: style.overflowX ?? style.overflow ?? 'visible',
-			overflowY: style.overflowY ?? style.overflow ?? 'visible',
-		}}
-		internal_accessibility={{
-			role,
-			state: ariaState,
-		}}
-	>
-		{isScreenReaderEnabled && label ? label : children}
-	</ink-box>;
+	const boxElement = (
+		<ink-box
+			ref={ref}
+			style={{
+				flexWrap: 'nowrap',
+				flexDirection: 'row',
+				flexGrow: 0,
+				flexShrink: 1,
+				...style,
+				backgroundColor,
+				overflowX: style.overflowX ?? style.overflow ?? 'visible',
+				overflowY: style.overflowY ?? style.overflow ?? 'visible',
+			}}
+			internal_accessibility={{
+				role,
+				state: ariaState,
+			}}
+		>
+			{isScreenReaderEnabled && label ? label : children}
+		</ink-box>
+	);
 
 	// If this Box has a background color, provide it to children via context
 	if (backgroundColor) {

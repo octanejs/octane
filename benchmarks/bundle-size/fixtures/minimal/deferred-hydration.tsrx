@@ -9,7 +9,9 @@ function DeferredButton(props: { onActivate: () => void }) @{
 			props.onActivate();
 			setLabel('active');
 		}}
-	>{label as string}</button>
+	>
+		{label as string}
+	</button>
 }
 
 function DeferredRoot(props: { onActivate: () => void }) @{

@@ -20,7 +20,9 @@ export function SiblingHeads() @{
 		<Head>
 			<Title text="XYZ" />
 		</Head>
-		<button id="toggle" onClick={() => setOpen(!open)}>toggle</button>
+		<button id="toggle" onClick={() => setOpen(!open)}>
+			toggle
+		</button>
 		@if (open) {
 			<TabPanel />
 		}
@@ -33,7 +35,9 @@ export function NestedHeads() @{
 	<Head>
 		<Head>
 			<Title text="XYZ" />
-			<button id="toggle" onClick={() => setOpen(!open)}>toggle</button>
+			<button id="toggle" onClick={() => setOpen(!open)}>
+				toggle
+			</button>
 			@if (open) {
 				<TabPanel />
 			}

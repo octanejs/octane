@@ -22,9 +22,11 @@ function Counter() @{
 const nested = <content.tag data-child="nested">{content.label as string}</content.tag>;
 const children = [nested, <input defaultValue="draft" />, <Counter />];
 const shared = <section>{children}</section>;
-const inspected = <section data-inspected-tag={nested.type}>
-	<Counter />
-</section>;
+const inspected = (
+	<section data-inspected-tag={nested.type}>
+		<Counter />
+	</section>
+);
 const risky = <content.riskyTag />;
 const inspection = {
 	get status() {
@@ -35,9 +37,11 @@ const inspection = {
 		}
 	},
 };
-const recovered = <section data-status={inspection.status}>
-	<Counter />
-</section>;
+const recovered = (
+	<section data-status={inspection.status}>
+		<Counter />
+	</section>
+);
 
 const PassThrough = memo(function PassThrough() {
 	return shared;

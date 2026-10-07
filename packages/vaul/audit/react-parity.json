@@ -36,7 +36,7 @@
       "arch": "any",
       "packageManager": "pnpm@12.9.1",
       "lockfile": "pnpm-lock.yaml",
-      "lockfileSha256": "12e10f2aa9dc05ffbedf9272eca9e195da62c135db7c819f49ce5149923140df"
+      "lockfileSha256": "84dbefa8929419194a46ef5ec966ae8459aa05f40399e583828134ccc8121aad"
     }
   },
   "lanes": [
@@ -276,7 +276,7 @@
         {
           "path": "packages/vaul/tests/browser/harness/main.tsrx",
           "role": "support",
-          "sha256": "0c1d24f0e67a7b9013389d54bdd80871cf1b63fdd61b6ac0fdb7c058ef644b35"
+          "sha256": "5997d5285a72c9b68f256a8f6a4f847eb05bfce1006bf14915a37c493d10d68a"
         },
         {
           "path": "packages/vaul/tests/browser/harness/index.html",

@@ -106,7 +106,9 @@ export function CSSTransition(props: CSSTransitionProps) @{
 			add('exit', 'done');
 			onExited?.(maybeNode);
 		}}
-	>{children}</Transition>
+	>
+		{children}
+	</Transition>
 }
 
 export default CSSTransition;

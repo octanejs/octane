@@ -41,21 +41,26 @@ function RegistryBody(props) @{
 	});
 	const secondDrop = useDroppable({ id: 'drop-two', type: 'card' });
 
-	useLayoutEffect(() => props.captureInstances({ first, second, firstDrop, secondDrop }), [
-		first,
-		second,
-		firstDrop,
-		secondDrop,
-		props.captureInstances,
-	]);
+	useLayoutEffect(
+		() => props.captureInstances({ first, second, firstDrop, secondDrop }),
+		[first, second, firstDrop, secondDrop, props.captureInstances],
+	);
 
 	<section id="registry-body">
 		<button id="drag-one" ref={first.ref} data-disabled={props.firstDisabled as string}>
-			<span id="drag-one-handle" ref={first.handleRef}>one</span>
+			<span id="drag-one-handle" ref={first.handleRef}>
+				one
+			</span>
 		</button>
-		<button id="drag-two" ref={second.ref}>two</button>
-		<div id="drop-one" ref={firstDrop.ref}>drop one</div>
-		<div id="drop-two" ref={secondDrop.ref}>drop two</div>
+		<button id="drag-two" ref={second.ref}>
+			two
+		</button>
+		<div id="drop-one" ref={firstDrop.ref}>
+			drop one
+		</div>
+		<div id="drop-two" ref={secondDrop.ref}>
+			drop two
+		</div>
 	</section>
 }
 
@@ -115,11 +120,10 @@ function SortableBody(props) @{
 		data: { label: 'second' },
 		plugins: [],
 	});
-	useLayoutEffect(() => props.captureInstances({ first, second }), [
-		first,
-		second,
-		props.captureInstances,
-	]);
+	useLayoutEffect(
+		() => props.captureInstances({ first, second }),
+		[first, second, props.captureInstances],
+	);
 
 	<ol>
 		<li
@@ -130,10 +134,14 @@ function SortableBody(props) @{
 			data-source={String(first.isDragSource)}
 			data-target={String(first.isDropTarget)}
 		>
-			<button id="sort-one-handle" ref={first.handleRef}>first</button>
+			<button id="sort-one-handle" ref={first.handleRef}>
+				first
+			</button>
 		</li>
 		<li id="sort-two" ref={second.ref}>
-			<button id="sort-two-handle" ref={second.handleRef}>second</button>
+			<button id="sort-two-handle" ref={second.handleRef}>
+				second
+			</button>
 		</li>
 	</ol>
 }
@@ -175,10 +183,9 @@ function KeyboardSortableItem(props) @{
 	});
 
 	<li id={`keyboard-sort-${props.id}`} ref={sortable.ref}>
-		<button
-			id={`keyboard-sort-${props.id}-handle`}
-			ref={sortable.handleRef}
-		>{props.id as string}</button>
+		<button id={`keyboard-sort-${props.id}-handle`} ref={sortable.handleRef}>
+			{props.id as string}
+		</button>
 	</li>
 }
 
@@ -196,10 +203,8 @@ export function SortableGroupsFixture(props) @{
 			if (!source || !target) return;
 			setGroups((current) => {
 				const next = { left: [...current.left], right: [...current.right] };
-				const sourceGroup =
-					source.group === 'right' ? next.right : next.left;
-				const targetGroup =
-					target.group === 'right' ? next.right : next.left;
+				const sourceGroup = source.group === 'right' ? next.right : next.left;
+				const targetGroup = target.group === 'right' ? next.right : next.left;
 				const sourceIndex = sourceGroup.indexOf(source.id);
 				if (sourceIndex < 0) return current;
 				const [moved] = sourceGroup.splice(sourceIndex, 1);
@@ -244,7 +249,9 @@ function InteractionBody(props) @{
 		<button id="drag" ref={draggable.ref}>
 			drag
 		</button>
-		<div id="drop" ref={droppable.ref}>drop</div>
+		<div id="drop" ref={droppable.ref}>
+			drop
+		</div>
 		<output id="operation-source">{String(operation.source?.id ?? 'none') as string}</output>
 		<output id="operation-target">{String(operation.target?.id ?? 'none') as string}</output>
 	</main>
@@ -277,17 +284,21 @@ export function InteractionFixture(props) @{
 
 function StaticOverlayBody() @{
 	const draggable = useDraggable({ id: 'static-drag' });
-	<button id="static-drag" ref={draggable.ref}>drag</button>
+	<button id="static-drag" ref={draggable.ref}>
+		drag
+	</button>
 }
 
 function StaticOverlayEntity(props) @{
 	const draggable = useDraggable({ id: 'overlay-drag' });
 	const manager = useDragDropManager();
-	useLayoutEffect(() => props.captureRegistry(manager?.registry.draggables), [
-		manager,
-		props.captureRegistry,
-	]);
-	<span id="static-overlay" ref={draggable.ref}>static overlay</span>
+	useLayoutEffect(
+		() => props.captureRegistry(manager?.registry.draggables),
+		[manager, props.captureRegistry],
+	);
+	<span id="static-overlay" ref={draggable.ref}>
+		static overlay
+	</span>
 }
 
 export function StaticOverlayFixture(props) @{

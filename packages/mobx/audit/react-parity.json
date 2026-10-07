@@ -37,7 +37,7 @@
       "arch": "any",
       "packageManager": "pnpm@12.9.1",
       "lockfile": "pnpm-lock.yaml",
-      "lockfileSha256": "12e10f2aa9dc05ffbedf9272eca9e195da62c135db7c819f49ce5149923140df"
+      "lockfileSha256": "84dbefa8929419194a46ef5ec966ae8459aa05f40399e583828134ccc8121aad"
     }
   },
   "lanes": [
@@ -65,7 +65,7 @@
         {
           "path": "packages/mobx/tests/_fixtures/store.tsrx",
           "role": "support",
-          "sha256": "d2ed1ef7226b7af56e3078aa14c9e14b1758aa2ef32c266beae750863cc598c3"
+          "sha256": "eaf3ca644aad4ea84ddbac93649f9dae5a9e1e4fe33eb26cf38b965410a6ee00"
         },
         {
           "path": "packages/mobx/tests/differential/_setup.ts",

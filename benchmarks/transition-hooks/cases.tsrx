@@ -22,7 +22,7 @@ export function TransitionCycle(props: {
 
 function HeldValue(props: { value: number; promiseFor: PromiseFor }) @{
 	const resolved = use(props.promiseFor(props.value));
-	<span>{'value-' + resolved as string}</span>
+	<span>{('value-' + resolved) as string}</span>
 }
 
 export function HeldTransition(props: {
@@ -35,9 +35,7 @@ export function HeldTransition(props: {
 	props.bind(setValue, start);
 	props.observe('held', value, isPending);
 	<section>
-		<b>
-			{isPending ? 'pending' : 'idle'}
-		</b>
+		<b>{isPending ? 'pending' : 'idle'}</b>
 		@try {
 			<HeldValue value={value} promiseFor={props.promiseFor} />
 		} @pending {

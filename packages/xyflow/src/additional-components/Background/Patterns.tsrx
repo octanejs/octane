@@ -10,11 +10,13 @@ type LinePatternProps = {
 };
 
 export function LinePattern({ dimensions, lineWidth, variant, className }: LinePatternProps) {
-	return <path
-		strokeWidth={lineWidth}
-		d={`M${dimensions[0] / 2} 0 V${dimensions[1]} M0 ${dimensions[1] / 2} H${dimensions[0]}`}
-		className={cc(['react-flow__background-pattern', variant, className])}
-	/>;
+	return (
+		<path
+			strokeWidth={lineWidth}
+			d={`M${dimensions[0] / 2} 0 V${dimensions[1]} M0 ${dimensions[1] / 2} H${dimensions[0]}`}
+			className={cc(['react-flow__background-pattern', variant, className])}
+		/>
+	);
 }
 
 type DotPatternProps = {
@@ -23,10 +25,12 @@ type DotPatternProps = {
 };
 
 export function DotPattern({ radius, className }: DotPatternProps) {
-	return <circle
-		cx={radius}
-		cy={radius}
-		r={radius}
-		className={cc(['react-flow__background-pattern', 'dots', className])}
-	/>;
+	return (
+		<circle
+			cx={radius}
+			cy={radius}
+			r={radius}
+			className={cc(['react-flow__background-pattern', 'dots', className])}
+		/>
+	);
 }

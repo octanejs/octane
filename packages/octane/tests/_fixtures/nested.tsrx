@@ -8,10 +8,14 @@ import { useState, useEffect } from 'octane';
 export function HookInIf() @{
 	const [show, setShow] = useState(true);
 	<>
-		<button id="top" onClick={() => setShow(!show)}>{'toggle'}</button>
+		<button id="top" onClick={() => setShow(!show)}>
+			{'toggle'}
+		</button>
 		@if (show) {
 			const [n, setN] = useState(0);
-			<button id="inner" onClick={() => setN(n + 1)}>{n as string}</button>
+			<button id="inner" onClick={() => setN(n + 1)}>
+				{n as string}
+			</button>
 		}
 	</>
 }
@@ -20,13 +24,19 @@ export function HookInIf() @{
 export function HooksInIfElse() @{
 	const [path, setPath] = useState('a');
 	<>
-		<button id="swap" onClick={() => setPath(path === 'a' ? 'b' : 'a')}>{'swap'}</button>
+		<button id="swap" onClick={() => setPath(path === 'a' ? 'b' : 'a')}>
+			{'swap'}
+		</button>
 		@if (path === 'a') {
 			const [na, setNa] = useState(0);
-			<button id="a" onClick={() => setNa(na + 1)}>{'a:' + na as string}</button>
+			<button id="a" onClick={() => setNa(na + 1)}>
+				{('a:' + na) as string}
+			</button>
 		} @else {
 			const [nb, setNb] = useState(0);
-			<button id="b" onClick={() => setNb(nb + 1)}>{'b:' + nb as string}</button>
+			<button id="b" onClick={() => setNb(nb + 1)}>
+				{('b:' + nb) as string}
+			</button>
 		}
 	</>
 }
@@ -36,7 +46,7 @@ export function HooksInIfElse() @{
 function Row(props) @{
 	const [n, setN] = useState(0);
 	<li class={'row-' + props.id}>
-		<button onClick={() => setN(n + 1)}>{props.label + ':' + n as string}</button>
+		<button onClick={() => setN(n + 1)}>{(props.label + ':' + n) as string}</button>
 	</li>
 }
 
@@ -47,7 +57,9 @@ export function RowList() @{
 		{ id: 3, label: 'c' },
 	]);
 	<div>
-		<button id="reverse" onClick={() => setItems([...items].reverse())}>{'rev'}</button>
+		<button id="reverse" onClick={() => setItems([...items].reverse())}>
+			{'rev'}
+		</button>
 		<ul>
 			@for (const it of items; key it.id) {
 				<Row id={it.id} label={it.label} />
@@ -64,10 +76,14 @@ function TryBoundaryWithHooks(props) @{
 			if (props.bang) {
 				throw new Error('boom');
 			}
-			<button id="hit" onClick={() => setHit(hit + 1)}>{'hit:' + hit as string}</button>
+			<button id="hit" onClick={() => setHit(hit + 1)}>
+				{('hit:' + hit) as string}
+			</button>
 		} @catch (err) {
 			const [tries, setTries] = useState(0);
-			<button id="retry" onClick={() => setTries(tries + 1)}>{'tries:' + tries as string}</button>
+			<button id="retry" onClick={() => setTries(tries + 1)}>
+				{('tries:' + tries) as string}
+			</button>
 		}
 	</>
 }

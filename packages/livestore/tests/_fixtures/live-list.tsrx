@@ -13,7 +13,9 @@ function TodoRow(props: {
 		data-id={props.item.id}
 		data-index={props.index}
 		data-initial={String(props.isInitialListRender)}
-	>{props.item.text}</li>
+	>
+		{props.item.text}
+	</li>
 }
 
 export function TodoLiveList(props: {
@@ -26,13 +28,14 @@ export function TodoLiveList(props: {
 			store={props.store}
 			items$={props.items$}
 			getKey={(item) => item.id}
-			renderItem={(item, options) =>
+			renderItem={(item, options) => (
 				<TodoRow
 					item={item}
 					index={options.index}
 					isInitialListRender={options.isInitialListRender}
 					onRender={props.onRender}
-				/>}
+				/>
+			)}
 		/>
 	</ul>
 }

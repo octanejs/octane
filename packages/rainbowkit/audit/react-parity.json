@@ -37,7 +37,7 @@
       "arch": "any",
       "packageManager": "pnpm@12.9.1",
       "lockfile": "pnpm-lock.yaml",
-      "lockfileSha256": "12e10f2aa9dc05ffbedf9272eca9e195da62c135db7c819f49ce5149923140df"
+      "lockfileSha256": "84dbefa8929419194a46ef5ec966ae8459aa05f40399e583828134ccc8121aad"
     }
   },
   "lanes": [
@@ -65,7 +65,7 @@
         {
           "path": "packages/rainbowkit/tests/_fixtures/parity.tsrx",
           "role": "support",
-          "sha256": "de8176f301795d4c835000b074c74e46413b6b341bb38838f9ef347d82a69532"
+          "sha256": "57f65ac41f36f4a7d0d4d7949439c1f03b1d14b030463a778d735566aa10150f"
         },
         {
           "path": "packages/rainbowkit/tests/differential/_setup.ts",

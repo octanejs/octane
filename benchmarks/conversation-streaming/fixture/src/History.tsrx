@@ -21,9 +21,13 @@ export function History() @{
 				}
 			</ul>
 		} @pending {
-			<p role="status" data-history-pending>Loading recent conversations…</p>
+			<p role="status" data-history-pending>
+				Loading recent conversations…
+			</p>
 		} @catch (error) {
-			<p role="alert" data-history-error>Recent conversations unavailable.</p>
+			<p role="alert" data-history-error>
+				Recent conversations unavailable.
+			</p>
 		}
 		<output data-selected-history>{selectedHistory$}</output>
 	</section>

@@ -25,7 +25,8 @@ export function ScrollArea({ className, children, ...props }: Props & { children
 			ScrollAreaPrimitive.Viewport,
 			{
 				'data-slot': 'scroll-area-viewport',
-				className: 'cn-scroll-area-viewport size-full rounded-[inherit] transition-[color,box-shadow] outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50 focus-visible:outline-1',
+				className:
+					'cn-scroll-area-viewport size-full rounded-[inherit] transition-[color,box-shadow] outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50 focus-visible:outline-1',
 			},
 			children,
 		),

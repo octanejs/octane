@@ -13,19 +13,21 @@ export function CheckboxGroupExtraFixture1({
 	nativeButton: boolean;
 	parent: boolean;
 }) {
-	return <Field.Root name="apple">
-		<CheckboxGroup allValues={['fuji']}>
-			<Field.Item>
-				<Field.Label data-testid="label">Fuji</Field.Label>
-				<Checkbox.Root
-					parent={parent}
-					value={parent ? undefined : 'fuji'}
-					nativeButton={nativeButton}
-					render={nativeButton ? <button /> : undefined}
-				/>
-			</Field.Item>
-		</CheckboxGroup>
-	</Field.Root>;
+	return (
+		<Field.Root name="apple">
+			<CheckboxGroup allValues={['fuji']}>
+				<Field.Item>
+					<Field.Label data-testid="label">Fuji</Field.Label>
+					<Checkbox.Root
+						parent={parent}
+						value={parent ? undefined : 'fuji'}
+						nativeButton={nativeButton}
+						render={nativeButton ? <button /> : undefined}
+					/>
+				</Field.Item>
+			</CheckboxGroup>
+		</Field.Root>
+	);
 }
 
 export function CheckboxGroupExtraFixture2({
@@ -35,26 +37,28 @@ export function CheckboxGroupExtraFixture2({
 	nativeButton: boolean;
 	parent: boolean;
 }) {
-	return <Field.Root name="apple">
-		<CheckboxGroup allValues={['fuji']}>
-			<Field.Item>
-				<Field.Label data-testid="label">All</Field.Label>
-				<Checkbox.Root
-					parent
-					data-testid="parent"
-					nativeButton={nativeButton}
-					render={nativeButton ? <button /> : undefined}
-				/>
-			</Field.Item>
-			<Field.Item>
-				<Field.Label data-testid="label">Fuji</Field.Label>
-				<Checkbox.Root
-					value="fuji"
-					data-testid="fuji"
-					nativeButton={nativeButton}
-					render={nativeButton ? <button /> : undefined}
-				/>
-			</Field.Item>
-		</CheckboxGroup>
-	</Field.Root>;
+	return (
+		<Field.Root name="apple">
+			<CheckboxGroup allValues={['fuji']}>
+				<Field.Item>
+					<Field.Label data-testid="label">All</Field.Label>
+					<Checkbox.Root
+						parent
+						data-testid="parent"
+						nativeButton={nativeButton}
+						render={nativeButton ? <button /> : undefined}
+					/>
+				</Field.Item>
+				<Field.Item>
+					<Field.Label data-testid="label">Fuji</Field.Label>
+					<Checkbox.Root
+						value="fuji"
+						data-testid="fuji"
+						nativeButton={nativeButton}
+						render={nativeButton ? <button /> : undefined}
+					/>
+				</Field.Item>
+			</CheckboxGroup>
+		</Field.Root>
+	);
 }

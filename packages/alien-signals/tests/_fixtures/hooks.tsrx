@@ -27,8 +27,12 @@ export function SignalReaders(props: {
 
 	<div>
 		<p id="values">{left + '/' + right}</p>
-		<button id="increment" onClick={() => setLeft((value) => value + 1)}>increment</button>
-		<button id="set" onClick={() => setLeftOnly(10)}>set</button>
+		<button id="increment" onClick={() => setLeft((value) => value + 1)}>
+			increment
+		</button>
+		<button id="set" onClick={() => setLeftOnly(10)}>
+			set
+		</button>
 	</div>
 }
 
@@ -41,8 +45,12 @@ export function SignalTuple(props: { source: WritableSignal<number> }) @{
 	const [value, setValue] = useSignal(props.source);
 	<div>
 		<p id="value">{value as string}</p>
-		<button id="set" onClick={() => setValue(10)}>set</button>
-		<button id="inc" onClick={() => setValue((previous) => previous + 1)}>inc</button>
+		<button id="set" onClick={() => setValue(10)}>
+			set
+		</button>
+		<button id="inc" onClick={() => setValue((previous) => previous + 1)}>
+			inc
+		</button>
 		<button
 			id="inc-twice"
 			onClick={() => {
@@ -58,8 +66,12 @@ export function SignalTuple(props: { source: WritableSignal<number> }) @{
 export function SetterOnly(props: { source: WritableSignal<number> }) @{
 	const setValue = useSetSignal(props.source);
 	<div>
-		<button id="set" onClick={() => setValue(10)}>set</button>
-		<button id="inc" onClick={() => setValue((previous) => previous + 5)}>inc</button>
+		<button id="set" onClick={() => setValue(10)}>
+			set
+		</button>
+		<button id="inc" onClick={() => setValue((previous) => previous + 5)}>
+			inc
+		</button>
 	</div>
 }
 
@@ -72,14 +84,13 @@ export function SwitchingReader(props: {
 
 	<div>
 		<p id="switch-value">{value as string}</p>
-		<button id="switch" onClick={() => setSecond(true)}>switch</button>
+		<button id="switch" onClick={() => setSecond(true)}>
+			switch
+		</button>
 	</div>
 }
 
-export function ComputedReader(props: {
-	source: WritableSignal<number>;
-	multiplier: number;
-}) @{
+export function ComputedReader(props: { source: WritableSignal<number>; multiplier: number }) @{
 	const value = useComputed(() => props.source() * props.multiplier, [props.multiplier]);
 	<p id="computed">{value as string}</p>
 }
@@ -112,7 +123,9 @@ export function ComputedReuseReader(props: {
 	}, []);
 	<div>
 		<p id="computed">{value as string}</p>
-		<button id="rerender" onClick={() => setRender((value) => value + 1)}>rerender</button>
+		<button id="rerender" onClick={() => setRender((value) => value + 1)}>
+			rerender
+		</button>
 	</div>
 }
 
@@ -142,18 +155,22 @@ export function NullableSignalReader(props: {
 	const [value, setValue] = useSignal(props.source);
 	<div>
 		<p id="value">{String(value)}</p>
-		<button id="undef" onClick={() => setValue(undefined)}>undef</button>
-		<button id="null" onClick={() => setValue(null)}>null</button>
+		<button id="undef" onClick={() => setValue(undefined)}>
+			undef
+		</button>
+		<button id="null" onClick={() => setValue(null)}>
+			null
+		</button>
 	</div>
 }
 
-export function ObjectSignalReader(props: {
-	source: WritableSignal<{ a: number; b: number }>;
-}) @{
+export function ObjectSignalReader(props: { source: WritableSignal<{ a: number; b: number }> }) @{
 	const [value, setValue] = useSignal(props.source);
 	<div>
 		<p id="value">{JSON.stringify(value)}</p>
-		<button id="set" onClick={() => setValue({ a: 2, b: 2 })}>set</button>
+		<button id="set" onClick={() => setValue({ a: 2, b: 2 })}>
+			set
+		</button>
 	</div>
 }
 
@@ -165,7 +182,9 @@ export function SetterProbe(props: {
 	const [, setRender] = useState(0);
 	props.record(setValue);
 
-	<button id="rerender" onClick={() => setRender((value) => value + 1)}>rerender</button>
+	<button id="rerender" onClick={() => setRender((value) => value + 1)}>
+		rerender
+	</button>
 }
 
 export function ScopeProbe(props: {
@@ -208,10 +227,18 @@ export function EffectAndSignal(props: {
 	props.record(setValue);
 	<div>
 		<p id="value">{value as string}</p>
-		<button id="set1" onClick={() => setValue(1)}>set1</button>
-		<button id="set2" onClick={() => setValue(2)}>set2</button>
-		<button id="set3" onClick={() => setValue(3)}>set3</button>
-		<button id="set4" onClick={() => setValue(4)}>set4</button>
+		<button id="set1" onClick={() => setValue(1)}>
+			set1
+		</button>
+		<button id="set2" onClick={() => setValue(2)}>
+			set2
+		</button>
+		<button id="set3" onClick={() => setValue(3)}>
+			set3
+		</button>
+		<button id="set4" onClick={() => setValue(4)}>
+			set4
+		</button>
 	</div>
 }
 
@@ -260,9 +287,13 @@ export function DependencyListEffects(props: {
 	useSignalScope(() => {
 		createEffect(() => props.log('scope:' + props.label + ':' + props.source()));
 	}, [props.label]);
-	useSignalLayoutEffect(props.signals, () => {
-		props.log('layout:' + props.label);
-	}, [props.label]);
+	useSignalLayoutEffect(
+		props.signals,
+		() => {
+			props.log('layout:' + props.label);
+		},
+		[props.label],
+	);
 	<p id="dependency-list-effects">ready</p>
 }
 

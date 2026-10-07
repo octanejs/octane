@@ -18,7 +18,9 @@ const config: Config<{ HeadingBlock: Props }> = {
 };
 
 export function PuckEditorProbe() {
-	return <div id="root">
-		<Puck config={config} data={{ content: [], root: { props: {} } }} />
-	</div>;
+	return (
+		<div id="root">
+			<Puck config={config} data={{ content: [], root: { props: {} } }} />
+		</div>
+	);
 }

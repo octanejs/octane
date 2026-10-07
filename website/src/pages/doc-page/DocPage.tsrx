@@ -23,8 +23,7 @@ function DocTable(props: { children?: unknown; [key: string]: unknown }) @{
 function DocPre(props: { children?: unknown; [key: string]: unknown }) @{
 	const { children, ...preProps } = props;
 	const stamped = preProps['data-language'] ?? preProps.dataLanguage;
-	const language =
-		typeof stamped === 'string' ? stamped : '';
+	const language = typeof stamped === 'string' ? stamped : '';
 
 	<CodeBlock variant="plain" language={language}>
 		<pre {...preProps}>{children}</pre>
@@ -38,12 +37,9 @@ export function DocPage() @{
 	const doc = findDoc(params.slug);
 	useTitle(doc ? 'Octane — ' + doc.title : 'Octane — Docs');
 	const Doc = doc ? doc.component : null;
-	const currentIndex =
-		doc ? docs.indexOf(doc) : -1;
-	const previous =
-		currentIndex > 0 ? docs[currentIndex - 1] : null;
-	const next =
-		currentIndex >= 0 && currentIndex < docs.length - 1 ? docs[currentIndex + 1] : null;
+	const currentIndex = doc ? docs.indexOf(doc) : -1;
+	const previous = currentIndex > 0 ? docs[currentIndex - 1] : null;
+	const next = currentIndex >= 0 && currentIndex < docs.length - 1 ? docs[currentIndex + 1] : null;
 	<>
 		<div class="doc-frame">
 			<article class="prose">
@@ -74,7 +70,7 @@ export function DocPage() @{
 				} @else {
 					<div class="doc-missing">
 						<h1>Document not found</h1>
-						<p>{'No document named “' + params.slug + '”.' as string}</p>
+						<p>{('No document named “' + params.slug + '”.') as string}</p>
 					</div>
 				}
 			</article>

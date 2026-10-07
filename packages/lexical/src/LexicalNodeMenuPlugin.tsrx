@@ -15,8 +15,12 @@ export type { MenuRenderFn, MenuResolution } from './shared/menuShared';
  * Props for the {@link LexicalNodeMenuPlugin} component.
  */
 export type NodeMenuPluginProps<TOption extends MenuOption> = {
-	onSelectOption: (option: TOption, textNodeContainingQuery: | TextNode
-	| null, closeMenu: () => void, matchingString: string) => void;
+	onSelectOption: (
+		option: TOption,
+		textNodeContainingQuery: TextNode | null,
+		closeMenu: () => void,
+		matchingString: string,
+	) => void;
 	options: TOption[];
 	nodeKey: NodeKey | null;
 	menuRenderFn?: MenuRenderFn<TOption>;
@@ -52,12 +56,15 @@ export function LexicalNodeMenuPlugin<TOption extends MenuOption>(
 		}
 	}, [onClose, resolution]);
 
-	const openNodeMenu = useCallback((res: MenuResolution) => {
-		setResolution(res);
-		if (onOpen != null && resolution === null) {
-			onOpen(res);
-		}
-	}, [onOpen, resolution]);
+	const openNodeMenu = useCallback(
+		(res: MenuResolution) => {
+			setResolution(res);
+			if (onOpen != null && resolution === null) {
+				onOpen(res);
+			}
+		},
+		[onOpen, resolution],
+	);
 
 	const positionOrCloseMenu = useCallback(() => {
 		if (nodeKey) {
@@ -66,8 +73,8 @@ export function LexicalNodeMenuPlugin<TOption extends MenuOption>(
 				const domElement = editor.getElementByKey(nodeKey);
 				if (node != null && domElement != null) {
 					if (resolution == null) {
-						startTransition(
-							() => openNodeMenu({ getRect: () => domElement.getBoundingClientRect() }),
+						startTransition(() =>
+							openNodeMenu({ getRect: () => domElement.getBoundingClientRect() }),
 						);
 					}
 				}
@@ -94,14 +101,16 @@ export function LexicalNodeMenuPlugin<TOption extends MenuOption>(
 	if (anchorElementRef.current === null || resolution === null || editor === null) {
 		return null;
 	}
-	return <LexicalMenu
-		close={closeNodeMenu}
-		resolution={resolution}
-		editor={editor}
-		anchorElementRef={anchorElementRef}
-		options={options}
-		menuRenderFn={menuRenderFn}
-		onSelectOption={onSelectOption}
-		commandPriority={commandPriority}
-	/>;
+	return (
+		<LexicalMenu
+			close={closeNodeMenu}
+			resolution={resolution}
+			editor={editor}
+			anchorElementRef={anchorElementRef}
+			options={options}
+			menuRenderFn={menuRenderFn}
+			onSelectOption={onSelectOption}
+			commandPriority={commandPriority}
+		/>
+	);
 }

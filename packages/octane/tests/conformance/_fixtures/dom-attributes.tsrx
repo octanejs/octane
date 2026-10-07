@@ -39,7 +39,9 @@ export function BoolDisabled(props) @{
 // Overloaded boolean (`download`): true → bare attr, false → removed,
 // string → the string.
 export function DownloadAttr(props) @{
-	<a id="dl" href="#x" download={props.v}>{'dl'}</a>
+	<a id="dl" href="#x" download={props.v}>
+		{'dl'}
+	</a>
 }
 
 // Boolean attribute spelled camelCase (HTML lowercases the DOM name).
@@ -110,7 +112,9 @@ export function LinkHref(props) @{
 }
 
 export function AnchorHref(props) @{
-	<a id="an" href={props.href}>{'x'}</a>
+	<a id="an" href={props.href}>
+		{'x'}
+	</a>
 }
 
 export function FormAction(props) @{
@@ -151,7 +155,9 @@ export function CustomElCustomEvent(props) @{
 
 // Regular delegated onClick on a custom element.
 export function CustomElClick(props) @{
-	<my-custom-element id="cec" onClick={props.onClick}>{'hit'}</my-custom-element>
+	<my-custom-element id="cec" onClick={props.onClick}>
+		{'hit'}
+	</my-custom-element>
 }
 
 // Native onChange / onInput handlers on a custom element (removable via props).
@@ -169,7 +175,9 @@ export function AutoFocusBare(props) @{
 }
 
 export function AutoFocusButton() @{
-	<button id="af-button" autoFocus>{'button'}</button>
+	<button id="af-button" autoFocus>
+		{'button'}
+	</button>
 }
 
 export function AutoFocusSelect() @{
@@ -185,7 +193,9 @@ export function AutoFocusTextarea() @{
 export function AutoFocusUnsupported() @{
 	<div>
 		<div id="af-div" tabIndex={0} autoFocus />
-		<a id="af-anchor" href="#autofocus" autoFocus>{'link'}</a>
+		<a id="af-anchor" href="#autofocus" autoFocus>
+			{'link'}
+		</a>
 		<svg id="af-svg" tabIndex={0} autoFocus>
 			<circle id="af-circle" autoFocus />
 		</svg>

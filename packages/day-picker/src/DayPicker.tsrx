@@ -110,17 +110,20 @@ export function DayPicker(initialProps: DayPickerProps) @{
 		const overrides =
 			props.dateLib && noonOverrides
 				? { ...noonOverrides, ...props.dateLib }
-				: props.dateLib ?? noonOverrides;
+				: (props.dateLib ?? noonOverrides);
 
-		const dateLib = new DateLib({
-			locale,
-			weekStartsOn,
-			firstWeekContainsDate: props.firstWeekContainsDate,
-			useAdditionalWeekYearTokens: props.useAdditionalWeekYearTokens,
-			useAdditionalDayOfYearTokens: props.useAdditionalDayOfYearTokens,
-			timeZone: props.timeZone,
-			numerals: props.numerals,
-		}, overrides);
+		const dateLib = new DateLib(
+			{
+				locale,
+				weekStartsOn,
+				firstWeekContainsDate: props.firstWeekContainsDate,
+				useAdditionalWeekYearTokens: props.useAdditionalWeekYearTokens,
+				useAdditionalDayOfYearTokens: props.useAdditionalDayOfYearTokens,
+				timeZone: props.timeZone,
+				numerals: props.numerals,
+			},
+			overrides,
+		);
 
 		return {
 			dateLib,
@@ -198,12 +201,15 @@ export function DayPicker(initialProps: DayPickerProps) @{
 		formatYearDropdown,
 	} = formatters;
 
-	const calendar = useCalendar(props, dateLib, monthIsControlled ? undefined : uncontrolledMonth, (
-		month,
-	) => {
-		setUncontrolledMonth(month);
-		props.onMonthChange?.(month);
-	});
+	const calendar = useCalendar(
+		props,
+		dateLib,
+		monthIsControlled ? undefined : uncontrolledMonth,
+		(month) => {
+			setUncontrolledMonth(month);
+			props.onMonthChange?.(month);
+		},
+	);
 
 	const { days, months, navStart, navEnd, previousMonth, nextMonth, goToMonth } = calendar;
 
@@ -403,7 +409,7 @@ export function DayPicker(initialProps: DayPickerProps) @{
 			{...dataAttributes}
 		>
 			<components.Months className={classNames[UI.Months]} style={styles?.[UI.Months]}>
-				{!props.hideNavigation && !navLayout &&
+				{!props.hideNavigation && !navLayout && (
 					<components.Nav
 						data-animated-nav={props.animate ? 'true' : undefined}
 						className={classNames[UI.Nav]}
@@ -413,95 +419,98 @@ export function DayPicker(initialProps: DayPickerProps) @{
 						onNextClick={handleNextClick}
 						previousMonth={previousMonth}
 						nextMonth={nextMonth}
-					/>}
+					/>
+				)}
 				{months.map((calendarMonth, displayIndex) => {
 					const monthOffset = props.reverseMonths ? months.length - 1 - displayIndex : displayIndex;
 
-					return <components.Month
-						data-animated-month={props.animate ? 'true' : undefined}
-						className={classNames[UI.Month]}
-						style={styles?.[UI.Month]}
-						// biome-ignore lint/suspicious/noArrayIndexKey: breaks animation
-						key={displayIndex}
-						displayIndex={displayIndex}
-						calendarMonth={calendarMonth}
-					>
-						{navLayout === 'around' && !props.hideNavigation && displayIndex === 0 &&
-							<components.PreviousMonthButton
-								type="button"
-								className={classNames[UI.PreviousMonthButton]}
-								style={styles?.[UI.PreviousMonthButton]}
-								tabIndex={previousMonth ? undefined : -1}
-								aria-disabled={previousMonth ? undefined : true}
-								aria-label={labelPrevious(previousMonth)}
-								onClick={handlePreviousClick}
-								data-animated-button={props.animate ? 'true' : undefined}
-							>
-								<components.Chevron
-									disabled={previousMonth ? undefined : true}
-									className={classNames[UI.Chevron]}
-									style={styles?.[UI.Chevron]}
-									orientation={props.dir === 'rtl' ? 'right' : 'left'}
-								/>
-							</components.PreviousMonthButton>}
-						<components.MonthCaption
-							data-animated-caption={props.animate ? 'true' : undefined}
-							className={classNames[UI.MonthCaption]}
-							style={styles?.[UI.MonthCaption]}
-							calendarMonth={calendarMonth}
+					return (
+						<components.Month
+							data-animated-month={props.animate ? 'true' : undefined}
+							className={classNames[UI.Month]}
+							style={styles?.[UI.Month]}
+							// biome-ignore lint/suspicious/noArrayIndexKey: breaks animation
+							key={displayIndex}
 							displayIndex={displayIndex}
+							calendarMonth={calendarMonth}
 						>
-							{captionLayout?.startsWith('dropdown')
-								? <components.DropdownNav
+							{navLayout === 'around' && !props.hideNavigation && displayIndex === 0 && (
+								<components.PreviousMonthButton
+									type="button"
+									className={classNames[UI.PreviousMonthButton]}
+									style={styles?.[UI.PreviousMonthButton]}
+									tabIndex={previousMonth ? undefined : -1}
+									aria-disabled={previousMonth ? undefined : true}
+									aria-label={labelPrevious(previousMonth)}
+									onClick={handlePreviousClick}
+									data-animated-button={props.animate ? 'true' : undefined}
+								>
+									<components.Chevron
+										disabled={previousMonth ? undefined : true}
+										className={classNames[UI.Chevron]}
+										style={styles?.[UI.Chevron]}
+										orientation={props.dir === 'rtl' ? 'right' : 'left'}
+									/>
+								</components.PreviousMonthButton>
+							)}
+							<components.MonthCaption
+								data-animated-caption={props.animate ? 'true' : undefined}
+								className={classNames[UI.MonthCaption]}
+								style={styles?.[UI.MonthCaption]}
+								calendarMonth={calendarMonth}
+								displayIndex={displayIndex}
+							>
+								{captionLayout?.startsWith('dropdown') ? (
+									<components.DropdownNav
 										className={classNames[UI.Dropdowns]}
 										style={styles?.[UI.Dropdowns]}
 									>
 										{(() => {
 											const monthControl =
-												captionLayout === 'dropdown' || captionLayout === 'dropdown-months'
-													? <components.MonthsDropdown
-															key="month"
-															className={classNames[UI.MonthsDropdown]}
-															aria-label={labelMonthDropdown()}
-															disabled={Boolean(props.disableNavigation)}
-															onChange={handleMonthChange(calendarMonth.date, monthOffset)}
-															options={getMonthOptions(
-																calendarMonth.date,
-																navStart,
-																navEnd,
-																formatters,
-																dateLib,
-															)}
-															style={getDropdownStyle(UI.MonthsDropdown)}
-															value={dateLib.getMonth(calendarMonth.date)}
-														/>
-													: <span key="month">{formatMonthDropdown(
+												captionLayout === 'dropdown' || captionLayout === 'dropdown-months' ? (
+													<components.MonthsDropdown
+														key="month"
+														className={classNames[UI.MonthsDropdown]}
+														aria-label={labelMonthDropdown()}
+														disabled={Boolean(props.disableNavigation)}
+														onChange={handleMonthChange(calendarMonth.date, monthOffset)}
+														options={getMonthOptions(
 															calendarMonth.date,
+															navStart,
+															navEnd,
+															formatters,
 															dateLib,
-														)}</span>;
+														)}
+														style={getDropdownStyle(UI.MonthsDropdown)}
+														value={dateLib.getMonth(calendarMonth.date)}
+													/>
+												) : (
+													<span key="month">
+														{formatMonthDropdown(calendarMonth.date, dateLib)}
+													</span>
+												);
 
 											const yearControl =
-												captionLayout === 'dropdown' || captionLayout === 'dropdown-years'
-													? <components.YearsDropdown
-															key="year"
-															className={classNames[UI.YearsDropdown]}
-															aria-label={labelYearDropdown(dateLib.options)}
-															disabled={Boolean(props.disableNavigation)}
-															onChange={handleYearChange(calendarMonth.date, monthOffset)}
-															options={getYearOptions(
-																navStart,
-																navEnd,
-																formatters,
-																dateLib,
-																Boolean(props.reverseYears),
-															)}
-															style={getDropdownStyle(UI.YearsDropdown)}
-															value={dateLib.getYear(calendarMonth.date)}
-														/>
-													: <span key="year">{formatYearDropdown(
-															calendarMonth.date,
+												captionLayout === 'dropdown' || captionLayout === 'dropdown-years' ? (
+													<components.YearsDropdown
+														key="year"
+														className={classNames[UI.YearsDropdown]}
+														aria-label={labelYearDropdown(dateLib.options)}
+														disabled={Boolean(props.disableNavigation)}
+														onChange={handleYearChange(calendarMonth.date, monthOffset)}
+														options={getYearOptions(
+															navStart,
+															navEnd,
+															formatters,
 															dateLib,
-														)}</span>;
+															Boolean(props.reverseYears),
+														)}
+														style={getDropdownStyle(UI.YearsDropdown)}
+														value={dateLib.getYear(calendarMonth.date)}
+													/>
+												) : (
+													<span key="year">{formatYearDropdown(calendarMonth.date, dateLib)}</span>
+												);
 
 											const controls =
 												dateLib.getMonthYearOrder() === 'year-first'
@@ -525,195 +534,235 @@ export function DayPicker(initialProps: DayPickerProps) @{
 												whiteSpace: 'nowrap',
 												wordWrap: 'normal',
 											}}
-										>{formatCaption(calendarMonth.date, dateLib.options, dateLib)}</span>
+										>
+											{formatCaption(calendarMonth.date, dateLib.options, dateLib)}
+										</span>
 									</components.DropdownNav>
-								: <components.CaptionLabel
+								) : (
+									<components.CaptionLabel
 										className={classNames[UI.CaptionLabel]}
 										style={styles?.[UI.CaptionLabel]}
 										role="status"
 										aria-live="polite"
-									>{formatCaption(
-										calendarMonth.date,
-										dateLib.options,
-										dateLib,
-									)}</components.CaptionLabel>}
-						</components.MonthCaption>
-						{navLayout === 'around' && !props.hideNavigation &&
-							displayIndex === numberOfMonths - 1 &&
-							<components.NextMonthButton
-								type="button"
-								className={classNames[UI.NextMonthButton]}
-								style={styles?.[UI.NextMonthButton]}
-								tabIndex={nextMonth ? undefined : -1}
-								aria-disabled={nextMonth ? undefined : true}
-								aria-label={labelNext(nextMonth)}
-								onClick={handleNextClick}
-								data-animated-button={props.animate ? 'true' : undefined}
-							>
-								<components.Chevron
-									disabled={nextMonth ? undefined : true}
-									className={classNames[UI.Chevron]}
-									style={styles?.[UI.Chevron]}
-									orientation={props.dir === 'rtl' ? 'left' : 'right'}
-								/>
-							</components.NextMonthButton>}
-						{displayIndex === numberOfMonths - 1 && navLayout === 'after' &&
-							!props.hideNavigation &&
-							<components.Nav
-								data-animated-nav={props.animate ? 'true' : undefined}
-								className={classNames[UI.Nav]}
-								style={styles?.[UI.Nav]}
-								aria-label={labelNav()}
-								onPreviousClick={handlePreviousClick}
-								onNextClick={handleNextClick}
-								previousMonth={previousMonth}
-								nextMonth={nextMonth}
-							/>}
+									>
+										{formatCaption(calendarMonth.date, dateLib.options, dateLib)}
+									</components.CaptionLabel>
+								)}
+							</components.MonthCaption>
+							{navLayout === 'around' &&
+								!props.hideNavigation &&
+								displayIndex === numberOfMonths - 1 && (
+									<components.NextMonthButton
+										type="button"
+										className={classNames[UI.NextMonthButton]}
+										style={styles?.[UI.NextMonthButton]}
+										tabIndex={nextMonth ? undefined : -1}
+										aria-disabled={nextMonth ? undefined : true}
+										aria-label={labelNext(nextMonth)}
+										onClick={handleNextClick}
+										data-animated-button={props.animate ? 'true' : undefined}
+									>
+										<components.Chevron
+											disabled={nextMonth ? undefined : true}
+											className={classNames[UI.Chevron]}
+											style={styles?.[UI.Chevron]}
+											orientation={props.dir === 'rtl' ? 'left' : 'right'}
+										/>
+									</components.NextMonthButton>
+								)}
+							{displayIndex === numberOfMonths - 1 &&
+								navLayout === 'after' &&
+								!props.hideNavigation && (
+									<components.Nav
+										data-animated-nav={props.animate ? 'true' : undefined}
+										className={classNames[UI.Nav]}
+										style={styles?.[UI.Nav]}
+										aria-label={labelNav()}
+										onPreviousClick={handlePreviousClick}
+										onNextClick={handleNextClick}
+										previousMonth={previousMonth}
+										nextMonth={nextMonth}
+									/>
+								)}
 
-						<components.MonthGrid
-							role="grid"
-							aria-multiselectable={mode === 'multiple' || mode === 'range'}
-							aria-label={labelGrid(calendarMonth.date, dateLib.options, dateLib) || undefined}
-							className={classNames[UI.MonthGrid]}
-							style={styles?.[UI.MonthGrid]}
-						>
-							{!props.hideWeekdays &&
-								<components.Weekdays
-									data-animated-weekdays={props.animate ? 'true' : undefined}
-									className={classNames[UI.Weekdays]}
-									style={styles?.[UI.Weekdays]}
-								>
-									{showWeekNumber &&
-										<components.WeekNumberHeader
-											aria-label={labelWeekNumberHeader(dateLib.options)}
-											className={classNames[UI.WeekNumberHeader]}
-											style={styles?.[UI.WeekNumberHeader]}
-											scope="col"
-										>{formatWeekNumberHeader()}</components.WeekNumberHeader>}
-									{weekdays.map(
-										(weekday) =>
+							<components.MonthGrid
+								role="grid"
+								aria-multiselectable={mode === 'multiple' || mode === 'range'}
+								aria-label={labelGrid(calendarMonth.date, dateLib.options, dateLib) || undefined}
+								className={classNames[UI.MonthGrid]}
+								style={styles?.[UI.MonthGrid]}
+							>
+								{!props.hideWeekdays && (
+									<components.Weekdays
+										data-animated-weekdays={props.animate ? 'true' : undefined}
+										className={classNames[UI.Weekdays]}
+										style={styles?.[UI.Weekdays]}
+									>
+										{showWeekNumber && (
+											<components.WeekNumberHeader
+												aria-label={labelWeekNumberHeader(dateLib.options)}
+												className={classNames[UI.WeekNumberHeader]}
+												style={styles?.[UI.WeekNumberHeader]}
+												scope="col"
+											>
+												{formatWeekNumberHeader()}
+											</components.WeekNumberHeader>
+										)}
+										{weekdays.map((weekday) => (
 											<components.Weekday
 												aria-label={labelWeekday(weekday, dateLib.options, dateLib)}
 												className={classNames[UI.Weekday]}
 												key={String(weekday)}
 												style={styles?.[UI.Weekday]}
 												scope="col"
-											>{formatWeekdayName(weekday, dateLib.options, dateLib)}</components.Weekday>,
-									)}
-								</components.Weekdays>}
-							<components.Weeks
-								data-animated-weeks={props.animate ? 'true' : undefined}
-								className={classNames[UI.Weeks]}
-								style={styles?.[UI.Weeks]}
-							>{calendarMonth.weeks.map((week) => {
-								return <components.Week
-									className={classNames[UI.Week]}
-									key={week.weekNumber}
-									style={styles?.[UI.Week]}
-									week={week}
+											>
+												{formatWeekdayName(weekday, dateLib.options, dateLib)}
+											</components.Weekday>
+										))}
+									</components.Weekdays>
+								)}
+								<components.Weeks
+									data-animated-weeks={props.animate ? 'true' : undefined}
+									className={classNames[UI.Weeks]}
+									style={styles?.[UI.Weeks]}
 								>
-									{showWeekNumber &&
-										<components.WeekNumber
-											week={week}
-											style={styles?.[UI.WeekNumber]}
-											aria-label={labelWeekNumber(week.weekNumber, {
-												locale,
-											})}
-											className={classNames[UI.WeekNumber]}
-											scope="row"
-											role="rowheader"
-										>{formatWeekNumber(week.weekNumber, dateLib)}</components.WeekNumber>}
-									{week.days.map((day: CalendarDay) => {
-										const { date } = day;
-										const modifiers = getModifiers(day);
+									{calendarMonth.weeks.map((week) => {
+										return (
+											<components.Week
+												className={classNames[UI.Week]}
+												key={week.weekNumber}
+												style={styles?.[UI.Week]}
+												week={week}
+											>
+												{showWeekNumber && (
+													<components.WeekNumber
+														week={week}
+														style={styles?.[UI.WeekNumber]}
+														aria-label={labelWeekNumber(week.weekNumber, {
+															locale,
+														})}
+														className={classNames[UI.WeekNumber]}
+														scope="row"
+														role="rowheader"
+													>
+														{formatWeekNumber(week.weekNumber, dateLib)}
+													</components.WeekNumber>
+												)}
+												{week.days.map((day: CalendarDay) => {
+													const { date } = day;
+													const modifiers = getModifiers(day);
 
-										modifiers[DayFlag.focused] = !modifiers.hidden &&
-											Boolean(focused?.isEqualTo(day));
+													modifiers[DayFlag.focused] =
+														!modifiers.hidden && Boolean(focused?.isEqualTo(day));
 
-										modifiers[SelectionState.selected] = isSelected?.(date) || modifiers.selected;
+													modifiers[SelectionState.selected] =
+														isSelected?.(date) || modifiers.selected;
 
-										if (isDateRange(selectedValue)) {
-											// add range modifiers
-											const { from, to } = selectedValue;
-											modifiers[SelectionState.range_start] = Boolean(
-												from && to && dateLib.isSameDay(date, from),
-											);
-											modifiers[SelectionState.range_end] = Boolean(
-												from && to && dateLib.isSameDay(date, to),
-											);
-											modifiers[SelectionState.range_middle] = rangeIncludesDate(
-												selectedValue,
-												date,
-												true,
-												dateLib,
-											);
-										}
+													if (isDateRange(selectedValue)) {
+														// add range modifiers
+														const { from, to } = selectedValue;
+														modifiers[SelectionState.range_start] = Boolean(
+															from && to && dateLib.isSameDay(date, from),
+														);
+														modifiers[SelectionState.range_end] = Boolean(
+															from && to && dateLib.isSameDay(date, to),
+														);
+														modifiers[SelectionState.range_middle] = rangeIncludesDate(
+															selectedValue,
+															date,
+															true,
+															dateLib,
+														);
+													}
 
-										const style = getStyleForModifiers(modifiers, styles, props.modifiersStyles);
+													const style = getStyleForModifiers(
+														modifiers,
+														styles,
+														props.modifiersStyles,
+													);
 
-										const className = getClassNamesForModifiers(
-											modifiers,
-											classNames,
-											props.modifiersClassNames,
+													const className = getClassNamesForModifiers(
+														modifiers,
+														classNames,
+														props.modifiersClassNames,
+													);
+
+													const ariaLabel =
+														!isInteractive && !modifiers.hidden
+															? labelGridcell(date, modifiers, dateLib.options, dateLib)
+															: undefined;
+
+													return (
+														<components.Day
+															key={`${day.isoDate}_${day.displayMonthId}`}
+															day={day}
+															modifiers={modifiers}
+															className={className.join(' ')}
+															style={style}
+															role="gridcell"
+															aria-selected={modifiers.selected || undefined}
+															aria-label={ariaLabel}
+															data-day={day.isoDate}
+															data-month={day.outside ? day.dateMonthId : undefined}
+															data-selected={modifiers.selected || undefined}
+															data-disabled={modifiers.disabled || undefined}
+															data-hidden={modifiers.hidden || undefined}
+															data-outside={day.outside || undefined}
+															data-focused={modifiers.focused || undefined}
+															data-today={modifiers.today || undefined}
+														>
+															{!modifiers.hidden && isInteractive ? (
+																<components.DayButton
+																	className={classNames[UI.DayButton]}
+																	style={styles?.[UI.DayButton]}
+																	type="button"
+																	day={day}
+																	modifiers={modifiers}
+																	disabled={(!modifiers.focused && modifiers.disabled) || undefined}
+																	aria-disabled={
+																		(modifiers.focused && modifiers.disabled) || undefined
+																	}
+																	tabIndex={isFocusTarget(day) ? 0 : -1}
+																	aria-label={labelDayButton(
+																		date,
+																		modifiers,
+																		dateLib.options,
+																		dateLib,
+																	)}
+																	onClick={handleDayClick(day, modifiers)}
+																	onBlur={handleDayBlur(day, modifiers)}
+																	onFocus={handleDayFocus(day, modifiers)}
+																	onKeyDown={handleDayKeyDown(day, modifiers)}
+																	onMouseEnter={handleDayMouseEnter(day, modifiers)}
+																	onMouseLeave={handleDayMouseLeave(day, modifiers)}
+																>
+																	{formatDay(date, dateLib.options, dateLib)}
+																</components.DayButton>
+															) : (
+																!modifiers.hidden && formatDay(day.date, dateLib.options, dateLib)
+															)}
+														</components.Day>
+													);
+												})}
+											</components.Week>
 										);
-
-										const ariaLabel =
-											!isInteractive && !modifiers.hidden
-												? labelGridcell(date, modifiers, dateLib.options, dateLib)
-												: undefined;
-
-										return <components.Day
-											key={`${day.isoDate}_${day.displayMonthId}`}
-											day={day}
-											modifiers={modifiers}
-											className={className.join(' ')}
-											style={style}
-											role="gridcell"
-											aria-selected={modifiers.selected || undefined}
-											aria-label={ariaLabel}
-											data-day={day.isoDate}
-											data-month={day.outside ? day.dateMonthId : undefined}
-											data-selected={modifiers.selected || undefined}
-											data-disabled={modifiers.disabled || undefined}
-											data-hidden={modifiers.hidden || undefined}
-											data-outside={day.outside || undefined}
-											data-focused={modifiers.focused || undefined}
-											data-today={modifiers.today || undefined}
-										>
-											{!modifiers.hidden && isInteractive
-												? <components.DayButton
-														className={classNames[UI.DayButton]}
-														style={styles?.[UI.DayButton]}
-														type="button"
-														day={day}
-														modifiers={modifiers}
-														disabled={!modifiers.focused && modifiers.disabled || undefined}
-														aria-disabled={modifiers.focused && modifiers.disabled || undefined}
-														tabIndex={isFocusTarget(day) ? 0 : -1}
-														aria-label={labelDayButton(date, modifiers, dateLib.options, dateLib)}
-														onClick={handleDayClick(day, modifiers)}
-														onBlur={handleDayBlur(day, modifiers)}
-														onFocus={handleDayFocus(day, modifiers)}
-														onKeyDown={handleDayKeyDown(day, modifiers)}
-														onMouseEnter={handleDayMouseEnter(day, modifiers)}
-														onMouseLeave={handleDayMouseLeave(day, modifiers)}
-													>{formatDay(date, dateLib.options, dateLib)}</components.DayButton>
-												: !modifiers.hidden && formatDay(day.date, dateLib.options, dateLib)}
-										</components.Day>;
 									})}
-								</components.Week>;
-							})}</components.Weeks>
-						</components.MonthGrid>
-					</components.Month>;
+								</components.Weeks>
+							</components.MonthGrid>
+						</components.Month>
+					);
 				})}
 			</components.Months>
-			{props.footer &&
+			{props.footer && (
 				<components.Footer
 					className={classNames[UI.Footer]}
 					style={styles?.[UI.Footer]}
 					role="status"
 					aria-live="polite"
-				>{props.footer}</components.Footer>}
+				>
+					{props.footer}
+				</components.Footer>
+			)}
 		</components.Root>
 	</DayPickerContextProvider>
 }

@@ -25,7 +25,9 @@ interface Item {
 function Tip(props: { item: Item; cls: string }) @{
 	<div class={props.cls}>
 		<span class="tip-label">{props.item.label}</span>
-		<button class="tip-btn" onClick={hit}>{'hit'}</button>
+		<button class="tip-btn" onClick={hit}>
+			{'hit'}
+		</button>
 	</div>
 }
 
@@ -33,7 +35,11 @@ function Section(props: {
 	secClass: string;
 	tipClass: string;
 	prefix: string;
-	bind: (setOpen: (v: boolean) => void, setTick: (v: number) => void, setDistinct: (v: boolean) => void) => void;
+	bind: (
+		setOpen: (v: boolean) => void,
+		setTick: (v: number) => void,
+		setDistinct: (v: boolean) => void,
+	) => void;
 }) @{
 	const open = track(false);
 	const tick = track(0);

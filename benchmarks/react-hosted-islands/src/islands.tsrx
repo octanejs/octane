@@ -21,7 +21,9 @@ export function EmptyIsland(props) @{
 /** An island with one delegated click binding. */
 export function ClickIsland(props) @{
 	<section class="click-island">
-		<button class="go" onClick={() => props.onPing(props.index)}>{'go ' + props.index}</button>
+		<button class="go" onClick={() => props.onPing(props.index)}>
+			{'go ' + props.index}
+		</button>
 	</section>
 }
 

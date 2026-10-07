@@ -3,6 +3,8 @@ export function App(props: { initialName: string }) @{
 		<label>Name</label>
 		<input value={props.initialName} />
 		<h1 id="greeting">Not implemented</h1>
-		<button id="submit-count" type="button">Submitted: 0</button>
+		<button id="submit-count" type="button">
+			Submitted: 0
+		</button>
 	</section>
 }

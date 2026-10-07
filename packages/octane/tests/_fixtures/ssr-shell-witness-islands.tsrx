@@ -35,11 +35,15 @@ export function Islands() @{
 			<Action />
 			<Descriptor />
 			<Hydrate independent when={interaction()}>
-				<button type="button" onClick={choose}>{'Nested'}</button>
+				<button type="button" onClick={choose}>
+					{'Nested'}
+				</button>
 			</Hydrate>
 		</Hydrate>
 		<footer>
-			<button type="button" onDoubleClick={choose}>{'After'}</button>
+			<button type="button" onDoubleClick={choose}>
+				{'After'}
+			</button>
 		</footer>
 	</main>
 }

@@ -3,7 +3,7 @@
   "pristineSource": "packages/alien-signals/upstream/src/index.test.ts",
   "adaptedSource": "packages/alien-signals/tests/upstream-adapted.test.ts",
   "fixtureSource": "packages/alien-signals/tests/_fixtures/hooks.tsrx",
-  "fixtureFileSha256": "2fe6dfb198d5acd39a2ba2c88e1b3587879d4bf68092d839d7124a9e05e028ca",
+  "fixtureFileSha256": "3cfa34a95bc3b24b11e640058fe0ab84e73e8fa446eafb9965fda27701581e5d",
   "permittedTransformations": [
     {
       "kind": "runner",

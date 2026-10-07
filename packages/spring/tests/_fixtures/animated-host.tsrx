@@ -4,7 +4,9 @@ export function AnimatedHostFixture(props) @{
 	const x = new SpringValue(0);
 	const y = new SpringValue(0);
 	props.onReady({ x, y });
-	<animated.div id="animated-host" style={{ left: x, top: y }}>{'spring'}</animated.div>
+	<animated.div id="animated-host" style={{ left: x, top: y }}>
+		{'spring'}
+	</animated.div>
 }
 
 export function AnimatedSsrFixture(props) @{
@@ -12,7 +14,9 @@ export function AnimatedSsrFixture(props) @{
 		id="animated-ssr"
 		data-state="initial"
 		style={{ left: props.left, opacity: props.opacity }}
-	>{'hydrated spring'}</animated.div>
+	>
+		{'hydrated spring'}
+	</animated.div>
 }
 
 export function AnimatedHostSurfaceFixture(props) @{
@@ -39,12 +43,16 @@ export function AnimatedHostSurfaceFixture(props) @{
 }
 
 function ForwardingCustom(props) @{
-	<button id="animated-custom" ref={props.ref} style={props.style}>{props.children}</button>
+	<button id="animated-custom" ref={props.ref} style={props.style}>
+		{props.children}
+	</button>
 }
 
 function OpaqueCustom(props) @{
 	props.onRender();
-	<span id="animated-opaque" data-value={props.value}>{'opaque'}</span>
+	<span id="animated-opaque" data-value={props.value}>
+		{'opaque'}
+	</span>
 }
 
 const AnimatedCustom = animated(ForwardingCustom);
@@ -52,7 +60,9 @@ const AnimatedOpaque = animated(OpaqueCustom);
 
 export function AnimatedCustomFixture(props) @{
 	<>
-		<AnimatedCustom ref={props.hostRef} style={{ width: props.width }}>{'custom'}</AnimatedCustom>
+		<AnimatedCustom ref={props.hostRef} style={{ width: props.width }}>
+			{'custom'}
+		</AnimatedCustom>
 		<AnimatedOpaque value={props.value} onRender={props.onRender} />
 	</>
 }

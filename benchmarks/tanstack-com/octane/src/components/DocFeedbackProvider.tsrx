@@ -28,13 +28,10 @@ export function DocFeedbackProvider({
 	const { openLoginModal } = useLoginModal();
 	const containerRef = useRef<HTMLDivElement>(null);
 
-	const [creatingState, setCreatingState] = useState<
-		| {
-				blockId: string;
-				type: 'note' | 'improvement';
-		  }
-		| null
-	>(null);
+	const [creatingState, setCreatingState] = useState<{
+		blockId: string;
+		type: 'note' | 'improvement';
+	} | null>(null);
 
 	const [blockSelectors, setBlockSelectors] = useState<Map<string, string>>(new Map());
 	const [blockContentHashes, setBlockContentHashes] = useState<Map<string, string>>(new Map());
@@ -122,10 +119,8 @@ export function DocFeedbackProvider({
 				const handleMouseLeave = (e: MouseEvent) => {
 					// Only clear hover if we're actually leaving this block
 					// (not just entering a child element)
-					const relatedTarget =
-						e.relatedTarget instanceof HTMLElement ? e.relatedTarget : null;
-					const closestBlock =
-						relatedTarget ? findClosestBlock(relatedTarget) : null;
+					const relatedTarget = e.relatedTarget instanceof HTMLElement ? e.relatedTarget : null;
+					const closestBlock = relatedTarget ? findClosestBlock(relatedTarget) : null;
 					if (!relatedTarget || !block.contains(relatedTarget) || closestBlock !== block) {
 						setHoveredBlockId((current) => (current === blockId ? null : current));
 						block.style.backgroundColor = '';
@@ -201,116 +196,124 @@ export function DocFeedbackProvider({
 		setCreatingState(null);
 	}, []);
 
-	const handleAddFeedback = useCallback((blockId: string, type: 'note' | 'improvement') => {
-		const selector = blockSelectors.get(blockId);
-		if (!selector) return;
-
-		// If not logged in, show login modal
-		if (!user) {
-			openLoginModal({
-				onSuccess: () => {
-					// After login, open the creating interface
-					setCreatingState({ blockId, type });
-				},
-			});
-			return;
-		}
-
-		// Check if there's existing feedback for this block
-		const existingNote = userNotes.find((n) => n.blockSelector === selector);
-		const existingImprovement = userImprovements.find((n) => n.blockSelector === selector);
-
-		// If feedback already exists, do nothing (user can toggle it themselves)
-		if (type === 'note' && existingNote) {
-			return;
-		}
-
-		if (type === 'improvement' && existingImprovement) {
-			return;
-		}
-
-		// Open creating interface for new feedback
-		setCreatingState({
-			blockId,
-			type,
-		});
-	}, [blockSelectors, userNotes, userImprovements, user, openLoginModal]);
-
-	return <div ref={containerRef} class="relative">
-		{children}
-
-		{/* Render floating buttons for each block (visible to all users) */}
-		{Array.from(blockSelectors.keys()).map((blockId) => {
+	const handleAddFeedback = useCallback(
+		(blockId: string, type: 'note' | 'improvement') => {
 			const selector = blockSelectors.get(blockId);
-			if (!selector) return null;
-			const block = blockElements.get(blockId);
-			if (!block) return null;
+			if (!selector) return;
 
-			// Check if this block has a note or improvement (only for logged-in users)
-			const note =
-				user ? userNotes.find((n) => n.blockSelector === selector) : undefined;
-			const improvement =
-				user ? userImprovements.find((n) => n.blockSelector === selector) : undefined;
-			const isHovered = hoveredBlockId === blockId;
+			// If not logged in, show login modal
+			if (!user) {
+				openLoginModal({
+					onSuccess: () => {
+						// After login, open the creating interface
+						setCreatingState({ blockId, type });
+					},
+				});
+				return;
+			}
 
-			return <BlockButton
-				key={blockId}
-				blockId={blockId}
-				block={block}
-				isHovered={isHovered}
-				hasNote={!!note}
-				hasImprovement={!!improvement}
-				isMenuOpen={openMenuBlockId === blockId}
-				onMenuOpenChange={(isOpen) => setOpenMenuBlockId(isOpen ? blockId : null)}
-				onAddNote={() => handleAddFeedback(blockId, 'note')}
-				onAddFeedback={() => handleAddFeedback(blockId, 'improvement')}
-				onShowNote={note ? () => {} : undefined}
-			/>;
-		})}
+			// Check if there's existing feedback for this block
+			const existingNote = userNotes.find((n) => n.blockSelector === selector);
+			const existingImprovement = userImprovements.find((n) => n.blockSelector === selector);
 
-		{/* Render notes inline (only for logged-in users) */}
-		{userNotes.map((note) => {
-			// Find the block ID for this note's selector
-			const blockId = Array.from(blockSelectors.entries()).find(
-				([_, selector]) => selector === note.blockSelector,
-			)?.[0];
+			// If feedback already exists, do nothing (user can toggle it themselves)
+			if (type === 'note' && existingNote) {
+				return;
+			}
 
-			if (!blockId) return null;
-			const block = blockElements.get(blockId);
-			if (!block) return null;
+			if (type === 'improvement' && existingImprovement) {
+				return;
+			}
 
-			return <NotePortal key={note.id} block={block} note={note} />;
-		})}
+			// Open creating interface for new feedback
+			setCreatingState({
+				blockId,
+				type,
+			});
+		},
+		[blockSelectors, userNotes, userImprovements, user, openLoginModal],
+	);
 
-		{/* Render improvements inline */}
-		{userImprovements.map((improvement) => {
-			// Find the block ID for this improvement's selector
-			const blockId = Array.from(blockSelectors.entries()).find(
-				([_, selector]) => selector === improvement.blockSelector,
-			)?.[0];
+	return (
+		<div ref={containerRef} class="relative">
+			{children}
 
-			if (!blockId) return null;
-			const block = blockElements.get(blockId);
-			if (!block) return null;
+			{/* Render floating buttons for each block (visible to all users) */}
+			{Array.from(blockSelectors.keys()).map((blockId) => {
+				const selector = blockSelectors.get(blockId);
+				if (!selector) return null;
+				const block = blockElements.get(blockId);
+				if (!block) return null;
 
-			return <NotePortal key={improvement.id} block={block} note={improvement} />;
-		})}
+				// Check if this block has a note or improvement (only for logged-in users)
+				const note = user ? userNotes.find((n) => n.blockSelector === selector) : undefined;
+				const improvement = user
+					? userImprovements.find((n) => n.blockSelector === selector)
+					: undefined;
+				const isHovered = hoveredBlockId === blockId;
 
-		{/* Render creating interface */}
-		{creatingState &&
-			<CreatingFeedbackPortal
-				blockId={creatingState.blockId}
-				block={blockElements.get(creatingState.blockId)}
-				type={creatingState.type}
-				blockSelector={blockSelectors.get(creatingState.blockId) || ''}
-				blockContentHash={blockContentHashes.get(creatingState.blockId) || ''}
-				blockMarkdown={blockMarkdowns.get(creatingState.blockId) || ''}
-				pagePath={pagePath}
-				libraryId={libraryId}
-				libraryVersion={libraryVersion}
-				onClose={handleCloseCreating}
-			/>}
-	</div>;
+				return (
+					<BlockButton
+						key={blockId}
+						blockId={blockId}
+						block={block}
+						isHovered={isHovered}
+						hasNote={!!note}
+						hasImprovement={!!improvement}
+						isMenuOpen={openMenuBlockId === blockId}
+						onMenuOpenChange={(isOpen) => setOpenMenuBlockId(isOpen ? blockId : null)}
+						onAddNote={() => handleAddFeedback(blockId, 'note')}
+						onAddFeedback={() => handleAddFeedback(blockId, 'improvement')}
+						onShowNote={note ? () => {} : undefined}
+					/>
+				);
+			})}
+
+			{/* Render notes inline (only for logged-in users) */}
+			{userNotes.map((note) => {
+				// Find the block ID for this note's selector
+				const blockId = Array.from(blockSelectors.entries()).find(
+					([_, selector]) => selector === note.blockSelector,
+				)?.[0];
+
+				if (!blockId) return null;
+				const block = blockElements.get(blockId);
+				if (!block) return null;
+
+				return <NotePortal key={note.id} block={block} note={note} />;
+			})}
+
+			{/* Render improvements inline */}
+			{userImprovements.map((improvement) => {
+				// Find the block ID for this improvement's selector
+				const blockId = Array.from(blockSelectors.entries()).find(
+					([_, selector]) => selector === improvement.blockSelector,
+				)?.[0];
+
+				if (!blockId) return null;
+				const block = blockElements.get(blockId);
+				if (!block) return null;
+
+				return <NotePortal key={improvement.id} block={block} note={improvement} />;
+			})}
+
+			{/* Render creating interface */}
+			{creatingState && (
+				<CreatingFeedbackPortal
+					blockId={creatingState.blockId}
+					block={blockElements.get(creatingState.blockId)}
+					type={creatingState.type}
+					blockSelector={blockSelectors.get(creatingState.blockId) || ''}
+					blockContentHash={blockContentHashes.get(creatingState.blockId) || ''}
+					blockMarkdown={blockMarkdowns.get(creatingState.blockId) || ''}
+					pagePath={pagePath}
+					libraryId={libraryId}
+					libraryVersion={libraryVersion}
+					onClose={handleCloseCreating}
+				/>
+			)}
+		</div>
+	);
 }
 
 // Component to render floating button for a block
@@ -527,22 +530,21 @@ function CreatingFeedbackNote({
 	const isImprovement = type === 'improvement';
 	const Icon = isImprovement ? Lightbulb : MessageSquare;
 
-	const colors =
-		isImprovement
-			? {
-					bg: 'bg-yellow-50 dark:bg-yellow-900/20',
-					border: 'border-yellow-400 dark:border-yellow-600',
-					header: 'bg-yellow-100 dark:bg-yellow-900/30',
-					icon: 'text-yellow-600 dark:text-yellow-500 text-[14px]',
-					text: 'text-yellow-800 dark:text-yellow-300',
-				}
-			: {
-					bg: 'bg-blue-50 dark:bg-blue-900/20',
-					border: 'border-blue-400 dark:border-blue-600',
-					header: 'bg-blue-100 dark:bg-blue-900/30',
-					icon: 'text-blue-600 dark:text-blue-500 text-[14px]',
-					text: 'text-blue-800 dark:text-blue-300',
-				};
+	const colors = isImprovement
+		? {
+				bg: 'bg-yellow-50 dark:bg-yellow-900/20',
+				border: 'border-yellow-400 dark:border-yellow-600',
+				header: 'bg-yellow-100 dark:bg-yellow-900/30',
+				icon: 'text-yellow-600 dark:text-yellow-500 text-[14px]',
+				text: 'text-yellow-800 dark:text-yellow-300',
+			}
+		: {
+				bg: 'bg-blue-50 dark:bg-blue-900/20',
+				border: 'border-blue-400 dark:border-blue-600',
+				header: 'bg-blue-100 dark:bg-blue-900/30',
+				icon: 'text-blue-600 dark:text-blue-500 text-[14px]',
+				text: 'text-blue-800 dark:text-blue-300',
+			};
 
 	const createMutation = useMutation({
 		mutationFn: createDocFeedback,
@@ -644,112 +646,117 @@ function CreatingFeedbackNote({
 	};
 
 	const charCount = content.length;
-	const points =
-		isImprovement ? (charCount * 0.1).toFixed(1) : '0.0';
+	const points = isImprovement ? (charCount * 0.1).toFixed(1) : '0.0';
 
-	return <div class="w-full transition-all duration-200">
-		<div
-			class={twMerge(
-				colors.bg,
-				`border-r-4 ${colors.border}`,
-				'rounded-l-lg shadow-lg',
-				'overflow-hidden',
-				'transition-all duration-200',
-			)}
-		>
-			{/* Error message */}
-			{error &&
-				<div
-					class="m-2 p-2 rounded bg-red-50 dark:bg-red-900/20 text-red-800 dark:text-red-200 border border-red-200 dark:border-red-800 text-xs"
-				>{error}</div>}
+	return (
+		<div class="w-full transition-all duration-200">
+			<div
+				class={twMerge(
+					colors.bg,
+					`border-r-4 ${colors.border}`,
+					'rounded-l-lg shadow-lg',
+					'overflow-hidden',
+					'transition-all duration-200',
+				)}
+			>
+				{/* Error message */}
+				{error && (
+					<div class="m-2 p-2 rounded bg-red-50 dark:bg-red-900/20 text-red-800 dark:text-red-200 border border-red-200 dark:border-red-800 text-xs">
+						{error}
+					</div>
+				)}
 
-			{/* Header */}
-			<div class={`flex items-center justify-between gap-2 p-2 ${colors.header}`}>
-				<div class="flex items-center gap-2 flex-1 min-w-0">
-					<Suspense fallback={<div class={`${colors.icon} text-xs`}>...</div>}>
-						<Icon className={`${colors.icon} text-xs shrink-0`} />
-					</Suspense>
-					<span class={`text-xs font-medium ${colors.text}`}>
-						{isImprovement ? 'New Improvement' : 'New Note'}
-					</span>
+				{/* Header */}
+				<div class={`flex items-center justify-between gap-2 p-2 ${colors.header}`}>
+					<div class="flex items-center gap-2 flex-1 min-w-0">
+						<Suspense fallback={<div class={`${colors.icon} text-xs`}>...</div>}>
+							<Icon className={`${colors.icon} text-xs shrink-0`} />
+						</Suspense>
+						<span class={`text-xs font-medium ${colors.text}`}>
+							{isImprovement ? 'New Improvement' : 'New Note'}
+						</span>
+					</div>
 				</div>
-			</div>
 
-			{/* Content */}
-			<div class="p-3">
-				{/* Editable textarea */}
-				<textarea
-					ref={textareaRef}
-					value={content}
-					onInput={(e) => setContent(e.currentTarget.value)}
-					placeholder={isImprovement
-						? 'Describe what could be improved...'
-						: 'Add your personal note...'}
-					class={twMerge(
-						'w-full px-0 py-0',
-						'bg-transparent',
-						'border-none',
-						'text-sm text-gray-800 dark:text-gray-200',
-						'placeholder-gray-400 dark:placeholder-gray-500',
-						'focus:outline-none',
-						'resize-none overflow-hidden',
-						'whitespace-pre-wrap',
+				{/* Content */}
+				<div class="p-3">
+					{/* Editable textarea */}
+					<textarea
+						ref={textareaRef}
+						value={content}
+						onInput={(e) => setContent(e.currentTarget.value)}
+						placeholder={
+							isImprovement ? 'Describe what could be improved...' : 'Add your personal note...'
+						}
+						class={twMerge(
+							'w-full px-0 py-0',
+							'bg-transparent',
+							'border-none',
+							'text-sm text-gray-800 dark:text-gray-200',
+							'placeholder-gray-400 dark:placeholder-gray-500',
+							'focus:outline-none',
+							'resize-none overflow-hidden',
+							'whitespace-pre-wrap',
+						)}
+						disabled={isSaving}
+					/>
+
+					{/* Character count for improvements */}
+					{isImprovement && charCount > 0 && (
+						<div class="mt-2 flex items-center justify-between text-xs">
+							<div
+								class={twMerge(
+									'font-medium',
+									charCount < 10
+										? 'text-red-600 dark:text-red-400'
+										: charCount >= 1000
+											? 'text-yellow-600 dark:text-yellow-400'
+											: 'text-green-600 dark:text-green-400',
+								)}
+							>
+								{charCount < 10 ? (
+									<span>{10 - charCount} more characters needed</span>
+								) : charCount >= 1000 ? (
+									<span>At maximum points</span>
+								) : (
+									<span>{charCount} characters</span>
+								)}
+							</div>
+							<div class="text-gray-600 dark:text-gray-400">
+								<span class="font-semibold text-blue-600 dark:text-blue-400">
+									{points}
+									points
+								</span>
+							</div>
+						</div>
 					)}
-					disabled={isSaving}
-				/>
 
-				{/* Character count for improvements */}
-				{isImprovement && charCount > 0 &&
-					<div class="mt-2 flex items-center justify-between text-xs">
-						<div
+					{/* Action buttons */}
+					<div class="flex items-center gap-2 mt-2">
+						<button
+							onClick={handleSave}
+							disabled={isSaving || (isImprovement && charCount < 10) || charCount === 0}
 							class={twMerge(
-								'font-medium',
-								charCount < 10
-									? 'text-red-600 dark:text-red-400'
-									: charCount >= 1000
-										? 'text-yellow-600 dark:text-yellow-400'
-										: 'text-green-600 dark:text-green-400',
+								'px-3 py-1 text-xs font-medium rounded',
+								'bg-blue-600 text-white',
+								'hover:bg-blue-700',
+								'disabled:opacity-50 disabled:cursor-not-allowed',
+								'transition-colors duration-150',
+								'flex items-center gap-1',
 							)}
 						>
-							{charCount < 10
-								? <span>{10 - charCount} more characters needed</span>
-								: charCount >= 1000
-									? <span>At maximum points</span>
-									: <span>{charCount} characters</span>}
-						</div>
-						<div class="text-gray-600 dark:text-gray-400">
-							<span class="font-semibold text-blue-600 dark:text-blue-400">
-								{points}
-								points
-							</span>
-						</div>
-					</div>}
-
-				{/* Action buttons */}
-				<div class="flex items-center gap-2 mt-2">
-					<button
-						onClick={handleSave}
-						disabled={isSaving || isImprovement && charCount < 10 || charCount === 0}
-						class={twMerge(
-							'px-3 py-1 text-xs font-medium rounded',
-							'bg-blue-600 text-white',
-							'hover:bg-blue-700',
-							'disabled:opacity-50 disabled:cursor-not-allowed',
-							'transition-colors duration-150',
-							'flex items-center gap-1',
-						)}
-					>
-						{isSaving ? 'Saving...' : 'Save'}
-					</button>
-					<button
-						onClick={onClose}
-						disabled={isSaving}
-						class="px-3 py-1 text-xs font-medium text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white disabled:opacity-50"
-					>
-						Cancel
-					</button>
+							{isSaving ? 'Saving...' : 'Save'}
+						</button>
+						<button
+							onClick={onClose}
+							disabled={isSaving}
+							class="px-3 py-1 text-xs font-medium text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white disabled:opacity-50"
+						>
+							Cancel
+						</button>
+					</div>
 				</div>
 			</div>
 		</div>
-	</div>;
+	);
 }

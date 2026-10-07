@@ -33,7 +33,7 @@
       "arch": "any",
       "packageManager": "pnpm@12.9.1",
       "lockfile": "pnpm-lock.yaml",
-      "lockfileSha256": "12e10f2aa9dc05ffbedf9272eca9e195da62c135db7c819f49ce5149923140df"
+      "lockfileSha256": "84dbefa8929419194a46ef5ec966ae8459aa05f40399e583828134ccc8121aad"
     }
   },
   "lanes": [
@@ -141,7 +141,7 @@
         {
           "path": "packages/radix/tests/_fixtures/radix-diff.tsrx",
           "role": "support",
-          "sha256": "0bab8d77b6897d720fcdfd227a2fc215226aef193870f92597feebf684d2bad7"
+          "sha256": "105ab192bd4600c6f98010ebbfe8e3911b73f6bb9b640a5c8eb592bc820179a5"
         },
         {
           "path": "packages/octane/tests/differential/_rig.ts",

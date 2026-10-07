@@ -107,14 +107,15 @@ export function BenchmarkExplorer(props: { card: BenchCard }) @{
 		for (const s of card.series) {
 			if (!selected.has(s.key)) continue;
 			const value = row[s.key];
-			if (typeof value === 'number') present.push({
-				key: s.key,
-				label: s.label,
-				value,
-				ceiling: rangeEnd(value, card.ceilings?.[row.op as string]?.[s.key]),
-				color: s.color,
-				ink: inkOnFill(s.color),
-			});
+			if (typeof value === 'number')
+				present.push({
+					key: s.key,
+					label: s.label,
+					value,
+					ceiling: rangeEnd(value, card.ceilings?.[row.op as string]?.[s.key]),
+					color: s.color,
+					ink: inkOnFill(s.color),
+				});
 			else missing.push({ key: s.key, label: s.label });
 		}
 		present.sort((a, b) => a.value - b.value);
@@ -126,18 +127,16 @@ export function BenchmarkExplorer(props: { card: BenchCard }) @{
 	}, [card, suite, selected]);
 
 	// --- Heatmap: raw grid + per-row re-baselining, computed once. --------------
-	const grid = useMemo(
-		() => card.rows.map((row) => {
+	const grid = useMemo(() =>
+		card.rows.map((row) => {
 			const nums: number[] = [];
 			for (const s of card.series) {
 				const v = row[s.key];
 				if (typeof v === 'number') nums.push(v);
 			}
-			const fastest =
-				nums.length ? Math.min(...nums) : null;
+			const fastest = nums.length ? Math.min(...nums) : null;
 			const cells = card.series.map((s) => {
-				const raw =
-					typeof row[s.key] === 'number' ? row[s.key] as number : null;
+				const raw = typeof row[s.key] === 'number' ? (row[s.key] as number) : null;
 				return {
 					key: s.key,
 					raw,
@@ -175,37 +174,28 @@ export function BenchmarkExplorer(props: { card: BenchCard }) @{
 	// The display projection for the current mode — text, tint and tooltip
 	// strings per cell, so the template only reads flat properties.
 	const heat = useMemo(() => {
-		const rows = grid.map(
-			(r) => ({
-				op: r.op,
-				cells: r.cells.map((c) => {
-					const disp =
-						mode === 'A' ? c.raw : c.rebased;
-					const isRef = mode === 'A' && c.key === baselineKey;
-					const kind =
-						c.raw == null
-							? 'null'
-							: isRef
-								? 'ref'
-								: 'data';
-					return {
-						key: c.key,
-						label: labelOf[c.key],
-						kind,
-						isFastest: mode === 'B' && c.isFastest,
-						text: disp == null ? '—' : fmtX(disp),
-						tint: kind === 'data' && disp != null ? tintFor(disp) : '',
-						primary: mode === 'A' ? fmtX(c.raw) + ' vs Octane' : fmtX(c.rebased) + ' vs fastest',
-						secondary: mode === 'B' && c.raw != null ? fmtX(c.raw) + ' vs Octane' : '',
-						fastest: mode === 'B' ? r.fastestLabel : '',
-						suite: r.op,
-					};
-				}),
+		const rows = grid.map((r) => ({
+			op: r.op,
+			cells: r.cells.map((c) => {
+				const disp = mode === 'A' ? c.raw : c.rebased;
+				const isRef = mode === 'A' && c.key === baselineKey;
+				const kind = c.raw == null ? 'null' : isRef ? 'ref' : 'data';
+				return {
+					key: c.key,
+					label: labelOf[c.key],
+					kind,
+					isFastest: mode === 'B' && c.isFastest,
+					text: disp == null ? '—' : fmtX(disp),
+					tint: kind === 'data' && disp != null ? tintFor(disp) : '',
+					primary: mode === 'A' ? fmtX(c.raw) + ' vs Octane' : fmtX(c.rebased) + ' vs fastest',
+					secondary: mode === 'B' && c.raw != null ? fmtX(c.raw) + ' vs Octane' : '',
+					fastest: mode === 'B' ? r.fastestLabel : '',
+					suite: r.op,
+				};
 			}),
-		);
+		}));
 		const geoRow = card.series.map((s) => {
-			const val =
-				mode === 'A' ? geo.a[s.key] : geo.b[s.key];
+			const val = mode === 'A' ? geo.a[s.key] : geo.b[s.key];
 			const isRef = mode === 'A' && s.key === baselineKey;
 			return {
 				key: s.key,
@@ -732,7 +722,9 @@ export function BenchmarkExplorer(props: { card: BenchCard }) @{
 				<div class="bx-panel">
 					<div class="bx-controls">
 						<div class="bx-ctl">
-							<span class="bx-ctl-label" id="bx-fw-label">frameworks</span>
+							<span class="bx-ctl-label" id="bx-fw-label">
+								frameworks
+							</span>
 							<div class="bx-chips" role="group" aria-labelledby="bx-fw-label">
 								@for (const s of card.series; key s.key) {
 									<button
@@ -748,7 +740,9 @@ export function BenchmarkExplorer(props: { card: BenchCard }) @{
 							</div>
 						</div>
 						<div class="bx-ctl">
-							<span class="bx-ctl-label" id="bx-suite-label">suite</span>
+							<span class="bx-ctl-label" id="bx-suite-label">
+								suite
+							</span>
 							<div class="bx-suites" role="group" aria-labelledby="bx-suite-label">
 								@for (const r of card.rows; key r.op) {
 									<button
@@ -756,7 +750,9 @@ export function BenchmarkExplorer(props: { card: BenchCard }) @{
 										class={['bx-suite', { 'bx-suite-on': r.op === suite }]}
 										aria-pressed={r.op === suite}
 										onClick={() => setSuite(r.op as string)}
-									>{r.op as string}</button>
+									>
+										{r.op as string}
+									</button>
 								}
 							</div>
 						</div>
@@ -769,43 +765,52 @@ export function BenchmarkExplorer(props: { card: BenchCard }) @{
 					>
 						<div
 							class="bx-refline"
-							style={'left:calc(var(--bx-label) + (100% - var(--bx-label)) * ' + bars.refFraction +
-								')'}
+							style={
+								'left:calc(var(--bx-label) + (100% - var(--bx-label)) * ' + bars.refFraction + ')'
+							}
 						>
 							<span class="bx-refcap">1× Octane</span>
 						</div>
 						@for (const item of bars.present; key item.key) {
 							<div
 								class="bx-row"
-								onMouseEnter={(e: MouseEvent) => show(e, {
-									fw: item.label,
-									suite,
-									primary: barText(item) + ' vs Octane',
-									secondary: item.ceiling !== undefined
-										? 'up to ' + fmtX(item.ceiling) + ' using the whole client API'
-										: item.value < 0.98
-											? 'faster than Octane'
-											: item.value > 1.02
-												? 'slower than Octane'
-												: 'matches Octane',
-									fastest: '',
-								})}
+								onMouseEnter={(e: MouseEvent) =>
+									show(e, {
+										fw: item.label,
+										suite,
+										primary: barText(item) + ' vs Octane',
+										secondary:
+											item.ceiling !== undefined
+												? 'up to ' + fmtX(item.ceiling) + ' using the whole client API'
+												: item.value < 0.98
+													? 'faster than Octane'
+													: item.value > 1.02
+														? 'slower than Octane'
+														: 'matches Octane',
+										fastest: '',
+									})
+								}
 								onMouseLeave={hide}
 							>
 								<span class="bx-row-label">{item.label as string}</span>
 								<div class="bx-track">
 									<div
 										class={['bx-fill', { 'bx-fill-cut': item.ceiling !== undefined }]}
-										style={'width:' + (item.value / bars.scaleMax) * 100 + '%;background:' +
-											item.color}
+										style={
+											'width:' + (item.value / bars.scaleMax) * 100 + '%;background:' + item.color
+										}
 									></div>
 									@if (item.ceiling !== undefined) {
 										<div
 											class="bx-fill-range"
-											style={'left:' + (item.value / bars.scaleMax) * 100 + '%;width:' +
+											style={
+												'left:' +
+												(item.value / bars.scaleMax) * 100 +
+												'%;width:' +
 												((item.ceiling - item.value) / bars.scaleMax) * 100 +
 												'%;background-color:' +
-												item.color}
+												item.color
+											}
 										></div>
 									}
 									<span
@@ -815,13 +820,19 @@ export function BenchmarkExplorer(props: { card: BenchCard }) @{
 												? 'bx-val-in'
 												: 'bx-val-out',
 										]}
-										style={'left:' + ((item.ceiling ?? item.value) / bars.scaleMax) * 100 + '%' +
+										style={
+											'left:' +
+											((item.ceiling ?? item.value) / bars.scaleMax) * 100 +
+											'%' +
 											((item.ceiling ?? item.value) / bars.scaleMax > 0.62
 												? item.ceiling === undefined
 													? ';color:' + item.ink.color + ';text-shadow:' + item.ink.shadow
 													: ';text-shadow:0 0 3px var(--panel)' // the hatched range is translucent, so the panel's ink reads on it
-												: '')}
-									>{barText(item) as string}</span>
+												: '')
+										}
+									>
+										{barText(item) as string}
+									</span>
 								</div>
 							</div>
 						}
@@ -829,7 +840,9 @@ export function BenchmarkExplorer(props: { card: BenchCard }) @{
 							<div class="bx-row bx-row-empty">
 								<span class="bx-row-label">{item.label as string}</span>
 								<div class="bx-track">
-									<span class="bx-val bx-val-out bx-muted" style="left:0">{'—'}</span>
+									<span class="bx-val bx-val-out bx-muted" style="left:0">
+										{'—'}
+									</span>
 								</div>
 							</div>
 						}
@@ -866,7 +879,9 @@ export function BenchmarkExplorer(props: { card: BenchCard }) @{
 						<table class="bx-heat">
 							<thead>
 								<tr>
-									<th scope="col" class="bx-corner">suite</th>
+									<th scope="col" class="bx-corner">
+										suite
+									</th>
 									@for (const s of card.series; key s.key) {
 										<th scope="col">
 											<span class="bx-th">
@@ -880,7 +895,9 @@ export function BenchmarkExplorer(props: { card: BenchCard }) @{
 							<tbody>
 								@for (const r of heat.rows; key r.op) {
 									<tr>
-										<th scope="row" class="bx-rowhead">{r.op as string}</th>
+										<th scope="row" class="bx-rowhead">
+											{r.op as string}
+										</th>
 										@for (const cell of r.cells; key cell.key) {
 											<td
 												class={[
@@ -894,30 +911,37 @@ export function BenchmarkExplorer(props: { card: BenchCard }) @{
 												style={cell.kind === 'data' ? 'background:' + cell.tint : undefined}
 												aria-label={cell.kind === 'null' ? 'no data' : undefined}
 												onMouseEnter={(e: MouseEvent) => {
-													if (cell.kind === 'data') show(e, {
-														fw: cell.label,
-														suite: cell.suite,
-														primary: cell.primary,
-														secondary: cell.secondary,
-														fastest: cell.fastest,
-													});
+													if (cell.kind === 'data')
+														show(e, {
+															fw: cell.label,
+															suite: cell.suite,
+															primary: cell.primary,
+															secondary: cell.secondary,
+															fastest: cell.fastest,
+														});
 												}}
 												onMouseLeave={() => {
 													if (cell.kind === 'data') hide();
 												}}
-											>{cell.text as string}</td>
+											>
+												{cell.text as string}
+											</td>
 										}
 									</tr>
 								}
 							</tbody>
 							<tfoot>
 								<tr>
-									<th scope="row" class="bx-rowhead bx-geo-head">geomean</th>
+									<th scope="row" class="bx-rowhead bx-geo-head">
+										geomean
+									</th>
 									@for (const g of heat.geoRow; key g.key) {
 										<td
 											class={['bx-cell', 'bx-geo', { 'bx-cell-ref': g.isRef }]}
 											style={g.tint ? 'background:' + g.tint : ''}
-										>{g.text as string}</td>
+										>
+											{g.text as string}
+										</td>
 									}
 								</tr>
 							</tfoot>

@@ -37,7 +37,7 @@
       "arch": "any",
       "packageManager": "pnpm@12.9.1",
       "lockfile": "pnpm-lock.yaml",
-      "lockfileSha256": "12e10f2aa9dc05ffbedf9272eca9e195da62c135db7c819f49ce5149923140df"
+      "lockfileSha256": "84dbefa8929419194a46ef5ec966ae8459aa05f40399e583828134ccc8121aad"
     }
   },
   "lanes": [
@@ -65,7 +65,7 @@
         {
           "path": "packages/wagmi/tests/_fixtures/parity.tsrx",
           "role": "support",
-          "sha256": "6cee81d1cd00c05c74d8e7a1596e5afaf895d3858c5d0210cf625272ef209e2e"
+          "sha256": "f6541cfb1e3f6ed74a471d6ba5b6df3fca87acd9d2d2f1bff73f0ea0a6d5a50b"
         },
         {
           "path": "packages/wagmi/tests/differential/_setup.ts",

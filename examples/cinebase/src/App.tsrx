@@ -17,9 +17,14 @@ interface NavigationProps {
 }
 
 function stopLinkNavigation(event: MouseEvent): boolean {
-	return event.defaultPrevented || event.button !== 0 || event.metaKey || event.ctrlKey ||
+	return (
+		event.defaultPrevented ||
+		event.button !== 0 ||
+		event.metaKey ||
+		event.ctrlKey ||
 		event.shiftKey ||
-		event.altKey;
+		event.altKey
+	);
 }
 
 function AppLink(props: {
@@ -38,12 +43,16 @@ function AppLink(props: {
 			event.preventDefault();
 			props.navigate(props.href);
 		}}
-	>{props.children}</a>
+	>
+		{props.children}
+	</a>
 }
 
 function Brand(props: NavigationProps) @{
 	<AppLink href="/" class="brand" navigate={props.navigate}>
-		<span class="brand-mark" aria-hidden="true">C</span>
+		<span class="brand-mark" aria-hidden="true">
+			C
+		</span>
 		<span>Cinebase</span>
 	</AppLink>
 }
@@ -53,7 +62,9 @@ function Header(props: NavigationProps & { watchlistCount: number }) @{
 		<div class="header-inner">
 			<Brand navigate={props.navigate} />
 			<nav aria-label="Primary navigation">
-				<AppLink href="/" class="nav-link" navigate={props.navigate}>Discover</AppLink>
+				<AppLink href="/" class="nav-link" navigate={props.navigate}>
+					Discover
+				</AppLink>
 				<AppLink href="/watchlist" class="nav-link watchlist-link" navigate={props.navigate}>
 					Watchlist
 					<span
@@ -113,23 +124,15 @@ function WatchlistButton(props: {
 			saved ? 'from' : 'to'
 		} watchlist`}
 		onClick={() => {
-			const next =
-				saved ? ids.filter((id) => id !== props.title.id) : [...ids, props.title.id];
+			const next = saved ? ids.filter((id) => id !== props.title.id) : [...ids, props.title.id];
 			props.watchlist(next);
 			try {
 				localStorage.setItem('cinebase:watchlist', JSON.stringify(next));
-			} catch {
-			}
+			} catch {}
 		}}
 	>
-		<span aria-hidden="true">
-			{saved ? '✓' : '+'}
-		</span>
-		{props.compact
-			? ''
-			: saved
-				? 'In watchlist'
-				: 'Add to watchlist'}
+		<span aria-hidden="true">{saved ? '✓' : '+'}</span>
+		{props.compact ? '' : saved ? 'In watchlist' : 'Add to watchlist'}
 	</button>
 }
 
@@ -154,10 +157,9 @@ function TitleCard(props: {
 		<div class="card-copy">
 			<p class="eyebrow">{`${props.title.kind} · ${props.title.year}`}</p>
 			<h3>
-				<AppLink
-					href={`/title/${props.title.id}`}
-					navigate={props.navigate}
-				>{props.title.name}</AppLink>
+				<AppLink href={`/title/${props.title.id}`} navigate={props.navigate}>
+					{props.title.name}
+				</AppLink>
 			</h3>
 			<div class="rating-row">
 				<span class="rating">
@@ -231,7 +233,9 @@ function CatalogPage(props: {
 		<div class="catalog-tools" role="search">
 			<label class="search-field">
 				<span class="sr-only">Search titles</span>
-				<span aria-hidden="true" class="search-icon">⌕</span>
+				<span aria-hidden="true" class="search-icon">
+					⌕
+				</span>
 				<input
 					type="search"
 					defaultValue={props.search}
@@ -253,7 +257,9 @@ function CatalogPage(props: {
 						]}
 						aria-pressed={genre === 'All' ? props.genre === '' : props.genre === genre}
 						onClick={() => props.navigate(catalogHref(props.search, genre === 'All' ? '' : genre))}
-					>{genre}</button>
+					>
+						{genre}
+					</button>
 				}
 			</div>
 		</div>
@@ -265,7 +271,9 @@ function CatalogPage(props: {
 			</div>
 		} @else if (result.error) {
 			<div class="catalog-status error-state" role="alert">
-				<span class="status-icon" aria-hidden="true">!</span>
+				<span class="status-icon" aria-hidden="true">
+					!
+				</span>
 				<h2>The catalog is temporarily unavailable</h2>
 				<p>Your search is safe. Reconnect and try the request again.</p>
 				<button
@@ -280,7 +288,9 @@ function CatalogPage(props: {
 			</div>
 		} @else if (titles.length === 0) {
 			<div class="catalog-status empty-state">
-				<span class="status-icon" aria-hidden="true">○</span>
+				<span class="status-icon" aria-hidden="true">
+					○
+				</span>
 				<h2>No titles found</h2>
 				<p>Try another title or clear the active filters.</p>
 				<button type="button" class="secondary-button" onClick={() => props.navigate('/')}>
@@ -290,9 +300,7 @@ function CatalogPage(props: {
 		} @else {
 			<>
 				<div class="results-heading">
-					<h2>
-						{props.search === '' && props.genre === '' ? 'Featured now' : 'Search results'}
-					</h2>
+					<h2>{props.search === '' && props.genre === '' ? 'Featured now' : 'Search results'}</h2>
 					<p role="status">{`${titles.length} ${titles.length === 1 ? 'title' : 'titles'}`}</p>
 				</div>
 				<div class="title-grid">
@@ -398,7 +406,9 @@ function WatchlistPage(props: {
 			</div>
 		} @else if (saved.length === 0) {
 			<div class="catalog-status empty-state">
-				<span class="status-icon" aria-hidden="true">＋</span>
+				<span class="status-icon" aria-hidden="true">
+					＋
+				</span>
 				<h2>Your watchlist is ready for a first pick</h2>
 				<p>Add a title from Discover and it will appear here.</p>
 				<AppLink href="/" class="primary-button link-button" navigate={props.navigate}>
@@ -462,7 +472,9 @@ function Shell(props: AppProps) @{
 	};
 
 	<div class="app-shell" data-app-ready={hydrated ? 'true' : 'false'}>
-		<a class="skip-link" href="#main">Skip to content</a>
+		<a class="skip-link" href="#main">
+			Skip to content
+		</a>
 		<OfflineBanner />
 		<Header navigate={navigate} watchlistCount={watchlistIds.length} />
 		<main id="main" tabIndex={-1}>

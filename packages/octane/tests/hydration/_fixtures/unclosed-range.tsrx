@@ -19,12 +19,16 @@ interface ParentProps {
 }
 
 export function PlainButton(props: ButtonProps) @{
-	<button data-state={props.label} onClick={props.onPress}>{props.children}</button>
+	<button data-state={props.label} onClick={props.onPress}>
+		{props.children}
+	</button>
 }
 
 export function BindingButton(props: ButtonProps) @{
 	'use dom bindings';
-	<button data-state={props.label} onClick={props.onPress}>{unbound(props.children)}</button>
+	<button data-state={props.label} onClick={props.onPress}>
+		{unbound(props.children)}
+	</button>
 }
 
 export function PlainParent(props: ParentProps) @{

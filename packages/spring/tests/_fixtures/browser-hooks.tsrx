@@ -6,5 +6,7 @@ export function BrowserHooksFixture(props) @{
 	const [intersectionRef, inView] = useInView({ once: props.once });
 	const reducedMotion = useReducedMotion();
 	props.onReady({ scroll, resize, inView, reducedMotion });
-	<div id="intersection-target" ref={intersectionRef}>target</div>
+	<div id="intersection-target" ref={intersectionRef}>
+		target
+	</div>
 }

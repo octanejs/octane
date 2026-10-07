@@ -26,46 +26,48 @@ function Fixture({ onSubmit }: { onSubmit: (output: v.InferOutput<typeof schema>
 	const role = useField(form, { path: ['role'] });
 	const tags = useFieldArray(form, { path: ['tags'] });
 
-	return <Form
-		of={form}
-		onSubmit={(output) => {
-			onSubmit(output);
-			setSubmitCount((count) => count + 1);
-		}}
-	>
-		<input
-			aria-label="Email"
-			name={email.props.name}
-			ref={email.props.ref}
-			value={email.input as string}
-			onFocus={email.props.onFocus}
-			onInput={email.props.onInput}
-			onBlur={email.props.onBlur}
-		/>
-		<select
-			aria-label="Role"
-			name={role.props.name}
-			ref={role.props.ref}
-			value={role.input as string}
-			onChange={role.props.onChange}
+	return (
+		<Form
+			of={form}
+			onSubmit={(output) => {
+				onSubmit(output);
+				setSubmitCount((count) => count + 1);
+			}}
 		>
-			<option value="reader">Reader</option>
-			<option value="writer">Writer</option>
-		</select>
-		<p data-testid="email-error">{email.errors?.[0] ?? ''}</p>
-		<p data-testid="tag-count">{String(tags.items.length)}</p>
-		<p data-testid="submit-count">{String(submitCount)}</p>
-		<button
-			type="button"
-			onClick={() => insert(form, { path: ['tags'], initialInput: { label: 'two' } })}
-		>
-			Add tag
-		</button>
-		<button type="button" onClick={() => reset(form)}>
-			Reset
-		</button>
-		<button type="submit">Submit</button>
-	</Form>;
+			<input
+				aria-label="Email"
+				name={email.props.name}
+				ref={email.props.ref}
+				value={email.input as string}
+				onFocus={email.props.onFocus}
+				onInput={email.props.onInput}
+				onBlur={email.props.onBlur}
+			/>
+			<select
+				aria-label="Role"
+				name={role.props.name}
+				ref={role.props.ref}
+				value={role.input as string}
+				onChange={role.props.onChange}
+			>
+				<option value="reader">Reader</option>
+				<option value="writer">Writer</option>
+			</select>
+			<p data-testid="email-error">{email.errors?.[0] ?? ''}</p>
+			<p data-testid="tag-count">{String(tags.items.length)}</p>
+			<p data-testid="submit-count">{String(submitCount)}</p>
+			<button
+				type="button"
+				onClick={() => insert(form, { path: ['tags'], initialInput: { label: 'two' } })}
+			>
+				Add tag
+			</button>
+			<button type="button" onClick={() => reset(form)}>
+				Reset
+			</button>
+			<button type="submit">Submit</button>
+		</Form>
+	);
 }
 
 describe('Formisch adapter', () => {
@@ -77,8 +79,8 @@ describe('Formisch adapter', () => {
 		const role = view.getByLabelText('Role');
 
 		await user.type(email, 'bad');
-		await waitFor(
-			() => expect(view.getByTestId('email-error')).toHaveTextContent('Enter a valid email'),
+		await waitFor(() =>
+			expect(view.getByTestId('email-error')).toHaveTextContent('Enter a valid email'),
 		);
 
 		await user.clear(email);

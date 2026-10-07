@@ -10,5 +10,6 @@ const colorModel: ColorModel<string> = {
 	equal: equalColorString,
 };
 
-export const HsvaStringColorPicker = (props: Partial<ColorPickerBaseProps<string>>) =>
-	<AlphaColorPicker {...props} colorModel={colorModel} />;
+export const HsvaStringColorPicker = (props: Partial<ColorPickerBaseProps<string>>) => (
+	<AlphaColorPicker {...props} colorModel={colorModel} />
+);

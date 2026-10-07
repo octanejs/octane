@@ -65,7 +65,11 @@ export function HostArm({ observe, show }: Toggle) @{
 }
 
 // A bare-function row handler is republished whenever the list updates.
-export function Rows({ observe, rows, onRowBlur }: Observe & {
+export function Rows({
+	observe,
+	rows,
+	onRowBlur,
+}: Observe & {
 	readonly rows: readonly number[];
 	readonly onRowBlur: () => void;
 }) @{
@@ -118,14 +122,23 @@ export function DialogArm({ observe, show, restore }: Restoring) @{
 }
 
 // A top-level portal: its DOM lies outside the range the arm's deletion removes.
-function PortaledDialog({ observe, restore, target }: Observe & {
+function PortaledDialog({
+	observe,
+	restore,
+	target,
+}: Observe & {
 	readonly restore: HTMLElement;
 	readonly target: HTMLElement;
 }) {
 	return createPortal(<Dialog observe={observe} restore={restore} />, target);
 }
 
-export function PortalDialogArm({ observe, show, restore, target }: Restoring & {
+export function PortalDialogArm({
+	observe,
+	show,
+	restore,
+	target,
+}: Restoring & {
 	readonly target: HTMLElement;
 }) @{
 	<section onBlur={() => observe('parent')}>
@@ -142,7 +155,11 @@ function Restore({ restore }: { readonly restore: HTMLElement }) @{
 
 // A value hole's input has a Block below its row; an earlier row component
 // restores focus as the row is deleted.
-export function EditableRows({ observe, restore, rows }: Observe & {
+export function EditableRows({
+	observe,
+	restore,
+	rows,
+}: Observe & {
 	readonly restore: HTMLElement;
 	readonly rows: readonly number[];
 }) @{

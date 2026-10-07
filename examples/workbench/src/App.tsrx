@@ -22,11 +22,15 @@ function RunPanel(props: { taskId: string }) @{
 		setRunError('');
 	}, [props.taskId]);
 
-	useTauriEvent<LogLine>('workbench:log', (received) => {
-		if (received.payload.taskId !== props.taskId) return;
-		setLines((current) => [...current, received.payload]);
-		if (received.payload.done) setRunning(false);
-	}, { enabled: watching });
+	useTauriEvent<LogLine>(
+		'workbench:log',
+		(received) => {
+			if (received.payload.taskId !== props.taskId) return;
+			setLines((current) => [...current, received.payload]);
+			if (received.payload.done) setRunning(false);
+		},
+		{ enabled: watching },
+	);
 
 	<div class="run">
 		<div class="run-controls">
@@ -50,15 +54,17 @@ function RunPanel(props: { taskId: string }) @{
 				type="button"
 				aria-pressed={watching ? 'true' : 'false'}
 				onClick={() => setWatching((current) => !current)}
-			>{(watching ? 'Stop watching log' : 'Watch log') as string}</button>
+			>
+				{(watching ? 'Stop watching log' : 'Watch log') as string}
+			</button>
 		</div>
-		<p class="run-status" role="status" aria-label="Run status">{(running
-			? 'Running'
-			: lines.length === 0
-				? 'Idle'
-				: 'Finished') as string}</p>
+		<p class="run-status" role="status" aria-label="Run status">
+			{(running ? 'Running' : lines.length === 0 ? 'Idle' : 'Finished') as string}
+		</p>
 		@if (runError !== '') {
-			<p class="error" role="alert">{runError as string}</p>
+			<p class="error" role="alert">
+				{runError as string}
+			</p>
 		}
 		<ol class="log" aria-label="Task log">
 			@for (const line of lines; key line.seq) {
@@ -86,7 +92,9 @@ function TaskDetailPane(props: { taskId: string }) @{
 
 	<div class="detail-body">
 		@if (detail.status === 'pending') {
-			<p class="status" role="status">Reading the task manifest…</p>
+			<p class="status" role="status">
+				Reading the task manifest…
+			</p>
 		} @else if (detail.status === 'error') {
 			<div class="error" role="alert">
 				<p>{describeError(detail.error) as string}</p>
@@ -103,11 +111,7 @@ function TaskDetailPane(props: { taskId: string }) @{
 	</div>
 }
 
-function TaskList(props: {
-	attempt: number;
-	selectedId: string;
-	onSelect: (id: string) => void;
-}) @{
+function TaskList(props: { attempt: number; selectedId: string; onSelect: (id: string) => void }) @{
 	const tasks = useInvoke<Task[]>('list_tasks', undefined, { deps: [props.attempt] });
 
 	<ul class="task-list">
@@ -141,7 +145,9 @@ export function App(props: { mode: BridgeMode }) @{
 				@try {
 					<TaskList attempt={attempt} selectedId={selectedId} onSelect={setSelectedId} />
 				} @pending {
-					<p class="status" role="status">Loading tasks…</p>
+					<p class="status" role="status">
+						Loading tasks…
+					</p>
 				} @catch (error, reset) {
 					<div class="error" role="alert">
 						<p>{describeError(error) as string}</p>

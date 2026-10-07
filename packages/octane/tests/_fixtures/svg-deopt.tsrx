@@ -212,8 +212,8 @@ export function TemplateNamespaceDestinations(props) @{
 // template-position tag resolving to a string, a pure-to-Blocks upgrade, the
 // foreignObject HTML reset, and MathML inheritance.
 export function DeoptNamespaceSlots(props) @{
-	const keyedLinks = props.items.map(
-		(item) => createElement('a', { id: `svg-key-${item.id}`, key: item.id }, item.label),
+	const keyedLinks = props.items.map((item) =>
+		createElement('a', { id: `svg-key-${item.id}`, key: item.id }, item.label),
 	);
 	const upgradingLink = createElement(
 		'a',
@@ -244,20 +244,24 @@ export function DeoptNamespaceSlots(props) @{
 				<text id="svg-string-text">{props.label as string}</text>
 			</props.parts.svgLink>
 			{upgradingLink}
-			<foreignObject id="svg-foreign-object">{createElement(HtmlAnchor, {
-				id: 'foreign-html-anchor',
-				label: props.label,
-			})}</foreignObject>
+			<foreignObject id="svg-foreign-object">
+				{createElement(HtmlAnchor, {
+					id: 'foreign-html-anchor',
+					label: props.label,
+				})}
+			</foreignObject>
 		</svg>
-		<math id="math-slot">{createElement(
-			'mrow',
-			{ id: 'math-component-host' },
-			createElement(MathRow, {
-				id: 'math-component-row',
-				textId: 'math-component-text',
-				label: props.label,
-			}),
-		)}</math>
+		<math id="math-slot">
+			{createElement(
+				'mrow',
+				{ id: 'math-component-host' },
+				createElement(MathRow, {
+					id: 'math-component-row',
+					textId: 'math-component-text',
+					label: props.label,
+				}),
+			)}
+		</math>
 		{createElement(
 			CompiledSvgChildren,
 			null,

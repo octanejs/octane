@@ -4,18 +4,20 @@ import type { Client as SolanaClient } from '@solana/kit';
 import { ClientContext } from './client-context';
 import { createClientStore } from './client-store';
 
-export type ClientProviderProps =
-	Readonly<{
-		client: SolanaClient<object>;
-		children?: OctaneNode;
-	}>;
+export type ClientProviderProps = Readonly<{
+	client: SolanaClient<object>;
+	children?: OctaneNode;
+}>;
 
 function assertResolvedClient(client: unknown): void {
 	if (
-		client !== null && typeof client === 'object' &&
-			typeof (client as { then?: unknown }).then === 'function'
+		client !== null &&
+		typeof client === 'object' &&
+		typeof (client as { then?: unknown }).then === 'function'
 	) {
-		throw new Error('ClientProvider accepts only a resolved client; resolve async setup before mount');
+		throw new Error(
+			'ClientProvider accepts only a resolved client; resolve async setup before mount',
+		);
 	}
 }
 

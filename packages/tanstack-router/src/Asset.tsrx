@@ -4,11 +4,10 @@ import type { RouterManagedTag } from '@tanstack/router-core';
 import { useRouter } from './context.ts';
 import { useHydrated } from './ClientOnly.tsrx';
 
-export type AssetProps =
-	RouterManagedTag & {
-		assetKey: string;
-		target: 'head' | 'body';
-	};
+export type AssetProps = RouterManagedTag & {
+	assetKey: string;
+	target: 'head' | 'body';
+};
 
 type ManagedAssetProps = AssetProps & { managedKey?: string };
 
@@ -40,8 +39,10 @@ function setAttributes(element: Element, attrs: RouterManagedTag['attrs']) {
 	}
 	for (const [name, value] of Object.entries(attrs)) {
 		if (
-			name === 'suppressHydrationWarning' || value === undefined || value === null ||
-				value === false
+			name === 'suppressHydrationWarning' ||
+			value === undefined ||
+			value === null ||
+			value === false
 		) {
 			continue;
 		}
@@ -67,8 +68,7 @@ function claim(element: Element) {
 }
 
 function mountAsset(props: ManagedAssetProps) {
-	const parent =
-		props.target === 'head' ? document.head : document.body;
+	const parent = props.target === 'head' ? document.head : document.body;
 	const managedKey = props.managedKey ?? props.assetKey;
 	const existing = findManagedElement(parent, managedKey);
 	if (existing) {
@@ -95,23 +95,19 @@ export function Asset(props: AssetProps) @{
 		// every navigation, and an identity dependency would remove and re-add
 		// unchanged assets such as the stylesheet.
 		const attrsKey = JSON.stringify(props.attrs ?? null);
-		useLayoutEffect(() => mountAsset(props), [
-			props.assetKey,
-			managedKey,
-			props.tag,
-			attrsKey,
-			props.children,
-			props.target,
-		]);
+		useLayoutEffect(
+			() => mountAsset(props),
+			[props.assetKey, managedKey, props.tag, attrsKey, props.children, props.target],
+		);
 	}
 
 	const visibleTag =
-		(isServer ?? router.isServer) || props.target === 'body' && !hydrated ? props.tag : undefined;
+		(isServer ?? router.isServer) || (props.target === 'body' && !hydrated) ? props.tag : undefined;
 
 	@switch (visibleTag) {
 		@case 'title': {
 			<title {...props.attrs} data-tsr-managed-key={managedKey}>
-				{props.children ?? '' as string}
+				{props.children ?? ('' as string)}
 			</title>
 		}
 		@case 'meta': {

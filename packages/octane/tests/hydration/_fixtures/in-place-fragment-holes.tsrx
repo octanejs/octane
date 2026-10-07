@@ -117,38 +117,48 @@ type Props = { server?: boolean; text?: string };
 // The trailing hole adopts the server's bare text.
 export function TextHole(props: Props) {
 	const Arm = props.server ? RawText : TextCalls;
-	return <section>
-		<Arm text={props.text ?? 'x'} />
-	</section>;
+	return (
+		<section>
+			<Arm text={props.text ?? 'x'} />
+		</section>
+	);
 }
 
 // A static root follows the hole.
 export function TextHoleRoot(props: Props) {
 	const Arm = props.server ? RawTextItalic : TextItalicCalls;
-	return <section>
-		<Arm text={props.text ?? 'x'} />
-	</section>;
+	return (
+		<section>
+			<Arm text={props.text ?? 'x'} />
+		</section>
+	);
 }
 
 // The hole's value is an element.
 export function ElementHole(props: Props) {
 	const Arm = props.server ? RawChild : ChildCalls;
-	return <section>
-		<Arm text={props.text ?? 'x'} />
-	</section>;
+	return (
+		<section>
+			<Arm text={props.text ?? 'x'} />
+		</section>
+	);
 }
 
 export function TextHoleTail(props: Props) {
 	const Arm = props.server ? RawTextTail : TextCalls;
-	return <section>
-		<Arm text={props.text ?? 'x'} />
-	</section>;
+	return (
+		<section>
+			<Arm text={props.text ?? 'x'} />
+		</section>
+	);
 }
 
 // The null hole meets the server node after the fragment.
 export function NullHoleTail(props: Props) {
 	const Arm = props.server ? RawEmTail : NullCalls;
-	return <section>
-		<Arm text={props.text ?? 'x'} />
-	</section>;
+	return (
+		<section>
+			<Arm text={props.text ?? 'x'} />
+		</section>
+	);
 }

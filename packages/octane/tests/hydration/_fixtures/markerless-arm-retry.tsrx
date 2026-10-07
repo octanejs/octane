@@ -115,9 +115,7 @@ export function TextArm(props: { server?: boolean; k: string; leaf: Promise<stri
 					<>
 						@switch (props.k) {
 							@case 'a': {
-								<>
-									{use(props.leaf) as string}
-								</>
+								<>{use(props.leaf) as string}</>
 							}
 							@case 'c': {
 								<b>{'c'}</b>
@@ -425,14 +423,16 @@ export function TrailingFrame(props: { server?: boolean; k: string; leaf: Promis
 // item, and the retry adopts the server's items again.
 export function TrailingDescriptor(props: { server?: boolean; k: string; leaf: Promise<string> }) {
 	const Shape = props.server ? ServerFrame : ClientFrame;
-	return <div>
-		<Hydrate split={false} when={load()}>
-			<section>
-				<Shape k={props.k} leaf={props.leaf} />
-				<em>{'e'}</em>
-			</section>
-		</Hydrate>
-	</div>;
+	return (
+		<div>
+			<Hydrate split={false} when={load()}>
+				<section>
+					<Shape k={props.k} leaf={props.leaf} />
+					<em>{'e'}</em>
+				</section>
+			</Hydrate>
+		</div>
+	);
 }
 
 // The same component as the row of a keyed @for.

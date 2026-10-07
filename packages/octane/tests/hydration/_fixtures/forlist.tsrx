@@ -15,7 +15,9 @@ export function List(props: { items: ListItem[]; onPick: (id: number) => void })
 		@for (const item of props.items; key item.id) {
 			<li class="row">
 				<span class="name">{item.name as string}</span>
-				<button class="pick" onClick={() => props.onPick(item.id)}>{'pick'}</button>
+				<button class="pick" onClick={() => props.onPick(item.id)}>
+					{'pick'}
+				</button>
 			</li>
 		}
 	</ul>

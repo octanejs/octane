@@ -40,7 +40,7 @@
       "arch": "any",
       "packageManager": "pnpm@12.9.1",
       "lockfile": "pnpm-lock.yaml",
-      "lockfileSha256": "12e10f2aa9dc05ffbedf9272eca9e195da62c135db7c819f49ce5149923140df"
+      "lockfileSha256": "84dbefa8929419194a46ef5ec966ae8459aa05f40399e583828134ccc8121aad"
     }
   },
   "lanes": [
@@ -130,7 +130,7 @@
         {
           "path": "packages/alien-signals/audit/runtime-transformation-ledger.json",
           "role": "support",
-          "sha256": "3151fdc53020a8a649d087f4b3b1e1c650ccb97c7d4c21e72a26b833ff1f5bb8"
+          "sha256": "6f79a56122cde3d518c48ef72378cda937e7f4c9c50e163be7cb48b322108e21"
         },
         {
           "path": "packages/alien-signals/audit/test-classifications.json",
@@ -140,7 +140,7 @@
         {
           "path": "packages/alien-signals/tests/_fixtures/hooks.tsrx",
           "role": "support",
-          "sha256": "2fe6dfb198d5acd39a2ba2c88e1b3587879d4bf68092d839d7124a9e05e028ca"
+          "sha256": "3cfa34a95bc3b24b11e640058fe0ab84e73e8fa446eafb9965fda27701581e5d"
         },
         {
           "path": "scripts/react-parity/alien-signals-classifications-lib.mjs",

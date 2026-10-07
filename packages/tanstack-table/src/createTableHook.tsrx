@@ -126,22 +126,22 @@ export function createTableHook<
 	const HeaderContext = headerContext as unknown as Context<Header<TFeatures, any, any>>;
 
 	/**
- * Create a column helper pre-bound to the features and components configured
- * in this table hook. The cell, header, and footer contexts include pre-bound
- * components (e.g. `cell.TextCell`).
- *
- * @example
- * ```tsx
- * const columnHelper = createAppColumnHelper<Person>()
- *
- * const columns = [
- *   columnHelper.accessor('firstName', {
- *     header: 'First Name',
- *     cell: ({ cell }) => <cell.TextCell />, // cell has pre-bound components
- *   }),
- * ]
- * ```
- */
+	 * Create a column helper pre-bound to the features and components configured
+	 * in this table hook. The cell, header, and footer contexts include pre-bound
+	 * components (e.g. `cell.TextCell`).
+	 *
+	 * @example
+	 * ```tsx
+	 * const columnHelper = createAppColumnHelper<Person>()
+	 *
+	 * const columns = [
+	 *   columnHelper.accessor('firstName', {
+	 *     header: 'First Name',
+	 *     cell: ({ cell }) => <cell.TextCell />, // cell has pre-bound components
+	 *   }),
+	 * ]
+	 * ```
+	 */
 	function createAppColumnHelper<TData extends RowData>(): AppColumnHelper<
 		TFeatures,
 		TData,
@@ -159,22 +159,22 @@ export function createTableHook<
 	}
 
 	/**
- * Access the table instance from within an `AppTable` wrapper. Use this in
- * custom `tableComponents` passed to `createTableHook`. `TFeatures` is already
- * known from the `createTableHook` call.
- *
- * @example
- * ```tsx
- * function PaginationControls() @{
- *   const table = useTableContext()
- *   <table.Subscribe selector={(s) => s.pagination}>
- *     {(pagination) => (
- *       <button onClick={() => table.nextPage()}>{(pagination.pageIndex + 1) as unknown as string}</button>
- *     )}
- *   </table.Subscribe>
- * }
- * ```
- */
+	 * Access the table instance from within an `AppTable` wrapper. Use this in
+	 * custom `tableComponents` passed to `createTableHook`. `TFeatures` is already
+	 * known from the `createTableHook` call.
+	 *
+	 * @example
+	 * ```tsx
+	 * function PaginationControls() @{
+	 *   const table = useTableContext()
+	 *   <table.Subscribe selector={(s) => s.pagination}>
+	 *     {(pagination) => (
+	 *       <button onClick={() => table.nextPage()}>{(pagination.pageIndex + 1) as unknown as string}</button>
+	 *     )}
+	 *   </table.Subscribe>
+	 * }
+	 * ```
+	 */
 	function useTableContext<
 		TData extends RowData = RowData,
 		TSelected = TableState<TFeatures>,
@@ -189,8 +189,10 @@ export function createTableHook<
 		const table = useContext(TableContext);
 
 		if (!table) {
-			throw new Error('`useTableContext` must be used within an `AppTable` component. ' +
-				'Make sure your component is wrapped with `<table.AppTable>...</table.AppTable>`.');
+			throw new Error(
+				'`useTableContext` must be used within an `AppTable` component. ' +
+					'Make sure your component is wrapped with `<table.AppTable>...</table.AppTable>`.',
+			);
 		}
 
 		// The value provided by `<table.AppTable>` is the extended table (the App*
@@ -207,56 +209,60 @@ export function createTableHook<
 	}
 
 	/**
- * Access the cell instance from within an `AppCell` wrapper. Use this in
- * custom `cellComponents` passed to `createTableHook`.
- *
- * @example
- * ```tsx
- * function TextCell() @{
- *   const cell = useCellContext<string>()
- *   <span>{cell.getValue()}</span>
- * }
- * ```
- */
+	 * Access the cell instance from within an `AppCell` wrapper. Use this in
+	 * custom `cellComponents` passed to `createTableHook`.
+	 *
+	 * @example
+	 * ```tsx
+	 * function TextCell() @{
+	 *   const cell = useCellContext<string>()
+	 *   <span>{cell.getValue()}</span>
+	 * }
+	 * ```
+	 */
 	function useCellContext<TValue extends CellData = CellData>() {
 		const cell = useContext(CellContext);
 
 		if (!cell) {
-			throw new Error('`useCellContext` must be used within an `AppCell` component. ' +
-				'Make sure your component is wrapped with `<table.AppCell cell={cell}>...</table.AppCell>`.');
+			throw new Error(
+				'`useCellContext` must be used within an `AppCell` component. ' +
+					'Make sure your component is wrapped with `<table.AppCell cell={cell}>...</table.AppCell>`.',
+			);
 		}
 
 		// `<table.AppCell>` Object.assign-es `cellComponents` and `FlexRender` onto
 		// the same cell instance it provides, so this asserts the runtime shape.
-		return cell as unknown as
-			Cell<TFeatures, any, TValue> & TCellComponents & {
+		return cell as unknown as Cell<TFeatures, any, TValue> &
+			TCellComponents & {
 				FlexRender: () => OctaneNode;
 			};
 	}
 
 	/**
- * Access the header instance from within an `AppHeader` or `AppFooter`
- * wrapper. Use this in custom `headerComponents` passed to `createTableHook`.
- *
- * @example
- * ```tsx
- * function SortIndicator() @{
- *   const header = useHeaderContext()
- *   <span>{(header.column.getIsSorted() || '') as string}</span>
- * }
- * ```
- */
+	 * Access the header instance from within an `AppHeader` or `AppFooter`
+	 * wrapper. Use this in custom `headerComponents` passed to `createTableHook`.
+	 *
+	 * @example
+	 * ```tsx
+	 * function SortIndicator() @{
+	 *   const header = useHeaderContext()
+	 *   <span>{(header.column.getIsSorted() || '') as string}</span>
+	 * }
+	 * ```
+	 */
 	function useHeaderContext<TValue extends CellData = CellData>() {
 		const header = useContext(HeaderContext);
 
 		if (!header) {
-			throw new Error('`useHeaderContext` must be used within an `AppHeader` or `AppFooter` component.');
+			throw new Error(
+				'`useHeaderContext` must be used within an `AppHeader` or `AppFooter` component.',
+			);
 		}
 
 		// `<table.AppHeader>` / `<table.AppFooter>` Object.assign `headerComponents`
 		// and `FlexRender` onto the same header instance they provide.
-		return header as unknown as
-			Header<TFeatures, any, TValue> & THeaderComponents & {
+		return header as unknown as Header<TFeatures, any, TValue> &
+			THeaderComponents & {
 				FlexRender: () => OctaneNode;
 			};
 	}
@@ -280,12 +286,12 @@ export function createTableHook<
 	}
 
 	/**
- * Enhanced `useTable` that returns a table with App wrapper components and
- * pre-bound `tableComponents` attached directly to the table object.
- *
- * Default options from `createTableHook` are merged with the options passed
- * here; options passed here take precedence.
- */
+	 * Enhanced `useTable` that returns a table with App wrapper components and
+	 * pre-bound `tableComponents` attached directly to the table object.
+	 *
+	 * Default options from `createTableHook` are merged with the options passed
+	 * here; options passed here take precedence.
+	 */
 	function useAppTable<TData extends RowData, TSelected = TableState<TFeatures>>(
 		tableOptions: Omit<TableOptions<TFeatures, TData>, 'features'>,
 		// `selector` is optional, so the compiler-injected call-site slot would
@@ -320,21 +326,20 @@ export function createTableHook<
 		// AppTable — root wrapper providing table context, with optional Subscribe.
 		const AppTable = useMemo(() => {
 			function AppTableImpl<TAppTableSelected>(
-				props: | AppTablePropsWithoutSelector
-				| AppTablePropsWithSelector<TFeatures, TAppTableSelected>,
+				props:
+					AppTablePropsWithoutSelector | AppTablePropsWithSelector<TFeatures, TAppTableSelected>,
 			) {
 				const { children, selector: appTableSelector } = props as any;
 				const currentTable = tableRef.current;
 
 				// Built in setup with `createElement` so the template stays a single
 				// renderable hole rather than branching JSX inside the Provider.
-				const body =
-					appTableSelector
-						? createElement(currentTable.Subscribe as any, {
-								selector: appTableSelector,
-								children: (state: TAppTableSelected) => children(state),
-							})
-						: children;
+				const body = appTableSelector
+					? createElement(currentTable.Subscribe as any, {
+							selector: appTableSelector,
+							children: (state: TAppTableSelected) => children(state),
+						})
+					: children;
 
 				return <TableContext value={currentTable}>{body}</TableContext>;
 			}
@@ -344,8 +349,9 @@ export function createTableHook<
 		// AppCell — cell context, pre-bound cellComponents, optional Subscribe.
 		const AppCell = useMemo(() => {
 			function AppCellImpl<TValue extends CellData = CellData, TAppCellSelected = unknown>(
-				props: | AppCellPropsWithoutSelector<TFeatures, TData, TValue, TCellComponents>
-				| AppCellPropsWithSelector<TFeatures, TData, TValue, TCellComponents, TAppCellSelected>,
+				props:
+					| AppCellPropsWithoutSelector<TFeatures, TData, TValue, TCellComponents>
+					| AppCellPropsWithSelector<TFeatures, TData, TValue, TCellComponents, TAppCellSelected>,
 			) {
 				const { cell, children, selector: appCellSelector } = props as any;
 				const currentTable = tableRef.current;
@@ -354,13 +360,12 @@ export function createTableHook<
 					...cellComponents,
 				});
 
-				const body =
-					appCellSelector
-						? createElement(currentTable.Subscribe as any, {
-								selector: appCellSelector,
-								children: (state: TAppCellSelected) => children(extendedCell, state),
-							})
-						: children(extendedCell);
+				const body = appCellSelector
+					? createElement(currentTable.Subscribe as any, {
+							selector: appCellSelector,
+							children: (state: TAppCellSelected) => children(extendedCell, state),
+						})
+					: children(extendedCell);
 
 				return <CellContext value={cell}>{body}</CellContext>;
 			}
@@ -370,14 +375,15 @@ export function createTableHook<
 		// AppHeader — header context, pre-bound headerComponents, optional Subscribe.
 		const AppHeader = useMemo(() => {
 			function AppHeaderImpl<TValue extends CellData = CellData, TAppHeaderSelected = unknown>(
-				props: | AppHeaderPropsWithoutSelector<TFeatures, TData, TValue, THeaderComponents>
-				| AppHeaderPropsWithSelector<
-						TFeatures,
-						TData,
-						TValue,
-						THeaderComponents,
-						TAppHeaderSelected
-				  >,
+				props:
+					| AppHeaderPropsWithoutSelector<TFeatures, TData, TValue, THeaderComponents>
+					| AppHeaderPropsWithSelector<
+							TFeatures,
+							TData,
+							TValue,
+							THeaderComponents,
+							TAppHeaderSelected
+					  >,
 			) {
 				const { header, children, selector: appHeaderSelector } = props as any;
 				const currentTable = tableRef.current;
@@ -386,13 +392,12 @@ export function createTableHook<
 					...headerComponents,
 				});
 
-				const body =
-					appHeaderSelector
-						? createElement(currentTable.Subscribe as any, {
-								selector: appHeaderSelector,
-								children: (state: TAppHeaderSelected) => children(extendedHeader, state),
-							})
-						: children(extendedHeader);
+				const body = appHeaderSelector
+					? createElement(currentTable.Subscribe as any, {
+							selector: appHeaderSelector,
+							children: (state: TAppHeaderSelected) => children(extendedHeader, state),
+						})
+					: children(extendedHeader);
 
 				return <HeaderContext value={header}>{body}</HeaderContext>;
 			}
@@ -403,14 +408,15 @@ export function createTableHook<
 		// context-bound FlexRender renders `columnDef.footer`.
 		const AppFooter = useMemo(() => {
 			function AppFooterImpl<TValue extends CellData = CellData, TAppFooterSelected = unknown>(
-				props: | AppHeaderPropsWithoutSelector<TFeatures, TData, TValue, THeaderComponents>
-				| AppHeaderPropsWithSelector<
-						TFeatures,
-						TData,
-						TValue,
-						THeaderComponents,
-						TAppFooterSelected
-				  >,
+				props:
+					| AppHeaderPropsWithoutSelector<TFeatures, TData, TValue, THeaderComponents>
+					| AppHeaderPropsWithSelector<
+							TFeatures,
+							TData,
+							TValue,
+							THeaderComponents,
+							TAppFooterSelected
+					  >,
 			) {
 				const { header, children, selector: appFooterSelector } = props as any;
 				const currentTable = tableRef.current;
@@ -419,13 +425,12 @@ export function createTableHook<
 					...headerComponents,
 				});
 
-				const body =
-					appFooterSelector
-						? createElement(currentTable.Subscribe as any, {
-								selector: appFooterSelector,
-								children: (state: TAppFooterSelected) => children(extendedHeader, state),
-							})
-						: children(extendedHeader);
+				const body = appFooterSelector
+					? createElement(currentTable.Subscribe as any, {
+							selector: appFooterSelector,
+							children: (state: TAppFooterSelected) => children(extendedHeader, state),
+						})
+					: children(extendedHeader);
 
 				return <HeaderContext value={header}>{body}</HeaderContext>;
 			}

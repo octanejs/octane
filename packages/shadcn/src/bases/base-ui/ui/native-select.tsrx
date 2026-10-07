@@ -12,10 +12,9 @@ import { ChevronDownIcon } from '@octanejs/lucide';
 import { cn } from 'cn';
 import type { HostProps } from '../../../lib/types';
 
-export type NativeSelectProps =
-	Omit<HostProps<'select'>, 'size'> & {
-		size?: 'sm' | 'default';
-	};
+export type NativeSelectProps = Omit<HostProps<'select'>, 'size'> & {
+	size?: 'sm' | 'default';
+};
 
 export function NativeSelect({ className, size = 'default', ...props }: NativeSelectProps) @{
 	<div

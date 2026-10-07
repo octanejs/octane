@@ -24,7 +24,9 @@ export function UndefinedRef(props) @{
 			props.report(ref.current);
 			setCount(count + 1);
 		}}
-	>{count as string}</button>
+	>
+		{count as string}
+	</button>
 }
 
 export function CaptureRef(props) @{
@@ -56,11 +58,15 @@ export function TransitionRef(props) @{
 	const [count, setCount] = useState(0);
 	<>
 		<button
-			onClick={() => startTransition(() => {
-				setPromise(props.next);
-				setCount(count + 1);
-			})}
-		>{count as string}</button>
+			onClick={() =>
+				startTransition(() => {
+					setPromise(props.next);
+					setCount(count + 1);
+				})
+			}
+		>
+			{count as string}
+		</button>
 		<Suspense fallback={<i>{'loading'}</i>}>
 			@if (promise === null) {
 				<p>{'idle'}</p>

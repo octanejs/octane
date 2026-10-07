@@ -22,13 +22,12 @@ export type PuckZoneData = {
 export type NodeIndex = Record<string, PuckNodeData>;
 export type ZoneIndex = Record<string, PuckZoneData>;
 
-export type PrivateAppState<UserData extends Data = Data> =
-	AppState<UserData> & {
-		indexes: {
-			nodes: NodeIndex;
-			zones: ZoneIndex;
-		};
+export type PrivateAppState<UserData extends Data = Data> = AppState<UserData> & {
+	indexes: {
+		nodes: NodeIndex;
+		zones: ZoneIndex;
 	};
+};
 
 type BuiltinTypes = Date | RegExp | Error | Function | symbol | null | undefined;
 
@@ -40,15 +39,17 @@ export type WithDeepSlots<T, SlotType = T> =
 	T extends Slot
 		? SlotType
 		: // ────────────────────────── recurse into arrays & tuples ─────────────────
-		T extends (infer U)[]
+			T extends (infer U)[]
 			? Array<WithDeepSlots<U, SlotType>>
 			: T extends (infer U)[]
 				? WithDeepSlots<U, SlotType>[]
 				: // ────────────────────────── preserve objects like Date ───────────────────
-				T extends BuiltinTypes
+					T extends BuiltinTypes
 					? T
 					: // ───────────── recurse into objects while preserving optionality ─────────
-					T extends object ? { [K in keyof T]: WithDeepSlots<T[K], SlotType> } : T;
+						T extends object
+						? { [K in keyof T]: WithDeepSlots<T[K], SlotType> }
+						: T;
 
 export type ConfigParams<
 	Components extends DefaultComponents = DefaultComponents,

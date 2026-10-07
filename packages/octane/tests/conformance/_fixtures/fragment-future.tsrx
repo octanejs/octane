@@ -18,15 +18,17 @@ interface FragmentPortalProps extends FragmentProps {
 export function FutureChildren(props: FragmentProps) @{
 	const [show, setShow] = useState(false);
 	<div id="host">
-		<button
-			id="toggle"
-			type="button"
-			onClick={() => setShow((current) => !current)}
-		>{'toggle'}</button>
+		<button id="toggle" type="button" onClick={() => setShow((current) => !current)}>
+			{'toggle'}
+		</button>
 		<Fragment ref={props.fragRef}>
-			<button id="a" type="button">{'a'}</button>
+			<button id="a" type="button">
+				{'a'}
+			</button>
 			@if (show) {
-				<button id="b" type="button">{'b'}</button>
+				<button id="b" type="button">
+					{'b'}
+				</button>
 			}
 		</Fragment>
 	</div>
@@ -81,10 +83,9 @@ export function RootFragmentPortals(props: FragmentPortalProps) @{
 export function ConditionalFragmentPortal(props: FragmentPortalProps) @{
 	const [show, setShow] = useState(false);
 	<div id="conditional-portal-parent">
-		<button
-			id="conditional-toggle"
-			onClick={() => setShow((current) => !current)}
-		>{'toggle'}</button>
+		<button id="conditional-toggle" onClick={() => setShow((current) => !current)}>
+			{'toggle'}
+		</button>
 		<Fragment ref={props.fragRef}>
 			<button id="conditional-before">{'before'}</button>
 			{show
@@ -117,24 +118,28 @@ interface InterleavedPortalProps extends FragmentPortalProps {
 }
 
 function InterleavedOwnedPortal(props: InterleavedPortalProps) @{
-	<Fragment>{createPortal(
-		<Fragment ref={props.fragRef}>
-			<button id="interleaved-owned-first" type="button">{'first'}</button>
-			@if (props.showLate) {
-				<button id="interleaved-owned-late" type="button">{'late'}</button>
-			}
-		</Fragment>,
-		props.target,
-	)}</Fragment>
+	<Fragment>
+		{createPortal(
+			<Fragment ref={props.fragRef}>
+				<button id="interleaved-owned-first" type="button">
+					{'first'}
+				</button>
+				@if (props.showLate) {
+					<button id="interleaved-owned-late" type="button">
+						{'late'}
+					</button>
+				}
+			</Fragment>,
+			props.target,
+		)}
+	</Fragment>
 }
 
 function InterleavedIndependentPortal(props: InterleavedPortalProps) {
 	return createPortal(
-		<button
-			id="interleaved-independent"
-			type="button"
-			onClick={props.onSiblingClick}
-		>{'independent'}</button>,
+		<button id="interleaved-independent" type="button" onClick={props.onSiblingClick}>
+			{'independent'}
+		</button>,
 		props.target,
 	);
 }

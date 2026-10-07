@@ -61,7 +61,11 @@ export function BreadcrumbPage({ className, ...props }: Props) @{
 	/>
 }
 
-export function BreadcrumbSeparator({ children, className, ...props }: Props & {
+export function BreadcrumbSeparator({
+	children,
+	className,
+	...props
+}: Props & {
 	children?: OctaneNode;
 }) {
 	return createElement(
