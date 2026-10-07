@@ -25,6 +25,7 @@ import { fileURLToPath } from 'node:url';
 import { measureCssModules } from './css-modules.mjs';
 import { measureForRootKeys } from './for-root-key.mjs';
 import { measureRspackCssModules } from './rspack-css-modules.mjs';
+import { measureRspackVoidRoots } from './rspack-void-roots.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const REPO = path.resolve(__dirname, '../..');
@@ -262,6 +263,9 @@ const forRootKeys = await measureForRootKeys();
 // The real adapter must keep producing the proven input. A low-level compiler
 // sentinel alone would stay green if graph proof collection became a no-op.
 const rspackCssModules = await measureRspackCssModules();
+// The same adapter's imported void-root proofs, with the runtime bundled: their
+// saving is the generic root renderer the minifier can then drop.
+const rspackVoidRoots = await measureRspackVoidRoots();
 
 const payload = {
 	suite: 'codegen-size',
@@ -291,6 +295,7 @@ const payload = {
 		...cssModules.targets,
 		...forRootKeys.targets,
 		...rspackCssModules.targets,
+		...rspackVoidRoots.targets,
 	],
 };
 
@@ -328,6 +333,13 @@ for (const lane of ['named', 'default']) {
 			`Rspack CSS-module ${lane} ${mode} sentinel  min ${control.minified} -> ${proven.minified}  gz ${control.gzip} -> ${proven.gzip}  br ${control.brotli} -> ${proven.brotli}`,
 		);
 	}
+}
+
+for (const [name, { variants }] of Object.entries(rspackVoidRoots.summary.scenarios)) {
+	const { control, proven } = variants;
+	console.log(
+		`Rspack void-root ${name} sentinel  min ${control.minified} -> ${proven.minified}  gz ${control.gzip} -> ${proven.gzip}  br ${control.brotli} -> ${proven.brotli}`,
+	);
 }
 
 if (process.env.BENCH_JSON) {

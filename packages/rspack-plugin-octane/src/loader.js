@@ -16,6 +16,11 @@ import {
 } from './shared.js';
 import { loadDescriptorChildrenImports } from './descriptor-children.js';
 import { textTypeFactsForLoader } from './text-types.js';
+import {
+	clearVoidComponentBuildInfo,
+	finishVoidComponents,
+	prepareVoidComponents,
+} from './void-component-data.js';
 
 function realRoot(path) {
 	try {
@@ -95,6 +100,7 @@ export default function octaneLoader(source, inputSourceMap) {
 	this.cacheable?.(true);
 	clearBuildInfo(this._module);
 	clearCssModuleBuildInfo(this._module);
+	clearVoidComponentBuildInfo(this._module);
 
 	try {
 		const options = normalizeLoaderOptions(this.getOptions?.() ?? {});
@@ -182,6 +188,12 @@ export default function octaneLoader(source, inputSourceMap) {
 						dev,
 					})
 				: null;
+		const voidComponents = prepareVoidComponents(this, authoredSource, id, {
+			environment,
+			hmr,
+			dev,
+			profile,
+		});
 		const finish = (clientOnlyImports, isDescriptorChildrenImport, textTypeFacts, callback) => {
 			try {
 				const result = compiler.transform(authoredSource, id, {
@@ -193,8 +205,10 @@ export default function octaneLoader(source, inputSourceMap) {
 					...(isDescriptorChildrenImport === null ? null : { isDescriptorChildrenImport }),
 					...(textTypeFacts === undefined ? null : { textTypeFacts }),
 					...cssModuleConstants?.transformOptions,
+					...voidComponents?.transformOptions,
 				});
 
+				finishVoidComponents(this, voidComponents, result);
 				if (result === null) {
 					callback(null, source, this.sourceMap === false ? undefined : inputSourceMap);
 					return;

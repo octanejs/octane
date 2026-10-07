@@ -50,6 +50,18 @@ describe('compile errors — rejected authoring patterns', () => {
 		expect(() => compile(src, 'async-default.tsrx')).toThrow(/declared `async`/);
 	});
 
+	it.each([
+		['async', 'export default async function () @{ <div>{1}</div> }', /declared `async`/],
+		['generator', 'export default function* () @{ <div>{1}</div> }', /declared as a generator/],
+	])('names an anonymous %s default component by its export', (_kind, src, message) => {
+		for (const mode of ['client', 'server'] as const) {
+			expect(() => compile(src, 'anonymous-default.tsrx', { mode })).toThrow(message);
+			expect(() => compile(src, 'anonymous-default.tsrx', { mode })).toThrow(
+				/^Component `default` /,
+			);
+		}
+	});
+
 	it('rejects a generator (`function*`) component', () => {
 		const src = `export function* Gen() @{ <div>{1}</div> }`;
 		expect(() => compile(src, 'gen-comp.tsrx')).toThrow(/generator/);

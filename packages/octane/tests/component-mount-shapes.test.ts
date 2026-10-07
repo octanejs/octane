@@ -3,9 +3,12 @@ import * as ServerRuntime from 'octane/server';
 import { flushSync, hydrateRoot } from '../src/index.js';
 import { mount } from './_helpers';
 import { loadServerFixture } from './_server-fixture';
+import AnonymousDefault from './_fixtures/anonymous-default-component.tsrx';
 import { KeyedPair } from './_fixtures/component-children-host.tsrx';
 import { NestedRefs } from './_fixtures/scope-lazy-collections.tsrx';
 
+const ANONYMOUS_DEFAULT_FIXTURE =
+	'packages/octane/tests/_fixtures/anonymous-default-component.tsrx';
 const NESTED_REFS_FIXTURE = 'packages/octane/tests/_fixtures/scope-lazy-collections.tsrx';
 
 describe('component placement and identity', () => {
@@ -88,6 +91,54 @@ describe('component placement and identity', () => {
 			const updated = Array.from(container.querySelectorAll('.leaf'));
 			for (let index = 0; index < leaves.length; index++)
 				expect(updated[index]).toBe(leaves[index]);
+		} finally {
+			root.unmount();
+			container.remove();
+		}
+	});
+});
+
+// `export default function () @{…}` declares no module binding of its own; it
+// must still compile, render, and hydrate like a named default component.
+describe('anonymous default-exported component', () => {
+	it('renders and keeps hook state across prop updates', () => {
+		const r = mount(AnonymousDefault, { label: 'A' });
+		try {
+			const button = r.find('.counter');
+			expect(button.textContent).toBe('A clicks 0');
+			r.click('.counter');
+			expect(button.textContent).toBe('A clicks 1');
+			r.update(AnonymousDefault, { label: 'B' });
+			expect(r.find('.counter')).toBe(button);
+			expect(button.textContent).toBe('B clicks 1');
+		} finally {
+			r.unmount();
+		}
+	});
+
+	it.each([false, true])('server-renders the default export (dev compile: %s)', (dev) => {
+		const server = loadServerFixture(ANONYMOUS_DEFAULT_FIXTURE, { compileOptions: { dev } });
+		const { html } = ServerRuntime.renderToString(server.default, { label: 'A' });
+		const container = document.createElement('div');
+		container.innerHTML = html;
+		expect(container.querySelector('.counter')?.textContent).toBe('A clicks 0');
+	});
+
+	it('hydrates the server markup in place and stays interactive', () => {
+		const server = loadServerFixture(ANONYMOUS_DEFAULT_FIXTURE);
+		const { html } = ServerRuntime.renderToString(server.default, { label: 'A' });
+		const container = document.createElement('div');
+		document.body.appendChild(container);
+		container.innerHTML = html;
+		const button = container.querySelector<HTMLButtonElement>('.counter')!;
+
+		const root = hydrateRoot(container, AnonymousDefault, { label: 'A' });
+		try {
+			flushSync(() => {});
+			expect(container.querySelector('.counter')).toBe(button);
+			expect(button.textContent).toBe('A clicks 0');
+			flushSync(() => button.click());
+			expect(button.textContent).toBe('A clicks 1');
 		} finally {
 			root.unmount();
 			container.remove();
