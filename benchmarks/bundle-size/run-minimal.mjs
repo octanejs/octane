@@ -17,8 +17,9 @@ process.env.NODE_ENV = 'production';
 
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import { brotliCompressSync, constants as zlib, gzipSync } from 'node:zlib';
 import { build as buildEsbuild } from 'esbuild';
 import { createOctaneCompiler } from 'octane/compiler/bundler';
@@ -47,6 +48,7 @@ const existingScenarios = [
 	['context', 'tsrx'],
 	['hydrate-root', 'tsrx'],
 	['deferred-hydration', 'tsrx'],
+	['hydrate-frame', 'ts'],
 	['suspense-transition', 'tsrx'],
 	['server-hooks', 'ts'],
 	['server-render', 'ts'],
@@ -305,6 +307,45 @@ export function run(container) {
 `;
 		},
 	};
+}
+
+// A scenario with a `<id>.server.ts` companion hydrates real server markup: the
+// companion's `render()` runs from a production server build of the same
+// application modules, and its HTML is handed to the measured client bundle.
+// The server build itself is never measured.
+async function renderServerMarkup(id) {
+	const entry = path.join(fixtures, `${id}.server.ts`);
+	if (!fs.existsSync(entry)) return undefined;
+	const result = await buildVite({
+		configFile: false,
+		root: directory,
+		mode: 'production',
+		logLevel: 'error',
+		plugins: [octane({ hmr: false })],
+		define: productionDefines,
+		ssr: { noExternal: true },
+		build: {
+			write: false,
+			ssr: entry,
+			minify: false,
+			target: 'esnext',
+			rollupOptions: { output: { format: 'esm' } },
+		},
+	});
+	const built = Array.isArray(result) ? result : [result];
+	const chunks = built[0].output.filter((file) => file.type === 'chunk');
+	assert.equal(chunks.length, 1, `${id}: expected one server bundle`);
+	const outDir = fs.mkdtempSync(path.join(os.tmpdir(), 'octane-reachability-ssr-'));
+	try {
+		const file = path.join(outDir, 'server.mjs');
+		fs.writeFileSync(file, chunks[0].code);
+		const { render } = await import(pathToFileURL(file).href);
+		const html = render();
+		assert.equal(typeof html, 'string', `${id}: server render must return markup`);
+		return html;
+	} finally {
+		fs.rmSync(outDir, { recursive: true, force: true });
+	}
 }
 
 async function buildScenario(scenario, entry) {
@@ -600,7 +641,7 @@ try {
 			);
 		}
 
-		const snapshot = await verifyScenario(id, code);
+		const snapshot = await verifyScenario(id, code, await renderServerMarkup(id));
 		const bytes = Buffer.from(code);
 		const measured = {
 			raw: bytes.length,
