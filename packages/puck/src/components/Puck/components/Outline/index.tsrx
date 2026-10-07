@@ -10,12 +10,15 @@ export const Outline = () => {
 	const rootZones = useAppStore(useShallow((s) => findZonesForArea(s.state, 'root')));
 
 	const Wrapper = useMemo(() => outlineOverride || 'div', [outlineOverride]);
-	return <Wrapper>{rootZones.map(
-		(zoneCompound) =>
-			<LayerTree
-				key={zoneCompound}
-				label={rootZones.length === 1 ? '' : zoneCompound.split(':')[1]}
-				zoneCompound={zoneCompound}
-			/>,
-	)}</Wrapper>;
+	return (
+		<Wrapper>
+			{rootZones.map((zoneCompound) => (
+				<LayerTree
+					key={zoneCompound}
+					label={rootZones.length === 1 ? '' : zoneCompound.split(':')[1]}
+					zoneCompound={zoneCompound}
+				/>
+			))}
+		</Wrapper>
+	);
 };

@@ -70,12 +70,9 @@ export function Provided(props) @{
 // Portal — server emits a site marker; the body renders into a target on the client.
 export function WithPortal() @{
 	<div id="host">
-		{createPortal(
-			() => @{
-				<div class="modal">{'m'}</div>
-			},
-			document.body,
-		)}
+		{createPortal(() => @{
+			<div class="modal">{'m'}</div>
+		}, document.body)}
 		<span>{'inline'}</span>
 	</div>
 }

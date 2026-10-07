@@ -51,12 +51,15 @@ export class NodeContextMenuOption extends MenuOption {
 	$onSelect: () => void;
 	$showOn?: (node: LexicalNode) => boolean;
 
-	constructor(title: string, options: {
-		disabled?: boolean;
-		icon?: OctaneNode;
-		$onSelect: () => void;
-		$showOn?: (node: LexicalNode) => boolean;
-	}) {
+	constructor(
+		title: string,
+		options: {
+			disabled?: boolean;
+			icon?: OctaneNode;
+			$onSelect: () => void;
+			$showOn?: (node: LexicalNode) => boolean;
+		},
+	) {
 		super(title);
 		this.type = 'item';
 		this.title = title;
@@ -113,13 +116,12 @@ interface Props {
 // item-only fields are optional (`type` is a plain string, so the union does not
 // discriminate), plus the item's resolved getItemProps() bag —
 // `Record<string, unknown>`, the @octanejs/floating-ui prop-getter return type.
-type ContextMenuListItem =
-	MenuSeparatorType & {
-		disabled?: boolean;
-		icon?: OctaneNode | null;
-		label?: string;
-		itemProps: Record<string, unknown>;
-	};
+type ContextMenuListItem = MenuSeparatorType & {
+	disabled?: boolean;
+	icon?: OctaneNode | null;
+	label?: string;
+	itemProps: Record<string, unknown>;
+};
 
 type ContextMenuListProps = {
 	className: string | undefined;

@@ -1,12 +1,11 @@
 import { createElement } from 'octane';
 import { twMerge } from 'tailwind-merge';
 
-type CardProps =
-	Record<string, any> & {
-		as?: any;
-		children?: any;
-		className?: string;
-	};
+type CardProps = Record<string, any> & {
+	as?: any;
+	children?: any;
+	className?: string;
+};
 
 export const Card = ({ as, children, className, ...props }: CardProps) => {
 	const Component = as || 'div';

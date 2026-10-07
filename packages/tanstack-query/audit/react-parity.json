@@ -40,7 +40,7 @@
       "arch": "any",
       "packageManager": "pnpm@12.9.1",
       "lockfile": "pnpm-lock.yaml",
-      "lockfileSha256": "e92f4520cd88a2593a0ecd555e0532b2e4e8bb1396c9558a09f0cbf3fbaa5917"
+      "lockfileSha256": "caea67fe61ab57f3e8cbd8a0e55f0e8b3014b3dd6815c6fe6e158095f291daeb"
     }
   },
   "lanes": [
@@ -514,17 +514,17 @@
         {
           "path": "packages/tanstack-query/tests/_fixtures/cached-diff.tsrx",
           "role": "support",
-          "sha256": "b126b97eae02fa46b2681df67a7856998f1c7357f7e86f3d5769eaff69cd4b9e"
+          "sha256": "3ad3c4220c8c5b379ed4ae9d0ef294bc3b91496ec067f6a0d8de5f0a60b3f3cb"
         },
         {
           "path": "packages/tanstack-query/tests/_fixtures/async-diff.tsrx",
           "role": "support",
-          "sha256": "12015b62a30e93c32120d866f8124ab758a789043a8d351da627b3d8b11b515e"
+          "sha256": "755a9ef013929acf4d96c1102d6ab23e18461132c868cb47ca148fe650f7ae45"
         },
         {
           "path": "packages/tanstack-query/tests/_fixtures/sequential-suspense-diff.tsrx",
           "role": "support",
-          "sha256": "caa821362bdbd1b087744e74fd4e471d407ec240b4a17873c09cd3dd2b7a70a9"
+          "sha256": "27ea7f1f71fc6e4a469f485e2826a6a307a6ef89b5936a4dcd45eee5d776210a"
         }
       ]
     },

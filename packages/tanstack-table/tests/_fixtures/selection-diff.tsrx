@@ -14,9 +14,7 @@ const data = [
 	{ name: 'kevin', age: 17 },
 ];
 
-const columns = [
-	{ accessorKey: 'name', header: 'Name' },
-];
+const columns = [{ accessorKey: 'name', header: 'Name' }];
 
 export function SelectionTable() @{
 	const table = useTable({

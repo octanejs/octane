@@ -31,11 +31,9 @@ export function NotificationPanel() @{
 					<Switch.Root
 						id={'channel-' + channel.id}
 						checked={channel.enabled}
-						onCheckedChange={(enabled: boolean) => handlers.setItemProp(
-							channels.indexOf(channel),
-							'enabled',
-							enabled,
-						)}
+						onCheckedChange={(enabled: boolean) =>
+							handlers.setItemProp(channels.indexOf(channel), 'enabled', enabled)
+						}
 					>
 						<Switch.Thumb />
 					</Switch.Root>

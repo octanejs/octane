@@ -64,13 +64,13 @@
     "total": {
       "raw": 156639,
       "gzip": 50777,
-      "brotli": 44491
+      "brotli": 44466
     }
   },
   "bindings": {
     "app": {
       "raw": 347651,
-      "gzip": 115703,
+      "gzip": 115697,
       "brotli": 96447
     },
     "framework": {

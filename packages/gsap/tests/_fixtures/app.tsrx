@@ -8,12 +8,15 @@ export function GSAPProbe(props: {
 	revertOnUpdate?: boolean;
 }) @{
 	const scope = useRef<HTMLDivElement>(null);
-	const api = useGSAP((context, contextSafe) => {
-		props.log(`effect:${props.value}:${context.selector?.('.target').length ?? 0}`);
-		const safeLog = contextSafe(() => props.log(`safe:${props.value}`));
-		safeLog();
-		return () => props.log(`cleanup:${props.value}`);
-	}, { scope, dependencies: [props.value], revertOnUpdate: props.revertOnUpdate });
+	const api = useGSAP(
+		(context, contextSafe) => {
+			props.log(`effect:${props.value}:${context.selector?.('.target').length ?? 0}`);
+			const safeLog = contextSafe(() => props.log(`safe:${props.value}`));
+			safeLog();
+			return () => props.log(`cleanup:${props.value}`);
+		},
+		{ scope, dependencies: [props.value], revertOnUpdate: props.revertOnUpdate },
+	);
 	props.capture(api);
 
 	<div ref={scope}>
@@ -25,18 +28,18 @@ export function GSAPUndefinedDependenciesProbe(props: {
 	value: string;
 	log: (entry: string) => void;
 }) @{
-	useGSAP(() => {
-		props.log(`effect:${props.value}`);
-		return () => props.log(`cleanup:${props.value}`);
-	}, { dependencies: undefined });
+	useGSAP(
+		() => {
+			props.log(`effect:${props.value}`);
+			return () => props.log(`cleanup:${props.value}`);
+		},
+		{ dependencies: undefined },
+	);
 
 	<div>{props.value}</div>
 }
 
-export function GSAPNullDependenciesProbe(props: {
-	value: string;
-	log: (entry: string) => void;
-}) @{
+export function GSAPNullDependenciesProbe(props: { value: string; log: (entry: string) => void }) @{
 	useGSAP(() => {
 		props.log(`effect:${props.value}`);
 		return () => props.log(`cleanup:${props.value}`);

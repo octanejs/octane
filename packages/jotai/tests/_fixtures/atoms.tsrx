@@ -25,7 +25,9 @@ function Derived(props: { derived: any }) @{
 function IncButton(props: { count: any }) @{
 	renders.writer++;
 	const set = useSetAtom(props.count);
-	<button id="inc" onClick={() => set((c: number) => c + 1)}>{'inc'}</button>
+	<button id="inc" onClick={() => set((c: number) => c + 1)}>
+		{'inc'}
+	</button>
 }
 
 // Primitive counter + derived reader + WRITE-ONLY writer, all on the default
@@ -55,8 +57,12 @@ export function TwoAtoms(props: { a: any; b: any }) @{
 	const [b, setB] = useAtom(props.b);
 	<div>
 		<span id="two">{'a=' + a + ' b=' + b}</span>
-		<button id="bump-a" onClick={() => setA((v: number) => v + 1)}>{'a'}</button>
-		<button id="bump-b" onClick={() => setB((v: number) => v + 1)}>{'b'}</button>
+		<button id="bump-a" onClick={() => setA((v: number) => v + 1)}>
+			{'a'}
+		</button>
+		<button id="bump-b" onClick={() => setB((v: number) => v + 1)}>
+			{'b'}
+		</button>
 	</div>
 }
 
@@ -126,6 +132,8 @@ export function SwapApp(props: { storeA: any; storeB: any; count: any }) @{
 		<Provider store={useB ? props.storeB : props.storeA}>
 			<Counter count={props.count} />
 		</Provider>
-		<button id="swap" onClick={() => setUseB(true)}>{'swap'}</button>
+		<button id="swap" onClick={() => setUseB(true)}>
+			{'swap'}
+		</button>
 	</div>
 }

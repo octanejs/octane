@@ -15,15 +15,12 @@ type Props = {
 const EMPTY = Symbol('empty');
 
 export function Subscribe(props: Props) @{
-	const owner = useRef<
-		| {
-				children: Subscription;
-				source: Observable<unknown> | undefined;
-				sourceSubscription: Subscription | null;
-				add: (source: StateObservable<unknown>) => void;
-		  }
-		| null
-	>(null);
+	const owner = useRef<{
+		children: Subscription;
+		source: Observable<unknown> | undefined;
+		sourceSubscription: Subscription | null;
+		add: (source: StateObservable<unknown>) => void;
+	} | null>(null);
 
 	if (!owner.current) {
 		const children = new Subscription();

@@ -33,8 +33,12 @@ export function DynamicList() @{
 	});
 	captured.instance = virtualizer;
 	<div>
-		<button id="resize-3" onClick={() => virtualizer.resizeItem(3, 100)}>r3</button>
-		<button id="measure-all" onClick={() => virtualizer.measure()}>m</button>
+		<button id="resize-3" onClick={() => virtualizer.resizeItem(3, 100)}>
+			r3
+		</button>
+		<button id="measure-all" onClick={() => virtualizer.measure()}>
+			m
+		</button>
 		<button
 			id="scroll-200"
 			onClick={() => {

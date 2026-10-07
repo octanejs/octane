@@ -26,7 +26,9 @@ export function StableSubscriptionReader(props: { source: Observable<number> }) 
 	const [renders, setRenders] = useState(0);
 	<>
 		<output id="stable-value">{value as any}</output>
-		<button id="rerender" onClick={() => setRenders(renders + 1)}>{renders as any}</button>
+		<button id="rerender" onClick={() => setRenders(renders + 1)}>
+			{renders as any}
+		</button>
 	</>
 }
 

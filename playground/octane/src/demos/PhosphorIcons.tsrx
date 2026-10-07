@@ -17,9 +17,9 @@ export function PhosphorIconsDemo() @{
 
 	<div>
 		<h2 class="demo-title">{'Phosphor Icons on Octane'}</h2>
-		<p
-			class="demo-blurb"
-		>{'Generated, tree-shakeable SVG components with the complete Phosphor weight contract.'}</p>
+		<p class="demo-blurb">
+			{'Generated, tree-shakeable SVG components with the complete Phosphor weight contract.'}
+		</p>
 		<div class="panel row">
 			<label>
 				{'Weight '}

@@ -38,14 +38,17 @@ export function NeverHydrate(props: HydrateProps) @{
 	const id = internalProps.h ? `${internalProps.h}${octaneId}` : octaneId;
 	const shouldPreserveServerHTMLRef = useRef<boolean | undefined>(undefined);
 	shouldPreserveServerHTMLRef.current ??= (isServer ?? typeof window === 'undefined') || !hydrated;
-	const markerRef = useCallback((element: HTMLDivElement | null) => {
-		if (!element) return;
-		if (!shouldPreserveServerHTMLRef.current) {
-			element.replaceChildren();
-		} else {
-			saveFallbackHtml(id, element);
-		}
-	}, [id]);
+	const markerRef = useCallback(
+		(element: HTMLDivElement | null) => {
+			if (!element) return;
+			if (!shouldPreserveServerHTMLRef.current) {
+				element.replaceChildren();
+			} else {
+				saveFallbackHtml(id, element);
+			}
+		},
+		[id],
+	);
 	const savedHtml = getFallbackHtml(id);
 
 	<div
@@ -56,9 +59,13 @@ export function NeverHydrate(props: HydrateProps) @{
 		}}
 	>
 		<Suspense
-			fallback={savedHtml
-				? <div style={{ display: 'contents' }} dangerouslySetInnerHTML={{ __html: savedHtml }} />
-				: props.fallback ?? null}
+			fallback={
+				savedHtml ? (
+					<div style={{ display: 'contents' }} dangerouslySetInnerHTML={{ __html: savedHtml }} />
+				) : (
+					(props.fallback ?? null)
+				)
+			}
 		>
 			<NeverGate>{props.children}</NeverGate>
 		</Suspense>

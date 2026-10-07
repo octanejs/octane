@@ -1,0 +1,15 @@
+diff --git a/src/parse/index.js b/src/parse/index.js
+index 16f3d394e5dff7971d50aacc22032d444f39bf2b..084af4ffab408ff3bc88eeca831906fa26ee7dd7 100644
+--- a/src/parse/index.js
++++ b/src/parse/index.js
+@@ -3422,7 +3422,9 @@ export function get_comment_handlers(source, comments, index = 0) {
+ 									!isAfterParent &&
+ 									(opensNamedSpecifiers ? /^[,{ \t]*$/ : /^[,) \t]*$/).test(slice);
+ 								const onlyWhitespace = /^\s*$/.test(slice);
+-								const hasBlankLine = includesBlankLine(slice);
++								// Read only alongside `onlyWhitespace`. Testing it first keeps each
++								// node from scanning all the code before the next comment
++								const hasBlankLine = onlyWhitespace && includesBlankLine(slice);
+ 								const nodeEndLine = end_node.loc?.end?.line ?? null;
+ 								const commentStartLine = comments[0].loc?.start?.line ?? null;
+ 								const commentOnSameLine =

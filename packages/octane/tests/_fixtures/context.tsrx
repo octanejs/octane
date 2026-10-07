@@ -27,7 +27,7 @@ export function CountReader() @{
 export function CombinedReader() @{
 	const theme = use(ThemeCtx);
 	const user = use(UserCtx);
-	<span class="combined">{theme + '/' + user as string}</span>
+	<span class="combined">{(theme + '/' + user) as string}</span>
 }
 
 // Reads a context that has NO Provider anywhere above it: must resolve to the
@@ -37,14 +37,16 @@ export function CombinedReader() @{
 // a surviving consumer) means later reads must keep returning the default.
 export function BareReader(props) @{
 	const v = use(CountCtx);
-	<span class="bare">{v + ':' + props.tick as string}</span>
+	<span class="bare">{(v + ':' + props.tick) as string}</span>
 }
 
 // Provider value updates → consumers re-render.
 export function DynamicProvider() @{
 	const [v, setV] = useState('init');
 	<div>
-		<button id="swap" onClick={() => setV(v === 'init' ? 'changed' : 'init')}>{'swap'}</button>
+		<button id="swap" onClick={() => setV(v === 'init' ? 'changed' : 'init')}>
+			{'swap'}
+		</button>
 		<ThemeCtx value={v}>
 			<ThemeReader />
 		</ThemeCtx>
@@ -58,7 +60,9 @@ export function DynamicProvider() @{
 export function CombinedDynamic() @{
 	const [theme, setTheme] = useState('t0');
 	<div>
-		<button id="bump" onClick={() => setTheme(theme === 't0' ? 't1' : 't0')}>{'bump'}</button>
+		<button id="bump" onClick={() => setTheme(theme === 't0' ? 't1' : 't0')}>
+			{'bump'}
+		</button>
 		<ThemeCtx value={theme}>
 			<UserCtx value="alice">
 				<CombinedReader />
@@ -79,7 +83,9 @@ export function CombinedDynamic() @{
 function StableShell(props) @{
 	const [v, setV] = useState('init');
 	<div>
-		<button id="swap" onClick={() => setV(v === 'init' ? 'changed' : 'init')}>{'swap'}</button>
+		<button id="swap" onClick={() => setV(v === 'init' ? 'changed' : 'init')}>
+			{'swap'}
+		</button>
 		<ThemeCtx value={v}>{props.children}</ThemeCtx>
 	</div>
 }
@@ -167,14 +173,13 @@ export function ListConsumers(props) @{
 // the Provider that wraps the portal call site.
 export function PortalledContext(props) @{
 	<ThemeCtx value="from-portal-parent">
-		<div>{createPortal(
-			() => @{
+		<div>
+			{createPortal(() => @{
 				<div class="portal-content">
 					<ThemeReader />
 				</div>
-			},
-			props.target,
-		)}</div>
+			}, props.target)}
+		</div>
 	</ThemeCtx>
 }
 
@@ -183,11 +188,13 @@ export function LiveCount(props) @{
 	const [n, setN] = useState(0);
 	<CountCtx value={n}>
 		<div>
-			<button id="inc" onClick={() => setN(n + 1)}>{n as string}</button>
+			<button id="inc" onClick={() => setN(n + 1)}>
+				{n as string}
+			</button>
 			<ul>
 				@for (const x of props.ids; key x) {
 					<li>
-						<span class="label">{'r' + x as string}</span>
+						<span class="label">{('r' + x) as string}</span>
 						<CountReader />
 					</li>
 				}
@@ -206,7 +213,7 @@ export function ContextOnlyReader(props: { selected: typeof ThemeCtx | typeof Us
 	const theme = use(ThemeCtx);
 	const selected = use(props.selected);
 	const profile = useProfileLabel();
-	<output class="context-only">{theme + '|' + selected + '|' + profile as string}</output>
+	<output class="context-only">{(theme + '|' + selected + '|' + profile) as string}</output>
 }
 
 export function ContextOnlyHost() @{
@@ -214,15 +221,15 @@ export function ContextOnlyHost() @{
 	const [user, setUser] = useState('alice');
 	const [pickTheme, setPickTheme] = useState(false);
 	<div>
-		<button
-			id="change-theme"
-			onClick={() => setTheme(theme === 'light' ? 'dark' : 'light')}
-		>{'theme'}</button>
-		<button
-			id="change-user"
-			onClick={() => setUser(user === 'alice' ? 'bob' : 'alice')}
-		>{'user'}</button>
-		<button id="change-selection" onClick={() => setPickTheme(!pickTheme)}>{'selection'}</button>
+		<button id="change-theme" onClick={() => setTheme(theme === 'light' ? 'dark' : 'light')}>
+			{'theme'}
+		</button>
+		<button id="change-user" onClick={() => setUser(user === 'alice' ? 'bob' : 'alice')}>
+			{'user'}
+		</button>
+		<button id="change-selection" onClick={() => setPickTheme(!pickTheme)}>
+			{'selection'}
+		</button>
 		<ThemeCtx value={theme}>
 			<UserCtx value={user}>
 				<ContextOnlyReader selected={pickTheme ? ThemeCtx : UserCtx} />
@@ -241,7 +248,7 @@ function MixedContextPromiseReader(props: { load: (key: string) => Promise<strin
 	const theme = use(ThemeCtx);
 	const second = use(props.load('second'));
 	<section>
-		<p class="mixed-context-promise">{theme + ':' + first + '/' + second as string}</p>
+		<p class="mixed-context-promise">{(theme + ':' + first + '/' + second) as string}</p>
 		<MixedContextPromiseLeaf load={props.load} />
 	</section>
 }
@@ -249,10 +256,9 @@ function MixedContextPromiseReader(props: { load: (key: string) => Promise<strin
 export function MixedContextPromiseHost(props: { load: (key: string) => Promise<string> }) @{
 	const [theme, setTheme] = useState('dark');
 	<div>
-		<button
-			id="change-pending-theme"
-			onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
-		>{'theme'}</button>
+		<button id="change-pending-theme" onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}>
+			{'theme'}
+		</button>
 		<ThemeCtx value={theme}>
 			<>
 				@try {
@@ -312,7 +318,7 @@ export function ShadowedContextPromiseHost(props: {
 				const ShadowCtx = props.gate;
 				const value = use(ShadowCtx);
 				<section>
-					<span class="shadowed-context-result">{theme + ':' + value as string}</span>
+					<span class="shadowed-context-result">{(theme + ':' + value) as string}</span>
 					<ShadowedContextPromiseLeaf load={props.load} />
 				</section>
 			} @pending {
@@ -331,7 +337,9 @@ export function ImportedContextHost() @{
 	const [value, setValue] = useState('dark');
 	<ImportedTheme value={value}>
 		<div>
-			<button class="imported-context-toggle" onClick={() => setValue('light')}>{'theme'}</button>
+			<button class="imported-context-toggle" onClick={() => setValue('light')}>
+				{'theme'}
+			</button>
 			<ImportedThemeReader />
 		</div>
 	</ImportedTheme>
@@ -353,7 +361,7 @@ export function ImportedContextPromiseHost(props: {
 				const theme = useContext(ImportedTheme);
 				const value = use(props.gate);
 				<section>
-					<span class="imported-context-result">{theme + ':' + value as string}</span>
+					<span class="imported-context-result">{(theme + ':' + value) as string}</span>
 					<span class="imported-context-authored">{_$isContext as string}</span>
 					<ImportedContextPromiseLeaf load={props.load} />
 				</section>

@@ -37,19 +37,30 @@ function FormPage() @{
 		</p>
 		<Form id="get-form" method="get">
 			<input name="q" defaultValue="octane" />
-			<button id="get-submit" type="submit">get</button>
+			<button id="get-submit" type="submit">
+				get
+			</button>
 		</Form>
 		<Form id="post-form" method="post">
 			<input name="name" defaultValue="dominic" />
-			<button id="post-submit" type="submit">post</button>
-			<button id="put-submit" type="submit" formmethod="put">put</button>
+			<button id="post-submit" type="submit">
+				post
+			</button>
+			<button id="put-submit" type="submit" formmethod="put">
+				put
+			</button>
 		</Form>
 		<button
 			id="submit-json"
-			onClick={() => submit({ name: 'imperative' }, {
-				method: 'post',
-				encType: 'application/json',
-			})}
+			onClick={() =>
+				submit(
+					{ name: 'imperative' },
+					{
+						method: 'post',
+						encType: 'application/json',
+					},
+				)
+			}
 		>
 			json
 		</button>
@@ -128,18 +139,20 @@ function FetcherPage() @{
 	const FForm = fetcher.Form;
 	<div>
 		<p id="f-state">{fetcher.state}</p>
-		<p id="f-data">
-			{fetcher.data ? fetcher.data.value : '(none)'}
-		</p>
-		<p id="shared-data">
-			{shared.data ? shared.data.value : '(none)'}
-		</p>
+		<p id="f-data">{fetcher.data ? fetcher.data.value : '(none)'}</p>
+		<p id="shared-data">{shared.data ? shared.data.value : '(none)'}</p>
 		<p id="f-count">{String(fetchers.length)}</p>
-		<button id="f-load" onClick={() => fetcher.load('/api')}>load</button>
-		<button id="shared-load" onClick={() => shared.load('/instant')}>shared-load</button>
+		<button id="f-load" onClick={() => fetcher.load('/api')}>
+			load
+		</button>
+		<button id="shared-load" onClick={() => shared.load('/instant')}>
+			shared-load
+		</button>
 		<FForm id="f-form" method="post" action="/act">
 			<input name="name" defaultValue="fx" />
-			<button id="f-form-submit" type="submit">fsubmit</button>
+			<button id="f-form-submit" type="submit">
+				fsubmit
+			</button>
 		</FForm>
 		<button
 			id="f-submit"
@@ -154,9 +167,7 @@ function FetcherPage() @{
 function SharedReader() @{
 	// Same key → same fetcher state, read from a second component.
 	const shared = useFetcher({ key: 'shared' });
-	<p id="shared-mirror">
-		{shared.data ? shared.data.value : '(none)'}
-	</p>
+	<p id="shared-mirror">{shared.data ? shared.data.value : '(none)'}</p>
 }
 
 export function FetcherApp() @{

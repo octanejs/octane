@@ -19,9 +19,7 @@ function LiveSwitch(props: { onChange: (live: boolean) => void }) @{
 }
 
 export function ActivityPanel() @{
-	const [events, handlers] = useListState<Event>([
-		{ id: 1, text: 'Signed in' },
-	]);
+	const [events, handlers] = useListState<Event>([{ id: 1, text: 'Signed in' }]);
 	const ticker = useInterval(
 		() => handlers.prepend({ id: Date.now(), text: 'Synced settings' }),
 		5000,
@@ -39,7 +37,9 @@ export function ActivityPanel() @{
 						initial={{ opacity: 0, y: -4 }}
 						animate={{ opacity: 1, y: 0 }}
 						exit={{ opacity: 0 }}
-					>{event.text as string}</motion.li>
+					>
+						{event.text as string}
+					</motion.li>
 				}
 			</AnimatePresence>
 		</ul>

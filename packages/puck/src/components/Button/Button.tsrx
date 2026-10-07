@@ -40,45 +40,43 @@ export const Button = ({
 
 	useEffect(() => setLoading(loadingProp), [loadingProp]);
 
-	const ElementType =
-		href
-			? 'a'
-			: type
-				? 'button'
-				: 'span';
+	const ElementType = href ? 'a' : type ? 'button' : 'span';
 	const dataAttrs = filterDataAttrs(props);
 
-	const el = <ElementType
-		className={getClassName({
-			primary: variant === 'primary',
-			secondary: variant === 'secondary',
-			disabled,
-			fullWidth,
-			[size]: true,
-		})}
-		onClick={(e) => {
-			if (!onClick) return;
+	const el = (
+		<ElementType
+			className={getClassName({
+				primary: variant === 'primary',
+				secondary: variant === 'secondary',
+				disabled,
+				fullWidth,
+				[size]: true,
+			})}
+			onClick={(e) => {
+				if (!onClick) return;
 
-			setLoading(true);
-			Promise.resolve(onClick(e)).then(() => {
-				setLoading(false);
-			});
-		}}
-		type={type}
-		disabled={disabled || loading}
-		tabIndex={tabIndex}
-		target={newTab ? '_blank' : undefined}
-		rel={newTab ? 'noreferrer' : undefined}
-		href={href}
-		{...dataAttrs}
-	>
-		{icon && <div className={getClassName('icon')}>{icon}</div>}
-		{children}
-		{loading &&
-			<div className={getClassName('spinner')}>
-				<Loader size={14} />
-			</div>}
-	</ElementType>;
+				setLoading(true);
+				Promise.resolve(onClick(e)).then(() => {
+					setLoading(false);
+				});
+			}}
+			type={type}
+			disabled={disabled || loading}
+			tabIndex={tabIndex}
+			target={newTab ? '_blank' : undefined}
+			rel={newTab ? 'noreferrer' : undefined}
+			href={href}
+			{...dataAttrs}
+		>
+			{icon && <div className={getClassName('icon')}>{icon}</div>}
+			{children}
+			{loading && (
+				<div className={getClassName('spinner')}>
+					<Loader size={14} />
+				</div>
+			)}
+		</ElementType>
+	);
 
 	return el;
 };

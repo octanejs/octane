@@ -54,7 +54,9 @@ reassignedHelper = (row: { read: () => string }) => row.read();
 export function LiveViaModuleHelper() @{
 	const [n, setN] = useState(0);
 	<div>
-		<button id="lmh-go" onClick={() => setN(n + 1)}>{'go'}</button>
+		<button id="lmh-go" onClick={() => setN(n + 1)}>
+			{'go'}
+		</button>
 		<ul>
 			@for (const row of liveRows; key row.id) {
 				<li class="lmh-row">{viaModuleHelper(row)}</li>
@@ -66,7 +68,9 @@ export function LiveViaModuleHelper() @{
 export function LiveViaTransitiveHelper() @{
 	const [n, setN] = useState(0);
 	<div>
-		<button id="lth-go" onClick={() => setN(n + 1)}>{'go'}</button>
+		<button id="lth-go" onClick={() => setN(n + 1)}>
+			{'go'}
+		</button>
 		<ul>
 			@for (const row of liveRows; key row.id) {
 				<li class="lth-row">{viaTransitiveHelper(row)}</li>
@@ -79,7 +83,9 @@ export function LiveViaLocalArrow() @{
 	const [n, setN] = useState(0);
 	const read = (row: { read: () => string }) => row.read();
 	<div>
-		<button id="lla-go" onClick={() => setN(n + 1)}>{'go'}</button>
+		<button id="lla-go" onClick={() => setN(n + 1)}>
+			{'go'}
+		</button>
 		<ul>
 			@for (const row of liveRows; key row.id) {
 				<li class="lla-row">{read(row)}</li>
@@ -94,7 +100,9 @@ export function LiveViaStableLocal() @{
 	const [n, setN] = useState(0);
 	const read = useCallback((row: { read: () => string }) => row.read());
 	<div>
-		<button id="lsl-go" onClick={() => setN(n + 1)}>{'go'}</button>
+		<button id="lsl-go" onClick={() => setN(n + 1)}>
+			{'go'}
+		</button>
 		<ul>
 			@for (const row of liveRows; key row.id) {
 				<li class="lsl-row">{read(row)}</li>
@@ -109,7 +117,9 @@ export function LiveViaLocalFunction() @{
 		return row.read();
 	}
 	<div>
-		<button id="llf-go" onClick={() => setN(n + 1)}>{'go'}</button>
+		<button id="llf-go" onClick={() => setN(n + 1)}>
+			{'go'}
+		</button>
 		<ul>
 			@for (const row of liveRows; key row.id) {
 				<li class="llf-row">{read(row)}</li>
@@ -121,7 +131,9 @@ export function LiveViaLocalFunction() @{
 export function LiveViaReassignedHelper() @{
 	const [n, setN] = useState(0);
 	<div>
-		<button id="lrh-go" onClick={() => setN(n + 1)}>{'go'}</button>
+		<button id="lrh-go" onClick={() => setN(n + 1)}>
+			{'go'}
+		</button>
 		<ul>
 			@for (const row of liveRows; key row.id) {
 				<li class="lrh-row">{reassignedHelper(row)}</li>
@@ -135,7 +147,9 @@ export function LiveViaReassignedHelper() @{
 export function LiveViaProjectedArgument() @{
 	const [n, setN] = useState(0);
 	<div>
-		<button id="lpa-go" onClick={() => setN(n + 1)}>{'go'}</button>
+		<button id="lpa-go" onClick={() => setN(n + 1)}>
+			{'go'}
+		</button>
 		<ul>
 			@for (const row of liveRows; key row.id) {
 				<li class="lpa-row">{projectCount(row.read().length)}</li>
@@ -148,7 +162,9 @@ export function LiveViaProjectedArgument() @{
 export function LiveViaMemberCall() @{
 	const [n, setN] = useState(0);
 	<div>
-		<button id="lmc-go" onClick={() => setN(n + 1)}>{'go'}</button>
+		<button id="lmc-go" onClick={() => setN(n + 1)}>
+			{'go'}
+		</button>
 		<ul>
 			@for (const row of liveRows; key row.id) {
 				<li class="lmc-row">{row.read()}</li>
@@ -174,11 +190,15 @@ export function ProjectionModuleHelper() @{
 	]);
 	const [n, setN] = useState(0);
 	<div>
-		<button id="pmh-go" onClick={() => setN(n + 1)}>{'go'}</button>
+		<button id="pmh-go" onClick={() => setN(n + 1)}>
+			{'go'}
+		</button>
 		<button
 			id="pmh-bump"
 			onClick={() => setRows(rows.map((r) => (r.id === 1 ? { ...r, value: r.value + 1 } : r)))}
-		>{'bump'}</button>
+		>
+			{'bump'}
+		</button>
 		<ul>
 			@for (const row of rows; key row.id) {
 				<li class="pmh-row">{projectRow(row)}</li>
@@ -194,11 +214,15 @@ export function ProjectionTransitive() @{
 	]);
 	const [n, setN] = useState(0);
 	<div>
-		<button id="pt-go" onClick={() => setN(n + 1)}>{'go'}</button>
+		<button id="pt-go" onClick={() => setN(n + 1)}>
+			{'go'}
+		</button>
 		<button
 			id="pt-bump"
 			onClick={() => setRows(rows.map((r) => (r.id === 1 ? { ...r, value: r.value + 1 } : r)))}
-		>{'bump'}</button>
+		>
+			{'bump'}
+		</button>
 		<ul>
 			@for (const row of rows; key row.id) {
 				<li class="pt-row">{projectRowTransitive(row)}</li>
@@ -214,11 +238,15 @@ export function ProjectionImported() @{
 	]);
 	const [n, setN] = useState(0);
 	<div>
-		<button id="pi-go" onClick={() => setN(n + 1)}>{'go'}</button>
+		<button id="pi-go" onClick={() => setN(n + 1)}>
+			{'go'}
+		</button>
 		<button
 			id="pi-bump"
 			onClick={() => setRows(rows.map((r) => (r.id === 1 ? { ...r, value: r.value + 1 } : r)))}
-		>{'bump'}</button>
+		>
+			{'bump'}
+		</button>
 		<ul>
 			@for (const row of rows; key row.id) {
 				<li class="pi-row">{projectValue(row)}</li>
@@ -250,7 +278,9 @@ export function HookInRegion() @{
 	const [rows] = useState([{ id: 1 }, { id: 2 }]);
 	const [n, setN] = useState(0);
 	<div>
-		<button id="hir-go" onClick={() => setN(n + 1)}>{'go'}</button>
+		<button id="hir-go" onClick={() => setN(n + 1)}>
+			{'go'}
+		</button>
 		<ul>
 			@for (const row of rows; key row.id) {
 				<li class="hir-row">{useLabel(row.id)}</li>
@@ -273,7 +303,9 @@ export function CtxUnderRegion() @{
 	const [rows] = useState([{ id: 1 }, { id: 2 }]);
 	const [value, setValue] = useState('c0');
 	<div>
-		<button id="cur-bump" onClick={() => setValue('c1')}>{'bump'}</button>
+		<button id="cur-bump" onClick={() => setValue('c1')}>
+			{'bump'}
+		</button>
 		<LabelCtx value={value}>
 			<ul>
 				@for (const row of rows; key row.id) {
@@ -304,8 +336,12 @@ export function CallSiteParent() @{
 	const [count, setCount] = useState(0);
 	const [tick, setTick] = useState(0);
 	<div>
-		<button id="csp-tick" onClick={() => setTick(tick + 1)}>{'tick'}</button>
-		<button id="csp-count" onClick={() => setCount(count + 1)}>{'count'}</button>
+		<button id="csp-tick" onClick={() => setTick(tick + 1)}>
+			{'tick'}
+		</button>
+		<button id="csp-count" onClick={() => setCount(count + 1)}>
+			{'count'}
+		</button>
 		<span class="csc-heading">{labelFor(tick)}</span>
 		<CallSiteChild label={labelFor(count)} />
 	</div>

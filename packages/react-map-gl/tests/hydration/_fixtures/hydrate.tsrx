@@ -17,7 +17,9 @@ export function HydratePage(props: HydratePageProps) @{
 
 	<main id="page">
 		<h1>Where we are</h1>
-		<button id="counter" onClick={() => setClicks(clicks + 1)}>{'clicks: ' + clicks}</button>
+		<button id="counter" onClick={() => setClicks(clicks + 1)}>
+			{'clicks: ' + clicks}
+		</button>
 		<Map
 			id="hydrated-map"
 			mapLib={props.mapLib}

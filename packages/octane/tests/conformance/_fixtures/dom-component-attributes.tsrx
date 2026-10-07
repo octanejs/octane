@@ -19,7 +19,9 @@ export function ClassedDiv(props) @{
 
 // empty href on <a> (allowed in React, unlike <link href="">).
 export function AnchorHref(props) @{
-	<a id="ah" href={props.href}>{'x'}</a>
+	<a id="ah" href={props.href}>
+		{'x'}
+	</a>
 }
 
 // empty href on <link> (React refuses to write it). NOTE: octane hoists <link>

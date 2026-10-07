@@ -14,8 +14,7 @@ import {
 export function Composer() @{
 	// Deliberately omit the $ suffix: the binding follows the actual writable
 	// capability through aliases, not the identifier's spelling.
-	const handle =
-		selectedConversation$.get() === 'A' ? draftA$ : draftB$;
+	const handle = selectedConversation$.get() === 'A' ? draftA$ : draftB$;
 	<section aria-label="Composer">
 		<label>
 			Message
@@ -36,12 +35,14 @@ export function Composer() @{
 				handle.set('');
 				void send(prompt).then(
 					() => notice$.set('Message accepted.'),
-					(error: unknown) => notice$.set(
-						isActionUncertain(error)
-							? 'Acknowledgement uncertain. Check operation ' + error.operationId +
-								'; do not resend.'
-							: 'Message rejected. Your next draft has not changed.',
-					),
+					(error: unknown) =>
+						notice$.set(
+							isActionUncertain(error)
+								? 'Acknowledgement uncertain. Check operation ' +
+										error.operationId +
+										'; do not resend.'
+								: 'Message rejected. Your next draft has not changed.',
+						),
 				);
 			}}
 		>
@@ -54,14 +55,17 @@ export function Composer() @{
 				const operation = lastOperation$.get();
 				if (operation === null) return;
 				const reads = reconcileReceipt(operation.operationId, operation.conversationId);
-				void Promise.all([reads.receipt, reads.conversation]).then(([receipt, frame]) => {
-					if (lastOperation$.get()?.operationId !== operation.operationId) return;
-					notice$.set(
-						receipt === null
-							? 'No receipt found. No message was resent.'
-							: 'Operation ' + receipt.status + ', conversation revision ' + frame.revision,
-					);
-				}, () => notice$.set('Receipt check failed. No message was resent.'));
+				void Promise.all([reads.receipt, reads.conversation]).then(
+					([receipt, frame]) => {
+						if (lastOperation$.get()?.operationId !== operation.operationId) return;
+						notice$.set(
+							receipt === null
+								? 'No receipt found. No message was resent.'
+								: 'Operation ' + receipt.status + ', conversation revision ' + frame.revision,
+						);
+					},
+					() => notice$.set('Receipt check failed. No message was resent.'),
+				);
 			}}
 		>
 			Check last operation

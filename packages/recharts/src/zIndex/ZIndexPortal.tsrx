@@ -8,10 +8,7 @@ import { useAppDispatch, useAppSelector } from '../state/hooks';
 import { registerZIndexPortalElement, unregisterZIndexPortalElement } from '../state/zIndexSlice';
 import { selectAllRegisteredZIndexes } from './zIndexSelectors';
 
-function ZIndexSvgPortal(props: {
-	zIndex: number;
-	isPanorama: boolean;
-}) {
+function ZIndexSvgPortal(props: { zIndex: number; isPanorama: boolean }) {
 	const { zIndex, isPanorama } = props;
 	const ref = useRef<SVGGElement | null>(null);
 	const dispatch = useAppDispatch();
@@ -27,10 +24,7 @@ function ZIndexSvgPortal(props: {
 	return <g tabIndex={-1} ref={ref} className={'recharts-zIndex-layer_' + zIndex}></g>;
 }
 
-export function AllZIndexPortals(props: {
-	children?: OctaneNode;
-	isPanorama: boolean;
-}) @{
+export function AllZIndexPortals(props: { children?: OctaneNode; isPanorama: boolean }) @{
 	const { children, isPanorama } = props;
 	const allRegisteredZIndexes: ReadonlyArray<number> | undefined = useAppSelector(
 		selectAllRegisteredZIndexes,

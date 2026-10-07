@@ -2,10 +2,9 @@ import { useState } from 'octane';
 import styled, { ThemeProvider } from '@octanejs/styled-components';
 
 const Card = styled.div`
-  color: ${(p: any) => p.theme.fg};
-  background: ${(p: any) =>
-	p.theme.bg};
-  border-color: ${(p: any) => p.theme.accent};
+	color: ${(p: any) => p.theme.fg};
+	background: ${(p: any) => p.theme.bg};
+	border-color: ${(p: any) => p.theme.accent};
 `;
 
 export function ThemedCard() @{

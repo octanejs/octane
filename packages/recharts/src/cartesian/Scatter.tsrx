@@ -114,34 +114,34 @@ export interface ScatterPointNode {
  */
 export interface ScatterPointItem {
 	/**
- * The x coordinate of the point center in pixels.
- */
+	 * The x coordinate of the point center in pixels.
+	 */
 	cx: number | null | undefined;
 	/**
- * The y coordinate of the point center in pixels.
- */
+	 * The y coordinate of the point center in pixels.
+	 */
 	cy: number | null | undefined;
 	/**
- * The x coordinate (in pixels) of the top-left corner of the rectangle that wraps the point.
- */
+	 * The x coordinate (in pixels) of the top-left corner of the rectangle that wraps the point.
+	 */
 	x: number | undefined;
 	/**
- * The y coordinate (in pixels) of the top-left corner of the rectangle that wraps the point.
- */
+	 * The y coordinate (in pixels) of the top-left corner of the rectangle that wraps the point.
+	 */
 	y: number | undefined;
 	/**
- * ScatterPointItem size is an abstract number that is used to calculate the radius of the point.
- * It's not the radius itself, but rather a value that is used to calculate the radius.
- * Interacts with the zAxis range.
- */
+	 * ScatterPointItem size is an abstract number that is used to calculate the radius of the point.
+	 * It's not the radius itself, but rather a value that is used to calculate the radius.
+	 * Interacts with the zAxis range.
+	 */
 	size: number | undefined;
 	/**
- * Width of the point in pixels.
- */
+	 * Width of the point in pixels.
+	 */
 	width: number;
 	/**
- * Height of the point in pixels.
- */
+	 * Height of the point in pixels.
+	 */
 	height: number;
 	node: ScatterPointNode;
 	payload?: any;
@@ -191,215 +191,214 @@ interface ScatterInternalProps extends ZIndexable {
 /**
  * External props, intended for end users to fill in
  */
-interface ScatterProps<DataPointType = any, DataValueType = any> extends DataProvider<
-	DataPointType
->, DataConsumer<DataPointType, DataValueType>, ZIndexable {
+interface ScatterProps<DataPointType = any, DataValueType = any>
+	extends DataProvider<DataPointType>, DataConsumer<DataPointType, DataValueType>, ZIndexable {
 	/**
- * Unique identifier of this component.
- * Used as an HTML attribute `id`, and also to identify this element internally.
- *
- * If undefined, Recharts will generate a unique ID automatically.
- */
+	 * Unique identifier of this component.
+	 * Used as an HTML attribute `id`, and also to identify this element internally.
+	 *
+	 * If undefined, Recharts will generate a unique ID automatically.
+	 */
 	id?: string;
 	/**
- * The id of XAxis which is corresponding to the data. Required when there are multiple XAxes.
- * @defaultValue 0
- */
+	 * The id of XAxis which is corresponding to the data. Required when there are multiple XAxes.
+	 * @defaultValue 0
+	 */
 	xAxisId?: AxisId;
 	/**
- * The id of YAxis which is corresponding to the data. Required when there are multiple YAxes.
- * @defaultValue 0
- */
+	 * The id of YAxis which is corresponding to the data. Required when there are multiple YAxes.
+	 * @defaultValue 0
+	 */
 	yAxisId?: AxisId;
 	/**
- * The id of ZAxis which is corresponding to the data. Required when there are multiple ZAxes.
- *
- * ZAxis does not render directly, has no ticks and no tick line.
- * It is used to control the size of each scatter point.
- *
- * @defaultValue 0
- * @see {@link https://recharts.github.io/en-US/examples/ThreeDimScatterChart/ Scatter chart with Z axis}
- */
+	 * The id of ZAxis which is corresponding to the data. Required when there are multiple ZAxes.
+	 *
+	 * ZAxis does not render directly, has no ticks and no tick line.
+	 * It is used to control the size of each scatter point.
+	 *
+	 * @defaultValue 0
+	 * @see {@link https://recharts.github.io/en-US/examples/ThreeDimScatterChart/ Scatter chart with Z axis}
+	 */
 	zAxisId?: AxisId;
 	/**
- * Renders line connecting individual points.
- * Options:
- * - `false`: no line is drawn.
- * - `true`: a default line is drawn.
- * - `OctaneElement`: the option is the custom line element.
- * - `function`: the function will be called to render customized line.
- * - `object`: the option is the props of Curve element.
- *
- * Also see the `lineType` prop which controls how is this line calculated.
- *
- * @defaultValue false
- * @example <Scatter line />
- * @example <Scatter line={CustomizedLineComponent} />
- * @example <Scatter line={{ strokeDasharray: '5 5' }} />
- *
- * @see {@link https://recharts.github.io/en-US/examples/JointLineScatterChart/ Scatter chart with joint line}
- */
+	 * Renders line connecting individual points.
+	 * Options:
+	 * - `false`: no line is drawn.
+	 * - `true`: a default line is drawn.
+	 * - `OctaneElement`: the option is the custom line element.
+	 * - `function`: the function will be called to render customized line.
+	 * - `object`: the option is the props of Curve element.
+	 *
+	 * Also see the `lineType` prop which controls how is this line calculated.
+	 *
+	 * @defaultValue false
+	 * @example <Scatter line />
+	 * @example <Scatter line={CustomizedLineComponent} />
+	 * @example <Scatter line={{ strokeDasharray: '5 5' }} />
+	 *
+	 * @see {@link https://recharts.github.io/en-US/examples/JointLineScatterChart/ Scatter chart with joint line}
+	 */
 	line?: OctaneElement<CurveProps> | ((props: CurveProps) => OctaneNode) | CurveProps | boolean;
 	/**
- * Determines calculation method of the line if the `line` prop is set.
- * Options:
- * - `'joint'`: line will be generated by connecting all the points.
- * - `'fitting'`: line will be generated by fitting algorithm (linear regression).
- *
- * Has no effect if `line` prop is not set or is false.
- *
- * @defaultValue joint
- * @example <Scatter line lineType="fitting" />
- * @see {@link https://recharts.github.io/en-US/examples/JointLineScatterChart/ Scatter chart with joint line}
- */
+	 * Determines calculation method of the line if the `line` prop is set.
+	 * Options:
+	 * - `'joint'`: line will be generated by connecting all the points.
+	 * - `'fitting'`: line will be generated by fitting algorithm (linear regression).
+	 *
+	 * Has no effect if `line` prop is not set or is false.
+	 *
+	 * @defaultValue joint
+	 * @example <Scatter line lineType="fitting" />
+	 * @see {@link https://recharts.github.io/en-US/examples/JointLineScatterChart/ Scatter chart with joint line}
+	 */
 	lineType?: 'fitting' | 'joint';
 	/**
- * Determines the shape of joint line.
- * Same as `type` prop on Curve, Line and Area components.
- *
- * Has no effect if `line` prop is not set or is false or if `lineType` is 'fitting'.
- *
- * @defaultValue linear
- * @see {@link https://recharts.github.io/en-US/examples/JointLineScatterChart/ Scatter chart with joint line}
- */
+	 * Determines the shape of joint line.
+	 * Same as `type` prop on Curve, Line and Area components.
+	 *
+	 * Has no effect if `line` prop is not set or is false or if `lineType` is 'fitting'.
+	 *
+	 * @defaultValue linear
+	 * @see {@link https://recharts.github.io/en-US/examples/JointLineScatterChart/ Scatter chart with joint line}
+	 */
 	lineJointType?: CurveType;
 	/**
- * The type of icon in legend.
- * If set to 'none', no legend item will be rendered.
- *
- * @defaultValue 'circle'
- * @example <Scatter legendType="diamond" />
- */
+	 * The type of icon in legend.
+	 * If set to 'none', no legend item will be rendered.
+	 *
+	 * @defaultValue 'circle'
+	 * @example <Scatter legendType="diamond" />
+	 */
 	legendType?: LegendType;
 	tooltipType?: TooltipType;
 	/**
- * Formats the value displayed in the tooltip for this Scatter.
- * When set, takes precedence over the `formatter` prop on the Tooltip component.
- */
+	 * Formats the value displayed in the tooltip for this Scatter.
+	 * When set, takes precedence over the `formatter` prop on the Tooltip component.
+	 */
 	formatter?: Formatter;
 	className?: string;
 	/**
- * The name of data.
- * This option will be used in tooltip and legend to represent this graphical item.
- * If no value was set to this option, the value of dataKey will be used alternatively.
- */
+	 * The name of data.
+	 * This option will be used in tooltip and legend to represent this graphical item.
+	 * If no value was set to this option, the value of dataKey will be used alternatively.
+	 */
 	name?: string;
 	/**
- * This component is rendered when this graphical item is activated
- * (could be by mouse hover, touch, keyboard, programmatically).
- *
- * @see {@link https://recharts.github.io/en-US/examples/SimpleScatterChart/ Scatter chart with custom active shape}
- * @example <Scatter activeShape={{ fill: 'red' }} />
- */
+	 * This component is rendered when this graphical item is activated
+	 * (could be by mouse hover, touch, keyboard, programmatically).
+	 *
+	 * @see {@link https://recharts.github.io/en-US/examples/SimpleScatterChart/ Scatter chart with custom active shape}
+	 * @example <Scatter activeShape={{ fill: 'red' }} />
+	 */
 	activeShape?: ScatterCustomizedShape;
 	/**
- * Determines the shape of individual data points.
- * - Can be one of the predefined shapes as a string, which will be passed to {@link Symbols} component.
- * - If set a OctaneElement, the shape of point can be customized.
- * - If set a function, the function will be called to render customized shape.
- * - During animations, the function shape also receives `animationElapsedTime`, `isAnimating`, and `isEntrance`.
- * @defaultValue circle
- *
- * @example <Scatter shape={CustomizedShapeComponent} />
- * @example <Scatter shape="diamond" />
- *
- * @see {@link https://recharts.github.io/en-US/examples/JointLineScatterChart/ Scatter chart with custom shapes}
- */
+	 * Determines the shape of individual data points.
+	 * - Can be one of the predefined shapes as a string, which will be passed to {@link Symbols} component.
+	 * - If set a OctaneElement, the shape of point can be customized.
+	 * - If set a function, the function will be called to render customized shape.
+	 * - During animations, the function shape also receives `animationElapsedTime`, `isAnimating`, and `isEntrance`.
+	 * @defaultValue circle
+	 *
+	 * @example <Scatter shape={CustomizedShapeComponent} />
+	 * @example <Scatter shape="diamond" />
+	 *
+	 * @see {@link https://recharts.github.io/en-US/examples/JointLineScatterChart/ Scatter chart with custom shapes}
+	 */
 	shape?: ScatterCustomizedShape;
 	/**
- * Hides the whole graphical element when true.
- *
- * Hiding an element is different from removing it from the chart:
- * Hidden graphical elements are still visible in Legend,
- * and can be included in axis domain calculations,
- * depending on `includeHidden` props of your XAxis/YAxis.
- *
- * @defaultValue false
- */
+	 * Hides the whole graphical element when true.
+	 *
+	 * Hiding an element is different from removing it from the chart:
+	 * Hidden graphical elements are still visible in Legend,
+	 * and can be included in axis domain calculations,
+	 * depending on `includeHidden` props of your XAxis/YAxis.
+	 *
+	 * @defaultValue false
+	 */
 	hide?: boolean;
 	/**
- * Renders one label for each data point. Options:
- * - `true`: renders default labels;
- * - `false`: no labels are rendered;
- * - `object`: the props of LabelList component;
- * - `OctaneElement`: a custom SVG label element, such as `<text>` or `<g>`.
- *   HTML elements such as `<div>` are not valid inside the chart SVG and may trigger React DOM warnings.
- * - `function`: a render function of custom label.
- *
- * @defaultValue false
- */
+	 * Renders one label for each data point. Options:
+	 * - `true`: renders default labels;
+	 * - `false`: no labels are rendered;
+	 * - `object`: the props of LabelList component;
+	 * - `OctaneElement`: a custom SVG label element, such as `<text>` or `<g>`.
+	 *   HTML elements such as `<div>` are not valid inside the chart SVG and may trigger React DOM warnings.
+	 * - `function`: a render function of custom label.
+	 *
+	 * @defaultValue false
+	 */
 	label?: ImplicitLabelListType;
 	/**
- * If set false, animation of Scatter points will be disabled.
- * If set "auto", the animation will be disabled in SSR and will respect the user's prefers-reduced-motion system preference for accessibility.
- * @defaultValue 'auto'
- */
+	 * If set false, animation of Scatter points will be disabled.
+	 * If set "auto", the animation will be disabled in SSR and will respect the user's prefers-reduced-motion system preference for accessibility.
+	 * @defaultValue 'auto'
+	 */
 	isAnimationActive?: boolean | 'auto';
 	/**
- * Specifies when the animation should begin, the unit of this option is ms.
- * @defaultValue 0
- */
+	 * Specifies when the animation should begin, the unit of this option is ms.
+	 * @defaultValue 0
+	 */
 	animationBegin?: number;
 	/**
- * Specifies the duration of animation, the unit of this option is ms.
- * @defaultValue 400
- */
+	 * Specifies the duration of animation, the unit of this option is ms.
+	 * @defaultValue 400
+	 */
 	animationDuration?: AnimationDuration;
 	/**
- * The type of easing function.
- * @defaultValue 'linear'
- */
+	 * The type of easing function.
+	 * @defaultValue 'linear'
+	 */
 	animationEasing?: EasingInput;
 	/**
- * Custom animation function for interpolating data items.
- * When provided, this replaces the default animation interpolation.
- *
- * @param prevItems The items from the previous animation frame, or null on first render
- * @param nextItems The target items to animate towards
- * @param animationElapsedTime A normalized time value (0 = start, 1 = end)
- * @returns The interpolated items at time animationElapsedTime
- *
- * @since 3.9
- * @see {@link https://recharts.github.io/en-US/guide/animations/ Animations guide}
- */
+	 * Custom animation function for interpolating data items.
+	 * When provided, this replaces the default animation interpolation.
+	 *
+	 * @param prevItems The items from the previous animation frame, or null on first render
+	 * @param nextItems The target items to animate towards
+	 * @param animationElapsedTime A normalized time value (0 = start, 1 = end)
+	 * @returns The interpolated items at time animationElapsedTime
+	 *
+	 * @since 3.9
+	 * @see {@link https://recharts.github.io/en-US/guide/animations/ Animations guide}
+	 */
 	animationInterpolateFn?: AnimationInterpolateFn<ScatterPointItem, CartesianLayout>;
 	/**
- * Strategy for matching previous items to next items during animation.
- * Determines how Recharts pairs old data points with new data points
- * to create smooth transitions.
- *
- * - `matchAppend` (default): match sequentially by index and treat newly appended items as new
- * - `matchByIndex`: match by array position with proportional stretching
- * - `matchByDataKey('someKey')`: match by a data key from the payload
- * - Custom function `(item, index) => key`: match by the returned key
- *
- * @defaultValue append
- * @see matchByIndex
- * @see matchByDataKey
- * @see matchAppend
- *
- * @since 3.9
- * @see {@link https://recharts.github.io/en-US/guide/animations/ Animations guide}
- */
+	 * Strategy for matching previous items to next items during animation.
+	 * Determines how Recharts pairs old data points with new data points
+	 * to create smooth transitions.
+	 *
+	 * - `matchAppend` (default): match sequentially by index and treat newly appended items as new
+	 * - `matchByIndex`: match by array position with proportional stretching
+	 * - `matchByDataKey('someKey')`: match by a data key from the payload
+	 * - Custom function `(item, index) => key`: match by the returned key
+	 *
+	 * @defaultValue append
+	 * @see matchByIndex
+	 * @see matchByDataKey
+	 * @see matchAppend
+	 *
+	 * @since 3.9
+	 * @see {@link https://recharts.github.io/en-US/guide/animations/ Animations guide}
+	 */
 	animationMatchBy?: AnimationMatchByProp<ScatterPointItem>;
 	/**
- * Called when the Scatter animation starts.
- */
+	 * Called when the Scatter animation starts.
+	 */
 	onAnimationStart?: () => void;
 	/**
- * Called when the Scatter animation finishes.
- */
+	 * Called when the Scatter animation finishes.
+	 */
 	onAnimationEnd?: () => void;
 	/**
- * Z-Index of this component and its children. The higher the value,
- * the more on top it will be rendered.
- * Components with higher zIndex will appear in front of components with lower zIndex.
- * If undefined or 0, the content is rendered in the default layer without portals.
- *
- * @since 3.4
- * @defaultValue 600
- * @see {@link https://recharts.github.io/en-US/guide/zIndex/ Z-Index and layers guide}
- */
+	 * Z-Index of this component and its children. The higher the value,
+	 * the more on top it will be rendered.
+	 * Components with higher zIndex will appear in front of components with lower zIndex.
+	 * If undefined or 0, the content is rendered in the default layer without portals.
+	 *
+	 * @since 3.4
+	 * @defaultValue 600
+	 * @see {@link https://recharts.github.io/en-US/guide/zIndex/ Z-Index and layers guide}
+	 */
 	zIndex?: number;
 	children?: OctaneNode;
 }
@@ -407,16 +406,15 @@ interface ScatterProps<DataPointType = any, DataValueType = any> extends DataPro
 /**
  * Because of naming conflict, we are forced to ignore certain (valid) SVG attributes.
  */
-type BaseScatterSvgProps =
-	Omit<
-		PresentationAttributesAdaptChildEvent<ScatterPointItem, SVGGraphicsElement>,
-		'points' | 'ref' | 'children' | 'dangerouslySetInnerHTML'
-	>;
+type BaseScatterSvgProps = Omit<
+	PresentationAttributesAdaptChildEvent<ScatterPointItem, SVGGraphicsElement>,
+	'points' | 'ref' | 'children' | 'dangerouslySetInnerHTML'
+>;
 
 type InternalProps = BaseScatterSvgProps & ScatterInternalProps;
 
-export type Props<DataPointType = any, ValueAxisType = any> =
-	BaseScatterSvgProps & ScatterProps<DataPointType, ValueAxisType>;
+export type Props<DataPointType = any, ValueAxisType = any> = BaseScatterSvgProps &
+	ScatterProps<DataPointType, ValueAxisType>;
 
 const computeLegendPayloadFromScatterProps = (props: Props): ReadonlyArray<LegendPayload> => {
 	const { dataKey, name, fill, legendType, hide } = props;
@@ -445,45 +443,46 @@ type InputRequiredToComputeTooltipEntrySettings = {
 	id: GraphicalItemId;
 };
 
-const SetScatterTooltipEntrySettings = React.memo(({
-	dataKey,
-	points,
-	stroke,
-	strokeWidth,
-	fill,
-	name,
-	hide,
-	formatter,
-	tooltipType,
-	id,
-}: InputRequiredToComputeTooltipEntrySettings) => {
-	const tooltipEntrySettings: TooltipPayloadConfiguration = {
-		dataDefinedOnItem: points?.map((p: ScatterPointItem) => p.tooltipPayload),
-		getPosition: (index) => points?.[Number(index)]?.tooltipPosition,
-		settings: {
-			stroke,
-			strokeWidth,
-			fill,
-			nameKey: undefined,
-			dataKey,
-			name: getTooltipNameProp(name, dataKey),
-			hide,
-			type: tooltipType,
-			color: fill,
-			unit: '', // why doesn't Scatter support unit?
-			formatter,
-			graphicalItemId: id,
-		},
-	};
-	return <SetTooltipEntrySettings tooltipEntrySettings={tooltipEntrySettings} />;
-});
+const SetScatterTooltipEntrySettings = React.memo(
+	({
+		dataKey,
+		points,
+		stroke,
+		strokeWidth,
+		fill,
+		name,
+		hide,
+		formatter,
+		tooltipType,
+		id,
+	}: InputRequiredToComputeTooltipEntrySettings) => {
+		const tooltipEntrySettings: TooltipPayloadConfiguration = {
+			dataDefinedOnItem: points?.map((p: ScatterPointItem) => p.tooltipPayload),
+			getPosition: (index) => points?.[Number(index)]?.tooltipPosition,
+			settings: {
+				stroke,
+				strokeWidth,
+				fill,
+				nameKey: undefined,
+				dataKey,
+				name: getTooltipNameProp(name, dataKey),
+				hide,
+				type: tooltipType,
+				color: fill,
+				unit: '', // why doesn't Scatter support unit?
+				formatter,
+				graphicalItemId: id,
+			},
+		};
+		return <SetTooltipEntrySettings tooltipEntrySettings={tooltipEntrySettings} />;
+	},
+);
 
-type ScatterSymbolsProps =
-	ShapeAnimationProps & {
-		points: ReadonlyArray<ScatterPointItem>;
-		showLabels: boolean;
-		allOtherScatterProps: InternalProps;
-	};
+type ScatterSymbolsProps = ShapeAnimationProps & {
+	points: ReadonlyArray<ScatterPointItem>;
+	showLabels: boolean;
+	allOtherScatterProps: InternalProps;
+};
 
 function ScatterLine({
 	points,
@@ -529,7 +528,11 @@ function ScatterLine({
 		lineItem = <Curve {...lineProps} type={lineJointType} />;
 	}
 
-	return <Layer className="recharts-scatter-line" key="recharts-scatter-line">{lineItem}</Layer>;
+	return (
+		<Layer className="recharts-scatter-line" key="recharts-scatter-line">
+			{lineItem}
+		</Layer>
+	);
 }
 
 function ScatterLabelListProvider({
@@ -546,14 +549,14 @@ function ScatterLabelListProvider({
 		return points?.map((point): CartesianLabelListEntry => {
 			const viewBox: TrapezoidViewBox = {
 				/*
- * Scatter label uses x and y as the reference point for the label,
- * not cx and cy.
- */
+				 * Scatter label uses x and y as the reference point for the label,
+				 * not cx and cy.
+				 */
 				x: point.x ?? 0,
 				/*
- * Scatter label uses x and y as the reference point for the label,
- * not cx and cy.
- */
+				 * Scatter label uses x and y as the reference point for the label,
+				 * not cx and cy.
+				 */
 				y: point.y ?? 0,
 				width: point.width,
 				height: point.height,
@@ -563,10 +566,10 @@ function ScatterLabelListProvider({
 			return {
 				...viewBox,
 				/*
- * Here we put undefined because Scatter shows two values usually, one for X and one for Y.
- * LabelList will see this undefined and will use its own `dataKey` prop to determine which value to show,
- * using the payload below.
- */
+				 * Here we put undefined because Scatter shows two values usually, one for X and one for Y.
+				 * LabelList will see this undefined and will use its own `dataKey` prop to determine which value to show,
+				 * using the payload below.
+				 */
 				value: undefined,
 				payload: point.payload,
 				viewBox,
@@ -576,9 +579,11 @@ function ScatterLabelListProvider({
 		});
 	}, [chartViewBox, points]);
 
-	return <CartesianLabelListContextProvider
-		value={showLabels ? labelListEntries : undefined}
-	>{children}</CartesianLabelListContextProvider>;
+	return (
+		<CartesianLabelListContextProvider value={showLabels ? labelListEntries : undefined}>
+			{children}
+		</CartesianLabelListContextProvider>
+	);
 }
 
 /**
@@ -619,15 +624,18 @@ function ScatterPoint({
 	baseProps: ReturnType<typeof svgPropertiesNoEvents>;
 	id: GraphicalItemId;
 	restOfAllOtherProps: InternalProps;
-	onMouseEnterFromContext: (data: ScatterPointItem, index: number) => (event: NativeMouseEvent<
-		SVGGraphicsElement
-	>) => void;
-	onMouseLeaveFromContext: (data: ScatterPointItem, index: number) => (event: NativeMouseEvent<
-		SVGGraphicsElement
-	>) => void;
-	onClickFromContext: (data: ScatterPointItem, index: number) => (event: NativeMouseEvent<
-		SVGGraphicsElement
-	>) => void;
+	onMouseEnterFromContext: (
+		data: ScatterPointItem,
+		index: number,
+	) => (event: NativeMouseEvent<SVGGraphicsElement>) => void;
+	onMouseLeaveFromContext: (
+		data: ScatterPointItem,
+		index: number,
+	) => (event: NativeMouseEvent<SVGGraphicsElement>) => void;
+	onClickFromContext: (
+		data: ScatterPointItem,
+		index: number,
+	) => (event: NativeMouseEvent<SVGGraphicsElement>) => void;
 }): OctaneElement {
 	const hasActiveShape = activeShape != null && activeShape !== false;
 	const selectIsActive = useMemo(() => {
@@ -638,8 +646,7 @@ function ScatterPoint({
 	const isActive: boolean = useAppSelector(selectIsActive) ?? false;
 
 	// isActive is only true when hasActiveShape is true, so activeShape is defined here
-	const option =
-		isActive && activeShape != null && activeShape !== false ? activeShape : shape;
+	const option = isActive && activeShape != null && activeShape !== false ? activeShape : shape;
 	const symbolProps: ScatterShapeProps = {
 		...baseProps,
 		...entry,
@@ -651,24 +658,26 @@ function ScatterPoint({
 		[DATA_ITEM_GRAPHICAL_ITEM_ID_ATTRIBUTE_NAME]: String(id),
 	};
 
-	return <ZIndexLayer
-		/*
- * inactive Scatters use the parent zIndex, which is represented by undefined here.
- * ZIndexLayer will render undefined zIndex as-is, as regular children, without portals.
- * Active Scatters use the activeDot zIndex so they render above other elements.
- */
-		zIndex={isActive ? DefaultZIndexes.activeDot : undefined}
-	>
-		<Layer
-			className="recharts-scatter-symbol"
-			{...adaptEventsOfChild(restOfAllOtherProps, entry, index)}
-			onMouseEnter={onMouseEnterFromContext(entry, index)}
-			onMouseLeave={onMouseLeaveFromContext(entry, index)}
-			onClick={onClickFromContext(entry, index)}
+	return (
+		<ZIndexLayer
+			/*
+			 * inactive Scatters use the parent zIndex, which is represented by undefined here.
+			 * ZIndexLayer will render undefined zIndex as-is, as regular children, without portals.
+			 * Active Scatters use the activeDot zIndex so they render above other elements.
+			 */
+			zIndex={isActive ? DefaultZIndexes.activeDot : undefined}
 		>
-			<ScatterSymbol option={option} {...symbolProps} />
-		</Layer>
-	</ZIndexLayer>;
+			<Layer
+				className="recharts-scatter-symbol"
+				{...adaptEventsOfChild(restOfAllOtherProps, entry, index)}
+				onMouseEnter={onMouseEnterFromContext(entry, index)}
+				onMouseLeave={onMouseLeaveFromContext(entry, index)}
+				onClick={onClickFromContext(entry, index)}
+			>
+				<ScatterSymbol option={option} {...symbolProps} />
+			</Layer>
+		</ZIndexLayer>
+	);
 }
 
 function ScatterSymbols(props: ScatterSymbolsProps) {
@@ -692,10 +701,10 @@ function ScatterSymbols(props: ScatterSymbolsProps) {
 
 	const baseProps = svgPropertiesNoEvents(allOtherPropsWithoutId);
 
-	return <>
-		<ScatterLine points={points} props={allOtherPropsWithoutId} />
-		{points.map(
-			(entry: ScatterPointItem, i: number) =>
+	return (
+		<>
+			<ScatterLine points={points} props={allOtherPropsWithoutId} />
+			{points.map((entry: ScatterPointItem, i: number) => (
 				<ScatterPoint
 					key={`symbol-${entry?.cx}-${entry?.cy}-${entry?.size}-${i}`}
 					entry={entry}
@@ -711,9 +720,10 @@ function ScatterSymbols(props: ScatterSymbolsProps) {
 					onMouseEnterFromContext={onMouseEnterFromContext}
 					onMouseLeaveFromContext={onMouseLeaveFromContext}
 					onClickFromContext={onClickFromContext}
-				/>,
-		)}
-	</>;
+				/>
+			))}
+		</>
+	);
 }
 
 const defaultScatterAnimateItems: AnimationInterpolateFn<ScatterPointItem, CartesianLayout> = (
@@ -730,20 +740,20 @@ const defaultScatterAnimateItems: AnimationInterpolateFn<ScatterPointItem, Carte
 			return [
 				{
 					...item.next,
-					cx: item.next.cx == null
-						? undefined
-						: interpolate(item.prev.cx, item.next.cx, animationElapsedTime),
-					cy: item.next.cy == null
-						? undefined
-						: interpolate(item.prev.cy, item.next.cy, animationElapsedTime),
+					cx:
+						item.next.cx == null
+							? undefined
+							: interpolate(item.prev.cx, item.next.cx, animationElapsedTime),
+					cy:
+						item.next.cy == null
+							? undefined
+							: interpolate(item.prev.cy, item.next.cy, animationElapsedTime),
 					size: interpolate(item.prev.size, item.next.size, animationElapsedTime),
 				},
 			];
 		}
 		// added
-		return [
-			{ ...item.next, size: interpolate(0, item.next.size, animationElapsedTime) },
-		];
+		return [{ ...item.next, size: interpolate(0, item.next.size, animationElapsedTime) }];
 	});
 };
 
@@ -773,36 +783,40 @@ function SymbolsWithAnimation({
 
 	if (layout == null) return null;
 
-	return <ScatterLabelListProvider showLabels={!isAnimating} points={points}>
-		<AnimatedItems
-			animationInput={points}
-			animationIdPrefix="recharts-scatter-"
-			items={points}
-			previousItemsRef={previousPointsRef}
-			isAnimationActive={isAnimationActive}
-			animationBegin={animationBegin}
-			animationDuration={animationDuration}
-			animationEasing={animationEasing}
-			onAnimationStart={handleAnimationStart}
-			onAnimationEnd={handleAnimationEnd}
-			animationInterpolateFn={animationInterpolateFn}
-			animationMatchBy={props.animationMatchBy}
-			layout={layout}
-		>
-			{(stepData, animationElapsedTime, isEntrance) => <Layer>
-				<ScatterSymbols
-					points={stepData}
-					allOtherScatterProps={props}
-					showLabels={!isAnimating}
-					animationElapsedTime={animationElapsedTime}
-					isAnimating={isAnimating || animationElapsedTime < 1}
-					isEntrance={isEntrance}
-				/>
-			</Layer>}
-		</AnimatedItems>
-		{props.children}
-		<LabelListFromLabelProp label={props.label} />
-	</ScatterLabelListProvider>;
+	return (
+		<ScatterLabelListProvider showLabels={!isAnimating} points={points}>
+			<AnimatedItems
+				animationInput={points}
+				animationIdPrefix="recharts-scatter-"
+				items={points}
+				previousItemsRef={previousPointsRef}
+				isAnimationActive={isAnimationActive}
+				animationBegin={animationBegin}
+				animationDuration={animationDuration}
+				animationEasing={animationEasing}
+				onAnimationStart={handleAnimationStart}
+				onAnimationEnd={handleAnimationEnd}
+				animationInterpolateFn={animationInterpolateFn}
+				animationMatchBy={props.animationMatchBy}
+				layout={layout}
+			>
+				{(stepData, animationElapsedTime, isEntrance) => (
+					<Layer>
+						<ScatterSymbols
+							points={stepData}
+							allOtherScatterProps={props}
+							showLabels={!isAnimating}
+							animationElapsedTime={animationElapsedTime}
+							isAnimating={isAnimating || animationElapsedTime < 1}
+							isEntrance={isEntrance}
+						/>
+					</Layer>
+				)}
+			</AnimatedItems>
+			{props.children}
+			<LabelListFromLabelProp label={props.label} />
+		</ScatterLabelListProvider>
+	);
 }
 
 export function computeScatterPoints({
@@ -829,16 +843,14 @@ export function computeScatterPoints({
 	const zAxisDataKey = zAxis && zAxis.dataKey;
 	const defaultRangeZ = zAxis ? zAxis.range : implicitZAxis.range;
 	const defaultZ = defaultRangeZ && defaultRangeZ[0];
-	const xBandSize =
-		xAxis.scale.bandwidth ? xAxis.scale.bandwidth() : 0;
-	const yBandSize =
-		yAxis.scale.bandwidth ? yAxis.scale.bandwidth() : 0;
+	const xBandSize = xAxis.scale.bandwidth ? xAxis.scale.bandwidth() : 0;
+	const yBandSize = yAxis.scale.bandwidth ? yAxis.scale.bandwidth() : 0;
 	return displayedData.map((entry: unknown, index): ScatterPointItem => {
 		const x = getValueByDataKey<unknown, number | string>(entry, xAxisDataKey);
 		const y = getValueByDataKey<unknown, number | string>(entry, yAxisDataKey);
 		const z: number | string = isNullish(zAxisDataKey)
 			? '-'
-			: getValueByDataKey<unknown, number | string>(entry, zAxisDataKey) ?? '-';
+			: (getValueByDataKey<unknown, number | string>(entry, zAxisDataKey) ?? '-');
 
 		const tooltipPayload: Array<TooltipPayloadEntry> = [
 			{
@@ -889,13 +901,11 @@ export function computeScatterPoints({
 			index,
 			dataKey: yAxisDataKey,
 		});
-		const size =
-			z !== '-' && zAxis != null ? zAxis.scale.map(z) : defaultZ;
-		const radius =
-			size == null ? 0 : Math.sqrt(Math.max(size, 0) / Math.PI);
+		const size = z !== '-' && zAxis != null ? zAxis.scale.map(z) : defaultZ;
+		const radius = size == null ? 0 : Math.sqrt(Math.max(size, 0) / Math.PI);
 
 		return {
-			...entry as Record<string, unknown>,
+			...(entry as Record<string, unknown>),
 			cx,
 			cy,
 			x: cx == null ? undefined : cx - radius,
@@ -907,7 +917,7 @@ export function computeScatterPoints({
 			tooltipPayload,
 			tooltipPosition: cx == null || cy == null ? undefined : { x: cx, y: cy },
 			payload: entry,
-			...cells && cells[index] && cells[index].props as CellPropsFor<SVGPathElement>,
+			...(cells && cells[index] && (cells[index].props as CellPropsFor<SVGPathElement>)),
 		};
 	});
 }
@@ -934,29 +944,32 @@ function ScatterWithId(props: InternalProps) {
 	const layerClass = clsx('recharts-scatter', className);
 	const clipPathId = id;
 
-	return <ZIndexLayer zIndex={props.zIndex}>
-		<Layer
-			className={layerClass}
-			clipPath={needClip ? `url(#clipPath-${clipPathId})` : undefined}
-			id={id}
-		>
-			{needClip &&
-				<defs>
-					<GraphicalItemClipPath clipPathId={clipPathId} xAxisId={xAxisId} yAxisId={yAxisId} />
-				</defs>}
-			<SetErrorBarContext
-				xAxisId={xAxisId}
-				yAxisId={yAxisId}
-				data={points}
-				dataPointFormatter={errorBarDataPointFormatter}
-				errorBarOffset={0}
+	return (
+		<ZIndexLayer zIndex={props.zIndex}>
+			<Layer
+				className={layerClass}
+				clipPath={needClip ? `url(#clipPath-${clipPathId})` : undefined}
+				id={id}
 			>
-				<Layer key="recharts-scatter-symbols">
-					<SymbolsWithAnimation props={props} previousPointsRef={previousPointsRef} />
-				</Layer>
-			</SetErrorBarContext>
-		</Layer>
-	</ZIndexLayer>;
+				{needClip && (
+					<defs>
+						<GraphicalItemClipPath clipPathId={clipPathId} xAxisId={xAxisId} yAxisId={yAxisId} />
+					</defs>
+				)}
+				<SetErrorBarContext
+					xAxisId={xAxisId}
+					yAxisId={yAxisId}
+					data={points}
+					dataPointFormatter={errorBarDataPointFormatter}
+					errorBarOffset={0}
+				>
+					<Layer key="recharts-scatter-symbols">
+						<SymbolsWithAnimation props={props} previousPointsRef={previousPointsRef} />
+					</Layer>
+				</SetErrorBarContext>
+			</Layer>
+		</ZIndexLayer>
+	);
 }
 
 export const defaultScatterProps = {
@@ -1007,37 +1020,39 @@ function ScatterImpl(props: WithIdRequired<Props>) {
 	if (needClip == null || points == null) {
 		return <CellsContext value={cellRegistry}>{props.children}</CellsContext>;
 	}
-	return <CellsContext value={cellRegistry}>
-		<SetScatterTooltipEntrySettings
-			dataKey={props.dataKey}
-			points={points}
-			stroke={props.stroke}
-			strokeWidth={props.strokeWidth}
-			fill={props.fill}
-			name={props.name}
-			hide={props.hide}
-			formatter={props.formatter}
-			tooltipType={props.tooltipType}
-			id={props.id}
-		/>
-		<ScatterWithId
-			{...everythingElse}
-			xAxisId={xAxisId}
-			yAxisId={yAxisId}
-			zAxisId={zAxisId}
-			lineType={lineType}
-			lineJointType={lineJointType}
-			legendType={legendType}
-			shape={shape}
-			hide={hide}
-			isAnimationActive={isAnimationActive}
-			animationBegin={animationBegin}
-			animationDuration={animationDuration}
-			animationEasing={animationEasing}
-			points={points}
-			needClip={needClip}
-		/>
-	</CellsContext>;
+	return (
+		<CellsContext value={cellRegistry}>
+			<SetScatterTooltipEntrySettings
+				dataKey={props.dataKey}
+				points={points}
+				stroke={props.stroke}
+				strokeWidth={props.strokeWidth}
+				fill={props.fill}
+				name={props.name}
+				hide={props.hide}
+				formatter={props.formatter}
+				tooltipType={props.tooltipType}
+				id={props.id}
+			/>
+			<ScatterWithId
+				{...everythingElse}
+				xAxisId={xAxisId}
+				yAxisId={yAxisId}
+				zAxisId={zAxisId}
+				lineType={lineType}
+				lineJointType={lineJointType}
+				legendType={legendType}
+				shape={shape}
+				hide={hide}
+				isAnimationActive={isAnimationActive}
+				animationBegin={animationBegin}
+				animationDuration={animationDuration}
+				animationEasing={animationEasing}
+				points={points}
+				needClip={needClip}
+			/>
+		</CellsContext>
+	);
 }
 
 function ScatterFn<DataPointType = any, ValueAxisType = any>(
@@ -1045,25 +1060,29 @@ function ScatterFn<DataPointType = any, ValueAxisType = any>(
 ) {
 	const props = resolveDefaultProps(outsideProps, defaultScatterProps);
 	const isPanorama = useIsPanorama();
-	return <RegisterGraphicalItemId id={props.id} type="scatter">
-		{(id) => <>
-			<SetLegendPayload legendPayload={computeLegendPayloadFromScatterProps(props)} />
-			<SetCartesianGraphicalItem
-				type="scatter"
-				id={id}
-				data={props.data}
-				xAxisId={props.xAxisId}
-				yAxisId={props.yAxisId}
-				zAxisId={props.zAxisId}
-				dataKey={props.dataKey}
-				hide={props.hide}
-				name={props.name}
-				tooltipType={props.tooltipType}
-				isPanorama={isPanorama}
-			/>
-			<ScatterImpl {...props} id={id} />
-		</>}
-	</RegisterGraphicalItemId>;
+	return (
+		<RegisterGraphicalItemId id={props.id} type="scatter">
+			{(id) => (
+				<>
+					<SetLegendPayload legendPayload={computeLegendPayloadFromScatterProps(props)} />
+					<SetCartesianGraphicalItem
+						type="scatter"
+						id={id}
+						data={props.data}
+						xAxisId={props.xAxisId}
+						yAxisId={props.yAxisId}
+						zAxisId={props.zAxisId}
+						dataKey={props.dataKey}
+						hide={props.hide}
+						name={props.name}
+						tooltipType={props.tooltipType}
+						isPanorama={isPanorama}
+					/>
+					<ScatterImpl {...props} id={id} />
+				</>
+			)}
+		</RegisterGraphicalItemId>
+	);
 }
 
 /**
@@ -1072,8 +1091,7 @@ function ScatterFn<DataPointType = any, ValueAxisType = any>(
  * @provides CellReader
  * @consumes CartesianChartContext
  */
-export const Scatter = React.memo(ScatterFn, propsAreEqual) as
-	typeof ScatterFn & {
-		displayName?: string;
-	};
+export const Scatter = React.memo(ScatterFn, propsAreEqual) as typeof ScatterFn & {
+	displayName?: string;
+};
 Scatter.displayName = 'Scatter';

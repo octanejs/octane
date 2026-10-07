@@ -104,8 +104,7 @@ export function start(host: HTMLElement, name: string, props: Props, hydrate = f
 		ShadowBoundary,
 	};
 	const View = views[name as keyof typeof views] as ComponentBody<any>;
-	const root =
-		hydrate ? hydrateRoot(host, View, props) : createRoot(host);
+	const root = hydrate ? hydrateRoot(host, View, props) : createRoot(host);
 	if (!hydrate) root.render(View, props);
 	return {
 		settle: () => act(() => {}),

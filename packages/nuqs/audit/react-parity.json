@@ -33,7 +33,7 @@
       "arch": "any",
       "packageManager": "pnpm@12.9.1",
       "lockfile": "pnpm-lock.yaml",
-      "lockfileSha256": "e92f4520cd88a2593a0ecd555e0532b2e4e8bb1396c9558a09f0cbf3fbaa5917"
+      "lockfileSha256": "caea67fe61ab57f3e8cbd8a0e55f0e8b3014b3dd6815c6fe6e158095f291daeb"
     }
   },
   "lanes": [
@@ -66,7 +66,7 @@
         {
           "path": "packages/nuqs/tests/_fixtures/query.tsrx",
           "role": "support",
-          "sha256": "f9de71db674b1bc33cff9cc52aefa6261627b5d455509c8a140322b0e36219e0"
+          "sha256": "4f623dd8ae23ccda88c205e3b374b0718ba81047d1580ccb0b7c6acf6b03e891"
         },
         {
           "path": "packages/nuqs/tests/differential/_setup.ts",

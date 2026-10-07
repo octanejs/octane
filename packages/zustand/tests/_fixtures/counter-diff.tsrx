@@ -4,15 +4,13 @@ import { create } from '@octanejs/zustand';
 // on octane (via @octanejs/zustand) AND on React (the setup rewrites the import
 // to real `zustand`), and the rig asserts byte-identical innerHTML after each
 // click. Exercises independent slices, a derived selector, and an action.
-const useStore = create(
-	(set) => ({
-		count: 0,
-		other: 0,
-		inc: () => set((s) => ({ count: s.count + 1 })),
-		incOther: () => set((s) => ({ other: s.other + 1 })),
-		reset: () => set({ count: 0, other: 0 }),
-	}),
-);
+const useStore = create((set) => ({
+	count: 0,
+	other: 0,
+	inc: () => set((s) => ({ count: s.count + 1 })),
+	incOther: () => set((s) => ({ other: s.other + 1 })),
+	reset: () => set({ count: 0, other: 0 }),
+}));
 
 export function Counter() @{
 	const count = useStore((s) => s.count);
@@ -25,8 +23,14 @@ export function Counter() @{
 		<span id="count">{count as string}</span>
 		<span id="other">{other as string}</span>
 		<span id="doubled">{doubled as string}</span>
-		<button id="inc" onClick={inc}>inc</button>
-		<button id="incOther" onClick={incOther}>incOther</button>
-		<button id="reset" onClick={reset}>reset</button>
+		<button id="inc" onClick={inc}>
+			inc
+		</button>
+		<button id="incOther" onClick={incOther}>
+			incOther
+		</button>
+		<button id="reset" onClick={reset}>
+			reset
+		</button>
 	</div>
 }

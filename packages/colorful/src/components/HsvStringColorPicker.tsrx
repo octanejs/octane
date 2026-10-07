@@ -10,5 +10,6 @@ const colorModel: ColorModel<string> = {
 	equal: equalColorString,
 };
 
-export const HsvStringColorPicker = (props: Partial<ColorPickerBaseProps<string>>) =>
-	<ColorPicker {...props} colorModel={colorModel} />;
+export const HsvStringColorPicker = (props: Partial<ColorPickerBaseProps<string>>) => (
+	<ColorPicker {...props} colorModel={colorModel} />
+);

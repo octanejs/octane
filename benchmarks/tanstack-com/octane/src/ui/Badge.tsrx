@@ -21,11 +21,15 @@ const variantStyles: Record<BadgeVariant, string> = {
 };
 
 export function Badge({ children, variant = 'default', className }: BadgeProps) {
-	return <span
-		class={twMerge(
-			'inline-flex items-center px-2 py-1 rounded-full text-xs font-medium',
-			variantStyles[variant],
-			className,
-		)}
-	>{children}</span>;
+	return (
+		<span
+			class={twMerge(
+				'inline-flex items-center px-2 py-1 rounded-full text-xs font-medium',
+				variantStyles[variant],
+				className,
+			)}
+		>
+			{children}
+		</span>
+	);
 }

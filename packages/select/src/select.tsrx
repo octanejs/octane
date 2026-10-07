@@ -185,10 +185,11 @@ export type RawSelectRequiredPropKeys =
 	| 'unstyled'
 	| 'value';
 
-export type RawSelectProps<Option, IsMulti extends boolean, Group extends GroupBase<Option>> =
-	Omit<SelectProps<Option, IsMulti, Group>, RawSelectRequiredPropKeys> & Required<
-		Pick<SelectProps<Option, IsMulti, Group>, RawSelectRequiredPropKeys>
-	>;
+export type RawSelectProps<Option, IsMulti extends boolean, Group extends GroupBase<Option>> = Omit<
+	SelectProps<Option, IsMulti, Group>,
+	RawSelectRequiredPropKeys
+> &
+	Required<Pick<SelectProps<Option, IsMulti, Group>, RawSelectRequiredPropKeys>>;
 
 export interface SelectInstance<
 	Option = unknown,
@@ -259,9 +260,8 @@ export const defaultProps = {
 	options: [],
 	pageSize: 5,
 	placeholder: 'Select...',
-	screenReaderStatus: ({ count }: { count: number }) => `${count} result${
-		count !== 1 ? 's' : ''
-	} available`,
+	screenReaderStatus: ({ count }: { count: number }) =>
+		`${count} result${count !== 1 ? 's' : ''} available`,
 	styles: {},
 	tabIndex: 0,
 	tabSelectsValue: true,
@@ -299,48 +299,51 @@ function isSelected<Option, IsMulti extends boolean, Group extends GroupBase<Opt
 	return selectValue.some((value) => props.getOptionValue(value) === candidate);
 }
 
-type RequiredSelectProps<Option, IsMulti extends boolean, Group extends GroupBase<Option>> =
-	SelectProps<Option, IsMulti, Group> & {
-		'aria-live': 'off' | 'polite' | 'assertive';
-		captureMenuScroll: boolean;
-		classNames: ClassNamesConfig<Option, IsMulti, Group>;
-		closeMenuOnSelect: boolean;
-		closeMenuOnScroll: boolean | ((event: Event) => boolean);
-		components: SelectComponentsConfig;
-		controlShouldRenderValue: boolean;
-		filterOption: ((option: FilterOptionOption<Option>, inputValue: string) => boolean) | null;
-		formatGroupLabel: (group: Group) => OctaneNode;
-		getOptionLabel: GetOptionLabel<Option>;
-		getOptionValue: GetOptionValue<Option>;
-		inputValue: string;
-		isDisabled: boolean;
-		isLoading: boolean;
-		isMulti: IsMulti;
-		isOptionDisabled: (option: Option, selectValue: Options<Option>) => boolean;
-		isRtl: boolean;
-		loadingMessage: (value: { inputValue: string }) => OctaneNode;
-		maxMenuHeight: number;
-		menuIsOpen: boolean;
-		menuPlacement: 'auto' | 'bottom' | 'top';
-		menuPosition: 'absolute' | 'fixed';
-		menuShouldBlockScroll: boolean;
-		menuShouldScrollIntoView: boolean;
-		minMenuHeight: number;
-		noOptionsMessage: (value: { inputValue: string }) => OctaneNode;
-		onChange: (value: OnChangeValue<Option, IsMulti>, actionMeta: ActionMeta<Option>) => void;
-		onInputChange: (newValue: string, actionMeta: InputActionMeta) => void;
-		onMenuClose: () => void;
-		onMenuOpen: () => void;
-		openMenuOnClick: boolean;
-		options: OptionsOrGroups<Option, Group>;
-		pageSize: number;
-		placeholder: OctaneNode;
-		screenReaderStatus: (value: { count: number }) => string;
-		styles: StylesConfig<Option, IsMulti, Group>;
-		tabIndex: number;
-		tabSelectsValue: boolean;
-		unstyled: boolean;
-	};
+type RequiredSelectProps<
+	Option,
+	IsMulti extends boolean,
+	Group extends GroupBase<Option>,
+> = SelectProps<Option, IsMulti, Group> & {
+	'aria-live': 'off' | 'polite' | 'assertive';
+	captureMenuScroll: boolean;
+	classNames: ClassNamesConfig<Option, IsMulti, Group>;
+	closeMenuOnSelect: boolean;
+	closeMenuOnScroll: boolean | ((event: Event) => boolean);
+	components: SelectComponentsConfig;
+	controlShouldRenderValue: boolean;
+	filterOption: ((option: FilterOptionOption<Option>, inputValue: string) => boolean) | null;
+	formatGroupLabel: (group: Group) => OctaneNode;
+	getOptionLabel: GetOptionLabel<Option>;
+	getOptionValue: GetOptionValue<Option>;
+	inputValue: string;
+	isDisabled: boolean;
+	isLoading: boolean;
+	isMulti: IsMulti;
+	isOptionDisabled: (option: Option, selectValue: Options<Option>) => boolean;
+	isRtl: boolean;
+	loadingMessage: (value: { inputValue: string }) => OctaneNode;
+	maxMenuHeight: number;
+	menuIsOpen: boolean;
+	menuPlacement: 'auto' | 'bottom' | 'top';
+	menuPosition: 'absolute' | 'fixed';
+	menuShouldBlockScroll: boolean;
+	menuShouldScrollIntoView: boolean;
+	minMenuHeight: number;
+	noOptionsMessage: (value: { inputValue: string }) => OctaneNode;
+	onChange: (value: OnChangeValue<Option, IsMulti>, actionMeta: ActionMeta<Option>) => void;
+	onInputChange: (newValue: string, actionMeta: InputActionMeta) => void;
+	onMenuClose: () => void;
+	onMenuOpen: () => void;
+	openMenuOnClick: boolean;
+	options: OptionsOrGroups<Option, Group>;
+	pageSize: number;
+	placeholder: OctaneNode;
+	screenReaderStatus: (value: { count: number }) => string;
+	styles: StylesConfig<Option, IsMulti, Group>;
+	tabIndex: number;
+	tabSelectsValue: boolean;
+	unstyled: boolean;
+};
 
 export function buildCategorizedOptions<
 	Option,
@@ -362,12 +365,12 @@ export function buildCategorizedOptions<
 	});
 	const focusable = (option: CategorizedOption<Option>) =>
 		(!hideSelected || !option.isSelected) &&
-			(props.filterOption
-				? props.filterOption(
-						{ label: option.label, value: option.value, data: option.data },
-						props.inputValue ?? '',
-					)
-				: true);
+		(props.filterOption
+			? props.filterOption(
+					{ label: option.label, value: option.value, data: option.data },
+					props.inputValue ?? '',
+				)
+			: true);
 	const result: CategorizedGroupOrOption<Option, Group>[] = [];
 	props.options.forEach((item, outerIndex) => {
 		if (typeof item === 'object' && item !== null && 'options' in item) {
@@ -511,9 +514,8 @@ const defaultAriaLiveMessages = {
 		isSelected: boolean;
 		isAppleDevice: boolean;
 	}) {
-		const index = (values: readonly Option[]) => values.length
-			? `${values.indexOf(props.focused) + 1} of ${values.length}`
-			: '';
+		const index = (values: readonly Option[]) =>
+			values.length ? `${values.indexOf(props.focused) + 1} of ${values.length}` : '';
 		if (props.context === 'value') {
 			return `value ${props.label} focused, ${index(props.selectValue)}.`;
 		}
@@ -554,42 +556,40 @@ function LiveRegion<Option, IsMulti extends boolean, Group extends GroupBase<Opt
 		  })
 		| null;
 	const selected =
-		selection?.removedValue ?? selection?.option ??
-			(selection && !Array.isArray(selection.value) ? selection.value as Option : undefined);
+		selection?.removedValue ??
+		selection?.option ??
+		(selection && !Array.isArray(selection.value) ? (selection.value as Option) : undefined);
 	const selectedMany = selection?.options ?? selection?.removedValues;
 	const ariaSelected =
 		selection && messages.onChange
-			? messages.onChange(
-					{
-						...selection,
-						isDisabled: selected
-							? props.selectProps.isOptionDisabled(selected, props.selectValue)
-							: false,
-						label: selected ? props.selectProps.getOptionLabel(selected) : '',
-						labels: selectedMany ? selectedMany.map(props.selectProps.getOptionLabel) : [],
-					} as never,
-				)
+			? messages.onChange({
+					...selection,
+					isDisabled: selected
+						? props.selectProps.isOptionDisabled(selected, props.selectValue)
+						: false,
+					label: selected ? props.selectProps.getOptionLabel(selected) : '',
+					labels: selectedMany ? selectedMany.map(props.selectProps.getOptionLabel) : [],
+				} as never)
 			: '';
 	const focused = props.focusedOption ?? props.focusedValue;
 	const ariaFocused =
 		focused && messages.onFocus
-			? messages.onFocus(
-					{
-						context: focused === props.focusedOption ? 'menu' : 'value',
-						focused,
-						isDisabled: props.selectProps.isOptionDisabled(focused, props.selectValue),
-						isSelected: Boolean(
-							props.focusedOption && props.selectValue.includes(props.focusedOption),
-						),
-						label: props.selectProps.getOptionLabel(focused),
-						options: props.focusableOptions,
-						selectValue: props.selectValue,
-						isAppleDevice: props.isAppleDevice,
-					} as never,
-				)
+			? messages.onFocus({
+					context: focused === props.focusedOption ? 'menu' : 'value',
+					focused,
+					isDisabled: props.selectProps.isOptionDisabled(focused, props.selectValue),
+					isSelected: Boolean(
+						props.focusedOption && props.selectValue.includes(props.focusedOption),
+					),
+					label: props.selectProps.getOptionLabel(focused),
+					options: props.focusableOptions,
+					selectValue: props.selectValue,
+					isAppleDevice: props.isAppleDevice,
+				} as never)
 			: '';
 	const ariaResults =
-		props.selectProps.menuIsOpen && props.selectProps.options.length &&
+		props.selectProps.menuIsOpen &&
+		props.selectProps.options.length &&
 		!props.selectProps.isLoading &&
 		messages.onFilter
 			? messages.onFilter({
@@ -600,33 +600,27 @@ function LiveRegion<Option, IsMulti extends boolean, Group extends GroupBase<Opt
 				})
 			: '';
 	const isInitialFocus = selection?.action === 'initial-input-focus';
-	const context =
-		props.focusedValue
-			? 'value'
-			: props.selectProps.menuIsOpen
-				? 'menu'
-				: 'input';
+	const context = props.focusedValue ? 'value' : props.selectProps.menuIsOpen ? 'menu' : 'input';
 	const ariaGuidance =
-		messages.guidance?.(
-			{
-				'aria-label': props.selectProps['aria-label'],
-				context,
-				isDisabled: props.focusedOption
-					? props.selectProps.isOptionDisabled(props.focusedOption, props.selectValue)
-					: false,
-				isMulti: Boolean(props.selectProps.isMulti),
-				isSearchable: props.selectProps.isSearchable,
-				tabSelectsValue: props.selectProps.tabSelectsValue,
-				isInitialFocus,
-			} as never,
-		) ??
-			'';
-	const screenReaderText = <>
-		<span id="aria-selection">{ariaSelected}</span>
-		<span id="aria-focused">{ariaFocused}</span>
-		<span id="aria-results">{ariaResults}</span>
-		<span id="aria-guidance">{ariaGuidance}</span>
-	</>;
+		messages.guidance?.({
+			'aria-label': props.selectProps['aria-label'],
+			context,
+			isDisabled: props.focusedOption
+				? props.selectProps.isOptionDisabled(props.focusedOption, props.selectValue)
+				: false,
+			isMulti: Boolean(props.selectProps.isMulti),
+			isSearchable: props.selectProps.isSearchable,
+			tabSelectsValue: props.selectProps.tabSelectsValue,
+			isInitialFocus,
+		} as never) ?? '';
+	const screenReaderText = (
+		<>
+			<span id="aria-selection">{ariaSelected}</span>
+			<span id="aria-focused">{ariaFocused}</span>
+			<span id="aria-results">{ariaResults}</span>
+			<span id="aria-guidance">{ariaGuidance}</span>
+		</>
+	);
 	<>
 		<span id={props.id} className={resolved.className}>
 			{isInitialFocus ? screenReaderText : null}
@@ -647,7 +641,7 @@ function isAppleDevice() {
 	if (typeof window === 'undefined' || window.navigator == null) return false;
 	const platform = window.navigator.platform;
 	const isMac = /^Mac/i.test(platform);
-	return /^iPhone|^iPad/i.test(platform) || isMac && navigator.maxTouchPoints > 1 || isMac;
+	return /^iPhone|^iPad/i.test(platform) || (isMac && navigator.maxTouchPoints > 1) || isMac;
 }
 
 export function Select<
@@ -746,15 +740,16 @@ export function Select<
 		const nextFocusedOption =
 			focusedOption && focusableOptions.includes(focusedOption)
 				? focusedOption
-				: focusableOptions[0] ?? null;
+				: (focusableOptions[0] ?? null);
 		if (nextFocusedOption !== focusedOption) setFocusedOption(nextFocusedOption);
 	}, [props.options, props.value, props.menuIsOpen, props.inputValue, focusedOption]);
 	useEffect(() => {
 		const prev = prevFocusReconcileRef.current;
 		const changed =
-			props.value !== prev.value || props.options !== prev.options ||
-				props.menuIsOpen !== prev.menuIsOpen ||
-				props.inputValue !== prev.inputValue;
+			props.value !== prev.value ||
+			props.options !== prev.options ||
+			props.menuIsOpen !== prev.menuIsOpen ||
+			props.inputValue !== prev.inputValue;
 		if (!changed) return;
 		prevFocusReconcileRef.current = {
 			options: props.options,
@@ -764,10 +759,9 @@ export function Select<
 		};
 		const lastSelectValue = prevSelectValueRef.current;
 		prevSelectValueRef.current = selectValue;
-		const nextFocusedValue =
-			clearFocusValueOnUpdateRef.current
-				? getNextFocusedValue(focusedValue, lastSelectValue, selectValue)
-				: null;
+		const nextFocusedValue = clearFocusValueOnUpdateRef.current
+			? getNextFocusedValue(focusedValue, lastSelectValue, selectValue)
+			: null;
 		clearFocusValueOnUpdateRef.current = false;
 		if (nextFocusedValue !== focusedValue) setFocusedValue(nextFocusedValue);
 	}, [props.options, props.value, props.menuIsOpen, props.inputValue, selectValue, focusedValue]);
@@ -786,11 +780,8 @@ export function Select<
 	};
 	const getClassNames = (name: string, componentProps: unknown) =>
 		props.classNames[name as StyleKey]?.(componentProps);
-	const cx = (state: Record<string, boolean>, ...names: (string | undefined)[]) => classNames(
-		props.classNamePrefix,
-		state,
-		...names,
-	);
+	const cx = (state: Record<string, boolean>, ...names: (string | undefined)[]) =>
+		classNames(props.classNamePrefix, state, ...names);
 
 	const closeMenu = () => {
 		props.onInputChange('', {
@@ -810,8 +801,9 @@ export function Select<
 			const target = event.target;
 			if (
 				target instanceof HTMLElement &&
-					(target === document.documentElement || target === document.body)
-			) props.onMenuClose();
+				(target === document.documentElement || target === document.body)
+			)
+				props.onMenuClose();
 		};
 		document.addEventListener('scroll', onScroll, true);
 		return () => document.removeEventListener('scroll', onScroll, true);
@@ -827,16 +819,20 @@ export function Select<
 		const onTouchMove = (event: TouchEvent) => {
 			const touch = event.touches.item(0);
 			if (!touch) return;
-			userIsDragging.current = Math.abs(touch.clientX - initialTouch.current.x) > 5 ||
+			userIsDragging.current =
+				Math.abs(touch.clientX - initialTouch.current.x) > 5 ||
 				Math.abs(touch.clientY - initialTouch.current.y) > 5;
 		};
 		const onTouchEnd = (event: TouchEvent) => {
 			if (!userIsDragging.current) {
 				const target = event.target as Node;
 				if (
-					controlRef.current && !controlRef.current.contains(target) && menuListRef.current &&
-						!menuListRef.current.contains(target)
-				) inputRef.current?.blur();
+					controlRef.current &&
+					!controlRef.current.contains(target) &&
+					menuListRef.current &&
+					!menuListRef.current.contains(target)
+				)
+					inputRef.current?.blur();
 			}
 			initialTouch.current = { x: 0, y: 0 };
 		};
@@ -876,14 +872,12 @@ export function Select<
 				option,
 			);
 		} else if (props.isOptionDisabled(option, selectValue)) {
-			setAriaSelection(
-				{
-					action: 'select-option',
-					option,
-					name: props.name,
-					value: option,
-				} as AriaSelection<Option, IsMulti>,
-			);
+			setAriaSelection({
+				action: 'select-option',
+				option,
+				name: props.name,
+				value: option,
+			} as AriaSelection<Option, IsMulti>);
 			return;
 		} else if (props.isMulti) {
 			setValue([...selectValue, option] as OnChangeValue<Option, IsMulti>, 'select-option', option);
@@ -911,7 +905,7 @@ export function Select<
 		const nextValue = valueTernary(
 			props.isMulti,
 			newValue,
-			newValue[0] ?? null as Option,
+			newValue[0] ?? (null as Option),
 		) as OnChangeValue<Option, IsMulti>;
 		const actionMeta = {
 			action: 'remove-value',
@@ -930,7 +924,7 @@ export function Select<
 		const nextValue = valueTernary(
 			props.isMulti,
 			newValue,
-			newValue[0] ?? null as Option,
+			newValue[0] ?? (null as Option),
 		) as OnChangeValue<Option, IsMulti>;
 		const actionMeta = {
 			action: 'pop-value',
@@ -962,8 +956,7 @@ export function Select<
 	const focusOption = (direction: FocusDirection = 'first') => {
 		if (!focusableOptions.length) return;
 		if (ariaSelection?.action === 'initial-input-focus') setAriaSelection(null);
-		const current =
-			focusedOption ? focusableOptions.indexOf(focusedOption) : -1;
+		const current = focusedOption ? focusableOptions.indexOf(focusedOption) : -1;
 		const index =
 			direction === 'first'
 				? 0
@@ -985,8 +978,7 @@ export function Select<
 	const focusValue = (direction: 'previous' | 'next') => {
 		if (!props.isMulti || !selectValue.length) return;
 		if (ariaSelection?.action === 'initial-input-focus') setAriaSelection(null);
-		const current =
-			focusedValue ? selectValue.indexOf(focusedValue) : -1;
+		const current = focusedValue ? selectValue.indexOf(focusedValue) : -1;
 		const next =
 			direction === 'previous'
 				? current === 0
@@ -1008,12 +1000,9 @@ export function Select<
 		const selectedIndex =
 			!props.isMulti && selectValue.length ? focusableOptions.indexOf(selectValue[0]) : -1;
 		setFocusedOption(
-			focusableOptions[selectedIndex > -1
-				? selectedIndex
-				: direction === 'first'
-					? 0
-					: focusableOptions.length - 1] ??
-				null,
+			focusableOptions[
+				selectedIndex > -1 ? selectedIndex : direction === 'first' ? 0 : focusableOptions.length - 1
+			] ?? null,
 		);
 		props.onMenuOpen();
 	};
@@ -1039,13 +1028,7 @@ export function Select<
 			selectOption,
 			setValue,
 		}),
-		[
-			categorized,
-			focusableOptions,
-			props.getOptionLabel,
-			props.getOptionValue,
-			selectValue,
-		],
+		[categorized, focusableOptions, props.getOptionLabel, props.getOptionValue, selectValue],
 	);
 
 	const onKeyDown = (event: KeyboardEvent) => {
@@ -1107,9 +1090,13 @@ export function Select<
 			case 'Tab':
 				if (isComposing) return;
 				if (
-					!event.shiftKey && props.tabSelectsValue && props.menuIsOpen && focusedOption &&
-						!(props.openMenuOnFocus && selectValue.includes(focusedOption))
-				) selectOption(focusedOption);
+					!event.shiftKey &&
+					props.tabSelectsValue &&
+					props.menuIsOpen &&
+					focusedOption &&
+					!(props.openMenuOnFocus && selectValue.includes(focusedOption))
+				)
+					selectOption(focusedOption);
 				else return;
 				break;
 			case ' ':
@@ -1166,58 +1153,58 @@ export function Select<
 	};
 
 	const valueUI =
-		!selectValue.length || !props.controlShouldRenderValue
-			? props.inputValue
-				? null
-				: <Components.Placeholder
-						{...commonProps}
-						key="placeholder"
-						isDisabled={props.isDisabled}
-						isFocused={isFocused}
-						innerProps={{ id: elementId('placeholder') }}
-					>{props.placeholder}</Components.Placeholder>
-			: props.isMulti
-				? selectValue.map(
-						(option, index) => <Components.MultiValue
-							{...commonProps}
-							key={`${props.getOptionLabel(option)}-${props.getOptionValue(option)}`}
-							components={{
-								Container: Components.MultiValueContainer,
-								Label: Components.MultiValueLabel,
-								Remove: Components.MultiValueRemove,
-							}}
-							data={option}
-							index={index}
-							isDisabled={props.isDisabled}
-							isFocused={focusedValue === option}
-							removeProps={{
-								onClick: () => removeValue(option),
-								onMouseDown: (event: MouseEvent) => event.preventDefault(),
-								onTouchEnd: () => {
-									if (!userIsDragging.current) removeValue(option);
-								},
-							}}
-						>{formatOption(option, 'value')}</Components.MultiValue>,
-					)
-				: props.inputValue
-					? null
-					: <Components.SingleValue
-							{...commonProps}
-							data={selectValue[0]}
-							isDisabled={props.isDisabled}
-						>{formatOption(selectValue[0], 'value')}</Components.SingleValue>;
+		!selectValue.length || !props.controlShouldRenderValue ? (
+			props.inputValue ? null : (
+				<Components.Placeholder
+					{...commonProps}
+					key="placeholder"
+					isDisabled={props.isDisabled}
+					isFocused={isFocused}
+					innerProps={{ id: elementId('placeholder') }}
+				>
+					{props.placeholder}
+				</Components.Placeholder>
+			)
+		) : props.isMulti ? (
+			selectValue.map((option, index) => (
+				<Components.MultiValue
+					{...commonProps}
+					key={`${props.getOptionLabel(option)}-${props.getOptionValue(option)}`}
+					components={{
+						Container: Components.MultiValueContainer,
+						Label: Components.MultiValueLabel,
+						Remove: Components.MultiValueRemove,
+					}}
+					data={option}
+					index={index}
+					isDisabled={props.isDisabled}
+					isFocused={focusedValue === option}
+					removeProps={{
+						onClick: () => removeValue(option),
+						onMouseDown: (event: MouseEvent) => event.preventDefault(),
+						onTouchEnd: () => {
+							if (!userIsDragging.current) removeValue(option);
+						},
+					}}
+				>
+					{formatOption(option, 'value')}
+				</Components.MultiValue>
+			))
+		) : props.inputValue ? null : (
+			<Components.SingleValue {...commonProps} data={selectValue[0]} isDisabled={props.isDisabled}>
+				{formatOption(selectValue[0], 'value')}
+			</Components.SingleValue>
+		);
 
 	const inputId = props.inputId || elementId('input');
 	const handleInputFocus = (event: FocusEvent) => {
 		setInputIsHidden(false);
 		setIsFocused(true);
-		setAriaSelection(
-			{
-				action: 'initial-input-focus',
-				value: valueTernary(props.isMulti, selectValue, selectValue[0] ?? null as Option),
-				options: selectValue,
-			} as AriaSelection<Option, IsMulti>,
-		);
+		setAriaSelection({
+			action: 'initial-input-focus',
+			value: valueTernary(props.isMulti, selectValue, selectValue[0] ?? (null as Option)),
+			options: selectValue,
+		} as AriaSelection<Option, IsMulti>);
 		props.onFocus?.(event);
 		if (props.openMenuOnFocus) openMenu('first');
 	};
@@ -1235,12 +1222,11 @@ export function Select<
 		setFocusedValue(null);
 		setIsFocused(false);
 	};
-	const ariaDescribedBy =
-		selectValue.length
-			? ariaSelection?.action === 'initial-input-focus'
-				? elementId('live-region')
-				: undefined
-			: elementId('placeholder');
+	const ariaDescribedBy = selectValue.length
+		? ariaSelection?.action === 'initial-input-focus'
+			? elementId('live-region')
+			: undefined
+		: elementId('placeholder');
 	function focusedOptionId(): string {
 		if (!focusedOption) return '';
 		for (const item of categorized) {
@@ -1256,8 +1242,7 @@ export function Select<
 		}
 		return '';
 	}
-	const ariaActiveDescendant =
-		appleDevice ? undefined : focusedOptionId();
+	const ariaActiveDescendant = appleDevice ? undefined : focusedOptionId();
 	const commonInputAttributes: Omit<Octane.JSX.IntrinsicElements['input'], 'ref'> & {
 		ref?: Octane.Ref<HTMLInputElement>;
 	} = {
@@ -1281,56 +1266,57 @@ export function Select<
 		'aria-describedby': ariaDescribedBy,
 		ref: inputRef,
 	};
-	const inputUI =
-		!props.isSearchable
-			? <input
-					{...commonInputAttributes}
-					className={resolveStyle(dummyInputStyle).className}
-					inputMode="none"
-					value=""
-					onInput={() => {}}
-					aria-readonly="true"
-				/>
-			: <Components.Input
-					{...commonProps}
-					autoCapitalize="none"
-					autoComplete="off"
-					autoCorrect="off"
-					id={inputId}
-					innerRef={inputRef}
-					isDisabled={props.isDisabled}
-					isHidden={inputIsHidden}
-					onBlur={commonInputAttributes.onBlur}
-					onInput={(event: InputEvent) => {
-						const target = event.currentTarget as HTMLInputElement;
-						setInputIsHidden(false);
-						props.onInputChange(target.value, {
-							action: 'input-change',
-							prevInputValue: props.inputValue ?? '',
-						});
-						if (!props.menuIsOpen) props.onMenuOpen();
-					}}
-					onFocus={handleInputFocus}
-					spellCheck="false"
-					onCompositionStart={() => setIsComposing(true)}
-					onCompositionEnd={() => setIsComposing(false)}
-					tabIndex={props.tabIndex}
-					form={props.form}
-					type="text"
-					value={props.inputValue ?? ''}
-					aria-autocomplete="list"
-					aria-expanded={props.menuIsOpen}
-					aria-haspopup="true"
-					aria-errormessage={props['aria-errormessage']}
-					aria-invalid={props['aria-invalid']}
-					aria-label={props['aria-label']}
-					aria-labelledby={props['aria-labelledby']}
-					aria-required={props.required}
-					role="combobox"
-					aria-activedescendant={ariaActiveDescendant}
-					aria-controls={props.menuIsOpen ? elementId('listbox') : undefined}
-					aria-describedby={ariaDescribedBy}
-				/>;
+	const inputUI = !props.isSearchable ? (
+		<input
+			{...commonInputAttributes}
+			className={resolveStyle(dummyInputStyle).className}
+			inputMode="none"
+			value=""
+			onInput={() => {}}
+			aria-readonly="true"
+		/>
+	) : (
+		<Components.Input
+			{...commonProps}
+			autoCapitalize="none"
+			autoComplete="off"
+			autoCorrect="off"
+			id={inputId}
+			innerRef={inputRef}
+			isDisabled={props.isDisabled}
+			isHidden={inputIsHidden}
+			onBlur={commonInputAttributes.onBlur}
+			onInput={(event: InputEvent) => {
+				const target = event.currentTarget as HTMLInputElement;
+				setInputIsHidden(false);
+				props.onInputChange(target.value, {
+					action: 'input-change',
+					prevInputValue: props.inputValue ?? '',
+				});
+				if (!props.menuIsOpen) props.onMenuOpen();
+			}}
+			onFocus={handleInputFocus}
+			spellCheck="false"
+			onCompositionStart={() => setIsComposing(true)}
+			onCompositionEnd={() => setIsComposing(false)}
+			tabIndex={props.tabIndex}
+			form={props.form}
+			type="text"
+			value={props.inputValue ?? ''}
+			aria-autocomplete="list"
+			aria-expanded={props.menuIsOpen}
+			aria-haspopup="true"
+			aria-errormessage={props['aria-errormessage']}
+			aria-invalid={props['aria-invalid']}
+			aria-label={props['aria-label']}
+			aria-labelledby={props['aria-labelledby']}
+			aria-required={props.required}
+			role="combobox"
+			aria-activedescendant={ariaActiveDescendant}
+			aria-controls={props.menuIsOpen ? elementId('listbox') : undefined}
+			aria-describedby={ariaDescribedBy}
+		/>
+	);
 
 	const onOptionHover = (option: Option) => {
 		if (blockOptionHover.current || focusedOption === option) return;
@@ -1339,171 +1325,193 @@ export function Select<
 	const renderOption = (option: CategorizedOption<Option>, id: string) => {
 		const optionIsFocused = focusedOption === option.data;
 		const optionId = elementId(`option-${id}`);
-		return <Components.Option
-			{...commonProps}
-			key={optionId}
-			data={option.data}
-			innerRef={optionIsFocused ? focusedOptionRef : null}
-			innerProps={{
-				id: optionId,
-				onClick: option.isDisabled ? undefined : () => selectOption(option.data),
-				onMouseMove: option.isDisabled ? undefined : () => onOptionHover(option.data),
-				onMouseOver: option.isDisabled ? undefined : () => onOptionHover(option.data),
-				onTouchEnd: option.isDisabled
-					? undefined
-					: () => {
-							if (!userIsDragging.current) selectOption(option.data);
-						},
-				tabIndex: -1,
-				role: 'option',
-				'aria-selected': appleDevice ? undefined : option.isSelected,
-			}}
-			isDisabled={option.isDisabled}
-			isFocused={optionIsFocused}
-			isSelected={option.isSelected}
-			label={option.label}
-			type="option"
-		>{formatOption(option.data, 'menu')}</Components.Option>;
+		return (
+			<Components.Option
+				{...commonProps}
+				key={optionId}
+				data={option.data}
+				innerRef={optionIsFocused ? focusedOptionRef : null}
+				innerProps={{
+					id: optionId,
+					onClick: option.isDisabled ? undefined : () => selectOption(option.data),
+					onMouseMove: option.isDisabled ? undefined : () => onOptionHover(option.data),
+					onMouseOver: option.isDisabled ? undefined : () => onOptionHover(option.data),
+					onTouchEnd: option.isDisabled
+						? undefined
+						: () => {
+								if (!userIsDragging.current) selectOption(option.data);
+							},
+					tabIndex: -1,
+					role: 'option',
+					'aria-selected': appleDevice ? undefined : option.isSelected,
+				}}
+				isDisabled={option.isDisabled}
+				isFocused={optionIsFocused}
+				isSelected={option.isSelected}
+				label={option.label}
+				type="option"
+			>
+				{formatOption(option.data, 'menu')}
+			</Components.Option>
+		);
 	};
 
 	let menuUI: OctaneNode = null;
 	if (props.menuIsOpen) {
-		const children =
-			categorized.length
-				? categorized.map(
-						(item) => item.type === 'group'
-							? <Components.Group
-									{...commonProps}
-									key={elementId(`group-${item.index}`)}
-									Heading={Components.GroupHeading}
-									data={item.data}
-									headingProps={{
-										id: `${elementId(`group-${item.index}`)}-heading`,
-										data: item.data,
-									}}
-									label={props.formatGroupLabel(item.data)}
-									options={item.options}
-								>{item.options.map(
-									(option) => renderOption(option, `${item.index}-${option.index}`),
-								)}</Components.Group>
-							: renderOption(item, String(item.index)),
-					)
-				: props.isLoading
-					? props.loadingMessage({ inputValue: props.inputValue ?? '' })
-					: props.noOptionsMessage({ inputValue: props.inputValue ?? '' });
+		const children = categorized.length
+			? categorized.map((item) =>
+					item.type === 'group' ? (
+						<Components.Group
+							{...commonProps}
+							key={elementId(`group-${item.index}`)}
+							Heading={Components.GroupHeading}
+							data={item.data}
+							headingProps={{
+								id: `${elementId(`group-${item.index}`)}-heading`,
+								data: item.data,
+							}}
+							label={props.formatGroupLabel(item.data)}
+							options={item.options}
+						>
+							{item.options.map((option) => renderOption(option, `${item.index}-${option.index}`))}
+						</Components.Group>
+					) : (
+						renderOption(item, String(item.index))
+					),
+				)
+			: props.isLoading
+				? props.loadingMessage({ inputValue: props.inputValue ?? '' })
+				: props.noOptionsMessage({ inputValue: props.inputValue ?? '' });
 		if (children === null) {
 			menuUI = null;
 		} else {
-			const renderedChildren =
-				categorized.length
-					? children
-					: props.isLoading
-						? <Components.LoadingMessage {...commonProps}>{children}</Components.LoadingMessage>
-						: <Components.NoOptionsMessage
-								{...commonProps}
-							>{children}</Components.NoOptionsMessage>;
-			const menuElement = <Components.Menu
-				{...commonProps}
-				innerRef={menuRef}
-				innerProps={{
-					onMouseDown: (event: MouseEvent) => {
-						event.stopPropagation();
-						event.preventDefault();
-					},
-					onMouseMove: (event: MouseEvent) => {
-						blockOptionHover.current = false;
-						event.stopPropagation();
-					},
-				}}
-				isLoading={props.isLoading}
-				placement={menuPlacement}
-				minMenuHeight={props.minMenuHeight}
-				maxMenuHeight={menuMaxHeight}
-				menuPlacement={props.menuPlacement}
-				menuPosition={props.menuPosition}
-				menuShouldScrollIntoView={props.menuShouldScrollIntoView}
-			>
-				<Components.MenuList
+			const renderedChildren = categorized.length ? (
+				children
+			) : props.isLoading ? (
+				<Components.LoadingMessage {...commonProps}>{children}</Components.LoadingMessage>
+			) : (
+				<Components.NoOptionsMessage {...commonProps}>{children}</Components.NoOptionsMessage>
+			);
+			const menuElement = (
+				<Components.Menu
 					{...commonProps}
-					innerRef={menuListRef}
+					innerRef={menuRef}
 					innerProps={{
-						role: 'listbox',
-						'aria-multiselectable': Boolean(props.isMulti),
-						id: elementId('listbox'),
+						onMouseDown: (event: MouseEvent) => {
+							event.stopPropagation();
+							event.preventDefault();
+						},
+						onMouseMove: (event: MouseEvent) => {
+							blockOptionHover.current = false;
+							event.stopPropagation();
+						},
 					}}
-					maxHeight={menuMaxHeight}
-					focusedOption={focusedOption}
-				>{renderedChildren}</Components.MenuList>
-			</Components.Menu>;
-			menuUI = props.menuPortalTarget || props.menuPosition === 'fixed'
-				? <Components.MenuPortal
+					isLoading={props.isLoading}
+					placement={menuPlacement}
+					minMenuHeight={props.minMenuHeight}
+					maxMenuHeight={menuMaxHeight}
+					menuPlacement={props.menuPlacement}
+					menuPosition={props.menuPosition}
+					menuShouldScrollIntoView={props.menuShouldScrollIntoView}
+				>
+					<Components.MenuList
+						{...commonProps}
+						innerRef={menuListRef}
+						innerProps={{
+							role: 'listbox',
+							'aria-multiselectable': Boolean(props.isMulti),
+							id: elementId('listbox'),
+						}}
+						maxHeight={menuMaxHeight}
+						focusedOption={focusedOption}
+					>
+						{renderedChildren}
+					</Components.MenuList>
+				</Components.Menu>
+			);
+			menuUI =
+				props.menuPortalTarget || props.menuPosition === 'fixed' ? (
+					<Components.MenuPortal
 						{...commonProps}
 						appendTo={props.menuPortalTarget ?? undefined}
 						controlElement={controlRef.current}
 						innerProps={{}}
 						menuPlacement={menuPlacement}
 						menuPosition={props.menuPosition}
-					>{menuElement}</Components.MenuPortal>
-				: menuElement;
+					>
+						{menuElement}
+					</Components.MenuPortal>
+				) : (
+					menuElement
+				);
 			if (props.menuShouldBlockScroll) {
 				const unlockedMenu = menuUI;
-				menuUI = <>
-					<div
-						className={resolveStyle(scrollBlockerStyle).className}
-						onClick={(event: MouseEvent) => {
-							const target = event.target as HTMLElement;
-							(target.ownerDocument.activeElement as HTMLElement | null)?.blur();
-						}}
-					/>
-					{unlockedMenu}
-				</>;
+				menuUI = (
+					<>
+						<div
+							className={resolveStyle(scrollBlockerStyle).className}
+							onClick={(event: MouseEvent) => {
+								const target = event.target as HTMLElement;
+								(target.ownerDocument.activeElement as HTMLElement | null)?.blur();
+							}}
+						/>
+						{unlockedMenu}
+					</>
+				);
 			}
 		}
 	}
 
 	let formField: OctaneNode = null;
 	if (props.required && !selectValue.length && !props.isDisabled) {
-		formField = <input
-			required={true}
-			name={props.name}
-			tabIndex={-1}
-			aria-hidden="true"
-			onFocus={(event: FocusEvent) => {
-				event.preventDefault();
-				event.stopPropagation();
-				inputRef.current?.focus();
-			}}
-			className={resolveStyle(requiredInputStyle).className}
-			value=""
-			onInput={() => {}}
-		/>;
+		formField = (
+			<input
+				required={true}
+				name={props.name}
+				tabIndex={-1}
+				aria-hidden="true"
+				onFocus={(event: FocusEvent) => {
+					event.preventDefault();
+					event.stopPropagation();
+					inputRef.current?.focus();
+				}}
+				className={resolveStyle(requiredInputStyle).className}
+				value=""
+				onInput={() => {}}
+			/>
+		);
 	} else if (props.name && !props.isDisabled) {
 		if (props.isMulti) {
-			formField = props.delimiter
-				? <input
-						name={props.name}
-						type="hidden"
-						value={selectValue.map(props.getOptionValue).join(props.delimiter)}
-					/>
-				: <div>
-						{selectValue.length
-							? selectValue.map(
-									(option, index) =>
-										<input
-											key={`i-${index}`}
-											name={props.name}
-											type="hidden"
-											value={props.getOptionValue(option)}
-										/>,
-								)
-							: <input name={props.name} type="hidden" value="" />}
-					</div>;
+			formField = props.delimiter ? (
+				<input
+					name={props.name}
+					type="hidden"
+					value={selectValue.map(props.getOptionValue).join(props.delimiter)}
+				/>
+			) : (
+				<div>
+					{selectValue.length ? (
+						selectValue.map((option, index) => (
+							<input
+								key={`i-${index}`}
+								name={props.name}
+								type="hidden"
+								value={props.getOptionValue(option)}
+							/>
+						))
+					) : (
+						<input name={props.name} type="hidden" value="" />
+					)}
+				</div>
+			);
 		} else {
-			formField = <input
-				name={props.name}
-				type="hidden"
-				value={selectValue[0] ? props.getOptionValue(selectValue[0]) : ''}
-			/>;
+			formField = (
+				<input
+					name={props.name}
+					type="hidden"
+					value={selectValue[0] ? props.getOptionValue(selectValue[0]) : ''}
+				/>
+			);
 		}
 	}
 	<Components.SelectContainer
@@ -1542,15 +1550,13 @@ export function Select<
 					{createElement(Components.ValueContainer, {
 						...commonProps,
 						isDisabled: props.isDisabled,
-						children: props.isMulti && Array.isArray(valueUI)
-							? [
-									...valueUI,
-									createElement(Fragment, { key: 'select-input', children: inputUI }),
-								]
-							: [
-									createElement(Fragment, { key: 'select-value', children: valueUI }),
-									createElement(Fragment, { key: 'select-input', children: inputUI }),
-								],
+						children:
+							props.isMulti && Array.isArray(valueUI)
+								? [...valueUI, createElement(Fragment, { key: 'select-input', children: inputUI })]
+								: [
+										createElement(Fragment, { key: 'select-value', children: valueUI }),
+										createElement(Fragment, { key: 'select-input', children: inputUI }),
+									],
 					})}
 				</>
 			} @else {
@@ -1560,50 +1566,52 @@ export function Select<
 				</Components.ValueContainer>
 			}
 			<Components.IndicatorsContainer {...commonProps} isDisabled={props.isDisabled}>
-				{(props.isClearable ?? Boolean(props.isMulti)) && selectValue.length && !props.isDisabled &&
-				!props.isLoading
-					? <Components.ClearIndicator
-							{...commonProps}
-							innerProps={{
-								'aria-hidden': 'true',
-								onMouseDown: handleClearPointerEnd,
-								onTouchEnd: (event: TouchEvent) => {
-									if (!userIsDragging.current) handleClearPointerEnd(event);
-								},
-							}}
-							isDisabled={props.isDisabled}
-							isFocused={isFocused}
-						/>
-					: null}
-				{props.isLoading
-					? <Components.LoadingIndicator
-							{...commonProps}
-							innerProps={{ 'aria-hidden': 'true' }}
-							isDisabled={props.isDisabled}
-							isFocused={isFocused}
-						/>
-					: null}
-				{Components.DropdownIndicator && Components.IndicatorSeparator
-					? <Components.IndicatorSeparator
-							{...commonProps}
-							isDisabled={props.isDisabled}
-							isFocused={isFocused}
-						/>
-					: null}
-				{Components.DropdownIndicator
-					? <Components.DropdownIndicator
-							{...commonProps}
-							innerProps={{
-								'aria-hidden': 'true',
-								onMouseDown: handleDropdownPointerEnd,
-								onTouchEnd: (event: TouchEvent) => {
-									if (!userIsDragging.current) handleDropdownPointerEnd(event);
-								},
-							}}
-							isDisabled={props.isDisabled}
-							isFocused={isFocused}
-						/>
-					: null}
+				{(props.isClearable ?? Boolean(props.isMulti)) &&
+				selectValue.length &&
+				!props.isDisabled &&
+				!props.isLoading ? (
+					<Components.ClearIndicator
+						{...commonProps}
+						innerProps={{
+							'aria-hidden': 'true',
+							onMouseDown: handleClearPointerEnd,
+							onTouchEnd: (event: TouchEvent) => {
+								if (!userIsDragging.current) handleClearPointerEnd(event);
+							},
+						}}
+						isDisabled={props.isDisabled}
+						isFocused={isFocused}
+					/>
+				) : null}
+				{props.isLoading ? (
+					<Components.LoadingIndicator
+						{...commonProps}
+						innerProps={{ 'aria-hidden': 'true' }}
+						isDisabled={props.isDisabled}
+						isFocused={isFocused}
+					/>
+				) : null}
+				{Components.DropdownIndicator && Components.IndicatorSeparator ? (
+					<Components.IndicatorSeparator
+						{...commonProps}
+						isDisabled={props.isDisabled}
+						isFocused={isFocused}
+					/>
+				) : null}
+				{Components.DropdownIndicator ? (
+					<Components.DropdownIndicator
+						{...commonProps}
+						innerProps={{
+							'aria-hidden': 'true',
+							onMouseDown: handleDropdownPointerEnd,
+							onTouchEnd: (event: TouchEvent) => {
+								if (!userIsDragging.current) handleDropdownPointerEnd(event);
+							},
+						}}
+						isDisabled={props.isDisabled}
+						isFocused={isFocused}
+					/>
+				) : null}
 			</Components.IndicatorsContainer>
 		</Components.Control>
 		{menuUI}
@@ -1615,7 +1623,6 @@ export type PublicBaseSelectProps<
 	Option,
 	IsMulti extends boolean,
 	Group extends GroupBase<Option>,
-> =
-	SelectProps<Option, IsMulti, Group>;
+> = SelectProps<Option, IsMulti, Group>;
 
 export const baseComponents = builtinComponents;

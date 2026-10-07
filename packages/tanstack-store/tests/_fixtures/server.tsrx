@@ -11,10 +11,7 @@ function ContextCount() @{
 	<span id="context-count">{'context=' + count}</span>
 }
 
-export function ServerView(props: {
-	store: Store<{ count: number }>;
-	atom: Atom<number>;
-}) @{
+export function ServerView(props: { store: Store<{ count: number }>; atom: Atom<number> }) @{
 	const count = useSelector(props.store, (state) => state.count);
 	const [atomValue] = useAtom(props.atom);
 

@@ -28,22 +28,32 @@ function WeeklyDownloadCounter({
 		updatedAt: startedAtRef.current,
 	});
 
-	return <span
-		ref={ref}
-		style={{ fontVariantNumeric: 'tabular-nums' }}
-	>{weeklyDownloads.toLocaleString() as string}</span>;
+	return (
+		<span ref={ref} style={{ fontVariantNumeric: 'tabular-nums' }}>
+			{weeklyDownloads.toLocaleString() as string}
+		</span>
+	);
 }
 
 function isValidMetric(value: number | undefined | null): boolean {
-	return value !== undefined && value !== null && !Number.isNaN(value) && value > 0 &&
-		Number.isFinite(value);
+	return (
+		value !== undefined &&
+		value !== null &&
+		!Number.isNaN(value) &&
+		value > 0 &&
+		Number.isFinite(value)
+	);
 }
 
 function StatValue({ placeholder, children }: { placeholder: string; children?: any }) {
-	return <span class="inline-grid [&>*]:col-start-1 [&>*]:row-start-1">
-		<span class="invisible" aria-hidden>{placeholder as string}</span>
-		<span>{children}</span>
-	</span>;
+	return (
+		<span class="inline-grid [&>*]:col-start-1 [&>*]:row-start-1">
+			<span class="invisible" aria-hidden>
+				{placeholder as string}
+			</span>
+			<span>{children}</span>
+		</span>
+	);
 }
 
 type BaseHomeStatLinkProps = {
@@ -75,10 +85,18 @@ function HomeStatLink({
 	const mergedClassName = `group min-w-0 rounded-r-md border-l-2 px-4 py-2 text-left transition-opacity ${className} ${gradientClassName}`;
 
 	if (to) {
-		return <Link to={to} search={search} className={mergedClassName}>{children}</Link>;
+		return (
+			<Link to={to} search={search} className={mergedClassName}>
+				{children}
+			</Link>
+		);
 	}
 
-	return <a href={href} target="_blank" rel="noreferrer" class={mergedClassName}>{children}</a>;
+	return (
+		<a href={href} target="_blank" rel="noreferrer" class={mergedClassName}>
+			{children}
+		</a>
+	);
 }
 
 export default function OssStats({ library }: { library?: Library }) {
@@ -96,20 +114,20 @@ export default function OssStats({ library }: { library?: Library }) {
 
 	const totalNpmStats = stats?.npm;
 	const npmDownloads = library
-		? totalNpmStats?.totalDownloads ?? 0
-		: homepageNpmSummary?.totalDownloads ?? 0;
+		? (totalNpmStats?.totalDownloads ?? 0)
+		: (homepageNpmSummary?.totalDownloads ?? 0);
 	const starCount = stats?.github?.starCount ?? 0;
 	const weeklyDownloads = library
-		? recentDownloads?.weeklyDownloads ?? 0
-		: homepageNpmSummary?.weeklyDownloads ?? 0;
+		? (recentDownloads?.weeklyDownloads ?? 0)
+		: (homepageNpmSummary?.weeklyDownloads ?? 0);
 	const weeklyRatePerDay = library ? undefined : homepageNpmSummary?.weeklyRatePerDay;
 
 	const hasNpmDownloads =
-		!((library ? isLoading : isLoadingHomepageNpmSummary)) && isValidMetric(npmDownloads);
+		!(library ? isLoading : isLoadingHomepageNpmSummary) && isValidMetric(npmDownloads);
 	const hasStarCount = !isLoading && isValidMetric(starCount);
 	const hasWeeklyDownloads =
-		!((library ? isLoadingRecentDownloads : isLoadingHomepageNpmSummary)) &&
-			isValidMetric(weeklyDownloads);
+		!(library ? isLoadingRecentDownloads : isLoadingHomepageNpmSummary) &&
+		isValidMetric(weeklyDownloads);
 
 	const hasAnyData = hasNpmDownloads || hasWeeklyDownloads || hasStarCount;
 
@@ -125,9 +143,10 @@ export default function OssStats({ library }: { library?: Library }) {
 		return null;
 	}
 
-	return <div class="mx-auto grid w-full max-w-3xl grid-cols-1 gap-4 sm:grid-cols-3">
-		{npmLoading || hasNpmDownloads
-			? <HomeStatLink
+	return (
+		<div class="mx-auto grid w-full max-w-3xl grid-cols-1 gap-4 sm:grid-cols-3">
+			{npmLoading || hasNpmDownloads ? (
+				<HomeStatLink
 					to="/stats/npm"
 					search={tanStackTotalNpmStatsSearch}
 					className="border-emerald-500 hover:text-emerald-500"
@@ -136,25 +155,21 @@ export default function OssStats({ library }: { library?: Library }) {
 					<div class="flex min-w-0 items-start gap-3">
 						<Download className="mt-1 size-5 shrink-0 transition-colors duration-200" />
 						<div class="min-w-0">
-							<div
-								class="relative text-2xl font-black leading-none tracking-tight transition-colors duration-200"
-							>
+							<div class="relative text-2xl font-black leading-none tracking-tight transition-colors duration-200">
 								<StatValue placeholder="00.00 Billion">
 									{hasNpmDownloads ? formatBillions(npmDownloads) : null}
 								</StatValue>
 							</div>
-							<div
-								class="mt-1 text-sm font-semibold italic text-zinc-500 transition-colors duration-200 dark:text-zinc-400"
-							>
+							<div class="mt-1 text-sm font-semibold italic text-zinc-500 transition-colors duration-200 dark:text-zinc-400">
 								NPM Downloads
 							</div>
 						</div>
 					</div>
 				</HomeStatLink>
-			: null}
+			) : null}
 
-		{weeklyLoading || hasWeeklyDownloads
-			? <HomeStatLink
+			{weeklyLoading || hasWeeklyDownloads ? (
+				<HomeStatLink
 					to="/stats/npm"
 					search={tanStackTotalNpmStatsSearch}
 					className="border-cyan-500 hover:text-cyan-500"
@@ -163,54 +178,49 @@ export default function OssStats({ library }: { library?: Library }) {
 					<div class="flex min-w-0 items-start gap-3">
 						<TrendingUp className="mt-1 size-5 shrink-0 transition-colors duration-200" />
 						<div class="min-w-0">
-							<div
-								class="relative text-2xl font-black leading-none tracking-tight transition-colors duration-200"
-							>
+							<div class="relative text-2xl font-black leading-none tracking-tight transition-colors duration-200">
 								<StatValue placeholder="00,000,000">
-									{hasWeeklyDownloads
-										? <WeeklyDownloadCounter
-												ratePerDay={weeklyRatePerDay}
-												weeklyDownloads={weeklyDownloads}
-											/>
-										: null}
+									{hasWeeklyDownloads ? (
+										<WeeklyDownloadCounter
+											ratePerDay={weeklyRatePerDay}
+											weeklyDownloads={weeklyDownloads}
+										/>
+									) : null}
 								</StatValue>
 							</div>
-							<div
-								class="mt-1 text-sm font-semibold italic text-zinc-500 transition-colors duration-200 dark:text-zinc-400"
-							>
+							<div class="mt-1 text-sm font-semibold italic text-zinc-500 transition-colors duration-200 dark:text-zinc-400">
 								Weekly Downloads
 							</div>
 						</div>
 					</div>
 				</HomeStatLink>
-			: null}
+			) : null}
 
-		{loading || hasStarCount
-			? <HomeStatLink
-					href={library
-						? `https://github.com/${library.repo}`
-						: 'https://github.com/orgs/TanStack/repositories?q=sort:stars'}
+			{loading || hasStarCount ? (
+				<HomeStatLink
+					href={
+						library
+							? `https://github.com/${library.repo}`
+							: 'https://github.com/orgs/TanStack/repositories?q=sort:stars'
+					}
 					className="border-yellow-500 hover:text-yellow-500"
 					gradientClassName="bg-linear-to-r from-transparent to-yellow-500/5"
 				>
 					<div class="flex min-w-0 items-start gap-3">
 						<Star className="mt-1 size-5 shrink-0 transition-colors duration-200" />
 						<div class="min-w-0">
-							<div
-								class="relative text-2xl font-black leading-none tracking-tight transition-colors duration-200"
-							>
+							<div class="relative text-2xl font-black leading-none tracking-tight transition-colors duration-200">
 								<StatValue placeholder="000,000">
 									{hasStarCount ? starCount.toLocaleString() : null}
 								</StatValue>
 							</div>
-							<div
-								class="mt-1 text-sm font-semibold italic text-zinc-500 transition-colors duration-200 dark:text-zinc-400"
-							>
+							<div class="mt-1 text-sm font-semibold italic text-zinc-500 transition-colors duration-200 dark:text-zinc-400">
 								GitHub Stars
 							</div>
 						</div>
 					</div>
 				</HomeStatLink>
-			: null}
-	</div>;
+			) : null}
+		</div>
+	);
 }

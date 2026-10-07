@@ -62,7 +62,9 @@ export function ScopedControl() @{
 				color: rebeccapurple;
 			}
 		</style>
-		<div class="scoped" id="scoped-control">{'SC' as string}</div>
+		<div class="scoped" id="scoped-control">
+			{'SC' as string}
+		</div>
 	</>
 }
 
@@ -106,17 +108,21 @@ export function AsyncScriptDuplicate() @{
 // Return-position (React-style `.tsx` value body) forms: resources must
 // classify through requiresTemplateNormalization exactly like `@{}` bodies.
 export function ReturnScript() {
-	return <>
-		<script async src="/return-script.js" />
-		<div class="rs">{'RS' as string}</div>
-	</>;
+	return (
+		<>
+			<script async src="/return-script.js" />
+			<div class="rs">{'RS' as string}</div>
+		</>
+	);
 }
 
 export function ReturnSheet() {
-	return <>
-		<link rel="stylesheet" href="/return.css" precedence="default" />
-		<div class="rl">{'RL' as string}</div>
-	</>;
+	return (
+		<>
+			<link rel="stylesheet" href="/return.css" precedence="default" />
+			<div class="rl">{'RL' as string}</div>
+		</>
+	);
 }
 
 // A Float MODULE script — one executable identity with preinitModule.

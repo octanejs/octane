@@ -19,9 +19,7 @@ function ControlledCheckbox() @{
 			checked={on}
 			onInput={(e) => setOn((e.target as HTMLInputElement).checked)}
 		/>
-		<span>
-			{on ? 'on' : 'off'}
-		</span>
+		<span>{on ? 'on' : 'off'}</span>
 	</label>
 }
 
@@ -38,9 +36,7 @@ function ControlledCheckboxChange() @{
 			checked={on}
 			onChange={(event) => setOn((event.target as HTMLInputElement).checked)}
 		/>
-		<span>
-			{on ? 'on' : 'off'}
-		</span>
+		<span>{on ? 'on' : 'off'}</span>
 	</label>
 }
 

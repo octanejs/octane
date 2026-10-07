@@ -21,7 +21,7 @@
     "path": "src/createTableHook.tsrx",
     "origin": "adapted",
     "packageName": "@tanstack/react-table",
-    "sha256": "aa5eac08aa8140c8ee19827876bf570d245bdd5c31540c069fe1f5e35b122765"
+    "sha256": "a1e4dffaf1f4cf1dc6fbfc8d0c9eb82d45941393a8cd95e198f6a74b6f66a354"
   },
   {
     "path": "src/createTableHookContexts.ts",
@@ -80,12 +80,12 @@
     "path": "src/useLegacyTable.tsrx",
     "origin": "adapted",
     "packageName": "@tanstack/react-table",
-    "sha256": "da3cd6c674ca7b1cbc4bf2616adc306de4f9c4952b9ed6ad5831e074eb795bd1"
+    "sha256": "c215b2840f4bb483fa0b55eff97e0cc2dce43ea27336be1a4d5fd3413f2710e0"
   },
   {
     "path": "src/useTable.tsrx",
     "origin": "adapted",
     "packageName": "@tanstack/react-table",
-    "sha256": "7a74df7b94ccd6cad7328f08e05f1379dedd7284718c5a7c7111a3e7c26cba9b"
+    "sha256": "f4dacccd2c24bfb8d2d8283547923728d8fdac4a71add4b2013c485755ad0e2d"
   }
 ]

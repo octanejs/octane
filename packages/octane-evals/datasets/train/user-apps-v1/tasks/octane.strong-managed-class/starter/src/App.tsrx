@@ -16,7 +16,9 @@ function Tab({
 		button.current!.classList.toggle('selected', selected);
 	});
 
-	<button ref={button} class="tab" onClick={onSelect}>{label as string}</button>
+	<button ref={button} class="tab" onClick={onSelect}>
+		{label as string}
+	</button>
 }
 
 export function App() @{

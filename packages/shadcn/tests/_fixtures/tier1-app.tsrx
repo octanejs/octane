@@ -73,7 +73,9 @@ export function AlertFixture() @{
 }
 
 export function ButtonFixture() @{
-	<Button variant="destructive" size="sm" className="extra" type="submit">Delete</Button>
+	<Button variant="destructive" size="sm" className="extra" type="submit">
+		Delete
+	</Button>
 }
 
 export function ButtonAsChildFixture() {
@@ -168,7 +170,9 @@ export function PaginationFixture() @{
 				<PaginationPrevious href="#prev" />
 			</PaginationItem>
 			<PaginationItem>
-				<PaginationLink href="#1" isActive>{'1'}</PaginationLink>
+				<PaginationLink href="#1" isActive>
+					{'1'}
+				</PaginationLink>
 			</PaginationItem>
 			<PaginationItem>
 				<PaginationEllipsis />

@@ -15,8 +15,7 @@ function publish(observe: Observe, box: Box, callback: Callback): number {
 // Hook-free control: the same root update and output as the scenarios below,
 // with no memo hook. Its counts are the per-render driver cost.
 export function Driver({ dep, tick, enabled }: Props) @{
-	const value =
-		enabled ? String(dep) : 'off';
+	const value = enabled ? String(dep) : 'off';
 	<output>{tick + ':' + value}</output>
 }
 

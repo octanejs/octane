@@ -24,10 +24,14 @@ export function KeyAliasTable(props: AliasSelectionProps) @{
 				<tr class={selected === id ? 'selected' : ''} data-id={id}>
 					<td>{id}</td>
 					<td>
-						<a class="pick" onClick={() => onPick(id)}>{row.label}</a>
+						<a class="pick" onClick={() => onPick(id)}>
+							{row.label}
+						</a>
 					</td>
 					<td>
-						<button class="remove" onClick={() => onRemove(id)}>Remove</button>
+						<button class="remove" onClick={() => onRemove(id)}>
+							Remove
+						</button>
 					</td>
 				</tr>
 			}
@@ -71,7 +75,9 @@ export function OverriddenKeyAliasList(props: NamedAliasProps) @{
 	<ul>
 		@for (const row of props.items; key row.id) {
 			const id = row.id;
-			<li key={row.uuid} class={selected === id ? 'selected' : ''}>{row.label as string}</li>
+			<li key={row.uuid} class={selected === id ? 'selected' : ''}>
+				{row.label as string}
+			</li>
 		}
 	</ul>
 }
@@ -90,7 +96,9 @@ export function CapturedSelectionAliasList(props: {
 				class={selected === id ? 'selected' : ''}
 				data-id={id}
 				onClick={() => onObserve(id, selected)}
-			>{row.label as string}</li>
+			>
+				{row.label as string}
+			</li>
 		}
 	</ul>
 }
@@ -109,15 +117,14 @@ export function ShadowedSelectionAliasList(props: {
 				class={selected === id ? 'selected' : ''}
 				data-id={id}
 				onClick={(selected: MouseEvent) => onObserve(id, selected.type)}
-			>{row.label as string}</li>
+			>
+				{row.label as string}
+			</li>
 		}
 	</ul>
 }
 
-export function ControlledKeyAliasList(props: {
-	items: AliasRow[];
-	selected: number | null;
-}) @{
+export function ControlledKeyAliasList(props: { items: AliasRow[]; selected: number | null }) @{
 	const selected = props.selected;
 	<ul>
 		@for (const row of props.items; key row.id) {
@@ -196,7 +203,9 @@ export function SuspenseKeyAliasTable(props: {
 							<tr class={selected === id ? 'selected' : ''}>
 								<td>{id}</td>
 								<td>
-									<a class="pick" onClick={() => setSelected(id)}>{row.label}</a>
+									<a class="pick" onClick={() => setSelected(id)}>
+										{row.label}
+									</a>
 								</td>
 							</tr>
 						}

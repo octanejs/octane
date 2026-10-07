@@ -29,7 +29,7 @@
       "arch": "any",
       "packageManager": "pnpm@12.9.1",
       "lockfile": "pnpm-lock.yaml",
-      "lockfileSha256": "e92f4520cd88a2593a0ecd555e0532b2e4e8bb1396c9558a09f0cbf3fbaa5917"
+      "lockfileSha256": "caea67fe61ab57f3e8cbd8a0e55f0e8b3014b3dd6815c6fe6e158095f291daeb"
     }
   },
   "lanes": [
@@ -67,7 +67,7 @@
         {
           "path": "packages/dexie/tests/_fixtures/live-query.tsrx",
           "role": "support",
-          "sha256": "eeb2886c268fe605ff0fbac50e4466b8abb2890155da1d61648c110ce318beed"
+          "sha256": "a289f7f3bac22a143d63f46aef739bfe043a1d7e345a1c061aa5b5a03f6195de"
         }
       ]
     },
@@ -114,7 +114,7 @@
         {
           "path": "packages/dexie/tests/_fixtures/upstream-app.tsrx",
           "role": "support",
-          "sha256": "215f0e47e6c3d875621b118a4e42d1a03478bb56c9f8380f44fe7936483fe051"
+          "sha256": "8195e342dd57741097e9f67cc0cf7178501a33921e9149071313e3c758e75656"
         }
       ]
     },

@@ -640,9 +640,7 @@ export function ShadcnBaseUIDemo() @{
 		<Section title="AspectRatio" note="Derived — compare against the React Aria tab.">
 			<div class="max-w-sm">
 				<AspectRatio ratio={16 / 9}>
-					<div
-						class="flex size-full items-center justify-center rounded-lg bg-muted text-sm text-muted-foreground"
-					>
+					<div class="flex size-full items-center justify-center rounded-lg bg-muted text-sm text-muted-foreground">
 						16 / 9
 					</div>
 				</AspectRatio>
@@ -712,7 +710,9 @@ export function ShadcnBaseUIDemo() @{
 						<PaginationLink href="#1">1</PaginationLink>
 					</PaginationItem>
 					<PaginationItem>
-						<PaginationLink href="#2" isActive>2</PaginationLink>
+						<PaginationLink href="#2" isActive>
+							2
+						</PaginationLink>
 					</PaginationItem>
 					<PaginationItem>
 						<PaginationLink href="#3">3</PaginationLink>
@@ -866,9 +866,7 @@ export function ShadcnBaseUIDemo() @{
 			note="Right-click the dashed box. Unlike DropdownMenu this family has a real Separator part. Check the submenu row stays highlighted while open, and that the menu opens at the pointer."
 		>
 			<ContextMenu>
-				<ContextMenuTrigger
-					class="flex h-32 w-full items-center justify-center rounded-lg border border-dashed text-sm text-muted-foreground"
-				>
+				<ContextMenuTrigger class="flex h-32 w-full items-center justify-center rounded-lg border border-dashed text-sm text-muted-foreground">
 					Right click here
 				</ContextMenuTrigger>
 				<ContextMenuContent>
@@ -977,7 +975,9 @@ export function ShadcnBaseUIDemo() @{
 					<TabsList>
 						<TabsTrigger value="account">Account</TabsTrigger>
 						<TabsTrigger value="password">Password</TabsTrigger>
-						<TabsTrigger value="disabled" disabled>Disabled</TabsTrigger>
+						<TabsTrigger value="disabled" disabled>
+							Disabled
+						</TabsTrigger>
 					</TabsList>
 					<TabsContent value="account">Make changes to your account here.</TabsContent>
 					<TabsContent value="password">Change your password here.</TabsContent>

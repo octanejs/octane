@@ -40,15 +40,13 @@ function defaultTransformers(): Transformer[] {
 
 export const DEFAULT_TRANSFORMERS: Transformer[] = /* @__PURE__ */ defaultTransformers();
 
-type Props =
-	Readonly<{
-		transformers?: Transformer[];
-	}>;
+type Props = Readonly<{
+	transformers?: Transformer[];
+}>;
 
 export function MarkdownShortcutPlugin(props: Props) {
 	const [editor] = useLexicalComposerContext();
-	const transformers =
-		props.transformers === undefined ? DEFAULT_TRANSFORMERS : props.transformers;
+	const transformers = props.transformers === undefined ? DEFAULT_TRANSFORMERS : props.transformers;
 
 	useEffect(() => registerMarkdownShortcuts(editor, transformers), [editor, transformers]);
 

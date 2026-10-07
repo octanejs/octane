@@ -21,16 +21,15 @@ import type { ElementFormatType, NodeKey } from 'lexical';
 import { useEffect, useRef } from 'octane';
 import type { OctaneNode } from 'octane';
 
-type Props =
-	Readonly<{
-		children: OctaneNode;
-		format?: ElementFormatType | null;
-		nodeKey: NodeKey;
-		className: Readonly<{
-			base: string;
-			focus: string;
-		}>;
+type Props = Readonly<{
+	children: OctaneNode;
+	format?: ElementFormatType | null;
+	nodeKey: NodeKey;
+	className: Readonly<{
+		base: string;
+		focus: string;
 	}>;
+}>;
 
 export function BlockWithAlignableContents(props: Props) {
 	const nodeKey = props.nodeKey;
@@ -90,9 +89,9 @@ export function BlockWithAlignableContents(props: Props) {
 
 	const cls = [className.base, isSelected ? className.focus : null].filter(Boolean).join(' ');
 
-	return <div
-		class={cls}
-		ref={ref}
-		style={{ textAlign: format ? format : undefined }}
-	>{props.children}</div>;
+	return (
+		<div class={cls} ref={ref} style={{ textAlign: format ? format : undefined }}>
+			{props.children}
+		</div>
+	);
 }

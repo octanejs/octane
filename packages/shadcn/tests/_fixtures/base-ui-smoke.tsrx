@@ -241,7 +241,9 @@ export function AspectRatioCase() @{
 }
 
 export function ButtonCase() @{
-	<Button variant="outline" size="sm">Press</Button>
+	<Button variant="outline" size="sm">
+		Press
+	</Button>
 }
 
 export function CardCase() @{
@@ -500,7 +502,9 @@ export function PaginationCase() @{
 				<PaginationLink href="#1">1</PaginationLink>
 			</PaginationItem>
 			<PaginationItem>
-				<PaginationLink href="#2" isActive>2</PaginationLink>
+				<PaginationLink href="#2" isActive>
+					2
+				</PaginationLink>
 			</PaginationItem>
 			<PaginationItem>
 				<PaginationEllipsis />

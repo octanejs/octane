@@ -47,7 +47,6 @@ import {
 	unwrapServerFunctionInitializer,
 } from './server-context.js';
 import { createStyleScopePass } from './style-scopes.js';
-import { decodeHTMLStrict } from 'entities';
 import { print as esrapPrint } from 'esrap';
 import esrapTsx from 'esrap/languages/tsx';
 import { buildFatSegments } from './fat-segments.js';
@@ -25224,6 +25223,9 @@ function emitHeadServer(headNodes, ctx) {
 function normalizeAuthoredJsxLiterals(ast) {
 	return mapAst(ast, (node) => {
 		if (node.type === 'JSXText') {
+			// Both parsers give `value` with its character references decoded, as
+			// JSX parsers do, so it is only cleaned up here: JSX's whitespace rule,
+			// applied to the decoded text as Babel applies it.
 			const lines = node.value.split(/\r\n|\n|\r/);
 			let last = 0;
 			for (let i = 0; i < lines.length; i++) if (/[^ \t]/.test(lines[i])) last = i;
@@ -25234,17 +25236,18 @@ function normalizeAuthoredJsxLiterals(ast) {
 				if (i !== lines.length - 1) line = line.replace(/ +$/, '');
 				if (line !== '') value += line + (i !== last ? ' ' : '');
 			}
-			if (value.includes('&')) value = decodeHTMLStrict(value);
-			return value === node.value ? node : { ...node, value, raw: value };
+			return value === node.value && value === node.raw ? node : { ...node, value, raw: value };
 		}
 		if (
 			node.type === 'JSXAttribute' &&
 			node.value?.type === 'Literal' &&
-			typeof node.value.value === 'string' &&
-			node.value.value.includes('&')
+			typeof node.value.value === 'string'
 		) {
-			const value = decodeHTMLStrict(node.value.value);
-			return { ...node, value: { ...node.value, value, raw: JSON.stringify(value) } };
+			// Both parsers give `value` decoded. Where that differs from the string
+			// as written, print it from `value`, not from `raw`.
+			const { raw, value } = node.value;
+			if (typeof raw === 'string' && raw.slice(1, -1) === value) return null;
+			return { ...node, value: { ...node.value, raw: JSON.stringify(value) } };
 		}
 		if (
 			node.type === 'JSXStyleElement' &&

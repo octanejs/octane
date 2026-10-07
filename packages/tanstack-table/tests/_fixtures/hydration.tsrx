@@ -8,13 +8,13 @@ export function HydratedTable() @{
 	const table = useTable({
 		features,
 		columns,
-		data: [
-			{ id: '1', name },
-		],
+		data: [{ id: '1', name }],
 		getRowId: (row) => row.id,
 	});
 	<section>
-		<button id="rename" onClick={() => setName('Grace')}>Rename</button>
+		<button id="rename" onClick={() => setName('Grace')}>
+			Rename
+		</button>
 		<table>
 			<tbody>
 				@for (const row of table.getRowModel().rows; key row.id) {

@@ -290,13 +290,18 @@ export function RebuiltHoleValueBranch(props: { server?: boolean; leaf: Promise<
 
 // The rebuilt root is what a component returns into the range it adopted.
 function ReturningPara(props: { server?: boolean; leaf: Promise<string> }) {
-	if (props.server) return <>
-		<b class="server">{'server'}</b>
-		<em>{'tail'}</em>
-	</>;
-	return <p>
-		<EmPair leaf={props.leaf} />
-	</p>;
+	if (props.server)
+		return (
+			<>
+				<b class="server">{'server'}</b>
+				<em>{'tail'}</em>
+			</>
+		);
+	return (
+		<p>
+			<EmPair leaf={props.leaf} />
+		</p>
+	);
 }
 
 export function ReturnBranch(props: { server?: boolean; leaf: Promise<string> }) @{

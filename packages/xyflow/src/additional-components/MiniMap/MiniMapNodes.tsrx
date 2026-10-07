@@ -17,7 +17,7 @@ import type {
 declare const window: any;
 
 const selectorNodeIds = (s: ReactFlowState) => s.nodes.map((node) => node.id);
-const getAttrFunction = <NodeType extends Node,>(func: any): GetMiniMapNodeAttribute<NodeType> =>
+const getAttrFunction = <NodeType extends Node>(func: any): GetMiniMapNodeAttribute<NodeType> =>
 	func instanceof Function ? func : () => func;
 
 function MiniMapNodes<NodeType extends Node>({
@@ -27,9 +27,9 @@ function MiniMapNodes<NodeType extends Node>({
 	nodeBorderRadius = 5,
 	nodeStrokeWidth,
 	/*
- * We need to rename the prop to be `CapitalCase` so that JSX will render it as
- * a component properly.
- */
+	 * We need to rename the prop to be `CapitalCase` so that JSX will render it as
+	 * a component properly.
+	 */
 	nodeComponent: NodeComponent = MiniMapNode,
 	onClick,
 }: MiniMapNodesProps<NodeType>) {
@@ -41,31 +41,31 @@ function MiniMapNodes<NodeType extends Node>({
 	const shapeRendering =
 		typeof window === 'undefined' || !!window.chrome ? 'crispEdges' : 'geometricPrecision';
 
-	return <>
-		{nodeIds.map(
-			(
-				nodeId,
-			) => /*
- * The split of responsibilities between MiniMapNodes and
- * NodeComponentWrapper may appear weird. However, it’s designed to
- * minimize the cost of updates when individual nodes change.
- *
- * For more details, see a similar commit in `NodeRenderer/index.tsx`.
- */
-			<NodeComponentWrapper
-				key={nodeId}
-				id={nodeId}
-				nodeColorFunc={nodeColorFunc}
-				nodeStrokeColorFunc={nodeStrokeColorFunc}
-				nodeClassNameFunc={nodeClassNameFunc}
-				nodeBorderRadius={nodeBorderRadius}
-				nodeStrokeWidth={nodeStrokeWidth}
-				NodeComponent={NodeComponent}
-				onClick={onClick}
-				shapeRendering={shapeRendering}
-			/>,
-		)}
-	</>;
+	return (
+		<>
+			{nodeIds.map((nodeId) => (
+				/*
+				 * The split of responsibilities between MiniMapNodes and
+				 * NodeComponentWrapper may appear weird. However, it’s designed to
+				 * minimize the cost of updates when individual nodes change.
+				 *
+				 * For more details, see a similar commit in `NodeRenderer/index.tsx`.
+				 */
+				<NodeComponentWrapper
+					key={nodeId}
+					id={nodeId}
+					nodeColorFunc={nodeColorFunc}
+					nodeStrokeColorFunc={nodeStrokeColorFunc}
+					nodeClassNameFunc={nodeClassNameFunc}
+					nodeBorderRadius={nodeBorderRadius}
+					nodeStrokeWidth={nodeStrokeWidth}
+					NodeComponent={NodeComponent}
+					onClick={onClick}
+					shapeRendering={shapeRendering}
+				/>
+			))}
+		</>
+	);
 }
 
 function NodeComponentWrapperInner<NodeType extends Node>({
@@ -113,22 +113,24 @@ function NodeComponentWrapperInner<NodeType extends Node>({
 		return null;
 	}
 
-	return <NodeComponent
-		x={x}
-		y={y}
-		width={width}
-		height={height}
-		style={node.style}
-		selected={!!node.selected}
-		className={nodeClassNameFunc(node)}
-		color={nodeColorFunc(node)}
-		borderRadius={nodeBorderRadius}
-		strokeColor={nodeStrokeColorFunc(node)}
-		strokeWidth={nodeStrokeWidth}
-		shapeRendering={shapeRendering}
-		onClick={onClick}
-		id={node.id}
-	/>;
+	return (
+		<NodeComponent
+			x={x}
+			y={y}
+			width={width}
+			height={height}
+			style={node.style}
+			selected={!!node.selected}
+			className={nodeClassNameFunc(node)}
+			color={nodeColorFunc(node)}
+			borderRadius={nodeBorderRadius}
+			strokeColor={nodeStrokeColorFunc(node)}
+			strokeWidth={nodeStrokeWidth}
+			shapeRendering={shapeRendering}
+			onClick={onClick}
+			id={node.id}
+		/>
+	);
 }
 
 const NodeComponentWrapper = memo(NodeComponentWrapperInner) as typeof NodeComponentWrapperInner;

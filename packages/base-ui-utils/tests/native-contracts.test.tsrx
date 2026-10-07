@@ -5,19 +5,17 @@ import { fastComponentRef } from '../src/fastHooks';
 import { useMergedRefs } from '../src/useMergedRefs';
 import { isReactVersionAtLeast } from '../src/reactVersion';
 
-const Input = fastComponentRef(
-	function Input(
-		{
-			secondaryRef,
-		}: {
-			secondaryRef?: Ref<HTMLInputElement>;
-		},
-		forwardedRef: Ref<HTMLInputElement>,
-	) {
-		const ref = useMergedRefs(forwardedRef, secondaryRef);
-		return <input aria-label="Merged input" ref={ref} />;
+const Input = fastComponentRef(function Input(
+	{
+		secondaryRef,
+	}: {
+		secondaryRef?: Ref<HTMLInputElement>;
 	},
-);
+	forwardedRef: Ref<HTMLInputElement>,
+) {
+	const ref = useMergedRefs(forwardedRef, secondaryRef);
+	return <input aria-label="Merged input" ref={ref} />;
+});
 
 // @parity-case ordinary:base-ui-utils-native-refs
 it('attaches and cleans up recursive refs passed through a fast component', () => {
@@ -42,27 +40,26 @@ it('attaches and cleans up recursive refs passed through a fast component', () =
 
 function ModernFeatures({ onCleanup }: { onCleanup: () => void }) {
 	const id = useId();
-	return <section inert={isReactVersionAtLeast(19)} ref={() => onCleanup}>
-		<label htmlFor={id}>Modern input</label>
-		<input id={id} />
-	</section>;
+	return (
+		<section inert={isReactVersionAtLeast(19)} ref={() => onCleanup}>
+			<label htmlFor={id}>Modern input</label>
+			<input id={id} />
+		</section>
+	);
 }
 
 // @parity-case ordinary:base-ui-utils-capabilities
-it(
-	'supports the inert, stable ID, and ref cleanup capabilities advertised to upstream code',
-	() => {
-		const onCleanup = vi.fn();
-		const { rerender, unmount } = render(<ModernFeatures onCleanup={onCleanup} />);
-		const input = screen.getByLabelText('Modern input');
-		const id = input.id;
-		expect(id).not.toBe('');
-		expect(input.parentElement).toHaveAttribute('inert');
-		rerender(<ModernFeatures onCleanup={onCleanup} />);
-		expect(screen.getByLabelText('Modern input')).toBe(input);
-		expect(input.id).toBe(id);
-		onCleanup.mockClear();
-		unmount();
-		expect(onCleanup).toHaveBeenCalledOnce();
-	},
-);
+it('supports the inert, stable ID, and ref cleanup capabilities advertised to upstream code', () => {
+	const onCleanup = vi.fn();
+	const { rerender, unmount } = render(<ModernFeatures onCleanup={onCleanup} />);
+	const input = screen.getByLabelText('Modern input');
+	const id = input.id;
+	expect(id).not.toBe('');
+	expect(input.parentElement).toHaveAttribute('inert');
+	rerender(<ModernFeatures onCleanup={onCleanup} />);
+	expect(screen.getByLabelText('Modern input')).toBe(input);
+	expect(input.id).toBe(id);
+	onCleanup.mockClear();
+	unmount();
+	expect(onCleanup).toHaveBeenCalledOnce();
+});

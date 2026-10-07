@@ -46,8 +46,10 @@ const iconColorStyles: Record<ButtonColor, string> = {
 
 const variantStyles: Record<ButtonVariant, string> = {
 	primary: 'border font-medium',
-	secondary: 'bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700 border-transparent font-medium',
-	ghost: 'border border-gray-200 dark:border-gray-700 hover:bg-gray-100 dark:hover:bg-gray-800 font-medium',
+	secondary:
+		'bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700 border-transparent font-medium',
+	ghost:
+		'border border-gray-200 dark:border-gray-700 hover:bg-gray-100 dark:hover:bg-gray-800 font-medium',
 	icon: 'border-transparent',
 };
 
@@ -67,7 +69,8 @@ const roundedStyles: Record<ButtonRounded, string> = {
 	full: 'rounded-full',
 };
 
-const baseStyles = 'inline-flex items-center justify-center gap-2 cursor-pointer transition-colors disabled:opacity-50 disabled:cursor-not-allowed focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-1 focus-visible:ring-offset-white dark:focus-visible:ring-offset-gray-900';
+const baseStyles =
+	'inline-flex items-center justify-center gap-2 cursor-pointer transition-colors disabled:opacity-50 disabled:cursor-not-allowed focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-1 focus-visible:ring-offset-white dark:focus-visible:ring-offset-gray-900';
 
 function getDefaultSize(variant: ButtonVariant): ButtonSize {
 	if (variant === 'icon') return 'icon-md';

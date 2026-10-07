@@ -104,132 +104,133 @@ export function RouterProvider(props: RouterProviderProps) @{
 	const [interruption, setInterruption] = useState<VtInterruption | undefined>(undefined);
 	const fetcherData = useRef<FetchersContextObject>(new Map());
 
-	const setState = useCallback<RouterSubscriber>((
-		newState,
-		{ deletedFetchers, newErrors, flushSync, viewTransitionOpts },
-	) => {
-		// Send router errors through onError
-		if (newErrors && onError) {
-			Object.values(newErrors).forEach(
-				(error) => onError(error, {
-					location: newState.location,
-					params: newState.matches[0]?.params ?? {},
-					pattern: getRoutePattern(newState.matches),
-				}),
-			);
-		}
-
-		newState.fetchers.forEach((fetcher, key) => {
-			if (fetcher.data !== undefined) {
-				fetcherData.current.set(key, fetcher.data);
+	const setState = useCallback<RouterSubscriber>(
+		(newState, { deletedFetchers, newErrors, flushSync, viewTransitionOpts }) => {
+			// Send router errors through onError
+			if (newErrors && onError) {
+				Object.values(newErrors).forEach((error) =>
+					onError(error, {
+						location: newState.location,
+						params: newState.matches[0]?.params ?? {},
+						pattern: getRoutePattern(newState.matches),
+					}),
+				);
 			}
-		});
-		deletedFetchers.forEach((key) => fetcherData.current.delete(key));
 
-		warnOnce(
-			flushSync === false || reactDomFlushSyncImpl != null,
-			'You provided the `flushSync` option to a router update, ' +
-				'but you are not using the `<RouterProvider>` from `@octanejs/remix-router/dom` ' +
-				'so `flushSync()` is unavailable.  Please update your app ' +
-				'to `import { RouterProvider } from "@octanejs/remix-router/dom"` ' +
-				'to use the `flushSync` option.',
-		);
+			newState.fetchers.forEach((fetcher, key) => {
+				if (fetcher.data !== undefined) {
+					fetcherData.current.set(key, fetcher.data);
+				}
+			});
+			deletedFetchers.forEach((key) => fetcherData.current.delete(key));
 
-		const isViewTransitionAvailable =
-			router.window != null && router.window.document != null &&
+			warnOnce(
+				flushSync === false || reactDomFlushSyncImpl != null,
+				'You provided the `flushSync` option to a router update, ' +
+					'but you are not using the `<RouterProvider>` from `@octanejs/remix-router/dom` ' +
+					'so `flushSync()` is unavailable.  Please update your app ' +
+					'to `import { RouterProvider } from "@octanejs/remix-router/dom"` ' +
+					'to use the `flushSync` option.',
+			);
+
+			const isViewTransitionAvailable =
+				router.window != null &&
+				router.window.document != null &&
 				typeof router.window.document.startViewTransition === 'function';
 
-		warnOnce(
-			viewTransitionOpts == null || isViewTransitionAvailable,
-			'You provided the `viewTransition` option to a router update, ' +
-				'but you do not appear to be running in a DOM environment as ' +
-				'`window.startViewTransition` is not available.',
-		);
+			warnOnce(
+				viewTransitionOpts == null || isViewTransitionAvailable,
+				'You provided the `viewTransition` option to a router update, ' +
+					'but you do not appear to be running in a DOM environment as ' +
+					'`window.startViewTransition` is not available.',
+			);
 
-		// If this isn't a view transition or it's not available in this browser,
-		// just update and be done with it
-		if (!viewTransitionOpts || !isViewTransitionAvailable) {
-			if (reactDomFlushSyncImpl && flushSync) {
-				reactDomFlushSyncImpl(() => setStateImpl(newState));
-			} else if (useTransitions === false) {
-				setStateImpl(newState);
-			} else {
-				startTransition(() => {
-					if (useTransitions === true) {
-						setOptimisticState((s) => getOptimisticRouterState(s, newState));
-					}
+			// If this isn't a view transition or it's not available in this browser,
+			// just update and be done with it
+			if (!viewTransitionOpts || !isViewTransitionAvailable) {
+				if (reactDomFlushSyncImpl && flushSync) {
+					reactDomFlushSyncImpl(() => setStateImpl(newState));
+				} else if (useTransitions === false) {
 					setStateImpl(newState);
-				});
-			}
-			return;
-		}
-
-		// flushSync + startViewTransition
-		if (reactDomFlushSyncImpl && flushSync) {
-			// Flush through the context to mark DOM elements as transition=ing
-			reactDomFlushSyncImpl(() => {
-				// Cancel any pending transitions
-				if (transition) {
-					renderDfd?.resolve();
-					transition.skipTransition();
+				} else {
+					startTransition(() => {
+						if (useTransitions === true) {
+							setOptimisticState((s) => getOptimisticRouterState(s, newState));
+						}
+						setStateImpl(newState);
+					});
 				}
-				setVtContext({
-					isTransitioning: true,
-					flushSync: true,
+				return;
+			}
+
+			// flushSync + startViewTransition
+			if (reactDomFlushSyncImpl && flushSync) {
+				// Flush through the context to mark DOM elements as transition=ing
+				reactDomFlushSyncImpl(() => {
+					// Cancel any pending transitions
+					if (transition) {
+						renderDfd?.resolve();
+						transition.skipTransition();
+					}
+					setVtContext({
+						isTransitioning: true,
+						flushSync: true,
+						currentLocation: viewTransitionOpts.currentLocation,
+						nextLocation: viewTransitionOpts.nextLocation,
+					});
+				});
+
+				// Update the DOM (window presence was checked via isViewTransitionAvailable)
+				const t = router.window!.document.startViewTransition(() => {
+					reactDomFlushSyncImpl(() => setStateImpl(newState));
+				});
+
+				// Clean up after the animation completes
+				t.finished.finally(() => {
+					reactDomFlushSyncImpl(() => {
+						setRenderDfd(undefined);
+						setTransition(undefined);
+						setPendingState(undefined);
+						setVtContext({ isTransitioning: false });
+					});
+				});
+
+				reactDomFlushSyncImpl(() => setTransition(t));
+				return;
+			}
+
+			// startTransition + startViewTransition
+			if (transition) {
+				// Interrupting an in-progress transition, cancel and let everything flush
+				// out, and then kick off a new transition from the interruption state
+				renderDfd?.resolve();
+				transition.skipTransition();
+				setInterruption({
+					state: newState,
 					currentLocation: viewTransitionOpts.currentLocation,
 					nextLocation: viewTransitionOpts.nextLocation,
 				});
-			});
-
-			// Update the DOM (window presence was checked via isViewTransitionAvailable)
-			const t = router.window!.document.startViewTransition(() => {
-				reactDomFlushSyncImpl(() => setStateImpl(newState));
-			});
-
-			// Clean up after the animation completes
-			t.finished.finally(() => {
-				reactDomFlushSyncImpl(() => {
-					setRenderDfd(undefined);
-					setTransition(undefined);
-					setPendingState(undefined);
-					setVtContext({ isTransitioning: false });
+			} else {
+				// Completed navigation update with opted-in view transitions, let 'er rip
+				setPendingState(newState);
+				setVtContext({
+					isTransitioning: true,
+					flushSync: false,
+					currentLocation: viewTransitionOpts.currentLocation,
+					nextLocation: viewTransitionOpts.nextLocation,
 				});
-			});
-
-			reactDomFlushSyncImpl(() => setTransition(t));
-			return;
-		}
-
-		// startTransition + startViewTransition
-		if (transition) {
-			// Interrupting an in-progress transition, cancel and let everything flush
-			// out, and then kick off a new transition from the interruption state
-			renderDfd?.resolve();
-			transition.skipTransition();
-			setInterruption({
-				state: newState,
-				currentLocation: viewTransitionOpts.currentLocation,
-				nextLocation: viewTransitionOpts.nextLocation,
-			});
-		} else {
-			// Completed navigation update with opted-in view transitions, let 'er rip
-			setPendingState(newState);
-			setVtContext({
-				isTransitioning: true,
-				flushSync: false,
-				currentLocation: viewTransitionOpts.currentLocation,
-				nextLocation: viewTransitionOpts.nextLocation,
-			});
-		}
-	}, [
-		router.window,
-		reactDomFlushSyncImpl,
-		transition,
-		renderDfd,
-		useTransitions,
-		setOptimisticState,
-		onError,
-	]);
+			}
+		},
+		[
+			router.window,
+			reactDomFlushSyncImpl,
+			transition,
+			renderDfd,
+			useTransitions,
+			setOptimisticState,
+			onError,
+		],
+	);
 
 	// Need to use a layout effect here so we are subscribed early enough to
 	// pick up on any render-driven redirects/navigations (useEffect/<Navigate>).
@@ -304,15 +305,17 @@ export function RouterProvider(props: RouterProviderProps) @{
 			createHref: router.createHref,
 			encodeLocation: router.encodeLocation,
 			go: (n) => router.navigate(n),
-			push: (to, state2, opts) => router.navigate(to, {
-				state: state2,
-				preventScrollReset: opts?.preventScrollReset,
-			}),
-			replace: (to, state2, opts) => router.navigate(to, {
-				replace: true,
-				state: state2,
-				preventScrollReset: opts?.preventScrollReset,
-			}),
+			push: (to, state2, opts) =>
+				router.navigate(to, {
+					state: state2,
+					preventScrollReset: opts?.preventScrollReset,
+				}),
+			replace: (to, state2, opts) =>
+				router.navigate(to, {
+					replace: true,
+					state: state2,
+					preventScrollReset: opts?.preventScrollReset,
+				}),
 		};
 	}, [router]);
 

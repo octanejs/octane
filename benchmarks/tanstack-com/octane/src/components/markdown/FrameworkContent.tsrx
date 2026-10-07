@@ -21,8 +21,10 @@ export function FrameworkContent({ children }: FrameworkContentProps) {
 	const userFramework = userQuery.data?.lastUsedFramework;
 
 	const actualFramework =
-		paramsFramework || userFramework || localCurrentFramework.currentFramework ||
-			'react' as Framework;
+		paramsFramework ||
+		userFramework ||
+		localCurrentFramework.currentFramework ||
+		('react' as Framework);
 
 	const normalizedFramework = actualFramework.toLowerCase();
 	const panels = Children.toArray(children).filter(isFrameworkPanel);

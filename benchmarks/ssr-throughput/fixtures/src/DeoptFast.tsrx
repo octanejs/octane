@@ -14,10 +14,9 @@ import type { CardData } from './deopt-data';
 // the plain/compiled render-time ratio (the intra-octane authoring cliff).
 
 export function Avatar(props: { initials: string; hue: number }) @{
-	<span
-		class="avatar"
-		style={{ background: 'hsl(' + props.hue + ',60%,50%)' }}
-	>{props.initials as string}</span>
+	<span class="avatar" style={{ background: 'hsl(' + props.hue + ',60%,50%)' }}>
+		{props.initials as string}
+	</span>
 }
 
 export function Card(props: { c: CardData }) @{

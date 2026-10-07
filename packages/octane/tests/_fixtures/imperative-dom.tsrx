@@ -9,7 +9,9 @@ function EmptyHost(props) {
 export function ImperativeChildrenSurvive() @{
 	const [n, setN] = useState(0);
 	<div>
-		<button class="bump" onClick={() => setN(n + 1)}>bump</button>
+		<button class="bump" onClick={() => setN(n + 1)}>
+			bump
+		</button>
 		<EmptyHost n={n} />
 	</div>
 }
@@ -27,7 +29,9 @@ function OwnedHost(props) {
 export function OwnedChildrenStillClear() @{
 	const [show, setShow] = useState(true);
 	<div>
-		<button class="toggle" onClick={() => setShow(false)}>hide</button>
+		<button class="toggle" onClick={() => setShow(false)}>
+			hide
+		</button>
 		<OwnedHost show={show} />
 	</div>
 }
@@ -45,7 +49,9 @@ function ClearingHost(props) {
 export function ForeignDomAfterOurChildrenClear() @{
 	const [step, setStep] = useState(0);
 	<div>
-		<button class="next" onClick={() => setStep(step + 1)}>next</button>
+		<button class="next" onClick={() => setStep(step + 1)}>
+			next
+		</button>
 		<ClearingHost show={step === 0} n={step} />
 	</div>
 }
@@ -62,7 +68,9 @@ function SinkHost(props) {
 export function MovedRenderedNodes() @{
 	const [n, setN] = useState(0);
 	<div>
-		<button class="bump" onClick={() => setN(n + 1)}>bump</button>
+		<button class="bump" onClick={() => setN(n + 1)}>
+			bump
+		</button>
 		<SourceHost />
 		<SinkHost n={n} />
 	</div>

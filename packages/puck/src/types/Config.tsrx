@@ -16,17 +16,15 @@ import {
 
 export type SlotComponent = (props?: Omit<DropZoneProps, 'zone'>) => OctaneNode;
 
-export type PuckComponent<Props> =
-	(props: WithId<
-		WithPuckProps<{ [K in keyof Props]: WithDeepSlots<Props[K], SlotComponent> }>
-	>) => JSX.Element;
+export type PuckComponent<Props> = (
+	props: WithId<WithPuckProps<{ [K in keyof Props]: WithDeepSlots<Props[K], SlotComponent> }>>,
+) => JSX.Element;
 
 export type ResolveDataTrigger = 'insert' | 'replace' | 'load' | 'force';
 
-type WithPartialProps<T, Props extends DefaultComponentProps> =
-	Omit<T, 'props'> & {
-		props?: Partial<Props>;
-	};
+type WithPartialProps<T, Props extends DefaultComponentProps> = Omit<T, 'props'> & {
+	props?: Partial<Props>;
+};
 
 type ComponentConfigInternal<
 	RenderProps extends DefaultComponentProps,
@@ -40,27 +38,36 @@ type ComponentConfigInternal<
 	fields?: Fields<FieldProps, UserField>;
 	permissions?: Partial<Permissions>;
 	inline?: boolean;
-	resolveFields?: (data: DataShape, params: {
-		changed: Partial<Record<keyof FieldProps, boolean> & { id: string }>;
-		fields: Fields<FieldProps>;
-		lastFields: Fields<FieldProps>;
-		lastData: DataShape | null;
-		appState: AppState;
-		parent: ComponentData | null;
-	}) => Promise<Fields<FieldProps>> | Fields<FieldProps>;
-	resolveData?: (data: DataShape, params: {
-		changed: Partial<Record<keyof FieldProps, boolean> & { id: string }>;
-		lastData: DataShape | null;
-		metadata: Metadata;
-		trigger: ResolveDataTrigger;
-	}) => Promise<WithPartialProps<DataShape, FieldProps>> | WithPartialProps<DataShape, FieldProps>;
-	resolvePermissions?: (data: DataShape, params: {
-		changed: Partial<Record<keyof FieldProps, boolean> & { id: string }>;
-		lastPermissions: Partial<Permissions>;
-		permissions: Partial<Permissions>;
-		appState: AppState;
-		lastData: DataShape | null;
-	}) => Promise<Partial<Permissions>> | Partial<Permissions>;
+	resolveFields?: (
+		data: DataShape,
+		params: {
+			changed: Partial<Record<keyof FieldProps, boolean> & { id: string }>;
+			fields: Fields<FieldProps>;
+			lastFields: Fields<FieldProps>;
+			lastData: DataShape | null;
+			appState: AppState;
+			parent: ComponentData | null;
+		},
+	) => Promise<Fields<FieldProps>> | Fields<FieldProps>;
+	resolveData?: (
+		data: DataShape,
+		params: {
+			changed: Partial<Record<keyof FieldProps, boolean> & { id: string }>;
+			lastData: DataShape | null;
+			metadata: Metadata;
+			trigger: ResolveDataTrigger;
+		},
+	) => Promise<WithPartialProps<DataShape, FieldProps>> | WithPartialProps<DataShape, FieldProps>;
+	resolvePermissions?: (
+		data: DataShape,
+		params: {
+			changed: Partial<Record<keyof FieldProps, boolean> & { id: string }>;
+			lastPermissions: Partial<Permissions>;
+			permissions: Partial<Permissions>;
+			appState: AppState;
+			lastData: DataShape | null;
+		},
+	) => Promise<Partial<Permissions>> | Partial<Permissions>;
 	metadata?: Metadata;
 };
 
@@ -92,15 +99,14 @@ export type ComponentConfig<
 type RootConfigInternal<
 	RootProps extends DefaultComponentProps = DefaultComponentProps,
 	UserField extends BaseField = {},
-> =
-	Partial<
-		ComponentConfigInternal<
-			WithChildren<RootProps>,
-			AsFieldProps<RootProps>,
-			RootData<AsFieldProps<RootProps>>,
-			UserField
-		>
-	>;
+> = Partial<
+	ComponentConfigInternal<
+		WithChildren<RootProps>,
+		AsFieldProps<RootProps>,
+		RootData<AsFieldProps<RootProps>>,
+		UserField
+	>
+>;
 
 // DEPRECATED - remove old generics in favour of Params
 export type RootConfig<
@@ -132,15 +138,17 @@ type ConfigInternal<
 	categories?: Record<CategoryName, Category<keyof Props>> & {
 		other?: Category<keyof Props>;
 	};
-	components: { [ComponentName in keyof Props]: Omit<
-		ComponentConfigInternal<
-			Props[ComponentName],
-			Props[ComponentName],
-			Omit<ComponentData<Props[ComponentName]>, 'type'>,
-			UserField
-		>,
-		'type'
-	> };
+	components: {
+		[ComponentName in keyof Props]: Omit<
+			ComponentConfigInternal<
+				Props[ComponentName],
+				Props[ComponentName],
+				Omit<ComponentData<Props[ComponentName]>, 'type'>,
+				UserField
+			>,
+			'type'
+		>;
+	};
 	root?: RootConfigInternal<RootProps, UserField>;
 };
 
@@ -149,11 +157,8 @@ export type DefaultComponents = Record<string, any>;
 
 // DEPRECATED - remove old generics in favour of Params
 export type Config<
-	PropsOrParams extends LeftOrExactRight<
-		PropsOrParams,
-		DefaultComponents,
-		ConfigParams
-	> = DefaultComponents | ConfigParams,
+	PropsOrParams extends LeftOrExactRight<PropsOrParams, DefaultComponents, ConfigParams> =
+		DefaultComponents | ConfigParams,
 	RootProps extends DefaultComponentProps = any,
 	CategoryName extends string = string,
 > =
@@ -165,11 +170,11 @@ export type Config<
 	>
 		? ConfigInternal<ParamComponents, ParamRoot, ParamCategoryName[number]>
 		: PropsOrParams extends ConfigParams<
-			infer ParamComponents,
-			infer ParamRoot,
-			infer ParamCategoryName,
-			infer ParamFields
-		>
+					infer ParamComponents,
+					infer ParamRoot,
+					infer ParamCategoryName,
+					infer ParamFields
+			  >
 			? ConfigInternal<
 					ParamComponents,
 					ParamRoot,
@@ -177,11 +182,11 @@ export type Config<
 					ParamFields[keyof ParamFields] & BaseField
 				>
 			: PropsOrParams extends ConfigParams<
-				infer ParamComponents,
-				infer ParamRoot,
-				infer ParamCategoryName,
-				any
-			>
+						infer ParamComponents,
+						infer ParamRoot,
+						infer ParamCategoryName,
+						any
+				  >
 				? ConfigInternal<ParamComponents, ParamRoot, ParamCategoryName[number], {}>
 				: ConfigInternal<PropsOrParams, RootProps, CategoryName>;
 

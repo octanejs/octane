@@ -114,13 +114,11 @@ export function ClickUpdateApp(props) @{
 	const [expanded, setExpanded] = useState(false);
 
 	<>
-		<button
-			onClick={() => startTransition(() => setExpanded((value) => !value))}
-		>{'Toggle'}</button>
+		<button onClick={() => startTransition(() => setExpanded((value) => !value))}>
+			{'Toggle'}
+		</button>
 		<ViewTransition onUpdate={props.onUpdate}>
-			<div>
-				{expanded ? 'Much longer transition content' : 'Short'}
-			</div>
+			<div>{expanded ? 'Much longer transition content' : 'Short'}</div>
 		</ViewTransition>
 	</>
 }
@@ -132,9 +130,9 @@ export function PlainClickApp() @{
 	const [count, setCount] = useState(0);
 
 	<>
-		<button
-			onClick={() => startTransition(() => setCount((value) => value + 1))}
-		>{'Increment'}</button>
+		<button onClick={() => startTransition(() => setCount((value) => value + 1))}>
+			{'Increment'}
+		</button>
 		<div>{'Count: ' + count}</div>
 	</>
 }
