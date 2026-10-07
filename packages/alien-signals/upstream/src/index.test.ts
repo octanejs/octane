@@ -2,17 +2,26 @@ import { GlobalRegistrator } from "@happy-dom/global-registrator";
 import * as matchers from "@testing-library/jest-dom/matchers";
 import { act, cleanup, renderHook } from "@testing-library/react";
 import { afterEach, describe, expect, it, jest } from "bun:test";
+import { createElement, startTransition, StrictMode } from "react";
+import { renderToString } from "react-dom/server";
 
 import {
+  batch,
   createComputed,
   createEffect,
   createSignal,
   createSignalScope,
+  trigger,
   useComputed,
+  useDeferredSignalValue,
   useSetSignal,
   useSignal,
   useSignalEffect,
+  useSignalInsertionEffect,
+  useSignalLayoutEffect,
+  useSignalPassiveEffect,
   useSignalScope,
+  useSignalSelector,
   useSignalValue,
 } from ".";
 
@@ -389,8 +398,7 @@ describe("Alien React Library", () => {
     act(() => {
       result.current[1](undefined);
     });
-    // @ts-expect-error
-    expect(result.current[0]).toBe(undefined);
+    expect(result.current[0]).toBeUndefined();
 
     act(() => {
       result.current[1](null);
@@ -497,5 +505,181 @@ describe("Alien React Library", () => {
     });
 
     expect(signal()).toBe(4);
+  });
+
+  describe("Alien Signals 3 and React 19.2 integration", () => {
+    it("lets React automatically batch multiple signal notifications into one render", () => {
+      const first = createSignal(0);
+      const second = createSignal(0);
+      let renders = 0;
+      const hook = renderHook(() => {
+        renders++;
+        return [useSignalValue(first), useSignalValue(second)] as const;
+      });
+
+      act(() => {
+        first(1);
+        second(1);
+        first(2);
+      });
+
+      expect(hook.result.current).toEqual([2, 1]);
+      expect(renders).toBe(2);
+    });
+
+    it("batches multiple writes into one propagation", () => {
+      const first = createSignal(1);
+      const second = createSignal(2);
+      const snapshots: number[] = [];
+      const stop = createEffect(() => {
+        snapshots.push(first() + second());
+      });
+
+      batch(() => {
+        first(10);
+        second(20);
+      });
+
+      expect(snapshots).toEqual([3, 30]);
+      stop();
+    });
+
+    it("manually triggers dependents after an in-place mutation", () => {
+      const items = createSignal<number[]>([]);
+      const size = createComputed(() => items().length);
+
+      expect(size()).toBe(0);
+      items().push(1);
+      expect(size()).toBe(0);
+      trigger(items);
+      expect(size()).toBe(1);
+    });
+
+    it("shares a source safely across multiple React subscribers", () => {
+      const count = createSignal(0);
+      const first = renderHook(() => useSignalValue(count));
+      const second = renderHook(() => useSignalValue(count));
+      const third = renderHook(() => useSignalValue(count));
+
+      act(() => count(1));
+      expect(first.result.current).toBe(1);
+      expect(second.result.current).toBe(1);
+      expect(third.result.current).toBe(1);
+
+      second.unmount();
+      act(() => count(2));
+      expect(first.result.current).toBe(2);
+      expect(third.result.current).toBe(2);
+
+      first.unmount();
+      act(() => count(3));
+      expect(third.result.current).toBe(3);
+      third.unmount();
+    });
+
+    it("skips React renders when a selected signal slice is unchanged", () => {
+      const state = createSignal({ selected: 1, unrelated: 1 });
+      const select = (value: { selected: number; unrelated: number }) => value.selected;
+      let renders = 0;
+      const hook = renderHook(() => {
+        renders++;
+        return useSignalSelector(state, select);
+      });
+
+      act(() => state({ selected: 1, unrelated: 2 }));
+      expect(hook.result.current).toBe(1);
+      expect(renders).toBe(1);
+
+      act(() => state({ selected: 2, unrelated: 2 }));
+      expect(hook.result.current).toBe(2);
+      expect(renders).toBe(2);
+    });
+
+    it("does not create a signal scope during server rendering", () => {
+      const callback = jest.fn();
+
+      function ServerComponent() {
+        useSignalScope(callback, []);
+        return null;
+      }
+
+      renderToString(createElement(ServerComponent));
+      expect(callback).not.toHaveBeenCalled();
+    });
+
+    it("keeps snapshots consistent when a signal write occurs in a transition", () => {
+      const count = createSignal(0);
+      const hook = renderHook(() => useSignalValue(count), {
+        wrapper: StrictMode,
+      });
+
+      act(() => {
+        startTransition(() => count(1));
+      });
+
+      expect(hook.result.current).toBe(1);
+    });
+
+    it("offers a deferred snapshot without changing the source value", async () => {
+      const count = createSignal(0);
+      const hook = renderHook(() => ({
+        current: useSignalValue(count),
+        deferred: useDeferredSignalValue(count),
+      }));
+
+      act(() => count(1));
+      expect(hook.result.current.current).toBe(1);
+
+      await act(async () => {});
+      expect(hook.result.current.deferred).toBe(1);
+    });
+
+    it("runs insertion, layout, and passive signal effects in React order", () => {
+      const order: string[] = [];
+      const source = createSignal(0);
+      const dependencies = [source] as const;
+
+      renderHook(() => {
+        useSignalInsertionEffect(dependencies, () => {
+          order.push("insertion");
+        });
+        useSignalLayoutEffect(dependencies, () => {
+          order.push("layout");
+        });
+        useSignalPassiveEffect(dependencies, () => {
+          order.push("passive");
+        });
+      });
+
+      expect(order).toEqual(["insertion", "layout", "passive"]);
+
+      act(() => source(1));
+      expect(order).toEqual([
+        "insertion",
+        "layout",
+        "passive",
+        "insertion",
+        "layout",
+        "passive",
+      ]);
+    });
+
+    it("cleans a manually stopped React scope exactly once", () => {
+      const source = createSignal(0);
+      const cleanupEffect = jest.fn();
+      const hook = renderHook(() =>
+        useSignalScope(() => {
+          createEffect(() => {
+            source();
+            return cleanupEffect;
+          });
+        }, []),
+      );
+
+      act(() => hook.result.current());
+      expect(cleanupEffect).toHaveBeenCalledTimes(1);
+      hook.unmount();
+      expect(cleanupEffect).toHaveBeenCalledTimes(1);
+    });
   });
 });

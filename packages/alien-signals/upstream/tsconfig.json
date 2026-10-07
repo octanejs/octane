@@ -7,8 +7,12 @@
     ],
     "target": "ESNext",
     "module": "ESNext",
+    "jsx": "react-jsx",
     "moduleDetection": "force",
     "allowJs": true,
+    "types": [
+      "bun"
+    ],
     // Bundler mode
     "moduleResolution": "bundler",
     "allowImportingTsExtensions": true,
@@ -25,6 +29,7 @@
   },
   "exclude": [
     "playground/**",
-    "node_modules/**"
+    "node_modules/**",
+    "src/benchmark.ts"
   ]
 }
