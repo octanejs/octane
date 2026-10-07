@@ -1633,6 +1633,103 @@ export const ordinaryResult: string = ordinary('draft', { count: 1 });
 		}
 	});
 
+	it('type-checks static JSX in the scope it was authored in', () => {
+		// @tsrx/core hoists a fully static element (literal attributes and
+		// children) to a module-level `const`, React's element-identity fast path.
+		// A component tag is the only binding such an element can name, and at
+		// module scope it was checked against the wrong one: a named function
+		// expression's own name resolved to a module binding of the same name or
+		// to nothing (TS2604 / TS2304), and `@if` narrowing was lost (TS2604).
+		const sources = {
+			DefaultExpression:
+				"const Counter = 'module binding';\n" +
+				'export default (function Counter(props: { nested?: boolean }) @{\n' +
+				'\t<section>@if (!props.nested) { <Counter nested /> }</section>\n' +
+				'});\n',
+			MemoExpression:
+				'declare function memo<T>(component: T): T;\n' +
+				'export const Counter = memo(function Self(props: { nested?: boolean }) @{\n' +
+				'\t<section>@if (!props.nested) { <Self nested /> }</section>\n' +
+				'});\n',
+			Narrowed:
+				'declare const Maybe: ((props: { label: string }) => unknown) | undefined;\n' +
+				'export function Optional() @{\n' +
+				'\t<section>@if (Maybe) { <Maybe label="ready" /> }</section>\n' +
+				'}\n',
+			// An authored `Suspense` import selects the transform that reuses it.
+			AuthoredSuspense:
+				"import { Suspense } from 'octane';\n" +
+				'declare function memo<T>(component: T): T;\n' +
+				'export const Boundary = memo(function Panel(props: { nested?: boolean }) @{\n' +
+				'\t<Suspense fallback={null}>@if (!props.nested) { <Panel nested /> }</Suspense>\n' +
+				'});\n',
+		};
+		// The self-reference is checked against the function's own props, so a
+		// wrong literal is a props error, not a call-signature one.
+		const invalidSource = sources.DefaultExpression.replace(
+			'<Counter nested />',
+			'<Counter nested={1} />',
+		);
+
+		const root = mkdtempSync(join(tmpdir(), 'octane-volar-static-scope-'));
+		try {
+			writeOctaneJsxRuntimeStub(
+				root,
+				'\t\tsection: { children?: unknown };\n\t\tspan: { children?: unknown };',
+			);
+			writeFileSync(
+				join(root, 'node_modules/octane/package.json'),
+				JSON.stringify({
+					name: 'octane',
+					exports: { '.': './index.d.ts', './jsx-runtime': './jsx-runtime.d.ts' },
+				}),
+			);
+			writeFileSync(
+				join(root, 'node_modules/octane/index.d.ts'),
+				'export declare function Suspense(props: { fallback: unknown; children?: unknown }): unknown;\n',
+			);
+			const files = Object.entries(sources).flatMap(([name, source]) => {
+				const result = compileToVolarMappings(source, `/src/${name}.tsrx`);
+				expect(result.errors).toEqual([]);
+				const file = join(root, `${name}.tsx`);
+				writeFileSync(file, result.code);
+				const inspectionFile = join(root, `${name}.inspection.tsx`);
+				writeFileSync(inspectionFile, compileTypesInspection(source, `/src/${name}.tsrx`).code);
+				return [file, inspectionFile];
+			});
+			const invalid = compileToVolarMappings(invalidSource, '/src/Invalid.tsrx');
+			expect(invalid.errors).toEqual([]);
+			const invalidFile = join(root, 'Invalid.tsx');
+			writeFileSync(invalidFile, invalid.code);
+			const program = ts.createProgram({
+				rootNames: [...files, invalidFile],
+				options: {
+					jsx: ts.JsxEmit.Preserve,
+					module: ts.ModuleKind.ESNext,
+					moduleResolution: ts.ModuleResolutionKind.Bundler,
+					noEmit: true,
+					skipLibCheck: true,
+					strict: true,
+					target: ts.ScriptTarget.ESNext,
+				},
+			});
+			const diagnostics = ts.getPreEmitDiagnostics(program);
+			expect(
+				diagnostics
+					.filter(({ file }) => file?.fileName !== invalidFile)
+					.map(
+						({ file, messageText }) =>
+							`${file?.fileName.slice(root.length + 1)}: ${ts.flattenDiagnosticMessageText(messageText, '\n')}`,
+					),
+			).toEqual([]);
+			expect(
+				diagnostics.filter(({ file }) => file?.fileName === invalidFile).map(({ code }) => code),
+			).toEqual([2322]);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
 	it('exposes both authored and generated ASTs for editor and playground integrations', () => {
 		const src = "export function Foo() @{ <p>{'x'}</p> }\n";
 		const result = compileToVolarMappings(src, 'foo.tsrx');

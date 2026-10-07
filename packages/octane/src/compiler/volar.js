@@ -28,6 +28,7 @@ import {
 	analyzeTsrx,
 	builders as b,
 	clone_ast_node as cloneAstNode,
+	contains_component_jsx as containsComponentJsx,
 	createJsxTransform,
 	createVolarMappingsResult,
 	dedupeMappings,
@@ -72,6 +73,14 @@ import {
  *     typecheck (TS1147 in-block import, TS2307 boundary import). The
  *     runtime compiler (`compile.js`) owns the dialect's real semantics
  *     (isolation validation, SSR namespace, RPC stubs) and is unaffected.
+ *   - `hooks.canHoistStaticNode` keeps component elements where they were
+ *     written, as the Vue and Solid targets do. The shared transform moves a
+ *     fully static element (literal attributes and children) to a
+ *     module-level `const`. A component tag is the only binding such an
+ *     element can name, and at module scope it is checked against the wrong
+ *     binding: a named function expression's own name resolves to an outer
+ *     binding or to nothing, and `@if` narrowing is lost. Host-only statics
+ *     name no binding, so they still hoist.
  *
  * `imports.suspense` and `imports.fragment` aren't real components in
  * octane (we lower `@try`/`@pending` to `tryBlock` and fragments to
@@ -105,6 +114,9 @@ const OCTANE_PLATFORM = {
 	serverModule: {
 		blockName: 'server',
 		importSpecifier: 'server',
+	},
+	hooks: {
+		canHoistStaticNode: (node) => !containsComponentJsx(node),
 	},
 };
 
@@ -333,6 +345,7 @@ function projectServerContextCalls(ast, filename) {
 const octaneTransformWithAuthoredSuspense = createJsxTransform({
 	...OCTANE_PLATFORM,
 	hooks: {
+		...OCTANE_PLATFORM.hooks,
 		createPendingBoundary(_content, _fallback, context) {
 			// Reuse the authored value binding without replacing its mapped import.
 			// Returning null keeps the shared boundary lowering; only its redundant
