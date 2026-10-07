@@ -52,7 +52,7 @@
   },
   "peerDependencies": {
     "@opentui/core": ">=0.5.8 <0.6.0",
-    "octane": "workspace:^0.11.0"
+    "octane": "workspace:^0.10.0"
   },
   "devDependencies": {
     "@opentui/core": "catalog:default",

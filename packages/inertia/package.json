@@ -49,7 +49,7 @@
     "laravel-precognition": "catalog:default"
   },
   "peerDependencies": {
-    "octane": "workspace:^0.11.0"
+    "octane": "workspace:^0.10.0"
   },
   "devDependencies": {
     "@inertiajs/react": "catalog:default",

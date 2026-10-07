@@ -44,7 +44,7 @@
     "typecheck": "octane-tsc -p tsconfig.json -p tsconfig.tests.json"
   },
   "peerDependencies": {
-    "octane": "workspace:^0.11.0"
+    "octane": "workspace:^0.10.0"
   },
   "devDependencies": {
     "octane": "workspace:*",

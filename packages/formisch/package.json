@@ -43,7 +43,7 @@
     "typecheck": "tsrx-tsc --noEmit -p tsconfig.json && tsrx-tsc --noEmit -p typetests/tsconfig.json"
   },
   "peerDependencies": {
-    "octane": "workspace:^0.11.0",
+    "octane": "workspace:^0.10.0",
     "valibot": "^1.4.1"
   },
   "devDependencies": {

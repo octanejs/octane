@@ -47,7 +47,7 @@
     "alien-signals": "catalog:default"
   },
   "peerDependencies": {
-    "octane": "workspace:^0.11.0"
+    "octane": "workspace:^0.10.0"
   },
   "devDependencies": {
     "@happy-dom/global-registrator": "20.11.2",

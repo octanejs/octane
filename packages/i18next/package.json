@@ -57,7 +57,7 @@
   },
   "peerDependencies": {
     "i18next": ">=26.2.0",
-    "octane": "workspace:^0.11.0"
+    "octane": "workspace:^0.10.0"
   },
   "devDependencies": {
     "@testing-library/jest-dom": "catalog:default",

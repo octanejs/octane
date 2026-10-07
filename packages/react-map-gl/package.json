@@ -39,7 +39,7 @@
   },
   "peerDependencies": {
     "mapbox-gl": ">=3.5.0",
-    "octane": "workspace:^0.11.0"
+    "octane": "workspace:^0.10.0"
   },
   "peerDependenciesMeta": {
     "mapbox-gl": {

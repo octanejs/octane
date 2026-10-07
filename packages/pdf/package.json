@@ -56,7 +56,7 @@
     "pdfjs-dist": "5.4.296"
   },
   "peerDependencies": {
-    "octane": "workspace:^0.11.0"
+    "octane": "workspace:^0.10.0"
   },
   "devDependencies": {
     "@types/react": "catalog:react-pdf-react-oracle",
