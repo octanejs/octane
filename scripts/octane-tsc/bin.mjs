@@ -1,15 +1,9 @@
 #!/usr/bin/env node
 import { spawnSync } from 'node:child_process';
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
-import { createRequire } from 'node:module';
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { availableParallelism, tmpdir } from 'node:os';
 import path from 'node:path';
-import * as jsonc from 'jsonc-parser';
-
-const tsc = path.join(
-	path.dirname(createRequire(import.meta.url).resolve('typescript/package.json')),
-	'bin/tsc',
-);
+import { compatibilityOptions, NATIVE_TSC, TSRX_CONTENT_MAPPER } from './native.mjs';
 
 const projects = [];
 const passthrough = [];
@@ -22,32 +16,6 @@ for (let index = 0; index < args.length; index++) {
 if (projects.length === 0) {
 	console.error('Usage: octane-tsc -p <tsconfig> [-p <tsconfig> ...] [tsc build options]');
 	process.exit(2);
-}
-
-function declaredOptions(project, seen = new Set()) {
-	if (seen.has(project)) return {};
-	seen.add(project);
-	const config = jsonc.parse(readFileSync(project, 'utf8')) ?? {};
-	const bases = [config.extends ?? []].flat().filter((base) => base.startsWith('.'));
-	const inherited = bases.map((base) => {
-		const resolved = path.resolve(path.dirname(project), base);
-		return declaredOptions(resolved.endsWith('.json') ? resolved : `${resolved}.json`, seen);
-	});
-	return Object.assign({}, ...inherited, config.compilerOptions);
-}
-
-// TypeScript 7 changed two defaults that tsrx-tsc (TypeScript 5.9) relied on:
-// `types` now defaults to none instead of every @types package, and unresolved
-// side-effect imports such as './styles.css' are errors. Projects that never
-// chose either keep the 5.9 behavior they were written against.
-function compatibilityOptions(project) {
-	const declared = declaredOptions(project);
-	return {
-		...(declared.types === undefined ? { types: ['*'] } : {}),
-		...(declared.noUncheckedSideEffectImports === undefined
-			? { noUncheckedSideEffectImports: false }
-			: {}),
-	};
 }
 
 // The mapper is enabled from a generated sibling wrapper rather than the
@@ -68,13 +36,7 @@ const wrappers = [...new Set(projects)].map((project, index) => {
 				...compatibilityOptions(project),
 				tsBuildInfoFile: path.join(buildInfoDir, `${index}.tsbuildinfo`), // --build records build state even with --noEmit
 			},
-			contentMappers: [
-				{
-					package: '@tsrx/content-mapper',
-					extensions: ['.tsrx'],
-					options: { compiler: 'octane/compiler/volar' }, // auto-detection prefers @tsrx/react, which bindings install for parity tests
-				},
-			],
+			contentMappers: [TSRX_CONTENT_MAPPER],
 		}),
 	);
 	return wrapper;
@@ -91,9 +53,9 @@ try {
 	result = spawnSync(
 		process.execPath,
 		showConfig
-			? [tsc, '--showConfig', '-p', wrappers[0], '--runExternalCode']
+			? [NATIVE_TSC, '--showConfig', '-p', wrappers[0], '--runExternalCode']
 			: [
-					tsc,
+					NATIVE_TSC,
 					'--build',
 					...wrappers,
 					'--noEmit',

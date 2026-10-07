@@ -20,7 +20,10 @@ this source commit because the registry metadata omits `gitHead`.
 The source boundary contains 315 runtime test files and 41 type-test files.
 The pristine runtime uses React 19.2.8. The upstream `typescript` command resolves
 TypeScript 7.0.2 through its `@typescript/native` alias; its separate TypeScript 6
-package only provides `tsc6`. Pristine and adapted type suites use separate programs.
+package only provides `tsc6`. The pristine type lane does not run that 7.0.2: it
+runs the repository's only TypeScript 7, the 7.1 nightly in the `native` catalog
+(`typescript-native`), so pristine type evidence comes from that compiler.
+Pristine and adapted type suites use separate programs.
 
 Both runtime runners preserve the pinned `vitest.shared.mts` policy: one retry
 in CI and none otherwise. The byte-exact configuration is retained under

@@ -33,6 +33,7 @@ export const REPO_SKILLS = {
 	'create-a-pr': '.rulesync/skills/create-a-pr/SKILL.md',
 	'handle-issue': '.rulesync/skills/handle-issue/SKILL.md',
 	'octane-core-extend': '.rulesync/skills/octane-core-extend/SKILL.md',
+	'perf-review': '.rulesync/skills/perf-review/SKILL.md',
 	'performance-audit': '.rulesync/skills/performance-audit/SKILL.md',
 	// Stable entry point routes maintenance and React implementation ports.
 	'react-library-port': '.rulesync/skills/react-library-port/SKILL.md',

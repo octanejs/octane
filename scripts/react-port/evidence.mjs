@@ -20,6 +20,18 @@ import { assertBindingSurfacePolicy } from '../binding-surface-policy.mjs';
 import { assertTsrxTypecheckSucceeded } from '../tsrx-typecheck.mjs';
 import { createTypeEvidenceProgram } from './type-program.mjs';
 import {
+	declarationsOf,
+	is,
+	isTypeScriptLibraryNode,
+	ObjectFlags,
+	primaryDeclarationOf,
+	SignatureKind,
+	SymbolFlags,
+	SyntaxKind,
+	TypeFlags,
+	valueDeclarationOf,
+} from './native-types.mjs';
+import {
 	assertMaterializedTypeEvidence,
 	scopedUpstreamTestInventory,
 } from './materialized-type-evidence.mjs';
@@ -84,7 +96,6 @@ const PACK_GATES = new Set([
 	'packed-source-types-browser',
 	'package-pack',
 ]);
-const TYPESCRIPT_LIBRARY_DIRECTORY = path.dirname(ts.getDefaultLibFilePath({}));
 
 function usage() {
 	return `Usage:
@@ -614,20 +625,13 @@ function configSelectsCustomSource(config, projectDirectory, sourcePath) {
 	);
 }
 
-function scriptKind(filePath) {
-	if (/\.(?:tsx|tsrx)$/i.test(filePath)) return ts.ScriptKind.TSX;
-	if (/\.jsx$/i.test(filePath)) return ts.ScriptKind.JSX;
-	if (/\.(?:js|mjs|cjs)$/i.test(filePath)) return ts.ScriptKind.JS;
-	return ts.ScriptKind.TS;
-}
-
 function bindingSymbols(name, checker, output) {
-	if (ts.isIdentifier(name)) {
+	if (is.isIdentifier(name)) {
 		const symbol = checker.getSymbolAtLocation(name);
 		if (symbol) output.add(symbol);
-	} else if (ts.isObjectBindingPattern(name) || ts.isArrayBindingPattern(name)) {
+	} else if (is.isObjectBindingPattern(name) || is.isArrayBindingPattern(name)) {
 		for (const element of name.elements) {
-			if (ts.isBindingElement(element)) bindingSymbols(element.name, checker, output);
+			if (is.isBindingElement(element)) bindingSymbols(element.name, checker, output);
 		}
 	}
 }
@@ -635,8 +639,8 @@ function bindingSymbols(name, checker, output) {
 function referencesSymbols(node, checker, symbols) {
 	let found = false;
 	const visit = (child) => {
-		if (ts.isIdentifier(child) && symbols.has(checker.getSymbolAtLocation(child))) found = true;
-		if (!found) ts.forEachChild(child, visit);
+		if (is.isIdentifier(child) && symbols.has(checker.getSymbolAtLocation(child))) found = true;
+		if (!found) child.forEachChild(visit);
 	};
 	visit(node);
 	return found;
@@ -645,22 +649,22 @@ function referencesSymbols(node, checker, symbols) {
 function referencedProvenance(node, checker, provenanceBySymbol) {
 	const keys = new Set();
 	const visit = (child) => {
-		if (ts.isIdentifier(child)) {
+		if (is.isIdentifier(child)) {
 			for (const key of provenanceBySymbol.get(checker.getSymbolAtLocation(child)) ?? []) {
 				keys.add(key);
 			}
 		}
-		ts.forEachChild(child, visit);
+		child.forEachChild(visit);
 	};
 	visit(node);
 	return keys;
 }
 
 function typeContainsUnsafe(type, checker, seen = new Set()) {
-	if (type.flags & (ts.TypeFlags.Any | ts.TypeFlags.Unknown)) return true;
+	if (type.flags & (TypeFlags.Any | TypeFlags.Unknown)) return true;
 	if (seen.has(type)) return false;
 	seen.add(type);
-	if (type.flags & ts.TypeFlags.TypeParameter) {
+	if (type.flags & TypeFlags.TypeParameter) {
 		for (const parameterType of [
 			checker.getBaseConstraintOfType(type),
 			checker.getDefaultFromTypeParameter(type),
@@ -668,46 +672,46 @@ function typeContainsUnsafe(type, checker, seen = new Set()) {
 			if (parameterType && typeContainsUnsafe(parameterType, checker, seen)) return true;
 		}
 	}
-	if (type.isUnionOrIntersection?.()) {
-		return type.types.some((nested) => typeContainsUnsafe(nested, checker, seen));
+	if (type.isUnionType() || type.isIntersectionType()) {
+		return type.getTypes().some((nested) => typeContainsUnsafe(nested, checker, seen));
 	}
 	for (const signature of [
-		...checker.getSignaturesOfType(type, ts.SignatureKind.Call),
-		...checker.getSignaturesOfType(type, ts.SignatureKind.Construct),
+		...checker.getSignaturesOfType(type, SignatureKind.Call),
+		...checker.getSignaturesOfType(type, SignatureKind.Construct),
 	]) {
 		for (const typeParameter of signature.getTypeParameters() ?? []) {
 			if (typeContainsUnsafe(typeParameter, checker, seen)) return true;
 		}
 		if (typeContainsUnsafe(checker.getReturnTypeOfSignature(signature), checker, seen)) return true;
-		for (const parameter of signature.parameters) {
-			const declaration = parameter.valueDeclaration ?? parameter.declarations?.[0];
+		for (const parameter of signature.getParameters()) {
+			const declaration = primaryDeclarationOf(parameter);
 			if (!declaration) continue;
 			const parameterType = checker.getTypeOfSymbolAtLocation(parameter, declaration);
 			// Classifiers can safely accept an arbitrary value without erasing their
 			// return contract. Only a direct unknown parameter has that meaning;
 			// any, nested unknown shapes, and unknown returns still fail below.
-			if (parameterType.flags & ts.TypeFlags.Unknown) continue;
+			if (parameterType.flags & TypeFlags.Unknown) continue;
 			if (typeContainsUnsafe(parameterType, checker, seen)) return true;
 		}
 	}
-	if (type.flags & ts.TypeFlags.Object) {
-		if (type.objectFlags & (ts.ObjectFlags.Class | ts.ObjectFlags.Interface)) {
+	if (type.flags & TypeFlags.Object) {
+		if (type.objectFlags & (ObjectFlags.Class | ObjectFlags.Interface)) {
 			for (const baseType of checker.getBaseTypes(type)) {
 				if (typeContainsUnsafe(baseType, checker, seen)) return true;
 			}
 		}
-		if (type.objectFlags & ts.ObjectFlags.Reference) {
+		if (type.objectFlags & ObjectFlags.Reference) {
 			for (const argument of checker.getTypeArguments(type)) {
 				if (typeContainsUnsafe(argument, checker, seen)) return true;
 			}
 		}
 		for (const property of checker.getPropertiesOfType(type)) {
-			const declarations = property.declarations ?? [];
+			const declarations = declarationsOf(property);
 			const authoredDeclaration = declarations.find(
-				(declaration) => !declaration.getSourceFile().hasNoDefaultLib,
+				(declaration) => !isTypeScriptLibraryNode(declaration),
 			);
 			if (!authoredDeclaration && declarations.length > 0) continue;
-			const declaration = authoredDeclaration ?? property.valueDeclaration;
+			const declaration = authoredDeclaration ?? valueDeclarationOf(property);
 			if (
 				declaration &&
 				typeContainsUnsafe(checker.getTypeOfSymbolAtLocation(property, declaration), checker, seen)
@@ -716,16 +720,16 @@ function typeContainsUnsafe(type, checker, seen = new Set()) {
 			}
 		}
 		for (const indexInfo of checker.getIndexInfosOfType(type)) {
-			if (typeContainsUnsafe(indexInfo.type, checker, seen)) return true;
+			if (typeContainsUnsafe(indexInfo.valueType, checker, seen)) return true;
 		}
 	}
 	return false;
 }
 
 function declarationsContainUnsafeTypeParameters(symbol, checker) {
-	for (const declaration of symbol.declarations ?? []) {
+	for (const declaration of declarationsOf(symbol)) {
 		for (const typeParameter of declaration.typeParameters ?? []) {
-			for (const typeNode of [typeParameter.constraint, typeParameter.default]) {
+			for (const typeNode of [typeParameter.constraint, typeParameter.defaultType]) {
 				if (typeNode && typeContainsUnsafe(checker.getTypeFromTypeNode(typeNode), checker)) {
 					return true;
 				}
@@ -736,33 +740,33 @@ function declarationsContainUnsafeTypeParameters(symbol, checker) {
 }
 
 function assertionRootIdentifier(expression) {
-	if (ts.isIdentifier(expression)) return expression;
-	if (ts.isPropertyAccessExpression(expression)) {
+	if (is.isIdentifier(expression)) return expression;
+	if (is.isPropertyAccessExpression(expression)) {
 		return assertionRootIdentifier(expression.expression);
 	}
-	if (ts.isCallExpression(expression)) return assertionRootIdentifier(expression.expression);
+	if (is.isCallExpression(expression)) return assertionRootIdentifier(expression.expression);
 	return null;
 }
 
 function directBindingExpressionProvenance(expression, checker, provenanceBySymbol) {
 	const provenance = new Set();
 	const visit = (node) => {
-		if (ts.isIdentifier(node)) {
+		if (is.isIdentifier(node)) {
 			if (!identifierIsImportBinding(node, checker)) return false;
 			for (const key of referencedProvenance(node, checker, provenanceBySymbol)) {
 				provenance.add(key);
 			}
 			return true;
 		}
-		if (ts.isPropertyAccessExpression(node)) {
+		if (is.isPropertyAccessExpression(node)) {
 			if (!visit(node.expression)) return false;
 			for (const key of referencedProvenance(node.name, checker, provenanceBySymbol)) {
 				provenance.add(key);
 			}
 			return true;
 		}
-		if (ts.isCallExpression(node)) return visit(node.expression);
-		if (ts.isParenthesizedExpression(node)) return visit(node.expression);
+		if (is.isCallExpression(node)) return visit(node.expression);
+		if (is.isParenthesizedExpression(node)) return visit(node.expression);
 		return false;
 	};
 	return visit(expression) && provenance.size > 0 ? provenance : null;
@@ -770,50 +774,42 @@ function directBindingExpressionProvenance(expression, checker, provenanceBySymb
 
 function resolvedSymbolAtLocation(node, checker) {
 	let symbol = checker.getSymbolAtLocation(node);
-	while (symbol?.flags & ts.SymbolFlags.Alias) symbol = checker.getAliasedSymbol(symbol);
+	while (symbol?.flags & SymbolFlags.Alias) symbol = checker.getAliasedSymbol(symbol);
 	return symbol;
 }
 
 function identifierIsImportBinding(identifier, checker) {
-	return Boolean(
-		checker
-			.getSymbolAtLocation(identifier)
-			?.declarations?.some(
-				(declaration) =>
-					ts.isImportClause(declaration) ||
-					ts.isImportSpecifier(declaration) ||
-					ts.isNamespaceImport(declaration),
-			),
+	return declarationsOf(checker.getSymbolAtLocation(identifier)).some(
+		(declaration) =>
+			is.isImportClause(declaration) ||
+			is.isImportSpecifier(declaration) ||
+			is.isNamespaceImport(declaration),
 	);
 }
 
 function typeQueryRootIdentifier(name) {
-	return ts.isIdentifier(name) ? name : typeQueryRootIdentifier(name.left);
+	return is.isIdentifier(name) ? name : typeQueryRootIdentifier(name.left);
 }
 
 function isTypeScriptLibrarySymbol(symbol) {
-	return symbol?.declarations?.some((declaration) => {
-		const declarationPath = canonicalPath(declaration.getSourceFile().fileName);
-		const relative = path.relative(TYPESCRIPT_LIBRARY_DIRECTORY, declarationPath);
-		return !relative.startsWith('..') && !path.isAbsolute(relative);
-	});
+	return declarationsOf(symbol).some(isTypeScriptLibraryNode);
 }
 
 function typeParameterAffectsDeclaration(symbol, parameterIndex, checker) {
-	return symbol?.declarations?.some((declaration) => {
+	return declarationsOf(symbol).some((declaration) => {
 		const parameter = declaration.typeParameters?.[parameterIndex];
 		const parameterSymbol = parameter && checker.getSymbolAtLocation(parameter.name);
 		if (!parameterSymbol) return false;
 		let affectsDeclaration = false;
 		const visit = (node) => {
 			if (affectsDeclaration) return;
-			if (ts.isIdentifier(node) && checker.getSymbolAtLocation(node) === parameterSymbol) {
+			if (is.isIdentifier(node) && checker.getSymbolAtLocation(node) === parameterSymbol) {
 				affectsDeclaration = true;
 				return;
 			}
-			ts.forEachChild(node, visit);
+			node.forEachChild(visit);
 		};
-		if (ts.isTypeAliasDeclaration(declaration)) visit(declaration.type);
+		if (is.isTypeAliasDeclaration(declaration)) visit(declaration.type);
 		else {
 			for (const member of declaration.members ?? []) visit(member);
 			for (const clause of declaration.heritageClauses ?? []) visit(clause);
@@ -849,8 +845,8 @@ function typeProjectionHasObservableStructure(node, checker) {
 	const result = checker.getTypeFromTypeNode(node);
 	return (
 		checker.getPropertiesOfType(result).length > 0 ||
-		checker.getSignaturesOfType(result, ts.SignatureKind.Call).length > 0 ||
-		checker.getSignaturesOfType(result, ts.SignatureKind.Construct).length > 0 ||
+		checker.getSignaturesOfType(result, SignatureKind.Call).length > 0 ||
+		checker.getSignaturesOfType(result, SignatureKind.Construct).length > 0 ||
 		checker.getIndexInfosOfType(result).length > 0
 	);
 }
@@ -872,7 +868,7 @@ function typeAliasProjectionPreservesArgument(name, node, argumentIndex, checker
 				!typeNodeHasFlags(
 					arguments_[1],
 					checker,
-					ts.TypeFlags.Any | ts.TypeFlags.Unknown | ts.TypeFlags.Never,
+					TypeFlags.Any | TypeFlags.Unknown | TypeFlags.Never,
 				)
 			);
 		case 'Record':
@@ -882,7 +878,7 @@ function typeAliasProjectionPreservesArgument(name, node, argumentIndex, checker
 				!typeNodeHasFlags(
 					arguments_[0],
 					checker,
-					ts.TypeFlags.Any | ts.TypeFlags.Unknown | ts.TypeFlags.Never,
+					TypeFlags.Any | TypeFlags.Unknown | TypeFlags.Never,
 				)
 			);
 		default:
@@ -893,32 +889,32 @@ function typeAliasProjectionPreservesArgument(name, node, argumentIndex, checker
 function directBindingDerivedTypeProvenance(node, checker, provenanceBySymbol) {
 	let containsConditionalProof = false;
 	const inspect = (child) => {
-		if (ts.isConditionalTypeNode(child)) {
+		if (is.isConditionalTypeNode(child)) {
 			containsConditionalProof = true;
 			return;
 		}
-		ts.forEachChild(child, inspect);
+		child.forEachChild(inspect);
 	};
 	inspect(node);
 	if (containsConditionalProof) return null;
-	if (ts.isParenthesizedTypeNode(node)) {
+	if (is.isParenthesizedTypeNode(node)) {
 		return directBindingDerivedTypeProvenance(node.type, checker, provenanceBySymbol);
 	}
-	if (ts.isTypeOperatorNode(node) && node.operator === ts.SyntaxKind.KeyOfKeyword) {
+	if (is.isTypeOperatorNode(node) && node.operator === SyntaxKind.KeyOfKeyword) {
 		return directBindingDerivedTypeProvenance(node.type, checker, provenanceBySymbol);
 	}
-	if (ts.isIndexedAccessTypeNode(node)) {
+	if (is.isIndexedAccessTypeNode(node)) {
 		const index = checker.getTypeFromTypeNode(node.indexType);
-		if (index.flags & (ts.TypeFlags.Any | ts.TypeFlags.Unknown | ts.TypeFlags.Never)) return null;
+		if (index.flags & (TypeFlags.Any | TypeFlags.Unknown | TypeFlags.Never)) return null;
 		if (referencedProvenance(node.indexType, checker, provenanceBySymbol).size > 0) return null;
 		return directBindingDerivedTypeProvenance(node.objectType, checker, provenanceBySymbol);
 	}
-	if (ts.isTypeQueryNode(node)) {
+	if (is.isTypeQueryNode(node)) {
 		if (!identifierIsImportBinding(typeQueryRootIdentifier(node.exprName), checker)) return null;
 		const provenance = referencedProvenance(node.exprName, checker, provenanceBySymbol);
 		return provenance.size > 0 ? provenance : null;
 	}
-	if (!ts.isTypeReferenceNode(node)) return null;
+	if (!is.isTypeReferenceNode(node)) return null;
 	const directProvenance = referencedProvenance(node.typeName, checker, provenanceBySymbol);
 	if (
 		directProvenance.size > 0 &&
@@ -929,7 +925,7 @@ function directBindingDerivedTypeProvenance(node, checker, provenanceBySymbol) {
 	const wrapper = resolvedSymbolAtLocation(node.typeName, checker);
 	if (!isTypeScriptLibrarySymbol(wrapper)) return null;
 	const provenance = new Set();
-	const wrapperIsTypeAlias = wrapper.declarations?.some(ts.isTypeAliasDeclaration);
+	const wrapperIsTypeAlias = declarationsOf(wrapper).some(is.isTypeAliasDeclaration);
 	for (const [index, argument] of (node.typeArguments ?? []).entries()) {
 		const argumentProvenance = directBindingDerivedTypeProvenance(
 			argument,
@@ -939,7 +935,7 @@ function directBindingDerivedTypeProvenance(node, checker, provenanceBySymbol) {
 		if (
 			argumentProvenance &&
 			!(wrapperIsTypeAlias
-				? typeAliasProjectionPreservesArgument(wrapper.getName(), node, index, checker)
+				? typeAliasProjectionPreservesArgument(wrapper.name, node, index, checker)
 				: typeParameterAffectsDeclaration(wrapper, index, checker))
 		) {
 			return null;
@@ -957,21 +953,22 @@ function constrainedTypeAliasProvenance(
 	provenanceBySymbol,
 	trustedTypeAliasSymbols,
 ) {
-	if (!ts.isTypeReferenceNode(node.type)) return null;
+	if (!is.isTypeReferenceNode(node.type)) return null;
 	if (!trustedTypeAliasSymbols.Assert?.has(resolvedSymbolAtLocation(node.type.typeName, checker))) {
 		return null;
 	}
 	if (node.type.typeArguments?.length !== 1) return null;
 	const proof = node.type.typeArguments[0];
 	if (
-		!ts.isTypeReferenceNode(proof) ||
+		!is.isTypeReferenceNode(proof) ||
 		!trustedTypeAliasSymbols.Equal?.has(resolvedSymbolAtLocation(proof.typeName, checker))
 	) {
 		return null;
 	}
 	if (proof.typeArguments?.length !== 2) return null;
 	const result = checker.getTypeFromTypeNode(node.type);
-	if (!(result.flags & ts.TypeFlags.BooleanLiteral) || result.intrinsicName !== 'true') return null;
+	// TypeScript 7 gives a boolean literal its `value`, not an intrinsic name.
+	if (!(result.flags & TypeFlags.BooleanLiteral) || result.value !== true) return null;
 	const leftProvenance = referencedProvenance(proof.typeArguments[0], checker, provenanceBySymbol);
 	const rightProvenance = referencedProvenance(proof.typeArguments[1], checker, provenanceBySymbol);
 	const leftHasProvenance = leftProvenance.size > 0;
@@ -993,23 +990,23 @@ function positiveAssertionProvenance(
 ) {
 	const provenance = referencedProvenance(node, checker, provenanceBySymbol);
 	if (provenance.size === 0) return null;
-	if (ts.isSatisfiesExpression(node)) {
+	if (is.isSatisfiesExpression(node)) {
 		const constraint = checker.getTypeFromTypeNode(node.type);
-		const emptyObjectConstraint = ts.isTypeLiteralNode(node.type) && node.type.members.length === 0;
+		const emptyObjectConstraint = is.isTypeLiteralNode(node.type) && node.type.members.length === 0;
 		const constraintProvenance = referencedProvenance(node.type, checker, provenanceBySymbol);
 		const expressionProvenance = directBindingExpressionProvenance(
 			node.expression,
 			checker,
 			provenanceBySymbol,
 		);
-		return constraint.flags & (ts.TypeFlags.Any | ts.TypeFlags.Unknown) ||
+		return constraint.flags & (TypeFlags.Any | TypeFlags.Unknown) ||
 			emptyObjectConstraint ||
 			constraintProvenance.size > 0 ||
 			!expressionProvenance
 			? null
 			: expressionProvenance;
 	}
-	if (ts.isTypeAliasDeclaration(node)) {
+	if (is.isTypeAliasDeclaration(node)) {
 		return constrainedTypeAliasProvenance(
 			node,
 			checker,
@@ -1017,12 +1014,12 @@ function positiveAssertionProvenance(
 			trustedTypeAliasSymbols,
 		);
 	}
-	if (ts.isCallExpression(node)) {
+	if (is.isCallExpression(node)) {
 		const root = assertionRootIdentifier(node.expression);
 		const rootSymbol = root && checker.getSymbolAtLocation(root);
 		if (!rootSymbol || !trustedAssertionSymbols.has(rootSymbol)) return null;
 		const exactEquality =
-			ts.isPropertyAccessExpression(node.expression) &&
+			is.isPropertyAccessExpression(node.expression) &&
 			node.expression.name.text === 'toEqualTypeOf';
 		if (
 			node.typeArguments?.some((argument) => {
@@ -1031,7 +1028,7 @@ function positiveAssertionProvenance(
 				// Bare any/unknown and permissive structural matches are not proof.
 				// Public export inspection above separately rejects new type erasure.
 				return exactEquality
-					? Boolean(type.flags & (ts.TypeFlags.Any | ts.TypeFlags.Unknown))
+					? Boolean(type.flags & (TypeFlags.Any | TypeFlags.Unknown))
 					: typeContainsUnsafe(type, checker);
 			})
 		) {
@@ -1040,7 +1037,7 @@ function positiveAssertionProvenance(
 		if (root.text === 'expectType') {
 			return node.typeArguments?.length && node.arguments.length ? provenance : null;
 		}
-		return ts.isPropertyAccessExpression(node.expression) ? provenance : null;
+		return is.isPropertyAccessExpression(node.expression) ? provenance : null;
 	}
 	return null;
 }
@@ -1064,25 +1061,49 @@ function collectPositiveAssertionProvenance(
 		if (provenance) {
 			for (const key of provenance) asserted.add(key);
 		}
-		ts.forEachChild(child, visit);
+		child.forEachChild(visit);
 	};
 	visit(node);
 	return asserted;
 }
 
+// The result holds a TypeScript 7 program; call its `close()` when done with it.
 function analyzeTypeEvidence(
 	programFiles,
-	parsed,
+	project,
 	expectedSpecifiers,
 	trustedTypeAssertionModulePath,
 	pinnedEntries,
 ) {
 	const checkerFiles = programFiles.filter((filePath) => !filePath.endsWith('.tsrx'));
-	const program = createTypeEvidenceProgram(
+	const evidence = createTypeEvidenceProgram(
 		[...checkerFiles, ...(pinnedEntries?.values() ?? [])],
-		parsed.options,
+		project,
 	);
-	const checker = program.getTypeChecker();
+	try {
+		return {
+			...inspectTypeEvidence(
+				evidence,
+				checkerFiles,
+				expectedSpecifiers,
+				trustedTypeAssertionModulePath,
+				pinnedEntries,
+			),
+			close: evidence.close,
+		};
+	} catch (error) {
+		evidence.close();
+		throw error;
+	}
+}
+
+function inspectTypeEvidence(
+	{ program, checker },
+	checkerFiles,
+	expectedSpecifiers,
+	trustedTypeAssertionModulePath,
+	pinnedEntries,
+) {
 	const expected = new Set(expectedSpecifiers);
 	const importedEntries = new Set();
 	const importedBindings = [];
@@ -1101,15 +1122,14 @@ function analyzeTypeEvidence(
 
 	for (const filePath of checkerFiles) {
 		const source = readFileSync(filePath, 'utf8');
-		const sourceFile =
-			program.getSourceFile(filePath) ??
-			ts.createSourceFile(filePath, source, ts.ScriptTarget.Latest, true, scriptKind(filePath));
+		const sourceFile = program.getSourceFile(filePath);
+		if (!sourceFile) throw new Error(`Type project does not load ${filePath}`);
 		const taintedSymbols = new Set();
 		for (const statement of sourceFile.statements) {
 			if (
-				ts.isImportDeclaration(statement) &&
+				is.isImportDeclaration(statement) &&
 				statement.importClause?.namedBindings &&
-				ts.isNamedImports(statement.importClause.namedBindings)
+				is.isNamedImports(statement.importClause.namedBindings)
 			) {
 				for (const element of statement.importClause.namedBindings.elements) {
 					const symbol = resolvedSymbolAtLocation(element.name, checker);
@@ -1117,7 +1137,7 @@ function analyzeTypeEvidence(
 					if (
 						symbol &&
 						Object.hasOwn(trustedTypeAliasSymbols, exportName) &&
-						symbol.declarations?.some(
+						declarationsOf(symbol).some(
 							(declaration) =>
 								canonicalPath(declaration.getSourceFile().fileName) ===
 								trustedTypeAssertionModulePath,
@@ -1128,11 +1148,11 @@ function analyzeTypeEvidence(
 				}
 			}
 			if (
-				ts.isImportDeclaration(statement) &&
-				ts.isStringLiteral(statement.moduleSpecifier) &&
+				is.isImportDeclaration(statement) &&
+				is.isStringLiteral(statement.moduleSpecifier) &&
 				['vitest', 'expect-type', 'tsd'].includes(statement.moduleSpecifier.text) &&
 				statement.importClause?.namedBindings &&
-				ts.isNamedImports(statement.importClause.namedBindings)
+				is.isNamedImports(statement.importClause.namedBindings)
 			) {
 				for (const element of statement.importClause.namedBindings.elements) {
 					if (
@@ -1144,8 +1164,8 @@ function analyzeTypeEvidence(
 				}
 			}
 			if (
-				!ts.isImportDeclaration(statement) ||
-				!ts.isStringLiteral(statement.moduleSpecifier) ||
+				!is.isImportDeclaration(statement) ||
+				!is.isStringLiteral(statement.moduleSpecifier) ||
 				!expected.has(statement.moduleSpecifier.text)
 			) {
 				continue;
@@ -1164,12 +1184,12 @@ function analyzeTypeEvidence(
 				importedBindings.push(clause.name);
 				addProvenance(checker.getSymbolAtLocation(clause.name), `${specifier}:default`);
 			}
-			if (clause?.namedBindings && ts.isNamespaceImport(clause.namedBindings)) {
+			if (clause?.namedBindings && is.isNamespaceImport(clause.namedBindings)) {
 				bindingSymbols(clause.namedBindings.name, checker, taintedSymbols);
 				record.namespace = true;
 				importedBindings.push(clause.namedBindings.name);
 			}
-			if (clause?.namedBindings && ts.isNamedImports(clause.namedBindings)) {
+			if (clause?.namedBindings && is.isNamedImports(clause.namedBindings)) {
 				for (const element of clause.namedBindings.elements) {
 					bindingSymbols(element.name, checker, taintedSymbols);
 					const exportName = element.propertyName?.text ?? element.name.text;
@@ -1214,12 +1234,11 @@ function analyzeTypeEvidence(
 			const exportKey = `${specifier}:${symbol.name}`;
 			publicExports.set(exportKey, { name: symbol.name, specifier });
 			addProvenance(symbol, exportKey);
-			const declaration =
-				symbol.valueDeclaration ?? symbol.declarations?.[0] ?? record.moduleSpecifier;
+			const declaration = primaryDeclarationOf(symbol) ?? record.moduleSpecifier;
 			let type;
 			try {
 				type =
-					symbol.flags & (ts.SymbolFlags.TypeAlias | ts.SymbolFlags.Interface)
+					symbol.flags & (SymbolFlags.TypeAlias | SymbolFlags.Interface)
 						? checker.getDeclaredTypeOfSymbol(symbol)
 						: checker.getTypeOfSymbolAtLocation(symbol, declaration);
 			} catch (error) {
@@ -1253,7 +1272,7 @@ function analyzeTypeEvidence(
 		}
 	}
 	for (const imported of importedBindings) {
-		if (checker.getTypeAtLocation(imported).flags & (ts.TypeFlags.Any | ts.TypeFlags.Unknown)) {
+		if (checker.getTypeAtLocation(imported).flags & (TypeFlags.Any | TypeFlags.Unknown)) {
 			throw new Error(`Imported public type ${imported.text} resolves to any or unknown`);
 		}
 	}
@@ -1264,7 +1283,7 @@ function analyzeTypeEvidence(
 			changed = false;
 			const visit = (node) => {
 				if (
-					ts.isVariableDeclaration(node) &&
+					is.isVariableDeclaration(node) &&
 					node.initializer &&
 					referencesSymbols(node.initializer, checker, evidence.taintedSymbols)
 				) {
@@ -1279,7 +1298,7 @@ function analyzeTypeEvidence(
 					changed ||= evidence.taintedSymbols.size !== before;
 				}
 				if (
-					ts.isTypeAliasDeclaration(node) &&
+					is.isTypeAliasDeclaration(node) &&
 					referencesSymbols(node.type, checker, evidence.taintedSymbols)
 				) {
 					const before = evidence.taintedSymbols.size;
@@ -1289,7 +1308,7 @@ function analyzeTypeEvidence(
 					for (const key of provenance) addProvenance(symbol, key);
 					changed ||= evidence.taintedSymbols.size !== before;
 				}
-				ts.forEachChild(node, visit);
+				node.forEachChild(visit);
 			};
 			visit(evidence.sourceFile);
 		}
@@ -1311,7 +1330,7 @@ function analyzeTypeEvidence(
 				hasPositiveAssertion = true;
 				for (const key of asserted) assertedExports.add(key);
 			}
-			if (ts.isStatement(node)) {
+			if (is.isStatement(node)) {
 				const leading = evidence.source.slice(
 					node.getFullStart(),
 					node.getStart(evidence.sourceFile),
@@ -1323,7 +1342,7 @@ function analyzeTypeEvidence(
 					hasNegativeControl = true;
 				}
 			}
-			ts.forEachChild(node, inspect);
+			node.forEachChild(inspect);
 		};
 		inspect(evidence.sourceFile);
 	}
@@ -1352,10 +1371,10 @@ function structurallyMappedRegistrations(programFiles, analysis) {
 		const { sourceFile, taintedSymbols } = evidence;
 		const visit = (node) => {
 			if (
-				ts.isCallExpression(node) &&
-				ts.isIdentifier(node.expression) &&
+				is.isCallExpression(node) &&
+				is.isIdentifier(node.expression) &&
 				node.expression.text === 'assertUpstreamRegistration' &&
-				ts.isStringLiteral(node.arguments[0]) &&
+				is.isStringLiteral(node.arguments[0]) &&
 				node.arguments[1] &&
 				referencesSymbols(node.arguments[1], analysis.checker, taintedSymbols) &&
 				collectPositiveAssertionProvenance(
@@ -1368,7 +1387,7 @@ function structurallyMappedRegistrations(programFiles, analysis) {
 			) {
 				registrations.add(node.arguments[0].text);
 			}
-			ts.forEachChild(node, visit);
+			node.forEachChild(visit);
 		};
 		visit(sourceFile);
 	}
@@ -1436,13 +1455,14 @@ function assertTypeProjectSemantics(gateId, commandArguments, node, workspaceRoo
 			);
 			const semantics = analyzeTypeEvidence(
 				programFiles,
-				parsed,
+				projectPath,
 				concretePublicSpecifiers(packageDirectory, node.binding, { excludePackageMetadata: true }),
 				trustedTypeAssertionModulePath,
 				loaded.config.reactPortEvidence?.publicMode === 'pinned'
 					? pinnedPublicEntries(packageDirectory, node)
 					: undefined,
 			);
+			semantics.close();
 			if (!semantics.hasPositiveAssertion) {
 				throw new Error('Public type project must contain a positive type assertion');
 			}
@@ -1486,24 +1506,29 @@ function assertTypeProjectSemantics(gateId, commandArguments, node, workspaceRoo
 		}
 		const analysis = analyzeTypeEvidence(
 			programFiles,
-			parsed,
+			projectPath,
 			[expectedImport],
 			canonicalPath(path.join(workspaceRoot, 'scripts/react-port/type-assertions.d.ts')),
 			loaded.config.reactPortEvidence?.publicMode === 'pinned'
 				? pinnedPublicEntries(packageDirectory, { ...node, binding: expectedImport })
 				: undefined,
 		);
-		if (!analysis.hasPositiveAssertion || !analysis.hasNegativeControl) {
-			throw new Error(
-				`Type project for ${gateId} must contain positive and negative assertions tied to ${expectedImport}`,
-			);
+		let mappedRegistrations;
+		try {
+			if (!analysis.hasPositiveAssertion || !analysis.hasNegativeControl) {
+				throw new Error(
+					`Type project for ${gateId} must contain positive and negative assertions tied to ${expectedImport}`,
+				);
+			}
+			if (analysis.missingPositiveExports.length > 0) {
+				throw new Error(
+					`Type project for ${gateId} must contain a positive assertion for every imported public export: ${analysis.missingPositiveExports.join(', ')}`,
+				);
+			}
+			mappedRegistrations = structurallyMappedRegistrations(programFiles, analysis);
+		} finally {
+			analysis.close();
 		}
-		if (analysis.missingPositiveExports.length > 0) {
-			throw new Error(
-				`Type project for ${gateId} must contain a positive assertion for every imported public export: ${analysis.missingPositiveExports.join(', ')}`,
-			);
-		}
-		const mappedRegistrations = structurallyMappedRegistrations(programFiles, analysis);
 		for (const registrationId of expectedRegistrations) {
 			if (!mappedRegistrations.has(registrationId)) {
 				throw new Error(

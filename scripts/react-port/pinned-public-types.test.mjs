@@ -4,7 +4,7 @@ import { createHash } from 'node:crypto';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
-import ts from 'typescript';
+import { declarationsOf } from './native-types.mjs';
 import { publicCompatibilityExport } from './public-compatibility.mjs';
 import { assertApprovedGateCommand } from './evidence.mjs';
 import { copyFileSync } from 'node:fs';
@@ -16,30 +16,43 @@ import {
 } from './pinned-public-types.mjs';
 import { buildUpstreamLock, gitBlobSha1 } from './materialize-lib.mjs';
 import { buildTarGz, fixtureIdentity } from './__fixtures__/materialize-fixtures.mjs';
+import { linkTsrxTypeTools } from './__fixtures__/tsrx-type-tools.mjs';
+import { createTypeEvidenceProgram } from './type-program.mjs';
+
+// A TypeScript 7 program over fixture files that contain no `.tsrx`, so it needs
+// no content mapper and may sit outside the repository.
+function fixtureProgram(files, compilerOptions) {
+	const project = path.join(path.dirname(files[0]), 'tsconfig.types.json');
+	writeFileSync(project, JSON.stringify({ compilerOptions }));
+	return createTypeEvidenceProgram(files, project, { tsrx: false });
+}
 
 function check(actual, expected, constraintWitness = false) {
 	const root = mkdtempSync(path.join(tmpdir(), 'public-opacity-'));
+	let evidence;
 	try {
 		const files = ['native.ts', 'upstream.ts'].map((file) => path.join(root, file));
 		writeFileSync(files[0], actual);
 		writeFileSync(files[1], expected);
-		const program = ts.createProgram(files, {
+		evidence = fixtureProgram(files, {
 			strict: true,
 			noEmit: true,
-			target: ts.ScriptTarget.ESNext,
-			module: ts.ModuleKind.ESNext,
-			moduleResolution: ts.ModuleResolutionKind.Bundler,
+			target: 'esnext',
+			module: 'esnext',
+			moduleResolution: 'bundler',
 			paths: { react: [path.resolve('packages/base-ui/node_modules/@types/react/index.d.ts')] },
 			types: [],
 		});
-		const diagnostics = ts.getPreEmitDiagnostics(program);
+		const { program, checker } = evidence;
+		const diagnostics = [
+			...program.getSyntacticDiagnostics(),
+			...program.getGlobalDiagnostics(),
+			...program.getSemanticDiagnostics(),
+		];
 		assert.deepEqual(
-			diagnostics.map((diagnostic) =>
-				ts.flattenDiagnosticMessageText(diagnostic.messageText, '\n'),
-			),
+			diagnostics.map((diagnostic) => diagnostic.text),
 			[],
 		);
-		const checker = program.getTypeChecker();
 		const symbols = files.map((file) =>
 			checker
 				.getExportsOfModule(checker.getSymbolAtLocation(program.getSourceFile(file)))
@@ -56,6 +69,7 @@ function check(actual, expected, constraintWitness = false) {
 			: symbols[1];
 		return newOpaquePublicSymbol(symbols[0], witness, checker);
 	} finally {
+		evidence?.close();
 		rmSync(root, { recursive: true, force: true });
 	}
 }
@@ -201,6 +215,7 @@ function pinnedFixture(
 	const workspaceRoot = realpathSync(mkdtempSync(path.join(tmpdir(), 'pinned-public-artifact-')));
 	const directory = path.join(workspaceRoot, 'packages/widget');
 	mkdirSync(directory, { recursive: true });
+	linkTsrxTypeTools(workspaceRoot);
 	try {
 		const published = JSON.stringify({
 			name: packageName,
@@ -664,25 +679,29 @@ const jotaiCompatibilityFixture = {
 test('retained Jotai utility alias requires its authenticated published declaration', () => {
 	pinnedFixture(({ directory, node, put }) => {
 		const entries = pinnedPublicEntries(directory, node);
-		const program = ts.createProgram([...entries.values()], {
+		const evidence = fixtureProgram([...entries.values()], {
 			strict: true,
 			noEmit: true,
 			types: [],
 		});
-		const checker = program.getTypeChecker();
-		for (const specifier of ['@octanejs/jotai/utils', '@octanejs/jotai/react/utils']) {
-			const symbol = pinnedPublicExport(
-				entries,
-				program,
-				checker,
-				specifier,
-				'INTERNAL_InferAtomTuples',
-			);
-			assert.equal(symbol?.name, 'INTERNAL_InferAtomTuples');
-			assert.equal(
-				symbol?.declarations[0].getSourceFile().fileName,
-				path.join(directory, 'node_modules/jotai', hydrationDeclaration),
-			);
+		const { program, checker } = evidence;
+		try {
+			for (const specifier of ['@octanejs/jotai/utils', '@octanejs/jotai/react/utils']) {
+				const symbol = pinnedPublicExport(
+					entries,
+					program,
+					checker,
+					specifier,
+					'INTERNAL_InferAtomTuples',
+				);
+				assert.equal(symbol?.name, 'INTERNAL_InferAtomTuples');
+				assert.equal(
+					declarationsOf(symbol)[0]?.getSourceFile().fileName,
+					path.join(directory, 'node_modules/jotai', hydrationDeclaration),
+				);
+			}
+		} finally {
+			evidence.close();
 		}
 		assert.equal(
 			publicCompatibilityExport('@octanejs/jotai', 'INTERNAL_InferAtomTuples'),

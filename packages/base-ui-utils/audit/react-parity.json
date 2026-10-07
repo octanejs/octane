@@ -37,7 +37,7 @@
       "arch": "any",
       "packageManager": "pnpm@12.9.1",
       "lockfile": "pnpm-lock.yaml",
-      "lockfileSha256": "84dbefa8929419194a46ef5ec966ae8459aa05f40399e583828134ccc8121aad"
+      "lockfileSha256": "a5bd68590935134632252419f04aebbf9c73f192c9d113a5ded2a08a1da391f6"
     }
   },
   "lanes": [
@@ -77,7 +77,7 @@
         {
           "path": "packages/base-ui/scripts/build-react-parity-manifest.mjs",
           "role": "support",
-          "sha256": "0b50076f63bce447c18fb94bf123e51c5494d9e5b08610051387df30ec4de7e7"
+          "sha256": "79137825282aa2732e2689566267f8105c250150d89172168f546f985a475602"
         },
         {
           "path": "packages/base-ui/scripts/build-runtime-inventories.mjs",
@@ -147,7 +147,7 @@
         {
           "path": "packages/base-ui/scripts/build-react-parity-manifest.mjs",
           "role": "support",
-          "sha256": "0b50076f63bce447c18fb94bf123e51c5494d9e5b08610051387df30ec4de7e7"
+          "sha256": "79137825282aa2732e2689566267f8105c250150d89172168f546f985a475602"
         },
         {
           "path": "packages/base-ui/scripts/build-runtime-inventories.mjs",
@@ -193,7 +193,7 @@
         "kind": "typescript",
         "compiler": "tsc",
         "project": "packages/base-ui-utils/tsconfig.pristine-specs.json",
-        "compilerBins": ["packages/base-ui-utils/node_modules/typescript-pristine-native/bin/tsc"]
+        "compilerBins": ["packages/base-ui-utils/node_modules/typescript-native/bin/tsc"]
       },
       "files": [
         {
@@ -216,7 +216,7 @@
         {
           "path": "packages/base-ui/scripts/build-react-parity-manifest.mjs",
           "role": "support",
-          "sha256": "0b50076f63bce447c18fb94bf123e51c5494d9e5b08610051387df30ec4de7e7"
+          "sha256": "79137825282aa2732e2689566267f8105c250150d89172168f546f985a475602"
         }
       ]
     },
@@ -254,7 +254,7 @@
         {
           "path": "packages/base-ui/scripts/build-react-parity-manifest.mjs",
           "role": "support",
-          "sha256": "0b50076f63bce447c18fb94bf123e51c5494d9e5b08610051387df30ec4de7e7"
+          "sha256": "79137825282aa2732e2689566267f8105c250150d89172168f546f985a475602"
         }
       ]
     }
