@@ -4,6 +4,7 @@ import { test } from 'node:test';
 import vm from 'node:vm';
 import { transform } from 'esbuild';
 import { specializeErrorCalls } from '../../packages/octane/scripts/specialize-error-calls.mjs';
+import * as noArgumentErrorMessage from '../../packages/octane/src/error-message-no-arguments.ts';
 import { formatProdErrorMessage } from '../../packages/octane/src/error-message.ts';
 
 const catalog = JSON.parse(
@@ -11,11 +12,17 @@ const catalog = JSON.parse(
 );
 const importFormatter = "import { formatClientError } from './error-codes.client.generated.js';";
 
-async function execute(source) {
+// A specialized module imports the shared production formatter; resolve that
+// one import the way a bundler would, from `expectedSpecifier`.
+async function execute(source, expectedSpecifier = './error-message-no-arguments.js') {
 	const compiled = await transform(source, { loader: 'ts', format: 'cjs', target: 'esnext' });
 	const module = { exports: {} };
 	const process = { env: {} };
-	const context = vm.createContext({ module, exports: module.exports, process });
+	const require = (specifier) => {
+		assert.equal(specifier, expectedSpecifier);
+		return noArgumentErrorMessage;
+	};
+	const context = vm.createContext({ module, exports: module.exports, process, require });
 	vm.runInContext(compiled.code, context);
 	return { exports: module.exports, process, context };
 }
@@ -110,4 +117,14 @@ test('preserves module directives and pure annotations on surrounding expression
 		treeShaking: true,
 	});
 	assert.doesNotMatch(compiled.code, /sideEffect/);
+});
+
+test('a nested module imports the shared formatter relative to its own directory', async () => {
+	const source = `import { formatClientError } from '../error-codes.client.generated.js';
+export function fail() { throw new TypeError(formatClientError(313)); }`;
+	const specialized = specializeErrorCalls(source, 'signals/native-read-client.ts', catalog);
+	assert.notEqual(specialized, source);
+	const result = await execute(specialized, '../error-message-no-arguments.js');
+	result.process.env.NODE_ENV = 'production';
+	assert.throws(result.exports.fail, { message: formatProdErrorMessage(313, []) });
 });

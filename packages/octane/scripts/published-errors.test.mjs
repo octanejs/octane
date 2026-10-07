@@ -257,4 +257,7 @@ test('a compiled binding consumer drops the generic error formatter in productio
 	);
 	const output = result.outputFiles[0].text;
 	assert.doesNotMatch(output, /encodeURIComponent|Maximum update depth exceeded/);
+	// The binding view reaches several specialized modules; they share one copy
+	// of the production text instead of carrying one each.
+	assert.equal(output.split('Minified Octane error #').length - 1, 1);
 });

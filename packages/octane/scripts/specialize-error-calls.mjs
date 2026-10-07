@@ -1,17 +1,24 @@
-import { dirname, resolve } from 'node:path';
+import { dirname, posix, resolve } from 'node:path';
 import ts from 'typescript';
 import { frameworkErrorSurface } from '../../../scripts/error-codes/generate.mjs';
-import { formatProdErrorMessage } from '../src/error-message.ts';
 
 const HELPER = '__octaneNoArgError';
-const SENTINEL = 8642097531;
-const productionParts = formatProdErrorMessage(SENTINEL, []).split(String(SENTINEL));
+// A specialized module imports its production text from
+// error-message-no-arguments.ts instead of carrying its own copy, so every such
+// module of a consumer's bundle, and every chunk of a split one, shares it.
+const SHARED_FORMATTER = 'formatNoArgumentErrorMessage';
+
+// `filename` is relative to src/, with forward slashes.
+function sharedFormatterSpecifier(filename) {
+	const specifier = posix.relative(posix.dirname(filename), 'error-message-no-arguments.js');
+	return specifier.startsWith('.') ? specifier : `./${specifier}`;
+}
 
 // Only modules whose formatter binding has exclusively literal, zero-argument
 // calls can stop importing the generic formatter. Unknown forms are left alone.
 export function specializeErrorCalls(source, filename, catalog) {
 	const surface = frameworkErrorSurface(filename);
-	if (surface === undefined || productionParts.length !== 3) return source;
+	if (surface === undefined) return source;
 	const formatter = surface === 'server' ? 'formatServerError' : 'formatClientError';
 	const runtime = surface === 'server' ? 'server' : 'client';
 	const sourceFile = ts.createSourceFile(filename, source, ts.ScriptTarget.Latest, true);
@@ -84,38 +91,20 @@ export function specializeErrorCalls(source, filename, catalog) {
 	if (!safe || calls === 0) return source;
 
 	const factory = ts.factory;
-	const helperCode = factory.createIdentifier('code');
-	const productionExpression = productionParts
-		.slice(1)
-		.reduce(
-			(expression, part) =>
-				factory.createBinaryExpression(
-					factory.createBinaryExpression(
-						expression,
-						factory.createToken(ts.SyntaxKind.PlusToken),
-						helperCode,
-					),
-					factory.createToken(ts.SyntaxKind.PlusToken),
-					factory.createStringLiteral(part),
+	const sharedImport = factory.createImportDeclaration(
+		undefined,
+		factory.createImportClause(
+			false,
+			undefined,
+			factory.createNamedImports([
+				factory.createImportSpecifier(
+					false,
+					factory.createIdentifier(SHARED_FORMATTER),
+					factory.createIdentifier(HELPER),
 				),
-			factory.createStringLiteral(productionParts[0]),
-		);
-	const helper = factory.createFunctionDeclaration(
-		undefined,
-		undefined,
-		HELPER,
-		undefined,
-		[
-			factory.createParameterDeclaration(
-				undefined,
-				undefined,
-				helperCode,
-				undefined,
-				factory.createKeywordTypeNode(ts.SyntaxKind.NumberKeyword),
-			),
-		],
-		factory.createKeywordTypeNode(ts.SyntaxKind.StringKeyword),
-		factory.createBlock([factory.createReturnStatement(productionExpression)], true),
+			]),
+		),
+		factory.createStringLiteral(sharedFormatterSpecifier(filename)),
 	);
 	const result = ts.transform(sourceFile, [
 		(context) => {
@@ -146,18 +135,10 @@ export function specializeErrorCalls(source, filename, catalog) {
 				return ts.visitEachChild(node, visit, context);
 			};
 			return (file) => {
-				const statements = file.statements
-					.filter((statement) => statement !== imports[0])
-					.map((statement) => ts.visitNode(statement, visit));
-				let index = 0;
-				while (
-					index < statements.length &&
-					(ts.isImportDeclaration(statements[index]) ||
-						(ts.isExpressionStatement(statements[index]) &&
-							ts.isStringLiteral(statements[index].expression)))
-				)
-					index++;
-				statements.splice(index, 0, helper);
+				// The shared formatter's import takes the generic formatter's place.
+				const statements = file.statements.map((statement) =>
+					statement === imports[0] ? sharedImport : ts.visitNode(statement, visit),
+				);
 				return factory.updateSourceFile(file, statements);
 			};
 		},
