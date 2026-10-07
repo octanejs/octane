@@ -46,9 +46,10 @@ copies a DOM measurement into state becomes
 `useLayoutSnapshot(() => measure(), { initial })`. A state update after an
 `await` or promise callback needs cleanup that aborts the request's
 `AbortController` or sets a flag the update checks
-(`OCTANE_STRONG_EFFECT_DATA_FETCH`). Effect setup may not call a state getter,
-read an unattached ref's `current`, or read a reassigned module variable
-(`OCTANE_STRONG_EFFECT_HIDDEN_DEPENDENCY`); use the snapshot or `useEffectEvent`.
+(`OCTANE_STRONG_EFFECT_DATA_FETCH`). Effect setup may not read a reassigned
+module variable (`OCTANE_STRONG_EFFECT_HIDDEN_DEPENDENCY`); use state or
+`useEffectEvent`. It may read and write a ref's `current` and call a state
+getter; neither is a dependency.
 Platform listeners, intervals, observers, connections, and geolocation watches
 acquired in setup must be released by the cleanup
 (`OCTANE_STRONG_EFFECT_RESOURCE_LEAK`). Use `useLinkedState` for prop-driven state;

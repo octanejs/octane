@@ -128,11 +128,11 @@ describe('Strong lazy ref factories and ownership', () => {
 		expect(() => compile(source, '/src/App.tsx', { strong: true })).toThrow(diagnostic);
 	});
 
-	it('checks value-ref reads in effects and permits an attached element ref', () => {
+	it('permits value and element ref access in effects', () => {
 		const imports = `import { useLazyRef, useEffect } from 'octane';`;
 		const valueRef = `${imports} export function App(props) @{
-			const ref = useLazyRef(() => 1);
-			useEffect(() => { props.log(ref.current); });
+			const store = useLazyRef(() => new Map());
+			useEffect(() => { store.current.set(props.id, props.value); props.log(store.current.size); });
 			<div />
 		}`;
 		const elementRef = `${imports} export function App() @{
@@ -140,9 +140,7 @@ describe('Strong lazy ref factories and ownership', () => {
 			useEffect(() => { ref.current?.focus(); });
 			<div {ref} />
 		}`;
-		expect(() => compile(valueRef, '/src/App.tsrx', { strong: true })).toThrow(
-			'OCTANE_STRONG_EFFECT_HIDDEN_DEPENDENCY',
-		);
+		expect(() => compile(valueRef, '/src/App.tsrx', { strong: true })).not.toThrow();
 		expect(() => compile(elementRef, '/src/App.tsrx', { strong: true })).not.toThrow();
 	});
 });

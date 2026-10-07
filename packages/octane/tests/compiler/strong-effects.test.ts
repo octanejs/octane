@@ -1583,13 +1583,12 @@ export function App(props) @{
 			app(hooks, `const [value, setValue] = useThing(); setValue(1);`),
 			'OCTANE_STRONG_RENDER_STATE_UPDATE',
 		);
-		rejects(
-			app(
-				hooks,
-				`const [value, setValue, getValue] = useThing(); useEffect(() => { props.log(getValue()); });`,
-			),
-			HIDDEN,
+		const effectRead = app(
+			hooks,
+			`const [value, setValue, getValue] = useThing(); useEffect(() => { props.log(getValue()); });`,
 		);
+		accepts(effectRead);
+		expect(errors(effectRead)).toEqual([]);
 	});
 
 	it.each([
@@ -1696,6 +1695,10 @@ export function App(props) @{
   ${output}
 }`;
 
+	// A ref is React's escape hatch for a value that effects read and write
+	// without re-running, and a state getter reads the latest state without
+	// subscribing. Neither is a dependency, so effect setup may use them as an
+	// event handler can.
 	it.each([
 		['a state getter', `useEffect(() => { props.log(getCount()); });`],
 		[
@@ -1751,8 +1754,24 @@ export function App(props) @{
 			'a namespace ref',
 			`const last = Octane.useRef(0); useEffect(() => { props.log(last.current); });`,
 		],
-	])('rejects %s in effect setup', (_label, setup) => {
-		rejects(app(setup), HIDDEN);
+		[
+			'a previous-value ref in a layout effect',
+			`const last = useRef(0); useLayoutEffect(() => { props.log(last.current); last.current = count; });`,
+		],
+		[
+			'a ref counter in an insertion effect',
+			`const runs = useRef(0); useInsertionEffect(() => { runs.current++; props.log(runs.current); });`,
+		],
+		[
+			'a ref collection',
+			`const items = useRef(new Map()); useEffect(() => { items.current.get(props.id)?.focus(); });`,
+		],
+	])('accepts %s in effect setup', (_label, setup) => {
+		const source = app(setup);
+		expect(errors(source)).toEqual([]);
+		for (const mode of ['client', 'server'] as const) {
+			expect(() => compile(source, '/src/App.tsrx', { mode, strong: true })).not.toThrow();
+		}
 	});
 
 	it.each([
@@ -1774,21 +1793,6 @@ export function App(props) @{
 		],
 	])('rejects %s in effect setup', (_label, setup, moduleSetup) => {
 		rejects(app(setup, '<div />', moduleSetup), HIDDEN);
-	});
-
-	it.each([
-		['a dependency list', '[last]'],
-		['a parenthesized dependency list', '([last])'],
-		['a cast dependency list', '[last] as const'],
-		['a satisfies dependency list', '[last] satisfies unknown[]'],
-	])('does not treat %s as attaching a ref', (_label, dependencies) => {
-		expect(
-			errors(
-				app(
-					`const last = useRef(0); useEffect(() => { props.log(last.current); }, ${dependencies});`,
-				),
-			),
-		).toContain(HIDDEN);
 	});
 
 	it.each([
@@ -1861,14 +1865,32 @@ export function App(props) @{
 
 	it('enforces TSX components and plain TypeScript custom hooks', () => {
 		const tsx = `"use strong";
-import { useState, useEffect, useRef } from 'octane';
-export function A({ log }) { const [c, setC] = useState(0); const last = useRef(0); useEffect(() => { log(last.current); last.current = c; }); return <button onClick={() => setC(c + 1)}>{c}</button>; }`;
+import { useState, useEffect } from 'octane';
+let last = 0;
+export function A({ log }) { const [c, setC] = useState(0); useEffect(() => { log(last); last = c; }); return <button onClick={() => setC(c + 1)}>{c}</button>; }`;
 		expect(() => compile(tsx, '/src/A.tsx')).toThrow(HIDDEN);
 		const ts = `"use strong";
-import { useRef, useEffect } from 'octane';
-export function usePreviousLog(value, log) { const last = useRef(value); useEffect(() => { log(last.current); last.current = value; }); }`;
+import { useEffect } from 'octane';
+let last = 0;
+export function usePreviousLog(value, log) { useEffect(() => { log(last); last = value; }); }`;
 		expect(() => slotHooks(ts, '/src/use-previous-log.ts')).toThrow(HIDDEN);
 	});
+
+	it('accepts refs and state getters in TSX component and plain TypeScript custom-hook effects', () => {
+		const tsx = `"use strong";
+import { useState, useEffect, useRef } from 'octane';
+export function A({ log }) { const [c, setC, getC] = useState(0); const last = useRef(0); useEffect(() => { log(last.current, getC()); last.current = c; }); return <button onClick={() => setC(c + 1)}>{c}</button>; }`;
+		expect(() => compile(tsx, '/src/A.tsx')).not.toThrow();
+		expect(errors(tsx, '/src/A.tsx')).toEqual([]);
+		const ts = `"use strong";
+import { useState, useRef, useEffect } from 'octane';
+export function usePreviousLog(value, log) { const [count, setCount, getCount] = useState(0); const last = useRef(value); useEffect(() => { log(last.current, getCount()); last.current = value; }); return [count, setCount]; }`;
+		expect(() => slotHooks(ts, '/src/use-previous-log.ts')).not.toThrow();
+	});
+
+	// Strong requires cleanup for a listener only on a proven platform target, so
+	// a ref holds a host element only when a callback provably attaches one.
+	const listen = `useLayoutEffect(() => { element.current?.addEventListener('scroll', props.onScroll); });`;
 
 	it.each([
 		['an inline callback', '', '<div ref={(node) => { element.current = node; }} />'],
@@ -1982,62 +2004,55 @@ export function usePreviousLog(value, log) { const last = useRef(value); useEffe
 			'',
 			'<section>@try { <div ref={(node) => { element.current = node; }} /> } @catch (element) { <div /> }</section>',
 		],
+	])('treats a ref attached by %s as a host element', (_label, callback, output) => {
+		const source = app(`const element = useRef(null); ${callback} ${listen}`, output);
+		for (const mode of ['client', 'server'] as const) {
+			expect(() => compile(source, '/src/App.tsrx', { mode, strong: true })).toThrow(LEAK);
+		}
+		expect(errors(source)).toContain(LEAK);
+	});
+
+	it('treats a ref attached by a nearer JavaScript callback binding inside a shadowing template row as a host element', () => {
+		const source = app(
+			`const element = useRef(null); const attach = (node) => { element.current = node; }; ${listen}`,
+			'<section>@for (const attach of props.callbacks; key attach) { const render = () => { const attach = (node) => { element.current = node; }; const alias = attach; return <div ref={alias} />; }; {render()} }</section>',
+		);
+		for (const mode of ['client', 'server'] as const) {
+			expect(() => compile(source, '/src/App.tsrx', { mode, strong: true })).toThrow(LEAK);
+		}
+		expect(errors(source)).toContain(LEAK);
+	});
+
+	it('treats a ref attached through a nearer JavaScript alias inside a shadowing template row as a host element', () => {
+		const source = app(
+			`const element = useRef(null); ${listen}`,
+			'<section>@for (const local of props.items; key local) { const render = () => { const local = element; return <div ref={(node) => { local.current = node; }} />; }; {render()} }</section>',
+		);
+		for (const mode of ['client', 'server'] as const) {
+			expect(() => compile(source, '/src/App.tsrx', { mode, strong: true })).toThrow(LEAK);
+		}
+		expect(errors(source)).toContain(LEAK);
+	});
+
+	it('treats a callback-attached ref in a TSX component as a host element', () => {
+		const source = `import { useLayoutEffect, useRef } from 'octane';
+export function App(props) {
+  const element = useRef(null);
+  ${listen}
+  return <div ref={(node) => { element.current = node; }} />;
+}`;
+		for (const mode of ['client', 'server'] as const) {
+			expect(() => compile(source, '/src/App.tsx', { mode, strong: true })).toThrow(LEAK);
+		}
+		expect(errors(source, '/src/App.tsx')).toContain(LEAK);
+	});
+
+	it.each([
 		[
 			'a callback passed as a component ref',
 			'const attach = (node) => { element.current = node; };',
 			'<props.Input ref={attach} />',
 		],
-	])('accepts reading a ref attached by %s', (_label, callback, output) => {
-		const source = app(
-			`const element = useRef(null); ${callback} useLayoutEffect(() => { props.log(element.current); });`,
-			output,
-		);
-		for (const mode of ['client', 'server'] as const) {
-			const standard = compile(source, '/src/App.tsrx', { mode });
-			const strong = compile(source, '/src/App.tsrx', { mode, strong: true });
-			expect(strong.code).toBe(standard.code);
-		}
-		expect(errors(source)).toEqual([]);
-	});
-
-	it('accepts a nearer JavaScript callback binding inside a shadowing template row', () => {
-		const source = app(
-			`const element = useRef(null); const attach = (node) => { element.current = node; }; useLayoutEffect(() => { props.log(element.current); });`,
-			'<section>@for (const attach of props.callbacks; key attach) { const render = () => { const attach = (node) => { element.current = node; }; const alias = attach; return <div ref={alias} />; }; {render()} }</section>',
-		);
-		for (const mode of ['client', 'server'] as const) {
-			expect(() => compile(source, '/src/App.tsrx', { mode, strong: true })).not.toThrow();
-		}
-		expect(errors(source)).toEqual([]);
-	});
-
-	it('accepts a nearer JavaScript ref alias inside a shadowing template row', () => {
-		const source = app(
-			`const element = useRef(null); useLayoutEffect(() => { props.log(element.current); });`,
-			'<section>@for (const local of props.items; key local) { const render = () => { const local = element; return <div ref={(node) => { local.current = node; }} />; }; {render()} }</section>',
-		);
-		for (const mode of ['client', 'server'] as const) {
-			expect(() => compile(source, '/src/App.tsrx', { mode, strong: true })).not.toThrow();
-		}
-		expect(errors(source)).toEqual([]);
-	});
-
-	it('accepts a callback-attached ref in a TSX component', () => {
-		const source = `import { useLayoutEffect, useRef } from 'octane';
-export function App(props) {
-  const element = useRef(null);
-  useLayoutEffect(() => { props.log(element.current); });
-  return <div ref={(node) => { element.current = node; }} />;
-}`;
-		for (const mode of ['client', 'server'] as const) {
-			const standard = compile(source, '/src/App.tsx', { mode });
-			const strong = compile(source, '/src/App.tsx', { mode, strong: true });
-			expect(strong.code).toBe(standard.code);
-		}
-		expect(errors(source, '/src/App.tsx')).toEqual([]);
-	});
-
-	it.each([
 		[
 			'an unrelated event callback',
 			'const attach = (node) => { element.current = node; };',
@@ -2248,15 +2263,12 @@ export function App(props) {
 			'const attach = (node) => { element.current = node; };',
 			'<section>@for (const item of props.items; index attach; key item) { const alias = attach; <div ref={alias} /> }</section>',
 		],
-	])('keeps the hidden dependency diagnostic for %s', (_label, callback, output) => {
-		const source = app(
-			`const element = useRef(0); ${callback} useLayoutEffect(() => { props.log(element.current); });`,
-			output,
-		);
+	])('does not treat a ref attached by %s as a host element', (_label, callback, output) => {
+		const source = app(`const element = useRef(null); ${callback} ${listen}`, output);
 		for (const mode of ['client', 'server'] as const) {
-			expect(() => compile(source, '/src/App.tsrx', { mode, strong: true })).toThrow(HIDDEN);
+			expect(() => compile(source, '/src/App.tsrx', { mode, strong: true })).not.toThrow();
 		}
-		expect(errors(source)).toContain(HIDDEN);
+		expect(errors(source)).toEqual([]);
 	});
 
 	it('detects a leaked listener on a callback-attached host ref', () => {
@@ -2286,7 +2298,9 @@ export function App(props) {
 	it('names the snapshot and Effect Event replacements', () => {
 		const result = compileToVolarMappings(
 			app(
-				`const first = useRef(true); useEffect(() => { if (first.current) { first.current = false; return; } props.track(props.value); });`,
+				`useEffect(() => { if (didInit) return; didInit = true; props.init(); });`,
+				'<div />',
+				'let didInit = false;',
 			),
 			'/src/App.tsrx',
 			{ strong: true },
@@ -2872,17 +2886,19 @@ export function useWidth() {
 	it('publishes each new effect code as a source-located editor error', () => {
 		const result = compileToVolarMappings(
 			`"use strong";
-import { useState, useEffect, useRef } from 'octane';
+import { useState, useEffect } from 'octane';
 import { api } from './api';
 export function App(props) @{
-  const [value, setValue, getValue] = useState(0);
-  const last = useRef(0);
+  const [value, setValue] = useState(0);
+  const label = props.label;
   useEffect(() => { queueMicrotask(() => setValue(1)); });
   useEffect(() => { api.get(props.id).then(setValue); });
-  useEffect(() => { props.log(getValue(), last.current); });
+  useEffect(() => { props.log(hits); });
   useEffect(() => { setInterval(() => setValue(2), 1000); });
-  <div />
-}`,
+  <div title={label}>{value as string}</div>
+}
+let hits = 0;
+export function hit() { hits++; }`,
 			'/src/App.tsrx',
 		);
 		const lines = Object.fromEntries(
