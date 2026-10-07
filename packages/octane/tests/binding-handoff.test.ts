@@ -459,6 +459,70 @@ describe.each([false, true])('signal handles cast to number in text leaves (dev=
 	);
 });
 
+// The view adopted early, server-rendered with opacity 1. A literal style binds
+// one declaration; a forwarded one binds the whole style.
+function adoptedStyleView(dev: boolean, native: boolean, style: 'literal' | 'forwarded') {
+	function view() {
+		const id = '/src/adopted-style.tsrx';
+		const source = `${native ? "import 'octane/signals';" : ''}
+export function Badge(props) @{
+  'use dom bindings';
+  <p title={props.title} style={${style === 'literal' ? '{ opacity: props.opacity }' : 'props.style'}}><b>{props.label as string}</b></p>
+}`;
+		const options = {
+			compileOptions: { dev, hmr: false },
+			runtimeModules: {
+				'octane/behavior': DomBindings,
+				'octane/dom-bindings': DomBindings,
+				'octane/dom-binding-signals': DomBindingSignals,
+				'octane/dom-binding-styles': DomBindingStyles,
+				'octane/internal/signal-read': SignalReads,
+			},
+		};
+		return {
+			server: loadCompiledFixtureSource(source, { ...options, id, mode: 'server' }),
+			client: loadCompiledFixtureSource(source, { ...options, id, mode: 'client' }),
+			artifact: loadCompiledFixtureSource(source, {
+				...options,
+				id: `${id}?octane-bindings=Badge`,
+				mode: 'client',
+			}).default as DomBindings.CompiledBindings<Record<string, unknown>> & {
+				adopt: typeof DomBindings.__adoptBindings;
+			},
+		};
+	}
+	const props = (opacity: number | undefined, title = 'Badge') =>
+		style === 'literal'
+			? { title, label: 'Label', opacity }
+			: {
+					title,
+					label: 'Label',
+					style: opacity === undefined ? undefined : `opacity: ${opacity};`,
+				};
+
+	// Server-render with opacity 1, adopt the paragraph early, then publish
+	// `early` from the early binding.
+	function adoptEarly(early: number | undefined) {
+		const { server, client, artifact } = view();
+		document.body.innerHTML = renderToString(server.Badge, props(1)).html;
+		const paragraph = document.querySelector('p')!;
+		let snapshot: Record<string, unknown> = props(1);
+		const subscribers = new Set<() => void>();
+		const handle = artifact.adopt(paragraph, artifact, {
+			getSnapshot: () => snapshot,
+			subscribe(notify) {
+				subscribers.add(notify);
+				return () => subscribers.delete(notify);
+			},
+		});
+		snapshot = props(early, 'Early');
+		for (const notify of subscribers) notify();
+		expect([paragraph.style.opacity, paragraph.title]).toEqual([String(early ?? ''), 'Early']);
+		return { client, paragraph, handle };
+	}
+	return { props, adoptEarly };
+}
+
 // A style the early binding published stays through hydration, whatever writer
 // the renderer chose: an ordinary one, or in a module whose signals import
 // enables native reads, a native style binding over a scalar literal or a
@@ -477,64 +541,7 @@ describe.each(
 			vi.restoreAllMocks();
 		});
 
-		function view() {
-			const id = '/src/adopted-style.tsrx';
-			const source = `${native ? "import 'octane/signals';" : ''}
-export function Badge(props) @{
-  'use dom bindings';
-  <p title={props.title} style={${style === 'literal' ? '{ opacity: props.opacity }' : 'props.style'}}><b>{props.label as string}</b></p>
-}`;
-			const options = {
-				compileOptions: { dev, hmr: false },
-				runtimeModules: {
-					'octane/behavior': DomBindings,
-					'octane/dom-bindings': DomBindings,
-					'octane/dom-binding-signals': DomBindingSignals,
-					'octane/dom-binding-styles': DomBindingStyles,
-					'octane/internal/signal-read': SignalReads,
-				},
-			};
-			return {
-				server: loadCompiledFixtureSource(source, { ...options, id, mode: 'server' }),
-				client: loadCompiledFixtureSource(source, { ...options, id, mode: 'client' }),
-				artifact: loadCompiledFixtureSource(source, {
-					...options,
-					id: `${id}?octane-bindings=Badge`,
-					mode: 'client',
-				}).default as DomBindings.CompiledBindings<Record<string, unknown>> & {
-					adopt: typeof DomBindings.__adoptBindings;
-				},
-			};
-		}
-		const props = (opacity: number | undefined, title = 'Badge') =>
-			style === 'literal'
-				? { title, label: 'Label', opacity }
-				: {
-						title,
-						label: 'Label',
-						style: opacity === undefined ? undefined : `opacity: ${opacity};`,
-					};
-
-		// Server-render with opacity 1, adopt the paragraph early, then publish
-		// `early` from the early binding.
-		function adoptEarly(early: number | undefined) {
-			const { server, client, artifact } = view();
-			document.body.innerHTML = renderToString(server.Badge, props(1)).html;
-			const paragraph = document.querySelector('p')!;
-			let snapshot: Record<string, unknown> = props(1);
-			const subscribers = new Set<() => void>();
-			const handle = artifact.adopt(paragraph, artifact, {
-				getSnapshot: () => snapshot,
-				subscribe(notify) {
-					subscribers.add(notify);
-					return () => subscribers.delete(notify);
-				},
-			});
-			snapshot = props(early, 'Early');
-			for (const notify of subscribers) notify();
-			expect([paragraph.style.opacity, paragraph.title]).toEqual([String(early ?? ''), 'Early']);
-			return { client, paragraph, handle };
-		}
+		const { props, adoptEarly } = adoptedStyleView(dev, native, style);
 
 		it('keeps the early publication through hydration and then updates it normally', () => {
 			const { client, paragraph, handle } = adoptEarly(0.5);
@@ -585,34 +592,6 @@ export function Badge(props) @{
 					expect(paragraph.getAttribute('style')).toBe('');
 					expect(recoverable).not.toHaveBeenCalled();
 					expect(error).not.toHaveBeenCalled();
-				} finally {
-					handle.dispose();
-					root?.unmount();
-				}
-			},
-		);
-
-		// The early binding published a declaration, and something else removed
-		// it. The empty attribute left behind is a server difference, as in React.
-		it.runIf(style === 'literal')(
-			'reports an empty style attribute that the early binding did not leave',
-			() => {
-				const { client, paragraph, handle } = adoptEarly(0.5);
-				paragraph.style.removeProperty('opacity');
-				expect(paragraph.getAttribute('style')).toBe('');
-				const error = vi.spyOn(console, 'error').mockImplementation(() => {});
-				let root: ReturnType<typeof hydrateRoot> | undefined;
-				try {
-					flushSync(() => {
-						root = hydrateRoot(document.body, client.Badge, props(undefined));
-					});
-					expect(paragraph.getAttribute('style')).toBe('');
-					if (dev) {
-						expect(error).toHaveBeenCalledOnce();
-						expect(String(error.mock.calls[0]![0])).toContain("won't be patched up");
-					} else {
-						expect(error).not.toHaveBeenCalled();
-					}
 				} finally {
 					handle.dispose();
 					root?.unmount();
@@ -672,6 +651,44 @@ export function Badge(props) @{
 				handle.dispose();
 				flushSync(() => root!.render(client.Badge, props(0.75)));
 				expect(paragraph.style.opacity).toBe('0.75');
+			} finally {
+				handle.dispose();
+				root?.unmount();
+			}
+		});
+	},
+);
+
+// A single declaration's publication claims that declaration, not the style
+// attribute. When the early binding published one and something else removed
+// it, the empty attribute left behind is a server difference, as in React.
+describe.each([false, true].flatMap((dev) => [false, true].map((native) => ({ dev, native }))))(
+	'adopted style declaration publication (dev=$dev, native=$native)',
+	({ dev, native }) => {
+		afterEach(() => {
+			document.body.replaceChildren();
+			vi.restoreAllMocks();
+		});
+
+		const { props, adoptEarly } = adoptedStyleView(dev, native, 'literal');
+
+		it('reports an empty style attribute that the early binding did not leave', () => {
+			const { client, paragraph, handle } = adoptEarly(0.5);
+			paragraph.style.removeProperty('opacity');
+			expect(paragraph.getAttribute('style')).toBe('');
+			const error = vi.spyOn(console, 'error').mockImplementation(() => {});
+			let root: ReturnType<typeof hydrateRoot> | undefined;
+			try {
+				flushSync(() => {
+					root = hydrateRoot(document.body, client.Badge, props(undefined));
+				});
+				expect(paragraph.getAttribute('style')).toBe('');
+				if (dev) {
+					expect(error).toHaveBeenCalledOnce();
+					expect(String(error.mock.calls[0]![0])).toContain("won't be patched up");
+				} else {
+					expect(error).not.toHaveBeenCalled();
+				}
 			} finally {
 				handle.dispose();
 				root?.unmount();
