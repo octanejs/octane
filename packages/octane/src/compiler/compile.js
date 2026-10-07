@@ -9067,6 +9067,35 @@ function normalizeArrowComponents(ast) {
 	return changed ? { ...ast, body } : ast;
 }
 
+// `export default function () @{…}` declares no module binding, but component
+// lowering addresses the compiled function through one: capability stamps, the
+// HMR rebinding, dev LOC metadata, and profile registration all name it. Give
+// the anonymous component a synthesized binding no authored identifier uses, so
+// it compiles exactly like `export default function Name() @{…}`. The public
+// export stays `default`, and HMR registration is keyed by the export name.
+// Copy-on-write: returns the input module when nothing changed.
+/** @param {any} ast @returns {any} */
+function nameAnonymousDefaultComponent(ast) {
+	if (!ast || !Array.isArray(ast.body)) return ast;
+	const index = ast.body.findIndex(
+		(node) =>
+			node.type === 'ExportDefaultDeclaration' &&
+			node.declaration?.id == null &&
+			isComponentFunction(node.declaration),
+	);
+	if (index === -1) return ast;
+	const node = ast.body[index];
+	// Diagnostics name the authored export, never the synthesized binding.
+	rejectAsyncOrGenerator(node.declaration, 'default');
+	const name = allocCompilerName(
+		{ usedCompilerNames: collectIdentifierNames(ast), compilerNameSuffixes: null },
+		'_default',
+	);
+	const body = ast.body.slice();
+	body[index] = { ...node, declaration: { ...node.declaration, id: b.id(name) } };
+	return { ...ast, body };
+}
+
 // A top-level statement that carries NO runtime value — pure TypeScript type
 // surface (`interface`, `type` alias, `declare …` ambients, `import type` /
 // `export type`). The runtime compile (client/server) must DROP these: esrap
@@ -11049,7 +11078,7 @@ function compileInternal(
 	const serverModuleInfo = analyzeServerModule(ast, filename);
 	// Normalize arrow-function components (`const X = () => @{…}`) to
 	// FunctionDeclaration form so the component pipeline recognizes them.
-	ast = normalizeArrowComponents(ast);
+	ast = nameAnonymousDefaultComponent(normalizeArrowComponents(ast));
 	ast = annotatePureFactoryCalls(
 		ast,
 		octanePureFactoryNames({
@@ -12621,7 +12650,7 @@ function compileServer(
 	const serverModuleInfo = analyzeServerModule(ast, filename);
 	// Normalize arrow-function components (`const X = () => @{…}`) to
 	// FunctionDeclaration form so the component pipeline recognizes them.
-	ast = normalizeArrowComponents(ast);
+	ast = nameAnonymousDefaultComponent(normalizeArrowComponents(ast));
 	ast = annotatePureFactoryCalls(ast, octanePureFactoryNames({ clientDom: false }));
 	const errorBoundaryLowering = lowerImportedErrorBoundaries(ast);
 	ast = errorBoundaryLowering.ast;

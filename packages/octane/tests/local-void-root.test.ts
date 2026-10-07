@@ -249,6 +249,26 @@ export function run() { const host = document.querySelector('#host'), c = attach
 		},
 	);
 
+	it('specializes roots over an anonymous default component export', async () => {
+		const view =
+			'export default function (props) @{ <main>{props.label as string}<input /></main> }';
+		const entry = `${IMPORTS}
+export async function run() { const host=document.querySelector('#host'); const root=createRoot(host);
+ root.render(View, {label:'first'}); const input=host.querySelector('input'); input.value='typed';
+ root.render(View, {label:'second'}); await Promise.resolve(); const text=host.textContent;
+ const retained=input===host.querySelector('input') && input.value==='typed';
+ root.unmount(); return {text, retained, cleaned:host.childNodes.length===0}; }`;
+		expect(specializedEntry(VIEW, entry)).toContain('__createVoidRoot');
+		expect(specializedEntry(view, entry)).toContain('__createVoidRoot');
+		for (const dev of [false, true]) {
+			expect(await runConsumer(view, entry, dev)).toEqual({
+				text: 'second',
+				retained: true,
+				cleaned: true,
+			});
+		}
+	});
+
 	it('keeps escaped roots reusable for renderable values', async () => {
 		const entry = `${IMPORTS}
 function mount(host) { const root = createRoot(host); root.render(View, {label:'first'}); return root; }
