@@ -284,6 +284,7 @@ import {
 	documentSignalOwner,
 	enableSignalDocument,
 	signalDocumentEnabled,
+	signalOwnerFrame,
 	streamedSignalOwnerActivator as STREAMED_SIGNAL_OWNER_ACTIVATOR,
 } from './signals/document-owner.js';
 export {
@@ -402,6 +403,12 @@ export interface Scope {
 	 * queued past the deletion cannot mint fresh instance state for it.
 	 */
 	signalTokenEscaped: boolean;
+	/**
+	 * The renderer signal owner this scope resolved (scopeSignalOwner), false when
+	 * it borrows an enclosing row's owner, or null once retired. Undefined until
+	 * a render or handler first resolves it.
+	 */
+	signalOwner: SignalRendererOwnerIdentity | false | null | undefined;
 	/**
 	 * Hook slot map. Lazily allocated on the first hook call via `ensureHooks`.
 	 * For-of item bodies that never call a hook (the common case in
@@ -603,10 +610,6 @@ let HYDRATION_DRIVER: HydrationDriver | null = null;
 // arrives. They do not create document/instance owners until a genuine facade or
 // handle enables the shared document capability.
 let SIGNAL_BINDINGS_ENABLED = false;
-const SCOPE_SIGNAL_OWNERS = /* @__PURE__ */ new WeakMap<
-	Scope,
-	SignalRendererOwnerIdentity | false | null
->();
 type SignalInstanceKey =
 	| string
 	| { parentScope: Scope; invocationSite: string | undefined; key: unknown; hasKey: boolean };
@@ -745,7 +748,7 @@ function retainSignalRetryScope(
 	holder: { retrySignalOwners?: SignalRetryOwners },
 	subtree = false,
 ): void {
-	const owner = SCOPE_SIGNAL_OWNERS.get(scope);
+	const owner = scope.signalOwner;
 	if (owner) {
 		const path = signalRetryPath(scope, root);
 		if (path !== null) {
@@ -772,7 +775,7 @@ function retainSignalRetryScope(
 // retirement when deleted. A nested boundary's primary claims only from its own
 // cache, so its owners stay with it and retire with this tree.
 function handOverSignalRetryScope(scope: Scope, root: Scope, state: TrySlot): void {
-	const owner = SCOPE_SIGNAL_OWNERS.get(scope);
+	const owner = scope.signalOwner;
 	const path = owner ? signalRetryPath(scope, root) : null;
 	if (path !== null) {
 		const cache = (state.retrySignalOwners ??= { paths: {}, owners: new Set() });
@@ -783,7 +786,7 @@ function handOverSignalRetryScope(scope: Scope, root: Scope, state: TrySlot): vo
 		}
 		node.owner = owner as SignalRendererOwnerIdentity;
 		cache.owners.add(node.owner);
-		SCOPE_SIGNAL_OWNERS.set(scope, false);
+		scope.signalOwner = false;
 	}
 	forEachSubtreeChild(scope, (child) => {
 		const nested = (child as any).__trySlot as TrySlot | undefined;
@@ -1193,7 +1196,7 @@ function scopeSignalOwner(scope: Scope | null): SignalOwner | undefined {
 		if (root !== undefined) root.signalOwner = documentOwner;
 	}
 	if (documentOwner === undefined) return;
-	let owner = SCOPE_SIGNAL_OWNERS.get(scope);
+	let owner = scope.signalOwner;
 	if (
 		(owner === undefined || owner === false) &&
 		!scope.block.forSlot &&
@@ -1209,7 +1212,7 @@ function scopeSignalOwner(scope: Scope | null): SignalOwner | undefined {
 			if (parent.signalInstanceParent !== null || parent.signalInstanceResolved !== undefined)
 				break;
 			if (parent.block.forSlot?.signalSite !== undefined) {
-				SCOPE_SIGNAL_OWNERS.set(scope, false);
+				scope.signalOwner = false;
 				return scopeSignalOwner(parent);
 			}
 			parent = parent.parent ?? parent.block.parentBlock;
@@ -1292,7 +1295,7 @@ function scopeSignalOwner(scope: Scope | null): SignalOwner | undefined {
 			identity.instanceOwner = identity;
 			owner = Object.freeze(identity);
 		}
-		SCOPE_SIGNAL_OWNERS.set(scope, owner);
+		scope.signalOwner = owner;
 		if (visit !== null) SIGNAL_RETRY_VISIT = visit;
 		// A queued native bubble handler may outlive deletion and first enable
 		// signals afterwards. Its invocation must remain retired, not fall back
@@ -11233,6 +11236,7 @@ class BlockImpl {
 	declare signalInstanceHasKey: boolean;
 	declare signalInstanceResolved: string | undefined;
 	declare signalTokenEscaped: boolean;
+	declare signalOwner: SignalRendererOwnerIdentity | false | null | undefined;
 	declare $$ctxValues: Map<Context<any>, any> | null;
 	// Contexts whose value this block's subtree consumes — stamped on this block
 	// AND its memo ancestors by useContextInternal. The TRANSITIVE signal: a
@@ -11388,6 +11392,7 @@ class BlockImpl {
 		this.signalInstanceHasKey = false;
 		this.signalInstanceResolved = undefined;
 		this.signalTokenEscaped = false;
+		this.signalOwner = undefined;
 	}
 }
 
@@ -11426,6 +11431,7 @@ class ScopeImpl {
 	declare signalInstanceHasKey: boolean;
 	declare signalInstanceResolved: string | undefined;
 	declare signalTokenEscaped: boolean;
+	declare signalOwner: SignalRendererOwnerIdentity | false | null | undefined;
 
 	constructor(parent: Scope, block: Block) {
 		this.block = block;
@@ -11449,6 +11455,7 @@ class ScopeImpl {
 		this.signalInstanceHasKey = false;
 		this.signalInstanceResolved = undefined;
 		this.signalTokenEscaped = false;
+		this.signalOwner = undefined;
 	}
 }
 
@@ -11499,28 +11506,46 @@ function captureRenderPhaseUpdate(cell: RenderPhaseCell, key: RenderPhaseSnapsho
 }
 
 export function renderBlock(block: Block): void {
-	let retryVisit: SignalRetryVisit | null = null;
-	if (signalDocumentEnabled || block.idState.renderOwner?.signalOwner !== undefined) {
-		const owner = scopeSignalOwner(block);
-		if (owner !== undefined) STREAMED_SIGNAL_OWNER_ACTIVATOR?.(owner);
-		if (owner !== undefined && currentSignalOwner() !== owner) {
-			runWithSignalOwner(owner, () => renderBlock(block));
-			return;
-		}
-		retryVisit = takeSignalRetryVisit(block);
-	}
 	const hydration = hydrating ? activeHydration() : null;
 	// A replacement dynamic range owns client DOM even while its parent adopts
 	// server siblings. Fresh control-flow markers can instead be replay scaffolding
 	// whose body must still read the server rejection seed before adopting a catch.
-	if (
+	const rebuild =
 		hydration !== null &&
 		(!hydration.owns(block) ||
-			(block.kind === 'dynamic' && block.endMarker !== null && hydration.rebuilds(block.endMarker)))
-	) {
+			(block.kind === 'dynamic' &&
+				block.endMarker !== null &&
+				hydration.rebuilds(block.endMarker)));
+	let retryVisit: SignalRetryVisit | null = null;
+	// The synchronous owner this call replaced, or undefined when the block
+	// renders in its caller's owner frame.
+	let previousSignalOwner: SignalOwner | null | undefined;
+	if (signalDocumentEnabled || block.idState.renderOwner?.signalOwner !== undefined) {
+		const owner = scopeSignalOwner(block);
+		if (owner !== undefined) {
+			STREAMED_SIGNAL_OWNER_ACTIVATOR?.(owner);
+			// Every block has an owner of its own, so nearly every render changes
+			// owner. Enter it in place: a callback frame would allocate a closure and
+			// resolve the same owner a second time on re-entry. A host carrier owns
+			// its execution boundary, and a root given an owner without the signal
+			// document has no in-place frame, so both keep the callback frame. A
+			// rebuilt block enters its owner in the nested client build below.
+			if (
+				!rebuild &&
+				currentSignalOwner() !== owner &&
+				(signalOwnerFrame === undefined ||
+					(previousSignalOwner = signalOwnerFrame.enter(owner)) === undefined)
+			) {
+				runWithSignalOwner(owner, () => renderBlock(block));
+				return;
+			}
+		}
+		retryVisit = takeSignalRetryVisit(block);
+	}
+	if (rebuild) {
 		// The nested client build renders this block, so it takes the retry visit.
 		SIGNAL_RETRY_VISIT = retryVisit;
-		hydration.suspend(() => renderBlock(block));
+		hydration!.suspend(() => renderBlock(block));
 		return;
 	}
 	const previousOwner = renderPhaseOwner;
@@ -11582,6 +11607,7 @@ export function renderBlock(block: Block): void {
 	} finally {
 		renderPhaseOwner = previousOwner;
 		renderPhaseUpdates = previousUpdates;
+		if (previousSignalOwner !== undefined) signalOwnerFrame!.restore(previousSignalOwner);
 	}
 }
 
@@ -12948,7 +12974,7 @@ function runScopeCleanups(scope: Scope, retireUnowned: boolean): void {
 				reportTeardownError(err);
 			}
 		}
-	const signalOwner = SCOPE_SIGNAL_OWNERS.get(scope);
+	const signalOwner = scope.signalOwner;
 	if (signalOwner) {
 		if (RETAINED_SIGNAL_OWNERS?.owners.has(signalOwner)) return;
 		// Deferred cleanups must still resolve facade reads in this exact owner.
@@ -12956,14 +12982,14 @@ function runScopeCleanups(scope: Scope, retireUnowned: boolean): void {
 		if (
 			STAGED_COMMIT_CAPTURE !== null &&
 			DEFERRED_LAYOUT_DRIVER!.stageAction(() => {
-				if (retireUnowned) SCOPE_SIGNAL_OWNERS.set(scope, null);
-				else SCOPE_SIGNAL_OWNERS.delete(scope);
+				if (retireUnowned) scope.signalOwner = null;
+				else scope.signalOwner = undefined;
 				retireRendererSignalOwner(signalOwner);
 			}, true)
 		)
 			return;
-		if (retireUnowned) SCOPE_SIGNAL_OWNERS.set(scope, null);
-		else SCOPE_SIGNAL_OWNERS.delete(scope);
+		if (retireUnowned) scope.signalOwner = null;
+		else scope.signalOwner = undefined;
 		retireRendererSignalOwner(signalOwner);
 	} else if (
 		retireUnowned &&
@@ -12981,11 +13007,11 @@ function runScopeCleanups(scope: Scope, retireUnowned: boolean): void {
 function retireUnownedSignalScope(scope: Scope): void {
 	// Resolve at publication, after deferred cleanups which may read the first
 	// handle. Null records retirement without allocating speculative authority.
-	const owner = SCOPE_SIGNAL_OWNERS.get(scope);
+	const owner = scope.signalOwner;
 	if (owner === false || (owner === undefined && scope.signalTokenEscaped))
-		SCOPE_SIGNAL_OWNERS.set(scope, null);
+		scope.signalOwner = null;
 	else if (owner) {
-		SCOPE_SIGNAL_OWNERS.set(scope, null);
+		scope.signalOwner = null;
 		retireRendererSignalOwner(owner);
 	}
 }
@@ -24854,10 +24880,7 @@ function bindDirectSignal(
 			? (previous as DirectSignalBinding)
 			: null;
 	const handle = isSignalHandle(value) ? value : null;
-	if (
-		handle !== null &&
-		(!signalDocumentEnabled || currentSignalOwner() !== SCOPE_SIGNAL_OWNERS.get(scope))
-	) {
+	if (handle !== null && (!signalDocumentEnabled || currentSignalOwner() !== scope.signalOwner)) {
 		// A prop/callback can reveal the first handle midway through a render.
 		// Enter its already-stamped scope for both the initial read and subscribe;
 		// the ambient render frame may have started before document activation.
@@ -28877,7 +28900,7 @@ export function setEventHandler(el: Element, key?: string, handler?: any, foreig
 			(signalDocumentEnabled || CURRENT_SCOPE?.block.idState.renderOwner?.signalOwner !== undefined
 				? CURRENT_SCOPE === null
 					? currentSignalOwner()
-					: SCOPE_SIGNAL_OWNERS.get(CURRENT_SCOPE) || CURRENT_SCOPE
+					: CURRENT_SCOPE.signalOwner || CURRENT_SCOPE
 				: CURRENT_SCOPE);
 		if (owner !== null) {
 			// Mark that a scope token escaped before queuing publication. A staged

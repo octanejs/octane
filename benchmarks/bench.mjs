@@ -462,6 +462,16 @@ const SUITES = [
 		runs: [{ script: 'run.mjs', args: (n) => [String(n)] }],
 	},
 	{
+		// Headless-Chromium production hydration of a ~1,650-Block signal-enabled
+		// app frame on fresh pages at 4x CPU throttling, with jitless call and
+		// heap counters. `run.mjs --base=<checkout>` adds paired head/base ratios.
+		name: 'app-frame-hydration',
+		cwd: 'app-frame-hydration',
+		servers: [],
+		iter: { normal: 20, quick: 3 },
+		runs: [{ script: 'run.mjs', args: (n) => [String(n)] }],
+	},
+	{
 		// Headless-Chromium production scaling for late behavior events whose
 		// distinct asynchronous adoptions settle one at a time.
 		name: 'behavior-root-events',

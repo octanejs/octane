@@ -79,6 +79,7 @@ export const BENCHMARK_SUITES = [
 	'hydration-range-compaction',
 	'deferred-hydration-boundaries',
 	'hydration-render-phase-queue',
+	'app-frame-hydration',
 	'behavior-root-events',
 	'radix-collection-order',
 	'router-dispatch',
