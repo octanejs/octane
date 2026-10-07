@@ -74,7 +74,9 @@ function HomePage() @{
 		<button
 			class="go-items"
 			onClick={() => navigate({ to: '/items/i7', search: { tab: 'specs' } })}
-		>{'go'}</button>
+		>
+			{'go'}
+		</button>
 	</div>
 }
 
@@ -105,7 +107,7 @@ export function makeHooksRouter(initial: string) {
 		getParentRoute: () => itemsRoute,
 		path: '$id',
 		component: ItemPage,
-		validateSearch: (search: Record<string, unknown>) => ({ tab: search.tab as string ?? 'all' }),
+		validateSearch: (search: Record<string, unknown>) => ({ tab: (search.tab as string) ?? 'all' }),
 		loaderDeps: ({ search }: any) => ({ tab: search.tab }),
 		beforeLoad: () => ({ fromBeforeLoad: 'ctx-value' }),
 		loader: ({ params }: any) => 'loaded-' + params.id,
@@ -120,7 +122,7 @@ export function makeHooksRouter(initial: string) {
 		getParentRoute: () => rootRoute,
 		path: 'search',
 		component: SearchPage,
-		validateSearch: (s: Record<string, unknown>) => ({ q: s.q as string ?? '' }),
+		validateSearch: (s: Record<string, unknown>) => ({ q: (s.q as string) ?? '' }),
 	});
 
 	return createRouter({

@@ -1112,4 +1112,32 @@ export function Styled(props) @{ 'use dom bindings'; <div {...nativeAttrs(props.
 			expect(await transform(gated, source, `${ROOT}/src/App.tsx`, { ssr })).toBeNull();
 		}
 	});
+
+	// A module the plugin compiles can be hundreds of kilobytes of generated
+	// code with almost no comments. Parsing it must stay roughly linear: when
+	// every node scanned all the code up to the next comment, this 540 kB
+	// module took about 20 s to transform instead of about 2 s.
+	it('compiles a large module with few comments without quadratic comment scans', async () => {
+		const plugin = octane({ hmr: false });
+		configure(plugin, 'build');
+		const moduleWithRows = (count: number) =>
+			[
+				"import { useState } from 'octane';",
+				'export function useRow() { return useState(0); }',
+				...Array.from(
+					{ length: count },
+					(_, index) => `export const value${index} = compute(${index}, 'label ${index}');`,
+				),
+				'// end of generated rows',
+			].join('\n');
+		// Time the parse, not the plugin's first-use setup.
+		expect(await transform(plugin, moduleWithRows(1), `${ROOT}/src/warm.js`)).not.toBeNull();
+
+		const start = performance.now();
+		const output = await transform(plugin, moduleWithRows(10_000), `${ROOT}/src/rows.js`);
+		const seconds = (performance.now() - start) / 1000;
+
+		expect(output).not.toBeNull();
+		expect(seconds).toBeLessThan(6);
+	}, 60_000);
 });

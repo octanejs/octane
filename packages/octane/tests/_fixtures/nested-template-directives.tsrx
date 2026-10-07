@@ -1,6 +1,8 @@
 function StoryRow(props) @{
 	const label = props.read(props.story);
-	<article class="story" data-story-id={props.story.id}>{label as string}</article>
+	<article class="story" data-story-id={props.story.id}>
+		{label as string}
+	</article>
 }
 
 // Product-style feed composition: visibility owns the keyed collection and
@@ -12,9 +14,13 @@ export function NestedStoryFeed(props) @{
 				@try {
 					<StoryRow story={story} read={props.read} />
 				} @pending {
-					<p class="story-pending" data-story-id={story.id}>Loading story</p>
+					<p class="story-pending" data-story-id={story.id}>
+						Loading story
+					</p>
 				} @catch (error) {
-					<p class="story-error" data-story-id={story.id}>{'Unavailable: ' + error.message}</p>
+					<p class="story-error" data-story-id={story.id}>
+						{'Unavailable: ' + error.message}
+					</p>
 				}
 			} @empty {
 				<p id="empty-feed">No stories</p>
@@ -35,11 +41,7 @@ interface SparseRow {
 // selected and plain arms read different subsets again, including a later
 // captured value after a skipped sibling. Reordering must not swap those
 // values between keyed survivors.
-export function SparseCaptureFeed(props: {
-	rows: SparseRow[];
-	prefix: string;
-	suffix: string;
-}) @{
+export function SparseCaptureFeed(props: { rows: SparseRow[]; prefix: string; suffix: string }) @{
 	const alpha = props.prefix;
 	const zulu = props.suffix;
 	<ul id="sparse-feed">

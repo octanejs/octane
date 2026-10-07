@@ -6,10 +6,12 @@ import { useState } from 'octane';
 
 function ServerArm() {
 	const [value] = useState('ok');
-	return <>
-		<i>{value as string}</i>
-		<s class="foreign">{'f'}</s>
-	</>;
+	return (
+		<>
+			<i>{value as string}</i>
+			<s class="foreign">{'f'}</s>
+		</>
+	);
 }
 
 function ClientArm() {
@@ -21,10 +23,12 @@ function ClientArm() {
 // full component frame.
 export function DynamicIdentity(props: { server?: boolean }) {
 	const Arm = props.server ? ServerArm : ClientArm;
-	return <div>
-		<Arm />
-		<p>{'after'}</p>
-	</div>;
+	return (
+		<div>
+			<Arm />
+			<p>{'after'}</p>
+		</div>
+	);
 }
 
 function LiteServer() @{
@@ -50,17 +54,22 @@ export function RenderableHole(props: { server?: boolean }) @{
 // straight into the range of the hole it fills.
 export function DynamicTemplate(props: { server?: boolean }) {
 	const Arm = props.server ? LiteServer : LiteClient;
-	return <div>
-		<Arm />
-		<p>{'after'}</p>
-	</div>;
+	return (
+		<div>
+			<Arm />
+			<p>{'after'}</p>
+		</div>
+	);
 }
 
 function Returning(props: { server?: boolean }) {
-	if (props.server) return <>
-		<i>{'ok'}</i>
-		<s class="foreign">{'f'}</s>
-	</>;
+	if (props.server)
+		return (
+			<>
+				<i>{'ok'}</i>
+				<s class="foreign">{'f'}</s>
+			</>
+		);
 	return <i>{'ok'}</i>;
 }
 
@@ -75,10 +84,12 @@ export function ConditionalReturn(props: { server?: boolean }) @{
 // A keyed list item lends its range to the component it renders.
 export function ListItem(props: { server?: boolean }) {
 	const Item = props.server ? LiteServer : LiteClient;
-	return <div>
-		{[<Item key="item" />]}
-		<p>{'after'}</p>
-	</div>;
+	return (
+		<div>
+			{[<Item key="item" />]}
+			<p>{'after'}</p>
+		</div>
+	);
 }
 
 function ServerPair() @{
@@ -110,13 +121,11 @@ function ClientShape(props: { inner?: boolean }) @{
 // frame's first hosts in place.
 export function BranchBody(props: { server?: 'tail' | 'same'; inner?: boolean }) {
 	const Shape =
-		props.server === 'tail'
-			? ServerShape
-			: props.server === 'same'
-				? ServerPair
-				: ClientShape;
-	return <div>
-		<Shape inner={props.inner} />
-		<p>{'after'}</p>
-	</div>;
+		props.server === 'tail' ? ServerShape : props.server === 'same' ? ServerPair : ClientShape;
+	return (
+		<div>
+			<Shape inner={props.inner} />
+			<p>{'after'}</p>
+		</div>
+	);
 }

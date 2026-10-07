@@ -33,7 +33,7 @@
       "arch": "any",
       "packageManager": "pnpm@12.9.1",
       "lockfile": "pnpm-lock.yaml",
-      "lockfileSha256": "e92f4520cd88a2593a0ecd555e0532b2e4e8bb1396c9558a09f0cbf3fbaa5917"
+      "lockfileSha256": "caea67fe61ab57f3e8cbd8a0e55f0e8b3014b3dd6815c6fe6e158095f291daeb"
     }
   },
   "lanes": [
@@ -88,7 +88,7 @@
         {
           "path": "packages/dropzone/audit/transformation-ledger.json",
           "role": "support",
-          "sha256": "9ff94d0ec567169b5c267b908f8fbe6b9c2c114c0ad637f2aa990e9d0ffd3809"
+          "sha256": "ce1c10e23887e42eb7ba828cdffdd1fd74d7e95f99ca768ee238db7715b2d80c"
         },
         {
           "path": "scripts/react-parity/react-dropzone-evidence.mjs",

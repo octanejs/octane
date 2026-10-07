@@ -62,9 +62,7 @@ export function SiblingHole(props: HoleProps) @{
 // The hole is the component's entire output, so it adopts the server range
 // from the hydration cursor rather than from a template anchor.
 function Sole(props: { kind: Kind; v: string }) @{
-	<>
-		{pick(props.kind, props.v)}
-	</>
+	<>{pick(props.kind, props.v)}</>
 }
 
 export function SoleHole(props: HoleProps) @{

@@ -8,9 +8,10 @@ export interface PdfHydrationFixtureProps {
 	onPageReady?: () => void;
 }
 
-export function PdfHydrationFixture(
-	{ onDocumentReady, onPageReady }: PdfHydrationFixtureProps = {},
-) @{
+export function PdfHydrationFixture({
+	onDocumentReady,
+	onPageReady,
+}: PdfHydrationFixtureProps = {}) @{
 	const file = useMemo(() => ({ data: createProbePdf() }), []);
 	<Document file={file} loading="Hydrating PDF…" onLoadSuccess={onDocumentReady}>
 		<Page

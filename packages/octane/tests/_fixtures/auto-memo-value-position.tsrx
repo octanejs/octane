@@ -21,11 +21,10 @@ interface ValuePositionRow {
 
 const ValuePositionTheme = createContext('initial');
 const ValuePositionBoundaryContext = createContext('unrelated');
-const Activity = ActivitySentinel as unknown as
-	(props: {
-		mode: 'hidden' | 'visible';
-		children?: OctaneNode;
-	}) => null;
+const Activity = ActivitySentinel as unknown as (props: {
+	mode: 'hidden' | 'visible';
+	children?: OctaneNode;
+}) => null;
 
 function ValuePositionRowBody(props: ValuePositionRow) @{
 	const theme = useContext(ValuePositionTheme);
@@ -64,16 +63,21 @@ export function CachedValuePositionRows() @{
 	const [tick, setTick] = useState(0);
 	const rows = buildValuePositionRows(items);
 	<section>
-		<button id="memo-value-tick" onClick={() => setTick(tick + 1)}>{tick as number}</button>
-		<button id="memo-value-theme" onClick={() => setTheme(theme + '!')}>{'theme'}</button>
+		<button id="memo-value-tick" onClick={() => setTick(tick + 1)}>
+			{tick as number}
+		</button>
+		<button id="memo-value-theme" onClick={() => setTheme(theme + '!')}>
+			{'theme'}
+		</button>
 		<button
 			id="memo-value-change"
 			onClick={() => setItems([{ ...items[0]!, label: items[0]!.label + '!' }, items[1]!])}
-		>{'change'}</button>
-		<button
-			id="memo-value-reorder"
-			onClick={() => setItems([items[1]!, items[0]!])}
-		>{'reorder'}</button>
+		>
+			{'change'}
+		</button>
+		<button id="memo-value-reorder" onClick={() => setItems([items[1]!, items[0]!])}>
+			{'reorder'}
+		</button>
 		<ValuePositionTheme value={theme}>
 			<div id="memo-value-rows">{rows}</div>
 		</ValuePositionTheme>
@@ -84,7 +88,9 @@ function ValuePositionMemoBoundaryBody(props: { items: ValuePositionRow[]; tick:
 	const items = props.items;
 	const rows = buildValuePositionRows(items);
 	<ValuePositionBoundaryContext value="unrelated">
-		<div id="memo-value-boundary-rows" data-tick={props.tick}>{rows}</div>
+		<div id="memo-value-boundary-rows" data-tick={props.tick}>
+			{rows}
+		</div>
 	</ValuePositionBoundaryContext>
 }
 
@@ -98,11 +104,12 @@ export function CachedValuePositionMemoContext() @{
 	const [theme, setTheme] = useState('initial');
 	const [tick, setTick] = useState(0);
 	<section>
-		<button
-			id="memo-value-boundary-tick"
-			onClick={() => setTick(tick + 1)}
-		>{tick as number}</button>
-		<button id="memo-value-boundary-theme" onClick={() => setTheme(theme + '!')}>{'theme'}</button>
+		<button id="memo-value-boundary-tick" onClick={() => setTick(tick + 1)}>
+			{tick as number}
+		</button>
+		<button id="memo-value-boundary-theme" onClick={() => setTheme(theme + '!')}>
+			{'theme'}
+		</button>
 		<ValuePositionTheme value={theme}>
 			<MemoValuePositionBoundary items={items} tick={tick} />
 		</ValuePositionTheme>
@@ -126,14 +133,12 @@ export function CachedValuePositionRoundTrip() @{
 	const stableRows = useMemo(() => buildValuePositionRows(items), [items]);
 	const output = selectValuePositionOutput(stableRows, visible);
 	<section>
-		<button
-			id="memo-value-round-trip-toggle"
-			onClick={() => setVisible(!visible)}
-		>{'toggle rows'}</button>
-		<button
-			id="memo-value-round-trip-theme"
-			onClick={() => setTheme(theme + '!')}
-		>{'change theme'}</button>
+		<button id="memo-value-round-trip-toggle" onClick={() => setVisible(!visible)}>
+			{'toggle rows'}
+		</button>
+		<button id="memo-value-round-trip-theme" onClick={() => setTheme(theme + '!')}>
+			{'change theme'}
+		</button>
 		<ValuePositionTheme value={theme}>
 			<div id="memo-value-round-trip-rows">{output}</div>
 		</ValuePositionTheme>
@@ -158,14 +163,12 @@ export function CachedValuePositionSignalRoundTrip(props: { label$: SignalHandle
 	const stableRows = useMemo(() => buildValuePositionRows(items), [items]);
 	const output = selectValuePositionSignalOutput(stableRows, props.label$, showSignal);
 	<section>
-		<button
-			id="memo-value-signal-toggle"
-			onClick={() => setShowSignal(!showSignal)}
-		>{'toggle signal'}</button>
-		<button
-			id="memo-value-signal-theme"
-			onClick={() => setTheme(theme + '!')}
-		>{'change theme'}</button>
+		<button id="memo-value-signal-toggle" onClick={() => setShowSignal(!showSignal)}>
+			{'toggle signal'}
+		</button>
+		<button id="memo-value-signal-theme" onClick={() => setTheme(theme + '!')}>
+			{'change theme'}
+		</button>
 		<ValuePositionTheme value={theme}>
 			<div id="memo-value-signal-rows">{output}</div>
 		</ValuePositionTheme>
@@ -181,7 +184,9 @@ export function CachedValuePositionSpreadHost(props: { attrs: Record<string, unk
 	const stableRows = useMemo(() => buildValuePositionRows(valuePositionRawRows), []);
 	const output = selectValuePositionOutput(stableRows, true);
 	<ValuePositionTheme value="spread">
-		<div id="memo-value-spread-host" {...props.attrs}>{output}</div>
+		<div id="memo-value-spread-host" {...props.attrs}>
+			{output}
+		</div>
 	</ValuePositionTheme>
 }
 
@@ -199,7 +204,9 @@ export function EscapedValuePositionRows() @{
 				rows.reverse();
 				setTick(tick + 1);
 			}}
-		>{tick as number}</button>
+		>
+			{tick as number}
+		</button>
 		<div id="memo-value-escaped-rows">{rows}</div>
 	</section>
 }
@@ -219,7 +226,9 @@ export function SetupEscapedValuePositionRows() @{
 				mutate();
 				setTick(tick + 1);
 			}}
-		>{tick as number}</button>
+		>
+			{tick as number}
+		</button>
 		<div id="memo-value-setup-rows">{rows}</div>
 	</section>
 }
@@ -275,10 +284,9 @@ export function CachedValuePositionActivity(props: { mode: 'visible' | 'hidden' 
 	]);
 	const rows = buildValuePositionEffectRows(items);
 	<section>
-		<button
-			id="memo-value-activity-reorder"
-			onClick={() => setItems([items[1]!, items[0]!])}
-		>{'reorder'}</button>
+		<button id="memo-value-activity-reorder" onClick={() => setItems([items[1]!, items[0]!])}>
+			{'reorder'}
+		</button>
 		<Activity mode={props.mode}>
 			<ValuePositionTheme value="initial">
 				<div id="memo-value-activity-rows">{rows}</div>
@@ -325,21 +333,29 @@ export function CachedValuePositionTransition(props: {
 	<section>
 		<button
 			id="memo-value-transition-bump"
-			onClick={() => startTransition(() => {
-				setItems([
-					{ id: 2, label: 'pending second' },
-					{ id: 1, label: 'pending first' },
-				]);
-				setResource(props.nextPromise);
-			})}
-		>{'start transition'}</button>
+			onClick={() =>
+				startTransition(() => {
+					setItems([
+						{ id: 2, label: 'pending second' },
+						{ id: 1, label: 'pending first' },
+					]);
+					setResource(props.nextPromise);
+				})
+			}
+		>
+			{'start transition'}
+		</button>
 		<button
 			id="memo-value-transition-urgent"
-			onClick={() => setItems([
-				{ id: 2, label: 'urgent second' },
-				{ id: 1, label: 'urgent first' },
-			])}
-		>{'update urgently'}</button>
+			onClick={() =>
+				setItems([
+					{ id: 2, label: 'urgent second' },
+					{ id: 1, label: 'urgent first' },
+				])
+			}
+		>
+			{'update urgently'}
+		</button>
 		@try {
 			<>
 				<ValuePositionTheme value="initial">

@@ -22,8 +22,8 @@ export function Deferred(props: MeasurementProps) @{
 	const [width, setWidth] = useState(0);
 	useLayoutEffect(() => {
 		const element = target.current;
-		const frame = requestAnimationFrame(
-			() => setWidth(element?.getBoundingClientRect().width ?? -props.width),
+		const frame = requestAnimationFrame(() =>
+			setWidth(element?.getBoundingClientRect().width ?? -props.width),
 		);
 		return () => cancelAnimationFrame(frame);
 	});

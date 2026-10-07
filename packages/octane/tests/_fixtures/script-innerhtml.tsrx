@@ -45,8 +45,9 @@ export function SpeculationRules(props: ScriptValueProps) @{
 
 export function ConditionalSpreadScript(props: ConditionalSpreadScriptProps) @{
 	<section>
-		{props.show &&
-			<script type="application/json" data-kind="conditional-spread" {...props.spread} />}
+		{props.show && (
+			<script type="application/json" data-kind="conditional-spread" {...props.spread} />
+		)}
 	</section>
 }
 
@@ -62,12 +63,12 @@ export function StaticScript() @{
 
 export function StaticJsonScript() @{
 	// prettier-ignore
-	<script type="application/json" data-kind="static-json">{"nested":{"enabled":true},"chars":"<&\"'","boundary":"</ScRiPt><ScRiPt data-pwn=\"static\">bad</ScRiPt>"}</script>
+	<script type="application/json" data-kind="static-json">{"nested":{"enabled":true},"chars":"<&\"'","boundary":"<\/ScRiPt><ScRiPt data-pwn=\"static\">bad<\/ScRiPt>"}</script>
 }
 
 export function ConditionalStaticJsonScript(props: { show: boolean }) @{
 	// prettier-ignore
-	<section>{props.show && <script type="application/json" data-kind="conditional-static-json">{"nested":{"enabled":true},"chars":"<&\"'","boundary":"</ScRiPt><ScRiPt data-pwn=\"static\">bad</ScRiPt>"}</script>}</section>
+	<section>{props.show && <script type="application/json" data-kind="conditional-static-json">{"nested":{"enabled":true},"chars":"<&\"'","boundary":"<\/ScRiPt><ScRiPt data-pwn=\"static\">bad<\/ScRiPt>"}</script>}</section>
 }
 
 export function AuthoredExpressionScript(props: ScriptValueProps) @{

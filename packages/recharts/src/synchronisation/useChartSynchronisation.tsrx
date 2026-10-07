@@ -109,9 +109,8 @@ function useTooltipSyncEventsListener() {
 			if (typeof syncMethod === 'function') {
 				// The 2.x CategoricalChartState data shape, kept for compatibility.
 				const syncMethodParam: MouseHandlerDataParam = {
-					activeTooltipIndex: action.payload.index == null
-						? undefined
-						: Number(action.payload.index),
+					activeTooltipIndex:
+						action.payload.index == null ? undefined : Number(action.payload.index),
 					isTooltipActive: action.payload.active,
 					activeIndex: action.payload.index == null ? undefined : Number(action.payload.index),
 					activeLabel: action.payload.label,
@@ -235,8 +234,8 @@ export function useTooltipChartSynchronisation(
 	activeIndex: TooltipIndex | undefined,
 	isTooltipActive: boolean,
 ) {
-	const activeDataKey = useAppSelector(
-		(state) => selectTooltipDataKey(state, tooltipEventType, trigger),
+	const activeDataKey = useAppSelector((state) =>
+		selectTooltipDataKey(state, tooltipEventType, trigger),
 	);
 	const activeGraphicalItemId = useAppSelector(selectActiveTooltipGraphicalItemId);
 	const eventEmitterSymbol = useAppSelector(selectEventEmitter);
@@ -289,8 +288,10 @@ export function useBrushChartSynchronisation() {
 	const brushEndIndex = useAppSelector((state) => state.chartData.dataEndIndex);
 	useEffect(() => {
 		if (
-			syncId == null || brushStartIndex == null || brushEndIndex == null ||
-				eventEmitterSymbol == null
+			syncId == null ||
+			brushStartIndex == null ||
+			brushEndIndex == null ||
+			eventEmitterSymbol == null
 		) {
 			return;
 		}

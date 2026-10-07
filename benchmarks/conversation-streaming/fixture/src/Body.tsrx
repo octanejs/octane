@@ -14,14 +14,20 @@ export function Body() @{
 					<li data-turn={turn.id}>
 						<p data-prompt>{turn.prompt as string}</p>
 						<p data-answer>{turn.answer as string}</p>
-						<button type="button" onClick={() => selectedTurn$.set(turn.id)}>Select turn</button>
+						<button type="button" onClick={() => selectedTurn$.set(turn.id)}>
+							Select turn
+						</button>
 					</li>
 				}
 			</ol>
 		} @pending {
-			<p role="status" data-body-pending>Loading conversation…</p>
+			<p role="status" data-body-pending>
+				Loading conversation…
+			</p>
 		} @catch (error) {
-			<p role="alert" data-body-error>Conversation unavailable.</p>
+			<p role="alert" data-body-error>
+				Conversation unavailable.
+			</p>
 		}
 		<output data-selected-turn>{selectedTurn$}</output>
 	</section>

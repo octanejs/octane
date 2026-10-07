@@ -11,7 +11,9 @@ export function QueryReader(props: {
 	props.onRender?.();
 	const result = useQueryRef(props.queryable, { store: props.store });
 	props.onQuery?.(result.queryRcRef.value);
-	<div class="query" data-label={props.label}>{JSON.stringify(result.valueRef.current)}</div>
+	<div class="query" data-label={props.label}>
+		{JSON.stringify(result.valueRef.current)}
+	</div>
 }
 
 export function TwoQueryReaders(props: {

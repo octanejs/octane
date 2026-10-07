@@ -8,8 +8,11 @@ interface DocFeedbackContextValue {
 	collapsedNotes: Set<string>;
 	toggleNote: (noteId: string) => void;
 	// Actions
-	onAddFeedback: (blockSelector: string, blockContentHash: string | undefined, type: | 'note'
-	| 'improvement') => void;
+	onAddFeedback: (
+		blockSelector: string,
+		blockContentHash: string | undefined,
+		type: 'note' | 'improvement',
+	) => void;
 	onEditNote: (note: DocFeedback) => void;
 	onShowNote: (noteId: string) => void;
 	// Page info

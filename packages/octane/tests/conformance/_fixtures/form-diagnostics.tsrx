@@ -58,14 +58,18 @@ export function TextareaChildren(props) @{
 
 export function SelectedOption(props) @{
 	<select id="form-selected-option">
-		<option value="first" selected={props.selected}>first</option>
+		<option value="first" selected={props.selected}>
+			first
+		</option>
 		<option value="second">second</option>
 	</select>
 }
 
 export function StaticSelectedOption() @{
 	<select id="form-static-selected-option">
-		<option value="first" selected>first</option>
+		<option value="first" selected>
+			first
+		</option>
 	</select>
 }
 

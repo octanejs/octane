@@ -26,7 +26,9 @@ export function MixedSelectors(props) @{
 	const plain = useSelection(props.store, (v) => v + 1);
 	const scaled = useSelection(props.store, (v) => v * multiplier);
 	<div>
-		<button id="scale" onClick={() => setMultiplier(multiplier + 1)}>{'scale'}</button>
+		<button id="scale" onClick={() => setMultiplier(multiplier + 1)}>
+			{'scale'}
+		</button>
 		<p id="selectors">{plain + '/' + scaled}</p>
 	</div>
 }

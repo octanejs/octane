@@ -22,15 +22,25 @@ function BlockerShell() @{
 	const blocker = useBlocker(shouldBlock);
 	<div>
 		<nav>
-			<Link id="to-home" to="/">Home</Link>
-			<Link id="to-away" to="/away">Away</Link>
+			<Link id="to-home" to="/">
+				Home
+			</Link>
+			<Link id="to-away" to="/away">
+				Away
+			</Link>
 		</nav>
 		<p id="b-state">{blocker.state}</p>
-		<button id="b-toggle" onClick={() => setShouldBlock((v) => !v)}>toggle</button>
+		<button id="b-toggle" onClick={() => setShouldBlock((v) => !v)}>
+			toggle
+		</button>
 		@if (blocker.state === 'blocked') {
 			<>
-				<button id="b-proceed" onClick={() => blocker.proceed()}>proceed</button>
-				<button id="b-reset" onClick={() => blocker.reset()}>reset</button>
+				<button id="b-proceed" onClick={() => blocker.proceed()}>
+					proceed
+				</button>
+				<button id="b-reset" onClick={() => blocker.reset()}>
+					reset
+				</button>
 			</>
 		}
 		<main>
@@ -61,9 +71,13 @@ function PromptShell() @{
 	unstable_usePrompt({ when: armed, message: 'Leave?' });
 	<div>
 		<nav>
-			<Link id="to-away" to="/away">Away</Link>
+			<Link id="to-away" to="/away">
+				Away
+			</Link>
 		</nav>
-		<button id="p-arm" onClick={() => setArmed(true)}>arm</button>
+		<button id="p-arm" onClick={() => setArmed(true)}>
+			arm
+		</button>
 		<main>
 			<Outlet />
 		</main>
@@ -91,9 +105,15 @@ function ScrollShell() @{
 	const navigate = useNavigate();
 	<div>
 		<nav>
-			<Link id="to-home" to="/">Home</Link>
-			<Link id="to-away" to="/away">Away</Link>
-			<button id="go-back" onClick={() => navigate(-1)}>back</button>
+			<Link id="to-home" to="/">
+				Home
+			</Link>
+			<Link id="to-away" to="/away">
+				Away
+			</Link>
+			<button id="go-back" onClick={() => navigate(-1)}>
+				back
+			</button>
 		</nav>
 		<ScrollRestoration />
 		<main>
@@ -129,9 +149,7 @@ function UnloadProbe() @{
 export function BeforeUnloadApp() @{
 	const routerRef = useRef(null);
 	if (routerRef.current === null) {
-		routerRef.current = createMemoryRouter([
-			{ path: '/', element: <UnloadProbe /> },
-		]);
+		routerRef.current = createMemoryRouter([{ path: '/', element: <UnloadProbe /> }]);
 	}
 	<RouterProvider router={routerRef.current} />
 }
@@ -147,7 +165,9 @@ function StateShell() @{
 	const vt = useViewTransitionState('/slow');
 	<div>
 		<nav>
-			<Link id="to-slow" to="/slow?a=1">Slow</Link>
+			<Link id="to-slow" to="/slow?a=1">
+				Slow
+			</Link>
 		</nav>
 		<p id="rs-active">
 			{rs.active.location.pathname + '|' + rs.active.searchParams.toString() + '|' + rs.active.type}
@@ -156,12 +176,8 @@ function StateShell() @{
 		<p id="rs-pending">
 			{rs.pending ? rs.pending.state + ':' + rs.pending.location.pathname : '(idle)'}
 		</p>
-		<p id="route-handle">
-			{self ? String(self.handle) : '(none)'}
-		</p>
-		<p id="route-by-id">
-			{byId ? String(byId.loaderData ?? '(no data)') : '(no match)'}
-		</p>
+		<p id="route-handle">{self ? String(self.handle) : '(none)'}</p>
+		<p id="route-by-id">{byId ? String(byId.loaderData ?? '(no data)') : '(no match)'}</p>
 		<p id="vt-state">{String(vt)}</p>
 		<main>
 			<Outlet />

@@ -36,7 +36,7 @@
       "arch": "any",
       "packageManager": "pnpm@12.9.1",
       "lockfile": "pnpm-lock.yaml",
-      "lockfileSha256": "e92f4520cd88a2593a0ecd555e0532b2e4e8bb1396c9558a09f0cbf3fbaa5917"
+      "lockfileSha256": "caea67fe61ab57f3e8cbd8a0e55f0e8b3014b3dd6815c6fe6e158095f291daeb"
     }
   },
   "lanes": [
@@ -138,12 +138,12 @@
         {
           "path": "packages/transition-group/audit/adapted-evidence.SHA256SUMS",
           "role": "support",
-          "sha256": "24fb18b6cc131bcdcbcccfa0533ba4482f26c0db3c570bf7363e5128f572628e"
+          "sha256": "15ebc3e15be642b668afd992a5c905ed7a30e5b298ddddc09a3eecd7fcfc99bf"
         },
         {
           "path": "packages/transition-group/audit/adapted-case-contracts.json",
           "role": "support",
-          "sha256": "aed00ae890e8be96c0800a598df2a0d212c32e917c1e44aad6565b715f5d3c16"
+          "sha256": "80dafd67c8cfd106bc8408d1cdfa98d7d320b28b7a36a51cee556c13a5f4a2df"
         },
         {
           "path": "packages/transition-group/audit/upstream.lock.json",

@@ -58,16 +58,10 @@ export function App() @{
 			<p class="tagline">{'streaming SSR benchmark storefront'}</p>
 			<nav class="nav">
 				<ul class="links">
-					@for (const n of [
-						'home',
-						'new',
-						'sale',
-						'gear',
-						'parts',
-						'labs',
-						'blog',
-						'help',
-					]; key n) {
+					@for (
+						const n of ['home', 'new', 'sale', 'gear', 'parts', 'labs', 'blog', 'help'];
+						key n
+					) {
 						<li class="link">
 							<a href={'/' + n}>{n}</a>
 						</li>
@@ -77,9 +71,9 @@ export function App() @{
 		</header>
 		<section class="hero">
 			<h2 class="pitch">{'Ten cards, one stream'}</h2>
-			<p
-				class="blurb"
-			>{'The shell flushes immediately; each card streams when its data resolves.'}</p>
+			<p class="blurb">
+				{'The shell flushes immediately; each card streams when its data resolves.'}
+			</p>
 			<div class="stats">
 				<div class="stat">
 					<span class="num">{'10'}</span>

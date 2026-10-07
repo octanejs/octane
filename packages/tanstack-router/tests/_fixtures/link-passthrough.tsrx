@@ -18,30 +18,35 @@ export function resetUserClickCount() {
 function RootLayout() @{
 	<div class="root">
 		<nav>
-			<Link
-				to="/"
-				class="nav-home"
-				data-testid="lk"
-				aria-label="go"
-				title="t"
-				id="home-link"
-			>{'Home'}</Link>
-			<Link to="/about" class="nav-about">{'About'}</Link>
+			<Link to="/" class="nav-home" data-testid="lk" aria-label="go" title="t" id="home-link">
+				{'Home'}
+			</Link>
+			<Link to="/about" class="nav-about">
+				{'About'}
+			</Link>
 			<Link
 				to="/about"
 				class="nav-active"
 				activeProps={{ class: 'is-active', 'data-extra': 'active-extra' }}
 				inactiveProps={{ class: 'is-inactive' }}
-			>{'Active props'}</Link>
+			>
+				{'Active props'}
+			</Link>
 			<Link
 				to="/about"
 				class="nav-click"
 				onClick={() => {
 					userClickCount++;
 				}}
-			>{'User click'}</Link>
-			<Link to="/about" class="nav-reload" reloadDocument={true}>{'Reload'}</Link>
-			<Link to="/about" class="nav-disabled" disabled={true}>{'Disabled'}</Link>
+			>
+				{'User click'}
+			</Link>
+			<Link to="/about" class="nav-reload" reloadDocument={true}>
+				{'Reload'}
+			</Link>
+			<Link to="/about" class="nav-disabled" disabled={true}>
+				{'Disabled'}
+			</Link>
 		</nav>
 		<Outlet />
 	</div>

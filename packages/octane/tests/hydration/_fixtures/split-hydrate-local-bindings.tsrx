@@ -40,7 +40,9 @@ export function CatchReset(props: Props) @{
 					props.state.failed = false;
 					retry();
 				}}
-			>{(error as Error).message as string}</button>
+			>
+				{(error as Error).message as string}
+			</button>
 		}
 	</Hydrate>
 }
@@ -59,7 +61,9 @@ export function NestedCatch(props: Props) @{
 							props.inner.failed = false;
 							again();
 						}}
-					>{(innerError as Error).message as string}</button>
+					>
+						{(innerError as Error).message as string}
+					</button>
 				}
 			</>
 		} @catch ({ message }: any, retry) {
@@ -69,7 +73,9 @@ export function NestedCatch(props: Props) @{
 					props.state.failed = false;
 					retry();
 				}}
-			>{message as string}</button>
+			>
+				{message as string}
+			</button>
 		}
 	</Hydrate>
 }
@@ -145,7 +151,9 @@ export function ShadowedReset(props: Props) @{
 						props.state.failed = false;
 						reset();
 					}}
-				>{(error as Error).message as string}</button>
+				>
+					{(error as Error).message as string}
+				</button>
 			</Hydrate>
 		}
 	</main>

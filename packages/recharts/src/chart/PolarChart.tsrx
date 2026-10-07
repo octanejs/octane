@@ -42,15 +42,14 @@ export const defaultPolarChartProps = {
  * We can't have the defaults in this file because each of those convenience components
  * have their own opinions about what they should be.
  */
-type PolarChartPropsWithDefaults =
-	PolarChartProps & {
-		cx: NonNullable<PolarChartProps['cx']>;
-		cy: NonNullable<PolarChartProps['cy']>;
-		startAngle: NonNullable<PolarChartProps['startAngle']>;
-		endAngle: NonNullable<PolarChartProps['endAngle']>;
-		innerRadius: NonNullable<PolarChartProps['innerRadius']>;
-		outerRadius: NonNullable<PolarChartProps['outerRadius']>;
-	};
+type PolarChartPropsWithDefaults = PolarChartProps & {
+	cx: NonNullable<PolarChartProps['cx']>;
+	cy: NonNullable<PolarChartProps['cy']>;
+	startAngle: NonNullable<PolarChartProps['startAngle']>;
+	endAngle: NonNullable<PolarChartProps['endAngle']>;
+	innerRadius: NonNullable<PolarChartProps['innerRadius']>;
+	outerRadius: NonNullable<PolarChartProps['outerRadius']>;
+};
 
 /**
  * These are one-time, immutable options that decide the chart's behavior.
@@ -71,12 +70,8 @@ export function PolarChart(props: PolarChartOptions & { ref?: Ref<SVGSVGElement>
 
 	const { layout, ...otherCategoricalProps } = polarChartProps;
 
-	const {
-		chartName,
-		defaultTooltipEventType,
-		validateTooltipEventTypes,
-		tooltipPayloadSearcher,
-	} = props;
+	const { chartName, defaultTooltipEventType, validateTooltipEventTypes, tooltipPayloadSearcher } =
+		props;
 
 	const options: ChartOptions = {
 		chartName,
@@ -86,37 +81,39 @@ export function PolarChart(props: PolarChartOptions & { ref?: Ref<SVGSVGElement>
 		eventEmitter: undefined,
 	};
 
-	return <RechartsStoreProvider
-		preloadedState={{ options }}
-		reduxStoreName={polarChartProps.id ?? chartName}
-	>
-		<ChartDataContextProvider chartData={polarChartProps.data} />
-		<ReportMainChartProps layout={layout} margin={polarChartProps.margin} />
-		<ReportEventSettings
-			throttleDelay={polarChartProps.throttleDelay}
-			throttledEvents={polarChartProps.throttledEvents}
-		/>
-		<ReportChartProps
-			baseValue={undefined}
-			accessibilityLayer={polarChartProps.accessibilityLayer}
-			barCategoryGap={polarChartProps.barCategoryGap}
-			maxBarSize={polarChartProps.maxBarSize}
-			stackOffset={polarChartProps.stackOffset}
-			barGap={polarChartProps.barGap}
-			barSize={polarChartProps.barSize}
-			syncId={polarChartProps.syncId}
-			syncMethod={polarChartProps.syncMethod}
-			className={polarChartProps.className}
-			reverseStackOrder={polarChartProps.reverseStackOrder}
-		/>
-		<ReportPolarOptions
-			cx={polarChartProps.cx}
-			cy={polarChartProps.cy}
-			startAngle={polarChartProps.startAngle}
-			endAngle={polarChartProps.endAngle}
-			innerRadius={polarChartProps.innerRadius}
-			outerRadius={polarChartProps.outerRadius}
-		/>
-		<CategoricalChart {...otherCategoricalProps} ref={ref} />
-	</RechartsStoreProvider>;
+	return (
+		<RechartsStoreProvider
+			preloadedState={{ options }}
+			reduxStoreName={polarChartProps.id ?? chartName}
+		>
+			<ChartDataContextProvider chartData={polarChartProps.data} />
+			<ReportMainChartProps layout={layout} margin={polarChartProps.margin} />
+			<ReportEventSettings
+				throttleDelay={polarChartProps.throttleDelay}
+				throttledEvents={polarChartProps.throttledEvents}
+			/>
+			<ReportChartProps
+				baseValue={undefined}
+				accessibilityLayer={polarChartProps.accessibilityLayer}
+				barCategoryGap={polarChartProps.barCategoryGap}
+				maxBarSize={polarChartProps.maxBarSize}
+				stackOffset={polarChartProps.stackOffset}
+				barGap={polarChartProps.barGap}
+				barSize={polarChartProps.barSize}
+				syncId={polarChartProps.syncId}
+				syncMethod={polarChartProps.syncMethod}
+				className={polarChartProps.className}
+				reverseStackOrder={polarChartProps.reverseStackOrder}
+			/>
+			<ReportPolarOptions
+				cx={polarChartProps.cx}
+				cy={polarChartProps.cy}
+				startAngle={polarChartProps.startAngle}
+				endAngle={polarChartProps.endAngle}
+				innerRadius={polarChartProps.innerRadius}
+				outerRadius={polarChartProps.outerRadius}
+			/>
+			<CategoricalChart {...otherCategoricalProps} ref={ref} />
+		</RechartsStoreProvider>
+	);
 }

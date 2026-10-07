@@ -14,8 +14,8 @@ export interface InnerSymbolsProp {
 	size?: number;
 	sizeType?: SizeType;
 }
-export type SymbolsProps =
-	Omit<SVGProps<SVGPathElement>, keyof InnerSymbolsProp> & InnerSymbolsProp;
+export type SymbolsProps = Omit<SVGProps<SVGPathElement>, keyof InnerSymbolsProp> &
+	InnerSymbolsProp;
 // Port of shape/Symbols.tsx — the scatter/legend marker shapes, drawn by
 // victory-vendor's d3-shape symbol generators (byte-identical `d` output).
 import {
@@ -88,9 +88,9 @@ export function Symbols(symbolsProps: SymbolsProps) {
 	}
 	const getSymbolPath = () => {
 		const symbolFactory = getSymbolFactory(realType);
-		const symbolGen = shapeSymbol().type(symbolFactory).size(
-			calculateAreaSize(size, sizeType, realType),
-		);
+		const symbolGen = shapeSymbol()
+			.type(symbolFactory)
+			.size(calculateAreaSize(size, sizeType, realType));
 		const s = symbolGen();
 		if (s === null) {
 			return undefined;
@@ -100,12 +100,14 @@ export function Symbols(symbolsProps: SymbolsProps) {
 	const { className, cx, cy } = props;
 	const filteredProps = svgPropertiesAndEvents(props);
 	if (isNumber(cx) && isNumber(cy) && isNumber(size)) {
-		return <path
-			{...filteredProps}
-			className={clsx('recharts-symbols', className)}
-			transform={'translate(' + cx + ', ' + cy + ')'}
-			d={getSymbolPath()}
-		/>;
+		return (
+			<path
+				{...filteredProps}
+				className={clsx('recharts-symbols', className)}
+				transform={'translate(' + cx + ', ' + cy + ')'}
+				d={getSymbolPath()}
+			/>
+		);
 	}
 	return null;
 }

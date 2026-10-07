@@ -39,10 +39,11 @@ export function BoundaryApp(props: {
 	} @else {
 		<ErrorBoundary
 			{...common}
-			fallbackRender={({ error, resetErrorBoundary }) =>
+			fallbackRender={({ error, resetErrorBoundary }) => (
 				<button id="render-fallback" onClick={() => resetErrorBoundary('render-retry')}>
 					{'render:' + (error as Error).message}
-				</button>}
+				</button>
+			)}
 		>
 			<Thrower error={props.error} />
 		</ErrorBoundary>
@@ -67,11 +68,11 @@ function EventFailure() @{
 
 export function HookApp() @{
 	<ErrorBoundary
-		fallbackRender={({ error, resetErrorBoundary }) =>
-			<button
-				id="hook-fallback"
-				onClick={() => resetErrorBoundary()}
-			>{(error as Error).message as string}</button>}
+		fallbackRender={({ error, resetErrorBoundary }) => (
+			<button id="hook-fallback" onClick={() => resetErrorBoundary()}>
+				{(error as Error).message as string}
+			</button>
+		)}
 	>
 		<EventFailure />
 	</ErrorBoundary>
@@ -96,15 +97,17 @@ export function LocalResetApp(
 	<ErrorBoundary
 		onError={props.onError}
 		onReset={props.onReset}
-		fallbackRender={({ resetErrorBoundary }) => <button
-			id="local-reset"
-			onClick={() => {
-				setFail(false);
-				resetErrorBoundary();
-			}}
-		>
-			retry
-		</button>}
+		fallbackRender={({ resetErrorBoundary }) => (
+			<button
+				id="local-reset"
+				onClick={() => {
+					setFail(false);
+					resetErrorBoundary();
+				}}
+			>
+				retry
+			</button>
+		)}
 	>
 		<Thrower error={fail ? new Error('local') : undefined} />
 	</ErrorBoundary>
@@ -113,7 +116,9 @@ export function LocalResetApp(
 function RetainedApiChild(props: { apiRef: { current: UseErrorBoundaryApi | null } }) @{
 	const api = useErrorBoundary();
 	props.apiRef.current = api;
-	<button id="retained-show" onClick={() => api.showBoundary('retained failure')}>show</button>
+	<button id="retained-show" onClick={() => api.showBoundary('retained failure')}>
+		show
+	</button>
 }
 
 export function RetainedApiApp(props: {

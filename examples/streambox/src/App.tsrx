@@ -88,10 +88,9 @@ function CommentList(props: {
 					aria-posinset={item.index + 1}
 					aria-setsize={props.comments.length}
 				>
-					<div
-						class="avatar avatar--comment"
-						aria-hidden="true"
-					>{props.comments[item.index].initials}</div>
+					<div class="avatar avatar--comment" aria-hidden="true">
+						{props.comments[item.index].initials}
+					</div>
 					<div class="comment-card__body">
 						<header>
 							<strong>{props.comments[item.index].author}</strong>
@@ -106,12 +105,11 @@ function CommentList(props: {
 								class="timecode"
 								type="button"
 								onClick={() => props.onJump(props.comments[item.index].timecode)}
-							>{formatTime(props.comments[item.index].timecode)}</button>
+							>
+								{formatTime(props.comments[item.index].timecode)}
+							</button>
 							<span>{`${props.comments[item.index].likes} likes`}</span>
-							<span>
-								Conversation #
-								{props.comments[item.index].index + 1}
-							</span>
+							<span>Conversation #{props.comments[item.index].index + 1}</span>
 						</footer>
 					</div>
 				</article>
@@ -128,8 +126,8 @@ function CommentsPanel(props: {
 	const [sort, setSort] = useState<CommentSort>('featured');
 	const visibleComments = useMemo(() => {
 		const normalized = query.trim().toLocaleLowerCase();
-		const matching = props.comments.filter(
-			(comment) => `${comment.author} ${comment.body}`.toLocaleLowerCase().includes(normalized),
+		const matching = props.comments.filter((comment) =>
+			`${comment.author} ${comment.body}`.toLocaleLowerCase().includes(normalized),
 		);
 		if (sort === 'latest') return [...matching].reverse();
 		return matching;
@@ -157,9 +155,9 @@ function CommentsPanel(props: {
 					<span class="sr-only">Sort comments</span>
 					<select
 						value={sort}
-						onChange={(event) => setSort(
-							(event.currentTarget as HTMLSelectElement).value as CommentSort,
-						)}
+						onChange={(event) =>
+							setSort((event.currentTarget as HTMLSelectElement).value as CommentSort)
+						}
 						aria-label="Sort comments"
 					>
 						<option value="featured">Featured</option>
@@ -173,7 +171,9 @@ function CommentsPanel(props: {
 				<span aria-hidden="true">◎</span>
 				<h3>No comments found</h3>
 				<p>Try another name or phrase from the conversation.</p>
-				<button type="button" onClick={() => setQuery('')}>Clear comment search</button>
+				<button type="button" onClick={() => setQuery('')}>
+					Clear comment search
+				</button>
 			</div>
 		} @else {
 			<CommentList comments={visibleComments} onJump={props.onJump} />
@@ -277,10 +277,13 @@ export function App() @{
 		setCatalogQuery('');
 	}, []);
 
-	const setPanel = useCallback((panel: WatchPanel) => {
-		history.pushState(null, '', watchURL(video.id, panel));
-		setRoute({ videoId: video.id, panel });
-	}, [video.id]);
+	const setPanel = useCallback(
+		(panel: WatchPanel) => {
+			history.pushState(null, '', watchURL(video.id, panel));
+			setRoute({ videoId: video.id, panel });
+		},
+		[video.id],
+	);
 
 	const togglePlayback = useCallback(() => {
 		const player = videoRef.current;
@@ -311,10 +314,13 @@ export function App() @{
 		player.load();
 	}, [video.title]);
 
-	const commitAction = useCallback((message: string) => {
-		if (!online) setQueuedActions((count) => count + 1);
-		setActivity(online ? message : `${message} · queued offline`);
-	}, [online]);
+	const commitAction = useCallback(
+		(message: string) => {
+			if (!online) setQueuedActions((count) => count + 1);
+			setActivity(online ? message : `${message} · queued offline`);
+		},
+		[online],
+	);
 
 	const shareVideo = useCallback(() => {
 		const shareURL = window.location.href;
@@ -331,15 +337,15 @@ export function App() @{
 	const matchingVideos = useMemo(() => {
 		const normalized = catalogQuery.trim().toLocaleLowerCase();
 		if (normalized === '') return [];
-		return VIDEOS.filter(
-			(item) => `${item.title} ${item.creator} ${item.category}`.toLocaleLowerCase().includes(
-				normalized,
-			),
+		return VIDEOS.filter((item) =>
+			`${item.title} ${item.creator} ${item.category}`.toLocaleLowerCase().includes(normalized),
 		);
 	}, [catalogQuery]);
 
 	<div class="app-shell">
-		<a class="skip-link" href="#watch-main">Skip to video</a>
+		<a class="skip-link" href="#watch-main">
+			Skip to video
+		</a>
 		<header class="topbar">
 			<a
 				class="brand"
@@ -398,7 +404,9 @@ export function App() @{
 				>
 					<span aria-hidden="true">◌</span>
 				</button>
-				<div class="avatar" aria-label="Signed in as Alex Morgan">AM</div>
+				<div class="avatar" aria-label="Signed in as Alex Morgan">
+					AM
+				</div>
 			</div>
 		</header>
 
@@ -458,11 +466,15 @@ export function App() @{
 				</section>
 			} @else if (loadState === 'error') {
 				<section class="load-error" role="alert">
-					<span class="load-error__mark" aria-hidden="true">↺</span>
+					<span class="load-error__mark" aria-hidden="true">
+						↺
+					</span>
 					<p class="eyebrow">Playback library unavailable</p>
 					<h1>We couldn’t load this video</h1>
 					<p>The deterministic fixture stopped before media was attached. Retry to continue.</p>
-					<button type="button" onClick={loadCatalog}>Retry loading video</button>
+					<button type="button" onClick={loadCatalog}>
+						Retry loading video
+					</button>
 				</section>
 			} @else {
 				<div
@@ -532,12 +544,16 @@ export function App() @{
 								></video>
 								@if (mediaFailed) {
 									<div class="media-error" role="alert">
-										<span class="media-error__mark" aria-hidden="true">!</span>
+										<span class="media-error__mark" aria-hidden="true">
+											!
+										</span>
 										<div>
 											<strong>Video playback unavailable</strong>
 											<p>The local media file could not be prepared.</p>
 										</div>
-										<button type="button" onClick={retryMedia}>Retry video</button>
+										<button type="button" onClick={retryMedia}>
+											Retry video
+										</button>
 									</div>
 								} @else {
 									<div class={{ 'media-loader': true, 'media-loader--hidden': mediaReady }}>
@@ -554,9 +570,7 @@ export function App() @{
 									aria-label={isPlaying ? 'Pause video' : 'Play video'}
 									disabled={!mediaReady}
 								>
-									<span aria-hidden="true">
-										{isPlaying ? 'Ⅱ' : '▶'}
-									</span>
+									<span aria-hidden="true">{isPlaying ? 'Ⅱ' : '▶'}</span>
 								</button>
 								<span class="time-readout" data-testid="time-readout">{`${formatTime(
 									currentTime,
@@ -569,9 +583,9 @@ export function App() @{
 										max={Math.max(duration, 1)}
 										step="0.05"
 										value={Math.min(currentTime, duration)}
-										onInput={(event) => seekTo(
-											Number((event.currentTarget as HTMLInputElement).value),
-										)}
+										onInput={(event) =>
+											seekTo(Number((event.currentTarget as HTMLInputElement).value))
+										}
 										aria-label="Seek video"
 									/>
 								</label>
@@ -583,9 +597,7 @@ export function App() @{
 									}}
 									aria-label={muted ? 'Unmute video' : 'Mute video'}
 								>
-									<span aria-hidden="true">
-										{muted ? '⊘' : '◖'}
-									</span>
+									<span aria-hidden="true">{muted ? '⊘' : '◖'}</span>
 								</button>
 								<button
 									class="control-button control-button--wide"
@@ -598,9 +610,7 @@ export function App() @{
 									}}
 								>
 									<span aria-hidden="true">▭</span>
-									<span>
-										{theaterMode ? 'Close' : 'Theater'}
-									</span>
+									<span>{theaterMode ? 'Close' : 'Theater'}</span>
 								</button>
 							</div>
 						</section>
@@ -611,11 +621,9 @@ export function App() @{
 								aria-hidden="true"
 							></span>
 							<span data-testid="media-event">{lastMediaEvent}</span>
-							<span
-								class="media-event-line__activity"
-								role="status"
-								data-testid="activity-status"
-							>{activity}</span>
+							<span class="media-event-line__activity" role="status" data-testid="activity-status">
+								{activity}
+							</span>
 						</div>
 
 						<section class="video-meta">
@@ -640,9 +648,7 @@ export function App() @{
 									aria-pressed={liked}
 								>
 									<span aria-hidden="true">♡</span>
-									<span>
-										{liked ? 'Liked' : 'Like'}
-									</span>
+									<span>{liked ? 'Liked' : 'Like'}</span>
 								</button>
 								<button
 									class={{ 'action-button': true, 'action-button--active': saved }}
@@ -659,9 +665,7 @@ export function App() @{
 									aria-pressed={saved}
 								>
 									<span aria-hidden="true">＋</span>
-									<span>
-										{saved ? 'Saved' : 'Save'}
-									</span>
+									<span>{saved ? 'Saved' : 'Save'}</span>
 								</button>
 								<button
 									class="action-button"
@@ -784,7 +788,9 @@ export function App() @{
 							/>
 						}
 						<div class="playlist-card">
-							<span class="playlist-card__art" aria-hidden="true">03</span>
+							<span class="playlist-card__art" aria-hidden="true">
+								03
+							</span>
 							<div>
 								<p class="eyebrow">Playlist</p>
 								<strong>Slow cinema for late hours</strong>
@@ -794,7 +800,9 @@ export function App() @{
 								type="button"
 								aria-label="Open Slow cinema for late hours"
 								onClick={() => navigate('signal-garden')}
-							>→</button>
+							>
+								→
+							</button>
 						</div>
 					</aside>
 				</div>

@@ -13,9 +13,7 @@ interface EffectProps extends BoundStoreProps {
 
 function PendingProbe() @{
 	const [isPending] = useTransition();
-	<span id="pending">
-		{isPending ? 'pending' : 'idle'}
-	</span>
+	<span id="pending">{isPending ? 'pending' : 'idle'}</span>
 }
 
 function InnerChild(props: BoundStoreProps) @{
@@ -23,7 +21,7 @@ function InnerChild(props: BoundStoreProps) @{
 	const [, start] = useTransition();
 	props.bindStart(start);
 	const v = use(props.promiseFor(value));
-	<span id="inner-content">{'inner-' + v as string}</span>
+	<span id="inner-content">{('inner-' + v) as string}</span>
 }
 
 export function NestedHeldBoundary(props: BoundStoreProps) @{
@@ -53,10 +51,10 @@ function ThrowableChild(props: BoundStoreProps) @{
 	const [, start] = useTransition();
 	props.bindStart(start);
 	if (value < 0) {
-		throw new Error('boom-' + -value as string);
+		throw new Error(('boom-' + -value) as string);
 	}
 	const v = use(props.promiseFor(value));
-	<span id="content">{'content-' + v as string}</span>
+	<span id="content">{('content-' + v) as string}</span>
 }
 
 export function ErrorWhileHeld(props: BoundStoreProps) @{
@@ -71,7 +69,7 @@ export function ErrorWhileHeld(props: BoundStoreProps) @{
 		} @pending {
 			<span id="fallback">{'fallback'}</span>
 		} @catch (e) {
-			<span id="error">{'error:' + (e.message) as string}</span>
+			<span id="error">{('error:' + e.message) as string}</span>
 		}
 	</div>
 }
@@ -82,7 +80,7 @@ export function RapidTransitions(props: StoreProps) @{
 		@try {
 			const value = useSyncExternalStore(props.store.subscribe, props.store.get);
 			const v = use(props.promiseFor(value));
-			<span id="content">{'content-' + v as string}</span>
+			<span id="content">{('content-' + v) as string}</span>
 		} @pending {
 			<span id="fallback">{'fallback'}</span>
 		}
@@ -98,7 +96,7 @@ function EffectChild(props: EffectProps) @{
 		props.log('mount-' + v);
 		return () => props.log('cleanup-' + v);
 	}, [v]);
-	<span id="content">{'content-' + v as string}</span>
+	<span id="content">{('content-' + v) as string}</span>
 }
 
 export function EffectOrdering(props: EffectProps) @{

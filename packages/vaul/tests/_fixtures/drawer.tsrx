@@ -8,9 +8,7 @@ export function DrawerFixture() @{
 		setOpen(false);
 	}
 	<main>
-		<output id="drawer-state">
-			{open ? 'open' : 'closed'}
-		</output>
+		<output id="drawer-state">{open ? 'open' : 'closed'}</output>
 		<button type="button" data-testid="controlled-close" onClick={closeControlled}>
 			Controlled close
 		</button>

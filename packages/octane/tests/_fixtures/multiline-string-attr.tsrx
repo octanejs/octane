@@ -12,27 +12,38 @@ type WarmPropInput = {
 
 type WarmPropLoader = (ariaLabel: string, dataTestId: string, title: string) => Promise<string>;
 
-function Chip(props: {
-	'aria-label': string;
-	'data-testid': string;
-	title: string;
-}) {
-	return <span
-		aria-label={props['aria-label']}
-		data-testid={props['data-testid']}
-		data-title={props.title}
-	>{props.title as string}</span>;
+function Chip(props: { 'aria-label': string; 'data-testid': string; title: string }) {
+	return (
+		<span
+			aria-label={props['aria-label']}
+			data-testid={props['data-testid']}
+			data-title={props.title}
+		>
+			{props.title as string}
+		</span>
+	);
 }
 
 export function SpreadHost(props: { rest?: Record<string, string> }) {
-	return <div {...props.rest} class="one
-		two" />;
+	return (
+		<div
+			{...props.rest}
+			class="one
+		two"
+		/>
+	);
 }
 
 export function PropChip() {
-	return <Chip aria-label="accessible
-				chip" data-testid="multiline-prop-chip" title="one
-				two" />;
+	return (
+		<Chip
+			aria-label="accessible
+				chip"
+			data-testid="multiline-prop-chip"
+			title="one
+				two"
+		/>
+	);
 }
 
 function WarmPropChip(props: WarmPropInput & { load: WarmPropLoader }) {

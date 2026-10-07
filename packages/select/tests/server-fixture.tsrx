@@ -21,5 +21,7 @@ export function ServerStyleFixture(props: ServerStyleFixtureProps = {}) @{
 		{},
 		injectStyle,
 	);
-	<div id="react-select-u1" className={resolved.className}>candidate</div>
+	<div id="react-select-u1" className={resolved.className}>
+		candidate
+	</div>
 }

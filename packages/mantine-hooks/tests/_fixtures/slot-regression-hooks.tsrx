@@ -21,9 +21,7 @@ export function MoveDefaultDirectionHarness({
 
 export function MediaQueryOmittedOptionsHarness() @{
 	const matches = useMediaQuery('(min-width: 60rem)', false);
-	<output id="media-result">
-		{matches ? 'wide' : 'narrow'}
-	</output>
+	<output id="media-result">{matches ? 'wide' : 'narrow'}</output>
 }
 
 export function MouseLifecycleHarness({ attached }: { attached: boolean }) @{
@@ -45,18 +43,18 @@ export function OmittedOptionsHarness({ onTimeout }: { onTimeout: () => void }) 
 	const [toggleValue, toggle] = useToggle();
 
 	<section>
-		<output id="clipboard-default">
-			{clipboard.copied ? 'copied' : 'idle'}
-		</output>
-		<output id="disclosure-default">
-			{opened ? 'open' : 'closed'}
-		</output>
+		<output id="clipboard-default">{clipboard.copied ? 'copied' : 'idle'}</output>
+		<output id="disclosure-default">{opened ? 'open' : 'closed'}</output>
 		<output id="hash-default">{hash || 'empty'}</output>
-		<output id="toggle-default">
-			{toggleValue ? 'on' : 'off'}
-		</output>
-		<button id="open-disclosure" onClick={disclosure.open}>open</button>
-		<button id="toggle-default-value" onClick={() => toggle()}>toggle</button>
-		<button id="start-timeout" onClick={() => timeout.start()}>start timeout</button>
+		<output id="toggle-default">{toggleValue ? 'on' : 'off'}</output>
+		<button id="open-disclosure" onClick={disclosure.open}>
+			open
+		</button>
+		<button id="toggle-default-value" onClick={() => toggle()}>
+			toggle
+		</button>
+		<button id="start-timeout" onClick={() => timeout.start()}>
+			start timeout
+		</button>
 	</section>
 }

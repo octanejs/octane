@@ -35,9 +35,11 @@ export function AlienSignalsDemo() @{
 
 	<div>
 		<h2 class="demo-title">{'Alien Signals on Octane'}</h2>
-		<p
-			class="demo-blurb"
-		>{'Writable and computed Alien Signals drive Octane through concurrency-safe external-store subscriptions.'}</p>
+		<p class="demo-blurb">
+			{
+				'Writable and computed Alien Signals drive Octane through concurrency-safe external-store subscriptions.'
+			}
+		</p>
 
 		<div class="panel">
 			<div class="row">

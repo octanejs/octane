@@ -40,7 +40,10 @@ export function ContextMenuRadioGroup(props: Record<string, unknown>) @{
 	<ContextMenuPrimitive.RadioGroup data-slot="context-menu-radio-group" {...props} />
 }
 
-export function ContextMenuContent({ className, ...props }: Props & {
+export function ContextMenuContent({
+	className,
+	...props
+}: Props & {
 	side?: 'top' | 'right' | 'bottom' | 'left';
 }) {
 	return createElement(
@@ -57,7 +60,12 @@ export function ContextMenuContent({ className, ...props }: Props & {
 	);
 }
 
-export function ContextMenuItem({ className, inset, variant = 'default', ...props }: Props & {
+export function ContextMenuItem({
+	className,
+	inset,
+	variant = 'default',
+	...props
+}: Props & {
 	inset?: boolean;
 	variant?: 'default' | 'destructive';
 }) @{
@@ -66,7 +74,7 @@ export function ContextMenuItem({ className, inset, variant = 'default', ...prop
 		data-inset={inset}
 		data-variant={variant}
 		className={cn(
-			'group/context-menu-item relative flex cursor-default items-center gap-1.5 rounded-md px-1.5 py-1 text-sm outline-hidden select-none focus:bg-accent focus:text-accent-foreground data-inset:pl-7 data-[variant=destructive]:text-destructive data-[variant=destructive]:focus:bg-destructive/10 data-[variant=destructive]:focus:text-destructive dark:data-[variant=destructive]:focus:bg-destructive/20 data-disabled:pointer-events-none data-disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*=\'size-\'])]:size-4 focus:*:[svg]:text-accent-foreground data-[variant=destructive]:*:[svg]:text-destructive',
+			"group/context-menu-item relative flex cursor-default items-center gap-1.5 rounded-md px-1.5 py-1 text-sm outline-hidden select-none focus:bg-accent focus:text-accent-foreground data-inset:pl-7 data-[variant=destructive]:text-destructive data-[variant=destructive]:focus:bg-destructive/10 data-[variant=destructive]:focus:text-destructive dark:data-[variant=destructive]:focus:bg-destructive/20 data-disabled:pointer-events-none data-disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4 focus:*:[svg]:text-accent-foreground data-[variant=destructive]:*:[svg]:text-destructive",
 			className,
 		)}
 		{...props}
@@ -80,7 +88,7 @@ export function ContextMenuSubTrigger(props: Props & { inset?: boolean }) @{
 		data-slot="context-menu-sub-trigger"
 		data-inset={inset}
 		className={cn(
-			'flex cursor-default items-center gap-1.5 rounded-md px-1.5 py-1 text-sm outline-hidden select-none focus:bg-accent focus:text-accent-foreground data-inset:pl-7 data-open:bg-accent data-open:text-accent-foreground [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*=\'size-\'])]:size-4',
+			"flex cursor-default items-center gap-1.5 rounded-md px-1.5 py-1 text-sm outline-hidden select-none focus:bg-accent focus:text-accent-foreground data-inset:pl-7 data-open:bg-accent data-open:text-accent-foreground [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4",
 			className,
 		)}
 		{...rest}
@@ -101,17 +109,19 @@ export function ContextMenuSubContent({ className, ...props }: Props) @{
 	/>
 }
 
-export function ContextMenuCheckboxItem(props: Props & {
-	checked?: boolean | 'indeterminate';
-	inset?: boolean;
-}) @{
+export function ContextMenuCheckboxItem(
+	props: Props & {
+		checked?: boolean | 'indeterminate';
+		inset?: boolean;
+	},
+) @{
 	const { className, children: _children, checked, inset, ...rest } = props;
 
 	<ContextMenuPrimitive.CheckboxItem
 		data-slot="context-menu-checkbox-item"
 		data-inset={inset}
 		className={cn(
-			'relative flex cursor-default items-center gap-1.5 rounded-md py-1 pr-8 pl-1.5 text-sm outline-hidden select-none focus:bg-accent focus:text-accent-foreground data-inset:pl-7 data-disabled:pointer-events-none data-disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*=\'size-\'])]:size-4',
+			"relative flex cursor-default items-center gap-1.5 rounded-md py-1 pr-8 pl-1.5 text-sm outline-hidden select-none focus:bg-accent focus:text-accent-foreground data-inset:pl-7 data-disabled:pointer-events-none data-disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4",
 			className,
 		)}
 		checked={checked}
@@ -133,7 +143,7 @@ export function ContextMenuRadioItem(props: Props & { inset?: boolean }) @{
 		data-slot="context-menu-radio-item"
 		data-inset={inset}
 		className={cn(
-			'relative flex cursor-default items-center gap-1.5 rounded-md py-1 pr-8 pl-1.5 text-sm outline-hidden select-none focus:bg-accent focus:text-accent-foreground data-inset:pl-7 data-disabled:pointer-events-none data-disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*=\'size-\'])]:size-4',
+			"relative flex cursor-default items-center gap-1.5 rounded-md py-1 pr-8 pl-1.5 text-sm outline-hidden select-none focus:bg-accent focus:text-accent-foreground data-inset:pl-7 data-disabled:pointer-events-none data-disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4",
 			className,
 		)}
 		{...rest}

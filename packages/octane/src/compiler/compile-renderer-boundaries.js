@@ -5,6 +5,7 @@ import {
 } from './renderer-boundaries.js';
 import { lowerUniversalRendererRegionAst } from './compile-universal.js';
 import { builders as b, clone_ast_node, parseModule } from '@tsrx/core';
+import { adoptTemplateShape } from './parser-template-shape.js';
 import { inheritGeneratedOrigin } from './generated-origin.js';
 
 const DOM_RENDERER = Object.freeze({ id: 'dom', module: 'octane', target: 'dom' });
@@ -424,7 +425,7 @@ function collectRuntimeCallNames(node, runtime) {
 }
 
 function collectLocalSpecializationInfo(source, filename, parsedAst = null) {
-	const ast = parsedAst ?? parseModule(source, filename);
+	const ast = parsedAst ?? adoptTemplateShape(parseModule(source, filename));
 	const components = new Map();
 	const exported = new Set();
 	const runtime = { direct: new Map(), namespaces: new Set(), moduleBindings: new Set() };
@@ -941,7 +942,7 @@ export function prepareRendererBoundaryRegions(
 	parsedAst = null,
 ) {
 	const { rendererBoundaries, rendererRegistry } = options;
-	const ast = parsedAst ?? parseModule(source, filename);
+	const ast = parsedAst ?? adoptTemplateShape(parseModule(source, filename));
 	const tree = analyzeBoundaryTree(source, filename, ownerRenderer, rendererBoundaries, ast);
 	if (tree === null || tree.roots.length === 0) return null;
 	attachBoundaryAstNodes(tree.roots, astNodeIndex(ast));
@@ -1042,7 +1043,7 @@ export function prepareServerRendererBoundaryRegions(
 	{ rendererBoundaries, rendererRegistry } = {},
 	parsedAst = null,
 ) {
-	const ast = parsedAst ?? parseModule(source, filename);
+	const ast = parsedAst ?? adoptTemplateShape(parseModule(source, filename));
 	const tree = analyzeBoundaryTree(source, filename, ownerRenderer, rendererBoundaries, ast);
 	if (tree === null || tree.roots.length === 0) return null;
 	attachBoundaryAstNodes(tree.roots, astNodeIndex(ast));

@@ -55,13 +55,15 @@ function getSinglePolygonPath(points: ReadonlyArray<Coordinate>, connectNulls?: 
 	if (connectNulls) {
 		segmentPoints = [segmentPoints.reduce((res, segPoints) => [...res, ...segPoints], [])];
 	}
-	const polygonPath = segmentPoints.map(
-		(segPoints) => segPoints.reduce(
-			(path, point, index) =>
-				path + (index === 0 ? 'M' : 'L') + round(point.x) + ',' + round(point.y),
-			'',
-		),
-	).join('');
+	const polygonPath = segmentPoints
+		.map((segPoints) =>
+			segPoints.reduce(
+				(path, point, index) =>
+					path + (index === 0 ? 'M' : 'L') + round(point.x) + ',' + round(point.y),
+				'',
+			),
+		)
+		.join('');
 	return segmentPoints.length === 1 ? polygonPath + 'Z' : polygonPath;
 }
 
@@ -71,8 +73,11 @@ function getRanglePath(
 	connectNulls?: boolean,
 ) {
 	const outerPath = getSinglePolygonPath(points, connectNulls);
-	return (outerPath.slice(-1) === 'Z' ? outerPath.slice(0, -1) : outerPath) + 'L' +
-		getSinglePolygonPath(Array.from(baseLinePoints).reverse(), connectNulls).slice(1);
+	return (
+		(outerPath.slice(-1) === 'Z' ? outerPath.slice(0, -1) : outerPath) +
+		'L' +
+		getSinglePolygonPath(Array.from(baseLinePoints).reverse(), connectNulls).slice(1)
+	);
 }
 
 export function Polygon(props: Props) {
@@ -84,34 +89,38 @@ export function Polygon(props: Props) {
 	if (baseLinePoints && baseLinePoints.length) {
 		const hasStroke = others.stroke && others.stroke !== 'none';
 		const rangePath = getRanglePath(points, baseLinePoints, connectNulls);
-		return <g className={layerClass}>
-			<path
-				{...svgPropertiesAndEvents(others)}
-				fill={rangePath.slice(-1) === 'Z' ? others.fill : 'none'}
-				stroke="none"
-				d={rangePath}
-			/>
-			{hasStroke
-				? <path
+		return (
+			<g className={layerClass}>
+				<path
+					{...svgPropertiesAndEvents(others)}
+					fill={rangePath.slice(-1) === 'Z' ? others.fill : 'none'}
+					stroke="none"
+					d={rangePath}
+				/>
+				{hasStroke ? (
+					<path
 						{...svgPropertiesAndEvents(others)}
 						fill="none"
 						d={getSinglePolygonPath(points, connectNulls)}
 					/>
-				: null}
-			{hasStroke
-				? <path
+				) : null}
+				{hasStroke ? (
+					<path
 						{...svgPropertiesAndEvents(others)}
 						fill="none"
 						d={getSinglePolygonPath(baseLinePoints, connectNulls)}
 					/>
-				: null}
-		</g>;
+				) : null}
+			</g>
+		);
 	}
 	const singlePath = getSinglePolygonPath(points, connectNulls);
-	return <path
-		{...svgPropertiesAndEvents(others)}
-		fill={singlePath.slice(-1) === 'Z' ? others.fill : 'none'}
-		className={layerClass}
-		d={singlePath}
-	/>;
+	return (
+		<path
+			{...svgPropertiesAndEvents(others)}
+			fill={singlePath.slice(-1) === 'Z' ? others.fill : 'none'}
+			className={layerClass}
+			d={singlePath}
+		/>
+	);
 }

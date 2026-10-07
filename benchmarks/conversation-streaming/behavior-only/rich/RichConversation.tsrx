@@ -51,8 +51,12 @@ interface DeterministicMapProps {
 function DeterministicMap(props: DeterministicMapProps) @{
 	<section id="rich-map" aria-label="Deterministic map fixture">
 		<div>
-			<button id="rich-zoom-in" type="button" onClick={() => props.onZoom('in')}>Zoom in</button>
-			<button id="rich-zoom-out" type="button" onClick={() => props.onZoom('out')}>Zoom out</button>
+			<button id="rich-zoom-in" type="button" onClick={() => props.onZoom('in')}>
+				Zoom in
+			</button>
+			<button id="rich-zoom-out" type="button" onClick={() => props.onZoom('out')}>
+				Zoom out
+			</button>
 		</div>
 		<svg id="rich-map-svg" viewBox={props.viewBox} width="480" height="240" aria-hidden="true">
 			<rect x="0" y="0" width="100" height="50" fill="#e7f1e8" />
@@ -75,7 +79,9 @@ function DeterministicMap(props: DeterministicMapProps) @{
 						type="button"
 						aria-pressed={props.selectedPlace === place.id}
 						onClick={() => props.onSelectPlace(place.id)}
-					>{place.label as string}</button>
+					>
+						{place.label as string}
+					</button>
 				</li>
 			}
 		</ul>
@@ -88,7 +94,9 @@ export function RichConversation(props: RichConversationProps) @{
 		<h1 id="rich-title">{props.title as string}</h1>
 		<ol id="rich-progress" aria-label="Response progress">
 			@for (const block of props.progress; key block.id) {
-				<li data-progress={block.id} data-state={block.state}>{block.text as string}</li>
+				<li data-progress={block.id} data-state={block.state}>
+					{block.text as string}
+				</li>
 			}
 		</ol>
 		<article id="rich-response" aria-label="Response">
@@ -114,7 +122,9 @@ export function RichConversation(props: RichConversationProps) @{
 		} @else {
 			<section id="rich-map-placeholder" aria-label="Map preview">
 				<p>Places will appear in an interactive map.</p>
-				<button id="rich-activate-map" type="button" onClick={props.onActivateMap}>Show map</button>
+				<button id="rich-activate-map" type="button" onClick={props.onActivateMap}>
+					Show map
+				</button>
 			</section>
 		}
 	</section>

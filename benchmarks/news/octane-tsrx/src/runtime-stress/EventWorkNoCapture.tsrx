@@ -29,18 +29,16 @@ function FormField(props: { index: number }) @{
 }
 
 function reportMediaEvent(phase: string, event: Event) {
-	const benchmark = globalThis as
-		typeof globalThis & {
-			__eventWorkMedia?: (phase: string, event: Event) => void;
-		};
+	const benchmark = globalThis as typeof globalThis & {
+		__eventWorkMedia?: (phase: string, event: Event) => void;
+	};
 	benchmark.__eventWorkMedia?.(phase, event);
 }
 
 function reportClickEvent(phase: string, event: Event) {
-	const benchmark = globalThis as
-		typeof globalThis & {
-			__eventWorkClick?: (phase: string, event: Event) => void;
-		};
+	const benchmark = globalThis as typeof globalThis & {
+		__eventWorkClick?: (phase: string, event: Event) => void;
+	};
 	benchmark.__eventWorkClick?.(phase, event);
 }
 
@@ -65,6 +63,8 @@ export function EventWorkNoCapture() @{
 			id="event-work-trusted-click"
 			type="button"
 			onClick={(event: Event) => reportClickEvent('button-bubble', event)}
-		>{'Click work target'}</button>
+		>
+			{'Click work target'}
+		</button>
 	</form>
 }

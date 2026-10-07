@@ -27,10 +27,18 @@ export function DynamicList() @{
 		measureElement: MEASURE_DATA_SIZE,
 	});
 	<div>
-		<button id="resize-3" onClick={() => virtualizer.resizeItem(3, 100)}>r3</button>
-		<button id="resize-3-back" onClick={() => virtualizer.resizeItem(3, 30)}>r3b</button>
-		<button id="measure-all" onClick={() => virtualizer.measure()}>m</button>
-		<button id="scroll-200" onClick={() => virtualizer.scrollToOffset(200)}>s200</button>
+		<button id="resize-3" onClick={() => virtualizer.resizeItem(3, 100)}>
+			r3
+		</button>
+		<button id="resize-3-back" onClick={() => virtualizer.resizeItem(3, 30)}>
+			r3b
+		</button>
+		<button id="measure-all" onClick={() => virtualizer.measure()}>
+			m
+		</button>
+		<button id="scroll-200" onClick={() => virtualizer.scrollToOffset(200)}>
+			s200
+		</button>
 		<div id="dscroller" ref={scrollRef} style={{ height: '200px', overflow: 'auto' }}>
 			<div style={{ height: virtualizer.getTotalSize() + 'px', position: 'relative' }}>
 				@for (const item of virtualizer.getVirtualItems(); key item.key) {

@@ -20,9 +20,11 @@ function ForeignRow(props: { index: number; onRender(index: number, value: numbe
 function SettlingRow(props: { index: number; settle: boolean }) {
 	const [value, setValue] = useState(props.settle ? 0 : 2);
 	if (props.settle && value < 2) setValue(value + 1);
-	return <button data-settling-row={String(props.index)} onClick={() => setValue(value + 1)}>
-		{'target:' + value}
-	</button>;
+	return (
+		<button data-settling-row={String(props.index)} onClick={() => setValue(value + 1)}>
+			{'target:' + value}
+		</button>
+	);
 }
 
 export function ForeignRows(props: ForeignRowsProps) @{

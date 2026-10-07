@@ -22,10 +22,8 @@ type Props = {
 };
 
 export default function ErrorOverview({ error }: Props) {
-	const stack =
-		error.stack ? error.stack.split('\n').slice(1) : undefined;
-	const origin =
-		stack ? stackUtils.parseLine(stack[0]!) : undefined;
+	const stack = error.stack ? error.stack.split('\n').slice(1) : undefined;
+	const origin = stack ? stackUtils.parseLine(stack[0]!) : undefined;
 	const filePath = cleanupPath(origin?.file);
 	let excerpt: CodeExcerpt[] | undefined;
 	let lineWidth = 0;
@@ -42,85 +40,99 @@ export default function ErrorOverview({ error }: Props) {
 		}
 	}
 
-	return <Box flexDirection="column" padding={1}>
-		<Box>
-			<Text backgroundColor="red" color="white">
-				{' '}
-				ERROR{' '}
-			</Text>
+	return (
+		<Box flexDirection="column" padding={1}>
+			<Box>
+				<Text backgroundColor="red" color="white">
+					{' '}
+					ERROR{' '}
+				</Text>
 
-			<Text> {error.message}</Text>
-		</Box>
+				<Text> {error.message}</Text>
+			</Box>
 
-		{origin && filePath
-			? <Box marginTop={1}>
+			{origin && filePath ? (
+				<Box marginTop={1}>
 					<Text dimColor>
 						{filePath}:{origin.line}:{origin.column}
 					</Text>
 				</Box>
-			: null}
+			) : null}
 
-		{origin && excerpt
-			? <Box marginTop={1} flexDirection="column">{excerpt.map(
-					({ line, value }) => <Box key={line}>
-						<Box width={lineWidth + 1}>
+			{origin && excerpt ? (
+				<Box marginTop={1} flexDirection="column">
+					{excerpt.map(({ line, value }) => (
+						<Box key={line}>
+							<Box width={lineWidth + 1}>
+								<Text
+									dimColor={line !== origin.line}
+									backgroundColor={line === origin.line ? 'red' : undefined}
+									color={line === origin.line ? 'white' : undefined}
+									aria-label={line === origin.line ? `Line ${line}, error` : `Line ${line}`}
+								>
+									{String(line).padStart(lineWidth, ' ')}:
+								</Text>
+							</Box>
+
 							<Text
-								dimColor={line !== origin.line}
+								key={line}
 								backgroundColor={line === origin.line ? 'red' : undefined}
 								color={line === origin.line ? 'white' : undefined}
-								aria-label={line === origin.line ? `Line ${line}, error` : `Line ${line}`}
 							>
-								{String(line).padStart(lineWidth, ' ')}:
+								{' ' + value}
 							</Text>
 						</Box>
+					))}
+				</Box>
+			) : null}
 
-						<Text
-							key={line}
-							backgroundColor={line === origin.line ? 'red' : undefined}
-							color={line === origin.line ? 'white' : undefined}
-						>
-							{' ' + value}
-						</Text>
-					</Box>,
-				)}</Box>
-			: null}
+			{error.stack ? (
+				<Box marginTop={1} flexDirection="column">
+					{error.stack
+						.split('\n')
+						.slice(1)
+						.map((line) => {
+							const parsedLine = stackUtils.parseLine(line);
+							const lineCount = stackLineCounts.get(line) ?? 0;
+							stackLineCounts.set(line, lineCount + 1);
+							const key = `${line}-${lineCount}`;
 
-		{error.stack
-			? <Box marginTop={1} flexDirection="column">{error.stack.split('\n').slice(1).map((line) => {
-					const parsedLine = stackUtils.parseLine(line);
-					const lineCount = stackLineCounts.get(line) ?? 0;
-					stackLineCounts.set(line, lineCount + 1);
-					const key = `${line}-${lineCount}`;
+							// If the line from the stack cannot be parsed, or parsed into an incomplete
+							// frame without source location data (for example, "at native"), we print
+							// out the unparsed line.
+							if (!parsedLine?.file || !parsedLine.line || !parsedLine.column) {
+								return (
+									<Box key={key}>
+										<Text dimColor>-</Text>
+										<Text dimColor bold>
+											{line}
+											\t{' '}
+										</Text>
+									</Box>
+								);
+							}
 
-					// If the line from the stack cannot be parsed, or parsed into an incomplete
-					// frame without source location data (for example, "at native"), we print
-					// out the unparsed line.
-					if (!parsedLine?.file || !parsedLine.line || !parsedLine.column) {
-						return <Box key={key}>
-							<Text dimColor>-</Text>
-							<Text dimColor bold>
-								{line}
-								\t{' '}
-							</Text>
-						</Box>;
-					}
-
-					return <Box key={key}>
-						<Text dimColor>-</Text>
-						<Text dimColor bold>{parsedLine.function}</Text>
-						<Text
-							dimColor
-							color="gray"
-							aria-label={`at ${
-								cleanupPath(parsedLine.file) ?? ''
-							} line ${parsedLine.line} column ${parsedLine.column}`}
-						>
-							{' '}
-							({cleanupPath(parsedLine.file) ?? ''}:{parsedLine.line}:
-							{parsedLine.column})
-						</Text>
-					</Box>;
-				})}</Box>
-			: null}
-	</Box>;
+							return (
+								<Box key={key}>
+									<Text dimColor>-</Text>
+									<Text dimColor bold>
+										{parsedLine.function}
+									</Text>
+									<Text
+										dimColor
+										color="gray"
+										aria-label={`at ${
+											cleanupPath(parsedLine.file) ?? ''
+										} line ${parsedLine.line} column ${parsedLine.column}`}
+									>
+										{' '}
+										({cleanupPath(parsedLine.file) ?? ''}:{parsedLine.line}:{parsedLine.column})
+									</Text>
+								</Box>
+							);
+						})}
+				</Box>
+			) : null}
+		</Box>
+	);
 }

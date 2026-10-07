@@ -29,7 +29,6 @@ export default function AnimatedGridLines<Scale extends GridScale>({
 	});
 
 	return <>
-		{/* @ts-expect-error react-spring's type inference issue on the styles */}
 		{animatedLines(
 			({ fromX, toX, fromY, toY, opacity }, _, { key }) =>
 				<animated.line

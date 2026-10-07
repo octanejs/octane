@@ -7,7 +7,9 @@ import { Fragment, useState } from 'octane';
 function Draft(props: { id: string }) @{
 	const [edits, setEdits] = useState(0);
 	const label = props.id + ': ' + edits;
-	<button id={props.id} onClick={() => setEdits((count) => count + 1)}>{label as string}</button>
+	<button id={props.id} onClick={() => setEdits((count) => count + 1)}>
+		{label as string}
+	</button>
 }
 
 function Failing(props: { fail: boolean }) @{
@@ -65,13 +67,15 @@ export function ResetCaughtTry(props: { selected: string }) @{
 }
 
 export function ReturnedWithDirective(props: { selected: string; open: boolean }) {
-	return <section>
-		<Fragment key={props.selected}>
-			@if (props.open) {
-				<Draft id="returned-directive" />
-			}
-		</Fragment>
-	</section>;
+	return (
+		<section>
+			<Fragment key={props.selected}>
+				@if (props.open) {
+					<Draft id="returned-directive" />
+				}
+			</Fragment>
+		</section>
+	);
 }
 
 export function KeyedFragmentRef(props: { selected: string; fragmentRef: any }) @{

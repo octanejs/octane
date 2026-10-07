@@ -96,12 +96,8 @@ function AddToCartButton(props: AddToCartButtonProps) @{
 		type="submit"
 		disabled={status.pending}
 	>
-		<span aria-hidden="true">
-			{status.pending ? '···' : '+'}
-		</span>
-		<span>
-			{status.pending ? 'Adding…' : props.label}
-		</span>
+		<span aria-hidden="true">{status.pending ? '···' : '+'}</span>
+		<span>{status.pending ? 'Adding…' : props.label}</span>
 	</button>
 }
 
@@ -109,9 +105,7 @@ function CheckoutSubmit() @{
 	const status = useFormStatus();
 	<div class="checkout-submit">
 		<button class="button button--checkout" type="submit" disabled={status.pending}>
-			<span>
-				{status.pending ? 'Placing your order…' : 'Place order securely'}
-			</span>
+			<span>{status.pending ? 'Placing your order…' : 'Place order securely'}</span>
 			<span aria-hidden="true">→</span>
 		</button>
 		<p class="pending-copy" role="status" aria-live="polite">
@@ -171,7 +165,9 @@ function ProductCard(props: ProductCardProps) @{
 						event.preventDefault();
 						props.navigate('/products/' + props.product.id);
 					}}
-				>{props.product.name}</a>
+				>
+					{props.product.name}
+				</a>
 			</h2>
 			<p>{props.product.tagline}</p>
 			<div class="product-card__footer">
@@ -202,7 +198,9 @@ function Header(props: HeaderProps) @{
 			}}
 			aria-label="Cartlane home"
 		>
-			<span class="wordmark__mark" aria-hidden="true">C</span>
+			<span class="wordmark__mark" aria-hidden="true">
+				C
+			</span>
 			<span>Cartlane</span>
 		</a>
 		<nav class="site-nav" aria-label="Primary navigation">
@@ -349,7 +347,9 @@ function ProductDetail(props: ProductDetailProps) @{
 					event.preventDefault();
 					props.navigate('/');
 				}}
-			>Return to the collection</a>
+			>
+				Return to the collection
+			</a>
 		</main>
 	} @else {
 		<main id="main-content" class="product-detail" tabIndex={-1}>
@@ -360,7 +360,9 @@ function ProductDetail(props: ProductDetailProps) @{
 						event.preventDefault();
 						props.navigate('/');
 					}}
-				>Collection</a>
+				>
+					Collection
+				</a>
 				<span aria-hidden="true">/</span>
 				<span aria-current="page">{props.product.name}</span>
 			</nav>
@@ -429,7 +431,9 @@ function CartPage(props: CartPageProps) @{
 			</div>
 		} @else if (props.lines.length === 0) {
 			<section class="empty-basket">
-				<span class="empty-basket__mark" aria-hidden="true">○</span>
+				<span class="empty-basket__mark" aria-hidden="true">
+					○
+				</span>
 				<h2>Your basket has room for something useful.</h2>
 				<p>The collection is small on purpose. Start with an object you will reach for often.</p>
 				<a
@@ -439,7 +443,9 @@ function CartPage(props: CartPageProps) @{
 						event.preventDefault();
 						props.navigate('/');
 					}}
-				>Browse the collection</a>
+				>
+					Browse the collection
+				</a>
 			</section>
 		} @else {
 			<div class="cart-layout">
@@ -461,7 +467,9 @@ function CartPage(props: CartPageProps) @{
 										name="intent"
 										value="decrease"
 										aria-label={'Decrease ' + requireProduct(line.productId).name + ' quantity'}
-									>−</button>
+									>
+										−
+									</button>
 									<output
 										aria-label={'Quantity for ' + requireProduct(line.productId).name}
 									>{`${line.quantity}`}</output>
@@ -470,15 +478,17 @@ function CartPage(props: CartPageProps) @{
 										name="intent"
 										value="increase"
 										aria-label={'Increase ' + requireProduct(line.productId).name + ' quantity'}
-									>+</button>
+									>
+										+
+									</button>
 									<button class="remove-line" type="submit" name="intent" value="remove">
 										Remove
 									</button>
 								</form>
 							</div>
-							<strong>{formatMoney(
-								requireProduct(line.productId).priceCents * line.quantity,
-							)}</strong>
+							<strong>
+								{formatMoney(requireProduct(line.productId).priceCents * line.quantity)}
+							</strong>
 						</article>
 					}
 				</section>
@@ -492,9 +502,7 @@ function CartPage(props: CartPageProps) @{
 						</div>
 						<div>
 							<dt>Delivery</dt>
-							<dd>
-								{props.delivery === 0 ? 'Complimentary' : formatMoney(props.delivery)}
-							</dd>
+							<dd>{props.delivery === 0 ? 'Complimentary' : formatMoney(props.delivery)}</dd>
 						</div>
 						<div class="summary-total">
 							<dt>Total</dt>
@@ -526,7 +534,9 @@ interface FieldErrorProps {
 
 function FieldError(props: FieldErrorProps) @{
 	@if (props.message) {
-		<p class="field-error" id={props.id}>{props.message}</p>
+		<p class="field-error" id={props.id}>
+			{props.message}
+		</p>
 	} @else {
 		<span></span>
 	}
@@ -544,13 +554,14 @@ interface CheckoutPageProps {
 }
 
 function CheckoutPage(props: CheckoutPageProps) @{
-	const errors: FieldErrors =
-		props.state.status === 'invalid' ? props.state.errors : {};
+	const errors: FieldErrors = props.state.status === 'invalid' ? props.state.errors : {};
 	<main id="main-content" class="checkout-page" tabIndex={-1}>
 		<nav class="checkout-steps" aria-label="Checkout progress">
 			<span class="checkout-step checkout-step--done">Basket</span>
 			<span aria-hidden="true">—</span>
-			<span class="checkout-step checkout-step--active" aria-current="step">Details</span>
+			<span class="checkout-step checkout-step--active" aria-current="step">
+				Details
+			</span>
 			<span aria-hidden="true">—</span>
 			<span class="checkout-step">Confirmed</span>
 		</nav>
@@ -570,7 +581,9 @@ function CheckoutPage(props: CheckoutPageProps) @{
 						event.preventDefault();
 						props.navigate('/');
 					}}
-				>Return to the collection</a>
+				>
+					Return to the collection
+				</a>
 			</section>
 		} @else {
 			<div class="checkout-layout">
@@ -687,9 +700,9 @@ function CheckoutPage(props: CheckoutPageProps) @{
 					@for (const line of props.lines; key line.productId) {
 						<div class="checkout-summary__line">
 							<span>{line.quantity + ' × ' + requireProduct(line.productId).name}</span>
-							<strong>{formatMoney(
-								line.quantity * requireProduct(line.productId).priceCents,
-							)}</strong>
+							<strong>
+								{formatMoney(line.quantity * requireProduct(line.productId).priceCents)}
+							</strong>
 						</div>
 					}
 					<div class="checkout-summary__total">
@@ -721,11 +734,15 @@ function OrderPage(props: OrderPageProps) @{
 					event.preventDefault();
 					props.navigate('/');
 				}}
-			>Return to the collection</a>
+			>
+				Return to the collection
+			</a>
 		</main>
 	} @else {
 		<main id="main-content" class="confirmation" tabIndex={-1} data-order-id={props.order.id}>
-			<div class="confirmation__mark" aria-hidden="true">✓</div>
+			<div class="confirmation__mark" aria-hidden="true">
+				✓
+			</div>
 			<p class="eyebrow">Order confirmed</p>
 			<h1>Thank you. It is in good hands.</h1>
 			<p class="confirmation__lede">A receipt is ready for {props.order.email}.</p>
@@ -733,7 +750,8 @@ function OrderPage(props: OrderPageProps) @{
 				<div class="idempotency-note" role="status">
 					<strong>Charged once.</strong>
 					<span>
-						{' ' + props.checkoutState.submissionCount +
+						{' ' +
+							props.checkoutState.submissionCount +
 							' matching submissions resolved to this single order.'}
 					</span>
 				</div>
@@ -768,7 +786,9 @@ function OrderPage(props: OrderPageProps) @{
 					event.preventDefault();
 					props.navigate('/');
 				}}
-			>Continue browsing</a>
+			>
+				Continue browsing
+			</a>
 		</main>
 	}
 }
@@ -871,65 +891,70 @@ export function App(props: RenderRouteProps) @{
 		});
 	}, []);
 
-	const [checkoutState, checkoutAction, checkoutPending] = useActionState(async (
-		previous: CheckoutState,
-		formData: FormData,
-	): Promise<CheckoutState> => {
-		if (!navigator.onLine) {
-			return {
-				status: 'failure',
-				message: 'You are offline. Your details are still here; reconnect and retry.',
-				recoverable: true,
-			};
-		}
-		let submittedLines: unknown = null;
-		try {
-			submittedLines = JSON.parse(String(formData.get('cart') ?? '[]'));
-		} catch {
-		}
-		let result;
-		try {
-			result = await placeOrder({
-				idempotencyKey: String(formData.get('idempotencyKey') ?? ''),
-				lines: submittedLines,
-				name: String(formData.get('name') ?? ''),
-				email: String(formData.get('email') ?? ''),
-				address: String(formData.get('address') ?? ''),
-				city: String(formData.get('city') ?? ''),
-				postalCode: String(formData.get('postalCode') ?? ''),
-				cardNumber: String(formData.get('cardNumber') ?? ''),
-				agreeToTerms: formData.get('agreeToTerms') === 'yes',
-			});
-		} catch {
-			return {
-				status: 'failure',
-				message: 'The secure checkout service did not answer. Your details are still here; retry safely.',
-				recoverable: true,
-			};
-		}
-		if (result.status === 'success') {
-			setLastOrder(result.order);
-			writeStorage('local', ORDER_STORAGE_KEY, JSON.stringify(result.order));
-			setLines([]);
-			const nextCheckoutKey = crypto.randomUUID();
-			writeStorage('session', SESSION_STORAGE_KEY, nextCheckoutKey);
-			setCheckoutKey(nextCheckoutKey);
-			const orderPath = '/orders/' + result.order.id;
-			if (window.location.pathname !== orderPath) {
-				history.pushState(null, '', orderPath);
+	const [checkoutState, checkoutAction, checkoutPending] = useActionState(
+		async (previous: CheckoutState, formData: FormData): Promise<CheckoutState> => {
+			if (!navigator.onLine) {
+				return {
+					status: 'failure',
+					message: 'You are offline. Your details are still here; reconnect and retry.',
+					recoverable: true,
+				};
 			}
-			setRoute({ name: 'order', orderId: result.order.id });
-			window.scrollTo({ top: 0, behavior: 'instant' });
-		}
-		return result;
-	}, INITIAL_CHECKOUT_STATE);
+			let submittedLines: unknown = null;
+			try {
+				submittedLines = JSON.parse(String(formData.get('cart') ?? '[]'));
+			} catch {}
+			let result;
+			try {
+				result = await placeOrder({
+					idempotencyKey: String(formData.get('idempotencyKey') ?? ''),
+					lines: submittedLines,
+					name: String(formData.get('name') ?? ''),
+					email: String(formData.get('email') ?? ''),
+					address: String(formData.get('address') ?? ''),
+					city: String(formData.get('city') ?? ''),
+					postalCode: String(formData.get('postalCode') ?? ''),
+					cardNumber: String(formData.get('cardNumber') ?? ''),
+					agreeToTerms: formData.get('agreeToTerms') === 'yes',
+				});
+			} catch {
+				return {
+					status: 'failure',
+					message:
+						'The secure checkout service did not answer. Your details are still here; retry safely.',
+					recoverable: true,
+				};
+			}
+			if (result.status === 'success') {
+				setLastOrder(result.order);
+				writeStorage('local', ORDER_STORAGE_KEY, JSON.stringify(result.order));
+				setLines([]);
+				const nextCheckoutKey = crypto.randomUUID();
+				writeStorage('session', SESSION_STORAGE_KEY, nextCheckoutKey);
+				setCheckoutKey(nextCheckoutKey);
+				const orderPath = '/orders/' + result.order.id;
+				if (window.location.pathname !== orderPath) {
+					history.pushState(null, '', orderPath);
+				}
+				setRoute({ name: 'order', orderId: result.order.id });
+				window.scrollTo({ top: 0, behavior: 'instant' });
+			}
+			return result;
+		},
+		INITIAL_CHECKOUT_STATE,
+	);
 
 	const visibleProducts = useMemo(() => {
 		const normalizedQuery = query.trim().toLocaleLowerCase();
 		return PRODUCTS.filter((product) => {
 			const matchesCategory = category === 'All' || product.category === category;
-			const haystack = (product.name + ' ' + product.tagline + ' ' +
-				product.category).toLocaleLowerCase();
+			const haystack = (
+				product.name +
+				' ' +
+				product.tagline +
+				' ' +
+				product.category
+			).toLocaleLowerCase();
 			return matchesCategory && (normalizedQuery === '' || haystack.includes(normalizedQuery));
 		});
 	}, [query, category]);
@@ -944,7 +969,9 @@ export function App(props: RenderRouteProps) @{
 		data-hydrated={hydrated ? 'true' : 'false'}
 		data-app-ready={storageReady ? 'true' : 'false'}
 	>
-		<a class="skip-link" href="#main-content">Skip to main content</a>
+		<a class="skip-link" href="#main-content">
+			Skip to main content
+		</a>
 		<div class="service-strip">
 			<span>Complimentary UK delivery over £120</span>
 			<span aria-hidden="true">·</span>

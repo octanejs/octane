@@ -41,12 +41,10 @@ function getRectanglePath(x: number, y: number, width: number, height: number, r
 	const roundedWidth = round(width);
 	const roundedHeight = round(height);
 	const maxRadius = Math.min(Math.abs(roundedWidth) / 2, Math.abs(roundedHeight) / 2);
-	const ySign =
-		roundedHeight >= 0 ? 1 : -1;
-	const xSign =
-		roundedWidth >= 0 ? 1 : -1;
+	const ySign = roundedHeight >= 0 ? 1 : -1;
+	const xSign = roundedWidth >= 0 ? 1 : -1;
 	const clockWise =
-		roundedHeight >= 0 && roundedWidth >= 0 || roundedHeight < 0 && roundedWidth < 0 ? 1 : 0;
+		(roundedHeight >= 0 && roundedWidth >= 0) || (roundedHeight < 0 && roundedWidth < 0) ? 1 : 0;
 	let path;
 
 	if (maxRadius > 0 && Array.isArray(radius)) {
@@ -58,40 +56,71 @@ function getRectanglePath(x: number, y: number, width: number, height: number, r
 		// roundTemplateLiteral`M${…},${…}` etc. — values rounded, whitespace verbatim.
 		path = 'M' + round(x) + ',' + round(y + ySign * newRadius[0]);
 		if (newRadius[0] > 0) {
-			path += 'A ' + round(newRadius[0]) + ',' + round(newRadius[0]) + ',0,0,' + round(clockWise) +
+			path +=
+				'A ' +
+				round(newRadius[0]) +
+				',' +
+				round(newRadius[0]) +
+				',0,0,' +
+				round(clockWise) +
 				',' +
 				round(x + xSign * newRadius[0]) +
 				',' +
-			round(y);
+				round(y);
 		}
 		path += 'L ' + round(x + width - xSign * newRadius[1]) + ',' + round(y);
 		if (newRadius[1] > 0) {
-			path += 'A ' + round(newRadius[1]) + ',' + round(newRadius[1]) + ',0,0,' + round(clockWise) +
+			path +=
+				'A ' +
+				round(newRadius[1]) +
+				',' +
+				round(newRadius[1]) +
+				',0,0,' +
+				round(clockWise) +
 				',\n        ' +
 				round(x + width) +
 				',' +
-			round(y + ySign * newRadius[1]);
+				round(y + ySign * newRadius[1]);
 		}
 		path += 'L ' + round(x + width) + ',' + round(y + height - ySign * newRadius[2]);
 		if (newRadius[2] > 0) {
-			path += 'A ' + round(newRadius[2]) + ',' + round(newRadius[2]) + ',0,0,' + round(clockWise) +
+			path +=
+				'A ' +
+				round(newRadius[2]) +
+				',' +
+				round(newRadius[2]) +
+				',0,0,' +
+				round(clockWise) +
 				',\n        ' +
 				round(x + width - xSign * newRadius[2]) +
 				',' +
-			round(y + height);
+				round(y + height);
 		}
 		path += 'L ' + round(x + xSign * newRadius[3]) + ',' + round(y + height);
 		if (newRadius[3] > 0) {
-			path += 'A ' + round(newRadius[3]) + ',' + round(newRadius[3]) + ',0,0,' + round(clockWise) +
+			path +=
+				'A ' +
+				round(newRadius[3]) +
+				',' +
+				round(newRadius[3]) +
+				',0,0,' +
+				round(clockWise) +
 				',\n        ' +
 				round(x) +
 				',' +
-			round(y + height - ySign * newRadius[3]);
+				round(y + height - ySign * newRadius[3]);
 		}
 		path += 'Z';
 	} else if (maxRadius > 0 && radius === +radius && radius > 0) {
 		const r = Math.min(maxRadius, radius);
-		path = 'M ' + round(x) + ',' + round(y + ySign * r) + '\n            A ' + round(r) + ',' +
+		path =
+			'M ' +
+			round(x) +
+			',' +
+			round(y + ySign * r) +
+			'\n            A ' +
+			round(r) +
+			',' +
 			round(r) +
 			',0,0,' +
 			round(clockWise) +
@@ -141,11 +170,20 @@ function getRectanglePath(x: number, y: number, width: number, height: number, r
 			round(x) +
 			',' +
 			round(y + height - ySign * r) +
-		' Z';
+			' Z';
 	} else {
-		path = 'M ' + round(x) + ',' + round(y) + ' h ' + round(width) + ' v ' + round(height) + ' h ' +
+		path =
+			'M ' +
+			round(x) +
+			',' +
+			round(y) +
+			' h ' +
+			round(width) +
+			' v ' +
+			round(height) +
+			' h ' +
 			round(-width) +
-		' Z';
+			' Z';
 	}
 	return path;
 }
@@ -168,7 +206,12 @@ export function Rectangle(rectangleProps: Props) {
 	const { x, y, width, height, radius, className } = props;
 
 	if (
-		x !== +x || y !== +y || width !== +width || height !== +height || width === 0 || height === 0
+		x !== +x ||
+		y !== +y ||
+		width !== +width ||
+		height !== +height ||
+		width === 0 ||
+		height === 0
 	) {
 		return null;
 	}
@@ -176,14 +219,16 @@ export function Rectangle(rectangleProps: Props) {
 
 	// Static path — the update-animation branch is a Phase 5 port.
 	const { radius: _radius, ...otherPathProps } = svgPropertiesAndEvents(props);
-	return <path
-		{...otherPathProps}
-		x={round(x)}
-		y={round(y)}
-		width={round(width)}
-		height={round(height)}
-		radius={typeof radius === 'number' ? radius : undefined}
-		className={layerClass}
-		d={getRectanglePath(x, y, width, height, radius)}
-	/>;
+	return (
+		<path
+			{...otherPathProps}
+			x={round(x)}
+			y={round(y)}
+			width={round(width)}
+			height={round(height)}
+			radius={typeof radius === 'number' ? radius : undefined}
+			className={layerClass}
+			d={getRectanglePath(x, y, width, height, radius)}
+		/>
+	);
 }

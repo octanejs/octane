@@ -79,10 +79,12 @@ const reactFlowFieldsToTrack = [
 ] as const;
 
 type ReactFlowFieldsToTrack = (typeof reactFlowFieldsToTrack)[number];
-type StoreUpdaterProps<NodeType extends Node = Node, EdgeType extends Edge = Edge> =
-	Pick<ReactFlowProps<NodeType, EdgeType>, ReactFlowFieldsToTrack> & {
-		rfId: string;
-	};
+type StoreUpdaterProps<NodeType extends Node = Node, EdgeType extends Edge = Edge> = Pick<
+	ReactFlowProps<NodeType, EdgeType>,
+	ReactFlowFieldsToTrack
+> & {
+	rfId: string;
+};
 
 // rfId doesn't exist in ReactFlowProps, but it's one of the fields we want to update
 const fieldsToTrack = [...reactFlowFieldsToTrack, 'rfId'] as const;
@@ -100,10 +102,10 @@ const selector = (s: ReactFlowState) => ({
 
 const initPrevValues = {
 	/*
- * these are values that are also passed directly to other components
- * than the StoreUpdater. We can reduce the number of setStore calls
- * by setting the same values here as prev fields.
- */
+	 * these are values that are also passed directly to other components
+	 * than the StoreUpdater. We can reduce the number of setStore calls
+	 * by setting the same values here as prev fields.
+	 */
 	translateExtent: infiniteExtent,
 	nodeOrigin: defaultNodeOrigin,
 	minZoom: 0.5,
@@ -140,34 +142,41 @@ export function StoreUpdater<NodeType extends Node = Node, EdgeType extends Edge
 
 	const previousFields = useRef<Partial<StoreUpdaterProps<NodeType, EdgeType>>>(initPrevValues);
 
-	useEffect(() => {
-		for (const fieldName of fieldsToTrack) {
-			const fieldValue = props[fieldName];
-			const previousFieldValue = previousFields.current[fieldName];
+	useEffect(
+		() => {
+			for (const fieldName of fieldsToTrack) {
+				const fieldValue = props[fieldName];
+				const previousFieldValue = previousFields.current[fieldName];
 
-			if (fieldValue === previousFieldValue) continue;
-			if (typeof props[fieldName] === 'undefined') continue;
-			// Custom handling with dedicated setters for some fields
-			if (fieldName === 'nodes') setNodes(fieldValue as Node[]);
-			else if (fieldName === 'edges') setEdges(fieldValue as Edge[]);
-			else if (fieldName === 'minZoom') setMinZoom(fieldValue as number);
-			else if (fieldName === 'maxZoom') setMaxZoom(fieldValue as number);
-			else if (fieldName === 'translateExtent') setTranslateExtent(fieldValue as CoordinateExtent);
-			else if (fieldName === 'nodeExtent') setNodeExtent(fieldValue as CoordinateExtent);
-			else if (fieldName === 'ariaLabelConfig') store.setState({
-				ariaLabelConfig: mergeAriaLabelConfig(fieldValue as AriaLabelConfig),
-			});
-			else // Renamed fields
-			if (fieldName === 'fitView') store.setState({ fitViewQueued: fieldValue as boolean });
-			else if (fieldName === 'fitViewOptions') store.setState({
-				fitViewOptions: fieldValue as FitViewOptions,
-			});
-			else // General case
-			store.setState({ [fieldName]: fieldValue });
-		}
+				if (fieldValue === previousFieldValue) continue;
+				if (typeof props[fieldName] === 'undefined') continue;
+				// Custom handling with dedicated setters for some fields
+				if (fieldName === 'nodes') setNodes(fieldValue as Node[]);
+				else if (fieldName === 'edges') setEdges(fieldValue as Edge[]);
+				else if (fieldName === 'minZoom') setMinZoom(fieldValue as number);
+				else if (fieldName === 'maxZoom') setMaxZoom(fieldValue as number);
+				else if (fieldName === 'translateExtent')
+					setTranslateExtent(fieldValue as CoordinateExtent);
+				else if (fieldName === 'nodeExtent') setNodeExtent(fieldValue as CoordinateExtent);
+				else if (fieldName === 'ariaLabelConfig')
+					store.setState({
+						ariaLabelConfig: mergeAriaLabelConfig(fieldValue as AriaLabelConfig),
+					});
+				else // Renamed fields
+				if (fieldName === 'fitView') store.setState({ fitViewQueued: fieldValue as boolean });
+				else if (fieldName === 'fitViewOptions')
+					store.setState({
+						fitViewOptions: fieldValue as FitViewOptions,
+					});
+				else
+					// General case
+					store.setState({ [fieldName]: fieldValue });
+			}
 
-		previousFields.current = props;
-	}, fieldsToTrack.map((fieldName) => props[fieldName])); // Only re-run the effect if one of the fields we track changes
+			previousFields.current = props;
+		},
+		fieldsToTrack.map((fieldName) => props[fieldName]),
+	); // Only re-run the effect if one of the fields we track changes
 
 	return null;
 }

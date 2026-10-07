@@ -46,10 +46,13 @@ export interface AppProps {
 }
 
 function OptionalSidebar(props: { item?: { title: string } }) {
-	return props.item &&
-		<ViewTransition exit="auto" default="none">
-			<nav id="optional-sidebar">{props.item.title as string}</nav>
-		</ViewTransition>;
+	return (
+		props.item && (
+			<ViewTransition exit="auto" default="none">
+				<nav id="optional-sidebar">{props.item.title as string}</nav>
+			</ViewTransition>
+		)
+	);
 }
 
 export function App(props: AppProps) @{
@@ -99,10 +102,14 @@ export function App(props: AppProps) @{
 						? null
 						: createElement('aside', { id: 'descriptor' }, props.descriptor)}
 					@for (const row of props.rows; key row.id) {
-						<p data-row={row.id} contentEditable={row.editable}>{row.label as string}</p>
+						<p data-row={row.id} contentEditable={row.editable}>
+							{row.label as string}
+						</p>
 					}
 					@if (props.measure) {
-						<strong id="measured" ref={props.onMeasuredRef}>Font sample</strong>
+						<strong id="measured" ref={props.onMeasuredRef}>
+							Font sample
+						</strong>
 					}
 					@if (props.nested) {
 						<ViewTransition name="inner" update="none" {...props.nestedTransition}>

@@ -71,7 +71,12 @@ export function MenubarContent({
 	);
 }
 
-export function MenubarItem({ className, inset, variant = 'default', ...props }: Props & {
+export function MenubarItem({
+	className,
+	inset,
+	variant = 'default',
+	...props
+}: Props & {
 	inset?: boolean;
 	variant?: 'default' | 'destructive';
 }) @{
@@ -80,17 +85,19 @@ export function MenubarItem({ className, inset, variant = 'default', ...props }:
 		data-inset={inset}
 		data-variant={variant}
 		className={cn(
-			'group/menubar-item relative flex cursor-default items-center gap-1.5 rounded-md px-1.5 py-1 text-sm outline-hidden select-none focus:bg-accent focus:text-accent-foreground not-data-[variant=destructive]:focus:**:text-accent-foreground data-inset:pl-7 data-[variant=destructive]:text-destructive data-[variant=destructive]:focus:bg-destructive/10 data-[variant=destructive]:focus:text-destructive dark:data-[variant=destructive]:focus:bg-destructive/20 data-disabled:pointer-events-none data-disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*=\'size-\'])]:size-4 data-[variant=destructive]:*:[svg]:text-destructive!',
+			"group/menubar-item relative flex cursor-default items-center gap-1.5 rounded-md px-1.5 py-1 text-sm outline-hidden select-none focus:bg-accent focus:text-accent-foreground not-data-[variant=destructive]:focus:**:text-accent-foreground data-inset:pl-7 data-[variant=destructive]:text-destructive data-[variant=destructive]:focus:bg-destructive/10 data-[variant=destructive]:focus:text-destructive dark:data-[variant=destructive]:focus:bg-destructive/20 data-disabled:pointer-events-none data-disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4 data-[variant=destructive]:*:[svg]:text-destructive!",
 			className,
 		)}
 		{...props}
 	/>
 }
 
-export function MenubarCheckboxItem(props: Props & {
-	checked?: boolean | 'indeterminate';
-	inset?: boolean;
-}) @{
+export function MenubarCheckboxItem(
+	props: Props & {
+		checked?: boolean | 'indeterminate';
+		inset?: boolean;
+	},
+) @{
 	const { className, children: _children, checked, inset, ...rest } = props;
 
 	<MenubarPrimitive.CheckboxItem
@@ -103,9 +110,7 @@ export function MenubarCheckboxItem(props: Props & {
 		checked={checked}
 		{...rest}
 	>
-		<span
-			className="pointer-events-none absolute left-1.5 flex size-4 items-center justify-center [&_svg:not([class*='size-'])]:size-4"
-		>
+		<span className="pointer-events-none absolute left-1.5 flex size-4 items-center justify-center [&_svg:not([class*='size-'])]:size-4">
 			<MenubarPrimitive.ItemIndicator>
 				<CheckIcon />
 			</MenubarPrimitive.ItemIndicator>
@@ -121,14 +126,12 @@ export function MenubarRadioItem(props: Props & { inset?: boolean }) @{
 		data-slot="menubar-radio-item"
 		data-inset={inset}
 		className={cn(
-			'relative flex cursor-default items-center gap-1.5 rounded-md py-1 pr-1.5 pl-7 text-sm outline-hidden select-none focus:bg-accent focus:text-accent-foreground focus:**:text-accent-foreground data-inset:pl-7 data-disabled:pointer-events-none data-disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*=\'size-\'])]:size-4',
+			"relative flex cursor-default items-center gap-1.5 rounded-md py-1 pr-1.5 pl-7 text-sm outline-hidden select-none focus:bg-accent focus:text-accent-foreground focus:**:text-accent-foreground data-inset:pl-7 data-disabled:pointer-events-none data-disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4",
 			className,
 		)}
 		{...rest}
 	>
-		<span
-			className="pointer-events-none absolute left-1.5 flex size-4 items-center justify-center [&_svg:not([class*='size-'])]:size-4"
-		>
+		<span className="pointer-events-none absolute left-1.5 flex size-4 items-center justify-center [&_svg:not([class*='size-'])]:size-4">
 			<MenubarPrimitive.ItemIndicator>
 				<CheckIcon />
 			</MenubarPrimitive.ItemIndicator>
@@ -176,7 +179,7 @@ export function MenubarSubTrigger(props: Props & { inset?: boolean }) @{
 		data-slot="menubar-sub-trigger"
 		data-inset={inset}
 		className={cn(
-			'flex cursor-default items-center gap-1.5 rounded-md px-1.5 py-1 text-sm outline-none select-none focus:bg-accent focus:text-accent-foreground data-inset:pl-7 data-open:bg-accent data-open:text-accent-foreground [&_svg:not([class*=\'size-\'])]:size-4',
+			"flex cursor-default items-center gap-1.5 rounded-md px-1.5 py-1 text-sm outline-none select-none focus:bg-accent focus:text-accent-foreground data-inset:pl-7 data-open:bg-accent data-open:text-accent-foreground [&_svg:not([class*='size-'])]:size-4",
 			className,
 		)}
 		{...rest}

@@ -40,7 +40,7 @@
       "arch": "any",
       "packageManager": "pnpm@12.9.1",
       "lockfile": "pnpm-lock.yaml",
-      "lockfileSha256": "e92f4520cd88a2593a0ecd555e0532b2e4e8bb1396c9558a09f0cbf3fbaa5917"
+      "lockfileSha256": "caea67fe61ab57f3e8cbd8a0e55f0e8b3014b3dd6815c6fe6e158095f291daeb"
     }
   },
   "lanes": [
@@ -305,22 +305,22 @@
         {
           "path": "packages/jotai/tests/_fixtures/counter-diff.tsrx",
           "role": "support",
-          "sha256": "da9bf8889c07aa0480ccdd56488ffe539666d22b3af2ba8e1c1549f438299f06"
+          "sha256": "d617e097d9dbdcdad771c08c378ab49fdb08839e719040b7cdc137edb7f2bf3e"
         },
         {
           "path": "packages/jotai/tests/_fixtures/providers-diff.tsrx",
           "role": "support",
-          "sha256": "51df31bb17f61b3199a68a59b3ce75c39075ff242b8e2a9999d3a73196ab472d"
+          "sha256": "3fe2de58bea3e9ebb3fb7794bf4f71e84b158eaabc2dea0fd794b0a7536d6c3c"
         },
         {
           "path": "packages/jotai/tests/_fixtures/split-diff.tsrx",
           "role": "support",
-          "sha256": "98e8ab19e17485fd8df300cdb286299abf642ae9c1c049ef2c602653b47c6d87"
+          "sha256": "7df36b67d6f1c0ac2f29335b4d93734f1f605109108fa55afab080d76c21ceaa"
         },
         {
           "path": "packages/jotai/tests/_fixtures/async-diff.tsrx",
           "role": "support",
-          "sha256": "55369525c098fa0f9d25dd0f995d0df27e861e16b259a642cff1e6519acb1a39"
+          "sha256": "0a5273efc73abeb4c4f6e4c4be84ff295708fc2a6a90fbcdf89304562c07c5a0"
         },
         {
           "path": "packages/jotai/tests/differential/_setup.ts",

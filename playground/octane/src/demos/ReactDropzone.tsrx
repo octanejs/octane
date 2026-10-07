@@ -27,13 +27,16 @@ export function ReactDropzoneDemo() @{
 
 	<div>
 		<h2 class="demo-title">{'React Dropzone on Octane'}</h2>
-		<p
-			class="demo-blurb"
-		>{'Drop, paste, or choose up to three PNG/JPEG files. Validation stays local; nothing is uploaded.'}</p>
+		<p class="demo-blurb">
+			{
+				'Drop, paste, or choose up to three PNG/JPEG files. Validation stays local; nothing is uploaded.'
+			}
+		</p>
 		<section
 			{...dropzone.getRootProps({
 				class: 'panel',
-				style: 'min-height: 11rem; display: grid; place-items: center; text-align: center; border-style: dashed;',
+				style:
+					'min-height: 11rem; display: grid; place-items: center; text-align: center; border-style: dashed;',
 			})}
 		>
 			<input {...dropzone.getInputProps()} />
@@ -55,18 +58,16 @@ export function ReactDropzoneDemo() @{
 						event.stopPropagation();
 						dropzone.open();
 					}}
-				>{'Choose files programmatically'}</button>
+				>
+					{'Choose files programmatically'}
+				</button>
 			</div>
 		</section>
 		<div class="panel">
 			<h3>{'Accepted'}</h3>
-			<p>
-				{accepted.length ? accepted.join(', ') : 'No accepted files yet.'}
-			</p>
+			<p>{accepted.length ? accepted.join(', ') : 'No accepted files yet.'}</p>
 			<h3>{'Rejected'}</h3>
-			<p>
-				{rejected.length ? rejected.join(' · ') : 'No rejected files yet.'}
-			</p>
+			<p>{rejected.length ? rejected.join(' · ') : 'No rejected files yet.'}</p>
 			<small>{`Built-in rejection code example: ${ErrorCode.FileTooLarge}`}</small>
 		</div>
 	</div>

@@ -12,7 +12,9 @@ function Tally({ label }: { label: string }) @{
 			counts.set(label, (counts.get(label) ?? 0) + 1);
 			force(counts.get(label)!);
 		}}
-	>{`${label}: ${counts.get(label) ?? 0}` as string}</button>
+	>
+		{`${label}: ${counts.get(label) ?? 0}` as string}
+	</button>
 }
 
 export function App() @{

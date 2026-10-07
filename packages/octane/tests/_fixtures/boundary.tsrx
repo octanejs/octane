@@ -2,7 +2,7 @@ import { Suspense, ErrorBoundary, use, useEffect, useLayoutEffect, useState } fr
 
 export function Suspender(props) @{
 	const v = use(props.promise);
-	<span id="v">{'v:' + v as string}</span>
+	<span id="v">{('v:' + v) as string}</span>
 }
 
 export function SuspenseHost(props) @{
@@ -16,7 +16,9 @@ export function SuspenseHost(props) @{
 function UpdateSuspender(props) @{
 	const [pending, setPending] = useState(false);
 	<section>
-		<button id="suspend" onClick={() => setPending(true)}>suspend</button>
+		<button id="suspend" onClick={() => setPending(true)}>
+			suspend
+		</button>
 		@if (pending) {
 			<Suspender promise={props.promise} />
 		} @else {
@@ -55,8 +57,7 @@ interface SuspendingErrorFallbackProps {
 }
 
 function SuspendingErrorFallback(props: SuspendingErrorFallbackProps) @{
-	const value =
-		props.usePromise ? use(props.promise) : props.read();
+	const value = props.usePromise ? use(props.promise) : props.read();
 	useLayoutEffect(() => {
 		props.log.push('mount');
 		return () => {
@@ -71,12 +72,14 @@ function SuspendingErrorFallback(props: SuspendingErrorFallbackProps) @{
 export function SuspendingErrorFallbackHost(props: SuspendingErrorFallbackProps) @{
 	<Suspense fallback={<span id="outer-error-pending">{'outer loading'}</span>}>
 		<ErrorBoundary
-			fallback={<SuspendingErrorFallback
-				promise={props.promise}
-				read={props.read}
-				usePromise={props.usePromise}
-				log={props.log}
-			/>}
+			fallback={
+				<SuspendingErrorFallback
+					promise={props.promise}
+					read={props.read}
+					usePromise={props.usePromise}
+					log={props.log}
+				/>
+			}
 		>
 			<Thrower bang={true} />
 		</ErrorBoundary>
@@ -90,15 +93,17 @@ function ResetThrower(props) @{
 
 export function ResetErrorHost(props) @{
 	<ErrorBoundary
-		fallback={(error, reset) => <button
-			id="reset-error"
-			onClick={() => {
-				props.state.failed = false;
-				reset();
-			}}
-		>
-			{'retry:' + (error as Error).message}
-		</button>}
+		fallback={(error, reset) => (
+			<button
+				id="reset-error"
+				onClick={() => {
+					props.state.failed = false;
+					reset();
+				}}
+			>
+				{'retry:' + (error as Error).message}
+			</button>
+		)}
 	>
 		<ResetThrower state={props.state} />
 	</ErrorBoundary>
@@ -140,8 +145,9 @@ function EffectFailure(props: EffectFailureProps) @{
 
 export function EffectErrorHost(props: EffectFailureProps) @{
 	<ErrorBoundary
-		fallback={(error: unknown) =>
-			<strong id="effect-error">{(error as Error).message as string}</strong>}
+		fallback={(error: unknown) => (
+			<strong id="effect-error">{(error as Error).message as string}</strong>
+		)}
 	>
 		<EffectFailure phase={props.phase} />
 	</ErrorBoundary>
@@ -163,13 +169,16 @@ function BoundaryLifecycleChild(props: BoundaryLifecycleProps) @{
 		};
 	}, []);
 	if (props.fail) throw new Error('lifecycle failed');
-	<span id="boundary-primary" ref={props.hostRef}>{'primary'}</span>
+	<span id="boundary-primary" ref={props.hostRef}>
+		{'primary'}
+	</span>
 }
 
 export function LifecycleErrorHost(props: BoundaryLifecycleProps) @{
 	<ErrorBoundary
-		fallback={(error: unknown) =>
-			<strong id="lifecycle-error">{(error as Error).message as string}</strong>}
+		fallback={(error: unknown) => (
+			<strong id="lifecycle-error">{(error as Error).message as string}</strong>
+		)}
 	>
 		<BoundaryLifecycleChild
 			fail={props.fail}
@@ -188,7 +197,9 @@ interface BoundaryRefProps {
 function RemovableRef(props: BoundaryRefProps) @{
 	<section>
 		@if (props.keep) {
-			<span id="boundary-ref" ref={props.hostRef}>{'ref'}</span>
+			<span id="boundary-ref" ref={props.hostRef}>
+				{'ref'}
+			</span>
 		}
 		<span id="boundary-ref-sibling">{'sibling'}</span>
 	</section>
@@ -196,8 +207,9 @@ function RemovableRef(props: BoundaryRefProps) @{
 
 export function RefDetachErrorHost(props: BoundaryRefProps) @{
 	<ErrorBoundary
-		fallback={(error: unknown) =>
-			<strong id="ref-error">{(error as Error).message as string}</strong>}
+		fallback={(error: unknown) => (
+			<strong id="ref-error">{(error as Error).message as string}</strong>
+		)}
 	>
 		<RemovableRef keep={props.keep} hostRef={props.hostRef} />
 	</ErrorBoundary>

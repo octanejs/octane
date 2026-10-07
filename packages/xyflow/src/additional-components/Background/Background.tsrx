@@ -53,37 +53,43 @@ function BackgroundComponent({
 
 	const _patternId = `${patternId}${id ? id : ''}`;
 
-	return <svg
-		className={cc(['react-flow__background', className])}
-		style={{
-			...style,
-			...containerStyle,
-			'--xy-background-color-props': bgColor,
-			'--xy-background-pattern-color-props': color,
-		} as CSSProperties}
-		ref={ref}
-		data-testid="rf__background"
-	>
-		<pattern
-			id={_patternId}
-			x={transform[0] % scaledGap[0]}
-			y={transform[1] % scaledGap[1]}
-			width={scaledGap[0]}
-			height={scaledGap[1]}
-			patternUnits="userSpaceOnUse"
-			patternTransform={`translate(-${scaledOffset[0]},-${scaledOffset[1]})`}
+	return (
+		<svg
+			className={cc(['react-flow__background', className])}
+			style={
+				{
+					...style,
+					...containerStyle,
+					'--xy-background-color-props': bgColor,
+					'--xy-background-pattern-color-props': color,
+				} as CSSProperties
+			}
+			ref={ref}
+			data-testid="rf__background"
 		>
-			{isDots
-				? <DotPattern radius={scaledSize / 2} className={patternClassName} />
-				: <LinePattern
+			<pattern
+				id={_patternId}
+				x={transform[0] % scaledGap[0]}
+				y={transform[1] % scaledGap[1]}
+				width={scaledGap[0]}
+				height={scaledGap[1]}
+				patternUnits="userSpaceOnUse"
+				patternTransform={`translate(-${scaledOffset[0]},-${scaledOffset[1]})`}
+			>
+				{isDots ? (
+					<DotPattern radius={scaledSize / 2} className={patternClassName} />
+				) : (
+					<LinePattern
 						dimensions={patternDimensions}
 						lineWidth={lineWidth}
 						variant={variant}
 						className={patternClassName}
-					/>}
-		</pattern>
-		<rect x="0" y="0" width="100%" height="100%" fill={`url(#${_patternId})`} />
-	</svg>;
+					/>
+				)}
+			</pattern>
+			<rect x="0" y="0" width="100%" height="100%" fill={`url(#${_patternId})`} />
+		</svg>
+	);
 }
 
 BackgroundComponent.displayName = 'Background';

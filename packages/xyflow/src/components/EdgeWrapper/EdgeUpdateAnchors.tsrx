@@ -13,17 +13,16 @@ import type { MouseEvent as ReactMouseEvent } from '../../react-shim.js';
 import type { EdgeWrapperProps, Edge } from '../../types/edges';
 import { useStoreApi } from '../../hooks/useStore';
 
-type EdgeUpdateAnchorsProps<EdgeType extends Edge = Edge> =
-	{
-		edge: EdgeType;
-		isReconnectable: boolean | 'source' | 'target';
-		reconnectRadius: EdgeWrapperProps['reconnectRadius'];
-		onReconnect: EdgeWrapperProps<EdgeType>['onReconnect'];
-		onReconnectStart: EdgeWrapperProps<EdgeType>['onReconnectStart'];
-		onReconnectEnd: EdgeWrapperProps<EdgeType>['onReconnectEnd'];
-		setUpdateHover: (hover: boolean) => void;
-		setReconnecting: (updating: boolean) => void;
-	} & EdgePosition;
+type EdgeUpdateAnchorsProps<EdgeType extends Edge = Edge> = {
+	edge: EdgeType;
+	isReconnectable: boolean | 'source' | 'target';
+	reconnectRadius: EdgeWrapperProps['reconnectRadius'];
+	onReconnect: EdgeWrapperProps<EdgeType>['onReconnect'];
+	onReconnectStart: EdgeWrapperProps<EdgeType>['onReconnectStart'];
+	onReconnectEnd: EdgeWrapperProps<EdgeType>['onReconnectEnd'];
+	setUpdateHover: (hover: boolean) => void;
+	setReconnecting: (updating: boolean) => void;
+} & EdgePosition;
 
 export function EdgeUpdateAnchors<EdgeType extends Edge = Edge>({
 	isReconnectable,
@@ -124,28 +123,32 @@ export function EdgeUpdateAnchors<EdgeType extends Edge = Edge>({
 	const onReconnectMouseEnter = () => setUpdateHover(true);
 	const onReconnectMouseOut = () => setUpdateHover(false);
 
-	return <>
-		{(isReconnectable === true || isReconnectable === 'source') &&
-			<EdgeAnchor
-				position={sourcePosition}
-				centerX={sourceX}
-				centerY={sourceY}
-				radius={reconnectRadius}
-				onMouseDown={onReconnectSourceMouseDown}
-				onMouseEnter={onReconnectMouseEnter}
-				onMouseOut={onReconnectMouseOut}
-				type="source"
-			/>}
-		{(isReconnectable === true || isReconnectable === 'target') &&
-			<EdgeAnchor
-				position={targetPosition}
-				centerX={targetX}
-				centerY={targetY}
-				radius={reconnectRadius}
-				onMouseDown={onReconnectTargetMouseDown}
-				onMouseEnter={onReconnectMouseEnter}
-				onMouseOut={onReconnectMouseOut}
-				type="target"
-			/>}
-	</>;
+	return (
+		<>
+			{(isReconnectable === true || isReconnectable === 'source') && (
+				<EdgeAnchor
+					position={sourcePosition}
+					centerX={sourceX}
+					centerY={sourceY}
+					radius={reconnectRadius}
+					onMouseDown={onReconnectSourceMouseDown}
+					onMouseEnter={onReconnectMouseEnter}
+					onMouseOut={onReconnectMouseOut}
+					type="source"
+				/>
+			)}
+			{(isReconnectable === true || isReconnectable === 'target') && (
+				<EdgeAnchor
+					position={targetPosition}
+					centerX={targetX}
+					centerY={targetY}
+					radius={reconnectRadius}
+					onMouseDown={onReconnectTargetMouseDown}
+					onMouseEnter={onReconnectMouseEnter}
+					onMouseOut={onReconnectMouseOut}
+					type="target"
+				/>
+			)}
+		</>
+	);
 }

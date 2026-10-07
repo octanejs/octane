@@ -7,14 +7,12 @@ import { ENABLE_DEV_WARNINGS, isRouteErrorResponse } from './router/utils.ts';
 
 export function DefaultErrorComponent() @{
 	const error = useContext(RouteErrorContext);
-	const message =
-		isRouteErrorResponse(error)
-			? error.status + ' ' + error.statusText
-			: error instanceof Error
-				? error.message
-				: JSON.stringify(error);
-	const stack =
-		error instanceof Error ? error.stack : null;
+	const message = isRouteErrorResponse(error)
+		? error.status + ' ' + error.statusText
+		: error instanceof Error
+			? error.message
+			: JSON.stringify(error);
+	const stack = error instanceof Error ? error.stack : null;
 	const lightgrey = 'rgba(200,200,200, 0.5)';
 
 	if (ENABLE_DEV_WARNINGS) {
@@ -31,7 +29,9 @@ export function DefaultErrorComponent() @{
 			<>
 				<p>💿 Hey developer 👋</p>
 				<p>
-					{'You can provide a way better UX than this when your app throws errors by providing your own '}
+					{
+						'You can provide a way better UX than this when your app throws errors by providing your own '
+					}
 					<code style={{ padding: '2px 4px', backgroundColor: lightgrey }}>ErrorBoundary</code>
 					{' or '}
 					<code style={{ padding: '2px 4px', backgroundColor: lightgrey }}>errorElement</code>

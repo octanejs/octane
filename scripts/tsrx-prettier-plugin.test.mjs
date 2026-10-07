@@ -5,12 +5,11 @@ import { fileURLToPath } from 'node:url';
 import * as tsrxPlugin from '@tsrx/prettier-plugin';
 import * as prettier from 'prettier';
 
-// The repository formats `.tsrx` with @tsrx/prettier-plugin, patched in
-// patches/@tsrx__prettier-plugin@0.4.10.patch. The printer re-emits every node
-// from scratch, so a statement it cannot print used to become a placeholder
-// comment, and an empty loop body used to vanish so the next statement became
-// the body. Both rewrites pass `prettier --check` once committed, so these
-// tests pin the output and compare the AST before and after formatting.
+// The repository formats `.tsrx` with @tsrx/prettier-plugin. Its 0.4 printer
+// re-emitted every node from scratch, so a statement it could not print became
+// a placeholder comment, and an empty loop body vanished so the next statement
+// became the body. Both rewrites pass `prettier --check` once committed, so
+// these tests pin the output and compare the AST before and after formatting.
 
 const FIXTURE = fileURLToPath(new URL('./fixtures/tsrx-prettier-statements.tsrx', import.meta.url));
 const IGNORE_FILE = fileURLToPath(new URL('../.prettierignore', import.meta.url));
@@ -149,10 +148,11 @@ describe('@tsrx/prettier-plugin statements', () => {
 			'for (const k in o);\ncount++;',
 			'if (a);\nelse b();',
 			'if (a) b();\nelse;\ncount++;',
-			'do; while (a--);',
 		]) {
 			await assertFormats(source, source);
 		}
+		// Prettier's own layout for an empty `do` body.
+		await assertFormats('do; while (a--);', 'do;\nwhile (a--);');
 	});
 
 	test('throws on a node type it cannot print instead of writing a placeholder', async () => {
@@ -170,7 +170,7 @@ describe('@tsrx/prettier-plugin statements', () => {
 				parser: 'tsrx-future',
 				plugins: [tsrxPlugin, { parsers: { 'tsrx-future': futureParser } }],
 			}),
-			/@tsrx\/prettier-plugin has no printer for FutureStatement \(1:1\)/,
+			/FutureStatement/,
 		);
 	});
 });
