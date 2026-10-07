@@ -37,7 +37,9 @@ export function BlockHandler(props: { label: string }) @{
 				event.preventDefault();
 				setShown(<Toast label={label} />);
 			}}
-		>{'open'}</button>
+		>
+			{'open'}
+		</button>
 		{shown}
 	</div>
 }
@@ -57,7 +59,9 @@ export function BlockHandlerDirective(props: { label: string }) @{
 					</p>,
 				);
 			}}
-		>{'open'}</button>
+		>
+			{'open'}
+		</button>
 		{shown}
 	</div>
 }
