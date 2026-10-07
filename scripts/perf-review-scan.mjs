@@ -503,7 +503,13 @@ function collect(options) {
 	if (options.diff !== undefined) {
 		const text = readFileSync(options.diff === '-' ? 0 : options.diff, 'utf8');
 		const runtime = path.join(ROOT, RUNTIME);
-		return { text, runtime: () => (existsSync(runtime) ? readFileSync(runtime, 'utf8') : null) };
+		// The local checkout stands in for the diff's runtime.ts, so its shape is
+		// only an approximation of the reviewed head's.
+		return {
+			text,
+			exact: false,
+			runtime: () => (existsSync(runtime) ? readFileSync(runtime, 'utf8') : null),
+		};
 	}
 	const unified = `--unified=${CONTEXT_LINES}`;
 	if (options.head !== undefined) {
@@ -519,6 +525,7 @@ function collect(options) {
 				'--',
 				'packages',
 			]),
+			exact: true,
 			runtime: () => git(['show', `${options.head}:${RUNTIME}`]),
 		};
 	}
@@ -532,7 +539,22 @@ function collect(options) {
 		const lines = readFileSync(path.join(ROOT, file), 'utf8').split('\n');
 		text += `\n+++ b/${file}\n@@ -0,0 +1,${lines.length} @@\n${lines.map((l) => '+' + l).join('\n')}\n`;
 	}
-	return { text, runtime: () => readFileSync(path.join(ROOT, RUNTIME), 'utf8') };
+	return { text, exact: true, runtime: () => readFileSync(path.join(ROOT, RUNTIME), 'utf8') };
+}
+
+/** Fields a diff declares in runtime.ts, which a stand-in checkout may not have yet. */
+export function addedDeclarations(files) {
+	const fields = new Set();
+	for (const file of files) {
+		if (file.path !== RUNTIME) continue;
+		for (const hunk of file.hunks) {
+			for (const entry of hunk) {
+				const match = entry.kind === 'add' && /^\s*declare\s+([\w$]+)\??\s*:/.exec(entry.text);
+				if (match) fields.add(match[1]);
+			}
+		}
+	}
+	return fields;
 }
 
 /** Collapse runs of one rule in one file (within 15 lines) so a block of similar lines reads once. */
@@ -580,15 +602,17 @@ export function formatFindings(findings) {
 
 export function run(argv) {
 	const options = readOptions(argv);
-	const { text, runtime } = collect(options);
+	const { text, exact, runtime } = collect(options);
 	const files = parseDiff(text);
 	const scanned = files.filter((file) => isScannedFile(file.path, options.only));
 	const source = scanned.some((file) => writesHotRecords(file.path)) ? runtime() : null;
-	const findings = scanFiles(files, {
-		only: options.only,
-		hotFields: source === null ? null : hotClassFields(source),
-	});
-	if (source !== null && scanned.some((file) => file.path === RUNTIME)) {
+	const hotFields = source === null ? null : hotClassFields(source);
+	if (hotFields !== null && !exact)
+		for (const field of addedDeclarations(files)) hotFields.add(field);
+	const findings = scanFiles(files, { only: options.only, hotFields });
+	// The structural check needs the reviewed head's runtime.ts; a pasted diff
+	// does not carry it, so use --head for that check.
+	if (exact && source !== null && scanned.some((file) => file.path === RUNTIME)) {
 		findings.push(...checkHotClasses(source));
 	}
 	return findings;

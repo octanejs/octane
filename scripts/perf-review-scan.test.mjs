@@ -1,5 +1,7 @@
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import path from 'node:path';
 import test from 'node:test';
 import {
 	checkHotClasses,
@@ -8,6 +10,7 @@ import {
 	hotClassFields,
 	isScannedFile,
 	parseDiff,
+	run,
 	scanFiles,
 } from './perf-review-scan.mjs';
 
@@ -278,5 +281,21 @@ test('every Block and Scope field write in the current runtime targets a declare
 	assert.deepEqual(
 		findings.filter((f) => f.rule === 'hot-field-write'),
 		[],
+	);
+});
+
+test('a pasted PR diff may declare hot fields the local checkout does not have yet', () => {
+	const file = path.join(mkdtempSync(path.join(tmpdir(), 'perf-review-scan-')), 'pr.diff');
+	writeFileSync(
+		file,
+		diff('packages/octane/src/runtime.ts', [
+			'+	declare brandNewField: number;',
+			'+	block.brandNewField = 1;',
+			'+	block.otherUndeclared = 2;',
+		]),
+	);
+	assert.deepEqual(
+		run(['--diff', file]).map((f) => [f.line, f.rule, f.message.split('`')[1]]),
+		[[12, 'hot-field-write', 'block.otherUndeclared']],
 	);
 });

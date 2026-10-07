@@ -28,8 +28,9 @@ node scripts/perf-review-scan.mjs packages/<binding>/src/ # a binding's hot path
   excluding `compiler/`. Path prefixes replace that scope; tests, fixtures, and
   benchmarks are always excluded. `--json` prints machine-readable findings.
 - `gh pr diff` carries only three lines of context, so the loop and
-  read-after-write notes see less. For a full review, check out the PR head in a
-  worktree and use `--head`.
+  read-after-write notes see less. A pasted diff also lacks the head's
+  `runtime.ts`, so `--diff` skips `hot-class-shape`. For a full review, check
+  out the PR head in a worktree and use `--head`.
 
 ## 2. Classify the change before judging it
 
