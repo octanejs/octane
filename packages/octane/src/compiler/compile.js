@@ -8957,19 +8957,26 @@ function arrowComponentToFunctionDecl(varDecl) {
 	) {
 		return null;
 	}
+	return componentFunctionDeclaration(d.id, init, varDecl);
+}
+
+// The canonical FunctionDeclaration for an arrow/function-expression `@{…}`
+// component `fn`, bound to `id` and spanning `origin`.
+/** @param {any} id @param {any} fn @param {any} origin @returns {any} */
+function componentFunctionDeclaration(id, fn, origin) {
 	const declaration = b.function_declaration(
-		d.id,
-		init.params || [],
-		init.body,
-		!!init.async,
-		init.typeParameters,
+		id,
+		fn.params || [],
+		fn.body,
+		!!fn.async,
+		fn.typeParameters,
 	);
-	declaration.generator = !!init.generator;
-	if (init.returnType !== undefined) declaration.returnType = init.returnType;
-	if (init.predicate !== undefined) declaration.predicate = init.predicate;
-	declaration.start = varDecl.start;
-	declaration.end = varDecl.end;
-	declaration.loc = varDecl.loc;
+	declaration.generator = !!fn.generator;
+	if (fn.returnType !== undefined) declaration.returnType = fn.returnType;
+	if (fn.predicate !== undefined) declaration.predicate = fn.predicate;
+	declaration.start = origin.start;
+	declaration.end = origin.end;
+	declaration.loc = origin.loc;
 	return declaration;
 }
 
@@ -9067,32 +9074,86 @@ function normalizeArrowComponents(ast) {
 	return changed ? { ...ast, body } : ast;
 }
 
-// `export default function () @{…}` declares no module binding, but component
-// lowering addresses the compiled function through one: capability stamps, the
-// HMR rebinding, dev LOC metadata, and profile registration all name it. Give
-// the anonymous component a synthesized binding no authored identifier uses, so
-// it compiles exactly like `export default function Name() @{…}`. The public
-// export stays `default`, and HMR registration is keyed by the export name.
-// Copy-on-write: returns the input module when nothing changed.
+// Component lowering addresses a compiled component through its module
+// binding: capability stamps, the HMR rebinding, dev LOC metadata, and profile
+// registration all name it. Three default-export forms lack a usable one:
+//
+// - `export default function () @{…}` and `export default () => @{…}` declare
+//   no binding. Give the component a synthesized binding no authored identifier
+//   uses, converting an arrow to FunctionDeclaration form as
+//   normalizeArrowComponents does for `const X = () => @{…}`.
+// - `export default (function Name() @{…})` binds `Name` only inside the
+//   component, so the module may bind `Name` too. Lowering would redeclare it.
+//   On that collision, bind the component to a fresh name, and alias `Name` at
+//   the top of its setup when the component refers to itself by name.
+//
+// Each then compiles exactly like `export default function Name() @{…}`. The
+// public export stays `default`, and HMR registration is keyed by the export
+// name. Copy-on-write: returns the input module when nothing changed.
 /** @param {any} ast @returns {any} */
-function nameAnonymousDefaultComponent(ast) {
+function bindDefaultComponent(ast) {
 	if (!ast || !Array.isArray(ast.body)) return ast;
 	const index = ast.body.findIndex(
 		(node) =>
 			node.type === 'ExportDefaultDeclaration' &&
-			node.declaration?.id == null &&
-			isComponentFunction(node.declaration),
+			(isComponentFunction(node.declaration) ||
+				(node.declaration?.type === 'ArrowFunctionExpression' &&
+					node.declaration.body?.type === 'JSXCodeBlock')),
 	);
 	if (index === -1) return ast;
 	const node = ast.body[index];
-	// Diagnostics name the authored export, never the synthesized binding.
-	rejectAsyncOrGenerator(node.declaration, 'default');
-	const name = allocCompilerName(
-		{ usedCompilerNames: collectIdentifierNames(ast), compilerNameSuffixes: null },
-		'_default',
-	);
+	const component = node.declaration;
+	const self = component.id?.name;
+	let declaration;
+	if (self === undefined) {
+		// Diagnostics name the authored export, never the synthesized binding.
+		rejectAsyncOrGenerator(component, 'default');
+		const name = allocCompilerName(
+			{ usedCompilerNames: collectIdentifierNames(ast), compilerNameSuffixes: null },
+			'_default',
+		);
+		declaration =
+			component.type === 'ArrowFunctionExpression'
+				? componentFunctionDeclaration(b.id(name), component, component)
+				: { ...component, id: b.id(name) };
+	} else {
+		if (component.type !== 'FunctionExpression') return ast;
+		const others = ast.body.filter((statement) => statement !== node);
+		const outer = collectFreeIdentifiers(others, []);
+		for (const statement of others) collectStatementBindings(statement, outer);
+		if (!outer.has(self)) return ast;
+		rejectAsyncOrGenerator(component, self);
+		const name = allocCompilerName(
+			{ usedCompilerNames: collectIdentifierNames(ast), compilerNameSuffixes: null },
+			self,
+		);
+		let block = component.body;
+		const unnamed = { ...component, id: null };
+		if (collectFreeIdentifiers(unnamed, []).has(self)) {
+			// The alias lives in the body, so parameter defaults and computed keys
+			// cannot see it, and a declaration of `Name` the free-identifier walk
+			// cannot place could collide with it. Reject both instead of guessing.
+			const where = collectFreeIdentifiers({ ...unnamed, body: b.block([]) }, []).has(self)
+				? 'in a parameter'
+				: collectModuleBoundNames(unnamed).has(self)
+					? `while its body also declares \`${self}\``
+					: null;
+			if (where !== null) {
+				throw new Error(
+					`Component \`${self}\` refers to itself by name ${where}, but its module also declares \`${self}\`. Rename the component's function expression.`,
+				);
+			}
+			// After any directive prologue, which must stay first in the body.
+			const setup = block.body;
+			let at = 0;
+			while (at < setup.length && typeof setup[at].directive === 'string') at++;
+			const alias = b.const(self, b.id(name));
+			block = { ...block, body: [...setup.slice(0, at), alias, ...setup.slice(at)] };
+		}
+		declaration = { ...component, id: b.id(name), body: block };
+	}
 	const body = ast.body.slice();
-	body[index] = { ...node, declaration: { ...node.declaration, id: b.id(name) } };
+	body[index] = { ...node, declaration };
 	return { ...ast, body };
 }
 
@@ -11078,7 +11139,7 @@ function compileInternal(
 	const serverModuleInfo = analyzeServerModule(ast, filename);
 	// Normalize arrow-function components (`const X = () => @{…}`) to
 	// FunctionDeclaration form so the component pipeline recognizes them.
-	ast = nameAnonymousDefaultComponent(normalizeArrowComponents(ast));
+	ast = bindDefaultComponent(normalizeArrowComponents(ast));
 	ast = annotatePureFactoryCalls(
 		ast,
 		octanePureFactoryNames({
@@ -12650,7 +12711,7 @@ function compileServer(
 	const serverModuleInfo = analyzeServerModule(ast, filename);
 	// Normalize arrow-function components (`const X = () => @{…}`) to
 	// FunctionDeclaration form so the component pipeline recognizes them.
-	ast = nameAnonymousDefaultComponent(normalizeArrowComponents(ast));
+	ast = bindDefaultComponent(normalizeArrowComponents(ast));
 	ast = annotatePureFactoryCalls(ast, octanePureFactoryNames({ clientDom: false }));
 	const errorBoundaryLowering = lowerImportedErrorBoundaries(ast);
 	ast = errorBoundaryLowering.ast;

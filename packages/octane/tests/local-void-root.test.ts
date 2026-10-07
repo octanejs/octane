@@ -249,9 +249,13 @@ export function run() { const host = document.querySelector('#host'), c = attach
 		},
 	);
 
-	it('specializes roots over an anonymous default component export', async () => {
-		const view =
-			'export default function (props) @{ <main>{props.label as string}<input /></main> }';
+	it.each([
+		[
+			'function',
+			'export default function (props) @{ <main>{props.label as string}<input /></main> }',
+		],
+		['arrow', 'export default (props) => @{ <main>{props.label as string}<input /></main> }'],
+	])('specializes roots over an anonymous default %s component export', async (_form, view) => {
 		const entry = `${IMPORTS}
 export async function run() { const host=document.querySelector('#host'); const root=createRoot(host);
  root.render(View, {label:'first'}); const input=host.querySelector('input'); input.value='typed';
