@@ -32,7 +32,6 @@ export default function AnimatedTicks<Scale extends AxisScale>({
 	});
 
 	return <>
-		{/* @ts-expect-error react-spring's type inference issue on the styles */}
 		{animatedTicks(({ fromX, toX, fromY, toY, opacity }, item, { key }, index) => {
 			const tickLabelProps = allTickLabelProps[index] ?? allTickLabelProps[0] ?? {};
 			return item == null || key == null

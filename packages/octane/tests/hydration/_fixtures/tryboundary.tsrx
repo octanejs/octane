@@ -9,7 +9,9 @@ export function Boundary(props) @{
 		@try {
 			const msg = use(props.promise);
 			const [n, setN] = useState(0);
-			<button id="ok" class="ok" onClick={() => setN(n + 1)}>{msg + ':' + n as string}</button>
+			<button id="ok" class="ok" onClick={() => setN(n + 1)}>
+				{(msg + ':' + n) as string}
+			</button>
 		} @pending {
 			<span class="loading">{'loading' as string}</span>
 		} @catch (err) {

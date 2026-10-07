@@ -59,9 +59,7 @@ describe('Strong compiler-owned hook policies', () => {
 		'const event = useEffectEvent(() => console.log(props.value)); useEffect(() => { event(); }, []);',
 		'const ref = useRef(null); useEffect(() => { console.log(ref.current, props.value); }, [ref, props.value]);',
 	])('reports equivalent explicit dependencies as a non-fatal redundancy hint', (setup) => {
-		// Effect setup may read refs attached to an element, not value refs.
-		const output = setup.includes('useRef') ? '<div ref={ref} />' : undefined;
-		const result = compile(strong(app(setup, output)), '/src/App.tsrx');
+		const result = compile(strong(app(setup)), '/src/App.tsrx');
 		expect(result.diagnostics).toEqual(
 			expect.arrayContaining([expect.objectContaining({ code: REDUNDANT, severity: 'hint' })]),
 		);

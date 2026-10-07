@@ -106,9 +106,15 @@ function LegendItem({ item }: { item: LegendRow }) @{
 function Tooltip({ t }: { t: TooltipRow }) @{
 	<g class="tooltip" transform={t.transform}>
 		<rect class="tooltip-bg" width="120" height="46" rx="4"></rect>
-		<text class="tt-title" x="8" y="14">{t.title as string}</text>
-		<text class="tt-l1" x="8" y="28">{t.l1 as string}</text>
-		<text class="tt-l2" x="8" y="42">{t.l2 as string}</text>
+		<text class="tt-title" x="8" y="14">
+			{t.title as string}
+		</text>
+		<text class="tt-l1" x="8" y="28">
+			{t.l1 as string}
+		</text>
+		<text class="tt-l2" x="8" y="42">
+			{t.l2 as string}
+		</text>
 	</g>
 }
 
@@ -219,7 +225,9 @@ function Sparks({ sparks }: { sparks: SparkRow[] }) @{
 function IconLayer({ icons }: { icons: IconRow[] }) @{
 	<g class="icons">
 		@for (const ic of icons; key ic.id) {
-			<g class="icon" transform={ic.transform}>{icon(ic.name)}</g>
+			<g class="icon" transform={ic.transform}>
+				{icon(ic.name)}
+			</g>
 		}
 	</g>
 }
@@ -252,11 +260,13 @@ export default function App() @{
 
 	<Viewport
 		defs={<Defs charts={charts.charts} />}
-		layers={<>
-			<Topology topo={topo} />
-			<ChartsStrip charts={charts.charts} />
-			<Sparks sparks={charts.sparks} />
-			<IconLayer icons={topo.icons} />
-		</>}
+		layers={
+			<>
+				<Topology topo={topo} />
+				<ChartsStrip charts={charts.charts} />
+				<Sparks sparks={charts.sparks} />
+				<IconLayer icons={topo.icons} />
+			</>
+		}
 	/>
 }

@@ -83,14 +83,18 @@ function TransitionRebaseApp(props) @{
 	<>
 		<button
 			id="stage"
-			onClick={() => start(async () => {
-				setValue(0);
-				await props.gate;
-			})}
+			onClick={() =>
+				start(async () => {
+					setValue(0);
+					await props.gate;
+				})
+			}
 		>
 			{isPending ? 'pending' : 'stage'}
 		</button>
-		<button id="urgent" onClick={() => setValue(0)}>{value as string}</button>
+		<button id="urgent" onClick={() => setValue(0)}>
+			{value as string}
+		</button>
 	</>
 }
 
@@ -111,7 +115,9 @@ function ParentAndChildUpdateApp() @{
 				setCount(count + 1);
 				updateMemoChild();
 			}}
-		>{count as string}</button>
+		>
+			{count as string}
+		</button>
 		<MemoChild />
 	</>
 }
@@ -362,10 +368,12 @@ describe('profile build render causes', () => {
 describe('profile build component boundaries', () => {
 	it('recognizes components rendered directly and as values', () => {
 		const direct = mount(DirectReturnApp);
-		expect(profiler.summary().map((entry) => entry.component).sort()).toEqual([
-			'DirectChild',
-			'DirectReturnApp',
-		]);
+		expect(
+			profiler
+				.summary()
+				.map((entry) => entry.component)
+				.sort(),
+		).toEqual(['DirectChild', 'DirectReturnApp']);
 		direct.unmount();
 
 		profiler.clear();

@@ -13,7 +13,7 @@ function AsyncSelect<
 >(props: AsyncProps<Option, IsMulti, Group> & SelectProps<Option, IsMulti, Group>) @{
 	const asyncProps = useAsync<Option, IsMulti, Group>(props);
 	const selectProps = useStateManager<Option, IsMulti, Group>(asyncProps);
-	<Select {...selectProps as SelectProps<Option, IsMulti, Group>} />
+	<Select {...(selectProps as SelectProps<Option, IsMulti, Group>)} />
 }
 
 export default AsyncSelect;

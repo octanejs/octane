@@ -194,6 +194,30 @@
   {
     "suite": "bundle-reachability",
     "op": "raw",
+    "target": "root-callback-local",
+    "reference": "root-callback-local-budget",
+    "maxRatio": 1,
+    "note": "A private compiled root rendered and unmounted only from retained controller callbacks; deterministic production raw bytes must not exceed the committed same-run budget."
+  },
+  {
+    "suite": "bundle-reachability",
+    "op": "gzip",
+    "target": "root-callback-local",
+    "reference": "root-callback-local-budget",
+    "maxRatio": 1,
+    "note": "A private compiled root rendered and unmounted only from retained controller callbacks; deterministic production gzip bytes must not exceed the committed same-run budget."
+  },
+  {
+    "suite": "bundle-reachability",
+    "op": "brotli",
+    "target": "root-callback-local",
+    "reference": "root-callback-local-budget",
+    "maxRatio": 1,
+    "note": "A private compiled root rendered and unmounted only from retained controller callbacks; deterministic production brotli bytes must not exceed the committed same-run budget."
+  },
+  {
+    "suite": "bundle-reachability",
+    "op": "raw",
     "target": "hooks-state",
     "reference": "hooks-state-budget",
     "maxRatio": 1,
@@ -310,6 +334,30 @@
     "reference": "deferred-hydration-budget",
     "maxRatio": 1,
     "note": "Interaction-triggered public deferred hydration and replay; deterministic production brotli bytes must not exceed the committed same-run budget."
+  },
+  {
+    "suite": "bundle-reachability",
+    "op": "raw",
+    "target": "hydrate-frame",
+    "reference": "hydrate-frame-budget",
+    "maxRatio": 1,
+    "note": "A server-rendered application frame hydrated with native signal reads, a keyed list, a resolved @try boundary, forwarded styles, a portal and a behavior island; deterministic production raw bytes must not exceed the committed same-run budget."
+  },
+  {
+    "suite": "bundle-reachability",
+    "op": "gzip",
+    "target": "hydrate-frame",
+    "reference": "hydrate-frame-budget",
+    "maxRatio": 1,
+    "note": "A server-rendered application frame hydrated with native signal reads, a keyed list, a resolved @try boundary, forwarded styles, a portal and a behavior island; deterministic production gzip bytes must not exceed the committed same-run budget."
+  },
+  {
+    "suite": "bundle-reachability",
+    "op": "brotli",
+    "target": "hydrate-frame",
+    "reference": "hydrate-frame-budget",
+    "maxRatio": 1,
+    "note": "A server-rendered application frame hydrated with native signal reads, a keyed list, a resolved @try boundary, forwarded styles, a portal and a behavior island; deterministic production brotli bytes must not exceed the committed same-run budget."
   },
   {
     "suite": "bundle-reachability",
@@ -1420,8 +1468,8 @@
     "op": "minified",
     "target": "css-modules-client-proven",
     "reference": "css-modules-client-control",
-    "maxRatio": 0.84,
-    "note": "The production CSS-module client sentinel must retain a material minified-code reduction with stylesheet ownership preserved."
+    "maxRatio": 0.91,
+    "note": "The production CSS-module client sentinel must retain a material minified-code reduction with stylesheet ownership preserved. Rebaselined on 2026-10-07 at b8e55da03f: 2294 / 2582 = 0.888x, up from 3183 / 3890 = 0.818x at e233e4a11d^. e233e4a11d (#1762) binds opaque holes in modules without signals through plain writers, so each control class binding shrank from bindSignalAttribute (seven arguments plus a signal key) to setClassNameIfChanged. The 15 class bindings the proof removes fell from 755 to 352 minified bytes, which cut the saving from 707 to 288 B. The proof itself did not change: both commits fold the same 15 of 18 classes into byte-identical templates. The 0.91 ceiling leaves 55 B."
   },
   {
     "suite": "codegen-size",
@@ -1566,6 +1614,54 @@
     "reference": "rspack-css-default-server-control",
     "maxRatio": 0.96,
     "note": "Same-run Brotli guards the authenticated-default server path; stylesheet bytes and full SSR checksums must match."
+  },
+  {
+    "suite": "codegen-size",
+    "op": "minified",
+    "target": "rspack-void-hydrate-proven",
+    "reference": "rspack-void-hydrate-control",
+    "maxRatio": 0.7,
+    "note": "The octanejs/octane#1839 shape, one hydrateRoot over an imported void leaf, built by the real Rspack adapter with the runtime bundled: 178,334 / 289,043 = 0.617x under Node 24 and Rspack 2.1.4 on 2026-10-07. The control's post loader routes the root import through a re-export, which the adapter leaves unproven; every other module and the hydrated DOM are identical."
+  },
+  {
+    "suite": "codegen-size",
+    "op": "gzip",
+    "target": "rspack-void-hydrate-proven",
+    "reference": "rspack-void-hydrate-control",
+    "maxRatio": 0.68,
+    "note": "Same-run gzip of the hydrated void root: 52,075 / 86,560 = 0.602x on 2026-10-07. Losing the proof fails the harness outright; this bound catches the specialized root pulling generic renderer code back in."
+  },
+  {
+    "suite": "codegen-size",
+    "op": "brotli",
+    "target": "rspack-void-hydrate-proven",
+    "reference": "rspack-void-hydrate-control",
+    "maxRatio": 0.7,
+    "note": "Same-run Brotli of the hydrated void root: 44,522 / 72,159 = 0.617x on 2026-10-07, with the server node adopted in both variants."
+  },
+  {
+    "suite": "codegen-size",
+    "op": "minified",
+    "target": "rspack-void-tree-proven",
+    "reference": "rspack-void-tree-control",
+    "maxRatio": 0.72,
+    "note": "createRoot over four imported void components, a keyed @for and a second root.render, built by the real Rspack adapter with the runtime bundled: 134,160 / 209,250 = 0.641x under Node 24 and Rspack 2.1.4 on 2026-10-07. Only the entry differs between variants; the DOM after mount, update and unmount is identical."
+  },
+  {
+    "suite": "codegen-size",
+    "op": "gzip",
+    "target": "rspack-void-tree-proven",
+    "reference": "rspack-void-tree-control",
+    "maxRatio": 0.73,
+    "note": "Same-run gzip of the created void root: 42,610 / 65,380 = 0.652x on 2026-10-07. The component calls inside the tree are proven in both variants, so this is the root proof's saving alone."
+  },
+  {
+    "suite": "codegen-size",
+    "op": "brotli",
+    "target": "rspack-void-tree-proven",
+    "reference": "rspack-void-tree-control",
+    "maxRatio": 0.74,
+    "note": "Same-run Brotli of the created void root: 36,330 / 54,993 = 0.661x on 2026-10-07."
   },
   {
     "suite": "bundle-size",
@@ -9230,6 +9326,22 @@
     "reference": "direct",
     "maxRatio": 0,
     "note": "Changing ordinary scalar style props uses fixed-field writers without additional native style body invocations; the observed handle control must update the same CSS and preserve identity."
+  },
+  {
+    "suite": "signal-dom-bindings",
+    "op": "style_blocks",
+    "target": "forwarded",
+    "reference": "direct",
+    "maxRatio": 0,
+    "note": "A forwarded string style and an unset one inside a native-capable module have no native read to own, so they allocate no presentation blocks (a production audit of a signed-out home page found 273 such Blocks in one hydration). Direct-handle controls exercise the observer; the forwarded target displays the same CSS and preserves the same host and child."
+  },
+  {
+    "suite": "signal-dom-bindings",
+    "op": "style_update_bodies",
+    "target": "forwarded",
+    "reference": "direct",
+    "maxRatio": 0,
+    "note": "Re-rendering forwarded string and unset styles writes them directly, without native style body invocations; the observed handle control must update the same CSS and preserve identity."
   },
   {
     "suite": "signal-dom-bindings",

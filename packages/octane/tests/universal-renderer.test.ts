@@ -1592,6 +1592,34 @@ export function Scene() @{
 			}),
 		).toThrow(/forbids unbound global "document".*Default\.native\.tsrx:1:30/);
 
+		// Inside an enum, a member's name is in scope for the later initializers.
+		const enumMember = `enum Target {
+  document = 1,
+  next = document + 1,
+}
+export function Scene() @{
+  <view id={String(Target.next) as string} />
+}`;
+		expect(() =>
+			compile(enumMember, '/src/EnumMember.native.tsrx', {
+				hmr: false,
+				renderer: validationRenderer,
+			}),
+		).not.toThrow();
+		const enumGlobal = `enum Target {
+  first = 1,
+  next = document.title.length,
+}
+export function Scene() @{
+  <view id={String(Target.next) as string} />
+}`;
+		expect(() =>
+			compile(enumGlobal, '/src/EnumGlobal.native.tsrx', {
+				hmr: false,
+				renderer: validationRenderer,
+			}),
+		).toThrow(/forbids unbound global "document".*EnumGlobal\.native\.tsrx:3:9/);
+
 		expect(() =>
 			compile(`import value = window.module;`, '/src/Qualified.native.ts', {
 				hmr: false,
@@ -3277,6 +3305,88 @@ export default function Default() @{ <scene version={1} /> }`);
 				const next = evaluate(source);
 				for (const callback of previousAccept) callback(next);
 				expect(hot.invalidate).toHaveBeenCalled();
+			} finally {
+				root.unmount();
+			}
+		},
+	);
+
+	// `export default (function Counter() @{…})` binds `Counter` only inside the
+	// component, so the rest of the module may bind or read `Counter` on its own.
+	// The component still renders itself by that name and hot-updates as
+	// `default`, and module code keeps seeing what it saw before compilation.
+	it.each([
+		['a module binding of its name', false, `const Counter = 'module binding';`, 'module binding'],
+		['a module binding of its name', 'vite', `const Counter = 'module binding';`, 'module binding'],
+		[
+			'a module binding of its name',
+			'webpack',
+			`const Counter = 'module binding';`,
+			'module binding',
+		],
+		['an unbound module read of its name', false, '', 'undefined'],
+		['an unbound module read of its name', 'vite', '', 'undefined'],
+	] as const)(
+		'keeps a named default component expression apart from %s (hmr: %s)',
+		async (_label, hmr, prelude, outer) => {
+			const source = (version: number) => `${prelude}
+export const outer = () => (typeof Counter === 'string' ? Counter : typeof Counter);
+export default (function Counter({ depth }) @{
+	<node depth={depth} version={${version}}>
+		@if (depth > 0) {
+			<Counter depth={depth - 1} />
+		}
+	</node>
+})`;
+			const hotData: Record<string, unknown> = {};
+			let dispose: HmrDispose[] = [];
+			let accept: HmrAccept[] = [];
+			const evaluate = (version: number, data: Record<string, unknown> | undefined) =>
+				evaluateUniversalHmrModule(
+					compile(source(version), '/src/NamedDefault.object.tsrx', { renderer, hmr }).code,
+					{
+						data,
+						dispose(callback) {
+							dispose.push(callback);
+						},
+						accept(callback = () => {}) {
+							accept.push(callback);
+						},
+						invalidate: vi.fn(),
+					},
+				);
+			const levels = (container: ReturnType<typeof objectRoot>['container']) => {
+				const output: unknown[][] = [];
+				for (let node = container.children[0]; node; node = node.children[0]) {
+					output.push([node.props.depth, node.props.version]);
+				}
+				return output;
+			};
+			const first = evaluate(1, hmr === 'webpack' ? undefined : hotData);
+			expect(first.outer()).toBe(outer);
+			const { root, container } = objectRoot();
+			try {
+				root.render(first.default, { depth: 2 });
+				expect(levels(container)).toEqual([
+					[2, 1],
+					[1, 1],
+					[0, 1],
+				]);
+				if (hmr === false) return;
+				const data = hmr === 'webpack' ? {} : hotData;
+				const previousAccept = accept;
+				for (const callback of dispose) callback(data);
+				dispose = [];
+				accept = [];
+				const next = evaluate(2, data);
+				for (const callback of previousAccept) callback(next);
+				await Promise.resolve();
+				expect(next.outer()).toBe(outer);
+				expect(levels(container)).toEqual([
+					[2, 2],
+					[1, 2],
+					[0, 2],
+				]);
 			} finally {
 				root.unmount();
 			}

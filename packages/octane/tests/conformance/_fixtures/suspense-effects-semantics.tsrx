@@ -7,16 +7,19 @@ import { use, useState, useLayoutEffect } from 'octane';
 // (the content is hidden), and RECREATED when it resolves again.
 
 function Before(props) @{
-	useLayoutEffect((log) => {
-		log.push('Before create layout');
-		return () => log.push('Before destroy layout');
-	}, [props.log]);
+	useLayoutEffect(
+		(log) => {
+			log.push('Before create layout');
+			return () => log.push('Before destroy layout');
+		},
+		[props.log],
+	);
 	<span class="before">{'Before'}</span>
 }
 
 function Async(props) @{
 	const v = use(props.promise);
-	<span class="async">{'Async-' + v as string}</span>
+	<span class="async">{('Async-' + v) as string}</span>
 }
 
 export function App(props) @{
@@ -41,7 +44,7 @@ export function App(props) @{
 // must NOT re-destroy or recreate them).
 function AsyncN(props) @{
 	const v = use(props.promiseFor(props.id));
-	<span class="async">{'A-' + v as string}</span>
+	<span class="async">{('A-' + v) as string}</span>
 }
 export function MultiApp(props) @{
 	const [show, setShow] = useState(false);
@@ -68,11 +71,14 @@ function InnerC(props) @{
 	const [n, setN] = useState(1);
 	props.bindInner((x: number) => setN(x));
 	const v = use(props.promiseFor(n));
-	useLayoutEffect((log) => {
-		log.push('Inner create');
-		return () => log.push('Inner destroy');
-	}, [props.log]);
-	<span class="inner">{'I-' + v as string}</span>
+	useLayoutEffect(
+		(log) => {
+			log.push('Inner create');
+			return () => log.push('Inner destroy');
+		},
+		[props.log],
+	);
+	<span class="inner">{('I-' + v) as string}</span>
 }
 export function NestedApp(props) @{
 	@try {

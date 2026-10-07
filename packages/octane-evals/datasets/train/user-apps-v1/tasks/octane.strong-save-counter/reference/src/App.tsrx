@@ -10,7 +10,9 @@ export function App({ save }: { save: () => Promise<void> }) @{
 				await save();
 				setSaves((count) => count + 1);
 			}}
-		>{'Save'}</button>
+		>
+			{'Save'}
+		</button>
 		<p>{`Saved ${saves} times` as string}</p>
 	</section>
 }

@@ -47,7 +47,6 @@ import {
 	unwrapServerFunctionInitializer,
 } from './server-context.js';
 import { createStyleScopePass } from './style-scopes.js';
-import { decodeHTMLStrict } from 'entities';
 import { print as esrapPrint } from 'esrap';
 import esrapTsx from 'esrap/languages/tsx';
 import { buildFatSegments } from './fat-segments.js';
@@ -8960,20 +8959,73 @@ function arrowComponentToFunctionDecl(varDecl) {
 	) {
 		return null;
 	}
+	let fn = init;
+	// `const X = function Name() @{…}` binds `Name` only inside the component,
+	// which the declaration binds as `X` alone.
+	if (init.id && init.id.name !== d.id.name) {
+		const binding = d.id.name;
+		const self = init.id.name;
+		const body = aliasComponentOwnName(
+			init,
+			binding,
+			(where) =>
+				new Error(
+					`Component \`${binding}\` refers to itself as \`${self}\` ${where}, but only its function expression binds \`${self}\`. Rename the function expression to \`${binding}\` and refer to the component by that name.`,
+				),
+		);
+		if (body !== init.body) fn = { ...init, body };
+	}
+	return componentFunctionDeclaration(d.id, fn, varDecl);
+}
+
+// The canonical FunctionDeclaration for an arrow/function-expression `@{…}`
+// component `fn`, bound to `id` and spanning `origin`.
+/** @param {any} id @param {any} fn @param {any} origin @returns {any} */
+function componentFunctionDeclaration(id, fn, origin) {
 	const declaration = b.function_declaration(
-		d.id,
-		init.params || [],
-		init.body,
-		!!init.async,
-		init.typeParameters,
+		id,
+		fn.params || [],
+		fn.body,
+		!!fn.async,
+		fn.typeParameters,
 	);
-	declaration.generator = !!init.generator;
-	if (init.returnType !== undefined) declaration.returnType = init.returnType;
-	if (init.predicate !== undefined) declaration.predicate = init.predicate;
-	declaration.start = varDecl.start;
-	declaration.end = varDecl.end;
-	declaration.loc = varDecl.loc;
+	declaration.generator = !!fn.generator;
+	if (fn.returnType !== undefined) declaration.returnType = fn.returnType;
+	if (fn.predicate !== undefined) declaration.predicate = fn.predicate;
+	declaration.start = origin.start;
+	declaration.end = origin.end;
+	declaration.loc = origin.loc;
 	return declaration;
+}
+
+// A function-expression component `fn` binds its own name only inside itself,
+// and lowering binds the component as `binding` instead. When the component
+// refers to itself by name, alias the name to `binding` at the top of its
+// setup, so the reference reads the component as `<binding/>` there would. The
+// alias lives in the body, so parameter defaults and computed keys cannot see
+// it, and a declaration of either name the free-identifier walk cannot place
+// could collide with or shadow it. Reject those with `reject(where)` instead of
+// guessing. Returns the body, unchanged when the component never names itself.
+/** @param {any} fn @param {string} binding @param {(where: string) => Error} reject @returns {any} */
+function aliasComponentOwnName(fn, binding, reject) {
+	const self = fn.id.name;
+	const unnamed = { ...fn, id: null };
+	if (!collectFreeIdentifiers(unnamed, []).has(self)) return fn.body;
+	const declared = collectModuleBoundNames(unnamed);
+	const where = collectFreeIdentifiers({ ...unnamed, body: b.block([]) }, []).has(self)
+		? 'in a parameter'
+		: declared.has(self)
+			? `while its body also declares \`${self}\``
+			: declared.has(binding)
+				? `while it also declares \`${binding}\``
+				: null;
+	if (where !== null) throw reject(where);
+	// After any directive prologue, which must stay first in the body.
+	const setup = fn.body.body;
+	let at = 0;
+	while (at < setup.length && typeof setup[at].directive === 'string') at++;
+	const alias = b.const(self, b.id(binding));
+	return { ...fn.body, body: [...setup.slice(0, at), alias, ...setup.slice(at)] };
 }
 
 function functionExpressionFromDeclaration(declaration, origin = declaration) {
@@ -9068,6 +9120,74 @@ function normalizeArrowComponents(ast) {
 		}
 	}
 	return changed ? { ...ast, body } : ast;
+}
+
+// Component lowering addresses a compiled component through its module
+// binding: capability stamps, the HMR rebinding, dev LOC metadata, and profile
+// registration all name it. Three default-export forms lack a usable one:
+//
+// - `export default function () @{…}` and `export default () => @{…}` declare
+//   no binding. Give the component a synthesized binding no authored identifier
+//   uses, converting an arrow to FunctionDeclaration form as
+//   normalizeArrowComponents does for `const X = () => @{…}`.
+// - `export default (function Name() @{…})` binds `Name` only inside the
+//   component, so the module may bind `Name` too. Lowering would redeclare it.
+//   On that collision, bind the component to a fresh name, and alias `Name` at
+//   the top of its setup when the component refers to itself by name.
+//
+// Each then compiles exactly like `export default function Name() @{…}`. The
+// public export stays `default`, and HMR registration is keyed by the export
+// name. Copy-on-write: returns the input module when nothing changed.
+/** @param {any} ast @returns {any} */
+function bindDefaultComponent(ast) {
+	if (!ast || !Array.isArray(ast.body)) return ast;
+	const index = ast.body.findIndex(
+		(node) =>
+			node.type === 'ExportDefaultDeclaration' &&
+			(isComponentFunction(node.declaration) ||
+				(node.declaration?.type === 'ArrowFunctionExpression' &&
+					node.declaration.body?.type === 'JSXCodeBlock')),
+	);
+	if (index === -1) return ast;
+	const node = ast.body[index];
+	const component = node.declaration;
+	const self = component.id?.name;
+	let declaration;
+	if (self === undefined) {
+		// Diagnostics name the authored export, never the synthesized binding.
+		rejectAsyncOrGenerator(component, 'default');
+		const name = allocCompilerName(
+			{ usedCompilerNames: collectIdentifierNames(ast), compilerNameSuffixes: null },
+			'_default',
+		);
+		declaration =
+			component.type === 'ArrowFunctionExpression'
+				? componentFunctionDeclaration(b.id(name), component, component)
+				: { ...component, id: b.id(name) };
+	} else {
+		if (component.type !== 'FunctionExpression') return ast;
+		const others = ast.body.filter((statement) => statement !== node);
+		const outer = collectFreeIdentifiers(others, []);
+		for (const statement of others) collectStatementBindings(statement, outer);
+		if (!outer.has(self)) return ast;
+		rejectAsyncOrGenerator(component, self);
+		const name = allocCompilerName(
+			{ usedCompilerNames: collectIdentifierNames(ast), compilerNameSuffixes: null },
+			self,
+		);
+		const block = aliasComponentOwnName(
+			component,
+			name,
+			(where) =>
+				new Error(
+					`Component \`${self}\` refers to itself by name ${where}, but its module also declares \`${self}\`. Rename the component's function expression.`,
+				),
+		);
+		declaration = { ...component, id: b.id(name), body: block };
+	}
+	const body = ast.body.slice();
+	body[index] = { ...node, declaration };
+	return { ...ast, body };
 }
 
 // A top-level statement that carries NO runtime value — pure TypeScript type
@@ -11086,7 +11206,7 @@ function compileInternal(
 	const serverModuleInfo = analyzeServerModule(ast, filename);
 	// Normalize arrow-function components (`const X = () => @{…}`) to
 	// FunctionDeclaration form so the component pipeline recognizes them.
-	ast = normalizeArrowComponents(ast);
+	ast = bindDefaultComponent(normalizeArrowComponents(ast));
 	ast = annotatePureFactoryCalls(
 		ast,
 		octanePureFactoryNames({
@@ -11628,7 +11748,8 @@ function compileInternal(
 					? true
 					: undefined;
 			},
-			// Roots created while a component renders stay on the generic path.
+			// Roots created or used inside a component body stay on the generic
+			// path: component lowering still reads each body's authored nodes.
 			skip: (node) => node.type === 'JSXCodeBlock' || components.has(node),
 		})) {
 			callees.set(root.callee, root.helper);
@@ -12657,7 +12778,7 @@ function compileServer(
 	const serverModuleInfo = analyzeServerModule(ast, filename);
 	// Normalize arrow-function components (`const X = () => @{…}`) to
 	// FunctionDeclaration form so the component pipeline recognizes them.
-	ast = normalizeArrowComponents(ast);
+	ast = bindDefaultComponent(normalizeArrowComponents(ast));
 	ast = annotatePureFactoryCalls(ast, octanePureFactoryNames({ clientDom: false }));
 	const errorBoundaryLowering = lowerImportedErrorBoundaries(ast);
 	ast = errorBoundaryLowering.ast;
@@ -23084,6 +23205,13 @@ function rewriteTsrxBlocks(
  * plus the function's own. A missing name is left out of the tuple and the
  * hoisted arm reads it as a free identifier.
  *
+ * The function's own name is one of them. In `memo(function Counter() @{ … })`
+ * it is bound only inside the function, and a declaration in a nested block of
+ * the enclosing setup is not one of that body's top-level locals, so an arm that
+ * renders `<Counter />` must receive it like any other local. Module-level
+ * component declarations do not come through here; their names are module
+ * bindings that every hoisted arm already sees.
+ *
  * A name the function introduces can shadow an enclosing lifetime-invariant
  * binding with one that changes between renders, so it must not inherit that
  * proof. `compileFunctionBody` recomputes the nested body's own invariants.
@@ -23099,6 +23227,7 @@ function withNestedTemplateScope(fn, ctx, compile, untracked = false) {
 	const prevEventInvariantLocals = ctx.currentEventInvariantLocals;
 	const prevUntracked = ctx._untrackedScope;
 	const introduced = collectComponentLocals(fn);
+	if (fn.id) introduced.add(fn.id.name);
 	if (prevLocals == null && (untracked || prevUntracked === true)) {
 		ctx._untrackedScope = true;
 	} else {
@@ -25149,6 +25278,9 @@ function emitHeadServer(headNodes, ctx) {
 function normalizeAuthoredJsxLiterals(ast) {
 	return mapAst(ast, (node) => {
 		if (node.type === 'JSXText') {
+			// Both parsers give `value` with its character references decoded, as
+			// JSX parsers do, so it is only cleaned up here: JSX's whitespace rule,
+			// applied to the decoded text as Babel applies it.
 			const lines = node.value.split(/\r\n|\n|\r/);
 			let last = 0;
 			for (let i = 0; i < lines.length; i++) if (/[^ \t]/.test(lines[i])) last = i;
@@ -25159,17 +25291,18 @@ function normalizeAuthoredJsxLiterals(ast) {
 				if (i !== lines.length - 1) line = line.replace(/ +$/, '');
 				if (line !== '') value += line + (i !== last ? ' ' : '');
 			}
-			if (value.includes('&')) value = decodeHTMLStrict(value);
-			return value === node.value ? node : { ...node, value, raw: value };
+			return value === node.value && value === node.raw ? node : { ...node, value, raw: value };
 		}
 		if (
 			node.type === 'JSXAttribute' &&
 			node.value?.type === 'Literal' &&
-			typeof node.value.value === 'string' &&
-			node.value.value.includes('&')
+			typeof node.value.value === 'string'
 		) {
-			const value = decodeHTMLStrict(node.value.value);
-			return { ...node, value: { ...node.value, value, raw: JSON.stringify(value) } };
+			// Both parsers give `value` decoded. Where that differs from the string
+			// as written, print it from `value`, not from `raw`.
+			const { raw, value } = node.value;
+			if (typeof raw === 'string' && raw.slice(1, -1) === value) return null;
+			return { ...node, value: { ...node.value, raw: JSON.stringify(value) } };
 		}
 		if (
 			node.type === 'JSXStyleElement' &&

@@ -36,8 +36,8 @@ the compiler cannot prove equivalent, is an error; an equivalent array is a hint
 (`OCTANE_STRONG_EXPLICIT_DEPENDENCIES`).
 
 Code outside render works as before. Event handlers update state, effects synchronize
-external systems and release what they acquire in cleanup, and refs hold DOM nodes and
-timers for events and effects to use.
+external systems and release what they acquire in cleanup, and refs hold DOM nodes,
+timers, and other values for events and effects to read and write.
 
 Strong is off by default. Compatibility mode keeps React's rules, including manual memo
 hooks and explicit dependency arrays, so an app can opt in one module at a time. The
@@ -575,9 +575,9 @@ A state update runs after an `await`, or in a `.then`, `.catch`, or `.finally` c
 	<code>OCTANE_STRONG_EFFECT_HIDDEN_DEPENDENCY</code>
 </h4>
 
-Synchronous effect setup calls a state getter, reads `current` from a value ref, or reads a reassigned module `let` or `var`. None of these is an inferred dependency, so the effect does not re-run when they change.
+Synchronous effect setup reads a reassigned module `let` or `var`. It is not an inferred dependency, so the effect does not re-run when it changes, and every instance shares it. Calling a state getter and reading or writing a ref's `current` in an effect stay legal; neither is a dependency.
 
-**Replacement.** Read the render snapshot, or move the non-reactive read into a `useEffectEvent` callback. Octane never double-invokes effects, so first-run and `didInit` guards are unnecessary.
+**Replacement.** Keep the value in state, a prop, or context and read its snapshot, or move the non-reactive read into a `useEffectEvent` callback. Octane never double-invokes effects, so `didInit` guards are unnecessary.
 
 <h4 id="octane-strong-effect-resource-leak">
 	<code>OCTANE_STRONG_EFFECT_RESOURCE_LEAK</code>

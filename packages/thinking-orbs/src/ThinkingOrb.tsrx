@@ -35,7 +35,7 @@ export function ThinkingOrb({
 	useEffect(() => {
 		const canvas = ref.current;
 		if (!canvas) return;
-		const dpr = Math.min(2, typeof devicePixelRatio !== 'undefined' && devicePixelRatio || 1);
+		const dpr = Math.min(2, (typeof devicePixelRatio !== 'undefined' && devicePixelRatio) || 1);
 		canvas.width = Math.round(size * dpr);
 		canvas.height = Math.round(size * dpr);
 		const ctx = canvas.getContext('2d');
@@ -99,11 +99,13 @@ export function ThinkingOrb({
 		};
 	}, [state, size, dark, speed, paused, reduced]);
 
-	return <canvas
-		ref={ref}
-		role="img"
-		aria-label={ariaLabel ?? LABELS[state]}
-		style={{ width: size, height: size, display: 'block', ...style }}
-		{...rest}
-	/>;
+	return (
+		<canvas
+			ref={ref}
+			role="img"
+			aria-label={ariaLabel ?? LABELS[state]}
+			style={{ width: size, height: size, display: 'block', ...style }}
+			{...rest}
+		/>
+	);
 }

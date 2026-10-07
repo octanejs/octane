@@ -1,15 +1,13 @@
 import type { Client } from '@solana/kit';
 import { ClientProvider, useClient } from '@octanejs/solana-kit';
 
-export type FixtureClient =
-	Client<object> & {
-		label: string;
-	};
+export type FixtureClient = Client<object> & {
+	label: string;
+};
 
-export type ClientProviderFixtureProps =
-	Readonly<{
-		client: FixtureClient;
-	}>;
+export type ClientProviderFixtureProps = Readonly<{
+	client: FixtureClient;
+}>;
 
 function ClientLabel() @{
 	const client = useClient() as FixtureClient;

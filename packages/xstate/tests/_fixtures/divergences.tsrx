@@ -39,9 +39,10 @@ export function createActorLikeStore(initial: number): ActorLikeStore {
 
 	return {
 		actorRef,
-		subscribe: (onStoreChange: () => void) => actorRef.subscribe({
-			next: onStoreChange,
-		}).unsubscribe,
+		subscribe: (onStoreChange: () => void) =>
+			actorRef.subscribe({
+				next: onStoreChange,
+			}).unsubscribe,
 		send(next: number) {
 			snapshot = next;
 			for (const observer of [...observers]) observer();
@@ -56,9 +57,8 @@ export function createActorLikeStore(initial: number): ActorLikeStore {
 // identity change is what React's `updateSyncExternalStore` keys its commit-time
 // re-read on; `subscribe` stays stable so the store-swap branch never fires.
 export function StoreReadout(props: { store: ActorLikeStore; label: number }) @{
-	const value = useSyncExternalStore(
-		props.store.subscribe,
-		() => props.store.actorRef.getSnapshot(),
+	const value = useSyncExternalStore(props.store.subscribe, () =>
+		props.store.actorRef.getSnapshot(),
 	);
 
 	<span id="readout">{'value=' + value + ' label=' + props.label}</span>

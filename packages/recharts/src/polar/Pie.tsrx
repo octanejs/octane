@@ -91,38 +91,38 @@ import { CellsContext, useCellRegistry } from '../context/CellsContext';
 
 interface PieDef {
 	/**
- * The x-coordinate of center. If set a percentage, the final value is obtained by multiplying the percentage of container width.
- */
+	 * The x-coordinate of center. If set a percentage, the final value is obtained by multiplying the percentage of container width.
+	 */
 	cx?: number | string;
 	/**
- * The y-coordinate of center. If set a percentage, the final value is obtained by multiplying the percentage of container height.
- */
+	 * The y-coordinate of center. If set a percentage, the final value is obtained by multiplying the percentage of container height.
+	 */
 	cy?: number | string;
 	/**
- * Angle in degrees from which the chart should start.
- */
+	 * Angle in degrees from which the chart should start.
+	 */
 	startAngle?: number;
 	/**
- * Angle, in degrees, at which the chart should end.
- */
+	 * Angle, in degrees, at which the chart should end.
+	 */
 	endAngle?: number;
 	/**
- * The angle between two sectors.
- *
- * @example <Pie paddingAngle={5} />
- * @example https://recharts.github.io/examples/PieChartWithPaddingAngle
- */
+	 * The angle between two sectors.
+	 *
+	 * @example <Pie paddingAngle={5} />
+	 * @example https://recharts.github.io/examples/PieChartWithPaddingAngle
+	 */
 	paddingAngle?: number;
 	/**
- * The inner radius of the sectors.
- * If set a percentage, the final value is obtained by multiplying the percentage of maxRadius which is calculated by the width, height, cx, cy.
- */
+	 * The inner radius of the sectors.
+	 * If set a percentage, the final value is obtained by multiplying the percentage of maxRadius which is calculated by the width, height, cx, cy.
+	 */
 	innerRadius?: number | string;
 	/**
- * The outer radius of the sectors.
- * If set a percentage, the final value is obtained by multiplying the percentage of maxRadius which is calculated by the width, height, cx, cy.
- * Function should return a string percentage or number.
- */
+	 * The outer radius of the sectors.
+	 * If set a percentage, the final value is obtained by multiplying the percentage of maxRadius which is calculated by the width, height, cx, cy.
+	 * Function should return a string percentage or number.
+	 */
 	outerRadius?: number | string | ((dataPoint: any) => number | string);
 	cornerRadius?: number | string;
 }
@@ -139,14 +139,14 @@ interface PieLabelExtraProps {
 	textAnchor: TextAnchor;
 }
 
-export type PieLabelRenderProps =
-	Omit<SVGPropsNoEvents<PieSvgAttributes>, 'offset'> & Omit<
-		PieSectorDataItem,
-		'offset' | 'ref'
-	> & Pick<SVGProps<SVGTextElement>, 'ref'> & PieLabelExtraProps & Coordinate;
+export type PieLabelRenderProps = Omit<SVGPropsNoEvents<PieSvgAttributes>, 'offset'> &
+	Omit<PieSectorDataItem, 'offset' | 'ref'> &
+	Pick<SVGProps<SVGTextElement>, 'ref'> &
+	PieLabelExtraProps &
+	Coordinate;
 
-export type LabelListPropsWithPosition =
-	Omit<LabelListProps, keyof PieCoordinate> & Partial<PieCoordinate> & {
+export type LabelListPropsWithPosition = Omit<LabelListProps, keyof PieCoordinate> &
+	Partial<PieCoordinate> & {
 		position: LabelListProps['position'];
 	};
 
@@ -155,34 +155,30 @@ export type LabelListPropsWithPosition =
  */
 export type PieLabel =
 	/*
- * If label prop is false, labels don't show.
- * If label prop is true, labels will be rendered with default props.
- */
-	| boolean
-	| /*
- * If label prop is an object, and it contains a `position` prop,
- * the object will become props to a <LabelList /> component.
- */
-	  LabelListPropsWithPosition
-	| /*
- * If label prop is an object, and it does not have a `position` prop,
- * this renders a special Pie label that is similar to <Label position="outside"> and supports an optional labelLine.
- * labelLine is a small line connecting the sector to the label.
- */
-	  Partial<PieLabelRenderProps>
-	| /*
- * If label prop is a function, or a React component, it will be called once for each label.
- * The result of each call will be rendered.
- */
-	  ((props: PieLabelRenderProps) => RenderableText | OctaneElement<PieLabelRenderProps>)
-	| /*
- * If label prop is a OctaneElement, it will get cloned and receive brand-new surprise props.
- * I do not recommend this variant
- */
-	  OctaneElement<PieLabelRenderProps>;
+	 * If label prop is false, labels don't show.
+	 * If label prop is true, labels will be rendered with default props.
+	 */
+	| boolean /*
+	 * If label prop is an object, and it contains a `position` prop,
+	 * the object will become props to a <LabelList /> component.
+	 */
+	| LabelListPropsWithPosition /*
+	 * If label prop is an object, and it does not have a `position` prop,
+	 * this renders a special Pie label that is similar to <Label position="outside"> and supports an optional labelLine.
+	 * labelLine is a small line connecting the sector to the label.
+	 */
+	| Partial<PieLabelRenderProps> /*
+	 * If label prop is a function, or a React component, it will be called once for each label.
+	 * The result of each call will be rendered.
+	 */
+	| ((props: PieLabelRenderProps) => RenderableText | OctaneElement<PieLabelRenderProps>) /*
+	 * If label prop is a OctaneElement, it will get cloned and receive brand-new surprise props.
+	 * I do not recommend this variant
+	 */
+	| OctaneElement<PieLabelRenderProps>;
 
-export type PieSectorData =
-	GeometrySector & TooltipTriggerInfo & {
+export type PieSectorData = GeometrySector &
+	TooltipTriggerInfo & {
 		dataKey?: DataKey<any>;
 		midAngle?: number;
 		middleRadius?: number;
@@ -203,13 +199,14 @@ export type PieSectorData =
  * https://github.com/recharts/recharts/issues/6380
  * https://github.com/recharts/recharts/discussions/6375
  */
-export type PieSectorDataItem =
-	PiePresentationProps & PieCoordinate & PieSectorData & {
+export type PieSectorDataItem = PiePresentationProps &
+	PieCoordinate &
+	PieSectorData & {
 		cornerRadius: number | undefined;
 	};
 
-export type PieSectorShapeProps =
-	PieSectorDataItem & ShapeAnimationProps & {
+export type PieSectorShapeProps = PieSectorDataItem &
+	ShapeAnimationProps & {
 		[DATA_ITEM_INDEX_ATTRIBUTE_NAME]: number;
 		[DATA_ITEM_GRAPHICAL_ITEM_ID_ATTRIBUTE_NAME]: GraphicalItemId;
 		isActive: boolean;
@@ -219,62 +216,84 @@ export type PieShape = ActiveShape<PieSectorShapeProps, SVGPathElement>;
 
 interface PieEvents {
 	/**
- * The customized event handler of click on the sectors in this group.
- */
-	onClick?: (data: PieSectorDataItem, index: number, e: NativeMouseEvent<
-		SVGGraphicsElement
-	>) => void;
+	 * The customized event handler of click on the sectors in this group.
+	 */
+	onClick?: (
+		data: PieSectorDataItem,
+		index: number,
+		e: NativeMouseEvent<SVGGraphicsElement>,
+	) => void;
 	/**
- * The customized event handler of mousedown on the sectors in this group.
- */
-	onMouseDown?: (data: PieSectorDataItem, index: number, e: NativeMouseEvent<
-		SVGGraphicsElement
-	>) => void;
+	 * The customized event handler of mousedown on the sectors in this group.
+	 */
+	onMouseDown?: (
+		data: PieSectorDataItem,
+		index: number,
+		e: NativeMouseEvent<SVGGraphicsElement>,
+	) => void;
 	/**
- * The customized event handler of mouseup on the sectors in this group.
- */
-	onMouseUp?: (data: PieSectorDataItem, index: number, e: NativeMouseEvent<
-		SVGGraphicsElement
-	>) => void;
+	 * The customized event handler of mouseup on the sectors in this group.
+	 */
+	onMouseUp?: (
+		data: PieSectorDataItem,
+		index: number,
+		e: NativeMouseEvent<SVGGraphicsElement>,
+	) => void;
 	/**
- * The customized event handler of mousemove on the sectors in this group.
- */
-	onMouseMove?: (data: PieSectorDataItem, index: number, e: NativeMouseEvent<
-		SVGGraphicsElement
-	>) => void;
+	 * The customized event handler of mousemove on the sectors in this group.
+	 */
+	onMouseMove?: (
+		data: PieSectorDataItem,
+		index: number,
+		e: NativeMouseEvent<SVGGraphicsElement>,
+	) => void;
 	/**
- * The customized event handler of mouseover on the sectors in this group.
- */
-	onMouseOver?: (data: PieSectorDataItem, index: number, e: NativeMouseEvent<
-		SVGGraphicsElement
-	>) => void;
+	 * The customized event handler of mouseover on the sectors in this group.
+	 */
+	onMouseOver?: (
+		data: PieSectorDataItem,
+		index: number,
+		e: NativeMouseEvent<SVGGraphicsElement>,
+	) => void;
 	/**
- * The customized event handler of mouseout on the sectors in this group.
- */
-	onMouseOut?: (data: PieSectorDataItem, index: number, e: NativeMouseEvent<
-		SVGGraphicsElement
-	>) => void;
+	 * The customized event handler of mouseout on the sectors in this group.
+	 */
+	onMouseOut?: (
+		data: PieSectorDataItem,
+		index: number,
+		e: NativeMouseEvent<SVGGraphicsElement>,
+	) => void;
 	/**
- * The customized event handler of mouseenter on the sectors in this group.
- */
-	onMouseEnter?: (data: PieSectorDataItem, index: number, e: NativeMouseEvent<
-		SVGGraphicsElement
-	>) => void;
+	 * The customized event handler of mouseenter on the sectors in this group.
+	 */
+	onMouseEnter?: (
+		data: PieSectorDataItem,
+		index: number,
+		e: NativeMouseEvent<SVGGraphicsElement>,
+	) => void;
 	/**
- * The customized event handler of mouseleave on the sectors in this group.
- */
-	onMouseLeave?: (data: PieSectorDataItem, index: number, e: NativeMouseEvent<
-		SVGGraphicsElement
-	>) => void;
-	onTouchStart?: (data: PieSectorDataItem, index: number, e: NativeTouchEvent<
-		SVGGraphicsElement
-	>) => void;
-	onTouchMove?: (data: PieSectorDataItem, index: number, e: NativeTouchEvent<
-		SVGGraphicsElement
-	>) => void;
-	onTouchEnd?: (data: PieSectorDataItem, index: number, e: NativeTouchEvent<
-		SVGGraphicsElement
-	>) => void;
+	 * The customized event handler of mouseleave on the sectors in this group.
+	 */
+	onMouseLeave?: (
+		data: PieSectorDataItem,
+		index: number,
+		e: NativeMouseEvent<SVGGraphicsElement>,
+	) => void;
+	onTouchStart?: (
+		data: PieSectorDataItem,
+		index: number,
+		e: NativeTouchEvent<SVGGraphicsElement>,
+	) => void;
+	onTouchMove?: (
+		data: PieSectorDataItem,
+		index: number,
+		e: NativeTouchEvent<SVGGraphicsElement>,
+	) => void;
+	onTouchEnd?: (
+		data: PieSectorDataItem,
+		index: number,
+		e: NativeTouchEvent<SVGGraphicsElement>,
+	) => void;
 }
 
 /**
@@ -285,178 +304,184 @@ interface InternalPieProps extends PropsWithResolvedDefaults {
 	sectors: ReadonlyArray<PieSectorDataItem>;
 }
 
-interface PieProps<DataPointType = any, DataValueType = any> extends DataProvider<
-	DataPointType
->, DataConsumer<DataPointType, DataValueType>, PieDef, PieEvents, ZIndexable {
+interface PieProps<DataPointType = any, DataValueType = any>
+	extends
+		DataProvider<DataPointType>,
+		DataConsumer<DataPointType, DataValueType>,
+		PieDef,
+		PieEvents,
+		ZIndexable {
 	/**
- * This component is rendered when this graphical item is activated
- * (could be by mouse hover, touch, keyboard, programmatically).
- *
- * @deprecated Use the `shape` prop to create each sector. `isActive` designates the "active" shape.
- * @example <Pie activeShape={<CustomActiveShape />} />
- * @example https://recharts.github.io/examples/CustomActiveShapePieChart
- */
+	 * This component is rendered when this graphical item is activated
+	 * (could be by mouse hover, touch, keyboard, programmatically).
+	 *
+	 * @deprecated Use the `shape` prop to create each sector. `isActive` designates the "active" shape.
+	 * @example <Pie activeShape={<CustomActiveShape />} />
+	 * @example https://recharts.github.io/examples/CustomActiveShapePieChart
+	 */
 	activeShape?: ActiveShape<PieSectorDataItem, SVGPathElement>;
 	/**
- * Specifies when the animation should begin, the unit of this option is ms.
- * @defaultValue 400
- */
+	 * Specifies when the animation should begin, the unit of this option is ms.
+	 * @defaultValue 400
+	 */
 	animationBegin?: number;
 	/**
- * Specifies the duration of animation, the unit of this option is ms.
- * @defaultValue 1500
- */
+	 * Specifies the duration of animation, the unit of this option is ms.
+	 * @defaultValue 1500
+	 */
 	animationDuration?: AnimationDuration;
 	/**
- * The type of easing function.
- * @defaultValue ease
- */
+	 * The type of easing function.
+	 * @defaultValue ease
+	 */
 	animationEasing?: EasingInput;
 	/**
- * Custom animation function for interpolating data items.
- * When provided, this replaces the default animation interpolation.
- *
- * @param prevItems The items from the previous animation frame, or null on first render
- * @param nextItems The target items to animate towards
- * @param animationElapsedTime A normalized time value (0 = start, 1 = end)
- * @returns The interpolated items at time animationElapsedTime
- *
- * @since 3.9
- * @see {@link https://recharts.github.io/en-US/guide/animations/ Animations guide}
- */
+	 * Custom animation function for interpolating data items.
+	 * When provided, this replaces the default animation interpolation.
+	 *
+	 * @param prevItems The items from the previous animation frame, or null on first render
+	 * @param nextItems The target items to animate towards
+	 * @param animationElapsedTime A normalized time value (0 = start, 1 = end)
+	 * @returns The interpolated items at time animationElapsedTime
+	 *
+	 * @since 3.9
+	 * @see {@link https://recharts.github.io/en-US/guide/animations/ Animations guide}
+	 */
 	animationInterpolateFn?: AnimationInterpolateFn<PieSectorDataItem, PolarLayout>;
 	/**
- * Strategy for matching previous items to next items during animation.
- * Determines how Recharts pairs old data points with new data points
- * to create smooth transitions.
- *
- * - `matchAppend` (default): match sequentially by index and treat newly appended items as new
- * - `matchByIndex`: match by array position with proportional stretching
- * - `matchByDataKey('someKey')`: match by a data key from the payload
- * - Custom function `(item, index) => key`: match by the returned key
- *
- * @defaultValue append
- * @see matchByIndex
- * @see matchByDataKey
- * @see matchAppend
- *
- * @since 3.9
- * @see {@link https://recharts.github.io/en-US/guide/animations/ Animations guide}
- */
+	 * Strategy for matching previous items to next items during animation.
+	 * Determines how Recharts pairs old data points with new data points
+	 * to create smooth transitions.
+	 *
+	 * - `matchAppend` (default): match sequentially by index and treat newly appended items as new
+	 * - `matchByIndex`: match by array position with proportional stretching
+	 * - `matchByDataKey('someKey')`: match by a data key from the payload
+	 * - Custom function `(item, index) => key`: match by the returned key
+	 *
+	 * @defaultValue append
+	 * @see matchByIndex
+	 * @see matchByDataKey
+	 * @see matchAppend
+	 *
+	 * @since 3.9
+	 * @see {@link https://recharts.github.io/en-US/guide/animations/ Animations guide}
+	 */
 	animationMatchBy?: AnimationMatchByProp<PieSectorDataItem>;
 	className?: string;
 	/**
- * Hides the whole graphical element when true.
- *
- * Hiding an element is different from removing it from the chart:
- * Hidden graphical elements are still visible in Legend,
- * and can be included in axis domain calculations,
- * depending on `includeHidden` props of your XAxis/YAxis.
- *
- * @defaultValue false
- */
+	 * Hides the whole graphical element when true.
+	 *
+	 * Hiding an element is different from removing it from the chart:
+	 * Hidden graphical elements are still visible in Legend,
+	 * and can be included in axis domain calculations,
+	 * depending on `includeHidden` props of your XAxis/YAxis.
+	 *
+	 * @defaultValue false
+	 */
 	hide?: boolean;
 	id?: string;
 	/**
- * The shape of inactive sector.
- * @deprecated Use the `shape` prop to modify each sector.
- */
+	 * The shape of inactive sector.
+	 * @deprecated Use the `shape` prop to modify each sector.
+	 */
 	inactiveShape?: ActiveShape<PieSectorDataItem, SVGPathElement>;
 	/**
- * If set false, animation will be disabled.
- * If set "auto", the animation will be disabled in SSR and will respect the user's prefers-reduced-motion system preference for accessibility.
- * @defaultValue auto
- */
+	 * If set false, animation will be disabled.
+	 * If set "auto", the animation will be disabled in SSR and will respect the user's prefers-reduced-motion system preference for accessibility.
+	 * @defaultValue auto
+	 */
 	isAnimationActive?: boolean | 'auto';
 	/**
- * Renders one label for each pie sector. Options:
- * - `true`: renders default labels;
- * - `false`: no labels are rendered;
- * - `object` that has `position` prop: the props of LabelList component;
- * - `object` that does not have `position` prop: the props of a custom Pie label (similar to Label with position "outside"); this variant supports `labelLine`
- * - `OctaneElement`: a custom SVG label element, such as `<text>` or `<g>`.
- *   HTML elements such as `<div>` are not valid inside the chart SVG and may trigger React DOM warnings.
- * - `function`: a render function of custom label.
- *
- * Also see the `labelLine` prop that draws a line connecting each label to the corresponding sector.
- *
- * @defaultValue false
- * @example <Pie label={<CustomizedLabel />} />
- * @example https://recharts.github.io/examples/PieChartWithCustomizedLabel
- */
+	 * Renders one label for each pie sector. Options:
+	 * - `true`: renders default labels;
+	 * - `false`: no labels are rendered;
+	 * - `object` that has `position` prop: the props of LabelList component;
+	 * - `object` that does not have `position` prop: the props of a custom Pie label (similar to Label with position "outside"); this variant supports `labelLine`
+	 * - `OctaneElement`: a custom SVG label element, such as `<text>` or `<g>`.
+	 *   HTML elements such as `<div>` are not valid inside the chart SVG and may trigger React DOM warnings.
+	 * - `function`: a render function of custom label.
+	 *
+	 * Also see the `labelLine` prop that draws a line connecting each label to the corresponding sector.
+	 *
+	 * @defaultValue false
+	 * @example <Pie label={<CustomizedLabel />} />
+	 * @example https://recharts.github.io/examples/PieChartWithCustomizedLabel
+	 */
 	label?: PieLabel;
 	/**
- * If false set, label lines will not be drawn. If true set, label lines will be drawn which have the props calculated internally.
- * If object set, label lines will be drawn which have the props merged by the internal calculated props and the option.
- * If OctaneElement set, the option can be the custom label line element.
- * If set a function, the function will be called to render customized label line.
- * @defaultValue true
- * @example <Pie labelLine={<CustomizedLabelLine />} />
- * @example https://recharts.github.io/examples/PieChartWithCustomizedLabel
- */
+	 * If false set, label lines will not be drawn. If true set, label lines will be drawn which have the props calculated internally.
+	 * If object set, label lines will be drawn which have the props merged by the internal calculated props and the option.
+	 * If OctaneElement set, the option can be the custom label line element.
+	 * If set a function, the function will be called to render customized label line.
+	 * @defaultValue true
+	 * @example <Pie labelLine={<CustomizedLabelLine />} />
+	 * @example https://recharts.github.io/examples/PieChartWithCustomizedLabel
+	 */
 	labelLine?: PieLabelLine;
 	/**
- * The type of icon in legend. If set to 'none', no legend item will be rendered.
- * @defaultValue rect
- */
+	 * The type of icon in legend. If set to 'none', no legend item will be rendered.
+	 * @defaultValue rect
+	 */
 	legendType?: LegendType;
 	/** the max radius of pie */
 	maxRadius?: number;
 	/**
- * The minimum angle of each unzero data.
- * @defaultValue 0
- */
+	 * The minimum angle of each unzero data.
+	 * @defaultValue 0
+	 */
 	minAngle?: number;
 	/**
- * Name represents each sector in the tooltip, and legend.
- * This allows you to extract the name from the data:
- *
- * - `string`: the name of the field in the data object;
- * - `number`: the index of the field in the data;
- * - `function`: a function that receives the data object and returns the name.
- *
- * @defaultValue name
- */
+	 * Name represents each sector in the tooltip, and legend.
+	 * This allows you to extract the name from the data:
+	 *
+	 * - `string`: the name of the field in the data object;
+	 * - `number`: the index of the field in the data;
+	 * - `function`: a function that receives the data object and returns the name.
+	 *
+	 * @defaultValue name
+	 */
 	nameKey?: DataKey<DataPointType, DataValueType>;
 	/**
- * The customized event handler of animation end.
- */
+	 * The customized event handler of animation end.
+	 */
 	onAnimationEnd?: () => void;
 	/**
- * The customized event handler of animation start.
- */
+	 * The customized event handler of animation start.
+	 */
 	onAnimationStart?: () => void;
 	/**
- * The tabindex of wrapper surrounding the cells.
- * @defaultValue 0
- */
+	 * The tabindex of wrapper surrounding the cells.
+	 * @defaultValue 0
+	 */
 	rootTabIndex?: number;
 	/**
- * The custom shape of a Pie Sector.
- * Can also be used to render active sector by checking isActive.
- * During animations, the function shape also receives `animationElapsedTime`, `isAnimating`, and `isEntrance`.
- * If undefined, renders {@link Sector} shape.
- */
+	 * The custom shape of a Pie Sector.
+	 * Can also be used to render active sector by checking isActive.
+	 * During animations, the function shape also receives `animationElapsedTime`, `isAnimating`, and `isEntrance`.
+	 * If undefined, renders {@link Sector} shape.
+	 */
 	shape?: PieShape;
 	tooltipType?: TooltipType;
 	/**
- * Formats the value displayed in the tooltip for this Pie.
- * When set, takes precedence over the `formatter` prop on the Tooltip component.
- */
+	 * Formats the value displayed in the tooltip for this Pie.
+	 * When set, takes precedence over the `formatter` prop on the Tooltip component.
+	 */
 	formatter?: Formatter;
 	/**
- * @defaultValue 100
- */
+	 * @defaultValue 100
+	 */
 	zIndex?: number;
 }
 
-type PieSvgAttributes =
-	Omit<PresentationAttributesAdaptChildEvent<any, SVGElement>, 'ref' | keyof PieEvents>;
+type PieSvgAttributes = Omit<
+	PresentationAttributesAdaptChildEvent<any, SVGElement>,
+	'ref' | keyof PieEvents
+>;
 
 type InternalProps = PieSvgAttributes & InternalPieProps;
 
-export type Props<DataPointType = any, DataValueType = any> =
-	PieSvgAttributes & PieProps<DataPointType, DataValueType>;
+export type Props<DataPointType = any, DataValueType = any> = PieSvgAttributes &
+	PieProps<DataPointType, DataValueType>;
 
 type RealPieData = Record<string, unknown>;
 
@@ -482,28 +507,29 @@ function SetPiePayloadLegend(props: {
 	return <SetPolarLegendPayload legendPayload={legendPayload} />;
 }
 
-type PieSectorsProps =
-	ShapeAnimationProps & {
-		sectors: Readonly<PieSectorDataItem[]>;
-		/**
- * @deprecated
- */
-		activeShape: ActiveShape<Readonly<PieSectorDataItem>, SVGPathElement> | undefined;
-		/**
- * @deprecated
- */
-		inactiveShape: ActiveShape<Readonly<PieSectorDataItem>, SVGPathElement> | undefined;
-		shape: PieShape;
-		allOtherPieProps: WithoutId<InternalProps>;
-		id: GraphicalItemId;
-	};
+type PieSectorsProps = ShapeAnimationProps & {
+	sectors: Readonly<PieSectorDataItem[]>;
+	/**
+	 * @deprecated
+	 */
+	activeShape: ActiveShape<Readonly<PieSectorDataItem>, SVGPathElement> | undefined;
+	/**
+	 * @deprecated
+	 */
+	inactiveShape: ActiveShape<Readonly<PieSectorDataItem>, SVGPathElement> | undefined;
+	shape: PieShape;
+	allOtherPieProps: WithoutId<InternalProps>;
+	id: GraphicalItemId;
+};
 
 function getActiveShapeFill(
 	activeShape: ActiveShape<Readonly<PieSectorDataItem>, SVGPathElement> | undefined,
 ): string | undefined {
 	// activeShape can be boolean/function/element/object; only element/object can carry a static fill value.
 	if (
-		activeShape == null || typeof activeShape === 'boolean' || typeof activeShape === 'function'
+		activeShape == null ||
+		typeof activeShape === 'boolean' ||
+		typeof activeShape === 'function'
 	) {
 		return undefined;
 	}
@@ -522,71 +548,71 @@ function getActiveShapeFill(
 	return typeof fill === 'string' ? fill : undefined;
 }
 
-const SetPieTooltipEntrySettings = React.memo(({
-	dataKey,
-	nameKey,
-	sectors,
-	stroke,
-	strokeWidth,
-	fill,
-	name,
-	hide,
-	tooltipType,
-	formatter,
-	id,
-	activeShape,
-}: Pick<
-	InternalProps,
-	| 'dataKey'
-	| 'nameKey'
-	| 'sectors'
-	| 'stroke'
-	| 'strokeWidth'
-	| 'fill'
-	| 'name'
-	| 'hide'
-	| 'tooltipType'
-	| 'formatter'
-	| 'id'
-	| 'activeShape'
->) => {
-	const activeShapeFill = getActiveShapeFill(activeShape);
+const SetPieTooltipEntrySettings = React.memo(
+	({
+		dataKey,
+		nameKey,
+		sectors,
+		stroke,
+		strokeWidth,
+		fill,
+		name,
+		hide,
+		tooltipType,
+		formatter,
+		id,
+		activeShape,
+	}: Pick<
+		InternalProps,
+		| 'dataKey'
+		| 'nameKey'
+		| 'sectors'
+		| 'stroke'
+		| 'strokeWidth'
+		| 'fill'
+		| 'name'
+		| 'hide'
+		| 'tooltipType'
+		| 'formatter'
+		| 'id'
+		| 'activeShape'
+	>) => {
+		const activeShapeFill = getActiveShapeFill(activeShape);
 
-	const tooltipDataDefinedOnItem = sectors.map((sector) => {
-		const sectorTooltipPayload = sector.tooltipPayload;
-		if (activeShapeFill == null || sectorTooltipPayload == null) {
-			return sectorTooltipPayload;
-		}
+		const tooltipDataDefinedOnItem = sectors.map((sector) => {
+			const sectorTooltipPayload = sector.tooltipPayload;
+			if (activeShapeFill == null || sectorTooltipPayload == null) {
+				return sectorTooltipPayload;
+			}
 
-		return sectorTooltipPayload.map(
-			(item) => ({
+			return sectorTooltipPayload.map((item) => ({
 				...item,
 				color: activeShapeFill,
 				fill: activeShapeFill,
-			}),
-		);
-	});
+			}));
+		});
 
-	const tooltipEntrySettings: TooltipPayloadConfiguration = {
-		dataDefinedOnItem: tooltipDataDefinedOnItem,
-		getPosition: (index) => sectors[Number(index)]?.tooltipPosition,
-		settings: {
-			stroke,
-			strokeWidth,
-			fill,
-			dataKey,
-			nameKey,
-			name: getTooltipNameProp(name, dataKey),
-			hide,
-			type: tooltipType,
-			color: fill,
-			unit: '', // why doesn't Pie support unit?
-			formatter,
-			graphicalItemId: id,
-		},
-	};
-	return <SetTooltipEntrySettings tooltipEntrySettings={tooltipEntrySettings} />;
-});
+		const tooltipEntrySettings: TooltipPayloadConfiguration = {
+			dataDefinedOnItem: tooltipDataDefinedOnItem,
+			getPosition: (index) => sectors[Number(index)]?.tooltipPosition,
+			settings: {
+				stroke,
+				strokeWidth,
+				fill,
+				dataKey,
+				nameKey,
+				name: getTooltipNameProp(name, dataKey),
+				hide,
+				type: tooltipType,
+				color: fill,
+				unit: '', // why doesn't Pie support unit?
+				formatter,
+				graphicalItemId: id,
+			},
+		};
+		return <SetTooltipEntrySettings tooltipEntrySettings={tooltipEntrySettings} />;
+	},
+);
 
 const getTextAnchor = (x: number, cx: number) => {
 	if (x > cx) {
@@ -665,7 +691,11 @@ const renderLabelItem = (option: PieLabel, props: PieLabelRenderProps, value: Re
 	}
 
 	const className = clsx('recharts-pie-label-text', getClassNameFromUnknown(option));
-	return <Text {...props} alignmentBaseline="middle" className={className}>{label}</Text>;
+	return (
+		<Text {...props} alignmentBaseline="middle" className={className}>
+			{label}
+		</Text>
+	);
 };
 
 function PieLabels({
@@ -685,10 +715,11 @@ function PieLabels({
 	const customLabelProps = svgPropertiesNoEventsFromUnknown(label);
 	const customLabelLineProps = svgPropertiesNoEventsFromUnknown(labelLine);
 	const offsetRadius =
-		typeof label === 'object' && 'offsetRadius' in label &&
+		(typeof label === 'object' &&
+			'offsetRadius' in label &&
 			typeof label.offsetRadius === 'number' &&
-			label.offsetRadius ||
-			20;
+			label.offsetRadius) ||
+		20;
 
 	const labels = sectors.map((entry, i) => {
 		// The Cell ref belongs to its sector, not to the label or connector.
@@ -721,19 +752,21 @@ function PieLabels({
 			key: 'line',
 		};
 
-		return <ZIndexLayer
-			zIndex={DefaultZIndexes.label}
-			key={`label-${entry.startAngle}-${entry.endAngle}-${entry.midAngle}-${i}`}
-		>
-			<Layer>
-				{labelLine && renderLabelLineItem(labelLine, lineProps)}
-				{renderLabelItem(
-					label,
-					labelProps,
-					getValueByDataKey<unknown, RenderableText>(entry, dataKey),
-				)}
-			</Layer>
-		</ZIndexLayer>;
+		return (
+			<ZIndexLayer
+				zIndex={DefaultZIndexes.label}
+				key={`label-${entry.startAngle}-${entry.endAngle}-${entry.midAngle}-${i}`}
+			>
+				<Layer>
+					{labelLine && renderLabelLineItem(labelLine, lineProps)}
+					{renderLabelItem(
+						label,
+						labelProps,
+						getValueByDataKey<unknown, RenderableText>(entry, dataKey),
+					)}
+				</Layer>
+			</ZIndexLayer>
+		);
 	});
 
 	return <Layer className="recharts-pie-labels">{labels}</Layer>;
@@ -794,51 +827,54 @@ function PieSectors(props: PieSectorsProps) {
 		return null;
 	}
 
-	return <>
-		{sectors.map((entry: PieSectorDataItem, i: number) => {
-			if (entry?.startAngle === 0 && entry?.endAngle === 0 && sectors.length !== 1) return null;
+	return (
+		<>
+			{sectors.map((entry: PieSectorDataItem, i: number) => {
+				if (entry?.startAngle === 0 && entry?.endAngle === 0 && sectors.length !== 1) return null;
 
-			// For Pie charts, when multiple Pies share the same dataKey, we need to ensure only the hovered Pie's sector is active.
-			// We do this by checking if the active graphical item ID matches this Pie's ID.
-			const graphicalItemMatches = activeGraphicalItemId == null || activeGraphicalItemId === id;
+				// For Pie charts, when multiple Pies share the same dataKey, we need to ensure only the hovered Pie's sector is active.
+				// We do this by checking if the active graphical item ID matches this Pie's ID.
+				const graphicalItemMatches = activeGraphicalItemId == null || activeGraphicalItemId === id;
 
-			const isActive =
-				String(i) === activeIndex &&
+				const isActive =
+					String(i) === activeIndex &&
 					(activeDataKey == null || allOtherPieProps.dataKey === activeDataKey) &&
 					graphicalItemMatches;
-			const inactiveShape = activeIndex ? inactiveShapeProp : null;
-			const sectorOptions =
-				activeShape && isActive ? activeShape : inactiveShape;
-			const sectorProps: PieSectorShapeProps = {
-				...entry,
-				stroke: entry.stroke,
-				tabIndex: -1,
-				index: i,
-				isActive,
-				animationElapsedTime,
-				isAnimating,
-				isEntrance,
-				[DATA_ITEM_INDEX_ATTRIBUTE_NAME]: i,
-				[DATA_ITEM_GRAPHICAL_ITEM_ID_ATTRIBUTE_NAME]: id,
-			};
+				const inactiveShape = activeIndex ? inactiveShapeProp : null;
+				const sectorOptions = activeShape && isActive ? activeShape : inactiveShape;
+				const sectorProps: PieSectorShapeProps = {
+					...entry,
+					stroke: entry.stroke,
+					tabIndex: -1,
+					index: i,
+					isActive,
+					animationElapsedTime,
+					isAnimating,
+					isEntrance,
+					[DATA_ITEM_INDEX_ATTRIBUTE_NAME]: i,
+					[DATA_ITEM_GRAPHICAL_ITEM_ID_ATTRIBUTE_NAME]: id,
+				};
 
-			return <Layer
-				key={`sector-${entry?.startAngle}-${entry?.endAngle}-${entry.midAngle}-${i}`}
-				tabIndex={-1}
-				className="recharts-pie-sector"
-				{...adaptEventsOfChild(restOfAllOtherProps, entry, i)}
-				onMouseEnter={onMouseEnterFromContext(entry, i)}
-				onMouseLeave={onMouseLeaveFromContext(entry, i)}
-				onClick={onClickFromContext(entry, i)}
-			>
-				<PieSectorShape
-					option={sectorOptions ?? shape}
-					DefaultShape={defaultPieSectorShape}
-					shapeProps={sectorProps}
-				/>
-			</Layer>;
-		})}
-	</>;
+				return (
+					<Layer
+						key={`sector-${entry?.startAngle}-${entry?.endAngle}-${entry.midAngle}-${i}`}
+						tabIndex={-1}
+						className="recharts-pie-sector"
+						{...adaptEventsOfChild(restOfAllOtherProps, entry, i)}
+						onMouseEnter={onMouseEnterFromContext(entry, i)}
+						onMouseLeave={onMouseLeaveFromContext(entry, i)}
+						onClick={onClickFromContext(entry, i)}
+					>
+						<PieSectorShape
+							option={sectorOptions ?? shape}
+							DefaultShape={defaultPieSectorShape}
+							shapeProps={sectorProps}
+						/>
+					</Layer>
+				);
+			})}
+		</>
+	);
 }
 
 export function computePieSectors({
@@ -856,8 +892,7 @@ export function computePieSectors({
 	const minAngle = Math.abs(pieSettings.minAngle);
 	const deltaAngle = parseDeltaAngle(startAngle, endAngle);
 	const absDeltaAngle = Math.abs(deltaAngle);
-	const paddingAngle =
-		displayedData.length <= 1 ? 0 : pieSettings.paddingAngle ?? 0;
+	const paddingAngle = displayedData.length <= 1 ? 0 : (pieSettings.paddingAngle ?? 0);
 
 	const notZeroItemCount = displayedData.filter(
 		(entry) => getValueByDataKey(entry, dataKey, 0) !== 0,
@@ -874,11 +909,14 @@ export function computePieSectors({
 	// natural angle falls below the minAngle threshold. Otherwise, minAngle
 	// unnecessarily shifts all segments even when none need the boost.
 	// See: https://github.com/recharts/recharts/issues/6814
-	const needsMinAngleAdjustment = minAngle > 0 && sum > 0 && displayedData.some((entry) => {
-				const val = getValueByDataKey(entry, dataKey, 0);
-				const percent = (isNumber(val) ? val : 0) / sum;
-				return val !== 0 && percent * absDeltaAngle < minAngle;
-			});
+	const needsMinAngleAdjustment =
+		minAngle > 0 &&
+		sum > 0 &&
+		displayedData.some((entry) => {
+			const val = getValueByDataKey(entry, dataKey, 0);
+			const percent = (isNumber(val) ? val : 0) / sum;
+			return val !== 0 && percent * absDeltaAngle < minAngle;
+		});
 	const effectiveMinAngle = needsMinAngleAdjustment ? minAngle : 0;
 
 	const realTotalAngle = absDeltaAngle - notZeroItemCount * effectiveMinAngle - totalPaddingAngle;
@@ -894,11 +932,12 @@ export function computePieSectors({
 			let tempStartAngle;
 
 			const entryWithCellInfo: RealPieData = {
-				...entry as Record<string, unknown>,
-				...cells && cells[i] && cells[i].props,
+				...(entry as Record<string, unknown>),
+				...(cells && cells[i] && cells[i].props),
 			};
 			const sectorColor =
-				entryWithCellInfo != null && 'fill' in entryWithCellInfo &&
+				entryWithCellInfo != null &&
+				'fill' in entryWithCellInfo &&
 				typeof entryWithCellInfo.fill === 'string'
 					? entryWithCellInfo.fill
 					: pieSettings.fill;
@@ -971,28 +1010,28 @@ function PieLabelListProvider({
 		if (!showLabels || !sectors) {
 			return [];
 		}
-		return sectors.map(
-			(entry): PolarLabelListEntry => ({
-				value: entry.value,
-				payload: entry.payload,
+		return sectors.map((entry): PolarLabelListEntry => ({
+			value: entry.value,
+			payload: entry.payload,
+			clockWise: false,
+			parentViewBox: undefined,
+			viewBox: {
+				cx: entry.cx,
+				cy: entry.cy,
+				innerRadius: entry.innerRadius,
+				outerRadius: entry.outerRadius,
+				startAngle: entry.startAngle,
+				endAngle: entry.endAngle,
 				clockWise: false,
-				parentViewBox: undefined,
-				viewBox: {
-					cx: entry.cx,
-					cy: entry.cy,
-					innerRadius: entry.innerRadius,
-					outerRadius: entry.outerRadius,
-					startAngle: entry.startAngle,
-					endAngle: entry.endAngle,
-					clockWise: false,
-				},
-				fill: entry.fill,
-			}),
-		);
+			},
+			fill: entry.fill,
+		}));
 	}, [sectors, showLabels]);
-	return <PolarLabelListContextProvider
-		value={showLabels ? labelListEntries : undefined}
-	>{children}</PolarLabelListContextProvider>;
+	return (
+		<PolarLabelListContextProvider value={showLabels ? labelListEntries : undefined}>
+			{children}
+		</PolarLabelListContextProvider>
+	);
 }
 
 type WithoutId<T> = Omit<T, 'id'>;
@@ -1008,8 +1047,7 @@ const defaultPieAnimateItems: AnimationInterpolateFn<PieSectorDataItem, PolarLay
 
 	items.forEach((item, index) => {
 		if (item.status === 'removed') return;
-		const paddingAngle =
-			index > 0 ? get(item.next, 'paddingAngle', 0) : 0;
+		const paddingAngle = index > 0 ? get(item.next, 'paddingAngle', 0) : 0;
 
 		if (item.status === 'matched') {
 			const angle = interpolate(
@@ -1077,39 +1115,43 @@ function SectorsWithAnimation({
 
 	if (layout == null) return null;
 
-	return <PieLabelListProvider showLabels={!isAnimating} sectors={sectors}>
-		<AnimatedItems
-			animationInput={animationInput}
-			animationIdPrefix="recharts-pie-"
-			items={sectors}
-			previousItemsRef={previousSectorsRef}
-			isAnimationActive={props.isAnimationActive}
-			animationBegin={props.animationBegin}
-			animationDuration={props.animationDuration}
-			animationEasing={props.animationEasing}
-			onAnimationStart={handleAnimationStart}
-			onAnimationEnd={handleAnimationEnd}
-			animationInterpolateFn={animationInterpolateFn}
-			animationMatchBy={props.animationMatchBy}
-			layout={layout}
-		>
-			{(stepData, animationElapsedTime, isEntrance) => <Layer>
-				<PieSectors
-					sectors={stepData}
-					activeShape={activeShape}
-					inactiveShape={inactiveShape}
-					allOtherPieProps={props}
-					shape={props.shape}
-					id={id}
-					animationElapsedTime={animationElapsedTime}
-					isAnimating={isAnimating || animationElapsedTime < 1}
-					isEntrance={isEntrance}
-				/>
-			</Layer>}
-		</AnimatedItems>
-		<PieLabelList showLabels={!isAnimating} sectors={sectors} props={props} />
-		{props.children}
-	</PieLabelListProvider>;
+	return (
+		<PieLabelListProvider showLabels={!isAnimating} sectors={sectors}>
+			<AnimatedItems
+				animationInput={animationInput}
+				animationIdPrefix="recharts-pie-"
+				items={sectors}
+				previousItemsRef={previousSectorsRef}
+				isAnimationActive={props.isAnimationActive}
+				animationBegin={props.animationBegin}
+				animationDuration={props.animationDuration}
+				animationEasing={props.animationEasing}
+				onAnimationStart={handleAnimationStart}
+				onAnimationEnd={handleAnimationEnd}
+				animationInterpolateFn={animationInterpolateFn}
+				animationMatchBy={props.animationMatchBy}
+				layout={layout}
+			>
+				{(stepData, animationElapsedTime, isEntrance) => (
+					<Layer>
+						<PieSectors
+							sectors={stepData}
+							activeShape={activeShape}
+							inactiveShape={inactiveShape}
+							allOtherPieProps={props}
+							shape={props.shape}
+							id={id}
+							animationElapsedTime={animationElapsedTime}
+							isAnimating={isAnimating || animationElapsedTime < 1}
+							isEntrance={isEntrance}
+						/>
+					</Layer>
+				)}
+			</AnimatedItems>
+			<PieLabelList showLabels={!isAnimating} sectors={sectors} props={props} />
+			{props.children}
+		</PieLabelListProvider>
+	);
 }
 
 export const defaultPieProps = {
@@ -1154,44 +1196,52 @@ function PieImpl(props: WithIdRequired<PropsWithResolvedDefaults>) {
 
 	if (sectors == null) {
 		previousSectorsRef.current = null;
-		return <CellsContext value={cellRegistry}>
-			<SetPiePayloadLegend cells={cells} id={id} />
-			<Layer tabIndex={rootTabIndex} className={layerClass}>{props.children}</Layer>
-		</CellsContext>;
+		return (
+			<CellsContext value={cellRegistry}>
+				<SetPiePayloadLegend cells={cells} id={id} />
+				<Layer tabIndex={rootTabIndex} className={layerClass}>
+					{props.children}
+				</Layer>
+			</CellsContext>
+		);
 	}
 
 	if (hide) {
 		previousSectorsRef.current = null;
 	}
 
-	return <CellsContext value={cellRegistry}>
-		<SetPiePayloadLegend cells={cells} id={id} />
-		<ZIndexLayer zIndex={props.zIndex}>
-			<SetPieTooltipEntrySettings
-				dataKey={props.dataKey}
-				nameKey={props.nameKey}
-				sectors={sectors}
-				stroke={props.stroke}
-				strokeWidth={props.strokeWidth}
-				fill={props.fill}
-				name={props.name}
-				hide={props.hide}
-				tooltipType={props.tooltipType}
-				formatter={props.formatter}
-				id={id}
-				activeShape={props.activeShape}
-			/>
-			<Layer tabIndex={rootTabIndex} className={layerClass}>
-				{!hide
-					? <SectorsWithAnimation
+	return (
+		<CellsContext value={cellRegistry}>
+			<SetPiePayloadLegend cells={cells} id={id} />
+			<ZIndexLayer zIndex={props.zIndex}>
+				<SetPieTooltipEntrySettings
+					dataKey={props.dataKey}
+					nameKey={props.nameKey}
+					sectors={sectors}
+					stroke={props.stroke}
+					strokeWidth={props.strokeWidth}
+					fill={props.fill}
+					name={props.name}
+					hide={props.hide}
+					tooltipType={props.tooltipType}
+					formatter={props.formatter}
+					id={id}
+					activeShape={props.activeShape}
+				/>
+				<Layer tabIndex={rootTabIndex} className={layerClass}>
+					{!hide ? (
+						<SectorsWithAnimation
 							props={{ ...propsWithoutId, sectors }}
 							previousSectorsRef={previousSectorsRef}
 							id={id}
 						/>
-					: props.children}
-			</Layer>
-		</ZIndexLayer>
-	</CellsContext>;
+					) : (
+						props.children
+					)}
+				</Layer>
+			</ZIndexLayer>
+		</CellsContext>
+	);
 }
 
 type PropsWithResolvedDefaults = RequiresDefaultProps<Props, typeof defaultPieProps>;
@@ -1211,36 +1261,40 @@ function PieFn<DataPointType = any, DataValueType = any>(
 	const { id: externalId, ...propsWithoutId } = props;
 	const presentationProps: PiePresentationProps | null = svgPropertiesNoEvents(propsWithoutId);
 
-	return <RegisterGraphicalItemId id={externalId} type="pie">
-		{(id) => <>
-			<SetPolarGraphicalItem
-				type="pie"
-				id={id}
-				data={propsWithoutId.data}
-				dataKey={propsWithoutId.dataKey}
-				hide={propsWithoutId.hide}
-				angleAxisId={0}
-				radiusAxisId={0}
-				name={propsWithoutId.name}
-				nameKey={propsWithoutId.nameKey}
-				tooltipType={propsWithoutId.tooltipType}
-				legendType={propsWithoutId.legendType}
-				fill={propsWithoutId.fill}
-				cx={propsWithoutId.cx}
-				cy={propsWithoutId.cy}
-				startAngle={propsWithoutId.startAngle}
-				endAngle={propsWithoutId.endAngle}
-				paddingAngle={propsWithoutId.paddingAngle}
-				minAngle={propsWithoutId.minAngle}
-				innerRadius={propsWithoutId.innerRadius}
-				outerRadius={propsWithoutId.outerRadius}
-				cornerRadius={propsWithoutId.cornerRadius}
-				presentationProps={presentationProps}
-				maxRadius={props.maxRadius}
-			/>
-			<PieImpl {...propsWithoutId} id={id} />
-		</>}
-	</RegisterGraphicalItemId>;
+	return (
+		<RegisterGraphicalItemId id={externalId} type="pie">
+			{(id) => (
+				<>
+					<SetPolarGraphicalItem
+						type="pie"
+						id={id}
+						data={propsWithoutId.data}
+						dataKey={propsWithoutId.dataKey}
+						hide={propsWithoutId.hide}
+						angleAxisId={0}
+						radiusAxisId={0}
+						name={propsWithoutId.name}
+						nameKey={propsWithoutId.nameKey}
+						tooltipType={propsWithoutId.tooltipType}
+						legendType={propsWithoutId.legendType}
+						fill={propsWithoutId.fill}
+						cx={propsWithoutId.cx}
+						cy={propsWithoutId.cy}
+						startAngle={propsWithoutId.startAngle}
+						endAngle={propsWithoutId.endAngle}
+						paddingAngle={propsWithoutId.paddingAngle}
+						minAngle={propsWithoutId.minAngle}
+						innerRadius={propsWithoutId.innerRadius}
+						outerRadius={propsWithoutId.outerRadius}
+						cornerRadius={propsWithoutId.cornerRadius}
+						presentationProps={presentationProps}
+						maxRadius={props.maxRadius}
+					/>
+					<PieImpl {...propsWithoutId} id={id} />
+				</>
+			)}
+		</RegisterGraphicalItemId>
+	);
 }
 export const Pie = PieFn as typeof PieFn & { displayName?: string };
 Pie.displayName = 'Pie';

@@ -99,10 +99,11 @@ export function TapClick(props) @{
 
 // Portal into a foreign target — React stamps noop `onclick` on the portal ROOT.
 export function PortalClick(props) @{
-	<div id="phost">{createPortal(
-		() => @{
-			<div id="pclick" onClick={props.h}>{'p'}</div>
-		},
-		props.target,
-	)}</div>
+	<div id="phost">
+		{createPortal(() => @{
+			<div id="pclick" onClick={props.h}>
+				{'p'}
+			</div>
+		}, props.target)}
+	</div>
 }

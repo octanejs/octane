@@ -37,7 +37,7 @@
       "arch": "any",
       "packageManager": "pnpm@12.9.1",
       "lockfile": "pnpm-lock.yaml",
-      "lockfileSha256": "7a38a56db0a01f07e08a3a383bd2afdcfeb9132bfbbcd54e82c852225be9667b"
+      "lockfileSha256": "84dbefa8929419194a46ef5ec966ae8459aa05f40399e583828134ccc8121aad"
     }
   },
   "lanes": [
@@ -105,7 +105,7 @@
         {
           "path": "packages/valtio/tests/_fixtures/store.tsrx",
           "role": "support",
-          "sha256": "a4ce7f3e535cd5c28698b688fbdf6c967e1649b19f39ef9b10b96fcf196335d2"
+          "sha256": "6fa898d9178f00eb9e58500cfce553b79b766215028b6429a70e6e285a5ea9b9"
         },
         {
           "path": "packages/octane/tests/differential/_rig.ts",

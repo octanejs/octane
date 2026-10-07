@@ -22,7 +22,9 @@ export function EffectProbe(props: {
 		threshold: props.threshold,
 		triggerOnce: props.triggerOnce,
 	});
-	<div ref={ref} data-testid="effect">effect</div>
+	<div ref={ref} data-testid="effect">
+		effect
+	</div>
 }
 
 export function EffectStaleCleanupProbe(props: {
@@ -39,20 +41,33 @@ export function EffectSwapProbe(props: {
 	onChange(inView: boolean, entry: IntersectionObserverEntry): void;
 }) {
 	const ref = useOnInView(props.onChange);
-	if (props.alternate) return <span ref={ref} data-testid="effect-swap">alternate</span>;
-	return <div ref={ref} data-testid="effect-swap">initial</div>;
+	if (props.alternate)
+		return (
+			<span ref={ref} data-testid="effect-swap">
+				alternate
+			</span>
+		);
+	return (
+		<div ref={ref} data-testid="effect-swap">
+			initial
+		</div>
+	);
 }
 
 export function HookStateSwapProbe(props: { alternate: boolean }) {
 	const { ref, inView, entry } = useInView();
 	if (props.alternate) {
-		return <span ref={ref} data-testid="hook-state-swap" data-entry={entry?.target.tagName}>
-			{inView ? 'visible' : 'hidden'}
-		</span>;
+		return (
+			<span ref={ref} data-testid="hook-state-swap" data-entry={entry?.target.tagName}>
+				{inView ? 'visible' : 'hidden'}
+			</span>
+		);
 	}
-	return <div ref={ref} data-testid="hook-state-swap" data-entry={entry?.target.tagName}>
-		{inView ? 'visible' : 'hidden'}
-	</div>;
+	return (
+		<div ref={ref} data-testid="hook-state-swap" data-entry={entry?.target.tagName}>
+			{inView ? 'visible' : 'hidden'}
+		</div>
+	);
 }
 
 export function HookSwapProbe(props: {
@@ -60,8 +75,17 @@ export function HookSwapProbe(props: {
 	onChange(inView: boolean, entry: IntersectionObserverEntry): void;
 }) {
 	const { ref } = useInView({ onChange: props.onChange });
-	if (props.alternate) return <span ref={ref} data-testid="hook-swap">alternate</span>;
-	return <div ref={ref} data-testid="hook-swap">initial</div>;
+	if (props.alternate)
+		return (
+			<span ref={ref} data-testid="hook-swap">
+				alternate
+			</span>
+		);
+	return (
+		<div ref={ref} data-testid="hook-swap">
+			initial
+		</div>
+	);
 }
 
 export function EffectPoolProbe(
@@ -81,19 +105,22 @@ export function EffectPoolProbe(
 		initialInView: false,
 	});
 	<>
-		<div ref={first} data-testid="effect-first">first</div>
-		<div ref={second} data-testid="effect-second">second</div>
+		<div ref={first} data-testid="effect-first">
+			first
+		</div>
+		<div ref={second} data-testid="effect-second">
+			second
+		</div>
 	</>
 }
 
 export function ComponentProbe() @{
 	<InView
-		children={({ inView, ref }: { inView: boolean; ref(node: Element | null): void }) => <section
-			ref={ref}
-			data-testid="component"
-		>
-			{inView ? 'inside' : 'outside'}
-		</section>}
+		children={({ inView, ref }: { inView: boolean; ref(node: Element | null): void }) => (
+			<section ref={ref} data-testid="component">
+				{inView ? 'inside' : 'outside'}
+			</section>
+		)}
 	/>
 }
 

@@ -19,17 +19,21 @@ export const defaultRadialBarChartProps = {
  * @provides PolarViewBoxContext
  * @provides PolarChartContext
  */
-export function RadialBarChart<DataPointType = unknown>(props: PolarChartProps<DataPointType> & {
-	ref?: Ref<SVGSVGElement>;
-}) {
+export function RadialBarChart<DataPointType = unknown>(
+	props: PolarChartProps<DataPointType> & {
+		ref?: Ref<SVGSVGElement>;
+	},
+) {
 	const { ref, ...rest } = props;
 	const propsWithDefaults = resolveDefaultProps(rest, defaultRadialBarChartProps);
-	return <PolarChart
-		chartName="RadialBarChart"
-		defaultTooltipEventType="axis"
-		validateTooltipEventTypes={allowedTooltipTypes}
-		tooltipPayloadSearcher={arrayTooltipSearcher}
-		categoricalChartProps={propsWithDefaults}
-		ref={ref}
-	/>;
+	return (
+		<PolarChart
+			chartName="RadialBarChart"
+			defaultTooltipEventType="axis"
+			validateTooltipEventTypes={allowedTooltipTypes}
+			tooltipPayloadSearcher={arrayTooltipSearcher}
+			categoricalChartProps={propsWithDefaults}
+			ref={ref}
+		/>
+	);
 }

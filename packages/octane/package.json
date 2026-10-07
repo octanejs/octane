@@ -1,6 +1,6 @@
 {
   "name": "octane",
-  "version": "0.10.0",
+  "version": "0.10.2",
   "license": "MIT",
   "type": "module",
   "sideEffects": [
@@ -378,21 +378,23 @@
     "@types/react": "catalog:default",
     "@volar/language-core": "catalog:default",
     "@volar/typescript": "catalog:default",
-    "alien-signals": "3.2.0",
+    "alien-signals": "3.2.1",
     "csstype": "catalog:default",
     "devalue": "catalog:default",
-    "entities": "7.0.1",
     "es-module-lexer": "catalog:default",
-    "esrap": "catalog:default",
-    "@tsrx/oxc": "catalog:default"
+    "esrap": "catalog:default"
   },
   "peerDependencies": {
+    "@tsrx/oxc": "catalog:default",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "typescript": "^5.9.3",
     "vite": "^8.0.16"
   },
   "peerDependenciesMeta": {
+    "@tsrx/oxc": {
+      "optional": true
+    },
     "react": {
       "optional": true
     },
@@ -407,6 +409,7 @@
     }
   },
   "devDependencies": {
+    "@tsrx/oxc": "catalog:default",
     "@tsrx/react": "catalog:default",
     "@types/react-dom": "catalog:default",
     "@wagmi/connectors": "catalog:default",

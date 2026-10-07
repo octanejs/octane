@@ -15,9 +15,7 @@ function BrowserProbe() @{
 		<AcquisitionProbe
 			options={{
 				useFsAccessApi: true,
-				accept: [
-					{ description: 'Text', accept: { 'text/plain': ['.txt'] } },
-				],
+				accept: [{ description: 'Text', accept: { 'text/plain': ['.txt'] } }],
 				onDrop(files: File[]) {
 					document.body.dataset.lastPicker = files.map((file) => file.name).join(',');
 				},

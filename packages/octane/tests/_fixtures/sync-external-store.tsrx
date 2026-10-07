@@ -58,7 +58,9 @@ export function SwappableReader(props) @{
 	const subscribe = useCallback(props.store.subscribe, [props.store]);
 	const getSnapshot = useCallback(props.store.get, [props.store]);
 	const value = useSyncExternalStore(subscribe, getSnapshot);
-	<p class="value" data-key={props.store === props.alt ? 'alt' : 'main'}>{value as string}</p>
+	<p class="value" data-key={props.store === props.alt ? 'alt' : 'main'}>
+		{value as string}
+	</p>
 }
 
 // Removes the reader without unmounting its host so a stale store callback

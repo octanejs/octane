@@ -9,6 +9,7 @@ import {
 	DEVELOPMENT_FLAG_DECLARATION,
 } from '../../packages/octane/scripts/compile-node-env.mjs';
 import { specializeErrorCalls } from '../../packages/octane/scripts/specialize-error-calls.mjs';
+import * as noArgumentErrorMessage from '../../packages/octane/src/error-message-no-arguments.ts';
 import { formatProdErrorMessage } from '../../packages/octane/src/error-message.ts';
 
 const catalog = JSON.parse(
@@ -18,7 +19,12 @@ const catalog = JSON.parse(
 async function evaluate(source, env) {
 	const compiled = await transform(source, { loader: 'ts', format: 'cjs', target: 'esnext' });
 	const module = { exports: {} };
-	const context = vm.createContext({ module, exports: module.exports, process: { env } });
+	// Specialized errors import the shared production formatter.
+	const require = (specifier) => {
+		assert.equal(specifier, './error-message-no-arguments.js');
+		return noArgumentErrorMessage;
+	};
+	const context = vm.createContext({ module, exports: module.exports, process: { env }, require });
 	vm.runInContext(compiled.code, context);
 	return { exports: module.exports, context };
 }

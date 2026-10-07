@@ -1,6 +1,9 @@
 // @vitest-environment node
 
 import { parseModule } from '@tsrx/core';
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { describe, expect, it, vi } from 'vitest';
 import type { Plugin } from 'vite';
 import { octane } from 'octane/compiler/vite';
@@ -608,6 +611,63 @@ export function App(props: { label: Label }) @{ <p>{props.label}</p> }`;
 		await expect(transformIn(shared, 'server')).rejects.toThrow(leaked);
 	});
 
+	it("checks a rebundled server chunk's imports, not the code samples in its strings", async () => {
+		// Nitro feeds the SSR build's chunks back through the plugin. Their static
+		// imports still face the client-only check; module syntax quoted inside a
+		// string is data.
+		const root = mkdtempSync(join(tmpdir(), 'octane-vite-chunk-'));
+		try {
+			writeFileSync(
+				join(root, 'package.json'),
+				JSON.stringify({ name: 'app', private: true, dependencies: { octane: '*' } }),
+			);
+			const assets = join(root, 'node_modules/.nitro/vite/services/ssr/assets');
+			mkdirSync(assets, { recursive: true });
+			const chunkId = join(assets, 'docs-Dx1.js');
+			const sceneId = join(root, 'src/Scene.object.tsrx');
+			const sample =
+				"import Leak from './Leak.object.tsrx';\n" +
+				"import { useState } from 'octane';\n" +
+				'export const leak = Leak;';
+			const chunk = (live: boolean) =>
+				[
+					'import { t as useState } from "./runtime.server-Dx2.js";',
+					live ? 'import Scene from "../../../../../../src/Scene.object.tsrx";' : '',
+					`export const sample = ${JSON.stringify(sample)};`,
+					'export function useCount() { return useState(0); }',
+					live ? 'export const live = Scene;' : '',
+				].join('\n');
+			writeFileSync(chunkId, chunk(false));
+			const plugin = octane({
+				renderers: {
+					registry: { object: { module: '/src/object-renderer.js', server: 'client-only' } },
+					rules: [{ include: 'src/**/*.object.tsrx', renderer: 'object' }],
+				},
+			});
+			(plugin.config as any)({ root }, { command: 'build' });
+			(plugin.configResolved as any)({ root, command: 'build', build: {}, define: {} });
+			const resolve = vi.fn(async (request: string) => ({
+				id: request.endsWith('.object.tsrx') ? sceneId : join(assets, request),
+			}));
+			const transformChunk = (source: string) =>
+				Promise.resolve(
+					(plugin.transform as any).call(
+						{ environment: { name: 'nitro', config: { consumer: 'server' } }, resolve },
+						source,
+						chunkId,
+					),
+				);
+
+			expect(await transformChunk(chunk(false))).toBeNull();
+			expect(resolve.mock.calls.map(([request]) => request)).toEqual(['./runtime.server-Dx2.js']);
+			await expect(transformChunk(chunk(true))).rejects.toThrow(
+				/Client-only export "default".*is used by server code/,
+			);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
 	it('carries descriptor-children export metadata through the Vite module graph', async () => {
 		const childId = `${ROOT}/src/Slot.tsrx`;
 		const barrelId = `${ROOT}/src/index.ts`;
@@ -1052,4 +1112,32 @@ export function Styled(props) @{ 'use dom bindings'; <div {...nativeAttrs(props.
 			expect(await transform(gated, source, `${ROOT}/src/App.tsx`, { ssr })).toBeNull();
 		}
 	});
+
+	// A module the plugin compiles can be hundreds of kilobytes of generated
+	// code with almost no comments. Parsing it must stay roughly linear: when
+	// every node scanned all the code up to the next comment, this 540 kB
+	// module took about 20 s to transform instead of about 2 s.
+	it('compiles a large module with few comments without quadratic comment scans', async () => {
+		const plugin = octane({ hmr: false });
+		configure(plugin, 'build');
+		const moduleWithRows = (count: number) =>
+			[
+				"import { useState } from 'octane';",
+				'export function useRow() { return useState(0); }',
+				...Array.from(
+					{ length: count },
+					(_, index) => `export const value${index} = compute(${index}, 'label ${index}');`,
+				),
+				'// end of generated rows',
+			].join('\n');
+		// Time the parse, not the plugin's first-use setup.
+		expect(await transform(plugin, moduleWithRows(1), `${ROOT}/src/warm.js`)).not.toBeNull();
+
+		const start = performance.now();
+		const output = await transform(plugin, moduleWithRows(10_000), `${ROOT}/src/rows.js`);
+		const seconds = (performance.now() - start) / 1000;
+
+		expect(output).not.toBeNull();
+		expect(seconds).toBeLessThan(6);
+	}, 60_000);
 });

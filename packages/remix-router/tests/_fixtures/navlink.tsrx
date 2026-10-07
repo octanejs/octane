@@ -14,9 +14,15 @@ import {
 function Layout() @{
 	<div>
 		<nav>
-			<NavLink id="nl-home" to="/" end>Home</NavLink>
-			<NavLink id="nl-users" to="/users">Users</NavLink>
-			<NavLink id="nl-users-end" to="/users" end>UsersEnd</NavLink>
+			<NavLink id="nl-home" to="/" end>
+				Home
+			</NavLink>
+			<NavLink id="nl-users" to="/users">
+				Users
+			</NavLink>
+			<NavLink id="nl-users-end" to="/users" end>
+				UsersEnd
+			</NavLink>
 			<NavLink id="nl-fn" to="/about" className={({ isActive }) => (isActive ? 'is-on' : 'is-off')}>
 				About
 			</NavLink>
@@ -32,7 +38,9 @@ function Layout() @{
 				to="/users"
 				children={({ isActive }) => (isActive ? 'ON' : 'OFF')}
 			/>
-			<NavLink id="nl-case" to="/About" caseSensitive>CaseAbout</NavLink>
+			<NavLink id="nl-case" to="/About" caseSensitive>
+				CaseAbout
+			</NavLink>
 		</nav>
 		<main>
 			<Outlet />
@@ -77,7 +85,9 @@ export const pendingGate: { resolve: (() => void) | null } = { resolve: null };
 function PendingLayout() @{
 	<div>
 		<nav>
-			<NavLink id="np-slow" to="/slow">Slow</NavLink>
+			<NavLink id="np-slow" to="/slow">
+				Slow
+			</NavLink>
 		</nav>
 		<Outlet />
 	</div>

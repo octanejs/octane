@@ -10,25 +10,29 @@ export function SsrGreeting(props) @{
 	const [count, setCount] = useState(0);
 	<section class="ssr-island">
 		<h3 class="ssr-title">{'island ' + props.name}</h3>
-		<button class="ssr-count" onClick={() => setCount(count + 1)}>{'clicks:' + count}</button>
+		<button class="ssr-count" onClick={() => setCount(count + 1)}>
+			{'clicks:' + count}
+		</button>
 	</section>
 }
 
 export function SsrIdIsland() @{
 	const id = useId();
-	<p class="ssr-id" data-oid={id}>{'id island'}</p>
+	<p class="ssr-id" data-oid={id}>
+		{'id island'}
+	</p>
 }
 
 /** Reads a REAL React context object handed through props (§6.4 on the server). */
 export function SsrThemed(props) @{
 	const theme = use(props.themeContext);
-	<p class="ssr-theme">{'theme:' + theme as string}</p>
+	<p class="ssr-theme">{('theme:' + theme) as string}</p>
 }
 
 export function SsrAsync(props) @{
 	props.log?.('render:async');
 	const value = use(props.resource);
-	<p class="ssr-async">{'value:' + value as string}</p>
+	<p class="ssr-async">{('value:' + value) as string}</p>
 }
 
 /** Two sequential strata: the second fetch exists only once the first resolved. */
@@ -36,7 +40,7 @@ export function SsrChained(props) @{
 	props.log?.('render:chained');
 	const first = use(props.first);
 	const second = use(props.makeSecond(first));
-	<p class="ssr-chained">{first as string + '+' + second as string}</p>
+	<p class="ssr-chained">{((first as string) + '+' + second) as string}</p>
 }
 
 /** Two INDEPENDENT fetch creations — the parallel-use stratum shape. */
@@ -44,12 +48,12 @@ export function SsrParallel(props) @{
 	props.log?.('render:parallel');
 	const first = use(props.fetchA());
 	const second = use(props.fetchB());
-	<p class="ssr-parallel">{first as string + '+' + second as string}</p>
+	<p class="ssr-parallel">{((first as string) + '+' + second) as string}</p>
 }
 
 export function SsrRejecting(props) @{
 	const value = use(props.resource);
-	<p class="ssr-rejecting">{'value:' + value as string}</p>
+	<p class="ssr-rejecting">{('value:' + value) as string}</p>
 }
 
 /** A local @try: its @pending arm ships in the shell; the client completes it. */
@@ -67,7 +71,7 @@ export function SsrLocallyGuarded(props) @{
 
 function SsrInner(props) @{
 	const value = use(props.resource);
-	<p class="ssr-inner">{'value:' + value as string}</p>
+	<p class="ssr-inner">{('value:' + value) as string}</p>
 }
 
 /** Stamps its DOM from a layout effect — observable only if island layout
@@ -77,7 +81,9 @@ export function SsrLayout() @{
 	useLayoutEffect(() => {
 		ref.current?.setAttribute('data-laid-out', 'yes');
 	});
-	<p class="ssr-layout" ref={ref}>{'layout'}</p>
+	<p class="ssr-layout" ref={ref}>
+		{'layout'}
+	</p>
 }
 
 /** Scoped style — exercises the §9.2 style-resource channel. */

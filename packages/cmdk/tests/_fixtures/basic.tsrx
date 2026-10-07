@@ -212,7 +212,9 @@ export function ForceMountSwapMenu(props: { forced: boolean }) @{
 	<Command label="Command Menu">
 		<Command.List>
 			@if (props.forced) {
-				<Command.Item forceMount value="Apple">Apple</Command.Item>
+				<Command.Item forceMount value="Apple">
+					Apple
+				</Command.Item>
 			}
 			@if (!props.forced) {
 				<Command.Item value="Apple">Apple</Command.Item>
@@ -267,7 +269,9 @@ export function RemovableMenu(props: { show: boolean; kind: 'item' | 'force' | '
 				<Command.Item value="Apple">Apple</Command.Item>
 			}
 			@if (props.show && props.kind === 'force') {
-				<Command.Item forceMount value="Apple">Apple</Command.Item>
+				<Command.Item forceMount value="Apple">
+					Apple
+				</Command.Item>
 			}
 			@if (props.show && props.kind === 'group') {
 				<Command.Group heading="Fruits">

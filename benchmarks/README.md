@@ -283,6 +283,7 @@ internally, get their own baseline and guard namespace.
 | `scheduler-responsiveness` | scheduler-responsiveness | none (builds) | real controlled typing during eight 512-subscriber store updates at 6× CPU throttling, with focus, caret, frame, and notification gates |
 | `suspense-recovery` | suspense-recovery | none (builds) | seven-framework visible async pending, rejection, retry, cancellation, and stale-response correctness |
 | `event-delegation` | event-delegation | none (builds) | 128 real native input events, 512 event-bearing hosts, capture/bubble accounting, and every controlled output |
+| `app-frame-hydration` | app-frame-hydration | none (headless Chromium) | production SSR + cold hydration of a ~1,650-Block signal-enabled app frame (small wrapper components, `@if` arms, `@for` rows, forwarded `style`) at 4× CPU throttling, with jitless render-entry, call, and heap counters and an optional paired `--base=<checkout>` comparison |
 | `behavior-root-events` | behavior-root-events | none (headless Chromium) | queued events across 1,000 and 8,000 distinct async behavior adoptions, with FIFO/exactly-once gates |
 | `application-composition` | application-composition | none (builds) | lifecycle resources, large forms, store fan-out, async recovery, form submission, and navigation teardown in one app |
 | `scaling-curves` | scaling-curves | none (builds) | independently correctness-gated controlled updates at 8, 32, 96, 256, and 512 components |
@@ -369,6 +370,13 @@ adapter with named exports and authenticated immutable default maps. They compar
 identical source with the option off/on, keep framework imports external for byte
 measurement, and verify equal emitted CSS and full-runtime SSR output. Their
 same-run ratios catch an adapter that silently stops supplying compiler proofs.
+The `rspack-void-*` targets build the same adapter's imported void-root proofs
+with the runtime bundled, because the saving is the generic root renderer the
+minifier drops. Each control's post loader routes the root import through a
+re-export the adapter leaves unproven; every other module stays byte-identical,
+and both variants must render the same DOM in jsdom. The `hydrate` pair is the
+octanejs/octane#1839 shape, and the `tree` pair is `createRoot` over four imported
+void components with an update.
 `lynx-bundle-size` instead uses the pinned Rspeedy native encoder unchanged and
 bounds the incremental decoded/encoded cost of IFR against the equivalent
 background-rendered preview graph; its semantic checks remain source/build
@@ -408,8 +416,8 @@ comparison. Each raw and gzip ceiling is the measured value plus 32 bytes (see
 [Size budgets](#size-budgets)), so small changes in another framework cannot
 hide Octane application or runtime growth.
 
-`bundle-reachability` builds twenty-four independent public-entry feature fixtures
-across thirty-two production builds with the production Octane compiler,
+`bundle-reachability` builds twenty-five independent public-entry feature fixtures
+across thirty-three production builds with the production Octane compiler,
 disabled HMR/profiling, and each bundler's default production minifier: Vite's
 `'oxc'` and esbuild's `minify: true`. The seven package
 side-effect fixtures and the behavior-only fixture each run through both Vite
@@ -441,15 +449,28 @@ component, and verifies `unmount`; its broader reachable runtime is
 real and must not be disguised as the specialized entry. `root-static-local`
 keeps the original same-file compiled render/unmount control and its existing
 static-root ceiling, so losing that specialization fails independently of the
-escaped generic contract. `prop-attributes` binds opaque props to named
+escaped generic contract. `root-callback-local` keeps a private root inside a
+controller whose retained `replace` and `dispose` callbacks are its only later
+uses, so render and unmount calls that outlive the creating function stay
+specialized. `prop-attributes` binds opaque props to named
 attributes and text in a module with no signals import. Those opaque values are
 potential signal bindings, so the fixture pins that they keep the narrow scalar
 writers and never retain the generic attribute route with its form-control
 writers and DOM routing tables.
 
+`hydrate-frame` is the shape of a server-rendered application frame. A
+production server build of the same modules renders its markup with
+`renderToString`, and the measured client bundle hydrates it: native signal
+reads, a keyed `@for`, a `@try`/`@pending`/`@catch` boundary over settled data,
+forwarded style objects, a portal opened after hydration, and an
+`octane/behavior` island beside the root. Its oracle requires the server nodes
+to be adopted, not rebuilt. It never starts a transition or renders an
+`<Activity>`, so its ceiling also holds those graphs out of a hydrating
+Suspense application.
+
 `bundle-size/minimal-budgets.json` supplies explicit raw, gzip, and brotli byte
 ceilings for every feature. Each scenario publishes its committed ceiling as a
-same-run `*-budget` reference target, so one hundred and five `maxRatio: 1`
+same-run `*-budget` reference target, so one hundred and eleven `maxRatio: 1`
 entries in `baselines/ratios.json` also enforce all three metrics in the
 weekly/manual Bench CI workflow. An unknown or empty scenario name fails instead
 of skipping the builds.

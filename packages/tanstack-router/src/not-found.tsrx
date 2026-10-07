@@ -40,11 +40,15 @@ export function CatchNotFound(props: {
 				throw error;
 			}
 		}}
-		errorComponent={(p: ErrorComponentProps) => NotFoundFallback({
-			error: p.error,
-			render: props.fallback,
-		})}
-	>{props.children}</CatchBoundary>
+		errorComponent={(p: ErrorComponentProps) =>
+			NotFoundFallback({
+				error: p.error,
+				render: props.fallback,
+			})
+		}
+	>
+		{props.children}
+	</CatchBoundary>
 }
 
 export function DefaultGlobalNotFound() @{

@@ -10,7 +10,9 @@ function Tally({ label }: { label: string }) @{
 			clicks.current += 1;
 			force(clicks.current);
 		}}
-	>{`${label}: ${clicks.current}` as string}</button>
+	>
+		{`${label}: ${clicks.current}` as string}
+	</button>
 }
 
 export function App() @{

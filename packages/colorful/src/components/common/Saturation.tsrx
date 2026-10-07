@@ -25,22 +25,24 @@ const SaturationBase = ({ hsva, onChange, onChangeEnd }: Props) => {
 	const containerStyle = {
 		backgroundColor: hsvaToHslString({ h: hsva.h, s: 100, v: 100, a: 1 }),
 	};
-	return <div class="react-colorful__saturation" style={containerStyle}>
-		<Interactive
-			onMove={handleMove}
-			onKey={handleKey}
-			onEnd={onChangeEnd}
-			aria-label="Color"
-			aria-valuetext={`Saturation ${round(hsva.s)}%, Brightness ${round(hsva.v)}%`}
-		>
-			<Pointer
-				className="react-colorful__saturation-pointer"
-				top={1 - hsva.v / 100}
-				left={hsva.s / 100}
-				color={hsvaToHslString(hsva)}
-			/>
-		</Interactive>
-	</div>;
+	return (
+		<div class="react-colorful__saturation" style={containerStyle}>
+			<Interactive
+				onMove={handleMove}
+				onKey={handleKey}
+				onEnd={onChangeEnd}
+				aria-label="Color"
+				aria-valuetext={`Saturation ${round(hsva.s)}%, Brightness ${round(hsva.v)}%`}
+			>
+				<Pointer
+					className="react-colorful__saturation-pointer"
+					top={1 - hsva.v / 100}
+					left={hsva.s / 100}
+					color={hsvaToHslString(hsva)}
+				/>
+			</Interactive>
+		</div>
+	);
 };
 
 export const Saturation = memo(SaturationBase);

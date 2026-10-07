@@ -1,17 +1,17 @@
 import { createRoot } from 'octane';
 import { create } from '@octanejs/zustand';
 
-const useCounter = create<{ count: number; increment: () => void }>(
-	(set) => ({
-		count: 0,
-		increment: () => set((state) => ({ count: state.count + 1 })),
-	}),
-);
+const useCounter = create<{ count: number; increment: () => void }>((set) => ({
+	count: 0,
+	increment: () => set((state) => ({ count: state.count + 1 })),
+}));
 
 function BoundCounter() @{
 	const count = useCounter((state) => state.count);
 	const increment = useCounter((state) => state.increment);
-	<button id="minimal-binding-action" onClick={increment}>{String(count) as string}</button>
+	<button id="minimal-binding-action" onClick={increment}>
+		{String(count) as string}
+	</button>
 }
 
 export async function run(container: HTMLElement) {

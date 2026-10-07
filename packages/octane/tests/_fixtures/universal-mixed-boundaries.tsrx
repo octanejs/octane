@@ -1,8 +1,6 @@
 import { UniversalTheme } from './universal-boundary.tsrx';
 import { Scene } from './universal-mixed-scene.object.tsrx';
-import {
-	Canvas as SceneCanvas,
-} from '/packages/octane/tests/_fixtures/universal-renderer-boundaries.tsrx';
+import { Canvas as SceneCanvas } from '/packages/octane/tests/_fixtures/universal-renderer-boundaries.tsrx';
 import { Html } from '/packages/octane/tests/_fixtures/universal-renderer-boundaries.object.tsrx';
 
 export function MixedBoundaryApp(props) @{

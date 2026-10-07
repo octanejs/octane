@@ -36,7 +36,11 @@ export function FieldSet({ className, ...props }: Props) @{
 	/>
 }
 
-export function FieldLegend({ className, variant = 'legend', ...props }: Props & {
+export function FieldLegend({
+	className,
+	variant = 'legend',
+	...props
+}: Props & {
 	variant?: 'legend' | 'label';
 }) @{
 	<legend
@@ -67,8 +71,10 @@ export const fieldVariants = cva(
 		variants: {
 			orientation: {
 				vertical: 'flex-col *:w-full [&>.sr-only]:w-auto',
-				horizontal: 'flex-row items-center has-[>[data-slot=field-content]]:items-start *:data-[slot=field-label]:flex-auto has-[>[data-slot=field-content]]:[&>[role=checkbox],[role=radio]]:mt-px',
-				responsive: 'flex-col *:w-full @md/field-group:flex-row @md/field-group:items-center @md/field-group:*:w-auto @md/field-group:has-[>[data-slot=field-content]]:items-start @md/field-group:*:data-[slot=field-label]:flex-auto [&>.sr-only]:w-auto @md/field-group:has-[>[data-slot=field-content]]:[&>[role=checkbox],[role=radio]]:mt-px',
+				horizontal:
+					'flex-row items-center has-[>[data-slot=field-content]]:items-start *:data-[slot=field-label]:flex-auto has-[>[data-slot=field-content]]:[&>[role=checkbox],[role=radio]]:mt-px',
+				responsive:
+					'flex-col *:w-full @md/field-group:flex-row @md/field-group:items-center @md/field-group:*:w-auto @md/field-group:has-[>[data-slot=field-content]]:items-start @md/field-group:*:data-[slot=field-label]:flex-auto [&>.sr-only]:w-auto @md/field-group:has-[>[data-slot=field-content]]:[&>[role=checkbox],[role=radio]]:mt-px',
 			},
 		},
 		defaultVariants: {
@@ -77,7 +83,11 @@ export const fieldVariants = cva(
 	},
 );
 
-export function Field({ className, orientation = 'vertical', ...props }: Props & {
+export function Field({
+	className,
+	orientation = 'vertical',
+	...props
+}: Props & {
 	orientation?: VariantProps<typeof fieldVariants>['orientation'];
 }) @{
 	<div
@@ -169,19 +179,15 @@ export function FieldError(props: Props & { errors?: Array<{ message?: string } 
 		const errors = props.errors;
 		if (!errors?.length) return null;
 
-		const uniqueErrors = [
-			...new Map(errors.map((error) => [error?.message, error])).values(),
-		];
+		const uniqueErrors = [...new Map(errors.map((error) => [error?.message, error])).values()];
 
 		if (uniqueErrors?.length == 1) return uniqueErrors[0]?.message;
 
 		return createElement(
 			'ul',
 			{ className: 'ml-4 flex list-disc flex-col gap-1' },
-			uniqueErrors.map(
-				(error, index) => error?.message
-					? createElement('li', { key: index }, error.message)
-					: null,
+			uniqueErrors.map((error, index) =>
+				error?.message ? createElement('li', { key: index }, error.message) : null,
 			),
 		);
 	});

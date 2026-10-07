@@ -3,9 +3,11 @@ import type { EasingInput } from './easing';
 import type { AnimationItem, AnimationMatchByProp } from './matchBy';
 import type { CartesianLayout, PolarLayout } from '../util/types';
 
-export type AnimationInterpolateFn<ItemType, LayoutType extends CartesianLayout | PolarLayout> =
-	(items: | ReadonlyArray<AnimationItem<ItemType>>
-	| null, animationElapsedTime: number, layout: LayoutType) => ReadonlyArray<ItemType>;
+export type AnimationInterpolateFn<ItemType, LayoutType extends CartesianLayout | PolarLayout> = (
+	items: ReadonlyArray<AnimationItem<ItemType>> | null,
+	animationElapsedTime: number,
+	layout: LayoutType,
+) => ReadonlyArray<ItemType>;
 export type AnimatedItemsProps<ItemType, LayoutType extends CartesianLayout | PolarLayout> = {
 	animationInput: unknown;
 	animationIdPrefix: string;
@@ -20,9 +22,11 @@ export type AnimatedItemsProps<ItemType, LayoutType extends CartesianLayout | Po
 	animationInterpolateFn: AnimationInterpolateFn<ItemType, LayoutType>;
 	animationMatchBy?: AnimationMatchByProp<ItemType>;
 	shouldUpdatePreviousRef?: (animationElapsedTime: number) => boolean;
-	children: (items: ReadonlyArray<
-		ItemType
-	>, animationElapsedTime: number, isEntrance: boolean) => OctaneNode;
+	children: (
+		items: ReadonlyArray<ItemType>,
+		animationElapsedTime: number,
+		isEntrance: boolean,
+	) => OctaneNode;
 	layout: LayoutType;
 };
 // Port of animation/AnimatedItems.tsx — the reusable enter/update/exit
@@ -85,31 +89,32 @@ export function AnimatedItems<ItemType, LayoutType extends CartesianLayout | Pol
 		items,
 		animationMatchBy ?? matchByIndex,
 	);
-	return <JavascriptAnimate
-		animationId={animationId}
-		begin={animationBegin}
-		duration={animationDuration}
-		isActive={isAnimationActive}
-		easing={animationEasing}
-		onAnimationEnd={onAnimationEnd}
-		onAnimationStart={onAnimationStart}
-		key={animationId}
-	>
-		{(animationElapsedTime) => {
-			const isEntrance = rawPrevItems == null;
-			const stepData =
-				items == null
-					? items
-					: animationInterpolateFn(animationItems, animationElapsedTime, layout);
-			const canUpdate =
-				shouldUpdatePreviousRef
+	return (
+		<JavascriptAnimate
+			animationId={animationId}
+			begin={animationBegin}
+			duration={animationDuration}
+			isActive={isAnimationActive}
+			easing={animationEasing}
+			onAnimationEnd={onAnimationEnd}
+			onAnimationStart={onAnimationStart}
+			key={animationId}
+		>
+			{(animationElapsedTime) => {
+				const isEntrance = rawPrevItems == null;
+				const stepData =
+					items == null
+						? items
+						: animationInterpolateFn(animationItems, animationElapsedTime, layout);
+				const canUpdate = shouldUpdatePreviousRef
 					? shouldUpdatePreviousRef(animationElapsedTime)
 					: animationElapsedTime > 0;
-			animationStartItems.syncStepValue(stepData, animationElapsedTime, canUpdate);
-			if (stepData == null) {
-				return null;
-			}
-			return children(stepData, animationElapsedTime, isEntrance);
-		}}
-	</JavascriptAnimate>;
+				animationStartItems.syncStepValue(stepData, animationElapsedTime, canUpdate);
+				if (stepData == null) {
+					return null;
+				}
+				return children(stepData, animationElapsedTime, isEntrance);
+			}}
+		</JavascriptAnimate>
+	);
 }

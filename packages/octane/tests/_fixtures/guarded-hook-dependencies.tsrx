@@ -69,7 +69,7 @@ export function GuardedGetter({ item, enabled, log }) @{
 }
 
 export function GuardedMemo({ item }) @{
-	const label = useMemo(() => item ? item.name : 'empty');
+	const label = useMemo(() => (item ? item.name : 'empty'));
 	<p>{label as string}</p>
 }
 

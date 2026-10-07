@@ -684,6 +684,9 @@ export function strictValue<T>(state: NodeState<T>, key = 'idle'): T {
 	throw state.waiting;
 }
 
+/** Set while a targeted binding, not a render, reads a historical value. */
+export let historicalBindingRead = false;
+
 /** Track historical lease release, but keep live binding reads out of the broad collector. */
 export function readSignalBinding<T>(handle$: SignalHandle<T>): T {
 	const resolveAdoption = getNativeAdoptionResolver();
@@ -695,8 +698,15 @@ export function readSignalBinding<T>(handle$: SignalHandle<T>): T {
 	) {
 		// A historical read must witness its lease ending so the renderer can
 		// reconcile the adopted DOM with already-newer live state. Ordinary live
-		// binding reads still subscribe only to their targeted graph node below.
-		return handle$.get();
+		// binding reads still subscribe only to their targeted graph node below,
+		// so an unchanged release drops this read rather than moving it live.
+		const previous = historicalBindingRead;
+		historicalBindingRead = true;
+		try {
+			return handle$.get();
+		} finally {
+			historicalBindingRead = previous;
+		}
 	}
 	const observer = setNativeReadObserver(null);
 	try {
@@ -704,6 +714,34 @@ export function readSignalBinding<T>(handle$: SignalHandle<T>): T {
 	} finally {
 		setNativeReadObserver(observer);
 	}
+}
+
+/**
+ * The live source and revision `readNode(node, read)` would report outside a
+ * render, when that read presents what the ready `presented` state did: the
+ * same value, and for a snapshot read the same state. Value and latest reads
+ * cannot observe activity metadata. Like a committed read, this may evaluate.
+ */
+export function unchangedLiveRead(
+	node: ScopedNode,
+	read: SignalReadMode,
+	presented: NodeState,
+): { live: NativeReadSource; version: number } | undefined {
+	if (activeCandidate || node.owner.retired) return undefined;
+	let state = refreshNode(node);
+	if (read === 'latest' && state.snapshot.status !== 'ready') state = node.lastState ?? state;
+	const live = state.snapshot;
+	if (
+		read === 'snapshot'
+			? !sameState(presented, state)
+			: live.status !== 'ready' ||
+				!Object.is(live.value, (presented.snapshot as { value: unknown }).value)
+	)
+		return undefined;
+	return {
+		live: (node[nativeSourceField(read)] ??= createNativeSource(node, read)),
+		version: node.revision,
+	};
 }
 
 export function refreshNode<T>(node: ScopedNode<T>): NodeState<T> {

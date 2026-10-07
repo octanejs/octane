@@ -111,7 +111,12 @@ export function TemplatePortalToggle({ observe, restore, show, target }: PortalP
 
 // A value hole's input has a Block of its own, below the row. The restoring
 // component sits before it in the row.
-export function EditableRows({ observe, restore, rows, editing }: Props & {
+export function EditableRows({
+	observe,
+	restore,
+	rows,
+	editing,
+}: Props & {
 	readonly rows: readonly number[];
 	readonly editing: number;
 }) @{

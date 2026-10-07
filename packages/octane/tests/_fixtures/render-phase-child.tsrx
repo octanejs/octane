@@ -122,10 +122,12 @@ export function MultipleSelfUpdates() @{
 
 export function InlinePortalSelfUpdate(props: Props & { target: Element }) @{
 	const [value, setValue] = useState(0);
-	<div>{createPortal(
-		<Child value={value} log={props.log} rejectZero={props.rejectZero} />,
-		value === 0 ? (setValue(5), props.target) : props.target,
-	)}</div>
+	<div>
+		{createPortal(
+			<Child value={value} log={props.log} rejectZero={props.rejectZero} />,
+			value === 0 ? (setValue(5), props.target) : props.target,
+		)}
+	</div>
 }
 
 type Row = { id: number; label: string };
@@ -142,8 +144,11 @@ export function InlineHostForSelfUpdate(props: { items: Row[] }) @{
 
 export function InlineHostMapSelfUpdate(props: { items: Row[] }) @{
 	const [selected, setSelected] = useState(0);
-	<ul data-selected={selected === 0 ? (setSelected(1), selected) : selected}>{props.items.map(
-		(row) =>
-			<li key={row.id} class={selected === row.id ? 'selected' : ''}>{row.label as string}</li>,
-	)}</ul>
+	<ul data-selected={selected === 0 ? (setSelected(1), selected) : selected}>
+		{props.items.map((row) => (
+			<li key={row.id} class={selected === row.id ? 'selected' : ''}>
+				{row.label as string}
+			</li>
+		))}
+	</ul>
 }

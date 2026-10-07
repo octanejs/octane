@@ -66,7 +66,8 @@ export function TooltipContent({
 				createElement(ChildrenHost, { key: 'children', children }),
 				createElement(TooltipPrimitive.Arrow, {
 					key: 'arrow',
-					className: 'cn-tooltip-arrow z-50 translate-y-[calc(-50%_-_2px)] bg-foreground fill-foreground',
+					className:
+						'cn-tooltip-arrow z-50 translate-y-[calc(-50%_-_2px)] bg-foreground fill-foreground',
 				}),
 			],
 		}),

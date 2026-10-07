@@ -27,7 +27,9 @@ export function Comment({ id, depth }: { id: number; depth: number }) @{
 				params={{ id: data.by ?? '' }}
 				data-testid="user-link"
 				{...stylex.props(styles.metaLink)}
-			>{data.by as string}</Link>
+			>
+				{data.by as string}
+			</Link>
 			{' ' + relativeTime(data.time)}
 		</div>
 		<div

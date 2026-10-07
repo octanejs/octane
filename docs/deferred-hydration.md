@@ -659,10 +659,12 @@ adoption callback when discovery, externally streamed ranges, or automatic
 element-removal cleanup is needed; the small binding runtime does not require
 that machinery itself.
 
-For scalar views hydrated without an explicit lease, hydration retains values
-published by a live binding. After releasing that binding, the next normal
-render applies its props even when they equal the historical server props;
-hydration does not cache a skipped write as an applied value.
+For views hydrated without an explicit lease, hydration retains the attribute,
+class, text and style values that a live binding published, whether it owns
+single style declarations or the whole `style`. A value changed since its
+publication hydrates like any other server value. After releasing that binding,
+the next normal render applies its props even when they equal the historical
+server props; hydration does not cache a skipped write as an applied value.
 
 Each external range belongs to its declared `owner`. Strictly nested ranges are
 allowed, and the closest registered range determines ownership for behaviors

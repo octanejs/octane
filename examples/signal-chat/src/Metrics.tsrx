@@ -47,18 +47,17 @@ export function Metrics() @{
 			<div class="capture-actions">
 				<p>
 					Current run:
-					{config.scenario as string}
-					·
-					{String(config.waves)}
-					snapshots ·
-					{String(config.turns)}
+					{config.scenario as string}·{String(config.waves)}
+					snapshots ·{String(config.turns)}
 					turns
 				</p>
 				<button type="button" onClick={() => exportBrowserTrace(config.run)}>
 					Export browser trace
 				</button>
 				<output>{exportState$ as string}</output>
-				<a href={traceHref(config.run)} target="_blank" rel="noreferrer">Producer trace ↗</a>
+				<a href={traceHref(config.run)} target="_blank" rel="noreferrer">
+					Producer trace ↗
+				</a>
 				<small>
 					Run
 					<code>{config.run as string}</code>

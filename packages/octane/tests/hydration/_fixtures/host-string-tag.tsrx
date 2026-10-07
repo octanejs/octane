@@ -13,10 +13,12 @@
 // ── value position ───────────────────────────────────────────────────────────
 
 export function Doc(props) {
-	return <>
-		<props.components.h1 class="title">{props.title}</props.components.h1>
-		<props.components.p>body text</props.components.p>
-	</>;
+	return (
+		<>
+			<props.components.h1 class="title">{props.title}</props.components.h1>
+			<props.components.p>body text</props.components.p>
+		</>
+	);
 }
 
 // The same call site can resolve to a real COMPONENT at runtime (an MDX
@@ -33,7 +35,9 @@ export function Overridable(props) {
 
 export function Card(props) @{
 	<div id="card">
-		<props.parts.title id="t" class={props.klass}>{props.text as string}</props.parts.title>
+		<props.parts.title id="t" class={props.klass}>
+			{props.text as string}
+		</props.parts.title>
 	</div>
 }
 
@@ -57,7 +61,9 @@ export function Wrap(props) @{
 export function Clicky(props) @{
 	const Tag = props.tag;
 	<div id="cl">
-		<Tag id="btn" ref={props.tagRef} onClick={props.onPick}>{'pick'}</Tag>
+		<Tag id="btn" ref={props.tagRef} onClick={props.onPick}>
+			{'pick'}
+		</Tag>
 	</div>
 }
 

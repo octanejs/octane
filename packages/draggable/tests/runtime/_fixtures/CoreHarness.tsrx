@@ -1,9 +1,11 @@
 import { createElement } from 'octane';
 import { DraggableCore, type DraggableCoreProps } from '@octanejs/draggable';
 
-export function CoreHarness(props: DraggableCoreProps & {
-	nodeRef: { current: HTMLDivElement | null };
-}) {
+export function CoreHarness(
+	props: DraggableCoreProps & {
+		nodeRef: { current: HTMLDivElement | null };
+	},
+) {
 	const child = createElement(
 		'div',
 		{ ref: props.nodeRef, id: 'core-target', className: 'kept', style: { color: 'red' } },

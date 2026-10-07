@@ -14,13 +14,17 @@ import {
 // condition + helpers thread into the renderer as `props.hN` holes).
 export function RetToggle(props) {
 	const [n, setN] = useState(0);
-	return <div>
-		@if (props.on) {
-			<button id="hit" onClick={() => setN(n + 1)}>{'on:' + n}</button>
-		} @else {
-			<span class="off">off</span>
-		}
-	</div>;
+	return (
+		<div>
+			@if (props.on) {
+				<button id="hit" onClick={() => setN(n + 1)}>
+					{'on:' + n}
+				</button>
+			} @else {
+				<span class="off">off</span>
+			}
+		</div>
+	);
 }
 
 // `@{}` oracle — the inline form. Must produce byte-identical DOM to the folded
@@ -29,7 +33,9 @@ export function AtToggle(props) @{
 	const [n, setN] = useState(0);
 	<div>
 		@if (props.on) {
-			<button id="hit" onClick={() => setN(n + 1)}>{'on:' + n}</button>
+			<button id="hit" onClick={() => setN(n + 1)}>
+				{'on:' + n}
+			</button>
 		} @else {
 			<span class="off">off</span>
 		}
@@ -42,25 +48,29 @@ export function AtToggle(props) @{
 // React-style `return <>...</>` authoring.
 export function ReturnedMailbox(props) {
 	const [folder, setFolder] = useState('drafts');
-	return <>
-		<button id="folder-toggle" onClick={() => setFolder(folder === 'drafts' ? 'sent' : 'drafts')}>
-			{'Show ' + (folder === 'drafts' ? 'sent' : 'drafts')}
-		</button>
-		@if (folder === 'drafts') {
-			<section id="drafts">
-				<h2>Saved drafts</h2>
-				@for (const draft of props.drafts; key draft.id) {
-					<article class="draft" data-id={draft.id as string}>{draft.subject as string}</article>
-				} @empty {
-					<p id="empty-drafts">No saved drafts</p>
-				}
-			</section>
-		} @else {
-			<section id="sent">
-				<h2>Sent mail</h2>
-			</section>
-		}
-	</>;
+	return (
+		<>
+			<button id="folder-toggle" onClick={() => setFolder(folder === 'drafts' ? 'sent' : 'drafts')}>
+				{'Show ' + (folder === 'drafts' ? 'sent' : 'drafts')}
+			</button>
+			@if (folder === 'drafts') {
+				<section id="drafts">
+					<h2>Saved drafts</h2>
+					@for (const draft of props.drafts; key draft.id) {
+						<article class="draft" data-id={draft.id as string}>
+							{draft.subject as string}
+						</article>
+					} @empty {
+						<p id="empty-drafts">No saved drafts</p>
+					}
+				</section>
+			} @else {
+				<section id="sent">
+					<h2>Sent mail</h2>
+				</section>
+			}
+		</>
+	);
 }
 
 function DeliverySummary(props) {
@@ -72,31 +82,35 @@ function DeliverySummary(props) {
 // resembles a dashboard with an independent folder summary, delivery event
 // list, and error-contained aggregate rather than a directive-only toy.
 export function ReturnedDashboard(props) {
-	return <>
-		<h2 id="dashboard-title">Delivery dashboard</h2>
-		@switch (props.folder) {
-			@case 'inbox': {
-				<p id="folder-summary">Inbox activity</p>
+	return (
+		<>
+			<h2 id="dashboard-title">Delivery dashboard</h2>
+			@switch (props.folder) {
+				@case 'inbox': {
+					<p id="folder-summary">Inbox activity</p>
+				}
+				@case 'sent': {
+					<p id="folder-summary">Sent activity</p>
+				}
+				@default: {
+					<p id="folder-summary">Other activity</p>
+				}
 			}
-			@case 'sent': {
-				<p id="folder-summary">Sent activity</p>
+			@for (const event of props.events; key event.id) {
+				<article class="delivery-event" data-id={event.id as string}>
+					{event.label as string}
+				</article>
+			} @empty {
+				<p id="empty-events">No delivery events</p>
 			}
-			@default: {
-				<p id="folder-summary">Other activity</p>
-			}
-		}
-		@for (const event of props.events; key event.id) {
-			<article class="delivery-event" data-id={event.id as string}>{event.label as string}</article>
-		} @empty {
-			<p id="empty-events">No delivery events</p>
-		}
 
-		@try {
-			<DeliverySummary failed={props.failed} total={props.events.length as number} />
-		} @catch (error) {
-			<p id="summary-error">Summary unavailable</p>
-		}
-	</>;
+			@try {
+				<DeliverySummary failed={props.failed} total={props.events.length as number} />
+			} @catch (error) {
+				<p id="summary-error">Summary unavailable</p>
+			}
+		</>
+	);
 }
 
 const MailboxContext = createContext('unknown');
@@ -110,85 +124,98 @@ function CurrentMailbox() {
 // returned fragment must receive its @if children rather than a descriptor
 // conversion silently discarding them.
 export function ReturnedProviderMailbox(props) {
-	return <>
-		<h2 id="provider-title">Mailbox context</h2>
-		<MailboxContext value={props.folder}>
-			@if (props.show) {
-				<CurrentMailbox />
-			} @else {
-				<span id="no-mailbox">No mailbox selected</span>
-			}
-		</MailboxContext>
-	</>;
+	return (
+		<>
+			<h2 id="provider-title">Mailbox context</h2>
+			<MailboxContext value={props.folder}>
+				@if (props.show) {
+					<CurrentMailbox />
+				} @else {
+					<span id="no-mailbox">No mailbox selected</span>
+				}
+			</MailboxContext>
+		</>
+	);
 }
 
 export function EvaluationPanel(props) {
-	return <section
-		id="evaluation-panel"
-		data-label={props.label as string}
-	>{props.children}</section>;
+	return (
+		<section id="evaluation-panel" data-label={props.label as string}>
+			{props.children}
+		</section>
+	);
 }
 
 // A member component nested in a returned fragment keeps its directive children
 // in template position. Its tag getter must still run before the authored prop
 // and child expressions, matching ordinary JSX evaluation order.
 export function ReturnedMemberEvaluationOrder(props) {
-	return <>
-		<props.widgets.Panel label={props.observe('prop')}>
-			@if (props.observe('condition')) {
-				<span id="evaluation-child">Condition active</span>
-			} @else {
-				<span id="evaluation-child">Condition inactive</span>
-			}
-		</props.widgets.Panel>
-	</>;
+	return (
+		<>
+			<props.widgets.Panel label={props.observe('prop')}>
+				@if (props.observe('condition')) {
+					<span id="evaluation-child">Condition active</span>
+				} @else {
+					<span id="evaluation-child">Condition inactive</span>
+				}
+			</props.widgets.Panel>
+		</>
+	);
 }
 
 function ActivityDraft(props) {
 	const [edits, setEdits] = useState(0);
-	return <button id={props.id} onClick={() => setEdits((count) => count + 1)}>{props.prefix +
-		edits as string}</button>;
+	return (
+		<button id={props.id} onClick={() => setEdits((count) => count + 1)}>
+			{(props.prefix + edits) as string}
+		</button>
+	);
 }
 
 // Activity is compiler-owned template control flow, even when it is the only
 // control-flow form inside a React-style returned fragment.
 export function ReturnedActivityMailbox(props) {
-	return <>
-		<h2 id="activity-title">Focused draft</h2>
-		<Activity mode={props.mode}>
-			<ActivityDraft id="activity-draft" prefix="Draft edits: " />
-		</Activity>
-		<span id="activity-tail">Mailbox ready</span>
-	</>;
+	return (
+		<>
+			<h2 id="activity-title">Focused draft</h2>
+			<Activity mode={props.mode}>
+				<ActivityDraft id="activity-draft" prefix="Draft edits: " />
+			</Activity>
+			<span id="activity-tail">Mailbox ready</span>
+		</>
+	);
 }
 
 // A direct returned Activity is the render output itself. Multiple children make
 // its range ownership observable, while observe() pins normal attribute-before-
 // child expression evaluation.
 export function DirectReturnedActivityMailbox(props) {
-	return <Activity mode={props.observe('mode', props.mode)}>
-		<h2 id="direct-activity-title">Direct focused draft</h2>
-		<ActivityDraft id="direct-activity-draft" prefix="Direct edits: " />
-		<span id="direct-activity-tail">{props.observe(
-			'child',
-			'Direct mailbox ready',
-		) as string}</span>
-	</Activity>;
+	return (
+		<Activity mode={props.observe('mode', props.mode)}>
+			<h2 id="direct-activity-title">Direct focused draft</h2>
+			<ActivityDraft id="direct-activity-draft" prefix="Direct edits: " />
+			<span id="direct-activity-tail">
+				{props.observe('child', 'Direct mailbox ready') as string}
+			</span>
+		</Activity>
+	);
 }
 
 // Head singletons nested in a React-style returned fragment still belong to the
 // document-head channel. Dynamic values make update/adoption behavior observable.
 export function ReturnedHeadMailbox(props) {
-	return <>
-		<title data-returned-fragment-head="title">{props.title as string}</title>
-		<meta
-			name="returned-fragment-description"
-			content={props.description}
-			data-returned-fragment-head="meta"
-		/>
-		<link rel="canonical" href={props.canonical} data-returned-fragment-head="link" />
-		<main id="head-mailbox">{props.body as string}</main>
-	</>;
+	return (
+		<>
+			<title data-returned-fragment-head="title">{props.title as string}</title>
+			<meta
+				name="returned-fragment-description"
+				content={props.description}
+				data-returned-fragment-head="meta"
+			/>
+			<link rel="canonical" href={props.canonical} data-returned-fragment-head="link" />
+			<main id="head-mailbox">{props.body as string}</main>
+		</>
+	);
 }
 
 export function DirectReturnedTitle(props) {
@@ -196,11 +223,13 @@ export function DirectReturnedTitle(props) {
 }
 
 export function DirectReturnedMeta(props) {
-	return <meta
-		name="direct-returned-description"
-		content={props.description}
-		data-direct-returned-head="meta"
-	/>;
+	return (
+		<meta
+			name="direct-returned-description"
+			content={props.description}
+			data-direct-returned-head="meta"
+		/>
+	);
 }
 
 export function DirectReturnedLink(props) {
@@ -210,17 +239,21 @@ export function DirectReturnedLink(props) {
 // An ordinary keyed Fragment is a runtime descriptor boundary, not compiler-only
 // template syntax. Changing its key must remount the stateful child.
 export function ReturnedKeyedFragmentBoundary(props) {
-	return <>
-		<Fragment key={props.fragmentKey}>
-			<ActivityDraft id="keyed-fragment-draft" prefix="Keyed edits: " />
-		</Fragment>
-	</>;
+	return (
+		<>
+			<Fragment key={props.fragmentKey}>
+				<ActivityDraft id="keyed-fragment-draft" prefix="Keyed edits: " />
+			</Fragment>
+		</>
+	);
 }
 
 export function DirectReturnedKeyedFragmentBoundary(props) {
-	return <Fragment key={props.fragmentKey}>
-		<ActivityDraft id="direct-keyed-fragment-draft" prefix="Direct keyed edits: " />
-	</Fragment>;
+	return (
+		<Fragment key={props.fragmentKey}>
+			<ActivityDraft id="direct-keyed-fragment-draft" prefix="Direct keyed edits: " />
+		</Fragment>
+	);
 }
 
 // Public createElement may place a keyed Fragment among a de-opt host's other
@@ -265,12 +298,16 @@ export function DescriptorHostWithKeyedComponents() {
 // A render-only child `@{...}` is template syntax, not a value child. It must
 // survive the returned-fragment extraction and remain interactive and reactive.
 export function ReturnedChildCodeBlock(props) {
-	return <>
-		<h2 id="child-code-block-title">Quick action</h2>
-		@{
-			<button id="child-code-block-action" onClick={props.onAction}>{props.label as string}</button>
-		}
-	</>;
+	return (
+		<>
+			<h2 id="child-code-block-title">Quick action</h2>
+			@{
+				<button id="child-code-block-action" onClick={props.onAction}>
+					{props.label as string}
+				</button>
+			}
+		</>
+	);
 }
 
 function ValueTemplatePropHost(props: { content: OctaneNode }) {
@@ -279,19 +316,18 @@ function ValueTemplatePropHost(props: { content: OctaneNode }) {
 
 // Passing a setup JSX value through a component prop must preserve the authored
 // descriptor and the compiler-owned directive region nested inside it.
-export function ValueTemplatePropSlot(props: {
-	showHeading: boolean;
-	heading: string;
-}) @{
-	const content = <section id="setup-value-prop-content">
-		<span id="setup-value-prop-before">Before</span>
+export function ValueTemplatePropSlot(props: { showHeading: boolean; heading: string }) @{
+	const content = (
+		<section id="setup-value-prop-content">
+			<span id="setup-value-prop-before">Before</span>
 
-		@if (props.showHeading) {
-			<h1 id="setup-value-prop-heading">{props.heading}</h1>
-		}
+			@if (props.showHeading) {
+				<h1 id="setup-value-prop-heading">{props.heading}</h1>
+			}
 
-		<span id="setup-value-prop-after">After</span>
-	</section>;
+			<span id="setup-value-prop-after">After</span>
+		</section>
+	);
 
 	<ValueTemplatePropHost content={content} />
 }
@@ -305,16 +341,16 @@ export function ValueTemplateExpressionSemantics(props: {
 	output: string;
 	observe: (value: string) => string;
 }) @{
-	const content = <section id="setup-value-expression-semantics">
-		@if (props.visible) {
-			props.observe(props.setupValue);
-		}
-		@if (props.visible) {
-			<>
-				{props.output}
-			</>
-		}
-	</section>;
+	const content = (
+		<section id="setup-value-expression-semantics">
+			@if (props.visible) {
+				props.observe(props.setupValue);
+			}
+			@if (props.visible) {
+				<>{props.output}</>
+			}
+		</section>
+	);
 
 	<main>{content}</main>
 }
@@ -322,23 +358,22 @@ export function ValueTemplateExpressionSemantics(props: {
 // The object wrapper mirrors component-slot composition used by consumers. Its
 // outer JSX remains a descriptor; only the compiler-owned directive child folds
 // into a fragment renderer.
-export function ValueTemplateSlot(props: {
-	showHeading: boolean;
-	heading: string;
-}) @{
+export function ValueTemplateSlot(props: { showHeading: boolean; heading: string }) @{
 	const slots = {
-		composer: <div id="composer">
-			<span id="before-heading">Before</span>
+		composer: (
+			<div id="composer">
+				<span id="before-heading">Before</span>
 
-			@if (props.showHeading) {
-				<h1 id="heading">{props.heading}</h1>
-			}
-			@{
-				<small id="setup-value-code-block">{props.heading + ' action'}</small>
-			}
+				@if (props.showHeading) {
+					<h1 id="heading">{props.heading}</h1>
+				}
+				@{
+					<small id="setup-value-code-block">{props.heading + ' action'}</small>
+				}
 
-			<span id="after-heading">After</span>
-		</div>,
+				<span id="after-heading">After</span>
+			</div>
+		),
 	};
 
 	<main>{slots.composer}</main>
@@ -353,20 +388,22 @@ export function ClonedValueTemplateSlot(props: {
 	slotKey: string;
 	hostRef: { current: HTMLElement | null };
 }) {
-	const composer = <section id="original-composer" data-source="original">
-		<span id="clone-before">Before</span>
+	const composer = (
+		<section id="original-composer" data-source="original">
+			<span id="clone-before">Before</span>
 
-		@if (props.showHeading) {
-			const [count, setCount] = useState(0);
-			<h2 id="cloned-heading">
-				<button id="cloned-counter" onClick={() => setCount((value) => value + 1)}>
-					{props.heading + ':' + count}
-				</button>
-			</h2>
-		}
+			@if (props.showHeading) {
+				const [count, setCount] = useState(0);
+				<h2 id="cloned-heading">
+					<button id="cloned-counter" onClick={() => setCount((value) => value + 1)}>
+						{props.heading + ':' + count}
+					</button>
+				</h2>
+			}
 
-		<span id="clone-after">After</span>
-	</section>;
+			<span id="clone-after">After</span>
+		</section>
+	);
 	const cloned = cloneElement(composer, {
 		id: 'cloned-composer',
 		'data-source': 'clone',
@@ -379,12 +416,14 @@ export function ClonedValueTemplateSlot(props: {
 // The stored descriptor can be inserted under any namespace. A directive child
 // must defer ambiguous <title> placement to its actual SVG parent at runtime.
 export function ValueTemplateSvg(props: { showTitle: boolean; title: string }) @{
-	const icon = <svg id="setup-value-svg" viewBox="0 0 10 10">
-		@if (props.showTitle) {
-			<title id="setup-value-svg-title">{props.title}</title>
-		}
-		<circle id="setup-value-circle" cx="5" cy="5" r="4" />
-	</svg>;
+	const icon = (
+		<svg id="setup-value-svg" viewBox="0 0 10 10">
+			@if (props.showTitle) {
+				<title id="setup-value-svg-title">{props.title}</title>
+			}
+			<circle id="setup-value-circle" cx="5" cy="5" r="4" />
+		</svg>
+	);
 
 	<main>{icon}</main>
 }
@@ -393,29 +432,31 @@ export function ValueTemplateMatrix(props: {
 	items: Array<{ id: string; label: string }>;
 	mode: string;
 }) @{
-	const panel = <section id="setup-value-matrix">
-		@for (const item of props.items; key item.id) {
-			const [count, setCount] = useState(0);
-			<button
-				class="setup-value-row"
-				data-id={item.id as string}
-				onClick={() => setCount((value) => value + 1)}
-			>
-				{item.label + ':' + count}
-			</button>
-		} @empty {
-			<i id="setup-value-empty">empty</i>
-		}
+	const panel = (
+		<section id="setup-value-matrix">
+			@for (const item of props.items; key item.id) {
+				const [count, setCount] = useState(0);
+				<button
+					class="setup-value-row"
+					data-id={item.id as string}
+					onClick={() => setCount((value) => value + 1)}
+				>
+					{item.label + ':' + count}
+				</button>
+			} @empty {
+				<i id="setup-value-empty">empty</i>
+			}
 
-		@switch (props.mode) {
-			@case 'primary': {
-				<strong id="setup-value-mode">Primary</strong>
+			@switch (props.mode) {
+				@case 'primary': {
+					<strong id="setup-value-mode">Primary</strong>
+				}
+				@default: {
+					<strong id="setup-value-mode">Secondary</strong>
+				}
 			}
-			@default: {
-				<strong id="setup-value-mode">Secondary</strong>
-			}
-		}
-	</section>;
+		</section>
+	);
 
 	<main>{panel}</main>
 }

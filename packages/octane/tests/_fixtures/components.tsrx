@@ -73,9 +73,11 @@ export function Counter(props) @{
 		};
 	}, []);
 	<div class="kh">
-		<span class="label">{props.label ?? '' as string}</span>
+		<span class="label">{props.label ?? ('' as string)}</span>
 		<span class="count">{n as string}</span>
-		<button class="inc" onClick={() => setN(n + 1)}>{'+'}</button>
+		<button class="inc" onClick={() => setN(n + 1)}>
+			{'+'}
+		</button>
 	</div>
 }
 

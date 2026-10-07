@@ -309,9 +309,9 @@ export function HeroDemo() @{
 			<section class="demo-terminal" aria-label="Console">
 				<header class="demo-terminal-header">
 					<span class="demo-terminal-title">Console</span>
-					<span class={['demo-terminal-status', paused ? 'paused' : 'running']}>{(paused
-						? 'Effect paused'
-						: 'Effect active') as string}</span>
+					<span class={['demo-terminal-status', paused ? 'paused' : 'running']}>
+						{(paused ? 'Effect paused' : 'Effect active') as string}
+					</span>
 					@if (!followingTail) {
 						<button type="button" class="demo-terminal-jump" onClick={jumpToLatest}>
 							Latest ↓
@@ -329,7 +329,9 @@ export function HeroDemo() @{
 				>
 					@for (const entry of entries; key entry.id) {
 						<code class="demo-terminal-line">
-							<span class="demo-terminal-prompt" aria-hidden="true">›</span>
+							<span class="demo-terminal-prompt" aria-hidden="true">
+								›
+							</span>
 							<span>{entry.message as string}</span>
 						</code>
 					} @empty {

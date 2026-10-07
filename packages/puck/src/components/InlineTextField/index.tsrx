@@ -87,38 +87,40 @@ const InlineTextFieldInternal = ({
 	const [isHovering, setIsHovering] = useState(false);
 	const [isFocused, setIsFocused] = useState(false);
 
-	return <span
-		className={getClassName()}
-		ref={ref}
-		contentEditable={isHovering || isFocused ? 'plaintext-only' : 'false'}
-		onClick={(e) => {
-			e.preventDefault();
-			e.stopPropagation();
-		}}
-		onClickCapture={(e) => {
-			e.preventDefault();
-			e.stopPropagation();
-
-			const itemSelector = getSelectorForId(appStoreApi.getState().state, componentId);
-
-			appStoreApi.getState().setUi({ itemSelector });
-		}}
-		onKeyDown={(e) => {
-			e.stopPropagation();
-
-			if (disableLineBreaks && e.key === 'Enter' || isReadOnly) {
+	return (
+		<span
+			className={getClassName()}
+			ref={ref}
+			contentEditable={isHovering || isFocused ? 'plaintext-only' : 'false'}
+			onClick={(e) => {
 				e.preventDefault();
-			}
-		}}
-		onKeyUp={(e) => {
-			e.stopPropagation();
-			e.preventDefault();
-		}}
-		onMouseOverCapture={() => setIsHovering(true)}
-		onMouseOutCapture={() => setIsHovering(false)}
-		onFocus={() => setIsFocused(true)}
-		onBlur={() => setIsFocused(false)}
-	/>;
+				e.stopPropagation();
+			}}
+			onClickCapture={(e) => {
+				e.preventDefault();
+				e.stopPropagation();
+
+				const itemSelector = getSelectorForId(appStoreApi.getState().state, componentId);
+
+				appStoreApi.getState().setUi({ itemSelector });
+			}}
+			onKeyDown={(e) => {
+				e.stopPropagation();
+
+				if ((disableLineBreaks && e.key === 'Enter') || isReadOnly) {
+					e.preventDefault();
+				}
+			}}
+			onKeyUp={(e) => {
+				e.stopPropagation();
+				e.preventDefault();
+			}}
+			onMouseOverCapture={() => setIsHovering(true)}
+			onMouseOutCapture={() => setIsHovering(false)}
+			onFocus={() => setIsFocused(true)}
+			onBlur={() => setIsFocused(false)}
+		/>
+	);
 };
 
 export const InlineTextField = memo(InlineTextFieldInternal);

@@ -90,11 +90,7 @@ function QueryPanel() @{
 	const result = useQuery(GET_VALUE);
 	const value = (result.data as { value?: string } | undefined)?.value;
 	<output id="query-result">
-		{result.loading
-			? 'loading'
-			: result.error
-				? 'error'
-				: 'data:' + (value || '-')}
+		{result.loading ? 'loading' : result.error ? 'error' : 'data:' + (value || '-')}
 	</output>
 }
 
@@ -110,9 +106,7 @@ function QuerySourcePanel(props: { query: any; onResult: (result: any) => void }
 	const current = JSON.stringify(result.data ?? null);
 	const previous = JSON.stringify(result.previousData ?? null);
 	<section id="query-source-result">
-		<output id="query-source-status">
-			{result.loading ? 'loading' : 'ready'}
-		</output>
+		<output id="query-source-status">{result.loading ? 'loading' : 'ready'}</output>
 		<output id="query-source-current">{current as string}</output>
 		<output id="query-source-previous">{previous as string}</output>
 	</section>
@@ -169,18 +163,10 @@ function TwinQueryPanel() @{
 	const secondValue = (second.data as { item?: { value?: string } } | undefined)?.item?.value;
 	<section id="twin-query-panel">
 		<output id="first-query-result">
-			{first.loading
-				? 'loading'
-				: first.error
-					? 'error'
-					: 'data:' + (firstValue || '-')}
+			{first.loading ? 'loading' : first.error ? 'error' : 'data:' + (firstValue || '-')}
 		</output>
 		<output id="second-query-result">
-			{second.loading
-				? 'loading'
-				: second.error
-					? 'error'
-					: 'data:' + (secondValue || '-')}
+			{second.loading ? 'loading' : second.error ? 'error' : 'data:' + (secondValue || '-')}
 		</output>
 	</section>
 }
@@ -204,11 +190,7 @@ function FragmentPanel(props: { from: any; onRender: () => void }) @{
 	</output>
 }
 
-export function FragmentApp(props: {
-	client: any;
-	from: any;
-	onRender: () => void;
-}) @{
+export function FragmentApp(props: { client: any; from: any; onRender: () => void }) @{
 	<ApolloProvider client={props.client}>
 		<FragmentPanel from={props.from} onRender={props.onRender} />
 	</ApolloProvider>
@@ -248,7 +230,9 @@ export function ReactiveVarApp(props: { valueVar: any }) @{
 	const value = useReactiveVar(props.valueVar);
 	<section id="reactive-var-panel">
 		<output id="reactive-var-value">{value}</output>
-		<button id="update-var" onClick={() => props.valueVar('updated')}>update</button>
+		<button id="update-var" onClick={() => props.valueVar('updated')}>
+			update
+		</button>
 	</section>
 }
 
@@ -256,11 +240,7 @@ function SubscriptionPanel() @{
 	const result = useSubscription(VALUE_SUBSCRIPTION);
 	const value = (result.data as { valueChanged?: string } | undefined)?.valueChanged;
 	<output id="subscription-result">
-		{result.loading
-			? 'loading'
-			: result.error
-				? 'error'
-				: 'data:' + (value || '-')}
+		{result.loading ? 'loading' : result.error ? 'error' : 'data:' + (value || '-')}
 	</output>
 }
 
@@ -297,10 +277,7 @@ function LazyQueryPanel(props: { executeDuringRender?: boolean }) @{
 	</section>
 }
 
-export function LazyQueryApp(props: {
-	client: any;
-	executeDuringRender?: boolean;
-}) @{
+export function LazyQueryApp(props: { client: any; executeDuringRender?: boolean }) @{
 	<ApolloProvider client={props.client}>
 		<LazyQueryPanel executeDuringRender={props.executeDuringRender} />
 	</ApolloProvider>
@@ -312,11 +289,7 @@ function MockedQueryPanel(props: { label?: string }) @{
 	<section id="mocked-provider-panel">
 		<output id="mocked-provider-label">{props.label || '-'}</output>
 		<output id="mocked-provider-result">
-			{result.loading
-				? 'loading'
-				: result.error
-					? 'error'
-					: 'data:' + (value || '-')}
+			{result.loading ? 'loading' : result.error ? 'error' : 'data:' + (value || '-')}
 		</output>
 	</section>
 }

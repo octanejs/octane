@@ -23,10 +23,10 @@ export type { IconMap } from './lib/icon-context.tsrx';
 export type { AllowElement, Components, ExtraProps, UrlTransform } from './lib/markdown.tsrx';
 export { defaultUrlTransform } from './lib/markdown.tsrx';
 export { parseMarkdownIntoBlocks } from './lib/parse-blocks.tsrx';
-export type { CjkPlugin, CodeHighlighterPlugin, CustomRenderer, CustomRendererProps, DiagramPlugin, HighlightOptions, MathPlugin, PluginConfig, ThemeInput } from './lib/plugin-types';
+export type { CjkPlugin, CodeHighlighterPlugin, CustomRenderer, CustomRendererProps, DiagramPlugin, HighlightOptions, MathPlugin, PluginConfig, ThemeInput, } from './lib/plugin-types';
 export { TableCopyDropdown, type TableCopyDropdownProps } from './lib/table/copy-dropdown.tsrx';
-export { TableDownloadButton, type TableDownloadButtonProps, TableDownloadDropdown, type TableDownloadDropdownProps } from './lib/table/download-dropdown.tsrx';
-export { escapeMarkdownTableCell, extractTableDataFromElement, type TableData, tableDataToCSV, tableDataToMarkdown, tableDataToTSV } from './lib/table/utils';
+export { TableDownloadButton, type TableDownloadButtonProps, TableDownloadDropdown, type TableDownloadDropdownProps, } from './lib/table/download-dropdown.tsrx';
+export { escapeMarkdownTableCell, extractTableDataFromElement, type TableData, tableDataToCSV, tableDataToMarkdown, tableDataToTSV, } from './lib/table/utils';
 export type { StreamdownTranslations } from './lib/translations-context.tsrx';
 export { defaultTranslations } from './lib/translations-context.tsrx';
 /**
@@ -100,20 +100,20 @@ export type StreamdownProps = Options & {
     /** Custom tags to allow through sanitization with their permitted attributes */
     allowedTags?: AllowedTags;
     /**
-* Tags whose children should be treated as plain text (no markdown parsing).
-* Useful for mention/entity tags in AI UIs where child content is a data
-* label rather than prose. Requires the tag to also be listed in `allowedTags`.
-*
-* @example
-* ```tsx
-* <Streamdown
-*   allowedTags={{ mention: ['user_id'] }}
-*   literalTagContent={['mention']}
-* >
-*   {`<mention user_id="123">@_some_username_</mention>`}
-* </Streamdown>
-* ```
-*/
+     * Tags whose children should be treated as plain text (no markdown parsing).
+     * Useful for mention/entity tags in AI UIs where child content is a data
+     * label rather than prose. Requires the tag to also be listed in `allowedTags`.
+     *
+     * @example
+     * ```tsx
+     * <Streamdown
+     *   allowedTags={{ mention: ['user_id'] }}
+     *   literalTagContent={['mention']}
+     * >
+     *   {`<mention user_id="123">@_some_username_</mention>`}
+     * </Streamdown>
+     * ```
+     */
     literalTagContent?: string[];
     /** Override UI strings for i18n / custom labels */
     translations?: Partial<StreamdownTranslations>;

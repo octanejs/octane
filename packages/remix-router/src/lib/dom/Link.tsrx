@@ -75,9 +75,8 @@ export function Link(props: LinkProps) @{
 		// basename which allows the basename to have full control over the presence
 		// of a trailing slash on root links
 		if (basename !== '/') {
-			resolved.pathname = resolved.pathname === '/'
-				? basename
-				: joinPaths([basename, resolved.pathname]);
+			resolved.pathname =
+				resolved.pathname === '/' ? basename : joinPaths([basename, resolved.pathname]);
 		}
 
 		maskedHref = navigator.createHref(resolved);
@@ -105,11 +104,13 @@ export function Link(props: LinkProps) @{
 	const isSpaLink = !(parsed.isExternal || reloadDocument);
 
 	<a
-		{...rest as typeof rest & { ref?: undefined }}
+		{...(rest as typeof rest & { ref?: undefined })}
 		href={(isSpaLink ? maskedHref : undefined) || parsed.absoluteURL || href}
 		onClick={isSpaLink ? handleClick : onClick}
 		ref={ref}
 		target={target}
 		data-discover={!isAbsolute && discover === 'render' ? 'true' : undefined}
-	>{children}</a>
+	>
+		{children}
+	</a>
 }

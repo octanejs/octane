@@ -9,9 +9,7 @@ export interface NativeHydrationState {
 	log?: (value: string) => void;
 }
 
-export function StreamedSignalShell(props: {
-	onInput?: (event: Event) => void;
-}) @{
+export function StreamedSignalShell(props: { onInput?: (event: Event) => void }) @{
 	<>
 		<section>
 			<p>{'shell'}</p>
@@ -44,8 +42,7 @@ export function LatestHydration(props: { resource$: Resource<string>; fallback: 
 export function ChannelsHydration(props: NativeHydrationState) @{
 	const value = props.scope.get(props.value$);
 	const snapshot = props.value$.snapshot();
-	const snapshotValue =
-		snapshot.status === 'ready' ? snapshot.value : snapshot.status;
+	const snapshotValue = snapshot.status === 'ready' ? snapshot.value : snapshot.status;
 	<output>{value + '/' + snapshotValue}</output>
 }
 
@@ -74,10 +71,12 @@ function NativeResourceHydration(props: {
 	<output class="resource">{value}</output>
 }
 
-export function NativeBoundaryHydration(props: NativeHydrationState & {
-	resource$: Resource<string>;
-	resourceLog?: (value: string) => void;
-}) @{
+export function NativeBoundaryHydration(
+	props: NativeHydrationState & {
+		resource$: Resource<string>;
+		resourceLog?: (value: string) => void;
+	},
+) @{
 	<section>
 		@try {
 			<NativeResourceHydration resource$={props.resource$} log={props.resourceLog} />
@@ -110,10 +109,53 @@ export function ControlledSignalHydration(props: DirectControlledHydrationState)
 	</section>
 }
 
-export function DeferredControlledSignalHydration(props: DirectControlledHydrationState & {
-	when: HydrateWhen;
-}) @{
+export function DeferredControlledSignalHydration(
+	props: DirectControlledHydrationState & {
+		when: HydrateWhen;
+	},
+) @{
 	<Hydrate when={props.when} split={false}>
 		<ControlledSignalHydration scope={props.scope} value$={props.value$} length$={props.length$} />
 	</Hydrate>
+}
+
+interface AdoptedRenderProps {
+	render: (name: string) => void;
+}
+
+function AdoptedLeaf(props: AdoptedRenderProps) @{
+	props.render('leaf');
+	<i>{'leaf'}</i>
+}
+
+// A section-level reader: rendering it again renders its children again too.
+export function AdoptedSection(props: NativeHydrationState & AdoptedRenderProps) @{
+	const value = props.scope.get(props.value$);
+	props.render('section:' + value);
+	<section>
+		<output>{value}</output>
+		<AdoptedLeaf render={props.render} />
+	</section>
+}
+
+// Only a targeted binding reads the signal; the component body does not.
+export function AdoptedBinding(props: NativeHydrationState & AdoptedRenderProps) @{
+	props.render('binding');
+	<output>{props.value$}</output>
+}
+
+function AdoptedResourceReader(props: { resource$: Resource<string> } & AdoptedRenderProps) @{
+	const value = props.resource$.get();
+	props.render('resource:' + value);
+	<output>{value}</output>
+}
+
+export function AdoptedResource(props: { resource$: Resource<string> } & AdoptedRenderProps) @{
+	<section>
+		@try {
+			<AdoptedResourceReader resource$={props.resource$} render={props.render} />
+		} @pending {
+			<i class="pending">{'waiting'}</i>
+		}
+	</section>
 }

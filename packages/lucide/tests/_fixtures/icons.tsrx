@@ -12,23 +12,25 @@ export function IconGallery(
 		onCameraRef?: (node: SVGSVGElement | null) => void;
 	} = {},
 ) {
-	return <section>
-		<Camera
-			id="camera"
-			size={32}
-			color="rebeccapurple"
-			strokeWidth={1.5}
-			className="toolbar-icon"
-			data-kind="media"
-			onClick={props.onCameraClick}
-			ref={props.onCameraRef}
-		/>
-		<LucideProvider size={18} color="tomato" strokeWidth={3} className="provided">
-			<Search id="search" absoluteStrokeWidth className="local" aria-label="Find" />
-		</LucideProvider>
-		<CircleAlert id="alert" aria-labelledby="alert-title">
-			<title id="alert-title">Warning</title>
-		</CircleAlert>
-		<Icon id="custom" iconNode={customNode} role="img" />
-	</section>;
+	return (
+		<section>
+			<Camera
+				id="camera"
+				size={32}
+				color="rebeccapurple"
+				strokeWidth={1.5}
+				className="toolbar-icon"
+				data-kind="media"
+				onClick={props.onCameraClick}
+				ref={props.onCameraRef}
+			/>
+			<LucideProvider size={18} color="tomato" strokeWidth={3} className="provided">
+				<Search id="search" absoluteStrokeWidth className="local" aria-label="Find" />
+			</LucideProvider>
+			<CircleAlert id="alert" aria-labelledby="alert-title">
+				<title id="alert-title">Warning</title>
+			</CircleAlert>
+			<Icon id="custom" iconNode={customNode} role="img" />
+		</section>
+	);
 }

@@ -29,9 +29,7 @@ function PendingChild(props: PendingStagedProps) @{
 		>
 			{props.version === 0 ? 'Short' : 'Much longer content here'}
 		</button>
-		<output>
-			{snapshot.status === 'ready' ? snapshot.value : snapshot.status}
-		</output>
+		<output>{snapshot.status === 'ready' ? snapshot.value : snapshot.status}</output>
 	</section>
 }
 

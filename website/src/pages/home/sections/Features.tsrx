@@ -16,7 +16,8 @@ const FEATURES = [
 	},
 	{
 		title: 'Still feels familiar',
-		body: 'You still get hooks, memo, context, portals, transitions, actions, controlled forms and ' +
+		body:
+			'You still get hooks, memo, context, portals, transitions, actions, controlled forms and ' +
 			'Suspense. Events use the DOM, refs are regular props, and ' +
 			BINDING_COUNT +
 			' first-party bindings cover familiar libraries.',

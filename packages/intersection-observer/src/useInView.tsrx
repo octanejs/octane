@@ -53,13 +53,27 @@ export function useInView(options: IntersectionOptions | symbol = {}): InViewHoo
 			fallbackInView,
 		);
 		return () => unobserve?.();
-	}, [Array.isArray(threshold) ? threshold.toString() : threshold, ref, root, rootMargin, triggerOnce, skip, trackVisibility, fallbackInView, delay, scrollMargin]);
+	}, [
+		Array.isArray(threshold) ? threshold.toString() : threshold,
+		ref,
+		root,
+		rootMargin,
+		triggerOnce,
+		skip,
+		trackVisibility,
+		fallbackInView,
+		delay,
+		scrollMargin,
+	]);
 
 	const entryTarget = state.entry?.target;
 	const previousTarget = useRef<Element | undefined>(undefined);
 	if (
-		entryTarget && entryTarget !== ref && !triggerOnce && !skip &&
-			previousTarget.current !== entryTarget
+		entryTarget &&
+		entryTarget !== ref &&
+		!triggerOnce &&
+		!skip &&
+		previousTarget.current !== entryTarget
 	) {
 		previousTarget.current = entryTarget;
 		setState({

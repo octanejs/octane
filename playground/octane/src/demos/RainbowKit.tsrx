@@ -21,17 +21,15 @@ const queryClient = new QueryClient({ defaultOptions: { mutations: { retry: fals
 export function RainbowKitDemo() @{
 	<div>
 		<h2 class="demo-title">{'RainbowKit on Octane'}</h2>
-		<p
-			class="demo-blurb"
-		>{'A deterministic mock wallet exercises connection, account, chain, and modal states.'}</p>
+		<p class="demo-blurb">
+			{'A deterministic mock wallet exercises connection, account, chain, and modal states.'}
+		</p>
 		<div class="panel">
 			<WagmiProvider config={config} reconnectOnMount={false}>
 				<QueryClientProvider client={queryClient}>
 					<RainbowKitProvider
 						theme={rainbowTheme()}
-						wallets={[
-							{ id: 'mock', name: 'Playground wallet' },
-						]}
+						wallets={[{ id: 'mock', name: 'Playground wallet' }]}
 					>
 						<div class="row">
 							<ConnectButton />

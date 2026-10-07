@@ -126,7 +126,9 @@ export function CaptureSelect(props) @{
 // No-match fallback: the FIRST NON-DISABLED option wins (React updateOptions).
 export function DisabledFirstSelect(props) @{
 	<select id="dfs" value={props.value}>
-		<option value="x" disabled>X</option>
+		<option value="x" disabled>
+			X
+		</option>
 		<option value="y">Y</option>
 		<option value="z">Z</option>
 	</select>

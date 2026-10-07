@@ -184,8 +184,7 @@ export function Parallax(props: any) @{
 		const onResize = () => state.update();
 		state.update();
 		node.addEventListener('scroll', onScroll, { passive: true });
-		const observer =
-			typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(onResize);
+		const observer = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(onResize);
 		observer?.observe(node);
 		return () => {
 			live = false;
@@ -245,52 +244,52 @@ export function ParallaxLayer(props: any) @{
 	const parent = useContext(ParallaxContext);
 	if (parent === null) throw new Error('ParallaxLayer must be rendered inside Parallax');
 	const [node] = useState<RefObject<HTMLDivElement>>(() => ({ current: null }));
-	const [layer] = useState<ParallaxLayerState>(
-		() => ({
-			horizontal: layerHorizontal === undefined || sticky ? parent.horizontal : layerHorizontal,
-			factor,
-			offset,
-			speed,
-			sticky: sticky === undefined
+	const [layer] = useState<ParallaxLayerState>(() => ({
+		horizontal: layerHorizontal === undefined || sticky ? parent.horizontal : layerHorizontal,
+		factor,
+		offset,
+		speed,
+		sticky:
+			sticky === undefined
 				? undefined
 				: { start: sticky.start ?? 0, end: sticky.end ?? (sticky.start ?? 0) + 1 },
-			isSticky: false,
-			setHeight(height) {
-				if (node.current === null) return;
-				const size = layer.sticky ? height : height * layer.factor;
-				node.current.style[layer.horizontal ? 'width' : 'height'] = `${size}px`;
-			},
-			setPosition(height, scroll) {
-				const element = node.current;
-				if (element === null) return;
-				let translate: number;
-				if (layer.sticky) {
-					const start = (layer.sticky.start ?? 0) * height;
-					const end = (layer.sticky.end ?? layer.sticky.start ?? 0) * height;
-					layer.isSticky = scroll >= start && scroll <= end;
-					element.style.position = layer.isSticky ? 'sticky' : 'absolute';
-					translate = layer.isSticky ? 0 : scroll < start ? start : end;
-				} else {
-					const targetScroll = Math.floor(layer.offset) * height;
-					translate = -(scroll * layer.speed) + height * layer.offset + targetScroll * layer.speed;
-				}
-				updateLayerNode(
-					element,
-					layer.horizontal,
-					layer.sticky ? height : height * layer.factor,
-					translate,
-				);
-			},
-			stop() {},
-		}),
-	);
+		isSticky: false,
+		setHeight(height) {
+			if (node.current === null) return;
+			const size = layer.sticky ? height : height * layer.factor;
+			node.current.style[layer.horizontal ? 'width' : 'height'] = `${size}px`;
+		},
+		setPosition(height, scroll) {
+			const element = node.current;
+			if (element === null) return;
+			let translate: number;
+			if (layer.sticky) {
+				const start = (layer.sticky.start ?? 0) * height;
+				const end = (layer.sticky.end ?? layer.sticky.start ?? 0) * height;
+				layer.isSticky = scroll >= start && scroll <= end;
+				element.style.position = layer.isSticky ? 'sticky' : 'absolute';
+				translate = layer.isSticky ? 0 : scroll < start ? start : end;
+			} else {
+				const targetScroll = Math.floor(layer.offset) * height;
+				translate = -(scroll * layer.speed) + height * layer.offset + targetScroll * layer.speed;
+			}
+			updateLayerNode(
+				element,
+				layer.horizontal,
+				layer.sticky ? height : height * layer.factor,
+				translate,
+			);
+		},
+		stop() {},
+	}));
 	layer.horizontal = layerHorizontal === undefined || sticky ? parent.horizontal : layerHorizontal;
 	layer.factor = factor;
 	layer.offset = offset;
 	layer.speed = speed;
-	layer.sticky = sticky === undefined
-		? undefined
-		: { start: sticky.start ?? 0, end: sticky.end ?? (sticky.start ?? 0) + 1 };
+	layer.sticky =
+		sticky === undefined
+			? undefined
+			: { start: sticky.start ?? 0, end: sticky.end ?? (sticky.start ?? 0) + 1 };
 	useImperativeHandle(givenRef, () => layer, []);
 	useLayoutEffect(() => {
 		parent.layers.add(layer);
@@ -317,5 +316,7 @@ export function ParallaxLayer(props: any) @{
 			transform: START_TRANSLATE_3D,
 			...style,
 		}}
-	>{children}</div>
+	>
+		{children}
+	</div>
 }

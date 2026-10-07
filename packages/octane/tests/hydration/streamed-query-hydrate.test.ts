@@ -186,3 +186,80 @@ it.each(['', 'query-app-'])(
 		}
 	},
 );
+
+it.each([
+	{ snapshot: false, later: false, renders: ['accepted server result'] },
+	{ snapshot: false, later: true, renders: ['accepted server result', 'later server result'] },
+	{
+		snapshot: true,
+		later: false,
+		renders: ['accepted server result:open', 'accepted server result:complete'],
+	},
+])(
+	'renders a streamed reader again only when what it read changed (%j)',
+	async ({ snapshot, later, renders: expected }) => {
+		const producer = controlledStream<string>();
+		const controller = new AbortController();
+		const container = document.createElement('div');
+		document.body.append(container);
+		let root: Root | undefined;
+		let hydration: ReturnType<typeof bootstrapStreamedSignalHydration> | undefined;
+		try {
+			const collector = createPipeableCollector();
+			renderToPipeableStream(
+				server.RenderedStreamedQuery,
+				{ load: () => producer.iterable, render: () => {}, snapshot },
+				{
+					signal: controller.signal,
+					streamedSignals: {
+						buildId: 'rendered-query-build',
+						documentId: 'rendered-query-document',
+					},
+				},
+			).pipe(collector.destination);
+			await producer.started;
+			producer.emit('accepted server result');
+			// A later yield travels as data after the boundary's HTML.
+			for (let turn = 0; !collector.chunks.join('').includes('<output>'); turn++) {
+				expect(turn).toBeLessThan(20);
+				await drainProducers();
+			}
+			if (later) producer.emit('later server result');
+			producer.end();
+			await drainProducers();
+			container.innerHTML = await collector.ended;
+			activateStreamedMarkup(container);
+			const output = container.querySelector('output');
+			expect(output?.textContent).toBe(expected[0]);
+			hydration = bootstrapStreamedSignalHydration({
+				buildId: 'rendered-query-build',
+				documentId: 'rendered-query-document',
+			});
+			const renders: string[] = [];
+			root = hydrateRoot(
+				container,
+				client.RenderedStreamedQuery,
+				{
+					load: async function* () {
+						yield 'duplicate browser result';
+					},
+					render: (value: string) => renders.push(value),
+					snapshot,
+				},
+				{ signalOwner: hydration.signalOwner },
+			);
+			await drainProducers();
+			flushSync(() => {});
+			expect(renders).toEqual(expected);
+			expect(container.querySelector('output')).toBe(output);
+			expect(output?.textContent).toBe(expected.at(-1));
+		} finally {
+			producer.end();
+			controller.abort();
+			root?.unmount();
+			hydration?.dispose();
+			container.remove();
+			resetStreamRuntimeGlobals();
+		}
+	},
+);

@@ -76,10 +76,8 @@ function CommitMutator(props) @{
 }
 
 function ChangingSelection(props) @{
-	const label =
-		props.step === 0 ? 'A' : 'B';
-	const getSnapshot =
-		props.step === 0 ? props.getSnapshotA : props.getSnapshotB;
+	const label = props.step === 0 ? 'A' : 'B';
+	const getSnapshot = props.step === 0 ? props.getSnapshotA : props.getSnapshotB;
 	const value = useSyncExternalStore(props.store.subscribe, getSnapshot);
 	<span id="commit-selection">{label + value}</span>
 }
@@ -176,9 +174,8 @@ export function UncachedSnapshotReader(props) @{
 }
 
 export function NumberSnapshotReader(props) @{
-	const value = useSyncExternalStore(
-		props.store.subscribe,
-		() => parseInt(props.store.getState(), 10),
+	const value = useSyncExternalStore(props.store.subscribe, () =>
+		parseInt(props.store.getState(), 10),
 	);
 	<span id="number-snapshot">{value as string}</span>
 }
@@ -197,5 +194,7 @@ export function HydrationStoreReader(props) @{
 		props.store.getState,
 		props.store.getServerState,
 	);
-	<div id="hydrated-store" ref={props.hostRef}>{value as string}</div>
+	<div id="hydrated-store" ref={props.hostRef}>
+		{value as string}
+	</div>
 }

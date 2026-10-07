@@ -48,9 +48,12 @@ const events = {
 
 const materializers = State.SQLite.materializers(events, {
 	'playground.todoCreated': ({ id, text, completed }) => todos.insert({ id, text, completed }),
-	'playground.todoUpdated': ({ id, text, completed }) => todos.update({
-		...omitUndefineds({ text, completed }),
-	}).where({ id }),
+	'playground.todoUpdated': ({ id, text, completed }) =>
+		todos
+			.update({
+				...omitUndefineds({ text, completed }),
+			})
+			.where({ id }),
 });
 const schema = makeSchema({
 	state: State.SQLite.makeState({ tables: { todos, preferences }, materializers }),
@@ -76,9 +79,9 @@ function LiveStorePanel() @{
 
 	<div class={['panel', settings.compact && 'livestore-compact']}>
 		<h2 class="demo-title">{'LiveStore on Octane'}</h2>
-		<p
-			class="demo-blurb"
-		>{'Suspense-loaded store, reactive query, client document, sync status, and keyed LiveList.'}</p>
+		<p class="demo-blurb">
+			{'Suspense-loaded store, reactive query, client document, sync status, and keyed LiveList.'}
+		</p>
 		<dl class="metrics-grid">
 			<div>
 				<dt>{'Rows'}</dt>
@@ -86,15 +89,11 @@ function LiveStorePanel() @{
 			</div>
 			<div>
 				<dt>{'Sync'}</dt>
-				<dd>
-					{sync.isSynced ? 'synced' : `${sync.pendingCount} pending`}
-				</dd>
+				<dd>{sync.isSynced ? 'synced' : `${sync.pendingCount} pending`}</dd>
 			</div>
 			<div>
 				<dt>{'Density'}</dt>
-				<dd>
-					{settings.compact ? 'compact' : 'comfortable'}
-				</dd>
+				<dd>{settings.compact ? 'compact' : 'comfortable'}</dd>
 			</div>
 		</dl>
 		<div class="row">
@@ -111,28 +110,31 @@ function LiveStorePanel() @{
 					);
 					setNextId(nextId + 1);
 				}}
-			>{'Add todo'}</button>
-			<button
-				class="btn"
-				onClick={() => setSettings((value) => ({ compact: !value.compact }))}
-			>{'Toggle density'}</button>
+			>
+				{'Add todo'}
+			</button>
+			<button class="btn" onClick={() => setSettings((value) => ({ compact: !value.compact }))}>
+				{'Toggle density'}
+			</button>
 		</div>
 		<ul>
 			<LiveList
 				store={store}
 				items$={allTodos$}
 				getKey={(todo) => todo.id}
-				renderItem={(todo, itemOptions) => <li data-id={todo.id} data-index={itemOptions.index}>
-					<button
-						class="btn"
-						onClick={() => store.commit(
-							events.todoUpdated({ id: todo.id, completed: !todo.completed }),
-						)}
-					>
-						{todo.completed ? 'Undo' : 'Complete'}
-					</button>
-					<span>{todo.text}</span>
-				</li>}
+				renderItem={(todo, itemOptions) => (
+					<li data-id={todo.id} data-index={itemOptions.index}>
+						<button
+							class="btn"
+							onClick={() =>
+								store.commit(events.todoUpdated({ id: todo.id, completed: !todo.completed }))
+							}
+						>
+							{todo.completed ? 'Undo' : 'Complete'}
+						</button>
+						<span>{todo.text}</span>
+					</li>
+				)}
 			/>
 		</ul>
 	</div>
@@ -143,7 +145,9 @@ export function LiveStoreDemo() @{
 		@try {
 			<LiveStorePanel />
 		} @pending {
-			<div class="panel" data-testid="livestore-loading">{'Loading LiveStore…'}</div>
+			<div class="panel" data-testid="livestore-loading">
+				{'Loading LiveStore…'}
+			</div>
 		}
 	</StoreRegistryProvider>
 }

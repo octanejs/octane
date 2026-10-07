@@ -49,100 +49,106 @@ import {
  *
  * @inline
  */
-export type ReferenceLineSegment =
-	readonly [{
+export type ReferenceLineSegment = readonly [
+	{
 		x?: number | string;
 		y?: number | string;
-	}, {
+	},
+	{
 		x?: number | string;
 		y?: number | string;
-	}];
+	},
+];
 
 type ReferenceCoordinateValue = number | string;
 
 interface ReferenceLineProps<
 	XValueType extends ReferenceCoordinateValue = any,
 	YValueType extends ReferenceCoordinateValue = any,
-> extends Overflowable, ZIndexable {
+>
+	extends Overflowable, ZIndexable {
 	/**
- * If defined, renders a horizontal line on this position.
- *
- * This value is using your chart's domain, so you will provide a data value instead of a pixel value.
- * ReferenceLine will internally calculate the correct pixel position.
- *
- * @example <ReferenceLine y="Page D" />
- */
+	 * If defined, renders a horizontal line on this position.
+	 *
+	 * This value is using your chart's domain, so you will provide a data value instead of a pixel value.
+	 * ReferenceLine will internally calculate the correct pixel position.
+	 *
+	 * @example <ReferenceLine y="Page D" />
+	 */
 	y?: YValueType;
 	/**
- * If defined, renders a vertical line on this position.
- *
- * This value is using your chart's domain, so you will provide a data value instead of a pixel value.
- * ReferenceLine will internally calculate the correct pixel position.
- *
- * @example <ReferenceLine x="Monday" />
- */
+	 * If defined, renders a vertical line on this position.
+	 *
+	 * This value is using your chart's domain, so you will provide a data value instead of a pixel value.
+	 * ReferenceLine will internally calculate the correct pixel position.
+	 *
+	 * @example <ReferenceLine x="Monday" />
+	 */
 	x?: XValueType;
 	/**
- * Tuple of coordinates. If defined, renders a diagonal line segment.
- */
-	segment?: readonly [{
-		x?: XValueType;
-		y?: YValueType;
-	}, {
-		x?: XValueType;
-		y?: YValueType;
-	}];
+	 * Tuple of coordinates. If defined, renders a diagonal line segment.
+	 */
+	segment?: readonly [
+		{
+			x?: XValueType;
+			y?: YValueType;
+		},
+		{
+			x?: XValueType;
+			y?: YValueType;
+		},
+	];
 	/**
- * The position of the reference line when the axis has bandwidth
- * (e.g., a band scale). This determines where within the band
- * the line is drawn.
- * @defaultValue 'middle'
- */
+	 * The position of the reference line when the axis has bandwidth
+	 * (e.g., a band scale). This determines where within the band
+	 * the line is drawn.
+	 * @defaultValue 'middle'
+	 */
 	position?: BandPosition;
 	className?: number | string;
 	/**
- * The id of y-axis which is corresponding to the data.
- * Required when there are multiple YAxes.
- * @defaultValue 0
- */
+	 * The id of y-axis which is corresponding to the data.
+	 * Required when there are multiple YAxes.
+	 * @defaultValue 0
+	 */
 	yAxisId?: number | string;
 	/**
- * The id of x-axis which is corresponding to the data.
- * Required when there are multiple XAxes.
- * @defaultValue 0
- */
+	 * The id of x-axis which is corresponding to the data.
+	 * Required when there are multiple XAxes.
+	 * @defaultValue 0
+	 */
 	xAxisId?: number | string;
 	shape?: OctaneElement<SVGElement> | ((props: any) => OctaneElement<SVGElement>);
 	/**
- * Renders a single label.
- *
- * - `false`: no labels are rendered
- * - `string` | `number`: the content of the label
- * - `object`: the props of LabelList component
- * - `OctaneElement`: a custom SVG label element, such as `<text>` or `<g>`.
- *   HTML elements such as `<div>` are not valid inside the chart SVG and may trigger React DOM warnings.
- * - `function`: a render function of custom label
- *
- * @defaultValue false
- *
- * @see {@link https://recharts.github.io/en-US/examples/LineChartWithReferenceLines/ Reference elements with a label}
- */
+	 * Renders a single label.
+	 *
+	 * - `false`: no labels are rendered
+	 * - `string` | `number`: the content of the label
+	 * - `object`: the props of LabelList component
+	 * - `OctaneElement`: a custom SVG label element, such as `<text>` or `<g>`.
+	 *   HTML elements such as `<div>` are not valid inside the chart SVG and may trigger React DOM warnings.
+	 * - `function`: a render function of custom label
+	 *
+	 * @defaultValue false
+	 *
+	 * @see {@link https://recharts.github.io/en-US/examples/LineChartWithReferenceLines/ Reference elements with a label}
+	 */
 	label?: ImplicitLabelType;
 	/**
- * Z-Index of this component and its children. The higher the value,
- * the more on top it will be rendered.
- * Components with higher zIndex will appear in front of components with lower zIndex.
- * If undefined or 0, the content is rendered in the default layer without portals.
- *
- * @since 3.4
- * @defaultValue 400
- * @see {@link https://recharts.github.io/en-US/guide/zIndex/ Z-Index and layers guide}
- */
+	 * Z-Index of this component and its children. The higher the value,
+	 * the more on top it will be rendered.
+	 * Components with higher zIndex will appear in front of components with lower zIndex.
+	 * If undefined or 0, the content is rendered in the default layer without portals.
+	 *
+	 * @since 3.4
+	 * @defaultValue 400
+	 * @see {@link https://recharts.github.io/en-US/guide/zIndex/ Z-Index and layers guide}
+	 */
 	zIndex?: number;
 	/**
- * The width of the stroke
- * @defaultValue 1
- */
+	 * The width of the stroke
+	 * @defaultValue 1
+	 */
 	strokeWidth?: number | string;
 }
 
@@ -155,8 +161,7 @@ interface ReferenceLineProps<
 export type Props<
 	XValueType extends ReferenceCoordinateValue = any,
 	YValueType extends ReferenceCoordinateValue = any,
-> =
-	Omit<SVGProps<SVGLineElement>, 'viewBox'> & ReferenceLineProps<XValueType, YValueType>;
+> = Omit<SVGProps<SVGLineElement>, 'viewBox'> & ReferenceLineProps<XValueType, YValueType>;
 
 const renderLine = (option: ReferenceLineProps['shape'], props: SVGProps<SVGLineElement>) => {
 	let line;
@@ -167,9 +172,10 @@ const renderLine = (option: ReferenceLineProps['shape'], props: SVGProps<SVGLine
 		line = option(props);
 	} else {
 		if (
-			!isWellBehavedNumber(props.x1) || !isWellBehavedNumber(props.y1) ||
-				!isWellBehavedNumber(props.x2) ||
-				!isWellBehavedNumber(props.y2)
+			!isWellBehavedNumber(props.x1) ||
+			!isWellBehavedNumber(props.y1) ||
+			!isWellBehavedNumber(props.x2) ||
+			!isWellBehavedNumber(props.y2)
 		) {
 			return null;
 		}
@@ -310,12 +316,13 @@ export function ReportReferenceLine(props: ReferenceLineSettings): null {
 			ifOverflow,
 			x,
 			y,
-			segment: segment == null
-				? segment
-				: [
-						{ x: segmentStartX, y: segmentStartY },
-						{ x: segmentEndX, y: segmentEndY },
-					],
+			segment:
+				segment == null
+					? segment
+					: [
+							{ x: segmentStartX, y: segmentStartY },
+							{ x: segmentEndX, y: segmentEndY },
+						],
 		};
 		dispatch(addLine(settings));
 		return () => {
@@ -343,18 +350,22 @@ function ReferenceLineImpl(props: PropsWithDefaults) {
 	const clipPathId = useClipPathId();
 	const xAxis = useAppSelector((state) => selectXAxisSettings(state, xAxisId));
 	const yAxis = useAppSelector((state) => selectYAxisSettings(state, yAxisId));
-	const xAxisScale = useAppSelector(
-		(state) => selectAxisScale(state, 'xAxis', xAxisId, isPanorama),
+	const xAxisScale = useAppSelector((state) =>
+		selectAxisScale(state, 'xAxis', xAxisId, isPanorama),
 	);
-	const yAxisScale = useAppSelector(
-		(state) => selectAxisScale(state, 'yAxis', yAxisId, isPanorama),
+	const yAxisScale = useAppSelector((state) =>
+		selectAxisScale(state, 'yAxis', yAxisId, isPanorama),
 	);
 
 	const viewBox = useViewBox();
 
 	if (
-		!clipPathId || !viewBox || xAxis == null || yAxis == null || xAxisScale == null ||
-			yAxisScale == null
+		!clipPathId ||
+		!viewBox ||
+		xAxis == null ||
+		yAxis == null ||
+		xAxisScale == null ||
+		yAxisScale == null
 	) {
 		return null;
 	}
@@ -380,8 +391,7 @@ function ReferenceLineImpl(props: PropsWithDefaults) {
 	const { x: x1, y: y1 } = point1;
 	const { x: x2, y: y2 } = point2;
 
-	const clipPath =
-		ifOverflow === 'hidden' ? `url(#${clipPathId})` : undefined;
+	const clipPath = ifOverflow === 'hidden' ? `url(#${clipPathId})` : undefined;
 
 	const lineProps: SVGProps<SVGLineElement> = {
 		clipPath,
@@ -394,15 +404,17 @@ function ReferenceLineImpl(props: PropsWithDefaults) {
 
 	const rect = rectWithCoords({ x1, y1, x2, y2 });
 
-	return <ZIndexLayer zIndex={props.zIndex}>
-		<Layer className={clsx('recharts-reference-line', className)}>
-			{renderLine(shape, lineProps)}
-			<CartesianLabelContextProvider {...rect} lowerWidth={rect.width} upperWidth={rect.width}>
-				<CartesianLabelFromLabelProp label={props.label} />
-				{props.children}
-			</CartesianLabelContextProvider>
-		</Layer>
-	</ZIndexLayer>;
+	return (
+		<ZIndexLayer zIndex={props.zIndex}>
+			<Layer className={clsx('recharts-reference-line', className)}>
+				{renderLine(shape, lineProps)}
+				<CartesianLabelContextProvider {...rect} lowerWidth={rect.width} upperWidth={rect.width}>
+					<CartesianLabelFromLabelProp label={props.label} />
+					{props.children}
+				</CartesianLabelContextProvider>
+			</Layer>
+		</ZIndexLayer>
+	);
 }
 
 export const referenceLineDefaultProps = {
@@ -439,17 +451,19 @@ export function ReferenceLine<
 	YValueType extends ReferenceCoordinateValue = any,
 >(outsideProps: Props<XValueType, YValueType>) {
 	const props: PropsWithDefaults = resolveDefaultProps(outsideProps, referenceLineDefaultProps);
-	return <>
-		<ReportReferenceLine
-			yAxisId={props.yAxisId}
-			xAxisId={props.xAxisId}
-			ifOverflow={props.ifOverflow}
-			x={props.x}
-			y={props.y}
-			segment={props.segment}
-		/>
-		<ReferenceLineImpl {...props} />
-	</>;
+	return (
+		<>
+			<ReportReferenceLine
+				yAxisId={props.yAxisId}
+				xAxisId={props.xAxisId}
+				ifOverflow={props.ifOverflow}
+				x={props.x}
+				y={props.y}
+				segment={props.segment}
+			/>
+			<ReferenceLineImpl {...props} />
+		</>
+	);
 }
 
 ReferenceLine.displayName = 'ReferenceLine';

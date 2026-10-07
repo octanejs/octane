@@ -54,10 +54,13 @@ export function OTPInput(props: OTPInputProps) {
 	);
 	const value = controlledValue ?? internalValue;
 	const previousValue = usePrevious(value);
-	const onChange = useCallback((newValue: string) => {
-		consumerOnChange?.(newValue);
-		setInternalValue(newValue);
-	}, [consumerOnChange]);
+	const onChange = useCallback(
+		(newValue: string) => {
+			consumerOnChange?.(newValue);
+			setInternalValue(newValue);
+		},
+		[consumerOnChange],
+	);
 	const regexp = useMemo(
 		() => (pattern ? (typeof pattern === 'string' ? new RegExp(pattern) : pattern) : null),
 		[pattern],
@@ -69,7 +72,8 @@ export function OTPInput(props: OTPInputProps) {
 	const initialLoadRef = useRef({
 		value,
 		onChange,
-		isIOS: typeof window !== 'undefined' &&
+		isIOS:
+			typeof window !== 'undefined' &&
 			window.CSS?.supports?.('-webkit-touch-callout', 'none') === true,
 	});
 	const inputMetadataRef = useRef<{
@@ -117,7 +121,7 @@ export function OTPInput(props: OTPInputProps) {
 				const isSingleCaret = selectionStart === selectionEnd;
 				const isInsertMode =
 					selectionStart === mountedInput.value.length &&
-						mountedInput.value.length < mountedInput.maxLength;
+					mountedInput.value.length < mountedInput.maxLength;
 				if (isSingleCaret && !isInsertMode) {
 					const caret = selectionStart;
 					if (caret === 0) {
@@ -145,17 +149,11 @@ export function OTPInput(props: OTPInputProps) {
 				}
 			}
 
-			const nextStart =
-				start !== -1 ? start : selectionStart;
-			const nextEnd =
-				end !== -1 ? end : selectionEnd;
+			const nextStart = start !== -1 ? start : selectionStart;
+			const nextEnd = end !== -1 ? end : selectionEnd;
 			setMirrorSelectionStart(nextStart);
 			setMirrorSelectionEnd(nextEnd);
-			inputMetadataRef.current.prev = [
-				nextStart,
-				nextEnd,
-				direction ?? selectionDirection,
-			];
+			inputMetadataRef.current.prev = [nextStart, nextEnd, direction ?? selectionDirection];
 		}
 
 		document.addEventListener('selectionchange', onDocumentSelectionChange, { capture: true });
@@ -195,8 +193,10 @@ export function OTPInput(props: OTPInputProps) {
 
 	useEffect(() => {
 		if (
-			previousValue !== undefined && value !== previousValue && previousValue.length < maxLength &&
-				value.length === maxLength
+			previousValue !== undefined &&
+			value !== previousValue &&
+			previousValue.length < maxLength &&
+			value.length === maxLength
 		) {
 			onComplete?.(value);
 		}
@@ -249,23 +249,20 @@ export function OTPInput(props: OTPInputProps) {
 			fontFamily: 'monospace',
 			fontVariantNumeric: 'tabular-nums',
 		}),
-		[
-			passwordManagerBadge.PWM_BADGE_SPACE_WIDTH,
-			passwordManagerBadge.willPushPWMBadge,
-			textAlign,
-		],
+		[passwordManagerBadge.PWM_BADGE_SPACE_WIDTH, passwordManagerBadge.willPushPWMBadge, textAlign],
 	);
 
 	const contextValue = useMemo<RenderProps>(() => {
 		return {
 			slots: Array.from({ length: maxLength }).map((_, slotIndex) => {
 				const isActive =
-					isFocused && mirrorSelectionStart !== null && mirrorSelectionEnd !== null &&
-						(mirrorSelectionStart === mirrorSelectionEnd && slotIndex === mirrorSelectionStart ||
-							slotIndex >= mirrorSelectionStart && slotIndex < mirrorSelectionEnd);
+					isFocused &&
+					mirrorSelectionStart !== null &&
+					mirrorSelectionEnd !== null &&
+					((mirrorSelectionStart === mirrorSelectionEnd && slotIndex === mirrorSelectionStart) ||
+						(slotIndex >= mirrorSelectionStart && slotIndex < mirrorSelectionEnd));
 				const char = value[slotIndex] ?? null;
-				const placeholderChar =
-					value[0] !== undefined ? null : placeholder?.[slotIndex] ?? null;
+				const placeholderChar = value[0] !== undefined ? null : (placeholder?.[slotIndex] ?? null);
 				return {
 					char,
 					placeholderChar,
@@ -296,105 +293,108 @@ export function OTPInput(props: OTPInputProps) {
 	const noScriptStyle =
 		noScriptCSSFallback === null ? null : createElement('style', null, noScriptCSSFallback);
 
-	return <>
-		@if (noScriptStyle !== null) {
-			<noscript>{noScriptStyle}</noscript>
-		}
-		<div
-			ref={containerRef}
-			data-input-otp-container=""
-			translate="no"
-			style={rootStyle}
-			className={containerClassName}
-		>
-			{renderedChildren}
-			<div style={{ position: 'absolute', inset: 0, pointerEvents: 'none' }}>
-				<input
-					{...inputProps}
-					autoComplete={autoComplete || 'one-time-code'}
-					data-input-otp=""
-					data-input-otp-placeholder-shown={value.length === 0 || undefined}
-					data-input-otp-mss={mirrorSelectionStart}
-					data-input-otp-mse={mirrorSelectionEnd}
-					inputMode={inputMode}
-					pattern={regexp ? regexp.source : undefined}
-					aria-placeholder={placeholder}
-					style={inputStyle}
-					maxLength={maxLength}
-					spellCheck={spellCheck ?? false}
-					suppressHydrationWarning
-					value={value}
-					ref={composedInputRef}
-					onInput={(event) => {
-						consumerOnInput?.(event);
-						const newValue = event.currentTarget.value.slice(0, maxLength);
-						if (newValue.length > 0 && regexp && !regexp.test(newValue)) {
-							event.preventDefault();
-							event.currentTarget.value = value;
-							return;
-						}
-						const hasDeleted = newValue.length < value.length;
-						if (hasDeleted && typeof document !== 'undefined') {
-							document.dispatchEvent(new Event('selectionchange'));
-						}
-						onChange(newValue);
-						if (!hasDeleted) {
-							syncSelectionRef.current?.();
-						}
-					}}
-					onPaste={(event) => {
-						const input = inputRef.current;
-						if (
-							input && event.clipboardData && (pasteTransformer || initialLoadRef.current.isIOS)
-						) {
-							const pasted = event.clipboardData.getData('text/plain');
-							const content =
-								pasteTransformer ? pasteTransformer(pasted) : pasted;
-							event.preventDefault();
-							const start = input.selectionStart ?? value.length;
-							const end = input.selectionEnd ?? start;
-							const uncapped = value.slice(0, start) + content + value.slice(end);
-							const newValue = uncapped.slice(0, maxLength);
-							if (newValue.length === 0 || !regexp || regexp.test(newValue)) {
-								input.value = newValue;
-								onChange(newValue);
-								const nextStart = Math.min(newValue.length, maxLength - 1);
-								const nextEnd = newValue.length;
-								input.setSelectionRange(nextStart, nextEnd);
-								setMirrorSelectionStart(nextStart);
-								setMirrorSelectionEnd(nextEnd);
+	return (
+		<>
+			@if (noScriptStyle !== null) {
+				<noscript>{noScriptStyle}</noscript>
+			}
+			<div
+				ref={containerRef}
+				data-input-otp-container=""
+				translate="no"
+				style={rootStyle}
+				className={containerClassName}
+			>
+				{renderedChildren}
+				<div style={{ position: 'absolute', inset: 0, pointerEvents: 'none' }}>
+					<input
+						{...inputProps}
+						autoComplete={autoComplete || 'one-time-code'}
+						data-input-otp=""
+						data-input-otp-placeholder-shown={value.length === 0 || undefined}
+						data-input-otp-mss={mirrorSelectionStart}
+						data-input-otp-mse={mirrorSelectionEnd}
+						inputMode={inputMode}
+						pattern={regexp ? regexp.source : undefined}
+						aria-placeholder={placeholder}
+						style={inputStyle}
+						maxLength={maxLength}
+						spellCheck={spellCheck ?? false}
+						suppressHydrationWarning
+						value={value}
+						ref={composedInputRef}
+						onInput={(event) => {
+							consumerOnInput?.(event);
+							const newValue = event.currentTarget.value.slice(0, maxLength);
+							if (newValue.length > 0 && regexp && !regexp.test(newValue)) {
+								event.preventDefault();
+								event.currentTarget.value = value;
+								return;
 							}
-						}
-						consumerOnPaste?.(event);
-					}}
-					onMouseOver={(event) => {
-						setIsHoveringInput(true);
-						consumerOnMouseOver?.(event);
-					}}
-					onMouseLeave={(event) => {
-						setIsHoveringInput(false);
-						consumerOnMouseLeave?.(event);
-					}}
-					onFocus={(event) => {
-						const input = inputRef.current;
-						if (input) {
-							const start = Math.min(input.value.length, maxLength - 1);
-							const end = input.value.length;
-							input.setSelectionRange(start, end);
-							setMirrorSelectionStart(start);
-							setMirrorSelectionEnd(end);
-						}
-						setIsFocused(true);
-						consumerOnFocus?.(event);
-					}}
-					onBlur={(event) => {
-						setIsFocused(false);
-						consumerOnBlur?.(event);
-					}}
-				/>
+							const hasDeleted = newValue.length < value.length;
+							if (hasDeleted && typeof document !== 'undefined') {
+								document.dispatchEvent(new Event('selectionchange'));
+							}
+							onChange(newValue);
+							if (!hasDeleted) {
+								syncSelectionRef.current?.();
+							}
+						}}
+						onPaste={(event) => {
+							const input = inputRef.current;
+							if (
+								input &&
+								event.clipboardData &&
+								(pasteTransformer || initialLoadRef.current.isIOS)
+							) {
+								const pasted = event.clipboardData.getData('text/plain');
+								const content = pasteTransformer ? pasteTransformer(pasted) : pasted;
+								event.preventDefault();
+								const start = input.selectionStart ?? value.length;
+								const end = input.selectionEnd ?? start;
+								const uncapped = value.slice(0, start) + content + value.slice(end);
+								const newValue = uncapped.slice(0, maxLength);
+								if (newValue.length === 0 || !regexp || regexp.test(newValue)) {
+									input.value = newValue;
+									onChange(newValue);
+									const nextStart = Math.min(newValue.length, maxLength - 1);
+									const nextEnd = newValue.length;
+									input.setSelectionRange(nextStart, nextEnd);
+									setMirrorSelectionStart(nextStart);
+									setMirrorSelectionEnd(nextEnd);
+								}
+							}
+							consumerOnPaste?.(event);
+						}}
+						onMouseOver={(event) => {
+							setIsHoveringInput(true);
+							consumerOnMouseOver?.(event);
+						}}
+						onMouseLeave={(event) => {
+							setIsHoveringInput(false);
+							consumerOnMouseLeave?.(event);
+						}}
+						onFocus={(event) => {
+							const input = inputRef.current;
+							if (input) {
+								const start = Math.min(input.value.length, maxLength - 1);
+								const end = input.value.length;
+								input.setSelectionRange(start, end);
+								setMirrorSelectionStart(start);
+								setMirrorSelectionEnd(end);
+							}
+							setIsFocused(true);
+							consumerOnFocus?.(event);
+						}}
+						onBlur={(event) => {
+							setIsFocused(false);
+							consumerOnBlur?.(event);
+						}}
+					/>
+				</div>
 			</div>
-		</div>
-	</>;
+		</>
+	);
 }
 
 OTPInput.displayName = 'Input';
@@ -428,7 +428,8 @@ function installInputStyles(nonce?: string): void {
 	document.head.appendChild(style);
 	ownedInputStyle = style;
 	if (!style.sheet) return;
-	const autofillStyles = 'background: transparent !important; color: transparent !important; border-color: transparent !important; opacity: 0 !important; box-shadow: none !important; -webkit-box-shadow: none !important; -webkit-text-fill-color: transparent !important;';
+	const autofillStyles =
+		'background: transparent !important; color: transparent !important; border-color: transparent !important; opacity: 0 !important; box-shadow: none !important; -webkit-box-shadow: none !important; -webkit-text-fill-color: transparent !important;';
 	safeInsertRule(
 		style.sheet,
 		'[data-input-otp]::selection { background: transparent !important; color: transparent !important; }',

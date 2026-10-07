@@ -24,10 +24,12 @@ export default function Transform({ children, transform, accessibilityLabel }: P
 		return null;
 	}
 
-	return <ink-text
-		style={{ flexGrow: 0, flexShrink: 1, flexDirection: 'row' }}
-		internal_transform={transform}
-	>
-		{isScreenReaderEnabled && accessibilityLabel ? accessibilityLabel : children}
-	</ink-text>;
+	return (
+		<ink-text
+			style={{ flexGrow: 0, flexShrink: 1, flexDirection: 'row' }}
+			internal_transform={transform}
+		>
+			{isScreenReaderEnabled && accessibilityLabel ? accessibilityLabel : children}
+		</ink-text>
+	);
 }

@@ -7,11 +7,10 @@ import type { ComponentProps } from '../types';
 import { save } from '../utils';
 import { useCodeBlockContext } from './context.tsrx';
 
-export type CodeBlockDownloadButtonProps =
-	ComponentProps<'button'> & {
-		onDownload?: () => void;
-		onError?: (error: Error) => void;
-	};
+export type CodeBlockDownloadButtonProps = ComponentProps<'button'> & {
+	onDownload?: () => void;
+	onError?: (error: Error) => void;
+};
 
 const languageExtensionMap: Record<string, string> = {
 	'1c': '1c',
@@ -354,18 +353,20 @@ export const CodeBlockDownloadButton = ({
 		}
 	};
 
-	return <button
-		className={cn(
-			'cursor-pointer p-1 text-muted-foreground transition-all hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50',
-			className,
-		)}
-		data-streamdown="code-block-download-button"
-		disabled={isAnimating}
-		onClick={downloadCode}
-		title={t.downloadFile}
-		type="button"
-		{...props}
-	>
-		{children ?? <icons.DownloadIcon size={14} />}
-	</button>;
+	return (
+		<button
+			className={cn(
+				'cursor-pointer p-1 text-muted-foreground transition-all hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50',
+				className,
+			)}
+			data-streamdown="code-block-download-button"
+			disabled={isAnimating}
+			onClick={downloadCode}
+			title={t.downloadFile}
+			type="button"
+			{...props}
+		>
+			{children ?? <icons.DownloadIcon size={14} />}
+		</button>
+	);
 };

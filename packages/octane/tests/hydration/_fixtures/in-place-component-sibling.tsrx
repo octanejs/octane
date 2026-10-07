@@ -143,7 +143,7 @@ export function Shown(props: { v: string }) @{
 
 // Returns a single-root component, which has no range of its own.
 export function Maybe(props: { shown: boolean }) {
-	return props.shown ? <Shown v="m" /> : undefined as never;
+	return props.shown ? <Shown v="m" /> : (undefined as never);
 }
 
 export function MaybeThenSibling(props: { shown: boolean }) @{

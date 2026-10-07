@@ -5,7 +5,9 @@ import { createPortal, useState } from 'octane';
 
 // Nested-root propagation (:32/:65) — one div per root, handler + name via props.
 export function RootDiv(props: { name: string; onOut: (e: Event) => void }) @{
-	<div class={props.name} onMouseOut={props.onOut}>{props.name}</div>
+	<div class={props.name} onMouseOut={props.onOut}>
+		{props.name}
+	</div>
 }
 
 export function PropagationTree(props: {
@@ -23,7 +25,9 @@ export function PropagationTree(props: {
 			class="propagation-target"
 			onClick={props.onTarget}
 			onClickCapture={props.onTargetCapture}
-		>Target</button>
+		>
+			Target
+		</button>
 	</section>
 }
 
@@ -43,7 +47,9 @@ function DeferredPortalChild(props: DeferredPortalProps) @{
 				onClickCapture={() => props.log('target capture')}
 				onClick={() => props.log('target bubble')}
 				onAuxClick={() => props.log('target bubble')}
-			>Portal target</button>
+			>
+				Portal target
+			</button>
 		}
 	</>
 }
@@ -54,7 +60,9 @@ export function DeferredPortalEvents(props: DeferredPortalProps) @{
 		onClickCapture={() => props.log('logical capture')}
 		onClick={() => props.log('logical bubble')}
 		onAuxClick={() => props.log('logical bubble')}
-	>{createPortal(<DeferredPortalChild {...props} />, props.target)}</section>
+	>
+		{createPortal(<DeferredPortalChild {...props} />, props.target)}
+	</section>
 }
 
 // :106 — the clicked element is REMOVED by the update its own handler schedules.
@@ -77,15 +85,15 @@ export function BatchChild(props: {
 }) @{
 	const [state, setState] = useState('Child');
 	props.register(setState);
-	<span class="child-span" onClick={props.onEvent} onMouseOut={props.onEvent}>{state}</span>
+	<span class="child-span" onClick={props.onEvent} onMouseOut={props.onEvent}>
+		{state}
+	</span>
 }
 
 export function BatchParent(props: { onEvent: () => void }) @{
-	<section
-		class="parent-section"
-		onClick={props.onEvent}
-		onMouseOut={props.onEvent}
-	>{'Parent'}</section>
+	<section class="parent-section" onClick={props.onEvent} onMouseOut={props.onEvent}>
+		{'Parent'}
+	</section>
 }
 
 // :295 — single tree, handler on an ancestor, dispatch on the inner node.
@@ -130,7 +138,9 @@ export function NonBubblingPairs(props: { log: (s: string) => void }) @{
 		onClose={() => props.log('anc-close')}
 		onPlay={() => props.log('anc-play')}
 	>
-		<details class="det" onToggle={() => props.log('det-toggle')}>{'d'}</details>
+		<details class="det" onToggle={() => props.log('det-toggle')}>
+			{'d'}
+		</details>
 		<dialog
 			class="dlg"
 			onCancel={() => props.log('dlg-cancel')}
@@ -175,7 +185,9 @@ export function PlayCaptureTree(props: { log: (s: string) => void }) @{
 			<div
 				class="inner"
 				onPlayCapture={(e) => props.log('cap:' + (e.currentTarget as Element).className)}
-			>{'x'}</div>
+			>
+				{'x'}
+			</div>
 		</div>
 	</div>
 }
@@ -187,34 +199,36 @@ export function ScrollTreeFull(props: { log: (s: string) => void }) @{
 		onScroll={(e) => props.log('onScroll:bubble:' + (e.currentTarget as Element).className)}
 		onScrollCapture={(e) => props.log('onScroll:capture:' + (e.currentTarget as Element).className)}
 		onScrollEnd={(e) => props.log('onScrollEnd:bubble:' + (e.currentTarget as Element).className)}
-		onScrollEndCapture={(e) => props.log(
-			'onScrollEnd:capture:' + (e.currentTarget as Element).className,
-		)}
+		onScrollEndCapture={(e) =>
+			props.log('onScrollEnd:capture:' + (e.currentTarget as Element).className)
+		}
 	>
 		<div
 			class="parent"
 			onScroll={(e) => props.log('onScroll:bubble:' + (e.currentTarget as Element).className)}
-			onScrollCapture={(e) => props.log(
-				'onScroll:capture:' + (e.currentTarget as Element).className,
-			)}
+			onScrollCapture={(e) =>
+				props.log('onScroll:capture:' + (e.currentTarget as Element).className)
+			}
 			onScrollEnd={(e) => props.log('onScrollEnd:bubble:' + (e.currentTarget as Element).className)}
-			onScrollEndCapture={(e) => props.log(
-				'onScrollEnd:capture:' + (e.currentTarget as Element).className,
-			)}
+			onScrollEndCapture={(e) =>
+				props.log('onScrollEnd:capture:' + (e.currentTarget as Element).className)
+			}
 		>
 			<div
 				class="child"
 				onScroll={(e) => props.log('onScroll:bubble:' + (e.currentTarget as Element).className)}
-				onScrollCapture={(e) => props.log(
-					'onScroll:capture:' + (e.currentTarget as Element).className,
-				)}
-				onScrollEnd={(e) => props.log(
-					'onScrollEnd:bubble:' + (e.currentTarget as Element).className,
-				)}
-				onScrollEndCapture={(e) => props.log(
-					'onScrollEnd:capture:' + (e.currentTarget as Element).className,
-				)}
-			>{'c'}</div>
+				onScrollCapture={(e) =>
+					props.log('onScroll:capture:' + (e.currentTarget as Element).className)
+				}
+				onScrollEnd={(e) =>
+					props.log('onScrollEnd:bubble:' + (e.currentTarget as Element).className)
+				}
+				onScrollEndCapture={(e) =>
+					props.log('onScrollEnd:capture:' + (e.currentTarget as Element).className)
+				}
+			>
+				{'c'}
+			</div>
 		</div>
 	</div>
 }
@@ -226,20 +240,20 @@ export function ScrollTreeNoChild(props: { log: (s: string) => void }) @{
 		onScroll={(e) => props.log('onScroll:bubble:' + (e.currentTarget as Element).className)}
 		onScrollCapture={(e) => props.log('onScroll:capture:' + (e.currentTarget as Element).className)}
 		onScrollEnd={(e) => props.log('onScrollEnd:bubble:' + (e.currentTarget as Element).className)}
-		onScrollEndCapture={(e) => props.log(
-			'onScrollEnd:capture:' + (e.currentTarget as Element).className,
-		)}
+		onScrollEndCapture={(e) =>
+			props.log('onScrollEnd:capture:' + (e.currentTarget as Element).className)
+		}
 	>
 		<div
 			class="parent"
 			onScroll={(e) => props.log('onScroll:bubble:' + (e.currentTarget as Element).className)}
-			onScrollCapture={(e) => props.log(
-				'onScroll:capture:' + (e.currentTarget as Element).className,
-			)}
+			onScrollCapture={(e) =>
+				props.log('onScroll:capture:' + (e.currentTarget as Element).className)
+			}
 			onScrollEnd={(e) => props.log('onScrollEnd:bubble:' + (e.currentTarget as Element).className)}
-			onScrollEndCapture={(e) => props.log(
-				'onScrollEnd:capture:' + (e.currentTarget as Element).className,
-			)}
+			onScrollEndCapture={(e) =>
+				props.log('onScrollEnd:capture:' + (e.currentTarget as Element).className)
+			}
 		>
 			<div class="child">{'c'}</div>
 		</div>
@@ -274,7 +288,9 @@ export function ScrollSubscribe(props: {
 				onScrollCapture={props.onScrollCapture}
 				onScrollEnd={props.onScrollEnd}
 				onScrollEndCapture={props.onScrollEndCapture}
-			>{'c'}</div>
+			>
+				{'c'}
+			</div>
 		</div>
 	</div>
 }

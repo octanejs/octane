@@ -40,7 +40,7 @@
       "arch": "any",
       "packageManager": "pnpm@12.9.1",
       "lockfile": "pnpm-lock.yaml",
-      "lockfileSha256": "7a38a56db0a01f07e08a3a383bd2afdcfeb9132bfbbcd54e82c852225be9667b"
+      "lockfileSha256": "84dbefa8929419194a46ef5ec966ae8459aa05f40399e583828134ccc8121aad"
     }
   },
   "lanes": [
@@ -73,7 +73,7 @@
         {
           "path": "packages/tanstack-form/tests/_fixtures/parity.tsrx",
           "role": "support",
-          "sha256": "99090526cd01879e1a479225af0b9486a15f7f3281e666d10ae5d839103ecc7c"
+          "sha256": "ca950df29bf29707b81cb4efe8a82e0f75042e09adb6e373c94876a9056aad5f"
         },
         {
           "path": "packages/tanstack-form/audit/test-classifications.json",

@@ -16,10 +16,9 @@ function Row(props: RowProps) @{
 		data-local={String(local)}
 		style={model.displayStyle}
 	>
-		<button
-			type="button"
-			onClick={() => setLocal((value) => value + 1)}
-		>{`${index}:${props.generation}:${local}` as string}</button>
+		<button type="button" onClick={() => setLocal((value) => value + 1)}>
+			{`${index}:${props.generation}:${local}` as string}
+		</button>
 		<input aria-label={`Draft ${index}`} defaultValue={`row-${index}`} />
 	</article>
 }

@@ -65,9 +65,7 @@ export function TextNested(props: { value: string }) @{
 
 export function DynamicHostText(props: { value: string }) @{
 	const tag = 'div';
-	<{tag}>
-		{() => props.value}
-	</{tag}>
+	<{tag}>{() => props.value}</{tag}>
 }
 
 export function PreHole(props: { value: unknown }) @{

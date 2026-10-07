@@ -219,7 +219,11 @@ import {
 } from './stream-protocol.js';
 import { isRendererContext, registerClientRendererBridge } from './renderer-bridge.js';
 import { defineRemovedContextMembers, registerContext } from './context-identity.js';
-import { createNativeReadDriver, type NativeReadDriver } from './signals/native-read-client.js';
+import {
+	createNativeReadDriver,
+	rebaseNativeRead,
+	type NativeReadDriver,
+} from './signals/native-read-client.js';
 import {
 	validateNativeReadWitness,
 	type NativeReadWitness,
@@ -247,6 +251,7 @@ import {
 	NATIVE_TRANSITION_CONSUMER,
 	readNativeDomStyle,
 	registerNativeActionResolver,
+	registerNativeReadRebase,
 	registerSignalDeclarationStage,
 	runNativeBatch,
 	setNativeCandidateResolver,
@@ -279,6 +284,7 @@ import {
 	documentSignalOwner,
 	enableSignalDocument,
 	signalDocumentEnabled,
+	signalOwnerFrame,
 	streamedSignalOwnerActivator as STREAMED_SIGNAL_OWNER_ACTIVATOR,
 } from './signals/document-owner.js';
 export {
@@ -397,6 +403,12 @@ export interface Scope {
 	 * queued past the deletion cannot mint fresh instance state for it.
 	 */
 	signalTokenEscaped: boolean;
+	/**
+	 * The renderer signal owner this scope resolved (scopeSignalOwner), false when
+	 * it borrows an enclosing row's owner, or null once retired. Undefined until
+	 * a render or handler first resolves it.
+	 */
+	signalOwner: SignalRendererOwnerIdentity | false | null | undefined;
 	/**
 	 * Hook slot map. Lazily allocated on the first hook call via `ensureHooks`.
 	 * For-of item bodies that never call a hook (the common case in
@@ -598,10 +610,6 @@ let HYDRATION_DRIVER: HydrationDriver | null = null;
 // arrives. They do not create document/instance owners until a genuine facade or
 // handle enables the shared document capability.
 let SIGNAL_BINDINGS_ENABLED = false;
-const SCOPE_SIGNAL_OWNERS = /* @__PURE__ */ new WeakMap<
-	Scope,
-	SignalRendererOwnerIdentity | false | null
->();
 type SignalInstanceKey =
 	| string
 	| { parentScope: Scope; invocationSite: string | undefined; key: unknown; hasKey: boolean };
@@ -740,7 +748,7 @@ function retainSignalRetryScope(
 	holder: { retrySignalOwners?: SignalRetryOwners },
 	subtree = false,
 ): void {
-	const owner = SCOPE_SIGNAL_OWNERS.get(scope);
+	const owner = scope.signalOwner;
 	if (owner) {
 		const path = signalRetryPath(scope, root);
 		if (path !== null) {
@@ -767,7 +775,7 @@ function retainSignalRetryScope(
 // retirement when deleted. A nested boundary's primary claims only from its own
 // cache, so its owners stay with it and retire with this tree.
 function handOverSignalRetryScope(scope: Scope, root: Scope, state: TrySlot): void {
-	const owner = SCOPE_SIGNAL_OWNERS.get(scope);
+	const owner = scope.signalOwner;
 	const path = owner ? signalRetryPath(scope, root) : null;
 	if (path !== null) {
 		const cache = (state.retrySignalOwners ??= { paths: {}, owners: new Set() });
@@ -778,7 +786,7 @@ function handOverSignalRetryScope(scope: Scope, root: Scope, state: TrySlot): vo
 		}
 		node.owner = owner as SignalRendererOwnerIdentity;
 		cache.owners.add(node.owner);
-		SCOPE_SIGNAL_OWNERS.set(scope, false);
+		scope.signalOwner = false;
 	}
 	forEachSubtreeChild(scope, (child) => {
 		const nested = (child as any).__trySlot as TrySlot | undefined;
@@ -1188,7 +1196,7 @@ function scopeSignalOwner(scope: Scope | null): SignalOwner | undefined {
 		if (root !== undefined) root.signalOwner = documentOwner;
 	}
 	if (documentOwner === undefined) return;
-	let owner = SCOPE_SIGNAL_OWNERS.get(scope);
+	let owner = scope.signalOwner;
 	if (
 		(owner === undefined || owner === false) &&
 		!scope.block.forSlot &&
@@ -1204,7 +1212,7 @@ function scopeSignalOwner(scope: Scope | null): SignalOwner | undefined {
 			if (parent.signalInstanceParent !== null || parent.signalInstanceResolved !== undefined)
 				break;
 			if (parent.block.forSlot?.signalSite !== undefined) {
-				SCOPE_SIGNAL_OWNERS.set(scope, false);
+				scope.signalOwner = false;
 				return scopeSignalOwner(parent);
 			}
 			parent = parent.parent ?? parent.block.parentBlock;
@@ -1287,7 +1295,7 @@ function scopeSignalOwner(scope: Scope | null): SignalOwner | undefined {
 			identity.instanceOwner = identity;
 			owner = Object.freeze(identity);
 		}
-		SCOPE_SIGNAL_OWNERS.set(scope, owner);
+		scope.signalOwner = owner;
 		if (visit !== null) SIGNAL_RETRY_VISIT = visit;
 		// A queued native bubble handler may outlive deletion and first enable
 		// signals afterwards. Its invocation must remain retired, not fall back
@@ -1313,8 +1321,8 @@ interface NativeStyleBinding {
 	__flags: number;
 	__teardown: typeof disposeNativeStyleBinding;
 	block: Block | null;
-	// Scalar-literal writes before any Block exists: the host and the last
-	// applied style, which seeds the Block's cache if a handle arrives later.
+	// Scalar writes before any Block exists: the host and the last applied
+	// style, which seeds the Block's cache if a structured value arrives later.
 	el: HTMLElement | SVGElement | null;
 	style: unknown;
 }
@@ -1349,21 +1357,24 @@ export function nativeStyleBinding(
 	value: any,
 	literal?: 1,
 ): void {
-	// The compiler passes `literal` for a fresh object literal of plain data
-	// properties, so enumerating it runs no accessor. When every value is a
-	// scalar there is no native protocol to read: write it like an ordinary style
-	// binding and allocate the owning Block only once a structured value appears.
-	if (literal === 1) {
-		const binding = owner.slots[slotIndex] as NativeStyleBinding | undefined;
-		if ((binding === undefined || binding.block === null) && isScalarStyleLiteral(value)) {
-			writeScalarNativeStyle(owner, slotIndex, binding, el, value);
-			return;
-		}
+	// Only an object carries the native read protocol, so a nullish or string
+	// style, such as an optional prop forwarded unset, has nothing to read.
+	// Neither does a scalar style literal: the compiler passes `literal` for a
+	// fresh object literal of plain data properties, so enumerating it runs no
+	// accessor. Write those like an ordinary style binding and allocate the
+	// owning Block only once a structured value appears. That Block then stays,
+	// so a later scalar releases its subscriptions through the same
+	// transactional render.
+	const binding = owner.slots[slotIndex] as NativeStyleBinding | undefined;
+	if ((binding === undefined || binding.block === null) && isScalarNativeStyle(value, literal)) {
+		writeScalarNativeStyle(owner, slotIndex, binding, el, value);
+		return;
 	}
 	nativePresentationBinding(owner, slotIndex, el, nativeStyleBody, { el, value });
 }
 
-function isScalarStyleLiteral(value: Record<string, unknown>): boolean {
+function isScalarNativeStyle(value: any, literal: 1 | undefined): boolean {
+	if (literal !== 1) return typeof value !== 'object' || value === null;
 	for (const name in value) {
 		const item = value[name];
 		if (item !== null && (typeof item === 'object' || typeof item === 'function')) return false;
@@ -1376,7 +1387,9 @@ function writeScalarNativeStyle(
 	slotIndex: number,
 	binding: NativeStyleBinding | undefined,
 	el: HTMLElement | SVGElement,
-	value: Record<string, unknown>,
+	value: unknown,
+	// Presentation hydration prepares the takeover write instead.
+	write: (el: HTMLElement | SVGElement, value: unknown, previous: unknown) => void = setStyle,
 ): void {
 	if (binding === undefined) {
 		binding = {
@@ -1400,10 +1413,11 @@ function writeScalarNativeStyle(
 		binding.el = el;
 		binding.style = undefined;
 	}
-	setStyle(el, value, binding.style);
+	write(el, value, binding.style);
 	if (TRANSITION_JOURNAL !== null)
 		TRANSITION_JOURNAL.push(JOURNAL_PROP, binding, 'style', binding.style);
-	// A compiler literal is fresh per render and never escapes, so it is its own snapshot.
+	// A compiler literal is fresh per render and never escapes, and a primitive
+	// is immutable, so either is its own snapshot.
 	binding.style = value;
 }
 
@@ -1845,7 +1859,7 @@ function retainNativeRetryReads(block: Block, reads: NativeReadWitness): void {
 					return;
 				owner.wakeable = null;
 				owner.generation++;
-				if (owner.transition === undefined || !TRANSITION_SWAP_DRIVER!.retryRoot(owner))
+				if (owner.transition === undefined || !TRANSITION_ROOT_DRIVER!.retryRoot(owner))
 					owner.retry();
 			});
 		});
@@ -1863,6 +1877,8 @@ function ownNativeAdoption(
 		manifest,
 		scope.block.idState.renderOwner?.initialDocumentSignals,
 	);
+	// Release moves an unchanged committed read live instead of rendering again.
+	registerNativeReadRebase(rebaseNativeRead);
 	registerHookCleanup(scope, () => {
 		adoption.release();
 		if (!ROOT_RENDER_ROLLBACK || scope.block.idState.renderOwner?.disposed) consume?.();
@@ -1871,7 +1887,8 @@ function ownNativeAdoption(
 		if (discarded) adoption.release();
 		else {
 			// Keep historical reads alive through the accepted ref/layout callbacks.
-			// Release then schedules ordinary live reconciliation as the next render.
+			// Release then schedules ordinary live reconciliation as the next render
+			// for each reader whose live value differs from what it presented.
 			(NATIVE_ADOPTION_RELEASES ??= []).push(adoption);
 			consume?.();
 		}
@@ -2668,18 +2685,37 @@ let TRANSITION_DEPTH = 0;
 let ASYNC_TRANSITION_COUNT = 0;
 
 /**
- * Optional transition-swap capability. Generic component/child/control-flow
+ * Optional off-screen swap capability. Generic component/child/control-flow
  * slots must not reference the concrete off-screen renderer directly: one
  * ordinary `@if` would otherwise retain the complete WIP/Suspense/descriptor
- * graph even when the application has no transition entry point. Every path
- * that can create transition-priority work runs through startTransition(),
- * which installs this driver before raising TRANSITION_DEPTH.
+ * graph even when the application has no transition entry point. A Suspense
+ * primary with a pending arm (tryBlock) and startTransition() install it.
  */
 interface TransitionSwapDriver {
 	render: typeof renderOffscreen;
-	commit: typeof commitOffscreen;
 	dispose: typeof disposeWip;
 	splice: typeof spliceWipCapture;
+}
+
+let TRANSITION_SWAP_DRIVER: TransitionSwapDriver | null = null;
+
+function ensureOffscreenSwapDriver(): void {
+	TRANSITION_SWAP_DRIVER ??= {
+		render: renderOffscreen,
+		dispose: disposeWip,
+		splice: spliceWipCapture,
+	};
+}
+
+/**
+ * Transition attempts, root holds and held state updates. Every path that can
+ * create transition-priority work runs through startTransition(), which
+ * installs this driver before raising TRANSITION_DEPTH. Until then no render
+ * runs at transition priority, so a missing driver means what an installed one
+ * would report: no attempt, no root hold and no held update. A Suspense-only
+ * application therefore does not retain it.
+ */
+interface TransitionRootDriver {
 	begin: typeof beginTransitionAttempt;
 	end: typeof endTransitionAttempt;
 	beginUrgent: typeof beginUrgentTransitionRender;
@@ -2695,14 +2731,17 @@ interface TransitionSwapDriver {
 	rebaseHeld: typeof rebaseHeldTransitionUpdate;
 }
 
-let TRANSITION_SWAP_DRIVER: TransitionSwapDriver | null = null;
+let TRANSITION_ROOT_DRIVER: TransitionRootDriver | null = null;
 
 function ensureTransitionSwapDriver(): void {
+	// Written out rather than calling ensureOffscreenSwapDriver, so applications
+	// that start transitions but render no Suspense pending arm carry one install.
 	TRANSITION_SWAP_DRIVER ??= {
 		render: renderOffscreen,
-		commit: commitOffscreen,
 		dispose: disposeWip,
 		splice: spliceWipCapture,
+	};
+	TRANSITION_ROOT_DRIVER ??= {
 		begin: beginTransitionAttempt,
 		end: endTransitionAttempt,
 		beginUrgent: beginUrgentTransitionRender,
@@ -2966,7 +3005,7 @@ function stagedTransitionValue<T>(slot: TransitionActionSlot<T>, block?: Block):
 	const update = batch.updates.get(slot) as TransitionActionUpdate<T> | undefined;
 	if (update !== undefined) return rebaseTransitionActionUpdate(update);
 	if (slot.renderTransition !== undefined) return slot.renderTransition.value;
-	const held = block === undefined ? undefined : TRANSITION_SWAP_DRIVER?.heldUpdate(slot, block);
+	const held = block === undefined ? undefined : TRANSITION_ROOT_DRIVER?.heldUpdate(slot, block);
 	return held === undefined ? slot.value : held.value;
 }
 
@@ -4585,7 +4624,7 @@ function commitRootRenders(): void {
 		try {
 			if (transaction.aborted || owner.disposed) {
 				if (owner.transaction === transaction) owner.transaction = null;
-				if (owner.transition !== undefined) TRANSITION_SWAP_DRIVER!.commitRoot(owner, transaction);
+				if (owner.transition !== undefined) TRANSITION_ROOT_DRIVER!.commitRoot(owner, transaction);
 				continue;
 			}
 			// This is the native acceptance point. Validate before any deletion,
@@ -4616,7 +4655,7 @@ function commitRootRenders(): void {
 			}
 			if (
 				transaction.rootRequest &&
-				(owner.transition === undefined || !TRANSITION_SWAP_DRIVER!.keepsRoot(owner))
+				(owner.transition === undefined || !TRANSITION_ROOT_DRIVER!.keepsRoot(owner))
 			) {
 				owner.wakeable = null;
 				owner.generation++;
@@ -4671,7 +4710,7 @@ function commitRootRenders(): void {
 			}
 			// Outgoing cleanup may have removed the state origin of a held root
 			// transition. Inspect its lifetime after those deletions have completed.
-			if (owner.transition !== undefined) TRANSITION_SWAP_DRIVER!.commitRoot(owner, transaction);
+			if (owner.transition !== undefined) TRANSITION_ROOT_DRIVER!.commitRoot(owner, transaction);
 		} finally {
 			finishStagedOwner?.();
 		}
@@ -4688,8 +4727,8 @@ function suspendRootRender(
 	const transaction = owner.transaction;
 	if (transaction === null) return false;
 	if (
-		TRANSITION_SWAP_DRIVER === null ||
-		!TRANSITION_SWAP_DRIVER.holdRoot(owner, transaction, attempt)
+		TRANSITION_ROOT_DRIVER === null ||
+		!TRANSITION_ROOT_DRIVER.holdRoot(owner, transaction, attempt)
 	) {
 		if (WARM_EVER && transaction.created !== null) {
 			// Only fresh subtrees are destroyed by this rollback. Their warm
@@ -4727,7 +4766,7 @@ function suspendRootRender(
 		queueMicrotask(() => {
 			if (owner.disposed || owner.generation !== generation || owner.wakeable !== wakeable) return;
 			owner.wakeable = null;
-			if (owner.transition === undefined || !TRANSITION_SWAP_DRIVER!.retryRoot(owner))
+			if (owner.transition === undefined || !TRANSITION_ROOT_DRIVER!.retryRoot(owner))
 				owner.retry();
 		});
 	};
@@ -7120,7 +7159,7 @@ interface StoreInst<T> {
 // Pending store-syncs to reconcile at the next commit (drained in commitEffects
 // after runLayoutEffects). Populated at RENDER time, so — like effects — pushes
 // during an off-screen (WIP) render are redirected into WIP_CAPTURE.stores and
-// spliced back only if that render commits (see renderOffscreen/commitOffscreen).
+// spliced back only if that render commits (see renderOffscreen/spliceWipCapture).
 const storeSyncQueue: StoreInst<any>[] = [];
 
 // Deferred ref attaches (React-19 timing parity). On mount the whole subtree is
@@ -7681,8 +7720,12 @@ interface ScheduledVisibilityDriver {
 	reveal: typeof attemptHiddenReveal;
 	hidePending: typeof hideTryContentAndMountPending;
 	visible: typeof renderVisibleTry;
-	rehide: typeof rehideActivityAfterDescendantRender;
-	retryActivity: typeof renderHiddenActivity;
+	// A hidden Activity's re-hide and re-render, set by activityBlock
+	// (ensureActivityVisibilityDriver) before it hides one. A Suspense boundary
+	// reaches them only through a hidden Activity it found, so roots that never
+	// render <Activity> do not retain them.
+	rehide: typeof rehideActivityAfterDescendantRender | null;
+	retryActivity: typeof renderHiddenActivity | null;
 }
 
 let SCHEDULED_VISIBILITY_DRIVER: ScheduledVisibilityDriver | null = null;
@@ -7694,9 +7737,17 @@ function ensureScheduledVisibilityDriver(): void {
 		reveal: attemptHiddenReveal,
 		hidePending: hideTryContentAndMountPending,
 		visible: renderVisibleTry,
-		rehide: rehideActivityAfterDescendantRender,
-		retryActivity: renderHiddenActivity,
+		rehide: null,
+		retryActivity: null,
 	};
+}
+
+/** activityBlock only: it is the one place an Activity becomes hidden. */
+function ensureActivityVisibilityDriver(): void {
+	ensureScheduledVisibilityDriver();
+	const driver = SCHEDULED_VISIBILITY_DRIVER!;
+	driver.rehide = rehideActivityAfterDescendantRender;
+	driver.retryActivity = renderHiddenActivity;
 }
 
 function holdsNativeRead(block: Block): boolean {
@@ -7810,15 +7861,16 @@ function drainQueue(): { err: any } | null {
 				continue;
 			}
 			if (hiddenActivity !== null && hiddenActivity.pendingThenable !== null) {
-				visibilityDriver!.retryActivity(hiddenActivity, true);
+				visibilityDriver!.retryActivity!(hiddenActivity, true);
 				continue;
 			}
-			// An urgent render can install its first Suspense driver. Pair both
-			// hooks with the same captured driver rather than rereading it after render.
-			const transitionSwap = TRANSITION_SWAP_DRIVER;
-			attempt = transitionSwap === null ? null : transitionSwap.begin(block);
+			// A render can start the first transition and install the driver. Pair
+			// both hooks with the same captured driver rather than rereading it after
+			// render.
+			const transitionRoot = TRANSITION_ROOT_DRIVER;
+			attempt = transitionRoot === null ? null : transitionRoot.begin(block);
 			try {
-				if (hiddenActivity !== null) visibilityDriver!.retryActivity(hiddenActivity, false, block);
+				if (hiddenActivity !== null) visibilityDriver!.retryActivity!(hiddenActivity, false, block);
 				else if (visibleTry !== null) visibilityDriver!.visible(visibleTry, block);
 				else {
 					const owner = block.idState.renderOwner;
@@ -7831,7 +7883,7 @@ function drainQueue(): { err: any } | null {
 					} else renderBlock(block);
 				}
 			} finally {
-				if (transitionSwap !== null) transitionSwap.end(attempt);
+				if (transitionRoot !== null) transitionRoot.end(attempt);
 			}
 		} catch (err) {
 			try {
@@ -7894,7 +7946,7 @@ function drainQueue(): { err: any } | null {
 	// the complete render wave, before refs or layout effects can observe it.
 	// No Activity update means no collection/allocation on the ordinary path.
 	if (activitiesToRehide !== null) {
-		for (const activity of activitiesToRehide) SCHEDULED_VISIBILITY_DRIVER!.rehide(activity);
+		for (const activity of activitiesToRehide) SCHEDULED_VISIBILITY_DRIVER!.rehide!(activity);
 	}
 	commitRootRenders();
 	NATIVE_TRANSITION_DRIVER?.flush();
@@ -11184,6 +11236,7 @@ class BlockImpl {
 	declare signalInstanceHasKey: boolean;
 	declare signalInstanceResolved: string | undefined;
 	declare signalTokenEscaped: boolean;
+	declare signalOwner: SignalRendererOwnerIdentity | false | null | undefined;
 	declare $$ctxValues: Map<Context<any>, any> | null;
 	// Contexts whose value this block's subtree consumes — stamped on this block
 	// AND its memo ancestors by useContextInternal. The TRANSITIVE signal: a
@@ -11339,6 +11392,7 @@ class BlockImpl {
 		this.signalInstanceHasKey = false;
 		this.signalInstanceResolved = undefined;
 		this.signalTokenEscaped = false;
+		this.signalOwner = undefined;
 	}
 }
 
@@ -11377,6 +11431,7 @@ class ScopeImpl {
 	declare signalInstanceHasKey: boolean;
 	declare signalInstanceResolved: string | undefined;
 	declare signalTokenEscaped: boolean;
+	declare signalOwner: SignalRendererOwnerIdentity | false | null | undefined;
 
 	constructor(parent: Scope, block: Block) {
 		this.block = block;
@@ -11400,6 +11455,7 @@ class ScopeImpl {
 		this.signalInstanceHasKey = false;
 		this.signalInstanceResolved = undefined;
 		this.signalTokenEscaped = false;
+		this.signalOwner = undefined;
 	}
 }
 
@@ -11450,28 +11506,46 @@ function captureRenderPhaseUpdate(cell: RenderPhaseCell, key: RenderPhaseSnapsho
 }
 
 export function renderBlock(block: Block): void {
-	let retryVisit: SignalRetryVisit | null = null;
-	if (signalDocumentEnabled || block.idState.renderOwner?.signalOwner !== undefined) {
-		const owner = scopeSignalOwner(block);
-		if (owner !== undefined) STREAMED_SIGNAL_OWNER_ACTIVATOR?.(owner);
-		if (owner !== undefined && currentSignalOwner() !== owner) {
-			runWithSignalOwner(owner, () => renderBlock(block));
-			return;
-		}
-		retryVisit = takeSignalRetryVisit(block);
-	}
 	const hydration = hydrating ? activeHydration() : null;
 	// A replacement dynamic range owns client DOM even while its parent adopts
 	// server siblings. Fresh control-flow markers can instead be replay scaffolding
 	// whose body must still read the server rejection seed before adopting a catch.
-	if (
+	const rebuild =
 		hydration !== null &&
 		(!hydration.owns(block) ||
-			(block.kind === 'dynamic' && block.endMarker !== null && hydration.rebuilds(block.endMarker)))
-	) {
+			(block.kind === 'dynamic' &&
+				block.endMarker !== null &&
+				hydration.rebuilds(block.endMarker)));
+	let retryVisit: SignalRetryVisit | null = null;
+	// The synchronous owner this call replaced, or undefined when the block
+	// renders in its caller's owner frame.
+	let previousSignalOwner: SignalOwner | null | undefined;
+	if (signalDocumentEnabled || block.idState.renderOwner?.signalOwner !== undefined) {
+		const owner = scopeSignalOwner(block);
+		if (owner !== undefined) {
+			STREAMED_SIGNAL_OWNER_ACTIVATOR?.(owner);
+			// Every block has an owner of its own, so nearly every render changes
+			// owner. Enter it in place: a callback frame would allocate a closure and
+			// resolve the same owner a second time on re-entry. A host carrier owns
+			// its execution boundary, and a root given an owner without the signal
+			// document has no in-place frame, so both keep the callback frame. A
+			// rebuilt block enters its owner in the nested client build below.
+			if (
+				!rebuild &&
+				currentSignalOwner() !== owner &&
+				(signalOwnerFrame === undefined ||
+					(previousSignalOwner = signalOwnerFrame.enter(owner)) === undefined)
+			) {
+				runWithSignalOwner(owner, () => renderBlock(block));
+				return;
+			}
+		}
+		retryVisit = takeSignalRetryVisit(block);
+	}
+	if (rebuild) {
 		// The nested client build renders this block, so it takes the retry visit.
 		SIGNAL_RETRY_VISIT = retryVisit;
-		hydration.suspend(() => renderBlock(block));
+		hydration!.suspend(() => renderBlock(block));
 		return;
 	}
 	const previousOwner = renderPhaseOwner;
@@ -11533,6 +11607,7 @@ export function renderBlock(block: Block): void {
 	} finally {
 		renderPhaseOwner = previousOwner;
 		renderPhaseUpdates = previousUpdates;
+		if (previousSignalOwner !== undefined) signalOwnerFrame!.restore(previousSignalOwner);
 	}
 }
 
@@ -11682,7 +11757,7 @@ function renderBlockInner(block: Block): true | undefined {
 		block.pendingMode === 'transition' &&
 		continuesParentTree &&
 		prevBlock!.currentRenderMode === 'urgent'
-			? TRANSITION_SWAP_DRIVER
+			? TRANSITION_ROOT_DRIVER
 			: null;
 	const urgentTransitionRender: UrgentTransitionRender | null =
 		urgentTransitionDriver === null
@@ -12713,7 +12788,7 @@ function unmountBlockInner(block: Block, detachDom: boolean): void {
 		owner.generation++;
 		owner.wakeable = null;
 		owner.request = null;
-		if (owner.transition !== undefined) TRANSITION_SWAP_DRIVER!.discardRoot(owner);
+		if (owner.transition !== undefined) TRANSITION_ROOT_DRIVER!.discardRoot(owner);
 	}
 	// An installed ViewTransition driver unregisters eagerly (its wrapped flush
 	// also prunes lazily; the disposed stamp above drives exit detection).
@@ -12899,7 +12974,7 @@ function runScopeCleanups(scope: Scope, retireUnowned: boolean): void {
 				reportTeardownError(err);
 			}
 		}
-	const signalOwner = SCOPE_SIGNAL_OWNERS.get(scope);
+	const signalOwner = scope.signalOwner;
 	if (signalOwner) {
 		if (RETAINED_SIGNAL_OWNERS?.owners.has(signalOwner)) return;
 		// Deferred cleanups must still resolve facade reads in this exact owner.
@@ -12907,14 +12982,14 @@ function runScopeCleanups(scope: Scope, retireUnowned: boolean): void {
 		if (
 			STAGED_COMMIT_CAPTURE !== null &&
 			DEFERRED_LAYOUT_DRIVER!.stageAction(() => {
-				if (retireUnowned) SCOPE_SIGNAL_OWNERS.set(scope, null);
-				else SCOPE_SIGNAL_OWNERS.delete(scope);
+				if (retireUnowned) scope.signalOwner = null;
+				else scope.signalOwner = undefined;
 				retireRendererSignalOwner(signalOwner);
 			}, true)
 		)
 			return;
-		if (retireUnowned) SCOPE_SIGNAL_OWNERS.set(scope, null);
-		else SCOPE_SIGNAL_OWNERS.delete(scope);
+		if (retireUnowned) scope.signalOwner = null;
+		else scope.signalOwner = undefined;
 		retireRendererSignalOwner(signalOwner);
 	} else if (
 		retireUnowned &&
@@ -12932,11 +13007,11 @@ function runScopeCleanups(scope: Scope, retireUnowned: boolean): void {
 function retireUnownedSignalScope(scope: Scope): void {
 	// Resolve at publication, after deferred cleanups which may read the first
 	// handle. Null records retirement without allocating speculative authority.
-	const owner = SCOPE_SIGNAL_OWNERS.get(scope);
+	const owner = scope.signalOwner;
 	if (owner === false || (owner === undefined && scope.signalTokenEscaped))
-		SCOPE_SIGNAL_OWNERS.set(scope, null);
+		scope.signalOwner = null;
 	else if (owner) {
-		SCOPE_SIGNAL_OWNERS.set(scope, null);
+		scope.signalOwner = null;
 		retireRendererSignalOwner(owner);
 	}
 }
@@ -13257,7 +13332,7 @@ function readStateHook<T>(
 						s!.renderTransition !== undefined ||
 						(typeof next === 'function' &&
 							TRANSITION_PENDING_COUNT > 0 &&
-							TRANSITION_SWAP_DRIVER?.hasHeld(s!, block)) ||
+							TRANSITION_ROOT_DRIVER?.hasHeld(s!, block)) ||
 						(block.pending && typeof next === 'function')) &&
 					transitionActionBatchForUpdate() === null
 				) {
@@ -13291,7 +13366,7 @@ function readStateHook<T>(
 					s!.pendingActionBatch !== undefined ||
 					(block.pending && typeof next === 'function');
 				if (Object.is(computed, previous) && !forceRender) {
-					if (typeof next !== 'function' && TRANSITION_SWAP_DRIVER?.cancelEqual(s!, block)) {
+					if (typeof next !== 'function' && TRANSITION_ROOT_DRIVER?.cancelEqual(s!, block)) {
 						scheduleRender(block);
 					}
 					return;
@@ -13342,7 +13417,7 @@ function readStateHook<T>(
 	if (s.renderTransition !== undefined || s.updates !== undefined) {
 		const value = readQueuedState(s);
 		if (!s.urgentTransition && s.updates !== undefined && Object.is(value, s.value))
-			TRANSITION_SWAP_DRIVER?.rebaseHeld(s, block, s.updates);
+			TRANSITION_ROOT_DRIVER?.rebaseHeld(s, block, s.updates);
 		s.value = value;
 		if (!s.urgentTransition) {
 			if (s.renderTransition !== undefined) {
@@ -13399,7 +13474,7 @@ function captureTransitionHookQueue<T>(
 	cell: StateSlot<T> | ReducerSlot<T, any>,
 ): void {
 	update.replayBaseValue = cell.value;
-	const previous = cell.renderTransition ?? TRANSITION_SWAP_DRIVER?.heldUpdate(cell, update.block);
+	const previous = cell.renderTransition ?? TRANSITION_ROOT_DRIVER?.heldUpdate(cell, update.block);
 	if (previous !== undefined) {
 		update.previous = previous;
 		previous.next = update;
@@ -13965,7 +14040,7 @@ function readReducerHook<S, A, I>(
 		if (s.renderTransition !== undefined || s.renderPhaseActions !== undefined) {
 			const value = readQueuedReducer(s);
 			if (!s.urgentTransition && s.renderPhaseActions !== undefined && Object.is(value, s.value))
-				TRANSITION_SWAP_DRIVER?.rebaseHeld(s, block, s.renderPhaseActions, reducer);
+				TRANSITION_ROOT_DRIVER?.rebaseHeld(s, block, s.renderPhaseActions, reducer);
 			s.value = value;
 			if (!s.urgentTransition) {
 				if (s.renderTransition !== undefined) {
@@ -22434,7 +22509,8 @@ class HydrationCapability {
 	 * attributes (allowAttribute). Comparing canonical cssText, through a
 	 * detached CSSOM, treats equivalent spellings (`#fff` and rgb(), compact
 	 * whitespace) as equal, while it still finds reordered, missing, added and
-	 * empty declarations.
+	 * empty declarations. What an early host binding published there, single
+	 * declarations or the whole style, is the server's now.
 	 */
 	keepsStyle(
 		el: HTMLElement | SVGElement,
@@ -22474,8 +22550,10 @@ class HydrationCapability {
 		}
 		const expected = expectedStyle.cssText;
 		if (
-			server !== expected ||
-			(STAGED_DOM?.view(el) ?? el).hasAttribute('style') !== (expected !== '')
+			(server !== expected ||
+				(STAGED_DOM?.view(el) ?? el).hasAttribute('style') !== (expected !== '')) &&
+			// So is a whole style that one published.
+			claims?.get('style') !== server
 		)
 			this.unpatched(el, 'style', server, expected);
 		return true;
@@ -23847,14 +23925,32 @@ export function presentationWrite<T>(
 	if (kind === 'nativeStyleBinding' || kind === 'nativeProjectionBinding') {
 		const [owner, slot, el] = args;
 		const style = kind === 'nativeStyleBinding';
+		const current = owner.slots[slot] as NativeStyleBinding | undefined;
 		try {
-			nativePresentationBinding(
-				owner,
-				slot,
-				el,
-				style ? preparedNativeStyleBody : preparedNativeProjectionBody,
-				style ? { el, value: args[3], frame } : { el, compute: args[3], fields: args[4], frame },
-			);
+			if (
+				style &&
+				(current === undefined || current.block === null) &&
+				isScalarNativeStyle(args[3], args[4])
+			) {
+				// No native read to witness or subscribe: prepare the takeover write
+				// exactly as a plain style write does, without an owning Block.
+				writeScalarNativeStyle(
+					owner,
+					slot,
+					current,
+					el,
+					__normalizeBindingStyle(args[3]),
+					(host, value) =>
+						preparePresentationOperation(frame, host, 'style', () => setStyle(host, value, '')),
+				);
+			} else
+				nativePresentationBinding(
+					owner,
+					slot,
+					el,
+					style ? preparedNativeStyleBody : preparedNativeProjectionBody,
+					style ? { el, value: args[3], frame } : { el, compute: args[3], fields: args[4], frame },
+				);
 		} finally {
 			if (frame.hostSuccessors !== undefined) {
 				const binding = owner.slots[slot] as NativeStyleBinding | undefined;
@@ -24330,9 +24426,16 @@ export function hydrateClaimedBindingCaches(
 				? (STAGED_DOM?.view(element as HTMLElement) ?? (element as HTMLElement)).style.cssText
 				: CLAIMED_BINDING_VALUE;
 		if (typeof field === 'number') {
-			const slots = (scope.slots[field] as NativeStyleBinding).block!.slots;
-			journalRootProperty(slots, 0, slots[0]);
-			slots[0] = value;
+			// A scalar native style has no Block and caches its last write itself.
+			const binding = scope.slots[field] as NativeStyleBinding;
+			if (binding.block === null) {
+				journalRootProperty(binding, 'style', binding.style);
+				binding.style = value;
+			} else {
+				const slots = binding.block.slots;
+				journalRootProperty(slots, 0, slots[0]);
+				slots[0] = value;
+			}
 		} else {
 			const cached = bag[field];
 			if (cached?.[DIRECT_SIGNAL_BINDING] === true) {
@@ -24780,10 +24883,7 @@ function bindDirectSignal(
 			? (previous as DirectSignalBinding)
 			: null;
 	const handle = isSignalHandle(value) ? value : null;
-	if (
-		handle !== null &&
-		(!signalDocumentEnabled || currentSignalOwner() !== SCOPE_SIGNAL_OWNERS.get(scope))
-	) {
+	if (handle !== null && (!signalDocumentEnabled || currentSignalOwner() !== scope.signalOwner)) {
 		// A prop/callback can reveal the first handle midway through a render.
 		// Enter its already-stamped scope for both the initial read and subscribe;
 		// the ambient render frame may have started before document activation.
@@ -28803,7 +28903,7 @@ export function setEventHandler(el: Element, key?: string, handler?: any, foreig
 			(signalDocumentEnabled || CURRENT_SCOPE?.block.idState.renderOwner?.signalOwner !== undefined
 				? CURRENT_SCOPE === null
 					? currentSignalOwner()
-					: SCOPE_SIGNAL_OWNERS.get(CURRENT_SCOPE) || CURRENT_SCOPE
+					: CURRENT_SCOPE.signalOwner || CURRENT_SCOPE
 				: CURRENT_SCOPE);
 		if (owner !== null) {
 			// Mark that a scope token escaped before queuing publication. A staged
@@ -34610,8 +34710,8 @@ function renderOffscreen(
 
 // Splice a COMPLETED off-screen WIP's captured effects/refs/store-syncs back into the
 // live queues so the surrounding commit drains them (child-first, now that the WIP's
-// nodes are connected). Shared by every commit site — commitOffscreen (childSlot, which
-// also DOM-moves the range) and the componentSlot / renderBranchSlot commit branches
+// nodes are connected). Shared by every commit site — childSlot (which also DOM-moves
+// the range, moveOffscreenRange) and the componentSlot / renderBranchSlot commit branches
 // (which adopt the WIP's markers in place, so no DOM move is needed).
 
 function spliceOffscreenCapture(capture: OffscreenCapture, deferredNativeAcceptance = false): void {
@@ -34706,14 +34806,6 @@ function moveOffscreenRange(wip: OffscreenWip, beforeNode: Node): void {
 		if (n === wip.end) break;
 		n = next;
 	}
-}
-
-// Commit a COMPLETED off-screen WIP: move its node range into final position (before
-// `beforeNode`) and splice its captured effects/refs back into the live queues so the
-// surrounding commit drains them (child-first, now that the nodes are connected).
-function commitOffscreen(wip: OffscreenWip, beforeNode: Node): void {
-	moveOffscreenRange(wip, beforeNode);
-	spliceWipCapture(wip);
 }
 
 // Discard an off-screen WIP (suspended or superseded): remove its node range + fire any
@@ -40884,7 +40976,7 @@ export function tryBlock(
 	// disposing browser-owned state, then either commit it or show @pending while
 	// the old arm stays connected and hidden.
 	if (pendingBody !== null) {
-		ensureTransitionSwapDriver();
+		ensureOffscreenSwapDriver();
 		ensureScheduledVisibilityDriver();
 	}
 	const parentBlock = parentScope.block;
@@ -41084,7 +41176,7 @@ function renderVisibleTry(state: TrySlot, source?: Block): void {
 				CURRENT_BLOCK !== null &&
 				CURRENT_BLOCK.currentRenderMode === 'urgent' &&
 				blockIsAncestor(CURRENT_BLOCK, block) &&
-				TRANSITION_SWAP_DRIVER !== null))
+				TRANSITION_ROOT_DRIVER !== null))
 			? snapshotSubtreeEffectDeps(block)
 			: null;
 	const refDetachCheckpoint = refDetachQueue.length;
@@ -42546,7 +42638,7 @@ function commitResumeInner(state: TrySlot): void {
 		// the LAYOUT queue stays non-empty and the scheduler never goes quiescent.
 		if (!deferringStagedRevealEffects) commitEffects();
 	} finally {
-		if (hiddenActivity !== null) rehideActivityAfterDescendantRender(hiddenActivity);
+		if (hiddenActivity !== null) SCHEDULED_VISIBILITY_DRIVER!.rehide!(hiddenActivity);
 		if (releaseHeld) {
 			tickTransitionCount(-1);
 			releaseTransitionHookHolder(state);
@@ -42857,7 +42949,7 @@ function attemptHiddenReveal(
 		attemptHiddenRevealInner(state, scheduledMode, reason);
 	} finally {
 		RESUME_REPLAY = previousReplay;
-		if (hiddenActivity !== null) rehideActivityAfterDescendantRender(hiddenActivity);
+		if (hiddenActivity !== null) SCHEDULED_VISIBILITY_DRIVER!.rehide!(hiddenActivity);
 	}
 }
 
@@ -45614,7 +45706,7 @@ export function activityBlock(
 			}
 		}
 	}
-	if (mode === 'hidden') ensureScheduledVisibilityDriver();
+	if (mode === 'hidden') ensureActivityVisibilityDriver();
 	const parentBlock = parentScope.block;
 	const hydration = hydrating ? activeHydration() : null;
 	const wantHidden = mode === 'hidden';
@@ -49869,9 +49961,9 @@ function makeRoot(
 				!rootBlock.disposed &&
 				currentBody === body &&
 				Object.is(currentKey, nextKey) &&
-				TRANSITION_SWAP_DRIVER!.keepsRoot(renderOwner, true);
+				TRANSITION_ROOT_DRIVER!.keepsRoot(renderOwner, true);
 			if (!keepTransition) {
-				if (renderOwner.transition !== undefined) TRANSITION_SWAP_DRIVER!.discardRoot(renderOwner);
+				if (renderOwner.transition !== undefined) TRANSITION_ROOT_DRIVER!.discardRoot(renderOwner);
 				renderOwner.generation++;
 				renderOwner.wakeable = null;
 			}
@@ -49946,7 +50038,7 @@ function makeRoot(
 			renderOwner.nativeRetry?.clear();
 			if (renderOwner.retrySignalOwners !== undefined) clearSignalRetryOwners(renderOwner);
 			renderOwner.retry = noop;
-			if (renderOwner.transition !== undefined) TRANSITION_SWAP_DRIVER!.discardRoot(renderOwner);
+			if (renderOwner.transition !== undefined) TRANSITION_ROOT_DRIVER!.discardRoot(renderOwner);
 			renderOwner.generation++;
 			renderOwner.wakeable = null;
 			renderOwner.request = null;

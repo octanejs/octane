@@ -50,10 +50,12 @@ function directoryState(rawSearch: Record<string, unknown>): DirectoryState {
 	return {
 		q: stringParam(rawSearch.q),
 		kind,
-		category: kind !== 'integration' && typeof rawSearch.category === 'string' &&
-		VALID_CATEGORIES.has(rawSearch.category)
-			? rawSearch.category
-			: '',
+		category:
+			kind !== 'integration' &&
+			typeof rawSearch.category === 'string' &&
+			VALID_CATEGORIES.has(rawSearch.category)
+				? rawSearch.category
+				: '',
 	};
 }
 
@@ -84,15 +86,16 @@ function directorySections(entities: EcosystemEntity[], searching: boolean): Dir
 		sections.push({
 			id: 'framework-integrations',
 			title: 'Framework integrations',
-			description: 'Connect Octane to the app framework that owns routing, rendering, and production builds.',
+			description:
+				'Connect Octane to the app framework that owns routing, rendering, and production builds.',
 			entities: integrations.sort((left, right) => left.title.localeCompare(right.title)),
 			layout: 'binding-card',
 		});
 	}
 	for (const category of CATEGORIES) {
-		const bindings = entities.filter(
-			(entity) => entity.kind === 'library-binding' && entity.categoryId === category.id,
-		).sort((left, right) => left.title.localeCompare(right.title));
+		const bindings = entities
+			.filter((entity) => entity.kind === 'library-binding' && entity.categoryId === category.id)
+			.sort((left, right) => left.title.localeCompare(right.title));
 		if (bindings.length) sections.push({ ...category, entities: bindings, layout: 'binding-card' });
 	}
 	return sections;
@@ -120,10 +123,9 @@ export function EcosystemDirectory() @{
 	const filters = { kind, category };
 	const searching = query.trim().length >= 2;
 	const queryTooShort = query.trim().length === 1;
-	const visible =
-		searching
-			? searchEcosystem(ENTITIES, query, filters).map((match) => match.entity)
-			: filterEcosystemEntities(ENTITIES, filters);
+	const visible = searching
+		? searchEcosystem(ENTITIES, query, filters).map((match) => match.entity)
+		: filterEcosystemEntities(ENTITIES, filters);
 	const sections = directorySections(visible, searching);
 	const hasSelection = Boolean(query || kind || category);
 
@@ -598,15 +600,27 @@ export function EcosystemDirectory() @{
 			<div class="ecosystem-results-bar" aria-live="polite">
 				<p class="ecosystem-results-summary">
 					@if (searching) {
-						<span>{visible.length + (visible.length === 1 ? ' result' : ' results') + ' for “' +
-							query.trim() +
-							'”' as string}</span>
+						<span>
+							{
+								(visible.length +
+									(visible.length === 1 ? ' result' : ' results') +
+									' for “' +
+									query.trim() +
+									'”') as string
+							}
+						</span>
 					} @else if (queryTooShort) {
-						<span>{visible.length + (visible.length === 1 ? ' package' : ' packages') +
-							' · enter at least 2 characters to search' as string}</span>
+						<span>
+							{
+								(visible.length +
+									(visible.length === 1 ? ' package' : ' packages') +
+									' · enter at least 2 characters to search') as string
+							}
+						</span>
 					} @else {
-						<span>{visible.length +
-							(visible.length === 1 ? ' package' : ' packages') as string}</span>
+						<span>
+							{(visible.length + (visible.length === 1 ? ' package' : ' packages')) as string}
+						</span>
 					}
 				</p>
 				@if (hasSelection) {
@@ -623,7 +637,7 @@ export function EcosystemDirectory() @{
 						@for (const option of CATEGORIES; key option.id) {
 							<a href={'#ecosystem-section-' + option.id}>
 								<span>{option.title as string}</span>
-								<small>{option.count + '' as string}</small>
+								<small>{(option.count + '') as string}</small>
 							</a>
 						}
 					</div>
@@ -639,10 +653,9 @@ export function EcosystemDirectory() @{
 						>
 							<header class="ecosystem-section-header">
 								<div>
-									<h3
-										id={'ecosystem-section-' + section.id}
-										class="ecosystem-section-heading"
-									>{section.title as string}</h3>
+									<h3 id={'ecosystem-section-' + section.id} class="ecosystem-section-heading">
+										{section.title as string}
+									</h3>
 									<p>{section.description as string}</p>
 								</div>
 								<span class="ecosystem-count">{sectionCount(section) as string}</span>
@@ -652,13 +665,15 @@ export function EcosystemDirectory() @{
 									@for (const entity of section.entities; key entity.id) {
 										<li
 											id={entity.id}
-											class={'ecosystem-entity ' +
+											class={
+												'ecosystem-entity ' +
 												(entity.kind === 'library-binding'
 													? 'ecosystem-binding-item'
-													: 'ecosystem-integration-item')}
-											data-binding-title={entity.kind === 'library-binding'
-												? entity.title
-												: undefined}
+													: 'ecosystem-integration-item')
+											}
+											data-binding-title={
+												entity.kind === 'library-binding' ? entity.title : undefined
+											}
 										>
 											<a
 												class="binding-link"

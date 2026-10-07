@@ -20,30 +20,29 @@ type DivAttributes = Octane.HTMLAttributes<HTMLDivElement>;
  * set ARIA properties. The camelCase `aria*` props (such as `ariaLabel`) are
  * also accepted but are retained only for backwards compatibility.
  */
-export type ContentEditableElementProps =
-	{
-		editor: LexicalEditor;
-		ariaActiveDescendant?: DivAttributes['aria-activedescendant'];
-		ariaAutoComplete?: DivAttributes['aria-autocomplete'];
-		ariaControls?: DivAttributes['aria-controls'];
-		ariaDescribedBy?: DivAttributes['aria-describedby'];
-		ariaErrorMessage?: DivAttributes['aria-errormessage'];
-		ariaExpanded?: DivAttributes['aria-expanded'];
-		ariaInvalid?: DivAttributes['aria-invalid'];
-		ariaLabel?: DivAttributes['aria-label'];
-		ariaLabelledBy?: DivAttributes['aria-labelledby'];
-		ariaMultiline?: DivAttributes['aria-multiline'];
-		ariaOwns?: DivAttributes['aria-owns'];
-		ariaRequired?: DivAttributes['aria-required'];
-		autoCapitalize?: HTMLDivElement['autocapitalize'];
-		'data-testid'?: string | null | undefined;
-		// Octane ref shapes (no forwardRef): callback or ref object.
-		ref?: ((el: HTMLDivElement | null) => void) | { current: HTMLDivElement | null };
-		// Consumed (excluded from the `rest` passthrough) but never rendered —
-		// upstream omits `placeholder` from the accepted div attributes; the octane
-		// port receives it via `<ContentEditable {...props}>`'s spread instead.
-		placeholder?: unknown;
-	} & Omit<Octane.JSX.IntrinsicElements['div'], 'ref' | 'placeholder'>;
+export type ContentEditableElementProps = {
+	editor: LexicalEditor;
+	ariaActiveDescendant?: DivAttributes['aria-activedescendant'];
+	ariaAutoComplete?: DivAttributes['aria-autocomplete'];
+	ariaControls?: DivAttributes['aria-controls'];
+	ariaDescribedBy?: DivAttributes['aria-describedby'];
+	ariaErrorMessage?: DivAttributes['aria-errormessage'];
+	ariaExpanded?: DivAttributes['aria-expanded'];
+	ariaInvalid?: DivAttributes['aria-invalid'];
+	ariaLabel?: DivAttributes['aria-label'];
+	ariaLabelledBy?: DivAttributes['aria-labelledby'];
+	ariaMultiline?: DivAttributes['aria-multiline'];
+	ariaOwns?: DivAttributes['aria-owns'];
+	ariaRequired?: DivAttributes['aria-required'];
+	autoCapitalize?: HTMLDivElement['autocapitalize'];
+	'data-testid'?: string | null | undefined;
+	// Octane ref shapes (no forwardRef): callback or ref object.
+	ref?: ((el: HTMLDivElement | null) => void) | { current: HTMLDivElement | null };
+	// Consumed (excluded from the `rest` passthrough) but never rendered —
+	// upstream omits `placeholder` from the accepted div attributes; the octane
+	// port receives it via `<ContentEditable {...props}>`'s spread instead.
+	placeholder?: unknown;
+} & Omit<Octane.JSX.IntrinsicElements['div'], 'ref' | 'placeholder'>;
 
 // Props consumed by name — everything else flows through to the <div> via `rest`.
 const NAMED_PROPS = new Set([
@@ -77,15 +76,18 @@ export function ContentEditableElement(props: ContentEditableElementProps) @{
 	const editor = props.editor;
 	const [isEditable, setEditable] = useState(editor.isEditable());
 
-	const handleRef = useCallback((rootElement: HTMLDivElement | null) => {
-		// defaultView is required for a root element. In multi-window setups it may
-		// not exist at certain points.
-		if (rootElement && rootElement.ownerDocument && rootElement.ownerDocument.defaultView) {
-			editor.setRootElement(rootElement);
-		} else {
-			editor.setRootElement(null);
-		}
-	}, [editor]);
+	const handleRef = useCallback(
+		(rootElement: HTMLDivElement | null) => {
+			// defaultView is required for a root element. In multi-window setups it may
+			// not exist at certain points.
+			if (rootElement && rootElement.ownerDocument && rootElement.ownerDocument.defaultView) {
+				editor.setRootElement(rootElement);
+			} else {
+				editor.setRootElement(null);
+			}
+		},
+		[editor],
+	);
 
 	useLayoutEffect(() => {
 		setEditable(editor.isEditable());
@@ -94,8 +96,7 @@ export function ContentEditableElement(props: ContentEditableElementProps) @{
 		});
 	}, [editor]);
 
-	const role =
-		props.role != null ? props.role : 'textbox';
+	const role = props.role != null ? props.role : 'textbox';
 	const rest: Record<string, any> = {};
 	for (const k in props) {
 		if (!NAMED_PROPS.has(k)) {
@@ -114,29 +115,33 @@ export function ContentEditableElement(props: ContentEditableElementProps) @{
 	// (`tabIndex` via ATTRIBUTE_ALIASES, the rest via HTML's case-insensitive
 	// setAttribute).
 	<div
-		ref={props.ref != null
-			? // Octane's runtime accepts an array of refs natively; the checker's
-				// merged-ref signature only models the single-ref forms, so the
-				// dynamic array branch needs a type-level cast.
-				[props.ref, handleRef] as unknown as typeof handleRef
-			: handleRef}
+		ref={
+			props.ref != null
+				? // Octane's runtime accepts an array of refs natively; the checker's
+					// merged-ref signature only models the single-ref forms, so the
+					// dynamic array branch needs a type-level cast.
+					([props.ref, handleRef] as unknown as typeof handleRef)
+				: handleRef
+		}
 		aria-activedescendant={isEditable ? props.ariaActiveDescendant : undefined}
 		aria-autocomplete={isEditable ? props.ariaAutoComplete : 'none'}
 		aria-controls={isEditable ? props.ariaControls : undefined}
 		aria-describedby={props.ariaDescribedBy}
 		aria-errormessage={props.ariaErrorMessage != null ? props.ariaErrorMessage : undefined}
-		aria-expanded={isEditable && role === 'combobox'
-			? String(!!props.ariaExpanded) as 'true' | 'false'
-			: undefined}
+		aria-expanded={
+			isEditable && role === 'combobox'
+				? (String(!!props.ariaExpanded) as 'true' | 'false')
+				: undefined
+		}
 		aria-invalid={props.ariaInvalid != null ? props.ariaInvalid : undefined}
 		aria-label={props.ariaLabel}
 		aria-labelledby={props.ariaLabelledBy}
 		aria-multiline={props.ariaMultiline}
 		aria-owns={isEditable ? props.ariaOwns : undefined}
 		aria-readonly={isEditable ? undefined : 'true'}
-		aria-required={props.ariaRequired != null
-			? String(props.ariaRequired) as 'true' | 'false'
-			: undefined}
+		aria-required={
+			props.ariaRequired != null ? (String(props.ariaRequired) as 'true' | 'false') : undefined
+		}
 		autoCapitalize={props.autoCapitalize}
 		contentEditable={isEditable ? 'true' : 'false'}
 		data-testid={props['data-testid']}

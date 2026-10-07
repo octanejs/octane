@@ -3,7 +3,9 @@ import { useCounter } from '@octanejs/mantine-hooks';
 
 function Counter() @{
 	const [count, actions] = useCounter(2, { min: 0, max: 3 });
-	<button id="minimal-mantine-counter" onClick={() => actions.set(3)}>{count as string}</button>
+	<button id="minimal-mantine-counter" onClick={() => actions.set(3)}>
+		{count as string}
+	</button>
 }
 
 export async function run(container: HTMLElement) {

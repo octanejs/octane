@@ -7,7 +7,9 @@ function SearchPanel({ title }: { title: string }) @{
 		<input type="search" aria-label={`Search ${title}`} />
 		<button
 			onClick={() => document.querySelector<HTMLInputElement>('input[type="search"]')!.focus()}
-		>{'Focus search'}</button>
+		>
+			{'Focus search'}
+		</button>
 	</section>
 }
 

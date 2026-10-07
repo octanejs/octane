@@ -8,14 +8,16 @@ export function CodeBlock(props: CodeBlockProps) {
 	const { code, lang, title } = extractCodeBlockData(props);
 
 	if (lang === 'mermaid') {
-		return <MermaidBlock
-			className={props.className}
-			code={code}
-			isEmbedded={props.isEmbedded}
-			showTypeCopyButton={props.showTypeCopyButton}
-			style={props.style}
-			title={title}
-		/>;
+		return (
+			<MermaidBlock
+				className={props.className}
+				code={code}
+				isEmbedded={props.isEmbedded}
+				showTypeCopyButton={props.showTypeCopyButton}
+				style={props.style}
+				title={title}
+			/>
+		);
 	}
 
 	return <HighlightedCodeBlock code={code} lang={lang} props={props} title={title} />;
@@ -36,14 +38,16 @@ function HighlightedCodeBlock({
 		return renderCodeBlockData({ code, lang, title });
 	}, [code, lang, title]);
 
-	return <CodeBlockView
-		className={props.className}
-		copyText={rendered.copyText}
-		htmlMarkup={rendered.htmlMarkup}
-		isEmbedded={props.isEmbedded}
-		lang={rendered.lang}
-		showTypeCopyButton={props.showTypeCopyButton}
-		style={props.style}
-		title={rendered.title}
-	/>;
+	return (
+		<CodeBlockView
+			className={props.className}
+			copyText={rendered.copyText}
+			htmlMarkup={rendered.htmlMarkup}
+			isEmbedded={props.isEmbedded}
+			lang={rendered.lang}
+			showTypeCopyButton={props.showTypeCopyButton}
+			style={props.style}
+			title={rendered.title}
+		/>
+	);
 }

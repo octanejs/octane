@@ -49,7 +49,7 @@
   "affectedInputsSha256": {
     "index.html": "e73beec0d39ba2fea3c08e5a5f50d44bbdefb87102c54e1bbf636898d0616a3b",
     "main.ts": "f3c7bebea73771907d0ddb967977a7f313709ad739757c74bd38a6c00e407991",
-    "root-suspension.tsrx": "ec698e7c0311c73c128cfb2456aa143acfc0c0d27630ff38b074033021413532"
+    "root-suspension.tsrx": "138e66aacfe350fd869488a2882cedd88c118b447df89a8db3f5f3c8c29ac2ec"
   },
   "affectedAssetsSha256": {
     "assets/index-CcMdRmU_.js": "1cf331b92b031097c6c2292a5e655a2357f4f0ce7e3abaaa84701a9aba4a7a7c"

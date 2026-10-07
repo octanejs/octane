@@ -181,7 +181,8 @@ export const Route = createRootRoute({
 			},
 			{
 				name: 'description',
-				content: 'Octane — React\'s programming model, compiled ahead of time. No VDOM, no rules of hooks.',
+				content:
+					"Octane — React's programming model, compiled ahead of time. No VDOM, no rules of hooks.",
 			},
 			{ title: DEFAULT_TITLE },
 			{
@@ -198,7 +199,7 @@ export const Route = createRootRoute({
 			},
 			{
 				property: 'og:description',
-				content: 'React\'s programming model, compiled ahead of time. No VDOM, no rules of hooks.',
+				content: "React's programming model, compiled ahead of time. No VDOM, no rules of hooks.",
 			},
 			{
 				property: 'og:image',
@@ -214,7 +215,7 @@ export const Route = createRootRoute({
 			},
 			{
 				property: 'og:image:alt',
-				content: 'Octane — React\'s programming model, compiled ahead of time',
+				content: "Octane — React's programming model, compiled ahead of time",
 			},
 			{
 				name: 'twitter:card',

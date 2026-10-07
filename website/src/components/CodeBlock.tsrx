@@ -177,16 +177,16 @@ export function CodeBlock(props: CodeBlockProps) @{
 								style={'--icon:url("' + (copied ? checkUrl : copyUrl) + '")'}
 								aria-hidden="true"
 							></span>
-							<span>
-								{copied ? 'Copied' : 'Copy'}
-							</span>
+							<span>{copied ? 'Copied' : 'Copy'}</span>
 						</button>
 					}
 				</div>
 			}
 
 			<div class="codeblock-body">
-				<div class="codeblock-code" ref={codeEl}>{props.children}</div>
+				<div class="codeblock-code" ref={codeEl}>
+					{props.children}
+				</div>
 				@if (showFloatCopy) {
 					<button
 						type="button"
@@ -199,9 +199,7 @@ export function CodeBlock(props: CodeBlockProps) @{
 							style={'--icon:url("' + (copied ? checkUrl : copyUrl) + '")'}
 							aria-hidden="true"
 						></span>
-						<span>
-							{copied ? 'Copied' : 'Copy'}
-						</span>
+						<span>{copied ? 'Copied' : 'Copy'}</span>
 					</button>
 				}
 				{props.footer}

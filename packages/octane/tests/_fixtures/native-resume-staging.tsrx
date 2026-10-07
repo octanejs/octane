@@ -25,7 +25,9 @@ function StagedAsyncValue(props: StagedResource & { log: (entry: string) => void
 		ref={(node: HTMLParagraphElement | null) => {
 			props.log('ref:' + value + ':' + (node === null ? 'detach' : 'attach'));
 		}}
-	>{value}</p>
+	>
+		{value}
+	</p>
 }
 
 export function StagedNativeResume(props: StagedResource & { log: (entry: string) => void }) @{
