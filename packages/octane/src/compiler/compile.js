@@ -23151,6 +23151,13 @@ function rewriteTsrxBlocks(
  * plus the function's own. A missing name is left out of the tuple and the
  * hoisted arm reads it as a free identifier.
  *
+ * The function's own name is one of them. In `memo(function Counter() @{ … })`
+ * it is bound only inside the function, and a declaration in a nested block of
+ * the enclosing setup is not one of that body's top-level locals, so an arm that
+ * renders `<Counter />` must receive it like any other local. Module-level
+ * component declarations do not come through here; their names are module
+ * bindings that every hoisted arm already sees.
+ *
  * A name the function introduces can shadow an enclosing lifetime-invariant
  * binding with one that changes between renders, so it must not inherit that
  * proof. `compileFunctionBody` recomputes the nested body's own invariants.
@@ -23166,6 +23173,7 @@ function withNestedTemplateScope(fn, ctx, compile, untracked = false) {
 	const prevEventInvariantLocals = ctx.currentEventInvariantLocals;
 	const prevUntracked = ctx._untrackedScope;
 	const introduced = collectComponentLocals(fn);
+	if (fn.id) introduced.add(fn.id.name);
 	if (prevLocals == null && (untracked || prevUntracked === true)) {
 		ctx._untrackedScope = true;
 	} else {
