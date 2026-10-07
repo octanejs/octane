@@ -16,11 +16,11 @@ import {
 // Ports of facebook/react ReactDeferredValue-test.js (React 19.2.7), adapted
 // to octane's sync scheduler: React's per-paint `waitForPaint` checkpoints map
 // to "after the synchronous flush" (urgent pass) and "after act()" (the spawned
-// deferred pass — octane schedules it on a microtask at transition priority).
+// deferred pass — octane posts it as a later host task at transition priority).
 //
 // Octane's useDeferredValue model (runtime.ts): a hook slot holds the last
 // COMMITTED value. An urgent render with a changed value returns the previous
-// committed value and queues a microtask that re-renders the block inside
+// committed value and posts a host task that re-renders the block inside
 // startTransition; a render that is ALREADY at transition priority commits the
 // new value in the same pass. The (value, initialValue) overload returns
 // initialValue on mount and spawns the same deferred swap.
@@ -355,7 +355,7 @@ describe('conformance: useDeferredValue (ReactDeferredValue-test.js)', () => {
 //   :526 "…finish the original task if that one loads first" — N/A: no
 //        Suspense boundary (see :407), and choosing between two parked
 //        in-flight renders is time-slicing choreography; octane's deferred
-//        swap supersedes the initial value as soon as its microtask runs.
+//        swap supersedes the initial value as soon as its task runs.
 //   :564 "only the first level defers…" — PORTED (passes; the spawned swap
 //        tags its pass with Block.currentRenderDeferred and the mount path
 //        adopts the final value directly inside such a pass).

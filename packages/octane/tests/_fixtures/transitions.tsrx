@@ -119,7 +119,7 @@ export function StandaloneStartTransition(props) @{
 // ---------------------------------------------------------------------------
 // useDeferredValue with suspense — the deferred re-render runs at transition
 // priority, so a suspending consumer keeps the prior DOM (no fallback flash).
-// First render shows the prior value with isStale=true; microtask later, the
+// First render shows the prior value with isStale=true; a task later, the
 // new value commits, suspends, and the OLD DOM stays put until resolution.
 // ---------------------------------------------------------------------------
 export function DeferredValueWithSuspense(props) @{

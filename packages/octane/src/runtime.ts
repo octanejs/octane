@@ -83,6 +83,7 @@ import {
 } from './constants.js';
 import { isDelegatedEventProp } from './event-names.js';
 import { hasOwnProp } from './has-own.js';
+import { postHostTask } from './host-task.js';
 import { headOwnershipKey } from './head-ownership.js';
 import { resourceHintWarning } from './resource-hint-diagnostics.js';
 import {
@@ -3122,7 +3123,7 @@ function flushTransitionActionBatchIfReady(batch: TransitionActionBatch): void {
 }
 /**
  * True only while useDeferredValue's spawned swap dispatches its re-render
- * (the microtask's startTransition(scheduleRender) call — see
+ * (the posted task's startTransition(scheduleRender) call — see
  * spawnDeferredSwap). scheduleRender copies it onto the scheduled block as
  * `pendingDeferred`: the "deferred lane" bit that lets a useDeferredValue
  * mounting inside that pass skip its own preview state (React's
@@ -10516,8 +10517,9 @@ export function drainPassiveEffects(): void {
  * True if there's a queued render or any uncommitted effect. Used by `act`,
  * and exported (tier 2, binding infrastructure) so @octanejs/testing-library's
  * synchronous settle can loop to EXACT quiescence instead of a fixed bound.
- * Purely promise-driven work (use(promise), async transitions) is not "pending"
- * by this definition — it needs `waitFor`/async `act`.
+ * Purely promise-driven work (use(promise), async transitions) and a
+ * useDeferredValue swap waiting for its host task are not "pending" by this
+ * definition — they need `waitFor`/async `act`.
  */
 export function hasPendingWork(): boolean {
 	return (
@@ -10626,8 +10628,9 @@ function actCheckpoint(): Promise<void> {
  *    work and carries the callback's result. Callback and render errors reject
  *    it rather than escaping through the scheduler.
  *  - ASYNC callback (returns a thenable) → awaited, then the scheduler is
- *    drained across microtask ticks until quiescent (renders, effects, and
- *    microtask chains from `use(promise)` / transition retries).
+ *    drained across microtask ticks until quiescent (renders, effects,
+ *    microtask chains from `use(promise)` / transition retries, and
+ *    useDeferredValue swaps, which wait for their own host task).
  *
  * While the act() scope is active, scheduleRender's "update outside act(...)"
  * dev warning is suppressed (see `IS_OCTANE_ACT_ENVIRONMENT` and
@@ -10664,7 +10667,7 @@ export function act<T>(fn: () => T | Promise<T>): Promise<T> {
 				for (let i = 0; i < ACT_DRAIN_LIMIT; i++) {
 					await actCheckpoint();
 					throwPendingActErrors();
-					const hadWork = hasPendingWork();
+					const hadWork = hasPendingWork() || DEFERRED_SWAPS !== null;
 					drainPassiveEffects();
 					if (!hadWork && !hasPendingWork()) return value;
 				}
@@ -10716,7 +10719,7 @@ export function act<T>(fn: () => T | Promise<T>): Promise<T> {
 			for (let i = 0; i < ACT_DRAIN_LIMIT; i++) {
 				await actCheckpoint();
 				throwPendingActErrors();
-				const hadWork = hasPendingWork();
+				const hadWork = hasPendingWork() || DEFERRED_SWAPS !== null;
 				drainPassiveEffects();
 				if (!hadWork && !hasPendingWork()) return result as T;
 			}
@@ -43931,8 +43934,24 @@ interface DeferredSlot<T> extends TransitionActionSlot<T> {
 }
 
 /**
- * Schedule the deferred current→next swap on a microtask. The re-render runs
- * at transition priority — it can be interrupted by urgent updates and won't
+ * Slots whose deferred swap waits for the posted host task, or null when none
+ * is queued (spawnDeferredSwap). Async act() keeps draining while it is set.
+ */
+let DEFERRED_SWAPS: Array<DeferredSlot<any>> | null = null;
+
+/**
+ * Schedule the deferred current→next swap in a later host task (#1864). A
+ * microtask swap shared the urgent commit's checkpoint, so the browser could
+ * neither paint that commit nor deliver the next keystroke before the
+ * expensive deferred render. The post is armed from a microtask, after the
+ * spawning commit and its layout effects, so the swap queues behind any task
+ * that commit posted, as React's Scheduler task does. Urgent renders before
+ * the task only retarget `s.next`: a fast typist's skipped values never render
+ * deferred.
+ *
+ * The task does not make the deferred render interruptible. Once it starts it
+ * renders and commits to completion (there is no time-slicing), so input that
+ * arrives during it waits. The re-render runs at transition priority and won't
  * tear down the prior DOM if the swapped-in value suspends. DEFERRED_SPAWN
  * tags the pass as a DEFERRED render (Block.pendingDeferred) so a
  * useDeferredValue mounting inside it adopts its final value directly instead
@@ -43940,27 +43959,49 @@ interface DeferredSlot<T> extends TransitionActionSlot<T> {
  */
 function spawnDeferredSwap<T>(s: DeferredSlot<T>): void {
 	s.scheduled = true;
-	queueMicrotask(() => {
-		if (!s.scheduled || s.block.disposed) return;
-		s.scheduled = false;
-		if (Object.is(s.value, s.next)) return;
-		// Set the flag INSIDE the callback so it wraps only the scheduleRender
-		// for the deferred block: startTransition synchronously notifies
-		// useTransition listeners (tickTransitionCount) BEFORE running fn, and
-		// those listeners scheduleRender their own blocks — which must NOT be
-		// tagged as deferred passes.
-		startTransition(() => {
-			DEFERRED_SPAWN = true;
-			try {
-				stageTransitionValue(s, s.block, s.next, s.next, true);
-				if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__) {
-					__profileSchedule(s.block, 'deferred-value', s.profileSlot);
-					scheduleRender(s.block);
-				} else scheduleRender(s.block);
-			} finally {
-				DEFERRED_SPAWN = false;
-			}
-		});
+	if (DEFERRED_SWAPS !== null) {
+		DEFERRED_SWAPS.push(s);
+		return;
+	}
+	DEFERRED_SWAPS = [s];
+	queueMicrotask(postDeferredSwaps);
+}
+
+function postDeferredSwaps(): void {
+	postHostTask(runDeferredSwaps);
+}
+
+function runDeferredSwaps(): void {
+	const slots = DEFERRED_SWAPS;
+	DEFERRED_SWAPS = null;
+	if (slots === null) return;
+	// Every swap schedules its render here, so they all join the one flush
+	// that ends this task.
+	for (let i = 0; i < slots.length; i++) swapDeferredValue(slots[i]);
+}
+
+function swapDeferredValue<T>(s: DeferredSlot<T>): void {
+	// A slot that unmounted, or whose spawning render was rolled back, since
+	// the spawn has nothing to swap. A duplicate entry finds `scheduled` clear.
+	if (!s.scheduled || s.block.disposed) return;
+	s.scheduled = false;
+	if (Object.is(s.value, s.next)) return;
+	// Set the flag INSIDE the callback so it wraps only the scheduleRender
+	// for the deferred block: startTransition synchronously notifies
+	// useTransition listeners (tickTransitionCount) BEFORE running fn, and
+	// those listeners scheduleRender their own blocks — which must NOT be
+	// tagged as deferred passes.
+	startTransition(() => {
+		DEFERRED_SPAWN = true;
+		try {
+			stageTransitionValue(s, s.block, s.next, s.next, true);
+			if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__) {
+				__profileSchedule(s.block, 'deferred-value', s.profileSlot);
+				scheduleRender(s.block);
+			} else scheduleRender(s.block);
+		} finally {
+			DEFERRED_SPAWN = false;
+		}
 	});
 }
 

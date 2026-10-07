@@ -1359,6 +1359,16 @@ setPage(next); // If it suspends, show the pending fallback.
 startTransition(() => setPage(next)); // Keep the previous content while pending.
 ```
 
+`useDeferredValue` is the exception. Its deferred render runs in a later host task,
+not in the microtask checkpoint of the urgent commit that returned the previous value,
+so the browser can paint that commit and deliver input first, as it can before React's
+Scheduler task. Octane posts the task with `scheduler.postTask` where available, then
+`MessageChannel`, then `setTimeout`. Urgent updates that arrive before the task runs
+only change the value it renders, so a fast typist's skipped values never render
+deferred. There is still no time-slicing: once the deferred render starts it runs to
+completion, and a keystroke that arrives during it waits until it commits, where React
+would yield to handle it.
+
 Native `ResizeObserver` callbacks run inside the browser's resize delivery loop.
 An ordinary microtask commit that resizes an already-delivered target can trigger
 `ResizeObserver loop completed with undelivered notifications`, even when the
@@ -1461,7 +1471,8 @@ before-mutation ref-detach phase.
 Other consequences:
 
 - Priority (`urgent` vs `transition`) governs Suspense hold semantics, not
-  general commit deferral.
+  general commit deferral. Only `useDeferredValue`'s deferred render waits for a
+  later task (above).
 - Fallback-visible boundaries whose retries fully stage reveal together,
   including refs and layout effects.
 - Retry-only Suspense reveals use a shared 100ms fallback window (React uses

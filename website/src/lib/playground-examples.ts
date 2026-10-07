@@ -1006,14 +1006,17 @@ export function fetchForecast(attempt: number) {
 
 // ── Transitions & animation ─────────────────────────────────────────────────
 
-const TRANSITIONS_TSRX = `import { useState, useDeferredValue, useTransition } from 'octane';
+const TRANSITIONS_TSRX = `import { memo, useState, useDeferredValue, useTransition } from 'octane';
 
-// useDeferredValue lets the slow list lag one step behind the input, and
-// useTransition keeps the UI responsive while a heavy update commits.
+// useDeferredValue lets the slow list lag one step behind the input: each
+// keystroke commits and paints first, and the list catches up with the latest
+// query in a later task. useTransition keeps the UI responsive while a heavy
+// update commits.
 const WORDS = ['ember', 'orchid', 'quartz', 'saffron', 'thistle', 'umbra', 'verdant', 'willow'];
 const ITEMS = Array.from({ length: 1500 }, (_, i) => WORDS[i % WORDS.length] + '-' + i);
 
-function SlowList(props: { query: string }) @{
+// memo lets the keystroke's render skip the list, whose query has not changed yet.
+const SlowList = memo(function SlowList(props: { query: string }) @{
 	// Artificial cost so the deferral is visible.
 	const start = performance.now();
 	while (performance.now() - start < 40) {
@@ -1033,7 +1036,7 @@ function SlowList(props: { query: string }) @{
 			}
 		</style>
 	</ul>
-}
+});
 
 export default function App() @{
 	const [query, setQuery] = useState('');
