@@ -14,8 +14,7 @@ import type { BenchCard } from '../content/benchmarks.ts';
 import { inkOnFill, type FillInk } from '../lib/contrast.ts';
 
 function fmt(value: unknown): string {
-	const n =
-		typeof value === 'number' ? value : Number(value);
+	const n = typeof value === 'number' ? value : Number(value);
 	if (!Number.isFinite(n)) return '—';
 	// A literal 0 is a sub-timer-resolution measurement — show it as plain 0,
 	// not a misleading "0.00".
@@ -27,8 +26,7 @@ function fmt(value: unknown): string {
 
 // ×-vs-Octane ratios (format: 'x'): 15.35 → "15×", 2.99 → "3.0×", 0.73 → "0.73×".
 function fmtX(value: unknown): string {
-	const n =
-		typeof value === 'number' ? value : Number(value);
+	const n = typeof value === 'number' ? value : Number(value);
 	if (!Number.isFinite(n)) return '—';
 	if (n >= 10) return Math.round(n) + '×';
 	if (n >= 1) return (n === Math.round(n) ? String(n) : n.toFixed(1)) + '×';
@@ -38,15 +36,13 @@ function fmtX(value: unknown): string {
 // Deterministic operation counters (format: 'count') — exact integers with
 // thousands separators; no unit suffix and no decimal padding.
 function fmtCount(value: unknown): string {
-	const n =
-		typeof value === 'number' ? value : Number(value);
+	const n = typeof value === 'number' ? value : Number(value);
 	if (!Number.isFinite(n)) return '—';
 	return Math.round(n).toLocaleString('en-US');
 }
 
 function fmtBytes(value: unknown): string {
-	const n =
-		typeof value === 'number' ? value : Number(value);
+	const n = typeof value === 'number' ? value : Number(value);
 	if (!Number.isFinite(n)) return '—';
 	if (n >= 1024 * 1024) return (n / (1024 * 1024)).toFixed(1) + ' MB';
 	if (n >= 1024) return Math.round(n / 1024) + ' kB';
@@ -57,10 +53,9 @@ function fmtBytes(value: unknown): string {
 // "React 19 + Compiler" becomes "React + Compiler", while an explicitly
 // uncompiled control remains visibly distinct. Full labels stay in the table.
 function shortLabel(label: string): string {
-	return label.replace(
-		/\s+[\d][\d.]*(?:\s+beta)?(?=\s+(?:\+ Compiler|\(uncompiled control\))|$)/,
-		'',
-	).replace(' (uncompiled control)', ' (uncompiled)');
+	return label
+		.replace(/\s+[\d][\d.]*(?:\s+beta)?(?=\s+(?:\+ Compiler|\(uncompiled control\))|$)/, '')
+		.replace(' (uncompiled control)', ' (uncompiled)');
 }
 
 // The picker's synthetic first entry — no suite has an operation named this.
@@ -141,13 +136,14 @@ export function BenchBars(props: { card: BenchCard }) @{
 			const present: BarItem[] = [];
 			for (const row of card.rows) {
 				const value = row[only.key];
-				if (typeof value === 'number') present.push({
-					key: row.op as string,
-					label: row.op as string,
-					value,
-					color: only.color,
-					ink: inkOnFill(only.color),
-				});
+				if (typeof value === 'number')
+					present.push({
+						key: row.op as string,
+						label: row.op as string,
+						value,
+						color: only.color,
+						ink: inkOnFill(only.color),
+					});
 			}
 			return barView(present, []);
 		}
@@ -177,9 +173,10 @@ export function BenchBars(props: { card: BenchCard }) @{
 						key: s.key,
 						label: shortLabel(s.label),
 						value,
-						ceiling: ceilingRatios.length === ratios.length
-							? rangeEnd(value, geomeanRatio(ceilingRatios), fmtX)
-							: undefined,
+						ceiling:
+							ceilingRatios.length === ratios.length
+								? rangeEnd(value, geomeanRatio(ceilingRatios), fmtX)
+								: undefined,
 						color: s.color,
 						ink: inkOnFill(s.color),
 					});
@@ -190,32 +187,31 @@ export function BenchBars(props: { card: BenchCard }) @{
 		const row = card.rows.find((r) => r.op === op) ?? card.rows[0];
 		for (const s of card.series) {
 			const value = row[s.key];
-			if (typeof value === 'number') present.push({
-				key: s.key,
-				label: shortLabel(s.label),
-				value,
-				ceiling: rangeEnd(value, card.ceilings?.[row.op as string]?.[s.key], format),
-				color: s.color,
-				ink: inkOnFill(s.color),
-			});
+			if (typeof value === 'number')
+				present.push({
+					key: s.key,
+					label: shortLabel(s.label),
+					value,
+					ceiling: rangeEnd(value, card.ceilings?.[row.op as string]?.[s.key], format),
+					color: s.color,
+					ink: inkOnFill(s.color),
+				});
 			else missing.push({ key: s.key, label: shortLabel(s.label) });
 		}
 		return barView(present, missing);
 	});
 	const valueFormat = overall ? fmtX : format;
-	const barText = (item: BarItem) => item.ceiling === undefined
-		? valueFormat(item.value)
-		: valueFormat(item.value) + '–' + valueFormat(item.ceiling);
-	const ceilingRows =
-		card.ceilings
-			? card.rows.map(
-					(row) => ({
-						op: row.op as string,
-						label: row.op as string + ', whole client API',
-						values: card.ceilings![row.op as string] ?? {},
-					}),
-				)
-			: [];
+	const barText = (item: BarItem) =>
+		item.ceiling === undefined
+			? valueFormat(item.value)
+			: valueFormat(item.value) + '–' + valueFormat(item.ceiling);
+	const ceilingRows = card.ceilings
+		? card.rows.map((row) => ({
+				op: row.op as string,
+				label: (row.op as string) + ', whole client API',
+				values: card.ceilings![row.op as string] ?? {},
+			}))
+		: [];
 
 	<>
 		<style>
@@ -437,21 +433,27 @@ export function BenchBars(props: { card: BenchCard }) @{
 						class={['bench-op', { 'bench-op-on': overall }]}
 						aria-pressed={overall}
 						onClick={() => setOp(OVERALL_OP)}
-					>{OVERALL_OP as string}</button>
+					>
+						{OVERALL_OP as string}
+					</button>
 					@for (const r of card.rows; key r.op) {
 						<button
 							type="button"
 							class={['bench-op', { 'bench-op-on': r.op === op }]}
 							aria-pressed={r.op === op}
 							onClick={() => setOp(r.op as string)}
-						>{r.op as string}</button>
+						>
+							{r.op as string}
+						</button>
 					}
 				</div>
 			}
 			<div class="bench-plot" aria-hidden="true">
 				@for (const item of bars.present; key item.key) {
 					<div class="bench-row" data-series={item.key}>
-						<span class="bench-row-label" title={item.label}>{item.label as string}</span>
+						<span class="bench-row-label" title={item.label}>
+							{item.label as string}
+						</span>
 						<div class="bench-track">
 							<div
 								class={['bench-fill', { 'bench-fill-cut': item.ceiling !== undefined }]}
@@ -460,10 +462,14 @@ export function BenchBars(props: { card: BenchCard }) @{
 							@if (item.ceiling !== undefined) {
 								<div
 									class="bench-fill-range"
-									style={'left:' + (item.value / bars.scaleMax) * 100 + '%;width:' +
+									style={
+										'left:' +
+										(item.value / bars.scaleMax) * 100 +
+										'%;width:' +
 										((item.ceiling - item.value) / bars.scaleMax) * 100 +
 										'%;background-color:' +
-										item.color}
+										item.color
+									}
 								></div>
 							}
 							<span
@@ -473,35 +479,46 @@ export function BenchBars(props: { card: BenchCard }) @{
 										? 'bench-val-in'
 										: 'bench-val-out',
 								]}
-								style={'left:' + ((item.ceiling ?? item.value) / bars.scaleMax) * 100 + '%' +
+								style={
+									'left:' +
+									((item.ceiling ?? item.value) / bars.scaleMax) * 100 +
+									'%' +
 									((item.ceiling ?? item.value) / bars.scaleMax > 0.62
 										? item.ceiling === undefined
 											? ';color:' + item.ink.color + ';text-shadow:' + item.ink.shadow
 											: ';text-shadow:0 0 3px var(--panel)' // the hatched range is translucent, so the panel's ink reads on it
-										: '')}
-							>{barText(item) as string}</span>
+										: '')
+								}
+							>
+								{barText(item) as string}
+							</span>
 						</div>
 					</div>
 				}
 				@for (const item of bars.missing; key item.key) {
 					<div class="bench-row bench-row-empty">
-						<span class="bench-row-label" title={item.label}>{item.label as string}</span>
+						<span class="bench-row-label" title={item.label}>
+							{item.label as string}
+						</span>
 						<div class="bench-track">
-							<span class="bench-val bench-val-out bench-muted" style="left:0">{'—'}</span>
+							<span class="bench-val bench-val-out bench-muted" style="left:0">
+								{'—'}
+							</span>
 						</div>
 					</div>
 				}
 			</div>
 			@if (overall) {
 				<p class="bench-plot-note">
-					{'geometric mean across all operations, × vs ' + shortLabel(card.series[0].label) +
+					{'geometric mean across all operations, × vs ' +
+						shortLabel(card.series[0].label) +
 						' — lower is better'}
 				</p>
 			}
 			@if (card.ceilings) {
-				<p
-					class="bench-plot-note"
-				>{'hatched: the same application using the framework’s whole client API'}</p>
+				<p class="bench-plot-note">
+					{'hatched: the same application using the framework’s whole client API'}
+				</p>
 			}
 			<details class="bench-table">
 				<summary>{tableCaption as string}</summary>

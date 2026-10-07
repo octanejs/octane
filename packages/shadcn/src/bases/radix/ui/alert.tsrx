@@ -6,12 +6,13 @@ import { cn } from 'cn';
 import type { DivProps } from '../../../lib/types';
 
 export const alertVariants = cva(
-	'group/alert relative grid w-full gap-0.5 rounded-lg border px-2.5 py-2 text-left text-sm has-data-[slot=alert-action]:relative has-data-[slot=alert-action]:pr-18 has-[>svg]:grid-cols-[auto_1fr] has-[>svg]:gap-x-2 *:[svg]:row-span-2 *:[svg]:translate-y-0.5 *:[svg]:text-current *:[svg:not([class*=\'size-\'])]:size-4',
+	"group/alert relative grid w-full gap-0.5 rounded-lg border px-2.5 py-2 text-left text-sm has-data-[slot=alert-action]:relative has-data-[slot=alert-action]:pr-18 has-[>svg]:grid-cols-[auto_1fr] has-[>svg]:gap-x-2 *:[svg]:row-span-2 *:[svg]:translate-y-0.5 *:[svg]:text-current *:[svg:not([class*='size-'])]:size-4",
 	{
 		variants: {
 			variant: {
 				default: 'bg-card text-card-foreground',
-				destructive: 'bg-card text-destructive *:data-[slot=alert-description]:text-destructive/90 *:[svg]:text-current',
+				destructive:
+					'bg-card text-destructive *:data-[slot=alert-description]:text-destructive/90 *:[svg]:text-current',
 			},
 		},
 		defaultVariants: {
@@ -33,10 +34,10 @@ export function Alert({ className, variant, ...props }: AlertProps) @{
 	/>
 }
 
-export function AlertTitle({ className, ...props }: { className?: string } & Record<
-	string,
-	unknown
->) @{
+export function AlertTitle({
+	className,
+	...props
+}: { className?: string } & Record<string, unknown>) @{
 	<div
 		data-slot="alert-title"
 		className={cn(
@@ -47,10 +48,10 @@ export function AlertTitle({ className, ...props }: { className?: string } & Rec
 	/>
 }
 
-export function AlertDescription({ className, ...props }: { className?: string } & Record<
-	string,
-	unknown
->) @{
+export function AlertDescription({
+	className,
+	...props
+}: { className?: string } & Record<string, unknown>) @{
 	<div
 		data-slot="alert-description"
 		className={cn(
@@ -61,9 +62,9 @@ export function AlertDescription({ className, ...props }: { className?: string }
 	/>
 }
 
-export function AlertAction({ className, ...props }: { className?: string } & Record<
-	string,
-	unknown
->) @{
+export function AlertAction({
+	className,
+	...props
+}: { className?: string } & Record<string, unknown>) @{
 	<div data-slot="alert-action" className={cn('absolute top-2 right-2', className)} {...props} />
 }

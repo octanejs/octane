@@ -14,10 +14,9 @@ import {
 type IndexedProps = { index: number };
 
 function observeDelegatedInputCapture(event: Event) {
-	const benchmark = globalThis as
-		typeof globalThis & {
-			__octaneDelegatedInputCapture?: (event: Event) => void;
-		};
+	const benchmark = globalThis as typeof globalThis & {
+		__octaneDelegatedInputCapture?: (event: Event) => void;
+	};
 	benchmark.__octaneDelegatedInputCapture?.(event);
 }
 
@@ -51,7 +50,11 @@ function FormField(props: IndexedProps & { resetVersion: number }) @{
 
 function StoreSubscriber(props: IndexedProps) @{
 	const store = getRuntimeStress().store;
-	const value = useSyncExternalStore(store.subscribe, () => store.get(props.index), () => 0);
+	const value = useSyncExternalStore(
+		store.subscribe,
+		() => store.get(props.index),
+		() => 0,
+	);
 	markStoreRender(props.index);
 	<output data-subscriber-index={String(props.index)}>{String(value) as string}</output>
 }
@@ -64,21 +67,15 @@ function AsyncStatus() @{
 		resource.getSnapshot,
 	);
 	<section aria-label="Async recovery">
-		<button
-			id="async-resolve"
-			type="button"
-			onClick={() => resource.run('resolve')}
-		>{'Resolve request'}</button>
-		<button
-			id="async-reject"
-			type="button"
-			onClick={() => resource.run('reject')}
-		>{'Reject request'}</button>
-		<button
-			id="async-slow"
-			type="button"
-			onClick={() => resource.run('slow', 'stale')}
-		>{'Start slow request'}</button>
+		<button id="async-resolve" type="button" onClick={() => resource.run('resolve')}>
+			{'Resolve request'}
+		</button>
+		<button id="async-reject" type="button" onClick={() => resource.run('reject')}>
+			{'Reject request'}
+		</button>
+		<button id="async-slow" type="button" onClick={() => resource.run('slow', 'stale')}>
+			{'Start slow request'}
+		</button>
 		<output id="async-status">{snapshot.status as string}</output>
 		<output id="async-value">{snapshot.value as string}</output>
 		<output id="async-error">{snapshot.error as string}</output>
@@ -110,12 +107,16 @@ export function App() @{
 				id="lifecycle-toggle"
 				type="button"
 				onClick={() => setLifecycleVisible((visible) => !visible)}
-			>{'Toggle lifecycle rows'}</button>
+			>
+				{'Toggle lifecycle rows'}
+			</button>
 			<button
 				id="lifecycle-update"
 				type="button"
 				onClick={() => setLifecycleTick((tick) => tick + 1)}
-			>{'Update lifecycle rows'}</button>
+			>
+				{'Update lifecycle rows'}
+			</button>
 			@if (lifecycleVisible) {
 				<ul>
 					@for (const index of LIFECYCLE_ROWS; key index) {
@@ -140,9 +141,9 @@ export function App() @{
 					name="notifications"
 					value="enabled"
 					checked={notifications}
-					onChange={(event: Event) => setNotifications(
-						(event.currentTarget as HTMLInputElement).checked,
-					)}
+					onChange={(event: Event) =>
+						setNotifications((event.currentTarget as HTMLInputElement).checked)
+					}
 				/>
 				{'Notifications'}
 			</label>
@@ -181,12 +182,18 @@ export function App() @{
 				id="form-conditional-toggle"
 				type="button"
 				onClick={() => setConditional((visible) => !visible)}
-			>{'Toggle conditional section'}</button>
+			>
+				{'Toggle conditional section'}
+			</button>
 			@if (conditional) {
 				<aside id="form-conditional">{'Conditional validation section'}</aside>
 			}
-			<button id="form-submit" type="submit">{'Send form'}</button>
-			<button id="form-reset" type="button" onClick={reset}>{'Reset form'}</button>
+			<button id="form-submit" type="submit">
+				{'Send form'}
+			</button>
+			<button id="form-reset" type="button" onClick={reset}>
+				{'Reset form'}
+			</button>
 		</form>
 
 		<section aria-label="External store">
@@ -194,17 +201,15 @@ export function App() @{
 				id="store-toggle"
 				type="button"
 				onClick={() => setStoreVisible((visible) => !visible)}
-			>{'Toggle store subscribers'}</button>
-			<button
-				id="store-narrow"
-				type="button"
-				onClick={() => store.writeOne(17, 1)}
-			>{'Write one subscriber'}</button>
-			<button
-				id="store-broad"
-				type="button"
-				onClick={() => store.writeAll(7)}
-			>{'Write all subscribers'}</button>
+			>
+				{'Toggle store subscribers'}
+			</button>
+			<button id="store-narrow" type="button" onClick={() => store.writeOne(17, 1)}>
+				{'Write one subscriber'}
+			</button>
+			<button id="store-broad" type="button" onClick={() => store.writeAll(7)}>
+				{'Write all subscribers'}
+			</button>
 			<button
 				id="store-rapid"
 				type="button"
@@ -213,7 +218,9 @@ export function App() @{
 					store.writeOne(17, 9);
 					store.writeOne(17, 10);
 				}}
-			>{'Write rapid updates'}</button>
+			>
+				{'Write rapid updates'}
+			</button>
 			@if (storeVisible) {
 				<div id="store-subscribers">
 					@for (const index of STORE_SUBSCRIBERS; key index) {

@@ -18,15 +18,13 @@ import {
 import type { CommandProps, Context, State, Store } from '../types';
 
 export function CommandRoot(props: CommandProps) @{
-	const state = useLazyRef<State>(
-		() => ({
-			search: '',
-			value: props.value ?? props.defaultValue ?? '',
-			selectedItemId: undefined,
-			filtered: { count: 0, items: new Map(), groups: new Set() },
-			forceMountedCount: 0,
-		}),
-	);
+	const state = useLazyRef<State>(() => ({
+		search: '',
+		value: props.value ?? props.defaultValue ?? '',
+		selectedItemId: undefined,
+		filtered: { count: 0, items: new Map(), groups: new Set() },
+		forceMountedCount: 0,
+	}));
 	const allItems = useLazyRef<Set<string>>(() => new Set());
 	const allForceMounted = useLazyRef<Set<string>>(() => new Set());
 	const allGroups = useLazyRef<Map<string, Set<string>>>(() => new Map());
@@ -228,7 +226,7 @@ export function CommandRoot(props: CommandProps) @{
 				};
 			},
 			filter: () => propsRef.current.shouldFilter !== false,
-			label: label || props['aria-label'] as string,
+			label: label || (props['aria-label'] as string),
 			getDisablePointerSelection: () => propsRef.current.disablePointerSelection ?? false,
 			listId,
 			inputId,
@@ -239,13 +237,13 @@ export function CommandRoot(props: CommandProps) @{
 	);
 
 	/**
- * DEV ONLY. Selection is keyed by VALUE, not by item id, so two items sharing
- * a value both report `aria-selected="true"` while only the first one — the
- * one `getSelectedItem()`'s `querySelector` finds — actually responds to
- * Enter. That is an authoring error (cmdk requires unique values) rather than
- * something the runtime can resolve, so report it instead of silently
- * rendering a listbox with two selected options.
- */
+	 * DEV ONLY. Selection is keyed by VALUE, not by item id, so two items sharing
+	 * a value both report `aria-selected="true"` while only the first one — the
+	 * one `getSelectedItem()`'s `querySelector` finds — actually responds to
+	 * Enter. That is an authoring error (cmdk requires unique values) rather than
+	 * something the runtime can resolve, so report it instead of silently
+	 * rendering a listbox with two selected options.
+	 */
 	function trackValueOwner(previous: string | undefined, next: string) {
 		if (previous) {
 			const remaining = (valueOwners.current.get(previous) ?? 1) - 1;
@@ -267,34 +265,34 @@ export function CommandRoot(props: CommandProps) @{
 	}
 
 	/**
- * Queue a teardown's follow-up work.
- *
- * Octane runs a removed child's effect cleanups DURING the parent's render
- * (`renderBranchSlot` → `unmountBlock` → `unmountScope` →
- * `runEffectCleanupCallback`), so calling `schedule` straight from a teardown
- * lands its `ss({})` mid-render and the runtime reports "Cannot update a
- * component (`CommandRoot`) while rendering a different component" — advice a
- * teardown cannot act on, since it does not choose when it runs. Hopping a
- * microtask moves the update out of the render pass; the queued work itself is
- * unchanged and still runs before paint.
- *
- * Only the teardowns defer. Every other caller schedules from a layout effect,
- * where the synchronous update is both correct and load-bearing (the search →
- * filter → select-first chain has to settle inside the same commit).
- */
+	 * Queue a teardown's follow-up work.
+	 *
+	 * Octane runs a removed child's effect cleanups DURING the parent's render
+	 * (`renderBranchSlot` → `unmountBlock` → `unmountScope` →
+	 * `runEffectCleanupCallback`), so calling `schedule` straight from a teardown
+	 * lands its `ss({})` mid-render and the runtime reports "Cannot update a
+	 * component (`CommandRoot`) while rendering a different component" — advice a
+	 * teardown cannot act on, since it does not choose when it runs. Hopping a
+	 * microtask moves the update out of the render pass; the queued work itself is
+	 * unchanged and still runs before paint.
+	 *
+	 * Only the teardowns defer. Every other caller schedules from a layout effect,
+	 * where the synchronous update is both correct and load-bearing (the search →
+	 * filter → select-first chain has to settle inside the same commit).
+	 */
 	function scheduleFromTeardown(id: string | number, cb: () => void) {
 		queueMicrotask(() => schedule(id, cb));
 	}
 
 	/**
- * Drop everything `context.value` registered for `id`. Items, force-mounted
- * items AND groups all register their value through the same `useValue` hook,
- * so all three teardown paths have to release through here. Releasing on only
- * one of them leaves the entry alive past the component: the dev-only owner
- * count then reports a duplicate for a value just one live component holds
- * (re-showing a force-mounted item counts 2, then 3, ...), and `ids` /
- * `filtered.items` keep growing for the Command's lifetime.
- */
+	 * Drop everything `context.value` registered for `id`. Items, force-mounted
+	 * items AND groups all register their value through the same `useValue` hook,
+	 * so all three teardown paths have to release through here. Releasing on only
+	 * one of them leaves the entry alive past the component: the dev-only owner
+	 * count then reports a duplicate for a value just one live component holds
+	 * (re-showing a force-mounted item counts 2, then 3, ...), and `ids` /
+	 * `filtered.items` keep growing for the Command's lifetime.
+	 */
 	function releaseValue(id: string) {
 		if (process.env.NODE_ENV !== 'production') {
 			trackValueOwner(ids.current.get(id)?.value, '');
@@ -357,10 +355,10 @@ export function CommandRoot(props: CommandProps) @{
 	}
 
 	/**
- * Inline styles this component applied, mapped to the values that were there
- * before, so clearing a search restores the consumer's own inline styling
- * rather than deleting it.
- */
+	 * Inline styles this component applied, mapped to the values that were there
+	 * before, so clearing a search restores the consumer's own inline styling
+	 * rather than deleting it.
+	 */
 	const styled = useLazyRef<Map<HTMLElement, Record<string, string>>>(() => new Map());
 
 	function setStyle(element: HTMLElement, property: string, value: string) {
@@ -384,7 +382,7 @@ export function CommandRoot(props: CommandProps) @{
 	}
 
 	/** The direct child of `container` that positions `item` — the item itself, or
- * the wrapper element it sits inside. */
+	 * the wrapper element it sits inside. */
 	function positionedNode(item: Element, container: Element): HTMLElement | null {
 		// Walk up to the child the container actually lays out. `order` applies to
 		// a flex CHILD, so an item nested in a wrapper has to rank through that
@@ -405,30 +403,30 @@ export function CommandRoot(props: CommandProps) @{
 	}
 
 	/**
- * Order items by score, and groups by their best item score, using CSS `order`.
- *
- * OCTANE DIVERGENCE[runtime-adaptation-divergences][differential:cmdk-filter-selection-empty]: cmdk's sort is DOM-authoritative — it puts matches in
- * score order by physically relocating item nodes into the list sizer. Octane
- * fences every component's DOM with a pair of comment markers and tracks the
- * range between them, and a template construct like `@for` or `@if` wraps each
- * item in a SECOND, outer range. Relocating a node carries it out of every one
- * of those ranges at once: the loop later clears a range that is now empty and
- * the real node is orphaned in the list forever (observed as every item
- * surviving a removal, stacked above a "No results found." empty state).
- *
- * Carrying the flanking markers along only ever repairs the innermost range,
- * so it breaks again at each new nesting construct. Expressing the order
- * declaratively removes the class of bug instead of an instance of it: no node
- * is ever moved, so no range is ever violated, and clearing the search
- * restores true source order for free — physical reordering left a scrambled
- * residue that accumulated across searches and never recovered.
- *
- * The cost is that the sizer and each group's item container become flex
- * columns while a filter is active, so a consumer who relies on physical DOM
- * order (`:nth-child` styling, drag handles) or on a custom container
- * `display` sees a divergence from upstream. This marker authenticates ranking
- * and aria wiring only; event/ref adaptations are out of scope for this case.
- */
+	 * Order items by score, and groups by their best item score, using CSS `order`.
+	 *
+	 * OCTANE DIVERGENCE[runtime-adaptation-divergences][differential:cmdk-filter-selection-empty]: cmdk's sort is DOM-authoritative — it puts matches in
+	 * score order by physically relocating item nodes into the list sizer. Octane
+	 * fences every component's DOM with a pair of comment markers and tracks the
+	 * range between them, and a template construct like `@for` or `@if` wraps each
+	 * item in a SECOND, outer range. Relocating a node carries it out of every one
+	 * of those ranges at once: the loop later clears a range that is now empty and
+	 * the real node is orphaned in the list forever (observed as every item
+	 * surviving a removal, stacked above a "No results found." empty state).
+	 *
+	 * Carrying the flanking markers along only ever repairs the innermost range,
+	 * so it breaks again at each new nesting construct. Expressing the order
+	 * declaratively removes the class of bug instead of an instance of it: no node
+	 * is ever moved, so no range is ever violated, and clearing the search
+	 * restores true source order for free — physical reordering left a scrambled
+	 * residue that accumulated across searches and never recovered.
+	 *
+	 * The cost is that the sizer and each group's item container become flex
+	 * columns while a filter is active, so a consumer who relies on physical DOM
+	 * order (`:nth-child` styling, drag handles) or on a custom container
+	 * `display` sees a divergence from upstream. This marker authenticates ranking
+	 * and aria wiring only; event/ref adaptations are out of scope for this case.
+	 */
 	function sort() {
 		if (!state.current.search || propsRef.current.shouldFilter === false) {
 			// No active filter: source order is the answer, so drop everything we set.
@@ -474,29 +472,28 @@ export function CommandRoot(props: CommandProps) @{
 		//
 		// The sort is stable on the DOM index, so items that score equally keep
 		// their source order.
-		getValidItems().map(
-			(item, index) => ({
+		getValidItems()
+			.map((item, index) => ({
 				item,
 				index,
 				score: scores.get(item.getAttribute('id') ?? '') ?? 0,
-			}),
-		).sort((a, b) => b.score - a.score || a.index - b.index).map(({ item }) => item).forEach((
-			item,
-			rank,
-		) => {
-			const group = item.closest(GROUP_ITEMS_SELECTOR);
-			const container = group ?? listInsertionElement;
-			if (group) asOrderedContainer(group);
-			const node = positionedNode(item, container);
-			if (!node) return;
-			// A grouped item is ranked against its own container's children, so the
-			// global rank works there — it is sparse but monotonic. A sizer child
-			// shares one rank space with the group hosts numbered below, so it needs
-			// a DENSE counter: the global rank skips ahead whenever a grouped item
-			// outranks it, which let an ungrouped item tie a group host and leave the
-			// two painting in DOM order.
-			setStyle(node, 'order', String(group ? rank + 1 : topLevel += 1));
-		});
+			}))
+			.sort((a, b) => b.score - a.score || a.index - b.index)
+			.map(({ item }) => item)
+			.forEach((item, rank) => {
+				const group = item.closest(GROUP_ITEMS_SELECTOR);
+				const container = group ?? listInsertionElement;
+				if (group) asOrderedContainer(group);
+				const node = positionedNode(item, container);
+				if (!node) return;
+				// A grouped item is ranked against its own container's children, so the
+				// global rank works there — it is sparse but monotonic. A sizer child
+				// shares one rank space with the group hosts numbered below, so it needs
+				// a DENSE counter: the global rank skips ahead whenever a grouped item
+				// outranks it, which let an ungrouped item tie a group host and leave the
+				// two painting in DOM order.
+				setStyle(node, 'order', String(group ? rank + 1 : (topLevel += 1)));
+			});
 
 		// OCTANE DIVERGENCE[corrected-group-ordering][differential:cmdk-groups]: upstream looks each group element up by
 		// `[cmdk-group=""][data-value="<groupId>"]`, but `data-value` holds the
@@ -507,18 +504,19 @@ export function CommandRoot(props: CommandProps) @{
 		// attribute directly also avoids escaping problems for values containing
 		// quotes (upstream encodes the selector but writes `data-value` raw).
 		const groupElements = Array.from(listInsertionElement.querySelectorAll(GROUP_SELECTOR));
-		groups.sort((a, b) => b[1] - a[1]).forEach(([groupId], rank) => {
-			const groupValue = ids.current.get(groupId)?.value;
-			if (!groupValue) return;
-			const element = groupElements.find((el) => el.getAttribute(VALUE_ATTR) === groupValue);
-			// Through the positioned node for the same reason items do: a group
-			// wrapped in another element is not itself the sizer's flex child, so
-			// ordering the group host would do nothing and leave the wrapper
-			// unranked at `order: 0`, ahead of everything.
-			const node =
-				element ? positionedNode(element, listInsertionElement) : null;
-			if (node) setStyle(node, 'order', String(topLevel + rank + 1));
-		});
+		groups
+			.sort((a, b) => b[1] - a[1])
+			.forEach(([groupId], rank) => {
+				const groupValue = ids.current.get(groupId)?.value;
+				if (!groupValue) return;
+				const element = groupElements.find((el) => el.getAttribute(VALUE_ATTR) === groupValue);
+				// Through the positioned node for the same reason items do: a group
+				// wrapped in another element is not itself the sizer's flex child, so
+				// ordering the group host would do nothing and leave the wrapper
+				// unranked at `order: 0`, ahead of everything.
+				const node = element ? positionedNode(element, listInsertionElement) : null;
+				if (node) setStyle(node, 'order', String(topLevel + rank + 1));
+			});
 	}
 
 	function getSelectedItem() {
@@ -539,26 +537,26 @@ export function CommandRoot(props: CommandProps) @{
 
 	/** Element children of `container`, in the order they are painted. */
 	function orderedChildren(container: Element): HTMLElement[] {
-		return Array.from(container.children).filter(
-			(child): child is HTMLElement => child instanceof HTMLElement,
-		).map((child, index) => ({ child, index, order: Number(child.style.order) || 0 })).sort(
-			(a, b) => a.order - b.order || a.index - b.index,
-		).map(({ child }) => child);
+		return Array.from(container.children)
+			.filter((child): child is HTMLElement => child instanceof HTMLElement)
+			.map((child, index) => ({ child, index, order: Number(child.style.order) || 0 }))
+			.sort((a, b) => a.order - b.order || a.index - b.index)
+			.map(({ child }) => child);
 	}
 
 	/**
- * Selectable items in the order the user sees them.
- *
- * Selection and arrow-key navigation both read this, so it has to agree with
- * what is on screen. While a filter is active the ranking lives in CSS `order`
- * rather than in DOM order (see `sort()`), and the two disagree — walking the
- * DOM would select and navigate in source order behind a differently-ordered
- * list. Descending through the ranked containers keeps group ranking and
- * within-group ranking composed in the right order.
- *
- * With no filter active nothing carries an `order`, so DOM order already IS
- * visual order and the flat query is both correct and cheaper.
- */
+	 * Selectable items in the order the user sees them.
+	 *
+	 * Selection and arrow-key navigation both read this, so it has to agree with
+	 * what is on screen. While a filter is active the ranking lives in CSS `order`
+	 * rather than in DOM order (see `sort()`), and the two disagree — walking the
+	 * DOM would select and navigate in source order behind a differently-ordered
+	 * list. Descending through the ranked containers keeps group ranking and
+	 * within-group ranking composed in the right order.
+	 *
+	 * With no filter active nothing carries an `order`, so DOM order already IS
+	 * visual order and the flat query is both correct and cheaper.
+	 */
 	function getValidItems(): Element[] {
 		const root = listInnerRef.current;
 		if (!root) return [];
@@ -592,19 +590,20 @@ export function CommandRoot(props: CommandProps) @{
 		let newSelected = items[index + change];
 
 		if (propsRef.current?.loop) {
-			newSelected = index + change < 0
-				? items[items.length - 1]
-				: index + change === items.length
-					? items[0]
-					: items[index + change];
+			newSelected =
+				index + change < 0
+					? items[items.length - 1]
+					: index + change === items.length
+						? items[0]
+						: items[index + change];
 		}
 
 		if (newSelected) store.setState('value', newSelected.getAttribute(VALUE_ATTR) || '');
 	}
 
 	/** Groups in the order they are painted, for the same reason `getValidItems`
- * exists: while a filter is active the ranking lives in CSS `order`, so DOM
- * order and on-screen order disagree. */
+	 * exists: while a filter is active the ranking lives in CSS `order`, so DOM
+	 * order and on-screen order disagree. */
 	function getOrderedGroups(): Element[] {
 		const root = listInnerRef.current;
 		if (!root) return [];
@@ -613,13 +612,14 @@ export function CommandRoot(props: CommandProps) @{
 		// Read the rank off the positioned node, not the group host: a wrapped group
 		// carries its `order` on the wrapper, so reading the host would see 0 for
 		// every such group and collapse navigation back to DOM order.
-		return groups.map(
-			(group, index) => ({
+		return groups
+			.map((group, index) => ({
 				group,
 				index,
 				order: Number(positionedNode(group, root)?.style.order) || 0,
-			}),
-		).sort((a, b) => a.order - b.order || a.index - b.index).map(({ group }) => group);
+			}))
+			.sort((a, b) => a.order - b.order || a.index - b.index)
+			.map(({ group }) => group);
 	}
 
 	function updateSelectedByGroup(change: 1 | -1) {
@@ -632,8 +632,7 @@ export function CommandRoot(props: CommandProps) @{
 		// filter is active.
 		const groups = getOrderedGroups();
 		const items = getValidItems();
-		let index =
-			group ? groups.indexOf(group) : -1;
+		let index = group ? groups.indexOf(group) : -1;
 		let item: Element | undefined;
 
 		while (index >= 0 && !item) {
@@ -731,7 +730,9 @@ export function CommandRoot(props: CommandProps) @{
 			}
 		}}
 	>
-		<label cmdk-label="" for={inputId} id={labelId} style={srOnlyStyles}>{label}</label>
+		<label cmdk-label="" for={inputId} id={labelId} style={srOnlyStyles}>
+			{label}
+		</label>
 		<StoreContext value={store}>
 			<CommandContext value={context}>{children}</CommandContext>
 		</StoreContext>

@@ -6,11 +6,10 @@ import { ProjectHeader } from './ProjectHeader.tsrx';
 
 const DASHBOARD_PANELS = ['activity', 'insights'];
 const LazyCodeProof = lazy(() => {
-	const benchmark = globalThis as
-		typeof globalThis & {
-			__octaneLazyCodeLoads?: number;
-			__octaneLazyCodeStartedAt?: number;
-		};
+	const benchmark = globalThis as typeof globalThis & {
+		__octaneLazyCodeLoads?: number;
+		__octaneLazyCodeStartedAt?: number;
+	};
 	benchmark.__octaneLazyCodeLoads = (benchmark.__octaneLazyCodeLoads ?? 0) + 1;
 	benchmark.__octaneLazyCodeStartedAt = performance.now();
 	return import('./LazyCodeProof.tsrx').then((module) => ({ default: module.LazyCodeProof }));

@@ -20,7 +20,11 @@ function renderTab(item: { id: string; name: string }) {
 function Tab(props: { item: any; state: any }) {
 	const ref = useRef<any>(null);
 	const { tabProps } = useTab({ key: props.item.key }, props.state, ref);
-	return <div {...tabProps} ref={ref}>{props.item.rendered}</div>;
+	return (
+		<div {...tabProps} ref={ref}>
+			{props.item.rendered}
+		</div>
+	);
 }
 
 export function TabsSpec() {
@@ -30,10 +34,16 @@ export function TabsSpec() {
 	const panelRef = useRef<any>(null);
 	const { tabPanelProps } = useTabPanel({}, state, panelRef);
 	const selected = String(state.selectedKey);
-	return <div>
-		<div {...tabListProps} ref={listRef}>{[...state.collection].map(
-			(item: any) => <Tab key={item.key} item={item} state={state} />,
-		)}</div>
-		<div {...tabPanelProps} ref={panelRef}>{'panel:' + selected}</div>
-	</div>;
+	return (
+		<div>
+			<div {...tabListProps} ref={listRef}>
+				{[...state.collection].map((item: any) => (
+					<Tab key={item.key} item={item} state={state} />
+				))}
+			</div>
+			<div {...tabPanelProps} ref={panelRef}>
+				{'panel:' + selected}
+			</div>
+		</div>
+	);
 }

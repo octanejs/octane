@@ -27,9 +27,9 @@ export function KeyedList() @{
 
 	<div>
 		<h2 class="demo-title">{'Keyed list'}</h2>
-		<p
-			class="demo-blurb"
-		>{'@for with `key item.id`. Reorder / prepend / append — each row keeps its identity.'}</p>
+		<p class="demo-blurb">
+			{'@for with `key item.id`. Reorder / prepend / append — each row keeps its identity.'}
+		</p>
 		<div class="row">
 			<input
 				class="txt"
@@ -37,16 +37,26 @@ export function KeyedList() @{
 				onInput={(e) => setDraft(e.target.value)}
 				placeholder="new item"
 			/>
-			<button class="btn" onClick={prepend}>{'prepend'}</button>
-			<button class="btn" onClick={append}>{'append'}</button>
-			<button class="btn" onClick={reverse}>{'reverse'}</button>
-			<button class="btn" onClick={clear}>{'clear'}</button>
+			<button class="btn" onClick={prepend}>
+				{'prepend'}
+			</button>
+			<button class="btn" onClick={append}>
+				{'append'}
+			</button>
+			<button class="btn" onClick={reverse}>
+				{'reverse'}
+			</button>
+			<button class="btn" onClick={clear}>
+				{'clear'}
+			</button>
 		</div>
 		<ul class="list">
 			@for (const item of items; key item.id) {
 				<li>
 					<span>{item.label as string}</span>
-					<button class="btn" onClick={() => remove(item.id)}>{'×'}</button>
+					<button class="btn" onClick={() => remove(item.id)}>
+						{'×'}
+					</button>
 				</li>
 			} @empty {
 				<li>

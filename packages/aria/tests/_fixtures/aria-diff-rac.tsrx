@@ -23,12 +23,14 @@ function pressedClass(values: { isPressed: boolean; isHovered: boolean }) {
 
 export function ButtonSpec() {
 	const [count, setCount] = useState(0);
-	return <div>
-		<Button id="btn" className={pressedClass} onPress={() => setCount((c: number) => c + 1)}>
-			Press me
-		</Button>
-		<output>{'presses:' + count}</output>
-	</div>;
+	return (
+		<div>
+			<Button id="btn" className={pressedClass} onPress={() => setCount((c: number) => c + 1)}>
+				Press me
+			</Button>
+			<output>{'presses:' + count}</output>
+		</div>
+	);
 }
 
 export function ToggleButtonSpec() {
@@ -40,25 +42,27 @@ function checkboxClass(values: { isSelected: boolean }) {
 }
 
 export function CheckboxSpec() {
-	return <Checkbox className={checkboxClass}>
-		Agree to terms
-	</Checkbox>;
+	return <Checkbox className={checkboxClass}>Agree to terms</Checkbox>;
 }
 
 export function TextFieldSpec() {
-	return <TextField defaultValue="">
-		<Label>Name</Label>
-		<Input id="name-input" />
-	</TextField>;
+	return (
+		<TextField defaultValue="">
+			<Label>Name</Label>
+			<Input id="name-input" />
+		</TextField>
+	);
 }
 
 export function DisclosureSpec() {
-	return <Disclosure>
-		<Heading>
-			<Button slot="trigger">Show details</Button>
-		</Heading>
-		<DisclosurePanel>
-			<p>The hidden details.</p>
-		</DisclosurePanel>
-	</Disclosure>;
+	return (
+		<Disclosure>
+			<Heading>
+				<Button slot="trigger">Show details</Button>
+			</Heading>
+			<DisclosurePanel>
+				<p>The hidden details.</p>
+			</DisclosurePanel>
+		</Disclosure>
+	);
 }

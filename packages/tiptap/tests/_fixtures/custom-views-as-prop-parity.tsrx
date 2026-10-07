@@ -29,9 +29,7 @@ function ParityPanelView(props) @{
 	<NodeViewWrapper as="article" data-parity-node-view="true">
 		<output data-parity-node-theme="true">{theme}</output>
 		<output data-parity-node-label="true">{props.node.attrs.label as string}</output>
-		<output data-parity-node-selection="true">
-			{props.selected ? 'selected' : 'unselected'}
-		</output>
+		<output data-parity-node-selection="true">{props.selected ? 'selected' : 'unselected'}</output>
 		<button
 			type="button"
 			contentEditable={false}
@@ -166,9 +164,7 @@ const initialContent = {
 		{
 			type: 'parityPanel',
 			attrs: { label: 'initial' },
-			content: [
-				{ type: 'text', text: 'Editable panel' },
-			],
+			content: [{ type: 'text', text: 'Editable panel' }],
 		},
 		{
 			type: 'paragraph',
@@ -176,9 +172,7 @@ const initialContent = {
 				{
 					type: 'text',
 					text: 'Marked text',
-					marks: [
-						{ type: 'parityBadge', attrs: { tone: 'warm' } },
-					],
+					marks: [{ type: 'parityBadge', attrs: { tone: 'warm' } }],
 				},
 				{ type: 'text', text: ' tail' },
 			],

@@ -15,12 +15,14 @@ export interface PriceBadgeProps {
 // fragment: a block styles the items beside it and everything below them,
 // never the element that contains it. Declared above the component because a
 // theme must precede the block that applies it.
-const dark = <style>
-	.price-badge[data-theme='dark'] {
-		background: rgb(13, 17, 23);
-		color: rgb(201, 209, 217);
-	}
-</style>;
+const dark = (
+	<style>
+		.price-badge[data-theme='dark'] {
+			background: rgb(13, 17, 23);
+			color: rgb(201, 209, 217);
+		}
+	</style>
+);
 
 export function PriceBadge(props: PriceBadgeProps) @{
 	const locale = use(LocaleContext);

@@ -8,18 +8,19 @@ export function ReactResizablePanelsDemo() @{
 
 	<div>
 		<h2 class="demo-title">{'React Resizable Panels on Octane'}</h2>
-		<p
-			class="demo-blurb"
-		>{'Drag either separator, focus it and use the arrow keys, then reload to restore the layout.'}</p>
+		<p class="demo-blurb">
+			{'Drag either separator, focus it and use the arrow keys, then reload to restore the layout.'}
+		</p>
 		<div class="panel" style={{ height: '22rem', padding: 0, overflow: 'hidden' }}>
 			<Group
 				id="playground-panels"
-				defaultLayout={persistence.defaultLayout ??
-					{
+				defaultLayout={
+					persistence.defaultLayout ?? {
 						navigation: 24,
 						content: 52,
 						details: 24,
-					}}
+					}
+				}
 				onLayoutChange={persistence.onLayoutChange}
 				onLayoutChanged={persistence.onLayoutChanged}
 			>

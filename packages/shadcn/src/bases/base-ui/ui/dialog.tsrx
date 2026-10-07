@@ -72,10 +72,12 @@ export function DialogContent({
 				<DialogPrimitive.Close
 					data-slot="dialog-close"
 					className="absolute top-2 right-2"
-					render={<Button variant="ghost" size="icon-sm">
-						<XIcon />
-						<span className="sr-only">Close</span>
-					</Button>}
+					render={
+						<Button variant="ghost" size="icon-sm">
+							<XIcon />
+							<span className="sr-only">Close</span>
+						</Button>
+					}
 				/>
 			}
 		</DialogPrimitive.Popup>

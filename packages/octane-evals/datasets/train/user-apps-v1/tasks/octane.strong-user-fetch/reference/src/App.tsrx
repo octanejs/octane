@@ -8,9 +8,11 @@ export function App({ userId }: { userId: string }) @{
 
 	useEffect(() => {
 		let current = true;
-		fetch(`/api/users/${userId}`).then((response) => response.json()).then((next: User) => {
-			if (current) setUser(next);
-		});
+		fetch(`/api/users/${userId}`)
+			.then((response) => response.json())
+			.then((next: User) => {
+				if (current) setUser(next);
+			});
 		return () => {
 			current = false;
 		};

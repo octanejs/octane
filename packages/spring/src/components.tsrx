@@ -7,8 +7,9 @@ import {
 import { useSpring, useTrail, useTransition } from './hooks';
 
 function itemKey(item: any, index: number): string | number {
-	return item?.key ?? item?.id ??
-		(typeof item === 'string' || typeof item === 'number' ? item : index);
+	return (
+		item?.key ?? item?.id ?? (typeof item === 'string' || typeof item === 'number' ? item : index)
+	);
 }
 
 function keyed(value: unknown, key: string | number): unknown {
@@ -24,9 +25,7 @@ export function SpringContext(props: SpringContextValue & { children?: unknown }
 export function Spring(props: Record<string, unknown> & { children?: unknown }) @{
 	const { children, ...update } = props;
 	const styles = useSpring(update);
-	<>
-		{typeof children === 'function' && !isChildrenBlock(children) ? children(styles) : children}
-	</>
+	<>{typeof children === 'function' && !isChildrenBlock(children) ? children(styles) : children}</>
 }
 
 export function Trail(props: any) @{
@@ -34,11 +33,8 @@ export function Trail(props: any) @{
 	const styles = useTrail(items.length, update);
 	<>
 		{typeof children === 'function' && !isChildrenBlock(children)
-			? items.map(
-					(item: any, index: number) => keyed(
-						children(item, index)(styles[index]),
-						itemKey(item, index),
-					),
+			? items.map((item: any, index: number) =>
+					keyed(children(item, index)(styles[index]), itemKey(item, index)),
 				)
 			: children}
 	</>
@@ -49,11 +45,8 @@ export function Transition(props: any) @{
 	const transitions = useTransition(items, update);
 	<>
 		{typeof children === 'function' && !isChildrenBlock(children)
-			? transitions(
-					(styles: any, item: any, transition: any, index: number) => keyed(
-						children(item, index)(styles),
-						transition.key,
-					),
+			? transitions((styles: any, item: any, transition: any, index: number) =>
+					keyed(children(item, index)(styles), transition.key),
 				)
 			: children}
 	</>

@@ -78,11 +78,13 @@ function PrimaryMeta(props: { promise: Promise<string> }) @{
 export function FallbackMetaBoundary(props: { promise: Promise<string> }) @{
 	<div class="fm-host">
 		<Suspense
-			fallback={<>
-				<meta name="fallback-meta" content="f" />
-				<link rel="author" href="/fallback-author" />
-				<span class="fb">{'fb'}</span>
-			</>}
+			fallback={
+				<>
+					<meta name="fallback-meta" content="f" />
+					<link rel="author" href="/fallback-author" />
+					<span class="fb">{'fb'}</span>
+				</>
+			}
 		>
 			<PrimaryMeta promise={props.promise} />
 		</Suspense>
@@ -103,9 +105,11 @@ export function NestedFallbackMetaBoundary(props: {
 }) @{
 	<div class="nfm-host">
 		<Suspense
-			fallback={<Suspense fallback={<span class="nested-fb">{'nested fb'}</span>}>
-				<NestedFallbackPrimary inner={props.inner} />
-			</Suspense>}
+			fallback={
+				<Suspense fallback={<span class="nested-fb">{'nested fb'}</span>}>
+					<NestedFallbackPrimary inner={props.inner} />
+				</Suspense>
+			}
 		>
 			<PrimaryMeta promise={props.promise} />
 		</Suspense>

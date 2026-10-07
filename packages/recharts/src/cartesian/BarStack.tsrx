@@ -58,9 +58,11 @@ export function useBarStackClipPathUrl(index: number) {
 	return 'url(#' + getClipPathId(stackId, index) + ')';
 }
 
-export function BarStackClipLayer(props: LayerProps & {
-	index: number;
-}) {
+export function BarStackClipLayer(
+	props: LayerProps & {
+		index: number;
+	},
+) {
 	const { index, ...rest } = props;
 	const clipPathUrl = useBarStackClipPathUrl(index);
 	return <Layer className="recharts-bar-stack-layer" clipPath={clipPathUrl} {...rest} />;
@@ -70,42 +72,45 @@ export function BarStackClipLayer(props: LayerProps & {
  * Renders one clipPath per stack rectangle so the whole stack gets rounded
  * corners.
  */
-function BarStackClipPath(props: {
-	stackId: NormalizedStackId;
-	radius: RectRadius;
-}) {
+function BarStackClipPath(props: { stackId: NormalizedStackId; radius: RectRadius }) {
 	const { stackId, radius } = props;
 	const isPanorama = useIsPanorama();
 	const positions = useAppSelector((state) => selectStackRects(state, stackId, isPanorama));
 	if (positions == null || positions.length === 0) {
 		return null;
 	}
-	return <defs>{positions.map((pos, index) => {
-		if (pos == null) {
-			return null;
-		}
-		const clipPathId = getClipPathId(stackId, index);
-		return <clipPath key={clipPathId} id={clipPathId}>
-			<Rectangle
-				isAnimationActive={false}
-				isUpdateAnimationActive={false}
-				x={pos.x}
-				y={pos.y}
-				width={pos.width}
-				height={pos.height}
-				radius={radius}
-			/>
-		</clipPath>;
-	})}</defs>;
+	return (
+		<defs>
+			{positions.map((pos, index) => {
+				if (pos == null) {
+					return null;
+				}
+				const clipPathId = getClipPathId(stackId, index);
+				return (
+					<clipPath key={clipPathId} id={clipPathId}>
+						<Rectangle
+							isAnimationActive={false}
+							isUpdateAnimationActive={false}
+							x={pos.x}
+							y={pos.y}
+							width={pos.width}
+							height={pos.height}
+							radius={radius}
+						/>
+					</clipPath>
+				);
+			})}
+		</defs>
+	);
 }
 
 function BarStackImpl(props: BarStackProps) @{
 	const resolvedStackId = useUniqueId('recharts-bar-stack', getNormalizedStackId(props.stackId));
 	const { children, radius } = resolveDefaultProps(props, defaultBarStackProps);
-	const context: BarStackSettings = useMemo(() => ({ stackId: resolvedStackId, radius }), [
-		resolvedStackId,
-		radius,
-	]);
+	const context: BarStackSettings = useMemo(
+		() => ({ stackId: resolvedStackId, radius }),
+		[resolvedStackId, radius],
+	);
 	<BarStackContext value={context}>
 		<BarStackClipPath stackId={resolvedStackId} radius={radius} />
 		{children}

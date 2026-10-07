@@ -53,71 +53,75 @@ export const TableFullscreenButton = ({
 		}
 	}, [isFullscreen]);
 
-	return <>
-		<button
-			className={cn(
-				'cursor-pointer p-1 text-muted-foreground transition-all hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50',
-				className,
-			)}
-			disabled={isAnimating}
-			onClick={handleOpen}
-			title={t.viewFullscreen}
-			type="button"
-		>
-			<Maximize2Icon size={14} />
-		</button>
+	return (
+		<>
+			<button
+				className={cn(
+					'cursor-pointer p-1 text-muted-foreground transition-all hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50',
+					className,
+				)}
+				disabled={isAnimating}
+				onClick={handleOpen}
+				title={t.viewFullscreen}
+				type="button"
+			>
+				<Maximize2Icon size={14} />
+			</button>
 
-		{isFullscreen
-			? createPortal(
-					// biome-ignore lint/a11y/noNoninteractiveElementInteractions: "dialog overlay needs click-to-dismiss"
-					<div
-						aria-label={t.viewFullscreen}
-						aria-modal="true"
-						className={cn('fixed inset-0 z-50 flex flex-col bg-background')}
-						data-streamdown="table-fullscreen"
-						onClick={handleClose}
-						onKeyDown={(e) => {
-							if (e.key === 'Escape') {
-								handleClose();
-							}
-						}}
-						role="dialog"
-					>
-						{/* biome-ignore lint/a11y/noStaticElementInteractions: "div with role=presentation is used for event propagation control" */}
+			{isFullscreen
+				? createPortal(
+						// biome-ignore lint/a11y/noNoninteractiveElementInteractions: "dialog overlay needs click-to-dismiss"
 						<div
-							className={cn('flex h-full flex-col')}
-							onClick={(e) => e.stopPropagation()}
-							onKeyDown={(e) => e.stopPropagation()}
-							role="presentation"
+							aria-label={t.viewFullscreen}
+							aria-modal="true"
+							className={cn('fixed inset-0 z-50 flex flex-col bg-background')}
+							data-streamdown="table-fullscreen"
+							onClick={handleClose}
+							onKeyDown={(e) => {
+								if (e.key === 'Escape') {
+									handleClose();
+								}
+							}}
+							role="dialog"
 						>
-							<div className={cn('flex items-center justify-end gap-1 p-4')}>
-								{showCopy ? <TableCopyDropdown /> : null}
-								{showDownload ? <TableDownloadDropdown /> : null}
-								<button
-									className={cn(
-										'rounded-md p-1 text-muted-foreground transition-all hover:bg-muted hover:text-foreground',
-									)}
-									onClick={handleClose}
-									title={t.exitFullscreen}
-									type="button"
-								>
-									<XIcon size={20} />
-								</button>
-							</div>
+							{/* biome-ignore lint/a11y/noStaticElementInteractions: "div with role=presentation is used for event propagation control" */}
 							<div
-								className={cn(
-									'flex-1 overflow-auto p-4 pt-0 [&_thead]:sticky [&_thead]:top-0 [&_thead]:z-10',
-								)}
+								className={cn('flex h-full flex-col')}
+								onClick={(e) => e.stopPropagation()}
+								onKeyDown={(e) => e.stopPropagation()}
+								role="presentation"
 							>
-								<table
-									className={cn('w-full border-collapse border border-border')}
-									data-streamdown="table"
-								>{children}</table>
+								<div className={cn('flex items-center justify-end gap-1 p-4')}>
+									{showCopy ? <TableCopyDropdown /> : null}
+									{showDownload ? <TableDownloadDropdown /> : null}
+									<button
+										className={cn(
+											'rounded-md p-1 text-muted-foreground transition-all hover:bg-muted hover:text-foreground',
+										)}
+										onClick={handleClose}
+										title={t.exitFullscreen}
+										type="button"
+									>
+										<XIcon size={20} />
+									</button>
+								</div>
+								<div
+									className={cn(
+										'flex-1 overflow-auto p-4 pt-0 [&_thead]:sticky [&_thead]:top-0 [&_thead]:z-10',
+									)}
+								>
+									<table
+										className={cn('w-full border-collapse border border-border')}
+										data-streamdown="table"
+									>
+										{children}
+									</table>
+								</div>
 							</div>
-						</div>
-					</div>,
-					document.body,
-				)
-			: null}
-	</>;
+						</div>,
+						document.body,
+					)
+				: null}
+		</>
+	);
 };

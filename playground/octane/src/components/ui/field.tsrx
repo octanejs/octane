@@ -26,7 +26,11 @@ export function FieldSet({ className, ...props }: Props) @{
 	/>
 }
 
-export function FieldLegend({ className, variant = 'legend', ...props }: Props & {
+export function FieldLegend({
+	className,
+	variant = 'legend',
+	...props
+}: Props & {
 	variant?: 'legend' | 'label';
 }) @{
 	<legend
@@ -52,8 +56,10 @@ const fieldVariants = cva('cn-field group/field flex w-full', {
 	variants: {
 		orientation: {
 			vertical: 'cn-field-orientation-vertical flex-col *:w-full [&>.sr-only]:w-auto',
-			horizontal: 'cn-field-orientation-horizontal flex-row items-center has-[>[data-slot=field-content]]:items-start *:data-[slot=field-label]:flex-auto has-[>[data-slot=field-content]]:[&>[role=checkbox],[role=radio]]:mt-px',
-			responsive: 'cn-field-orientation-responsive flex-col *:w-full @md/field-group:flex-row @md/field-group:items-center @md/field-group:*:w-auto @md/field-group:has-[>[data-slot=field-content]]:items-start @md/field-group:*:data-[slot=field-label]:flex-auto [&>.sr-only]:w-auto @md/field-group:has-[>[data-slot=field-content]]:[&>[role=checkbox],[role=radio]]:mt-px',
+			horizontal:
+				'cn-field-orientation-horizontal flex-row items-center has-[>[data-slot=field-content]]:items-start *:data-[slot=field-label]:flex-auto has-[>[data-slot=field-content]]:[&>[role=checkbox],[role=radio]]:mt-px',
+			responsive:
+				'cn-field-orientation-responsive flex-col *:w-full @md/field-group:flex-row @md/field-group:items-center @md/field-group:*:w-auto @md/field-group:has-[>[data-slot=field-content]]:items-start @md/field-group:*:data-[slot=field-label]:flex-auto [&>.sr-only]:w-auto @md/field-group:has-[>[data-slot=field-content]]:[&>[role=checkbox],[role=radio]]:mt-px',
 		},
 	},
 	defaultVariants: {
@@ -166,12 +172,12 @@ export function FieldError({ className, children, errors, ...props }: FieldError
 		}
 
 		const uniqueErrors = [
-			...new Map(errors.map(
-				(error): [string | undefined, { message?: string } | undefined] => [
+			...new Map(
+				errors.map((error): [string | undefined, { message?: string } | undefined] => [
 					error?.message,
 					error,
-				],
-			)).values(),
+				]),
+			).values(),
 		];
 
 		if (uniqueErrors?.length == 1) {
@@ -183,10 +189,8 @@ export function FieldError({ className, children, errors, ...props }: FieldError
 			{ className: 'ml-4 flex list-disc flex-col gap-1' },
 			// Falsy entries map to null: React skips `false` children, and null is
 			// octane's "render nothing" value for renderable holes.
-			uniqueErrors.map(
-				(error, index) => error?.message
-					? createElement('li', { key: index }, error.message)
-					: null,
+			uniqueErrors.map((error, index) =>
+				error?.message ? createElement('li', { key: index }, error.message) : null,
 			),
 		);
 	}, [children, errors]);

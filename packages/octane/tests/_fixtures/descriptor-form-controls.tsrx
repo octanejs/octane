@@ -5,7 +5,9 @@ export function Controls(props) @{
 		<input id="checked" type="checkbox" {...props.checkbox} readOnly />
 		<select id="select" {...props.select} onChange={props.onChange}>
 			@for (const option of props.options; key option.id) {
-				<option value={option.id} disabled={option.disabled}>{option.label}</option>
+				<option value={option.id} disabled={option.disabled}>
+					{option.label}
+				</option>
 			}
 		</select>
 		<output>{(props.read?.() ?? 'ready') as string}</output>

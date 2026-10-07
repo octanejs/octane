@@ -5,7 +5,9 @@ import { useState, useRef, useLayoutEffect, Fragment } from 'octane';
 // before layout effects run. Cross-component refs attach child-before-parent.
 
 export function ConnectedRef(props) @{
-	<div id="host" ref={(el) => props.observe(el)}>{'x'}</div>
+	<div id="host" ref={(el) => props.observe(el)}>
+		{'x'}
+	</div>
 }
 
 export function RefInLayout(props) @{
@@ -13,12 +15,16 @@ export function RefInLayout(props) @{
 	useLayoutEffect(() => {
 		props.observe(r.current);
 	}, []);
-	<div id="host" ref={r}>{'x'}</div>
+	<div id="host" ref={r}>
+		{'x'}
+	</div>
 }
 
 function TimingChild(props) @{
 	const [n] = useState(0);
-	<span id="child" ref={() => props.log('child')}>{n as number}</span>
+	<span id="child" ref={() => props.log('child')}>
+		{n as number}
+	</span>
 }
 
 export function NestedTiming(props) @{
@@ -42,7 +48,9 @@ export function RefAndLayout(props) @{
 			props.log('ref:attach');
 			return () => props.log('ref:cleanup');
 		}}
-	>{'x'}</div>
+	>
+		{'x'}
+	</div>
 }
 
 // A fragment callback ref: at call time its child (#fragtiming) must already be

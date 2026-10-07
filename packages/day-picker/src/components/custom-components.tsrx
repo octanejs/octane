@@ -30,14 +30,18 @@ export function Chevron(props: {
 }) @{
 	const { size = 24, orientation = 'left', className, style } = props;
 	<svg className={className} style={style} width={size} height={size} viewBox="0 0 24 24">
-		{orientation === 'up' &&
-			<polygon points="6.77 17 12.5 11.43 18.24 17 20 15.28 12.5 8 5 15.28" />}
-		{orientation === 'down' &&
-			<polygon points="6.77 8 12.5 13.57 18.24 8 20 9.72 12.5 17 5 9.72" />}
-		{orientation === 'left' &&
-			<polygon points="16 18.112 9.81111111 12 16 5.87733333 14.0888889 4 6 12 14.0888889 20" />}
-		{orientation === 'right' &&
-			<polygon points="8 18.112 14.18888889 12 8 5.87733333 9.91111111 4 18 12 9.91111111 20" />}
+		{orientation === 'up' && (
+			<polygon points="6.77 17 12.5 11.43 18.24 17 20 15.28 12.5 8 5 15.28" />
+		)}
+		{orientation === 'down' && (
+			<polygon points="6.77 8 12.5 13.57 18.24 8 20 9.72 12.5 17 5 9.72" />
+		)}
+		{orientation === 'left' && (
+			<polygon points="16 18.112 9.81111111 12 16 5.87733333 14.0888889 4 6 12 14.0888889 20" />
+		)}
+		{orientation === 'right' && (
+			<polygon points="8 18.112 14.18888889 12 8 5.87733333 9.91111111 4 18 12 9.91111111 20" />
+		)}
 	</svg>
 }
 export type ChevronProps = Parameters<typeof Chevron>[0];
@@ -48,8 +52,10 @@ export function Day(props: DayProps) @{
 	<td {...cellProps} />
 }
 
-export type DayButtonProps =
-	{ day: CalendarDay; modifiers: Modifiers } & ButtonHTMLAttributes<HTMLButtonElement>;
+export type DayButtonProps = {
+	day: CalendarDay;
+	modifiers: Modifiers;
+} & ButtonHTMLAttributes<HTMLButtonElement>;
 export function DayButton(props: DayButtonProps) @{
 	const { day: _day, modifiers, ...buttonProps } = props;
 	const ref = useRef<HTMLButtonElement | null>(null);
@@ -60,8 +66,10 @@ export function DayButton(props: DayButtonProps) @{
 }
 
 export type DropdownOption = { value: number; label: string; disabled: boolean };
-export type DropdownProps =
-	{ options?: DropdownOption[] } & Omit<SelectHTMLAttributes<HTMLSelectElement>, 'children'>;
+export type DropdownProps = { options?: DropdownOption[] } & Omit<
+	SelectHTMLAttributes<HTMLSelectElement>,
+	'children'
+>;
 export function Dropdown(props: DropdownProps) @{
 	const { options, className, ...selectProps } = props;
 	const { classNames, components, styles } = useDayPicker();
@@ -73,14 +81,11 @@ export function Dropdown(props: DropdownProps) @{
 		style={styles?.[UI.DropdownRoot]}
 	>
 		<components.Select className={cssClassSelect} {...selectProps}>
-			{options?.map(
-				({ value, label, disabled }) =>
-					<components.Option
-						key={value}
-						value={value}
-						disabled={disabled}
-					>{label}</components.Option>,
-			)}
+			{options?.map(({ value, label, disabled }) => (
+				<components.Option key={value} value={value} disabled={disabled}>
+					{label}
+				</components.Option>
+			))}
 		</components.Select>
 		<span className={classNames[UI.CaptionLabel]} style={styles?.[UI.CaptionLabel]} aria-hidden>
 			{selectedOption?.label}
@@ -103,8 +108,10 @@ export function Footer(props: HTMLAttributes<HTMLDivElement>) @{
 }
 export type FooterProps = Parameters<typeof Footer>[0];
 
-export type MonthProps =
-	{ calendarMonth: CalendarMonth; displayIndex: number } & HTMLAttributes<HTMLDivElement>;
+export type MonthProps = {
+	calendarMonth: CalendarMonth;
+	displayIndex: number;
+} & HTMLAttributes<HTMLDivElement>;
 export function Month(props: MonthProps) @{
 	const { calendarMonth: _calendarMonth, displayIndex: _displayIndex, ...divProps } = props;
 	<div {...divProps}>{props.children}</div>
@@ -132,22 +139,32 @@ export function YearsDropdown(props: DropdownProps) @{
 	<components.Dropdown {...props} />
 }
 
-export type NavProps =
-	{
-		onPreviousClick?: MouseEventHandler<HTMLButtonElement>;
-		onNextClick?: MouseEventHandler<HTMLButtonElement>;
-		previousMonth?: Date;
-		nextMonth?: Date;
-	} & HTMLAttributes<HTMLElement>;
+export type NavProps = {
+	onPreviousClick?: MouseEventHandler<HTMLButtonElement>;
+	onNextClick?: MouseEventHandler<HTMLButtonElement>;
+	previousMonth?: Date;
+	nextMonth?: Date;
+} & HTMLAttributes<HTMLElement>;
 export function Nav(props: NavProps) @{
 	const { onPreviousClick, onNextClick, previousMonth, nextMonth, ...navProps } = props;
-	const { components, classNames, styles, labels: { labelPrevious, labelNext } } = useDayPicker();
-	const handleNextClick = useCallback((event: MouseEvent<HTMLButtonElement>) => {
-		if (nextMonth) onNextClick?.(event);
-	}, [nextMonth, onNextClick]);
-	const handlePreviousClick = useCallback((event: MouseEvent<HTMLButtonElement>) => {
-		if (previousMonth) onPreviousClick?.(event);
-	}, [previousMonth, onPreviousClick]);
+	const {
+		components,
+		classNames,
+		styles,
+		labels: { labelPrevious, labelNext },
+	} = useDayPicker();
+	const handleNextClick = useCallback(
+		(event: MouseEvent<HTMLButtonElement>) => {
+			if (nextMonth) onNextClick?.(event);
+		},
+		[nextMonth, onNextClick],
+	);
+	const handlePreviousClick = useCallback(
+		(event: MouseEvent<HTMLButtonElement>) => {
+			if (previousMonth) onPreviousClick?.(event);
+		},
+		[previousMonth, onPreviousClick],
+	);
 	<nav {...navProps}>
 		<components.PreviousMonthButton
 			type="button"

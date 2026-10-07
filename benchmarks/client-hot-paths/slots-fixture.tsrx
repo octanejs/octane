@@ -30,11 +30,13 @@ export function Other(props: ChildProps) @{
 	<aside>{props.label as string}</aside>
 }
 
-export function Slots(props: ChildProps & {
-	component: typeof Child;
-	identity: string;
-	value: OctaneNode;
-}) @{
+export function Slots(
+	props: ChildProps & {
+		component: typeof Child;
+		identity: string;
+		value: OctaneNode;
+	},
+) @{
 	const Component = props.component;
 	<section>
 		<Component

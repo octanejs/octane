@@ -38,8 +38,10 @@ type SelectorSlice = ReturnType<typeof selector>;
 const selectId = (obj: Node | Edge) => obj.id;
 
 function areEqual(a: SelectorSlice, b: SelectorSlice) {
-	return shallow(a.selectedNodes.map(selectId), b.selectedNodes.map(selectId)) &&
-		shallow(a.selectedEdges.map(selectId), b.selectedEdges.map(selectId));
+	return (
+		shallow(a.selectedNodes.map(selectId), b.selectedNodes.map(selectId)) &&
+		shallow(a.selectedEdges.map(selectId), b.selectedEdges.map(selectId))
+	);
 }
 
 function SelectionListenerInner<NodeType extends Node = Node, EdgeType extends Edge = Edge>({

@@ -18,24 +18,24 @@ export const DEFERRED_RENDER_IDLE_TIMEOUT = 500;
 
 export interface UseDeferredRenderOptions {
 	/**
- * Debounce delay in milliseconds before checking if still in view
- * @default DEFERRED_RENDER_DEBOUNCE_DELAY
- */
+	 * Debounce delay in milliseconds before checking if still in view
+	 * @default DEFERRED_RENDER_DEBOUNCE_DELAY
+	 */
 	debounceDelay?: number;
 	/**
- * Timeout for requestIdleCallback in milliseconds
- * @default DEFERRED_RENDER_IDLE_TIMEOUT
- */
+	 * Timeout for requestIdleCallback in milliseconds
+	 * @default DEFERRED_RENDER_IDLE_TIMEOUT
+	 */
 	idleTimeout?: number;
 	/**
- * If true, render immediately without waiting for intersection
- * @default false
- */
+	 * If true, render immediately without waiting for intersection
+	 * @default false
+	 */
 	immediate?: boolean;
 	/**
- * Root margin for Intersection Observer (e.g., '200px' to start rendering 200px before entering viewport)
- * @default DEFERRED_RENDER_ROOT_MARGIN
- */
+	 * Root margin for Intersection Observer (e.g., '200px' to start rendering 200px before entering viewport)
+	 * @default DEFERRED_RENDER_ROOT_MARGIN
+	 */
 	rootMargin?: string;
 }
 
@@ -76,31 +76,35 @@ export function useDeferredRender(options: UseDeferredRenderOptions = {}) {
 
 	// Polyfill for requestIdleCallback
 	const requestIdleCallbackPolyfill = useMemo(
-		() => (callback: IdleRequestCallback): number => {
-			const start = Date.now();
-			return window.setTimeout(() => {
-				callback({
-					didTimeout: false,
-					timeRemaining: () => Math.max(0, 50 - (Date.now() - start)),
-				});
-			}, 1);
-		},
+		() =>
+			(callback: IdleRequestCallback): number => {
+				const start = Date.now();
+				return window.setTimeout(() => {
+					callback({
+						didTimeout: false,
+						timeRemaining: () => Math.max(0, 50 - (Date.now() - start)),
+					});
+				}, 1);
+			},
 		[],
 	);
 
 	const requestIdleCallbackWrapper = useMemo(
-		() => typeof window !== 'undefined' && window.requestIdleCallback
-			? (cb: IdleRequestCallback, opts?: IdleRequestOptions) => window.requestIdleCallback(cb, opts)
-			: requestIdleCallbackPolyfill,
+		() =>
+			typeof window !== 'undefined' && window.requestIdleCallback
+				? (cb: IdleRequestCallback, opts?: IdleRequestOptions) =>
+						window.requestIdleCallback(cb, opts)
+				: requestIdleCallbackPolyfill,
 		[requestIdleCallbackPolyfill],
 	);
 
 	const cancelIdleCallbackWrapper = useMemo(
-		() => typeof window !== 'undefined' && window.cancelIdleCallback
-			? (id: number) => window.cancelIdleCallback(id)
-			: (id: number) => {
-					clearTimeout(id);
-				},
+		() =>
+			typeof window !== 'undefined' && window.cancelIdleCallback
+				? (id: number) => window.cancelIdleCallback(id)
+				: (id: number) => {
+						clearTimeout(id);
+					},
 		[],
 	);
 
@@ -139,19 +143,25 @@ export function useDeferredRender(options: UseDeferredRenderOptions = {}) {
 		};
 
 		const scheduleRender = (obs: IntersectionObserver) => {
-			idleCallbackRef.current = requestIdleCallbackWrapper((deadline) => {
-				// If we have time remaining or it's urgent, render
-				if (deadline.timeRemaining() > 0 || deadline.didTimeout) {
-					setShouldRender(true);
-					obs.disconnect();
-				} else {
-					// Otherwise, schedule again with shorter timeout
-					idleCallbackRef.current = requestIdleCallbackWrapper(() => {
+			idleCallbackRef.current = requestIdleCallbackWrapper(
+				(deadline) => {
+					// If we have time remaining or it's urgent, render
+					if (deadline.timeRemaining() > 0 || deadline.didTimeout) {
 						setShouldRender(true);
 						obs.disconnect();
-					}, { timeout: idleTimeout / 2 });
-				}
-			}, { timeout: idleTimeout });
+					} else {
+						// Otherwise, schedule again with shorter timeout
+						idleCallbackRef.current = requestIdleCallbackWrapper(
+							() => {
+								setShouldRender(true);
+								obs.disconnect();
+							},
+							{ timeout: idleTimeout / 2 },
+						);
+					}
+				},
+				{ timeout: idleTimeout },
+			);
 		};
 
 		const handleIntersecting = (obs: IntersectionObserver) => {
@@ -179,14 +189,17 @@ export function useDeferredRender(options: UseDeferredRenderOptions = {}) {
 			}
 		};
 
-		const observer = new IntersectionObserver((entries) => {
-			for (const entry of entries) {
-				handleIntersection(entry, observer);
-			}
-		}, {
-			rootMargin,
-			threshold: 0,
-		});
+		const observer = new IntersectionObserver(
+			(entries) => {
+				for (const entry of entries) {
+					handleIntersection(entry, observer);
+				}
+			},
+			{
+				rootMargin,
+				threshold: 0,
+			},
+		);
 
 		observer.observe(container);
 

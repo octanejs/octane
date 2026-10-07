@@ -88,21 +88,29 @@ export function NestedEditor(props) @{
 				const editor = $getEditor();
 				const nestedEditor = props.createNested(editor);
 				nestedEditor.update(() => {
-					$getRoot().clear().append($createParagraphNode().append($createTextNode('nested')));
+					$getRoot()
+						.clear()
+						.append($createParagraphNode().append($createTextNode('nested')));
 				});
 				props.onEditors(editor, nestedEditor);
-				$getRoot().clear().append(
-					$createParagraphNode().append($createTextNode('parent')),
-					$createOctaneDecoratorNode().setInline(false).setDecorate(() => {
-						return <NestedContent
-							nestedEditor={nestedEditor}
-							initialNodes={props.initialNodes}
-							skipEditableListener={props.skipEditableListener}
-							ariaLabel={props.nestedAriaLabel}
-							register={props.register}
-						/>;
-					}),
-				);
+				$getRoot()
+					.clear()
+					.append(
+						$createParagraphNode().append($createTextNode('parent')),
+						$createOctaneDecoratorNode()
+							.setInline(false)
+							.setDecorate(() => {
+								return (
+									<NestedContent
+										nestedEditor={nestedEditor}
+										initialNodes={props.initialNodes}
+										skipEditableListener={props.skipEditableListener}
+										ariaLabel={props.nestedAriaLabel}
+										register={props.register}
+									/>
+								);
+							}),
+					);
 			},
 			namespace: 'parent',
 			nodes: props.parentNodes ?? [OctaneDecoratorNode],

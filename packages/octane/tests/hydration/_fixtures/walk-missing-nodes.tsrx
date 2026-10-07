@@ -3,7 +3,9 @@
 
 export function Link(props: { url: string }) @{
 	<div>
-		<a id="first" href={props.url}>{'p0wned'}</a>
+		<a id="first" href={props.url}>
+			{'p0wned'}
+		</a>
 	</div>
 }
 
@@ -16,7 +18,9 @@ export function Bold(props: { t: string }) @{
 export function Deep(props: { url: string }) @{
 	<div>
 		<p>
-			<a id="deep" href={props.url}>{'p0wned'}</a>
+			<a id="deep" href={props.url}>
+				{'p0wned'}
+			</a>
 		</p>
 	</div>
 }
@@ -26,7 +30,9 @@ export function InBoundary(props: { url: string }) @{
 		<h1>{'title'}</h1>
 		@try {
 			<div>
-				<a id="first" href={props.url}>{'p0wned'}</a>
+				<a id="first" href={props.url}>
+					{'p0wned'}
+				</a>
 			</div>
 		} @pending {
 			<i>{'loading'}</i>

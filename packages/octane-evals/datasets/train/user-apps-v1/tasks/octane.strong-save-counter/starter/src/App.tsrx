@@ -19,7 +19,9 @@ export function App({ save }: { save: () => Promise<void> }) @{
 				await save();
 				setStatus('saved');
 			}}
-		>{'Save'}</button>
+		>
+			{'Save'}
+		</button>
 		<p>{`Saved ${saves} times` as string}</p>
 	</section>
 }

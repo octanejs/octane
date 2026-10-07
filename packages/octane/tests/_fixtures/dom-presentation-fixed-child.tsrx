@@ -20,11 +20,7 @@ export function FixedChild({
 	const rounded = radius === 'full';
 	const classes = [
 		'base',
-		variant === 'primary'
-			? 'primary'
-			: variant === 'ghost'
-				? 'ghost'
-				: 'secondary',
+		variant === 'primary' ? 'primary' : variant === 'ghost' ? 'ghost' : 'secondary',
 		rounded ? 'rounded' : 'square',
 		active && 'active',
 	];

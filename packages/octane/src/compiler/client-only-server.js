@@ -562,7 +562,20 @@ export function assertNoLiveClientOnlyImports(
 		// smuggle a client-only binding into the server graph.
 		if (node.type === 'TSEnumDeclaration') {
 			if (node.declare !== true) {
-				for (const member of node.members ?? []) visit(member.initializer, member, 'initializer');
+				// Inside an enum, its member names shadow outer bindings: `B = A`
+				// reads the member `A`, not an import named `A`.
+				const members = node.body?.members ?? [];
+				const bindings = new Set();
+				for (const member of members) {
+					const name = member.computed ? null : astName(member.id);
+					if (name !== null) bindings.add(name);
+				}
+				scopes.push(bindings);
+				for (const member of members) {
+					if (member.computed) visit(member.id, member, 'id');
+					visit(member.initializer, member, 'initializer');
+				}
+				scopes.pop();
 			}
 			return;
 		}

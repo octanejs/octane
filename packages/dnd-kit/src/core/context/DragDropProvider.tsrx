@@ -14,8 +14,7 @@ export type Events<
 	U extends Draggable<T> = Draggable<T>,
 	V extends Droppable<T> = Droppable<T>,
 	W extends DragDropManager<T, U, V> = DragDropManager<T, U, V>,
-> =
-	DragDropEventHandlers<U, V, W>;
+> = DragDropEventHandlers<U, V, W>;
 
 export interface DragDropProviderProps<
 	T extends Data = Data,
@@ -62,7 +61,7 @@ export function DragDropProvider<
 	const handleDragEnd = useLatest(onDragEnd);
 	const handleCollision = useLatest(onCollision);
 	const manager = useStableInstance<W>(
-		() => input.manager ?? new DragDropManager<T, U, V>(input) as W,
+		() => input.manager ?? (new DragDropManager<T, U, V>(input) as W),
 	);
 
 	useEffect(() => {

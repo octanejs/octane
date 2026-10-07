@@ -36,9 +36,7 @@ export function ChildDefaults(props: CollectionProps) @{
 }
 
 export function ConditionalReader(props: CollectionProps & { enabled: boolean }) @{
-	<p>
-		{props.enabled ? String(props.count$.get()) : 'idle'}
-	</p>
+	<p>{props.enabled ? String(props.count$.get()) : 'idle'}</p>
 }
 
 function SwitchableChild({
@@ -52,11 +50,8 @@ function SwitchableChild({
 	label: string;
 	value?: number | null;
 }) @{
-	const body =
-		enabled ? source$.get() : null;
-	<output data-collection-child={label}>
-		{enabled ? value + ':' + body : 'idle'}
-	</output>
+	const body = enabled ? source$.get() : null;
+	<output data-collection-child={label}>{enabled ? value + ':' + body : 'idle'}</output>
 }
 
 export function CollectionPanel(props: {
@@ -90,12 +85,17 @@ export function ReplayReader(props: {
 	final$: SignalHandle<number>;
 }) @{
 	const [ready, setReady] = useState(false);
-	const value = ((ready ? props.final$ : props.first$)).get();
+	const value = (ready ? props.final$ : props.first$).get();
 	if (!ready) setReady(true);
 	<p>{String(value)}</p>
 }
 
-export function HydrationDefault({ count$, body$, value = count$.get(), log }: CollectionProps & {
+export function HydrationDefault({
+	count$,
+	body$,
+	value = count$.get(),
+	log,
+}: CollectionProps & {
 	log?: (value: string) => void;
 }) @{
 	const output = useRef<HTMLOutputElement | null>(null);

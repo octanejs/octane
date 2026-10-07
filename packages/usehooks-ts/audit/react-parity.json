@@ -37,7 +37,7 @@
       "arch": "any",
       "packageManager": "pnpm@12.9.1",
       "lockfile": "pnpm-lock.yaml",
-      "lockfileSha256": "e92f4520cd88a2593a0ecd555e0532b2e4e8bb1396c9558a09f0cbf3fbaa5917"
+      "lockfileSha256": "caea67fe61ab57f3e8cbd8a0e55f0e8b3014b3dd6815c6fe6e158095f291daeb"
     }
   },
   "lanes": [
@@ -65,7 +65,7 @@
         {
           "path": "packages/usehooks-ts/tests/_fixtures/hooks.tsrx",
           "role": "support",
-          "sha256": "fb0addc15f92ae1c7d4bc75ed1790310ad946699a04593c84cea4b4080af1f8d"
+          "sha256": "45701b8fc9d85f57b0a7aeb7cc813e3d0cd81764bef832ee999d38044eb5ade0"
         },
         {
           "path": "packages/usehooks-ts/tests/differential/_setup.ts",

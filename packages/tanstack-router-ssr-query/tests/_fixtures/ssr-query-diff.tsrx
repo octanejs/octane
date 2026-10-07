@@ -6,16 +6,16 @@ export function ExistingWrapper(props: { children?: unknown }) {
 
 function QueryReader() {
 	const queryClient = useQueryClient();
-	return <output id="router-ssr-query">{String(
-		queryClient.getQueryData(['parity-proof']),
-	)}</output>;
+	return (
+		<output id="router-ssr-query">{String(queryClient.getQueryData(['parity-proof']))}</output>
+	);
 }
 
-export function WrappedQueryReader(props: {
-	Wrap: (props: { children?: unknown }) => unknown;
-}) {
+export function WrappedQueryReader(props: { Wrap: (props: { children?: unknown }) => unknown }) {
 	const Wrap = props.Wrap;
-	return <Wrap>
-		<QueryReader />
-	</Wrap>;
+	return (
+		<Wrap>
+			<QueryReader />
+		</Wrap>
+	);
 }

@@ -765,7 +765,7 @@ function emitIntrinsicContents(node, state, attrs) {
 function isEmptyChild(node) {
 	return (
 		node == null ||
-		(node.type === 'JSXText' && /^[\s;]*$/.test(node.value ?? '')) ||
+		(node.type === 'JSXText' && /^[ \t\r\n;]*$/.test(node.raw ?? node.value ?? '')) ||
 		(node.type === 'JSXExpressionContainer' && node.expression?.type === 'JSXEmptyExpression')
 	);
 }

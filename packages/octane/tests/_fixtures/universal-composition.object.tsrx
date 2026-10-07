@@ -14,17 +14,15 @@ function LocalStatus(props) {
 	if (props.mode === 'null') return null;
 	if (props.mode === 'primitive') return props.tail;
 	if (props.mode === 'array') {
-		return [
-			<badge key="badge" value={props.value} />,
-			props.tail,
-			null,
-		];
+		return [<badge key="badge" value={props.value} />, props.tail, null];
 	}
 	if (props.mode === 'fragment') {
-		return <>
-			<badge value={props.value} />
-			<fragment-marker value={props.tail} />
-		</>;
+		return (
+			<>
+				<badge value={props.value} />
+				<fragment-marker value={props.tail} />
+			</>
+		);
 	}
 	return <badge value={props.value} />;
 }
@@ -111,18 +109,19 @@ function AtomicChild(props) @{
 	}, [props.log, props.value]);
 	if (props.bumpDraft) setCount((value) => value + 10);
 	if (props.mode === 'error') throw new Error('atomic render failed');
-	const resolved =
-		props.mode === 'suspend' ? use(props.resource) : props.value;
+	const resolved = props.mode === 'suspend' ? use(props.resource) : props.value;
 	<atomic-node
 		value={resolved}
 		count={count}
 		ref={props.hostRef}
-		onPress={props.listen
-			? (event) => {
-					props.log(`atomic-press:${props.handler}:${event.delta}`);
-					setCount((value) => value + event.delta);
-				}
-			: undefined}
+		onPress={
+			props.listen
+				? (event) => {
+						props.log(`atomic-press:${props.handler}:${event.delta}`);
+						setCount((value) => value + event.delta);
+					}
+				: undefined
+		}
 	/>
 }
 

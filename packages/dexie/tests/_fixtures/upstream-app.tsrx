@@ -17,9 +17,8 @@ function ItemView({ item, idPrefix = 'item-' }: { item: Item; idPrefix?: string 
 }
 
 function ItemList({ db }: { db: any }) @{
-	const items = useLiveQuery(() => db.items.toArray() as Promise<Item[]>, [
-		db,
-	]) as Item[] | undefined;
+	const items = useLiveQuery(() => db.items.toArray() as Promise<Item[]>, [db]) as
+		Item[] | undefined;
 	@if (!items) {
 		<p>Loading...</p>
 	} @else {
@@ -41,11 +40,10 @@ function ItemList({ db }: { db: any }) @{
 function ItemLoader({ db, id }: { db: any; id: number }) @{
 	// Include db.name so per-test databases do not share the module-level
 	// suspending cache entry (upstream uses a singleton db + ['item', id]).
-	const item = useSuspendingLiveQuery(() => db.items.get(id) as Promise<Item | undefined>, [
-		'item',
-		db.name,
-		id,
-	]) as Item | undefined;
+	const item = useSuspendingLiveQuery(
+		() => db.items.get(id) as Promise<Item | undefined>,
+		['item', db.name, id],
+	) as Item | undefined;
 	@if (!item) {
 		<p class="not-found-item">
 			<span>NOT_FOUND</span>

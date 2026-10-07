@@ -78,7 +78,9 @@ function FocusManagerHarness(props) @{
 			<div ref={toolbarRef} data-testid="toolbar">
 				<button data-testid="btn-0">First</button>
 				<button data-testid="btn-1">Second</button>
-				<span data-item="true" data-testid="item" tabIndex={-1}>Item</span>
+				<span data-item="true" data-testid="item" tabIndex={-1}>
+					Item
+				</span>
 			</div>
 		}
 		<div

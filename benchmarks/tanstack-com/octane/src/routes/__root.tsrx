@@ -93,9 +93,7 @@ function getCanonicalHeadTags(matches: ReadonlyArray<CanonicalHeadMatch>): {
 			{ property: 'og:url', content: pageUrl },
 			{ name: 'twitter:url', content: pageUrl },
 			...(!shouldIndexPath(canonicalPath)
-				? [
-						{ name: 'robots', content: 'noindex, nofollow' },
-					]
+				? [{ name: 'robots', content: 'noindex, nofollow' }]
 				: []),
 		],
 	};
@@ -133,7 +131,8 @@ export const Route = createRootRouteWithContext<{
 					title: 'TanStack | High Quality Open-Source Software for Web Developers',
 					description: `Headless, type-safe, powerful utilities for complex workflows like Data Management, Data Visualization, Charts, Tables, and UI Components.`,
 					image: `https://tanstack.com${ogImage}`,
-					keywords: 'tanstack,react,reactjs,react query,react table,open source,open source software,oss,software',
+					keywords:
+						'tanstack,react,reactjs,react query,react table,open source,open source software,oss,software',
 				}),
 				...canonicalHeadTags.meta,
 			],
@@ -178,9 +177,7 @@ export const Route = createRootRouteWithContext<{
 			// managed head tags (deduped via data-tsr-managed-key) are the idiomatic
 			// carrier for the same markup.
 			scripts: [{ children: THEME_BOOTSTRAP }],
-			styles: [
-				{ id: 'tanstack-highlight-theme', children: HIGHLIGHT_THEME_CSS },
-			],
+			styles: [{ id: 'tanstack-highlight-theme', children: HIGHLIGHT_THEME_CSS }],
 		};
 	},
 	headers: () => DOCUMENT_CACHE_HEADERS,
@@ -193,11 +190,13 @@ export const Route = createRootRouteWithContext<{
 });
 
 function RootShell({ children }: { children?: any }) {
-	return <ThemeProvider>
-		<SearchProvider>
-			<ShellComponent>{children}</ShellComponent>
-		</SearchProvider>
-	</ThemeProvider>;
+	return (
+		<ThemeProvider>
+			<SearchProvider>
+				<ShellComponent>{children}</ShellComponent>
+			</SearchProvider>
+		</ThemeProvider>
+	);
 }
 
 function ShellComponent({ children }: { children?: any }) {
@@ -232,41 +231,43 @@ function ShellComponent({ children }: { children?: any }) {
 
 	const htmlClass = useHtmlClass();
 
-	return <Html lang="en" class={htmlClass} suppressHydrationWarning>
-		<Head>
-			<HeadContent />
-			{hasBaseParent ? <base target="_parent" /> : null}
-		</Head>
-		<Body class="overflow-x-hidden">
-			<LoginModalProvider>
-				<ToastProvider>
-					{hideNavbar ? children : <Navbar>{children}</Navbar>}
-					<div
-						aria-hidden="true"
-						class={twMerge(
-							'pointer-events-none fixed top-0 left-0 z-99999999 h-[320px] w-full select-none',
-						)}
-					>
+	return (
+		<Html lang="en" class={htmlClass} suppressHydrationWarning>
+			<Head>
+				<HeadContent />
+				{hasBaseParent ? <base target="_parent" /> : null}
+			</Head>
+			<Body class="overflow-x-hidden">
+				<LoginModalProvider>
+					<ToastProvider>
+						{hideNavbar ? children : <Navbar>{children}</Navbar>}
 						<div
+							aria-hidden="true"
 							class={twMerge(
-								'absolute top-0 w-full h-80 rounded-[100%] bg-amber-500/30 blur-3xl transition-all duration-500 dark:bg-sky-400/25',
-								showNavigationSpinner
-									? '-translate-y-1/2 opacity-100'
-									: '-translate-y-full opacity-0',
-							)}
-						/>
-						<div
-							class={twMerge(
-								'absolute top-6 left-1/2 -translate-x-1/2 rounded-full bg-white/75 p-2 shadow-lg backdrop-blur-lg transition-all duration-300 dark:bg-slate-900/40',
-								showNavigationSpinner ? 'translate-y-0 opacity-100' : '-translate-y-6 opacity-0',
+								'pointer-events-none fixed top-0 left-0 z-99999999 h-[320px] w-full select-none',
 							)}
 						>
-							<Spinner className="text-4xl" />
+							<div
+								class={twMerge(
+									'absolute top-0 w-full h-80 rounded-[100%] bg-amber-500/30 blur-3xl transition-all duration-500 dark:bg-sky-400/25',
+									showNavigationSpinner
+										? '-translate-y-1/2 opacity-100'
+										: '-translate-y-full opacity-0',
+								)}
+							/>
+							<div
+								class={twMerge(
+									'absolute top-6 left-1/2 -translate-x-1/2 rounded-full bg-white/75 p-2 shadow-lg backdrop-blur-lg transition-all duration-300 dark:bg-slate-900/40',
+									showNavigationSpinner ? 'translate-y-0 opacity-100' : '-translate-y-6 opacity-0',
+								)}
+							>
+								<Spinner className="text-4xl" />
+							</div>
 						</div>
-					</div>
-				</ToastProvider>
-			</LoginModalProvider>
-			<Scripts />
-		</Body>
-	</Html>;
+					</ToastProvider>
+				</LoginModalProvider>
+				<Scripts />
+			</Body>
+		</Html>
+	);
 }

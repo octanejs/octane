@@ -6,14 +6,20 @@ const [useValue] = bind(values);
 
 function Value() {
 	const value = useValue();
-	return <div>
-		<span id="value">{String(value)}</span>
-		<button id="next" onClick={() => values.next(values.value + 1)}>{'next'}</button>
-	</div>;
+	return (
+		<div>
+			<span id="value">{String(value)}</span>
+			<button id="next" onClick={() => values.next(values.value + 1)}>
+				{'next'}
+			</button>
+		</div>
+	);
 }
 
 export function BoundValue() {
-	return <Subscribe source$={values}>
-		<Value />
-	</Subscribe>;
+	return (
+		<Subscribe source$={values}>
+			<Value />
+		</Subscribe>
+	);
 }

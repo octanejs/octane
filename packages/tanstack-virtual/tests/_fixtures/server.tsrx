@@ -10,7 +10,10 @@ export function ServerVirtualList() @{
 		overscan: 0,
 	});
 	<p id="server-range">
-		{virtualizer.getVirtualItems().map((item) => item.index).join(',')}
+		{virtualizer
+			.getVirtualItems()
+			.map((item) => item.index)
+			.join(',')}
 		{'/' + virtualizer.getTotalSize()}
 	</p>
 }

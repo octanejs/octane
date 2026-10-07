@@ -264,9 +264,7 @@ function CompatCode(props: { direction: Direction }) @{
 				<span class="compat-dot compat-dot-r"></span>
 				<span class="compat-dot compat-dot-y"></span>
 				<span class="compat-dot compat-dot-g"></span>
-				<span class="compat-code-name">
-					{reactInOctane ? 'App.tsrx' : 'App.tsx'}
-				</span>
+				<span class="compat-code-name">{reactInOctane ? 'App.tsrx' : 'App.tsx'}</span>
 				<button
 					type="button"
 					class="compat-code-copy"
@@ -278,9 +276,7 @@ function CompatCode(props: { direction: Direction }) @{
 						style={'--icon:url("' + (copied ? checkUrl : copyUrl) + '")'}
 						aria-hidden="true"
 					></span>
-					<span>
-						{copied ? 'Copied' : 'Copy'}
-					</span>
+					<span>{copied ? 'Copied' : 'Copy'}</span>
 				</button>
 			</div>
 			<div class="compat-code-body" ref={sampleEl}>

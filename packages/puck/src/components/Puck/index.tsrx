@@ -68,15 +68,17 @@ const getClassName = getClassNameFactory('Puck', styles);
 const getLayoutClassName = getClassNameFactory('PuckLayout', styles);
 
 const FieldSideBar = () => {
-	const title = useAppStore(
-		(s) => s.selectedItem
-			? s.config.components[s.selectedItem.type]?.['label'] ?? s.selectedItem.type.toString()
+	const title = useAppStore((s) =>
+		s.selectedItem
+			? (s.config.components[s.selectedItem.type]?.['label'] ?? s.selectedItem.type.toString())
 			: 'Page',
 	);
 
-	return <SidebarSection noPadding noBorderTop showBreadcrumbs title={title}>
-		<Fields />
-	</SidebarSection>;
+	return (
+		<SidebarSection noPadding noBorderTop showBreadcrumbs title={title}>
+			<Fields />
+		</SidebarSection>
+	);
 };
 
 type PuckProps<
@@ -168,12 +170,12 @@ function PuckProvider<
 
 			const viewportWidth = window.innerWidth;
 
-			const viewportDifferences = Object.entries(viewports).map(
-				([key, value]) => ({
+			const viewportDifferences = Object.entries(viewports)
+				.map(([key, value]) => ({
 					key,
 					diff: Math.abs(viewportWidth - value.width),
-				}),
-			).sort((a, b) => (a.diff > b.diff ? 1 : -1));
+				}))
+				.sort((a, b) => (a.diff > b.diff ? 1 : -1));
 
 			const closestViewport = viewportDifferences[0].key as any;
 
@@ -185,7 +187,9 @@ function PuckProvider<
 
 						current: {
 							...initial.viewports.current,
-							height: initialUi?.viewports?.current?.height || viewports[closestViewport]?.height ||
+							height:
+								initialUi?.viewports?.current?.height ||
+								viewports[closestViewport]?.height ||
 								'auto',
 							width: initialUi?.viewports?.current?.width || viewports[closestViewport]?.width,
 						},
@@ -243,7 +247,7 @@ function PuckProvider<
 
 	const [blendedHistories] = useState(
 		[
-			..._initialHistory?.histories || [],
+			...(_initialHistory?.histories || []),
 			...(appendData ? [{ state: generatedAppState }] : []),
 		].map((history) => {
 			// Inject default data to enable partial history injections
@@ -283,29 +287,32 @@ function PuckProvider<
 		};
 	}, [fieldTransforms, plugins]);
 
-	const generateAppStore = useCallback((state?: PrivateAppState) => {
-		return {
-			state,
+	const generateAppStore = useCallback(
+		(state?: PrivateAppState) => {
+			return {
+				state,
+				config,
+				plugins: plugins || [],
+				overrides: loadedOverrides,
+				viewports,
+				iframe,
+				onAction,
+				metadata,
+				fieldTransforms: loadedFieldTransforms,
+			};
+		},
+		[
+			initialAppState,
 			config,
-			plugins: plugins || [],
-			overrides: loadedOverrides,
+			plugins,
+			loadedOverrides,
 			viewports,
 			iframe,
 			onAction,
 			metadata,
-			fieldTransforms: loadedFieldTransforms,
-		};
-	}, [
-		initialAppState,
-		config,
-		plugins,
-		loadedOverrides,
-		viewports,
-		iframe,
-		onAction,
-		metadata,
-		loadedFieldTransforms,
-	]);
+			loadedFieldTransforms,
+		],
+	);
 
 	const [appStore] = useState(() => createAppStore(generateAppStore(initialAppState)));
 
@@ -332,15 +339,18 @@ function PuckProvider<
 	const previousData = useRef<Data | null>(null);
 
 	useEffect(() => {
-		appStore.subscribe((s) => s.state.data, (data) => {
-			if (onChange) {
-				if (fdeq(data, previousData.current)) return;
+		appStore.subscribe(
+			(s) => s.state.data,
+			(data) => {
+				if (onChange) {
+					if (fdeq(data, previousData.current)) return;
 
-				onChange(data as G['UserData']);
+					onChange(data as G['UserData']);
 
-				previousData.current = data;
-			}
-		});
+					previousData.current = data;
+				}
+			},
+		);
 	}, []);
 
 	useRegisterPermissionsSlice(appStore, permissions);
@@ -353,9 +363,11 @@ function PuckProvider<
 		resolveAndCommitData();
 	}, []);
 
-	return <AppStoreContext value={appStore}>
-		<UsePuckStoreContext value={uPuckStore}>{children}</UsePuckStoreContext>
-	</AppStoreContext>;
+	return (
+		<AppStoreContext value={appStore}>
+			<UsePuckStoreContext value={uPuckStore}>{children}</UsePuckStoreContext>
+		</AppStoreContext>
+	);
 }
 
 function PuckLayout<
@@ -459,62 +471,67 @@ function PuckLayout<
 		layoutOptions['--puck-user-right-side-bar-width'] = `${rightWidth}px`;
 	}
 
-	return <div className={`Puck ${getClassName()}`}>
-		<DragDropContext disableAutoScroll={dnd?.disableAutoScroll}>
-			<CustomPuck>
-				{children ||
-					<FrameProvider>
-						<div
-							className={getLayoutClassName({
-								leftSideBarVisible,
-								mounted,
-								rightSideBarVisible,
-							})}
-						>
-							<div className={getLayoutClassName('inner')} style={layoutOptions}>
-								<Header />
-								<Sidebar
-									position="left"
-									sidebarRef={leftSidebarRef}
-									isVisible={leftSideBarVisible}
-									onResize={setLeftWidth}
-									onResizeEnd={handleLeftSidebarResizeEnd}
-								>
-									<SidebarSection title="Components" noBorderTop>
-										<Components />
-									</SidebarSection>
-									<SidebarSection title="Outline">
-										<Outline />
-									</SidebarSection>
-								</Sidebar>
-								<Canvas />
-								<Sidebar
-									position="right"
-									sidebarRef={rightSidebarRef}
-									isVisible={rightSideBarVisible}
-									onResize={setRightWidth}
-									onResizeEnd={handleRightSidebarResizeEnd}
-								>
-									<FieldSideBar />
-								</Sidebar>
+	return (
+		<div className={`Puck ${getClassName()}`}>
+			<DragDropContext disableAutoScroll={dnd?.disableAutoScroll}>
+				<CustomPuck>
+					{children || (
+						<FrameProvider>
+							<div
+								className={getLayoutClassName({
+									leftSideBarVisible,
+									mounted,
+									rightSideBarVisible,
+								})}
+							>
+								<div className={getLayoutClassName('inner')} style={layoutOptions}>
+									<Header />
+									<Sidebar
+										position="left"
+										sidebarRef={leftSidebarRef}
+										isVisible={leftSideBarVisible}
+										onResize={setLeftWidth}
+										onResizeEnd={handleLeftSidebarResizeEnd}
+									>
+										<SidebarSection title="Components" noBorderTop>
+											<Components />
+										</SidebarSection>
+										<SidebarSection title="Outline">
+											<Outline />
+										</SidebarSection>
+									</Sidebar>
+									<Canvas />
+									<Sidebar
+										position="right"
+										sidebarRef={rightSidebarRef}
+										isVisible={rightSideBarVisible}
+										onResize={setRightWidth}
+										onResizeEnd={handleRightSidebarResizeEnd}
+									>
+										<FieldSideBar />
+									</Sidebar>
+								</div>
 							</div>
-						</div>
-					</FrameProvider>}
-			</CustomPuck>
-		</DragDropContext>
-		<div id="puck-portal-root" className={getClassName('portal')} />
-	</div>;
+						</FrameProvider>
+					)}
+				</CustomPuck>
+			</DragDropContext>
+			<div id="puck-portal-root" className={getClassName('portal')} />
+		</div>
+	);
 }
 
 export function Puck<
 	UserConfig extends Config = Config,
 	G extends UserGenerics<UserConfig> = UserGenerics<UserConfig>,
 >(props: PuckProps<UserConfig>) {
-	return <PropsProvider {...props}>
-		<PuckProvider {...props}>
-			<PuckLayout {...props} />
-		</PuckProvider>
-	</PropsProvider>;
+	return (
+		<PropsProvider {...props}>
+			<PuckProvider {...props}>
+				<PuckLayout {...props} />
+			</PuckProvider>
+		</PropsProvider>
+	);
 }
 
 Puck.Components = Components;

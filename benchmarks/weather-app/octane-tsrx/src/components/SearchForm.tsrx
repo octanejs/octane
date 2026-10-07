@@ -25,7 +25,9 @@ function SearchFormImpl({ onSearch, isLoading }: SearchFormProps) @{
 	<section class="search-section">
 		<form class="search-form" data-testid="search-form" onSubmit={handleSubmit}>
 			<div class="search-form__group">
-				<label htmlFor="location-input" class="sr-only">Enter city name</label>
+				<label htmlFor="location-input" class="sr-only">
+					Enter city name
+				</label>
 				<input
 					type="text"
 					id="location-input"
@@ -41,9 +43,7 @@ function SearchFormImpl({ onSearch, isLoading }: SearchFormProps) @{
 					data-testid="search-button"
 					disabled={isLoading}
 				>
-					<span class="search-button__text">
-						{isLoading ? 'Loading...' : 'Get Weather'}
-					</span>
+					<span class="search-button__text">{isLoading ? 'Loading...' : 'Get Weather'}</span>
 					<span class="search-button__icon">🌦️</span>
 				</button>
 			</div>

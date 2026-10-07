@@ -14,44 +14,50 @@ export const defaultRadarChartProps = {
 	endAngle: -270,
 } as const satisfies Partial<PolarChartProps<never>>;
 
-type RadarChartProps<DataPointType> =
-	Omit<PolarChartProps<DataPointType>, 'layout' | 'startAngle' | 'endAngle'> & {
-		/**
- * The layout of chart defines the orientation of axes, graphical items, and tooltip.
- *
- * @defaultValue centric
- */
-		layout?: PolarLayout;
-		/**
- * Angle in degrees from which the chart should start.
- * @defaultValue 90
- *
- */
-		startAngle?: number;
-		/**
- * Angle, in degrees, at which the chart should end.
- *
- * @defaultValue -270
- */
-		endAngle?: number;
-	};
+type RadarChartProps<DataPointType> = Omit<
+	PolarChartProps<DataPointType>,
+	'layout' | 'startAngle' | 'endAngle'
+> & {
+	/**
+	 * The layout of chart defines the orientation of axes, graphical items, and tooltip.
+	 *
+	 * @defaultValue centric
+	 */
+	layout?: PolarLayout;
+	/**
+	 * Angle in degrees from which the chart should start.
+	 * @defaultValue 90
+	 *
+	 */
+	startAngle?: number;
+	/**
+	 * Angle, in degrees, at which the chart should end.
+	 *
+	 * @defaultValue -270
+	 */
+	endAngle?: number;
+};
 
 /**
  * @consumes ResponsiveContainerContext
  * @provides PolarViewBoxContext
  * @provides PolarChartContext
  */
-export function RadarChart<DataPointType = unknown>(props: RadarChartProps<DataPointType> & {
-	ref?: Ref<SVGSVGElement>;
-}) {
+export function RadarChart<DataPointType = unknown>(
+	props: RadarChartProps<DataPointType> & {
+		ref?: Ref<SVGSVGElement>;
+	},
+) {
 	const { ref, ...rest } = props;
 	const propsWithDefaults = resolveDefaultProps(rest, defaultRadarChartProps);
-	return <PolarChart
-		chartName="RadarChart"
-		defaultTooltipEventType="axis"
-		validateTooltipEventTypes={allowedTooltipTypes}
-		tooltipPayloadSearcher={arrayTooltipSearcher}
-		categoricalChartProps={propsWithDefaults}
-		ref={ref}
-	/>;
+	return (
+		<PolarChart
+			chartName="RadarChart"
+			defaultTooltipEventType="axis"
+			validateTooltipEventTypes={allowedTooltipTypes}
+			tooltipPayloadSearcher={arrayTooltipSearcher}
+			categoricalChartProps={propsWithDefaults}
+			ref={ref}
+		/>
+	);
 }

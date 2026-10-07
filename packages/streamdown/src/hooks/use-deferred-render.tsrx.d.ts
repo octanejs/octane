@@ -14,24 +14,24 @@ export declare const DEFERRED_RENDER_ROOT_MARGIN = "300px";
 export declare const DEFERRED_RENDER_IDLE_TIMEOUT = 500;
 export interface UseDeferredRenderOptions {
     /**
- * Debounce delay in milliseconds before checking if still in view
- * @default DEFERRED_RENDER_DEBOUNCE_DELAY
- */
+     * Debounce delay in milliseconds before checking if still in view
+     * @default DEFERRED_RENDER_DEBOUNCE_DELAY
+     */
     debounceDelay?: number;
     /**
- * Timeout for requestIdleCallback in milliseconds
- * @default DEFERRED_RENDER_IDLE_TIMEOUT
- */
+     * Timeout for requestIdleCallback in milliseconds
+     * @default DEFERRED_RENDER_IDLE_TIMEOUT
+     */
     idleTimeout?: number;
     /**
- * If true, render immediately without waiting for intersection
- * @default false
- */
+     * If true, render immediately without waiting for intersection
+     * @default false
+     */
     immediate?: boolean;
     /**
- * Root margin for Intersection Observer (e.g., '200px' to start rendering 200px before entering viewport)
- * @default DEFERRED_RENDER_ROOT_MARGIN
- */
+     * Root margin for Intersection Observer (e.g., '200px' to start rendering 200px before entering viewport)
+     * @default DEFERRED_RENDER_ROOT_MARGIN
+     */
     rootMargin?: string;
 }
 /**

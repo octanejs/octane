@@ -41,7 +41,9 @@ export function NestedBlocks() @{
 			}
 		</style>
 		<div id="nb-outer" class="nb-outer">
-			<p id="nb-p" class="nb-p">{'outer'}</p>
+			<p id="nb-p" class="nb-p">
+				{'outer'}
+			</p>
 			@{
 				<>
 					<style>
@@ -49,7 +51,9 @@ export function NestedBlocks() @{
 							font-weight: 700;
 						}
 					</style>
-					<span id="nb-inner" class="nb-inner">{'inner'}</span>
+					<span id="nb-inner" class="nb-inner">
+						{'inner'}
+					</span>
 				</>
 			}
 		</div>
@@ -71,8 +75,12 @@ export function StyleCallChain(props: { cls: string }) @{
 						font-weight: 700;
 					}
 				</style>
-				<p id="sc-static" class={style('sc-row')}>{'static'}</p>
-				<p id="sc-dynamic" class={style(props.cls)}>{'dynamic'}</p>
+				<p id="sc-static" class={style('sc-row')}>
+					{'static'}
+				</p>
+				<p id="sc-dynamic" class={style(props.cls)}>
+					{'dynamic'}
+				</p>
 			</>
 		}</div>
 	</>
@@ -115,7 +123,9 @@ export function ControlFlow(props: {
 							color: rgb(2, 2, 2);
 						}
 					</style>
-					<p id="cf-maybe" class="cf-maybe">{'maybe'}</p>
+					<p id="cf-maybe" class="cf-maybe">
+						{'maybe'}
+					</p>
 				</>
 			} @else {
 				<>
@@ -124,7 +134,9 @@ export function ControlFlow(props: {
 							color: rgb(3, 3, 3);
 						}
 					</style>
-					<p id="cf-no" class="cf-no">{'no'}</p>
+					<p id="cf-no" class="cf-no">
+						{'no'}
+					</p>
 				</>
 			}
 			<ul id="cf-list">
@@ -147,7 +159,9 @@ export function ControlFlow(props: {
 								color: rgb(5, 5, 5);
 							}
 						</style>
-						<li id="cf-empty" class="cf-empty">{'none'}</li>
+						<li id="cf-empty" class="cf-empty">
+							{'none'}
+						</li>
 					</>
 				}
 			</ul>
@@ -159,7 +173,9 @@ export function ControlFlow(props: {
 								color: rgb(6, 6, 6);
 							}
 						</style>
-						<b id="cf-one" class="cf-one">{'one'}</b>
+						<b id="cf-one" class="cf-one">
+							{'one'}
+						</b>
 					</>
 				}
 				@default: {
@@ -169,7 +185,9 @@ export function ControlFlow(props: {
 								color: rgb(7, 7, 7);
 							}
 						</style>
-						<i id="cf-other" class="cf-other">{'other'}</i>
+						<i id="cf-other" class="cf-other">
+							{'other'}
+						</i>
 					</>
 				}
 			}
@@ -180,7 +198,9 @@ export function ControlFlow(props: {
 							color: rgb(8, 8, 8);
 						}
 					</style>
-					<em id="cf-ok" class="cf-ok">{'ok'}</em>
+					<em id="cf-ok" class="cf-ok">
+						{'ok'}
+					</em>
 				</>
 			} @catch (error) {
 				<>
@@ -189,7 +209,9 @@ export function ControlFlow(props: {
 							color: rgb(10, 10, 10);
 						}
 					</style>
-					<s id="cf-err" class="cf-err">{'err'}</s>
+					<s id="cf-err" class="cf-err">
+						{'err'}
+					</s>
 				</>
 			}
 		</div>
@@ -206,7 +228,9 @@ export function SiblingScopes() @{
 						color: rgb(11, 0, 0);
 					}
 				</style>
-				<p id="sib-a" class="sib-a">{'a'}</p>
+				<p id="sib-a" class="sib-a">
+					{'a'}
+				</p>
 			</>
 		}
 		@{
@@ -216,7 +240,9 @@ export function SiblingScopes() @{
 						color: rgb(0, 11, 0);
 					}
 				</style>
-				<p id="sib-b" class="sib-b">{'b'}</p>
+				<p id="sib-b" class="sib-b">
+					{'b'}
+				</p>
 			</>
 		}
 	</>
@@ -236,7 +262,9 @@ export function FloatSibling() @{
 				color: rgb(12, 13, 14);
 			}
 		</style>
-		<div id="fs-host" class="fs-scoped fs-tokens">{'float sibling'}</div>
+		<div id="fs-host" class="fs-scoped fs-tokens">
+			{'float sibling'}
+		</div>
 	</>
 }
 

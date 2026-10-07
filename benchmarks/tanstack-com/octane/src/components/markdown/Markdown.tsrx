@@ -25,8 +25,7 @@ export function Markdown({ content, document, preserveTabPanels, eagerFirstImage
 	const parsed = useMemo(() => document ?? parseSiteMarkdown(content ?? ''), [content, document]);
 
 	return useMemo(() => {
-		const firstImageSrc =
-			eagerFirstImage ? findFirstImageSrc(parsed) : undefined;
+		const firstImageSrc = eagerFirstImage ? findFirstImageSrc(parsed) : undefined;
 
 		return renderMarkdown(parsed, {
 			allowHtml: true,
@@ -47,9 +46,7 @@ const headingAnchors = {
 };
 
 function CodeFigure({ children }: { children?: any }) {
-	return <>
-		{children}
-	</>;
+	return <>{children}</>;
 }
 
 function CodeFigcaption() {
@@ -60,11 +57,11 @@ function createHeadingComponent(level: 'h1' | 'h2' | 'h3' | 'h4' | 'h5' | 'h6') 
 	function HeadingComponent({ children, className, id, ...props }: Record<string, any>) {
 		const Tag = level;
 
-		return <Tag
-			id={id}
-			class={`${className ?? ''} block scroll-my-20 lg:scroll-my-4`}
-			{...props}
-		>{children}</Tag>;
+		return (
+			<Tag id={id} class={`${className ?? ''} block scroll-my-20 lg:scroll-my-4`} {...props}>
+				{children}
+			</Tag>
+		);
 	}
 
 	HeadingComponent.displayName = `Heading${level.toUpperCase()}`;
@@ -107,10 +104,18 @@ function MarkdownIframe(props: Record<string, any>) {
 
 function CodeElement({ children, className, ...props }: Record<string, any>) {
 	if (className?.includes('language-')) {
-		return <code class={className} {...props}>{children}</code>;
+		return (
+			<code class={className} {...props}>
+				{children}
+			</code>
+		);
 	}
 
-	return <InlineCode className={className} {...props}>{children}</InlineCode>;
+	return (
+		<InlineCode className={className} {...props}>
+			{children}
+		</InlineCode>
+	);
 }
 
 function LinkElement(props: Record<string, any>) {
@@ -122,9 +127,11 @@ function LinkElement(props: Record<string, any>) {
 }
 
 function TableElement({ className, ...props }: Record<string, any>) {
-	return <div class="w-full max-w-full overflow-x-auto">
-		<table class={['min-w-full', className].filter(Boolean).join(' ')} {...props} />
-	</div>;
+	return (
+		<div class="w-full max-w-full overflow-x-auto">
+			<table class={['min-w-full', className].filter(Boolean).join(' ')} {...props} />
+		</div>
+	);
 }
 
 function createMarkdownComponents(

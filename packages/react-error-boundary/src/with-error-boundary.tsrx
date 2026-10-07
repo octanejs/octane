@@ -6,9 +6,11 @@ export function withErrorBoundary<Props extends object>(
 	errorBoundaryProps: ErrorBoundaryProps,
 ): ComponentType<Props> {
 	function WrappedComponent(props: Props) {
-		return <ErrorBoundary {...errorBoundaryProps}>
-			<BaseComponent {...props} />
-		</ErrorBoundary>;
+		return (
+			<ErrorBoundary {...errorBoundaryProps}>
+				<BaseComponent {...props} />
+			</ErrorBoundary>
+		);
 	}
 
 	WrappedComponent.displayName = `withErrorBoundary(${

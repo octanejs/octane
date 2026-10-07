@@ -12,15 +12,13 @@ function uppercase(value: string): string {
 	return value.toUpperCase();
 }
 
-export function TextScene(props: {
-	label: string;
-	maybe: string | null;
-	child: OctaneNode;
-}) @{
+export function TextScene(props: { label: string; maybe: string | null; child: OctaneNode }) @{
 	const [count, setCount] = useState(0);
 	const { label } = props;
 	<main>
-		<button id="text-bump" onClick={() => setCount(count + 1)}>increment</button>
+		<button id="text-bump" onClick={() => setCount(count + 1)}>
+			increment
+		</button>
 		<section id="text-siblings">
 			<Before />
 			{label}

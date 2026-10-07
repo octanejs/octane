@@ -18,7 +18,9 @@ function LayoutGrandchild(props) @{
 		props.log('mount layout Grandchild');
 		return () => props.log('cleanup layout Grandchild');
 	}, []);
-	<span id="lg" data-k="lg">{'gc'}</span>
+	<span id="lg" data-k="lg">
+		{'gc'}
+	</span>
 }
 
 function LayoutChild(props) @{
@@ -47,7 +49,9 @@ function PassiveGrandchild(props) @{
 		props.log('mount passive Grandchild');
 		return () => props.log('cleanup passive Grandchild');
 	}, []);
-	<span id="pg" data-k="pg">{'gc'}</span>
+	<span id="pg" data-k="pg">
+		{'gc'}
+	</span>
 }
 
 function PassiveChild(props) @{
