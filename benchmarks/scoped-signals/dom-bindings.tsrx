@@ -27,3 +27,12 @@ export function PlainStyles(props: { left: number; right: number; record: () => 
 		<span>{'stable'}</span>
 	</div>
 }
+
+// Components often forward an optional style prop: here a string on the host and
+// an unset one on its child. Neither has a native read for a Block to own.
+export function ForwardedStyles(props: { style: string; extra?: string; record: () => void }) @{
+	props.record();
+	<div style={props.style}>
+		<span style={props.extra}>{'stable'}</span>
+	</div>
+}

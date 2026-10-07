@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { flushSync, hydrateRoot, startTransition } from 'octane';
 import { renderToString } from 'octane/server';
+import { createScope } from 'octane/signals';
 import { act, mount } from './_helpers';
 import { loadCompiledFixtureSource } from './_server-fixture';
 import { installViewTransitionMocks } from './conformance/_helpers/view-transition-mocks';
@@ -29,6 +30,19 @@ export function Siblings(props) @{
 		<div id="first" style={{ color: props.color, width: props.width }} />
 		<div id="second" style={{ color: props.color, width: props.last }} />
 	</main>
+}
+function Forward(props) @{
+	props.record?.();
+	<div id="target" title={props.title} style={props.style}><input /></div>
+}
+export function Forwarded(props) @{
+	<main><Forward style={props.style} title={props.title} record={props.record} /><Reader read={props.read} /></main>
+}
+export function SuspendedForwarded(props) @{
+	<Suspense fallback={<p>pending</p>}>
+		<Forward style={props.style} title={props.title} record={props.record} />
+		<Reader read={props.read} />
+	</Suspense>
 }
 `;
 
@@ -249,6 +263,62 @@ describe.each([
 		}
 	});
 
+	// Components often forward an optional style prop that is unset or a string.
+	// Native and ordinary bindings write those the same way, and a root render
+	// that waits must restore both the attribute and the value later writes diff against.
+	it('writes forwarded unset and string styles in place and restores them while a root render waits', async () => {
+		const client = fixture(dev, native);
+		const pending = deferred();
+		let ready = true;
+		const read = () => {
+			if (!ready) throw pending.promise;
+			return 'ready';
+		};
+		const root = mount(client.Forwarded, { style: undefined, title: 'unset', read });
+		const element = root.find('#target') as HTMLElement;
+		const input = element.querySelector('input')!;
+		input.value = 'retained draft';
+		try {
+			expect(element.hasAttribute('style')).toBe(false);
+			root.update(client.Forwarded, { style: 'color: red; width: 10px;', title: 'string', read });
+			expect(element.style.cssText).toBe('color: red; width: 10px;');
+			element.style.borderColor = 'green';
+			const original = element.style.cssText;
+			ready = false;
+			root.update(client.Forwarded, { style: undefined, title: 'waiting', read });
+			expect(root.find('#target')).toBe(element);
+			expect(element.style.cssText).toBe(original);
+			expect(element.title).toBe('string');
+			ready = true;
+			await act(() => pending.resolve());
+			// Unsetting a string style clears the attribute's declarations, as it
+			// would have without the wait, including the edit made outside Octane.
+			expect(element.style.cssText).toBe('');
+			expect(element.title).toBe('waiting');
+			const steps: Array<[unknown, string]> = [
+				['color: blue;', 'color: blue;'],
+				[null, ''],
+				['width: 5px;', 'width: 5px;'],
+				[false, ''],
+				[{ color: 'green', width: 5 }, 'color: green; width: 5px;'],
+				['', ''],
+				['color: red;', 'color: red;'],
+				[undefined, ''],
+			];
+			for (const [value, css] of steps) {
+				root.update(client.Forwarded, { style: value, title: 'step', read });
+				expect(element.style.cssText).toBe(css);
+			}
+			expect(root.find('#target')).toBe(element);
+			expect(element.querySelector('input')).toBe(input);
+			expect(input.value).toBe('retained draft');
+		} finally {
+			ready = true;
+			pending.resolve();
+			root.unmount();
+		}
+	});
+
 	it('discards a suspended native preparation before a later accepted style is published', async () => {
 		const client = fixture(dev, native);
 		const mocks = installViewTransitionMocks();
@@ -287,6 +357,209 @@ describe.each([
 			finished.resolve();
 			root.unmount();
 			mocks.restore();
+		}
+	});
+});
+
+// A forwarded style that starts unset or as a string can later carry signal
+// handles. The handle must then update the style without its component, and stop
+// doing so once the style is unset, without leaking an abandoned attempt's reads.
+describe.each([false, true])('forwarded native style handles dev=%s', (dev) => {
+	function colorScope$(name: string) {
+		const scope = createScope({ scopeKey: `forwarded-style-${name}-${dev}` });
+		return { scope, color$: scope.signal$('color', 'red') };
+	}
+
+	it('upgrades an unset style to a live handle and releases it when unset again', () => {
+		const client = fixture(dev, true);
+		const { scope, color$ } = colorScope$('upgrade');
+		const read = () => 'ready';
+		const root = mount(client.Forwarded, { style: undefined, title: 'unset', read });
+		const element = root.find('#target') as HTMLElement;
+		try {
+			expect(element.hasAttribute('style')).toBe(false);
+			root.update(client.Forwarded, { style: { color: color$, width: 10 }, title: 'live', read });
+			expect(element.style.cssText).toBe('color: red; width: 10px;');
+			flushSync(() => color$.set('blue'));
+			expect(element.style.color).toBe('blue');
+			root.update(client.Forwarded, { style: undefined, title: 'unset', read });
+			expect(element.style.cssText).toBe('');
+			flushSync(() => color$.set('green'));
+			expect(element.style.cssText).toBe('');
+			root.update(client.Forwarded, { style: 'width: 3px;', title: 'string', read });
+			expect(element.style.cssText).toBe('width: 3px;');
+			root.update(client.Forwarded, { style: { color: color$ }, title: 'live', read });
+			expect(element.style.cssText).toBe('color: green;');
+			flushSync(() => color$.set('purple'));
+			expect(element.style.cssText).toBe('color: purple;');
+			expect(root.find('#target')).toBe(element);
+			root.unmount();
+			flushSync(() => color$.set('black'));
+			expect(element.style.cssText).toBe('color: purple;');
+		} finally {
+			root.unmount();
+			scope.dispose();
+		}
+	});
+
+	it('rolls back a handle upgrade while a root render waits, then publishes its retry', async () => {
+		const client = fixture(dev, true);
+		const { scope, color$ } = colorScope$('root-wait');
+		const pending = deferred();
+		let ready = true;
+		const read = () => {
+			if (!ready) throw pending.promise;
+			return 'ready';
+		};
+		const root = mount(client.Forwarded, { style: undefined, title: 'before', read });
+		const element = root.find('#target') as HTMLElement;
+		element.style.borderColor = 'green';
+		const original = element.style.cssText;
+		try {
+			ready = false;
+			root.update(client.Forwarded, { style: { color: color$ }, title: 'after', read });
+			expect(element.style.cssText).toBe(original);
+			expect(element.title).toBe('before');
+			// The abandoned attempt read the handle; its write must not publish.
+			flushSync(() => color$.set('blue'));
+			expect(element.style.cssText).toBe(original);
+			ready = true;
+			await act(() => pending.resolve());
+			expect(root.find('#target')).toBe(element);
+			expect(element.style.cssText).toBe('border-color: green; color: blue;');
+			expect(element.title).toBe('after');
+			flushSync(() => color$.set('purple'));
+			expect(element.style.color).toBe('purple');
+			root.update(client.Forwarded, { style: undefined, title: 'unset', read });
+			expect(element.style.cssText).toBe('border-color: green;');
+			flushSync(() => color$.set('red'));
+			expect(element.style.cssText).toBe('border-color: green;');
+		} finally {
+			ready = true;
+			pending.resolve();
+			root.unmount();
+			scope.dispose();
+		}
+	});
+
+	it('holds a handle upgrade in a transition that suspends a visible boundary until it commits', async () => {
+		const client = fixture(dev, true);
+		const { scope, color$ } = colorScope$('transition');
+		const pending = deferred();
+		let ready = true;
+		const read = () => {
+			if (!ready) throw pending.promise;
+			return 'ready';
+		};
+		const root = mount(client.SuspendedForwarded, { style: 'width: 4px;', title: 'before', read });
+		const element = root.find('#target') as HTMLElement;
+		try {
+			ready = false;
+			await act(() =>
+				startTransition(() =>
+					root.root.render(client.SuspendedForwarded, {
+						style: { color: color$ },
+						title: 'after',
+						read,
+					}),
+				),
+			);
+			expect(root.find('#target')).toBe(element);
+			expect(element.style.cssText).toBe('width: 4px;');
+			expect(element.title).toBe('before');
+			flushSync(() => color$.set('blue'));
+			expect(element.style.cssText).toBe('width: 4px;');
+			ready = true;
+			await act(() => pending.resolve());
+			expect(root.find('#target')).toBe(element);
+			expect(element.style.cssText).toBe('color: blue;');
+			expect(element.title).toBe('after');
+			flushSync(() => color$.set('purple'));
+			expect(element.style.cssText).toBe('color: purple;');
+		} finally {
+			ready = true;
+			pending.resolve();
+			root.unmount();
+			scope.dispose();
+		}
+	});
+
+	it('server-renders and hydrates unset and string styles like ordinary styles, then upgrades them', () => {
+		const client = fixture(dev, true);
+		const server = fixture(dev, true, 'server');
+		const ordinary = { client: fixture(dev, false), server: fixture(dev, false, 'server') };
+		const { scope, color$ } = colorScope$('hydrate');
+		const read = () => 'ready';
+		const host = document.createElement('div');
+		document.body.append(host);
+		try {
+			for (const style of [undefined, null, '', 'color: red; width: 10px;']) {
+				const props = { style, title: 'server', read };
+				const html = renderToString(server.Forwarded, props).html;
+				expect(html).toBe(renderToString(ordinary.server.Forwarded, props).html);
+				host.innerHTML = html;
+				const element = host.querySelector('#target') as HTMLElement;
+				const input = element.querySelector('input')!;
+				input.value = 'before hydration';
+				const serverStyle = element.getAttribute('style');
+				const errors: unknown[] = [];
+				const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
+				const root = hydrateRoot(host, client.Forwarded, props, {
+					onRecoverableError: (error) => errors.push(error),
+				});
+				try {
+					flushSync(() => {});
+					expect(host.querySelector('#target')).toBe(element);
+					expect(element.getAttribute('style')).toBe(serverStyle);
+					expect(errors).toEqual([]);
+					expect(consoleError).not.toHaveBeenCalled();
+					flushSync(() => root.render(client.Forwarded, { ...props, style: { color: color$ } }));
+					expect(element.style.cssText).toBe(`color: ${color$.get()};`);
+					flushSync(() => color$.set(color$.get() === 'red' ? 'blue' : 'red'));
+					expect(element.style.cssText).toBe(`color: ${color$.get()};`);
+					flushSync(() => root.render(client.Forwarded, { ...props, style: undefined }));
+					expect(element.style.cssText).toBe('');
+					expect(host.querySelector('#target')).toBe(element);
+					expect(input.value).toBe('before hydration');
+				} finally {
+					root.unmount();
+					consoleError.mockRestore();
+				}
+			}
+			// A server style the client leaves unset is an ordinary attribute
+			// difference: both bindings keep it rather than rebuilding the host.
+			const outcomes = [client, ordinary.client].map((view) => {
+				host.innerHTML = renderToString(server.Forwarded, {
+					style: 'color: red;',
+					title: 'server',
+					read,
+				}).html;
+				const element = host.querySelector('#target') as HTMLElement;
+				const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
+				const errors: unknown[] = [];
+				const root = hydrateRoot(
+					host,
+					view.Forwarded,
+					{ style: undefined, title: 'server', read },
+					{ onRecoverableError: (error) => errors.push(error) },
+				);
+				try {
+					flushSync(() => {});
+					return {
+						adopted: host.querySelector('#target') === element,
+						style: element.getAttribute('style'),
+						errors: errors.length,
+					};
+				} finally {
+					root.unmount();
+					consoleError.mockRestore();
+				}
+			});
+			expect(outcomes[0]).toEqual(outcomes[1]);
+			expect(outcomes[0]).toEqual({ adopted: true, style: 'color: red;', errors: 0 });
+		} finally {
+			host.remove();
+			scope.dispose();
 		}
 	});
 });
