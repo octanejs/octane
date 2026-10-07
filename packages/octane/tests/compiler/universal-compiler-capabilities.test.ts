@@ -877,3 +877,76 @@ describe('universal renderer helper imports', () => {
 		},
 	);
 });
+
+describe('universal named default component expressions', () => {
+	// The module-scope runtime bindings a compiled module declares, and the one
+	// its default export reads.
+	function moduleBindings(code: string) {
+		const declared: string[] = [];
+		let defaultLocal: string | undefined;
+		for (const statement of parseModule(code, '/dist/App.js').body) {
+			if (statement.type === 'ImportDeclaration') {
+				for (const specifier of statement.specifiers ?? []) declared.push(specifier.local.name);
+				continue;
+			}
+			if (statement.type === 'ExportDefaultDeclaration') {
+				defaultLocal = statement.declaration.name;
+				continue;
+			}
+			for (const specifier of statement.specifiers ?? []) {
+				if ((specifier.exported.name ?? specifier.exported.value) === 'default') {
+					defaultLocal = specifier.local.name;
+				}
+			}
+			const declaration =
+				statement.type === 'ExportNamedDeclaration' ? statement.declaration : statement;
+			if (declaration?.type === 'VariableDeclaration') {
+				for (const declarator of declaration.declarations) declared.push(declarator.id.name);
+			} else if (
+				declaration?.type === 'FunctionDeclaration' ||
+				declaration?.type === 'ClassDeclaration'
+			) {
+				declared.push(declaration.id.name);
+			}
+		}
+		return { declared, defaultLocal };
+	}
+
+	const component = 'export default (function Counter() @{ <node /> })';
+
+	// `export default (function Counter() @{…})` binds `Counter` only inside the
+	// component. Its compiled module binding must neither redeclare a module
+	// `Counter` nor capture a read of `Counter` the module leaves unbound.
+	it.each([
+		['an import of its name', `import Counter from './counter.js';`, 1],
+		['a class of its name', 'class Counter {}', 1],
+		['an unbound JSX element of its name', 'export function Other() @{ <Counter /> }', 0],
+		['an unbound JSX member of its name', 'export function Other() @{ <Counter.Item /> }', 0],
+	])('binds the component apart from %s', (_label, prelude, count) => {
+		for (const hmr of [false, 'vite', 'webpack'] as const) {
+			const { code } = compile(`${prelude}\n${component}`, '/src/App.tsrx', {
+				renderer: baseRenderer,
+				hmr,
+			});
+			const { declared, defaultLocal } = moduleBindings(code);
+			expect(declared.filter((name) => name === 'Counter')).toHaveLength(count);
+			expect(defaultLocal).not.toBe('Counter');
+			expect(declared).toContain(defaultLocal);
+		}
+	});
+
+	it('keeps the component bound by its own name when the module does not claim it', () => {
+		const prelude = `
+			type Counter = number;
+			const read = (): Counter => { const Counter = 2; return Counter; };
+			const record = { Counter: read() };
+			export const pick = () => record.Counter;
+		`;
+		for (const source of [component, `${prelude}\n${component}`]) {
+			for (const hmr of [false, 'vite'] as const) {
+				const { code } = compile(source, '/src/App.tsrx', { renderer: baseRenderer, hmr });
+				expect(moduleBindings(code).defaultLocal).toBe('Counter');
+			}
+		}
+	});
+});

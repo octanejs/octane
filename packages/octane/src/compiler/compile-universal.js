@@ -2605,6 +2605,37 @@ function componentShape(node, state) {
 	return null;
 }
 
+// `export default (function Name() @{…})` binds `Name` only inside the
+// component, so the rest of the module may bind or read `Name` on its own.
+// Reports whether it does: a module-scope binding of `Name`, or a read of
+// `Name` outside `component` that no scope binds, which a module binding of
+// `Name` would capture. Type-only declarations bind nothing at runtime.
+function moduleClaimsName(ast, name, component) {
+	const analysis = createLexicalAnalysis(ast);
+	const { nodeScopes, rootScope, isBound } = analysis;
+	if (rootScope.bindings.has(name)) return true;
+	let claimed = false;
+	const visit = (node, parent = null, key = null) => {
+		if (claimed || node === component || !node || typeof node !== 'object') return;
+		const reads =
+			node.name === name &&
+			(node.type === 'Identifier'
+				? isIdentifierReference(node, parent, key, analysis)
+				: node.type === 'JSXIdentifier' &&
+					(((parent?.type === 'JSXOpeningElement' || parent?.type === 'JSXClosingElement') &&
+						key === 'name' &&
+						isComponentElement(parent)) ||
+						(parent?.type === 'JSXMemberExpression' && key === 'object')));
+		if (reads && !isBound(nodeScopes.get(node) ?? rootScope, name)) {
+			claimed = true;
+			return;
+		}
+		forEachRuntimeAstChild(node, (child, childKey) => visit(child, node, childKey));
+	};
+	visit(ast);
+	return claimed;
+}
+
 function hasOwnTemplateReturn(fn) {
 	let found = false;
 	const seen = new WeakSet();
@@ -3967,6 +3998,17 @@ function emitComponentAst(shape, state) {
 	if (render === null) return null;
 	let name = shape.name ?? fn.id?.name;
 	if (!name) name = allocName(state, '__octaneUniversalDefault');
+	// The component's module binding. When the module claims a named default
+	// function expression's name, the binding takes a fresh one. The function
+	// keeps its own name, which its body's self-references and the component
+	// metadata resolve through.
+	const binding =
+		exportKind === 'default' &&
+		fn.type === 'FunctionExpression' &&
+		fn.id != null &&
+		moduleClaimsName(state.ast, name, fn)
+			? allocName(state, name)
+			: name;
 	const loc = fn.loc?.start;
 	state.components.push({
 		name,
@@ -4030,7 +4072,7 @@ function emitComponentAst(shape, state) {
 			[b.literal(state.renderer.id), wrapped],
 			fn,
 		);
-		state.hmrComponents.push({ name, exportKind, origin: fn });
+		state.hmrComponents.push({ name: binding, exportKind, origin: fn });
 	}
 	if (state.profile) {
 		const metadata = {
@@ -4044,7 +4086,7 @@ function emitComponentAst(shape, state) {
 		wrapped = generatedCall(state.helpers.profile, [wrapped, jsonValueToAst(metadata, fn)], fn);
 	}
 	const declaration = generatedConst(
-		name,
+		binding,
 		wrapped,
 		fn,
 		state.hmr && exportKind !== null ? 'let' : 'const',
@@ -4057,8 +4099,8 @@ function emitComponentAst(shape, state) {
 			declaration,
 			inheritGeneratedOrigin(
 				state.hmr
-					? b.export(null, [b.export_specifier(name, 'default')])
-					: b.export_default(generatedIdentifier(name, fn)),
+					? b.export(null, [b.export_specifier(binding, 'default')])
+					: b.export_default(generatedIdentifier(binding, fn)),
 				fn,
 			),
 		];
@@ -4791,6 +4833,7 @@ export function compileUniversal(
 		componentNames: collectComponentNames(ast),
 		contextSourceFacts: createContextSourceFacts(ast),
 		runtimeImports: new Map(),
+		ast,
 	};
 	state.explicitThreeHostIntrinsics = collectExplicitThreeHostIntrinsics(ast, renderer);
 	state.ownerFreeThreeHostComponents = collectOwnerFreeThreeHostComponents(
