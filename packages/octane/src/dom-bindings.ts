@@ -718,8 +718,8 @@ export function __adoptBindings<Props>(
 			} else written = write(nodes[binding[0]]!, binding, next[i] as string | null);
 			if (!disposed) {
 				previous[i] = next[i]!;
-				// Only fixed scalar and URL channels participate in this legacy handoff,
-				// publishing the value left in the DOM. New grouped/style/control
+				// Only fixed scalar, URL and style channels participate in this legacy
+				// handoff, publishing the value left in the DOM. New grouped/control
 				// channels keep the native lease protocol.
 				if (
 					binding[1] === 'attr' ||
@@ -728,11 +728,16 @@ export function __adoptBindings<Props>(
 					binding[1] === 'class' ||
 					binding[1] === 'url' ||
 					binding[1] === 'styleProperty' ||
+					binding[1] === 'styleObject' ||
 					binding[1] === 'text'
 				) {
 					const [node, name] = owned[i]!;
 					let published = written as string | null;
-					if (binding[1] === 'styleProperty') {
+					// A whole style owns the entire inline style, so it publishes its
+					// canonical CSS text, as hydration reads it.
+					if (binding[1] === 'styleObject')
+						published = (node as HTMLElement | SVGElement).style.cssText;
+					else if (binding[1] === 'styleProperty') {
 						const style = (node as HTMLElement | SVGElement).style;
 						const value = style.getPropertyValue(binding[2]);
 						published =

@@ -22509,7 +22509,8 @@ class HydrationCapability {
 	 * attributes (allowAttribute). Comparing canonical cssText, through a
 	 * detached CSSOM, treats equivalent spellings (`#fff` and rgb(), compact
 	 * whitespace) as equal, while it still finds reordered, missing, added and
-	 * empty declarations.
+	 * empty declarations. What an early host binding published there, single
+	 * declarations or the whole style, is the server's now.
 	 */
 	keepsStyle(
 		el: HTMLElement | SVGElement,
@@ -22549,8 +22550,10 @@ class HydrationCapability {
 		}
 		const expected = expectedStyle.cssText;
 		if (
-			server !== expected ||
-			(STAGED_DOM?.view(el) ?? el).hasAttribute('style') !== (expected !== '')
+			(server !== expected ||
+				(STAGED_DOM?.view(el) ?? el).hasAttribute('style') !== (expected !== '')) &&
+			// So is a whole style that one published.
+			claims?.get('style') !== server
 		)
 			this.unpatched(el, 'style', server, expected);
 		return true;
