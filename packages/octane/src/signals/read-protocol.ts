@@ -272,6 +272,33 @@ export function setNativeAdoptionResolver(
 	return previous;
 }
 
+/** A historical read whose adoption lease just ended. */
+export interface NativeReadRelease {
+	readonly historical: NativeReadSource;
+	/** A targeted binding holds its own live subscription, so its read is dropped, not moved. */
+	readonly binding: boolean;
+	/**
+	 * When a live read would now present what the historical read did, the live
+	 * source and revision that read would report; otherwise undefined. This may
+	 * evaluate the live node, so only a subscriber that can move its read asks.
+	 */
+	successor(): { readonly live: NativeReadSource; readonly version: number } | undefined;
+}
+
+/**
+ * Moves a renderer consumer's committed historical read to its unchanged live
+ * successor and returns true, so adopting unchanged data renders nothing
+ * again. Release notifies every subscriber this returns false for.
+ */
+export type NativeReadRebase = (notify: () => void, release: NativeReadRelease) => boolean;
+
+/** Installed by hydration that adopts native reads; null keeps every release a notification. */
+export let nativeReadRebase: NativeReadRebase | null = null;
+
+export function registerNativeReadRebase(rebase: NativeReadRebase): void {
+	nativeReadRebase = rebase;
+}
+
 export interface NativeBatchHooks {
 	startBatch(): void;
 	endBatch(): void;
