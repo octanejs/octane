@@ -7890,6 +7890,9 @@ function liftBlockEventBundle(node, ctx, attrs, attr) {
 	const captures = [];
 	for (const name of collectFreeIdentifiers(arrow, [])) {
 		if (name === 'eval') return null;
+		// Lowered value JSX can write a body-scoped compiler temp (a folded
+		// `@if` condition), which module scope cannot reach.
+		if (ctx.currentMapTemps?.includes(name)) return null;
 		if (!ctx.currentComponentLocals.has(name)) continue;
 		if (!ctx.currentEventCaptureLocals.has(name)) return null;
 		captures.push(name);
@@ -10592,6 +10595,40 @@ function expandKnownAttributeSpreads(attributes) {
 			}),
 		];
 	});
+}
+
+// A host attribute's value is an ordinary expression, so JSX anywhere inside it
+// (`onClick={() => root.render(<Toast />)}`, `title={String(<B />)}`) lowers to
+// a descriptor exactly as it does at any other value position. Both emitters
+// read their attributes through this, which keeps client and server in step,
+// and the handler, bundle, and lift analyses then see the lowered form they
+// emit. Copy-on-write: an attribute without value JSX keeps its identity.
+function lowerHostAttributeValues(attributes, ctx) {
+	let out = null;
+	for (let i = 0; i < attributes.length; i++) {
+		const attr = attributes[i];
+		let lowered = attr;
+		if (attr.knownSource || attr.type === 'SpreadAttribute' || attr.type === 'JSXSpreadAttribute') {
+			const argument = rewriteJsxValues(attr.argument, ctx);
+			if (argument !== attr.argument) lowered = { ...attr, argument };
+		} else if (attr.value != null && (attr.type === 'Attribute' || attr.type === 'JSXAttribute')) {
+			const value = attr.value;
+			const expression = value.type === 'JSXExpressionContainer' ? value.expression : value;
+			const rewritten = rewriteJsxValues(expression, ctx);
+			if (rewritten !== expression) {
+				lowered = {
+					...attr,
+					value:
+						value.type === 'JSXExpressionContainer'
+							? { ...value, expression: rewritten }
+							: inheritOriginLoc(b.jsx_expression_container(rewritten), value),
+				};
+			}
+		}
+		if (out === null && lowered !== attr) out = attributes.slice(0, i);
+		if (out !== null) out.push(lowered);
+	}
+	return out ?? attributes;
 }
 
 function resolveKnownAttributeSource(expression, valueOf) {
@@ -14090,8 +14127,9 @@ function ssrEmitElement(node, ctx, name, inlinedSubs, parentNs, cssHash, compone
 	rejectVoidElementContent(tag, node, ctx);
 	rejectTextareaValueChildren(tag, node, ctx);
 	rejectDangerouslySetInnerHTMLChildren(tag, node, ctx);
-	const attrs = expandKnownAttributeSpreads(
-		node.attributes || node.openingElement?.attributes || [],
+	const attrs = lowerHostAttributeValues(
+		expandKnownAttributeSpreads(node.attributes || node.openingElement?.attributes || []),
+		ctx,
 	);
 	const devFormActionAttribute =
 		ctx.dev && (tag === 'form' || tag === 'button' || tag === 'input')
@@ -14523,7 +14561,7 @@ function ssrEmitElement(node, ctx, name, inlinedSubs, parentNs, cssHash, compone
 			const childExpr = bindAttributeEvaluation(
 				childInner === null
 					? inheritOriginLoc(b.literal(true, 'true'), attr)
-					: tsrxExprNode(rewriteJsxValues(childInner, ctx), ctx, name, inlinedSubs),
+					: tsrxExprNode(childInner, ctx, name, inlinedSubs),
 			);
 			childrenPropSources.push(ssrSourcePair(b.literal(true, 'true'), childExpr, attr));
 			continue;
@@ -17310,12 +17348,29 @@ function compileFunctionBody(node, ctx, name, parentNs = 'html', cssHash = null,
 	// is hoisted as a render function in inlinedSubs and replaced with an
 	// identifier reference. One that reads a setup callback's names stays for
 	// rewriteJsxValues, which compiles it in place inside that callback.
-	const rewrittenStatements = preparedStatements
-		.map((s) => rewriteHookCalls(s, ctx, name, options?.localHookSlots === true))
-		.map((s) => rewriteTsrxBlocks(s, ctx, name, inlinedSubs, 'html', null, true))
-		// JSX component element at VALUE position in setup (e.g. `const el = <App/>`)
-		// → createElement(App, props). Output JSX (jsxNodes) was already split off.
-		.map((s) => rewriteJsxValues(s, ctx));
+	const lowerSetupStatements = (prepared) =>
+		prepared
+			.map((s) => rewriteHookCalls(s, ctx, name, options?.localHookSlots === true))
+			.map((s) => rewriteTsrxBlocks(s, ctx, name, inlinedSubs, 'html', null, true))
+			// JSX component element at VALUE position in setup (e.g. `const el = <App/>`)
+			// → createElement(App, props). Output JSX (jsxNodes) was already split off.
+			.map((s) => rewriteJsxValues(s, ctx));
+	const rewrittenStatements = lowerSetupStatements(preparedStatements);
+	// A mount event sink's declaration left setup before the passes above, and
+	// planJsx installs its arrow where the handler is consumed. Lower the arrow
+	// as its declaration would have been, so `const f = () => show(<Toast />)`
+	// does not reach that mount line as raw JSX.
+	if (mountCallbackSinks.size > 0) {
+		const sinks = [...mountCallbackSinks.values()];
+		const lowered = lowerSetupStatements(
+			sinks.map((sink) =>
+				lowerSetupValueDirectives(b.const(sink.name, sink.arrow), lowerBodyValueDirective),
+			),
+		);
+		mountCallbackSinks = new Map(
+			sinks.map((sink, i) => [sink.name, { ...sink, arrow: lowered[i].declarations[0].init }]),
+		);
+	}
 	// A folded fragment renderer carries pre-built directive records; expose them so
 	// emitElementHtml resolves each `FoldedDirective` placeholder (instead of calling
 	// makeIfCall again, which would re-compile the branch bodies + re-allocate ids).
@@ -30943,8 +30998,9 @@ function emitElementHtml(
 	const hostNs = nsForSelf(tag, parentNs);
 	const childNs = nsForChildren(tag, parentNs);
 	// Collect attributes.
-	const attrs = expandKnownAttributeSpreads(
-		node.attributes || node.openingElement?.attributes || [],
+	const attrs = lowerHostAttributeValues(
+		expandKnownAttributeSpreads(node.attributes || node.openingElement?.attributes || []),
+		ctx,
 	);
 	// A null/undefined child alongside direct raw HTML is semantically absent.
 	// Suppress its child binding so hydration cannot clear the raw HTML that the
