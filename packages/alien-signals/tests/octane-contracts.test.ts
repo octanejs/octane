@@ -2,11 +2,11 @@ import { describe, expect, it } from 'vitest';
 import { createSignal } from '@octanejs/alien-signals';
 import { mount, nextPaint } from './_helpers';
 import {
+	DependencyListEffects,
 	LifecycleEffects,
 	ScopeProbe,
 	SetterProbe,
 	SwitchingReader,
-	SyncStopScopeProbe,
 } from './_fixtures/hooks.tsrx';
 
 describe('@octanejs/alien-signals Octane contracts', () => {
@@ -87,42 +87,52 @@ describe('@octanejs/alien-signals Octane contracts', () => {
 		).toEqual([]);
 	});
 
-	it('returns a stop controller that disposes every scoped effect', async function returnsStopController() {
+	it('returns a stable stop that disposes the active scope until it is replaced', async function returnsStableStop() {
 		const source = createSignal(0);
 		const entries: string[] = [];
-		let stop = function noop() {};
-		const result = mount(LifecycleEffects, {
+		const stops: Array<() => void> = [];
+		const props = {
 			source,
 			log: function log(entry: string) {
 				entries.push(entry);
 			},
 			onStop: function onStop(nextStop: () => void) {
-				stop = nextStop;
+				stops.push(nextStop);
 			},
-		});
+		};
+		const result = mount(LifecycleEffects, props);
 		await nextPaint();
 
-		stop();
-		result.update(LifecycleEffects, {
-			source,
-			log: function log(entry: string) {
-				entries.push(entry);
-			},
-			onStop: function onStop(nextStop: () => void) {
-				stop = nextStop;
-			},
-		});
-		await nextPaint();
+		stops.at(-1)?.();
 		source(1);
 		expect(
 			entries.filter(function scopedOnes(entry) {
 				return entry.startsWith('scope-') && entry.endsWith(':1');
 			}),
 		).toEqual([]);
+
+		// The scope callback is a new closure on every render, so the default
+		// dependency list starts a replacement scope after the next commit.
+		result.update(LifecycleEffects, { ...props });
+		await nextPaint();
+		expect(stops.at(-1)).toBe(stops[0]);
+		expect(
+			entries.filter(function scopedOnes(entry) {
+				return entry.startsWith('scope-') && entry.endsWith(':1');
+			}),
+		).toEqual(['scope-a:1', 'scope-b:1']);
+
+		stops.at(-1)?.();
+		source(2);
+		expect(
+			entries.filter(function scopedTwos(entry) {
+				return entry.startsWith('scope-') && entry.endsWith(':2');
+			}),
+		).toEqual([]);
 		result.unmount();
 	});
 
-	it('cancels a scope before commit and remains safe during unmount', async function cancelsScopeBeforeCommit() {
+	it('treats a stop before commit as a no-op and disposes on unmount', async function stopBeforeCommitIsNoop() {
 		const source = createSignal(0);
 		const entries: string[] = [];
 		let stop = function noop() {};
@@ -139,8 +149,11 @@ describe('@octanejs/alien-signals Octane contracts', () => {
 
 		stop();
 		await nextPaint();
-		expect(entries).toEqual([]);
+		expect(entries).toEqual(['pending:0']);
 		result.unmount();
+		await nextPaint();
+		source(1);
+		expect(entries).toEqual(['pending:0']);
 	});
 
 	it('stops the prior scope when callback identity changes', async function stopsPriorScopeOnCallbackChange() {
@@ -165,21 +178,46 @@ describe('@octanejs/alien-signals Octane contracts', () => {
 		result.unmount();
 	});
 
-	it('disposes a scope stopped during synchronous setup', async function disposesScopeStoppedDuringSetup() {
+	it('keeps explicit dependency lists across renders and replaces work when they change', async function honorsExplicitDependencyLists() {
 		const source = createSignal(0);
+		const signals = [source] as const;
 		const entries: string[] = [];
-		const stopRef = { current: function noop() {} };
-		const result = mount(SyncStopScopeProbe, {
+		const props = {
 			source,
+			signals,
+			label: 'a',
 			log: function log(entry: string) {
 				entries.push(entry);
 			},
-			stopRef,
-		});
+		};
+		const result = mount(DependencyListEffects, props);
 		await nextPaint();
-		expect(entries).toEqual([]);
+		expect(entries).toEqual(['layout:a', 'effect:a:0', 'scope:a:0']);
+
+		// New closures with unchanged dependencies keep the running work.
+		result.update(DependencyListEffects, { ...props });
+		await nextPaint();
+		expect(entries).toEqual(['layout:a', 'effect:a:0', 'scope:a:0']);
+
+		entries.length = 0;
 		source(1);
-		expect(entries).toEqual([]);
+		await nextPaint();
+		expect(entries).toEqual(['effect-cleanup:a', 'effect:a:1', 'scope:a:1', 'layout:a']);
+
+		entries.length = 0;
+		result.update(DependencyListEffects, { ...props, label: 'b' });
+		await nextPaint();
+		expect(entries).toEqual(['layout:b', 'effect-cleanup:a', 'effect:b:1', 'scope:b:1']);
+
+		entries.length = 0;
+		source(2);
+		await nextPaint();
+		expect(entries).toEqual(['effect-cleanup:b', 'effect:b:2', 'scope:b:2', 'layout:b']);
+
+		entries.length = 0;
 		result.unmount();
+		await nextPaint();
+		source(3);
+		expect(entries).toEqual(['effect-cleanup:b']);
 	});
 });

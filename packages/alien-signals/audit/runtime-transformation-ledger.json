@@ -3,7 +3,7 @@
   "pristineSource": "packages/alien-signals/upstream/src/index.test.ts",
   "adaptedSource": "packages/alien-signals/tests/upstream-adapted.test.ts",
   "fixtureSource": "packages/alien-signals/tests/_fixtures/hooks.tsrx",
-  "fixtureFileSha256": "7bfdda87666b7febb305c04fa57b290fbd16206d25faf05555eed85d966e3571",
+  "fixtureFileSha256": "3cfa34a95bc3b24b11e640058fe0ab84e73e8fa446eafb9965fda27701581e5d",
   "permittedTransformations": [
     {
       "kind": "runner",
@@ -11,7 +11,7 @@
     },
     {
       "kind": "harness",
-      "rule": "renderHook/act/cleanup become mount/nextPaint/click/update against .tsrx fixtures"
+      "rule": "renderHook/act/cleanup become mount/nextPaint/click/update against .tsrx fixtures; React startTransition and StrictMode become their Octane exports; renderToString(createElement(Component)) becomes the shared Octane SSR fixture renderer (renderHydrationFixture)"
     },
     {
       "kind": "fixture-extraction",
@@ -19,11 +19,11 @@
     },
     {
       "kind": "assertion-surface",
-      "rule": "result.current / result.current[0] / toEqual object receivers may become DOM textContent string forms of the same observable value; expect() receivers are compared (signal calls and literals must not weaken); matcher contracts (toBe/toEqual/toHaveBeenCalledTimes/toBeDefined/toBeGreaterThan) must still cover every pristine assertion value"
+      "rule": "result.current / a named renderHook handle's hook.result.current / result.current[0] / hook.result.current.<member> / toEqual object receivers may become DOM textContent string forms of the same observable value, and argument-free toBeUndefined()/toBeNull() match the 'undefined'/'null' text forms; expect() receivers are compared (signal calls and literals must not weaken); matcher contracts (toBe/toEqual/toHaveBeenCalledTimes/toBeDefined/toBeGreaterThan/toBeUndefined/toBeNull) must still cover every pristine assertion value"
     },
     {
       "kind": "async-flush",
-      "rule": "act(...) may become await nextPaint() around the same state transition; concurrent Promise.all microtask setters stay microtask-concurrent"
+      "rule": "act(...) may become await nextPaint() around the same state transition, and an empty async act may become Octane's await act(() => {}); concurrent Promise.all microtask setters stay microtask-concurrent"
     },
     {
       "kind": "citation",

@@ -284,4 +284,147 @@ describe('native signal server output and adoption', () => {
 		expect(container.querySelector('.resource')?.textContent).toBe('live-b');
 		expect(container.querySelector('.caught')).toBeNull();
 	});
+
+	describe('adoption release', () => {
+		const quiet = () => {};
+
+		function adoptedResource$(scopeKey: string, load: (key: string) => Promise<string>) {
+			const model = state$(scopeKey, 'a');
+			const fetch = query(scopeKey + '-query', load);
+			const resource$ = createResource(model.scope, 'resource', () =>
+				fetch(model.scope.get(model.value$)),
+			);
+			return { ...model, resource$ };
+		}
+
+		it('does not render a reader again when the live value equals the server value', async () => {
+			const model = state$('native-release-unchanged');
+			container.innerHTML = renderToString(server.AdoptedSection, { ...model, render: quiet }).html;
+			const output = container.querySelector('output')!;
+			const renders: string[] = [];
+			flushSync(() => {
+				root = hydrateRoot(container, client.AdoptedSection, {
+					...model,
+					render: (name: string) => renders.push(name),
+				});
+			});
+			expect(renders).toEqual(['section:server', 'leaf']);
+			expect(container.querySelector('output')).toBe(output);
+			// The read moved to the live signal, so a later write still renders it.
+			await act(() => model.scope.set(model.value$, 'live'));
+			expect(renders).toEqual(['section:server', 'leaf', 'section:live', 'leaf']);
+			expect(output.textContent).toBe('live');
+		});
+
+		it('renders a reader again when the live value differs from the server value', () => {
+			const model = state$('native-release-changed');
+			container.innerHTML = renderToString(server.AdoptedSection, { ...model, render: quiet }).html;
+			const output = container.querySelector('output')!;
+			model.scope.set(model.value$, 'live');
+			const renders: string[] = [];
+			flushSync(() => {
+				root = hydrateRoot(container, client.AdoptedSection, {
+					...model,
+					render: (name: string) => renders.push(name),
+				});
+			});
+			expect(renders).toEqual(['section:server', 'leaf', 'section:live', 'leaf']);
+			expect(container.querySelector('output')).toBe(output);
+			expect(output.textContent).toBe('live');
+		});
+
+		it('leaves a targeted binding to its own subscription after an unchanged release', async () => {
+			const model = state$('native-release-binding');
+			container.innerHTML = renderToString(server.AdoptedBinding, { ...model, render: quiet }).html;
+			const output = container.querySelector('output')!;
+			const renders: string[] = [];
+			flushSync(() => {
+				root = hydrateRoot(container, client.AdoptedBinding, {
+					...model,
+					render: (name: string) => renders.push(name),
+				});
+			});
+			expect(renders).toEqual(['binding']);
+			await act(() => model.scope.set(model.value$, 'live'));
+			expect(output.textContent).toBe('live');
+			// The binding updates its text alone; the component never read the signal.
+			expect(renders).toEqual(['binding']);
+		});
+
+		it('does not render a query reader again when the live result equals the server result', async () => {
+			const model = adoptedResource$('native-release-query', async (key) => 'ready-' + key);
+			await act(() => {});
+			container.innerHTML = renderToString(server.AdoptedResource, {
+				resource$: model.resource$,
+				render: quiet,
+			}).html;
+			const output = container.querySelector('output')!;
+			const renders: string[] = [];
+			const render = (name: string) => renders.push(name);
+			flushSync(() => {
+				root = hydrateRoot(container, client.AdoptedResource, {
+					resource$: model.resource$,
+					render,
+				});
+			});
+			expect(renders).toEqual(['resource:ready-a']);
+			expect(container.querySelector('output')).toBe(output);
+			// A changed selection reaches the reader through its live subscription.
+			await act(() => model.scope.set(model.value$, 'b'));
+			expect(container.querySelector('output')?.textContent).toBe('ready-b');
+			expect(renders.at(-1)).toBe('resource:ready-b');
+		});
+
+		it('renders a query reader again when the same selection has a newer live result', async () => {
+			let loads = 0;
+			const model = adoptedResource$('native-release-query-newer', async (key) => {
+				loads++;
+				return 'ready-' + key + '#' + loads;
+			});
+			await act(() => {});
+			container.innerHTML = renderToString(server.AdoptedResource, {
+				resource$: model.resource$,
+				render: quiet,
+			}).html;
+			const output = container.querySelector('output')!;
+			expect(output.textContent).toBe('ready-a#1');
+			await act(() => model.scope.batch(() => model.resource$.retry()));
+			expect(model.scope.get(model.resource$)).toBe('ready-a#2');
+			const renders: string[] = [];
+			flushSync(() => {
+				root = hydrateRoot(container, client.AdoptedResource, {
+					resource$: model.resource$,
+					render: (name: string) => renders.push(name),
+				});
+			});
+			expect(renders).toEqual(['resource:ready-a#1', 'resource:ready-a#2']);
+			expect(container.querySelector('output')).toBe(output);
+			expect(output.textContent).toBe('ready-a#2');
+		});
+
+		it('renders a query reader again when its live selection is still pending', async () => {
+			const later = deferred<string>();
+			let loads = 0;
+			const model = adoptedResource$('native-release-query-pending', (key) =>
+				++loads === 1 ? Promise.resolve('ready-' + key) : later.promise,
+			);
+			await act(() => {});
+			container.innerHTML = renderToString(server.AdoptedResource, {
+				resource$: model.resource$,
+				render: quiet,
+			}).html;
+			await act(() => model.scope.batch(() => model.resource$.retry({ pending: true })));
+			const renders: string[] = [];
+			flushSync(() => {
+				root = hydrateRoot(container, client.AdoptedResource, {
+					resource$: model.resource$,
+					render: (name: string) => renders.push(name),
+				});
+			});
+			expect(renders).toEqual(['resource:ready-a']);
+			await act(() => later.resolve('ready-a again'));
+			expect(container.querySelector('output')?.textContent).toBe('ready-a again');
+			expect(renders.at(-1)).toBe('resource:ready-a again');
+		});
+	});
 });

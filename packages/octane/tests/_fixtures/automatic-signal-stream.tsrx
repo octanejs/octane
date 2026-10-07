@@ -53,3 +53,30 @@ export function DirectRootQuery(props: StreamedQueryProps) @{
 	const value$ = query$(() => 'conversation', props.load, { kind: 'stream' });
 	<StreamedQueryView value$={value$} />
 }
+
+interface RenderedStreamedProps {
+	render: (value: string) => void;
+	snapshot: boolean;
+}
+
+function RenderedStreamedView(props: { value$: QuerySignal<string> } & RenderedStreamedProps) @{
+	const value = props.value$.get();
+	// Only a snapshot read observes whether the stream has completed.
+	const text = props.snapshot
+		? value + (props.value$.snapshot().complete ? ':complete' : ':open')
+		: value;
+	props.render(text);
+	<output>{text}</output>
+}
+
+// The view reads the stream in its body, so adoption release decides whether it renders again.
+export function RenderedStreamedQuery(props: StreamedQueryProps & RenderedStreamedProps) @{
+	const value$ = query$(() => 'conversation', props.load, { kind: 'stream' });
+	<main>
+		@try {
+			<RenderedStreamedView value$={value$} render={props.render} snapshot={props.snapshot} />
+		} @pending {
+			<i class="streamed-query-pending">{'waiting'}</i>
+		}
+	</main>
+}
