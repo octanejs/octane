@@ -1,13 +1,11 @@
-import { createHash } from 'node:crypto';
+import { sourceHash as cssModuleSourceHash } from './module-graph.js';
 
 // Only plain data crosses Rspack's worker boundary. The provider callback and
 // native module graph stay on the main thread for the current compilation.
 export const CSS_MODULE_CONTEXT_KEY = '__octaneCssModuleConstants';
 export const CSS_MODULE_BUILD_INFO_KEY = 'octaneCssModuleConstants';
 
-export function cssModuleSourceHash(source) {
-	return createHash('sha256').update(String(source)).digest('hex');
-}
+export { cssModuleSourceHash };
 
 export function clearCssModuleBuildInfo(module) {
 	if (module?.buildInfo && typeof module.buildInfo === 'object') {

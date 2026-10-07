@@ -1,5 +1,9 @@
 import octaneLoader from './loader.js';
 import { CSS_MODULE_BUILD_INFO_KEY, CSS_MODULE_CONTEXT_KEY } from './css-module-data.js';
+import {
+	VOID_COMPONENT_BUILD_INFO_KEY,
+	VOID_COMPONENT_CONTEXT_KEY,
+} from './void-component-data.js';
 
 /**
  * Run the unchanged public Octane loader inside Rspack's worker pool. Rspack
@@ -12,6 +16,8 @@ export default function parallelOctaneLoader(source, sourceMap) {
 	const finalizer = this.loaders[this.loaderIndex - 1];
 	module.layer = finalizer?.loaderItem?.data?.octaneLayer ?? undefined;
 	this[CSS_MODULE_CONTEXT_KEY] = finalizer?.loaderItem?.data?.[CSS_MODULE_CONTEXT_KEY] ?? undefined;
+	this[VOID_COMPONENT_CONTEXT_KEY] =
+		finalizer?.loaderItem?.data?.[VOID_COMPONENT_CONTEXT_KEY] ?? undefined;
 
 	const callback = this.callback.bind(this);
 	const async = this.async.bind(this);
@@ -27,6 +33,9 @@ export default function parallelOctaneLoader(source, sourceMap) {
 				...(module.buildInfo?.[CSS_MODULE_BUILD_INFO_KEY] === undefined
 					? null
 					: { cssModuleBuildInfo: module.buildInfo[CSS_MODULE_BUILD_INFO_KEY] }),
+				...(module.buildInfo?.[VOID_COMPONENT_BUILD_INFO_KEY] === undefined
+					? null
+					: { voidComponentBuildInfo: module.buildInfo[VOID_COMPONENT_BUILD_INFO_KEY] }),
 				missingDependencies,
 			},
 		});

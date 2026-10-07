@@ -3,6 +3,11 @@ import {
 	CSS_MODULE_BUILD_INFO_KEY,
 	CSS_MODULE_CONTEXT_KEY,
 } from './css-module-data.js';
+import {
+	clearVoidComponentBuildInfo,
+	VOID_COMPONENT_BUILD_INFO_KEY,
+	VOID_COMPONENT_CONTEXT_KEY,
+} from './void-component-data.js';
 
 /**
  * Rspack does not copy a module's layer or buildInfo into parallel-loader
@@ -12,7 +17,9 @@ export function pitch() {
 	this.data ??= {};
 	this.data.octaneLayer = this._module?.layer ?? null;
 	this.data[CSS_MODULE_CONTEXT_KEY] = this[CSS_MODULE_CONTEXT_KEY] ?? null;
+	this.data[VOID_COMPONENT_CONTEXT_KEY] = this[VOID_COMPONENT_CONTEXT_KEY] ?? null;
 	clearCssModuleBuildInfo(this._module);
+	clearVoidComponentBuildInfo(this._module);
 	if (this._module?.buildInfo && typeof this._module.buildInfo === 'object') {
 		delete this._module.buildInfo.octane;
 	}
@@ -32,6 +39,12 @@ export default function finalizeOctaneLoader(source, sourceMap, metadata) {
 			this._module.buildInfo = {};
 		}
 		this._module.buildInfo[CSS_MODULE_BUILD_INFO_KEY] = result.cssModuleBuildInfo;
+	}
+	if (result?.voidComponentBuildInfo) {
+		if (!this._module.buildInfo || typeof this._module.buildInfo !== 'object') {
+			this._module.buildInfo = {};
+		}
+		this._module.buildInfo[VOID_COMPONENT_BUILD_INFO_KEY] = result.voidComponentBuildInfo;
 	}
 	for (const dependency of result?.missingDependencies ?? []) {
 		this.addMissingDependency(dependency);

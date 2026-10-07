@@ -11,6 +11,7 @@ import {
 } from 'octane/compiler/bundler';
 import { installCssModuleConstants } from './css-module-constants.js';
 import { createStreamedSignalHmrRuntimeModule } from './streamed-signals-hmr.js';
+import { installVoidComponentProofs } from './void-component-proofs.js';
 import {
 	getOctaneRspackBuildInfo,
 	inferRspackEnvironment,
@@ -522,6 +523,18 @@ export class OctaneRspackPlugin {
 			compiler.options.mode === 'production' &&
 			!dev &&
 			!hotModuleReplacement;
+		// Imported void components specialize roots and component calls, as the
+		// Vite plugin does for production builds. Profiling keeps generic roots,
+		// and only the DOM runtime is known to export the specialized helpers.
+		const voidComponents =
+			environment === 'client' &&
+			compiler.options.mode === 'production' &&
+			!dev &&
+			!profile &&
+			!hotModuleReplacement &&
+			this.options.runtime === undefined &&
+			this.options.universalRuntime === undefined &&
+			this.options.layerSpecializations === undefined;
 		// Loader worker pools cannot share one TypeScript Program. Watch and HMR
 		// use syntax-only compilation, including production-mode watch builds.
 		const textTypes =
@@ -551,6 +564,7 @@ export class OctaneRspackPlugin {
 			requireDirective: this.options.requireDirective === true,
 			transpile: this.options.transpile !== false,
 			cssModuleConstants,
+			voidComponents,
 			textTypes: tsconfig,
 		});
 		if (tsconfig !== undefined) {
@@ -566,6 +580,7 @@ export class OctaneRspackPlugin {
 				environment,
 			});
 		}
+		if (voidComponents) installVoidComponentProofs(compiler);
 		const neutralCompiler = createDiscoveryCompiler(this.options, root, profile);
 		const discoveryCompilers = [neutralCompiler];
 		for (const specialization of Object.values(this.options.layerSpecializations ?? {})) {

@@ -104,6 +104,19 @@ default and does not change development, HMR, or watch output. See
 [CSS-module constants](../../docs/compiler-css-module-constants.md) for the
 provider contract and stylesheet-ownership rules.
 
+One-shot production client builds also specialize imported components whose
+body never returns a value, as the Vite plugin does. A `createRoot` or
+`hydrateRoot` root and a `<Component />` call over such an import skip the
+generic return-value path, so a small app can tree-shake that path out of its
+bundle. An import is proven only when Octane compiled it as a void export and
+the provider's final JavaScript, after SWC and every later loader, still cannot
+return a value. The importer's final code must also still bind it to the same
+module and export. An importer that uses a proof is compiled once more and is
+not stored in the persistent module cache. A proven module that changes after
+that fails the build. Watch, development, HMR and profiling builds, and builds
+with a custom `runtime`, `universalRuntime` or `layerSpecializations`, keep the
+generic paths.
+
 Rspack layers can compile the same authored module against distinct universal
 renderer graphs. Configure the background graph at the top level, then key
 `layerSpecializations` by the exact value of `module.layer`:

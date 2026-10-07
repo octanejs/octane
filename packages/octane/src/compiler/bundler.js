@@ -428,6 +428,226 @@ export function findVoidComponentExports(source, id) {
 	return exports;
 }
 
+// Runtime wrappers that return a component with their first argument's render
+// ABI, by arity: the compiled single-root, warm-plan and presentation-view
+// stamps, and a comparator-free `memo`. Compiled output imports them from the
+// client runtime entry or its internal re-export.
+const VOID_PRESERVING_WRAPPERS = new Map([
+	['__s', 1],
+	['bindPresentationView', 2],
+	['markWarm', 2],
+	['memo', 1],
+]);
+const VOID_WRAPPER_REQUESTS = new Set(['octane', 'octane/internal/client']);
+
+// The value a parameterless IIFE evaluates to: compiled initializers run setup
+// (style injection, event delegation) as `(() => (setup, Component))()`, which
+// transpilers lower to `(function () { return setup, Component; })()`.
+function immediateResult(call) {
+	const callee = call.callee;
+	if (
+		call.optional === true ||
+		call.arguments?.length !== 0 ||
+		(callee?.type !== 'ArrowFunctionExpression' && callee?.type !== 'FunctionExpression') ||
+		callee.async ||
+		callee.generator ||
+		callee.params?.length !== 0 ||
+		// A named function expression can rebind its own name inside the body.
+		callee.id != null
+	)
+		return null;
+	if (callee.body?.type !== 'BlockStatement') return callee.body;
+	const [statement, ...rest] = callee.body.body;
+	return rest.length === 0 && statement?.type === 'ReturnStatement' ? statement.argument : null;
+}
+
+// Whether a function body can complete with a value. Nested functions and
+// classes own their own returns.
+function hasValueReturn(node) {
+	if (!node || typeof node !== 'object') return false;
+	if (Array.isArray(node)) return node.some(hasValueReturn);
+	switch (node.type) {
+		case 'ReturnStatement':
+			return node.argument != null;
+		case 'FunctionDeclaration':
+		case 'FunctionExpression':
+		case 'ArrowFunctionExpression':
+		case 'ClassDeclaration':
+		case 'ClassExpression':
+			return false;
+	}
+	for (const key in node) {
+		if (key === 'loc' || key === 'start' || key === 'end' || key === 'range' || key === 'parent')
+			continue;
+		const value = node[key];
+		if (value && typeof value === 'object' && hasValueReturn(value)) return true;
+	}
+	return false;
+}
+
+// The exports of a module's final JavaScript whose value is still a function
+// that never returns a value: a synchronous function with no value `return`,
+// directly, through a runtime wrapper above, or as a setup IIFE's result, and
+// bound by a lexical binding nothing reassigns. Re-exports, namespace objects
+// and every other shape stay unknown.
+function compiledVoidExports(ast) {
+	const reassigned = collectReassignedBindings(ast);
+	const wrappers = new Map();
+	// Top-level value bindings with a statically known value. Imports and other
+	// declarations stay absent, so a reference to them is never void.
+	const values = new Map();
+	for (const node of ast.body || []) {
+		if (node.type === 'ImportDeclaration') {
+			if (!VOID_WRAPPER_REQUESTS.has(node.source?.value) || node.importKind === 'type') continue;
+			for (const specifier of node.specifiers || []) {
+				const imported = specifier.imported?.name ?? specifier.imported?.value;
+				if (
+					specifier.type === 'ImportSpecifier' &&
+					specifier.importKind !== 'type' &&
+					VOID_PRESERVING_WRAPPERS.has(imported)
+				)
+					wrappers.set(specifier.local.name, VOID_PRESERVING_WRAPPERS.get(imported));
+			}
+			continue;
+		}
+		const declaration =
+			node.type === 'ExportNamedDeclaration' || node.type === 'ExportDefaultDeclaration'
+				? node.declaration
+				: node;
+		if (declaration?.type === 'FunctionDeclaration' && declaration.id?.name) {
+			if (!reassigned.has(declaration.id)) values.set(declaration.id.name, declaration);
+		} else if (declaration?.type === 'VariableDeclaration') {
+			for (const item of declaration.declarations || []) {
+				if (item.id?.type === 'Identifier' && item.init != null && !reassigned.has(item.id))
+					values.set(item.id.name, item.init);
+			}
+		}
+	}
+
+	const isVoid = (node, seen) => {
+		switch (node?.type) {
+			case 'FunctionDeclaration':
+			case 'FunctionExpression':
+				return !node.async && !node.generator && !hasValueReturn(node.body);
+			case 'ArrowFunctionExpression':
+				return !node.async && node.body?.type === 'BlockStatement' && !hasValueReturn(node.body);
+			case 'Identifier': {
+				if (seen.has(node.name)) return false;
+				seen.add(node.name);
+				return isVoid(values.get(node.name), seen);
+			}
+			case 'SequenceExpression':
+				return isVoid(node.expressions?.at(-1), seen);
+			case 'CallExpression': {
+				if (node.optional === true) return false;
+				if (node.callee?.type === 'Identifier') {
+					const arity = wrappers.get(node.callee.name);
+					return (
+						arity !== undefined &&
+						node.arguments?.length === arity &&
+						node.arguments[0].type !== 'SpreadElement' &&
+						isVoid(node.arguments[0], seen)
+					);
+				}
+				const result = immediateResult(node);
+				return result != null && isVoid(result, seen);
+			}
+		}
+		return false;
+	};
+
+	const exports = [];
+	for (const node of ast.body || []) {
+		if (node.type === 'ExportDefaultDeclaration') {
+			const declaration = node.declaration;
+			// A named default function is a binding like any other.
+			const value =
+				declaration?.type === 'FunctionDeclaration' && declaration.id?.name
+					? values.get(declaration.id.name)
+					: declaration;
+			if (isVoid(value, new Set())) exports.push('default');
+			continue;
+		}
+		if (node.type !== 'ExportNamedDeclaration' || node.source != null || node.exportKind === 'type')
+			continue;
+		const declaration = node.declaration;
+		if (declaration?.type === 'FunctionDeclaration' && declaration.id?.name) {
+			if (isVoid(values.get(declaration.id.name), new Set())) exports.push(declaration.id.name);
+		} else if (declaration?.type === 'VariableDeclaration') {
+			for (const item of declaration.declarations || []) {
+				if (item.id?.type === 'Identifier' && isVoid(values.get(item.id.name), new Set()))
+					exports.push(item.id.name);
+			}
+		} else if (declaration == null) {
+			for (const specifier of node.specifiers || []) {
+				const local = specifier.local?.name ?? specifier.local?.value;
+				const exported = specifier.exported?.name ?? specifier.exported?.value;
+				if (
+					specifier.exportKind !== 'type' &&
+					typeof exported === 'string' &&
+					isVoid(values.get(local), new Set())
+				)
+					exports.push(exported);
+			}
+		}
+	}
+	return exports;
+}
+
+// The value bindings a module's static import declarations create.
+function moduleImportBindings(ast) {
+	const bindings = [];
+	for (const node of ast.body || []) {
+		if (
+			node.type !== 'ImportDeclaration' ||
+			node.importKind === 'type' ||
+			typeof node.source?.value !== 'string'
+		)
+			continue;
+		for (const specifier of node.specifiers || []) {
+			if (specifier.importKind === 'type' || !specifier.local?.name) continue;
+			const imported =
+				specifier.type === 'ImportDefaultSpecifier'
+					? 'default'
+					: specifier.type === 'ImportNamespaceSpecifier'
+						? '*'
+						: (specifier.imported?.name ?? specifier.imported?.value);
+			if (typeof imported === 'string')
+				bindings.push({ local: specifier.local.name, request: node.source.value, imported });
+		}
+	}
+	return bindings;
+}
+
+/**
+ * Facts about a module's final JavaScript, after every bundler transform that
+ * ran over Octane's output, or null when it does not parse:
+ *
+ * - `voidComponentExports`: exports that still cannot return a value. That is
+ *   the whole runtime contract of a void root or void component call, which
+ *   discards a return value such a function cannot produce. An adapter whose
+ *   transforms can rewrite compiled output (transpiler lowering, other
+ *   loaders) pairs {@link findVoidComponentExports}, the authored contract,
+ *   with this check of the code that actually runs.
+ * - `importBindings`: each value import binding as `{ local, request,
+ *   imported }` (`imported` is `default` or `*` for those forms). Comparing
+ *   the bindings Octane's output read a proof through with the final code's
+ *   keeps a transform that rebinds an import from redirecting a specialized
+ *   call.
+ */
+export function analyzeCompiledModule(source, id) {
+	let ast;
+	try {
+		ast = parseModule(source, id);
+	} catch {
+		return null;
+	}
+	return {
+		voidComponentExports: compiledVoidExports(ast),
+		importBindings: moduleImportBindings(ast),
+	};
+}
+
 export function findDescriptorChildrenExports(source, id) {
 	let ast;
 	try {
