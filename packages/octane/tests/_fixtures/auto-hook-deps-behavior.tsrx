@@ -21,8 +21,12 @@ export function EffectFromState(props) @{
 		return () => props.log(`cleanup:${value}`);
 	});
 	<div>
-		<button class="value" onClick={() => setValue(value + 1)}>{value as string}</button>
-		<button class="noise" onClick={() => setNoise(noise + 1)}>{noise as string}</button>
+		<button class="value" onClick={() => setValue(value + 1)}>
+			{value as string}
+		</button>
+		<button class="noise" onClick={() => setNoise(noise + 1)}>
+			{noise as string}
+		</button>
 	</div>
 }
 
@@ -135,8 +139,12 @@ export function MemoFromState(props) @{
 	const computed = useMemo(() => props.compute(value));
 	<div>
 		<span class="computed">{computed as string}</span>
-		<button class="value" onClick={() => setValue(value + 1)}>{value as string}</button>
-		<button class="noise" onClick={() => setNoise(noise + 1)}>{noise as string}</button>
+		<button class="value" onClick={() => setValue(value + 1)}>
+			{value as string}
+		</button>
+		<button class="noise" onClick={() => setNoise(noise + 1)}>
+			{noise as string}
+		</button>
 	</div>
 }
 
@@ -169,9 +177,7 @@ export function CaptureFreeMemo() @{
 	const value = useMemo(() => ({ token: 'stable' }));
 	const first = useRef(value);
 	<div>
-		<span class="identity">
-			{first.current === value ? 'same' : 'changed'}
-		</span>
+		<span class="identity">{first.current === value ? 'same' : 'changed'}</span>
 		<button onClick={() => setTick(tick + 1)}>{tick as string}</button>
 	</div>
 }
@@ -302,7 +308,9 @@ export function MemoFromOpaqueDirectiveClosure(props) @{
 export function MemoFromPrototypeMethodCall() @{
 	const [count, setCount] = useState(0);
 	const fixed = useMemo(() => count.toFixed(2));
-	<button class="step" onClick={() => setCount(count + 0.25)}>{fixed as string}</button>
+	<button class="step" onClick={() => setCount(count + 0.25)}>
+		{fixed as string}
+	</button>
 }
 
 class PrefixFormatter {

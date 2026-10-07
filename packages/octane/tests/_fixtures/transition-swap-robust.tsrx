@@ -5,7 +5,7 @@ function A() @{
 }
 function Sus(props) @{
 	const v = use(props.promise);
-	<span id="content">{'B-' + v as string}</span>
+	<span id="content">{('B-' + v) as string}</span>
 }
 
 // nested Suspense: B has its OWN @try that catches its suspend → the OUTER swap
@@ -21,11 +21,11 @@ export function NestedSwap(props) @{
 	const [showB, setShowB] = useState(false);
 	const [, start] = useTransition();
 	<div>
-		<button id="go" onClick={() => start(() => setShowB(true))}>{'go'}</button>
+		<button id="go" onClick={() => start(() => setShowB(true))}>
+			{'go'}
+		</button>
 		@try {
-			<div class="slot">
-				{showB ? <BInner promise={props.promise} /> : <A />}
-			</div>
+			<div class="slot">{showB ? <BInner promise={props.promise} /> : <A />}</div>
 		} @pending {
 			<span id="fallback">{'outer-fallback'}</span>
 		}

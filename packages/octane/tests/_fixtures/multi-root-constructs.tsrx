@@ -18,7 +18,9 @@ export function MixedRootsIf(props) @{
 		@if (props.show) {
 			<span id="cond">{'cond'}</span>
 		}
-		<p id="after" class={props.cls}>{props.label as string}</p>
+		<p id="after" class={props.cls}>
+			{props.label as string}
+		</p>
 	</>
 }
 

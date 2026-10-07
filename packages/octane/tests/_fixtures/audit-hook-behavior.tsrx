@@ -23,7 +23,9 @@ export function RepeatedTransitionFlag(props: { repeats: number }) @{
 				startTransition(() => setPending(false));
 			}
 		}}
-	>{String(pending)}</button>
+	>
+		{String(pending)}
+	</button>
 }
 
 export function QueuedStateOrder(props: {
@@ -40,7 +42,9 @@ export function QueuedStateOrder(props: {
 			}
 			props.read(getValue());
 		}}
-	>{String(value)}</button>
+	>
+		{String(value)}
+	</button>
 }
 
 export function QueuedReducerOrder(props: {
@@ -60,7 +64,9 @@ export function QueuedReducerOrder(props: {
 			}
 			props.read(getValue());
 		}}
-	>{String(value)}</button>
+	>
+		{String(value)}
+	</button>
 }
 
 export function AsyncQueuedStateOrder(props: {
@@ -71,21 +77,24 @@ export function AsyncQueuedStateOrder(props: {
 }) @{
 	const [state, setState, getState] = useState(0);
 	const [reduced, dispatch, getReduced] = useReducer(
-		(previous: number, action: { value: number; replace: boolean }) => action.replace
-			? action.value
-			: previous * 10 + action.value,
+		(previous: number, action: { value: number; replace: boolean }) =>
+			action.replace ? action.value : previous * 10 + action.value,
 		0,
 	);
 	const [pending, start] = useTransition();
 	<div>
 		<button
 			id="action"
-			onClick={() => start(async () => {
-				if (props.reducer) dispatch({ value: 1, replace: false });
-				else setState((previous) => previous * 10 + 1);
-				await props.gate;
-			})}
-		>action</button>
+			onClick={() =>
+				start(async () => {
+					if (props.reducer) dispatch({ value: 1, replace: false });
+					else setState((previous) => previous * 10 + 1);
+					await props.gate;
+				})
+			}
+		>
+			action
+		</button>
 		<button
 			id="urgent"
 			onClick={() => {
@@ -94,7 +103,9 @@ export function AsyncQueuedStateOrder(props: {
 				else setState((previous) => previous * 10 + 2);
 				props.read(props.reducer ? getReduced() : getState());
 			}}
-		>urgent</button>
+		>
+			urgent
+		</button>
 		<p>{String(props.reducer ? reduced : state)}</p>
 		<span>{String(pending)}</span>
 	</div>
@@ -127,7 +138,9 @@ export function AsyncInterleavedStateOrder(props: {
 				});
 				props.read(props.reducer ? getReduced() : getState());
 			}}
-		>action</button>
+		>
+			action
+		</button>
 		<button
 			id="urgent"
 			onClick={() => {
@@ -136,7 +149,9 @@ export function AsyncInterleavedStateOrder(props: {
 				append(6);
 				props.read(props.reducer ? getReduced() : getState());
 			}}
-		>urgent</button>
+		>
+			urgent
+		</button>
 		<p>{String(props.reducer ? reduced : state)}</p>
 	</div>
 }
@@ -164,8 +179,11 @@ function Wrapper(props: { value: string }) @{
 // The same descriptor-copying strategy used by hoist-non-react-statics.
 for (const key of Reflect.ownKeys(MemoInner)) {
 	if (
-		key !== 'name' && key !== 'length' && key !== 'prototype' && key !== 'arguments' &&
-			key !== 'caller'
+		key !== 'name' &&
+		key !== 'length' &&
+		key !== 'prototype' &&
+		key !== 'arguments' &&
+		key !== 'caller'
 	) {
 		Object.defineProperty(Wrapper, key, Object.getOwnPropertyDescriptor(MemoInner, key)!);
 	}
@@ -186,7 +204,9 @@ export function FreshReducer() @{
 			setFactor(10);
 			dispatch(1);
 		}}
-	>{String(value)}</button>
+	>
+		{String(value)}
+	</button>
 }
 
 export function FreshTransitionReducer() @{
@@ -197,11 +217,15 @@ export function FreshTransitionReducer() @{
 	);
 	const [, start] = useTransition();
 	<button
-		onClick={() => start(() => {
-			setFactor(10);
-			dispatch(1);
-		})}
-	>{String(value)}</button>
+		onClick={() =>
+			start(() => {
+				setFactor(10);
+				dispatch(1);
+			})
+		}
+	>
+		{String(value)}
+	</button>
 }
 
 function ThrowingUpdates(props: { reducer: boolean }) @{
@@ -212,11 +236,14 @@ function ThrowingUpdates(props: { reducer: boolean }) @{
 	<button
 		onClick={() => {
 			if (props.reducer) dispatch(1);
-			else setValue(() => {
-				throw new Error('updater failed');
-			});
+			else
+				setValue(() => {
+					throw new Error('updater failed');
+				});
 		}}
-	>update</button>
+	>
+		update
+	</button>
 }
 
 export function CaughtUpdates(props: { reducer: boolean }) @{
@@ -235,17 +262,15 @@ function PendingThrowingUpdater(props: {
 }) @{
 	const [, setValue] = useState(0);
 	const [pending, start] = useTransition();
-	props.bind(
-		() => start(async () => {
+	props.bind(() =>
+		start(async () => {
 			setValue(() => {
 				throw new Error('staged updater failed');
 			});
 			await props.wait;
 		}),
 	);
-	<span>
-		{pending ? 'pending' : 'ready'}
-	</span>
+	<span>{pending ? 'pending' : 'ready'}</span>
 }
 
 export function CaughtPendingUpdater(props: {
@@ -270,7 +295,9 @@ export function FreshUpdater() @{
 			setValue((old) => old + ref.current);
 			ref.current = 100;
 		}}
-	>{String(value)}</button>
+	>
+		{String(value)}
+	</button>
 }
 
 export function FreshTransitionUpdater(props: { noop?: boolean }) @{
@@ -278,12 +305,16 @@ export function FreshTransitionUpdater(props: { noop?: boolean }) @{
 	const [value, setValue] = useState(0);
 	const [, start] = useTransition();
 	<button
-		onClick={() => start(() => {
-			setValue(props.noop ? 0 : 100);
-			setValue((old) => old + ref.current);
-			ref.current = 100;
-		})}
-	>{String(value)}</button>
+		onClick={() =>
+			start(() => {
+				setValue(props.noop ? 0 : 100);
+				setValue((old) => old + ref.current);
+				ref.current = 100;
+			})
+		}
+	>
+		{String(value)}
+	</button>
 }
 
 export function PassiveCleanup(props: { log: (message: string) => void }) @{
@@ -319,8 +350,10 @@ export function MemoFactorySelfUpdate(props: { log: (message: string) => void })
 }
 
 export function IndependentTransitions(props: {
-	bind: (first: (fn: () => void | Promise<unknown>) => void, second: (fn: () => | void
-	| Promise<unknown>) => void) => void;
+	bind: (
+		first: (fn: () => void | Promise<unknown>) => void,
+		second: (fn: () => void | Promise<unknown>) => void,
+	) => void;
 }) @{
 	const [first, startFirst] = useTransition();
 	const [second, startSecond] = useTransition();

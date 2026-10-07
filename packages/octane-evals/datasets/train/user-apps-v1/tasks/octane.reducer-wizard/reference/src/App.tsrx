@@ -56,7 +56,9 @@ export function ProfileStep(props: {
 			value={props.name}
 			onInput={(event: InputEvent) => props.onName((event.target as HTMLInputElement).value)}
 		/>
-		<button type="submit" disabled={!valid}>Choose plan</button>
+		<button type="submit" disabled={!valid}>
+			Choose plan
+		</button>
 	</form>
 }
 
@@ -82,7 +84,9 @@ export function PlanStep(props: {
 			<option value="starter">Starter</option>
 			<option value="pro">Pro</option>
 		</select>
-		<button type="button" onClick={props.onBack}>Back</button>
+		<button type="button" onClick={props.onBack}>
+			Back
+		</button>
 		<button type="submit">Review</button>
 	</form>
 }
@@ -95,23 +99,22 @@ export function ReviewStep(props: {
 }) @{
 	<section aria-label="Review step">
 		<output aria-label="Review name">{props.name.trim() as string}</output>
-		<output aria-label="Review plan">
-			{props.plan === 'starter' ? 'Starter' : 'Pro'}
-		</output>
-		<button type="button" onClick={props.onBack}>Back</button>
-		<button type="button" onClick={props.onConfirm}>Confirm</button>
+		<output aria-label="Review plan">{props.plan === 'starter' ? 'Starter' : 'Pro'}</output>
+		<button type="button" onClick={props.onBack}>
+			Back
+		</button>
+		<button type="button" onClick={props.onConfirm}>
+			Confirm
+		</button>
 	</section>
 }
 
 export function App(props: { onConfirm: (confirmation: Confirmation) => void }) @{
-	const [state, dispatch] = useReducer(
-		wizardReducer,
-		{
-			step: 'profile',
-			name: '',
-			plan: 'starter',
-		} as WizardState,
-	);
+	const [state, dispatch] = useReducer(wizardReducer, {
+		step: 'profile',
+		name: '',
+		plan: 'starter',
+	} as WizardState);
 
 	<main>
 		<h1>Account wizard</h1>

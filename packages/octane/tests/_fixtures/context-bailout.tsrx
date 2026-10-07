@@ -119,7 +119,9 @@ export function AppSiblings(props) @{
 	const [step, setStep] = useState(0);
 	log('App');
 	<div id="app-siblings">
-		<button id="bump" onClick={() => setStep(step + 1)}>{'bump'}</button>
+		<button id="bump" onClick={() => setStep(step + 1)}>
+			{'bump'}
+		</button>
 		<Ctx value={step}>
 			<StaticContent />
 			@if (step > 0) {
@@ -138,7 +140,7 @@ export function AppSiblings(props) @{
 function RowImpl(props) @{
 	const value = use(Ctx);
 	log('Row:' + props.id);
-	<li class={'row-' + props.id as string}>{value as string}</li>
+	<li class={('row-' + props.id) as string}>{value as string}</li>
 }
 const Row = memo(RowImpl);
 

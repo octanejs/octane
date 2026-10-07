@@ -47,18 +47,21 @@ export const FieldLabel = ({
 	className?: string;
 }) => {
 	const El = el;
-	return <El className={className}>
-		<div className={getClassName('label')}>
-			{icon ? <div className={getClassName('labelIcon')}>{icon}</div> : <></>}
-			{label}
+	return (
+		<El className={className}>
+			<div className={getClassName('label')}>
+				{icon ? <div className={getClassName('labelIcon')}>{icon}</div> : <></>}
+				{label}
 
-			{readOnly &&
-				<div className={getClassName('disabledIcon')} title="Read-only">
-					<Lock size="12" />
-				</div>}
-		</div>
-		{children}
-	</El>;
+				{readOnly && (
+					<div className={getClassName('disabledIcon')} title="Read-only">
+						<Lock size="12" />
+					</div>
+				)}
+			</div>
+			{children}
+		</El>
+	);
 };
 
 type FieldLabelPropsInternal = {
@@ -81,36 +84,36 @@ export const FieldLabelInternal = ({
 	const Wrapper = useMemo(() => overrides.fieldLabel || FieldLabel, [overrides]);
 
 	if (!label) {
-		return <>
-			{children}
-		</>;
+		return <>{children}</>;
 	}
 
-	return <Wrapper
-		label={label}
-		icon={icon}
-		className={getClassName({ readOnly })}
-		readOnly={readOnly}
-		el={el}
-	>{children}</Wrapper>;
+	return (
+		<Wrapper
+			label={label}
+			icon={icon}
+			className={getClassName({ readOnly })}
+			readOnly={readOnly}
+			el={el}
+		>
+			{children}
+		</Wrapper>
+	);
 };
 
-type FieldPropsInternalOptional<ValueType = any, F = Field<any>> =
-	FieldProps<F, ValueType> & {
-		Label?: FC<FieldLabelPropsInternal>;
-		label?: string;
-		labelIcon?: OctaneNode;
-		name?: string;
-	};
+type FieldPropsInternalOptional<ValueType = any, F = Field<any>> = FieldProps<F, ValueType> & {
+	Label?: FC<FieldLabelPropsInternal>;
+	label?: string;
+	labelIcon?: OctaneNode;
+	name?: string;
+};
 
-export type FieldPropsInternal<ValueType = any, F = Field<any>> =
-	FieldProps<F, ValueType> & {
-		Label: FC<FieldLabelPropsInternal>;
-		label?: string;
-		labelIcon?: OctaneNode;
-		id: string;
-		name?: string;
-	};
+export type FieldPropsInternal<ValueType = any, F = Field<any>> = FieldProps<F, ValueType> & {
+	Label: FC<FieldLabelPropsInternal>;
+	label?: string;
+	labelIcon?: OctaneNode;
+	id: string;
+	name?: string;
+};
 
 const defaultFields = {
 	array: ArrayField,
@@ -126,9 +129,11 @@ const defaultFields = {
 function AutoFieldInternal<
 	ValueType = any,
 	FieldType extends FieldNoLabel<ValueType> = FieldNoLabel<ValueType>,
->(props: FieldPropsInternalOptional<ValueType, FieldType> & {
-	Label?: FC<FieldLabelPropsInternal>;
-}) {
+>(
+	props: FieldPropsInternalOptional<ValueType, FieldType> & {
+		Label?: FC<FieldLabelPropsInternal>;
+	},
+) {
 	const dispatch = useAppStore((s) => s.dispatch);
 	const overrides = useAppStore((s) => s.overrides);
 	const readOnly = useAppStore((s) => s.selectedItem?.readOnly);
@@ -170,20 +175,23 @@ function AutoFieldInternal<
 		[props, field, label, labelIcon, Label, resolvedId],
 	);
 
-	const onFocus = useCallback((e: FocusEvent) => {
-		const target = e.target as Element;
+	const onFocus = useCallback(
+		(e: FocusEvent) => {
+			const target = e.target as Element;
 
-		if (mergedProps.name && (target.nodeName === 'INPUT' || target.nodeName === 'TEXTAREA')) {
-			e.stopPropagation();
+			if (mergedProps.name && (target.nodeName === 'INPUT' || target.nodeName === 'TEXTAREA')) {
+				e.stopPropagation();
 
-			dispatch({
-				type: 'setUi',
-				ui: {
-					field: { focus: mergedProps.name },
-				},
-			});
-		}
-	}, [mergedProps.name]);
+				dispatch({
+					type: 'setUi',
+					ui: {
+						field: { focus: mergedProps.name },
+					},
+				});
+			}
+		},
+		[mergedProps.name],
+	);
 
 	const onBlur = useCallback((e: FocusEvent) => {
 		const target = e.target as Element;
@@ -231,25 +239,27 @@ function AutoFieldInternal<
 		throw new Error(`Field type for ${field.type} did not exist.`);
 	}
 
-	return <NestedFieldContext
-		value={{
-			readOnlyFields: nestedFieldContext.readOnlyFields || readOnly || {},
-			localName: nestedFieldContext.localName ?? mergedProps.name,
-		}}
-	>
-		<div
-			className={getClassNameWrapper()}
-			onFocus={onFocus}
-			onBlur={onBlur}
-			onClick={(e) => {
-				e.stopPropagation();
+	return (
+		<NestedFieldContext
+			value={{
+				readOnlyFields: nestedFieldContext.readOnlyFields || readOnly || {},
+				localName: nestedFieldContext.localName ?? mergedProps.name,
 			}}
 		>
-			<FieldComponent {...mergedProps}>
-				<Children {...mergedProps} />
-			</FieldComponent>
-		</div>
-	</NestedFieldContext>;
+			<div
+				className={getClassNameWrapper()}
+				onFocus={onFocus}
+				onBlur={onBlur}
+				onClick={(e) => {
+					e.stopPropagation();
+				}}
+			>
+				<FieldComponent {...mergedProps}>
+					<Children {...mergedProps} />
+				</FieldComponent>
+			</div>
+		</NestedFieldContext>
+	);
 }
 
 type FieldNoLabel<Props extends any = any> = Omit<Field<Props>, 'label'>;
@@ -257,19 +267,24 @@ type FieldNoLabel<Props extends any = any> = Omit<Field<Props>, 'label'>;
 export function AutoFieldPrivate<
 	ValueType = any,
 	FieldType extends FieldNoLabel<ValueType> = FieldNoLabel<ValueType>,
->(props: FieldPropsInternalOptional<ValueType, FieldType> & {
-	Label?: FC<FieldLabelPropsInternal>;
-}) {
+>(
+	props: FieldPropsInternalOptional<ValueType, FieldType> & {
+		Label?: FC<FieldLabelPropsInternal>;
+	},
+) {
 	const isFocused = useAppStore((s) => s.state.ui.field.focus === props.name);
 	const { value, onChange } = props;
 
 	const [localValue, setLocalValue] = useState(value);
 
-	const onChangeLocal = useCallback((val: any, ui?: Partial<UiState>) => {
-		setLocalValue(val);
+	const onChangeLocal = useCallback(
+		(val: any, ui?: Partial<UiState>) => {
+			setLocalValue(val);
 
-		onChange(val, ui);
-	}, [onChange]);
+			onChange(val, ui);
+		},
+		[onChange],
+	);
 
 	useEffect(() => {
 		// Prevent global state from setting local state if this field is focused
@@ -299,8 +314,9 @@ export function AutoField<
 	FieldType extends FieldNoLabel<ValueType> = FieldNoLabel<ValueType>,
 >(props: FieldProps<FieldType, ValueType>) {
 	const DefaultLabel = useMemo(() => {
-		const DefaultLabel = (labelProps: any) =>
-			<div {...labelProps} className={getClassName({ readOnly: props.readOnly })} />;
+		const DefaultLabel = (labelProps: any) => (
+			<div {...labelProps} className={getClassName({ readOnly: props.readOnly })} />
+		);
 
 		return DefaultLabel;
 	}, [props.readOnly]);

@@ -42,11 +42,12 @@ export function RenderPropInput(props: { value: string; onChange: (value: string
 		maxLength={4}
 		value={props.value}
 		onChange={props.onChange}
-		render={(state) =>
+		render={(state) => (
 			<output
 				data-testid="render"
 				data-slots={state.slots.map((slot) => slot.char ?? '_').join('|')}
-			/>}
+			/>
+		)}
 	/>
 }
 

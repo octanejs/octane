@@ -77,8 +77,8 @@ export function FormProvider<
 	);
 
 	<HookFormContext value={memoizedValue as unknown as UseFormReturn}>
-		<HookFormControlContext
-			value={memoizedValue.control as Control}
-		>{children}</HookFormControlContext>
+		<HookFormControlContext value={memoizedValue.control as Control}>
+			{children}
+		</HookFormControlContext>
 	</HookFormContext>
 }

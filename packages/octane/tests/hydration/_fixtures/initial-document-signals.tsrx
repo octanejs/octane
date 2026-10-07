@@ -18,11 +18,10 @@ export type ReaderProps = {
 	nestedWhen?: HydrateProps['when'];
 };
 
-export type DocumentProps =
-	Omit<ReaderProps, 'id'> & {
-		when: HydrateProps['when'];
-		secondWhen?: HydrateProps['when'];
-	};
+export type DocumentProps = Omit<ReaderProps, 'id'> & {
+	when: HydrateProps['when'];
+	secondWhen?: HydrateProps['when'];
+};
 
 export function IndependentReader() @{
 	const route = route$.get();
@@ -118,7 +117,11 @@ export function Region({ when, ...props }: ReaderProps & { when: HydrateProps['w
 	</Hydrate>
 }
 
-export function StreamedRegion({ ready, when, ...props }: ReaderProps & {
+export function StreamedRegion({
+	ready,
+	when,
+	...props
+}: ReaderProps & {
 	ready: Promise<void>;
 	when: HydrateProps['when'];
 }) @{

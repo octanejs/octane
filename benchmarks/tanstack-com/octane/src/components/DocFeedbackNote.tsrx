@@ -41,26 +41,25 @@ export function DocFeedbackNote({ note, anchorName, inline = false }: DocFeedbac
 	// Theme based on type
 	const isImprovement = note.type === 'improvement';
 	const Icon = isImprovement ? Lightbulb : MessageSquare;
-	const colors =
-		isImprovement
-			? {
-					bg: 'bg-yellow-50 dark:bg-yellow-900/20',
-					border: 'border-yellow-400 dark:border-yellow-600',
-					header: 'bg-yellow-100 dark:bg-yellow-900/30',
-					icon: 'text-yellow-600 dark:text-yellow-500 text-[14px]',
-					text: 'text-yellow-800 dark:text-yellow-300',
-					timestamp: 'text-yellow-700 dark:text-yellow-400',
-					deleteHover: 'hover:text-yellow-600 dark:hover:text-yellow-400',
-				}
-			: {
-					bg: 'bg-blue-50 dark:bg-blue-900/20',
-					border: 'border-blue-400 dark:border-blue-600',
-					header: 'bg-blue-100 dark:bg-blue-900/30',
-					icon: 'text-blue-600 dark:text-blue-500 text-[14px]',
-					text: 'text-blue-800 dark:text-blue-300',
-					timestamp: 'text-blue-700 dark:text-blue-400',
-					deleteHover: 'hover:text-blue-600 dark:hover:text-blue-400',
-				};
+	const colors = isImprovement
+		? {
+				bg: 'bg-yellow-50 dark:bg-yellow-900/20',
+				border: 'border-yellow-400 dark:border-yellow-600',
+				header: 'bg-yellow-100 dark:bg-yellow-900/30',
+				icon: 'text-yellow-600 dark:text-yellow-500 text-[14px]',
+				text: 'text-yellow-800 dark:text-yellow-300',
+				timestamp: 'text-yellow-700 dark:text-yellow-400',
+				deleteHover: 'hover:text-yellow-600 dark:hover:text-yellow-400',
+			}
+		: {
+				bg: 'bg-blue-50 dark:bg-blue-900/20',
+				border: 'border-blue-400 dark:border-blue-600',
+				header: 'bg-blue-100 dark:bg-blue-900/30',
+				icon: 'text-blue-600 dark:text-blue-500 text-[14px]',
+				text: 'text-blue-800 dark:text-blue-300',
+				timestamp: 'text-blue-700 dark:text-blue-400',
+				deleteHover: 'hover:text-blue-600 dark:hover:text-blue-400',
+			};
 
 	// Auto-resize textarea to fit content
 	useEffect(() => {
@@ -72,8 +71,7 @@ export function DocFeedbackNote({ note, anchorName, inline = false }: DocFeedbac
 
 	// Extract first line for preview
 	const firstLine = note.content.split('\n')[0];
-	const preview =
-		firstLine.length > 60 ? firstLine.substring(0, 60) + '...' : firstLine;
+	const preview = firstLine.length > 60 ? firstLine.substring(0, 60) + '...' : firstLine;
 
 	const deleteMutation = useMutation({
 		mutationFn: deleteDocFeedback,
@@ -145,8 +143,8 @@ export function DocFeedbackNote({ note, anchorName, inline = false }: DocFeedbac
 				if ('userFeedback' in old && Array.isArray(old.userFeedback)) {
 					return {
 						...old,
-						userFeedback: old.userFeedback.map(
-							(f: DocFeedback) => f.id === note.id
+						userFeedback: old.userFeedback.map((f: DocFeedback) =>
+							f.id === note.id
 								? {
 										...f,
 										content: variables.data.content,
@@ -161,8 +159,8 @@ export function DocFeedbackNote({ note, anchorName, inline = false }: DocFeedbac
 				if ('feedback' in old && Array.isArray(old.feedback)) {
 					return {
 						...old,
-						feedback: old.feedback.map(
-							(f: DocFeedback) => f.id === note.id
+						feedback: old.feedback.map((f: DocFeedback) =>
+							f.id === note.id
 								? {
 										...f,
 										content: variables.data.content,
@@ -216,10 +214,8 @@ export function DocFeedbackNote({ note, anchorName, inline = false }: DocFeedbac
 				if ('userFeedback' in old && Array.isArray(old.userFeedback)) {
 					return {
 						...old,
-						userFeedback: old.userFeedback.map(
-							(f: DocFeedback) => f.id === note.id
-								? { ...f, isCollapsed: variables.data.isCollapsed }
-								: f,
+						userFeedback: old.userFeedback.map((f: DocFeedback) =>
+							f.id === note.id ? { ...f, isCollapsed: variables.data.isCollapsed } : f,
 						),
 					};
 				}
@@ -228,10 +224,8 @@ export function DocFeedbackNote({ note, anchorName, inline = false }: DocFeedbac
 				if ('feedback' in old && Array.isArray(old.feedback)) {
 					return {
 						...old,
-						feedback: old.feedback.map(
-							(f: DocFeedback) => f.id === note.id
-								? { ...f, isCollapsed: variables.data.isCollapsed }
-								: f,
+						feedback: old.feedback.map((f: DocFeedback) =>
+							f.id === note.id ? { ...f, isCollapsed: variables.data.isCollapsed } : f,
 						),
 					};
 				}
@@ -297,167 +291,184 @@ export function DocFeedbackNote({ note, anchorName, inline = false }: DocFeedbac
 		setSaveError(null);
 	};
 
-	return <div
-		class={twMerge(
-			inline ? 'w-full' : 'fixed z-40 w-80 max-w-[calc(100vw-2rem)]',
-			'transition-all duration-200',
-		)}
-		style={inline
-			? undefined
-			: {
-					positionAnchor: anchorName,
-					top: 'anchor(top)',
-					left: 'anchor(right)',
-					marginLeft: '0.5rem',
-				}}
-		onClick={(e) => e.stopPropagation()}
-		onMouseDown={(e) => e.stopPropagation()}
-	>
+	return (
 		<div
 			class={twMerge(
-				colors.bg,
-				`border-r-4 ${colors.border}`,
-				'rounded-l-lg shadow-lg',
-				'overflow-hidden',
+				inline ? 'w-full' : 'fixed z-40 w-80 max-w-[calc(100vw-2rem)]',
 				'transition-all duration-200',
-				isDeleting && 'opacity-50',
 			)}
+			style={
+				inline
+					? undefined
+					: {
+							positionAnchor: anchorName,
+							top: 'anchor(top)',
+							left: 'anchor(right)',
+							marginLeft: '0.5rem',
+						}
+			}
+			onClick={(e) => e.stopPropagation()}
+			onMouseDown={(e) => e.stopPropagation()}
 		>
-			{/* Error messages */}
-			{(deleteError || saveError) &&
-				<div
-					class="m-2 p-2 rounded bg-red-50 dark:bg-red-900/20 text-red-800 dark:text-red-200 border border-red-200 dark:border-red-800 text-xs"
-				>
-					{deleteError || saveError}
-				</div>}
-
-			{/* Header - always visible */}
 			<div
 				class={twMerge(
-					`flex flex-col gap-1 p-2 ${colors.header}`,
-					note.isCollapsed && 'cursor-pointer hover:opacity-80 transition-opacity',
+					colors.bg,
+					`border-r-4 ${colors.border}`,
+					'rounded-l-lg shadow-lg',
+					'overflow-hidden',
+					'transition-all duration-200',
+					isDeleting && 'opacity-50',
 				)}
-				onClick={note.isCollapsed ? handleToggle : undefined}
 			>
-				<div class="flex items-center justify-between gap-2">
-					<div class="flex items-center gap-2 flex-1 min-w-0">
-						<Icon className={`${colors.icon} text-xs shrink-0`} />
-						<span class={`text-xs font-medium ${colors.text} truncate`}>
-							{isImprovement ? 'Your Improvement' : 'Your Note'}
-						</span>
-						{isImprovement && note.status &&
-							<span
-								class={twMerge(
-									'text-[10px] px-1.5 py-0.5 rounded font-medium uppercase tracking-wide shrink-0',
-									note.status === 'approved' &&
-										'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400',
-									note.status === 'denied' &&
-										'bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400',
-									note.status === 'pending' &&
-										'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400',
-								)}
-							>{note.status}</span>}
+				{/* Error messages */}
+				{(deleteError || saveError) && (
+					<div class="m-2 p-2 rounded bg-red-50 dark:bg-red-900/20 text-red-800 dark:text-red-200 border border-red-200 dark:border-red-800 text-xs">
+						{deleteError || saveError}
 					</div>
-					<div class="flex items-center gap-1 shrink-0">
-						{!note.isCollapsed &&
-							<>
-								<button
-									onClick={(e) => {
-										e.stopPropagation();
-										handleDelete();
-									}}
-									class={`p-1 ${colors.icon} hover:text-red-600 dark:hover:text-red-400 transition-colors disabled:opacity-50`}
-									title={isImprovement ? 'Delete improvement' : 'Delete note'}
-									disabled={isDeleting || isSaving}
+				)}
+
+				{/* Header - always visible */}
+				<div
+					class={twMerge(
+						`flex flex-col gap-1 p-2 ${colors.header}`,
+						note.isCollapsed && 'cursor-pointer hover:opacity-80 transition-opacity',
+					)}
+					onClick={note.isCollapsed ? handleToggle : undefined}
+				>
+					<div class="flex items-center justify-between gap-2">
+						<div class="flex items-center gap-2 flex-1 min-w-0">
+							<Icon className={`${colors.icon} text-xs shrink-0`} />
+							<span class={`text-xs font-medium ${colors.text} truncate`}>
+								{isImprovement ? 'Your Improvement' : 'Your Note'}
+							</span>
+							{isImprovement && note.status && (
+								<span
+									class={twMerge(
+										'text-[10px] px-1.5 py-0.5 rounded font-medium uppercase tracking-wide shrink-0',
+										note.status === 'approved' &&
+											'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400',
+										note.status === 'denied' &&
+											'bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400',
+										note.status === 'pending' &&
+											'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400',
+									)}
 								>
-									<Trash className="text-xs" />
-								</button>
-							</>}
-						<button
-							onClick={(e) => {
-								e.stopPropagation();
-								handleToggle();
-							}}
-							class={`p-1 ${colors.icon} ${colors.deleteHover} transition-colors`}
-							title={note.isCollapsed
-								? `Expand ${isImprovement ? 'improvement' : 'note'}`
-								: `Collapse ${isImprovement ? 'improvement' : 'note'}`}
-						>
-							{note.isCollapsed
-								? <ChevronDown className="text-xs" />
-								: <ChevronUp className="text-xs" />}
-						</button>
-					</div>
-				</div>
-				{/* Preview when collapsed */}
-				{note.isCollapsed &&
-					<div class={`text-xs ${colors.text} opacity-70 truncate`}>{preview}</div>}
-			</div>
-
-			{/* Content - collapsible */}
-			{!note.isCollapsed &&
-				<div class="p-3">
-					{/* Editable textarea */}
-					<textarea
-						ref={textareaRef}
-						value={content}
-						onInput={handleContentChange}
-						class={twMerge(
-							'w-full px-0 py-0',
-							'bg-transparent',
-							'border-none',
-							'text-sm text-gray-800 dark:text-gray-200',
-							'focus:outline-none',
-							'resize-none overflow-hidden',
-							'whitespace-pre-wrap',
-						)}
-						disabled={isSaving || isDeleting}
-					/>
-
-					{/* Action buttons when content changes */}
-					{hasChanges &&
-						<div class="flex items-center gap-2 mt-2">
-							<button
-								onClick={handleSave}
-								class={twMerge(
-									'px-3 py-1 text-xs font-medium rounded',
-									'bg-blue-600 text-white',
-									'hover:bg-blue-700',
-									'disabled:opacity-50 disabled:cursor-not-allowed',
-									'transition-colors duration-150',
-									'flex items-center gap-1',
-								)}
-								disabled={isSaving}
-							>
-								<Save className="text-[10px]" />
-								{isSaving ? 'Saving...' : 'Save'}
-							</button>
-							<button
-								onClick={handleCancel}
-								class="px-3 py-1 text-xs font-medium text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white disabled:opacity-50"
-								disabled={isSaving}
-							>
-								<X className="inline text-[10px] mr-1" />
-								Cancel
-							</button>
-						</div>}
-
-					{/* Timestamp and Points */}
-					<div class={`mt-2 flex items-center justify-between text-xs ${colors.timestamp}`}>
-						<div>{new Date(note.createdAt).toLocaleDateString('en-US', {
-							month: 'short',
-							day: 'numeric',
-							year: 'numeric',
-						})}</div>
-						{isImprovement &&
-							<div class="font-medium">
-								<span class="text-blue-600 dark:text-blue-400">
-									{(note.content.length * 0.1).toFixed(1) as string}
-									points
+									{note.status}
 								</span>
-							</div>}
+							)}
+						</div>
+						<div class="flex items-center gap-1 shrink-0">
+							{!note.isCollapsed && (
+								<>
+									<button
+										onClick={(e) => {
+											e.stopPropagation();
+											handleDelete();
+										}}
+										class={`p-1 ${colors.icon} hover:text-red-600 dark:hover:text-red-400 transition-colors disabled:opacity-50`}
+										title={isImprovement ? 'Delete improvement' : 'Delete note'}
+										disabled={isDeleting || isSaving}
+									>
+										<Trash className="text-xs" />
+									</button>
+								</>
+							)}
+							<button
+								onClick={(e) => {
+									e.stopPropagation();
+									handleToggle();
+								}}
+								class={`p-1 ${colors.icon} ${colors.deleteHover} transition-colors`}
+								title={
+									note.isCollapsed
+										? `Expand ${isImprovement ? 'improvement' : 'note'}`
+										: `Collapse ${isImprovement ? 'improvement' : 'note'}`
+								}
+							>
+								{note.isCollapsed ? (
+									<ChevronDown className="text-xs" />
+								) : (
+									<ChevronUp className="text-xs" />
+								)}
+							</button>
+						</div>
 					</div>
-				</div>}
+					{/* Preview when collapsed */}
+					{note.isCollapsed && (
+						<div class={`text-xs ${colors.text} opacity-70 truncate`}>{preview}</div>
+					)}
+				</div>
+
+				{/* Content - collapsible */}
+				{!note.isCollapsed && (
+					<div class="p-3">
+						{/* Editable textarea */}
+						<textarea
+							ref={textareaRef}
+							value={content}
+							onInput={handleContentChange}
+							class={twMerge(
+								'w-full px-0 py-0',
+								'bg-transparent',
+								'border-none',
+								'text-sm text-gray-800 dark:text-gray-200',
+								'focus:outline-none',
+								'resize-none overflow-hidden',
+								'whitespace-pre-wrap',
+							)}
+							disabled={isSaving || isDeleting}
+						/>
+
+						{/* Action buttons when content changes */}
+						{hasChanges && (
+							<div class="flex items-center gap-2 mt-2">
+								<button
+									onClick={handleSave}
+									class={twMerge(
+										'px-3 py-1 text-xs font-medium rounded',
+										'bg-blue-600 text-white',
+										'hover:bg-blue-700',
+										'disabled:opacity-50 disabled:cursor-not-allowed',
+										'transition-colors duration-150',
+										'flex items-center gap-1',
+									)}
+									disabled={isSaving}
+								>
+									<Save className="text-[10px]" />
+									{isSaving ? 'Saving...' : 'Save'}
+								</button>
+								<button
+									onClick={handleCancel}
+									class="px-3 py-1 text-xs font-medium text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white disabled:opacity-50"
+									disabled={isSaving}
+								>
+									<X className="inline text-[10px] mr-1" />
+									Cancel
+								</button>
+							</div>
+						)}
+
+						{/* Timestamp and Points */}
+						<div class={`mt-2 flex items-center justify-between text-xs ${colors.timestamp}`}>
+							<div>
+								{new Date(note.createdAt).toLocaleDateString('en-US', {
+									month: 'short',
+									day: 'numeric',
+									year: 'numeric',
+								})}
+							</div>
+							{isImprovement && (
+								<div class="font-medium">
+									<span class="text-blue-600 dark:text-blue-400">
+										{(note.content.length * 0.1).toFixed(1) as string}
+										points
+									</span>
+								</div>
+							)}
+						</div>
+					</div>
+				)}
+			</div>
 		</div>
-	</div>;
+	);
 }

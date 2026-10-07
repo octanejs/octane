@@ -80,7 +80,12 @@ export function MenubarContent({
 	);
 }
 
-export function MenubarItem({ className, inset, variant = 'default', ...props }: Props & {
+export function MenubarItem({
+	className,
+	inset,
+	variant = 'default',
+	...props
+}: Props & {
 	inset?: boolean;
 	variant?: 'default' | 'destructive';
 }) @{
@@ -96,7 +101,13 @@ export function MenubarItem({ className, inset, variant = 'default', ...props }:
 	/>
 }
 
-export function MenubarCheckboxItem({ className, children, checked, inset, ...props }: Props & {
+export function MenubarCheckboxItem({
+	className,
+	children,
+	checked,
+	inset,
+	...props
+}: Props & {
 	children?: OctaneNode;
 	checked?: boolean | 'indeterminate';
 	inset?: boolean;
@@ -116,7 +127,8 @@ export function MenubarCheckboxItem({ className, children, checked, inset, ...pr
 		createElement(
 			'span',
 			{
-				className: 'cn-menubar-checkbox-item-indicator pointer-events-none absolute flex items-center justify-center',
+				className:
+					'cn-menubar-checkbox-item-indicator pointer-events-none absolute flex items-center justify-center',
 			},
 			createElement(MenubarPrimitive.ItemIndicator, null, createElement(CheckIcon, {})),
 		),
@@ -124,7 +136,12 @@ export function MenubarCheckboxItem({ className, children, checked, inset, ...pr
 	);
 }
 
-export function MenubarRadioItem({ className, children, inset, ...props }: Props & {
+export function MenubarRadioItem({
+	className,
+	children,
+	inset,
+	...props
+}: Props & {
 	children?: OctaneNode;
 	inset?: boolean;
 }) {
@@ -142,7 +159,8 @@ export function MenubarRadioItem({ className, children, inset, ...props }: Props
 		createElement(
 			'span',
 			{
-				className: 'cn-menubar-radio-item-indicator pointer-events-none absolute flex items-center justify-center',
+				className:
+					'cn-menubar-radio-item-indicator pointer-events-none absolute flex items-center justify-center',
 			},
 			createElement(MenubarPrimitive.ItemIndicator, null, createElement(CheckIcon, {})),
 		),
@@ -179,7 +197,12 @@ export function MenubarSub(props: Record<string, unknown>) @{
 	<MenubarPrimitive.Sub data-slot="menubar-sub" {...props} />
 }
 
-export function MenubarSubTrigger({ className, inset, children, ...props }: Props & {
+export function MenubarSubTrigger({
+	className,
+	inset,
+	children,
+	...props
+}: Props & {
 	inset?: boolean;
 	children?: OctaneNode;
 }) {

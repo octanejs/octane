@@ -6,16 +6,18 @@ import { createPortal } from 'octane';
 // has to reach them through the env tuple.
 
 export function ValueArm({ value }: { value: string }) @{
-	const el = <section class="value-arm">
-		{() => @{
-			const trimmed = value.trim();
-			@if (trimmed !== '') {
-				<b>{trimmed as string}</b>
-			} @else {
-				<i>{'empty'}</i>
-			}
-		}}
-	</section>;
+	const el = (
+		<section class="value-arm">
+			{() => @{
+				const trimmed = value.trim();
+				@if (trimmed !== '') {
+					<b>{trimmed as string}</b>
+				} @else {
+					<i>{'empty'}</i>
+				}
+			}}
+		</section>
+	);
 	<div>{el}</div>
 }
 
@@ -25,7 +27,7 @@ export function OutputRows(props: { items: string[]; loud: boolean }) @{
 			const suffix = props.loud ? '!' : '.';
 			<ul>
 				@for (const item of props.items; key item) {
-					<li>{item + suffix as string}</li>
+					<li>{(item + suffix) as string}</li>
 				}
 			</ul>
 		}}
@@ -43,7 +45,9 @@ export function OutputHandler(props: { loud: boolean; log: string[] }) @{
 					props.log.push(suffix);
 					props.log.push(event.type);
 				}}
-			>{'log' + suffix as string}</button>
+			>
+				{('log' + suffix) as string}
+			</button>
 		}}
 	</section>
 }
@@ -75,8 +79,8 @@ export function ParamSwitchTry(props: { mode: string }) @{
 // A portal body is compiled in place rather than hoisted into the component,
 // and the handler it lifts reads both a component local and its own.
 export function PortalHandler(props: { value: string; log: string[]; target: HTMLElement }) @{
-	<div class="portal-handler">{createPortal(
-		() => @{
+	<div class="portal-handler">
+		{createPortal(() => @{
 			const tag = props.value + '#';
 			<button
 				class="portal-handler-action"
@@ -84,8 +88,9 @@ export function PortalHandler(props: { value: string; log: string[]; target: HTM
 					props.log.push(tag);
 					props.log.push(event.type);
 				}}
-			>{tag as string}</button>
-		},
-		props.target,
-	)}</div>
+			>
+				{tag as string}
+			</button>
+		}, props.target)}
+	</div>
 }

@@ -6,7 +6,7 @@
   },
   {
     "path": "src/react/index.tsrx",
-    "sha256": "64503debd3c1bcfcb2eed0c2e74d5d4194caaa2aed95a8fc7032cd3fbbe44edd",
+    "sha256": "739e6cef2f265ee319632cfd9076137b9101ff477139c319fbbd7f5bb6621bb9",
     "origin": "adapted",
     "packageName": "@formkit/auto-animate"
   }

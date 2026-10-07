@@ -10,22 +10,26 @@ export type ServerDocumentProps = {
 };
 
 export function ServerDocument({ content, mode = 'static' }: ServerDocumentProps) {
-	return <Streamdown
-		controls={false}
-		mode={mode}
-		parseIncompleteMarkdown={mode === 'streaming'}
-		plugins={{ math }}
-	>{content}</Streamdown>;
+	return (
+		<Streamdown
+			controls={false}
+			mode={mode}
+			parseIncompleteMarkdown={mode === 'streaming'}
+			plugins={{ math }}
+		>
+			{content}
+		</Streamdown>
+	);
 }
 
 type ServerHeadingProps = Octane.JSX.IntrinsicElements['h1'] & ExtraProps;
 
 function ServerHeading({ node, children, ...props }: ServerHeadingProps) {
-	return <h2
-		{...props}
-		data-server-hast-node={node?.tagName}
-		data-testid="server-heading"
-	>{children}</h2>;
+	return (
+		<h2 {...props} data-server-hast-node={node?.tagName} data-testid="server-heading">
+			{children}
+		</h2>
+	);
 }
 
 const serverComponents = {
@@ -33,11 +37,15 @@ const serverComponents = {
 };
 
 export function ServerFeatureDocument({ content, mode = 'static' }: ServerDocumentProps) {
-	return <Streamdown
-		components={serverComponents}
-		controls={false}
-		mode={mode}
-		parseIncompleteMarkdown={mode === 'streaming'}
-		plugins={{ code, math }}
-	>{content}</Streamdown>;
+	return (
+		<Streamdown
+			components={serverComponents}
+			controls={false}
+			mode={mode}
+			parseIncompleteMarkdown={mode === 'streaming'}
+			plugins={{ code, math }}
+		>
+			{content}
+		</Streamdown>
+	);
 }

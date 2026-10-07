@@ -23,12 +23,7 @@ export function MarkdownHooks(options: Readonly<HooksOptions>): OctaneNode {
 		return () => {
 			cancelled = true;
 		};
-	}, [
-		options.children,
-		options.rehypePlugins,
-		options.remarkPlugins,
-		options.remarkRehypeOptions,
-	]);
+	}, [options.children, options.rehypePlugins, options.remarkPlugins, options.remarkRehypeOptions]);
 
 	if (error) throw error;
 

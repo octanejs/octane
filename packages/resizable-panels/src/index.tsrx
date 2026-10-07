@@ -7,6 +7,20 @@ export { useDefaultLayout } from './components/group/useDefaultLayout';
 export { usePanelCallbackRef } from './components/panel/usePanelCallbackRef';
 export { usePanelRef } from './components/panel/usePanelRef';
 export { isCoarsePointer } from './global/utils/isCoarsePointer';
-export type { GroupImperativeHandle, GroupProps, Layout, LayoutChangedMeta, LayoutStorage, OnGroupLayoutChange, Orientation } from './components/group/types';
-export type { OnPanelResize, PanelImperativeHandle, PanelProps, PanelSize, SizeUnit } from './components/panel/types';
+export type {
+	GroupImperativeHandle,
+	GroupProps,
+	Layout,
+	LayoutChangedMeta,
+	LayoutStorage,
+	OnGroupLayoutChange,
+	Orientation,
+} from './components/group/types';
+export type {
+	OnPanelResize,
+	PanelImperativeHandle,
+	PanelProps,
+	PanelSize,
+	SizeUnit,
+} from './components/panel/types';
 export type { SeparatorProps } from './components/separator/types';

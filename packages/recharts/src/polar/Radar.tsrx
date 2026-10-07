@@ -72,128 +72,126 @@ export interface RadarPoint {
 	name?: string | number;
 }
 
-interface RadarProps<DataPointType = any, DataValueType = any> extends ZIndexable, DataConsumer<
-	DataPointType,
-	DataValueType
-> {
+interface RadarProps<DataPointType = any, DataValueType = any>
+	extends ZIndexable, DataConsumer<DataPointType, DataValueType> {
 	/**
- * @defaultValue true
- */
+	 * @defaultValue true
+	 */
 	activeDot?: ActiveDotType;
 	/**
- * @defaultValue 0
- */
+	 * @defaultValue 0
+	 */
 	angleAxisId?: string | number;
 	/**
- * Specifies when the animation should begin, the unit of this option is ms.
- * @defaultValue 0
- */
+	 * Specifies when the animation should begin, the unit of this option is ms.
+	 * @defaultValue 0
+	 */
 	animationBegin?: number;
 	/**
- * Specifies the duration of animation, the unit of this option is ms.
- * @defaultValue 1500
- */
+	 * Specifies the duration of animation, the unit of this option is ms.
+	 * @defaultValue 1500
+	 */
 	animationDuration?: AnimationDuration;
 	/**
- * The type of easing function.
- * @defaultValue ease
- */
+	 * The type of easing function.
+	 * @defaultValue ease
+	 */
 	animationEasing?: EasingInput;
 	/**
- * Custom animation function for interpolating data items.
- * When provided, this replaces the default animation interpolation.
- *
- * @param prevItems The items from the previous animation frame, or null on first render
- * @param nextItems The target items to animate towards
- * @param animationElapsedTime A normalized time value (0 = start, 1 = end)
- * @returns The interpolated items at time animationElapsedTime
- *
- * @since 3.9
- * @see {@link https://recharts.github.io/en-US/guide/animations/ Animations guide}
- */
+	 * Custom animation function for interpolating data items.
+	 * When provided, this replaces the default animation interpolation.
+	 *
+	 * @param prevItems The items from the previous animation frame, or null on first render
+	 * @param nextItems The target items to animate towards
+	 * @param animationElapsedTime A normalized time value (0 = start, 1 = end)
+	 * @returns The interpolated items at time animationElapsedTime
+	 *
+	 * @since 3.9
+	 * @see {@link https://recharts.github.io/en-US/guide/animations/ Animations guide}
+	 */
 	animationInterpolateFn?: AnimationInterpolateFn<RadarPoint, PolarLayout>;
 	/**
- * Strategy for matching previous items to next items during animation.
- * Determines how Recharts pairs old data points with new data points
- * to create smooth transitions.
- *
- * - `matchByIndex` (default): match by array position with proportional stretching
- * - `matchAppend`: match sequentially by index and treat newly appended items as new
- * - `matchByDataKey('someKey')`: match by a data key from the payload
- * - Custom function `(item, index) => key`: match by the returned key
- *
- * @defaultValue index
- * @see matchByIndex
- * @see matchByDataKey
- * @see matchAppend
- */
+	 * Strategy for matching previous items to next items during animation.
+	 * Determines how Recharts pairs old data points with new data points
+	 * to create smooth transitions.
+	 *
+	 * - `matchByIndex` (default): match by array position with proportional stretching
+	 * - `matchAppend`: match sequentially by index and treat newly appended items as new
+	 * - `matchByDataKey('someKey')`: match by a data key from the payload
+	 * - Custom function `(item, index) => key`: match by the returned key
+	 *
+	 * @defaultValue index
+	 * @see matchByIndex
+	 * @see matchByDataKey
+	 * @see matchAppend
+	 */
 	animationMatchBy?: AnimationMatchByProp<RadarPoint>;
 	baseLinePoints?: RadarPoint[];
 	className?: string;
 	connectNulls?: boolean;
 	/**
- * Renders a circle element at each data point. Options:
- *
- * - `false`: no dots are drawn;
- * - `true`: renders the dots with default settings;
- * - `object`: the props of the dot. This will be merged with the internal calculated props of each dot;
- * - `OctaneElement`: the custom dot element;
- * - `function`: a render function of the custom dot.
- *
- * @defaultValue false
- */
+	 * Renders a circle element at each data point. Options:
+	 *
+	 * - `false`: no dots are drawn;
+	 * - `true`: renders the dots with default settings;
+	 * - `object`: the props of the dot. This will be merged with the internal calculated props of each dot;
+	 * - `OctaneElement`: the custom dot element;
+	 * - `function`: a render function of the custom dot.
+	 *
+	 * @defaultValue false
+	 */
 	dot?: DotType;
 	/**
- * @defaultValue false
- */
+	 * @defaultValue false
+	 */
 	hide?: boolean;
 	/**
- * If set false, animation of polygon will be disabled.
- * If set "auto", the animation will be disabled in SSR and will respect the user's prefers-reduced-motion system preference for accessibility.
- * @defaultValue auto
- */
+	 * If set false, animation of polygon will be disabled.
+	 * If set "auto", the animation will be disabled in SSR and will respect the user's prefers-reduced-motion system preference for accessibility.
+	 * @defaultValue auto
+	 */
 	isAnimationActive?: boolean | 'auto';
 	isRange?: boolean;
 	/**
- * Renders one label for each point. Options:
- * - `true`: renders default labels;
- * - `false`: no labels are rendered;
- * - `object`: the props of LabelList component;
- * - `OctaneElement`: a custom SVG label element, such as `<text>` or `<g>`.
- *   HTML elements such as `<div>` are not valid inside the chart SVG and may trigger React DOM warnings.
- * - `function`: a render function of custom label.
- *
- * @defaultValue false
- */
+	 * Renders one label for each point. Options:
+	 * - `true`: renders default labels;
+	 * - `false`: no labels are rendered;
+	 * - `object`: the props of LabelList component;
+	 * - `OctaneElement`: a custom SVG label element, such as `<text>` or `<g>`.
+	 *   HTML elements such as `<div>` are not valid inside the chart SVG and may trigger React DOM warnings.
+	 * - `function`: a render function of custom label.
+	 *
+	 * @defaultValue false
+	 */
 	label?: ImplicitLabelListType;
 	/**
- * The type of icon in legend.  If set to 'none', no legend item will be rendered.
- * @defaultValue rect
- */
+	 * The type of icon in legend.  If set to 'none', no legend item will be rendered.
+	 * @defaultValue rect
+	 */
 	legendType?: LegendType;
 	/**
- * The customized event handler of animation end
- */
+	 * The customized event handler of animation end
+	 */
 	onAnimationEnd?: () => void;
 	/**
- * The customized event handler of animation start
- */
+	 * The customized event handler of animation start
+	 */
 	onAnimationStart?: () => void;
 	onMouseEnter?: (props: InternalRadarProps, e: NativeMouseEvent<SVGPathElement>) => void;
 	onMouseLeave?: (props: InternalRadarProps, e: NativeMouseEvent<SVGPathElement>) => void;
 	/**
- * @defaultValue 0
- */
+	 * @defaultValue 0
+	 */
 	radiusAxisId?: string | number;
 	/**
- * If set a OctaneElement, the shape of radar can be customized.
- * If set a function, the function will be called to render customized shape.
- */
+	 * If set a OctaneElement, the shape of radar can be customized.
+	 * If set a function, the function will be called to render customized shape.
+	 */
 	shape?: OctaneElement<SVGElement> | ((props: any) => OctaneElement<SVGElement>);
 	tooltipType?: TooltipType;
 	/**
- * @defaultValue 100
- */
+	 * @defaultValue 100
+	 */
 	zIndex?: number;
 }
 
@@ -206,11 +204,11 @@ export type AngleAxisForRadar = {
 	cy: number;
 };
 
-export type Props<DataPointType = any, DataValueType = any> =
-	Omit<
-		SVGProps<SVGGraphicsElement>,
-		'onMouseEnter' | 'onMouseLeave' | 'points' | 'ref'
-	> & RadarProps<DataPointType, DataValueType>;
+export type Props<DataPointType = any, DataValueType = any> = Omit<
+	SVGProps<SVGGraphicsElement>,
+	'onMouseEnter' | 'onMouseLeave' | 'points' | 'ref'
+> &
+	RadarProps<DataPointType, DataValueType>;
 
 export type RadarComposedData = {
 	points: RadarPoint[];
@@ -241,44 +239,46 @@ const computeLegendPayloadFromRadarSectors = (
 	];
 };
 
-const SetRadarTooltipEntrySettings = React.memo(({
-	dataKey,
-	stroke,
-	strokeWidth,
-	fill,
-	name,
-	hide,
-	tooltipType,
-	id,
-}: Pick<
-	WithIdRequired<PropsWithDefaults>,
-	'dataKey' | 'stroke' | 'strokeWidth' | 'fill' | 'name' | 'hide' | 'tooltipType' | 'id'
->) => {
-	const tooltipEntrySettings: TooltipPayloadConfiguration = {
-		/*
- * I suppose this here _could_ return props.points
- * because while Radar does not support item tooltip mode, it _could_ support it.
- * But when I actually do return the points here, a defaultIndex test starts failing.
- * So, undefined it is.
- */
-		dataDefinedOnItem: undefined,
-		getPosition: noop,
-		settings: {
-			stroke,
-			strokeWidth,
-			fill,
-			nameKey: undefined, // RadarChart does not have nameKey unfortunately
-			dataKey,
-			name: getTooltipNameProp(name, dataKey),
-			hide,
-			type: tooltipType,
-			color: getLegendItemColor(stroke, fill),
-			unit: '', // why doesn't Radar support unit?
-			graphicalItemId: id,
-		},
-	};
-	return <SetTooltipEntrySettings tooltipEntrySettings={tooltipEntrySettings} />;
-});
+const SetRadarTooltipEntrySettings = React.memo(
+	({
+		dataKey,
+		stroke,
+		strokeWidth,
+		fill,
+		name,
+		hide,
+		tooltipType,
+		id,
+	}: Pick<
+		WithIdRequired<PropsWithDefaults>,
+		'dataKey' | 'stroke' | 'strokeWidth' | 'fill' | 'name' | 'hide' | 'tooltipType' | 'id'
+	>) => {
+		const tooltipEntrySettings: TooltipPayloadConfiguration = {
+			/*
+			 * I suppose this here _could_ return props.points
+			 * because while Radar does not support item tooltip mode, it _could_ support it.
+			 * But when I actually do return the points here, a defaultIndex test starts failing.
+			 * So, undefined it is.
+			 */
+			dataDefinedOnItem: undefined,
+			getPosition: noop,
+			settings: {
+				stroke,
+				strokeWidth,
+				fill,
+				nameKey: undefined, // RadarChart does not have nameKey unfortunately
+				dataKey,
+				name: getTooltipNameProp(name, dataKey),
+				hide,
+				type: tooltipType,
+				color: getLegendItemColor(stroke, fill),
+				unit: '', // why doesn't Radar support unit?
+				graphicalItemId: id,
+			},
+		};
+		return <SetTooltipEntrySettings tooltipEntrySettings={tooltipEntrySettings} />;
+	},
+);
 
 function RadarDotsWrapper({
 	points,
@@ -292,14 +292,16 @@ function RadarDotsWrapper({
 
 	const baseProps = svgPropertiesNoEvents(propsWithoutId);
 
-	return <Dots
-		points={points}
-		dot={dot}
-		className="recharts-radar-dots"
-		dotClassName="recharts-radar-dot"
-		dataKey={dataKey}
-		baseProps={baseProps}
-	/>;
+	return (
+		<Dots
+			points={points}
+			dot={dot}
+			className="recharts-radar-dots"
+			dotClassName="recharts-radar-dot"
+			dataKey={dataKey}
+			baseProps={baseProps}
+		/>
+	);
 }
 
 export function computeRadarPoints({
@@ -318,16 +320,14 @@ export function computeRadarPoints({
 	const { cx, cy } = angleAxis;
 	let isRange = false;
 	const points: RadarPoint[] = [];
-	const angleBandSize =
-		angleAxis.type !== 'number' ? bandSize ?? 0 : 0;
+	const angleBandSize = angleAxis.type !== 'number' ? (bandSize ?? 0) : 0;
 
 	displayedData.forEach((entry, i) => {
 		const name = getValueByDataKey(entry, angleAxis.dataKey, i);
 		const value = getValueByDataKey(entry, dataKey);
 		const angle: number = (angleAxis.scale.map(name) ?? 0) + angleBandSize;
-		const pointValue =
-			Array.isArray(value) ? last(value) : value;
-		const radius: number = isNullish(pointValue) ? 0 : radiusAxis.scale.map(pointValue) ?? 0;
+		const pointValue = Array.isArray(value) ? last(value) : value;
+		const radius: number = isNullish(pointValue) ? 0 : (radiusAxis.scale.map(pointValue) ?? 0);
 
 		if (Array.isArray(value) && value.length >= 2) {
 			isRange = true;
@@ -352,7 +352,7 @@ export function computeRadarPoints({
 		points.forEach((point: RadarPoint) => {
 			if (Array.isArray(point.value)) {
 				const baseValue = point.value[0];
-				const radius: number = isNullish(baseValue) ? 0 : radiusAxis.scale.map(baseValue) ?? 0;
+				const radius: number = isNullish(baseValue) ? 0 : (radiusAxis.scale.map(baseValue) ?? 0);
 
 				baseLinePoints.push({
 					...point,
@@ -378,9 +378,9 @@ function RadarLabelListProvider({
 	children: OctaneNode;
 }) {
 	/*
- * Radar provides a Cartesian label list context. Do we want to also provide a polar label list context?
- * That way, users can choose to use polar positions for the Radar labels.
- */
+	 * Radar provides a Cartesian label list context. Do we want to also provide a polar label list context?
+	 * That way, users can choose to use polar positions for the Radar labels.
+	 */
 	// const labelListEntries: ReadonlyArray<PolarLabelListEntry> = points.map(
 	//   (point): PolarLabelListEntry => ({
 	//     value: point.value,
@@ -399,30 +399,32 @@ function RadarLabelListProvider({
 	//   }),
 	// );
 
-	const labelListEntries: ReadonlyArray<CartesianLabelListEntry> = points.map((
-		point,
-	): CartesianLabelListEntry => {
-		const viewBox: TrapezoidViewBox = {
-			x: point.x,
-			y: point.y,
-			width: 0,
-			lowerWidth: 0,
-			upperWidth: 0,
-			height: 0,
-		};
-		return {
-			...viewBox,
-			value: point.value ?? '',
-			payload: point.payload,
-			parentViewBox: undefined,
-			viewBox,
-			fill: undefined,
-		};
-	});
+	const labelListEntries: ReadonlyArray<CartesianLabelListEntry> = points.map(
+		(point): CartesianLabelListEntry => {
+			const viewBox: TrapezoidViewBox = {
+				x: point.x,
+				y: point.y,
+				width: 0,
+				lowerWidth: 0,
+				upperWidth: 0,
+				height: 0,
+			};
+			return {
+				...viewBox,
+				value: point.value ?? '',
+				payload: point.payload,
+				parentViewBox: undefined,
+				viewBox,
+				fill: undefined,
+			};
+		},
+	);
 
-	return <CartesianLabelListContextProvider
-		value={showLabels ? labelListEntries : undefined}
-	>{children}</CartesianLabelListContextProvider>;
+	return (
+		<CartesianLabelListContextProvider value={showLabels ? labelListEntries : undefined}>
+			{children}
+		</CartesianLabelListContextProvider>
+	);
 }
 
 function StaticPolygon({
@@ -462,20 +464,24 @@ function StaticPolygon({
 	} else if (typeof shape === 'function') {
 		radar = shape({ ...props, points });
 	} else {
-		radar = <Polygon
-			{...svgPropertiesAndEvents(props)}
-			onMouseEnter={handleMouseEnter}
-			onMouseLeave={handleMouseLeave}
-			points={points}
-			baseLinePoints={isRange ? baseLinePoints : undefined}
-			connectNulls={connectNulls}
-		/>;
+		radar = (
+			<Polygon
+				{...svgPropertiesAndEvents(props)}
+				onMouseEnter={handleMouseEnter}
+				onMouseLeave={handleMouseLeave}
+				points={points}
+				baseLinePoints={isRange ? baseLinePoints : undefined}
+				connectNulls={connectNulls}
+			/>
+		);
 	}
 
-	return <Layer className="recharts-radar-polygon">
-		{radar}
-		<RadarDotsWrapper props={props} points={points} />
-	</Layer>;
+	return (
+		<Layer className="recharts-radar-polygon">
+			{radar}
+			<RadarDotsWrapper props={props} points={points} />
+		</Layer>
+	);
 }
 
 const defaultRadarAnimateItems: AnimationInterpolateFn<RadarPoint, PolarLayout> = (
@@ -553,49 +559,51 @@ function PolygonWithAnimation({
 
 	if (layout == null) return null;
 
-	return <RadarLabelListProvider showLabels={!isAnimating} points={points}>
-		<AnimatedItems
-			animationInput={animationInput}
-			animationIdPrefix="recharts-radar-"
-			items={points}
-			previousItemsRef={previousPointsRef}
-			isAnimationActive={isAnimationActive}
-			animationBegin={animationBegin}
-			animationDuration={animationDuration}
-			animationEasing={animationEasing}
-			onAnimationStart={handleAnimationStart}
-			onAnimationEnd={handleAnimationEnd}
-			animationInterpolateFn={animationInterpolateFn}
-			animationMatchBy={animationMatchBy}
-			layout={layout}
-		>
-			{(stepData, animationElapsedTime) => {
-				const stepBaseLinePoints =
-					animationElapsedTime === 1
-						? baseLinePoints
-						: animationInterpolateFn(baseLineAnimationItems, animationElapsedTime, layout);
-				baseLineAnimationState.syncStepValue(stepBaseLinePoints, animationElapsedTime);
-				return <StaticPolygon
-					points={stepData}
-					baseLinePoints={stepBaseLinePoints}
-					props={props}
-				/>;
-			}}
-		</AnimatedItems>
-		<LabelListFromLabelProp label={props.label} />
-		{props.children}
-	</RadarLabelListProvider>;
+	return (
+		<RadarLabelListProvider showLabels={!isAnimating} points={points}>
+			<AnimatedItems
+				animationInput={animationInput}
+				animationIdPrefix="recharts-radar-"
+				items={points}
+				previousItemsRef={previousPointsRef}
+				isAnimationActive={isAnimationActive}
+				animationBegin={animationBegin}
+				animationDuration={animationDuration}
+				animationEasing={animationEasing}
+				onAnimationStart={handleAnimationStart}
+				onAnimationEnd={handleAnimationEnd}
+				animationInterpolateFn={animationInterpolateFn}
+				animationMatchBy={animationMatchBy}
+				layout={layout}
+			>
+				{(stepData, animationElapsedTime) => {
+					const stepBaseLinePoints =
+						animationElapsedTime === 1
+							? baseLinePoints
+							: animationInterpolateFn(baseLineAnimationItems, animationElapsedTime, layout);
+					baseLineAnimationState.syncStepValue(stepBaseLinePoints, animationElapsedTime);
+					return (
+						<StaticPolygon points={stepData} baseLinePoints={stepBaseLinePoints} props={props} />
+					);
+				}}
+			</AnimatedItems>
+			<LabelListFromLabelProp label={props.label} />
+			{props.children}
+		</RadarLabelListProvider>
+	);
 }
 
 function RenderPolygon(props: InternalRadarProps) {
 	const previousPointsRef = useRef<ReadonlyArray<RadarPoint> | undefined>(undefined);
 	const previousBaseLinePointsRef = useRef<ReadonlyArray<RadarPoint> | undefined>(undefined);
 
-	return <PolygonWithAnimation
-		props={props}
-		previousPointsRef={previousPointsRef}
-		previousBaseLinePointsRef={previousBaseLinePointsRef}
-	/>;
+	return (
+		<PolygonWithAnimation
+			props={props}
+			previousPointsRef={previousPointsRef}
+			previousBaseLinePointsRef={previousBaseLinePointsRef}
+		/>
+	);
 }
 
 export const defaultRadarProps = {
@@ -628,41 +636,39 @@ function RadarWithState(props: InternalRadarProps) {
 
 	const layerClass = clsx('recharts-radar', className);
 
-	return <ZIndexLayer zIndex={props.zIndex}>
-		<Layer className={layerClass}>
-			<RenderPolygon {...props} />
-		</Layer>
-		<ActivePoints
-			points={points}
-			mainColor={getLegendItemColor(props.stroke, props.fill)}
-			itemDataKey={props.dataKey}
-			activeDot={props.activeDot}
-		/>
-	</ZIndexLayer>;
+	return (
+		<ZIndexLayer zIndex={props.zIndex}>
+			<Layer className={layerClass}>
+				<RenderPolygon {...props} />
+			</Layer>
+			<ActivePoints
+				points={points}
+				mainColor={getLegendItemColor(props.stroke, props.fill)}
+				itemDataKey={props.dataKey}
+				activeDot={props.activeDot}
+			/>
+		</ZIndexLayer>
+	);
 }
 
 function RadarImpl(props: WithIdRequired<PropsWithDefaults>) {
 	const isPanorama = useIsPanorama();
-	const radarPoints = useAppSelector(
-		(state) => selectRadarPoints(
-			state,
-			props.radiusAxisId,
-			props.angleAxisId,
-			isPanorama,
-			props.id,
-		),
+	const radarPoints = useAppSelector((state) =>
+		selectRadarPoints(state, props.radiusAxisId, props.angleAxisId, isPanorama, props.id),
 	);
 
 	if (radarPoints?.points == null) {
 		return null;
 	}
 
-	return <RadarWithState
-		{...props}
-		points={radarPoints?.points}
-		baseLinePoints={radarPoints?.baseLinePoints}
-		isRange={radarPoints?.isRange}
-	/>;
+	return (
+		<RadarWithState
+			{...props}
+			points={radarPoints?.points}
+			baseLinePoints={radarPoints?.baseLinePoints}
+			isRange={radarPoints?.isRange}
+		/>
+	);
 }
 
 /**
@@ -673,31 +679,35 @@ export function Radar<DataPointType = any, DataValueType = any>(
 	outsideProps: Props<DataPointType, DataValueType>,
 ) {
 	const props: PropsWithDefaults = resolveDefaultProps(outsideProps, defaultRadarProps);
-	return <RegisterGraphicalItemId id={props.id} type="radar">
-		{(id) => <>
-			<SetPolarGraphicalItem
-				type="radar"
-				id={id}
-				data={undefined}
-				dataKey={props.dataKey}
-				hide={props.hide}
-				angleAxisId={props.angleAxisId}
-				radiusAxisId={props.radiusAxisId}
-			/>
-			<SetPolarLegendPayload legendPayload={computeLegendPayloadFromRadarSectors(props)} />
-			<SetRadarTooltipEntrySettings
-				dataKey={props.dataKey}
-				stroke={props.stroke}
-				strokeWidth={props.strokeWidth}
-				fill={props.fill}
-				name={props.name}
-				hide={props.hide}
-				tooltipType={props.tooltipType}
-				id={id}
-			/>
-			<RadarImpl {...props} id={id} />
-		</>}
-	</RegisterGraphicalItemId>;
+	return (
+		<RegisterGraphicalItemId id={props.id} type="radar">
+			{(id) => (
+				<>
+					<SetPolarGraphicalItem
+						type="radar"
+						id={id}
+						data={undefined}
+						dataKey={props.dataKey}
+						hide={props.hide}
+						angleAxisId={props.angleAxisId}
+						radiusAxisId={props.radiusAxisId}
+					/>
+					<SetPolarLegendPayload legendPayload={computeLegendPayloadFromRadarSectors(props)} />
+					<SetRadarTooltipEntrySettings
+						dataKey={props.dataKey}
+						stroke={props.stroke}
+						strokeWidth={props.strokeWidth}
+						fill={props.fill}
+						name={props.name}
+						hide={props.hide}
+						tooltipType={props.tooltipType}
+						id={id}
+					/>
+					<RadarImpl {...props} id={id} />
+				</>
+			)}
+		</RegisterGraphicalItemId>
+	);
 }
 
 Radar.displayName = 'Radar';

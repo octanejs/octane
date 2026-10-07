@@ -13,11 +13,9 @@ function StaticHtml(props: { onRender?: () => void }) @{
 
 function LiveAction(props: { label: string; onClick?: (id: string) => void }) @{
 	const id = useId();
-	<button
-		id="static-browser-live-action"
-		data-runtime-id={id}
-		onClick={() => props.onClick?.(id)}
-	>{props.label}</button>
+	<button id="static-browser-live-action" data-runtime-id={id} onClick={() => props.onClick?.(id)}>
+		{props.label}
+	</button>
 }
 
 export function PermanentStaticBrowser(props: {

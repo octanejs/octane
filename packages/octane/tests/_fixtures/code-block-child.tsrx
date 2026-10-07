@@ -35,7 +35,8 @@ export function MultipleBlocks() @{
 export function EmptyBlockDropped() @{
 	<div>
 		<span class="before">{'before'}</span>
-		@{}
+		@{
+		}
 		<span class="after">{'after'}</span>
 	</div>
 }
@@ -47,16 +48,15 @@ export function SetupBearingChild(props: { label: string }) @{
 			let name = props.label;
 			const [count, setCount] = useState(0);
 
-			<button id="setup-action" onClick={() => setCount(count + 1)}>{name + ':' + count}</button>
+			<button id="setup-action" onClick={() => setCount(count + 1)}>
+				{name + ':' + count}
+			</button>
 		}
 		<span id="setup-after">{'after'}</span>
 	</section>
 }
 
-export function ConditionalHooksInSetupBearingChild(props: {
-	enabled: boolean;
-	log: string[];
-}) @{
+export function ConditionalHooksInSetupBearingChild(props: { enabled: boolean; log: string[] }) @{
 	<section id="conditional-hook-child">@{
 		let label = 'disabled';
 		let increment = () => {};
@@ -73,7 +73,9 @@ export function ConditionalHooksInSetupBearingChild(props: {
 			increment = () => setCount(count + 1);
 		}
 
-		<button id="conditional-hook-action" onClick={increment}>{label}</button>
+		<button id="conditional-hook-action" onClick={increment}>
+			{label}
+		</button>
 	}</section>
 }
 
@@ -110,39 +112,40 @@ export function ExplicitSetupBearingChild(props: { label: string }) @{
 }
 
 export function ReturnedSetupBearingChild(props: { label: string }) {
-	return <section class="setup-children">
-		<span id="setup-before">{'before'}</span>
-		@{
-			const [count, setCount] = useState(0);
+	return (
+		<section class="setup-children">
+			<span id="setup-before">{'before'}</span>
+			@{
+				const [count, setCount] = useState(0);
 
-			<button id="setup-action" onClick={() => setCount(count + 1)}>
-				{props.label + ':' + count}
-			</button>
-		}
-		<span id="setup-after">{'after'}</span>
-	</section>;
+				<button id="setup-action" onClick={() => setCount(count + 1)}>
+					{props.label + ':' + count}
+				</button>
+			}
+			<span id="setup-after">{'after'}</span>
+		</section>
+	);
 }
 
 export function StoredSetupBearingChild(props: { label: string }) @{
-	const content = <section class="setup-children">
-		<span id="setup-before">{'before'}</span>
-		@{
-			const [count, setCount] = useState(0);
+	const content = (
+		<section class="setup-children">
+			<span id="setup-before">{'before'}</span>
+			@{
+				const [count, setCount] = useState(0);
 
-			<button id="setup-action" onClick={() => setCount(count + 1)}>
-				{props.label + ':' + count}
-			</button>
-		}
-		<span id="setup-after">{'after'}</span>
-	</section>;
+				<button id="setup-action" onClick={() => setCount(count + 1)}>
+					{props.label + ':' + count}
+				</button>
+			}
+			<span id="setup-after">{'after'}</span>
+		</section>
+	);
 
 	<main>{content}</main>
 }
 
-export function CodeOnlyChild(props: {
-	label: string;
-	observe: (value: string) => void;
-}) @{
+export function CodeOnlyChild(props: { label: string; observe: (value: string) => void }) @{
 	<section id="code-only-children">
 		<span id="code-only-before">{'before'}</span>
 		@{
@@ -191,7 +194,7 @@ export function ListReadsChildLocal(props: { items: string[]; loud: boolean }) @
 	<ul class="list-child">@{
 		const suffix = props.loud ? '!' : '.';
 		@for (const item of props.items; key item) {
-			<li>{item + suffix as string}</li>
+			<li>{(item + suffix) as string}</li>
 		}
 	}</ul>
 }
@@ -217,7 +220,9 @@ export function HandlerReadsChildLocal(props: { value: string; log: string[] }) 
 				props.log.push(tag);
 				props.log.push(event.type);
 			}}
-		>{'log'}</button>
+		>
+			{'log'}
+		</button>
 	}</section>
 }
 
@@ -229,7 +234,9 @@ export function ChildShadowsStableSetter(props: { handler: () => void }) @{
 		<span class="shadow-setter-count">{'count:' + count}</span>
 		@{
 			const setCount = props.handler;
-			<button class="shadow-setter-action" onClick={setCount}>{'go'}</button>
+			<button class="shadow-setter-action" onClick={setCount}>
+				{'go'}
+			</button>
 		}
 	</section>
 }

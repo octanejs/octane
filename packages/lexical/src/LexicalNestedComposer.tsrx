@@ -64,7 +64,7 @@ export function LexicalNestedComposer(props: LexicalNestedComposerProps) {
 
 		if (!initialNodes) {
 			if (!(createEditorArgs && createEditorArgs.nodes)) {
-				const parentNodes = initialEditor._nodes = new Map(parentEditor._nodes);
+				const parentNodes = (initialEditor._nodes = new Map(parentEditor._nodes));
 				if (!explicitNamespace) {
 					initialEditor._config.namespace = parentEditor._config.namespace;
 				}
@@ -119,8 +119,9 @@ export function LexicalNestedComposer(props: LexicalNestedComposerProps) {
 	const yjsDocMap = collabContext ? collabContext.yjsDocMap : undefined;
 
 	const isCollabReady =
-		skipCollabChecks || wasCollabPreviouslyReadyRef.current ||
-			yjsDocMap && yjsDocMap.has(initialEditor.getKey());
+		skipCollabChecks ||
+		wasCollabPreviouslyReadyRef.current ||
+		(yjsDocMap && yjsDocMap.has(initialEditor.getKey()));
 
 	useEffect(() => {
 		if (isCollabReady) {
@@ -136,7 +137,9 @@ export function LexicalNestedComposer(props: LexicalNestedComposerProps) {
 		}
 	}, [initialEditor, parentEditor, skipEditableListener]);
 
-	return <LexicalComposerContext value={composerContext}>
-		{!isCollabActive || isCollabReady ? props.children : null}
-	</LexicalComposerContext>;
+	return (
+		<LexicalComposerContext value={composerContext}>
+			{!isCollabActive || isCollabReady ? props.children : null}
+		</LexicalComposerContext>
+	);
 }

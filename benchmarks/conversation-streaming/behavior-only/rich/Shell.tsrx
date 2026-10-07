@@ -7,8 +7,12 @@ export function Shell() @{
 		<label for="draft">Draft</label>
 		<textarea id="draft" value={draft$} />
 		<nav aria-label="Fixture conversations">
-			<button id="rich-visit-b" type="button">Conversation B</button>
-			<button id="rich-return-a" type="button">Return to A</button>
+			<button id="rich-visit-b" type="button">
+				Conversation B
+			</button>
+			<button id="rich-return-a" type="button">
+				Return to A
+			</button>
 		</nav>
 		<div id="rich-slot">
 			<RichConversation {...initialRich} />

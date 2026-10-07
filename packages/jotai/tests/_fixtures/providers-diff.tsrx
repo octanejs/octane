@@ -12,7 +12,9 @@ function Cell(props: { id: string }) @{
 	const [v, setV] = useAtom(sharedAtom);
 	<div>
 		<span id={props.id}>{props.id + '=' + v}</span>
-		<button id={props.id + '-inc'} onClick={() => setV((c) => c + 1)}>+</button>
+		<button id={props.id + '-inc'} onClick={() => setV((c) => c + 1)}>
+			+
+		</button>
 	</div>
 }
 

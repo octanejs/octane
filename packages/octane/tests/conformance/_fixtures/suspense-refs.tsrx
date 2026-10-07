@@ -8,9 +8,15 @@ function DeoptHost(props) {
 
 function RefHost(props) @{
 	<>
-		<span ref={props.objRef} class="a">{'A'}</span>
-		<span ref={props.cbRef} class="b">{'B'}</span>
-		<span {...props.sp} class="s">{'S'}</span>
+		<span ref={props.objRef} class="a">
+			{'A'}
+		</span>
+		<span ref={props.cbRef} class="b">
+			{'B'}
+		</span>
+		<span {...props.sp} class="s">
+			{'S'}
+		</span>
 		<Fragment ref={props.fRef}>
 			<span class="f1">{'F1'}</span>
 		</Fragment>

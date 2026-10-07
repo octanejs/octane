@@ -118,8 +118,7 @@ export function PassiveSpawnSuspends(props) @{
 	}, [step]);
 	<div>
 		@try {
-			const value =
-				step < 2 ? 'plain' + step : use(props.p2);
+			const value = step < 2 ? 'plain' + step : use(props.p2);
 			<span id="ps-value">{value as string}</span>
 		} @pending {
 			<span id="ps-fallback">{'loading'}</span>

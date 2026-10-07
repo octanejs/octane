@@ -27,13 +27,13 @@ export function HelpTip(props: { label: string }) @{
 	const { getReferenceProps, getFloatingProps } = useInteractions([hover, dismiss, role]);
 
 	<span class="help">
-		<button ref={floating.refs.setReference} {...getReferenceProps()}>{'?'}</button>
+		<button ref={floating.refs.setReference} {...getReferenceProps()}>
+			{'?'}
+		</button>
 		@if (open) {
-			<span
-				ref={floating.refs.setFloating}
-				style={floating.floatingStyles}
-				{...getFloatingProps()}
-			>{props.label as string}</span>
+			<span ref={floating.refs.setFloating} style={floating.floatingStyles} {...getFloatingProps()}>
+				{props.label as string}
+			</span>
 		}
 	</span>
 }

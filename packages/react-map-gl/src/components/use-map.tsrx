@@ -18,7 +18,7 @@ export function MapProvider(props: { children?: MapChildren }) @{
 	const onMapMount = useCallback((map: MapRef, id: string = 'default') => {
 		setMaps((currMaps) => {
 			if (id === 'current') {
-				throw new Error('\'current\' cannot be used as map id');
+				throw new Error("'current' cannot be used as map id");
 			}
 			if (currMaps[id]) {
 				throw new Error(`Multiple maps with the same id: ${id}`);
@@ -44,7 +44,9 @@ export function MapProvider(props: { children?: MapChildren }) @{
 			onMapMount,
 			onMapUnmount,
 		}}
-	>{props.children}</MountedMapsContext>
+	>
+		{props.children}
+	</MountedMapsContext>
 }
 
 export type MapCollection = {

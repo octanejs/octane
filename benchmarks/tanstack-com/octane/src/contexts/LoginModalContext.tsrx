@@ -23,7 +23,9 @@ declare global {
 
 const LoginModalContext =
 	import.meta.env.DEV && typeof window !== 'undefined'
-		? globalThis.__tanstackLoginModalContext ??= createContext<LoginModalContextValue | null>(null)
+		? (globalThis.__tanstackLoginModalContext ??= createContext<LoginModalContextValue | null>(
+				null,
+			))
 		: createContext<LoginModalContextValue | null>(null);
 
 export function useLoginModal() {
@@ -70,13 +72,15 @@ export function LoginModalProvider({ children }: LoginModalProviderProps) {
 		return () => window.removeEventListener('message', handleMessage);
 	}, [queryClient]);
 
-	const value = useMemo(() => ({ openLoginModal, closeLoginModal }), [
-		openLoginModal,
-		closeLoginModal,
-	]);
+	const value = useMemo(
+		() => ({ openLoginModal, closeLoginModal }),
+		[openLoginModal, closeLoginModal],
+	);
 
-	return <LoginModalContext value={value}>
-		{children}
-		<LoginModal open={isOpen} onOpenChange={setIsOpen} />
-	</LoginModalContext>;
+	return (
+		<LoginModalContext value={value}>
+			{children}
+			<LoginModal open={isOpen} onOpenChange={setIsOpen} />
+		</LoginModalContext>
+	);
 }

@@ -11,11 +11,19 @@ import 'octane/signals';
 
 export function FiveInputs(props: { a: string; b: string; c: string; d: string; e: string }) {
 	const values = [props.a, props.b, props.c, props.d, props.e];
-	return <p class="five-inputs" title={values.join(',')}>{values.join(',') as string}</p>;
+	return (
+		<p class="five-inputs" title={values.join(',')}>
+			{values.join(',') as string}
+		</p>
+	);
 }
 
 export function createDeferredView$(count$: SignalHandle<number>) {
-	return <p class="deferred-value" title={String(count$.get())}>{String(count$.get())}</p>;
+	return (
+		<p class="deferred-value" title={String(count$.get())}>
+			{String(count$.get())}
+		</p>
+	);
 }
 
 export function DeferredHost(props: { view: OctaneNode; label: string }) @{
@@ -31,7 +39,11 @@ export const ArrowReader = (props: { count$: SignalHandle<number> }) => {
 };
 
 function makePrivateView(count$: SignalHandle<number>) {
-	return <p class="factory-value" title={String(count$.get())}>{String(count$.get())}</p>;
+	return (
+		<p class="factory-value" title={String(count$.get())}>
+			{String(count$.get())}
+		</p>
+	);
 }
 
 export function makePrivateDescriptor$(count$: SignalHandle<number>) {
@@ -39,7 +51,11 @@ export function makePrivateDescriptor$(count$: SignalHandle<number>) {
 }
 
 export default function makeDefaultView(count$: SignalHandle<number>) {
-	return <p class="factory-value" title={String(count$.get())}>{String(count$.get())}</p>;
+	return (
+		<p class="factory-value" title={String(count$.get())}>
+			{String(count$.get())}
+		</p>
+	);
 }
 
 export function DeferredPair(props: { original: OctaneNode; copy: OctaneNode }) @{
@@ -57,66 +73,86 @@ function makeContextualView(count$: SignalHandle<number>) {
 			return `${use(LabelContext)}:${count$.get()}`;
 		},
 	};
-	return <p class="contextual-value" title={label$.current$}>{label$.current$ as string}</p>;
+	return (
+		<p class="contextual-value" title={label$.current$}>
+			{label$.current$ as string}
+		</p>
+	);
 }
 
 export function InspectAndProvide(props: { count$: SignalHandle<number> }) {
 	const view = makeContextualView(props.count$);
 	const inspected = (Children.only(view) as ElementDescriptor<{ title: string }>).props.title;
-	return <section data-inspected={inspected}>
-		<LabelContext value="inner">{view}</LabelContext>
-	</section>;
+	return (
+		<section data-inspected={inspected}>
+			<LabelContext value="inner">{view}</LabelContext>
+		</section>
+	);
 }
 
 export function makePendingView(value$: SignalHandle<string>) {
-	return <Suspense fallback={<i class="deferred-pending">{'waiting'}</i>}>
-		<p class="deferred-resource" title={value$.get()}>{value$.get() as string}</p>
-	</Suspense>;
+	return (
+		<Suspense fallback={<i class="deferred-pending">{'waiting'}</i>}>
+			<p class="deferred-resource" title={value$.get()}>
+				{value$.get() as string}
+			</p>
+		</Suspense>
+	);
 }
 
 // Raw CSS in <style> is TSRX template syntax, so a value factory that returns
 // JSX carries its scoped block inside a nested `@{ … }` container, as a child
 // of that container's output fragment; the block styles the sibling beside it.
 export function StyledDeferredView(props: { count$: SignalHandle<number> }) {
-	return <>@{
-		<>
-			<style>
-				.stored-style {
-					color: rgb(19, 23, 29);
-				}
-			</style>
-			<p class="stored-style">{String(props.count$.get())}</p>
-		</>
-	}</>;
+	return (
+		<>@{
+			<>
+				<style>
+					.stored-style {
+						color: rgb(19, 23, 29);
+					}
+				</style>
+				<p class="stored-style">{String(props.count$.get())}</p>
+			</>
+		}</>
+	);
 }
 
 export function PlainStaticFragment() {
-	return <><p class="plain-static-value">{'plain'}</p></>;
+	return (
+		<>
+			<p class="plain-static-value">{'plain'}</p>
+		</>
+	);
 }
 
 export function StaticStyledFragment() {
-	return <>@{
-		<>
-			<style>
-				.stored-static-style {
-					color: rgb(31, 37, 41);
-				}
-			</style>
-			<p class="stored-static-style">{'static style'}</p>
-		</>
-	}</>;
+	return (
+		<>@{
+			<>
+				<style>
+					.stored-static-style {
+						color: rgb(31, 37, 41);
+					}
+				</style>
+				<p class="stored-static-style">{'static style'}</p>
+			</>
+		}</>
+	);
 }
 
 export function EmptyGlobalStyledFragment() {
-	return <>@{
-		<>
-			<style>
-				:global(.global-style-target) {
-					color: rgb(43, 47, 53);
-				}
-			</style>
-		</>
-	}</>;
+	return (
+		<>@{
+			<>
+				<style>
+					:global(.global-style-target) {
+						color: rgb(43, 47, 53);
+					}
+				</style>
+			</>
+		}</>
+	);
 }
 
 export function GlobalStyleHost(props: { view: OctaneNode }) @{
@@ -127,9 +163,11 @@ export function GlobalStyleHost(props: { view: OctaneNode }) @{
 }
 
 export function ReturnedHead(props: { title$: SignalHandle<string> }) {
-	return <>
-		<title data-deferred-native-head="yes">{props.title$.get() as string}</title>
-		<meta name="deferred-native-head" content={props.title$.get()} />
-		<p class="deferred-head-value">{props.title$.get() as string}</p>
-	</>;
+	return (
+		<>
+			<title data-deferred-native-head="yes">{props.title$.get() as string}</title>
+			<meta name="deferred-native-head" content={props.title$.get()} />
+			<p class="deferred-head-value">{props.title$.get() as string}</p>
+		</>
+	);
 }

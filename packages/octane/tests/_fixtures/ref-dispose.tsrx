@@ -12,7 +12,9 @@ export function SameFlushUnmount(props) @{
 	<>
 		@try {
 			<>
-				<div id="refchild" ref={props.refObj}>{'x'}</div>
+				<div id="refchild" ref={props.refObj}>
+					{'x'}
+				</div>
 				<BoomChild />
 			</>
 		} @catch (e) {

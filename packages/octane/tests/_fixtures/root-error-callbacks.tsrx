@@ -37,7 +37,9 @@ function caughtRenderText(error: unknown): string {
 export function CaughtRenderFallback(props: { error: unknown } & CaughtFallbackOptions) @{
 	if (props.fallbackError !== undefined) throw props.fallbackError;
 	useLayoutEffect(() => props.onFallbackLayout?.(), [props.onFallbackLayout]);
-	<span data-error-fallback ref={props.fallbackRef}>{caughtRenderText(props.error) as string}</span>
+	<span data-error-fallback ref={props.fallbackRef}>
+		{caughtRenderText(props.error) as string}
+	</span>
 }
 
 function renderCaughtFallback(error: unknown, props: CaughtFallbackOptions) {
@@ -92,7 +94,9 @@ export function ParentDrivenCaughtHost(
 	const [bang, setBang] = useState(props.initiallyThrow);
 	const Boundary = props.boundary;
 	<main>
-		<button data-trigger="boundary-error" onClick={() => setBang(true)}>trigger</button>
+		<button data-trigger="boundary-error" onClick={() => setBang(true)}>
+			trigger
+		</button>
 		<Boundary
 			error={bang ? props.error : null}
 			fallbackRef={props.fallbackRef}
@@ -105,23 +109,23 @@ export function ParentDrivenCaughtHost(
 
 function CaughtHostTail(props: { failed: boolean; error?: Error }) @{
 	if (props.failed && props.error !== undefined) throw props.error;
-	<span>
-		{props.failed ? 'tail:failed' : 'tail:ready'}
-	</span>
+	<span>{props.failed ? 'tail:failed' : 'tail:ready'}</span>
 }
 
 export function LayoutResetCaughtHost(props: { error: Error } & CaughtFallbackOptions) @{
 	const [failed, setFailed] = useState(true);
 	<main>
 		<ErrorBoundary
-			fallback={(error: unknown, reset: () => void) => renderCaughtFallback(error, {
-				fallbackRef: props.fallbackRef,
-				onFallbackLayout: () => {
-					props.onFallbackLayout?.();
-					setFailed(false);
-					reset();
-				},
-			})}
+			fallback={(error: unknown, reset: () => void) =>
+				renderCaughtFallback(error, {
+					fallbackRef: props.fallbackRef,
+					onFallbackLayout: () => {
+						props.onFallbackLayout?.();
+						setFailed(false);
+						reset();
+					},
+				})
+			}
 		>
 			<ParentDrivenThrower error={failed ? props.error : null} />
 		</ErrorBoundary>
@@ -189,7 +193,7 @@ interface SuspenseReparkCaughtProps extends CaughtFallbackOptions {
 
 function ReparkPendingSibling(props: { promise: Promise<string> }) @{
 	const value = use(props.promise);
-	<span>{'|' + value as string}</span>
+	<span>{('|' + value) as string}</span>
 }
 
 export function SuspenseReparkCaughtHost(props: SuspenseReparkCaughtProps) @{
@@ -224,9 +228,8 @@ interface InterruptedActivityCaughtProps extends ParentErrorProps {
 }
 
 function ActivityCaughtPendingSibling(props: { promise: Promise<string> | null }) @{
-	const value =
-		props.promise === null ? 'initial' : use(props.promise);
-	<span>{'|' + value as string}</span>
+	const value = props.promise === null ? 'initial' : use(props.promise);
+	<span>{('|' + value) as string}</span>
 }
 
 function ActivityCaughtContents(props: InterruptedActivityCaughtProps) @{
@@ -351,7 +354,9 @@ export function RefCleanupHost() @{
 // delegation, so a click on freshly rendered content still reaches handlers.
 export function ClickCounter() @{
 	const [n, setN] = useState(0);
-	<button id="counter" onClick={() => setN(n + 1)}>{'n:' + n}</button>
+	<button id="counter" onClick={() => setN(n + 1)}>
+		{'n:' + n}
+	</button>
 }
 
 let bumpEffect: (() => void) | null = null;

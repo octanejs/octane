@@ -33,7 +33,7 @@
       "arch": "any",
       "packageManager": "pnpm@12.9.1",
       "lockfile": "pnpm-lock.yaml",
-      "lockfileSha256": "e92f4520cd88a2593a0ecd555e0532b2e4e8bb1396c9558a09f0cbf3fbaa5917"
+      "lockfileSha256": "caea67fe61ab57f3e8cbd8a0e55f0e8b3014b3dd6815c6fe6e158095f291daeb"
     }
   },
   "lanes": [
@@ -71,12 +71,12 @@
         {
           "path": "packages/i18next/tests/_fixtures/runtime-diff.tsrx",
           "role": "support",
-          "sha256": "29c985249b8999c8cc0d810ca2de57a7e36d48fe5a9facff33bb2bdfba3f8173"
+          "sha256": "e595c8fb3bc36a37950b7a3e4ade8aa9f2dc1419f4d548632ab085167bad03c4"
         },
         {
           "path": "packages/i18next/tests/_fixtures/suspense-diff.tsrx",
           "role": "support",
-          "sha256": "d1e22627b86feb5859cc9542d99402ac04c5c0a9a465b66fdfdeadf0ae1b6740"
+          "sha256": "1749fd0e5b601fef49baaa5de07015b28e0287c0e0b549e3ab6284eb869f5c4a"
         },
         {
           "path": "packages/i18next/tests/differential/_setup.ts",

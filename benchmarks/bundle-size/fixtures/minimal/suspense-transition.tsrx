@@ -11,7 +11,9 @@ function SuspenseRoot(props: { initial: Promise<string>; next: Promise<string> }
 		<button
 			id="minimal-transition-action"
 			onClick={() => startTransition(() => setResource(props.next))}
-		>{'advance'}</button>
+		>
+			{'advance'}
+		</button>
 		@try {
 			<SuspendedValue resource={resource} />
 		} @pending {
@@ -26,8 +28,8 @@ async function waitForVisibleValue(container: HTMLElement, expected: string) {
 		const value = container.querySelector<HTMLElement>('#minimal-suspense-value');
 		if (
 			value?.textContent === expected &&
-				container.querySelector('#minimal-suspense-fallback') === null &&
-				getComputedStyle(value).display !== 'none'
+			container.querySelector('#minimal-suspense-fallback') === null &&
+			getComputedStyle(value).display !== 'none'
 		) {
 			return value;
 		}
@@ -59,9 +61,9 @@ export async function run(container: HTMLElement) {
 	await Promise.resolve();
 	if (
 		container.querySelector('#minimal-suspense-value') !== committed ||
-			committed.textContent !== resolved ||
-			getComputedStyle(committed).display === 'none' ||
-			container.querySelector('#minimal-suspense-fallback') !== null
+		committed.textContent !== resolved ||
+		getComputedStyle(committed).display === 'none' ||
+		container.querySelector('#minimal-suspense-fallback') !== null
 	) {
 		throw new Error('A pending transition replaced the committed Suspense content.');
 	}

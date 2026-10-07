@@ -28,7 +28,9 @@ export function AnnotatedPattern(props: Props) @{
 					props.state.failed = false;
 					retry();
 				}}
-			>{message as string}</button>
+			>
+				{message as string}
+			</button>
 		}
 	</div>
 }

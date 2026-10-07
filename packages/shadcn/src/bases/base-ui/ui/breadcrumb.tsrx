@@ -55,10 +55,10 @@ export function BreadcrumbItem({ className, ...props }: Props) @{
 
 export interface BreadcrumbLinkProps extends Props {
 	/**
- * NOT SUPPORTED in this base — see the header. Declared as `never` so markup carrying it over
- * from the radix base fails to compile instead of silently rendering the anchor AND the child,
- * which nests one link inside another.
- */
+	 * NOT SUPPORTED in this base — see the header. Declared as `never` so markup carrying it over
+	 * from the radix base fails to compile instead of silently rendering the anchor AND the child,
+	 * which nests one link inside another.
+	 */
 	asChild?: never;
 }
 

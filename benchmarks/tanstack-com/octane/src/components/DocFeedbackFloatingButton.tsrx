@@ -85,73 +85,74 @@ export function DocFeedbackFloatingButton({
 		onAddFeedback();
 	};
 
-	return <div
-		ref={buttonRef}
-		class="doc-feedback-floating-btn absolute top-0 right-0 -translate-y-full z-30"
-		onMouseEnter={onMouseEnter}
-		onMouseLeave={onMouseLeave}
-		onClick={(e) => e.stopPropagation()}
-		onMouseDown={(e) => e.stopPropagation()}
-	>
-		{/* Button - neutral with shadow */}
-		<button
-			onClick={handleButtonClick}
-			class={twMerge(
-				'flex items-center justify-center',
-				'w-6 h-6 rounded',
-				'bg-white dark:bg-gray-800',
-				'text-gray-600 dark:text-gray-400',
-				'border border-gray-200 dark:border-gray-700',
-				'shadow-md hover:shadow-lg',
-				'hover:bg-gray-50 dark:hover:bg-gray-700',
-				'transition-all duration-200',
-				'focus:outline-none focus:ring-2 focus:ring-offset-1 focus:ring-blue-500',
-				isMenuOpen && 'shadow-lg bg-gray-50 dark:bg-gray-700',
-			)}
-			title="Add feedback"
+	return (
+		<div
+			ref={buttonRef}
+			class="doc-feedback-floating-btn absolute top-0 right-0 -translate-y-full z-30"
+			onMouseEnter={onMouseEnter}
+			onMouseLeave={onMouseLeave}
+			onClick={(e) => e.stopPropagation()}
+			onMouseDown={(e) => e.stopPropagation()}
 		>
-			<Plus
-				className={twMerge(
-					'text-[10px] transition-transform duration-200',
-					isMenuOpen && 'rotate-45',
+			{/* Button - neutral with shadow */}
+			<button
+				onClick={handleButtonClick}
+				class={twMerge(
+					'flex items-center justify-center',
+					'w-6 h-6 rounded',
+					'bg-white dark:bg-gray-800',
+					'text-gray-600 dark:text-gray-400',
+					'border border-gray-200 dark:border-gray-700',
+					'shadow-md hover:shadow-lg',
+					'hover:bg-gray-50 dark:hover:bg-gray-700',
+					'transition-all duration-200',
+					'focus:outline-none focus:ring-2 focus:ring-offset-1 focus:ring-blue-500',
+					isMenuOpen && 'shadow-lg bg-gray-50 dark:bg-gray-700',
 				)}
-			/>
-		</button>
-
-		{/* Context Menu */}
-		{isMenuOpen &&
-			<div
-				class="absolute right-0 top-full mt-2 w-48 bg-white dark:bg-gray-800 rounded-lg shadow-xl border border-gray-200 dark:border-gray-700 overflow-hidden"
+				title="Add feedback"
 			>
-				{!hasNote &&
-					<>
+				<Plus
+					className={twMerge(
+						'text-[10px] transition-transform duration-200',
+						isMenuOpen && 'rotate-45',
+					)}
+				/>
+			</button>
+
+			{/* Context Menu */}
+			{isMenuOpen && (
+				<div class="absolute right-0 top-full mt-2 w-48 bg-white dark:bg-gray-800 rounded-lg shadow-xl border border-gray-200 dark:border-gray-700 overflow-hidden">
+					{!hasNote && (
+						<>
+							<button
+								onClick={handleNoteClick}
+								class="w-full px-4 py-3 flex items-center gap-3 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors text-left"
+							>
+								<MessageSquare className="text-blue-500" />
+								<div>
+									<div class="font-medium text-sm text-gray-900 dark:text-white">Add Note</div>
+									<div class="text-xs text-gray-500 dark:text-gray-400">Personal annotation</div>
+								</div>
+							</button>
+							{!hasImprovement && <div class="h-px bg-gray-200 dark:bg-gray-700" />}
+						</>
+					)}
+					{!hasImprovement && (
 						<button
-							onClick={handleNoteClick}
+							onClick={handleFeedbackClick}
 							class="w-full px-4 py-3 flex items-center gap-3 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors text-left"
 						>
-							<MessageSquare className="text-blue-500" />
+							<Lightbulb className="text-yellow-500" />
 							<div>
-								<div class="font-medium text-sm text-gray-900 dark:text-white">Add Note</div>
-								<div class="text-xs text-gray-500 dark:text-gray-400">
-									Personal annotation
+								<div class="font-medium text-sm text-gray-900 dark:text-white">
+									Suggest Improvement
 								</div>
+								<div class="text-xs text-gray-500 dark:text-gray-400">Help improve docs</div>
 							</div>
 						</button>
-						{!hasImprovement && <div class="h-px bg-gray-200 dark:bg-gray-700" />}
-					</>}
-				{!hasImprovement &&
-					<button
-						onClick={handleFeedbackClick}
-						class="w-full px-4 py-3 flex items-center gap-3 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors text-left"
-					>
-						<Lightbulb className="text-yellow-500" />
-						<div>
-							<div class="font-medium text-sm text-gray-900 dark:text-white">
-								Suggest Improvement
-							</div>
-							<div class="text-xs text-gray-500 dark:text-gray-400">Help improve docs</div>
-						</div>
-					</button>}
-			</div>}
-	</div>;
+					)}
+				</div>
+			)}
+		</div>
+	);
 }

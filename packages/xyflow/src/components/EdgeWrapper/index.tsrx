@@ -51,12 +51,17 @@ function EdgeWrapper<EdgeType extends Edge = Edge>({
 		EdgeComponent = edgeTypes?.['default'] || builtinEdgeTypes.default;
 	}
 
-	const isFocusable = !!(edge.focusable || edgesFocusable && typeof edge.focusable === 'undefined');
+	const isFocusable = !!(
+		edge.focusable ||
+		(edgesFocusable && typeof edge.focusable === 'undefined')
+	);
 	const isReconnectable =
 		typeof onReconnect !== 'undefined' &&
-			(edge.reconnectable || edgesReconnectable && typeof edge.reconnectable === 'undefined');
-	const isSelectable = !!(edge.selectable ||
-		elementsSelectable && typeof edge.selectable === 'undefined');
+		(edge.reconnectable || (edgesReconnectable && typeof edge.reconnectable === 'undefined'));
+	const isSelectable = !!(
+		edge.selectable ||
+		(elementsSelectable && typeof edge.selectable === 'undefined')
+	);
 
 	const edgeRef = useRef<SVGGElement | null>(null);
 	const [updateHover, setUpdateHover] = useState<boolean>(false);
@@ -72,38 +77,41 @@ function EdgeWrapper<EdgeType extends Edge = Edge>({
 		sourcePosition,
 		targetPosition,
 	} = useStore(
-		useCallback((store) => {
-			const sourceNode = store.nodeLookup.get(edge.source);
-			const targetNode = store.nodeLookup.get(edge.target);
+		useCallback(
+			(store) => {
+				const sourceNode = store.nodeLookup.get(edge.source);
+				const targetNode = store.nodeLookup.get(edge.target);
 
-			if (!sourceNode || !targetNode) {
-				return nullPosition;
-			}
+				if (!sourceNode || !targetNode) {
+					return nullPosition;
+				}
 
-			const edgePosition = getEdgePosition({
-				id,
-				sourceNode,
-				targetNode,
-				sourceHandle: edge.sourceHandle || null,
-				targetHandle: edge.targetHandle || null,
-				connectionMode: store.connectionMode,
-				onError,
-			});
+				const edgePosition = getEdgePosition({
+					id,
+					sourceNode,
+					targetNode,
+					sourceHandle: edge.sourceHandle || null,
+					targetHandle: edge.targetHandle || null,
+					connectionMode: store.connectionMode,
+					onError,
+				});
 
-			const zIndex = getElevatedEdgeZIndex({
-				selected: edge.selected,
-				zIndex: edge.zIndex,
-				sourceNode,
-				targetNode,
-				elevateOnSelect: store.elevateEdgesOnSelect,
-				zIndexMode: store.zIndexMode,
-			});
+				const zIndex = getElevatedEdgeZIndex({
+					selected: edge.selected,
+					zIndex: edge.zIndex,
+					sourceNode,
+					targetNode,
+					elevateOnSelect: store.elevateEdgesOnSelect,
+					zIndexMode: store.zIndexMode,
+				});
 
-			return {
-				...edgePosition || nullPosition,
-				zIndex,
-			};
-		}, [edge.source, edge.target, edge.sourceHandle, edge.targetHandle, edge.selected, edge.zIndex]),
+				return {
+					...(edgePosition || nullPosition),
+					zIndex,
+				};
+			},
+			[edge.source, edge.target, edge.sourceHandle, edge.targetHandle, edge.selected, edge.zIndex],
+		),
 		shallow,
 	);
 
@@ -140,36 +148,31 @@ function EdgeWrapper<EdgeType extends Edge = Edge>({
 		}
 	};
 
-	const onEdgeDoubleClick =
-		onDoubleClick
-			? (event: ReactMouseEvent) => {
-					onDoubleClick(event, { ...edge });
-				}
-			: undefined;
-	const onEdgeContextMenu =
-		onContextMenu
-			? (event: ReactMouseEvent) => {
-					onContextMenu(event, { ...edge });
-				}
-			: undefined;
-	const onEdgeMouseEnter =
-		onMouseEnter
-			? (event: ReactMouseEvent) => {
-					onMouseEnter(event, { ...edge });
-				}
-			: undefined;
-	const onEdgeMouseMove =
-		onMouseMove
-			? (event: ReactMouseEvent) => {
-					onMouseMove(event, { ...edge });
-				}
-			: undefined;
-	const onEdgeMouseLeave =
-		onMouseLeave
-			? (event: ReactMouseEvent) => {
-					onMouseLeave(event, { ...edge });
-				}
-			: undefined;
+	const onEdgeDoubleClick = onDoubleClick
+		? (event: ReactMouseEvent) => {
+				onDoubleClick(event, { ...edge });
+			}
+		: undefined;
+	const onEdgeContextMenu = onContextMenu
+		? (event: ReactMouseEvent) => {
+				onContextMenu(event, { ...edge });
+			}
+		: undefined;
+	const onEdgeMouseEnter = onMouseEnter
+		? (event: ReactMouseEvent) => {
+				onMouseEnter(event, { ...edge });
+			}
+		: undefined;
+	const onEdgeMouseMove = onMouseMove
+		? (event: ReactMouseEvent) => {
+				onMouseMove(event, { ...edge });
+			}
+		: undefined;
+	const onEdgeMouseLeave = onMouseLeave
+		? (event: ReactMouseEvent) => {
+				onMouseLeave(event, { ...edge });
+			}
+		: undefined;
 
 	const onKeyDown = (event: KeyboardEvent) => {
 		if (!disableKeyboardA11y && elementSelectionKeys.includes(event.key) && isSelectable) {
@@ -185,90 +188,96 @@ function EdgeWrapper<EdgeType extends Edge = Edge>({
 		}
 	};
 
-	return <svg style={{ zIndex }}>
-		<g
-			className={cc([
-				'react-flow__edge',
-				`react-flow__edge-${edgeType}`,
-				edge.className,
-				noPanClassName,
-				{
-					selected: edge.selected,
-					animated: edge.animated,
-					inactive: !isSelectable && !onClick,
-					updating: updateHover,
-					selectable: isSelectable,
-				},
-			])}
-			onClick={onEdgeClick}
-			onDoubleClick={onEdgeDoubleClick}
-			onContextMenu={onEdgeContextMenu}
-			onMouseEnter={onEdgeMouseEnter}
-			onMouseMove={onEdgeMouseMove}
-			onMouseLeave={onEdgeMouseLeave}
-			onKeyDown={isFocusable ? onKeyDown : undefined}
-			tabIndex={isFocusable ? 0 : undefined}
-			role={edge.ariaRole ?? (isFocusable ? 'group' : 'img')}
-			aria-roledescription="edge"
-			data-id={id}
-			data-testid={`rf__edge-${id}`}
-			aria-label={edge.ariaLabel === null
-				? undefined
-				: edge.ariaLabel || `Edge from ${edge.source} to ${edge.target}`}
-			aria-describedby={isFocusable ? `${ARIA_EDGE_DESC_KEY}-${rfId}` : undefined}
-			ref={edgeRef}
-			{...edge.domAttributes}
-		>
-			{!reconnecting &&
-				<EdgeComponent
-					id={id}
-					source={edge.source}
-					target={edge.target}
-					type={edge.type}
-					selected={edge.selected}
-					animated={edge.animated}
-					selectable={isSelectable}
-					deletable={edge.deletable ?? true}
-					label={edge.label}
-					labelStyle={edge.labelStyle}
-					labelShowBg={edge.labelShowBg}
-					labelBgStyle={edge.labelBgStyle}
-					labelBgPadding={edge.labelBgPadding}
-					labelBgBorderRadius={edge.labelBgBorderRadius}
-					sourceX={sourceX}
-					sourceY={sourceY}
-					targetX={targetX}
-					targetY={targetY}
-					sourcePosition={sourcePosition}
-					targetPosition={targetPosition}
-					data={edge.data}
-					style={edge.style}
-					sourceHandleId={edge.sourceHandle}
-					targetHandleId={edge.targetHandle}
-					markerStart={markerStartUrl}
-					markerEnd={markerEndUrl}
-					pathOptions={'pathOptions' in edge ? edge.pathOptions : undefined}
-					interactionWidth={edge.interactionWidth}
-				/>}
-			{isReconnectable &&
-				<EdgeUpdateAnchors
-					edge={edge}
-					isReconnectable={isReconnectable}
-					reconnectRadius={reconnectRadius}
-					onReconnect={onReconnect}
-					onReconnectStart={onReconnectStart}
-					onReconnectEnd={onReconnectEnd}
-					sourceX={sourceX}
-					sourceY={sourceY}
-					targetX={targetX}
-					targetY={targetY}
-					sourcePosition={sourcePosition}
-					targetPosition={targetPosition}
-					setUpdateHover={setUpdateHover}
-					setReconnecting={setReconnecting}
-				/>}
-		</g>
-	</svg>;
+	return (
+		<svg style={{ zIndex }}>
+			<g
+				className={cc([
+					'react-flow__edge',
+					`react-flow__edge-${edgeType}`,
+					edge.className,
+					noPanClassName,
+					{
+						selected: edge.selected,
+						animated: edge.animated,
+						inactive: !isSelectable && !onClick,
+						updating: updateHover,
+						selectable: isSelectable,
+					},
+				])}
+				onClick={onEdgeClick}
+				onDoubleClick={onEdgeDoubleClick}
+				onContextMenu={onEdgeContextMenu}
+				onMouseEnter={onEdgeMouseEnter}
+				onMouseMove={onEdgeMouseMove}
+				onMouseLeave={onEdgeMouseLeave}
+				onKeyDown={isFocusable ? onKeyDown : undefined}
+				tabIndex={isFocusable ? 0 : undefined}
+				role={edge.ariaRole ?? (isFocusable ? 'group' : 'img')}
+				aria-roledescription="edge"
+				data-id={id}
+				data-testid={`rf__edge-${id}`}
+				aria-label={
+					edge.ariaLabel === null
+						? undefined
+						: edge.ariaLabel || `Edge from ${edge.source} to ${edge.target}`
+				}
+				aria-describedby={isFocusable ? `${ARIA_EDGE_DESC_KEY}-${rfId}` : undefined}
+				ref={edgeRef}
+				{...edge.domAttributes}
+			>
+				{!reconnecting && (
+					<EdgeComponent
+						id={id}
+						source={edge.source}
+						target={edge.target}
+						type={edge.type}
+						selected={edge.selected}
+						animated={edge.animated}
+						selectable={isSelectable}
+						deletable={edge.deletable ?? true}
+						label={edge.label}
+						labelStyle={edge.labelStyle}
+						labelShowBg={edge.labelShowBg}
+						labelBgStyle={edge.labelBgStyle}
+						labelBgPadding={edge.labelBgPadding}
+						labelBgBorderRadius={edge.labelBgBorderRadius}
+						sourceX={sourceX}
+						sourceY={sourceY}
+						targetX={targetX}
+						targetY={targetY}
+						sourcePosition={sourcePosition}
+						targetPosition={targetPosition}
+						data={edge.data}
+						style={edge.style}
+						sourceHandleId={edge.sourceHandle}
+						targetHandleId={edge.targetHandle}
+						markerStart={markerStartUrl}
+						markerEnd={markerEndUrl}
+						pathOptions={'pathOptions' in edge ? edge.pathOptions : undefined}
+						interactionWidth={edge.interactionWidth}
+					/>
+				)}
+				{isReconnectable && (
+					<EdgeUpdateAnchors
+						edge={edge}
+						isReconnectable={isReconnectable}
+						reconnectRadius={reconnectRadius}
+						onReconnect={onReconnect}
+						onReconnectStart={onReconnectStart}
+						onReconnectEnd={onReconnectEnd}
+						sourceX={sourceX}
+						sourceY={sourceY}
+						targetX={targetX}
+						targetY={targetY}
+						sourcePosition={sourcePosition}
+						targetPosition={targetPosition}
+						setUpdateHover={setUpdateHover}
+						setReconnecting={setReconnecting}
+					/>
+				)}
+			</g>
+		</svg>
+	);
 }
 
 export default memo(EdgeWrapper) as typeof EdgeWrapper;

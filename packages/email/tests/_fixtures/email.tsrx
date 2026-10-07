@@ -27,7 +27,9 @@ export function WelcomeEmail(props: { name: string }) @{
 		<Preview text={`Welcome, ${props.name}`} />
 		<Body style={{ backgroundColor: '#f6f9fc', margin: 0 }}>
 			<Container style={{ padding: '20px', backgroundColor: '#ffffff' }}>
-				<Heading as="h2" mx={4}>Welcome</Heading>
+				<Heading as="h2" mx={4}>
+					Welcome
+				</Heading>
 				<Text>Hello, {props.name}</Text>
 				<Section>
 					<Row>
@@ -39,7 +41,9 @@ export function WelcomeEmail(props: { name: string }) @{
 				<Button
 					href="https://example.com"
 					style={{ backgroundColor: '#000', color: '#fff', padding: '12px 20px' }}
-				>Get started</Button>
+				>
+					Get started
+				</Button>
 				<Link href="https://example.com/help">Help</Link>
 			</Container>
 		</Body>

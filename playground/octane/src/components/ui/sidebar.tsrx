@@ -91,19 +91,20 @@ export function SidebarProvider({
 	// We use openProp and setOpenProp for control from outside the component.
 	const [_open, _setOpen] = useState(defaultOpen);
 	const open = openProp ?? _open;
-	const setOpen = useCallback((value: boolean | ((value: boolean) => boolean)) => {
-		const openState =
-			typeof value === 'function' ? value(open) : value;
-		if (setOpenProp) {
-			setOpenProp(openState);
-		} else {
-			_setOpen(openState);
-		}
+	const setOpen = useCallback(
+		(value: boolean | ((value: boolean) => boolean)) => {
+			const openState = typeof value === 'function' ? value(open) : value;
+			if (setOpenProp) {
+				setOpenProp(openState);
+			} else {
+				_setOpen(openState);
+			}
 
-		// This sets the cookie to keep the sidebar state.
-		document.cookie =
-			`${SIDEBAR_COOKIE_NAME}=${openState}; path=/; max-age=${SIDEBAR_COOKIE_MAX_AGE}`;
-	}, [setOpenProp, open]);
+			// This sets the cookie to keep the sidebar state.
+			document.cookie = `${SIDEBAR_COOKIE_NAME}=${openState}; path=/; max-age=${SIDEBAR_COOKIE_MAX_AGE}`;
+		},
+		[setOpenProp, open],
+	);
 
 	// Helper to toggle the sidebar.
 	const toggleSidebar = useCallback(() => {
@@ -391,7 +392,11 @@ export function SidebarGroup({ className, ...props }: Props) @{
 	/>
 }
 
-export function SidebarGroupLabel({ className, asChild = false, ...props }: Props & {
+export function SidebarGroupLabel({
+	className,
+	asChild = false,
+	...props
+}: Props & {
 	asChild?: boolean;
 }) @{
 	@if (asChild) {
@@ -417,7 +422,11 @@ export function SidebarGroupLabel({ className, asChild = false, ...props }: Prop
 	}
 }
 
-export function SidebarGroupAction({ className, asChild = false, ...props }: Props & {
+export function SidebarGroupAction({
+	className,
+	asChild = false,
+	...props
+}: Props & {
 	asChild?: boolean;
 }) @{
 	@if (asChild) {
@@ -594,7 +603,11 @@ export function SidebarMenuBadge({ className, ...props }: Props) @{
 	/>
 }
 
-export function SidebarMenuSkeleton({ className, showIcon = false, ...props }: Props & {
+export function SidebarMenuSkeleton({
+	className,
+	showIcon = false,
+	...props
+}: Props & {
 	showIcon?: boolean;
 }) @{
 	// Random width between 50 to 90%.

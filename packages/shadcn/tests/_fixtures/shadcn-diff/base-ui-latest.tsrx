@@ -39,7 +39,9 @@ export function SelectExample() @{
 			</SelectContent>
 		</Select>
 		<output id="selected-fruit">{value as string}</output>
-		<button id="choose-pear" type="button" onClick={() => setValue('pear')}>Choose pear</button>
+		<button id="choose-pear" type="button" onClick={() => setValue('pear')}>
+			Choose pear
+		</button>
 	</form>
 }
 
@@ -53,7 +55,9 @@ export function NavigationExample() @{
 				</NavigationMenuContent>
 			</NavigationMenuItem>
 			<NavigationMenuItem>
-				<NavigationMenuLink id="home-link" href="#home" active>Home</NavigationMenuLink>
+				<NavigationMenuLink id="home-link" href="#home" active>
+					Home
+				</NavigationMenuLink>
 			</NavigationMenuItem>
 		</NavigationMenuList>
 	</NavigationMenu>

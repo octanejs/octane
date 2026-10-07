@@ -38,8 +38,7 @@ export function Render<
 	} as G['UserData'];
 
 	// DEPRECATED
-	const rootProps =
-		'props' in defaultedData.root ? defaultedData.root.props : defaultedData.root;
+	const rootProps = 'props' in defaultedData.root ? defaultedData.root.props : defaultedData.root;
 	const title = rootProps?.title || '';
 
 	const pageProps = {
@@ -55,11 +54,9 @@ export function Render<
 		id: 'puck-root',
 	};
 
-	const propsWithSlots = useSlots(
-		config,
-		{ type: 'root', props: pageProps },
-		(props) => <SlotRender {...props} config={config} metadata={metadata} />,
-	);
+	const propsWithSlots = useSlots(config, { type: 'root', props: pageProps }, (props) => (
+		<SlotRender {...props} config={config} metadata={metadata} />
+	));
 
 	const nextContextValue = useMemo<DropZoneContext>(
 		() => ({
@@ -70,18 +67,22 @@ export function Render<
 	);
 
 	if (config.root?.render) {
-		return <RenderContextProvider value={{ config, data: defaultedData, metadata }}>
-			<DropZoneProvider value={nextContextValue}>
-				<config.root.render {...propsWithSlots}>
-					<DropZoneRenderPure zone={rootZone} />
-				</config.root.render>
-			</DropZoneProvider>
-		</RenderContextProvider>;
+		return (
+			<RenderContextProvider value={{ config, data: defaultedData, metadata }}>
+				<DropZoneProvider value={nextContextValue}>
+					<config.root.render {...propsWithSlots}>
+						<DropZoneRenderPure zone={rootZone} />
+					</config.root.render>
+				</DropZoneProvider>
+			</RenderContextProvider>
+		);
 	}
 
-	return <RenderContextProvider value={{ config, data: defaultedData, metadata }}>
-		<DropZoneProvider value={nextContextValue}>
-			<DropZoneRenderPure zone={rootZone} />
-		</DropZoneProvider>
-	</RenderContextProvider>;
+	return (
+		<RenderContextProvider value={{ config, data: defaultedData, metadata }}>
+			<DropZoneProvider value={nextContextValue}>
+				<DropZoneRenderPure zone={rootZone} />
+			</DropZoneProvider>
+		</RenderContextProvider>
+	);
 }

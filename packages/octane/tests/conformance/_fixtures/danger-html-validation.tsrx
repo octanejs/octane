@@ -1,27 +1,27 @@
 import { createElement } from 'octane';
 
 export function DirectDangerChild(props) @{
-	<div id="direct-danger" dangerouslySetInnerHTML={props.danger}>{props.child}</div>
+	<div id="direct-danger" dangerouslySetInnerHTML={props.danger}>
+		{props.child}
+	</div>
 }
 
 export function SpreadDangerChild(props) @{
-	<div id="spread-danger" {...props.spread}>{props.child}</div>
+	<div id="spread-danger" {...props.spread}>
+		{props.child}
+	</div>
 }
 
 export function DirectThenSpreadDangerChild(props) @{
-	<div
-		id="direct-then-spread-danger"
-		dangerouslySetInnerHTML={props.direct}
-		{...props.spread}
-	>{props.child}</div>
+	<div id="direct-then-spread-danger" dangerouslySetInnerHTML={props.direct} {...props.spread}>
+		{props.child}
+	</div>
 }
 
 export function SpreadThenDirectDangerChild(props) @{
-	<div
-		id="spread-then-direct-danger"
-		{...props.spread}
-		dangerouslySetInnerHTML={props.direct}
-	>{props.child}</div>
+	<div id="spread-then-direct-danger" {...props.spread} dangerouslySetInnerHTML={props.direct}>
+		{props.child}
+	</div>
 }
 
 export function SpreadChildrenDanger(props) @{
@@ -51,11 +51,15 @@ export function VoidSpreadThenDirectChildren(props) @{
 }
 
 export function DirectDangerStaticChild(props) @{
-	<div id="direct-static-danger" dangerouslySetInnerHTML={props.danger}>static child</div>
+	<div id="direct-static-danger" dangerouslySetInnerHTML={props.danger}>
+		static child
+	</div>
 }
 
 export function SpreadDangerStaticChild(props) @{
-	<div id="spread-static-danger" {...props.spread}>static child</div>
+	<div id="spread-static-danger" {...props.spread}>
+		static child
+	</div>
 }
 
 export function SpreadDangerIf(props) @{

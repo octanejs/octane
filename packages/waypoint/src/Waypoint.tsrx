@@ -38,9 +38,12 @@ function WaypointComponent(props: WaypointProps): object {
 		props.children && isValidElement(props.children)
 			? (props.children as { props?: { ref?: unknown } }).props?.ref
 			: undefined;
-	const mergedRef = useMemo(function mergeRefs() {
-		return [childRef, setNode];
-	}, [childRef]);
+	const mergedRef = useMemo(
+		function mergeRefs() {
+			return [childRef, setNode];
+		},
+		[childRef],
+	);
 
 	function measureWaypoint(event: Event | null) {
 		const currentNode = nodeRef.current;
@@ -124,19 +127,22 @@ function WaypointComponent(props: WaypointProps): object {
 	// remounted host), keep previousPosition. Upstream never resets
 	// `_previousPosition` for the instance lifetime; resetting here would make a
 	// still-inside remount look like the first enter and re-fire onEnter.
-	useEffect(function cleanupOnUnmountOrNodeClear() {
-		if (!node) {
-			clearScrollListeners();
-			ancestorRef.current = null;
-		}
-		return function cleanup() {
-			if (cancelOnNextTick.current) {
-				cancelOnNextTick.current();
-				cancelOnNextTick.current = null;
+	useEffect(
+		function cleanupOnUnmountOrNodeClear() {
+			if (!node) {
+				clearScrollListeners();
+				ancestorRef.current = null;
 			}
-			clearScrollListeners();
-		};
-	}, [node]);
+			return function cleanup() {
+				if (cancelOnNextTick.current) {
+					cancelOnNextTick.current();
+					cancelOnNextTick.current = null;
+				}
+				clearScrollListeners();
+			};
+		},
+		[node],
+	);
 
 	if (props.children && isValidElement(props.children)) {
 		return cloneElement(props.children, {
@@ -154,12 +160,9 @@ export const Waypoint: ((props: WaypointProps) => object) & {
 	below: typeof BELOW;
 	inside: typeof INSIDE;
 	invisible: typeof INVISIBLE;
-} = Object.assign(
-	WaypointComponent,
-	{
-		above: ABOVE,
-		below: BELOW,
-		inside: INSIDE,
-		invisible: INVISIBLE,
-	} as const,
-);
+} = Object.assign(WaypointComponent, {
+	above: ABOVE,
+	below: BELOW,
+	inside: INSIDE,
+	invisible: INVISIBLE,
+} as const);

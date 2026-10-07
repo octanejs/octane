@@ -38,14 +38,18 @@ function createDemoPdf(): Uint8Array {
 
 export function PdfDemo() {
 	const file = useMemo(() => ({ data: createDemoPdf() }), []);
-	return <div>
-		<h2 class="demo-title">react-pdf on Octane</h2>
-		<p class="demo-blurb">Worker-backed canvas, selectable text, links, and outline navigation.</p>
-		<div class="panel" style={{ display: 'flex', gap: '1rem', alignItems: 'flex-start' }}>
-			<Document file={file}>
-				<Outline />
-				<Page pageNumber={1} width={360} />
-			</Document>
+	return (
+		<div>
+			<h2 class="demo-title">react-pdf on Octane</h2>
+			<p class="demo-blurb">
+				Worker-backed canvas, selectable text, links, and outline navigation.
+			</p>
+			<div class="panel" style={{ display: 'flex', gap: '1rem', alignItems: 'flex-start' }}>
+				<Document file={file}>
+					<Outline />
+					<Page pageNumber={1} width={360} />
+				</Document>
+			</div>
 		</div>
-	</div>;
+	);
 }

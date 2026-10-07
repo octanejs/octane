@@ -48,8 +48,7 @@ function bump(cell: Cell | null) {
 
 export function Cells(props: { first: string; second: string; showFirst: boolean }) @{
 	// A skipped hook keeps its cells; the remaining calls keep their own.
-	const first =
-		props.showFirst ? useCell$(props.first) : null;
+	const first = props.showFirst ? useCell$(props.first) : null;
 	const second = useCell$(props.second);
 	const [left, right] = usePair$('l', 'r');
 	const [left2, right2] = usePair$('l2', 'r2');
@@ -63,10 +62,18 @@ export function Cells(props: { first: string; second: string; showFirst: boolean
 	].join(',');
 	<section>
 		<output>{text}</output>
-		<button class="first" onClick={() => bump(first)}>{'first'}</button>
-		<button class="second" onClick={() => bump(second)}>{'second'}</button>
-		<button class="right" onClick={() => bump(right)}>{'right'}</button>
-		<button class="left2" onClick={() => bump(left2)}>{'left2'}</button>
+		<button class="first" onClick={() => bump(first)}>
+			{'first'}
+		</button>
+		<button class="second" onClick={() => bump(second)}>
+			{'second'}
+		</button>
+		<button class="right" onClick={() => bump(right)}>
+			{'right'}
+		</button>
+		<button class="left2" onClick={() => bump(left2)}>
+			{'left2'}
+		</button>
 	</section>
 }
 

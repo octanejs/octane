@@ -23,19 +23,23 @@ export function ImageCropFixture(props: ImageCropFixtureProps) {
 		setCrop(pixel);
 	}
 
-	return <ReactCrop
-		circularCrop
-		crop={crop}
-		onChange={onChange}
-		renderSelectionAddon={(state) => <output
-			data-testid="selection-state"
-			data-active={String(state.cropIsActive)}
-			data-drawing={String(state.newCropIsBeingDrawn)}
+	return (
+		<ReactCrop
+			circularCrop
+			crop={crop}
+			onChange={onChange}
+			renderSelectionAddon={(state) => (
+				<output
+					data-testid="selection-state"
+					data-active={String(state.cropIsActive)}
+					data-drawing={String(state.newCropIsBeingDrawn)}
+				>
+					selection
+				</output>
+			)}
+			ruleOfThirds
 		>
-			selection
-		</output>}
-		ruleOfThirds
-	>
-		<img alt="Crop target" src="/target.jpg" />
-	</ReactCrop>;
+			<img alt="Crop target" src="/target.jpg" />
+		</ReactCrop>
+	);
 }

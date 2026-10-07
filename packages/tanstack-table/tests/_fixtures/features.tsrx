@@ -65,16 +65,16 @@ export function FilterTable(props: { global?: boolean }) @{
 		@if (props.global) {
 			<input
 				id="gflt"
-				value={table.state.globalFilter as string ?? ''}
+				value={(table.state.globalFilter as string) ?? ''}
 				onInput={(e) => table.setGlobalFilter((e.target as HTMLInputElement).value)}
 			/>
 		} @else {
 			<input
 				id="flt"
-				value={table.getColumn('firstName')!.getFilterValue() as string ?? ''}
-				onInput={(e) => table.getColumn('firstName')!.setFilterValue(
-					(e.target as HTMLInputElement).value,
-				)}
+				value={(table.getColumn('firstName')!.getFilterValue() as string) ?? ''}
+				onInput={(e) =>
+					table.getColumn('firstName')!.setFilterValue((e.target as HTMLInputElement).value)
+				}
 			/>
 		}
 		<ul>
@@ -86,13 +86,10 @@ export function FilterTable(props: { global?: boolean }) @{
 }
 
 // ── Pagination: 25 rows, pageSize 10, button-driven. ──
-const manyRows = Array.from(
-	{ length: 25 },
-	(_, i) => ({
-		firstName: 'p' + String(i).padStart(2, '0'),
-		age: i,
-	}),
-);
+const manyRows = Array.from({ length: 25 }, (_, i) => ({
+	firstName: 'p' + String(i).padStart(2, '0'),
+	age: i,
+}));
 
 const paginationFeatures = tableFeatures({
 	rowPaginationFeature,
@@ -103,9 +100,7 @@ export function PaginationTable() @{
 	const table = useTable({
 		features: paginationFeatures,
 		data: manyRows,
-		columns: [
-			{ accessorKey: 'firstName', header: 'First' },
-		],
+		columns: [{ accessorKey: 'firstName', header: 'First' }],
 	});
 	captured.table = table;
 	<div>
@@ -116,7 +111,9 @@ export function PaginationTable() @{
 		<button id="next" disabled={!table.getCanNextPage()} onClick={() => table.nextPage()}>
 			next
 		</button>
-		<button id="ps-5" onClick={() => table.setPageSize(5)}>5</button>
+		<button id="ps-5" onClick={() => table.setPageSize(5)}>
+			5
+		</button>
 		<ul>
 			@for (const row of table.getRowModel().rows; key row.id) {
 				<li class="p-row">{row.original.firstName as string}</li>
@@ -185,10 +182,9 @@ export function VisibilityTable() @{
 	captured.table = table;
 	<div>
 		@for (const col of table.getAllLeafColumns(); key col.id) {
-			<button
-				id={'vis-' + col.id}
-				onClick={() => col.toggleVisibility()}
-			>{col.id as string}</button>
+			<button id={'vis-' + col.id} onClick={() => col.toggleVisibility()}>
+				{col.id as string}
+			</button>
 		}
 		<table>
 			<thead>
@@ -235,9 +231,7 @@ export function ExpandTable() @{
 	const table = useTable({
 		features: expandFeatures,
 		data: tree,
-		columns: [
-			{ accessorKey: 'name', header: 'Name' },
-		],
+		columns: [{ accessorKey: 'name', header: 'Name' }],
 		getSubRows: (row: any) => row.subRows,
 	});
 	captured.table = table;

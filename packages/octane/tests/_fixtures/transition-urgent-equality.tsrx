@@ -19,22 +19,21 @@ export function TransitionUrgentEquality(props: {
 	wait: Promise<void>;
 	bind: (controls: EqualityControls) => void;
 }) @{
-	const [value, update, read] =
-		props.reducer
-			? useReducer(
-					(previous: number, action: ValueAction) => typeof action === 'function'
-						? action(previous)
-						: action,
-					1,
-				)
-			: useState(1);
+	const [value, update, read] = props.reducer
+		? useReducer(
+				(previous: number, action: ValueAction) =>
+					typeof action === 'function' ? action(previous) : action,
+				1,
+			)
+		: useState(1);
 	const [pending, start] = useTransition();
 	props.bind({
 		transition: (next) => start(() => update(next)),
-		asyncTransition: (next, wait) => start(async () => {
-			update(next);
-			await wait;
-		}),
+		asyncTransition: (next, wait) =>
+			start(async () => {
+				update(next);
+				await wait;
+			}),
 		read,
 		urgent: update,
 	});

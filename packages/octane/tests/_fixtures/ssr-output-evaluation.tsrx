@@ -13,7 +13,9 @@ export function MultipleAttributes(props) @{
 }
 
 export function SpreadAttribute(props) @{
-	<div {...props.read('spread')} title={props.read('title')}>{props.child() as string}</div>
+	<div {...props.read('spread')} title={props.read('title')}>
+		{props.child() as string}
+	</div>
 }
 
 export function KeyedRows(props) @{
@@ -29,10 +31,11 @@ export function KeyedRows(props) @{
 
 export function DestructuredRows(props) @{
 	<ul>
-		@for (const { id, label = props.fallback() } of props.rows; index index; key props.key(
-			id,
-			index,
-		)) {
+		@for (
+			const { id, label = props.fallback() } of props.rows;
+			index index;
+			key props.key(id, index)
+		) {
 			props.visit(id, index, arguments.length);
 			<li data-id={id}>{label as string}</li>
 		}
@@ -42,7 +45,9 @@ export function DestructuredRows(props) @{
 function AsyncRow(props) @{
 	const id = useId();
 	const value = use(props.row.value);
-	<li data-id={props.row.id} id={id}>{value as string}</li>
+	<li data-id={props.row.id} id={id}>
+		{value as string}
+	</li>
 }
 
 export function AsyncRows(props) @{

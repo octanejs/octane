@@ -9,9 +9,7 @@ export interface NativeHydrationState {
 	log?: (value: string) => void;
 }
 
-export function StreamedSignalShell(props: {
-	onInput?: (event: Event) => void;
-}) @{
+export function StreamedSignalShell(props: { onInput?: (event: Event) => void }) @{
 	<>
 		<section>
 			<p>{'shell'}</p>
@@ -44,8 +42,7 @@ export function LatestHydration(props: { resource$: Resource<string>; fallback: 
 export function ChannelsHydration(props: NativeHydrationState) @{
 	const value = props.scope.get(props.value$);
 	const snapshot = props.value$.snapshot();
-	const snapshotValue =
-		snapshot.status === 'ready' ? snapshot.value : snapshot.status;
+	const snapshotValue = snapshot.status === 'ready' ? snapshot.value : snapshot.status;
 	<output>{value + '/' + snapshotValue}</output>
 }
 
@@ -74,10 +71,12 @@ function NativeResourceHydration(props: {
 	<output class="resource">{value}</output>
 }
 
-export function NativeBoundaryHydration(props: NativeHydrationState & {
-	resource$: Resource<string>;
-	resourceLog?: (value: string) => void;
-}) @{
+export function NativeBoundaryHydration(
+	props: NativeHydrationState & {
+		resource$: Resource<string>;
+		resourceLog?: (value: string) => void;
+	},
+) @{
 	<section>
 		@try {
 			<NativeResourceHydration resource$={props.resource$} log={props.resourceLog} />
@@ -110,9 +109,11 @@ export function ControlledSignalHydration(props: DirectControlledHydrationState)
 	</section>
 }
 
-export function DeferredControlledSignalHydration(props: DirectControlledHydrationState & {
-	when: HydrateWhen;
-}) @{
+export function DeferredControlledSignalHydration(
+	props: DirectControlledHydrationState & {
+		when: HydrateWhen;
+	},
+) @{
 	<Hydrate when={props.when} split={false}>
 		<ControlledSignalHydration scope={props.scope} value$={props.value$} length$={props.length$} />
 	</Hydrate>

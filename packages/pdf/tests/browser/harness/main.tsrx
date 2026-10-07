@@ -26,10 +26,9 @@ window.Worker = class TrackedPdfWorker extends NativeWorker {
 
 	override terminate() {
 		workerTerminations += 1;
-		document.querySelector('#binding-probe')?.setAttribute(
-			'data-worker-terminations',
-			String(workerTerminations),
-		);
+		document
+			.querySelector('#binding-probe')
+			?.setAttribute('data-worker-terminations', String(workerTerminations));
 		return super.terminate();
 	}
 };
@@ -54,36 +53,45 @@ function BrowserHarness() {
 	const [outlineEventValue, setOutlineEventValue] = useState('');
 	const [loadError, setLoadError] = useState('');
 	const ready =
-		documentReady && canvasReady && textReady && annotationsReady && outlineReady &&
-			customTextReady;
+		documentReady &&
+		canvasReady &&
+		textReady &&
+		annotationsReady &&
+		outlineReady &&
+		customTextReady;
 
-	return <main
-		id="binding-probe"
-		data-status={ready ? 'ready' : 'loading'}
-		data-worker-count={workerCount}
-		data-document-ready={documentReady}
-		data-canvas-ready={canvasReady}
-		data-text-ready={textReady}
-		data-annotations-ready={annotationsReady}
-		data-outline-ready={outlineReady}
-		data-page-loaded={pageLoaded}
-		data-render-error={renderError}
-		data-item-click={itemClick}
-		data-thumbnail-click={thumbnailClick}
-		data-worker-terminations={workerTerminations}
-		data-document-event-value={documentEventValue}
-		data-page-event-value={pageEventValue}
-		data-outline-event-value={outlineEventValue}
-		data-load-error={loadError}
-	>
-		<button id="resize-binding" onClick={() => setWidth(200)}>Resize</button>
-		<button id="unmount-binding" onClick={() => setMounted(false)}>Unmount</button>
-		{mounted
-			? <Document
+	return (
+		<main
+			id="binding-probe"
+			data-status={ready ? 'ready' : 'loading'}
+			data-worker-count={workerCount}
+			data-document-ready={documentReady}
+			data-canvas-ready={canvasReady}
+			data-text-ready={textReady}
+			data-annotations-ready={annotationsReady}
+			data-outline-ready={outlineReady}
+			data-page-loaded={pageLoaded}
+			data-render-error={renderError}
+			data-item-click={itemClick}
+			data-thumbnail-click={thumbnailClick}
+			data-worker-terminations={workerTerminations}
+			data-document-event-value={documentEventValue}
+			data-page-event-value={pageEventValue}
+			data-outline-event-value={outlineEventValue}
+			data-load-error={loadError}
+		>
+			<button id="resize-binding" onClick={() => setWidth(200)}>
+				Resize
+			</button>
+			<button id="unmount-binding" onClick={() => setMounted(false)}>
+				Unmount
+			</button>
+			{mounted ? (
+				<Document
 					file={file}
-					onMouseMove={(_event, currentDocument) => setDocumentEventValue(
-						currentDocument ? String(currentDocument.numPages) : '',
-					)}
+					onMouseMove={(_event, currentDocument) =>
+						setDocumentEventValue(currentDocument ? String(currentDocument.numPages) : '')
+					}
 					onItemClick={({ pageIndex, pageNumber }) => setItemClick(`${pageIndex}:${pageNumber}`)}
 					onLoadSuccess={() => {
 						setDocumentReady(true);
@@ -93,9 +101,9 @@ function BrowserHarness() {
 					<Page
 						pageNumber={1}
 						width={width}
-						onMouseMove={(_event, currentPage) => setPageEventValue(
-							currentPage ? String(currentPage.pageNumber) : '',
-						)}
+						onMouseMove={(_event, currentPage) =>
+							setPageEventValue(currentPage ? String(currentPage.pageNumber) : '')
+						}
 						onLoadError={(error) => setRenderError(`load:${error.message}`)}
 						onLoadSuccess={() => setPageLoaded(true)}
 						onRenderError={(error) => setRenderError(`canvas:${error.message}`)}
@@ -107,33 +115,35 @@ function BrowserHarness() {
 					/>
 					<Outline
 						onLoadSuccess={() => setOutlineReady(true)}
-						onMouseMove={(_event, currentOutline) => setOutlineEventValue(
-							currentOutline ? String(currentOutline.length) : '',
-						)}
+						onMouseMove={(_event, currentOutline) =>
+							setOutlineEventValue(currentOutline ? String(currentOutline.length) : '')
+						}
 					/>
 					<Thumbnail
 						pageNumber={1}
-						onItemClick={({ pageIndex, pageNumber }) => setThumbnailClick(
-							`${pageIndex}:${pageNumber}`,
-						)}
+						onItemClick={({ pageIndex, pageNumber }) =>
+							setThumbnailClick(`${pageIndex}:${pageNumber}`)
+						}
 					/>
 					<Page
 						pageNumber={1}
 						renderMode="none"
 						renderAnnotationLayer={false}
 						customTextRenderer={() =>
-							'<strong data-safe="yes" onclick="window.__unsafe = 1">safe</strong><script>window.__unsafe = 2</script><a href=" javascript:alert(1)">link</a>'}
+							'<strong data-safe="yes" onclick="window.__unsafe = 1">safe</strong><script>window.__unsafe = 2</script><a href=" javascript:alert(1)">link</a>'
+						}
 						onRenderTextLayerSuccess={() => setCustomTextReady(true)}
 					/>
 				</Document>
-			: null}
-		<Document
-			file={{ data: new Uint8Array([0]) }}
-			error="Invalid PDF"
-			onLoadError={(caught) => setLoadError(caught.name)}
-		/>
-		<span id="custom-text-ready">{String(customTextReady)}</span>
-	</main>;
+			) : null}
+			<Document
+				file={{ data: new Uint8Array([0]) }}
+				error="Invalid PDF"
+				onLoadError={(caught) => setLoadError(caught.name)}
+			/>
+			<span id="custom-text-ready">{String(customTextReady)}</span>
+		</main>
+	);
 }
 
 function ReactAuthority() {

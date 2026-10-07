@@ -44,7 +44,9 @@ export default function Row(props) @{
 			ref={(el) => {
 				cell.value = el;
 			}}
-		>{props.item.value.id}</td>
+		>
+			{props.item.value.id}
+		</td>
 		<td class="col-label">{props.item.value.label}</td>
 		<td class="col-value">{props.item.value.value}</td>
 	</tr>

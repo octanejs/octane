@@ -12,12 +12,10 @@ const observer = () => (next) => (action) => {
 const useEnhancedDispatch = dynamicMiddleware.createDispatchWithMiddlewareHook(observer);
 
 export const store = configureStore({
-	reducer: (state = { value: 0 }, action) => action.type === 'counter/increment'
-		? { value: state.value + 1 }
-		: state,
-	middleware: (getDefaultMiddleware) => getDefaultMiddleware().prepend(
-		dynamicMiddleware.middleware,
-	),
+	reducer: (state = { value: 0 }, action) =>
+		action.type === 'counter/increment' ? { value: state.value + 1 } : state,
+	middleware: (getDefaultMiddleware) =>
+		getDefaultMiddleware().prepend(dynamicMiddleware.middleware),
 });
 
 function DynamicMiddlewarePanel() @{

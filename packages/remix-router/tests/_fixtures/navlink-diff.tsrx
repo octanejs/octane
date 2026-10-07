@@ -17,9 +17,15 @@ import {
 function Layout() @{
 	<div>
 		<nav>
-			<NavLink id="nl-home" to="/" end>Home</NavLink>
-			<NavLink id="nl-users" to="/users">Users</NavLink>
-			<NavLink id="nl-users-end" to="/users" end>UsersEnd</NavLink>
+			<NavLink id="nl-home" to="/" end>
+				Home
+			</NavLink>
+			<NavLink id="nl-users" to="/users">
+				Users
+			</NavLink>
+			<NavLink id="nl-users-end" to="/users" end>
+				UsersEnd
+			</NavLink>
 			<NavLink
 				id="nl-fn"
 				to="/search"
@@ -46,7 +52,9 @@ function Home() @{
 function Users() @{
 	<div>
 		<h1>Users</h1>
-		<NavLink id="nl-user-7" to="/users/7">Seven</NavLink>
+		<NavLink id="nl-user-7" to="/users/7">
+			Seven
+		</NavLink>
 	</div>
 }
 
@@ -58,8 +66,12 @@ function SearchPage() @{
 	const [searchParams, setSearchParams] = useSearchParams({ q: 'fallback' });
 	<div>
 		<p id="q">{'q=' + (searchParams.get('q') ?? '(none)')}</p>
-		<button id="set-q" onClick={() => setSearchParams({ q: 'octane' })}>set</button>
-		<button id="clear-q" onClick={() => setSearchParams({})}>clear</button>
+		<button id="set-q" onClick={() => setSearchParams({ q: 'octane' })}>
+			set
+		</button>
+		<button id="clear-q" onClick={() => setSearchParams({})}>
+			clear
+		</button>
 	</div>
 }
 

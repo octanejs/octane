@@ -14,7 +14,9 @@ export function HtmlAdoption() @{
 		ref={ref}
 		data-kind={kind ?? 'server'}
 		style={kind === 'html' ? { transform: 'translate(3px,4px)' } : undefined}
-	>html</div>
+	>
+		html
+	</div>
 }
 
 export function SvgAdoption() @{

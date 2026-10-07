@@ -4,7 +4,9 @@ import { choose, ready } from './deferred-hydration-style-actions.js';
 
 export function StyledIndependentHydration() @{
 	<main>
-		<p class="deferred-style-note" data-outside>Outside the style scope</p>
+		<p class="deferred-style-note" data-outside>
+			Outside the style scope
+		</p>
 		<Hydrate independent when={load()}>
 			<section>
 				<style>

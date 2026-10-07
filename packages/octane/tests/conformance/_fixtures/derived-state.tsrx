@@ -75,8 +75,12 @@ export function SameValueEffectSkip() @{
 		_effectRuns++;
 	}, [n]);
 	<div>
-		<button id="same" onClick={() => setN(0)}>{'same'}</button>
-		<button id="bump" onClick={() => setN(n + 1)}>{'bump'}</button>
+		<button id="same" onClick={() => setN(0)}>
+			{'same'}
+		</button>
+		<button id="bump" onClick={() => setN(n + 1)}>
+			{'bump'}
+		</button>
 		<span id="out">{n as number}</span>
 	</div>
 }
@@ -87,11 +91,13 @@ export function BailThenChange() @{
 	const [n, setN] = useState(NaN);
 	_renderCount++;
 	<div>
-		<button id="nan" onClick={() => setN(NaN)}>{'nan'}</button>
-		<button id="one" onClick={() => setN(1)}>{'one'}</button>
-		<span id="out">
-			{Number.isNaN(n) ? 'NaN' : n as number}
-		</span>
+		<button id="nan" onClick={() => setN(NaN)}>
+			{'nan'}
+		</button>
+		<button id="one" onClick={() => setN(1)}>
+			{'one'}
+		</button>
+		<span id="out">{Number.isNaN(n) ? 'NaN' : (n as number)}</span>
 	</div>
 }
 
@@ -123,7 +129,9 @@ export function UpdaterSeesPending() @{
 					return p + 1;
 				});
 			}}
-		>{'chain'}</button>
+		>
+			{'chain'}
+		</button>
 		<span id="out">{n as number}</span>
 	</div>
 }
@@ -140,7 +148,9 @@ export function SetThenRevert() @{
 				setN(1);
 				setN(0);
 			}}
-		>{'revert'}</button>
+		>
+			{'revert'}
+		</button>
 		<span id="out">{n as number}</span>
 	</div>
 }
@@ -153,5 +163,7 @@ export function CleanupClosure(props) @{
 		props.log('setup:' + n);
 		return () => props.log('cleanup:' + n);
 	}, [n]);
-	<button id="inc" onClick={() => setN(n + 1)}>{n as number}</button>
+	<button id="inc" onClick={() => setN(n + 1)}>
+		{n as number}
+	</button>
 }

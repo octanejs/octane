@@ -23,8 +23,7 @@ export function DragOverlay<T extends Data, U extends Draggable<T>>(props: DragO
 	const ref = useRef<HTMLElement | null>(null);
 	const manager = useDragDropManager<T, U>();
 	const source = useComputed(() => manager?.dragOperation.source, [manager]).value ?? null;
-	const isDisabled =
-		typeof disabled === 'function' ? disabled(source) : disabled;
+	const isDisabled = typeof disabled === 'function' ? disabled(source) : disabled;
 
 	useEffect(() => {
 		if (!ref.current || !manager || isDisabled) return;
@@ -68,14 +67,15 @@ export function DragOverlay<T extends Data, U extends Draggable<T>>(props: DragO
 		// Upstream treats every function child as a render prop. Octane compiled
 		// children blocks are also functions, so distinguish them with
 		// isChildrenBlock and only call plain render props.
-		content = typeof children === 'function' && !isChildrenBlock(children)
-			? // The typeof/isChildrenBlock guard proves this is the render function,
-				// but `object` in DragOverlayChild keeps a bare Function arm in the union.
-				createElement(OverlayChildren, {
-					source,
-					children: children as (source: Draggable<Data>) => DragOverlayChild,
-				})
-			: children;
+		content =
+			typeof children === 'function' && !isChildrenBlock(children)
+				? // The typeof/isChildrenBlock guard proves this is the render function,
+					// but `object` in DragOverlayChild keeps a bare Function arm in the union.
+					createElement(OverlayChildren, {
+						source,
+						children: children as (source: Draggable<Data>) => DragOverlayChild,
+					})
+				: children;
 	}
 
 	return createElement(DragDropContext, {

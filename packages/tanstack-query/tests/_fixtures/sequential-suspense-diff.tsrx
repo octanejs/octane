@@ -23,19 +23,19 @@ const second = { queryKey: ['second'], queryFn: () => delayed('b', 200), retry: 
 function SingularSingularReader() @{
 	const a = useSuspenseQuery(first);
 	const b = useSuspenseQuery(second);
-	<span id="result">{a.data + '/' + b.data.toUpperCase() as string}</span>
+	<span id="result">{(a.data + '/' + b.data.toUpperCase()) as string}</span>
 }
 
 function GroupedSingularReader() @{
 	const [a] = useSuspenseQueries({ queries: [first] });
 	const b = useSuspenseQuery(second);
-	<span id="result">{a.data + '/' + b.data.toUpperCase() as string}</span>
+	<span id="result">{(a.data + '/' + b.data.toUpperCase()) as string}</span>
 }
 
 function GroupedGroupedReader() @{
 	const [a] = useSuspenseQueries({ queries: [first] });
 	const [b] = useSuspenseQueries({ queries: [second] });
-	<span id="result">{a.data + '/' + b.data.toUpperCase() as string}</span>
+	<span id="result">{(a.data + '/' + b.data.toUpperCase()) as string}</span>
 }
 
 const READERS = {

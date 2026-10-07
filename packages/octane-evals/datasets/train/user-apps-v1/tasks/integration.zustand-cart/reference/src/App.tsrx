@@ -14,27 +14,25 @@ interface CartState {
 	clear: () => void;
 }
 
-const useCartStore = create<CartState>(
-	(set) => ({
-		quantities: {},
-		add: (id) => set(
-			(state) => ({
-				quantities: {
-					...state.quantities,
-					[id]: (state.quantities[id] ?? 0) + 1,
-				},
-			}),
-		),
-		decrease: (id) => set((state) => {
+const useCartStore = create<CartState>((set) => ({
+	quantities: {},
+	add: (id) =>
+		set((state) => ({
+			quantities: {
+				...state.quantities,
+				[id]: (state.quantities[id] ?? 0) + 1,
+			},
+		})),
+	decrease: (id) =>
+		set((state) => {
 			const quantities = { ...state.quantities };
 			const next = (quantities[id] ?? 0) - 1;
 			if (next > 0) quantities[id] = next;
 			else delete quantities[id];
 			return { quantities };
 		}),
-		clear: () => set({ quantities: {} }),
-	}),
-);
+	clear: () => set({ quantities: {} }),
+}));
 
 function formatPrice(cents: number): string {
 	return '£' + (cents / 100).toFixed(2);
@@ -75,6 +73,8 @@ export function App() @{
 			</ul>
 		}
 		<p>{'Total: ' + formatPrice(total)}</p>
-		<button disabled={lines.length === 0} onClick={clear}>Clear cart</button>
+		<button disabled={lines.length === 0} onClick={clear}>
+			Clear cart
+		</button>
 	</main>
 }

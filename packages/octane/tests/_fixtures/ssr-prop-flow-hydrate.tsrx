@@ -19,7 +19,9 @@ export function SeedCard(props) @{
 	<div>
 		@try {
 			const v = use(props.promise);
-			<button id="card" onClick={() => setN(n + 1)}>{v + ':' + props.tag + ':' + n}</button>
+			<button id="card" onClick={() => setN(n + 1)}>
+				{v + ':' + props.tag + ':' + n}
+			</button>
 		} @pending {
 			<i>p</i>
 		}

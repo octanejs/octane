@@ -37,7 +37,7 @@
       "arch": "any",
       "packageManager": "pnpm@12.9.1",
       "lockfile": "pnpm-lock.yaml",
-      "lockfileSha256": "e92f4520cd88a2593a0ecd555e0532b2e4e8bb1396c9558a09f0cbf3fbaa5917"
+      "lockfileSha256": "caea67fe61ab57f3e8cbd8a0e55f0e8b3014b3dd6815c6fe6e158095f291daeb"
     }
   },
   "lanes": [
@@ -216,7 +216,7 @@
         {
           "path": "packages/tanstack-hotkeys/tests/_fixtures/hotkeys-diff.tsrx",
           "role": "support",
-          "sha256": "24386b24df08d080b3705ffcccd6a2f3456c003ee63d50a6cf0f8bd33b959421"
+          "sha256": "182e1f569309146143dfe05c5eaeb9171e8c768cf81b2ff3da9ff56bd616fab6"
         },
         {
           "path": "packages/octane/tests/differential/_rig.ts",

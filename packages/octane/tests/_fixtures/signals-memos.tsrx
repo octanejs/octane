@@ -45,7 +45,7 @@ export function MemoSelected(props: {
 	right$: () => string;
 	label?: string;
 }) @{
-	const value = useMemo(() => props.choose$() ? props.left$() : props.right$());
+	const value = useMemo(() => (props.choose$() ? props.left$() : props.right$()));
 	<section>
 		<span>{props.label ?? ''}</span>
 		<output>{value as string}</output>

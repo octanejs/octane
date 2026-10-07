@@ -14,10 +14,9 @@ type LifecycleBucket = {
  * Entries are keyed by the nearest `data-rt` ancestor the shared rig sets.
  */
 function lifecycleBucket(): LifecycleBucket {
-	const globalObject = globalThis as
-		typeof globalThis & {
-			__octaneGsapLifecycle?: LifecycleBucket;
-		};
+	const globalObject = globalThis as typeof globalThis & {
+		__octaneGsapLifecycle?: LifecycleBucket;
+	};
 	if (globalObject.__octaneGsapLifecycle == null) {
 		globalObject.__octaneGsapLifecycle = { octane: [], react: [] };
 	}
@@ -70,37 +69,40 @@ export function GSAPLifecycleDiff(props: { revertOnUpdate?: boolean }) @{
 	const scope = useRef<HTMLDivElement>(null);
 	const [value, setValue] = useState('one');
 	const [log, setLog] = useState('');
-	useGSAP(function lifecycle(context, contextSafe) {
-		// Capture while mounted; refs may already be cleared when cleanup runs.
-		const mountedKey = runtimeKey(scope.current);
-		const count = context.selector?.('.target').length ?? 0;
-		recordLifecycle(scope.current, `effect:${value}:${String(count)}`);
-		setLog(function appendEffect(previous) {
-			const next = `effect:${value}:${String(count)}`;
-			return previous === '' ? next : `${previous}|${next}`;
-		});
-		const safeMark = contextSafe(function markSafe() {
-			recordLifecycle(scope.current, `safe:${value}`);
-			setLog(function appendSafe(previous) {
-				const next = `safe:${value}`;
+	useGSAP(
+		function lifecycle(context, contextSafe) {
+			// Capture while mounted; refs may already be cleared when cleanup runs.
+			const mountedKey = runtimeKey(scope.current);
+			const count = context.selector?.('.target').length ?? 0;
+			recordLifecycle(scope.current, `effect:${value}:${String(count)}`);
+			setLog(function appendEffect(previous) {
+				const next = `effect:${value}:${String(count)}`;
 				return previous === '' ? next : `${previous}|${next}`;
 			});
-		});
-		safeMark();
-		return function cleanup() {
-			if (mountedKey != null) {
-				lifecycleBucket()[mountedKey].push(`cleanup:${value}`);
-			}
-			setLog(function appendCleanup(previous) {
-				const next = `cleanup:${value}`;
-				return previous === '' ? next : `${previous}|${next}`;
+			const safeMark = contextSafe(function markSafe() {
+				recordLifecycle(scope.current, `safe:${value}`);
+				setLog(function appendSafe(previous) {
+					const next = `safe:${value}`;
+					return previous === '' ? next : `${previous}|${next}`;
+				});
 			});
-		};
-	}, {
-		scope,
-		dependencies: [value],
-		revertOnUpdate: props.revertOnUpdate,
-	});
+			safeMark();
+			return function cleanup() {
+				if (mountedKey != null) {
+					lifecycleBucket()[mountedKey].push(`cleanup:${value}`);
+				}
+				setLog(function appendCleanup(previous) {
+					const next = `cleanup:${value}`;
+					return previous === '' ? next : `${previous}|${next}`;
+				});
+			};
+		},
+		{
+			scope,
+			dependencies: [value],
+			revertOnUpdate: props.revertOnUpdate,
+		},
+	);
 
 	function bump() {
 		setValue(function nextValue(previous) {

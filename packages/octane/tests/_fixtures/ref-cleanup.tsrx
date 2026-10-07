@@ -8,7 +8,9 @@ import { useState } from 'octane';
 export function CleanupRef(props) @{
 	const [shown, setShown] = useState(true);
 	<div>
-		<button id="toggle" onClick={() => setShown(!shown)}>{'toggle'}</button>
+		<button id="toggle" onClick={() => setShown(!shown)}>
+			{'toggle'}
+		</button>
 		@if (shown) {
 			<span
 				id="target"
@@ -16,7 +18,9 @@ export function CleanupRef(props) @{
 					props.onAttach(el);
 					return () => props.onCleanup(el);
 				}}
-			>{'x'}</span>
+			>
+				{'x'}
+			</span>
 		}
 	</div>
 }
@@ -27,7 +31,9 @@ export function CleanupRef(props) @{
 export function SharedRefList(props) @{
 	const [items, setItems] = useState([{ id: 1 }, { id: 2 }]);
 	<div>
-		<button id="remove-first" onClick={() => setItems(items.slice(1))}>{'rm'}</button>
+		<button id="remove-first" onClick={() => setItems(items.slice(1))}>
+			{'rm'}
+		</button>
 		<ul>
 			@for (const item of items; key item.id) {
 				<li ref={props.register}>{'item-' + item.id}</li>
@@ -39,14 +45,18 @@ export function SharedRefList(props) @{
 export function LegacyRef(props) @{
 	const [shown, setShown] = useState(true);
 	<div>
-		<button id="toggle" onClick={() => setShown(!shown)}>{'toggle'}</button>
+		<button id="toggle" onClick={() => setShown(!shown)}>
+			{'toggle'}
+		</button>
 		@if (shown) {
 			<span
 				id="target"
 				ref={(el) => {
 					props.observe(el);
 				}}
-			>{'x'}</span>
+			>
+				{'x'}
+			</span>
 		}
 	</div>
 }

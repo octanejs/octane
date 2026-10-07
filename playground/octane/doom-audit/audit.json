@@ -423,7 +423,7 @@
     {
       "id": "procedural-visual-three",
       "path": "playground/octane/src/demos/doom/Doom.three.tsrx",
-      "sha256": "1e81953068259e30d22397e1c20cdea1c301879f2d4cff0905b87f0bc453196b",
+      "sha256": "4b6934659daa0946458c478e16de0479ed2622349fef423d0aee7404d1757065",
       "kind": "source-authored",
       "license": "MIT",
       "creator": "Octane contributors",

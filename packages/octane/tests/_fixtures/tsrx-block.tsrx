@@ -13,12 +13,11 @@ export function PortalledWithTsrx(props: { label: string; target: HTMLElement })
 
 // Inline arrow returning a @{ } block — directly as createPortal's body argument.
 export function InlineTsrx(props: { target: HTMLElement }) @{
-	<div class="host">{createPortal(
-		() => @{
+	<div class="host">
+		{createPortal(() => @{
 			<span class="inline">{'inline'}</span>
-		},
-		props.target,
-	)}</div>
+		}, props.target)}
+	</div>
 }
 
 // A sub-template's params and locals, and the enclosing component's locals,
@@ -57,14 +56,13 @@ export function PortalBranchReadsOuterLocal(props: {
 	target: HTMLElement;
 }) @{
 	const outer = props.value;
-	<div class="portal-host">{createPortal(
-		() => @{
+	<div class="portal-host">
+		{createPortal(() => @{
 			@if (props.enabled) {
 				<b>{outer as string}</b>
 			} @else {
 				<i>{outer as string}</i>
 			}
-		},
-		props.target,
-	)}</div>
+		}, props.target)}
+	</div>
 }

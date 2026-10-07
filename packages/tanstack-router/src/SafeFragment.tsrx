@@ -9,7 +9,5 @@
 // it stands in for Suspense/CatchBoundary/CatchNotFound/shellComponent at dynamic
 // boundary slots, so it must accept any boundary's props and render only children.
 export function SafeFragment(props: any) @{
-	<>
-		{props.children}
-	</>
+	<>{props.children}</>
 }

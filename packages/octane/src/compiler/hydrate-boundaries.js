@@ -8,6 +8,7 @@
  * intentionally instantiated afresh for every resource query.
  */
 import { builders as b, parseModule, strongHash } from '@tsrx/core';
+import { adoptTemplateShape } from './parser-template-shape.js';
 import { inheritGeneratedOrigin } from './generated-origin.js';
 import {
 	createLexicalAnalysis,
@@ -615,7 +616,8 @@ function isFunction(node) {
 
 function isRenderableChild(child) {
 	if (!child || child.type === 'JSXStyleElement') return false;
-	if (child.type === 'JSXText') return !/^\s*$/.test(child.value ?? '');
+	// JSX whitespace, read from the text as written: a decoded `&nbsp;` renders.
+	if (child.type === 'JSXText') return !/^[ \t\r\n]*$/.test(child.raw ?? child.value ?? '');
 	if (child.type === 'JSXExpressionContainer') {
 		return child.expression != null && child.expression.type !== 'JSXEmptyExpression';
 	}
@@ -897,7 +899,7 @@ function validateBoundary(boundary, filename, hookNames) {
 
 /** Resolve Hydrate boundaries and assign source-order paths under their nearest boundary. */
 export function analyzeHydrateBoundaries(source, filename = 'unknown.tsrx', parsedAst = null) {
-	const ast = parsedAst ?? parseModule(source, filename);
+	const ast = parsedAst ?? adoptTemplateShape(parseModule(source, filename));
 	const imports = collectImports(ast);
 	if (imports.hydrateNames.size === 0) {
 		return { ast, boundaries: [], imports, roots: [] };

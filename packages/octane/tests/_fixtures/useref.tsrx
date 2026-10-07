@@ -13,7 +13,9 @@ export function PersistsAcrossRenders() @{
 				ref.current++;
 				setTick(tick + 1);
 			}}
-		>{'bump'}</button>
+		>
+			{'bump'}
+		</button>
 	</div>
 }
 
@@ -40,7 +42,9 @@ export function StableIdentity(props) @{
 export function RefInIf() @{
 	const [show, setShow] = useState(true);
 	<div>
-		<button id="top" onClick={() => setShow(!show)}>{'toggle'}</button>
+		<button id="top" onClick={() => setShow(!show)}>
+			{'toggle'}
+		</button>
 		@if (show) {
 			const ref = useRef(0);
 			const [_t, force] = useState(0);
@@ -50,7 +54,9 @@ export function RefInIf() @{
 					ref.current++;
 					force(ref.current);
 				}}
-			>{ref.current as string}</button>
+			>
+				{ref.current as string}
+			</button>
 		}
 	</div>
 }
@@ -65,7 +71,9 @@ function RowWithRef(props) @{
 				counter.current++;
 				force(counter.current);
 			}}
-		>{props.label + ':' + counter.current as string}</button>
+		>
+			{(props.label + ':' + counter.current) as string}
+		</button>
 	</li>
 }
 
@@ -76,7 +84,9 @@ export function PerRowRef() @{
 		{ id: 3, label: 'c' },
 	]);
 	<div>
-		<button id="reverse" onClick={() => setItems([...items].reverse())}>{'rev'}</button>
+		<button id="reverse" onClick={() => setItems([...items].reverse())}>
+			{'rev'}
+		</button>
 		<ul>
 			@for (const it of items; key it.id) {
 				<RowWithRef id={it.id} label={it.label} />
@@ -94,7 +104,9 @@ export function DomRefObject(props) @{
 	useEffect(() => {
 		props.target.received = ref.current;
 	}, [props.target, ref]);
-	<div class="target" id="unique-id" ref={ref}>{'mounted'}</div>
+	<div class="target" id="unique-id" ref={ref}>
+		{'mounted'}
+	</div>
 }
 
 // `ref={(el) => …}` callback form invoked with the element.
@@ -104,7 +116,9 @@ export function DomRefCallback(props) @{
 		ref={(el) => {
 			props.target.received = el;
 		}}
-	>{'mounted'}</div>
+	>
+		{'mounted'}
+	</div>
 }
 
 // `MultipleRefsOneEl` was moved to its own fixture (useref-multi.tsrx) so
@@ -119,9 +133,13 @@ export function DomRefCallback(props) @{
 export function DomRefCleanup(props) @{
 	const [show, setShow] = useState(true);
 	<div>
-		<button id="toggle" onClick={() => setShow(!show)}>{'toggle'}</button>
+		<button id="toggle" onClick={() => setShow(!show)}>
+			{'toggle'}
+		</button>
 		@if (show) {
-			<div class="target" ref={(el) => props.observe(el)}>{'live'}</div>
+			<div class="target" ref={(el) => props.observe(el)}>
+				{'live'}
+			</div>
 		}
 	</div>
 }
@@ -130,9 +148,13 @@ export function DomRefCleanup(props) @{
 export function DomRefObjectCleanup(props) @{
 	const [show, setShow] = useState(true);
 	<div>
-		<button id="toggle" onClick={() => setShow(!show)}>{'toggle'}</button>
+		<button id="toggle" onClick={() => setShow(!show)}>
+			{'toggle'}
+		</button>
 		@if (show) {
-			<div class="obj-target" ref={props.ref}>{'live'}</div>
+			<div class="obj-target" ref={props.ref}>
+				{'live'}
+			</div>
 		}
 	</div>
 }
@@ -170,5 +192,5 @@ export function ImperativeValue(props) @{
 export function LazyInit(props) @{
 	const ref = useRef(props.factory());
 	const [tick, setTick] = useState(0);
-	<button onClick={() => setTick(tick + 1)}>{'init-value:' + ref.current as string}</button>
+	<button onClick={() => setTick(tick + 1)}>{('init-value:' + ref.current) as string}</button>
 }

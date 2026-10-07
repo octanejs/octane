@@ -78,7 +78,7 @@ const NOUNS = [
 
 let nextId = 1;
 function _random(max) {
-	return Math.random() * max | 0;
+	return (Math.random() * max) | 0;
 }
 
 function buildData(count) {
@@ -86,7 +86,11 @@ function buildData(count) {
 	for (let i = 0; i < count; i++) {
 		data[i] = {
 			id: nextId++,
-			label: ADJECTIVES[_random(ADJECTIVES.length)] + ' ' + COLOURS[_random(COLOURS.length)] + ' ' +
+			label:
+				ADJECTIVES[_random(ADJECTIVES.length)] +
+				' ' +
+				COLOURS[_random(COLOURS.length)] +
+				' ' +
 				NOUNS[_random(NOUNS.length)],
 		};
 	}
@@ -104,20 +108,20 @@ function buildData(count) {
 function mulberry32(seed) {
 	return () => {
 		seed |= 0;
-		seed = seed + 1831565813 | 0;
-		let t = Math.imul(seed ^ seed >>> 15, 1 | seed);
-		t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t;
-		return ((t ^ t >>> 14) >>> 0) / 4294967296;
+		seed = (seed + 1831565813) | 0;
+		let t = Math.imul(seed ^ (seed >>> 15), 1 | seed);
+		t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+		return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
 	};
 }
 const SHUFFLE_SEED = 42;
 const shuffleSeeds = mulberry32(SHUFFLE_SEED);
-const nextShuffleSeed = () => shuffleSeeds() * 4294967296 >>> 0;
+const nextShuffleSeed = () => (shuffleSeeds() * 4294967296) >>> 0;
 function shuffleWithSeed(d, seed) {
 	const rand = mulberry32(seed);
 	const out = d.slice();
 	for (let i = out.length - 1; i > 0; i--) {
-		const j = rand() * (i + 1) | 0;
+		const j = (rand() * (i + 1)) | 0;
 		const tmp = out[i];
 		out[i] = out[j];
 		out[j] = tmp;
@@ -132,29 +136,32 @@ export default function Main() @{
 	const run = () => setItems(buildData(1000));
 	const runLots = () => setItems(buildData(10000));
 	const add = () => setItems((d) => d.concat(buildData(1000)));
-	const update = () => setItems((d) => {
-		const out = d.slice();
-		for (let i = 0; i < out.length; i += 10) {
-			const r = out[i];
-			out[i] = { id: r.id, label: r.label + ' !!!' };
-		}
-		return out;
-	});
+	const update = () =>
+		setItems((d) => {
+			const out = d.slice();
+			for (let i = 0; i < out.length; i += 10) {
+				const r = out[i];
+				out[i] = { id: r.id, label: r.label + ' !!!' };
+			}
+			return out;
+		});
 	const clear = () => setItems([]);
-	const swap = () => setItems((d) => {
-		if (d.length <= 998) return d;
-		const out = d.slice();
-		const tmp = out[1];
-		out[1] = out[998];
-		out[998] = tmp;
-		return out;
-	});
+	const swap = () =>
+		setItems((d) => {
+			if (d.length <= 998) return d;
+			const out = d.slice();
+			const tmp = out[1];
+			out[1] = out[998];
+			out[998] = tmp;
+			return out;
+		});
 	const select = (id) => setSelected(id);
-	const remove = (row) => setItems((d) => {
-		const out = d.slice();
-		out.splice(out.indexOf(row), 1);
-		return out;
-	});
+	const remove = (row) =>
+		setItems((d) => {
+			const out = d.slice();
+			out.splice(out.indexOf(row), 1);
+			return out;
+		});
 
 	// Keyed-reorder matrix handlers (../../run-reorder.mjs). Every button below
 	// binds an IDENTIFIER-callee arrow (`onClick={() => reverseRows()}`) so it
@@ -168,16 +175,16 @@ export default function Main() @{
 		const seed = nextShuffleSeed();
 		setItems((d) => shuffleWithSeed(d, seed));
 	};
-	const rotateForward = () => setItems(
-		(d) => (d.length === 0 ? d : [d[d.length - 1], ...d.slice(0, -1)]),
-	);
+	const rotateForward = () =>
+		setItems((d) => (d.length === 0 ? d : [d[d.length - 1], ...d.slice(0, -1)]));
 	const rotateBackward = () => setItems((d) => (d.length === 0 ? d : [...d.slice(1), d[0]]));
 	const prepend100 = () => setItems((d) => buildData(100).concat(d));
 	const append100 = () => setItems((d) => d.concat(buildData(100)));
-	const insertMid100 = () => setItems((d) => {
-		const mid = d.length >> 1;
-		return d.slice(0, mid).concat(buildData(100), d.slice(mid));
-	});
+	const insertMid100 = () =>
+		setItems((d) => {
+			const mid = d.length >> 1;
+			return d.slice(0, mid).concat(buildData(100), d.slice(mid));
+		});
 	const removeFirst = () => setItems((d) => d.slice(1));
 	const removeEvery10 = () => setItems((d) => d.filter((_, i) => i % 10 !== 0));
 	// displace_k: move the FIRST k rows (as a group, order preserved) to the END.
@@ -202,7 +209,9 @@ export default function Main() @{
 								class="btn btn-primary btn-block"
 								id="runlots"
 								onClick={runLots}
-							>Create 10,000 rows</button>
+							>
+								Create 10,000 rows
+							</button>
 						</div>
 						<div class="col-sm-6 smallpad">
 							<button type="button" class="btn btn-primary btn-block" id="add" onClick={add}>
@@ -232,7 +241,9 @@ export default function Main() @{
 								class="btn btn-primary btn-block"
 								id="reverse"
 								onClick={() => reverseRows()}
-							>Reverse rows</button>
+							>
+								Reverse rows
+							</button>
 						</div>
 						<div class="col-sm-6 smallpad">
 							<button
@@ -240,7 +251,9 @@ export default function Main() @{
 								class="btn btn-primary btn-block"
 								id="shuffle"
 								onClick={() => shuffleRows()}
-							>Shuffle rows (seeded)</button>
+							>
+								Shuffle rows (seeded)
+							</button>
 						</div>
 						<div class="col-sm-6 smallpad">
 							<button
@@ -248,7 +261,9 @@ export default function Main() @{
 								class="btn btn-primary btn-block"
 								id="rotatef"
 								onClick={() => rotateForward()}
-							>Rotate last to front</button>
+							>
+								Rotate last to front
+							</button>
 						</div>
 						<div class="col-sm-6 smallpad">
 							<button
@@ -256,7 +271,9 @@ export default function Main() @{
 								class="btn btn-primary btn-block"
 								id="rotateb"
 								onClick={() => rotateBackward()}
-							>Rotate first to end</button>
+							>
+								Rotate first to end
+							</button>
 						</div>
 						<div class="col-sm-6 smallpad">
 							<button
@@ -264,7 +281,9 @@ export default function Main() @{
 								class="btn btn-primary btn-block"
 								id="prepend100"
 								onClick={() => prepend100()}
-							>Prepend 100 rows</button>
+							>
+								Prepend 100 rows
+							</button>
 						</div>
 						<div class="col-sm-6 smallpad">
 							<button
@@ -272,7 +291,9 @@ export default function Main() @{
 								class="btn btn-primary btn-block"
 								id="append100"
 								onClick={() => append100()}
-							>Append 100 rows</button>
+							>
+								Append 100 rows
+							</button>
 						</div>
 						<div class="col-sm-6 smallpad">
 							<button
@@ -280,7 +301,9 @@ export default function Main() @{
 								class="btn btn-primary btn-block"
 								id="insertmid100"
 								onClick={() => insertMid100()}
-							>Insert 100 rows at middle</button>
+							>
+								Insert 100 rows at middle
+							</button>
 						</div>
 						<div class="col-sm-6 smallpad">
 							<button
@@ -288,7 +311,9 @@ export default function Main() @{
 								class="btn btn-primary btn-block"
 								id="removefirst"
 								onClick={() => removeFirst()}
-							>Remove first row</button>
+							>
+								Remove first row
+							</button>
 						</div>
 						<div class="col-sm-6 smallpad">
 							<button
@@ -296,7 +321,9 @@ export default function Main() @{
 								class="btn btn-primary btn-block"
 								id="removeevery10"
 								onClick={() => removeEvery10()}
-							>Remove every 10th row</button>
+							>
+								Remove every 10th row
+							</button>
 						</div>
 						<div class="col-sm-6 smallpad">
 							<button
@@ -304,7 +331,9 @@ export default function Main() @{
 								class="btn btn-primary btn-block"
 								id="displace3"
 								onClick={() => displace(3)}
-							>Displace first 3 to end</button>
+							>
+								Displace first 3 to end
+							</button>
 						</div>
 						<div class="col-sm-6 smallpad">
 							<button
@@ -312,7 +341,9 @@ export default function Main() @{
 								class="btn btn-primary btn-block"
 								id="displace4"
 								onClick={() => displace(4)}
-							>Displace first 4 to end</button>
+							>
+								Displace first 4 to end
+							</button>
 						</div>
 						<div class="col-sm-6 smallpad">
 							<button
@@ -320,7 +351,9 @@ export default function Main() @{
 								class="btn btn-primary btn-block"
 								id="displace5"
 								onClick={() => displace(5)}
-							>Displace first 5 to end</button>
+							>
+								Displace first 5 to end
+							</button>
 						</div>
 						<div class="col-sm-6 smallpad">
 							<button
@@ -328,7 +361,9 @@ export default function Main() @{
 								class="btn btn-primary btn-block"
 								id="displace6"
 								onClick={() => displace(6)}
-							>Displace first 6 to end</button>
+							>
+								Displace first 6 to end
+							</button>
 						</div>
 						<div class="col-sm-6 smallpad">
 							<button
@@ -336,7 +371,9 @@ export default function Main() @{
 								class="btn btn-primary btn-block"
 								id="displace8"
 								onClick={() => displace(8)}
-							>Displace first 8 to end</button>
+							>
+								Displace first 8 to end
+							</button>
 						</div>
 					</div>
 				</div>

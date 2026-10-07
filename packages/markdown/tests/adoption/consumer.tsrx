@@ -7,7 +7,11 @@ import remarkGfm from 'remark-gfm';
 
 const components: Components = {
 	code({ children, class: className, node: _node, ...props }) {
-		return <code class={className} {...props}>{children}</code>;
+		return (
+			<code class={className} {...props}>
+				{children}
+			</code>
+		);
 	},
 	strong({ children }) {
 		return <b>{children}</b>;
@@ -30,5 +34,7 @@ export function AsyncConsumer() {
 }
 
 export function HooksConsumer() @{
-	<MarkdownHooks {...options} fallback={<span>{'Loading'}</span>}>{'# Client'}</MarkdownHooks>
+	<MarkdownHooks {...options} fallback={<span>{'Loading'}</span>}>
+		{'# Client'}
+	</MarkdownHooks>
 }

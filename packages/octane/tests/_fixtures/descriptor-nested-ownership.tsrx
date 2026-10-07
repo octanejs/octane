@@ -37,11 +37,7 @@ const content = {
 		return [
 			null,
 			'prefix',
-			kind === 'tag'
-				? changingTag
-				: kind === 'key'
-					? changingKey
-					: pair,
+			kind === 'tag' ? changingTag : kind === 'key' ? changingKey : pair,
 			false,
 			<input data-stable="true" defaultValue="draft" />,
 			active ? <Counter /> : <span>plain</span>,

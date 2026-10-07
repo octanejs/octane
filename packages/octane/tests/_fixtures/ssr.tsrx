@@ -2,10 +2,9 @@ import { useState, useMemo, useId, useRef, useEffect } from 'octane';
 
 // Dynamic object style + camelCase keys + a dynamic class.
 export function Styled(props) @{
-	<div
-		class={props.klass}
-		style={{ color: props.color, fontSize: '12px' }}
-	>{props.label as string}</div>
+	<div class={props.klass} style={{ color: props.color, fontSize: '12px' }}>
+		{props.label as string}
+	</div>
 }
 
 // Boolean attribute, void element, static + dynamic attrs.
@@ -17,7 +16,9 @@ export function Field(props) @{
 
 // Spread attributes.
 export function Spread(props) @{
-	<div {...props.attrs} class="base">{'x'}</div>
+	<div {...props.attrs} class="base">
+		{'x'}
+	</div>
 }
 
 // dangerouslySetInnerHTML (raw, unescaped).

@@ -20,9 +20,13 @@ function CornerControl(props: { position: any }) {
 /** The three-argument form: `useControl(onCreate, onRemove, opts)` — a different
  *  positional path through the same resolution, so it is worth its own control. */
 function CornerControlWithTeardown(props: { position: any; onRemoved: () => void }) {
-	useControl(({ mapLib }: any) => new mapLib.NavigationControl({}), () => props.onRemoved(), {
-		position: props.position,
-	});
+	useControl(
+		({ mapLib }: any) => new mapLib.NavigationControl({}),
+		() => props.onRemoved(),
+		{
+			position: props.position,
+		},
+	);
 	return null;
 }
 

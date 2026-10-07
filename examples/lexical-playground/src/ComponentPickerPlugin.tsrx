@@ -33,22 +33,24 @@ type PickerItemProps = {
 
 function ComponentPickerMenu(props: { itemProps: PickerItemProps }) @{
 	<div class="typeahead-popover component-picker-menu">
-		<ul>{props.itemProps.options.map(
-			(option, i) => <li
-				key={option.key}
-				class={props.itemProps.selectedIndex === i ? 'item selected' : 'item'}
-				role="option"
-				aria-selected={props.itemProps.selectedIndex === i ? 'true' : 'false'}
-				ref={option.setRefElement}
-				onMouseEnter={() => props.itemProps.setHighlightedIndex(i)}
-				onClick={() => {
-					props.itemProps.setHighlightedIndex(i);
-					props.itemProps.selectOptionAndCleanUp(option);
-				}}
-			>
-				<span class="text">{option.title}</span>
-			</li>,
-		)}</ul>
+		<ul>
+			{props.itemProps.options.map((option, i) => (
+				<li
+					key={option.key}
+					class={props.itemProps.selectedIndex === i ? 'item selected' : 'item'}
+					role="option"
+					aria-selected={props.itemProps.selectedIndex === i ? 'true' : 'false'}
+					ref={option.setRefElement}
+					onMouseEnter={() => props.itemProps.setHighlightedIndex(i)}
+					onClick={() => {
+						props.itemProps.setHighlightedIndex(i);
+						props.itemProps.selectOptionAndCleanUp(option);
+					}}
+				>
+					<span class="text">{option.title}</span>
+				</li>
+			))}
+		</ul>
 	</div>
 }
 
@@ -65,23 +67,35 @@ export function ComponentPickerPlugin() {
 			}
 		};
 		const all = [
-			new ComponentPickerOption('Paragraph', $block(() => $createParagraphNode())),
-			new ComponentPickerOption('Heading 1', $block(() => $createHeadingNode('h1'))),
-			new ComponentPickerOption('Heading 2', $block(() => $createHeadingNode('h2'))),
-			new ComponentPickerOption('Heading 3', $block(() => $createHeadingNode('h3'))),
-			new ComponentPickerOption('Quote', $block(() => $createQuoteNode())),
-			new ComponentPickerOption('Bulleted List', () => editor.dispatchCommand(
-				INSERT_UNORDERED_LIST_COMMAND,
-				undefined,
-			)),
-			new ComponentPickerOption('Numbered List', () => editor.dispatchCommand(
-				INSERT_ORDERED_LIST_COMMAND,
-				undefined,
-			)),
-			new ComponentPickerOption('Divider', () => editor.dispatchCommand(
-				INSERT_HORIZONTAL_RULE_COMMAND,
-				undefined,
-			)),
+			new ComponentPickerOption(
+				'Paragraph',
+				$block(() => $createParagraphNode()),
+			),
+			new ComponentPickerOption(
+				'Heading 1',
+				$block(() => $createHeadingNode('h1')),
+			),
+			new ComponentPickerOption(
+				'Heading 2',
+				$block(() => $createHeadingNode('h2')),
+			),
+			new ComponentPickerOption(
+				'Heading 3',
+				$block(() => $createHeadingNode('h3')),
+			),
+			new ComponentPickerOption(
+				'Quote',
+				$block(() => $createQuoteNode()),
+			),
+			new ComponentPickerOption('Bulleted List', () =>
+				editor.dispatchCommand(INSERT_UNORDERED_LIST_COMMAND, undefined),
+			),
+			new ComponentPickerOption('Numbered List', () =>
+				editor.dispatchCommand(INSERT_ORDERED_LIST_COMMAND, undefined),
+			),
+			new ComponentPickerOption('Divider', () =>
+				editor.dispatchCommand(INSERT_HORIZONTAL_RULE_COMMAND, undefined),
+			),
 		];
 		if (!queryString) {
 			return all;
@@ -90,19 +104,22 @@ export function ComponentPickerPlugin() {
 		return all.filter((o) => o.title.toLowerCase().includes(q));
 	}, [editor, queryString]);
 
-	const onSelectOption = useCallback((
-		selectedOption: ComponentPickerOption,
-		nodeToRemove: TextNode | null,
-		closeMenu: () => void,
-	) => {
-		editor.update(() => {
-			if (nodeToRemove) {
-				nodeToRemove.remove();
-			}
-			selectedOption.onSelect();
-			closeMenu();
-		});
-	}, [editor]);
+	const onSelectOption = useCallback(
+		(
+			selectedOption: ComponentPickerOption,
+			nodeToRemove: TextNode | null,
+			closeMenu: () => void,
+		) => {
+			editor.update(() => {
+				if (nodeToRemove) {
+					nodeToRemove.remove();
+				}
+				selectedOption.onSelect();
+				closeMenu();
+			});
+		},
+		[editor],
+	);
 
 	// React-compatible: return a portal (octane renders a createPortal value at any
 	// position — no host-element wrapper needed).
@@ -113,11 +130,13 @@ export function ComponentPickerPlugin() {
 		return createPortal(<ComponentPickerMenu itemProps={itemProps} />, anchorRef.current);
 	};
 
-	return <LexicalTypeaheadMenuPlugin
-		onQueryChange={setQueryString}
-		onSelectOption={onSelectOption}
-		triggerFn={triggerFn}
-		options={options}
-		menuRenderFn={menuRenderFn}
-	/>;
+	return (
+		<LexicalTypeaheadMenuPlugin
+			onQueryChange={setQueryString}
+			onSelectOption={onSelectOption}
+			triggerFn={triggerFn}
+			options={options}
+			menuRenderFn={menuRenderFn}
+		/>
+	);
 }

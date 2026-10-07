@@ -51,16 +51,10 @@ export function App(props: { cards: CardSlot[] }) @{
 			<p class="tagline">{'streaming SSR benchmark storefront' as string}</p>
 			<nav class="nav">
 				<ul class="links">
-					@for (const n of [
-						'home',
-						'new',
-						'sale',
-						'gear',
-						'parts',
-						'labs',
-						'blog',
-						'help',
-					]; key n) {
+					@for (
+						const n of ['home', 'new', 'sale', 'gear', 'parts', 'labs', 'blog', 'help'];
+						key n
+					) {
 						<li class="link">
 							<a href={'/' + n}>{n as string}</a>
 						</li>
@@ -70,9 +64,9 @@ export function App(props: { cards: CardSlot[] }) @{
 		</header>
 		<section class="hero">
 			<h2 class="pitch">{'Ten cards, one stream' as string}</h2>
-			<p
-				class="blurb"
-			>{'The shell flushes immediately; each card streams when its data resolves.' as string}</p>
+			<p class="blurb">
+				{'The shell flushes immediately; each card streams when its data resolves.' as string}
+			</p>
 			<div class="stats">
 				<div class="stat">
 					<span class="num">{'10' as string}</span>
@@ -95,9 +89,9 @@ export function App(props: { cards: CardSlot[] }) @{
 		</main>
 		<footer class="foot">
 			<p class="fine">{'Octane Outfitters — streaming SSR benchmark' as string}</p>
-			<small
-				class="legal"
-			>{'same DOM shape and data schedule across all frameworks' as string}</small>
+			<small class="legal">
+				{'same DOM shape and data schedule across all frameworks' as string}
+			</small>
 		</footer>
 	</div>
 }

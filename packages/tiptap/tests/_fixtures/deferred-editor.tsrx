@@ -22,9 +22,7 @@ export function DeferredEditor(props) @{
 	}, [editor, props?.onEditor]);
 
 	<main id="deferred-editor">
-		<output id="deferred-status">
-			{editor ? 'ready' : 'deferred'}
-		</output>
+		<output id="deferred-status">{editor ? 'ready' : 'deferred'}</output>
 		<output id="deferred-selection">{selectedText ?? 'deferred'}</output>
 		@if (editor) {
 			<EditorContent editor={editor} data-editor-host="deferred" />

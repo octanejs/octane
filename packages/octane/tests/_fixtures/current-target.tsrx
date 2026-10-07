@@ -11,7 +11,9 @@ export function Nested(props) @{
 			id="inner"
 			onClick={(e) => props.log('inner:' + e.currentTarget.id + ':target=' + e.target.id)}
 			onClickCapture={(e) => props.log('capture-inner:' + e.currentTarget.id)}
-		>{'go'}</button>
+		>
+			{'go'}
+		</button>
 	</div>
 }
 

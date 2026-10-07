@@ -36,9 +36,8 @@ export function TodoApp() @{
 		setTodos((t) => [...t, { id: nextId++, title, completed: false }]);
 		input.value = '';
 	};
-	const toggle = (id: number) => setTodos(
-		(t) => t.map((x) => (x.id === id ? { ...x, completed: !x.completed } : x)),
-	);
+	const toggle = (id: number) =>
+		setTodos((t) => t.map((x) => (x.id === id ? { ...x, completed: !x.completed } : x)));
 	const destroy = (id: number) => setTodos((t) => t.filter((x) => x.id !== id));
 	const toggleAll = (e: Event) => {
 		const on = (e.target as HTMLInputElement).checked;
@@ -141,7 +140,9 @@ export function TodoApp() @{
 						</li>
 					</ul>
 					@if (anyCompleted) {
-						<button class="clear-completed" onClick={clearCompleted}>Clear completed</button>
+						<button class="clear-completed" onClick={clearCompleted}>
+							Clear completed
+						</button>
 					}
 				</footer>
 			</>

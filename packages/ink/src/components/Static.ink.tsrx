@@ -54,5 +54,9 @@ export default function Static<T>(props: Props<T>) {
 		[customStyle],
 	);
 
-	return <ink-box internal_static style={style}>{children}</ink-box>;
+	return (
+		<ink-box internal_static style={style}>
+			{children}
+		</ink-box>
+	);
 }

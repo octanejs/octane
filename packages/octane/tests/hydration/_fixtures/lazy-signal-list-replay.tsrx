@@ -9,7 +9,7 @@ type View = { reversed: boolean; loading: boolean; rows: { id: string; label: st
 type Props = {
 	view: View;
 	expose?: (view$: WritableSignal<View>) => void;
-	onMount?: () => (() => void);
+	onMount?: () => () => void;
 	onClick?: () => void;
 };
 

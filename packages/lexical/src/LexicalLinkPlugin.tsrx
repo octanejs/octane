@@ -23,11 +23,10 @@ export function LinkPlugin(props: Props) {
 		}
 	}, null);
 
-	useEffect(() => registerLink(editor, namedSignals({ attributes, validateUrl })), [
-		editor,
-		validateUrl,
-		attributes,
-	]);
+	useEffect(
+		() => registerLink(editor, namedSignals({ attributes, validateUrl })),
+		[editor, validateUrl, attributes],
+	);
 
 	return null;
 }

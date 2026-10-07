@@ -15,21 +15,21 @@ function Label(props: { text: string }) @{
 
 // A host descriptor with a component child (the host element Block path).
 export function BlockHost(props: { tag: string; text: string }) @{
-	<section id="block">{createElement(
-		props.tag,
-		{ id: 'el' },
-		createElement(Label, { text: props.text }),
-	)}</section>
+	<section id="block">
+		{createElement(props.tag, { id: 'el' }, createElement(Label, { text: props.text }))}
+	</section>
 }
 
 // A textarea whose `value` or `defaultValue` owns its content, not children.
 export function TextareaHost(props: { tag: string; value: string; controlled: boolean }) @{
-	<section id="textarea">{createElement(
-		props.tag,
-		props.controlled
-			? { id: 'el', value: props.value, onInput: () => {} }
-			: { id: 'el', defaultValue: props.value },
-	)}</section>
+	<section id="textarea">
+		{createElement(
+			props.tag,
+			props.controlled
+				? { id: 'el', value: props.value, onInput: () => {} }
+				: { id: 'el', defaultValue: props.value },
+		)}
+	</section>
 }
 
 // A dynamic host tag at template position. JSX types list only the canonical

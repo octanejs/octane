@@ -117,39 +117,35 @@ describe('<ApolloProvider /> Component', () => {
 		);
 	});
 
-	describe.each(
-		[
-			['client', { client }, { client: anotherClient }],
-		] as const,
-	)('context value stability, %s prop', function suite(prop, value, childValue) {
-		it(`should not recreate the context value if the ${prop} prop didn't change`, () => {
-			let lastContext: ApolloContextValue | undefined;
+	describe.each([['client', { client }, { client: anotherClient }]] as const)(
+		'context value stability, %s prop',
+		function suite(prop, value, childValue) {
+			it(`should not recreate the context value if the ${prop} prop didn't change`, () => {
+				let lastContext: ApolloContextValue | undefined;
 
-			function TestChild() {
-				lastContext = useContext(getApolloContext());
-				return null;
-			}
+				function TestChild() {
+					lastContext = useContext(getApolloContext());
+					return null;
+				}
 
-			const { rerender } = render(
-				<ApolloProvider {...value}>
-					<TestChild />
-				</ApolloProvider>,
-			);
+				const { rerender } = render(
+					<ApolloProvider {...value}>
+						<TestChild />
+					</ApolloProvider>,
+				);
 
-			const firstContextValue = lastContext;
+				const firstContextValue = lastContext;
 
-			rerender(
-				<ApolloProvider {...value}>
-					<TestChild />
-				</ApolloProvider>,
-			);
+				rerender(
+					<ApolloProvider {...value}>
+						<TestChild />
+					</ApolloProvider>,
+				);
 
-			expect(lastContext).toBe(firstContextValue);
-		});
+				expect(lastContext).toBe(firstContextValue);
+			});
 
-		it(
-			`should not recreate the context if the parent context value differs, but the ${prop} prop didn't change`,
-			() => {
+			it(`should not recreate the context if the parent context value differs, but the ${prop} prop didn't change`, () => {
 				let lastContext: ApolloContextValue | undefined;
 
 				function TestChild() {
@@ -176,7 +172,7 @@ describe('<ApolloProvider /> Component', () => {
 				);
 
 				expect(lastContext).toBe(firstContextValue);
-			},
-		);
-	});
+			});
+		},
+	);
 });

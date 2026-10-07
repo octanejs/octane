@@ -4,7 +4,9 @@ import { createElement, useState, type ComponentType, type OctaneNode } from 'oc
 function Tally(props: { name: string }) @{
 	const [n, setN] = useState(0);
 	<>
-		<button class={props.name} onClick={() => setN(n + 1)}>{props.name + ':' + n}</button>
+		<button class={props.name} onClick={() => setN(n + 1)}>
+			{props.name + ':' + n}
+		</button>
 		<small class={props.name}>{props.name as string}</small>
 	</>
 }

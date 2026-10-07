@@ -21,23 +21,25 @@ export const Alpha = ({ className, hsva, onChange, onChangeEnd }: Props) => {
 	const gradientStyle = { backgroundImage: `linear-gradient(90deg, ${colorFrom}, ${colorTo})` };
 	const nodeClassName = formatClassName(['react-colorful__alpha', className]);
 	const ariaValue = round(hsva.a * 100);
-	return <div class={nodeClassName}>
-		<div class="react-colorful__alpha-gradient" style={gradientStyle} />
-		<Interactive
-			onMove={handleMove}
-			onKey={handleKey}
-			onEnd={onChangeEnd}
-			aria-label="Alpha"
-			aria-valuetext={`${ariaValue}%`}
-			aria-valuenow={ariaValue}
-			aria-valuemin={0}
-			aria-valuemax={100}
-		>
-			<Pointer
-				className="react-colorful__alpha-pointer"
-				left={hsva.a}
-				color={hsvaToHslaString(hsva)}
-			/>
-		</Interactive>
-	</div>;
+	return (
+		<div class={nodeClassName}>
+			<div class="react-colorful__alpha-gradient" style={gradientStyle} />
+			<Interactive
+				onMove={handleMove}
+				onKey={handleKey}
+				onEnd={onChangeEnd}
+				aria-label="Alpha"
+				aria-valuetext={`${ariaValue}%`}
+				aria-valuenow={ariaValue}
+				aria-valuemin={0}
+				aria-valuemax={100}
+			>
+				<Pointer
+					className="react-colorful__alpha-pointer"
+					left={hsva.a}
+					color={hsvaToHslaString(hsva)}
+				/>
+			</Interactive>
+		</div>
+	);
 };

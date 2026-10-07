@@ -97,26 +97,30 @@ export function MermaidBlock({
 	}, [code, isDark, mermaidId]);
 
 	if (renderState.status !== 'rendered') {
-		return <CodeBlockView
-			className={className}
-			copyText={code.trimEnd()}
-			htmlMarkup={buildPlainCodeBlockHtml(code)}
-			isEmbedded={isEmbedded}
-			lang="mermaid"
-			showTypeCopyButton={showTypeCopyButton}
-			style={style}
-			title={title}
-		/>;
+		return (
+			<CodeBlockView
+				className={className}
+				copyText={code.trimEnd()}
+				htmlMarkup={buildPlainCodeBlockHtml(code)}
+				isEmbedded={isEmbedded}
+				lang="mermaid"
+				showTypeCopyButton={showTypeCopyButton}
+				style={style}
+				title={title}
+			/>
+		);
 	}
 
-	return <div
-		class={twMerge(
-			'mermaid-block not-prose w-full max-w-full overflow-x-auto rounded-md border border-gray-500/20 bg-white p-4 dark:bg-gray-950 [&_svg]:mx-auto [&_svg]:max-w-none',
-			className,
-		)}
-		style={style}
-		role="img"
-		aria-label={title ?? 'Mermaid diagram'}
-		dangerouslySetInnerHTML={{ __html: renderState.svg }}
-	/>;
+	return (
+		<div
+			class={twMerge(
+				'mermaid-block not-prose w-full max-w-full overflow-x-auto rounded-md border border-gray-500/20 bg-white p-4 dark:bg-gray-950 [&_svg]:mx-auto [&_svg]:max-w-none',
+				className,
+			)}
+			style={style}
+			role="img"
+			aria-label={title ?? 'Mermaid diagram'}
+			dangerouslySetInnerHTML={{ __html: renderState.svg }}
+		/>
+	);
 }

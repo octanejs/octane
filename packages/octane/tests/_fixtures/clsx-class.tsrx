@@ -33,19 +33,25 @@ export function SpreadClass(props) @{
 // A later spread owns the final class value when it supplies either `class` or
 // `className`. The class value itself still uses octane's clsx-style composition.
 export function ExplicitThenSpreadClass(props) @{
-	<a href={props.href} class="story-title" {...props.attrs}>{'x'}</a>
+	<a href={props.href} class="story-title" {...props.attrs}>
+		{'x'}
+	</a>
 }
 
 // A later explicit class owns the final value when an earlier spread supplies class.
 // Hydration must not replay the spread's intermediate class onto the adopted node.
 export function SpreadThenExplicitClass(props) @{
-	<div {...props.attrs} class={props.cls}>{'x'}</div>
+	<div {...props.attrs} class={props.cls}>
+		{'x'}
+	</div>
 }
 
 // Class ownership follows authored order across any number of spreads. Non-class
 // attributes retain their authored serialization positions.
 export function MultipleClassSpreads(props) @{
-	<div class={props.base} {...props.first} data-own="own" {...props.second}>{'x'}</div>
+	<div class={props.base} {...props.first} data-own="own" {...props.second}>
+		{'x'}
+	</div>
 }
 
 // SVGElement.className is a read-only SVGAnimatedString, so the compiler routes this
@@ -57,7 +63,9 @@ export function SvgClass(props) @{
 // Toggling a class across renders (update path — a fresh array each render).
 export function Toggling() @{
 	const [on, setOn] = useState(false);
-	<button id="btn" onClick={() => setOn(!on)} class={['btn', on && 'on']}>{'x'}</button>
+	<button id="btn" onClick={() => setOn(!on)} class={['btn', on && 'on']}>
+		{'x'}
+	</button>
 }
 
 // Scoped component (has a <style> block) with an array class — exercises the pre-pass

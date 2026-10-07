@@ -20,21 +20,24 @@ declare module 'octane/jsx-runtime' {
 
 export function BadListenerTree(props: { onAnc: (e: Event) => void; bad: any }) @{
 	<div class="anc" onClick={props.onAnc}>
-		<div class="target" onClick={props.bad}>{'x'}</div>
+		<div class="target" onClick={props.bad}>
+			{'x'}
+		</div>
 	</div>
 }
 
-export function BadCaptureListenerTree(props: {
-	onAnc: (e: Event) => void;
-	bad: any;
-}) @{
+export function BadCaptureListenerTree(props: { onAnc: (e: Event) => void; bad: any }) @{
 	<div class="anc" onClickCapture={props.onAnc}>
-		<div class="target" onClickCapture={props.bad}>{'x'}</div>
+		<div class="target" onClickCapture={props.bad}>
+			{'x'}
+		</div>
 	</div>
 }
 
 export function BadScrollListener(props: { bad: any }) @{
-	<div class="target" onScroll={props.bad}>{'scroll target'}</div>
+	<div class="target" onScroll={props.bad}>
+		{'scroll target'}
+	</div>
 }
 
 export function BadLoadListener(props: { bad: any }) @{
@@ -46,7 +49,9 @@ export function ThrowingListenerTree(props: {
 	onTarget: (event: Event) => void;
 }) @{
 	<div class="anc" onClick={props.onAnc}>
-		<button class="target" onClick={props.onTarget}>{'throwing target'}</button>
+		<button class="target" onClick={props.onTarget}>
+			{'throwing target'}
+		</button>
 	</div>
 }
 

@@ -39,13 +39,12 @@ export interface CursorProps extends ZIndexable {
 	index: TooltipIndex | undefined;
 }
 
-export type CursorConnectedProps =
-	CursorProps & {
-		tooltipAxisBandSize: number;
-		layout: LayoutType;
-		offset: ChartOffsetInternal;
-		chartName: string;
-	};
+export type CursorConnectedProps = CursorProps & {
+	tooltipAxisBandSize: number;
+	layout: LayoutType;
+	offset: ChartOffsetInternal;
+	chartName: string;
+};
 
 function RenderCursor({
 	cursor,
@@ -79,7 +78,11 @@ export function CursorInternal(props: CursorConnectedProps) {
 	const activeCoordinate = coordinate;
 	const activePayload = payload;
 	const activeTooltipIndex = index;
-	if (!cursor || !activeCoordinate || chartName !== 'ScatterChart' && tooltipEventType !== 'axis') {
+	if (
+		!cursor ||
+		!activeCoordinate ||
+		(chartName !== 'ScatterChart' && tooltipEventType !== 'axis')
+	) {
 		return null;
 	}
 	let restProps, cursorComp: ComponentType<any>, preferredZIndex: number;
@@ -124,9 +127,11 @@ export function CursorInternal(props: CursorConnectedProps) {
 		className: clsx('recharts-tooltip-cursor', extraClassName),
 	};
 
-	return <ZIndexLayer zIndex={props.zIndex ?? preferredZIndex}>
-		<RenderCursor cursor={cursor} cursorComp={cursorComp} cursorProps={cursorProps} />
-	</ZIndexLayer>;
+	return (
+		<ZIndexLayer zIndex={props.zIndex ?? preferredZIndex}>
+			<RenderCursor cursor={cursor} cursorComp={cursorComp} cursorProps={cursorProps} />
+		</ZIndexLayer>
+	);
 }
 
 /*
@@ -147,11 +152,13 @@ export function Cursor(props: CursorProps) {
 		return null;
 	}
 
-	return <CursorInternal
-		{...props}
-		offset={offset}
-		layout={layout}
-		tooltipAxisBandSize={tooltipAxisBandSize}
-		chartName={chartName}
-	/>;
+	return (
+		<CursorInternal
+			{...props}
+			offset={offset}
+			layout={layout}
+			tooltipAxisBandSize={tooltipAxisBandSize}
+			chartName={chartName}
+		/>
+	);
 }

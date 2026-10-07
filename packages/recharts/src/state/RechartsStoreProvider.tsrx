@@ -29,5 +29,9 @@ export function RechartsStoreProvider(props: RechartsStoreProviderProps) {
 	if (storeRef.current == null) {
 		storeRef.current = createRechartsStore(preloadedState, reduxStoreName);
 	}
-	return <Provider context={RechartsReduxContext} store={storeRef.current}>{children}</Provider>;
+	return (
+		<Provider context={RechartsReduxContext} store={storeRef.current}>
+			{children}
+		</Provider>
+	);
 }

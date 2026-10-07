@@ -5,12 +5,14 @@ import { useState } from 'octane';
 // Functional updates so both synchronous handlers accumulate.
 export function FocusEvents() {
 	const [log, setLog] = useState('');
-	return <div class="wrap" onFocus={() => setLog((l) => l + 'W')}>
-		<input
-			class="inp"
-			onFocus={() => setLog((l) => l + 'f')}
-			onBlur={() => setLog((l) => l + 'b')}
-		/>
-		<span class="log">{log as string}</span>
-	</div>;
+	return (
+		<div class="wrap" onFocus={() => setLog((l) => l + 'W')}>
+			<input
+				class="inp"
+				onFocus={() => setLog((l) => l + 'f')}
+				onBlur={() => setLog((l) => l + 'b')}
+			/>
+			<span class="log">{log as string}</span>
+		</div>
+	);
 }

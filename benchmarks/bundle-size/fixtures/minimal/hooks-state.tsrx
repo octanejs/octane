@@ -18,7 +18,9 @@ function StatefulCounter() @{
 			clicks++;
 			setCount(count + 1);
 		}}
-	>{String(count) as string}</button>
+	>
+		{String(count) as string}
+	</button>
 }
 
 export async function run(container: HTMLElement) {

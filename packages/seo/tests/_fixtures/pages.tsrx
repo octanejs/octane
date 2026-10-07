@@ -19,7 +19,7 @@ function Post(props: { slug: string }) @{
 			languages={{ de: '/de/blog/' + props.slug, fr: '/fr/blog/' + props.slug }}
 			jsonLd={{ '@type': 'Article', headline: 'Post: ' + props.slug }}
 		/>
-		<main>{'Body of ' + props.slug as string}</main>
+		<main>{('Body of ' + props.slug) as string}</main>
 	</>
 }
 

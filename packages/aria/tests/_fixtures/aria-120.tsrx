@@ -13,37 +13,37 @@ import {
 } from '@octanejs/aria/components';
 
 export function Tokens(props: { isReadOnly?: boolean; isDisabled?: boolean }) {
-	return <TokenField
-		defaultValue={new TokenFieldValue([
-			{ type: 'text', text: 'Hello ' },
-			{ type: 'token', text: 'Ada' },
-		])}
-		isReadOnly={props.isReadOnly}
-		isDisabled={props.isDisabled}
-	>
-		<Label>Message</Label>
-		<TokenInput>
-			{(segment) => <Token>{segment.text as string}</Token>}
-		</TokenInput>
-		<Text slot="description">Choose recipients</Text>
-	</TokenField>;
+	return (
+		<TokenField
+			defaultValue={
+				new TokenFieldValue([
+					{ type: 'text', text: 'Hello ' },
+					{ type: 'token', text: 'Ada' },
+				])
+			}
+			isReadOnly={props.isReadOnly}
+			isDisabled={props.isDisabled}
+		>
+			<Label>Message</Label>
+			<TokenInput>{(segment) => <Token>{segment.text as string}</Token>}</TokenInput>
+			<Text slot="description">Choose recipients</Text>
+		</TokenField>
+	);
 }
 
 export function Preview() {
-	return <PreviewTrigger delay={0} closeDelay={0}>
-		<Link href="#details">Preview details</Link>
-		<Popover aria-label="Details">
-			<a href="#more">Read more</a>
-		</Popover>
-	</PreviewTrigger>;
+	return (
+		<PreviewTrigger delay={0} closeDelay={0}>
+			<Link href="#details">Preview details</Link>
+			<Popover aria-label="Details">
+				<a href="#more">Read more</a>
+			</Popover>
+		</PreviewTrigger>
+	);
 }
 
 export function TokenBlocks() @{
-	<TokenField
-		defaultValue={new TokenFieldValue([
-			{ type: 'token', text: 'Ada' },
-		])}
-	>
+	<TokenField defaultValue={new TokenFieldValue([{ type: 'token', text: 'Ada' }])}>
 		<Label>Recipient</Label>
 		<TokenInput>
 			<Token>Ada</Token>
@@ -57,8 +57,10 @@ export function Shortcuts() {
 	const { keyboardProps } = useKeyboard({
 		shortcuts: { 'Control+k': () => setCount((n: number) => n + 1) },
 	});
-	return <div onKeyDown={() => setBubbles((n: number) => n + 1)}>
-		<input aria-label="Shortcuts" {...keyboardProps} />
-		<output>{'handled:' + count + ' bubbled:' + bubbles}</output>
-	</div>;
+	return (
+		<div onKeyDown={() => setBubbles((n: number) => n + 1)}>
+			<input aria-label="Shortcuts" {...keyboardProps} />
+			<output>{'handled:' + count + ' bubbled:' + bubbles}</output>
+		</div>
+	);
 }

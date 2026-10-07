@@ -147,7 +147,7 @@ export function OtherOnlyWithState() @{
 	const [n] = useState(0);
 	const other = CounterContext.useSelector((state) => state.context.other);
 
-	renderLog.push('OtherOnlyWithState:' + n as unknown as string);
+	renderLog.push(('OtherOnlyWithState:' + n) as unknown as string);
 
 	<span id="ws-other">{other as string}</span>
 }

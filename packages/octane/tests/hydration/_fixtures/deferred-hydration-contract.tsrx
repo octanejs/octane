@@ -11,7 +11,9 @@ import {
 } from 'octane';
 
 function ContractButton(props) @{
-	<button id={props.id} onClick={props.onClick}>{props.label as string}</button>
+	<button id={props.id} onClick={props.onClick}>
+		{props.label as string}
+	</button>
 }
 
 export function EarlyInteractionHydration(props) @{
@@ -28,7 +30,9 @@ export function ProceduralPrefetchHydration(props) @{
 
 function ActivationSuspendingChild(props) @{
 	if (props.suspend) use(props.promise);
-	<button id="activation-content" onClick={props.onClick}>{'Server reviews'}</button>
+	<button id="activation-content" onClick={props.onClick}>
+		{'Server reviews'}
+	</button>
 }
 
 export function ActivationSuspendingHydration(props) @{
@@ -100,7 +104,9 @@ function PartiallyAdoptedEditor(props) @{
 
 function PartiallyAdoptedSuffix(props) @{
 	if (props.suspend) use(props.promise);
-	<button id="partial-suspended-suffix" onClick={props.onClick}>{'Resolved suffix'}</button>
+	<button id="partial-suspended-suffix" onClick={props.onClick}>
+		{'Resolved suffix'}
+	</button>
 }
 
 export function PartiallyAdoptedSuspendingHydration(props) @{

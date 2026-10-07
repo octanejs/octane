@@ -26,14 +26,22 @@ function contains(textValue: string, inputValue: string): boolean {
 function Option(props: { item: any; state: any }) {
 	const ref = useRef<any>(null);
 	const { optionProps } = useOption({ key: props.item.key }, props.state, ref);
-	return <li {...optionProps} ref={ref}>{props.item.rendered}</li>;
+	return (
+		<li {...optionProps} ref={ref}>
+			{props.item.rendered}
+		</li>
+	);
 }
 
 function ComboListBox(props: { listBoxProps: any; state: any; listBoxRef: any }) {
 	const { listBoxProps } = useListBox(props.listBoxProps, props.state, props.listBoxRef);
-	return <ul {...listBoxProps} ref={props.listBoxRef}>{[...props.state.collection].map(
-		(item: any) => <Option key={item.key} item={item} state={props.state} />,
-	)}</ul>;
+	return (
+		<ul {...listBoxProps} ref={props.listBoxRef}>
+			{[...props.state.collection].map((item: any) => (
+				<Option key={item.key} item={item} state={props.state} />
+			))}
+		</ul>
+	);
 }
 
 export function ComboBoxSpec() {
@@ -52,20 +60,22 @@ export function ComboBoxSpec() {
 	);
 	const openState = state.isOpen ? 'true' : 'false';
 	const selectedKey = String(state.selectedKey ?? 'null');
-	return <div>
-		<label {...labelProps}>Fruit</label>
-		<input {...inputProps} ref={inputRef} />
-		{state.isOpen
-			? <div ref={popoverRef}>
+	return (
+		<div>
+			<label {...labelProps}>Fruit</label>
+			<input {...inputProps} ref={inputRef} />
+			{state.isOpen ? (
+				<div ref={popoverRef}>
 					<ComboListBox listBoxProps={listBoxProps} state={state} listBoxRef={listBoxRef} />
 				</div>
-			: null}
-		<output
-			data-open={openState}
-			data-input-value={state.inputValue}
-			data-selected-key={selectedKey}
-		>
-			{'open:' + openState}
-		</output>
-	</div>;
+			) : null}
+			<output
+				data-open={openState}
+				data-input-value={state.inputValue}
+				data-selected-key={selectedKey}
+			>
+				{'open:' + openState}
+			</output>
+		</div>
+	);
 }

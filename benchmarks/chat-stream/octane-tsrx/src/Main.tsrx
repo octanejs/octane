@@ -42,9 +42,9 @@ export function ChatApp() @{
 		const text = draft.trim();
 		if (text === '') return;
 		const reply = nextReply();
-		setConvs(
-			(cs) => cs.map(
-				(c, i) => i === active ? { ...c, messages: [...c.messages, userMessage(text), reply] } : c,
+		setConvs((cs) =>
+			cs.map((c, i) =>
+				i === active ? { ...c, messages: [...c.messages, userMessage(text), reply] } : c,
 			),
 		);
 		setStreamingId(reply.id);
@@ -64,8 +64,8 @@ export function ChatApp() @{
 		// window captures the render (octane otherwise flushes on a microtask).
 		flushSync(() => {
 			setConvs(
-				convs.map(
-					(c, i) => i === active
+				convs.map((c, i) =>
+					i === active
 						? { ...c, messages: c.messages.map((m) => (m.id === streamingId ? { ...m, done } : m)) }
 						: c,
 				),
@@ -74,12 +74,13 @@ export function ChatApp() @{
 		});
 		return msg.total - done;
 	};
-	(window as any).__reset = () => flushSync(() => {
-		setConvs(initialConversations());
-		setActive(0);
-		setDraft('');
-		setStreamingId(null);
-	});
+	(window as any).__reset = () =>
+		flushSync(() => {
+			setConvs(initialConversations());
+			setActive(0);
+			setDraft('');
+			setStreamingId(null);
+		});
 
 	const conv = convs[active];
 
@@ -92,7 +93,9 @@ export function ChatApp() @{
 						class={{ 'conv-tab': true, active: c.id === active }}
 						data-conv={'' + c.id}
 						onClick={() => setActive(c.id)}
-					>{c.title as string}</button>
+					>
+						{c.title as string}
+					</button>
 				}
 			</nav>
 		</header>
@@ -123,7 +126,9 @@ export function ChatApp() @{
 					if (e.key === 'Enter') send();
 				}}
 			/>
-			<button class="send" onClick={send}>Send</button>
+			<button class="send" onClick={send}>
+				Send
+			</button>
 		</footer>
 	</div>
 }

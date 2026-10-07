@@ -48,16 +48,10 @@ export function App(props: { cards: CardSlot[] }) @{
 			<p className="tagline">{'streaming SSR benchmark storefront'}</p>
 			<nav className="nav">
 				<ul className="links">
-					@for (const n of [
-						'home',
-						'new',
-						'sale',
-						'gear',
-						'parts',
-						'labs',
-						'blog',
-						'help',
-					]; key n) {
+					@for (
+						const n of ['home', 'new', 'sale', 'gear', 'parts', 'labs', 'blog', 'help'];
+						key n
+					) {
 						<li className="link">
 							<a href={'/' + n}>{n}</a>
 						</li>
@@ -67,9 +61,9 @@ export function App(props: { cards: CardSlot[] }) @{
 		</header>
 		<section className="hero">
 			<h2 className="pitch">{'Ten cards, one stream'}</h2>
-			<p
-				className="blurb"
-			>{'The shell flushes immediately; each card streams when its data resolves.'}</p>
+			<p className="blurb">
+				{'The shell flushes immediately; each card streams when its data resolves.'}
+			</p>
 			<div className="stats">
 				<div className="stat">
 					<span className="num">{'10'}</span>

@@ -53,7 +53,9 @@ export const useCustomRenderer = (language: string) => {
 	if (!(plugins?.renderers && language)) {
 		return null;
 	}
-	return plugins.renderers.find(
-		(r) => Array.isArray(r.language) ? r.language.includes(language) : r.language === language,
-	) ?? null;
+	return (
+		plugins.renderers.find((r) =>
+			Array.isArray(r.language) ? r.language.includes(language) : r.language === language,
+		) ?? null
+	);
 };

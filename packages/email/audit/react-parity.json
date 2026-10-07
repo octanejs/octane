@@ -33,7 +33,7 @@
       "arch": "any",
       "packageManager": "pnpm@12.9.1",
       "lockfile": "pnpm-lock.yaml",
-      "lockfileSha256": "e92f4520cd88a2593a0ecd555e0532b2e4e8bb1396c9558a09f0cbf3fbaa5917"
+      "lockfileSha256": "caea67fe61ab57f3e8cbd8a0e55f0e8b3014b3dd6815c6fe6e158095f291daeb"
     }
   },
   "lanes": [
@@ -66,7 +66,7 @@
         {
           "path": "packages/email/tests/_fixtures/parity-email.tsrx",
           "role": "support",
-          "sha256": "33559e202fc23b6f825cc4c765303bcb5dd5e4b4625f59411b6cd54406d067db"
+          "sha256": "46cacdd46372ca6da4aed8b32565941c6bf73d633b2744869fa27b270afb6fc1"
         },
         {
           "path": "packages/email/tests/differential/_setup.ts",

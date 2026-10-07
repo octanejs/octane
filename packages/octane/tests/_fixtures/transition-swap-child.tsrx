@@ -10,21 +10,19 @@ function A() @{
 
 function B(props) @{
 	const v = use(props.promise);
-	<span id="content">{'B-' + v as string}</span>
+	<span id="content">{('B-' + v) as string}</span>
 }
 
 export function SwapChild(props) @{
 	const [showB, setShowB] = useState(false);
 	const [isPending, start] = useTransition();
 	<div>
-		<button id="go" onClick={() => start(() => setShowB(true))}>{'go'}</button>
-		<span id="pending">
-			{isPending ? 'pending' : 'idle'}
-		</span>
+		<button id="go" onClick={() => start(() => setShowB(true))}>
+			{'go'}
+		</button>
+		<span id="pending">{isPending ? 'pending' : 'idle'}</span>
 		@try {
-			<div class="slot">
-				{showB ? <B promise={props.promise} /> : <A />}
-			</div>
+			<div class="slot">{showB ? <B promise={props.promise} /> : <A />}</div>
 		} @pending {
 			<span id="fallback">{'fallback'}</span>
 		}

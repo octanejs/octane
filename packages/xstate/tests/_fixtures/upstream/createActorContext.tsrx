@@ -34,9 +34,11 @@ describe('createActorContext', () => {
 		};
 
 		const App = () => {
-			return <SomeContext.Provider>
-				<Component />
-			</SomeContext.Provider>;
+			return (
+				<SomeContext.Provider>
+					<Component />
+				</SomeContext.Provider>
+			);
 		};
 
 		render(<App />);
@@ -63,18 +65,22 @@ describe('createActorContext', () => {
 			const actorRef = SomeContext.useActorRef();
 			const state = SomeContext.useSelector((s) => s);
 
-			return <>
-				<div data-testid="value">{state.value as string}</div>
-				<button data-testid="next" onClick={() => actorRef.send({ type: 'NEXT' })}>
-					Next
-				</button>
-			</>;
+			return (
+				<>
+					<div data-testid="value">{state.value as string}</div>
+					<button data-testid="next" onClick={() => actorRef.send({ type: 'NEXT' })}>
+						Next
+					</button>
+				</>
+			);
 		};
 
 		const App = () => {
-			return <SomeContext.Provider>
-				<Component />
-			</SomeContext.Provider>;
+			return (
+				<SomeContext.Provider>
+					<Component />
+				</SomeContext.Provider>
+			);
 		};
 
 		render(<App />);
@@ -102,20 +108,16 @@ describe('createActorContext', () => {
 			},
 			on: {
 				INC: {
-					actions: assign(
-						({ context }) => ({
-							obj: {
-								counter: context.obj.counter + 1,
-							},
-						}),
-					),
+					actions: assign(({ context }) => ({
+						obj: {
+							counter: context.obj.counter + 1,
+						},
+					})),
 				},
 				PUSH: {
-					actions: assign(
-						({ context }) => ({
-							arr: [...context.arr, Math.random().toString(36).slice(2)],
-						}),
-					),
+					actions: assign(({ context }) => ({
+						arr: [...context.arr, Math.random().toString(36).slice(2)],
+					})),
 				},
 			},
 		});
@@ -130,17 +132,21 @@ describe('createActorContext', () => {
 
 			rerenders += 1;
 
-			return <>
-				<button onClick={() => actor.send({ type: 'INC' })}>Inc</button>
-				<button onClick={() => actor.send({ type: 'PUSH' })}>Push</button>
-				<div data-testid="value">{value.counter as unknown as string}</div>;
-			</>;
+			return (
+				<>
+					<button onClick={() => actor.send({ type: 'INC' })}>Inc</button>
+					<button onClick={() => actor.send({ type: 'PUSH' })}>Push</button>
+					<div data-testid="value">{value.counter as unknown as string}</div>;
+				</>
+			);
 		};
 
 		const App = () => {
-			return <SomeContext.Provider>
-				<Component />
-			</SomeContext.Provider>;
+			return (
+				<SomeContext.Provider>
+					<Component />
+				</SomeContext.Provider>
+			);
 		};
 
 		render(<App />);
@@ -179,9 +185,11 @@ describe('createActorContext', () => {
 		};
 
 		const App = () => {
-			return <SomeContext.Provider>
-				<Component />
-			</SomeContext.Provider>;
+			return (
+				<SomeContext.Provider>
+					<Component />
+				</SomeContext.Provider>
+			);
 		};
 
 		render(<App />);
@@ -190,9 +198,10 @@ describe('createActorContext', () => {
 	});
 
 	it('should work with a provided machine', () => {
-		const createSomeMachine = (context: { count: number }) => createMachine({
-			context,
-		});
+		const createSomeMachine = (context: { count: number }) =>
+			createMachine({
+				context,
+			});
 
 		const SomeContext = createActorContext(createSomeMachine({ count: 0 }));
 
@@ -206,9 +215,11 @@ describe('createActorContext', () => {
 		const otherMachine = createSomeMachine({ count: 42 });
 
 		const App = () => {
-			return <SomeContext.Provider logic={otherMachine}>
-				<Component />
-			</SomeContext.Provider>;
+			return (
+				<SomeContext.Provider logic={otherMachine}>
+					<Component />
+				</SomeContext.Provider>
+			);
 		};
 
 		render(<App />);
@@ -259,15 +270,17 @@ describe('createActorContext', () => {
 		};
 
 		const App = () => {
-			return <SomeContext.Provider
-				logic={someMachine.provide({
-					actions: {
-						testAction: stubFn,
-					},
-				})}
-			>
-				<Component />
-			</SomeContext.Provider>;
+			return (
+				<SomeContext.Provider
+					logic={someMachine.provide({
+						actions: {
+							testAction: stubFn,
+						},
+					})}
+				>
+					<Component />
+				</SomeContext.Provider>
+			);
 		};
 
 		render(<App />);
@@ -285,9 +298,11 @@ describe('createActorContext', () => {
 		};
 
 		const App = () => {
-			return <PromiseContext.Provider>
-				<Component />
-			</PromiseContext.Provider>;
+			return (
+				<PromiseContext.Provider>
+					<Component />
+				</PromiseContext.Provider>
+			);
 		};
 
 		render(<App />);
@@ -297,7 +312,7 @@ describe('createActorContext', () => {
 		});
 	});
 
-	it('should preserve machine\'s identity when swapping options using in-render `.provide`', () => {
+	it("should preserve machine's identity when swapping options using in-render `.provide`", () => {
 		const someMachine = createMachine({
 			context: { count: 0 },
 			on: {
@@ -312,24 +327,28 @@ describe('createActorContext', () => {
 		const Component = () => {
 			const { send } = SomeContext.useActorRef();
 			const count = SomeContext.useSelector((state) => state.context.count);
-			return <>
-				<span data-testid="count">{count as unknown as string}</span>
-				<button data-testid="button" onClick={() => send({ type: 'inc' })}>
-					Inc
-				</button>
-			</>;
+			return (
+				<>
+					<span data-testid="count">{count as unknown as string}</span>
+					<button data-testid="button" onClick={() => send({ type: 'inc' })}>
+						Inc
+					</button>
+				</>
+			);
 		};
 
 		const App = () => {
-			return <SomeContext.Provider
-				logic={someMachine.provide({
-					actions: {
-						testAction: stubFn,
-					},
-				})}
-			>
-				<Component />
-			</SomeContext.Provider>;
+			return (
+				<SomeContext.Provider
+					logic={someMachine.provide({
+						actions: {
+							testAction: stubFn,
+						},
+					})}
+				>
+					<Component />
+				</SomeContext.Provider>
+			);
 		};
 
 		render(<App />);
@@ -365,18 +384,24 @@ describe('createActorContext', () => {
 
 			persistedState = actorRef.getPersistedSnapshot();
 
-			return <div
-				data-testid="value"
-				onClick={() => {
-					actorRef.send({ type: 'next' });
-				}}
-			>{state.value as string}</div>;
+			return (
+				<div
+					data-testid="value"
+					onClick={() => {
+						actorRef.send({ type: 'next' });
+					}}
+				>
+					{state.value as string}
+				</div>
+			);
 		};
 
 		const App = () => {
-			return <SomeContext.Provider options={{ snapshot: persistedState }}>
-				<Component />
-			</SomeContext.Provider>;
+			return (
+				<SomeContext.Provider options={{ snapshot: persistedState }}>
+					<Component />
+				</SomeContext.Provider>
+			);
 		};
 
 		const { unmount } = render(<App />);
@@ -419,9 +444,11 @@ describe('createActorContext', () => {
 		};
 
 		const App = () => {
-			return <SomeContext.Provider options={{ input: 42 }}>
-				<Component />
-			</SomeContext.Provider>;
+			return (
+				<SomeContext.Provider options={{ input: 42 }}>
+					<Component />
+				</SomeContext.Provider>
+			);
 		};
 
 		render(<App />);
@@ -453,9 +480,11 @@ describe('createActorContext', () => {
 		};
 
 		const App = () => {
-			return <SomeContext.Provider options={{ input: 10 }}>
-				<Component />
-			</SomeContext.Provider>;
+			return (
+				<SomeContext.Provider options={{ input: 10 }}>
+					<Component />
+				</SomeContext.Provider>
+			);
 		};
 
 		render(<App />);

@@ -23,7 +23,9 @@ export function ListFallbackBoundary(props) @{
 				<p class="list-fallback-tail">{'loading'}</p>
 			</>
 		}
-		<button id="list-fallback-after" onClick={() => setCount(count + 1)}>{count as number}</button>
+		<button id="list-fallback-after" onClick={() => setCount(count + 1)}>
+			{count as number}
+		</button>
 	</div>
 }
 
@@ -45,6 +47,8 @@ export function BindingListFallbackBoundary(props) @{
 				<p class="list-fallback-tail">{'loading'}</p>
 			</>
 		}
-		<button id="list-fallback-after" onClick={() => setCount(count + 1)}>{count as number}</button>
+		<button id="list-fallback-after" onClick={() => setCount(count + 1)}>
+			{count as number}
+		</button>
 	</div>
 }

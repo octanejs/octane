@@ -155,7 +155,9 @@ export function StaticEmptyObjectData() @{
 }
 
 export function DynamicAnchorHref(props: { value: unknown }) @{
-	<a id="dynamic-anchor-href" href={props.value}>{'valid empty href'}</a>
+	<a id="dynamic-anchor-href" href={props.value}>
+		{'valid empty href'}
+	</a>
 }
 
 export function DynamicObjectData(props: { value: unknown }) @{

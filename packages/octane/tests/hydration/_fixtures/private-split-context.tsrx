@@ -43,11 +43,13 @@ function Editor(props: Props) @{
 		return () => props.onEffect?.('cleanup');
 	}, []);
 	<section id="split-context-editor" data-runtime-id={id}>
-		<span id="split-context-value" title={value}>{value as string}</span>
+		<span id="split-context-value" title={value}>
+			{value as string}
+		</span>
 		<input id="split-context-draft" defaultValue="server draft" />
-		<button id="split-context-action" onClick={() => setCount(count + 1)}>{String(
-			count,
-		) as string}</button>
+		<button id="split-context-action" onClick={() => setCount(count + 1)}>
+			{String(count) as string}
+		</button>
 	</section>
 }
 

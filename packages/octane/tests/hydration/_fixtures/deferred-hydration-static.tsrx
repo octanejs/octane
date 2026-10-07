@@ -12,11 +12,9 @@ function StaticLeaf(props) @{
 
 function LiveSibling(props) @{
 	const id = useId();
-	<button
-		id="live-sibling"
-		data-runtime-id={id}
-		onClick={() => props.onClick?.(id)}
-	>{props.label as string}</button>
+	<button id="live-sibling" data-runtime-id={id} onClick={() => props.onClick?.(id)}>
+		{props.label as string}
+	</button>
 }
 
 export function PermanentStaticHtml(props) @{

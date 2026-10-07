@@ -41,14 +41,15 @@ function ExtractedCompatibilityRow(props: ExtractedCompatibilityRowProps) @{
 		source={table.atoms.rowSelection}
 		selector={(selection: any) => !!selection[row.id]}
 	>
-		{(selected: boolean) =>
+		{(selected: boolean) => (
 			<StrongTableSnapshot
 				variant="extracted"
 				rowId={row.id}
 				label={row.original.name}
 				selected={selected}
 				sortDirection={sortDirection}
-			/>}
+			/>
+		)}
 	</table.Subscribe>
 }
 
@@ -59,8 +60,7 @@ export function StrongTableBoundaries() @{
 	const table = useTable({ features, data, columns });
 	const rows = table.getRowModel().rows;
 	const sorted = table.getColumn('age')!.getIsSorted();
-	const sortDirection =
-		sorted === false ? 'none' : sorted;
+	const sortDirection = sorted === false ? 'none' : sorted;
 	<div>
 		<button id="strong-table-select" onClick={() => table.getRow('0').toggleSelected()}>
 			select
@@ -69,8 +69,8 @@ export function StrongTableBoundaries() @{
 			sort
 		</button>
 
-		<ul id="strong-table-inline">{rows.map(
-			(row) =>
+		<ul id="strong-table-inline">
+			{rows.map((row) => (
 				<StrongTableSnapshot
 					key={row.id}
 					variant="inline"
@@ -78,8 +78,9 @@ export function StrongTableBoundaries() @{
 					label={row.original.name}
 					selected={row.getIsSelected()}
 					sortDirection={sortDirection}
-				/>,
-		)}</ul>
+				/>
+			))}
+		</ul>
 
 		<ul id="strong-table-for">
 			@for (const row of rows; key row.id) {

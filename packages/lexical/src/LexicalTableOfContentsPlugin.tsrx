@@ -46,7 +46,7 @@ function $insertHeadingIntoTableOfContents(
 			if (key === prevHeading.getKey() && key !== newHeading.getKey()) {
 				if (
 					i + 1 < currentTableOfContents.length &&
-						currentTableOfContents[i + 1][0] === newHeading.__key
+					currentTableOfContents[i + 1][0] === newHeading.__key
 				) {
 					return currentTableOfContents;
 				}
@@ -127,11 +127,7 @@ export function TableOfContentsPlugin(props: Props) {
 			const updateCurrentTableOfContents = (node: ElementNode) => {
 				for (const child of node.getChildren()) {
 					if ($isHeadingNode(child)) {
-						currentTableOfContents.push([
-							child.getKey(),
-							child.getTextContent(),
-							child.getTag(),
-						]);
+						currentTableOfContents.push([child.getKey(), child.getTextContent(), child.getTag()]);
 					} else if ($isElementNode(child)) {
 						updateCurrentTableOfContents(child);
 					}
@@ -142,92 +138,97 @@ export function TableOfContentsPlugin(props: Props) {
 			setTableOfContents(currentTableOfContents);
 		});
 
-		const removeRootUpdateListener = editor.registerUpdateListener(({
-			editorState,
-			dirtyElements,
-		}) => {
-			editorState.read(() => {
-				const updateChildHeadings = (node: ElementNode) => {
-					for (const child of node.getChildren()) {
-						if ($isHeadingNode(child)) {
-							const prevHeading = $getPreviousHeading(child);
-							currentTableOfContents = $updateHeadingPosition(
-								prevHeading,
-								child,
-								currentTableOfContents,
-							);
-							setTableOfContents(currentTableOfContents);
-						} else if ($isElementNode(child)) {
-							updateChildHeadings(child);
-						}
-					}
-				};
-
-				$getRoot().getChildren().forEach((node) => {
-					if ($isElementNode(node) && dirtyElements.get(node.__key)) {
-						updateChildHeadings(node);
-					}
-				});
-			});
-		});
-
-		const removeHeaderMutationListener = editor.registerMutationListener(HeadingNode, (
-			mutatedNodes,
-		) => {
-			editor.read('latest', () => {
-				for (const [nodeKey, mutation] of mutatedNodes) {
-					if (mutation === 'created') {
-						const newHeading = $getNodeByKey(nodeKey);
-						if ($isHeadingNode(newHeading)) {
-							const prevHeading = $getPreviousHeading(newHeading);
-							currentTableOfContents = $insertHeadingIntoTableOfContents(
-								prevHeading,
-								newHeading,
-								currentTableOfContents,
-							);
-						}
-					} else if (mutation === 'destroyed') {
-						currentTableOfContents = $deleteHeadingFromTableOfContents(
-							nodeKey,
-							currentTableOfContents,
-						);
-					} else if (mutation === 'updated') {
-						const newHeading = $getNodeByKey(nodeKey);
-						if ($isHeadingNode(newHeading)) {
-							const prevHeading = $getPreviousHeading(newHeading);
-							currentTableOfContents = $updateHeadingPosition(
-								prevHeading,
-								newHeading,
-								currentTableOfContents,
-							);
-						}
-					}
-				}
-				setTableOfContents(currentTableOfContents);
-			});
-		}, { skipInitialization: true });
-
-		const removeTextNodeMutationListener = editor.registerMutationListener(TextNode, (
-			mutatedNodes,
-		) => {
-			editor.read('latest', () => {
-				for (const [nodeKey, mutation] of mutatedNodes) {
-					if (mutation === 'updated') {
-						const currNode = $getNodeByKey(nodeKey);
-						if (currNode !== null) {
-							const parentNode = currNode.getParentOrThrow();
-							if ($isHeadingNode(parentNode)) {
-								currentTableOfContents = $updateHeadingInTableOfContents(
-									parentNode,
+		const removeRootUpdateListener = editor.registerUpdateListener(
+			({ editorState, dirtyElements }) => {
+				editorState.read(() => {
+					const updateChildHeadings = (node: ElementNode) => {
+						for (const child of node.getChildren()) {
+							if ($isHeadingNode(child)) {
+								const prevHeading = $getPreviousHeading(child);
+								currentTableOfContents = $updateHeadingPosition(
+									prevHeading,
+									child,
 									currentTableOfContents,
 								);
 								setTableOfContents(currentTableOfContents);
+							} else if ($isElementNode(child)) {
+								updateChildHeadings(child);
+							}
+						}
+					};
+
+					$getRoot()
+						.getChildren()
+						.forEach((node) => {
+							if ($isElementNode(node) && dirtyElements.get(node.__key)) {
+								updateChildHeadings(node);
+							}
+						});
+				});
+			},
+		);
+
+		const removeHeaderMutationListener = editor.registerMutationListener(
+			HeadingNode,
+			(mutatedNodes) => {
+				editor.read('latest', () => {
+					for (const [nodeKey, mutation] of mutatedNodes) {
+						if (mutation === 'created') {
+							const newHeading = $getNodeByKey(nodeKey);
+							if ($isHeadingNode(newHeading)) {
+								const prevHeading = $getPreviousHeading(newHeading);
+								currentTableOfContents = $insertHeadingIntoTableOfContents(
+									prevHeading,
+									newHeading,
+									currentTableOfContents,
+								);
+							}
+						} else if (mutation === 'destroyed') {
+							currentTableOfContents = $deleteHeadingFromTableOfContents(
+								nodeKey,
+								currentTableOfContents,
+							);
+						} else if (mutation === 'updated') {
+							const newHeading = $getNodeByKey(nodeKey);
+							if ($isHeadingNode(newHeading)) {
+								const prevHeading = $getPreviousHeading(newHeading);
+								currentTableOfContents = $updateHeadingPosition(
+									prevHeading,
+									newHeading,
+									currentTableOfContents,
+								);
 							}
 						}
 					}
-				}
-			});
-		}, { skipInitialization: true });
+					setTableOfContents(currentTableOfContents);
+				});
+			},
+			{ skipInitialization: true },
+		);
+
+		const removeTextNodeMutationListener = editor.registerMutationListener(
+			TextNode,
+			(mutatedNodes) => {
+				editor.read('latest', () => {
+					for (const [nodeKey, mutation] of mutatedNodes) {
+						if (mutation === 'updated') {
+							const currNode = $getNodeByKey(nodeKey);
+							if (currNode !== null) {
+								const parentNode = currNode.getParentOrThrow();
+								if ($isHeadingNode(parentNode)) {
+									currentTableOfContents = $updateHeadingInTableOfContents(
+										parentNode,
+										currentTableOfContents,
+									);
+									setTableOfContents(currentTableOfContents);
+								}
+							}
+						}
+					}
+				});
+			},
+			{ skipInitialization: true },
+		);
 
 		return () => {
 			removeHeaderMutationListener();

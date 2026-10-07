@@ -38,39 +38,47 @@ export function BundlerTabs({ tabs, panelContent, children }: BundlerTabsProps) 
 	}, [tabs, childrenArray]);
 
 	const tabDefinitions = useMemo<Array<TabDefinition>>(
-		() => tabs.filter((tab) => isBundler(tab.slug)).map(
-			(tab) => ({
-				slug: tab.slug,
-				name: BUNDLER_LABELS[tab.slug as Bundler] ?? tab.name,
-				headers: [],
-			}),
-		),
+		() =>
+			tabs
+				.filter((tab) => isBundler(tab.slug))
+				.map((tab) => ({
+					slug: tab.slug,
+					name: BUNDLER_LABELS[tab.slug as Bundler] ?? tab.name,
+					headers: [],
+				})),
 		[tabs],
 	);
 
-	const orderedChildren = useMemo(() => tabDefinitions.map((tab) => panelsBySlug.get(tab.slug)), [
-		tabDefinitions,
-		panelsBySlug,
-	]);
+	const orderedChildren = useMemo(
+		() => tabDefinitions.map((tab) => panelsBySlug.get(tab.slug)),
+		[tabDefinitions, panelsBySlug],
+	);
 
 	const resolvedActiveSlug = tabDefinitions.some((tab) => tab.slug === activeBundler)
 		? activeBundler
-		: tabDefinitions[0]?.slug ?? activeBundler;
+		: (tabDefinitions[0]?.slug ?? activeBundler);
 
-	const handleTabChange = useCallback((slug: string) => {
-		if (isBundler(slug)) {
-			setBundler(slug);
-		}
-	}, [setBundler]);
+	const handleTabChange = useCallback(
+		(slug: string) => {
+			if (isBundler(slug)) {
+				setBundler(slug);
+			}
+		},
+		[setBundler],
+	);
 
 	if (tabDefinitions.length === 0) return null;
 
-	return <Tabs
-		tabs={tabDefinitions}
-		activeSlug={resolvedActiveSlug}
-		onTabChange={handleTabChange}
-		panelContent={panelContent}
-	>{orderedChildren.map(
-		(child, index) => <Fragment key={tabDefinitions[index]?.slug ?? index}>{child}</Fragment>,
-	)}</Tabs>;
+	return (
+		<Tabs
+			tabs={tabDefinitions}
+			activeSlug={resolvedActiveSlug}
+			onTabChange={handleTabChange}
+			panelContent={panelContent}
+		>
+			{orderedChildren.map((child, index) => (
+				<Fragment key={tabDefinitions[index]?.slug ?? index}>{child}</Fragment>
+			))}
+		</Tabs>
+	);
 }

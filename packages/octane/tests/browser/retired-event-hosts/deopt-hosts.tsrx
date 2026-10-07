@@ -7,10 +7,11 @@ type Toggle = Observe & { readonly show: boolean };
 // renders it, so removing it disposes nothing.
 export function HoleHost({ observe, show }: Toggle) @{
 	<section onBlur={() => observe('parent')}>
-		{show &&
+		{show && (
 			<div onBlur={() => observe('dropped')}>
 				<input />
-			</div>}
+			</div>
+		)}
 	</section>
 }
 
@@ -22,19 +23,23 @@ export function HoleInput({ observe, show }: Toggle) @{
 
 // The removed span is a de-opt child of a de-opt element that stays.
 export function NestedHole({ observe, show }: Toggle) @{
-	<section onBlur={() => observe('parent')}>{createElement(
-		'div',
-		{ onBlur: () => observe('wrapper') },
-		show && createElement('span', { onBlur: () => observe('dropped') }, createElement('input')),
-	)}</section>
+	<section onBlur={() => observe('parent')}>
+		{createElement(
+			'div',
+			{ onBlur: () => observe('wrapper') },
+			show && createElement('span', { onBlur: () => observe('dropped') }, createElement('input')),
+		)}
+	</section>
 }
 
 function pick(observe: (entry: string) => void, show: boolean) {
-	return show
-		? <div onBlur={() => observe('dropped')}>
-				<input />
-			</div>
-		: <p>{'gone'}</p>;
+	return show ? (
+		<div onBlur={() => observe('dropped')}>
+			<input />
+		</div>
+	) : (
+		<p>{'gone'}</p>
+	);
 }
 
 // A different tag replaces the hole's host node.
@@ -47,14 +52,16 @@ function Label() @{
 }
 
 function pickWithChild(observe: (entry: string) => void, show: boolean) {
-	return show
-		? <div onBlur={() => observe('dropped')}>
-				<Label />
-				<input />
-			</div>
-		: <p>
-				<Label />
-			</p>;
+	return show ? (
+		<div onBlur={() => observe('dropped')}>
+			<Label />
+			<input />
+		</div>
+	) : (
+		<p>
+			<Label />
+		</p>
+	);
 }
 
 // Component children give the host a Block that survives its tag change.
@@ -65,20 +72,21 @@ export function SwappedBlockHost({ observe, show }: Toggle) @{
 // The same host in a value hole gets its own Block, which the removal disposes.
 export function BlockHostHole({ observe, show }: Toggle) @{
 	<section onBlur={() => observe('parent')}>
-		{show &&
+		{show && (
 			<div onBlur={() => observe('dropped')}>
 				<Label />
 				<input />
-			</div>}
+			</div>
+		)}
 	</section>
 }
 
 function list(observe: (entry: string) => void, rows: readonly number[]) {
-	return rows.map(
-		(row) => <div key={row} onBlur={() => observe('dropped')}>
+	return rows.map((row) => (
+		<div key={row} onBlur={() => observe('dropped')}>
 			<input data-row={row} />
-		</div>,
-	);
+		</div>
+	));
 }
 
 export function MappedRows({ observe, rows }: Observe & { readonly rows: readonly number[] }) @{
@@ -87,27 +95,37 @@ export function MappedRows({ observe, rows }: Observe & { readonly rows: readonl
 
 export function HoleCaptured({ observe, show, remove }: Toggle & { readonly remove: () => void }) @{
 	<section onClick={() => observe('section')}>
-		{show &&
+		{show && (
 			<div onClick={() => observe('div')}>
 				<button onClick={remove}>{'remove'}</button>
-			</div>}
+			</div>
+		)}
 	</section>
 }
 
 // The capture phase removes the div before the bubble phase snapshots it.
-export function HoleCapturePhase({ observe, show, remove }: Toggle & {
+export function HoleCapturePhase({
+	observe,
+	show,
+	remove,
+}: Toggle & {
 	readonly remove: () => void;
 }) @{
 	<section onClickCapture={remove} onClick={() => observe('section')}>
-		{show &&
+		{show && (
 			<div onClick={() => observe('div')}>
 				<button>{'remove'}</button>
-			</div>}
+			</div>
+		)}
 	</section>
 }
 
 // The owning component's state update removes the host.
-export function StatefulHole({ observe, expose, Fixture }: Observe & {
+export function StatefulHole({
+	observe,
+	expose,
+	Fixture,
+}: Observe & {
 	readonly expose: (hide: () => void) => void;
 	readonly Fixture: (props: Toggle) => void;
 }) @{

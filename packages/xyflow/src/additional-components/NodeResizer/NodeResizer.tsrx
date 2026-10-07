@@ -54,9 +54,9 @@ export function NodeResizer({
 		return null;
 	}
 
-	return <>
-		{XY_RESIZER_LINE_POSITIONS.map(
-			(position) =>
+	return (
+		<>
+			{XY_RESIZER_LINE_POSITIONS.map((position) => (
 				<NodeResizeControl
 					key={position}
 					className={lineClassName}
@@ -75,10 +75,9 @@ export function NodeResizer({
 					shouldResize={shouldResize}
 					onResize={onResize}
 					onResizeEnd={onResizeEnd}
-				/>,
-		)}
-		{XY_RESIZER_HANDLE_POSITIONS.map(
-			(position) =>
+				/>
+			))}
+			{XY_RESIZER_HANDLE_POSITIONS.map((position) => (
 				<NodeResizeControl
 					key={position}
 					className={handleClassName}
@@ -96,7 +95,8 @@ export function NodeResizer({
 					shouldResize={shouldResize}
 					onResize={onResize}
 					onResizeEnd={onResizeEnd}
-				/>,
-		)}
-	</>;
+				/>
+			))}
+		</>
+	);
 }

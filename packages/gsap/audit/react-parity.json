@@ -33,7 +33,7 @@
       "arch": "any",
       "packageManager": "pnpm@12.9.1",
       "lockfile": "pnpm-lock.yaml",
-      "lockfileSha256": "e92f4520cd88a2593a0ecd555e0532b2e4e8bb1396c9558a09f0cbf3fbaa5917"
+      "lockfileSha256": "caea67fe61ab57f3e8cbd8a0e55f0e8b3014b3dd6815c6fe6e158095f291daeb"
     }
   },
   "lanes": [
@@ -163,7 +163,7 @@
         {
           "path": "packages/gsap/tests/_fixtures/differential/lifecycle-diff.tsrx",
           "role": "support",
-          "sha256": "83101709f18a0da24d7ac600ccdf05161389176c4181e75d8bd3333ceb832824"
+          "sha256": "48209f3b25e363a4186501ff7f27ed8bbb82b316bda4c9e2b4fb076e6dd679b5"
         },
         {
           "path": "packages/octane/tests/differential/_rig.ts",

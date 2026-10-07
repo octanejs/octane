@@ -62,85 +62,85 @@ interface SunburstNode extends SunburstData {
 export interface SunburstChartProps extends EventThrottlingProps {
 	className?: string;
 	/**
- * The source data. Each element should be an object.
- * The properties of each object represent the values of different data dimensions.
- *
- * Use the `dataKey` prop to specify which properties to use.
- *
- * @example data={[{ name: 'a', value: 12, fill: '#8884d8' }, { name: 'b', value: 5, fill: '#83a6ed' }]}
- */
+	 * The source data. Each element should be an object.
+	 * The properties of each object represent the values of different data dimensions.
+	 *
+	 * Use the `dataKey` prop to specify which properties to use.
+	 *
+	 * @example data={[{ name: 'a', value: 12, fill: '#8884d8' }, { name: 'b', value: 5, fill: '#83a6ed' }]}
+	 */
 	data: SunburstData;
 	/**
- * The width of chart container.
- * Can be a number or a percent string like "100%".
- *
- * @see {@link https://recharts.github.io/en-US/guide/sizes/ Chart sizing guide}
- */
+	 * The width of chart container.
+	 * Can be a number or a percent string like "100%".
+	 *
+	 * @see {@link https://recharts.github.io/en-US/guide/sizes/ Chart sizing guide}
+	 */
 	width?: number | Percent;
 	/**
- * The height of chart container.
- * Can be a number or a percent string like "100%".
- *
- * @see {@link https://recharts.github.io/en-US/guide/sizes/ Chart sizing guide}
- */
+	 * The height of chart container.
+	 * Can be a number or a percent string like "100%".
+	 *
+	 * @see {@link https://recharts.github.io/en-US/guide/sizes/ Chart sizing guide}
+	 */
 	height?: number | Percent;
 	/**
- * If true, then it will listen to container size changes and adapt the SVG chart accordingly.
- * If false, then it renders the chart at the specified width and height and will stay that way
- * even if the container size changes.
- *
- * This is similar to ResponsiveContainer but without the need for an extra wrapper component.
- * The `responsive` prop also uses standard CSS sizing rules, instead of custom resolution logic (like ResponsiveContainer does).
- * @default false
- */
+	 * If true, then it will listen to container size changes and adapt the SVG chart accordingly.
+	 * If false, then it renders the chart at the specified width and height and will stay that way
+	 * even if the container size changes.
+	 *
+	 * This is similar to ResponsiveContainer but without the need for an extra wrapper component.
+	 * The `responsive` prop also uses standard CSS sizing rules, instead of custom resolution logic (like ResponsiveContainer does).
+	 * @default false
+	 */
 	responsive?: boolean;
 	/**
- * Distance between sectors.
- *
- * @defaultValue 2
- */
+	 * Distance between sectors.
+	 *
+	 * @defaultValue 2
+	 */
 	padding?: number;
 	/**
- * Decides how to extract value from the data.
- *
- * @defaultValue value
- */
+	 * Decides how to extract value from the data.
+	 *
+	 * @defaultValue value
+	 */
 	dataKey?: string;
 	/**
- * Name represents each sector in the tooltip.
- * This allows you to extract the name from the data:
- *
- * - `string`: the name of the field in the data object;
- * - `number`: the index of the field in the data;
- * - `function`: a function that receives the data object and returns the name.
- *
- * @defaultValue name
- */
+	 * Name represents each sector in the tooltip.
+	 * This allows you to extract the name from the data:
+	 *
+	 * - `string`: the name of the field in the data object;
+	 * - `number`: the index of the field in the data;
+	 * - `function`: a function that receives the data object and returns the name.
+	 *
+	 * @defaultValue name
+	 */
 	nameKey?: DataKey<any>;
 	/**
- * Padding between each hierarchical level.
- */
+	 * Padding between each hierarchical level.
+	 */
 	ringPadding?: number;
 	/**
- * The radius of the inner circle at the center of the chart.
- *
- * @defaultValue 50
- */
+	 * The radius of the inner circle at the center of the chart.
+	 *
+	 * @defaultValue 50
+	 */
 	innerRadius?: number;
 	/**
- * Outermost edge of the chart.
- * Defaults to the max possible radius for a circle inscribed in the chart container
- */
+	 * Outermost edge of the chart.
+	 * Defaults to the max possible radius for a circle inscribed in the chart container
+	 */
 	outerRadius?: number;
 	/**
- * The x-coordinate of center in pixels.
- * If undefined, it will be set to half of the chart width.
- */
+	 * The x-coordinate of center in pixels.
+	 * If undefined, it will be set to half of the chart width.
+	 */
 	cx?: number;
 	/**
- * The y-coordinate of center in pixels.
- * If undefined, it will be set to half of the chart height.
- */
+	 * The y-coordinate of center in pixels.
+	 * If undefined, it will be set to half of the chart height.
+	 */
 	cy?: number;
 	/** Angle in degrees from which the chart should start. */
 	startAngle?: number;
@@ -150,8 +150,8 @@ export interface SunburstChartProps extends EventThrottlingProps {
 	fill?: string;
 	stroke?: string;
 	/**
- * An object with svg text options to control the appearance of the chart labels.
- */
+	 * An object with svg text options to control the appearance of the chart labels.
+	 */
 	textOptions?: TextProps;
 	onMouseEnter?: (node: SunburstData, e: NativeMouseEvent) => void;
 	onMouseLeave?: (node: SunburstData, e: NativeMouseEvent) => void;
@@ -185,41 +185,43 @@ function getMaxDepthOf(node: SunburstData): number {
 	return 1 + Math.max(...childDepths);
 }
 
-const SetSunburstTooltipEntrySettings = React.memo(({
-	dataKey,
-	nameKey,
-	data,
-	stroke,
-	fill,
-	positions,
-	id,
-}: Pick<
-	WithIdRequired<SunburstChartProps>,
-	'dataKey' | 'data' | 'stroke' | 'fill' | 'nameKey' | 'id'
-> & {
-	positions: SunburstPositionMap;
-}) => {
-	const tooltipEntrySettings: TooltipPayloadConfiguration = {
-		dataDefinedOnItem: data.children,
-		getPosition: (index) => positions.get(index),
-		// Sunburst does not support many of the properties as other charts do so there's plenty of defaults here
-		settings: {
-			stroke,
-			strokeWidth: undefined,
-			fill,
-			nameKey,
-			dataKey,
-			// if there is a nameKey use it, otherwise make the name of the tooltip the dataKey itself
-			name: nameKey ? undefined : dataKey,
-			hide: false,
-			type: undefined,
-			color: fill,
-			unit: '',
-			graphicalItemId: id,
-		},
-	};
-	return <SetTooltipEntrySettings tooltipEntrySettings={tooltipEntrySettings} />;
-});
+const SetSunburstTooltipEntrySettings = React.memo(
+	({
+		dataKey,
+		nameKey,
+		data,
+		stroke,
+		fill,
+		positions,
+		id,
+	}: Pick<
+		WithIdRequired<SunburstChartProps>,
+		'dataKey' | 'data' | 'stroke' | 'fill' | 'nameKey' | 'id'
+	> & {
+		positions: SunburstPositionMap;
+	}) => {
+		const tooltipEntrySettings: TooltipPayloadConfiguration = {
+			dataDefinedOnItem: data.children,
+			getPosition: (index) => positions.get(index),
+			// Sunburst does not support many of the properties as other charts do so there's plenty of defaults here
+			settings: {
+				stroke,
+				strokeWidth: undefined,
+				fill,
+				nameKey,
+				dataKey,
+				// if there is a nameKey use it, otherwise make the name of the tooltip the dataKey itself
+				name: nameKey ? undefined : dataKey,
+				hide: false,
+				type: undefined,
+				color: fill,
+				unit: '',
+				graphicalItemId: id,
+			},
+		};
+		return <SetTooltipEntrySettings tooltipEntrySettings={tooltipEntrySettings} />;
+	},
+);
 
 // Why is margin not a sunburst prop? No clue. Probably it should be
 const defaultSunburstMargin: Margin = {
@@ -273,8 +275,9 @@ export const defaultSunburstChartProps = {
 	...initialEventSettingsState,
 } as const satisfies Partial<SunburstChartProps>;
 
-type InternalSunburstChartProps =
-	WithIdRequired<RequiresDefaultProps<SunburstChartProps, typeof defaultSunburstChartProps>>;
+type InternalSunburstChartProps = WithIdRequired<
+	RequiresDefaultProps<SunburstChartProps, typeof defaultSunburstChartProps>
+>;
 
 const SunburstChartImpl = ({
 	className,
@@ -383,14 +386,12 @@ const SunburstChartImpl = ({
 				<g key={`sunburst-sector-${d.name}-${i}`}>
 					<Sector
 						onClick={() => handleClick(nodeWithIndex)}
-						onMouseEnter={(e: NativeMouseEvent<SVGPathElement>) => handleMouseEnter(
-							nodeWithIndex,
-							e,
-						)}
-						onMouseLeave={(e: NativeMouseEvent<SVGPathElement>) => handleMouseLeave(
-							nodeWithIndex,
-							e,
-						)}
+						onMouseEnter={(e: NativeMouseEvent<SVGPathElement>) =>
+							handleMouseEnter(nodeWithIndex, e)
+						}
+						onMouseLeave={(e: NativeMouseEvent<SVGPathElement>) =>
+							handleMouseLeave(nodeWithIndex, e)
+						}
 						fill={fillColor}
 						stroke={stroke}
 						strokeWidth={padding}
@@ -407,7 +408,9 @@ const SunburstChartImpl = ({
 						textAnchor="middle"
 						x={textX + cx}
 						y={cy - textY}
-					>{d[dataKey]}</Text>
+					>
+						{d[dataKey]}
+					</Text>
 				</g>,
 			);
 
@@ -431,19 +434,21 @@ const SunburstChartImpl = ({
 	drawArcs(data.children, { radius: thickness, innerR: innerRadius, initialAngle: startAngle });
 
 	const layerClass = clsx('recharts-sunburst', className);
-	return <Surface width={width} height={height}>
-		<Layer className={layerClass}>{sectors}</Layer>
-		<SetSunburstTooltipEntrySettings
-			dataKey={dataKey}
-			nameKey={nameKey}
-			data={data}
-			stroke={stroke}
-			fill={fill}
-			positions={positions}
-			id={id}
-		/>
-		{children}
-	</Surface>;
+	return (
+		<Surface width={width} height={height}>
+			<Layer className={layerClass}>{sectors}</Layer>
+			<SetSunburstTooltipEntrySettings
+				dataKey={dataKey}
+				nameKey={nameKey}
+				data={data}
+				stroke={stroke}
+				fill={fill}
+				positions={positions}
+				id={id}
+			/>
+			{children}
+		</Surface>
+	);
 };
 
 /**
@@ -468,41 +473,43 @@ export const SunburstChart = (outsideProps: SunburstChartProps) => {
 		throttledEvents,
 	} = props;
 	const [tooltipPortal, setTooltipPortal] = useState<HTMLElement | null>(null);
-	return <RechartsStoreProvider
-		preloadedState={preloadedState}
-		reduxStoreName={className ?? 'SunburstChart'}
-	>
-		<ReportChartSize width={width} height={height} />
-		<ReportChartMargin margin={defaultSunburstMargin} />
-		<ReportEventSettings throttleDelay={throttleDelay} throttledEvents={throttledEvents} />
-		<TooltipPortalContext value={tooltipPortal}>
-			<RechartsWrapper
-				className={className}
-				width={width}
-				height={height}
-				responsive={responsive}
-				style={style}
-				ref={(node: HTMLDivElement) => {
-					if (tooltipPortal == null && node != null) {
-						setTooltipPortal(node);
-					}
-				}}
-				onMouseEnter={undefined}
-				onMouseLeave={undefined}
-				onClick={undefined}
-				onMouseMove={undefined}
-				onMouseDown={undefined}
-				onMouseUp={undefined}
-				onContextMenu={undefined}
-				onDoubleClick={undefined}
-				onTouchStart={undefined}
-				onTouchMove={undefined}
-				onTouchEnd={undefined}
-			>
-				<RegisterGraphicalItemId id={externalId} type="sunburst">
-					{(id) => <SunburstChartImpl {...props} id={id} />}
-				</RegisterGraphicalItemId>
-			</RechartsWrapper>
-		</TooltipPortalContext>
-	</RechartsStoreProvider>;
+	return (
+		<RechartsStoreProvider
+			preloadedState={preloadedState}
+			reduxStoreName={className ?? 'SunburstChart'}
+		>
+			<ReportChartSize width={width} height={height} />
+			<ReportChartMargin margin={defaultSunburstMargin} />
+			<ReportEventSettings throttleDelay={throttleDelay} throttledEvents={throttledEvents} />
+			<TooltipPortalContext value={tooltipPortal}>
+				<RechartsWrapper
+					className={className}
+					width={width}
+					height={height}
+					responsive={responsive}
+					style={style}
+					ref={(node: HTMLDivElement) => {
+						if (tooltipPortal == null && node != null) {
+							setTooltipPortal(node);
+						}
+					}}
+					onMouseEnter={undefined}
+					onMouseLeave={undefined}
+					onClick={undefined}
+					onMouseMove={undefined}
+					onMouseDown={undefined}
+					onMouseUp={undefined}
+					onContextMenu={undefined}
+					onDoubleClick={undefined}
+					onTouchStart={undefined}
+					onTouchMove={undefined}
+					onTouchEnd={undefined}
+				>
+					<RegisterGraphicalItemId id={externalId} type="sunburst">
+						{(id) => <SunburstChartImpl {...props} id={id} />}
+					</RegisterGraphicalItemId>
+				</RechartsWrapper>
+			</TooltipPortalContext>
+		</RechartsStoreProvider>
+	);
 };

@@ -19,7 +19,9 @@ function TextField(props: { label: string; value: string; onValue: (value: strin
 function SaveButton(props: { onSave: () => void }) @{
 	const ref = useRef<HTMLButtonElement | null>(null);
 	const { buttonProps, isPressed } = useButton({ onPress: props.onSave }, ref);
-	<button {...buttonProps} ref={ref} data-pressed={isPressed || undefined}>{'Save profile'}</button>
+	<button {...buttonProps} ref={ref} data-pressed={isPressed || undefined}>
+		{'Save profile'}
+	</button>
 }
 
 export function AccountPanel() @{

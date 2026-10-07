@@ -11,7 +11,9 @@ export function App({ text }: { text: string }) @{
 			ref={(el: HTMLSpanElement | null) => {
 				if (el) setWidth(el.offsetWidth);
 			}}
-		>{text as string}</span>
+		>
+			{text as string}
+		</span>
 		<figcaption>{`${width}px wide` as string}</figcaption>
 	</figure>
 }

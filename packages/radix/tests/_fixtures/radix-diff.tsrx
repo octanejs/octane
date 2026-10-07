@@ -60,7 +60,9 @@ export function Separators() @{
 
 export function LabelBasic() @{
 	<div>
-		<LabelRoot id="lbl" class="field-label">Email</LabelRoot>
+		<LabelRoot id="lbl" class="field-label">
+			Email
+		</LabelRoot>
 	</div>
 }
 
@@ -137,8 +139,12 @@ export function ToggleApp() @{
 export function ToggleGroupSingle() @{
 	<div>
 		<ToggleGroupRoot type="single" defaultValue="a">
-			<ToggleGroupItem id="ga" value="a">A</ToggleGroupItem>
-			<ToggleGroupItem id="gb" value="b">B</ToggleGroupItem>
+			<ToggleGroupItem id="ga" value="a">
+				A
+			</ToggleGroupItem>
+			<ToggleGroupItem id="gb" value="b">
+				B
+			</ToggleGroupItem>
 		</ToggleGroupRoot>
 	</div>
 }
@@ -146,8 +152,12 @@ export function ToggleGroupSingle() @{
 export function ToggleGroupMultiple() @{
 	<div>
 		<ToggleGroupRoot type="multiple" defaultValue={['a']}>
-			<ToggleGroupItem id="ga" value="a">A</ToggleGroupItem>
-			<ToggleGroupItem id="gb" value="b">B</ToggleGroupItem>
+			<ToggleGroupItem id="ga" value="a">
+				A
+			</ToggleGroupItem>
+			<ToggleGroupItem id="gb" value="b">
+				B
+			</ToggleGroupItem>
 		</ToggleGroupRoot>
 	</div>
 }
@@ -155,8 +165,12 @@ export function ToggleGroupMultiple() @{
 export function TabsApp() @{
 	<TabsRoot defaultValue="one">
 		<TabsList>
-			<TabsTrigger id="t1" value="one">One</TabsTrigger>
-			<TabsTrigger id="t2" value="two">Two</TabsTrigger>
+			<TabsTrigger id="t1" value="one">
+				One
+			</TabsTrigger>
+			<TabsTrigger id="t2" value="two">
+				Two
+			</TabsTrigger>
 		</TabsList>
 		<TabsContent value="one">panel-one</TabsContent>
 		<TabsContent value="two">panel-two</TabsContent>
@@ -201,10 +215,16 @@ export function ToolbarApp() @{
 		<ToolbarRoot id="tb">
 			<ToolbarButton id="b1">One</ToolbarButton>
 			<ToolbarSeparator id="sep" />
-			<ToolbarLink id="lnk" href="#">Link</ToolbarLink>
+			<ToolbarLink id="lnk" href="#">
+				Link
+			</ToolbarLink>
 			<ToolbarToggleGroup type="multiple" defaultValue={['b']}>
-				<ToolbarToggleItem id="ti-a" value="a">A</ToolbarToggleItem>
-				<ToolbarToggleItem id="ti-b" value="b">B</ToolbarToggleItem>
+				<ToolbarToggleItem id="ti-a" value="a">
+					A
+				</ToolbarToggleItem>
+				<ToolbarToggleItem id="ti-b" value="b">
+					B
+				</ToolbarToggleItem>
 			</ToolbarToggleGroup>
 		</ToolbarRoot>
 	</div>
@@ -287,7 +307,9 @@ export function NavMenuClosed() @{
 					<NavigationMenuTrigger id="nm-t1">One</NavigationMenuTrigger>
 				</NavigationMenuItem>
 				<NavigationMenuItem value="two">
-					<NavigationMenuLink id="nm-l" href="#">Two</NavigationMenuLink>
+					<NavigationMenuLink id="nm-l" href="#">
+						Two
+					</NavigationMenuLink>
 				</NavigationMenuItem>
 			</NavigationMenuList>
 		</NavigationMenuRoot>

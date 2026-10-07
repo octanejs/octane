@@ -21,7 +21,7 @@ import {
 // the error again (not fall through and render undefined data). ---
 function AlwaysFailReader(props: { queryFn: () => Promise<string> }) @{
 	const q = useSuspenseQuery({ queryKey: ['fail'], queryFn: props.queryFn, retry: false });
-	<span id="sq-data">{'data:' + q.data as string}</span>
+	<span id="sq-data">{('data:' + q.data) as string}</span>
 }
 
 function SuspenseRetryBoundary(props: { queryFn: () => Promise<string> }) @{
@@ -31,10 +31,14 @@ function SuspenseRetryBoundary(props: { queryFn: () => Promise<string> }) @{
 		reset();
 	};
 	<ErrorBoundary
-		fallback={(e, reset) => <div id="sq-error">
-			<span id="sq-msg">{(e as Error).message as string}</span>
-			<button id="sq-retry" onClick={onRetry(reset)}>retry</button>
-		</div>}
+		fallback={(e, reset) => (
+			<div id="sq-error">
+				<span id="sq-msg">{(e as Error).message as string}</span>
+				<button id="sq-retry" onClick={onRetry(reset)}>
+					retry
+				</button>
+			</div>
+		)}
 	>
 		<Suspense fallback={<i id="sq-loading">loading</i>}>
 			<AlwaysFailReader queryFn={props.queryFn} />
@@ -124,7 +128,9 @@ function InfiniteReader(props: { pageFn: (page: number) => Promise<string> }) @{
 	<div>
 		<span id="pages">{(q.data ? q.data.pages.join(',') : 'none') as string}</span>
 		<span id="has-next">{String(q.hasNextPage)}</span>
-		<button id="next" onClick={() => q.fetchNextPage()}>next</button>
+		<button id="next" onClick={() => q.fetchNextPage()}>
+			next
+		</button>
 	</div>
 }
 
@@ -188,8 +194,10 @@ function MutationStateReader(props: { mutationFn: (v: string) => Promise<string>
 		select: (m) => m.state.variables,
 	});
 	<div>
-		<button id="mutate" onClick={() => mutation.mutate('v-' + ++mutationCounter.n)}>go</button>
-		<span id="vars">{variables.join(',') || 'none' as string}</span>
+		<button id="mutate" onClick={() => mutation.mutate('v-' + ++mutationCounter.n)}>
+			go
+		</button>
+		<span id="vars">{variables.join(',') || ('none' as string)}</span>
 	</div>
 }
 

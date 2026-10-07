@@ -25,7 +25,11 @@ function hole(label: string): OctaneNode {
 }
 
 function list(items: string[]): OctaneNode {
-	return createElement('ul', null, items.map((item) => createElement('li', { key: item }, item)));
+	return createElement(
+		'ul',
+		null,
+		items.map((item) => createElement('li', { key: item }, item)),
+	);
 }
 
 // A hole whose server text becomes a component that returns a fragment.
@@ -108,13 +112,12 @@ export function DormantSuppressed(props: { v: string }) @{
 	<div>
 		<Hydrate split={false} when={condition(false)}>
 			<section>
-				<em
-					suppressHydrationWarning
-					title={props.v}
-					class={props.v}
-					style={{ color: props.v }}
-				>{props.v as string}</em>
-				<i title={props.v} class={props.v} style={{ color: props.v }}>{props.v as string}</i>
+				<em suppressHydrationWarning title={props.v} class={props.v} style={{ color: props.v }}>
+					{props.v as string}
+				</em>
+				<i title={props.v} class={props.v} style={{ color: props.v }}>
+					{props.v as string}
+				</i>
 			</section>
 		</Hydrate>
 	</div>
@@ -123,12 +126,9 @@ export function DormantSuppressed(props: { v: string }) @{
 export function PlainSuppressed(props: { v: string }) @{
 	<div>
 		<section>
-			<em
-				suppressHydrationWarning
-				title={props.v}
-				class={props.v}
-				style={{ color: props.v }}
-			>{props.v as string}</em>
+			<em suppressHydrationWarning title={props.v} class={props.v} style={{ color: props.v }}>
+				{props.v as string}
+			</em>
 		</section>
 	</div>
 }

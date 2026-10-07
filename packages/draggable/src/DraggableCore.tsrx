@@ -23,7 +23,13 @@ import {
 import { cloneCoreChild } from './internal.ts';
 import type { DraggableEventHandler, MouseTouchEvent } from './utils/types.ts';
 
-export type { ControlPosition, DraggableData, DraggableEvent, DraggableEventHandler, PositionOffsetControlPosition } from './utils/types.ts';
+export type {
+	ControlPosition,
+	DraggableData,
+	DraggableEvent,
+	DraggableEventHandler,
+	PositionOffsetControlPosition,
+} from './utils/types.ts';
 export type DraggableCoreProps = {
 	allowAnyClick?: boolean;
 	allowMobileScroll?: boolean;
@@ -42,8 +48,8 @@ export type DraggableCoreProps = {
 	nodeRef?: { current: HTMLElement | null } | null;
 	nonce?: string;
 };
-type ResolvedProps =
-	DraggableCoreProps & Required<
+type ResolvedProps = DraggableCoreProps &
+	Required<
 		Pick<
 			DraggableCoreProps,
 			| 'allowAnyClick'
@@ -108,7 +114,8 @@ function DraggableCoreImpl(inputProps: Partial<DraggableCoreProps>): ElementDesc
 			if (position == null) return;
 			let { x, y } = position;
 			if (Array.isArray(state.props.grid)) {
-				let dx = x - state.lastX, dy = y - state.lastY;
+				let dx = x - state.lastX,
+					dy = y - state.lastY;
 				[dx, dy] = snapToGrid(state.props.grid, dx, dy);
 				if (!dx && !dy) return;
 				x = state.lastX + dx;
@@ -150,16 +157,16 @@ function DraggableCoreImpl(inputProps: Partial<DraggableCoreProps>): ElementDesc
 			if (position == null) return;
 			let { x, y } = position;
 			if (Array.isArray(state.props.grid)) {
-				let dx = x - state.lastX || 0, dy = y - state.lastY || 0;
+				let dx = x - state.lastX || 0,
+					dy = y - state.lastY || 0;
 				[dx, dy] = snapToGrid(state.props.grid, dx, dy);
 				x = state.lastX + dx;
 				y = state.lastY + dy;
 			}
 			if (state.props.onStop(e, createCoreData(state, x, y)) === false || !state.mounted) return;
 			const node = state.findDOMNode();
-			if (node && state.props.enableUserSelectHack) scheduleRemoveUserSelectStyles(
-				node.ownerDocument,
-			);
+			if (node && state.props.enableUserSelectHack)
+				scheduleRemoveUserSelectStyles(node.ownerDocument);
 			state.dragging = false;
 			state.lastX = NaN;
 			state.lastY = NaN;
@@ -174,16 +181,20 @@ function DraggableCoreImpl(inputProps: Partial<DraggableCoreProps>): ElementDesc
 	const handleDragStart = (e: MouseTouchEvent) => {
 		state.props.onMouseDown(e);
 		if (
-			!state.props.allowAnyClick && (typeof e.button === 'number' && e.button !== 0 || e.ctrlKey)
-		) return false;
+			!state.props.allowAnyClick &&
+			((typeof e.button === 'number' && e.button !== 0) || e.ctrlKey)
+		)
+			return false;
 		const node = state.findDOMNode();
 		if (!node?.ownerDocument?.body) throw new Error('<DraggableCore> not mounted on DragStart!');
 		const ownerDocument = node.ownerDocument;
 		if (
-			state.props.disabled || !(e.target instanceof ownerDocument.defaultView!.Node) ||
-				state.props.handle && !matchesSelectorAndParentsTo(e.target, state.props.handle, node) ||
-				state.props.cancel && matchesSelectorAndParentsTo(e.target, state.props.cancel, node)
-		) return;
+			state.props.disabled ||
+			!(e.target instanceof ownerDocument.defaultView!.Node) ||
+			(state.props.handle && !matchesSelectorAndParentsTo(e.target, state.props.handle, node)) ||
+			(state.props.cancel && matchesSelectorAndParentsTo(e.target, state.props.cancel, node))
+		)
+			return;
 		if (e.type === 'touchstart' && !state.props.allowMobileScroll) e.preventDefault();
 		state.touchIdentifier = getTouchIdentifier(e);
 		const position = getControlPosition(e, state.touchIdentifier, state);
@@ -237,11 +248,10 @@ function DraggableCoreImpl(inputProps: Partial<DraggableCoreProps>): ElementDesc
 	});
 }
 
-const DraggableCore = DraggableCoreImpl as
-	typeof DraggableCoreImpl & {
-		displayName?: string;
-		defaultProps?: DraggableCoreProps;
-	};
+const DraggableCore = DraggableCoreImpl as typeof DraggableCoreImpl & {
+	displayName?: string;
+	defaultProps?: DraggableCoreProps;
+};
 DraggableCore.displayName = 'DraggableCore';
 DraggableCore.defaultProps = defaults;
 

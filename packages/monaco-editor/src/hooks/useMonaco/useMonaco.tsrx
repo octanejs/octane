@@ -12,13 +12,15 @@ export function useMonaco(): Monaco | null {
 
 		let active = true;
 		const request = loader.init();
-		request.then((loadedMonaco) => {
-			if (active) setMonaco(loadedMonaco);
-		}).catch((error: unknown) => {
-			if (active && !isLoaderCancelation(error)) {
-				console.error('Monaco initialization: error:', error);
-			}
-		});
+		request
+			.then((loadedMonaco) => {
+				if (active) setMonaco(loadedMonaco);
+			})
+			.catch((error: unknown) => {
+				if (active && !isLoaderCancelation(error)) {
+					console.error('Monaco initialization: error:', error);
+				}
+			});
 
 		return () => {
 			active = false;

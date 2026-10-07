@@ -79,38 +79,44 @@ function ParaEmItalic() @{
 // Hookless calls in a component whose identity differs on the client.
 export function InPlaceTail(props: { server?: boolean }) {
 	const Arm = props.server ? RawParaEm : ParaEm;
-	return <section>
-		<Arm />
-	</section>;
+	return (
+		<section>
+			<Arm />
+		</section>
+	);
 }
 
 // Calls with hooks.
 export function StateTail(props: { server?: boolean }) {
 	const Arm = props.server ? RawParaEm : StateParaEm;
-	return <section>
-		<Arm />
-	</section>;
+	return (
+		<section>
+			<Arm />
+		</section>
+	);
 }
 
 // The last call adopts a fragment's roots in place.
 export function FragmentTail(props: { server?: boolean }) {
 	const Arm = props.server ? RawParaEmItalic : ParaEmItalic;
-	return <section>
-		<Arm />
-	</section>;
+	return (
+		<section>
+			<Arm />
+		</section>
+	);
 }
 
 // Hookless components in a renderable hole render in lite frames.
 export function RenderableHole(props: { server?: boolean }) @{
-	<section>
-		{props.server ? <RawParaEm /> : <ParaEm />}
-	</section>
+	<section>{props.server ? <RawParaEm /> : <ParaEm />}</section>
 }
 
 // The first call rebuilds its root over the server's first node instead.
 export function RebuiltFirst(props: { server?: boolean }) {
 	const Arm = props.server ? RawBoldEm : ParaEm;
-	return <section>
-		<Arm />
-	</section>;
+	return (
+		<section>
+			<Arm />
+		</section>
+	);
 }

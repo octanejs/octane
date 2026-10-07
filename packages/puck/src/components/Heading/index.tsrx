@@ -13,9 +13,13 @@ export type HeadingProps = {
 export const Heading = ({ children, rank, size = 'm' }: HeadingProps) => {
 	const Tag: any = rank ? `h${rank}` : 'span';
 
-	return <Tag
-		className={getClassName({
-			[size]: true,
-		})}
-	>{children}</Tag>;
+	return (
+		<Tag
+			className={getClassName({
+				[size]: true,
+			})}
+		>
+			{children}
+		</Tag>
+	);
 };

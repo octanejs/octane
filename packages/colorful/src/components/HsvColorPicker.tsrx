@@ -10,5 +10,6 @@ const colorModel: ColorModel<HsvColor> = {
 	equal: equalColorObjects,
 };
 
-export const HsvColorPicker = (props: Partial<ColorPickerBaseProps<HsvColor>>) =>
-	<ColorPicker {...props} colorModel={colorModel} />;
+export const HsvColorPicker = (props: Partial<ColorPickerBaseProps<HsvColor>>) => (
+	<ColorPicker {...props} colorModel={colorModel} />
+);

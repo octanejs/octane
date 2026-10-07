@@ -28,11 +28,12 @@ export function AutoLinkPlugin(props: Props) {
 	}, null);
 
 	useEffect(
-		() => registerAutoLink(editor, {
-			changeHandlers: onChange ? [onChange] : [],
-			excludeParents: excludeParents ?? [],
-			matchers,
-		}),
+		() =>
+			registerAutoLink(editor, {
+				changeHandlers: onChange ? [onChange] : [],
+				excludeParents: excludeParents ?? [],
+				matchers,
+			}),
 		[editor, matchers, onChange, excludeParents],
 	);
 

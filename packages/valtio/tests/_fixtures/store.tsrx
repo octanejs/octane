@@ -15,7 +15,9 @@ export function Counter(props: { state: CounterState }) @{
 	const snap = useSnapshot(props.state);
 	<div>
 		<span id="count">{snap.count as string}</span>
-		<button id="increment" onClick={() => props.state.count++}>increment</button>
+		<button id="increment" onClick={() => props.state.count++}>
+			increment
+		</button>
 	</div>
 }
 
@@ -24,10 +26,7 @@ export function NestedValue(props: { state: CounterState }) @{
 	<span id="name">{snap.profile.name}</span>
 }
 
-export function TwoStores(props: {
-	left: CounterState;
-	right: CounterState;
-}) @{
+export function TwoStores(props: { left: CounterState; right: CounterState }) @{
 	const left = useSnapshot(props.left);
 	const right = useSnapshot(props.right);
 	<div>
@@ -46,13 +45,17 @@ export function SwitchingValue(props: { state: CounterState }) @{
 	const snap = useSnapshot(props.state);
 	<div>
 		<span id="selected">{(showOther ? snap.other : snap.count) as string}</span>
-		<button id="show-other" onClick={() => setShowOther(true)}>show other</button>
+		<button id="show-other" onClick={() => setShowOther(true)}>
+			show other
+		</button>
 	</div>
 }
 
 export function MutableProxy(props: { state: CounterState }) @{
 	const state = useProxy(props.state);
-	<button id="proxy-count" onClick={() => state.count++}>{state.count as string}</button>
+	<button id="proxy-count" onClick={() => state.count++}>
+		{state.count as string}
+	</button>
 }
 
 // The React fixture compiler evaluates this module independently, so these
@@ -72,11 +75,15 @@ export function DifferentialCounter() @{
 	const snap = useSnapshot(differentialCounterState);
 	<div>
 		<span id="count">{snap.count as string}</span>
-		<button id="increment" onClick={() => differentialCounterState.count++}>increment</button>
+		<button id="increment" onClick={() => differentialCounterState.count++}>
+			increment
+		</button>
 	</div>
 }
 
 export function DifferentialMutableProxy() @{
 	const state = useProxy(differentialMutableProxyState);
-	<button id="proxy-count" onClick={() => state.count++}>{state.count as string}</button>
+	<button id="proxy-count" onClick={() => state.count++}>
+		{state.count as string}
+	</button>
 }

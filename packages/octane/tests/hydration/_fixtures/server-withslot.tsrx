@@ -12,5 +12,7 @@ function useCounter(initial) {
 
 export function Widget(props) @{
 	const [count, inc] = useCounter(props.start);
-	<button id="w" onClick={inc}>{'count:' + count as string}</button>
+	<button id="w" onClick={inc}>
+		{('count:' + count) as string}
+	</button>
 }

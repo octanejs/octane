@@ -52,8 +52,9 @@ const CLICK_SETTLE_MS = 250;
 // would be satisfied from the very top.
 function isAtPageBottom(): boolean {
 	const scrollable = document.documentElement.scrollHeight - window.innerHeight > 1;
-	return scrollable &&
-		window.innerHeight + window.scrollY >= document.documentElement.scrollHeight - 2;
+	return (
+		scrollable && window.innerHeight + window.scrollY >= document.documentElement.scrollHeight - 2
+	);
 }
 
 export function OnThisPage(props: {
@@ -72,11 +73,9 @@ export function OnThisPage(props: {
 	// very first render of the new page clean; the setter bails on no-change so
 	// the per-frame scroll spy doesn't re-render every scroll step.
 	const [active, setActive] = useState({ key: '', id: '' });
-	const activeId =
-		active.key === resetKey ? active.id : '';
-	const setActiveId = (id: string) => setActive(
-		(prev) => (prev.key === resetKey && prev.id === id ? prev : { key: resetKey, id }),
-	);
+	const activeId = active.key === resetKey ? active.id : '';
+	const setActiveId = (id: string) =>
+		setActive((prev) => (prev.key === resetKey && prev.id === id ? prev : { key: resetKey, id }));
 	const tocTrack = useRef<HTMLDivElement | null>(null);
 	// A TOC click claims its target here so the scroll-spy can hold that row lit
 	// through the smooth scroll instead of walking the highlight through every
@@ -111,8 +110,7 @@ export function OnThisPage(props: {
 			const id = clickLock.current;
 			clickLock.current = null;
 			clickTimer.current = 0;
-			const heading =
-				id !== null ? document.getElementById(id) : null;
+			const heading = id !== null ? document.getElementById(id) : null;
 			if (heading) {
 				const top = heading.getBoundingClientRect().top;
 				const activationLine = activationLineFor(tocTrack.current, heading);
@@ -121,7 +119,8 @@ export function OnThisPage(props: {
 				// on the activation line covers rounding; the bottom clause accepts
 				// any visible resting spot when the page ran out of scroll room.
 				const landed =
-					top >= -2 && (top <= activationLine + 4 || isAtPageBottom() && top < window.innerHeight);
+					top >= -2 &&
+					(top <= activationLine + 4 || (isAtPageBottom() && top < window.innerHeight));
 				if (landed) return;
 			}
 			// The reader ended up elsewhere — resume live tracking right away
@@ -138,9 +137,9 @@ export function OnThisPage(props: {
 	// empty gap.
 	useEffect(() => {
 		if (sections.length === 0) return;
-		const headings = sections.map((section) => document.getElementById(section.id)).filter(
-			(el) => el !== null,
-		) as HTMLElement[];
+		const headings = sections
+			.map((section) => document.getElementById(section.id))
+			.filter((el) => el !== null) as HTMLElement[];
 		if (headings.length === 0) return;
 
 		let frame = 0;
@@ -269,13 +268,14 @@ export function OnThisPage(props: {
 		const navigate = () => {
 			if (
 				navigation !== navigationSequence.current ||
-					currentResetKey.current !== navigationResetKey ||
-					!heading.isConnected ||
-					document.getElementById(id) !== heading
-			) return;
+				currentResetKey.current !== navigationResetKey ||
+				!heading.isConnected ||
+				document.getElementById(id) !== heading
+			)
+				return;
 			const reduce =
 				typeof window.matchMedia === 'function' &&
-					window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+				window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 			// Claim the target before scrolling so the spy holds it through the
 			// smooth animation; the settle timer (re-armed by every scroll tick)
 			// then judges the outcome once scrolling stops. This initial arm covers

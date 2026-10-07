@@ -23,14 +23,15 @@ export function ErrorBoundary(props: ErrorBoundaryProps) @{
 
 	<NativeErrorBoundary
 		resetRef={nativeResetRef}
-		fallback={(error: unknown) =>
+		fallback={(error: unknown) => (
 			<CaughtError
 				error={error}
 				reset={nativeResetRef.current!}
 				resetErrorBoundary={resetErrorBoundary}
 				caughtRef={caughtRef}
 				propsRef={propsRef}
-			/>}
+			/>
+		)}
 	>
 		<ErrorBoundaryContext value={idleContext}>{props.children}</ErrorBoundaryContext>
 	</NativeErrorBoundary>

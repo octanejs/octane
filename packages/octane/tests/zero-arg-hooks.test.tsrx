@@ -8,9 +8,7 @@ import { mount, act } from './_helpers';
 
 function ZeroArgState() @{
 	const [value, setValue] = useState<string | undefined>();
-	<button onClick={() => setValue('set')}>
-		{value === undefined ? 'undef' : value}
-	</button>
+	<button onClick={() => setValue('set')}>{value === undefined ? 'undef' : value}</button>
 }
 
 function ZeroArgRef() @{

@@ -5,9 +5,8 @@ import { useEffect, useState } from 'octane';
 type User = { name: string };
 
 const api = {
-	getUser: (userId: string): Promise<User> => fetch(`/api/users/${userId}`).then(
-		(response) => response.json(),
-	),
+	getUser: (userId: string): Promise<User> =>
+		fetch(`/api/users/${userId}`).then((response) => response.json()),
 };
 
 export function App({ userId }: { userId: string }) @{

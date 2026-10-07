@@ -5,7 +5,9 @@ import { createRoot, createContext, useState, useContext } from 'octane';
 // holds its own count (so block-identity reuse across re-renders is observable).
 export function App(props) @{
 	const [n, setN] = useState(5);
-	<button id="app-btn" onClick={() => setN(n + 1)}>{props.label + ':' + n as string}</button>
+	<button id="app-btn" onClick={() => setN(n + 1)}>
+		{(props.label + ':' + n) as string}
+	</button>
 }
 
 // Uses the React element form — the compiler lowers <App/> to createElement(App, …).
@@ -36,5 +38,7 @@ export function ThemeApp(props) @{
 
 // --- camelCase style -------------------------------------------------------
 export function CamelStyle(props) @{
-	<div id="cs" style={props.style}>{'x'}</div>
+	<div id="cs" style={props.style}>
+		{'x'}
+	</div>
 }

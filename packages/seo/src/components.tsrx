@@ -74,9 +74,7 @@ function SeoOutlet() @{
  * loudly rather than serialized.
  */
 export function Title(props: { text?: string; children?: string }) {
-	useRegisterSeo([
-		{ tag: 'title', key: 'title', attrs: {}, text: titleText(props) },
-	]);
+	useRegisterSeo([{ tag: 'title', key: 'title', attrs: {}, text: titleText(props) }]);
 	return null;
 }
 
@@ -85,25 +83,23 @@ function titleText(props: { text?: string; children?: string }): string {
 	if (typeof value === 'string') return value;
 	if (typeof value === 'number') return String(value);
 	if (value === undefined || value === null) return '';
-	throw new Error('[@octanejs/seo] <Title> needs a string: use <Title text="…" /> or <Seo title="…" />. ' +
-		'JSX children compile to a children block, which is not a string.');
+	throw new Error(
+		'[@octanejs/seo] <Title> needs a string: use <Title text="…" /> or <Seo title="…" />. ' +
+			'JSX children compile to a children block, which is not a string.',
+	);
 }
 
 /** `<Meta name="description" content="…" />` / `<Meta property="og:title" … />`. */
 export function Meta(props: MetaAttributes & { seoKey?: string }) {
 	const { seoKey, ...attrs } = props;
-	useRegisterSeo([
-		{ tag: 'meta', key: seoKey ?? metaKey(attrs), attrs },
-	]);
+	useRegisterSeo([{ tag: 'meta', key: seoKey ?? metaKey(attrs), attrs }]);
 	return null;
 }
 
 /** `<Link rel="canonical" href="…" />`. */
 export function Link(props: MetaAttributes & { seoKey?: string }) {
 	const { seoKey, ...attrs } = props;
-	useRegisterSeo([
-		{ tag: 'link', key: seoKey ?? linkKey(attrs), attrs },
-	]);
+	useRegisterSeo([{ tag: 'link', key: seoKey ?? linkKey(attrs), attrs }]);
 	return null;
 }
 
@@ -151,9 +147,7 @@ export function Head(props: { children?: OctaneNode }) @{
 			<SeoOutlet />
 		</SeoContext>
 	} @else {
-		<>
-			{props.children}
-		</>
+		<>{props.children}</>
 	}
 }
 
@@ -173,8 +167,7 @@ export function Script(props: {
 	[attr: string]: unknown;
 }) {
 	const { json, text, seoKey, ...attrs } = props;
-	const type =
-		typeof attrs.type === 'string' ? attrs.type : 'application/ld+json';
+	const type = typeof attrs.type === 'string' ? attrs.type : 'application/ld+json';
 	// ONE registration call site. Hooks are keyed by call site, so branching into
 	// two `useRegisterSeo` calls would give a `<Script>` that switches between
 	// `json` and `text` a second slot, and the abandoned branch's source would
@@ -185,7 +178,7 @@ export function Script(props: {
 			: {
 					tag: 'script',
 					key: 'script:' + (seoKey ?? type),
-					attrs: { ...attrs as MetaAttributes, type },
+					attrs: { ...(attrs as MetaAttributes), type },
 					text: text ?? '',
 				};
 	useRegisterSeo(descriptor === null ? EMPTY : [descriptor]);

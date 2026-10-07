@@ -12,9 +12,9 @@ interface GalleryScrollDetail {
 	scrollTop: number;
 	scrollHeight: number;
 	/**
- * The list's own height in px. Native engines report it; Lynx for Web does
- * not, so treat it as optional and fall back to the page height.
- */
+	 * The list's own height in px. Native engines report it; Lynx for Web does
+	 * not, so treat it as optional and fall back to the page height.
+	 */
 	listHeight?: number;
 }
 
@@ -37,9 +37,8 @@ export function Gallery({ pictureData }: { pictureData: Picture[] }) @{
 		'main thread';
 		const scrollbar = scrollbarMTSRef.current;
 		const gallery = galleryMTSRef.current;
-		if (
-			scrollbar === null || scrollbar === undefined || gallery === null || gallery === undefined
-		) return;
+		if (scrollbar === null || scrollbar === undefined || gallery === null || gallery === undefined)
+			return;
 		// The viewport the scrollbar maps onto is the list's own box. Native
 		// engines report it directly; Lynx for Web does not, and there the list
 		// fills the page, so the page height is the same number.

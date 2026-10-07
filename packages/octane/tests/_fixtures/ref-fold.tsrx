@@ -2,9 +2,11 @@
 // attribute hole (`props.hN`), so it attaches on the renderer's element exactly
 // like the inline form.
 export function RetRef(props) {
-	return <div>
-		<button ref={props.r}>x</button>
-	</div>;
+	return (
+		<div>
+			<button ref={props.r}>x</button>
+		</div>
+	);
 }
 
 export function AtRef(props) @{

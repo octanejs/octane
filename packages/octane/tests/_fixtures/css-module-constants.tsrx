@@ -30,6 +30,8 @@ export function CssConstants(props: Props) @{
 				<li class={styles.root}>{styles.id as string}</li>
 			}
 		</ul>
-		<button class={badge + ' action'} onClick={props.onClick}>Go</button>
+		<button class={badge + ' action'} onClick={props.onClick}>
+			Go
+		</button>
 	</main>
 }

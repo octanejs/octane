@@ -23,13 +23,17 @@ import { makeTipB, stableTipBS } from './tips.ts';
 // compiler hoists it to a sub-template render fn (the same `portal()` fast
 // path as the arrow `() => @{ … }` form).
 function TipA(props) @{
-	<span class="anchor">{createPortal(
-		<div class="tip tipA">
-			<span class="tip-label">{props.item.label as string}</span>
-			<button class="tip-btn" onClick={hit}>{'hit'}</button>
-		</div>,
-		props.target,
-	)}</span>
+	<span class="anchor">
+		{createPortal(
+			<div class="tip tipA">
+				<span class="tip-label">{props.item.label as string}</span>
+				<button class="tip-btn" onClick={hit}>
+					{'hit'}
+				</button>
+			</div>,
+			props.target,
+		)}
+	</span>
 }
 
 function SectionA() @{

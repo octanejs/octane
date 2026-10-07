@@ -31,15 +31,23 @@ export function forBetweenSiblings() @{
 		<button
 			id="prepend"
 			onClick={() => setItems([{ id: items.length + 10, label: 'z' }, ...items])}
-		>{'prepend'}</button>
+		>
+			{'prepend'}
+		</button>
 		<button
 			id="append"
-			onClick={() => setItems([
-				...items,
-				{ id: items.length + 1, label: String.fromCharCode(97 + items.length) },
-			])}
-		>{'append'}</button>
-		<button id="clear" onClick={() => setItems([])}>{'clear'}</button>
+			onClick={() =>
+				setItems([
+					...items,
+					{ id: items.length + 1, label: String.fromCharCode(97 + items.length) },
+				])
+			}
+		>
+			{'append'}
+		</button>
+		<button id="clear" onClick={() => setItems([])}>
+			{'clear'}
+		</button>
 		<section class="list">
 			@for (const item of items; key item.id) {
 				<p class="row">{item.label as string}</p>
@@ -67,7 +75,9 @@ export function ifBeforeSibling(props) @{
 export function ifBeforeSiblingToggle() @{
 	const [show, setShow] = useState(true);
 	<div class="wrap">
-		<button id="toggle" onClick={() => setShow(!show)}>{'toggle'}</button>
+		<button id="toggle" onClick={() => setShow(!show)}>
+			{'toggle'}
+		</button>
 		@if (show) {
 			<p class="gated">{'gated-then'}</p>
 		} @else {
@@ -83,20 +93,32 @@ export function ifBeforeSiblingToggle() @{
 
 export function switchBeforeSibling(props) @{
 	<div>
-		<span class="before" data-pos="lead">{'lead'}</span>
+		<span class="before" data-pos="lead">
+			{'lead'}
+		</span>
 		@switch (props.kind) {
 			@case 'a': {
-				<span class="hit" data-kind="a">{'A-body'}</span>
+				<span class="hit" data-kind="a">
+					{'A-body'}
+				</span>
 			}
 			@case 'b': {
-				<span class="hit" data-kind="b">{'B-body'}</span>
+				<span class="hit" data-kind="b">
+					{'B-body'}
+				</span>
 			}
 			@default: {
-				<span class="hit" data-kind="other">{'D-body'}</span>
+				<span class="hit" data-kind="other">
+					{'D-body'}
+				</span>
 			}
 		}
-		<span class="after" data-pos="mid">{'mid'}</span>
-		<span class="after" data-pos="tail">{'tail'}</span>
+		<span class="after" data-pos="mid">
+			{'mid'}
+		</span>
+		<span class="after" data-pos="tail">
+			{'tail'}
+		</span>
 	</div>
 }
 
@@ -104,14 +126,22 @@ export function switchFirstChild(props) @{
 	<div>
 		@switch (props.kind) {
 			@case 'a': {
-				<span class="hit" data-kind="a">{'A'}</span>
+				<span class="hit" data-kind="a">
+					{'A'}
+				</span>
 			}
 			@default: {
-				<span class="hit" data-kind="other">{'D'}</span>
+				<span class="hit" data-kind="other">
+					{'D'}
+				</span>
 			}
 		}
-		<span class="after" data-pos="1">{'one'}</span>
-		<span class="after" data-pos="2">{'two'}</span>
+		<span class="after" data-pos="1">
+			{'one'}
+		</span>
+		<span class="after" data-pos="2">
+			{'two'}
+		</span>
 	</div>
 }
 
@@ -121,16 +151,24 @@ export function switchCycle() @{
 		<span class="before">{'BEFORE'}</span>
 		@switch (n % 3) {
 			@case 0: {
-				<span class="hit" data-step="0">{'zero'}</span>
+				<span class="hit" data-step="0">
+					{'zero'}
+				</span>
 			}
 			@case 1: {
-				<span class="hit" data-step="1">{'one'}</span>
+				<span class="hit" data-step="1">
+					{'one'}
+				</span>
 			}
 			@case 2: {
-				<span class="hit" data-step="2">{'two'}</span>
+				<span class="hit" data-step="2">
+					{'two'}
+				</span>
 			}
 		}
-		<button id="bump" onClick={() => setN(n + 1)}>{'bump'}</button>
+		<button id="bump" onClick={() => setN(n + 1)}>
+			{'bump'}
+		</button>
 		<span class="after">{'AFTER'}</span>
 	</div>
 }
@@ -151,10 +189,12 @@ export function switchCycle() @{
 // doesn't accidentally delete a pre-existing sibling in the live parent.
 function Thrower(props) @{
 	<>
-		{(() => {
-			if (props.throwIt) throw new Error('kaboom');
-			return '';
-		})() as string}
+		{
+			(() => {
+				if (props.throwIt) throw new Error('kaboom');
+				return '';
+			})() as string
+		}
 	</>
 }
 
@@ -176,10 +216,14 @@ export function tryBeforeSibling(props) @{
 						reset();
 						setThrowIt(false);
 					}}
-				>{'reset'}</button>
+				>
+					{'reset'}
+				</button>
 			</div>
 		}
 		<span class="after">{'after-sibling'}</span>
-		<button id="toggle" onClick={() => setThrowIt(!throwIt)}>{'toggle'}</button>
+		<button id="toggle" onClick={() => setThrowIt(!throwIt)}>
+			{'toggle'}
+		</button>
 	</div>
 }

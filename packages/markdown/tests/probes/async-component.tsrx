@@ -19,9 +19,11 @@ export function AsyncProjectionProbe(props: {
 	label: string;
 	reject?: boolean;
 }) @{
-	<section id="async-projection">{createElement(props.component, {
-		label: props.label,
-		reject: props.reject,
-		children: createElement('em', null, 'nested'),
-	})}</section>
+	<section id="async-projection">
+		{createElement(props.component, {
+			label: props.label,
+			reject: props.reject,
+			children: createElement('em', null, 'nested'),
+		})}
+	</section>
 }

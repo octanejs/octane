@@ -14,116 +14,114 @@ import { resolveDefaultProps } from '../util/resolveDefaultProps';
 
 interface PolarGridProps extends ZIndexable {
 	/**
- * The x-coordinate of center.
- * When used inside a chart context, this prop is calculated based on the chart's dimensions,
- * and this prop is ignored.
- *
- * This is only used when rendered outside a chart context.
- */
+	 * The x-coordinate of center.
+	 * When used inside a chart context, this prop is calculated based on the chart's dimensions,
+	 * and this prop is ignored.
+	 *
+	 * This is only used when rendered outside a chart context.
+	 */
 	cx?: number;
 	/**
- * The y-coordinate of center.
- * When used inside a chart context, this prop is calculated based on the chart's dimensions,
- * and this prop is ignored.
- *
- * This is only used when rendered outside a chart context.
- */
+	 * The y-coordinate of center.
+	 * When used inside a chart context, this prop is calculated based on the chart's dimensions,
+	 * and this prop is ignored.
+	 *
+	 * This is only used when rendered outside a chart context.
+	 */
 	cy?: number;
 	/**
- * The radius of the inner polar grid.
- * When used inside a chart context, this prop is calculated based on the chart's dimensions,
- * and this prop is ignored.
- *
- * This is only used when rendered outside a chart context.
- */
+	 * The radius of the inner polar grid.
+	 * When used inside a chart context, this prop is calculated based on the chart's dimensions,
+	 * and this prop is ignored.
+	 *
+	 * This is only used when rendered outside a chart context.
+	 */
 	innerRadius?: number;
 	/**
- * The radius of the outer polar grid.
- * When used inside a chart context, this prop is calculated based on the chart's dimensions,
- * and this prop is ignored.
- *
- * This is only used when rendered outside a chart context.
- */
+	 * The radius of the outer polar grid.
+	 * When used inside a chart context, this prop is calculated based on the chart's dimensions,
+	 * and this prop is ignored.
+	 *
+	 * This is only used when rendered outside a chart context.
+	 */
 	outerRadius?: number;
 	/**
- * The array of every line grid's angle.
- */
+	 * The array of every line grid's angle.
+	 */
 	polarAngles?: ReadonlyArray<number>;
 	/**
- * The array of every circle grid's radius.
- */
+	 * The array of every circle grid's radius.
+	 */
 	polarRadius?: ReadonlyArray<number>;
 	/**
- * The type of polar grids.
- * @defaultValue polygon
- */
+	 * The type of polar grids.
+	 * @defaultValue polygon
+	 */
 	gridType?: 'polygon' | 'circle';
 	/**
- * @defaultValue true
- */
+	 * @defaultValue true
+	 */
 	radialLines?: boolean;
 	/**
- * @defaultValue 0
- */
+	 * @defaultValue 0
+	 */
 	angleAxisId?: AxisId;
 	/**
- * @defaultValue 0
- */
+	 * @defaultValue 0
+	 */
 	radiusAxisId?: AxisId;
 	/**
- * Z-Index of this component and its children. The higher the value,
- * the more on top it will be rendered.
- * Components with higher zIndex will appear in front of components with lower zIndex.
- * If undefined or 0, the content is rendered in the default layer without portals.
- *
- * @since 3.4
- * @defaultValue -100
- * @see {@link https://recharts.github.io/en-US/guide/zIndex/ Z-Index and layers guide}
- */
+	 * Z-Index of this component and its children. The higher the value,
+	 * the more on top it will be rendered.
+	 * Components with higher zIndex will appear in front of components with lower zIndex.
+	 * If undefined or 0, the content is rendered in the default layer without portals.
+	 *
+	 * @since 3.4
+	 * @defaultValue -100
+	 * @see {@link https://recharts.github.io/en-US/guide/zIndex/ Z-Index and layers guide}
+	 */
 	zIndex?: number;
 	/**
- * The stroke color. If "none", no line will be drawn.
- * @defaultValue #ccc
- */
+	 * The stroke color. If "none", no line will be drawn.
+	 * @defaultValue #ccc
+	 */
 	stroke?: string;
 	/**
- * The width of the stroke.
- * @defaultValue 1
- */
+	 * The width of the stroke.
+	 * @defaultValue 1
+	 */
 	strokeWidth?: number | string;
 	/**
- * The pattern of dashes and gaps used to paint the lines of the grid.
- * @see {@link https://developer.mozilla.org/en-US/docs/Web/SVG/Attribute/stroke-dasharray stroke-dasharray on MDN}
- */
+	 * The pattern of dashes and gaps used to paint the lines of the grid.
+	 * @see {@link https://developer.mozilla.org/en-US/docs/Web/SVG/Attribute/stroke-dasharray stroke-dasharray on MDN}
+	 */
 	strokeDasharray?: string | number;
 	/**
- * The background color used to fill the space between grid lines.
- * @defaultValue none
- */
+	 * The background color used to fill the space between grid lines.
+	 * @defaultValue none
+	 */
 	fill?: string;
 	/**
- * The opacity of the background used to fill the space between grid lines.
- */
+	 * The opacity of the background used to fill the space between grid lines.
+	 */
 	fillOpacity?: number | string;
 }
 
 export type Props = Omit<SVGProps<SVGLineElement>, 'ref'> & PolarGridProps;
 
-type PropsWithDefaults =
-	Props & {
-		cx: number;
-		cy: number;
-		innerRadius: number;
-		outerRadius: number;
-		polarAngles: ReadonlyArray<number>;
-		polarRadius: ReadonlyArray<number>;
-	};
+type PropsWithDefaults = Props & {
+	cx: number;
+	cy: number;
+	innerRadius: number;
+	outerRadius: number;
+	polarAngles: ReadonlyArray<number>;
+	polarRadius: ReadonlyArray<number>;
+};
 
-type ConcentricProps =
-	PropsWithDefaults & {
-		// The radius of circle
-		radius: number;
-	};
+type ConcentricProps = PropsWithDefaults & {
+	// The radius of circle
+	radius: number;
+};
 
 const getPolygonPath = (
 	radius: number,
@@ -158,19 +156,25 @@ const PolarAngles: FunctionComponent<PropsWithDefaults> = (props: PropsWithDefau
 		...svgPropertiesNoEvents(props),
 	};
 
-	return <g className="recharts-polar-grid-angle">{polarAngles.map((entry) => {
-		const start = polarToCartesian(cx, cy, innerRadius, entry);
-		const end = polarToCartesian(cx, cy, outerRadius, entry);
+	return (
+		<g className="recharts-polar-grid-angle">
+			{polarAngles.map((entry) => {
+				const start = polarToCartesian(cx, cy, innerRadius, entry);
+				const end = polarToCartesian(cx, cy, outerRadius, entry);
 
-		return <line
-			key={`line-${entry}`}
-			{...polarAnglesProps}
-			x1={start.x}
-			y1={start.y}
-			x2={end.x}
-			y2={end.y}
-		/>;
-	})}</g>;
+				return (
+					<line
+						key={`line-${entry}`}
+						{...polarAnglesProps}
+						x1={start.x}
+						y1={start.y}
+						x2={end.x}
+						y2={end.y}
+					/>
+				);
+			})}
+		</g>
+	);
 };
 
 // Draw concentric circles
@@ -199,11 +203,13 @@ const ConcentricPolygon: FunctionComponent<ConcentricProps> = (props: Concentric
 		...svgPropertiesNoEvents(props),
 	};
 
-	return <path
-		{...concentricPolygonProps}
-		className={clsx('recharts-polar-grid-concentric-polygon', props.className)}
-		d={getPolygonPath(radius, props.cx, props.cy, props.polarAngles)}
-	/>;
+	return (
+		<path
+			{...concentricPolygonProps}
+			className={clsx('recharts-polar-grid-concentric-polygon', props.className)}
+			d={getPolygonPath(radius, props.cx, props.cy, props.polarAngles)}
+		/>
+	);
 };
 
 // Draw concentric axis
@@ -217,23 +223,27 @@ const ConcentricGridPath = (props: PropsWithDefaults) => {
 	const maxPolarRadius: number = Math.max(...polarRadius);
 	const renderBackground = props.fill && props.fill !== 'none';
 
-	return <g className="recharts-polar-grid-concentric">
-		{/* Render background as separate first child to do not cover strokes of smaller figures */}
-		{renderBackground && gridType === 'circle' &&
-			<ConcentricCircle {...props} radius={maxPolarRadius} />}
-		{renderBackground && gridType !== 'circle' &&
-			<ConcentricPolygon {...props} radius={maxPolarRadius} />}
+	return (
+		<g className="recharts-polar-grid-concentric">
+			{/* Render background as separate first child to do not cover strokes of smaller figures */}
+			{renderBackground && gridType === 'circle' && (
+				<ConcentricCircle {...props} radius={maxPolarRadius} />
+			)}
+			{renderBackground && gridType !== 'circle' && (
+				<ConcentricPolygon {...props} radius={maxPolarRadius} />
+			)}
 
-		{polarRadius.map((entry: number, i: number) => {
-			const key = i;
+			{polarRadius.map((entry: number, i: number) => {
+				const key = i;
 
-			if (gridType === 'circle') {
-				return <ConcentricCircle key={key} {...props} fill="none" radius={entry} />;
-			}
+				if (gridType === 'circle') {
+					return <ConcentricCircle key={key} {...props} fill="none" radius={entry} />;
+				}
 
-			return <ConcentricPolygon key={key} {...props} fill="none" radius={entry} />;
-		})}
-	</g>;
+				return <ConcentricPolygon key={key} {...props} fill="none" radius={entry} />;
+			})}
+		</g>
+	);
 };
 
 export const defaultPolarGridProps = {
@@ -294,24 +304,26 @@ export const PolarGrid = (outsideProps: Props) => {
 		return null;
 	}
 
-	return <ZIndexLayer zIndex={props.zIndex}>
-		<g className="recharts-polar-grid">
-			<ConcentricGridPath
-				gridType={gridType}
-				radialLines={radialLines}
-				{...props}
-				polarAngles={polarAngles}
-				polarRadius={polarRadius}
-			/>
-			<PolarAngles
-				gridType={gridType}
-				radialLines={radialLines}
-				{...props}
-				polarAngles={polarAngles}
-				polarRadius={polarRadius}
-			/>
-		</g>
-	</ZIndexLayer>;
+	return (
+		<ZIndexLayer zIndex={props.zIndex}>
+			<g className="recharts-polar-grid">
+				<ConcentricGridPath
+					gridType={gridType}
+					radialLines={radialLines}
+					{...props}
+					polarAngles={polarAngles}
+					polarRadius={polarRadius}
+				/>
+				<PolarAngles
+					gridType={gridType}
+					radialLines={radialLines}
+					{...props}
+					polarAngles={polarAngles}
+					polarRadius={polarRadius}
+				/>
+			</g>
+		</ZIndexLayer>
+	);
 };
 
 PolarGrid.displayName = 'PolarGrid';

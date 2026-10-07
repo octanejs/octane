@@ -255,7 +255,9 @@ export function SetupShadowHost({
 		label = label + ':' + use(item);
 	}
 	<div>
-		<button id="tick" onClick={() => setTick(tick + 1)}>t</button>
+		<button id="tick" onClick={() => setTick(tick + 1)}>
+			t
+		</button>
 		{'l=' + label}
 	</div>
 }
@@ -276,7 +278,9 @@ export function ShadowedLoopHost({
 	const item = build();
 	log('built:' + item.n);
 	<div>
-		<button id="tick" onClick={() => setTick(tick + 1)}>t</button>
+		<button id="tick" onClick={() => setTick(tick + 1)}>
+			t
+		</button>
 		<span>{'t=' + tick}</span>
 		@for (const item of rows; key item.id) {
 			<p>{'v=' + use(item.promise)}</p>
@@ -293,7 +297,9 @@ export function ChainHost({
 }) @{
 	const [tick, setTick] = useState(0);
 	<div>
-		<button id="tick" onClick={() => setTick(tick + 1)}>t</button>
+		<button id="tick" onClick={() => setTick(tick + 1)}>
+			t
+		</button>
 		<span>{'tick=' + tick}</span>
 		@try {
 			<ChainReader fetchUser={fetchUser} id={id} />

@@ -7,8 +7,10 @@ export function ServerTransition() @{
 }
 
 export function ServerGroup() @{
-	const child = <Transition key="server" timeout={20}>
-		<span id="server-child">{'child'}</span>
-	</Transition>;
+	const child = (
+		<Transition key="server" timeout={20}>
+			<span id="server-child">{'child'}</span>
+		</Transition>
+	);
 	<TransitionGroup component="section" id="server-group" children={[child]} />
 }

@@ -24,9 +24,7 @@ export interface ResetStore {
 const MatchContext = createContext<string | undefined>(undefined);
 
 function SafeFragment(props: any) @{
-	<>
-		{props.children}
-	</>
+	<>{props.children}</>
 }
 
 function CatchBoundary(props: {
@@ -35,26 +33,17 @@ function CatchBoundary(props: {
 	onCatch?: (error: Error) => void;
 }) @{
 	@try {
-		<>
-			{props.children}
-		</>
+		<>{props.children}</>
 	} @catch (error: unknown) {
 		<div class="match-error">{String(error)}</div>
 	}
 }
 
-function CatchNotFound(props: {
-	fallback: (error: Error) => OctaneNode;
-	children: OctaneNode;
-}) @{
+function CatchNotFound(props: { fallback: (error: Error) => OctaneNode; children: OctaneNode }) @{
 	@try {
-		<>
-			{props.children}
-		</>
+		<>{props.children}</>
 	} @catch (error: unknown) {
-		<>
-			{props.fallback(error as Error)}
-		</>
+		<>{props.fallback(error as Error)}</>
 	}
 }
 
@@ -64,7 +53,9 @@ function MatchInner(props: { log: string[] }) @{
 		props.log.push('mount:inner');
 		return () => props.log.push('unmount:inner');
 	}, []);
-	<button class="inner-button" onClick={() => setCount(count + 1)}>{'inner:' + count}</button>
+	<button class="inner-button" onClick={() => setCount(count + 1)}>
+		{'inner:' + count}
+	</button>
 }
 
 export function MatchShape(props: {

@@ -247,14 +247,16 @@ classes of any theme it applies), plus one key per class selector whose value is
 hash class and the class name together:
 
 ```tsrx
-export const theme = <style>
-	div {
-		color: green;
-	}
-	.dark {
-		color: purple;
-	}
-</style>;
+export const theme = (
+	<style>
+		div {
+			color: green;
+		}
+		.dark {
+			color: purple;
+		}
+	</style>
+);
 // theme.$class → 'tsrx-fe4e37b1'
 // theme.dark   → 'tsrx-fe4e37b1 dark'
 
@@ -283,20 +285,24 @@ declares the scope's own block in one tag:
 
 ```tsrx
 // theme.tsrx
-const base = <style>
-	div {
-		font-family: system-ui;
-	}
-</style>;
+const base = (
+	<style>
+		div {
+			font-family: system-ui;
+		}
+	</style>
+);
 
-export const theme = <style apply={base}>
-	div {
-		color: green;
-	}
-	.dark {
-		color: purple;
-	}
-</style>;
+export const theme = (
+	<style apply={base}>
+		div {
+			color: green;
+		}
+		.dark {
+			color: purple;
+		}
+	</style>
+);
 // theme.$class → base's hash, then theme's own hash
 ```
 
@@ -364,15 +370,17 @@ function Card({ parentClass }: { parentClass: string }) @{
 }
 
 export function App() @{
-	const theme = <style>
-		div,
-		h2 {
-			color: blue;
-		}
-		.card {
-			color: red;
-		}
-	</style>;
+	const theme = (
+		<style>
+			div,
+			h2 {
+				color: blue;
+			}
+			.card {
+				color: red;
+			}
+		</style>
+	);
 	<>
 		<Card parentClass={theme.$class} />
 		<div class={theme.$class}>Blue: opted in</div>

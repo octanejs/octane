@@ -119,7 +119,9 @@ function MultiHopEmptyLeaf(props: { big?: boolean; label: string }) @{
 function Panel(props: { big?: boolean; label: string }) @{
 	const [n, setN] = useState(0);
 	@if (props.big) {
-		<div class="big" onClick={() => setN(n + 1)}>{props.label + ':' + n as string}</div>
+		<div class="big" onClick={() => setN(n + 1)}>
+			{(props.label + ':' + n) as string}
+		</div>
 	} @else {
 		<Leaf label={props.label} />
 	}
@@ -147,7 +149,9 @@ export function Tree(props: { depth: number; path: string }) @{
 
 function Counter(props: { label: string }) @{
 	const [n, setN] = useState(0);
-	<button class="c" onClick={() => setN(n + 1)}>{props.label + ':' + n as string}</button>
+	<button class="c" onClick={() => setN(n + 1)}>
+		{(props.label + ':' + n) as string}
+	</button>
 }
 
 // Neighbouring contract: a keyed sibling must still remount (state reset) on a
@@ -163,7 +167,9 @@ export function KeyedPair(props: { k: number }) @{
 export function TransitionPair() @{
 	const [aBig, setABig] = useState(true);
 	<div>
-		<button class="flip" onClick={() => startTransition(() => setABig(!aBig))}>flip</button>
+		<button class="flip" onClick={() => startTransition(() => setABig(!aBig))}>
+			flip
+		</button>
 		<section class="host">
 			<Panel big={aBig} label="A" />
 			<Panel big={true} label="B" />

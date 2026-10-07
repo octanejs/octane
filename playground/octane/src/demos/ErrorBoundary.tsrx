@@ -11,26 +11,30 @@ export function ErrorBoundaryDemo() @{
 
 	<div>
 		<h2 class="demo-title">{'react-error-boundary on Octane'}</h2>
-		<p
-			class="demo-blurb"
-		>{'Trigger a render failure, inspect the fallback, then reset the native Octane boundary.'}</p>
+		<p class="demo-blurb">
+			{'Trigger a render failure, inspect the fallback, then reset the native Octane boundary.'}
+		</p>
 		<ErrorBoundary
 			resetKeys={[shouldThrow]}
-			fallbackRender={({ error, resetErrorBoundary }) => <div class="panel">
-				<pre class="boom">{getErrorMessage(error) ?? 'Unknown error'}</pre>
-				<button
-					class="btn"
-					onClick={() => {
-						setShouldThrow(false);
-						resetErrorBoundary();
-					}}
-				>
-					Retry
-				</button>
-			</div>}
+			fallbackRender={({ error, resetErrorBoundary }) => (
+				<div class="panel">
+					<pre class="boom">{getErrorMessage(error) ?? 'Unknown error'}</pre>
+					<button
+						class="btn"
+						onClick={() => {
+							setShouldThrow(false);
+							resetErrorBoundary();
+						}}
+					>
+						Retry
+					</button>
+				</div>
+			)}
 		>
 			<UnstablePanel shouldThrow={shouldThrow} />
 		</ErrorBoundary>
-		<button class="btn" onClick={() => setShouldThrow(true)}>Crash the panel</button>
+		<button class="btn" onClick={() => setShouldThrow(true)}>
+			Crash the panel
+		</button>
 	</div>
 }

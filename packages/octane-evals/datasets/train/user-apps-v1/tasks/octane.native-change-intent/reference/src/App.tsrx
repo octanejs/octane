@@ -51,9 +51,7 @@ export function App() @{
 				<option value="pro">Pro</option>
 			</select>
 		</label>
-		<output aria-label="Selected plan">
-			{plan === 'free' ? 'Free' : 'Pro'}
-		</output>
+		<output aria-label="Selected plan">{plan === 'free' ? 'Free' : 'Pro'}</output>
 
 		<label>
 			<input
@@ -63,9 +61,7 @@ export function App() @{
 			/>
 			Email alerts
 		</label>
-		<output aria-label="Alert status">
-			{alerts ? 'enabled' : 'disabled'}
-		</output>
+		<output aria-label="Alert status">{alerts ? 'enabled' : 'disabled'}</output>
 
 		<PreferenceField onChange={setLayout} />
 		<output aria-label="Layout">{layout}</output>

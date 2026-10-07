@@ -40,7 +40,7 @@
       "arch": "any",
       "packageManager": "pnpm@12.9.1",
       "lockfile": "pnpm-lock.yaml",
-      "lockfileSha256": "e92f4520cd88a2593a0ecd555e0532b2e4e8bb1396c9558a09f0cbf3fbaa5917"
+      "lockfileSha256": "caea67fe61ab57f3e8cbd8a0e55f0e8b3014b3dd6815c6fe6e158095f291daeb"
     }
   },
   "lanes": [
@@ -389,47 +389,47 @@
         {
           "path": "packages/tanstack-table/tests/_fixtures/app-table.tsrx",
           "role": "support",
-          "sha256": "5035133e84b23dbfaff0557998260e4ba5aae1403146211fe557a010c4dae7b7"
+          "sha256": "9d3fd179740f011918c1c3ecfcb8d6dd6a754e236d710053e44802459f02e0e5"
         },
         {
           "path": "packages/tanstack-table/tests/_fixtures/basic-table-diff.tsrx",
           "role": "support",
-          "sha256": "00af3daa3fbe2a2423edde221157903d640433779f41a36238164aa89d29a620"
+          "sha256": "5f1b7558f415defd36a546b578438b184b5cb2bd4d6d14817a139865436ad273"
         },
         {
           "path": "packages/tanstack-table/tests/_fixtures/features.tsrx",
           "role": "support",
-          "sha256": "c217c149cb2d362866078156f9f6cee054c5644e70e4467a2e57875297796679"
+          "sha256": "b6006266e23d3d94b306c6ab2c062c5d42d21244e746c1c9ea0a848d3039a895"
         },
         {
           "path": "packages/tanstack-table/tests/_fixtures/filter-paginate-diff.tsrx",
           "role": "support",
-          "sha256": "3c231375c46517f2555858d7203e8b1499f664f79770f1b194b59745d779ccd7"
+          "sha256": "dd701df2f3dbd8af51393e63d62d69e11838e10fcd66a3f84bbc1354200dc7f5"
         },
         {
           "path": "packages/tanstack-table/tests/_fixtures/flex-render.tsrx",
           "role": "support",
-          "sha256": "9f6e50aa65563fceb30bae8c0c2f4909f76e7bc0af47627ff5d44d83897c903e"
+          "sha256": "c992f5c0be978519b7cb80499b06a540ec2eba1b9d4c2a9e9bccfbeb3f2af320"
         },
         {
           "path": "packages/tanstack-table/tests/_fixtures/selection-diff.tsrx",
           "role": "support",
-          "sha256": "f03f1cc7e0039d75da176fb4360035ff139adba940b37fdf5f3d26637ecb5f6e"
+          "sha256": "35de2f679eab45d354d155621f779daf6341a5fd882b34a14b85ee423779d523"
         },
         {
           "path": "packages/tanstack-table/tests/_fixtures/sorting-diff.tsrx",
           "role": "support",
-          "sha256": "1b5e45128a12a7c1ea0bee05c20f3b6bc0cccdc177960867e66ff3eb1b3042c8"
+          "sha256": "00e439357ec3b07b3ce4d5c1d471cec1f1b94669a749b39e55acdd85ccb6fdf1"
         },
         {
           "path": "packages/tanstack-table/tests/_fixtures/table-basic.tsrx",
           "role": "support",
-          "sha256": "a8a3af972b735c2f09db3c40b697cd32a6a54f91ea6be3640ee734f2c78fa79b"
+          "sha256": "3d5d2cd7a065f182c9f445c4848cf8b616f11984c026c9c2b3f1cf1949b9e497"
         },
         {
           "path": "packages/tanstack-table/tests/_fixtures/visibility-expand-diff.tsrx",
           "role": "support",
-          "sha256": "cdb2ac532b20a899c96c1aa8932ee674290b39194a6a104c0018453130c32ac8"
+          "sha256": "ef6bf697753ab9306fab71f6f50f03738b285fa2b84a5b54c2f8e38014f8e172"
         }
       ]
     },
@@ -468,7 +468,7 @@
         {
           "path": "packages/tanstack-table/tests/_fixtures/hydration.tsrx",
           "role": "support",
-          "sha256": "7dc0e85cb6c406bb7f60e3a4691f18348552d972a1742d6e004cc5723b8bf563"
+          "sha256": "a716070a242505af091f70b84deaab97dae8fcd7e15eb8dbd4ac859396c78839"
         }
       ]
     }

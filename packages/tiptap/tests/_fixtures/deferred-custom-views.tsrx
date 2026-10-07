@@ -59,9 +59,7 @@ const content = {
 	content: [
 		{
 			type: 'hydrationPanel',
-			content: [
-				{ type: 'text', text: 'Hydrated panel content' },
-			],
+			content: [{ type: 'text', text: 'Hydrated panel content' }],
 		},
 	],
 };
@@ -89,9 +87,7 @@ export function DeferredCustomViews(props) @{
 	<HydrationTheme value="hydrated">
 		<main id="deferred-custom-views">
 			<h1 id="deferred-custom-title">Deferred custom editor</h1>
-			<output id="deferred-custom-status">
-				{editor ? 'ready' : 'deferred'}
-			</output>
+			<output id="deferred-custom-status">{editor ? 'ready' : 'deferred'}</output>
 			<output id="deferred-custom-text">{editorText ?? 'deferred'}</output>
 			<output id="deferred-shell-clicks">{'shell:' + shellClicks}</output>
 			<output id="deferred-menu-clicks">{'menu:' + menuClicks}</output>
@@ -110,7 +106,9 @@ export function DeferredCustomViews(props) @{
 							data-hydration-menu-action="true"
 							type="button"
 							onClick={() => setMenuClicks((current) => current + 1)}
-						>{'menu action'}</button>
+						>
+							{'menu action'}
+						</button>
 					</BubbleMenu>
 				</>
 			}

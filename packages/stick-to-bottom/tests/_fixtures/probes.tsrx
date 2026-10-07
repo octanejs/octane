@@ -19,23 +19,20 @@ export function StickProbe() @{
 
 export function RenderPropStickProbe() @{
 	<StickToBottom style={{ height: '80px' }}>
-		{(context: StickToBottomContext) => <StickToBottom.Content
-			scrollClassName="scroll"
-			data-content=""
-		>
-			<div>
-				{context.isAtBottom ? 'bottom' : 'away'}
-			</div>
-		</StickToBottom.Content>}
+		{(context: StickToBottomContext) => (
+			<StickToBottom.Content scrollClassName="scroll" data-content="">
+				<div>{context.isAtBottom ? 'bottom' : 'away'}</div>
+			</StickToBottom.Content>
+		)}
 	</StickToBottom>
 }
 
 export function ContentRenderPropStickProbe() @{
 	<StickToBottom style={{ height: '80px' }}>
 		<StickToBottom.Content scrollClassName="scroll" data-content="">
-			{(context: StickToBottomContext) => <div>
-				{context.isAtBottom ? 'content-bottom' : 'content-away'}
-			</div>}
+			{(context: StickToBottomContext) => (
+				<div>{context.isAtBottom ? 'content-bottom' : 'content-away'}</div>
+			)}
 		</StickToBottom.Content>
 	</StickToBottom>
 }

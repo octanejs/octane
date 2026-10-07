@@ -42,14 +42,13 @@ export function PortalledChild() @{
 // body). Same compile-time semantics: the body is rendered inside the portal
 // target rather than at the call site.
 export function Modal(props) @{
-	<section class="modal-anchor">{createPortal(
-		() => @{
+	<section class="modal-anchor">
+		{createPortal(() => @{
 			<div class="modal">
 				<PortalledChild />
 			</div>
-		},
-		props.target,
-	)}</section>
+		}, props.target)}
+	</section>
 }
 
 export function App(props) @{
@@ -71,7 +70,9 @@ export function App(props) @{
 export function InlineModal(props) @{
 	const [n, setN] = useState(0);
 	<section class="inline-anchor">
-		<button id="bump" onClick={() => setN(n + 1)}>{'bump'}</button>
+		<button id="bump" onClick={() => setN(n + 1)}>
+			{'bump'}
+		</button>
 		{createPortal(<div class="inline-modal">{'count:' + n}</div>, props.target)}
 	</section>
 }
@@ -81,10 +82,11 @@ function PortalOwnedStateChild() {
 	if (updated) {
 		return <section data-slot="portal-owned-child">{'updated'}</section>;
 	}
-	return <button
-		data-slot="portal-owned-child"
-		onClick={() => setUpdated(true)}
-	>{'initial'}</button>;
+	return (
+		<button data-slot="portal-owned-child" onClick={() => setUpdated(true)}>
+			{'initial'}
+		</button>
+	);
 }
 
 export function PortalOwnedStateApp(props: PortalTargetProps) @{
@@ -136,7 +138,9 @@ function KeyedDialog(props: { id: number; log(entry: string): void }) @{
 		props.log('passive:' + props.id);
 		return () => props.log('passive-cleanup:' + props.id);
 	}, []);
-	<button class="keyed-dialog" data-id={String(props.id)}>{'dialog ' + props.id}</button>
+	<button class="keyed-dialog" data-id={String(props.id)}>
+		{'dialog ' + props.id}
+	</button>
 }
 
 function KeyedStatus(props: { id: number; load(id: number): Promise<string> }) @{

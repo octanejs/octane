@@ -39,9 +39,11 @@ export function AnimeJsDemo() @{
 
 	<div>
 		<h2 class="demo-title">{'Anime.js on Octane'}</h2>
-		<p
-			class="demo-blurb"
-		>{'One scoped DOM animation and the official Anime.js Three adapter driving an @octanejs/three object.'}</p>
+		<p class="demo-blurb">
+			{
+				'One scoped DOM animation and the official Anime.js Three adapter driving an @octanejs/three object.'
+			}
+		</p>
 
 		<div class="panel animejs-grid">
 			<section>

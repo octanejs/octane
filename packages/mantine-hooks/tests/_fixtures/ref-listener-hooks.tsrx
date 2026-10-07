@@ -11,11 +11,15 @@ export function RefListenerHarness({
 	const { ref: focusRef } = useFocusWithin<HTMLElement>();
 
 	<section>
-		{replacement
-			? <div id="event-node" ref={eventRef} />
-			: <button id="event-node" ref={eventRef} />}
-		{replacement
-			? <div id="focus-node" ref={focusRef} />
-			: <button id="focus-node" ref={focusRef} />}
+		{replacement ? (
+			<div id="event-node" ref={eventRef} />
+		) : (
+			<button id="event-node" ref={eventRef} />
+		)}
+		{replacement ? (
+			<div id="focus-node" ref={focusRef} />
+		) : (
+			<button id="focus-node" ref={focusRef} />
+		)}
 	</section>
 }

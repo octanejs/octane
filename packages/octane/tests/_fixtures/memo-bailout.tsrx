@@ -21,8 +21,12 @@ export function BailoutHost(props) @{
 	const [tick, setTick] = useState(0);
 	const [count, setCount] = useState(0);
 	<div>
-		<button id="tick" onClick={() => setTick(tick + 1)}>{'tick'}</button>
-		<button id="count" onClick={() => setCount(count + 1)}>{'count'}</button>
+		<button id="tick" onClick={() => setTick(tick + 1)}>
+			{'tick'}
+		</button>
+		<button id="count" onClick={() => setCount(count + 1)}>
+			{'count'}
+		</button>
 		<Counter count={count} log={props.log} />
 	</div>
 }
@@ -33,7 +37,7 @@ const CountContext = createContext(0);
 function CtxCounterImpl(props) @{
 	const count = use(CountContext);
 	props.log(props.label + ': ' + count);
-	<span class="ctxval">{props.label + ': ' + count as string}</span>
+	<span class="ctxval">{(props.label + ': ' + count) as string}</span>
 }
 const CtxCounter = memo(CtxCounterImpl);
 
@@ -43,7 +47,9 @@ export function ContextHost(props) @{
 	// only the Provider value does. A correct memo must still re-render because
 	// the consumer reads a context whose value changed.
 	<div>
-		<button id="ctxbump" onClick={() => setCount(count + 1)}>{'bump'}</button>
+		<button id="ctxbump" onClick={() => setCount(count + 1)}>
+			{'bump'}
+		</button>
 		<CountContext value={count}>
 			<CtxCounter label="Count" log={props.log} />
 		</CountContext>
@@ -67,8 +73,12 @@ export function CustomCompareHost(props) @{
 	const [tick, setTick] = useState(0);
 	const [count, setCount] = useState(0);
 	<div>
-		<button id="ctick" onClick={() => setTick(tick + 1)}>{'tick'}</button>
-		<button id="ccount" onClick={() => setCount(count + 1)}>{'count'}</button>
+		<button id="ctick" onClick={() => setTick(tick + 1)}>
+			{'tick'}
+		</button>
+		<button id="ccount" onClick={() => setCount(count + 1)}>
+			{'count'}
+		</button>
 		<CustomCounter count={count} log={props.log} />
 	</div>
 }
@@ -121,7 +131,9 @@ const MemoStoreOwner = memo(MemoStoreOwnerImpl);
 export function MemoStoreHost(props: { store: MemoStore; log: MemoStoreLog }) @{
 	const [tick, setTick] = useState(0);
 	<div data-tick={tick as number}>
-		<button id="memo-store-parent-update" onClick={() => setTick(tick + 1)}>{'parent'}</button>
+		<button id="memo-store-parent-update" onClick={() => setTick(tick + 1)}>
+			{'parent'}
+		</button>
 		<MemoStoreOwner store={props.store} log={props.log} />
 	</div>
 }

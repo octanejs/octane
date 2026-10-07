@@ -19,10 +19,14 @@ export function EventIsland(props) @{
 				props.log('octane-bubble-target');
 				if (props.stopAt === 'octane-bubble-target') event.stopPropagation();
 			}}
-		>{'go'}</button>
+		>
+			{'go'}
+		</button>
 	</div>
 }
 
 export function CounterEventIsland(props) @{
-	<button class="evt-count" onClick={() => props.onIncrement()}>{'count:' + props.count}</button>
+	<button class="evt-count" onClick={() => props.onIncrement()}>
+		{'count:' + props.count}
+	</button>
 }

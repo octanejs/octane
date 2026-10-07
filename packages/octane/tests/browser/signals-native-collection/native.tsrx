@@ -35,7 +35,9 @@ export function NativeCounter(props: NativeProps) @{
 	<main>
 		<h1 id="label">{props.label}</h1>
 		<input id="draft" aria-label="Draft" defaultValue="initial" />
-		<button type="button" onClick={() => props.count$.set((value) => value + 1)}>Increment</button>
+		<button type="button" onClick={() => props.count$.set((value) => value + 1)}>
+			Increment
+		</button>
 		@if (props.visible) {
 			<section id="readers">
 				<MemoRead count$={props.count$} />

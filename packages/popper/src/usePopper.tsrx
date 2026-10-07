@@ -59,7 +59,7 @@ export function usePopperImpl<Modifiers = string>(
 			placement,
 			strategy,
 			modifiers: [
-				...modifiers as ReadonlyArray<CoreModifier<any, any>>,
+				...(modifiers as ReadonlyArray<CoreModifier<any, any>>),
 				updateStateModifier,
 				{ name: 'applyStyles', enabled: false },
 			],

@@ -9,14 +9,22 @@ import './styles.css';
 
 export function App({ eager = false }: { eager?: boolean } = {}) @{
 	<div class="app" data-lab-shell data-activation={eager ? 'eager' : 'interaction'}>
-		<a class="skip-link" href="#message">Skip to message</a>
+		<a class="skip-link" href="#message">
+			Skip to message
+		</a>
 		<aside class="rail">
-			<a class="brand" href="/" aria-label="Signal Chat home">✳</a>
+			<a class="brand" href="/" aria-label="Signal Chat home">
+				✳
+			</a>
 			<span class="rail-label">
-				SIGNAL<br />CHAT
+				SIGNAL
+				<br />
+				CHAT
 			</span>
 			<span class="rail-bottom">
-				SSR<br />LAB
+				SSR
+				<br />
+				LAB
 			</span>
 		</aside>
 		<div class="workspace">
@@ -28,9 +36,7 @@ export function App({ eager = false }: { eager?: boolean } = {}) @{
 						<span class="beta">LOCAL</span>
 					</h1>
 				</div>
-				<span class="mode">
-					{eager ? 'Activate on load' : 'Activate on interaction'}
-				</span>
+				<span class="mode">{eager ? 'Activate on load' : 'Activate on interaction'}</span>
 			</header>
 			<main class="layout">
 				<aside class="sidebar">
@@ -42,7 +48,8 @@ export function App({ eager = false }: { eager?: boolean } = {}) @{
 						<p class="panel-note">Choose data and timings for a new run.</p>
 						<form method="get" action={eager ? '/eager' : '/'}>
 							<label>
-								Scenario<select name="scenario" defaultValue="steady">
+								Scenario
+								<select name="scenario" defaultValue="steady">
 									<option value="steady">Steady tokens</option>
 									<option value="burst">Burst tokens</option>
 									<option value="unicode">Unicode &amp; escaping</option>
@@ -52,43 +59,48 @@ export function App({ eager = false }: { eager?: boolean } = {}) @{
 								</select>
 							</label>
 							<label>
-								Session delay
-								(ms)<input type="number" name="auth" min={0} max={2000} defaultValue={250} />
+								Session delay (ms)
+								<input type="number" name="auth" min={0} max={2000} defaultValue={250} />
 							</label>
 							<label>
-								Answer delay
-								(ms)<input type="number" name="answer" min={0} max={2000} defaultValue={180} />
+								Answer delay (ms)
+								<input type="number" name="answer" min={0} max={2000} defaultValue={180} />
 							</label>
 							<label>
-								History delay
-								(ms)<input type="number" name="history" min={0} max={2000} defaultValue={600} />
+								History delay (ms)
+								<input type="number" name="history" min={0} max={2000} defaultValue={600} />
 							</label>
 							<label>
-								Between yields
-								(ms)<input type="number" name="interval" min={0} max={2000} defaultValue={160} />
+								Between yields (ms)
+								<input type="number" name="interval" min={0} max={2000} defaultValue={160} />
 							</label>
 							<label>
-								Stream
-								snapshots<input type="number" name="waves" min={1} max={64} defaultValue={8} />
+								Stream snapshots
+								<input type="number" name="waves" min={1} max={64} defaultValue={8} />
 							</label>
 							<label>
-								Total turns<input type="number" name="turns" min={1} max={200} defaultValue={4} />
+								Total turns
+								<input type="number" name="turns" min={1} max={200} defaultValue={4} />
 							</label>
 							<label>
-								Shell hydration delay
-								(ms)<input type="number" name="hydrateDelay" min={0} max={5000} defaultValue={0} />
+								Shell hydration delay (ms)
+								<input type="number" name="hydrateDelay" min={0} max={5000} defaultValue={0} />
 							</label>
 							<label>
-								Initial
-								prompt<input
+								Initial prompt
+								<input
 									name="q"
 									defaultValue="Explain how SSR streaming signals work."
 									maxLength={4000}
 								/>
 							</label>
 							<div class="run-actions">
-								<button class="primary" type="submit" formAction="/">Run deferred</button>
-								<button type="submit" formAction="/eager">Run eager</button>
+								<button class="primary" type="submit" formAction="/">
+									Run deferred
+								</button>
+								<button type="submit" formAction="/eager">
+									Run eager
+								</button>
 							</div>
 						</form>
 					</section>

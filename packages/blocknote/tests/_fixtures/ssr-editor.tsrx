@@ -22,9 +22,7 @@ export function DescriptorSsrEditor(props: { text: string }) @{
 
 export function SsrEditor(props: { text: string }) @{
 	const editor = useCreateBlockNote({
-		initialContent: [
-			{ type: 'paragraph', content: props.text },
-		],
+		initialContent: [{ type: 'paragraph', content: props.text }],
 	});
 
 	<main id="ssr-editor">

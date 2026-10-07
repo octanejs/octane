@@ -69,9 +69,7 @@ export function UseRetry(props: { server: boolean; text: Promise<string> | null 
 		@try {
 			<section>
 				{el}
-				<p>
-					{props.text === null ? 'A' : createElement(Waits, { text: props.text })}
-				</p>
+				<p>{props.text === null ? 'A' : createElement(Waits, { text: props.text })}</p>
 			</section>
 		} @pending {
 			<i>{'loading'}</i>

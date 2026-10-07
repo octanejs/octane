@@ -37,7 +37,7 @@
       "arch": "any",
       "packageManager": "pnpm@12.9.1",
       "lockfile": "pnpm-lock.yaml",
-      "lockfileSha256": "e92f4520cd88a2593a0ecd555e0532b2e4e8bb1396c9558a09f0cbf3fbaa5917"
+      "lockfileSha256": "caea67fe61ab57f3e8cbd8a0e55f0e8b3014b3dd6815c6fe6e158095f291daeb"
     }
   },
   "lanes": [
@@ -490,7 +490,7 @@
         {
           "path": "packages/hook-form/tests/_fixtures/forms.tsrx",
           "role": "support",
-          "sha256": "7ce8fcc9ff9cbd73b07a26a652cd149894781f67c25e5eccb0992115fab9bd03"
+          "sha256": "30fa8a645c974d45fb6ac23583633ee4e7fbc5f6ccc654e8efa6b0b104a9b145"
         },
         {
           "path": "packages/octane/tests/differential/_rig.ts",

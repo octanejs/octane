@@ -17,46 +17,43 @@ import { useEffect, useState } from 'octane';
  */
 export interface TablePluginProps {
 	/**
- * When `false` (default `true`), merged cell support (colspan and rowspan)
- * will be disabled and all tables will be forced into a regular grid with
- * 1x1 table cells.
- */
+	 * When `false` (default `true`), merged cell support (colspan and rowspan)
+	 * will be disabled and all tables will be forced into a regular grid with
+	 * 1x1 table cells.
+	 */
 	hasCellMerge?: boolean;
 	/**
- * When `false` (default `true`), the background color of TableCellNode will
- * always be removed.
- */
+	 * When `false` (default `true`), the background color of TableCellNode will
+	 * always be removed.
+	 */
 	hasCellBackgroundColor?: boolean;
 	/**
- * When `true` (default `true`), the tab key can be used to navigate table
- * cells.
- */
+	 * When `true` (default `true`), the tab key can be used to navigate table
+	 * cells.
+	 */
 	hasTabHandler?: boolean;
 	/**
- * When `true` (default `false`), tables will be wrapped in a `<div>` to
- * enable horizontal scrolling.
- */
+	 * When `true` (default `false`), tables will be wrapped in a `<div>` to
+	 * enable horizontal scrolling.
+	 */
 	hasHorizontalScroll?: boolean;
 	/**
- * When `true` (default `false`), nested tables will be allowed.
- *
- * @experimental Nested tables are not officially supported.
- */
+	 * When `true` (default `false`), nested tables will be allowed.
+	 *
+	 * @experimental Nested tables are not officially supported.
+	 */
 	hasNestedTables?: boolean;
 }
 
 export function TablePlugin(props: TablePluginProps) {
 	const [editor] = useLexicalComposerContext();
-	const hasCellMerge =
-		props.hasCellMerge === undefined ? true : props.hasCellMerge;
+	const hasCellMerge = props.hasCellMerge === undefined ? true : props.hasCellMerge;
 	const hasCellBackgroundColor =
 		props.hasCellBackgroundColor === undefined ? true : props.hasCellBackgroundColor;
-	const hasTabHandler =
-		props.hasTabHandler === undefined ? true : props.hasTabHandler;
+	const hasTabHandler = props.hasTabHandler === undefined ? true : props.hasTabHandler;
 	const hasHorizontalScroll =
 		props.hasHorizontalScroll === undefined ? false : props.hasHorizontalScroll;
-	const hasNestedTables =
-		props.hasNestedTables === undefined ? false : props.hasNestedTables;
+	const hasNestedTables = props.hasNestedTables === undefined ? false : props.hasNestedTables;
 
 	useEffect(() => {
 		const hadHorizontalScroll = $isScrollableTablesActive(editor);
@@ -72,10 +69,10 @@ export function TablePlugin(props: TablePluginProps) {
 		hasNestedTablesSignal.value = hasNestedTables;
 	}
 
-	useEffect(() => registerTablePlugin(editor, { hasNestedTables: hasNestedTablesSignal }), [
-		editor,
-		hasNestedTablesSignal,
-	]);
+	useEffect(
+		() => registerTablePlugin(editor, { hasNestedTables: hasNestedTablesSignal }),
+		[editor, hasNestedTablesSignal],
+	);
 
 	useEffect(() => registerTableSelectionObserver(editor, hasTabHandler), [editor, hasTabHandler]);
 

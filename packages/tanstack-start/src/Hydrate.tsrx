@@ -30,16 +30,14 @@ import type {
 export type OctaneHydrationStrategy<
 	TWhen extends HydrationWhen = HydrationWhen,
 	TCanPrefetch extends boolean = boolean,
-> =
-	CoreHydrationStrategy<TWhen, TCanPrefetch> & {
-		_h: (props: HydrateProps) => OctaneNode;
-	};
+> = CoreHydrationStrategy<TWhen, TCanPrefetch> & {
+	_h: (props: HydrateProps) => OctaneNode;
+};
 
 export type HydrationStrategy<
 	TWhen extends HydrationWhen = HydrationWhen,
 	TCanPrefetch extends boolean = boolean,
-> =
-	OctaneHydrationStrategy<TWhen, TCanPrefetch>;
+> = OctaneHydrationStrategy<TWhen, TCanPrefetch>;
 
 export type HydrateWhen = OctaneHydrationStrategy | (() => OctaneHydrationStrategy);
 
@@ -63,16 +61,14 @@ export type HydrateOptions =
 			split?: boolean;
 	  });
 
-export type HydrateProps =
-	HydrateOptions & {
-		children: OctaneNode;
-	};
+export type HydrateProps = HydrateOptions & {
+	children: OctaneNode;
+};
 
-export type InternalHydrateProps =
-	HydrateProps & {
-		h?: string;
-		p?: () => Promise<void>;
-	};
+export type InternalHydrateProps = HydrateProps & {
+	h?: string;
+	p?: () => Promise<void>;
+};
 
 const dynamicType = 'dynamic';
 

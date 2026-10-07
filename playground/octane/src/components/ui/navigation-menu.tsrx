@@ -16,7 +16,12 @@ import { cn } from '@/lib/utils';
 
 type Props = { className?: string } & Record<string, unknown>;
 
-export function NavigationMenu({ className, children, viewport = true, ...props }: Props & {
+export function NavigationMenu({
+	className,
+	children,
+	viewport = true,
+	...props
+}: Props & {
 	children?: OctaneNode;
 	viewport?: boolean;
 }) {
@@ -59,7 +64,11 @@ export const navigationMenuTriggerStyle = cva(
 	'cn-navigation-menu-trigger group/navigation-menu-trigger inline-flex h-9 w-max items-center justify-center outline-none disabled:pointer-events-none',
 );
 
-export function NavigationMenuTrigger({ className, children, ...props }: Props & {
+export function NavigationMenuTrigger({
+	className,
+	children,
+	...props
+}: Props & {
 	children?: OctaneNode;
 }) {
 	return createElement(

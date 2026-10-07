@@ -4,9 +4,7 @@ import { DreiScene } from './Drei.three.tsrx';
 export function DreiDemo() @{
 	<div>
 		<h2 class="demo-title">Drei on Octane</h2>
-		<p class="demo-blurb">
-			Drag to orbit a scene composed with the full @octanejs/drei binding.
-		</p>
+		<p class="demo-blurb">Drag to orbit a scene composed with the full @octanejs/drei binding.</p>
 		<div
 			data-drei-playground="ready"
 			style={{

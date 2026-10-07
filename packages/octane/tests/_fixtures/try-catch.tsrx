@@ -10,9 +10,12 @@ function ThrowsOnRender(props) @{
 
 // Inner component that registers a useEffect that throws after mount.
 function ThrowsInEffect(props) @{
-	useEffect((trigger) => {
-		if (trigger) throw new Error('effect boom');
-	}, [props.bang]);
+	useEffect(
+		(trigger) => {
+			if (trigger) throw new Error('effect boom');
+		},
+		[props.bang],
+	);
 	<p class="ok">{'ok-for-now'}</p>
 }
 
@@ -60,11 +63,11 @@ export function Nested() @{
 				@try {
 					<AlwaysThrows />
 				} @catch (err) {
-					<span class="inner-msg">{'inner: ' + err.message as string}</span>
+					<span class="inner-msg">{('inner: ' + err.message) as string}</span>
 				}
 			</div>
 		} @catch (err) {
-			<span class="outer-msg">{'outer: ' + err.message as string}</span>
+			<span class="outer-msg">{('outer: ' + err.message) as string}</span>
 		}
 	</>
 }
@@ -75,7 +78,9 @@ export function StatefulInside() @{
 	<>
 		@try {
 			<div class="wrap">
-				<button id="inc" onClick={() => setN(n + 1)}>{n as string}</button>
+				<button id="inc" onClick={() => setN(n + 1)}>
+					{n as string}
+				</button>
 			</div>
 		} @catch (err) {
 			<span class="caught">{err.message as string}</span>

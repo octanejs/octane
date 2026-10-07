@@ -56,11 +56,11 @@ export const MermaidDownloadDropdown = ({
 			// Use a stable ID based on chart content hash and timestamp to ensure uniqueness
 			const chartHash = chart.split('').reduce((acc, char) => {
 				// biome-ignore lint/suspicious/noBitwiseOperators: "Required for Mermaid"
-				return (acc << 5) - acc + char.charCodeAt(0) | 0;
+				return ((acc << 5) - acc + char.charCodeAt(0)) | 0;
 			}, 0);
-			const uniqueId = `mermaid-${Math.abs(chartHash)}-${Date.now()}-${Math.random().toString(
-				36,
-			).substring(2, 9)}`;
+			const uniqueId = `mermaid-${Math.abs(chartHash)}-${Date.now()}-${Math.random()
+				.toString(36)
+				.substring(2, 9)}`;
 
 			const { svg } = await mermaid.render(uniqueId, chart);
 			// For SVG and PNG, we need to extract the rendered SVG
@@ -105,21 +105,22 @@ export const MermaidDownloadDropdown = ({
 		};
 	}, []);
 
-	return <div className={cn('relative')} ref={dropdownRef}>
-		<button
-			className={cn(
-				'cursor-pointer p-1 text-muted-foreground transition-all hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50',
-				className,
-			)}
-			disabled={isAnimating}
-			onClick={() => setIsOpen(!isOpen)}
-			title={t.downloadDiagram}
-			type="button"
-		>
-			{children ?? <icons.DownloadIcon size={14} />}
-		</button>
-		{isOpen
-			? <div
+	return (
+		<div className={cn('relative')} ref={dropdownRef}>
+			<button
+				className={cn(
+					'cursor-pointer p-1 text-muted-foreground transition-all hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50',
+					className,
+				)}
+				disabled={isAnimating}
+				onClick={() => setIsOpen(!isOpen)}
+				title={t.downloadDiagram}
+				type="button"
+			>
+				{children ?? <icons.DownloadIcon size={14} />}
+			</button>
+			{isOpen ? (
+				<div
 					className={cn(
 						'absolute top-full right-0 z-10 mt-1 min-w-[120px] overflow-hidden rounded-md border border-border bg-background shadow-lg',
 					)}
@@ -129,20 +130,27 @@ export const MermaidDownloadDropdown = ({
 						onClick={() => downloadMermaid('svg')}
 						title={t.downloadDiagramAsSvg}
 						type="button"
-					>{t.mermaidFormatSvg}</button>
+					>
+						{t.mermaidFormatSvg}
+					</button>
 					<button
 						className={cn('w-full px-3 py-2 text-left text-sm transition-colors hover:bg-muted/40')}
 						onClick={() => downloadMermaid('png')}
 						title={t.downloadDiagramAsPng}
 						type="button"
-					>{t.mermaidFormatPng}</button>
+					>
+						{t.mermaidFormatPng}
+					</button>
 					<button
 						className={cn('w-full px-3 py-2 text-left text-sm transition-colors hover:bg-muted/40')}
 						onClick={() => downloadMermaid('mmd')}
 						title={t.downloadDiagramAsMmd}
 						type="button"
-					>{t.mermaidFormatMmd}</button>
+					>
+						{t.mermaidFormatMmd}
+					</button>
 				</div>
-			: null}
-	</div>;
+			) : null}
+		</div>
+	);
 };

@@ -72,11 +72,11 @@ export const Mermaid = ({
 				// Use a stable ID based on chart content hash and timestamp to ensure uniqueness
 				const chartHash = chart.split('').reduce((acc, char) => {
 					// biome-ignore lint/suspicious/noBitwiseOperators: "Required for Mermaid"
-					return (acc << 5) - acc + char.charCodeAt(0) | 0;
+					return ((acc << 5) - acc + char.charCodeAt(0)) | 0;
 				}, 0);
-				const uniqueId = `mermaid-${Math.abs(chartHash)}-${Date.now()}-${Math.random().toString(
-					36,
-				).substring(2, 9)}`;
+				const uniqueId = `mermaid-${Math.abs(chartHash)}-${Date.now()}-${Math.random()
+					.toString(36)
+					.substring(2, 9)}`;
 
 				const { svg } = await mermaid.render(uniqueId, chart);
 
@@ -118,12 +118,14 @@ export const Mermaid = ({
 	}
 
 	if (isLoading && !svgContent && !lastValidSvg) {
-		return <div className={cn('my-4 flex justify-center p-4', className)} ref={containerRef}>
-			<div className={cn('flex items-center space-x-2 text-muted-foreground')}>
-				<div className={cn('h-4 w-4 animate-spin rounded-full border-current border-b-2')} />
-				<span className={cn('text-sm')}>Loading diagram...</span>
+		return (
+			<div className={cn('my-4 flex justify-center p-4', className)} ref={containerRef}>
+				<div className={cn('flex items-center space-x-2 text-muted-foreground')}>
+					<div className={cn('h-4 w-4 animate-spin rounded-full border-current border-b-2')} />
+					<span className={cn('text-sm')}>Loading diagram...</span>
+				</div>
 			</div>
-		</div>;
+		);
 	}
 
 	// Only show error if we have no valid SVG to display
@@ -132,46 +134,50 @@ export const Mermaid = ({
 
 		// Use custom error component if provided
 		if (ErrorComponent) {
-			return <div ref={containerRef}>
-				<ErrorComponent chart={chart} error={error} retry={retry} />
-			</div>;
+			return (
+				<div ref={containerRef}>
+					<ErrorComponent chart={chart} error={error} retry={retry} />
+				</div>
+			);
 		}
 
 		// Default error display
-		return <div className={cn('rounded-md bg-red-50 p-4', className)} ref={containerRef}>
-			<p className={cn('font-mono text-red-700 text-sm')}>
-				Mermaid Error:
-				{error}
-			</p>
-			<details className={cn('mt-2')}>
-				<summary className={cn('cursor-pointer text-red-600 text-xs')}>
-					Show Code
-				</summary>
-				<pre
-					className={cn('mt-2 overflow-x-auto rounded bg-red-100 p-2 text-red-800 text-xs')}
-				>{chart}</pre>
-			</details>
-		</div>;
+		return (
+			<div className={cn('rounded-md bg-red-50 p-4', className)} ref={containerRef}>
+				<p className={cn('font-mono text-red-700 text-sm')}>
+					Mermaid Error:
+					{error}
+				</p>
+				<details className={cn('mt-2')}>
+					<summary className={cn('cursor-pointer text-red-600 text-xs')}>Show Code</summary>
+					<pre className={cn('mt-2 overflow-x-auto rounded bg-red-100 p-2 text-red-800 text-xs')}>
+						{chart}
+					</pre>
+				</details>
+			</div>
+		);
 	}
 
 	// Always render the SVG if we have content (either current or last valid)
 	const displaySvg = svgContent || lastValidSvg;
 
-	return <div className={cn('size-full', className)} data-streamdown="mermaid" ref={containerRef}>
-		<PanZoom
-			className={cn(fullscreen ? 'size-full overflow-hidden' : 'overflow-hidden', className)}
-			fullscreen={fullscreen}
-			maxZoom={3}
-			minZoom={0.5}
-			showControls={showControls}
-			zoomStep={0.1}
-		>
-			<div
-				aria-label="Mermaid chart"
-				className={cn('flex justify-center', fullscreen ? 'size-full items-center' : null)}
-				dangerouslySetInnerHTML={{ __html: displaySvg }}
-				role="img"
-			/>
-		</PanZoom>
-	</div>;
+	return (
+		<div className={cn('size-full', className)} data-streamdown="mermaid" ref={containerRef}>
+			<PanZoom
+				className={cn(fullscreen ? 'size-full overflow-hidden' : 'overflow-hidden', className)}
+				fullscreen={fullscreen}
+				maxZoom={3}
+				minZoom={0.5}
+				showControls={showControls}
+				zoomStep={0.1}
+			>
+				<div
+					aria-label="Mermaid chart"
+					className={cn('flex justify-center', fullscreen ? 'size-full items-center' : null)}
+					dangerouslySetInnerHTML={{ __html: displaySvg }}
+					role="img"
+				/>
+			</PanZoom>
+		</div>
+	);
 };

@@ -162,10 +162,12 @@ describeEachReactMode('useActor (%s)', ({ suiteKey, render }) => {
 			case 'loading':
 				return <div>Loading...</div>;
 			case 'success':
-				return <div>
-					Success! Data:
-					<div data-testid="data">{current.context.data}</div>
-				</div>;
+				return (
+					<div>
+						Success! Data:
+						<div data-testid="data">{current.context.data}</div>
+					</div>
+				);
 			default:
 				return null;
 		}
@@ -263,12 +265,13 @@ describeEachReactMode('useActor (%s)', ({ suiteKey, render }) => {
 			states: {
 				start: {
 					entry: assign({
-						ref: ({ spawn }) => spawn(
-							fromPromise(() => {
-								return new Promise((res) => res(42));
-							}),
-							{ id: 'my-promise' },
-						),
+						ref: ({ spawn }) =>
+							spawn(
+								fromPromise(() => {
+									return new Promise((res) => res(42));
+								}),
+								{ id: 'my-promise' },
+							),
 					}),
 					on: {
 						'xstate.done.actor.my-promise': 'success',
@@ -333,20 +336,22 @@ describeEachReactMode('useActor (%s)', ({ suiteKey, render }) => {
 				}),
 			);
 
-			return <>
-				<button
-					data-testid="extbutton"
-					onClick={(_) => {
-						setExt(2);
-					}}
-				/>
-				<button
-					data-testid="button"
-					onClick={(_) => {
-						send({ type: 'SET_LATEST' });
-					}}
-				/>
-			</>;
+			return (
+				<>
+					<button
+						data-testid="extbutton"
+						onClick={(_) => {
+							setExt(2);
+						}}
+					/>
+					<button
+						data-testid="button"
+						onClick={(_) => {
+							send({ type: 'SET_LATEST' });
+						}}
+					/>
+				</>
+			);
 		};
 
 		render(<Component />);
@@ -398,20 +403,22 @@ describeEachReactMode('useActor (%s)', ({ suiteKey, render }) => {
 				}),
 			);
 
-			return <>
-				<button
-					data-testid="extbutton"
-					onClick={(_) => {
-						setExt(2);
-					}}
-				/>
-				<button
-					data-testid="button"
-					onClick={(_) => {
-						send({ type: 'NEXT' });
-					}}
-				/>
-			</>;
+			return (
+				<>
+					<button
+						data-testid="extbutton"
+						onClick={(_) => {
+							setExt(2);
+						}}
+					/>
+					<button
+						data-testid="button"
+						onClick={(_) => {
+							send({ type: 'NEXT' });
+						}}
+					/>
+				</>
+			);
 		};
 
 		render(<Component />);
@@ -459,20 +466,22 @@ describeEachReactMode('useActor (%s)', ({ suiteKey, render }) => {
 				}),
 			);
 
-			return <>
-				<button
-					data-testid="extbutton"
-					onClick={(_) => {
-						setExt(true);
-					}}
-				/>
-				<button
-					data-testid="button"
-					onClick={(_) => {
-						send({ type: 'TOGGLE' });
-					}}
-				/>
-			</>;
+			return (
+				<>
+					<button
+						data-testid="extbutton"
+						onClick={(_) => {
+							setExt(true);
+						}}
+					/>
+					<button
+						data-testid="button"
+						onClick={(_) => {
+							send({ type: 'TOGGLE' });
+						}}
+					/>
+				</>
+			);
 		};
 
 		render(<Toggle />);
@@ -561,10 +570,12 @@ describeEachReactMode('useActor (%s)', ({ suiteKey, render }) => {
 				effectsFired++;
 			}, [state.context.stuff]);
 
-			return <>
-				<div>{`Counter: ${state.context.counter}`}</div>
-				<button onClick={() => send({ type: 'INC' })}>Increase</button>
-			</>;
+			return (
+				<>
+					<div>{`Counter: ${state.context.counter}`}</div>
+					<button onClick={() => send({ type: 'INC' })}>Increase</button>
+				</>
+			);
 		};
 
 		const { getByRole } = render(<App />);
@@ -742,10 +753,12 @@ describeEachReactMode('useActor (%s)', ({ suiteKey, render }) => {
 
 		const App = () => {
 			const [state, send] = useActor(machine);
-			return <>
-				<div data-testid="result">{state.value}</div>
-				<button onClick={() => send({ type: 'EV' })} />
-			</>;
+			return (
+				<>
+					<div data-testid="result">{state.value}</div>
+					<button onClick={() => send({ type: 'EV' })} />
+				</>
+			);
 		};
 
 		render(<App />);
@@ -790,10 +803,12 @@ describeEachReactMode('useActor (%s)', ({ suiteKey, render }) => {
 					},
 				}),
 			);
-			return <>
-				<div data-testid="result">{state.value}</div>
-				<button onClick={() => send({ type: 'EV' })} />
-			</>;
+			return (
+				<>
+					<div data-testid="result">{state.value}</div>
+					<button onClick={() => send({ type: 'EV' })} />
+				</>
+			);
 		};
 
 		const { rerender } = render(<App isAwesome={false} />);
@@ -862,10 +877,12 @@ describeEachReactMode('useActor (%s)', ({ suiteKey, render }) => {
 		const Test = () => {
 			const [state, send] = useActor(machine);
 
-			return <>
-				<ChildTest send={send} />
-				{state.value}
-			</>;
+			return (
+				<>
+					<ChildTest send={send} />
+					{state.value}
+				</>
+			);
 		};
 
 		const { container } = render(<Test />);
@@ -1003,9 +1020,7 @@ describeEachReactMode('useActor (%s)', ({ suiteKey, render }) => {
 
 		const App = () => {
 			const [state] = useActor(m);
-			return <>
-				{state.context.count}
-			</>;
+			return <>{state.context.count}</>;
 		};
 
 		const { container } = render(<App />);
@@ -1089,9 +1104,7 @@ describeEachReactMode('useActor (%s)', ({ suiteKey, render }) => {
 
 		const App = () => {
 			const [state] = useActor(machine);
-			return <>
-				{state.value}
-			</>;
+			return <>{state.value}</>;
 		};
 
 		const { container } = render(<App />);
@@ -1105,28 +1118,25 @@ describeEachReactMode('useActor (%s)', ({ suiteKey, render }) => {
 		expect(container.textContent).toBe('two');
 	});
 
-	it(
-		'should throw an error to an error boundary when the actor reaches an error state',
-		async () => {
-			const errorMessage = 'test_useActor_error';
+	it('should throw an error to an error boundary when the actor reaches an error state', async () => {
+		const errorMessage = 'test_useActor_error';
 
-			const machine = createMachine({
-				initial: 'loading',
-				states: {
-					loading: {
-						invoke: {
-							src: fromPromise(() => Promise.reject(new Error(errorMessage))),
-						},
+		const machine = createMachine({
+			initial: 'loading',
+			states: {
+				loading: {
+					invoke: {
+						src: fromPromise(() => Promise.reject(new Error(errorMessage))),
 					},
 				},
-			});
+			},
+		});
 
-			console.error = vi.fn();
+		console.error = vi.fn();
 
-			render(<ErrorBoundary machine={machine} />);
+		render(<ErrorBoundary machine={machine} />);
 
-			await screen.findByTestId('error');
-			expect(screen.getByTestId('error').textContent).toBe(errorMessage);
-		},
-	);
+		await screen.findByTestId('error');
+		expect(screen.getByTestId('error').textContent).toBe(errorMessage);
+	});
 });

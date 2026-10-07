@@ -5,10 +5,10 @@ import { DOMCounter, DOMRegionTheme } from './dom-region-content.tsrx';
 export function DOMRegionScene(props) @{
 	const [domEffectCount, setDOMEffectCount] = useThreeState(0);
 	const [effectToken, setEffectToken] = useThreeState(props.effectToken);
-	useLayoutEffect(() => props.captureEffectToken?.(setEffectToken), [
-		props.captureEffectToken,
-		setEffectToken,
-	]);
+	useLayoutEffect(
+		() => props.captureEffectToken?.(setEffectToken),
+		[props.captureEffectToken, setEffectToken],
+	);
 	<DOMRegionTheme value={props.theme}>
 		<group name={'dom-effect-' + domEffectCount}>
 			@for (const item of props.order; key item) {

@@ -11,38 +11,36 @@ const themeKey = 'theme';
 type ThemeMode = v.InferOutput<typeof themeModeSchema>;
 type ResolvedTheme = v.InferOutput<typeof resolvedThemeSchema>;
 
-const getStoredThemeMode = createIsomorphicFn().server((): ThemeMode => 'auto').client(
-	(): ThemeMode => {
+const getStoredThemeMode = createIsomorphicFn()
+	.server((): ThemeMode => 'auto')
+	.client((): ThemeMode => {
 		try {
 			const storedTheme = localStorage.getItem(themeKey);
 			return v.parse(themeModeSchema, storedTheme);
 		} catch {
 			return 'auto';
 		}
-	},
-);
+	});
 
 const setStoredThemeMode = createClientOnlyFn((theme: ThemeMode) => {
 	try {
 		const parsedTheme = v.parse(themeModeSchema, theme);
 		localStorage.setItem(themeKey, parsedTheme);
-	} catch {
-	}
+	} catch {}
 });
 
-const getSystemTheme = createIsomorphicFn().server((): ResolvedTheme => 'light').client(
-	(): ResolvedTheme => {
+const getSystemTheme = createIsomorphicFn()
+	.server((): ResolvedTheme => 'light')
+	.client((): ResolvedTheme => {
 		return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
-	},
-);
+	});
 
 const updateThemeClass = createClientOnlyFn((themeMode: ThemeMode) => {
 	const root = document.documentElement;
 	root.classList.add('theme-switching');
 
 	root.classList.remove('light', 'dark', 'auto');
-	const newTheme =
-		themeMode === 'auto' ? getSystemTheme() : themeMode;
+	const newTheme = themeMode === 'auto' ? getSystemTheme() : themeMode;
 	root.classList.add(newTheme);
 
 	if (themeMode === 'auto') {
@@ -119,9 +117,11 @@ export function ThemeProvider({ children }: ThemeProviderProps) {
 		setTheme(getNextTheme(themeMode));
 	};
 
-	return <ThemeContext
-		value={{ themeMode, resolvedTheme, setTheme, toggleMode }}
-	>{children}</ThemeContext>;
+	return (
+		<ThemeContext value={{ themeMode, resolvedTheme, setTheme, toggleMode }}>
+			{children}
+		</ThemeContext>
+	);
 }
 
 export const useTheme = () => {
@@ -134,9 +134,9 @@ export const useTheme = () => {
 
 // Returns the class string for <html> element
 // Reads from DOM on client (matches what head script set), empty on server
-const getHtmlClass = createIsomorphicFn().server(() => '').client(
-	() => document.documentElement.className,
-);
+const getHtmlClass = createIsomorphicFn()
+	.server(() => '')
+	.client(() => document.documentElement.className);
 
 export function useHtmlClass(): string {
 	return getHtmlClass();

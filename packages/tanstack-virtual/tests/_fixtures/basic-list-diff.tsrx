@@ -54,8 +54,12 @@ export function BasicList() @{
 		>
 			s0
 		</button>
-		<button id="count-swap" onClick={() => setCount(count === 30 ? 100 : 30)}>swap</button>
-		<button id="to-idx-40" onClick={() => virtualizer.scrollToIndex(40)}>i40</button>
+		<button id="count-swap" onClick={() => setCount(count === 30 ? 100 : 30)}>
+			swap
+		</button>
+		<button id="to-idx-40" onClick={() => virtualizer.scrollToIndex(40)}>
+			i40
+		</button>
 		<div id="scroller" ref={scrollRef} style={{ height: '200px', overflow: 'auto' }}>
 			<div style={{ height: virtualizer.getTotalSize() + 'px', position: 'relative' }}>
 				@for (const item of virtualizer.getVirtualItems(); key item.key) {

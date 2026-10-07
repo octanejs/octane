@@ -8,13 +8,15 @@ function Boom(props) {
 // fragment model. The try/catch bodies stay in the component (closure); the two
 // helper fns thread as `props.hN` holes.
 export function RetTry(props) {
-	return <div>
-		@try {
-			<Boom boom={props.boom} />
-		} @catch (e) {
-			<span class="caught">caught</span>
-		}
-	</div>;
+	return (
+		<div>
+			@try {
+				<Boom boom={props.boom} />
+			} @catch (e) {
+				<span class="caught">caught</span>
+			}
+		</div>
+	);
 }
 
 // `@{}` oracle — must produce byte-identical DOM.

@@ -58,22 +58,21 @@ export function DropdownMenuTrigger(props: Record<string, unknown>) @{
 }
 
 /** Props routed to the Positioner rather than the popup. */
-export type BaseUiPositioningProps =
-	Pick<
-		MenuPrimitive.Positioner.Props,
-		| 'side'
-		| 'sideOffset'
-		| 'align'
-		| 'alignOffset'
-		| 'anchor'
-		| 'positionMethod'
-		| 'collisionBoundary'
-		| 'collisionPadding'
-		| 'collisionAvoidance'
-		| 'arrowPadding'
-		| 'sticky'
-		| 'disableAnchorTracking'
-	>;
+export type BaseUiPositioningProps = Pick<
+	MenuPrimitive.Positioner.Props,
+	| 'side'
+	| 'sideOffset'
+	| 'align'
+	| 'alignOffset'
+	| 'anchor'
+	| 'positionMethod'
+	| 'collisionBoundary'
+	| 'collisionPadding'
+	| 'collisionAvoidance'
+	| 'arrowPadding'
+	| 'sticky'
+	| 'disableAnchorTracking'
+>;
 
 export interface DropdownMenuContentProps extends Props, BaseUiPositioningProps {}
 
@@ -124,7 +123,12 @@ export function DropdownMenuGroup(props: Record<string, unknown>) @{
 	<MenuPrimitive.Group data-slot="dropdown-menu-group" {...props} />
 }
 
-export function DropdownMenuItem({ className, inset, variant = 'default', ...props }: Props & {
+export function DropdownMenuItem({
+	className,
+	inset,
+	variant = 'default',
+	...props
+}: Props & {
 	inset?: boolean;
 	variant?: 'default' | 'destructive';
 }) @{
@@ -133,24 +137,26 @@ export function DropdownMenuItem({ className, inset, variant = 'default', ...pro
 		data-inset={inset}
 		data-variant={variant}
 		className={cn(
-			'group/dropdown-menu-item relative flex cursor-default items-center gap-1.5 rounded-md px-1.5 py-1 text-sm outline-hidden select-none focus:bg-accent focus:text-accent-foreground not-data-[variant=destructive]:focus:**:text-accent-foreground data-inset:pl-7 data-[variant=destructive]:text-destructive data-[variant=destructive]:focus:bg-destructive/10 data-[variant=destructive]:focus:text-destructive dark:data-[variant=destructive]:focus:bg-destructive/20 data-disabled:pointer-events-none data-disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*=\'size-\'])]:size-4 data-[variant=destructive]:*:[svg]:text-destructive',
+			"group/dropdown-menu-item relative flex cursor-default items-center gap-1.5 rounded-md px-1.5 py-1 text-sm outline-hidden select-none focus:bg-accent focus:text-accent-foreground not-data-[variant=destructive]:focus:**:text-accent-foreground data-inset:pl-7 data-[variant=destructive]:text-destructive data-[variant=destructive]:focus:bg-destructive/10 data-[variant=destructive]:focus:text-destructive dark:data-[variant=destructive]:focus:bg-destructive/20 data-disabled:pointer-events-none data-disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4 data-[variant=destructive]:*:[svg]:text-destructive",
 			className,
 		)}
 		{...props}
 	/>
 }
 
-export function DropdownMenuCheckboxItem(props: Props & {
-	checked?: boolean;
-	inset?: boolean;
-}) @{
+export function DropdownMenuCheckboxItem(
+	props: Props & {
+		checked?: boolean;
+		inset?: boolean;
+	},
+) @{
 	const { className, children: _children, checked, inset, ...rest } = props;
 
 	<MenuPrimitive.CheckboxItem
 		data-slot="dropdown-menu-checkbox-item"
 		data-inset={inset}
 		className={cn(
-			'relative flex cursor-default items-center gap-1.5 rounded-md py-1 pr-8 pl-1.5 text-sm outline-hidden select-none focus:bg-accent focus:text-accent-foreground focus:**:text-accent-foreground data-inset:pl-7 data-disabled:pointer-events-none data-disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*=\'size-\'])]:size-4',
+			"relative flex cursor-default items-center gap-1.5 rounded-md py-1 pr-8 pl-1.5 text-sm outline-hidden select-none focus:bg-accent focus:text-accent-foreground focus:**:text-accent-foreground data-inset:pl-7 data-disabled:pointer-events-none data-disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4",
 			className,
 		)}
 		checked={checked}
@@ -172,17 +178,19 @@ export function DropdownMenuRadioGroup(props: Record<string, unknown>) @{
 	<MenuPrimitive.RadioGroup data-slot="dropdown-menu-radio-group" {...props} />
 }
 
-export function DropdownMenuRadioItem(props: Omit<MenuPrimitive.RadioItem.Props, 'className'> & {
-	className?: string;
-	inset?: boolean;
-}) @{
+export function DropdownMenuRadioItem(
+	props: Omit<MenuPrimitive.RadioItem.Props, 'className'> & {
+		className?: string;
+		inset?: boolean;
+	},
+) @{
 	const { className, children: _children, inset, ...rest } = props;
 
 	<MenuPrimitive.RadioItem
 		data-slot="dropdown-menu-radio-item"
 		data-inset={inset}
 		className={cn(
-			'relative flex cursor-default items-center gap-1.5 rounded-md py-1 pr-8 pl-1.5 text-sm outline-hidden select-none focus:bg-accent focus:text-accent-foreground focus:**:text-accent-foreground data-inset:pl-7 data-disabled:pointer-events-none data-disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*=\'size-\'])]:size-4',
+			"relative flex cursor-default items-center gap-1.5 rounded-md py-1 pr-8 pl-1.5 text-sm outline-hidden select-none focus:bg-accent focus:text-accent-foreground focus:**:text-accent-foreground data-inset:pl-7 data-disabled:pointer-events-none data-disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4",
 			className,
 		)}
 		{...rest}
@@ -243,7 +251,7 @@ export function DropdownMenuSubTrigger(props: Props & { inset?: boolean }) @{
 		data-slot="dropdown-menu-sub-trigger"
 		data-inset={inset}
 		className={cn(
-			'flex cursor-default items-center gap-1.5 rounded-md px-1.5 py-1 text-sm outline-hidden select-none focus:bg-accent focus:text-accent-foreground not-data-[variant=destructive]:focus:**:text-accent-foreground data-inset:pl-7 data-popup-open:bg-accent data-popup-open:text-accent-foreground [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*=\'size-\'])]:size-4',
+			"flex cursor-default items-center gap-1.5 rounded-md px-1.5 py-1 text-sm outline-hidden select-none focus:bg-accent focus:text-accent-foreground not-data-[variant=destructive]:focus:**:text-accent-foreground data-inset:pl-7 data-popup-open:bg-accent data-popup-open:text-accent-foreground [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4",
 			className,
 		)}
 		{...rest}

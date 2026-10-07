@@ -67,16 +67,15 @@ type DocMetadata = {
 	next?: DocLink;
 };
 
-type DocContent =
-	ComponentBody<Record<string, unknown>> & {
-		contentTitle?: string;
-		frontMatter?: {
-			title?: string;
-			description?: string;
-			noIndex?: boolean;
-		};
-		metadata?: DocMetadata;
+type DocContent = ComponentBody<Record<string, unknown>> & {
+	contentTitle?: string;
+	frontMatter?: {
+		title?: string;
+		description?: string;
+		noIndex?: boolean;
 	};
+	metadata?: DocMetadata;
+};
 
 type RouteProps = {
 	attributes?: Record<string, unknown>;
@@ -131,8 +130,8 @@ function categoryItems(version: DocsVersion, href: string): DocLink[] {
 	for (const sidebar of Object.values(version.docsSidebars)) {
 		const category = findSidebarCategory(sidebar, href);
 		if (category === null) continue;
-		return (category.items ?? []).flatMap(
-			(item) => item.href === undefined
+		return (category.items ?? []).flatMap((item) =>
+			item.href === undefined
 				? []
 				: [
 						{
@@ -160,17 +159,13 @@ function ThemeLink(props: {
 	children?: OctaneNode;
 }) @{
 	@if (isExternal(props.href)) {
-		<a
-			href={props.href}
-			class={props.class}
-			aria-current={props['aria-current']}
-		>{props.children}</a>
+		<a href={props.href} class={props.class} aria-current={props['aria-current']}>
+			{props.children}
+		</a>
 	} @else {
-		<RouterLink
-			to={props.href}
-			class={props.class}
-			aria-current={props['aria-current']}
-		>{props.children}</RouterLink>
+		<RouterLink to={props.href} class={props.class} aria-current={props['aria-current']}>
+			{props.children}
+		</RouterLink>
 	}
 }
 
@@ -196,9 +191,9 @@ function Navbar(props: { config?: NavbarConfig }) @{
 					@for (const item of items; key navigationKey(item)) {
 						@if (resolvedHref(item) !== null) {
 							<li>
-								<ThemeLink
-									href={withBaseUrl(manifest.baseUrl, resolvedHref(item)!)}
-								>{item.label}</ThemeLink>
+								<ThemeLink href={withBaseUrl(manifest.baseUrl, resolvedHref(item)!)}>
+									{item.label}
+								</ThemeLink>
 							</li>
 						}
 					}
@@ -224,9 +219,9 @@ function Footer(props: { baseUrl: string; config?: FooterConfig }) @{
 								@for (const item of group.items; key navigationKey(item)) {
 									@if (resolvedHref(item) !== null) {
 										<li>
-											<ThemeLink
-												href={withBaseUrl(props.baseUrl, resolvedHref(item)!)}
-											>{item.label}</ThemeLink>
+											<ThemeLink href={withBaseUrl(props.baseUrl, resolvedHref(item)!)}>
+												{item.label}
+											</ThemeLink>
 										</li>
 									}
 								}
@@ -256,7 +251,9 @@ function SidebarItems(props: { items: SidebarItem[]; pathname: string }) @{
 								href={item.href}
 								class="octane-docs-sidebar__category"
 								aria-current={item.href === props.pathname ? 'page' : undefined}
-							>{item.label}</ThemeLink>
+							>
+								{item.label}
+							</ThemeLink>
 						} @else {
 							<span class="octane-docs-sidebar__category">{item.label}</span>
 						}
@@ -266,7 +263,9 @@ function SidebarItems(props: { items: SidebarItem[]; pathname: string }) @{
 					<ThemeLink
 						href={item.href}
 						aria-current={item.href === props.pathname ? 'page' : undefined}
-					>{item.label}</ThemeLink>
+					>
+						{item.label}
+					</ThemeLink>
 				} @else {
 					<span>{item.label}</span>
 				}
@@ -291,9 +290,9 @@ function PageMetadata(props: {
 		<Seo
 			title={title}
 			description={props.description}
-			canonical={props.permalink === undefined
-				? undefined
-				: absoluteUrl(manifest.site.url, props.permalink)}
+			canonical={
+				props.permalink === undefined ? undefined : absoluteUrl(manifest.site.url, props.permalink)
+			}
 			openGraph={{ title, description: props.description }}
 			robots={props.noIndex === true ? { index: false, follow: false } : undefined}
 		/>
@@ -331,9 +330,7 @@ function CardList(props: { items: DocLink[] }) @{
 }
 
 export function Root(props: { children?: OctaneNode }) @{
-	<>
-		{props.children}
-	</>
+	<>{props.children}</>
 }
 
 export function DocsRoot(props: { children?: OctaneNode }) @{
@@ -351,16 +348,11 @@ export function DocVersionRoot(props: { children?: OctaneNode; version: DocsVers
 	<VersionContext value={props.version}>{props.children}</VersionContext>
 }
 
-export function DocRoot(props: {
-	children?: OctaneNode;
-	location: Location;
-	route: RouteProps;
-}) @{
+export function DocRoot(props: { children?: OctaneNode; location: Location; route: RouteProps }) @{
 	const version = useDocsVersion();
 	const activeRoute = props.route.routes?.find((route) => route.path === props.location.pathname);
 	const sidebarId = activeRoute?.attributes?.sidebar;
-	const sidebar =
-		typeof sidebarId === 'string' ? version.docsSidebars[sidebarId] ?? [] : [];
+	const sidebar = typeof sidebarId === 'string' ? (version.docsSidebars[sidebarId] ?? []) : [];
 
 	<div class="octane-docs-layout">
 		@if (sidebar.length > 0) {

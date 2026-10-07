@@ -6,10 +6,7 @@ export interface Product {
 	priceCents: number;
 }
 
-export function App(props: {
-	productId: string;
-	loadProduct: (id: string) => Promise<Product>;
-}) @{
+export function App(props: { productId: string; loadProduct: (id: string) => Promise<Product> }) @{
 	<section aria-label="Product details">
 		@try {
 			const product = use(props.loadProduct(props.productId));
@@ -20,9 +17,10 @@ export function App(props: {
 		} @pending {
 			<p class="loading">Loading product…</p>
 		} @catch (error) {
-			const message =
-				error instanceof Error ? error.message : String(error);
-			<p class="error" role="alert">{message as string}</p>
+			const message = error instanceof Error ? error.message : String(error);
+			<p class="error" role="alert">
+				{message as string}
+			</p>
 		}
 	</section>
 }

@@ -7,13 +7,10 @@ import type { Queue, QueueItem } from './types';
 import type { Edge, Node } from '../../types';
 import { useQueue } from './useQueue';
 
-const BatchContext = createContext<
-	| {
-			nodeQueue: Queue<any>;
-			edgeQueue: Queue<any>;
-	  }
-	| null
->(
+const BatchContext = createContext<{
+	nodeQueue: Queue<any>;
+	edgeQueue: Queue<any>;
+} | null>(
 	// eslint-disable-next-line @typescript-eslint/no-explicit-any
 
 	// eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -46,10 +43,10 @@ export function BatchProvider<NodeType extends Node = Node, EdgeType extends Edg
 		} = store.getState();
 
 		/*
- * This is essentially an `Array.reduce` in imperative clothing. Processing
- * this queue is a relatively hot path so we'd like to avoid the overhead of
- * array methods where we can.
- */
+		 * This is essentially an `Array.reduce` in imperative clothing. Processing
+		 * this queue is a relatively hot path so we'd like to avoid the overhead of
+		 * array methods where we can.
+		 */
 		let next = nodes;
 		for (const payload of queueItems) {
 			next = typeof payload === 'function' ? payload(next) : payload;

@@ -12,17 +12,20 @@ export function AutoFocusPlugin(props: Props) {
 	const defaultSelection = props.defaultSelection;
 
 	useEffect(() => {
-		editor.focus(() => {
-			const rootElement = editor.getRootElement();
-			// getActiveElement rather than document.activeElement (shadow-root safe).
-			const activeElement =
-				rootElement !== null ? getActiveElement(rootElement) : null;
-			if (
-				rootElement !== null && (activeElement === null || !rootElement.contains(activeElement))
-			) {
-				rootElement.focus({ preventScroll: true });
-			}
-		}, { defaultSelection });
+		editor.focus(
+			() => {
+				const rootElement = editor.getRootElement();
+				// getActiveElement rather than document.activeElement (shadow-root safe).
+				const activeElement = rootElement !== null ? getActiveElement(rootElement) : null;
+				if (
+					rootElement !== null &&
+					(activeElement === null || !rootElement.contains(activeElement))
+				) {
+					rootElement.focus({ preventScroll: true });
+				}
+			},
+			{ defaultSelection },
+		);
 	}, [defaultSelection, editor]);
 
 	return null;

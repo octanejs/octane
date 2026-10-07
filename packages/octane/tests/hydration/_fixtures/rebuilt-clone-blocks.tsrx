@@ -206,7 +206,9 @@ function Tally(props: { name: string }) @{
 
 function Count(props: { name: string }) @{
 	const [count, setCount] = useState(0);
-	<button class={props.name} onClick={() => setCount(count + 1)}>{props.name + ':' + count}</button>
+	<button class={props.name} onClick={() => setCount(count + 1)}>
+		{props.name + ':' + count}
+	</button>
 }
 
 // Returns its output as a value rather than through an @{} body.

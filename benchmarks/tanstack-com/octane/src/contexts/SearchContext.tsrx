@@ -10,19 +10,18 @@ import {
 	useState,
 } from 'octane';
 
-const LazySearchModal = lazy(
-	() => import('~/components/SearchModal.tsrx').then((m) => ({ default: m.SearchModal })),
+const LazySearchModal = lazy(() =>
+	import('~/components/SearchModal.tsrx').then((m) => ({ default: m.SearchModal })),
 );
 
 interface SearchContextType {
 	isOpen: boolean;
 	isAiDockOpen: boolean;
 	isAiDockDirty: boolean;
-	aiDockAskRequest: | {
-			id: number;
-			question: string;
-	  }
-	| null;
+	aiDockAskRequest: {
+		id: number;
+		question: string;
+	} | null;
 	newChatRequestId: number;
 	openSearch: () => void;
 	openAiDock: () => void;
@@ -43,13 +42,10 @@ export function SearchProvider({ children }: { children?: any }) {
 	const [isAiDockDirty, setIsAiDockDirty] = useState(false);
 	const [hasLoadedSearch, setHasLoadedSearch] = useState(false);
 	const [newChatRequestId, setNewChatRequestId] = useState(0);
-	const [aiDockAskRequest, setAiDockAskRequest] = useState<
-		| {
-				id: number;
-				question: string;
-		  }
-		| null
-	>(null);
+	const [aiDockAskRequest, setAiDockAskRequest] = useState<{
+		id: number;
+		question: string;
+	} | null>(null);
 	const aiDockCloseTimerRef = useRef<number | null>(null);
 
 	const cancelAiDockHoverClose = useCallback(() => {
@@ -72,23 +68,24 @@ export function SearchProvider({ children }: { children?: any }) {
 		setIsAiDockOpen(true);
 	}, [cancelAiDockHoverClose]);
 
-	const askAiDock = useCallback((question: string) => {
-		const trimmedQuestion = question.trim();
-		if (trimmedQuestion.length < 3) {
-			return;
-		}
+	const askAiDock = useCallback(
+		(question: string) => {
+			const trimmedQuestion = question.trim();
+			if (trimmedQuestion.length < 3) {
+				return;
+			}
 
-		cancelAiDockHoverClose();
-		setIsOpen(false);
-		setIsAiDockDirty(true);
-		setIsAiDockOpen(true);
-		setAiDockAskRequest(
-			(current) => ({
+			cancelAiDockHoverClose();
+			setIsOpen(false);
+			setIsAiDockDirty(true);
+			setIsAiDockOpen(true);
+			setAiDockAskRequest((current) => ({
 				id: (current?.id ?? 0) + 1,
 				question: trimmedQuestion,
-			}),
-		);
-	}, [cancelAiDockHoverClose]);
+			}));
+		},
+		[cancelAiDockHoverClose],
+	);
 
 	const clearAiDockAskRequest = useCallback((id: number) => {
 		setAiDockAskRequest((current) => (current?.id === id ? null : current));
@@ -200,14 +197,16 @@ export function SearchProvider({ children }: { children?: any }) {
 		};
 	}, [isOpen, openSearch, requestNewChat]);
 
-	return <SearchContext value={value}>
-		{children}
-		{hasLoadedSearch
-			? <Suspense fallback={null}>
+	return (
+		<SearchContext value={value}>
+			{children}
+			{hasLoadedSearch ? (
+				<Suspense fallback={null}>
 					<LazySearchModal />
 				</Suspense>
-			: null}
-	</SearchContext>;
+			) : null}
+		</SearchContext>
+	);
 }
 
 export function useSearchContext() {

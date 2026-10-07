@@ -10,10 +10,9 @@ const theme$ = signal$('light');
 
 function Counter() @{
 	const count$ = signal$(0);
-	<button
-		id="signals-action"
-		onClick={() => count$.set(count$.get() + 1)}
-	>{`${theme$.get()} ${count$.get()}` as string}</button>
+	<button id="signals-action" onClick={() => count$.set(count$.get() + 1)}>
+		{`${theme$.get()} ${count$.get()}` as string}
+	</button>
 }
 
 export function run(container: HTMLElement) {

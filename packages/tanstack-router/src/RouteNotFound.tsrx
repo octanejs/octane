@@ -16,7 +16,7 @@ export function RouteNotFound(props: { routeId: string; error?: any }) @{
 	const NotFound = route.options.notFoundComponent ?? router.options.defaultNotFoundComponent;
 
 	@if (NotFound) {
-		<NotFound {...props.error ?? {}} />
+		<NotFound {...(props.error ?? {})} />
 	} @else {
 		<p>Not Found</p>
 	}

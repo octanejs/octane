@@ -30,15 +30,18 @@ const Layer = ({
 	const itemSelector = useAppStore((s) => s.state.ui.itemSelector);
 	const dispatch = useAppStore((s) => s.dispatch);
 
-	const setItemSelector = useCallback((itemSelector: ItemSelector | null) => {
-		dispatch({ type: 'setUi', ui: { itemSelector } });
-	}, [dispatch]);
+	const setItemSelector = useCallback(
+		(itemSelector: ItemSelector | null) => {
+			dispatch({ type: 'setUi', ui: { itemSelector } });
+		},
+		[dispatch],
+	);
 
 	const selecedItemId = useAppStore((s) => s.selectedItem?.props.id);
 
 	const isSelected =
 		selecedItemId === itemId ||
-			itemSelector && itemSelector.zone === rootDroppableId && !zoneCompound;
+		(itemSelector && itemSelector.zone === rootDroppableId && !zoneCompound);
 
 	// eslint-disable-next-line react-hooks/rules-of-hooks
 	const nodeData = useAppStore((s) => s.state.indexes.nodes[itemId]);
@@ -55,85 +58,95 @@ const Layer = ({
 	const childIsSelected = useAppStore((s) => {
 		const selectedData = s.state.indexes.nodes[s.selectedItem?.props.id];
 
-		return selectedData?.path.some((candidate) => {
-			const [candidateId] = candidate.split(':');
+		return (
+			selectedData?.path.some((candidate) => {
+				const [candidateId] = candidate.split(':');
 
-			return candidateId === itemId;
-		}) ?? false;
+				return candidateId === itemId;
+			}) ?? false
+		);
 	});
 
 	const componentConfig: ComponentConfig | undefined = config.components[nodeData.data.type];
 	const label = componentConfig?.['label'] ?? nodeData.data.type.toString();
 
-	return <li
-		className={getClassNameLayer({
-			isSelected,
-			isHovering,
-			containsZone,
-			childIsSelected,
-		})}
-	>
-		<div className={getClassNameLayer('inner')}>
-			<button
-				type="button"
-				className={getClassNameLayer('clickable')}
-				onClick={() => {
-					if (isSelected) {
-						setItemSelector(null);
-						return;
-					}
+	return (
+		<li
+			className={getClassNameLayer({
+				isSelected,
+				isHovering,
+				containsZone,
+				childIsSelected,
+			})}
+		>
+			<div className={getClassNameLayer('inner')}>
+				<button
+					type="button"
+					className={getClassNameLayer('clickable')}
+					onClick={() => {
+						if (isSelected) {
+							setItemSelector(null);
+							return;
+						}
 
-					const frame = getFrame();
+						const frame = getFrame();
 
-					const el = frame?.querySelector(`[data-puck-component="${itemId}"]`);
+						const el = frame?.querySelector(`[data-puck-component="${itemId}"]`);
 
-					if (!el) {
-						setItemSelector({
-							index,
-							zone: zoneCompound,
+						if (!el) {
+							setItemSelector({
+								index,
+								zone: zoneCompound,
+							});
+							return;
+						}
+
+						scrollIntoView(el as HTMLElement);
+
+						onScrollEnd(frame, () => {
+							setItemSelector({
+								index,
+								zone: zoneCompound,
+							});
 						});
-						return;
-					}
-
-					scrollIntoView(el as HTMLElement);
-
-					onScrollEnd(frame, () => {
-						setItemSelector({
-							index,
-							zone: zoneCompound,
-						});
-					});
-				}}
-				onMouseEnter={(e) => {
-					e.stopPropagation();
-					zoneStore.setState({ hoveringComponent: itemId });
-				}}
-				onMouseLeave={(e) => {
-					e.stopPropagation();
-					zoneStore.setState({ hoveringComponent: null });
-				}}
-			>
-				{containsZone &&
-					<div className={getClassNameLayer('chevron')} title={isSelected ? 'Collapse' : 'Expand'}>
-						<ChevronDown size="12" />
-					</div>}
-				<div className={getClassNameLayer('title')}>
-					<div className={getClassNameLayer('icon')}>
-						{nodeData.data.type === 'Text' || nodeData.data.type === 'Heading'
-							? <Type size="16" />
-							: <LayoutGrid size="16" />}
+					}}
+					onMouseEnter={(e) => {
+						e.stopPropagation();
+						zoneStore.setState({ hoveringComponent: itemId });
+					}}
+					onMouseLeave={(e) => {
+						e.stopPropagation();
+						zoneStore.setState({ hoveringComponent: null });
+					}}
+				>
+					{containsZone && (
+						<div
+							className={getClassNameLayer('chevron')}
+							title={isSelected ? 'Collapse' : 'Expand'}
+						>
+							<ChevronDown size="12" />
+						</div>
+					)}
+					<div className={getClassNameLayer('title')}>
+						<div className={getClassNameLayer('icon')}>
+							{nodeData.data.type === 'Text' || nodeData.data.type === 'Heading' ? (
+								<Type size="16" />
+							) : (
+								<LayoutGrid size="16" />
+							)}
+						</div>
+						<div className={getClassNameLayer('name')}>{label}</div>
 					</div>
-					<div className={getClassNameLayer('name')}>{label}</div>
-				</div>
-			</button>
-		</div>
-		{containsZone &&
-			zonesForItem.map(
-				(subzone) => <div key={subzone} className={getClassNameLayer('zones')}>
-					<LayerTree zoneCompound={subzone} />
-				</div>,
-			)}
-	</li>;
+				</button>
+			</div>
+			{containsZone &&
+				zonesForItem.map((subzone) => (
+					<div key={subzone} className={getClassNameLayer('zones')}>
+						<LayerTree zoneCompound={subzone} />
+					</div>
+				))}
+		</li>
+	);
 };
 
 export const LayerTree = ({
@@ -162,22 +175,27 @@ export const LayerTree = ({
 	});
 
 	const contentIds = useAppStore(
-		useShallow((s) => zoneCompound ? s.state.indexes.zones[zoneCompound]?.contentIds ?? [] : []),
+		useShallow((s) =>
+			zoneCompound ? (s.state.indexes.zones[zoneCompound]?.contentIds ?? []) : [],
+		),
 	);
 
-	return <>
-		{label &&
-			<div className={getClassName('zoneTitle')}>
-				<div className={getClassName('zoneIcon')}>
-					<Layers size="16" />
+	return (
+		<>
+			{label && (
+				<div className={getClassName('zoneTitle')}>
+					<div className={getClassName('zoneIcon')}>
+						<Layers size="16" />
+					</div>
+					{label}
 				</div>
-				{label}
-			</div>}
-		<ul className={getClassName()}>
-			{contentIds.length === 0 && <div className={getClassName('helper')}>No items</div>}
-			{contentIds.map((itemId, i) => {
-				return <Layer index={i} itemId={itemId} zoneCompound={zoneCompound} key={itemId} />;
-			})}
-		</ul>
-	</>;
+			)}
+			<ul className={getClassName()}>
+				{contentIds.length === 0 && <div className={getClassName('helper')}>No items</div>}
+				{contentIds.map((itemId, i) => {
+					return <Layer index={i} itemId={itemId} zoneCompound={zoneCompound} key={itemId} />;
+				})}
+			</ul>
+		</>
+	);
 };

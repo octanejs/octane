@@ -7,9 +7,11 @@ const nodes: Node[] = [
 ];
 
 export function NativeEventConnectProbe(props: { onClickConnectStart: OnConnectStart }) {
-	return <div style={{ width: '400px', height: '300px' }}>
-		<ReactFlowProvider>
-			<ReactFlow nodes={nodes} onClickConnectStart={props.onClickConnectStart} />
-		</ReactFlowProvider>
-	</div>;
+	return (
+		<div style={{ width: '400px', height: '300px' }}>
+			<ReactFlowProvider>
+				<ReactFlow nodes={nodes} onClickConnectStart={props.onClickConnectStart} />
+			</ReactFlowProvider>
+		</div>
+	);
 }

@@ -5,7 +5,7 @@
       "upstream": "packages/dropzone/upstream/src/index.tsx",
       "upstreamSha256": "4fc4ce4feb05906e4362ef35b927f13c750134b1d1605ec038c0cc7395fc3d41",
       "adapted": "packages/dropzone/src/index.tsrx",
-      "adaptedSha256": "b9aba2d175acd8917c51a5894955ae01cdf8458ca89e8b1ee39caf5a2f4cd97f"
+      "adaptedSha256": "f1bca80980463aeaf34dbb08dc9aa84a56b9d8a078418135e2bb49840170461e"
     },
     {
       "upstream": "packages/dropzone/upstream/src/utils/index.ts",

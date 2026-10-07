@@ -18,7 +18,7 @@ const getTouchPoint = (touches: TouchList, touchId: null | number): Touch => {
 };
 
 const getParentWindow = (node?: HTMLDivElement | null): Window =>
-	node && node.ownerDocument.defaultView || self;
+	(node && node.ownerDocument.defaultView) || self;
 
 const getRelativePosition = (
 	node: HTMLDivElement,
@@ -26,8 +26,7 @@ const getRelativePosition = (
 	touchId: null | number,
 ): Interaction => {
 	const rect = node.getBoundingClientRect();
-	const pointer =
-		isTouch(event) ? getTouchPoint(event.touches, touchId) : event;
+	const pointer = isTouch(event) ? getTouchPoint(event.touches, touchId) : event;
 	return {
 		left: clamp((pointer.pageX - (rect.left + getParentWindow(node).pageXOffset)) / rect.width),
 		top: clamp((pointer.pageY - (rect.top + getParentWindow(node).pageYOffset)) / rect.height),
@@ -124,16 +123,8 @@ const InteractiveBase = ({
 			if (keyCode < 37 || keyCode > 40) return;
 			event.preventDefault();
 			onKeyCallback({
-				left: keyCode === 39
-					? 0.05
-					: keyCode === 37
-						? -0.05
-						: 0,
-				top: keyCode === 40
-					? 0.05
-					: keyCode === 38
-						? -0.05
-						: 0,
+				left: keyCode === 39 ? 0.05 : keyCode === 37 ? -0.05 : 0,
+				top: keyCode === 40 ? 0.05 : keyCode === 38 ? -0.05 : 0,
 			});
 		};
 
@@ -147,21 +138,25 @@ const InteractiveBase = ({
 
 	useEffect(() => toggleDocumentEvents, [toggleDocumentEvents]);
 
-	return <div
-		aria-label={ariaLabel}
-		aria-valuetext={ariaValueText}
-		aria-valuenow={ariaValueNow}
-		aria-valuemax={ariaValueMax}
-		aria-valuemin={ariaValueMin}
-		onTouchStart={handleMoveStart}
-		onMouseDown={handleMoveStart}
-		class="react-colorful__interactive"
-		ref={container}
-		onKeyDown={handleKeyDown}
-		onKeyUp={handleKeyUp}
-		tabIndex={0}
-		role="slider"
-	>{children}</div>;
+	return (
+		<div
+			aria-label={ariaLabel}
+			aria-valuetext={ariaValueText}
+			aria-valuenow={ariaValueNow}
+			aria-valuemax={ariaValueMax}
+			aria-valuemin={ariaValueMin}
+			onTouchStart={handleMoveStart}
+			onMouseDown={handleMoveStart}
+			class="react-colorful__interactive"
+			ref={container}
+			onKeyDown={handleKeyDown}
+			onKeyUp={handleKeyUp}
+			tabIndex={0}
+			role="slider"
+		>
+			{children}
+		</div>
+	);
 };
 
 export const Interactive = memo(InteractiveBase);

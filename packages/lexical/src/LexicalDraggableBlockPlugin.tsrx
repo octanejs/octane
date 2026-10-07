@@ -78,8 +78,7 @@ function getCollapsedMargins(elem: HTMLElement): {
 	const getMargin = (element: Element | null, margin: 'marginTop' | 'marginBottom'): number =>
 		element && view ? parseFloat(view.getComputedStyle(element)[margin]) : 0;
 
-	const { marginTop = '0', marginBottom = '0' } =
-		view ? view.getComputedStyle(elem) : {};
+	const { marginTop = '0', marginBottom = '0' } = view ? view.getComputedStyle(elem) : {};
 	const prevElemSiblingMarginBottom = getMargin(elem.previousElementSibling, 'marginBottom');
 	const nextElemSiblingMarginTop = getMargin(elem.nextElementSibling, 'marginTop');
 	const collapsedTopMargin = Math.max(parseFloat(marginTop), prevElemSiblingMarginBottom);
@@ -146,7 +145,10 @@ function getBlockElement(
 				top: domRect.top - marginTop,
 			});
 
-			const { result, reason: { isOnTopSide, isOnBottomSide } } = rect.contains(point);
+			const {
+				result,
+				reason: { isOnTopSide, isOnBottomSide },
+			} = rect.contains(point);
 
 			if (result) {
 				blockElem = elem;
@@ -184,13 +186,11 @@ function setMenuPosition(
 
 	const targetRect = targetElem.getBoundingClientRect();
 	const targetView = targetElem.ownerDocument.defaultView;
-	const targetStyle =
-		targetView ? targetView.getComputedStyle(targetElem) : null;
+	const targetStyle = targetView ? targetView.getComputedStyle(targetElem) : null;
 	const floatingElemRect = floatingElem.getBoundingClientRect();
 	const anchorElementRect = anchorElem.getBoundingClientRect();
 
-	let targetCalculateHeight =
-		targetStyle ? parseInt(targetStyle.lineHeight, 10) : NaN;
+	let targetCalculateHeight = targetStyle ? parseInt(targetStyle.lineHeight, 10) : NaN;
 	if (isNaN(targetCalculateHeight)) {
 		targetCalculateHeight = targetRect.bottom - targetRect.top;
 	}
@@ -284,12 +284,15 @@ function useDraggableBlockMenu(
 	const isDraggingBlockRef = useRef(false);
 	const [draggableBlockElem, setDraggableBlockElemState] = useState<HTMLElement | null>(null);
 
-	const setDraggableBlockElem = useCallback((elem: HTMLElement | null) => {
-		setDraggableBlockElemState(elem);
-		if (onElementChanged) {
-			onElementChanged(elem);
-		}
-	}, [onElementChanged]);
+	const setDraggableBlockElem = useCallback(
+		(elem: HTMLElement | null) => {
+			setDraggableBlockElemState(elem);
+			if (onElementChanged) {
+				onElementChanged(elem);
+			}
+		},
+		[onElementChanged],
+	);
 
 	useEffect(() => {
 		function onMouseMove(event: MouseEvent) {
@@ -365,8 +368,7 @@ function useDraggableBlockMenu(
 			}
 			const { dataTransfer, pageY } = event;
 			const target = getComposedEventTarget(event);
-			const dragData =
-				dataTransfer != null ? dataTransfer.getData(DRAG_DATA_FORMAT) : '';
+			const dragData = dataTransfer != null ? dataTransfer.getData(DRAG_DATA_FORMAT) : '';
 			const draggedNode = $getNodeByKey(dragData);
 			if (!draggedNode) {
 				return false;

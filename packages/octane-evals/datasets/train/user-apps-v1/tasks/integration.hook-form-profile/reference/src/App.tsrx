@@ -8,7 +8,11 @@ interface Profile {
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 export function App(props: { onSave: (profile: Profile) => void }) @{
-	const { register, handleSubmit, formState: { errors } } = useForm<Profile>({ mode: 'onChange' });
+	const {
+		register,
+		handleSubmit,
+		formState: { errors },
+	} = useForm<Profile>({ mode: 'onChange' });
 	const submit = handleSubmit((profile) => props.onSave(profile));
 
 	<form onSubmit={submit} noValidate>

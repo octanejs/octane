@@ -89,9 +89,7 @@ function LayoutValue(props: FailureProps) @{
 		if (props.fail) setFail(true);
 	}, [props.fail]);
 	if (fail) throw props.error;
-	<span>
-		{props.fail ? 'Prepared' : 'Initial'}
-	</span>
+	<span>{props.fail ? 'Prepared' : 'Initial'}</span>
 }
 
 export function UnsupportedScopeFailureApp(props: FailureProps) @{

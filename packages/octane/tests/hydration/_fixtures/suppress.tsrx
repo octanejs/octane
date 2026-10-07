@@ -3,7 +3,9 @@
 // opt-out, hydration keeps the SERVER value and emits no warning.
 
 export function Suppressed(props) @{
-	<div id={props.id} suppressHydrationWarning>{props.text as string}</div>
+	<div id={props.id} suppressHydrationWarning>
+		{props.text as string}
+	</div>
 }
 
 // Control: same shape WITHOUT the opt-out — should warn + patch.

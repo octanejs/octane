@@ -11,13 +11,13 @@ function Reader(props: { fail?: boolean }) @{
 	if (props.fail) throw new Error('abandoned provider');
 	const value = useContext(Theme);
 	const [count, update] = useState(0);
-	useLayoutEffect(
-		() => () => {
-			cleanups++;
-		},
-	);
+	useLayoutEffect(() => () => {
+		cleanups++;
+	});
 	<section>
-		<span class="value" title={value}>{value as string}</span>
+		<span class="value" title={value}>
+			{value as string}
+		</span>
 		<button onClick={() => update(count + 1)}>{String(count) as string}</button>
 		<input defaultValue="seed" />
 	</section>

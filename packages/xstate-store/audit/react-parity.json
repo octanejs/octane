@@ -37,7 +37,7 @@
       "arch": "any",
       "packageManager": "pnpm@12.9.1",
       "lockfile": "pnpm-lock.yaml",
-      "lockfileSha256": "e92f4520cd88a2593a0ecd555e0532b2e4e8bb1396c9558a09f0cbf3fbaa5917"
+      "lockfileSha256": "caea67fe61ab57f3e8cbd8a0e55f0e8b3014b3dd6815c6fe6e158095f291daeb"
     }
   },
   "lanes": [
@@ -122,7 +122,7 @@
         {
           "path": "packages/xstate-store/tests/_fixtures/upstream/index.tsrx",
           "role": "support",
-          "sha256": "1ff85d4b612c52a4b147a4b200f26b97fe993a5f115bbcfdff717769d3456ee3"
+          "sha256": "28c8c62d50d91436119ff143f27ae6873ad1a04a54aeb669d08731b2ff9723b1"
         },
         {
           "path": "packages/xstate-store/upstream/src/index.test.tsx",

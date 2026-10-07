@@ -10,5 +10,6 @@ const colorModel: ColorModel<string> = {
 	equal: equalHex,
 };
 
-export const HexAlphaColorPicker = (props: Partial<ColorPickerBaseProps<string>>) =>
-	<AlphaColorPicker {...props} colorModel={colorModel} />;
+export const HexAlphaColorPicker = (props: Partial<ColorPickerBaseProps<string>>) => (
+	<AlphaColorPicker {...props} colorModel={colorModel} />
+);

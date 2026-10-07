@@ -15,9 +15,13 @@ export function RequestQueryReader(props: {
 	props.onResult?.(result);
 	<>
 		<span id="data">{(result.data === undefined ? 'none' : result.data) as string}</span>
-		<span id="error">{(result.error == null
-			? 'none'
-			: String((result.error as Error).message ?? result.error)) as string}</span>
+		<span id="error">
+			{
+				(result.error == null
+					? 'none'
+					: String((result.error as Error).message ?? result.error)) as string
+			}
+		</span>
 		<span id="fetch-status">{result.fetchStatus as string}</span>
 		<button type="button" id="refetch" onClick={() => void result.refetch()}>
 			Refetch

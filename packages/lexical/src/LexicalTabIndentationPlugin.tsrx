@@ -10,10 +10,10 @@ export { registerTabIndentation } from '@lexical/extension';
 type Props = {
 	maxIndent?: number;
 	/**
- * By default, indents are set on all elements for which
- * {@link ElementNode.canIndent} returns true. This option allows you to set
- * indents for specific nodes without overriding the method for others.
- */
+	 * By default, indents are set on all elements for which
+	 * {@link ElementNode.canIndent} returns true. This option allows you to set
+	 * indents for specific nodes without overriding the method for others.
+	 */
 	$canIndent?: CanIndentPredicate;
 };
 
@@ -22,11 +22,10 @@ export function TabIndentationPlugin(props: Props) {
 	const maxIndent = props.maxIndent;
 	const canIndent = props.$canIndent;
 
-	useEffect(() => registerTabIndentation(editor, maxIndent, canIndent), [
-		editor,
-		maxIndent,
-		canIndent,
-	]);
+	useEffect(
+		() => registerTabIndentation(editor, maxIndent, canIndent),
+		[editor, maxIndent, canIndent],
+	);
 
 	return null;
 }

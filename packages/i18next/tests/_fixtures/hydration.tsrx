@@ -10,7 +10,7 @@ interface HydrationProps {
 function LazyConsumer(props: HydrationProps) @{
 	const { t } = useTranslation('lazy', { i18n: props.i18n });
 	const value = use(props.load());
-	<p id="hydrated-value">{t('key') + '/' + value as string}</p>
+	<p id="hydrated-value">{(t('key') + '/' + value) as string}</p>
 }
 
 export function SuspenseHydrationApp(props: HydrationProps) @{

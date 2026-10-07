@@ -19,9 +19,7 @@ export interface GenericChildStore {
 
 function PendingProbe() @{
 	const [pending] = useTransition();
-	<output id="pending">
-		{pending ? 'pending' : 'idle'}
-	</output>
+	<output id="pending">{pending ? 'pending' : 'idle'}</output>
 }
 
 function OnlyChild(props: { value: OctaneNode }) @{
@@ -75,9 +73,7 @@ export function GenericChildStateTransition(props: {
 	const [pending, start] = useTransition();
 	props.bind((next) => start(() => setSnapshot(next)));
 	<div>
-		<output id="pending">
-			{pending ? 'pending' : 'idle'}
-		</output>
+		<output id="pending">{pending ? 'pending' : 'idle'}</output>
 		@try {
 			<Contents snapshot={snapshot} />
 		} @pending {

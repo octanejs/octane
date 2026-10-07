@@ -16,11 +16,13 @@ export const HexColorInput = ({ prefixed, alpha, ...rest }: HexColorInputProps) 
 		[alpha],
 	);
 	const validate = useCallback((value: string) => validHex(value, alpha), [alpha]);
-	return <ColorInput
-		{...rest}
-		escape={escape}
-		format={prefixed ? prefix : undefined}
-		process={prefix}
-		validate={validate}
-	/>;
+	return (
+		<ColorInput
+			{...rest}
+			escape={escape}
+			format={prefixed ? prefix : undefined}
+			process={prefix}
+			validate={validate}
+		/>
+	);
 };

@@ -65,9 +65,11 @@ export function ExplicitFallbackBoundary(props: TemplateProps & { fallback?: Oct
 	</Hydrate>
 }
 
-export function SpreadBoundary(props: EditorProps & {
-	boundary: Pick<HydrateProps, 'when' | 'fallback'>;
-}) @{
+export function SpreadBoundary(
+	props: EditorProps & {
+		boundary: Pick<HydrateProps, 'when' | 'fallback'>;
+	},
+) @{
 	<Hydrate {...props.boundary} split={false}>
 		<Editor {...props} />
 	</Hydrate>

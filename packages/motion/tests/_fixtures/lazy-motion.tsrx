@@ -10,12 +10,16 @@ export function LazyMotionSurface() @{
 }
 
 export function UnloadedMotionSurface() @{
-	<m.div id="unloaded-div" animate={{ opacity: 1 }}>{'unloaded'}</m.div>
+	<m.div id="unloaded-div" animate={{ opacity: 1 }}>
+		{'unloaded'}
+	</m.div>
 }
 
 export function AsyncLazyMotionSurface(props) @{
 	<LazyMotion features={props.features}>
-		<m.div id="async-lazy-div" initial={props.initial} animate={{ opacity: 1 }}>{'async'}</m.div>
+		<m.div id="async-lazy-div" initial={props.initial} animate={{ opacity: 1 }}>
+			{'async'}
+		</m.div>
 	</LazyMotion>
 }
 
@@ -37,7 +41,9 @@ export function FeatureBundleSurface(props) @{
 			drag
 			dragConstraints={{ left: -50, right: 50, top: -50, bottom: 50 }}
 			onDrag={props.onDrag}
-		>{'features'}</m.div>
+		>
+			{'features'}
+		</m.div>
 	</LazyMotion>
 }
 

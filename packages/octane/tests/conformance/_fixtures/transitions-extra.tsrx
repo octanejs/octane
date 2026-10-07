@@ -12,7 +12,7 @@ function MaybeThrow(props) @{
 	if (props.bang) {
 		throw new Error('transition-boom');
 	}
-	<span class="ok">{'val:' + props.n as string}</span>
+	<span class="ok">{('val:' + props.n) as string}</span>
 }
 
 export function TransitionThatThrows(props) @{
@@ -26,11 +26,15 @@ export function TransitionThatThrows(props) @{
 				<span id="n">{n as string}</span>
 				<button
 					id="do"
-					onClick={() => start(() => {
-						setBang(true);
-						setN(n + 1);
-					})}
-				>{'transition'}</button>
+					onClick={() =>
+						start(() => {
+							setBang(true);
+							setN(n + 1);
+						})
+					}
+				>
+					{'transition'}
+				</button>
 				<MaybeThrow bang={bang} n={n} />
 			</div>
 		} @catch (err) {
@@ -50,15 +54,20 @@ export function StartTransitionInEffect(props) @{
 	const [tick, setTick] = useState(0);
 	const [v, setV] = useState('init');
 	const [isPending] = useTransition();
-	useEffect((tickP, setVRef) => {
-		if (tickP > 0) {
-			startTransition(() => setVRef('via-effect'));
-		}
-	}, [tick, setV]);
+	useEffect(
+		(tickP, setVRef) => {
+			if (tickP > 0) {
+				startTransition(() => setVRef('via-effect'));
+			}
+		},
+		[tick, setV],
+	);
 	<div>
 		<span id="pending">{(isPending ? '1' : '0') as string}</span>
 		<span id="v">{v as string}</span>
-		<button id="tick" onClick={() => setTick(tick + 1)}>{'tick'}</button>
+		<button id="tick" onClick={() => setTick(tick + 1)}>
+			{'tick'}
+		</button>
 	</div>
 }
 
@@ -74,7 +83,9 @@ export function DeferredIdentity(props) @{
 	// value reference. The observer is invoked during render, so each render
 	// logs ONE value — the test asserts identity by comparing across renders.
 	props.observe(d);
-	<span class="out" data-tag={d.tag}>{d.tag as string}</span>
+	<span class="out" data-tag={d.tag}>
+		{d.tag as string}
+	</span>
 }
 
 // ============================================================================
@@ -91,7 +102,9 @@ export function DeferredSuspenseTransition(props) @{
 	const deferred = useDeferredValue(promise);
 	<div>
 		<span id="pending">{(isPending ? '1' : '0') as string}</span>
-		<button id="swap" onClick={() => start(() => setPromise(props.nextPromise))}>{'swap'}</button>
+		<button id="swap" onClick={() => start(() => setPromise(props.nextPromise))}>
+			{'swap'}
+		</button>
 		@try {
 			const value = use(deferred);
 			<span id="value">{value as string}</span>
@@ -113,7 +126,9 @@ export function PendingSequence(props) @{
 	const [isPending, start] = useTransition();
 	props.observePending(isPending); // observer fires on every render
 	<div>
-		<button id="do" onClick={() => start(() => setN(n + 1))}>{'go'}</button>
+		<button id="do" onClick={() => start(() => setN(n + 1))}>
+			{'go'}
+		</button>
 		<span id="n">{n as string}</span>
 	</div>
 }
@@ -132,13 +147,11 @@ export function NestedInnerOnly(props) @{
 		<span id="outer">{(outerPending ? '1' : '0') as string}</span>
 		<span id="inner">{(innerPending ? '1' : '0') as string}</span>
 		<span id="n">{n as string}</span>
-		<button
-			id="do-inner"
-			onClick={() => innerStart(() => setN(props.target))}
-		>{'inner-only'}</button>
-		<button
-			id="do-outer"
-			onClick={() => outerStart(() => innerStart(() => setN(props.target)))}
-		>{'both'}</button>
+		<button id="do-inner" onClick={() => innerStart(() => setN(props.target))}>
+			{'inner-only'}
+		</button>
+		<button id="do-outer" onClick={() => outerStart(() => innerStart(() => setN(props.target)))}>
+			{'both'}
+		</button>
 	</div>
 }

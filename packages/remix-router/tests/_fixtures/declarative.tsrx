@@ -17,9 +17,15 @@ import {
 function Layout() @{
 	<div>
 		<nav>
-			<Link class="nav-home" to="/">Home</Link>
-			<Link class="nav-about" to="/about">About</Link>
-			<Link class="nav-user" to="/users/7">User</Link>
+			<Link class="nav-home" to="/">
+				Home
+			</Link>
+			<Link class="nav-about" to="/about">
+				About
+			</Link>
+			<Link class="nav-user" to="/users/7">
+				User
+			</Link>
 		</nav>
 		<main>
 			<Outlet />
@@ -78,7 +84,9 @@ export function NavigateApp() @{
 export function ConditionalApp() @{
 	const [showExtra, setShowExtra] = useState(false);
 	<div>
-		<button id="add-route" onClick={() => setShowExtra(true)}>add</button>
+		<button id="add-route" onClick={() => setShowExtra(true)}>
+			add
+		</button>
 		<MemoryRouter initialEntries={['/extra']}>
 			<Routes>
 				<Route path="/" element={<Home />} />

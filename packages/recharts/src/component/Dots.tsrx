@@ -15,8 +15,10 @@ type DotItemProps = {
 	className: string;
 };
 type DotElementProps = Extract<DotType, OctaneElement>['props'];
-export type DotsDotProps =
-	Omit<DotProps, 'cx' | 'cy' | 'key' | 'index' | 'dataKey' | 'value' | 'payload'>;
+export type DotsDotProps = Omit<
+	DotProps,
+	'cx' | 'cy' | 'key' | 'index' | 'dataKey' | 'value' | 'payload'
+>;
 interface DotsProps extends ZIndexable {
 	points: ReadonlyArray<DotPoint>;
 	dot: DotType;
@@ -99,7 +101,11 @@ export function Dots(dotsProps: DotsProps) {
 	if (needClip && clipPathId != null) {
 		layerProps.clipPath = 'url(#clipPath-' + (clipDot ? '' : 'dots-') + clipPathId + ')';
 	}
-	return <ZIndexLayer zIndex={zIndex}>
-		<Layer className={className} {...layerProps}>{dots}</Layer>
-	</ZIndexLayer>;
+	return (
+		<ZIndexLayer zIndex={zIndex}>
+			<Layer className={className} {...layerProps}>
+				{dots}
+			</Layer>
+		</ZIndexLayer>
+	);
 }

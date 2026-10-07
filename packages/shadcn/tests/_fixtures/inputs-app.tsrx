@@ -31,8 +31,7 @@ export function CheckboxFixture() @{
 
 export function RadioGroupFixture() @{
 	const [value, setValue] = useState('');
-	const label =
-		value === '' ? 'none' : value;
+	const label = value === '' ? 'none' : value;
 	<div>
 		<span data-testid="value">{label as string}</span>
 		<RadioGroup data-testid="group" onValueChange={setValue}>
@@ -77,8 +76,7 @@ export function UnvaluedSliderFixture() @{
 
 export function SelectFixture(props?: { defaultValue?: string }) @{
 	const [value, setValue] = useState(props?.defaultValue ?? '');
-	const label =
-		value === '' ? 'none' : value;
+	const label = value === '' ? 'none' : value;
 	<div>
 		<span data-testid="value">{label as string}</span>
 		<Select defaultValue={props?.defaultValue} onValueChange={(v: string) => setValue(v)}>
@@ -90,11 +88,17 @@ export function SelectFixture(props?: { defaultValue?: string }) @{
 					<SelectLabel data-testid="label">Fruits</SelectLabel>
 					{/* Keep item text inline: the label text portals into the trigger
     value node verbatim, and tests assert its exact textContent. */}
-					<SelectItem data-testid="item-apple" value="apple">Apple</SelectItem>
-					<SelectItem data-testid="item-banana" value="banana">Banana</SelectItem>
+					<SelectItem data-testid="item-apple" value="apple">
+						Apple
+					</SelectItem>
+					<SelectItem data-testid="item-banana" value="banana">
+						Banana
+					</SelectItem>
 				</SelectGroup>
 				<SelectSeparator data-testid="separator" />
-				<SelectItem data-testid="item-cherry" value="cherry">Cherry</SelectItem>
+				<SelectItem data-testid="item-cherry" value="cherry">
+					Cherry
+				</SelectItem>
 			</SelectContent>
 		</Select>
 	</div>
@@ -132,8 +136,7 @@ export function ToggleFixture() @{
 
 export function ToggleGroupFixture() @{
 	const [value, setValue] = useState('');
-	const label =
-		value === '' ? 'none' : value;
+	const label = value === '' ? 'none' : value;
 	<div>
 		<span data-testid="value">{label as string}</span>
 		<ToggleGroup
@@ -173,8 +176,14 @@ export function VerticalToggleGroupFixture() @{
 		aria-label="Vertical"
 		data-testid="vgroup"
 	>
-		<ToggleGroupItem value="a" data-testid="vitem-a">A</ToggleGroupItem>
-		<ToggleGroupItem value="b" data-testid="vitem-b">B</ToggleGroupItem>
-		<ToggleGroupItem value="c" data-testid="vitem-c">C</ToggleGroupItem>
+		<ToggleGroupItem value="a" data-testid="vitem-a">
+			A
+		</ToggleGroupItem>
+		<ToggleGroupItem value="b" data-testid="vitem-b">
+			B
+		</ToggleGroupItem>
+		<ToggleGroupItem value="c" data-testid="vitem-c">
+			C
+		</ToggleGroupItem>
 	</ToggleGroup>
 }

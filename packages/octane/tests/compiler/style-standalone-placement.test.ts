@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { DIAGNOSTIC_CODES } from '@tsrx/core/diagnostics';
 import { compile } from 'octane/compiler';
 import { compileToVolarMappings } from 'octane/compiler/volar';
 
@@ -6,12 +7,12 @@ import { compileToVolarMappings } from 'octane/compiler/volar';
 // template syntax: a standalone block is allowed only lexically inside a
 // `@{ … }` body or an @if/@for/@switch/@try body, and anywhere else the core
 // analyzer (which Octane runs in compile.js and volar.js) reports
-// `tsrx-style-standalone-outside-template`. In plain TSX, `<style>` is an
+// `STYLE_STANDALONE_OUTSIDE_TEMPLATE`. In plain TSX, `<style>` is an
 // ordinary element whose content is an expression child — `<style>{css}</style>`
 // — and both emitters pass it through untouched: no scope, no `injectStyle`,
 // no hash, no head hoist.
 
-const OUTSIDE_TEMPLATE = 'tsrx-style-standalone-outside-template';
+const OUTSIDE_TEMPLATE = DIAGNOSTIC_CODES.STYLE_STANDALONE_OUTSIDE_TEMPLATE;
 
 const RAW_IN_PLAIN_RETURN = `export function C() {
 	return <section><style>.a { color: red; }</style><div class="a" /></section>;
@@ -62,7 +63,7 @@ describe('rule B: raw CSS in <style> needs a TSRX container', () => {
 	it('a bare block statement at module scope keeps its own code', () => {
 		const error = thrownBy(`<style>.a { color: red; }</style>;\n`, {});
 		expect(error).not.toBeNull();
-		expect(error.code).toBe('tsrx-style-standalone-at-module-scope');
+		expect(error.code).toBe(DIAGNOSTIC_CODES.STYLE_STANDALONE_AT_MODULE_SCOPE);
 	});
 
 	it.each([

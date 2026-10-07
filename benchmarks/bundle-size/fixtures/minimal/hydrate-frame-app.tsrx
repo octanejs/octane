@@ -12,7 +12,9 @@ export const selected$ = signal$('inbox');
 const selectedLength$ = derived$(() => selected$.get().length);
 
 function Row(props: { item: FrameItem; style: { color: string } }) @{
-	<li data-id={props.item.id} style={props.style}>{props.item.label as string}</li>
+	<li data-id={props.item.id} style={props.style}>
+		{props.item.label as string}
+	</li>
 }
 
 function Sidebar(props: { items: FrameItem[]; style: { width: string } }) @{
@@ -33,11 +35,11 @@ function Content(props: { content: Promise<string> }) @{
 function Menu() @{
 	const [open, setOpen] = useState(false);
 	<div>
-		<button id="frame-menu-toggle" onClick={() => setOpen(!open)}>{'menu'}</button>
+		<button id="frame-menu-toggle" onClick={() => setOpen(!open)}>
+			{'menu'}
+		</button>
 		@if (open) {
-			<>
-				{createPortal(<div id="frame-menu">{'portal'}</div>, document.body)}
-			</>
+			<>{createPortal(<div id="frame-menu">{'portal'}</div>, document.body)}</>
 		}
 	</div>
 }
@@ -45,10 +47,9 @@ function Menu() @{
 export function Frame(props: FrameProps) @{
 	<main id="frame">
 		<header>
-			<button
-				id="frame-select"
-				onClick={() => selected$.set('sent')}
-			>{selected$.get() as string}</button>
+			<button id="frame-select" onClick={() => selected$.set('sent')}>
+				{selected$.get() as string}
+			</button>
 			<output id="frame-length">{String(selectedLength$.get())}</output>
 			<Menu />
 		</header>

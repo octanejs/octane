@@ -18,10 +18,9 @@ export interface RadialBarSectorProps extends RadialBarDataItem, ShapeAnimationP
 	isActive: boolean;
 }
 
-type RadialBarSectorComponentProps =
-	RadialBarSectorProps & {
-		option: Exclude<RadialBarProps['shape'], undefined> | RadialBarProps['activeShape'];
-	};
+type RadialBarSectorComponentProps = RadialBarSectorProps & {
+	option: Exclude<RadialBarProps['shape'], undefined> | RadialBarProps['activeShape'];
+};
 
 export function RadialBarSector({ option, ...shapeProps }: RadialBarSectorComponentProps) {
 	return <Shape option={option} DefaultShape={defaultRadialBarShape} shapeProps={shapeProps} />;

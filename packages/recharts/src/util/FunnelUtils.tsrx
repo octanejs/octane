@@ -5,11 +5,11 @@ import { Shape } from './ActiveShapeUtils.tsrx';
 
 export const defaultFunnelShape = Trapezoid;
 
-export type FunnelTrapezoidProps =
-	{
-		option: Exclude<FunnelProps['shape'], undefined> | FunnelProps['activeShape'];
-		isActive: boolean;
-	} & ShapeAnimationProps & FunnelTrapezoidItem;
+export type FunnelTrapezoidProps = {
+	option: Exclude<FunnelProps['shape'], undefined> | FunnelProps['activeShape'];
+	isActive: boolean;
+} & ShapeAnimationProps &
+	FunnelTrapezoidItem;
 
 export function FunnelTrapezoid({ option, ...shapeProps }: FunnelTrapezoidProps) {
 	return <Shape option={option} DefaultShape={defaultFunnelShape} shapeProps={shapeProps} />;

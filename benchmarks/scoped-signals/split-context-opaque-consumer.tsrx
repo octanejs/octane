@@ -66,8 +66,8 @@ export async function run(host: HTMLElement) {
 		flushSync(() => value.set('retired'));
 		const retired = span.textContent;
 		const descriptors = createRoot(host);
-		flushSync(
-			() => descriptors.render(Exported, {
+		flushSync(() =>
+			descriptors.render(Exported, {
 				value: 'provided',
 				children: createElement(ExportedReader, null),
 			}),

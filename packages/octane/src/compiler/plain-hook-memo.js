@@ -305,6 +305,7 @@ const PARENT_PRINTED = new Map([
 		],
 	],
 	['TSDeclareMethod', ['MethodDefinition.value']],
+	['TSEnumBody', ['TSEnumDeclaration.body']],
 ]);
 
 // esrap 2.3 has a visitor for each of these shapes, but it would print other

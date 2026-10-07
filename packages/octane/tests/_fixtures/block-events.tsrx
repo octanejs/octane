@@ -6,7 +6,9 @@ export function BlockEvent({ log, value }) @{
 			event.preventDefault();
 			log(value, event, event.currentTarget);
 		}}
-	>go</button>
+	>
+		go
+	</button>
 }
 
 export function DeferredReads(props) @{
@@ -15,7 +17,9 @@ export function DeferredReads(props) @{
 			props.log(props.box.current);
 			props.receiver.record(props.label);
 		}}
-	>read</button>
+	>
+		read
+	</button>
 }
 
 export function MutableCapture({ log }) @{
@@ -25,7 +29,9 @@ export function MutableCapture({ log }) @{
 			value++;
 			log(value);
 		}}
-	>mutable</button>
+	>
+		mutable
+	</button>
 }
 
 export function ReassignedParameter({ log, value, expose }) @{
@@ -37,7 +43,9 @@ export function ReassignedParameter({ log, value, expose }) @{
 			log(value);
 			log('end');
 		}}
-	>reassigned</button>
+	>
+		reassigned
+	</button>
 }
 
 export function Count() @{
@@ -47,7 +55,9 @@ export function Count() @{
 			event.preventDefault();
 			setCount(count + 1);
 		}}
-	>{count as string}</button>
+	>
+		{count as string}
+	</button>
 }
 
 export function Rows({ rows, log }) @{
@@ -59,7 +69,9 @@ export function Rows({ rows, log }) @{
 						event.preventDefault();
 						log(row.label);
 					}}
-				>{row.label}</button>
+				>
+					{row.label}
+				</button>
 			</li>
 		}
 	</ul>
@@ -83,7 +95,9 @@ export function Failing(props) @{
 				props.log(props.label);
 				throw props.error;
 			}}
-		>fail</button>
+		>
+			fail
+		</button>
 	</div>
 }
 
@@ -96,7 +110,9 @@ export function FunctionScoped({ log, value, enabled }) @{
 			log(value);
 			log('end');
 		}}
-	>scope</button>
+	>
+		scope
+	</button>
 }
 
 export function LexicalArguments(props) @{
@@ -105,16 +121,24 @@ export function LexicalArguments(props) @{
 			props.log(arguments[0].value);
 			props.log('end');
 		}}
-	>arguments</button>
+	>
+		arguments
+	</button>
 }
 
-class Local { label = 'outer'; }
+class Local {
+	label = 'outer';
+}
 export function LocalClass(props) @{
-	class Local { label = 'inner'; }
+	class Local {
+		label = 'inner';
+	}
 	<button
 		onClick={() => {
 			props.log(new Local().label);
 			props.log('end');
 		}}
-	>class</button>
+	>
+		class
+	</button>
 }

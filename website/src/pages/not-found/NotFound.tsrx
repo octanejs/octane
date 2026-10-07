@@ -41,7 +41,9 @@ export function NotFound() @{
 			<p class="notfound-code">404</p>
 			<h1 class="notfound-title">Page not found</h1>
 			<p class="notfound-sub">That route didn’t match anything.</p>
-			<Link to="/" class="notfound-home">Back to the homepage</Link>
+			<Link to="/" class="notfound-home">
+				Back to the homepage
+			</Link>
 		</div>
 	</>
 }

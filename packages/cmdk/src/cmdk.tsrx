@@ -50,4 +50,13 @@ const Command = Object.assign(CommandRoot, {
 
 export { Command, CommandRoot, Item, Input, List, Group, Separator, Dialog, Empty, Loading };
 export { useCmdk as useCommandState };
-export { Item as CommandItem, Input as CommandInput, List as CommandList, Group as CommandGroup, Separator as CommandSeparator, Dialog as CommandDialog, Empty as CommandEmpty, Loading as CommandLoading };
+export {
+	Item as CommandItem,
+	Input as CommandInput,
+	List as CommandList,
+	Group as CommandGroup,
+	Separator as CommandSeparator,
+	Dialog as CommandDialog,
+	Empty as CommandEmpty,
+	Loading as CommandLoading,
+};

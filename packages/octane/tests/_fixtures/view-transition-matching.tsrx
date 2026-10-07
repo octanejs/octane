@@ -24,7 +24,9 @@ export function MatchingApp(props: MatchingProps) @{
 		</ViewTransition>
 		@if (props.show !== false) {
 			<ViewTransition {...props.transition}>
-				<div data-vt-target="target" style={props.style}>{props.text as string}</div>
+				<div data-vt-target="target" style={props.style}>
+					{props.text as string}
+				</div>
 			</ViewTransition>
 		}
 	</>
@@ -107,7 +109,9 @@ export function LayoutReadinessApp(props: {
 			ref={(node) => {
 				props.events.push(node === null ? 'detach:' + props.text : 'attach:' + props.text);
 			}}
-		>{props.text as string}</div>
+		>
+			{props.text as string}
+		</div>
 	</ViewTransition>
 }
 
@@ -175,7 +179,9 @@ function StagedChild(props: {
 			props.events.push('unsubscribe:' + props.name);
 		};
 	}, []);
-	<div ref={node} data-child={props.name}>{props.name as string}</div>
+	<div ref={node} data-child={props.name}>
+		{props.name as string}
+	</div>
 }
 
 export function StagingLifecycleApp(props: {
@@ -204,7 +210,9 @@ export function StagingLifecycleApp(props: {
 				ref={(node) => {
 					props.events.push((node === null ? 'detach:' : 'attach:') + props.value);
 				}}
-			>{props.value as string}</button>
+			>
+				{props.value as string}
+			</button>
 			@if (props.children) {
 				<>
 					<StagedChild name="first" events={props.events} onDelete={props.onDelete} />
@@ -223,7 +231,9 @@ function StagedSuspender(props: { pending: Promise<void> | null }) @{
 export function StagingRollbackApp(props: { value: string; pending: Promise<void> | null }) @{
 	<ViewTransition>
 		<section>
-			<span data-rollback="target" title={props.value}>{props.value as string}</span>
+			<span data-rollback="target" title={props.value}>
+				{props.value as string}
+			</span>
 			<StagedSuspender pending={props.pending} />
 		</section>
 	</ViewTransition>
@@ -293,9 +303,7 @@ export function StagingPortalApp(props: { show: boolean; target: Element; clicks
 					)}
 				</>
 			}
-			<span>
-				{props.show ? 'before' : 'after'}
-			</span>
+			<span>{props.show ? 'before' : 'after'}</span>
 		</section>
 	</ViewTransition>
 }

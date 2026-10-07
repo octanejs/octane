@@ -14,15 +14,21 @@ function ResizeFeedback() @{
 	const reference = useRef<HTMLDivElement | null>(null);
 	const floating = useRef<HTMLDivElement | null>(null);
 	useEffect(
-		() => autoUpdate(reference.current!, floating.current!, () => {
-			const next = reference.current!.getBoundingClientRect().width;
-			setMeasured(next);
-			if (getEnabled() && next < 200) setWidth(Math.min(200, next + 20));
-		}, {
-			ancestorScroll: false,
-			ancestorResize: false,
-			layoutShift: false,
-		}),
+		() =>
+			autoUpdate(
+				reference.current!,
+				floating.current!,
+				() => {
+					const next = reference.current!.getBoundingClientRect().width;
+					setMeasured(next);
+					if (getEnabled() && next < 200) setWidth(Math.min(200, next + 20));
+				},
+				{
+					ancestorScroll: false,
+					ancestorResize: false,
+					layoutShift: false,
+				},
+			),
 		[],
 	);
 	<section>
@@ -32,7 +38,9 @@ function ResizeFeedback() @{
 				setEnabled(true);
 				setWidth(140);
 			}}
-		>resize</button>
+		>
+			resize
+		</button>
 		<div id="resize-parent" style={{ width: `${width}px` }}>
 			<div id="resize-reference" ref={reference} style={{ width: '100%', height: '20px' }} />
 		</div>
@@ -51,14 +59,17 @@ function ResizeMiddleware() @{
 				},
 			}),
 		],
-		whileElementsMounted: (reference, element, update) => autoUpdate(reference, element, update, {
-			ancestorScroll: false,
-			ancestorResize: false,
-			layoutShift: false,
-		}),
+		whileElementsMounted: (reference, element, update) =>
+			autoUpdate(reference, element, update, {
+				ancestorScroll: false,
+				ancestorResize: false,
+				layoutShift: false,
+			}),
 	});
 	<section>
-		<button id="middleware-resize" onClick={() => setWidth(180)}>resize middleware</button>
+		<button id="middleware-resize" onClick={() => setWidth(180)}>
+			resize middleware
+		</button>
 		<div
 			id="middleware-reference"
 			ref={floating.refs.setReference}
@@ -83,13 +94,17 @@ function App() @{
 			id="reference"
 			ref={floating.refs.setReference}
 			style={{ position: 'absolute', left: '40px', top: '30px', width: '100px', height: '20px' }}
-		>reference</button>
+		>
+			reference
+		</button>
 		<div
 			id="floating"
 			ref={floating.refs.setFloating}
 			style={{ ...floating.floatingStyles, width: '60px', height: '30px' }}
 			data-positioned={floating.isPositioned ? 'yes' : 'no'}
-		>floating</div>
+		>
+			floating
+		</div>
 		<ResizeFeedback />
 		<ResizeMiddleware />
 	</div>

@@ -7,8 +7,7 @@ import { isChildrenBlock } from 'octane';
 // excludes it.
 function Consumer(props) {
 	const c = props.children;
-	const resolved =
-		typeof c === 'function' && !isChildrenBlock(c) ? c({ name: 'payload' }) : c;
+	const resolved = typeof c === 'function' && !isChildrenBlock(c) ? c({ name: 'payload' }) : c;
 	return <div class="wrap">{resolved}</div>;
 }
 
@@ -26,7 +25,5 @@ export function TextChildren() @{
 
 // Render-prop child → called with `{ name: 'payload' }`.
 export function RenderPropChildren() @{
-	<Consumer>
-		{(data) => <span class="rp">{data.name as string}</span>}
-	</Consumer>
+	<Consumer>{(data) => <span class="rp">{data.name as string}</span>}</Consumer>
 }

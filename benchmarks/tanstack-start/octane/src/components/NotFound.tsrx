@@ -4,9 +4,7 @@ export function NotFound(props: { children?: unknown }) @{
 	<div class="space-y-2 p-2" data-testid="default-not-found-component">
 		<div class="text-gray-600 dark:text-gray-400">
 			@if (props.children) {
-				<>
-					{props.children}
-				</>
+				<>{props.children}</>
 			} @else {
 				<p>The page you are looking for does not exist.</p>
 			}

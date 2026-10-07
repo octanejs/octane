@@ -44,7 +44,9 @@ const Inner = memo(InnerImpl);
 function RowImpl(props) @{
 	window.__renders['row' + props.wall]++;
 	<div class="item">
-		<span class="id" onClick={props.onSelect}>{props.id as string}</span>
+		<span class="id" onClick={props.onSelect}>
+			{props.id as string}
+		</span>
 		<span class="label">{props.label as string}</span>
 		<Inner value={props.value} wall={props.wall} />
 	</div>

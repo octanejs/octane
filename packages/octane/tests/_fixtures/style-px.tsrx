@@ -4,7 +4,9 @@
 
 // Dynamic object style — goes through setStyle → applyStyleProperty at runtime.
 export function DynStyle(props: { s: any }) @{
-	<div id="d" style={props.s}>{'x'}</div>
+	<div id="d" style={props.s}>
+		{'x'}
+	</div>
 }
 
 // Static object literal — baked into the template HTML at compile time; must apply
@@ -20,9 +22,13 @@ export function StaticStyle() @{
 			zIndex: 3,
 			backgroundColor: 'red',
 		}}
-	>{'x'}</div>
+	>
+		{'x'}
+	</div>
 }
 
 export function StaticStyleAliases() @{
-	<div id="aliases" style={{ scale: 1.5, cssFloat: 'left' }}>style</div>
+	<div id="aliases" style={{ scale: 1.5, cssFloat: 'left' }}>
+		style
+	</div>
 }

@@ -6,9 +6,9 @@ import type { ComponentType, ErrorBoundaryProps } from './types.ts';
 // This explicit server entry therefore renders children without installing
 // Octane's native server boundary.
 export function ErrorBoundary(props: ErrorBoundaryProps) @{
-	<ErrorBoundaryContext
-		value={{ didCatch: false, error: null, resetErrorBoundary: () => {} }}
-	>{props.children as OctaneNode}</ErrorBoundaryContext>
+	<ErrorBoundaryContext value={{ didCatch: false, error: null, resetErrorBoundary: () => {} }}>
+		{props.children as OctaneNode}
+	</ErrorBoundaryContext>
 }
 
 export function withErrorBoundary<Props extends object>(
@@ -16,9 +16,11 @@ export function withErrorBoundary<Props extends object>(
 	errorBoundaryProps: ErrorBoundaryProps,
 ): ComponentType<Props> {
 	function WrappedComponent(props: Props) {
-		return <ErrorBoundary {...errorBoundaryProps}>
-			<BaseComponent {...props} />
-		</ErrorBoundary>;
+		return (
+			<ErrorBoundary {...errorBoundaryProps}>
+				<BaseComponent {...props} />
+			</ErrorBoundary>
+		);
 	}
 	WrappedComponent.displayName = `withErrorBoundary(${
 		BaseComponent.displayName || BaseComponent.name || 'Unknown'
@@ -29,5 +31,14 @@ export function withErrorBoundary<Props extends object>(
 export { useErrorBoundary } from './use-error-boundary.ts';
 export { ErrorBoundaryContext };
 export { getErrorMessage } from './utils.ts';
-export type { ComponentType, ErrorBoundaryContextType, ErrorBoundaryProps, ErrorBoundaryPropsWithComponent, ErrorBoundaryPropsWithFallback, ErrorBoundaryPropsWithRender, FallbackProps, OnErrorCallback } from './types.ts';
+export type {
+	ComponentType,
+	ErrorBoundaryContextType,
+	ErrorBoundaryProps,
+	ErrorBoundaryPropsWithComponent,
+	ErrorBoundaryPropsWithFallback,
+	ErrorBoundaryPropsWithRender,
+	FallbackProps,
+	OnErrorCallback,
+} from './types.ts';
 export type { UseErrorBoundaryApi } from './use-error-boundary.ts';

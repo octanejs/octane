@@ -62,12 +62,22 @@ function NodeWrapper<NodeType extends Node>({
 		NodeComponent = nodeTypes?.['default'] || builtinNodeTypes.default;
 	}
 
-	const isDraggable = !!(node.draggable || nodesDraggable && typeof node.draggable === 'undefined');
-	const isSelectable = !!(node.selectable ||
-		elementsSelectable && typeof node.selectable === 'undefined');
-	const isConnectable = !!(node.connectable ||
-		nodesConnectable && typeof node.connectable === 'undefined');
-	const isFocusable = !!(node.focusable || nodesFocusable && typeof node.focusable === 'undefined');
+	const isDraggable = !!(
+		node.draggable ||
+		(nodesDraggable && typeof node.draggable === 'undefined')
+	);
+	const isSelectable = !!(
+		node.selectable ||
+		(elementsSelectable && typeof node.selectable === 'undefined')
+	);
+	const isConnectable = !!(
+		node.connectable ||
+		(nodesConnectable && typeof node.connectable === 'undefined')
+	);
+	const isFocusable = !!(
+		node.focusable ||
+		(nodesFocusable && typeof node.focusable === 'undefined')
+	);
 
 	const store = useStoreApi();
 	const hasDimensions = nodeHasDimensions(node);
@@ -114,9 +124,9 @@ function NodeWrapper<NodeType extends Node>({
 
 		if (isSelectable && (!selectNodesOnDrag || !isDraggable || nodeDragThreshold > 0)) {
 			/*
- * this handler gets called by XYDrag on drag start when selectNodesOnDrag=true
- * here we only need to call it when selectNodesOnDrag=false
- */
+			 * this handler gets called by XYDrag on drag start when selectNodesOnDrag=true
+			 * here we only need to call it when selectNodesOnDrag=false
+			 */
 			handleNodeClick({
 				id,
 				store,
@@ -144,7 +154,9 @@ function NodeWrapper<NodeType extends Node>({
 				nodeRef,
 			});
 		} else if (
-			isDraggable && node.selected && Object.prototype.hasOwnProperty.call(arrowKeyDiffs, event.key)
+			isDraggable &&
+			node.selected &&
+			Object.prototype.hasOwnProperty.call(arrowKeyDiffs, event.key)
 		) {
 			// prevent default scrolling behavior on arrow key press when node is moved
 			event.preventDefault();
@@ -192,68 +204,70 @@ function NodeWrapper<NodeType extends Node>({
 		}
 	};
 
-	return <div
-		className={cc([
-			'react-flow__node',
-			`react-flow__node-${nodeType}`,
-			{ [noPanClassName]: isDraggable },
-			node.className,
-			{
-				selected: node.selected,
-				selectable: isSelectable,
-				parent: isParent,
-				draggable: isDraggable,
-				dragging,
-			},
-		])}
-		ref={nodeRef}
-		style={{
-			zIndex: internals.z,
-			transform: `translate(${internals.positionAbsolute.x}px,${internals.positionAbsolute.y}px)`,
-			pointerEvents: hasPointerEvents ? 'all' : 'none',
-			visibility: hasDimensions ? 'visible' : 'hidden',
-			...node.style,
-			...inlineDimensions,
-		}}
-		data-id={id}
-		data-testid={`rf__node-${id}`}
-		onMouseEnter={onMouseEnterHandler}
-		onMouseMove={onMouseMoveHandler}
-		onMouseLeave={onMouseLeaveHandler}
-		onContextMenu={onContextMenuHandler}
-		onClick={onSelectNodeHandler}
-		onDoubleClick={onDoubleClickHandler}
-		onKeyDown={isFocusable ? onKeyDown : undefined}
-		tabIndex={isFocusable ? 0 : undefined}
-		onFocus={isFocusable ? onFocus : undefined}
-		role={node.ariaRole ?? (isFocusable ? 'group' : undefined)}
-		aria-roledescription="node"
-		aria-describedby={disableKeyboardA11y ? undefined : `${ARIA_NODE_DESC_KEY}-${rfId}`}
-		aria-label={node.ariaLabel}
-		{...node.domAttributes}
-	>
-		<Provider value={id}>
-			<NodeComponent
-				id={id}
-				data={node.data}
-				type={nodeType}
-				positionAbsoluteX={internals.positionAbsolute.x}
-				positionAbsoluteY={internals.positionAbsolute.y}
-				selected={node.selected ?? false}
-				selectable={isSelectable}
-				draggable={isDraggable}
-				deletable={node.deletable ?? true}
-				isConnectable={isConnectable}
-				sourcePosition={node.sourcePosition}
-				targetPosition={node.targetPosition}
-				dragging={dragging}
-				dragHandle={node.dragHandle}
-				zIndex={internals.z}
-				parentId={node.parentId}
-				{...nodeDimensions}
-			/>
-		</Provider>
-	</div>;
+	return (
+		<div
+			className={cc([
+				'react-flow__node',
+				`react-flow__node-${nodeType}`,
+				{ [noPanClassName]: isDraggable },
+				node.className,
+				{
+					selected: node.selected,
+					selectable: isSelectable,
+					parent: isParent,
+					draggable: isDraggable,
+					dragging,
+				},
+			])}
+			ref={nodeRef}
+			style={{
+				zIndex: internals.z,
+				transform: `translate(${internals.positionAbsolute.x}px,${internals.positionAbsolute.y}px)`,
+				pointerEvents: hasPointerEvents ? 'all' : 'none',
+				visibility: hasDimensions ? 'visible' : 'hidden',
+				...node.style,
+				...inlineDimensions,
+			}}
+			data-id={id}
+			data-testid={`rf__node-${id}`}
+			onMouseEnter={onMouseEnterHandler}
+			onMouseMove={onMouseMoveHandler}
+			onMouseLeave={onMouseLeaveHandler}
+			onContextMenu={onContextMenuHandler}
+			onClick={onSelectNodeHandler}
+			onDoubleClick={onDoubleClickHandler}
+			onKeyDown={isFocusable ? onKeyDown : undefined}
+			tabIndex={isFocusable ? 0 : undefined}
+			onFocus={isFocusable ? onFocus : undefined}
+			role={node.ariaRole ?? (isFocusable ? 'group' : undefined)}
+			aria-roledescription="node"
+			aria-describedby={disableKeyboardA11y ? undefined : `${ARIA_NODE_DESC_KEY}-${rfId}`}
+			aria-label={node.ariaLabel}
+			{...node.domAttributes}
+		>
+			<Provider value={id}>
+				<NodeComponent
+					id={id}
+					data={node.data}
+					type={nodeType}
+					positionAbsoluteX={internals.positionAbsolute.x}
+					positionAbsoluteY={internals.positionAbsolute.y}
+					selected={node.selected ?? false}
+					selectable={isSelectable}
+					draggable={isDraggable}
+					deletable={node.deletable ?? true}
+					isConnectable={isConnectable}
+					sourcePosition={node.sourcePosition}
+					targetPosition={node.targetPosition}
+					dragging={dragging}
+					dragHandle={node.dragHandle}
+					zIndex={internals.z}
+					parentId={node.parentId}
+					{...nodeDimensions}
+				/>
+			</Provider>
+		</div>
+	);
 }
 
 export default memo(NodeWrapper) as typeof NodeWrapper;

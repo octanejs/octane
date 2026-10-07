@@ -13,8 +13,7 @@ const snapPoints =
 		: fixture === 'with-handle'
 			? ['148px', '355px']
 			: [0.25, 0.75];
-const initialSnapPoint =
-	fixture === 'initial-snap' || fixture === 'with-handle' ? '148px' : 0.25;
+const initialSnapPoint = fixture === 'initial-snap' || fixture === 'with-handle' ? '148px' : 0.25;
 
 function BrowserDrawer() @{
 	const [open, setOpen] = useState(startOpen);
@@ -22,9 +21,7 @@ function BrowserDrawer() @{
 	const activeSnapPointIndex = snapPoints.indexOf(activeSnapPoint as never);
 
 	<main>
-		<output id="drawer-state">
-			{open ? 'open' : 'closed'}
-		</output>
+		<output id="drawer-state">{open ? 'open' : 'closed'}</output>
 		<output id="snap-point">{String(activeSnapPoint)}</output>
 		<output id="active-snap-index">{String(activeSnapPointIndex)}</output>
 		<Drawer.Root

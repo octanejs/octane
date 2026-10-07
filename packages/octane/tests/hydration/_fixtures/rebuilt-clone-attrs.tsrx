@@ -8,7 +8,9 @@ function AttrLeaf(props: { value: unknown }) @{
 		title={read(props.value)}
 		class={read(props.value)}
 		style={{ color: read(props.value) === 'ok' ? 'red' : 'blue' }}
-	>{'t'}</i>
+	>
+		{'t'}
+	</i>
 }
 
 function SuppressedLeaf(props: { value: unknown }) @{
@@ -17,12 +19,16 @@ function SuppressedLeaf(props: { value: unknown }) @{
 		title={read(props.value)}
 		class={read(props.value)}
 		style={{ color: read(props.value) === 'ok' ? 'red' : 'blue' }}
-	>{'t'}</i>
+	>
+		{'t'}
+	</i>
 }
 
 function NestedLeaf(props: { value: unknown }) @{
 	<i>
-		<u title={read(props.value)} class={read(props.value)} style={{ color: 'red' }}>{'t'}</u>
+		<u title={read(props.value)} class={read(props.value)} style={{ color: 'red' }}>
+			{'t'}
+		</u>
 	</i>
 }
 
@@ -75,7 +81,9 @@ export function SpreadBranch(props: { server?: boolean; rest?: Record<string, un
 // Same tag, different values: a genuine server attribute mismatch.
 export function Attrs(props: { text: string; color: string }) @{
 	<div>
-		<i title={props.text} class={props.text} style={{ color: props.color }}>{'t'}</i>
+		<i title={props.text} class={props.text} style={{ color: props.color }}>
+			{'t'}
+		</i>
 	</div>
 }
 
@@ -86,6 +94,8 @@ export function SuppressedAttrs(props: { text: string; color: string }) @{
 			title={props.text}
 			class={props.text}
 			style={{ color: props.color }}
-		>{'t'}</i>
+		>
+			{'t'}
+		</i>
 	</div>
 }

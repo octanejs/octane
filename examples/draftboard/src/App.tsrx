@@ -47,8 +47,9 @@ const SAVE_DEBOUNCE_MS = 300;
 const SHAPE_COLORS = ['#ffd166', '#74d3ae', '#8ec5ff', '#f6a6c1'] as const;
 
 function scenarioIncludes(name: string): boolean {
-	return new URLSearchParams(window.location.search).get('scenario')?.split(',').includes(name) ??
-		false;
+	return (
+		new URLSearchParams(window.location.search).get('scenario')?.split(',').includes(name) ?? false
+	);
 }
 
 function syncLabel(state: SyncState, online: boolean, pendingChanges: number): string {
@@ -86,9 +87,9 @@ export function App() @{
 	const [saveRetry, setSaveRetry] = useState(0);
 	const [activity, setActivity] = useState('Opening Draftboard');
 	const [showShortcuts, setShowShortcuts] = useState(false);
-	const [pendingPersistenceRecords, setPendingPersistenceRecords] = useState<
-		PersistenceRecord[]
-	>([]);
+	const [pendingPersistenceRecords, setPendingPersistenceRecords] = useState<PersistenceRecord[]>(
+		[],
+	);
 	const [persistenceOutcome, setPersistenceOutcome] = useState(
 		'Release saves to reproduce an overlapping completion.',
 	);
@@ -119,24 +120,25 @@ export function App() @{
 	const publishPendingPersistence = useCallback(() => {
 		if (!mountedRef.current) return;
 		setPendingPersistenceRecords(
-			persistenceWaitersRef.current.map(
-				({ id, boardId, generation, revision }) => ({
-					id,
-					boardId,
-					generation,
-					revision,
-				}),
-			),
+			persistenceWaitersRef.current.map(({ id, boardId, generation, revision }) => ({
+				id,
+				boardId,
+				generation,
+				revision,
+			})),
 		);
 	}, []);
 
-	const settlePersistence = useCallback((id: number, result: PersistenceSettlement) => {
-		const index = persistenceWaitersRef.current.findIndex((waiter) => waiter.id === id);
-		if (index === -1) return;
-		const [waiter] = persistenceWaitersRef.current.splice(index, 1);
-		publishPendingPersistence();
-		waiter.settle(result);
-	}, [publishPendingPersistence]);
+	const settlePersistence = useCallback(
+		(id: number, result: PersistenceSettlement) => {
+			const index = persistenceWaitersRef.current.findIndex((waiter) => waiter.id === id);
+			if (index === -1) return;
+			const [waiter] = persistenceWaitersRef.current.splice(index, 1);
+			publishPendingPersistence();
+			waiter.settle(result);
+		},
+		[publishPendingPersistence],
+	);
 
 	const cancelPersistence = useCallback((outcome: string) => {
 		const waiters = persistenceWaitersRef.current.splice(0);
@@ -148,17 +150,20 @@ export function App() @{
 		for (const waiter of waiters) waiter.settle('cancelled');
 	}, []);
 
-	const waitForSavePersistence = useCallback((record: Omit<PersistenceRecord, 'id'>) => {
-		if (!saveRaceScenario) return Promise.resolve<PersistenceSettlement>('released');
-		return new Promise<PersistenceSettlement>((settle) => {
-			persistenceWaitersRef.current.push({
-				...record,
-				id: ++persistenceSequenceRef.current,
-				settle,
+	const waitForSavePersistence = useCallback(
+		(record: Omit<PersistenceRecord, 'id'>) => {
+			if (!saveRaceScenario) return Promise.resolve<PersistenceSettlement>('released');
+			return new Promise<PersistenceSettlement>((settle) => {
+				persistenceWaitersRef.current.push({
+					...record,
+					id: ++persistenceSequenceRef.current,
+					settle,
+				});
+				publishPendingPersistence();
 			});
-			publishPendingPersistence();
-		});
-	}, [publishPendingPersistence, saveRaceScenario]);
+		},
+		[publishPendingPersistence, saveRaceScenario],
+	);
 
 	const releaseOldestPersistence = useCallback(() => {
 		const oldest = persistenceWaitersRef.current[0];
@@ -170,78 +175,80 @@ export function App() @{
 		if (newest !== undefined) settlePersistence(newest.id, 'released');
 	}, [settlePersistence]);
 
-	const loadBoard = useCallback((nextBoardId: BoardId) => {
-		cancelPersistence('Pending saves cancelled because the board was reloaded.');
-		const outgoingDocument = documentRef.current;
-		if (outgoingDocument !== null && outgoingDocument.id !== nextBoardId) {
-			const outgoingDraft = boardDraftsRef.current.get(outgoingDocument.id);
-			if (
-				outgoingDraft !== undefined && outgoingDraft.changeRevision > outgoingDraft.savedRevision &&
+	const loadBoard = useCallback(
+		(nextBoardId: BoardId) => {
+			cancelPersistence('Pending saves cancelled because the board was reloaded.');
+			const outgoingDocument = documentRef.current;
+			if (outgoingDocument !== null && outgoingDocument.id !== nextBoardId) {
+				const outgoingDraft = boardDraftsRef.current.get(outgoingDocument.id);
+				if (
+					outgoingDraft !== undefined &&
+					outgoingDraft.changeRevision > outgoingDraft.savedRevision &&
 					onlineRef.current &&
 					writeStoredBoard(outgoingDraft.document)
-			) {
-				boardDraftsRef.current.set(outgoingDocument.id, {
-					...outgoingDraft,
-					savedRevision: outgoingDraft.changeRevision,
-				});
+				) {
+					boardDraftsRef.current.set(outgoingDocument.id, {
+						...outgoingDraft,
+						savedRevision: outgoingDraft.changeRevision,
+					});
+				}
 			}
-		}
-		const generation = ++loadGenerationRef.current;
-		++saveGenerationRef.current;
-		if (loadTimerRef.current !== null) window.clearTimeout(loadTimerRef.current);
-		if (saveTimerRef.current !== null) window.clearTimeout(saveTimerRef.current);
-		setLoadState('loading');
-		setDocument(null);
-		setSelectedIds([]);
-		setUndoStack([]);
-		setRedoStack([]);
-		changeRevisionRef.current = 0;
-		savedRevisionRef.current = 0;
-		setChangeRevision(0);
-		setSavedRevision(0);
-		setSyncState('saved');
-		setActivity(`Loading ${nextBoardId === 'launch' ? 'Launch narrative' : 'Blank exploration'}`);
-		loadTimerRef.current = window.setTimeout(() => {
-			if (generation !== loadGenerationRef.current) return;
-			loadTimerRef.current = null;
-			if (loadFailurePendingRef.current) {
-				loadFailurePendingRef.current = false;
-				setLoadState('error');
-				setActivity('Board load failed');
-				return;
-			}
-			const cachedDraft = boardDraftsRef.current.get(nextBoardId);
-			const nextDocument =
-				cachedDraft?.document ?? readStoredBoard(nextBoardId) ?? createSeededBoard(nextBoardId);
-			const nextDraft =
-				cachedDraft ??
-					{
-						document: nextDocument,
-						changeRevision: 0,
-						savedRevision: 0,
-					};
-			boardDraftsRef.current.set(nextBoardId, nextDraft);
-			documentRef.current = nextDocument;
-			changeRevisionRef.current = nextDraft.changeRevision;
-			savedRevisionRef.current = nextDraft.savedRevision;
-			setDocument(nextDocument);
-			setChangeRevision(nextDraft.changeRevision);
-			setSavedRevision(nextDraft.savedRevision);
-			setSyncState(
-				nextDraft.changeRevision > nextDraft.savedRevision
-					? onlineRef.current
-						? 'queued'
-						: 'queued'
-					: 'saved',
-			);
-			setLoadState('ready');
-			setActivity(
-				nextDocument.shapes.length === 0
-					? 'Blank exploration is ready'
-					: `${nextDocument.shapes.length} objects loaded`,
-			);
-		}, 220);
-	}, [cancelPersistence]);
+			const generation = ++loadGenerationRef.current;
+			++saveGenerationRef.current;
+			if (loadTimerRef.current !== null) window.clearTimeout(loadTimerRef.current);
+			if (saveTimerRef.current !== null) window.clearTimeout(saveTimerRef.current);
+			setLoadState('loading');
+			setDocument(null);
+			setSelectedIds([]);
+			setUndoStack([]);
+			setRedoStack([]);
+			changeRevisionRef.current = 0;
+			savedRevisionRef.current = 0;
+			setChangeRevision(0);
+			setSavedRevision(0);
+			setSyncState('saved');
+			setActivity(`Loading ${nextBoardId === 'launch' ? 'Launch narrative' : 'Blank exploration'}`);
+			loadTimerRef.current = window.setTimeout(() => {
+				if (generation !== loadGenerationRef.current) return;
+				loadTimerRef.current = null;
+				if (loadFailurePendingRef.current) {
+					loadFailurePendingRef.current = false;
+					setLoadState('error');
+					setActivity('Board load failed');
+					return;
+				}
+				const cachedDraft = boardDraftsRef.current.get(nextBoardId);
+				const nextDocument =
+					cachedDraft?.document ?? readStoredBoard(nextBoardId) ?? createSeededBoard(nextBoardId);
+				const nextDraft = cachedDraft ?? {
+					document: nextDocument,
+					changeRevision: 0,
+					savedRevision: 0,
+				};
+				boardDraftsRef.current.set(nextBoardId, nextDraft);
+				documentRef.current = nextDocument;
+				changeRevisionRef.current = nextDraft.changeRevision;
+				savedRevisionRef.current = nextDraft.savedRevision;
+				setDocument(nextDocument);
+				setChangeRevision(nextDraft.changeRevision);
+				setSavedRevision(nextDraft.savedRevision);
+				setSyncState(
+					nextDraft.changeRevision > nextDraft.savedRevision
+						? onlineRef.current
+							? 'queued'
+							: 'queued'
+						: 'saved',
+				);
+				setLoadState('ready');
+				setActivity(
+					nextDocument.shapes.length === 0
+						? 'Blank exploration is ready'
+						: `${nextDocument.shapes.length} objects loaded`,
+				);
+			}, 220);
+		},
+		[cancelPersistence],
+	);
 
 	useEffect(() => {
 		loadBoard(boardId);
@@ -315,8 +322,9 @@ export function App() @{
 		setSyncState('saving');
 		saveTimerRef.current = window.setTimeout(async () => {
 			if (
-				generation !== saveGenerationRef.current || revision !== changeRevisionRef.current ||
-					activeBoardIdRef.current !== documentToSave.id
+				generation !== saveGenerationRef.current ||
+				revision !== changeRevisionRef.current ||
+				activeBoardIdRef.current !== documentToSave.id
 			) {
 				return;
 			}
@@ -334,11 +342,14 @@ export function App() @{
 			});
 			if (persistenceResult === 'cancelled' || !mountedRef.current) return;
 			if (
-				generation !== saveGenerationRef.current || revision !== changeRevisionRef.current ||
-					activeBoardIdRef.current !== documentToSave.id
+				generation !== saveGenerationRef.current ||
+				revision !== changeRevisionRef.current ||
+				activeBoardIdRef.current !== documentToSave.id
 			) {
 				if (
-					saveRaceScenario && onlineRef.current && activeBoardIdRef.current === documentToSave.id
+					saveRaceScenario &&
+					onlineRef.current &&
+					activeBoardIdRef.current === documentToSave.id
 				) {
 					setPersistenceOutcome(
 						'Older save completion ignored; latest saved canvas was preserved.',
@@ -349,11 +360,14 @@ export function App() @{
 			const didSave = writeStoredBoard(documentToSave);
 			if (!mountedRef.current) return;
 			if (
-				generation !== saveGenerationRef.current || revision !== changeRevisionRef.current ||
-					activeBoardIdRef.current !== documentToSave.id
+				generation !== saveGenerationRef.current ||
+				revision !== changeRevisionRef.current ||
+				activeBoardIdRef.current !== documentToSave.id
 			) {
 				if (
-					saveRaceScenario && onlineRef.current && activeBoardIdRef.current === documentToSave.id
+					saveRaceScenario &&
+					onlineRef.current &&
+					activeBoardIdRef.current === documentToSave.id
 				) {
 					setPersistenceOutcome(
 						'Older save completion ignored; latest saved canvas was preserved.',
@@ -396,14 +410,17 @@ export function App() @{
 		waitForSavePersistence,
 	]);
 
-	const navigateToBoard = useCallback((nextBoardId: BoardId) => {
-		if (nextBoardId === boardId) return;
-		activeBoardIdRef.current = nextBoardId;
-		++saveGenerationRef.current;
-		cancelPersistence('Pending saves cancelled because the board route changed.');
-		history.pushState(null, '', boardURL(nextBoardId));
-		setBoardId(nextBoardId);
-	}, [boardId, cancelPersistence]);
+	const navigateToBoard = useCallback(
+		(nextBoardId: BoardId) => {
+			if (nextBoardId === boardId) return;
+			activeBoardIdRef.current = nextBoardId;
+			++saveGenerationRef.current;
+			cancelPersistence('Pending saves cancelled because the board route changed.');
+			history.pushState(null, '', boardURL(nextBoardId));
+			setBoardId(nextBoardId);
+		},
+		[boardId, cancelPersistence],
+	);
 
 	const markDocumentChanged = useCallback((next: BoardDocument) => {
 		++saveGenerationRef.current;
@@ -422,18 +439,17 @@ export function App() @{
 		});
 	}, []);
 
-	const recordCommit = useCallback((
-		before: BoardDocument,
-		next: BoardDocument,
-		message: string,
-	) => {
-		documentRef.current = next;
-		setDocument(next);
-		setUndoStack((current) => [...current.slice(-49), cloneDocument(before)]);
-		setRedoStack([]);
-		markDocumentChanged(next);
-		setActivity(message);
-	}, [markDocumentChanged]);
+	const recordCommit = useCallback(
+		(before: BoardDocument, next: BoardDocument, message: string) => {
+			documentRef.current = next;
+			setDocument(next);
+			setUndoStack((current) => [...current.slice(-49), cloneDocument(before)]);
+			setRedoStack([]);
+			markDocumentChanged(next);
+			setActivity(message);
+		},
+		[markDocumentChanged],
+	);
 
 	const undo = useCallback(() => {
 		const currentDocument = documentRef.current;
@@ -443,8 +459,8 @@ export function App() @{
 		setRedoStack((current) => [...current.slice(-49), cloneDocument(currentDocument)]);
 		documentRef.current = previous;
 		setDocument(previous);
-		setSelectedIds(
-			(current) => current.filter((id) => previous.shapes.some((shape) => shape.id === id)),
+		setSelectedIds((current) =>
+			current.filter((id) => previous.shapes.some((shape) => shape.id === id)),
 		);
 		markDocumentChanged(previous);
 		setActivity('Undid the last canvas change');
@@ -458,8 +474,8 @@ export function App() @{
 		setUndoStack((current) => [...current.slice(-49), cloneDocument(currentDocument)]);
 		documentRef.current = next;
 		setDocument(next);
-		setSelectedIds(
-			(current) => current.filter((id) => next.shapes.some((shape) => shape.id === id)),
+		setSelectedIds((current) =>
+			current.filter((id) => next.shapes.some((shape) => shape.id === id)),
 		);
 		markDocumentChanged(next);
 		setActivity('Redid the canvas change');
@@ -501,7 +517,9 @@ export function App() @{
 				event.preventDefault();
 				canvasApiRef.current?.focusCanvas();
 			}}
-		>Skip to canvas</a>
+		>
+			Skip to canvas
+		</a>
 		<aside class="rail" aria-label="Draftboard navigation">
 			<a
 				class="wordmark"
@@ -510,7 +528,9 @@ export function App() @{
 					event.preventDefault();
 					navigateToBoard('launch');
 				}}
-			>D</a>
+			>
+				D
+			</a>
 			<nav aria-label="Boards">
 				<a
 					class={['rail-link', boardId === 'launch' && 'rail-link--active']}
@@ -537,7 +557,9 @@ export function App() @{
 					<span>Blank</span>
 				</a>
 			</nav>
-			<div class="avatar" title="Maya Chen">MC</div>
+			<div class="avatar" title="Maya Chen">
+				MC
+			</div>
 		</aside>
 
 		<main class="workspace">
@@ -563,12 +585,16 @@ export function App() @{
 						type="button"
 						ref={shortcutsTriggerRef}
 						onClick={(event) => openShortcuts(event.currentTarget as HTMLButtonElement)}
-					>Shortcuts</button>
+					>
+						Shortcuts
+					</button>
 					<button
 						class="share-button"
 						type="button"
 						onClick={() => setActivity('Board link copied for teammates')}
-					>Share</button>
+					>
+						Share
+					</button>
 				</div>
 			</header>
 
@@ -604,12 +630,16 @@ export function App() @{
 							type="button"
 							disabled={pendingPersistenceCount === 0}
 							onClick={releaseOldestPersistence}
-						>Complete oldest pending save</button>
+						>
+							Complete oldest pending save
+						</button>
 						<button
 							type="button"
 							disabled={pendingPersistenceCount === 0}
 							onClick={releaseNewestPersistence}
-						>Complete newest pending save</button>
+						>
+							Complete newest pending save
+						</button>
 					</div>
 				</section>
 			}
@@ -668,24 +698,32 @@ export function App() @{
 								aria-label="Undo"
 								disabled={undoStack.length === 0}
 								onClick={undo}
-							>↶</button>
+							>
+								↶
+							</button>
 							<button
 								type="button"
 								aria-label="Redo"
 								disabled={redoStack.length === 0}
 								onClick={redo}
-							>↷</button>
+							>
+								↷
+							</button>
 							<span class="tool-separator" aria-hidden="true"></span>
 							<button
 								type="button"
 								aria-label="Zoom out"
 								onClick={() => canvasApiRef.current?.zoomBy(-0.2)}
-							>−</button>
+							>
+								−
+							</button>
 							<button
 								type="button"
 								aria-label="Zoom in"
 								onClick={() => canvasApiRef.current?.zoomBy(0.2)}
-							>＋</button>
+							>
+								＋
+							</button>
 							<button type="button" onClick={() => canvasApiRef.current?.fitSelection()}>
 								Fit selection
 							</button>
@@ -715,10 +753,14 @@ export function App() @{
 							/>
 							@if (document.shapes.length === 0) {
 								<div class="empty-board" role="status">
-									<div class="empty-spark" aria-hidden="true">✦</div>
+									<div class="empty-spark" aria-hidden="true">
+										✦
+									</div>
 									<h2>This canvas is ready for its first idea</h2>
 									<p>Add a note here, or choose Rectangle and draw anywhere.</p>
-									<button type="button" onClick={createBlankShape}>Create first idea</button>
+									<button type="button" onClick={createBlankShape}>
+										Create first idea
+									</button>
 								</div>
 							}
 						</div>
@@ -750,17 +792,17 @@ export function App() @{
 										<div>
 											<dt>X</dt>
 											<dd>
-												<output aria-label="Selected X coordinate">{String(
-													Math.round(selectedShapes[0].x),
-												)}</output>
+												<output aria-label="Selected X coordinate">
+													{String(Math.round(selectedShapes[0].x))}
+												</output>
 											</dd>
 										</div>
 										<div>
 											<dt>Y</dt>
 											<dd>
-												<output aria-label="Selected Y coordinate">{String(
-													Math.round(selectedShapes[0].y),
-												)}</output>
+												<output aria-label="Selected Y coordinate">
+													{String(Math.round(selectedShapes[0].y))}
+												</output>
 											</dd>
 										</div>
 									</dl>
@@ -777,7 +819,9 @@ export function App() @{
 						</aside>
 					</div>
 					<footer class="activity-bar">
-						<span role="status" aria-live="polite">{activity}</span>
+						<span role="status" aria-live="polite">
+							{activity}
+						</span>
 						<span>{`${document.shapes.length} ${
 							document.shapes.length === 1 ? 'object' : 'objects'
 						} · ${selectedIds.length} selected`}</span>
@@ -805,10 +849,14 @@ function LoadingCanvas() @{
 
 function LoadFailure(props: { onRetry: () => void }) @{
 	<section class="load-failure" role="alert">
-		<div class="failure-icon" aria-hidden="true">!</div>
+		<div class="failure-icon" aria-hidden="true">
+			!
+		</div>
 		<h2>We couldn’t load this board</h2>
 		<p>The deterministic fixture is still available. Retry without losing the board link.</p>
-		<button type="button" onClick={props.onRetry}>Retry loading</button>
+		<button type="button" onClick={props.onRetry}>
+			Retry loading
+		</button>
 	</section>
 }
 
@@ -875,7 +923,7 @@ function BoardCanvas(props: BoardCanvasProps) @{
 	useEffect(() => {
 		if (
 			keyboardShapeId === null ||
-				!props.document.shapes.some((shape) => shape.id === keyboardShapeId)
+			!props.document.shapes.some((shape) => shape.id === keyboardShapeId)
 		) {
 			setKeyboardShapeId(props.document.shapes[0]?.id ?? null);
 		}
@@ -886,17 +934,20 @@ function BoardCanvas(props: BoardCanvasProps) @{
 		props.onActivity('Canvas focused. Keyboard shortcuts are ready.');
 	}, [props.onActivity]);
 
-	const zoomBy = useCallback((amount: number) => {
-		setZoom((current) => {
-			const next = clamp(Number((current + amount).toFixed(2)), 0.4, 2.4);
-			props.onActivity(`Canvas zoom ${Math.round(next * 100)}%`);
-			return next;
-		});
-	}, [props.onActivity]);
+	const zoomBy = useCallback(
+		(amount: number) => {
+			setZoom((current) => {
+				const next = clamp(Number((current + amount).toFixed(2)), 0.4, 2.4);
+				props.onActivity(`Canvas zoom ${Math.round(next * 100)}%`);
+				return next;
+			});
+		},
+		[props.onActivity],
+	);
 
 	const fitSelection = useCallback(() => {
-		const selected = documentRef.current.shapes.filter(
-			(shape) => props.selectedIds.includes(shape.id),
+		const selected = documentRef.current.shapes.filter((shape) =>
+			props.selectedIds.includes(shape.id),
 		);
 		if (selected.length === 0) {
 			setZoom(1);
@@ -1037,9 +1088,11 @@ function BoardCanvas(props: BoardCanvasProps) @{
 			if (svg === null) return;
 			const bounds = svg.getBoundingClientRect();
 			setPan({
-				x: interaction.origin.x +
+				x:
+					interaction.origin.x +
 					((event.clientX - interaction.startClient.x) / bounds.width) * VIEW_WIDTH,
-				y: interaction.origin.y +
+				y:
+					interaction.origin.y +
 					((event.clientY - interaction.startClient.y) / bounds.height) * VIEW_HEIGHT,
 			});
 			return;
@@ -1064,8 +1117,8 @@ function BoardCanvas(props: BoardCanvasProps) @{
 		if (Math.abs(dx) > 0.5 || Math.abs(dy) > 0.5) interaction.moved = true;
 		const next: BoardDocument = {
 			...interaction.before,
-			shapes: interaction.before.shapes.map(
-				(shape) => interaction.shapeIds.includes(shape.id)
+			shapes: interaction.before.shapes.map((shape) =>
+				interaction.shapeIds.includes(shape.id)
 					? { ...shape, x: shape.x + dx, y: shape.y + dy }
 					: shape,
 			),
@@ -1138,9 +1191,11 @@ function BoardCanvas(props: BoardCanvasProps) @{
 			event.preventDefault();
 			const shapes = documentRef.current.shapes;
 			if (shapes.length === 0) return;
-			const currentIndex = Math.max(0, shapes.findIndex((shape) => shape.id === keyboardShapeId));
-			const direction =
-				event.key === 'ArrowRight' ? 1 : -1;
+			const currentIndex = Math.max(
+				0,
+				shapes.findIndex((shape) => shape.id === keyboardShapeId),
+			);
+			const direction = event.key === 'ArrowRight' ? 1 : -1;
 			const nextIndex = (currentIndex + direction + shapes.length) % shapes.length;
 			const nextShape = shapes[nextIndex];
 			setKeyboardShapeId(nextShape.id);
@@ -1157,10 +1212,8 @@ function BoardCanvas(props: BoardCanvasProps) @{
 				shapes: before.shapes.filter((shape) => !props.selectedIds.includes(shape.id)),
 			};
 			const focusedIndex = before.shapes.findIndex((shape) => shape.id === keyboardShapeId);
-			const nextKeyboardShape = next.shapes[Math.min(
-				Math.max(0, focusedIndex),
-				next.shapes.length - 1,
-			)];
+			const nextKeyboardShape =
+				next.shapes[Math.min(Math.max(0, focusedIndex), next.shapes.length - 1)];
 			documentRef.current = next;
 			props.onSelectionChange([]);
 			setKeyboardShapeId(nextKeyboardShape?.id ?? null);
@@ -1172,10 +1225,8 @@ function BoardCanvas(props: BoardCanvasProps) @{
 					: `${props.selectedIds.length} objects deleted`,
 			);
 			if (nextKeyboardShape !== undefined) {
-				requestAnimationFrame(
-					() => requestAnimationFrame(
-						() => shapeElementsRef.current.get(nextKeyboardShape.id)?.focus(),
-					),
+				requestAnimationFrame(() =>
+					requestAnimationFrame(() => shapeElementsRef.current.get(nextKeyboardShape.id)?.focus()),
 				);
 			} else {
 				requestAnimationFrame(() => svgRef.current?.focus());
@@ -1195,8 +1246,8 @@ function BoardCanvas(props: BoardCanvasProps) @{
 		const before = cloneDocument(documentRef.current);
 		const next = {
 			...before,
-			shapes: before.shapes.map(
-				(shape) => props.selectedIds.includes(shape.id)
+			shapes: before.shapes.map((shape) =>
+				props.selectedIds.includes(shape.id)
 					? { ...shape, x: shape.x + offset.x * distance, y: shape.y + offset.y * distance }
 					: shape,
 			),
@@ -1335,13 +1386,12 @@ function CanvasShape(props: CanvasShapeProps) @{
 			height={props.shape.height + 10}
 			rx="18"
 		></rect>
-		<text
-			class="shape-label"
-			x={centerX}
-			y={centerY - 4}
-			text-anchor="middle"
-		>{props.shape.label}</text>
-		<text class="shape-meta" x={centerX} y={centerY + 23} text-anchor="middle">Product note</text>
+		<text class="shape-label" x={centerX} y={centerY - 4} text-anchor="middle">
+			{props.shape.label}
+		</text>
+		<text class="shape-meta" x={centerX} y={centerY + 23} text-anchor="middle">
+			Product note
+		</text>
 		@if (props.selected) {
 			<circle
 				class="selection-handle"
@@ -1416,9 +1466,7 @@ function KeyboardHelpDialog(props: { onClose: () => void }) @{
 				<div>
 					<dt>Move faster</dt>
 					<dd>
-						<kbd>Shift</kbd>
-						+
-						<kbd>Arrow</kbd>
+						<kbd>Shift</kbd>+<kbd>Arrow</kbd>
 					</dd>
 				</div>
 				<div>
@@ -1430,9 +1478,7 @@ function KeyboardHelpDialog(props: { onClose: () => void }) @{
 				<div>
 					<dt>Undo / redo</dt>
 					<dd>
-						<kbd>⌘/Ctrl Z</kbd>
-						·
-						<kbd>Shift ⌘/Ctrl Z</kbd>
+						<kbd>⌘/Ctrl Z</kbd>·<kbd>Shift ⌘/Ctrl Z</kbd>
 					</dd>
 				</div>
 			</dl>
@@ -1441,7 +1487,9 @@ function KeyboardHelpDialog(props: { onClose: () => void }) @{
 				outside its visible bounds.
 			</p>
 			<div class="dialog-actions">
-				<button ref={doneRef} type="button" onClick={props.onClose}>Got it</button>
+				<button ref={doneRef} type="button" onClick={props.onClose}>
+					Got it
+				</button>
 			</div>
 		</section>
 	</div>

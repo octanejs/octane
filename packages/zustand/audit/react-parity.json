@@ -40,7 +40,7 @@
       "arch": "any",
       "packageManager": "pnpm@12.9.1",
       "lockfile": "pnpm-lock.yaml",
-      "lockfileSha256": "e92f4520cd88a2593a0ecd555e0532b2e4e8bb1396c9558a09f0cbf3fbaa5917"
+      "lockfileSha256": "caea67fe61ab57f3e8cbd8a0e55f0e8b3014b3dd6815c6fe6e158095f291daeb"
     }
   },
   "lanes": [
@@ -73,17 +73,17 @@
         {
           "path": "packages/zustand/tests/_fixtures/shallow.tsrx",
           "role": "support",
-          "sha256": "d009c8ddd24a552821e47145ccda57c6a22682c2553113520ff5c292cea02104"
+          "sha256": "4c4d00f41511a13ad90d3b840347cea4833ede6b715486e760b93355738eb0ea"
         },
         {
           "path": "packages/zustand/tests/_fixtures/middleware.tsrx",
           "role": "support",
-          "sha256": "8f2ea0eae2a4086fd5dd47a50ceab820958d2e8339ebf41792f180a8f55eb2c5"
+          "sha256": "6dfa0bf7cb07ce52160a46b4045c745be6bb818af4954e6337a5b192c6c9fa9e"
         },
         {
           "path": "packages/zustand/tests/_fixtures/stores.tsrx",
           "role": "support",
-          "sha256": "817c4a301a22fc58e8e6a6bb8f97b89a0692dcc51672d0b94473111c088ea26f"
+          "sha256": "fba0f8958f4f3762114a3d26942aede2e5e51bd31906b819050d28e92a18c4b0"
         }
       ]
     },

@@ -80,11 +80,12 @@ export function SuspenseInActivity(props) @{
 }
 
 function LateSuspender(props) @{
-	const value =
-		props.suspend ? use(props.promise) : 'late';
+	const value = props.suspend ? use(props.promise) : 'late';
 	@if (props.suspend) {
 		<>
-			<small id="activity-resolved-display" style="display: block">{value as string}</small>
+			<small id="activity-resolved-display" style="display: block">
+				{value as string}
+			</small>
 			{'resolved text'}
 		</>
 	} @else {
@@ -96,12 +97,16 @@ function SuspenseHideOwnershipChild(props) @{
 	const [stage, setStage] = useState('ready');
 	props.expose(setStage);
 	<>
-		<strong id="activity-stable-display" style="display: inline-grid">{'stable'}</strong>
+		<strong id="activity-stable-display" style="display: inline-grid">
+			{'stable'}
+		</strong>
 		@if (stage === 'ready') {
 			<span id="activity-owner-ready">{'ready'}</span>
 		} @else {
 			<>
-				<strong id="activity-owned-display" style="display: inline-flex">{'new'}</strong>
+				<strong id="activity-owned-display" style="display: inline-flex">
+					{'new'}
+				</strong>
 				{'authored text'}
 			</>
 		}

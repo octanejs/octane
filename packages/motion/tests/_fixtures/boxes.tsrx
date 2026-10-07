@@ -13,7 +13,9 @@ export function Box() @{
 }
 
 export function Span() @{
-	<motion.span id="sp" className="lbl">{'label'}</motion.span>
+	<motion.span id="sp" className="lbl">
+		{'label'}
+	</motion.span>
 }
 
 export function HoverBox() @{

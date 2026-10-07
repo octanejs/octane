@@ -9,17 +9,14 @@ function A() @{
 
 function Suspender(props) @{
 	const v = use(props.promise);
-	<span id="sus">{'sus-' + v as string}</span>
+	<span id="sus">{('sus-' + v) as string}</span>
 }
 
 function BPortal(props) @{
 	<span id="content">
-		{createPortal(
-			() => @{
-				<span id="ported">{'ported'}</span>
-			},
-			props.target,
-		)}
+		{createPortal(() => @{
+			<span id="ported">{'ported'}</span>
+		}, props.target)}
 		<Suspender promise={props.promise} />
 	</span>
 }
@@ -28,7 +25,9 @@ export function SwapPortal(props) @{
 	const [showB, setShowB] = useState(false);
 	const [, start] = useTransition();
 	<div>
-		<button id="go" onClick={() => start(() => setShowB(true))}>{'go'}</button>
+		<button id="go" onClick={() => start(() => setShowB(true))}>
+			{'go'}
+		</button>
 		@try {
 			<div class="slot">
 				{showB ? <BPortal promise={props.promise} target={props.target} /> : <A />}

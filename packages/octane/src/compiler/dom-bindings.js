@@ -18,7 +18,7 @@ import {
 } from '../html-tree-validation.js';
 import { shouldSanitizeURLAttribute } from '../sanitize-url.js';
 import { fixedBindingProps } from './dom-binding-fixed-props.js';
-import { needsBindingProgram, planBindingProgram } from './dom-binding-program.js';
+import { isLayoutText, needsBindingProgram, planBindingProgram } from './dom-binding-program.js';
 import {
 	parseDomBindingRequest,
 	formatDomBindingRequest,
@@ -989,7 +989,7 @@ function planView(fn, filename, source, imports, lexical, native = null) {
 		}
 		const authoredChildren = (native === null ? (element.children ?? []) : []).filter(
 			(child) =>
-				(child.type !== 'JSXText' || child.value.trim() !== '' || !/[\r\n]/.test(child.value)) &&
+				(child.type !== 'JSXText' || !isLayoutText(child.raw ?? child.value)) &&
 				(child.type !== 'JSXExpressionContainer' ||
 					child.expression?.type !== 'JSXEmptyExpression'),
 		);

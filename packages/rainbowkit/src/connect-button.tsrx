@@ -38,17 +38,19 @@ function useConnectButtonState(): ConnectButtonRendererProps {
 	const connected = connection.status === 'connected' && Boolean(connection.address);
 	const mounted = rainbowKit?.mounted ?? false;
 	return {
-		account: mounted && connected
-			? {
-					address: connection.address!,
-					displayName: formatAddress(connection.address!),
-				}
-			: undefined,
+		account:
+			mounted && connected
+				? {
+						address: connection.address!,
+						displayName: formatAddress(connection.address!),
+					}
+				: undefined,
 		accountModalOpen: accountModal.accountModalOpen,
 		authenticationStatus: undefined,
-		chain: mounted && connected
-			? { id: connection.chainId!, name: chain?.name, unsupported: chain === undefined }
-			: undefined,
+		chain:
+			mounted && connected
+				? { id: connection.chainId!, name: chain?.name, unsupported: chain === undefined }
+				: undefined,
 		chainModalOpen: chainModal.chainModalOpen,
 		connectModalOpen: connectModal.connectModalOpen,
 		connectionStatus: !mounted
@@ -90,11 +92,9 @@ export function ConnectButton(props: ConnectButtonProps = {}) @{
 					</button>
 				}
 			}
-			<button
-				type="button"
-				className="rk-connect-button"
-				onClick={state.openAccountModal}
-			>{state.account.displayName}</button>
+			<button type="button" className="rk-connect-button" onClick={state.openAccountModal}>
+				{state.account.displayName}
+			</button>
 			<button
 				type="button"
 				className="rk-connect-button"

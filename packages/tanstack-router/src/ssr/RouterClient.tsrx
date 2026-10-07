@@ -16,7 +16,7 @@ const ready = {
 function getHydrationPromise(router: AnyRouter) {
 	let promise = hydrationPromises.get(router);
 	if (!promise) {
-		promise = router.stores.ids.get().length ? ready as PromiseLike<void> : hydrate(router);
+		promise = router.stores.ids.get().length ? (ready as PromiseLike<void>) : hydrate(router);
 		hydrationPromises.set(router, promise);
 	}
 	return promise;

@@ -7,9 +7,13 @@ export function BooleanAttrs(props) @{
 		<input class="b1" type="checkbox" checked={props.on} />
 		<input class="b2" type="checkbox" defaultChecked={props.on} />
 		<input class="b3" disabled={props.on} readOnly={props.on} required={props.on} />
-		<button class="b4" disabled={props.on}>{'b'}</button>
+		<button class="b4" disabled={props.on}>
+			{'b'}
+		</button>
 		<select class="b5" multiple={props.on}>
-			<option value="a" selected={props.on}>{'a'}</option>
+			<option value="a" selected={props.on}>
+				{'a'}
+			</option>
 		</select>
 		<video class="b6" controls={props.on} loop={props.on} muted={props.on} />
 	</div>
@@ -41,7 +45,9 @@ export function EnumeratedAndAria(props) @{
 
 export function NamedAndAliased(props) @{
 	<div>
-		<label class="n1" for={props.text}>{'l'}</label>
+		<label class="n1" for={props.text}>
+			{'l'}
+		</label>
 		<div class="n2" class={props.text} />
 		<div class="n3" style={{ color: 'red', marginTop: props.num }} />
 		<a class="n4" href={props.text} download={props.on} />
@@ -52,7 +58,9 @@ export function NamedAndAliased(props) @{
 export function FormAttrs(props) @{
 	<form class="f0" action={props.text}>
 		<input class="f1" name="a" formAction={props.text} />
-		<button class="f2" formAction={props.text} formMethod="post">{'go'}</button>
+		<button class="f2" formAction={props.text} formMethod="post">
+			{'go'}
+		</button>
 		<input class="f3" autoFocus={props.on} />
 	</form>
 }
@@ -109,7 +117,9 @@ export function StyleShapes(props) @{
 export function DangerAndSuppress(props) @{
 	<div>
 		<div class="d1" dangerouslySetInnerHTML={{ __html: props.html }} />
-		<div class="d2" suppressHydrationWarning={true}>{props.text}</div>
+		<div class="d2" suppressHydrationWarning={true}>
+			{props.text}
+		</div>
 	</div>
 }
 
@@ -122,17 +132,16 @@ export function EnumeratedBooleans(props) @{
 	</div>
 }
 
-export function HydratedAttributeValues(props: {
-	text: string | null;
-	on: boolean;
-}) @{
+export function HydratedAttributeValues(props: { text: string | null; on: boolean }) @{
 	<div>
 		<button
 			title={props.text}
 			data-label={props.text as string}
 			disabled={props.on}
 			aria-expanded={props.on}
-		>{'attributes'}</button>
+		>
+			{'attributes'}
+		</button>
 		<svg>
 			<use xlinkHref={props.text} xmlLang={props.text} />
 		</svg>

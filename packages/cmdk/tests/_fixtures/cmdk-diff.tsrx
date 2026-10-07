@@ -96,7 +96,9 @@ export function CmdkDiffForceMountSwap() @{
 		</button>
 		<Command.List>
 			@if (forced) {
-				<Command.Item forceMount value="Apple">Apple</Command.Item>
+				<Command.Item forceMount value="Apple">
+					Apple
+				</Command.Item>
 			}
 			@if (!forced) {
 				<Command.Item value="Apple">Apple</Command.Item>
@@ -145,7 +147,9 @@ export function CmdkDiffSelectedForceMount() @{
 		</button>
 		<Command.List>
 			@if (showForced) {
-				<Command.Item forceMount value="Apple">Apple</Command.Item>
+				<Command.Item forceMount value="Apple">
+					Apple
+				</Command.Item>
 			}
 			<Command.Item value="Banana">Banana</Command.Item>
 		</Command.List>
@@ -202,7 +206,7 @@ export function CmdkDiffValueChangeFilter() @{
 export function CmdkDiffAsChild() @{
 	<Command label="Command Menu">
 		<Command.List>
-			<Command.Item {...{ asChild: true } as object}>
+			<Command.Item {...({ asChild: true } as object)}>
 				<a href="#apple">Apple</a>
 			</Command.Item>
 		</Command.List>

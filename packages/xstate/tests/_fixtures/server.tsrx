@@ -72,7 +72,7 @@ export function ServerContextView() @{
 export function ServerActorView() @{
 	const [state] = useActor(serverMachine, { input: { count: 3 } });
 
-	<span id="actor">{'count=' + state.context.count + ' state=' + state.value as string}</span>
+	<span id="actor">{('count=' + state.context.count + ' state=' + state.value) as string}</span>
 }
 
 export function ServerSelectorView(props: { actorRef: ActorRefFrom<typeof serverMachine> }) @{
@@ -98,9 +98,8 @@ function subscribeToHandRolledActor(onStoreChange: () => void) {
 }
 
 export function ServerNoServerSnapshotView() @{
-	const snapshot = useSyncExternalStore(
-		subscribeToHandRolledActor,
-		() => handRolledActor.getSnapshot(),
+	const snapshot = useSyncExternalStore(subscribeToHandRolledActor, () =>
+		handRolledActor.getSnapshot(),
 	);
 
 	<span id="no-server-snapshot">{'count=' + snapshot.count + ' state=' + snapshot.value}</span>

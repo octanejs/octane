@@ -40,9 +40,7 @@ const defaultColumns = [
 	{ accessorKey: 'lastName', header: () => 'Last Name', cell: (info: any) => info.getValue() },
 	{ accessorKey: 'age', header: 'Age' },
 ];
-const altColumns = [
-	{ accessorKey: 'age', header: 'Only Age' },
-];
+const altColumns = [{ accessorKey: 'age', header: 'Only Age' }];
 
 // v9 always builds the core row model, so a plain table opts into no features.
 const coreFeatures = tableFeatures({});
@@ -82,10 +80,9 @@ export function BasicTable(props: { data?: any; columns?: any }) @{
 			@for (const row of table.getRowModel().rows; key row.id) {
 				<tr>
 					@for (const cell of row.getAllCells(); key cell.id) {
-						<td id={'td-' + cell.id}>{flexRender(
-							cell.column.columnDef.cell,
-							cell.getContext(),
-						)}</td>
+						<td id={'td-' + cell.id}>
+							{flexRender(cell.column.columnDef.cell, cell.getContext())}
+						</td>
 					}
 				</tr>
 			}
@@ -117,9 +114,15 @@ export function SwapApp() @{
 			data={alt ? altData : defaultData}
 			columns={altCols ? altColumns : defaultColumns}
 		/>
-		<button id="swap-data" onClick={() => setAlt(!alt)}>data</button>
-		<button id="swap-cols" onClick={() => setAltCols(!altCols)}>cols</button>
-		<button id="bump" onClick={() => setBump(bump + 1)}>{'bump=' + bump}</button>
+		<button id="swap-data" onClick={() => setAlt(!alt)}>
+			data
+		</button>
+		<button id="swap-cols" onClick={() => setAltCols(!altCols)}>
+			cols
+		</button>
+		<button id="bump" onClick={() => setBump(bump + 1)}>
+			{'bump=' + bump}
+		</button>
 	</div>
 }
 
@@ -181,10 +184,9 @@ export function ControlledSortingTable() @{
 			@for (const hg of table.getHeaderGroups(); key hg.id) {
 				<tr>
 					@for (const header of hg.headers; key header.id) {
-						<th
-							id={'c-th-' + header.id}
-							onClick={header.column.getToggleSortingHandler()}
-						>{flexRender(header.column.columnDef.header, header.getContext())}</th>
+						<th id={'c-th-' + header.id} onClick={header.column.getToggleSortingHandler()}>
+							{flexRender(header.column.columnDef.header, header.getContext())}
+						</th>
 					}
 				</tr>
 			}

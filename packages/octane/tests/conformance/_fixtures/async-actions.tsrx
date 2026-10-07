@@ -19,26 +19,40 @@ export function AsyncActionEvents(props: {
 		<button
 			id="event-action"
 			type="button"
-			onClick={() => start(async () => {
-				setSaved('started');
-				await props.resume;
-				setSaved('awaited');
-				props.onResume?.();
-				await props.gate;
-				setSaved('finished');
-			})}
-		>Start action</button>
-		<button id="event-pointermove" type="button" onPointerMove={increment}>Pointer move</button>
-		<button id="event-mousemove" type="button" onMouseMoveCapture={increment}>Mouse move</button>
-		<button id="event-wheel" type="button" onWheel={increment}>Wheel</button>
-		<div id="event-scroll" onScroll={increment}>Scroll</div>
-		<button id="event-pointerdown" type="button" onPointerDown={increment}>Pointer down</button>
-		<button id="event-click" type="button" onClickCapture={increment}>Click</button>
+			onClick={() =>
+				start(async () => {
+					setSaved('started');
+					await props.resume;
+					setSaved('awaited');
+					props.onResume?.();
+					await props.gate;
+					setSaved('finished');
+				})
+			}
+		>
+			Start action
+		</button>
+		<button id="event-pointermove" type="button" onPointerMove={increment}>
+			Pointer move
+		</button>
+		<button id="event-mousemove" type="button" onMouseMoveCapture={increment}>
+			Mouse move
+		</button>
+		<button id="event-wheel" type="button" onWheel={increment}>
+			Wheel
+		</button>
+		<div id="event-scroll" onScroll={increment}>
+			Scroll
+		</div>
+		<button id="event-pointerdown" type="button" onPointerDown={increment}>
+			Pointer down
+		</button>
+		<button id="event-click" type="button" onClickCapture={increment}>
+			Click
+		</button>
 		<output id="event-count">{String(count)}</output>
 		<output id="event-saved">{saved as string}</output>
-		<output id="event-pending">
-			{pending ? 'pending' : 'idle'}
-		</output>
+		<output id="event-pending">{pending ? 'pending' : 'idle'}</output>
 	</div>
 }
 
@@ -54,17 +68,16 @@ export function OptimisticRebase(props: OptimisticRebaseProps) @{
 	const [isPending, start] = useTransition();
 	const [optimistic, addOptimistic] = useOptimistic(saved, (n: number, delta: number) => n + delta);
 	props.bind({
-		add: () => start(async () => {
-			addOptimistic(1);
-			await props.gate;
-			setSaved((s: number) => s + 1);
-		}),
+		add: () =>
+			start(async () => {
+				addOptimistic(1);
+				await props.gate;
+				setSaved((s: number) => s + 1);
+			}),
 		bumpSaved: () => setSaved((s: number) => s + 1),
 	});
 	<div>
-		<span id="pending">
-			{isPending ? '1' : '0'}
-		</span>
+		<span id="pending">{isPending ? '1' : '0'}</span>
 		<span id="opt">{String(optimistic)}</span>
 		<span id="saved">{String(saved)}</span>
 	</div>
@@ -81,8 +94,8 @@ export function OptimisticRepeated(props: OptimisticRepeatedProps) @{
 	const [saved, setSaved] = useState(0);
 	const [isPending, start] = useTransition();
 	const [optimistic, addOptimistic] = useOptimistic(saved, (n: number, delta: number) => n + delta);
-	props.bind(
-		() => start(async () => {
+	props.bind(() =>
+		start(async () => {
 			addOptimistic(1);
 			addOptimistic(1);
 			addOptimistic(1);
@@ -91,9 +104,7 @@ export function OptimisticRepeated(props: OptimisticRepeatedProps) @{
 		}),
 	);
 	<div>
-		<span id="pending">
-			{isPending ? '1' : '0'}
-		</span>
+		<span id="pending">{isPending ? '1' : '0'}</span>
 		<span id="opt">{String(optimistic)}</span>
 		<span id="saved">{String(saved)}</span>
 	</div>

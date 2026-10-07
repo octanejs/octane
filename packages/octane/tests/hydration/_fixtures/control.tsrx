@@ -9,7 +9,9 @@ export function Toggle(props) @{
 	const [n, setN] = useState(0);
 	<div id="toggle">
 		@if (props.on) {
-			<button id="hit" class="on" onClick={() => setN(n + 1)}>{'on:' + n as string}</button>
+			<button id="hit" class="on" onClick={() => setN(n + 1)}>
+				{('on:' + n) as string}
+			</button>
 		} @else {
 			<span class="off">{'off' as string}</span>
 		}

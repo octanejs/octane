@@ -20,8 +20,10 @@ export function ChildProbe(props: {
 }) @{
 	<Waypoint
 		onEnter={props.onEnter}
-		children={<div key={props.hostKey} ref={props.childRef} data-testid="child">
-			{props.label ?? 'child'}
-		</div>}
+		children={
+			<div key={props.hostKey} ref={props.childRef} data-testid="child">
+				{props.label ?? 'child'}
+			</div>
+		}
 	/>
 }

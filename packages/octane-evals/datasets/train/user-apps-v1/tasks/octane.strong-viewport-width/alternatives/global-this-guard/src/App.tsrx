@@ -4,8 +4,8 @@
 import { useEffect, useState } from 'octane';
 
 export function App() @{
-	const [width, setWidth] = useState(
-		() => globalThis.window === undefined ? 1024 : globalThis.window.innerWidth,
+	const [width, setWidth] = useState(() =>
+		globalThis.window === undefined ? 1024 : globalThis.window.innerWidth,
 	);
 
 	useEffect(() => {

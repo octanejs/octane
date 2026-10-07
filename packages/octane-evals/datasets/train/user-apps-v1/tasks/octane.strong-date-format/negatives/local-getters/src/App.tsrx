@@ -11,9 +11,13 @@ export function App() @{
 		@for (const post of POSTS; key post.id) {
 			<li>
 				<h2>{post.title as string}</h2>
-				<time dateTime={post.publishedAt}>{`${
-					new Date(post.publishedAt).getMonth() + 1
-				}/${new Date(post.publishedAt).getDate()}/${new Date(post.publishedAt).getFullYear()}` as string}</time>
+				<time dateTime={post.publishedAt}>
+					{
+						`${
+							new Date(post.publishedAt).getMonth() + 1
+						}/${new Date(post.publishedAt).getDate()}/${new Date(post.publishedAt).getFullYear()}` as string
+					}
+				</time>
 			</li>
 		}
 	</ul>

@@ -10,7 +10,9 @@ function ContextReader() @{
 function ContextRoot() @{
 	const [theme, setTheme] = useState('light');
 	<div>
-		<button id="minimal-context-action" onClick={() => setTheme('dark')}>{'change'}</button>
+		<button id="minimal-context-action" onClick={() => setTheme('dark')}>
+			{'change'}
+		</button>
 		<ThemeContext value={theme}>
 			<ContextReader />
 		</ThemeContext>

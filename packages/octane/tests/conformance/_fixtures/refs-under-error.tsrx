@@ -25,8 +25,9 @@ export function AbortedMountRefs(props) @{
 				<BrokenRender />
 			</>
 		} @catch (err) {
-			<div class="error-message" ref={props.errorMessageRef}>{'Caught an error: ' + err.message +
-				'.' as string}</div>
+			<div class="error-message" ref={props.errorMessageRef}>
+				{('Caught an error: ' + err.message + '.') as string}
+			</div>
 		}
 	</>
 }
@@ -34,7 +35,9 @@ export function AbortedMountRefs(props) @{
 // Per ReactErrorBoundaries-test.internal.js:2793 — LocalBrokenCallbackRef:
 // renders a div whose callback ref throws when detached (called with null).
 function BrokenDetachRef(props) @{
-	<div class="inner-ref" ref={props.r}>{'ref'}</div>
+	<div class="inner-ref" ref={props.r}>
+		{'ref'}
+	</div>
 }
 
 // Per ReactErrorBoundaries-test.internal.js:2782 — "catches errors thrown
@@ -65,5 +68,7 @@ export function DetachThrowApp(props) @{
 // updates (host component)": the host element's output never changes; only
 // which ref object its `ref` binding resolves to flips with `which`.
 export function HostRefSwap(props) @{
-	<div class="host" ref={props.which === 1 ? props.ref1 : props.ref2}>{'Hi'}</div>
+	<div class="host" ref={props.which === 1 ? props.ref1 : props.ref2}>
+		{'Hi'}
+	</div>
 }

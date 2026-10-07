@@ -145,7 +145,9 @@ export function ContextUpdatedAttributesBoundary(props: Props) @{
 	<DiagnosticContext value={props.contextValue ?? 'outside'}>
 		<>
 			<UpdatedAttributesBoundary {...props} />
-			<p id="updated-context-sibling" data-runtime-id={siblingId}>Context sibling</p>
+			<p id="updated-context-sibling" data-runtime-id={siblingId}>
+				Context sibling
+			</p>
 		</>
 	</DiagnosticContext>
 }
@@ -185,9 +187,8 @@ export function startObservedCaptures(host: HTMLElement, props: ObservedCaptures
 	return {
 		recoverable,
 		settle: () => act(() => {}),
-		update: (next: ObservedCapturesProps) => act(
-			() => root.render(UnsplitObservedCapturesBoundary, next),
-		),
+		update: (next: ObservedCapturesProps) =>
+			act(() => root.render(UnsplitObservedCapturesBoundary, next)),
 		unmount: () => flushSync(() => root.unmount()),
 	};
 }
@@ -200,7 +201,9 @@ type GuardedCapturesProps = {
 export function UnsplitGuardedCapturesBoundary({ when, guarded }: GuardedCapturesProps) @{
 	<Hydrate when={when} split={false}>
 		@if (guarded.show) {
-			<span id="unsplit-guarded-child" title={guarded.hiddenGetter}>Chosen</span>
+			<span id="unsplit-guarded-child" title={guarded.hiddenGetter}>
+				Chosen
+			</span>
 		} @else {
 			<span id="unsplit-guarded-child">Unchosen</span>
 		}
@@ -215,9 +218,8 @@ export function startGuardedCaptures(host: HTMLElement, props: GuardedCapturesPr
 	return {
 		recoverable,
 		settle: () => act(() => {}),
-		update: (next: GuardedCapturesProps) => act(
-			() => root.render(UnsplitGuardedCapturesBoundary, next),
-		),
+		update: (next: GuardedCapturesProps) =>
+			act(() => root.render(UnsplitGuardedCapturesBoundary, next)),
 		unmount: () => flushSync(() => root.unmount()),
 	};
 }
@@ -239,12 +241,14 @@ export function ForeignEffectsUpdatedAttributesBoundary({
 					color: teal;
 				}
 			</style>
-			<span id="updated-capture-portal-anchor">{createPortal(PortalControl, portalTarget!, {
-				when,
-				identity,
-				hidden,
-				onClick,
-			})}</span>
+			<span id="updated-capture-portal-anchor">
+				{createPortal(PortalControl, portalTarget!, {
+					when,
+					identity,
+					hidden,
+					onClick,
+				})}
+			</span>
 			<Controls
 				when={when}
 				identity={identity}
@@ -266,16 +270,15 @@ export function start(
 	contextual = false,
 ) {
 	const recoverable: unknown[] = [];
-	const View =
-		contextual
-			? ContextUpdatedAttributesBoundary
-			: foreign
-				? ForeignEffectsUpdatedAttributesBoundary
-				: nested
-					? NestedUpdatedAttributesBoundary
-					: split
-						? UpdatedAttributesBoundary
-						: UnsplitUpdatedAttributesBoundary;
+	const View = contextual
+		? ContextUpdatedAttributesBoundary
+		: foreign
+			? ForeignEffectsUpdatedAttributesBoundary
+			: nested
+				? NestedUpdatedAttributesBoundary
+				: split
+					? UpdatedAttributesBoundary
+					: UnsplitUpdatedAttributesBoundary;
 	const root = hydrateRoot(host, View, props, {
 		onRecoverableError: (error) => recoverable.push(error),
 	});
@@ -316,7 +319,9 @@ function LoggedChild({ label, log, store }: Omit<LoggedProps, 'when'>) @{
 		data-initial={initial}
 		data-memo={memo}
 		data-snapshot={snapshot}
-	>{label}</p>
+	>
+		{label}
+	</p>
 }
 
 export function LoggedBoundary({ when, label, log, store }: LoggedProps) @{

@@ -7,11 +7,15 @@ export function DefaultBadge() @{
 }
 
 export function SecondaryBadge() @{
-	<Badge variant="secondary" className="custom-extra">Beta</Badge>
+	<Badge variant="secondary" className="custom-extra">
+		Beta
+	</Badge>
 }
 
 export function OverridingBadge() @{
-	<Badge className="overflow-visible" id="host-props" title="badge">x</Badge>
+	<Badge className="overflow-visible" id="host-props" title="badge">
+		x
+	</Badge>
 }
 
 // asChild composes an element DESCRIPTOR (the documented radix Slot contract),

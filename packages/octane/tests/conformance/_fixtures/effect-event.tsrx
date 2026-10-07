@@ -16,7 +16,9 @@ export function EffectEventCounter(props) @{
 	const [count, setCount] = useState(0);
 	const increment = useEffectEvent(() => setCount((value) => value + props.incrementBy));
 	props.observe?.(increment);
-	<button id="increment" onClick={() => increment()}>{count as number}</button>
+	<button id="increment" onClick={() => increment()}>
+		{count as number}
+	</button>
 }
 
 export function MultipleEffectEvents(props) @{
@@ -24,8 +26,12 @@ export function MultipleEffectEvents(props) @{
 	const add = useEffectEvent(() => setCount((value) => value + props.amount));
 	const multiply = useEffectEvent(() => setCount((value) => value * props.amount));
 	<>
-		<button id="add" onClick={() => add()}>{'add'}</button>
-		<button id="multiply" onClick={() => multiply()}>{'multiply'}</button>
+		<button id="add" onClick={() => add()}>
+			{'add'}
+		</button>
+		<button id="multiply" onClick={() => multiply()}>
+			{'multiply'}
+		</button>
 		<output>{count as number}</output>
 	</>
 }
@@ -54,7 +60,9 @@ export function LayoutEffectEventCounter(props) @{
 		props.log('layout ' + props.incrementBy);
 		increment();
 	}, [props.incrementBy]);
-	<button id="increment" onClick={() => increment()}>{count as number}</button>
+	<button id="increment" onClick={() => increment()}>
+		{count as number}
+	</button>
 }
 
 export function PassiveEffectEventCounter(props) @{
@@ -64,7 +72,9 @@ export function PassiveEffectEventCounter(props) @{
 		props.log('passive ' + props.incrementBy);
 		increment();
 	}, [props.incrementBy]);
-	<button id="increment" onClick={() => increment()}>{count as number}</button>
+	<button id="increment" onClick={() => increment()}>
+		{count as number}
+	</button>
 }
 
 function useEventCount(incrementBy) {
@@ -79,7 +89,9 @@ export function CustomHookEffectEventCounter(props) @{
 		props.log('custom ' + props.incrementBy);
 		increment();
 	}, [props.incrementBy]);
-	<button id="increment" onClick={() => increment()}>{count as number}</button>
+	<button id="increment" onClick={() => increment()}>
+		{count as number}
+	</button>
 }
 
 export function EffectEventBeforeEffects(props) @{
@@ -246,7 +258,9 @@ function ConditionalEventCleanupChild(props) @{
 	useLayoutEffect(() => {
 		return () => props.log('cleanup ' + read() + ' connected=' + elementRef.current.isConnected);
 	}, []);
-	<span ref={elementRef} class="conditional-event-child">{props.value as string}</span>
+	<span ref={elementRef} class="conditional-event-child">
+		{props.value as string}
+	</span>
 }
 
 export function ConditionalEventCleanup(props) @{
@@ -272,7 +286,9 @@ export function EffectEventLogVisit(props) @{
 	useEffect(() => {
 		onVisit(props.url);
 	}, [props.url]);
-	<button id="add" onClick={() => addItem()}>{items.length as number}</button>
+	<button id="add" onClick={() => addItem()}>
+		{items.length as number}
+	</button>
 }
 
 const EffectEventContext = createContext('default');
@@ -310,7 +326,9 @@ export function RefPropContextEffectEvent(props) @{
 
 export function ServerEffectEventDeclaration() @{
 	const onClick = useEffectEvent(() => {});
-	<button class="server-effect-event" onClick={() => onClick()}>{'ready'}</button>
+	<button class="server-effect-event" onClick={() => onClick()}>
+		{'ready'}
+	</button>
 }
 
 export function ServerEffectEventInvocation() @{

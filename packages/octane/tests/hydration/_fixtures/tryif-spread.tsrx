@@ -19,7 +19,9 @@ const Ctx = createContext('none');
 // The hook routes it through the HOOKED `componentSlot` path (not lite).
 function SpreadRoot(props) @{
 	const [n] = useState(0);
-	<header {...props.attrs} data-n={n}>{props.label as string}</header>
+	<header {...props.attrs} data-n={n}>
+		{props.label as string}
+	</header>
 }
 
 function FallbackOutlet() @{

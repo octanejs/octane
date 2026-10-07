@@ -21,8 +21,7 @@ export function createModel$(hidden: boolean): Model {
 	};
 }
 function Control({ identity, hidden, model, onRender, onRef, onEffect }: Props) @{
-	const projectedHidden =
-		model ? model.hidden$.get() : hidden;
+	const projectedHidden = model ? model.hidden$.get() : hidden;
 	onRender?.();
 	useLayoutEffect(() => {
 		onEffect?.('layout-mount');

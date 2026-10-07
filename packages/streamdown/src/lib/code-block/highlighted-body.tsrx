@@ -6,14 +6,13 @@ import type { CodeHighlighterPlugin, HighlightResult, ThemeInput } from '../plug
 import type { HTMLAttributes } from '../types';
 import { CodeBlockBody } from './body.tsrx';
 
-type HighlightedCodeBlockBodyProps =
-	HTMLAttributes<HTMLDivElement> & {
-		code: string;
-		language: string;
-		raw: HighlightResult;
-		startLine?: number;
-		lineNumbers?: boolean;
-	};
+type HighlightedCodeBlockBodyProps = HTMLAttributes<HTMLDivElement> & {
+	code: string;
+	language: string;
+	raw: HighlightResult;
+	startLine?: number;
+	lineNumbers?: boolean;
+};
 
 type HighlightRequest = {
 	code: string;
@@ -50,8 +49,7 @@ export const HighlightedCodeBlockBody = ({
 	requestRef.current = request;
 	// A callback for an older streaming revision can resolve after props advance.
 	// Show the latest raw source until a result with the same request identity lands.
-	const result =
-		highlight.request === request ? highlight.result : raw;
+	const result = highlight.request === request ? highlight.result : raw;
 
 	useEffect(() => {
 		const commit = (nextResult: HighlightResult) => {
@@ -75,12 +73,14 @@ export const HighlightedCodeBlockBody = ({
 		if (cachedResult) commit(cachedResult);
 	}, [request, raw]);
 
-	return <CodeBlockBody
-		className={className}
-		language={language}
-		lineNumbers={lineNumbers}
-		result={result}
-		startLine={startLine}
-		{...rest}
-	/>;
+	return (
+		<CodeBlockBody
+			className={className}
+			language={language}
+			lineNumbers={lineNumbers}
+			result={result}
+			startLine={startLine}
+			{...rest}
+		/>
+	);
 };

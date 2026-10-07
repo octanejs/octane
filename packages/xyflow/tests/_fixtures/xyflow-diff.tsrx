@@ -12,32 +12,34 @@ const initialNodes: Node[] = [
 	{ id: '2', position: { x: 120, y: 80 }, data: { label: 'B' } },
 ];
 
-const initialEdges: Edge[] = [
-	{ id: 'e1-2', source: '1', target: '2' },
-];
+const initialEdges: Edge[] = [{ id: 'e1-2', source: '1', target: '2' }];
 
 export function XyflowDiff() {
-	return <div id="root" style={{ width: '320px', height: '240px' }}>
-		<ReactFlowProvider>
-			<ReactFlow nodes={initialNodes} edges={initialEdges} fitView />
-		</ReactFlowProvider>
-	</div>;
+	return (
+		<div id="root" style={{ width: '320px', height: '240px' }}>
+			<ReactFlowProvider>
+				<ReactFlow nodes={initialNodes} edges={initialEdges} fitView />
+			</ReactFlowProvider>
+		</div>
+	);
 }
 
 export function XyflowHelpersProbe() {
 	const [nodes, , onNodesChange] = useNodesState(initialNodes);
 	const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges);
-	return <div id="helpers">
-		<ReactFlow
-			nodes={nodes}
-			edges={edges}
-			onNodesChange={onNodesChange}
-			onEdgesChange={onEdgesChange}
-			onConnect={(connection) => {
-				setEdges(function add(connectionEdges) {
-					return addEdge(connection, connectionEdges);
-				});
-			}}
-		/>
-	</div>;
+	return (
+		<div id="helpers">
+			<ReactFlow
+				nodes={nodes}
+				edges={edges}
+				onNodesChange={onNodesChange}
+				onEdgesChange={onEdgesChange}
+				onConnect={(connection) => {
+					setEdges(function add(connectionEdges) {
+						return addEdge(connection, connectionEdges);
+					});
+				}}
+			/>
+		</div>
+	);
 }

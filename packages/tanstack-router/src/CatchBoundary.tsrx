@@ -24,9 +24,7 @@ export function CatchBoundary(props: {
 	onCatch?: (error: Error, errorInfo: ErrorInfo) => void;
 }) @{
 	@try {
-		<>
-			{props.children}
-		</>
+		<>{props.children}</>
 	} @catch (error, reset) {
 		<CatchErrorView
 			error={error}
@@ -55,8 +53,7 @@ function CatchErrorView(props: {
 
 	// Reset when the reset key rolls (navigation). Skip the mount render — the key
 	// captured while catching is the baseline.
-	const resetKey =
-		props.getResetKey ? props.getResetKey() : undefined;
+	const resetKey = props.getResetKey ? props.getResetKey() : undefined;
 	const keyRef = useRef(resetKey);
 	useLayoutEffect(() => {
 		if (keyRef.current !== resetKey) {
@@ -93,9 +90,7 @@ export function ErrorComponent(props: {
 		<div style="height:.25rem"></div>
 		@if (show) {
 			<div>
-				<pre
-					style="font-size:.7em;border:1px solid red;border-radius:.25rem;padding:.3rem;color:red;overflow:auto"
-				>
+				<pre style="font-size:.7em;border:1px solid red;border-radius:.25rem;padding:.3rem;color:red;overflow:auto">
 					@if (props.error?.message) {
 						<code>{props.error.message as string}</code>
 					}

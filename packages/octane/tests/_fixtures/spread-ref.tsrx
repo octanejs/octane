@@ -22,15 +22,21 @@ interface SharedHostProps extends SpreadProps {
 export function SpreadToggle(props: SpreadProps) @{
 	const [shown, setShown] = useState(true);
 	<div>
-		<button id="toggle" onClick={() => setShown(!shown)}>{'t'}</button>
+		<button id="toggle" onClick={() => setShown(!shown)}>
+			{'t'}
+		</button>
 		@if (shown) {
-			<span id="target" {...props.attrs}>{'x'}</span>
+			<span id="target" {...props.attrs}>
+				{'x'}
+			</span>
 		}
 	</div>
 }
 
 export function SpreadDirect(props: SpreadProps) @{
-	<span id="target" {...props.attrs}>{'x'}</span>
+	<span id="target" {...props.attrs}>
+		{'x'}
+	</span>
 }
 
 export function SpreadSharedHost(props: SharedHostProps) @{
@@ -41,7 +47,9 @@ export function SpreadSharedHost(props: SharedHostProps) @{
 		onClick={props.onClick}
 		onKeyDown={props.onKeyDown}
 	>
-		<span class="secondary" title={props.secondary}>{'secondary'}</span>
+		<span class="secondary" title={props.secondary}>
+			{'secondary'}
+		</span>
 		@if (props.shown) {
 			<span class="detail">{props.label as string}</span>
 		}

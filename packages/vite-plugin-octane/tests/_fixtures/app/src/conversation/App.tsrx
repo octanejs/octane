@@ -15,8 +15,12 @@ export function ConversationApp() @{
 		</nav>
 		<fieldset aria-busy={!ready}>
 			<legend>Conversation in this document</legend>
-			<button type="button" onClick={() => selectedConversation$.set('A')}>Conversation A</button>
-			<button type="button" onClick={() => selectedConversation$.set('B')}>Conversation B</button>
+			<button type="button" onClick={() => selectedConversation$.set('A')}>
+				Conversation A
+			</button>
+			<button type="button" onClick={() => selectedConversation$.set('B')}>
+				Conversation B
+			</button>
 		</fieldset>
 		<h2>{'Conversation ' + selectedConversation$.get()}</h2>
 		<section aria-label="Conversation history">
@@ -32,11 +36,13 @@ export function ConversationApp() @{
 								<button
 									type="button"
 									onClick={() => {
-										void stopConversation(turn.id).catch(
-											() => notice$.set('Stop was not acknowledged.'),
+										void stopConversation(turn.id).catch(() =>
+											notice$.set('Stop was not acknowledged.'),
 										);
 									}}
-								>Stop generation</button>
+								>
+									Stop generation
+								</button>
 							}
 						</li>
 					}

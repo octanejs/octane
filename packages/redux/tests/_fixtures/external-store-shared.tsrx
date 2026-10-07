@@ -92,11 +92,11 @@ export function ChangingSelectorReader(props) @{
 		inlineSelector,
 		(left, right) =>
 			left.items.length === right.items.length &&
-				left.items.every((item, index) => item === right.items[index]),
+			left.items.every((item, index) => item === right.items[index]),
 	);
 	useLayoutEffect(() => {
-		props.selectionProbe.value = selection.items.join(',') + '|selected:' +
-		selection.selectedAtStep;
+		props.selectionProbe.value =
+			selection.items.join(',') + '|selected:' + selection.selectedAtStep;
 	}, [selection]);
 	<div>
 		<span id="changing-selection">

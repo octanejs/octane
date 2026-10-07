@@ -13,10 +13,9 @@ export function App() @{
 		<ol>
 			@for (const answer of order.current; key answer) {
 				<li>
-					<button
-						aria-pressed={picked === answer}
-						onClick={() => setPicked(answer)}
-					>{answer as string}</button>
+					<button aria-pressed={picked === answer} onClick={() => setPicked(answer)}>
+						{answer as string}
+					</button>
 				</li>
 			}
 		</ol>
@@ -25,6 +24,8 @@ export function App() @{
 				order.current = order.current.toSorted(() => Math.random() - 0.5);
 				setRound(round + 1);
 			}}
-		>{'Shuffle'}</button>
+		>
+			{'Shuffle'}
+		</button>
 	</section>
 }

@@ -99,13 +99,15 @@ export function BadgeCase() @{
 	<Badge>B</Badge>
 }
 export function BreadcrumbCase() {
-	return <Breadcrumb>
-		<BreadcrumbList>
-			<BreadcrumbItem>
-				<BreadcrumbLink href="#">H</BreadcrumbLink>
-			</BreadcrumbItem>
-		</BreadcrumbList>
-	</Breadcrumb>;
+	return (
+		<Breadcrumb>
+			<BreadcrumbList>
+				<BreadcrumbItem>
+					<BreadcrumbLink href="#">H</BreadcrumbLink>
+				</BreadcrumbItem>
+			</BreadcrumbList>
+		</Breadcrumb>
+	);
 }
 export function ButtonCase() @{
 	<Button>Go</Button>
@@ -231,30 +233,34 @@ export function SwitchCase() @{
 	<Switch>On</Switch>
 }
 export function TableCase() {
-	return <Table aria-label="t">
-		<TableHeader>
-			<TableRow>
-				<TableHead isRowHeader>Name</TableHead>
-			</TableRow>
-		</TableHeader>
-		<TableBody>
-			<TableRow>
-				<TableCell>A</TableCell>
-			</TableRow>
-		</TableBody>
-	</Table>;
+	return (
+		<Table aria-label="t">
+			<TableHeader>
+				<TableRow>
+					<TableHead isRowHeader>Name</TableHead>
+				</TableRow>
+			</TableHeader>
+			<TableBody>
+				<TableRow>
+					<TableCell>A</TableCell>
+				</TableRow>
+			</TableBody>
+		</Table>
+	);
 }
 // OCTANE DIVERGENCE: RAC collections walk their children as element
 // DESCRIPTORS. A `@{ … }` body compiles children to a block the walk cannot
 // enter, so a collection authored that way renders empty. Collection-backed
 // families are therefore authored with `return <jsx>`.
 export function TabsCase() {
-	return <Tabs defaultSelectedKey="a">
-		<TabsList>
-			<TabsTrigger id="a">A</TabsTrigger>
-		</TabsList>
-		<TabsContent id="a">P</TabsContent>
-	</Tabs>;
+	return (
+		<Tabs defaultSelectedKey="a">
+			<TabsList>
+				<TabsTrigger id="a">A</TabsTrigger>
+			</TabsList>
+			<TabsContent id="a">P</TabsContent>
+		</Tabs>
+	);
 }
 export function TextareaCase() @{
 	<Textarea placeholder="p" />
@@ -267,14 +273,18 @@ export function ToggleCase() @{
 // a caller-supplied value of the same name wins. These fixtures pin that, since
 // it is upstream React's behavior too and the port must not quietly diverge.
 export function AspectRatioCallerStyle() {
-	return <AspectRatio ratio={16 / 9} style={{ opacity: 0.5 }}>
-		<div>x</div>
-	</AspectRatio>;
+	return (
+		<AspectRatio ratio={16 / 9} style={{ opacity: 0.5 }}>
+			<div>x</div>
+		</AspectRatio>
+	);
 }
 
 export function AvatarCallerOnError(props: any) {
-	return <Avatar>
-		<AvatarImage src="broken.png" onError={props.onError} />
-		<AvatarFallback>FB</AvatarFallback>
-	</Avatar>;
+	return (
+		<Avatar>
+			<AvatarImage src="broken.png" onError={props.onError} />
+			<AvatarFallback>FB</AvatarFallback>
+		</Avatar>
+	);
 }

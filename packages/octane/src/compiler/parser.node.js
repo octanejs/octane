@@ -5,6 +5,7 @@ import { parseModule as parseNativeModule } from '@tsrx/oxc/tsrx-core-compat';
 import { parseModule as parseJavaScriptModule } from './parser.browser.js';
 
 import { isolateOutputOptions, publishOutput } from './parser-output.js';
+import { adoptTemplateShape } from './parser-template-shape.js';
 
 /**
  * `<style>` with an expression child — `<style>{css}</style>`, an ordinary
@@ -76,5 +77,5 @@ export function parseModule(source, filename = 'module.tsrx', options) {
 	}
 	// Caller buffer errors are not parser errors and must never trigger a retry.
 	publishOutput(options, nativeOptions);
-	return program;
+	return adoptTemplateShape(program);
 }

@@ -51,6 +51,8 @@ export function App({
 				setDraft(history.current.pop() ?? '');
 				setUndoSteps(history.current.size);
 			}}
-		>{'Undo'}</button>
+		>
+			{'Undo'}
+		</button>
 	</form>
 }

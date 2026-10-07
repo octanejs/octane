@@ -125,7 +125,7 @@
     "@octanejs/tanstack-query": "workspace:*",
     "@octanejs/wagmi": "workspace:*",
     "@rolldown/plugin-babel": "catalog:default",
-    "@tsrx/content-mapper": "0.1.1",
+    "@tsrx/content-mapper": "catalog:default",
     "@tsrx/prettier-plugin": "catalog:default",
     "@tsrx/typescript-plugin": "catalog:default",
     "@types/node": "catalog:default",

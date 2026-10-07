@@ -12,7 +12,9 @@ function Tally({ label }: { label: string }) @{
 			tally.clicks += 1;
 			force(tally.clicks);
 		}}
-	>{`${label}: ${tally.clicks}` as string}</button>
+	>
+		{`${label}: ${tally.clicks}` as string}
+	</button>
 }
 
 export function App() @{

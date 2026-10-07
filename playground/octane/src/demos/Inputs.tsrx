@@ -8,9 +8,11 @@ export function Inputs() @{
 
 	<div>
 		<h2 class="demo-title">{'Inputs + @switch'}</h2>
-		<p
-			class="demo-blurb"
-		>{'Controlled <input> + a @switch over the kind discriminant. Each case is its own block boundary.'}</p>
+		<p class="demo-blurb">
+			{
+				'Controlled <input> + a @switch over the kind discriminant. Each case is its own block boundary.'
+			}
+		</p>
 		<div class="row">
 			<input class="txt" value={name} onInput={(e) => setName(e.target.value)} />
 			<select class="txt" value={kind} onChange={(e) => setKind(e.target.value)}>
@@ -22,16 +24,17 @@ export function Inputs() @{
 		<div class="panel" style="margin-top: 12px">
 			@switch (kind) {
 				@case 'plain': {
-					<p style="margin: 0">{'hello, ' + name as string}</p>
+					<p style="margin: 0">{('hello, ' + name) as string}</p>
 				}
 				@case 'shout': {
-					<p style="margin: 0; font-weight: 700">{'HELLO, ' + name.toUpperCase() +
-						'!' as string}</p>
+					<p style="margin: 0; font-weight: 700">
+						{('HELLO, ' + name.toUpperCase() + '!') as string}
+					</p>
 				}
 				@case 'whisper': {
-					<p style="margin: 0; color: var(--muted); font-style: italic">{'hello, ' +
-						name.toLowerCase() +
-						'...' as string}</p>
+					<p style="margin: 0; color: var(--muted); font-style: italic">
+						{('hello, ' + name.toLowerCase() + '...') as string}
+					</p>
 				}
 				@default: {
 					<p style="margin: 0">{'(unknown kind)'}</p>

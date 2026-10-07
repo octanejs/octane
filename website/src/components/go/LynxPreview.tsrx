@@ -22,17 +22,17 @@ interface LynxPreviewProps {
 	/** Names the preview for assistive technology. */
 	label: string;
 	/**
- * How the example fills the panel. `responsive` (the default) re-bases
- * `rpx`/`vw`/`vh` onto the panel so the example lays itself out for it; `fit`
- * keeps the authored phone viewport and scales it with a CSS transform, which
- * a `<list>` cannot survive (see ./lynx-view/controller.ts); `auto` picks per
- * container size.
- */
+	 * How the example fills the panel. `responsive` (the default) re-bases
+	 * `rpx`/`vw`/`vh` onto the panel so the example lays itself out for it; `fit`
+	 * keeps the authored phone viewport and scales it with a CSS transform, which
+	 * a `<list>` cannot survive (see ./lynx-view/controller.ts); `auto` picks per
+	 * container size.
+	 */
 	mode?: WebPreviewMode;
 	/**
- * Increment to soft-refresh: the page is rebuilt from the bundle already in
- * memory, without remounting the element or going back to the network.
- */
+	 * Increment to soft-refresh: the page is rebuilt from the bundle already in
+	 * memory, without remounting the element or going back to the network.
+	 */
 	reloadKey?: number;
 	/** Demonstrate the example with simulated touches once it has painted. */
 	autoGesture?: AutoGestureOptions;

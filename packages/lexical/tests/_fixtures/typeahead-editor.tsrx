@@ -13,17 +13,20 @@ import { useCallback } from 'octane';
 // createPortal(CustomTypeaheadBody, anchor, { itemProps, matchingString }).
 export function CustomTypeaheadBody(props) @{
 	<div class="custom-typeahead-menu" data-testid="custom-typeahead">
-		<ul>{props.itemProps.options.map(
-			(option, i) =>
+		<ul>
+			{props.itemProps.options.map((option, i) => (
 				<li
 					key={option.key}
 					data-selected={props.itemProps.selectedIndex === i ? 'true' : 'false'}
 					class="custom-item"
-				>{option.title as string}</li>,
-		)}</ul>
-		{props.matchingString != null
-			? <span data-testid="matching-string">{props.matchingString as string}</span>
-			: null}
+				>
+					{option.title as string}
+				</li>
+			))}
+		</ul>
+		{props.matchingString != null ? (
+			<span data-testid="matching-string">{props.matchingString as string}</span>
+		) : null}
 	</div>
 }
 

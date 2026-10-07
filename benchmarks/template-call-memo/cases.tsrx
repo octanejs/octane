@@ -37,7 +37,12 @@ export function LoggedRows({ rows, suffix, tick }: Props) @{
 	</section>
 }
 
-export function CapturedRows({ rows, suffix, tick, onRows }: Props & {
+export function CapturedRows({
+	rows,
+	suffix,
+	tick,
+	onRows,
+}: Props & {
 	onRows: (rows: readonly Row[]) => void;
 }) @{
 	<section>

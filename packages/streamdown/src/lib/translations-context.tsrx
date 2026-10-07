@@ -69,7 +69,7 @@ export const defaultTranslations: StreamdownTranslations = {
 	downloadImage: 'Download image',
 	// Link modal
 	openExternalLink: 'Open external link?',
-	externalLinkWarning: 'You\'re about to visit an external website.',
+	externalLinkWarning: "You're about to visit an external website.",
 	close: 'Close',
 	copyLink: 'Copy link',
 	copied: 'Copied',

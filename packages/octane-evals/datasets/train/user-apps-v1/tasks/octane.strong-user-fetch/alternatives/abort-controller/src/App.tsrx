@@ -9,11 +9,12 @@ export function App({ userId }: { userId: string }) @{
 
 	useEffect(() => {
 		const controller = new AbortController();
-		fetch(`/api/users/${userId}`, { signal: controller.signal }).then(
-			(response) => response.json(),
-		).then((next: User) => setUser(next)).catch((error: unknown) => {
-			if ((error as Error).name !== 'AbortError') throw error;
-		});
+		fetch(`/api/users/${userId}`, { signal: controller.signal })
+			.then((response) => response.json())
+			.then((next: User) => setUser(next))
+			.catch((error: unknown) => {
+				if ((error as Error).name !== 'AbortError') throw error;
+			});
 		return () => controller.abort();
 	});
 

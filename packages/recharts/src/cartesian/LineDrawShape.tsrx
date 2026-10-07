@@ -2,8 +2,8 @@ import type { RefObject } from '../util/OctaneTypes.ts';
 import type { Props as CurveProps } from '../shape/Curve.tsrx';
 import type { ShapeAnimationProps } from '../util/types';
 
-export type LineDrawShapeProps =
-	Omit<CurveProps, 'pathRef'> & ShapeAnimationProps & {
+export type LineDrawShapeProps = Omit<CurveProps, 'pathRef'> &
+	ShapeAnimationProps & {
 		pathRef: RefObject<SVGPathElement | null>;
 		visibleLength?: number | null;
 	};
@@ -17,7 +17,7 @@ import { Curve } from '../shape/Curve.tsrx';
  */
 function getTotalLength(path: SVGPathElement | null) {
 	try {
-		return path && path.getTotalLength && path.getTotalLength() || 0;
+		return (path && path.getTotalLength && path.getTotalLength()) || 0;
 	} catch {
 		return 0;
 	}
@@ -57,18 +57,17 @@ function getStrokeDasharray(length: number, totalLength: number, lines: number[]
 	const count = Math.floor(length / lineLength);
 	const remainLength = length % lineLength;
 	let remainLines: number[] = [];
-	for (let i = 0, sum = 0; i < normalizedLines.length; (sum += normalizedLines[i] ?? 0, ++i)) {
+	for (let i = 0, sum = 0; i < normalizedLines.length; sum += normalizedLines[i] ?? 0, ++i) {
 		const lineValue = normalizedLines[i];
 		if (lineValue != null && sum + lineValue > remainLength) {
 			remainLines = [...normalizedLines.slice(0, i), remainLength - sum];
 			break;
 		}
 	}
-	const emptyLines =
-		remainLines.length % 2 === 0 ? [0, totalLength] : [totalLength];
-	return [...repeat(normalizedLines, count), ...remainLines, ...emptyLines].map(
-		(line) => line + 'px',
-	).join(', ');
+	const emptyLines = remainLines.length % 2 === 0 ? [0, totalLength] : [totalLength];
+	return [...repeat(normalizedLines, count), ...remainLines, ...emptyLines]
+		.map((line) => line + 'px')
+		.join(', ');
 }
 
 function computeAnimatedStrokeDasharray(
@@ -77,7 +76,9 @@ function computeAnimatedStrokeDasharray(
 	visibleLength: number,
 ) {
 	if (userStrokeDasharray) {
-		const lines = String(userStrokeDasharray).split(/[,\s]+/gim).map((num) => parseFloat(num));
+		const lines = String(userStrokeDasharray)
+			.split(/[,\s]+/gim)
+			.map((num) => parseFloat(num));
 		return getStrokeDasharray(visibleLength, totalLength, lines);
 	}
 	return generateSimpleStrokeDasharray(totalLength, visibleLength);
@@ -111,9 +112,7 @@ export function LineDrawShape(props: LineDrawShapeProps) {
 	} else if (userStrokeDasharray != null) {
 		strokeDasharray = String(userStrokeDasharray);
 	}
-	return <Curve
-		{...curveProps}
-		connectNulls={finalConnectNulls}
-		strokeDasharray={strokeDasharray}
-	/>;
+	return (
+		<Curve {...curveProps} connectNulls={finalConnectNulls} strokeDasharray={strokeDasharray} />
+	);
 }

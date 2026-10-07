@@ -15,18 +15,28 @@ export function OverlayDiff(props: any) @{
 	const popupRef = useRef<any>(null);
 
 	<div>
-		<button id="widen" onClick={() => setWide(true)}>widen</button>
-		<button id="drop-nav" onClick={() => setShowNav(false)}>drop nav</button>
-		<button id="add-scale" onClick={() => setShowScale(true)}>add scale</button>
+		<button id="widen" onClick={() => setWide(true)}>
+			widen
+		</button>
+		<button id="drop-nav" onClick={() => setShowNav(false)}>
+			drop nav
+		</button>
+		<button id="add-scale" onClick={() => setShowScale(true)}>
+			add scale
+		</button>
 		<button
 			id="read-options"
-			onClick={() => setOptions(
-				JSON.stringify({
-					maxWidth: popupRef.current?.options?.maxWidth ?? null,
-					offset: popupRef.current?.options?.offset ?? null,
-				}),
-			)}
-		>read options</button>
+			onClick={() =>
+				setOptions(
+					JSON.stringify({
+						maxWidth: popupRef.current?.options?.maxWidth ?? null,
+						offset: popupRef.current?.options?.offset ?? null,
+					}),
+				)
+			}
+		>
+			read options
+		</button>
 		<pre id="popup-options">{options as string}</pre>
 		<Map
 			mapLib={props.mapLib}

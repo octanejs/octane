@@ -11,9 +11,9 @@ export function LocalSignal(props: {
 	useLayoutEffect(() => {
 		props.expose?.(value$);
 	}, [value$, props.expose]);
-	<button data-label={props.label} onClick={() => value$.set((value) => value + 1)}>{String(
-		value$.get(),
-	)}</button>
+	<button data-label={props.label} onClick={() => value$.set((value) => value + 1)}>
+		{String(value$.get())}
+	</button>
 }
 
 export function LocalRows(props: {

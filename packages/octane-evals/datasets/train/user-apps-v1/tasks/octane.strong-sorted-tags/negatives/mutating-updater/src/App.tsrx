@@ -25,6 +25,8 @@ export function App() @{
 					return current;
 				});
 			}}
-		>{'Add tag'}</button>
+		>
+			{'Add tag'}
+		</button>
 	</section>
 }

@@ -24,7 +24,9 @@ export function RequestReader(props: {
 	props.onRefetch?.(query.refetch);
 	<>
 		<span id="status">{(query.isPending ? 'pending' : `data:${query.data}`) as string}</span>
-		<button type="button" id="refetch" onClick={() => void query.refetch()}>Refetch</button>
+		<button type="button" id="refetch" onClick={() => void query.refetch()}>
+			Refetch
+		</button>
 	</>
 }
 
@@ -55,9 +57,9 @@ export function OmittedOptionsReader(props: {
 	const second = useRequestQuery(['second'], props.secondSource);
 	<>
 		<span id="first-status">{(first.isPending ? 'pending' : `data:${first.data}`) as string}</span>
-		<span id="second-status">{(second.isPending
-			? 'pending'
-			: `data:${second.data}`) as string}</span>
+		<span id="second-status">
+			{(second.isPending ? 'pending' : `data:${second.data}`) as string}
+		</span>
 	</>
 }
 

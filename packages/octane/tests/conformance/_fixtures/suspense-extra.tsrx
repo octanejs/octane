@@ -91,7 +91,9 @@ function SuspendingLeaf(props) @{
 export function ToggleableSuspense(props) @{
 	const [show, setShow] = useState(true);
 	<>
-		<button id="toggle" onClick={() => setShow(!show)}>{'toggle'}</button>
+		<button id="toggle" onClick={() => setShow(!show)}>
+			{'toggle'}
+		</button>
 		@if (show) {
 			@try {
 				<SuspendingLeaf promise={props.promise} />
@@ -123,7 +125,9 @@ export function HooksAboveReplay(props) @{
 				<span id="reduced">{reduced as string}</span>
 				<span id="memo-ident">{(memoed === props.lastMemoed ? 'same' : 'fresh') as string}</span>
 				<span id="value">{v as string}</span>
-				<button id="dispatch" onClick={() => dispatch(10)}>{'+10'}</button>
+				<button id="dispatch" onClick={() => dispatch(10)}>
+					{'+10'}
+				</button>
 			</div>
 		} @pending {
 			<span class="fallback">{'loading'}</span>
@@ -143,9 +147,12 @@ export function HooksBelowNoFire(props) @{
 		@try {
 			const v = use(props.promise);
 			// Anything below the use() should not have fired while pending.
-			useEffect((log) => {
-				log.push('below-effect');
-			}, [props.log]);
+			useEffect(
+				(log) => {
+					log.push('below-effect');
+				},
+				[props.log],
+			);
 			const r = useRef(0);
 			r.current++;
 			props.observeRef(r);

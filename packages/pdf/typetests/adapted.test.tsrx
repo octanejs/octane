@@ -58,11 +58,13 @@ const outlineProps: OutlineProps = {
 };
 const thumbnailProps: ThumbnailProps = { pageIndex: 0, onItemClick: ({ pageIndex }) => pageIndex };
 
-const app = <Document {...documentProps}>
-	<Page {...pageProps} />
-	<Outline {...outlineProps} />
-	<Thumbnail {...thumbnailProps} />
-</Document>;
+const app = (
+	<Document {...documentProps}>
+		<Page {...pageProps} />
+		<Outline {...outlineProps} />
+		<Thumbnail {...thumbnailProps} />
+	</Document>
+);
 
 void [
 	app,

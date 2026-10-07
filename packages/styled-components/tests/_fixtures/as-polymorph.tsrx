@@ -2,7 +2,7 @@ import { useState } from 'octane';
 import styled from '@octanejs/styled-components';
 
 const Poly = styled.button`
-  color: firebrick;
+	color: firebrick;
 `;
 
 export function AsPolymorph() @{

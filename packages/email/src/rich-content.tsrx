@@ -13,14 +13,18 @@ function resolveTextChild(child: unknown): string {
 	}
 	if (typeof value === 'string') return value;
 	if (isChildrenBlock(child)) {
-		throw new Error('Markdown children must be a string prop: use <Markdown children={"…"} />. ' +
-			'JSX children compile to a children block, which is not a string.');
+		throw new Error(
+			'Markdown children must be a string prop: use <Markdown children={"…"} />. ' +
+				'JSX children compile to a children block, which is not a string.',
+		);
 	}
 	throw new Error('Markdown children must resolve to a string');
 }
 
-export type MarkdownProps =
-	Readonly<Omit<EmailElementProps<HTMLDivElement>, 'children' | 'style'>> & Readonly<{
+export type MarkdownProps = Readonly<
+	Omit<EmailElementProps<HTMLDivElement>, 'children' | 'style'>
+> &
+	Readonly<{
 		children: string;
 		markdownCustomStyles?: MarkdownStyles;
 		markdownContainerStyles?: EmailStyle;
@@ -74,21 +78,26 @@ function CodeToken({
 	theme: Theme;
 	inheritedStyle?: EmailStyle;
 }): OctaneNode {
-	if (typeof token === 'string') return <span style={inheritedStyle}>{token.replaceAll(
-		' ',
-		' ‍​',
-	)}</span>;
+	if (typeof token === 'string')
+		return <span style={inheritedStyle}>{token.replaceAll(' ', ' ‍​')}</span>;
 	const style = { ...inheritedStyle, ...tokenStyle(token, theme) };
-	if (Array.isArray(token.content)) return <>
-		@for (const child of token.content; index childIndex; key childIndex) {
-			<CodeToken token={child} theme={theme} inheritedStyle={style} />
-		}
-	</>;
-	return <span style={style}>
-		{typeof token.content === 'string'
-			? token.content
-			: <CodeToken token={token.content} theme={theme} inheritedStyle={style} />}
-	</span>;
+	if (Array.isArray(token.content))
+		return (
+			<>
+				@for (const child of token.content; index childIndex; key childIndex) {
+					<CodeToken token={child} theme={theme} inheritedStyle={style} />
+				}
+			</>
+		);
+	return (
+		<span style={style}>
+			{typeof token.content === 'string' ? (
+				token.content
+			) : (
+				<CodeToken token={token.content} theme={theme} inheritedStyle={style} />
+			)}
+		</span>
+	);
 }
 
 function CodeLine({
@@ -106,9 +115,9 @@ function CodeLine({
 }) @{
 	<>
 		@if (lineNumbers) {
-			<span
-				style={{ width: '2em', height: '1em', display: 'inline-block', fontFamily }}
-			>{lineNumber}</span>
+			<span style={{ width: '2em', height: '1em', display: 'inline-block', fontFamily }}>
+				{lineNumber}
+			</span>
 		}
 		@for (const [tokenIndex, token] of tokens.entries(); key tokenIndex) {
 			<CodeToken token={token} theme={theme} inheritedStyle={{ fontFamily }} />
@@ -128,9 +137,8 @@ export function CodeBlock({
 	...props
 }: CodeBlockProps) @{
 	const grammar = Prism.languages[language];
-	if (
-		grammar === undefined
-	) throw new Error(`CodeBlock: There is no language defined on Prism called ${String(language)}`);
+	if (grammar === undefined)
+		throw new Error(`CodeBlock: There is no language defined on Prism called ${String(language)}`);
 	const lines = code.split(/\r\n|\r|\n/gm).map((line) => Prism.tokenize(line, grammar));
 	<pre
 		{...props}

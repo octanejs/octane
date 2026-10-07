@@ -28,7 +28,7 @@ export function RestoringApp(props: {
 // --- QueryErrorResetBoundary: reset() lets a throwOnError query retry ---
 function ErrReader(props: { queryFn: () => Promise<string> }) @{
 	const q = useQuery({ queryKey: ['e'], queryFn: props.queryFn, retry: false, throwOnError: true });
-	<span id="data">{'data:' + q.data as string}</span>
+	<span id="data">{('data:' + q.data) as string}</span>
 }
 
 function Boundary(props: { queryFn: () => Promise<string> }) @{
@@ -38,7 +38,11 @@ function Boundary(props: { queryFn: () => Promise<string> }) @{
 		reset();
 	};
 	<ErrorBoundary
-		fallback={(e, reset) => <button id="retry" onClick={onRetry(reset)}>retry</button>}
+		fallback={(e, reset) => (
+			<button id="retry" onClick={onRetry(reset)}>
+				retry
+			</button>
+		)}
 	>
 		<ErrReader queryFn={props.queryFn} />
 	</ErrorBoundary>

@@ -41,34 +41,31 @@ export function setValueUrgent(v: number): void {
 
 function PendingProbe() @{
 	const [isPending] = useTransition();
-	<span id="pending">
-		{isPending ? 'pending' : 'idle'}
-	</span>
+	<span id="pending">{isPending ? 'pending' : 'idle'}</span>
 }
 
 // The child OWNS its value state, so changing it re-renders ONLY the child —
 // the re-suspend originates in this descendant block. `start` (a useTransition
 // setter) makes the value change transition-priority.
 function TransitionChild(props: ReaderProps) @{
-	const [value, setValue] =
-		props.useReducer ? useReducer((_value: number, next: number) => next, 1) : useState(1);
+	const [value, setValue] = props.useReducer
+		? useReducer((_value: number, next: number) => next, 1)
+		: useState(1);
 	const [isPending, start] = useTransition();
 	_setValueTransition = (v) => start(() => setValue(v));
 	_setValueUrgent = (v) => setValue(v);
 	if (props.failOnRevision && props.revision) throw new Error('urgent child error');
 	const v = use(props.promiseFor(value));
-	<span
-		id="content"
-		data-pending={isPending ? 'pending' : 'idle'}
-		data-parent={props.revision}
-	>{'content-' + v as string}</span>
+	<span id="content" data-pending={isPending ? 'pending' : 'idle'} data-parent={props.revision}>
+		{('content-' + v) as string}
+	</span>
 }
 
 function UrgentChild(props: ReaderProps) @{
 	const [value, setValue] = useState(1);
 	_setValueUrgent = (v) => setValue(v);
 	const v = use(props.promiseFor(value));
-	<span id="content">{'content-' + v as string}</span>
+	<span id="content">{('content-' + v) as string}</span>
 }
 
 export function TransitionDescendantSuspend(props: ReaderProps) @{

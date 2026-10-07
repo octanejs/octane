@@ -13,33 +13,29 @@ import { createStore, StoreApi } from '@octanejs/zustand';
 
 export type PathData = Record<string, { path: string[]; label: string }>;
 
-export type DropZoneContext =
-	| {
-			areaId?: string;
-			zoneCompound?: string;
-			index?: number;
-			registerZone?: (zoneCompound: string) => void;
-			unregisterZone?: (zoneCompound: string) => void;
-			mode?: 'edit' | 'render';
-			depth: number;
-			registerLocalZone?: (zone: string, active: boolean) => void; // A zone as it pertains to the current area
-			unregisterLocalZone?: (zone: string) => void;
-	  }
-	| null;
+export type DropZoneContext = {
+	areaId?: string;
+	zoneCompound?: string;
+	index?: number;
+	registerZone?: (zoneCompound: string) => void;
+	unregisterZone?: (zoneCompound: string) => void;
+	mode?: 'edit' | 'render';
+	depth: number;
+	registerLocalZone?: (zone: string, active: boolean) => void; // A zone as it pertains to the current area
+	unregisterLocalZone?: (zone: string) => void;
+} | null;
 
 export const dropZoneContext = createContext<DropZoneContext>(null);
 const DropZoneContextProvider = dropZoneContext;
 
-export type Preview =
-	| {
-			componentType: string;
-			index: number;
-			zone: string;
-			props: Record<string, any>;
-			type: 'insert' | 'move';
-			element: Element | undefined;
-	  }
-	| null;
+export type Preview = {
+	componentType: string;
+	index: number;
+	zone: string;
+	props: Record<string, any>;
+	type: 'insert' | 'move';
+	element: Element | undefined;
+} | null;
 
 export type ZoneStore = {
 	zoneDepthIndex: Record<string, boolean>;
@@ -53,21 +49,22 @@ export type ZoneStore = {
 };
 
 export const ZoneStoreContext = createContext<StoreApi<ZoneStore>>(
-	createStore(
-		() => ({
-			zoneDepthIndex: {},
-			nextZoneDepthIndex: {},
-			areaDepthIndex: {},
-			nextAreaDepthIndex: {},
-			draggedItem: null,
-			previewIndex: {},
-			enabledIndex: {},
-			hoveringComponent: null,
-		}),
-	),
+	createStore(() => ({
+		zoneDepthIndex: {},
+		nextZoneDepthIndex: {},
+		areaDepthIndex: {},
+		nextAreaDepthIndex: {},
+		draggedItem: null,
+		previewIndex: {},
+		enabledIndex: {},
+		hoveringComponent: null,
+	})),
 );
 
-export const ZoneStoreProvider = ({ children, store }: PropsWithChildren<{
+export const ZoneStoreProvider = ({
+	children,
+	store,
+}: PropsWithChildren<{
 	store: StoreApi<ZoneStore>;
 }>) => {
 	return <ZoneStoreContext value={store}>{children}</ZoneStoreContext>;
@@ -82,12 +79,15 @@ export const DropZoneProvider = ({
 }) => {
 	const dispatch = useAppStore((s) => s.dispatch);
 
-	const registerZone = useCallback((zoneCompound: string) => {
-		dispatch({
-			type: 'registerZone',
-			zone: zoneCompound,
-		});
-	}, [dispatch]);
+	const registerZone = useCallback(
+		(zoneCompound: string) => {
+			dispatch({
+				type: 'registerZone',
+				zone: zoneCompound,
+			});
+		},
+		[dispatch],
+	);
 
 	const memoValue = useMemo(() => {
 		return {
@@ -96,7 +96,9 @@ export const DropZoneProvider = ({
 		} as DropZoneContext;
 	}, [value]);
 
-	return <>
-		{memoValue && <DropZoneContextProvider value={memoValue}>{children}</DropZoneContextProvider>}
-	</>;
+	return (
+		<>
+			{memoValue && <DropZoneContextProvider value={memoValue}>{children}</DropZoneContextProvider>}
+		</>
+	);
 };

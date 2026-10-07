@@ -21,9 +21,15 @@ export function PreferencesPanel() @{
 				<Progress.Indicator />
 			</Progress.Track>
 		</Progress.Root>
-		<button onClick={steps.goToPrevStep} disabled={!steps.canGoToPrevStep}>{'Back'}</button>
-		<button onClick={steps.goToNextStep} disabled={!steps.canGoToNextStep}>{'Next'}</button>
-		<Toggle pressed={compact.value} onPressedChange={compact.setValue}>{'Compact rows'}</Toggle>
+		<button onClick={steps.goToPrevStep} disabled={!steps.canGoToPrevStep}>
+			{'Back'}
+		</button>
+		<button onClick={steps.goToNextStep} disabled={!steps.canGoToNextStep}>
+			{'Next'}
+		</button>
+		<Toggle pressed={compact.value} onPressedChange={compact.setValue}>
+			{'Compact rows'}
+		</Toggle>
 		<NumberField.Root
 			value={pageSize}
 			min={10}
@@ -68,9 +74,9 @@ export function PreferencesPanel() @{
 			<Menu.Portal>
 				<Menu.Positioner>
 					<Menu.Popup>
-						<Menu.Item
-							onClick={() => shortcutActions.set('archive', 'e')}
-						>{'Add archive'}</Menu.Item>
+						<Menu.Item onClick={() => shortcutActions.set('archive', 'e')}>
+							{'Add archive'}
+						</Menu.Item>
 						<Menu.Item onClick={() => shortcutActions.reset()}>{'Reset'}</Menu.Item>
 					</Menu.Popup>
 				</Menu.Positioner>

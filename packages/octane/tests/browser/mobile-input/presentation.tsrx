@@ -20,15 +20,13 @@ export function mountPresentationRows(
 	}
 	const source = {
 		getSnapshot: () => ({
-			items: rows.map(
-				(row) => ({
-					id: String(row.id),
-					name: row.label,
-					preview: null,
-					state: 'ready' as const,
-					error: '',
-				}),
-			),
+			items: rows.map((row) => ({
+				id: String(row.id),
+				name: row.label,
+				preview: null,
+				state: 'ready' as const,
+				error: '',
+			})),
 			locked: false,
 			onRemove() {},
 			onRetry() {},
@@ -41,10 +39,9 @@ export function mountPresentationRows(
 			};
 		},
 	};
-	const binding: BindingHandle =
-		shadowEditor
-			? mountBindings({ parent }, ShadowEditorRows, source)
-			: mountBindings({ parent }, AttachmentPresentation, source);
+	const binding: BindingHandle = shadowEditor
+		? mountBindings({ parent }, ShadowEditorRows, source)
+		: mountBindings({ parent }, AttachmentPresentation, source);
 	return {
 		update(next) {
 			rows = next;

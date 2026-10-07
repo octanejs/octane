@@ -42,8 +42,12 @@ function Row({ item }: { item: Item }) @{
 export function ComponentRows() @{
 	const [items, setItems] = useState(items3);
 	<div>
-		<button id="clear" onClick={() => setItems([])}>clear</button>
-		<button id="replace" onClick={() => setItems(items3b)}>replace</button>
+		<button id="clear" onClick={() => setItems([])}>
+			clear
+		</button>
+		<button id="replace" onClick={() => setItems(items3b)}>
+			replace
+		</button>
 		<ul>
 			@for (const item of items; key item.id) {
 				<Row item={item} />
@@ -63,7 +67,9 @@ const rowRef = (_el: Element) => {
 export function RefRows() @{
 	const [items, setItems] = useState(items3);
 	<div>
-		<button id="clear" onClick={() => setItems([])}>clear</button>
+		<button id="clear" onClick={() => setItems([])}>
+			clear
+		</button>
 		<ul>
 			@for (const item of items; key item.id) {
 				<li ref={rowRef}>{item.label}</li>
@@ -76,7 +82,9 @@ export function RefRows() @{
 export function LargeRefRows() @{
 	const [items, setItems] = useState(ownedItems);
 	<div>
-		<button id="clear" onClick={() => setItems([])}>clear</button>
+		<button id="clear" onClick={() => setItems([])}>
+			clear
+		</button>
 		<ul>
 			@for (const item of items; key item.id) {
 				<li ref={rowRef}>
@@ -113,21 +121,27 @@ export function OwnedParentRows({
 				if (clearTwiceOnSuspend) setClearStage(1);
 				if (reorderBeforeClearOnSuspend) setClearStage(4);
 			}}
-		>clear</button>
+		>
+			clear
+		</button>
 		<button
 			id="append"
 			onClick={() => {
 				setPending(false);
 				setItems(items3b);
 			}}
-		>append</button>
+		>
+			append
+		</button>
 		<button
 			id="reverse"
 			onClick={() => {
 				setPending(false);
 				setItems(ownedItems.toReversed());
 			}}
-		>reverse</button>
+		>
+			reverse
+		</button>
 		<ul id="owned-list">
 			@for (const item of items; key item.id) {
 				<li class="row">
@@ -137,9 +151,8 @@ export function OwnedParentRows({
 			}
 		</ul>
 		@{
-			if (pending && suspendOnClear && !clearTwiceOnSuspend && !reorderBeforeClearOnSuspend) use(
-				suspendOnClear,
-			);
+			if (pending && suspendOnClear && !clearTwiceOnSuspend && !reorderBeforeClearOnSuspend)
+				use(suspendOnClear);
 			if (pending && refillDuringClear && items.length === 0) setItems(items3b);
 			if (clearTwiceOnSuspend) {
 				if (clearStage === 1 && items.length === 0) {
@@ -178,14 +191,18 @@ export function OwnedParentEmptyRows({ suspendOnClear }: { suspendOnClear?: Prom
 				setItems([]);
 				setPending(true);
 			}}
-		>clear</button>
+		>
+			clear
+		</button>
 		<button
 			id="append"
 			onClick={() => {
 				setPending(false);
 				setItems(items3b);
 			}}
-		>append</button>
+		>
+			append
+		</button>
 		<ul>
 			@for (const item of items; key item.id) {
 				<li class="row">
@@ -204,12 +221,9 @@ export function OwnedParentEmptyRows({ suspendOnClear }: { suspendOnClear?: Prom
 function PortalRow({ item, target }: { item: Item; target: Element }) @{
 	<li>
 		{item.label}
-		{createPortal(
-			() => @{
-				<span class="tip">{'tip-' + item.label}</span>
-			},
-			target,
-		)}
+		{createPortal(() => @{
+			<span class="tip">{'tip-' + item.label}</span>
+		}, target)}
 	</li>
 }
 
@@ -223,7 +237,9 @@ export function SharedParentRows({ size }: { size: number }) @{
 	for (let i = 1; i <= size; i++) initial.push({ id: i, label: 'row-' + i });
 	const [items, setItems] = useState(initial);
 	<div>
-		<button id="clear" onClick={() => setItems([])}>clear</button>
+		<button id="clear" onClick={() => setItems([])}>
+			clear
+		</button>
 		<ul>
 			<li id="before">before</li>
 			@for (const item of items; key item.id) {
@@ -238,7 +254,9 @@ export function SharedParentRows({ size }: { size: number }) @{
 export function PortalRows({ target }: { target: Element }) @{
 	const [items, setItems] = useState(items3);
 	<div>
-		<button id="clear" onClick={() => setItems([])}>clear</button>
+		<button id="clear" onClick={() => setItems([])}>
+			clear
+		</button>
 		<ul>
 			@for (const item of items; key item.id) {
 				<PortalRow item={item} target={target} />

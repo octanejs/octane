@@ -26,11 +26,15 @@ export function LazyStatefulItem(props) @{
 		class="lazy-item"
 		data-id={props.id as string}
 		onClick={() => setCount((value) => value + 1)}
-	>{props.label + ':' + count as string}</button>
+	>
+		{(props.label + ':' + count) as string}
+	</button>
 }
 
 export function LazyRefTarget(props) @{
-	<div class="lazy-ref" ref={props.ref}>{props.label as string}</div>
+	<div class="lazy-ref" ref={props.ref}>
+		{props.label as string}
+	</div>
 }
 
 export function LazyHost(props) @{
@@ -41,7 +45,7 @@ export function LazyHost(props) @{
 		} @pending {
 			<div class="lazy-fallback">{'Loading...'}</div>
 		} @catch (error) {
-			<div class="lazy-error">{'Error: ' + error.message as string}</div>
+			<div class="lazy-error">{('Error: ' + error.message) as string}</div>
 		}
 	</>
 }
@@ -58,14 +62,14 @@ export function LazyPairHost(props) @{
 		} @pending {
 			<div class="lazy-fallback">{'Loading...'}</div>
 		} @catch (error) {
-			<div class="lazy-error">{'Error: ' + error.message as string}</div>
+			<div class="lazy-error">{('Error: ' + error.message) as string}</div>
 		}
 	</>
 }
 
 export function LazyListHost(props) @{
-	const children = props.items.map(
-		(item) => createElement(item.comp, {
+	const children = props.items.map((item) =>
+		createElement(item.comp, {
 			key: item.key,
 			id: item.key,
 			label: item.label,
@@ -78,7 +82,7 @@ export function LazyListHost(props) @{
 		} @pending {
 			<div class="lazy-fallback">{'Loading...'}</div>
 		} @catch (error) {
-			<div class="lazy-error">{'Error: ' + error.message as string}</div>
+			<div class="lazy-error">{('Error: ' + error.message) as string}</div>
 		}
 	</>
 }
@@ -98,7 +102,7 @@ export function LazyProviderHost(props) @{
 		} @pending {
 			<div class="lazy-fallback">{'Loading...'}</div>
 		} @catch (error) {
-			<div class="lazy-error">{'Error: ' + error.message as string}</div>
+			<div class="lazy-error">{('Error: ' + error.message) as string}</div>
 		}
 	</>
 }

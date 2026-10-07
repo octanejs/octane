@@ -38,24 +38,32 @@ export function LoggedRefSwap(props) @{
 export function InlineSetterRef({ label = 'first' }: { label?: string }) {
 	const [node, setNode] = useState<HTMLButtonElement | null>(null);
 	const [count, setCount] = useState(0);
-	return <section>
-		<button
-			ref={(element) => {
-				setNode(element);
-			}}
-			onClick={() => setCount(count + 1)}
-		>{label}</button>
-		<output>{(node ? `${label}:${count}:attached` : 'detached') as string}</output>
-	</section>;
+	return (
+		<section>
+			<button
+				ref={(element) => {
+					setNode(element);
+				}}
+				onClick={() => setCount(count + 1)}
+			>
+				{label}
+			</button>
+			<output>{(node ? `${label}:${count}:attached` : 'detached') as string}</output>
+		</section>
+	);
 }
 
 export function RefStateCausalLoop() {
 	const [value, setValue] = useState(0);
 	// A finite bound keeps the broken implementation from hanging the test runner.
 	// The renderer's nested-update guard must reject this recursive commit chain.
-	return <span
-		ref={(element) => {
-			if (element && value < 100) setValue(value + 1);
-		}}
-	>{value as number}</span>;
+	return (
+		<span
+			ref={(element) => {
+				if (element && value < 100) setValue(value + 1);
+			}}
+		>
+			{value as number}
+		</span>
+	);
 }

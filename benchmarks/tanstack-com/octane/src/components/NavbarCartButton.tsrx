@@ -40,26 +40,27 @@ export function NavbarCartButton() {
 	if (!onShopRoute && totalQuantity === 0) return null;
 
 	const badge =
-		totalQuantity > 0
-			? <span class={badgeClasses}>
-					{totalQuantity > 99 ? '99+' : totalQuantity}
-				</span>
-			: null;
+		totalQuantity > 0 ? (
+			<span class={badgeClasses}>{totalQuantity > 99 ? '99+' : totalQuantity}</span>
+		) : null;
 
-	const label =
-		totalQuantity > 0 ? `Cart (${totalQuantity} items)` : 'Cart';
+	const label = totalQuantity > 0 ? `Cart (${totalQuantity} items)` : 'Cart';
 
 	// On shop routes: open the drawer (it's mounted in ShopLayout)
 	if (onShopRoute) {
-		return <button type="button" onClick={openDrawer} aria-label={label} class={buttonClasses}>
-			<ShoppingCart className="w-4 h-4" />
-			{badge}
-		</button>;
+		return (
+			<button type="button" onClick={openDrawer} aria-label={label} class={buttonClasses}>
+				<ShoppingCart className="w-4 h-4" />
+				{badge}
+			</button>
+		);
 	}
 
 	// Everywhere else: navigate to the cart page
-	return <Link to="/shop/cart" aria-label={label} className={buttonClasses}>
-		<ShoppingCart className="w-4 h-4" />
-		{badge}
-	</Link>;
+	return (
+		<Link to="/shop/cart" aria-label={label} className={buttonClasses}>
+			<ShoppingCart className="w-4 h-4" />
+			{badge}
+		</Link>
+	);
 }

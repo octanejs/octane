@@ -48,40 +48,50 @@ function MainChartSurface(props: RootSurfaceProps) {
 			role = hasAccessibilityLayer ? 'application' : undefined;
 		}
 	}
-	return <Surface
-		{...otherAttributes}
-		title={title}
-		desc={desc}
-		role={role}
-		tabIndex={tabIndex}
-		width={width}
-		height={height}
-		style={FULL_WIDTH_AND_HEIGHT}
-		ref={ref}
-	>{children}</Surface>;
+	return (
+		<Surface
+			{...otherAttributes}
+			title={title}
+			desc={desc}
+			role={role}
+			tabIndex={tabIndex}
+			width={width}
+			height={height}
+			style={FULL_WIDTH_AND_HEIGHT}
+			ref={ref}
+		>
+			{children}
+		</Surface>
+	);
 }
 
-function BrushPanoramaSurface(props: {
-	children: OctaneNode;
-}) {
+function BrushPanoramaSurface(props: { children: OctaneNode }) {
 	const { children } = props;
 	const brushDimensions = useAppSelector(selectBrushDimensions);
 	if (!brushDimensions) {
 		return null;
 	}
 	const { width, height, y, x } = brushDimensions;
-	return <Surface width={width} height={height} x={x} y={y}>{children}</Surface>;
+	return (
+		<Surface width={width} height={height} x={x} y={y}>
+			{children}
+		</Surface>
+	);
 }
 
 export function RootSurface(props: RootSurfaceProps) {
 	const { children, ref, ...rest } = props;
 	const isPanorama = useIsPanorama();
 	if (isPanorama) {
-		return <BrushPanoramaSurface>
-			<AllZIndexPortals isPanorama={true}>{children}</AllZIndexPortals>
-		</BrushPanoramaSurface>;
+		return (
+			<BrushPanoramaSurface>
+				<AllZIndexPortals isPanorama={true}>{children}</AllZIndexPortals>
+			</BrushPanoramaSurface>
+		);
 	}
-	return <MainChartSurface ref={ref} {...rest}>
-		<AllZIndexPortals isPanorama={false}>{children}</AllZIndexPortals>
-	</MainChartSurface>;
+	return (
+		<MainChartSurface ref={ref} {...rest}>
+			<AllZIndexPortals isPanorama={false}>{children}</AllZIndexPortals>
+		</MainChartSurface>
+	);
 }

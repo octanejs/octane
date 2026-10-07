@@ -38,7 +38,9 @@ export function HydratableCounter(props: CounterProps) @{
 	}, []);
 	<div data-testid="counter">
 		<p data-testid="label">{props.label as string}</p>
-		<button data-testid="button" onClick={() => setCount(count + 1)}>{'Count: ' + count}</button>
+		<button data-testid="button" onClick={() => setCount(count + 1)}>
+			{'Count: ' + count}
+		</button>
 	</div>
 }
 

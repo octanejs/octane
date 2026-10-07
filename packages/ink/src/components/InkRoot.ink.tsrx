@@ -41,10 +41,12 @@ export function InkRoot<P>({ component, componentProps, ...props }: InkRootProps
 			onWaitUntilRenderFlush={props.onWaitUntilRenderFlush}
 			onSuspendTerminal={props.onSuspendTerminal}
 			onRegisterInputControl={props.onRegisterInputControl}
-		>{universalComponent(
-			'ink',
-			component as unknown as UniversalComponent<P>,
-			componentProps as unknown as Readonly<Record<string, unknown>>,
-		)}</App>
+		>
+			{universalComponent(
+				'ink',
+				component as unknown as UniversalComponent<P>,
+				componentProps as unknown as Readonly<Record<string, unknown>>,
+			)}
+		</App>
 	</AccessibilityContext>
 }

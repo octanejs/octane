@@ -20,11 +20,11 @@ function renderFruit(item: { id: string; name: string }) {
 function Option(props: { item: any; state: any }) {
 	const ref = useRef<any>(null);
 	const { optionProps, isSelected } = useOption({ key: props.item.key }, props.state, ref);
-	return <li
-		{...optionProps}
-		ref={ref}
-		data-selected={isSelected ? 'y' : 'n'}
-	>{props.item.rendered}</li>;
+	return (
+		<li {...optionProps} ref={ref} data-selected={isSelected ? 'y' : 'n'}>
+			{props.item.rendered}
+		</li>
+	);
 }
 
 export function ListBoxSpec() {
@@ -36,11 +36,15 @@ export function ListBoxSpec() {
 	const ref = useRef<any>(null);
 	const { listBoxProps, labelProps } = useListBox({ label: 'Fruits' }, state, ref);
 	const selected = [...state.selectionManager.selectedKeys].sort().join(',') || 'none';
-	return <div>
-		<span {...labelProps}>Fruits</span>
-		<ul {...listBoxProps} ref={ref}>{[...state.collection].map(
-			(item: any) => <Option key={item.key} item={item} state={state} />,
-		)}</ul>
-		<output>{'selected:' + selected}</output>
-	</div>;
+	return (
+		<div>
+			<span {...labelProps}>Fruits</span>
+			<ul {...listBoxProps} ref={ref}>
+				{[...state.collection].map((item: any) => (
+					<Option key={item.key} item={item} state={state} />
+				))}
+			</ul>
+			<output>{'selected:' + selected}</output>
+		</div>
+	);
 }

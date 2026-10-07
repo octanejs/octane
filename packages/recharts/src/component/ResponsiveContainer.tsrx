@@ -66,9 +66,11 @@ function ResponsiveContainerContextProvider({
 	if (!isPositiveNumber(size.width) || !isPositiveNumber(size.height)) {
 		return null;
 	}
-	return <ResponsiveContainerContext
-		value={size as ResponsiveContainerDimensions}
-	>{children}</ResponsiveContainerContext>;
+	return (
+		<ResponsiveContainerContext value={size as ResponsiveContainerDimensions}>
+			{children}
+		</ResponsiveContainerContext>
+	);
 }
 
 function SizeDetectorContainer(props: Props) @{
@@ -100,9 +102,8 @@ function SizeDetectorContainer(props: Props) @{
 	const setContainerSize = useCallback((newWidth: number, newHeight: number) => {
 		const containerWidth = Math.round(newWidth);
 		const containerHeight = Math.round(newHeight);
-		setSizes(
-			(previous) => previous.containerWidth === containerWidth &&
-			previous.containerHeight === containerHeight
+		setSizes((previous) =>
+			previous.containerWidth === containerWidth && previous.containerHeight === containerHeight
 				? previous
 				: { containerWidth, containerHeight },
 		);
@@ -147,7 +148,9 @@ function SizeDetectorContainer(props: Props) @{
 			<ResponsiveContainerContextProvider
 				width={calculated.calculatedWidth}
 				height={calculated.calculatedHeight}
-			>{children}</ResponsiveContainerContextProvider>
+			>
+				{children}
+			</ResponsiveContainerContextProvider>
 		</div>
 	</div>
 }
@@ -165,10 +168,14 @@ export function ResponsiveContainer(props: Props) {
 		maxHeight: props.maxHeight,
 	});
 	if (isNumber(calculated.calculatedWidth) && isNumber(calculated.calculatedHeight)) {
-		return <ResponsiveContainerContextProvider
-			width={calculated.calculatedWidth}
-			height={calculated.calculatedHeight}
-		>{props.children}</ResponsiveContainerContextProvider>;
+		return (
+			<ResponsiveContainerContextProvider
+				width={calculated.calculatedWidth}
+				height={calculated.calculatedHeight}
+			>
+				{props.children}
+			</ResponsiveContainerContextProvider>
+		);
 	}
 	return <SizeDetectorContainer {...props} width={defaults.width} height={defaults.height} />;
 }

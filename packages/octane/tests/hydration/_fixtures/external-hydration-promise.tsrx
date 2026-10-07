@@ -7,7 +7,9 @@ export function MixedHydrationOwners(props) @{
 		id="mixed-hydration-owners"
 		data-external={String(external)}
 		data-ordinary={String(ordinary)}
-	>{String(external) + ':' + String(ordinary) as string}</div>
+	>
+		{(String(external) + ':' + String(ordinary)) as string}
+	</div>
 }
 
 export function ExternalBoundary(props) @{

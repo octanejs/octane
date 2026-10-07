@@ -12,7 +12,9 @@ function InputProbe(props: Record<string, unknown>) @{
 
 function FadeProbe(props: Record<string, unknown>) @{
 	const innerProps = props.innerProps as Record<string, unknown>;
-	<div id="animated-fade-probe" data-consumer={String(props.consumer)} {...innerProps}>fade</div>
+	<div id="animated-fade-probe" data-consumer={String(props.consumer)} {...innerProps}>
+		fade
+	</div>
 }
 
 export function AnimatedInputFixture() @{
@@ -26,9 +28,7 @@ export function AnimatedSingleSelectFixture() @{
 		defaultValue={{ label: 'Selected option', value: 'selected' }}
 		inputId="animated-single-input"
 		instanceId="animated-single"
-		options={[
-			{ label: 'Selected option', value: 'selected' },
-		]}
+		options={[{ label: 'Selected option', value: 'selected' }]}
 	/>
 }
 

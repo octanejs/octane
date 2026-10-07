@@ -30,13 +30,15 @@ export function GuardedQuery(props: {
 	const label = label$.snapshot();
 	const state = details$.snapshot();
 	<main>
-		<button id="tick" onClick={() => setTick(tick + 1)}>{'tick'}</button>
-		<button id="open" onClick={() => active$.set(true)}>{'open'}</button>
+		<button id="tick" onClick={() => setTick(tick + 1)}>
+			{'tick'}
+		</button>
+		<button id="open" onClick={() => active$.set(true)}>
+			{'open'}
+		</button>
 		<output>{tick as string}</output>
 		<aside>{label.status}</aside>
-		<p>
-			{state.status === 'ready' ? state.value.text : 'loading'}
-		</p>
+		<p>{state.status === 'ready' ? state.value.text : 'loading'}</p>
 	</main>
 }
 
@@ -63,9 +65,7 @@ export function NestedSnapshot(props: NestedProps) @{
 	const visible$ = derived$(() => String(available$.get()) + ':' + String(fallback$.get()));
 	<main>
 		<button onClick={() => active$.set(true)}>{'load'}</button>
-		<p>
-			{fallback$.get() ? 'pending' : 'settled'}
-		</p>
+		<p>{fallback$.get() ? 'pending' : 'settled'}</p>
 		<span>{visible$.get() as string}</span>
 	</main>
 }
@@ -96,8 +96,9 @@ export function LayoutActivatedSnapshot({ fixture }: { fixture: LayoutFixture })
 	const empty$ = derived$(() => {
 		if (!active$.get() || !eligible$.get()) return false;
 		const result = selected$.snapshot();
-		return result.status === 'error' ||
-			result.status === 'ready' && result.value?.values.length === 0;
+		return (
+			result.status === 'error' || (result.status === 'ready' && result.value?.values.length === 0)
+		);
 	});
 	const visible$ = derived$(() => hasValues$.get() || empty$.get());
 	const run = captureSignalOwner(currentSignalOwner()!);
@@ -106,7 +107,9 @@ export function LayoutActivatedSnapshot({ fixture }: { fixture: LayoutFixture })
 		queueMicrotask(activate);
 	});
 	<section>
-		<button id="open" onClick={() => setOpen(true)}>{'Open'}</button>
+		<button id="open" onClick={() => setOpen(true)}>
+			{'Open'}
+		</button>
 		@if (open) {
 			<div id="panel">{'Panel'}</div>
 		}
@@ -152,7 +155,9 @@ export function PendingSelector(props: SelectorProps) @{
 		};
 	}, []);
 	<section>
-		<button id="next" onClick={() => setTick(tick + 1)}>{'Next'}</button>
+		<button id="next" onClick={() => setTick(tick + 1)}>
+			{'Next'}
+		</button>
 		<output id="status">{`${tick}:${a$.get()}:${b$.get()}`}</output>
 	</section>
 }
@@ -184,37 +189,38 @@ export function RejectedSnapshot({ fixture }: { fixture: RejectedFixture }) @{
 	const empty$ = derived$(() => {
 		if (!active$.get() || !eligible$.get()) return false;
 		const result = selected$.snapshot();
-		return result.status === 'error' ||
-			result.status === 'ready' && result.value?.values.length === 0;
+		return (
+			result.status === 'error' || (result.status === 'ready' && result.value?.values.length === 0)
+		);
 	});
 	const fallback$ = query$(
-		() => !fixture.skipFallback && active$.get() && eligible$.get() && empty$.get()
-			? 'fallback'
-			: skip,
+		() =>
+			!fixture.skipFallback && active$.get() && eligible$.get() && empty$.get() ? 'fallback' : skip,
 		fixture.fallback,
 	);
 	const visible$ = derived$(
 		() =>
 			hasValues$.get() ||
-				empty$.get() && fallback$.snapshot().status === 'ready' &&
-					fallback$.get().values.length > 0,
+			(empty$.get() &&
+				fallback$.snapshot().status === 'ready' &&
+				fallback$.get().values.length > 0),
 	);
 	const run = captureSignalOwner(currentSignalOwner()!);
 	const activate = useEffectEvent(() => run(() => active$.set(true)));
 	useLayoutEffect(() => {
 		queueMicrotask(activate);
 	});
-	const taskState =
-		active$.get() && eligible$.get() ? request$.snapshot() : undefined;
-	const taskResult =
-		active$.get() && eligible$.get() ? request$.latest(undefined) : undefined;
+	const taskState = active$.get() && eligible$.get() ? request$.snapshot() : undefined;
+	const taskResult = active$.get() && eligible$.get() ? request$.latest(undefined) : undefined;
 	const fallbackNeeded = empty$.get();
 	const visible = visible$.get();
 	<section>
 		<output id="observation">{`${taskState?.status ?? 'none'}:${
 			taskResult?.values.length ?? 'none'
 		}:${fallbackNeeded}:${visible}`}</output>
-		<button id="open" onClick={() => setOpen(true)}>{'Open'}</button>
+		<button id="open" onClick={() => setOpen(true)}>
+			{'Open'}
+		</button>
 		@if (open) {
 			<div id="panel">{'Panel'}</div>
 		}
@@ -233,8 +239,12 @@ export function NewObjectChain() @{
 	const boxed$ = derived$(() => ({ n: base$.get() }));
 	const n$ = derived$(() => boxed$.get().n);
 	<section>
-		<button id="tick" onClick={() => setTick(tick + 1)}>{'Tick'}</button>
-		<button id="count" onClick={() => count$.set(count$.get() + 1)}>{'Count'}</button>
+		<button id="tick" onClick={() => setTick(tick + 1)}>
+			{'Tick'}
+		</button>
+		<button id="count" onClick={() => count$.set(count$.get() + 1)}>
+			{'Count'}
+		</button>
 		<output>{`${tick}:${n$.get()}`}</output>
 	</section>
 }
@@ -252,8 +262,12 @@ export function NewErrorChain() @{
 		return result.status === 'error' ? (result.error as Error).message : result.status;
 	});
 	<section>
-		<button id="tick" onClick={() => setTick(tick + 1)}>{'Tick'}</button>
-		<button id="count" onClick={() => count$.set(count$.get() + 1)}>{'Count'}</button>
+		<button id="tick" onClick={() => setTick(tick + 1)}>
+			{'Tick'}
+		</button>
+		<button id="count" onClick={() => count$.set(count$.get() + 1)}>
+			{'Count'}
+		</button>
 		<output>{`${tick}:${status$.get()}`}</output>
 	</section>
 }

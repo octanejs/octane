@@ -6,12 +6,11 @@ import { useTranslations } from '../translations-context.tsrx';
 import type { ComponentProps } from '../types';
 import { useCodeBlockContext } from './context.tsrx';
 
-export type CodeBlockCopyButtonProps =
-	ComponentProps<'button'> & {
-		onCopy?: () => void;
-		onError?: (error: Error) => void;
-		timeout?: number;
-	};
+export type CodeBlockCopyButtonProps = ComponentProps<'button'> & {
+	onCopy?: () => void;
+	onError?: (error: Error) => void;
+	timeout?: number;
+};
 
 export const CodeBlockCopyButton = ({
 	onCopy,
@@ -58,18 +57,20 @@ export const CodeBlockCopyButton = ({
 	const icons = useIcons();
 	const Icon = isCopied ? icons.CheckIcon : icons.CopyIcon;
 
-	return <button
-		className={cn(
-			'cursor-pointer p-1 text-muted-foreground transition-all hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50',
-			className,
-		)}
-		data-streamdown="code-block-copy-button"
-		disabled={isAnimating}
-		onClick={copyToClipboard}
-		title={t.copyCode}
-		type="button"
-		{...props}
-	>
-		{children ?? <Icon size={14} />}
-	</button>;
+	return (
+		<button
+			className={cn(
+				'cursor-pointer p-1 text-muted-foreground transition-all hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50',
+				className,
+			)}
+			data-streamdown="code-block-copy-button"
+			disabled={isAnimating}
+			onClick={copyToClipboard}
+			title={t.copyCode}
+			type="button"
+			{...props}
+		>
+			{children ?? <Icon size={14} />}
+		</button>
+	);
 };

@@ -44,8 +44,7 @@ function resolveTransitionProperty(args: {
 		return undefined;
 	}
 	if (args.isAnimationActive && args.active) {
-		const easing =
-			typeof args.animationEasing === 'string' ? args.animationEasing : 'ease';
+		const easing = typeof args.animationEasing === 'string' ? args.animationEasing : 'ease';
 		return `transform ${args.animationDuration}ms ${easing}`;
 	}
 	return undefined;
@@ -53,12 +52,10 @@ function resolveTransitionProperty(args: {
 
 function TooltipBoundingBoxImpl(props: TooltipBoundingBoxProps) {
 	const prefersReducedMotion = usePrefersReducedMotion();
-	const [state, setState] = React.useState(
-		() => ({
-			dismissed: false,
-			dismissedAtCoordinate: { x: 0, y: 0 },
-		}),
-	);
+	const [state, setState] = React.useState(() => ({
+		dismissed: false,
+		dismissedAtCoordinate: { x: 0, y: 0 },
+	}));
 
 	React.useEffect(() => {
 		const handleKeyDown = (event: KeyboardEvent) => {
@@ -80,8 +77,8 @@ function TooltipBoundingBoxImpl(props: TooltipBoundingBoxProps) {
 
 	if (
 		state.dismissed &&
-			((props.coordinate?.x ?? 0) !== state.dismissedAtCoordinate.x ||
-				(props.coordinate?.y ?? 0) !== state.dismissedAtCoordinate.y)
+		((props.coordinate?.x ?? 0) !== state.dismissedAtCoordinate.x ||
+			(props.coordinate?.y ?? 0) !== state.dismissedAtCoordinate.y)
 	) {
 		setState({ ...state, dismissed: false });
 	}
@@ -100,35 +97,38 @@ function TooltipBoundingBoxImpl(props: TooltipBoundingBoxProps) {
 		useTranslate3d: props.useTranslate3d,
 		viewBox: props.viewBox,
 	});
-	const positionStyle: CSSProperties =
-		props.hasPortalFromProps
-			? {}
-			: {
-					transition: resolveTransitionProperty({
-						prefersReducedMotion,
-						isAnimationActive: props.isAnimationActive,
-						active: props.active,
-						animationDuration: props.animationDuration,
-						animationEasing: props.animationEasing,
-					}),
-					...cssProperties,
-					pointerEvents: 'none',
-					position: 'absolute',
-					top: 0,
-					left: 0,
-				};
+	const positionStyle: CSSProperties = props.hasPortalFromProps
+		? {}
+		: {
+				transition: resolveTransitionProperty({
+					prefersReducedMotion,
+					isAnimationActive: props.isAnimationActive,
+					active: props.active,
+					animationDuration: props.animationDuration,
+					animationEasing: props.animationEasing,
+				}),
+				...cssProperties,
+				pointerEvents: 'none',
+				position: 'absolute',
+				top: 0,
+				left: 0,
+			};
 	const outerStyle: CSSProperties = {
 		...positionStyle,
 		visibility: !state.dismissed && props.active && props.hasPayload ? 'visible' : 'hidden',
 		...props.wrapperStyle,
 	};
-	return <div
-		xmlns="http://www.w3.org/1999/xhtml"
-		tabIndex={-1}
-		className={cssClasses}
-		style={outerStyle}
-		ref={props.innerRef}
-	>{props.children}</div>;
+	return (
+		<div
+			xmlns="http://www.w3.org/1999/xhtml"
+			tabIndex={-1}
+			className={cssClasses}
+			style={outerStyle}
+			ref={props.innerRef}
+		>
+			{props.children}
+		</div>
+	);
 }
 
 export const TooltipBoundingBox = React.memo(TooltipBoundingBoxImpl);

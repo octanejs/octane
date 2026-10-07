@@ -9,6 +9,6 @@
   "dependencies": {
     "jsonc-parser": "3.3.1",
     "octane": "workspace:*",
-    "typescript": "7.1.0-dev.20260921.1"
+    "typescript": "catalog:native"
   }
 }

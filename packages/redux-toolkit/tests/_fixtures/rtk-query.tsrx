@@ -25,26 +25,21 @@ export const api = createApi({
 				}
 				return { data: { id: arg, value: 'value-' + arg } };
 			},
-			providesTags: (_result, _error, arg) => [
-				{ type: 'Value', id: arg },
-			],
+			providesTags: (_result, _error, arg) => [{ type: 'Value', id: arg }],
 		}),
 		setValue: build.mutation({
 			async queryFn(arg) {
 				await delay();
 				return { data: { id: arg, value: 'mutated-' + arg } };
 			},
-			invalidatesTags: (_result, _error, arg) => [
-				{ type: 'Value', id: arg },
-			],
+			invalidatesTags: (_result, _error, arg) => [{ type: 'Value', id: arg }],
 		}),
 		getPages: build.infiniteQuery({
 			infiniteQueryOptions: {
 				initialPageParam: 0,
 				getNextPageParam: (_lastPage, _allPages, lastPageParam) => lastPageParam + 1,
-				getPreviousPageParam: (_firstPage, _allPages, firstPageParam) => firstPageParam > 0
-					? firstPageParam - 1
-					: undefined,
+				getPreviousPageParam: (_firstPage, _allPages, firstPageParam) =>
+					firstPageParam > 0 ? firstPageParam - 1 : undefined,
 				maxPages: 3,
 			},
 			async queryFn({ queryArg, pageParam }) {
@@ -69,8 +64,12 @@ function QueryPanel() @{
 		<p id="first">{'first=' + (first.data?.value || '-') + ':' + first.status}</p>
 		<p id="second">{'second=' + (second.data?.value || '-') + ':' + second.status}</p>
 		<p id="selected">{'selected=' + (selected.value || '-')}</p>
-		<button id="swap" onClick={() => setArg((value) => value === 'a' ? 'c' : 'a')}>swap</button>
-		<button id="refetch" onClick={() => first.refetch()}>refetch</button>
+		<button id="swap" onClick={() => setArg((value) => (value === 'a' ? 'c' : 'a'))}>
+			swap
+		</button>
+		<button id="refetch" onClick={() => first.refetch()}>
+			refetch
+		</button>
 	</section>
 }
 
@@ -86,10 +85,18 @@ function LazyMutationPanel() @{
 	<section id="actions">
 		<p id="lazy">{'lazy=' + (lazy.data?.value || '-') + ':' + lazy.status}</p>
 		<p id="mutation">{'mutation=' + (mutation.data?.value || '-') + ':' + mutation.status}</p>
-		<button id="load" onClick={() => trigger('lazy')}>load</button>
-		<button id="mutate" onClick={() => mutate('mutation')}>mutate</button>
-		<button id="reset-lazy" onClick={() => lazy.reset()}>reset lazy</button>
-		<button id="reset-mutation" onClick={() => mutation.reset()}>reset mutation</button>
+		<button id="load" onClick={() => trigger('lazy')}>
+			load
+		</button>
+		<button id="mutate" onClick={() => mutate('mutation')}>
+			mutate
+		</button>
+		<button id="reset-lazy" onClick={() => lazy.reset()}>
+			reset lazy
+		</button>
+		<button id="reset-mutation" onClick={() => mutation.reset()}>
+			reset mutation
+		</button>
 	</section>
 }
 
@@ -104,8 +111,12 @@ function InfinitePanel() @{
 	const pages = result.data?.pages.join('|') || '-';
 	<section id="infinite">
 		<p id="pages">{'pages=' + pages + ':' + result.status}</p>
-		<button id="next" onClick={() => result.fetchNextPage()}>next</button>
-		<button id="previous" onClick={() => result.fetchPreviousPage()}>previous</button>
+		<button id="next" onClick={() => result.fetchNextPage()}>
+			next
+		</button>
+		<button id="previous" onClick={() => result.fetchPreviousPage()}>
+			previous
+		</button>
 	</section>
 }
 
@@ -129,8 +140,12 @@ function SkipPrefetchPanel() @{
 		<p id="prefetched">
 			{'prefetched=' + (prefetched.data?.value || '-') + ':' + prefetched.status}
 		</p>
-		<button id="start-conditional" onClick={() => setSkip(false)}>start</button>
-		<button id="prefetch-value" onClick={() => prefetch('prefetched')}>prefetch</button>
+		<button id="start-conditional" onClick={() => setSkip(false)}>
+			start
+		</button>
+		<button id="prefetch-value" onClick={() => prefetch('prefetched')}>
+			prefetch
+		</button>
 	</section>
 }
 

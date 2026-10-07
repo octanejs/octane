@@ -3,10 +3,9 @@ import { selectionAlwaysOnDisplay } from '@lexical/utils';
 import { useLexicalComposerContext } from './LexicalComposerContext';
 import { useEffect } from 'octane';
 
-type Props =
-	Readonly<{
-		onReposition?: (node: readonly HTMLElement[]) => void;
-	}>;
+type Props = Readonly<{
+	onReposition?: (node: readonly HTMLElement[]) => void;
+}>;
 
 export function SelectionAlwaysOnDisplay(props: Props) {
 	const [editor] = useLexicalComposerContext();

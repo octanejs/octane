@@ -22,9 +22,10 @@ export function useFieldTransforms<
 
 			return {
 				...acc,
-				[fieldType]: ({ parentId, ...params }: MapFnParams<
-					ExtractField<G['UserField'], Field['type']>
-				>) => {
+				[fieldType]: ({
+					parentId,
+					...params
+				}: MapFnParams<ExtractField<G['UserField'], Field['type']>>) => {
 					const wildcardPath = params.propPath.replace(/\[\d+\]/g, '[*]');
 
 					const isReadOnly =
@@ -50,10 +51,10 @@ export function useFieldTransforms<
 		return mapped;
 	}, [config, item, mappers]);
 
-	const mergedProps = useMemo(() => ({ ...item.props, ...transformedProps }), [
-		item.props,
-		transformedProps,
-	]);
+	const mergedProps = useMemo(
+		() => ({ ...item.props, ...transformedProps }),
+		[item.props, transformedProps],
+	);
 
 	return mergedProps;
 }

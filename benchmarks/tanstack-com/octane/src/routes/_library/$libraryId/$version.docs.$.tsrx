@@ -62,13 +62,11 @@ export const Route = createFileRoute('/_library/$libraryId/$version/docs/$')({
 			throw notFound();
 		}
 
-		const frameworkVariantLinks = (loaderData?.frameworks ?? []).map(
-			(framework) => ({
-				rel: 'alternate',
-				type: 'text/markdown',
-				href: `/${libraryId}/${version}/docs/${docsPath}.md?framework=${framework}`,
-			}),
-		);
+		const frameworkVariantLinks = (loaderData?.frameworks ?? []).map((framework) => ({
+			rel: 'alternate',
+			type: 'text/markdown',
+			href: `/${libraryId}/${version}/docs/${docsPath}.md?framework=${framework}`,
+		}));
 
 		return {
 			meta: seo({
@@ -101,21 +99,23 @@ function Docs() {
 	const branch = getBranch(library, version);
 	const location = useLocation();
 
-	return <DocContainer>
-		<Doc
-			title={title}
-			content={content}
-			repo={library.repo}
-			branch={branch}
-			filePath={filePath}
-			colorFrom={library.colorFrom}
-			colorTo={library.colorTo}
-			textColor={library.textColor}
-			shouldRenderToc
-			libraryId={libraryId}
-			libraryVersion={version === 'latest' ? library.latestVersion : version}
-			pagePath={location.pathname}
-			config={config}
-		/>
-	</DocContainer>;
+	return (
+		<DocContainer>
+			<Doc
+				title={title}
+				content={content}
+				repo={library.repo}
+				branch={branch}
+				filePath={filePath}
+				colorFrom={library.colorFrom}
+				colorTo={library.colorTo}
+				textColor={library.textColor}
+				shouldRenderToc
+				libraryId={libraryId}
+				libraryVersion={version === 'latest' ? library.latestVersion : version}
+				pagePath={location.pathname}
+				config={config}
+			/>
+		</DocContainer>
+	);
 }

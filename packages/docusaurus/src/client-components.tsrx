@@ -61,9 +61,9 @@ function mergeRouteContext(
 	const ownPlugin = resolvedPlugin as DocusaurusPluginIdentifier | undefined;
 	const plugin = parent?.plugin ?? ownPlugin ?? route.plugin;
 	if (plugin === undefined) {
-		throw new Error(`[@octanejs/docusaurus] Route ${String(
-			route.path,
-		)} has no Docusaurus plugin context.`);
+		throw new Error(
+			`[@octanejs/docusaurus] Route ${String(route.path)} has no Docusaurus plugin context.`,
+		);
 	}
 	return {
 		plugin,
@@ -71,7 +71,7 @@ function mergeRouteContext(
 			...parent?.data,
 			...ownData,
 			...(explicitData !== null && typeof explicitData === 'object'
-				? explicitData as Record<string, unknown>
+				? (explicitData as Record<string, unknown>)
 				: {}),
 		},
 	};
@@ -120,7 +120,9 @@ export function DocusaurusRouteRenderer(props: {
 export function useDocusaurusManifest(): DocusaurusManifestValue {
 	const manifest = useContext(ManifestContext);
 	if (manifest === null) {
-		throw new Error('[@octanejs/docusaurus] useDocusaurusManifest() requires DocusaurusRouterProvider.');
+		throw new Error(
+			'[@octanejs/docusaurus] useDocusaurusManifest() requires DocusaurusRouterProvider.',
+		);
 	}
 	return manifest;
 }
@@ -128,7 +130,9 @@ export function useDocusaurusManifest(): DocusaurusManifestValue {
 export function useDocusaurusRouteContext(): DocusaurusRouteContextValue {
 	const context = useContext(RouteContext);
 	if (context === null) {
-		throw new Error('[@octanejs/docusaurus] useDocusaurusRouteContext() requires a matched Docusaurus route.');
+		throw new Error(
+			'[@octanejs/docusaurus] useDocusaurusRouteContext() requires a matched Docusaurus route.',
+		);
 	}
 	return context;
 }

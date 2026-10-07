@@ -42,10 +42,7 @@ export function OrdinaryMemoRoot(props: {
 	<p class="ordinary-memo-value">{value.label as string}</p>
 }
 
-function IndependentWarmPanel(props: {
-	name: string;
-	load: (name: string) => Promise<string>;
-}) @{
+function IndependentWarmPanel(props: { name: string; load: (name: string) => Promise<string> }) @{
 	const value = use(props.load(props.name));
 	<p class="independent-warm-value">{value as string}</p>
 }
@@ -117,7 +114,7 @@ export function DependentChain(props) @{
 		@try {
 			const a = use(props.fetchA());
 			const b = use(props.fetchB(a));
-			<div class="dep">{a + '/' + b as string}</div>
+			<div class="dep">{(a + '/' + b) as string}</div>
 		} @pending {
 			<div class="fallback">{'dep-loading'}</div>
 		}
@@ -131,7 +128,7 @@ export function BatchCatch(props) @{
 		@try {
 			const a = use(props.a);
 			const b = use(props.b);
-			<div class="ok">{a + '/' + b as string}</div>
+			<div class="ok">{(a + '/' + b) as string}</div>
 		} @pending {
 			<div class="fallback">{'w'}</div>
 		} @catch (err) {
@@ -175,8 +172,7 @@ export function NestedIfDirectUse({
 	load: (key: string) => Promise<string>;
 	outer: boolean;
 }) @{
-	if (outer)
-		if (inner) use(load('nested'));
+	if (outer) if (inner) use(load('nested'));
 	<p class="nested-if-use">{'active=' + (outer && inner)}</p>
 }
 
@@ -236,9 +232,9 @@ export function ImportedHookTwiceHost(props) @{
 		@try {
 			const left = useImportedPair(props.load, props.version);
 			const right = useImportedPair(props.load, props.version);
-			<div class="imported-pair-twice">{left.project + '|' + left.viewer + '|' + right.project +
-				'|' +
-				right.viewer as string}</div>
+			<div class="imported-pair-twice">
+				{(left.project + '|' + left.viewer + '|' + right.project + '|' + right.viewer) as string}
+			</div>
 		} @pending {
 			<div class="fallback">{'pairs-loading'}</div>
 		}
@@ -249,7 +245,9 @@ export function ImportedDependentHookHost(props) @{
 	<>
 		@try {
 			const result = useImportedDependent(props.loadProject, props.loadOwner);
-			<div class="imported-dependent">{result.project.ownerId + '/' + result.owner as string}</div>
+			<div class="imported-dependent">
+				{(result.project.ownerId + '/' + result.owner) as string}
+			</div>
 		} @pending {
 			<div class="fallback">{'dependent-loading'}</div>
 		}
@@ -519,15 +517,17 @@ export function SyncWarmBranchesHost(props: SyncWarmProps) @{
 // component's ordinary render-tree walk. Its async creations must still receive
 // Pass A before the synthetic branch helper runs Pass B.
 export function SetupValueParallelHost(props) @{
-	const slot = <section class="setup-value-slot">
-		@try {
-			const a = use(props.load('a'));
-			const b = use(props.load('b'));
-			<p class="setup-value-result">{a + '|' + b as string}</p>
-		} @pending {
-			<i class="setup-value-fallback">loading</i>
-		}
-	</section>;
+	const slot = (
+		<section class="setup-value-slot">
+			@try {
+				const a = use(props.load('a'));
+				const b = use(props.load('b'));
+				<p class="setup-value-result">{(a + '|' + b) as string}</p>
+			} @pending {
+				<i class="setup-value-fallback">loading</i>
+			}
+		</section>
+	);
 
 	<main>{slot}</main>
 }

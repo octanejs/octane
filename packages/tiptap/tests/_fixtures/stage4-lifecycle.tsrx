@@ -152,9 +152,7 @@ export function createSwitchingEditor(options) {
 			content: [
 				{
 					type: 'switchingNode',
-					content: [
-						{ type: 'text', text: `${options.owner} node content` },
-					],
+					content: [{ type: 'text', text: `${options.owner} node content` }],
 				},
 				{
 					type: 'paragraph',
@@ -190,11 +188,9 @@ export function SwitchingMenuHost(props) @{
 			className={'switching-menu-' + props.owner}
 			ref={props.menuRef}
 		>
-			<button
-				type="button"
-				data-switching-menu-action="true"
-				onClick={props.onAction}
-			>{props.owner as string}</button>
+			<button type="button" data-switching-menu-action="true" onClick={props.onAction}>
+				{props.owner as string}
+			</button>
 		</BubbleMenu>
 	</section>
 }
@@ -211,10 +207,12 @@ function AdvancedNodeView(props) @{
 			type="button"
 			contentEditable={false}
 			id={'advanced-publish-' + id}
-			onClick={() => props.updateAttributes({
-				label: `${id}-published`,
-				publish: true,
-			})}
+			onClick={() =>
+				props.updateAttributes({
+					label: `${id}-published`,
+					publish: true,
+				})
+			}
 		>
 			publish
 		</button>
@@ -222,10 +220,12 @@ function AdvancedNodeView(props) @{
 			type="button"
 			contentEditable={false}
 			id={'advanced-hold-' + id}
-			onClick={() => props.updateAttributes({
-				label: `${id}-held`,
-				publish: false,
-			})}
+			onClick={() =>
+				props.updateAttributes({
+					label: `${id}-held`,
+					publish: false,
+				})
+			}
 		>
 			hold
 		</button>
@@ -241,10 +241,12 @@ function AdvancedNodeView(props) @{
 			type="button"
 			contentEditable={false}
 			id={'advanced-refresh-' + id}
-			onClick={() => props.updateAttributes({
-				publish: true,
-				revision: props.node.attrs.revision + 1,
-			})}
+			onClick={() =>
+				props.updateAttributes({
+					publish: true,
+					revision: props.node.attrs.revision + 1,
+				})
+			}
 		>
 			refresh
 		</button>
@@ -310,16 +312,12 @@ export function createAdvancedEditor() {
 				{
 					type: 'advancedNode',
 					attrs: { id: 'one', label: 'one-initial', publish: true, revision: 0 },
-					content: [
-						{ type: 'text', text: 'one content' },
-					],
+					content: [{ type: 'text', text: 'one content' }],
 				},
 				{
 					type: 'advancedNode',
 					attrs: { id: 'two', label: 'two-initial', publish: true, revision: 0 },
-					content: [
-						{ type: 'text', text: 'two content' },
-					],
+					content: [{ type: 'text', text: 'two content' }],
 				},
 			],
 		},

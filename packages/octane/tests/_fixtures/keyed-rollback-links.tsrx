@@ -32,14 +32,18 @@ export function HeldRows({
 			onClick={() => {
 				if (before !== undefined) setItems(before);
 			}}
-		>{'before'}</button>
+		>
+			{'before'}
+		</button>
 		<button
 			id="go"
 			onClick={() => {
 				setItems(steps[0]);
 				setStage(1);
 			}}
-		>{'go'}</button>
+		>
+			{'go'}
+		</button>
 		<ul>
 			@for (const item of items; key item.id) {
 				<li class="row">{item.label}</li>

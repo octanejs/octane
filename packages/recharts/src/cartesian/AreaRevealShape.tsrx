@@ -34,12 +34,14 @@ function HorizontalClipRect({ alpha, baseLine, points, strokeWidth }: ClipRectPr
 	}
 
 	if (isNumber(maxY)) {
-		return <rect
-			x={startX < endX ? startX : startX - width}
-			y={0}
-			width={width}
-			height={Math.floor(maxY + (strokeWidth ? parseInt(`${strokeWidth}`, 10) : 1))}
-		/>;
+		return (
+			<rect
+				x={startX < endX ? startX : startX - width}
+				y={0}
+				width={width}
+				height={Math.floor(maxY + (strokeWidth ? parseInt(`${strokeWidth}`, 10) : 1))}
+			/>
+		);
 	}
 
 	return null;
@@ -61,39 +63,51 @@ function VerticalClipRect({ alpha, baseLine, points, strokeWidth }: ClipRectProp
 	}
 
 	if (isNumber(maxX)) {
-		return <rect
-			x={0}
-			y={startY < endY ? startY : startY - height}
-			width={maxX + (strokeWidth ? parseInt(`${strokeWidth}`, 10) : 1)}
-			height={Math.floor(height)}
-		/>;
+		return (
+			<rect
+				x={0}
+				y={startY < endY ? startY : startY - height}
+				width={maxX + (strokeWidth ? parseInt(`${strokeWidth}`, 10) : 1)}
+				height={Math.floor(height)}
+			/>
+		);
 	}
 
 	return null;
 }
 
-function RevealClipRect({ alpha, layout, points, baseLine, strokeWidth }: ClipRectProps & {
+function RevealClipRect({
+	alpha,
+	layout,
+	points,
+	baseLine,
+	strokeWidth,
+}: ClipRectProps & {
 	layout: CartesianLayout;
 }) {
 	if (layout === 'vertical') {
-		return <VerticalClipRect
+		return (
+			<VerticalClipRect
+				alpha={alpha}
+				points={points}
+				baseLine={baseLine}
+				strokeWidth={strokeWidth}
+			/>
+		);
+	}
+
+	return (
+		<HorizontalClipRect
 			alpha={alpha}
 			points={points}
 			baseLine={baseLine}
 			strokeWidth={strokeWidth}
-		/>;
-	}
-
-	return <HorizontalClipRect
-		alpha={alpha}
-		points={points}
-		baseLine={baseLine}
-		strokeWidth={strokeWidth}
-	/>;
+		/>
+	);
 }
 
-export type AreaRevealShapeProps =
-	CurveProps & ShapeAnimationProps & { layout?: LayoutType; isRange?: boolean };
+export type AreaRevealShapeProps = CurveProps &
+	ShapeAnimationProps & { layout?: LayoutType; isRange?: boolean };
 
 /**
  * The default shape for Area that reveals the chart with a left-to-right (or top-to-bottom)
@@ -129,74 +143,79 @@ export function AreaRevealShape(props: AreaRevealShapeProps): OctaneElement | nu
 		connectNulls,
 		...restProps
 	} = props;
-	const layout: CartesianLayout =
-		layoutProp === 'vertical' ? 'vertical' : 'horizontal';
+	const layout: CartesianLayout = layoutProp === 'vertical' ? 'vertical' : 'horizontal';
 	const finalConnectNulls = connectNulls ?? false;
 	const clipId = useId();
 
 	const { id, baseLine, ...propsWithoutIdBaseline } = restProps;
 	const strokeSvgProps = svgPropertiesNoEvents(propsWithoutIdBaseline);
 
-	const fillCurve = <Curve
-		{...restProps}
-		id={id}
-		baseLine={baseLine}
-		connectNulls={finalConnectNulls}
-		stroke="none"
-		className="recharts-area-area"
-		layout={layout}
-	/>;
+	const fillCurve = (
+		<Curve
+			{...restProps}
+			id={id}
+			baseLine={baseLine}
+			connectNulls={finalConnectNulls}
+			stroke="none"
+			className="recharts-area-area"
+			layout={layout}
+		/>
+	);
 
-	const strokeCurve =
-		stroke !== 'none' &&
-			<Curve
-				{...strokeSvgProps}
-				className="recharts-area-curve"
-				layout={layout}
-				type={restProps.type}
-				connectNulls={finalConnectNulls}
-				fill="none"
-				stroke={stroke}
-				points={restProps.points}
-			/>;
+	const strokeCurve = stroke !== 'none' && (
+		<Curve
+			{...strokeSvgProps}
+			className="recharts-area-curve"
+			layout={layout}
+			type={restProps.type}
+			connectNulls={finalConnectNulls}
+			fill="none"
+			stroke={stroke}
+			points={restProps.points}
+		/>
+	);
 
-	const baselineCurve =
-		stroke !== 'none' && isRange && Array.isArray(baseLine) &&
-			<Curve
-				{...strokeSvgProps}
-				className="recharts-area-curve"
-				layout={layout}
-				type={restProps.type}
-				connectNulls={finalConnectNulls}
-				fill="none"
-				stroke={stroke}
-				points={baseLine}
-			/>;
+	const baselineCurve = stroke !== 'none' && isRange && Array.isArray(baseLine) && (
+		<Curve
+			{...strokeSvgProps}
+			className="recharts-area-curve"
+			layout={layout}
+			type={restProps.type}
+			connectNulls={finalConnectNulls}
+			fill="none"
+			stroke={stroke}
+			points={baseLine}
+		/>
+	);
 
 	if (isEntrance && (isAnimating || animationElapsedTime < 1)) {
-		return <Layer>
-			<defs>
-				<clipPath id={clipId}>
-					<RevealClipRect
-						alpha={animationElapsedTime}
-						points={restProps.points ?? []}
-						baseLine={baseLine}
-						layout={layout}
-						strokeWidth={restProps.strokeWidth}
-					/>
-				</clipPath>
-			</defs>
-			<Layer clipPath={`url(#${clipId})`}>
-				{fillCurve}
-				{strokeCurve}
-				{baselineCurve}
+		return (
+			<Layer>
+				<defs>
+					<clipPath id={clipId}>
+						<RevealClipRect
+							alpha={animationElapsedTime}
+							points={restProps.points ?? []}
+							baseLine={baseLine}
+							layout={layout}
+							strokeWidth={restProps.strokeWidth}
+						/>
+					</clipPath>
+				</defs>
+				<Layer clipPath={`url(#${clipId})`}>
+					{fillCurve}
+					{strokeCurve}
+					{baselineCurve}
+				</Layer>
 			</Layer>
-		</Layer>;
+		);
 	}
 
-	return <>
-		{fillCurve}
-		{strokeCurve}
-		{baselineCurve}
-	</>;
+	return (
+		<>
+			{fillCurve}
+			{strokeCurve}
+			{baselineCurve}
+		</>
+	);
 }

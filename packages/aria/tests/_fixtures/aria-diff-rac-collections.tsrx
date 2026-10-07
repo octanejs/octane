@@ -34,63 +34,89 @@ const FRUITS = [
 
 export function ListBoxSpec() {
 	const [items, setItems] = useState(FRUITS);
-	return <div>
-		<ListBox aria-label="Fruits" selectionMode="single" items={items}>
-			{(item: { id: string; name: string }) =>
-				<ListBoxItem id={item.id} textValue={item.name}>{item.name}</ListBoxItem>}
-		</ListBox>
-		<button id="reverse" onClick={() => setItems((xs: typeof FRUITS) => [...xs].reverse())}>
-			Reverse
-		</button>
-	</div>;
+	return (
+		<div>
+			<ListBox aria-label="Fruits" selectionMode="single" items={items}>
+				{(item: { id: string; name: string }) => (
+					<ListBoxItem id={item.id} textValue={item.name}>
+						{item.name}
+					</ListBoxItem>
+				)}
+			</ListBox>
+			<button id="reverse" onClick={() => setItems((xs: typeof FRUITS) => [...xs].reverse())}>
+				Reverse
+			</button>
+		</div>
+	);
 }
 
 export function TabsSpec() {
-	return <Tabs>
-		<TabList aria-label="Tabs">
-			<Tab id="one">One</Tab>
-			<Tab id="two">Two</Tab>
-		</TabList>
-		<TabPanel id="one">First panel</TabPanel>
-		<TabPanel id="two">Second panel</TabPanel>
-	</Tabs>;
+	return (
+		<Tabs>
+			<TabList aria-label="Tabs">
+				<Tab id="one">One</Tab>
+				<Tab id="two">Two</Tab>
+			</TabList>
+			<TabPanel id="one">First panel</TabPanel>
+			<TabPanel id="two">Second panel</TabPanel>
+		</Tabs>
+	);
 }
 
 export function TagGroupSpec() {
-	return <TagGroup selectionMode="multiple">
-		<Label>Categories</Label>
-		<TagList>
-			<Tag id="news" textValue="News">News</Tag>
-			<Tag id="travel" textValue="Travel">Travel</Tag>
-		</TagList>
-	</TagGroup>;
+	return (
+		<TagGroup selectionMode="multiple">
+			<Label>Categories</Label>
+			<TagList>
+				<Tag id="news" textValue="News">
+					News
+				</Tag>
+				<Tag id="travel" textValue="Travel">
+					Travel
+				</Tag>
+			</TagList>
+		</TagGroup>
+	);
 }
 
 export function GridListSpec() {
-	return <GridList aria-label="Rows" selectionMode="multiple">
-		<GridListItem id="a" textValue="Alpha">Alpha</GridListItem>
-		<GridListItem id="b" textValue="Bravo">Bravo</GridListItem>
-	</GridList>;
+	return (
+		<GridList aria-label="Rows" selectionMode="multiple">
+			<GridListItem id="a" textValue="Alpha">
+				Alpha
+			</GridListItem>
+			<GridListItem id="b" textValue="Bravo">
+				Bravo
+			</GridListItem>
+		</GridList>
+	);
 }
 
 export function BreadcrumbsSpec() {
-	return <Breadcrumbs>
-		<Breadcrumb>
-			<Link href="/">Home</Link>
-		</Breadcrumb>
-		<Breadcrumb>
-			<Link>Current</Link>
-		</Breadcrumb>
-	</Breadcrumbs>;
+	return (
+		<Breadcrumbs>
+			<Breadcrumb>
+				<Link href="/">Home</Link>
+			</Breadcrumb>
+			<Breadcrumb>
+				<Link>Current</Link>
+			</Breadcrumb>
+		</Breadcrumbs>
+	);
 }
 
 export function ComboBoxSpec() {
-	return <ComboBox defaultItems={FRUITS} menuTrigger="input">
-		<Label>Fruit</Label>
-		<Input id="combo-input" />
-		<ListBox>
-			{(item: { id: string; name: string }) =>
-				<ListBoxItem id={item.id} textValue={item.name}>{item.name}</ListBoxItem>}
-		</ListBox>
-	</ComboBox>;
+	return (
+		<ComboBox defaultItems={FRUITS} menuTrigger="input">
+			<Label>Fruit</Label>
+			<Input id="combo-input" />
+			<ListBox>
+				{(item: { id: string; name: string }) => (
+					<ListBoxItem id={item.id} textValue={item.name}>
+						{item.name}
+					</ListBoxItem>
+				)}
+			</ListBox>
+		</ComboBox>
+	);
 }

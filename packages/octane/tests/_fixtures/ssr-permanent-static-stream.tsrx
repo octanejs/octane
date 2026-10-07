@@ -16,10 +16,9 @@ export function DeferredWithPermanentStaticStream(props) @{
 					<PermanentStaticStreamedValue promise={props.promise} />
 				</Suspense>
 			</Hydrate>
-			<button
-				id="deferred-permanent-static-action"
-				onClick={props.onClick}
-			>{'Activate outer'}</button>
+			<button id="deferred-permanent-static-action" onClick={props.onClick}>
+				{'Activate outer'}
+			</button>
 		</section>
 	</Hydrate>
 }

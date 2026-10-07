@@ -14,11 +14,8 @@ export const Route = createFileRoute('/_library/router/$version/')({
 	beforeLoad: ({ params, location }) => {
 		beforeLoadLibraryLanding('router', params.version, location.href);
 	},
-	loader: ({ params, context: { queryClient } }) => loadLibraryLandingRouteData(
-		'router',
-		params.version,
-		queryClient,
-	),
+	loader: ({ params, context: { queryClient } }) =>
+		loadLibraryLandingRouteData('router', params.version, queryClient),
 	head: () => getLibraryLandingHead('router'),
 	headers: () => getLibraryLandingHeaders('router'),
 	staticData: {

@@ -40,7 +40,7 @@
       "arch": "any",
       "packageManager": "pnpm@12.9.1",
       "lockfile": "pnpm-lock.yaml",
-      "lockfileSha256": "e92f4520cd88a2593a0ecd555e0532b2e4e8bb1396c9558a09f0cbf3fbaa5917"
+      "lockfileSha256": "caea67fe61ab57f3e8cbd8a0e55f0e8b3014b3dd6815c6fe6e158095f291daeb"
     }
   },
   "lanes": [
@@ -70,7 +70,7 @@
         {
           "path": "packages/xyflow/tests/_fixtures/connection-slots.tsrx",
           "role": "support",
-          "sha256": "02dfe8e94ed3986e59be313526483c1f7ae297f3de0052ad25eadd180382b517"
+          "sha256": "7e5cb80080fe0d3c1a2c6413be8541f5ce2c3d8cb2c7087f67fd32f57314975b"
         },
         {
           "path": "packages/xyflow/tests/_setup.ts",
@@ -181,7 +181,7 @@
         {
           "path": "packages/xyflow/tests/_fixtures/xyflow-diff.tsrx",
           "role": "support",
-          "sha256": "cb8cdece56eb19d755add9163c3697da264e579eb930e0e74fecef17498e0e39"
+          "sha256": "fd57ca7a0231300fe0d5b07a6cc3d87db616025efcad8f6b20f154b52af81239"
         },
         {
           "path": "packages/octane/tests/differential/_rig.ts",
@@ -239,7 +239,7 @@
         {
           "path": "packages/xyflow/tests/_fixtures/public-hooks-consumer.tsrx",
           "role": "support",
-          "sha256": "fbb7767b59bb33380b0e20d961a92e04c108422a771c2a43a83539829fb1a56c"
+          "sha256": "e0fab216ef8052f6498d57310faaa9aab5d6fbd8a45a17d044927bcca7414f65"
         }
       ]
     }

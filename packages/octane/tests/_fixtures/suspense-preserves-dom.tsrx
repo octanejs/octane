@@ -14,23 +14,32 @@ import {
 function PreservedPanel() @{
 	const [count, setCount] = useState(0);
 	<aside id="preserved-panel" style="display: grid !important; gap: 4px">
-		<button id="preserved-count" onClick={() => setCount(count + 1)}>{'count:' + count}</button>
+		<button id="preserved-count" onClick={() => setCount(count + 1)}>
+			{'count:' + count}
+		</button>
 		<input id="preserved-input" defaultValue="initial value" />
 		<div id="preserved-scroller" style={{ overflow: 'auto', height: '40px', width: '160px' }}>
 			<div style={{ height: '1000px' }}>{'tall content'}</div>
 		</div>
-		<div id="preserved-editable" contentEditable={true}>{'editable selection text'}</div>
+		<div id="preserved-editable" contentEditable={true}>
+			{'editable selection text'}
+		</div>
 	</aside>
 }
 
 function PortalReader(props) @{
 	props.renderLog?.push('portal:render');
 	const value = useSyncExternalStore(props.store.subscribe, props.store.get);
-	useLayoutEffect((log) => {
-		log.push('portal:layout');
-		return () => log.push('portal:cleanup');
-	}, [props.log]);
-	<button id="preserved-portal" ref={props.portalRef}>{'portal:' + value}</button>
+	useLayoutEffect(
+		(log) => {
+			log.push('portal:layout');
+			return () => log.push('portal:cleanup');
+		},
+		[props.log],
+	);
+	<button id="preserved-portal" ref={props.portalRef}>
+		{'portal:' + value}
+	</button>
 }
 
 // A component-returned portal exercises childSlot's embedded PortalSlot path.
@@ -48,24 +57,33 @@ function ValuePortal(props) {
 
 function MemoizedOrderedEffect(props) @{
 	props.renderLog.push('memo:render');
-	useLayoutEffect((log) => {
-		log.push('memo:layout');
-		return () => log.push('memo:cleanup');
-	}, [props.orderLog]);
+	useLayoutEffect(
+		(log) => {
+			log.push('memo:layout');
+			return () => log.push('memo:cleanup');
+		},
+		[props.orderLog],
+	);
 	<span id="memo-ordered-effect">{'memo'}</span>
 }
 
 const StableOrderedEffect = memo(MemoizedOrderedEffect);
 
 function EffectHistoryOrder(props) @{
-	useLayoutEffect((log, value) => {
-		log.push('first:' + value);
-		return () => log.push('cleanup:first:' + value);
-	}, [props.orderLog, props.first]);
-	useLayoutEffect((log, value) => {
-		log.push('second:' + value);
-		return () => log.push('cleanup:second:' + value);
-	}, [props.orderLog, props.second]);
+	useLayoutEffect(
+		(log, value) => {
+			log.push('first:' + value);
+			return () => log.push('cleanup:first:' + value);
+		},
+		[props.orderLog, props.first],
+	);
+	useLayoutEffect(
+		(log, value) => {
+			log.push('second:' + value);
+			return () => log.push('cleanup:second:' + value);
+		},
+		[props.orderLog, props.second],
+	);
 	<span id="effect-history-order">{'effects'}</span>
 }
 
@@ -87,10 +105,13 @@ export function SuspenseEffectHistoryOrderApp(props) @{
 }
 
 function SuspensePassiveSurvivor(props) @{
-	useEffect((log) => {
-		log.push('passive:mount');
-		return () => log.push('passive:cleanup');
-	}, [props.log]);
+	useEffect(
+		(log) => {
+			log.push('passive:mount');
+			return () => log.push('passive:cleanup');
+		},
+		[props.log],
+	);
 	<span id="passive-survivor">{'passive'}</span>
 }
 
@@ -107,10 +128,13 @@ export function SuspensePassiveSurvivalApp(props) @{
 
 function UpdatingOrderedEffect(props) @{
 	props.renderLog.push('updating:render:' + props.route);
-	useLayoutEffect((log, route) => {
-		log.push('updating:layout:' + route);
-		return () => log.push('updating:cleanup:' + route);
-	}, [props.orderLog, props.route]);
+	useLayoutEffect(
+		(log, route) => {
+			log.push('updating:layout:' + route);
+			return () => log.push('updating:cleanup:' + route);
+		},
+		[props.orderLog, props.route],
+	);
 	<span id="updating-ordered-effect">{'updating:' + props.route}</span>
 }
 
@@ -139,7 +163,9 @@ function RawRootSuspensionReader(props: { read: () => string }) @{
 
 export function RawRootSuspensionAfterSiblingApp(props: { label: string; read: () => string }) @{
 	<section id="raw-root-suspension-shell">
-		<span id="raw-root-suspension-label" title={props.label}>{props.label}</span>
+		<span id="raw-root-suspension-label" title={props.label}>
+			{props.label}
+		</span>
 		<RawRootSuspensionReader read={props.read} />
 	</section>
 }
@@ -166,14 +192,18 @@ export function RootSuspensionAfterSiblingApp(props: {
 	promise: PromiseLike<string>;
 }) @{
 	<section id="root-suspension-shell">
-		<span id="root-suspension-label" title={props.label}>{props.label}</span>
+		<span id="root-suspension-label" title={props.label}>
+			{props.label}
+		</span>
 		<input id="root-suspension-draft" defaultValue="initial" />
 		<RootSuspensionReader promise={props.promise} />
 	</section>
 }
 
 function ConditionalArmExpandButton(props: { click: () => void }) @{
-	<button id="conditional-arm-expand" onClick={props.click}>{'expand'}</button>
+	<button id="conditional-arm-expand" onClick={props.click}>
+		{'expand'}
+	</button>
 }
 
 export function ConditionalArmRootSuspensionApp(props: {
@@ -241,9 +271,7 @@ export function SuspensePreservationApp(props) @{
 		},
 	});
 	<section id="preservation-app">
-		<output id="preserved-transition">
-			{isPending ? 'pending' : 'idle'}
-		</output>
+		<output id="preserved-transition">{isPending ? 'pending' : 'idle'}</output>
 		@try {
 			<Primary
 				shape={props.shape}
@@ -317,7 +345,9 @@ export function DirectRootRefUnmountApp(props) @{
 export function HiddenPrimaryRefCatchApp(props) @{
 	@try {
 		const value = use(props.promise);
-		<span id="hidden-ref-primary" ref={props.primaryRef}>{value as string}</span>
+		<span id="hidden-ref-primary" ref={props.primaryRef}>
+			{value as string}
+		</span>
 	} @pending {
 		<span id="hidden-ref-fallback">{'loading'}</span>
 	} @catch (error) {
@@ -336,11 +366,15 @@ export function HiddenInsertionCleanupApp(props) @{
 }
 
 export function IndependentRefApp(props) @{
-	<span id="independent-ref" ref={props.hostRef}>{'independent'}</span>
+	<span id="independent-ref" ref={props.hostRef}>
+		{'independent'}
+	</span>
 }
 
 function NestedAbortedRefChild(props) @{
-	<span id="nested-aborted-ref" ref={props.hostRef}>{'uncommitted'}</span>
+	<span id="nested-aborted-ref" ref={props.hostRef}>
+		{'uncommitted'}
+	</span>
 }
 
 function NestedAbortedThrow() {
@@ -413,13 +447,13 @@ function PendingChildSlotArm(props) @{
 }
 
 export function UrgentChildSlotSuspenseApp(props) @{
-	const child = props.pending
-		? <PendingChildSlotArm promise={props.promise} />
-		: <ReadyChildSlotArm />;
+	const child = props.pending ? (
+		<PendingChildSlotArm promise={props.promise} />
+	) : (
+		<ReadyChildSlotArm />
+	);
 	@try {
-		<>
-			{child}
-		</>
+		<>{child}</>
 	} @pending {
 		<span id="child-slot-fallback">{'loading'}</span>
 	}
@@ -449,10 +483,15 @@ function ReentrantOldBranch(props) @{
 }
 
 function ReentrantIncomingBranch(props) @{
-	useLayoutEffect((log) => {
-		log.push('layout:new');
-	}, [props.log]);
-	<span id="reentrant-wip-new" ref={props.incomingRef}>{'new'}</span>
+	useLayoutEffect(
+		(log) => {
+			log.push('layout:new');
+		},
+		[props.log],
+	);
+	<span id="reentrant-wip-new" ref={props.incomingRef}>
+		{'new'}
+	</span>
 }
 
 export function UrgentWipReentrantUnmountApp(props) @{
@@ -491,13 +530,13 @@ export function TransitionChildWipReentrantUnmountApp(props) @{
 			start(() => setNext(true));
 		},
 	});
-	const child = next
-		? <ReentrantIncomingBranch log={props.log} incomingRef={props.incomingRef} />
-		: <ReentrantOldBranch onCleanup={props.onCleanup} />;
+	const child = next ? (
+		<ReentrantIncomingBranch log={props.log} incomingRef={props.incomingRef} />
+	) : (
+		<ReentrantOldBranch onCleanup={props.onCleanup} />
+	);
 	@try {
-		<>
-			{child}
-		</>
+		<>{child}</>
 	} @pending {
 		<span id="reentrant-child-wip-fallback">{'loading'}</span>
 	}

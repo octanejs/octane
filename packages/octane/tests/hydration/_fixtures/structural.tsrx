@@ -20,7 +20,9 @@ export function Pick(props) @{
 
 function RecoveryButton(props: { id: string; label: string }) @{
 	const [count, setCount] = useState(0);
-	<button id={props.id} onClick={() => setCount(count + 1)}>{props.label + ':' + count}</button>
+	<button id={props.id} onClick={() => setCount(count + 1)}>
+		{props.label + ':' + count}
+	</button>
 }
 
 // RDX-HYD-006: a mismatch at the root has no narrower ownership scope. Recovery

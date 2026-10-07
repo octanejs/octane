@@ -50,7 +50,7 @@ export function App() @{
 	const selected = messages.find((message) => message.id === selectedId);
 	const remove = (id: number) => {
 		setMessages((current) => current.filter((message) => message.id !== id));
-		setSelectedId((current) => current === id ? null : current);
+		setSelectedId((current) => (current === id ? null : current));
 	};
 
 	<main>

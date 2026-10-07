@@ -7,12 +7,14 @@ export function DialogDetachedTriggerFixture1({
 }: {
 	handle: ReturnType<typeof Dialog.createHandle>;
 }) {
-	return <React.Fragment>
-		<Dialog.Root handle={handle} defaultOpen defaultTriggerId="trigger" />
-		<Dialog.Trigger handle={handle} id="trigger">
-			Trigger
-		</Dialog.Trigger>
-	</React.Fragment>;
+	return (
+		<React.Fragment>
+			<Dialog.Root handle={handle} defaultOpen defaultTriggerId="trigger" />
+			<Dialog.Trigger handle={handle} id="trigger">
+				Trigger
+			</Dialog.Trigger>
+		</React.Fragment>
+	);
 }
 
 export const createDialogHandle = () => Dialog.createHandle();

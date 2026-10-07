@@ -25,7 +25,9 @@ export function SvgCamelAttrs(props) @{
 			<marker id="mk" markerWidth={props.markerWidth} />
 			<pattern id="pt" patternUnits={props.patternUnits} />
 		</defs>
-		<text id="tx" x="10" y="20" textLength={props.textLength}>{'hi'}</text>
+		<text id="tx" x="10" y="20" textLength={props.textLength}>
+			{'hi'}
+		</text>
 	</svg>
 }
 
@@ -65,7 +67,9 @@ export function SvgKebabAttrs(props) @{
 // ---------------------------------------------------------------------------
 export function SvgXmlAttrs(props) @{
 	<svg id="xml" viewBox="0 0 50 50" xml:lang={props.lang} xml:space={props.space}>
-		<text id="xt" x="5" y="15">{'ns'}</text>
+		<text id="xt" x="5" y="15">
+			{'ns'}
+		</text>
 	</svg>
 }
 

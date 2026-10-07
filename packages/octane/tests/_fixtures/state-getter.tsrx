@@ -9,7 +9,9 @@ export function StateGetter(props) @{
 		setCount((n) => n + 1);
 		props.observeValue(getCount());
 	};
-	<button id="state" onClick={update}>{count as string}</button>
+	<button id="state" onClick={update}>
+		{count as string}
+	</button>
 }
 
 export function ReducerGetter(props) @{
@@ -23,7 +25,9 @@ export function ReducerGetter(props) @{
 		dispatch(2);
 		props.observeValue(getCount());
 	};
-	<button id="reducer" onClick={update}>{count as string}</button>
+	<button id="reducer" onClick={update}>
+		{count as string}
+	</button>
 }
 
 export function RenderPhaseNullableReducerGetter(props) @{
@@ -60,7 +64,10 @@ export function ConditionalGetters(props) @{
 	const second = useIndependentCounters(20, props.step);
 	props.bind({ first, second });
 	<output>
-		{(first ? first.state[0] + ':' + first.reducer[0] : 'hidden') + '|' + second.state[0] + ':' +
+		{(first ? first.state[0] + ':' + first.reducer[0] : 'hidden') +
+			'|' +
+			second.state[0] +
+			':' +
 			second.reducer[0]}
 	</output>
 }

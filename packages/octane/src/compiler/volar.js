@@ -1,4 +1,4 @@
-import { parseModule } from './parser.browser.js';
+import { parseEditorModule } from './parser.browser.js';
 /**
  * Volar (IDE language-service) mappings for octane .tsrx files.
  *
@@ -478,7 +478,7 @@ export function compileToVolarMappings(source, filename, options) {
 	const errors = [];
 	/** @type {import('@tsrx/core/types').AST.CommentWithLocation[]} */
 	const comments = [];
-	const ast = parseModule(source, filename, {
+	const ast = parseEditorModule(source, filename, {
 		collect: true,
 		loose: !!options?.loose,
 		preserveParens: true,
@@ -810,7 +810,7 @@ export function compileTypesInspection(source, filename, options) {
 	const errors = [];
 	/** @type {import('@tsrx/core/types').AST.CommentWithLocation[]} */
 	const comments = [];
-	const ast = parseModule(source, filename, {
+	const ast = parseEditorModule(source, filename, {
 		collect: true,
 		loose: true,
 		preserveParens: true,

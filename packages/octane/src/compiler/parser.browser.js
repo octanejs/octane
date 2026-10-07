@@ -1,5 +1,6 @@
 import { acorn, tsPlugin, getCommentHandlers, parseModule as parseTsrx } from '@tsrx/core';
 import { isolateOutputOptions, publishOutput } from './parser-output.js';
+import { adoptTemplateShape } from './parser-template-shape.js';
 
 // The TypeScript parser currently enters type context after consuming `{`, so a
 // first generic call signature is tokenized as JSX. Enter before its first token;
@@ -121,6 +122,15 @@ function parseTypeScript(source, options) {
 
 /** Preserve TSRX parsing and recovery; retry rejected ordinary TS/JSX modules. */
 export function parseModule(source, filename, options) {
+	return adoptTemplateShape(parseAuthoredModule(source, filename, options));
+}
+
+/** `parseModule` for the editor's type-only output, which core prints. */
+export function parseEditorModule(source, filename, options) {
+	return adoptTemplateShape(parseAuthoredModule(source, filename, options), true);
+}
+
+function parseAuthoredModule(source, filename, options) {
 	const primary = isolateOutputOptions(options);
 	let program;
 	try {

@@ -9,12 +9,12 @@ const Global = createGlobalStyle`
 `;
 
 const Hero = styled.h1`
-  color: ${(p: any) => p.theme.fg};
-  animation: ${pulse} 2s infinite;
+	color: ${(p: any) => p.theme.fg};
+	animation: ${pulse} 2s infinite;
 `;
 
 const Plain = styled.p`
-  padding: 4px;
+	padding: 4px;
 `;
 
 export function ServerApp() @{

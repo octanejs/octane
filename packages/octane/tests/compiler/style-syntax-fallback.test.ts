@@ -247,7 +247,7 @@ describe('style syntax spec table through the Node parser (native first, JS fall
 			it(`${spec.name}: the JavaScript parser reports the spec diagnostic`, () => {
 				const errors: any[] = [];
 				const ast = parseJavaScriptModule(spec.source, FILENAME, { collect: true, errors });
-				expect(errors.map((error) => error.message)).toEqual([spec.error!.message]);
+				expect(errors.map((error) => error.code)).toEqual([spec.error!.code]);
 				if (spec.error!.start !== undefined) expect(errors[0].pos).toBe(spec.error!.start);
 				if (spec.error!.end !== undefined) expect(errors[0].end).toBe(spec.error!.end);
 				if (spec.expected) assertShape(spec.locate(ast), spec.expected);
@@ -257,7 +257,7 @@ describe('style syntax spec table through the Node parser (native first, JS fall
 				expect(() => parseModule(spec.source, FILENAME)).toThrow(SyntaxError);
 				const errors: any[] = [];
 				const ast = parseModule(spec.source, FILENAME, { collect: true, errors });
-				expect(errors.map((error) => error.message)).toEqual([spec.error!.message]);
+				expect(errors.map((error) => error.code)).toEqual([spec.error!.code]);
 				if (spec.error!.start !== undefined) expect(errors[0].pos).toBe(spec.error!.start);
 				if (spec.error!.end !== undefined) expect(errors[0].end).toBe(spec.error!.end);
 				if (spec.expected) assertShape(spec.locate(ast), spec.expected);

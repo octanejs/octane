@@ -24,8 +24,7 @@ export function Matches() @{
 	const rootRoute = (router.routesById as any)[rootRouteId];
 	const PendingComponent =
 		rootRoute.options.pendingComponent ?? router.options.defaultPendingComponent;
-	const pendingElement =
-		PendingComponent ? createElement(PendingComponent, {}) : null;
+	const pendingElement = PendingComponent ? createElement(PendingComponent, {}) : null;
 	const InnerWrap = router.options.InnerWrap ?? SafeFragment;
 
 	// `createRouter({ scrollRestoration: true })` wires scroll save/restore here, so
@@ -49,7 +48,7 @@ function MatchesInner() @{
 	// navigation transition is pending, render the matches router-core expects
 	// (`acknowledgement[0]`) so the committed tree equals what it awaits, then
 	// settle that render acknowledgement from a layout effect once it lands.
-	const acknowledgement: Array<any> = (router as any)._rendered ??= [];
+	const acknowledgement: Array<any> = ((router as any)._rendered ??= []);
 	const matches = useStore(router.stores.matches, (m: any) => acknowledgement[0] ?? m);
 	const rootMatch = matches[0];
 	const routeId = rootMatch?.routeId as string | undefined;

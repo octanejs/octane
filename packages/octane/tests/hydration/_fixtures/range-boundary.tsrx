@@ -62,9 +62,7 @@ function BoundaryHost(props: ChildProps) {
 }
 
 function Passthrough(props: ChildProps) @{
-	<>
-		{props.children}
-	</>
+	<>{props.children}</>
 }
 
 function PortalBridge(props: PortalProps) {
@@ -154,11 +152,7 @@ export function BoundaryListClient(props: ListProps) {
 			props.failAfterOwner
 				? createElement(Passthrough, {}, createElement(Interactive), createElement(ThrowingContent))
 				: createElement(
-						props.failOwner
-							? ThrowingContent
-							: props.pair
-								? InteractivePair
-								: Interactive,
+						props.failOwner ? ThrowingContent : props.pair ? InteractivePair : Interactive,
 					),
 		),
 		after: createElement(
@@ -234,11 +228,12 @@ export function BoundarySuspendingArrayClient(props: ArrayProps) {
 BoundarySuspendingArrayClient[HYDRATION_RANGE_BOUNDARY] = 'passthrough';
 
 export function BoundaryNestedListClient(props: NestedListProps) {
-	const portal = (key: 'h' | 't' | 'a' | 'b') => createElement(
-		PortalBridge,
-		{ key, target: props.portalTarget },
-		createElement('span', { id: `range-boundary-${key}` }, key),
-	);
+	const portal = (key: 'h' | 't' | 'a' | 'b') =>
+		createElement(
+			PortalBridge,
+			{ key, target: props.portalTarget },
+			createElement('span', { id: `range-boundary-${key}` }, key),
+		);
 	const inner = {
 		a: portal('a'),
 		body: createElement(BoundaryHost, { key: 'body' }, createElement(Interactive)),

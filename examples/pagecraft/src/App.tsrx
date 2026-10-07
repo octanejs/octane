@@ -44,16 +44,20 @@ interface ToolbarButtonProps {
 }
 
 function ToolbarButton(props: ToolbarButtonProps) {
-	return <button
-		type="button"
-		class={props.active ? 'toolbar-button is-active' : 'toolbar-button'}
-		disabled={props.disabled}
-		aria-label={props.label}
-		aria-pressed={props.pressed}
-		title={props.label}
-		onMouseDown={(event) => event.preventDefault()}
-		onClick={props.onClick}
-	>{props.children}</button>;
+	return (
+		<button
+			type="button"
+			class={props.active ? 'toolbar-button is-active' : 'toolbar-button'}
+			disabled={props.disabled}
+			aria-label={props.label}
+			aria-pressed={props.pressed}
+			title={props.label}
+			onMouseDown={(event) => event.preventDefault()}
+			onClick={props.onClick}
+		>
+			{props.children}
+		</button>
+	);
 }
 
 function EditorToolbar() {
@@ -72,8 +76,7 @@ function EditorToolbar() {
 		setItalic(selection.hasFormat('italic'));
 		setUnderline(selection.hasFormat('underline'));
 		const anchor = selection.anchor.getNode();
-		const element =
-			anchor.getKey() === 'root' ? anchor : anchor.getTopLevelElementOrThrow();
+		const element = anchor.getKey() === 'root' ? anchor : anchor.getTopLevelElementOrThrow();
 		setBlockType($isHeadingNode(element) ? element.getTag() : element.getType());
 	};
 
@@ -108,86 +111,98 @@ function EditorToolbar() {
 		);
 	}, [editor]);
 
-	const setParagraph = () => editor.update(() => {
-		const selection = $getSelection();
-		if ($isRangeSelection(selection)) $setBlocksType(selection, () => $createParagraphNode());
-	});
-	const setHeading = () => editor.update(() => {
-		const selection = $getSelection();
-		if ($isRangeSelection(selection)) $setBlocksType(selection, () => $createHeadingNode('h2'));
-	});
+	const setParagraph = () =>
+		editor.update(() => {
+			const selection = $getSelection();
+			if ($isRangeSelection(selection)) $setBlocksType(selection, () => $createParagraphNode());
+		});
+	const setHeading = () =>
+		editor.update(() => {
+			const selection = $getSelection();
+			if ($isRangeSelection(selection)) $setBlocksType(selection, () => $createHeadingNode('h2'));
+		});
 
-	return <div class="editor-toolbar" role="toolbar" aria-label="Document formatting">
-		<div class="toolbar-group">
-			<ToolbarButton
-				label="Undo"
-				disabled={!canUndo}
-				onClick={() => editor.dispatchCommand(UNDO_COMMAND, undefined)}
-			>{'↶'}</ToolbarButton>
-			<ToolbarButton
-				label="Redo"
-				disabled={!canRedo}
-				onClick={() => editor.dispatchCommand(REDO_COMMAND, undefined)}
-			>{'↷'}</ToolbarButton>
+	return (
+		<div class="editor-toolbar" role="toolbar" aria-label="Document formatting">
+			<div class="toolbar-group">
+				<ToolbarButton
+					label="Undo"
+					disabled={!canUndo}
+					onClick={() => editor.dispatchCommand(UNDO_COMMAND, undefined)}
+				>
+					{'↶'}
+				</ToolbarButton>
+				<ToolbarButton
+					label="Redo"
+					disabled={!canRedo}
+					onClick={() => editor.dispatchCommand(REDO_COMMAND, undefined)}
+				>
+					{'↷'}
+				</ToolbarButton>
+			</div>
+			<span class="toolbar-divider" />
+			<div class="toolbar-group">
+				<ToolbarButton
+					label="Paragraph"
+					active={blockType === 'paragraph'}
+					pressed={blockType === 'paragraph' ? 'true' : 'false'}
+					onClick={setParagraph}
+				>
+					{'Text'}
+				</ToolbarButton>
+				<ToolbarButton
+					label="Heading 2"
+					active={blockType === 'h2'}
+					pressed={blockType === 'h2' ? 'true' : 'false'}
+					onClick={setHeading}
+				>
+					{'H2'}
+				</ToolbarButton>
+			</div>
+			<span class="toolbar-divider" />
+			<div class="toolbar-group">
+				<ToolbarButton
+					label="Bold"
+					active={bold}
+					pressed={bold ? 'true' : 'false'}
+					onClick={() => editor.dispatchCommand(FORMAT_TEXT_COMMAND, 'bold')}
+				>
+					<strong>{'B'}</strong>
+				</ToolbarButton>
+				<ToolbarButton
+					label="Italic"
+					active={italic}
+					pressed={italic ? 'true' : 'false'}
+					onClick={() => editor.dispatchCommand(FORMAT_TEXT_COMMAND, 'italic')}
+				>
+					<em>{'I'}</em>
+				</ToolbarButton>
+				<ToolbarButton
+					label="Underline"
+					active={underline}
+					pressed={underline ? 'true' : 'false'}
+					onClick={() => editor.dispatchCommand(FORMAT_TEXT_COMMAND, 'underline')}
+				>
+					<u>{'U'}</u>
+				</ToolbarButton>
+			</div>
 		</div>
-		<span class="toolbar-divider" />
-		<div class="toolbar-group">
-			<ToolbarButton
-				label="Paragraph"
-				active={blockType === 'paragraph'}
-				pressed={blockType === 'paragraph' ? 'true' : 'false'}
-				onClick={setParagraph}
-			>{'Text'}</ToolbarButton>
-			<ToolbarButton
-				label="Heading 2"
-				active={blockType === 'h2'}
-				pressed={blockType === 'h2' ? 'true' : 'false'}
-				onClick={setHeading}
-			>{'H2'}</ToolbarButton>
-		</div>
-		<span class="toolbar-divider" />
-		<div class="toolbar-group">
-			<ToolbarButton
-				label="Bold"
-				active={bold}
-				pressed={bold ? 'true' : 'false'}
-				onClick={() => editor.dispatchCommand(FORMAT_TEXT_COMMAND, 'bold')}
-			>
-				<strong>{'B'}</strong>
-			</ToolbarButton>
-			<ToolbarButton
-				label="Italic"
-				active={italic}
-				pressed={italic ? 'true' : 'false'}
-				onClick={() => editor.dispatchCommand(FORMAT_TEXT_COMMAND, 'italic')}
-			>
-				<em>{'I'}</em>
-			</ToolbarButton>
-			<ToolbarButton
-				label="Underline"
-				active={underline}
-				pressed={underline ? 'true' : 'false'}
-				onClick={() => editor.dispatchCommand(FORMAT_TEXT_COMMAND, 'underline')}
-			>
-				<u>{'U'}</u>
-			</ToolbarButton>
-		</div>
-	</div>;
+	);
 }
 
-function EditorChangePlugin(props: {
-	onChange: (editorState: string, plainText: string) => void;
-}) {
-	return <OnChangePlugin
-		ignoreSelectionChange={true}
-		onChange={(editorState) => {
-			let plainText = '';
-			editorState.read(() => {
-				plainText = $getRoot().getTextContent();
-			});
-			props.onChange(JSON.stringify(editorState.toJSON()), plainText);
-		}}
-	/>;
+function EditorChangePlugin(props: { onChange: (editorState: string, plainText: string) => void }) {
+	return (
+		<OnChangePlugin
+			ignoreSelectionChange={true}
+			onChange={(editorState) => {
+				let plainText = '';
+				editorState.read(() => {
+					plainText = $getRoot().getTextContent();
+				});
+				props.onChange(JSON.stringify(editorState.toJSON()), plainText);
+			}}
+		/>
+	);
 }
 
 type SaveOwnerStatus = 'dirty' | 'saving' | 'offline' | 'error' | 'saved';
@@ -330,9 +345,8 @@ async function saveOwner(owner: SaveOwner) {
 			owner.status = 'dirty';
 			if (owner.timer === null) scheduleSaveOwner(owner);
 		} else {
-			owner.error = error instanceof Error
-				? error.message
-				: 'Pagecraft could not save this document';
+			owner.error =
+				error instanceof Error ? error.message : 'Pagecraft could not save this document';
 			owner.status = 'error';
 		}
 		emitSaveOwner(owner);
@@ -405,110 +419,120 @@ function DocumentSurface(props: { document: PageDocument }) {
 
 	const saveState = titleInvalid ? 'invalid' : owner.status;
 
-	return <article class="document-surface" aria-labelledby="document-heading">
-		<header class="document-header">
-			<div>
-				<p class="document-eyebrow">{document.eyebrow as string}</p>
-				<h1 id="document-heading" class="document-semantic-title">
-					{title.trim() || 'Untitled document' as string}
-				</h1>
-				<input
-					id="document-title"
-					class="document-title"
-					aria-label="Document title"
-					aria-invalid={titleInvalid ? 'true' : 'false'}
-					maxLength={120}
-					required={true}
-					value={title}
-					onInput={(event) => {
-						const nextTitle = event.currentTarget.value;
-						setTitle(nextTitle);
-						const invalid = nextTitle.trim().length === 0;
-						setTitleInvalid(invalid);
-						if (!invalid) changeSaveOwner(owner, { title: nextTitle });
-					}}
-					onBlur={() => {
-						if (!title.trim()) {
-							setTitle(owner.title);
-							setTitleInvalid(false);
-						}
-					}}
-				/>
-				@if (titleInvalid) {
-					<p class="title-error" role="alert">Add a title before saving.</p>
-				}
-			</div>
-			<div class={'save-indicator ' + saveState} role="status" aria-live="polite">
-				<span class="save-dot" />
-				<span>{saveLabel(saveState) as string}</span>
-			</div>
-		</header>
-
-		<LexicalComposer
-			initialConfig={{
-				namespace: `Pagecraft-${document.id}`,
-				theme: pagecraftTheme,
-				nodes: PAGECRAFT_NODES,
-				editorState: owner.editorState,
-				onError: (error) => {
-					throw error;
-				},
-			}}
-		>
-			<div class="editor-frame">
-				<EditorToolbar />
-				<div class="editor-canvas">
-					<RichTextPlugin
-						contentEditable={<ContentEditable
-							aria-label="Document body"
-							aria-placeholder="Start with a thought, a question, or a title…"
-							class="document-editor"
-							placeholder={EditorPlaceholder}
-						/>}
-						ErrorBoundary={LexicalErrorBoundary}
-					/>
-					<HistoryPlugin />
-					<ListPlugin />
-					<EditorChangePlugin
-						onChange={(editorState, plainText) => changeSaveOwner(owner, {
-							editorState,
-							plainText,
-						})}
-					/>
-				</div>
-			</div>
-		</LexicalComposer>
-
-		@if (owner.status === 'error' && !titleInvalid) {
-			<div class="save-error" role="alert">
+	return (
+		<article class="document-surface" aria-labelledby="document-heading">
+			<header class="document-header">
 				<div>
-					<strong>We could not autosave.</strong>
-					<p>{owner.error as string}</p>
+					<p class="document-eyebrow">{document.eyebrow as string}</p>
+					<h1 id="document-heading" class="document-semantic-title">
+						{title.trim() || ('Untitled document' as string)}
+					</h1>
+					<input
+						id="document-title"
+						class="document-title"
+						aria-label="Document title"
+						aria-invalid={titleInvalid ? 'true' : 'false'}
+						maxLength={120}
+						required={true}
+						value={title}
+						onInput={(event) => {
+							const nextTitle = event.currentTarget.value;
+							setTitle(nextTitle);
+							const invalid = nextTitle.trim().length === 0;
+							setTitleInvalid(invalid);
+							if (!invalid) changeSaveOwner(owner, { title: nextTitle });
+						}}
+						onBlur={() => {
+							if (!title.trim()) {
+								setTitle(owner.title);
+								setTitleInvalid(false);
+							}
+						}}
+					/>
+					@if (titleInvalid) {
+						<p class="title-error" role="alert">
+							Add a title before saving.
+						</p>
+					}
 				</div>
-				<button type="button" class="retry-button" onClick={() => void saveOwner(owner)}>
-					Retry save
-				</button>
-			</div>
-		}
-		<footer class="document-footer">
-			<span>Private workspace</span>
-			<span aria-hidden="true">·</span>
-			<span>Changes are saved automatically</span>
-		</footer>
-	</article>;
+				<div class={'save-indicator ' + saveState} role="status" aria-live="polite">
+					<span class="save-dot" />
+					<span>{saveLabel(saveState) as string}</span>
+				</div>
+			</header>
+
+			<LexicalComposer
+				initialConfig={{
+					namespace: `Pagecraft-${document.id}`,
+					theme: pagecraftTheme,
+					nodes: PAGECRAFT_NODES,
+					editorState: owner.editorState,
+					onError: (error) => {
+						throw error;
+					},
+				}}
+			>
+				<div class="editor-frame">
+					<EditorToolbar />
+					<div class="editor-canvas">
+						<RichTextPlugin
+							contentEditable={
+								<ContentEditable
+									aria-label="Document body"
+									aria-placeholder="Start with a thought, a question, or a title…"
+									class="document-editor"
+									placeholder={EditorPlaceholder}
+								/>
+							}
+							ErrorBoundary={LexicalErrorBoundary}
+						/>
+						<HistoryPlugin />
+						<ListPlugin />
+						<EditorChangePlugin
+							onChange={(editorState, plainText) =>
+								changeSaveOwner(owner, {
+									editorState,
+									plainText,
+								})
+							}
+						/>
+					</div>
+				</div>
+			</LexicalComposer>
+
+			@if (owner.status === 'error' && !titleInvalid) {
+				<div class="save-error" role="alert">
+					<div>
+						<strong>We could not autosave.</strong>
+						<p>{owner.error as string}</p>
+					</div>
+					<button type="button" class="retry-button" onClick={() => void saveOwner(owner)}>
+						Retry save
+					</button>
+				</div>
+			}
+			<footer class="document-footer">
+				<span>Private workspace</span>
+				<span aria-hidden="true">·</span>
+				<span>Changes are saved automatically</span>
+			</footer>
+		</article>
+	);
 }
 
 function LoadingDocument() {
-	return <div class="document-loading" role="status">
-		<div class="loading-line short" />
-		<div class="loading-line title" />
-		<div class="loading-card">
-			<div class="loading-line" />
-			<div class="loading-line" />
-			<div class="loading-line medium" />
+	return (
+		<div class="document-loading" role="status">
+			<div class="loading-line short" />
+			<div class="loading-line title" />
+			<div class="loading-card">
+				<div class="loading-line" />
+				<div class="loading-line" />
+				<div class="loading-line medium" />
+			</div>
+			<span>Opening document…</span>
 		</div>
-		<span>Opening document…</span>
-	</div>;
+	);
 }
 
 type DocumentState =
@@ -609,9 +633,8 @@ export function App() {
 
 	function openDocument(documentId: string, event?: MouseEvent) {
 		if (event !== undefined) {
-			if (
-				event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey
-			) return;
+			if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey)
+				return;
 			event.preventDefault();
 		}
 		if (route.documentId === documentId) return;
@@ -621,9 +644,8 @@ export function App() {
 	}
 
 	function openWorkspace(event: MouseEvent) {
-		if (
-			event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey
-		) return;
+		if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey)
+			return;
 		event.preventDefault();
 		flushSaveOwner(route.documentId);
 		window.history.pushState({}, '', `/documents${window.location.search}`);
@@ -631,115 +653,131 @@ export function App() {
 	}
 
 	function updateDocumentTitle(documentId: string, title: string) {
-		setDocuments(
-			(items) => items.map(
-				(item) => (item.id === documentId
-					? { ...item, title, updatedAt: 'Edited just now' }
-					: item),
+		setDocuments((items) =>
+			items.map((item) =>
+				item.id === documentId ? { ...item, title, updatedAt: 'Edited just now' } : item,
 			),
 		);
 	}
 
 	const currentMatches = documentState.documentId === route.documentId;
 
-	return <div class="workspace-shell">
-		<a class="skip-link" href="#document-workspace">Skip to document</a>
-		<aside class="workspace-sidebar" aria-label="Pagecraft workspace">
-			<header class="brand-block">
-				<a class="brand" href={`/documents${window.location.search}`} onClick={openWorkspace}>
-					<span class="brand-mark" aria-hidden="true">P</span>
-					<span>
-						<strong>Pagecraft</strong>
-						<small>Northstar studio</small>
-					</span>
-				</a>
-			</header>
-			<div class="sidebar-heading">
-				<span>Your documents</span>
-				<span class="document-count">{`${documents.length}`}</span>
-			</div>
-			<nav class="document-nav" aria-label="Documents">
-				@if (libraryState === 'loading') {
-					<div class="nav-loading" role="status">Loading documents…</div>
-				} @else if (libraryState === 'error') {
-					<p class="nav-error">The document list is unavailable.</p>
-				} @else {
-					@for (const item of documents; key item.id) {
-						<a
-							class={route.documentId === item.id ? 'document-link is-current' : 'document-link'}
-							href={documentURL(item.id)}
-							aria-current={route.documentId === item.id ? 'page' : undefined}
-							onClick={(event) => openDocument(item.id, event)}
-						>
-							<span class="document-glyph" aria-hidden="true">{'◇'}</span>
-							<span class="document-link-copy">
-								<strong>{item.title as string}</strong>
-								<small>{item.updatedAt as string}</small>
-							</span>
-						</a>
+	return (
+		<div class="workspace-shell">
+			<a class="skip-link" href="#document-workspace">
+				Skip to document
+			</a>
+			<aside class="workspace-sidebar" aria-label="Pagecraft workspace">
+				<header class="brand-block">
+					<a class="brand" href={`/documents${window.location.search}`} onClick={openWorkspace}>
+						<span class="brand-mark" aria-hidden="true">
+							P
+						</span>
+						<span>
+							<strong>Pagecraft</strong>
+							<small>Northstar studio</small>
+						</span>
+					</a>
+				</header>
+				<div class="sidebar-heading">
+					<span>Your documents</span>
+					<span class="document-count">{`${documents.length}`}</span>
+				</div>
+				<nav class="document-nav" aria-label="Documents">
+					@if (libraryState === 'loading') {
+						<div class="nav-loading" role="status">
+							Loading documents…
+						</div>
+					} @else if (libraryState === 'error') {
+						<p class="nav-error">The document list is unavailable.</p>
+					} @else {
+						@for (const item of documents; key item.id) {
+							<a
+								class={route.documentId === item.id ? 'document-link is-current' : 'document-link'}
+								href={documentURL(item.id)}
+								aria-current={route.documentId === item.id ? 'page' : undefined}
+								onClick={(event) => openDocument(item.id, event)}
+							>
+								<span class="document-glyph" aria-hidden="true">
+									{'◇'}
+								</span>
+								<span class="document-link-copy">
+									<strong>{item.title as string}</strong>
+									<small>{item.updatedAt as string}</small>
+								</span>
+							</a>
+						}
 					}
-				}
-			</nav>
-			<footer class="sidebar-footer">
-				<span class="avatar" aria-hidden="true">AR</span>
-				<span>
-					<strong>Alex Rowan</strong>
-					<small>Editor</small>
-				</span>
-			</footer>
-		</aside>
+				</nav>
+				<footer class="sidebar-footer">
+					<span class="avatar" aria-hidden="true">
+						AR
+					</span>
+					<span>
+						<strong>Alex Rowan</strong>
+						<small>Editor</small>
+					</span>
+				</footer>
+			</aside>
 
-		<main class="workspace-main" id="document-workspace" tabIndex={-1}>
-			@if (route.documentId === null) {
-				<section class="workspace-empty">
-					<span class="empty-mark" aria-hidden="true">{'✦'}</span>
-					<p class="document-eyebrow">Northstar studio</p>
-					<h1>Choose a document and make a little progress.</h1>
-					<p>Your recent work is waiting in the sidebar. Every change saves as you type.</p>
-					@if (documents.length > 0) {
+			<main class="workspace-main" id="document-workspace" tabIndex={-1}>
+				@if (route.documentId === null) {
+					<section class="workspace-empty">
+						<span class="empty-mark" aria-hidden="true">
+							{'✦'}
+						</span>
+						<p class="document-eyebrow">Northstar studio</p>
+						<h1>Choose a document and make a little progress.</h1>
+						<p>Your recent work is waiting in the sidebar. Every change saves as you type.</p>
+						@if (documents.length > 0) {
+							<a
+								class="primary-link"
+								href={documentURL(documents[0].id)}
+								onClick={(event) => openDocument(documents[0].id, event)}
+							>
+								Open
+								{documents[0].title as string}
+							</a>
+						}
+					</section>
+				} @else if (!currentMatches || documentState.status === 'loading') {
+					<LoadingDocument />
+				} @else if (documentState.status === 'error') {
+					<section class="document-problem" role="alert">
+						<span class="problem-mark" aria-hidden="true">
+							{'↻'}
+						</span>
+						<p class="document-eyebrow">A temporary pause</p>
+						<h1>Let’s try that document again.</h1>
+						<p>{documentState.message as string}</p>
+						<button
+							type="button"
+							class="primary-button"
+							onClick={() => setLoadAttempt((value) => value + 1)}
+						>
+							Retry opening
+						</button>
+					</section>
+				} @else if (documentState.status === 'not-found') {
+					<section class="document-problem" role="alert">
+						<span class="problem-mark" aria-hidden="true">
+							{'404'}
+						</span>
+						<p class="document-eyebrow">Missing page</p>
+						<h1>That document is not in this workspace.</h1>
+						<p>{documentState.message as string}</p>
 						<a
 							class="primary-link"
-							href={documentURL(documents[0].id)}
-							onClick={(event) => openDocument(documents[0].id, event)}
+							href={`/documents${window.location.search}`}
+							onClick={openWorkspace}
 						>
-							Open
-							{documents[0].title as string}
+							Return to Pagecraft
 						</a>
-					}
-				</section>
-			} @else if (!currentMatches || documentState.status === 'loading') {
-				<LoadingDocument />
-			} @else if (documentState.status === 'error') {
-				<section class="document-problem" role="alert">
-					<span class="problem-mark" aria-hidden="true">{'↻'}</span>
-					<p class="document-eyebrow">A temporary pause</p>
-					<h1>Let’s try that document again.</h1>
-					<p>{documentState.message as string}</p>
-					<button
-						type="button"
-						class="primary-button"
-						onClick={() => setLoadAttempt((value) => value + 1)}
-					>
-						Retry opening
-					</button>
-				</section>
-			} @else if (documentState.status === 'not-found') {
-				<section class="document-problem" role="alert">
-					<span class="problem-mark" aria-hidden="true">{'404'}</span>
-					<p class="document-eyebrow">Missing page</p>
-					<h1>That document is not in this workspace.</h1>
-					<p>{documentState.message as string}</p>
-					<a
-						class="primary-link"
-						href={`/documents${window.location.search}`}
-						onClick={openWorkspace}
-					>
-						Return to Pagecraft
-					</a>
-				</section>
-			} @else if (documentState.status === 'ready') {
-				<DocumentSurface key={documentState.document.id} document={documentState.document} />
-			}
-		</main>
-	</div>;
+					</section>
+				} @else if (documentState.status === 'ready') {
+					<DocumentSurface key={documentState.document.id} document={documentState.document} />
+				}
+			</main>
+		</div>
+	);
 }

@@ -19,17 +19,21 @@ export const defaultPieChartProps = {
  * @provides PolarViewBoxContext
  * @provides PolarChartContext
  */
-export function PieChart<DataPointType = unknown>(props: PolarChartProps<DataPointType> & {
-	ref?: Ref<SVGSVGElement>;
-}) {
+export function PieChart<DataPointType = unknown>(
+	props: PolarChartProps<DataPointType> & {
+		ref?: Ref<SVGSVGElement>;
+	},
+) {
 	const { ref, ...rest } = props;
 	const propsWithDefaults = resolveDefaultProps(rest, defaultPieChartProps);
-	return <PolarChart
-		chartName="PieChart"
-		defaultTooltipEventType="item"
-		validateTooltipEventTypes={allowedTooltipTypes}
-		tooltipPayloadSearcher={arrayTooltipSearcher}
-		categoricalChartProps={propsWithDefaults}
-		ref={ref}
-	/>;
+	return (
+		<PolarChart
+			chartName="PieChart"
+			defaultTooltipEventType="item"
+			validateTooltipEventTypes={allowedTooltipTypes}
+			tooltipPayloadSearcher={arrayTooltipSearcher}
+			categoricalChartProps={propsWithDefaults}
+			ref={ref}
+		/>
+	);
 }

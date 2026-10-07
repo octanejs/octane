@@ -21,67 +21,64 @@ const DefaultFields = ({
 	isLoading: boolean;
 	itemSelector?: ItemSelector | null;
 }) => {
-	return <>
-		{children}
-	</>;
+	return <>{children}</>;
 };
 
-const createOnChange = (fieldName: string, appStore: StoreApi<AppStore>) => async (
-	value: any,
-	updatedUi?: Partial<UiState>,
-) => {
-	let currentProps;
+const createOnChange =
+	(fieldName: string, appStore: StoreApi<AppStore>) =>
+	async (value: any, updatedUi?: Partial<UiState>) => {
+		let currentProps;
 
-	const { dispatch, state, selectedItem, resolveComponentData } = appStore.getState();
+		const { dispatch, state, selectedItem, resolveComponentData } = appStore.getState();
 
-	const { data, ui } = state;
-	const { itemSelector } = ui;
+		const { data, ui } = state;
+		const { itemSelector } = ui;
 
-	// DEPRECATED
-	const rootProps = data.root.props || data.root;
+		// DEPRECATED
+		const rootProps = data.root.props || data.root;
 
-	if (selectedItem) {
-		currentProps = selectedItem.props;
-	} else {
-		currentProps = rootProps;
-	}
+		if (selectedItem) {
+			currentProps = selectedItem.props;
+		} else {
+			currentProps = rootProps;
+		}
 
-	const newProps = {
-		...currentProps,
-		[fieldName]: value,
-	};
+		const newProps = {
+			...currentProps,
+			[fieldName]: value,
+		};
 
-	if (selectedItem && itemSelector) {
-		dispatch({
-			type: 'replace',
-			destinationIndex: itemSelector.index,
-			destinationZone: itemSelector.zone || rootDroppableId,
-			data: (await resolveComponentData({ ...selectedItem, props: newProps }, 'replace')).node,
-			ui: updatedUi,
-		});
-	} else {
-		if (data.root.props) {
+		if (selectedItem && itemSelector) {
 			dispatch({
-				type: 'replaceRoot',
-				root: (await resolveComponentData({ ...data.root, props: newProps }, 'replace')).node,
-				ui: { ...ui, ...updatedUi },
-				recordHistory: true,
+				type: 'replace',
+				destinationIndex: itemSelector.index,
+				destinationZone: itemSelector.zone || rootDroppableId,
+				data: (await resolveComponentData({ ...selectedItem, props: newProps }, 'replace')).node,
+				ui: updatedUi,
 			});
 		} else {
-			// DEPRECATED
-			dispatch({
-				type: 'setData',
-				data: { root: newProps },
-			});
+			if (data.root.props) {
+				dispatch({
+					type: 'replaceRoot',
+					root: (await resolveComponentData({ ...data.root, props: newProps }, 'replace')).node,
+					ui: { ...ui, ...updatedUi },
+					recordHistory: true,
+				});
+			} else {
+				// DEPRECATED
+				dispatch({
+					type: 'setData',
+					data: { root: newProps },
+				});
+			}
 		}
-	}
-};
+	};
 
 const FieldsChild = ({ fieldName }: { fieldName: string }) => {
 	const field = useAppStore((s) => s.fields.fields[fieldName]);
 	const isReadOnly = useAppStore(
-		(s) => ((s.selectedItem ? s.selectedItem.readOnly : s.state.data.root.readOnly) ||
-			{})[fieldName],
+		(s) =>
+			((s.selectedItem ? s.selectedItem.readOnly : s.state.data.root.readOnly) || {})[fieldName],
 	);
 
 	const value = useAppStore((s) => {
@@ -111,9 +108,7 @@ const FieldsChild = ({ fieldName }: { fieldName: string }) => {
 
 	const appStore = useAppStoreApi();
 
-	const onChange = useCallback(createOnChange(fieldName, appStore), [
-		fieldName,
-	]);
+	const onChange = useCallback(createOnChange(fieldName, appStore), [fieldName]);
 
 	const { visible = true } = field ?? {};
 
@@ -121,16 +116,18 @@ const FieldsChild = ({ fieldName }: { fieldName: string }) => {
 
 	if (field.type === 'slot') return null;
 
-	return <div key={id} className={getClassName('field')}>
-		<AutoFieldPrivate
-			field={field}
-			name={fieldName}
-			id={id}
-			readOnly={!permissions.edit || isReadOnly}
-			value={value}
-			onChange={onChange}
-		/>
-	</div>;
+	return (
+		<div key={id} className={getClassName('field')}>
+			<AutoFieldPrivate
+				field={field}
+				name={fieldName}
+				id={id}
+				readOnly={!permissions.edit || isReadOnly}
+				value={value}
+				onChange={onChange}
+			/>
+		</div>
+	);
 };
 
 const FieldsChildMemo = memo(FieldsChild);
@@ -164,22 +161,27 @@ const FieldsInternal = ({ wrapFields = true }: { wrapFields?: boolean }) => {
 
 	const Wrapper = useMemo(() => overrides.fields || DefaultFields, [overrides]);
 
-	return <form
-		className={getClassName({ wrapFields })}
-		onSubmit={(e) => {
-			e.preventDefault();
-		}}
-	>
-		<Wrapper isLoading={isLoading} itemSelector={itemSelector}>{fieldNames.map(
-			(fieldName) => <FieldsChildMemo key={fieldName} fieldName={fieldName} />,
-		)}</Wrapper>
-		{isLoading &&
-			<div className={getClassName('loadingOverlay')}>
-				<div className={getClassName('loadingOverlayInner')}>
-					<Loader size={16} />
+	return (
+		<form
+			className={getClassName({ wrapFields })}
+			onSubmit={(e) => {
+				e.preventDefault();
+			}}
+		>
+			<Wrapper isLoading={isLoading} itemSelector={itemSelector}>
+				{fieldNames.map((fieldName) => (
+					<FieldsChildMemo key={fieldName} fieldName={fieldName} />
+				))}
+			</Wrapper>
+			{isLoading && (
+				<div className={getClassName('loadingOverlay')}>
+					<div className={getClassName('loadingOverlayInner')}>
+						<Loader size={16} />
+					</div>
 				</div>
-			</div>}
-	</form>;
+			)}
+		</form>
+	);
 };
 
 export const Fields = memo(FieldsInternal);

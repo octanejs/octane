@@ -103,7 +103,9 @@ export const LinkSafetyModal = ({ url, isOpen, onClose, onConfirm }: LinkSafetyM
 						'break-all rounded-md bg-muted p-3 font-mono text-sm',
 						url.length > 100 && 'max-h-32 overflow-y-auto',
 					)}
-				>{url}</div>
+				>
+					{url}
+				</div>
 
 				<div className={cn('flex gap-2')}>
 					<button
@@ -113,15 +115,17 @@ export const LinkSafetyModal = ({ url, isOpen, onClose, onConfirm }: LinkSafetyM
 						onClick={handleCopy}
 						type="button"
 					>
-						{copied
-							? <>
-									<CheckIcon size={14} />
-									<span>{t.copied}</span>
-								</>
-							: <>
-									<CopyIcon size={14} />
-									<span>{t.copyLink}</span>
-								</>}
+						{copied ? (
+							<>
+								<CheckIcon size={14} />
+								<span>{t.copied}</span>
+							</>
+						) : (
+							<>
+								<CopyIcon size={14} />
+								<span>{t.copyLink}</span>
+							</>
+						)}
 					</button>
 					<button
 						className={cn(

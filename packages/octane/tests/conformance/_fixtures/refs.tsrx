@@ -27,7 +27,9 @@ export function HostRoot(props) @{
 export function FragmentRoot(props) @{
 	<>
 		<span id="frag-span">{'x'}</span>
-		<div id="frag-div" ref={props.r}>{'Hello'}</div>
+		<div id="frag-div" ref={props.r}>
+			{'Hello'}
+		</div>
 	</>
 }
 

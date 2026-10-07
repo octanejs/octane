@@ -57,10 +57,12 @@ export function ParallelJsxConditional(props: ParallelReadProps & { show?: boole
 export function ParallelJsxDeferred(props: ParallelReadProps) @{
 	const first$ = query$(() => 'first', props.load);
 	const second$ = query$(() => 'second', props.load);
-	const unused = <>
-		<h2>{first$.get()}</h2>
-		<p>{second$.get()}</p>
-	</>;
+	const unused = (
+		<>
+			<h2>{first$.get()}</h2>
+			<p>{second$.get()}</p>
+		</>
+	);
 	<p class="hidden">hidden</p>
 }
 
@@ -127,7 +129,10 @@ export const parallelModule = {
 		throw new Error('No module loader installed');
 	},
 };
-const moduleFirst$ = query$(() => 'first', (key) => parallelModule.load(key));
+const moduleFirst$ = query$(
+	() => 'first',
+	(key) => parallelModule.load(key),
+);
 const moduleSecond$ = derived$(async () => parallelModule.load('second'));
 
 export function ParallelModule(_props: ParallelReadProps) @{
@@ -212,11 +217,13 @@ export function ParallelKeyed(props: ParallelReadProps & { keys?: readonly strin
 	</section>
 }
 
-export function ParallelLifetimeBoundary(props: ParallelReadProps & {
-	keyed: boolean;
-	show: boolean;
-	keys: readonly string[];
-}) @{
+export function ParallelLifetimeBoundary(
+	props: ParallelReadProps & {
+		keyed: boolean;
+		show: boolean;
+		keys: readonly string[];
+	},
+) @{
 	<section>
 		@try {
 			@if (props.keyed) {
@@ -232,10 +239,12 @@ export function ParallelLifetimeBoundary(props: ParallelReadProps & {
 	</section>
 }
 
-export function ParallelNativeLifetime(props: ParallelReadProps & {
-	keyed: boolean;
-	rows$: SignalHandle<readonly string[]>;
-}) @{
+export function ParallelNativeLifetime(
+	props: ParallelReadProps & {
+		keyed: boolean;
+		rows$: SignalHandle<readonly string[]>;
+	},
+) @{
 	<section>
 		@try {
 			@if (props.keyed) {

@@ -107,7 +107,9 @@ function StoreWithActionState(props: { options: RegistryStoreOptions<any> }) @{
 		});
 	}
 	<div>
-		<button id="submit" onClick={onSubmit}>{'Submit'}</button>
+		<button id="submit" onClick={onSubmit}>
+			{'Submit'}
+		</button>
 		<div id="state">{(state ?? 'none') as string}</div>
 		<div id="pending">{String(isPending)}</div>
 	</div>

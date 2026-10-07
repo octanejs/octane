@@ -16,12 +16,12 @@ type Props = {
 export function HistoryPlugin(props: Props) {
 	const [editor] = useLexicalComposerContext();
 	const externalHistoryState = props.externalHistoryState;
-	const delay =
-		props.delay === undefined ? 1000 : props.delay;
+	const delay = props.delay === undefined ? 1000 : props.delay;
 
-	const historyState = useMemo(() => externalHistoryState || createEmptyHistoryState(), [
-		externalHistoryState,
-	]);
+	const historyState = useMemo(
+		() => externalHistoryState || createEmptyHistoryState(),
+		[externalHistoryState],
+	);
 
 	useEffect(() => registerHistory(editor, historyState, delay), [delay, editor, historyState]);
 

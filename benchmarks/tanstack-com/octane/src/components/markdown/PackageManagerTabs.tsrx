@@ -30,8 +30,11 @@ function isPackageManagerPanel(child: any): child is {
 		children?: any;
 	};
 } {
-	return isValidElement(child) && typeof (child as any).props['data-framework'] === 'string' &&
-		typeof (child as any).props['data-package-manager'] === 'string';
+	return (
+		isValidElement(child) &&
+		typeof (child as any).props['data-framework'] === 'string' &&
+		typeof (child as any).props['data-package-manager'] === 'string'
+	);
 }
 
 export function PackageManagerTabs({ children }: PackageManagerTabsProps) {
@@ -46,24 +49,30 @@ export function PackageManagerTabs({ children }: PackageManagerTabsProps) {
 	const userFramework = userQuery.data?.lastUsedFramework;
 
 	const actualFramework =
-		paramsFramework || userFramework || localCurrentFramework.currentFramework ||
-			'react' as Framework;
+		paramsFramework ||
+		userFramework ||
+		localCurrentFramework.currentFramework ||
+		('react' as Framework);
 
 	const normalizedFramework = actualFramework.toLowerCase();
 	const panels = Children.toArray(children).filter(isPackageManagerPanel);
-	const availableFramework =
-		panels.find((child) => {
-			return child.props['data-framework'] === normalizedFramework;
-		}) ? normalizedFramework : panels[0]?.props['data-framework'];
+	const availableFramework = panels.find((child) => {
+		return child.props['data-framework'] === normalizedFramework;
+	})
+		? normalizedFramework
+		: panels[0]?.props['data-framework'];
 	const packageManagerPanels = panels.filter((child) => {
 		return child.props['data-framework'] === availableFramework;
 	});
 
-	const handleTabChange = useCallback((slug: string) => {
-		if (isPackageManager(slug)) {
-			setPackageManager(slug);
-		}
-	}, [setPackageManager]);
+	const handleTabChange = useCallback(
+		(slug: string) => {
+			if (isPackageManager(slug)) {
+				setPackageManager(slug);
+			}
+		},
+		[setPackageManager],
+	);
 
 	if (!packageManagerPanels.length) {
 		return null;
@@ -83,12 +92,16 @@ export function PackageManagerTabs({ children }: PackageManagerTabsProps) {
 		};
 	});
 
-	return <div class="package-manager-tabs">
-		<Tabs
-			tabs={tabs}
-			activeSlug={selectedPackageManager}
-			onTabChange={handleTabChange}
-			panelContent="code-only"
-		>{packageManagerPanels.map((panel) => panel.props.children)}</Tabs>
-	</div>;
+	return (
+		<div class="package-manager-tabs">
+			<Tabs
+				tabs={tabs}
+				activeSlug={selectedPackageManager}
+				onTabChange={handleTabChange}
+				panelContent="code-only"
+			>
+				{packageManagerPanels.map((panel) => panel.props.children)}
+			</Tabs>
+		</div>
+	);
 }

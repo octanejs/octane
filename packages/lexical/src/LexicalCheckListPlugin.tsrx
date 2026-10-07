@@ -12,9 +12,9 @@ export function CheckListPlugin(props: Props) {
 	const disableTakeFocusOnClick =
 		props.disableTakeFocusOnClick === undefined ? false : props.disableTakeFocusOnClick;
 
-	useEffect(() => registerCheckList(editor, { disableTakeFocusOnClick }), [
-		editor,
-		disableTakeFocusOnClick,
-	]);
+	useEffect(
+		() => registerCheckList(editor, { disableTakeFocusOnClick }),
+		[editor, disableTakeFocusOnClick],
+	);
 	return null;
 }

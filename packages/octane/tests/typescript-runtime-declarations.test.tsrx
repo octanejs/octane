@@ -33,7 +33,9 @@ namespace Copy {
 function Compass() @{
 	const [turns, setTurns] = useState(0);
 	<button class={Tone.Loud} onClick={() => setTurns(turns + 1)}>
-		{Copy.shout(Copy.greeting) + Direction[Direction.Right] + ':' +
+		{Copy.shout(Copy.greeting) +
+			Direction[Direction.Right] +
+			':' +
 			(Direction.Down + turns * Direction.Left)}
 	</button>
 }

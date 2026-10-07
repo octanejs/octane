@@ -10,4 +10,13 @@ const DraggableCore = descriptorChildren(DraggableCoreImpl);
 
 export { DraggableCore };
 export default descriptorChildren(Draggable);
-export type { DraggableProps, DraggableCoreProps, DraggableData, DraggableEventHandler, ControlPosition, PositionOffsetControlPosition, DraggableBounds, DraggableEvent } from './types.ts';
+export type {
+	DraggableProps,
+	DraggableCoreProps,
+	DraggableData,
+	DraggableEventHandler,
+	ControlPosition,
+	PositionOffsetControlPosition,
+	DraggableBounds,
+	DraggableEvent,
+} from './types.ts';

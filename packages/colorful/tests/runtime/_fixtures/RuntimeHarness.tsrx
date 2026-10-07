@@ -53,20 +53,22 @@ export function InputHarness(props: any) {
 }
 
 export function AllPickers() {
-	return <div data-testid="all-pickers">
-		<HexColorPicker />
-		<HexAlphaColorPicker />
-		<HslColorPicker />
-		<HslaColorPicker />
-		<HslStringColorPicker />
-		<HslaStringColorPicker />
-		<HsvColorPicker />
-		<HsvaColorPicker />
-		<HsvStringColorPicker />
-		<HsvaStringColorPicker />
-		<RgbColorPicker />
-		<RgbaColorPicker />
-		<RgbStringColorPicker />
-		<RgbaStringColorPicker />
-	</div>;
+	return (
+		<div data-testid="all-pickers">
+			<HexColorPicker />
+			<HexAlphaColorPicker />
+			<HslColorPicker />
+			<HslaColorPicker />
+			<HslStringColorPicker />
+			<HslaStringColorPicker />
+			<HsvColorPicker />
+			<HsvaColorPicker />
+			<HsvStringColorPicker />
+			<HsvaStringColorPicker />
+			<RgbColorPicker />
+			<RgbaColorPicker />
+			<RgbStringColorPicker />
+			<RgbaStringColorPicker />
+		</div>
+	);
 }

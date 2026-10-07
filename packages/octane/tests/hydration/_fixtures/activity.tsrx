@@ -36,7 +36,9 @@ export function NestedActivityHydration(props) @{
 
 function IdChild(props) @{
 	const id = useId();
-	<span class={props.className} id={id}>{id}</span>
+	<span class={props.className} id={id}>
+		{id}
+	</span>
 }
 
 export function ActivityIdHydration() @{
@@ -52,8 +54,7 @@ export function ActivitySuspenseHydration(props) @{
 	<section id="activity-suspense-host">
 		<Activity mode={props.mode}>
 			@try {
-				const value =
-					props.suspend ? use(props.promise) : 'server';
+				const value = props.suspend ? use(props.promise) : 'server';
 				<span id="activity-resumed-content">{value as string}</span>
 			} @pending {
 				<span id="activity-resume-pending">{'loading'}</span>

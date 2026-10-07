@@ -11,7 +11,9 @@ export function Item(props) @{
 	const [n, setN] = useState(0);
 	<li class="item">
 		<span class="label">{props.label as string}</span>
-		<button class="bump" onClick={() => setN(n + 1)}>{'x' + n as string}</button>
+		<button class="bump" onClick={() => setN(n + 1)}>
+			{('x' + n) as string}
+		</button>
 	</li>
 }
 

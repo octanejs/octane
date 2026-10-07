@@ -3,10 +3,9 @@ import { Scene } from './Scene.three.tsrx';
 
 export function App() @{
 	const onPointerMissed = (event) => {
-		const proof = globalThis as
-			typeof globalThis & {
-				__octaneThreeEventLog?: Array<Record<string, unknown>>;
-			};
+		const proof = globalThis as typeof globalThis & {
+			__octaneThreeEventLog?: Array<Record<string, unknown>>;
+		};
 		(proof.__octaneThreeEventLog ??= []).push({
 			type: 'root-miss',
 			nativeType: event.type,

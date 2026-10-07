@@ -9,7 +9,9 @@ export interface StyledHydrationProps {
 
 export function App(props: StyledHydrationProps) @{
 	<main>
-		<p class="deferred-style-note" data-outside>Outside the style scope</p>
+		<p class="deferred-style-note" data-outside>
+			Outside the style scope
+		</p>
 		<Hydrate when={props.when} onHydrated={props.onHydrated}>
 			<section>
 				<style>

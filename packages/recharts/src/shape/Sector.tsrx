@@ -31,8 +31,8 @@ interface SectorProps {
 	onMouseEnter?: (e: NativeMouseEvent<SVGPathElement>) => void;
 	onMouseLeave?: (e: NativeMouseEvent<SVGPathElement>) => void;
 }
-export type Props =
-	Omit<SVGProps<SVGPathElement>, 'cx' | 'cy' | 'dangerouslySetInnerHTML'> & Partial<SectorProps>;
+export type Props = Omit<SVGProps<SVGPathElement>, 'cx' | 'cy' | 'dangerouslySetInnerHTML'> &
+	Partial<SectorProps>;
 // Port of shape/Sector.tsx — the pie/radial-bar wedge (arc path with optional
 // per-corner rounding). Path strings must be BYTE-IDENTICAL to upstream:
 // recharts builds them with roundTemplateLiteral (every interpolated number
@@ -106,8 +106,7 @@ const getSectorPath = ({
 		const innerStartPoint = polarToCartesian(cx, cy, innerRadius, startAngle);
 		const innerEndPoint = polarToCartesian(cx, cy, innerRadius, tempEndAngle);
 		const innerSweep = +(startAngle <= tempEndAngle);
-		path +=
-			roundTemplateLiteral`L ${innerEndPoint.x},${innerEndPoint.y}
+		path += roundTemplateLiteral`L ${innerEndPoint.x},${innerEndPoint.y}
             A ${innerRadius},${innerRadius},0,
             ${largeArc},${innerSweep},
             ${innerStartPoint.x},${innerStartPoint.y} Z`;
@@ -129,7 +128,11 @@ const getSectorWithCorner = ({
 	endAngle,
 }: GeometrySectorWithCornerRadius) => {
 	const sign = mathSign(endAngle - startAngle);
-	const { circleTangency: soct, lineTangency: solt, theta: sot } = getTangentCircle({
+	const {
+		circleTangency: soct,
+		lineTangency: solt,
+		theta: sot,
+	} = getTangentCircle({
 		cx,
 		cy,
 		radius: outerRadius,
@@ -138,7 +141,11 @@ const getSectorWithCorner = ({
 		cornerRadius,
 		cornerIsExternal,
 	});
-	const { circleTangency: eoct, lineTangency: eolt, theta: eot } = getTangentCircle({
+	const {
+		circleTangency: eoct,
+		lineTangency: eolt,
+		theta: eot,
+	} = getTangentCircle({
 		cx,
 		cy,
 		radius: outerRadius,
@@ -147,10 +154,9 @@ const getSectorWithCorner = ({
 		cornerRadius,
 		cornerIsExternal,
 	});
-	const outerArcAngle =
-		cornerIsExternal
-			? Math.abs(startAngle - endAngle)
-			: Math.abs(startAngle - endAngle) - sot - eot;
+	const outerArcAngle = cornerIsExternal
+		? Math.abs(startAngle - endAngle)
+		: Math.abs(startAngle - endAngle) - sot - eot;
 	if (outerArcAngle < 0) {
 		if (forceCornerRadius) {
 			const cornerDiameter = cornerRadius * 2;
@@ -169,7 +175,11 @@ const getSectorWithCorner = ({
     A${cornerRadius},${cornerRadius},0,0,${sweep},${eolt.x},${eolt.y}
   `;
 	if (innerRadius > 0) {
-		const { circleTangency: sict, lineTangency: silt, theta: sit } = getTangentCircle({
+		const {
+			circleTangency: sict,
+			lineTangency: silt,
+			theta: sit,
+		} = getTangentCircle({
 			cx,
 			cy,
 			radius: innerRadius,
@@ -179,7 +189,11 @@ const getSectorWithCorner = ({
 			cornerRadius,
 			cornerIsExternal,
 		});
-		const { circleTangency: eict, lineTangency: eilt, theta: eit } = getTangentCircle({
+		const {
+			circleTangency: eict,
+			lineTangency: eilt,
+			theta: eit,
+		} = getTangentCircle({
 			cx,
 			cy,
 			radius: innerRadius,
@@ -189,17 +203,15 @@ const getSectorWithCorner = ({
 			cornerRadius,
 			cornerIsExternal,
 		});
-		const innerArcAngle =
-			cornerIsExternal
-				? Math.abs(startAngle - endAngle)
-				: Math.abs(startAngle - endAngle) - sit - eit;
+		const innerArcAngle = cornerIsExternal
+			? Math.abs(startAngle - endAngle)
+			: Math.abs(startAngle - endAngle) - sit - eit;
 		if (innerArcAngle < 0 && cornerRadius === 0) {
 			return path + 'L' + cx + ',' + cy + 'Z';
 		}
 		const innerLargeArc = +(innerArcAngle > 180);
 		const innerSweep = +(sign > 0);
-		path +=
-			roundTemplateLiteral`L${eilt.x},${eilt.y}
+		path += roundTemplateLiteral`L${eilt.x},${eilt.y}
       A${cornerRadius},${cornerRadius},0,0,${sweep},${eict.x},${eict.y}
       A${innerRadius},${innerRadius},0,${innerLargeArc},${innerSweep},${sict.x},${sict.y}
       A${cornerRadius},${cornerRadius},0,0,${sweep},${silt.x},${silt.y}Z`;

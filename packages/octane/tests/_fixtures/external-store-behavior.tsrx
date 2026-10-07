@@ -45,7 +45,7 @@ export function KeyedConsumer(props: {
 // Throw after reading a negative snapshot so the nearest boundary handles it.
 function ThrowConsumer(props: { store: ExternalStore<number> }) @{
 	const value = useSyncExternalStore(props.store.subscribe, props.store.getState);
-	if (value < 0) throw new Error('boom-' + -value as string);
+	if (value < 0) throw new Error(('boom-' + -value) as string);
 	<span class="tc">{'' + value}</span>
 }
 
@@ -121,10 +121,7 @@ export function StorePriorityBoundary(props: {
 	}
 }
 
-function RenderNotificationMutator(props: {
-	store: ExternalStore<number>;
-	next: number | null;
-}) @{
+function RenderNotificationMutator(props: { store: ExternalStore<number>; next: number | null }) @{
 	if (props.next !== null) props.store.setState(props.next);
 	<span />
 }

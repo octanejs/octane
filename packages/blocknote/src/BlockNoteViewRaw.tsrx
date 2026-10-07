@@ -35,29 +35,28 @@ export type BlockNoteViewProps<
 	B extends BlockSchema = DefaultBlockSchema,
 	I extends InlineContentSchema = DefaultInlineContentSchema,
 	S extends StyleSchema = DefaultStyleSchema,
-> =
-	{
-		editor: BlockNoteEditor<B, I, S>;
-		theme?: 'light' | 'dark';
-		/** @default true */
-		editable?: boolean;
-		onChange?: Parameters<BlockNoteEditor<B, I, S>['onChange']>[0];
-		onSelectionChange?: () => void;
-		/**
- * Render the editable surface as the container's first child. Set to
- * `false` to place `BlockNoteViewEditor` among `children` yourself.
- * @default true
- */
-		renderEditor?: boolean;
-		autoFocus?: boolean;
-		portalElements?: PortalElementsMap;
-		className?: string;
-		children?: OctaneNode;
-		ref?: React.Ref<HTMLDivElement>;
-	} & Omit<
-		Octane.HTMLAttributes<HTMLDivElement>,
-		'onChange' | 'onSelectionChange' | 'children' | 'class' | 'className'
-	>;
+> = {
+	editor: BlockNoteEditor<B, I, S>;
+	theme?: 'light' | 'dark';
+	/** @default true */
+	editable?: boolean;
+	onChange?: Parameters<BlockNoteEditor<B, I, S>['onChange']>[0];
+	onSelectionChange?: () => void;
+	/**
+	 * Render the editable surface as the container's first child. Set to
+	 * `false` to place `BlockNoteViewEditor` among `children` yourself.
+	 * @default true
+	 */
+	renderEditor?: boolean;
+	autoFocus?: boolean;
+	portalElements?: PortalElementsMap;
+	className?: string;
+	children?: OctaneNode;
+	ref?: React.Ref<HTMLDivElement>;
+} & Omit<
+	Octane.HTMLAttributes<HTMLDivElement>,
+	'onChange' | 'onSelectionChange' | 'children' | 'class' | 'className'
+>;
 
 /** What `BlockNoteViewRaw` hands to the `BlockNoteViewEditor` it contains. */
 type ViewEditorSettings = {
@@ -94,8 +93,9 @@ export function BlockNoteViewRaw<
 	const outerContext = useBlockNoteContext();
 	const systemColorScheme = usePrefersColorScheme();
 	const scheme: 'light' | 'dark' =
-		theme ?? outerContext?.colorSchemePreference ??
-			(systemColorScheme === 'dark' ? 'dark' : 'light');
+		theme ??
+		outerContext?.colorSchemePreference ??
+		(systemColorScheme === 'dark' ? 'dark' : 'light');
 
 	const [contentEditableProps, setContentEditableProps] = useState<Record<string, any> | undefined>(
 		undefined,
@@ -143,9 +143,7 @@ export function BlockNoteViewRaw<
 				@if (renderEditor !== false) {
 					<BlockNoteViewEditor>{children}</BlockNoteViewEditor>
 				} @else {
-					<>
-						{children}
-					</>
+					<>{children}</>
 				}
 			</div>
 		</ViewEditorContext>
@@ -166,14 +164,17 @@ export function BlockNoteViewEditor(props: { children?: OctaneNode }) @{
 	// A new callback identity detaches the old ref (unmount) and attaches the new
 	// one (mount). Remounting on `editable` changes is deliberate: TipTap drops the
 	// host's tabIndex when editability flips on a mounted view.
-	const mountEditor = useCallback((element: HTMLDivElement | null) => {
-		editor.isEditable = editable !== false;
-		if (element) {
-			editor.mount(element, { portalTarget });
-		} else {
-			editor.unmount();
-		}
-	}, [editable, editor, portalTarget]);
+	const mountEditor = useCallback(
+		(element: HTMLDivElement | null) => {
+			editor.isEditable = editable !== false;
+			if (element) {
+				editor.mount(element, { portalTarget });
+			} else {
+				editor.unmount();
+			}
+		},
+		[editable, editor, portalTarget],
+	);
 
 	<>
 		<div

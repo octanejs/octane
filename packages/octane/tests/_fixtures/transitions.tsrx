@@ -20,11 +20,13 @@ export function TransitionBasics() @{
 	const [isPending, start] = useTransition();
 	<div>
 		<span id="n">{n as string}</span>
-		<span id="pending">
-			{isPending ? 'pending' : 'idle'}
-		</span>
-		<button id="bump-urgent" onClick={() => setN(n + 1)}>{'urgent'}</button>
-		<button id="bump-transition" onClick={() => start(() => setN(n + 10))}>{'transition'}</button>
+		<span id="pending">{isPending ? 'pending' : 'idle'}</span>
+		<button id="bump-urgent" onClick={() => setN(n + 1)}>
+			{'urgent'}
+		</button>
+		<button id="bump-transition" onClick={() => start(() => setN(n + 10))}>
+			{'transition'}
+		</button>
 	</div>
 }
 
@@ -36,10 +38,10 @@ export function TransitionKeepsDom(props) @{
 	const [promise, setPromise] = useState(props.initialPromise);
 	const [isPending, start] = useTransition();
 	<div>
-		<span id="pending">
-			{isPending ? 'pending' : 'idle'}
-		</span>
-		<button id="swap" onClick={() => start(() => setPromise(props.nextPromise))}>{'swap'}</button>
+		<span id="pending">{isPending ? 'pending' : 'idle'}</span>
+		<button id="swap" onClick={() => start(() => setPromise(props.nextPromise))}>
+			{'swap'}
+		</button>
 		@try {
 			const value = use(promise);
 			<span id="value">{value as string}</span>
@@ -62,25 +64,29 @@ export function AsyncActionKeepsCommittedState(props) @{
 	);
 	const [isPending, start] = useTransition();
 	<div>
-		<span id="pending">
-			{isPending ? 'pending' : 'idle'}
-		</span>
+		<span id="pending">{isPending ? 'pending' : 'idle'}</span>
 		<span id="parent-selection">{selection.id as string}</span>
 		<span id="reducer-selection">{reducerSelection as string}</span>
 		<span id="action-count">{count as string}</span>
 		<button
 			id="swap-action"
-			onClick={() => start(async () => {
-				setCount((value) => value + 10);
-				await props.stageGate;
-				startTransition(() => {
-					setSelection(() => props.nextSelection);
-					dispatchSelection(props.nextSelection.id);
-				});
-				await props.nextSelection.promise;
-			})}
-		>{'swap'}</button>
-		<button id="urgent-count" onClick={() => setCount((value) => value + 1)}>{'urgent'}</button>
+			onClick={() =>
+				start(async () => {
+					setCount((value) => value + 10);
+					await props.stageGate;
+					startTransition(() => {
+						setSelection(() => props.nextSelection);
+						dispatchSelection(props.nextSelection.id);
+					});
+					await props.nextSelection.promise;
+				})
+			}
+		>
+			{'swap'}
+		</button>
+		<button id="urgent-count" onClick={() => setCount((value) => value + 1)}>
+			{'urgent'}
+		</button>
 		@try {
 			const value = use(selection.promise);
 			<span id="action-value">{value as string}</span>
@@ -98,10 +104,9 @@ export function AsyncActionKeepsCommittedState(props) @{
 export function StandaloneStartTransition(props) @{
 	const [promise, setPromise] = useState(props.initialPromise);
 	<div>
-		<button
-			id="swap"
-			onClick={() => startTransition(() => setPromise(props.nextPromise))}
-		>{'swap'}</button>
+		<button id="swap" onClick={() => startTransition(() => setPromise(props.nextPromise))}>
+			{'swap'}
+		</button>
 		@try {
 			const value = use(promise);
 			<span id="value">{value as string}</span>
@@ -123,7 +128,9 @@ export function DeferredValueWithSuspense(props) @{
 	<div>
 		@try {
 			const value = use(deferred);
-			<span id="value" class={isStale ? 'stale' : 'fresh'}>{value as string}</span>
+			<span id="value" class={isStale ? 'stale' : 'fresh'}>
+				{value as string}
+			</span>
 		} @pending {
 			<span id="fallback">{'fallback'}</span>
 		}
@@ -139,11 +146,12 @@ export function UrgentPreemptsTransition(props) @{
 	const [promise, setPromise] = useState(props.initialPromise);
 	const [_, start] = useTransition();
 	<div>
-		<button
-			id="swap-trans"
-			onClick={() => start(() => setPromise(props.nextPromise))}
-		>{'trans'}</button>
-		<button id="swap-urgent" onClick={() => setPromise(props.nextPromise)}>{'urgent'}</button>
+		<button id="swap-trans" onClick={() => start(() => setPromise(props.nextPromise))}>
+			{'trans'}
+		</button>
+		<button id="swap-urgent" onClick={() => setPromise(props.nextPromise)}>
+			{'urgent'}
+		</button>
 		@try {
 			const value = use(promise);
 			<span id="value">{value as string}</span>
@@ -162,7 +170,7 @@ function EntLeafA(props) @{
 	<>
 		@try {
 			const v = use(props.p);
-			<span class="ent-a">{'A:' + v as string}</span>
+			<span class="ent-a">{('A:' + v) as string}</span>
 		} @pending {
 			<span class="ent-a-load">{'A-load'}</span>
 		}
@@ -173,7 +181,7 @@ function EntLeafB(props) @{
 	<>
 		@try {
 			const v = use(props.p);
-			<span class="ent-b">{'B:' + v as string}</span>
+			<span class="ent-b">{('B:' + v) as string}</span>
 		} @pending {
 			<span class="ent-b-load">{'B-load'}</span>
 		}
@@ -185,16 +193,18 @@ export function EntangledTransitions(props) @{
 	const [pB, setPB] = useState(props.initialB);
 	const [isPending, start] = useTransition();
 	<div>
-		<span id="pending">
-			{isPending ? '1' : '0'}
-		</span>
+		<span id="pending">{isPending ? '1' : '0'}</span>
 		<button
 			id="swap-both"
-			onClick={() => start(() => {
-				setPA(props.nextA);
-				setPB(props.nextB);
-			})}
-		>{'swap'}</button>
+			onClick={() =>
+				start(() => {
+					setPA(props.nextA);
+					setPB(props.nextB);
+				})
+			}
+		>
+			{'swap'}
+		</button>
 		<EntLeafA p={pA} />
 		<EntLeafB p={pB} />
 	</div>
@@ -210,14 +220,14 @@ export function IsPendingThroughReplay(props) @{
 	const [step, setStep] = useState(0);
 	const [isPending, start] = useTransition();
 	<div>
-		<span id="pending">
-			{isPending ? '1' : '0'}
-		</span>
-		<button id="swap" onClick={() => start(() => setStep(1))}>{'swap'}</button>
+		<span id="pending">{isPending ? '1' : '0'}</span>
+		<button id="swap" onClick={() => start(() => setStep(1))}>
+			{'swap'}
+		</button>
 		@try {
 			const a = use(step === 0 ? props.initialA : props.nextA);
 			const b = use(step === 0 ? props.initialB : props.nextB);
-			<span id="value">{a + '/' + b as string}</span>
+			<span id="value">{(a + '/' + b) as string}</span>
 		} @pending {
 			<span id="fallback">{'fallback'}</span>
 		}
@@ -234,13 +244,12 @@ export function NestedTransitions(props) @{
 	const [pendingA, startA] = useTransition();
 	const [pendingB, startB] = useTransition();
 	<div>
-		<span id="pending-a">{'A:' + (pendingA ? '1' : '0') as string}</span>
-		<span id="pending-b">{'B:' + (pendingB ? '1' : '0') as string}</span>
+		<span id="pending-a">{('A:' + (pendingA ? '1' : '0')) as string}</span>
+		<span id="pending-b">{('B:' + (pendingB ? '1' : '0')) as string}</span>
 		<span id="n">{n as string}</span>
-		<button
-			id="nest"
-			onClick={() => startA(() => startB(() => setN(props.target)))}
-		>{'nest'}</button>
+		<button id="nest" onClick={() => startA(() => startB(() => setN(props.target)))}>
+			{'nest'}
+		</button>
 	</div>
 }
 
@@ -254,9 +263,11 @@ export function DeferredValueInTransition() @{
 	const [_, start] = useTransition();
 	const deferred = useDeferredValue(v);
 	<div>
-		<span id="original">{'Original: ' + v as string}</span>
-		<span id="deferred">{'Deferred: ' + deferred as string}</span>
-		<button id="bump" onClick={() => start(() => setV(v + 1))}>{'bump'}</button>
+		<span id="original">{('Original: ' + v) as string}</span>
+		<span id="deferred">{('Deferred: ' + deferred) as string}</span>
+		<button id="bump" onClick={() => start(() => setV(v + 1))}>
+			{'bump'}
+		</button>
 	</div>
 }
 
@@ -301,14 +312,13 @@ export function UrgentSupersedesTransition(props) @{
 	const [promise, setPromise] = useState(props.initialPromise);
 	const [isPending, start] = useTransition();
 	<div>
-		<span id="pending">
-			{isPending ? '1' : '0'}
-		</span>
-		<button
-			id="swap-trans"
-			onClick={() => start(() => setPromise(props.transitionPromise))}
-		>{'trans'}</button>
-		<button id="swap-urgent" onClick={() => setPromise(props.urgentPromise)}>{'urgent'}</button>
+		<span id="pending">{isPending ? '1' : '0'}</span>
+		<button id="swap-trans" onClick={() => start(() => setPromise(props.transitionPromise))}>
+			{'trans'}
+		</button>
+		<button id="swap-urgent" onClick={() => setPromise(props.urgentPromise)}>
+			{'urgent'}
+		</button>
 		@try {
 			const value = use(promise);
 			<span id="value">{value as string}</span>
@@ -329,16 +339,18 @@ export function AsyncStartTransition(props) @{
 	const [isPending, start] = useTransition();
 	<div>
 		<span id="n">{n as string}</span>
-		<span id="pending">
-			{isPending ? 'pending' : 'idle'}
-		</span>
+		<span id="pending">{isPending ? 'pending' : 'idle'}</span>
 		<button
 			id="go"
-			onClick={() => start(async () => {
-				await props.gate;
-				setN(n + 1);
-			})}
-		>{'go'}</button>
+			onClick={() =>
+				start(async () => {
+					await props.gate;
+					setN(n + 1);
+				})
+			}
+		>
+			{'go'}
+		</button>
 	</div>
 }
 
@@ -353,16 +365,18 @@ export function AsyncTransitionKeepsDom(props) @{
 	const [promise, setPromise] = useState(props.initialPromise);
 	const [isPending, start] = useTransition();
 	<div>
-		<span id="pending">
-			{isPending ? 'pending' : 'idle'}
-		</span>
+		<span id="pending">{isPending ? 'pending' : 'idle'}</span>
 		<button
 			id="go"
-			onClick={() => start(async () => {
-				await props.gate;
-				setPromise(props.nextPromise);
-			})}
-		>{'go'}</button>
+			onClick={() =>
+				start(async () => {
+					await props.gate;
+					setPromise(props.nextPromise);
+				})
+			}
+		>
+			{'go'}
+		</button>
 		@try {
 			const value = use(promise);
 			<span id="value">{value as string}</span>
@@ -394,13 +408,10 @@ export function TransitionAtomicity(props) @{
 	const [version, setVersion] = useState(0);
 	const [isPending, start] = useTransition();
 	<div>
-		<span id="pending">
-			{isPending ? 'pending' : 'idle'}
-		</span>
-		<button
-			id="bump"
-			onClick={() => start(() => setVersion((value: number) => value + 1))}
-		>{'bump'}</button>
+		<span id="pending">{isPending ? 'pending' : 'idle'}</span>
+		<button id="bump" onClick={() => start(() => setVersion((value: number) => value + 1))}>
+			{'bump'}
+		</button>
 		@try {
 			<AtomicityPanel version={version} load={props.load} />
 		} @pending {
@@ -429,10 +440,10 @@ export function TransitionResumeAtomicity(props) @{
 	const [step, setStep] = useState(0);
 	const [isPending, start] = useTransition();
 	<div>
-		<span id="pending">
-			{isPending ? 'pending' : 'idle'}
-		</span>
-		<button id="bump" onClick={() => start(() => setStep(1))}>{'bump'}</button>
+		<span id="pending">{isPending ? 'pending' : 'idle'}</span>
+		<button id="bump" onClick={() => start(() => setStep(1))}>
+			{'bump'}
+		</button>
 		@try {
 			<>
 				<ResumeLeafA load={props.load} step={step} />
@@ -458,7 +469,9 @@ function NamespacedValue(props) @{
 export function TransitionNamespacedAttr(props) @{
 	const [step, setStep] = useState(0);
 	<div>
-		<button id="bump" onClick={() => startTransition(() => setStep(1))}>{'bump'}</button>
+		<button id="bump" onClick={() => startTransition(() => setStep(1))}>
+			{'bump'}
+		</button>
 		@try {
 			<>
 				<svg>
@@ -475,11 +488,15 @@ export function TransitionNamespacedAttr(props) @{
 export function TransitionHeadAndDefault(props) @{
 	const [step, setStep] = useState(0);
 	<div>
-		<button id="bump" onClick={() => startTransition(() => setStep(1))}>{'bump'}</button>
+		<button id="bump" onClick={() => startTransition(() => setStep(1))}>
+			{'bump'}
+		</button>
 		<title
 			data-transition-title="yes"
 			{...(step === 0 ? { 'data-old': 'old' } : { 'data-new': 'new' })}
-		>{(step === 0 ? 'Old' : 'New') as string}</title>
+		>
+			{(step === 0 ? 'Old' : 'New') as string}
+		</title>
 		@try {
 			<>
 				<input id="default-box" type="checkbox" defaultChecked={step === 0} />
@@ -495,7 +512,9 @@ function TransitionHeadTitle(props: { step: number }) @{
 	<title
 		data-transition-held-title="yes"
 		{...(props.step === 0 ? { 'data-old': 'old' } : { 'data-new': 'new' })}
-	>{(props.step === 0 ? 'Old' : 'New') as string}</title>
+	>
+		{(props.step === 0 ? 'Old' : 'New') as string}
+	</title>
 }
 
 // The head entry is owned by the first child of the visible try body. A later
@@ -506,7 +525,9 @@ export function TransitionHeadInsideBoundary(props: {
 }) @{
 	const [step, setStep] = useState(0);
 	<div>
-		<button id="bump" onClick={() => startTransition(() => setStep(1))}>{'bump'}</button>
+		<button id="bump" onClick={() => startTransition(() => setStep(1))}>
+			{'bump'}
+		</button>
 		@try {
 			<>
 				<TransitionHeadTitle step={step} />
@@ -535,9 +556,9 @@ function TransitionHeadListener(props: {
 				: props.onNext === undefined
 					? {}
 					: { onClick: props.onNext ?? undefined };
-	<title data-transition-held-listener="yes" {...handlerProps}>{(props.step === 0
-		? 'Old'
-		: 'New') as string}</title>
+	<title data-transition-held-listener="yes" {...handlerProps}>
+		{(props.step === 0 ? 'Old' : 'New') as string}
+	</title>
 }
 
 export function TransitionHeadListenerInsideBoundary(props: {
@@ -548,7 +569,9 @@ export function TransitionHeadListenerInsideBoundary(props: {
 }) @{
 	const [step, setStep] = useState(0);
 	<div>
-		<button id="bump" onClick={() => startTransition(() => setStep(1))}>{'bump'}</button>
+		<button id="bump" onClick={() => startTransition(() => setStep(1))}>
+			{'bump'}
+		</button>
 		@try {
 			<>
 				<TransitionHeadListener
@@ -578,7 +601,9 @@ function ControlledValue(props) @{
 export function TransitionControlledInput(props) @{
 	const [step, setStep] = useState(0);
 	<div>
-		<button id="bump" onClick={() => startTransition(() => setStep(1))}>{'bump'}</button>
+		<button id="bump" onClick={() => startTransition(() => setStep(1))}>
+			{'bump'}
+		</button>
 		@try {
 			<>
 				<input id="text" value={'step-' + step} onInput={() => {}} />
@@ -600,7 +625,9 @@ export function TransitionControlledInput(props) @{
 export function TransitionRadioGroup(props) @{
 	const [step, setStep] = useState(0);
 	<div>
-		<button id="bump" onClick={() => startTransition(() => setStep(1))}>{'bump'}</button>
+		<button id="bump" onClick={() => startTransition(() => setStep(1))}>
+			{'bump'}
+		</button>
 		@try {
 			<>
 				<input id="r-a" type="radio" name="pick-group" checked={step === 1} onChange={() => {}} />
@@ -626,15 +653,19 @@ function RemovalRow(props) @{
 		props.log('mount:' + props.id);
 		return () => props.log('cleanup:' + props.id);
 	}, []);
-	<li id={'row-' + props.id} tabIndex={0}>{seen as string}</li>
+	<li id={'row-' + props.id} tabIndex={0}>
+		{seen as string}
+	</li>
 }
 
 export function TransitionKeyedRemoval(props) @{
 	const [step, setStep] = useState(0);
 	const items =
-		step === 0 ? props.initialItems ?? ['a', 'b', 'c'] : props.nextItems ?? ['a', 'c'];
+		step === 0 ? (props.initialItems ?? ['a', 'b', 'c']) : (props.nextItems ?? ['a', 'c']);
 	<div>
-		<button id="bump" onClick={() => startTransition(() => setStep(1))}>{'bump'}</button>
+		<button id="bump" onClick={() => startTransition(() => setStep(1))}>
+			{'bump'}
+		</button>
 		@try {
 			<>
 				<ul id="list">
@@ -672,8 +703,12 @@ function OmittedEffect(props) @{
 export function TransitionEffectsBeforeSuspension(props) @{
 	const [step, setStep] = useState(0);
 	<div>
-		<button id="bump" onClick={() => startTransition(() => setStep(1))}>{'bump'}</button>
-		<button id="urgent" onClick={() => setStep(2)}>{'urgent'}</button>
+		<button id="bump" onClick={() => startTransition(() => setStep(1))}>
+			{'bump'}
+		</button>
+		<button id="urgent" onClick={() => setStep(2)}>
+			{'urgent'}
+		</button>
 		@try {
 			<>
 				<ChangingEffect step={step} log={props.log} />
@@ -688,10 +723,11 @@ export function TransitionEffectsBeforeSuspension(props) @{
 
 export function TransitionListToEmpty(props) @{
 	const [step, setStep] = useState(0);
-	const items =
-		step === 0 ? ['a', 'b'] : [];
+	const items = step === 0 ? ['a', 'b'] : [];
 	<div>
-		<button id="bump" onClick={() => startTransition(() => setStep(1))}>{'bump'}</button>
+		<button id="bump" onClick={() => startTransition(() => setStep(1))}>
+			{'bump'}
+		</button>
 		@try {
 			<>
 				<ul id="list">
@@ -725,10 +761,11 @@ function AddedRow(props) @{
 
 export function TransitionKeyedAddition(props) @{
 	const [step, setStep] = useState(0);
-	const items =
-		step === 0 ? ['a'] : ['a', 'd'];
+	const items = step === 0 ? ['a'] : ['a', 'd'];
 	<div>
-		<button id="bump" onClick={() => startTransition(() => setStep(1))}>{'bump'}</button>
+		<button id="bump" onClick={() => startTransition(() => setStep(1))}>
+			{'bump'}
+		</button>
 		@try {
 			<>
 				<ul id="list">
@@ -748,10 +785,11 @@ export function TransitionKeyedAddition(props) @{
 // freshly-filled rows still have to come out and their scopes go with them.
 export function TransitionKeyedEmptyFill(props) @{
 	const [step, setStep] = useState(0);
-	const items =
-		step === 0 ? [] : ['d'];
+	const items = step === 0 ? [] : ['d'];
 	<div>
-		<button id="bump" onClick={() => startTransition(() => setStep(1))}>{'bump'}</button>
+		<button id="bump" onClick={() => startTransition(() => setStep(1))}>
+			{'bump'}
+		</button>
 		@try {
 			<>
 				<ul id="list">
@@ -800,18 +838,19 @@ function FlipTail(props: { load: ArrayModeExitProps['load']; step: number }) @{
 
 export function TransitionArrayModeExit(props: ArrayModeExitProps) @{
 	const [step, setStep] = useState(0);
-	const rows =
-		step === 0 ? ['a', 'b'] : null;
+	const rows = step === 0 ? ['a', 'b'] : null;
 	<div>
-		<button id="bump" onClick={() => startTransition(() => setStep(1))}>{'bump'}</button>
+		<button id="bump" onClick={() => startTransition(() => setStep(1))}>
+			{'bump'}
+		</button>
 		@try {
 			<>
 				<div id="host">
 					{rows === null
 						? 'plain'
-						: rows.map(
-								(id) => <FlipRow key={id} id={id} log={props.log} rowRef={props.rowRefs?.[id]} />,
-							)}
+						: rows.map((id) => (
+								<FlipRow key={id} id={id} log={props.log} rowRef={props.rowRefs?.[id]} />
+							))}
 				</div>
 				<FlipTail load={props.load} step={step} />
 			</>
@@ -834,7 +873,9 @@ export function TransitionOutsideBoundary(props) @{
 		props.log('effect:' + step);
 	}, [step]);
 	<div>
-		<button id="bump" onClick={() => startTransition(() => setStep(1))}>{'bump'}</button>
+		<button id="bump" onClick={() => startTransition(() => setStep(1))}>
+			{'bump'}
+		</button>
 		<h1 id="shell">{'shell-' + step}</h1>
 		@try {
 			<ControlledValue load={props.load} step={step} />
@@ -861,9 +902,15 @@ export function TransitionAuthoredMemo(props: MemoTransitionProps) @{
 	const [step, setStep] = useState(0);
 	const [tick, setTick] = useState(0);
 	<div>
-		<button id="memo-next" onClick={() => startTransition(() => setStep(1))}>{'next'}</button>
-		<button id="memo-urgent" onClick={() => setStep(2)}>{'urgent'}</button>
-		<button id="memo-refresh" onClick={() => setTick(tick + 1)}>{'refresh'}</button>
+		<button id="memo-next" onClick={() => startTransition(() => setStep(1))}>
+			{'next'}
+		</button>
+		<button id="memo-urgent" onClick={() => setStep(2)}>
+			{'urgent'}
+		</button>
+		<button id="memo-refresh" onClick={() => setTick(tick + 1)}>
+			{'refresh'}
+		</button>
 		<h1 id="memo-shell">{'shell-' + step + ':' + tick}</h1>
 		@try {
 			<MemoTransitionValue load={props.load} observe={props.observe} step={step} />
@@ -888,10 +935,9 @@ function MemoTransitionStagesValue({ load, step }: MemoTransitionStagesProps & {
 export function TransitionAuthoredMemoStages(props: MemoTransitionStagesProps) @{
 	const [step, setStep] = useState(0);
 	<div>
-		<button
-			id="memo-stages-next"
-			onClick={() => startTransition(() => setStep(1))}
-		>{'next'}</button>
+		<button id="memo-stages-next" onClick={() => startTransition(() => setStep(1))}>
+			{'next'}
+		</button>
 		<h1 id="memo-stages-shell">{'shell-' + step}</h1>
 		@try {
 			<MemoTransitionStagesValue load={props.load} step={step} />
@@ -906,26 +952,32 @@ type InvariantMemoTransitionProps = {
 	observe: (step: number, callback: () => void) => void;
 };
 
-function InvariantMemoTransitionValue({ step, promise, observe }: InvariantMemoTransitionProps & {
+function InvariantMemoTransitionValue({
+	step,
+	promise,
+	observe,
+}: InvariantMemoTransitionProps & {
 	step: number;
 }) @{
 	const [count, setCount] = useState(0);
 	if (step === 0) return <span id="memo-invariant-value">{'zero'}</span>;
 	const increment = () => setCount((current) => current + 1);
 	observe(step, increment);
-	const value =
-		step === 1 ? use(promise) : 'urgent';
-	<button id="memo-invariant-value" onClick={increment}>{value + ':' + count}</button>
+	const value = step === 1 ? use(promise) : 'urgent';
+	<button id="memo-invariant-value" onClick={increment}>
+		{value + ':' + count}
+	</button>
 }
 
 export function TransitionInvariantMemo(props: InvariantMemoTransitionProps) @{
 	const [step, setStep] = useState(0);
 	<div>
-		<button
-			id="memo-invariant-next"
-			onClick={() => startTransition(() => setStep(1))}
-		>{'next'}</button>
-		<button id="memo-invariant-urgent" onClick={() => setStep(2)}>{'urgent'}</button>
+		<button id="memo-invariant-next" onClick={() => startTransition(() => setStep(1))}>
+			{'next'}
+		</button>
+		<button id="memo-invariant-urgent" onClick={() => setStep(2)}>
+			{'urgent'}
+		</button>
 		<h1 id="memo-invariant-shell">{'shell-' + step}</h1>
 		@try {
 			<InvariantMemoTransitionValue step={step} promise={props.promise} observe={props.observe} />
@@ -941,7 +993,11 @@ type MemoArityTransitionProps = {
 	observe: (step: number, values: MemoArityValue[], late: MemoArityValue | null) => void;
 };
 
-function MemoArityTransitionValue({ step, promise, observe }: MemoArityTransitionProps & {
+function MemoArityTransitionValue({
+	step,
+	promise,
+	observe,
+}: MemoArityTransitionProps & {
 	step: number;
 }) @{
 	const zero = useMemo(() => ({ step }), []);
@@ -956,12 +1012,7 @@ function MemoArityTransitionValue({ step, promise, observe }: MemoArityTransitio
 		late = reached;
 	}
 	observe(step, [zero, one, two, three, four, five], late);
-	const value =
-		step === 1
-			? use(promise)
-			: step === 0
-				? 'zero'
-				: 'urgent';
+	const value = step === 1 ? use(promise) : step === 0 ? 'zero' : 'urgent';
 	<span id="memo-arities-value">
 		{value + ':' + [zero.step, one.step, two.step, three.step, four.step, five.step].join(',')}
 	</span>
@@ -970,11 +1021,12 @@ function MemoArityTransitionValue({ step, promise, observe }: MemoArityTransitio
 export function TransitionMemoArities(props: MemoArityTransitionProps) @{
 	const [step, setStep] = useState(0);
 	<div>
-		<button
-			id="memo-arities-next"
-			onClick={() => startTransition(() => setStep(1))}
-		>{'next'}</button>
-		<button id="memo-arities-urgent" onClick={() => setStep(2)}>{'urgent'}</button>
+		<button id="memo-arities-next" onClick={() => startTransition(() => setStep(1))}>
+			{'next'}
+		</button>
+		<button id="memo-arities-urgent" onClick={() => setStep(2)}>
+			{'urgent'}
+		</button>
 		<h1 id="memo-arities-shell">{'shell-' + step}</h1>
 		@try {
 			<MemoArityTransitionValue step={step} promise={props.promise} observe={props.observe} />

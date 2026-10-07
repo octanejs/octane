@@ -23,22 +23,24 @@ export function StaticText() @{
 
 // Dynamic attributes + dynamic single-text-child.
 export function Attrs(props) @{
-	<div id={props.id} class={props.cls} data-kind="leaf">{props.text as string}</div>
+	<div id={props.id} class={props.cls} data-kind="leaf">
+		{props.text as string}
+	</div>
 }
 
 // The client compiler proves this data-* value is already a string and uses
 // its narrow attribute path. Server serialization stays on the normal ssrAttr
 // path; hydration must still adopt, recover, warn, and suppress identically.
 export function StringData(props) @{
-	<div id="string-data" data-state={props.value as string}>{'data'}</div>
+	<div id="string-data" data-state={props.value as string}>
+		{'data'}
+	</div>
 }
 
 export function SuppressedStringData(props) @{
-	<div
-		id="suppressed-string-data"
-		suppressHydrationWarning
-		data-state={props.value as string}
-	>{'data'}</div>
+	<div id="suppressed-string-data" suppressHydrationWarning data-state={props.value as string}>
+		{'data'}
+	</div>
 }
 
 // Nested ELEMENTS (not components), each with a single text child — element
@@ -53,5 +55,7 @@ export function Mixed() @{
 // Stateful + event — proves handlers attach to adopted nodes and updates work.
 export function Counter(props) @{
 	const [n, setN] = useState(props.start);
-	<button id="btn" onClick={() => setN(n + 1)}>{n as string}</button>
+	<button id="btn" onClick={() => setN(n + 1)}>
+		{n as string}
+	</button>
 }

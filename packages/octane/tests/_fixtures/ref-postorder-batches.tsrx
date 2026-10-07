@@ -5,7 +5,9 @@ function Leaf({ log, label }: Props) @{
 		ref={(el) => {
 			if (el) log(label);
 		}}
-	>{label}</span>
+	>
+		{label}
+	</span>
 }
 
 function FirstBranch({ log, label }: Props) @{

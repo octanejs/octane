@@ -8,9 +8,7 @@ interface PackingItem {
 
 export function App() @{
 	const [draft, setDraft] = useState('');
-	const [items, setItems] = useState<PackingItem[]>([
-		{ id: 1, label: 'Passport', packed: false },
-	]);
+	const [items, setItems] = useState<PackingItem[]>([{ id: 1, label: 'Passport', packed: false }]);
 	const nextId = useRef(2);
 
 	const addItem = (event: Event) => {
@@ -43,20 +41,24 @@ export function App() @{
 					<span>{item.label as string}</span>
 					<button
 						aria-label={(item.packed ? 'Unpack ' : 'Pack ') + item.label}
-						onClick={() => setItems(
-							items.map(
-								(candidate) => candidate.id === item.id
-									? { ...candidate, packed: !candidate.packed }
-									: candidate,
-							),
-						)}
+						onClick={() =>
+							setItems(
+								items.map((candidate) =>
+									candidate.id === item.id
+										? { ...candidate, packed: !candidate.packed }
+										: candidate,
+								),
+							)
+						}
 					>
 						{item.packed ? 'Unpack' : 'Pack'}
 					</button>
 					<button
 						aria-label={'Remove ' + item.label}
 						onClick={() => setItems(items.filter((candidate) => candidate.id !== item.id))}
-					>{'Remove'}</button>
+					>
+						{'Remove'}
+					</button>
 				</li>
 			} @empty {
 				<li>{'No items to pack'}</li>

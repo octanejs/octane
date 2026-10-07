@@ -26,13 +26,23 @@ export function NumberRoot() {
 }
 
 export function ArrayOne() {
-	return [<div key="one" id="array-one">text1</div>];
+	return [
+		<div key="one" id="array-one">
+			text1
+		</div>,
+	];
 }
 
 export function NestedArray() {
 	return [
-		[<div key="one" id="nested-array-first">text1</div>],
-		<span key="two" id="nested-array-second">text2</span>,
+		[
+			<div key="one" id="nested-array-first">
+				text1
+			</div>,
+		],
+		<span key="two" id="nested-array-second">
+			text2
+		</span>,
 		[[[null, <p key="three" id="nested-array-third" />], false]],
 	];
 }
@@ -58,8 +68,12 @@ export function LegacyIterable() {
 
 export function EmptyishValues() {
 	return [
-		<span key="zero" id="emptyish-zero">{0}</span>,
-		<div key="empty-string" id="emptyish-string">{''}</div>,
+		<span key="zero" id="emptyish-zero">
+			{0}
+		</span>,
+		<div key="empty-string" id="emptyish-string">
+			{''}
+		</div>,
 		[],
 		false,
 		true,
@@ -88,6 +102,8 @@ export function MultipleEmptyText() @{
 }
 
 export function MultipleWhitespace() @{
+	// Prettier merges the three space children into one.
+	// prettier-ignore
 	<div id="multiple-whitespace">
 		{' '}
 		{' '}
@@ -347,9 +363,7 @@ export function WhitespaceSurroundedChild(props) @{
 }
 
 export function CompositeMultipleChildren() @{
-	<Box>
-		{['a', 'b', [undefined], [[false, 'c']]]}
-	</Box>
+	<Box>{['a', 'b', [undefined], [[false, 'c']]]}</Box>
 }
 
 export function EscapedSingleText() @{
@@ -410,7 +424,9 @@ export function FragmentOne() @{
 }
 
 export function EmptyFragment() @{
-	<div id="empty-fragment-parent"><></></div>
+	<div id="empty-fragment-parent">
+		<></>
+	</div>
 }
 
 export function ObjectWithChildren() @{

@@ -41,8 +41,10 @@ function RouteForm() {
 		throw notFound();
 	}
 
-	return <>
-		<Outlet />
-		<RedirectVersionBanner version={version!} latestVersion={library.latestVersion} />
-	</>;
+	return (
+		<>
+			<Outlet />
+			<RedirectVersionBanner version={version!} latestVersion={library.latestVersion} />
+		</>
+	);
 }

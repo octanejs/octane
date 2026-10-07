@@ -19,7 +19,7 @@ import { fixtureRpc } from 'server';
 
 let pendingFixture: Promise<string> | undefined;
 function loadPendingFixture() {
-	return pendingFixture ??= new Promise((resolve) => setTimeout(() => resolve('ready'), 10));
+	return (pendingFixture ??= new Promise((resolve) => setTimeout(() => resolve('ready'), 10)));
 }
 
 function UnsplitHydrationProof() @{
@@ -60,9 +60,7 @@ export function Page(props: { params: Record<string, string>; url: string }) @{
 			<p class="url">{props.url}</p>
 			<p class="count">{'Count: ' + count}</p>
 			<button onClick={() => setCount((current) => current + 1)}>Increment fixture</button>
-			<button onClick={() => setGuardedVisible((visible) => !visible)}>
-				Toggle guarded const
-			</button>
+			<button onClick={() => setGuardedVisible((visible) => !visible)}>Toggle guarded const</button>
 			<GuardedConst visible={guardedVisible} />
 			<button onClick={() => fixtureRpc('browser')}>Call server</button>
 			<RpcProbe />

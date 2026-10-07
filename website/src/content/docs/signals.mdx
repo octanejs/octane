@@ -497,9 +497,7 @@ module server {
 
 	export async function* loadMessages() {
 		await new Promise((resolve) => setTimeout(resolve, 500));
-		yield [
-			{ id: 1, text: 'Hello!' },
-		];
+		yield [{ id: 1, text: 'Hello!' }];
 
 		await new Promise((resolve) => setTimeout(resolve, 500));
 		yield [
@@ -512,8 +510,15 @@ module server {
 import { loadTitle, loadMessages } from 'server';
 import { derived$, query$, signal$ } from 'octane/signals';
 
-const title$ = query$(() => 'team-chat', () => loadTitle());
-const messages$ = query$(() => 'team-chat', () => loadMessages(), { kind: 'stream' });
+const title$ = query$(
+	() => 'team-chat',
+	() => loadTitle(),
+);
+const messages$ = query$(
+	() => 'team-chat',
+	() => loadMessages(),
+	{ kind: 'stream' },
+);
 const draft$ = signal$('');
 const draftLength$ = derived$(() => draft$.get().length);
 

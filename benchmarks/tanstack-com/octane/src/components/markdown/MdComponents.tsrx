@@ -44,17 +44,23 @@ function getTabs(value: unknown): Array<TabMeta> {
 }
 
 function isPackageGroups(value: unknown): value is string[][] {
-	return Array.isArray(value) &&
+	return (
+		Array.isArray(value) &&
 		value.every(
 			(group) =>
 				Array.isArray(group) && group.every((packageName) => typeof packageName === 'string'),
-		);
+		)
+	);
 }
 
 function isInstallMode(value: unknown): value is InstallMode {
-	return value === 'install' || value === 'dev-install' || value === 'local-install' ||
+	return (
+		value === 'install' ||
+		value === 'dev-install' ||
+		value === 'local-install' ||
 		value === 'create' ||
-		value === 'custom';
+		value === 'custom'
+	);
 }
 
 type PackageManagerMeta = {
@@ -99,16 +105,20 @@ type MdCommentComponentProps = {
 };
 
 function isMdTabPanelElement(child: any): child is { props: MdTabPanelProps; type: unknown } {
-	return isValidElement(child) &&
-		((child as any).type === MdTabPanel || (child as any).type === 'md-tab-panel');
+	return (
+		isValidElement(child) &&
+		((child as any).type === MdTabPanel || (child as any).type === 'md-tab-panel')
+	);
 }
 
 function isMdFrameworkPanelElement(child: any): child is {
 	props: MdFrameworkPanelProps;
 	type: unknown;
 } {
-	return isValidElement(child) &&
-		((child as any).type === MdFrameworkPanel || (child as any).type === 'md-framework-panel');
+	return (
+		isValidElement(child) &&
+		((child as any).type === MdFrameworkPanel || (child as any).type === 'md-framework-panel')
+	);
 }
 
 function renderPanelChildren(
@@ -154,15 +164,17 @@ export function MdCommentComponent({
 						resolvedPackageManagerMeta.mode,
 					).join('\n');
 
-					return <div
-						key={`${framework}-${packageManager}`}
-						data-framework={framework}
-						data-package-manager={packageManager}
-					>
-						<CodeBlock>
-							<code className="language-bash">{commandText}</code>
-						</CodeBlock>
-					</div>;
+					return (
+						<div
+							key={`${framework}-${packageManager}`}
+							data-framework={framework}
+							data-package-manager={packageManager}
+						>
+							<CodeBlock>
+								<code className="language-bash">{commandText}</code>
+							</CodeBlock>
+						</div>
+					);
 				});
 			});
 
@@ -191,9 +203,13 @@ export function MdCommentComponent({
 				void index;
 			});
 
-			return <BundlerTabs tabs={tabs} panelContent={panelContent}>{tabs.map(
-				(tab) => <Fragment key={tab.slug}>{childrenBySlug.get(tab.slug)}</Fragment>,
-			)}</BundlerTabs>;
+			return (
+				<BundlerTabs tabs={tabs} panelContent={panelContent}>
+					{tabs.map((tab) => (
+						<Fragment key={tab.slug}>{childrenBySlug.get(tab.slug)}</Fragment>
+					))}
+				</BundlerTabs>
+			);
 		}
 
 		const parsedFilesMeta = parseJson(filesMeta);
@@ -228,9 +244,7 @@ type MdTabPanelProps = {
 };
 
 export function MdTabPanel({ children }: MdTabPanelProps) {
-	return <>
-		{children}
-	</>;
+	return <>{children}</>;
 }
 
 type MdFrameworkPanelProps = {
@@ -239,9 +253,7 @@ type MdFrameworkPanelProps = {
 };
 
 export function MdFrameworkPanel({ children }: MdFrameworkPanelProps) {
-	return <>
-		{children}
-	</>;
+	return <>{children}</>;
 }
 
 function MdFrameworkComponentInner({ children }: { children?: any }) {
@@ -258,7 +270,9 @@ function MdFrameworkComponentInner({ children }: { children?: any }) {
 		}
 
 		frameworkPanels.push(
-			<div key={framework} data-framework={framework}>{child.props.children}</div>,
+			<div key={framework} data-framework={framework}>
+				{child.props.children}
+			</div>,
 		);
 	}
 

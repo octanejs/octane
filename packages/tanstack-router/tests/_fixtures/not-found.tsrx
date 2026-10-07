@@ -67,7 +67,7 @@ export interface NotFoundRouterOptions {
 export function makeRouter(initial: string, opts: NotFoundRouterOptions = {}) {
 	const rootRoute = createRootRoute({
 		component: RootLayout,
-		notFoundComponent: opts.rootNotFound ?? true ? RootNotFound : undefined,
+		notFoundComponent: (opts.rootNotFound ?? true) ? RootNotFound : undefined,
 	});
 	const indexRoute = createRoute({
 		getParentRoute: () => rootRoute,

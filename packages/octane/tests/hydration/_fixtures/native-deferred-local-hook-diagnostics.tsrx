@@ -33,8 +33,7 @@ function Control({
 	onRef,
 	onEffect,
 }: Props) @{
-	const projectedHidden =
-		model ? model.hidden$.get() : hidden;
+	const projectedHidden = model ? model.hidden$.get() : hidden;
 	onRender?.();
 	const local$ = useSignal$(localInitial ?? false);
 	onLocal?.(local$);
@@ -53,7 +52,10 @@ function Control({
 		data-identity={identity}
 		onClick={() => local$.set((value) => !value)}
 	>
-		Action<span id="synthetic-local-status" hidden={!local$.get()}>Status</span>
+		Action
+		<span id="synthetic-local-status" hidden={!local$.get()}>
+			Status
+		</span>
 	</button>
 }
 export function Boundary({

@@ -226,9 +226,15 @@ export function Header() @{
 						aria-label="Main"
 						onClick={() => setMenuOpen(false)}
 					>
-						<Link to="/docs" activeOptions={{ exact: false }} class="nav-link">Docs</Link>
-						<Link to="/benchmarks" class="nav-link">Benchmarks</Link>
-						<Link to="/playground" class="nav-link">Playground</Link>
+						<Link to="/docs" activeOptions={{ exact: false }} class="nav-link">
+							Docs
+						</Link>
+						<Link to="/benchmarks" class="nav-link">
+							Benchmarks
+						</Link>
+						<Link to="/playground" class="nav-link">
+							Playground
+						</Link>
 						<a class="nav-link" href="/llms.txt" target="_blank" rel="noreferrer">
 							llms.txt
 						</a>

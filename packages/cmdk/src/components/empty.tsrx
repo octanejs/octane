@@ -26,5 +26,7 @@ export function Empty(props: EmptyProps) @{
 	if (!render) return null;
 
 	const { ref: _ref, children, ...etc } = props;
-	<div ref={props.ref ?? null} {...etc} cmdk-empty="" role="presentation">{children}</div>
+	<div ref={props.ref ?? null} {...etc} cmdk-empty="" role="presentation">
+		{children}
+	</div>
 }

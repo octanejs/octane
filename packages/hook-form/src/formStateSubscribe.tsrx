@@ -9,15 +9,16 @@ import type { FieldValues, UseFormStateProps, UseFormStateReturn } from './types
 export type FormStateSubscribeProps<
 	TFieldValues extends FieldValues,
 	TTransformedValues = TFieldValues,
-> =
-	UseFormStateProps<TFieldValues, TTransformedValues> & {
-		render: (values: UseFormStateReturn<TFieldValues>) => OctaneNode;
-	};
+> = UseFormStateProps<TFieldValues, TTransformedValues> & {
+	render: (values: UseFormStateReturn<TFieldValues>) => OctaneNode;
+};
 
 export const FormStateSubscribe = <
 	TFieldValues extends FieldValues,
 	TTransformedValues = TFieldValues,
->(props: FormStateSubscribeProps<TFieldValues, TTransformedValues>) => {
+>(
+	props: FormStateSubscribeProps<TFieldValues, TTransformedValues>,
+) => {
 	const { control, disabled, exact, name, render } = props;
 	return render(useFormState({ control, name, disabled, exact }));
 };

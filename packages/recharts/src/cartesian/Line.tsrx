@@ -71,9 +71,8 @@ interface InternalLineProps extends ZIndexable {
 	xAxisId: AxisId;
 	yAxisId: AxisId;
 }
-interface LineProps<DataPointType = any, DataValueType = any> extends DataProvider<
-	DataPointType
->, DataConsumer<DataPointType, DataValueType>, ZIndexable {
+interface LineProps<DataPointType = any, DataValueType = any>
+	extends DataProvider<DataPointType>, DataConsumer<DataPointType, DataValueType>, ZIndexable {
 	activeDot?: ActiveDotType;
 	animateNewValues?: boolean;
 	animationBegin?: number;
@@ -106,8 +105,8 @@ interface LineProps<DataPointType = any, DataValueType = any> extends DataProvid
 }
 type LineSvgProps = Omit<CurveProps, 'points' | 'pathRef' | 'ref' | 'layout' | 'baseLine'>;
 type InternalProps = LineSvgProps & InternalLineProps;
-export type Props<DataPointType = any, ValueAxisType = any> =
-	LineSvgProps & LineProps<DataPointType, ValueAxisType>;
+export type Props<DataPointType = any, ValueAxisType = any> = LineSvgProps &
+	LineProps<DataPointType, ValueAxisType>;
 // Port of cartesian/Line.tsx — the line graphical item: redux registration,
 // store-computed points, the draw-in curve, dots, labels, active points.
 // `computeLinePoints` stays here (vendored lineSelectors imports it through
@@ -150,7 +149,7 @@ import { Dots } from '../component/Dots.tsrx';
 
 function getTotalLength(mainCurve: SVGPathElement | null) {
 	try {
-		return mainCurve && mainCurve.getTotalLength && mainCurve.getTotalLength() || 0;
+		return (mainCurve && mainCurve.getTotalLength && mainCurve.getTotalLength()) || 0;
 	} catch {
 		return 0;
 	}
@@ -258,55 +257,57 @@ const computeLegendPayloadFromAreaData = (props: Props) => {
 	];
 };
 
-const SetLineTooltipEntrySettings = memo((
-	props: Pick<
-		InternalProps,
-		| 'dataKey'
-		| 'data'
-		| 'stroke'
-		| 'strokeWidth'
-		| 'fill'
-		| 'name'
-		| 'hide'
-		| 'unit'
-		| 'formatter'
-		| 'tooltipType'
-		| 'id'
-	>,
-) => {
-	const {
-		dataKey,
-		data,
-		stroke,
-		strokeWidth,
-		fill,
-		name,
-		hide,
-		unit,
-		formatter,
-		tooltipType,
-		id,
-	} = props;
-	const tooltipEntrySettings: TooltipPayloadConfiguration = {
-		dataDefinedOnItem: data,
-		getPosition: noop,
-		settings: {
+const SetLineTooltipEntrySettings = memo(
+	(
+		props: Pick<
+			InternalProps,
+			| 'dataKey'
+			| 'data'
+			| 'stroke'
+			| 'strokeWidth'
+			| 'fill'
+			| 'name'
+			| 'hide'
+			| 'unit'
+			| 'formatter'
+			| 'tooltipType'
+			| 'id'
+		>,
+	) => {
+		const {
+			dataKey,
+			data,
 			stroke,
 			strokeWidth,
 			fill,
-			dataKey,
-			nameKey: undefined,
-			name: getTooltipNameProp(name, dataKey),
+			name,
 			hide,
-			type: tooltipType,
-			color: stroke,
 			unit,
 			formatter,
-			graphicalItemId: id,
-		},
-	};
-	return <SetTooltipEntrySettings tooltipEntrySettings={tooltipEntrySettings} />;
-});
+			tooltipType,
+			id,
+		} = props;
+		const tooltipEntrySettings: TooltipPayloadConfiguration = {
+			dataDefinedOnItem: data,
+			getPosition: noop,
+			settings: {
+				stroke,
+				strokeWidth,
+				fill,
+				dataKey,
+				nameKey: undefined,
+				name: getTooltipNameProp(name, dataKey),
+				hide,
+				type: tooltipType,
+				color: stroke,
+				unit,
+				formatter,
+				graphicalItemId: id,
+			},
+		};
+		return <SetTooltipEntrySettings tooltipEntrySettings={tooltipEntrySettings} />;
+	},
+);
 
 function LineDotsWrapper(props: {
 	points: ReadonlyArray<LinePointItem>;
@@ -318,16 +319,18 @@ function LineDotsWrapper(props: {
 	// Exclude ID so it isn't duplicated across every dot.
 	const { id, ...propsWithoutId } = props.props;
 	const lineProps = svgPropertiesNoEvents(propsWithoutId);
-	return <Dots
-		points={points}
-		dot={dot}
-		className="recharts-line-dots"
-		dotClassName="recharts-line-dot"
-		dataKey={dataKey}
-		baseProps={lineProps}
-		needClip={needClip}
-		clipPathId={clipPathId}
-	/>;
+	return (
+		<Dots
+			points={points}
+			dot={dot}
+			className="recharts-line-dots"
+			dotClassName="recharts-line-dot"
+			dataKey={dataKey}
+			baseProps={lineProps}
+			needClip={needClip}
+			clipPathId={clipPathId}
+		/>
+	);
 }
 
 function LineLabelListProvider(props: {
@@ -356,9 +359,9 @@ function LineLabelListProvider(props: {
 			};
 		});
 	}, [points]);
-	<CartesianLabelListContextProvider
-		value={showLabels ? labelListEntries : undefined}
-	>{children}</CartesianLabelListContextProvider>
+	<CartesianLabelListContextProvider value={showLabels ? labelListEntries : undefined}>
+		{children}
+	</CartesianLabelListContextProvider>
 }
 
 function StaticCurve(staticCurveProps: {
@@ -398,11 +401,14 @@ function StaticCurve(staticCurveProps: {
 		isEntrance: props.animateNewValues ? isEntrance : false,
 		visibleLength,
 	};
-	return <>
-		{points?.length > 1 &&
-			<Shape option={shape} DefaultShape={defaultLineProps.shape} shapeProps={curveProps} />}
-		<LineDotsWrapper points={points} clipPathId={clipPathId} props={props} />
-	</>;
+	return (
+		<>
+			{points?.length > 1 && (
+				<Shape option={shape} DefaultShape={defaultLineProps.shape} shapeProps={curveProps} />
+			)}
+			<LineDotsWrapper points={points} clipPathId={clipPathId} props={props} />
+		</>
+	);
 }
 
 function CurveWithAnimation(curveWithAnimationProps: {
@@ -434,57 +440,61 @@ function CurveWithAnimation(curveWithAnimationProps: {
 		(animationElapsedTime: number) => animationElapsedTime > 0 && totalLength > 0,
 		[totalLength],
 	);
-	return <LineLabelListProvider points={points} showLabels={showLabels}>
-		{props.children}
-		<AnimatedItems
-			animationInput={points}
-			animationIdPrefix="recharts-line-"
-			items={points}
-			previousItemsRef={previousPointsRef}
-			isAnimationActive={isAnimationActive}
-			animationBegin={animationBegin}
-			animationDuration={animationDuration}
-			animationEasing={animationEasing}
-			onAnimationStart={handleAnimationStart}
-			onAnimationEnd={handleAnimationEnd}
-			animationInterpolateFn={animationInterpolateFn}
-			animationMatchBy={animationMatchBy}
-			shouldUpdatePreviousRef={shouldUpdatePreviousRef}
-			layout={layout}
-		>
-			{(stepData, animationElapsedTime, isEntrance) => {
-				const animationActive = isAnimating || animationElapsedTime < 1;
-				const visibleLength =
-					animationActive ? getVisibleLength(animationElapsedTime, totalLength) : null;
-				return <StaticCurve
-					props={props}
-					points={stepData}
-					clipPathId={clipPathId}
-					pathRef={pathRef}
-					animationElapsedTime={animationElapsedTime}
-					isAnimating={animationActive}
-					isEntrance={isEntrance}
-					visibleLength={visibleLength}
-				/>;
-			}}
-		</AnimatedItems>
-		<LabelListFromLabelProp label={props.label} />
-	</LineLabelListProvider>;
+	return (
+		<LineLabelListProvider points={points} showLabels={showLabels}>
+			{props.children}
+			<AnimatedItems
+				animationInput={points}
+				animationIdPrefix="recharts-line-"
+				items={points}
+				previousItemsRef={previousPointsRef}
+				isAnimationActive={isAnimationActive}
+				animationBegin={animationBegin}
+				animationDuration={animationDuration}
+				animationEasing={animationEasing}
+				onAnimationStart={handleAnimationStart}
+				onAnimationEnd={handleAnimationEnd}
+				animationInterpolateFn={animationInterpolateFn}
+				animationMatchBy={animationMatchBy}
+				shouldUpdatePreviousRef={shouldUpdatePreviousRef}
+				layout={layout}
+			>
+				{(stepData, animationElapsedTime, isEntrance) => {
+					const animationActive = isAnimating || animationElapsedTime < 1;
+					const visibleLength = animationActive
+						? getVisibleLength(animationElapsedTime, totalLength)
+						: null;
+					return (
+						<StaticCurve
+							props={props}
+							points={stepData}
+							clipPathId={clipPathId}
+							pathRef={pathRef}
+							animationElapsedTime={animationElapsedTime}
+							isAnimating={animationActive}
+							isEntrance={isEntrance}
+							visibleLength={visibleLength}
+						/>
+					);
+				}}
+			</AnimatedItems>
+			<LabelListFromLabelProp label={props.label} />
+		</LineLabelListProvider>
+	);
 }
 
-function RenderCurve(props: {
-	clipPathId: string;
-	props: InternalProps;
-}) {
+function RenderCurve(props: { clipPathId: string; props: InternalProps }) {
 	const { clipPathId } = props;
 	const previousPointsRef = useRef<ReadonlyArray<LinePointItem> | null>(null);
 	const pathRef = useRef<SVGPathElement | null>(null);
-	return <CurveWithAnimation
-		props={props.props}
-		clipPathId={clipPathId}
-		previousPointsRef={previousPointsRef}
-		pathRef={pathRef}
-	/>;
+	return (
+		<CurveWithAnimation
+			props={props.props}
+			clipPathId={clipPathId}
+			previousPointsRef={previousPointsRef}
+			pathRef={pathRef}
+		/>
+	);
 }
 
 const errorBarDataPointFormatter: ErrorBarDataPointFormatter<LinePointItem> = (
@@ -588,38 +598,40 @@ function LineImpl(props: WithIdRequired<Props>) {
 	const plotArea = usePlotArea();
 	const layout = useChartLayout();
 	const isPanorama = useIsPanorama();
-	const points: ReadonlyArray<LinePointItem> | undefined = useAppSelector(
-		(state) => selectLinePoints(state, xAxisId, yAxisId, isPanorama, id),
+	const points: ReadonlyArray<LinePointItem> | undefined = useAppSelector((state) =>
+		selectLinePoints(state, xAxisId, yAxisId, isPanorama, id),
 	);
-	if (layout !== 'horizontal' && layout !== 'vertical' || points == null || plotArea == null) {
+	if ((layout !== 'horizontal' && layout !== 'vertical') || points == null || plotArea == null) {
 		// Cannot render Line in an unsupported layout
 		return null;
 	}
 	const { height, width, x: left, y: top } = plotArea;
-	return <LineWithState
-		{...everythingElse}
-		id={id}
-		connectNulls={connectNulls}
-		dot={dot}
-		activeDot={activeDot}
-		animateNewValues={animateNewValues}
-		animationBegin={animationBegin}
-		animationDuration={animationDuration}
-		animationEasing={animationEasing}
-		isAnimationActive={isAnimationActive}
-		hide={hide}
-		label={label}
-		legendType={legendType}
-		xAxisId={xAxisId}
-		yAxisId={yAxisId}
-		points={points}
-		layout={layout}
-		height={height}
-		width={width}
-		left={left}
-		top={top}
-		needClip={needClip}
-	/>;
+	return (
+		<LineWithState
+			{...everythingElse}
+			id={id}
+			connectNulls={connectNulls}
+			dot={dot}
+			activeDot={activeDot}
+			animateNewValues={animateNewValues}
+			animationBegin={animationBegin}
+			animationDuration={animationDuration}
+			animationEasing={animationEasing}
+			isAnimationActive={isAnimationActive}
+			hide={hide}
+			label={label}
+			legendType={legendType}
+			xAxisId={xAxisId}
+			yAxisId={yAxisId}
+			points={points}
+			layout={layout}
+			height={height}
+			width={width}
+			left={left}
+			top={top}
+			needClip={needClip}
+		/>
+	);
 }
 
 export function computeLinePoints({
@@ -646,8 +658,7 @@ export function computeLinePoints({
 		const value: number = getValueByDataKey(entry, dataKey);
 		if (layout === 'horizontal') {
 			const x = getCateCoordinateOfLine({ axis: xAxis, ticks: xAxisTicks, bandSize, entry, index });
-			const y =
-				isNullish(value) ? null : yAxis.scale.map(value);
+			const y = isNullish(value) ? null : yAxis.scale.map(value);
 			return {
 				x,
 				y: y ?? null,
@@ -655,8 +666,7 @@ export function computeLinePoints({
 				payload: entry,
 			};
 		}
-		const x =
-			isNullish(value) ? null : xAxis.scale.map(value);
+		const x = isNullish(value) ? null : xAxis.scale.map(value);
 		const y = getCateCoordinateOfLine({ axis: yAxis, ticks: yAxisTicks, bandSize, entry, index });
 		if (x == null || y == null) {
 			return null;
@@ -665,9 +675,8 @@ export function computeLinePoints({
 	});
 	// This map returns only objects or null, so Boolean removes exactly the nulls.
 	return points.filter(
-		Boolean as BooleanConstructor & ((point: (typeof points)[number]) => point is NonNullable<
-			typeof point
-		>),
+		Boolean as BooleanConstructor &
+			((point: (typeof points)[number]) => point is NonNullable<typeof point>),
 	);
 }
 
@@ -676,36 +685,40 @@ function LineFn<DataPointType = any, ValueAxisType = any>(
 ) {
 	const props = resolveDefaultProps(outsideProps, defaultLineProps);
 	const isPanorama = useIsPanorama();
-	return <RegisterGraphicalItemId id={props.id} type="line">
-		{(id) => <>
-			<SetLegendPayload legendPayload={computeLegendPayloadFromAreaData(props)} />
-			<SetLineTooltipEntrySettings
-				dataKey={props.dataKey}
-				data={props.data}
-				stroke={props.stroke}
-				strokeWidth={props.strokeWidth}
-				fill={props.fill}
-				name={props.name}
-				hide={props.hide}
-				unit={props.unit}
-				formatter={props.formatter}
-				tooltipType={props.tooltipType}
-				id={id}
-			/>
-			<SetCartesianGraphicalItem
-				type="line"
-				id={id}
-				data={props.data}
-				xAxisId={props.xAxisId}
-				yAxisId={props.yAxisId}
-				zAxisId={0}
-				dataKey={props.dataKey}
-				hide={props.hide}
-				isPanorama={isPanorama}
-			/>
-			<LineImpl {...props} id={id} />
-		</>}
-	</RegisterGraphicalItemId>;
+	return (
+		<RegisterGraphicalItemId id={props.id} type="line">
+			{(id) => (
+				<>
+					<SetLegendPayload legendPayload={computeLegendPayloadFromAreaData(props)} />
+					<SetLineTooltipEntrySettings
+						dataKey={props.dataKey}
+						data={props.data}
+						stroke={props.stroke}
+						strokeWidth={props.strokeWidth}
+						fill={props.fill}
+						name={props.name}
+						hide={props.hide}
+						unit={props.unit}
+						formatter={props.formatter}
+						tooltipType={props.tooltipType}
+						id={id}
+					/>
+					<SetCartesianGraphicalItem
+						type="line"
+						id={id}
+						data={props.data}
+						xAxisId={props.xAxisId}
+						yAxisId={props.yAxisId}
+						zAxisId={0}
+						dataKey={props.dataKey}
+						hide={props.hide}
+						isPanorama={isPanorama}
+					/>
+					<LineImpl {...props} id={id} />
+				</>
+			)}
+		</RegisterGraphicalItemId>
+	);
 }
 
 /**

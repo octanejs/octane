@@ -533,6 +533,9 @@ export function Rules(props) @{
 
 `<script>{JSON.stringify(props.rules) as string}</script>` is static script
 source, not an interpolation; the cast does not change the raw-text grammar.
+HTML ends a script at `</script` in any letter case, so a static body that
+contains one is a compile error; write `<\/script` instead, which JavaScript and
+JSON strings read the same way.
 `dangerouslySetInnerHTML` supplies the complete body and cannot be combined with
 child content. Client mounts and updates write it through `textContent`. Server
 rendering neutralizes case-insensitive opening and closing `script` tokens

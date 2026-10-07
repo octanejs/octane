@@ -48,7 +48,11 @@ export function TransitionStatusProbe(props: TransitionProbeProps) @{
 		foo={props.foo}
 		bar={props.bar}
 	>
-		{(status) => <div ref={nodeRef} id="status">{'status: ' + status}</div>}
+		{(status) => (
+			<div ref={nodeRef} id="status">
+				{'status: ' + status}
+			</div>
+		)}
 	</Transition>
 }
 
@@ -66,10 +70,11 @@ export function TransitionChildPropsProbe(props: TransitionProbeProps) @{
 		foo={props.foo}
 		bar={props.bar}
 	>
-		{(_status, childProps) =>
+		{(_status, childProps) => (
 			<div ref={nodeRef} id="filtered">
 				{'foo: ' + String(childProps.foo) + ', bar: ' + String(childProps.bar)}
-			</div>}
+			</div>
+		)}
 	</Transition>
 }
 
@@ -115,14 +120,13 @@ export type YoloProps = {
 
 export function YoloTransition(props: YoloProps & Record<string, unknown>) @{
 	const nodeRef = useRef<HTMLSpanElement | null>(null);
-	const { id, classNames, timeout, className, ...rest } = props as
-		YoloProps & {
-			className?: string;
-		} & Record<string, unknown>;
+	const { id, classNames, timeout, className, ...rest } = props as YoloProps & {
+		className?: string;
+	} & Record<string, unknown>;
 	<CSSTransition
 		nodeRef={nodeRef}
-		classNames={classNames as string ?? 'yolo'}
-		timeout={timeout as number ?? 0}
+		classNames={(classNames as string) ?? 'yolo'}
+		timeout={(timeout as number) ?? 0}
 		className={className as string | undefined}
 		{...rest}
 	>
@@ -140,11 +144,13 @@ export type GroupProbeProps = {
 };
 
 export function CSSTransitionGroupProbe(props: GroupProbeProps) @{
-	const children = props.items.filter(function keep(item) {
-		return item != null;
-	}).map(function toChild(id) {
-		return <YoloTransition key={id as string} id={id as string} />;
-	});
+	const children = props.items
+		.filter(function keep(item) {
+			return item != null;
+		})
+		.map(function toChild(id) {
+			return <YoloTransition key={id as string} id={id as string} />;
+		});
 	<TransitionGroup
 		enter={props.enter}
 		exit={props.exit}
@@ -159,9 +165,7 @@ function CallbackRefChild(props: { ref?: (node: HTMLSpanElement | null) => void 
 	<span ref={props.ref} id="callback-ref-child" />
 }
 
-export function CallbackRefGroupProbe(props: {
-	onRef: (node: HTMLSpanElement | null) => void;
-}) @{
+export function CallbackRefGroupProbe(props: { onRef: (node: HTMLSpanElement | null) => void }) @{
 	<TransitionGroup children={[<CallbackRefChild key="child" ref={props.onRef} />]} />
 }
 
@@ -170,12 +174,11 @@ function NullRenderChild() {
 }
 
 export function NullRenderGroupProbe(props: { active: boolean }) @{
-	const child =
-		props.active
-			? <CSSTransition key="null-child" classNames="yolo" timeout={0}>
-					<NullRenderChild />
-				</CSSTransition>
-			: null;
+	const child = props.active ? (
+		<CSSTransition key="null-child" classNames="yolo" timeout={0}>
+			<NullRenderChild />
+		</CSSTransition>
+	) : null;
 	<TransitionGroup children={child} />
 }
 
@@ -187,9 +190,11 @@ function ConditionalHostChild(props: { show: boolean }) {
 export function ConditionalHostGroupProbe(props: { show: boolean }) @{
 	<TransitionGroup
 		appear={true}
-		children={<CSSTransition key="child" classNames="yolo" timeout={0} appear>
-			<ConditionalHostChild show={props.show} />
-		</CSSTransition>}
+		children={
+			<CSSTransition key="child" classNames="yolo" timeout={0} appear>
+				<ConditionalHostChild show={props.show} />
+			</CSSTransition>
+		}
 	/>
 }
 
@@ -217,16 +222,20 @@ export function CSSTransitionReenterGroupProbe(props: ReenterGroupProbeProps) @{
 		childFactory={function applyDirection(child: ElementDescriptor) {
 			return cloneElement(child, { classNames: props.direction });
 		}}
-		children={<CSSTransition
-			key={props.text}
-			timeout={props.timeout ?? 100}
-			nodeRef={props.nodeRef}
-			onEnter={props.onEnter}
-			onEntering={props.onEntering}
-			onEntered={props.onEntered}
-		>
-			<span ref={props.nodeRef} id={'reenter-' + props.text}>{props.text as string}</span>
-		</CSSTransition>}
+		children={
+			<CSSTransition
+				key={props.text}
+				timeout={props.timeout ?? 100}
+				nodeRef={props.nodeRef}
+				onEnter={props.onEnter}
+				onEntering={props.onEntering}
+				onEntered={props.onEntered}
+			>
+				<span ref={props.nodeRef} id={'reenter-' + props.text}>
+					{props.text as string}
+				</span>
+			</CSSTransition>
+		}
 	/>
 }
 
@@ -244,31 +253,36 @@ export type SwitchProbeProps = {
 export function SwitchTransitionProbe(props: SwitchProbeProps) @{
 	const nodeRef = useRef<HTMLSpanElement | null>(null);
 	const child =
-		props.keyId == null
-			? null
-			: <Transition
-					key={props.keyId}
-					nodeRef={nodeRef}
-					timeout={0}
-					onEnter={props.onEnter}
-					onEntering={props.onEntering}
-					onEntered={props.onEntered}
-					onExit={props.onExit}
-					onExiting={props.onExiting}
-					onExited={props.onExited}
-				>
-					{(status) =>
-						<span ref={nodeRef} id="switch-status">{props.keyId + ' status: ' + status}</span>}
-				</Transition>;
+		props.keyId == null ? null : (
+			<Transition
+				key={props.keyId}
+				nodeRef={nodeRef}
+				timeout={0}
+				onEnter={props.onEnter}
+				onEntering={props.onEntering}
+				onEntered={props.onEntered}
+				onExit={props.onExit}
+				onExiting={props.onExiting}
+				onExited={props.onExited}
+			>
+				{(status) => (
+					<span ref={nodeRef} id="switch-status">
+						{props.keyId + ' status: ' + status}
+					</span>
+				)}
+			</Transition>
+		);
 	<SwitchTransition mode={props.mode} children={child} />
 }
 
 export function SwitchTransitionStaticChildProbe() @{
 	const nodeRef = useRef<HTMLSpanElement | null>(null);
 	<SwitchTransition
-		children={<Transition key="first" nodeRef={nodeRef} timeout={0}>
-			<span ref={nodeRef} />
-		</Transition>}
+		children={
+			<Transition key="first" nodeRef={nodeRef} timeout={0}>
+				<span ref={nodeRef} />
+			</Transition>
+		}
 	/>
 }
 
@@ -320,34 +334,33 @@ export type ReAddOnExitedGroupProbeProps = {
 
 export function ReAddOnExitedGroupProbe(props: ReAddOnExitedGroupProbeProps) @{
 	const nodeRef = useRef<HTMLSpanElement | null>(null);
-	const child =
-		props.show
-			? <Transition
-					key="child"
-					nodeRef={nodeRef}
-					timeout={0}
-					onEnter={function onEnter(isAppearing?: Element | boolean) {
-						props.log.push(isAppearing === true ? 'appear' : 'enter');
-					}}
-					onEntering={function onEntering(isAppearing?: Element | boolean) {
-						props.log.push(isAppearing === true ? 'appearing' : 'entering');
-					}}
-					onEntered={function onEntered(isAppearing?: Element | boolean) {
-						props.log.push(isAppearing === true ? 'appeared' : 'entered');
-					}}
-					onExit={function onExit() {
-						props.log.push('exit');
-					}}
-					onExiting={function onExiting() {
-						props.log.push('exiting');
-					}}
-					onExited={function onExited() {
-						props.log.push('exited');
-						props.onShowChange(true);
-					}}
-				>
-					<span ref={nodeRef} id="readd-child" />
-				</Transition>
-			: null;
+	const child = props.show ? (
+		<Transition
+			key="child"
+			nodeRef={nodeRef}
+			timeout={0}
+			onEnter={function onEnter(isAppearing?: Element | boolean) {
+				props.log.push(isAppearing === true ? 'appear' : 'enter');
+			}}
+			onEntering={function onEntering(isAppearing?: Element | boolean) {
+				props.log.push(isAppearing === true ? 'appearing' : 'entering');
+			}}
+			onEntered={function onEntered(isAppearing?: Element | boolean) {
+				props.log.push(isAppearing === true ? 'appeared' : 'entered');
+			}}
+			onExit={function onExit() {
+				props.log.push('exit');
+			}}
+			onExiting={function onExiting() {
+				props.log.push('exiting');
+			}}
+			onExited={function onExited() {
+				props.log.push('exited');
+				props.onShowChange(true);
+			}}
+		>
+			<span ref={nodeRef} id="readd-child" />
+		</Transition>
+	) : null;
 	<TransitionGroup appear={true} enter={true} exit={true} children={child} />
 }

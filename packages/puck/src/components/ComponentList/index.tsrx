@@ -17,9 +17,10 @@ const ComponentListItem = ({
 }) => {
 	const overrides = useAppStore((s) => s.overrides);
 	const canInsert = useAppStore(
-		(s) => s.permissions.getPermissions({
-			type: name,
-		}).insert,
+		(s) =>
+			s.permissions.getPermissions({
+				type: name,
+			}).insert,
 	);
 
 	// DEPRECATED
@@ -29,9 +30,11 @@ const ComponentListItem = ({
 		}
 	}, [overrides]);
 
-	return <Drawer.Item label={label} name={name} isDragDisabled={!canInsert}>
-		{overrides.componentItem ?? overrides.drawerItem}
-	</Drawer.Item>;
+	return (
+		<Drawer.Item label={label} name={name} isDragDisabled={!canInsert}>
+			{overrides.componentItem ?? overrides.drawerItem}
+		</Drawer.Item>
+	);
 };
 
 const ComponentList = ({
@@ -49,39 +52,49 @@ const ComponentList = ({
 
 	const { expanded = true } = componentList[id] || {};
 
-	return <div className={getClassName({ isExpanded: expanded })}>
-		{title &&
-			<button
-				type="button"
-				className={getClassName('title')}
-				onClick={() => setUi({
-					componentList: {
-						...componentList,
-						[id]: {
-							...componentList[id],
-							expanded: !expanded,
-						},
-					},
-				})}
-				title={expanded
-					? `Collapse${title ? ` ${title}` : ''}`
-					: `Expand${title ? ` ${title}` : ''}`}
-			>
-				<div>{title}</div>
-				<div className={getClassName('titleIcon')}>
-					{expanded ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
-				</div>
-			</button>}
-		<div className={getClassName('content')}>
-			<Drawer>{children || Object.keys(config.components).map((componentKey) => {
-						return <ComponentListItem
-							key={componentKey}
-							label={config.components[componentKey]['label'] ?? componentKey}
-							name={componentKey}
-						/>;
-					})}</Drawer>
+	return (
+		<div className={getClassName({ isExpanded: expanded })}>
+			{title && (
+				<button
+					type="button"
+					className={getClassName('title')}
+					onClick={() =>
+						setUi({
+							componentList: {
+								...componentList,
+								[id]: {
+									...componentList[id],
+									expanded: !expanded,
+								},
+							},
+						})
+					}
+					title={
+						expanded ? `Collapse${title ? ` ${title}` : ''}` : `Expand${title ? ` ${title}` : ''}`
+					}
+				>
+					<div>{title}</div>
+					<div className={getClassName('titleIcon')}>
+						{expanded ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
+					</div>
+				</button>
+			)}
+			<div className={getClassName('content')}>
+				<Drawer>
+					{children ||
+						Object.keys(config.components).map((componentKey) => {
+							return (
+								<ComponentListItem
+									key={componentKey}
+									label={config.components[componentKey]['label'] ?? componentKey}
+									name={componentKey}
+								/>
+							);
+						})}
+				</Drawer>
+			</div>
 		</div>
-	</div>;
+	);
 };
 
 ComponentList.Item = ComponentListItem;

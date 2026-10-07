@@ -18,10 +18,9 @@ import { useStyleResolver } from './style-context.tsrx';
 export type Ref<T> = ((value: T | null) => void) | { current: T | null } | null;
 export type ClassNamesState = Record<string, boolean>;
 export type CX = (state: ClassNamesState, ...classNames: (string | undefined)[]) => string;
-type DivProps =
-	Omit<Octane.JSX.IntrinsicElements['div'], 'ref'> & {
-		ref?: Octane.Ref<HTMLDivElement>;
-	};
+type DivProps = Omit<Octane.JSX.IntrinsicElements['div'], 'ref'> & {
+	ref?: Octane.Ref<HTMLDivElement>;
+};
 type InputPropsBase = Omit<Octane.JSX.IntrinsicElements['input'], 'ref'>;
 type SpanProps = Octane.JSX.IntrinsicElements['span'];
 type SvgProps = Octane.JSX.IntrinsicElements['svg'];
@@ -85,9 +84,7 @@ export function CrossIcon(props: CrossIconProps) @{
 		focusable="false"
 		className={resolved.className}
 	>
-		<path
-			d="M14.348 14.849c-0.469 0.469-1.229 0.469-1.697 0l-2.651-3.030-2.651 3.029c-0.469 0.469-1.229 0.469-1.697 0-0.469-0.469-0.469-1.229 0-1.697l2.758-3.15-2.759-3.152c-0.469-0.469-0.469-1.228 0-1.697s1.228-0.469 1.697 0l2.652 3.031 2.651-3.031c0.469-0.469 1.228-0.469 1.697 0s0.469 1.229 0 1.697l-2.758 3.152 2.758 3.15c0.469 0.469 0.469 1.229 0 1.698z"
-		/>
+		<path d="M14.348 14.849c-0.469 0.469-1.229 0.469-1.697 0l-2.651-3.030-2.651 3.029c-0.469 0.469-1.229 0.469-1.697 0-0.469-0.469-0.469-1.229 0-1.697l2.758-3.15-2.759-3.152c-0.469-0.469-0.469-1.228 0-1.697s1.228-0.469 1.697 0l2.652 3.031 2.651-3.031c0.469-0.469 1.228-0.469 1.697 0s0.469 1.229 0 1.697l-2.758 3.152 2.758 3.15c0.469 0.469 0.469 1.229 0 1.698z" />
 	</svg>
 }
 
@@ -105,9 +102,7 @@ export function DownChevron(props: DownChevronProps) @{
 		focusable="false"
 		className={resolved.className}
 	>
-		<path
-			d="M4.516 7.548c0.436-0.446 1.043-0.481 1.576 0l3.908 3.747 3.908-3.747c0.533-0.481 1.141-0.446 1.574 0 0.436 0.445 0.408 1.197 0 1.615-0.406 0.418-4.695 4.502-4.695 4.502-0.217 0.223-0.502 0.335-0.787 0.335s-0.57-0.112-0.789-0.335c0 0-4.287-4.084-4.695-4.502s-0.436-1.17 0-1.615z"
-		/>
+		<path d="M4.516 7.548c0.436-0.446 1.043-0.481 1.576 0l3.908 3.747 3.908-3.747c0.533-0.481 1.141-0.446 1.574 0 0.436 0.445 0.408 1.197 0 1.615-0.406 0.418-4.695 4.502-4.695 4.502-0.217 0.223-0.502 0.335-0.787 0.335s-0.57-0.112-0.789-0.335c0 0-4.287-4.084-4.695-4.502s-0.436-1.17 0-1.615z" />
 	</svg>
 }
 
@@ -130,7 +125,9 @@ export function SelectContainer(props: ContainerProps) @{
 			'--is-rtl': isRtl,
 		})}
 		{...innerProps}
-	>{children}</div>
+	>
+		{children}
+	</div>
 }
 
 export interface ControlProps<
@@ -158,7 +155,9 @@ export function Control(props: ControlProps) @{
 		})}
 		{...innerProps}
 		aria-disabled={isDisabled || undefined}
-	>{children}</div>
+	>
+		{children}
+	</div>
 }
 
 export interface ValueContainerProps<
@@ -180,7 +179,9 @@ export function ValueContainer(props: ValueContainerProps) @{
 			'value-container--has-value': hasValue,
 		})}
 		{...innerProps}
-	>{children}</div>
+	>
+		{children}
+	</div>
 }
 
 export interface IndicatorsContainerProps<
@@ -194,10 +195,9 @@ export interface IndicatorsContainerProps<
 }
 
 export function IndicatorsContainer(props: IndicatorsContainerProps) @{
-	<div
-		{...useStyleProps(props, 'indicatorsContainer', { indicators: true })}
-		{...props.innerProps}
-	>{props.children}</div>
+	<div {...useStyleProps(props, 'indicatorsContainer', { indicators: true })} {...props.innerProps}>
+		{props.children}
+	</div>
 }
 
 export interface PlaceholderProps<
@@ -212,10 +212,9 @@ export interface PlaceholderProps<
 }
 
 export function Placeholder(props: PlaceholderProps) @{
-	<div
-		{...useStyleProps(props, 'placeholder', { placeholder: true })}
-		{...props.innerProps}
-	>{props.children}</div>
+	<div {...useStyleProps(props, 'placeholder', { placeholder: true })} {...props.innerProps}>
+		{props.children}
+	</div>
 }
 
 export interface SingleValueProps<
@@ -236,7 +235,9 @@ export function SingleValue(props: SingleValueProps) @{
 			'single-value--is-disabled': props.isDisabled,
 		})}
 		{...props.innerProps}
-	>{props.children}</div>
+	>
+		{props.children}
+	</div>
 }
 
 export interface OptionProps<
@@ -266,14 +267,17 @@ export function Option(props: OptionProps) @{
 		ref={props.innerRef}
 		aria-disabled={props.isDisabled}
 		{...props.innerProps}
-	>{props.children}</div>
+	>
+		{props.children}
+	</div>
 }
 
 export interface InputProps<
 	Option = unknown,
 	IsMulti extends boolean = boolean,
 	Group extends GroupBase<Option> = GroupBase<Option>,
-> extends CommonComponentProps<Option, IsMulti, Group>, Omit<InputPropsBase, 'className'> {
+>
+	extends CommonComponentProps<Option, IsMulti, Group>, Omit<InputPropsBase, 'className'> {
 	innerRef?: Ref<HTMLInputElement>;
 	isHidden: boolean;
 	isDisabled?: boolean;
@@ -406,11 +410,9 @@ export interface MenuProps<
 }
 
 export function Menu(props: MenuProps) @{
-	<div
-		{...useStyleProps(props, 'menu', { menu: true })}
-		ref={props.innerRef}
-		{...props.innerProps}
-	>{props.children}</div>
+	<div {...useStyleProps(props, 'menu', { menu: true })} ref={props.innerRef} {...props.innerProps}>
+		{props.children}
+	</div>
 }
 
 export interface MenuListProps<
@@ -433,7 +435,9 @@ export function MenuList(props: MenuListProps) @{
 		})}
 		ref={props.innerRef}
 		{...props.innerProps}
-	>{props.children}</div>
+	>
+		{props.children}
+	</div>
 }
 
 export interface NoticeProps<
@@ -453,7 +457,9 @@ export function NoOptionsMessage(props: NoticeProps) @{
 			'menu-notice--no-options': true,
 		})}
 		{...props.innerProps}
-	>{children}</div>
+	>
+		{children}
+	</div>
 }
 
 export function LoadingMessage(props: NoticeProps) @{
@@ -464,7 +470,9 @@ export function LoadingMessage(props: NoticeProps) @{
 			'menu-notice--loading': true,
 		})}
 		{...props.innerProps}
-	>{children}</div>
+	>
+		{children}
+	</div>
 }
 
 type ComponentType<Props> = (props: Props) => Octane.JSX.Element;
@@ -489,8 +497,8 @@ export type GroupHeadingProps<
 	Option = unknown,
 	IsMulti extends boolean = boolean,
 	Group extends GroupBase<Option> = GroupBase<Option>,
-> =
-	CommonComponentProps<Option, IsMulti, Group> & Omit<DivProps, 'className'> & {
+> = CommonComponentProps<Option, IsMulti, Group> &
+	Omit<DivProps, 'className'> & {
 		children?: OctaneNode;
 		id: string;
 		data: unknown;
@@ -528,7 +536,9 @@ export function Group(props: GroupProps) @{
 			hasValue={props.hasValue}
 			isMulti={props.isMulti}
 			isRtl={props.isRtl}
-		>{props.label}</Heading>
+		>
+			{props.label}
+		</Heading>
 		<div>{props.children}</div>
 	</div>
 }
@@ -563,7 +573,9 @@ export interface MultiValueRemoveProps<
 }
 
 export function MultiValueRemove(props: MultiValueRemoveProps) @{
-	<div role="button" {...props.innerProps}>{props.children || <CrossIcon size={14} />}</div>
+	<div role="button" {...props.innerProps}>
+		{props.children || <CrossIcon size={14} />}
+	</div>
 }
 
 export interface MultiValueProps<
@@ -607,7 +619,9 @@ export function MultiValue(props: MultiValueProps) @{
 				...useStyleProps(props, 'multiValueLabel', { 'multi-value__label': true }),
 			}}
 			selectProps={props.selectProps}
-		>{props.children}</Label>
+		>
+			{props.children}
+		</Label>
 		<Remove
 			data={props.data}
 			innerProps={{
@@ -670,12 +684,9 @@ export function LoadingIndicator(props: LoadingIndicatorProps) @{
 
 type MenuPlacement = 'auto' | 'bottom' | 'top';
 type MenuPosition = 'absolute' | 'fixed';
-const PortalPlacementContext = createContext<
-	| {
-			setPortalPlacement: (placement: 'bottom' | 'top') => void;
-	  }
-	| null
->(null);
+const PortalPlacementContext = createContext<{
+	setPortalPlacement: (placement: 'bottom' | 'top') => void;
+} | null>(null);
 
 function coercePlacement(placement: MenuPlacement): 'bottom' | 'top' {
 	return placement === 'auto' ? 'bottom' : placement;
@@ -716,23 +727,20 @@ export function MenuPortal(props: MenuPortalProps) @{
 	useLayoutEffect(() => {
 		setPortalPlacement(coercePlacement(props.menuPlacement));
 	}, [props.menuPlacement]);
-	const [computedPosition, setComputedPosition] = useState<
-		| {
-				offset: number;
-				rect: { left: number; width: number };
-		  }
-		| null
-	>(null);
+	const [computedPosition, setComputedPosition] = useState<{
+		offset: number;
+		rect: { left: number; width: number };
+	} | null>(null);
 
 	const updateComputedPosition = useCallback(() => {
 		if (!props.controlElement) return;
 		const rect = boundingClientObject(props.controlElement);
-		const scrollDistance =
-			props.menuPosition === 'fixed' ? 0 : window.pageYOffset;
+		const scrollDistance = props.menuPosition === 'fixed' ? 0 : window.pageYOffset;
 		const offset = rect[placement] + scrollDistance;
 		if (
-			offset !== computedPosition?.offset || rect.left !== computedPosition?.rect.left ||
-				rect.width !== computedPosition?.rect.width
+			offset !== computedPosition?.offset ||
+			rect.left !== computedPosition?.rect.left ||
+			rect.width !== computedPosition?.rect.width
 		) {
 			setComputedPosition({ offset, rect });
 		}
@@ -767,12 +775,15 @@ export function MenuPortal(props: MenuPortalProps) @{
 		return () => cleanupRef.current?.();
 	}, [runAutoUpdate]);
 
-	const setMenuPortalElement = useCallback((element: HTMLDivElement | null) => {
-		menuPortalRef.current = element;
-		runAutoUpdate();
-	}, [runAutoUpdate]);
+	const setMenuPortalElement = useCallback(
+		(element: HTMLDivElement | null) => {
+			menuPortalRef.current = element;
+			runAutoUpdate();
+		},
+		[runAutoUpdate],
+	);
 
-	if (!props.appendTo && props.menuPosition !== 'fixed' || !computedPosition) return null;
+	if ((!props.appendTo && props.menuPosition !== 'fixed') || !computedPosition) return null;
 
 	const menuWrapperProps: DivProps = {
 		...useStyleProps(
@@ -831,8 +842,7 @@ export type SelectComponentsConfig<
 	Option = unknown,
 	IsMulti extends boolean = boolean,
 	Group extends GroupBase<Option> = GroupBase<Option>,
-> =
-	Partial<SelectComponents<Option, IsMulti, Group>>;
+> = Partial<SelectComponents<Option, IsMulti, Group>>;
 
 export const components: SelectComponents = {
 	ClearIndicator,

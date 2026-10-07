@@ -44,24 +44,25 @@ export function BaseEdge({
 	interactionWidth = 20,
 	...props
 }: BaseEdgeProps) {
-	return <>
-		<path
-			{...props}
-			d={path}
-			fill="none"
-			className={cc(['react-flow__edge-path', props.className])}
-		/>
-		{interactionWidth
-			? <path
+	return (
+		<>
+			<path
+				{...props}
+				d={path}
+				fill="none"
+				className={cc(['react-flow__edge-path', props.className])}
+			/>
+			{interactionWidth ? (
+				<path
 					d={path}
 					fill="none"
 					strokeOpacity={0}
 					strokeWidth={interactionWidth}
 					className="react-flow__edge-interaction"
 				/>
-			: null}
-		{label && isNumeric(labelX) && isNumeric(labelY)
-			? <EdgeText
+			) : null}
+			{label && isNumeric(labelX) && isNumeric(labelY) ? (
+				<EdgeText
 					x={labelX}
 					y={labelY}
 					label={label}
@@ -71,6 +72,7 @@ export function BaseEdge({
 					labelBgPadding={labelBgPadding}
 					labelBgBorderRadius={labelBgBorderRadius}
 				/>
-			: null}
-	</>;
+			) : null}
+		</>
+	);
 }

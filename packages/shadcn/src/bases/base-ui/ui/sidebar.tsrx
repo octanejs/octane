@@ -74,12 +74,14 @@ export function useSidebar(): SidebarContextProps {
 	return context;
 }
 
-export function SidebarProvider(props: Props & {
-	defaultOpen?: boolean;
-	open?: boolean;
-	onOpenChange?: (open: boolean) => void;
-	style?: Record<string, string>;
-}) {
+export function SidebarProvider(
+	props: Props & {
+		defaultOpen?: boolean;
+		open?: boolean;
+		onOpenChange?: (open: boolean) => void;
+		style?: Record<string, string>;
+	},
+) {
 	const {
 		defaultOpen = true,
 		open: openProp,
@@ -97,8 +99,7 @@ export function SidebarProvider(props: Props & {
 	const [_open, _setOpen] = useState(defaultOpen);
 	const open = openProp ?? _open;
 	const setOpen = useCallback((value: boolean | ((value: boolean) => boolean)) => {
-		const openState =
-			typeof value === 'function' ? value(open) : value;
+		const openState = typeof value === 'function' ? value(open) : value;
 		if (setOpenProp) {
 			setOpenProp(openState);
 		} else {
@@ -106,8 +107,7 @@ export function SidebarProvider(props: Props & {
 		}
 
 		// This sets the cookie to keep the sidebar state.
-		document.cookie =
-			`${SIDEBAR_COOKIE_NAME}=${openState}; path=/; max-age=${SIDEBAR_COOKIE_MAX_AGE}`;
+		document.cookie = `${SIDEBAR_COOKIE_NAME}=${openState}; path=/; max-age=${SIDEBAR_COOKIE_MAX_AGE}`;
 	});
 
 	// Helper to toggle the sidebar.
@@ -132,17 +132,15 @@ export function SidebarProvider(props: Props & {
 	// This makes it easier to style the sidebar with Tailwind classes.
 	const state = open ? 'expanded' : 'collapsed';
 
-	const contextValue = useMemo<SidebarContextProps>(
-		() => ({
-			state,
-			open,
-			setOpen,
-			isMobile,
-			openMobile,
-			setOpenMobile,
-			toggleSidebar,
-		}),
-	);
+	const contextValue = useMemo<SidebarContextProps>(() => ({
+		state,
+		open,
+		setOpen,
+		isMobile,
+		openMobile,
+		setOpenMobile,
+		toggleSidebar,
+	}));
 
 	return createElement(
 		SidebarContext,
@@ -167,12 +165,14 @@ export function SidebarProvider(props: Props & {
 	);
 }
 
-export function Sidebar(props: Props & {
-	side?: 'left' | 'right';
-	variant?: 'sidebar' | 'floating' | 'inset';
-	collapsible?: 'offcanvas' | 'icon' | 'none';
-	dir?: string;
-}) {
+export function Sidebar(
+	props: Props & {
+		side?: 'left' | 'right';
+		variant?: 'sidebar' | 'floating' | 'inset';
+		collapsible?: 'offcanvas' | 'icon' | 'none';
+		dir?: string;
+	},
+) {
 	const {
 		side = 'left',
 		variant = 'sidebar',
@@ -273,7 +273,8 @@ export function Sidebar(props: Props & {
 				{
 					'data-sidebar': 'sidebar',
 					'data-slot': 'sidebar-inner',
-					className: 'flex size-full flex-col bg-sidebar group-data-[variant=floating]:rounded-lg group-data-[variant=floating]:shadow-sm group-data-[variant=floating]:ring-1 group-data-[variant=floating]:ring-sidebar-border',
+					className:
+						'flex size-full flex-col bg-sidebar group-data-[variant=floating]:rounded-lg group-data-[variant=floating]:shadow-sm group-data-[variant=floating]:ring-1 group-data-[variant=floating]:ring-sidebar-border',
 				},
 				props.children,
 			),
@@ -281,7 +282,11 @@ export function Sidebar(props: Props & {
 	);
 }
 
-export function SidebarTrigger({ className, onClick, ...props }: Props & {
+export function SidebarTrigger({
+	className,
+	onClick,
+	...props
+}: Props & {
 	onClick?: (event: MouseEvent) => void;
 }) @{
 	const { toggleSidebar } = useSidebar();
@@ -394,7 +399,10 @@ export function SidebarGroup({ className, ...props }: Props) @{
 	/>
 }
 
-export function SidebarGroupLabel({ className, ...props }: Props & {
+export function SidebarGroupLabel({
+	className,
+	...props
+}: Props & {
 	/** Not supported in this base — see the header. Declared so it fails to compile, not silently. */
 	asChild?: never;
 }) @{
@@ -409,7 +417,10 @@ export function SidebarGroupLabel({ className, ...props }: Props & {
 	/>
 }
 
-export function SidebarGroupAction({ className, ...props }: Props & {
+export function SidebarGroupAction({
+	className,
+	...props
+}: Props & {
 	/** Not supported in this base — see the header. Declared so it fails to compile, not silently. */
 	asChild?: never;
 }) @{
@@ -461,7 +472,8 @@ export const sidebarMenuButtonVariants = cva(
 		variants: {
 			variant: {
 				default: 'hover:bg-sidebar-accent hover:text-sidebar-accent-foreground',
-				outline: 'bg-background shadow-[0_0_0_1px_var(--sidebar-border)] hover:bg-sidebar-accent hover:text-sidebar-accent-foreground hover:shadow-[0_0_0_1px_var(--sidebar-accent)]',
+				outline:
+					'bg-background shadow-[0_0_0_1px_var(--sidebar-border)] hover:bg-sidebar-accent hover:text-sidebar-accent-foreground hover:shadow-[0_0_0_1px_var(--sidebar-accent)]',
 			},
 			size: {
 				default: 'h-8 text-sm',
@@ -476,14 +488,16 @@ export const sidebarMenuButtonVariants = cva(
 	},
 );
 
-export function SidebarMenuButton(props: Props & {
-	/** Not supported in this base — see the header. Declared so it fails to compile, not silently. */
-	asChild?: never;
-	isActive?: boolean;
-	tooltip?: string | Record<string, unknown>;
-	variant?: VariantProps<typeof sidebarMenuButtonVariants>['variant'];
-	size?: VariantProps<typeof sidebarMenuButtonVariants>['size'];
-}) {
+export function SidebarMenuButton(
+	props: Props & {
+		/** Not supported in this base — see the header. Declared so it fails to compile, not silently. */
+		asChild?: never;
+		isActive?: boolean;
+		tooltip?: string | Record<string, unknown>;
+		variant?: VariantProps<typeof sidebarMenuButtonVariants>['variant'];
+		size?: VariantProps<typeof sidebarMenuButtonVariants>['size'];
+	},
+) {
 	const {
 		isActive = false,
 		variant = 'default',
@@ -512,8 +526,7 @@ export function SidebarMenuButton(props: Props & {
 		return button;
 	}
 
-	const tooltipProps =
-		typeof tooltip === 'string' ? { children: tooltip } : tooltip;
+	const tooltipProps = typeof tooltip === 'string' ? { children: tooltip } : tooltip;
 
 	return createElement(
 		Tooltip,
@@ -529,7 +542,11 @@ export function SidebarMenuButton(props: Props & {
 	);
 }
 
-export function SidebarMenuAction({ className, showOnHover = false, ...props }: Props & {
+export function SidebarMenuAction({
+	className,
+	showOnHover = false,
+	...props
+}: Props & {
 	/** Not supported in this base — see the header. Declared so it fails to compile, not silently. */
 	asChild?: never;
 	showOnHover?: boolean;
@@ -559,7 +576,11 @@ export function SidebarMenuBadge({ className, ...props }: Props) @{
 	/>
 }
 
-export function SidebarMenuSkeleton({ className, showIcon = false, ...props }: Props & {
+export function SidebarMenuSkeleton({
+	className,
+	showIcon = false,
+	...props
+}: Props & {
 	showIcon?: boolean;
 }) @{
 	// Random width between 50 to 90%.

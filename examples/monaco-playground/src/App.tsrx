@@ -18,9 +18,9 @@ export function App() @{
 				<select
 					aria-label="Theme"
 					value={theme}
-					onChange={(event) => setTheme(
-						(event.currentTarget as HTMLSelectElement).value as 'light' | 'vs-dark',
-					)}
+					onChange={(event) =>
+						setTheme((event.currentTarget as HTMLSelectElement).value as 'light' | 'vs-dark')
+					}
 				>
 					<option value="light">light</option>
 					<option value="vs-dark">vs-dark</option>
@@ -53,7 +53,9 @@ export function App() @{
 				}}
 			/>
 		</div>
-		<pre class="value-preview" data-testid="value-preview">{value as string}</pre>
+		<pre class="value-preview" data-testid="value-preview">
+			{value as string}
+		</pre>
 		<h2>DiffEditor</h2>
 		<div class="diff-frame" data-testid="diff-frame">
 			<DiffEditor

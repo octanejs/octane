@@ -89,7 +89,9 @@ export function VisibleHydrate(props: HydrateProps) @{
 
 	<div ref={markerRef}>
 		<Suspense fallback={props.fallback}>
-			<HydrationBoundary g={gate} o={props.onHydrated}>{props.children}</HydrationBoundary>
+			<HydrationBoundary g={gate} o={props.onHydrated}>
+				{props.children}
+			</HydrationBoundary>
 		</Suspense>
 	</div>
 }
@@ -110,11 +112,14 @@ export function visible(
 				return;
 			}
 
-			const observer = new IntersectionObserver((entries) => {
-				if (!entries[0]!.isIntersecting) return;
-				observer.disconnect();
-				callback();
-			}, { rootMargin, threshold });
+			const observer = new IntersectionObserver(
+				(entries) => {
+					if (!entries[0]!.isIntersecting) return;
+					observer.disconnect();
+					callback();
+				},
+				{ rootMargin, threshold },
+			);
 			observer.observe(element);
 			return () => observer.disconnect();
 		},

@@ -24,15 +24,19 @@ export const Sidebar: FC<SidebarProps> = ({
 }) => {
 	if (!isVisible) return null;
 
-	return <>
-		<div ref={sidebarRef} className={getClassName({ [position]: true })}>{children}</div>
-		<div className={`${getClassName('resizeHandle')}`}>
-			<ResizeHandle
-				position={position}
-				sidebarRef={sidebarRef}
-				onResize={onResize}
-				onResizeEnd={onResizeEnd}
-			/>
-		</div>
-	</>;
+	return (
+		<>
+			<div ref={sidebarRef} className={getClassName({ [position]: true })}>
+				{children}
+			</div>
+			<div className={`${getClassName('resizeHandle')}`}>
+				<ResizeHandle
+					position={position}
+					sidebarRef={sidebarRef}
+					onResize={onResize}
+					onResizeEnd={onResizeEnd}
+				/>
+			</div>
+		</>
+	);
 };

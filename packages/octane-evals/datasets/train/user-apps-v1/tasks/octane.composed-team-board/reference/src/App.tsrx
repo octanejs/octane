@@ -49,16 +49,13 @@ export function TeamSummary(props: { total: number }) @{
 export function App() @{
 	const [applause, setApplause] = useState<Record<string, number>>({ ada: 0, grace: 0 });
 	const [reversed, setReversed] = useState(false);
-	const orderedMembers =
-		reversed ? [...members].reverse() : members;
+	const orderedMembers = reversed ? [...members].reverse() : members;
 	const total = Object.values(applause).reduce((sum, count) => sum + count, 0);
 	const applaud = (id: string) => {
-		setApplause(
-			(current) => ({
-				...current,
-				[id]: (current[id] ?? 0) + 1,
-			}),
-		);
+		setApplause((current) => ({
+			...current,
+			[id]: (current[id] ?? 0) + 1,
+		}));
 	};
 
 	<main>

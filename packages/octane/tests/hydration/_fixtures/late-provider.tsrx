@@ -9,9 +9,11 @@ function Late(props: { show: boolean }) {
 
 function LateProvided(props: { show: boolean }) {
 	if (!props.show) return null;
-	return <Context value={1}>
-		<p class="late">late content</p>
-	</Context>;
+	return (
+		<Context value={1}>
+			<p class="late">late content</p>
+		</Context>
+	);
 }
 
 function Root(props: { children?: OctaneNode }) {
@@ -20,31 +22,35 @@ function Root(props: { children?: OctaneNode }) {
 
 function Case(props: { variant: 'a' | 'b' | 'c' | 'd' }) {
 	const [show, setShow] = useState(false);
-	return <section id={props.variant}>
-		<button onClick={() => setShow(!show)}>
-			{show ? 'close' : 'open'}
-		</button>
-		{props.variant === 'a'
-			? <Context value={1}>
+	return (
+		<section id={props.variant}>
+			<button onClick={() => setShow(!show)}>{show ? 'close' : 'open'}</button>
+			{props.variant === 'a' ? (
+				<Context value={1}>
 					<Late show={show} />
 				</Context>
-			: props.variant === 'b'
-				? <LateProvided show={show} />
-				: props.variant === 'c'
-					? <Root>
-							<LateProvided show={show} />
-						</Root>
-					: <Root>
-							<Late show={show} />
-						</Root>}
-	</section>;
+			) : props.variant === 'b' ? (
+				<LateProvided show={show} />
+			) : props.variant === 'c' ? (
+				<Root>
+					<LateProvided show={show} />
+				</Root>
+			) : (
+				<Root>
+					<Late show={show} />
+				</Root>
+			)}
+		</section>
+	);
 }
 
 export function LateProviderApp() {
-	return <main>
-		<Case variant="a" />
-		<Case variant="b" />
-		<Case variant="c" />
-		<Case variant="d" />
-	</main>;
+	return (
+		<main>
+			<Case variant="a" />
+			<Case variant="b" />
+			<Case variant="c" />
+			<Case variant="d" />
+		</main>
+	);
 }

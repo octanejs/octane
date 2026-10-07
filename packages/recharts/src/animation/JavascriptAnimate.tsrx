@@ -56,8 +56,7 @@ export function JavascriptAnimate(outsideProps: JavascriptAnimateProps) {
 		children,
 	} = props;
 	const prefersReducedMotion = usePrefersReducedMotion();
-	const isActive =
-		isActiveProp === 'auto' ? !Global.isSsr && !prefersReducedMotion : isActiveProp;
+	const isActive = isActiveProp === 'auto' ? !Global.isSsr && !prefersReducedMotion : isActiveProp;
 	const animationController = useAnimationController(props.animationController);
 	const [style, setStyle] = useState(isActive ? from : to);
 	useEffect(() => {

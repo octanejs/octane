@@ -6,9 +6,11 @@ interface WrapperProps {
 
 function InteractiveLeaf() {
 	const [count, setCount] = useState(0);
-	return <button data-hydration-range-leaf="" onClick={() => setCount(count + 1)}>
-		{'count:' + count}
-	</button>;
+	return (
+		<button data-hydration-range-leaf="" onClick={() => setCount(count + 1)}>
+			{'count:' + count}
+		</button>
+	);
 }
 
 function Wrapper(props: WrapperProps) {

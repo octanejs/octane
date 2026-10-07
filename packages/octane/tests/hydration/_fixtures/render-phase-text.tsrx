@@ -49,9 +49,7 @@ export function SettlingHoleText(props: SettlingTextProps) @{
 	const [settled, settleNow] = useSettleWhileRendering(props.settle);
 	<div>
 		<i>{settleNow() as string}</i>
-		<p>
-			{settled ? props.settled : props.first}
-		</p>
+		<p>{settled ? props.settled : props.first}</p>
 	</div>
 }
 

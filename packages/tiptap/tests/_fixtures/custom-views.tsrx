@@ -33,9 +33,7 @@ function PanelNodeView(props) @{
 	>
 		<output data-node-theme="true">{theme}</output>
 		<output data-node-label="true">{props.node.attrs.label as string}</output>
-		<output data-node-selected="true">
-			{props.selected ? 'selected' : 'unselected'}
-		</output>
+		<output data-node-selected="true">{props.selected ? 'selected' : 'unselected'}</output>
 		<button
 			type="button"
 			contentEditable={false}
@@ -169,9 +167,7 @@ const initialContent = {
 		{
 			type: 'panelNode',
 			attrs: { label: 'initial' },
-			content: [
-				{ type: 'text', text: 'Editable panel content' },
-			],
+			content: [{ type: 'text', text: 'Editable panel content' }],
 		},
 		{
 			type: 'paragraph',
@@ -179,9 +175,7 @@ const initialContent = {
 				{
 					type: 'text',
 					text: 'Marked text',
-					marks: [
-						{ type: 'badgeMark', attrs: { tone: 'warm' } },
-					],
+					marks: [{ type: 'badgeMark', attrs: { tone: 'warm' } }],
 				},
 				{ type: 'text', text: ' tail' },
 			],

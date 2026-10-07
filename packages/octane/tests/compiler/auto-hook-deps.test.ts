@@ -64,7 +64,6 @@ describe('automatic hook dependencies — full compiler', () => {
 	it.each([
 		['const row', 'const item'],
 		['let row', 'let item'],
-		['var row', 'var item'],
 		['bare row', 'item'],
 		['object row', '{ value: item }'],
 		['array row', '[item]'],
@@ -98,6 +97,29 @@ describe('automatic hook dependencies — full compiler', () => {
 					).toEqual([['method(props, "log")'], ['method(props, "log")', 'item']]);
 				}
 			}
+		}
+	});
+
+	it('rejects a var row that redeclares an outer binding', () => {
+		// A `var` row belongs to the component function, as in JavaScript, so it
+		// cannot shadow the outer `item`: it redeclares it.
+		const source = `
+      import { useEffect } from 'octane';
+      export function Rows(props) @{
+        const item = 'outer';
+        <section>@for (var item of props.items; key item) {
+          useEffect(() => props.log(item));
+          <div>{item as string}</div>
+        }</section>
+      }
+    `;
+		for (const mode of ['client', 'server'] as const) {
+			expect(() => compile(source, 'rows.tsrx', { mode })).toThrow(
+				expect.objectContaining({
+					name: 'SyntaxError',
+					message: expect.stringContaining("'item'"),
+				}),
+			);
 		}
 	});
 

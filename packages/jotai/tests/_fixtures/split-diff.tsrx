@@ -18,8 +18,12 @@ function Todo(props: { todoAtom: any; remove: any }) @{
 			id={'t-' + todo.id}
 			class={todo.done ? 'done' : 'todo'}
 			onClick={() => setTodo({ ...todo, done: !todo.done })}
-		>{todo.text as string}</span>
-		<button id={'rm-' + todo.id} onClick={props.remove}>x</button>
+		>
+			{todo.text as string}
+		</span>
+		<button id={'rm-' + todo.id} onClick={props.remove}>
+			x
+		</button>
 	</li>
 }
 

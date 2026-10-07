@@ -14,15 +14,18 @@ const sensors = [];
 const plugins = [Feedback];
 
 function pluginNames(pluginsValue: unknown): string {
-	return ((Array.isArray(pluginsValue) ? pluginsValue : [])).map(function (plugin: unknown) {
-		if (typeof plugin === 'function') {
-			return (plugin as { name?: string }).name ?? 'anonymous';
-		}
-		if (plugin && typeof plugin === 'object') {
-			return (plugin as { constructor?: { name?: string } }).constructor?.name ?? 'unknown';
-		}
-		return String(plugin);
-	}).sort().join('|');
+	return (Array.isArray(pluginsValue) ? pluginsValue : [])
+		.map(function (plugin: unknown) {
+			if (typeof plugin === 'function') {
+				return (plugin as { name?: string }).name ?? 'anonymous';
+			}
+			if (plugin && typeof plugin === 'object') {
+				return (plugin as { constructor?: { name?: string } }).constructor?.name ?? 'unknown';
+			}
+			return String(plugin);
+		})
+		.sort()
+		.join('|');
 }
 
 function DraggableCard() @{
@@ -34,7 +37,9 @@ function DraggableCard() @{
 
 function DropTarget() @{
 	const droppable = useDroppable({ id: 'drop' });
-	<div id="drop" ref={droppable.ref} data-target={droppable.isDropTarget as string}>drop</div>
+	<div id="drop" ref={droppable.ref} data-target={droppable.isDropTarget as string}>
+		drop
+	</div>
 }
 
 function OperationStatus() @{
@@ -57,7 +62,9 @@ function Controls(props: { sourceId?: string }) @{
 		<button id="move" onClick={() => manager.actions.move({ by: { x: 10, y: 10 } })}>
 			move
 		</button>
-		<button id="drop-control" onClick={() => manager.actions.stop()}>drop</button>
+		<button id="drop-control" onClick={() => manager.actions.stop()}>
+			drop
+		</button>
 	</nav>
 }
 
@@ -105,10 +112,9 @@ function DefaultSortableItem(props: { id: string; index: number }) @{
 		ref={sortable.ref}
 		data-plugins={pluginNames(sortable.sortable.draggable.plugins) as string}
 	>
-		<button
-			id={`${props.id}-handle` as string}
-			ref={sortable.handleRef}
-		>{props.id as string}</button>
+		<button id={`${props.id}-handle` as string} ref={sortable.handleRef}>
+			{props.id as string}
+		</button>
 	</li>
 }
 

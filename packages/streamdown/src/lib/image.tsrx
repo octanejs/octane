@@ -8,8 +8,11 @@ import { save } from './utils';
 
 const fileExtensionPattern = /\.[^/.]+$/;
 
-type ImageComponentProps =
-	DetailedHTMLProps<ImgHTMLAttributes<HTMLImageElement>, HTMLImageElement> & ExtraProps;
+type ImageComponentProps = DetailedHTMLProps<
+	ImgHTMLAttributes<HTMLImageElement>,
+	HTMLImageElement
+> &
+	ExtraProps;
 
 export const ImageComponent = ({
 	node,
@@ -38,8 +41,8 @@ export const ImageComponent = ({
 
 	// Handle images already complete before Octane attaches event handlers (e.g. cached or SSR hydration)
 	useEffect(() => {
-		setImageState(
-			(state) => state.source === src ? state : { error: false, loaded: false, source: src },
+		setImageState((state) =>
+			state.source === src ? state : { error: false, loaded: false, source: src },
 		);
 
 		const img = imgRef.current;
@@ -49,15 +52,21 @@ export const ImageComponent = ({
 		}
 	}, [src]);
 
-	const handleLoad = useCallback<NativeEventHandler<HTMLImageElement>>((event) => {
-		setImageState({ error: false, loaded: true, source: src });
-		onLoadProp?.(event);
-	}, [onLoadProp, src]);
+	const handleLoad = useCallback<NativeEventHandler<HTMLImageElement>>(
+		(event) => {
+			setImageState({ error: false, loaded: true, source: src });
+			onLoadProp?.(event);
+		},
+		[onLoadProp, src],
+	);
 
-	const handleError = useCallback<NativeEventHandler<HTMLImageElement>>((event) => {
-		setImageState({ error: true, loaded: false, source: src });
-		onErrorProp?.(event);
-	}, [onErrorProp, src]);
+	const handleError = useCallback<NativeEventHandler<HTMLImageElement>>(
+		(event) => {
+			setImageState({ error: true, loaded: false, source: src });
+			onErrorProp?.(event);
+		},
+		[onErrorProp, src],
+	);
 
 	// biome-ignore lint/complexity/noExcessiveCognitiveComplexity: "Complex image download logic with multiple edge cases"
 	const downloadImage = async () => {
@@ -124,29 +133,35 @@ export const ImageComponent = ({
 		src,
 	});
 
-	return <div className={cn('group relative my-4 inline-block')} data-streamdown="image-wrapper">
-		{image}
-		{showFallback &&
-			<span
-				className={cn('text-muted-foreground text-xs italic')}
-				data-streamdown="image-fallback"
-			>{t.imageNotAvailable}</span>}
-		<div
-			className={cn(
-				'pointer-events-none absolute inset-0 hidden rounded-lg bg-black/10 group-hover:block',
+	return (
+		<div className={cn('group relative my-4 inline-block')} data-streamdown="image-wrapper">
+			{image}
+			{showFallback && (
+				<span
+					className={cn('text-muted-foreground text-xs italic')}
+					data-streamdown="image-fallback"
+				>
+					{t.imageNotAvailable}
+				</span>
 			)}
-		/>
-		{showDownload &&
-			<button
+			<div
 				className={cn(
-					'absolute right-2 bottom-2 flex h-8 w-8 cursor-pointer items-center justify-center rounded-md border border-border bg-background/90 shadow-sm backdrop-blur-sm transition-all duration-200 hover:bg-background',
-					'opacity-0 group-hover:opacity-100',
+					'pointer-events-none absolute inset-0 hidden rounded-lg bg-black/10 group-hover:block',
 				)}
-				onClick={downloadImage}
-				title={t.downloadImage}
-				type="button"
-			>
-				<DownloadIcon size={14} />
-			</button>}
-	</div>;
+			/>
+			{showDownload && (
+				<button
+					className={cn(
+						'absolute right-2 bottom-2 flex h-8 w-8 cursor-pointer items-center justify-center rounded-md border border-border bg-background/90 shadow-sm backdrop-blur-sm transition-all duration-200 hover:bg-background',
+						'opacity-0 group-hover:opacity-100',
+					)}
+					onClick={downloadImage}
+					title={t.downloadImage}
+					type="button"
+				>
+					<DownloadIcon size={14} />
+				</button>
+			)}
+		</div>
+	);
 };

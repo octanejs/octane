@@ -23,18 +23,20 @@ export function Link<
 	TMaskFrom extends string = TFrom,
 	TMaskTo extends string = '',
 >(props: LinkComponentProps<'a', TRouter, TFrom, TTo, TMaskFrom, TMaskTo>) @{
-	const { _asChild: AsChild, children, ...rest } = props as
-		typeof props & {
-			_asChild?: any;
-		};
+	const {
+		_asChild: AsChild,
+		children,
+		...rest
+	} = props as typeof props & {
+		_asChild?: any;
+	};
 	const linkProps = useLinkProps(
 		rest as UseLinkPropsOptions<TRouter, TFrom, TTo, TMaskFrom, TMaskTo>,
-	) as
-		OctaneAnchorProps & {
-			disabled?: boolean;
-			'data-status'?: string;
-			'data-transitioning'?: string;
-		};
+	) as OctaneAnchorProps & {
+		disabled?: boolean;
+		'data-status'?: string;
+		'data-transitioning'?: string;
+	};
 	const { disabled: _disabled, ...aProps } = linkProps;
 
 	const resolvedChildren =
@@ -48,6 +50,6 @@ export function Link<
 	@if (AsChild) {
 		<AsChild {...linkProps}>{resolvedChildren}</AsChild>
 	} @else {
-		<a {...aProps as Record<string, any>}>{resolvedChildren}</a>
+		<a {...(aProps as Record<string, any>)}>{resolvedChildren}</a>
 	}
 }

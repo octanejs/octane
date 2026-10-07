@@ -33,12 +33,7 @@ export function DynProbe(props: {
 	slow: Promise<string>;
 	items: string[];
 }) @{
-	const C =
-		props.k === 'a'
-			? A
-			: props.k === 's'
-				? Slow
-				: B;
+	const C = props.k === 'a' ? A : props.k === 's' ? Slow : B;
 	<div>
 		<Hydrate split={false} when={load()}>
 			<section>
@@ -65,19 +60,19 @@ export function HoleProbe(props: {
 }) @{
 	const Lead = props.lead ? B : Em;
 	const node =
-		props.k === 'a'
-			? <A />
-			: props.k === 'b'
-				? <B />
-				: props.k === 's'
-					? <Slow slow={props.slow} />
-					: props.k === 'l'
-						? [<A key="a" />, <B key="b" />]
-						: props.k === 'L'
-							? [<A key="a" />, <Slow key="s" slow={props.slow} />]
-							: props.k === 'n'
-								? null
-								: props.k;
+		props.k === 'a' ? (
+			<A />
+		) : props.k === 'b' ? (
+			<B />
+		) : props.k === 's' ? (
+			<Slow slow={props.slow} />
+		) : props.k === 'l' ? (
+			[<A key="a" />, <B key="b" />]
+		) : props.k === 'L' ? (
+			[<A key="a" />, <Slow key="s" slow={props.slow} />]
+		) : props.k === 'n' ? null : (
+			props.k
+		);
 	<div>
 		<Hydrate split={false} when={load()}>
 			<section>

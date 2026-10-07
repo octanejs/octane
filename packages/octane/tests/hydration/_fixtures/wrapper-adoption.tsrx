@@ -4,9 +4,11 @@ import { Suspense, useState } from 'octane';
 // layers without exposing the framework's ownership representation.
 function InteractiveLeaf(props: { label: string; className: string }) {
 	const [count, setCount] = useState(0);
-	return <button class={props.className} onClick={() => setCount(count + 1)}>
-		{props.label + ':' + count}
-	</button>;
+	return (
+		<button class={props.className} onClick={() => setCount(count + 1)}>
+			{props.label + ':' + count}
+		</button>
+	);
 }
 
 function InteractiveMiddle(props: { label: string; className: string }) {
@@ -19,9 +21,7 @@ function InteractiveOuter(props: { label: string; className: string }) {
 
 // A fragment-style pass-through adds another component layer around children.
 function PassThrough(props: { children?: unknown }) @{
-	<>
-		{props.children}
-	</>
+	<>{props.children}</>
 }
 
 export function WrapperChain() @{
@@ -40,7 +40,11 @@ function RecursiveWrapper(props: { remaining: number }) {
 function DeepStructuralLeaf() {
 	const [active, setActive] = useState(true);
 	if (!active) return <strong class="deep-wrapper-replacement">replaced</strong>;
-	return <button class="deep-wrapper-button" onClick={() => setActive(false)}>replace</button>;
+	return (
+		<button class="deep-wrapper-button" onClick={() => setActive(false)}>
+			replace
+		</button>
+	);
 }
 
 export function DeepWrapperChain(props: { depth: number }) @{
@@ -58,7 +62,11 @@ export function KeyedReturnWrapper(props: { itemKey?: string }) {
 }
 
 function BranchLeaf(props: { count: number; onClick: () => void }) {
-	return <button class="branch-button" onClick={props.onClick}>{'branch:' + props.count}</button>;
+	return (
+		<button class="branch-button" onClick={props.onClick}>
+			{'branch:' + props.count}
+		</button>
+	);
 }
 
 function BranchMiddle(props: { count: number; onClick: () => void }) {
@@ -80,11 +88,13 @@ type Row = { id: string };
 
 function StatefulRow(props: { row: Row }) {
 	const [count, setCount] = useState(0);
-	return <li class="coalesced-row" data-id={props.row.id}>
-		<button class="row-button" onClick={() => setCount(count + 1)}>
-			{props.row.id + ':' + count}
-		</button>
-	</li>;
+	return (
+		<li class="coalesced-row" data-id={props.row.id}>
+			<button class="row-button" onClick={() => setCount(count + 1)}>
+				{props.row.id + ':' + count}
+			</button>
+		</li>
+	);
 }
 
 function RowWrapper(props: { row: Row }) {
@@ -120,11 +130,13 @@ export function SuspenseWrapperChain() @{
 // Return Suspense as a component value rather than placing it directly in the
 // parent's template.
 function ReturnedSuspenseValue() {
-	return <Suspense fallback={<i class="returned-pending">pending</i>}>
-		<PassThrough>
-			<InteractiveOuter label="returned" className="returned-suspense-button" />
-		</PassThrough>
-	</Suspense>;
+	return (
+		<Suspense fallback={<i class="returned-pending">pending</i>}>
+			<PassThrough>
+				<InteractiveOuter label="returned" className="returned-suspense-button" />
+			</PassThrough>
+		</Suspense>
+	);
 }
 
 export function ReturnedSuspenseChildSlot() @{

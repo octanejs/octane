@@ -44,7 +44,9 @@ export function PendingApp(props) @{
 		} @pending {
 			<p data-octane-pending="">Octane pending</p>
 		} @catch (error, reset) {
-			<button data-octane-caught="" onClick={reset}>{error.message as string}</button>
+			<button data-octane-caught="" onClick={reset}>
+				{error.message as string}
+			</button>
 		}
 	</div>
 }
@@ -65,7 +67,9 @@ export function ErrorApp(props) @{
 			<Fault error={props.error} effect={props.effect} />
 		</ReactCompat>
 	} @catch (error, reset) {
-		<button data-octane-caught="" onClick={reset}>{error.message as string}</button>
+		<button data-octane-caught="" onClick={reset}>
+			{error.message as string}
+		</button>
 	}
 }
 

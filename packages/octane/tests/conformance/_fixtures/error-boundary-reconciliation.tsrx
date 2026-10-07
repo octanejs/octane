@@ -4,7 +4,9 @@
 // Renders fine until `props.fail` flips true, then throws on render.
 function BrokenRender(props) @{
 	if (props.fail) throw new Error('fail');
-	<span class="inner" data-prop="BrokenRender">{'BrokenRender'}</span>
+	<span class="inner" data-prop="BrokenRender">
+		{'BrokenRender'}
+	</span>
 }
 
 // Fallback renders the SAME host type (span) as the errored content.
@@ -13,7 +15,9 @@ export function SameTypeFallback(props) @{
 		@try {
 			<BrokenRender fail={props.fail} />
 		} @catch (err) {
-			<span class="inner" data-prop="ErrorBoundary">{'ErrorBoundary'}</span>
+			<span class="inner" data-prop="ErrorBoundary">
+				{'ErrorBoundary'}
+			</span>
 		}
 	</div>
 }
@@ -24,7 +28,9 @@ export function DifferentTypeFallback(props) @{
 		@try {
 			<BrokenRender fail={props.fail} />
 		} @catch (err) {
-			<div class="inner" data-prop="ErrorBoundary">{'ErrorBoundary'}</div>
+			<div class="inner" data-prop="ErrorBoundary">
+				{'ErrorBoundary'}
+			</div>
 		}
 	</div>
 }

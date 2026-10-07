@@ -19,7 +19,9 @@ function Branch(props) @{
 export function NestedRefs(props) @{
 	const [shown, setShown, getShown] = useState(true);
 	<div>
-		<button class="toggle" onClick={() => setShown(!getShown())}>t</button>
+		<button class="toggle" onClick={() => setShown(!getShown())}>
+			t
+		</button>
 		@if (shown) {
 			<Branch collect={props.collect} />
 		}
@@ -31,7 +33,9 @@ export function NestedRefs(props) @{
 export function RefRows(props) @{
 	const [items, setItems, getItems] = useState(() => [{ id: 1 }, { id: 2 }, { id: 3 }]);
 	<div>
-		<button class="clear" onClick={() => setItems([])}>clear</button>
+		<button class="clear" onClick={() => setItems([])}>
+			clear
+		</button>
 		@for (const it of items; key it.id) {
 			<span class="row" ref={props.collect} />
 		}

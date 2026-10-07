@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { describe, expect, it, vi } from 'vitest';
+import { compile } from 'octane/compiler';
 import * as ServerRuntime from 'octane/server';
 import { flushSync, hydrateRoot } from '../src/index.js';
 import { loadCompiledFixtureSource, loadServerFixture } from './_server-fixture.js';
@@ -339,6 +340,27 @@ describe('<script> content contract', () => {
 		expect(JSON.parse(fragment.querySelector('script')?.textContent ?? '')).toEqual(
 			STATIC_JSON_VALUE,
 		);
+	});
+
+	it('rejects a static script body that an HTML end tag would cut short', () => {
+		for (const mode of ['client', 'server'] as const) {
+			for (const endTag of ['</ScRiPt>', '</SCRIPT >']) {
+				expect(() =>
+					compile(
+						`export function App() @{\n\t<script type="application/json">{"b":"${endTag}"}</script>\n}\n`,
+						'script-end-tag.tsrx',
+						{ mode },
+					),
+				).toThrow(/can end a script in HTML/);
+			}
+			expect(() =>
+				compile(
+					`export function App() @{\n\t<script type="application/json">{"b":"<\\/ScRiPt>"}</script>\n}\n`,
+					'script-end-tag.tsrx',
+					{ mode },
+				),
+			).not.toThrow();
+		}
 	});
 
 	it('hydrates a value-position static script without rewriting its server-safe text', () => {

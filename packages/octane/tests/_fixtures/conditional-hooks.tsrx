@@ -13,7 +13,9 @@ export function Guarded(props) @{
 		props.log.push('mount:' + n);
 		return () => props.log.push('cleanup:' + n);
 	}, [n]);
-	<button id="bump" onClick={() => setN(n + 1)}>{n as string}</button>
+	<button id="bump" onClick={() => setN(n + 1)}>
+		{n as string}
+	</button>
 }
 
 // Same shape but with the hook order interleaved with intermediate logic.
@@ -27,19 +29,19 @@ export function PartialGuard(props) @{
 		props.log.push('seen:' + n + ':' + m);
 	}, [n, m]);
 	<>
-		<button id="bumpN" onClick={() => setN(n + 1)}>{'n=' + n as string}</button>
-		<button id="bumpM" onClick={() => setM(m + 1)}>{'m=' + m as string}</button>
+		<button id="bumpN" onClick={() => setN(n + 1)}>
+			{('n=' + n) as string}
+		</button>
+		<button id="bumpM" onClick={() => setM(m + 1)}>
+			{('m=' + m) as string}
+		</button>
 	</>
 }
 
 // A plain JavaScript conditional does not create an @if-owned child scope.
 // The effect still disconnects when its call site is not reached by a completed
 // render, while the component's stable output keeps updating in place.
-export function ConditionalTsrxEffect(props: {
-	enabled: boolean;
-	label: string;
-	log: string[];
-}) @{
+export function ConditionalTsrxEffect(props: { enabled: boolean; label: string; log: string[] }) @{
 	if (props.enabled) {
 		useEffect(() => {
 			props.log.push('create:' + props.label);
@@ -53,9 +55,7 @@ export function ConditionalRepeatedEffects(props: { enabled: boolean; log: strin
 	if (props.enabled) {
 		useRepeatedSharedEffects(props.log);
 	}
-	<div class="conditional-repeated">
-		{props.enabled ? 'enabled' : 'disabled'}
-	</div>
+	<div class="conditional-repeated">{props.enabled ? 'enabled' : 'disabled'}</div>
 }
 
 function ConditionalSuspendingEffect(props: {
@@ -92,9 +92,7 @@ function ConditionalActivityChildImpl(props: { enabled: boolean; log: string[] }
 			return () => props.log.push('activity:cleanup');
 		}, [props.log]);
 	}
-	<span class="conditional-activity">
-		{props.enabled ? 'enabled' : 'disabled'}
-	</span>
+	<span class="conditional-activity">{props.enabled ? 'enabled' : 'disabled'}</span>
 }
 
 const ConditionalActivityChild = memo(ConditionalActivityChildImpl);
@@ -126,9 +124,7 @@ function ConditionalActivityReentryChildImpl(props: {
 		// was reached by this render.
 		useEffect(() => {}, [props.log]);
 	}
-	<span class="conditional-activity-reentry">
-		{enabled ? 'enabled' : 'disabled'}
-	</span>
+	<span class="conditional-activity-reentry">{enabled ? 'enabled' : 'disabled'}</span>
 }
 
 const ConditionalActivityReentryChild = memo(ConditionalActivityReentryChildImpl);

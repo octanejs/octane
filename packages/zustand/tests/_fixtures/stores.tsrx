@@ -3,24 +3,20 @@ import { create, useStore } from '@octanejs/zustand';
 // A store with two independent slices (`count`, `other`) plus actions. Module
 // scope mirrors how zustand stores are normally declared; tests reset it in
 // `beforeEach` via `useCounter.setState(...)`.
-export const useCounter = create(
-	(set) => ({
-		count: 0,
-		other: 0,
-		inc: () => set((s) => ({ count: s.count + 1 })),
-		incOther: () => set((s) => ({ other: s.other + 1 })),
-		setBoth: (c: number, o: number) => set({ count: c, other: o }),
-	}),
-);
+export const useCounter = create((set) => ({
+	count: 0,
+	other: 0,
+	inc: () => set((s) => ({ count: s.count + 1 })),
+	incOther: () => set((s) => ({ other: s.other + 1 })),
+	setBoth: (c: number, o: number) => set({ count: c, other: o }),
+}));
 
 // A second, independent store — proves two distinct stores compose in one
 // component without cross-talk.
-export const useFish = create(
-	(set) => ({
-		n: 100,
-		add: () => set((s) => ({ n: s.n + 1 })),
-	}),
-);
+export const useFish = create((set) => ({
+	n: 100,
+	add: () => set((s) => ({ n: s.n + 1 })),
+}));
 
 // Selects ONLY `count` (plus the stable action refs). `onRender` lets a test
 // count renders to prove the selector bails out when an UNRELATED slice
@@ -32,15 +28,19 @@ export function CountOnly(props: { onRender: () => void }) @{
 	props.onRender();
 	<div>
 		<span id="count">{count as string}</span>
-		<button id="inc" onClick={inc}>inc</button>
-		<button id="incOther" onClick={incOther}>incOther</button>
+		<button id="inc" onClick={inc}>
+			inc
+		</button>
+		<button id="incOther" onClick={incOther}>
+			incOther
+		</button>
 	</div>
 }
 
 // No selector → subscribes to the whole state object.
 export function Whole() @{
 	const s = useCounter();
-	<span id="whole">{s.count + '/' + s.other as string}</span>
+	<span id="whole">{(s.count + '/' + s.other) as string}</span>
 }
 
 // Derived selector — a computed slice, not a stored field.
@@ -56,8 +56,12 @@ export function Both() @{
 	const incC = useCounter((s) => s.inc);
 	const addF = useFish((s) => s.add);
 	<div>
-		<button id="c" onClick={incC}>{c as string}</button>
-		<button id="f" onClick={addF}>{f as string}</button>
+		<button id="c" onClick={incC}>
+			{c as string}
+		</button>
+		<button id="f" onClick={addF}>
+			{f as string}
+		</button>
 	</div>
 }
 

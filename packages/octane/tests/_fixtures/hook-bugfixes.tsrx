@@ -15,8 +15,7 @@ export function CallbackLabels(props) @{
 	const [label, setLabel] = useState('a');
 	props.bind((x: string) => setLabel(x));
 	const cbs = useLabelCallbacks(label);
-	<button
-		class="cb"
-		onClick={() => props.onResult(cbs.noDeps() + '|' + cbs.withDeps())}
-	>{label as string}</button>
+	<button class="cb" onClick={() => props.onResult(cbs.noDeps() + '|' + cbs.withDeps())}>
+		{label as string}
+	</button>
 }

@@ -61,10 +61,9 @@ export function FlexTable() @{
 			@for (const row of table.getRowModel().rows; key row.id) {
 				<tr>
 					@for (const cell of row.getAllCells(); key cell.id) {
-						<td id={'f-td-' + cell.id}>{flexRender(
-							cell.column.columnDef.cell,
-							cell.getContext(),
-						)}</td>
+						<td id={'f-td-' + cell.id}>
+							{flexRender(cell.column.columnDef.cell, cell.getContext())}
+						</td>
 					}
 				</tr>
 			}

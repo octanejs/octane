@@ -12,10 +12,12 @@ export function PrimaryAction(snapshot: PrimaryActionSnapshot) @{
 		data-stop-generating={snapshot.stopRequested ? '' : null}
 		data-visually-disabled={snapshot.visuallyDisabled ? '' : null}
 		class={['primary-action', snapshot.active ? 'active' : 'ready']}
-		style={{
-			opacity: snapshot.visuallyDisabled ? 0.5 : 1,
-			'--action-tone': snapshot.tone,
-		} as CSSProperties & { '--action-tone': string }}
+		style={
+			{
+				opacity: snapshot.visuallyDisabled ? 0.5 : 1,
+				'--action-tone': snapshot.tone,
+			} as CSSProperties & { '--action-tone': string }
+		}
 	>
 		<span data-send-icon hidden={snapshot.active}>
 			<svg viewBox="0 0 24 24" aria-hidden="true">

@@ -6,17 +6,23 @@ import { useState, useRef, useLayoutEffect, flushSync } from 'octane';
 
 export function Counter() @{
 	const [n, setN] = useState(0);
-	<button id="counter" onClick={() => setN(n + 1)}>{n as number}</button>
+	<button id="counter" onClick={() => setN(n + 1)}>
+		{n as number}
+	</button>
 }
 
 export function FunctionalCounter() @{
 	const [n, setN] = useState(0);
-	<button id="fcounter" onClick={() => setN((v) => v + 1)}>{n as number}</button>
+	<button id="fcounter" onClick={() => setN((v) => v + 1)}>
+		{n as number}
+	</button>
 }
 
 export function SyncCounter() @{
 	const [n, setN] = useState(0);
-	<button id="sync" onClick={() => flushSync(() => setN(n + 1))}>{n as number}</button>
+	<button id="sync" onClick={() => flushSync(() => setN(n + 1))}>
+		{n as number}
+	</button>
 }
 
 // A click handler that submits the form programmatically from INSIDE the click
@@ -57,7 +63,9 @@ export function RejectedInput() @{
 
 export function CapturedNestedInput(props: { onCapture: () => void }) @{
 	<div>
-		<button id="captured-button" type="button" onClickCapture={props.onCapture}>press</button>
+		<button id="captured-button" type="button" onClickCapture={props.onCapture}>
+			press
+		</button>
 		<input id="nested-input" value="fixed" />
 	</div>
 }

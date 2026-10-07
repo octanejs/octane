@@ -34,25 +34,27 @@ export function SponsorSection({
 	packMaxWidth,
 	showCTA = true,
 }: SponsorSectionProps) {
-	return <div class="px-4 w-full lg:max-w-(--breakpoint-lg) md:mx-auto">
-		<div class="space-y-8">
-			<h3 class="text-3xl font-bold">{title}</h3>
-			<div
-				class="relative mx-auto flex w-full flex-wrap overflow-hidden [&>div]:h-full [&>div]:w-full"
-				style={{ aspectRatio, maxWidth: packMaxWidth }}
-			>
-				<Hydrate when={visible({ rootMargin: '50%' })} fallback={<PlaceholderSponsorPack />}>
-					<SponsorPackWithQuery />
-				</Hydrate>
-			</div>
-			{showCTA
-				? <div class="flex justify-center">
+	return (
+		<div class="px-4 w-full lg:max-w-(--breakpoint-lg) md:mx-auto">
+			<div class="space-y-8">
+				<h3 class="text-3xl font-bold">{title}</h3>
+				<div
+					class="relative mx-auto flex w-full flex-wrap overflow-hidden [&>div]:h-full [&>div]:w-full"
+					style={{ aspectRatio, maxWidth: packMaxWidth }}
+				>
+					<Hydrate when={visible({ rootMargin: '50%' })} fallback={<PlaceholderSponsorPack />}>
+						<SponsorPackWithQuery />
+					</Hydrate>
+				</div>
+				{showCTA ? (
+					<div class="flex justify-center">
 						<Button as="a" href="https://github.com/sponsors/tannerlinsley">
 							Become a Sponsor
 							<ArrowRight className="w-4 h-4" />
 						</Button>
 					</div>
-				: null}
+				) : null}
+			</div>
 		</div>
-	</div>;
+	);
 }
