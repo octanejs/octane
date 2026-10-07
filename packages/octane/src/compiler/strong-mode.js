@@ -5829,15 +5829,19 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 				) {
 					const callback = callableValue(callee, scope);
 					if (callback !== null) {
+						// An Effect Event runs its callback synchronously, like a local
+						// helper: its parameters name this call's arguments, and what it
+						// returns, such as a disposer, is this call's value.
+						const invoked = callback.kind === 'effect-event' ? callback.callback : callback;
 						const enclosingCollector = returnCollector;
 						const collector =
-							callback.kind === 'callback' && callback.node.async !== true
-								? { fn: callback.node, shapes: [] }
+							invoked?.kind === 'callback' && invoked.node.async !== true
+								? { fn: invoked.node, shapes: [] }
 								: null;
 						returnCollector = collector;
 						const frame =
-							currentEffect !== null && callback.kind === 'callback'
-								? effectPolicy.enterCall(callback.node, node.arguments)
+							currentEffect !== null && invoked?.kind === 'callback'
+								? effectPolicy.enterCall(invoked.node, node.arguments)
 								: undefined;
 						try {
 							if (callback.kind === 'callback') stateOwners.push({ call: node, fn: callback.node });
@@ -5857,7 +5861,7 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 						if (collector !== null && collector.shapes.length !== 0) {
 							const shape = mergeShapes(collector.shapes);
 							if (shape !== null) {
-								callShapes.set(node, deriveMember({ call: node, fn: callback.node }, shape));
+								callShapes.set(node, deriveMember({ call: node, fn: invoked.node }, shape));
 							}
 						}
 					}

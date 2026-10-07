@@ -2300,7 +2300,7 @@ export function App(props) {
 
 describe('Strong effect resource cleanup', () => {
 	const app = (setup: string) => `
-import { useState, useEffect, useLayoutEffect, useRef } from 'octane';
+import { useState, useEffect, useLayoutEffect, useEffectEvent, useRef } from 'octane';
 export function App(props) @{
   const [width, setWidth] = useState(0);
   const element = useRef(null);
@@ -2516,6 +2516,22 @@ export function App(props) @{
 			'a helper removal for another handler',
 			`function listen(target, type, handler) { target.addEventListener(type, handler); } function unlisten(target, type, handler) { target.removeEventListener(type, handler); } useEffect(() => { const first = () => setWidth(1); const second = () => setWidth(2); listen(window, 'resize', first); return () => unlisten(window, 'resize', second); });`,
 		],
+		[
+			'an Effect Event remover the effect discards',
+			`const start = useEffectEvent(() => { const onResize = () => setWidth(1); window.addEventListener('resize', onResize); return () => window.removeEventListener('resize', onResize); }); useEffect(() => { start(); });`,
+		],
+		[
+			'an Effect Event remover without capture',
+			`const start = useEffectEvent(() => { const onResize = () => setWidth(1); window.addEventListener('resize', onResize, true); return () => window.removeEventListener('resize', onResize, false); }); useLayoutEffect(() => start());`,
+		],
+		[
+			'an Effect Event remover for another handler',
+			`const start = useEffectEvent((handler, other) => { window.addEventListener('resize', handler); return () => window.removeEventListener('resize', other); }); useEffect(() => start(() => setWidth(1), () => setWidth(2)));`,
+		],
+		[
+			'a target passed to an Effect Event',
+			`const listen = useEffectEvent((target) => { target.addEventListener('resize', () => setWidth(1)); }); useEffect(() => { listen(window); });`,
+		],
 	])('rejects %s without release', (_label, setup) => {
 		rejects(app(setup), LEAK);
 	});
@@ -2707,6 +2723,26 @@ export function App(props) @{
 			'a reset global handler property',
 			`useEffect(() => { onresize = () => setWidth(1); return () => { window.onresize = null; }; });`,
 		],
+		[
+			'a remover returned by an Effect Event',
+			`const start = useEffectEvent(() => { const onResize = () => setWidth(1); window.addEventListener('resize', onResize); return () => window.removeEventListener('resize', onResize); }); useLayoutEffect(() => start());`,
+		],
+		[
+			'an Effect Event remover stored before it is returned',
+			`const start = useEffectEvent(() => { const onResize = () => setWidth(1); window.addEventListener('resize', onResize, { capture: true }); return () => window.removeEventListener('resize', onResize, true); }); useEffect(() => { const stop = start(); return stop; });`,
+		],
+		[
+			'a remover returned by an Effect Event for the handler passed to it',
+			`const start = useEffectEvent((handler) => { window.addEventListener('resize', handler); return () => window.removeEventListener('resize', handler); }); useEffect(() => { const onResize = () => setWidth(1); return start(onResize); });`,
+		],
+		[
+			'a listener added by an Effect Event and removed by the effect',
+			`const listen = useEffectEvent((handler) => { window.addEventListener('resize', handler); }); useEffect(() => { const onResize = () => setWidth(1); listen(onResize); return () => window.removeEventListener('resize', onResize); });`,
+		],
+		[
+			'a controller passed to an Effect Event',
+			`const listen = useEffectEvent((controller) => { window.addEventListener('resize', () => setWidth(1), { signal: controller.signal }); }); useEffect(() => { const controller = new AbortController(); listen(controller); return () => controller.abort(); });`,
+		],
 	])('accepts %s', (_label, setup) => {
 		accepts(app(setup));
 	});
@@ -2743,6 +2779,41 @@ export function A() { const r = useRef(null); const [h, setH] = useState(0); use
 import { useState, useEffect } from 'octane';
 export function useWidth() { const [w, setW] = useState(0); useEffect(() => { window.addEventListener('resize', () => setW(window.innerWidth)); }); return w; }`;
 		expect(() => slotHooks(ts, '/src/use-width.ts')).toThrow(LEAK);
+	});
+
+	it('follows a disposer returned through an Effect Event in every compiler path', () => {
+		const hook = (remove: string) => `import { useEffectEvent, useLayoutEffect } from 'octane';
+export function usePageEvents() {
+  const start = useEffectEvent(() => {
+    const handler = () => {};
+    window.addEventListener('pagehide', handler);
+    return () => ${remove};
+  });
+  useLayoutEffect(() => start());
+}`;
+		const released = hook(`window.removeEventListener('pagehide', handler)`);
+		const leaked = hook(`window.removeEventListener('pagehide', handler, true)`);
+		for (const mode of ['client', 'server'] as const) {
+			const options = { mode, strong: true, dev: false, hmr: false };
+			expect(() => compile(released, '/src/page-events.tsrx', options)).not.toThrow();
+			expect(() => compile(leaked, '/src/page-events.tsrx', options)).toThrow(LEAK);
+		}
+		expect(errors(released, '/src/page-events.tsrx')).toEqual([]);
+		expect(errors(leaked, '/src/page-events.tsrx')).toEqual([LEAK]);
+	});
+
+	it('follows a disposer returned through an Effect Event from a custom hook', () => {
+		accepts(`import { useEffectEvent, useLayoutEffect } from 'octane';
+function usePageHide(onHide) {
+  return useEffectEvent(() => {
+    window.addEventListener('pagehide', onHide);
+    return () => window.removeEventListener('pagehide', onHide);
+  });
+}
+export function usePage(props) {
+  const start = usePageHide(props.onHide);
+  useLayoutEffect(() => start());
+}`);
 	});
 });
 

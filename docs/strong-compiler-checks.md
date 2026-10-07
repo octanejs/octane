@@ -141,10 +141,12 @@ a user object stay legal without a visible release, as do one-shot timers and
 The proofs stay bounded. A cleanup returned on any path counts, the cleanup's
 own conditions are not evaluated, and aborting a request does not stop its
 `.catch` handler from running: guard updates there with the flag or
-`signal.aborted`. An imported helper is opaque, so a resource it acquires
-internally is not seen, and neither is a cleanup it returns. Work started after
-an `await`, or in a timer or subscription callback, is not checked for resource
-release.
+`signal.aborted`. A same-module helper or `useEffectEvent` callback that setup
+calls is followed with that call's arguments, so a cleanup it returns counts
+once the effect returns it. An imported helper is opaque, so a resource it
+acquires internally is not seen, and neither is a cleanup it returns. Work
+started after an `await`, or in a timer or subscription callback, is not checked
+for resource release.
 
 A value ref is a `useRef` object whose identity is only used for property
 access, stable aliases, and explicit dependency lists. Attaching it with a
