@@ -3,12 +3,12 @@
   "schemaVersion": 1,
   "provenance": {
     "repo": "https://github.com/Rajaniraiyn/react-alien-signals.git",
-    "version": "0.3.0",
-    "commit": "6d883959ddf25a3f486451ff8abff60eb989671c",
+    "version": "0.4.0",
+    "commit": "2d85d8d063d79332ec7c7e99c07bda3a722f491a",
     "sourceRoot": "src",
     "testRoot": "src",
     "license": "MIT",
-    "integrity": "sha256:6cd8b2e5d49973e75033f66cd74024918c8e635621dc5f18aaa556dcfccda06c",
+    "integrity": "sha256:c6e035f0c9c353ab35d6fa8f76724082d9699283d04e716539e5b960ca969db2",
     "verification": "verified"
   },
   "upstreamSuites": {
@@ -28,8 +28,8 @@
     }
   },
   "adaptedRuntimeSummary": {
-    "inventoryEntries": 26,
-    "uniqueIdentities": 26,
+    "inventoryEntries": 36,
+    "uniqueIdentities": 36,
     "duplicateEntriesWithinLanes": 0,
     "identitiesSharedAcrossLanes": 0
   },
@@ -40,7 +40,7 @@
       "arch": "any",
       "packageManager": "pnpm@12.9.1",
       "lockfile": "pnpm-lock.yaml",
-      "lockfileSha256": "caea67fe61ab57f3e8cbd8a0e55f0e8b3014b3dd6815c6fe6e158095f291daeb"
+      "lockfileSha256": "84dbefa8929419194a46ef5ec966ae8459aa05f40399e583828134ccc8121aad"
     }
   },
   "lanes": [
@@ -51,7 +51,7 @@
       "environment": "workspace-node",
       "project": "alien-signals-pristine",
       "evidenceOrigin": "upstream-suite",
-      "notes": "Runs the byte-exact react-alien-signals 0.3.0 bun:test suite against the vendored React binding and checks every passed identity against the committed inventory.",
+      "notes": "Runs the byte-exact react-alien-signals 0.4.0 bun:test suite against the vendored React binding and checks every passed identity against the committed inventory.",
       "execution": {
         "kind": "vitest-full",
         "inventory": "packages/alien-signals/audit/pristine-wrapper-runtime.json"
@@ -60,22 +60,22 @@
         {
           "path": "packages/alien-signals/audit/pristine-wrapper-runtime.json",
           "role": "support",
-          "sha256": "c0b9b567ca1c007b97833304ab21c728dfe225b29ae3564362f93948fbbfce48"
+          "sha256": "0b2bdb6f5a08b3ddee70d6bb930b97441087f45c8cb31819eddc82930f566231"
         },
         {
           "path": "packages/alien-signals/audit/pristine-runtime.json",
           "role": "support",
-          "sha256": "357c847b911ac0e967f3bd2fd1fa24d04bb38827b8c49cba00f684da524ef51a"
+          "sha256": "d04240407e7257fbe8200110b9618fbd6284ac721009ffaf6098424dece95572"
         },
         {
           "path": "packages/alien-signals/tests/upstream-original.test.ts",
           "role": "support",
-          "sha256": "2049785cbaabd314e64514a1687a80a6be4d81edc588c67ef66b420083211aba"
+          "sha256": "8433af2d89e4c95e89f92f28847507b2489dd6142cb2a6d7bf91fe092b654feb"
         },
         {
           "path": "scripts/react-parity/alien-signals-pristine-runtime.mjs",
           "role": "support",
-          "sha256": "7857350920bd515db8cfe0b5cd2768550cc669baab123564ad02ca6dd4a13747"
+          "sha256": "d920d9788fe524e8589ee994e1e2341596baf13df1d52f0c775d59417f4cf8b5"
         },
         {
           "path": "scripts/react-parity/run-pristine.mjs",
@@ -85,12 +85,12 @@
         {
           "path": "packages/alien-signals/audit/pristine-oracle-environment.json",
           "role": "support",
-          "sha256": "66a9082b9644aa8db0f7257d4c082880b5be7d6f901bdc79cccfc6ce25a4d1b3"
+          "sha256": "d62be25394fa09e32064abb87673d1962f08c4007f2e294651042a5ff5ccf8f5"
         },
         {
           "path": "packages/alien-signals/audit/upstream.lock.json",
           "role": "support",
-          "sha256": "b2ee1d80678b8bf972ceb7e560567b884821694146a54e9b6bff79f1937154d8"
+          "sha256": "546304bee7b467b4d1a0588c1710e4135cafa7958354c9be8ccdba43f7610cf5"
         }
       ]
     },
@@ -110,37 +110,37 @@
         {
           "path": "packages/alien-signals/audit/adapted-runtime.json",
           "role": "support",
-          "sha256": "7ff8ffffada071328a7741bcc12d03380a384ba42f7053f2b2276f526cfc0174"
+          "sha256": "df31b64d937e2d4e62b95f9d91022e9139f95389819d346dffc00494db82d219"
         },
         {
           "path": "scripts/react-parity/alien-signals-runtime-inventory.mjs",
           "role": "support",
-          "sha256": "187e573ef7b8c1e19360c871a4d8fe03564248af5e0bf007616b4b9814c4730e"
+          "sha256": "eefe7e238c21dda75e9c811990659d114eee1de26d7bc76250bc431428520e35"
         },
         {
           "path": "scripts/react-parity/alien-signals-runtime-lib.mjs",
           "role": "support",
-          "sha256": "f6503ad693b55f06da6e57ac09bf84cca6bff163bcbff3a9702ab060816dabc4"
+          "sha256": "62d3ed9a5da23223ab0dcafb7717b4b6a4379a5ef45515bafbcd6a2baf9e020b"
         },
         {
           "path": "scripts/react-parity/alien-signals-types-lib.mjs",
           "role": "support",
-          "sha256": "7e90f5b5ae3efd0890dafc0aeef74b06e50f73f4c8d15e6ed324deb389852514"
+          "sha256": "7a03c5ca1fff59e551fa72a9930d78957545435a26d663610c3105a86d37c0c1"
         },
         {
           "path": "packages/alien-signals/audit/runtime-transformation-ledger.json",
           "role": "support",
-          "sha256": "c654106da83f5957d941f5ba54000bdc1f026a8ad23d4231507cab328c7ab4f2"
+          "sha256": "6f79a56122cde3d518c48ef72378cda937e7f4c9c50e163be7cb48b322108e21"
         },
         {
           "path": "packages/alien-signals/audit/test-classifications.json",
           "role": "support",
-          "sha256": "6254e1f78e9ecafbb96036fad90e924a351ec89f83bc29c735ee1238eebb345d"
+          "sha256": "a176e80f920859f720cab312c588cb8d329754bfbd77db484712d08a6b679520"
         },
         {
           "path": "packages/alien-signals/tests/_fixtures/hooks.tsrx",
           "role": "support",
-          "sha256": "7bfdda87666b7febb305c04fa57b290fbd16206d25faf05555eed85d966e3571"
+          "sha256": "3cfa34a95bc3b24b11e640058fe0ab84e73e8fa446eafb9965fda27701581e5d"
         },
         {
           "path": "scripts/react-parity/alien-signals-classifications-lib.mjs",
@@ -156,7 +156,7 @@
       "environment": "workspace-node",
       "project": "alien-signals-pristine-types",
       "evidenceOrigin": "upstream-suite",
-      "notes": "Runs the pinned upstream typecheck (tsc --noEmit via vendored tsconfig) over src/index.ts + src/index.test.ts, including the @ts-expect-error at index.test.ts:392.",
+      "notes": "Runs the pinned upstream typecheck (tsc --noEmit via vendored tsconfig) over src/index.ts + src/index.test.ts; the 0.4.0 suite carries no @ts-expect-error groups, so its accepted public-API calls are the type evidence.",
       "execution": {
         "kind": "typescript",
         "compiler": "tsc",
@@ -166,7 +166,7 @@
         {
           "path": "packages/alien-signals/audit/pristine-types.json",
           "role": "test",
-          "sha256": "ba1515a38124418ba57c8d0ebd8bfd902a62e0b3f6db33f812baa184a06b8550",
+          "sha256": "933366c78b6b4b80b1133877c7ea9d211064f5e86c01f048379038c08a5d43fe",
           "cases": [
             {
               "id": "types:alien-signals-pristine",
@@ -178,22 +178,22 @@
         {
           "path": "packages/alien-signals/upstream/tsconfig.json",
           "role": "support",
-          "sha256": "21b91ad5888e2c1507015b6909d8f64a73d352c22229d74d210b5a4ebe9b6ae2"
+          "sha256": "c420064685461c27e9de2699ac0e6d5272f12e29b184fd1fd5aceacb6eef367d"
         },
         {
           "path": "packages/alien-signals/upstream/package.json",
           "role": "support",
-          "sha256": "4a343737443ed940988641cb14dcdefaacd08d00c1a2b4a78e70d0ed21064386"
+          "sha256": "7881303b560feda2a3f7b88f28c31796759df00891b76ce74be66e98e1f303cb"
         },
         {
           "path": "packages/alien-signals/upstream/src/index.test.ts",
           "role": "support",
-          "sha256": "479232596a061b5226bba6061b1ae8b66698e5bde8dc342d84b27ce01c4af500"
+          "sha256": "57cff6cee5b43ab4c2bbce27f4d057dbdf280f906e9030352da6a73aefb8969f"
         },
         {
           "path": "packages/alien-signals/audit/type-parity.json",
           "role": "support",
-          "sha256": "ea5dc84434e455db6573183ab5337449276a53d4d6983da673995ff1d11c11b7"
+          "sha256": "5051149ce7a24d274406bfb937c1d2c66b9ab910a955e3bf5f8c43fba5377016"
         }
       ]
     },
@@ -214,7 +214,7 @@
         {
           "path": "packages/alien-signals/audit/pristine-type-probes.json",
           "role": "test",
-          "sha256": "0323e55315b3956d397a0e9bfbb31c2e08e882e5520eba0cb07214fd4c6655f4",
+          "sha256": "e9b06a07e386f82a39e99baae0826cdc33629b75985b0053053b58f220911d24",
           "cases": [
             {
               "id": "types:alien-signals-pristine-probes",
@@ -226,7 +226,7 @@
         {
           "path": "packages/alien-signals/audit/type-probes/public-api.test-d.ts",
           "role": "support",
-          "sha256": "7205108d1bad438525a8114bdf37793faab70558dd7bdbd9f4679a273d8f8465"
+          "sha256": "9b7cc9b663300ea7f27b6830e11cfec3e6bee5e12dd5e95890af922a4b05e463"
         },
         {
           "path": "packages/alien-signals/audit/type-probes/tsconfig.pristine.json",
@@ -236,7 +236,7 @@
         {
           "path": "packages/alien-signals/audit/type-parity.json",
           "role": "support",
-          "sha256": "ea5dc84434e455db6573183ab5337449276a53d4d6983da673995ff1d11c11b7"
+          "sha256": "5051149ce7a24d274406bfb937c1d2c66b9ab910a955e3bf5f8c43fba5377016"
         }
       ]
     },
@@ -247,7 +247,7 @@
       "environment": "workspace-node",
       "project": "alien-signals-adapted-types",
       "evidenceOrigin": "upstream-suite",
-      "notes": "Adapted upstream typecheck assertion groups plus supplemental Octane public-api probes. The readable-computed Octane-only divergence typetest stays outside this parity compiler project.",
+      "notes": "Adapted upstream typecheck accepted-call inventory plus supplemental Octane public-api probes.",
       "execution": {
         "kind": "typescript",
         "compiler": "tsrx-tsc",
@@ -257,7 +257,7 @@
         {
           "path": "packages/alien-signals/audit/adapted-types.json",
           "role": "test",
-          "sha256": "f4aa0aaaa669e6160019641dd857e9cce8c50c8aa97e8c952adb72516965242a",
+          "sha256": "bc84fab19f05e938967a44a56926b709a4d44844976cbc024de10dc3175b6588",
           "cases": [
             {
               "id": "types:alien-signals-adapted",
@@ -269,12 +269,12 @@
         {
           "path": "packages/alien-signals/typetests/upstream-typecheck.test-d.ts",
           "role": "support",
-          "sha256": "6fffb3e110f4a96c680c9dc5365642b59fa7780aaf4aac50bea8996b4f06ab0e"
+          "sha256": "268564d783b4ffdd732e300c482af6f998ebe612e18b0a06812dcde3c3ccc056"
         },
         {
           "path": "packages/alien-signals/typetests/public-api.test-d.ts",
           "role": "support",
-          "sha256": "01fe9ee4df486a82f7f3be99c357d1c18a9afbd1e0748ec9a274da5fb50ea72b"
+          "sha256": "94eb921b87127b08ddf3d8dbbcfce079008fe633421e5ec190b54814a06769a3"
         },
         {
           "path": "packages/alien-signals/typetests/tsconfig.adapted.json",
@@ -284,35 +284,10 @@
         {
           "path": "packages/alien-signals/audit/type-parity.json",
           "role": "support",
-          "sha256": "ea5dc84434e455db6573183ab5337449276a53d4d6983da673995ff1d11c11b7"
+          "sha256": "5051149ce7a24d274406bfb937c1d2c66b9ab910a955e3bf5f8c43fba5377016"
         }
       ]
     }
   ],
-  "divergences": [
-    {
-      "id": "alien-signals-readable-computed",
-      "caseIds": ["types:alien-signals-adapted"],
-      "upstreamResult": "Pinned react-alien-signals declarations narrow useSignalValue to WritableSignal, so readable computed probes are rejected.",
-      "octaneResult": "useSignalValue accepts ReadableSignal, including createComputed results, matching the documented Octane surface.",
-      "rationale": "Upstream docs and runtime treat computed signals as readable; the published React declaration is narrower than that contract. Octane corrects the accept surface without weakening the read-only computed negative control.",
-      "classification": "type-surface",
-      "consumerImpact": "Octane callers may pass createComputed results to useSignalValue; React declaration consumers cannot without casts.",
-      "migrationGuidance": "Prefer ReadableSignal-typed values with useSignalValue on Octane. Keep paired type probes on writable count; use the Octane-only readable-computed typetest (ordinary package typecheck) for computed acceptance.",
-      "owner": "@octanejs/alien-signals",
-      "reviewCondition": "Review if upstream widens useSignalValue to ReadableSignal or Octane reintroduces a writable-only overload."
-    },
-    {
-      "id": "alien-signals-use-signal-scope",
-      "caseIds": ["runtime:5189801c40af28d9"],
-      "upstreamResult": "useSignalScope starts createSignalScope during React render via useMemo and returns that stop handle; pre-commit cancellation is not modeled.",
-      "octaneResult": "useSignalScope allocates a cancellation-safe controller during render, starts the scope after client commit via useEffect, and returns a stop that can cancel before commit.",
-      "rationale": "Octane forbids render-phase effects. Deferring scope start to commit preserves SSR/hydration safety and makes pre-commit stop a no-op instead of racing a render-created scope.",
-      "classification": "lifecycle",
-      "consumerImpact": "Scope callbacks and nested effects do not run until after commit; calling stop before commit cancels startup rather than disposing an already-running scope.",
-      "migrationGuidance": "Do not rely on scope work during the render that calls useSignalScope. Prefer post-commit observations; use the returned stop for cancellation-safe teardown including pre-commit abort.",
-      "owner": "@octanejs/alien-signals",
-      "reviewCondition": "Review if Octane gains a safe render-phase effect primitive or upstream moves scope creation out of useMemo."
-    }
-  ]
+  "divergences": []
 }
