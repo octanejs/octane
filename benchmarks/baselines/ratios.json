@@ -1592,6 +1592,54 @@
     "note": "Same-run Brotli guards the authenticated-default server path; stylesheet bytes and full SSR checksums must match."
   },
   {
+    "suite": "codegen-size",
+    "op": "minified",
+    "target": "rspack-void-hydrate-proven",
+    "reference": "rspack-void-hydrate-control",
+    "maxRatio": 0.7,
+    "note": "The octanejs/octane#1839 shape, one hydrateRoot over an imported void leaf, built by the real Rspack adapter with the runtime bundled: 178,334 / 289,043 = 0.617x under Node 24 and Rspack 2.1.4 on 2026-10-07. The control's post loader routes the root import through a re-export, which the adapter leaves unproven; every other module and the hydrated DOM are identical."
+  },
+  {
+    "suite": "codegen-size",
+    "op": "gzip",
+    "target": "rspack-void-hydrate-proven",
+    "reference": "rspack-void-hydrate-control",
+    "maxRatio": 0.68,
+    "note": "Same-run gzip of the hydrated void root: 52,075 / 86,560 = 0.602x on 2026-10-07. Losing the proof fails the harness outright; this bound catches the specialized root pulling generic renderer code back in."
+  },
+  {
+    "suite": "codegen-size",
+    "op": "brotli",
+    "target": "rspack-void-hydrate-proven",
+    "reference": "rspack-void-hydrate-control",
+    "maxRatio": 0.7,
+    "note": "Same-run Brotli of the hydrated void root: 44,522 / 72,159 = 0.617x on 2026-10-07, with the server node adopted in both variants."
+  },
+  {
+    "suite": "codegen-size",
+    "op": "minified",
+    "target": "rspack-void-tree-proven",
+    "reference": "rspack-void-tree-control",
+    "maxRatio": 0.72,
+    "note": "createRoot over four imported void components, a keyed @for and a second root.render, built by the real Rspack adapter with the runtime bundled: 134,160 / 209,250 = 0.641x under Node 24 and Rspack 2.1.4 on 2026-10-07. Only the entry differs between variants; the DOM after mount, update and unmount is identical."
+  },
+  {
+    "suite": "codegen-size",
+    "op": "gzip",
+    "target": "rspack-void-tree-proven",
+    "reference": "rspack-void-tree-control",
+    "maxRatio": 0.73,
+    "note": "Same-run gzip of the created void root: 42,610 / 65,380 = 0.652x on 2026-10-07. The component calls inside the tree are proven in both variants, so this is the root proof's saving alone."
+  },
+  {
+    "suite": "codegen-size",
+    "op": "brotli",
+    "target": "rspack-void-tree-proven",
+    "reference": "rspack-void-tree-control",
+    "maxRatio": 0.74,
+    "note": "Same-run Brotli of the created void root: 36,330 / 54,993 = 0.661x on 2026-10-07."
+  },
+  {
     "suite": "bundle-size",
     "op": "app_gzip",
     "target": "octane-tsrx",

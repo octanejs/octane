@@ -12,6 +12,7 @@
     "@rspack/core": "catalog:default",
     "css-loader": "6.11.0",
     "esbuild": "catalog:default",
+    "jsdom": "catalog:default",
     "octane": "workspace:*"
   }
 }
