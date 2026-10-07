@@ -3720,7 +3720,7 @@
     "target": "octane",
     "reference": "work-model",
     "maxRatio": 1,
-    "note": "Per-cycle runtime object literals (batch, staged update, render frames, journal copies) plus a one-time lazily installed driver record."
+    "note": "Per-cycle runtime object literals (batch, staged update, render frames, journal copies) plus the one-time lazily installed transition swap, root and task driver records."
   },
   {
     "suite": "transition-hooks",

@@ -177,19 +177,38 @@ function setupDom() {
 	return window;
 }
 
-/** Let the runtime's own microtask scheduling run until no render is observed. */
+/** A host task posted now, after every task the runtime has posted. */
+function hostTask() {
+	return new Promise((resolve) => {
+		const channel = new MessageChannel();
+		channel.port1.onmessage = () => {
+			channel.port1.close();
+			resolve();
+		};
+		channel.port2.postMessage(null);
+	});
+}
+
+/**
+ * Let the runtime's own scheduling run until no render is observed: microtasks,
+ * then the host task it posts for transition renders (#1864).
+ */
 async function quiesce(observations) {
-	let seen = observations.length;
-	for (let tick = 0, quiet = 0; tick < 256; tick++) {
-		await Promise.resolve();
-		if (observations.length === seen) {
-			if (++quiet === QUIET_TICKS) return;
-		} else {
-			seen = observations.length;
-			quiet = 0;
+	for (let task = 0; task < 8; task++) {
+		let seen = observations.length;
+		for (let tick = 0, quiet = 0; quiet < QUIET_TICKS; tick++) {
+			if (tick === 256) throw new Error('the scheduler did not quiesce within 256 microtask ticks');
+			await Promise.resolve();
+			if (observations.length === seen) quiet++;
+			else {
+				seen = observations.length;
+				quiet = 0;
+			}
 		}
+		await hostTask();
+		if (observations.length === seen) return;
 	}
-	throw new Error('the scheduler did not quiesce within 256 microtask ticks');
+	throw new Error('the scheduler did not quiesce within 8 host tasks');
 }
 
 function fail(label, observations, expected) {
@@ -697,7 +716,8 @@ const WORK_MODEL = {
 	cycle_renders: [2, 0],
 	cycle_runtime_functions: [2, 0],
 	cycle_runtime_arrays: [27, 0],
-	cycle_runtime_objects: [11, 1],
+	// One-time: the lazily installed transition swap, root and task driver records.
+	cycle_runtime_objects: [11, 3],
 	cycle_runtime_constructors: [3, 0],
 	updater_renders: [2, 0],
 	updater_runtime_functions: [1, 0],
