@@ -458,7 +458,7 @@ describe('useDeferredValue — transition-priority deferral', () => {
 		expect(r.find('#value').className).toBe('fresh');
 
 		// Update with a new pending promise. The FIRST render returns the prior
-		// value via useDeferredValue (no suspend; stale flag set). A microtask
+		// value via useDeferredValue (no suspend; stale flag set). A task
 		// later, useDeferredValue commits the new value via startTransition;
 		// that suspends but keeps the prior DOM.
 		r.update(DeferredValueWithSuspense, { promise: d2.promise });

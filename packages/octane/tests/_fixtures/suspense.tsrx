@@ -135,7 +135,7 @@ export function TwoUses(props) @{
 
 // useDeferredValue + use() — the React-idiomatic stale-data pattern. When
 // `props.promise` changes, useDeferredValue returns the prior value for one
-// render, then commits the new value on a microtask. The first render reads
+// render, then commits the new value in a later task. The first render reads
 // the cached fulfilled state of the old promise (no suspend) and can flag
 // `isStale`; the deferred-commit render suspends on the new promise.
 export function DeferredSwap(props) @{

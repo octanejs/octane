@@ -589,7 +589,7 @@ describe('Suspense — parallel boundaries (no waterfall)', () => {
 });
 
 describe('Suspense — useDeferredValue (React 18 stale-data pattern)', () => {
-	it('returns previous value while new value suspends; commits on microtask', async () => {
+	it('returns previous value while new value suspends; commits in a later task', async () => {
 		const d1 = deferred<string>();
 		const r = mount(DeferredSwap, { promise: d1.promise });
 		expect(r.find('.fallback').textContent).toBe('first load');
@@ -602,7 +602,7 @@ describe('Suspense — useDeferredValue (React 18 stale-data pattern)', () => {
 		// Update with a NEW pending promise. On the FIRST render after the prop
 		// change, useDeferredValue returns the PREVIOUS value (d1.promise), so
 		// use() reads the cached fulfilled state (no suspend) AND `props !== deferred`
-		// flips the class to 'stale'. A microtask later, useDeferredValue commits
+		// flips the class to 'stale'. A task later, useDeferredValue commits
 		// the new value; that re-render suspends → fallback shows briefly until
 		// d2 resolves and the body completes.
 		const d2 = deferred<string>();

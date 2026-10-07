@@ -1190,9 +1190,11 @@ for the full API; Octane uses the same component-level pattern.
 	Let a slow view lag with <code>useDeferredValue</code>
 </h3>
 
-`useDeferredValue` gives one part of the page permission to be a step behind. A search
-box can receive every keystroke immediately while a slower result list continues to show
-the last useful result.
+`useDeferredValue` gives one part of the page permission to be a step behind. A keystroke
+commits the input with the previous deferred value, so the browser can paint it while a
+slower result list continues to show the last useful result. The list renders the new
+value in a later task, and keystrokes that arrive before that task starts replace the
+value it renders.
 
 ```tsrx
 export function ProductSearch() @{
@@ -1215,7 +1217,10 @@ the deferred copy and keeps its old cards visible while the new search finishes.
 <DeferredSearchDemo />
 
 This is not a debounce: there is no fixed delay, and it does not reduce network requests.
-It only changes which render may wait. See the
+It only changes which render may wait. The deferred render is not interruptible either:
+once it starts, it runs to completion, so a keystroke that arrives during it waits until it
+commits. As in React, the slow component should skip the urgent render, for example by
+wrapping it in `memo`. See the
 [React `useDeferredValue` reference](https://react.dev/reference/react/useDeferredValue)
 for initial values, Suspense, and performance details.
 
