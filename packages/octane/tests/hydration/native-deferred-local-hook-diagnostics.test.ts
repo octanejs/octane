@@ -282,7 +282,9 @@ for (const dev of [true, false])
 							} catch {
 								rejectedSubscriptions++;
 							}
-							expect(cell.owner.inspect().adoptionLeases).toBe(0);
+							// A runtime-created local scope has no public inspect(); read the
+							// adoption leases it would report directly.
+							expect(cell.owner.frames?.size ?? 0).toBe(0);
 						},
 					};
 					root = view.api.hydrateRoot(view.host, Component, initial);
@@ -332,7 +334,7 @@ for (const dev of [true, false])
 					root = null;
 					await view.api.act(() => {});
 					expect(actual.owner.retired).toBe(true);
-					expect(actual.owner.inspect().nodes).toEqual([]);
+					expect(actual.owner.nodes.size).toBe(0);
 					expect(() => actual.get()).toThrow();
 					expect(effects).toEqual([
 						'layout-mount',
@@ -440,7 +442,7 @@ for (const dev of [true, false])
 				root = null;
 				await view.api.act(() => {});
 				expect(actual.owner.retired).toBe(true);
-				expect(actual.owner.inspect().nodes).toEqual([]);
+				expect(actual.owner.nodes.size).toBe(0);
 				expect(() => actual.get()).toThrow();
 				expect(effects).toEqual([
 					'layout-mount',
