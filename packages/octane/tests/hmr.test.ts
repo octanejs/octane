@@ -61,6 +61,13 @@ async function compileHmrComponent(
 		import('octane/internal/client'),
 	]);
 	const code = compile(source, filename, { hmr: options.hmr ?? 'webpack' }).code;
+	// An anonymous default export has no authored binding: its export clause
+	// names the module binding that holds it.
+	const local =
+		exportName === 'default'
+			? /^export\s*\{\s*([\w$]+)\s+as\s+default\s*\};?\s*$/m.exec(code)?.[1]
+			: exportName;
+	if (local === undefined) throw new Error('The compiled module has no default export binding');
 	const transformed =
 		code
 			.replace(
@@ -88,7 +95,7 @@ async function compileHmrComponent(
 			// instead of `export let X = …`; drop the list form the same way.
 			.replace(/^export\s*\{[^}]*\};?\s*$/gm, '')
 			.replaceAll('import.meta.webpackHot', 'hot')
-			.replaceAll('import.meta.hot', 'hot') + `\nreturn ${exportName};`;
+			.replaceAll('import.meta.hot', 'hot') + `\nreturn ${local};`;
 	const hot = options.hot ?? {
 		data: undefined,
 		dispose() {},
@@ -147,6 +154,9 @@ describe('hmr — runtime wrapper', () => {
 		{ dialect: 'webpack', name: 'App' },
 		{ dialect: 'vite', name: 'module' },
 		{ dialect: 'vite', name: '_$hmrModule' },
+		// An anonymous `export default function () @{…}` registers under its export.
+		{ dialect: 'vite', name: 'default' },
+		{ dialect: 'webpack', name: 'default' },
 	] as const)(
 		'preserves state and live events for $name across consecutive $dialect replacements',
 		async ({ dialect, name }) => {
@@ -163,7 +173,7 @@ describe('hmr — runtime wrapper', () => {
 				accept = undefined;
 				const App = await compileHmrComponent(
 					`import { useState } from 'octane';
-					 export function ${name}(props) @{
+					 export ${name === 'default' ? 'default function' : `function ${name}`}(props) @{
 					   const [count, setCount] = useState(0);
 					   ${incompatible ? "if (props.empty) return 'empty';" : ''}
 					   <main><p>version ${version}</p><button onClick={() => setCount(count + 1)}>{count as string}</button></main>
