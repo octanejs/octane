@@ -29,8 +29,9 @@ One command writes the project and installs it:
 <PackageInstall command="create" directory="my-app" />
 
 It asks what you are building, then writes the TypeScript settings `.tsrx` needs, the
-bundler config, the scripts, and the entry files, and installs the dependencies with the
-package manager you ran it through. Answer the prompt up front with `--template`:
+bundler config, the scripts, and the entry files, and installs dependencies with the
+package manager you ran it through. Follow any manual install instructions it prints.
+Answer the prompt up front with `--template`:
 
 ```bash
 npm create octane my-app -- --template spa        # client-only app
@@ -57,11 +58,14 @@ it.
 <h2 id="install">Install into an existing project</h2>
 
 The rest of this page is the same work by hand, against a Vite project you already have.
-`pnpm dlx @octanejs/cli init` does all of it for you; the steps below are what it writes.
+`pnpm dlx @octanejs/cli init` can wire it up; follow any manual instructions it prints.
 
 Install the runtime and the recommended Vite integration:
 
-<PackageInstall packages="octane @octanejs/vite-plugin" />
+<PackageInstall packages="octane @octanejs/vite-plugin @tsrx/oxc@0.16.0" />
+
+`@tsrx/oxc@0.16.0` is the optional peer used by the Node compiler. Applications that
+use only the Octane runtime do not need it.
 
 Then add the plugin to Vite:
 

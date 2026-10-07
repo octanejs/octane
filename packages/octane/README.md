@@ -17,6 +17,15 @@ wrapper is narrower: the wrapper must be locally declared in a fully compiled
 parameter to a supported hook. This package ships both the runtime and compiler,
 with the compiler exposed at `octane/compiler`.
 
+To use the compiler in Node, including through the Vite, Rspack, or Rsbuild
+integrations, install its optional parser peer in your project:
+
+```bash
+pnpm add @tsrx/oxc@0.16.0
+```
+
+Applications that use only the Octane runtime do not need this peer.
+
 [Signals](https://octanejs.dev/docs/signals) are stable. Import `createScope` and
 `query` from `octane/signals`, or `useSignal$` from `octane/signals/client`, for
 scoped state, derived values, async resources, and native component reads.

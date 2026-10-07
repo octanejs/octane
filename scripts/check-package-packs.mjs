@@ -78,10 +78,12 @@ const octaneSingletonConsumers = new Set([
 const viteToolRequire = createRequire(
 	path.join(REPO_ROOT, 'packages/vite-plugin-octane/package.json'),
 );
+const octaneToolRequire = createRequire(path.join(REPO_ROOT, 'packages/octane/package.json'));
 const repositoryRequire = createRequire(path.join(REPO_ROOT, 'package.json'));
 const packageManager = repositoryRequire('./package.json').packageManager;
 const viteVersion = viteToolRequire('vite/package.json').version;
 const nodeTypesVersion = viteToolRequire('@types/node/package.json').version;
+const tsrxOxcVersion = octaneToolRequire('@tsrx/oxc/package.json').version;
 const tsrxTypeScriptPluginVersion = repositoryRequire(
 	'@tsrx/typescript-plugin/package.json',
 ).version;
@@ -309,6 +311,12 @@ function fileArchiveSpec(archives, packageName) {
 	return `file:${requireArchive(archives, packageName)}`;
 }
 
+function addCompilerPeer(manifest) {
+	delete manifest.dependencies?.['@tsrx/oxc'];
+	manifest.devDependencies ??= {};
+	manifest.devDependencies['@tsrx/oxc'] = tsrxOxcVersion;
+}
+
 function preparePackedExample(tempRoot, archives, canary) {
 	const sourceDirectory = path.join(REPO_ROOT, 'examples', canary.directory);
 	const consumerDirectory = path.join(tempRoot, `example-${canary.directory}`);
@@ -335,6 +343,7 @@ function preparePackedExample(tempRoot, archives, canary) {
 		viteVersion,
 		canary.label,
 	);
+	addCompilerPeer(packedManifest);
 	writeFileSync(manifestPath, `${JSON.stringify(packedManifest, null, 2)}\n`);
 	writeFileSync(
 		path.join(consumerDirectory, 'pnpm-workspace.yaml'),
@@ -443,6 +452,66 @@ function validatePackedExample(tempRoot, archives, canary) {
 	);
 }
 
+function validatePackedRuntimeWithoutCompiler(tempRoot, archives) {
+	const consumerDirectory = path.join(tempRoot, 'external-runtime-only-consumer');
+	if (isWithinDirectory(REPO_ROOT, consumerDirectory)) {
+		throw new Error('packed runtime-only consumer must be created outside the workspace');
+	}
+	mkdirSync(consumerDirectory, { recursive: true });
+	const manifest = {
+		name: 'octane-packed-runtime-only-consumer',
+		private: true,
+		type: 'module',
+		dependencies: { octane: fileArchiveSpec(archives, 'octane') },
+	};
+	writeFileSync(
+		path.join(consumerDirectory, 'package.json'),
+		`${JSON.stringify(manifest, null, 2)}\n`,
+	);
+	writeFileSync(
+		path.join(consumerDirectory, 'runtime.mjs'),
+		`import assert from 'node:assert/strict';
+import { createElement } from 'octane';
+import 'octane/internal/client';
+import { renderToString } from 'octane/server';
+
+assert.equal(typeof createElement, 'function');
+assert.deepEqual(renderToString(() => 'runtime-only'), { html: 'runtime-only', css: '' });
+`,
+	);
+	execFileSync(
+		'pnpm',
+		[
+			'install',
+			'--prefer-offline',
+			'--ignore-scripts',
+			'--no-frozen-lockfile',
+			'--config.auto-install-peers=true',
+		],
+		{ cwd: consumerDirectory, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] },
+	);
+	const consumerRequire = createRequire(path.join(consumerDirectory, 'package.json'));
+	const octaneRequire = createRequire(realpathSync(consumerRequire.resolve('octane')));
+	let compilerPeerFound = true;
+	try {
+		octaneRequire.resolve('@tsrx/oxc/tsrx-core-compat');
+	} catch (error) {
+		if (error.code !== 'MODULE_NOT_FOUND') throw error;
+		compilerPeerFound = false;
+	}
+	const installedPackages = readdirSync(path.join(consumerDirectory, 'node_modules/.pnpm'));
+	if (compilerPeerFound || installedPackages.some((entry) => entry.startsWith('@tsrx+oxc@'))) {
+		throw new Error('runtime-only consumer unexpectedly installed or resolved @tsrx/oxc');
+	}
+	execFileSync(process.execPath, ['runtime.mjs'], {
+		cwd: consumerDirectory,
+		encoding: 'utf8',
+		stdio: ['ignore', 'pipe', 'pipe'],
+		timeout: 30_000,
+	});
+	console.log('executed packed Octane runtime and SSR without the compiler peer');
+}
+
 /**
  * Install a real consumer outside the workspace, then compile one application
  * against the packed core and a raw-source binding in both client and server
@@ -479,6 +548,7 @@ async function validatePackedConsumer(tempRoot, archives, packedManifests) {
 					three: '0.172.0',
 				},
 				devDependencies: {
+					'@tsrx/oxc': tsrxOxcVersion,
 					'@tsrx/typescript-plugin': tsrxTypeScriptPluginVersion,
 					'@types/node': nodeTypesVersion,
 					postcss: '^8.5.28',
@@ -1215,6 +1285,7 @@ function validatePackedTsrxConsumer(tempRoot, archives, packedFiles, packedManif
 		installedPackages,
 		externalDependencies,
 	);
+	addCompilerPeer(manifest);
 
 	writeFileSync(
 		path.join(consumerDirectory, 'package.json'),
@@ -1373,9 +1444,11 @@ async function validatePackedJavascriptConsumer(tempRoot, archives) {
 			fileArchiveSpec(archives, packageName),
 		]),
 	);
+	const manifest = createPackedJavascriptConsumerManifest(archiveSpecs);
+	addCompilerPeer(manifest);
 	writeFileSync(
 		path.join(consumerDirectory, 'package.json'),
-		`${JSON.stringify(createPackedJavascriptConsumerManifest(archiveSpecs), null, 2)}\n`,
+		`${JSON.stringify(manifest, null, 2)}\n`,
 	);
 	writeFileSync(
 		path.join(consumerDirectory, 'pnpm-workspace.yaml'),
@@ -1626,6 +1699,7 @@ function validatePackedLynxConsumer(tempRoot, archives) {
 					'@octanejs/rspeedy-plugin': archiveSpecs['@octanejs/rspeedy-plugin'],
 					octane: archiveSpecs.octane,
 				},
+				devDependencies: { '@tsrx/oxc': tsrxOxcVersion },
 			},
 			null,
 			2,
@@ -1940,6 +2014,10 @@ try {
 	}
 	if (!failures.length) {
 		const consumerValidations = [
+			{
+				label: 'external packed runtime-only consumer',
+				run: () => validatePackedRuntimeWithoutCompiler(tempRoot, packedArchives),
+			},
 			{
 				label: 'external strict packed TSRX source consumer',
 				run: () =>
