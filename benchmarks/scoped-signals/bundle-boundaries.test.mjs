@@ -1023,6 +1023,46 @@ export function exercise() {
 		'A program without createScope retained the public Scope surface.',
 	);
 
+	// Runtime-created owners reach application code through currentSignalOwner
+	// and the public owner carrier. Each route, in its own program without
+	// createScope, still hands out the whole Scope.
+	const current =
+		await bundle(`import { currentSignalOwner, derived$, runWithSignalOwner } from 'octane/signals';
+export function probe() {
+  const owner = { scopeKey: 'probe' };
+  const selected$ = derived$(() => {
+    const active = currentSignalOwner();
+    return active && 'signal$' in active ? active.inspect().scopeKey : active?.scopeKey;
+  }, { key: 'selection' });
+  return runWithSignalOwner(owner, () => selected$.get());
+}`);
+	assert.equal(current.api.probe(), 'probe');
+	const carried =
+		await bundle(`import { derived$, installSignalOwnerEnvironment, runWithSignalOwner } from 'octane/signals';
+export function probe() {
+  const seen = [];
+  let active = null;
+  const enter = (owner, callback) => {
+    const previous = active;
+    active = owner;
+    try { return callback(); } finally { active = previous; }
+  };
+  const restore = installSignalOwnerEnvironment({
+    current: () => active,
+    run(owner, callback) {
+      if ('signal$' in owner) seen.push(owner.inspect().scopeKey);
+      return enter(owner, callback);
+    },
+    capture: (owner) => (callback) => enter(owner, callback),
+  });
+  try {
+    const value$ = derived$(() => 1, { key: 'carried-value' });
+    runWithSignalOwner({ scopeKey: 'carried' }, () => value$.get());
+    return seen;
+  } finally { restore(); }
+}`);
+	assert.deepEqual(carried.api.probe(), ['carried']);
+
 	// Control: one createScope call installs the whole surface, and the owner
 	// scopes the runtime creates keep working before and after it does.
 	const withScope = await bundle(`${owned}

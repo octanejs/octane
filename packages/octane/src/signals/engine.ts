@@ -226,9 +226,8 @@ export class ScopeImpl implements Scope, GraphOwner {
 	sequence = 0;
 	private lifetime = 0;
 	private disposed = false;
-	// Installed by createScope, so only applications that create a public scope
-	// ship these (installPublicScope). Internal owner scopes never reach
-	// application code.
+	// Installed by installPublicScope, so only applications that can hold a
+	// scope (createScope, currentSignalOwner) ship these.
 	declare derived$: Scope['derived$'];
 	declare get: Scope['get'];
 	declare set: Scope['set'];
@@ -813,12 +812,14 @@ function ownScopeNode<T>(scope: ScopeImpl, handle$: SignalHandle<T>): ScopedNode
 let publicScope = false;
 
 /**
- * A scope the application creates exposes the whole Scope surface. Owner scopes
- * the runtime creates for `signal$` and friends never reach application code,
- * so an application that never calls createScope ships none of it. The methods
- * go on the shared prototype, which keeps every scope one shape.
+ * @internal Every scope an application can hold exposes the whole Scope
+ * surface. The runtime's owner scopes for `signal$` and friends reach
+ * application code only through createScope's scopes, currentSignalOwner and
+ * the public installSignalOwnerEnvironment, which all call this first, so an
+ * application that uses none of them ships none of it. The methods go on the
+ * shared prototype, which keeps every scope one shape.
  */
-function installPublicScope(): void {
+export function installPublicScope(): void {
 	if (publicScope) return;
 	publicScope = true;
 	const prototype = ScopeImpl.prototype;

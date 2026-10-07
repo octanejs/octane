@@ -24,11 +24,10 @@ export {
 } from './facade.js';
 export {
 	captureSignalOwner,
-	currentSignalOwner,
-	installSignalOwnerEnvironment,
 	retireSignalOwnerIdentity,
 	runWithSignalOwner,
 } from './owner-context.js';
+export { currentSignalOwner, installSignalOwnerEnvironment } from './public-owner.js';
 export {
 	ScopeDisposedError,
 	SignalCycleError,
