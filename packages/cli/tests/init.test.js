@@ -489,6 +489,53 @@ describe('octane init', () => {
 		expect(requested).not.toContain('typescript');
 	});
 
+	it.each(['spa', 'fullstack'])('installs the parser peer for a new %s app', async (mode) => {
+		const { root, write } = fixture();
+		/** @type {string[][]} */
+		const ran = [];
+		const exec = {
+			which: (/** @type {string} */ bin) => (bin === 'git' ? '/usr/bin/git' : `/usr/bin/${bin}`),
+			run: async (/** @type {string} */ file, /** @type {string[]} */ args) => {
+				if (file !== 'git') {
+					ran.push(args);
+					if (args.includes('octane')) {
+						write('node_modules/octane/package.json', {
+							name: 'octane',
+							version: '0.10.0',
+							peerDependencies: { '@tsrx/oxc': '0.16.0' },
+						});
+					}
+				}
+				return { code: 0, stdout: '', stderr: '' };
+			},
+		};
+
+		const result = await runCli(
+			['init', '--cwd', root, '--mode', mode, '--yes', '--package-manager', 'pnpm', '--json'],
+			{ exec },
+		);
+
+		expect(result.exitCode).toBe(0);
+		expect(ran.find((args) => args.includes('@tsrx/oxc@0.16.0'))).toContain('-D');
+		expect(result.json().installed).toContain('@tsrx/oxc');
+	});
+
+	it('leaves a parser the project already declares alone', async () => {
+		const { root } = fixture({
+			'package.json': {
+				name: 'app',
+				type: 'module',
+				devDependencies: { '@tsrx/oxc': '0.16.0' },
+			},
+			...installed('octane', '0.10.0', { peerDependencies: { '@tsrx/oxc': '0.16.0' } }),
+		});
+		const recorder = recordingExec();
+
+		await runCli(['init', '--cwd', root, '--mode', 'spa', '--yes'], { exec: recorder.exec });
+
+		expect(recorder.args.flat().filter((arg) => /^@tsrx\/oxc(@|$)/.test(arg))).toEqual([]);
+	});
+
 	it('leaves a TypeScript the project already declares alone', async () => {
 		const { root } = fixture({
 			'package.json': {
@@ -521,6 +568,7 @@ describe('octane init', () => {
 		);
 
 		expect(result.json().manual.join(' ')).toContain('typescript');
+		expect(result.json().manual.join(' ')).toContain('@tsrx/oxc at the range declared by octane');
 	});
 
 	it('registers the Prettier plugin, without which .tsrx cannot be parsed', async () => {

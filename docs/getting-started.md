@@ -17,6 +17,12 @@ cd my-app
 npm run dev
 ```
 
+The Node compiler requires `@tsrx/oxc@0.16.0` as an optional peer. Install it
+in projects that compile Octane components, including projects using Vite,
+Rspack, or Rsbuild. The Octane CLI normally installs it when creating a project;
+follow any manual install instructions it prints. Runtime-only consumers do not
+need it.
+
 `pnpm create octane my-app`, `yarn create octane my-app`, and
 `npx create-octane my-app` all reach the same place. It asks what you are
 building, or you can answer up front:
@@ -40,7 +46,7 @@ The rest of this page is for adding Octane to a project you already have.
 Install the runtime and a build-tool integration:
 
 ```bash
-pnpm add octane @octanejs/vite-plugin
+pnpm add octane @octanejs/vite-plugin @tsrx/oxc@0.16.0
 ```
 
 The CLI can wire that up instead, including the TypeScript settings `.tsrx`
