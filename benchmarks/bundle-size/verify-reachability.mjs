@@ -82,6 +82,19 @@ const EXPECTED_SNAPSHOTS = Object.freeze({
 		clicks: 1,
 		cleaned: true,
 	},
+	'hydrate-frame': {
+		adopted: true,
+		content: 'welcome',
+		width: '200px',
+		selected: 'sent',
+		length: '4',
+		highlighted: 'red',
+		portal: 'portal',
+		islandAdopted: true,
+		islandCount: '1',
+		portalCleaned: true,
+		cleaned: true,
+	},
 	'suspense-transition': {
 		pending: 'loading',
 		resolved: 'ready',
@@ -163,8 +176,9 @@ const EXPECTED_SNAPSHOTS = Object.freeze({
  * Execute the same production bytes whose reachability and size were measured.
  * Every scenario receives a fresh browser realm, so delegated events, pending
  * work, hydration listeners, and application globals cannot leak across runs.
+ * A hydrating scenario also receives the markup its server build rendered.
  */
-export async function verifyScenario(id, code) {
+export async function verifyScenario(id, code, serverMarkup) {
 	const expected = EXPECTED_SNAPSHOTS[id];
 	assert.notEqual(expected, undefined, `Unknown minimal-import scenario: ${id}`);
 	assert.equal(typeof code, 'string', `${id}: expected executable production JavaScript`);
@@ -241,7 +255,7 @@ export async function verifyScenario(id, code) {
 			`${id}: production bundle must expose its public scenario runner`,
 		);
 
-		const actual = await scenario.run(container);
+		const actual = await scenario.run(container, serverMarkup);
 		if (failures.length !== 0) {
 			throw new AggregateError(failures, `${id}: production bundle raised a browser error`);
 		}

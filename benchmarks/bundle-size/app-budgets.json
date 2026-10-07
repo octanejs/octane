@@ -25,7 +25,7 @@
     "framework": {
       "raw": 116552,
       "gzip": 37329,
-      "brotli": 33156
+      "brotli": 33152
     },
     "total": {
       "raw": 121170,
@@ -59,27 +59,27 @@
     "framework": {
       "raw": 134320,
       "gzip": 42905,
-      "brotli": 37872
+      "brotli": 37819
     },
     "total": {
       "raw": 156474,
       "gzip": 50777,
-      "brotli": 44521
+      "brotli": 44491
     }
   },
   "bindings": {
     "app": {
       "raw": 347651,
-      "gzip": 115704,
+      "gzip": 115703,
       "brotli": 96447
     },
     "framework": {
-      "raw": 338507,
+      "raw": 338484,
       "gzip": 108440,
       "brotli": 94487
     },
     "total": {
-      "raw": 686157,
+      "raw": 686134,
       "gzip": 224112,
       "brotli": 190693
     }

@@ -415,8 +415,8 @@ comparison. Each raw and gzip ceiling is the measured value plus 32 bytes (see
 [Size budgets](#size-budgets)), so small changes in another framework cannot
 hide Octane application or runtime growth.
 
-`bundle-reachability` builds twenty-four independent public-entry feature fixtures
-across thirty-two production builds with the production Octane compiler,
+`bundle-reachability` builds twenty-five independent public-entry feature fixtures
+across thirty-three production builds with the production Octane compiler,
 disabled HMR/profiling, and each bundler's default production minifier: Vite's
 `'oxc'` and esbuild's `minify: true`. The seven package
 side-effect fixtures and the behavior-only fixture each run through both Vite
@@ -457,9 +457,19 @@ potential signal bindings, so the fixture pins that they keep the narrow scalar
 writers and never retain the generic attribute route with its form-control
 writers and DOM routing tables.
 
+`hydrate-frame` is the shape of a server-rendered application frame. A
+production server build of the same modules renders its markup with
+`renderToString`, and the measured client bundle hydrates it: native signal
+reads, a keyed `@for`, a `@try`/`@pending`/`@catch` boundary over settled data,
+forwarded style objects, a portal opened after hydration, and an
+`octane/behavior` island beside the root. Its oracle requires the server nodes
+to be adopted, not rebuilt. It never starts a transition or renders an
+`<Activity>`, so its ceiling also holds those graphs out of a hydrating
+Suspense application.
+
 `bundle-size/minimal-budgets.json` supplies explicit raw, gzip, and brotli byte
 ceilings for every feature. Each scenario publishes its committed ceiling as a
-same-run `*-budget` reference target, so one hundred and eight `maxRatio: 1`
+same-run `*-budget` reference target, so one hundred and eleven `maxRatio: 1`
 entries in `baselines/ratios.json` also enforce all three metrics in the
 weekly/manual Bench CI workflow. An unknown or empty scenario name fails instead
 of skipping the builds.
