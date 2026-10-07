@@ -1316,8 +1316,8 @@ interface NativeStyleBinding {
 	__flags: number;
 	__teardown: typeof disposeNativeStyleBinding;
 	block: Block | null;
-	// Scalar-literal writes before any Block exists: the host and the last
-	// applied style, which seeds the Block's cache if a handle arrives later.
+	// Scalar writes before any Block exists: the host and the last applied
+	// style, which seeds the Block's cache if a structured value arrives later.
 	el: HTMLElement | SVGElement | null;
 	style: unknown;
 }
@@ -1352,21 +1352,24 @@ export function nativeStyleBinding(
 	value: any,
 	literal?: 1,
 ): void {
-	// The compiler passes `literal` for a fresh object literal of plain data
-	// properties, so enumerating it runs no accessor. When every value is a
-	// scalar there is no native protocol to read: write it like an ordinary style
-	// binding and allocate the owning Block only once a structured value appears.
-	if (literal === 1) {
-		const binding = owner.slots[slotIndex] as NativeStyleBinding | undefined;
-		if ((binding === undefined || binding.block === null) && isScalarStyleLiteral(value)) {
-			writeScalarNativeStyle(owner, slotIndex, binding, el, value);
-			return;
-		}
+	// Only an object carries the native read protocol, so a nullish or string
+	// style, such as an optional prop forwarded unset, has nothing to read.
+	// Neither does a scalar style literal: the compiler passes `literal` for a
+	// fresh object literal of plain data properties, so enumerating it runs no
+	// accessor. Write those like an ordinary style binding and allocate the
+	// owning Block only once a structured value appears. That Block then stays,
+	// so a later scalar releases its subscriptions through the same
+	// transactional render.
+	const binding = owner.slots[slotIndex] as NativeStyleBinding | undefined;
+	if ((binding === undefined || binding.block === null) && isScalarNativeStyle(value, literal)) {
+		writeScalarNativeStyle(owner, slotIndex, binding, el, value);
+		return;
 	}
 	nativePresentationBinding(owner, slotIndex, el, nativeStyleBody, { el, value });
 }
 
-function isScalarStyleLiteral(value: Record<string, unknown>): boolean {
+function isScalarNativeStyle(value: any, literal: 1 | undefined): boolean {
+	if (literal !== 1) return typeof value !== 'object' || value === null;
 	for (const name in value) {
 		const item = value[name];
 		if (item !== null && (typeof item === 'object' || typeof item === 'function')) return false;
@@ -1379,7 +1382,9 @@ function writeScalarNativeStyle(
 	slotIndex: number,
 	binding: NativeStyleBinding | undefined,
 	el: HTMLElement | SVGElement,
-	value: Record<string, unknown>,
+	value: unknown,
+	// Presentation hydration prepares the takeover write instead.
+	write: (el: HTMLElement | SVGElement, value: unknown, previous: unknown) => void = setStyle,
 ): void {
 	if (binding === undefined) {
 		binding = {
@@ -1403,10 +1408,11 @@ function writeScalarNativeStyle(
 		binding.el = el;
 		binding.style = undefined;
 	}
-	setStyle(el, value, binding.style);
+	write(el, value, binding.style);
 	if (TRANSITION_JOURNAL !== null)
 		TRANSITION_JOURNAL.push(JOURNAL_PROP, binding, 'style', binding.style);
-	// A compiler literal is fresh per render and never escapes, so it is its own snapshot.
+	// A compiler literal is fresh per render and never escapes, and a primitive
+	// is immutable, so either is its own snapshot.
 	binding.style = value;
 }
 
@@ -1848,7 +1854,7 @@ function retainNativeRetryReads(block: Block, reads: NativeReadWitness): void {
 					return;
 				owner.wakeable = null;
 				owner.generation++;
-				if (owner.transition === undefined || !TRANSITION_SWAP_DRIVER!.retryRoot(owner))
+				if (owner.transition === undefined || !TRANSITION_ROOT_DRIVER!.retryRoot(owner))
 					owner.retry();
 			});
 		});
@@ -2671,18 +2677,37 @@ let TRANSITION_DEPTH = 0;
 let ASYNC_TRANSITION_COUNT = 0;
 
 /**
- * Optional transition-swap capability. Generic component/child/control-flow
+ * Optional off-screen swap capability. Generic component/child/control-flow
  * slots must not reference the concrete off-screen renderer directly: one
  * ordinary `@if` would otherwise retain the complete WIP/Suspense/descriptor
- * graph even when the application has no transition entry point. Every path
- * that can create transition-priority work runs through startTransition(),
- * which installs this driver before raising TRANSITION_DEPTH.
+ * graph even when the application has no transition entry point. A Suspense
+ * primary with a pending arm (tryBlock) and startTransition() install it.
  */
 interface TransitionSwapDriver {
 	render: typeof renderOffscreen;
-	commit: typeof commitOffscreen;
 	dispose: typeof disposeWip;
 	splice: typeof spliceWipCapture;
+}
+
+let TRANSITION_SWAP_DRIVER: TransitionSwapDriver | null = null;
+
+function ensureOffscreenSwapDriver(): void {
+	TRANSITION_SWAP_DRIVER ??= {
+		render: renderOffscreen,
+		dispose: disposeWip,
+		splice: spliceWipCapture,
+	};
+}
+
+/**
+ * Transition attempts, root holds and held state updates. Every path that can
+ * create transition-priority work runs through startTransition(), which
+ * installs this driver before raising TRANSITION_DEPTH. Until then no render
+ * runs at transition priority, so a missing driver means what an installed one
+ * would report: no attempt, no root hold and no held update. A Suspense-only
+ * application therefore does not retain it.
+ */
+interface TransitionRootDriver {
 	begin: typeof beginTransitionAttempt;
 	end: typeof endTransitionAttempt;
 	beginUrgent: typeof beginUrgentTransitionRender;
@@ -2698,14 +2723,17 @@ interface TransitionSwapDriver {
 	rebaseHeld: typeof rebaseHeldTransitionUpdate;
 }
 
-let TRANSITION_SWAP_DRIVER: TransitionSwapDriver | null = null;
+let TRANSITION_ROOT_DRIVER: TransitionRootDriver | null = null;
 
 function ensureTransitionSwapDriver(): void {
+	// Written out rather than calling ensureOffscreenSwapDriver, so applications
+	// that start transitions but render no Suspense pending arm carry one install.
 	TRANSITION_SWAP_DRIVER ??= {
 		render: renderOffscreen,
-		commit: commitOffscreen,
 		dispose: disposeWip,
 		splice: spliceWipCapture,
+	};
+	TRANSITION_ROOT_DRIVER ??= {
 		begin: beginTransitionAttempt,
 		end: endTransitionAttempt,
 		beginUrgent: beginUrgentTransitionRender,
@@ -2969,7 +2997,7 @@ function stagedTransitionValue<T>(slot: TransitionActionSlot<T>, block?: Block):
 	const update = batch.updates.get(slot) as TransitionActionUpdate<T> | undefined;
 	if (update !== undefined) return rebaseTransitionActionUpdate(update);
 	if (slot.renderTransition !== undefined) return slot.renderTransition.value;
-	const held = block === undefined ? undefined : TRANSITION_SWAP_DRIVER?.heldUpdate(slot, block);
+	const held = block === undefined ? undefined : TRANSITION_ROOT_DRIVER?.heldUpdate(slot, block);
 	return held === undefined ? slot.value : held.value;
 }
 
@@ -4588,7 +4616,7 @@ function commitRootRenders(): void {
 		try {
 			if (transaction.aborted || owner.disposed) {
 				if (owner.transaction === transaction) owner.transaction = null;
-				if (owner.transition !== undefined) TRANSITION_SWAP_DRIVER!.commitRoot(owner, transaction);
+				if (owner.transition !== undefined) TRANSITION_ROOT_DRIVER!.commitRoot(owner, transaction);
 				continue;
 			}
 			// This is the native acceptance point. Validate before any deletion,
@@ -4619,7 +4647,7 @@ function commitRootRenders(): void {
 			}
 			if (
 				transaction.rootRequest &&
-				(owner.transition === undefined || !TRANSITION_SWAP_DRIVER!.keepsRoot(owner))
+				(owner.transition === undefined || !TRANSITION_ROOT_DRIVER!.keepsRoot(owner))
 			) {
 				owner.wakeable = null;
 				owner.generation++;
@@ -4674,7 +4702,7 @@ function commitRootRenders(): void {
 			}
 			// Outgoing cleanup may have removed the state origin of a held root
 			// transition. Inspect its lifetime after those deletions have completed.
-			if (owner.transition !== undefined) TRANSITION_SWAP_DRIVER!.commitRoot(owner, transaction);
+			if (owner.transition !== undefined) TRANSITION_ROOT_DRIVER!.commitRoot(owner, transaction);
 		} finally {
 			finishStagedOwner?.();
 		}
@@ -4691,8 +4719,8 @@ function suspendRootRender(
 	const transaction = owner.transaction;
 	if (transaction === null) return false;
 	if (
-		TRANSITION_SWAP_DRIVER === null ||
-		!TRANSITION_SWAP_DRIVER.holdRoot(owner, transaction, attempt)
+		TRANSITION_ROOT_DRIVER === null ||
+		!TRANSITION_ROOT_DRIVER.holdRoot(owner, transaction, attempt)
 	) {
 		if (WARM_EVER && transaction.created !== null) {
 			// Only fresh subtrees are destroyed by this rollback. Their warm
@@ -4730,7 +4758,7 @@ function suspendRootRender(
 		queueMicrotask(() => {
 			if (owner.disposed || owner.generation !== generation || owner.wakeable !== wakeable) return;
 			owner.wakeable = null;
-			if (owner.transition === undefined || !TRANSITION_SWAP_DRIVER!.retryRoot(owner))
+			if (owner.transition === undefined || !TRANSITION_ROOT_DRIVER!.retryRoot(owner))
 				owner.retry();
 		});
 	};
@@ -7123,7 +7151,7 @@ interface StoreInst<T> {
 // Pending store-syncs to reconcile at the next commit (drained in commitEffects
 // after runLayoutEffects). Populated at RENDER time, so — like effects — pushes
 // during an off-screen (WIP) render are redirected into WIP_CAPTURE.stores and
-// spliced back only if that render commits (see renderOffscreen/commitOffscreen).
+// spliced back only if that render commits (see renderOffscreen/spliceWipCapture).
 const storeSyncQueue: StoreInst<any>[] = [];
 
 // Deferred ref attaches (React-19 timing parity). On mount the whole subtree is
@@ -7684,8 +7712,12 @@ interface ScheduledVisibilityDriver {
 	reveal: typeof attemptHiddenReveal;
 	hidePending: typeof hideTryContentAndMountPending;
 	visible: typeof renderVisibleTry;
-	rehide: typeof rehideActivityAfterDescendantRender;
-	retryActivity: typeof renderHiddenActivity;
+	// A hidden Activity's re-hide and re-render, set by activityBlock
+	// (ensureActivityVisibilityDriver) before it hides one. A Suspense boundary
+	// reaches them only through a hidden Activity it found, so roots that never
+	// render <Activity> do not retain them.
+	rehide: typeof rehideActivityAfterDescendantRender | null;
+	retryActivity: typeof renderHiddenActivity | null;
 }
 
 let SCHEDULED_VISIBILITY_DRIVER: ScheduledVisibilityDriver | null = null;
@@ -7697,9 +7729,17 @@ function ensureScheduledVisibilityDriver(): void {
 		reveal: attemptHiddenReveal,
 		hidePending: hideTryContentAndMountPending,
 		visible: renderVisibleTry,
-		rehide: rehideActivityAfterDescendantRender,
-		retryActivity: renderHiddenActivity,
+		rehide: null,
+		retryActivity: null,
 	};
+}
+
+/** activityBlock only: it is the one place an Activity becomes hidden. */
+function ensureActivityVisibilityDriver(): void {
+	ensureScheduledVisibilityDriver();
+	const driver = SCHEDULED_VISIBILITY_DRIVER!;
+	driver.rehide = rehideActivityAfterDescendantRender;
+	driver.retryActivity = renderHiddenActivity;
 }
 
 function holdsNativeRead(block: Block): boolean {
@@ -7813,15 +7853,16 @@ function drainQueue(): { err: any } | null {
 				continue;
 			}
 			if (hiddenActivity !== null && hiddenActivity.pendingThenable !== null) {
-				visibilityDriver!.retryActivity(hiddenActivity, true);
+				visibilityDriver!.retryActivity!(hiddenActivity, true);
 				continue;
 			}
-			// An urgent render can install its first Suspense driver. Pair both
-			// hooks with the same captured driver rather than rereading it after render.
-			const transitionSwap = TRANSITION_SWAP_DRIVER;
-			attempt = transitionSwap === null ? null : transitionSwap.begin(block);
+			// A render can start the first transition and install the driver. Pair
+			// both hooks with the same captured driver rather than rereading it after
+			// render.
+			const transitionRoot = TRANSITION_ROOT_DRIVER;
+			attempt = transitionRoot === null ? null : transitionRoot.begin(block);
 			try {
-				if (hiddenActivity !== null) visibilityDriver!.retryActivity(hiddenActivity, false, block);
+				if (hiddenActivity !== null) visibilityDriver!.retryActivity!(hiddenActivity, false, block);
 				else if (visibleTry !== null) visibilityDriver!.visible(visibleTry, block);
 				else {
 					const owner = block.idState.renderOwner;
@@ -7834,7 +7875,7 @@ function drainQueue(): { err: any } | null {
 					} else renderBlock(block);
 				}
 			} finally {
-				if (transitionSwap !== null) transitionSwap.end(attempt);
+				if (transitionRoot !== null) transitionRoot.end(attempt);
 			}
 		} catch (err) {
 			try {
@@ -7897,7 +7938,7 @@ function drainQueue(): { err: any } | null {
 	// the complete render wave, before refs or layout effects can observe it.
 	// No Activity update means no collection/allocation on the ordinary path.
 	if (activitiesToRehide !== null) {
-		for (const activity of activitiesToRehide) SCHEDULED_VISIBILITY_DRIVER!.rehide(activity);
+		for (const activity of activitiesToRehide) SCHEDULED_VISIBILITY_DRIVER!.rehide!(activity);
 	}
 	commitRootRenders();
 	NATIVE_TRANSITION_DRIVER?.flush();
@@ -11708,7 +11749,7 @@ function renderBlockInner(block: Block): true | undefined {
 		block.pendingMode === 'transition' &&
 		continuesParentTree &&
 		prevBlock!.currentRenderMode === 'urgent'
-			? TRANSITION_SWAP_DRIVER
+			? TRANSITION_ROOT_DRIVER
 			: null;
 	const urgentTransitionRender: UrgentTransitionRender | null =
 		urgentTransitionDriver === null
@@ -12739,7 +12780,7 @@ function unmountBlockInner(block: Block, detachDom: boolean): void {
 		owner.generation++;
 		owner.wakeable = null;
 		owner.request = null;
-		if (owner.transition !== undefined) TRANSITION_SWAP_DRIVER!.discardRoot(owner);
+		if (owner.transition !== undefined) TRANSITION_ROOT_DRIVER!.discardRoot(owner);
 	}
 	// An installed ViewTransition driver unregisters eagerly (its wrapped flush
 	// also prunes lazily; the disposed stamp above drives exit detection).
@@ -13283,7 +13324,7 @@ function readStateHook<T>(
 						s!.renderTransition !== undefined ||
 						(typeof next === 'function' &&
 							TRANSITION_PENDING_COUNT > 0 &&
-							TRANSITION_SWAP_DRIVER?.hasHeld(s!, block)) ||
+							TRANSITION_ROOT_DRIVER?.hasHeld(s!, block)) ||
 						(block.pending && typeof next === 'function')) &&
 					transitionActionBatchForUpdate() === null
 				) {
@@ -13317,7 +13358,7 @@ function readStateHook<T>(
 					s!.pendingActionBatch !== undefined ||
 					(block.pending && typeof next === 'function');
 				if (Object.is(computed, previous) && !forceRender) {
-					if (typeof next !== 'function' && TRANSITION_SWAP_DRIVER?.cancelEqual(s!, block)) {
+					if (typeof next !== 'function' && TRANSITION_ROOT_DRIVER?.cancelEqual(s!, block)) {
 						scheduleRender(block);
 					}
 					return;
@@ -13368,7 +13409,7 @@ function readStateHook<T>(
 	if (s.renderTransition !== undefined || s.updates !== undefined) {
 		const value = readQueuedState(s);
 		if (!s.urgentTransition && s.updates !== undefined && Object.is(value, s.value))
-			TRANSITION_SWAP_DRIVER?.rebaseHeld(s, block, s.updates);
+			TRANSITION_ROOT_DRIVER?.rebaseHeld(s, block, s.updates);
 		s.value = value;
 		if (!s.urgentTransition) {
 			if (s.renderTransition !== undefined) {
@@ -13425,7 +13466,7 @@ function captureTransitionHookQueue<T>(
 	cell: StateSlot<T> | ReducerSlot<T, any>,
 ): void {
 	update.replayBaseValue = cell.value;
-	const previous = cell.renderTransition ?? TRANSITION_SWAP_DRIVER?.heldUpdate(cell, update.block);
+	const previous = cell.renderTransition ?? TRANSITION_ROOT_DRIVER?.heldUpdate(cell, update.block);
 	if (previous !== undefined) {
 		update.previous = previous;
 		previous.next = update;
@@ -13991,7 +14032,7 @@ function readReducerHook<S, A, I>(
 		if (s.renderTransition !== undefined || s.renderPhaseActions !== undefined) {
 			const value = readQueuedReducer(s);
 			if (!s.urgentTransition && s.renderPhaseActions !== undefined && Object.is(value, s.value))
-				TRANSITION_SWAP_DRIVER?.rebaseHeld(s, block, s.renderPhaseActions, reducer);
+				TRANSITION_ROOT_DRIVER?.rebaseHeld(s, block, s.renderPhaseActions, reducer);
 			s.value = value;
 			if (!s.urgentTransition) {
 				if (s.renderTransition !== undefined) {
@@ -23873,14 +23914,32 @@ export function presentationWrite<T>(
 	if (kind === 'nativeStyleBinding' || kind === 'nativeProjectionBinding') {
 		const [owner, slot, el] = args;
 		const style = kind === 'nativeStyleBinding';
+		const current = owner.slots[slot] as NativeStyleBinding | undefined;
 		try {
-			nativePresentationBinding(
-				owner,
-				slot,
-				el,
-				style ? preparedNativeStyleBody : preparedNativeProjectionBody,
-				style ? { el, value: args[3], frame } : { el, compute: args[3], fields: args[4], frame },
-			);
+			if (
+				style &&
+				(current === undefined || current.block === null) &&
+				isScalarNativeStyle(args[3], args[4])
+			) {
+				// No native read to witness or subscribe: prepare the takeover write
+				// exactly as a plain style write does, without an owning Block.
+				writeScalarNativeStyle(
+					owner,
+					slot,
+					current,
+					el,
+					__normalizeBindingStyle(args[3]),
+					(host, value) =>
+						preparePresentationOperation(frame, host, 'style', () => setStyle(host, value, '')),
+				);
+			} else
+				nativePresentationBinding(
+					owner,
+					slot,
+					el,
+					style ? preparedNativeStyleBody : preparedNativeProjectionBody,
+					style ? { el, value: args[3], frame } : { el, compute: args[3], fields: args[4], frame },
+				);
 		} finally {
 			if (frame.hostSuccessors !== undefined) {
 				const binding = owner.slots[slot] as NativeStyleBinding | undefined;
@@ -24356,9 +24415,16 @@ export function hydrateClaimedBindingCaches(
 				? (STAGED_DOM?.view(element as HTMLElement) ?? (element as HTMLElement)).style.cssText
 				: CLAIMED_BINDING_VALUE;
 		if (typeof field === 'number') {
-			const slots = (scope.slots[field] as NativeStyleBinding).block!.slots;
-			journalRootProperty(slots, 0, slots[0]);
-			slots[0] = value;
+			// A scalar native style has no Block and caches its last write itself.
+			const binding = scope.slots[field] as NativeStyleBinding;
+			if (binding.block === null) {
+				journalRootProperty(binding, 'style', binding.style);
+				binding.style = value;
+			} else {
+				const slots = binding.block.slots;
+				journalRootProperty(slots, 0, slots[0]);
+				slots[0] = value;
+			}
 		} else {
 			const cached = bag[field];
 			if (cached?.[DIRECT_SIGNAL_BINDING] === true) {
@@ -34633,8 +34699,8 @@ function renderOffscreen(
 
 // Splice a COMPLETED off-screen WIP's captured effects/refs/store-syncs back into the
 // live queues so the surrounding commit drains them (child-first, now that the WIP's
-// nodes are connected). Shared by every commit site — commitOffscreen (childSlot, which
-// also DOM-moves the range) and the componentSlot / renderBranchSlot commit branches
+// nodes are connected). Shared by every commit site — childSlot (which also DOM-moves
+// the range, moveOffscreenRange) and the componentSlot / renderBranchSlot commit branches
 // (which adopt the WIP's markers in place, so no DOM move is needed).
 
 function spliceOffscreenCapture(capture: OffscreenCapture, deferredNativeAcceptance = false): void {
@@ -34729,14 +34795,6 @@ function moveOffscreenRange(wip: OffscreenWip, beforeNode: Node): void {
 		if (n === wip.end) break;
 		n = next;
 	}
-}
-
-// Commit a COMPLETED off-screen WIP: move its node range into final position (before
-// `beforeNode`) and splice its captured effects/refs back into the live queues so the
-// surrounding commit drains them (child-first, now that the nodes are connected).
-function commitOffscreen(wip: OffscreenWip, beforeNode: Node): void {
-	moveOffscreenRange(wip, beforeNode);
-	spliceWipCapture(wip);
 }
 
 // Discard an off-screen WIP (suspended or superseded): remove its node range + fire any
@@ -40907,7 +40965,7 @@ export function tryBlock(
 	// disposing browser-owned state, then either commit it or show @pending while
 	// the old arm stays connected and hidden.
 	if (pendingBody !== null) {
-		ensureTransitionSwapDriver();
+		ensureOffscreenSwapDriver();
 		ensureScheduledVisibilityDriver();
 	}
 	const parentBlock = parentScope.block;
@@ -41107,7 +41165,7 @@ function renderVisibleTry(state: TrySlot, source?: Block): void {
 				CURRENT_BLOCK !== null &&
 				CURRENT_BLOCK.currentRenderMode === 'urgent' &&
 				blockIsAncestor(CURRENT_BLOCK, block) &&
-				TRANSITION_SWAP_DRIVER !== null))
+				TRANSITION_ROOT_DRIVER !== null))
 			? snapshotSubtreeEffectDeps(block)
 			: null;
 	const refDetachCheckpoint = refDetachQueue.length;
@@ -42569,7 +42627,7 @@ function commitResumeInner(state: TrySlot): void {
 		// the LAYOUT queue stays non-empty and the scheduler never goes quiescent.
 		if (!deferringStagedRevealEffects) commitEffects();
 	} finally {
-		if (hiddenActivity !== null) rehideActivityAfterDescendantRender(hiddenActivity);
+		if (hiddenActivity !== null) SCHEDULED_VISIBILITY_DRIVER!.rehide!(hiddenActivity);
 		if (releaseHeld) {
 			tickTransitionCount(-1);
 			releaseTransitionHookHolder(state);
@@ -42880,7 +42938,7 @@ function attemptHiddenReveal(
 		attemptHiddenRevealInner(state, scheduledMode, reason);
 	} finally {
 		RESUME_REPLAY = previousReplay;
-		if (hiddenActivity !== null) rehideActivityAfterDescendantRender(hiddenActivity);
+		if (hiddenActivity !== null) SCHEDULED_VISIBILITY_DRIVER!.rehide!(hiddenActivity);
 	}
 }
 
@@ -45637,7 +45695,7 @@ export function activityBlock(
 			}
 		}
 	}
-	if (mode === 'hidden') ensureScheduledVisibilityDriver();
+	if (mode === 'hidden') ensureActivityVisibilityDriver();
 	const parentBlock = parentScope.block;
 	const hydration = hydrating ? activeHydration() : null;
 	const wantHidden = mode === 'hidden';
@@ -49892,9 +49950,9 @@ function makeRoot(
 				!rootBlock.disposed &&
 				currentBody === body &&
 				Object.is(currentKey, nextKey) &&
-				TRANSITION_SWAP_DRIVER!.keepsRoot(renderOwner, true);
+				TRANSITION_ROOT_DRIVER!.keepsRoot(renderOwner, true);
 			if (!keepTransition) {
-				if (renderOwner.transition !== undefined) TRANSITION_SWAP_DRIVER!.discardRoot(renderOwner);
+				if (renderOwner.transition !== undefined) TRANSITION_ROOT_DRIVER!.discardRoot(renderOwner);
 				renderOwner.generation++;
 				renderOwner.wakeable = null;
 			}
@@ -49969,7 +50027,7 @@ function makeRoot(
 			renderOwner.nativeRetry?.clear();
 			if (renderOwner.retrySignalOwners !== undefined) clearSignalRetryOwners(renderOwner);
 			renderOwner.retry = noop;
-			if (renderOwner.transition !== undefined) TRANSITION_SWAP_DRIVER!.discardRoot(renderOwner);
+			if (renderOwner.transition !== undefined) TRANSITION_ROOT_DRIVER!.discardRoot(renderOwner);
 			renderOwner.generation++;
 			renderOwner.wakeable = null;
 			renderOwner.request = null;
