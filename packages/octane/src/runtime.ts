@@ -1313,8 +1313,8 @@ interface NativeStyleBinding {
 	__flags: number;
 	__teardown: typeof disposeNativeStyleBinding;
 	block: Block | null;
-	// Scalar-literal writes before any Block exists: the host and the last
-	// applied style, which seeds the Block's cache if a handle arrives later.
+	// Scalar writes before any Block exists: the host and the last applied
+	// style, which seeds the Block's cache if a structured value arrives later.
 	el: HTMLElement | SVGElement | null;
 	style: unknown;
 }
@@ -1349,21 +1349,24 @@ export function nativeStyleBinding(
 	value: any,
 	literal?: 1,
 ): void {
-	// The compiler passes `literal` for a fresh object literal of plain data
-	// properties, so enumerating it runs no accessor. When every value is a
-	// scalar there is no native protocol to read: write it like an ordinary style
-	// binding and allocate the owning Block only once a structured value appears.
-	if (literal === 1) {
-		const binding = owner.slots[slotIndex] as NativeStyleBinding | undefined;
-		if ((binding === undefined || binding.block === null) && isScalarStyleLiteral(value)) {
-			writeScalarNativeStyle(owner, slotIndex, binding, el, value);
-			return;
-		}
+	// Only an object carries the native read protocol, so a nullish or string
+	// style, such as an optional prop forwarded unset, has nothing to read.
+	// Neither does a scalar style literal: the compiler passes `literal` for a
+	// fresh object literal of plain data properties, so enumerating it runs no
+	// accessor. Write those like an ordinary style binding and allocate the
+	// owning Block only once a structured value appears. That Block then stays,
+	// so a later scalar releases its subscriptions through the same
+	// transactional render.
+	const binding = owner.slots[slotIndex] as NativeStyleBinding | undefined;
+	if ((binding === undefined || binding.block === null) && isScalarNativeStyle(value, literal)) {
+		writeScalarNativeStyle(owner, slotIndex, binding, el, value);
+		return;
 	}
 	nativePresentationBinding(owner, slotIndex, el, nativeStyleBody, { el, value });
 }
 
-function isScalarStyleLiteral(value: Record<string, unknown>): boolean {
+function isScalarNativeStyle(value: any, literal: 1 | undefined): boolean {
+	if (literal !== 1) return typeof value !== 'object' || value === null;
 	for (const name in value) {
 		const item = value[name];
 		if (item !== null && (typeof item === 'object' || typeof item === 'function')) return false;
@@ -1376,7 +1379,9 @@ function writeScalarNativeStyle(
 	slotIndex: number,
 	binding: NativeStyleBinding | undefined,
 	el: HTMLElement | SVGElement,
-	value: Record<string, unknown>,
+	value: unknown,
+	// Presentation hydration prepares the takeover write instead.
+	write: (el: HTMLElement | SVGElement, value: unknown, previous: unknown) => void = setStyle,
 ): void {
 	if (binding === undefined) {
 		binding = {
@@ -1400,10 +1405,11 @@ function writeScalarNativeStyle(
 		binding.el = el;
 		binding.style = undefined;
 	}
-	setStyle(el, value, binding.style);
+	write(el, value, binding.style);
 	if (TRANSITION_JOURNAL !== null)
 		TRANSITION_JOURNAL.push(JOURNAL_PROP, binding, 'style', binding.style);
-	// A compiler literal is fresh per render and never escapes, so it is its own snapshot.
+	// A compiler literal is fresh per render and never escapes, and a primitive
+	// is immutable, so either is its own snapshot.
 	binding.style = value;
 }
 
@@ -23847,14 +23853,32 @@ export function presentationWrite<T>(
 	if (kind === 'nativeStyleBinding' || kind === 'nativeProjectionBinding') {
 		const [owner, slot, el] = args;
 		const style = kind === 'nativeStyleBinding';
+		const current = owner.slots[slot] as NativeStyleBinding | undefined;
 		try {
-			nativePresentationBinding(
-				owner,
-				slot,
-				el,
-				style ? preparedNativeStyleBody : preparedNativeProjectionBody,
-				style ? { el, value: args[3], frame } : { el, compute: args[3], fields: args[4], frame },
-			);
+			if (
+				style &&
+				(current === undefined || current.block === null) &&
+				isScalarNativeStyle(args[3], args[4])
+			) {
+				// No native read to witness or subscribe: prepare the takeover write
+				// exactly as a plain style write does, without an owning Block.
+				writeScalarNativeStyle(
+					owner,
+					slot,
+					current,
+					el,
+					__normalizeBindingStyle(args[3]),
+					(host, value) =>
+						preparePresentationOperation(frame, host, 'style', () => setStyle(host, value, '')),
+				);
+			} else
+				nativePresentationBinding(
+					owner,
+					slot,
+					el,
+					style ? preparedNativeStyleBody : preparedNativeProjectionBody,
+					style ? { el, value: args[3], frame } : { el, compute: args[3], fields: args[4], frame },
+				);
 		} finally {
 			if (frame.hostSuccessors !== undefined) {
 				const binding = owner.slots[slot] as NativeStyleBinding | undefined;
@@ -24330,9 +24354,16 @@ export function hydrateClaimedBindingCaches(
 				? (STAGED_DOM?.view(element as HTMLElement) ?? (element as HTMLElement)).style.cssText
 				: CLAIMED_BINDING_VALUE;
 		if (typeof field === 'number') {
-			const slots = (scope.slots[field] as NativeStyleBinding).block!.slots;
-			journalRootProperty(slots, 0, slots[0]);
-			slots[0] = value;
+			// A scalar native style has no Block and caches its last write itself.
+			const binding = scope.slots[field] as NativeStyleBinding;
+			if (binding.block === null) {
+				journalRootProperty(binding, 'style', binding.style);
+				binding.style = value;
+			} else {
+				const slots = binding.block.slots;
+				journalRootProperty(slots, 0, slots[0]);
+				slots[0] = value;
+			}
 		} else {
 			const cached = bag[field];
 			if (cached?.[DIRECT_SIGNAL_BINDING] === true) {
