@@ -16,6 +16,7 @@
 import * as nodeCrypto from 'node:crypto';
 import * as nodeFs from 'node:fs';
 import * as nodePath from 'node:path';
+import * as nodeUrl from 'node:url';
 import { parseModule } from '@tsrx/core';
 import {
 	CLIENT_REFERENCE_MANIFEST_FILENAME,
@@ -34,10 +35,9 @@ import {
 	readCssModuleExports,
 	validateCssModuleConstants,
 } from './css-module-imports.js';
+import { PROFILE_DEFINE, foldProfileGuards } from './profile-guards.js';
 
 export { discoverOctaneSourceDependencies };
-
-const PROFILE_DEFINE = '__OCTANE_PROFILE_ENABLED__';
 const VOID_EXPORTS_META = 'octane:void-component-exports';
 const DESCRIPTOR_CHILDREN_EXPORTS_META = 'octane:descriptor-children-exports';
 const CLIENT_REFERENCE_META = 'octane:client-reference';
@@ -703,6 +703,52 @@ async function loadClientOnlyImports(context, compiler, requests, importer) {
 	);
 }
 
+// This package's runtime trees, as Vite spells module IDs. Resolved on first
+// use: the browser playground evaluates this module without a file URL.
+let runtimeRoots = null;
+function octaneRuntimeRoots() {
+	if (runtimeRoots === null) {
+		const packageRoot = realRoot(
+			nodePath.resolve(nodeUrl.fileURLToPath(import.meta.url), '../../..'),
+		);
+		runtimeRoots = ['src', 'dist'].map((tree) =>
+			nodePath.join(packageRoot, tree, nodePath.sep).replaceAll('\\', '/'),
+		);
+	}
+	return runtimeRoots;
+}
+
+// The last fold of each runtime module. Vitest starts one dev server per
+// project in a single process, and each would otherwise parse the same large
+// runtime module again. A fold depends only on the source text, so an entry is
+// reused only for identical text; there is one entry per runtime module.
+const servedProfileFolds = new Map();
+
+// Vite's dev server leaves `define` to the client as runtime globals, so a
+// served Octane runtime module would keep every profiling guard as a global
+// read on its hot paths and still load profiling.ts and devtools-hook.ts. With
+// profiling off, fold those guards the way a production build does. Only
+// modules of this package qualify: its side-effect-free contract is what lets
+// the fold drop imports that only profiling used.
+function foldServedProfileGuards(context, code, id) {
+	if (!code.includes(PROFILE_DEFINE) || typeof context.parse !== 'function') return null;
+	const file = cleanModuleId(id).replaceAll('\\', '/');
+	if (!octaneRuntimeRoots().some((root) => file.startsWith(root))) return null;
+	const typescript = /\.[cm]?ts$/.test(file);
+	if (!typescript && !/\.[cm]?js$/.test(file)) return null;
+	const cached = servedProfileFolds.get(file);
+	if (cached?.source === code) return cached.folded;
+	let program;
+	try {
+		program = context.parse(code, { lang: typescript ? 'ts' : 'js', preserveParens: true });
+	} catch {
+		return null;
+	}
+	const folded = foldProfileGuards(code, program, false);
+	servedProfileFolds.set(file, { source: code, folded });
+	return folded;
+}
+
 function assertProfilingDefineAvailable(definitions, enabled) {
 	if (
 		definitions === null ||
@@ -752,6 +798,7 @@ export function octane(options = {}) {
 		);
 	}
 	let hmrEnabled = options.hmr;
+	let foldDevProfileGuards = false;
 	let specializeProductionRoots = false;
 	let specializeCssModuleConstants = false;
 	let emitClientReferenceManifest = options.ssr !== true;
@@ -1024,14 +1071,31 @@ export function octane(options = {}) {
 				// profiling branches completely. Keep it defined in both modes so Vite's
 				// production optimizer never has to preserve a runtime feature check.
 				define: {
-					__OCTANE_PROFILE_ENABLED__: JSON.stringify(profileEnabled),
+					[PROFILE_DEFINE]: JSON.stringify(profileEnabled),
 				},
 				// Raw Octane dependencies must reach this plugin, never esbuild's dep
 				// prebundle or Node's SSR external loader. A raw package can also declare
 				// exact dependencies or an installed `family/*` that must stay out of
 				// Vite's rolling optimizer; this keeps module-identity-sensitive packages
 				// from mixing cold-crawl generations.
-				optimizeDeps: { exclude: optimizeDepsExclusions },
+				optimizeDeps: {
+					exclude: optimizeDepsExclusions,
+					// The dependency optimizer ignores `define`, so a pre-bundled octane
+					// would read the profiling constant as a global and bundle the
+					// profiler. Give Rolldown the constant so it folds both away. Vite
+					// copies a deprecated `esbuildOptions.define` here only when this is
+					// unset, so carry it over.
+					rolldownOptions: {
+						transform: {
+							define: {
+								...(config.optimizeDeps?.rolldownOptions?.transform?.define === undefined
+									? config.optimizeDeps?.esbuildOptions?.define
+									: null),
+								[PROFILE_DEFINE]: JSON.stringify(profileEnabled),
+							},
+						},
+					},
+				},
 				resolve: {
 					dedupe: ['octane'],
 					// Vite's default extension list, plus .tsrx: extensionless imports
@@ -1058,6 +1122,7 @@ export function octane(options = {}) {
 			if (realRoot(nodePath.resolve(config.root)) !== realRoot(projectRoot))
 				resetCompiler(config.root);
 			if (hmrEnabled === undefined) hmrEnabled = config.command === 'serve';
+			foldDevProfileGuards = config.command === 'serve' && !profileEnabled;
 			emitClientReferenceManifest =
 				options.ssr === false || (options.ssr !== true && !config.build?.ssr);
 			// A watch rebuild does not guarantee that an importer's cached transform
@@ -1162,6 +1227,10 @@ export function octane(options = {}) {
 			return resolved ?? null;
 		},
 		transform(code, id, transformOptions) {
+			const foldedCode = foldDevProfileGuards ? foldServedProfileGuards(this, code, id) : null;
+			if (foldedCode !== null) code = foldedCode;
+			// A module the compiler leaves alone still serves its folded code.
+			const passThrough = foldedCode === null ? null : { code, map: null };
 			const server =
 				forceSsr !== undefined
 					? forceSsr
@@ -1241,7 +1310,7 @@ export function octane(options = {}) {
 				});
 				if (result === null) {
 					options.__onIndependentWidgets?.(id, environment, [], false);
-					if (propagatedExports.length === 0) return null;
+					if (propagatedExports.length === 0) return passThrough;
 					return {
 						code,
 						map: null,
@@ -1292,7 +1361,7 @@ export function octane(options = {}) {
 						],
 					};
 				}
-				if (result.kind === 'none' && Object.keys(meta).length === 0) return null;
+				if (result.kind === 'none' && Object.keys(meta).length === 0) return passThrough;
 				return {
 					code: result.code,
 					map: result.map,

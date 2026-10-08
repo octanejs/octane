@@ -235,8 +235,10 @@ With profiling omitted or false, the compiler emits no component or hook
 metadata and the bundler specializes the runtime with profiling disabled. When
 application code does not explicitly import `octane/profiling`, normal
 production bundles can remove the recorder, track labels, clock reads,
-counters, and profiling allocations. Unminified development output keeps the
-disabled branches as dead code, but they never run.
+counters, and profiling allocations. The Vite dev server serves Octane's
+runtime with the same branches and the recorder removed. Other unminified
+development output, such as Rspack's, keeps the disabled branches as dead code,
+but they never run.
 
 Profile builds keep a bounded buffer. By default events contain project-relative
 or package-relative source paths, component and hook names, timing, and outcome

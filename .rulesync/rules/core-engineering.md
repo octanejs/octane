@@ -87,10 +87,12 @@ not cleanup work for a later change.
   runtime HTML string ABI, then embed that string as an AST literal. HTML, CSS,
   module specifier values, diagnostics, and ordinary string literals remain
   textual data; they are not permission to construct JavaScript through text.
-- `slot-hooks.js` and `runtime-requests.js` are the narrow text-edit exceptions:
-  hook slots preserve authored line numbers without a source map, while runtime
-  targeting edits only lexer-identified module specifier ranges in source that
-  otherwise passes through unchanged.
+- `slot-hooks.js`, `runtime-requests.js`, and `profile-guards.js` are the
+  narrow text-edit exceptions: hook slots preserve authored line numbers
+  without a source map, runtime targeting edits only lexer-identified module
+  specifier ranges in source that otherwise passes through unchanged, and the
+  dev-server profiling fold removes or replaces only parser-located guard,
+  declaration, and import ranges, keeping their line breaks.
   Volar/type-only generation delegates its one Program print to `@tsrx/core`;
   keep `boundaryTokens: true` so structural token boundaries resolve through
   its source map without changing output bytes.
