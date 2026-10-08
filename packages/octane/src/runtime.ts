@@ -4303,15 +4303,16 @@ function journalRootSlot(
 	before: Node | null,
 	after: Node | null,
 ): void {
-	const transaction = ROOT_RENDER_TRANSACTION;
-	if (transaction === null || transaction.aborted || ROOT_RENDER_ROLLBACK) return;
-	const structures = (transaction.structures ??= new Map());
-	if ((structures.get(state) ?? -1) >= TRANSITION_JOURNAL_CHECKPOINT) return;
-	structures.set(state, TRANSITION_JOURNAL!.length);
-	journalObjectOnce(state);
-	journalUndo(() => {
-		structures.delete(state);
-	});
+	if (ROOT_RENDER_TRANSACTION === null || ROOT_RENDER_TRANSACTION.aborted || ROOT_RENDER_ROLLBACK)
+		return;
+	const seen = TRANSITION_JOURNAL_BAGS!;
+	const at = seen.get(state) ?? -1;
+	// `seen` holds the snapshot's log index, plus one when the range was taken
+	// with it. A plain snapshot (journalObjectOnce) has no range, so take
+	// another with one; replay restores the older snapshot last.
+	if (at >= TRANSITION_JOURNAL_CHECKPOINT && (at & 1) !== 0) return;
+	seen.set(state, TRANSITION_JOURNAL!.length + 1);
+	TRANSITION_JOURNAL!.push(JOURNAL_BAG, state, { ...state }, null);
 	// Strict adoption prepares scopes, never an undo of the early owner's live DOM.
 	if (!hydrationStarted || PRESENTATION_HYDRATION?.revision === undefined)
 		journalRootRange(parent, before, after);
