@@ -1717,7 +1717,7 @@ describe('Pull request benchmark report', () => {
 	test('fails after uploading the report when a gate fails', () => {
 		const render = prBenchWorkflow.indexOf('- name: Render report');
 		const upload = prBenchWorkflow.indexOf('- name: Upload report');
-		const fail = prBenchWorkflow.indexOf('- name: Fail on a budget breach');
+		const fail = prBenchWorkflow.indexOf('- name: Fail on added work or a failed benchmark');
 		assert.ok(render !== -1 && render < upload && upload < fail);
 		assert.match(prBenchWorkflow, /--out="\$RESULTS\/report\/report\.md" \|\| status=\$\?/);
 		assert.match(
