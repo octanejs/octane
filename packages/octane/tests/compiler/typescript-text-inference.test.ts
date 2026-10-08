@@ -1,6 +1,8 @@
-import { existsSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import ts from 'typescript';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { compile, compileToVolarMappings } from 'octane/compiler';
 import { createTextTypeProject } from 'octane/compiler/typescript';
 import {
@@ -382,6 +384,37 @@ export function Errors(props: { sound: string }) @{
 			}
 		});
 
+		it('resolves an extensionless .tsrx import to the module its .tsrx spelling names', () => {
+			// Vite resolves `./model` to model.tsrx. Were the two spellings separate
+			// modules, the private brand would make the argument an error.
+			const model = `export class Token { private readonly brand = 1; }
+export function label(token: Token): string { return 'token'; }
+`;
+			const source = `import { Token } from './model';
+import { label } from './model.tsrx';
+export function Uses(props: { count: number }) @{
+	<main><p>{label(new Token())}</p><p>{props.count}</p></main>
+}`;
+			const consumer = fixture({ 'model.tsrx': model, 'Uses.tsrx': source });
+			const facts = consumer.project.snapshot(consumer.file('Uses.tsrx'));
+			expect(stringChildren(source, facts)).toEqual(['label(new Token())']);
+		});
+
+		it('includes the .tsrx roots an extended tsconfig names, relative to that tsconfig', () => {
+			// Nothing imports globals.tsrx: only the inherited include makes it a root.
+			const globals = `declare global { type GlobalLabel = string; }\nexport {};\n`;
+			const source = `export function Uses(props: { label: GlobalLabel }) @{ <p>{props.label}</p> }`;
+			const consumer = fixture({ 'globals.tsrx': globals, 'Uses.tsrx': source });
+			const config = JSON.parse(readFileSync(consumer.tsconfig, 'utf8'));
+			delete config.include;
+			config.extends = './config/base.json';
+			consumer.write('config/base.json', JSON.stringify({ include: ['../*.tsrx'] }));
+			writeFileSync(consumer.tsconfig, JSON.stringify(config));
+			consumer.project.invalidate();
+			const facts = consumer.project.snapshot(consumer.file('Uses.tsrx'));
+			expect(stringChildren(source, facts)).toEqual(['props.label']);
+		});
+
 		it.each(['tsrx', 'tsx'])(
 			'agrees with the runtime parser on grouped .%s child expressions',
 			(ext) => {
@@ -401,6 +434,39 @@ export function Errors(props: { sound: string }) @{
 		);
 	},
 );
+
+describe('TypeScript without a supported API', () => {
+	it('disables text facts with a warning instead of failing the build', () => {
+		const typescript = mkdtempSync(join(tmpdir(), 'octane-unsupported-typescript-'));
+		writeFileSync(
+			join(typescript, 'package.json'),
+			JSON.stringify({ name: 'typescript', version: '0.0.0-unsupported', main: 'index.js' }),
+		);
+		writeFileSync(
+			join(typescript, 'index.js'),
+			"module.exports = { version: '0.0.0-unsupported' };\n",
+		);
+		const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+		try {
+			const source = `export function Label(props: { value: string }) @{ <p>{props.value}</p> }`;
+			const consumer = fixtureOn({ 'Label.tsrx': source }, undefined, {
+				name: 'an unsupported TypeScript',
+				typescript,
+			} as unknown as TextTypeBackend);
+			const filename = consumer.file('Label.tsrx');
+			const facts = consumer.project.snapshot(filename);
+			expect(facts.stringChildRanges).toEqual([]);
+			expect(facts.primitiveTextChildRanges).toEqual([]);
+			expect(warn).toHaveBeenCalledWith(expect.stringContaining('Text type facts are disabled'));
+			for (const mode of ['client', 'server'] as const) {
+				expect(() => compile(source, filename, { mode, textTypeFacts: facts })).not.toThrow();
+			}
+		} finally {
+			warn.mockRestore();
+			rmSync(typescript, { recursive: true, force: true });
+		}
+	});
+});
 
 describe('source-bound textTypeFacts compile option', () => {
 	it('rejects stale, malformed, wrong-file, and non-child ranges instead of changing hydration shape', () => {
