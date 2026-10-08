@@ -25,3 +25,12 @@ node benchmarks/scheduler-responsiveness/action-backlog.mjs /path/to/base --repo
 
 These counters establish task ordering and avoided commits. They do not measure
 paint or input latency; use the Chromium suite above for those claims.
+
+`--simulated-view-transition` repeats the same workload with a native API test
+double whose update callback runs in a host task. It checks prompt pending cues
+and a single capture for all ready results, including a gated backlog. This is
+controller/task-order evidence; it does not simulate browser snapshots or paint.
+
+```bash
+node benchmarks/scheduler-responsiveness/action-backlog.mjs --simulated-view-transition
+```

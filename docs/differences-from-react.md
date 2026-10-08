@@ -1355,8 +1355,8 @@ physically-moved nodes can differ.
 
 ## Scheduler: synchronous, two priorities
 
-Urgent updates are microtask-batched. Transition-only rendering is coalesced in a
-later host task, including ready results from `useActionState`. Both priorities
+Urgent updates are microtask-batched. Transition-only rendering normally coalesces
+in a later host task, including ready results from `useActionState`. Both priorities
 run each render and commit to completion: there is no time-slicing, expiration,
 or selective hydration. Transition priority also preserves visible Suspense
 content:
@@ -1376,6 +1376,14 @@ already waiting for a transition task, and an urgent flush can also drain queued
 transition work. `flushSync` explicitly drains both priorities. Layout updates
 remain part of the current commit. Pure transition bursts need no urgent flush
 and therefore coalesce across promise and microtask continuations.
+
+A synchronous transition eligible for native `<ViewTransition>` capture keeps
+its microtask admission: that controller owns the staged commit and native
+capture boundary. This preserves capture before unrelated next-frame updates.
+Async Action results still coalesce in a host task before their first capture.
+Hosts without the native API use normal task batching. An Action's pending cue
+publishes promptly without starting an animation or changing sibling state to
+urgent Suspense semantics.
 
 `useDeferredValue` similarly keeps the previous value through the urgent commit
 and swaps to the latest value in a later host task. Urgent updates before that
@@ -1491,9 +1499,9 @@ before-mutation ref-detach phase.
 
 Other consequences:
 
-- Priority (`urgent` vs `transition`) governs Suspense hold semantics, not
-  general commit deferral. Only `useDeferredValue`'s deferred render waits for a
-  later task (above).
+- Priority (`urgent` vs `transition`) governs both Suspense hold semantics and
+  scheduling: urgent updates use microtasks and transition updates use host tasks
+  (above). A render already in progress still runs to completion.
 - Fallback-visible boundaries whose retries fully stage reveal together,
   including refs and layout effects.
 - Retry-only Suspense reveals use a shared 100ms fallback window (React uses

@@ -12,8 +12,12 @@ import {
 	useOptimistic,
 	useState,
 	useTransition,
+	ViewTransition,
+	addTransitionType,
 	type Root,
 } from '../src/index.js';
+
+import { installViewTransitionMocks } from './conformance/_helpers/view-transition-mocks.js';
 
 const roots: Root[] = [];
 
@@ -45,6 +49,55 @@ afterEach(async () => {
 });
 
 describe('transition rendering yields to the host', () => {
+	it('preserves a View Transition when another root updates before its task', async () => {
+		const native = installViewTransitionMocks();
+		try {
+			function Card() {
+				const [visible, setVisible] = useState(true, Symbol.for('transition-task.vt'));
+				return createElement(
+					'section',
+					null,
+					createElement(
+						'button',
+						{
+							onClick: () =>
+								startTransition(() => {
+									addTransitionType('card');
+									setVisible(false);
+								}),
+						},
+						visible ? 'Remove card' : 'Add card',
+					),
+					visible
+						? createElement(
+								ViewTransition,
+								{ exit: { card: 'fade-out' }, default: 'none' },
+								createElement('p', null, 'Card'),
+							)
+						: null,
+				);
+			}
+			let updateOther!: (value: number) => void;
+			function OtherRoot() {
+				const [value, update] = useState(0, Symbol.for('transition-task.vt-other'));
+				updateOther = update;
+				return createElement('output', null, String(value));
+			}
+			const other = mount(OtherRoot);
+			const container = mount(Card);
+			container.querySelector('button')!.click();
+			await microtasks();
+			updateOther(1);
+			await microtasks();
+			expect(other.textContent).toBe('1');
+			await act(async () => {});
+			expect(container.querySelector('button')!.textContent).toBe('Add card');
+			expect(native.calls).toHaveLength(1);
+		} finally {
+			native.restore();
+		}
+	});
+
 	it('defers an initial transition render while ordinary initial mounts stay synchronous', async () => {
 		const container = document.createElement('div');
 		document.body.append(container);
@@ -116,6 +169,93 @@ describe('transition rendering yields to the host', () => {
 		expect(container.textContent).toBe('2');
 		await act(async () => {});
 		expect(container.textContent).toBe('3');
+	});
+
+	it('finishes urgent layout updates to a queued transition before mutation observers', async () => {
+		let updateFirst!: (value: number) => void;
+		let updateSecond!: (value: number) => void;
+		function First() {
+			const [value, update] = useState(0, Symbol.for('transition-task.layout-first'));
+			updateFirst = update;
+			return createElement('output', null, String(value));
+		}
+		function Second() {
+			const [value, update] = useState(0, Symbol.for('transition-task.layout-second'));
+			updateSecond = update;
+			useLayoutEffect(
+				() => {
+					if (value === 1) updateFirst(2);
+				},
+				[value],
+				Symbol.for('transition-task.layout-upgrade'),
+			);
+			return createElement('output', null, String(value));
+		}
+		const first = mount(First);
+		const second = mount(Second);
+		const observed: string[] = [];
+		const observer = new MutationObserver(() =>
+			observed.push(`${first.textContent}:${second.textContent}`),
+		);
+		observer.observe(document.body, { subtree: true, childList: true, characterData: true });
+		try {
+			startTransition(() => updateFirst(1));
+			updateSecond(1);
+			await microtasks();
+			expect(observed.length).toBeGreaterThan(0);
+			expect(observed.every((value) => value === '2:1')).toBe(true);
+			await act(async () => {});
+			expect(first.textContent).toBe('2');
+		} finally {
+			observer.disconnect();
+		}
+	});
+
+	it('drops a deferred child removed by an urgent ancestor', async () => {
+		let updateChild!: (value: number) => void;
+		let remove!: () => void;
+		function Child() {
+			const [value, update] = useState(0, Symbol.for('transition-task.removed-child'));
+			updateChild = update;
+			return createElement('output', null, String(value));
+		}
+		function Parent() {
+			const [visible, update] = useState(true, Symbol.for('transition-task.remove-parent'));
+			remove = () => update(false);
+			return createElement('section', null, visible ? createElement(Child) : 'removed');
+		}
+		const container = mount(Parent);
+		startTransition(() => updateChild(1));
+		remove();
+		await microtasks();
+		expect(container.textContent).toBe('removed');
+		await act(async () => {});
+		expect(container.textContent).toBe('removed');
+	});
+
+	it('preserves a transition descendant across an urgent ancestor render', async () => {
+		let updateChild!: (value: number) => void;
+		let updateParent!: (value: number) => void;
+		function Child({ parent }: { parent: number }) {
+			const [value, update] = useState(0, Symbol.for('transition-task.consumed-child'));
+			updateChild = update;
+			return createElement('output', null, `${parent}:${value}`);
+		}
+		function Parent() {
+			const [value, update] = useState(0, Symbol.for('transition-task.consuming-parent'));
+			updateParent = update;
+			return createElement(Child, { parent: value });
+		}
+		const container = mount(Parent);
+		startTransition(() => updateChild(1));
+		updateParent(1);
+		await microtasks();
+		expect(container.textContent).toBe('1:1');
+		await act(async () => {});
+		expect(container.textContent).toBe('1:1');
+		updateChild(2);
+		await microtasks();
+		expect(container.textContent).toBe('1:2');
 	});
 
 	it('keeps flushSync synchronous with a transition task outstanding', async () => {
@@ -261,6 +401,109 @@ describe('transition rendering yields to the host', () => {
 		expect(calls.at(-1)).toEqual(['new', 4, 4]);
 		expect(container.textContent).toBe('8');
 	});
+
+	it('publishes an Action cue without waiting for a native View Transition', async () => {
+		const native = installViewTransitionMocks();
+		const action = gate();
+		const nativeReady = gate();
+		const updates: Array<() => void | Promise<void>> = [];
+		(
+			document as unknown as {
+				startViewTransition: (
+					input: (() => void | Promise<void>) | { update: () => void | Promise<void> },
+				) => unknown;
+			}
+		).startViewTransition = (input) => {
+			updates.push(typeof input === 'function' ? input : input.update);
+			return { ready: nativeReady.promise, finished: nativeReady.promise, skipTransition() {} };
+		};
+		let dispatch!: () => void;
+		function Form() {
+			const [state, run, pending] = useActionState(
+				async (value: number) => {
+					await action.promise;
+					return value + 1;
+				},
+				0,
+				Symbol.for('transition-task.native-action'),
+			);
+			dispatch = run;
+			return createElement(
+				ViewTransition,
+				{ default: 'fade' },
+				createElement('output', null, `${state}${pending ? ' pending' : ''}`),
+			);
+		}
+		try {
+			const container = mount(Form);
+			startTransition(() => dispatch());
+			await microtasks();
+			expect(container.textContent).toBe('0 pending');
+			expect(updates).toHaveLength(0);
+			action.resolve();
+			await vi.waitFor(() => expect(updates).toHaveLength(1));
+			await updates[0]();
+			nativeReady.resolve();
+			await act(async () => {});
+			expect(container.textContent).toBe('1');
+		} finally {
+			action.resolve();
+			for (const update of updates) await update();
+			nativeReady.resolve();
+			await act(async () => {});
+			native.restore();
+		}
+	});
+
+	for (const dispatchFirst of [false, true]) {
+		it(`keeps sibling transition content while publishing an Action cue (dispatch first: ${dispatchFirst})`, async () => {
+			const action = gate();
+			const data = gate();
+			let start!: () => void;
+			function Content({ page }: { page: number }) {
+				if (page === 1) use(data.promise);
+				return createElement('span', null, `page ${page}`);
+			}
+			function App() {
+				const [page, update] = useState(0, Symbol.for('transition-task.action-sibling'));
+				const [, dispatch, pending] = useActionState(
+					async (value: number) => {
+						await action.promise;
+						return value + 1;
+					},
+					0,
+					Symbol.for('transition-task.action-sibling-queue'),
+				);
+				start = () =>
+					startTransition(() => {
+						if (dispatchFirst) dispatch();
+						update(1);
+						if (!dispatchFirst) dispatch();
+					});
+				return createElement(
+					'div',
+					null,
+					createElement('output', null, pending ? 'pending' : 'ready'),
+					createElement(Suspense, {
+						fallback: createElement('i', null, 'fallback'),
+						children: createElement(Content, { page }),
+					}),
+				);
+			}
+			const container = mount(App);
+			try {
+				start();
+				await microtasks();
+				expect(container.textContent).toBe('pendingpage 0');
+			} finally {
+				await act(async () => {
+					action.resolve();
+					data.resolve();
+				});
+			}
+			expect(container.textContent).toBe('readypage 1');
+		});
+	}
 
 	it('keeps the pending cue and previous Suspense content until a deferred result is ready', async () => {
 		const data = gate();

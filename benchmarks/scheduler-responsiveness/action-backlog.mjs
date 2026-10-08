@@ -13,12 +13,13 @@ const repository = path.resolve(import.meta.dirname, '../..');
 const source = path.resolve(
 	process.argv.find((arg, i) => i > 1 && !arg.startsWith('--')) ?? repository,
 );
+const simulateViewTransition = process.argv.includes('--simulated-view-transition');
 const dependencies = createRequire(path.join(repository, 'packages/octane/package.json'));
 const scratch = fs.mkdtempSync(path.join(os.tmpdir(), 'octane-action-backlog-'));
 const outfile = path.join(scratch, 'runtime.mjs');
 await build({
 	stdin: {
-		contents: `export { createRoot, createElement, flushSync, act, startTransition, useActionState, useLayoutEffect } from ${JSON.stringify(path.join(source, 'packages/octane/src/index.ts'))};`,
+		contents: `export { createRoot, createElement, flushSync, act, startTransition, useActionState, useLayoutEffect, ViewTransition } from ${JSON.stringify(path.join(source, 'packages/octane/src/index.ts'))};`,
 		resolveDir: source,
 		loader: 'ts',
 	},
@@ -45,10 +46,35 @@ for (const name of [
 	'Comment',
 	'Event',
 	'MutationObserver',
+	'DOMRect',
 ]) {
 	globalThis[name] = name === 'window' ? dom.window : dom.window[name];
 }
 const runtime = await import(pathToFileURL(outfile).href);
+
+// Model an asynchronous native update callback with a host task. This probes
+// controller admission and commit work, not browser snapshots, paint or latency.
+let nativeCaptures = 0;
+if (simulateViewTransition) {
+	globalThis.CSS = { escape: (value) => value };
+	Object.defineProperty(document, 'fonts', {
+		value: { status: 'loaded', ready: Promise.resolve() },
+		configurable: true,
+	});
+	Element.prototype.getBoundingClientRect = function () {
+		return new DOMRect(0, 0, this.textContent.length * 10 + 10, 20);
+	};
+	Element.prototype.getAnimations = () => [];
+	Element.prototype.animate = () => ({ cancel() {}, finished: Promise.resolve() });
+	document.startViewTransition = (input) => {
+		nativeCaptures++;
+		const update = typeof input === 'function' ? input : input.update;
+		const updated = new Promise((resolve, reject) =>
+			task(() => Promise.resolve().then(update).then(resolve, reject)),
+		);
+		return { ready: updated, finished: updated, skipTransition() {} };
+	};
+}
 
 function task(callback) {
 	const channel = new MessageChannel();
@@ -61,6 +87,7 @@ function task(callback) {
 }
 
 async function measure(gated) {
+	const capturesBefore = nativeCaptures;
 	let release;
 	const gate = new Promise((resolve) => {
 		release = resolve;
@@ -87,7 +114,10 @@ async function measure(gated) {
 			null,
 			effectSlot,
 		);
-		return runtime.createElement('output', null, `${state}${pending ? 'P' : ''}`);
+		const output = runtime.createElement('output', null, `${state}${pending ? 'P' : ''}`);
+		return simulateViewTransition
+			? runtime.createElement(runtime.ViewTransition, { default: 'fade' }, output)
+			: output;
 	}
 	const container = document.createElement('div');
 	document.body.append(container);
@@ -110,6 +140,9 @@ async function measure(gated) {
 		}
 		const beforeMarker = await marker;
 		await runtime.act(async () => {});
+		// act() drains renderer work, not an externally held native animation.
+		for (let i = 0; simulateViewTransition && container.textContent !== '100' && i < 100; i++)
+			await new Promise(task);
 		assert.equal(container.textContent, '100');
 		assert.deepEqual(
 			previousStates,
@@ -117,6 +150,8 @@ async function measure(gated) {
 		);
 		const result = {
 			scenario: gated ? 'gated backlog' : 'ready backlog',
+			simulatedViewTransition: simulateViewTransition,
+			nativeCaptures: nativeCaptures - capturesBefore,
 			actions: previousStates.length,
 			beforeMarker,
 			commits,
@@ -125,6 +160,11 @@ async function measure(gated) {
 		if (!process.argv.includes('--report')) {
 			assert.ok(beforeMarker <= (gated ? 0 : 1), 'result rendering must yield to the marker task');
 			assert.ok(commits.length <= (gated ? 1 : 2), 'ready results must coalesce');
+			assert.equal(
+				result.nativeCaptures,
+				simulateViewTransition ? 1 : 0,
+				'ready Action results must share one native capture',
+			);
 		}
 	} finally {
 		release();

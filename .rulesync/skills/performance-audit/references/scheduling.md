@@ -22,12 +22,15 @@ scheduling contract; read its latest decisions before touching any of this.
 
 ## How Octane schedules today
 
-The contract is `docs/differences-from-react.md`, §Scheduler: renders are
-microtask-batched and run to completion, with no time-slicing.
+The contract is `docs/differences-from-react.md`, §Scheduler: urgent renders are
+microtask-batched; transition and Action-result renders coalesce in a host task.
+Both run to completion, with no time-slicing.
 
-- `scheduleRender` pushes the block onto `QUEUE`. If no flush is armed, it sets
-  `scheduled` and calls `queueMicrotask(flush)` once, so every update in one
-  synchronous burst shares a flush.
+- `scheduleRender` pushes the block onto `QUEUE`. `scheduleFlush` arms one urgent
+  microtask or delegates transition admission to the optional transition driver.
+  Mixed queues may ride an urgent flush, and `flushSync` drains both priorities.
+  Synchronous native ViewTransition batches retain microtask capture admission
+  through their existing controller; async Action results still coalesce in a task.
 - `flush` calls `flushWork`. `drainQueue` renders ancestors before descendants,
   so a parent's render absorbs queued descendants, and then the root commits.
   `commitEffects` runs insertion and layout work synchronously, then hands
@@ -40,7 +43,8 @@ microtask-batched and run to completion, with no time-slicing.
 The flush microtask runs before the next asynchronous value arrives. So a
 producer that publishes one value per microtask hop pays for a full render, a
 commit, and an early drain of the previous commit's passive effects at every hop,
-all inside one checkpoint. Measured in the #1864 investigation:
+all inside one checkpoint. Historical baseline measurements in the #1864
+investigation, before the scheduling fixes:
 
 - 100 ready stream values, or 100 action dispatches: 101 Octane commits against
   2 in React 19.2.7. A task armed before the burst ran after all of them.
@@ -65,8 +69,9 @@ all inside one checkpoint. Measured in the #1864 investigation:
    render and commit: latency improves and total work stays the same or grows.
 4. **One shared budget, not one per producer.** A per-producer budget resets for
    every producer, so N producers still make a megatask.
-5. **Reuse a task poster; don't add one.** The runtime already has four ad-hoc
-   posters, and #1864 proposes replacing them with one shared poster:
+5. **Reuse a task poster; don't add one.** `postHostTask` in `host-task.ts` is the
+   shared ordinary task poster, used by transition renders, deferred swaps and
+   island activation. Specialized scheduling still includes:
    - `schedulePostPaint`: post-paint, via rAF, then `MessageChannel`, with a
      bounded timer fallback;
    - `actCheckpoint`: test drains, via `MessageChannel`;
@@ -78,12 +83,13 @@ all inside one checkpoint. Measured in the #1864 investigation:
    A new poster must state why none of these fits. It must also cover hosts
    without `MessageChannel`, hidden tabs where rAF never fires, and `act()`,
    which drains through `MessageChannel` checkpoints.
+
 6. **Never depend on rAF for progress.** Pair it with a bounded timer, as
    `schedulePostPaint` does.
-7. **Defer to #1864 on the contract.** §Scheduler documents microtask batching,
-   that an `await 0` continuation can observe the commit after `setState`, and
-   that priority governs Suspense holds rather than commit deferral. Do not
-   change any of that in passing. A change that #1864 has decided ships with
+7. **Defer to #1864 on the contract.** §Scheduler documents urgent microtask
+   batching and transition host-task coalescing. An `await 0` continuation can
+   observe an urgent commit after `setState`; it does not wait for a transition.
+   Priority also governs Suspense holds. Do not change these contracts in passing. A change that #1864 has decided ships with
    the doc update, the evidence below, and a React-parity check; when in doubt,
    prefer React semantics. Without such a decision, new code must simply not
    make megatasks worse.

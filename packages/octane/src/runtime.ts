@@ -2656,15 +2656,14 @@ let scheduled = false;
 // same queue first; leave the posted callback armed so later work can reuse it.
 let transitionScheduled = false;
 let inDeferredTask = false;
+let inUrgentFlush = false;
 let transitionCompletions: Array<() => void> | null = null;
+let urgentActionCue = false;
 
 function scheduleFlush(transition = false): void {
 	if (syncFlush) return;
-	if (transition && !inDeferredTask) {
-		if (!transitionScheduled) {
-			transitionScheduled = true;
-			postHostTask(flushTransitionTask);
-		}
+	if (transition && !inDeferredTask && TRANSITION_ROOT_DRIVER !== null) {
+		TRANSITION_ROOT_DRIVER.schedule();
 	} else if (!scheduled) {
 		scheduled = true;
 		queueMicrotask(flushScheduled);
@@ -2673,6 +2672,25 @@ function scheduleFlush(transition = false): void {
 
 /** Resuming an existing queue must preserve the priority of its pending work. */
 function scheduleQueuedFlush(): void {
+	if (TRANSITION_ROOT_DRIVER !== null) TRANSITION_ROOT_DRIVER.resume();
+	else scheduleFlush();
+}
+
+function scheduleTransitionFlush(): void {
+	if (transitionScheduled || scheduled) return;
+	// Native ViewTransition owns its capture boundary. Start that controller
+	// before an unrelated next-frame update can consume its animation batch.
+	// Async results must coalesce before their first capture too. Unsupported
+	// hosts and work behind an active capture likewise use our task.
+	if (ASYNC_TRANSITION_COUNT === 0 && VIEW_TRANSITION_DRIVER?.wouldWrap() === true) {
+		scheduleFlush();
+		return;
+	}
+	transitionScheduled = true;
+	postHostTask(flushTransitionTask);
+}
+
+function scheduleTransitionQueue(): void {
 	for (let i = 0; i < QUEUE.length; i++) {
 		if (QUEUE[i].pending && QUEUE[i].pendingMode !== 'transition') {
 			scheduleFlush();
@@ -2685,12 +2703,36 @@ function scheduleQueuedFlush(): void {
 function flushScheduled(): void {
 	// flushSync can consume an urgent queue before this callback runs. Do not
 	// let that stale callback pull a newer transition back into a microtask.
-	if (scheduled) flush();
+	if (!scheduled) return;
+	if (TRANSITION_ROOT_DRIVER !== null) TRANSITION_ROOT_DRIVER.flushUrgent();
+	else flush();
+}
+
+/** Pending cues use transition render semantics but urgent animation admission. */
+function flushUrgent(): void {
+	inUrgentFlush = urgentActionCue;
+	urgentActionCue = false;
+	try {
+		flush();
+	} finally {
+		inUrgentFlush = false;
+	}
 }
 
 function flushTransitionTask(): void {
 	transitionScheduled = false;
 	flush();
+}
+
+function takeTransitionCompletions(): Array<() => void> | null {
+	urgentActionCue = false;
+	const completions = transitionCompletions;
+	transitionCompletions = null;
+	return completions;
+}
+
+function hasTransitionCompletions(): boolean {
+	return transitionCompletions !== null;
 }
 
 /** Release work after its render has had the opportunity to acquire a hold. */
@@ -2762,6 +2804,13 @@ function ensureOffscreenSwapDriver(): void {
  * application therefore does not retain it.
  */
 interface TransitionRootDriver {
+	// Task/completion machinery belongs to transition users, not ordinary roots.
+	schedule: typeof scheduleTransitionFlush;
+	resume: typeof scheduleTransitionQueue;
+	flushUrgent: typeof flushUrgent;
+	takeCompletions: typeof takeTransitionCompletions;
+	finishCompletions: typeof finishTransitionCompletions;
+	hasCompletions: typeof hasTransitionCompletions;
 	begin: typeof beginTransitionAttempt;
 	end: typeof endTransitionAttempt;
 	beginUrgent: typeof beginUrgentTransitionRender;
@@ -2788,6 +2837,12 @@ function ensureTransitionSwapDriver(): void {
 		splice: spliceWipCapture,
 	};
 	TRANSITION_ROOT_DRIVER ??= {
+		schedule: scheduleTransitionFlush,
+		resume: scheduleTransitionQueue,
+		flushUrgent,
+		takeCompletions: takeTransitionCompletions,
+		finishCompletions: finishTransitionCompletions,
+		hasCompletions: hasTransitionCompletions,
 		begin: beginTransitionAttempt,
 		end: endTransitionAttempt,
 		beginUrgent: beginUrgentTransitionRender,
@@ -6936,9 +6991,9 @@ function vtInterrupt(): void {
 	vtInterruptOwners(null);
 }
 
-/** Is every queued block scheduled at transition priority? (Empty → false.) */
+/** Is this an animation-eligible transition batch? Urgent cues never animate. */
 function queueAllTransition(): boolean {
-	if (QUEUE.length === 0) return false;
+	if (inUrgentFlush || QUEUE.length === 0) return false;
 	for (let i = 0; i < QUEUE.length; i++) {
 		if (QUEUE[i].pendingMode !== 'transition') return false;
 	}
@@ -7509,7 +7564,7 @@ function warnCrossComponentRenderUpdate(target: Block, source: Block): void {
 }
 
 /** `flushed`: a signal notification delivered during a flush (see scheduleNativeRead). */
-function scheduleRender(block: Block, flushed?: boolean, urgentPending?: boolean): void {
+function scheduleRender(block: Block, flushed?: boolean): void {
 	if (block.disposed) return;
 	if (process.env.NODE_ENV !== 'production' && CURRENT_EFFECT_PHASE === INSERTION) {
 		console.error(
@@ -7565,10 +7620,9 @@ function scheduleRender(block: Block, flushed?: boolean, urgentPending?: boolean
 		warnCrossComponentRenderUpdate(block, CURRENT_BLOCK!);
 	}
 	const mode: 'urgent' | 'transition' =
-		!urgentPending &&
-		(TRANSITION_DEPTH > 0 ||
-			(renderPhaseSelf && block.currentRenderMode === 'transition') ||
-			(!syncFlush && _dispatchDepth === 0 && ASYNC_TRANSITION_COUNT > 0 && !inCommitCallback()))
+		TRANSITION_DEPTH > 0 ||
+		(renderPhaseSelf && block.currentRenderMode === 'transition') ||
+		(!syncFlush && _dispatchDepth === 0 && ASYNC_TRANSITION_COUNT > 0 && !inCommitCallback())
 			? 'transition'
 			: 'urgent';
 	const deferred = DEFERRED_SPAWN || (renderPhaseSelf && block.currentRenderDeferred);
@@ -8010,7 +8064,7 @@ function flush(): void {
 		refAttachQueue.length === 0 &&
 		activeFragments.size === 0 &&
 		FLUSHED_TRANSITION_UPDATES.length === 0 &&
-		transitionCompletions === null &&
+		TRANSITION_ROOT_DRIVER?.hasCompletions() !== true &&
 		VIEW_TRANSITION_DRIVER === null
 	) {
 		if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__)
@@ -8420,8 +8474,7 @@ function drainLayoutUpdates(pendingError: { err: any } | null): { err: any } | n
  */
 function flushWork(): void {
 	inFlush = true;
-	const completions = transitionCompletions;
-	transitionCompletions = null;
+	const completions = TRANSITION_ROOT_DRIVER?.takeCompletions();
 	// Any retained sync-transition updates belong to the drain below. Whatever
 	// a hold did not consume is finished with once the flush completes.
 	const clearRetainedTransitionUpdates = FLUSHED_TRANSITION_UPDATES.length > 0;
@@ -8452,7 +8505,7 @@ function flushWork(): void {
 		if (pendingError !== null) throw pendingError.err;
 	} finally {
 		inFlush = false;
-		if (completions !== null) finishTransitionCompletions(completions);
+		if (completions != null) TRANSITION_ROOT_DRIVER!.finishCompletions(completions);
 		if (clearRetainedTransitionUpdates || FLUSHED_TRANSITION_UPDATES.length > 0)
 			FLUSHED_TRANSITION_UPDATES.length = 0;
 		if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__)
@@ -9272,8 +9325,7 @@ export function flushSync<T>(fn: () => T): T {
 		const effectPhase = CURRENT_EFFECT_PHASE;
 		CURRENT_EFFECT_PHASE = -1;
 		let pendingError: { err: any } | null = null;
-		const completions = transitionCompletions;
-		transitionCompletions = null;
+		const completions = TRANSITION_ROOT_DRIVER?.takeCompletions();
 		try {
 			// Drain anything scheduled by fn (same depth-sorted, coalescing drain as flush()).
 			// Octane drains insertion + layout synchronously. Newly queued passive
@@ -9297,7 +9349,7 @@ export function flushSync<T>(fn: () => T): T {
 			}
 		} finally {
 			inFlush = false;
-			if (completions !== null) finishTransitionCompletions(completions);
+			if (completions != null) TRANSITION_ROOT_DRIVER!.finishCompletions(completions);
 			CURRENT_EFFECT_PHASE = effectPhase;
 			if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__)
 				__devtoolsNotifyFlush();
@@ -9307,7 +9359,7 @@ export function flushSync<T>(fn: () => T): T {
 	} finally {
 		syncFlush = prevSync;
 		if (QUEUE.length > 0 || ROOT_RENDER_TRANSACTIONS.length > 0) scheduleQueuedFlush();
-		else if (transitionCompletions !== null) scheduleFlush(true);
+		else if (TRANSITION_ROOT_DRIVER?.hasCompletions()) scheduleFlush(true);
 	}
 }
 
@@ -10707,7 +10759,9 @@ export function act<T>(fn: () => T | Promise<T>): Promise<T> {
 					await actCheckpoint();
 					throwPendingActErrors();
 					const hadWork =
-						hasPendingWork() || DEFERRED_SWAPS !== null || transitionCompletions !== null;
+						hasPendingWork() ||
+						DEFERRED_SWAPS !== null ||
+						TRANSITION_ROOT_DRIVER?.hasCompletions() === true;
 					drainPassiveEffects();
 					if (!hadWork && !hasPendingWork()) return value;
 				}
@@ -10760,7 +10814,9 @@ export function act<T>(fn: () => T | Promise<T>): Promise<T> {
 				await actCheckpoint();
 				throwPendingActErrors();
 				const hadWork =
-					hasPendingWork() || DEFERRED_SWAPS !== null || transitionCompletions !== null;
+					hasPendingWork() ||
+					DEFERRED_SWAPS !== null ||
+					TRANSITION_ROOT_DRIVER?.hasCompletions() === true;
 				drainPassiveEffects();
 				if (!hadWork && !hasPendingWork()) return result as T;
 			}
@@ -43666,7 +43722,14 @@ export function useActionState<S>(
 				if (!block.disposed) {
 					if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__)
 						__profileSchedule(block, 'action-state-pending', slot);
-					scheduleRender(block, false, next);
+					if (next) {
+						// Publish the cue promptly without upgrading sibling transition
+						// state in this block, which must retain its Suspense hold policy.
+						ensureTransitionSwapDriver();
+						urgentActionCue = true;
+					}
+					scheduleRender(block);
+					if (next) scheduleFlush();
 				}
 			}
 		};
