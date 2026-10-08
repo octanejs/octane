@@ -5,13 +5,13 @@
     "brotli": 2659
   },
   "framework": {
-    "raw": 179338,
-    "gzip": 56668,
+    "raw": 179517,
+    "gzip": 56724,
     "brotli": 49479
   },
   "total": {
-    "raw": 187603,
-    "gzip": 59526,
+    "raw": 187782,
+    "gzip": 59582,
     "brotli": 51889
   }
 }
