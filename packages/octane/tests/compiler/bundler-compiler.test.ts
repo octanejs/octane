@@ -81,6 +81,50 @@ ${extension === 'tsrx' ? '}' : '); }'}`;
 		},
 	);
 
+	// List numbering and row spans are presentation channels. Form values, form
+	// identity and a spelling the numeric rule would not match stay outside.
+	it.each([
+		['<ol start={props.value}><li value={props.value}>A</li></ol>', null],
+		['<table><tbody><tr><td rowspan={props.value}>A</td></tr></tbody></table>', null],
+		['<svg><text start={props.value}>A</text></svg>', null],
+		[
+			'<select><option value={props.value}>A</option></select>',
+			'native state and identity attribute "value" must be static or explicitly unbound',
+		],
+		[
+			'<data value={props.value}>A</data>',
+			'native state and identity attribute "value" must be static or explicitly unbound',
+		],
+		[
+			'<input form={props.value} />',
+			'native state and identity attribute "form" must be static or explicitly unbound',
+		],
+		[
+			'<svg><text rowSpan={props.value}>A</text></svg>',
+			'attribute "rowSpan" is not supported in binding views',
+		],
+	])('classifies bound %s as a presentation channel or rejects it', (markup, message) => {
+		for (const dev of [false, true]) {
+			for (const mode of ['client', 'server'] as const) {
+				for (const extension of ['tsx', 'tsrx']) {
+					const source = `export function View(props) ${extension === 'tsrx' ? "@{ 'use dom bindings';" : "{ 'use dom bindings'; return ("}
+ ${markup}
+${extension === 'tsrx' ? '}' : '); }'}`;
+					const id = `/src/AttributeView.${extension}`;
+					const moduleIds =
+						mode === 'server'
+							? [id]
+							: [id, `${id}?octane-bindings=View`, `${id}?octane-bindings=View&octane-mount=1`];
+					for (const moduleId of moduleIds) {
+						const result = () => compile(source, moduleId, { mode, dev, hmr: false, strong: true });
+						if (message === null) expect(result).not.toThrow();
+						else expect(result).toThrow(message);
+					}
+				}
+			}
+		}
+	});
+
 	it.each([
 		'(external as typeof external)(stylex.attrs(styles))',
 		'external!(stylex.attrs(styles))',

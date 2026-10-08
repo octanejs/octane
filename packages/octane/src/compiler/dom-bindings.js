@@ -86,11 +86,17 @@ const FORBIDDEN_ATTRS = new Set([
 	'slot',
 	'download',
 	'capture',
-	'rowspan',
-	'start',
 	MARKER,
 	NODE_MARKER,
 ]);
+// React's numeric props remove a value that is not a number. The binding runtime
+// matches them by lowercase name, which every HTML name has here. An SVG spelling
+// such as `rowSpan`, which the renderer still treats as numeric, stays unsupported.
+const NUMERIC_ATTRS = new Set(['rowspan', 'start']);
+
+function forbiddenAttribute(name, lower) {
+	return FORBIDDEN_ATTRS.has(lower) || (name !== lower && NUMERIC_ATTRS.has(lower));
+}
 // Initial form state and submission identity stay with normal SSR/native owners.
 // A presentation binding must not reset a user's edit or change its form owner.
 const EXTERNAL_ATTRS = new Set([
@@ -110,7 +116,8 @@ const FORM_HOSTS = new Set(['input', 'textarea', 'select', 'button', 'option', '
 
 function externalAttribute(tag, name) {
 	return (
-		(EXTERNAL_ATTRS.has(name) && !(tag === 'button' && name === 'value')) ||
+		// A button's value and a list item's ordinal are attributes, not form state.
+		(EXTERNAL_ATTRS.has(name) && !(name === 'value' && (tag === 'button' || tag === 'li'))) ||
 		(MUST_USE_PROPERTY_PROPS.has(name) && !(tag === 'button' && name === 'value')) ||
 		POSITIVE_NUMERIC_ATTR_PROPS.has(name) ||
 		(FORM_HOSTS.has(tag) &&
@@ -1044,7 +1051,7 @@ function planView(fn, filename, source, imports, lexical, native = null) {
 					if (ns === 0) name = name.toLowerCase();
 					const lower = name.toLowerCase();
 					if (
-						FORBIDDEN_ATTRS.has(lower) ||
+						forbiddenAttribute(name, lower) ||
 						lower.startsWith('on') ||
 						lower.startsWith('data-octane-class-') ||
 						externalAttribute(tag, lower) ||
@@ -1154,7 +1161,7 @@ function planView(fn, filename, source, imports, lexical, native = null) {
 			}
 			if (
 				!/^[A-Za-z_][A-Za-z0-9_.:-]*$/.test(name) ||
-				FORBIDDEN_ATTRS.has(lower) ||
+				forbiddenAttribute(name, lower) ||
 				lower.startsWith('data-octane-class-')
 			) {
 				error(filename, attr, `attribute ${JSON.stringify(raw)} is not supported in binding views`);

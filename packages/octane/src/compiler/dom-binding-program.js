@@ -879,8 +879,9 @@ export function planBindingProgram(fn, render, context) {
 				const external = native.unbound.has(bare);
 				const value = external ? native.unbound.get(bare) : expression;
 				const literal = unwrap(value);
+				// A button's value and a list item's ordinal are attributes, not form state.
 				const property =
-					(tag !== 'button' || raw !== 'value') &&
+					(raw !== 'value' || (tag !== 'button' && tag !== 'li')) &&
 					['value', 'checked', 'defaultValue', 'defaultChecked', 'selected'].includes(raw);
 				const classGroup = native.classAttributes.get(attr)?._octaneBindingClassGroups;
 				if (classGroup) {
@@ -940,7 +941,14 @@ export function planBindingProgram(fn, render, context) {
 									: BOOLEAN_ATTR_PROPS.has(name.toLowerCase())
 										? 'boolean'
 										: 'attr';
-					initialize(index, kind, name, mapCow(value, native.unbound));
+					// HTML names are case-insensitive. The runtime matches canonical
+					// names, such as React's numeric `rowSpan`, in lowercase.
+					initialize(
+						index,
+						kind,
+						selfNs === 0 ? name.toLowerCase() : name,
+						mapCow(value, native.unbound),
+					);
 				}
 			}
 			const children = createTemplateIr();
