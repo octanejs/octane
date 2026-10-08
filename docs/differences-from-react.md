@@ -1386,7 +1386,10 @@ that render, in the same task. The cue still renders the transition's work with 
 when that work is not hook state, or when the component is inside a Suspense
 boundary that is holding a suspended transition. An urgent update to a component
 whose transition is waiting renders it in the microtask flush. `flushSync` and
-`act()` drain both priorities.
+`act()` drain both priorities. An Action pending cue on its own does not start
+native View Transition capture, and neither does a cue rendered apart from its
+component's waiting transition. Explicit transition work keeps its capture when it
+reaches the render queue, including state in the same component as the cue.
 
 `useDeferredValue`'s deferred render also runs in a later host task. Urgent updates
 that arrive before the task runs only change the value it renders, so a fast typist's
