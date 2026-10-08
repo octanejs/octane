@@ -254,13 +254,13 @@ function resolveFixedNodes(root: Element, descriptor: CompiledBindings<unknown>)
 	// per node; counting a live child list is not.
 	const cursors: Array<ChildNode | null> = [];
 	for (let i = 0; i < descriptor.nodes.length; i++) {
-		const [parent, tag, namespace, children, , text] = descriptor.nodes[i]!;
+		const [parent, tag, namespace, children, openChildren, text] = descriptor.nodes[i]!;
 		// An opaque or text parent's cursor is null, and an unvisited parent has none.
 		const node = (i === 0 ? (parent === -1 ? root : undefined) : cursors[parent]) as
 			Element | null | undefined;
 		if (
 			node == null ||
-			descriptor.nodes[i]![4] === true ||
+			openChildren === true ||
 			node.localName !== tag ||
 			node.namespaceURI !== namespaces[namespace] ||
 			(text && !isTextLeaf(node))
@@ -729,14 +729,16 @@ export function __adoptBindings<Props>(
 				preparedControls!.get(i)!.commit();
 				continue;
 			}
-			if (next[i] === previous[i]) continue;
+			const prepared = next[i]!;
+			const last = previous[i];
+			if (prepared === last) continue;
 			const binding = bindings[i]!;
-			if (binding[1] === 'classToken') previous[i] = next[i]!;
+			if (binding[1] === 'classToken') previous[i] = prepared;
 			let written: string | null | void = undefined;
 			if (binding[1] === 'styleObject') {
 				const projection = projections?.get(i);
-				if (projection) projection.writeStyle(i, next[i]!);
-				else signalConnections!.get(i)!.write!(next[i]);
+				if (projection) projection.writeStyle(i, prepared);
+				else signalConnections!.get(i)!.write!(prepared);
 			} else if (binding[1] === 'classGroup') preparedGroups!.get(i)!.commit();
 			else if (
 				(binding[1] === 'styleProperty' || binding[1] === 'styleAttribute') &&
@@ -746,10 +748,10 @@ export function __adoptBindings<Props>(
 				let style = styles.get(i);
 				if (!style)
 					styles.set(i, (style = __createBindingStyleRestoration(nodes[binding[0]]!, binding)));
-				style.write(next[i] as string | null);
-			} else written = write(nodes[binding[0]]!, binding, next[i] as string | null, previous[i]);
+				style.write(prepared as string | null);
+			} else written = write(nodes[binding[0]]!, binding, prepared as string | null, last);
 			if (!disposed) {
-				previous[i] = next[i]!;
+				previous[i] = prepared;
 				// Only fixed scalar, URL and style channels participate in this legacy
 				// handoff, publishing the value left in the DOM. New grouped/control
 				// channels keep the native lease protocol.
@@ -1266,11 +1268,13 @@ export function __adoptScalarBindings<Props>(
 			position++
 		) {
 			const i = indices ? indices[position]! : position;
-			if (next[i] === previous[i]) continue;
+			const value = next[i]!;
+			const last = previous[i];
+			if (value === last) continue;
 			const binding = bindings[i]!;
-			const published = writeChannel(nodes[binding[0]]!, binding, next[i]!, previous[i]);
+			const published = writeChannel(nodes[binding[0]]!, binding, value, last);
 			if (!disposed) {
-				previous[i] = next[i];
+				previous[i] = value;
 				const node = owned[i]![0];
 				let claims = domBindingClaims.get(node);
 				if (claims === undefined) domBindingClaims.set(node, (claims = new Map()));

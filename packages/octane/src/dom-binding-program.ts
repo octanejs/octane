@@ -947,9 +947,10 @@ function adoptRegion(region: RegionInstance, id: string, transaction: Transactio
 			transaction,
 		);
 	} else if (definition.kind === 'text') {
+		const end = range.end;
 		const text = range.start.nextSibling;
-		if (text !== range.end) {
-			if (text?.nextSibling !== range.end) mismatch();
+		if (text !== end) {
+			if (text?.nextSibling !== end) mismatch();
 			// Chrome Translate's <font> wrappers stay until the value changes.
 			region.text =
 				text.nodeType === 3
@@ -1557,19 +1558,21 @@ function commitRegion(plan: RegionPlan, id: string, transaction: Transaction): v
 
 function writeText(region: RegionInstance, value: string): void {
 	const text = region.text;
-	const range = region.range;
 	if (text == null) {
 		// Adopted translated text stays; the detached node only records its value.
 		if (text === undefined || value !== '') {
-			region.text = range.start.ownerDocument.createTextNode(value);
-			if (text === null) range.end.parentNode!.insertBefore(region.text, range.end);
+			const end = region.range.end;
+			const node = (region.text = end.ownerDocument.createTextNode(value));
+			if (text === null) end.parentNode!.insertBefore(node, end);
 		}
 	} else if (text.data !== value) {
 		text.data = value;
+		const range = region.range;
+		const end = range.end;
 		// Translation displaced the node, so its range is replaced only now that the value changed.
-		if (text.nextSibling !== range.end) {
+		if (text.nextSibling !== end) {
 			removeRange(range, true);
-			range.end.parentNode!.insertBefore(text, range.end);
+			end.parentNode!.insertBefore(text, end);
 		}
 	}
 }
@@ -1581,7 +1584,9 @@ function writeOperation(
 	group: { commit(): void } | undefined,
 	transaction: Transaction,
 ): void {
-	if (transaction.disposed || instance.disposed || value === instance.previous[index]) return;
+	if (transaction.disposed || instance.disposed) return;
+	const previous = instance.previous[index];
+	if (value === previous) return;
 	const operation = instance.definition.bindings[index]!;
 	if (operation[1] === 'classToken') instance.previous[index] = value;
 	if (operation[1] === 'styleObject') {
@@ -1609,7 +1614,7 @@ function writeOperation(
 			instance.nodes[operation[0]] as Element,
 			operation,
 			value as string | null,
-			instance.previous[index],
+			previous,
 		);
 	if (!transaction.disposed && !instance.disposed) instance.previous[index] = value;
 }
