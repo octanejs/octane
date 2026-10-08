@@ -2719,6 +2719,11 @@ let inFlush = false;
 // block does not: the block is queued in both places, and the microtask flush
 // renders only its cue (renderTransitionCue).
 const TRANSITION_QUEUE: Block[] = [];
+// Blocks whose pending cue was scheduled outside a flush (markTransitionCue); the
+// microtask flush renders them at urgent priority (splitTransitionCue). They hold
+// until a drain empties or reindexes QUEUE, while TRANSITION_CUE_EPOCH is current.
+const TRANSITION_CUES: Block[] = [];
+let TRANSITION_CUE_EPOCH = -1;
 // The live posted task's id, or 0. A flush that absorbs the queue retires that
 // task, so transitions scheduled afterwards post a task of their own rather than
 // joining one posted before input that arrived in between.
@@ -7048,30 +7053,34 @@ function vtInterrupt(): void {
 	vtInterruptOwners(null);
 }
 
-// A pending Action cue keeps transition rendering semantics, but alone it
-// should publish before native capture. Only this optional capability owns it.
+// An Action cue alone, even one that keeps transition priority, publishes
+// before native capture. Only this optional capability owns it.
 let VT_ACTION_CUE = false;
 
 /**
- * Is this an animation-eligible transition batch? A pending cue split from its
- * waiting transition work (splitTransitionCue) renders urgently, so it never is.
+ * Is this an animation-eligible transition batch? A pending cue renders urgently
+ * (splitTransitionCue). A cue split from its block's waiting transition work
+ * never is; a drain of other cues is only when transition work rides with them.
  */
 function queueAllTransition(): boolean {
 	if (QUEUE.length === 0) return false;
-	let cueOnly = VT_ACTION_CUE && NATIVE_TRANSITION_DRIVER?.hasWork() !== true;
+	let cue = VT_ACTION_CUE;
+	let work = false;
 	for (let i = 0; i < QUEUE.length; i++) {
 		const block = QUEUE[i];
-		if (block.pendingMode !== 'transition' || queuedTransitionCue(block)) return false;
-		if (cueOnly && block.pending && !block.disposed) {
+		if (block.pendingMode !== 'transition') return false;
+		if (queuedTransitionCue(block)) {
+			if (TRANSITION_QUEUE.indexOf(block) !== -1) return false;
+			cue = true;
+		}
+		if (!work && block.pending && !block.disposed) {
 			const owner = block.idState.renderOwner;
-			if (
+			work =
 				(block.kind === 'root' && !block.mounted) ||
-				(owner?.request != null && owner.current !== null && QUEUE.includes(owner.current))
-			)
-				cueOnly = false;
+				(owner?.request != null && owner.current !== null && QUEUE.includes(owner.current));
 		}
 	}
-	if (!cueOnly) return true;
+	if (!cue || work || NATIVE_TRANSITION_DRIVER?.hasWork() === true) return true;
 	// The separate task queue can hold sibling work while this cue drains.
 	// Only receipts belonging to this drain make the cue share a capture.
 	for (const entries of FLUSHED_TRANSITION_UPDATES) {
@@ -7092,7 +7101,7 @@ function queueAllTransition(): boolean {
 }
 
 function queuedTransitionCue(block: Block): boolean {
-	return TRANSITION_QUEUE.length !== 0 && TRANSITION_ROOT_DRIVER?.splitsCue(block) === true;
+	return TRANSITION_ROOT_DRIVER !== null && TRANSITION_ROOT_DRIVER.splitsCue(block);
 }
 
 function vtHasActiveHandles(): boolean {
@@ -7178,7 +7187,7 @@ function ensureViewTransitionDriver(): ViewTransitionDriver {
 			VT_ACTION_CUE = false;
 			if (VT_PENDING_TYPES.length === 0) return false;
 			for (let i = 0; i < QUEUE.length; i++) {
-				// A split cue leaves the types for its transition's task.
+				// A pending cue leaves the types for its transition's task.
 				if (QUEUE[i].pendingMode === 'transition' && !queuedTransitionCue(QUEUE[i])) return true;
 			}
 			return false;
@@ -7675,9 +7684,10 @@ function warnCrossComponentRenderUpdate(target: Block, source: Block): void {
  * `flushed`: a signal notification delivered during a flush (see scheduleNativeRead).
  * `cue`: useTransition or useActionState raising isPending, or useOptimistic
  * showing a value. These renders are the transition's in-flight surface, which
- * React renders urgently: they keep the microtask flush at the priority computed
- * here, so they commit before the transition work they announce. That work keeps
- * its task even when it belongs to the cue's own block (upgradeTransitionBlock).
+ * React renders in an urgent lane: they keep the microtask flush and render at
+ * urgent priority there (splitTransitionCue), so they commit before the
+ * transition work they announce, over its committed state. That work keeps its
+ * task even when it belongs to the cue's own block (upgradeTransitionBlock).
  * `background`: a native producer refresh shares task admission without
  * changing its existing render/Suspense priority.
  */
@@ -7819,7 +7829,8 @@ function scheduleRender(
 /**
  * Hold a render for the shared host task (see TRANSITION_QUEUE).
  * Work scheduled inside a render or flush belongs to the drain already on the
- * stack, and a pending cue keeps the microtask flush.
+ * stack. A pending cue keeps the microtask flush, which renders it at urgent
+ * priority (markTransitionCue).
  */
 function queueTransitionBlock(block: Block, cue?: boolean): boolean {
 	// The block is not queued, so a render consumed every update retained for it.
@@ -7879,24 +7890,28 @@ function upgradeTransitionBlock(block: Block, mode: 'urgent' | 'transition', cue
 }
 
 /**
- * Whether a queued block renders only its pending cue now, apart from the
- * transition work it also has waiting in the task queue (upgradeTransitionBlock).
- * The cue renders alone when that work holds staged cells it can show at their
- * committed values. A Suspense or Activity boundary that owns the render, or a
- * pending root request, keeps the combined render, as does work without staged
- * cells. View Transition routing asks this too, since a split cue is urgent work.
+ * Whether a queued block renders only its pending cue now, at urgent priority,
+ * apart from any transition work. A pure cue (TRANSITION_CUES) has no transition
+ * work of its own. A cue whose block also has transition work waiting in the
+ * task queue (upgradeTransitionBlock) renders alone when that work holds staged
+ * cells it can show at their committed values. A Suspense or Activity boundary
+ * that owns the render, or a pending root request, keeps the combined render at
+ * transition priority, as does work without staged cells. View Transition
+ * routing asks this too, since a split cue is urgent work.
  */
 function splitsTransitionCue(block: Block): boolean {
+	if (syncFlush || TRANSITION_TASK_ACTIVE || block.pendingMode !== 'transition') return false;
+	const waiting = TRANSITION_QUEUE.indexOf(block) !== -1;
 	if (
-		syncFlush ||
-		TRANSITION_TASK_ACTIVE ||
-		block.pendingMode !== 'transition' ||
-		TRANSITION_QUEUE.indexOf(block) === -1
+		!waiting &&
+		(TRANSITION_CUE_EPOCH !== QUEUE_REINDEX_EPOCH || TRANSITION_CUES.indexOf(block) === -1)
 	)
 		return false;
+	// A pure cue that gained staged cells from transition work scheduled in this
+	// flush renders that work with it.
+	if (hasQueuedTransitionCells(block) !== waiting) return false;
 	const owner = block.idState.renderOwner;
 	return (
-		hasQueuedTransitionCells(block) &&
 		(owner === undefined || owner.current !== block || owner.request === null) &&
 		(SCHEDULED_VISIBILITY_DRIVER === null ||
 			SCHEDULED_VISIBILITY_DRIVER.find(block, true, 'urgent') === null)
@@ -7904,14 +7919,20 @@ function splitsTransitionCue(block: Block): boolean {
 }
 
 /**
- * Choose how the drain renders a queued block: a split cue renders at urgent
- * priority (renderTransitionCue). Otherwise the drain's own render consumes any
- * transition work the block also has waiting.
+ * Choose how the drain renders a queued block. A pending cue renders at urgent
+ * priority, as React renders `isPending` and optimistic values in an urgent lane:
+ * descendants with transition work waiting show their committed cells
+ * (renderBlockInner) and keep that work for the task. A split cue also shows
+ * its own block's committed cells (renderTransitionCue). Otherwise the drain's
+ * own render consumes any transition work the block also has waiting.
  */
 function splitTransitionCue(block: Block): typeof renderBlock | undefined {
-	if (TRANSITION_QUEUE.length === 0 || block.pendingMode !== 'transition') return;
+	// Release an earlier drain's cues at the next drained block.
+	if (TRANSITION_CUE_EPOCH !== QUEUE_REINDEX_EPOCH) TRANSITION_CUES.length = 0;
+	if (block.pendingMode !== 'transition') return;
 	if (splitsTransitionCue(block)) {
 		block.pendingMode = 'urgent';
+		if (TRANSITION_QUEUE.indexOf(block) === -1) return;
 		// An urgent ancestor may already have rendered this cue in the drain.
 		return RENDERED_CUE_DRAIN === DRAIN_ID && RENDERED_CUES.indexOf(block) !== -1
 			? keepTransitionPending
@@ -7922,6 +7943,21 @@ function splitTransitionCue(block: Block): typeof renderBlock | undefined {
 		TRANSITION_QUEUE.splice(index, 1);
 		if (TRANSITION_QUEUE.length === 0) adoptTransitionQueue();
 	}
+}
+
+/**
+ * Record a pending cue its hook schedules outside a render, flush, or the
+ * transition task (TRANSITION_CUES), so the microtask flush renders it at urgent
+ * priority (splitTransitionCue). Hooks call this, not scheduleRender, so native
+ * readers that share the task queue never reach it.
+ */
+function markTransitionCue(block: Block): void {
+	if (syncFlush || inFlush || CURRENT_BLOCK !== null || TRANSITION_TASK_ACTIVE) return;
+	if (TRANSITION_CUE_EPOCH !== QUEUE_REINDEX_EPOCH) {
+		TRANSITION_CUE_EPOCH = QUEUE_REINDEX_EPOCH;
+		TRANSITION_CUES.length = 0;
+	}
+	TRANSITION_CUES.push(block);
 }
 
 /** A split cue that already rendered keeps its block waiting for the transition task. */
@@ -44012,6 +44048,7 @@ export function useTransition(
 					if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__)
 						__profileSchedule(block, 'transition-pending', slot);
 					// The rising edge is a pending cue; the falling edge follows the transition.
+					if (pending) markTransitionCue(block);
 					scheduleRender(block, false, pending);
 				} finally {
 					TRANSITION_LISTENER_PUBLISH_DEPTH--;
@@ -44094,7 +44131,10 @@ export function useActionState<S>(
 					if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__)
 						__profileSchedule(block, 'action-state-pending', slot);
 					// The rising edge is a pending cue; the falling edge commits with the result.
-					if (next) VIEW_TRANSITION_DRIVER?.markActionCue();
+					if (next) {
+						VIEW_TRANSITION_DRIVER?.markActionCue();
+						markTransitionCue(block);
+					}
 					scheduleRender(block, false, next);
 				}
 			}
@@ -44350,6 +44390,7 @@ export function useOptimistic<S, V = S>(
 				if (!block.disposed) {
 					if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__)
 						__profileSchedule(block, 'optimistic', slot);
+					markTransitionCue(block);
 					scheduleRender(block, false, true);
 				}
 			},

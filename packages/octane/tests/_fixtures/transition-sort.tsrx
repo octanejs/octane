@@ -37,3 +37,35 @@ export function TransitionSort(props: TransitionSortProps) @{
 		<SlowList sorted={sorted} busyMs={props.busyMs} />
 	</section>
 }
+
+type SortPanelProps = TransitionSortProps & {
+	isPending: boolean;
+	startTransition(fn: () => void): void;
+};
+
+function SortPanel(props: SortPanelProps) @{
+	const [sorted, setSorted] = useState(false);
+	const label = props.isPending ? 'Sorting…' : sorted ? 'Unsort' : 'Sort';
+	useLayoutEffect(() => {
+		props.onCommit(label, sorted);
+	}, null);
+	<section>
+		<button data-sort type="button" onClick={() => props.startTransition(() => setSorted(!sorted))}>
+			{label}
+		</button>
+		<SlowList sorted={sorted} busyMs={props.busyMs} />
+	</section>
+}
+
+// The same Sort button, with `isPending` owned by an ancestor of the component
+// whose state the transition sets. The cue's re-render reaches that component,
+// which React renders with its current state in the urgent lane.
+export function TransitionSortShell(props: TransitionSortProps) @{
+	const [isPending, startTransition] = useTransition();
+	<SortPanel
+		busyMs={props.busyMs}
+		onCommit={props.onCommit}
+		isPending={isPending}
+		startTransition={startTransition}
+	/>
+}

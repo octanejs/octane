@@ -1,21 +1,27 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { act, createRoot, flushSync, startTransition } from '../src/index.js';
+import { act, addTransitionType, createRoot, flushSync, startTransition } from '../src/index.js';
 import {
 	ActionProbe,
+	ActionShell,
 	type DeferredTabsControls,
 	DeferredPendingTabs,
 	HeldPendingPanel,
 	HeldPendingTabs,
+	HeldShell,
 	OptimisticProbe,
+	OptimisticShell,
 	OptimisticTabs,
 	PendingPanel,
+	PendingShell,
 	PendingTabs,
 	PendingTabsPanel,
 	PendingTransitionInput,
 	StateProbe,
+	SuspendingCueShell,
 	type TabsControls,
 	TransitionInput,
 	ViewTransitionPair,
+	ViewTransitionShell,
 	ViewTransitionTabs,
 } from './_fixtures/transition-flush-task.tsrx';
 import { installViewTransitionMocks } from './conformance/_helpers/view-transition-mocks';
@@ -669,6 +675,177 @@ describe('a pending cue in the component that holds the transition update', () =
 
 		expect(input.value).toBe('x');
 		expect(container.querySelector('p')!.textContent).toBe('x pending');
+	});
+});
+
+describe('a pending cue in an ancestor of the transition update', () => {
+	// The cue's re-render reaches the component that holds the transition's
+	// state. React renders the cue in an urgent lane, where that component shows
+	// its committed state, and renders the transition in a later task.
+
+	it("commits the cue with the child's previous state and renders the transition in a later task", async () => {
+		const log: string[] = [];
+		const { container } = mountWith(PendingShell, {
+			onCommit: (entry: string) => log.push(entry),
+		});
+		log.length = 0;
+		const frames = recordFrames(() => container.textContent);
+		postTask(() => log.push('task'));
+
+		(container.querySelector('button') as HTMLButtonElement).click();
+		await untilTasks(() => frames.length === 2);
+
+		expect(frames).toEqual(['a pending', 'b idle']);
+		expect(splitAtTask(log, 'b ')).toEqual({ before: ['a pending', 'task'], after: true });
+		expect(log.at(-1)).toBe('b idle');
+	});
+
+	it("shows the cue while the child's transition suspends", async () => {
+		const log: string[] = [];
+		let setPromise!: (promise: Promise<string>) => void;
+		let resolve!: (value: string) => void;
+		const next = new Promise<string>((done) => (resolve = done));
+		const initial = Object.assign(Promise.resolve('one'), { status: 'fulfilled', value: 'one' });
+		const { container } = mountWith(HeldShell, {
+			initial,
+			expose: (set: (promise: Promise<string>) => void) => (setPromise = set),
+			onCommit: (entry: string) => log.push(entry),
+			onPress: (start: (fn: () => void) => void) => start(() => setPromise(next)),
+		});
+		log.length = 0;
+
+		(container.querySelector('button') as HTMLButtonElement).click();
+		await untilTasks(() => false);
+
+		expect(log).toEqual(['pending']);
+		expect(container.textContent).toBe('pendingone');
+
+		resolve('two');
+		await untilTasks(() => log.includes('idle'));
+		expect(container.textContent).toBe('idletwo');
+	});
+
+	for (const [name, Shell, cued, settled] of [
+		['an optimistic value', OptimisticShell, 'a saving', 'b saved'],
+		["useActionState's isPending", ActionShell, 'a 0 pending', 'b 1'],
+	] as const) {
+		it(`commits ${name} with the child's previous state`, async () => {
+			const log: string[] = [];
+			let setFilter!: (filter: string) => void;
+			const { container } = mountWith(Shell, {
+				expose: (set: (filter: string) => void) => (setFilter = set),
+				onCommit: (entry: string) => log.push(entry),
+				onPress: (cue: () => void) =>
+					startTransition(() => {
+						cue();
+						setFilter('b');
+					}),
+			});
+			log.length = 0;
+			const frames = recordFrames(() => container.querySelector('p')!.textContent);
+
+			(container.querySelector('button') as HTMLButtonElement).click();
+			await untilTasks(() => frames.length === 2);
+
+			expect(frames[0]).toBe(cued);
+			expect(log[0]).toBe(cued);
+			await untilTasks(() => container.querySelector('p')!.textContent === settled);
+			expect(container.querySelector('p')!.textContent).toBe(settled);
+		});
+	}
+
+	it("animates only the child's transition, with its types, in a view transition", async () => {
+		const vt = installViewTransitionMocks();
+		try {
+			const types: string[][] = [];
+			let setTab!: (tab: string) => void;
+			const { container } = mountWith(ViewTransitionShell, {
+				expose: (set: (tab: string) => void) => (setTab = set),
+				onPress: (start: (fn: () => void) => void) =>
+					start(() => {
+						addTransitionType('tabs');
+						setTab('bbbb');
+					}),
+				onUpdate: (next: string[]) => types.push(next),
+			});
+
+			(container.querySelector('button') as HTMLButtonElement).click();
+			await flushMicrotasks();
+			expect(container.textContent).toBe('gopendinga');
+			expect(vt.calls).toHaveLength(0);
+
+			await untilTasks(() => container.textContent === 'goidlebbbb');
+			expect(vt.calls).toHaveLength(1);
+			expect(types).toEqual([['tabs']]);
+		} finally {
+			vt.restore();
+		}
+	});
+});
+
+describe('a pending cue renders at urgent priority', () => {
+	// React commits `isPending` and optimistic values in an urgent lane, apart
+	// from the transition they announce, even when no transition work is queued
+	// yet (an async Action before its first update).
+
+	it('does not start a view transition for the cue of an async Action', async () => {
+		let open!: () => void;
+		const gate = new Promise<void>((done) => (open = done));
+		const vt = installViewTransitionMocks();
+		try {
+			const types: string[][] = [];
+			let setTab!: (tab: string) => void;
+			const { container } = mountWith(ViewTransitionShell, {
+				expose: (set: (tab: string) => void) => (setTab = set),
+				onPress: (start: (fn: () => Promise<void>) => void) =>
+					start(async () => {
+						await gate;
+						startTransition(() => {
+							addTransitionType('tabs');
+							setTab('bbbb');
+						});
+					}),
+				onUpdate: (next: string[]) => types.push(next),
+			});
+
+			(container.querySelector('button') as HTMLButtonElement).click();
+			await untilTasks(() => false);
+			expect(container.textContent).toBe('gopendinga');
+			expect(vt.calls).toHaveLength(0);
+
+			open();
+			await untilTasks(() => container.textContent === 'goidlebbbb');
+			expect(vt.calls).toHaveLength(1);
+			expect(types).toEqual([['tabs']]);
+		} finally {
+			open();
+			vt.restore();
+		}
+	});
+
+	it('shows the fallback when the cue itself suspends', async () => {
+		let resolve!: (value: string) => void;
+		const spinner = new Promise<string>((done) => (resolve = done));
+		let open!: () => void;
+		const gate = new Promise<void>((done) => (open = done));
+		const { container } = mountWith(SuspendingCueShell, {
+			spinner,
+			onPress: (start: (fn: () => Promise<void>) => void) => start(() => gate),
+		});
+		try {
+			(container.querySelector('button') as HTMLButtonElement).click();
+			await untilTasks(() => false);
+			// The boundary hides its committed content behind the fallback.
+			expect(container.querySelector('p:not([style])')!.textContent).toBe('loading');
+
+			resolve('spinner');
+			// The reveal waits out the fallback throttle.
+			await vi.waitFor(() => expect(container.textContent).toBe('gospinnerpending'));
+		} finally {
+			open();
+		}
+		await untilTasks(() => container.textContent === 'goidle');
+		expect(container.textContent).toBe('goidle');
 	});
 });
 
