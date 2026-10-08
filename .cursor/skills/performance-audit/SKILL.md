@@ -30,6 +30,9 @@ already follows the rule.
   arrays, or iterators per item.
 - **Reachability:** never name a heavy function from a hot compiled path. Put
   feature-only code behind the capability or driver that owns it.
+- **Member reads:** look for repeated property reads and member-chain prefixes in
+  hot code and emitted JS. Prefer a local `const` for a stable value used more
+  than once; follow [Reuse stable member reads](#reuse-stable-member-reads).
 - **DOM:** read geometry before writing, never in the render walk, and never
   interleaved with writes in a loop. Insert built subtrees once. Keep events
   native and delegated. Write from resize callbacks only through
@@ -97,6 +100,49 @@ to the change and lists the evidence each finding needs.
      it does not, look for a harness or measurement error.
    - Re-run the final candidate after self-review changes. Never report a stale
      intermediate measurement as the final result.
+
+## Reuse stable member reads
+
+Repeated `node.firstChild`, `node.nextSibling`, `record.field`, or `object[key]`
+reads can repeat accessor work and duplicate property names in emitted code.
+Cache a reused value in a local declaration at its first needed read, in the
+smallest scope covering its uses. Prefer this simple reuse over a persistent
+cache or a new helper abstraction; do not alias every one-off property read.
+
+For a native DOM node with no intervening tree mutation:
+
+```ts
+// Before: read the same first child up to three times.
+if (node.firstChild !== null && node.firstChild.nodeType === 3) {
+  return node.firstChild;
+}
+
+// After: read once and reuse the result.
+const firstChild = node.firstChild;
+if (firstChild !== null && firstChild.nodeType === 3) {
+  return firstChild;
+}
+```
+
+- Prove the receiver, computed key, and value stay stable across all uses. A
+  getter or proxy may have observable effects or return a different value on
+  each read; evaluating the receiver or coercing the key can also have effects.
+  Reducing these evaluations is not automatically equivalent.
+- Preserve evaluation order, null guards, and short-circuit behavior. Do not
+  hoist a read onto a path that previously skipped it or before its guard.
+- Re-read after DOM or state mutation, callbacks or reentrant calls, and
+  `await`/yield boundaries that can invalidate the value. In loops, cache per
+  iteration unless stability across iterations is established; a removal loop
+  must observe the new `firstChild` after each removal.
+- Keep Octane's existing access semantics: where code uses `getFirstChild`,
+  `getNextSibling`, or staged DOM views, reuse that result instead of switching
+  to a raw native read. Compiled template walks can reuse stable chain prefixes
+  without routing every access through a shared helper.
+- Check the emitted and minified JS, including raw and compressed size, before
+  claiming a size win. A local declaration can cost more than it saves, and a
+  JIT or minifier may already eliminate some repeated reads. Use the owning
+  benchmark for runtime claims and relevant correctness checks when changing
+  code; fewer source-level reads alone do not establish a speedup.
 
 ## Bundle bytes
 
