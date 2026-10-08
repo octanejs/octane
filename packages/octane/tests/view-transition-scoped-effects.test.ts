@@ -9,7 +9,7 @@ import {
 	type Root,
 	type ViewTransitionInstance,
 } from '../src/index.js';
-import { act } from './_helpers';
+import { act, nextTask } from './_helpers';
 import {
 	installViewTransitionMocks,
 	type ViewTransitionMocks,
@@ -123,6 +123,7 @@ describe('element-scoped ViewTransition commit lifetimes', () => {
 		else Reflect.deleteProperty(Element.prototype, 'startViewTransition');
 		mocks.restore();
 		vi.restoreAllMocks();
+		vi.useRealTimers();
 	});
 
 	const text = (id: string) => container.querySelector('[data-value="' + id + '"]')!.textContent;
@@ -338,6 +339,12 @@ describe('element-scoped ViewTransition commit lifetimes', () => {
 	});
 
 	it('commits without animation when a pre-render passive adds urgent sibling work', async () => {
+		// Hold the frame clock so the passive stays pending until the transition
+		// drains it before rendering. A frame that lands first, as on a loaded
+		// host, drains it earlier, and the transition then animates.
+		vi.useFakeTimers({
+			toFake: ['setTimeout', 'clearTimeout', 'requestAnimationFrame', 'cancelAnimationFrame'],
+		});
 		onEffect = (id, value) => {
 			if (id === 'right' && value === 'trigger') controls.right('urgent from effect');
 		};
@@ -346,7 +353,8 @@ describe('element-scoped ViewTransition commit lifetimes', () => {
 		await Promise.resolve();
 		// The transition waits for its own host task (#1864).
 		expect(text('left')).toBe('initial');
-		await vi.waitFor(() => expect(text('left')).toBe('left changed'));
+		await nextTask();
+		expect(text('left')).toBe('left changed');
 		expect(captures).toEqual([]);
 		expect(text('right')).toBe('urgent from effect');
 	});
