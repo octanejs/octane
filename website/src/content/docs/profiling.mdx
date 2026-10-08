@@ -147,6 +147,52 @@ timestamps.
 instrumentation. Call `start()` to begin recording again, or call `clear()`
 followed by `start()` to begin a fresh session.
 
+<h2 id="engine-counters">Engine counters</h2>
+
+Beside component events, profile builds count the engine work around them:
+Blocks created and torn down, directive arms kept or replaced, boundaries
+falling back or catching, commits, and work thrown away by rollbacks. Counts are
+deterministic for a fixed build, fixture, and interaction, so they are useful
+for catching regressions that timing noise would hide.
+
+```js
+const profiler = globalThis.__OCTANE_PROFILER__;
+
+const before = profiler.snapshot();
+// ...perform one interaction and wait for it to finish...
+const after = profiler.snapshot();
+console.table(profiler.diff(before, after).counters);
+```
+
+| Counter                                                | Counts                                                                        |
+| ------------------------------------------------------ | ----------------------------------------------------------------------------- |
+| `component.render`                                     | Component body invocations, including attempts that suspend, throw, or replay |
+| `component.renderSuspended`, `component.renderErrored` | Attempts that ended by suspending or throwing, for every component unwound    |
+| `component.bailout`                                    | Memo and implicit bailouts that skipped a body                                |
+| `block.create`, `block.unmount`                        | Render Blocks allocated and torn down                                         |
+| `arm.keep`, `arm.swap`                                 | `@if`/`@switch` evaluations that re-rendered or replaced the current arm      |
+| `boundary.fallback`, `boundary.catch`                  | Boundaries switching to their fallback or catch arm                           |
+| `scheduler.drain`                                      | Passes over the render queue                                                  |
+| `commit.root`, `rollback.root`                         | Root render attempts committed, and rolled back                               |
+| `rollback.journalEntries`                              | Recorded writes, created Blocks, and rendered Blocks undone by rollbacks      |
+| `rollback.capture`                                     | Speculative renders whose effects, refs, and bindings were dropped            |
+
+Counters measure work attempted: a render that a later rollback discards still
+counts as a render. They are session totals, so they never shrink when the
+event buffer evicts old events; only `clear()` resets them. A counter that the
+installed renderer does not record is absent from the snapshot rather than
+zero.
+
+`diff()` throws instead of returning a misleading result when the two snapshots
+come from different counter schemas, builds, or renderer sets, when recording
+was stopped or cleared between them, or when they are passed in the wrong
+order.
+
+Profile builds turn off the compiler optimizations that only production builds
+apply, as development builds do. Counter totals therefore describe that generic
+program rather than optimized production output; compare them between two
+profile builds of the same app.
+
 <h2 id="reading-the-data">Reading the data</h2>
 
 Octane renders eagerly: a component invocation can execute setup code, apply
@@ -188,8 +234,9 @@ cascade cause.
 With profiling omitted or false, the compiler emits no component or hook
 metadata and the bundler specializes the runtime with profiling disabled. When
 application code does not explicitly import `octane/profiling`, normal
-production bundles can remove the recorder, track labels, clock reads, and
-profiling allocations.
+production bundles can remove the recorder, track labels, clock reads,
+counters, and profiling allocations. Unminified development output keeps the
+disabled branches as dead code, but they never run.
 
 Profile builds keep a bounded buffer. By default events contain project-relative
 or package-relative source paths, component and hook names, timing, and outcome
