@@ -1382,7 +1382,10 @@ announce the transition rather than complete it: `useTransition` and
 component that raises `isPending` also holds the transition's own update, both
 render together in that microtask flush, because Octane keeps one live tree. An
 urgent update to a component whose transition is waiting renders it in the
-microtask flush. `flushSync` and `act()` drain both priorities.
+microtask flush. `flushSync` and `act()` drain both priorities. An Action pending
+cue on its own does not start native View Transition capture. Explicit transition
+work keeps its capture when it reaches the render queue, including state in the
+same component as the cue.
 
 `useDeferredValue`'s deferred render also runs in a later host task. Urgent updates
 that arrive before the task runs only change the value it renders, so a fast typist's

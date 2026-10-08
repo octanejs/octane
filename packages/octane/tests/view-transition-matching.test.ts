@@ -520,6 +520,10 @@ export function Counter(props) @{
 	it('completes pending layout before a synchronous root replacement mutates its DOM', async () => {
 		const fonts = holdFonts();
 		const observations: string[] = [];
+		let enteredNative!: () => void;
+		const nativeStarted = new Promise<void>((resolve) => {
+			enteredNative = resolve;
+		});
 		const props = {
 			events: [],
 			requestFont: fonts.request,
@@ -527,6 +531,7 @@ export function Counter(props) @{
 		};
 		(document as any).startViewTransition = (input: { update: () => unknown }) => {
 			const ready = Promise.resolve(input.update());
+			enteredNative();
 			return { ready, finished: ready, skipTransition() {} };
 		};
 		try {
@@ -534,8 +539,11 @@ export function Counter(props) @{
 			observations.length = 0;
 			await act(async () => {
 				startTransition(() => root.render(LayoutReadinessApp, { ...props, text: 'after' }));
-				await nextTask();
+				// The transition now starts in a host task. A timer can win that race.
+				await nativeStarted;
+				expect(observations).toEqual([]);
 				root.render(MatchingApp, { text: 'replacement', transition: {} });
+				expect(observations).toEqual(['after:after']);
 				fonts.release();
 			});
 			expect(observations).toEqual(['after:after']);
