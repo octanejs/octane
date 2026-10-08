@@ -24,6 +24,20 @@ describe('error decoder', () => {
 		);
 	});
 
+	it('adds catalog guidance below the message only for codes that carry it', async () => {
+		const translated = await renderRoute('/errors/318');
+		expect(translated.container.querySelector('.error-message')?.textContent).toBe(
+			'DOM bindings cannot adopt a mismatched static element topology.',
+		);
+		expect(translated.container.querySelector('.error-note')?.textContent).toContain(
+			'translate="no"',
+		);
+		cleanup();
+
+		const plain = await renderRoute('/errors/28');
+		expect(plain.container.querySelector('.error-note')).toBeNull();
+	});
+
 	it('preserves opaque and repeated production-error arguments', () => {
 		const parsed = parseWebsiteSearch(
 			'?args%5B%5D=%22quoted%22&args%5B%5D=null&args%5B%5D=true&note=01',

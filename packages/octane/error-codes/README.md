@@ -12,6 +12,8 @@ production. The numbers are unrelated to React's error codes.
 - Changing a published message or its argument shape requires a new code.
 - Keep retired entries in the catalog with `"status": "retired"` so deployed
   error URLs remain decodable.
+- An optional `note` adds guidance to the website decoder only. It never reaches
+  a runtime bundle, so it may change without a new code.
 - Compiler diagnostics, user-thrown errors, and errors in other runtime surfaces
   do not belong in this initial catalog tranche.
 

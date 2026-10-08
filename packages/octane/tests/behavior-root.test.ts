@@ -4815,6 +4815,117 @@ export function TreeHydration(props) @{
 		// This dev/prod matrix compiles and exercises hundreds of fresh fixtures.
 	}, 15_000);
 
+	describe('a page translated by the browser', () => {
+		const source = `export function Notice(props) @{ 'use dom bindings';
+  <section>
+    <p>Statut : {props.status as string} maintenant</p>
+    @if (props.open) {
+      <>Ouvert par {props.owner as string}</>
+    }
+  </section>
+}`;
+		const english: Record<string, string> = {
+			'Statut : ': 'Status: ',
+			' maintenant': ' now',
+			'Ouvert par ': 'Opened by ',
+			prête: 'ready',
+			envoyée: 'sent',
+		};
+
+		// Chrome Translate replaces each translated Text node with nested <font> wrappers.
+		function translate(root: Node): void {
+			const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+			const texts: Text[] = [];
+			while (walker.nextNode())
+				if ((walker.currentNode as Text).data.trim()) texts.push(walker.currentNode as Text);
+			for (const text of texts) {
+				const outer = document.createElement('font');
+				const inner = outer.appendChild(document.createElement('font'));
+				outer.style.verticalAlign = inner.style.verticalAlign = 'inherit';
+				inner.textContent = english[text.data] ?? text.data;
+				text.replaceWith(outer);
+			}
+		}
+
+		function notice(dev: boolean) {
+			const fixture = authoredPresentation(
+				'Notice',
+				{ status: 'prête', open: true, owner: 'Ana' },
+				dev,
+				source,
+			);
+			container.innerHTML = fixture.html;
+			const section = container.querySelector('section')!;
+			return { fixture, section, paragraph: section.querySelector('p')! };
+		}
+
+		for (const dev of [false, true]) {
+			const mode = dev ? 'dev' : 'prod';
+
+			it(`adopts translated text as it is and replaces only a changed value (${mode})`, () => {
+				const { fixture, section, paragraph } = notice(dev);
+				translate(section);
+				const translated = section.innerHTML;
+				const binding = fixture.attach(section, fixture.state);
+				try {
+					// Writing the source text back would flash the untranslated page.
+					expect(section.innerHTML).toBe(translated);
+					fixture.publish({ owner: 'Ana' });
+					expect(section.innerHTML).toBe(translated);
+					fixture.publish({ status: 'envoyée' });
+					expect(paragraph.textContent).toBe('Status: envoyée now');
+					expect(section.textContent).toBe('Status: envoyée nowOpened by Ana');
+					fixture.publish({ owner: 'Bea' });
+					expect(section.textContent).toBe('Status: envoyée nowOpened by Bea');
+					expect(section.querySelector('p')).toBe(paragraph);
+					fixture.publish({ open: false });
+					expect(section.textContent).toBe('Status: envoyée now');
+					fixture.publish({ open: true, owner: 'Cy' });
+					expect(section.textContent).toBe('Status: envoyée nowOuvert par Cy');
+				} finally {
+					binding.dispose();
+				}
+			});
+
+			it(`keeps updating text that was translated after adoption (${mode})`, () => {
+				const { fixture, section, paragraph } = notice(dev);
+				const binding = fixture.attach(section, fixture.state);
+				try {
+					translate(section);
+					const translated = section.innerHTML;
+					fixture.publish({ owner: 'Ana' });
+					expect(section.innerHTML).toBe(translated);
+					fixture.publish({ status: 'envoyée' });
+					expect(paragraph.textContent).toBe('Status: envoyée now');
+					fixture.publish({ owner: 'Bea' });
+					expect(section.textContent).toBe('Status: envoyée nowOpened by Bea');
+					// The translator also rewrites the replacement text.
+					translate(section);
+					const retranslated = section.innerHTML;
+					fixture.publish({ owner: 'Bea' });
+					expect(section.innerHTML).toBe(retranslated);
+					fixture.publish({ status: 'prête' });
+					expect(section.textContent).toBe('Status: prête nowOpened by Bea');
+					fixture.publish({ open: false });
+					expect(section.textContent).toBe('Status: prête now');
+					fixture.publish({ open: true, owner: 'Cy' });
+					expect(section.textContent).toBe('Status: prête nowOuvert par Cy');
+				} finally {
+					binding.dispose();
+				}
+			});
+		}
+
+		// Both the static text and the bound status text, in the same paragraph.
+		it.each([0, 2])('still rejects other content in place of server text (child %i)', (child) => {
+			const { fixture, section, paragraph } = notice(false);
+			paragraph.childNodes[child]!.replaceWith(document.createElement('span'));
+			const retained = section.innerHTML;
+			expect(() => fixture.attach(section, fixture.state)).toThrow(/mismatch/i);
+			expect(section.innerHTML).toBe(retained);
+		});
+	});
+
 	it('preserves externally owned DOM when disposed by default', async () => {
 		container.innerHTML = '<section data-owner="stream"><button>Action</button></section>';
 		const section = container.firstElementChild!;

@@ -5,6 +5,8 @@ export interface ErrorCodeEntry {
 	message: string;
 	argumentCount: number;
 	status: 'active' | 'retired';
+	/** Website-only guidance; never part of the runtime message. */
+	note?: string;
 }
 
 interface ErrorCodeCatalog {
@@ -15,6 +17,7 @@ interface ErrorCodeCatalog {
 			message: string;
 			argumentCount: number;
 			status: 'active' | 'retired';
+			note?: string;
 		}
 	>;
 }
