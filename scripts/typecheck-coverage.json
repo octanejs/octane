@@ -8,14 +8,7 @@
     "packages/xyflow/tsconfig.json"
   ],
   "privateExceptions": [],
-  "publishedExceptions": [
-    {
-      "package": "@octanejs/drei",
-      "projects": ["packages/drei/tsconfig.json", "packages/drei/typetests/tsconfig.json"],
-      "reason": "octane/compiler/volar virtual TSX passes a keyed @for row's `key` as a component prop (Clone.three.tsrx), types a <Suspense> without children as missing them (Example.three.tsrx), and passes an undefined ref to ThreeRef (Sky.three.tsrx); none of these errors has a source location.",
-      "expires": "2026-10-31"
-    }
-  ],
+  "publishedExceptions": [],
   "materializedProjects": [
     {
       "project": "packages/floating-ui/typetests/tsconfig.adapted.json",
