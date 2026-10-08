@@ -1,12 +1,15 @@
 // @vitest-environment node
 
 import { resolve, sep } from 'node:path';
-import { build } from 'esbuild';
+import { build, type Plugin } from 'esbuild';
 import { JSDOM } from 'jsdom';
 import { createScope } from 'octane/signals';
 import { describe, expect, it } from 'vitest';
+import { createOctaneCompiler } from '../src/compiler/bundler.js';
+import type { BindingMountTarget } from '../src/dom-binding-program.js';
+import type { BindingHandle, BindingSource } from '../src/dom-bindings.js';
 
-async function bundleConsumer(contents: string) {
+async function bundleConsumer(contents: string, plugins: Plugin[] = []) {
 	const result = await build({
 		stdin: {
 			contents,
@@ -14,6 +17,7 @@ async function bundleConsumer(contents: string) {
 			resolveDir: resolve(import.meta.dirname, '..'),
 			sourcefile: 'behavior-consumer.ts',
 		},
+		plugins,
 		bundle: true,
 		define: { 'process.env.NODE_ENV': JSON.stringify('production') },
 		format: 'esm',
@@ -55,7 +59,9 @@ describe('production behavior-root entry points', () => {
 			);
 			expect(
 				bundle.inputs.some((input) =>
-					/\/packages\/octane\/src\/(?:runtime(?:\.server)?\.ts|compiler\/|server\/)/.test(input),
+					/(?:^|\/)packages\/octane\/src\/(?:runtime(?:\.server)?\.ts|compiler\/|server\/)/.test(
+						input,
+					),
 				),
 			).toBe(false);
 
@@ -73,6 +79,90 @@ describe('production behavior-root entry points', () => {
 			).toEqual([]);
 		});
 	}
+
+	it('activates a recursive binding view without retaining a renderer', async () => {
+		const packageRoot = resolve(import.meta.dirname, '..');
+		const compiler = createOctaneCompiler({ root: packageRoot, hmr: false, dev: false });
+		const view = `type Branch = { key: string; label: string; children: readonly Branch[] };
+export function Tree({ node }: { node: Branch }) @{
+  'use dom bindings';
+  <section data-key={node.key}>
+    <span>{node.label as string}</span>
+    @for (const child of node.children; key child.key) { <Tree node={child} /> }
+  </section>
+}`;
+		const entry = `import { mountBindings } from 'octane/behavior';
+import { Tree } from './RecursiveTree.tsrx';
+export function mount(target, source) { return mountBindings(target, Tree, source); }`;
+		const tsrx: Plugin = {
+			name: 'compiled-recursive-view',
+			setup(bundler) {
+				bundler.onResolve({ filter: /^\.\/RecursiveTree\.tsrx(?:\?.*)?$/ }, ({ path }) => ({
+					path,
+					namespace: 'recursive-view',
+				}));
+				bundler.onLoad({ filter: /.*/, namespace: 'recursive-view' }, ({ path }) => ({
+					contents: compiler.transform(
+						view,
+						resolve(packageRoot, 'RecursiveTree.tsrx') + path.slice('./RecursiveTree.tsrx'.length),
+						{ environment: 'client' },
+					)!.code,
+					loader: 'js',
+					resolveDir: packageRoot,
+				}));
+			},
+		};
+		const bundle = await bundleConsumer(
+			compiler.transform(entry, resolve(packageRoot, 'recursive-entry.tsrx'), {
+				environment: 'client',
+			})!.code,
+			[tsrx],
+		);
+		expect(
+			bundle.resolvedInputs.filter((input) =>
+				/(?:^|\/)packages\/octane\/src\/(?:runtime(?:\.server)?\.ts|compiler\/|server\/|internal\/)/.test(
+					input,
+				),
+			),
+		).toEqual([]);
+		const { mount } = (await import(
+			`data:text/javascript;base64,${Buffer.from(bundle.contents).toString('base64')}`
+		)) as {
+			mount(target: BindingMountTarget, source: BindingSource<unknown>): BindingHandle;
+		};
+		type Branch = { key: string; label: string; children: Branch[] };
+		let snapshot: { node: Branch } = {
+			node: { key: 'root', label: 'Root', children: [{ key: 'a', label: 'A', children: [] }] },
+		};
+		const listeners = new Set<() => void>();
+		const document = new JSDOM('<main></main>').window.document;
+		const parent = document.querySelector('main')!;
+		const handle = mount(
+			{ parent },
+			{
+				getSnapshot: () => snapshot,
+				subscribe(notify) {
+					listeners.add(notify);
+					return () => listeners.delete(notify);
+				},
+			},
+		);
+		const labels = () => [...parent.querySelectorAll('span')].map((node) => node.textContent);
+		expect(labels()).toEqual(['Root', 'A']);
+		const a = parent.querySelector('section[data-key="a"]');
+		snapshot = {
+			node: {
+				key: 'root',
+				label: 'Root',
+				children: [{ key: 'a', label: 'A', children: [{ key: 'a1', label: 'A1', children: [] }] }],
+			},
+		};
+		for (const notify of listeners) notify();
+		expect(labels()).toEqual(['Root', 'A', 'A1']);
+		expect(parent.querySelector('section[data-key="a"]')).toBe(a);
+		handle.dispose();
+		expect(listeners.size).toBe(0);
+	});
 
 	it('keeps ordinary roots and standalone signal predicates free of unrelated ownership', async () => {
 		const bundle = await bundleConsumer("export { createRoot } from 'octane';");

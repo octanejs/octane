@@ -1593,7 +1593,7 @@ function projectProgram(ast, plan, filename, lexical) {
 			...plan.dependencies.flatMap((node) =>
 				node.specifiers.map((specifier) => specifier.local.name),
 			),
-			...plan.hoists.flatMap((node) => node.declarations.map((item) => item.id.name)),
+			...plan.hoists.flatMap((node) => node.declarations?.map((item) => item.id.name) ?? []),
 		]);
 		const allocate = (prefix) => {
 			let name = prefix;
@@ -1748,7 +1748,12 @@ function projectProgram(ast, plan, filename, lexical) {
 					b.export_default(
 						b.object([
 							b.prop('init', b.id('id'), b.literal(plan.id)),
-							b.prop('init', b.id('root'), root ?? plan.root),
+							b.prop(
+								'init',
+								b.id('root'),
+								root ??
+									(plan.descriptor === null ? plan.root : b.member(b.id(plan.descriptor), 'root')),
+							),
 							...(plan.prepareProps
 								? [b.prop('init', b.id('prepareProps'), plan.prepareProps)]
 								: []),
@@ -2241,8 +2246,16 @@ export function prepareDomBindings(ast, source, filename, selectedExport, helper
 			return fn.type === 'FunctionDeclaration' && fn.id ? [[fn.id.name, fn]] : [];
 		}),
 	);
-	const inProgress = new Set();
-	const programPlans = new Map();
+	// Local child views may recurse into each other, so programs are planned depth
+	// first with Tarjan's bookkeeping. A view that enters one still open joins
+	// its strongly connected component, which completes as one unit once the
+	// first of its members to be entered finishes.
+	const visits = new Map();
+	const openVisits = [];
+	const planning = [];
+	let nextVisit = 0;
+	// Local child views each view enters on every path, with the first such call.
+	const everyPathCalls = new Map();
 	const programNames = new Set(imports.keys());
 	const localConstants = new Map();
 	walk(ast, (node) => {
@@ -2328,14 +2341,102 @@ export function prepareDomBindings(ast, source, filename, selectedExport, helper
 				lexical.rootScope
 		);
 	};
+	// Every member of a recursive unit enters every other member, so each one
+	// needs the whole unit's capabilities, imports and hoists. Each member's
+	// descriptor is declared before any hoist that enters it; the roots, which
+	// enter each other, are attached once every descriptor exists.
+	const completeCycle = (members) => {
+		const plans = members.map((member) => member.plan);
+		for (const capability of [
+			'signals',
+			'controls',
+			'hostOperations',
+			'initialOperations',
+			'styles',
+			'projectionsEnabled',
+			'lists',
+			'tries',
+			'mounts',
+		]) {
+			const value = plans.some((plan) => plan[capability]);
+			for (const plan of plans) plan[capability] = value;
+		}
+		// A control anywhere in the unit rules out structural handoff for each member.
+		for (const plan of plans) plan.structural &&= !plan.controls;
+		for (const member of members) member.finish();
+		const dependencies = [...new Set(plans.flatMap((plan) => plan.dependencies))];
+		const expressions = [...new Set(plans.flatMap((plan) => plan.expressions))];
+		const childPrograms = new Set(plans.flatMap((plan) => [...plan.childPrograms]));
+		const hoists = [
+			...members.map((member) =>
+				inheritHookMemoOrigin(
+					b.const(
+						b.id(member.descriptor),
+						b.object([
+							b.prop('init', b.id('id'), b.literal(member.plan.id)),
+							b.prop('init', b.id('root'), b.literal(null)),
+							...(member.plan.prepareProps
+								? [b.prop('init', b.id('prepareProps'), member.plan.prepareProps)]
+								: []),
+						]),
+					),
+					member.fn,
+				),
+			),
+			...new Set(plans.flatMap((plan) => plan.hoists)),
+			...members.map((member) =>
+				inheritHookMemoOrigin(
+					b.stmt(b.assignment('=', b.member(b.id(member.descriptor), 'root'), member.plan.root)),
+					member.fn,
+				),
+			),
+		];
+		for (const member of members)
+			Object.assign(member.plan, {
+				dependencies,
+				expressions,
+				childPrograms,
+				hoists,
+				descriptor: member.descriptor,
+			});
+	};
 	const programFor = (fn, render, props = null, annotationsOnly = false, fixedProps = null) => {
+		// Specializing a recursive call could fold a new primitive at every depth,
+		// as in `depth={depth + 1}`, so recursion uses the generic program.
+		if (fixedProps?.length && planning.some((visit) => visit.fn === fn)) fixedProps = null;
+		// Caller prop names shape a plan only through its rest parameter.
+		const shape = fn.params[0]?.properties?.some((property) => property.type === 'RestElement')
+			? props
+			: null;
 		const key = annotationsOnly
 			? 'annotations'
-			: JSON.stringify(fixedProps?.length ? [props, fixedProps] : props);
-		if (programPlans.get(fn)?.has(key)) return programPlans.get(fn).get(key);
-		if (inProgress.has(fn))
-			error(filename, fn, 'recursive binding child programs are not supported');
-		inProgress.add(fn);
+			: JSON.stringify(fixedProps?.length ? [shape, fixedProps] : shape);
+		const known = visits.get(fn)?.get(key);
+		if (known) {
+			// An annotation pass merges nothing from its children, so a recursive one
+			// receives its own still-open pass (null) and carries on.
+			if (annotationsOnly || !known.onStack) return known.plan;
+			const caller = planning.at(-1);
+			caller.low = Math.min(caller.low, known.index);
+			known.descriptor ??= allocateProgramName('_bindingChild');
+			return { cycle: known.descriptor };
+		}
+		const visit = {
+			fn,
+			index: nextVisit,
+			low: nextVisit,
+			onStack: !annotationsOnly,
+			descriptor: null,
+			plan: null,
+			finish: null,
+		};
+		nextVisit++;
+		if (!visits.has(fn)) visits.set(fn, new Map());
+		visits.get(fn).set(key, visit);
+		if (!annotationsOnly) {
+			openVisits.push(visit);
+			planning.push(visit);
+		}
 		const rest = bindingRestSpreads(fn, render, props, lexical, filename);
 		const setup = statements(fn)
 			.filter((statement) => statement.type === 'VariableDeclaration')
@@ -2484,17 +2585,20 @@ export function prepareDomBindings(ast, source, filename, selectedExport, helper
 				});
 				return !renderable;
 			},
-			localProgram: (name, props, annotationsOnly = false, fixedProps = null) => {
+			localProgram: (name, props, annotationsOnly = false, fixedProps = null, everyPath = null) => {
 				const child = localFunctions.get(name);
-				return child
-					? programFor(
-							child,
-							bindingRender(child, filename, false),
-							props,
-							annotationsOnly,
-							fixedProps,
-						)
-					: null;
+				if (!child) return null;
+				if (everyPath !== null) {
+					if (!everyPathCalls.has(fn)) everyPathCalls.set(fn, new Map());
+					if (!everyPathCalls.get(fn).has(child)) everyPathCalls.get(fn).set(child, everyPath);
+				}
+				return programFor(
+					child,
+					bindingRender(child, filename, false),
+					props,
+					annotationsOnly,
+					fixedProps,
+				);
 			},
 			nativePlan: (element, namespace, ancestors) =>
 				planView(fn, filename, source, imports, lexical, { element, namespace, ancestors }),
@@ -2532,88 +2636,112 @@ export function prepareDomBindings(ast, source, filename, selectedExport, helper
 			},
 		};
 		const plan = planBindingProgram(fn, rest.render, context);
-		inProgress.delete(fn);
-		if (!programPlans.has(fn)) programPlans.set(fn, new Map());
-		programPlans.get(fn).set(key, plan);
-		const authored =
-			!annotationsOnly && rest.hasRest
-				? planBindingProgram(fn, render, { ...context, annotationsOnly: true })
-				: plan;
-		if (annotationsOnly) {
-			const structuralPresentation =
-				!rest.hasRest && plan.structural && fn.body.type === 'JSXCodeBlock';
+		visit.plan = plan;
+		// Handoff proof reads the capabilities of every entered child, so a
+		// recursive member finishes only once its whole unit has completed.
+		const finish = () => {
+			const authored =
+				!annotationsOnly && rest.hasRest
+					? planBindingProgram(fn, render, { ...context, annotationsOnly: true })
+					: plan;
+			if (annotationsOnly) {
+				const structuralPresentation =
+					!rest.hasRest && plan.structural && fn.body.type === 'JSXCodeBlock';
+				replacements.set(fn, {
+					...mapCow(fn, authored.replacements),
+					_octaneBindingView: { id: plan.id },
+					_octanePresentationHydration: {
+						id: plan.id,
+						supported: structuralPresentation,
+						...(structuralPresentation ? { structural: true } : {}),
+						...(rest.hasRest && fn.body.type === 'JSXCodeBlock'
+							? { structural: true, conditionalRest: true }
+							: {}),
+					},
+				});
+				return;
+			}
+			const field = (name) =>
+				plan.root.properties.find((property) => property.key.name === name)?.value;
+			const fixedPresentation =
+				!rest.hasRest &&
+				fn.body.type === 'JSXCodeBlock' &&
+				!plan.controls &&
+				field('regions').elements.length === 0 &&
+				field('bindings').elements.every((binding) => binding.elements[1].value !== 'text');
+			const conditionalRest =
+				rest.hasRest && rest.conditional && plan.structural && fn.body.type === 'JSXCodeBlock';
+			plan.structural &&= !rest.hasRest && fn.body.type === 'JSXCodeBlock';
+			const structuralPresentation = !fixedPresentation && plan.structural;
+			let createHandoff;
+			if (structuralPresentation || conditionalRest) {
+				createHandoff = allocateProgramName('_bindingHandoff');
+				plan.dependencies.push(
+					inheritHookMemoOrigin(
+						b.imports(
+							[['__createStructuralBindingHandoff', createHandoff]],
+							'octane/dom-binding-program',
+						),
+						fn,
+					),
+				);
+			}
+			plan.root = {
+				...plan.root,
+				properties: [
+					...plan.root.properties,
+					b.prop(
+						'init',
+						b.id('handoff'),
+						b.literal(structuralPresentation ? 'structural' : fixedPresentation),
+					),
+					...(createHandoff ? [b.prop('init', b.id('createHandoff'), b.id(createHandoff))] : []),
+					// A receipt is not a lease capability. The runtime must explicitly
+					// validate the caller/range and prepare its host writers before takeover.
+					...(rest.hasRest && props !== null
+						? [b.prop('init', b.id('closedProps'), b.array(props.map((name) => b.literal(name))))]
+						: []),
+					...(conditionalRest ? [b.prop('init', b.id('conditionalRest'), b.literal(true))] : []),
+				],
+			};
 			replacements.set(fn, {
 				...mapCow(fn, authored.replacements),
 				_octaneBindingView: { id: plan.id },
+				// Normal renderer ownership transfer is narrower than binding-program
+				// adoption. Keep its proof separate from the existing SSR view stamp.
 				_octanePresentationHydration: {
 					id: plan.id,
-					supported: structuralPresentation,
-					...(structuralPresentation ? { structural: true } : {}),
-					...(rest.hasRest && fn.body.type === 'JSXCodeBlock'
-						? { structural: true, conditionalRest: true }
+					supported: fixedPresentation || structuralPresentation,
+					...(field('nodes').elements.some((node) => node.elements[5]?.value === 'value')
+						? { nativeControl: true }
 						: {}),
+					...(structuralPresentation || conditionalRest ? { structural: true } : {}),
+					...(conditionalRest ? { conditionalRest: true } : {}),
 				},
 			});
+		};
+		if (annotationsOnly) {
+			finish();
 			return plan;
 		}
-		const field = (name) =>
-			plan.root.properties.find((property) => property.key.name === name)?.value;
-		const fixedPresentation =
-			!rest.hasRest &&
-			fn.body.type === 'JSXCodeBlock' &&
-			!plan.controls &&
-			field('regions').elements.length === 0 &&
-			field('bindings').elements.every((binding) => binding.elements[1].value !== 'text');
-		const conditionalRest =
-			rest.hasRest && rest.conditional && plan.structural && fn.body.type === 'JSXCodeBlock';
-		plan.structural &&= !rest.hasRest && fn.body.type === 'JSXCodeBlock';
-		const structuralPresentation = !fixedPresentation && plan.structural;
-		let createHandoff;
-		if (structuralPresentation || conditionalRest) {
-			createHandoff = allocateProgramName('_bindingHandoff');
-			plan.dependencies.push(
-				inheritHookMemoOrigin(
-					b.imports(
-						[['__createStructuralBindingHandoff', createHandoff]],
-						'octane/dom-binding-program',
-					),
-					fn,
-				),
-			);
+		planning.pop();
+		const caller = planning.at(-1);
+		if (caller) caller.low = Math.min(caller.low, visit.low);
+		if (visit.low < visit.index) {
+			// This view entered an earlier open view and completes with its unit.
+			visit.finish = finish;
+			visit.descriptor ??= allocateProgramName('_bindingChild');
+			return { cycle: visit.descriptor };
 		}
-		plan.root = {
-			...plan.root,
-			properties: [
-				...plan.root.properties,
-				b.prop(
-					'init',
-					b.id('handoff'),
-					b.literal(structuralPresentation ? 'structural' : fixedPresentation),
-				),
-				...(createHandoff ? [b.prop('init', b.id('createHandoff'), b.id(createHandoff))] : []),
-				// A receipt is not a lease capability. The runtime must explicitly
-				// validate the caller/range and prepare its host writers before takeover.
-				...(rest.hasRest && props !== null
-					? [b.prop('init', b.id('closedProps'), b.array(props.map((name) => b.literal(name))))]
-					: []),
-				...(conditionalRest ? [b.prop('init', b.id('conditionalRest'), b.literal(true))] : []),
-			],
-		};
-		replacements.set(fn, {
-			...mapCow(fn, authored.replacements),
-			_octaneBindingView: { id: plan.id },
-			// Normal renderer ownership transfer is narrower than binding-program
-			// adoption. Keep its proof separate from the existing SSR view stamp.
-			_octanePresentationHydration: {
-				id: plan.id,
-				supported: fixedPresentation || structuralPresentation,
-				...(field('nodes').elements.some((node) => node.elements[5]?.value === 'value')
-					? { nativeControl: true }
-					: {}),
-				...(structuralPresentation || conditionalRest ? { structural: true } : {}),
-				...(conditionalRest ? { conditionalRest: true } : {}),
-			},
-		});
+		const members = openVisits.splice(openVisits.indexOf(visit));
+		for (const member of members) member.onStack = false;
+		// Only a recursive unit entered its first member while that member was open.
+		if (visit.descriptor === null) {
+			finish();
+			return plan;
+		}
+		visit.finish = finish;
+		completeCycle(members);
 		return plan;
 	};
 	walk(ast, (node, parent) => {
@@ -2711,6 +2839,29 @@ export function prepareDomBindings(ast, source, filename, selectedExport, helper
 				},
 			});
 	});
+	// Recursion that enters a view again on every path never ends, in the
+	// browser or on the server. Each such cycle must pass through a branch,
+	// list or caller slot.
+	const entered = new Map();
+	const path = [];
+	const assertRecursionEnds = (fn) => {
+		entered.set(fn, false);
+		path.push(fn);
+		for (const [child, call] of everyPathCalls.get(fn) ?? []) {
+			if (entered.get(child) === false) {
+				const cycle = [...path.slice(path.indexOf(child)), child].map((view) => view.id.name);
+				error(
+					filename,
+					call,
+					`binding view ${child.id.name} renders itself on every path (${cycle.join(' → ')}); place the recursive call inside @if, @for or @try`,
+				);
+			}
+			if (!entered.has(child)) assertRecursionEnds(child);
+		}
+		path.pop();
+		entered.set(fn, true);
+	};
+	for (const fn of everyPathCalls.keys()) if (!entered.has(fn)) assertRecursionEnds(fn);
 	if (selectedExport !== null) {
 		const plan = plans.get(selectedExport);
 		if (!plan)
@@ -2738,7 +2889,7 @@ export function prepareDomBindings(ast, source, filename, selectedExport, helper
 	if (helpers.collectConstants) {
 		const names = new Set();
 		for (const fn of new Set(
-			[...plans.values()].map((plan) => plan.fn).concat([...programPlans.keys()]),
+			[...plans.values()].map((plan) => plan.fn).concat([...visits.keys()]),
 		)) {
 			// Open rest-prop views only need annotations in the ordinary renderer;
 			// their authored body still identifies the shared module constants.

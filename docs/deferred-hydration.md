@@ -649,6 +649,33 @@ diagnostic, not a renderer fallback. Structural programs own
 only their declared regions; fixed programs update properties without replacing
 nodes.
 
+Child composition may recurse. A view can render itself, or same-module views
+can render each other, so a tree's depth comes from its data:
+
+```tsrx
+type Branch = { key: string; label: string; children: readonly Branch[] };
+
+export function Tree({ node }: { node: Branch }) @{
+	'use dom bindings';
+	<section>
+		<span>{node.label as string}</span>
+		@for (const child of node.children; key child.key) {
+			<Tree node={child} />
+		}
+	</section>
+}
+```
+
+The compiler emits one program for the recursive views and creates an instance
+for each level the data reaches. Recursion must be able to end on a branch or an
+empty list. The compiler rejects a view that renders itself on every path, such
+as a recursive call outside any `@if`, `@for` or `@try`, and names the cycle in
+the error. Each instance owns its own text, keyed items,
+handlers, effects and `@try` arms, and removing a branch retires the instances
+beneath it. A recursive call does not specialize fixed primitive props, so a
+`depth={depth + 1}` prop never unrolls the recursion at compile time. Recursion
+is supported among views declared in the same module.
+
 Declare scalar text explicitly when its type is not evident in the template: `<span>{message$ as string}</span>` keeps a string-valued signal directly bound, while `<span>{(status?.message ?? '') as string}</span>` marks an ordinary string projection. The type checker checks the signal's value for this text intent; it does not require an application-side read or a cast through `unknown`. Keep shared control labels in typed label props rather than opaque renderable child slots when the view needs primitive-text handoff.
 
 Binding views may use flat destructured props, including aliases, primitive literal defaults, and a final rest binding: `function Action({ label: text = 'Send', ...props }) @{ ... }`. Destructuring runs once for each prepared snapshot, so projections and event handlers share the same captured values and rest object. Defaults apply only to `undefined`, not `null`. Nested or computed patterns and nonliteral defaults fail extraction. A rendered `children` slot may be aliased or read through rest when it was not excluded; a non-null default for that slot is unsupported. A rest binding does not authorize an arbitrary native JSX spread: the existing spread restrictions still apply.
