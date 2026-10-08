@@ -86,6 +86,52 @@ function App(): string {
 	return '<p>shell</p>';
 }
 
+it('handles a rejected server result while the consumer delays its first transport read', async () => {
+	const stream = createStreamedRendererFrameStream(
+		createStreamedSignalResultFrames(identity, Promise.reject(new Error('private server detail'))),
+	);
+	// A paced reader can yield before pulling this demand-driven stream. The
+	// producer owns the result already, so its rejection must not escape then.
+	await new Promise((resolve) => setTimeout(resolve, 0));
+	const output = await text(stream);
+	const frames = output
+		.trim()
+		.split('\n')
+		.map((line) => JSON.parse(line));
+	expect(frames.map((frame) => frame.kind)).toEqual(['open', 'error']);
+	expect(frames[1]).toMatchObject({ code: 'SERVER_RESULT_FAILED' });
+	expect(output).not.toContain('private server detail');
+});
+
+it('observes a result thenable once while leaving its iterator demand-driven', async () => {
+	let assimilations = 0;
+	let acquisitions = 0;
+	const upstream = idleUpstream();
+	const result = {
+		then(resolve: (value: AsyncIterable<string>) => void) {
+			assimilations++;
+			resolve({
+				[Symbol.asyncIterator]() {
+					acquisitions++;
+					return upstream.iterable[Symbol.asyncIterator]();
+				},
+			});
+		},
+	};
+	const frames = createStreamedSignalResultFrames(identity, result);
+	await new Promise((resolve) => setTimeout(resolve, 0));
+	expect(assimilations).toBe(1);
+	expect(acquisitions).toBe(0);
+	expect(upstream.state.nextCalls).toBe(0);
+	expect((await frames.next()).value).toMatchObject({ kind: 'open', resource: 'stream' });
+	expect(acquisitions).toBe(1);
+	expect(upstream.state.nextCalls).toBe(0);
+	expect((await frames.next()).value).toMatchObject({ kind: 'value' });
+	await frames.return(undefined);
+	expect(assimilations).toBe(1);
+	expect(upstream.state.returned).toBe(1);
+});
+
 it('returns an idle upstream iterator when the consumer returns the frame producer', async () => {
 	const upstream = idleUpstream();
 	const frames = createStreamedSignalResultFrames(identity, Promise.resolve(upstream.iterable));

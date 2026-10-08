@@ -1,3 +1,4 @@
+import { yieldForHostBudget } from '../host-budget.js';
 import { formatClientError } from '../error-codes.client.generated.js';
 import {
 	isStreamedRendererFrame,
@@ -60,6 +61,7 @@ function createDelivery(
 	receiver: StreamedDeliveryReceiver,
 	options: StreamedRendererDeliveryOptions,
 	delivered?: (frame: StreamedRendererFrame, disposition: StreamedFrameDisposition) => void,
+	admit?: () => Promise<void> | undefined,
 ) {
 	const maxFrameBytes = positiveLimit(options.maxFrameBytes, DEFAULT_MAX_FRAME_BYTES);
 	const maxPendingBytes = positiveLimit(options.maxPendingBytes, DEFAULT_PENDING_BYTES);
@@ -120,12 +122,12 @@ function createDelivery(
 				() => abort(new StreamedReceiverError('timeout', formatClientError(225))),
 				timeoutMs,
 			);
-			const work = previous
-				.catch(() => {})
-				.then(() => {
-					if (canceled !== undefined) throw canceled;
-					return receiver.receive(frame);
-				});
+			function receive(): Promise<StreamedFrameDisposition> {
+				if (canceled !== undefined) throw canceled;
+				const wait = admit?.();
+				return wait === undefined ? receiver.receive(frame) : wait.then(receive);
+			}
+			const work = previous.catch(() => {}).then(receive);
 			const delivery: Promise<void> = Promise.race([work, cancellation])
 				.then((disposition) => {
 					if (canceled !== undefined) throw canceled;
@@ -293,16 +295,22 @@ export async function readStreamedRendererResponse(
 	const reader = response.body.getReader();
 	const decoder = new TextDecoder('utf-8', { fatal: true });
 	const openResults = new Map<string, StreamFrameIdentity>();
-	const delivery = createDelivery(receiver, options, (frame, disposition) => {
-		if (disposition === 'stale' || frame.channel !== 'result') return;
-		const key = streamFrameIdentityKey(frame.identity);
-		if (frame.kind === 'open') openResults.set(key, frame.identity);
-		else if (frame.kind === 'complete' || frame.kind === 'error') openResults.delete(key);
-	});
+	const delivery = createDelivery(
+		receiver,
+		options,
+		(frame, disposition) => {
+			if (disposition === 'stale' || frame.channel !== 'result') return;
+			const key = streamFrameIdentityKey(frame.identity);
+			if (frame.kind === 'open') openResults.set(key, frame.identity);
+			else if (frame.kind === 'complete' || frame.kind === 'error') openResults.delete(key);
+		},
+		yieldForHostBudget,
+	);
 	let frameParts: Uint8Array[] = [];
 	let frameBytes = 0;
 	let totalBytes = 0;
 	let finished = false;
+	let aborted = false;
 	let failure: StreamedReceiverError | undefined;
 	function failOpenResults(error: StreamedReceiverError): boolean {
 		let failed = false;
@@ -313,6 +321,12 @@ export async function readStreamedRendererResponse(
 	}
 	const acceptLine = async (): Promise<void> => {
 		if (frameBytes === 0) return;
+		for (;;) {
+			if (aborted) throw failure;
+			const wait = yieldForHostBudget();
+			if (wait === undefined) break;
+			await wait;
+		}
 		const bytes =
 			frameParts.length === 1
 				? frameParts[0]
@@ -336,6 +350,7 @@ export async function readStreamedRendererResponse(
 
 	const abort = (): void => {
 		failure ??= new StreamedReceiverError('terminal', formatClientError(234));
+		aborted = true;
 		delivery.close(failure);
 		failOpenResults(failure);
 		void reader.cancel(options.signal?.reason).catch(() => {});
@@ -344,8 +359,13 @@ export async function readStreamedRendererResponse(
 	if (options.signal?.aborted) abort();
 	try {
 		for (;;) {
-			if (failure !== undefined && options.signal?.aborted) throw failure;
+			if (aborted) throw failure;
 			options.signal?.throwIfAborted();
+			const wait = yieldForHostBudget();
+			if (wait !== undefined) {
+				await wait;
+				continue;
+			}
 			// Local delivery backpressure has its own bounded wait. Only time
 			// spent waiting for the transport belongs to the response deadline.
 			const timer = setTimeout(() => {

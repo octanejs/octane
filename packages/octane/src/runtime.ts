@@ -109,12 +109,22 @@ import {
 	textareaChildText,
 } from './shared-value-helpers.js';
 import {
+	__profileArm,
 	__profileBail,
 	__profileBeginRender,
+	__profileBlockCreated,
+	__profileBlockUnmounted,
+	__profileBoundary,
+	__profileCaptureDiscarded,
 	__profileComponentSource,
+	__profileCounters,
+	__profileDrain,
 	__profileEndRender,
 	__profileHasComponentMetadata,
+	__profileJournalRolledBack,
 	__profileResolveHook,
+	__profileRootCommitted,
+	__profileRootRolledBack,
 	__profileSchedule,
 	__profileTrackComponent,
 	__profileGetComponent,
@@ -313,6 +323,27 @@ export { EXTERNAL_HYDRATION_PROMISE, HYDRATION_RANGE_BOUNDARY };
 export { validateNativeReadWitness };
 
 declare const __OCTANE_PROFILE_ENABLED__: boolean;
+
+// Every counter below has a profile-guarded probe in this module. A counter a
+// renderer does not declare reads as absent rather than zero.
+if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__)
+	__profileCounters('dom', [
+		'component.render',
+		'component.renderSuspended',
+		'component.renderErrored',
+		'component.bailout',
+		'block.create',
+		'block.unmount',
+		'arm.keep',
+		'arm.swap',
+		'boundary.fallback',
+		'boundary.catch',
+		'scheduler.drain',
+		'commit.root',
+		'rollback.root',
+		'rollback.journalEntries',
+		'rollback.capture',
+	]);
 
 let PROFILE_COMPONENT_OVERRIDE: { target: Function; component: Function | null } | null = null;
 
@@ -4542,6 +4573,8 @@ function preserveRootCreatedDom(block: Block): void {
 function rollbackRootRender(transaction: RootRenderTransaction): void {
 	if (transaction.aborted) return;
 	transaction.aborted = true;
+	if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__)
+		__profileRootRolledBack();
 	if (
 		transaction.owner.retrySignalOwners !== undefined &&
 		transaction.owner.retrySignalOwners !== RETAINED_SIGNAL_OWNERS
@@ -4554,6 +4587,8 @@ function rollbackRootRender(transaction: RootRenderTransaction): void {
 		const owner = transaction.owner.current;
 		if (owner !== null) rollbackTransitionJournal(0, owner);
 		else {
+			if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__)
+				__profileJournalRolledBack(transaction.log.length / 4);
 			for (let i = transaction.log.length - 4; i >= 0; i -= 4) {
 				if (transaction.log[i] === JOURNAL_UNDO) transaction.log[i + 1]();
 				else if (transaction.log[i] === JOURNAL_CREATED)
@@ -4677,6 +4712,8 @@ function commitRootRenders(): void {
 				}
 				continue;
 			}
+			if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__)
+				__profileRootCommitted();
 			if (owner.transaction === transaction) owner.transaction = null;
 			if (transaction.capture.presentations !== undefined && STAGED_COMMIT_CAPTURE !== null) {
 				stagedOwnerGuard(STAGED_COMMIT_CAPTURE, owner);
@@ -5579,6 +5616,10 @@ function rollbackTransitionJournal(checkpoint: number, owner: Block): void {
 	if (checkpoint < 0) return;
 	const log = TRANSITION_JOURNAL;
 	if (log === null) return;
+	// Sample before replay truncates the log. A partial rollback starts at a
+	// nonzero checkpoint, so only the entries after it are undone.
+	if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__)
+		__profileJournalRolledBack((log.length - checkpoint) / 4);
 	const previousReplay = TRANSITION_JOURNAL_REPLAYING;
 	TRANSITION_JOURNAL_REPLAYING = true;
 	try {
@@ -5887,6 +5928,8 @@ type VtActivationKind = 'enter' | 'exit' | 'update' | 'share' | 'parent-enter' |
 interface ViewTransitionDriver {
 	addType(type: string): void;
 	routeFlush(): boolean;
+	markActionCue(): void;
+	endCue(): void;
 	shouldClearTypesAfterFlush(): boolean;
 	clearTypes(): void;
 	interrupt(): void;
@@ -6676,7 +6719,7 @@ function vtWaitForResources(
 				img.complete ||
 				img.loading === 'lazy' ||
 				img.onload !== null ||
-				(img as HTMLImageElement & { $$load?: unknown }).$$load != null
+				(img as HTMLImageElement & { $oload?: unknown }).$oload != null
 			)
 				continue;
 			const rect = img.getBoundingClientRect();
@@ -6935,13 +6978,44 @@ function vtInterrupt(): void {
 	vtInterruptOwners(null);
 }
 
-/** Is every queued block scheduled at transition priority? (Empty → false.) */
+// A pending Action cue keeps transition rendering semantics, but alone it
+// should publish before native capture. Only this optional capability owns it.
+let VT_ACTION_CUE = false;
+
+/** Is this an animation-eligible transition batch? */
 function queueAllTransition(): boolean {
 	if (QUEUE.length === 0) return false;
+	let cueOnly = VT_ACTION_CUE && NATIVE_TRANSITION_DRIVER?.hasWork() !== true;
 	for (let i = 0; i < QUEUE.length; i++) {
-		if (QUEUE[i].pendingMode !== 'transition') return false;
+		const block = QUEUE[i];
+		if (block.pendingMode !== 'transition') return false;
+		if (cueOnly && block.pending && !block.disposed) {
+			const owner = block.idState.renderOwner;
+			if (
+				(block.kind === 'root' && !block.mounted) ||
+				(owner?.request != null && owner.current !== null && QUEUE.includes(owner.current))
+			)
+				cueOnly = false;
+		}
 	}
-	return true;
+	if (!cueOnly) return true;
+	// The separate task queue can hold sibling work while this cue drains.
+	// Only receipts belonging to this drain make the cue share a capture.
+	for (const entries of FLUSHED_TRANSITION_UPDATES) {
+		for (const entry of entries) {
+			if (
+				!entry.superseded &&
+				!entry.block.disposed &&
+				entry.block.pending &&
+				QUEUE.includes(entry.block) &&
+				(entry.state !== undefined || entry.reducer !== undefined
+					? entry.slot.renderTransition === entry
+					: !Object.is(entry.slot.value, entry.baseValue))
+			)
+				return true;
+		}
+	}
+	return false;
 }
 
 function vtHasActiveHandles(): boolean {
@@ -7017,7 +7091,14 @@ function ensureViewTransitionDriver(): ViewTransitionDriver {
 			vtFlush();
 			return true;
 		},
+		markActionCue() {
+			if (!syncFlush && !inFlush) VT_ACTION_CUE = true;
+		},
+		endCue() {
+			VT_ACTION_CUE = false;
+		},
 		shouldClearTypesAfterFlush() {
+			VT_ACTION_CUE = false;
 			if (VT_PENDING_TYPES.length === 0) return false;
 			for (let i = 0; i < QUEUE.length; i++) {
 				if (QUEUE[i].pendingMode === 'transition') return true;
@@ -7906,6 +7987,8 @@ function drainQueue(): { err: any } | null {
 	let pendingError: { err: any; all: any[] } | null = null;
 	let activitiesToRehide: Set<ActivitySlot> | null = null;
 	const drainId = ++DRAIN_ID;
+	if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__)
+		__profileDrain();
 	if (QUEUE.length > 1) sortWaveByDepth(QUEUE, drainId);
 	// Iterate by index. A render may enqueue MORE work (e.g. a setState during
 	// render) — it appends to QUEUE, and `i < QUEUE.length` is re-evaluated every
@@ -9394,6 +9477,8 @@ export function flushSync<T>(fn: () => T): T {
 			}
 		} finally {
 			inFlush = false;
+			VIEW_TRANSITION_DRIVER?.endCue();
+			FLUSHED_TRANSITION_UPDATES.length = 0;
 			CURRENT_EFFECT_PHASE = effectPhase;
 			if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__)
 				__devtoolsNotifyFlush();
@@ -11672,6 +11757,8 @@ function createBlock(
 		extra,
 		outputHandler,
 	) as unknown as Block;
+	if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__)
+		__profileBlockCreated();
 	if (parentBlock !== null && block.idState.renderOwner === ROOT_RENDER_TRANSACTION?.owner) {
 		createdInRootRender(block);
 	}
@@ -12975,12 +13062,10 @@ function unmountBlock(block: Block, detachDom: boolean = true): void {
 
 function unmountBlockInner(block: Block, detachDom: boolean): void {
 	block.disposed = true;
-	if (
-		typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' &&
-		__OCTANE_PROFILE_ENABLED__ &&
-		block.kind === 'root'
-	)
-		__devtoolsUnregisterRoot(block);
+	if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__) {
+		__profileBlockUnmounted();
+		if (block.kind === 'root') __devtoolsUnregisterRoot(block);
+	}
 	const owner = block.idState.renderOwner;
 	if (owner?.current === block) {
 		owner.generation++;
@@ -19662,7 +19747,7 @@ export function useId(slot?: HookSlot): string {
 //    mono/polymorphic already.)
 //
 // 2. The runtime polls expando slots on nodes that mostly DON'T carry them —
-//    `$$<type>` handler bundles + `$$portalParent` on every ancestor of every
+//    `$o<type>` handler bundles + `$$portalParent` on every ancestor of every
 //    delegated event, `$$portalEnd`/`$$deoptKey` in the de-opt child scans,
 //    `$$ctrl`/`__oct_suppress` on form/hydration paths. A read of a property
 //    the object does NOT have walks the whole prototype chain and cannot be
@@ -27505,10 +27590,15 @@ function isEventKey(k: string): boolean {
 	);
 }
 
-// DOM-stamp prefix for capture-phase delegated handlers (`onXxxCapture`). Bubble
-// handlers stamp `$$<type>`; capture handlers stamp `$$capture:<type>` so the two
-// phases stay independent on the same element + event type.
-const CAPTURE_PREFIX = '$$capture:';
+// DOM-stamp prefixes for delegated handlers. Bubble handlers stamp `$o<type>`;
+// capture handlers (`onXxxCapture`) stamp `$ocapture:<type>` so the two phases
+// stay independent on the same element + event type. The namespace must belong to
+// Octane alone: Solid's delegation reads and calls `node.$$<type>` from a document
+// listener, so sharing `$$` ran each library's handlers twice inside an Octane
+// root (#1882). The compiler emits the same keys (compile.js, event attributes).
+// Bubble keys inline the `'$o'` literal: a named constant for it measured larger
+// in every production bundle.
+const CAPTURE_PREFIX = '$ocapture:';
 
 // Parse an `on<Name>` / `on<Name>Capture` handler prop into its delegated event
 // `type`, DOM-stamp `key`, and phase. React-shape: a trailing `Capture` selects the
@@ -27556,7 +27646,7 @@ function eventSlot(name: string, el?: Element): ParsedEventSlot | null {
 		rest = rest.slice(0, rest.length - 7);
 	}
 	const type = jsxEventName(rest);
-	const slot = { type, key: capture ? CAPTURE_PREFIX + type : '$$' + type, capture };
+	const slot = { type, key: capture ? CAPTURE_PREFIX + type : '$o' + type, capture };
 	if (isDelegatedEventProp(name)) (PARSED_EVENT_SLOTS ??= new Map()).set(name, slot);
 	return slot;
 }
@@ -29486,13 +29576,13 @@ export function delegateEvents(eventNames: string[]): void {
 		const type = _delegatedCapture.get(name) ?? createDelegatedEventType(name);
 		type.flags |= EVENT_BUBBLE;
 		_delegated.set(name, type);
-		// Pre-seed the handler-slot key: the dispatch walk polls `$$<type>` on
+		// Pre-seed the handler-slot key: the dispatch walk polls `$o<type>` on
 		// EVERY logical ancestor of every delegated event, and most of them carry
 		// no handler (see initDomOperations, trick 2).
-		if (canSeed) seedExpando(Element.prototype, '$$' + name);
+		if (canSeed) seedExpando(Element.prototype, '$o' + name);
 		// A new event type was registered after some roots/portals already mounted —
 		// back-attach the listener to every active target so handlers stamped on
-		// their DOM via `el.$$click = …` still receive events.
+		// their DOM via `el.$oclick = …` still receive events.
 		for (const target of _delegationTargets.keys()) {
 			if (delegatedCapture(name) && _delegatedCapture.has(name)) continue;
 			target.addEventListener(
@@ -29513,7 +29603,7 @@ export function delegateEvents(eventNames: string[]): void {
 
 // Register capture-phase delegated events (for `onXxxCapture` handlers). Attaches a
 // capture-phase `dispatchDelegatedCapture` listener to every active target, which
-// fires the matching `$$capture:<type>` slots root→target (capture order). Compiled
+// fires the matching `$ocapture:<type>` slots root→target (capture order). Compiled
 // modules call this at load for the capture handlers they contain; the spread path
 // lazy-registers dynamically-supplied ones.
 export function delegateCaptureEvents(eventNames: string[]): void {
@@ -29525,7 +29615,7 @@ export function delegateCaptureEvents(eventNames: string[]): void {
 		type.flags |= EVENT_CAPTURE;
 		_delegatedCapture.set(name, type);
 		// Same seeding rationale as delegateEvents (the capture walk polls
-		// `$$capture:<type>` along the built path).
+		// `$ocapture:<type>` along the built path).
 		if (canSeed) seedExpando(Element.prototype, CAPTURE_PREFIX + name);
 		for (const target of _delegationTargets.keys()) {
 			if (_delegated.has(name)) continue;
@@ -29699,7 +29789,7 @@ let _dispatchDepth = 0;
 function createDelegatedEventType(name: string): DelegatedEventType {
 	return {
 		name,
-		bubbleKey: '$$' + name,
+		bubbleKey: '$o' + name,
 		captureKey: CAPTURE_PREFIX + name,
 		flags:
 			(delegatedCapture(name) ? EVENT_NATIVE_CAPTURE : 0) |
@@ -30424,7 +30514,7 @@ function dispatchDelegated(this: Node, event: Event): void {
 			if (targetOnly) break;
 		}
 		// Form actions are a default action, after every user submit handler has
-		// had a chance to cancel. Keep their storage separate from $$submit.
+		// had a chance to cancel. Keep their storage separate from $osubmit.
 		if (
 			submitRec !== null &&
 			FORM_SUBMIT_DRIVER !== null &&
@@ -30872,7 +30962,7 @@ const UNCONTROLLED: unique symbol = Symbol('octane.uncontrolled');
 
 /**
  * Per-element controlled state, stored as a `$$ctrl` expando (octane's slot
- * idiom — `$$click`, `$$formAction`; a WeakMap would cost a hash lookup on
+ * idiom — `$oclick`, `$$formAction`; a WeakMap would cost a hash lookup on
  * every delegated event). One monomorphic shape for every control kind.
  */
 interface ControlledState {
@@ -31248,8 +31338,8 @@ function hasPotentialFormDiagnostic(el: Element): boolean {
 	if (!isTextEntry(el)) return false;
 	return (
 		(ctrl !== undefined && ctrl.v !== UNCONTROLLED) ||
-		isUsableEventSlot((el as any).$$change) ||
-		isUsableEventSlot((STAGED_DOM?.view(el as any) ?? (el as any))['$$capture:change'])
+		isUsableEventSlot((el as any).$ochange) ||
+		isUsableEventSlot((STAGED_DOM?.view(el as any) ?? (el as any))['$ocapture:change'])
 	);
 }
 
@@ -31977,10 +32067,10 @@ function formDiagnosticOutcome(el: Element): FormDiagnosticOutcome | null {
 	if ((STAGED_DOM?.view(el) ?? el).getAttribute('aria-hidden') === 'true') return null;
 
 	const hasInput =
-		isUsableEventSlot(host.$$input as EventSlot) ||
-		isUsableEventSlot(host['$$capture:input'] as EventSlot);
-	const hasBubbleChange = isUsableEventSlot(host.$$change as EventSlot);
-	const hasCaptureChange = isUsableEventSlot(host['$$capture:change'] as EventSlot);
+		isUsableEventSlot(host.$oinput as EventSlot) ||
+		isUsableEventSlot(host['$ocapture:input'] as EventSlot);
+	const hasBubbleChange = isUsableEventSlot(host.$ochange as EventSlot);
+	const hasCaptureChange = isUsableEventSlot(host['$ocapture:change'] as EventSlot);
 	const hasChange = hasBubbleChange || hasCaptureChange;
 	const ctrl = host.$$ctrl as ControlledState | undefined;
 
@@ -32032,8 +32122,8 @@ function formDiagnosticOutcome(el: Element): FormDiagnosticOutcome | null {
 			(STAGED_DOM?.view(input) ?? input).type === 'radio');
 	if (!checkable || ctrl === undefined || ctrl.c === -1) return null;
 	const hasClick =
-		isUsableEventSlot(host.$$click as EventSlot) ||
-		isUsableEventSlot(host['$$capture:click'] as EventSlot);
+		isUsableEventSlot(host.$oclick as EventSlot) ||
+		isUsableEventSlot(host['$ocapture:click'] as EventSlot);
 	if (hasClick || hasInput || hasChange || hasHydrationControlSignalWriter(el, 'checked'))
 		return null;
 	return {
@@ -32773,7 +32863,7 @@ function renderPortalState(
 		state = { __kind: 'portalSlotSlot', block, target, key, childType, host, start, end };
 		registerPortalEventRange(target, state);
 		activityPortalCreated?.(block);
-		// Portal target hosts handlers stamped via the same `el.$$click = …`
+		// Portal target hosts handlers stamped via the same `el.$oclick = …`
 		// mechanism as the main tree, so it needs the delegated event listeners too.
 		// Refcounted: a target hosting two portals attaches once, detaches when the
 		// last portal unmounts.
@@ -34982,6 +35072,8 @@ function spliceWipCapture(wip: OffscreenWip): void {
 /** Drop captured commit work that never became visible. */
 function discardOffscreenCapture(capture: OffscreenCapture | null): void {
 	if (capture === null) return;
+	if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__)
+		__profileCaptureDiscarded(capture);
 	NATIVE_READ_DRIVER?.discardCapture(capture);
 	const rendered = capture.renderedBlocks;
 	const owner = capture.renderRoot;
@@ -35325,7 +35417,7 @@ function noteDeoptRef(block: Block): void {
 }
 
 // Apply ONE host prop, reusing the same helpers the compiler emits (className/style/
-// setAttribute + `$$type` delegated-event slots + deferred ref attach).
+// setAttribute + `$o<type>` delegated-event slots + deferred ref attach).
 function applyDeoptProp(el: Element, name: string, v: any, ownerBlock: Block): void {
 	const actionName = formActionAttributeName(el, name);
 	if (actionName !== null) {
@@ -40681,6 +40773,8 @@ function endDetachedBoundaryRender(frame: RootRenderFrame | null): void {
 // arm ends the caught error's unwinding (HYDRATION_THROWN) and marks the root
 // render as one that caught an error (RootRenderTransaction.caught).
 function setTryBranch(slot: TrySlot | ErrorSlot, next: -1 | 0 | 1 | 2): void {
+	if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__)
+		__profileBoundary(slot.branch, next);
 	slot.branch = next;
 	if (next === 0 && slot.catchBody !== null) {
 		clearHydrationThrow();
@@ -43826,6 +43920,7 @@ export function useActionState<S>(
 					if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__)
 						__profileSchedule(block, 'action-state-pending', slot);
 					// The rising edge is a pending cue; the falling edge commits with the result.
+					if (next) VIEW_TRANSITION_DRIVER?.markActionCue();
 					scheduleRender(block, false, next);
 				}
 			}
@@ -44915,6 +45010,12 @@ function renderBranchSlot(
 	const parentBlock = parentScope.block;
 	const hydration = hydrating ? activeHydration() : null;
 	if (next !== state.branch) {
+		if (
+			typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' &&
+			__OCTANE_PROFILE_ENABLED__ &&
+			state.branch !== -1
+		)
+			__profileArm(true);
 		if (ROOT_RENDER_TRANSACTION !== null && (state.branch !== -1 || hydration !== null)) {
 			const previousBlock = state.block;
 			if (state.unfinalized && previousBlock !== null) {
@@ -45385,6 +45486,8 @@ function renderBranchSlot(
 			replaceSharedBlockBoundary(parentBlock, oldBlockStart, oldBlockEnd, s, e);
 		}
 	} else if (state.block) {
+		if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__)
+			__profileArm(false);
 		// Same branch — re-render in place with this render's env snapshot.
 		if (state.block.body !== body) journalRootProperty(state.block, 'body', state.block.body);
 		if (state.block.extra !== env) journalRootProperty(state.block, 'extra', state.block.extra);
