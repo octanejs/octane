@@ -52,12 +52,20 @@ function classify(packageJson) {
 	// A package resolves its own name through its exports, which is also how an
 	// aliased install (installed as `typescript-native`, named `typescript`) is read.
 	if (manifest.exports?.['./unstable/sync'] !== undefined) {
-		const ast = packageRequire(`${manifest.name}/unstable/ast`);
+		// TypeScript 7.0's API has no snapshots or synthetic programs.
+		const [major, minor] = String(manifest.version).split('.').map(Number);
+		if (major === 7 && minor === 0) {
+			return {
+				kind: 'unsupported',
+				version: manifest.version,
+				reason: `TypeScript ${manifest.version}'s native API predates the snapshots text facts use; use TypeScript 7.1 or later`,
+			};
+		}
 		return {
 			kind: 'native',
 			version: manifest.version,
 			sync: packageRequire(`${manifest.name}/unstable/sync`),
-			ast,
+			ast: packageRequire(`${manifest.name}/unstable/ast`),
 			is: packageRequire(`${manifest.name}/unstable/ast/is`),
 		};
 	}
