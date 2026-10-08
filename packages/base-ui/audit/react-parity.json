@@ -37,7 +37,7 @@
       "arch": "any",
       "packageManager": "pnpm@12.9.1",
       "lockfile": "pnpm-lock.yaml",
-      "lockfileSha256": "a5bd68590935134632252419f04aebbf9c73f192c9d113a5ded2a08a1da391f6"
+      "lockfileSha256": "0e2eade65aa106fa828d427102627db725709a0944b9a900927ae88e784d7afd"
     }
   },
   "lanes": [
@@ -529,7 +529,7 @@
         {
           "path": "packages/base-ui/tsconfig.adapted-specs.json",
           "role": "test",
-          "sha256": "f218a2e9d4d2e506956f3ad287c5341c08a4995a52c26f0c3bb5206b0d93cd4f",
+          "sha256": "0346425a1454afb8c06ec466c882ac9762a6ab566f04539c9510528014b368e4",
           "cases": [
             {
               "id": "types:base-ui-adapted-types",

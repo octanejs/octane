@@ -9,7 +9,9 @@
     "noEmit": true,
     "noErrorTruncation": true,
     "jsx": "react-jsx",
-    "jsxImportSource": "octane"
+    "jsxImportSource": "octane",
+    "noUnusedLocals": true,
+    "noUnusedParameters": true
   },
   "include": ["src", "tests/_fixtures"]
 }

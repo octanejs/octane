@@ -1,7 +1,17 @@
 import { createHash } from 'node:crypto';
 import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { dirname, relative, resolve, sep } from 'node:path';
-import ts from 'typescript';
+import { is, NodeFlags, parseSourceFile, ScriptKind } from '../octane-tsc/native-syntax.mjs';
+import {
+	createSingleFileChecker,
+	factory,
+	flattenDiagnosticText,
+	parseProjectConfigContent,
+	printFileWithoutComments,
+	printNodeWithoutComments,
+	readProjectConfig,
+	visitEachChild,
+} from './native-typescript-lib.mjs';
 
 export const TYPE_PARITY_CONFIG = 'packages/tanstack-pacer/audit/type-parity.json';
 
@@ -14,8 +24,8 @@ function posix(value) {
 }
 
 function scriptKind(fileName) {
-	if (fileName.endsWith('.tsx') || fileName.endsWith('.tsrx')) return ts.ScriptKind.TSX;
-	return ts.ScriptKind.TS;
+	if (fileName.endsWith('.tsx') || fileName.endsWith('.tsrx')) return ScriptKind.TSX;
+	return ScriptKind.TS;
 }
 
 function listSourceFiles(root, extensions) {
@@ -89,18 +99,12 @@ const DROP_TYPE_NAMES = new Set([
 ]);
 
 function dropSelectorSlotsAndUseStateTypeArgs(source, fileName) {
-	const sf = ts.createSourceFile(
-		fileName,
-		source,
-		ts.ScriptTarget.Latest,
-		true,
-		scriptKind(fileName),
-	);
+	const sf = parseSourceFile(fileName, source, scriptKind(fileName));
 	const replacements = [];
 	function visit(node) {
 		if (
-			ts.isCallExpression(node) &&
-			ts.isIdentifier(node.expression) &&
+			is.isCallExpression(node) &&
+			is.isIdentifier(node.expression) &&
 			node.expression.text === 'useSelector' &&
 			node.arguments.length >= 4
 		) {
@@ -110,7 +114,7 @@ function dropSelectorSlotsAndUseStateTypeArgs(source, fileName) {
 				value: '',
 			});
 		}
-		ts.forEachChild(node, visit);
+		node.forEachChild(visit);
 	}
 	visit(sf);
 	let text = source;
@@ -157,27 +161,28 @@ function preprocessTsrxComponentBodies(source) {
 	return text;
 }
 
-function normalizeContextProviderTags(sourceFile) {
-	const options = { noLib: true, noResolve: true, types: [], allowNonTsExtensions: true };
-	const host = ts.createCompilerHost(options);
-	const sourcePath = resolve(sourceFile.fileName);
-	host.getSourceFile = (fileName) => (resolve(fileName) === sourcePath ? sourceFile : undefined);
-	host.fileExists = (fileName) => resolve(fileName) === sourcePath;
-	host.readFile = () => undefined;
-	host.getDirectories = () => [];
-	const program = ts.createProgram([sourceFile.fileName], options, host);
-	const checker = program.getTypeChecker();
+function isJsxTag(node) {
+	return (
+		is.isJsxOpeningElement(node) || is.isJsxClosingElement(node) || is.isJsxSelfClosingElement(node)
+	);
+}
+
+function jsxTagKey(node) {
+	return `${node.kind}:${node.pos}`;
+}
+
+function providerTagsBackedByContexts(sourceFile, checker) {
 	const factories = new Set();
 	for (const statement of sourceFile.statements) {
 		if (
-			!ts.isImportDeclaration(statement) ||
-			!ts.isStringLiteral(statement.moduleSpecifier) ||
+			!is.isImportDeclaration(statement) ||
+			!is.isStringLiteral(statement.moduleSpecifier) ||
 			!['react', 'octane'].includes(statement.moduleSpecifier.text) ||
 			statement.importClause?.isTypeOnly
 		)
 			continue;
 		const bindings = statement.importClause?.namedBindings;
-		if (!bindings || !ts.isNamedImports(bindings)) continue;
+		if (!bindings || !is.isNamedImports(bindings)) continue;
 		for (const specifier of bindings.elements) {
 			if (
 				!specifier.isTypeOnly &&
@@ -190,16 +195,13 @@ function normalizeContextProviderTags(sourceFile) {
 	}
 	const contexts = new Set();
 	for (const statement of sourceFile.statements) {
-		if (
-			!ts.isVariableStatement(statement) ||
-			!(statement.declarationList.flags & ts.NodeFlags.Const)
-		)
+		if (!is.isVariableStatement(statement) || !(statement.declarationList.flags & NodeFlags.Const))
 			continue;
 		for (const declaration of statement.declarationList.declarations) {
 			if (
-				ts.isIdentifier(declaration.name) &&
+				is.isIdentifier(declaration.name) &&
 				declaration.initializer &&
-				ts.isCallExpression(declaration.initializer) &&
+				is.isCallExpression(declaration.initializer) &&
 				factories.has(checker.getSymbolAtLocation(declaration.initializer.expression))
 			) {
 				const symbol = checker.getSymbolAtLocation(declaration.name);
@@ -207,47 +209,66 @@ function normalizeContextProviderTags(sourceFile) {
 			}
 		}
 	}
-	if (contexts.size === 0) return sourceFile;
+	const tags = new Set();
+	if (contexts.size === 0) return tags;
+	function visit(node) {
+		if (
+			isJsxTag(node) &&
+			is.isPropertyAccessExpression(node.tagName) &&
+			node.tagName.name.text === 'Provider' &&
+			is.isIdentifier(node.tagName.expression) &&
+			contexts.has(checker.getSymbolAtLocation(node.tagName.expression))
+		) {
+			tags.add(jsxTagKey(node));
+		}
+		node.forEachChild(visit);
+	}
+	visit(sourceFile);
+	return tags;
+}
+
+function normalizeContextProviderTags(sourceFile) {
+	// Symbols need a program, which holds a virtual copy of this file alone. Its
+	// nodes sit where this parse's nodes do, so tags carry over by position.
+	const program = createSingleFileChecker(
+		`/tanstack-pacer-type-parity/${sourceFile.fileName}${
+			scriptKind(sourceFile.fileName) === ScriptKind.TSX ? '.tsx' : '.ts'
+		}`,
+		sourceFile.text,
+		{ noLib: true, noResolve: true, types: [] },
+	);
+	let tags;
+	try {
+		tags = providerTagsBackedByContexts(program.sourceFile, program.checker);
+	} finally {
+		program.dispose();
+	}
+	if (tags.size === 0) return sourceFile;
 	// Only JSX tags backed by the framework factory share the direct-context
 	// spelling. Binding symbols keep ordinary namespaces and local shadows intact.
-	const transformation = ts.transform(sourceFile, [
-		(context) => {
-			function visit(node) {
-				const visited = ts.visitEachChild(node, visit, context);
-				if (
-					(ts.isJsxOpeningElement(node) ||
-						ts.isJsxClosingElement(node) ||
-						ts.isJsxSelfClosingElement(node)) &&
-					ts.isPropertyAccessExpression(node.tagName) &&
-					node.tagName.name.text === 'Provider' &&
-					ts.isIdentifier(node.tagName.expression) &&
-					contexts.has(checker.getSymbolAtLocation(node.tagName.expression))
-				) {
-					const tag = node.tagName.expression;
-					if (ts.isJsxOpeningElement(visited))
-						return ts.factory.updateJsxOpeningElement(
-							visited,
-							tag,
-							visited.typeArguments,
-							visited.attributes,
-						);
-					if (ts.isJsxSelfClosingElement(visited))
-						return ts.factory.updateJsxSelfClosingElement(
-							visited,
-							tag,
-							visited.typeArguments,
-							visited.attributes,
-						);
-					return ts.factory.updateJsxClosingElement(visited, tag);
-				}
-				return visited;
-			}
-			return (node) => ts.visitNode(node, visit);
-		},
-	]);
-	const result = transformation.transformed[0];
-	transformation.dispose();
-	return result;
+	function visit(node) {
+		const visited = visitEachChild(node, visit);
+		if (isJsxTag(node) && tags.has(jsxTagKey(node))) {
+			const tag = node.tagName.expression;
+			if (is.isJsxOpeningElement(visited))
+				return factory.updateJsxOpeningElement(
+					visited,
+					tag,
+					visited.typeArguments,
+					visited.attributes,
+				);
+			if (is.isJsxSelfClosingElement(visited))
+				return factory.updateJsxSelfClosingElement(
+					visited,
+					tag,
+					visited.typeArguments,
+					visited.attributes,
+				);
+			return factory.updateJsxClosingElement(visited, tag);
+		}
+		return visited;
+	}
+	return visit(sourceFile);
 }
 
 /**
@@ -281,17 +302,16 @@ export function structuralSource(source, fileName, { mergeProviderContext = fals
 	text = text.replace(/\s*&&\s*!isChildrenBlock\(props\.children\)/g, '');
 	text = dropSelectorSlotsAndUseStateTypeArgs(text, fileName);
 
-	let sf = ts.createSourceFile(fileName, text, ts.ScriptTarget.Latest, true, scriptKind(fileName));
+	let sf = parseSourceFile(fileName, text, scriptKind(fileName));
 	if (mergeProviderContext) sf = normalizeContextProviderTags(sf);
-	const printer = ts.createPrinter({ removeComments: true });
 	const importMap = new Map();
 	const otherParts = [];
 
 	for (const stmt of sf.statements) {
 		if (
-			ts.isImportDeclaration(stmt) &&
+			is.isImportDeclaration(stmt) &&
 			stmt.moduleSpecifier &&
-			ts.isStringLiteral(stmt.moduleSpecifier)
+			is.isStringLiteral(stmt.moduleSpecifier)
 		) {
 			const spec = normalizeSpecifier(stmt.moduleSpecifier.text);
 			if (spec === '../internal' || spec === './internal') continue;
@@ -308,7 +328,7 @@ export function structuralSource(source, fileName, { mergeProviderContext = fals
 
 			const named = [];
 			const nb = stmt.importClause?.namedBindings;
-			if (nb && ts.isNamedImports(nb)) {
+			if (nb && is.isNamedImports(nb)) {
 				for (const el of nb.elements) {
 					if (DROP_TYPE_NAMES.has(el.name.text)) continue;
 					if (spec === 'octane' && el.name.text === 'isChildrenBlock') continue;
@@ -339,28 +359,24 @@ export function structuralSource(source, fileName, { mergeProviderContext = fals
 		}
 
 		if (
-			ts.isExportDeclaration(stmt) &&
+			is.isExportDeclaration(stmt) &&
 			stmt.moduleSpecifier &&
-			ts.isStringLiteral(stmt.moduleSpecifier)
+			is.isStringLiteral(stmt.moduleSpecifier)
 		) {
 			const spec = normalizeSpecifier(stmt.moduleSpecifier.text);
 			if (
 				stmt.exportClause &&
-				ts.isNamedExports(stmt.exportClause) &&
+				is.isNamedExports(stmt.exportClause) &&
 				(spec.endsWith('/context') || spec === './context' || spec === './provider/context')
 			) {
 				otherParts.push(`export * from '${spec}';`);
 				continue;
 			}
-			otherParts.push(
-				printer
-					.printNode(ts.EmitHint.Unspecified, stmt, sf)
-					.replace(stmt.moduleSpecifier.text, spec),
-			);
+			otherParts.push(printNodeWithoutComments(stmt).replace(stmt.moduleSpecifier.text, spec));
 			continue;
 		}
 
-		otherParts.push(printer.printNode(ts.EmitHint.Unspecified, stmt, sf));
+		otherParts.push(printNodeWithoutComments(stmt));
 	}
 
 	const importKeys = [];
@@ -388,18 +404,11 @@ export function structuralSource(source, fileName, { mergeProviderContext = fals
 	const combined = `${importKeys.sort().join('\n')}\n${dedupedOther.join('\n')}`;
 	if (mergeProviderContext) {
 		// Declaration order differs after the context split; compare a stable set.
-		const bodySf = ts.createSourceFile(
-			fileName,
-			combined,
-			ts.ScriptTarget.Latest,
-			true,
-			scriptKind(fileName),
-		);
+		const bodySf = parseSourceFile(fileName, combined, scriptKind(fileName));
 		const parts = [];
 		for (const stmt of bodySf.statements) {
 			parts.push(
-				printer
-					.printNode(ts.EmitHint.Unspecified, stmt, bodySf)
+				printNodeWithoutComments(stmt)
 					.replace(/\s+/g, ' ')
 					.replace(/,(\s*[}\)])/g, '$1')
 					.trim(),
@@ -411,8 +420,8 @@ export function structuralSource(source, fileName, { mergeProviderContext = fals
 			.replace(/>\s+\{/g, '>{')
 			.replace(/\}\s+</g, '}<');
 	}
-	const printed = printer.printFile(
-		ts.createSourceFile(fileName, combined, ts.ScriptTarget.Latest, true, scriptKind(fileName)),
+	const printed = printFileWithoutComments(
+		parseSourceFile(fileName, combined, scriptKind(fileName)),
 	);
 	return printed
 		.replace(/\s+/g, ' ')
@@ -511,28 +520,18 @@ function programFileSet(root, tsconfigPath) {
 	if (!existsSync(absoluteConfig)) {
 		throw new Error(`missing type project config: ${tsconfigPath}`);
 	}
-	const read = ts.readConfigFile(absoluteConfig, ts.sys.readFile);
+	const read = readProjectConfig(absoluteConfig);
 	if (read.error) {
-		throw new Error(
-			`unable to read ${tsconfigPath}: ${ts.flattenDiagnosticMessageText(read.error.messageText, '\n')}`,
-		);
+		throw new Error(`unable to read ${tsconfigPath}: ${flattenDiagnosticText(read.error)}`);
 	}
 	const configDir = dirname(absoluteConfig);
-	const parsed = ts.parseJsonConfigFileContent(
-		read.config,
-		ts.sys,
-		configDir,
-		undefined,
-		absoluteConfig,
-		undefined,
-		[{ extension: '.tsrx', isMixedContent: false, scriptKind: ts.ScriptKind.TSX }],
-	);
+	const parsed = parseProjectConfigContent(read.config, { configFileName: absoluteConfig });
 	const files = new Set(
 		parsed.fileNames.map(function absolute(file) {
 			return resolve(file);
 		}),
 	);
-	// TypeScript wildcards do not expand extraFileExtensions into fileNames, and
+	// TypeScript wildcards do not select `.tsrx` (explicit `files` entries stay), and
 	// `*.ts` globs can surface sibling `*.tsrx.d.ts` stubs instead. Record the
 	// authored `.tsrx` when include/exclude still select it, and drop the stub.
 	const sidecars = [];

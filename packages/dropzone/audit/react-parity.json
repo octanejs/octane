@@ -33,7 +33,7 @@
       "arch": "any",
       "packageManager": "pnpm@12.9.1",
       "lockfile": "pnpm-lock.yaml",
-      "lockfileSha256": "a5bd68590935134632252419f04aebbf9c73f192c9d113a5ded2a08a1da391f6"
+      "lockfileSha256": "0e2eade65aa106fa828d427102627db725709a0944b9a900927ae88e784d7afd"
     }
   },
   "lanes": [
@@ -204,7 +204,7 @@
         {
           "path": "packages/dropzone/typetests/tsconfig.json",
           "role": "support",
-          "sha256": "fb490e66885e61b1db63f58a53a209205d0f9b63df536ebaa2e68685e86369cc"
+          "sha256": "2fc377a85c46a03a6265e15c596fd0ba56847d000f068bb330716809f261a291"
         }
       ]
     },

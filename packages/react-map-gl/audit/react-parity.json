@@ -40,7 +40,7 @@
       "arch": "any",
       "packageManager": "pnpm@12.9.1",
       "lockfile": "pnpm-lock.yaml",
-      "lockfileSha256": "a5bd68590935134632252419f04aebbf9c73f192c9d113a5ded2a08a1da391f6"
+      "lockfileSha256": "0e2eade65aa106fa828d427102627db725709a0944b9a900927ae88e784d7afd"
     }
   },
   "lanes": [
@@ -416,7 +416,7 @@
         {
           "path": "packages/react-map-gl/tests/_mocks/mapbox-gl.ts",
           "role": "support",
-          "sha256": "ba922849c42f4756360689ba772e6d9c484971e61c00ef65d4a3bd0f188dc509"
+          "sha256": "d87f5eef872955a2c8e3ac823d68274738fe590059c88a292ff7175c3e5c8a84"
         },
         {
           "path": "packages/react-map-gl/tests/_fixtures/upstream-apps.tsrx",
@@ -591,7 +591,7 @@
         {
           "path": "packages/react-map-gl/tests/_mocks/mapbox-gl.ts",
           "role": "support",
-          "sha256": "ba922849c42f4756360689ba772e6d9c484971e61c00ef65d4a3bd0f188dc509"
+          "sha256": "d87f5eef872955a2c8e3ac823d68274738fe590059c88a292ff7175c3e5c8a84"
         }
       ]
     }

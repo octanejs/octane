@@ -7,9 +7,8 @@ import {
 	publicCompatibilityDeclarations,
 	publicCompatibilityExport,
 } from './public-compatibility.mjs';
-// Classic TypeScript only parses upstream sources and resolves their entries
-// below; every program node, symbol and type is TypeScript 7's.
-import ts from 'typescript';
+import { importNativeTypeScript } from '../octane-tsc/native.mjs';
+import { parseSourceFile } from '../octane-tsc/native-syntax.mjs';
 import { validateUpstreamLock, verifyPristineTree } from './materialize-lib.mjs';
 import {
 	declarationsOf,
@@ -29,6 +28,43 @@ import {
 	typeArgumentsOf,
 	unionMembers,
 } from './native-types.mjs';
+
+const { API, ModuleKind, ModuleResolutionKind } = await importNativeTypeScript('unstable/sync');
+const { getJSDocTags } = await importNativeTypeScript('unstable/ast');
+const { createFileSystemLayer } = await importNativeTypeScript('unstable/fs');
+
+// Resolve upstream specifiers from the binding package as a bundler-mode import
+// does, to the files TypeScript 7 selects. Its API resolves only within a
+// program, so a probe importing every specifier exists in the request's file
+// system layer, never on disk; the program needs no library or ambient types.
+function resolveFromPackage(packageDirectory, specifiers) {
+	if (specifiers.length === 0) return [];
+	const probe = path.join(packageDirectory, '.pinned-public-entries.ts');
+	const api = new API({ cwd: packageDirectory });
+	try {
+		const program = api.createSnapshot({
+			createPrograms: [
+				{
+					rootFiles: [probe],
+					compilerOptions: {
+						module: ModuleKind.ESNext,
+						moduleResolution: ModuleResolutionKind.Bundler,
+						noLib: true,
+						types: [],
+					},
+				},
+			],
+			fileSystem: createFileSystemLayer([
+				[probe, specifiers.map((specifier) => `import ${JSON.stringify(specifier)};`).join('\n')],
+			]),
+		}).operation.createdPrograms[0];
+		return specifiers.map((specifier) =>
+			program.getResolvedModule(probe, specifier, ModuleKind.ESNext),
+		);
+	} finally {
+		api.close();
+	}
+}
 
 // An upstream declaration is an authority only after its complete source tree
 // has matched the immutable inventory. No package-local list of allowed `any`
@@ -83,34 +119,31 @@ export function pinnedPublicEntries(packageDirectory, node) {
 	entries.internalMembers = new Set();
 	for (const file of lock.files) {
 		if (!/^src\/.*\.tsx?$/.test(file.path)) continue;
-		const source = ts.createSourceFile(
-			file.path,
-			readFileSync(path.join(root, file.path), 'utf8'),
-			ts.ScriptTarget.Latest,
-			true,
-		);
+		const source = parseSourceFile(file.path, readFileSync(path.join(root, file.path), 'utf8'));
 		const visit = (node) => {
-			if (ts.getJSDocTags(node).some((tag) => tag.tagName.text === 'internal')) {
+			if (getJSDocTags(node).some((tag) => tag.tagName.text === 'internal')) {
 				const nativePath = path.resolve(packageDirectory, file.path.replace(/\.tsx$/, '.tsrx'));
 				entries.internalMembers.add(memberKey(node, nativePath));
 			}
-			ts.forEachChild(node, visit);
+			node.forEachChild(visit);
 		};
 		visit(source);
 	}
-	for (const [subpath, target] of Object.entries(manifest.exports)) {
-		if (subpath === './package.json') continue;
-		if (typeof target !== 'object' || target === null) continue;
-		// Let the checking compiler select versioned and nested export conditions,
-		// just as it does for the consumer. A fallback `types` may intentionally
-		// reject older compilers rather than describe the current public surface.
-		const upstreamSpecifier = node.identity.packageName + (subpath === '.' ? '' : subpath.slice(1));
-		const resolved = ts.resolveModuleName(
-			upstreamSpecifier,
-			path.join(packageDirectory, 'package.json'),
-			{ module: ts.ModuleKind.ESNext, moduleResolution: ts.ModuleResolutionKind.Bundler },
-			ts.sys,
-		).resolvedModule;
+	const publicExports = Object.entries(manifest.exports).filter(
+		([subpath, target]) =>
+			subpath !== './package.json' && typeof target === 'object' && target !== null,
+	);
+	// Let the checking compiler select versioned and nested export conditions,
+	// just as it does for the consumer. A fallback `types` may intentionally
+	// reject older compilers rather than describe the current public surface.
+	const resolutions = resolveFromPackage(
+		packageDirectory,
+		publicExports.map(
+			([subpath]) => node.identity.packageName + (subpath === '.' ? '' : subpath.slice(1)),
+		),
+	);
+	for (const [index, [subpath, target]] of publicExports.entries()) {
+		const resolved = resolutions[index];
 		let file;
 		if (resolved && /\.d\.[cm]?ts$/.test(resolved.resolvedFileName)) {
 			file = path.relative(installedRoot, resolved.resolvedFileName).replaceAll(path.sep, '/');
@@ -178,8 +211,8 @@ export function publicSymbolType(symbol, checker) {
 		: checker.getTypeOfSymbolAtLocation(symbol, declaration);
 }
 
-// Keys both classic upstream nodes and TypeScript 7 program nodes, whose
-// `SyntaxKind` numbering differs: either way only the source file has no parent.
+// Keys both parsed upstream nodes and program nodes: either way only the source
+// file has no parent.
 function memberKey(node, file = node.getSourceFile().fileName) {
 	const names = [];
 	for (let parent = node; parent?.parent; parent = parent.parent) {

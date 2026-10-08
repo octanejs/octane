@@ -1,7 +1,17 @@
 import { createHash } from 'node:crypto';
 import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { dirname, relative, resolve, sep } from 'node:path';
+// The classic compiler API only lists the lanes' programs (listCompilerProgramFiles);
+// every syntax tree here comes from TypeScript 7.
 import ts from 'typescript';
+import { is, parseSourceFile, ScriptKind } from '../octane-tsc/native-syntax.mjs';
+import {
+	flattenDiagnosticText,
+	parseProjectConfigContent,
+	printFileWithoutComments,
+	printNodeWithoutComments,
+	readProjectConfig,
+} from './native-typescript-lib.mjs';
 
 export const TYPE_PARITY_CONFIG = 'packages/colorful/audit/type-parity.json';
 
@@ -46,6 +56,10 @@ function tsrxReadDirectory(path, extensions, excludes, includes, depth) {
 	return ts.sys.readDirectory(path, withTsrx, excludes, includes, depth);
 }
 
+// Program membership stays on the classic API because both lanes compile with the
+// classic compiler: tsc, and tsrx-tsc, which adds `.tsrx` as an extra extension so
+// project wildcards select `.tsrx` sources. TypeScript 7's config parser has no
+// extra extensions; it lists `.tsrx` only by running the content mapper.
 export function listCompilerProgramFiles(root, projectPath, sourceRoot) {
 	const configPath = resolve(root, projectPath);
 	if (!existsSync(configPath)) {
@@ -97,23 +111,13 @@ function listProbeProgramFiles(root, projectPath) {
 	if (!existsSync(configPath)) {
 		throw new Error(`missing compiler project for probe membership: ${projectPath}`);
 	}
-	const readResult = ts.readConfigFile(configPath, ts.sys.readFile);
+	const readResult = readProjectConfig(configPath);
 	if (readResult.error) {
-		throw new Error(
-			`failed to read ${projectPath}: ${ts.flattenDiagnosticMessageText(readResult.error.messageText, '\n')}`,
-		);
+		throw new Error(`failed to read ${projectPath}: ${flattenDiagnosticText(readResult.error)}`);
 	}
-	const parsed = ts.parseJsonConfigFileContent(
-		readResult.config,
-		ts.sys,
-		dirname(configPath),
-		undefined,
-		configPath,
-	);
+	const parsed = parseProjectConfigContent(readResult.config, { configFileName: configPath });
 	if (parsed.errors.length > 0) {
-		throw new Error(
-			`${projectPath}: ${ts.flattenDiagnosticMessageText(parsed.errors[0].messageText, '\n')}`,
-		);
+		throw new Error(`${projectPath}: ${flattenDiagnosticText(parsed.errors[0])}`);
 	}
 	const projectDir = dirname(configPath);
 	return parsed.fileNames
@@ -135,19 +139,12 @@ function normalizeComment(comment) {
 }
 
 function containsExpect(node) {
-	if (ts.isIdentifier(node) && node.text === 'Expect') return true;
+	if (is.isIdentifier(node) && node.text === 'Expect') return true;
 	return node.getChildren().some(containsExpect);
 }
 
 function assertionGroups(source, fileName) {
-	const sourceFile = ts.createSourceFile(
-		fileName,
-		source,
-		ts.ScriptTarget.Latest,
-		true,
-		ts.ScriptKind.TS,
-	);
-	const printer = ts.createPrinter({ removeComments: true });
+	const sourceFile = parseSourceFile(fileName, source, ScriptKind.TS);
 	const groups = [];
 	for (const match of source.matchAll(/\/\*\*[\s\S]*?\*\//g)) {
 		groups.push(`doc:${normalizeComment(match[0])}`);
@@ -156,24 +153,19 @@ function assertionGroups(source, fileName) {
 		groups.push(`expect-error:${match[1].trim()}:${match[2].replace(/\s+/g, ' ').trim()}`);
 	}
 	function visit(node) {
-		if (ts.isTypeAliasDeclaration(node) && node.type && containsExpect(node.type)) {
+		if (is.isTypeAliasDeclaration(node) && node.type && containsExpect(node.type)) {
 			groups.push(
-				`expect:${node.name.text}:${printer.printNode(ts.EmitHint.Unspecified, node.type, sourceFile).replace(/\s+/g, ' ').trim()}`,
+				`expect:${node.name.text}:${printNodeWithoutComments(node.type).replace(/\s+/g, ' ').trim()}`,
 			);
 		}
 		if (
-			ts.isCallExpression(node) &&
-			ts.isIdentifier(node.expression) &&
+			is.isCallExpression(node) &&
+			is.isIdentifier(node.expression) &&
 			node.expression.text === 'expectType'
 		) {
-			groups.push(
-				`expectType:${printer
-					.printNode(ts.EmitHint.Unspecified, node, sourceFile)
-					.replace(/\s+/g, ' ')
-					.trim()}`,
-			);
+			groups.push(`expectType:${printNodeWithoutComments(node).replace(/\s+/g, ' ').trim()}`);
 		}
-		ts.forEachChild(node, visit);
+		node.forEachChild(visit);
 	}
 	visit(sourceFile);
 	return groups;
@@ -190,16 +182,10 @@ function normalizeSpecifier(specifier) {
 }
 
 function structuralSource(source, fileName) {
-	const sourceFile = ts.createSourceFile(
-		fileName,
-		source,
-		ts.ScriptTarget.Latest,
-		true,
-		ts.ScriptKind.TS,
-	);
+	const sourceFile = parseSourceFile(fileName, source, ScriptKind.TS);
 	const replacements = [];
 	for (const statement of sourceFile.statements) {
-		if (!ts.isImportDeclaration(statement) || !ts.isStringLiteral(statement.moduleSpecifier))
+		if (!is.isImportDeclaration(statement) || !is.isStringLiteral(statement.moduleSpecifier))
 			continue;
 		const specifier = statement.moduleSpecifier.text;
 		const normalized = normalizeSpecifier(specifier);
@@ -216,18 +202,8 @@ function structuralSource(source, fileName) {
 	})) {
 		transformed = `${transformed.slice(0, replacement.start)}${replacement.value}${transformed.slice(replacement.end)}`;
 	}
-	const normalizedFile = ts.createSourceFile(
-		fileName,
-		transformed,
-		ts.ScriptTarget.Latest,
-		true,
-		ts.ScriptKind.TS,
-	);
-	return ts
-		.createPrinter({ removeComments: true })
-		.printFile(normalizedFile)
-		.replace(/\s+/g, ' ')
-		.trim();
+	const normalizedFile = parseSourceFile(fileName, transformed, ScriptKind.TS);
+	return printFileWithoutComments(normalizedFile).replace(/\s+/g, ' ').trim();
 }
 
 export function readTypeParityConfig(root, configPath = TYPE_PARITY_CONFIG) {

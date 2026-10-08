@@ -1,3 +1,7 @@
+// This stays on the classic `typescript` API: symbolAt reads the binder's per-scope
+// `locals`, a name lookup that ignores meaning. TypeScript 7's API exposes no
+// binder state, and its checker lookups (getSymbolAtLocation, resolveName) resolve
+// by meaning and declaration role, which would change the inventoried counts.
 import ts from 'typescript';
 
 // Inspect array shapes without evaluating test code. Unknown values can occupy

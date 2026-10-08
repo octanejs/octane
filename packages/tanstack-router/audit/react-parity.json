@@ -37,7 +37,7 @@
       "arch": "any",
       "packageManager": "pnpm@12.9.1",
       "lockfile": "pnpm-lock.yaml",
-      "lockfileSha256": "a5bd68590935134632252419f04aebbf9c73f192c9d113a5ded2a08a1da391f6"
+      "lockfileSha256": "0e2eade65aa106fa828d427102627db725709a0944b9a900927ae88e784d7afd"
     }
   },
   "lanes": [
@@ -123,7 +123,7 @@
         {
           "path": "packages/tanstack-router/typetests/tsconfig.json",
           "role": "support",
-          "sha256": "1010237b70446c6adb91d55911a81d9037fde7e4dce533eb7652bbac205bb9eb"
+          "sha256": "94d0e04c4eda7c1c7e1b5fb1ef012e12f63eedcc08cfd5f9c09a237b69df31c8"
         }
       ]
     }

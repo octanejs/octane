@@ -2,11 +2,11 @@
 import type { SharedAxisProps, AxisScale } from '../types';
 export type AxisRightProps<Scale extends AxisScale> = SharedAxisProps<Scale>;
 export declare const rightTickLabelProps: {
-    readonly dx: "0.25em";
-    readonly dy: "0.25em";
-    readonly fill: "#222";
-    readonly fontFamily: "Arial";
+    readonly dx: '0.25em';
+    readonly dy: '0.25em';
+    readonly fill: '#222';
+    readonly fontFamily: 'Arial';
     readonly fontSize: 10;
-    readonly textAnchor: "start";
+    readonly textAnchor: 'start';
 };
 export default function AxisRight<Scale extends AxisScale>({ axisClassName, labelOffset, tickLength, tickLabelProps, ...restProps }: AxisRightProps<Scale>): import("react").JSX.Element;

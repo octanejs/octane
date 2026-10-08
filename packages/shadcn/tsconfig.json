@@ -19,7 +19,9 @@
         "name": "@tsrx/typescript-plugin"
       }
     ],
-    "allowImportingTsExtensions": true
+    "allowImportingTsExtensions": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true
   },
   "include": ["./src/"],
   "exclude": ["node_modules", "dist", "tests"],

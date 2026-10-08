@@ -1,7 +1,8 @@
 import { createHash } from 'node:crypto';
 import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { relative, resolve, sep } from 'node:path';
-import ts from 'typescript';
+import { is, parseSourceFile, ScriptKind } from '../octane-tsc/native-syntax.mjs';
+import { printFileWithoutComments, printNodeWithoutComments } from './native-typescript-lib.mjs';
 
 export const TYPE_PARITY_CONFIG = 'packages/spring/audit/type-parity.json';
 
@@ -37,9 +38,8 @@ function normalizeComment(comment) {
 }
 
 function assertionGroups(source, fileName) {
-	const kind = fileName.endsWith('.tsx') ? ts.ScriptKind.TSX : ts.ScriptKind.TS;
-	const sourceFile = ts.createSourceFile(fileName, source, ts.ScriptTarget.Latest, true, kind);
-	const printer = ts.createPrinter({ removeComments: true });
+	const kind = fileName.endsWith('.tsx') ? ScriptKind.TSX : ScriptKind.TS;
+	const sourceFile = parseSourceFile(fileName, source, kind);
 	const groups = [];
 	for (const match of source.matchAll(/\/\*\*[\s\S]*?\*\//g)) {
 		groups.push(`doc:${normalizeComment(match[0])}`);
@@ -54,31 +54,21 @@ function assertionGroups(source, fileName) {
 	}
 	function visit(node) {
 		if (
-			ts.isCallExpression(node) &&
-			ts.isPropertyAccessExpression(node.expression) &&
-			ts.isIdentifier(node.expression.expression) &&
+			is.isCallExpression(node) &&
+			is.isPropertyAccessExpression(node.expression) &&
+			is.isIdentifier(node.expression.expression) &&
 			node.expression.expression.text === 'expectTypeOf'
 		) {
-			groups.push(
-				`expectTypeOf:${printer
-					.printNode(ts.EmitHint.Unspecified, node, sourceFile)
-					.replace(/\s+/g, ' ')
-					.trim()}`,
-			);
+			groups.push(`expectTypeOf:${printNodeWithoutComments(node).replace(/\s+/g, ' ').trim()}`);
 		}
 		if (
-			ts.isCallExpression(node) &&
-			ts.isIdentifier(node.expression) &&
+			is.isCallExpression(node) &&
+			is.isIdentifier(node.expression) &&
 			node.expression.text === 'assert'
 		) {
-			groups.push(
-				`assert:${printer
-					.printNode(ts.EmitHint.Unspecified, node, sourceFile)
-					.replace(/\s+/g, ' ')
-					.trim()}`,
-			);
+			groups.push(`assert:${printNodeWithoutComments(node).replace(/\s+/g, ' ').trim()}`);
 		}
-		ts.forEachChild(node, visit);
+		node.forEachChild(visit);
 	}
 	visit(sourceFile);
 	return groups;
@@ -97,12 +87,12 @@ function normalizeSpecifier(specifier) {
 }
 
 function structuralSource(source, fileName) {
-	const kind = fileName.endsWith('.tsx') ? ts.ScriptKind.TSX : ts.ScriptKind.TS;
-	const sourceFile = ts.createSourceFile(fileName, source, ts.ScriptTarget.Latest, true, kind);
+	const kind = fileName.endsWith('.tsx') ? ScriptKind.TSX : ScriptKind.TS;
+	const sourceFile = parseSourceFile(fileName, source, kind);
 	const dropRanges = [];
 	const replacements = [];
 	for (const statement of sourceFile.statements) {
-		if (!ts.isImportDeclaration(statement) || !ts.isStringLiteral(statement.moduleSpecifier))
+		if (!is.isImportDeclaration(statement) || !is.isStringLiteral(statement.moduleSpecifier))
 			continue;
 		const specifier = statement.moduleSpecifier.text;
 		if (specifier === 'react' || specifier === 'octane') {
@@ -129,16 +119,8 @@ function structuralSource(source, fileName) {
 	})) {
 		transformed = `${transformed.slice(0, range.start)}${transformed.slice(range.end)}`;
 	}
-	const normalizedFile = ts.createSourceFile(
-		fileName,
-		transformed,
-		ts.ScriptTarget.Latest,
-		true,
-		kind,
-	);
-	return ts
-		.createPrinter({ removeComments: true })
-		.printFile(normalizedFile)
+	const normalizedFile = parseSourceFile(fileName, transformed, kind);
+	return printFileWithoutComments(normalizedFile)
 		.replace(/\((\w+)\)\s*=>/g, '$1 =>')
 		.replace(/\s+/g, ' ')
 		.trim();

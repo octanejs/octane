@@ -1,10 +1,6 @@
 import { rmSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
-import {
-	compatibilityOptions,
-	importNativeTypeScript,
-	TSRX_CONTENT_MAPPER,
-} from '../octane-tsc/native.mjs';
+import { importNativeTypeScript, TSRX_CONTENT_MAPPER } from '../octane-tsc/native.mjs';
 
 const { API } = await importNativeTypeScript('unstable/sync');
 
@@ -40,7 +36,6 @@ export function createTypeEvidenceProgram(rootNames, project, { tsrx = true } = 
 		wrapper,
 		JSON.stringify({
 			extends: `./${path.basename(project)}`,
-			compilerOptions: compatibilityOptions(project),
 			files: rootNames.map((file) => path.resolve(file)),
 			include: [],
 			...(tsrx ? { contentMappers: [TSRX_CONTENT_MAPPER] } : {}),

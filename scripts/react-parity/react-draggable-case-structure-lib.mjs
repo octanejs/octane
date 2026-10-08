@@ -1,7 +1,8 @@
 import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
-import ts from 'typescript';
+import { is, parseSourceFile, ScriptKind } from '../octane-tsc/native-syntax.mjs';
+import { factory, printNodeWithoutComments, visitEachChild } from './native-typescript-lib.mjs';
 
 function sha256(value) {
 	return createHash('sha256').update(value).digest('hex');
@@ -22,15 +23,15 @@ export function normalizeAssertionText(source) {
 
 function scriptKindFor(fileName) {
 	if (fileName.endsWith('.tsrx') || fileName.endsWith('.tsx') || fileName.endsWith('.jsx')) {
-		return ts.ScriptKind.TSX;
+		return ScriptKind.TSX;
 	}
-	return ts.ScriptKind.TS;
+	return ScriptKind.TS;
 }
 
 function isExpectRoot(node) {
 	return (
-		ts.isCallExpression(node) &&
-		ts.isIdentifier(node.expression) &&
+		is.isCallExpression(node) &&
+		is.isIdentifier(node.expression) &&
 		node.expression.text === 'expect'
 	);
 }
@@ -39,9 +40,9 @@ function outermostExpect(node) {
 	let current = node;
 	while (
 		current.parent &&
-		(ts.isPropertyAccessExpression(current.parent) ||
-			ts.isCallExpression(current.parent) ||
-			ts.isElementAccessExpression(current.parent))
+		(is.isPropertyAccessExpression(current.parent) ||
+			is.isCallExpression(current.parent) ||
+			is.isElementAccessExpression(current.parent))
 	) {
 		current = current.parent;
 	}
@@ -56,7 +57,7 @@ function containsExpect(node) {
 			found = true;
 			return;
 		}
-		ts.forEachChild(child, visit);
+		child.forEachChild(visit);
 	}
 	visit(node);
 	return found;
@@ -64,15 +65,15 @@ function containsExpect(node) {
 
 function callbackBody(call) {
 	for (const argument of call.arguments) {
-		if (ts.isArrowFunction(argument) || ts.isFunctionExpression(argument)) {
-			if (ts.isBlock(argument.body)) return argument.body;
+		if (is.isArrowFunction(argument) || is.isFunctionExpression(argument)) {
+			if (is.isBlock(argument.body)) return argument.body;
 			return null;
 		}
 	}
 	return null;
 }
 
-function extractAssertionsFrom(node, printer, sourceFile) {
+function extractAssertionsFrom(node) {
 	const groups = [];
 	const seen = new Set();
 	function visit(child) {
@@ -80,13 +81,11 @@ function extractAssertionsFrom(node, printer, sourceFile) {
 			const outer = outermostExpect(child);
 			if (!seen.has(outer)) {
 				seen.add(outer);
-				groups.push(
-					normalizeAssertionText(printer.printNode(ts.EmitHint.Unspecified, outer, sourceFile)),
-				);
+				groups.push(normalizeAssertionText(printNodeWithoutComments(outer)));
 			}
 			return;
 		}
-		ts.forEachChild(child, visit);
+		child.forEachChild(visit);
 	}
 	visit(node);
 	return groups;
@@ -94,19 +93,19 @@ function extractAssertionsFrom(node, printer, sourceFile) {
 
 function isOutermostExpectExpression(node) {
 	if (!(
-		ts.isCallExpression(node) ||
-		ts.isPropertyAccessExpression(node) ||
-		ts.isElementAccessExpression(node)
+		is.isCallExpression(node) ||
+		is.isPropertyAccessExpression(node) ||
+		is.isElementAccessExpression(node)
 	)) {
 		return false;
 	}
 	let cursor = node;
 	while (
-		ts.isPropertyAccessExpression(cursor) ||
-		ts.isCallExpression(cursor) ||
-		ts.isElementAccessExpression(cursor)
+		is.isPropertyAccessExpression(cursor) ||
+		is.isCallExpression(cursor) ||
+		is.isElementAccessExpression(cursor)
 	) {
-		if (ts.isCallExpression(cursor) && isExpectRoot(cursor)) {
+		if (is.isCallExpression(cursor) && isExpectRoot(cursor)) {
 			return outermostExpect(cursor) === node;
 		}
 		cursor = cursor.expression;
@@ -116,10 +115,10 @@ function isOutermostExpectExpression(node) {
 
 function unwrapParenthesizedExpressions(node) {
 	function visit(current) {
-		if (ts.isParenthesizedExpression(current)) {
+		if (is.isParenthesizedExpression(current)) {
 			return visit(current.expression);
 		}
-		return ts.visitEachChild(current, visit, undefined);
+		return visitEachChild(current, visit);
 	}
 	return visit(node);
 }
@@ -127,20 +126,20 @@ function unwrapParenthesizedExpressions(node) {
 function collapseExpectExpressions(node) {
 	function visit(current) {
 		if (isOutermostExpectExpression(current)) {
-			return ts.factory.createIdentifier('__ASSERTION__');
+			return factory.createIdentifier('__ASSERTION__');
 		}
-		return ts.visitEachChild(current, visit, undefined);
+		return visitEachChild(current, visit);
 	}
 	return visit(node);
 }
 
-function extractScenarioSteps(body, printer, sourceFile) {
+function extractScenarioSteps(body) {
 	const steps = [];
 	for (const statement of body.statements) {
 		const node = containsExpect(statement)
 			? unwrapParenthesizedExpressions(collapseExpectExpressions(statement))
 			: unwrapParenthesizedExpressions(statement);
-		let text = normalizeAssertionText(printer.printNode(ts.EmitHint.Unspecified, node, sourceFile));
+		let text = normalizeAssertionText(printNodeWithoutComments(node));
 		if (text === '__ASSERTION__;') text = '__ASSERTION__';
 		steps.push(text);
 	}
@@ -148,16 +147,16 @@ function extractScenarioSteps(body, printer, sourceFile) {
 }
 
 function literalTitle(node) {
-	if (ts.isStringLiteral(node) || ts.isNoSubstitutionTemplateLiteral(node)) return node.text;
+	if (is.isStringLiteral(node) || is.isNoSubstitutionTemplateLiteral(node)) return node.text;
 	return null;
 }
 
 function isAdaptedCaseCall(expression) {
-	return ts.isIdentifier(expression) && expression.text === 'adaptedCase';
+	return is.isIdentifier(expression) && expression.text === 'adaptedCase';
 }
 
 function isTestCall(expression) {
-	return ts.isIdentifier(expression) && (expression.text === 'it' || expression.text === 'test');
+	return is.isIdentifier(expression) && (expression.text === 'it' || expression.text === 'test');
 }
 
 function fixtureRefs(steps) {
@@ -186,22 +185,15 @@ function fixtureRefs(steps) {
  * Extract adaptedCase(identity, callback) ledgers. Identity is the upstream citation.
  */
 export function extractAdaptedCaseLedger(source, fileName) {
-	const sourceFile = ts.createSourceFile(
-		fileName,
-		source,
-		ts.ScriptTarget.Latest,
-		true,
-		scriptKindFor(fileName),
-	);
-	const printer = ts.createPrinter({ removeComments: true });
+	const sourceFile = parseSourceFile(fileName, source, scriptKindFor(fileName));
 	const cases = [];
 	function visit(node) {
-		if (ts.isCallExpression(node) && isAdaptedCaseCall(node.expression)) {
+		if (is.isCallExpression(node) && isAdaptedCaseCall(node.expression)) {
 			const identity = node.arguments.length > 0 ? literalTitle(node.arguments[0]) : null;
 			const body = callbackBody(node);
 			if (identity && body) {
-				const assertions = extractAssertionsFrom(body, printer, sourceFile);
-				const scenarioSteps = extractScenarioSteps(body, printer, sourceFile);
+				const assertions = extractAssertionsFrom(body);
+				const scenarioSteps = extractScenarioSteps(body);
 				cases.push({
 					identity,
 					citation: identity,
@@ -214,7 +206,7 @@ export function extractAdaptedCaseLedger(source, fileName) {
 				});
 			}
 		}
-		ts.forEachChild(node, visit);
+		node.forEachChild(visit);
 	}
 	visit(sourceFile);
 	return cases;
@@ -226,24 +218,17 @@ export function extractAdaptedCaseLedger(source, fileName) {
  * registers plain `it` cases under those markers rather than adaptedCase calls.
  */
 export function extractMarkedCaseLedger(source, fileName) {
-	const sourceFile = ts.createSourceFile(
-		fileName,
-		source,
-		ts.ScriptTarget.Latest,
-		true,
-		scriptKindFor(fileName),
-	);
-	const printer = ts.createPrinter({ removeComments: true });
+	const sourceFile = parseSourceFile(fileName, source, scriptKindFor(fileName));
 	const cases = [];
 	function visit(node) {
-		if (ts.isCallExpression(node) && isTestCall(node.expression)) {
+		if (is.isCallExpression(node) && isTestCall(node.expression)) {
 			const leading = source.slice(node.getFullStart(), node.getStart(sourceFile));
 			const marker = /@parity-case\s+adapted-browser:([^\n]+?)\s*$/m.exec(leading);
 			const body = callbackBody(node);
 			if (marker && body) {
 				const identity = marker[1];
-				const assertions = extractAssertionsFrom(body, printer, sourceFile);
-				const scenarioSteps = extractScenarioSteps(body, printer, sourceFile);
+				const assertions = extractAssertionsFrom(body);
+				const scenarioSteps = extractScenarioSteps(body);
 				cases.push({
 					identity,
 					citation: identity,
@@ -256,7 +241,7 @@ export function extractMarkedCaseLedger(source, fileName) {
 				});
 			}
 		}
-		ts.forEachChild(node, visit);
+		node.forEachChild(visit);
 	}
 	visit(sourceFile);
 	return cases;
@@ -266,22 +251,15 @@ export function extractMarkedCaseLedger(source, fileName) {
  * Extract upstream it/test callback ledgers keyed by `file::title`.
  */
 export function extractUpstreamCaseLedger(source, relativeFile) {
-	const sourceFile = ts.createSourceFile(
-		relativeFile,
-		source,
-		ts.ScriptTarget.Latest,
-		true,
-		scriptKindFor(relativeFile),
-	);
-	const printer = ts.createPrinter({ removeComments: true });
+	const sourceFile = parseSourceFile(relativeFile, source, scriptKindFor(relativeFile));
 	const cases = [];
 	function visit(node) {
-		if (ts.isCallExpression(node) && isTestCall(node.expression)) {
+		if (is.isCallExpression(node) && isTestCall(node.expression)) {
 			const title = node.arguments.length > 0 ? literalTitle(node.arguments[0]) : null;
 			const body = callbackBody(node);
 			if (title && body) {
-				const assertions = extractAssertionsFrom(body, printer, sourceFile);
-				const scenarioSteps = extractScenarioSteps(body, printer, sourceFile);
+				const assertions = extractAssertionsFrom(body);
+				const scenarioSteps = extractScenarioSteps(body);
 				cases.push({
 					identity: `${relativeFile}::${title}`,
 					citation: `${relativeFile}::${title}`,
@@ -294,7 +272,7 @@ export function extractUpstreamCaseLedger(source, relativeFile) {
 				});
 			}
 		}
-		ts.forEachChild(node, visit);
+		node.forEachChild(visit);
 	}
 	visit(sourceFile);
 	return cases;

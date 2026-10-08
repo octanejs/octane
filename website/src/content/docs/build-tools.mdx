@@ -17,7 +17,7 @@ import { PackageInstall } from '../../components/PackageInstall.tsrx';
 Octane has one compiler with thin bundler integrations. Choosing a bundler changes
 the build pipeline, not component semantics.
 
-The Node compiler uses the optional `@tsrx/oxc@0.18.0` peer included in the install
+The Node compiler uses the optional `@tsrx/oxc@0.20.0` peer included in the install
 commands below. Runtime-only consumers do not need it.
 
 <h2 id="choose-an-integration">Choose an integration</h2>
@@ -48,7 +48,7 @@ capabilities. No `nativeReads` compiler option is required.
 
 Use `@octanejs/vite-plugin` for every Vite app:
 
-<PackageInstall packages="octane @octanejs/vite-plugin @tsrx/oxc@0.18.0" dev="vite" />
+<PackageInstall packages="octane @octanejs/vite-plugin @tsrx/oxc@0.20.0" dev="vite" />
 
 ```ts
 // vite.config.ts
@@ -98,7 +98,7 @@ The Rspack package is deliberately low-level. It compiles `.tsrx`, eligible
 Octane `.tsx`, and raw Octane `.ts`/`.js` dependency sources, but leaves HTML,
 routing, and server orchestration to your application.
 
-<PackageInstall packages="octane @tsrx/oxc@0.18.0" dev="@rspack/core @octanejs/rspack-plugin" />
+<PackageInstall packages="octane @tsrx/oxc@0.20.0" dev="@rspack/core @octanejs/rspack-plugin" />
 
 ```js
 // rspack.config.mjs
@@ -136,7 +136,7 @@ Rsbuild is the closest equivalent to the full Vite metaframework integration.
 Its Environment API builds a browser hydration environment and a Node SSR
 environment with the correct Octane runtime in each.
 
-<PackageInstall packages="octane @octanejs/rsbuild-plugin @tsrx/oxc@0.18.0" dev="@rsbuild/core" />
+<PackageInstall packages="octane @octanejs/rsbuild-plugin @tsrx/oxc@0.20.0" dev="@rsbuild/core" />
 
 ```ts
 // rsbuild.config.ts

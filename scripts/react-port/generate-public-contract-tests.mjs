@@ -164,11 +164,17 @@ try {
 		'isPropagationStopped',
 	]);
 	for (const assertion of assertions) {
+		if (assertion.context) {
+			// An upstream React context is matched by an Octane context, which is
+			// itself the provider component (`<Context value>`). Octane has no
+			// `Context.Provider` or `Context.Consumer` member to compare keys with.
+			assertion.proof = `type Contract${assertion.id} = Assert<${assertion.native} extends import('octane').Context<infer _Value> ? true : false>;`;
+			continue;
+		}
 		const witness = witnessChecker.getTypeFromTypeNode(witnesses[assertion.id].type);
 		const parts = unionMembers(witness) ?? [witness];
 		const filtered = parts.filter((part) => {
-			if (part.value === '$$typeof' || (assertion.context && part.value !== 'Provider'))
-				return false;
+			if (part.value === '$$typeof') return false;
 			return (
 				!['BaseUIEvent', 'MaybeBaseUIEvent'].includes(assertion.name) ||
 				!syntheticKeys.has(part.value)

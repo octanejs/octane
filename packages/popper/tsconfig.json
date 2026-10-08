@@ -14,7 +14,9 @@
     "allowSyntheticDefaultImports": true,
     "verbatimModuleSyntax": true,
     "types": ["node", "vite/client"],
-    "strict": true
+    "strict": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true
   },
   "include": ["src"],
   "exclude": ["node_modules", "dist", "tests"]

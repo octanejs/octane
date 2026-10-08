@@ -9,7 +9,9 @@
       "@octanejs/tanstack-virtual": ["../../src/index.ts"],
       "@tanstack/react-virtual": ["../../upstream/src/index.tsx"]
     },
-    "types": ["node", "react", "react-dom"]
+    "types": ["node", "react", "react-dom"],
+    "noUnusedLocals": false,
+    "noUnusedParameters": false
   },
   "include": ["./*.test-d.ts", "../../upstream/src/**/*"],
   "exclude": ["node_modules"],

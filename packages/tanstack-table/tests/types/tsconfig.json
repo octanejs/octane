@@ -10,7 +10,9 @@
       "@octanejs/tanstack-table": ["../../src/index.ts"],
       "@octanejs/tanstack-table/*": ["../../src/*.ts"]
     },
-    "verbatimModuleSyntax": false
+    "verbatimModuleSyntax": false,
+    "noUnusedLocals": false,
+    "noUnusedParameters": false
   },
   "include": ["./*.test-d.ts", "../../src/**/*"],
   "exclude": ["node_modules"],

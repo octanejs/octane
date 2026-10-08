@@ -20,7 +20,7 @@ import {
 	type ScopedNode,
 } from './graph.js';
 import { RedeclarableBinding } from './redeclaration.js';
-import type { DerivedCompute, DerivedSignal, OwnerScope, Scope } from './types.js';
+import type { DerivedCompute, DerivedSignal, OwnerScope } from './types.js';
 
 /**
  * The compiler selects this only for a zero-context callback whose result is

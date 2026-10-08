@@ -1,5 +1,6 @@
 import { realpathSync } from 'node:fs';
 import path from 'node:path';
+import semver from 'semver';
 
 export const NATIVE_GRAPH_FORBIDDEN_MODULE =
 	/(?:^|[\\/])(?:runtime(?:\.server)?|universal-dom-boundary|dom-tables)\.[cm]?[jt]sx?$|(?:^|[\\/])hydration(?:[\\/]|\.[cm]?[jt]sx?$)|(?:^|[\\/])(?:react|react-dom|preact)(?:[\\/]|$)|@lynx-js[\\/]react/i;
@@ -333,13 +334,93 @@ export function findExternalDependencySpecs(manifests, packageNames) {
 // This version exposed duplicated tuple annotations with the unbundled backend.
 export const PACKED_TSRX_CONSUMER_ESRAP_VERSION = '2.3.6';
 
+// Bindings ship their TSRX source, so each application's own TypeScript
+// compiles it. The strict TSRX source consumer therefore installs the same
+// packed graph once per TypeScript an application can choose and runs the same
+// projects on each, so a binding that compiles only on the repository's
+// TypeScript fails here rather than in an application:
+//
+// - TypeScript 5.9: the oldest TypeScript Octane supports, and the repository's
+//   classic `typescript`. tsrx-tsc runs classic tsc with the Volar plugin.
+// - TypeScript 6: the last major with the classic compiler, on the same tsrx-tsc
+//   path, but with the new defaults TypeScript 7 keeps, such as checked
+//   side-effect imports. The repository installs no TypeScript 6, so its latest
+//   release is pinned here.
+// - TypeScript 7.1: the native compiler, which reads `.tsrx` only through
+//   `@tsrx/content-mapper` and `--runExternalCode`, on the repository's `native`
+//   catalog nightly (the root typecheck's). The lane runs that `tsc` directly, as
+//   the mapper documents, because tsrx-tsc 0.6 refuses nightlies older than
+//   7.1.0-dev.20260923.1 and the catalog stays on 7.1.0-dev.20260921.1 (see
+//   pnpm-workspace.yaml).
+export const PACKED_TSRX_TYPESCRIPT_6_VERSION = '6.0.3';
+
+// The first nightly with the content-mapper protocol (@tsrx/content-mapper).
+const PACKED_TSRX_CONTENT_MAPPER_PROTOCOL = '7.1.0-dev.20260822.1';
+
+export function createPackedTsrxTypeScriptLanes({
+	classicTypeScript,
+	contentMapper,
+	nativeTypeScript,
+	tsrxTypeScriptPlugin,
+}) {
+	// The lane names are claims about the installed compiler; refuse a version
+	// that would quietly turn one lane into a copy of another.
+	if (!semver.satisfies(classicTypeScript, '~5.9.0')) {
+		throw new Error(`the TypeScript 5.9 lane cannot run on typescript@${classicTypeScript}`);
+	}
+	if (
+		!semver.satisfies(nativeTypeScript, `>=${PACKED_TSRX_CONTENT_MAPPER_PROTOCOL} <7.2.0-0`, {
+			includePrerelease: true,
+		})
+	) {
+		throw new Error(
+			`the TypeScript 7.1 lane needs the content-mapper protocol (${PACKED_TSRX_CONTENT_MAPPER_PROTOCOL} or a later 7.1 build), not typescript@${nativeTypeScript}`,
+		);
+	}
+	return [
+		{
+			id: 'typescript-5.9',
+			name: 'TypeScript 5.9',
+			checker: 'tsrx-tsc',
+			tooling: { typescript: classicTypeScript, tsrxTypeScriptPlugin },
+		},
+		{
+			id: 'typescript-6',
+			name: 'TypeScript 6',
+			checker: 'tsrx-tsc',
+			tooling: { typescript: PACKED_TSRX_TYPESCRIPT_6_VERSION, tsrxTypeScriptPlugin },
+		},
+		{
+			id: 'typescript-7.1',
+			name: 'TypeScript 7.1',
+			checker: 'tsc',
+			tooling: { typescript: nativeTypeScript, contentMapper },
+		},
+	];
+}
+
+// Tooling the consumer pins itself. A published range for one of these, such as
+// octane's optional `typescript` peer, must not also reach `dependencies`, where
+// it would compete with the lane's pinned compiler.
+const PACKED_TSRX_CONSUMER_TOOLING = new Set([
+	'@tsrx/content-mapper',
+	'@tsrx/typescript-plugin',
+	'@types/node',
+	'esrap',
+	'typescript',
+]);
+
 export function createPackedTsrxConsumerManifest(
 	archiveSpecs,
 	toolingVersions,
 	packageNames,
 	externalDependencies = {},
 ) {
-	const { esrap: _externalPrinter, ...dependencies } = externalDependencies;
+	const dependencies = Object.fromEntries(
+		Object.entries(externalDependencies).filter(
+			([dependencyName]) => !PACKED_TSRX_CONSUMER_TOOLING.has(dependencyName),
+		),
+	);
 
 	for (const packageName of packageNames) {
 		const archiveSpec = archiveSpecs[packageName];
@@ -357,7 +438,14 @@ export function createPackedTsrxConsumerManifest(
 		engines: { node: '>=22.22.2' },
 		dependencies,
 		devDependencies: {
-			'@tsrx/typescript-plugin': toolingVersions.tsrxTypeScriptPlugin,
+			// TypeScript 5 and 6 read `.tsrx` through the language plugin, and
+			// TypeScript 7 through the content mapper; a lane installs only its own.
+			...(toolingVersions.contentMapper
+				? { '@tsrx/content-mapper': toolingVersions.contentMapper }
+				: {}),
+			...(toolingVersions.tsrxTypeScriptPlugin
+				? { '@tsrx/typescript-plugin': toolingVersions.tsrxTypeScriptPlugin }
+				: {}),
 			'@types/node': toolingVersions.nodeTypes,
 			esrap: PACKED_TSRX_CONSUMER_ESRAP_VERSION,
 			typescript: toolingVersions.typescript,
@@ -386,13 +474,22 @@ export function resolvePackedTsrxSourceDirectories(consumerDirectory, packageNam
 	];
 }
 
+// The application form the mapper documents: TypeScript 5 and 6 ignore the key,
+// and the mapper takes its compiler from the `tsrx.compiler` entry beside it.
+export const PACKED_TSRX_CONTENT_MAPPER = {
+	package: '@tsrx/content-mapper',
+	extensions: ['.tsrx'],
+};
+
 export function createPackedTsrxConsumerConfig({
 	consumerSourceFiles = ['src/**/*.ts', 'src/**/*.tsrx'],
+	contentMapper = false,
 	ecmaVersion = 'es2024',
 	nodeTypes = true,
 	sourcePackageDirectories = [],
 } = {}) {
 	return {
+		...(contentMapper ? { contentMappers: [PACKED_TSRX_CONTENT_MAPPER] } : {}),
 		compilerOptions: {
 			allowImportingTsExtensions: true,
 			jsx: 'react-jsx',
@@ -428,6 +525,98 @@ export const PACKED_TSRX_CONSUMER_PROJECTS = [
 ];
 
 export { assertTsrxTypecheckSucceeded as assertPackedTsrxConsumerSucceeded } from './tsrx-typecheck.mjs';
+
+/** Arguments for the lane's checker: `tsrx-tsc` (TypeScript 5 and 6) or native `tsc`. */
+export function createPackedTsrxTypecheckArguments(lane, project) {
+	return [
+		'--noEmit',
+		'--pretty',
+		'false',
+		// The program's file list is the evidence of which shipped .tsrx was checked.
+		'--listFiles',
+		// TypeScript 7 starts the content mapper only when the user opts in.
+		...(lane.checker === 'tsc' ? ['--runExternalCode'] : []),
+		'-p',
+		project,
+	];
+}
+
+/** Separates `--listFiles` output (absolute paths) from the diagnostics around it. */
+export function splitPackedTsrxTypecheckOutput(stdout = '') {
+	const files = [];
+	const diagnostics = [];
+	for (const line of stdout.split(/\r?\n/)) {
+		if (path.isAbsolute(line) && !/\(\d+,\d+\): /.test(line)) files.push(line);
+		else diagnostics.push(line);
+	}
+	return { files, diagnostics: diagnostics.join('\n').trim() };
+}
+
+/**
+ * A passing lane is evidence only for the files it compiled. TypeScript 7 without
+ * the content mapper, for example, silently leaves every `.tsrx` that `include`
+ * matches out of the program, so require each expected file in the listed program.
+ */
+export function assertPackedTsrxFilesChecked(expectedFiles, checkedFiles, label) {
+	if (expectedFiles.length === 0) {
+		throw new Error(`${label} selected no .tsrx files, so it would prove nothing`);
+	}
+	const checked = new Set(checkedFiles);
+	const unchecked = expectedFiles.filter((file) => !checked.has(file));
+	if (unchecked.length) {
+		const shown = unchecked.slice(0, 20);
+		throw new Error(
+			`${label} left ${unchecked.length} of ${expectedFiles.length} expected .tsrx files out of the program:\n  ${shown.join('\n  ')}${unchecked.length > shown.length ? '\n  ...' : ''}`,
+		);
+	}
+}
+
+export const PACKED_TSRX_LANE_SENTINEL_PROJECT = 'tsconfig.lane-sentinel.json';
+export const PACKED_TSRX_LANE_SENTINEL_FILE = 'sentinel/LaneSentinel.tsrx';
+
+// The negative control: a lane must report this error, from inside a .tsrx
+// module and through the packed octane types. A lane that skips .tsrx, or that
+// resolves octane as `any`, reports nothing.
+export function renderPackedTsrxLaneSentinel() {
+	return `import { useState } from 'octane';
+
+export function LaneSentinel() @{
+	const [count] = useState(0);
+	const notText: string = count;
+	<span>{notText}</span>
+}
+`;
+}
+
+export function createPackedTsrxLaneSentinelConfig({ contentMapper = false } = {}) {
+	const config = createPackedTsrxConsumerConfig({
+		consumerSourceFiles: [PACKED_TSRX_LANE_SENTINEL_FILE],
+		contentMapper,
+	});
+	// No ambient types: the control's only diagnostic is the deliberate one.
+	config.compilerOptions.types = [];
+	return config;
+}
+
+export function assertPackedTsrxLaneSentinelReported(result, label) {
+	const output = [result.stdout, result.stderr].filter(Boolean).join('\n');
+	const { diagnostics } = splitPackedTsrxTypecheckOutput(output);
+	const errors = [...diagnostics.matchAll(/^(?:(.+?)\(\d+,\d+\): )?error (TS(?:RX)?\d+):/gm)];
+	const [sentinel] = errors;
+	if (
+		result.error ||
+		result.status === 0 ||
+		/^\[tsrx-tsc\]/m.test(diagnostics) ||
+		errors.length !== 1 ||
+		sentinel[2] !== 'TS2322' ||
+		sentinel[1]?.replaceAll('\\', '/') !== PACKED_TSRX_LANE_SENTINEL_FILE
+	) {
+		const reason = result.error?.message ?? `exit ${result.signal ?? result.status}`;
+		throw new Error(
+			`${label} did not report exactly the deliberate TS2322 in ${PACKED_TSRX_LANE_SENTINEL_FILE} (${reason}), so its passing projects may not have checked .tsrx${diagnostics ? `\n${diagnostics}` : ''}`,
+		);
+	}
+}
 
 // These packages have deliberate API assertions in the hand-authored consumer
 // probes. Keep them installed even when source compilation is temporarily
@@ -777,7 +966,7 @@ export function PublishedSourceConsumer() @{
 	const commandRef = useRef<HTMLDivElement | null>(null);
 	const inputRef = useRef<HTMLInputElement | null>(null);
 	const toasterRef = useRef<HTMLElement | null>(null);
-	const [springStyles] = useSpring({ from: { opacity: 0 }, to: { opacity: 1 } });
+	const springStyles = useSpring({ from: { opacity: 0 }, to: { opacity: 1 } });
 
 	<section>
 		<BarChart width={320} height={160} data={[{ name: 'Packed', value: 1 }]}>

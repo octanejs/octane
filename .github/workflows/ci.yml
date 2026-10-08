@@ -1200,6 +1200,10 @@ jobs:
       # matching runtime/type pair; the current lane checks the newest published
       # matching pair and tests the latest runtime even when its types lag.
       # Both select the Octane-owned compatibility suite.
+      # The typetests run on the classic `tsc` (the default catalog's TypeScript
+      # 5.9) on purpose, not octane-tsc's 7.1: they import the package as an
+      # application on 5.9 would, and Canvas.tsrx is typed by its sibling
+      # declaration, so they prove each @types/three pair for those consumers.
       - name: Test Three compatibility (minimum r156)
         working-directory: ${{ runner.temp }}/octane-three-compat-minimum-r156
         env:
@@ -1323,6 +1327,11 @@ jobs:
       # including exports/bin/types and workspace/catalog protocol replacement,
       # then installs packed core + binding tarballs into an isolated consumer
       # to prove singleton resolution and client/server raw-source compilation.
+      # Applications compile the shipped TSRX with their own TypeScript, so the
+      # strict source consumer runs one lane per supported compiler, each in its
+      # own install: TypeScript 5.9 and 6 through tsrx-tsc, and the native
+      # catalog's 7.1 nightly through tsc --runExternalCode and the content
+      # mapper (lanes and what each proves: scripts/package-pack-canaries.mjs).
       - name: Pack and validate every publishable package
         run: pnpm packages:pack:check
 

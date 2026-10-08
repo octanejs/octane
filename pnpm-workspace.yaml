@@ -136,6 +136,12 @@ packageExtensions:
   '@lynx-js/rspeedy@0.16.0':
     peerDependencies:
       '@rspack/core': 2.1.3
+  # vaul's declarations import 'react' but list no @types/react, so without a
+  # peer they resolve whichever @types/react pnpm hoists, which can be 18.x after
+  # an incremental install. As a peer it is linked from the installing package.
+  vaul@1.1.2:
+    peerDependencies:
+      '@types/react': '*'
 
 catalogs:
   # Immer 11's published Iterator global conflicts with TypeScript's ESNext
@@ -362,7 +368,7 @@ catalogs:
     es-module-lexer: ^1.7.0
     esbuild: ^0.28.1
     esrap: ^2.3.2
-    '@tsrx/oxc': 0.18.0
+    '@tsrx/oxc': 0.20.0
     sucrase: ^3.35.1
     graphql: ^16.14.2
     gsap: 3.15.0
@@ -610,15 +616,15 @@ minimumReleaseAgeExclude:
   - '@blocknote/core@0.53.0'
   - '@blocknote/react@0.53.0'
   - '@tanstack/db@0.7.0'
-  - '@tsrx/oxc-darwin-arm64@0.18.0'
-  - '@tsrx/oxc-darwin-x64@0.18.0'
-  - '@tsrx/oxc-linux-arm64-gnu@0.18.0'
-  - '@tsrx/oxc-linux-arm64-musl@0.18.0'
-  - '@tsrx/oxc-linux-x64-gnu@0.18.0'
-  - '@tsrx/oxc-linux-x64-musl@0.18.0'
-  - '@tsrx/oxc-win32-arm64-msvc@0.18.0'
-  - '@tsrx/oxc-win32-x64-msvc@0.18.0'
-  - '@tsrx/oxc@0.18.0'
+  - '@tsrx/oxc-darwin-arm64@0.20.0'
+  - '@tsrx/oxc-darwin-x64@0.20.0'
+  - '@tsrx/oxc-linux-arm64-gnu@0.20.0'
+  - '@tsrx/oxc-linux-arm64-musl@0.20.0'
+  - '@tsrx/oxc-linux-x64-gnu@0.20.0'
+  - '@tsrx/oxc-linux-x64-musl@0.20.0'
+  - '@tsrx/oxc-win32-arm64-msvc@0.20.0'
+  - '@tsrx/oxc-win32-x64-msvc@0.20.0'
+  - '@tsrx/oxc@0.20.0'
   - '@ripple-ts/adapter@0.4.0'
   - '@ripple-ts/vite-plugin@0.4.0'
   - '@tsrx/core@0.5.5'

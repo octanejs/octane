@@ -11,7 +11,10 @@
     "allowSyntheticDefaultImports": true,
     "strict": true,
     "jsx": "react-jsx",
-    "jsxImportSource": "octane"
+    "jsxImportSource": "octane",
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "types": []
   },
   "include": ["./src/"],
   "exclude": ["node_modules", "dist", "tests"]

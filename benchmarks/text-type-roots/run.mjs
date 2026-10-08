@@ -13,6 +13,10 @@ const SOURCE_ROOT = process.env.OCTANE_TEXT_TYPE_ROOT
 const { createTextTypeProject } = await import(
 	pathToFileURL(path.join(SOURCE_ROOT, 'packages/octane/src/compiler/typescript.js')).href
 );
+// The TypeScript to analyze with, as `createTextTypeProject`'s `typescript`
+// option: an absolute package directory, since fixtures live outside the
+// repository. Unset, it is octane's classic `typescript` peer.
+const TYPESCRIPT = process.env.OCTANE_TEXT_TYPES_TYPESCRIPT || undefined;
 
 const SMALL_ROOTS = 32;
 const LARGE_ROOTS = 20_000;
@@ -54,7 +58,7 @@ function createFixture(name, unrelatedRoots) {
 			files: [...rootNames, 'jsx.d.ts', 'zz-target.tsx'],
 		}),
 	);
-	const project = createTextTypeProject({ tsconfig });
+	const project = createTextTypeProject({ tsconfig, typescript: TYPESCRIPT });
 	return {
 		name,
 		directory,

@@ -36,7 +36,7 @@
       "arch": "any",
       "packageManager": "pnpm@12.9.1",
       "lockfile": "pnpm-lock.yaml",
-      "lockfileSha256": "a5bd68590935134632252419f04aebbf9c73f192c9d113a5ded2a08a1da391f6"
+      "lockfileSha256": "0e2eade65aa106fa828d427102627db725709a0944b9a900927ae88e784d7afd"
     }
   },
   "lanes": [
@@ -106,7 +106,7 @@
         {
           "path": "scripts/react-parity/react-resizable-panels-upstream-lib.mjs",
           "role": "support",
-          "sha256": "bae76fd4e3395e0ef59438312cd2e33e574891a31fca5a68564d2e447ef0481e"
+          "sha256": "5c7ac54b2e9614efd59ce6b9fc50a23d74ceb1a5e16ada7f16defc3044293cca"
         },
         {
           "path": "packages/resizable-panels/audit/test-classifications.json",
@@ -217,7 +217,7 @@
         {
           "path": "packages/resizable-panels/typetests/tsconfig.json",
           "role": "support",
-          "sha256": "d0530df985084ced1b2672a8a1d27994e2adca5cb6d8a057f23e011791b74e6d"
+          "sha256": "750e6c33fa848192f7aa3911bcdd8db34f040e3353d10df36954536084b11659"
         },
         {
           "path": "packages/resizable-panels/audit/type-parity.json",
@@ -227,7 +227,7 @@
         {
           "path": "scripts/react-parity/react-resizable-panels-types-lib.mjs",
           "role": "support",
-          "sha256": "b1ec9bf0f5bcb1e268ce676633a0651099c3accc0b1a745115955751e4552fc8"
+          "sha256": "f829654fcf1467f3db70d6b90cefd256d1c3c0f54777222e06491536f3a3db3f"
         }
       ]
     }

@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { readFileSync, readdirSync } from 'node:fs';
 import test from 'node:test';
 import { resolve } from 'node:path';
-import ts from 'typescript';
+import { is, parseSourceFile } from '../octane-tsc/native-syntax.mjs';
 
 import { isVitestLane, requiredExecutableLanes, validateManifest } from './harness-lib.mjs';
 import { discoverReactParityManifestPaths } from './vitest-batch-lib.mjs';
@@ -27,12 +27,15 @@ function preloadIdentity(call, sourceFile) {
 }
 
 function collectBindingNames(name, bindings) {
-	if (ts.isIdentifier(name)) {
+	if (is.isIdentifier(name)) {
 		bindings.add(name.text);
 		return;
 	}
 	for (const element of name.elements) {
-		if (!ts.isOmittedExpression(element)) collectBindingNames(element.name, bindings);
+		// TypeScript 7 spells an array-pattern hole as a nameless binding element.
+		if (!is.isOmittedExpression(element) && element.name) {
+			collectBindingNames(element.name, bindings);
+		}
 	}
 }
 
@@ -40,21 +43,21 @@ function topLevelBindingsBefore(sourceFile, position) {
 	const bindings = new Set(['__dirname', '__filename']);
 	for (const statement of sourceFile.statements) {
 		if (statement.getStart(sourceFile) >= position) break;
-		if (ts.isImportDeclaration(statement) && statement.importClause) {
+		if (is.isImportDeclaration(statement) && statement.importClause) {
 			if (statement.importClause.name) bindings.add(statement.importClause.name.text);
 			const named = statement.importClause.namedBindings;
-			if (named && ts.isNamespaceImport(named)) bindings.add(named.name.text);
-			if (named && ts.isNamedImports(named)) {
+			if (named && is.isNamespaceImport(named)) bindings.add(named.name.text);
+			if (named && is.isNamedImports(named)) {
 				for (const element of named.elements) bindings.add(element.name.text);
 			}
 		}
-		if (ts.isVariableStatement(statement)) {
+		if (is.isVariableStatement(statement)) {
 			for (const declaration of statement.declarationList.declarations) {
 				collectBindingNames(declaration.name, bindings);
 			}
 		}
 		if (
-			(ts.isFunctionDeclaration(statement) || ts.isClassDeclaration(statement)) &&
+			(is.isFunctionDeclaration(statement) || is.isClassDeclaration(statement)) &&
 			statement.name
 		) {
 			bindings.add(statement.name.text);
@@ -68,39 +71,39 @@ function usesOnlyTopLevelBindings(expression, sourceFile, position) {
 	let valid = true;
 	function visit(node) {
 		if (
-			ts.isIdentifier(node) &&
-			!(ts.isPropertyAccessExpression(node.parent) && node.parent.name === node) &&
+			is.isIdentifier(node) &&
+			!(is.isPropertyAccessExpression(node.parent) && node.parent.name === node) &&
 			!bindings.has(node.text)
 		) {
 			valid = false;
 		}
-		ts.forEachChild(node, visit);
+		node.forEachChild(visit);
 	}
 	visit(expression);
 	return valid;
 }
 
 function differentialImportCoverage(source, file = 'differential.test.ts') {
-	const sourceFile = ts.createSourceFile(file, source, ts.ScriptTarget.Latest, true);
+	const sourceFile = parseSourceFile(file, source);
 	const mounted = new Set();
 	const preloaded = new Set();
 	let firstSuitePosition = Infinity;
 
 	function collectMounts(node) {
 		if (
-			ts.isCallExpression(node) &&
-			ts.isIdentifier(node.expression) &&
+			is.isCallExpression(node) &&
+			is.isIdentifier(node.expression) &&
 			differentialMounts.has(node.expression.text)
 		) {
 			mounted.add(mountIdentity(node, sourceFile));
 		}
-		ts.forEachChild(node, collectMounts);
+		node.forEachChild(collectMounts);
 	}
 
 	function collectPreloads(node, statementPosition) {
 		if (
-			ts.isCallExpression(node) &&
-			ts.isIdentifier(node.expression) &&
+			is.isCallExpression(node) &&
+			is.isIdentifier(node.expression) &&
 			differentialPreloads.has(node.expression.text) &&
 			node.arguments.every((argument) =>
 				usesOnlyTopLevelBindings(argument, sourceFile, statementPosition),
@@ -108,24 +111,24 @@ function differentialImportCoverage(source, file = 'differential.test.ts') {
 		) {
 			preloaded.add(preloadIdentity(node, sourceFile));
 		}
-		ts.forEachChild(node, collectPreloads);
+		node.forEachChild(collectPreloads);
 	}
 
 	for (const statement of sourceFile.statements) {
 		if (
-			ts.isExpressionStatement(statement) &&
-			ts.isCallExpression(statement.expression) &&
-			((ts.isIdentifier(statement.expression.expression) &&
+			is.isExpressionStatement(statement) &&
+			is.isCallExpression(statement.expression) &&
+			((is.isIdentifier(statement.expression.expression) &&
 				statement.expression.expression.text === 'describe') ||
-				(ts.isPropertyAccessExpression(statement.expression.expression) &&
-					ts.isIdentifier(statement.expression.expression.expression) &&
+				(is.isPropertyAccessExpression(statement.expression.expression) &&
+					is.isIdentifier(statement.expression.expression.expression) &&
 					statement.expression.expression.expression.text === 'describe'))
 		) {
 			firstSuitePosition = Math.min(firstSuitePosition, statement.getStart(sourceFile));
 		}
 		if (
-			ts.isExpressionStatement(statement) &&
-			ts.isAwaitExpression(statement.expression) &&
+			is.isExpressionStatement(statement) &&
+			is.isAwaitExpression(statement.expression) &&
 			statement.getStart(sourceFile) < firstSuitePosition
 		) {
 			collectPreloads(statement, statement.getStart(sourceFile));
