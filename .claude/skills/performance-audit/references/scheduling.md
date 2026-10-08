@@ -140,6 +140,32 @@ against the same app built with React.
 - `passive-scheduling` and `effect-scheduling`: post-paint callback work;
 - `chat-stream` and `conversation-streaming`: streamed updates.
 
+## Native producer admission and shared pacing
+
+Ready query and asynchronous derived publications use the existing native graph
+batch boundary to mark their publication context. Native component reads keep
+their existing render priority while joining the existing host-task queue.
+Subscriptions, graph effects, and direct signal bindings still run for every
+publication; plain signal writes and native event or layout updates retain urgent
+admission. An urgent update to a queued component upgrades its admission;
+an ordinary unrelated urgent microtask flush does not consume its waiting
+producer refresh. Controlled restoration can drain both queues, and an urgent
+ancestor can absorb a queued descendant.
+
+Query and derived streams share `yieldForHostBudget` from `host-budget.ts`. Check
+it before a pull and before processing a ready result: checking only the next
+pull leaves a concurrent batch of already-ready results unbounded. Re-enter the
+producer lease guard after waking, and preserve observation acknowledgements
+before requesting another value. The approximately 5 ms window is shared across
+producers and reset by a host task, not by each value or owner. It cannot interrupt
+an expensive iterator, subscriber, render, or commit. A cold I/O wait lets the
+sentinel run without adding another timer to each result.
+
+`benchmarks/scheduler-responsiveness/signal-backlog.mjs` records ordered source
+publications, component commits, marker latency, and total completion for ready
+and CPU-heavy streams. Direct binding writes are outside its component commit
+count. Use Chromium Event Timing for input-to-paint claims.
+
 ## Direct buffered transport readers
 
 Direct streamed RPC and optional renderer-response readers share one approximately
