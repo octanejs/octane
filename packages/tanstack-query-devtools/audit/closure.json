@@ -1,0 +1,41 @@
+{
+  "runtimeDependencies": ["@octanejs/tanstack-query", "@tanstack/query-devtools", "octane"],
+  "adaptedSources": [
+    {
+      "packageName": "@tanstack/react-query-devtools",
+      "paths": [
+        "src/ReactQueryDevtools.tsrx",
+        "src/ReactQueryDevtoolsPanel.tsrx",
+        "src/index.ts",
+        "src/production.ts"
+      ]
+    }
+  ],
+  "sourceLedger": [
+    {
+      "path": "src/ReactQueryDevtools.tsrx",
+      "origin": "adapted",
+      "packageName": "@tanstack/react-query-devtools",
+      "sha256": "c697c9d85bd77e5e8ab9bf7bfd687a1309304a01b6fa0112330a94f130b83bfe"
+    },
+    {
+      "path": "src/ReactQueryDevtoolsPanel.tsrx",
+      "origin": "adapted",
+      "packageName": "@tanstack/react-query-devtools",
+      "sha256": "003f3c8a4f3c402e207f4e9f97d866ecd5e6c348b0969cda47843fddc794a2ee"
+    },
+    {
+      "path": "src/index.ts",
+      "origin": "adapted",
+      "packageName": "@tanstack/react-query-devtools",
+      "sha256": "2db88aee000a3c1ed95167d184659b95ad84a96f9f279b25f277de294af16e69"
+    },
+    {
+      "path": "src/production.ts",
+      "origin": "adapted",
+      "packageName": "@tanstack/react-query-devtools",
+      "sha256": "038b7d65048e27b43b79993712186b5fc3da56edbd767cb69e04e5f577bde3f5"
+    }
+  ],
+  "reimplementedDependencies": []
+}

@@ -1063,8 +1063,15 @@ controlled state and radio cousins.
 
 Form **actions**
 (`<form action={fn}>`, `useActionState`, `useFormStatus`, `useOptimistic`,
-`requestFormReset`, auto-reset) match React 19; an action error does **not**
-cancel queued dispatches (octane keeps threading).
+`requestFormReset`, auto-reset) follow React 19's commit pattern. Action results
+render at transition priority in a later host task (see the scheduler section
+below), so a backlog of queued dispatches that settle together commits once, with
+the final state, and intermediate results never commit. A hundred synchronous
+`useActionState` dispatches commit twice, `isPending` and then the result, as in
+React. Two differences remain: an action error does **not** cancel queued
+dispatches (octane keeps threading), and every dispatch, even of a synchronous
+action, starts its action one microtask after the call, where React runs the
+first queued action synchronously.
 
 ## Attributes: native names, React's value rules
 
@@ -1350,24 +1357,38 @@ physically-moved nodes can differ.
 
 ## Scheduler: synchronous, two priorities
 
-Renders are microtask-batched and run to completion — no lanes, yields,
-time-slicing, expiration, or selective hydration. Priority changes Suspense
-behavior, not whether ordinary work is time-sliced:
+Renders run to completion — no lanes beyond the two priorities, yields,
+time-slicing, expiration, or selective hydration. Urgent renders are
+microtask-batched. Priority changes Suspense behavior, and where the render runs:
 
 ```tsx
 setPage(next); // If it suspends, show the pending fallback.
 startTransition(() => setPage(next)); // Keep the previous content while pending.
 ```
 
-`useDeferredValue` is the exception. Its deferred render runs in a later host task,
-not in the microtask checkpoint of the urgent commit that returned the previous value,
-so the browser can paint that commit and deliver input first, as it can before React's
-Scheduler task. Octane posts the task with `scheduler.postTask` where available, then
-`MessageChannel`, then `setTimeout`. Urgent updates that arrive before the task runs
-only change the value it renders, so a fast typist's skipped values never render
-deferred. There is still no time-slicing: once the deferred render starts it runs to
-completion, and a keystroke that arrives during it waits until it commits, where React
-would yield to handle it.
+Transition-priority renders run in a later host task, never in the microtask
+checkpoint of the urgent commit before them, as React renders a transition lane in
+a Scheduler task. The browser can therefore paint that commit and deliver input
+first, and a burst of ready continuations renders once: a backlog of `useActionState`
+results, a transition started after each `await`, or the post-`await` updates of
+several Actions that settle together. Octane posts the task with
+`scheduler.postTask` where available, then `MessageChannel`, then `setTimeout`.
+Waiting there are updates inside `startTransition`, Action results, and, while an
+async Action is pending, every update made outside a delegated event, `flushSync`,
+or a commit callback, which Octane already treats as part of the Action. Three kinds
+of update keep the microtask flush at their transition priority, because they
+announce the transition rather than complete it: `useTransition` and
+`useActionState` raising `isPending`, and `useOptimistic` showing a value. When the
+component that raises `isPending` also holds the transition's own update, both
+render together in that microtask flush, because Octane keeps one live tree. An
+urgent update to a component whose transition is waiting renders it in the
+microtask flush. `flushSync` and `act()` drain both priorities.
+
+`useDeferredValue`'s deferred render also runs in a later host task. Urgent updates
+that arrive before the task runs only change the value it renders, so a fast typist's
+skipped values never render deferred. There is still no time-slicing: once a
+transition or deferred render starts it runs to completion, and a keystroke that
+arrives during it waits until it commits, where React would yield to handle it.
 
 Native `ResizeObserver` callbacks run inside the browser's resize delivery loop.
 An ordinary microtask commit that resizes an already-delivered target can trigger
@@ -1457,7 +1478,7 @@ Octane also skips React's extra same-value render after a previous state change.
 If a component body does run, its children can render even when the final state
 is unchanged; do not depend on React's incidental render counts. Updates across
 roots share a microtask wave, and an `await` continuation can observe the commit
-after `setState(); await 0`. Cross-component render-time updates join the current
+after an urgent `setState(); await 0`. A transition commits in a later host task. Cross-component render-time updates join the current
 drain. Finite layout-effect cascades complete before DOM mutation observers run,
 including commits started by the scheduler. `flushSync` drains them before returning.
 
@@ -1470,9 +1491,8 @@ before-mutation ref-detach phase.
 
 Other consequences:
 
-- Priority (`urgent` vs `transition`) governs Suspense hold semantics, not
-  general commit deferral. Only `useDeferredValue`'s deferred render waits for a
-  later task (above).
+- Priority (`urgent` vs `transition`) governs Suspense hold semantics and
+  whether a render waits for a later host task (above), not time-slicing.
 - Fallback-visible boundaries whose retries fully stage reveal together,
   including refs and layout effects.
 - Retry-only Suspense reveals use a shared 100ms fallback window (React uses
