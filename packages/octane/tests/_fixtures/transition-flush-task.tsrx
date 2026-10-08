@@ -212,6 +212,19 @@ export function PendingTabsPanel(props: PendingTabsPanelProps) @{
 	</>
 }
 
+interface PendingTabsHeldPanelProps extends PendingTabsProps {
+	initial: Promise<string>;
+	exposePanel: (setPromise: (promise: Promise<string>) => void) => void;
+}
+
+// The same component, beside a sibling whose boundary can hold its transitions.
+export function PendingTabsHeldPanel(props: PendingTabsHeldPanelProps) @{
+	<>
+		<PendingTabs expose={props.expose} onCommit={props.onCommit} onPress={props.onPress} />
+		<HeldPanel initial={props.initial} expose={props.exposePanel} />
+	</>
+}
+
 interface HeldPendingTabsProps extends HeldPanelProps {
 	onCommit: (entry: string) => void;
 	next: Promise<string>;

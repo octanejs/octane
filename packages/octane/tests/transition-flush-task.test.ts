@@ -14,6 +14,7 @@ import {
 	PendingPanel,
 	PendingShell,
 	PendingTabs,
+	PendingTabsHeldPanel,
 	PendingTabsPanel,
 	PendingTransitionInput,
 	StateProbe,
@@ -261,7 +262,9 @@ describe('startTransition from async code', () => {
 });
 
 describe('pending cues commit before the transition they announce', () => {
-	it('shows isPending in the urgent flush and the transition in a later task', async () => {
+	// React's transition lane carries `isPending`'s falling edge with the
+	// transition's own updates, so both commit together, in tree order.
+	it('shows isPending in the urgent flush and drops it with the transition in a later task', async () => {
 		const log: string[] = [];
 		let setPanel!: (value: number) => void;
 		const { container } = mountWith(PendingPanel, {
@@ -277,11 +280,29 @@ describe('pending cues commit before the transition they announce', () => {
 		(container.querySelector('button') as HTMLButtonElement).click();
 		await untilTasks(() => log.includes('button idle'));
 
-		expect(log).toEqual(['button pending', 'task', 'panel 1', 'button idle']);
+		expect(log).toEqual(['button pending', 'task', 'button idle', 'panel 1']);
 		expect(container.textContent).toBe('idlepanel 1');
 	});
 
-	it('drops isPending right after an urgent update takes over the waiting transition', async () => {
+	it('drops isPending in a later task when the transition updates nothing', async () => {
+		const log: string[] = [];
+		const { container } = mountWith(PendingPanel, {
+			expose: () => {},
+			onCommit: (entry: string) => log.push(entry),
+			onPress: (start: (fn: () => void) => void) => {
+				postTask(() => log.push('task'));
+				start(() => {});
+			},
+		});
+		log.length = 0;
+
+		(container.querySelector('button') as HTMLButtonElement).click();
+		await untilTasks(() => log.includes('button idle'));
+
+		expect(log).toEqual(['button pending', 'task', 'button idle']);
+	});
+
+	it('drops isPending in a later task after an urgent update takes over the waiting transition', async () => {
 		const log: string[] = [];
 		let setPanel!: (value: number) => void;
 		const { container } = mountWith(PendingPanel, {
@@ -297,9 +318,10 @@ describe('pending cues commit before the transition they announce', () => {
 		log.length = 0;
 
 		(container.querySelector('button') as HTMLButtonElement).click();
-		await untilTasks(() => log.includes('task'));
+		await untilTasks(() => log.includes('button idle'));
 
-		expect(log).toEqual(['button pending', 'panel 2', 'button idle', 'task']);
+		// The transition's falling edge is still transition work, so it waits for the task.
+		expect(log).toEqual(['button pending', 'panel 2', 'task', 'button idle']);
 		expect(container.textContent).toBe('idlepanel 2');
 	});
 
@@ -395,22 +417,12 @@ function recordFrames(read: () => string | null | undefined): string[] {
 	return frames;
 }
 
-/** Commits up to a task marker, then whether every later commit shows `prefix`. */
-function splitAtTask(log: string[], prefix: string): { before: string[]; after: boolean } {
-	const index = log.indexOf('task');
-	const after = log.slice(index + 1);
-	return {
-		before: log.slice(0, index + 1),
-		after: after.length > 0 && after.every((entry) => entry.startsWith(prefix)),
-	};
-}
-
 describe('a pending cue in the component that holds the transition update', () => {
 	// The canonical useTransition pattern keeps `isPending` and the state the
 	// transition sets in one component. React commits the pending cue with the
 	// previous state, then renders the transition in a later Scheduler task, so
-	// the browser can paint the cue first. The falling edge of `isPending` follows
-	// the transition's render within that same task.
+	// the browser can paint the cue first. The falling edge of `isPending` renders
+	// with the transition's own updates, in that one render.
 
 	it('commits the cue with the previous state and renders the transition in a later task', async () => {
 		const tabs = mountTabs();
@@ -421,11 +433,7 @@ describe('a pending cue in the component that holds the transition update', () =
 		await untilTasks(() => frames.length === 2);
 
 		expect(frames).toEqual(['a pending', 'b idle']);
-		expect(splitAtTask(tabs.log, 'b ')).toEqual({
-			before: ['a pending', 'task'],
-			after: true,
-		});
-		expect(tabs.log.at(-1)).toBe('b idle');
+		expect(tabs.log).toEqual(['a pending', 'task', 'b idle']);
 	});
 
 	it('also holds back the transition when it was waiting before the cue', async () => {
@@ -475,8 +483,7 @@ describe('a pending cue in the component that holds the transition update', () =
 		tabs.click();
 		await untilTasks(() => tabs.log.includes('b idle'));
 
-		expect(splitAtTask(tabs.log, '').before).toEqual(['a pending', 'task']);
-		expect(tabs.log.slice(tabs.log.indexOf('task') + 1)).toContain('panel 1');
+		expect(tabs.log).toEqual(['a pending', 'task', 'b idle', 'panel 1']);
 		expect(tabs.container.textContent).toBe('b idlepanel 1');
 	});
 
@@ -491,9 +498,10 @@ describe('a pending cue in the component that holds the transition update', () =
 		// The urgent update renders the waiting transition with it, applying the
 		// transition's update first, as React's rebasing does.
 		tabs.controls().setTab((tab) => `${tab}!`);
-		await untilTasks(() => tabs.log.includes('task'));
+		await untilTasks(() => tabs.log.includes('b! idle'));
 
-		expect(tabs.log).toEqual(['a pending', 'b! pending', 'b! idle', 'task']);
+		// isPending still falls with the transition lane, in the task.
+		expect(tabs.log).toEqual(['a pending', 'b! pending', 'task', 'b! idle']);
 		expect(tabs.text()).toBe('b! idle');
 	});
 
@@ -572,19 +580,55 @@ describe('a pending cue in the component that holds the transition update', () =
 		expect(log).not.toContain('loading');
 	});
 
-	it('shows an optimistic value with the previous state, then the transition in a task', async () => {
+	it('keeps isPending raised while a sibling boundary holds the transition', async () => {
+		const log: string[] = [];
+		let setPromise!: (promise: Promise<string>) => void;
+		let resolve!: (value: string) => void;
+		const next = new Promise<string>((done) => (resolve = done));
+		const initial = Object.assign(Promise.resolve('one'), { status: 'fulfilled', value: 'one' });
+		const { container } = mountWith(PendingTabsHeldPanel, {
+			initial,
+			exposePanel: (set: (promise: Promise<string>) => void) => (setPromise = set),
+			onCommit: (entry: string) => log.push(entry),
+			onPress: (controls: TabsControls) =>
+				controls.start(() => {
+					controls.setTab('b');
+					setPromise(next);
+				}),
+		});
+		log.length = 0;
+		const button = container.querySelector('button') as HTMLButtonElement;
+
+		button.click();
+		await untilTasks(() => false);
+
+		// OCTANE DIVERGENCE: the hold is per boundary, so the tab outside it commits
+		// (SUSPENSE_DIVERGENCE.md #4). The falling edge rendered with it must not.
+		expect(button.textContent).toMatch(/ pending$/);
+		expect(log.every((entry) => entry.endsWith(' pending'))).toBe(true);
+		expect(container.querySelector('p')!.textContent).toBe('one');
+
+		resolve('two');
+		await untilTasks(() => button.textContent === 'b idle');
+		expect(container.querySelector('p')!.textContent).toBe('two');
+		expect(log.at(-1)).toBe('b idle');
+	});
+
+	it('shows an optimistic value with the previous state, then the transition and its revert in a task', async () => {
 		const log: string[] = [];
 		const { container } = mountWith(OptimisticTabs, {
 			onCommit: (entry: string) => log.push(entry),
 		});
+		log.length = 0;
 		const frames = recordFrames(() => container.textContent);
+		postTask(() => log.push('task'));
 
 		(container.querySelector('button') as HTMLButtonElement).click();
 		await untilTasks(() => frames.length === 2);
 
 		expect(frames).toEqual(['0/1', '1/1']);
-		expect(log.slice(0, 2)).toEqual(['0/0', '0/1']);
-		expect(log.at(-1)).toBe('1/1');
+		// The optimistic value reverts in the commit of the transition that settles it.
+		expect(log).toEqual(['0/1', 'task', '1/1']);
 	});
 
 	it('keeps an async Action staged until it settles', async () => {
@@ -605,19 +649,19 @@ describe('a pending cue in the component that holds the transition update', () =
 		postTask(() => tabs.log.push('task'));
 		open();
 		await untilTasks(() => tabs.log.includes('b idle'));
-		expect(splitAtTask(tabs.log, 'b ')).toEqual({
-			before: ['a pending', 'task'],
-			after: true,
-		});
+		expect(tabs.log).toEqual(['a pending', 'task', 'b idle']);
 	});
 
-	it('is drained by flushSync together with its cue', () => {
+	it('is drained by flushSync together with its cue', async () => {
 		const tabs = mountTabs();
 
 		tabs.click();
 		flushSync(() => {});
-
 		expect(tabs.text()).toBe('b pending');
+
+		// The cue commits before its falling edge, which takes a later task.
+		await untilTasks(() => tabs.text() === 'b idle');
+		expect(tabs.log.at(-1)).toBe('b idle');
 	});
 
 	it('is drained by an awaited act()', async () => {
@@ -696,8 +740,7 @@ describe('a pending cue in an ancestor of the transition update', () => {
 		await untilTasks(() => frames.length === 2);
 
 		expect(frames).toEqual(['a pending', 'b idle']);
-		expect(splitAtTask(log, 'b ')).toEqual({ before: ['a pending', 'task'], after: true });
-		expect(log.at(-1)).toBe('b idle');
+		expect(log).toEqual(['a pending', 'task', 'b idle']);
 	});
 
 	it("shows the cue while the child's transition suspends", async () => {

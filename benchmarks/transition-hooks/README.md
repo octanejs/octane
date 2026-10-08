@@ -29,13 +29,13 @@ every application creation event belongs to the compiled template.
 
 | Scenario | Cycle | Control |
 | --- | --- | --- |
-| `cycle` | `start(() => setValue(next))` | three renders: the pending cue with the committed value, the new value in the transition's task, then the falling edge; text `next:idle` |
+| `cycle` | `start(() => setValue(next))` | two renders: the pending cue with the committed value, then the new value with the falling edge in the transition's task; text `next:idle` |
 | `updater` | `start(() => setValue((v) => v + 1))` | identical render sequence to `cycle` through the queued-updater path |
-| `held` | transition to a value whose `use()` request is pending, then resolve it | hold: the pending cue with the committed value, the transition suspending in its task, then the cue re-render with the committed value, no fallback, previous text retained; release: promotion, then the falling edge with the new text |
+| `held` | transition to a value whose `use()` request is pending, then resolve it | hold: the pending cue with the committed value, the transition with its falling edge suspending in its task, then the cue re-render with the committed value, no fallback, previous text retained; release: promotion, then the falling edge with the new text |
 | `dispatch` | `setValue((v) => v + 1)` outside any transition | exactly one render |
 | `bail` | `setValue(same)` on an idle cell | no render at all |
 | `click` | a native `button.click()` whose delegated handler dispatches a functional update | exactly one render through the discrete-event flush |
-| `urgent` | `start(() => setChild(next)); setParent(next)` in the same tick | parent renders once; the child renders its committed value under the urgent parent render, then the transition value, then the falling edge |
+| `urgent` | `start(() => setChild(next)); setParent(next)` in the same tick | parent renders once; the child renders its committed value under the urgent parent render, then the transition value with the falling edge |
 
 The `held` and `urgent` sequences pin behaviors the September 2026 React
 behavioral audit corrected; a checkout that predates them cannot run those
@@ -206,6 +206,39 @@ The extra render is the cue's own. A render of this component costs 11 arrays,
 and its separate flush: the task closure and its `MessageChannel`, and the follow-up
 list for the falling edge. The cue's committed-cell exposure no longer allocates a
 slot index or a predicate closure. React renders this pattern twice, folding the
-falling edge into the transition render. Octane still publishes it after the
-transition's render, as it does when the cue and the transition live in different
-components.
+falling edge into the transition render; the next section does the same.
+
+## Falling edge in the transition's render (#1864)
+
+React's transition lane carries `setPending(false)`, so `isPending` falls in the
+render that commits the transition's own updates. Octane used to publish it from a
+follow-up after the transition's task flush, a separate render and commit in the
+same task. Its completion now settles in the drain that renders the transition's
+work: the component holding the transition's state renders the new value with
+`isPending` false, and a suspending render that holds the transition raises it
+again. Creation events per 64 cycles against `385d6aba9`, with the `cycle`,
+`updater`, `held`, and `urgent` controls updated to the new sequences:
+
+| Scenario | Counter | `385d6aba9` | Falling edge folded |
+| --- | --- | ---: | ---: |
+| `cycle` | renders | 192 | 128 |
+| `cycle` | functions / arrays / objects / constructors | 256 / 2,624 / 1,155 / 320 | 192 / 1,792 / 899 / 256 |
+| `cycle` | map gets | 896 | 640 |
+| `updater` | renders | 192 | 128 |
+| `updater` | functions / arrays / objects / constructors | 192 / 2,624 / 1,152 / 320 | 128 / 1,792 / 896 / 256 |
+| `updater` | map gets | 896 | 640 |
+| `held` | renders | 320 | 320 |
+| `held` | functions / arrays / objects / constructors | 768 / 5,376 / 1,664 / 962 | 704 / 5,376 / 1,728 / 962 |
+| `urgent` | renders | 256 | 192 |
+| `urgent` | functions / arrays / objects / constructors | 256 / 2,688 / 1,280 / 320 | 192 / 1,856 / 1,024 / 256 |
+| `urgent` | map gets | 960 | 704 |
+
+`cycle`, `updater`, and `urgent` each drop the falling edge's render (11 arrays,
+4 objects, and 1 constructor here), its follow-up closure, and the follow-up list.
+`held` keeps five renders: its suspended attempt now shows the falling edge, so the
+journal snapshots one more binding bag before the hold restores it (+1 object), and
+promotion still renders before the falling edge that the boundary's release
+publishes. The bundle grows from 255,404 to 256,841 minified bytes (81,562 to
+82,090 gzip): the completion queue, its hold cancellation, and the effect ordering
+that commits a falling edge rendered after its drain's holds as the transition's
+first update.
