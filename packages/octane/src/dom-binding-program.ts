@@ -1582,7 +1582,13 @@ function writeOperation(
 				)),
 			);
 		style.write(value as string | null);
-	} else __writeBinding(instance.nodes[operation[0]] as Element, operation, value as string | null);
+	} else
+		__writeBinding(
+			instance.nodes[operation[0]] as Element,
+			operation,
+			value as string | null,
+			instance.previous[index],
+		);
 	if (!transaction.disposed && !instance.disposed) instance.previous[index] = value;
 }
 

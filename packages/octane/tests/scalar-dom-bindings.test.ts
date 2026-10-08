@@ -37,6 +37,24 @@ const NUMBERED = `export function Numbered(props) @{
   </section>
 }`;
 
+// Browser page translation rewrites the server's text leaves before adoption.
+const PANEL = `export function Panel(props) @{
+  'use dom bindings';
+  <div hidden={props.hidden}>
+    <span>{props.message as string}</span>
+    <button type="button" hidden={props.hidden}>{props.label as string}</button>
+  </div>
+}`;
+// Unbound children leave the bound targets addressed rather than positional.
+const FEED = `import { unbound } from 'octane/behavior';
+export function Feed(props) @{
+  'use dom bindings';
+  <section>
+    <h2>{props.title as string}</h2>
+    {unbound(props.children)}
+  </section>
+}`;
+
 type View = DomBindings.CompiledBindings<Record<string, unknown>> & {
 	adopt: typeof DomBindings.__adoptBindings;
 };
@@ -86,6 +104,20 @@ function source(initial: Record<string, unknown>) {
 	};
 }
 
+// Chrome Translate replaces a text leaf's Text node with nested <font> wrappers.
+function translate(leaf: Element, text: string): Element {
+	const outer = document.createElement('font');
+	const inner = outer.appendChild(document.createElement('font'));
+	outer.style.verticalAlign = inner.style.verticalAlign = 'inherit';
+	inner.textContent = text;
+	leaf.replaceChildren(outer);
+	return outer;
+}
+
+function textChildren(leaf: Element) {
+	return [...leaf.childNodes].map((node) => [node.nodeType, node.nodeValue]);
+}
+
 const plain = { title: 'First', classes: 'a', live: 'polite', hidden: false, count: 1 };
 const linked = { title: 'Links', href: '/a', label: 'Open', src: '/a.png', icon: '#send' };
 
@@ -131,6 +163,23 @@ describe.each([
 			icon: nav.querySelector('use')!,
 			adopt: (state: DomBindings.BindingSource<Record<string, unknown>>) =>
 				view.adopt(nav, view, state),
+		};
+	}
+
+	function panel(hidden: boolean) {
+		const { server, artifact } = compile(PANEL, 'Panel', dev);
+		const view: View =
+			lane === 'scalar' ? artifact : { ...artifact, adopt: DomBindings.__adoptBindings };
+		const props = { message: 'Le traitement est interrompu.', label: 'Réessayer', hidden };
+		document.body.innerHTML = renderToString(server.Panel, props).html;
+		const root = document.querySelector('div')!;
+		return {
+			props,
+			root,
+			span: root.querySelector('span')!,
+			button: root.querySelector('button')!,
+			adopt: (state: DomBindings.BindingSource<Record<string, unknown>>) =>
+				view.adopt(root, view, state),
 		};
 	}
 
@@ -274,6 +323,75 @@ describe.each([
 		expect(model.subscribers.size).toBe(0);
 		expect(scope.inspect().nodes.map((node) => node.subscribers)).toEqual([0, 0]);
 		scope.dispose();
+	});
+
+	// Translating again before adoption would flash the source language, so a
+	// translated leaf stays as it is until its value changes.
+	it.each([false, true])(
+		'adopts translated text leaves untouched and replaces each on change (hidden=%s)',
+		(hidden) => {
+			const { props, root, span, button, adopt } = panel(hidden);
+			const message = translate(span, 'Processing was interrupted.');
+			const label = translate(button, 'Retry');
+			const observer = new MutationObserver(() => {});
+			observer.observe(root, {
+				subtree: true,
+				childList: true,
+				characterData: true,
+				attributes: true,
+			});
+			const model = source(props);
+			const handle = adopt(model.state);
+			try {
+				expect(observer.takeRecords()).toEqual([]);
+				expect(document.querySelector('span')).toBe(span);
+				expect(document.querySelector('button')).toBe(button);
+				expect([span.firstChild, button.firstChild]).toEqual([message, label]);
+				expect([root.hidden, button.hidden]).toEqual([hidden, hidden]);
+
+				model.publish({ label: 'Fermer' });
+				expect(textChildren(button)).toEqual([[3, 'Fermer']]);
+				expect(span.firstChild).toBe(message);
+				model.publish({ message: 'Nouveau message.', hidden: !hidden });
+				expect(textChildren(span)).toEqual([[3, 'Nouveau message.']]);
+				expect([root.hidden, button.hidden]).toEqual([!hidden, !hidden]);
+				expect(document.querySelector('span')).toBe(span);
+				expect(document.querySelector('button')).toBe(button);
+			} finally {
+				observer.disconnect();
+				handle.dispose();
+			}
+		},
+	);
+
+	it('replaces a text leaf translated after adoption when its value changes', () => {
+		const { props, span, button, adopt } = panel(false);
+		const model = source(props);
+		const handle = adopt(model.state);
+		try {
+			translate(span, 'Processing was interrupted.');
+			translate(button, 'Retry');
+			model.publish({ message: 'Nouveau message.', label: 'Fermer' });
+			expect(textChildren(span)).toEqual([[3, 'Nouveau message.']]);
+			expect(textChildren(button)).toEqual([[3, 'Fermer']]);
+			model.publish({ message: 'Encore.' });
+			expect(textChildren(span)).toEqual([[3, 'Encore.']]);
+		} finally {
+			handle.dispose();
+		}
+	});
+
+	it('still refuses a text leaf holding any other element', () => {
+		const { props, span, adopt } = panel(false);
+		for (const leaf of [
+			[document.createElement('b')],
+			[document.createTextNode('Le'), document.createElement('font')],
+		]) {
+			span.replaceChildren(...leaf);
+			const model = source(props);
+			expect(() => adopt(model.state)).toThrow(/mismatched static element topology/);
+			expect(model.subscribers.size).toBe(0);
+		}
 	});
 
 	it('presents signal writes from an async transition Action atomically when it settles', async () => {
@@ -477,6 +595,43 @@ describe.each([
 			handle.dispose();
 			root?.unmount();
 		}
+	});
+});
+
+describe.each([false, true])('addressed text leaf adoption (dev=%s)', (dev) => {
+	function feed() {
+		const { server, artifact } = compile(FEED, 'Feed', dev);
+		const props = { title: 'Nouvelles' };
+		document.body.innerHTML = renderToString(server.Feed, props).html;
+		const section = document.querySelector('section')!;
+		return {
+			props,
+			heading: section.querySelector('h2')!,
+			adopt: (state: DomBindings.BindingSource<Record<string, unknown>>) =>
+				artifact.adopt(section, artifact, state),
+		};
+	}
+
+	it('adopts a translated leaf untouched and replaces it on change', () => {
+		const { props, heading, adopt } = feed();
+		const translated = translate(heading, 'News');
+		const model = source(props);
+		const handle = adopt(model.state);
+		try {
+			expect(heading.firstChild).toBe(translated);
+			model.publish({ title: 'Archives' });
+			expect(textChildren(heading)).toEqual([[3, 'Archives']]);
+		} finally {
+			handle.dispose();
+		}
+	});
+
+	it('still refuses a leaf holding any other element', () => {
+		const { props, heading, adopt } = feed();
+		heading.replaceChildren(document.createElement('b'));
+		const model = source(props);
+		expect(() => adopt(model.state)).toThrow(/mismatched addressed element topology/);
+		expect(model.subscribers.size).toBe(0);
 	});
 });
 

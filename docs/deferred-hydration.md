@@ -692,6 +692,19 @@ with their current owner. An application must stop previous manual writers for
 the channels it hands over. Template compatibility is not document or request
 authorization: retain the enclosing application's lifetime and stream fencing.
 
+Browser page translation is the one text rewrite adoption accepts. Chrome's
+Translate replaces a translated text leaf's Text node with `<font>` wrappers.
+Adoption keeps that leaf as it is and writes nothing to it, so the page neither
+flashes back to its source language nor shifts. The leaf is replaced with plain
+text the next time its bound value changes, and the browser may translate that
+text again. If the data changed between server rendering and adoption, a
+translated leaf shows its server text until that change. Any other element
+inside a text leaf is still a topology mismatch (error #318, or #321 for a view
+with unbound children). To keep text untranslated, such as names, codes or
+prices, add `translate="no"` (or `class="notranslate"`) to its element. That is
+an ordinary static attribute with no runtime cost. The compiler never adds it
+for you, since it would make all dynamic text untranslatable.
+
 `unbound(value)` marks an explicitly external-owned attribute in an opted-in
 view. The ordinary component uses its value during SSR and normal rendering;
 the adopter neither evaluates nor writes that attribute. Above, the server can

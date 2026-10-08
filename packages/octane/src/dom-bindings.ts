@@ -135,7 +135,12 @@ export type BindingScalarChannels = readonly [
 	accepts: (binding: BindingOperation) => boolean,
 	normalize: (binding: BindingOperation, value: unknown) => string | null,
 	/** Returns the value left in the DOM, which the legacy handoff publishes. */
-	write: (node: Element, binding: BindingOperation, value: string | null) => string | null,
+	write: (
+		node: Element,
+		binding: BindingOperation,
+		value: string | null,
+		previous?: BindingValue,
+	) => string | null,
 ];
 
 /** @internal Whole styles carry canonical snapshots; scalar channels remain strings. */
@@ -252,7 +257,10 @@ function resolveFixedNodes(root: Element, descriptor: CompiledBindings<unknown>)
 			node.localName !== tag ||
 			node.namespaceURI !== namespaces[namespace] ||
 			(text
-				? node.childNodes.length > 1 || (node.firstChild !== null && node.firstChild.nodeType !== 3)
+				? (node.childNodes.length > 1 ||
+						(node.firstChild !== null && node.firstChild.nodeType !== 3)) &&
+					// Chrome Translate wraps a translated text leaf in <font> elements.
+					(node.firstChild as Element).localName !== 'font'
 				: children !== null &&
 					(node.childNodes.length !== children || node.children.length !== children))
 		) {
@@ -321,7 +329,10 @@ function resolveAddressedNodes(root: Element, descriptor: CompiledBindings<unkno
 						nodes[parent]!.children[childCounts[parent]!] !== node)) ||
 			(openChildren && children === null) ||
 			(text
-				? node.childNodes.length > 1 || (node.firstChild !== null && node.firstChild.nodeType !== 3)
+				? (node.childNodes.length > 1 ||
+						(node.firstChild !== null && node.firstChild.nodeType !== 3)) &&
+					// Chrome Translate wraps a translated text leaf in <font> elements.
+					(node.firstChild as Element).localName !== 'font'
 				: children !== null &&
 					!openChildren &&
 					(node.childNodes.length !== children || node.children.length !== children))
@@ -380,12 +391,17 @@ function writeFixedScalar(
 	node: Element,
 	binding: BindingOperation,
 	value: string | null,
+	previous?: BindingValue,
 ): string | null {
 	const name = binding[2];
 	if (binding[1] === 'text') {
 		const text = node.firstChild;
 		if (text === null) node.appendChild(node.ownerDocument.createTextNode(value!));
-		else if (text.nodeValue !== value) text.nodeValue = value;
+		else if (text.nodeValue !== value) {
+			if (text.nodeType === 3) text.nodeValue = value;
+			// A translated leaf survives the channel's first write, then is replaced on change.
+			else if (previous !== undefined) node.textContent = value;
+		}
 	} else if (value === null) {
 		if (node.hasAttribute(name)) node.removeAttribute(name);
 	} else if (node.getAttribute(name) !== value) {
@@ -430,6 +446,7 @@ function write(
 	node: Element,
 	binding: BindingOperation,
 	value: string | null,
+	previous?: BindingValue,
 ): string | null | void {
 	const name = binding[2];
 	if (binding[1] === 'classToken') {
@@ -456,7 +473,7 @@ function write(
 			if (style.getPropertyValue(name) !== text || style.getPropertyPriority(name) !== priority)
 				style.setProperty(name, text, priority);
 		}
-	} else return writeFixedScalar(node, binding, value);
+	} else return writeFixedScalar(node, binding, value, previous);
 }
 
 export { normalize as __normalizeBinding, write as __writeBinding };
@@ -719,7 +736,7 @@ export function __adoptBindings<Props>(
 				if (!style)
 					styles.set(i, (style = __createBindingStyleRestoration(nodes[binding[0]]!, binding)));
 				style.write(next[i] as string | null);
-			} else written = write(nodes[binding[0]]!, binding, next[i] as string | null);
+			} else written = write(nodes[binding[0]]!, binding, next[i] as string | null, previous[i]);
 			if (!disposed) {
 				previous[i] = next[i]!;
 				// Only fixed scalar, URL and style channels participate in this legacy
@@ -1240,7 +1257,7 @@ export function __adoptScalarBindings<Props>(
 			const i = indices ? indices[position]! : position;
 			if (next[i] === previous[i]) continue;
 			const binding = bindings[i]!;
-			const published = writeChannel(nodes[binding[0]]!, binding, next[i]!);
+			const published = writeChannel(nodes[binding[0]]!, binding, next[i]!, previous[i]);
 			if (!disposed) {
 				previous[i] = next[i];
 				const node = owned[i]![0];

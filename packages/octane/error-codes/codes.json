@@ -1908,7 +1908,8 @@
       "message": "DOM bindings cannot adopt a mismatched static element topology.",
       "argumentCount": 0,
       "runtime": ["client"],
-      "status": "active"
+      "status": "active",
+      "note": "Browser page translation can rewrite text before adoption. A text leaf may hold only its text, or the <font> wrappers Chrome's Translate leaves in its place, which Octane replaces on the leaf's next value change. Any other element in a text leaf raises this error, as does translated text in an Octane release without that support. To keep an element's text untranslated, add translate=\"no\" or class=\"notranslate\" to it."
     },
     "319": {
       "message": "DOM bindings cannot adopt an incomplete static element topology.",
@@ -1926,7 +1927,8 @@
       "message": "DOM bindings cannot adopt a mismatched addressed element topology.",
       "argumentCount": 0,
       "runtime": ["client"],
-      "status": "active"
+      "status": "active",
+      "note": "Browser page translation can rewrite text before adoption. A text leaf may hold only its text, or the <font> wrappers Chrome's Translate leaves in its place, which Octane replaces on the leaf's next value change. Any other element in a text leaf raises this error, as does translated text in an Octane release without that support. To keep an element's text untranslated, add translate=\"no\" or class=\"notranslate\" to it."
     },
     "322": {
       "message": "DOM bindings cannot adopt an incomplete addressed element topology.",
