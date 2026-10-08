@@ -667,8 +667,10 @@ export function Tree({ node }: { node: Branch }) @{
 ```
 
 The compiler emits one program for the recursive views and creates an instance
-for each level the data reaches. Recursion needs to end on a branch or an empty
-list, as it does in the renderer. Each instance owns its own text, keyed items,
+for each level the data reaches. Recursion must be able to end on a branch or an
+empty list. The compiler rejects a view that renders itself on every path, such
+as a recursive call outside any `@if`, `@for` or `@try`, and names the cycle in
+the error. Each instance owns its own text, keyed items,
 handlers, effects and `@try` arms, and removing a branch retires the instances
 beneath it. A recursive call does not specialize fixed primitive props, so a
 `depth={depth + 1}` prop never unrolls the recursion at compile time. Recursion

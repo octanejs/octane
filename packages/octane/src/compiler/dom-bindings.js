@@ -2247,6 +2247,8 @@ export function prepareDomBindings(ast, source, filename, selectedExport, helper
 	const openVisits = [];
 	const planning = [];
 	let nextVisit = 0;
+	// Local child views each view enters on every path, with the first such call.
+	const everyPathCalls = new Map();
 	const programNames = new Set(imports.keys());
 	const localConstants = new Map();
 	walk(ast, (node) => {
@@ -2576,17 +2578,20 @@ export function prepareDomBindings(ast, source, filename, selectedExport, helper
 				});
 				return !renderable;
 			},
-			localProgram: (name, props, annotationsOnly = false, fixedProps = null) => {
+			localProgram: (name, props, annotationsOnly = false, fixedProps = null, everyPath = null) => {
 				const child = localFunctions.get(name);
-				return child
-					? programFor(
-							child,
-							bindingRender(child, filename, false),
-							props,
-							annotationsOnly,
-							fixedProps,
-						)
-					: null;
+				if (!child) return null;
+				if (everyPath !== null) {
+					if (!everyPathCalls.has(fn)) everyPathCalls.set(fn, new Map());
+					if (!everyPathCalls.get(fn).has(child)) everyPathCalls.get(fn).set(child, everyPath);
+				}
+				return programFor(
+					child,
+					bindingRender(child, filename, false),
+					props,
+					annotationsOnly,
+					fixedProps,
+				);
 			},
 			nativePlan: (element, namespace, ancestors) =>
 				planView(fn, filename, source, imports, lexical, { element, namespace, ancestors }),
@@ -2827,6 +2832,29 @@ export function prepareDomBindings(ast, source, filename, selectedExport, helper
 				},
 			});
 	});
+	// Recursion that enters a view again on every path never ends, in the
+	// browser or on the server. Each such cycle must pass through a branch,
+	// list or caller slot.
+	const entered = new Map();
+	const path = [];
+	const assertRecursionEnds = (fn) => {
+		entered.set(fn, false);
+		path.push(fn);
+		for (const [child, call] of everyPathCalls.get(fn) ?? []) {
+			if (entered.get(child) === false) {
+				const cycle = [...path.slice(path.indexOf(child)), child].map((view) => view.id.name);
+				error(
+					filename,
+					call,
+					`binding view ${child.id.name} renders itself on every path (${cycle.join(' → ')}); place the recursive call inside @if, @for or @try`,
+				);
+			}
+			if (!entered.has(child)) assertRecursionEnds(child);
+		}
+		path.pop();
+		entered.set(fn, true);
+	};
+	for (const fn of everyPathCalls.keys()) if (!entered.has(fn)) assertRecursionEnds(fn);
 	if (selectedExport !== null) {
 		const plan = plans.get(selectedExport);
 		if (!plan)

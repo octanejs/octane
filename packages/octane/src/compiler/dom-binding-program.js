@@ -281,6 +281,16 @@ export function planBindingProgram(fn, render, context) {
 		if (!context.annotationsOnly) assertProjection(expression);
 	};
 	const regionMarker = (site, arm) => `<!--[b;${id};${site};${arm}--><!--]-->`;
+	// A branch arm, list item or caller slot may not render, so a child view
+	// called there is not entered on every path through this view.
+	let conditional = false;
+	const compileBranch = (nodes, names, namespace, ancestors) => {
+		const outer = conditional;
+		conditional = true;
+		const result = compileFragment(nodes, names, namespace, ancestors);
+		conditional = outer;
+		return result;
+	};
 	const compileFragment = (
 		authoredNodes,
 		outerNames,
@@ -428,8 +438,8 @@ export function planBindingProgram(fn, render, context) {
 				const thenNodes = blockNodes(node.consequent);
 				const elseNodes = blockNodes(node.alternate);
 				const arms = [
-					compileFragment(thenNodes, names, ns, parents).fragment,
-					compileFragment(elseNodes, names, ns, parents).fragment,
+					compileBranch(thenNodes, names, ns, parents).fragment,
+					compileBranch(elseNodes, names, ns, parents).fragment,
 				];
 				const selected = context.fixed.known(node.test);
 				if (!context.annotationsOnly && selected !== context.fixed.unknown)
@@ -474,12 +484,12 @@ export function planBindingProgram(fn, render, context) {
 					if (parameter && parameter.type !== 'Identifier')
 						fail(parameter, 'binding @catch parameters must be identifiers');
 				const arms = [
-					compileFragment(blockNodes(node.block), names, ns, parents).fragment,
+					compileBranch(blockNodes(node.block), names, ns, parents).fragment,
 					node.pending?.body?.length
-						? compileFragment(node.pending.body, names, ns, parents).fragment
+						? compileBranch(node.pending.body, names, ns, parents).fragment
 						: b.literal(null),
 					handler
-						? compileFragment(
+						? compileBranch(
 								handler.body.body,
 								[...names, handler.param?.name ?? null, handler.resetParam?.name ?? null],
 								ns,
@@ -523,13 +533,13 @@ export function planBindingProgram(fn, render, context) {
 					),
 					node,
 				);
-				const body = compileFragment(
+				const body = compileBranch(
 					blockNodes(node.body),
 					[...names, item.name, indexName],
 					ns,
 					parents,
 				).fragment;
-				const empty = compileFragment(blockNodes(node.empty), names, ns, parents).fragment;
+				const empty = compileBranch(blockNodes(node.empty), names, ns, parents).fragment;
 				const index = nodes.length;
 				appendNode([parent, 'region', String(site)]);
 				regions.push(
@@ -556,9 +566,9 @@ export function planBindingProgram(fn, render, context) {
 				const html = createTemplateIr();
 				appendTemplatePart(html, regionMarker(site, 'v'), 'anchor');
 				if (context.annotationsOnly) {
-					localProgram(tag, null, true);
+					localProgram(tag, null, true, null, conditional ? null : node);
 					if ((node.children ?? []).some(significant))
-						compileFragment(node.children, names, ns, parents);
+						compileBranch(node.children, names, ns, parents);
 					return html;
 				}
 				const props = [];
@@ -584,7 +594,9 @@ export function planBindingProgram(fn, render, context) {
 				}
 				if ((node.children ?? []).some(significant)) propNames.push('children');
 				const imported = imports.get(tag);
-				const child = !imported ? localProgram(tag, propNames, false, fixedProps) : null;
+				const child = !imported
+					? localProgram(tag, propNames, false, fixedProps, conditional ? null : node)
+					: null;
 				if (
 					!child &&
 					(!imported?.imported ||
@@ -656,7 +668,7 @@ export function planBindingProgram(fn, render, context) {
 					expressions.push(...child.expressions);
 				} else signals = true;
 				if ((node.children ?? []).some(significant)) {
-					const fragment = compileFragment(node.children, names, ns, parents).fragment;
+					const fragment = compileBranch(node.children, names, ns, parents).fragment;
 					const local = allocateProgramName('_bindingSlotFragment');
 					hoists.push(origin(b.const(b.id(local), fragment), node));
 					if (slotFactory === null) {

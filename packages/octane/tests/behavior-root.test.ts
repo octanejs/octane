@@ -9428,6 +9428,76 @@ function Leaf({ node }) @{ const [open] = useState(false); <i>{String(open) as s
 			}
 		});
 
+		// Recursion that enters a view again on every path would never end, on the
+		// server or in the browser, so the compiler rejects it.
+		it(`rejects recursion that renders on every path (${dev ? 'dev' : 'prod'})`, () => {
+			const shape = encodeURIComponent(JSON.stringify([1, ['n']]));
+			for (const [view, source, cycle] of [
+				[
+					'Loop',
+					`export function Loop({ n }) @{ 'use dom bindings'; <section><p><Loop n={n} /></p></section> }`,
+					'Loop → Loop',
+				],
+				[
+					'Outer',
+					`function Inner({ n }) @{ <b><Outer n={n} /></b> }
+export function Outer({ n }) @{ 'use dom bindings'; <div><Inner n={n} /></div> }`,
+					'Outer → Inner → Outer',
+				],
+				[
+					'Spread',
+					`export function Spread({ n, ...rest }) @{ 'use dom bindings'; <div {...rest}><Spread n={n} /></div> }`,
+					'Spread → Spread',
+				],
+			] as const) {
+				for (const id of [
+					'/src/loop.tsrx',
+					`/src/loop.tsrx?octane-bindings=${view}&octane-props=${shape}`,
+				])
+					expect(() =>
+						loadCompiledFixtureSource(source, {
+							id,
+							mode: id.includes('?') ? 'client' : 'server',
+							compileOptions: { dev, hmr: false },
+						}),
+					).toThrow(`binding view ${view} renders itself on every path (${cycle})`);
+			}
+
+			// One conditional call in the cycle is enough for the recursion to end.
+			type Link = { label: string; next: Link | null };
+			const link = (...labels: string[]): Link | null =>
+				labels.length === 0 ? null : { label: labels[0]!, next: link(...labels.slice(1)) };
+			const chain = authoredPresentation(
+				'Chain',
+				{ link: link('a', 'b')! },
+				dev,
+				`type Link = { label: string; next: Link | null };
+function Wrap({ link }: { link: Link }) @{ <article><Chain link={link} /></article> }
+export function Chain({ link }: { link: Link }) @{
+  'use dom bindings';
+  <section title={link.label}>@if (link.next) { <Wrap link={link.next} /> }</section>
+}`,
+			);
+			const host = document.createElement('div');
+			container.append(host);
+			const titles = () => [...host.querySelectorAll('section')].map((node) => node.title);
+			for (const adopt of [true, false]) {
+				host.innerHTML = adopt ? chain.html : '';
+				chain.publish({ link: link('a', 'b')! }, false);
+				const handle = adopt
+					? chain.attach(host.querySelector('section')!, chain.state)
+					: chain.mount({ parent: host }, chain.state);
+				try {
+					expect(titles()).toEqual(['a', 'b']);
+					chain.publish({ link: link('x', 'y', 'z')! });
+					expect(titles()).toEqual(['x', 'y', 'z']);
+					expect(host.querySelectorAll('article')).toHaveLength(2);
+				} finally {
+					handle.dispose();
+				}
+			}
+		});
+
 		// `@try` selects its arm from the reads its body performs, exactly like the
 		// renderer: pending shows `@pending`, an error shows `@catch` until reset.
 		it(`adopts and switches @try arms from imported async reads (${dev ? 'dev' : 'prod'})`, async () => {
