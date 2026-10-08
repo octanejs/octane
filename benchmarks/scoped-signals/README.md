@@ -167,7 +167,9 @@ node benchmarks/bench.mjs --quick --ratios scoped-signals-trace
 
 The timing is normalized to nanoseconds per retained event. Same-run ratios compare the
 wrapped maximum budget with the unfilled maximum-budget control; they do not claim
-renderer or application-wide gains.
+renderer or application-wide gains. Here "budget" is the scope's trace retention
+limit (`debug.traceLimit`), not a committed CI ceiling: the guard compares two
+configurations measured in the same run.
 
 ## Baseline versus candidate owner reads
 

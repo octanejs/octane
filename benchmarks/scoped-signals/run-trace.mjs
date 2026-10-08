@@ -14,7 +14,7 @@ const repo = path.resolve(import.meta.dirname, '../..');
 const bundled = await build({
 	absWorkingDir: repo,
 	stdin: {
-		contents: 'export { ScopeImpl } from "./packages/octane/src/signals/engine.ts";',
+		contents: 'export { createScope } from "./packages/octane/src/signals/engine.ts";',
 		resolveDir: repo,
 		sourcefile: 'signal-trace-benchmark-entry.mjs',
 	},
@@ -27,7 +27,7 @@ const bundled = await build({
 	define: { 'process.env.NODE_ENV': '"production"' },
 	logLevel: 'silent',
 });
-const { ScopeImpl } = await import(
+const { createScope } = await import(
 	`data:text/javascript;base64,${Buffer.from(bundled.outputFiles[0].text).toString('base64')}`
 );
 
@@ -58,7 +58,7 @@ function verifyTrace(trace, traceLimit, emitted) {
 
 function sample(scenario, events, sampleIndex) {
 	const scopeKey = `trace-${scenario.name}-${sampleIndex}`;
-	const scope = new ScopeImpl(scopeKey, {
+	const scope = createScope({
 		scopeKey,
 		debug: { traceLimit: scenario.traceLimit },
 	});
@@ -77,7 +77,7 @@ function sample(scenario, events, sampleIndex) {
 	return { nanosecondsPerEvent: (elapsed * 1_000_000) / events, metadata };
 }
 
-const quiet = new ScopeImpl('trace-disabled-control', { scopeKey: 'trace-disabled-control' });
+const quiet = createScope({ scopeKey: 'trace-disabled-control' });
 quiet.trace('write');
 assert.deepEqual(quiet.inspect().trace, []);
 quiet.dispose();
