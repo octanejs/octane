@@ -32,7 +32,13 @@ export function Rows(props: { rows: { id: number; label: string }[] }) @{
 		}
 	</ul>
 }`;
-const compiled = compile(source, 'event-owner-rows.tsrx', { dev: false, hmr: false }).code;
+const compiled = compile(source, 'event-owner-rows.tsrx', {
+	dev: false,
+	hmr: false,
+	// Authority is measured for handle-capable rows; a module without a
+	// signals import publishes none unless it opts in.
+	opaqueSignalHandles: true,
+}).code;
 // The guarded path only exists in modules that may receive a signal handle.
 assert.match(compiled, /enableSignalBindings\(1, true\)/, 'potential signal bindings');
 
@@ -140,6 +146,11 @@ try {
 			mountWrites[count] = counted(() => flushSync(() => view.render(Rows, { rows })));
 			const buttons = [...container.querySelectorAll('button')];
 			assert.equal(buttons.length, count);
+			// Zero weak writes only counts if every handler recorded its authority.
+			assert.ok(
+				buttons.every((button) => button.$$signalOwner !== undefined),
+				'mounted handlers record signal authority',
+			);
 			click(container, count - 1);
 			assert.deepEqual(picked(container), [String(count - 1)], 'mounted handlers dispatch');
 			if (count === LARGE) {

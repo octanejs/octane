@@ -30,6 +30,7 @@ export const BUNDLED_SKILLS = {
 export const REPO_SKILLS = {
 	'authoring-tsrx': '.rulesync/skills/authoring-tsrx/SKILL.md',
 	'bug-hunter': '.rulesync/skills/bug-hunter/SKILL.md',
+	'concise-code': '.rulesync/skills/concise-code/SKILL.md',
 	'create-a-pr': '.rulesync/skills/create-a-pr/SKILL.md',
 	'handle-issue': '.rulesync/skills/handle-issue/SKILL.md',
 	'octane-core-extend': '.rulesync/skills/octane-core-extend/SKILL.md',

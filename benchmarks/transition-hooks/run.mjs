@@ -297,10 +297,10 @@ function scenarios(bundle) {
 					await quiesce(observations);
 					// The pending cue renders first with the committed value, as React
 					// renders isPending urgently; the transition renders the new value
-					// in its task, and the Action's settle publishes the falling edge.
+					// in its task with isPending's falling edge, as React's transition
+					// lane carries setPending(false).
 					expectRenders(label, observations, [
 						['cycle', previous, true],
-						['cycle', next, true],
 						['cycle', next, false],
 					]);
 					expectText(label, container, `${next}:idle`);
@@ -349,12 +349,13 @@ function scenarios(bundle) {
 					start(() => setValue(next));
 					await quiesce(observations);
 					// The pending cue renders first with the committed value. The
-					// transition then suspends in its task and holds the committed
-					// content whole: the cue re-render shows the previous value with
-					// the pending indicator and no fallback.
+					// transition then renders with its falling edge in its task,
+					// suspends, and holds the committed content whole: the cue
+					// re-render shows the previous value with the pending indicator
+					// and no fallback.
 					expectRenders('held hold', observations, [
 						['held', previous, true],
-						['held', next, true],
+						['held', next, false],
 						['held', previous, true],
 					]);
 					expectText('held hold', container, `pendingvalue-${previous}`);
@@ -463,11 +464,10 @@ function scenarios(bundle) {
 					await quiesce(observations);
 					// The urgent parent render exposes the child's committed value
 					// while its transition update stays queued; the transition then
-					// renders the new value and the settle publishes the falling edge.
+					// renders the new value with isPending's falling edge.
 					expectRenders('urgent', observations, [
 						['parent', next, false],
 						['child', previous, true],
-						['child', next, true],
 						['child', next, false],
 					]);
 					expectText('urgent', container, `${next}${next}/${next}:idle`);
@@ -711,29 +711,31 @@ try {
  * enforce exact ceilings, including zero for paths that must stay allocation-free.
  */
 const WORK_MODEL = {
-	cycle_map_gets: [14, 0],
-	updater_map_gets: [14, 0],
+	cycle_map_gets: [10, 0],
+	updater_map_gets: [10, 0],
 	held_map_gets: [28, 1],
 	dispatch_map_gets: [4, 0],
 	bail_map_gets: [1, 0],
 	click_map_gets: [53, 0],
 	urgent_map_gets: [23, 0],
-	// The pending cue renders apart from the transition, which renders in its task.
-	cycle_renders: [3, 0],
-	cycle_runtime_functions: [4, 0],
-	cycle_runtime_arrays: [41, 0],
+	// The pending cue renders apart from the transition, which renders in its task
+	// with isPending's falling edge.
+	cycle_renders: [2, 0],
+	cycle_runtime_functions: [3, 0],
+	cycle_runtime_arrays: [28, 0],
 	// One-time: the lazily installed transition swap, root and task driver records.
-	cycle_runtime_objects: [18, 3],
-	cycle_runtime_constructors: [5, 0],
-	updater_renders: [3, 0],
-	updater_runtime_functions: [3, 0],
-	updater_runtime_arrays: [41, 0],
-	updater_runtime_objects: [18, 0],
-	updater_runtime_constructors: [5, 0],
+	cycle_runtime_objects: [14, 3],
+	cycle_runtime_constructors: [4, 0],
+	updater_renders: [2, 0],
+	updater_runtime_functions: [2, 0],
+	updater_runtime_arrays: [28, 0],
+	updater_runtime_objects: [14, 0],
+	updater_runtime_constructors: [4, 0],
 	held_renders: [5, 0],
-	held_runtime_functions: [12, 0],
+	held_runtime_functions: [11, 0],
 	held_runtime_arrays: [84, 0],
-	held_runtime_objects: [26, 0],
+	// The held attempt renders the falling edge, so its journal snapshots that bag.
+	held_runtime_objects: [27, 0],
 	held_runtime_constructors: [15, 2],
 	dispatch_renders: [1, 0],
 	dispatch_runtime_functions: [1, 0],
@@ -751,11 +753,11 @@ const WORK_MODEL = {
 	// The delegated-dispatch frame pool allocates its first frame on the first event.
 	click_runtime_objects: [4, 1],
 	click_runtime_constructors: [1, 0],
-	urgent_renders: [4, 0],
-	urgent_runtime_functions: [4, 0],
-	urgent_runtime_arrays: [42, 0],
-	urgent_runtime_objects: [20, 0],
-	urgent_runtime_constructors: [6, 0],
+	urgent_renders: [3, 0],
+	urgent_runtime_functions: [3, 0],
+	urgent_runtime_arrays: [29, 0],
+	urgent_runtime_objects: [16, 0],
+	urgent_runtime_constructors: [4, 0],
 };
 
 const payload = {

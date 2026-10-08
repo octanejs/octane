@@ -132,6 +132,11 @@ export function ErrorCodesLayout() @{
 				white-space: pre-wrap;
 				overflow-wrap: anywhere;
 			}
+			.errors-layout :global(.error-note) {
+				margin: 0 0 1.5rem;
+				color: var(--text-body);
+				line-height: 1.7;
+			}
 			.errors-layout :global(.error-argument-note) {
 				margin: 0 0 1.5rem;
 				color: var(--text-secondary);
@@ -238,6 +243,9 @@ export function ErrorCodeDecoder() @{
 		</p>
 		<h1 class="errors-title">Full error message</h1>
 		<pre class="error-message">{message}</pre>
+		@if (entry.note) {
+			<p class="error-note">{entry.note as string}</p>
+		}
 		@if (missingCount > 0) {
 			<p class="error-argument-note">
 				{
