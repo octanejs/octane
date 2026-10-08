@@ -116,7 +116,7 @@ const NON_CONTRAST_BASELINE: Record<string, readonly DeferredFinding[]> = {
 		{ ruleId: 'scrollable-region-focusable', nodeSelector: '.table-scroll:nth-child(115)' },
 		{ ruleId: 'scrollable-region-focusable', nodeSelector: '.table-scroll:nth-child(139)' },
 		{ ruleId: 'scrollable-region-focusable', nodeSelector: '.table-scroll:nth-child(144)' },
-		{ ruleId: 'scrollable-region-focusable', nodeSelector: '.table-scroll:nth-child(204)' },
+		{ ruleId: 'scrollable-region-focusable', nodeSelector: '.table-scroll:nth-child(205)' },
 	]),
 	// CodeMirror: the contenteditable surface has no accessible field name and
 	// its scroller is not focusable. Editor chrome, not site styles.

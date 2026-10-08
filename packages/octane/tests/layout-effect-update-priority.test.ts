@@ -82,6 +82,18 @@ async function settle(): Promise<void> {
 	for (let index = 0; index < 10; index++) await Promise.resolve();
 }
 
+/** Wait for a host task posted now, after every task the runtime posted before it. */
+function nextTask(): Promise<void> {
+	return new Promise((resolve) => {
+		const channel = new MessageChannel();
+		channel.port1.onmessage = () => {
+			channel.port1.close();
+			resolve();
+		};
+		channel.port2.postMessage(null);
+	});
+}
+
 describe.each([true, false])('layout effect updates during an async Action (dev: %s)', (dev) => {
 	const fixture = () =>
 		loadCompiledFixtureSource(source, {
@@ -116,6 +128,9 @@ describe.each([true, false])('layout effect updates during an async Action (dev:
 			expect(view.find('output').textContent).toBe('idle');
 			finishSecond();
 			await settle();
+			// The settled Action commits in a later host task (#1864).
+			expect(view.find('output').textContent).toBe('idle');
+			await nextTask();
 			expect(view.find('output').textContent).toBe('continued');
 		} finally {
 			finishFirst();

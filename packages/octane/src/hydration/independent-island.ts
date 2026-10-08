@@ -1,5 +1,6 @@
 import { formatClientError } from '../error-codes.client.generated.js';
 import { decodeSignalValue } from '../data-encoding.js';
+import { postHostTask } from '../host-task.js';
 import type { ScopeSeed, SignalOwner, SignalRendererOwnerIdentity } from '../signals/types.js';
 import { captureInitialDocumentSignals } from '../signals/native-read-seeds.js';
 import {
@@ -98,25 +99,11 @@ interface ActivationTurn {
 // entry holds the islands waiting for later tasks.
 let activationQueues: WeakMap<Document, ActivationTurn[]> | undefined;
 
-function postActivationTask(callback: () => void): void {
-	const scheduler = (globalThis as { scheduler?: { postTask?(callback: () => void): unknown } })
-		.scheduler;
-	if (typeof scheduler?.postTask === 'function') scheduler.postTask(callback);
-	else if (typeof MessageChannel === 'function') {
-		const channel = new MessageChannel();
-		channel.port1.onmessage = () => {
-			channel.port1.close();
-			callback();
-		};
-		channel.port2.postMessage(null);
-	} else setTimeout(callback, 0);
-}
-
 function takeActivationTurn(ownerDocument: Document, waiting: ActivationTurn[]): void {
 	while (waiting.length !== 0) {
 		const urgent = waiting.findIndex((turn) => turn.urgent());
 		if (waiting.splice(urgent < 0 ? 0 : urgent, 1)[0].run()) {
-			postActivationTask(() => takeActivationTurn(ownerDocument, waiting));
+			postHostTask(() => takeActivationTurn(ownerDocument, waiting));
 			return;
 		}
 	}
@@ -141,7 +128,7 @@ function enterActivationGate(ownerDocument: Document, turn: ActivationTurn): voi
 	queues.set(ownerDocument, waiting);
 	// A stale or expired attempt does not use up this task.
 	if (turn.run() || waiting.length !== 0) {
-		postActivationTask(() => takeActivationTurn(ownerDocument, waiting));
+		postHostTask(() => takeActivationTurn(ownerDocument, waiting));
 	} else queues.delete(ownerDocument);
 }
 

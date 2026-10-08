@@ -76,12 +76,12 @@
     "framework": {
       "raw": 339780,
       "gzip": 108932,
-      "brotli": 94883
+      "brotli": 94788
     },
     "total": {
       "raw": 687418,
       "gzip": 224599,
-      "brotli": 191089
+      "brotli": 191021
     }
   }
 }

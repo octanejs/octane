@@ -20,12 +20,26 @@ async function tick() {
 }
 async function settle() {
 	for (let i = 0; i < 30; i++) await Promise.resolve();
+	// A settled Action renders in the transition task, and isPending falls after it.
+	await nextTask();
 	flushSync(() => {});
 	flushEffects();
 }
 
 async function microtasks() {
 	for (let i = 0; i < 5; i++) await Promise.resolve();
+}
+
+/** Wait for a host task posted now, after every task the runtime posted before it. */
+function nextTask(): Promise<void> {
+	return new Promise((resolve) => {
+		const channel = new MessageChannel();
+		channel.port1.onmessage = () => {
+			channel.port1.close();
+			resolve();
+		};
+		channel.port2.postMessage(null);
+	});
 }
 
 describe('conformance: delegated events during async actions', () => {
@@ -95,6 +109,12 @@ describe('conformance: delegated events during async actions', () => {
 
 			gate.resolve();
 			await microtasks();
+			// The settled Action commits at transition priority, in a later host task
+			// than the microtasks that settled it (#1864), as React's Scheduler does.
+			expect(r.find('#event-count').textContent).toBe(transition ? '0' : '1');
+			expect(r.find('#event-pending').textContent).toBe('pending');
+			expect(r.find('#event-saved').textContent).toBe('initial');
+			await nextTask();
 			expect(r.find('#event-count').textContent).toBe('1');
 			expect(r.find('#event-pending').textContent).toBe('idle');
 			expect(r.find('#event-saved').textContent).toBe('finished');
@@ -135,6 +155,8 @@ describe('conformance: delegated events during async actions', () => {
 
 			finish.resolve();
 			await microtasks();
+			expect(r.find('#event-saved').textContent).toBe('initial');
+			await nextTask();
 			expect(r.find('#event-saved').textContent).toBe('finished');
 			expect(r.find('#event-pending').textContent).toBe('idle');
 		} finally {

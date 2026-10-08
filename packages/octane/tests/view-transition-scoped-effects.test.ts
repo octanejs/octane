@@ -344,8 +344,10 @@ describe('element-scoped ViewTransition commit lifetimes', () => {
 		flushSync(() => controls.right('trigger'));
 		startTransition(() => controls.left('left changed'));
 		await Promise.resolve();
+		// The transition waits for its own host task (#1864).
+		expect(text('left')).toBe('initial');
+		await vi.waitFor(() => expect(text('left')).toBe('left changed'));
 		expect(captures).toEqual([]);
-		expect(text('left')).toBe('left changed');
 		expect(text('right')).toBe('urgent from effect');
 	});
 
