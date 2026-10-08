@@ -6991,13 +6991,37 @@ function vtInterrupt(): void {
 	vtInterruptOwners(null);
 }
 
-/** Is this an animation-eligible transition batch? Urgent cues never animate. */
+/** Is this an animation-eligible transition batch? A cue alone never animates. */
 function queueAllTransition(): boolean {
-	if (inUrgentFlush || QUEUE.length === 0) return false;
+	if (QUEUE.length === 0) return false;
+	let cueOnly = inUrgentFlush && NATIVE_TRANSITION_DRIVER?.hasWork() !== true;
 	for (let i = 0; i < QUEUE.length; i++) {
-		if (QUEUE[i].pendingMode !== 'transition') return false;
+		const block = QUEUE[i];
+		if (block.pendingMode !== 'transition') return false;
+		if (
+			cueOnly &&
+			(block.idState.renderOwner?.request != null || (block.kind === 'root' && !block.mounted))
+		)
+			cueOnly = false;
 	}
-	return true;
+	if (!cueOnly) return true;
+	// A pending cue can share a block or queue with an explicit transition.
+	// Reuse its retained receipts rather than giving the cue a second queue or
+	// upgrading the render priority (which would lose Suspense hold semantics).
+	for (const entries of FLUSHED_TRANSITION_UPDATES) {
+		for (const entry of entries) {
+			if (
+				!entry.superseded &&
+				!entry.block.disposed &&
+				entry.block.pending &&
+				(entry.state !== undefined || entry.reducer !== undefined
+					? entry.slot.renderTransition === entry
+					: !Object.is(entry.slot.value, entry.baseValue))
+			)
+				return true;
+		}
+	}
+	return false;
 }
 
 function vtHasActiveHandles(): boolean {
@@ -9350,6 +9374,9 @@ export function flushSync<T>(fn: () => T): T {
 		} finally {
 			inFlush = false;
 			if (completions != null) TRANSITION_ROOT_DRIVER!.finishCompletions(completions);
+			// This drain consumed the retained cells just like flushWork. A later
+			// cue must not mistake them for a still-pending transition.
+			FLUSHED_TRANSITION_UPDATES.length = 0;
 			CURRENT_EFFECT_PHASE = effectPhase;
 			if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__)
 				__devtoolsNotifyFlush();

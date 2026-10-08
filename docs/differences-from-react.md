@@ -1382,8 +1382,9 @@ its microtask admission: that controller owns the staged commit and native
 capture boundary. This preserves capture before unrelated next-frame updates.
 Async Action results still coalesce in a host task before their first capture.
 Hosts without the native API use normal task batching. An Action's pending cue
-publishes promptly without starting an animation or changing sibling state to
-urgent Suspense semantics.
+on its own publishes promptly without starting an animation. Explicit transition
+work queued alongside that cue keeps its native capture, including state in the
+same component. Neither case changes sibling state to urgent Suspense semantics.
 
 `useDeferredValue` similarly keeps the previous value through the urgent commit
 and swaps to the latest value in a later host task. Urgent updates before that

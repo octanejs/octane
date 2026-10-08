@@ -9,19 +9,21 @@ import {
 	use,
 	useActionState,
 	useLayoutEffect,
+	useLinkedState,
 	useOptimistic,
 	useState,
 	useTransition,
 	ViewTransition,
 	addTransitionType,
 	type Root,
+	type ComponentBody,
 } from '../src/index.js';
 
 import { installViewTransitionMocks } from './conformance/_helpers/view-transition-mocks.js';
 
 const roots: Root[] = [];
 
-function mount(body: () => ReturnType<typeof createElement>): HTMLElement {
+function mount(body: ComponentBody): HTMLElement {
 	const container = document.createElement('div');
 	document.body.append(container);
 	const root = createRoot(container);
@@ -442,6 +444,160 @@ describe('transition rendering yields to the host', () => {
 		expect(calls.at(-1)).toEqual(['new', 4, 4]);
 		expect(container.textContent).toBe('8');
 	});
+
+	for (const separateRoot of [false, true]) {
+		for (const dispatchFirst of [false, true]) {
+			it(`captures explicit transition state alongside an Action cue (separate root: ${separateRoot}, dispatch first: ${dispatchFirst})`, async () => {
+				const native = installViewTransitionMocks();
+				const action = gate();
+				let dispatch!: () => void;
+				let update!: (value: number) => void;
+				function ActionCue() {
+					const [, run, pending] = useActionState(
+						async (value: number) => {
+							await action.promise;
+							return value + 1;
+						},
+						0,
+						Symbol.for('transition-task.captured-cue'),
+					);
+					dispatch = run;
+					return createElement('p', null, pending ? 'pending' : 'ready');
+				}
+				function Animated() {
+					const [value, setValue] = useState(0, Symbol.for('transition-task.captured-state'));
+					update = setValue;
+					return createElement(
+						ViewTransition,
+						{ default: 'fade' },
+						createElement('output', null, String(value)),
+						separateRoot ? null : ActionCue(),
+					);
+				}
+				try {
+					const animated = mount(Animated);
+					const cue = separateRoot ? mount(ActionCue) : animated;
+					startTransition(() => {
+						if (dispatchFirst) dispatch();
+						update(1);
+						if (!dispatchFirst) dispatch();
+					});
+					await microtasks();
+					expect(native.calls).toHaveLength(1);
+					expect(animated.querySelector('output')!.textContent).toBe('1');
+					expect(cue.querySelector('p')!.textContent).toBe('pending');
+				} finally {
+					await act(async () => action.resolve());
+					native.restore();
+				}
+			});
+		}
+	}
+
+	for (const work of ['root render', 'initial root', 'native signal'] as const) {
+		it(`preserves a ${work} capture alongside an Action cue`, async () => {
+			const native = installViewTransitionMocks();
+			const action = gate();
+			const { enableNativeReadCollection } = await import('../src/runtime.js');
+			const { createScope } = await import('../src/signals/index.js');
+			enableNativeReadCollection();
+			const owner = createScope({ scopeKey: `transition-task-${work}` });
+			const value$ = owner.signal$('value', 0);
+			let dispatch!: () => void;
+			function Cue() {
+				const [, run, pending] = useActionState(
+					async (value: number) => {
+						await action.promise;
+						return value + 1;
+					},
+					0,
+					Symbol.for('transition-task.other-receipt-cue'),
+				);
+				dispatch = run;
+				return createElement(
+					ViewTransition,
+					{ default: 'fade' },
+					createElement('p', null, pending ? 'pending' : 'ready'),
+				);
+			}
+			function Animated({ value = 0 }: { value?: number }) {
+				return createElement(
+					ViewTransition,
+					{ default: 'fade' },
+					createElement('output', null, String(work === 'native signal' ? value$.get() : value)),
+				);
+			}
+			try {
+				const container = work === 'initial root' ? document.createElement('div') : mount(Animated);
+				const root = work === 'initial root' ? createRoot(container) : roots.at(-1)!;
+				if (work === 'initial root') {
+					document.body.append(container);
+					roots.push(root);
+				}
+				mount(Cue);
+				startTransition(() => {
+					dispatch();
+					if (work === 'native signal') value$.set(1);
+					else root.render(Animated, { value: 1 });
+				});
+				await microtasks();
+				expect(native.calls).toHaveLength(1);
+				expect(container.textContent).toBe('1');
+			} finally {
+				await act(async () => action.resolve());
+				for (const root of roots) root.unmount();
+				owner.dispose();
+				native.restore();
+			}
+		});
+	}
+
+	for (const linked of [false, true]) {
+		it(`does not treat a flushSync-consumed transition as work for a later Action cue (linked: ${linked})`, async () => {
+			const native = installViewTransitionMocks();
+			const action = gate();
+			let dispatch!: () => void;
+			let update!: (value: number) => void;
+			function App() {
+				const [value, setValue] = linked
+					? useLinkedState(
+							0,
+							(source: number) => source,
+							undefined,
+							Symbol.for('transition-task.consumed-linked'),
+						)
+					: useState(0, Symbol.for('transition-task.consumed-state'));
+				const [, run, pending] = useActionState(
+					async (state: number) => {
+						await action.promise;
+						return state + 1;
+					},
+					0,
+					Symbol.for('transition-task.after-consumed-state'),
+				);
+				update = setValue;
+				dispatch = run;
+				return createElement(
+					ViewTransition,
+					{ default: 'fade' },
+					createElement('output', null, `${value}${pending ? ' pending' : ''}`),
+				);
+			}
+			try {
+				const container = mount(App);
+				startTransition(() => update(1));
+				flushSync(() => {});
+				native.calls.length = 0;
+				startTransition(() => dispatch());
+				await microtasks();
+				expect(container.textContent).toBe('1 pending');
+				expect(native.calls).toHaveLength(0);
+			} finally {
+				await act(async () => action.resolve());
+				native.restore();
+			}
+		});
+	}
 
 	it('publishes an Action cue without waiting for a native View Transition', async () => {
 		const native = installViewTransitionMocks();
