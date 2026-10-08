@@ -28,6 +28,15 @@ const LINKS = `export function Links(props) @{
   </nav>
 }`;
 
+// List numbering and row spans are presentation, not form state.
+const NUMBERED = `export function Numbered(props) @{
+  'use dom bindings';
+  <section>
+    <ol start={props.start}><li value={props.value}>Alpha</li></ol>
+    <table><tbody><tr><td rowspan={props.rows}>Cell</td></tr></tbody></table>
+  </section>
+}`;
+
 type View = DomBindings.CompiledBindings<Record<string, unknown>> & {
 	adopt: typeof DomBindings.__adoptBindings;
 };
@@ -124,6 +133,107 @@ describe.each([
 				view.adopt(nav, view, state),
 		};
 	}
+
+	function numbered(initial: Record<string, unknown>) {
+		const { server, client, artifact } = compile(NUMBERED, 'Numbered', dev);
+		const view: View =
+			lane === 'scalar' ? artifact : { ...artifact, adopt: DomBindings.__adoptBindings };
+		const numbering = (root: ParentNode) => [
+			root.querySelector('ol')!.getAttribute('start'),
+			root.querySelector('li')!.getAttribute('value'),
+			root.querySelector('td')!.getAttribute('rowspan'),
+		];
+		document.body.innerHTML = renderToString(server.Numbered, initial).html;
+		const section = document.querySelector('section')!;
+		return {
+			client,
+			list: section.querySelector('ol')!,
+			item: section.querySelector('li')!,
+			cell: section.querySelector('td')!,
+			numbering: () => numbering(section),
+			// What the server renders for the same props is the oracle for every write.
+			serverNumbering(props: Record<string, unknown>) {
+				const template = document.createElement('template');
+				template.innerHTML = renderToString(server.Numbered, props).html;
+				return numbering(template.content);
+			},
+			adopt: (state: DomBindings.BindingSource<Record<string, unknown>>) =>
+				view.adopt(section, view, state),
+		};
+	}
+
+	it('writes list numbering and row spans in place as the server renders them', () => {
+		const initial = { start: 3, value: 7, rows: 2 };
+		const { list, item, cell, numbering, serverNumbering, adopt } = numbered(initial);
+		const model = source({ start: 5, value: 9, rows: 3 });
+		const handle = adopt(model.state);
+		try {
+			expect(numbering()).toEqual(['5', '9', '3']);
+			model.publish({ start: 0, value: -2, rows: 1 });
+			expect([list.start, item.value, cell.rowSpan]).toEqual([0, -2, 1]);
+			model.publish({ start: -4, value: 0 });
+			expect([list.start, item.value]).toEqual([-4, 0]);
+			// React's numeric rule removes a `start` or `rowspan` that is not a
+			// number; a list item's value is an ordinary attribute.
+			model.publish({ start: 'first', value: 'first', rows: Number.NaN });
+			expect(numbering()).toEqual([null, 'first', null]);
+			for (const next of [
+				12,
+				'6',
+				' 8 ',
+				'',
+				2.5,
+				10n,
+				Infinity,
+				Number.NaN,
+				'abc',
+				true,
+				false,
+				null,
+				undefined,
+			]) {
+				const props = { start: next, value: next, rows: next };
+				model.publish(props);
+				expect(numbering(), String(next)).toEqual(serverNumbering(props));
+			}
+			model.publish({ start: 1, value: 4, rows: 2 });
+			expect(numbering()).toEqual(['1', '4', '2']);
+			expect(document.querySelector('ol')).toBe(list);
+			expect(document.querySelector('li')).toBe(item);
+			expect(document.querySelector('td')).toBe(cell);
+		} finally {
+			handle.dispose();
+		}
+		expect(model.subscribers.size).toBe(0);
+		model.publish({ start: 20, value: 21, rows: 22 });
+		expect(numbering()).toEqual(['1', '4', '2']);
+	});
+
+	// Hydration with the older rendered props keeps what the binding published,
+	// including the numeric attributes it removed.
+	it('retains adopted list numbering through hydration', () => {
+		const initial = { start: 3, value: 7, rows: 2 };
+		const { client, list, item, cell, numbering, adopt } = numbered(initial);
+		const model = source(initial);
+		const handle = adopt(model.state);
+		model.publish({ start: Number.NaN, value: 0, rows: 'span' });
+		expect(numbering()).toEqual([null, '0', null]);
+		const error = vi.spyOn(console, 'error').mockImplementation(() => {});
+		let root: ReturnType<typeof hydrateRoot> | undefined;
+		try {
+			flushSync(() => {
+				root = hydrateRoot(document.body, client.Numbered, initial);
+			});
+			expect(document.querySelector('ol')).toBe(list);
+			expect(document.querySelector('li')).toBe(item);
+			expect(document.querySelector('td')).toBe(cell);
+			expect(numbering()).toEqual([null, '0', null]);
+			expect(error).not.toHaveBeenCalled();
+		} finally {
+			handle.dispose();
+			root?.unmount();
+		}
+	});
 
 	it('writes every channel in place and reads signal handles without the source', () => {
 		const { paragraph, text, adopt } = badge();
