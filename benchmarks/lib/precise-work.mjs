@@ -8,7 +8,7 @@
 // A hook is either a bare `window.__name` string or `{ name, arg }` for the
 // suites whose hooks are parameterized (spa-navigation drives one `__navigate`
 // with a route rather than one hook per destination).
-async function invokeHook(page, hook) {
+export async function invokeHook(page, hook) {
 	const call = typeof hook === 'string' ? { name: hook, arg: undefined } : hook;
 	await page.evaluate(async ({ name, arg }) => {
 		const fn = window[name];

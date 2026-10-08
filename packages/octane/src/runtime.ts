@@ -109,12 +109,22 @@ import {
 	textareaChildText,
 } from './shared-value-helpers.js';
 import {
+	__profileArm,
 	__profileBail,
 	__profileBeginRender,
+	__profileBlockCreated,
+	__profileBlockUnmounted,
+	__profileBoundary,
+	__profileCaptureDiscarded,
 	__profileComponentSource,
+	__profileCounters,
+	__profileDrain,
 	__profileEndRender,
 	__profileHasComponentMetadata,
+	__profileJournalRolledBack,
 	__profileResolveHook,
+	__profileRootCommitted,
+	__profileRootRolledBack,
 	__profileSchedule,
 	__profileTrackComponent,
 	__profileGetComponent,
@@ -314,6 +324,27 @@ export { EXTERNAL_HYDRATION_PROMISE, HYDRATION_RANGE_BOUNDARY };
 export { validateNativeReadWitness };
 
 declare const __OCTANE_PROFILE_ENABLED__: boolean;
+
+// Every counter below has a profile-guarded probe in this module. A counter a
+// renderer does not declare reads as absent rather than zero.
+if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__)
+	__profileCounters('dom', [
+		'component.render',
+		'component.renderSuspended',
+		'component.renderErrored',
+		'component.bailout',
+		'block.create',
+		'block.unmount',
+		'arm.keep',
+		'arm.swap',
+		'boundary.fallback',
+		'boundary.catch',
+		'scheduler.drain',
+		'commit.root',
+		'rollback.root',
+		'rollback.journalEntries',
+		'rollback.capture',
+	]);
 
 let PROFILE_COMPONENT_OVERRIDE: { target: Function; component: Function | null } | null = null;
 
@@ -4567,6 +4598,8 @@ function preserveRootCreatedDom(block: Block): void {
 function rollbackRootRender(transaction: RootRenderTransaction): void {
 	if (transaction.aborted) return;
 	transaction.aborted = true;
+	if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__)
+		__profileRootRolledBack();
 	if (
 		transaction.owner.retrySignalOwners !== undefined &&
 		transaction.owner.retrySignalOwners !== RETAINED_SIGNAL_OWNERS
@@ -4579,6 +4612,8 @@ function rollbackRootRender(transaction: RootRenderTransaction): void {
 		const owner = transaction.owner.current;
 		if (owner !== null) rollbackTransitionJournal(0, owner);
 		else {
+			if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__)
+				__profileJournalRolledBack(transaction.log.length / 4);
 			for (let i = transaction.log.length - 4; i >= 0; i -= 4) {
 				if (transaction.log[i] === JOURNAL_UNDO) transaction.log[i + 1]();
 				else if (transaction.log[i] === JOURNAL_CREATED)
@@ -4702,6 +4737,8 @@ function commitRootRenders(): void {
 				}
 				continue;
 			}
+			if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__)
+				__profileRootCommitted();
 			if (owner.transaction === transaction) owner.transaction = null;
 			if (transaction.capture.presentations !== undefined && STAGED_COMMIT_CAPTURE !== null) {
 				stagedOwnerGuard(STAGED_COMMIT_CAPTURE, owner);
@@ -5604,6 +5641,10 @@ function rollbackTransitionJournal(checkpoint: number, owner: Block): void {
 	if (checkpoint < 0) return;
 	const log = TRANSITION_JOURNAL;
 	if (log === null) return;
+	// Sample before replay truncates the log. A partial rollback starts at a
+	// nonzero checkpoint, so only the entries after it are undone.
+	if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__)
+		__profileJournalRolledBack((log.length - checkpoint) / 4);
 	const previousReplay = TRANSITION_JOURNAL_REPLAYING;
 	TRANSITION_JOURNAL_REPLAYING = true;
 	try {
@@ -7957,6 +7998,8 @@ function drainQueue(): { err: any } | null {
 	let pendingError: { err: any; all: any[] } | null = null;
 	let activitiesToRehide: Set<ActivitySlot> | null = null;
 	const drainId = ++DRAIN_ID;
+	if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__)
+		__profileDrain();
 	if (QUEUE.length > 1) sortWaveByDepth(QUEUE, drainId);
 	// Iterate by index. A render may enqueue MORE work (e.g. a setState during
 	// render) — it appends to QUEUE, and `i < QUEUE.length` is re-evaluated every
@@ -11684,6 +11727,8 @@ function createBlock(
 		extra,
 		outputHandler,
 	) as unknown as Block;
+	if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__)
+		__profileBlockCreated();
 	if (parentBlock !== null && block.idState.renderOwner === ROOT_RENDER_TRANSACTION?.owner) {
 		createdInRootRender(block);
 	}
@@ -12980,12 +13025,10 @@ function unmountBlock(block: Block, detachDom: boolean = true): void {
 
 function unmountBlockInner(block: Block, detachDom: boolean): void {
 	block.disposed = true;
-	if (
-		typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' &&
-		__OCTANE_PROFILE_ENABLED__ &&
-		block.kind === 'root'
-	)
-		__devtoolsUnregisterRoot(block);
+	if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__) {
+		__profileBlockUnmounted();
+		if (block.kind === 'root') __devtoolsUnregisterRoot(block);
+	}
 	const owner = block.idState.renderOwner;
 	if (owner?.current === block) {
 		owner.generation++;
@@ -34987,6 +35030,8 @@ function spliceWipCapture(wip: OffscreenWip): void {
 /** Drop captured commit work that never became visible. */
 function discardOffscreenCapture(capture: OffscreenCapture | null): void {
 	if (capture === null) return;
+	if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__)
+		__profileCaptureDiscarded(capture);
 	NATIVE_READ_DRIVER?.discardCapture(capture);
 	const rendered = capture.renderedBlocks;
 	const owner = capture.renderRoot;
@@ -40686,6 +40731,8 @@ function endDetachedBoundaryRender(frame: RootRenderFrame | null): void {
 // arm ends the caught error's unwinding (HYDRATION_THROWN) and marks the root
 // render as one that caught an error (RootRenderTransaction.caught).
 function setTryBranch(slot: TrySlot | ErrorSlot, next: -1 | 0 | 1 | 2): void {
+	if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__)
+		__profileBoundary(slot.branch, next);
 	slot.branch = next;
 	if (next === 0 && slot.catchBody !== null) {
 		clearHydrationThrow();
@@ -44919,6 +44966,12 @@ function renderBranchSlot(
 	const parentBlock = parentScope.block;
 	const hydration = hydrating ? activeHydration() : null;
 	if (next !== state.branch) {
+		if (
+			typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' &&
+			__OCTANE_PROFILE_ENABLED__ &&
+			state.branch !== -1
+		)
+			__profileArm(true);
 		if (ROOT_RENDER_TRANSACTION !== null && (state.branch !== -1 || hydration !== null)) {
 			const previousBlock = state.block;
 			if (state.unfinalized && previousBlock !== null) {
@@ -45389,6 +45442,8 @@ function renderBranchSlot(
 			replaceSharedBlockBoundary(parentBlock, oldBlockStart, oldBlockEnd, s, e);
 		}
 	} else if (state.block) {
+		if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__)
+			__profileArm(false);
 		// Same branch — re-render in place with this render's env snapshot.
 		if (state.block.body !== body) journalRootProperty(state.block, 'body', state.block.body);
 		if (state.block.extra !== env) journalRootProperty(state.block, 'extra', state.block.extra);
