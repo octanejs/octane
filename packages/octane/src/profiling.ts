@@ -37,7 +37,8 @@ export const PROFILE_COUNTER_SCHEMA = 1;
  * - `component.bailout`: memo and implicit bailouts that skipped a body.
  * - `block.create` / `block.unmount`: render Blocks allocated and torn down
  *   (roots, components, directive arms, portals). Lite component scopes are
- *   not Blocks; their work appears as component renders.
+ *   not Blocks; their work appears as component renders. Neither is a
+ *   hookless directive arm mounted with its owner in a root render.
  * - `arm.keep`: `@if`/`@switch` evaluations that re-rendered the current arm.
  * - `arm.swap`: evaluations that replaced the current arm with another,
  *   including an empty arm. A slot's first arm is not a swap.

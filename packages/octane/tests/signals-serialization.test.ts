@@ -23,8 +23,25 @@ function deferred<T>() {
 	return { promise, resolve, reject };
 }
 
+function hostTask(): Promise<void> {
+	return new Promise((resolve) => {
+		const channel = new MessageChannel();
+		channel.port1.onmessage = () => {
+			channel.port1.close();
+			resolve();
+		};
+		channel.port2.postMessage(null);
+	});
+}
+
+// A producer whose host budget is spent waits for a host task
+// (yieldForHostBudget), which a loaded machine reaches mid-test. Let tasks run
+// between microtask checkpoints, so a result does not depend on the time it took.
 async function drain() {
-	for (let i = 0; i < 8; i++) await Promise.resolve();
+	for (let round = 0; round < 4; round++) {
+		for (let i = 0; i < 8; i++) await Promise.resolve();
+		await hostTask();
+	}
 }
 
 describe('scoped signal serialization and adoption', () => {
