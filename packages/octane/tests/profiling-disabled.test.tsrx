@@ -22,6 +22,8 @@ describe('runtime without the profile specialization', () => {
 		await act(() => mounted.click('button'));
 
 		expect(profiler.getEvents()).toEqual([]);
+		// No renderer installed counters, so they read as absent rather than zero.
+		expect(profiler.snapshot()).toMatchObject({ renderers: [], counters: {} });
 		mounted.unmount();
 	});
 });
