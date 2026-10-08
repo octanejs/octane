@@ -1,6 +1,7 @@
 import { existsSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
-import ts from 'typescript';
+import { is, parseSourceFile, ScriptKind } from '../octane-tsc/native-syntax.mjs';
+import { printNodeWithoutComments } from './native-typescript-lib.mjs';
 
 export const PRISTINE_RUNTIME = 'packages/tiptap/audit/pristine-runtime.json';
 export const ADAPTED_RUNTIME = 'packages/tiptap/audit/adapted-runtime.json';
@@ -36,37 +37,33 @@ function listedUpstreamSpecs(markdown) {
 	});
 }
 
-function printNode(node, sourceFile) {
-	return ts
-		.createPrinter({ removeComments: true })
-		.printNode(ts.EmitHint.Unspecified, node, sourceFile)
-		.replace(/\s+/g, ' ')
-		.trim();
+function printNode(node) {
+	return printNodeWithoutComments(node).replace(/\s+/g, ' ').trim();
 }
 
 function expectRoot(node) {
 	let root = node;
 	while (
 		root.parent &&
-		(ts.isPropertyAccessExpression(root.parent) ||
-			(ts.isCallExpression(root.parent) && root.parent.expression === root))
+		(is.isPropertyAccessExpression(root.parent) ||
+			(is.isCallExpression(root.parent) && root.parent.expression === root))
 	) {
 		root = root.parent;
 	}
 	return root;
 }
 
-function isDispatchInteraction(node, sourceFile) {
-	if (!ts.isCallExpression(node)) return false;
-	const text = printNode(node, sourceFile);
+function isDispatchInteraction(node) {
+	if (!is.isCallExpression(node)) return false;
+	const text = printNode(node);
 	return /\.dispatchEvent\(/.test(text);
 }
 
 function arrayLiteralStrings(node) {
-	if (!ts.isArrayLiteralExpression(node)) return [];
+	if (!is.isArrayLiteralExpression(node)) return [];
 	return node.elements
 		.map(function element(entry) {
-			return ts.isStringLiteral(entry) || ts.isNoSubstitutionTemplateLiteral(entry)
+			return is.isStringLiteral(entry) || is.isNoSubstitutionTemplateLiteral(entry)
 				? entry.text
 				: null;
 		})
@@ -79,33 +76,33 @@ function resolveEachEntries(sourceFile, identifier) {
 	let entries = [];
 	function visit(node) {
 		if (
-			ts.isVariableDeclaration(node) &&
-			ts.isIdentifier(node.name) &&
+			is.isVariableDeclaration(node) &&
+			is.isIdentifier(node.name) &&
 			node.name.text === identifier &&
 			node.initializer
 		) {
 			entries = arrayLiteralStrings(node.initializer);
 		}
-		ts.forEachChild(node, visit);
+		node.forEachChild(visit);
 	}
 	visit(sourceFile);
 	return entries;
 }
 
-function collectScenarioBody(body, sourceFile) {
+function collectScenarioBody(body) {
 	const expects = [];
 	const interactions = [];
 	function walk(node) {
 		if (
-			ts.isCallExpression(node) &&
-			ts.isIdentifier(node.expression) &&
+			is.isCallExpression(node) &&
+			is.isIdentifier(node.expression) &&
 			node.expression.text === 'expect'
 		) {
-			expects.push(printNode(expectRoot(node), sourceFile));
-		} else if (isDispatchInteraction(node, sourceFile)) {
-			interactions.push(printNode(node, sourceFile));
+			expects.push(printNode(expectRoot(node)));
+		} else if (isDispatchInteraction(node)) {
+			interactions.push(printNode(node));
 		}
-		ts.forEachChild(node, walk);
+		node.forEachChild(walk);
 	}
 	if (body) walk(body);
 	return { expects, interactions };
@@ -128,17 +125,11 @@ function parseCitation(citation) {
  * Parse Vitest `it` / expanded `it.each` scenarios from a runtime test source.
  */
 export function extractRuntimeScenarios(source, fileName) {
-	const sourceFile = ts.createSourceFile(
-		fileName,
-		source,
-		ts.ScriptTarget.Latest,
-		true,
-		ts.ScriptKind.TSX,
-	);
+	const sourceFile = parseSourceFile(fileName, source, ScriptKind.TSX);
 	const scenarios = [];
 
 	function pushScenario(title, node, body, extra) {
-		const collected = collectScenarioBody(body, sourceFile);
+		const collected = collectScenarioBody(body);
 		const start = sourceFile.getLineAndCharacterOfPosition(node.getStart(sourceFile)).line + 1;
 		const end = sourceFile.getLineAndCharacterOfPosition(node.end).line + 1;
 		scenarios.push({
@@ -154,10 +145,10 @@ export function extractRuntimeScenarios(source, fileName) {
 
 	function visit(node) {
 		if (
-			ts.isCallExpression(node) &&
-			ts.isCallExpression(node.expression) &&
-			ts.isPropertyAccessExpression(node.expression.expression) &&
-			ts.isIdentifier(node.expression.expression.expression) &&
+			is.isCallExpression(node) &&
+			is.isCallExpression(node.expression) &&
+			is.isPropertyAccessExpression(node.expression.expression) &&
+			is.isIdentifier(node.expression.expression.expression) &&
 			node.expression.expression.expression.text === 'it' &&
 			node.expression.expression.name.text === 'each'
 		) {
@@ -166,11 +157,11 @@ export function extractRuntimeScenarios(source, fileName) {
 			const body = node.arguments[1];
 			const template =
 				titleNode &&
-				(ts.isStringLiteral(titleNode) || ts.isNoSubstitutionTemplateLiteral(titleNode))
+				(is.isStringLiteral(titleNode) || is.isNoSubstitutionTemplateLiteral(titleNode))
 					? titleNode.text
 					: '%s';
 			let entries = [];
-			if (ts.isIdentifier(eachArg)) {
+			if (is.isIdentifier(eachArg)) {
 				entries = resolveEachEntries(sourceFile, eachArg.text);
 			} else if (eachArg) {
 				entries = arrayLiteralStrings(eachArg);
@@ -182,19 +173,19 @@ export function extractRuntimeScenarios(source, fileName) {
 		}
 
 		if (
-			ts.isCallExpression(node) &&
-			ts.isIdentifier(node.expression) &&
+			is.isCallExpression(node) &&
+			is.isIdentifier(node.expression) &&
 			node.expression.text === 'it'
 		) {
 			const titleNode = node.arguments[0];
 			if (
 				titleNode &&
-				(ts.isStringLiteral(titleNode) || ts.isNoSubstitutionTemplateLiteral(titleNode))
+				(is.isStringLiteral(titleNode) || is.isNoSubstitutionTemplateLiteral(titleNode))
 			) {
 				pushScenario(titleNode.text, node, node.arguments[1]);
 			}
 		}
-		ts.forEachChild(node, visit);
+		node.forEachChild(visit);
 	}
 
 	visit(sourceFile);

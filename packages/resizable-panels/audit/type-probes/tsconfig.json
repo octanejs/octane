@@ -1,6 +1,10 @@
 {
   "extends": "../../tsconfig.json",
-  "compilerOptions": { "types": ["node"] },
+  "compilerOptions": {
+    "types": ["node"],
+    "noUnusedLocals": false,
+    "noUnusedParameters": false
+  },
   "include": ["./public-api.test-d.ts"],
   "exclude": ["../../upstream", "../../src", "../../tests"]
 }

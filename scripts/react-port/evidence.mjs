@@ -15,8 +15,8 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { promisify } from 'node:util';
 import { fileURLToPath, pathToFileURL } from 'node:url';
-import ts from 'typescript';
 import { assertBindingSurfacePolicy } from '../binding-surface-policy.mjs';
+import { importNativeTypeScript } from '../octane-tsc/native.mjs';
 import { assertTsrxTypecheckSucceeded } from '../tsrx-typecheck.mjs';
 import { createTypeEvidenceProgram } from './type-program.mjs';
 import {
@@ -74,6 +74,7 @@ import {
 	nodeRuntimeOptionBoundary,
 } from './node-test-invocation-wrapper.mjs';
 
+const { API } = await importNativeTypeScript('unstable/sync');
 const execFileAsync = promisify(execFile);
 const DEFAULT_COMMAND_TIMEOUT_MS = 10 * 60 * 1_000;
 const MAX_COMMAND_TIMEOUT_MS = 30 * 60 * 1_000;
@@ -1401,11 +1402,21 @@ function assertTypeProjectSemantics(gateId, commandArguments, node, workspaceRoo
 	if (relativeProject.startsWith('..') || path.isAbsolute(relativeProject)) {
 		throw new Error(`Type project for ${gateId} escapes the binding package`);
 	}
-	const loaded = ts.readConfigFile(projectPath, ts.sys.readFile);
-	if (loaded.error) {
-		throw new Error(`Type project for ${gateId} is invalid: ${loaded.error.messageText}`);
+	// TypeScript 7 checks the project, so its options are read the same way.
+	const api = new API({ cwd: path.dirname(projectPath) });
+	let loaded;
+	let parsed;
+	try {
+		loaded = api.readConfigFile(projectPath);
+		if (loaded.error) {
+			throw new Error(`Type project for ${gateId} is invalid: ${loaded.error.text}`);
+		}
+		parsed = api.parseJsonConfigFileContent(loaded.config, {
+			configDirectory: path.dirname(projectPath),
+		});
+	} finally {
+		api.close();
 	}
-	const parsed = ts.parseJsonConfigFileContent(loaded.config, ts.sys, path.dirname(projectPath));
 	if (parsed.errors.length > 0) {
 		throw new Error(`Type project for ${gateId} cannot be parsed`);
 	}

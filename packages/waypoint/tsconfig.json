@@ -11,7 +11,10 @@
     "noEmit": true,
     "allowImportingTsExtensions": true,
     "verbatimModuleSyntax": true,
-    "noErrorTruncation": true
+    "noErrorTruncation": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "types": []
   },
   "include": ["./src/"],
   "exclude": ["node_modules", "dist", "tests"],

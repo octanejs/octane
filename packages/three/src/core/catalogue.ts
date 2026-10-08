@@ -49,8 +49,13 @@ export type AttachFnType<T = unknown> = ThreeAttachFunction<T>;
 export type AttachType<T = unknown> = Attach<T>;
 export type ThreeKey = string | number | symbol | bigint;
 
+// A ref array may hold absent entries: composing an authored ref with a spread
+// that carries none leaves `undefined` (or an authored `null`) in its place, and
+// attachment skips them.
 export type ThreeRef<T> =
-	((value: T | null) => void | (() => void)) | { current: T | null } | readonly ThreeRef<T>[];
+	| ((value: T | null) => void | (() => void))
+	| { current: T | null }
+	| readonly (ThreeRef<T> | null | undefined)[];
 
 export interface ThreeInstanceProps<T = unknown> {
 	attach?: Attach<T>;

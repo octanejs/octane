@@ -18,9 +18,18 @@ ordinary `octane/compiler` entry point depend on a TypeScript checker.
 
 ## Use the project adapter
 
-Install TypeScript 5.9 alongside Octane when using this entry point. TypeScript
-is an optional peer dependency; applications that do not use the adapter do not
-need to initialize a checker.
+Install TypeScript alongside Octane when using this entry point: 5.9, 6, or a
+TypeScript 7.1 or later. TypeScript is an optional peer dependency; applications
+that do not use the adapter do not need to initialize a checker.
+
+The adapter uses the TypeScript that Octane resolves as `typescript`. TypeScript
+5.9 and 6 run in-process on the classic compiler API. TypeScript 7 runs in a
+native process behind its `typescript/unstable/sync` API, which the project owns
+until `dispose()`; it checks `.tsrx` files through the same virtual TSX as the
+classic API, without a content mapper or `--runExternalCode`, so both produce the
+same facts. To analyze with another installed TypeScript, such as one installed
+under an alias, pass `typescript` with its package name (resolved from the
+tsconfig directory) or package directory.
 
 ```ts
 import { readFileSync } from 'node:fs';

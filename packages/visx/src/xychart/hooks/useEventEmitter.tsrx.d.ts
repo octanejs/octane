@@ -20,4 +20,4 @@ eventType?: EventType,
 /** Handler invoked on emission of EventType event.  */
 handler?: Handler,
 /** Optional valid sources for EventType subscription. */
-allowedSources?: string[]): ((type: EventType, event: HandlerParams["event"], source?: string) => void) | null;
+allowedSources?: string[]): ((type: EventType, event: HandlerParams['event'], source?: string) => void) | null;

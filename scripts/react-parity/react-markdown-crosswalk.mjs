@@ -5,7 +5,7 @@ import { readFileSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { format, resolveConfig } from 'prettier';
-import ts from 'typescript';
+import { is, parseSourceFile, ScriptKind, SyntaxKind } from '../octane-tsc/native-syntax.mjs';
 
 const root = resolve(fileURLToPath(new URL('../..', import.meta.url)));
 const sourceOverridePath = process.env.OCTANE_REACT_MARKDOWN_SOURCE_OVERRIDE_PATH;
@@ -148,22 +148,22 @@ function deriveUniqueDeclaration(path, fullName) {
 function staticParameterValue(node) {
 	while (
 		node &&
-		(ts.isAsExpression(node) ||
-			ts.isParenthesizedExpression(node) ||
-			ts.isSatisfiesExpression(node))
+		(is.isAsExpression(node) ||
+			is.isParenthesizedExpression(node) ||
+			is.isSatisfiesExpression(node))
 	)
 		node = node.expression;
-	if (ts.isStringLiteral(node) || ts.isNoSubstitutionTemplateLiteral(node)) return node.text;
-	if (ts.isNumericLiteral(node)) return Number(node.text);
-	if (node.kind === ts.SyntaxKind.TrueKeyword) return true;
-	if (node.kind === ts.SyntaxKind.FalseKeyword) return false;
-	if (node.kind === ts.SyntaxKind.NullKeyword) return null;
-	if (ts.isIdentifier(node) && node.text === 'undefined') return undefined;
+	if (is.isStringLiteral(node) || is.isNoSubstitutionTemplateLiteral(node)) return node.text;
+	if (is.isNumericLiteral(node)) return Number(node.text);
+	if (node.kind === SyntaxKind.TrueKeyword) return true;
+	if (node.kind === SyntaxKind.FalseKeyword) return false;
+	if (node.kind === SyntaxKind.NullKeyword) return null;
+	if (is.isIdentifier(node) && node.text === 'undefined') return undefined;
 	throw new Error(`Parameterized title uses a non-static value: ${node.getText()}`);
 }
 
 function expandParameterizedTitle(template, row) {
-	const values = ts.isArrayLiteralExpression(row) ? row.elements : [row];
+	const values = is.isArrayLiteralExpression(row) ? row.elements : [row];
 	let index = 0;
 	const expanded = template.replace(/%[sj]/g, (placeholder) => {
 		if (index >= values.length) throw new Error(`Missing value for ${placeholder}: ${template}`);
@@ -181,37 +181,37 @@ function expandParameterizedTitle(template, row) {
 function declarationEvidence(path, fullName, declaration, explicit, binding) {
 	const text = readSource(path).toString();
 	if (binding) {
-		const source = ts.createSourceFile(path, text, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
+		const source = parseSourceFile(path, text, ScriptKind.TSX);
 		const matches = [];
 		const unwrap = (node) => {
 			while (
 				node &&
-				(ts.isAsExpression(node) ||
-					ts.isParenthesizedExpression(node) ||
-					ts.isSatisfiesExpression(node))
+				(is.isAsExpression(node) ||
+					is.isParenthesizedExpression(node) ||
+					is.isSatisfiesExpression(node))
 			)
 				node = node.expression;
 			return node;
 		};
 		const visit = (node) => {
 			if (
-				ts.isCallExpression(node) &&
-				ts.isCallExpression(node.expression) &&
-				ts.isPropertyAccessExpression(node.expression.expression) &&
+				is.isCallExpression(node) &&
+				is.isCallExpression(node.expression) &&
+				is.isPropertyAccessExpression(node.expression.expression) &&
 				node.expression.expression.name.text === 'each'
 			) {
 				const array = unwrap(node.expression.arguments[0]);
 				const template = node.arguments[0];
 				if (
 					array &&
-					ts.isArrayLiteralExpression(array) &&
+					is.isArrayLiteralExpression(array) &&
 					template &&
-					ts.isStringLiteral(template) &&
+					is.isStringLiteral(template) &&
 					template.text === binding.template
 				)
 					matches.push({ node, array, template });
 			}
-			ts.forEachChild(node, visit);
+			node.forEachChild(visit);
 		};
 		visit(source);
 		if (matches.length !== 1)
@@ -246,29 +246,29 @@ function declarationEvidence(path, fullName, declaration, explicit, binding) {
 	if (text.indexOf(declaration, start + 1) >= 0)
 		throw new Error(`Ambiguous adapted declaration: ${declaration}`);
 	if (!explicit) {
-		const source = ts.createSourceFile(path, text, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
+		const source = parseSourceFile(path, text, ScriptKind.TSX);
 		let ownership;
 		function unwrap(node) {
 			while (
 				node &&
-				(ts.isAsExpression(node) ||
-					ts.isParenthesizedExpression(node) ||
-					ts.isSatisfiesExpression(node))
+				(is.isAsExpression(node) ||
+					is.isParenthesizedExpression(node) ||
+					is.isSatisfiesExpression(node))
 			)
 				node = node.expression;
 			return node;
 		}
 		function visit(node) {
 			if (
-				ts.isCallExpression(node) &&
-				ts.isCallExpression(node.expression) &&
-				ts.isPropertyAccessExpression(node.expression.expression) &&
+				is.isCallExpression(node) &&
+				is.isCallExpression(node.expression) &&
+				is.isPropertyAccessExpression(node.expression.expression) &&
 				node.expression.expression.name.text === 'each'
 			) {
 				const array = unwrap(node.expression.arguments[0]);
 				if (
 					array &&
-					ts.isArrayLiteralExpression(array) &&
+					is.isArrayLiteralExpression(array) &&
 					start >= array.getStart(source) &&
 					start < array.end
 				) {
@@ -287,7 +287,7 @@ function declarationEvidence(path, fullName, declaration, explicit, binding) {
 					};
 				}
 			}
-			ts.forEachChild(node, visit);
+			node.forEachChild(visit);
 		}
 		visit(source);
 		const lineStart = text.lastIndexOf('\n', start) + 1;

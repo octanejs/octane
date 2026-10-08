@@ -46,7 +46,7 @@
       "arch": "any",
       "packageManager": "pnpm@12.9.1",
       "lockfile": "pnpm-lock.yaml",
-      "lockfileSha256": "a5bd68590935134632252419f04aebbf9c73f192c9d113a5ded2a08a1da391f6"
+      "lockfileSha256": "0e2eade65aa106fa828d427102627db725709a0944b9a900927ae88e784d7afd"
     }
   },
   "lanes": [
@@ -134,7 +134,7 @@
         {
           "path": "scripts/react-parity/react-markdown-crosswalk.mjs",
           "role": "support",
-          "sha256": "e46c91d548e54b713de6d7664d314b7e6fba1d86fa1fd4b76e788997928e5705"
+          "sha256": "4d95f843f42834591819f08b4331c5a05b1f9bfc19b479850501423dc7a1c337"
         }
       ]
     },
@@ -258,7 +258,7 @@
         {
           "path": "scripts/react-parity/react-markdown-types-lib.mjs",
           "role": "support",
-          "sha256": "f58d645a1af84f541f244396969d03d83fbe8363ae7519c01eeff7f5a1e85c64"
+          "sha256": "4635ce1d3b294834006a8bbdcf93a8ceb3b8c93c05c83d49caf23988a05049d8"
         }
       ]
     }

@@ -11,7 +11,10 @@
     "noEmitOnError": true,
     "noErrorTruncation": true,
     "verbatimModuleSyntax": true,
-    "strict": true
+    "strict": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "types": ["node"]
   },
   "include": ["./src/", "./tests/"],
   "exclude": ["node_modules", "dist"]

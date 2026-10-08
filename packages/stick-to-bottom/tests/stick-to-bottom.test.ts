@@ -1,10 +1,6 @@
 import { cleanup, render, renderHook } from '@octanejs/testing-library';
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
-import {
-	StickToBottom,
-	useStickToBottom,
-	useStickToBottomContext,
-} from '@octanejs/stick-to-bottom';
+import { StickToBottom, useStickToBottom } from '@octanejs/stick-to-bottom';
 import {
 	ContentRenderPropStickProbe,
 	HookProbe,

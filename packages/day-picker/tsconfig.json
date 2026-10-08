@@ -12,7 +12,9 @@
     "types": ["node", "react"],
     "strict": true,
     "jsx": "react-jsx",
-    "jsxImportSource": "octane"
+    "jsxImportSource": "octane",
+    "noUnusedLocals": true,
+    "noUnusedParameters": true
   },
   "include": ["./src/", "./tests/"],
   "exclude": ["node_modules", "dist", "upstream"]

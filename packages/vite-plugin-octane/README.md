@@ -7,7 +7,7 @@ client/server builds, and preview when an `octane.config.ts` declares routes.
 ## Install
 
 ```sh
-pnpm add octane @octanejs/vite-plugin @tsrx/oxc@0.18.0
+pnpm add octane @octanejs/vite-plugin @tsrx/oxc@0.20.0
 pnpm add -D vite
 ```
 

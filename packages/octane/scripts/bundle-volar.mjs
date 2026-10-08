@@ -1,39 +1,52 @@
 import { build } from 'esbuild';
 import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
 import { dirname, isAbsolute, join, relative, resolve, sep } from 'node:path';
-import ts from 'typescript';
+import { importNativeTypeScript } from '../../../scripts/octane-tsc/native.mjs';
+import {
+	LanguageVariant,
+	ScriptTarget,
+	SyntaxKind,
+} from '../../../scripts/octane-tsc/native-syntax.mjs';
+
+const { API, ModuleKind, ModuleResolutionKind } = await importNativeTypeScript('unstable/sync');
+const { createScanner } = await importNativeTypeScript('unstable/ast/scanner');
 
 const LICENSE_FILE = /^licen[cs]e(?:\.[^.]+)?$/i;
 
-function declarationTokens(source) {
-	const scanner = ts.createScanner(
-		ts.ScriptTarget.Latest,
-		true,
-		ts.LanguageVariant.Standard,
-		source,
-	);
+function declarationTokens(source, emitted = false) {
+	const scanner = createScanner(true, LanguageVariant.Standard, source);
 	const tokens = [];
-	for (let kind = scanner.scan(); kind !== ts.SyntaxKind.EndOfFileToken; kind = scanner.scan()) {
+	for (let kind = scanner.scan(); kind !== SyntaxKind.EndOfFile; kind = scanner.scan()) {
 		tokens.push([
 			kind,
-			kind === ts.SyntaxKind.StringLiteral ? scanner.getTokenValue() : scanner.getTokenText(),
+			kind === SyntaxKind.StringLiteral ? scanner.getTokenValue() : scanner.getTokenText(),
 		]);
 	}
 	// The declaration is formatted by Prettier in source. Whitespace, comments,
 	// quote spelling and optional trailing separators cannot change its contract.
 	return JSON.stringify(
 		tokens.filter(([kind], index) => {
+			// TypeScript 7 emits `export declare function` where the source, like
+			// TypeScript 5.9, writes `export function`; both are ambient in a
+			// declaration file.
 			if (
-				kind === ts.SyntaxKind.SemicolonToken &&
-				tokens[index + 1]?.[0] === ts.SyntaxKind.CloseBraceToken
+				emitted &&
+				kind === SyntaxKind.DeclareKeyword &&
+				tokens[index - 1]?.[0] === SyntaxKind.ExportKeyword
 			) {
 				return false;
 			}
-			if (kind !== ts.SyntaxKind.CommaToken) return true;
+			if (
+				kind === SyntaxKind.SemicolonToken &&
+				tokens[index + 1]?.[0] === SyntaxKind.CloseBraceToken
+			) {
+				return false;
+			}
+			if (kind !== SyntaxKind.CommaToken) return true;
 			return ![
-				ts.SyntaxKind.CloseParenToken,
-				ts.SyntaxKind.CloseBraceToken,
-				ts.SyntaxKind.CloseBracketToken,
+				SyntaxKind.CloseParenToken,
+				SyntaxKind.CloseBraceToken,
+				SyntaxKind.CloseBracketToken,
 			].includes(tokens[index + 1]?.[0]);
 		}),
 	);
@@ -42,38 +55,37 @@ function declarationTokens(source) {
 function assertVolarDeclaration(packageDir) {
 	const source = join(packageDir, 'src/compiler/volar.js');
 	const declaration = join(packageDir, 'src/compiler/volar.d.ts');
-	const program = ts.createProgram([source], {
-		allowJs: true,
-		declaration: true,
-		emitDeclarationOnly: true,
-		module: ts.ModuleKind.ESNext,
-		moduleResolution: ts.ModuleResolutionKind.Bundler,
-		target: ts.ScriptTarget.ESNext,
-		strict: true,
-		types: [],
-		outDir: join(packageDir, '.volar-declaration-check'),
-	});
-	const sourceFile = program.getSourceFile(source);
+	const api = new API({ cwd: packageDir });
 	let generated;
-	// Only capture TypeScript's declaration for the authored entry. No compiler
-	// JS, generated bundle or dependency declaration is used as a typing façade.
-	const emitted = program.emit(
-		sourceFile,
-		(_path, text) => {
-			generated = text;
-		},
-		undefined,
-		true,
-	);
-	const diagnostics = [...program.getSyntacticDiagnostics(sourceFile), ...emitted.diagnostics];
+	let diagnostics;
+	try {
+		const program = api.createProgram([source], {
+			allowJs: true,
+			declaration: true,
+			emitDeclarationOnly: true,
+			module: ModuleKind.ESNext,
+			moduleResolution: ModuleResolutionKind.Bundler,
+			target: ScriptTarget.ESNext,
+			strict: true,
+			types: [],
+			outDir: join(packageDir, '.volar-declaration-check'),
+		});
+		// Only capture TypeScript's declaration for the authored entry. No compiler
+		// JS, generated bundle or dependency declaration is used as a typing façade.
+		const emitted = program.getDeclarationEmit([source]);
+		generated = [...emitted.outputFiles].find(([fileName]) => fileName.endsWith('.d.ts'))?.[1].text;
+		diagnostics = [...program.getSyntacticDiagnostics(source), ...emitted.diagnostics];
+	} finally {
+		api.close();
+	}
 	if (diagnostics.length || generated === undefined) {
 		throw new Error(
 			`Could not emit the authored Volar declaration: ${diagnostics
-				.map((diagnostic) => ts.flattenDiagnosticMessageText(diagnostic.messageText, '\n'))
+				.map((diagnostic) => diagnostic.text)
 				.join('\n')}`,
 		);
 	}
-	if (declarationTokens(readFileSync(declaration, 'utf8')) !== declarationTokens(generated)) {
+	if (declarationTokens(readFileSync(declaration, 'utf8')) !== declarationTokens(generated, true)) {
 		throw new Error(
 			'volar.d.ts is stale: update it from the declaration emitted by volar.js JSDoc',
 		);

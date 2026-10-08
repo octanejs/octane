@@ -1,19 +1,14 @@
 import { readFileSync } from 'node:fs';
-import ts from 'typescript';
+import { is, parseSourceFile } from '../../../scripts/octane-tsc/native-syntax.mjs';
 
 export function exportedNames(file) {
-	const source = ts.createSourceFile(
-		file,
-		readFileSync(file, 'utf8'),
-		ts.ScriptTarget.Latest,
-		true,
-	);
+	const source = parseSourceFile(file, readFileSync(file, 'utf8'));
 	const names = new Map();
 	for (const statement of source.statements) {
 		if (
-			ts.isExportDeclaration(statement) &&
+			is.isExportDeclaration(statement) &&
 			statement.exportClause &&
-			ts.isNamedExports(statement.exportClause)
+			is.isNamedExports(statement.exportClause)
 		) {
 			for (const element of statement.exportClause.elements) {
 				names.set(

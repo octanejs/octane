@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import ts from 'typescript';
+import { is, parseSourceFile } from '../../../scripts/octane-tsc/native-syntax.mjs';
 
 const packageRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const upstreamPackage = path.join(packageRoot, 'node_modules/react-aria-components/package.json');
@@ -13,20 +13,15 @@ const localEntry = path.join(packageRoot, 'src/components/index.ts');
 const PINNED_VERSION = '1.20.0';
 
 function collectNamedExports(file) {
-	let source = ts.createSourceFile(
-		file,
-		fs.readFileSync(file, 'utf8'),
-		ts.ScriptTarget.Latest,
-		true,
-	);
+	let source = parseSourceFile(file, fs.readFileSync(file, 'utf8'));
 	let runtime = new Set();
 	let types = new Set();
 
 	for (let statement of source.statements) {
-		if (!ts.isExportDeclaration(statement)) {
+		if (!is.isExportDeclaration(statement)) {
 			continue;
 		}
-		if (!statement.exportClause || !ts.isNamedExports(statement.exportClause)) {
+		if (!statement.exportClause || !is.isNamedExports(statement.exportClause)) {
 			throw new Error(`Export parity requires explicit named exports in ${file}`);
 		}
 

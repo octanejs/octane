@@ -3,7 +3,6 @@ import { createDerivedCellWith } from './engine.js';
 import {
 	ScopedNode,
 	assertAlive,
-	attachObserver,
 	createDeclarationView,
 	derivedValueState,
 	errorState,

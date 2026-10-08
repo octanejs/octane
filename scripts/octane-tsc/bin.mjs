@@ -3,7 +3,7 @@ import { spawnSync } from 'node:child_process';
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { availableParallelism, tmpdir } from 'node:os';
 import path from 'node:path';
-import { compatibilityOptions, NATIVE_TSC, TSRX_CONTENT_MAPPER } from './native.mjs';
+import { NATIVE_TSC, TSRX_CONTENT_MAPPER } from './native.mjs';
 
 const projects = [];
 const passthrough = [];
@@ -33,7 +33,6 @@ const wrappers = [...new Set(projects)].map((project, index) => {
 		JSON.stringify({
 			extends: `./${path.basename(project)}`,
 			compilerOptions: {
-				...compatibilityOptions(project),
 				tsBuildInfoFile: path.join(buildInfoDir, `${index}.tsbuildinfo`), // --build records build state even with --noEmit
 			},
 			contentMappers: [TSRX_CONTENT_MAPPER],

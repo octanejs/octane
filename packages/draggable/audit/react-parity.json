@@ -40,7 +40,7 @@
       "arch": "any",
       "packageManager": "pnpm@12.9.1",
       "lockfile": "pnpm-lock.yaml",
-      "lockfileSha256": "a5bd68590935134632252419f04aebbf9c73f192c9d113a5ded2a08a1da391f6"
+      "lockfileSha256": "0e2eade65aa106fa828d427102627db725709a0944b9a900927ae88e784d7afd"
     }
   },
   "lanes": [
@@ -356,7 +356,7 @@
         {
           "path": "packages/draggable/typetests/tsconfig.adapted.json",
           "role": "support",
-          "sha256": "f7c06a2be4fc87321bfa37fee75f6dd8295ce9b11021d4486b7c45b885864e03"
+          "sha256": "d90f3a4a736c4bc3e893c9c38592188375a27d6cbe0cf0f0c61a5e38e215da01"
         },
         {
           "path": "packages/draggable/typetests/adapted/typings.consumer.ts",

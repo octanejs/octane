@@ -1,7 +1,8 @@
 import { createHash } from 'node:crypto';
 import { readdirSync, readFileSync } from 'node:fs';
 import { relative, resolve, sep } from 'node:path';
-import ts from 'typescript';
+import { is, parseSourceFile, ScriptKind } from '../octane-tsc/native-syntax.mjs';
+import { factory, printNodeWithoutComments, visitEachChild } from './native-typescript-lib.mjs';
 
 const UPSTREAM_TEST_ROOT = 'packages/resizable-panels/upstream/lib';
 const PORTED_TEST_ROOT = 'packages/resizable-panels/tests/upstream';
@@ -39,9 +40,7 @@ export function mapPristineFileToAdapted(pristineFile) {
 }
 
 function scriptKindFor(fileName) {
-	return fileName.endsWith('.tsrx') || fileName.endsWith('.tsx')
-		? ts.ScriptKind.TSX
-		: ts.ScriptKind.TS;
+	return fileName.endsWith('.tsrx') || fileName.endsWith('.tsx') ? ScriptKind.TSX : ScriptKind.TS;
 }
 
 export function normalizeAssertionText(source) {
@@ -59,8 +58,8 @@ export function normalizeAssertionText(source) {
 
 function isExpectRoot(node) {
 	return (
-		ts.isCallExpression(node) &&
-		ts.isIdentifier(node.expression) &&
+		is.isCallExpression(node) &&
+		is.isIdentifier(node.expression) &&
 		node.expression.text === 'expect'
 	);
 }
@@ -69,9 +68,9 @@ function outermostExpect(node) {
 	let current = node;
 	while (
 		current.parent &&
-		(ts.isPropertyAccessExpression(current.parent) ||
-			ts.isCallExpression(current.parent) ||
-			ts.isElementAccessExpression(current.parent))
+		(is.isPropertyAccessExpression(current.parent) ||
+			is.isCallExpression(current.parent) ||
+			is.isElementAccessExpression(current.parent))
 	) {
 		current = current.parent;
 	}
@@ -86,14 +85,14 @@ function containsExpect(node) {
 			found = true;
 			return;
 		}
-		ts.forEachChild(child, visit);
+		child.forEachChild(visit);
 	}
 	visit(node);
 	return found;
 }
 
 function literalTitle(node) {
-	if (ts.isStringLiteral(node) || ts.isNoSubstitutionTemplateLiteral(node)) return node.text;
+	if (is.isStringLiteral(node) || is.isNoSubstitutionTemplateLiteral(node)) return node.text;
 	return null;
 }
 
@@ -103,42 +102,40 @@ function registrarTitle(call) {
 }
 
 function isDescribeCall(expression) {
-	return ts.isIdentifier(expression) && expression.text === 'describe';
+	return is.isIdentifier(expression) && expression.text === 'describe';
 }
 
 function isTestCall(expression) {
-	return ts.isIdentifier(expression) && (expression.text === 'it' || expression.text === 'test');
+	return is.isIdentifier(expression) && (expression.text === 'it' || expression.text === 'test');
 }
 
 function isTestEachCall(expression) {
 	return (
-		ts.isCallExpression(expression) &&
-		ts.isPropertyAccessExpression(expression.expression) &&
-		ts.isIdentifier(expression.expression.expression) &&
+		is.isCallExpression(expression) &&
+		is.isPropertyAccessExpression(expression.expression) &&
+		is.isIdentifier(expression.expression.expression) &&
 		(expression.expression.expression.text === 'it' ||
 			expression.expression.expression.text === 'test') &&
 		expression.expression.name.text === 'each'
 	);
 }
 
-function eachTableText(eachCall, printer, sourceFile) {
+function eachTableText(eachCall) {
 	if (eachCall.arguments.length === 0) return null;
-	return normalizeAssertionText(
-		printer.printNode(ts.EmitHint.Unspecified, eachCall.arguments[0], sourceFile),
-	);
+	return normalizeAssertionText(printNodeWithoutComments(eachCall.arguments[0]));
 }
 
 function callbackBody(call) {
 	for (const argument of call.arguments) {
-		if (ts.isArrowFunction(argument) || ts.isFunctionExpression(argument)) {
-			if (ts.isBlock(argument.body)) return argument.body;
+		if (is.isArrowFunction(argument) || is.isFunctionExpression(argument)) {
+			if (is.isBlock(argument.body)) return argument.body;
 			return null;
 		}
 	}
 	return null;
 }
 
-function extractAssertionsFrom(node, printer, sourceFile) {
+function extractAssertionsFrom(node) {
 	const groups = [];
 	const seen = new Set();
 	function visit(child) {
@@ -146,13 +143,11 @@ function extractAssertionsFrom(node, printer, sourceFile) {
 			const outer = outermostExpect(child);
 			if (!seen.has(outer)) {
 				seen.add(outer);
-				groups.push(
-					normalizeAssertionText(printer.printNode(ts.EmitHint.Unspecified, outer, sourceFile)),
-				);
+				groups.push(normalizeAssertionText(printNodeWithoutComments(outer)));
 			}
 			return;
 		}
-		ts.forEachChild(child, visit);
+		child.forEachChild(visit);
 	}
 	visit(node);
 	return groups;
@@ -160,19 +155,19 @@ function extractAssertionsFrom(node, printer, sourceFile) {
 
 function isOutermostExpectExpression(node) {
 	if (!(
-		ts.isCallExpression(node) ||
-		ts.isPropertyAccessExpression(node) ||
-		ts.isElementAccessExpression(node)
+		is.isCallExpression(node) ||
+		is.isPropertyAccessExpression(node) ||
+		is.isElementAccessExpression(node)
 	)) {
 		return false;
 	}
 	let cursor = node;
 	while (
-		ts.isPropertyAccessExpression(cursor) ||
-		ts.isCallExpression(cursor) ||
-		ts.isElementAccessExpression(cursor)
+		is.isPropertyAccessExpression(cursor) ||
+		is.isCallExpression(cursor) ||
+		is.isElementAccessExpression(cursor)
 	) {
-		if (ts.isCallExpression(cursor) && isExpectRoot(cursor)) {
+		if (is.isCallExpression(cursor) && isExpectRoot(cursor)) {
 			return outermostExpect(cursor) === node;
 		}
 		cursor = cursor.expression;
@@ -182,10 +177,10 @@ function isOutermostExpectExpression(node) {
 
 function unwrapParenthesizedExpressions(node) {
 	function visit(current) {
-		if (ts.isParenthesizedExpression(current)) {
+		if (is.isParenthesizedExpression(current)) {
 			return visit(current.expression);
 		}
-		return ts.visitEachChild(current, visit, undefined);
+		return visitEachChild(current, visit);
 	}
 	return visit(node);
 }
@@ -196,20 +191,20 @@ function collapseExpectExpressions(node) {
 	// separately via extractAssertionsFrom.
 	function visit(current) {
 		if (isOutermostExpectExpression(current)) {
-			return ts.factory.createIdentifier('__ASSERTION__');
+			return factory.createIdentifier('__ASSERTION__');
 		}
-		return ts.visitEachChild(current, visit, undefined);
+		return visitEachChild(current, visit);
 	}
 	return visit(node);
 }
 
-function extractScenarioSteps(body, printer, sourceFile) {
+function extractScenarioSteps(body) {
 	const steps = [];
 	for (const statement of body.statements) {
 		const node = containsExpect(statement)
 			? unwrapParenthesizedExpressions(collapseExpectExpressions(statement))
 			: unwrapParenthesizedExpressions(statement);
-		let text = normalizeAssertionText(printer.printNode(ts.EmitHint.Unspecified, node, sourceFile));
+		let text = normalizeAssertionText(printNodeWithoutComments(node));
 		// Pure assertion statements stay the historical sentinel so divergence
 		// transforms that key on '__ASSERTION__' keep matching.
 		if (text === '__ASSERTION__;') text = '__ASSERTION__';
@@ -224,14 +219,7 @@ function extractScenarioSteps(body, printer, sourceFile) {
  * moved assertions, and interaction-to-state-mutation edits fail closed.
  */
 export function extractCaseLedger(source, fileName) {
-	const sourceFile = ts.createSourceFile(
-		fileName,
-		source,
-		ts.ScriptTarget.Latest,
-		true,
-		scriptKindFor(fileName),
-	);
-	const printer = ts.createPrinter({ removeComments: true });
+	const sourceFile = parseSourceFile(fileName, source, scriptKindFor(fileName));
 	const cases = [];
 	const occurrenceCounts = new Map();
 
@@ -245,18 +233,18 @@ export function extractCaseLedger(source, fileName) {
 			title,
 			occurrence,
 			parameterization: parameterization ?? null,
-			assertions: extractAssertionsFrom(body, printer, sourceFile),
-			scenarioSteps: extractScenarioSteps(body, printer, sourceFile),
+			assertions: extractAssertionsFrom(body),
+			scenarioSteps: extractScenarioSteps(body),
 		});
 	}
 
 	function visit(node, stack) {
-		if (ts.isCallExpression(node)) {
+		if (is.isCallExpression(node)) {
 			const title = registrarTitle(node);
 			const body = callbackBody(node);
 			if (title !== null && body) {
 				if (isDescribeCall(node.expression)) {
-					ts.forEachChild(body, function visitDescribeChild(child) {
+					body.forEachChild(function visitDescribeChild(child) {
 						visit(child, [...stack, title]);
 					});
 					return;
@@ -266,7 +254,7 @@ export function extractCaseLedger(source, fileName) {
 					return;
 				}
 				if (isTestEachCall(node.expression)) {
-					const table = eachTableText(node.expression, printer, sourceFile);
+					const table = eachTableText(node.expression);
 					if (table === null) {
 						throw new Error(`${fileName}: test.each/it.each registration is missing a data table`);
 					}
@@ -275,7 +263,7 @@ export function extractCaseLedger(source, fileName) {
 				}
 			}
 		}
-		ts.forEachChild(node, function visitChild(child) {
+		node.forEachChild(function visitChild(child) {
 			visit(child, stack);
 		});
 	}
@@ -625,78 +613,63 @@ const SUPPORT_FILE_CONTRACTS = [
 ];
 
 function normalizeSupportImportClause(statement, normalizeAssertImport) {
-	if (!normalizeAssertImport || !ts.isStringLiteral(statement.moduleSpecifier)) {
+	if (!normalizeAssertImport || !is.isStringLiteral(statement.moduleSpecifier)) {
 		return statement;
 	}
 	if (statement.moduleSpecifier.text !== '#rrp-assert') return statement;
 	// Upstream uses default import; adapted uses a named binding from the package assert.
-	return ts.factory.updateImportDeclaration(
+	return factory.updateImportDeclaration(
 		statement,
 		statement.modifiers,
-		ts.factory.createImportClause(false, ts.factory.createIdentifier('assert'), undefined),
-		ts.factory.createStringLiteral('#rrp-assert'),
+		factory.createImportClause(false, factory.createIdentifier('assert'), undefined),
+		factory.createStringLiteral('#rrp-assert'),
 		statement.attributes,
 	);
 }
 
 export function structuralSupportSource(source, fileName, options = {}) {
 	const importRewrites = options.importRewrites ?? new Map();
-	const sourceFile = ts.createSourceFile(
-		fileName,
-		source,
-		ts.ScriptTarget.Latest,
-		true,
-		ts.ScriptKind.TS,
-	);
-	const printer = ts.createPrinter({ removeComments: true });
+	const sourceFile = parseSourceFile(fileName, source, ScriptKind.TS);
 	const parts = [];
 	for (const statement of sourceFile.statements) {
 		let next = unwrapParenthesizedExpressions(statement);
-		if (ts.isImportDeclaration(next) && ts.isStringLiteral(next.moduleSpecifier)) {
+		if (is.isImportDeclaration(next) && is.isStringLiteral(next.moduleSpecifier)) {
 			const specifier = next.moduleSpecifier.text;
 			const rewritten = importRewrites.get(specifier) ?? specifier;
 			if (rewritten !== specifier) {
-				next = ts.factory.updateImportDeclaration(
+				next = factory.updateImportDeclaration(
 					next,
 					next.modifiers,
 					next.importClause,
-					ts.factory.createStringLiteral(rewritten),
+					factory.createStringLiteral(rewritten),
 					next.attributes,
 				);
 			}
 			next = normalizeSupportImportClause(next, options.normalizeAssertImport === true);
 		}
-		parts.push(
-			normalizeAssertionText(printer.printNode(ts.EmitHint.Unspecified, next, sourceFile)),
-		);
+		parts.push(normalizeAssertionText(printNodeWithoutComments(next)));
 	}
 	return parts.join('\n');
 }
 
 function authoredUserEventExports(source, fileName) {
-	const sourceFile = ts.createSourceFile(
-		fileName,
-		source,
-		ts.ScriptTarget.Latest,
-		true,
-		ts.ScriptKind.TS,
-	);
+	const sourceFile = parseSourceFile(fileName, source, ScriptKind.TS);
 	const names = new Set();
 	for (const statement of sourceFile.statements) {
-		if (ts.isFunctionDeclaration(statement) && statement.name) {
+		if (is.isFunctionDeclaration(statement) && statement.name) {
 			names.add(statement.name.text);
 		}
-		if (!ts.isExportAssignment(statement) || statement.isExportEquals) continue;
+		if (!is.isExportAssignment(statement) || statement.isExportEquals) continue;
 		const expr = statement.expression;
-		if (!ts.isObjectLiteralExpression(expr)) {
+		if (!is.isObjectLiteralExpression(expr)) {
 			throw new Error(`${fileName}: authored user-event default export must be an object literal`);
 		}
 		for (const prop of expr.properties) {
-			if (ts.isShorthandPropertyAssignment(prop)) {
+			if (is.isShorthandPropertyAssignment(prop)) {
 				names.add(prop.name.text);
 				continue;
 			}
-			if (ts.isPropertyAssignment(prop) && ts.isIdentifier(prop.name)) {
+			if (is.isPropertyAssignment(prop) && is.isIdentifier(prop.name)) {
 				names.add(prop.name.text);
 			}
 		}

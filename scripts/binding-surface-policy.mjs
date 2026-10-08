@@ -1,7 +1,10 @@
 import { createHash } from 'node:crypto';
 import { existsSync, readFileSync, realpathSync, statSync } from 'node:fs';
 import path from 'node:path';
-import ts from 'typescript';
+import { importNativeTypeScript } from './octane-tsc/native.mjs';
+import { is, SyntaxKind } from './octane-tsc/native-syntax.mjs';
+
+const { API } = await importNativeTypeScript('unstable/sync');
 
 const OWNERSHIP = new Set(['imported', 'adapter', 'copied']);
 const SOURCE_EXTENSIONS = ['.ts', '.tsx', '.tsrx', '.js', '.jsx', '.mjs', '.cjs'];
@@ -30,94 +33,119 @@ function targets(value) {
 	return value && typeof value === 'object' ? Object.values(value).flatMap(targets) : [];
 }
 
+// TypeScript 7 binds in its own process, which reads each source through these
+// callbacks under a name whose extension selects the parse: `.tsrx` and `.jsx`
+// as TSX, any other source as TypeScript. The process does not keep Node alive.
+const boundSources = new Map();
+let bindingAPI;
+
+function bindSource(sourcePath, source, file) {
+	const name = /\.(?:[cm]?ts|tsx)$/.test(sourcePath)
+		? sourcePath
+		: `${sourcePath}${/\.(?:jsx|tsrx)$/.test(file) ? '.tsx' : '.ts'}`;
+	boundSources.set(name, source);
+	bindingAPI ??= new API({
+		fs: {
+			readFile: (fileName) => boundSources.get(fileName),
+			fileExists: (fileName) => (boundSources.has(fileName) ? true : undefined),
+		},
+	});
+	// Bind only this source file: lexical references need no dependency resolution or libraries.
+	const program = bindingAPI.createProgram([name], { noResolve: true, noLib: true, types: [] });
+	return {
+		program,
+		name,
+		dispose() {
+			program.dispose();
+			boundSources.delete(name);
+		},
+	};
+}
+
 function sourceFacts(root, file, manifest, seen = new Set()) {
 	if (seen.has(file)) throw new Error(`Cyclic export coverage requires review: ${file}`);
 	seen = new Set([...seen, file]);
 	const source = readFileSync(path.join(root, file), 'utf8');
 	// TypeScript requests forward-slash file names, including on Windows.
 	const sourcePath = path.resolve(root, file).replaceAll(path.sep, '/');
-	const ast = ts.createSourceFile(
-		sourcePath,
-		source,
-		ts.ScriptTarget.Latest,
-		true,
-		/\.(?:tsx|jsx|tsrx)$/.test(file) ? ts.ScriptKind.TSX : ts.ScriptKind.TS,
-	);
-	if (ast.parseDiagnostics.length)
+	const bound = bindSource(sourcePath, source, file);
+	try {
+		return boundSourceFacts(root, file, manifest, seen, bound);
+	} finally {
+		bound.dispose();
+	}
+}
+
+function boundSourceFacts(root, file, manifest, seen, { program, name }) {
+	const ast = program.getSourceFile(name);
+	if (!ast || program.getSyntacticDiagnostics(name).length)
 		throw new Error(`Unparsed source coverage requires review: ${file}`);
 	const exports = [];
 	const files = new Set([file]);
 	const forwarding = new Map([[file, true]]);
-	// Bind only this source file: lexical references need no dependency resolution or libraries.
-	const options = { noResolve: true, noLib: true, types: [], allowNonTsExtensions: true };
-	const checker = ts
-		.createProgram([sourcePath], options, {
-			...ts.createCompilerHost(options),
-			getSourceFile: (name) => (name === sourcePath ? ast : undefined),
-		})
-		.getTypeChecker();
+	const { checker } = program.getProject();
 	const runtimeBindings = new Set();
 	const addRuntimeBinding = (name) => {
 		const symbol = checker.getSymbolAtLocation(name);
-		if (symbol?.declarations?.length === 1 && symbol.declarations[0] === name.parent)
+		if (symbol?.declarations?.length === 1 && symbol.declarations[0].resolve() === name.parent)
 			runtimeBindings.add(symbol);
 	};
 	for (const statement of ast.statements) {
 		if (
-			!ts.isImportDeclaration(statement) ||
-			!ts.isStringLiteral(statement.moduleSpecifier) ||
+			!is.isImportDeclaration(statement) ||
+			!is.isStringLiteral(statement.moduleSpecifier) ||
 			!/^octane(?:\/|$)/.test(statement.moduleSpecifier.text) ||
 			statement.importClause?.isTypeOnly
 		)
 			continue;
 		const clause = statement.importClause;
 		if (clause?.name) addRuntimeBinding(clause.name);
-		if (clause?.namedBindings && ts.isNamespaceImport(clause.namedBindings))
+		if (clause?.namedBindings && is.isNamespaceImport(clause.namedBindings))
 			addRuntimeBinding(clause.namedBindings.name);
-		if (clause?.namedBindings && ts.isNamedImports(clause.namedBindings))
+		if (clause?.namedBindings && is.isNamedImports(clause.namedBindings))
 			for (const item of clause.namedBindings.elements)
 				if (!item.isTypeOnly) addRuntimeBinding(item.name);
 	}
 	const usesRuntimeIntegration = (statement) => {
 		let found = false;
 		const visit = (node) => {
-			if (ts.isTypeNode(node)) return;
-			if (ts.isIdentifier(node)) {
+			if (is.isTypeNode(node)) return;
+			if (is.isIdentifier(node)) {
 				const symbol =
-					ts.isShorthandPropertyAssignment(node.parent) && node.parent.name === node
+					is.isShorthandPropertyAssignment(node.parent) && node.parent.name === node
 						? checker.getShorthandAssignmentValueSymbol(node.parent)
 						: checker.getSymbolAtLocation(node);
 				if (runtimeBindings.has(symbol)) found = true;
 			}
-			ts.forEachChild(node, visit);
+			node.forEachChild(visit);
 		};
 		visit(statement);
 		return found;
 	};
 	const localDeclarations = ast.statements.flatMap((statement) =>
-		ts.isVariableStatement(statement)
+		is.isVariableStatement(statement)
 			? [...statement.declarationList.declarations]
-			: ts.isFunctionDeclaration(statement)
+			: is.isFunctionDeclaration(statement)
 				? [statement]
 				: [],
 	);
 	const defaultIntegration = (expression, seen = new Set()) => {
 		while (
-			ts.isParenthesizedExpression(expression) ||
-			ts.isAsExpression(expression) ||
-			ts.isSatisfiesExpression(expression) ||
-			ts.isNonNullExpression(expression)
+			is.isParenthesizedExpression(expression) ||
+			is.isAsExpression(expression) ||
+			is.isSatisfiesExpression(expression) ||
+			is.isNonNullExpression(expression)
 		)
 			expression = expression.expression;
 		if (usesRuntimeIntegration(expression)) return true;
-		if (!ts.isIdentifier(expression) || seen.has(expression.text)) return false;
+		if (!is.isIdentifier(expression) || seen.has(expression.text)) return false;
 		seen.add(expression.text);
 		const declarations = localDeclarations.filter(
-			(item) => item.name && ts.isIdentifier(item.name) && item.name.text === expression.text,
+			(item) => item.name && is.isIdentifier(item.name) && item.name.text === expression.text,
 		);
 		if (declarations.length !== 1) return false;
 		const declaration = declarations[0];
-		return ts.isFunctionDeclaration(declaration)
+		return is.isFunctionDeclaration(declaration)
 			? usesRuntimeIntegration(declaration)
 			: !!declaration.initializer && defaultIntegration(declaration.initializer, seen);
 	};
@@ -164,36 +192,36 @@ function sourceFacts(root, file, manifest, seen = new Set()) {
 	};
 	const visit = (node) => {
 		let reference;
-		if (ts.isImportDeclaration(node) || ts.isExportDeclaration(node))
+		if (is.isImportDeclaration(node) || is.isExportDeclaration(node))
 			reference = node.moduleSpecifier;
 		else if (
-			ts.isImportEqualsDeclaration(node) &&
-			ts.isExternalModuleReference(node.moduleReference)
+			is.isImportEqualsDeclaration(node) &&
+			is.isExternalModuleReference(node.moduleReference)
 		)
 			reference = node.moduleReference.expression;
 		else if (
-			ts.isCallExpression(node) &&
-			(node.expression.kind === ts.SyntaxKind.ImportKeyword ||
-				(ts.isIdentifier(node.expression) && node.expression.text === 'require'))
+			is.isCallExpression(node) &&
+			(node.expression.kind === SyntaxKind.ImportKeyword ||
+				(is.isIdentifier(node.expression) && node.expression.text === 'require'))
 		) {
 			reference = node.arguments[0];
-			if (!reference || !ts.isStringLiteralLike(reference))
+			if (!reference || !is.isStringLiteralLikeNode(reference))
 				throw new Error(`Nonliteral module load requires review: ${file}`);
 		}
-		if (reference && ts.isStringLiteralLike(reference))
+		if (reference && is.isStringLiteralLikeNode(reference))
 			for (const resolved of resolveModule(reference.text))
 				if (resolved.file) childFacts(resolved.file);
-		ts.forEachChild(node, visit);
+		node.forEachChild(visit);
 	};
 	visit(ast);
 	for (const statement of ast.statements) {
 		if (
-			!ts.isExportDeclaration(statement) &&
-			!ts.isEmptyStatement(statement) &&
-			!(ts.isImportDeclaration(statement) && statement.importClause?.isTypeOnly)
+			!is.isExportDeclaration(statement) &&
+			!is.isEmptyStatement(statement) &&
+			!(is.isImportDeclaration(statement) && statement.importClause?.isTypeOnly)
 		)
 			forwarding.set(file, false);
-		if (ts.isExportDeclaration(statement)) {
+		if (is.isExportDeclaration(statement)) {
 			const specifier = statement.moduleSpecifier?.text;
 			if (!specifier) throw new Error(`Indirect local export requires review: ${file}`);
 			for (const resolved of resolveModule(specifier)) {
@@ -208,7 +236,7 @@ function sourceFacts(root, file, manifest, seen = new Set()) {
 									erased: statement.isTypeOnly || item.erased,
 								})),
 						);
-					else if (ts.isNamedExports(statement.exportClause)) {
+					else if (is.isNamedExports(statement.exportClause)) {
 						for (const element of statement.exportClause.elements) {
 							const original = (element.propertyName ?? element.name).text;
 							const found = child.exports.find((item) => item.name === original);
@@ -224,13 +252,13 @@ function sourceFacts(root, file, manifest, seen = new Set()) {
 				} else {
 					const specifier = resolved.specifier;
 					if (!statement.exportClause) exports.push({ name: '*', file, specifier });
-					else if (ts.isNamedExports(statement.exportClause)) {
+					else if (is.isNamedExports(statement.exportClause)) {
 						for (const element of statement.exportClause.elements)
 							exports.push({ name: element.name.text, file, specifier });
 					} else exports.push({ name: statement.exportClause.name.text, file, specifier });
 				}
 			}
-		} else if (ts.isExportAssignment(statement)) {
+		} else if (is.isExportAssignment(statement)) {
 			if (statement.isExportEquals)
 				throw new Error(`CommonJS export assignment requires review: ${file}`);
 			exports.push({
@@ -240,17 +268,17 @@ function sourceFacts(root, file, manifest, seen = new Set()) {
 				erased: false,
 			});
 		} else if (
-			statement.modifiers?.some((modifier) => modifier.kind === ts.SyntaxKind.ExportKeyword)
+			statement.modifiers?.some((modifier) => modifier.kind === SyntaxKind.ExportKeyword)
 		) {
 			const integration = usesRuntimeIntegration(statement);
-			const erased = ts.isTypeAliasDeclaration(statement) || ts.isInterfaceDeclaration(statement);
-			if (statement.modifiers.some((modifier) => modifier.kind === ts.SyntaxKind.DefaultKeyword))
+			const erased = is.isTypeAliasDeclaration(statement) || is.isInterfaceDeclaration(statement);
+			if (statement.modifiers.some((modifier) => modifier.kind === SyntaxKind.DefaultKeyword))
 				exports.push({ name: 'default', file, integration, erased });
 			else if (statement.name)
 				exports.push({ name: statement.name.text, file, integration, erased });
 			else if (
-				ts.isVariableStatement(statement) &&
-				statement.declarationList.declarations.every((item) => ts.isIdentifier(item.name))
+				is.isVariableStatement(statement) &&
+				statement.declarationList.declarations.every((item) => is.isIdentifier(item.name))
 			) {
 				for (const item of statement.declarationList.declarations)
 					exports.push({

@@ -10,7 +10,10 @@
     "allowImportingTsExtensions": true,
     "skipLibCheck": true,
     "jsx": "react-jsx",
-    "jsxImportSource": "octane"
+    "jsxImportSource": "octane",
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "types": ["node"]
   },
   "include": ["src"]
 }

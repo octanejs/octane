@@ -14,7 +14,9 @@
     "verbatimModuleSyntax": true,
     "skipLibCheck": true,
     "types": ["node"],
-    "strict": true
+    "strict": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true
   },
   "include": ["./src/", "./typetests/adapted/"],
   "exclude": ["node_modules", "dist", "tests"]

@@ -9,7 +9,8 @@
     "noErrorTruncation": true,
     "verbatimModuleSyntax": true,
     "skipLibCheck": true,
-    "strict": true
+    "strict": true,
+    "types": []
   },
   "include": ["../src/", "./"]
 }

@@ -10,7 +10,9 @@
     "strict": true,
     "jsx": "react-jsx",
     "jsxImportSource": "octane",
-    "types": ["node"]
+    "types": ["node"],
+    "noUnusedLocals": true,
+    "noUnusedParameters": true
   },
   "include": ["src"]
 }

@@ -37,7 +37,7 @@
       "arch": "any",
       "packageManager": "pnpm@12.9.1",
       "lockfile": "pnpm-lock.yaml",
-      "lockfileSha256": "a5bd68590935134632252419f04aebbf9c73f192c9d113a5ded2a08a1da391f6"
+      "lockfileSha256": "0e2eade65aa106fa828d427102627db725709a0944b9a900927ae88e784d7afd"
     }
   },
   "lanes": [
@@ -178,7 +178,7 @@
         {
           "path": "packages/tanstack-hotkeys/typetests/tsconfig.json",
           "role": "support",
-          "sha256": "c54176a2262da23f745f65d0b556b5172741a1869be2f48203664024081d1ffe"
+          "sha256": "b83fe7c8d0947adf7e37462e8ed6a99869acba37c2304984fdea7e3a5e33b805"
         },
         {
           "path": "packages/tanstack-hotkeys/typetests/exports.test-d.ts",

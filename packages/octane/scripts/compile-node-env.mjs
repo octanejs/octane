@@ -1,4 +1,12 @@
-import ts from 'typescript';
+import {
+	hasModifier,
+	hasParseErrors,
+	is,
+	isReparsed,
+	parseSourceFile,
+	ScriptKind,
+	SyntaxKind,
+} from '../../../scripts/octane-tsc/native-syntax.mjs';
 
 // Node evaluates the published runtime unbundled, so nothing substitutes
 // process.env.NODE_ENV: every guard crosses into the host environment
@@ -16,28 +24,28 @@ export const DEVELOPMENT_FLAG = '__octaneDev';
 export const DEVELOPMENT_FLAG_DECLARATION = `const ${DEVELOPMENT_FLAG} = process.env.NODE_ENV !== 'production';`;
 
 const EQUALITY = new Map([
-	[ts.SyntaxKind.EqualsEqualsEqualsToken, false],
-	[ts.SyntaxKind.EqualsEqualsToken, false],
-	[ts.SyntaxKind.ExclamationEqualsEqualsToken, true],
-	[ts.SyntaxKind.ExclamationEqualsToken, true],
+	[SyntaxKind.EqualsEqualsEqualsToken, false],
+	[SyntaxKind.EqualsEqualsToken, false],
+	[SyntaxKind.ExclamationEqualsEqualsToken, true],
+	[SyntaxKind.ExclamationEqualsToken, true],
 ]);
 
 function isEnvironmentRead(node) {
 	return (
-		ts.isPropertyAccessExpression(node) &&
+		is.isPropertyAccessExpression(node) &&
 		!node.questionDotToken &&
 		node.name.text === 'NODE_ENV' &&
-		ts.isPropertyAccessExpression(node.expression) &&
+		is.isPropertyAccessExpression(node.expression) &&
 		!node.expression.questionDotToken &&
 		node.expression.name.text === 'env' &&
-		ts.isIdentifier(node.expression.expression) &&
+		is.isIdentifier(node.expression.expression) &&
 		node.expression.expression.text === 'process'
 	);
 }
 
 function isProductionLiteral(node) {
 	return (
-		(ts.isStringLiteral(node) || ts.isNoSubstitutionTemplateLiteral(node)) &&
+		(is.isStringLiteral(node) || is.isNoSubstitutionTemplateLiteral(node)) &&
 		node.text === 'production'
 	);
 }
@@ -47,21 +55,29 @@ function isProductionLiteral(node) {
 function declaresProcess(node) {
 	const parent = node.parent;
 	if (!parent || parent.name !== node) return false;
-	if (ts.isVariableDeclaration(parent)) {
-		return (ts.getCombinedModifierFlags(parent) & ts.ModifierFlags.Ambient) === 0;
+	if (is.isVariableDeclaration(parent)) {
+		// Only a `declare` on the enclosing variable statement makes a variable ambient.
+		const statement = is.isVariableDeclarationList(parent.parent)
+			? parent.parent.parent
+			: undefined;
+		return !(
+			statement &&
+			is.isVariableStatement(statement) &&
+			hasModifier(statement, SyntaxKind.DeclareKeyword)
+		);
 	}
 	return (
-		ts.isParameter(parent) ||
-		ts.isBindingElement(parent) ||
-		ts.isFunctionDeclaration(parent) ||
-		ts.isFunctionExpression(parent) ||
-		ts.isClassDeclaration(parent) ||
-		ts.isClassExpression(parent) ||
-		ts.isImportClause(parent) ||
-		ts.isImportSpecifier(parent) ||
-		ts.isNamespaceImport(parent) ||
-		ts.isImportEqualsDeclaration(parent) ||
-		ts.isEnumDeclaration(parent)
+		is.isParameterDeclaration(parent) ||
+		is.isBindingElement(parent) ||
+		is.isFunctionDeclaration(parent) ||
+		is.isFunctionExpression(parent) ||
+		is.isClassDeclaration(parent) ||
+		is.isClassExpression(parent) ||
+		is.isImportClause(parent) ||
+		is.isImportSpecifier(parent) ||
+		is.isNamespaceImport(parent) ||
+		is.isImportEqualsDeclaration(parent) ||
+		is.isEnumDeclaration(parent)
 	);
 }
 
@@ -71,14 +87,12 @@ function declaresProcess(node) {
 // rather than shipping one.
 export function compileNodeEnvReads(source, filename) {
 	if (!source.includes('NODE_ENV')) return source;
-	const sourceFile = ts.createSourceFile(
+	const sourceFile = parseSourceFile(
 		filename,
 		source,
-		ts.ScriptTarget.Latest,
-		true,
-		/\.[cm]?js$/.test(filename) ? ts.ScriptKind.JS : ts.ScriptKind.TS,
+		/\.[cm]?js$/.test(filename) ? ScriptKind.JS : ScriptKind.TS,
 	);
-	if (sourceFile.parseDiagnostics.length !== 0) {
+	if (hasParseErrors(sourceFile)) {
 		throw new Error(`${filename}: cannot compile environment reads in a module with parse errors`);
 	}
 	const fail = (node, reason) => {
@@ -89,11 +103,12 @@ export function compileNodeEnvReads(source, filename) {
 	const edits = [];
 	let shadowed;
 	function visit(node) {
+		if (isReparsed(node)) return;
 		// Types never evaluate, including the ambient `process` declaration's.
-		if (ts.isTypeNode(node) || ts.isInterfaceDeclaration(node) || ts.isTypeAliasDeclaration(node)) {
+		if (is.isTypeNode(node) || is.isInterfaceDeclaration(node) || is.isTypeAliasDeclaration(node)) {
 			return;
 		}
-		if (ts.isIdentifier(node)) {
+		if (is.isIdentifier(node)) {
 			if (node.text === DEVELOPMENT_FLAG) fail(node, `${DEVELOPMENT_FLAG} is reserved`);
 			if (node.text === 'process' && declaresProcess(node)) shadowed ??= node;
 			if (node.text === 'NODE_ENV') {
@@ -102,7 +117,7 @@ export function compileNodeEnvReads(source, filename) {
 				if (
 					!isEnvironmentRead(read) ||
 					read.name !== node ||
-					!ts.isBinaryExpression(comparison) ||
+					!is.isBinaryExpression(comparison) ||
 					!EQUALITY.has(comparison.operatorToken.kind) ||
 					!isProductionLiteral(comparison.left === read ? comparison.right : comparison.left)
 				) {
@@ -117,13 +132,13 @@ export function compileNodeEnvReads(source, filename) {
 				});
 			}
 		} else if (
-			ts.isElementAccessExpression(node) &&
-			ts.isStringLiteralLike(node.argumentExpression) &&
+			is.isElementAccessExpression(node) &&
+			is.isStringLiteralLikeNode(node.argumentExpression) &&
 			node.argumentExpression.text === 'NODE_ENV'
 		) {
 			fail(node, 'read NODE_ENV as process.env.NODE_ENV');
 		}
-		ts.forEachChild(node, visit);
+		node.forEachChild(visit);
 	}
 	visit(sourceFile);
 	if (edits.length === 0) return source;
@@ -131,15 +146,16 @@ export function compileNodeEnvReads(source, filename) {
 
 	// The flag precedes every other statement, including the leading comments of
 	// the first one, so annotations such as @__NO_SIDE_EFFECTS__ stay attached.
+	const statements = sourceFile.statements.filter((statement) => !isReparsed(statement));
 	let index = 0;
 	while (
-		index < sourceFile.statements.length &&
-		ts.isExpressionStatement(sourceFile.statements[index]) &&
-		ts.isStringLiteral(sourceFile.statements[index].expression)
+		index < statements.length &&
+		is.isExpressionStatement(statements[index]) &&
+		is.isStringLiteral(statements[index].expression)
 	) {
 		index++;
 	}
-	const insertAt = index === 0 ? 0 : sourceFile.statements[index - 1].end;
+	const insertAt = index === 0 ? 0 : statements[index - 1].end;
 	edits.push({
 		start: insertAt,
 		end: insertAt,

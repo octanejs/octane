@@ -3,7 +3,7 @@ import { readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { format, resolveConfig } from 'prettier';
-import ts from 'typescript';
+import { is, parseSourceFile, SyntaxKind } from '../octane-tsc/native-syntax.mjs';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
 const catalogFile = join(root, 'packages/octane/error-codes/codes.json');
@@ -211,7 +211,7 @@ export function validateRuntimeUsages(catalog, sources) {
 	for (const [filename, source] of sources) {
 		const surface = frameworkErrorSurface(filename);
 		if (surface === undefined) continue;
-		const sourceFile = ts.createSourceFile(filename, source, ts.ScriptTarget.Latest, true);
+		const sourceFile = parseSourceFile(filename, source);
 		covered.push([filename, sourceFile, surface]);
 	}
 	const errorClasses = collectErrorClasses(covered.map(([, sourceFile]) => sourceFile));
@@ -241,26 +241,45 @@ const ERROR_CONSTRUCTORS = new Map([
 	['URIError', 0],
 ]);
 
+// Classic TypeScript's isFunctionLike: function declarations and expressions,
+// methods, accessors and constructors, and every signature kind.
+const SIGNATURE_KINDS = new Set([
+	SyntaxKind.CallSignature,
+	SyntaxKind.ConstructSignature,
+	SyntaxKind.ConstructorType,
+	SyntaxKind.FunctionType,
+	SyntaxKind.IndexSignature,
+	SyntaxKind.JSDocSignature,
+	SyntaxKind.MethodSignature,
+]);
+const isFunctionLike = (node) =>
+	is.isFunctionLikeDeclaration(node) || SIGNATURE_KINDS.has(node.kind);
+
+function findAncestor(node, predicate) {
+	while (node !== undefined && !predicate(node)) node = node.parent;
+	return node;
+}
+
 function extendedClassName(node) {
 	const clause = node.heritageClauses?.find(
-		(heritage) => heritage.token === ts.SyntaxKind.ExtendsKeyword,
+		(heritage) => heritage.token === SyntaxKind.ExtendsKeyword,
 	);
 	const base = clause?.types[0]?.expression;
-	return base !== undefined && ts.isIdentifier(base) ? base.text : undefined;
+	return base !== undefined && is.isIdentifier(base) ? base.text : undefined;
 }
 
 function findSuperCall(node) {
-	if (ts.isCallExpression(node) && node.expression.kind === ts.SyntaxKind.SuperKeyword) return node;
-	if (ts.isFunctionLike(node) || ts.isClassLike(node)) return undefined;
-	return ts.forEachChild(node, findSuperCall);
+	if (is.isCallExpression(node) && node.expression.kind === SyntaxKind.SuperKeyword) return node;
+	if (isFunctionLike(node) || is.isClassLikeDeclaration(node)) return undefined;
+	return node.forEachChild(findSuperCall);
 }
 
 function forwardedParameterIndex(constructor, message) {
 	if (message === undefined) return -1;
 	message = unwrapExpression(message);
-	if (!ts.isIdentifier(message)) return -1;
+	if (!is.isIdentifier(message)) return -1;
 	return constructor.parameters.findIndex(
-		(parameter) => ts.isIdentifier(parameter.name) && parameter.name.text === message.text,
+		(parameter) => is.isIdentifier(parameter.name) && parameter.name.text === message.text,
 	);
 }
 
@@ -276,8 +295,8 @@ function collectErrorClasses(sourceFiles) {
 	const declarations = [];
 	for (const sourceFile of sourceFiles) {
 		const visit = (node) => {
-			if (ts.isClassLike(node) && node.name !== undefined) declarations.push(node);
-			ts.forEachChild(node, visit);
+			if (is.isClassLikeDeclaration(node) && node.name !== undefined) declarations.push(node);
+			node.forEachChild(visit);
 		};
 		visit(sourceFile);
 	}
@@ -288,7 +307,7 @@ function collectErrorClasses(sourceFiles) {
 			const parent = extendedClassName(declaration);
 			if (classes.has(name) || parent === undefined || !classes.has(parent)) continue;
 			const parentIndex = classes.get(parent);
-			const constructor = declaration.members.find(ts.isConstructorDeclaration);
+			const constructor = declaration.members.find(is.isConstructorDeclaration);
 			const superCall = constructor?.body && findSuperCall(constructor.body);
 			let index = parentIndex;
 			if (constructor !== undefined && parentIndex !== null) {
@@ -304,11 +323,11 @@ function collectErrorClasses(sourceFiles) {
 
 function unwrapExpression(node) {
 	while (
-		ts.isParenthesizedExpression(node) ||
-		ts.isAsExpression(node) ||
-		ts.isTypeAssertionExpression(node) ||
-		ts.isNonNullExpression(node) ||
-		ts.isSatisfiesExpression(node)
+		is.isParenthesizedExpression(node) ||
+		is.isAsExpression(node) ||
+		is.isTypeAssertion(node) ||
+		is.isNonNullExpression(node) ||
+		is.isSatisfiesExpression(node)
 	) {
 		node = node.expression;
 	}
@@ -318,8 +337,8 @@ function unwrapExpression(node) {
 function isDirectFormatterCall(node, formatterName) {
 	node = unwrapExpression(node);
 	return (
-		ts.isCallExpression(node) &&
-		ts.isIdentifier(node.expression) &&
+		is.isCallExpression(node) &&
+		is.isIdentifier(node.expression) &&
 		node.expression.text === formatterName
 	);
 }
@@ -327,8 +346,8 @@ function isDirectFormatterCall(node, formatterName) {
 function isHydrationPayloadMessage(node) {
 	node = unwrapExpression(node);
 	return (
-		ts.isPropertyAccessExpression(node) &&
-		ts.isIdentifier(node.expression) &&
+		is.isPropertyAccessExpression(node) &&
+		is.isIdentifier(node.expression) &&
 		node.expression.text === 'payload' &&
 		node.name.text === 'message'
 	);
@@ -337,8 +356,8 @@ function isHydrationPayloadMessage(node) {
 function sameDynamicExpression(left, right) {
 	left = unwrapExpression(left);
 	right = unwrapExpression(right);
-	if (ts.isIdentifier(left) && ts.isIdentifier(right)) return left.text === right.text;
-	if (ts.isPropertyAccessExpression(left) && ts.isPropertyAccessExpression(right)) {
+	if (is.isIdentifier(left) && is.isIdentifier(right)) return left.text === right.text;
+	if (is.isPropertyAccessExpression(left) && is.isPropertyAccessExpression(right)) {
 		return (
 			left.name.text === right.name.text && sameDynamicExpression(left.expression, right.expression)
 		);
@@ -349,8 +368,8 @@ function sameDynamicExpression(left, right) {
 function isStringTypeGuard(condition, value) {
 	condition = unwrapExpression(condition);
 	if (
-		!ts.isBinaryExpression(condition) ||
-		condition.operatorToken.kind !== ts.SyntaxKind.EqualsEqualsEqualsToken
+		!is.isBinaryExpression(condition) ||
+		condition.operatorToken.kind !== SyntaxKind.EqualsEqualsEqualsToken
 	)
 		return false;
 	return [
@@ -358,8 +377,8 @@ function isStringTypeGuard(condition, value) {
 		[condition.right, condition.left],
 	].some(
 		([typeCheck, literal]) =>
-			ts.isTypeOfExpression(typeCheck) &&
-			ts.isStringLiteral(literal) &&
+			is.isTypeOfExpression(typeCheck) &&
+			is.isStringLiteral(literal) &&
 			literal.text === 'string' &&
 			sameDynamicExpression(typeCheck.expression, value),
 	);
@@ -371,12 +390,12 @@ function isCaughtErrorMessage(condition, value) {
 	condition = unwrapExpression(condition);
 	value = unwrapExpression(value);
 	return (
-		ts.isBinaryExpression(condition) &&
-		condition.operatorToken.kind === ts.SyntaxKind.InstanceOfKeyword &&
-		ts.isIdentifier(condition.left) &&
-		ts.isIdentifier(condition.right) &&
+		is.isBinaryExpression(condition) &&
+		condition.operatorToken.kind === SyntaxKind.InstanceOfKeyword &&
+		is.isIdentifier(condition.left) &&
+		is.isIdentifier(condition.right) &&
 		condition.right.text === 'Error' &&
-		ts.isPropertyAccessExpression(value) &&
+		is.isPropertyAccessExpression(value) &&
 		value.name.text === 'message' &&
 		sameDynamicExpression(value.expression, condition.left)
 	);
@@ -385,21 +404,18 @@ function isCaughtErrorMessage(condition, value) {
 function isAllowedErrorMessage(node, formatterName) {
 	node = unwrapExpression(node);
 	if (isDirectFormatterCall(node, formatterName)) return true;
-	if (
-		ts.isBinaryExpression(node) &&
-		node.operatorToken.kind === ts.SyntaxKind.QuestionQuestionToken
-	) {
+	if (is.isBinaryExpression(node) && node.operatorToken.kind === SyntaxKind.QuestionQuestionToken) {
 		// A compiled DOM binding definition carries the compiler's own reason an
 		// opaque view is not constructible; that message is emitted program data,
 		// so only the runtime's fallback is catalogued.
 		const carried = unwrapExpression(node.left);
 		return (
-			ts.isPropertyAccessExpression(carried) &&
+			is.isPropertyAccessExpression(carried) &&
 			carried.name.text === 'constructionError' &&
 			isAllowedErrorMessage(node.right, formatterName)
 		);
 	}
-	if (!ts.isConditionalExpression(node)) return false;
+	if (!is.isConditionalExpression(node)) return false;
 	// Choosing between catalogued messages keeps every branch coded.
 	if (
 		isAllowedErrorMessage(node.whenTrue, formatterName) &&
@@ -424,7 +440,7 @@ function isAllowedErrorMessage(node, formatterName) {
 		isStringTypeGuard(node.condition, node.whenTrue) &&
 		isDirectFormatterCall(fallback, formatterName) &&
 		fallback.arguments.length === 1 &&
-		ts.isNumericLiteral(fallback.arguments[0]) &&
+		is.isNumericLiteral(fallback.arguments[0]) &&
 		fallback.arguments[0].text === '23'
 	);
 }
@@ -447,7 +463,7 @@ function validateFrameworkErrorConstruction(
 	}
 
 	function validateFormatterCall(node) {
-		if (!ts.isIdentifier(node.expression)) return;
+		if (!is.isIdentifier(node.expression)) return;
 		const formatter = node.expression.text;
 		const runtime =
 			formatter === 'formatClientError'
@@ -460,7 +476,7 @@ function validateFrameworkErrorConstruction(
 			fail(`${location(node)} cannot use the ${runtime} formatter in the ${surface} runtime.`);
 		}
 		const codeNode = node.arguments[0];
-		if (codeNode === undefined || !ts.isNumericLiteral(codeNode)) {
+		if (codeNode === undefined || !is.isNumericLiteral(codeNode)) {
 			fail(`${location(node)} must reference a literal Octane error code.`);
 		}
 		const code = Number(codeNode.text);
@@ -492,32 +508,32 @@ function validateFrameworkErrorConstruction(
 
 	function validateSuperCall(node) {
 		let owner = node.parent;
-		while (owner !== undefined && !ts.isClassLike(owner)) owner = owner.parent;
+		while (owner !== undefined && !is.isClassLikeDeclaration(owner)) owner = owner.parent;
 		const parent = owner && extendedClassName(owner);
 		const messageIndex = parent === undefined ? undefined : errorClasses.get(parent);
 		// A null index means the parent formats its own message; super() then
 		// passes data, not a message.
 		if (messageIndex === undefined || messageIndex === null) return;
 		const message = node.arguments[messageIndex];
-		const constructor = ts.findAncestor(node, ts.isConstructorDeclaration);
+		const constructor = findAncestor(node, is.isConstructorDeclaration);
 		// Forwarding a constructor parameter is checked at each construction site.
 		if (constructor !== undefined && forwardedParameterIndex(constructor, message) !== -1) return;
 		validateMessage(node, `${parent} via super()`, message);
 	}
 
 	function visit(node) {
-		if (ts.isCallExpression(node)) {
-			if (node.expression.kind === ts.SyntaxKind.SuperKeyword) validateSuperCall(node);
+		if (is.isCallExpression(node)) {
+			if (node.expression.kind === SyntaxKind.SuperKeyword) validateSuperCall(node);
 			else validateFormatterCall(node);
 		}
-		const isErrorCall = ts.isCallExpression(node) || ts.isNewExpression(node);
-		if (isErrorCall && ts.isIdentifier(node.expression)) {
+		const isErrorCall = is.isCallExpression(node) || is.isNewExpression(node);
+		if (isErrorCall && is.isIdentifier(node.expression)) {
 			const messageIndex = errorClasses.get(node.expression.text);
 			if (messageIndex !== undefined && messageIndex !== null) {
 				validateMessage(node, node.expression.text, node.arguments?.[messageIndex]);
 			}
 		}
-		ts.forEachChild(node, visit);
+		node.forEachChild(visit);
 	}
 
 	visit(sourceFile);

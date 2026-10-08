@@ -1,7 +1,13 @@
 import { createHash } from 'node:crypto';
 import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { relative, resolve, sep } from 'node:path';
-import ts from 'typescript';
+import { is, parseSourceFile, ScriptKind, SyntaxKind } from '../octane-tsc/native-syntax.mjs';
+import {
+	flattenDiagnosticText,
+	parseProjectConfigContent,
+	printNodeWithoutComments,
+	readProjectConfig,
+} from './native-typescript-lib.mjs';
 
 export const TYPE_PARITY_CONFIG = 'packages/transition-group/audit/type-parity.json';
 
@@ -35,19 +41,16 @@ function normalizeComment(comment) {
 }
 
 function containsExpectType(node) {
-	if (ts.isIdentifier(node) && node.text === 'expectType') return true;
+	if (is.isIdentifier(node) && node.text === 'expectType') return true;
 	return node.getChildren().some(containsExpectType);
 }
 
 function assertionGroups(source, fileName) {
-	const sourceFile = ts.createSourceFile(
+	const sourceFile = parseSourceFile(
 		fileName,
 		source,
-		ts.ScriptTarget.Latest,
-		true,
-		fileName.endsWith('.tsx') ? ts.ScriptKind.TSX : ts.ScriptKind.TS,
+		fileName.endsWith('.tsx') ? ScriptKind.TSX : ScriptKind.TS,
 	);
-	const printer = ts.createPrinter({ removeComments: true });
 	const groups = [];
 	for (const match of source.matchAll(/\/\*\*[\s\S]*?\*\//g)) {
 		groups.push(`doc:${normalizeComment(match[0])}`);
@@ -56,44 +59,33 @@ function assertionGroups(source, fileName) {
 		groups.push(`expect-error:${match[1].trim()}:${match[2].replace(/\s+/g, ' ').trim()}`);
 	}
 	function visit(node) {
-		if (ts.isJsxOpeningElement(node) || ts.isJsxSelfClosingElement(node)) {
+		if (is.isJsxOpeningElement(node) || is.isJsxSelfClosingElement(node)) {
 			const attributes = node.attributes.properties.map(function describeAttribute(attribute) {
 				return attribute.name.getText(sourceFile);
 			});
 			groups.push(`jsx:${node.tagName.getText(sourceFile)}:${attributes.join(',')}`);
 		}
 		if (
-			ts.isBinaryExpression(node) &&
-			node.operatorToken.kind === ts.SyntaxKind.EqualsToken &&
-			ts.isPropertyAccessExpression(node.left)
+			is.isBinaryExpression(node) &&
+			node.operatorToken.kind === SyntaxKind.EqualsToken &&
+			is.isPropertyAccessExpression(node.left)
 		) {
-			groups.push(
-				`assignment:${printer
-					.printNode(ts.EmitHint.Unspecified, node, sourceFile)
-					.replace(/\s+/g, ' ')
-					.trim()}`,
-			);
+			groups.push(`assignment:${printNodeWithoutComments(node).replace(/\s+/g, ' ').trim()}`);
 		}
-		if (ts.isCallExpression(node) && containsExpectType(node.expression)) {
+		if (is.isCallExpression(node) && containsExpectType(node.expression)) {
 			const typeArgs = (node.typeArguments ?? [])
 				.map(function printType(typeNode) {
-					return printer
-						.printNode(ts.EmitHint.Unspecified, typeNode, sourceFile)
-						.replace(/\s+/g, ' ')
-						.trim();
+					return printNodeWithoutComments(typeNode).replace(/\s+/g, ' ').trim();
 				})
 				.join(',');
 			const args = node.arguments
 				.map(function printArg(arg) {
-					return printer
-						.printNode(ts.EmitHint.Unspecified, arg, sourceFile)
-						.replace(/\s+/g, ' ')
-						.trim();
+					return printNodeWithoutComments(arg).replace(/\s+/g, ' ').trim();
 				})
 				.join(',');
 			groups.push(`expect:${typeArgs}:${args}`);
 		}
-		ts.forEachChild(node, visit);
+		node.forEachChild(visit);
 	}
 	visit(sourceFile);
 	return groups;
@@ -187,23 +179,13 @@ export function buildTypeInventory(root, config) {
 
 function resolveProjectProbeFiles(root, projectPath) {
 	const absoluteProject = resolve(root, projectPath);
-	const read = ts.readConfigFile(absoluteProject, ts.sys.readFile);
+	const read = readProjectConfig(absoluteProject);
 	if (read.error) {
-		throw new Error(
-			`${projectPath}: ${ts.flattenDiagnosticMessageText(read.error.messageText, '\n')}`,
-		);
+		throw new Error(`${projectPath}: ${flattenDiagnosticText(read.error)}`);
 	}
-	const parsed = ts.parseJsonConfigFileContent(
-		read.config,
-		ts.sys,
-		resolve(absoluteProject, '..'),
-		undefined,
-		absoluteProject,
-	);
+	const parsed = parseProjectConfigContent(read.config, { configFileName: absoluteProject });
 	if (parsed.errors.length > 0) {
-		throw new Error(
-			`${projectPath}: ${ts.flattenDiagnosticMessageText(parsed.errors[0].messageText, '\n')}`,
-		);
+		throw new Error(`${projectPath}: ${flattenDiagnosticText(parsed.errors[0])}`);
 	}
 	const projectDir = resolve(absoluteProject, '..');
 	return parsed.fileNames

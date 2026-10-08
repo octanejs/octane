@@ -1,7 +1,8 @@
 import { createHash } from 'node:crypto';
 import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { relative, resolve, sep } from 'node:path';
-import ts from 'typescript';
+import { is, parseSourceFile, ScriptKind } from '../octane-tsc/native-syntax.mjs';
+import { printFileWithoutComments } from './native-typescript-lib.mjs';
 
 export const TYPE_PARITY_CONFIG = 'packages/visx/audit/type-parity.json';
 
@@ -62,16 +63,10 @@ function structuralSource(source, fileName) {
 			/\/\/\s*\d+\.\s+Pie centroid return (?:rejects|accepts) an Octane renderable\./g,
 			'// 2. Pie centroid return polarity.',
 		);
-	const sourceFile = ts.createSourceFile(
-		fileName,
-		withoutPolarityComments,
-		ts.ScriptTarget.Latest,
-		true,
-		ts.ScriptKind.TS,
-	);
+	const sourceFile = parseSourceFile(fileName, withoutPolarityComments, ScriptKind.TS);
 	const replacements = [];
 	for (const statement of sourceFile.statements) {
-		if (!ts.isImportDeclaration(statement) || !ts.isStringLiteral(statement.moduleSpecifier))
+		if (!is.isImportDeclaration(statement) || !is.isStringLiteral(statement.moduleSpecifier))
 			continue;
 		const specifier = statement.moduleSpecifier.text;
 		const normalized = normalizeSpecifier(specifier);
@@ -101,16 +96,8 @@ function structuralSource(source, fileName) {
 		)
 		.replace(/\bShape\b/g, 'VisxSurface')
 		.replace(/\bPieProps\b/g, 'VisxSurface');
-	const normalizedFile = ts.createSourceFile(
-		fileName,
-		transformed,
-		ts.ScriptTarget.Latest,
-		true,
-		ts.ScriptKind.TS,
-	);
-	return ts
-		.createPrinter({ removeComments: true })
-		.printFile(normalizedFile)
+	const normalizedFile = parseSourceFile(fileName, transformed, ScriptKind.TS);
+	return printFileWithoutComments(normalizedFile)
 		.replace(/\bimport type\b/g, 'import')
 		.replace(/\s+/g, ' ')
 		.trim();

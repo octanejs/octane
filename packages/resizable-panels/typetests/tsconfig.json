@@ -12,7 +12,8 @@
     "jsx": "preserve",
     "jsxImportSource": "octane",
     "allowImportingTsExtensions": true,
-    "skipLibCheck": false
+    "skipLibCheck": false,
+    "types": []
   },
   "include": ["./public-api.test-d.ts"]
 }

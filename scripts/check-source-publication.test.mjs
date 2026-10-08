@@ -1,19 +1,17 @@
 import assert from 'node:assert/strict';
-import { mkdirSync, mkdtempSync, realpathSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
 
 import {
+	collectTypecheckProjects,
 	findSourcePublicationViolations,
-	findUnusedDeclarationViolations,
 	parseJsonc,
 	partitionAgainstDebt,
 	RULES,
 	SOURCE_PUBLICATION_DEBT,
 } from './check-source-publication.mjs';
-import { parseUnusedDeclarations } from './consumer-unused-declarations.mjs';
-import { REPO_ROOT } from './workspace-packages.mjs';
 
 function writeJson(file, value) {
 	mkdirSync(path.dirname(file), { recursive: true });
@@ -53,41 +51,36 @@ const shippedTsrx = {
 	sources: { 'index.tsrx': 'export const a = 1;\n' },
 };
 
-test('a package that ships .tsrx may not be validated by tsgo', () => {
-	const withTsgo = createRepository({
-		...shippedTsrx,
-		rootScripts: { typecheck: 'tsgo --noEmit -p packages/demo/tsconfig.json' },
-		tsconfigs: { 'tsconfig.json': { include: ['src'] } },
-	});
-	assert.deepEqual(
-		findSourcePublicationViolations(withTsgo.repo, withTsgo.packages).map(({ rule, id }) => [
-			rule,
-			id,
-		]),
-		[[RULES.tsgo, 'packages/demo/tsconfig.json']],
-	);
+/** The consumer flags a validation project must enable for shipped `.ts`/`.tsrx`. */
+const unusedFlags = { noUnusedLocals: true, noUnusedParameters: true };
 
-	const withTsrxTsc = createRepository({
-		...shippedTsrx,
-		rootScripts: { typecheck: 'tsrx-tsc --noEmit -p packages/demo/tsconfig.json' },
-		tsconfigs: { 'tsconfig.json': { include: ['src'] } },
-	});
-	assert.deepEqual(findSourcePublicationViolations(withTsrxTsc.repo, withTsrxTsc.packages), []);
-});
+function rulesAndIds(violations) {
+	return violations.map(({ rule, id }) => [rule, id]);
+}
 
 test('every -p of one octane-tsc call reaches the chain, not only the first', () => {
 	const batched = createRepository({
 		...shippedTsrx,
 		rootScripts: {
 			typecheck:
-				'octane-tsc -p packages/demo/tsconfig.json -p packages/demo/tsconfig.tests.json && tsgo --noEmit -p packages/demo/tsconfig.tests.json',
+				'octane-tsc -p packages/demo/tsconfig.json -p packages/demo/tsconfig.tests.json && tsc --noEmit -p packages/demo/tsconfig.tests.json',
 		},
 		tsconfigs: {
 			'tsconfig.json': { include: ['src'] },
 			'tsconfig.tests.json': { include: ['src'] },
 		},
 	});
-	assert.deepEqual(findSourcePublicationViolations(batched.repo, batched.packages), []);
+	const directory = path.join(batched.repo, 'packages/demo');
+	assert.deepEqual(
+		[...collectTypecheckProjects(batched.repo, batched.packages)].map(([project, checkers]) => [
+			path.relative(directory, project),
+			[...checkers].sort(),
+		]),
+		[
+			['tsconfig.json', ['octane-tsc']],
+			['tsconfig.tests.json', ['octane-tsc', 'tsc']],
+		],
+	);
 });
 
 test('delegated package scripts cannot hide a project from the chain', () => {
@@ -99,35 +92,37 @@ test('delegated package scripts cannot hide a project from the chain', () => {
 	writeJson(path.join(delegated.repo, 'packages/demo/package.json'), {
 		name: '@demo/binding',
 		files: ['src'],
-		scripts: { typecheck: 'tsgo --noEmit -p tsconfig.json' },
+		scripts: { typecheck: 'tsc --noEmit -p tsconfig.json' },
 	});
 
 	assert.deepEqual(
-		findSourcePublicationViolations(delegated.repo, delegated.packages).map(({ rule }) => rule),
-		[RULES.tsgo],
+		[...collectTypecheckProjects(delegated.repo, delegated.packages)].map(([project, checkers]) => [
+			path.relative(delegated.repo, project),
+			[...checkers],
+		]),
+		[[path.join('packages/demo', 'tsconfig.json'), ['tsc']]],
 	);
 });
 
 test('the validation project may not pin Node types a consumer does not install', () => {
 	const { repo, packages } = createRepository({
 		manifest: { files: ['src'] },
-		rootScripts: { typecheck: 'tsgo --noEmit -p packages/demo/tsconfig.json' },
-		tsconfigs: { 'tsconfig.json': { compilerOptions: { types: ['node'] } } },
+		rootScripts: { typecheck: 'octane-tsc -p packages/demo/tsconfig.json' },
+		tsconfigs: { 'tsconfig.json': { compilerOptions: { types: ['node'], ...unusedFlags } } },
 		sources: { 'index.ts': 'export const a = 1;\n' },
 	});
 
-	assert.deepEqual(
-		findSourcePublicationViolations(repo, packages).map(({ rule, id }) => [rule, id]),
-		[[RULES.nodeTypes, 'packages/demo/tsconfig.json']],
-	);
+	assert.deepEqual(rulesAndIds(findSourcePublicationViolations(repo, packages)), [
+		[RULES.nodeTypes, 'packages/demo/tsconfig.json'],
+	]);
 });
 
 test('a validation project the typecheck chain never reaches is still checked', () => {
 	// A package the chain never names still ships source a consumer compiles.
 	const absent = createRepository({
 		manifest: { files: ['src'] },
-		rootScripts: { typecheck: 'tsgo --noEmit -p packages/octane/tsconfig.json' },
-		tsconfigs: { 'tsconfig.json': { compilerOptions: { types: ['node'] } } },
+		rootScripts: { typecheck: 'octane-tsc -p packages/octane/tsconfig.json' },
+		tsconfigs: { 'tsconfig.json': { compilerOptions: { types: ['node'], ...unusedFlags } } },
 		sources: { 'index.ts': 'export const a = 1;\n' },
 	});
 	assert.deepEqual(
@@ -140,7 +135,7 @@ test('a validation project the typecheck chain never reaches is still checked', 
 	const wrapped = createRepository({
 		manifest: { files: ['src'] },
 		rootScripts: { typecheck: 'pnpm --dir packages/demo typecheck' },
-		tsconfigs: { 'tsconfig.json': { compilerOptions: { types: ['node'] } } },
+		tsconfigs: { 'tsconfig.json': { compilerOptions: { types: ['node'], ...unusedFlags } } },
 		sources: { 'index.ts': 'export const a = 1;\n' },
 	});
 	writeJson(path.join(wrapped.repo, 'packages/demo/package.json'), {
@@ -173,37 +168,50 @@ test('a package-root project scoped away from src is not the validation project'
 		sources: { 'index.ts': 'export const a = 1;\n' },
 	});
 
-	assert.deepEqual(findSourcePublicationViolations(repo, packages), []);
+	// Neither project's Node types is reported, and with no project validating
+	// src, the shipped module is reported as unchecked by the unused flags.
+	assert.deepEqual(rulesAndIds(findSourcePublicationViolations(repo, packages)), [
+		[RULES.unusedFlags, '@demo/binding'],
+	]);
 });
 
 test('nested type-test projects are not treated as the validation project', () => {
 	const { repo, packages } = createRepository({
 		manifest: { files: ['src'] },
-		rootScripts: { typecheck: 'tsgo --noEmit -p packages/demo/typetests/tsconfig.json' },
-		tsconfigs: { 'typetests/tsconfig.json': { compilerOptions: { types: ['node'] } } },
+		rootScripts: { typecheck: 'octane-tsc -p packages/demo/typetests/tsconfig.json' },
+		tsconfigs: {
+			'typetests/tsconfig.json': { compilerOptions: { types: ['node'], ...unusedFlags } },
+		},
 		sources: { 'index.ts': 'export const a = 1;\n' },
 	});
 
-	assert.deepEqual(findSourcePublicationViolations(repo, packages), []);
+	assert.deepEqual(rulesAndIds(findSourcePublicationViolations(repo, packages)), [
+		[RULES.unusedFlags, '@demo/binding'],
+	]);
 });
 
 test('the validation project may not exclude source that still ships', () => {
 	const { repo, packages } = createRepository({
 		manifest: { files: ['src'] },
-		rootScripts: { typecheck: 'tsgo --noEmit -p packages/demo/tsconfig.json' },
+		rootScripts: { typecheck: 'octane-tsc -p packages/demo/tsconfig.json' },
 		tsconfigs: {
-			'tsconfig.json': { exclude: ['node_modules', 'src/broken.ts', 'src/absent.ts'] },
+			'tsconfig.json': {
+				compilerOptions: unusedFlags,
+				exclude: ['node_modules', 'src/broken.ts', 'src/absent.ts'],
+			},
 		},
 		sources: { 'index.ts': 'export const a = 1;\n', 'broken.ts': 'export const b = 2;\n' },
 	});
 
 	const violations = findSourcePublicationViolations(repo, packages);
-	assert.deepEqual(
-		violations.map(({ rule, id }) => [rule, id]),
-		[[RULES.excluded, 'packages/demo/tsconfig.json']],
-	);
-	// Only the file that exists in the packed tree is reported.
+	assert.deepEqual(rulesAndIds(violations), [
+		[RULES.excluded, 'packages/demo/tsconfig.json'],
+		[RULES.unusedFlags, '@demo/binding'],
+	]);
+	// Only the file that exists in the packed tree is reported, and the excluded
+	// module is the one the unused flags never check.
 	assert.match(violations[0].detail, /src\/broken\.ts$/);
+	assert.match(violations[1].detail, /1 shipped module\(s\), starting with broken\.ts,/);
 });
 
 test('a directory or glob exclude drops shipped source the same way a file name does', () => {
@@ -213,15 +221,22 @@ test('a directory or glob exclude drops shipped source the same way a file name 
 			manifest: { files: ['src'] },
 			rootScripts: { typecheck: 'tsrx-tsc --noEmit -p packages/demo/tsconfig.json' },
 			tsconfigs: {
-				'tsconfig.json': { include: ['src'], exclude: ['node_modules', 'dist', entry] },
+				'tsconfig.json': {
+					compilerOptions: unusedFlags,
+					include: ['src'],
+					exclude: ['node_modules', 'dist', entry],
+				},
 			},
 			sources: { 'index.tsrx': 'export const a = 1;\n' },
 		});
 
 		const violations = findSourcePublicationViolations(repo, packages);
 		assert.deepEqual(
-			violations.map(({ rule, id }) => [rule, id]),
-			[[RULES.excluded, 'packages/demo/tsconfig.json']],
+			rulesAndIds(violations),
+			[
+				[RULES.excluded, 'packages/demo/tsconfig.json'],
+				[RULES.unusedFlags, '@demo/binding'],
+			],
 			`exclude ${JSON.stringify(entry)} must be reported`,
 		);
 		assert.match(
@@ -236,7 +251,9 @@ test('a directory or glob exclude drops shipped source the same way a file name 
 		const { repo, packages } = createRepository({
 			manifest: { files: ['src'] },
 			rootScripts: { typecheck: 'tsrx-tsc --noEmit -p packages/demo/tsconfig.json' },
-			tsconfigs: { 'tsconfig.json': { include: ['src'], exclude: [entry] } },
+			tsconfigs: {
+				'tsconfig.json': { compilerOptions: unusedFlags, include: ['src'], exclude: [entry] },
+			},
 			sources: { 'index.tsrx': 'export const a = 1;\n' },
 		});
 
@@ -251,7 +268,7 @@ test('a directory or glob exclude drops shipped source the same way a file name 
 test('published JavaScript modules must ship a sibling declaration file', () => {
 	const { repo, packages } = createRepository({
 		manifest: { files: ['src'] },
-		rootScripts: { typecheck: 'tsgo --noEmit -p packages/demo/tsconfig.json' },
+		rootScripts: { typecheck: 'octane-tsc -p packages/demo/tsconfig.json' },
 		tsconfigs: { 'tsconfig.json': {} },
 		sources: {
 			'typed.js': 'export const typed = 1;\n',
@@ -273,7 +290,7 @@ test('published JavaScript modules must ship a sibling declaration file', () => 
 test('packages that do not ship source are outside the contract', () => {
 	const { repo, packages } = createRepository({
 		manifest: { files: ['dist'] },
-		rootScripts: { typecheck: 'tsgo --noEmit -p packages/demo/tsconfig.json' },
+		rootScripts: { typecheck: 'octane-tsc -p packages/demo/tsconfig.json' },
 		tsconfigs: { 'tsconfig.json': { compilerOptions: { types: ['node'] } } },
 		sources: { 'index.tsrx': 'export const a = 1;\n', 'legacy.js': 'export const b = 2;\n' },
 	});
@@ -282,9 +299,9 @@ test('packages that do not ship source are outside the contract', () => {
 });
 
 test('the debt allowlist admits known violations and rejects new ones', () => {
-	const known = { rule: RULES.tsgo, id: 'packages/demo/tsconfig.json', detail: 'known' };
-	const fresh = { rule: RULES.tsgo, id: 'packages/other/tsconfig.json', detail: 'new' };
-	const debt = { [RULES.tsgo]: [known.id] };
+	const known = { rule: RULES.nodeTypes, id: 'packages/demo/tsconfig.json', detail: 'known' };
+	const fresh = { rule: RULES.nodeTypes, id: 'packages/other/tsconfig.json', detail: 'new' };
+	const debt = { [RULES.nodeTypes]: [known.id] };
 
 	assert.deepEqual(partitionAgainstDebt([known], debt), { unexpected: [], stale: [] });
 	assert.deepEqual(partitionAgainstDebt([known, fresh], debt), {
@@ -294,11 +311,11 @@ test('the debt allowlist admits known violations and rejects new ones', () => {
 });
 
 test('a fixed package must be removed from the debt allowlist', () => {
-	const debt = { [RULES.tsgo]: ['packages/demo/tsconfig.json'] };
+	const debt = { [RULES.nodeTypes]: ['packages/demo/tsconfig.json'] };
 
 	assert.deepEqual(partitionAgainstDebt([], debt), {
 		unexpected: [],
-		stale: [{ rule: RULES.tsgo, id: 'packages/demo/tsconfig.json' }],
+		stale: [{ rule: RULES.nodeTypes, id: 'packages/demo/tsconfig.json' }],
 	});
 });
 
@@ -309,128 +326,102 @@ test('the committed allowlist only names rules this check reports', () => {
 	}
 });
 
-/**
- * Source-published packages outside the repository. The check still compiles
- * them from inside it, where octane-tsc resolves the `.tsrx` content mapper.
- */
-function createSourcePackages(packages) {
-	const root = realpathSync(mkdtempSync(path.join(tmpdir(), 'unused-declarations-')));
-	return packages.map(({ dir, files = ['src'], sources }) => {
-		const directory = path.join(root, dir);
-		for (const [relative, contents] of Object.entries(sources)) {
-			const file = path.join(directory, relative);
-			mkdirSync(path.dirname(file), { recursive: true });
-			writeFileSync(file, contents);
-		}
-		const name = `@demo/${dir}`;
-		return { dir, directory, name, manifest: { name, files } };
-	});
-}
-
-test('unused declarations in shipped .ts and .tsrx fail the consumer flag that rejects them', () => {
-	const packages = createSourcePackages([
-		{
-			dir: 'binding',
-			sources: {
-				'src/index.ts': [
-					"import { helper, leftover } from './helper.ts';",
-					"import { fromDependency } from '../../dependency/src/index.ts';",
-					"import { outside } from '../outside.ts';",
-					'export function run(value: number, ignored: string) {',
-					'\treturn helper(value) + fromDependency + outside;',
-					'}',
-					'',
-				].join('\n'),
-				'src/helper.ts':
-					'export const helper = (value: number) => value;\nexport const leftover = 1;\n',
-				'src/View.tsrx': [
-					"import type { OctaneNode } from 'octane';",
-					'export function View() @{',
-					'\t<div />',
-					'}',
-					'',
-				].join('\n'),
-				// Outside `src`, so the package does not ship it.
-				'outside.ts': 'const unreadOutside = 1;\nexport const outside = 2;\n',
-			},
-		},
-		{
-			dir: 'dependency',
-			sources: {
-				'src/index.ts': 'const unreadInDependency = 1;\nexport const fromDependency = 3;\n',
-			},
-		},
-	]);
-
-	const violations = findUnusedDeclarationViolations(REPO_ROOT, packages);
-	const reported = (rule, id) => {
-		const violation = violations.find((entry) => entry.rule === rule && entry.id === id);
-		return [...(violation?.detail ?? '').matchAll(/TS\d+ '([^']+)'/g)].map((match) => match[1]);
+test('shipped .ts and .tsrx must be checked by a project with both unused-declaration flags', () => {
+	const sources = {
+		'index.ts': 'export const a = 1;\n',
+		'View.tsrx': 'export const b = 2;\n',
+		'index.d.ts': 'export declare const a: number;\n',
+	};
+	const violationsFor = (compilerOptions) => {
+		const { repo, packages } = createRepository({
+			manifest: { files: ['src'] },
+			rootScripts: { typecheck: 'octane-tsc -p packages/demo/tsconfig.json' },
+			tsconfigs: { 'tsconfig.json': { compilerOptions, include: ['src'] } },
+			sources,
+		});
+		return findSourcePublicationViolations(repo, packages);
 	};
 
-	assert.deepEqual(
-		violations.map(({ rule, id }) => [rule, id]),
-		[
-			[RULES.unusedLocals, '@demo/binding'],
-			[RULES.unusedLocals, '@demo/dependency'],
-			[RULES.unusedParameters, '@demo/binding'],
-		],
-	);
-	assert.deepEqual(reported(RULES.unusedLocals, '@demo/binding').sort(), [
-		'OctaneNode',
-		'leftover',
-	]);
-	assert.deepEqual(reported(RULES.unusedLocals, '@demo/dependency'), ['unreadInDependency']);
-	assert.deepEqual(reported(RULES.unusedParameters, '@demo/binding'), ['ignored']);
+	assert.deepEqual(violationsFor(unusedFlags), []);
+	// Either flag alone leaves the other consumer flag unchecked.
+	for (const compilerOptions of [{}, { noUnusedLocals: true }, { noUnusedParameters: true }]) {
+		const violations = violationsFor(compilerOptions);
+		assert.deepEqual(
+			rulesAndIds(violations),
+			[[RULES.unusedFlags, '@demo/binding']],
+			JSON.stringify(compilerOptions),
+		);
+		// Declaration files give neither flag anything to check.
+		assert.match(
+			violations[0].detail,
+			/^2 shipped module\(s\), starting with View\.tsrx, index\.ts,/,
+		);
+	}
 });
 
-test('a package that ships only JavaScript gives the consumer flags nothing to compile', () => {
-	const packages = createSourcePackages([
-		{
-			dir: 'javascript',
-			sources: {
-				'src/index.js': 'const unread = 1;\nexport const value = 2;\n',
-				'src/index.d.ts': 'export declare const value: number;\n',
+test('the unused-declaration flags may come from a relative base the project extends', () => {
+	const { repo, packages } = createRepository({
+		manifest: { files: ['src'] },
+		rootScripts: {},
+		tsconfigs: {
+			'tsconfig.base.json': { compilerOptions: unusedFlags, include: ['scripts'] },
+			'tsconfig.json': { extends: './tsconfig.base', include: ['src'] },
+		},
+		sources: { 'index.ts': 'export const a = 1;\n' },
+	});
+	assert.deepEqual(findSourcePublicationViolations(repo, packages), []);
+
+	// A test project that turns the flags back off does not undo the project
+	// that validates src with them on.
+	const withTests = createRepository({
+		manifest: { files: ['src'] },
+		rootScripts: {},
+		tsconfigs: {
+			'tsconfig.json': { compilerOptions: unusedFlags, include: ['src'] },
+			'tsconfig.tests.json': {
+				extends: './tsconfig.json',
+				compilerOptions: { noUnusedLocals: false, noUnusedParameters: false },
+				include: ['src', 'tests'],
 			},
 		},
-	]);
-
-	assert.deepEqual(findUnusedDeclarationViolations(REPO_ROOT, packages), []);
+		sources: { 'index.ts': 'export const a = 1;\n' },
+	});
+	assert.deepEqual(findSourcePublicationViolations(withTests.repo, withTests.packages), []);
 });
 
-test('a consumer program that failed to build fails the check instead of passing', () => {
-	assert.deepEqual(
-		parseUnusedDeclarations(
-			[
-				"packages/demo/src/index.ts(3,10): error TS6133: 'leftover' is declared but its value is never read.",
-				"packages/demo/src/index.ts(4,1): error TS2304: Cannot find name 'process'.",
-				'packages/demo/src/index.ts(5,1): error TS2322: Type A is not assignable to type B.',
-				"  Type 'string' is not assignable to type 'number'.",
-				'',
-			].join('\n'),
-			REPO_ROOT,
-		),
-		[
-			{
-				file: 'packages/demo/src/index.ts',
-				line: 3,
-				column: 10,
-				code: 6133,
-				message: "'leftover' is declared but its value is never read.",
-			},
-		],
-	);
-	assert.throws(
-		() => parseUnusedDeclarations("error TS18003: No inputs were found in config file 'x'."),
-		/could not build the consumer program/,
-	);
-	assert.throws(
-		() =>
-			parseUnusedDeclarations(
-				"node_modules/.cache/x/tsconfig.json(1,9): error TS100031: The content mapper package '@tsrx/content-mapper' could not be resolved.",
-			),
-		/could not build the consumer program/,
-	);
+test('a flagged project must include every shipped module, not only some of them', () => {
+	const { repo, packages } = createRepository({
+		manifest: { files: ['src'] },
+		rootScripts: { typecheck: 'octane-tsc -p packages/demo/tsconfig.json' },
+		tsconfigs: {
+			// Declarations alone leave the shipped `.tsrx` beside them unchecked.
+			'tsconfig.json': { compilerOptions: unusedFlags, include: ['./src/**/*.d.ts'] },
+		},
+		sources: {
+			'Hydrate.tsrx': 'export const a = 1;\n',
+			'Hydrate.tsrx.d.ts': 'export declare const a: number;\n',
+			'index.js': 'export * from "./Hydrate.tsrx";\n',
+			'index.d.ts': 'export * from "./Hydrate.tsrx";\n',
+		},
+	});
+
+	const violations = findSourcePublicationViolations(repo, packages);
+	assert.deepEqual(rulesAndIds(violations), [[RULES.unusedFlags, '@demo/binding']]);
+	assert.match(violations[0].detail, /^1 shipped module\(s\), starting with Hydrate\.tsrx,/);
+});
+
+test('a package that ships only JavaScript and declarations gives the flags nothing to check', () => {
+	const { repo, packages } = createRepository({
+		manifest: { files: ['src'] },
+		rootScripts: {},
+		tsconfigs: {},
+		sources: {
+			'index.js': 'export const value = 2;\n',
+			'index.d.ts': 'export declare const value: number;\n',
+		},
+	});
+
+	assert.deepEqual(findSourcePublicationViolations(repo, packages), []);
 });
 
 test('tsconfig files with comments and trailing commas are read, not skipped', () => {
@@ -451,12 +442,14 @@ test('a wildcard final segment matches one path segment, the way tsc treats it',
 	const shallow = createRepository({
 		manifest: { files: ['src'] },
 		rootScripts: { typecheck: 'tsrx-tsc --noEmit -p packages/demo/tsconfig.json' },
-		tsconfigs: { 'tsconfig.json': { include: ['src'], exclude: ['src/*'] } },
+		tsconfigs: {
+			'tsconfig.json': { compilerOptions: unusedFlags, include: ['src'], exclude: ['src/*'] },
+		},
 		sources: { 'index.tsrx': 'export const a = 1;\n' },
 	});
 	assert.deepEqual(
 		findSourcePublicationViolations(shallow.repo, shallow.packages).map(({ rule }) => rule),
-		[RULES.excluded],
+		[RULES.excluded, RULES.unusedFlags],
 	);
 
 	// The same entry must NOT reach a nested file: `*` does not cross `/`. Only
@@ -465,7 +458,9 @@ test('a wildcard final segment matches one path segment, the way tsc treats it',
 	const nested = createRepository({
 		manifest: { files: ['src'] },
 		rootScripts: { typecheck: 'tsrx-tsc --noEmit -p packages/demo/tsconfig.json' },
-		tsconfigs: { 'tsconfig.json': { include: ['src'], exclude: ['src/*'] } },
+		tsconfigs: {
+			'tsconfig.json': { compilerOptions: unusedFlags, include: ['src'], exclude: ['src/*'] },
+		},
 		sources: { 'deep/nested/index.tsrx': 'export const a = 1;\n' },
 	});
 	assert.deepEqual(findSourcePublicationViolations(nested.repo, nested.packages), []);
@@ -473,11 +468,13 @@ test('a wildcard final segment matches one path segment, the way tsc treats it',
 	const spanning = createRepository({
 		manifest: { files: ['src'] },
 		rootScripts: { typecheck: 'tsrx-tsc --noEmit -p packages/demo/tsconfig.json' },
-		tsconfigs: { 'tsconfig.json': { include: ['src'], exclude: ['src/**'] } },
+		tsconfigs: {
+			'tsconfig.json': { compilerOptions: unusedFlags, include: ['src'], exclude: ['src/**'] },
+		},
 		sources: { 'deep/nested/index.tsrx': 'export const a = 1;\n' },
 	});
 	assert.deepEqual(
 		findSourcePublicationViolations(spanning.repo, spanning.packages).map(({ rule }) => rule),
-		[RULES.excluded],
+		[RULES.excluded, RULES.unusedFlags],
 	);
 });

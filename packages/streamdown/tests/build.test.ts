@@ -56,6 +56,8 @@ describe('@octanejs/streamdown package build', { timeout: 40_000 }, () => {
 			);
 			symlinkSync(join(repositoryRoot, 'node_modules'), join(scratchRoot, 'node_modules'), 'dir');
 			symlinkSync(join(packageRoot, 'node_modules'), join(scratchPackage, 'node_modules'), 'dir');
+			// The declaration emit runs the repository's native TypeScript tooling.
+			symlinkSync(join(repositoryRoot, 'scripts'), join(scratchRoot, 'scripts'), 'dir');
 
 			const result = spawnSync(process.execPath, ['scripts/build.mjs'], {
 				cwd: scratchPackage,

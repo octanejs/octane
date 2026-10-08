@@ -13,8 +13,11 @@ coverage
 .vite
 *.log
 
-# Project-local scoped-typecheck configs can remain after an interrupted run.
+# Project-local scoped-typecheck configs can remain after an interrupted run,
+# as can the sibling wrappers octane-tsc and the react-port type evidence write.
 **/.typecheck-files-*/
+.octane-tsc-*
+.type-evidence-*
 
 # Example-app browser and TSRX tooling outputs
 **/test-results/

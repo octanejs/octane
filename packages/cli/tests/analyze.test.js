@@ -134,6 +134,38 @@ export function Hint({ value }) @{
 		expect(result.exitCode).toBe(3);
 	});
 
+	it('points a parse failure at its position without repeating it in the message', async () => {
+		// A syntax error carries Acorn's `loc: { line, column }` and repeats it as a
+		// `(2:10)` message tail; a parser diagnostic with a range, such as two
+		// outputs in one code block, carries `loc: { start, end }` instead.
+		const result = await analyze({
+			'src/Syntax.tsrx': 'export function Syntax() @{\n\t<div>{1 +}</div>\n}\n',
+			'src/Outputs.tsrx': 'export function Outputs() @{\n\t<div />\n\t<span />\n}\n',
+		});
+
+		const findings = result.json().findings;
+		const finding = (/** @type {string} */ name) =>
+			findings.find((/** @type {{ file: string }} */ found) => found.file.endsWith(name));
+		expect(finding('Syntax.tsrx')).toEqual(
+			expect.objectContaining({
+				code: 'OCTANE_PARSE_ERROR',
+				line: 2,
+				column: 11,
+				message: 'Unexpected token',
+			}),
+		);
+		expect(finding('Outputs.tsrx')).toEqual(
+			expect.objectContaining({
+				code: 'OCTANE_PARSE_ERROR',
+				line: 3,
+				column: 2,
+				message:
+					"A code block renders a single node; wrap multiple nodes or text in a fragment '<>…</>'.",
+			}),
+		);
+		expect(result.exitCode).toBe(3);
+	});
+
 	it('points a semantic compile error at its real line, not 1:1', async () => {
 		// A slot-keyed hook in a plain JS loop is a compile error, and the compiler
 		// appends the position to the message rather than setting `loc`. Reporting

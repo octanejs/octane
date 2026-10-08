@@ -11,7 +11,10 @@
     "noErrorTruncation": true,
     "allowSyntheticDefaultImports": true,
     "skipLibCheck": true,
-    "strict": true
+    "strict": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "types": []
   },
   "include": ["./src/", "./typetests/"],
   "exclude": ["node_modules", "dist", "tests"]

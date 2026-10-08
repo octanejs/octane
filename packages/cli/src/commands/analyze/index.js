@@ -149,6 +149,12 @@ function describeSuggestions(suggestions) {
 const TRAILING_LOCATION = /\s*\(([^()\s]+):(\d+):(\d+)\)\s*$/;
 
 /**
+ * Position a parser appends to its own message, e.g. `Unexpected token (2:10)`:
+ * the zero-based `loc` an Acorn-style `SyntaxError` also carries.
+ */
+const PARSER_LOCATION = /\s*\((\d+):(\d+)\)\s*$/;
+
+/**
  * A compiler error that carries its own code, e.g. a Strong rule:
  * `/abs/App.tsrx:4:21: [OCTANE_STRONG_EFFECT_STATE_UPDATE] Strong mode …`.
  * The position is already in the finding's columns.
@@ -166,10 +172,13 @@ const STRONG_DIRECTIVE =
 /**
  * Normalise a thrown compile failure into a finding.
  *
- * Two shapes reach here. A genuine parse failure carries a Babel-style `loc`.
- * A semantic failure (a slot-keyed hook in a plain JS loop, say) is thrown with
- * its position appended to the message instead, so recovering it keeps the
- * report pointing at the offending line rather than at 1:1.
+ * Two shapes reach here. A genuine parse failure carries a `loc`: a syntax
+ * error has Acorn's `{ line, column }` and repeats it at the end of its message,
+ * and a parser diagnostic with a range (two outputs in one code block, a
+ * redeclared binding) has `{ start, end }`. A semantic failure (a slot-keyed
+ * hook in a plain JS loop, say) is thrown with its position appended to the
+ * message instead, so recovering it keeps the report pointing at the offending
+ * line rather than at 1:1.
  *
  * @param {unknown} error
  * @param {string} file
@@ -185,13 +194,20 @@ function thrownFailure(error, file, code) {
 	code ??= coded?.[1];
 	const loc = /** @type {any} */ (error)?.loc;
 	if (loc) {
+		const start = loc.start ?? loc;
+		const line = start.line ?? 1;
+		const column = start.column ?? 0;
+		// The position has its own columns, so drop the parser's copy of it.
+		const repeated = PARSER_LOCATION.exec(message);
+		const duplicate =
+			repeated !== null && Number(repeated[1]) === line && Number(repeated[2]) === column;
 		return {
 			file,
-			line: loc.line ?? 1,
-			column: (loc.column ?? 0) + 1,
+			line,
+			column: column + 1,
 			severity: 'error',
 			code: code ?? 'OCTANE_PARSE_ERROR',
-			message,
+			message: duplicate ? message.slice(0, repeated.index) : message,
 			suggestions: [],
 		};
 	}

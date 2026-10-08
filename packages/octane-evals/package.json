@@ -58,8 +58,7 @@
     "strong-repair:check": "node scripts/verify-strong-repair-corpus.mjs --check",
     "grade:user-app": "node scripts/grade-user-app.mjs",
     "corpus:generate": "node scripts/generate-user-app-corpus.mjs",
-    "corpus:check": "node scripts/generate-user-app-corpus.mjs --check",
-    "typecheck": "tsc --noEmit -p tsconfig.json"
+    "corpus:check": "node scripts/generate-user-app-corpus.mjs --check"
   },
   "devDependencies": {
     "@tsrx/core": "catalog:default",

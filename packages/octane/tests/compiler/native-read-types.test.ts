@@ -1,9 +1,11 @@
 // @vitest-environment node
 
+import { createRequire } from 'node:module';
+import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import ts from 'typescript';
-import { describe, expect, it } from 'vitest';
-import { validateNativeSignalNames } from '../../src/compiler/native-read-types.js';
+import { afterAll, describe, expect, it } from 'vitest';
+import { validateNativeSignalNames } from 'octane/compiler/typescript';
 
 const SIGNALS = fileURLToPath(new URL('../../src/signals/index.ts', import.meta.url));
 const OCTANE = fileURLToPath(new URL('../../src/index.ts', import.meta.url));
@@ -13,15 +15,42 @@ const ROOT = '/__octane_native_type_fixture__';
 const PRELUDE = `import type { Resource, SignalHandle, WritableSignal, Query, QueryRequest } from 'octane/signals';
 declare const task$: Resource<number>;
 `;
+const PATHS = {
+	'octane/signals': [SIGNALS],
+	octane: [OCTANE],
+	'octane/jsx-runtime': [fileURLToPath(new URL('../../src/jsx-runtime.d.ts', import.meta.url))],
+	'octane/signals/client': [CLIENT_HOOKS],
+	'octane/signals/server': [SERVER_HOOKS],
+};
+// The repository's TypeScript 7, whose `typescript/unstable/sync` API builds
+// the same fixtures as a native program.
+const TYPESCRIPT_7 = dirname(
+	createRequire(import.meta.url).resolve('typescript-native/package.json'),
+);
+const native = createRequire(join(TYPESCRIPT_7, 'package.json'));
 
-function fixture(source: string, otherFiles: Record<string, string> = {}) {
+interface FixtureProgram {
+	program: unknown;
+	sourceFile: unknown;
+	errors: string[];
+	diagnostics: ReturnType<typeof validateNativeSignalNames>;
+}
+
+function fixtureFiles(source: string, otherFiles: Record<string, string>) {
 	const filename = `${ROOT}/main.tsx`;
-	const files = new Map<string, string>([
-		[filename, source],
-		...Object.entries(otherFiles).map(
-			([name, text]) => [`${ROOT}/${name}`, text] as [string, string],
-		),
-	]);
+	return {
+		filename,
+		files: new Map<string, string>([
+			[filename, source],
+			...Object.entries(otherFiles).map(
+				([name, text]) => [`${ROOT}/${name}`, text] as [string, string],
+			),
+		]),
+	};
+}
+
+function classicProgram(source: string, otherFiles: Record<string, string>): FixtureProgram {
+	const { filename, files } = fixtureFiles(source, otherFiles);
 	const options: ts.CompilerOptions = {
 		target: ts.ScriptTarget.ES2022,
 		module: ts.ModuleKind.ESNext,
@@ -31,13 +60,7 @@ function fixture(source: string, otherFiles: Record<string, string> = {}) {
 		noEmit: true,
 		skipLibCheck: true,
 		types: [],
-		paths: {
-			'octane/signals': [SIGNALS],
-			octane: [OCTANE],
-			'octane/jsx-runtime': [fileURLToPath(new URL('../../src/jsx-runtime.d.ts', import.meta.url))],
-			'octane/signals/client': [CLIENT_HOOKS],
-			'octane/signals/server': [SERVER_HOOKS],
-		},
+		paths: PATHS,
 	};
 	const host = ts.createCompilerHost(options);
 	const readFile = host.readFile;
@@ -55,22 +78,70 @@ function fixture(source: string, otherFiles: Record<string, string> = {}) {
 	};
 	const program = ts.createProgram({ rootNames: [...files.keys()], options, host });
 	const sourceFile = program.getSourceFile(filename)!;
-	const errors = program.getSemanticDiagnostics(sourceFile);
-	expect(
-		errors.map((diagnostic) => ts.flattenDiagnosticMessageText(diagnostic.messageText, '\n')),
-	).toEqual([]);
-	const diagnostics = validateNativeSignalNames(program, sourceFile);
 	return {
 		program,
 		sourceFile,
-		diagnostics,
-		names: diagnostics
-			.filter((diagnostic) => diagnostic.code === 'OCTANE_NATIVE_SIGNAL_NAME')
-			.map((diagnostic) => source.slice(diagnostic.start.offset, diagnostic.end.offset)),
+		errors: program
+			.getSemanticDiagnostics(sourceFile)
+			.map((diagnostic) => ts.flattenDiagnosticMessageText(diagnostic.messageText, '\n')),
+		diagnostics: validateNativeSignalNames(program, sourceFile),
 	};
 }
 
-describe('optional native signal type validation', () => {
+let nativeApi: any = null;
+afterAll(() => nativeApi?.close());
+
+function nativeProgram(source: string, otherFiles: Record<string, string>): FixtureProgram {
+	const { filename, files } = fixtureFiles(source, otherFiles);
+	const sync = native('typescript/unstable/sync');
+	const { ScriptTarget } = native('typescript/unstable/ast');
+	nativeApi ??= new sync.API({});
+	const snapshot = nativeApi.createSnapshot({
+		fileSystem: { kind: 'layer', files: Object.fromEntries(files) },
+		createPrograms: [
+			{
+				rootFiles: [...files.keys()],
+				compilerOptions: {
+					target: ScriptTarget.ES2022,
+					module: sync.ModuleKind.ESNext,
+					moduleResolution: sync.ModuleResolutionKind.Bundler,
+					strict: true,
+					jsx: sync.JsxEmit.Preserve,
+					noEmit: true,
+					skipLibCheck: true,
+					types: [],
+					paths: PATHS,
+				},
+			},
+		],
+	});
+	const program = snapshot.operation.createdPrograms[0];
+	const sourceFile = program.getSourceFile(filename);
+	return {
+		program,
+		sourceFile,
+		errors: program.getSemanticDiagnostics(filename).map((diagnostic: any) => diagnostic.text),
+		diagnostics: validateNativeSignalNames(program, sourceFile, { typescript: TYPESCRIPT_7 }),
+	};
+}
+
+const BACKENDS = [
+	{ name: 'the classic API', build: classicProgram, typescript: undefined },
+	{ name: 'TypeScript 7', build: nativeProgram, typescript: TYPESCRIPT_7 },
+];
+
+describe.each(BACKENDS)('optional native signal type validation on $name', (backend) => {
+	function fixture(source: string, otherFiles: Record<string, string> = {}) {
+		const result = backend.build(source, otherFiles);
+		expect(result.errors).toEqual([]);
+		return {
+			...result,
+			names: result.diagnostics
+				.filter((diagnostic) => diagnostic.code === 'OCTANE_NATIVE_SIGNAL_NAME')
+				.map((diagnostic) => source.slice(diagnostic.start.offset, diagnostic.end.offset)),
+		};
+	}
+
 	it('follows owner-facade return types through the nominal handle brand', () => {
 		const result = fixture(`import { signal$ } from 'octane/signals';
 const value = signal$(1);`);
@@ -292,10 +363,14 @@ const namespace = Octane.useMemo(() => task$.snapshot());
 	});
 
 	it('rejects a stale SourceFile from another Program', () => {
+		// TypeScript 7 shares one SourceFile between programs while its text is
+		// unchanged, so the stale file is an earlier edit of the same module.
 		const first = fixture(`${PRELUDE}const alias$ = task$;`);
-		const second = fixture(`${PRELUDE}const alias$ = task$;`);
-		expect(() => validateNativeSignalNames(second.program, first.sourceFile)).toThrow(
-			/current Program/,
-		);
+		const second = fixture(`${PRELUDE}const alias$ = task$; // edited`);
+		expect(() =>
+			validateNativeSignalNames(second.program as never, first.sourceFile as never, {
+				typescript: backend.typescript,
+			}),
+		).toThrow(/current Program/);
 	});
 });

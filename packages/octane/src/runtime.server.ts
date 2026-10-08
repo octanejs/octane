@@ -7731,17 +7731,6 @@ export function useState<T>(
 	) as [T, (next: any) => void, () => T];
 }
 
-type AssertServerUseStateType<T extends true> = T;
-type _ServerUseStateAcceptsNoArguments = AssertServerUseStateType<
-	typeof useState extends <T = undefined>() => [
-		T | undefined,
-		(next: T | undefined | ((value: T | undefined) => T | undefined)) => void,
-		() => T | undefined,
-	]
-		? true
-		: false
->;
-
 /** Compiler-emitted useState variant for a tuple whose third member is observable. */
 export function __useStateWithGetter<T>(
 	initial: T | (() => T),

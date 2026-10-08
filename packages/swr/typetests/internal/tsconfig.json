@@ -1,5 +1,10 @@
 {
   "extends": "../../tsconfig.json",
-  "compilerOptions": { "module": "NodeNext", "moduleResolution": "NodeNext" },
+  "compilerOptions": {
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "noUnusedLocals": false,
+    "noUnusedParameters": false
+  },
   "include": ["index.ts"]
 }

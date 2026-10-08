@@ -12,7 +12,9 @@
     "allowSyntheticDefaultImports": true,
     "skipLibCheck": true,
     "types": ["node"],
-    "strict": true
+    "strict": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true
   },
   "include": ["./src/", "./tests/types/"],
   "exclude": ["node_modules", "dist", "upstream"]

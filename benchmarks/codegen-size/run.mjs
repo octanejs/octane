@@ -160,6 +160,9 @@ const textTypesControlSource = fs.readFileSync(
 );
 const textTypeProject = createTextTypeProject({
 	tsconfig: path.join(__dirname, 'text-types.tsconfig.json'),
+	// Another TypeScript to analyze with, such as the repository's TypeScript 7
+	// (`typescript-native`); unset, octane's classic `typescript` peer.
+	typescript: process.env.OCTANE_TEXT_TYPES_TYPESCRIPT || undefined,
 });
 let textTypes;
 try {

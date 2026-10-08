@@ -1,8 +1,9 @@
 import { execFileSync } from 'node:child_process';
 import { readFileSync, realpathSync } from 'node:fs';
 import path from 'node:path';
-import ts from 'typescript';
 import { fileURLToPath } from 'node:url';
+import { importNativeTypeScript } from '../octane-tsc/native.mjs';
+import { is, parseSourceFile, ScriptKind, SyntaxKind } from '../octane-tsc/native-syntax.mjs';
 import { planAdaptedFiles, validateUpstreamLock, verifyPristineTree } from './materialize-lib.mjs';
 import { isUpstreamTypeTestPath } from './preflight-lib.mjs';
 import {
@@ -11,6 +12,9 @@ import {
 	requiresUpstreamEvidence,
 	scopeUpstreamInventory,
 } from '../binding-surface-policy.mjs';
+
+const { CommentDirectiveType, createScanner, getLeadingCommentRanges } =
+	await importNativeTypeScript('unstable/ast');
 
 /** Gate registration and crosswalk consumers share the same lock-checked copied inventory. */
 export function scopedUpstreamTestInventory({
@@ -61,28 +65,60 @@ export function scopedUpstreamTestInventory({
 	return scoped;
 }
 
+// Whether a type test opts out of checking: a `// @ts-nocheck` pragma among its
+// leading comments, or a `@ts-ignore` comment anywhere in its trivia. TypeScript
+// 7's syntax tree records neither, so match the leading comments with classic
+// TypeScript's single-line pragma pattern, and rescan the trivia before every
+// token with TypeScript 7's scanner, which records comment directives as the
+// classic parser did.
+function suppressesChecking(ast) {
+	const { text } = ast;
+	const nocheck = (getLeadingCommentRanges(text, 0) ?? []).some(
+		(range) =>
+			range.kind === SyntaxKind.SingleLineCommentTrivia &&
+			/^\/\/\/?\s*@([^\s:]+)((?:[^\S\r\n]|:).*)?$/m
+				.exec(text.slice(range.pos, range.end))?.[1]
+				.toLowerCase() === 'ts-nocheck',
+	);
+	if (nocheck) return true;
+	const scanner = createScanner(false, ast.languageVariant);
+	const scanTrivia = (node) => {
+		// JSDoc is comment text inside the trivia of the token that follows it.
+		if (node.kind >= SyntaxKind.FirstJSDocNode && node.kind <= SyntaxKind.LastJSDocNode) return;
+		const children = node.kind >= SyntaxKind.FirstNode ? node.getChildren(ast) : [];
+		if (children.length > 0) {
+			children.forEach(scanTrivia);
+			return;
+		}
+		scanner.setText(text, node.pos, node.getStart(ast) - node.pos);
+		while (scanner.scan() !== SyntaxKind.EndOfFile);
+	};
+	scanTrivia(ast);
+	return Boolean(
+		scanner
+			.getCommentDirectives()
+			?.some((directive) => directive.type === CommentDirectiveType.Ignore),
+	);
+}
+
 function assertionCounts(source, file) {
-	const ast = ts.createSourceFile(file, source, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
-	if (
-		ast.pragmas?.has('ts-nocheck') ||
-		ast.commentDirectives?.some((directive) => directive.type === ts.CommentDirectiveType.Ignore)
-	)
-		throw new Error(`Type evidence suppresses checking: ${file}`);
+	const ast = parseSourceFile(file, source, ScriptKind.TSX);
+	if (suppressesChecking(ast)) throw new Error(`Type evidence suppresses checking: ${file}`);
 	const counts = {
 		checks: 0,
 		negative: [...source.matchAll(/@ts-expect-error\b/g)].length,
 		any: 0,
-		statements: ast.statements.filter((statement) => !ts.isImportDeclaration(statement)).length,
+		statements: ast.statements.filter((statement) => !is.isImportDeclaration(statement)).length,
 	};
 	const visit = (node) => {
-		if (node.kind === ts.SyntaxKind.AnyKeyword) counts.any++;
+		if (node.kind === SyntaxKind.AnyKeyword) counts.any++;
 		if (
-			ts.isCallExpression(node) &&
-			ts.isIdentifier(node.expression) &&
+			is.isCallExpression(node) &&
+			is.isIdentifier(node.expression) &&
 			['expectType', 'expectTypeOf'].includes(node.expression.text)
 		)
 			counts.checks++;
-		ts.forEachChild(node, visit);
+		node.forEachChild(visit);
 	};
 	visit(ast);
 	return counts;

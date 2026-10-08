@@ -565,8 +565,8 @@ catalogs:
       specifier: ^0.5.5
       version: 0.5.5
     '@tsrx/oxc':
-      specifier: 0.18.0
-      version: 0.18.0
+      specifier: 0.20.0
+      version: 0.20.0
     '@tsrx/prettier-plugin':
       specifier: ^0.6.3
       version: 0.6.3
@@ -1422,7 +1422,7 @@ overrides:
   '@solid-primitives/keyboard>solid-js': 1.9.14
   '@solid-primitives/resize-observer>solid-js': 1.9.14
 
-packageExtensionsChecksum: sha256-kfm1FmKj+dGJ1mbVor30ucTdX3Yg+IVGhIkuq6dFEI0=
+packageExtensionsChecksum: sha256-XN5zp/IiFh7oL3uoVIj9kQwS10aRIZS77YifBp5DLNo=
 
 patchedDependencies:
   '@tsrx/core@0.5.5': ded7f85ce6e75409681e6374df7398569aff266b83d1bd63cfdf757c52366b07
@@ -7317,7 +7317,7 @@ importers:
     devDependencies:
       '@tsrx/oxc':
         specifier: catalog:default
-        version: 0.18.0(svelte@5.56.7)
+        version: 0.20.0(svelte@5.56.7)
       '@tsrx/react':
         specifier: catalog:default
         version: 0.4.5(react@19.2.7)
@@ -7348,6 +7348,9 @@ importers:
       typescript:
         specifier: catalog:default
         version: 5.9.3
+      typescript-native:
+        specifier: catalog:native
+        version: typescript@7.1.0-dev.20260921.1
       viem:
         specifier: catalog:default
         version: 2.55.10(bufferutil@4.1.0)(typescript@5.9.3)(utf-8-validate@5.0.10)(zod@4.6.2)
@@ -10862,9 +10865,6 @@ importers:
 
   scripts/octane-tsc:
     dependencies:
-      jsonc-parser:
-        specifier: 3.3.1
-        version: 3.3.1
       octane:
         specifier: workspace:*
         version: link:../../packages/octane
@@ -20753,60 +20753,60 @@ packages:
   '@tsrx/core@0.5.5':
     resolution: {integrity: sha512-22Eym4Dtxm1d4INJHT560WQC9cxKT/YWXKztM7utjzHLtVB8egSycFmFt3D9g01Tb6G4g7GiF5YpgCOexx15uA==}
 
-  '@tsrx/oxc-darwin-arm64@0.18.0':
-    resolution: {integrity: sha512-0/SM6yIlIDgM0KIE2t5DXRpMpbIPUDPWc7u2UEv+klLVD25EkKUt87Jq5gDwjZLFBKGCgnZ+kA778JYktdoMfQ==}
+  '@tsrx/oxc-darwin-arm64@0.20.0':
+    resolution: {integrity: sha512-YpjpggD3earJQFJ8bUNfTqEiqIETDt+vtaVkdFftucaMZzzmBh1wU6QF50utl7fbSQejNedZhoDmPouEMA7huA==}
     engines: {node: ^20.19.0 || >=22.12.0}
     cpu: [arm64]
     os: [darwin]
 
-  '@tsrx/oxc-darwin-x64@0.18.0':
-    resolution: {integrity: sha512-rSDBdlcSEb+kFgcdSSGBSWZ3b9gwKeDqMIIK3Hzb/xNTjzarfOQnat85cnDkjzjf8/EXbHgmZkA7TFHrVmh8Lw==}
+  '@tsrx/oxc-darwin-x64@0.20.0':
+    resolution: {integrity: sha512-dlyBvObV8rYg0dtNt0ifrOyJDEnxyJBCeBFRYurFjzwpccL4GbiiMuhGRdRlDoY46JrFoLIb/LvzNK9ji8dAoA==}
     engines: {node: ^20.19.0 || >=22.12.0}
     cpu: [x64]
     os: [darwin]
 
-  '@tsrx/oxc-linux-arm64-gnu@0.18.0':
-    resolution: {integrity: sha512-HR0KNMp2wYX+BYGX3qXiUFhcXbd3+fJvW6OYwumBoZuxTkm5npKI1mVaXm867FOvWQQIdNR2/8f1EWbzl1qlfw==}
+  '@tsrx/oxc-linux-arm64-gnu@0.20.0':
+    resolution: {integrity: sha512-jOR+EGWUksTvL0GL2TeS5nMylZlFb+5PG6VG3ZHlsoBxwRwIyC+wz7v/YAonHOF94IBPvK7HCjPt19D+PlT+PA==}
     engines: {node: ^20.19.0 || >=22.12.0}
     cpu: [arm64]
     os: [linux]
     libc: [glibc]
 
-  '@tsrx/oxc-linux-arm64-musl@0.18.0':
-    resolution: {integrity: sha512-Do0OOgcUxlFIrJF6ikdGgFlsqVH/F7/9qfY/JhNDUCfZhRnChcb1mrHSisN9M9wTd907U/Rg9g6IPWEJVOId4A==}
+  '@tsrx/oxc-linux-arm64-musl@0.20.0':
+    resolution: {integrity: sha512-YDC2qF0wfmP8WVDLNysLbkFV9NGnYcJ/YkGaxJ46jSZWMM5qP9Xycytyo9RNtaXCvQPFZ1VupB8HDpDTn41TXA==}
     engines: {node: ^20.19.0 || >=22.12.0}
     cpu: [arm64]
     os: [linux]
     libc: [musl]
 
-  '@tsrx/oxc-linux-x64-gnu@0.18.0':
-    resolution: {integrity: sha512-iKx+hgzBDZOYwsdHUj/lhaagtvN7zW8HSTVCLFlSfqnwp3fOzZRllxSDaJEdgBTBPrp56EpNASLGAWFThGuglw==}
+  '@tsrx/oxc-linux-x64-gnu@0.20.0':
+    resolution: {integrity: sha512-UAWmYd00/xPMOwgH6aK+z44vTOq8AokOzUdqveMXV/XKqf+D9YmSrqAHj6PASEmcSIMqc2/WtbMMRN+hS8licg==}
     engines: {node: ^20.19.0 || >=22.12.0}
     cpu: [x64]
     os: [linux]
     libc: [glibc]
 
-  '@tsrx/oxc-linux-x64-musl@0.18.0':
-    resolution: {integrity: sha512-kIcpwtNYQ68WLc3TNCwQfHLxcfj6T8xaK8D6RUD4E75zUkyiEBIMbltCIiN8wRRSmpopjbkUgpUCJjwKSVsN6Q==}
+  '@tsrx/oxc-linux-x64-musl@0.20.0':
+    resolution: {integrity: sha512-LZn1ioOsIHgsKdeLQ1HvJFNx+v2UnQwIiSmdLfDAAu7X+lye2AVmhEkT8BNrrJMJU/ZKmbbrzG7+RC40PwU2tg==}
     engines: {node: ^20.19.0 || >=22.12.0}
     cpu: [x64]
     os: [linux]
     libc: [musl]
 
-  '@tsrx/oxc-win32-arm64-msvc@0.18.0':
-    resolution: {integrity: sha512-nUclNFnpN/HmSqNxrNc+H6rOVVMhQtx8EQ1MGTnS9xaQcDDmsWdefNzH2BgcRMBdhxMI2KEEReYtXT47DlgQjQ==}
+  '@tsrx/oxc-win32-arm64-msvc@0.20.0':
+    resolution: {integrity: sha512-MdcSkq6pGoUtytKcO9NxsNR4Deb/twIQbB715dI4UcOMCTos1uwrDv+6g1k9lAl0+XZMhvQ9xNmTkV40j1m+8g==}
     engines: {node: ^20.19.0 || >=22.12.0}
     cpu: [arm64]
     os: [win32]
 
-  '@tsrx/oxc-win32-x64-msvc@0.18.0':
-    resolution: {integrity: sha512-ypQAsqJSWoqdJVs0CVnOo9z0iU0u0fFUQxdl9QTCBKq7M1no5+ySEy8gW7U7BHq7iu8jY2IxgqHwgPx1gxcTJw==}
+  '@tsrx/oxc-win32-x64-msvc@0.20.0':
+    resolution: {integrity: sha512-Ry1bqRByeYuldljxpSxqEH6wE1G1deEBRb/ekLuFusEvL8yk8hYGQpzbsVDGmISMTIVDa9t9v4L1mPGAdgSKjw==}
     engines: {node: ^20.19.0 || >=22.12.0}
     cpu: [x64]
     os: [win32]
 
-  '@tsrx/oxc@0.18.0':
-    resolution: {integrity: sha512-k/LGsis+dgNk7RinU6YNYLutrLNNMnuHNUiRLCwLoHrdWX+mmBGVdJRscYP1iiQ2cRwLJKt7h+SCQ27FIF+dSQ==}
+  '@tsrx/oxc@0.20.0':
+    resolution: {integrity: sha512-Rk6uw//7E6f64dGyVHNujwP0q+inTRSGtNqiEPk63B47XYmEzH/UIhrMSGUcgJ7cE3ta3N0xObWEGImvhTfAmQ==}
     engines: {node: ^20.19.0 || >=22.12.0}
     hasBin: true
 
@@ -33270,6 +33270,7 @@ packages:
   vaul@1.1.2:
     resolution: {integrity: sha512-ZFkClGpWyI2WUQjdLJ/BaGuV6AVQiJ3uELGk3OYtP+B6yCO7Cmn9vPFXVJkRaGkOJu3m8bQMgtyzNHixULceQA==}
     peerDependencies:
+      '@types/react': '*'
       react: ^16.8 || ^17.0 || ^18.0 || ^19.0.0 || ^19.0.0-rc
       react-dom: ^16.8 || ^17.0 || ^18.0 || ^19.0.0 || ^19.0.0-rc
 
@@ -47855,31 +47856,31 @@ snapshots:
     transitivePeerDependencies:
       - '@typescript-eslint/types'
 
-  '@tsrx/oxc-darwin-arm64@0.18.0':
+  '@tsrx/oxc-darwin-arm64@0.20.0':
     optional: true
 
-  '@tsrx/oxc-darwin-x64@0.18.0':
+  '@tsrx/oxc-darwin-x64@0.20.0':
     optional: true
 
-  '@tsrx/oxc-linux-arm64-gnu@0.18.0':
+  '@tsrx/oxc-linux-arm64-gnu@0.20.0':
     optional: true
 
-  '@tsrx/oxc-linux-arm64-musl@0.18.0':
+  '@tsrx/oxc-linux-arm64-musl@0.20.0':
     optional: true
 
-  '@tsrx/oxc-linux-x64-gnu@0.18.0':
+  '@tsrx/oxc-linux-x64-gnu@0.20.0':
     optional: true
 
-  '@tsrx/oxc-linux-x64-musl@0.18.0':
+  '@tsrx/oxc-linux-x64-musl@0.20.0':
     optional: true
 
-  '@tsrx/oxc-win32-arm64-msvc@0.18.0':
+  '@tsrx/oxc-win32-arm64-msvc@0.20.0':
     optional: true
 
-  '@tsrx/oxc-win32-x64-msvc@0.18.0':
+  '@tsrx/oxc-win32-x64-msvc@0.20.0':
     optional: true
 
-  '@tsrx/oxc@0.18.0(svelte@5.56.7)':
+  '@tsrx/oxc@0.20.0(svelte@5.56.7)':
     dependencies:
       '@oxc-project/types': 0.150.0
       oxfmt-current: oxfmt@0.68.0(svelte@5.56.7)
@@ -47888,14 +47889,14 @@ snapshots:
       pathe: 2.0.3
       tinyglobby: 0.2.17
     optionalDependencies:
-      '@tsrx/oxc-darwin-arm64': 0.18.0
-      '@tsrx/oxc-darwin-x64': 0.18.0
-      '@tsrx/oxc-linux-arm64-gnu': 0.18.0
-      '@tsrx/oxc-linux-arm64-musl': 0.18.0
-      '@tsrx/oxc-linux-x64-gnu': 0.18.0
-      '@tsrx/oxc-linux-x64-musl': 0.18.0
-      '@tsrx/oxc-win32-arm64-msvc': 0.18.0
-      '@tsrx/oxc-win32-x64-msvc': 0.18.0
+      '@tsrx/oxc-darwin-arm64': 0.20.0
+      '@tsrx/oxc-darwin-x64': 0.20.0
+      '@tsrx/oxc-linux-arm64-gnu': 0.20.0
+      '@tsrx/oxc-linux-arm64-musl': 0.20.0
+      '@tsrx/oxc-linux-x64-gnu': 0.20.0
+      '@tsrx/oxc-linux-x64-musl': 0.20.0
+      '@tsrx/oxc-win32-arm64-msvc': 0.20.0
+      '@tsrx/oxc-win32-x64-msvc': 0.20.0
     transitivePeerDependencies:
       - svelte
       - vite-plus
@@ -64993,19 +64994,19 @@ snapshots:
   vaul@1.1.2(@types/react-dom@18.2.18)(@types/react@18.2.55)(react-dom@18.2.0(react@18.2.0))(react@18.2.0):
     dependencies:
       '@radix-ui/react-dialog': 1.1.20(@types/react-dom@18.2.18)(@types/react@18.2.55)(react-dom@18.2.0(react@18.2.0))(react@18.2.0)
+      '@types/react': 18.2.55
       react: 18.2.0
       react-dom: 18.2.0(react@18.2.0)
     transitivePeerDependencies:
-      - '@types/react'
       - '@types/react-dom'
 
   vaul@1.1.2(@types/react-dom@19.2.4(@types/react@19.2.18))(@types/react@19.2.18)(react-dom@19.2.7(react@19.2.7))(react@19.2.7):
     dependencies:
       '@radix-ui/react-dialog': 1.1.20(@types/react-dom@19.2.4(@types/react@19.2.18))(@types/react@19.2.18)(react-dom@19.2.7(react@19.2.7))(react@19.2.7)
+      '@types/react': 19.2.18
       react: 19.2.7
       react-dom: 19.2.7(react@19.2.7)
     transitivePeerDependencies:
-      - '@types/react'
       - '@types/react-dom'
 
   verror@1.10.0:

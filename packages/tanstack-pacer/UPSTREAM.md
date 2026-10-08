@@ -38,8 +38,8 @@ row. The binding reuses the exact framework-neutral core. All adapter source fil
   `typetests/assertions.md`.
 - Ordinary Octane-only: `typetests/octane-only/setter-types.test-d.ts` holds
   accept/reject evidence for local `Dispatch` / `SetStateAction` aliases outside
-  required React-parity ownership (no pristine React assertion counterpart). Root
-  `bindings:typecheck` runs `typetests/octane-only/tsconfig.json` so this evidence
+  required React-parity ownership (no pristine React assertion counterpart). The
+  root `typecheck` runs `typetests/octane-only/tsconfig.json` so this evidence
   executes in the always-on ordinary typecheck control plane.
 
 ## Executable evidence

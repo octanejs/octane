@@ -620,6 +620,7 @@ export const REQUIRED_PUBLIC_VALUE_EXPORTS = {
 	'./compiler/vite': ['discoverOctaneSourceDependencies', 'octane'],
 	'./compiler/volar': ['compileToVolarMappings'],
 	'./tsrx-iterable': ['map_iterable', 'map_iterable_async'],
+	'./tsrx-boundary': ['Suspense', 'TsrxErrorBoundary'],
 	'./tsrx-spread': ['normalize_spread_props', 'normalize_spread_props_for_ref_attr'],
 };
 

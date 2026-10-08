@@ -17,7 +17,9 @@
       "react-dom/client": ["./node_modules/@types/react-dom/client.d.ts"]
     },
     "types": ["node"],
-    "strict": true
+    "strict": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true
   },
   "include": ["./src/"],
   "exclude": ["node_modules", "dist", "tests"]

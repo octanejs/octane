@@ -16,7 +16,9 @@
     "checkJs": false,
     // The differential test imports the shared rig, which loads React DOM.
     "types": ["node", "react", "react-dom"],
-    "strict": true
+    "strict": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true
   },
   "include": ["./src/", "./tests/"],
   // The differential test imports Octane's shared rig, which resolves

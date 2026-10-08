@@ -1,4 +1,5 @@
 import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
+import { createRequire } from 'node:module';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { createTextTypeProject } from 'octane/compiler/typescript';
@@ -6,10 +7,26 @@ import { createTextTypeProject } from 'octane/compiler/typescript';
 export type TextTypeProject = ReturnType<typeof createTextTypeProject>;
 export type TextTypeFacts = ReturnType<TextTypeProject['snapshot']>;
 
+/**
+ * The TypeScript APIs text facts run on: octane's classic `typescript` peer and
+ * the repository's TypeScript 7 (`typescript-native`), named by directory
+ * because fixtures live outside the repository.
+ */
+export const TEXT_TYPE_BACKENDS = [
+	{ name: 'the classic API', typescript: undefined },
+	{
+		name: 'TypeScript 7',
+		typescript: dirname(createRequire(import.meta.url).resolve('typescript-native/package.json')),
+	},
+] as const;
+
+export type TextTypeBackend = (typeof TEXT_TYPE_BACKENDS)[number];
+
 /** A small, typed consumer project whose diagnostics do not depend on ambient test types. */
 export function createTextTypeFixture(
 	files: Record<string, string>,
 	compilerOptions: Record<string, unknown> = {},
+	backend: TextTypeBackend = TEXT_TYPE_BACKENDS[0],
 ) {
 	const directory = mkdtempSync(join(tmpdir(), 'octane-text-types-'));
 	const write = (name: string, source: string) => {
@@ -77,7 +94,7 @@ export declare function map_iterable<T, U>(values: Iterable<T> | Iterator<T>, ca
 		}),
 	);
 	for (const [name, source] of Object.entries(files)) write(name, source);
-	const project = createTextTypeProject({ tsconfig });
+	const project = createTextTypeProject({ tsconfig, typescript: backend.typescript });
 	return {
 		directory,
 		tsconfig,

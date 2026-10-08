@@ -10,8 +10,10 @@
     "noErrorTruncation": true,
     "allowSyntheticDefaultImports": true,
     "verbatimModuleSyntax": true,
-    "types": ["node"],
-    "strict": true
+    "types": [],
+    "strict": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true
   },
   "include": ["./src/"],
   "exclude": ["node_modules", "dist", "tests"]

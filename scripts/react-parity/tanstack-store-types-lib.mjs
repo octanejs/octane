@@ -1,7 +1,8 @@
 import { createHash } from 'node:crypto';
 import { existsSync, readFileSync } from 'node:fs';
 import { resolve, sep } from 'node:path';
-import ts from 'typescript';
+import { is, parseSourceFile, ScriptKind } from '../octane-tsc/native-syntax.mjs';
+import { printNodeWithoutComments } from './native-typescript-lib.mjs';
 
 export const TYPE_PARITY_CONFIG = 'packages/tanstack-store/audit/type-parity.json';
 
@@ -27,19 +28,12 @@ function normalizeComment(comment) {
 }
 
 function containsExpect(node) {
-	if (ts.isIdentifier(node) && node.text === 'Expect') return true;
+	if (is.isIdentifier(node) && node.text === 'Expect') return true;
 	return node.getChildren().some(containsExpect);
 }
 
 function assertionGroups(source, fileName) {
-	const sourceFile = ts.createSourceFile(
-		fileName,
-		source,
-		ts.ScriptTarget.Latest,
-		true,
-		ts.ScriptKind.TS,
-	);
-	const printer = ts.createPrinter({ removeComments: true });
+	const sourceFile = parseSourceFile(fileName, source, ScriptKind.TS);
 	const groups = [];
 	for (const match of source.matchAll(/\/\*\*[\s\S]*?\*\//g)) {
 		groups.push(`doc:${normalizeComment(match[0])}`);
@@ -58,12 +52,12 @@ function assertionGroups(source, fileName) {
 		groups.push(`test:${match[2]}`);
 	}
 	function visit(node) {
-		if (ts.isTypeAliasDeclaration(node) && node.type && containsExpect(node.type)) {
+		if (is.isTypeAliasDeclaration(node) && node.type && containsExpect(node.type)) {
 			groups.push(
-				`expect:${node.name.text}:${printer.printNode(ts.EmitHint.Unspecified, node.type, sourceFile).replace(/\s+/g, ' ').trim()}`,
+				`expect:${node.name.text}:${printNodeWithoutComments(node.type).replace(/\s+/g, ' ').trim()}`,
 			);
 		}
-		ts.forEachChild(node, visit);
+		node.forEachChild(visit);
 	}
 	visit(sourceFile);
 	return groups;
@@ -142,22 +136,16 @@ function stripPristineOnlyTests(source) {
 }
 
 function structuralSource(source, fileName) {
-	const sourceFile = ts.createSourceFile(
-		fileName,
-		source,
-		ts.ScriptTarget.Latest,
-		true,
-		ts.ScriptKind.TS,
-	);
+	const sourceFile = parseSourceFile(fileName, source, ScriptKind.TS);
 	const importStatements = [];
 	const otherStatements = [];
 	for (const statement of sourceFile.statements) {
-		if (ts.isImportDeclaration(statement)) importStatements.push(statement);
+		if (is.isImportDeclaration(statement)) importStatements.push(statement);
 		else otherStatements.push(statement);
 	}
 	const replacements = [];
 	for (const statement of importStatements) {
-		if (!ts.isStringLiteral(statement.moduleSpecifier)) continue;
+		if (!is.isStringLiteral(statement.moduleSpecifier)) continue;
 		const specifier = statement.moduleSpecifier.text;
 		const normalized = normalizeSpecifier(specifier);
 		if (normalized === specifier) continue;
@@ -173,34 +161,21 @@ function structuralSource(source, fileName) {
 	})) {
 		transformed = `${transformed.slice(0, replacement.start)}${replacement.value}${transformed.slice(replacement.end)}`;
 	}
-	const normalizedFile = ts.createSourceFile(
-		fileName,
-		transformed,
-		ts.ScriptTarget.Latest,
-		true,
-		ts.ScriptKind.TS,
-	);
-	const printer = ts.createPrinter({ removeComments: true });
+	const normalizedFile = parseSourceFile(fileName, transformed, ScriptKind.TS);
 	const sortedImports = normalizedFile.statements
 		.filter(function keepImports(statement) {
-			return ts.isImportDeclaration(statement);
+			return is.isImportDeclaration(statement);
 		})
 		.map(function printImport(statement) {
-			return printer
-				.printNode(ts.EmitHint.Unspecified, statement, normalizedFile)
-				.replace(/\s+/g, ' ')
-				.trim();
+			return printNodeWithoutComments(statement).replace(/\s+/g, ' ').trim();
 		})
 		.sort();
 	const body = normalizedFile.statements
 		.filter(function keepBody(statement) {
-			return !ts.isImportDeclaration(statement);
+			return !is.isImportDeclaration(statement);
 		})
 		.map(function printStatement(statement) {
-			return printer
-				.printNode(ts.EmitHint.Unspecified, statement, normalizedFile)
-				.replace(/\s+/g, ' ')
-				.trim();
+			return printNodeWithoutComments(statement).replace(/\s+/g, ' ').trim();
 		})
 		.join(' ');
 	return `${sortedImports.join(' ')} ${body}`.replace(/\s+/g, ' ').trim();

@@ -9,7 +9,8 @@
     "noEmit": true,
     "allowImportingTsExtensions": true,
     "skipLibCheck": true,
-    "types": ["node"]
+    "types": ["node"],
+    "noUncheckedSideEffectImports": false
   },
   "include": ["src/**/*", "*.ts", "e2e/**/*.ts"]
 }

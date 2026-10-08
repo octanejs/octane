@@ -5,5 +5,9 @@
   "reactPortEvidence": {
     "gate": "public-types",
     "publicMode": "pinned"
+  },
+  "compilerOptions": {
+    "noUnusedLocals": false,
+    "noUnusedParameters": false
   }
 }

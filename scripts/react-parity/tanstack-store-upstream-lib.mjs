@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
-import ts from 'typescript';
+import { is, parseSourceFile, ScriptKind } from '../octane-tsc/native-syntax.mjs';
+import { printNodeWithoutComments } from './native-typescript-lib.mjs';
 
 import { extractTestCases } from './inventory-lib.mjs';
 import { verifyMaterializedUpstreamEvidence } from './materialized-upstream-lib.mjs';
@@ -80,20 +81,13 @@ function comparableRuntimeSource(source, side) {
 }
 
 function assertionGroups(source, fileName) {
-	const sourceFile = ts.createSourceFile(
-		fileName,
-		source,
-		ts.ScriptTarget.Latest,
-		true,
-		ts.ScriptKind.TSX,
-	);
-	const printer = ts.createPrinter({ removeComments: true });
+	const sourceFile = parseSourceFile(fileName, source, ScriptKind.TSX);
 	const groups = [];
 
 	function isExpectRoot(node) {
 		return (
-			ts.isCallExpression(node) &&
-			ts.isIdentifier(node.expression) &&
+			is.isCallExpression(node) &&
+			is.isIdentifier(node.expression) &&
 			node.expression.text === 'expect'
 		);
 	}
@@ -102,9 +96,9 @@ function assertionGroups(source, fileName) {
 		let current = node;
 		while (
 			current.parent &&
-			(ts.isPropertyAccessExpression(current.parent) ||
-				(ts.isCallExpression(current.parent) &&
-					ts.isPropertyAccessExpression(current.parent.expression)))
+			(is.isPropertyAccessExpression(current.parent) ||
+				(is.isCallExpression(current.parent) &&
+					is.isPropertyAccessExpression(current.parent.expression)))
 		) {
 			current = current.parent;
 		}
@@ -114,11 +108,9 @@ function assertionGroups(source, fileName) {
 	function visit(node) {
 		if (isExpectRoot(node)) {
 			const chain = outermostExpectChain(node);
-			groups.push(
-				printer.printNode(ts.EmitHint.Unspecified, chain, sourceFile).replace(/\s+/g, ' ').trim(),
-			);
+			groups.push(printNodeWithoutComments(chain).replace(/\s+/g, ' ').trim());
 		}
-		ts.forEachChild(node, visit);
+		node.forEachChild(visit);
 	}
 
 	visit(sourceFile);
@@ -140,21 +132,12 @@ function normalizePrinted(printed) {
 
 function structuralSource(source, fileName) {
 	const collapsed = source.replace(/[ \t]+/g, ' ').replace(/\n+/g, '\n');
-	const sourceFile = ts.createSourceFile(
-		fileName,
-		collapsed,
-		ts.ScriptTarget.Latest,
-		true,
-		ts.ScriptKind.TSX,
-	);
-	const printer = ts.createPrinter({ removeComments: true, newLine: ts.NewLineKind.LineFeed });
+	const sourceFile = parseSourceFile(fileName, collapsed, ScriptKind.TSX);
 	const imports = [];
 	const body = [];
 	for (const statement of sourceFile.statements) {
-		const printed = normalizePrinted(
-			printer.printNode(ts.EmitHint.Unspecified, statement, sourceFile),
-		);
-		if (ts.isImportDeclaration(statement)) imports.push(printed);
+		const printed = normalizePrinted(printNodeWithoutComments(statement));
+		if (is.isImportDeclaration(statement)) imports.push(printed);
 		else body.push(printed);
 	}
 	imports.sort();

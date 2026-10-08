@@ -39,8 +39,7 @@
   },
   "scripts": {
     "test": "vitest run --root ../.. --project formisch",
-    "test:parity": "node ../../scripts/react-parity/formisch-check.mjs",
-    "typecheck": "tsrx-tsc --noEmit -p tsconfig.json && tsrx-tsc --noEmit -p typetests/tsconfig.json"
+    "test:parity": "node ../../scripts/react-parity/formisch-check.mjs"
   },
   "peerDependencies": {
     "octane": "workspace:^0.10.0",

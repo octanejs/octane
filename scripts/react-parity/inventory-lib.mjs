@@ -2,7 +2,8 @@ import { createHash } from 'node:crypto';
 import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
-import ts from 'typescript';
+import { is, NodeFlags, parseSourceFile, ScriptKind } from '../octane-tsc/native-syntax.mjs';
+import { createSingleFileChecker } from './native-typescript-lib.mjs';
 import { staticArrayInventory } from './static-array-inventory.mjs';
 
 export const INVENTORY_SCHEMA_VERSION = 1;
@@ -591,35 +592,35 @@ function eachInvocation(tokens, pairs, startIndex, staticCounts) {
 }
 
 function nodeSubtestRegistrarOffsets(source, file) {
-	const scriptKind = /\.[jt]sx$/i.test(file) ? ts.ScriptKind.TSX : ts.ScriptKind.TS;
-	const sourceFile = ts.createSourceFile(file, source, ts.ScriptTarget.Latest, true, scriptKind);
+	const scriptKind = /\.[jt]sx$/i.test(file) ? ScriptKind.TSX : ScriptKind.TS;
+	const sourceFile = parseSourceFile(file, source, scriptKind);
 	const offsets = new Set();
 	const callbackFor = (call) =>
 		[...call.arguments]
 			.reverse()
-			.find((argument) => ts.isArrowFunction(argument) || ts.isFunctionExpression(argument));
+			.find((argument) => is.isArrowFunction(argument) || is.isFunctionExpression(argument));
 	const visit = (node, contextNames) => {
-		if (!ts.isCallExpression(node)) {
-			ts.forEachChild(node, (child) => visit(child, contextNames));
+		if (!is.isCallExpression(node)) {
+			node.forEachChild((child) => visit(child, contextNames));
 			return;
 		}
 		const expression = node.expression;
-		const direct = ts.isIdentifier(expression) && expression.text === 'test';
+		const direct = is.isIdentifier(expression) && expression.text === 'test';
 		const contextual =
-			ts.isPropertyAccessExpression(expression) &&
+			is.isPropertyAccessExpression(expression) &&
 			expression.name.text === 'test' &&
-			ts.isIdentifier(expression.expression) &&
+			is.isIdentifier(expression.expression) &&
 			contextNames.has(expression.expression.text);
 		if (contextual) offsets.add(expression.name.getStart(sourceFile));
 		const callback = direct || contextual ? callbackFor(node) : null;
-		ts.forEachChild(node, (child) => {
+		node.forEachChild((child) => {
 			if (child !== callback) {
 				visit(child, contextNames);
 				return;
 			}
 			const parameter = callback.parameters[0]?.name;
 			const nestedNames = new Set(contextNames);
-			if (parameter && ts.isIdentifier(parameter)) nestedNames.add(parameter.text);
+			if (parameter && is.isIdentifier(parameter)) nestedNames.add(parameter.text);
 			visit(child, nestedNames);
 		});
 	};
@@ -673,30 +674,24 @@ function extractCoffeeScriptTestCases(source, file) {
 }
 
 function directRegistrarAliases(source) {
-	const file = ts.createSourceFile(
-		'aliases.tsx',
-		source,
-		ts.ScriptTarget.Latest,
-		true,
-		ts.ScriptKind.TSX,
-	);
+	const file = parseSourceFile('aliases.tsx', source, ScriptKind.TSX);
 	const aliases = new Map();
 	const isRegistrar = (node) =>
-		(ts.isIdentifier(node) && DIRECT_REGISTRARS.has(node.text)) ||
-		(ts.isPropertyAccessExpression(node) &&
+		(is.isIdentifier(node) && DIRECT_REGISTRARS.has(node.text)) ||
+		(is.isPropertyAccessExpression(node) &&
 			['skip', 'only', 'todo'].includes(node.name.text) &&
 			isRegistrar(node.expression)) ||
-		(ts.isConditionalExpression(node) && isRegistrar(node.whenTrue) && isRegistrar(node.whenFalse));
+		(is.isConditionalExpression(node) && isRegistrar(node.whenTrue) && isRegistrar(node.whenFalse));
 	const visit = (node) => {
 		if (
-			ts.isVariableDeclaration(node) &&
-			ts.isIdentifier(node.name) &&
+			is.isVariableDeclaration(node) &&
+			is.isIdentifier(node.name) &&
 			node.initializer &&
 			isRegistrar(node.initializer)
 		) {
 			aliases.set(node.name.text, node.initializer.getText(file));
 		}
-		ts.forEachChild(node, visit);
+		node.forEachChild(visit);
 	};
 	visit(file);
 	return aliases;
@@ -708,63 +703,60 @@ function pinnedRegistrarWrappers(source, wrappers) {
 	const calls = new Map();
 	const bodies = [];
 	if (!wrappers.length) return { calls, bodies };
-	const file = ts.createSourceFile(
-		'wrappers.tsx',
-		source,
-		ts.ScriptTarget.Latest,
-		true,
-		ts.ScriptKind.TSX,
-	);
-	const host = ts.createCompilerHost({ noLib: true });
-	host.getSourceFile = (name) => (name === file.fileName ? file : undefined);
-	const checker = ts
-		.createProgram([file.fileName], { noLib: true, noResolve: true }, host)
-		.getTypeChecker();
-	for (const wrapper of wrappers) {
-		const fail = () => {
-			throw new Error(`Cannot inventory pinned registrar wrapper ${wrapper.name}`);
-		};
-		const declarations = [];
-		const references = [];
-		const visit = (node) => {
+	const program = createSingleFileChecker('/wrappers.tsx', source, {
+		noLib: true,
+		noResolve: true,
+	});
+	const { sourceFile: file, checker } = program;
+	try {
+		for (const wrapper of wrappers) {
+			const fail = () => {
+				throw new Error(`Cannot inventory pinned registrar wrapper ${wrapper.name}`);
+			};
+			const declarations = [];
+			const references = [];
+			const visit = (node) => {
+				if (
+					is.isVariableDeclaration(node) &&
+					is.isIdentifier(node.name) &&
+					node.name.text === wrapper.name
+				)
+					declarations.push(node);
+				if (is.isIdentifier(node) && node.text === wrapper.name) references.push(node);
+				node.forEachChild(visit);
+			};
+			visit(file);
+			const declaration = declarations[0];
+			const fn = declaration?.initializer;
 			if (
-				ts.isVariableDeclaration(node) &&
-				ts.isIdentifier(node.name) &&
-				node.name.text === wrapper.name
-			)
-				declarations.push(node);
-			if (ts.isIdentifier(node) && node.text === wrapper.name) references.push(node);
-			ts.forEachChild(node, visit);
-		};
-		visit(file);
-		const declaration = declarations[0];
-		const fn = declaration?.initializer;
-		if (
-			declarations.length !== 1 ||
-			!(declaration.parent.flags & ts.NodeFlags.Const) ||
-			!fn ||
-			!(ts.isArrowFunction(fn) || ts.isFunctionExpression(fn)) ||
-			!Number.isInteger(wrapper.titleArgument) ||
-			wrapper.titleArgument < 0 ||
-			wrapper.titleArgument >= fn.parameters.length
-		)
-			fail();
-		const symbol = checker.getSymbolAtLocation(declaration.name);
-		for (const reference of references) {
-			if (reference === declaration.name) continue;
-			const call = reference.parent;
-			if (
-				checker.getSymbolAtLocation(reference) !== symbol ||
-				!ts.isCallExpression(call) ||
-				call.expression !== reference ||
-				call.arguments.length !== fn.parameters.length ||
-				call.arguments.some(ts.isSpreadElement) ||
-				(reference.pos >= fn.body.pos && reference.end <= fn.body.end)
+				declarations.length !== 1 ||
+				!(declaration.parent.flags & NodeFlags.Const) ||
+				!fn ||
+				!(is.isArrowFunction(fn) || is.isFunctionExpression(fn)) ||
+				!Number.isInteger(wrapper.titleArgument) ||
+				wrapper.titleArgument < 0 ||
+				wrapper.titleArgument >= fn.parameters.length
 			)
 				fail();
-			calls.set(reference.getStart(file), wrapper.titleArgument);
+			const symbol = checker.getSymbolAtLocation(declaration.name);
+			for (const reference of references) {
+				if (reference === declaration.name) continue;
+				const call = reference.parent;
+				if (
+					checker.getSymbolAtLocation(reference) !== symbol ||
+					!is.isCallExpression(call) ||
+					call.expression !== reference ||
+					call.arguments.length !== fn.parameters.length ||
+					call.arguments.some(is.isSpreadElement) ||
+					(reference.pos >= fn.body.pos && reference.end <= fn.body.end)
+				)
+					fail();
+				calls.set(reference.getStart(file), wrapper.titleArgument);
+			}
+			bodies.push({ start: fn.body.getStart(file), end: fn.body.end });
 		}
-		bodies.push({ start: fn.body.getStart(file), end: fn.body.end });
+	} finally {
+		program.dispose();
 	}
 	return { calls, bodies };
 }
@@ -1010,39 +1002,33 @@ export function findPossibleUnexpandedRegistrars(source) {
 		...directRegistrarAliases(source).keys(),
 	]);
 	const possible = new Map();
-	const sourceFile = ts.createSourceFile(
-		'possible-registrars.tsx',
-		source,
-		ts.ScriptTarget.Latest,
-		true,
-		ts.ScriptKind.TSX,
-	);
+	const sourceFile = parseSourceFile('possible-registrars.tsx', source, ScriptKind.TSX);
 	const visit = (node) => {
 		// Calls inside an existing test callback execute the test, rather than
 		// declaring cases (for example testSSR(file, source, assertions)).
 		if (
-			(ts.isArrowFunction(node) || ts.isFunctionExpression(node)) &&
-			ts.isCallExpression(node.parent)
+			(is.isArrowFunction(node) || is.isFunctionExpression(node)) &&
+			is.isCallExpression(node.parent)
 		) {
 			let callee = node.parent.expression;
-			while (ts.isCallExpression(callee) || ts.isPropertyAccessExpression(callee)) {
+			while (is.isCallExpression(callee) || is.isPropertyAccessExpression(callee)) {
 				callee = callee.expression;
 			}
-			if (ts.isIdentifier(callee) && DIRECT_REGISTRARS.has(callee.text)) return;
+			if (is.isIdentifier(callee) && DIRECT_REGISTRARS.has(callee.text)) return;
 		}
-		if (ts.isCallExpression(node) && ts.isIdentifier(node.expression)) {
+		if (is.isCallExpression(node) && is.isIdentifier(node.expression)) {
 			const name = node.expression.text;
 			if (/^(?:it|test)[A-Z][A-Za-z0-9_$]*$/.test(name) && !known.has(name)) {
 				const firstArgument = node.arguments[0];
 				const hasInlineCallback = node.arguments.some(
 					(argument, index) =>
-						index > 0 && (ts.isArrowFunction(argument) || ts.isFunctionExpression(argument)),
+						index > 0 && (is.isArrowFunction(argument) || is.isFunctionExpression(argument)),
 				);
 				const hasNamedCallback =
 					node.arguments.length > 1 &&
-					ts.isIdentifier(node.arguments.at(-1)) &&
+					is.isIdentifier(node.arguments.at(-1)) &&
 					firstArgument !== undefined &&
-					(ts.isStringLiteralLike(firstArgument) || ts.isCallExpression(firstArgument));
+					(is.isStringLiteralLikeNode(firstArgument) || is.isCallExpression(firstArgument));
 				if (hasInlineCallback || hasNamedCallback) {
 					const record = possible.get(name) ?? { name, occurrences: 0 };
 					record.occurrences++;
@@ -1050,7 +1036,7 @@ export function findPossibleUnexpandedRegistrars(source) {
 				}
 			}
 		}
-		ts.forEachChild(node, visit);
+		node.forEachChild(visit);
 	};
 	visit(sourceFile);
 	return [...possible.values()].sort((a, b) => a.name.localeCompare(b.name));

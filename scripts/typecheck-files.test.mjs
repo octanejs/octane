@@ -83,6 +83,18 @@ describe('typecheck-files command', () => {
 		assert.equal(result.status, 0, result.error?.message);
 	});
 
+	test('keeps the sibling wrappers an interrupted octane-tsc or type-evidence run leaves out of Git status', () => {
+		for (const wrapper of [
+			'packages/vaul/.octane-tsc-4242.tsconfig.json',
+			'packages/base-ui/tests/types/.type-evidence-4242-0.tsconfig.json',
+		]) {
+			const result = spawnSync('git', ['check-ignore', '--quiet', wrapper], {
+				cwd: REPOSITORY_ROOT,
+			});
+			assert.equal(result.status, 0, `${wrapper}: ${result.error?.message ?? 'not ignored'}`);
+		}
+	});
+
 	test('ignores build-only configs when selected explicitly or through Git', async () => {
 		const fixture = await createFixture('octane-typecheck-build-config-');
 

@@ -40,7 +40,7 @@
       "arch": "any",
       "packageManager": "pnpm@12.9.1",
       "lockfile": "pnpm-lock.yaml",
-      "lockfileSha256": "a5bd68590935134632252419f04aebbf9c73f192c9d113a5ded2a08a1da391f6"
+      "lockfileSha256": "0e2eade65aa106fa828d427102627db725709a0944b9a900927ae88e784d7afd"
     }
   },
   "lanes": [
@@ -203,7 +203,7 @@
         {
           "path": "packages/tanstack-virtual/typetests/pristine/tsconfig.json",
           "role": "test",
-          "sha256": "0bdc6c99e6448f4f73d884a5a3294bf5c6a97ae51b2ee58449643fb45d1c4a6c",
+          "sha256": "67b912db6dbc1608b4fd17f97818c929f3079121fbbb815cfa0327541b1875a2",
           "cases": [
             {
               "id": "types:virtual-pristine",
@@ -398,7 +398,7 @@
         {
           "path": "packages/tanstack-virtual/typetests/adapted/tsconfig.json",
           "role": "test",
-          "sha256": "36490de2a83039a9c44b9c263f1a82128c5aab8b5850d16afa5a23ad4655c787",
+          "sha256": "3bef243f785358e17a59a15f6c04b49992682038319d4895b33e542f1848bda8",
           "cases": [
             {
               "id": "types:virtual-adapted",

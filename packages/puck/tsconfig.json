@@ -12,7 +12,9 @@
     "noErrorTruncation": true,
     "allowSyntheticDefaultImports": true,
     "allowImportingTsExtensions": true,
-    "strict": true
+    "strict": true,
+    "types": ["node"],
+    "noUncheckedSideEffectImports": false
   },
   "tsrx": {
     "compiler": "octane/compiler/volar"

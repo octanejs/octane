@@ -37,7 +37,7 @@
       "arch": "any",
       "packageManager": "pnpm@12.9.1",
       "lockfile": "pnpm-lock.yaml",
-      "lockfileSha256": "a5bd68590935134632252419f04aebbf9c73f192c9d113a5ded2a08a1da391f6"
+      "lockfileSha256": "0e2eade65aa106fa828d427102627db725709a0944b9a900927ae88e784d7afd"
     }
   },
   "lanes": [
@@ -222,7 +222,7 @@
         {
           "path": "packages/swr/typetests/internal/tsconfig.json",
           "role": "support",
-          "sha256": "3db77c7db8c823e96c01d3503e131717a6324c0ebc5eb5f1cae5d299a01b42f4"
+          "sha256": "64d38222c26692b9a240515000ac40e30672b0cb011b53436f3837613095a536"
         }
       ]
     },
@@ -254,7 +254,7 @@
         {
           "path": "packages/swr/typetests/root/tsconfig.json",
           "role": "support",
-          "sha256": "03c0289e25335042723c5c4d87e453c097267a850dbceb23a4f98376625a16de"
+          "sha256": "aa7391d614d4887b81ef495a96358454c9ed59375ede68d4c47c359bf005085b"
         }
       ]
     },
@@ -286,7 +286,7 @@
         {
           "path": "packages/swr/typetests/specialized/tsconfig.json",
           "role": "support",
-          "sha256": "03c0289e25335042723c5c4d87e453c097267a850dbceb23a4f98376625a16de"
+          "sha256": "aa7391d614d4887b81ef495a96358454c9ed59375ede68d4c47c359bf005085b"
         }
       ]
     },

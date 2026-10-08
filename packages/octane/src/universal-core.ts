@@ -2439,13 +2439,7 @@ function findClaimableChildRecord(
 	return record;
 }
 
-function adoptChildOwner(
-	parent: DraftOwner,
-	record: UniversalOwnerRecord,
-	component: UniversalComponent<any> | null,
-	identityPath: readonly unknown[],
-	key: unknown,
-): DraftOwner {
+function adoptChildOwner(parent: DraftOwner, record: UniversalOwnerRecord): DraftOwner {
 	const attempt = currentAttempt();
 	parent.claimedChildren.add(record);
 	const draft = draftOwner(record, parent, null);
@@ -2463,7 +2457,7 @@ function claimChildOwner(
 	const record =
 		findClaimableChildRecord(parent, component, identityPath, key) ??
 		createOwnerRecord(currentAttempt().root, component, parent.record, identityPath, key);
-	return adoptChildOwner(parent, record, component, identityPath, key);
+	return adoptChildOwner(parent, record);
 }
 
 // Whether every context value observable from `owner` still matches the last
@@ -2783,9 +2777,6 @@ function materializeComponentValue(
 	const owner = adoptChildOwner(
 		parent,
 		record ?? createOwnerRecord(attempt.root, value.component, parent.record, path, key),
-		value.component,
-		path,
-		key,
 	);
 	owner.componentRevision = universalComponentRevision(value.component);
 	const props = { ...normalized.props };

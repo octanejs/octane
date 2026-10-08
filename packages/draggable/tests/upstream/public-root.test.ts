@@ -7,11 +7,7 @@ import { createElement, createRoot, flushSync } from 'octane';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { flushEffects } from '../../../octane/tests/_helpers.ts';
 import { CoreHarness } from '../runtime/_fixtures/CoreHarness.tsrx';
-import {
-	BareDraggableHarness,
-	DraggableHarness,
-	SvgDraggableHarness,
-} from '../runtime/_fixtures/DraggableHarness.tsrx';
+import { DraggableHarness, SvgDraggableHarness } from '../runtime/_fixtures/DraggableHarness.tsrx';
 
 type Mounted = ReturnType<typeof mountDraggable>;
 

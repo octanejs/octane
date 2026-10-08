@@ -10,7 +10,10 @@
     "noEmitOnError": true,
     "noErrorTruncation": true,
     "allowImportingTsExtensions": true,
-    "strict": true
+    "strict": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "types": []
   },
   "include": ["src/**/*.ts", "src/**/*.tsrx"],
   "exclude": ["node_modules", "dist", "upstream"]

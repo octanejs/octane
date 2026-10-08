@@ -4,7 +4,9 @@
     "skipLibCheck": false,
     "paths": {
       "@octanejs/tanstack-virtual": ["../../src/index.ts"]
-    }
+    },
+    "noUnusedLocals": false,
+    "noUnusedParameters": false
   },
   "include": ["./*.test-d.ts", "../../src/**/*"],
   "exclude": ["node_modules"],

@@ -8,7 +8,9 @@
     "paths": {
       "@octanejs/tanstack-virtual": ["../../src/index.ts"]
     },
-    "types": ["node"]
+    "types": ["node"],
+    "noUnusedLocals": false,
+    "noUnusedParameters": false
   },
   "include": ["./*.test-d.ts", "../../src/**/*"],
   "exclude": ["node_modules"],

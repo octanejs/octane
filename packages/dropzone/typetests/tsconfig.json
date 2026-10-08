@@ -10,5 +10,9 @@
     "plugin.tsx",
     "refs.tsx",
     "validator.tsx"
-  ]
+  ],
+  "compilerOptions": {
+    "noUnusedLocals": false,
+    "noUnusedParameters": false
+  }
 }

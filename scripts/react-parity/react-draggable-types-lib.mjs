@@ -1,7 +1,8 @@
 import { createHash } from 'node:crypto';
 import { existsSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
-import ts from 'typescript';
+import { is, parseSourceFile, ScriptKind } from '../octane-tsc/native-syntax.mjs';
+import { printNodeWithoutComments } from './native-typescript-lib.mjs';
 
 export const TYPE_PARITY_CONFIG = 'packages/draggable/audit/type-parity.json';
 
@@ -37,42 +38,31 @@ function normalizeText(source) {
 }
 
 function assertionGroups(source, fileName) {
-	const sourceFile = ts.createSourceFile(
+	const sourceFile = parseSourceFile(
 		fileName,
 		source,
-		ts.ScriptTarget.Latest,
-		true,
-		fileName.endsWith('.tsx') || fileName.endsWith('.tsrx') ? ts.ScriptKind.TSX : ts.ScriptKind.TS,
+		fileName.endsWith('.tsx') || fileName.endsWith('.tsrx') ? ScriptKind.TSX : ScriptKind.TS,
 	);
-	const printer = ts.createPrinter({ removeComments: true });
 	const groups = [];
 	for (const match of source.matchAll(/\/\/\s*@ts-expect-error([^\n]*)\n\s*([^\n]+)/g)) {
 		groups.push(`expect-error:${match[1].trim()}:${normalizeText(match[2])}`);
 	}
 	function visit(node) {
 		if (
-			ts.isCallExpression(node) &&
-			ts.isIdentifier(node.expression) &&
+			is.isCallExpression(node) &&
+			is.isIdentifier(node.expression) &&
 			node.expression.text === 'expectType' &&
 			node.typeArguments &&
 			node.typeArguments.length === 1
 		) {
-			const typeText = normalizeText(
-				printer.printNode(ts.EmitHint.Unspecified, node.typeArguments[0], sourceFile),
-			);
+			const typeText = normalizeText(printNodeWithoutComments(node.typeArguments[0]));
 			const argText =
-				node.arguments.length > 0
-					? normalizeText(printer.printNode(ts.EmitHint.Unspecified, node.arguments[0], sourceFile))
-					: '';
+				node.arguments.length > 0 ? normalizeText(printNodeWithoutComments(node.arguments[0])) : '';
 			groups.push(`expectType:${typeText}:${argText}`);
 		}
-		if (ts.isVariableDeclaration(node) && node.type && node.initializer) {
-			const typeText = normalizeText(
-				printer.printNode(ts.EmitHint.Unspecified, node.type, sourceFile),
-			);
-			const initText = normalizeText(
-				printer.printNode(ts.EmitHint.Unspecified, node.initializer, sourceFile),
-			);
+		if (is.isVariableDeclaration(node) && node.type && node.initializer) {
+			const typeText = normalizeText(printNodeWithoutComments(node.type));
+			const initText = normalizeText(printNodeWithoutComments(node.initializer));
 			if (/\[.children.\]/.test(typeText) || /\['children'\]/.test(typeText)) {
 				groups.push(`children-probe:${typeText}:${initText}`);
 			} else if (
@@ -86,15 +76,13 @@ function assertionGroups(source, fileName) {
 				groups.push(`prop-probe:${node.name.getText(sourceFile)}:${typeText}:${initText}`);
 			}
 		}
-		if (ts.isJsxSelfClosingElement(node) || ts.isJsxElement(node)) {
-			const tag = ts.isJsxElement(node) ? node.openingElement.tagName : node.tagName;
-			if (ts.isIdentifier(tag) && (tag.text === 'Draggable' || tag.text === 'DraggableCore')) {
-				groups.push(
-					`jsx-probe:${normalizeText(printer.printNode(ts.EmitHint.Unspecified, node, sourceFile))}`,
-				);
+		if (is.isJsxSelfClosingElement(node) || is.isJsxElement(node)) {
+			const tag = is.isJsxElement(node) ? node.openingElement.tagName : node.tagName;
+			if (is.isIdentifier(tag) && (tag.text === 'Draggable' || tag.text === 'DraggableCore')) {
+				groups.push(`jsx-probe:${normalizeText(printNodeWithoutComments(node))}`);
 			}
 		}
-		ts.forEachChild(node, visit);
+		node.forEachChild(visit);
 	}
 	visit(sourceFile);
 	return groups;

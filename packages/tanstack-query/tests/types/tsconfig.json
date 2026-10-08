@@ -5,7 +5,9 @@
     "types": ["node"],
     "paths": {
       "@octanejs/tanstack-query": ["../../src/index.ts"]
-    }
+    },
+    "noUnusedLocals": false,
+    "noUnusedParameters": false
   },
   "include": ["./*.test-d.ts", "../../src/**/*.ts", "../../src/**/*.tsrx"],
   "exclude": ["node_modules"],

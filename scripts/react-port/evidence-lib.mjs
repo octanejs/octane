@@ -2,7 +2,13 @@ import { createHash } from 'node:crypto';
 import { existsSync, readFileSync, readdirSync, realpathSync, statSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import ts from 'typescript';
+import {
+	is,
+	isReparsed,
+	parseSourceFile,
+	ScriptKind,
+	SyntaxKind,
+} from '../octane-tsc/native-syntax.mjs';
 import {
 	APPROVED_LICENSE_IDENTIFIERS,
 	fingerprint,
@@ -723,47 +729,48 @@ function normalizeReimplementationProof(proof) {
 const SHIPPED_SOURCE_EXTENSIONS = ['.ts', '.tsx', '.tsrx', '.js', '.jsx', '.mjs', '.cjs'];
 
 function staticModuleSpecifiers(filePath) {
-	const source = ts.createSourceFile(
+	const source = parseSourceFile(
 		filePath,
 		readFileSync(filePath, 'utf8'),
-		ts.ScriptTarget.Latest,
-		false,
-		/\.(?:tsx|tsrx|jsx)$/.test(filePath) ? ts.ScriptKind.TSX : undefined,
+		/\.(?:tsx|tsrx|jsx)$/.test(filePath) ? ScriptKind.TSX : undefined,
 	);
 	const specifiers = [];
 	function visit(node) {
+		// JSDoc that TypeScript 7 reparses into a JavaScript file (`@import`) is
+		// comment text, never a runtime import.
+		if (isReparsed(node)) return;
 		if (
-			ts.isImportDeclaration(node) &&
+			is.isImportDeclaration(node) &&
 			node.moduleSpecifier &&
-			ts.isStringLiteralLike(node.moduleSpecifier) &&
-			!node.importClause?.isTypeOnly
+			is.isStringLiteralLikeNode(node.moduleSpecifier) &&
+			node.importClause?.phaseModifier !== SyntaxKind.TypeKeyword
 		) {
 			specifiers.push(node.moduleSpecifier.text);
 		} else if (
-			ts.isExportDeclaration(node) &&
+			is.isExportDeclaration(node) &&
 			node.moduleSpecifier &&
-			ts.isStringLiteralLike(node.moduleSpecifier) &&
+			is.isStringLiteralLikeNode(node.moduleSpecifier) &&
 			!node.isTypeOnly
 		) {
 			specifiers.push(node.moduleSpecifier.text);
 		} else if (
-			ts.isImportEqualsDeclaration(node) &&
-			ts.isExternalModuleReference(node.moduleReference) &&
+			is.isImportEqualsDeclaration(node) &&
+			is.isExternalModuleReference(node.moduleReference) &&
 			node.moduleReference.expression &&
-			ts.isStringLiteralLike(node.moduleReference.expression) &&
+			is.isStringLiteralLikeNode(node.moduleReference.expression) &&
 			!node.isTypeOnly
 		) {
 			specifiers.push(node.moduleReference.expression.text);
 		} else if (
-			ts.isCallExpression(node) &&
+			is.isCallExpression(node) &&
 			node.arguments.length === 1 &&
-			ts.isStringLiteralLike(node.arguments[0]) &&
-			(node.expression.kind === ts.SyntaxKind.ImportKeyword ||
-				(ts.isIdentifier(node.expression) && node.expression.text === 'require'))
+			is.isStringLiteralLikeNode(node.arguments[0]) &&
+			(node.expression.kind === SyntaxKind.ImportKeyword ||
+				(is.isIdentifier(node.expression) && node.expression.text === 'require'))
 		) {
 			specifiers.push(node.arguments[0].text);
 		}
-		ts.forEachChild(node, visit);
+		node.forEachChild(visit);
 	}
 	visit(source);
 	return specifiers;

@@ -20,5 +20,10 @@ export type ThemeScopeProps = AutoThemeScopeProps | EmittingThemeScopeProps;
 export default function ThemeScope({ as, children, className, style, theme, }: ThemeScopeProps): import("octane").ElementDescriptor<import("octane").FragmentProps> | import("octane").ElementDescriptor<{
     className: string | undefined;
     style: CSSVarStyle | undefined;
+}> | import("octane").ElementDescriptor<{
+    className: string | undefined;
+    style: {
+        [x: `--${string}`]: string | number | undefined;
+    };
 }>;
 export {};

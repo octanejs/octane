@@ -1,11 +1,14 @@
 import { compile, type CompileOptions, type CompileResult } from 'octane/compiler';
 import {
 	createTextTypeProject,
+	validateNativeSignalNames,
+	type NativeTypeScriptProgram,
 	type TextTypeFacts,
 	type TextTypeProject,
 	type TextTypeProjectOptions,
 } from 'octane/compiler/typescript';
 import { compileToVolarMappings, compileTypesInspection } from 'octane/compiler/volar';
+import type ts from 'typescript';
 
 export const options = {
 	tsconfig: './tsconfig.json',
@@ -30,6 +33,20 @@ export const virtualSourceOffset: number = virtual.mappings[0].sourceOffsets[0];
 export const inspection = compileTypesInspection('', 'src/App.tsrx');
 export const inspectedSourceOffset: number = inspection.segments[0].srcStart;
 
+// An aliased TypeScript install, such as TypeScript 7 beside a classic 5.9.
+export const nativeOptions = {
+	tsconfig: './tsconfig.json',
+	typescript: 'typescript-native',
+} satisfies TextTypeProjectOptions;
+// A classic Program and its SourceFile, without naming TypeScript in the declaration.
+declare const classicProgram: ts.Program;
+declare const classicSourceFile: ts.SourceFile;
+export const classicDiagnostics = validateNativeSignalNames(classicProgram, classicSourceFile);
+declare const nativeProgram: NativeTypeScriptProgram;
+export const nativeDiagnostics = validateNativeSignalNames(nativeProgram, 'src/App.tsx', {
+	typescript: 'typescript-native',
+});
+
 project.invalidate('src/model.ts');
 project.invalidate();
 project.dispose();
@@ -38,6 +55,10 @@ project.dispose();
 createTextTypeProject({});
 // @ts-expect-error — adapter options are a closed public surface.
 createTextTypeProject({ tsconfig: './tsconfig.json', watch: true });
+// @ts-expect-error — `typescript` names a package or directory, not a loaded module.
+createTextTypeProject({ tsconfig: './tsconfig.json', typescript: {} });
+// @ts-expect-error — validation needs a Program, not an arbitrary object.
+validateNativeSignalNames({ getSourceFile: () => undefined }, 'src/App.tsx');
 // @ts-expect-error — authored source is text, not a TypeScript AST.
 project.snapshot('src/App.tsrx', {});
 // @ts-expect-error — snapshots expose immutable authored ranges.
