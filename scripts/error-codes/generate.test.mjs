@@ -92,6 +92,18 @@ test('rejects placeholder drift, duplicate messages, and reused next codes', () 
 		/ same active message/,
 	);
 	assert.throws(() => validateCatalog(catalog({ nextCode: 1 })), /must be greater/);
+	for (const note of ['', 1])
+		assert.throws(
+			() => validateCatalog(catalog({ codes: { 1: { ...catalog().codes[1], note } } })),
+			/note must be a non-empty string/,
+		);
+});
+
+test('keeps website-only notes out of the generated runtime formatters', () => {
+	const noted = catalog({
+		codes: { 1: { ...catalog().codes[1], note: 'Website-only guidance.' } },
+	});
+	assert.deepEqual(generateFiles(noted), generateFiles(catalog()));
 });
 
 test('requires every active surface code to have a valid literal call site', () => {
