@@ -12,20 +12,13 @@
  * backends share the analysis and produce the same facts for the same program.
  */
 
-import { readFileSync } from 'node:fs';
 import {
 	classicNativeReadHost,
 	nativeNativeReadHost,
 	validateNativeSignalNamesWith,
 } from './native-read-types.js';
-import { textTypeSourceVersion } from './text-type-facts.js';
 import { createClassicTextTypeProject } from './text-types-classic.js';
-import {
-	absoluteFilename,
-	assertSnapshotArguments,
-	freezeFacts,
-	textTypeProjectPaths,
-} from './text-types-shared.js';
+import { textTypeProjectPaths } from './text-types-shared.js';
 import { createNativeTextTypeProject } from './text-types-ts7.js';
 import { loadTypeScript } from './typescript-module.js';
 
@@ -37,52 +30,10 @@ function requireTypeScript(request, directory) {
 		return loadTypeScript(request, directory);
 	} catch (error) {
 		throw new Error(
-			`octane/compiler/typescript could not load ${request === undefined ? 'the optional `typescript` peer' : JSON.stringify(request)}. Install TypeScript 5.9 or later, or pass the package to use as \`typescript\`.`,
+			`octane/compiler/typescript could not load ${request === undefined ? 'the optional `typescript` peer' : JSON.stringify(request)}. Install TypeScript 5.9, 6, or 7.1 or later, or pass the package to use as \`typescript\`.`,
 			{ cause: error },
 		);
 	}
-}
-
-/**
- * A TypeScript without a supported API proves nothing. Its facts carry no
- * ranges, so the compiler keeps its untyped output, and the build still runs.
- * @returns {import('./typescript.js').TextTypeProject}
- */
-function createUnsupportedTextTypeProject(typescript, options) {
-	const { directory } = textTypeProjectPaths(options);
-	console.warn(`octane/compiler/typescript: ${typescript.reason}. Text type facts are disabled.`);
-	const projectVersion = textTypeSourceVersion(`unsupported typescript ${typescript.version}`);
-	const overrides = new Map();
-	let disposed = false;
-	const assertAlive = () => {
-		if (disposed) throw new Error('This Octane text type project has been disposed.');
-	};
-	return Object.freeze({
-		snapshot(filename, source) {
-			assertAlive();
-			const file = absoluteFilename(filename, directory);
-			assertSnapshotArguments(file, source);
-			if (source !== undefined) overrides.set(file, source);
-			let text = overrides.get(file);
-			if (text === undefined) {
-				try {
-					text = readFileSync(file, 'utf8');
-				} catch {
-					throw new Error(`Cannot read text type source ${JSON.stringify(file)}.`);
-				}
-			}
-			return freezeFacts(file, { version: textTypeSourceVersion(text) }, projectVersion, [], []);
-		},
-		invalidate(filename) {
-			assertAlive();
-			if (filename === undefined) overrides.clear();
-			else overrides.delete(absoluteFilename(filename, directory));
-		},
-		dispose() {
-			disposed = true;
-			overrides.clear();
-		},
-	});
 }
 
 /**
@@ -92,9 +43,9 @@ function createUnsupportedTextTypeProject(typescript, options) {
 export function createTextTypeProject(options) {
 	const { directory } = textTypeProjectPaths(options);
 	const typescript = requireTypeScript(options.typescript, directory);
-	if (typescript.kind === 'classic') return createClassicTextTypeProject(typescript.ts, options);
-	if (typescript.kind === 'native') return createNativeTextTypeProject(typescript, options);
-	return createUnsupportedTextTypeProject(typescript, options);
+	return typescript.kind === 'classic'
+		? createClassicTextTypeProject(typescript.ts, options)
+		: createNativeTextTypeProject(typescript, options);
 }
 
 /**
@@ -123,18 +74,15 @@ export function validateNativeSignalNames(program, file, options) {
 		}
 		return validateNativeSignalNamesWith(host, program, file);
 	}
-	if (typescript.kind === 'native') {
-		if (!(program instanceof typescript.sync.Program)) {
-			throw new TypeError(
-				`Native signal type validation requires a Program from the typescript/unstable/sync API of TypeScript ${typescript.version}; pass \`typescript\` to name the package that created it.`,
-			);
-		}
-		let host = nativeReadHosts.get(typescript);
-		if (host === undefined) {
-			host = nativeNativeReadHost(typescript.sync, typescript.ast, typescript.is);
-			nativeReadHosts.set(typescript, host);
-		}
-		return validateNativeSignalNamesWith(host, program, file);
+	if (!(program instanceof typescript.sync.Program)) {
+		throw new TypeError(
+			`Native signal type validation requires a Program from the typescript/unstable/sync API of TypeScript ${typescript.version}; pass \`typescript\` to name the package that created it.`,
+		);
 	}
-	throw new TypeError(`${typescript.reason}.`);
+	let host = nativeReadHosts.get(typescript);
+	if (host === undefined) {
+		host = nativeNativeReadHost(typescript.sync, typescript.ast, typescript.is);
+		nativeReadHosts.set(typescript, host);
+	}
+	return validateNativeSignalNamesWith(host, program, file);
 }

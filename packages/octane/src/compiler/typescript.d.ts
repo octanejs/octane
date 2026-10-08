@@ -29,9 +29,8 @@ export interface TextTypeProjectOptions {
 	 * The TypeScript to analyze with: a package name, resolved from the tsconfig
 	 * directory (for example an aliased `typescript-native` install), or the
 	 * absolute path of a package directory. Defaults to octane's `typescript`
-	 * peer. TypeScript 5.9 and 6 run on the classic compiler API, TypeScript 7 on
-	 * its native `typescript/unstable/sync` API; a TypeScript with neither
-	 * disables the facts with a warning.
+	 * peer. TypeScript 5.9 and 6 run on the classic compiler API, TypeScript 7.1
+	 * and later on its native `typescript/unstable/sync` API.
 	 */
 	typescript?: string;
 }

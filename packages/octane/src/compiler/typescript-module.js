@@ -17,8 +17,7 @@ const modules = new Map();
 
 /**
  * @typedef {{ kind: 'classic', version: string, ts: typeof import('typescript') }
- *   | { kind: 'native', version: string, sync: any, ast: any, is: any }
- *   | { kind: 'unsupported', version: string | undefined, reason: string }} TypeScriptModule
+ *   | { kind: 'native', version: string, sync: any, ast: any, is: any }} TypeScriptModule
  */
 
 /**
@@ -52,17 +51,6 @@ function classify(packageJson) {
 	// A package resolves its own name through its exports, which is also how an
 	// aliased install (installed as `typescript-native`, named `typescript`) is read.
 	if (manifest.exports?.['./unstable/sync'] !== undefined) {
-		// TypeScript 7.0's API opens projects only from tsconfig files on disk. It
-		// cannot build a program from chosen root files, which is how the virtual
-		// TSX of each `.tsrx` file becomes a root.
-		const [major, minor] = String(manifest.version).split('.').map(Number);
-		if (major === 7 && minor === 0) {
-			return {
-				kind: 'unsupported',
-				version: manifest.version,
-				reason: `TypeScript ${manifest.version}'s native API cannot create a program from the virtual files text facts check; use TypeScript 7.1 or later`,
-			};
-		}
 		return {
 			kind: 'native',
 			version: manifest.version,
@@ -78,11 +66,9 @@ function classify(packageJson) {
 	) {
 		return { kind: 'classic', version: ts.version, ts };
 	}
-	return {
-		kind: 'unsupported',
-		version: manifest.version,
-		reason: `TypeScript ${manifest.version} at ${nodePath.dirname(packageJson)} has neither the classic compiler API nor typescript/unstable/sync`,
-	};
+	throw new Error(
+		`TypeScript ${manifest.version} at ${nodePath.dirname(packageJson)} has neither the classic compiler API nor typescript/unstable/sync.`,
+	);
 }
 
 /**

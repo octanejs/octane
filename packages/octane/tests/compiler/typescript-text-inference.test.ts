@@ -2,7 +2,7 @@ import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'no
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import ts from 'typescript';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it } from 'vitest';
 import { compile, compileToVolarMappings } from 'octane/compiler';
 import { createTextTypeProject } from 'octane/compiler/typescript';
 import {
@@ -437,33 +437,33 @@ export function Uses(props: { count: number }) @{
 );
 
 describe('TypeScript without a supported API', () => {
-	it('disables text facts with a warning instead of failing the build', () => {
+	it('fails with the reason instead of analyzing', () => {
 		const typescript = mkdtempSync(join(tmpdir(), 'octane-unsupported-typescript-'));
-		writeFileSync(
-			join(typescript, 'package.json'),
-			JSON.stringify({ name: 'typescript', version: '0.0.0-unsupported', main: 'index.js' }),
-		);
-		writeFileSync(
-			join(typescript, 'index.js'),
-			"module.exports = { version: '0.0.0-unsupported' };\n",
-		);
-		const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
 		try {
-			const source = `export function Label(props: { value: string }) @{ <p>{props.value}</p> }`;
-			const consumer = fixtureOn({ 'Label.tsrx': source }, undefined, {
-				name: 'an unsupported TypeScript',
-				typescript,
-			} as unknown as TextTypeBackend);
-			const filename = consumer.file('Label.tsrx');
-			const facts = consumer.project.snapshot(filename);
-			expect(facts.stringChildRanges).toEqual([]);
-			expect(facts.primitiveTextChildRanges).toEqual([]);
-			expect(warn).toHaveBeenCalledWith(expect.stringContaining('Text type facts are disabled'));
-			for (const mode of ['client', 'server'] as const) {
-				expect(() => compile(source, filename, { mode, textTypeFacts: facts })).not.toThrow();
-			}
+			writeFileSync(
+				join(typescript, 'package.json'),
+				JSON.stringify({ name: 'typescript', version: '0.0.0-unsupported', main: 'index.js' }),
+			);
+			writeFileSync(
+				join(typescript, 'index.js'),
+				"module.exports = { version: '0.0.0-unsupported' };\n",
+			);
+			expect(() =>
+				fixtureOn({ 'Label.tsrx': 'export function Label() @{ <p /> }' }, undefined, {
+					name: 'an unsupported TypeScript',
+					typescript,
+				} as unknown as TextTypeBackend),
+			).toThrow(
+				expect.objectContaining({
+					message: expect.stringContaining('could not load'),
+					cause: expect.objectContaining({
+						message: expect.stringContaining(
+							'has neither the classic compiler API nor typescript/unstable/sync',
+						),
+					}),
+				}),
+			);
 		} finally {
-			warn.mockRestore();
 			rmSync(typescript, { recursive: true, force: true });
 		}
 	});

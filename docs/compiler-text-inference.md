@@ -29,9 +29,7 @@ until `dispose()`; it checks `.tsrx` files through the same virtual TSX as the
 classic API, without a content mapper or `--runExternalCode`, so both produce the
 same facts. To analyze with another installed TypeScript, such as one installed
 under an alias, pass `typescript` with its package name (resolved from the
-tsconfig directory) or package directory. TypeScript 7.0's API cannot create a
-program from the virtual `.tsrx` files, so it disables the facts with a warning,
-as does a package with neither API: the build keeps its syntax-only output.
+tsconfig directory) or package directory.
 
 ```ts
 import { readFileSync } from 'node:fs';
