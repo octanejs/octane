@@ -1385,6 +1385,22 @@ Hosts without the native API use normal task batching. An Action's pending cue
 publishes promptly without starting an animation or changing sibling state to
 urgent Suspense semantics.
 
+Ready query and asynchronous `derived$` publications coalesce native component
+rendering in the same host-task queue. Source subscriptions, graph effects, and
+direct signal bindings still observe every publication. Plain signal writes,
+native events, lifecycle updates, and `flushSync` retain their existing timing.
+The admission change does not turn an urgent signal render into a Suspense
+transition; held native-read frames keep their existing retention policy.
+
+Query and derived stream pulls share an approximately 5 ms host budget. Both a
+pull and a ready-result publication check the same window, so many producers do
+not each receive a separate allowance. A posted sentinel resets that window;
+ready continuations wait for it when the budget is spent, then recheck their
+current producer lease. Ordered values, cancellation, and server observation
+backpressure are preserved. This is a scheduling opportunity between complete
+units, not a hard 5 ms limit: one iterator call, subscriber, render, or commit can
+itself take longer. Cold I/O lets the sentinel run between results.
+
 `useDeferredValue` similarly keeps the previous value through the urgent commit
 and swaps to the latest value in a later host task. Urgent updates before that
 task retarget the swap, so skipped values never render deferred. The swap and
@@ -1474,7 +1490,10 @@ flushSync(() => {
 ```
 
 Passive effects normally run after paint, including effects queued by discrete
-events and external-store updates. A listener installed by `useEffect` can miss
+events and external-store updates. A later render drains pending passives first,
+so an urgent burst or an application-owned microtask loop can still pull that
+work into the same checkpoint. Coalescing producer renders avoids paying this
+drain once per ready signal value. A listener installed by `useEffect` can miss
 another event dispatched before that drain. Use `useLayoutEffect` when the
 subscription must be installed by the end of the commit. Passive timing is not
 React's synchronous discrete-event effect timing.

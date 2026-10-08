@@ -281,9 +281,22 @@ the existing animation controller owns their staged commit. Async Action results
 still coalesce in a host task. An urgent flush can consume other queued work,
 and `flushSync` explicitly drains both priorities.
 
+Ready query and asynchronous `derived$` publications also coalesce native
+component rendering in a host task. Source subscriptions, graph effects, and
+direct signal bindings still receive every publication. Plain signal writes,
+native events, layout updates, and `flushSync` keep their existing timing.
+
+Query and derived stream pulls share an approximately 5 ms execution budget,
+checked before pulling and before publishing a ready result. Producers resume
+with their current lease after a host task, preserving cancellation and server
+backpressure. A single callback, render, or commit can exceed that budget; this
+creates opportunities for input and paint between complete units of work.
+
 The useful transition behavior remains: when a slower replacement suspends, the
 current screen can stay visible and `isPending` can explain the wait. `flushSync`
-drains the full update queue, while passive effects still run after paint.
+drains the full update queue. Passive effects normally run after paint, but a
+new render drain can flush pending effects first; a continuous urgent microtask
+loop can therefore pull that work forward.
 
 For resize callbacks that update state or write DOM that can resize observed
 elements, use [createResizeObserver](/docs/core-apis#createResizeObserver) from

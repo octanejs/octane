@@ -250,6 +250,7 @@ import {
 	ADOPTION_CONTROL,
 	NativeAdoptionMiss,
 	NATIVE_TRANSITION_CONSUMER,
+	nativeProducerPublication,
 	readNativeDomStyle,
 	registerNativeActionResolver,
 	registerNativeReadRebase,
@@ -1629,7 +1630,11 @@ function scheduleNativeRead(target: Block): void {
 		// flush. Like an update from a layout effect, it spends the flush's
 		// nested-update budget, so a render whose acceptance changes what it reads
 		// fails with the depth error instead of rendering again without end.
-		scheduleRender(target, inFlush);
+		scheduleRender(
+			target,
+			inFlush,
+			nativeProducerPublication && !inFlush && !inCommitCallback() && _dispatchDepth === 0,
+		);
 	} finally {
 		if (retainPriority) TRANSITION_DEPTH--;
 	}
@@ -1689,6 +1694,7 @@ function currentSignalDeclarationStage(declaring?: number): SignalDeclarationSta
 function ensureNativeReadDriver(): NativeReadDriver {
 	if (NATIVE_READ_DRIVER !== null) return NATIVE_READ_DRIVER;
 	installNativeSignalActionExtension();
+	TASK_FLUSH = scheduleTaskFlush;
 	registerSignalDeclarationStage(currentSignalDeclarationStage);
 	NATIVE_READ_DRIVER = createNativeReadDriver({
 		capture: () => WIP_CAPTURE,
@@ -2654,16 +2660,18 @@ let QUEUE_REINDEX_EPOCH = 0;
 let scheduled = false;
 // Transition work shares one host task. An urgent microtask may consume the
 // same queue first; leave the posted callback armed so later work can reuse it.
-let transitionScheduled = false;
+// Native producer publications share this admission without changing Suspense priority.
+let taskScheduled = false;
+let TASK_FLUSH: (() => void) | null = null;
 let inDeferredTask = false;
 let inUrgentFlush = false;
 let transitionCompletions: Array<() => void> | null = null;
 let urgentActionCue = false;
 
-function scheduleFlush(transition = false): void {
+function scheduleFlush(background = false): void {
 	if (syncFlush) return;
-	if (transition && !inDeferredTask && TRANSITION_ROOT_DRIVER !== null) {
-		TRANSITION_ROOT_DRIVER.schedule();
+	if (background && !inDeferredTask && TASK_FLUSH !== null) {
+		TASK_FLUSH();
 	} else if (!scheduled) {
 		scheduled = true;
 		queueMicrotask(flushScheduled);
@@ -2676,8 +2684,8 @@ function scheduleQueuedFlush(): void {
 	else scheduleFlush();
 }
 
-function scheduleTransitionFlush(): void {
-	if (transitionScheduled || scheduled) return;
+function scheduleTaskFlush(): void {
+	if (taskScheduled || scheduled) return;
 	// Native ViewTransition owns its capture boundary. Start that controller
 	// before an unrelated next-frame update can consume its animation batch.
 	// Async results must coalesce before their first capture too. Unsupported
@@ -2686,8 +2694,8 @@ function scheduleTransitionFlush(): void {
 		scheduleFlush();
 		return;
 	}
-	transitionScheduled = true;
-	postHostTask(flushTransitionTask);
+	taskScheduled = true;
+	postHostTask(flushTask);
 }
 
 function scheduleTransitionQueue(): void {
@@ -2719,8 +2727,8 @@ function flushUrgent(): void {
 	}
 }
 
-function flushTransitionTask(): void {
-	transitionScheduled = false;
+function flushTask(): void {
+	taskScheduled = false;
 	flush();
 }
 
@@ -2805,7 +2813,6 @@ function ensureOffscreenSwapDriver(): void {
  */
 interface TransitionRootDriver {
 	// Task/completion machinery belongs to transition users, not ordinary roots.
-	schedule: typeof scheduleTransitionFlush;
 	resume: typeof scheduleTransitionQueue;
 	flushUrgent: typeof flushUrgent;
 	takeCompletions: typeof takeTransitionCompletions;
@@ -2829,6 +2836,7 @@ interface TransitionRootDriver {
 let TRANSITION_ROOT_DRIVER: TransitionRootDriver | null = null;
 
 function ensureTransitionSwapDriver(): void {
+	TASK_FLUSH = scheduleTaskFlush;
 	// Written out rather than calling ensureOffscreenSwapDriver, so applications
 	// that start transitions but render no Suspense pending arm carry one install.
 	TRANSITION_SWAP_DRIVER ??= {
@@ -2837,7 +2845,6 @@ function ensureTransitionSwapDriver(): void {
 		splice: spliceWipCapture,
 	};
 	TRANSITION_ROOT_DRIVER ??= {
-		schedule: scheduleTransitionFlush,
 		resume: scheduleTransitionQueue,
 		flushUrgent,
 		takeCompletions: takeTransitionCompletions,
@@ -7563,8 +7570,8 @@ function warnCrossComponentRenderUpdate(target: Block, source: Block): void {
 	);
 }
 
-/** `flushed`: a signal notification delivered during a flush (see scheduleNativeRead). */
-function scheduleRender(block: Block, flushed?: boolean): void {
+/** `flushed` preserves nested-update accounting; `background` changes admission, not render mode. */
+function scheduleRender(block: Block, flushed?: boolean, background = false): void {
 	if (block.disposed) return;
 	if (process.env.NODE_ENV !== 'production' && CURRENT_EFFECT_PHASE === INSERTION) {
 		console.error(
@@ -7631,7 +7638,7 @@ function scheduleRender(block: Block, flushed?: boolean): void {
 		if (mode === 'urgent') {
 			block.pendingMode = 'urgent';
 			block.pendingDeferred = false;
-			if (!syncFlush) scheduleFlush();
+			if (!syncFlush) scheduleFlush(background);
 		}
 		return;
 	}
@@ -7685,7 +7692,7 @@ function scheduleRender(block: Block, flushed?: boolean): void {
 	block.pendingMode = mode;
 	block.pendingDeferred = deferred;
 	QUEUE.push(block);
-	if (!syncFlush) scheduleFlush(mode === 'transition');
+	if (!syncFlush) scheduleFlush(background || mode === 'transition');
 }
 
 // Monotonic id per drainQueue pass, paired with Block.drainStamp/drainRenders
