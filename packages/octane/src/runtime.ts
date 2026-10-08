@@ -305,7 +305,6 @@ import {
 	type SignalHandle,
 	type SignalOwner,
 	type ScopeSeed,
-	type SignalOwnerIdentity,
 	type SignalRendererOwnerIdentity,
 	type WritableSignal,
 } from './signals/types.js';
@@ -13547,11 +13546,6 @@ function endUrgentTransitionCell(
 	for (let entry: TransitionActionUpdate<any> | undefined = update; entry; entry = entry.previous)
 		entry.baseValue = cell.value;
 }
-
-type AssertUseStateType<T extends true> = T;
-type _UseStateAcceptsNoArguments = AssertUseStateType<
-	typeof useState extends <T = undefined>() => StateTuple<T | undefined> ? true : false
->;
 
 /** Compiler-emitted useState variant for a tuple whose third member is observable. */
 export function __useStateWithGetter<T>(initial: T | (() => T), slot?: symbol): StateTuple<T>;
@@ -35861,18 +35855,8 @@ function iterableChildArray(value: any): any[] | null {
 // Flatten a descriptor's `children` (a single value, or a possibly-nested array —
 // `createElement` collapses positional children and `.map()` results into arrays)
 // into a flat list of renderable values, dropping empties (null/undefined/false/
-// true/'') which render nothing.
-function flattenDeoptChildren(out: any[], v: any): void {
-	if (v == null || v === false || v === true || v === '') return;
-	if (Array.isArray(v)) {
-		for (let i = 0; i < v.length; i++) flattenDeoptChildren(out, v[i]);
-		return;
-	}
-	out.push(v);
-}
-
-// flattenDeoptChildren + a parallel SLOT-SCOPED position key per kept child
-// (React identity semantics, same compound scheme as flattenChildItemsKeyed):
+// true/'') which render nothing, with a parallel SLOT-SCOPED position key per kept
+// child (React identity semantics, same compound scheme as flattenChildItemsKeyed):
 // a child keeps its top-level position as its implicit key even when EMPTY
 // siblings (`{cond && <input/>}` flipped off) render nothing — so a hole
 // going falsy never shifts the following siblings onto different DOM nodes
@@ -39807,8 +39791,6 @@ interface HmrMeta {
 	liveBlocks: Set<Block>;
 	update(incoming: ComponentBody<any>): boolean;
 }
-
-type HmrWrapper = ComponentBody<any> & { [HMR]: HmrMeta };
 
 export function hmr<P>(fn: ComponentBody<P>): ComponentBody<P> {
 	const meta: HmrMeta = {
@@ -43809,7 +43791,7 @@ export function useFormStatus(slot?: HookSlot): FormStatus {
 // addOptimistic should be called inside an Action.
 // ---------------------------------------------------------------------------
 
-interface OptimisticSlot<S, V> {
+interface OptimisticSlot<V> {
 	queue: V[];
 	add: (value: V) => void;
 	/**
@@ -43851,7 +43833,7 @@ export function useOptimistic<S, V = S>(
 	if (slot === undefined) missingSlot('useOptimistic');
 	const scope = CURRENT_SCOPE!;
 	const block = CURRENT_BLOCK!;
-	let s = scope.hooks?.get(slot) as OptimisticSlot<S, V> | undefined;
+	let s = scope.hooks?.get(slot) as OptimisticSlot<V> | undefined;
 	if (s === undefined) {
 		const clear = (): void => {
 			slotRef.armed = false;
@@ -43864,7 +43846,7 @@ export function useOptimistic<S, V = S>(
 				}
 			}
 		};
-		const slotRef: OptimisticSlot<S, V> = {
+		const slotRef: OptimisticSlot<V> = {
 			queue: [],
 			armed: false,
 			add: (value: V) => {
