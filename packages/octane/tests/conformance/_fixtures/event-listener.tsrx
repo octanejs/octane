@@ -65,6 +65,27 @@ export function DeferredPortalEvents(props: DeferredPortalProps) @{
 	</section>
 }
 
+interface ToggledDeferredPortalProps extends DeferredPortalProps {
+	open: boolean;
+}
+
+// The owner opens and closes the portal; the portal child reveals its content
+// later through its own state, so that content is resolved at event time.
+export function ToggledChildPortal(props: ToggledDeferredPortalProps) @{
+	<section class="deferred-portal-parent" onClick={() => props.log('logical bubble')}>
+		@if (props.open) {
+			<>{createPortal(<DeferredPortalChild {...props} />, props.target)}</>
+		}
+	</section>
+}
+
+// The same owner with the portal at value position (a `{expr}` hole).
+export function ToggledValuePortal(props: ToggledDeferredPortalProps) @{
+	<section class="deferred-portal-parent" onClick={() => props.log('logical bubble')}>
+		{props.open ? createPortal(<DeferredPortalChild {...props} />, props.target) : null}
+	</section>
+}
+
 // :106 — the clicked element is REMOVED by the update its own handler schedules.
 export function DisappearingButton() @{
 	const [clicked, setClicked] = useState(false);

@@ -20,6 +20,8 @@ import {
 	RootDiv,
 	PropagationTree,
 	DeferredPortalEvents,
+	ToggledChildPortal,
+	ToggledValuePortal,
 	DisappearingButton,
 	BatchChild,
 	BatchParent,
@@ -123,6 +125,84 @@ describe('portal events after descendant updates', () => {
 			target.remove();
 		}
 	});
+
+	// A shared target accumulates and releases portal ranges as owners open and
+	// close portals. Late content in every live range must keep routing to its own
+	// owner, and a closed range must stop claiming anything.
+	it.each([
+		['child position', ToggledChildPortal],
+		['value position', ToggledValuePortal],
+	] as const)(
+		'routes late portal content to its own owner while shared-target portals open and close (%s)',
+		(_placement, Owner) => {
+			const log: string[] = [];
+			const target = document.createElement('div');
+			document.body.appendChild(target);
+			const reveal = new Map<string, (visible: boolean) => void>();
+			const owners = ['a', 'b', 'c'].map((name) => {
+				const props = {
+					target,
+					open: true,
+					register: (setVisible: (visible: boolean) => void) => {
+						reveal.set(name, setVisible);
+					},
+					log: (label: string) => log.push(`${name}: ${label}`),
+				};
+				return { name, props, root: mount(Owner, props) };
+			});
+			const setOpen = (name: string, open: boolean) => {
+				const owner = owners.find((candidate) => candidate.name === name)!;
+				owner.props = { ...owner.props, open };
+				owner.root.update(Owner, owner.props);
+				if (open) flushSync(() => reveal.get(name)!(true));
+			};
+			// Click every portal button in target order; one routed owner per click.
+			const route = () =>
+				Array.from(
+					target.querySelectorAll<HTMLButtonElement>('.deferred-portal-target'),
+					(button) => {
+						log.length = 0;
+						button.click();
+						return log.join(', ');
+					},
+				);
+			const routed = (name: string) =>
+				`${name}: target capture, ${name}: target bubble, ${name}: logical bubble`;
+			try {
+				for (const name of ['a', 'b', 'c']) flushSync(() => reveal.get(name)!(true));
+				expect(route()).toEqual([routed('a'), routed('b'), routed('c')]);
+
+				setOpen('b', false);
+				expect(route()).toEqual([routed('a'), routed('c')]);
+				setOpen('b', true);
+				expect(route()).toEqual([routed('a'), routed('c'), routed('b')]);
+
+				setOpen('a', false);
+				expect(route()).toEqual([routed('c'), routed('b')]);
+				setOpen('a', true);
+				setOpen('c', false);
+				expect(route()).toEqual([routed('b'), routed('a')]);
+
+				setOpen('b', false);
+				expect(route()).toEqual([routed('a')]);
+				setOpen('a', false);
+				expect(target.childNodes).toHaveLength(0);
+
+				// No range is left to claim foreign content in the target.
+				const stray = document.createElement('button');
+				target.appendChild(stray);
+				log.length = 0;
+				stray.click();
+				expect(log).toEqual([]);
+
+				setOpen('c', true);
+				expect(route()).toEqual([routed('c')]);
+			} finally {
+				for (const owner of owners) owner.root.unmount();
+				target.remove();
+			}
+		},
+	);
 
 	it('preserves late portal ownership when a native target listener moves the host before bubbling', () => {
 		const log: string[] = [];

@@ -32624,8 +32624,11 @@ function unregisterPortalEventRange(target: Node, portal: PortalSlot): void {
 		return;
 	const start = portal.start as PortalEventBoundary | null;
 	const end = portal.end as PortalEventBoundary | null;
-	if (start?.$$portalEventRange === portal) delete start.$$portalEventRange;
-	if (end?.$$portalEventStart === start) delete end.$$portalEventStart;
+	// Clear, never `delete`: deleting an expando from a DOM wrapper drops it into
+	// dictionary mode (a fresh property dictionary per marker, every teardown).
+	// resolvePortalEventOwner reads both fields with `!== undefined`.
+	if (start?.$$portalEventRange === portal) start.$$portalEventRange = undefined;
+	if (end?.$$portalEventStart === start) end.$$portalEventStart = undefined;
 	const ranges = _portalEventRanges.get(target);
 	if (ranges === undefined) return;
 	ranges.delete(portal);
