@@ -5,6 +5,7 @@ import {
 	createRoot,
 	flushSync,
 	useState,
+	useTransition,
 	useLayoutEffect,
 	type Root,
 } from '../src/index.js';
@@ -109,6 +110,31 @@ afterEach(async () => {
 });
 
 describe('signal producer task admission', () => {
+	it('keeps the pending cue separate when transitions follow native readers', async () => {
+		const count$ = scope().signal$('count', 0);
+		const reader = mount(() => createElement('output', null, String(count$.get())));
+		count$.set(1);
+		await microtasks();
+		expect(reader.textContent).toBe('1');
+
+		let begin!: () => void;
+		const container = mount(() => {
+			const [value, setValue] = useState(0, Symbol.for('signal-task.transition-value'));
+			const [pending, start] = useTransition(Symbol.for('signal-task.transition-pending'));
+			begin = () => start(() => setValue(1));
+			return createElement(
+				'output',
+				null,
+				`${count$.get()}:${value}:${pending ? 'pending' : 'idle'}`,
+			);
+		});
+		begin();
+		await microtasks();
+		expect(container.textContent).toBe('1:0:pending');
+		await act(() => {});
+		expect(container.textContent).toBe('1:1:idle');
+	});
+
 	it.each(['query', 'derived'] as const)(
 		'keeps %s publications synchronous while rendering at a host boundary',
 		async (kind) => {
