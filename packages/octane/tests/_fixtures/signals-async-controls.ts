@@ -1,5 +1,6 @@
 import { setImmediate } from 'node:timers';
 import type { SignalHandle, SignalSnapshot } from 'octane/signals';
+import { postHostTask } from '../../src/host-task.js';
 
 export interface Deferred<T> {
 	readonly promise: Promise<T>;
@@ -47,9 +48,19 @@ export function capturePending$(read: () => unknown): PromiseLike<unknown> {
 	throw new Error('Expected the public read to suspend.');
 }
 
-/** Drain queued producer reactions at a host-turn boundary, without a timed sleep. */
-export function drainProducers(): Promise<void> {
-	return new Promise((resolve) => setImmediate(resolve));
+/**
+ * Drain queued producer reactions across host turns, without a timed sleep. A
+ * producer whose host budget is spent waits for a host task
+ * (yieldForHostBudget), which a loaded machine reaches mid-test. Each round
+ * lets at least one such wait finish; four cover the deepest step here even
+ * when every window admits one unit, so a result does not depend on the time
+ * it took.
+ */
+export async function drainProducers(): Promise<void> {
+	for (let round = 0; round < 4; round++) {
+		await new Promise((resolve) => setImmediate(resolve));
+		await new Promise<void>((resolve) => postHostTask(resolve));
+	}
 }
 
 type StreamEvent<T> =
