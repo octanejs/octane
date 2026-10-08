@@ -688,7 +688,7 @@ const SIGNAL_RETRY_LOCATIONS = /* @__PURE__ */ new WeakMap<Scope, SignalRetryLoc
 function signalRetryBoundary(block: Block): TrySlot | undefined {
 	let current: Block | null = block;
 	while (current !== null) {
-		const state = (current as any).__trySlot as TrySlot | undefined;
+		const state = current.rare?.trySlot;
 		if (state !== undefined && !state.propagateSuspense) return state;
 		current = current.parentBlock;
 	}
@@ -821,7 +821,8 @@ function handOverSignalRetryScope(scope: Scope, root: Scope, state: TrySlot): vo
 		scope.signalOwner = false;
 	}
 	forEachSubtreeChild(scope, (child) => {
-		const nested = (child as any).__trySlot as TrySlot | undefined;
+		// A lite child is a plain Scope with no `rare` record, and never a boundary.
+		const nested = (child as Block).rare?.trySlot;
 		if (nested === undefined || nested.propagateSuspense)
 			handOverSignalRetryScope(child, root, state);
 	});
@@ -1868,7 +1869,7 @@ function retainNativeRetryReads(block: Block, reads: NativeReadWitness): void {
 	// An existing Suspense/hidden Activity owner survives its unsuccessful body.
 	// Retain a minimal retry lease there, not in the discarded child Scope.
 	for (let current: Block | null = block; current !== null; current = current.parentBlock) {
-		if ((current as any).__suspenseHandler) {
+		if (current.rare?.suspenseHandler) {
 			const retries = (NATIVE_BLOCK_RETRIES ??= new WeakMap());
 			let retry = retries.get(current);
 			if (retry === undefined) {
@@ -2427,12 +2428,12 @@ export interface Block extends Scope {
 	/** Cached key for this item Block. null on non-item blocks. */
 	key: any;
 	/**
-	 * Set on a `<ViewTransition>` component's block: the boundary's current
-	 * props (docs/view-transitions-plan.md). Null on every other block —
-	 * declared everywhere so the shape stays monomorphic; the field gates the
-	 * nearest-boundary dirty walk and the unmount unregister.
+	 * Feature-only state (BlockRare): boundary handlers and slots, use()
+	 * thenables, fetch-tree warming, the commit-callback loop guard,
+	 * useEffectEvent versions and `<ViewTransition>` props. Null until the first
+	 * of those features touches this Block, and always null on LiteBlockImpl.
 	 */
-	vt: ViewTransitionProps | null;
+	rare: BlockRare | null;
 	/**
 	 * Render priority for the next scheduled render: 'transition' (queued from
 	 * inside startTransition — suspending shouldn't swap to fallback if prior
@@ -2482,8 +2483,6 @@ export interface Block extends Scope {
 	 * the bail's lazy consumer refresh is sound.
 	 */
 	$$implicitBail: boolean;
-	/** Per-render `use(thenable)` call-order counter; reset at the top of renderBlock. */
-	__thenableIdx: number;
 	/**
 	 * Render-loop guard: the drainQueue pass this block last rendered in, and how
 	 * many times it rendered within that pass. A block that keeps re-queueing
@@ -2497,18 +2496,6 @@ export interface Block extends Scope {
 	drainRenders: number;
 	/** True when the queued render came from a different component's render body. */
 	crossRenderUpdate: boolean;
-	/** Commit-callback loop guard, scoped to one externally-started update chain. */
-	nestedUpdateChain: number;
-	nestedUpdateCount: number;
-	nestedUpdateError: boolean;
-	/**
-	 * useEffectEvent updates publish only for the latest render of this block that
-	 * completed. Zero means this block has never called useEffectEvent. Keeping the
-	 * attempt/completion counters on the block makes aborted-render filtering
-	 * allocation-free for components that do not use the hook.
-	 */
-	effectEventRenderVersion: number;
-	effectEventCompletedVersion: number;
 }
 
 interface EffectSlot {
@@ -2719,6 +2706,11 @@ let inFlush = false;
 // block does not: the block is queued in both places, and the microtask flush
 // renders only its cue (renderTransitionCue).
 const TRANSITION_QUEUE: Block[] = [];
+// Blocks whose pending cue was scheduled outside a flush (markTransitionCue); the
+// microtask flush renders them at urgent priority (splitTransitionCue). They hold
+// until a drain empties or reindexes QUEUE, while TRANSITION_CUE_EPOCH is current.
+const TRANSITION_CUES: Block[] = [];
+let TRANSITION_CUE_EPOCH = -1;
 // The live posted task's id, or 0. A flush that absorbs the queue retires that
 // task, so transitions scheduled afterwards post a task of their own rather than
 // joining one posted before input that arrived in between.
@@ -3638,7 +3630,7 @@ function harvestTransitionWarmValues(
 		for (let i = 0; i < warmHarvest.length; i++) warmHarvest[i].taken = false;
 	}
 	const harvest = (scope: Scope): void => {
-		const cache = (scope.block as any).__warmCache as Map<HookSlot, WarmEntry[]> | undefined;
+		const cache = scope.block.rare?.warmCache;
 		if (cache !== undefined) {
 			for (const [slot, list] of cache) {
 				for (let i = 0; i < list.length; i++) {
@@ -4196,11 +4188,13 @@ let ROOT_RENDER_TRANSACTION: RootRenderTransaction | null = null;
 /**
  * The `createdStamp` of the Blocks the active root attempt discards whole on
  * rollback (undoCreatedInRootRender), or -1. Inside the root window, a write
- * such a Block makes into its own hosts and bag needs no undo entry. Hydration
- * and adopted DOM (retainedCreated) keep every entry, because rollback keeps
- * those hosts. Kept in step with the transaction by beginRootRender,
- * endRootRender, preserveRootCreatedDom and hydrateRoot's hydrating mark, so a
- * write tests one field instead of the transaction's shape.
+ * such a Block makes into its own hosts and bag needs no undo entry, and a
+ * Block created below one needs no creation or render entry
+ * (createdInRootRender). Hydration and adopted DOM (retainedCreated) keep
+ * every entry, because rollback keeps those hosts. Kept in step with the
+ * transaction by beginRootRender, endRootRender, preserveRootCreatedDom and
+ * hydrateRoot's hydrating mark, so a write tests one field instead of the
+ * transaction's shape.
  */
 let ROOT_DISCARD_STAMP = -1;
 let ROOT_RENDER_TRANSACTIONS: RootRenderTransaction[] = [];
@@ -4614,7 +4608,21 @@ function createdInRootRender(block: Block): void {
 	)
 		preserveRootCreatedDom(block);
 	(transaction.created ??= []).push(block);
-	TRANSITION_JOURNAL!.push(JOURNAL_CREATED, block, transaction, null);
+	// The root window discards a Block together with a parent this attempt also
+	// created, so it needs no creation entry. The parent's creation undo unmounts
+	// the subtree it can reach, and rollbackRootRender sweeps `created` for the
+	// rest, such as a portal whose content suspended before its slot was
+	// registered, or an arm a restored slot no longer names. When that parent is
+	// its own parentBlock, renderBlockInner skips its render entries too: the
+	// parent's entries invalidate the committed path above it. A nested boundary
+	// window replays only its own entries and has no sweep, so it keeps them all,
+	// as do hydration and adopted DOM, where ROOT_DISCARD_STAMP is -1. A hookless
+	// child's stand-in is not a Block; its owner's teardown reaches what is
+	// created below it.
+	let parent = TRANSITION_JOURNAL_DEPTH === 1 ? block.parentBlock : null;
+	while (parent instanceof LiteBlockImpl) parent = parent.parentBlock;
+	if (parent === null || parent.createdStamp !== ROOT_DISCARD_STAMP)
+		TRANSITION_JOURNAL!.push(JOURNAL_CREATED, block, transaction, null);
 }
 
 /** An upgraded runtime descriptor can give a fresh Block existing host DOM. */
@@ -4655,6 +4663,12 @@ function rollbackRootRender(transaction: RootRenderTransaction): void {
 			}
 			transaction.log.length = 0;
 		}
+		// A Block discarded with its parent has no creation entry
+		// (createdInRootRender). Unmount any its parent's undo did not reach.
+		const created = transaction.created;
+		if (created !== null)
+			for (let i = created.length - 1; i >= 0; i--)
+				if (!created[i].disposed) undoCreatedInRootRender(created[i], transaction);
 		discardOffscreenCapture(transaction.capture);
 		transaction.commit = null;
 		// Restored rows have already left the parked list. Only speculative
@@ -5248,15 +5262,6 @@ function forSlotParkable(state: ForSlot): boolean {
 }
 
 /**
- * Record a keyed list's shape before a reconcile that may have to be undone.
- *
- * The list is restored as a whole rather than per operation: the chain, the key
- * map and the counts all move together, and rebuilding the DOM from the restored
- * chain puts moved survivors back as well as dropped rows. Once per list per
- * window — the first record is the pre-render one, which is the one to go back
- * to.
- */
-/**
  * A keyed list's rollback record for one journal window. The full form copies
  * the chain, and the key Map's order where it differs, before a reconcile
  * relinks rows wholesale. The link form serves the shapes that relink a bounded
@@ -5266,12 +5271,24 @@ function forSlotParkable(state: ForSlot): boolean {
  * Restoring the chain rewrites every `prevSibling` and index from position, so
  * neither form records those. A wholesale change later in the same window, or
  * a record for an inner window, converts the link form to the full form first.
+ *
+ * A link record gets its `links` Map at its first relink. Until then only index
+ * writes have run, and they change neither the chain nor the key Map, so
+ * converting it copies the list as it stands, as the full form would have when
+ * the record was taken. A reorder that falls through to the LIS path therefore
+ * pays exactly the full form's copy.
+ *
+ * The record rides in the spare slot of its own undo entry, where `seen` (the
+ * window's bag index) finds it again, so it lives exactly as long as its log:
+ * a removed row it references goes when the committed log is dropped.
  */
 interface ForSlotRecord {
 	empty: Block | null;
+	/** The chain when the record was taken; null while it is in the link form. */
 	chain: Block[] | null;
 	mapOrder: Block[] | null;
 	head: Block | null;
+	/** Link form: each relinked row's old `nextSibling`, from the first relink on. */
 	links: Map<Block, Block | null> | null;
 	/** `state.inOrder` when the record was taken. */
 	inOrder: boolean;
@@ -5282,36 +5299,33 @@ interface ForSlotRecord {
 }
 
 /**
- * Each journal log's newest link record per list. Keyed by the log, so the
- * records (which reference removed rows) go when a committed log is dropped,
- * and a later log never sees an earlier one's.
- */
-const SLOT_RECORDS = new WeakMap<any[], Map<ForSlot, ForSlotRecord>>();
-
-/**
- * Ensure the current window can restore this list to its shape before the
- * window's first change. Without `link`, the caller is about to relink rows
- * wholesale, so the record takes, or converts to, the full form. With `link`,
- * the window's record comes back for the caller to record the old
- * `nextSibling` of each row whose `nextSibling` it rewrites in `record.links`
- * (a full record has no `links` and needs none). Null when hydration adoption
- * journals the range instead. One call either way, like the single snapshot
- * function this replaces.
+ * Record a keyed list's shape before a reconcile that may have to be undone.
+ *
+ * The list is restored as a whole rather than per operation: the chain, the key
+ * map and the counts all move together, and rebuilding the DOM from the restored
+ * chain puts moved survivors back as well as dropped rows. Once per list per
+ * window — the first record is the pre-render one, which is the one to go back
+ * to.
+ *
+ * Without `link`, the caller is about to relink rows wholesale, so the record
+ * takes, or converts to, the full form. With `link`, the window's record comes
+ * back, and a caller that relinks rows records the old `nextSibling` of each
+ * row it rewrites in `forSlotLinks(record)` first (a full record needs none).
+ * Null when hydration adoption journals the range instead. One call either
+ * way, like the single snapshot function this replaces.
  */
 function journalForSlot(state: ForSlot, link?: boolean): ForSlotRecord | null {
 	const seen = TRANSITION_JOURNAL_BAGS!;
-	let records = SLOT_RECORDS.get(TRANSITION_JOURNAL!);
-	const current = records?.get(state) ?? null;
-	if ((seen.get(state) ?? -1) >= TRANSITION_JOURNAL_CHECKPOINT) {
-		if (link) return current;
-		if (current !== null && current.links !== null) fullForSlotRecord(state, current);
-		return null;
-	}
-	// An enclosing window's link record stops gathering links here.
-	if (current !== null) {
-		if (current.links !== null) fullForSlotRecord(state, current);
-		records!.delete(state);
-	}
+	const at = seen.get(state) ?? -1;
+	// The record rides in the spare slot of the list's undo entry; an entry without
+	// one (hydration adoption, an owned-list clear) holds null there.
+	const current: ForSlotRecord | null =
+		at >= 0 && TRANSITION_JOURNAL![at] === JOURNAL_UNDO ? TRANSITION_JOURNAL![at + 2] : null;
+	if (link && at >= TRANSITION_JOURNAL_CHECKPOINT) return current;
+	// A wholesale change converts this window's link record; an inner window's
+	// record stops an enclosing window's link record gathering links.
+	if (current !== null) fullForSlotRecord(state, current);
+	if (at >= TRANSITION_JOURNAL_CHECKPOINT) return null;
 	seen.set(state, TRANSITION_JOURNAL!.length);
 	if (
 		ROOT_RENDER_TRANSACTION !== null &&
@@ -5331,42 +5345,38 @@ function journalForSlot(state: ForSlot, link?: boolean): ForSlotRecord | null {
 			TRANSITION_JOURNAL!.push(JOURNAL_PROP, b, 'itemIndex', b.itemIndex);
 		return null;
 	}
-	let chain: Block[] | null = null;
-	let mapOrder: Block[] | null = null;
-	if (!link) {
-		chain = [];
-		for (let b: Block | null = state.head; b !== null; b = b.nextSibling) chain.push(b);
-		// The key Map keeps insertion order through earlier reorders. Preserve that
-		// order for context refresh only when it differs from the linked DOM order.
-		// Spreading the values takes the engine's bulk copy; a list reordered before
-		// differs at its first rows, so the comparison usually stops at once.
-		const keyOrder = [...state.items.values()];
-		if (keyOrder.length !== chain.length) mapOrder = keyOrder;
-		for (let i = 0; mapOrder === null && i < keyOrder.length; i++)
-			if (keyOrder[i] !== chain[i]) mapOrder = keyOrder;
-	}
 	const record: ForSlotRecord = {
 		empty: state.emptyBlock,
-		chain,
-		mapOrder,
+		chain: null,
+		mapOrder: null,
 		head: state.head,
-		links: link ? new Map() : null,
+		links: null,
 		inOrder: state.inOrder,
 		prior: null,
 	};
-	if (link) {
-		if (process.env.NODE_ENV !== 'production') record.check = forSlotShape(state);
-		if (records === undefined) SLOT_RECORDS.set(TRANSITION_JOURNAL!, (records = new Map()));
-		records.set(state, record);
-	}
-	const owner = records;
-	journalUndo(() => {
-		if (record.links !== null) fullForSlotRecord(state, record);
-		restoreForSlot(state, record, record.chain);
-		seen.delete(state);
-		if (owner?.get(state) === record) owner.delete(state);
-	});
+	if (!link) fullForSlotRecord(state, record);
+	else if (process.env.NODE_ENV !== 'production') record.check = forSlotShape(state);
+	TRANSITION_JOURNAL!.push(
+		JOURNAL_UNDO,
+		() => {
+			fullForSlotRecord(state, record);
+			restoreForSlot(state, record, record.chain);
+			seen.delete(state);
+		},
+		record,
+		null,
+	);
 	return link ? record : null;
+}
+
+/**
+ * Where a link-form relink records old `nextSibling`s; null without a record or
+ * for a full one. The first relink allocates it even when it records nothing (a
+ * head insert or removal), because from then on the list is no longer the
+ * recorded one.
+ */
+function forSlotLinks(record: ForSlotRecord | null): Map<Block, Block | null> | null {
+	return record !== null && record.chain === null ? (record.links ??= new Map()) : null;
 }
 
 /** Development check: the chain, and the Map's order where it differs. */
@@ -5379,27 +5389,48 @@ function forSlotShape(state: ForSlot): Block[][] {
 		: [chain, keyOrder];
 }
 
-/** Convert a link record to the full form: the shape when it was taken. */
-function fullForSlotRecord(state: ForSlot, record: ForSlotRecord): void {
-	const links = record.links!;
+/**
+ * Convert a link record to the full form: the shape when it was taken. A new
+ * full record, and a link record nothing has relinked yet, copy the list as it
+ * stands. A full record, or none, is left as it is.
+ */
+function fullForSlotRecord(state: ForSlot, record: ForSlotRecord | null): void {
+	if (record === null || record.chain !== null) return;
+	const links = record.links;
 	record.links = null;
-	// The old head and the recorded nextSiblings reach every old row: a row whose
-	// nextSibling was not rewritten still holds it.
-	const chain: Block[] = [];
-	for (let b = record.head; b !== null; b = links.has(b) ? links.get(b)! : b.nextSibling)
-		chain.push(b);
-	record.chain = chain;
-	// Without a removal the Map has only gained fresh rows' keys, which the old
-	// chain excludes; a removal from a Map out of chain order kept its order.
-	if (!record.inOrder) {
-		const kept = new Set(chain);
-		const mapOrder: Block[] = [];
-		for (const block of record.prior ?? state.items.values())
-			if (kept.has(block)) mapOrder.push(block);
+	if (links === null) {
+		const chain: Block[] = [];
+		for (let b: Block | null = state.head; b !== null; b = b.nextSibling) chain.push(b);
+		record.chain = chain;
+		// The key Map keeps insertion order through earlier reorders. Preserve that
+		// order for context refresh only when it differs from the linked DOM order.
+		// Spreading the values takes the engine's bulk copy; a list reordered before
+		// differs at its first rows, so the comparison usually stops at once.
+		const keyOrder = [...state.items.values()];
+		let mapOrder: Block[] | null = keyOrder.length === chain.length ? null : keyOrder;
+		for (let i = 0; mapOrder === null && i < keyOrder.length; i++)
+			if (keyOrder[i] !== chain[i]) mapOrder = keyOrder;
 		record.mapOrder = mapOrder;
+	} else {
+		// The old head and the recorded nextSiblings reach every old row: a row whose
+		// nextSibling was not rewritten still holds it.
+		const chain: Block[] = [];
+		for (let b = record.head; b !== null; b = links.has(b) ? links.get(b)! : b.nextSibling)
+			chain.push(b);
+		record.chain = chain;
+		// Without a removal the Map has only gained fresh rows' keys, which the old
+		// chain excludes; a removal from a Map out of chain order kept its order.
+		if (!record.inOrder) {
+			const kept = new Set(chain);
+			const mapOrder: Block[] = [];
+			for (const block of record.prior ?? state.items.values())
+				if (kept.has(block)) mapOrder.push(block);
+			record.mapOrder = mapOrder;
+		}
 	}
-	if (process.env.NODE_ENV !== 'production') {
-		const [expectedChain, expectedMap = expectedChain] = record.check!;
+	if (process.env.NODE_ENV !== 'production' && record.check !== undefined) {
+		const chain = record.chain!;
+		const [expectedChain, expectedMap = expectedChain] = record.check;
 		const restoredMap = record.mapOrder ?? chain;
 		if (
 			expectedChain.length !== chain.length ||
@@ -5418,12 +5449,13 @@ function fullForSlotRecord(state: ForSlot, record: ForSlotRecord): void {
  */
 function journalForOwnedListClear(state: ForSlot): void {
 	const seen = TRANSITION_JOURNAL_BAGS!;
-	const records = SLOT_RECORDS.get(TRANSITION_JOURNAL!);
-	const current = records?.get(state);
-	if (current !== undefined) {
-		if (current.links !== null) fullForSlotRecord(state, current);
-		records!.delete(state);
-	}
+	// An enclosing window's link record stops gathering links here.
+	const at = seen.get(state) ?? -1;
+	if (at >= 0)
+		fullForSlotRecord(
+			state,
+			TRANSITION_JOURNAL![at] === JOURNAL_UNDO ? TRANSITION_JOURNAL![at + 2] : null,
+		);
 	const oldItems = state.items;
 	seen.set(state, TRANSITION_JOURNAL!.length);
 	const snapshot = {
@@ -6044,7 +6076,13 @@ function vtScopeName(host: Element, style = (host as HTMLElement).style): string
 		: 'root';
 }
 
-function vtGetName(block: Block, props: ViewTransitionProps | null = block.vt): string {
+/** A `<ViewTransition>` block's current props, or null for any other block. */
+function vtProps(block: Block): ViewTransitionProps | null {
+	const rare = block.rare;
+	return rare === null ? null : rare.vt;
+}
+
+function vtGetName(block: Block, props: ViewTransitionProps | null = vtProps(block)): string {
 	if (props?.name != null && props.name !== 'auto') return props.name;
 	if (props?.scope === 'element') {
 		const host = vtScopeHost(block);
@@ -6104,7 +6142,7 @@ function vtClosestScope(node: Node | null): Element | null {
 /** Logical declarations bound their physical hosts, including portaled descendants. */
 function vtScopeForBlock(block: Block): VTOwner | null {
 	for (let ancestor: Block | null = block; ancestor !== null; ancestor = ancestor.parentBlock) {
-		if (ancestor.vt?.scope !== 'element') continue;
+		if (vtProps(ancestor)?.scope !== 'element') continue;
 		const host = vtScopeHost(ancestor);
 		if (host === null) return null;
 		if (ancestor !== block) {
@@ -6188,14 +6226,15 @@ function vtReleaseScopeBoundary(block: Block): void {
 
 /** Keep nested scopes isolated while leaving authored inline CSS in control. */
 function vtPrepareScopeBoundary(block: Block): void {
-	if (block.vt?.scope !== 'element' && VT_BOUNDARIES.get(block)?.scopeHost == null) return;
-	const host = block.vt?.scope === 'element' ? vtScopeHost(block) : null;
+	const props = vtProps(block);
+	if (props?.scope !== 'element' && VT_BOUNDARIES.get(block)?.scopeHost == null) return;
+	const host = props?.scope === 'element' ? vtScopeHost(block) : null;
 	const state = vtBoundaryState(block);
 	if (state.scopeHost !== null && state.scopeHost !== host) vtReleaseScopeBoundary(block);
 	if (host === null) {
 		if (
 			process.env.NODE_ENV !== 'production' &&
-			block.vt?.scope === 'element' &&
+			props?.scope === 'element' &&
 			!inInactiveSubtree(block) &&
 			!VT_INVALID_SCOPE_WARNED.has(block)
 		) {
@@ -6294,11 +6333,12 @@ function vtGetInstance(
 				: owner.documentElement;
 	// Live ref mode is separate from the immutable name/owner cache. An explicit
 	// prop equal to the current CSS name must still detach the live ref lifetime.
+	const props = vtProps(block);
 	if (
 		!block.disposed &&
 		target?.nodeType === 1 &&
-		block.vt?.scope === 'element' &&
-		(block.vt.name == null || block.vt.name === 'auto')
+		props?.scope === 'element' &&
+		(props.name == null || props.name === 'auto')
 	) {
 		const live = VT_SCOPE_REFS.get(block);
 		if (live?.scope === scope && live.instance.name === name) return live.instance;
@@ -6340,7 +6380,7 @@ export function __vtSeen(): void {
 /** Nearest enclosing ViewTransition boundary of the currently rendering block. */
 function vtMarkDirtyFromCurrentBlock(): void {
 	for (let b: Block | null = CURRENT_BLOCK; b !== null; b = b.parentBlock) {
-		if (b.vt !== null) {
+		if (b.rare !== null && b.rare.vt !== null) {
 			// Innermost boundary only (React's rule) — stop at the first hit.
 			if (!b.disposed) VT_DIRTY.add(b);
 			return;
@@ -6449,8 +6489,9 @@ function vtRelayOutermost(
 		const up = vtNearestBoundaryAncestor(outer);
 		if (up === null || !inUnit(up)) return outer;
 		if (
-			!vtRelayParticipates(outer.vt, kind) ||
-			(vtRelayHasClass(outer.vt, kind) && vtResolveClass(outer.vt, kind, types) === 'none')
+			!vtRelayParticipates(vtProps(outer), kind) ||
+			(vtRelayHasClass(vtProps(outer), kind) &&
+				vtResolveClass(vtProps(outer), kind, types) === 'none')
 		)
 			return null;
 		outer = up;
@@ -6543,7 +6584,8 @@ function vtAnyInViewport(rects: VtMeasurement[]): boolean {
 }
 
 function vtNearestBoundaryAncestor(b: Block): Block | null {
-	for (let p = b.parentBlock; p !== null; p = p.parentBlock) if (p.vt !== null) return p;
+	for (let p = b.parentBlock; p !== null; p = p.parentBlock)
+		if (p.rare !== null && p.rare.vt !== null) return p;
 	return null;
 }
 
@@ -6568,7 +6610,7 @@ function vtCreateRecord(
 	block: Block,
 	els: Element[],
 	styles: Map<Element, VtSavedStyle>,
-	props = block.vt,
+	props = vtProps(block),
 	owner = vtScopeForBlock(block),
 	name = vtGetName(block, props),
 ): VtRec {
@@ -6928,7 +6970,7 @@ function vtQueuedOwners(blocks: readonly Block[] = QUEUE): Set<VTOwner> | null {
 	}
 	const queued = blocks.length > 1 ? new Set(blocks) : null;
 	for (const boundary of VT_REGISTRY) {
-		if (boundary.disposed || boundary.vt === null) continue;
+		if (boundary.disposed || vtProps(boundary) === null) continue;
 		for (let ancestor = boundary.parentBlock; ancestor !== null; ancestor = ancestor.parentBlock) {
 			if (queued === null ? ancestor !== blocks[0] : !queued.has(ancestor)) continue;
 			const owner = vtScopeForBlock(boundary);
@@ -7023,30 +7065,34 @@ function vtInterrupt(): void {
 	vtInterruptOwners(null);
 }
 
-// A pending Action cue keeps transition rendering semantics, but alone it
-// should publish before native capture. Only this optional capability owns it.
+// An Action cue alone, even one that keeps transition priority, publishes
+// before native capture. Only this optional capability owns it.
 let VT_ACTION_CUE = false;
 
 /**
- * Is this an animation-eligible transition batch? A pending cue split from its
- * waiting transition work (splitTransitionCue) renders urgently, so it never is.
+ * Is this an animation-eligible transition batch? A pending cue renders urgently
+ * (splitTransitionCue). A cue split from its block's waiting transition work
+ * never is; a drain of other cues is only when transition work rides with them.
  */
 function queueAllTransition(): boolean {
 	if (QUEUE.length === 0) return false;
-	let cueOnly = VT_ACTION_CUE && NATIVE_TRANSITION_DRIVER?.hasWork() !== true;
+	let cue = VT_ACTION_CUE;
+	let work = false;
 	for (let i = 0; i < QUEUE.length; i++) {
 		const block = QUEUE[i];
-		if (block.pendingMode !== 'transition' || queuedTransitionCue(block)) return false;
-		if (cueOnly && block.pending && !block.disposed) {
+		if (block.pendingMode !== 'transition') return false;
+		if (queuedTransitionCue(block)) {
+			if (TRANSITION_QUEUE.indexOf(block) !== -1) return false;
+			cue = true;
+		}
+		if (!work && block.pending && !block.disposed) {
 			const owner = block.idState.renderOwner;
-			if (
+			work =
 				(block.kind === 'root' && !block.mounted) ||
-				(owner?.request != null && owner.current !== null && QUEUE.includes(owner.current))
-			)
-				cueOnly = false;
+				(owner?.request != null && owner.current !== null && QUEUE.includes(owner.current));
 		}
 	}
-	if (!cueOnly) return true;
+	if (!cue || work || NATIVE_TRANSITION_DRIVER?.hasWork() === true) return true;
 	// The separate task queue can hold sibling work while this cue drains.
 	// Only receipts belonging to this drain make the cue share a capture.
 	for (const entries of FLUSHED_TRANSITION_UPDATES) {
@@ -7067,7 +7113,7 @@ function queueAllTransition(): boolean {
 }
 
 function queuedTransitionCue(block: Block): boolean {
-	return TRANSITION_QUEUE.length !== 0 && TRANSITION_ROOT_DRIVER?.splitsCue(block) === true;
+	return TRANSITION_ROOT_DRIVER !== null && TRANSITION_ROOT_DRIVER.splitsCue(block);
 }
 
 function vtHasActiveHandles(): boolean {
@@ -7153,7 +7199,7 @@ function ensureViewTransitionDriver(): ViewTransitionDriver {
 			VT_ACTION_CUE = false;
 			if (VT_PENDING_TYPES.length === 0) return false;
 			for (let i = 0; i < QUEUE.length; i++) {
-				// A split cue leaves the types for its transition's task.
+				// A pending cue leaves the types for its transition's task.
 				if (QUEUE[i].pendingMode === 'transition' && !queuedTransitionCue(QUEUE[i])) return true;
 			}
 			return false;
@@ -7222,7 +7268,7 @@ function ensureViewTransitionDriver(): ViewTransitionDriver {
 			return true;
 		},
 		unregister(block) {
-			if (block.vt !== null) {
+			if (block.rare !== null && block.rare.vt !== null) {
 				vtReleaseScopeBoundary(block);
 				VT_REGISTRY.delete(block);
 			}
@@ -7232,14 +7278,15 @@ function ensureViewTransitionDriver(): ViewTransitionDriver {
 		},
 		queueAllTransition,
 		renderBoundary(block, props) {
-			if (TRANSITION_JOURNAL !== null) journalRootProperty(block, 'vt', block.vt);
-			if (block.vt === null) {
+			const rare = blockRare(block);
+			if (TRANSITION_JOURNAL !== null) journalRootProperty(rare, 'vt', rare.vt);
+			if (rare.vt === null) {
 				// Visibility snapshots decide activation: retained Activity boundaries
 				// can enter/exit without changing this mounted-boundary registration.
-				block.vt = props;
+				rare.vt = props;
 				VT_REGISTRY.add(block);
 			} else {
-				block.vt = props;
+				rare.vt = props;
 			}
 		},
 	};
@@ -7523,7 +7570,7 @@ function isActEnvironment(): boolean {
 const NESTED_UPDATE_LIMIT = 50;
 const ACT_DRAIN_LIMIT = NESTED_UPDATE_LIMIT + 50;
 let UPDATE_CHAIN_ID = 0;
-// The synchronous-callback budget (Block.nestedUpdateCount) has its own chain.
+// The synchronous-callback budget (BlockRare.updateCount) has its own chain.
 // It restarts with every user update chain and after any outermost commit when
 // no synchronous-callback update was scheduled since the previous one. That is
 // React's rule: commitRootImpl resets nestedUpdateCount when a commit leaves no
@@ -7587,17 +7634,46 @@ function maximumUpdateDepthError(block?: Block): Error {
 		const cause = UPDATE_DEPTH_CAUSES?.get(block);
 		if (cause !== undefined) {
 			UPDATE_DEPTH_CAUSES!.delete(block);
-			if (cause.chain === block.nestedUpdateChain) error.message += ` ${cause.message}`;
+			if (cause.chain === block.rare?.updateChain) error.message += ` ${cause.message}`;
 		}
 	}
 	return error;
+}
+
+/** Spend one commit-callback update from the block's nested-update budget. */
+function countNestedUpdate(block: Block, flushed: boolean | undefined): void {
+	const rare = blockRare(block);
+	if (rare.updateChain !== NESTED_UPDATE_CHAIN_ID) {
+		rare.updateChain = NESTED_UPDATE_CHAIN_ID;
+		rare.updateCount = 0;
+	}
+	if (++rare.updateCount > NESTED_UPDATE_LIMIT) {
+		// Exhausted while passive effects wait to join the next render: hold
+		// them so that render carries only this budget's updates. A passive
+		// cascade re-measuring once per step settles, and its commit starts a
+		// fresh chain. A real loop schedules again and throws below. Only an
+		// outermost commit can settle the chain and release the hold, so work
+		// driven from a passive effect (flushSync there) keeps the plain error.
+		if (
+			rare.updateCount === NESTED_UPDATE_LIMIT + 1 &&
+			EFFECT_COMMIT_DEPTH <= 1 &&
+			CURRENT_EFFECT_PHASE !== PASSIVE &&
+			(effectQueues[PASSIVE].length > 0 || pendingPassiveUnmounts.length > 0)
+		) {
+			HELD_PASSIVE_CHAIN = NESTED_UPDATE_CHAIN_ID;
+		} else {
+			HELD_PASSIVE_CHAIN = -1;
+			rare.updateError = true;
+			if (process.env.NODE_ENV !== 'production' && flushed) attributeSignalUpdateDepth(block);
+		}
+	}
 }
 
 function attributeSignalUpdateDepth(block: Block): void {
 	const source = componentSourceLoc(block.body);
 	(UPDATE_DEPTH_CAUSES ??= new WeakMap()).set(block, {
 		cell: null,
-		chain: block.nestedUpdateChain,
+		chain: block.rare?.updateChain ?? -1,
 		message:
 			`Signals read by ${componentName(block)}${source ? ` (${source})` : ''} changed every time ` +
 			'its render was accepted. A component-local derived$ or query$ runs again on every render ' +
@@ -7650,9 +7726,10 @@ function warnCrossComponentRenderUpdate(target: Block, source: Block): void {
  * `flushed`: a signal notification delivered during a flush (see scheduleNativeRead).
  * `cue`: useTransition or useActionState raising isPending, or useOptimistic
  * showing a value. These renders are the transition's in-flight surface, which
- * React renders urgently: they keep the microtask flush at the priority computed
- * here, so they commit before the transition work they announce. That work keeps
- * its task even when it belongs to the cue's own block (upgradeTransitionBlock).
+ * React renders in an urgent lane: they keep the microtask flush and render at
+ * urgent priority there (splitTransitionCue), so they commit before the
+ * transition work they announce, over its committed state. That work keeps its
+ * task even when it belongs to the cue's own block (upgradeTransitionBlock).
  * `background`: a native producer refresh shares task admission without
  * changing its existing render/Suspense priority.
  */
@@ -7743,30 +7820,7 @@ function scheduleRender(
 		countPassiveUpdate(block);
 	} else if (flushed || inNestedUpdateCallback()) {
 		NESTED_UPDATE_SCHEDULED = true;
-		if (block.nestedUpdateChain !== NESTED_UPDATE_CHAIN_ID) {
-			block.nestedUpdateChain = NESTED_UPDATE_CHAIN_ID;
-			block.nestedUpdateCount = 0;
-		}
-		if (++block.nestedUpdateCount > NESTED_UPDATE_LIMIT) {
-			// Exhausted while passive effects wait to join the next render: hold
-			// them so that render carries only this budget's updates. A passive
-			// cascade re-measuring once per step settles, and its commit starts a
-			// fresh chain. A real loop schedules again and throws below. Only an
-			// outermost commit can settle the chain and release the hold, so work
-			// driven from a passive effect (flushSync there) keeps the plain error.
-			if (
-				block.nestedUpdateCount === NESTED_UPDATE_LIMIT + 1 &&
-				EFFECT_COMMIT_DEPTH <= 1 &&
-				CURRENT_EFFECT_PHASE !== PASSIVE &&
-				(effectQueues[PASSIVE].length > 0 || pendingPassiveUnmounts.length > 0)
-			) {
-				HELD_PASSIVE_CHAIN = NESTED_UPDATE_CHAIN_ID;
-			} else {
-				HELD_PASSIVE_CHAIN = -1;
-				block.nestedUpdateError = true;
-				if (process.env.NODE_ENV !== 'production' && flushed) attributeSignalUpdateDepth(block);
-			}
-		}
+		countNestedUpdate(block, flushed);
 	} else if (CURRENT_BLOCK === null) {
 		// A user/root update starts a new chain. This prevents fifty unrelated
 		// events, roots, or wide-batch members from sharing the recursion budget
@@ -7774,10 +7828,15 @@ function scheduleRender(
 		// work. Updates scheduled while rendering inherit the active chain: otherwise an
 		// effect -> render-phase update -> effect cycle could reset its budget on
 		// every pass. Pure render-phase loops retain the separate drain guard below.
+		// The block's recorded chain predates the new id, so its next commit
+		// callback update restarts the count; clear any pending error now. A Block
+		// without the record already reads as a fresh chain.
 		UPDATE_CHAIN_ID++;
-		block.nestedUpdateChain = ++NESTED_UPDATE_CHAIN_ID;
-		block.nestedUpdateCount = 0;
-		block.nestedUpdateError = false;
+		++NESTED_UPDATE_CHAIN_ID;
+		if (block.rare !== null) {
+			block.rare.updateCount = 0;
+			block.rare.updateError = false;
+		}
 	}
 	block.pending = true;
 	block.pendingMode = mode;
@@ -7794,7 +7853,8 @@ function scheduleRender(
 /**
  * Hold a render for the shared host task (see TRANSITION_QUEUE).
  * Work scheduled inside a render or flush belongs to the drain already on the
- * stack, and a pending cue keeps the microtask flush.
+ * stack. A pending cue keeps the microtask flush, which renders it at urgent
+ * priority (markTransitionCue).
  */
 function queueTransitionBlock(block: Block, cue?: boolean): boolean {
 	// The block is not queued, so a render consumed every update retained for it.
@@ -7854,24 +7914,28 @@ function upgradeTransitionBlock(block: Block, mode: 'urgent' | 'transition', cue
 }
 
 /**
- * Whether a queued block renders only its pending cue now, apart from the
- * transition work it also has waiting in the task queue (upgradeTransitionBlock).
- * The cue renders alone when that work holds staged cells it can show at their
- * committed values. A Suspense or Activity boundary that owns the render, or a
- * pending root request, keeps the combined render, as does work without staged
- * cells. View Transition routing asks this too, since a split cue is urgent work.
+ * Whether a queued block renders only its pending cue now, at urgent priority,
+ * apart from any transition work. A pure cue (TRANSITION_CUES) has no transition
+ * work of its own. A cue whose block also has transition work waiting in the
+ * task queue (upgradeTransitionBlock) renders alone when that work holds staged
+ * cells it can show at their committed values. A Suspense or Activity boundary
+ * that owns the render, or a pending root request, keeps the combined render at
+ * transition priority, as does work without staged cells. View Transition
+ * routing asks this too, since a split cue is urgent work.
  */
 function splitsTransitionCue(block: Block): boolean {
+	if (syncFlush || TRANSITION_TASK_ACTIVE || block.pendingMode !== 'transition') return false;
+	const waiting = TRANSITION_QUEUE.indexOf(block) !== -1;
 	if (
-		syncFlush ||
-		TRANSITION_TASK_ACTIVE ||
-		block.pendingMode !== 'transition' ||
-		TRANSITION_QUEUE.indexOf(block) === -1
+		!waiting &&
+		(TRANSITION_CUE_EPOCH !== QUEUE_REINDEX_EPOCH || TRANSITION_CUES.indexOf(block) === -1)
 	)
 		return false;
+	// A pure cue that gained staged cells from transition work scheduled in this
+	// flush renders that work with it.
+	if (hasQueuedTransitionCells(block) !== waiting) return false;
 	const owner = block.idState.renderOwner;
 	return (
-		hasQueuedTransitionCells(block) &&
 		(owner === undefined || owner.current !== block || owner.request === null) &&
 		(SCHEDULED_VISIBILITY_DRIVER === null ||
 			SCHEDULED_VISIBILITY_DRIVER.find(block, true, 'urgent') === null)
@@ -7879,14 +7943,20 @@ function splitsTransitionCue(block: Block): boolean {
 }
 
 /**
- * Choose how the drain renders a queued block: a split cue renders at urgent
- * priority (renderTransitionCue). Otherwise the drain's own render consumes any
- * transition work the block also has waiting.
+ * Choose how the drain renders a queued block. A pending cue renders at urgent
+ * priority, as React renders `isPending` and optimistic values in an urgent lane:
+ * descendants with transition work waiting show their committed cells
+ * (renderBlockInner) and keep that work for the task. A split cue also shows
+ * its own block's committed cells (renderTransitionCue). Otherwise the drain's
+ * own render consumes any transition work the block also has waiting.
  */
 function splitTransitionCue(block: Block): typeof renderBlock | undefined {
-	if (TRANSITION_QUEUE.length === 0 || block.pendingMode !== 'transition') return;
+	// Release an earlier drain's cues at the next drained block.
+	if (TRANSITION_CUE_EPOCH !== QUEUE_REINDEX_EPOCH) TRANSITION_CUES.length = 0;
+	if (block.pendingMode !== 'transition') return;
 	if (splitsTransitionCue(block)) {
 		block.pendingMode = 'urgent';
+		if (TRANSITION_QUEUE.indexOf(block) === -1) return;
 		// An urgent ancestor may already have rendered this cue in the drain.
 		return RENDERED_CUE_DRAIN === DRAIN_ID && RENDERED_CUES.indexOf(block) !== -1
 			? keepTransitionPending
@@ -7897,6 +7967,21 @@ function splitTransitionCue(block: Block): typeof renderBlock | undefined {
 		TRANSITION_QUEUE.splice(index, 1);
 		if (TRANSITION_QUEUE.length === 0) adoptTransitionQueue();
 	}
+}
+
+/**
+ * Record a pending cue its hook schedules outside a render, flush, or the
+ * transition task (TRANSITION_CUES), so the microtask flush renders it at urgent
+ * priority (splitTransitionCue). Hooks call this, not scheduleRender, so native
+ * readers that share the task queue never reach it.
+ */
+function markTransitionCue(block: Block): void {
+	if (syncFlush || inFlush || CURRENT_BLOCK !== null || TRANSITION_TASK_ACTIVE) return;
+	if (TRANSITION_CUE_EPOCH !== QUEUE_REINDEX_EPOCH) {
+		TRANSITION_CUE_EPOCH = QUEUE_REINDEX_EPOCH;
+		TRANSITION_CUES.length = 0;
+	}
+	TRANSITION_CUES.push(block);
 }
 
 /** A split cue that already rendered keeps its block waiting for the transition task. */
@@ -8021,10 +8106,10 @@ function drainHydrationRenderPhaseUpdates(root: Block, holdCrossRenderUpdates = 
 				QUEUE[write++] = block;
 				continue;
 			}
-			if ((!block.pending && !block.nestedUpdateError) || block.disposed) continue;
+			if ((!block.pending && !block.rare?.updateError) || block.disposed) continue;
 			try {
-				if (block.nestedUpdateError) {
-					block.nestedUpdateError = false;
+				if (block.rare?.updateError) {
+					block.rare.updateError = false;
 					throw maximumUpdateDepthError(block);
 				}
 
@@ -8175,10 +8260,10 @@ function drainQueue(): { err: any } | null {
 		// (renderBlock cleared its `pending`) — avoids a redundant standalone render.
 		// A max-depth flag is not redundant work, however: it must still surface
 		// after an ancestor coalesces the flagged child's pending render.
-		if (!block.pending && !block.nestedUpdateError) continue;
+		if (!block.pending && !block.rare?.updateError) continue;
 		block.pending = false;
 		if (block.disposed) {
-			block.nestedUpdateError = false;
+			if (block.rare !== null) block.rare.updateError = false;
 			continue;
 		}
 		// Every queued origin in this root belongs to the same commit attempt.
@@ -8219,8 +8304,8 @@ function drainQueue(): { err: any } | null {
 			// construction window. Its hooks and partial DOM still belong to this
 			// uncommitted attempt, and must be discarded if it suspends.
 			if (block.kind === 'root' && !block.mounted) createdInRootRender(block);
-			if (block.nestedUpdateError) {
-				block.nestedUpdateError = false;
+			if (block.rare?.updateError) {
+				block.rare.updateError = false;
 				throw maximumUpdateDepthError(block);
 			}
 			// Guarded render-phase updates (derived state) converge in a couple of
@@ -8909,7 +8994,7 @@ function vtFinalizeGroup(group: VtGroup, types: string[]): void {
 		} else {
 			const previousEls = rec.els;
 			rec.els = els;
-			rec.props = block.vt;
+			rec.props = vtProps(block);
 			rec.name = vtGetName(block, rec.props);
 			rec.nextRects = vtMeasureElements(els, true);
 			if (VT_DIRTY.has(block) || vtElsChanged(previousEls, els) || vtRectChanged(rec))
@@ -9136,14 +9221,14 @@ function vtFlush(
 			VT_REGISTRY.delete(block);
 			continue;
 		}
-		if (block.vt?.scope === 'element') hasScopedBoundary = true;
+		if (vtProps(block)?.scope === 'element') hasScopedBoundary = true;
 		const owner = vtScopeForBlock(block);
 		if (owner === null) continue;
 		if (queuedOwners !== null && !queuedOwners.has(owner)) {
 			if (typeof owner.startViewTransition !== 'function') continue;
 			const els = vtCaptureElements(block, owner);
 			if (els.length === 0) continue;
-			const props = block.vt;
+			const props = vtProps(block);
 			const name =
 				props?.name != null && props.name !== 'auto'
 					? props.name
@@ -9199,7 +9284,7 @@ function vtFlush(
 		try {
 			for (const block of VT_REGISTRY) {
 				if (block.disposed) continue;
-				if (block.vt?.scope === 'element') hasScopedBoundary = true;
+				if (vtProps(block)?.scope === 'element') hasScopedBoundary = true;
 				const owner = vtScopeForBlock(block);
 				if (
 					owner === null ||
@@ -9209,7 +9294,7 @@ function vtFlush(
 				)
 					continue;
 				if (vtCaptureElements(block, owner).length > 0)
-					getGroup(owner).planned.set(block, block.vt);
+					getGroup(owner).planned.set(block, vtProps(block));
 			}
 			if (unmeasured !== null)
 				for (const owner of groups.keys())
@@ -9225,7 +9310,7 @@ function vtFlush(
 						discoveredOwners.has(owner) &&
 						vtCaptureElements(block, owner).length > 0
 					)
-						groups.get(owner)!.planned.set(block, block.vt);
+						groups.get(owner)!.planned.set(block, vtProps(block));
 				}
 			}
 			for (const group of groups.values()) {
@@ -10976,16 +11061,16 @@ function drainEffectEventUpdates(): void {
 				if (
 					entry.cell.active &&
 					!blockSubtreeDisposed(block) &&
-					block.effectEventRenderVersion === entry.renderVersion &&
-					block.effectEventCompletedVersion === entry.renderVersion
+					block.rare?.eventRender === entry.renderVersion &&
+					block.rare.eventCommitted === entry.renderVersion
 				)
 					entry.cell.impl = entry.nextImpl;
 			});
 			continue;
 		}
 		if (
-			block.effectEventRenderVersion !== entry.renderVersion ||
-			block.effectEventCompletedVersion !== entry.renderVersion
+			block.rare?.eventRender !== entry.renderVersion ||
+			block.rare.eventCommitted !== entry.renderVersion
 		)
 			continue;
 		entry.cell.impl = entry.nextImpl;
@@ -11600,7 +11685,16 @@ function schedulePostPaint(cb: () => void): void {
  * `slots[0]` binding bag, NOT on the Block/Scope instance (see Scope.slots),
  * so every BlockImpl instance shares one hidden class outright. Feature-only
  * fields also start as undefined here, rather than transitioning the shape
- * when Suspense, Activity, or fetch-tree warming first uses them.
+ * when a feature first uses them. State that only boundaries, use(),
+ * useEffectEvent, ViewTransition, fetch-tree warming or nested commit updates
+ * need lives on the lazily allocated `rare` record (BlockRare): every Block
+ * pays one pointer for it, and only the Blocks using those features allocate it.
+ *
+ * The constructor's size is itself a hot-path cost. Moving those fields to
+ * `rare` cut its bytecode from 437 to 371 bytes and made cold memo-wall mounts
+ * about 5% faster; three dummy fields more (386 bytes) gave that gain back,
+ * consistent with V8 inlining a hot callee only within a bytecode budget. Add
+ * a field here only when every Block needs it.
  *
  * Type-only declarations leave the fixed-order constructor assignments as the
  * only runtime field definitions, including in consumers that compile source
@@ -11670,17 +11764,10 @@ class BlockImpl {
 	// Arming makes the block a stamping target (like __memo) so the bail's lazy
 	// consumer refresh has the context deps it needs.
 	declare $$implicitBail: boolean;
-	// __thenableIdx is reset every renderBlock so pre-init costs nothing.
-	declare __thenableIdx: number;
 	// Render-loop guard bookkeeping (see the Block interface).
 	declare drainStamp: number;
 	declare drainRenders: number;
 	declare crossRenderUpdate: boolean;
-	declare nestedUpdateChain: number;
-	declare nestedUpdateCount: number;
-	declare nestedUpdateError: boolean;
-	declare effectEventRenderVersion: number;
-	declare effectEventCompletedVersion: number;
 	// De-opt host node managed by this Block (deoptItemBody / hostElementBody), reused
 	// across renders. Null for all other blocks; declared so the shape stays monomorphic.
 	declare deoptNode: Node | null;
@@ -11695,25 +11782,17 @@ class BlockImpl {
 	declare prevSibling: Block | null;
 	declare nextSibling: Block | null;
 	declare key: any;
-	// ViewTransition boundary props (null on every other block — see Block).
-	declare vt: ViewTransitionProps | null;
 	// Scope contract: a Block is its own scope.
 	declare parent: Scope | null;
 	declare block: Block;
 	// Metadata.
 	declare kind: BlockKind;
-	// Optional render and boundary state. Keep these on the common Block shape:
-	// otherwise ordinary renders and each optional feature fork its V8 map.
+	// Optional render state written by every render. Keep these on the common
+	// Block shape: otherwise ordinary renders fork its V8 map.
 	declare __warmEpisode: number | undefined;
 	declare __thenableDone: boolean | undefined;
-	declare __thenables: TrackedThenable<unknown>[] | undefined;
-	declare $$tryHandler: TryHandler | undefined;
-	declare __suspenseHandler:
-		((thenable: TrackedThenable<unknown>, sourceBlock: Block) => void) | null | undefined;
-	declare __trySlot: TrySlot | undefined;
-	declare __activitySlot: ActivitySlot | undefined;
-	declare __warmCache: Map<HookSlot, WarmEntry[]> | undefined;
-	declare __warmCacheEpisode: number | undefined;
+	// Feature-only state, allocated by the first feature that needs it.
+	declare rare: BlockRare | null;
 
 	constructor(
 		kind: BlockKind,
@@ -11764,15 +11843,9 @@ class BlockImpl {
 		this.$$ctxCache = null;
 		this.$$ctxCacheOwner = null;
 		this.$$implicitBail = false;
-		this.__thenableIdx = 0;
 		this.drainStamp = 0;
 		this.drainRenders = 0;
 		this.crossRenderUpdate = false;
-		this.nestedUpdateChain = -1;
-		this.nestedUpdateCount = 0;
-		this.nestedUpdateError = false;
-		this.effectEventRenderVersion = 0;
-		this.effectEventCompletedVersion = 0;
 		this.deoptNode = null;
 		this.deoptRefs = false;
 		this.slots = [];
@@ -11781,7 +11854,6 @@ class BlockImpl {
 		this.prevSibling = null;
 		this.nextSibling = null;
 		this.key = null;
-		this.vt = null;
 		this.parent = null;
 		this.block = this as unknown as Block;
 		this.kind = kind;
@@ -11789,13 +11861,7 @@ class BlockImpl {
 		this.createdStamp = 0;
 		this.__warmEpisode = undefined;
 		this.__thenableDone = undefined;
-		this.__thenables = undefined;
-		this.$$tryHandler = undefined;
-		this.__suspenseHandler = undefined;
-		this.__trySlot = undefined;
-		this.__activitySlot = undefined;
-		this.__warmCache = undefined;
-		this.__warmCacheEpisode = undefined;
+		this.rare = null;
 		this.signalInstanceParent = null;
 		this.signalInstanceSite = undefined;
 		this.signalInstanceValue = undefined;
@@ -11804,6 +11870,66 @@ class BlockImpl {
 		this.signalTokenEscaped = false;
 		this.signalOwner = undefined;
 	}
+}
+
+/**
+ * Per-Block state that only some features use. A Block holds `rare: null` until
+ * the first such use allocates this record (blockRare), so ordinary Blocks stay
+ * small. blockRare is the record's only allocation site and writes every key in
+ * one order, so every record shares one hidden class. Readers that walk
+ * parentBlock chains also meet LiteBlockImpl proxies, which carry `rare: null`.
+ */
+interface BlockRare {
+	// Try/Suspense/Activity boundary registration on the boundary's own blocks.
+	tryHandler: TryHandler | undefined;
+	suspenseHandler:
+		((thenable: TrackedThenable<unknown>, sourceBlock: Block) => void) | null | undefined;
+	trySlot: TrySlot | undefined;
+	activitySlot: ActivitySlot | undefined;
+	// `use(thenable)` state: entries plus the per-render call-order counter, which
+	// renderBlockInner resets to 0 at the start of every render of this Block.
+	thenables: TrackedThenable<unknown>[] | undefined;
+	thenableIdx: number;
+	// Fetch-tree warming cache for this render episode.
+	warmCache: Map<HookSlot, WarmEntry[]> | undefined;
+	warmCacheEpisode: number | undefined;
+	// Nested-update loop guard for updates scheduled from commit callbacks
+	// (effects, refs, store checks), scoped to one externally-started update
+	// chain: its chain id, update count, and a pending maximum-depth error. A
+	// Block without this record has never updated from a commit callback, which
+	// the guard treats as a fresh chain with a zero count and no pending error.
+	updateChain: number;
+	updateCount: number;
+	updateError: boolean;
+	// useEffectEvent updates publish only for the latest render of this Block that
+	// completed: `eventRender` versions each render attempt and `eventCommitted`
+	// records the last one that completed. Zero means the Block has never called
+	// useEffectEvent, so components without the hook stay free of aborted-render
+	// filtering and of this record.
+	eventRender: number;
+	eventCommitted: number;
+	// A `<ViewTransition>` component's current props (docs/view-transitions-plan.md).
+	vt: ViewTransitionProps | null;
+}
+
+/** The Block's feature-only record, allocated on first use. Never call it on a LiteBlockImpl. */
+function blockRare(block: Block): BlockRare {
+	return (block.rare ??= {
+		tryHandler: undefined,
+		suspenseHandler: undefined,
+		trySlot: undefined,
+		activitySlot: undefined,
+		thenables: undefined,
+		thenableIdx: 0,
+		warmCache: undefined,
+		warmCacheEpisode: undefined,
+		updateChain: -1,
+		updateCount: 0,
+		updateError: false,
+		eventRender: 0,
+		eventCommitted: 0,
+		vt: null,
+	});
 }
 
 /**
@@ -11967,8 +12093,8 @@ export function renderBlock(block: Block): void {
 	try {
 		let retries = 0;
 		while (renderBlockInner(block)) {
-			if (block.nestedUpdateError) {
-				block.nestedUpdateError = false;
+			if (block.rare?.updateError) {
+				block.rare.updateError = false;
 				throw maximumUpdateDepthError(block);
 			}
 			if (++retries > RENDER_PHASE_UPDATE_LIMIT) throw new Error(formatClientError(9));
@@ -11977,10 +12103,10 @@ export function renderBlock(block: Block): void {
 		if (retryVisit !== null) pruneSignalRetryVisit(retryVisit, false);
 		if (
 			signalDocumentEnabled &&
-			(block as any).__trySlot?.tryBlock === block &&
-			(block as any).__trySlot.retrySignalOwners !== undefined
+			block.rare?.trySlot?.tryBlock === block &&
+			block.rare.trySlot.retrySignalOwners !== undefined
 		)
-			clearSignalRetryOwners((block as any).__trySlot);
+			clearSignalRetryOwners(block.rare.trySlot);
 		// Completed descendants still belong to their enclosing render attempt.
 		// A nested independent root commits separately and does not transfer state.
 		const updates = renderPhaseUpdates as Map<RenderPhaseCell, RenderPhaseSnapshot> | null;
@@ -12157,7 +12283,13 @@ function renderBlockInner(block: Block): true | undefined {
 	// A held in-place attempt has no capture. Its completed bodies must lose
 	// bailout validity with their rolled-back DOM. Record both owners: a nested
 	// journal can roll back even while its enclosing capture survives.
-	if (TRANSITION_JOURNAL !== null) {
+	// Not for a Block the root window discards with its parent (createdInRootRender).
+	if (
+		TRANSITION_JOURNAL !== null &&
+		(TRANSITION_JOURNAL_DEPTH !== 1 ||
+			block.createdStamp !== ROOT_DISCARD_STAMP ||
+			block.parentBlock?.createdStamp !== ROOT_DISCARD_STAMP)
+	) {
 		TRANSITION_JOURNAL.push(JOURNAL_RENDER, block, null, null);
 	}
 	const prevScope = CURRENT_SCOPE;
@@ -12205,10 +12337,6 @@ function renderBlockInner(block: Block): true | undefined {
 	(block as any).__warmEpisode = CURRENT_WARM_EPISODE;
 	EFFECT_EVENT_RENDER_TARGET = effectEventTarget;
 	EFFECT_EVENT_ACTION_TARGET = effectEventActionTarget;
-	// Invalidate any Effect Event payload queued by an earlier render in this
-	// commit. A hook call lazily starts version 1; subsequent attempts advance it
-	// here even if they suspend before reaching the hook again.
-	if (block.effectEventRenderVersion !== 0) block.effectEventRenderVersion++;
 	// Cascade coalescing: clear the queued flag now. A block dequeued by flush()
 	// gets re-rendered here; a block reached as a descendant of some OTHER queued
 	// block's cascade is also brought up to date here, so flush() can skip its
@@ -12217,7 +12345,7 @@ function renderBlockInner(block: Block): true | undefined {
 	block.pending = false;
 	block.crossRenderUpdate = false;
 	// Reset the per-render `use(thenable)` call-order counter. Cached entries
-	// in __thenables persist ONLY across the failed attempts of ONE suspension
+	// in `rare.thenables` persist ONLY across the failed attempts of ONE suspension
 	// episode: earlier use() calls return synchronously on replay-after-resolve
 	// (React's thenableState[index] scheme), and the resume-replay reuse
 	// leniency may consult them. They die on (a) any NON-replay render — a
@@ -12228,9 +12356,16 @@ function renderBlockInner(block: Block): true | undefined {
 	// mid-resume via changed props. (The resolved-value cache itself lives on
 	// each thenable's status/value expandos, not in this array, so dropping
 	// entries loses nothing.)
-	block.__thenableIdx = 0;
-	{
-		const tState = (block as any).__thenables as unknown[] | undefined;
+	// A Block without a `rare` record has never called use() or useEffectEvent:
+	// it has no counter to reset, and its first call allocates the record at 0.
+	const rare = block.rare;
+	if (rare !== null) {
+		// Invalidate any Effect Event payload queued by an earlier render in this
+		// commit. A hook call lazily starts version 1; subsequent attempts advance
+		// it here even if they suspend before reaching the hook again.
+		if (rare.eventRender !== 0) rare.eventRender++;
+		rare.thenableIdx = 0;
+		const tState = rare.thenables;
 		if (
 			tState !== undefined &&
 			tState.length !== 0 &&
@@ -12238,8 +12373,8 @@ function renderBlockInner(block: Block): true | undefined {
 		) {
 			tState.length = 0;
 		}
-		(block as any).__thenableDone = false;
 	}
+	(block as any).__thenableDone = false;
 	// Clear last render's recorded context dependencies; this render repopulates
 	// them (its own reads + descendant reads propagated up). Only memo/armed
 	// blocks ever hold a non-null map, so this is a no-op for the common case.
@@ -12329,9 +12464,9 @@ function renderBlockInner(block: Block): true | undefined {
 		if (block.effectSlots !== null) finishEffectRender(block);
 		if (!block.mounted) block.mounted = true;
 		if (block.renderStatus === RENDER_RETRYING) block.renderStatus = RENDER_VALID;
-		if (block.effectEventRenderVersion !== 0) {
-			block.effectEventCompletedVersion = block.effectEventRenderVersion;
-		}
+		// Re-read: the body's first useEffectEvent call allocates the record. A
+		// Block that never called the hook copies its version 0 onto 0.
+		if (block.rare !== null) block.rare.eventCommitted = block.rare.eventRender;
 		renderCompleted = true;
 		// Body completed without suspending: its use() episode is over — the
 		// next render (replay or not) must not reuse these entries.
@@ -12371,8 +12506,8 @@ function renderBlockInner(block: Block): true | undefined {
 				if (suspension || !isHostContextRequest(profileThrown)) {
 					for (let current: Block | null = block; current !== null; current = current.parentBlock) {
 						const claims = suspension
-							? (current as any).__suspenseHandler
-							: (current as any).$$tryHandler && (current as any).__trySlot?.catchBody !== null;
+							? current.rare?.suspenseHandler
+							: current.rare?.tryHandler && current.rare.trySlot?.catchBody !== null;
 						if (claims) {
 							owner = current;
 							break;
@@ -12806,6 +12941,9 @@ class LiteBlockImpl {
 	// stand-in carries its arm's bound exactly as an arm Block would: null until
 	// its first render publishes the bound (renderMarkerlessArm).
 	declare startMarker: Node | null | undefined;
+	// Boundary, thenable and transition state never lives on a stand-in. Readers
+	// that walk parentBlock chains see `rare === null` here and move on.
+	declare rare: null;
 
 	constructor(parentNode: Node, endMarker: Node | null, parentBlock: Block) {
 		this.parentNode = parentNode;
@@ -12820,6 +12958,7 @@ class LiteBlockImpl {
 		this.signalInstanceHasKey = false;
 		this.signalInstanceResolved = undefined;
 		this.startMarker = undefined;
+		this.rare = null;
 	}
 }
 
@@ -13517,10 +13656,7 @@ function unmountSlot(val: any, detachDom: boolean): void {
 		// never reaches it, so portals must always self-detach individually.
 		const childDetach = k === 'portalSlotSlot' ? true : detachDom;
 		if (val.block) unmountBlock(val.block, childDetach);
-		if (k === 'portalSlotSlot' && val.target) {
-			unregisterPortalEventRange(val.target, val);
-			unregisterDelegationTarget(val.target);
-		}
+		if (k === 'portalSlotSlot') releasePortalTarget(val);
 	}
 }
 
@@ -15505,7 +15641,8 @@ export function useEffectEvent<F extends (...args: any[]) => any>(fn: F, slot?: 
 	if (slot === undefined) missingSlot('useEffectEvent');
 	const scope = CURRENT_SCOPE!;
 	const block = scope.block;
-	if (block.effectEventRenderVersion === 0) block.effectEventRenderVersion = 1;
+	const rare = blockRare(block);
+	if (rare.eventRender === 0) rare.eventRender = 1;
 	let s = scope.hooks?.get(slot) as EffectEventCell | undefined;
 	if (s === undefined) {
 		s = { impl: fn, active: true };
@@ -15519,7 +15656,7 @@ export function useEffectEvent<F extends (...args: any[]) => any>(fn: F, slot?: 
 			cell: s,
 			nextImpl: fn,
 			block,
-			renderVersion: block.effectEventRenderVersion,
+			renderVersion: rare.eventRender,
 		});
 	}
 	const cell = s;
@@ -16325,7 +16462,7 @@ function findSuspendedHydrateBlock(scope: Scope, thenable: TrackedThenable<unkno
 	// A lite scope's block is a DOM-context proxy (LiteBlockImpl) with no render
 	// or mount state, so it is never the source. The Blocks below it still are.
 	if (block.block === block) {
-		const own = (block as Block & { __thenables?: TrackedThenable<unknown>[] }).__thenables;
+		const own = block.rare?.thenables;
 		if (own !== undefined && own.includes(thenable)) return block;
 		// Compiler-emitted useBatch can suspend before use() registers a thenable
 		// on its block. The deepest unfinished registered child is that same source.
@@ -18568,9 +18705,10 @@ export function seedOrCreate<T>(site: string, factory: () => T): T {
 
 function useThenable<T>(thenable: TrackedThenable<T>, replaceOnResume = false): T {
 	const block = CURRENT_BLOCK!;
-	const state: TrackedThenable<any>[] = ((block as any).__thenables ??= []);
-	const idx = block.__thenableIdx;
-	block.__thenableIdx = idx + 1;
+	const rare = blockRare(block);
+	const state: TrackedThenable<any>[] = (rare.thenables ??= []);
+	const idx = rare.thenableIdx;
+	rare.thenableIdx = idx + 1;
 
 	// Hydration seeding (SSR Phase 4): the server already resolved this use() and
 	// serialized the value. Adopt the next seeded value (use() calls hydrate in
@@ -18838,15 +18976,16 @@ let ROOT_WARM_RETRIES: WeakMap<object, Map<HookSlot, WarmEntry[]>> | null = null
 function rootWarmRetryKey(block: Block): object | null {
 	for (let current: Block | null = block; current !== null; current = current.parentBlock) {
 		// Scoped Suspense/Activity already retain their own ancestor warm cache.
-		if ((current as any).__suspenseHandler) return null;
+		if (current.rare?.suspenseHandler) return null;
 	}
 	return getRootRenderRetryKey(block);
 }
 
 function warmCacheForOwner(owner: Block): Map<HookSlot, WarmEntry[]> {
 	for (let block: Block | null = owner; block !== null; block = block.parentBlock) {
-		if ((block as any).__warmCacheEpisode !== CURRENT_WARM_EPISODE) continue;
-		const existing = (block as any).__warmCache as Map<HookSlot, WarmEntry[]> | undefined;
+		const rare = block.rare;
+		if (rare === null || rare.warmCacheEpisode !== CURRENT_WARM_EPISODE) continue;
+		const existing = rare.warmCache;
 		if (existing !== undefined) return existing;
 	}
 	const retryKey = rootWarmRetryKey(owner);
@@ -18855,8 +18994,9 @@ function warmCacheForOwner(owner: Block): Map<HookSlot, WarmEntry[]> {
 		cache = new Map<HookSlot, WarmEntry[]>();
 		if (retryKey !== null) (ROOT_WARM_RETRIES ??= new WeakMap()).set(retryKey, cache);
 	}
-	(owner as any).__warmCache = cache;
-	(owner as any).__warmCacheEpisode = CURRENT_WARM_EPISODE;
+	const ownerRare = blockRare(owner);
+	ownerRare.warmCache = cache;
+	ownerRare.warmCacheEpisode = CURRENT_WARM_EPISODE;
 	if (CURRENT_WARM_EPISODE > LATEST_WARM_CACHE_EPISODE)
 		LATEST_WARM_CACHE_EPISODE = CURRENT_WARM_EPISODE;
 	return cache;
@@ -19177,8 +19317,9 @@ function adoptWarmEntry(
 	// Root retries and held-transition harvests below are independently eligible.
 	let b: Block | null = CURRENT_WARM_EPISODE <= LATEST_WARM_CACHE_EPISODE ? CURRENT_BLOCK : null;
 	while (b !== null) {
-		const cache: Map<HookSlot, WarmEntry[]> | undefined = (b as any).__warmCache;
-		if ((b as any).__warmCacheEpisode === CURRENT_WARM_EPISODE && cache !== undefined) {
+		const rare = b.rare;
+		const cache = rare?.warmCache;
+		if (cache !== undefined && rare!.warmCacheEpisode === CURRENT_WARM_EPISODE) {
 			const entry = adoptWarmCacheEntry(cache, slot, deps, accept);
 			if (entry !== WARM_MISS) return entry;
 		}
@@ -19382,8 +19523,7 @@ function publishNativeMemoEntry<T>(
 	const entry = scope.hooks!.get(slot) as MemoHookEntry;
 	if (!scope.mounted && deps !== undefined && entry.warmRecord === undefined) {
 		let owner = CURRENT_BLOCK!;
-		while (!(owner as any).__suspenseHandler && owner.parentBlock !== null)
-			owner = owner.parentBlock;
+		while (!owner.rare?.suspenseHandler && owner.parentBlock !== null) owner = owner.parentBlock;
 		const cache = warmCacheForOwner(owner);
 		let list = cache.get(slot);
 		if (list === undefined) cache.set(slot, (list = []));
@@ -21974,7 +22114,8 @@ class HydrationCapability {
 	): T {
 		const factory = getHydrationSeedFactory(thenable);
 		if (factory !== undefined && factory.index !== this.seedCursor) {
-			CURRENT_BLOCK!.__thenableIdx = index;
+			// useThenable allocated the record before seeding this call.
+			CURRENT_BLOCK!.rare!.thenableIdx = index;
 			const usable = materializeHydrationSeedFactory(factory);
 			if (
 				replaceOnResume &&
@@ -33015,10 +33156,7 @@ function renderPortalState(
 		registerDelegationTarget(target);
 		if (ROOT_RENDER_TRANSACTION !== null) {
 			const created = state;
-			journalUndo(() => {
-				unregisterPortalEventRange(target, created);
-				unregisterDelegationTarget(target);
-			});
+			journalUndo(() => releasePortalTarget(created));
 		}
 		renderBlock(block);
 	} else {
@@ -33088,6 +33226,16 @@ function teardownPortalState(state: PortalSlot): void {
 		unmountBlock(state.block, true);
 		state.block = null;
 	}
+	releasePortalTarget(state);
+}
+
+/**
+ * Give back this portal's share of its target's event delegation. The share is
+ * a refcount, so it is released once: a root render that rolls back reaches a
+ * portal it created through the portal's creation undo and again through its
+ * owner's teardown. A released portal no longer owns a target.
+ */
+function releasePortalTarget(state: PortalSlot): void {
 	if (state.target) {
 		unregisterPortalEventRange(state.target, state);
 		unregisterDelegationTarget(state.target);
@@ -41046,7 +41194,8 @@ function renderPassthroughTry(state: TrySlot): void {
 		state.tryBlock = block;
 		state.block = block;
 		setTryBranch(state, 1);
-		(block as any).$$tryHandler = (error: unknown) => {
+		const rare = blockRare(block);
+		rare.tryHandler = (error: unknown) => {
 			try {
 				mountPassthroughCatch(state, error);
 			} catch (propagated) {
@@ -41056,7 +41205,7 @@ function renderPassthroughTry(state: TrySlot): void {
 			}
 		};
 		if (!state.propagateSuspense) {
-			(block as any).__suspenseHandler = (thenable: TrackedThenable<unknown>) => {
+			rare.suspenseHandler = (thenable: TrackedThenable<unknown>) => {
 				mountPassthroughPending(state, thenable);
 			};
 		}
@@ -41232,7 +41381,7 @@ function mountErrorBoundary(state: ErrorSlot, hydration: HydrationCapability | n
 		state.env,
 	);
 	body.idState = state.idState;
-	(body as any).$$tryHandler = (error: unknown) => {
+	blockRare(body).tryHandler = (error: unknown) => {
 		switchErrorToCatch(state, error);
 		return state.block;
 	};
@@ -41665,13 +41814,14 @@ function createTryBody(state: TrySlot, start: Node, end: Node): Block {
 		state.env,
 	);
 	block.idState = state.idState;
-	(block as any).__trySlot = state;
-	(block as any).$$tryHandler = (error: unknown) => {
+	const rare = blockRare(block);
+	rare.trySlot = state;
+	rare.tryHandler = (error: unknown) => {
 		switchToCatch(state, error);
 		return state.block;
 	};
 	if (!state.propagateSuspense) {
-		(block as any).__suspenseHandler = (thenable: TrackedThenable<any>, sourceBlock: Block) => {
+		rare.suspenseHandler = (thenable: TrackedThenable<any>, sourceBlock: Block) => {
 			handleSuspense(state, thenable, sourceBlock);
 		};
 	}
@@ -42481,7 +42631,7 @@ function handleSuspense(
 	// The hold fires for the boundary's OWN body re-suspend AND for a DESCENDANT
 	// re-suspend (a child component that re-rendered on its own — its own
 	// scheduleRender — and suspended during a transition). `handleSuspense` is
-	// only invoked for suspends routed to THIS boundary's `__suspenseHandler`
+	// only invoked for suspends routed to THIS boundary's `rare.suspenseHandler`
 	// (the nearest enclosing tryBlock), so `sourceBlock` is always this
 	// boundary's body OR a descendant within its subtree — we don't need to test
 	// which. What we DO require is that the resolved try content is currently
@@ -42727,7 +42877,7 @@ function hideTryContentAndMountPendingInner(
 /** Whether an enclosing Suspense primary's committed hide owns this block's refs. */
 function enclosingPrimaryDetachedRefs(block: Block | null): boolean {
 	for (let p = block; p !== null; p = p.parentBlock) {
-		const slot = (p as any).__trySlot as TrySlot | undefined;
+		const slot = p.rare?.trySlot;
 		if (slot !== undefined && slot.tryBlock === p && slot.detachedRefs !== null) return true;
 	}
 	return false;
@@ -42786,7 +42936,7 @@ function mountPendingBody(state: TrySlot): boolean {
 			state.env,
 		);
 		b.idState = state.idState;
-		(b as any).__trySlot = state;
+		blockRare(b).trySlot = state;
 		state.block = b;
 		try {
 			renderBlock(b);
@@ -43093,7 +43243,7 @@ function findScheduledVisibilityOwner(
  * their prior output. Callers inspecting only hidden ownership omit that mode.
  * All cases share one allocation-free ancestor walk.
  *
- * The pending arm's own block also carries `__trySlot`, but only the TRY block
+ * The pending arm's own block also carries `rare.trySlot`, but only the TRY block
  * matches `slot.tryBlock === p`, so updates inside the fallback render normally.
  */
 function findScheduledVisibilityOwner(
@@ -43105,12 +43255,12 @@ function findScheduledVisibilityOwner(
 	let visible: TrySlot | null = null;
 	for (let p: Block | null = block; p !== null; p = p.parentBlock) {
 		if (includeActivity && activity === null && p.inactive) {
-			const candidate = (p as any).__activitySlot as ActivitySlot | undefined;
+			const candidate = p.rare?.activitySlot;
 			if (candidate !== undefined && candidate.block === p && candidate.hidden) {
 				activity = candidate;
 			}
 		}
-		const slot = (p as any).__trySlot as TrySlot | undefined;
+		const slot = p.rare?.trySlot;
 		if (slot === undefined || slot.tryBlock !== p) continue;
 		if (slot.hiddenDom !== null) return slot;
 		if (
@@ -43138,7 +43288,7 @@ function findSuspenseHiddenTry(block: Block | null): TrySlot | null {
 function findHiddenActivity(block: Block | null): ActivitySlot | null {
 	for (let p: Block | null = block; p !== null; p = p.parentBlock) {
 		if (!p.inactive) continue;
-		const candidate = (p as any).__activitySlot as ActivitySlot | undefined;
+		const candidate = p.rare?.activitySlot;
 		if (candidate !== undefined && candidate.block === p && candidate.hidden) return candidate;
 	}
 	return null;
@@ -43981,6 +44131,7 @@ export function useTransition(
 					if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__)
 						__profileSchedule(block, 'transition-pending', slot);
 					// The rising edge is a pending cue; the falling edge follows the transition.
+					if (pending) markTransitionCue(block);
 					scheduleRender(block, false, pending);
 				} finally {
 					TRANSITION_LISTENER_PUBLISH_DEPTH--;
@@ -44063,7 +44214,10 @@ export function useActionState<S>(
 					if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__)
 						__profileSchedule(block, 'action-state-pending', slot);
 					// The rising edge is a pending cue; the falling edge commits with the result.
-					if (next) VIEW_TRANSITION_DRIVER?.markActionCue();
+					if (next) {
+						VIEW_TRANSITION_DRIVER?.markActionCue();
+						markTransitionCue(block);
+					}
 					scheduleRender(block, false, next);
 				}
 			}
@@ -44319,6 +44473,7 @@ export function useOptimistic<S, V = S>(
 				if (!block.disposed) {
 					if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__)
 						__profileSchedule(block, 'optimistic', slot);
+					markTransitionCue(block);
 					scheduleRender(block, false, true);
 				}
 			},
@@ -44792,15 +44947,15 @@ function switchToCatchInner(
 /** DOM handlers return their own surviving catch block; external bridges return void. */
 type TryHandler = (err: any) => Block | null | void;
 
-/** Walk Block.parentBlock chain looking for a `$$tryHandler` registration. */
+/** Walk Block.parentBlock chain looking for a `rare.tryHandler` registration. */
 function findTryHandler(block: Block | null): TryHandler | null {
 	const origin = block;
 	let b: Block | null = block;
 	while (b) {
-		const h = (b as any).$$tryHandler;
+		const h = b.rare?.tryHandler;
 		// Suspense-only slots route wakeables, but do not claim application errors.
 		// Skipping them also keeps root error reporting on the uncaught channel.
-		if (h && (b as any).__trySlot?.catchBody !== null) return h;
+		if (h && b.rare!.trySlot?.catchBody !== null) return h;
 		b = b.parentBlock;
 	}
 	return rendererRegionTryHandler(origin);
@@ -44808,8 +44963,8 @@ function findTryHandler(block: Block | null): TryHandler | null {
 
 /**
  * Route an error thrown by `renderBlock` during scheduled re-renders.
- * Suspense exceptions go to the nearest tryBlock's `__suspenseHandler`;
- * everything else goes to `$$tryHandler`. An unowned suspension retries through
+ * Suspense exceptions go to the nearest tryBlock's `rare.suspenseHandler`;
+ * everything else goes to `rare.tryHandler`. An unowned suspension retries through
  * its client root; an unclaimed application error is rethrown to the caller.
  */
 function handleRenderError(block: Block, err: any, attempt: TransitionAttempt | null = null): void {
@@ -44827,7 +44982,7 @@ function handleRenderError(block: Block, err: any, attempt: TransitionAttempt | 
 	if (isSuspenseException(err)) {
 		let b: Block | null = block;
 		while (b) {
-			const h = (b as any).__suspenseHandler;
+			const h = b.rare?.suspenseHandler;
 			if (h) {
 				h(err.thenable, block);
 				return;
@@ -44935,7 +45090,7 @@ export function ownSlotAnchor(scope: Scope, slotKey: number, block: Block): Node
 /** True when a committed primary must survive a replacement that may suspend. */
 function preservesCommittedSuspense(block: Block): boolean {
 	for (let current: Block | null = block; current !== null; current = current.parentBlock) {
-		const state = (current as any).__trySlot as TrySlot | undefined;
+		const state: TrySlot | undefined = current.rare?.trySlot;
 		if (
 			state !== undefined &&
 			state.tryBlock === current &&
@@ -46029,7 +46184,7 @@ function releaseActivityTracking(): void {
 function findActivityRefOwners(block: Block): boolean {
 	let owned = false;
 	for (let current: Block | null = block; current !== null; current = current.parentBlock) {
-		const owner = (current as any).__activitySlot as ActivitySlot | undefined;
+		const owner: ActivitySlot | undefined = current.rare?.activitySlot;
 		if (owner !== undefined && owner.block === current) {
 			owner.hasRefs = true;
 			owned = true;
@@ -46054,7 +46209,7 @@ function registerActivityRef(block: Block, target: Element | FragmentInstance): 
 
 function registerActivityInsertionEffect(block: Block): void {
 	for (let current: Block | null = block; current !== null; current = current.parentBlock) {
-		const owner = (current as any).__activitySlot as ActivitySlot | undefined;
+		const owner: ActivitySlot | undefined = current.rare?.activitySlot;
 		if (owner !== undefined && owner.block === current) owner.hasInsertionEffects = true;
 	}
 }
@@ -46062,7 +46217,7 @@ function registerActivityInsertionEffect(block: Block): void {
 function registerActivityPortal(block: Block): void {
 	let owners: ActivitySlot[] | null = null;
 	for (let parent = block.parentBlock; parent !== null; parent = parent.parentBlock) {
-		const owner = (parent as any).__activitySlot as ActivitySlot | undefined;
+		const owner = parent.rare?.activitySlot;
 		if (owner === undefined || owner.block !== parent) continue;
 		(owner.portals ??= new Set()).add(block);
 		(owners ??= []).push(owner);
@@ -46285,7 +46440,7 @@ function renderHiddenActivity(state: ActivitySlot, replay = false, block = state
 			current !== null && current !== state.block;
 			current = current.parentBlock
 		) {
-			if ((current as any).__suspenseHandler) throw error;
+			if (current.rare?.suspenseHandler) throw error;
 		}
 		let rolledBack: Set<EffectSlot> | null = null;
 		if (insertionQueue.length > insertionCheckpoint) {
@@ -46324,10 +46479,10 @@ function setActivitySuspenseHandler(state: ActivitySlot, hidden: boolean): void 
 	const block = state.block!;
 	if (hidden) {
 		state.suspend ??= (thenable) => suspendHiddenActivity(state, thenable);
-		(block as any).__suspenseHandler = state.suspend;
+		blockRare(block).suspenseHandler = state.suspend;
 	} else {
 		state.pendingThenable = null;
-		(block as any).__suspenseHandler = null;
+		blockRare(block).suspenseHandler = null;
 	}
 }
 
@@ -46435,9 +46590,8 @@ export function activityBlock(
 			hiddenDom: null,
 			portals: null,
 		};
-		// All Blocks reserve this optional back-reference so Activity boundaries
-		// keep the same shape as ordinary and Suspense blocks.
-		(b as any).__activitySlot = state;
+		// The back-reference lives on the Block's fixed-shape `rare` record.
+		blockRare(b).activitySlot = state;
 		parentScope.slots[slotKey] = state;
 		registerSlot(parentScope, state);
 		const adopted = open !== null;
@@ -48268,7 +48422,7 @@ function reconcileKeyed<T>(
 		if (journalShape) record = journalForSlot(state, true);
 		// Only `beforeMiddle` gets a new nextSibling; new keys append to the Map,
 		// which a middle insert leaves out of chain order.
-		const links = record !== null ? record.links : null;
+		const links = forSlotLinks(record);
 		if (links !== null && beforeMiddle !== null && !links.has(beforeMiddle))
 			links.set(beforeMiddle, beforeMiddle.nextSibling);
 		if (afterMiddle !== null) state.inOrder = false;
@@ -48311,7 +48465,7 @@ function reconcileKeyed<T>(
 		// The removed run keeps its own links; only `beforeMiddle` gets a new
 		// nextSibling. Deleted keys go back to their Map positions by chain order,
 		// or by the Map's order kept here when that differs.
-		const links = record !== null ? record.links : null;
+		const links = forSlotLinks(record);
 		if (links !== null) {
 			if (!record!.inOrder) record!.prior ??= [...oldItems.values()];
 			if (beforeMiddle !== null && !links.has(beforeMiddle))
@@ -48362,7 +48516,7 @@ function reconcileKeyed<T>(
 			cur = cur.nextSibling!;
 		}
 		if (!anySurvivors) {
-			if (journalShape || (record !== null && record.links !== null)) journalForSlot(state);
+			if (journalShape || record !== null) journalForSlot(state);
 			batchClearItems(state, oldItems);
 			state.inOrder = true;
 			state.head = null;
@@ -48422,7 +48576,7 @@ function reconcileKeyed<T>(
 			const next: Block | null = cur!.nextSibling!;
 			const newRelIdx = newKeysToIdx.get(cur!.key);
 			if (newRelIdx === undefined) {
-				if (journalShape || (record !== null && record.links !== null)) {
+				if (journalShape || record !== null) {
 					journalForSlot(state);
 					journalShape = false;
 					record = null;
@@ -48527,7 +48681,7 @@ function reconcileKeyed<T>(
 				// Before the first write, record each row whose nextSibling this
 				// shortcut rewrites: every displaced row and the row it lands after,
 				// the new middle's last row, and `beforeMiddle`.
-				const links = record !== null ? record.links : null;
+				const links = forSlotLinks(record);
 				if (links !== null) {
 					const touched: (Block | null)[] = [beforeMiddle, oldItems.get(newKeys[newMidLen - 1])!];
 					for (let j = 0; j < dCount; j++) {
@@ -48593,7 +48747,7 @@ function reconcileKeyed<T>(
 			}
 		}
 
-		if (journalShape || (record !== null && record.links !== null)) journalForSlot(state);
+		if (journalShape || record !== null) journalForSlot(state);
 		// Place survivors first, then mount new rows in authored order. Reversing
 		// mounts reverses their ref/layout/effect order even when the DOM is right.
 		const middleEndAnchor: Node = afterMiddle ? afterMiddle.startMarker! : state.end;
@@ -48740,7 +48894,7 @@ function canDeferRootOwnedListClear(state: ForSlot): boolean {
 			block._slots !== null ||
 			block.refFields !== null ||
 			block.deoptNode !== null ||
-			block.vt !== null
+			(block.rare !== null && block.rare.vt !== null)
 		)
 			return false;
 	}
@@ -49938,9 +50092,9 @@ function inlineCaughtErrorOwner(block: Block): ScheduledVisibilityOwner | null {
 	for (let context = EFFECT_RECONNECT_CONTEXT; context !== null; context = context.parent) {
 		const root = context.root;
 		if (root !== block && !blockIsAncestorOf(root, block)) continue;
-		const suspense = (root as any).__trySlot as TrySlot | undefined;
+		const suspense = root.rare?.trySlot;
 		if (suspense !== undefined && suspense.tryBlock === root) return suspense;
-		const activity = (root as any).__activitySlot as ActivitySlot | undefined;
+		const activity = root.rare?.activitySlot;
 		if (activity !== undefined && activity.block === root) return activity;
 	}
 	if (!block.mounted) {
@@ -49948,7 +50102,7 @@ function inlineCaughtErrorOwner(block: Block): ScheduledVisibilityOwner | null {
 		// Suspense, before that owner has hidden its primary. An ordinary fallback
 		// error instead disposes this catch and cancels its parked report.
 		for (let parent = block.parentBlock; parent !== null; parent = parent.parentBlock) {
-			const suspense = (parent as any).__trySlot as TrySlot | undefined;
+			const suspense = parent.rare?.trySlot;
 			if (suspense !== undefined && suspense.tryBlock === parent && !suspense.propagateSuspense) {
 				return suspense;
 			}
@@ -50607,7 +50761,7 @@ function makeRoot(
 					// next drain. Throwing directly here could be swallowed by effect
 					// error routing or unwind an active render replacement half-finished.
 					if (rootBlock !== null && !rootBlock.disposed) {
-						rootBlock.nestedUpdateError = true;
+						blockRare(rootBlock).updateError = true;
 						scheduleRender(rootBlock);
 					}
 					return;
