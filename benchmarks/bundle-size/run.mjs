@@ -44,18 +44,16 @@
 // row's `app_*` plus `full_fw_*` is what the same application ships once it
 // uses the rest of the API, which is the upper end the website draws beside
 // each fixture's measured total. A framework that cannot tree-shake shows
-// almost no gap. The ceiling has no budget: the reachability scenarios in
-// run-minimal.mjs gate individual public imports.
+// almost no gap. The reachability scenarios in run-minimal.mjs gate individual
+// public imports.
 //
 // Run:
-//   node benchmarks/bundle-size/run.mjs                      every target, report only
-//   node benchmarks/bundle-size/run.mjs --budgets octane-tsrx octane-jsx
-//   node benchmarks/bundle-size/run.mjs --write-budgets octane-tsrx octane-jsx
+//   node benchmarks/bundle-size/run.mjs                      every target
+//   node benchmarks/bundle-size/run.mjs octane-tsrx octane-jsx
 //
-// Positional arguments select framework targets in every set. `--budgets` fails
-// when an Octane application exceeds app-budgets.json or jsx-budgets.json, and
-// `--write-budgets` resets the selected Octane budgets to measured + headroom in
-// a dedicated budget pull request (CONTRIBUTING.md, "Size budgets").
+// Positional arguments select framework targets in every set. Bytes are reported,
+// never gated: the pull request benchmark comment lists every change. The
+// void-root specialization verdict below fails the run.
 process.env.NODE_ENV = 'production';
 
 import assert from 'node:assert/strict';
@@ -64,8 +62,6 @@ import { gzipSync, brotliCompressSync, constants as zc } from 'node:zlib';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { BYTE_METRICS, ratchetBudget, verifyByteBudget } from './minimal-gates.mjs';
-import { requireBudgetRatchet } from './budget-raises.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const JS_FRAMEWORK = path.resolve(__dirname, '../js-framework');
@@ -137,40 +133,12 @@ const SETS = [
 		ceiling: false,
 	},
 ];
-const APP_BUDGET_FILE = path.join(__dirname, 'app-budgets.json');
-const JSX_BUDGET_FILE = path.join(__dirname, 'jsx-budgets.json');
-const APP_BUDGETS = JSON.parse(fs.readFileSync(APP_BUDGET_FILE, 'utf8'));
-const JSX_BUDGETS = JSON.parse(fs.readFileSync(JSX_BUDGET_FILE, 'utf8'));
-const setName = ({ prefix }) => (prefix ? prefix.slice(0, -1) : 'rows');
-assert.deepEqual(
-	Object.keys(APP_BUDGETS).sort(),
-	SETS.map(setName).sort(),
-	'full-application budgets must cover every benchmark set exactly once',
-);
-
-const args = process.argv.slice(2);
-const requireTight = requireBudgetRatchet(args);
-const enforceBudgets = args.includes('--budgets');
-const writeBudgets = args.includes('--write-budgets');
-assert.equal(
-	enforceBudgets && writeBudgets,
-	false,
-	'--budgets checks the committed budgets and --write-budgets replaces them; pass one',
-);
-const requestedTargets = args.filter(
-	(arg) => arg !== '--budgets' && arg !== '--write-budgets' && arg !== '--ratchet',
-);
+const requestedTargets = process.argv.slice(2);
 const knownTargets = new Set(SETS.flatMap((set) => set.targets));
 for (const target of requestedTargets) {
 	assert.equal(knownTargets.has(target), true, `Unknown bundle-size target: ${target}`);
 }
 const selected = (name) => requestedTargets.length === 0 || requestedTargets.includes(name);
-// Budget rows map each committed bucket to the operation names the build emits.
-const BUDGET_BUCKETS = [
-	['app', 'app'],
-	['framework', 'fw'],
-	['total', 'js'],
-];
 
 const gz = (buf) => gzipSync(buf, { level: zc.Z_BEST_COMPRESSION }).length;
 const br = (buf) =>
@@ -394,92 +362,9 @@ for (const [name, { root, entries }] of ceilings) {
 		full_fw_brotli: val(sums.fw.brotli),
 	});
 }
-function appendBudgetOperations(operations, budget, name, prefix = '') {
-	assert.deepEqual(
-		Object.keys(budget).sort(),
-		['app', 'framework', 'total'],
-		`${name}: full-application budget must cover application, framework, and total bytes`,
-	);
-	for (const [bucket, operation] of BUDGET_BUCKETS) {
-		assert.deepEqual(
-			Object.keys(budget[bucket]).sort(),
-			['brotli', 'gzip', 'raw'],
-			`${name}/${bucket}: full-application budget must cover raw, gzip, and brotli bytes`,
-		);
-		for (const metric of BYTE_METRICS) {
-			const bytes = budget[bucket][metric];
-			assert.equal(
-				Number.isSafeInteger(bytes) && bytes > 0,
-				true,
-				`${name}/${bucket}: invalid committed ${metric} byte budget`,
-			);
-			operations[prefix + operation + '_' + metric] = val(bytes);
-		}
-	}
-}
-
-const tsrxBudgetOps = {};
-for (const set of SETS) {
-	appendBudgetOperations(tsrxBudgetOps, APP_BUDGETS[setName(set)], setName(set), set.prefix);
-}
-targets.push({ name: 'octane-tsrx-budget', ops: tsrxBudgetOps });
-
-const jsxBudgetOps = {};
-appendBudgetOperations(jsxBudgetOps, JSX_BUDGETS, 'rows-jsx');
-targets.push({ name: 'octane-jsx-budget', ops: jsxBudgetOps });
 
 const payload = { suite: 'bundle-size', iterations: 1, targets };
 
 if (process.env.BENCH_JSON) {
 	fs.writeFileSync(process.env.BENCH_JSON, JSON.stringify(payload, null, '\t') + '\n');
-}
-
-// Each committed budget belongs to one Octane target and one app set. A set the
-// target does not build (JSX ships only the rows app) has no budget here.
-const budgetedSets = [
-	...SETS.map((set) => ({
-		target: 'octane-tsrx',
-		label: setName(set),
-		prefix: set.prefix,
-		budget: APP_BUDGETS[setName(set)],
-	})),
-	{ target: 'octane-jsx', label: 'rows-jsx', prefix: '', budget: JSX_BUDGETS },
-].filter(({ target }) => byName.has(target));
-
-if (enforceBudgets) {
-	const breaches = [];
-	for (const { target, label, prefix, budget } of budgetedSets) {
-		const ops = byName.get(target).ops;
-		for (const [bucket, operation] of BUDGET_BUCKETS) {
-			const measured = Object.fromEntries(
-				BYTE_METRICS.map((metric) => [metric, ops[`${prefix}${operation}_${metric}`]?.median]),
-			);
-			try {
-				verifyByteBudget(`${label}/${bucket}`, measured, budget[bucket], true, requireTight);
-			} catch (error) {
-				breaches.push(error.message);
-			}
-		}
-	}
-	if (breaches.length) {
-		console.error(`✗ ${breaches.length} application byte budget(s) exceeded:`);
-		for (const breach of breaches) console.error(`  ${breach}`);
-		process.exit(1);
-	}
-	console.log(`✓ ${budgetedSets.length} application budget(s) hold`);
-}
-
-if (writeBudgets) {
-	for (const { target, label, prefix, budget } of budgetedSets) {
-		const ops = byName.get(target).ops;
-		for (const [bucket, operation] of BUDGET_BUCKETS) {
-			const measured = Object.fromEntries(
-				BYTE_METRICS.map((metric) => [metric, ops[`${prefix}${operation}_${metric}`].median]),
-			);
-			budget[bucket] = ratchetBudget(measured, budget[bucket]);
-		}
-		console.log(`ratcheted ${label} budgets to measured + headroom (raw/gzip 32, brotli 256)`);
-	}
-	fs.writeFileSync(APP_BUDGET_FILE, JSON.stringify(APP_BUDGETS, null, 2) + '\n');
-	fs.writeFileSync(JSX_BUDGET_FILE, JSON.stringify(JSX_BUDGETS, null, 2) + '\n');
 }

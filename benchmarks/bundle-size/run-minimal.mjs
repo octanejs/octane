@@ -1,13 +1,11 @@
 // Production public-import reachability: build and execute each independent
-// feature entry before publishing deterministic byte totals and budget peers.
+// feature entry, assert what it may and may not retain, and report its
+// deterministic byte totals.
 //
-//   node run-minimal.mjs [scenario...]                  report bytes and budget peers
-//   node run-minimal.mjs --budgets [scenario...]        fail when a scenario exceeds its budget
-//   node run-minimal.mjs --write-budgets [scenario...]  reset budgets to measured + headroom
+//   node run-minimal.mjs [scenario...]
 //
-// Pull request CI runs `--budgets --ratchet` over every scenario.
-// `--write-budgets` records savings in a source change; any raise must land
-// alone (CONTRIBUTING.md, "Size budgets").
+// Bytes are reported, never gated: the pull request benchmark comment lists
+// every change. The reachability assertions fail the run.
 //
 // Each bundler builds the way its users ship. Vite scenarios use Vite 8's
 // default client minifier (`'oxc'`); Vite's `'esbuild'` mode would turn off
@@ -27,14 +25,11 @@ import { octane } from 'octane/compiler/vite';
 import { build as buildVite } from 'vite';
 import { appComponent, clientEntry } from '../../packages/cli/src/commands/init/templates.js';
 import { verifyScenario } from './verify-reachability.mjs';
-import { ratchetBudget, selectMinimalScenarios, verifyByteBudget } from './minimal-gates.mjs';
-import { requireBudgetRatchet } from './budget-raises.mjs';
+import { selectMinimalScenarios } from './minimal-gates.mjs';
 
 const directory = path.dirname(fileURLToPath(import.meta.url));
 const repository = path.resolve(directory, '../..');
 const fixtures = path.join(directory, 'fixtures/minimal');
-const budgetFile = path.join(directory, 'minimal-budgets.json');
-const budgets = JSON.parse(fs.readFileSync(budgetFile, 'utf8'));
 const existingScenarios = [
 	['capture-only', 'ts'],
 	['cli-spa-starter', 'ts'],
@@ -260,20 +255,7 @@ function verifyBindingSideEffectsInventory() {
 
 verifyBindingSideEffectsInventory();
 
-const expectedNames = new Set(scenarios.map(({ name }) => name));
-assert.deepEqual(
-	Object.keys(budgets).sort(),
-	[...expectedNames].sort(),
-	'minimal-import budgets must cover every scenario exactly once',
-);
-
-const args = process.argv.slice(2);
-const requireTight = requireBudgetRatchet(args);
-const { selectedScenarios, enforceBudgets, writeBudgets } = selectMinimalScenarios(
-	args.filter((arg) => arg !== '--ratchet'),
-	scenarios,
-);
-const measuredBudgets = {};
+const selectedScenarios = selectMinimalScenarios(process.argv.slice(2), scenarios);
 
 const payload = { suite: 'bundle-reachability', iterations: 1, targets: [] };
 
@@ -650,17 +632,12 @@ try {
 				params: { [zlib.BROTLI_PARAM_QUALITY]: zlib.BROTLI_MAX_QUALITY },
 			}).length,
 		};
-		const budget = budgets[name];
-		const budgetEnforced = enforceBudgets || (id === 'behavior-root' && !writeBudgets);
-		verifyByteBudget(name, measured, budget, budgetEnforced, requireTight);
-		if (writeBudgets) measuredBudgets[name] = ratchetBudget(measured, budget);
 		payload.targets.push({
 			name,
 			ops: Object.fromEntries(
 				Object.entries(measured).map(([metric, value]) => [metric, stat(value)]),
 			),
 			meta: {
-				budgetEnforced,
 				modules: modules.map((id) =>
 					id.startsWith(repository + path.sep) ? path.relative(repository, id) : id,
 				),
@@ -672,25 +649,9 @@ try {
 				snapshot,
 			},
 		});
-		payload.targets.push({
-			name: `${name}-budget`,
-			ops: Object.fromEntries(
-				Object.entries(budget).map(([metric, value]) => [metric, stat(value)]),
-			),
-		});
 		console.log(
 			`${name.padEnd(32)} raw ${String(measured.raw).padStart(6)}  ` +
 				`gzip ${String(measured.gzip).padStart(5)}  brotli ${String(measured.brotli).padStart(5)}`,
-		);
-	}
-	if (writeBudgets) {
-		// Keep the committed key order so a rewrite diffs only the changed values.
-		const next = Object.fromEntries(
-			Object.entries(budgets).map(([name, budget]) => [name, measuredBudgets[name] ?? budget]),
-		);
-		fs.writeFileSync(budgetFile, JSON.stringify(next, null, 2) + '\n');
-		console.log(
-			`wrote ${Object.keys(measuredBudgets).length} budget(s) as measured + headroom (raw/gzip 32, brotli 256) to ${path.relative(repository, budgetFile)}`,
 		);
 	}
 } catch (error) {

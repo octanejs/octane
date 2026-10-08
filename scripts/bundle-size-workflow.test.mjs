@@ -32,32 +32,27 @@ test('runs bundle gates in a separate workflow without blocking runtime test exe
 	assert.match(bundle, /pnpm install --prod=false --frozen-lockfile/);
 });
 
-test('retains every bundle budget, ratchet, and hydration reachability gate exactly once', () => {
+test('retains every reachability gate exactly once and gates no byte count', () => {
 	for (const command of [
-		'node benchmarks/bundle-size/run-minimal.mjs --budgets --ratchet',
-		'node benchmarks/bundle-size/run.mjs --budgets --ratchet octane-tsrx octane-jsx',
-		'node benchmarks/bundle-size/run-hydration-free.mjs',
+		'node benchmarks/bundle-size/run-minimal.mjs\n',
+		'node benchmarks/bundle-size/run.mjs octane-tsrx octane-jsx\n',
+		'node benchmarks/bundle-size/run-hydration-free.mjs\n',
 	]) {
 		assert.equal(bundle.split(command).length - 1, 1, command);
-		assert.ok(!ci.includes(command), `${command} must not remain in ordinary CI jobs`);
+		assert.ok(!ci.includes(command.trim()), `${command} must not remain in ordinary CI jobs`);
 	}
-	assert.match(bundle, /fetch-depth: 0/);
-	assert.match(
-		bundle,
-		/BUDGET_BASE: \$\{\{ github\.event_name == 'pull_request' && 'HEAD\^1' \|\| github\.event\.before \}\}/,
-	);
+	assert.doesNotMatch(bundle, /budget|ratchet|BUDGET_BASE/i);
 	assert.doesNotMatch(bundle, /run-hydration-free\.mjs \S|continue-on-error/);
 	for (const suite of [
 		'scripts/bundle-size-workflow.test.mjs',
 		'benchmarks/bundle-size/minimal-gates.test.mjs',
-		'benchmarks/bundle-size/budget-raises.test.mjs',
 		'benchmarks/bundle-size/hydration-free-gates.test.mjs',
 	]) {
 		assert.ok(packageJson.scripts['ci:workflow:test'].split(' ').includes(suite), suite);
 	}
 });
 
-test('keeps the budget-raise policy active when builds inherit authenticated coverage', () => {
+test('builds only when CI has not authenticated inherited coverage', () => {
 	const caller = jobSource('bundle_size');
 	assert.match(
 		caller,
@@ -65,15 +60,8 @@ test('keeps the budget-raise policy active when builds inherit authenticated cov
 	);
 	assert.match(caller, /if:.*outputs\.is_release_pr != 'true'/);
 	assert.doesNotMatch(caller.match(/^    if:.*$/m)[0], /full_ci|outputs\.is_release !=/);
-	const policy = bundle.slice(
-		bundle.indexOf('      - name: Check that byte budget raises land alone'),
-		bundle.indexOf('      - name: Install dependencies'),
-	);
-	assert.doesNotMatch(policy, /\bif:/);
-	assert.match(policy, /node benchmarks\/bundle-size\/budget-raises\.mjs --base "\$BUDGET_BASE"/);
-	assert.doesNotMatch(jobSource('lint_checks'), /bundle-size\/budget-raises\.mjs/);
 	for (const step of [
-		'Verify every bundle budget',
+		'Verify bundle reachability and root specialization',
 		'Verify client-only bundles retain no hydration code',
 	]) {
 		assert.ok(bundle.includes(`- name: ${step}\n        if: inputs.run-benchmarks\n`));
