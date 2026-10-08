@@ -5224,11 +5224,12 @@ interface ForSlotRecord {
 function journalForSlot(state: ForSlot, link?: boolean): ForSlotRecord | null {
 	const seen = TRANSITION_JOURNAL_BAGS!;
 	const at = seen.get(state) ?? -1;
-	const current = forSlotRecordAt(at);
+	// A list's first record in a render finds no entry, and makes no call.
+	const current = at < 0 ? null : forSlotRecordAt(at);
 	if (link && at >= TRANSITION_JOURNAL_CHECKPOINT) return current;
 	// A wholesale change converts this window's link record; an inner window's
 	// record stops an enclosing window's link record gathering links.
-	fullForSlotRecord(state, current);
+	if (current !== null) fullForSlotRecord(state, current);
 	if (at >= TRANSITION_JOURNAL_CHECKPOINT) return null;
 	seen.set(state, TRANSITION_JOURNAL!.length);
 	if (
@@ -5274,12 +5275,12 @@ function journalForSlot(state: ForSlot, link?: boolean): ForSlotRecord | null {
 }
 
 /**
- * The keyed-list record carried by the journal entry at `at`, or null when that
- * entry has none (hydration adoption, an owned-list clear, no entry).
+ * The keyed-list record carried by the list's journal entry at `at`, or null
+ * when that entry has none (hydration adoption, an owned-list clear).
  */
 function forSlotRecordAt(at: number): ForSlotRecord | null {
 	const log = TRANSITION_JOURNAL!;
-	return at >= 0 && log[at] === JOURNAL_UNDO ? log[at + 2] : null;
+	return log[at] === JOURNAL_UNDO ? log[at + 2] : null;
 }
 
 /**
@@ -5363,7 +5364,8 @@ function fullForSlotRecord(state: ForSlot, record: ForSlotRecord | null): void {
 function journalForOwnedListClear(state: ForSlot): void {
 	const seen = TRANSITION_JOURNAL_BAGS!;
 	// An enclosing window's link record stops gathering links here.
-	fullForSlotRecord(state, forSlotRecordAt(seen.get(state) ?? -1));
+	const at = seen.get(state) ?? -1;
+	if (at >= 0) fullForSlotRecord(state, forSlotRecordAt(at));
 	const oldItems = state.items;
 	seen.set(state, TRANSITION_JOURNAL!.length);
 	const snapshot = {
