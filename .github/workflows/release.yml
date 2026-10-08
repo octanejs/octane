@@ -237,7 +237,7 @@ jobs:
 
       # GITHUB_TOKEN-created pull request workflows require manual approval, and
       # workflow_dispatch check suites are not linked to the pull request. Write
-      # the two required GitHub Actions checks directly onto the authenticated
+      # the required GitHub Actions checks directly onto the authenticated
       # generated head commit instead.
       - name: Record lightweight release pull request checks
         if: >-
@@ -381,7 +381,7 @@ jobs:
 
             const detailsUrl = `${context.serverUrl}/${owner}/${repo}/actions/runs/${context.runId}`;
             await Promise.all(
-              ["lint", "typecheck"].map((name) =>
+              ["lint", "typecheck", "bundle size / bundle size checks"].map((name) =>
                 github.rest.checks.create({
                   owner,
                   repo,
@@ -399,5 +399,5 @@ jobs:
               ),
             );
             core.notice(
-              `Recorded lightweight lint and typecheck results for Changesets PR #${pull.number} at ${generated.sha}.`,
+              `Recorded lightweight lint, typecheck, and bundle size results for Changesets PR #${pull.number} at ${generated.sha}.`,
             );
