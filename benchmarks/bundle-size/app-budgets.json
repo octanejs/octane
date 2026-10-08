@@ -64,7 +64,7 @@
     "total": {
       "raw": 156895,
       "gzip": 50941,
-      "brotli": 44466
+      "brotli": 44723
     }
   },
   "bindings": {
@@ -74,12 +74,12 @@
       "brotli": 96444
     },
     "framework": {
-      "raw": 341226,
+      "raw": 341272,
       "gzip": 109371,
       "brotli": 95217
     },
     "total": {
-      "raw": 688864,
+      "raw": 688910,
       "gzip": 225038,
       "brotli": 191431
     }
