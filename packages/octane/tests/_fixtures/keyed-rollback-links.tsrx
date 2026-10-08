@@ -3,6 +3,8 @@ import { use, useState } from 'octane';
 export interface Row {
 	id: number;
 	label: string;
+	/** The row suspends on the gate when it renders. */
+	wait?: boolean;
 }
 
 export const rows = (ids: number[]): Row[] => ids.map((id) => ({ id, label: 'row-' + id }));
@@ -11,7 +13,9 @@ export const rows = (ids: number[]): Row[] => ids.map((id) => ({ id, label: 'row
  * A keyed list whose root render applies `steps` one reconcile at a time, as
  * render-phase updates of one attempt, then suspends on `gate`. Until the gate
  * settles, the root keeps the committed rows. `before` is committed first by
- * its own click, so a later held render starts from a reordered list.
+ * its own click, so a later held render starts from a reordered list. A row
+ * marked `wait` suspends on the gate itself, partway through its list's
+ * reconcile.
  */
 export function HeldRows({
 	initial,
@@ -46,6 +50,7 @@ export function HeldRows({
 		</button>
 		<ul>
 			@for (const item of items; key item.id) {
+				if (item.wait) use(gate);
 				<li class="row">{item.label}</li>
 			}
 		</ul>

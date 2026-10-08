@@ -1,6 +1,9 @@
 // A held root render rolls a keyed list back to its committed rows. Inserts,
 // removals and small displacements record only the rows they relink, and
-// rollback walks the old chain through those links (journalForSlotLinks).
+// rollback walks the old chain through those links. A reorder takes its record
+// at the first row index it rewrites, before it knows whether it will relink a
+// few rows or all of them, so a rotation that relinks every row, and a row that
+// suspends before anything is relinked, roll back from that record as well.
 // Development builds also keep the full chain and throw when the two disagree,
 // so each shape below checks the link record against the full one. Every case
 // must keep the committed nodes, in order, until the gate settles, then show
@@ -11,7 +14,8 @@ import { HeldRows, rows, type Row } from './_fixtures/keyed-rollback-links.tsrx'
 
 const base = [1, 2, 3, 4, 5];
 
-async function holdAndSettle(steps: number[][], before?: number[]) {
+// `waitOn` marks that row as suspending in the first step.
+async function holdAndSettle(steps: number[][], before?: number[], waitOn?: number) {
 	let open!: (value: string) => void;
 	const gate = new Promise<string>((resolve) => {
 		open = resolve;
@@ -19,7 +23,9 @@ async function holdAndSettle(steps: number[][], before?: number[]) {
 	const r = mount(HeldRows, {
 		initial: rows(base),
 		before: before === undefined ? undefined : rows(before),
-		steps: steps.map(rows),
+		steps: steps.map((ids, step) =>
+			rows(ids).map((row) => (step === 0 && row.id === waitOn ? { ...row, wait: true } : row)),
+		),
 		gate,
 	});
 	if (before !== undefined) r.click('#before');
@@ -74,6 +80,14 @@ describe('keyed list rollback from link records', () => {
 			[1, 5, 4, 2, 6],
 			[0, 1, 5, 4, 2, 6],
 		]));
+
+	it('restores a rotation that relinks every row', () => holdAndSettle([[5, 1, 2, 3, 4]]));
+
+	it('restores a rotation after a committed reorder left the key map out of order', () =>
+		holdAndSettle([[5, 1, 4, 3, 2]], [1, 4, 3, 2, 5]));
+
+	it('restores a reorder whose row suspends before any row is relinked', () =>
+		holdAndSettle([[5, 4, 3, 2, 1]], undefined, 3));
 
 	it('restores a link reconcile followed by a wholesale reorder', () =>
 		holdAndSettle([
