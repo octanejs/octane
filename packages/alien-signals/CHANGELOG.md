@@ -1,5 +1,74 @@
 # @octanejs/alien-signals
 
+## 0.1.0
+
+### Minor Changes
+
+- a3dcbd9: Port `react-alien-signals@0.4.0` over `alien-signals@3.2.1`.
+
+  New exports: `batch`, `trigger`, `useDeferredSignalValue`, `useSignalSelector`,
+  `useSignalPassiveEffect`, `useSignalLayoutEffect`, `useSignalInsertionEffect`,
+  and the `SignalSetter`, `SignalEffectCallback`, and `SignalEffectDependencies`
+  types. `createComputed` passes the previous value to its getter, and
+  `useSignalEffect` and `useSignalScope` accept an optional dependency list.
+  Components reading the same signal now share one core subscription.
+
+  Behavior follows upstream 0.4.0, including three changes for existing callers:
+
+  - `WritableSignal` is the core signal and takes a value. Pass updater
+    functions to the setters from `useSignal` and `useSetSignal` instead of to
+    the signal itself.
+  - `useSignalScope` returns a stable stop handle. It stops the running scope;
+    calling it before commit does nothing, and a dependency change starts a new
+    scope.
+  - The core dependency moves from `alien-signals` 1.0.4 to 3.2.1.
+
+### Patch Changes
+
+- Updated dependencies [7540c35]
+- Updated dependencies [f6b6615]
+- Updated dependencies [293d143]
+- Updated dependencies [9d4c14f]
+- Updated dependencies [b6c040c]
+- Updated dependencies [247dffe]
+- Updated dependencies [3a94771]
+- Updated dependencies [79ca088]
+- Updated dependencies [d1e308b]
+- Updated dependencies [6e6aa98]
+- Updated dependencies [5e922d9]
+- Updated dependencies [8fa3398]
+- Updated dependencies [3557100]
+- Updated dependencies [1fb0ecd]
+- Updated dependencies [37a1c14]
+- Updated dependencies [0d95b26]
+- Updated dependencies [a3dcbd9]
+- Updated dependencies [c0192ec]
+- Updated dependencies [6df3359]
+- Updated dependencies [d30025a]
+- Updated dependencies [0ce371a]
+- Updated dependencies [8444db8]
+- Updated dependencies [78750a0]
+- Updated dependencies [f183be7]
+- Updated dependencies [0f3abca]
+- Updated dependencies [cbc1e8e]
+- Updated dependencies [1048eab]
+- Updated dependencies [188d60b]
+- Updated dependencies [3557100]
+- Updated dependencies [b4a61e7]
+- Updated dependencies [90a57d8]
+- Updated dependencies [47e030e]
+- Updated dependencies [d788d32]
+- Updated dependencies [e2044cb]
+- Updated dependencies [a7ae419]
+- Updated dependencies [21f911d]
+- Updated dependencies [3557100]
+- Updated dependencies [3557100]
+- Updated dependencies [3557100]
+- Updated dependencies [1e74902]
+- Updated dependencies [7e6bda5]
+- Updated dependencies [43b60d9]
+  - octane@0.11.0
+
 ## 0.0.27
 
 ### Patch Changes

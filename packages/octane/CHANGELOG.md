@@ -1,5 +1,467 @@
 # octane
 
+## 0.11.0
+
+### Minor Changes
+
+- 37a1c14: Ship less signal engine code to applications that use `signal$`, `derived$`,
+  `query$` or `useSignal$` without calling `createScope`. Owner scopes the runtime
+  creates for those declarations get the public `Scope` methods (`serialize`,
+  `inspect`, `derived$`, `get`, `set`, `isPending`, `batch` and `action`) only once
+  the program can hold one: `createScope`, `currentSignalOwner` and
+  `installSignalOwnerEnvironment` from `octane/signals` install them first. Only a
+  debug scope records a trace.
+
+  `SignalOwnerEnvironment` now carries owners as `SignalOwnerIdentity` values. A
+  host carrier, including one installed through `octane/server`, can store and
+  return the owners it receives but can no longer narrow them to `Scope` and call
+  its methods. Carriers that store owners as `SignalOwner` compile unchanged.
+
+  Signal applications are 0.49 to 0.65 kB smaller gzipped. Applications without
+  signals are unchanged.
+- 0ce371a: Count engine work in profile builds.
+
+  Profile builds now keep session totals of the work around component renders:
+  render attempts and their outcomes, bailouts, Blocks created and torn down,
+  `@if`/`@switch` arms kept or replaced, Suspense fallbacks and error catches,
+  render-queue passes, root commits, and work discarded by rollbacks. Read them
+  with `profiler.counters()`, or take `profiler.snapshot()` before and after an
+  interaction and pass both to `profiler.diff()`. Snapshots carry a schema
+  version, build, renderer set, and recording generation; `diff()` rejects pairs
+  it cannot compare. A counter the installed renderer does not record is absent
+  rather than zero.
+
+  Builds without `profile` contain none of this code once optimized; unminified
+  development output keeps the disabled branches as dead code.
+- 8444db8: Support recursive `'use dom bindings'` views. A view can now render itself, or another view in the same module that renders it back, including beneath a keyed `@for`, so a tree's depth comes from its data:
+
+  ```tsrx
+  export function Tree({ node }: { node: Branch }) @{
+  	'use dom bindings';
+  	<section>
+  		<span>{node.label as string}</span>
+  		@for (const child of node.children; key child.key) {
+  			<Tree node={child} />
+  		}
+  	</section>
+  }
+  ```
+
+  Server rendering and the extracted binding artifact both compile, where they previously failed with "recursive binding child programs are not supported". The artifact still loads only the binding runtime, not the renderer. Each level the data reaches is its own instance with its own text, keyed items, native handlers, mount-only effects and `@try` arms. Removing a branch retires the instances beneath it. Recursive calls use the generic program rather than specializing fixed primitive props, so `depth={depth + 1}` does not unroll at compile time.
+
+  Recursion that could never end is a compile error. A view that renders itself on every path, for example with a recursive call outside any `@if`, `@for` or `@try`, fails with an error that names the cycle, such as `binding view Tree renders itself on every path (Tree → Tree)`.
+
+  A local child view used at several call sites with different prop names now shares one compiled descriptor, unless it spreads a rest parameter.
+- 3557100: Run `octane/compiler/typescript` on TypeScript 6 and TypeScript 7.1 or later, as
+  well as 5.9. On TypeScript 7, `createTextTypeProject` checks `.tsrx` through its
+  native `typescript/unstable/sync` API and proves the same text facts as on the
+  classic API, and `validateNativeSignalNames` accepts a TypeScript 7 Program. A
+  new `typescript` option names the TypeScript to use. The optional `typescript`
+  peer range includes 6 and 7.1.
+
+### Patch Changes
+
+- 7540c35: Publish an Action pending cue without waiting for native View Transition capture. Preserve captures for actual queued state, root, and native signal work, and retire consumed transition receipts after synchronous drains.
+- f6b6615: Stop rendering a hydrated signal reader a second time when nothing it read changed.
+
+  After a hydration commit, releasing the adopted server values rendered every component that read a signal during hydration again, in the same task, even when the live value still matched the server's. Parents render their children, so a section-level read rendered the whole section twice. Release now compares each historical read with what a live read would return:
+
+  - A read whose live value is `Object.is`-equal to the server value moves to the live signal without rendering. A snapshot read also needs the same status and activity metadata. Later writes render the reader as before.
+  - A reader renders again when any read changed: an early edit, a newer query result or a changed selection, a pending selection, a later stream value, or a stream that has since completed under a snapshot read.
+  - A targeted binding (`{value$}`) keeps its own live subscription, so its component never starts depending on that signal.
+  - Decoded objects and arrays are fresh copies, so a component that read one still renders again.
+
+  On the `app-frame-hydration` benchmark, the `frame-live-sections` scenario drops from 3,078 to 1,653 renders for its 1,653 Blocks. Hydration is about 11% faster cold and 13% faster warm at 4× CPU throttle (paired head/base 0.886 and 0.873 over 20 pairs). It also allocates 680 KB less heap. The leaf-only `frame` scenario drops from 1,703 to 1,653 renders.
+- 293d143: Support directive values in module-level callbacks, including arrow components returning `@try` / `@pending` / `@catch` with concise bodies or explicit `return` statements. Keep callback parameters, local values, and lexical `this` and `arguments` available to the rendered branches without requiring an `@{}` wrapper.
+- 9d4c14f: Let `'use dom bindings'` views bind `start` on an ordered list, `value` on a list
+  item, and `rowspan` on a table cell. The compiler used to reject all three: the
+  binding runtime did not apply React's rule that removes a `start` or `rowspan`
+  that is not a number, and it treated every `value` except a button's as form
+  state. These attributes now update in place and match what the server renders,
+  in both adopted and constructed views. Form `value`, `checked` and form identity
+  attributes still have to be static or `unbound`.
+- b6c040c: Render each Block in its signal owner without re-entering the renderer.
+
+  With signals enabled, every Block renders in an owner of its own, so nearly every
+  render changes owner. `renderBlock` entered that owner through a callback frame
+  that called `renderBlock` again, which resolved the same owner a second time and
+  allocated a closure per render. It now enters the owner in place and restores the
+  caller's owner when the render returns, throws, or suspends. The in-place frame
+  is installed with the signal document, so apps that never enable signals do not
+  retain it. A host carrier installed with `installSignalOwnerEnvironment`, or a
+  root given a `signalOwner` without the signal document, still runs each Block
+  inside its own callback frame. A scope's resolved owner is also kept on the scope
+  instead of in a `WeakMap`, so each lookup is a field read and live Blocks no
+  longer occupy a weak table.
+
+  On the new `app-frame-hydration` benchmark (about 1,650 Blocks, 4× CPU throttle,
+  Chromium), `renderBlock` entries fall from two to one per render, production calls
+  fall by 4.0%, and hydration allocates 161 KB less. Paired with the previous
+  runtime, cold hydration is 1.8% faster and warm hydration 3.9% faster.
+- 247dffe: Coalesce native component renders from ready query and asynchronous derived signal results. Preserve every source publication while pacing stream pulls and ready results under a shared host budget, retaining cancellation, event urgency, and server backpressure.
+- 3a94771: Run `useDeferredValue`'s deferred render in a later task, so the browser can paint the urgent commit and handle input first.
+
+  The deferred render was queued on a microtask, which ran in the same microtask
+  checkpoint as the urgent commit that returned the previous value. The browser
+  could therefore neither paint the keystroke nor deliver the next one until the
+  slow deferred render had also finished, so `useDeferredValue` gave no
+  responsiveness benefit (#1864). The swap now runs in a host task posted after the
+  urgent commit, through `scheduler.postTask` where available, then
+  `MessageChannel`, then `setTimeout`. Urgent updates that arrive before that task
+  runs only change the value it renders, so a fast typist's skipped values are
+  never rendered deferred.
+
+  There is still no time-slicing: once the deferred render starts it runs to
+  completion, so a keystroke that arrives during it waits until it commits. Async
+  `act()` waits for a pending deferred render as it does for other scheduled work.
+  Code that expected the deferred value after awaiting only microtasks now needs
+  to await a task, or `act()`.
+- 79ca088: Stop development hydration from reporting an empty `style` attribute that an
+  early binding left behind.
+
+  When an early binding (`adoptBindings`) published a single style declaration as
+  unset before hydration, such as `style={{ opacity: props.opacity }}` with no
+  opacity, removing that declaration could leave an empty `style=""` on the
+  element. Development hydration then reported a mismatch where the server
+  rendered `""` and the client `""`. Hydration now treats the attribute's presence
+  as the early binding's doing too, and still reports an empty `style` attribute
+  that the binding did not leave.
+- d1e308b: Stop running click handlers twice when a Solid-built widget is mounted inside an Octane root.
+
+  Octane stored delegated handlers on DOM nodes at `$$<type>` (`$$click`), the same property Solid's event delegation uses. Inside an Octane root, each library's dispatcher found and called the other's handlers. A click on a TanStack Query devtools row ran its toggle twice, so the details view never opened, and once Solid's `document` listener was registered, every Octane `onClick` on the page ran twice as well. Delegated handlers now live at `$o<type>` and `$ocapture:<type>`, which no other delegation reads. Compiled output keeps the same size, because each key is as long as before. Code that wrote `el.$$click` by hand was relying on an undocumented internal and must write `el.$oclick` instead (#1882).
+- 6e6aa98: Render `@if` and `@switch` arms that call no hooks without a component Block of their own.
+
+  The compiler now marks an arm hookless when it calls no hook, `use` or context read, has no `@try`, and makes no call through a bare identifier while it renders (event handlers and refs don't count). On a client mount, such an arm renders in a lightweight scope inside its component's render. It skips the Block allocation and the per-Block render bookkeeping. An arm that holds hooks, hydrates, reads signals, or mounts into an already committed component still gets a Block, and a committed hookless arm swaps out through the same staged, rollback-safe path as any other arm.
+
+  Paired measurements against the previous code in Chromium:
+
+  - recursive-context: cold first mount about 3–7% faster; a partial unmount and remount about 10% faster.
+  - spa-navigation: navigations that mount a 1,024-leaf route about 17% faster.
+
+  DOM output, effect and ref order, keyed moves, Suspense, transitions, Activity and hydration are unchanged.
+- 5e922d9: Compile JSX written inside a host element's attribute, such as an event handler
+  that calls `root.render(<Toast label="saved" />)` or `title={String(<Badge />)}`.
+  The compiler used to leave that JSX unlowered, so the emitted module failed to
+  parse. It now builds the same element it would anywhere else, on the client and
+  the server, including when a handler is a setup `const` the compiler installs
+  at mount and when a statement-bodied handler moves to module scope.
+- 8fa3398: Activate independent `<Hydrate>` islands that become ready together one per task.
+
+  Each island activation hydrates its widget in one synchronous block. Islands that
+  became ready together activated back to back in one microtask checkpoint, so the
+  browser could not deliver input or paint until every one of them had finished.
+  This happened with repeated instances of one widget, which share a module, with
+  islands released by one stylesheet `load` or `IntersectionObserver` callback, and
+  with a back/forward-cache restore, which resumes every unfinished island at once.
+
+  Now the first island to become ready in a task still activates at once, and each
+  one after it activates in a later task of its own, from `scheduler.postTask`,
+  `MessageChannel`, or `setTimeout`. An island holding captured interactions takes
+  the next turn ahead of the others. An island waiting for its turn keeps capturing
+  input for its replay, and pausing or disposing it still cancels the activation.
+  Custom hosts that call `registerIndependentHydrationIsland` get the same pacing.
+- 3557100: Type-check `<input ref={a} {...props} />` in `.tsrx` when `props` has an index
+  signature, such as `Record<string, unknown>`, as TSX does. Type checking
+  composes the explicit ref with the spread's `ref`, and a `ref` that only the
+  index signature admitted was read as `unknown` and rejected. It now counts as
+  absent; a declared `ref` in the spread is still checked. Runtime output does not
+  change.
+- 1fb0ecd: Reorder keyed lists as fast as before 0.10.1 when every row moves.
+
+  0.10.1 made keyed swaps and removals cheaper by recording only the rows they
+  relink, so an abandoned render can put the list back. A reorder takes that record
+  before it knows how many rows it will move. When it then moved every row, as a
+  rotation or a move of a group of rows to the other end does, turning the record
+  into a full copy cost two extra Maps per reorder and, for a list that had been
+  reordered before, a `Set` of every row. The record now gets its links at the
+  first relink, so a record that has seen no relink is copied directly, at the
+  cost a full copy had before 0.10.1. It is also kept in its own undo entry rather
+  than in a separate per-render Map.
+
+  In the js-framework reorder benchmark (1,000 rows, octane-tsrx, Chromium, paired
+  samples), rotating the rows and moving 3 to 8 rows to the end are 22–27% faster,
+  within 5% of the runtime before 0.10.1. Swaps, inserts and removals keep their
+  0.10.1 gains. The production framework bundle is about 110 bytes smaller.
+- 0d95b26: Write an unset or string `style` directly in signal-enabled modules instead of
+  allocating a native style Block for it.
+
+  A module that imports `octane/signals` compiles every non-literal style, such
+  as a forwarded `style={props.style}`, to a native style binding, because the
+  value might carry signal handles. The binding allocated and rendered its own
+  Block even when the value was `undefined`, `null` or a string, which has
+  nothing to read. A production audit of a signed-out home page found 273 such
+  Blocks in one hydration, about 8 ms at 4x CPU throttling. These values are now
+  written like an ordinary style, during client renders and when hydration takes
+  over an early binding's host. The Block is allocated only once a structured
+  value arrives, and then stays, so a later unset style releases its signal
+  subscriptions transactionally.
+
+  Also fixes hydration of a binding view whose early binding claimed its style:
+  a scalar style literal such as `style={{ opacity: props.opacity }}` in a
+  signal-enabled module made hydration throw, and the host was rebuilt on the
+  client.
+- a3dcbd9: Depend on `alien-signals` 3.2.1 so the workspace and `@octanejs/alien-signals`
+  resolve a single core version. Octane imports only `alien-signals/system`,
+  which is unchanged from 3.2.0.
+- c0192ec: Pace buffered streamed RPC and optional renderer-response readers with the shared host budget. Preserve ordered delivery and backpressure, and recheck cancellation after waits so a retired RPC pull cannot publish a stale buffered value.
+
+  Observe server result rejections when the producer is created so a paced consumer can delay its first read without an unhandled rejection. The stream still delivers the sanitized error frame.
+- 6df3359: Closing a portal no longer allocates a property dictionary for each of its two comment markers. Teardown used `delete` to remove the markers' event-range fields, and that switches a DOM wrapper into dictionary mode. It now clears the fields instead. Event routing is unchanged.
+
+  On the `portal-swarm` benchmark, opening and closing all 600 tooltips allocates 4.6% less (3,101 KB to 2,958 KB), and `open_close_cycle` runs 1.5–3% faster (paired, A/A-controlled).
+- d30025a: Keep a committed portal's events working after a discarded render created another portal in the same target.
+
+  Portals that share a target also share its delegated event listeners, which detach when the last portal releases them. A root render can create a portal and then be discarded, for example when a sibling suspends with no Suspense boundary. In that case both the new portal's creation undo and its owner's teardown released the portal, so the target lost its listeners while a committed portal still used them, and that portal's handlers (a button's `onClick`, say) stopped firing. This affected compiled `createPortal` host children, portals returned as values, and portals that the same render created and removed again. Each portal now releases the target once.
+- 78750a0: Stop journaling the creation and renders of a Block whose parent the same root
+  render created.
+
+  Every scheduled root render keeps an undo journal so it can roll back if it
+  suspends. It recorded a creation entry and a render entry for every Block it
+  created, including Blocks nested inside a parent it had also created, which a
+  rollback discards together with that parent. Those Blocks are no longer
+  recorded, including Blocks below a hookless child (their render entries are
+  kept when the hookless child is their direct parent). After replaying the journal,
+  a rollback now unmounts every Block the render created that is still live. That
+  covers a Block its parent never linked, such as a portal whose content suspended
+  before its slot was registered. A boundary holding a transition keeps recording
+  everything inside its own window. During a rollback, the teardown callbacks of
+  these never-committed nested scopes, such as `nativeLocalHook` disposers, now
+  run parent first, as an ordinary unmount does, instead of in reverse creation
+  order.
+
+  A first mount of the 2,047-component `recursive-context` tree allocates 8% less
+  (4,028 KB to 3,689 KB per mount), and a cold `portal-swarm` mount is 13% faster.
+  Opening and closing portals under already mounted components is unchanged.
+- f183be7: Journal a structural slot change with one fewer Map, closure and log entry. Before a root render restructures an `@if`, `@switch`, component or child slot, it records the slot so that a suspension can roll it back. That record now marks the slot's snapshot instead of keeping a second Map with an undo closure to clear it. Rollback is unchanged.
+
+  On the `portal-swarm` benchmark, opening and closing all 600 tooltips allocates 6.6% less (3,111 KB to 2,906 KB), and `open_close_cycle` runs 1–2% faster (paired, A/A-controlled). Bundles that include the root journal lose 16–22 raw bytes.
+- 0f3abca: Ship the production text of argument-free errors once per application instead
+  of once per module.
+
+  The published package gave each module whose errors take no arguments its own
+  copy of the "Minified Octane error" formatter, about 190 bytes each. A bundle
+  carried one per such module, and a code-split application one in every chunk
+  that included any of them. Those modules now import one shared formatter, so a
+  bundle holds that text at most twice: once for argument-free errors and once in
+  the generic formatter that encodes arguments. Error messages are unchanged.
+
+  A hydrating signals application built from the published package drops from 9
+  copies to 2 (1.4 KB raw). Split across 19 chunks, it drops from 22 copies in 10
+  chunks to 2 copies in one chunk (3.7 KB raw, 1.1 KB gzip).
+- cbc1e8e: Mount component trees faster by keeping rarely used per-component state out of every Block.
+
+  Every rendered component, list row and control-flow arm is backed by a Block. Fourteen of its fields served only a few features: Suspense, `@try` and `<Activity>` boundaries, `use()` thenables, fetch-tree warming, the loop guard for updates scheduled from effects, `useEffectEvent`, and `<ViewTransition>`. Those fields now live on a small record that a Block allocates the first time one of those features touches it. Ordinary Blocks drop from 79 fields to 66 and construct faster.
+
+  Paired cold first mounts before and after this change, in Chromium (40 fresh pages each):
+
+  - memo-wall (8,006 Blocks): about 4% faster.
+  - portal-swarm (1,205 Blocks): about 2% faster.
+  - recursive-context (4,102 Blocks): about 1.5–3% faster.
+
+  Behavior is unchanged.
+- 1048eab: Hydrate an empty `{x as string}` text hole that is the sole content of a fragment, directive arm, list item, or component children without a recoverable mismatch. The server now emits the empty-text stand-in for these positions, as it already did for text holes with siblings, so hydration adopts the server DOM instead of regenerating it.
+- 188d60b: Keep the transition and hidden-Activity graphs out of applications that only
+  use Suspense.
+
+  A `@try` boundary with a `@pending` arm installed the whole transition driver
+  and the hidden-`<Activity>` re-render, so every Suspense application shipped
+  transition attempts, root holds, held-update replay and Activity re-hiding even
+  when it never called `startTransition` or rendered `<Activity>`. Suspense now
+  installs only the off-screen swap it uses for urgent branch replacement.
+  `startTransition` installs the transition members, and `<Activity>` installs its
+  own re-render when it first hides. Behavior is unchanged.
+
+  A server-rendered frame that hydrates native signal reads, a keyed list, a
+  `@try` boundary, a portal and a behavior island drops 9.6 KB raw and 2.6 KB gzip
+  of production JavaScript, and a Suspense application without transitions drops
+  9.7 KB raw and 2.7 KB gzip.
+- b4a61e7: Render a pending cue at urgent priority, so a cue in an ancestor commits before the transition it announces.
+
+  A `useTransition` or `useActionState` raising `isPending`, or a `useOptimistic` value,
+  rendered at transition priority in the click's microtask flush. When that render
+  reached a descendant whose state the transition sets, the descendant rendered its
+  new state there too, so the browser could not paint the cue until the whole
+  transition render had finished (#1864). The cue now renders at urgent priority, as
+  React renders it in an urgent lane. Descendants show their previous state and
+  render the transition in its later host task.
+
+  Because the cue is urgent, a component that suspends while rendering it shows its
+  boundary's fallback, as in React. A commit of cues alone, such as an async Action's
+  before its first update, no longer starts a View Transition; transition work that
+  commits with them keeps its capture.
+- 90a57d8: Commit `isPending` with the previous state when the same component holds the transition's update, and render that update in the transition's task.
+
+  In the canonical `useTransition` pattern, one component holds both `isPending` and
+  the state its transition sets. That component rendered the pending cue and the
+  transition together in one microtask flush, so a click paid for the whole
+  transition render before the browser could paint "pending" (#1864). The cue now
+  renders without the transition's own updates and shows their previous values. The
+  component renders those updates in the transition's later host task, as React
+  renders `isPending` in an urgent lane before the transition lane. The same holds
+  for a `useOptimistic` value set in that component, and for a cue that arrives
+  while the component's transition is already waiting. Such a cue renders outside a
+  View Transition and leaves the transition's `addTransitionType` types to the
+  transition's own render.
+
+  An urgent update to a component whose transition is waiting still renders the
+  transition with it, and `flushSync` and `act()` still drain both priorities.
+- 47e030e: Drop `useTransition`'s `isPending` in the same render that commits the transition's updates.
+
+  React's transition lane carries `setPending(false)` with the transition's own
+  updates, so `isPending` falls in the commit that shows them. Octane published the
+  falling edge from a follow-up after the transition's task flush, which cost a second
+  render and commit in that task: a component holding both `isPending` and the
+  transition's state committed `"b pending"` and then `"b idle"`, and a separate
+  button's `idle` committed after the panel its transition updated (#1864). The
+  falling edge now renders with the transition. If a render in that pass suspends and
+  holds the transition, `isPending` stays true and no `idle` commits. A
+  `useOptimistic` value that a synchronous transition showed reverts in that same
+  commit.
+
+  The falling edge is transition work, so it now waits for the transition's task when
+  an urgent update takes over the transition's components, or when the transition
+  updates nothing. When `flushSync` or `act()` drains a cue together with the
+  transition it announces, the cue still commits first, and its falling edge follows
+  in a later task.
+- d788d32: Render transition-priority work in a later task, so a backlog of Action results or transitions commits once instead of once per microtask.
+
+  Transition renders were flushed on a microtask, like urgent ones. Every ready
+  continuation therefore paid for its own render and commit inside one microtask
+  checkpoint, and the browser could neither paint nor deliver input until the last
+  one had finished (#1864). A hundred synchronous `useActionState` dispatches
+  committed 101 times where React 19 commits twice. Transition renders scheduled
+  outside a render now wait for a host task of their own (`scheduler.postTask`,
+  then `MessageChannel`, then `setTimeout`), as React renders a transition lane in
+  a Scheduler task. That covers updates inside `startTransition`, Action results,
+  transitions started after an `await`, and, while an async Action is pending,
+  updates made outside a delegated event, `flushSync`, or a commit callback.
+
+  The pending cue still commits first: `useTransition` and `useActionState`
+  raising `isPending`, and `useOptimistic` showing a value, keep the microtask
+  flush. An urgent update to a component whose transition is waiting renders it
+  at once, and `flushSync` and `act()` drain both priorities. Code that expected a
+  transition's commit after awaiting only microtasks now needs to await a task, or
+  `act()`.
+- e2044cb: Adopt DOM bindings on a page that the browser has translated. Text that Chrome's Translate has wrapped in `<font>` elements no longer throws error #318, #321 or #286. This covers fixed views' text leaves and structural programs' static text and text holes. Adoption leaves the translated text in place, and bound text is replaced with plain text when its value next changes. Text translated after adoption also updates again: before, those writes were silently dropped. Add `translate="no"` to an element to keep its text untranslated.
+- a7ae419: Keep updating an element's only text child after the browser translates the
+  page.
+
+  Chrome's page translator replaces each Text node with nested `<font>` wrappers
+  holding the translation and detaches the original node. Octane kept writing new
+  values into that detached node, so `<span>{message}</span>` and
+  `<span>{message as string}</span>` went on showing the stale translation. As
+  React's `setTextContent` does, the next update now replaces what the translator
+  put in the element with the new text. Switching that child to an element or to
+  nothing also clears the translation. Text that sits beside other children keeps
+  React's behavior: a translated sibling Text node is not rewritten.
+- 21f911d: Update the shared TSRX compiler dependencies to `@tsrx/core` 0.5.5 and
+  `@tsrx/oxc` 0.20.0. `octane` now declares `@tsrx/oxc@0.20.0` as its optional
+  compiler parser peer, so a project that compiles Octane in Node upgrades its
+  `@tsrx/oxc` install from 0.16.0 to 0.20.0.
+
+  The parser now gives template markup TSX's exact tree: the indentation between
+  children is its own whitespace text, and each `@case`/`@default` arm is one block.
+  Octane adopts that tree at the parser boundary, so templates keep compiling to the
+  same static templates, component slots, and fast paths. Indentation between
+  children also no longer reaches a component as empty-string children in
+  value-position JSX, so `Children.count` and `Children.only` match React.
+
+  The TSRX language changes in this release apply to `.tsrx` files:
+
+  - A `//` preceded by whitespace, at the start of a line, or right after a tag or
+    block starts a comment in template children; `https://example.com` and `a//b`
+    stay text.
+  - A static `<script>` body cannot contain `</script` in any letter case, since
+    HTML ends the element there; write `<\/script`.
+  - A dynamic tag, `<{expr}>`, must be an identifier, a member access, or a string
+    literal; compute any other expression into a local first.
+  - Every compile error has a TypeScript (`TS…`) or TSRX (`TSRX…`) code.
+
+  JSX text and attribute strings are decoded once, by the parser. Both parsers
+  now give their `value` decoded, so Octane no longer decodes it again: the
+  browser compiler, and a Node compile that fell back to `@tsrx/core`'s parser,
+  rendered `&amp;lt;` as `<` instead of `&lt;`. Decoding follows JSX, as in
+  React: numeric references and the XHTML named references are decoded, and a
+  later HTML name such as `&check;` stays text. JSX's whitespace rule applies to
+  the decoded text, as Babel applies it. Layout checks read the text as written,
+  so text that is only `&nbsp;` still renders.
+
+  Enum member initializers are now visible to the client-only server check and to
+  universal renderers' `forbiddenGlobals` validation, so a client-only binding or a
+  forbidden global used in one is reported, and a member name used by a later
+  initializer is not mistaken for a global.
+- 3557100: Report a file that will not parse with the same error from the Node compiler as
+  from the browser compiler, by moving the Node parser to `@tsrx/oxc` 0.20.0.
+
+  - A syntax error is a `SyntaxError` whose message ends with its position, as in
+    `Unexpected token (2:10)`. Its `loc` is that position, `{ line, column }` with a
+    zero-based column, and `pos` is its offset. Before, the message had no
+    position and `loc` was a `{ start, end }` range, which Vite discards, so Vite
+    named the file without a line and column.
+  - A template diagnostic, such as two outputs in one code block or a redeclared
+    binding, is now a plain `Error` with its code and a `loc` range, not a
+    `SyntaxError`.
+  - Messages use `@tsrx/core`'s wording. An unclosed tag reports
+    `Unclosed tag '<div>'. Expected '</div>' before end of template.` where the
+    closing tag was expected, instead of `unterminated JSX element starting at
+    byte N` at the opening tag. A directive written without parentheses, such as
+    `@if x { … }`, reports `Unexpected keyword 'if'`.
+
+  A `.tsrx` module with a generic call signature in an interface, such as
+  `<T>(props: Props<T>): Element`, now parses natively instead of falling back to
+  `@tsrx/core`'s parser. Its compiled output does not change.
+- 3557100: Let `octane/compiler/typescript`'s declarations type-check in a project whose
+  `typescript` is TypeScript 7. `validateNativeSignalNames` named
+  `import('typescript').Program` and `SourceFile`, which TypeScript 7's package
+  root does not export; it now declares the classic Program it needs
+  structurally, and still accepts a TypeScript 5.9 or 6 `Program` and
+  `SourceFile`.
+- 3557100: Type-check `@try` in `.tsrx` files for universal renderers such as
+  `@octanejs/ink`. Type checking renders `@try` as a `<Suspense>` (for
+  `@pending`) and a `<TsrxErrorBoundary>` (for `@catch`), imported from `octane`,
+  whose DOM component types return `void` and `unknown`. A universal renderer's
+  JSX accepts only components that return a `UniversalRenderable`, so TypeScript
+  rejected the boundaries in every such file. Type checking now imports
+  renderer-neutral stand-ins from the new type-only `octane/tsrx-boundary`
+  subpath. Runtime output does not change.
+- 1e74902: Stop shipping inert profiling code from `vite dev` when profiling is off. Vite's dev server leaves `define` entries as runtime globals, so Octane's served runtime kept every `__OCTANE_PROFILE_ENABLED__` guard as a global read on its hot paths and still loaded `profiling.ts` and `devtools-hook.ts`. The Vite plugin now folds those guards out of Octane's own runtime modules in dev and gives Vite's dependency optimizer the same constant, so a pre-bundled `octane` drops them too. Profiling-on dev servers and production builds are unchanged.
+- 7e6bda5: Stop parsing modules that the Vite plugin and compiler only pass through.
+
+  Nitro, as used by TanStack Start, rebundles the SSR build's own chunks from
+  `node_modules/.nitro`, and Octane's Vite plugin ran over each one again. Before
+  checking whether the compiler would read anything from a module, the plugin's
+  preflight parsed every module in full. The compiler then attributed these
+  chunks to the application's `package.json` by walking up past `node_modules`.
+  Code samples inside the chunks' strings matched the hook-import text gate, so
+  the compiler parsed them a second time to hook-slot them, and the result was
+  unchanged. The authored parser is slow on large modules with few comments, so
+  the website's 5 MB docs chunk cost about 90 s and its 1.5 MB benchmarks chunk
+  about 80 s.
+
+  - A file inside a `node_modules` directory that has no manifest of its own,
+    such as a `.vite`, `.nitro`, or `.cache` build cache, no longer belongs to
+    the application that installed it. Node's package scope lookup draws the
+    same boundary.
+  - Preflight parses a module only when its transform can read a fact that needs
+    the AST. Facts that need it are compilation, hook slotting, and a virtual
+    barrel's descriptor re-exports. Every other module skips the parse.
+  - The static requests for a plain JavaScript module's server client-only check
+    now come from the module lexer instead of a parse. Module syntax inside
+    strings and comments no longer counts as a request.
+
+  In a local production build of the website, the Nitro phase drops from 2 m 50 s
+  to 0.5 s. Every emitted file keeps its content hash.
+- 43b60d9: Keep an early binding's whole-`style` publication through hydration, as
+  single-declaration publications already were.
+
+  When an early binding (`adoptBindings`) owned a whole style, such as a
+  forwarded `style={props.style}`, and published a newer value before hydration,
+  development reported that value as a hydration mismatch. Once the binding was
+  released, a render with the hydration-time style did not write it, because
+  hydration had cached the skipped write as applied, so the early value stayed on
+  screen. The binding now publishes its style for hydration. Hydration keeps it
+  without a report, and the next render writes its style even when unchanged.
+
 ## 0.10.2
 
 ### Patch Changes
