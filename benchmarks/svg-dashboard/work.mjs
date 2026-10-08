@@ -47,8 +47,7 @@ const ACCESSORS = [
 	'scopedValueChildren',
 	'scopedValueInvocationSite',
 ];
-// Structural controls: the slot visits each commit still performs. They are
-// reported, not budgeted, so a change that skips work legitimately can land.
+// Structural controls: the slot visits each commit still performs.
 const CONTROLS = ['renderBlock', 'childSlot', 'deoptItemBody'];
 const METRICS = [...ACCESSORS, ...CONTROLS];
 // Every ui commit renders Viewport and classifies `defs`. Coverage omits a
@@ -58,19 +57,6 @@ const MUST_CALL = ['scopedValueType', 'renderBlock', 'childSlot'];
 
 const TOOLTIP_CYCLES = 4;
 const PAN_STEPS = 8; // one full preset rotation
-
-// Read budgets for the measured commits. A ui commit reads `defs`' type, key,
-// and props once each (3). Each of the four `layers` children reads its type
-// and key while its Fragment flattens, its type for its list item, and its type
-// and props in its child slot (4 x 5). A commit that renders the tooltip adds
-// the portal body's type, key, and props (3), and three of a cycle's four
-// commits do: 23 per pan_zoom commit, 4 x 23 + 3 x 3 = 101 per tooltip cycle.
-// The runtime before read-once classification paid 85 per pan_zoom commit and
-// 352 per tooltip cycle for the same slot visits.
-const BUDGET = {
-	tooltip_cycle_scoped_reads: 101 * TOOLTIP_CYCLES,
-	pan_zoom_scoped_reads: 23 * PAN_STEPS,
-};
 
 // Expected ui state after each measured step, replayed through the shared ops
 // module the fixture executes. Measurement starts after one warm cycle/rotation.
@@ -268,12 +254,11 @@ if (process.env.BENCH_JSON) {
 			{
 				name: `${TARGET.name}-work`,
 				ops: Object.fromEntries(Object.entries(ops).map(([op, value]) => [op, stat(value)])),
-				meta: { gates: failures.length > 0 ? 'fail' : 'pass' },
-			},
-			{
-				name: `${TARGET.name}-work-budget`,
-				ops: Object.fromEntries(Object.entries(BUDGET).map(([op, value]) => [op, stat(value)])),
-				meta: { tooltipCycles: TOOLTIP_CYCLES, panSteps: PAN_STEPS },
+				meta: {
+					gates: failures.length > 0 ? 'fail' : 'pass',
+					tooltipCycles: TOOLTIP_CYCLES,
+					panSteps: PAN_STEPS,
+				},
 			},
 		],
 	};

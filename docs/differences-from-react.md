@@ -1385,8 +1385,16 @@ render shows their previous values, and those components render them in the task
 Because the cue is urgent, a component that suspends during it shows its boundary's
 fallback, and its commit starts no native View Transition capture. Explicit
 transition work keeps its capture when it reaches the render queue, including state
-in the same component as the cue. `isPending` falls right after the transition's
-render, in the same task. A cue keeps transition priority and renders the
+in the same component as the cue. `isPending` falls in the transition's own
+render, as React's transition lane carries `setPending(false)`: the component that
+holds the transition's state renders the new value with `isPending` false, and a
+component whose only change is the falling edge renders in the same commit. A render
+that suspends into a hold keeps `isPending` raised. A `useOptimistic` value a
+synchronous transition showed reverts in that commit too. The falling edge is transition
+work, so it waits for the task even after an urgent update takes over the
+transition's components, or when the transition updates nothing. When `flushSync` or
+`act()` renders a cue together with the transition it announces, the cue commits
+first and the falling edge takes a later task. A cue keeps transition priority and renders the
 transition's work with it when that work is not hook state, inside a Suspense
 boundary that is holding a suspended transition, when `flushSync` drains both, or
 when the cue starts during a render, a commit, or the transition's task. An urgent

@@ -6,7 +6,7 @@ claim to remove their costs. The separate [replay audit](../ssr-final-replay/REA
 covers snapshot copying, streaming, output flattening, and `ssrTry`.
 
 ```sh
-node benchmarks/bench.mjs --quick --ratios ssr-final-metadata
+node benchmarks/bench.mjs --quick ssr-final-metadata
 SSR_SOURCE_ROOT=/path/to/frozen-source node benchmarks/ssr-final-metadata/audit.mjs
 METADATA_TIMING=1 node benchmarks/ssr-final-metadata/audit.mjs
 node benchmarks/ssr-final-replay/diagnostics.mjs
@@ -69,8 +69,8 @@ The suite builds unsafe alternatives in memory and verifies that removing:
 
 Sparse arrays, post-render accessor installation on the same receiver, normal
 arrays, and unchanged inputs are additional controls. The production guard
-budget remains one element query per element and two global property probes
-per eligible call. It is an accepted compatibility cost.
+still costs one element query per element and two global property probes per
+eligible call. It is an accepted compatibility cost.
 
 ## Frame and list identity — retain scoped counters and encoding
 

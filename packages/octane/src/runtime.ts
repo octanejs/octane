@@ -2716,8 +2716,19 @@ let TRANSITION_CUE_EPOCH = -1;
 // joining one posted before input that arrived in between.
 let transitionTask = 0;
 let transitionTaskIds = 0;
-// Callbacks that must run after the posted task's flush (afterTransitionFlush).
-let TRANSITION_FOLLOWUPS: Array<() => void> | null = null;
+// Transition completions waiting for the drain that renders their work
+// (queueTransitionFall), as pairs: the batch, then its synchronous callback's
+// submit record (or null), or undefined for an async Action, whose settle
+// released the rest already. A drain that adopts the queue arms them
+// (armTransitionFalls), and the armed pairs settle once that drain's renders are
+// done (settleTransitionFalls).
+const TRANSITION_FALLS: Array<TransitionActionBatch | SubmitDispatchRec | null | undefined> = [];
+const ARMED_TRANSITION_FALLS: typeof TRANSITION_FALLS = [];
+// The effect sequence of a drain's falling-edge renders, and the drain and queue
+// index from which its renders are those (renderTransitionFall).
+let TRANSITION_FALL_SEQ = 0;
+let TRANSITION_FALL_DRAIN = 0;
+let TRANSITION_FALL_FROM = 0;
 // Set while a posted transition task runs (the transition flush, or the
 // useDeferredValue swap). That task already follows the urgent commit, so
 // transition work it schedules, including from the passive effects drained
@@ -2794,6 +2805,9 @@ interface TransitionRootDriver {
 	endUrgent: typeof endUrgentTransitionRender;
 	splitCue: typeof splitTransitionCue;
 	splitsCue: typeof splitsTransitionCue;
+	armFalls: typeof armTransitionFalls;
+	settleFalls: typeof settleTransitionFalls;
+	cancelFall: typeof cancelTransitionFall;
 	holdRoot: typeof holdRootTransition;
 	retryRoot: typeof retryRootTransition;
 	commitRoot: typeof commitRootTransition;
@@ -2822,6 +2836,9 @@ function ensureTransitionSwapDriver(): void {
 		endUrgent: endUrgentTransitionRender,
 		splitCue: splitTransitionCue,
 		splitsCue: splitsTransitionCue,
+		armFalls: armTransitionFalls,
+		settleFalls: settleTransitionFalls,
+		cancelFall: cancelTransitionFall,
 		holdRoot: holdRootTransition,
 		retryRoot: retryRootTransition,
 		commitRoot: commitRootTransition,
@@ -2885,6 +2902,10 @@ interface TransitionActionBatch {
 	hooks: TransitionHookSlot[] | null;
 	/** True while this batch is counted in its hooks' pending batch counts. */
 	hooksPending: boolean;
+	/** Armed to finish with the drain rendering its work (armTransitionFall). */
+	falling: boolean;
+	/** QUEUE_REINDEX_EPOCH when its hooks last raised isPending (queueTransitionFall). */
+	cueEpoch: number;
 	pendingHolds?: number;
 	workComplete?: boolean;
 	/** Allocated only by a native write inside this Action. */
@@ -3045,6 +3066,8 @@ function createTransitionActionBatch(): TransitionActionBatch {
 		hook: null,
 		hooks: null,
 		hooksPending: false,
+		falling: false,
+		cueEpoch: -1,
 	};
 }
 
@@ -3242,6 +3265,7 @@ function addTransitionHookToBatch(batch: TransitionActionBatch, hook: Transition
 	if (batch.hooksPending) {
 		// The batch is already counted in its earlier hooks; count the newcomer.
 		hook.pendingBatches++;
+		batch.cueEpoch = QUEUE_REINDEX_EPOCH;
 		hook.publish(true);
 	}
 }
@@ -3251,6 +3275,7 @@ function publishTransitionHookBatch(batch: TransitionActionBatch): void {
 	const hook = batch.hook;
 	if (hook === null || batch.hooksPending) return;
 	batch.hooksPending = true;
+	batch.cueEpoch = QUEUE_REINDEX_EPOCH;
 	hook.pendingBatches++;
 	hook.publish(true);
 	const hooks = batch.hooks;
@@ -3284,6 +3309,8 @@ function holdTransitionHookBatch(holder: object, batch: TransitionActionBatch): 
 	if (batches.has(batch)) return;
 	batches.add(batch);
 	batch.pendingHolds = (batch.pendingHolds ?? 0) + 1;
+	// The drain rendering this batch's work held it: isPending stays raised.
+	if (batch.falling) TRANSITION_ROOT_DRIVER!.cancelFall(batch);
 	// A finished batch that a later round re-holds becomes pending again.
 	publishTransitionHookBatch(batch);
 }
@@ -3383,6 +3410,8 @@ interface TransitionAttempt {
 	heldSlots: Set<TrySlot> | null;
 	/** Hook-map entries and inline memo-cell ranges: undone on hold, redone on promotion. */
 	memoSwaps: TransitionMemoSwap[] | null;
+	/** Hooks whose falling edge this render showed before a hold (raiseTransitionHook). */
+	raised: TransitionHookSlot[] | null;
 }
 
 let ACTIVE_TRANSITION_ATTEMPT: TransitionAttempt | null = null;
@@ -3687,6 +3716,7 @@ function beginTransitionAttempt(block: Block): TransitionAttempt | null {
 		effectDeps: ROOT_RENDER_TRANSACTION === null ? snapshotSubtreeEffectDeps(block) : null,
 		heldSlots: null,
 		memoSwaps: null,
+		raised: null,
 	};
 	ACTIVE_TRANSITION_ATTEMPT = attempt;
 	return attempt;
@@ -3711,7 +3741,9 @@ function endTransitionAttempt(attempt: TransitionAttempt | null): void {
 	if (held !== null && held.size > 0) {
 		entries = takeSingleOriginTransitionUpdates(attempt.origin);
 	}
+	let unwind = false;
 	if (held !== null && held.size > 0 && entries !== null && entries.length > 0) {
+		unwind = true;
 		// Unwind everything the attempt did: bindings and structure via the
 		// journal, then the work it queued, then the effect cells it advanced.
 		rollbackTransitionJournal(attempt.journalCheckpoint, attempt.origin);
@@ -3778,6 +3810,19 @@ function endTransitionAttempt(attempt: TransitionAttempt | null): void {
 		TRANSITION_JOURNAL = null;
 		TRANSITION_JOURNAL_BAGS = null;
 		flushParkedItems();
+	}
+	// A hold raised isPending over a render in this attempt that showed its
+	// falling edge (raiseTransitionHook). The unwind restored a render inside
+	// it; any other renders the cue, now that it has left the stack.
+	const raised = attempt.raised;
+	if (raised !== null) {
+		for (let i = 0; i < raised.length; i++) {
+			const hook = raised[i];
+			if (unwind && blockIsAncestor(attempt.origin, hook.block)) {
+				hook.tentative = false;
+				hook.isPending = true;
+			} else hook.publish(true);
+		}
 	}
 }
 
@@ -7261,7 +7306,7 @@ function ensureViewTransitionDriver(): ViewTransitionDriver {
 				// can touch further owners, so only that fallback interrupts all scopes.
 				if (passivesSettled) vtInterruptOwners(owners);
 				else vtInterrupt();
-				adoptTransitionQueue();
+				adoptTransitionQueue(true);
 				work();
 				flushWork();
 				return true;
@@ -7281,7 +7326,7 @@ function ensureViewTransitionDriver(): ViewTransitionDriver {
 			if (!vtNativeAvailable(owners)) return false;
 			vtFlush(
 				() => {
-					adoptTransitionQueue();
+					adoptTransitionQueue(true);
 					work();
 					if (QUEUE.length > 0 || ROOT_RENDER_TRANSACTIONS.length > 0) flushWork();
 				},
@@ -7932,7 +7977,7 @@ function upgradeTransitionBlock(block: Block, mode: 'urgent' | 'transition', cue
 		scheduled = true;
 		queueMicrotask(flush);
 	}
-	// Nothing is left for the task: retire it, and run its follow-ups after this flush.
+	// Nothing is left for the task: retire it. Waiting completions keep a task.
 	if (TRANSITION_QUEUE.length === 0) adoptTransitionQueue();
 }
 
@@ -7973,9 +8018,12 @@ function splitsTransitionCue(block: Block): boolean {
  * its own block's committed cells (renderTransitionCue). Otherwise the drain's
  * own render consumes any transition work the block also has waiting.
  */
-function splitTransitionCue(block: Block): typeof renderBlock | undefined {
+function splitTransitionCue(block: Block, position: number): typeof renderBlock | undefined {
 	// Release an earlier drain's cues at the next drained block.
 	if (TRANSITION_CUE_EPOCH !== QUEUE_REINDEX_EPOCH) TRANSITION_CUES.length = 0;
+	// Renders queued as the drain's completions settled are falling edges.
+	if (TRANSITION_FALL_DRAIN === DRAIN_ID && position >= TRANSITION_FALL_FROM)
+		return renderTransitionFall;
 	if (block.pendingMode !== 'transition') return;
 	if (splitsTransitionCue(block)) {
 		block.pendingMode = 'urgent';
@@ -8053,7 +8101,7 @@ function scheduleTransitionTask(): void {
 		if (transitionTask !== id) return;
 		TRANSITION_TASK_ACTIVE = true;
 		try {
-			adoptTransitionQueue();
+			adoptTransitionQueue(true);
 			flush();
 		} finally {
 			TRANSITION_TASK_ACTIVE = false;
@@ -8061,29 +8109,191 @@ function scheduleTransitionTask(): void {
 	});
 }
 
-/** Move waiting transition renders onto the flush about to run. */
-function adoptTransitionQueue(): void {
+/**
+ * Move waiting transition renders onto the flush about to run. A flush that
+ * drains them (`drain`: the task, flushSync, act(), and the discrete-event and
+ * view-transition flushes) also arms their completions. An urgent flush that
+ * only takes them over leaves those completions a task of their own, as React
+ * keeps `setPending(false)` in the transition lane.
+ */
+function adoptTransitionQueue(drain?: boolean): void {
 	transitionTask = 0;
 	for (let i = 0; i < TRANSITION_QUEUE.length; i++) QUEUE.push(TRANSITION_QUEUE[i]);
 	TRANSITION_QUEUE.length = 0;
 	// Rendered-cue marks only matter while their blocks wait; release the blocks.
 	RENDERED_CUES.length = 0;
-	const followups = TRANSITION_FOLLOWUPS;
-	if (followups !== null) {
-		TRANSITION_FOLLOWUPS = null;
-		// Queued before the caller drains, so they run right after its commit.
-		for (let i = 0; i < followups.length; i++) queueMicrotask(followups[i]);
+	if (TRANSITION_FALLS.length !== 0) {
+		if (drain === true) TRANSITION_ROOT_DRIVER!.armFalls();
+		else scheduleTransitionTask();
 	}
 }
 
 /**
- * Run `callback` after the flush that renders the transition work scheduled so
- * far, as the microtask after it. While a transition task is posted, that is
- * the task's flush rather than the next microtask flush.
+ * Queue a transition's completion for the drain that renders its work: for a
+ * synchronous callback, the pending count, form status and form resets it holds,
+ * then isPending's falling edge. React carries `setPending(false)` in the
+ * transition lane with the transition's own updates, so both commit in one
+ * render, and a transition that suspends into a hold stays pending.
  */
-function afterTransitionFlush(callback: () => void): void {
-	if (transitionTask !== 0) (TRANSITION_FOLLOWUPS ??= []).push(callback);
-	else queueMicrotask(callback);
+function queueTransitionFall(
+	batch: TransitionActionBatch,
+	submit: SubmitDispatchRec | null | undefined,
+): void {
+	// Work scheduled inside a flush or the task joins the drain on the stack
+	// (queueTransitionBlock), which settles the completion with it, unless that
+	// drain also renders the cue announcing it.
+	if (
+		QUEUE.length !== 0 &&
+		(syncFlush || inFlush || CURRENT_BLOCK !== null || TRANSITION_TASK_ACTIVE) &&
+		batch.cueEpoch !== QUEUE_REINDEX_EPOCH
+	)
+		armTransitionFall(batch, submit);
+	else {
+		TRANSITION_FALLS.push(batch, submit);
+		scheduleTransitionTask();
+	}
+}
+
+/** Arm the waiting completions for the drain adopting their work (adoptTransitionQueue). */
+function armTransitionFalls(): void {
+	const falls = TRANSITION_FALLS;
+	let waiting = 0;
+	for (let i = 0; i < falls.length; i += 2) {
+		const batch = falls[i] as TransitionActionBatch;
+		// A flushSync or act() drain can render a cue with the transition it
+		// announces. The cue commits first, and its falling edge takes a later
+		// task. That drain advances the epoch, so the edge waits only once.
+		if (batch.cueEpoch === QUEUE_REINDEX_EPOCH && QUEUE.length !== 0) {
+			falls[waiting++] = batch;
+			falls[waiting++] = falls[i + 1];
+		} else armTransitionFall(batch, falls[i + 1] as SubmitDispatchRec | null | undefined);
+	}
+	falls.length = waiting;
+	if (waiting !== 0) scheduleTransitionTask();
+	// Nothing renders in this drain, so nothing can hold these batches.
+	if (QUEUE.length === 0 && ARMED_TRANSITION_FALLS.length !== 0) settleTransitionFalls();
+}
+
+function armTransitionFall(
+	batch: TransitionActionBatch,
+	submit: SubmitDispatchRec | null | undefined,
+): void {
+	// One sequence orders every falling-edge render of the drain (renderTransitionFall).
+	if (ARMED_TRANSITION_FALLS.length === 0) TRANSITION_FALL_SEQ = commitSeq++;
+	ARMED_TRANSITION_FALLS.push(batch, submit);
+	// A held batch, or one whose Action is still in flight, keeps its hooks pending.
+	if (
+		batch.falling ||
+		!batch.hooksPending ||
+		batch.pendingActions !== 0 ||
+		(batch.pendingHolds ?? 0) !== 0
+	)
+		return;
+	batch.falling = true;
+	fallTransitionHook(batch.hook!);
+	batch.hooks?.forEach(fallTransitionHook);
+}
+
+/**
+ * When this batch is the last a hook counts, the render its block has queued in
+ * the drain shows the falling edge. That render carries the transition's own
+ * updates, as React's transition lane renders `setPending(false)` with them. A
+ * hold on the batch raises it again (cancelTransitionFall). A hook whose block
+ * has no render queued publishes its edge when the drain settles, after every
+ * hold the drain's renders decide.
+ */
+function fallTransitionHook(hook: TransitionHookSlot): void {
+	if (hook.pendingBatches !== 1 || !hook.isPending || !hook.block.pending) return;
+	hook.isPending = false;
+	hook.tentative = true;
+	if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__)
+		__profileSchedule(hook.block, 'transition-pending', hook.profileSlot);
+}
+
+/** A render in the drain suspended into a hold of this falling batch. */
+function cancelTransitionFall(batch: TransitionActionBatch): void {
+	batch.falling = false;
+	raiseTransitionHook(batch.hook!);
+	batch.hooks?.forEach(raiseTransitionHook);
+}
+
+function raiseTransitionHook(hook: TransitionHookSlot): void {
+	if (!hook.tentative) return;
+	// A queued render reads the raised value. A render that already showed the
+	// falling edge renders the cue again once it leaves the stack, unless the
+	// attempt rendering it unwinds it instead (endTransitionAttempt).
+	const attempt = ACTIVE_TRANSITION_ATTEMPT;
+	if (hook.block.pending) {
+		hook.tentative = false;
+		hook.isPending = true;
+	} else if (attempt !== null) (attempt.raised ??= []).push(hook);
+	else hook.publish(true);
+}
+
+/**
+ * Settle the armed completions once the drain's renders have decided their
+ * holds (drainQueue), returning whether that queued more renders. A hook whose
+ * block rendered nothing in the drain publishes its falling edge here, and that
+ * render joins the same commit (renderTransitionFall). A root that suspended
+ * discards the drain's renders in it, including a falling edge already shown
+ * and any this would queue, so such a completion waits for the next task.
+ */
+function settleTransitionFalls(): boolean {
+	const armed = ARMED_TRANSITION_FALLS;
+	if (armed.length === 0) return false;
+	const from = QUEUE.length;
+	for (let i = 0; i < armed.length; i += 2) {
+		const batch = armed[i] as TransitionActionBatch;
+		const submit = armed[i + 1] as SubmitDispatchRec | null | undefined;
+		if (batch.falling) {
+			if (discardsTransitionFall(batch)) {
+				cancelTransitionFall(batch);
+				TRANSITION_FALLS.push(batch, submit);
+				scheduleTransitionTask();
+				continue;
+			}
+			batch.falling = false;
+		}
+		if (submit !== undefined) {
+			tickTransitionCount(-1);
+			if (submit !== null) settleSubmitTransition(submit);
+			flushFormResets();
+		}
+		batch.workComplete = true;
+		// The falling edge is transition work: if its render suspends, it holds.
+		TRANSITION_DEPTH++;
+		finishTransitionHookBatch(batch);
+		TRANSITION_DEPTH--;
+	}
+	armed.length = 0;
+	TRANSITION_FALL_DRAIN = DRAIN_ID;
+	TRANSITION_FALL_FROM = from;
+	return QUEUE.length !== from;
+}
+
+/** Whether a suspended root discarded this drain's renders of a hook of the batch. */
+function discardsTransitionFall(batch: TransitionActionBatch): boolean {
+	return (
+		batch.hook!.block.idState.renderOwner?.transaction?.aborted === true ||
+		batch.hooks?.some((hook) => hook.block.idState.renderOwner?.transaction?.aborted === true) ===
+			true
+	);
+}
+
+/**
+ * Render a block whose falling edge published as its drain settled
+ * (settleTransitionFalls). Its effects keep the sequence reserved when the drain
+ * armed, the position of the transition's first update, where React dispatches
+ * `setPending(false)`, rather than following the work that edge finishes.
+ */
+function renderTransitionFall(block: Block): void {
+	const queues = WIP_CAPTURE?.effects ?? effectQueues;
+	const lengths = [queues[0].length, queues[1].length, queues[2].length];
+	renderBlock(block);
+	for (let phase = 0; phase < 3; phase++) {
+		const queue = queues[phase];
+		for (let i = lengths[phase]; i < queue.length; i++) queue[i].seq = TRANSITION_FALL_SEQ;
+	}
 }
 
 // Monotonic id per drainQueue pass, paired with Block.drainStamp/drainRenders
@@ -8277,7 +8487,9 @@ function drainQueue(): { err: any } | null {
 	// reached the (possibly grown) end, so the truncation below clears only
 	// fully-processed blocks. Re-entrant additions render in append order rather
 	// than re-sorted, which at worst costs a redundant render in a rare case.
-	for (let i = 0; i < QUEUE.length; i++) {
+	// Transition completions settle at the end, once this pass has decided their
+	// holds, and the renders they schedule join it (settleTransitionFalls).
+	for (let i = 0; i < QUEUE.length || TRANSITION_ROOT_DRIVER?.settleFalls() === true; i++) {
 		const block = QUEUE[i];
 		// Skip if an ancestor's cascade already re-rendered this block this flush
 		// (renderBlock cleared its `pending`) — avoids a redundant standalone render.
@@ -8305,7 +8517,7 @@ function drainQueue(): { err: any } | null {
 		const crossRenderUpdate = block.crossRenderUpdate;
 		block.crossRenderUpdate = false;
 		// A pending cue whose transition work waits for the task renders alone.
-		const render = TRANSITION_ROOT_DRIVER?.splitCue(block) ?? renderBlock;
+		const render = TRANSITION_ROOT_DRIVER?.splitCue(block, i) ?? renderBlock;
 		const visibilityDriver = SCHEDULED_VISIBILITY_DRIVER;
 		const visibilityOwner =
 			visibilityDriver === null
@@ -9727,7 +9939,7 @@ export function flushSync<T>(fn: () => T): T {
 	try {
 		const result = runNativeBatch(fn);
 		// flushSync drains both priorities, including transitions waiting for their task.
-		TRANSITION_TASK_DRIVER?.adopt();
+		TRANSITION_TASK_DRIVER?.adopt(true);
 		// `inFlush` guards only the DRAIN below, not fn(): a nested flushSync
 		// inside fn still flushes inline (React isn't "rendering" during the
 		// callback), while one landing inside the drain defers (guard above).
@@ -11023,13 +11235,13 @@ export function drainPassiveEffects(): void {
  * True if there's a queued render or any uncommitted effect. Used by `act`,
  * and exported (tier 2, binding infrastructure) so @octanejs/testing-library's
  * synchronous settle can loop to EXACT quiescence instead of a fixed bound.
- * A transition render waiting for its host task is pending: flushSync drains
- * it. Purely promise-driven work (use(promise), async transitions) and a
- * useDeferredValue swap waiting for its host task are not "pending" by this
- * definition — they need `waitFor`/async `act`.
+ * A transition render, or the completion of one, waiting for its host task is
+ * pending: flushSync drains it. Purely promise-driven work (use(promise), async
+ * transitions) and a useDeferredValue swap waiting for its host task are not
+ * "pending" by this definition — they need `waitFor`/async `act`.
  */
 export function hasPendingWork(): boolean {
-	return TRANSITION_QUEUE.length > 0 || hasScheduledWork();
+	return TRANSITION_QUEUE.length > 0 || TRANSITION_FALLS.length > 0 || hasScheduledWork();
 }
 
 /** hasPendingWork() without the transition renders waiting for their task. */
@@ -11212,7 +11424,7 @@ export function act<T>(fn: () => T | Promise<T>): Promise<T> {
 			// startViewTransition under sync act() cannot be awaited here (use the
 			// async act form, which drains through the scheduled microtask flush).
 			// Transitions waiting for their task join this drain, wrapped or not.
-			TRANSITION_TASK_DRIVER?.adopt();
+			TRANSITION_TASK_DRIVER?.adopt(true);
 			if (VIEW_TRANSITION_DRIVER?.wouldWrap() === true) flush();
 			else flushSync(() => {});
 			throwPendingActErrors();
@@ -30673,7 +30885,7 @@ function maybeFlushDiscrete(type: DelegatedEventType): void {
 			// could never call document.startViewTransition. flush() also knows how to
 			// leave a second transition queued while an earlier one is still in flight.
 			// Transitions waiting for their task commit here too, before the restore.
-			TRANSITION_TASK_DRIVER?.adopt();
+			TRANSITION_TASK_DRIVER?.adopt(true);
 			if (VIEW_TRANSITION_DRIVER?.queueAllTransition() === true) flush();
 			else flushSync(noop);
 		}
@@ -44079,27 +44291,19 @@ function runTransition(fn: () => void | Promise<unknown>, hook?: TransitionHookS
 			if (submitRec !== null) settleSubmitTransition(submitRec);
 			// The action window (may have) closed — apply queued requestFormReset()s.
 			flushFormResets();
-			afterTransitionFlush(() => {
-				actionBatch.workComplete = true;
-				finishTransitionHookBatch(actionBatch);
-			});
+			// isPending falls with the render of the Action's promoted updates.
+			queueTransitionFall(actionBatch, undefined);
 		};
 		(result as Promise<unknown>).then(settle, (error) => {
 			settle();
 			reportTransitionError(error, hook);
 		});
 	} else {
-		// Synchronous callback: decrement after the scheduler has had a chance to
-		// flush the queued renders this transition produced — if any of those
-		// renders held the transition open by suspending, they incremented the
-		// count themselves via handleSuspense, so the net count stays > 0.
-		afterTransitionFlush(() => {
-			tickTransitionCount(-1);
-			if (submitRec !== null) settleSubmitTransition(submitRec);
-			flushFormResets();
-			actionBatch.workComplete = true;
-			finishTransitionHookBatch(actionBatch);
-		});
+		// Synchronous callback: decrement once the drain that renders the queued
+		// work this transition produced has decided its holds — a render that held
+		// the transition open by suspending incremented the count itself via
+		// handleSuspense, so the net count stays > 0 (settleTransitionFalls).
+		queueTransitionFall(actionBatch, submitRec);
 	}
 }
 
@@ -44112,6 +44316,10 @@ interface TransitionHookSlot {
 	 * the count to publish its falling edge, so no per-hook collection exists.
 	 */
 	pendingBatches: number;
+	/** isPending shows a falling edge its drain has yet to settle (fallTransitionHook). */
+	tentative: boolean;
+	/** Profile-build-only hook source; the assignment is erased in normal bundles. */
+	profileSlot?: HookSlot;
 	error?: { value: unknown };
 	start: (fn: () => void | Promise<unknown>) => void;
 	publish: (pending: boolean) => void;
@@ -44143,17 +44351,19 @@ export function useTransition(
 			isPending: false,
 			block,
 			pendingBatches: 0,
+			tentative: false,
 			start: (fn) => {
 				if (!block.disposed) runTransition(fn, hook);
 			},
 			publish: (pending) => {
+				hook.tentative = false;
 				if (hook.isPending === pending || block.disposed) return;
 				hook.isPending = pending;
 				TRANSITION_LISTENER_PUBLISH_DEPTH++;
 				try {
 					if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__)
 						__profileSchedule(block, 'transition-pending', slot);
-					// The rising edge is a pending cue; the falling edge follows the transition.
+					// The rising edge is a pending cue; the falling edge is transition work.
 					if (pending) markTransitionCue(block);
 					scheduleRender(block, false, pending);
 				} finally {
@@ -44162,6 +44372,8 @@ export function useTransition(
 			},
 		};
 		s = hook;
+		if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__)
+			hook.profileSlot = slot;
 		ensureHooks(scope).set(slot, hook);
 		// An in-flight batch keeps referencing an unmounted hook until it
 		// finishes; publish() ignores a disposed block, and the batch releases the
