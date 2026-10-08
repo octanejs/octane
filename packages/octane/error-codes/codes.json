@@ -1716,7 +1716,8 @@
       "message": "DOM presentation cannot adopt mismatched compiler-owned ranges or nodes.",
       "argumentCount": 0,
       "runtime": ["client"],
-      "status": "active"
+      "status": "active",
+      "note": "One cause is browser page translation, which can rewrite text before adoption. Octane accepts the <font> wrappers Chrome's Translate leaves in place of server-rendered text, and replaces translated bound text on its next value change. Any other element in place of that text raises this error, as does translated text in an Octane release without that support. To keep an element's text untranslated, add translate=\"no\" or class=\"notranslate\" to it."
     },
     "287": {
       "message": "This opaque view cannot be constructed without its external owner.",
@@ -1909,7 +1910,7 @@
       "argumentCount": 0,
       "runtime": ["client"],
       "status": "active",
-      "note": "Browser page translation can rewrite text before adoption. A text leaf may hold only its text, or the <font> wrappers Chrome's Translate leaves in its place, which Octane replaces on the leaf's next value change. Any other element in a text leaf raises this error, as does translated text in an Octane release without that support. To keep an element's text untranslated, add translate=\"no\" or class=\"notranslate\" to it."
+      "note": "One cause is browser page translation, which can rewrite text before adoption. Octane accepts the <font> wrappers Chrome's Translate leaves in place of server-rendered text, and replaces translated bound text on its next value change. Any other element in place of that text raises this error, as does translated text in an Octane release without that support. To keep an element's text untranslated, add translate=\"no\" or class=\"notranslate\" to it."
     },
     "319": {
       "message": "DOM bindings cannot adopt an incomplete static element topology.",
@@ -1928,7 +1929,7 @@
       "argumentCount": 0,
       "runtime": ["client"],
       "status": "active",
-      "note": "Browser page translation can rewrite text before adoption. A text leaf may hold only its text, or the <font> wrappers Chrome's Translate leaves in its place, which Octane replaces on the leaf's next value change. Any other element in a text leaf raises this error, as does translated text in an Octane release without that support. To keep an element's text untranslated, add translate=\"no\" or class=\"notranslate\" to it."
+      "note": "One cause is browser page translation, which can rewrite text before adoption. Octane accepts the <font> wrappers Chrome's Translate leaves in place of server-rendered text, and replaces translated bound text on its next value change. Any other element in place of that text raises this error, as does translated text in an Octane release without that support. To keep an element's text untranslated, add translate=\"no\" or class=\"notranslate\" to it."
     },
     "322": {
       "message": "DOM bindings cannot adopt an incomplete addressed element topology.",
