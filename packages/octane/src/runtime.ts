@@ -17435,12 +17435,17 @@ export const ErrorBoundary: ComponentBody<{
  * `unknown`) gives the emitted arrow contextual parameter types, so authored
  * `@catch` bindings type-check under `noImplicitAny`. `content` is the
  * transform's expression-position prop form of children.
+ *
+ * The virtual TSX imports this name from 'octane' whatever renderer the file
+ * targets, and nothing ever calls it, so it returns `never`: TypeScript then
+ * accepts it as a component under every renderer's JSX namespace, including
+ * universal renderers whose `JSX.Element` is the closed `UniversalRenderable`.
  */
 export const TsrxErrorBoundary = ErrorBoundary as unknown as (props: {
 	fallback?: (error: unknown, reset: () => void) => unknown;
 	content?: unknown;
 	children?: unknown;
-}) => OctaneNode;
+}) => never;
 
 /**
  * React 19's `use()` — accepts either a Context<T> or a thenable (Promise<T>).

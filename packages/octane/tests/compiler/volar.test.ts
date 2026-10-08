@@ -608,6 +608,83 @@ declare module '@fixture/object-intrinsics/jsx-runtime' {
 		}
 	});
 
+	it('type-checks @try/@catch under a renderer whose JSX.Element is a closed union', () => {
+		// Universal renderers such as ink type JSX.Element as UniversalRenderable
+		// and declare no JSX.ElementType, so every component in their virtual TSX,
+		// including the boundary that `@try` becomes, must return a member of it.
+		const root = mkdtempSync(join(tmpdir(), 'octane-volar-universal-try-'));
+		try {
+			mkdirSync(join(root, 'node_modules/@fixture'), { recursive: true });
+			symlinkSync(
+				fileURLToPath(new URL('../..', import.meta.url)),
+				join(root, 'node_modules/octane'),
+				'dir',
+			);
+			const moduleRoot = join(root, 'node_modules/@fixture/universal-intrinsics');
+			mkdirSync(moduleRoot);
+			writeFileSync(
+				join(moduleRoot, 'package.json'),
+				JSON.stringify({
+					name: '@fixture/universal-intrinsics',
+					exports: { './jsx-runtime': './jsx-runtime.d.ts' },
+				}),
+			);
+			writeFileSync(
+				join(moduleRoot, 'jsx-runtime.d.ts'),
+				`import type { UniversalRenderable } from 'octane/universal';
+export namespace JSX {
+	type Element = UniversalRenderable;
+	interface ElementChildrenAttribute {
+		children: {};
+	}
+	interface IntrinsicElements {
+		'fixture-text': { children?: UniversalRenderable };
+	}
+}
+`,
+			);
+			const compiled = compileToVolarMappings(
+				`/** @jsxImportSource @fixture/universal-intrinsics */
+function Content() @{ <fixture-text>ready</fixture-text> }
+function Fallback(props: { error: Error }) @{ <fixture-text>{props.error.message}</fixture-text> }
+export function Boundary() @{
+	@try {
+		<Content />
+	} @catch (error) {
+		<Fallback error={error as Error} />
+	}
+}
+`,
+				'/src/Boundary.tsrx',
+			);
+			expect(compiled.errors).toEqual([]);
+			expect(compiled.code).toContain('<TsrxErrorBoundary');
+			const file = join(root, 'Boundary.tsx');
+			writeFileSync(file, compiled.code);
+			const program = ts.createProgram({
+				rootNames: [file],
+				options: {
+					jsx: ts.JsxEmit.ReactJSX,
+					module: ts.ModuleKind.ESNext,
+					moduleResolution: ts.ModuleResolutionKind.Bundler,
+					noEmit: true,
+					skipLibCheck: true,
+					strict: true,
+					target: ts.ScriptTarget.ESNext,
+					types: [],
+				},
+			});
+			expect(
+				ts
+					.getPreEmitDiagnostics(program)
+					.filter((diagnostic) => diagnostic.file?.fileName === file)
+					.map((diagnostic) => ts.flattenDiagnosticMessageText(diagnostic.messageText, ' ')),
+			).toEqual([]);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	}, 15_000);
+
 	it('keeps a template @ts-expect-error on the line before the child it is about', () => {
 		const source = `export function Line(props: { label: (value: number) => string }) @{
 	<p>

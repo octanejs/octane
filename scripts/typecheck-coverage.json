@@ -16,12 +16,6 @@
       "expires": "2026-10-31"
     },
     {
-      "package": "@octanejs/ink",
-      "projects": ["packages/ink/tsconfig.json", "packages/ink/typetests/tsconfig.json"],
-      "reason": "octane/compiler/volar virtual TSX gives the @try boundary component in ErrorBoundary.ink.tsrx an `unknown` return type, so TypeScript rejects it as a JSX component; the error has no source location.",
-      "expires": "2026-10-31"
-    },
-    {
       "package": "@octanejs/select",
       "projects": [
         "packages/select/tsconfig.json",
