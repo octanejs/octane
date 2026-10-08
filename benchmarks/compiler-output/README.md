@@ -92,10 +92,9 @@ node benchmarks/compiler-output/state-arity.mjs /path/to/frozen/baseline
 node --jitless benchmarks/compiler-output/state-arity.mjs /path/to/frozen/baseline
 ```
 
-The unified suite enforces sixteen work ratios, including controls that preserve
-required arrays and larger handler closures. Its browser scenario uses real
-native events and verifies current values, cancellation, and survivor identity.
-The server report verifies the complete response hash, key/body counts, and row
+The unified suite enforces six work ratios against same-run controls. Its
+browser scenario uses real native events and verifies current values,
+cancellation, and survivor identity. The server report verifies the complete response hash, key/body counts, and row
 ordering. `corpus.mjs` compares the same fixed codegen corpus in client and
 server modes; optional `--timing` runs alternating compiler timing batches.
 

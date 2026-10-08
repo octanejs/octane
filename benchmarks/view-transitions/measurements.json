@@ -843,29 +843,7 @@
             }
           },
           {
-            "name": "branches-stable-work-budget",
-            "ops": {
-              "hydration_lookups": {
-                "score": 512,
-                "median": 512,
-                "min": 512,
-                "samples": 1
-              }
-            }
-          },
-          {
             "name": "branches-toggle",
-            "ops": {
-              "hydration_lookups": {
-                "score": 512,
-                "median": 512,
-                "min": 512,
-                "samples": 1
-              }
-            }
-          },
-          {
-            "name": "branches-toggle-work-budget",
             "ops": {
               "hydration_lookups": {
                 "score": 512,
@@ -887,29 +865,7 @@
             }
           },
           {
-            "name": "branches-absent-work-budget",
-            "ops": {
-              "hydration_lookups": {
-                "score": 512,
-                "median": 512,
-                "min": 512,
-                "samples": 1
-              }
-            }
-          },
-          {
             "name": "branches-mount",
-            "ops": {
-              "hydration_lookups": {
-                "score": 1024,
-                "median": 1024,
-                "min": 1024,
-                "samples": 1
-              }
-            }
-          },
-          {
-            "name": "branches-mount-work-budget",
             "ops": {
               "hydration_lookups": {
                 "score": 1024,
@@ -945,29 +901,7 @@
             }
           },
           {
-            "name": "branches-stable-work-budget",
-            "ops": {
-              "hydration_lookups": {
-                "score": 512,
-                "median": 512,
-                "min": 512,
-                "samples": 1
-              }
-            }
-          },
-          {
             "name": "branches-toggle",
-            "ops": {
-              "hydration_lookups": {
-                "score": 512,
-                "median": 512,
-                "min": 512,
-                "samples": 1
-              }
-            }
-          },
-          {
-            "name": "branches-toggle-work-budget",
             "ops": {
               "hydration_lookups": {
                 "score": 512,
@@ -989,29 +923,7 @@
             }
           },
           {
-            "name": "branches-absent-work-budget",
-            "ops": {
-              "hydration_lookups": {
-                "score": 512,
-                "median": 512,
-                "min": 512,
-                "samples": 1
-              }
-            }
-          },
-          {
             "name": "branches-mount",
-            "ops": {
-              "hydration_lookups": {
-                "score": 1024,
-                "median": 1024,
-                "min": 1024,
-                "samples": 1
-              }
-            }
-          },
-          {
-            "name": "branches-mount-work-budget",
             "ops": {
               "hydration_lookups": {
                 "score": 1024,

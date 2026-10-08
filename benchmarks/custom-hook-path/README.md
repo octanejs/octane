@@ -8,7 +8,7 @@ original string-building loops. No production source is rewritten by the runner.
 
 ```sh
 BENCH_JSON=/tmp/custom-hook-path.json node benchmarks/custom-hook-path/run.mjs 6284156ce
-node benchmarks/bench.mjs --ratios hooks-runtime
+node benchmarks/bench.mjs hooks-runtime
 ```
 
 The recorded deterministic comparison used Node 26.4.0 / V8 14.6.202.34-node.21
@@ -73,10 +73,10 @@ Symbol-description reads per segment.
 
 The bounded probe reaches sixteen frame records, at most thirty-two base entries
 per frame, and 480 retained base entries in total. Depth zero returns directly,
-so only the fifteen depths one through fifteen hold base-entry Maps. The
-`custom-path-{client,server,universal}-{cold,warm,bounds}` ratio targets use
-`custom-path-budget` (one unit for every operation). Over-depth diagnostics also
-assert the full 8,000 cold registry calls, retaining that fallback as a control.
+so only the fifteen depths one through fifteen hold base-entry Maps. The run
+reports `custom-path-{client,server,universal}-{cold,warm,bounds}` targets.
+Over-depth diagnostics also assert the full 8,000 cold registry calls, retaining
+that fallback as a control.
 
 ## Retained costs and rejected argument shortcut
 
