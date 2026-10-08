@@ -165,3 +165,16 @@ sentinel run without adding another timer to each result.
 publications, component commits, marker latency, and total completion for ready
 and CPU-heavy streams. Direct binding writes are outside its component commit
 count. Use Chromium Event Timing for input-to-paint claims.
+
+## Direct buffered transport readers
+
+Direct streamed RPC and optional renderer-response readers share one approximately
+5 ms host budget. Check reader retirement before every retry, including after a
+ready transport result. RPC `return()` retires a pending pull; it must not convert
+a fresh protocol error into successful completion. Custom delivery admission
+checks cancellation after each wait, keeps channel order/backpressure, and leaves
+inline document frame delivery on its existing path. Transport read timeouts
+exclude budget admission; delivery timeouts still include queue and style waits.
+A receiver's own later asynchronous continuation remains an indivisible
+receiver-owned unit. This does not change component render admission or the
+signal producers' own scheduling policy.

@@ -1735,6 +1735,7 @@
     "@tanstack/react-hotkeys": "@octanejs/tanstack-hotkeys",
     "@tanstack/react-pacer": "@octanejs/tanstack-pacer",
     "@tanstack/react-query": "@octanejs/tanstack-query",
+    "@tanstack/react-query-devtools": "@octanejs/tanstack-query-devtools",
     "@tanstack/react-router": "@octanejs/tanstack-router",
     "@tanstack/react-router-ssr-query": "@octanejs/tanstack-router-ssr-query",
     "@tanstack/react-store": "@octanejs/tanstack-store",

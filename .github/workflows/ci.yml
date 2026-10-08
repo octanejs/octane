@@ -228,7 +228,9 @@ jobs:
                   head_sha: parentSha,
                   per_page: 10,
                 });
-              const requiredTestJobs = ["test (24)"];
+              // Runtime tests and bundle checks now finish independently.
+              // Only provenance proves the parent completed both.
+              const requiredTestJobs = ["test (24)", "CI provenance"];
               let parentPassedTests = false;
 
               for (const run of parentRuns.workflow_runs) {
@@ -260,7 +262,7 @@ jobs:
 
               if (!parentPassedTests) {
                 core.warning(
-                  `The parent of Changesets merge ${context.sha} has no completed CI run with the full test suite passing. Running the full tests.`,
+                  `The parent of Changesets merge ${context.sha} has no completed CI run with tests and bundle coverage passing. Running full CI.`,
                 );
                 return;
               }
@@ -319,6 +321,7 @@ jobs:
               }
 
               const requiredFullJobs = [
+                "bundle size / bundle size checks",
                 "website integration suite",
                 "React parity checks",
                 "typecheck",
@@ -389,6 +392,14 @@ jobs:
               );
             }
 
+  bundle_size:
+    name: bundle size
+    needs: release_change
+    if: ${{ always() && !cancelled() && github.event.action != 'closed' && (github.event_name != 'pull_request' || github.event.pull_request.draft == false) && needs.release_change.outputs.is_release_pr != 'true' }}
+    uses: ./.github/workflows/bundle-size.yml
+    with:
+      run-benchmarks: ${{ needs.release_change.outputs.is_release != 'true' && needs.release_change.outputs.full_ci != 'false' }}
+
   test_shard:
     name: test shard (Node 24, ${{ matrix.shard }})
     needs: release_change
@@ -409,9 +420,6 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
-        with:
-          # Only the budget shard compares against an earlier commit.
-          fetch-depth: ${{ matrix.shard == '1/4' && '0' || '1' }}
 
       - name: Install pnpm
         uses: pnpm/action-setup@d9184bf108216479bc5a137cc391f4d7b14c870b # v6.1.0
@@ -424,29 +432,6 @@ jobs:
 
       - name: Install dependencies
         run: pnpm install --prod=false --frozen-lockfile
-
-      # Real builds, packed consumers, browser suites, and the ordinary suite
-      # all use the repository's Node 24 CI execution target.
-      #
-      # Every committed byte budget is a ratchet at measured + 32 bytes, so a
-      # change that grows any public-import scenario or complete Octane
-      # application by more than that fails here. Each reachability build also
-      # runs its executable and reachability gates: the renderer-free behavior
-      # bundle, and an Apollo binding that must keep `octane` tree-shakeable.
-      - name: Verify every bundle budget
-        if: matrix.shard == '1/4'
-        env:
-          BUDGET_BASE: ${{ github.event_name == 'pull_request' && 'HEAD^1' || github.event.before }}
-        run: |
-          node benchmarks/bundle-size/run-minimal.mjs --budgets --ratchet
-          node benchmarks/bundle-size/run.mjs --budgets --ratchet octane-tsrx octane-jsx
-
-      # A client that only calls createRoot never hydrates. Its production
-      # bundle, under Vite's default minifier and under esbuild, must map no
-      # code into a hydration-only declaration (hydration-free-gates.mjs).
-      - name: Verify client-only bundles retain no hydration code
-        if: matrix.shard == '1/4'
-        run: node benchmarks/bundle-size/run-hydration-free.mjs
 
       - name: Run tests
         # WEBSITE_DOCS_SPEC is excluded through the environment, not `--exclude`:
@@ -904,14 +889,6 @@ jobs:
       - name: Validate MCP skill catalogs
         run: pnpm exec vitest run --project octane-mcp-server packages/octane-mcp-server/src/index.test.js
 
-      # A raised byte budget lands in its own pull request with the bytes and
-      # the reason (CONTRIBUTING.md, "Size budgets"). A pull request is compared
-      # with its merge commit's first parent, a push with the previous commit.
-      - name: Check that byte budget raises land alone
-        env:
-          BUDGET_BASE: ${{ github.event_name == 'pull_request' && 'HEAD^1' || github.event.before }}
-        run: node benchmarks/bundle-size/budget-raises.mjs --base "$BUDGET_BASE"
-
       # A committed test must execute and pass. Intentional framework
       # divergences are ordinary assertions; missing environment prerequisites
       # fail with setup instructions instead of silently turning CI green.
@@ -1341,7 +1318,18 @@ jobs:
   # classifier verifies that its base already had equivalent provenance.
   provenance:
     name: CI provenance
-    needs: [release_change, test, lint, typecheck, examples, three_compat, lynx_compat, package]
+    needs:
+      [
+        release_change,
+        bundle_size,
+        test,
+        lint,
+        typecheck,
+        examples,
+        three_compat,
+        lynx_compat,
+        package,
+      ]
     if: ${{ always() && !cancelled() && github.event.action != 'closed' && (github.event_name != 'pull_request' || github.event.pull_request.draft == false) && needs.release_change.outputs.is_release_pr != 'true' }}
     runs-on: blacksmith-4vcpu-ubuntu-2404
 
@@ -1350,6 +1338,7 @@ jobs:
         env:
           FULL_CI: ${{ needs.release_change.outputs.full_ci }}
           RELEASE_CHANGE_RESULT: ${{ needs.release_change.result }}
+          BUNDLE_SIZE_RESULT: ${{ needs.bundle_size.result }}
           TEST_RESULT: ${{ needs.test.result }}
           LINT_RESULT: ${{ needs.lint.result }}
           TYPECHECK_RESULT: ${{ needs.typecheck.result }}
@@ -1359,6 +1348,7 @@ jobs:
           PACKAGE_RESULT: ${{ needs.package.result }}
         run: |
           test "$RELEASE_CHANGE_RESULT" = success
+          test "$BUNDLE_SIZE_RESULT" = success
           test "$TEST_RESULT" = success
           test "$LINT_RESULT" = success
           test "$TYPECHECK_RESULT" = success

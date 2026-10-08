@@ -281,6 +281,16 @@ export function planBindingProgram(fn, render, context) {
 		if (!context.annotationsOnly) assertProjection(expression);
 	};
 	const regionMarker = (site, arm) => `<!--[b;${id};${site};${arm}--><!--]-->`;
+	// A branch arm, list item or caller slot may not render, so a child view
+	// called there is not entered on every path through this view.
+	let conditional = false;
+	const compileBranch = (nodes, names, namespace, ancestors) => {
+		const outer = conditional;
+		conditional = true;
+		const result = compileFragment(nodes, names, namespace, ancestors);
+		conditional = outer;
+		return result;
+	};
 	const compileFragment = (
 		authoredNodes,
 		outerNames,
@@ -428,8 +438,8 @@ export function planBindingProgram(fn, render, context) {
 				const thenNodes = blockNodes(node.consequent);
 				const elseNodes = blockNodes(node.alternate);
 				const arms = [
-					compileFragment(thenNodes, names, ns, parents).fragment,
-					compileFragment(elseNodes, names, ns, parents).fragment,
+					compileBranch(thenNodes, names, ns, parents).fragment,
+					compileBranch(elseNodes, names, ns, parents).fragment,
 				];
 				const selected = context.fixed.known(node.test);
 				if (!context.annotationsOnly && selected !== context.fixed.unknown)
@@ -474,12 +484,12 @@ export function planBindingProgram(fn, render, context) {
 					if (parameter && parameter.type !== 'Identifier')
 						fail(parameter, 'binding @catch parameters must be identifiers');
 				const arms = [
-					compileFragment(blockNodes(node.block), names, ns, parents).fragment,
+					compileBranch(blockNodes(node.block), names, ns, parents).fragment,
 					node.pending?.body?.length
-						? compileFragment(node.pending.body, names, ns, parents).fragment
+						? compileBranch(node.pending.body, names, ns, parents).fragment
 						: b.literal(null),
 					handler
-						? compileFragment(
+						? compileBranch(
 								handler.body.body,
 								[...names, handler.param?.name ?? null, handler.resetParam?.name ?? null],
 								ns,
@@ -523,13 +533,13 @@ export function planBindingProgram(fn, render, context) {
 					),
 					node,
 				);
-				const body = compileFragment(
+				const body = compileBranch(
 					blockNodes(node.body),
 					[...names, item.name, indexName],
 					ns,
 					parents,
 				).fragment;
-				const empty = compileFragment(blockNodes(node.empty), names, ns, parents).fragment;
+				const empty = compileBranch(blockNodes(node.empty), names, ns, parents).fragment;
 				const index = nodes.length;
 				appendNode([parent, 'region', String(site)]);
 				regions.push(
@@ -556,9 +566,9 @@ export function planBindingProgram(fn, render, context) {
 				const html = createTemplateIr();
 				appendTemplatePart(html, regionMarker(site, 'v'), 'anchor');
 				if (context.annotationsOnly) {
-					localProgram(tag, null, true);
+					localProgram(tag, null, true, null, conditional ? null : node);
 					if ((node.children ?? []).some(significant))
-						compileFragment(node.children, names, ns, parents);
+						compileBranch(node.children, names, ns, parents);
 					return html;
 				}
 				const props = [];
@@ -584,7 +594,9 @@ export function planBindingProgram(fn, render, context) {
 				}
 				if ((node.children ?? []).some(significant)) propNames.push('children');
 				const imported = imports.get(tag);
-				const child = !imported ? localProgram(tag, propNames, false, fixedProps) : null;
+				const child = !imported
+					? localProgram(tag, propNames, false, fixedProps, conditional ? null : node)
+					: null;
 				if (
 					!child &&
 					(!imported?.imported ||
@@ -607,7 +619,12 @@ export function planBindingProgram(fn, render, context) {
 					childPrograms.add(local);
 					dependencies.push(origin(b.imports([['default', local]], request), node));
 				}
-				if (child) {
+				if (child?.cycle) {
+					// This view and the child recurse into each other. They complete as
+					// one unit, which shares capabilities, imports and hoists among its
+					// members and declares the child's descriptor ahead of its root.
+					local = child.cycle;
+				} else if (child) {
 					// Child capability is checked for the entered view instance when the
 					// lease is acquired and published, including a changed active branch.
 					signals ||= child.signals;
@@ -623,30 +640,35 @@ export function planBindingProgram(fn, render, context) {
 					for (const dependency of child.dependencies)
 						if (!dependencies.includes(dependency)) dependencies.push(dependency);
 					for (const hoist of child.hoists) if (!hoists.includes(hoist)) hoists.push(hoist);
-					// A cached plan identifies one declaration and ordered prop specialization.
-					// Share only its immutable descriptor; each entered region owns its state.
-					const childHoists = (lexical.domBindingChildHoists ??= new WeakMap());
-					let hoist = childHoists.get(child);
-					if (hoist === undefined) {
-						hoist = origin(
-							b.const(
-								b.id(allocateProgramName('_bindingChild')),
-								object({
-									id: b.literal(child.id),
-									root: child.root,
-									...(child.prepareProps ? { prepareProps: child.prepareProps } : {}),
-								}),
-							),
-							child.fn,
-						);
-						childHoists.set(child, hoist);
+					if (child.descriptor !== null) {
+						// A completed recursive unit already declares its members' descriptors.
+						local = child.descriptor;
+					} else {
+						// A cached plan identifies one declaration and ordered prop specialization.
+						// Share only its immutable descriptor; each entered region owns its state.
+						const childHoists = (lexical.domBindingChildHoists ??= new WeakMap());
+						let hoist = childHoists.get(child);
+						if (hoist === undefined) {
+							hoist = origin(
+								b.const(
+									b.id(allocateProgramName('_bindingChild')),
+									object({
+										id: b.literal(child.id),
+										root: child.root,
+										...(child.prepareProps ? { prepareProps: child.prepareProps } : {}),
+									}),
+								),
+								child.fn,
+							);
+							childHoists.set(child, hoist);
+						}
+						if (!hoists.includes(hoist)) hoists.push(hoist);
+						local = hoist.declarations[0].id.name;
 					}
-					if (!hoists.includes(hoist)) hoists.push(hoist);
-					local = hoist.declarations[0].id.name;
 					expressions.push(...child.expressions);
 				} else signals = true;
 				if ((node.children ?? []).some(significant)) {
-					const fragment = compileFragment(node.children, names, ns, parents).fragment;
+					const fragment = compileBranch(node.children, names, ns, parents).fragment;
 					const local = allocateProgramName('_bindingSlotFragment');
 					hoists.push(origin(b.const(b.id(local), fragment), node));
 					if (slotFactory === null) {
@@ -879,8 +901,9 @@ export function planBindingProgram(fn, render, context) {
 				const external = native.unbound.has(bare);
 				const value = external ? native.unbound.get(bare) : expression;
 				const literal = unwrap(value);
+				// A button's value and a list item's ordinal are attributes, not form state.
 				const property =
-					(tag !== 'button' || raw !== 'value') &&
+					(raw !== 'value' || (tag !== 'button' && tag !== 'li')) &&
 					['value', 'checked', 'defaultValue', 'defaultChecked', 'selected'].includes(raw);
 				const classGroup = native.classAttributes.get(attr)?._octaneBindingClassGroups;
 				if (classGroup) {
@@ -940,7 +963,14 @@ export function planBindingProgram(fn, render, context) {
 									: BOOLEAN_ATTR_PROPS.has(name.toLowerCase())
 										? 'boolean'
 										: 'attr';
-					initialize(index, kind, name, mapCow(value, native.unbound));
+					// HTML names are case-insensitive. The runtime matches canonical
+					// names, such as React's numeric `rowSpan`, in lowercase.
+					initialize(
+						index,
+						kind,
+						selfNs === 0 ? name.toLowerCase() : name,
+						mapCow(value, native.unbound),
+					);
 				}
 			}
 			const children = createTemplateIr();
@@ -1126,5 +1156,7 @@ export function planBindingProgram(fn, render, context) {
 		projectionsEnabled,
 		structural: structural && !controls,
 		childPrograms,
+		// The forward-declared descriptor of a view that recurses through local children.
+		descriptor: null,
 	};
 }

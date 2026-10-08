@@ -8645,6 +8645,123 @@ export function Rows() @{
 			}
 		});
 
+		// List numbering is presentation, not form state. Adopted and constructed
+		// lists write `start` and each item's `value` as the server renders them,
+		// and keyed items keep their nodes as the list grows and renumbers.
+		it(`numbers ordered lists and keyed items through start and value (${dev ? 'dev' : 'prod'})`, () => {
+			const source = `import { unbound } from 'octane/behavior';
+export function Ranked(props) @{
+  'use dom bindings';
+  <ol start={props.start}>
+    <li value={unbound(props.lead)}>Lead</li>
+    @for (const item of props.items; key item.id) {
+      <li value={item.rank}>{item.label as string}</li>
+    }
+  </ol>
+}`;
+			type Item = { id: string; rank: unknown; label: string };
+			type Props = { start: unknown; lead: unknown; items: readonly Item[] };
+			const alpha = { id: 'a', rank: 7, label: 'Alpha' };
+			const beta = { id: 'b', rank: null, label: 'Beta' };
+			const gamma = { id: 'c', rank: 0, label: 'Gamma' };
+			const initial: Props = { start: 3, lead: '2.5', items: [alpha, beta] };
+			const fixture = authoredPresentation<Props>(
+				'Ranked',
+				initial,
+				dev,
+				source,
+				{},
+				{
+					strong: true,
+				},
+			);
+			const numbering = (list: Element) => [
+				list.getAttribute('start'),
+				...[...list.children].map((item) => item.getAttribute('value')),
+			];
+			const serverNumbering = (props: Props) => {
+				const template = document.createElement('template');
+				template.innerHTML = renderToString(fixture.server.Ranked, props).html;
+				return numbering(template.content.querySelector('ol')!);
+			};
+			for (const adopt of [true, false]) {
+				fixture.publish(initial, false);
+				fixture.cleanup.mockClear();
+				container.innerHTML = adopt ? fixture.html : '';
+				const handle = adopt
+					? fixture.attach(container.querySelector('ol')!, fixture.state)
+					: fixture.mount({ parent: container }, fixture.state);
+				const list = container.querySelector('ol')!;
+				const items = () => [...list.children] as HTMLLIElement[];
+				// The unbound lead value is the server's attribute in both paths.
+				expect(numbering(list)).toEqual(['3', '2.5', '7', null]);
+				expect(numbering(list)).toEqual(serverNumbering(initial));
+				const [lead, first, second] = items();
+
+				fixture.publish({ items: [alpha, beta, gamma] });
+				expect(numbering(list)).toEqual(['3', '2.5', '7', null, '0']);
+				expect(items().slice(0, 3)).toEqual([lead, first, second]);
+
+				fixture.publish({
+					start: 0,
+					items: [
+						{ ...alpha, rank: -2 },
+						{ ...beta, rank: 4 },
+						{ ...gamma, rank: null },
+					],
+				});
+				expect(numbering(list)).toEqual(['0', '2.5', '-2', '4', null]);
+				expect([list.start, ...items().map((item) => item.value)]).toEqual([0, 2, -2, 4, 0]);
+				const third = items()[3];
+				expect(items()).toEqual([lead, first, second, third]);
+
+				for (const start of [-1, 12, '5', Number.NaN, 'abc', true, null, undefined]) {
+					fixture.publish({ start, items: [{ ...alpha, rank: start }, beta, gamma] });
+					const props = fixture.state.getSnapshot();
+					expect(numbering(list), String(start)).toEqual(serverNumbering(props));
+				}
+				expect(items()).toEqual([lead, first, second, third]);
+
+				handle.dispose();
+				expect(fixture.cleanup).toHaveBeenCalledOnce();
+				const retired = numbering(list);
+				fixture.publish({ start: 9, items: [{ ...alpha, rank: 9 }, beta, gamma] });
+				expect(numbering(list)).toEqual(retired);
+			}
+		});
+
+		// Construction initializes an unbound numeric attribute as the server
+		// renders it, under React's camelCase spelling too.
+		it(`constructs unbound numeric attributes as the server renders them (${dev ? 'dev' : 'prod'})`, () => {
+			const source = `import { unbound } from 'octane/behavior';
+export function Spanned(props) @{
+  'use dom bindings';
+  <table><tbody><tr><td rowSpan={unbound(props.span)}>{props.label as string}</td></tr></tbody></table>
+}`;
+			const fixture = authoredPresentation<{ span: unknown; label: string }>(
+				'Spanned',
+				{ span: 2, label: 'Cell' },
+				dev,
+				source,
+			);
+			for (const span of [2, 0, '3', Number.NaN, 'abc', undefined]) {
+				const props = { span, label: 'Cell' };
+				fixture.publish(props, false);
+				const template = document.createElement('template');
+				template.innerHTML = renderToString(fixture.server.Spanned, props).html;
+				container.innerHTML = '';
+				const handle = fixture.mount({ parent: container }, fixture.state);
+				const cell = container.querySelector('td')!;
+				expect(cell.getAttribute('rowspan'), String(span)).toBe(
+					template.content.querySelector('td')!.getAttribute('rowspan'),
+				);
+				fixture.publish({ label: 'Next' });
+				expect(container.querySelector('td')).toBe(cell);
+				expect(cell.textContent).toBe('Next');
+				handle.dispose();
+			}
+		});
+
 		// Leaving a page retires its document signals before its islands are
 		// disposed. That retirement ends a live presentation; it is not an error.
 		it(`keeps the last DOM without throwing when its signal owner retires (${dev ? 'dev' : 'prod'})`, () => {
@@ -9008,6 +9125,493 @@ export function Effectful() @{ 'use dom bindings'; ${effect}; <p /> }`,
 						},
 					),
 				).toThrow(/pure const aliases and mount-only effects/);
+			}
+		});
+
+		// A view may render itself beneath a keyed list. The data's depth, not the
+		// template, decides how many instances exist, and each owns its own state.
+		it(`adopts, updates and retires recursive keyed descendants (${dev ? 'dev' : 'prod'})`, () => {
+			type Branch = { key: string; label: string; children: Branch[] };
+			const source = `import { useLayoutEffect } from 'octane';
+import { log } from './tree-state';
+type Branch = { key: string; label: string; children: readonly Branch[] };
+export function Tree({ node, onPick }: { node: Branch; onPick: (key: string) => void }) @{
+  'use dom bindings';
+  useLayoutEffect(() => {
+    log('mount ' + node.key);
+    return () => log('cleanup ' + node.key);
+  }, []);
+  <section data-key={node.key}>
+    <button type="button" onClick={() => onPick(node.key)}>{node.label as string}</button>
+    <input aria-label={node.key} />
+    @for (const child of node.children; key child.key) {
+      <Tree node={child} onPick={onPick} />
+    }
+  </section>
+}`;
+			const branch = (key: string, label: string, children: Branch[] = []): Branch => ({
+				key,
+				label,
+				children,
+			});
+			const events: string[] = [];
+			const picks: string[] = [];
+			const onPick = (key: string) => picks.push(key);
+			for (const adopt of [true, false]) {
+				events.length = 0;
+				picks.length = 0;
+				const fixture = authoredPresentation(
+					'Tree',
+					{
+						node: branch('root', 'Root', [
+							branch('a', 'A', [branch('a1', 'A1')]),
+							branch('b', 'B'),
+						]),
+						onPick,
+					},
+					dev,
+					source,
+					{ './tree-state': { log: (event: string) => events.push(event) } },
+				);
+				const host = document.createElement('div');
+				container.append(host);
+				host.innerHTML = adopt ? fixture.html : '';
+				const serverSections = [...host.querySelectorAll('section')];
+				const error = vi.spyOn(console, 'error');
+				const handle = adopt
+					? fixture.attach(host.querySelector('section')!, fixture.state)
+					: fixture.mount({ parent: host }, fixture.state);
+				const section = (key: string) => host.querySelector(`section[data-key="${key}"]`)!;
+				const order = () =>
+					[...host.querySelectorAll('section')].map((node) => node.getAttribute('data-key'));
+				const labels = () => [...host.querySelectorAll('button')].map((node) => node.textContent);
+				try {
+					expect(labels()).toEqual(['Root', 'A', 'A1', 'B']);
+					if (adopt) expect([...host.querySelectorAll('section')]).toEqual(serverSections);
+					// Mount-only effects run children before parents in every instance.
+					expect(events.splice(0)).toEqual(['mount a1', 'mount a', 'mount b', 'mount root']);
+					const a = section('a');
+					const a1 = section('a1');
+					const input = a1.querySelector('input')!;
+					input.value = 'typed deep';
+					input.focus();
+
+					// A deep text edit and a deep insertion keep every surviving node.
+					fixture.publish({
+						node: branch('root', 'Root', [
+							branch('a', 'A', [branch('a1', 'A1 edited', [branch('a1x', 'A1X')])]),
+							branch('b', 'B'),
+						]),
+					});
+					expect(labels()).toEqual(['Root', 'A', 'A1 edited', 'A1X', 'B']);
+					expect(section('a1')).toBe(a1);
+					expect(a1.querySelector('input')).toBe(input);
+					expect(events.splice(0)).toEqual(['mount a1x']);
+
+					// Reordering and inserting siblings moves whole subtrees intact.
+					const b = section('b');
+					fixture.publish({
+						node: branch('root', 'Root', [
+							branch('b', 'B'),
+							branch('c', 'C'),
+							branch('a', 'A', [branch('a1', 'A1 edited', [branch('a1x', 'A1X')])]),
+						]),
+					});
+					expect(order()).toEqual(['root', 'b', 'c', 'a', 'a1', 'a1x']);
+					expect(section('a')).toBe(a);
+					expect(section('a1')).toBe(a1);
+					expect(section('b')).toBe(b);
+					expect(input.value).toBe('typed deep');
+					expect(document.activeElement).toBe(input);
+					expect(events.splice(0)).toEqual(['mount c']);
+					a1.querySelector('button')!.click();
+					expect(picks.splice(0)).toEqual(['a1']);
+
+					// A removed subtree retires its effects and native handlers.
+					const removed = section('a1x').querySelector('button')!;
+					fixture.publish({ node: branch('root', 'Root', [branch('b', 'B'), branch('c', 'C')]) });
+					expect(order()).toEqual(['root', 'b', 'c']);
+					expect(a.isConnected).toBe(false);
+					expect(events.splice(0).sort()).toEqual(['cleanup a', 'cleanup a1', 'cleanup a1x']);
+					removed.click();
+					a1.querySelector('button')!.click();
+					expect(picks).toEqual([]);
+					section('c').querySelector('button')!.click();
+					expect(picks.splice(0)).toEqual(['c']);
+					expect(error).not.toHaveBeenCalled();
+				} finally {
+					handle.dispose();
+					error.mockRestore();
+				}
+				expect(events.splice(0).sort()).toEqual(['cleanup b', 'cleanup c', 'cleanup root']);
+				// Disposal keeps the last DOM and its handlers stay retired.
+				expect(order()).toEqual(['root', 'b', 'c']);
+				section('b').querySelector('button')!.click();
+				expect(picks).toEqual([]);
+			}
+		});
+
+		// Mutually recursive views, one of them a plain local child, repeated with
+		// different props and entered through a caller's children slot.
+		// Fixed-prop specialization must not unroll the recursion.
+		it(`adopts and updates mutually recursive views with distinct props (${dev ? 'dev' : 'prod'})`, () => {
+			type Entry = { id: string; title: string; items: Entry[] };
+			const source = `import type { OctaneNode } from 'octane';
+type Entry = { id: string; title: string; items: readonly Entry[] };
+function Title({ text }: { text: string }) @{ <b>{text as string}</b> }
+function Frame({ depth, children }: { depth: number; children: OctaneNode }) @{
+  <li data-frame={depth}>{children}</li>
+}
+function Group({ entry, depth }: { entry: Entry; depth: number }) @{
+  <ul data-depth={depth}>
+    @for (const item of entry.items; key item.id) {
+      <Frame depth={depth}><Outline entry={item} depth={depth + 1} /></Frame>
+    }
+  </ul>
+}
+export function Outline({ entry, depth }: { entry: Entry; depth: number }) @{
+  'use dom bindings';
+  <div data-id={entry.id} data-depth={depth}>
+    <Title text={entry.title} />
+    @if (entry.items.length > 0) { <Group entry={entry} depth={depth} /> }
+  </div>
+}
+export function Page(props: { primary: Entry; secondary: Entry }) @{
+  'use dom bindings';
+  <main><Outline entry={props.primary} depth={0} /><Outline entry={props.secondary} depth={10} /></main>
+}`;
+			const entry = (id: string, title: string, items: Entry[] = []): Entry => ({
+				id,
+				title,
+				items,
+			});
+			const primary = entry('p', 'Primary', [entry('p1', 'P1', [entry('p11', 'P11')])]);
+			const secondary = entry('s', 'Secondary', [entry('s1', 'S1')]);
+			for (const fixed of [false, true]) {
+				for (const adopt of [true, false]) {
+					const fixture = authoredPresentation(
+						'Page',
+						{ primary, secondary },
+						dev,
+						source,
+						{},
+						fixed ? { domBindingFixedProps: ['depth'] } : {},
+					);
+					const host = document.createElement('div');
+					container.append(host);
+					host.innerHTML = adopt ? fixture.html : '';
+					const serverNodes = [...host.querySelectorAll('div, ul, li, b')];
+					const handle = adopt
+						? fixture.attach(host.querySelector('main')!, fixture.state)
+						: fixture.mount({ parent: host }, fixture.state);
+					const outline = (id: string) => host.querySelector(`div[data-id="${id}"]`)!;
+					const depths = () =>
+						[...host.querySelectorAll('div')].map(
+							(node) =>
+								`${node.dataset.id}:${node.dataset.depth}:${node.querySelector('b')!.textContent}`,
+						);
+					try {
+						expect(depths()).toEqual([
+							'p:0:Primary',
+							'p1:1:P1',
+							'p11:2:P11',
+							's:10:Secondary',
+							's1:11:S1',
+						]);
+						expect([...host.querySelectorAll('ul')].map((node) => node.dataset.depth)).toEqual([
+							'0',
+							'1',
+							'10',
+						]);
+						expect([...host.querySelectorAll('li')].map((node) => node.dataset.frame)).toEqual([
+							'0',
+							'1',
+							'10',
+						]);
+						if (adopt) expect([...host.querySelectorAll('div, ul, li, b')]).toEqual(serverNodes);
+						const p11 = outline('p11');
+						const s1 = outline('s1');
+
+						// One recursive use changes while the other keeps its nodes.
+						fixture.publish({
+							secondary: entry('s', 'Secondary', [
+								entry('s1', 'S1 edited', [entry('s11', 'S11')]),
+								entry('s2', 'S2'),
+							]),
+						});
+						expect(depths()).toEqual([
+							'p:0:Primary',
+							'p1:1:P1',
+							'p11:2:P11',
+							's:10:Secondary',
+							's1:11:S1 edited',
+							's11:12:S11',
+							's2:11:S2',
+						]);
+						expect(outline('p11')).toBe(p11);
+						expect(outline('s1')).toBe(s1);
+
+						// Collapsing a level removes its group; expanding builds it again.
+						fixture.publish({ primary: entry('p', 'Primary', [entry('p1', 'P1')]) });
+						expect(p11.isConnected).toBe(false);
+						expect(outline('p1').querySelector('ul')).toBeNull();
+						fixture.publish({ primary });
+						expect(outline('p11').getAttribute('data-depth')).toBe('2');
+						expect(outline('s1')).toBe(s1);
+					} finally {
+						handle.dispose();
+					}
+				}
+			}
+		});
+
+		// Suspension, failure and cancellation stay local to each recursive instance.
+		it(`keeps pending, failed and removed async reads local to recursive descendants (${dev ? 'dev' : 'prod'})`, async () => {
+			type Branch = { key: string; lazy: boolean; children: Branch[] };
+			const source = `import { answer$ } from './tree-state';
+type Branch = { key: string; lazy: boolean; children: readonly Branch[] };
+export function Lazy({ node }: { node: Branch }) @{
+  'use dom bindings';
+  <section data-key={node.key}>
+    @if (node.lazy) {
+      @try {
+        const answer = answer$.get();
+        <p data-answer>{answer as string}</p>
+      } @pending {
+        <p data-pending>loading</p>
+      } @catch (error) {
+        <p data-error>{String(error) as string}</p>
+      }
+    }
+    @for (const child of node.children; key child.key) { <Lazy node={child} /> }
+  </section>
+}`;
+			const scope = createScope({ scopeKey: `recursive-try-${dev}` });
+			const requests = new Map<number, ReturnType<typeof deferred<string>>>();
+			const request = (generation: number) => {
+				let pending = requests.get(generation);
+				if (!pending) requests.set(generation, (pending = deferred<string>()));
+				return pending;
+			};
+			const loadAnswer = query(
+				`recursive-answer-${dev}`,
+				(generation: number) => request(generation).promise,
+			);
+			const generation$ = scope.signal$('generation', 0);
+			const answer$ = createResource(scope, 'answer', () => loadAnswer(generation$.get()));
+			const settle = async () => {
+				for (let index = 0; index < 4; index++) await Promise.resolve();
+			};
+			const tree = (deep: boolean): Branch => ({
+				key: 'root',
+				lazy: false,
+				children: [
+					{
+						key: 'a',
+						lazy: false,
+						children: deep ? [{ key: 'deep', lazy: true, children: [] }] : [],
+					},
+					{ key: 'b', lazy: false, children: [] },
+				],
+			});
+			const fixture = authoredPresentation('Lazy', { node: tree(true) }, dev, source, {
+				'./tree-state': { answer$ },
+			});
+			const host = document.createElement('div');
+			container.append(host);
+			const handle = fixture.mount({ parent: host }, fixture.state);
+			const deep = () => host.querySelector('section[data-key="deep"]');
+			try {
+				const a = host.querySelector('section[data-key="a"]')!;
+				expect(deep()!.querySelector('[data-pending]')).not.toBeNull();
+				request(0).resolve('first');
+				await settle();
+				expect(deep()!.querySelector('[data-answer]')!.textContent).toBe('first');
+
+				// Removing a suspended descendant cancels it; its late value cannot
+				// rebuild content that is no longer in the tree.
+				generation$.set(1);
+				const suspended = deep()!;
+				expect(suspended.querySelector('[data-pending]')).not.toBeNull();
+				fixture.publish({ node: tree(false) });
+				expect(deep()).toBeNull();
+				expect(suspended.isConnected).toBe(false);
+				request(1).resolve('late');
+				await settle();
+				expect(host.querySelector('[data-answer]')).toBeNull();
+				expect(suspended.querySelector('[data-answer]')).toBeNull();
+				expect(host.querySelector('section[data-key="a"]')).toBe(a);
+
+				// Inserted again, the descendant reads the settled value.
+				fixture.publish({ node: tree(true) });
+				expect(deep()!.querySelector('[data-answer]')!.textContent).toBe('late');
+
+				// A failure selects the descendant's own @catch arm only.
+				generation$.set(2);
+				request(2).reject(new Error('broken'));
+				await settle();
+				expect(deep()!.querySelector('[data-error]')!.textContent).toBe('Error: broken');
+				expect([...host.querySelectorAll('section')].map((node) => node.dataset.key)).toEqual([
+					'root',
+					'a',
+					'deep',
+					'b',
+				]);
+			} finally {
+				handle.dispose();
+				scope.dispose();
+			}
+		});
+
+		it(`hands an early recursive conditional view to normal hydration (${dev ? 'dev' : 'prod'})`, () => {
+			type Link = { label: string; next: Link | null };
+			const link = (...labels: string[]): Link | null =>
+				labels.length === 0 ? null : { label: labels[0]!, next: link(...labels.slice(1)) };
+			const chain = authoredPresentation(
+				'Chain',
+				{ link: link('a', 'b')! },
+				dev,
+				`type Link = { label: string; next: Link | null };
+export function Chain({ link }: { link: Link }) @{
+  'use dom bindings';
+  <div title={link.label}>@if (link.next) { <Chain link={link.next} /> }</div>
+}`,
+			);
+			const host = document.createElement('div');
+			container.append(host);
+			host.innerHTML = chain.html;
+			const outer = host.querySelector('div')!;
+			const inner = outer.querySelector('div')!;
+			const titles = () => [...host.querySelectorAll('div')].map((node) => node.title);
+			const binding = chain.attach(outer, chain.state);
+			let root: ReturnType<typeof hydrateRoot> | undefined;
+			try {
+				chain.publish({ link: link('A', 'B')! });
+				expect(titles()).toEqual(['A', 'B']);
+				const Chain = chain.loadClient().Chain as never;
+				root = hydrateRoot(host, Chain, chain.state.getSnapshot(), { bindingLeases: [binding] });
+				flushSync(() => {});
+				flushEffects();
+				expect(chain.cleanup).toHaveBeenCalledOnce();
+				expect(host.querySelector('div')).toBe(outer);
+				expect(outer.querySelector('div')).toBe(inner);
+				expect(titles()).toEqual(['A', 'B']);
+				// The renderer now owns every level, including ones it adds.
+				chain.publish({ link: link('stale')! });
+				flushSync(() => root!.render(Chain, { link: link('x', 'y', 'z') }));
+				expect(titles()).toEqual(['x', 'y', 'z']);
+				expect(host.querySelector('div')).toBe(outer);
+				expect(outer.querySelector('div')).toBe(inner);
+			} finally {
+				root?.unmount();
+				binding.dispose();
+			}
+			expect(chain.cleanup).toHaveBeenCalledOnce();
+		});
+
+		// Each construct follows the recursive call, so planning passes through the
+		// recursion before it reaches the diagnostic.
+		it(`keeps binding diagnostics inside recursive views (${dev ? 'dev' : 'prod'})`, () => {
+			const recursive = (output: string, prefix = '') => `${prefix}
+type Branch = { key: string; html: string; tag: any; children: readonly Branch[] };
+export function Tree({ node }: { node: Branch }) @{
+  'use dom bindings';
+  <section>@for (const child of node.children; key child.key) { <Tree node={child} /> }${output}</section>
+}`;
+			for (const [source, diagnostic] of [
+				[
+					recursive('<div dangerouslySetInnerHTML={{ __html: node.html }} />'),
+					/OCTANE_STRONG_UNTRUSTED_HTML/,
+				],
+				[recursive('<node.tag />'), /directly imported named pure binding views/],
+				[recursive('<div {...node} />'), /attribute spreads must be explicitly unbound/],
+				[
+					recursive(
+						'<Leaf node={node} />',
+						`import { useState } from 'octane';
+function Leaf({ node }) @{ const [open] = useState(false); <i>{String(open) as string}</i> }`,
+					),
+					/pure const aliases and mount-only effects/,
+				],
+			] as const) {
+				for (const id of ['/src/tree.tsrx', '/src/tree.tsrx?octane-bindings=Tree'])
+					expect(() =>
+						loadCompiledFixtureSource(source, {
+							id,
+							mode: id.includes('?') ? 'client' : 'server',
+							compileOptions: { dev, hmr: false, strong: true },
+						}),
+					).toThrow(diagnostic);
+			}
+		});
+
+		// Recursion that enters a view again on every path would never end, on the
+		// server or in the browser, so the compiler rejects it.
+		it(`rejects recursion that renders on every path (${dev ? 'dev' : 'prod'})`, () => {
+			const shape = encodeURIComponent(JSON.stringify([1, ['n']]));
+			for (const [view, source, cycle] of [
+				[
+					'Loop',
+					`export function Loop({ n }) @{ 'use dom bindings'; <section><p><Loop n={n} /></p></section> }`,
+					'Loop → Loop',
+				],
+				[
+					'Outer',
+					`function Inner({ n }) @{ <b><Outer n={n} /></b> }
+export function Outer({ n }) @{ 'use dom bindings'; <div><Inner n={n} /></div> }`,
+					'Outer → Inner → Outer',
+				],
+				[
+					'Spread',
+					`export function Spread({ n, ...rest }) @{ 'use dom bindings'; <div {...rest}><Spread n={n} /></div> }`,
+					'Spread → Spread',
+				],
+			] as const) {
+				for (const id of [
+					'/src/loop.tsrx',
+					`/src/loop.tsrx?octane-bindings=${view}&octane-props=${shape}`,
+				])
+					expect(() =>
+						loadCompiledFixtureSource(source, {
+							id,
+							mode: id.includes('?') ? 'client' : 'server',
+							compileOptions: { dev, hmr: false },
+						}),
+					).toThrow(`binding view ${view} renders itself on every path (${cycle})`);
+			}
+
+			// One conditional call in the cycle is enough for the recursion to end.
+			type Link = { label: string; next: Link | null };
+			const link = (...labels: string[]): Link | null =>
+				labels.length === 0 ? null : { label: labels[0]!, next: link(...labels.slice(1)) };
+			const chain = authoredPresentation(
+				'Chain',
+				{ link: link('a', 'b')! },
+				dev,
+				`type Link = { label: string; next: Link | null };
+function Wrap({ link }: { link: Link }) @{ <article><Chain link={link} /></article> }
+export function Chain({ link }: { link: Link }) @{
+  'use dom bindings';
+  <section title={link.label}>@if (link.next) { <Wrap link={link.next} /> }</section>
+}`,
+			);
+			const host = document.createElement('div');
+			container.append(host);
+			const titles = () => [...host.querySelectorAll('section')].map((node) => node.title);
+			for (const adopt of [true, false]) {
+				host.innerHTML = adopt ? chain.html : '';
+				chain.publish({ link: link('a', 'b')! }, false);
+				const handle = adopt
+					? chain.attach(host.querySelector('section')!, chain.state)
+					: chain.mount({ parent: host }, chain.state);
+				try {
+					expect(titles()).toEqual(['a', 'b']);
+					chain.publish({ link: link('x', 'y', 'z')! });
+					expect(titles()).toEqual(['x', 'y', 'z']);
+					expect(host.querySelectorAll('article')).toHaveLength(2);
+				} finally {
+					handle.dispose();
+				}
 			}
 		});
 

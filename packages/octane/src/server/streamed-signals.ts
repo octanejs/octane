@@ -82,6 +82,10 @@ export function createStreamedSignalResultFrames(
 	result: unknown,
 	options: Pick<StreamedSignalResultOptions, 'signal' | 'run'> = {},
 ): AsyncGenerator<StreamedSignalResultFrame> {
+	// The consumer may yield before its first pull. Observe rejection as soon as
+	// the producer takes ownership, while preserving it for the error frame.
+	const pendingResult = Promise.resolve(result);
+	void pendingResult.catch(() => {});
 	// An async generator's return() queues behind a running body, and the body
 	// spends an idle upstream's lifetime parked on its next(). Every producer
 	// wait is therefore interruptible, so the consumer's return() (or the request
@@ -104,7 +108,7 @@ export function createStreamedSignalResultFrames(
 			fail?.(reason);
 		},
 	};
-	const frames = produceStreamedSignalResultFrames(identity, result, options, waits);
+	const frames = produceStreamedSignalResultFrames(identity, pendingResult, options, waits);
 	const returnFrames = frames.return;
 	frames.return = (value) => {
 		cancelled = true;
@@ -116,7 +120,7 @@ export function createStreamedSignalResultFrames(
 
 async function* produceStreamedSignalResultFrames(
 	identity: StreamFrameIdentity,
-	result: unknown,
+	pendingResult: Promise<unknown>,
 	options: Pick<StreamedSignalResultOptions, 'signal' | 'run'>,
 	waits: ProducerWaits,
 ): AsyncGenerator<StreamedSignalResultFrame> {
@@ -128,8 +132,7 @@ async function* produceStreamedSignalResultFrames(
 	const run = options.run ?? ((callback) => callback());
 	const signal = options.signal;
 	const abort = (): void => waits.interrupt(signal!.reason);
-	// Reuse one promise so cancellation never re-assimilates a user-provided thenable.
-	const pendingResult = Promise.resolve(result);
+	// Reuse the observed promise so cancellation never re-assimilates a thenable.
 	signal?.addEventListener('abort', abort, { once: true });
 	try {
 		signal?.throwIfAborted();

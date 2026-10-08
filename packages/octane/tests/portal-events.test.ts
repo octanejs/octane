@@ -199,9 +199,9 @@ describe('portal — event delegation', () => {
 		stray.className = 'stray';
 		portalTarget.appendChild(stray);
 		let leakedHandlerFired = false;
-		// Attach an $$click via the same DOM-property convention the runtime uses,
+		// Attach an $oclick via the same DOM-property convention the runtime uses,
 		// to detect whether the (now-detached) octane listener still runs.
-		(stray as any).$$click = () => {
+		(stray as any).$oclick = () => {
 			leakedHandlerFired = true;
 		};
 		stray.click();

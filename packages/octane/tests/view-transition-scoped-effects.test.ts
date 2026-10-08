@@ -512,6 +512,26 @@ describe('element-scoped ViewTransition commit lifetimes', () => {
 		},
 	);
 
+	it('does not wait for an image whose onLoad the app handles', async () => {
+		// The app reacts to the load itself, so the snapshot must not hold for it.
+		// Regression (#1882): the skip read the old `$load` slot after delegated
+		// slots moved to `$o<type>`, so these images held the snapshot again.
+		vi.spyOn(HTMLImageElement.prototype, 'complete', 'get').mockReturnValue(false);
+		const onLoad = () => {};
+		await act(() => root.render(ScopedImageApp, { value: 'initial', inside: true, onLoad }));
+		startTransition(() => root.render(ScopedImageApp, { value: 'changed', inside: true, onLoad }));
+		const left = await nextCapture('left');
+		let updated = false;
+		const updating = Promise.resolve(left.update()).then(() => {
+			updated = true;
+		});
+		await act(async () => {});
+		expect(container.querySelector('img')!.getAttribute('src')).toBe('changed.png');
+		expect(updated).toBe(true);
+		await updating;
+		left.ready.resolve();
+	});
+
 	it('keeps the outgoing ref and callback on its old scope when a portal moves', async () => {
 		const refs: Array<ViewTransitionInstance | null> = [];
 		const exits: ViewTransitionInstance[] = [];
