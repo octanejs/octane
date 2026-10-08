@@ -827,6 +827,7 @@ jobs:
           path: |
             benchmarks/results/view-transitions-js-framework.json
             benchmarks/results/view-transitions-effect-cleanup.json
+            benchmarks/results/scheduler-backlogs.json
           if-no-files-found: ignore
           retention-days: 1
 
