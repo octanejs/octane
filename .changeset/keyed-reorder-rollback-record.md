@@ -17,4 +17,4 @@ than in a separate per-render Map.
 In the js-framework reorder benchmark (1,000 rows, octane-tsrx, Chromium, paired
 samples), rotating the rows and moving 3 to 8 rows to the end are 22–27% faster,
 within 5% of the runtime before 0.10.1. Swaps, inserts and removals keep their
-0.10.1 gains. The production framework bundle is about 137 bytes smaller.
+0.10.1 gains. The production framework bundle is about 110 bytes smaller.
