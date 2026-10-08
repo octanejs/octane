@@ -24722,8 +24722,11 @@ export function presentationWrite<T>(
 	}
 	if (kind === 'bindSignalText') return preparePresentationSignalBinding(args, frame, true) as T;
 	if (kind === 'setText') {
-		const text = coerceText(args[1]);
-		preparePresentationOperation(frame, args[0], 'text', () => writer(args[0], text));
+		const [node, value, host] = args as [Text | null, unknown, Node | undefined];
+		const text = coerceText(value);
+		// A text binding that keeps only its host passes no Text (see setText), so
+		// the host keys its prepared write; the host also reaches the deferred write.
+		preparePresentationOperation(frame, node ?? host!, 'text', () => writer(node, text, host));
 		return undefined as T;
 	}
 	if (kind === 'bindSignalAttribute') return preparePresentationSignalBinding(args, frame) as T;
@@ -25169,7 +25172,7 @@ function updateTextValue(node: Text, value: string): void {
 	}
 }
 
-export function setText(node: Text, value: any): void {
+export function setText(node: Text | null, value: any, host?: Node): void {
 	// Unconditional writer: explicit text bindings guard cached raw values inline;
 	// textHoleUpdate and childTextHoleUpdate do the equivalent primitive check
 	// before using a cached Text node. The cache stores the raw input, not its
@@ -25177,17 +25180,49 @@ export function setText(node: Text, value: any): void {
 	// Do not read nodeValue here: the binding paths already chose this write, and
 	// a DOM text getter can materialize an extra string on every update.
 	//
+	// An only-child text binding passes its host, so a Text that a page translator
+	// took out of it is put back (see resetOnlyChildHost). One parent read, with
+	// no string, confirms a cached Text. A binding that keeps only its host passes
+	// no node: htext seeded the Text as the host's first child, and a first child
+	// that is not a Text means a translator replaced it.
+	if (host !== undefined) {
+		if (node === null) {
+			node = (STAGED_DOM?.view(host) ?? host).firstChild as Text | null;
+			if (node === null || node.nodeType !== 3) {
+				node = (STAGED_DOM?.view(document) ?? document).createTextNode('');
+				resetOnlyChildHost(host, node);
+			}
+		} else if ((STAGED_DOM?.view(node) ?? node).parentNode !== host) resetOnlyChildHost(host, node);
+	}
+	const target = node as Text;
+	//
 	// View-transition dirty tracking and journaling remain at this write boundary.
 	// The optional driver marks the innermost boundary only during a wrapped drain.
 	VIEW_TRANSITION_DRIVER?.markDirty();
-	if (TRANSITION_JOURNAL !== null) journalText(node, (STAGED_DOM?.view(node) ?? node).nodeValue);
+	if (TRANSITION_JOURNAL !== null)
+		journalText(target, (STAGED_DOM?.view(target) ?? target).nodeValue);
 	//
 	// Write via `nodeValue` (a `Node`-level accessor) rather than `data` (which
 	// lives on `CharacterData` one prototype hop deeper) — it's measurably faster
 	// for the hot text-update path.
 	const text = coerceText(value);
-	if (hiddenTextWriter !== null && hiddenTextWriter(node, text)) return;
-	(STAGED_DOM?.view(node) ?? node).nodeValue = text;
+	if (hiddenTextWriter !== null && hiddenTextWriter(target, text)) return;
+	(STAGED_DOM?.view(target) ?? target).nodeValue = text;
+}
+
+/**
+ * An only-child text binding's Text has left its host: a page translator took
+ * it out (Chrome's swaps it for nested `<font>` wrappers holding the
+ * translation), so a write to it would never be seen. React's setTextContent
+ * replaces such a host's content on the next update. Do the same, putting the
+ * binding's own Text back when it still has one, so every cache holding that
+ * node stays valid.
+ */
+function resetOnlyChildHost(host: Node, node: Text | null): void {
+	if (ROOT_RENDER_TRANSACTION !== null) journalRootRange(host, null, null);
+	const view = STAGED_DOM?.view(host) ?? host;
+	view.textContent = '';
+	if (node !== null) view.appendChild(node);
 }
 
 const DIRECT_SIGNAL_BINDING = /* @__PURE__ */ Symbol('octane.direct-signal-binding');
@@ -38617,9 +38652,14 @@ export function bindSignalChild(
 		(previous as DirectSignalChildBinding)[DIRECT_SIGNAL_CHILD] === true
 			? (previous as DirectSignalChildBinding)
 			: null;
-	const cachedText =
-		prior?.text ??
-		(previous instanceof Text ? previous : textToken ? (getFirstChild(domParent) as Text) : null);
+	let cachedText = prior?.text ?? (previous instanceof Text ? previous : null);
+	if (cachedText === null && textToken) {
+		const first = getFirstChild(domParent);
+		// A page translator can replace the token's Text with its own nodes (see
+		// resetOnlyChildHost); clear them so the hole writes a fresh Text.
+		if (first !== null && first.nodeType === 3) cachedText = first as Text;
+		else resetOnlyChildHost(domParent, null);
+	}
 	if (!isSignalHandle(value)) {
 		const type = typeof value;
 		// An ordinary marker-bounded hole keeps textHoleUpdate's fast path: its
@@ -40008,11 +40048,20 @@ export function childTextHoleUpdate(
 	if (!complex) {
 		if (previous === value) return cachedNode;
 		if (cachedNode != null && value !== null) {
-			setText(cachedNode, value === true ? '' : value);
+			setText(cachedNode, value === true ? '' : value, domParent);
 			return cachedNode;
 		}
 	}
 	return childTextHole(parentScope, slotKey, domParent, value, cachedNode);
+}
+
+// The markerless Text leaves an only-child hole. When a translator already took
+// it out, its replacement is what the host shows; clear that, as React resets a
+// host's text content.
+function removeOnlyChildText(host: Node, node: Text): void {
+	const view = STAGED_DOM?.view(node) ?? node;
+	if (view.parentNode === host) view.remove();
+	else resetOnlyChildHost(host, null);
 }
 
 // Slow path for an ONLY-CHILD `{expr}` value hole (the value hole is the sole
@@ -40085,10 +40134,12 @@ export function childTextHole(
 					return null;
 				return hydration.hempty(domParent, vt === 'string', siteLoc(parentScope, slotKey));
 			}
-			(STAGED_DOM?.view(cachedNode) ?? cachedNode).remove();
+			removeOnlyChildText(domParent, cachedNode);
 			return null;
 		}
 		if (cachedNode !== null) {
+			if ((STAGED_DOM?.view(cachedNode) ?? cachedNode).parentNode !== domParent)
+				resetOnlyChildHost(domParent, cachedNode);
 			updateTextValue(cachedNode, str);
 			return cachedNode;
 		}
@@ -40116,8 +40167,7 @@ export function childTextHole(
 	// server's `<!--[-->` range (ownsHost is ignored under hydration: server-pair
 	// adoption wins, as in M2), or builds the value as a client mount would when
 	// the server rendered text or nothing there.
-	if (state === undefined && cachedNode !== null)
-		(STAGED_DOM?.view(cachedNode) ?? cachedNode).remove();
+	if (state === undefined && cachedNode !== null) removeOnlyChildText(domParent, cachedNode);
 	const hydration = hydrating ? activeHydration() : null;
 	if (hydration !== null && state === undefined)
 		hydration.hydrateOnlyChild(parentScope, slotKey, domParent, value, (parent) =>
