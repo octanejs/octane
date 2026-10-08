@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { act } from './_helpers';
+import { act, nextTask } from './_helpers';
 import {
 	addTransitionType,
 	createRoot,
@@ -46,19 +46,6 @@ function holdFonts() {
 		},
 	};
 }
-
-// Give earlier posted-message transition tasks an opportunity to run. Timers
-// use a different task source and can win that race in the Node test host.
-const nextTask = () =>
-	new Promise<void>((resolve) => {
-		const channel = new MessageChannel();
-		channel.port1.onmessage = () => {
-			channel.port1.close();
-			channel.port2.close();
-			resolve();
-		};
-		channel.port2.postMessage(null);
-	});
 
 describe('ViewTransition activation and matching', () => {
 	let mocks: ViewTransitionMocks;
