@@ -14,8 +14,8 @@ export async function readServerResult(
 		throw new ServerCallUncertainError(new Error('Server function returned an empty response'));
 	const limits = serverResultLimits(options);
 	const reader = response.body.getReader();
-	const read = serverResultReader(reader, limits);
 	let finished = false;
+	const read = serverResultReader(reader, limits, () => finished);
 	let failure: unknown;
 	const cleanup = () => {
 		clearTimeout(timer);
@@ -53,9 +53,13 @@ export async function readServerResult(
 		try {
 			const frame = await read();
 			if (failure !== undefined) throw failure;
+			if (finished) return { kind: 'complete' } as const;
 			if (frame.kind === 'error') throw new Error(frame.error);
 			return frame;
 		} catch (error) {
+			// return() may retire a reader while a budget wait is pending. Check
+			// before close() so a fresh protocol failure is never swallowed.
+			if (finished && failure === undefined) return { kind: 'complete' } as const;
 			await close();
 			throw failure ?? new ServerCallUncertainError(error);
 		}
