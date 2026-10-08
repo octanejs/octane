@@ -8168,6 +8168,8 @@ function fallTransitionHook(hook: TransitionHookSlot): void {
 	if (hook.pendingBatches !== 1 || !hook.isPending || !hook.block.pending) return;
 	hook.isPending = false;
 	hook.tentative = true;
+	if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__)
+		__profileSchedule(hook.block, 'transition-pending', hook.profileSlot);
 }
 
 /** A render in the drain suspended into a hold of this falling batch. */
@@ -44274,6 +44276,8 @@ interface TransitionHookSlot {
 	pendingBatches: number;
 	/** isPending shows a falling edge its drain has yet to settle (fallTransitionHook). */
 	tentative: boolean;
+	/** Profile-build-only hook source; the assignment is erased in normal bundles. */
+	profileSlot?: HookSlot;
 	error?: { value: unknown };
 	start: (fn: () => void | Promise<unknown>) => void;
 	publish: (pending: boolean) => void;
@@ -44326,6 +44330,8 @@ export function useTransition(
 			},
 		};
 		s = hook;
+		if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__)
+			hook.profileSlot = slot;
 		ensureHooks(scope).set(slot, hook);
 		// An in-flight batch keeps referencing an unmounted hook until it
 		// finishes; publish() ignores a disposed block, and the batch releases the
