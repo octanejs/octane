@@ -18,7 +18,8 @@
       {
         "name": "@tsrx/typescript-plugin"
       }
-    ]
+    ],
+    "noUncheckedSideEffectImports": false
   },
   "include": ["src/**/*", "e2e/**/*", "vite.config.ts"]
 }

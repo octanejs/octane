@@ -9,7 +9,9 @@
     "noErrorTruncation": true,
     "verbatimModuleSyntax": true,
     "types": ["node"],
-    "strict": true
+    "strict": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true
   },
   "include": ["./src/", "./typetests/"],
   "exclude": ["node_modules", "dist", "tests"]

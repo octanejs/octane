@@ -154,7 +154,7 @@
         {
           "path": "packages/vaul/tsconfig.json",
           "role": "support",
-          "sha256": "a42fbdc850941411a0bda3a8aafa26008bfc772b7964e447a8c042e3096e1605"
+          "sha256": "ce5308bbf5481fc976e394aab7d0e563d036cecca4f388cdb393e891e3a75132"
         },
         {
           "path": "packages/vaul/typetests/assertions.md",

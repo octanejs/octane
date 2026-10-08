@@ -13,7 +13,9 @@
     "allowSyntheticDefaultImports": true,
     "allowImportingTsExtensions": true,
     "strict": true,
-    "types": ["node"]
+    "types": ["node"],
+    "noUnusedLocals": true,
+    "noUnusedParameters": true
   },
   "tsrx": { "compiler": "octane/compiler/volar" },
   "include": ["src/**/*.ts", "src/**/*.tsrx"],

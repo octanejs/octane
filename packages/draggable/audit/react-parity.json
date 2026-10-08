@@ -356,7 +356,7 @@
         {
           "path": "packages/draggable/typetests/tsconfig.adapted.json",
           "role": "support",
-          "sha256": "f7c06a2be4fc87321bfa37fee75f6dd8295ce9b11021d4486b7c45b885864e03"
+          "sha256": "d90f3a4a736c4bc3e893c9c38592188375a27d6cbe0cf0f0c61a5e38e215da01"
         },
         {
           "path": "packages/draggable/typetests/adapted/typings.consumer.ts",

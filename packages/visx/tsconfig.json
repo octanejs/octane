@@ -13,9 +13,11 @@
     "types": [],
     "strict": true,
     "isolatedModules": true,
-    "jsxImportSource": "octane"
+    "jsxImportSource": "octane",
+    "noUnusedLocals": true,
+    "noUnusedParameters": true
   },
   "tsrx": { "compiler": "octane/compiler/volar" },
-  "include": ["./src/", "./tests/types/"],
+  "include": ["./src/"],
   "exclude": ["node_modules", "dist"]
 }

@@ -130,7 +130,7 @@
         {
           "path": "packages/tanstack-pacer/audit/test-classifications.json",
           "role": "support",
-          "sha256": "44de69cc1d5f218940738da7ae9f4601c6744496b14be6040006bd9998474024"
+          "sha256": "565b1025f3a1b0a2d7fd66b577afa72127878b4d216e016f901380caa715dfb9"
         },
         {
           "path": "scripts/react-parity/tanstack-pacer-controls.test.mjs",

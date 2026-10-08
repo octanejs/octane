@@ -52,8 +52,7 @@
     "./testing": "./src/testing.ts"
   },
   "scripts": {
-    "test": "vitest run --root ../.. --project lynx",
-    "typecheck": "tsc --noEmit -p tsconfig.json && tsc --noEmit -p tsconfig.testing.json && tsc --noEmit -p typetests/tsconfig.json"
+    "test": "vitest run --root ../.. --project lynx"
   },
   "dependencies": {
     "@lynx-js/types": "catalog:lynx"

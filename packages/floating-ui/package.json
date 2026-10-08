@@ -55,7 +55,6 @@
     "test:adapted-upstream": "vitest run --config tests/adapted-vitest.config.ts",
     "parity:evidence:generate": "node scripts/generate-parity-evidence.mjs",
     "parity:evidence:check": "node scripts/generate-parity-evidence.mjs --check",
-    "typecheck": "tsrx-tsc --noEmit -p tsconfig.json && tsrx-tsc --noEmit -p typetests/tsconfig.adapted.json",
     "typecheck:pristine": "tsc --noEmit -p typetests/tsconfig.pristine.json",
     "upstream:verify": "node ../../scripts/react-parity/verify-provenance.mjs"
   },

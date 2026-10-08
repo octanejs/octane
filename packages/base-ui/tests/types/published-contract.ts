@@ -3621,17 +3621,16 @@ type PublishedKeys230 =
 	| 'color';
 type PublishedKeys231 = SharedKeys55;
 type PublishedKeys232 = 'index' | 'sample';
-type PublishedKeys233 = 'Provider';
-type PublishedKeys234 = SharedKeys56;
-type PublishedKeys235 = 'index' | 'label' | SharedKeys57;
-type PublishedKeys236 =
+type PublishedKeys233 = SharedKeys56;
+type PublishedKeys234 = 'index' | 'label' | SharedKeys57;
+type PublishedKeys235 =
 	'orientation' | 'loopFocus' | 'grid' | 'direction' | SharedKeys58 | SharedKeys59;
-type PublishedKeys237 = SharedKeys60;
-type PublishedKeys238 = 'event' | 'orientation' | 'loopFocus' | SharedKeys58 | SharedKeys61;
-type PublishedKeys239 = 'toLocaleString' | 'toString' | 'valueOf' | SharedKeys62;
-type PublishedKeys240 = 'style';
-type PublishedKeys241 = 'fallbackAxisSide';
-type PublishedKeys242 =
+type PublishedKeys236 = SharedKeys60;
+type PublishedKeys237 = 'event' | 'orientation' | 'loopFocus' | SharedKeys58 | SharedKeys61;
+type PublishedKeys238 = 'toLocaleString' | 'toString' | 'valueOf' | SharedKeys62;
+type PublishedKeys239 = 'style';
+type PublishedKeys240 = 'fallbackAxisSide';
+type PublishedKeys241 =
 	| 'fill'
 	| 'filter'
 	| SharedKeys6
@@ -3645,21 +3644,21 @@ type PublishedKeys242 =
 	| SharedKeys48
 	| 'color'
 	| SharedKeys63;
-type PublishedKeys243 = SharedKeys2 | 'target' | 'type' | SharedKeys64;
-type PublishedKeys244 = 'nonce' | 'disableStyleElements';
-type PublishedKeys245 = 'direction';
-type PublishedKeys246 = 'valid' | SharedKeys65;
-type PublishedKeys247 = SharedKeys14 | SharedKeys15 | 'valid';
-type PublishedKeys248 = 'valid';
-type PublishedKeys249 = 'value' | 'id' | 'name' | 'getValue' | 'controlRef';
-type PublishedKeys250 = 'name' | 'invalid' | SharedKeys66 | SharedKeys67;
-type PublishedKeys251 =
+type PublishedKeys242 = SharedKeys2 | 'target' | 'type' | SharedKeys64;
+type PublishedKeys243 = 'nonce' | 'disableStyleElements';
+type PublishedKeys244 = 'direction';
+type PublishedKeys245 = 'valid' | SharedKeys65;
+type PublishedKeys246 = SharedKeys14 | SharedKeys15 | 'valid';
+type PublishedKeys247 = 'valid';
+type PublishedKeys248 = 'value' | 'id' | 'name' | 'getValue' | 'controlRef';
+type PublishedKeys249 = 'name' | 'invalid' | SharedKeys66 | SharedKeys67;
+type PublishedKeys250 =
 	'disabled' | 'name' | 'validationMode' | 'state' | 'invalid' | SharedKeys67 | SharedKeys68;
-type PublishedKeys252 = 'errors' | 'validationMode' | SharedKeys69 | 'elementRef';
-type PublishedKeys253 = string;
-type PublishedKeys254 = 'sample';
-type PublishedKeys255 = 'id' | SharedKeys70;
-type PublishedKeys256 =
+type PublishedKeys251 = 'errors' | 'validationMode' | SharedKeys69 | 'elementRef';
+type PublishedKeys252 = string;
+type PublishedKeys253 = 'sample';
+type PublishedKeys254 = 'id' | SharedKeys70;
+type PublishedKeys255 =
 	| SharedKeys5
 	| 'children'
 	| 'className'
@@ -3675,13 +3674,13 @@ type PublishedKeys256 =
 	| 'defaultChecked'
 	| 'htmlFor'
 	| 'color';
-type PublishedKeys257 = 'disabled' | SharedKeys71;
-type PublishedKeys258 = number | string;
-type PublishedKeys259 = SharedKeys72;
-type PublishedKeys260 = 'transitionStatus';
-type PublishedKeys261 = 'date-fns';
-type PublishedKeys262 = 'toLocaleString' | 'toString' | 'valueOf' | SharedKeys73 | SharedKeys74;
-type PublishedKeys263 =
+type PublishedKeys256 = 'disabled' | SharedKeys71;
+type PublishedKeys257 = number | string;
+type PublishedKeys258 = SharedKeys72;
+type PublishedKeys259 = 'transitionStatus';
+type PublishedKeys260 = 'date-fns';
+type PublishedKeys261 = 'toLocaleString' | 'toString' | 'valueOf' | SharedKeys73 | SharedKeys74;
+type PublishedKeys262 =
 	| SharedKeys3
 	| SharedKeys4
 	| 'fill'
@@ -3693,22 +3692,22 @@ type PublishedKeys263 =
 	| 'values'
 	| number
 	| SharedKeys75;
-type PublishedKeys264 = SharedKeys76;
-type PublishedKeys265 = 'format' | SharedKeys73 | SharedKeys77;
-type PublishedKeys266 = 'reason' | 'open' | 'nested' | SharedKeys78;
-type PublishedKeys267 = 'nativeButton';
-type PublishedKeys268 = SharedKeys21 | 'fallbackAxisSide';
-type PublishedKeys269 = 'anchor' | SharedKeys21 | SharedKeys22;
-type PublishedKeys270 =
+type PublishedKeys263 = SharedKeys76;
+type PublishedKeys264 = 'format' | SharedKeys73 | SharedKeys77;
+type PublishedKeys265 = 'reason' | 'open' | 'nested' | SharedKeys78;
+type PublishedKeys266 = 'nativeButton';
+type PublishedKeys267 = SharedKeys21 | 'fallbackAxisSide';
+type PublishedKeys268 = 'anchor' | SharedKeys21 | SharedKeys22;
+type PublishedKeys269 =
 	'shift' | 'keepMounted' | 'anchor' | 'inline' | SharedKeys21 | SharedKeys22 | SharedKeys79;
-type PublishedKeys271 = SharedKeys21 | 'anchorHidden' | 'update' | SharedKeys80;
-type PublishedKeys272 = 'ref' | 'open' | 'enabled' | SharedKeys81;
-type PublishedKeys273 = 'disabled' | 'elementRef' | SharedKeys82;
-type PublishedKeys274 = SharedKeys83;
-type PublishedKeys275 =
+type PublishedKeys270 = SharedKeys21 | 'anchorHidden' | 'update' | SharedKeys80;
+type PublishedKeys271 = 'ref' | 'open' | 'enabled' | SharedKeys81;
+type PublishedKeys272 = 'disabled' | 'elementRef' | SharedKeys82;
+type PublishedKeys273 = SharedKeys83;
+type PublishedKeys274 =
 	'ref' | 'state' | 'enabled' | 'props' | 'stateAttributesMapping' | 'propGetter';
-type PublishedKeys276 = 'className' | 'render' | 'style';
-type PublishedKeys277 = SharedKeys84;
+type PublishedKeys275 = 'className' | 'render' | 'style';
+type PublishedKeys276 = SharedKeys84;
 
 type Contract0 = Assert<
 	Equal<keyof Pick<Native0.BaseUIChangeEventDetails<'sample'>, PublishedKeys0>, PublishedKeys0>
@@ -6946,13 +6945,13 @@ type Contract1376 = Assert<
 	>
 >;
 type Contract1377 = Assert<
-	Equal<keyof Pick<typeof Native21.CompositeListContext, PublishedKeys233>, PublishedKeys233>
+	typeof Native21.CompositeListContext extends import('octane').Context<infer _Value> ? true : false
 >;
 type Contract1378 = Assert<Equal<Parameters<typeof Native21.useCompositeListContext>['length'], 0>>;
 type Contract1379 = Assert<
 	Equal<
-		keyof Pick<Native21.CompositeListContextValue<{ sample: string }>, PublishedKeys234>,
-		PublishedKeys234
+		keyof Pick<Native21.CompositeListContextValue<{ sample: string }>, PublishedKeys233>,
+		PublishedKeys233
 	>
 >;
 type Contract1380 = Assert<Equal<Parameters<typeof Native21.CompositeRoot>['length'], 1>>;
@@ -6961,23 +6960,23 @@ type Contract1381 = Assert<
 >;
 type Contract1382 = Assert<
 	Equal<
-		keyof Pick<Native21.UseCompositeListItemParameters<{ sample: string }>, PublishedKeys235>,
-		PublishedKeys235
+		keyof Pick<Native21.UseCompositeListItemParameters<{ sample: string }>, PublishedKeys234>,
+		PublishedKeys234
 	>
 >;
 type Contract1383 = Assert<Equal<Parameters<typeof Native21.useCompositeRoot>['length'], 1>>;
 type Contract1384 = Assert<
-	Equal<keyof Pick<Native21.UseCompositeRootParameters, PublishedKeys236>, PublishedKeys236>
+	Equal<keyof Pick<Native21.UseCompositeRootParameters, PublishedKeys235>, PublishedKeys235>
 >;
 type Contract1385 = Assert<Equal<Parameters<typeof Native21.gridNavigation>['length'], 1>>;
 type Contract1386 = Assert<
-	Equal<keyof Pick<Native21.CompositeGridConfig, PublishedKeys237>, PublishedKeys237>
+	Equal<keyof Pick<Native21.CompositeGridConfig, PublishedKeys236>, PublishedKeys236>
 >;
 type Contract1387 = Assert<
 	Equal<keyof Pick<Native21.CompositeGridItemSize, PublishedKeys152>, PublishedKeys152>
 >;
 type Contract1388 = Assert<
-	Equal<keyof Pick<Native21.CompositeGridNavigationState, PublishedKeys238>, PublishedKeys238>
+	Equal<keyof Pick<Native21.CompositeGridNavigationState, PublishedKeys237>, PublishedKeys237>
 >;
 type Contract1389 = Assert<Equal<Parameters<Native21.CompositeGridNavigator>['length'], 1>>;
 type Contract1390 = Assert<Equal<Parameters<typeof Native21.scrollIntoViewIfNeeded>['length'], 4>>;
@@ -6986,13 +6985,13 @@ type Contract1391 = Assert<
 >;
 type Contract1392 = Assert<Equal<Parameters<typeof Native21.isListIndexDisabled>['length'], 2 | 3>>;
 type Contract1393 = Assert<
-	Equal<keyof Pick<typeof Native22.TYPEAHEAD_RESET_MS, PublishedKeys239>, PublishedKeys239>
+	Equal<keyof Pick<typeof Native22.TYPEAHEAD_RESET_MS, PublishedKeys238>, PublishedKeys238>
 >;
 type Contract1394 = Assert<
-	Equal<keyof Pick<typeof Native22.PATIENT_CLICK_THRESHOLD, PublishedKeys239>, PublishedKeys239>
+	Equal<keyof Pick<typeof Native22.PATIENT_CLICK_THRESHOLD, PublishedKeys238>, PublishedKeys238>
 >;
 type Contract1395 = Assert<
-	Equal<keyof Pick<typeof Native22.DISABLED_TRANSITIONS_STYLE, PublishedKeys240>, PublishedKeys240>
+	Equal<keyof Pick<typeof Native22.DISABLED_TRANSITIONS_STYLE, PublishedKeys239>, PublishedKeys239>
 >;
 type Contract1396 = Assert<
 	Equal<keyof Pick<typeof Native22.CLICK_TRIGGER_IDENTIFIER, PublishedKeys6>, PublishedKeys6>
@@ -7011,18 +7010,18 @@ type Contract1400 = Assert<
 >;
 type Contract1401 = Assert<
 	Equal<
-		keyof Pick<typeof Native22.DROPDOWN_COLLISION_AVOIDANCE, PublishedKeys241>,
-		PublishedKeys241
+		keyof Pick<typeof Native22.DROPDOWN_COLLISION_AVOIDANCE, PublishedKeys240>,
+		PublishedKeys240
 	>
 >;
 type Contract1402 = Assert<
-	Equal<keyof Pick<typeof Native22.POPUP_COLLISION_AVOIDANCE, PublishedKeys241>, PublishedKeys241>
+	Equal<keyof Pick<typeof Native22.POPUP_COLLISION_AVOIDANCE, PublishedKeys240>, PublishedKeys240>
 >;
 type Contract1403 = Assert<
-	Equal<keyof Pick<typeof Native22.ownerVisuallyHidden, PublishedKeys242>, PublishedKeys242>
+	Equal<keyof Pick<typeof Native22.ownerVisuallyHidden, PublishedKeys241>, PublishedKeys241>
 >;
 type Contract1404 = Assert<
-	Equal<keyof Pick<Native23.ReasonToEvent<'sample'>, PublishedKeys243>, PublishedKeys243>
+	Equal<keyof Pick<Native23.ReasonToEvent<'sample'>, PublishedKeys242>, PublishedKeys242>
 >;
 type Contract1405 = Assert<
 	Equal<keyof Pick<Native23.BaseUIChangeEventDetails<'sample'>, PublishedKeys0>, PublishedKeys0>
@@ -7037,36 +7036,36 @@ type Contract1408 = Assert<
 	Equal<Parameters<typeof Native23.createGenericEventDetails>['length'], 1 | 2 | 3>
 >;
 type Contract1409 = Assert<
-	Equal<keyof Pick<typeof Native24.CSPContext, PublishedKeys233>, PublishedKeys233>
+	typeof Native24.CSPContext extends import('octane').Context<infer _Value> ? true : false
 >;
 type Contract1410 = Assert<Equal<Parameters<typeof Native24.useCSPContext>['length'], 0>>;
 type Contract1411 = Assert<
-	Equal<keyof Pick<Native24.CSPContextValue, PublishedKeys244>, PublishedKeys244>
+	Equal<keyof Pick<Native24.CSPContextValue, PublishedKeys243>, PublishedKeys243>
 >;
 type Contract1412 = Assert<
-	Equal<keyof Pick<Native25.DirectionContext, PublishedKeys245>, PublishedKeys245>
+	Equal<keyof Pick<Native25.DirectionContext, PublishedKeys244>, PublishedKeys244>
 >;
 type Contract1413 = Assert<Equal<Parameters<typeof Native25.useDirection>['length'], 0>>;
 type Contract1414 = Assert<
 	Equal<keyof Pick<Native25.TextDirection, PublishedKeys6>, PublishedKeys6>
 >;
 type Contract1415 = Assert<
-	Equal<keyof Pick<Native25.DirectionContextType, PublishedKeys245>, PublishedKeys245>
+	Equal<keyof Pick<Native25.DirectionContextType, PublishedKeys244>, PublishedKeys244>
 >;
 type Contract1416 = Assert<
-	Equal<keyof Pick<typeof Native26.DEFAULT_VALIDITY_STATE, PublishedKeys246>, PublishedKeys246>
+	Equal<keyof Pick<typeof Native26.DEFAULT_VALIDITY_STATE, PublishedKeys245>, PublishedKeys245>
 >;
 type Contract1417 = Assert<
 	Equal<
-		keyof Pick<typeof Native26.DEFAULT_FIELD_STATE_ATTRIBUTES, PublishedKeys247>,
-		PublishedKeys247
+		keyof Pick<typeof Native26.DEFAULT_FIELD_STATE_ATTRIBUTES, PublishedKeys246>,
+		PublishedKeys246
 	>
 >;
 type Contract1418 = Assert<
 	Equal<keyof Pick<typeof Native26.DEFAULT_FIELD_ROOT_STATE, PublishedKeys33>, PublishedKeys33>
 >;
 type Contract1419 = Assert<
-	Equal<keyof Pick<typeof Native26.fieldValidityMapping, PublishedKeys248>, PublishedKeys248>
+	Equal<keyof Pick<typeof Native26.fieldValidityMapping, PublishedKeys247>, PublishedKeys247>
 >;
 type Contract1420 = Assert<
 	Equal<Parameters<typeof Native27.useRegisterFieldControl>['length'], 3 | 4 | 5 | 6>
@@ -7075,20 +7074,20 @@ type Contract1421 = Assert<
 	Equal<Parameters<typeof Native27.useFieldControlRegistration>['length'], 1>
 >;
 type Contract1422 = Assert<
-	Equal<keyof Pick<Native27.FieldControlRegistration, PublishedKeys249>, PublishedKeys249>
+	Equal<keyof Pick<Native27.FieldControlRegistration, PublishedKeys248>, PublishedKeys248>
 >;
 type Contract1423 = Assert<
 	Equal<
-		keyof Pick<Native27.UseFieldControlRegistrationParameters, PublishedKeys250>,
-		PublishedKeys250
+		keyof Pick<Native27.UseFieldControlRegistrationParameters, PublishedKeys249>,
+		PublishedKeys249
 	>
 >;
 type Contract1424 = Assert<
-	Equal<keyof Pick<Native28.FieldRootContext, PublishedKeys251>, PublishedKeys251>
+	Equal<keyof Pick<Native28.FieldRootContext, PublishedKeys250>, PublishedKeys250>
 >;
 type Contract1425 = Assert<Equal<Parameters<typeof Native28.useFieldRootContext>['length'], 0 | 1>>;
 type Contract1426 = Assert<
-	Equal<keyof Pick<Native28.FieldRootContextType, PublishedKeys251>, PublishedKeys251>
+	Equal<keyof Pick<Native28.FieldRootContextType, PublishedKeys250>, PublishedKeys250>
 >;
 type Contract1427 = Assert<Equal<Parameters<typeof Native29.getFilter>['length'], 0 | 1>>;
 type Contract1428 = Assert<
@@ -7096,17 +7095,17 @@ type Contract1428 = Assert<
 >;
 type Contract1429 = Assert<Equal<keyof Pick<Native29.Filter, PublishedKeys56>, PublishedKeys56>>;
 type Contract1430 = Assert<
-	Equal<keyof Pick<Native30.FormContext, PublishedKeys252>, PublishedKeys252>
+	Equal<keyof Pick<Native30.FormContext, PublishedKeys251>, PublishedKeys251>
 >;
 type Contract1431 = Assert<Equal<Parameters<typeof Native30.useFormContext>['length'], 0>>;
-type Contract1432 = Assert<Equal<keyof Pick<Native30.Errors, PublishedKeys253>, PublishedKeys253>>;
+type Contract1432 = Assert<Equal<keyof Pick<Native30.Errors, PublishedKeys252>, PublishedKeys252>>;
 type Contract1433 = Assert<
 	Equal<Parameters<typeof Native31.getDisabledMountTransitionStyles>['length'], 1>
 >;
 type Contract1434 = Assert<
 	Equal<
-		keyof Pick<Native32.StateAttributesMapping<{ sample: string }>, PublishedKeys254>,
-		PublishedKeys254
+		keyof Pick<Native32.StateAttributesMapping<{ sample: string }>, PublishedKeys253>,
+		PublishedKeys253
 	>
 >;
 type Contract1435 = Assert<
@@ -7133,22 +7132,22 @@ type Contract1449 = Assert<Equal<Parameters<typeof Native34.useLabelableContext>
 type Contract1450 = Assert<Equal<Parameters<typeof Native34.useLabelableId>['length'], 0 | 1>>;
 type Contract1451 = Assert<Equal<Parameters<typeof Native34.useLabel>['length'], 0 | 1>>;
 type Contract1452 = Assert<
-	Equal<keyof Pick<Native34.UseLabelParameters, PublishedKeys255>, PublishedKeys255>
+	Equal<keyof Pick<Native34.UseLabelParameters, PublishedKeys254>, PublishedKeys254>
 >;
 type Contract1453 = Assert<
-	Equal<keyof Pick<Native34.UseLabelReturnValue, PublishedKeys256>, PublishedKeys256>
+	Equal<keyof Pick<Native34.UseLabelReturnValue, PublishedKeys255>, PublishedKeys255>
 >;
 type Contract1454 = Assert<Equal<Parameters<typeof Native35.NOOP>['length'], 0>>;
 type Contract1455 = Assert<
-	Equal<keyof Pick<typeof Native36.REASONS, PublishedKeys257>, PublishedKeys257>
+	Equal<keyof Pick<typeof Native36.REASONS, PublishedKeys256>, PublishedKeys256>
 >;
 type Contract1456 = Assert<
-	Equal<keyof Pick<Native36.BaseUIEventReasons, PublishedKeys257>, PublishedKeys257>
+	Equal<keyof Pick<Native36.BaseUIEventReasons, PublishedKeys256>, PublishedKeys256>
 >;
 type Contract1457 = Assert<
 	Equal<keyof Pick<Native36.BaseUIEventReason, PublishedKeys6>, PublishedKeys6>
 >;
-type Contract1458 = Assert<Equal<keyof Pick<Native37.Group, PublishedKeys258>, PublishedKeys258>>;
+type Contract1458 = Assert<Equal<keyof Pick<Native37.Group, PublishedKeys257>, PublishedKeys257>>;
 type Contract1459 = Assert<Equal<Parameters<typeof Native37.isGroupedItems>['length'], 1>>;
 type Contract1460 = Assert<Equal<Parameters<typeof Native37.flattenLeafItems>['length'], 1>>;
 type Contract1461 = Assert<Equal<Parameters<typeof Native37.hasNullItemLabel>['length'], 1>>;
@@ -7163,41 +7162,41 @@ type Contract1465 = Assert<
 type Contract1466 = Assert<Equal<Parameters<typeof Native38.serializeValue>['length'], 1>>;
 type Contract1467 = Assert<
 	Equal<
-		keyof Pick<typeof Native39.TransitionStatusDataAttributes, PublishedKeys259>,
-		PublishedKeys259
+		keyof Pick<typeof Native39.TransitionStatusDataAttributes, PublishedKeys258>,
+		PublishedKeys258
 	>
 >;
 type Contract1468 = Assert<
-	Equal<keyof Pick<typeof Native39.transitionStatusMapping, PublishedKeys260>, PublishedKeys260>
+	Equal<keyof Pick<typeof Native39.transitionStatusMapping, PublishedKeys259>, PublishedKeys259>
 >;
 type Contract1469 = Assert<
-	Equal<keyof Pick<Native40.TemporalSupportedObjectLookup, PublishedKeys261>, PublishedKeys261>
+	Equal<keyof Pick<Native40.TemporalSupportedObjectLookup, PublishedKeys260>, PublishedKeys260>
 >;
 type Contract1470 = Assert<
-	Equal<keyof Pick<Native40.TemporalSupportedObject, PublishedKeys262>, PublishedKeys262>
+	Equal<keyof Pick<Native40.TemporalSupportedObject, PublishedKeys261>, PublishedKeys261>
 >;
 type Contract1471 = Assert<
 	Equal<keyof Pick<Native40.TemporalTimezone, PublishedKeys6>, PublishedKeys6>
 >;
 type Contract1472 = Assert<Equal<keyof Native40.TemporalValue, never>>;
 type Contract1473 = Assert<
-	Equal<keyof Pick<Native40.TemporalRangeValue, PublishedKeys263>, PublishedKeys263>
+	Equal<keyof Pick<Native40.TemporalRangeValue, PublishedKeys262>, PublishedKeys262>
 >;
 type Contract1474 = Assert<Equal<keyof Native40.TemporalSupportedValue, never>>;
 type Contract1475 = Assert<
-	Equal<keyof Pick<Native40.TemporalNonNullableRangeValue, PublishedKeys263>, PublishedKeys263>
+	Equal<keyof Pick<Native40.TemporalNonNullableRangeValue, PublishedKeys262>, PublishedKeys262>
 >;
 type Contract1476 = Assert<
-	Equal<keyof Pick<Native40.TemporalNonNullableValue<Date>, PublishedKeys262>, PublishedKeys262>
+	Equal<keyof Pick<Native40.TemporalNonNullableValue<Date>, PublishedKeys261>, PublishedKeys261>
 >;
 type Contract1477 = Assert<
-	Equal<keyof Pick<Native40.TemporalAdapterFormats, PublishedKeys264>, PublishedKeys264>
+	Equal<keyof Pick<Native40.TemporalAdapterFormats, PublishedKeys263>, PublishedKeys263>
 >;
 type Contract1478 = Assert<
-	Equal<keyof Pick<Native40.DateBuilderReturnType<'sample'>, PublishedKeys262>, PublishedKeys262>
+	Equal<keyof Pick<Native40.DateBuilderReturnType<'sample'>, PublishedKeys261>, PublishedKeys261>
 >;
 type Contract1479 = Assert<
-	Equal<keyof Pick<Native40.TemporalAdapter, PublishedKeys265>, PublishedKeys265>
+	Equal<keyof Pick<Native40.TemporalAdapter, PublishedKeys264>, PublishedKeys264>
 >;
 type Contract1480 = Assert<
 	Equal<keyof Pick<typeof Native41.TemporalAdapterDateFns, PublishedKeys29>, PublishedKeys29>
@@ -7218,12 +7217,12 @@ type Contract1485 = Assert<
 	Equal<keyof Pick<Native43.MaybeBaseUIEvent<MouseEvent>, PublishedKeys2>, PublishedKeys2>
 >;
 type Contract1486 = Assert<
-	Equal<keyof Pick<Native43.FloatingUIOpenChangeDetails, PublishedKeys266>, PublishedKeys266>
+	Equal<keyof Pick<Native43.FloatingUIOpenChangeDetails, PublishedKeys265>, PublishedKeys265>
 >;
 type Contract1487 = Assert<
 	Equal<
-		keyof Pick<Native43.WithBaseUIEvent<{ sample: string }>, PublishedKeys254>,
-		PublishedKeys254
+		keyof Pick<Native43.WithBaseUIEvent<{ sample: string }>, PublishedKeys253>,
+		PublishedKeys253
 	>
 >;
 type Contract1488 = Assert<
@@ -7233,18 +7232,18 @@ type Contract1488 = Assert<
 	>
 >;
 type Contract1489 = Assert<
-	Equal<keyof Pick<Native43.NativeButtonProps, PublishedKeys267>, PublishedKeys267>
+	Equal<keyof Pick<Native43.NativeButtonProps, PublishedKeys266>, PublishedKeys266>
 >;
 type Contract1490 = Assert<
-	Equal<keyof Pick<Native43.NonNativeButtonProps, PublishedKeys267>, PublishedKeys267>
+	Equal<keyof Pick<Native43.NonNativeButtonProps, PublishedKeys266>, PublishedKeys266>
 >;
 type Contract1491 = Assert<
-	Equal<keyof Pick<Native43.Simplify<{ sample: string }>, PublishedKeys254>, PublishedKeys254>
+	Equal<keyof Pick<Native43.Simplify<{ sample: string }>, PublishedKeys253>, PublishedKeys253>
 >;
 type Contract1492 = Assert<
 	Equal<
-		keyof Pick<Native43.RequiredExcept<{ sample: string }, 'sample'>, PublishedKeys254>,
-		PublishedKeys254
+		keyof Pick<Native43.RequiredExcept<{ sample: string }, 'sample'>, PublishedKeys253>,
+		PublishedKeys253
 	>
 >;
 type Contract1493 = Assert<Equal<keyof Pick<Native43.Orientation, PublishedKeys6>, PublishedKeys6>>;
@@ -7254,7 +7253,7 @@ type Contract1496 = Assert<Equal<keyof Pick<Native45.Align, PublishedKeys6>, Pub
 type Contract1497 = Assert<Equal<keyof Native45.Boundary, never>>;
 type Contract1498 = Assert<Equal<Parameters<Native45.OffsetFunction>['length'], 1>>;
 type Contract1499 = Assert<
-	Equal<keyof Pick<Native45.CollisionAvoidance, PublishedKeys268>, PublishedKeys268>
+	Equal<keyof Pick<Native45.CollisionAvoidance, PublishedKeys267>, PublishedKeys267>
 >;
 type Contract1500 = Assert<Equal<Parameters<typeof Native45.useAnchorPositioning>['length'], 1>>;
 type Contract1501 = Assert<
@@ -7262,15 +7261,15 @@ type Contract1501 = Assert<
 >;
 type Contract1502 = Assert<
 	Equal<
-		keyof Pick<Native45.UseAnchorPositioningSharedParameters, PublishedKeys269>,
-		PublishedKeys269
+		keyof Pick<Native45.UseAnchorPositioningSharedParameters, PublishedKeys268>,
+		PublishedKeys268
 	>
 >;
 type Contract1503 = Assert<
-	Equal<keyof Pick<Native45.UseAnchorPositioningParameters, PublishedKeys270>, PublishedKeys270>
+	Equal<keyof Pick<Native45.UseAnchorPositioningParameters, PublishedKeys269>, PublishedKeys269>
 >;
 type Contract1504 = Assert<
-	Equal<keyof Pick<Native45.UseAnchorPositioningReturnValue, PublishedKeys271>, PublishedKeys271>
+	Equal<keyof Pick<Native45.UseAnchorPositioningReturnValue, PublishedKeys270>, PublishedKeys270>
 >;
 type Contract1505 = Assert<
 	Equal<Parameters<typeof Native46.useAnimationsFinished>['length'], 1 | 2 | 3>
@@ -7278,15 +7277,15 @@ type Contract1505 = Assert<
 type Contract1506 = Assert<Equal<Parameters<typeof Native47.useBaseUiId>['length'], 0 | 1>>;
 type Contract1507 = Assert<Equal<Parameters<typeof Native48.useOpenChangeComplete>['length'], 1>>;
 type Contract1508 = Assert<
-	Equal<keyof Pick<Native48.UseOpenChangeCompleteParameters, PublishedKeys272>, PublishedKeys272>
+	Equal<keyof Pick<Native48.UseOpenChangeCompleteParameters, PublishedKeys271>, PublishedKeys271>
 >;
 type Contract1509 = Assert<Equal<keyof Native48.UseOpenChangeCompleteState, never>>;
 type Contract1510 = Assert<Equal<Parameters<typeof Native49.isTouchLikePointerType>['length'], 1>>;
 type Contract1511 = Assert<
-	Equal<keyof Pick<Native49.UsePressAndHoldParameters, PublishedKeys273>, PublishedKeys273>
+	Equal<keyof Pick<Native49.UsePressAndHoldParameters, PublishedKeys272>, PublishedKeys272>
 >;
 type Contract1512 = Assert<
-	Equal<keyof Pick<Native49.UsePressAndHoldReturnValue, PublishedKeys274>, PublishedKeys274>
+	Equal<keyof Pick<Native49.UsePressAndHoldReturnValue, PublishedKeys273>, PublishedKeys273>
 >;
 type Contract1513 = Assert<Equal<Parameters<typeof Native49.usePressAndHold>['length'], 1>>;
 type Contract1514 = Assert<Equal<Parameters<typeof Native50.useRenderElement>['length'], 2 | 3>>;
@@ -7299,15 +7298,15 @@ type Contract1515 = Assert<
 				{ sample: string },
 				true
 			>,
-			PublishedKeys275
+			PublishedKeys274
 		>,
-		PublishedKeys275
+		PublishedKeys274
 	>
 >;
 type Contract1516 = Assert<
 	Equal<
-		keyof Pick<Native50.UseRenderElementComponentProps<{ sample: string }>, PublishedKeys276>,
-		PublishedKeys276
+		keyof Pick<Native50.UseRenderElementComponentProps<{ sample: string }>, PublishedKeys275>,
+		PublishedKeys275
 	>
 >;
 type Contract1517 = Assert<Equal<keyof Native50.UseRenderElementState, never>>;
@@ -8589,7 +8588,7 @@ type Contract2060 = Assert<
 >;
 type Contract2061 = Assert<Equal<Parameters<typeof Native77.useMediaQuery>['length'], 1 | 2>>;
 type Contract2062 = Assert<
-	Equal<keyof Pick<Native77.UseMediaQueryOptions, PublishedKeys277>, PublishedKeys277>
+	Equal<keyof Pick<Native77.UseMediaQueryOptions, PublishedKeys276>, PublishedKeys276>
 >;
 type Contract2063 = Assert<Equal<keyof Native77.UseMediaQueryState, never>>;
 type Contract2064 = Assert<Equal<Parameters<typeof Native78.useRender>['length'], 1>>;

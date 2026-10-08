@@ -18,7 +18,9 @@
     "paths": {
       "react": ["./node_modules/@types/react/index.d.ts"]
     },
-    "skipLibCheck": false
+    "skipLibCheck": false,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true
   },
   "include": ["./src/"],
   "exclude": ["node_modules", "dist", "tests"],
