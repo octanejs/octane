@@ -2814,6 +2814,8 @@ interface TransitionActionSlot<T> {
 interface TransitionActionUpdate<T = unknown> {
 	/** An urgent replacement can cancel a held value even when its base is equal. */
 	superseded?: boolean;
+	/** Retained after its block rendered it (queueTransitionBlock); its value is committed. */
+	rendered?: boolean;
 	state?: StateSlot<T>;
 	/** Already queued work precedes this batch; later urgent work stays on the cell. */
 	previous?: TransitionActionUpdate<T>;
@@ -3575,7 +3577,11 @@ function takeSingleOriginTransitionUpdates(origin: Block): Array<TransitionActio
 			}
 		}
 		if (!single) continue;
-		for (let k = 0; k < group.length; k++) entries.push(group[k]);
+		for (let k = 0; k < group.length; k++) {
+			// The hold reverts and later re-applies the cell, whatever rendered it before.
+			group[k].rendered = undefined;
+			entries.push(group[k]);
+		}
 		FLUSHED_TRANSITION_UPDATES.splice(i, 1);
 	}
 	return entries;
@@ -7674,6 +7680,13 @@ function scheduleRender(block: Block, flushed?: boolean, cue?: boolean): void {
  * stack, and a pending cue keeps the microtask flush.
  */
 function queueTransitionBlock(block: Block, cue?: boolean): boolean {
+	// The block is not queued, so a render consumed every update retained for it.
+	// Those values are committed: a later cue must not expose their bases.
+	if (FLUSHED_TRANSITION_UPDATES.length !== 0 && CURRENT_BLOCK !== block) {
+		for (const entries of FLUSHED_TRANSITION_UPDATES) {
+			for (const entry of entries) if (entry.block === block) entry.rendered = true;
+		}
+	}
 	if (syncFlush || inFlush || CURRENT_BLOCK !== null || cue || TRANSITION_TASK_ACTIVE) return false;
 	TRANSITION_QUEUE.push(block);
 	scheduleTransitionTask();
@@ -7779,7 +7792,7 @@ function keepTransitionPending(block: Block): void {
 function hasQueuedTransitionCells(block: Block): boolean {
 	for (const entries of FLUSHED_TRANSITION_UPDATES) {
 		for (const update of entries) {
-			if (update.block !== block || update.superseded) continue;
+			if (update.block !== block || update.superseded || update.rendered) continue;
 			const cell = update.state ?? update.reducer;
 			if (cell === undefined || cell.renderTransition !== undefined) return true;
 		}
@@ -11943,7 +11956,7 @@ function beginUrgentTransitionRender(block: Block, render: UrgentTransitionRende
 	const cells = render.cells;
 	for (const entries of FLUSHED_TRANSITION_UPDATES) {
 		for (const update of entries) {
-			if (update.block !== block || update.superseded) continue;
+			if (update.block !== block || update.superseded || update.rendered) continue;
 			// A block has few staged cells, so a scan beats allocating a slot index.
 			let previous = 0;
 			while (previous < cells.length && cells[previous].update.slot !== update.slot) previous++;

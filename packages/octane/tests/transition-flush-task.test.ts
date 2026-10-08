@@ -2,6 +2,8 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { act, createRoot, flushSync, startTransition } from '../src/index.js';
 import {
 	ActionProbe,
+	type DeferredTabsControls,
+	DeferredPendingTabs,
 	HeldPendingPanel,
 	HeldPendingTabs,
 	OptimisticProbe,
@@ -511,6 +513,33 @@ describe('a pending cue in the component that holds the transition update', () =
 		// The cue shows the urgent render's committed tab, not the value before it.
 		expect(tabs.log[0]).toBe('b1 pending');
 		expect(tabs.container.textContent).toBe('b2 idlepanel 1');
+	});
+
+	it('keeps a committed deferred value in a later cue', async () => {
+		const log: string[] = [];
+		let controls!: DeferredTabsControls;
+		let setPanel!: (value: number) => void;
+		mountWith(DeferredPendingTabs, {
+			expose: (next: DeferredTabsControls) => (controls = next),
+			exposePanel: (next: (value: number) => void) => (setPanel = next),
+			onCommit: (entry: string) => log.push(entry),
+		});
+		await Promise.resolve();
+
+		controls.setQuery('b');
+		await flushMicrotasks();
+		// The deferred swap's task is posted; this task follows it, and the
+		// sibling's transition task follows this one, so it still waits after the swap.
+		postTask(() => {
+			log.length = 0;
+			controls.start(() => controls.setTab('y'));
+		});
+		startTransition(() => setPanel(1));
+		await untilTasks(() => log.includes('b/b/y idle'));
+
+		// The cue shows the deferred value the swap committed, not the one before it.
+		expect(log[0]).toBe('b/b/x pending');
+		expect(log.at(-1)).toBe('b/b/y idle');
 	});
 
 	it('keeps the previous content when the transition suspends after its cue', async () => {

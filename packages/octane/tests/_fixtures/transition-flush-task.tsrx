@@ -3,6 +3,7 @@ import {
 	startTransition,
 	use,
 	useActionState,
+	useDeferredValue,
 	useLayoutEffect,
 	useOptimistic,
 	useState,
@@ -299,5 +300,39 @@ export function PendingTransitionInput() @{
 			}}
 		/>
 		<p>{`${query} ${isPending ? 'pending' : 'idle'}`}</p>
+	</>
+}
+
+export interface DeferredTabsControls {
+	start: (fn: () => void | Promise<unknown>) => void;
+	setQuery: (query: string) => void;
+	setTab: (tab: string) => void;
+}
+
+interface DeferredPendingTabsProps {
+	onCommit: (entry: string) => void;
+	expose: (controls: DeferredTabsControls) => void;
+	exposePanel: (setValue: (value: number) => void) => void;
+}
+
+function DeferredTabs(props: Omit<DeferredPendingTabsProps, 'exposePanel'>) @{
+	const [isPending, start] = useTransition();
+	const [query, setQuery] = useState('a');
+	const deferred = useDeferredValue(query);
+	const [tab, setTab] = useState('x');
+	props.expose({ start, setQuery, setTab });
+	const label = `${query}/${deferred}/${tab} ${isPending ? 'pending' : 'idle'}`;
+	useLayoutEffect(() => {
+		props.onCommit(label);
+	}, null);
+	<output>{label}</output>
+}
+
+// useDeferredValue and a pending cue in one component, beside a sibling whose
+// transition can keep waiting for its task.
+export function DeferredPendingTabs(props: DeferredPendingTabsProps) @{
+	<>
+		<DeferredTabs expose={props.expose} onCommit={props.onCommit} />
+		<Panel expose={props.exposePanel} onCommit={() => {}} />
 	</>
 }
