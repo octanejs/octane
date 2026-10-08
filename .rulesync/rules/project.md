@@ -40,6 +40,7 @@ trigger first arises, even if it is a later step you chose:
 - `performance-audit`: a change that can move render, SSR, hydration, compiler
   output, or bundle cost.
 - `perf-review`: a PR touching runtime, compiler output, or binding hot paths.
+- `concise-code`: planning a change beyond a few lines, and the diff before a PR.
 - `update-bindings`: audit, maintain, or reduce existing bindings.
 - `octane-react-library-port`: new ports or copied React code.
 - `react-library-port`: legacy router.
@@ -132,17 +133,18 @@ consuming application compiles the source with its own toolchain.
 ```bash
 pnpm test          # full Vitest run
 pnpm typecheck
-pnpm typecheck:files [path...]     # defaults to staged and unstaged files
+pnpm typecheck:files [path...]
 pnpm sync
-pnpm format:files [path...]        # defaults to staged and unstaged files
-pnpm format:files:check [path...]  # defaults to staged and unstaged files
+pnpm format:files [path...]
+pnpm format:files:check [path...]
 pnpm format:check                  # optional repo-wide gate
 ```
 
 Before any push, run `pnpm sync` and commit its generated changes.
 
-Explicit paths override the staged/unstaged default. `format:files` writes;
-`format:files:check` is read-only. Use repo-wide checks only when needed.
+The `:files` commands default to staged and unstaged files; explicit paths
+override that. `format:files` writes; `format:files:check` is read-only. Use
+repo-wide checks only when needed.
 
 `pnpm test` runs package prechecks, then one root Vitest invocation for every
 project in `vitest.config.js`; it does not fan out through package `test`

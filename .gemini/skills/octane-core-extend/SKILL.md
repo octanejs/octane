@@ -27,7 +27,9 @@ Before editing, write down:
 - hot paths and expected call frequency: per render, node, item, event, signal
   notification, or request, versus once per root or module;
 - a credible failing behavioral test for a bug, or a relevant benchmark baseline
-  for an optimization.
+  for an optimization;
+- what the plan adds and the smaller alternatives you weighed, per
+  `concise-code`.
 
 Assume framework-fundamental code is performance-sensitive until the call graph
 shows otherwise. Use the `performance-audit` skill alongside this skill whenever
@@ -168,7 +170,8 @@ Inspect the complete diff after validation. Try applicable empty, large,
 repeated, nested, reordered, reentrant, error, abort, cleanup, and hydration
 cases. Trace each allocation and retained reference through release, inspect
 adjacent fast paths and every changed caller, compare with a simpler design, and
-remove complexity that does not justify its permanent cost. Resolve findings and
+remove complexity that does not justify its permanent cost, using the
+`concise-code` simplification pass. Resolve findings and
 repeat the review on the final diff.
 
 The handoff must report the contract, correctness evidence, measured baseline and

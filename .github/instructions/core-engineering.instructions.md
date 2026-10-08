@@ -108,8 +108,9 @@ change. At minimum:
    that moved from a cold path to a hot one.
 3. Re-read every changed call site and adjacent fast path. Check dev/prod and
    client/server symmetry, generated output, public types, and binding impact.
-4. Compare against at least one simpler design. Remove branches, helpers,
-   options, and comments that do not earn their ongoing cost.
+4. Compare against at least one simpler design, using the `concise-code`
+   pass. Remove branches, helpers, options, and comments that do not earn
+   their ongoing cost.
 5. Confirm that tests fail for the intended regression and remain insensitive
    to valid implementation alternatives. Confirm benchmark controls still
    produce the same semantic result.
