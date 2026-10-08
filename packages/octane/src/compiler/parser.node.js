@@ -21,7 +21,9 @@ const STYLE_EXPRESSION_CHILD = /<style\b[^>]*>\s*\{/;
  * `<style>` expression child. Operational failures keep their own name or
  * code and stay visible, and so does any other bare `Error`: without the
  * `<style …>{` shape in the source there is nothing the CSS reader could have
- * rejected.
+ * rejected, and a diagnostic `@tsrx/core` reports itself (two outputs in one
+ * code block, a redeclared binding) arrives as the bare `Error` the JavaScript
+ * parser throws for the same source.
  * @param {unknown} error
  * @param {string} source
  * @returns {boolean}

@@ -3,9 +3,9 @@
 ---
 
 Update the shared TSRX compiler dependencies to `@tsrx/core` 0.5.5 and
-`@tsrx/oxc` 0.18.0. `octane` now declares `@tsrx/oxc@0.18.0` as its optional
+`@tsrx/oxc` 0.20.0. `octane` now declares `@tsrx/oxc@0.20.0` as its optional
 compiler parser peer, so a project that compiles Octane in Node upgrades its
-`@tsrx/oxc` install from 0.16.0 to 0.18.0.
+`@tsrx/oxc` install from 0.16.0 to 0.20.0.
 
 The parser now gives template markup TSX's exact tree: the indentation between
 children is its own whitespace text, and each `@case`/`@default` arm is one block.
