@@ -1,15 +1,22 @@
 import assert from 'node:assert/strict';
-import { mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
+import { spawnSync } from 'node:child_process';
+import { mkdirSync, mkdtempSync, realpathSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { describe, test } from 'node:test';
+import { NATIVE_TSC } from './octane-tsc/native.mjs';
 import {
 	createPackedJavascriptConsumerManifest,
 	createPackedRuntimeConsumerDependencies,
 	assertPackedTsrxConsumerSucceeded,
+	assertPackedTsrxFilesChecked,
+	assertPackedTsrxLaneSentinelReported,
 	createPackedExampleManifest,
 	createPackedTsrxConsumerConfig,
+	createPackedTsrxLaneSentinelConfig,
+	createPackedTsrxTypecheckArguments,
+	createPackedTsrxTypeScriptLanes,
 	resolvePackedTsrxSourceDirectories,
 	createPackedTsrxConsumerManifest,
 	findPackedTsrxSourceConsumerPackages,
@@ -25,13 +32,18 @@ import {
 	renderPackedEsmConsumerSource,
 	renderPackedTsrxConsumerSource,
 	renderPackedTsrxBrowserAmbientProbe,
+	renderPackedTsrxLaneSentinel,
 	renderPackedTsrxSourceImports,
 	renderPackedTsrxConsumerTypeProbe,
 	renderPackedStrictBrowserConsumerTypeProbe,
 	renderPackedStrictBrowserConsumerSource,
+	splitPackedTsrxTypecheckOutput,
 	PACKED_TSRX_CONSUMER_PROJECTS,
 	PACKED_TSRX_BROWSER_AMBIENT_FILE,
+	PACKED_TSRX_LANE_SENTINEL_FILE,
+	PACKED_TSRX_LANE_SENTINEL_PROJECT,
 	PACKED_TSRX_PROBE_PACKAGES,
+	PACKED_TSRX_TYPESCRIPT_6_VERSION,
 	PACKED_STRICT_BROWSER_SOURCE_PACKAGES,
 } from './package-pack-canaries.mjs';
 
@@ -688,6 +700,275 @@ declare namespace NodeJS { interface Process { env: { NODE_ENV?: string } } }
 		assert.match(source, /AssertNotAny<Parameters<typeof EditorContent>\[0\]>/);
 		assert.match(source, /--consumer-offset/);
 		assert.match(source, /@ts-expect-error/g);
+	});
+});
+
+describe('packed TSRX TypeScript lanes', () => {
+	const laneVersions = {
+		classicTypeScript: '5.9.3',
+		contentMapper: '0.1.2',
+		nativeTypeScript: '7.1.0-dev.20260921.1',
+		tsrxTypeScriptPlugin: '0.6.3',
+	};
+	const lanes = createPackedTsrxTypeScriptLanes(laneVersions);
+	const lane = (name) => lanes.find((candidate) => candidate.name === name);
+	const repositoryRoot = path.resolve(import.meta.dirname, '..');
+
+	test('compiles shipped TSRX on TypeScript 5.9, TypeScript 6, and the TypeScript 7.1 nightly', () => {
+		assert.deepEqual(
+			lanes.map(({ name, checker, tooling }) => ({ name, checker, tooling })),
+			[
+				{
+					name: 'TypeScript 5.9',
+					checker: 'tsrx-tsc',
+					tooling: { typescript: '5.9.3', tsrxTypeScriptPlugin: '0.6.3' },
+				},
+				{
+					name: 'TypeScript 6',
+					checker: 'tsrx-tsc',
+					tooling: {
+						typescript: PACKED_TSRX_TYPESCRIPT_6_VERSION,
+						tsrxTypeScriptPlugin: '0.6.3',
+					},
+				},
+				{
+					name: 'TypeScript 7.1',
+					checker: 'tsc',
+					tooling: { typescript: '7.1.0-dev.20260921.1', contentMapper: '0.1.2' },
+				},
+			],
+		);
+		assert.equal(new Set(lanes.map(({ id }) => id)).size, lanes.length);
+		assert.match(PACKED_TSRX_TYPESCRIPT_6_VERSION, /^6\.\d+\.\d+$/);
+	});
+
+	test('accepts the compilers the repository pins for its lanes', () => {
+		const octaneRequire = createRequire(path.join(repositoryRoot, 'packages/octane/package.json'));
+		assert.doesNotThrow(() =>
+			createPackedTsrxTypeScriptLanes({
+				classicTypeScript: repositoryRequire('typescript/package.json').version,
+				contentMapper: repositoryRequire('@tsrx/content-mapper/package.json').version,
+				nativeTypeScript: octaneRequire('typescript-native/package.json').version,
+				tsrxTypeScriptPlugin: repositoryRequire('@tsrx/typescript-plugin/package.json').version,
+			}),
+		);
+	});
+
+	test('refuses a compiler that would make a lane a copy of another', () => {
+		assert.throws(
+			() => createPackedTsrxTypeScriptLanes({ ...laneVersions, classicTypeScript: '6.0.3' }),
+			/TypeScript 5\.9 lane cannot run on typescript@6\.0\.3/,
+		);
+		for (const nativeTypeScript of ['7.0.2', '7.1.0-dev.20260821.1', '7.2.0-dev.20261001.1']) {
+			assert.throws(
+				() => createPackedTsrxTypeScriptLanes({ ...laneVersions, nativeTypeScript }),
+				/TypeScript 7\.1 lane needs the content-mapper protocol/,
+			);
+		}
+	});
+
+	test("pins the lane's compiler even when a packed peer publishes a TypeScript range", () => {
+		const manifest = createPackedTsrxConsumerManifest(
+			{ octane: 'file:/tmp/octane.tgz' },
+			{ nodeTypes: '24.13.3', packageManager: 'pnpm@12.9.1', ...lane('TypeScript 7.1').tooling },
+			['octane'],
+			{ esrap: '^2.3.2', typescript: '^5.9.3 || ^6.0.0 || >=7.1.0-0', vite: '^8.0.16' },
+		);
+
+		assert.deepEqual(manifest.dependencies, {
+			octane: 'file:/tmp/octane.tgz',
+			vite: '^8.0.16',
+		});
+		assert.deepEqual(manifest.devDependencies, {
+			'@tsrx/content-mapper': '0.1.2',
+			'@types/node': '24.13.3',
+			esrap: '2.3.6',
+			typescript: '7.1.0-dev.20260921.1',
+		});
+		assert.equal(
+			createPackedTsrxConsumerManifest(
+				{ octane: 'file:/tmp/octane.tgz' },
+				{ nodeTypes: '24.13.3', ...lane('TypeScript 6').tooling },
+				['octane'],
+			).devDependencies['@tsrx/typescript-plugin'],
+			'0.6.3',
+		);
+	});
+
+	test('declares the content mapper only for TypeScript 7, in the documented form', () => {
+		const classic = createPackedTsrxConsumerConfig({ nodeTypes: false });
+		const native = createPackedTsrxConsumerConfig({ contentMapper: true, nodeTypes: false });
+
+		assert.equal(classic.contentMappers, undefined);
+		assert.deepEqual(native.contentMappers, [
+			{ package: '@tsrx/content-mapper', extensions: ['.tsrx'] },
+		]);
+		// The mapper and the plugin read the same compiler and options.
+		assert.deepEqual(
+			{ ...native, contentMappers: undefined },
+			{ ...classic, contentMappers: undefined },
+		);
+		assert.deepEqual(native.tsrx, { compiler: 'octane/compiler/volar' });
+	});
+
+	test('lists the program and opts TypeScript 7 into running the mapper', () => {
+		assert.deepEqual(createPackedTsrxTypecheckArguments(lane('TypeScript 6'), 'tsconfig.json'), [
+			'--noEmit',
+			'--pretty',
+			'false',
+			'--listFiles',
+			'-p',
+			'tsconfig.json',
+		]);
+		assert.deepEqual(createPackedTsrxTypecheckArguments(lane('TypeScript 7.1'), 'tsconfig.json'), [
+			'--noEmit',
+			'--pretty',
+			'false',
+			'--listFiles',
+			'--runExternalCode',
+			'-p',
+			'tsconfig.json',
+		]);
+	});
+
+	test('separates the listed program from the diagnostics', () => {
+		const listed = path.join(path.sep, 'consumer', 'node_modules', 'pkg', 'src', 'View.tsrx');
+		const output = [
+			"src/App.tsrx(5,8): error TS2322: Type 'number' is not assignable to type 'string'.",
+			'  Continued diagnostic text.',
+			listed,
+			'',
+		].join('\n');
+
+		assert.deepEqual(splitPackedTsrxTypecheckOutput(output), {
+			files: [listed],
+			diagnostics:
+				"src/App.tsrx(5,8): error TS2322: Type 'number' is not assignable to type 'string'.\n  Continued diagnostic text.",
+		});
+	});
+
+	test('fails a lane that left shipped TSRX out of its program', () => {
+		const expected = ['/consumer/pkg/src/A.tsrx', '/consumer/pkg/src/B.tsrx'];
+
+		assert.doesNotThrow(() =>
+			assertPackedTsrxFilesChecked(expected, [...expected, '/consumer/src/C.ts'], 'lane'),
+		);
+		assert.throws(
+			() => assertPackedTsrxFilesChecked(expected, ['/consumer/pkg/src/A.tsrx'], 'lane'),
+			/lane left 1 of 2 expected \.tsrx files out of the program:\n {2}\/consumer\/pkg\/src\/B\.tsrx/,
+		);
+		assert.throws(
+			() => assertPackedTsrxFilesChecked([], [], 'lane'),
+			/selected no \.tsrx files, so it would prove nothing/,
+		);
+	});
+
+	test('accepts only the deliberate .tsrx error as the negative control', () => {
+		const sentinel = `${PACKED_TSRX_LANE_SENTINEL_FILE}(6,8): error TS2322: Type 'number' is not assignable to type 'string'.\n/consumer/${PACKED_TSRX_LANE_SENTINEL_FILE}\n`;
+
+		assert.doesNotThrow(() =>
+			assertPackedTsrxLaneSentinelReported({ status: 2, stdout: sentinel }, 'lane'),
+		);
+		for (const result of [
+			// Nothing reported: the lane did not check the .tsrx module.
+			{ status: 0, stdout: `/consumer/${PACKED_TSRX_LANE_SENTINEL_FILE}\n` },
+			// TypeScript 7 without the content mapper finds no inputs at all.
+			{
+				status: 2,
+				stdout:
+					"error TS18003: No inputs were found in config file 'tsconfig.lane-sentinel.json'.\n",
+			},
+			// octane did not resolve, so the deliberate error has a different cause.
+			{
+				status: 2,
+				stdout: `${sentinel}${PACKED_TSRX_LANE_SENTINEL_FILE}(1,26): error TS2307: Cannot find module 'octane'.\n`,
+			},
+			// The TSRX compiler failed instead of the checker reporting the error.
+			{
+				status: 2,
+				stdout: `${PACKED_TSRX_LANE_SENTINEL_FILE}(1,1): error TSRX771002: no compiler.\n`,
+			},
+		]) {
+			assert.throws(
+				() => assertPackedTsrxLaneSentinelReported(result, 'lane'),
+				/lane did not report exactly the deliberate TS2322/,
+			);
+		}
+	});
+
+	describe('negative control on real compilers', () => {
+		const createSentinelConsumer = (context, { contentMapper }) => {
+			const directory = mkdtempSync(path.join(tmpdir(), 'packed-tsrx-lane-sentinel-'));
+			context.after(() => rmSync(directory, { recursive: true, force: true }));
+			mkdirSync(path.join(directory, 'node_modules/@tsrx'), { recursive: true });
+			symlinkSync(
+				path.join(repositoryRoot, 'packages/octane'),
+				path.join(directory, 'node_modules/octane'),
+				'junction',
+			);
+			symlinkSync(
+				realpathSync(path.join(repositoryRoot, 'node_modules/@tsrx/content-mapper')),
+				path.join(directory, 'node_modules/@tsrx/content-mapper'),
+				'junction',
+			);
+			mkdirSync(path.join(directory, path.dirname(PACKED_TSRX_LANE_SENTINEL_FILE)));
+			writeFileSync(
+				path.join(directory, PACKED_TSRX_LANE_SENTINEL_FILE),
+				renderPackedTsrxLaneSentinel(),
+			);
+			writeFileSync(
+				path.join(directory, PACKED_TSRX_LANE_SENTINEL_PROJECT),
+				JSON.stringify(createPackedTsrxLaneSentinelConfig({ contentMapper })),
+			);
+			return directory;
+		};
+		const run = (directory, command, lane) =>
+			spawnSync(
+				command[0],
+				[
+					...command.slice(1),
+					...createPackedTsrxTypecheckArguments(lane, PACKED_TSRX_LANE_SENTINEL_PROJECT),
+				],
+				{ cwd: directory, encoding: 'utf8', maxBuffer: 64 * 1024 * 1024, timeout: 120_000 },
+			);
+		const nativeTsc = [process.execPath, NATIVE_TSC];
+
+		test('TypeScript 7 reports it through the content mapper, and fails the lane without it', (context) => {
+			const native = lane('TypeScript 7.1');
+			const withMapper = createSentinelConsumer(context, { contentMapper: true });
+			assert.doesNotThrow(() =>
+				assertPackedTsrxLaneSentinelReported(run(withMapper, nativeTsc, native), 'mapped'),
+			);
+
+			const withoutMapper = createSentinelConsumer(context, { contentMapper: false });
+			assert.throws(
+				() =>
+					assertPackedTsrxLaneSentinelReported(
+						run(withoutMapper, nativeTsc, native),
+						'TypeScript 7 without the content mapper',
+					),
+				/TypeScript 7 without the content mapper did not report exactly the deliberate TS2322/,
+			);
+		});
+
+		test('classic TypeScript reports it through tsrx-tsc, and fails the lane through plain tsc', (context) => {
+			const classic = lane('TypeScript 5.9');
+			const directory = createSentinelConsumer(context, { contentMapper: false });
+			assert.doesNotThrow(() =>
+				assertPackedTsrxLaneSentinelReported(
+					run(directory, [path.join(repositoryRoot, 'node_modules/.bin/tsrx-tsc')], classic),
+					'tsrx-tsc',
+				),
+			);
+			const plainTsc = [
+				process.execPath,
+				path.join(path.dirname(repositoryRequire.resolve('typescript/package.json')), 'bin/tsc'),
+			];
+			assert.throws(
+				() => assertPackedTsrxLaneSentinelReported(run(directory, plainTsc, classic), 'plain tsc'),
+				/plain tsc did not report exactly the deliberate TS2322/,
+			);
+		});
 	});
 });
 

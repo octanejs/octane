@@ -1,50 +1,12 @@
 import assert from 'node:assert/strict';
-import { resolve } from 'node:path';
-import ts from 'typescript';
+import { dirname, resolve } from 'node:path';
+import { importNativeTypeScript } from '../../../scripts/octane-tsc/native.mjs';
+
+const { API, SymbolFlags } = await importNativeTypeScript('unstable/sync');
 
 const packageRoot = resolve(import.meta.dirname, '..');
 const configPath = resolve(packageRoot, 'tsconfig.json');
-const config = ts.readConfigFile(configPath, ts.sys.readFile);
-if (config.error) {
-	throw new Error(ts.flattenDiagnosticMessageText(config.error.messageText, '\n'));
-}
-
-const parsed = ts.parseJsonConfigFileContent(config.config, ts.sys, packageRoot);
-const program = ts.createProgram(parsed.fileNames, parsed.options);
-const checker = program.getTypeChecker();
 const containingFile = resolve(packageRoot, 'tests/types/parity.test-d.ts');
-
-function moduleSymbol(specifier) {
-	const resolved = ts.resolveModuleName(
-		specifier,
-		containingFile,
-		parsed.options,
-		ts.sys,
-	).resolvedModule;
-	assert.ok(resolved, `Unable to resolve ${specifier}`);
-	const sourceFile = program.getSourceFile(resolved.resolvedFileName);
-	assert.ok(sourceFile, `TypeScript program omitted ${specifier}`);
-	const symbol = checker.getSymbolAtLocation(sourceFile);
-	assert.ok(symbol, `TypeScript module has no symbol: ${specifier}`);
-	return symbol;
-}
-
-function dereference(symbol) {
-	return symbol.flags & ts.SymbolFlags.Alias ? checker.getAliasedSymbol(symbol) : symbol;
-}
-
-function exportNames(symbol) {
-	return checker
-		.getExportsOfModule(dereference(symbol))
-		.map((entry) => entry.getName())
-		.sort();
-}
-
-function namespaceSymbol(module, namespace) {
-	const symbol = checker.getExportsOfModule(module).find((entry) => entry.getName() === namespace);
-	assert.ok(symbol, `Missing namespace ${namespace}`);
-	return symbol;
-}
 
 const stableNamespaces = [
 	'Annotation',
@@ -84,27 +46,6 @@ const currentAdditionsToStableNamespaces = {
 	Shape: ['arcPath', 'areaPath', 'linePath'],
 	Voronoi: ['VoronoiConfig'],
 };
-
-const localRoot = moduleSymbol('@octanejs/visx');
-const upstreamRoot = moduleSymbol('@visx/visx');
-
-for (const namespace of stableNamespaces) {
-	const local = exportNames(namespaceSymbol(localRoot, namespace));
-	const upstream = exportNames(namespaceSymbol(upstreamRoot, namespace));
-	assert.deepEqual(
-		local,
-		[...upstream, ...(currentAdditionsToStableNamespaces[namespace] ?? [])].sort(),
-		`${namespace} public TypeScript exports differ from Visx 4.0.0 + current master`,
-	);
-}
-
-for (const entry of ['chord', 'delaunay', 'react-spring', 'sankey', 'stats']) {
-	assert.deepEqual(
-		exportNames(moduleSymbol(`@octanejs/visx/${entry}`)),
-		exportNames(moduleSymbol(`@visx/${entry}`)),
-		`${entry} public TypeScript exports differ from Visx 4.0.0`,
-	);
-}
 
 const words = (value) => value.trim().split(/\s+/).sort();
 
@@ -190,14 +131,103 @@ const currentMasterEntries = {
 	'voronoi/react': words(`useVoronoi UseVoronoiOptions`),
 };
 
-for (const [entry, expected] of Object.entries(currentMasterEntries)) {
-	assert.deepEqual(
-		exportNames(moduleSymbol(`@octanejs/visx/${entry}`)),
-		expected,
-		`${entry} public TypeScript exports differ from current Visx master`,
-	);
-}
+const releasedEntries = ['chord', 'delaunay', 'react-spring', 'sankey', 'stats'];
 
-console.log(
-	`Visx public TypeScript surface matches ${stableNamespaces.length + 5} released and ${Object.keys(currentMasterEntries).length} current entry points.`,
-);
+// TypeScript 7 resolves a module specifier written in a program file, so a
+// virtual module beside the parity tests imports every entry point under test.
+// It reaches TypeScript through the API's file system callbacks, never the disk.
+const specifiers = [
+	'@octanejs/visx',
+	'@visx/visx',
+	...releasedEntries.flatMap((entry) => [`@octanejs/visx/${entry}`, `@visx/${entry}`]),
+	...Object.keys(currentMasterEntries).map((entry) => `@octanejs/visx/${entry}`),
+];
+const importer = resolve(dirname(containingFile), `.public-types-${process.pid}.ts`);
+const importerText = specifiers
+	.map((specifier, index) => `import * as entry${index} from ${JSON.stringify(specifier)};`)
+	.join('\n');
+const api = new API({
+	cwd: packageRoot,
+	fs: {
+		readFile: (fileName) => (fileName === importer ? importerText : undefined),
+		fileExists: (fileName) => (fileName === importer ? true : undefined),
+	},
+});
+
+try {
+	const config = api.readConfigFile(configPath);
+	if (config.error) throw new Error(config.error.text);
+	const parsed = api.parseJsonConfigFileContent(config.config, { configDirectory: packageRoot });
+	const program = api.createProgram([...parsed.fileNames, importer], parsed.options);
+	const { checker } = program.getProject();
+	const moduleSpecifiers = new Map(
+		program
+			.getSourceFile(importer)
+			.statements.map((statement) => [statement.moduleSpecifier.text, statement.moduleSpecifier]),
+	);
+
+	function moduleSymbol(specifier) {
+		const resolved = program.getResolvedModuleFromModuleSpecifier(
+			moduleSpecifiers.get(specifier),
+			importer,
+		);
+		assert.ok(resolved, `Unable to resolve ${specifier}`);
+		const sourceFile = program.getSourceFile(resolved.resolvedFileName);
+		assert.ok(sourceFile, `TypeScript program omitted ${specifier}`);
+		const symbol = checker.getSymbolOfSourceFile(resolved.resolvedFileName);
+		assert.ok(symbol, `TypeScript module has no symbol: ${specifier}`);
+		return symbol;
+	}
+
+	function dereference(symbol) {
+		return symbol.flags & SymbolFlags.Alias ? checker.getAliasedSymbol(symbol) : symbol;
+	}
+
+	function exportNames(symbol) {
+		return checker
+			.getExportsOfModule(dereference(symbol))
+			.map((entry) => entry.name)
+			.sort();
+	}
+
+	function namespaceSymbol(module, namespace) {
+		const symbol = checker.getExportsOfModule(module).find((entry) => entry.name === namespace);
+		assert.ok(symbol, `Missing namespace ${namespace}`);
+		return symbol;
+	}
+
+	const localRoot = moduleSymbol('@octanejs/visx');
+	const upstreamRoot = moduleSymbol('@visx/visx');
+
+	for (const namespace of stableNamespaces) {
+		const local = exportNames(namespaceSymbol(localRoot, namespace));
+		const upstream = exportNames(namespaceSymbol(upstreamRoot, namespace));
+		assert.deepEqual(
+			local,
+			[...upstream, ...(currentAdditionsToStableNamespaces[namespace] ?? [])].sort(),
+			`${namespace} public TypeScript exports differ from Visx 4.0.0 + current master`,
+		);
+	}
+
+	for (const entry of releasedEntries) {
+		assert.deepEqual(
+			exportNames(moduleSymbol(`@octanejs/visx/${entry}`)),
+			exportNames(moduleSymbol(`@visx/${entry}`)),
+			`${entry} public TypeScript exports differ from Visx 4.0.0`,
+		);
+	}
+
+	for (const [entry, expected] of Object.entries(currentMasterEntries)) {
+		assert.deepEqual(
+			exportNames(moduleSymbol(`@octanejs/visx/${entry}`)),
+			expected,
+			`${entry} public TypeScript exports differ from current Visx master`,
+		);
+	}
+
+	console.log(
+		`Visx public TypeScript surface matches ${stableNamespaces.length + 5} released and ${Object.keys(currentMasterEntries).length} current entry points.`,
+	);
+} finally {
+	api.close();
+}

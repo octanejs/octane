@@ -1,4 +1,6 @@
-import { existsSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import ts from 'typescript';
 import { afterEach, describe, expect, it } from 'vitest';
 import { compile, compileToVolarMappings } from 'octane/compiler';
@@ -6,13 +8,19 @@ import { createTextTypeProject } from 'octane/compiler/typescript';
 import {
 	createTextTypeFixture,
 	stringChildren,
+	TEXT_TYPE_BACKENDS,
+	type TextTypeBackend,
 	type TextTypeFacts,
 } from '../_text-type-project.js';
 
 const fixtures: ReturnType<typeof createTextTypeFixture>[] = [];
 
-function fixture(files: Record<string, string>, compilerOptions?: Record<string, unknown>) {
-	const result = createTextTypeFixture(files, compilerOptions);
+function fixtureOn(
+	files: Record<string, string>,
+	compilerOptions?: Record<string, unknown>,
+	backend?: TextTypeBackend,
+) {
+	const result = createTextTypeFixture(files, compilerOptions, backend);
 	fixtures.push(result);
 	return result;
 }
@@ -31,9 +39,15 @@ function childRange(source: string, expression: string): [number, number] {
 // Each case builds a TypeScript project (one also type-checks a full program),
 // which is cold, CPU-bound work that a loaded CI shard can stretch well past
 // the 5 s default; none of these cases assert on speed.
-describe('TypeScript-backed text facts', { timeout: 20_000 }, () => {
-	it('proves only primitive text domains for numeric and mixed child values', () => {
-		const source = `export function TextValues(props: {
+describe.each(TEXT_TYPE_BACKENDS)(
+	'TypeScript-backed text facts on $name',
+	{ timeout: 20_000 },
+	(backend) => {
+		const fixture = (files: Record<string, string>, compilerOptions?: Record<string, unknown>) =>
+			fixtureOn(files, compilerOptions, backend);
+
+		it('proves only primitive text domains for numeric and mixed child values', () => {
+			const source = `export function TextValues(props: {
 			count: number; large: bigint; mixed: string | number | bigint;
 			optional?: number; boxed: Number; flag: boolean; date: Date;
 			unchecked: any; unknown: unknown;
@@ -46,27 +60,27 @@ describe('TypeScript-backed text facts', { timeout: 20_000 }, () => {
 				<p>{props.date}</p><p>{props.unchecked}</p><p>{props.unknown}</p>
 			</main>
 		}`;
-		const consumer = fixture({ 'TextValues.tsrx': source });
-		const facts = consumer.project.snapshot(consumer.file('TextValues.tsrx'));
-		const primitive = (facts.primitiveTextChildRanges ?? []).map(([start, end]) =>
-			source.slice(start, end),
-		);
-		expect(primitive).toEqual(['props.count', 'count', 'props.large', 'props.mixed']);
-		expect(stringChildren(source, facts)).toEqual(['Date()', 'props.date.toISOString()']);
-		for (const uncertain of [
-			'props.optional',
-			'props.boxed',
-			'props.flag',
-			'props.date',
-			'props.unchecked',
-			'props.unknown',
-		]) {
-			expect(primitive, uncertain).not.toContain(uncertain);
-		}
-	});
+			const consumer = fixture({ 'TextValues.tsrx': source });
+			const facts = consumer.project.snapshot(consumer.file('TextValues.tsrx'));
+			const primitive = (facts.primitiveTextChildRanges ?? []).map(([start, end]) =>
+				source.slice(start, end),
+			);
+			expect(primitive).toEqual(['props.count', 'count', 'props.large', 'props.mixed']);
+			expect(stringChildren(source, facts)).toEqual(['Date()', 'props.date.toISOString()']);
+			for (const uncertain of [
+				'props.optional',
+				'props.boxed',
+				'props.flag',
+				'props.date',
+				'props.unchecked',
+				'props.unknown',
+			]) {
+				expect(primitive, uncertain).not.toContain(uncertain);
+			}
+		});
 
-	it('proves exact primitive-string child expressions across declarations and calls', () => {
-		const source = `import { useState } from 'octane';
+		it('proves exact primitive-string child expressions across declarations and calls', () => {
+			const source = `import { useState } from 'octane';
 type Label = string;
 type Branded = string & { readonly brand: unique symbol };
 interface Props {
@@ -98,295 +112,367 @@ export function Shapes<T extends string>(props: Props, constrained: T) @{
 		<p>{props.values[0] ?? ''}</p>
 	</main>
 }`;
-		const consumer = fixture({ 'Shapes.tsrx': source });
-		const facts = consumer.project.snapshot(consumer.file('Shapes.tsrx'));
-		const proven = stringChildren(source, facts);
+			const consumer = fixture({ 'Shapes.tsrx': source });
+			const facts = consumer.project.snapshot(consumer.file('Shapes.tsrx'));
+			const proven = stringChildren(source, facts);
 
-		expect(proven).toEqual(
-			expect.arrayContaining([
-				'props.name',
-				'name',
-				'state',
-				'mutable',
-				'label(props.name)',
-				'props.choice',
-				'props.branded',
-				'constrained',
-				'String(props.mixed)',
-				"props.values[0] ?? ''",
-			]),
-		);
-		for (const uncertain of [
-			'props.optional',
-			'props.mixed',
-			'props.unchecked',
-			'props.unknown',
-			'props.boxed',
-			'impossible',
-			'props.values[0]',
-			'props.lookup[props.key]',
-		]) {
-			expect(proven, uncertain).not.toContain(uncertain);
-		}
-		expect(facts.stringChildRanges).toContainEqual(childRange(source, 'props.name'));
-		const attributeStart = source.indexOf('title={props.name}') + 'title={'.length;
-		expect(facts.stringChildRanges).not.toContainEqual([
-			attributeStart,
-			attributeStart + 'props.name'.length,
-		]);
-		expect(JSON.parse(JSON.stringify(facts))).toEqual(facts);
-	});
+			expect(proven).toEqual(
+				expect.arrayContaining([
+					'props.name',
+					'name',
+					'state',
+					'mutable',
+					'label(props.name)',
+					'props.choice',
+					'props.branded',
+					'constrained',
+					'String(props.mixed)',
+					"props.values[0] ?? ''",
+				]),
+			);
+			for (const uncertain of [
+				'props.optional',
+				'props.mixed',
+				'props.unchecked',
+				'props.unknown',
+				'props.boxed',
+				'impossible',
+				'props.values[0]',
+				'props.lookup[props.key]',
+			]) {
+				expect(proven, uncertain).not.toContain(uncertain);
+			}
+			expect(facts.stringChildRanges).toContainEqual(childRange(source, 'props.name'));
+			const attributeStart = source.indexOf('title={props.name}') + 'title={'.length;
+			expect(facts.stringChildRanges).not.toContainEqual([
+				attributeStart,
+				attributeStart + 'props.name'.length,
+			]);
+			expect(JSON.parse(JSON.stringify(facts))).toEqual(facts);
+		});
 
-	it('uses control-flow narrowing at the individual child, not at the symbol declaration', () => {
-		const source = `export function Narrow(props: { value: string | number; optional?: string }) @{
+		it('uses control-flow narrowing at the individual child, not at the symbol declaration', () => {
+			const source = `export function Narrow(props: { value: string | number; optional?: string }) @{
 	<main>
 		@if (typeof props.value === 'string') { <p>{props.value}</p> }
 		@else { <p>{props.value}</p> }
 		<p>{props.optional ?? ''}</p>
 	</main>
 }`;
-		const consumer = fixture({ 'Narrow.tsrx': source });
-		const facts = consumer.project.snapshot(consumer.file('Narrow.tsrx'));
-		const first = childRange(source, 'props.value');
-		const secondStart = source.lastIndexOf('{props.value}') + 1;
+			const consumer = fixture({ 'Narrow.tsrx': source });
+			const facts = consumer.project.snapshot(consumer.file('Narrow.tsrx'));
+			const first = childRange(source, 'props.value');
+			const secondStart = source.lastIndexOf('{props.value}') + 1;
 
-		expect(facts.stringChildRanges).toContainEqual(first);
-		expect(facts.stringChildRanges).not.toContainEqual([
-			secondStart,
-			secondStart + 'props.value'.length,
-		]);
-		expect(stringChildren(source, facts)).toContain("props.optional ?? ''");
-	});
+			expect(facts.stringChildRanges).toContainEqual(first);
+			expect(facts.stringChildRanges).not.toContainEqual([
+				secondStart,
+				secondStart + 'props.value'.length,
+			]);
+			expect(stringChildren(source, facts)).toContain("props.optional ?? ''");
+		});
 
-	it('maps complete expressions when virtual TSX printing changes their whitespace', () => {
-		const multiline = 'format( props.left,\n props.right )';
-		const compact = 'props.enabled?props.left:props.right';
-		const source = `function format(left: string, right: string): string { return left + right; }
+		it('maps complete expressions when virtual TSX printing changes their whitespace', () => {
+			const multiline = 'format( props.left,\n props.right )';
+			const compact = 'props.enabled?props.left:props.right';
+			const source = `function format(left: string, right: string): string { return left + right; }
 export function Printed(props: { left: string; right: string; enabled: boolean }) @{
 	<main><p>{${multiline}}</p><p>{${compact}}</p></main>
 }`;
-		const consumer = fixture({ 'Printed.tsrx': source });
-		const facts = consumer.project.snapshot(consumer.file('Printed.tsrx'));
-		expect(facts.stringChildRanges).toEqual([
-			childRange(source, multiline),
-			childRange(source, compact),
-		]);
-	});
+			const consumer = fixture({ 'Printed.tsrx': source });
+			const facts = consumer.project.snapshot(consumer.file('Printed.tsrx'));
+			expect(facts.stringChildRanges).toEqual([
+				childRange(source, multiline),
+				childRange(source, compact),
+			]);
+		});
 
-	it('resolves authored .tsrx exports and invalidates facts when an imported type changes', () => {
-		const model = `export type Label = string;
+		it('resolves authored .tsrx exports and invalidates facts when an imported type changes', () => {
+			const model = `export type Label = string;
 export function readLabel(): Label { return 'ready'; }
 export function Model() @{ <i>{readLabel()}</i> }
 `;
-		const source = `import { readLabel, type Label } from './model.tsrx';
+			const source = `import { readLabel, type Label } from './model.tsrx';
 import { normalize } from './normalize';
 export function Imported(props: { label: Label }) @{
 	<main><p>{props.label}</p><p>{readLabel()}</p><p>{normalize(props.label)}</p></main>
 }`;
-		const consumer = fixture({
-			'model.tsrx': model,
-			'normalize.ts': 'export function normalize(value: string): string { return value.trim(); }',
-			'Imported.tsrx': source,
+			const consumer = fixture({
+				'model.tsrx': model,
+				'normalize.ts': 'export function normalize(value: string): string { return value.trim(); }',
+				'Imported.tsrx': source,
+			});
+			const filename = consumer.file('Imported.tsrx');
+			const first = consumer.project.snapshot(filename);
+			const original = JSON.stringify(first);
+			expect(stringChildren(source, first)).toEqual([
+				'props.label',
+				'readLabel()',
+				'normalize(props.label)',
+			]);
+			expect(consumer.project.snapshot(filename)).toEqual(first);
+
+			consumer.write(
+				'model.tsrx',
+				model.replace('type Label = string', 'type Label = string | number'),
+			);
+			consumer.project.invalidate(consumer.file('model.tsrx'));
+			const second = consumer.project.snapshot(filename);
+			expect(stringChildren(source, second)).not.toContain('props.label');
+			expect(stringChildren(source, second)).not.toContain('readLabel()');
+			expect(
+				(second.primitiveTextChildRanges ?? []).map(([start, end]) => source.slice(start, end)),
+			).toEqual(expect.arrayContaining(['props.label', 'readLabel()']));
+			expect(second.sourceVersion).toBe(first.sourceVersion);
+			expect(second.projectVersion).not.toBe(first.projectVersion);
+			expect(JSON.stringify(first)).toBe(original);
 		});
-		const filename = consumer.file('Imported.tsrx');
-		const first = consumer.project.snapshot(filename);
-		const original = JSON.stringify(first);
-		expect(stringChildren(source, first)).toEqual([
-			'props.label',
-			'readLabel()',
-			'normalize(props.label)',
-		]);
-		expect(consumer.project.snapshot(filename)).toEqual(first);
 
-		consumer.write(
-			'model.tsrx',
-			model.replace('type Label = string', 'type Label = string | number'),
-		);
-		consumer.project.invalidate(consumer.file('model.tsrx'));
-		const second = consumer.project.snapshot(filename);
-		expect(stringChildren(source, second)).not.toContain('props.label');
-		expect(stringChildren(source, second)).not.toContain('readLabel()');
-		expect(
-			(second.primitiveTextChildRanges ?? []).map(([start, end]) => source.slice(start, end)),
-		).toEqual(expect.arrayContaining(['props.label', 'readLabel()']));
-		expect(second.sourceVersion).toBe(first.sourceVersion);
-		expect(second.projectVersion).not.toBe(first.projectVersion);
-		expect(JSON.stringify(first)).toBe(original);
-	});
+		it('requires strict null checking and reloads compiler settings after invalidation', () => {
+			const source = `export function Label(props: { value: string }) @{ <p>{props.value}</p> }`;
+			const consumer = fixture({ 'Label.tsrx': source }, { strictNullChecks: false });
+			const filename = consumer.file('Label.tsrx');
+			const loose = consumer.project.snapshot(filename);
+			expect(loose.stringChildRanges).toEqual([]);
 
-	it('requires strict null checking and reloads compiler settings after invalidation', () => {
-		const source = `export function Label(props: { value: string }) @{ <p>{props.value}</p> }`;
-		const consumer = fixture({ 'Label.tsrx': source }, { strictNullChecks: false });
-		const filename = consumer.file('Label.tsrx');
-		const loose = consumer.project.snapshot(filename);
-		expect(loose.stringChildRanges).toEqual([]);
-
-		const config = JSON.parse(readFileSync(consumer.tsconfig, 'utf8'));
-		config.compilerOptions.strictNullChecks = true;
-		writeFileSync(consumer.tsconfig, JSON.stringify(config));
-		consumer.project.invalidate();
-		const strict = consumer.project.snapshot(filename);
-		expect(stringChildren(source, strict)).toContain('props.value');
-		expect(strict.projectVersion).not.toBe(loose.projectVersion);
-	});
-
-	it('reloads an extended tsconfig after file-specific invalidation', () => {
-		const source = `export function Label(props: { value: string }) @{ <p>{props.value}</p> }`;
-		const consumer = fixture({ 'Label.tsrx': source });
-		const filename = consumer.file('Label.tsrx');
-		const config = JSON.parse(readFileSync(consumer.tsconfig, 'utf8'));
-		config.extends = './base.json';
-		consumer.write('base.json', JSON.stringify({ compilerOptions: { strictNullChecks: false } }));
-		writeFileSync(consumer.tsconfig, JSON.stringify(config));
-		consumer.project.invalidate();
-		const loose = consumer.project.snapshot(filename);
-		expect(loose.stringChildRanges).toEqual([]);
-
-		consumer.write('base.json', JSON.stringify({ compilerOptions: { strictNullChecks: true } }));
-		consumer.project.invalidate(filename);
-		const strict = consumer.project.snapshot(filename);
-		expect(stringChildren(source, strict)).toContain('props.value');
-		expect(strict.projectVersion).not.toBe(loose.projectVersion);
-	});
-
-	it('keeps extra roots current and deduplicates them when configured', () => {
-		const configured = `export function Configured(props: { label: string }) @{ <p>{props.label}</p> }`;
-		const promoted = `export function Promoted(props: { label: string }) @{ <p>{props.label}</p> }`;
-		const consumer = fixture({
-			'Configured.tsrx': configured,
-			'Promoted.tsrx': promoted,
+			const config = JSON.parse(readFileSync(consumer.tsconfig, 'utf8'));
+			config.compilerOptions.strictNullChecks = true;
+			writeFileSync(consumer.tsconfig, JSON.stringify(config));
+			consumer.project.invalidate();
+			const strict = consumer.project.snapshot(filename);
+			expect(stringChildren(source, strict)).toContain('props.value');
+			expect(strict.projectVersion).not.toBe(loose.projectVersion);
 		});
-		const config = JSON.parse(readFileSync(consumer.tsconfig, 'utf8'));
-		config.include = ['Configured.tsrx'];
-		writeFileSync(consumer.tsconfig, JSON.stringify(config));
-		consumer.project.invalidate();
 
-		const configuredFacts = consumer.project.snapshot(consumer.file('Configured.tsrx'));
-		expect(stringChildren(configured, configuredFacts)).toEqual(['props.label']);
-		const filename = consumer.file('Promoted.tsrx');
-		const extra = consumer.project.snapshot(filename);
-		expect(stringChildren(promoted, extra)).toEqual(['props.label']);
-		expect(consumer.project.snapshot(filename)).toEqual(extra);
+		it('reloads an extended tsconfig after file-specific invalidation', () => {
+			const source = `export function Label(props: { value: string }) @{ <p>{props.value}</p> }`;
+			const consumer = fixture({ 'Label.tsrx': source });
+			const filename = consumer.file('Label.tsrx');
+			const config = JSON.parse(readFileSync(consumer.tsconfig, 'utf8'));
+			config.extends = './base.json';
+			consumer.write('base.json', JSON.stringify({ compilerOptions: { strictNullChecks: false } }));
+			writeFileSync(consumer.tsconfig, JSON.stringify(config));
+			consumer.project.invalidate();
+			const loose = consumer.project.snapshot(filename);
+			expect(loose.stringChildRanges).toEqual([]);
 
-		config.include = ['*.tsrx'];
-		writeFileSync(consumer.tsconfig, JSON.stringify(config));
-		consumer.project.invalidate();
-		const promotedToConfig = consumer.project.snapshot(filename);
-		const fresh = createTextTypeProject({ tsconfig: consumer.tsconfig });
-		try {
-			const freshFacts = fresh.snapshot(filename);
-			expect(stringChildren(promoted, promotedToConfig)).toEqual(['props.label']);
-			expect(promotedToConfig.projectVersion).toBe(freshFacts.projectVersion);
-		} finally {
-			fresh.dispose();
-		}
-	});
+			consumer.write('base.json', JSON.stringify({ compilerOptions: { strictNullChecks: true } }));
+			consumer.project.invalidate(filename);
+			const strict = consumer.project.snapshot(filename);
+			expect(stringChildren(source, strict)).toContain('props.value');
+			expect(strict.projectVersion).not.toBe(loose.projectVersion);
+		});
 
-	it('retains source overlays until invalidated and releases the project explicitly', () => {
-		const disk = `export function Label(props: { value: number }) @{ <p>{props.value}</p> }`;
-		const edited = disk.replace('value: number', 'value: string');
-		const consumer = fixture({ 'Label.tsrx': disk });
-		const filename = consumer.file('Label.tsrx');
-		const overlay = consumer.project.snapshot(filename, edited);
-		expect(stringChildren(edited, overlay)).toContain('props.value');
-		expect(consumer.project.snapshot(filename)).toEqual(overlay);
-		consumer.project.invalidate(filename);
-		expect(consumer.project.snapshot(filename).stringChildRanges).toEqual([]);
-		consumer.project.dispose();
-		expect(() => consumer.project.snapshot(filename)).toThrow(/disposed/i);
-		expect(() => consumer.project.invalidate()).toThrow(/disposed/i);
-		expect(() => consumer.project.dispose()).not.toThrow();
-	});
+		it('keeps extra roots current and deduplicates them when configured', () => {
+			const configured = `export function Configured(props: { label: string }) @{ <p>{props.label}</p> }`;
+			const promoted = `export function Promoted(props: { label: string }) @{ <p>{props.label}</p> }`;
+			const consumer = fixture({
+				'Configured.tsrx': configured,
+				'Promoted.tsrx': promoted,
+			});
+			const config = JSON.parse(readFileSync(consumer.tsconfig, 'utf8'));
+			config.include = ['Configured.tsrx'];
+			writeFileSync(consumer.tsconfig, JSON.stringify(config));
+			consumer.project.invalidate();
 
-	it('binds cached facts to the requested filename spelling on case-insensitive filesystems', ({
-		skip,
-	}) => {
-		const source = `export function Case(props: { value: string }) @{ <p>{props.value}</p> }`;
-		const consumer = fixture({ 'Case.tsrx': source });
-		const upper = consumer.file('Case.tsrx');
-		const lower = consumer.file('case.tsrx');
-		if (ts.sys.useCaseSensitiveFileNames || !existsSync(lower)) skip();
-		for (const filename of [upper, lower, upper]) {
-			const facts = consumer.project.snapshot(filename);
-			expect(facts.filename).toBe(filename.replaceAll('\\', '/'));
-			expect(stringChildren(source, facts)).toContain('props.value');
-			for (const mode of ['client', 'server'] as const) {
-				expect(() => compile(source, filename, { mode, textTypeFacts: facts })).not.toThrow();
+			const configuredFacts = consumer.project.snapshot(consumer.file('Configured.tsrx'));
+			expect(stringChildren(configured, configuredFacts)).toEqual(['props.label']);
+			const filename = consumer.file('Promoted.tsrx');
+			const extra = consumer.project.snapshot(filename);
+			expect(stringChildren(promoted, extra)).toEqual(['props.label']);
+			expect(consumer.project.snapshot(filename)).toEqual(extra);
+
+			config.include = ['*.tsrx'];
+			writeFileSync(consumer.tsconfig, JSON.stringify(config));
+			consumer.project.invalidate();
+			const promotedToConfig = consumer.project.snapshot(filename);
+			const fresh = createTextTypeProject({
+				tsconfig: consumer.tsconfig,
+				typescript: backend.typescript,
+			});
+			try {
+				const freshFacts = fresh.snapshot(filename);
+				expect(stringChildren(promoted, promotedToConfig)).toEqual(['props.label']);
+				expect(promotedToConfig.projectVersion).toBe(freshFacts.projectVersion);
+			} finally {
+				fresh.dispose();
 			}
-		}
-	});
+		});
 
-	it('does not turn missing imports or erroneous expressions into string proof', () => {
-		const source = `import { missing } from './missing';
+		it('retains source overlays until invalidated and releases the project explicitly', () => {
+			const disk = `export function Label(props: { value: number }) @{ <p>{props.value}</p> }`;
+			const edited = disk.replace('value: number', 'value: string');
+			const consumer = fixture({ 'Label.tsrx': disk });
+			const filename = consumer.file('Label.tsrx');
+			const overlay = consumer.project.snapshot(filename, edited);
+			expect(stringChildren(edited, overlay)).toContain('props.value');
+			expect(consumer.project.snapshot(filename)).toEqual(overlay);
+			consumer.project.invalidate(filename);
+			expect(consumer.project.snapshot(filename).stringChildRanges).toEqual([]);
+			consumer.project.dispose();
+			expect(() => consumer.project.snapshot(filename)).toThrow(/disposed/i);
+			expect(() => consumer.project.invalidate()).toThrow(/disposed/i);
+			expect(() => consumer.project.dispose()).not.toThrow();
+		});
+
+		it('binds cached facts to the requested filename spelling on case-insensitive filesystems', ({
+			skip,
+		}) => {
+			const source = `export function Case(props: { value: string }) @{ <p>{props.value}</p> }`;
+			const consumer = fixture({ 'Case.tsrx': source });
+			const upper = consumer.file('Case.tsrx');
+			const lower = consumer.file('case.tsrx');
+			if (ts.sys.useCaseSensitiveFileNames || !existsSync(lower)) skip();
+			for (const filename of [upper, lower, upper]) {
+				const facts = consumer.project.snapshot(filename);
+				expect(facts.filename).toBe(filename.replaceAll('\\', '/'));
+				expect(stringChildren(source, facts)).toContain('props.value');
+				for (const mode of ['client', 'server'] as const) {
+					expect(() => compile(source, filename, { mode, textTypeFacts: facts })).not.toThrow();
+				}
+			}
+		});
+
+		it('does not turn missing imports or erroneous expressions into string proof', () => {
+			const source = `import { missing } from './missing';
 export function Errors(props: { sound: string }) @{
 	<main><p>{props.sound}</p><p>{missing()}</p><p>{props.absent}</p></main>
 }`;
-		const consumer = fixture({ 'Errors.tsrx': source });
-		const proven = stringChildren(source, consumer.project.snapshot(consumer.file('Errors.tsrx')));
-		expect(proven).toContain('props.sound');
-		expect(proven).not.toContain('missing()');
-		expect(proven).not.toContain('props.absent');
-	});
+			const consumer = fixture({ 'Errors.tsrx': source });
+			const proven = stringChildren(
+				source,
+				consumer.project.snapshot(consumer.file('Errors.tsrx')),
+			);
+			expect(proven).toContain('props.sound');
+			expect(proven).not.toContain('missing()');
+			expect(proven).not.toContain('props.absent');
+		});
 
-	it('preserves TypeScript diagnostics for an incompatible assertion while accepting real conversion', () => {
-		const source = `export function Conversion(props: { value: number }) @{
+		it('preserves TypeScript diagnostics for an incompatible assertion while accepting real conversion', () => {
+			const source = `export function Conversion(props: { value: number }) @{
 	<main><p>{props.value as string}</p><p>{String(props.value)}</p></main>
 }`;
-		const consumer = fixture({ 'Conversion.tsrx': source });
-		const filename = consumer.file('Conversion.tsrx');
-		const proven = stringChildren(source, consumer.project.snapshot(filename));
-		expect(proven).not.toContain('props.value as string');
-		expect(proven).toContain('String(props.value)');
-		const virtual = compileToVolarMappings(source, filename);
-		const checkFile = consumer.write('Conversion.check.tsx', virtual.code);
-		const program = ts.createProgram([checkFile], {
-			strict: true,
-			noEmit: true,
-			target: ts.ScriptTarget.ESNext,
-			module: ts.ModuleKind.ESNext,
-			moduleResolution: ts.ModuleResolutionKind.Bundler,
-			jsx: ts.JsxEmit.ReactJSX,
-			types: [],
+			const consumer = fixture({ 'Conversion.tsrx': source });
+			const filename = consumer.file('Conversion.tsrx');
+			const proven = stringChildren(source, consumer.project.snapshot(filename));
+			expect(proven).not.toContain('props.value as string');
+			expect(proven).toContain('String(props.value)');
+			const virtual = compileToVolarMappings(source, filename);
+			const checkFile = consumer.write('Conversion.check.tsx', virtual.code);
+			const program = ts.createProgram([checkFile], {
+				strict: true,
+				noEmit: true,
+				target: ts.ScriptTarget.ESNext,
+				module: ts.ModuleKind.ESNext,
+				moduleResolution: ts.ModuleResolutionKind.Bundler,
+				jsx: ts.JsxEmit.ReactJSX,
+				types: [],
+			});
+			expect(ts.getPreEmitDiagnostics(program).map(({ code }) => code)).toEqual([2352]);
 		});
-		expect(ts.getPreEmitDiagnostics(program).map(({ code }) => code)).toEqual([2352]);
-	});
 
-	it('maps UTF-16 source offsets exactly when non-ASCII text precedes a child', () => {
-		const source = `// 😀 café 漢字\nexport function Unicode(props: { label: string }) @{ <p title="😀">{props.label}</p> }`;
-		const consumer = fixture({ 'Unicode.tsrx': source });
-		const filename = consumer.file('Unicode.tsrx');
-		const facts = consumer.project.snapshot(filename);
-		expect(facts.stringChildRanges).toEqual([childRange(source, 'props.label')]);
-		// The Node/native compiler consumes the same authored offsets as the
-		// TypeScript virtual-source mapper, including astral UTF-16 characters.
-		for (const mode of ['client', 'server'] as const) {
-			expect(() => compile(source, filename, { mode, textTypeFacts: facts })).not.toThrow();
-		}
-	});
-
-	it.each(['tsrx', 'tsx'])(
-		'agrees with the runtime parser on grouped .%s child expressions',
-		(ext) => {
-			const source =
-				ext === 'tsrx'
-					? `export function Grouped(props: { value: string }) @{ <p>{((props.value))}</p> }`
-					: `/** @jsxImportSource octane */\nexport function Grouped(props: { value: string }) { return <p>{((props.value))}</p>; }`;
-			const consumer = fixture({ [`Grouped.${ext}`]: source });
-			const filename = consumer.file(`Grouped.${ext}`);
+		it('maps UTF-16 source offsets exactly when non-ASCII text precedes a child', () => {
+			const source = `// 😀 café 漢字\nexport function Unicode(props: { label: string }) @{ <p title="😀">{props.label}</p> }`;
+			const consumer = fixture({ 'Unicode.tsrx': source });
+			const filename = consumer.file('Unicode.tsrx');
 			const facts = consumer.project.snapshot(filename);
-			const start = source.lastIndexOf('props.value');
-			expect(facts.stringChildRanges).toEqual([[start, start + 'props.value'.length]]);
+			expect(facts.stringChildRanges).toEqual([childRange(source, 'props.label')]);
+			// The Node/native compiler consumes the same authored offsets as the
+			// TypeScript virtual-source mapper, including astral UTF-16 characters.
 			for (const mode of ['client', 'server'] as const) {
 				expect(() => compile(source, filename, { mode, textTypeFacts: facts })).not.toThrow();
 			}
-		},
-	);
+		});
+
+		it('resolves an extensionless .tsrx import to the module its .tsrx spelling names', () => {
+			// Vite resolves `./model` to model.tsrx. Unresolved, `label` would be
+			// untyped; were the two spellings separate modules, the private brand
+			// would make the argument an error.
+			const model = `export class Token { private readonly brand = 1; }
+export function label(token: Token): string { return 'token'; }
+`;
+			const source = `import { label } from './model';
+import { Token } from './model.tsrx';
+export function Uses(props: { count: number }) @{
+	<main><p>{label(new Token())}</p><p>{props.count}</p></main>
+}`;
+			const consumer = fixture({ 'model.tsrx': model, 'Uses.tsrx': source });
+			const facts = consumer.project.snapshot(consumer.file('Uses.tsrx'));
+			expect(stringChildren(source, facts)).toEqual(['label(new Token())']);
+		});
+
+		it('includes the .tsrx roots an extended tsconfig names, relative to that tsconfig', () => {
+			// Nothing imports globals.tsrx: only the inherited include makes it a root.
+			const globals = `declare global { type GlobalLabel = string; }\nexport {};\n`;
+			const source = `export function Uses(props: { label: GlobalLabel }) @{ <p>{props.label}</p> }`;
+			const consumer = fixture({ 'globals.tsrx': globals, 'Uses.tsrx': source });
+			const config = JSON.parse(readFileSync(consumer.tsconfig, 'utf8'));
+			delete config.include;
+			config.extends = './config/base.json';
+			consumer.write('config/base.json', JSON.stringify({ include: ['../*.tsrx'] }));
+			writeFileSync(consumer.tsconfig, JSON.stringify(config));
+			consumer.project.invalidate();
+			const facts = consumer.project.snapshot(consumer.file('Uses.tsrx'));
+			expect(stringChildren(source, facts)).toEqual(['props.label']);
+		});
+
+		it.each(['tsrx', 'tsx'])(
+			'agrees with the runtime parser on grouped .%s child expressions',
+			(ext) => {
+				const source =
+					ext === 'tsrx'
+						? `export function Grouped(props: { value: string }) @{ <p>{((props.value))}</p> }`
+						: `/** @jsxImportSource octane */\nexport function Grouped(props: { value: string }) { return <p>{((props.value))}</p>; }`;
+				const consumer = fixture({ [`Grouped.${ext}`]: source });
+				const filename = consumer.file(`Grouped.${ext}`);
+				const facts = consumer.project.snapshot(filename);
+				const start = source.lastIndexOf('props.value');
+				expect(facts.stringChildRanges).toEqual([[start, start + 'props.value'.length]]);
+				for (const mode of ['client', 'server'] as const) {
+					expect(() => compile(source, filename, { mode, textTypeFacts: facts })).not.toThrow();
+				}
+			},
+		);
+	},
+);
+
+describe('TypeScript without a supported API', () => {
+	it('fails with the reason instead of analyzing', () => {
+		const typescript = mkdtempSync(join(tmpdir(), 'octane-unsupported-typescript-'));
+		try {
+			writeFileSync(
+				join(typescript, 'package.json'),
+				JSON.stringify({ name: 'typescript', version: '0.0.0-unsupported', main: 'index.js' }),
+			);
+			writeFileSync(
+				join(typescript, 'index.js'),
+				"module.exports = { version: '0.0.0-unsupported' };\n",
+			);
+			expect(() =>
+				fixtureOn({ 'Label.tsrx': 'export function Label() @{ <p /> }' }, undefined, {
+					name: 'an unsupported TypeScript',
+					typescript,
+				} as unknown as TextTypeBackend),
+			).toThrow(
+				expect.objectContaining({
+					message: expect.stringContaining('could not load'),
+					cause: expect.objectContaining({
+						message: expect.stringContaining(
+							'has neither the classic compiler API nor typescript/unstable/sync',
+						),
+					}),
+				}),
+			);
+		} finally {
+			rmSync(typescript, { recursive: true, force: true });
+		}
+	});
 });
 
 describe('source-bound textTypeFacts compile option', () => {
 	it('rejects stale, malformed, wrong-file, and non-child ranges instead of changing hydration shape', () => {
 		const source = `export function Label(props: { value: string; title: string }) @{ <p title={props.title}>{props.value}<b>{props.title}</b></p> }`;
-		const consumer = fixture({ 'Label.tsrx': source });
+		const consumer = fixtureOn({ 'Label.tsrx': source });
 		const filename = consumer.file('Label.tsrx');
 		const facts = consumer.project.snapshot(filename);
 		const [start, end] = childRange(source, 'props.value');
@@ -442,7 +528,7 @@ describe('source-bound textTypeFacts compile option', () => {
 
 	it('accepts one serialized snapshot for both client and server compilation', () => {
 		const source = `export function Label(props: { value: string }) @{ <p>{props.value}</p> }`;
-		const consumer = fixture({ 'Label.tsrx': source });
+		const consumer = fixtureOn({ 'Label.tsrx': source });
 		const filename = consumer.file('Label.tsrx');
 		const original = consumer.project.snapshot(filename);
 		const facts = JSON.parse(JSON.stringify(original));
@@ -461,7 +547,7 @@ describe('source-bound textTypeFacts compile option', () => {
 				@for (const option of props.options; key option.id) { <p>{option.label}</p> }
 			</section>
 		}`;
-		const bindingConsumer = fixture({ 'View.tsrx': bindingSource });
+		const bindingConsumer = fixtureOn({ 'View.tsrx': bindingSource });
 		const bindingFilename = bindingConsumer.file('View.tsrx');
 		const bindingFacts = JSON.parse(
 			JSON.stringify(bindingConsumer.project.snapshot(bindingFilename)),

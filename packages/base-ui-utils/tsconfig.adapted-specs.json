@@ -1,7 +1,9 @@
 {
   "extends": "./tsconfig.json",
   "compilerOptions": {
-    "types": ["vitest/globals"]
+    "types": ["vitest/globals"],
+    "noUnusedLocals": false,
+    "noUnusedParameters": false
   },
   "include": ["src", "tests/upstream/src/**/*.spec.ts", "tests/upstream/src/**/*.spec.tsx"],
   "exclude": ["node_modules", "dist"],

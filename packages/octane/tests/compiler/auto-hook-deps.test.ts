@@ -116,8 +116,9 @@ describe('automatic hook dependencies — full compiler', () => {
 		for (const mode of ['client', 'server'] as const) {
 			expect(() => compile(source, 'rows.tsrx', { mode })).toThrow(
 				expect.objectContaining({
-					name: 'SyntaxError',
-					message: expect.stringContaining("'item'"),
+					name: 'Error',
+					code: 'TS2300',
+					message: "Identifier 'item' has already been declared",
 				}),
 			);
 		}

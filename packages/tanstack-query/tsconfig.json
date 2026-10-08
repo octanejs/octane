@@ -14,7 +14,9 @@
     "jsx": "react-jsx",
     "jsxImportSource": "octane",
     "allowImportingTsExtensions": true,
-    "skipLibCheck": false
+    "skipLibCheck": false,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true
   },
   "include": ["./src/"],
   "exclude": ["node_modules", "dist", "tests"],

@@ -4,11 +4,11 @@ import type { OctaneNode } from 'octane';
 import type { AddSVGProps } from '../types';
 export declare const getPoint: ({ sides, size, center, rotate, side }: {
     side: number;
-} & NonNullable<Pick<PolygonProps, "sides" | "size" | "center" | "rotate">>) => {
+} & NonNullable<Pick<PolygonProps, 'sides' | 'size' | 'center' | 'rotate'>>) => {
     x: number;
     y: number;
 };
-export declare const getPoints: ({ sides, size, center, rotate }: NonNullable<Pick<PolygonProps, "sides" | "size" | "center" | "rotate">>) => {
+export declare const getPoints: ({ sides, size, center, rotate }: NonNullable<Pick<PolygonProps, 'sides' | 'size' | 'center' | 'rotate'>>) => {
     x: number;
     y: number;
 }[];

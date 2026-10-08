@@ -47,14 +47,16 @@ pnpm examples:catalog        # regenerate examples/catalog.json
 pnpm examples:catalog:check  # validate manifests and catalog freshness
 pnpm examples:catalog:test   # exercise invalid manifest contracts
 pnpm examples:runner:test    # exercise sharding, timing, and failure propagation
-pnpm examples:typecheck      # run every example's strict TypeScript gate
 pnpm examples:shared:test    # exercise shared process lifecycle helpers
 pnpm examples:build          # build every example for production
 pnpm examples:e2e            # run every Playwright journey with per-app timing
 pnpm examples:e2e -- --shard=1/3 # run one deterministic CI shard
 pnpm examples:static:check   # catalog + orchestration + shared-helper tests
-pnpm examples:check          # catalog + types + helper tests + production builds
+pnpm examples:check          # catalog + helper tests + production builds
 ```
+
+Every example's strict TypeScript gate is part of the root `pnpm typecheck`.
+`pnpm typecheck:files examples/<app>/tsconfig.json` checks one application.
 
 The browser-launch scripts currently target a POSIX shell, matching the Ubuntu
 CI gate and local macOS/Linux workflows. The ordinary application `dev`,

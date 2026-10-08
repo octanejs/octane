@@ -60,7 +60,7 @@ example apps double as Playwright regression fixtures:
 
 ```bash
 pnpm --filter octane-playground dev
-pnpm examples:check   # manifests, tooling contracts, types, production builds
+pnpm examples:check   # manifests, tooling contracts, production builds
 pnpm examples:e2e     # browser journeys
 ```
 

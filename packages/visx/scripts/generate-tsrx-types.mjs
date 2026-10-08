@@ -11,7 +11,7 @@ import {
 } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { basename, dirname, extname, join, relative, resolve } from 'node:path';
-import ts from 'typescript';
+import { emitNativeDeclarations } from '../../../scripts/octane-tsc/native.mjs';
 
 const packageRoot = resolve(import.meta.dirname, '..');
 const sourceRoot = join(packageRoot, 'src');
@@ -158,29 +158,20 @@ try {
 	const roots = components.map((file) =>
 		join(temporarySource, relative(sourceRoot, file).replace(/\.tsrx$/, '.tsx')),
 	);
-	const program = ts.createProgram(roots, {
-		declaration: true,
-		emitDeclarationOnly: true,
+	emitNativeDeclarations(temporaryRoot, roots, {
 		esModuleInterop: true,
-		jsx: ts.JsxEmit.Preserve,
-		module: ts.ModuleKind.ESNext,
-		moduleResolution: ts.ModuleResolutionKind.Bundler,
+		jsx: 'preserve',
+		module: 'esnext',
+		moduleResolution: 'bundler',
 		noCheck: true,
 		outDir: temporaryOutput,
 		preserveSymlinks: true,
 		rootDir: temporarySource,
 		skipLibCheck: true,
 		strictNullChecks: true,
-		target: ts.ScriptTarget.ESNext,
+		target: 'esnext',
 		types: ['react'],
 	});
-	const result = program.emit();
-	if (result.emitSkipped) {
-		const diagnostics = [...ts.getPreEmitDiagnostics(program), ...result.diagnostics]
-			.map((diagnostic) => ts.flattenDiagnosticMessageText(diagnostic.messageText, '\n'))
-			.join('\n');
-		throw new Error(`TypeScript skipped Visx declaration generation.\n${diagnostics}`);
-	}
 
 	const changed = [];
 	for (const component of components) {
