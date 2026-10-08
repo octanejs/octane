@@ -406,7 +406,7 @@ function isSynthesizedClassAttr(attr) {
 }
 
 // Curated exact origins (`inspect: true`). A generated token whose authored
-// counterpart the compiler KNOWS — the `$$click` slot key of an `onClick`, the
+// counterpart the compiler KNOWS — the `$oclick` slot key of an `onClick`, the
 // block helper an `@if`/`@for` lowers to — but which the module map alone
 // reports imprecisely, because the map carries only a start and the smallest
 // AST node starting there is the whole attribute value or the whole directive.
@@ -444,7 +444,7 @@ function registerDirectiveOrigin(ctx, origin, names) {
 }
 
 /**
- * The `$$click` slot key an event attribute lowers to, anchored at the AUTHORED
+ * The `$oclick` slot key an event attribute lowers to, anchored at the AUTHORED
  * attribute name. Everything else in the binding maps to the handler
  * expression, which would leave `onClick` itself unreachable from the output.
  */
@@ -31678,7 +31678,7 @@ function emitElementHtml(
 		const expr = tsrxExprNode(inner, ctx, componentName, inlinedSubs);
 		if (isEventAttrName(attrName) && !(tag.includes('-') && !isDelegatedEventProp(attrName))) {
 			// React-shape: a trailing `Capture` selects the capture phase (fired
-			// root→target before bubble handlers), stamped under `$$capture:<type>`.
+			// root→target before bubble handlers), stamped under `$ocapture:<type>`.
 			// The real events gotpointercapture / lostpointercapture literally end in
 			// "capture", so they're excluded from the suffix rule.
 			let rest = attrName.slice(2);
@@ -31700,8 +31700,9 @@ function emitElementHtml(
 						: rest === 'Blur'
 							? 'focusout'
 							: rest.toLowerCase();
-			const slotKey = capture ? `$$capture:${eventName}` : `$$${eventName}`;
-			// `onClick` → the `'$$click'` slot key. Without this the attribute name
+			// The `$o` namespace is Octane's alone; runtime.ts CAPTURE_PREFIX explains why (#1882).
+			const slotKey = capture ? `$ocapture:${eventName}` : `$o${eventName}`;
+			// `onClick` → the `'$oclick'` slot key. Without this the attribute name
 			// is unreachable from the output: the key's map position resolves to
 			// the HANDLER expression, and the name itself emits nothing.
 			registerExactOrigin(ctx, attr.name, attr.name?.end, [`'${slotKey}'`, `"${slotKey}"`]);
