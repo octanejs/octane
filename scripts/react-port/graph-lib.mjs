@@ -1,6 +1,13 @@
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
-import ts from 'typescript';
+import {
+	hasModifier,
+	is,
+	NodeFlags,
+	parseSourceFile,
+	ScriptKind,
+	SyntaxKind,
+} from '../octane-tsc/native-syntax.mjs';
 import { confinedRepositoryPath, readRepositoryJson } from '../repository-files.mjs';
 import { getWorkspacePackages, REPO_ROOT } from '../workspace-packages.mjs';
 import { parseInput } from './input-lib.mjs';
@@ -93,42 +100,41 @@ function hasConfinedPackageTests(repoRoot, binding) {
 	return tests.length > 0;
 }
 
+// TypeScript 7 reports no parse diagnostics for a lone source file; its parser
+// flags the node it finishes after each syntax error instead. JSDoc that it
+// reparses into a JavaScript file's tree is comment text, not the file's syntax.
+function hasParseError(node) {
+	if (node.flags & NodeFlags.Reparsed) return false;
+	return Boolean(node.flags & NodeFlags.ThisNodeHasError || node.forEachChild(hasParseError));
+}
+
 // Registrations belong to the inspected checkout. Parse their literal data;
 // importing the bridge would execute that checkout's code in the audit process.
 function readBridgeRegistrations(repoRoot) {
 	const filePath = confinedRepositoryPath(repoRoot, 'packages/octane-mcp-server/src/bridge.js');
-	const source = ts.createSourceFile(
-		filePath,
-		readFileSync(filePath, 'utf8'),
-		ts.ScriptTarget.Latest,
-		false,
-		ts.ScriptKind.JS,
-	);
-	if (source.parseDiagnostics.length) throw new Error(`Cannot parse registrations in ${filePath}`);
+	const source = parseSourceFile(filePath, readFileSync(filePath, 'utf8'), ScriptKind.JS);
+	if (hasParseError(source)) throw new Error(`Cannot parse registrations in ${filePath}`);
 	const declarations = new Map();
 	for (const statement of source.statements) {
-		if (
-			!ts.isVariableStatement(statement) ||
-			!statement.modifiers?.some((modifier) => modifier.kind === ts.SyntaxKind.ExportKeyword)
-		)
+		if (!is.isVariableStatement(statement) || !hasModifier(statement, SyntaxKind.ExportKeyword))
 			continue;
 		for (const declaration of statement.declarationList.declarations) {
-			if (ts.isIdentifier(declaration.name)) {
+			if (is.isIdentifier(declaration.name)) {
 				declarations.set(declaration.name.text, declaration.initializer);
 			}
 		}
 	}
 	function literal(node, name) {
-		if (node && ts.isStringLiteral(node)) return node.text;
-		if (node?.kind === ts.SyntaxKind.NullKeyword) return null;
-		if (node && ts.isArrayLiteralExpression(node)) {
+		if (node && is.isStringLiteral(node)) return node.text;
+		if (node?.kind === SyntaxKind.NullKeyword) return null;
+		if (node && is.isArrayLiteralExpression(node)) {
 			return node.elements.map((element) => literal(element, name));
 		}
-		if (node && ts.isObjectLiteralExpression(node)) {
+		if (node && is.isObjectLiteralExpression(node)) {
 			const entries = node.properties.map((property) => {
 				if (
-					!ts.isPropertyAssignment(property) ||
-					(!ts.isIdentifier(property.name) && !ts.isStringLiteral(property.name))
+					!is.isPropertyAssignment(property) ||
+					(!is.isIdentifier(property.name) && !is.isStringLiteral(property.name))
 				)
 					throw new Error(`Expected static registration data for ${name}`);
 				return [property.name.text, literal(property.initializer, name)];
@@ -151,8 +157,8 @@ function readBridgeRegistrations(repoRoot) {
 		if (name === 'KNOWN_NATIVE_BINDINGS') {
 			if (
 				!initializer ||
-				!ts.isNewExpression(initializer) ||
-				!ts.isIdentifier(initializer.expression) ||
+				!is.isNewExpression(initializer) ||
+				!is.isIdentifier(initializer.expression) ||
 				initializer.expression.text !== 'Set' ||
 				initializer.arguments?.length !== 1
 			)

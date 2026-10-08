@@ -13,7 +13,7 @@ import {
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { describe, test } from 'node:test';
-import ts from 'typescript';
+import { importNativeTypeScript } from '../octane-tsc/native.mjs';
 import {
 	FIXTURE_SOURCES,
 	PIN_FIXTURE_SOURCES,
@@ -35,6 +35,8 @@ import {
 	verifyMaterializedAdaptedEvidence,
 	verifyMaterializedUpstreamEvidence,
 } from '../react-parity/materialized-upstream-lib.mjs';
+
+const { API, ModuleKind } = await importNativeTypeScript('unstable/sync');
 
 const NODE_ID = 'pkg:mit-widget';
 const COMMIT = 'a'.repeat(40);
@@ -251,22 +253,33 @@ copied(1);
 					['tests/consumer.ts', []],
 					['tests/invalid-consumer.ts', [2345, 2322, 2554]],
 				]) {
-					const program = ts.createProgram([path.join(context.packageDirectory, file)], {
-						strict: true,
-						noEmit: true,
-						allowJs: true,
-						maxNodeModuleJsDepth: 1,
-						module: ts.ModuleKind.NodeNext,
-						types: [],
-					});
-					const diagnostics = ts.getPreEmitDiagnostics(program);
-					assert.deepEqual(
-						diagnostics.map((item) => item.code),
-						expected,
-						diagnostics
-							.map((item) => ts.flattenDiagnosticMessageText(item.messageText, '\n'))
-							.join('\n'),
-					);
+					const api = new API({ cwd: context.packageDirectory });
+					try {
+						const program = api.createProgram([path.join(context.packageDirectory, file)], {
+							strict: true,
+							noEmit: true,
+							allowJs: true,
+							maxNodeModuleJsDepth: 1,
+							module: ModuleKind.NodeNext,
+							types: [],
+						});
+						const diagnostics = [
+							...program.getProgramDiagnostics(),
+							...program.getSyntacticDiagnostics(),
+							...program.getGlobalDiagnostics(),
+							...program.getSemanticDiagnostics(),
+						].sort(
+							(left, right) =>
+								(left.fileName ?? '').localeCompare(right.fileName ?? '') || left.pos - right.pos,
+						);
+						assert.deepEqual(
+							diagnostics.map((item) => item.code),
+							expected,
+							diagnostics.map((item) => item.text).join('\n'),
+						);
+					} finally {
+						api.close();
+					}
 				}
 			};
 			const runConsumerTests = () => {
