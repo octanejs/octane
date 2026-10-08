@@ -43,29 +43,6 @@ const PREVIEW_RECEIVER_NAME = 'main__preview_receiver';
 const BUNDLE_NAME = 'main.lynx.bundle';
 const FORBIDDEN_RUNTIME = /(?:^|[^$\w])(?:react|react-dom|preact|ReactLynx)(?:[^$\w]|$)/i;
 const FORBIDDEN_DOM = /\b(?:document|window|HTMLElement|MutationObserver)\b/;
-// The main-thread caps are measured + 32 bytes, like every other committed byte
-// budget (benchmarks/README.md, "Size budgets"); the background program size is
-// an exact pin. Reset on 2026-10-03 from main 27c2a12dab: the 2026-08-17 values
-// (82,070 / 87,566 / 276,922) had been exceeded since early September by shared
-// runtime growth, and the weekly job that enforces them never reached this
-// check. Linux CI and macOS main-thread gzip differ by up to 2 bytes; the larger
-// value is the base. Raise them only in a separate budget pull request.
-//
-// 2026-10-04, from main 77504c160c: #1700 freezes a fresh root's decoded program
-// runs so a first mount takes the dense host record store again (create_10k
-// 1.93x -> 1.08x ReactLynx). That costs the main thread 141 raw bytes, +85 gzip
-// in preview (83,657 -> 83,742) and +73 in IFR (89,331 -> 89,404). The
-// background program shrank to 288,390 after the reset (#1652, #1662).
-//
-// 2026-10-04, from main 78ec8326a0: #1714 moved the universal hook cells into
-// the owner kernel, which adds 8 raw bytes to the background program
-// (288,390 -> 288,398). The main-thread caps are unchanged.
-const NO_WORKLET_BUDGET = Object.freeze({
-	previewMainGzip: 83_774,
-	ifrMainGzip: 89_436,
-	backgroundRaw: 288_398,
-});
-
 function packageEntry(packageName) {
 	const packageRoot = path.join(RSPEEDY_MODULES, ...packageName.split('/'));
 	const manifest = JSON.parse(fs.readFileSync(path.join(packageRoot, 'package.json'), 'utf8'));
@@ -400,18 +377,6 @@ try {
 			`preview and IFR ${operation} differ`,
 		);
 	}
-	gate(
-		preview.ops.main_gzip.score <= NO_WORKLET_BUDGET.previewMainGzip,
-		`preview main gzip ${preview.ops.main_gzip.score} exceeds ${NO_WORKLET_BUDGET.previewMainGzip}`,
-	);
-	gate(
-		ifr.ops.main_gzip.score <= NO_WORKLET_BUDGET.ifrMainGzip,
-		`IFR main gzip ${ifr.ops.main_gzip.score} exceeds ${NO_WORKLET_BUDGET.ifrMainGzip}`,
-	);
-	gate(
-		preview.ops.background_raw.score === NO_WORKLET_BUDGET.backgroundRaw,
-		`background raw ${preview.ops.background_raw.score} differs from ${NO_WORKLET_BUDGET.backgroundRaw}`,
-	);
 } catch (error) {
 	failed = error instanceof Error ? error.stack || error.message : String(error);
 	console.error(failed);

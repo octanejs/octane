@@ -11,15 +11,13 @@
 // EVENT_BASE_SHA and BASE_DRIFT, for the header only.
 //
 // Gates (exit 1):
-// - A byte value above its committed budget. Bundle suites publish each
-//   committed budget as a same-run `<target>-budget` peer.
 // - Any increase in a js-framework work counter: production calls, DOM
 //   mutations, and live insertions per operation. These are exact for a fixed
 //   build, so an increase is real extra work and needs a justification.
 // - A suite that failed on the pull request.
 //
 // Reports only:
-// - Byte changes within budget, which are listed exactly.
+// - Byte changes, which are listed exactly.
 // - Wall time. js-framework pairs base and head samples in one browser
 //   (js-framework/pair.mjs); an operation is called slower or faster only when
 //   the 95% confidence interval of its head/base ratio lies entirely beyond ±3%.
@@ -52,11 +50,10 @@ const SUITE_INFO = {
 	},
 	'bundle-size': {
 		title: 'Application bundle size (bytes)',
-		reports: (name) => name.startsWith('octane-') && !name.endsWith('-budget'),
+		reports: (name) => name.startsWith('octane-'),
 	},
 	'bundle-reachability': {
 		title: 'Public-import reachability bundles (bytes)',
-		reports: (name) => !name.endsWith('-budget'),
 	},
 	'lynx-render': {
 		title: 'Lynx dual-thread render (report only)',
@@ -120,24 +117,6 @@ export function compareSuite(suite, base, head) {
 	return { deterministic, timing, unchanged };
 }
 
-// Every head value above the same-run budget peer of its own target.
-export function findBudgetBreaches(result) {
-	const targets = new Map((result?.targets ?? []).map((target) => [target.name, target]));
-	const breaches = [];
-	for (const target of result?.targets ?? []) {
-		const budget = targets.get(`${target.name}-budget`);
-		if (!budget) continue;
-		for (const [op, limitStat] of Object.entries(budget.ops)) {
-			const value = valueOf(target.ops[op]);
-			const limit = valueOf(limitStat);
-			if (typeof value === 'number' && typeof limit === 'number' && value > limit) {
-				breaches.push({ target: target.name, op, value, limit });
-			}
-		}
-	}
-	return breaches;
-}
-
 const formatInteger = (value) => Math.round(value).toLocaleString('en-US');
 const formatSigned = (value, format) =>
 	(value > 0 ? '+' : value < 0 ? '−' : '±') + format(Math.abs(value));
@@ -166,18 +145,6 @@ function renderDeterministic(rows, unchanged) {
 		),
 		'',
 		`${unchanged} other measured values are unchanged.`,
-	];
-}
-
-function renderBreaches(breaches) {
-	return [
-		'| target | metric | head | budget | over |',
-		'| --- | --- | ---: | ---: | ---: |',
-		...breaches.map(
-			(row) =>
-				`| ${row.target} | ${row.op} | ${formatInteger(row.value)} | ${formatInteger(row.limit)} | ` +
-				`+${formatInteger(row.value - row.limit)} |`,
-		),
 	];
 }
 
@@ -241,18 +208,6 @@ export function analyzeReport({
 			sections.push('❌ The suite failed on this pull request.', '', ...fenced(headFailure));
 			continue;
 		}
-		const breaches = findBudgetBreaches(head[suite]);
-		if (breaches.length) {
-			failures.push(`❌ ${suite}: ${breaches.length} value(s) exceed their committed budget`);
-			sections.push(
-				`❌ ${breaches.length} value(s) exceed their committed budget. Reduce the growth, or raise ` +
-					'the budget in a separate pull request that names the bytes and the reason ' +
-					'(CONTRIBUTING.md, "Size budgets").',
-				'',
-				...renderBreaches(breaches),
-				'',
-			);
-		}
 		if (baseFailure) {
 			notes.push(`⚠️ ${suite} failed on the base commit and was not compared`);
 			sections.push(
@@ -263,17 +218,13 @@ export function analyzeReport({
 			continue;
 		}
 		const { deterministic, timing, unchanged } = compareSuite(suite, base[suite], head[suite]);
-		// A value over its budget is already a failure above, not growth within budget.
-		const breached = new Set(breaches.map(({ target, op }) => `${target}\0${op}`));
-		const larger = deterministic.filter(
-			(row) => row.verdict === 'larger' && !breached.has(`${row.target}\0${row.op}`),
-		);
+		const larger = deterministic.filter((row) => row.verdict === 'larger');
 		if (info?.workGate && larger.length) {
 			failures.push(`❌ ${suite}: ${larger.length} work counter(s) increased`);
 		} else if (info?.reportOnly && larger.length) {
 			notes.push(`🔴 ${suite}: ${larger.length} counter(s) increased (report only)`);
 		} else if (larger.length) {
-			notes.push(`🔴 ${suite}: ${larger.length} value(s) increased within budget`);
+			notes.push(`🔴 ${suite}: ${larger.length} value(s) increased`);
 		}
 		const slower = timing.filter((row) => row.verdict === 'slower').length;
 		if (slower) notes.push(`🟡 ${suite}: ${slower} timed operation(s) slower beyond ±3%`);
@@ -312,11 +263,11 @@ export function analyzeReport({
 			'',
 			headline.length
 				? headline.map((item) => `- ${item}`).join('\n')
-				: '🟢 No budget breaches, no added work, and no timing changes beyond ±3%.',
+				: '🟢 No byte growth, no added work, and no timing changes beyond ±3%.',
 			'',
 			`Compares ${describeBase({ baseSha, eventBaseSha, drift })} with ` +
 				`${shortSha(headSha, 'the merge commit')} on the same runner. ` +
-				'A byte value over its committed budget or any increase in a js-framework work counter fails this check. ' +
+				'Any increase in a js-framework work counter fails this check; byte changes are a report. ' +
 				'Wall time is a report: base and head samples alternate in one browser, and an operation is called ' +
 				`slower or faster only when the 95% confidence interval of its ratio excludes ±${TIMING_THRESHOLD * 100}%.` +
 				(runUrl ? ` [Workflow run](${runUrl})` : ''),

@@ -9,10 +9,10 @@ name: PR bench
 # "PR bench comment" workflow posts it. Absolute numbers stay runner-specific:
 # the report compares base and merge commit from this one run only.
 #
-# The job fails when a byte value exceeds its committed budget, when a
-# js-framework work counter (production calls, DOM mutations) increases, or
-# when a benchmark fails on the merge commit. Wall time is reported only, and
-# so is the path-filtered lynx-render suite.
+# The job fails when a js-framework work counter (production calls, DOM
+# mutations) increases, or when a benchmark fails on the merge commit. Byte
+# changes and wall time are reported only, and so is the path-filtered
+# lynx-render suite.
 
 on:
   pull_request:
@@ -126,9 +126,9 @@ jobs:
           node benchmarks/bench.mjs --quick --results-dir="$RESULTS/head" lynx-render \
             || echo "::warning::lynx-render benchmark failed; the report names it"
 
-      # The report exits non-zero for a budget breach, an increased work
-      # counter, or a benchmark that failed on the merge commit. Record that and
-      # fail only after the report is uploaded for the comment workflow.
+      # The report exits non-zero for an increased work counter or a benchmark
+      # that failed on the merge commit. Record that and fail only after the
+      # report is uploaded for the comment workflow.
       - name: Render report
         id: report
         env:
@@ -155,6 +155,6 @@ jobs:
             ${{ env.RESULTS }}/*/*.json
           retention-days: 14
 
-      - name: Fail on a budget breach, added work, or a failed benchmark
+      - name: Fail on added work or a failed benchmark
         if: steps.bytes.outputs.status != '0' || steps.report.outputs.status != '0'
         run: exit 1

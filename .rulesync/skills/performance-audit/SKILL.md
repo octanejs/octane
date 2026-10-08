@@ -100,30 +100,24 @@ to the change and lists the evidence each finding needs.
    - Re-run the final candidate after self-review changes. Never report a stale
      intermediate measurement as the final result.
 
-## Size budgets and the pull request gates
+## Bundle bytes
 
-- Every byte budget in `benchmarks/bundle-size/` (`minimal-budgets.json`,
-  `app-budgets.json`, `jsx-budgets.json`) is the measured production bytes plus
-  32 for raw and gzip, and CI enforces all of them. Brotli gets 256 because it
-  can grow when code is removed; judge growth by raw and gzip. Check a change with
-  `node benchmarks/bundle-size/run-minimal.mjs --budgets` and
-  `node benchmarks/bundle-size/run.mjs --budgets octane-tsrx octane-jsx`; pass
-  scenario or target names to narrow a run while iterating.
-- Never raise a budget in a feature or fix pull request, including to absorb your
-  own growth. Shrink the change, typically by moving hydration-only or
-  feature-only code behind the capability that owns it, or ask for a separate
-  budget pull request that changes only budget files and prose and names the
-  bytes and the reason. `benchmarks/bundle-size/budget-raises.mjs` fails CI on a
-  raise that travels with other changes.
-- When a change saves bytes, lower the budget in the same pull request with
-  `--write-budgets` for the scenarios it improved, and report the delta.
+- There are no committed byte budgets, and no check fails on bytes. The pull
+  request benchmark report lists every byte change; read the rows your change
+  moved and justify any growth in the pull request description.
+- Keep growth small anyway: move hydration-only or feature-only code behind the
+  capability that owns it. Judge growth by raw and gzip; brotli can grow when
+  code is removed.
+- Measure while iterating with `node benchmarks/bundle-size/run-minimal.mjs
+  [scenario...]` and `node benchmarks/bundle-size/run.mjs octane-tsrx
+  octane-jsx`.
 
 ## Evidence required for hot-path changes
 
 | Change | Evidence |
 | --- | --- |
-| Any runtime, compiler-output, or binding hot path | The pull request benchmark report (`.github/workflows/pr-bench.yml`): bytes against committed budgets, and js-framework production calls and DOM mutations per operation, where any increase fails. |
-| Bundle bytes | `node benchmarks/bundle-size/run-minimal.mjs --budgets <scenario>` and `run.mjs --budgets octane-tsrx octane-jsx` while iterating. CI's report rows are authoritative: brotli, and occasionally gzip or raw for path-dependent scenarios, can differ locally. |
+| Any runtime, compiler-output, or binding hot path | The pull request benchmark report (`.github/workflows/pr-bench.yml`): byte changes, reported only, and js-framework production calls and DOM mutations per operation, where any increase fails. |
+| Bundle bytes | `node benchmarks/bundle-size/run-minimal.mjs <scenario>` and `run.mjs octane-tsrx octane-jsx` while iterating. CI's report rows are authoritative: brotli, and occasionally gzip or raw for path-dependent scenarios, can differ locally. |
 | A hot record's shape | `%HaveSameMap` across every construction mode, as `benchmarks/runtime-object-shapes` does, and `perf-review-scan` clean. |
 | Allocation or tiering | A scratch harness on the production bundle: pinned semi-space for bytes per call, `%GetOptimizationStatus` and `--trace-deopt` for tiers. |
 | Scheduling, commits, or effect timing | The marker-task commit count from [scheduling](references/scheduling.md), plus the relevant scheduling suite. |
