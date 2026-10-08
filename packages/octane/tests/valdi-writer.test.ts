@@ -22,17 +22,93 @@ const writerSource = readFileSync(
 // These synthetic source fixtures use an explicitly supplied writer adapter,
 // rather than the DOM compiler selected by the normal Vitest fixture plugin.
 function writerFixture(source: string, dev: boolean, options?: CompileOptions) {
-	const recorder = createWriterRecorder();
+	const selectedRenderer = options?.renderer ?? renderer;
+	const recorder = createWriterRecorder(
+		selectedRenderer.text === 'host' ||
+			(Array.isArray(selectedRenderer.capabilities) &&
+				selectedRenderer.capabilities.includes('host-ref'))
+			? 2
+			: 1,
+	);
 	const module = loadCompiledFixtureSource(source, {
 		id: '/src/WriterFixture.tsrx',
 		mode: 'client',
-		compileOptions: { ...options, renderer, hmr: false, dev },
-		runtimeModules: { [renderer.module]: recorder.adapter },
+		compileOptions: { ...options, renderer: selectedRenderer, hmr: false, dev },
+		runtimeModules: { [selectedRenderer.module]: recorder.adapter },
 	});
 	return { ...recorder, module };
 }
 
 describe.each([false, true])('compiled Valdi writer behavior in dev=%s', (dev) => {
+	it('writes opted-in host text in order, preserving spaces, semicolons and encoded whitespace', () => {
+		const { render, module } = writerFixture(
+			`export function Scene(props) @{ <text-box><em>left</em> <em>right</em>;&nbsp;{props.value as string}</text-box> }`,
+			dev,
+			{ renderer: { ...renderer, text: 'host', validation: { textParents: ['text-box', 'em'] } } },
+		);
+		const read = (value: string) => render(module.Scene, { value })[0].children;
+		expect(read('one')).toMatchObject([
+			{ tag: 'em', children: [{ props: { value: 'left' } }] },
+			{ tag: '#text', props: { value: ' ' } },
+			{ tag: 'em', children: [{ props: { value: 'right' } }] },
+			{ tag: '#text', props: { value: ';\u00a0' } },
+			{ tag: '#text', props: { value: 'one' } },
+		]);
+		expect(read('two').at(-1)).toMatchObject({ tag: '#text', props: { value: 'two' } });
+	});
+
+	it('sends refs to the opted-in host, including last-write-wins spreads without replaying getters', () => {
+		const ref = { current: null };
+		const discarded = { current: null };
+		const getter = vi.fn(() => discarded);
+		const { render, module } = writerFixture(
+			`export function Scene(props) @{ <frame {...props.first} key={props.key} ref={props.ref} size={12} /> }`,
+			dev,
+			{ renderer: { ...renderer, capabilities: ['host-ref'] } },
+		);
+		const written = render(module.Scene, {
+			first: {
+				get ref() {
+					return getter();
+				},
+			},
+			key: 'k',
+			ref,
+		});
+		expect(written[0]).toMatchObject({ tag: 'frame', props: { ref, size: 12 } });
+		expect(getter).toHaveBeenCalledOnce();
+		expect(written[0].props).not.toHaveProperty('key');
+	});
+
+	it('still rejects refs passed to components even when the host accepts refs', () => {
+		expect(() =>
+			writerFixture(
+				`function Leaf() @{ <frame/> } export function Scene(props) @{ <Leaf ref={props.ref} /> }`,
+				dev,
+				{ renderer: { ...renderer, capabilities: ['host-ref'] } },
+			),
+		).toThrow(/authored ref props/);
+	});
+
+	it('guards opted-in writer calls before prototype creation on an older adapter', () => {
+		const recorder = createWriterRecorder();
+		expect(() =>
+			loadCompiledFixtureSource(`export function Scene() @{ <text-box>hello</text-box> }`, {
+				id: '/src/WriterFixture.tsrx',
+				mode: 'client',
+				compileOptions: { renderer: { ...renderer, text: 'host' }, hmr: false, dev },
+				runtimeModules: { [renderer.module]: recorder.adapter },
+			}),
+		).toThrow(/Unsupported writer ABI 2/);
+	});
+
+	it('keeps configured host text placement restrictions in opted-in mode', () => {
+		expect(() =>
+			writerFixture(`export function Scene() @{ <frame>unsupported here</frame> }`, dev, {
+				renderer: { ...renderer, text: 'host', validation: { textParents: ['text-box'] } },
+			}),
+		).toThrow(/does not allow authored JSX text under <frame>/);
+	});
 	it.each([
 		[
 			'Comments.tsrx',
