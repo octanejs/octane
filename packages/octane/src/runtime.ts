@@ -2706,6 +2706,11 @@ let inFlush = false;
 // block does not: the block is queued in both places, and the microtask flush
 // renders only its cue (renderTransitionCue).
 const TRANSITION_QUEUE: Block[] = [];
+// Blocks whose pending cue was scheduled outside a flush (markTransitionCue); the
+// microtask flush renders them at urgent priority (splitTransitionCue). They hold
+// until a drain empties or reindexes QUEUE, while TRANSITION_CUE_EPOCH is current.
+const TRANSITION_CUES: Block[] = [];
+let TRANSITION_CUE_EPOCH = -1;
 // The live posted task's id, or 0. A flush that absorbs the queue retires that
 // task, so transitions scheduled afterwards post a task of their own rather than
 // joining one posted before input that arrived in between.
@@ -5242,15 +5247,6 @@ function forSlotParkable(state: ForSlot): boolean {
 }
 
 /**
- * Record a keyed list's shape before a reconcile that may have to be undone.
- *
- * The list is restored as a whole rather than per operation: the chain, the key
- * map and the counts all move together, and rebuilding the DOM from the restored
- * chain puts moved survivors back as well as dropped rows. Once per list per
- * window — the first record is the pre-render one, which is the one to go back
- * to.
- */
-/**
  * A keyed list's rollback record for one journal window. The full form copies
  * the chain, and the key Map's order where it differs, before a reconcile
  * relinks rows wholesale. The link form serves the shapes that relink a bounded
@@ -5260,12 +5256,24 @@ function forSlotParkable(state: ForSlot): boolean {
  * Restoring the chain rewrites every `prevSibling` and index from position, so
  * neither form records those. A wholesale change later in the same window, or
  * a record for an inner window, converts the link form to the full form first.
+ *
+ * A link record gets its `links` Map at its first relink. Until then only index
+ * writes have run, and they change neither the chain nor the key Map, so
+ * converting it copies the list as it stands, as the full form would have when
+ * the record was taken. A reorder that falls through to the LIS path therefore
+ * pays exactly the full form's copy.
+ *
+ * The record rides in the spare slot of its own undo entry, where `seen` (the
+ * window's bag index) finds it again, so it lives exactly as long as its log:
+ * a removed row it references goes when the committed log is dropped.
  */
 interface ForSlotRecord {
 	empty: Block | null;
+	/** The chain when the record was taken; null while it is in the link form. */
 	chain: Block[] | null;
 	mapOrder: Block[] | null;
 	head: Block | null;
+	/** Link form: each relinked row's old `nextSibling`, from the first relink on. */
 	links: Map<Block, Block | null> | null;
 	/** `state.inOrder` when the record was taken. */
 	inOrder: boolean;
@@ -5276,36 +5284,33 @@ interface ForSlotRecord {
 }
 
 /**
- * Each journal log's newest link record per list. Keyed by the log, so the
- * records (which reference removed rows) go when a committed log is dropped,
- * and a later log never sees an earlier one's.
- */
-const SLOT_RECORDS = new WeakMap<any[], Map<ForSlot, ForSlotRecord>>();
-
-/**
- * Ensure the current window can restore this list to its shape before the
- * window's first change. Without `link`, the caller is about to relink rows
- * wholesale, so the record takes, or converts to, the full form. With `link`,
- * the window's record comes back for the caller to record the old
- * `nextSibling` of each row whose `nextSibling` it rewrites in `record.links`
- * (a full record has no `links` and needs none). Null when hydration adoption
- * journals the range instead. One call either way, like the single snapshot
- * function this replaces.
+ * Record a keyed list's shape before a reconcile that may have to be undone.
+ *
+ * The list is restored as a whole rather than per operation: the chain, the key
+ * map and the counts all move together, and rebuilding the DOM from the restored
+ * chain puts moved survivors back as well as dropped rows. Once per list per
+ * window — the first record is the pre-render one, which is the one to go back
+ * to.
+ *
+ * Without `link`, the caller is about to relink rows wholesale, so the record
+ * takes, or converts to, the full form. With `link`, the window's record comes
+ * back, and a caller that relinks rows records the old `nextSibling` of each
+ * row it rewrites in `forSlotLinks(record)` first (a full record needs none).
+ * Null when hydration adoption journals the range instead. One call either
+ * way, like the single snapshot function this replaces.
  */
 function journalForSlot(state: ForSlot, link?: boolean): ForSlotRecord | null {
 	const seen = TRANSITION_JOURNAL_BAGS!;
-	let records = SLOT_RECORDS.get(TRANSITION_JOURNAL!);
-	const current = records?.get(state) ?? null;
-	if ((seen.get(state) ?? -1) >= TRANSITION_JOURNAL_CHECKPOINT) {
-		if (link) return current;
-		if (current !== null && current.links !== null) fullForSlotRecord(state, current);
-		return null;
-	}
-	// An enclosing window's link record stops gathering links here.
-	if (current !== null) {
-		if (current.links !== null) fullForSlotRecord(state, current);
-		records!.delete(state);
-	}
+	const at = seen.get(state) ?? -1;
+	// The record rides in the spare slot of the list's undo entry; an entry without
+	// one (hydration adoption, an owned-list clear) holds null there.
+	const current: ForSlotRecord | null =
+		at >= 0 && TRANSITION_JOURNAL![at] === JOURNAL_UNDO ? TRANSITION_JOURNAL![at + 2] : null;
+	if (link && at >= TRANSITION_JOURNAL_CHECKPOINT) return current;
+	// A wholesale change converts this window's link record; an inner window's
+	// record stops an enclosing window's link record gathering links.
+	if (current !== null) fullForSlotRecord(state, current);
+	if (at >= TRANSITION_JOURNAL_CHECKPOINT) return null;
 	seen.set(state, TRANSITION_JOURNAL!.length);
 	if (
 		ROOT_RENDER_TRANSACTION !== null &&
@@ -5325,42 +5330,38 @@ function journalForSlot(state: ForSlot, link?: boolean): ForSlotRecord | null {
 			TRANSITION_JOURNAL!.push(JOURNAL_PROP, b, 'itemIndex', b.itemIndex);
 		return null;
 	}
-	let chain: Block[] | null = null;
-	let mapOrder: Block[] | null = null;
-	if (!link) {
-		chain = [];
-		for (let b: Block | null = state.head; b !== null; b = b.nextSibling) chain.push(b);
-		// The key Map keeps insertion order through earlier reorders. Preserve that
-		// order for context refresh only when it differs from the linked DOM order.
-		// Spreading the values takes the engine's bulk copy; a list reordered before
-		// differs at its first rows, so the comparison usually stops at once.
-		const keyOrder = [...state.items.values()];
-		if (keyOrder.length !== chain.length) mapOrder = keyOrder;
-		for (let i = 0; mapOrder === null && i < keyOrder.length; i++)
-			if (keyOrder[i] !== chain[i]) mapOrder = keyOrder;
-	}
 	const record: ForSlotRecord = {
 		empty: state.emptyBlock,
-		chain,
-		mapOrder,
+		chain: null,
+		mapOrder: null,
 		head: state.head,
-		links: link ? new Map() : null,
+		links: null,
 		inOrder: state.inOrder,
 		prior: null,
 	};
-	if (link) {
-		if (process.env.NODE_ENV !== 'production') record.check = forSlotShape(state);
-		if (records === undefined) SLOT_RECORDS.set(TRANSITION_JOURNAL!, (records = new Map()));
-		records.set(state, record);
-	}
-	const owner = records;
-	journalUndo(() => {
-		if (record.links !== null) fullForSlotRecord(state, record);
-		restoreForSlot(state, record, record.chain);
-		seen.delete(state);
-		if (owner?.get(state) === record) owner.delete(state);
-	});
+	if (!link) fullForSlotRecord(state, record);
+	else if (process.env.NODE_ENV !== 'production') record.check = forSlotShape(state);
+	TRANSITION_JOURNAL!.push(
+		JOURNAL_UNDO,
+		() => {
+			fullForSlotRecord(state, record);
+			restoreForSlot(state, record, record.chain);
+			seen.delete(state);
+		},
+		record,
+		null,
+	);
 	return link ? record : null;
+}
+
+/**
+ * Where a link-form relink records old `nextSibling`s; null without a record or
+ * for a full one. The first relink allocates it even when it records nothing (a
+ * head insert or removal), because from then on the list is no longer the
+ * recorded one.
+ */
+function forSlotLinks(record: ForSlotRecord | null): Map<Block, Block | null> | null {
+	return record !== null && record.chain === null ? (record.links ??= new Map()) : null;
 }
 
 /** Development check: the chain, and the Map's order where it differs. */
@@ -5373,27 +5374,48 @@ function forSlotShape(state: ForSlot): Block[][] {
 		: [chain, keyOrder];
 }
 
-/** Convert a link record to the full form: the shape when it was taken. */
-function fullForSlotRecord(state: ForSlot, record: ForSlotRecord): void {
-	const links = record.links!;
+/**
+ * Convert a link record to the full form: the shape when it was taken. A new
+ * full record, and a link record nothing has relinked yet, copy the list as it
+ * stands. A full record, or none, is left as it is.
+ */
+function fullForSlotRecord(state: ForSlot, record: ForSlotRecord | null): void {
+	if (record === null || record.chain !== null) return;
+	const links = record.links;
 	record.links = null;
-	// The old head and the recorded nextSiblings reach every old row: a row whose
-	// nextSibling was not rewritten still holds it.
-	const chain: Block[] = [];
-	for (let b = record.head; b !== null; b = links.has(b) ? links.get(b)! : b.nextSibling)
-		chain.push(b);
-	record.chain = chain;
-	// Without a removal the Map has only gained fresh rows' keys, which the old
-	// chain excludes; a removal from a Map out of chain order kept its order.
-	if (!record.inOrder) {
-		const kept = new Set(chain);
-		const mapOrder: Block[] = [];
-		for (const block of record.prior ?? state.items.values())
-			if (kept.has(block)) mapOrder.push(block);
+	if (links === null) {
+		const chain: Block[] = [];
+		for (let b: Block | null = state.head; b !== null; b = b.nextSibling) chain.push(b);
+		record.chain = chain;
+		// The key Map keeps insertion order through earlier reorders. Preserve that
+		// order for context refresh only when it differs from the linked DOM order.
+		// Spreading the values takes the engine's bulk copy; a list reordered before
+		// differs at its first rows, so the comparison usually stops at once.
+		const keyOrder = [...state.items.values()];
+		let mapOrder: Block[] | null = keyOrder.length === chain.length ? null : keyOrder;
+		for (let i = 0; mapOrder === null && i < keyOrder.length; i++)
+			if (keyOrder[i] !== chain[i]) mapOrder = keyOrder;
 		record.mapOrder = mapOrder;
+	} else {
+		// The old head and the recorded nextSiblings reach every old row: a row whose
+		// nextSibling was not rewritten still holds it.
+		const chain: Block[] = [];
+		for (let b = record.head; b !== null; b = links.has(b) ? links.get(b)! : b.nextSibling)
+			chain.push(b);
+		record.chain = chain;
+		// Without a removal the Map has only gained fresh rows' keys, which the old
+		// chain excludes; a removal from a Map out of chain order kept its order.
+		if (!record.inOrder) {
+			const kept = new Set(chain);
+			const mapOrder: Block[] = [];
+			for (const block of record.prior ?? state.items.values())
+				if (kept.has(block)) mapOrder.push(block);
+			record.mapOrder = mapOrder;
+		}
 	}
-	if (process.env.NODE_ENV !== 'production') {
-		const [expectedChain, expectedMap = expectedChain] = record.check!;
+	if (process.env.NODE_ENV !== 'production' && record.check !== undefined) {
+		const chain = record.chain!;
+		const [expectedChain, expectedMap = expectedChain] = record.check;
 		const restoredMap = record.mapOrder ?? chain;
 		if (
 			expectedChain.length !== chain.length ||
@@ -5412,12 +5434,13 @@ function fullForSlotRecord(state: ForSlot, record: ForSlotRecord): void {
  */
 function journalForOwnedListClear(state: ForSlot): void {
 	const seen = TRANSITION_JOURNAL_BAGS!;
-	const records = SLOT_RECORDS.get(TRANSITION_JOURNAL!);
-	const current = records?.get(state);
-	if (current !== undefined) {
-		if (current.links !== null) fullForSlotRecord(state, current);
-		records!.delete(state);
-	}
+	// An enclosing window's link record stops gathering links here.
+	const at = seen.get(state) ?? -1;
+	if (at >= 0)
+		fullForSlotRecord(
+			state,
+			TRANSITION_JOURNAL![at] === JOURNAL_UNDO ? TRANSITION_JOURNAL![at + 2] : null,
+		);
 	const oldItems = state.items;
 	seen.set(state, TRANSITION_JOURNAL!.length);
 	const snapshot = {
@@ -7027,30 +7050,34 @@ function vtInterrupt(): void {
 	vtInterruptOwners(null);
 }
 
-// A pending Action cue keeps transition rendering semantics, but alone it
-// should publish before native capture. Only this optional capability owns it.
+// An Action cue alone, even one that keeps transition priority, publishes
+// before native capture. Only this optional capability owns it.
 let VT_ACTION_CUE = false;
 
 /**
- * Is this an animation-eligible transition batch? A pending cue split from its
- * waiting transition work (splitTransitionCue) renders urgently, so it never is.
+ * Is this an animation-eligible transition batch? A pending cue renders urgently
+ * (splitTransitionCue). A cue split from its block's waiting transition work
+ * never is; a drain of other cues is only when transition work rides with them.
  */
 function queueAllTransition(): boolean {
 	if (QUEUE.length === 0) return false;
-	let cueOnly = VT_ACTION_CUE && NATIVE_TRANSITION_DRIVER?.hasWork() !== true;
+	let cue = VT_ACTION_CUE;
+	let work = false;
 	for (let i = 0; i < QUEUE.length; i++) {
 		const block = QUEUE[i];
-		if (block.pendingMode !== 'transition' || queuedTransitionCue(block)) return false;
-		if (cueOnly && block.pending && !block.disposed) {
+		if (block.pendingMode !== 'transition') return false;
+		if (queuedTransitionCue(block)) {
+			if (TRANSITION_QUEUE.indexOf(block) !== -1) return false;
+			cue = true;
+		}
+		if (!work && block.pending && !block.disposed) {
 			const owner = block.idState.renderOwner;
-			if (
+			work =
 				(block.kind === 'root' && !block.mounted) ||
-				(owner?.request != null && owner.current !== null && QUEUE.includes(owner.current))
-			)
-				cueOnly = false;
+				(owner?.request != null && owner.current !== null && QUEUE.includes(owner.current));
 		}
 	}
-	if (!cueOnly) return true;
+	if (!cue || work || NATIVE_TRANSITION_DRIVER?.hasWork() === true) return true;
 	// The separate task queue can hold sibling work while this cue drains.
 	// Only receipts belonging to this drain make the cue share a capture.
 	for (const entries of FLUSHED_TRANSITION_UPDATES) {
@@ -7071,7 +7098,7 @@ function queueAllTransition(): boolean {
 }
 
 function queuedTransitionCue(block: Block): boolean {
-	return TRANSITION_QUEUE.length !== 0 && TRANSITION_ROOT_DRIVER?.splitsCue(block) === true;
+	return TRANSITION_ROOT_DRIVER !== null && TRANSITION_ROOT_DRIVER.splitsCue(block);
 }
 
 function vtHasActiveHandles(): boolean {
@@ -7157,7 +7184,7 @@ function ensureViewTransitionDriver(): ViewTransitionDriver {
 			VT_ACTION_CUE = false;
 			if (VT_PENDING_TYPES.length === 0) return false;
 			for (let i = 0; i < QUEUE.length; i++) {
-				// A split cue leaves the types for its transition's task.
+				// A pending cue leaves the types for its transition's task.
 				if (QUEUE[i].pendingMode === 'transition' && !queuedTransitionCue(QUEUE[i])) return true;
 			}
 			return false;
@@ -7684,9 +7711,10 @@ function warnCrossComponentRenderUpdate(target: Block, source: Block): void {
  * `flushed`: a signal notification delivered during a flush (see scheduleNativeRead).
  * `cue`: useTransition or useActionState raising isPending, or useOptimistic
  * showing a value. These renders are the transition's in-flight surface, which
- * React renders urgently: they keep the microtask flush at the priority computed
- * here, so they commit before the transition work they announce. That work keeps
- * its task even when it belongs to the cue's own block (upgradeTransitionBlock).
+ * React renders in an urgent lane: they keep the microtask flush and render at
+ * urgent priority there (splitTransitionCue), so they commit before the
+ * transition work they announce, over its committed state. That work keeps its
+ * task even when it belongs to the cue's own block (upgradeTransitionBlock).
  * `background`: a native producer refresh shares task admission without
  * changing its existing render/Suspense priority.
  */
@@ -7810,7 +7838,8 @@ function scheduleRender(
 /**
  * Hold a render for the shared host task (see TRANSITION_QUEUE).
  * Work scheduled inside a render or flush belongs to the drain already on the
- * stack, and a pending cue keeps the microtask flush.
+ * stack. A pending cue keeps the microtask flush, which renders it at urgent
+ * priority (markTransitionCue).
  */
 function queueTransitionBlock(block: Block, cue?: boolean): boolean {
 	// The block is not queued, so a render consumed every update retained for it.
@@ -7870,24 +7899,28 @@ function upgradeTransitionBlock(block: Block, mode: 'urgent' | 'transition', cue
 }
 
 /**
- * Whether a queued block renders only its pending cue now, apart from the
- * transition work it also has waiting in the task queue (upgradeTransitionBlock).
- * The cue renders alone when that work holds staged cells it can show at their
- * committed values. A Suspense or Activity boundary that owns the render, or a
- * pending root request, keeps the combined render, as does work without staged
- * cells. View Transition routing asks this too, since a split cue is urgent work.
+ * Whether a queued block renders only its pending cue now, at urgent priority,
+ * apart from any transition work. A pure cue (TRANSITION_CUES) has no transition
+ * work of its own. A cue whose block also has transition work waiting in the
+ * task queue (upgradeTransitionBlock) renders alone when that work holds staged
+ * cells it can show at their committed values. A Suspense or Activity boundary
+ * that owns the render, or a pending root request, keeps the combined render at
+ * transition priority, as does work without staged cells. View Transition
+ * routing asks this too, since a split cue is urgent work.
  */
 function splitsTransitionCue(block: Block): boolean {
+	if (syncFlush || TRANSITION_TASK_ACTIVE || block.pendingMode !== 'transition') return false;
+	const waiting = TRANSITION_QUEUE.indexOf(block) !== -1;
 	if (
-		syncFlush ||
-		TRANSITION_TASK_ACTIVE ||
-		block.pendingMode !== 'transition' ||
-		TRANSITION_QUEUE.indexOf(block) === -1
+		!waiting &&
+		(TRANSITION_CUE_EPOCH !== QUEUE_REINDEX_EPOCH || TRANSITION_CUES.indexOf(block) === -1)
 	)
 		return false;
+	// A pure cue that gained staged cells from transition work scheduled in this
+	// flush renders that work with it.
+	if (hasQueuedTransitionCells(block) !== waiting) return false;
 	const owner = block.idState.renderOwner;
 	return (
-		hasQueuedTransitionCells(block) &&
 		(owner === undefined || owner.current !== block || owner.request === null) &&
 		(SCHEDULED_VISIBILITY_DRIVER === null ||
 			SCHEDULED_VISIBILITY_DRIVER.find(block, true, 'urgent') === null)
@@ -7895,14 +7928,20 @@ function splitsTransitionCue(block: Block): boolean {
 }
 
 /**
- * Choose how the drain renders a queued block: a split cue renders at urgent
- * priority (renderTransitionCue). Otherwise the drain's own render consumes any
- * transition work the block also has waiting.
+ * Choose how the drain renders a queued block. A pending cue renders at urgent
+ * priority, as React renders `isPending` and optimistic values in an urgent lane:
+ * descendants with transition work waiting show their committed cells
+ * (renderBlockInner) and keep that work for the task. A split cue also shows
+ * its own block's committed cells (renderTransitionCue). Otherwise the drain's
+ * own render consumes any transition work the block also has waiting.
  */
 function splitTransitionCue(block: Block): typeof renderBlock | undefined {
-	if (TRANSITION_QUEUE.length === 0 || block.pendingMode !== 'transition') return;
+	// Release an earlier drain's cues at the next drained block.
+	if (TRANSITION_CUE_EPOCH !== QUEUE_REINDEX_EPOCH) TRANSITION_CUES.length = 0;
+	if (block.pendingMode !== 'transition') return;
 	if (splitsTransitionCue(block)) {
 		block.pendingMode = 'urgent';
+		if (TRANSITION_QUEUE.indexOf(block) === -1) return;
 		// An urgent ancestor may already have rendered this cue in the drain.
 		return RENDERED_CUE_DRAIN === DRAIN_ID && RENDERED_CUES.indexOf(block) !== -1
 			? keepTransitionPending
@@ -7913,6 +7952,21 @@ function splitTransitionCue(block: Block): typeof renderBlock | undefined {
 		TRANSITION_QUEUE.splice(index, 1);
 		if (TRANSITION_QUEUE.length === 0) adoptTransitionQueue();
 	}
+}
+
+/**
+ * Record a pending cue its hook schedules outside a render, flush, or the
+ * transition task (TRANSITION_CUES), so the microtask flush renders it at urgent
+ * priority (splitTransitionCue). Hooks call this, not scheduleRender, so native
+ * readers that share the task queue never reach it.
+ */
+function markTransitionCue(block: Block): void {
+	if (syncFlush || inFlush || CURRENT_BLOCK !== null || TRANSITION_TASK_ACTIVE) return;
+	if (TRANSITION_CUE_EPOCH !== QUEUE_REINDEX_EPOCH) {
+		TRANSITION_CUE_EPOCH = QUEUE_REINDEX_EPOCH;
+		TRANSITION_CUES.length = 0;
+	}
+	TRANSITION_CUES.push(block);
 }
 
 /** A split cue that already rendered keeps its block waiting for the transition task. */
@@ -13583,10 +13637,7 @@ function unmountSlot(val: any, detachDom: boolean): void {
 		// never reaches it, so portals must always self-detach individually.
 		const childDetach = k === 'portalSlotSlot' ? true : detachDom;
 		if (val.block) unmountBlock(val.block, childDetach);
-		if (k === 'portalSlotSlot' && val.target) {
-			unregisterPortalEventRange(val.target, val);
-			unregisterDelegationTarget(val.target);
-		}
+		if (k === 'portalSlotSlot') releasePortalTarget(val);
 	}
 }
 
@@ -33086,10 +33137,7 @@ function renderPortalState(
 		registerDelegationTarget(target);
 		if (ROOT_RENDER_TRANSACTION !== null) {
 			const created = state;
-			journalUndo(() => {
-				unregisterPortalEventRange(target, created);
-				unregisterDelegationTarget(target);
-			});
+			journalUndo(() => releasePortalTarget(created));
 		}
 		renderBlock(block);
 	} else {
@@ -33159,6 +33207,16 @@ function teardownPortalState(state: PortalSlot): void {
 		unmountBlock(state.block, true);
 		state.block = null;
 	}
+	releasePortalTarget(state);
+}
+
+/**
+ * Give back this portal's share of its target's event delegation. The share is
+ * a refcount, so it is released once: a root render that rolls back reaches a
+ * portal it created through the portal's creation undo and again through its
+ * owner's teardown. A released portal no longer owns a target.
+ */
+function releasePortalTarget(state: PortalSlot): void {
 	if (state.target) {
 		unregisterPortalEventRange(state.target, state);
 		unregisterDelegationTarget(state.target);
@@ -44054,6 +44112,7 @@ export function useTransition(
 					if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__)
 						__profileSchedule(block, 'transition-pending', slot);
 					// The rising edge is a pending cue; the falling edge follows the transition.
+					if (pending) markTransitionCue(block);
 					scheduleRender(block, false, pending);
 				} finally {
 					TRANSITION_LISTENER_PUBLISH_DEPTH--;
@@ -44136,7 +44195,10 @@ export function useActionState<S>(
 					if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__)
 						__profileSchedule(block, 'action-state-pending', slot);
 					// The rising edge is a pending cue; the falling edge commits with the result.
-					if (next) VIEW_TRANSITION_DRIVER?.markActionCue();
+					if (next) {
+						VIEW_TRANSITION_DRIVER?.markActionCue();
+						markTransitionCue(block);
+					}
 					scheduleRender(block, false, next);
 				}
 			}
@@ -44392,6 +44454,7 @@ export function useOptimistic<S, V = S>(
 				if (!block.disposed) {
 					if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__)
 						__profileSchedule(block, 'optimistic', slot);
+					markTransitionCue(block);
 					scheduleRender(block, false, true);
 				}
 			},
@@ -48128,7 +48191,7 @@ function reconcileKeyed<T>(
 		if (journalShape) record = journalForSlot(state, true);
 		// Only `beforeMiddle` gets a new nextSibling; new keys append to the Map,
 		// which a middle insert leaves out of chain order.
-		const links = record !== null ? record.links : null;
+		const links = forSlotLinks(record);
 		if (links !== null && beforeMiddle !== null && !links.has(beforeMiddle))
 			links.set(beforeMiddle, beforeMiddle.nextSibling);
 		if (afterMiddle !== null) state.inOrder = false;
@@ -48171,7 +48234,7 @@ function reconcileKeyed<T>(
 		// The removed run keeps its own links; only `beforeMiddle` gets a new
 		// nextSibling. Deleted keys go back to their Map positions by chain order,
 		// or by the Map's order kept here when that differs.
-		const links = record !== null ? record.links : null;
+		const links = forSlotLinks(record);
 		if (links !== null) {
 			if (!record!.inOrder) record!.prior ??= [...oldItems.values()];
 			if (beforeMiddle !== null && !links.has(beforeMiddle))
@@ -48222,7 +48285,7 @@ function reconcileKeyed<T>(
 			cur = cur.nextSibling!;
 		}
 		if (!anySurvivors) {
-			if (journalShape || (record !== null && record.links !== null)) journalForSlot(state);
+			if (journalShape || record !== null) journalForSlot(state);
 			batchClearItems(state, oldItems);
 			state.inOrder = true;
 			state.head = null;
@@ -48282,7 +48345,7 @@ function reconcileKeyed<T>(
 			const next: Block | null = cur!.nextSibling!;
 			const newRelIdx = newKeysToIdx.get(cur!.key);
 			if (newRelIdx === undefined) {
-				if (journalShape || (record !== null && record.links !== null)) {
+				if (journalShape || record !== null) {
 					journalForSlot(state);
 					journalShape = false;
 					record = null;
@@ -48387,7 +48450,7 @@ function reconcileKeyed<T>(
 				// Before the first write, record each row whose nextSibling this
 				// shortcut rewrites: every displaced row and the row it lands after,
 				// the new middle's last row, and `beforeMiddle`.
-				const links = record !== null ? record.links : null;
+				const links = forSlotLinks(record);
 				if (links !== null) {
 					const touched: (Block | null)[] = [beforeMiddle, oldItems.get(newKeys[newMidLen - 1])!];
 					for (let j = 0; j < dCount; j++) {
@@ -48453,7 +48516,7 @@ function reconcileKeyed<T>(
 			}
 		}
 
-		if (journalShape || (record !== null && record.links !== null)) journalForSlot(state);
+		if (journalShape || record !== null) journalForSlot(state);
 		// Place survivors first, then mount new rows in authored order. Reversing
 		// mounts reverses their ref/layout/effect order even when the DOM is right.
 		const middleEndAnchor: Node = afterMiddle ? afterMiddle.startMarker! : state.end;

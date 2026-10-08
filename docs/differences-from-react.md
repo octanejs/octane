@@ -1376,20 +1376,22 @@ several Actions that settle together. Octane posts the task with
 Waiting there are updates inside `startTransition`, Action results, and, while an
 async Action is pending, every update made outside a delegated event, `flushSync`,
 or a commit callback, which Octane already treats as part of the Action. Three kinds
-of update keep the microtask flush at their transition priority, because they
-announce the transition rather than complete it: `useTransition` and
-`useActionState` raising `isPending`, and `useOptimistic` showing a value. A cue
-renders without the transition's own updates, even in the component that holds
-them: that render shows their previous values, and the component renders them in
-the task, as React renders the cue in an urgent lane. `isPending` falls right after
-that render, in the same task. The cue still renders the transition's work with it
-when that work is not hook state, or when the component is inside a Suspense
-boundary that is holding a suspended transition. An urgent update to a component
-whose transition is waiting renders it in the microtask flush. `flushSync` and
-`act()` drain both priorities. An Action pending cue on its own does not start
-native View Transition capture, and neither does a cue rendered apart from its
-component's waiting transition. Explicit transition work keeps its capture when it
-reaches the render queue, including state in the same component as the cue.
+of update stay on the microtask flush, because they announce the transition rather
+than complete it: `useTransition` and `useActionState` raising `isPending`, and
+`useOptimistic` showing a value. As React renders these cues in an urgent lane, a
+cue renders at urgent priority and without the transition's own updates, whether
+the component that holds them is the cue's own or one its render reaches. That
+render shows their previous values, and those components render them in the task.
+Because the cue is urgent, a component that suspends during it shows its boundary's
+fallback, and its commit starts no native View Transition capture. Explicit
+transition work keeps its capture when it reaches the render queue, including state
+in the same component as the cue. `isPending` falls right after the transition's
+render, in the same task. A cue keeps transition priority and renders the
+transition's work with it when that work is not hook state, inside a Suspense
+boundary that is holding a suspended transition, when `flushSync` drains both, or
+when the cue starts during a render, a commit, or the transition's task. An urgent
+update to a component whose transition is waiting renders it in the microtask
+flush. `flushSync` and `act()` drain both priorities.
 
 `useDeferredValue`'s deferred render also runs in a later host task. Urgent updates
 that arrive before the task runs only change the value it renders, so a fast typist's
