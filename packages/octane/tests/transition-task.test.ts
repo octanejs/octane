@@ -127,12 +127,13 @@ describe('Action cues and native capture', () => {
 						if (!dispatchFirst) dispatch();
 					});
 					await microtasks();
-					if (separateRoot) {
-						expect(native.calls).toHaveLength(0);
-						expect(animated.querySelector('output')!.textContent).toBe('0');
-						expect(cue.querySelector('p')!.textContent).toBe('pending');
-						await act(async () => {});
-					}
+					// The cue commits first, with the previous state and no capture, even
+					// in the component that holds the transition's state; that state is
+					// captured when its task renders it.
+					expect(native.calls).toHaveLength(0);
+					expect(animated.querySelector('output')!.textContent).toBe('0');
+					expect(cue.querySelector('p')!.textContent).toBe('pending');
+					await act(async () => {});
 					expect(native.calls).toHaveLength(1);
 					expect(animated.querySelector('output')!.textContent).toBe('1');
 					expect(cue.querySelector('p')!.textContent).toBe('pending');
