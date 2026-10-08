@@ -4,7 +4,6 @@ import {
 	COMMENT_MARKER,
 	analyzeReport,
 	compareSuite,
-	findBudgetBreaches,
 	renderReport,
 	timingVerdict,
 } from './pr-report.mjs';
@@ -20,15 +19,13 @@ const timed = (score, pair) => ({
 });
 const suite = (name, targets) => ({ suite: name, iterations: 1, harnessExit: 0, targets });
 
-test('bundle byte changes are reported exactly while budget peers stay hidden', () => {
+test('bundle byte changes are reported exactly for Octane targets only', () => {
 	const base = suite('bundle-size', [
 		{ name: 'octane-tsrx', ops: { js_gzip: bytes(1000), app_gzip: bytes(400) } },
-		{ name: 'octane-tsrx-budget', ops: { js_gzip: bytes(1200) } },
 		{ name: 'react', ops: { js_gzip: bytes(9000) } },
 	]);
 	const head = suite('bundle-size', [
 		{ name: 'octane-tsrx', ops: { js_gzip: bytes(1012), app_gzip: bytes(400) } },
-		{ name: 'octane-tsrx-budget', ops: { js_gzip: bytes(1300) } },
 		{ name: 'react', ops: { js_gzip: bytes(9100) } },
 	]);
 	const { deterministic, timing, unchanged } = compareSuite('bundle-size', base, head);
@@ -40,75 +37,16 @@ test('bundle byte changes are reported exactly while budget peers stay hidden', 
 	assert.equal(unchanged, 1);
 });
 
-test('growth within the committed budget is reported but does not fail', () => {
-	const base = {
-		'bundle-size': suite('bundle-size', [
-			{ name: 'octane-tsrx', ops: { js_gzip: bytes(1000) } },
-			{ name: 'octane-tsrx-budget', ops: { js_gzip: bytes(1032) } },
-		]),
-	};
-	const head = {
-		'bundle-size': suite('bundle-size', [
-			{ name: 'octane-tsrx', ops: { js_gzip: bytes(1032) } },
-			{ name: 'octane-tsrx-budget', ops: { js_gzip: bytes(1032) } },
-		]),
-	};
-	const { body, failures } = analyzeReport({ suites: ['bundle-size'], base, head });
-	assert.deepEqual(failures, []);
-	assert.match(body, /🔴 bundle-size: 1 value\(s\) increased within budget/);
-});
-
-test('a byte value over its same-run budget fails the report', () => {
-	const head = suite('bundle-reachability', [
-		{ name: 'hydrate-root', ops: { raw: bytes(1000), gzip: bytes(433), brotli: bytes(380) } },
-		{
-			name: 'hydrate-root-budget',
-			ops: { raw: bytes(1032), gzip: bytes(432), brotli: bytes(400) },
-		},
-		{ name: 'context', ops: { gzip: bytes(999) } },
-	]);
-	assert.deepEqual(findBudgetBreaches(head), [
-		{ target: 'hydrate-root', op: 'gzip', value: 433, limit: 432 },
-	]);
-	const { body, failures } = analyzeReport({
-		suites: ['bundle-reachability'],
-		base: { 'bundle-reachability': head },
-		head: { 'bundle-reachability': head },
-	});
-	assert.deepEqual(failures, ['❌ bundle-reachability: 1 value(s) exceed their committed budget']);
-	assert.match(body, /\| hydrate-root \| gzip \| 433 \| 432 \| \+1 \|/);
-	assert.match(body, /separate pull request/);
-});
-
-test('a value over its budget is not also reported as growth within budget', () => {
-	const base = suite('bundle-size', [
-		{ name: 'octane-tsrx', ops: { js_gzip: bytes(1000), app_gzip: bytes(400) } },
-		{ name: 'octane-tsrx-budget', ops: { js_gzip: bytes(1032), app_gzip: bytes(432) } },
-	]);
-	const head = suite('bundle-size', [
-		{ name: 'octane-tsrx', ops: { js_gzip: bytes(1100), app_gzip: bytes(410) } },
-		{ name: 'octane-tsrx-budget', ops: { js_gzip: bytes(1032), app_gzip: bytes(432) } },
-	]);
-	const { body, failures } = analyzeReport({
-		suites: ['bundle-size'],
-		base: { 'bundle-size': base },
-		head: { 'bundle-size': head },
-	});
-	assert.deepEqual(failures, ['❌ bundle-size: 1 value(s) exceed their committed budget']);
-	assert.match(body, /🔴 bundle-size: 1 value\(s\) increased within budget/);
-});
-
-test('a budget breach still fails when the base could not be measured', () => {
-	const head = suite('bundle-size', [
-		{ name: 'octane-tsrx', ops: { js_gzip: bytes(1100) } },
-		{ name: 'octane-tsrx-budget', ops: { js_gzip: bytes(1032) } },
-	]);
-	const { failures } = analyzeReport({
-		suites: ['bundle-size'],
-		base: { 'bundle-size': { ...suite('bundle-size', []), harnessExit: 1, failed: 'base broke' } },
-		head: { 'bundle-size': head },
-	});
-	assert.deepEqual(failures, ['❌ bundle-size: 1 value(s) exceed their committed budget']);
+test('byte growth is reported but never fails the check', () => {
+	for (const name of ['bundle-size', 'bundle-reachability']) {
+		const target = name === 'bundle-size' ? 'octane-tsrx' : 'hydrate-root';
+		const base = { [name]: suite(name, [{ name: target, ops: { gzip: bytes(1000) } }]) };
+		const head = { [name]: suite(name, [{ name: target, ops: { gzip: bytes(5000) } }]) };
+		const { body, failures } = analyzeReport({ suites: [name], base, head });
+		assert.deepEqual(failures, []);
+		assert.match(body, new RegExp(`🔴 ${name}: 1 value\\(s\\) increased`));
+		assert.match(body, new RegExp(`\\| ${target} \\| gzip \\| 1,000 \\| 5,000 \\| \\+4,000`));
+	}
 });
 
 test('any increase in a js-framework work counter fails, and a decrease does not', () => {
@@ -204,7 +142,7 @@ test('a suite that failed on the base commit keeps the headline from reporting g
 	const { body, failures } = analyzeReport({ suites: ['bundle-size'], base, head });
 	assert.deepEqual(failures, []);
 	assert.match(body, /⚠️ bundle-size failed on the base commit and was not compared/);
-	assert.doesNotMatch(body, /🟢 No budget breaches/);
+	assert.doesNotMatch(body, /🟢 No byte growth/);
 });
 
 test('a missing result fails the pull request side', () => {
@@ -254,7 +192,7 @@ test('an unchanged pull request reports no regressions', () => {
 		head: results,
 	});
 	assert.deepEqual(failures, []);
-	assert.match(body, /🟢 No budget breaches, no added work, and no timing changes beyond ±3%\./);
+	assert.match(body, /🟢 No byte growth, no added work, and no timing changes beyond ±3%\./);
 	assert.match(body, /No changes across 1 measured values\./);
 });
 
