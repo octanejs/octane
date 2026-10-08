@@ -7665,18 +7665,19 @@ function queueTransitionBlock(block: Block, cue?: boolean): boolean {
 
 /** An urgent update or pending cue moves a waiting block onto the microtask flush. */
 function upgradeTransitionBlock(block: Block, mode: 'urgent' | 'transition', cue?: boolean): void {
-	if (
-		(mode !== 'urgent' && !cue) ||
-		block.pendingMode !== 'transition' ||
-		syncFlush ||
-		!TRANSITION_QUEUE.includes(block)
-	)
-		return;
+	// flushSync adopts the whole queue itself. Outside it, a queued block is
+	// always still pending at transition priority.
+	if ((mode !== 'urgent' && !cue) || syncFlush) return;
+	const index = TRANSITION_QUEUE.indexOf(block);
+	if (index === -1) return;
+	TRANSITION_QUEUE.splice(index, 1);
 	QUEUE.push(block);
 	if (!scheduled) {
 		scheduled = true;
 		queueMicrotask(flush);
 	}
+	// Nothing is left for the task: retire it, and run its follow-ups after this flush.
+	if (TRANSITION_QUEUE.length === 0) adoptTransitionQueue();
 }
 
 function scheduleTransitionTask(): void {
@@ -7697,10 +7698,8 @@ function scheduleTransitionTask(): void {
 /** Move waiting transition renders onto the flush about to run. */
 function adoptTransitionQueue(): void {
 	transitionTask = 0;
-	if (TRANSITION_QUEUE.length !== 0) {
-		for (let i = 0; i < TRANSITION_QUEUE.length; i++) QUEUE.push(TRANSITION_QUEUE[i]);
-		TRANSITION_QUEUE.length = 0;
-	}
+	for (let i = 0; i < TRANSITION_QUEUE.length; i++) QUEUE.push(TRANSITION_QUEUE[i]);
+	TRANSITION_QUEUE.length = 0;
 	const followups = TRANSITION_FOLLOWUPS;
 	if (followups !== null) {
 		TRANSITION_FOLLOWUPS = null;

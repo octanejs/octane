@@ -7,6 +7,7 @@ import {
 	PendingPanel,
 	StateProbe,
 	TransitionInput,
+	ViewTransitionPair,
 } from './_fixtures/transition-flush-task.tsrx';
 import { installViewTransitionMocks } from './conformance/_helpers/view-transition-mocks';
 
@@ -265,6 +266,28 @@ describe('pending cues commit before the transition they announce', () => {
 		expect(container.textContent).toBe('idlepanel 1');
 	});
 
+	it('drops isPending right after an urgent update takes over the waiting transition', async () => {
+		const log: string[] = [];
+		let setPanel!: (value: number) => void;
+		const { container } = mountWith(PendingPanel, {
+			expose: (next: (value: number) => void) => (setPanel = next),
+			onCommit: (entry: string) => log.push(entry),
+			onPress: (start: (fn: () => void) => void) => {
+				postTask(() => log.push('task'));
+				start(() => setPanel(1));
+				// The urgent update renders the panel now, so nothing is left for the task.
+				setPanel(2);
+			},
+		});
+		log.length = 0;
+
+		(container.querySelector('button') as HTMLButtonElement).click();
+		await untilTasks(() => log.includes('task'));
+
+		expect(log).toEqual(['button pending', 'panel 2', 'button idle', 'task']);
+		expect(container.textContent).toBe('idlepanel 2');
+	});
+
 	it('keeps the previous content when the transition suspends after its cue committed', async () => {
 		const log: string[] = [];
 		let setPromise!: (promise: Promise<string>) => void;
@@ -313,6 +336,37 @@ describe('pending cues commit before the transition they announce', () => {
 
 		expect(log).toEqual(['0/0', '0/1', 'task', '1/1']);
 		expect(container.textContent).toBe('1/1');
+	});
+});
+
+describe('view transitions over waiting work', () => {
+	it('wraps the transition task even after an urgent update took one of its components', async () => {
+		const vt = installViewTransitionMocks();
+		try {
+			let setA!: (value: number) => void;
+			let setB!: (value: number) => void;
+			const { container } = mountWith(ViewTransitionPair, {
+				exposeA: (next: (value: number) => void) => (setA = next),
+				exposeB: (next: (value: number) => void) => (setB = next),
+			});
+
+			await Promise.resolve();
+			startTransition(() => {
+				setA(1);
+				setB(1);
+			});
+			setA(2);
+			await flushMicrotasks();
+			expect(container.textContent).toBe('20');
+			expect(vt.calls).toHaveLength(0);
+
+			// Only transition work is left for the task, so it is wrapped.
+			await untilTasks(() => vt.calls.length > 0);
+			expect(vt.calls).toHaveLength(1);
+			expect(container.textContent).toBe('21');
+		} finally {
+			vt.restore();
+		}
 	});
 });
 

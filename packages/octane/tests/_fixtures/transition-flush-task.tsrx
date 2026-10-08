@@ -148,3 +148,18 @@ export function TransitionInput() @{
 		</ViewTransition>
 	</>
 }
+
+interface ViewTransitionPairProps {
+	exposeA: (setValue: (value: number) => void) => void;
+	exposeB: (setValue: (value: number) => void) => void;
+}
+
+// Two independent components; only the second sits in a ViewTransition.
+export function ViewTransitionPair(props: ViewTransitionPairProps) @{
+	<>
+		<StateProbe expose={props.exposeA} onCommit={() => {}} />
+		<ViewTransition>
+			<StateProbe expose={props.exposeB} onCommit={() => {}} />
+		</ViewTransition>
+	</>
+}
