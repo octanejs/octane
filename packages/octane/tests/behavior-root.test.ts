@@ -8645,6 +8645,123 @@ export function Rows() @{
 			}
 		});
 
+		// List numbering is presentation, not form state. Adopted and constructed
+		// lists write `start` and each item's `value` as the server renders them,
+		// and keyed items keep their nodes as the list grows and renumbers.
+		it(`numbers ordered lists and keyed items through start and value (${dev ? 'dev' : 'prod'})`, () => {
+			const source = `import { unbound } from 'octane/behavior';
+export function Ranked(props) @{
+  'use dom bindings';
+  <ol start={props.start}>
+    <li value={unbound(props.lead)}>Lead</li>
+    @for (const item of props.items; key item.id) {
+      <li value={item.rank}>{item.label as string}</li>
+    }
+  </ol>
+}`;
+			type Item = { id: string; rank: unknown; label: string };
+			type Props = { start: unknown; lead: unknown; items: readonly Item[] };
+			const alpha = { id: 'a', rank: 7, label: 'Alpha' };
+			const beta = { id: 'b', rank: null, label: 'Beta' };
+			const gamma = { id: 'c', rank: 0, label: 'Gamma' };
+			const initial: Props = { start: 3, lead: '2.5', items: [alpha, beta] };
+			const fixture = authoredPresentation<Props>(
+				'Ranked',
+				initial,
+				dev,
+				source,
+				{},
+				{
+					strong: true,
+				},
+			);
+			const numbering = (list: Element) => [
+				list.getAttribute('start'),
+				...[...list.children].map((item) => item.getAttribute('value')),
+			];
+			const serverNumbering = (props: Props) => {
+				const template = document.createElement('template');
+				template.innerHTML = renderToString(fixture.server.Ranked, props).html;
+				return numbering(template.content.querySelector('ol')!);
+			};
+			for (const adopt of [true, false]) {
+				fixture.publish(initial, false);
+				fixture.cleanup.mockClear();
+				container.innerHTML = adopt ? fixture.html : '';
+				const handle = adopt
+					? fixture.attach(container.querySelector('ol')!, fixture.state)
+					: fixture.mount({ parent: container }, fixture.state);
+				const list = container.querySelector('ol')!;
+				const items = () => [...list.children] as HTMLLIElement[];
+				// The unbound lead value is the server's attribute in both paths.
+				expect(numbering(list)).toEqual(['3', '2.5', '7', null]);
+				expect(numbering(list)).toEqual(serverNumbering(initial));
+				const [lead, first, second] = items();
+
+				fixture.publish({ items: [alpha, beta, gamma] });
+				expect(numbering(list)).toEqual(['3', '2.5', '7', null, '0']);
+				expect(items().slice(0, 3)).toEqual([lead, first, second]);
+
+				fixture.publish({
+					start: 0,
+					items: [
+						{ ...alpha, rank: -2 },
+						{ ...beta, rank: 4 },
+						{ ...gamma, rank: null },
+					],
+				});
+				expect(numbering(list)).toEqual(['0', '2.5', '-2', '4', null]);
+				expect([list.start, ...items().map((item) => item.value)]).toEqual([0, 2, -2, 4, 0]);
+				const third = items()[3];
+				expect(items()).toEqual([lead, first, second, third]);
+
+				for (const start of [-1, 12, '5', Number.NaN, 'abc', true, null, undefined]) {
+					fixture.publish({ start, items: [{ ...alpha, rank: start }, beta, gamma] });
+					const props = fixture.state.getSnapshot();
+					expect(numbering(list), String(start)).toEqual(serverNumbering(props));
+				}
+				expect(items()).toEqual([lead, first, second, third]);
+
+				handle.dispose();
+				expect(fixture.cleanup).toHaveBeenCalledOnce();
+				const retired = numbering(list);
+				fixture.publish({ start: 9, items: [{ ...alpha, rank: 9 }, beta, gamma] });
+				expect(numbering(list)).toEqual(retired);
+			}
+		});
+
+		// Construction initializes an unbound numeric attribute as the server
+		// renders it, under React's camelCase spelling too.
+		it(`constructs unbound numeric attributes as the server renders them (${dev ? 'dev' : 'prod'})`, () => {
+			const source = `import { unbound } from 'octane/behavior';
+export function Spanned(props) @{
+  'use dom bindings';
+  <table><tbody><tr><td rowSpan={unbound(props.span)}>{props.label as string}</td></tr></tbody></table>
+}`;
+			const fixture = authoredPresentation<{ span: unknown; label: string }>(
+				'Spanned',
+				{ span: 2, label: 'Cell' },
+				dev,
+				source,
+			);
+			for (const span of [2, 0, '3', Number.NaN, 'abc', undefined]) {
+				const props = { span, label: 'Cell' };
+				fixture.publish(props, false);
+				const template = document.createElement('template');
+				template.innerHTML = renderToString(fixture.server.Spanned, props).html;
+				container.innerHTML = '';
+				const handle = fixture.mount({ parent: container }, fixture.state);
+				const cell = container.querySelector('td')!;
+				expect(cell.getAttribute('rowspan'), String(span)).toBe(
+					template.content.querySelector('td')!.getAttribute('rowspan'),
+				);
+				fixture.publish({ label: 'Next' });
+				expect(container.querySelector('td')).toBe(cell);
+				expect(cell.textContent).toBe('Next');
+				handle.dispose();
+			}
+		});
+
 		// Leaving a page retires its document signals before its islands are
 		// disposed. That retirement ends a live presentation; it is not an error.
 		it(`keeps the last DOM without throwing when its signal owner retires (${dev ? 'dev' : 'prod'})`, () => {
