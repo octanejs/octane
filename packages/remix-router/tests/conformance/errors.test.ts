@@ -149,7 +149,12 @@ describe('route error boundaries', () => {
 		// revalidation is already "idle" is cleared by the NEXT revalidation
 		// completing (loading → idle) — not by a transition relative to the
 		// frozen catch-time value. (PR #46 review finding.)
+		// Router updates are transitions, which commit in a later task (#1864), as
+		// under React's Scheduler: the revalidation's loader stays pending across
+		// tasks so its "loading" state commits before "idle", rather than both
+		// coalescing into one render.
 		let broken = true;
+		let pending: Promise<object> | null = null;
 		function FlakyRender() {
 			if (broken) throw new Error('render flake');
 			return createElement(Home);
@@ -162,7 +167,7 @@ describe('route error boundaries', () => {
 					{
 						index: true,
 						element: createElement(FlakyRender),
-						loader: () => ({}),
+						loader: () => pending ?? {},
 						errorElement: createElement(ErrorProbe),
 					},
 				],
@@ -173,7 +178,14 @@ describe('route error boundaries', () => {
 		expect(r.find('main .err').textContent).toBe('error:render flake');
 
 		broken = false;
-		await router.revalidate();
+		let finish!: () => void;
+		pending = new Promise((resolve) => (finish = () => resolve({})));
+		const revalidated = router.revalidate();
+		await flush();
+		// While revalidating, the boundary keeps the error it caught.
+		expect(r.find('main .err').textContent).toBe('error:render flake');
+		finish();
+		await revalidated;
 		await flush();
 		expect(r.find('main h1').textContent).toBe('Home');
 		r.unmount();
