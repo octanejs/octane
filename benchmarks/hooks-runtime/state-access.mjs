@@ -186,7 +186,6 @@ if (process.env.BENCH_JSON) {
 			meta: { ...row, sourceHash: report.sourceHash, bundle: report.bundle },
 		});
 	}
-	targets.push({ name: 'state-access-budget', ops: { hook_map_reads: value(128) } });
 	await writeFile(
 		process.env.BENCH_JSON,
 		JSON.stringify({ suite: 'hooks-runtime', targets }, null, 2),

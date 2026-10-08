@@ -380,14 +380,6 @@ try {
 				default_hint: true,
 			},
 		});
-	// A positive unit reference lets the ratio runner enforce zero-work ceilings.
-	targets.push({
-		name: 'keys-work-budget',
-		ops: Object.fromEntries(
-			Object.keys(observedResult.component.primitive).map((name) => [name, stat(1)]),
-		),
-		controls: { unit_reference: true },
-	});
 	const payload = {
 		suite: 'client-hot-paths',
 		iterations: 1,

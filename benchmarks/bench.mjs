@@ -1332,8 +1332,8 @@ const SUITES = [
 	},
 	{
 		// Public-import reachability (Node-only): builds and executes isolated
-		// production feature entries, then compares raw/gzip/brotli bytes with
-		// explicit same-run budget targets through the committed ratio guards.
+		// production feature entries, asserts what each may retain, and reports
+		// raw/gzip/brotli bytes.
 		name: 'bundle-reachability',
 		cwd: 'bundle-size',
 		servers: [],

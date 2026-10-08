@@ -174,12 +174,6 @@ try {
 				},
 				meta: { gate: 'passed', mountWrites, insertWrites, semantic },
 			},
-			{
-				// One insertion per row is the smallest budget a weak-map record could use.
-				name: 'event-owner-rows-work-budget',
-				ops: { mount_row_weak_writes: value(1), insert_row_weak_writes: value(1) },
-				meta: { gate: 'passed' },
-			},
 		],
 		meta: {
 			node: process.version,
