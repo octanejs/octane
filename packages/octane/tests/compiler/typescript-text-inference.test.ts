@@ -385,13 +385,14 @@ export function Errors(props: { sound: string }) @{
 		});
 
 		it('resolves an extensionless .tsrx import to the module its .tsrx spelling names', () => {
-			// Vite resolves `./model` to model.tsrx. Were the two spellings separate
-			// modules, the private brand would make the argument an error.
+			// Vite resolves `./model` to model.tsrx. Unresolved, `label` would be
+			// untyped; were the two spellings separate modules, the private brand
+			// would make the argument an error.
 			const model = `export class Token { private readonly brand = 1; }
 export function label(token: Token): string { return 'token'; }
 `;
-			const source = `import { Token } from './model';
-import { label } from './model.tsrx';
+			const source = `import { label } from './model';
+import { Token } from './model.tsrx';
 export function Uses(props: { count: number }) @{
 	<main><p>{label(new Token())}</p><p>{props.count}</p></main>
 }`;
