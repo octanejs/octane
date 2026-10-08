@@ -1,5 +1,18 @@
 # @octanejs/mcp-server
 
+## 0.3.2
+
+### Patch Changes
+
+- 0a8c27c: Expose the `concise-code` maintainer skill through `octane_skill` when the MCP
+  server runs against an Octane repository checkout.
+- 3557100: The `migrate-to-strong` skill now tells you to typecheck with `tsrx-tsc`, the
+  command the `typecheck` script from `octane init` runs. It used to name
+  `octane-tsc`, a tool that exists only inside the Octane repository.
+- 40fdefd: Expose the `perf-review` maintainer skill through `octane_skill` when the MCP
+  server runs against an Octane repository checkout.
+- 7540c35: Register the TanStack Query Devtools binding in the MCP React-package bridge and keep its published binding catalog complete.
+
 ## 0.3.1
 
 ### Patch Changes
