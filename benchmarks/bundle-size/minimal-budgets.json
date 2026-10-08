@@ -77,7 +77,7 @@
   "suspense-transition": {
     "raw": 140150,
     "gzip": 44358,
-    "brotli": 39137
+    "brotli": 39132
   },
   "server-hooks": {
     "raw": 504,
@@ -111,7 +111,7 @@
   },
   "binding-base-ui-esbuild": {
     "raw": 213852,
-    "gzip": 69320,
+    "gzip": 69318,
     "brotli": 60247
   },
   "binding-aria-vite": {
@@ -141,8 +141,8 @@
   },
   "binding-radix-esbuild": {
     "raw": 215676,
-    "gzip": 69904,
-    "brotli": 60862
+    "gzip": 69893,
+    "brotli": 60828
   },
   "binding-floating-ui-vite": {
     "raw": 10726,
@@ -171,7 +171,7 @@
   },
   "binding-apollo-client-esbuild": {
     "raw": 363991,
-    "gzip": 115702,
+    "gzip": 115690,
     "brotli": 101084
   },
   "binding-usehooks-ts-vite": {

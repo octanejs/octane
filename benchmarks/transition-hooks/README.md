@@ -20,8 +20,9 @@ happy-dom, exactly as `hook-memo` does.
 ## Scenarios and semantic controls
 
 Every scenario mounts once, then repeats a complete cycle 64 times through the
-public API. A cycle calls the hook setters, lets the runtime's own microtask
-scheduling run until four consecutive ticks render nothing, and then checks the
+public API. A cycle calls the hook setters, lets the runtime's own scheduling
+run until four consecutive microtask ticks and the host task after them render
+nothing (transition renders flush in a posted task, #1864), and then checks the
 observed render sequence and the DOM. The fixtures create no per-render
 closures of their own: the runner composes `start(() => setValue(next))`, so
 every application creation event belongs to the compiled template.
