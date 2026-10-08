@@ -270,20 +270,23 @@ server.
 
 <h2 id="async-work">Transitions without time slicing</h2>
 
-Octane batches updates in a microtask, then runs each render to completion. There are
-urgent and transition updates, but no lanes, yield points, CPU time slicing, or
-selective hydration.
+Octane batches urgent updates in a microtask and renders transition updates in a
+later task, then runs each render to completion. There are urgent and transition
+updates, but no lanes, yield points, CPU time slicing, or selective hydration.
 
-The useful transition behavior remains: when a slower replacement suspends, the
-current screen can stay visible and `isPending` can explain the wait. `flushSync`
-drains the full update queue, while passive effects still run after paint.
+The useful transition behavior remains. `isPending` commits first, with the previous
+state, so the browser can paint it before the transition renders. When a slower
+replacement suspends, the current screen can stay visible while `isPending` explains
+the wait. `flushSync` drains the full update queue, while passive effects still run
+after paint.
 
 For resize callbacks that update state or write DOM that can resize observed
 elements, use [createResizeObserver](/docs/core-apis#createResizeObserver) from
 `octane`. Native observer callbacks run inside the browser's resize delivery loop,
 where a microtask commit that changes an observed size can report
 `ResizeObserver loop completed with undelivered notifications`, even if the layout
-eventually settles. `startTransition` does not move that commit out of the loop.
+eventually settles. A transition-only update renders in a later task, outside the
+loop, but an urgent update still commits inside it.
 
 The helper returns a native observer and delivers coalesced measurements in a
 separate task. Use its instance methods for observation and cleanup so unobserve

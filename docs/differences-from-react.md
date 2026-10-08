@@ -1378,11 +1378,15 @@ async Action is pending, every update made outside a delegated event, `flushSync
 or a commit callback, which Octane already treats as part of the Action. Three kinds
 of update keep the microtask flush at their transition priority, because they
 announce the transition rather than complete it: `useTransition` and
-`useActionState` raising `isPending`, and `useOptimistic` showing a value. When the
-component that raises `isPending` also holds the transition's own update, both
-render together in that microtask flush, because Octane keeps one live tree. An
-urgent update to a component whose transition is waiting renders it in the
-microtask flush. `flushSync` and `act()` drain both priorities.
+`useActionState` raising `isPending`, and `useOptimistic` showing a value. A cue
+renders without the transition's own updates, even in the component that holds
+them: that render shows their previous values, and the component renders them in
+the task, as React renders the cue in an urgent lane. `isPending` falls right after
+that render, in the same task. The cue still renders the transition's work with it
+when that work is not hook state, or when the component is inside a Suspense
+boundary that is holding a suspended transition. An urgent update to a component
+whose transition is waiting renders it in the microtask flush. `flushSync` and
+`act()` drain both priorities.
 
 `useDeferredValue`'s deferred render also runs in a later host task. Urgent updates
 that arrive before the task runs only change the value it renders, so a fast typist's
@@ -1393,7 +1397,8 @@ arrives during it waits until it commits, where React would yield to handle it.
 Native `ResizeObserver` callbacks run inside the browser's resize delivery loop.
 An ordinary microtask commit that resizes an already-delivered target can trigger
 `ResizeObserver loop completed with undelivered notifications`, even when the
-layout eventually settles. `startTransition` does not change that scheduling.
+layout eventually settles. A transition-only update renders in a later task, outside
+that loop, but an urgent update or `flushSync` still commits inside it.
 Use Octane's `createResizeObserver` when a callback updates state or writes DOM
 that can resize its observed targets:
 

@@ -2671,7 +2671,9 @@ let inFlush = false;
 // continuations (an Action backlog, a transition started after each `await`)
 // renders once rather than once per microtask hop. The microtask flush never
 // drains this queue; the task, flushSync and act() do. An urgent update to a
-// waiting block moves it onto the microtask flush.
+// waiting block moves it onto the microtask flush. A pending cue for a waiting
+// block does not: the block is queued in both places, and the microtask flush
+// renders only its cue (renderTransitionCue).
 const TRANSITION_QUEUE: Block[] = [];
 // The live posted task's id, or 0. A flush that absorbs the queue retires that
 // task, so transitions scheduled afterwards post a task of their own rather than
@@ -2695,6 +2697,8 @@ interface TransitionTaskDriver {
 	queue: typeof queueTransitionBlock;
 	adopt: typeof adoptTransitionQueue;
 	upgrade: typeof upgradeTransitionBlock;
+	splitCue: typeof splitTransitionCue;
+	splitsCue: typeof splitsTransitionCue;
 }
 
 let TRANSITION_TASK_DRIVER: TransitionTaskDriver | null = null;
@@ -2795,6 +2799,8 @@ function ensureTransitionSwapDriver(): void {
 		queue: queueTransitionBlock,
 		adopt: adoptTransitionQueue,
 		upgrade: upgradeTransitionBlock,
+		splitCue: splitTransitionCue,
+		splitsCue: splitsTransitionCue,
 	};
 }
 
@@ -3141,6 +3147,8 @@ function flushTransitionActionBatch(batch: TransitionActionBatch): void {
 				update.profileSlot,
 			);
 		scheduleRender(block);
+		// A block already queued for its pending cue keeps this update for the task.
+		TRANSITION_TASK_DRIVER?.upgrade(block, 'transition');
 	}
 	// Retain the applied updates for the drain this flush schedules: a render
 	// that suspends into a hold reverts these cells to their baseValues and
@@ -6938,13 +6946,20 @@ function vtInterrupt(): void {
 	vtInterruptOwners(null);
 }
 
-/** Is every queued block scheduled at transition priority? (Empty → false.) */
+/**
+ * Is every queued block scheduled at transition priority? (Empty → false.) A
+ * pending cue split from its waiting transition work renders urgently.
+ */
 function queueAllTransition(): boolean {
 	if (QUEUE.length === 0) return false;
 	for (let i = 0; i < QUEUE.length; i++) {
-		if (QUEUE[i].pendingMode !== 'transition') return false;
+		if (QUEUE[i].pendingMode !== 'transition' || queuedTransitionCue(QUEUE[i])) return false;
 	}
 	return true;
+}
+
+function queuedTransitionCue(block: Block): boolean {
+	return TRANSITION_QUEUE.length !== 0 && TRANSITION_TASK_DRIVER!.splitsCue(block);
 }
 
 function vtHasActiveHandles(): boolean {
@@ -7023,7 +7038,8 @@ function ensureViewTransitionDriver(): ViewTransitionDriver {
 		shouldClearTypesAfterFlush() {
 			if (VT_PENDING_TYPES.length === 0) return false;
 			for (let i = 0; i < QUEUE.length; i++) {
-				if (QUEUE[i].pendingMode === 'transition') return true;
+				// A split cue leaves the types for its transition's task.
+				if (QUEUE[i].pendingMode === 'transition' && !queuedTransitionCue(QUEUE[i])) return true;
 			}
 			return false;
 		},
@@ -7520,7 +7536,8 @@ function warnCrossComponentRenderUpdate(target: Block, source: Block): void {
  * `cue`: useTransition or useActionState raising isPending, or useOptimistic
  * showing a value. These renders are the transition's in-flight surface, which
  * React renders urgently: they keep the microtask flush at the priority computed
- * here, so they commit before the transition work they announce.
+ * here, so they commit before the transition work they announce. That work keeps
+ * its task even when it belongs to the cue's own block (upgradeTransitionBlock).
  */
 function scheduleRender(block: Block, flushed?: boolean, cue?: boolean): void {
 	if (block.disposed) return;
@@ -7663,11 +7680,37 @@ function queueTransitionBlock(block: Block, cue?: boolean): boolean {
 	return true;
 }
 
-/** An urgent update or pending cue moves a waiting block onto the microtask flush. */
+/**
+ * An urgent update moves a waiting block onto the microtask flush, transition
+ * work included. A pending cue does not: outside a flush, the block renders its
+ * cue in the microtask flush over its committed cells and keeps its transition
+ * render for the task, in whichever order the two arrive (renderTransitionCue).
+ * The cue therefore commits the previous transition state, as React renders
+ * `isPending` in an urgent lane before the transition lane.
+ */
 function upgradeTransitionBlock(block: Block, mode: 'urgent' | 'transition', cue?: boolean): void {
-	// flushSync adopts the whole queue itself. Outside it, a queued block is
-	// always still pending at transition priority.
-	if ((mode !== 'urgent' && !cue) || syncFlush) return;
+	// flushSync adopts the whole queue itself.
+	if (syncFlush) return;
+	if (mode === 'transition' && !inFlush && CURRENT_BLOCK === null && !TRANSITION_TASK_ACTIVE) {
+		// Outside a flush a transition-priority block is queued in exactly one
+		// place, or in both once its cue and its transition work are split.
+		const waiting = TRANSITION_QUEUE.indexOf(block) !== -1;
+		if (cue) {
+			if (!waiting || QUEUE.indexOf(block) !== -1) return;
+			QUEUE.push(block);
+			if (!scheduled) {
+				scheduled = true;
+				queueMicrotask(flush);
+			}
+		} else if (!waiting && block.pendingMode === 'transition') {
+			// A block queued for an urgent update renders this work with it, as it
+			// would after the work started waiting.
+			TRANSITION_QUEUE.push(block);
+			scheduleTransitionTask();
+		}
+		return;
+	}
+	if (mode !== 'urgent' && !cue) return;
 	const index = TRANSITION_QUEUE.indexOf(block);
 	if (index === -1) return;
 	TRANSITION_QUEUE.splice(index, 1);
@@ -7678,6 +7721,91 @@ function upgradeTransitionBlock(block: Block, mode: 'urgent' | 'transition', cue
 	}
 	// Nothing is left for the task: retire it, and run its follow-ups after this flush.
 	if (TRANSITION_QUEUE.length === 0) adoptTransitionQueue();
+}
+
+/**
+ * Whether a queued block renders only its pending cue now, apart from the
+ * transition work it also has waiting in the task queue (upgradeTransitionBlock).
+ * The cue renders alone when that work holds staged cells it can show at their
+ * committed values. A Suspense or Activity boundary that owns the render, or a
+ * pending root request, keeps the combined render, as does work without staged
+ * cells. View Transition routing asks this too, since a split cue is urgent work.
+ */
+function splitsTransitionCue(block: Block): boolean {
+	if (
+		syncFlush ||
+		TRANSITION_TASK_ACTIVE ||
+		block.pendingMode !== 'transition' ||
+		TRANSITION_QUEUE.indexOf(block) === -1
+	)
+		return false;
+	const owner = block.idState.renderOwner;
+	return (
+		hasQueuedTransitionCells(block) &&
+		(owner === undefined || owner.current !== block || owner.request === null) &&
+		(SCHEDULED_VISIBILITY_DRIVER === null ||
+			SCHEDULED_VISIBILITY_DRIVER.find(block, true, 'urgent') === null)
+	);
+}
+
+/**
+ * Choose how the drain renders a queued block: a split cue renders at urgent
+ * priority (renderTransitionCue). Otherwise the drain's own render consumes any
+ * transition work the block also has waiting.
+ */
+function splitTransitionCue(block: Block): typeof renderBlock | undefined {
+	if (TRANSITION_QUEUE.length === 0 || block.pendingMode !== 'transition') return;
+	if (splitsTransitionCue(block)) {
+		block.pendingMode = 'urgent';
+		// An urgent ancestor may already have rendered this cue in the drain.
+		return RENDERED_CUE_DRAIN === DRAIN_ID && RENDERED_CUES.indexOf(block) !== -1
+			? keepTransitionPending
+			: renderTransitionCue;
+	}
+	const index = TRANSITION_QUEUE.indexOf(block);
+	if (index !== -1) {
+		TRANSITION_QUEUE.splice(index, 1);
+		if (TRANSITION_QUEUE.length === 0) adoptTransitionQueue();
+	}
+}
+
+/** A split cue that already rendered keeps its block waiting for the transition task. */
+function keepTransitionPending(block: Block): void {
+	block.pending = true;
+	block.pendingMode = 'transition';
+}
+
+/** Staged cells of this block's flushed transitions that no render has consumed yet. */
+function hasQueuedTransitionCells(block: Block): boolean {
+	for (const entries of FLUSHED_TRANSITION_UPDATES) {
+		for (const update of entries) {
+			if (update.block !== block || update.superseded) continue;
+			const cell = update.state ?? update.reducer;
+			if (cell === undefined || cell.renderTransition !== undefined) return true;
+		}
+	}
+	return false;
+}
+
+/**
+ * Render a split pending cue (splitTransitionCue) over the block's committed
+ * cells, as an urgent ancestor renders a child whose transition is queued, then
+ * leave the block pending at transition priority for the task. React likewise
+ * renders `isPending` in an urgent lane and the transition's own updates later.
+ */
+function renderTransitionCue(block: Block): void {
+	const render: UrgentTransitionRender = {
+		pendingDeferred: block.pendingDeferred,
+		queueEpoch: QUEUE_REINDEX_EPOCH,
+		cells: [],
+	};
+	block.pendingDeferred = false;
+	beginUrgentTransitionRender(block, render);
+	try {
+		renderBlock(block);
+	} finally {
+		endUrgentTransitionRender(block, render);
+	}
 }
 
 function scheduleTransitionTask(): void {
@@ -7700,6 +7828,8 @@ function adoptTransitionQueue(): void {
 	transitionTask = 0;
 	for (let i = 0; i < TRANSITION_QUEUE.length; i++) QUEUE.push(TRANSITION_QUEUE[i]);
 	TRANSITION_QUEUE.length = 0;
+	// Rendered-cue marks only matter while their blocks wait; release the blocks.
+	RENDERED_CUES.length = 0;
 	const followups = TRANSITION_FOLLOWUPS;
 	if (followups !== null) {
 		TRANSITION_FOLLOWUPS = null;
@@ -7722,6 +7852,9 @@ function afterTransitionFlush(callback: () => void): void {
 // for the render-phase-update loop guard. 25 matches React's cap.
 let DRAIN_ID = 0;
 const RENDER_PHASE_UPDATE_LIMIT = 25;
+// Split cues (splitTransitionCue) an urgent ancestor rendered during drain RENDERED_CUE_DRAIN.
+let RENDERED_CUE_DRAIN = 0;
+const RENDERED_CUES: Block[] = [];
 
 function belongsToBlockTree(block: Block, root: Block): boolean {
 	for (let current: Block | null = block; current !== null; current = current.parentBlock) {
@@ -7931,6 +8064,8 @@ function drainQueue(): { err: any } | null {
 		}
 		const crossRenderUpdate = block.crossRenderUpdate;
 		block.crossRenderUpdate = false;
+		// A pending cue whose transition work waits for the task renders alone.
+		const render = TRANSITION_TASK_DRIVER?.splitCue(block) ?? renderBlock;
 		const visibilityDriver = SCHEDULED_VISIBILITY_DRIVER;
 		const visibilityOwner =
 			visibilityDriver === null
@@ -8002,7 +8137,7 @@ function drainQueue(): { err: any } | null {
 						const mode = block.pendingMode ?? 'urgent';
 						block.pendingMode = null;
 						request(mode);
-					} else renderBlock(block);
+					} else render(block);
 				}
 			} finally {
 				if (transitionRoot !== null) transitionRoot.end(attempt);
@@ -11805,18 +11940,19 @@ interface UrgentTransitionRender {
 
 /** Expose committed cells while an urgent ancestor traverses queued transition work. */
 function beginUrgentTransitionRender(block: Block, render: UrgentTransitionRender): void {
-	const slots = new Map<TransitionActionSlot<any>, number>();
+	const cells = render.cells;
 	for (const entries of FLUSHED_TRANSITION_UPDATES) {
 		for (const update of entries) {
 			if (update.block !== block || update.superseded) continue;
-			const previous = slots.get(update.slot);
-			if (previous !== undefined) {
+			// A block has few staged cells, so a scan beats allocating a slot index.
+			let previous = 0;
+			while (previous < cells.length && cells[previous].update.slot !== update.slot) previous++;
+			if (previous < cells.length) {
 				// State/reducer entries retain their preceding operation chain. Plain
 				// deferred cells still need the earliest committed value below.
-				render.cells[previous].update = update;
+				cells[previous].update = update;
 			} else {
-				slots.set(update.slot, render.cells.length);
-				render.cells.push({
+				cells.push({
 					update,
 					baseValue: update.baseValue,
 					value: update.slot.value,
@@ -11826,8 +11962,12 @@ function beginUrgentTransitionRender(block: Block, render: UrgentTransitionRende
 		}
 	}
 	for (const cell of render.cells) {
-		cell.hook = beginUrgentTransitionCell(cell.update);
-		if (cell.hook === null) cell.update.slot.value = cell.baseValue;
+		const hook = beginUrgentTransitionCell(cell.update);
+		// A render already consumed this hook queue, so its value is committed.
+		if (hook === null && (cell.update.state !== undefined || cell.update.reducer !== undefined))
+			continue;
+		cell.hook = hook;
+		if (hook === null) cell.update.slot.value = cell.baseValue;
 	}
 }
 
@@ -11845,7 +11985,9 @@ function endUrgentTransitionRender(block: Block, render: UrgentTransitionRender)
 			cell.update.slot.value = cell.value;
 	}
 	if (block.disposed || (block.pending && block.pendingMode === 'urgent')) return;
-	if (render.cells.length !== 0 && render.cells.every((cell) => cell.update.superseded)) return;
+	let live = render.cells.length === 0;
+	for (let i = 0; !live && i < render.cells.length; i++) live = !render.cells[i].update.superseded;
+	if (!live) return;
 	block.pending = true;
 	block.pendingMode = 'transition';
 	block.pendingDeferred = render.pendingDeferred;
@@ -11853,6 +11995,15 @@ function endUrgentTransitionRender(block: Block, render: UrgentTransitionRender)
 	// Its old queue position is otherwise retained, so ordinary cascades need no
 	// membership scan or extra queue entry.
 	if (render.queueEpoch !== QUEUE_REINDEX_EPOCH && !QUEUE.includes(block)) QUEUE.push(block);
+	// This render published the pending cue of a block whose transition waits for
+	// the task, so the block's own queue entry in this drain need not render it again.
+	if (TRANSITION_QUEUE.length !== 0 && TRANSITION_QUEUE.indexOf(block) !== -1) {
+		if (RENDERED_CUE_DRAIN !== DRAIN_ID) {
+			RENDERED_CUE_DRAIN = DRAIN_ID;
+			RENDERED_CUES.length = 0;
+		}
+		RENDERED_CUES.push(block);
+	}
 }
 
 function renderBlockInner(block: Block): true | undefined {

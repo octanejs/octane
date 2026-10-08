@@ -3,11 +3,18 @@ import { act, createRoot, flushSync, startTransition } from '../src/index.js';
 import {
 	ActionProbe,
 	HeldPendingPanel,
+	HeldPendingTabs,
 	OptimisticProbe,
+	OptimisticTabs,
 	PendingPanel,
+	PendingTabs,
+	PendingTabsPanel,
+	PendingTransitionInput,
 	StateProbe,
+	type TabsControls,
 	TransitionInput,
 	ViewTransitionPair,
+	ViewTransitionTabs,
 } from './_fixtures/transition-flush-task.tsrx';
 import { installViewTransitionMocks } from './conformance/_helpers/view-transition-mocks';
 
@@ -336,6 +343,303 @@ describe('pending cues commit before the transition they announce', () => {
 
 		expect(log).toEqual(['0/0', '0/1', 'task', '1/1']);
 		expect(container.textContent).toBe('1/1');
+	});
+});
+
+function mountTabs(
+	options: {
+		onPress?: (controls: TabsControls, log: string[]) => void;
+		exposePanel?: (setValue: (value: number) => void) => void;
+	} = {},
+) {
+	const log: string[] = [];
+	let controls!: TabsControls;
+	const { root, container } = mountWith(
+		options.exposePanel === undefined ? PendingTabs : PendingTabsPanel,
+		{
+			expose: (next: TabsControls) => (controls = next),
+			exposePanel: options.exposePanel!,
+			onCommit: (entry: string) => log.push(entry),
+			onPress:
+				options.onPress === undefined
+					? undefined
+					: (next: TabsControls) => options.onPress!(next, log),
+		},
+	);
+	log.length = 0;
+	return {
+		root,
+		container,
+		log,
+		controls: () => controls,
+		click: () => (container.querySelector('button') as HTMLButtonElement).click(),
+		text: () => container.querySelector('button')!.textContent,
+	};
+}
+
+/** The screen at the next two host-task boundaries, where a browser could paint. */
+function recordFrames(read: () => string | null | undefined): string[] {
+	const frames: string[] = [];
+	postTask(() => {
+		frames.push(read() ?? '');
+		postTask(() => frames.push(read() ?? ''));
+	});
+	return frames;
+}
+
+/** Commits up to a task marker, then whether every later commit shows `prefix`. */
+function splitAtTask(log: string[], prefix: string): { before: string[]; after: boolean } {
+	const index = log.indexOf('task');
+	const after = log.slice(index + 1);
+	return {
+		before: log.slice(0, index + 1),
+		after: after.length > 0 && after.every((entry) => entry.startsWith(prefix)),
+	};
+}
+
+describe('a pending cue in the component that holds the transition update', () => {
+	// The canonical useTransition pattern keeps `isPending` and the state the
+	// transition sets in one component. React commits the pending cue with the
+	// previous state, then renders the transition in a later Scheduler task, so
+	// the browser can paint the cue first. The falling edge of `isPending` follows
+	// the transition's render within that same task.
+
+	it('commits the cue with the previous state and renders the transition in a later task', async () => {
+		const tabs = mountTabs();
+		const frames = recordFrames(tabs.text);
+		postTask(() => tabs.log.push('task'));
+
+		tabs.click();
+		await untilTasks(() => frames.length === 2);
+
+		expect(frames).toEqual(['a pending', 'b idle']);
+		expect(splitAtTask(tabs.log, 'b ')).toEqual({
+			before: ['a pending', 'task'],
+			after: true,
+		});
+		expect(tabs.log.at(-1)).toBe('b idle');
+	});
+
+	it('also holds back the transition when it was waiting before the cue', async () => {
+		const tabs = mountTabs();
+		await Promise.resolve();
+		const frames = recordFrames(tabs.text);
+
+		startTransition(() => tabs.controls().setTab('b'));
+		tabs.controls().start(() => {});
+		await untilTasks(() => frames.length === 2);
+
+		expect(frames).toEqual(['a pending', 'b idle']);
+		expect(tabs.log[0]).toBe('a pending');
+	});
+
+	it('renders several transitions on the same state together in the task', async () => {
+		const tabs = mountTabs({
+			onPress: (controls) => {
+				controls.start(() => controls.setTab('b'));
+				controls.start(() => controls.setTab((tab) => `${tab}c`));
+				controls.start(() => controls.setCount(1));
+			},
+		});
+		const frames = recordFrames(tabs.text);
+
+		tabs.click();
+		await untilTasks(() => frames.length === 2);
+
+		expect(frames).toEqual(['a pending', 'bc1 idle']);
+		expect(tabs.log[0]).toBe('a pending');
+		expect(tabs.log.slice(1).every((entry) => entry.startsWith('bc1 '))).toBe(true);
+	});
+
+	it('renders a sibling that shares the transition in the same task', async () => {
+		let setPanel!: (value: number) => void;
+		const tabs = mountTabs({
+			exposePanel: (next) => (setPanel = next),
+			onPress: (controls, log) => {
+				postTask(() => log.push('task'));
+				controls.start(() => {
+					controls.setTab('b');
+					setPanel(1);
+				});
+			},
+		});
+
+		tabs.click();
+		await untilTasks(() => tabs.log.includes('b idle'));
+
+		expect(splitAtTask(tabs.log, '').before).toEqual(['a pending', 'task']);
+		expect(tabs.log.slice(tabs.log.indexOf('task') + 1)).toContain('panel 1');
+		expect(tabs.container.textContent).toBe('b idlepanel 1');
+	});
+
+	it('rebases an urgent update that arrives while the transition waits', async () => {
+		const tabs = mountTabs();
+		postTask(() => tabs.log.push('task'));
+
+		tabs.click();
+		await flushMicrotasks();
+		expect(tabs.log).toEqual(['a pending']);
+
+		// The urgent update renders the waiting transition with it, applying the
+		// transition's update first, as React's rebasing does.
+		tabs.controls().setTab((tab) => `${tab}!`);
+		await untilTasks(() => tabs.log.includes('task'));
+
+		expect(tabs.log).toEqual(['a pending', 'b! pending', 'b! idle', 'task']);
+		expect(tabs.text()).toBe('b! idle');
+	});
+
+	it('keeps a transition-committed value in a later cue', async () => {
+		let setPanel!: (value: number) => void;
+		const tabs = mountTabs({ exposePanel: (next) => (setPanel = next) });
+		await Promise.resolve();
+
+		// The sibling keeps the first transition waiting while an urgent update
+		// takes this component's share of it.
+		startTransition(() => {
+			tabs.controls().setTab('b');
+			setPanel(1);
+		});
+		tabs.controls().setCount(1);
+		await flushMicrotasks();
+		expect(tabs.text()).toBe('b1 idle');
+
+		tabs.log.length = 0;
+		tabs.controls().start(() => tabs.controls().setCount(2));
+		await untilTasks(() => tabs.log.includes('b2 idle'));
+
+		// The cue shows the urgent render's committed tab, not the value before it.
+		expect(tabs.log[0]).toBe('b1 pending');
+		expect(tabs.container.textContent).toBe('b2 idlepanel 1');
+	});
+
+	it('keeps the previous content when the transition suspends after its cue', async () => {
+		const log: string[] = [];
+		let resolve!: (value: string) => void;
+		const next = new Promise<string>((done) => (resolve = done));
+		const initial = Object.assign(Promise.resolve('one'), { status: 'fulfilled', value: 'one' });
+		const { container } = mountWith(HeldPendingTabs, {
+			initial,
+			next,
+			expose: () => {},
+			onCommit: (entry: string) => log.push(entry),
+		});
+		const frames = recordFrames(() => container.textContent);
+
+		(container.querySelector('button') as HTMLButtonElement).click();
+		await untilTasks(() => frames.length === 2);
+
+		expect(frames).toEqual(['pendingone', 'pendingone']);
+
+		resolve('two');
+		await untilTasks(() => container.textContent === 'idletwo');
+		expect(container.textContent).toBe('idletwo');
+		expect(log).not.toContain('loading');
+	});
+
+	it('shows an optimistic value with the previous state, then the transition in a task', async () => {
+		const log: string[] = [];
+		const { container } = mountWith(OptimisticTabs, {
+			onCommit: (entry: string) => log.push(entry),
+		});
+		const frames = recordFrames(() => container.textContent);
+
+		(container.querySelector('button') as HTMLButtonElement).click();
+		await untilTasks(() => frames.length === 2);
+
+		expect(frames).toEqual(['0/1', '1/1']);
+		expect(log.slice(0, 2)).toEqual(['0/0', '0/1']);
+		expect(log.at(-1)).toBe('1/1');
+	});
+
+	it('keeps an async Action staged until it settles', async () => {
+		let open!: () => void;
+		const gate = new Promise<void>((done) => (open = done));
+		const tabs = mountTabs({
+			onPress: (controls) =>
+				controls.start(async () => {
+					controls.setTab('b');
+					await gate;
+				}),
+		});
+
+		tabs.click();
+		await untilTasks(() => false);
+		expect(tabs.log).toEqual(['a pending']);
+
+		postTask(() => tabs.log.push('task'));
+		open();
+		await untilTasks(() => tabs.log.includes('b idle'));
+		expect(splitAtTask(tabs.log, 'b ')).toEqual({
+			before: ['a pending', 'task'],
+			after: true,
+		});
+	});
+
+	it('is drained by flushSync together with its cue', () => {
+		const tabs = mountTabs();
+
+		tabs.click();
+		flushSync(() => {});
+
+		expect(tabs.text()).toBe('b pending');
+	});
+
+	it('is drained by an awaited act()', async () => {
+		const tabs = mountTabs();
+
+		await act(async () => tabs.click());
+
+		expect(tabs.text()).toBe('b idle');
+		expect(tabs.log.at(-1)).toBe('b idle');
+	});
+
+	it('drops the waiting transition when the component unmounts before its task', async () => {
+		const errors = vi.spyOn(console, 'error').mockImplementation(() => {});
+		const tabs = mountTabs();
+
+		tabs.click();
+		await flushMicrotasks();
+		expect(tabs.log).toEqual(['a pending']);
+		tabs.root.unmount();
+		await untilTasks(() => false);
+
+		expect(tabs.log).toEqual(['a pending']);
+		expect(tabs.container.textContent).toBe('');
+		expect(errors).not.toHaveBeenCalled();
+		errors.mockRestore();
+	});
+
+	it('animates only the transition, with its types, in a view transition', async () => {
+		const vt = installViewTransitionMocks();
+		try {
+			const types: string[][] = [];
+			const { container } = mountWith(ViewTransitionTabs, {
+				onUpdate: (next: string[]) => types.push(next),
+			});
+
+			(container.querySelector('button') as HTMLButtonElement).click();
+			await flushMicrotasks();
+			expect(container.textContent).toBe('pendinga');
+			expect(vt.calls).toHaveLength(0);
+
+			await untilTasks(() => container.textContent === 'idlebbbb');
+			expect(vt.calls).toHaveLength(1);
+			expect(types).toEqual([['tabs']]);
+		} finally {
+			vt.restore();
+		}
+	});
+
+	it('commits a controlled input edit and its transition in the input event', () => {
+		const { container } = mountWith(PendingTransitionInput, {});
+		const input = container.querySelector('input') as HTMLInputElement;
+
+		input.value = 'x';
+		input.dispatchEvent(new Event('input', { bubbles: true }));
+
+		expect(input.value).toBe('x');
+		expect(container.querySelector('p')!.textContent).toBe('x pending');
 	});
 });
 
