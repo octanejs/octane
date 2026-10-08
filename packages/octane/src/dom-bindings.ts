@@ -135,7 +135,12 @@ export type BindingScalarChannels = readonly [
 	accepts: (binding: BindingOperation) => boolean,
 	normalize: (binding: BindingOperation, value: unknown) => string | null,
 	/** Returns the value left in the DOM, which the legacy handoff publishes. */
-	write: (node: Element, binding: BindingOperation, value: string | null) => string | null,
+	write: (
+		node: Element,
+		binding: BindingOperation,
+		value: string | null,
+		previous?: BindingValue,
+	) => string | null,
 ];
 
 /** @internal Whole styles carry canonical snapshots; scalar channels remain strings. */
@@ -232,39 +237,50 @@ function assertBindingRoot(root: Element, descriptor: CompiledBindings<unknown>)
 	return root;
 }
 
+/** No child, or one: a Text node or the <font> wrapper Chrome Translate puts in its place. */
+function isTextLeaf(node: Element): boolean {
+	const first = node.firstChild;
+	return (
+		first === null ||
+		(!first.nextSibling && (first.nodeType === 3 || (first as Element).localName === 'font'))
+	);
+}
+
 function resolveFixedNodes(root: Element, descriptor: CompiledBindings<unknown>): Element[] {
 	assertBindingRoot(root, descriptor);
 	const nodes: Element[] = [];
 	const childIndices: number[] = [];
+	// Each parent's next unclaimed child. Walking siblings keeps validation O(1)
+	// per node; counting a live child list is not.
+	const cursors: Array<ChildNode | null> = [];
 	for (let i = 0; i < descriptor.nodes.length; i++) {
-		const [parent, tag, namespace, children, , text] = descriptor.nodes[i]!;
-		const node =
-			i === 0
-				? parent === -1
-					? root
-					: undefined
-				: parent >= 0 && parent < i && descriptor.nodes[parent]![3] !== null
-					? nodes[parent]?.children[childIndices[parent]++]
-					: undefined;
+		const [parent, tag, namespace, children, openChildren, text] = descriptor.nodes[i]!;
+		// An opaque or text parent's cursor is null, and an unvisited parent has none.
+		const node = (i === 0 ? (parent === -1 ? root : undefined) : cursors[parent]) as
+			Element | null | undefined;
 		if (
-			node === undefined ||
-			descriptor.nodes[i]![4] === true ||
+			node == null ||
+			openChildren === true ||
 			node.localName !== tag ||
 			node.namespaceURI !== namespaces[namespace] ||
-			(text
-				? node.childNodes.length > 1 || (node.firstChild !== null && node.firstChild.nodeType !== 3)
-				: children !== null &&
-					(node.childNodes.length !== children || node.children.length !== children))
+			(text && !isTextLeaf(node))
 		) {
 			throw new Error(formatClientError(318));
 		}
+		if (i !== 0) {
+			cursors[parent] = node.nextSibling;
+			childIndices[parent]++;
+		}
 		nodes.push(node);
 		childIndices.push(0);
+		cursors.push(text || children === null ? null : node.firstChild);
 	}
 	for (let i = 0; i < nodes.length; i++) {
 		if (childIndices[i] !== (descriptor.nodes[i]![3] ?? 0)) {
 			throw new Error(formatClientError(319));
 		}
+		// A child the server topology does not have.
+		if (cursors[i] !== null) throw new Error(formatClientError(318));
 	}
 	return nodes;
 }
@@ -304,6 +320,9 @@ function resolveAddressedNodes(root: Element, descriptor: CompiledBindings<unkno
 		current = current.nextElementSibling;
 	}
 	const childCounts = new Array<number>(descriptor.nodes.length).fill(0);
+	// A closed parent's next unclaimed child; undefined for open, opaque and text
+	// children. Walking siblings keeps validation O(1) per node.
+	const cursors: Array<ChildNode | null | undefined> = [];
 	for (let i = 0; i < descriptor.nodes.length; i++) {
 		const [parent, tag, namespace, children, openChildren, text] = descriptor.nodes[i]!;
 		const node = nodes[i];
@@ -315,25 +334,26 @@ function resolveAddressedNodes(root: Element, descriptor: CompiledBindings<unkno
 				? parent !== -1 || node !== root
 				: parent < 0 ||
 					parent >= i ||
-					descriptor.nodes[parent]![3] === null ||
 					node.parentElement !== nodes[parent] ||
-					(descriptor.nodes[parent]![4] !== true &&
-						nodes[parent]!.children[childCounts[parent]!] !== node)) ||
+					// A parent without a cursor claims no children.
+					(descriptor.nodes[parent]![4] !== true && cursors[parent] !== node)) ||
 			(openChildren && children === null) ||
-			(text
-				? node.childNodes.length > 1 || (node.firstChild !== null && node.firstChild.nodeType !== 3)
-				: children !== null &&
-					!openChildren &&
-					(node.childNodes.length !== children || node.children.length !== children))
+			(text && !isTextLeaf(node))
 		) {
 			throw new Error(formatClientError(321));
 		}
-		if (parent !== -1) childCounts[parent]++;
+		if (parent !== -1) {
+			childCounts[parent]++;
+			if (cursors[parent] !== undefined) cursors[parent] = node.nextSibling;
+		}
+		cursors.push(text || children === null || openChildren ? undefined : node.firstChild);
 	}
 	for (let i = 0; i < descriptor.nodes.length; i++) {
 		if (childCounts[i] !== (descriptor.nodes[i]![3] ?? 0)) {
 			throw new Error(formatClientError(322));
 		}
+		// A child the server topology does not have.
+		if (cursors[i]) throw new Error(formatClientError(321));
 	}
 	return nodes;
 }
@@ -380,12 +400,19 @@ function writeFixedScalar(
 	node: Element,
 	binding: BindingOperation,
 	value: string | null,
+	previous?: BindingValue,
 ): string | null {
 	const name = binding[2];
 	if (binding[1] === 'text') {
 		const text = node.firstChild;
+		const current = text?.nodeValue;
 		if (text === null) node.appendChild(node.ownerDocument.createTextNode(value!));
-		else if (text.nodeValue !== value) text.nodeValue = value;
+		else if (current !== value) {
+			if (current !== null) text.nodeValue = value;
+			// A translated leaf's <font> has no nodeValue. It survives the channel's
+			// first write, then is replaced once the value changes.
+			else if (previous !== undefined) node.textContent = value;
+		}
 	} else if (value === null) {
 		if (node.hasAttribute(name)) node.removeAttribute(name);
 	} else if (node.getAttribute(name) !== value) {
@@ -430,6 +457,7 @@ function write(
 	node: Element,
 	binding: BindingOperation,
 	value: string | null,
+	previous?: BindingValue,
 ): string | null | void {
 	const name = binding[2];
 	if (binding[1] === 'classToken') {
@@ -456,7 +484,7 @@ function write(
 			if (style.getPropertyValue(name) !== text || style.getPropertyPriority(name) !== priority)
 				style.setProperty(name, text, priority);
 		}
-	} else return writeFixedScalar(node, binding, value);
+	} else return writeFixedScalar(node, binding, value, previous);
 }
 
 export { normalize as __normalizeBinding, write as __writeBinding };
@@ -701,14 +729,16 @@ export function __adoptBindings<Props>(
 				preparedControls!.get(i)!.commit();
 				continue;
 			}
-			if (next[i] === previous[i]) continue;
+			const prepared = next[i]!;
+			const last = previous[i];
+			if (prepared === last) continue;
 			const binding = bindings[i]!;
-			if (binding[1] === 'classToken') previous[i] = next[i]!;
+			if (binding[1] === 'classToken') previous[i] = prepared;
 			let written: string | null | void = undefined;
 			if (binding[1] === 'styleObject') {
 				const projection = projections?.get(i);
-				if (projection) projection.writeStyle(i, next[i]!);
-				else signalConnections!.get(i)!.write!(next[i]);
+				if (projection) projection.writeStyle(i, prepared);
+				else signalConnections!.get(i)!.write!(prepared);
 			} else if (binding[1] === 'classGroup') preparedGroups!.get(i)!.commit();
 			else if (
 				(binding[1] === 'styleProperty' || binding[1] === 'styleAttribute') &&
@@ -718,10 +748,10 @@ export function __adoptBindings<Props>(
 				let style = styles.get(i);
 				if (!style)
 					styles.set(i, (style = __createBindingStyleRestoration(nodes[binding[0]]!, binding)));
-				style.write(next[i] as string | null);
-			} else written = write(nodes[binding[0]]!, binding, next[i] as string | null);
+				style.write(prepared as string | null);
+			} else written = write(nodes[binding[0]]!, binding, prepared as string | null, last);
 			if (!disposed) {
-				previous[i] = next[i]!;
+				previous[i] = prepared;
 				// Only fixed scalar, URL and style channels participate in this legacy
 				// handoff, publishing the value left in the DOM. New grouped/control
 				// channels keep the native lease protocol.
@@ -1238,11 +1268,13 @@ export function __adoptScalarBindings<Props>(
 			position++
 		) {
 			const i = indices ? indices[position]! : position;
-			if (next[i] === previous[i]) continue;
+			const value = next[i]!;
+			const last = previous[i];
+			if (value === last) continue;
 			const binding = bindings[i]!;
-			const published = writeChannel(nodes[binding[0]]!, binding, next[i]!);
+			const published = writeChannel(nodes[binding[0]]!, binding, value, last);
 			if (!disposed) {
-				previous[i] = next[i];
+				previous[i] = value;
 				const node = owned[i]![0];
 				let claims = domBindingClaims.get(node);
 				if (claims === undefined) domBindingClaims.set(node, (claims = new Map()));
