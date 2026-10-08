@@ -7,8 +7,7 @@
     "octane-tsc": "./bin.mjs"
   },
   "dependencies": {
-    "jsonc-parser": "3.3.1",
     "octane": "workspace:*",
-    "typescript": "catalog:native"
+    "typescript-native": "catalog:native"
   }
 }

@@ -11,7 +11,10 @@
     "allowSyntheticDefaultImports": true,
     "skipLibCheck": true,
     "strict": true,
-    "jsxImportSource": "@octanejs/opentui/intrinsics"
+    "jsxImportSource": "@octanejs/opentui/intrinsics",
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "types": ["node"]
   },
   "include": ["./src/"],
   "exclude": ["node_modules", "dist"]

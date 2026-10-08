@@ -12,6 +12,12 @@ import { cleanup } from './pure';
 import { getIsOctaneActEnvironment, setOctaneActEnvironment } from './act-environment';
 
 type TestHook = (callback: () => void) => void;
+
+// `process` is declared here rather than taken from @types/node: this module
+// ships as source, so it compiles in the consumer's program, which a browser
+// application builds without Node types.
+declare const process: { env?: { RTL_SKIP_AUTO_CLEANUP?: string } };
+
 const globals = globalThis as {
 	afterEach?: TestHook;
 	teardown?: TestHook;

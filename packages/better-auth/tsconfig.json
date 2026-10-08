@@ -11,7 +11,9 @@
     "verbatimModuleSyntax": true,
     "skipLibCheck": true,
     "types": [],
-    "strict": true
+    "strict": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true
   },
   "include": ["./src/"],
   "exclude": ["node_modules", "dist", "tests"]

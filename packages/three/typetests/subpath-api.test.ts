@@ -44,6 +44,18 @@ const intrinsicMesh: IntrinsicMesh = { position: [1, 2, 3] };
 const runtimeMesh: RuntimeMesh = intrinsicMesh;
 const rootMesh: RootMesh = runtimeMesh;
 const intrinsicMeshAgain: IntrinsicMesh = rootMesh;
+// A keyed `@for` row places its key on the row's root, which may be a component.
+const rowAttributes: IntrinsicJSX.IntrinsicAttributes = { key: 'row' };
+// Composing an authored ref with a spread that carries none leaves an absent
+// entry in the ref array; attachment skips it.
+const composedRef: publicApi.ThreeRef<THREE.Group> = [
+	undefined,
+	null,
+	(group: THREE.Group | null) => void group,
+	{ current: null },
+];
+// @ts-expect-error A ref array entry is still a ref.
+const invalidComposedRef: publicApi.ThreeRef<THREE.Group> = ['group'];
 const constructedCameraOptions: CreateThreeTestRendererOptions = {
 	camera: new THREE.PerspectiveCamera(),
 };
@@ -62,6 +74,9 @@ void threeRenderer;
 void threeRendererBoundaries;
 void threeRendererRules;
 void intrinsicMeshAgain;
+void rowAttributes;
+void composedRef;
+void invalidComposedRef;
 void constructedCameraOptions;
 void declarativeCameraOptions;
 void (undefined as unknown as MockEventData);

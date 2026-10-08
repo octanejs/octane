@@ -29,7 +29,7 @@
       "arch": "any",
       "packageManager": "pnpm@12.9.1",
       "lockfile": "pnpm-lock.yaml",
-      "lockfileSha256": "84dbefa8929419194a46ef5ec966ae8459aa05f40399e583828134ccc8121aad"
+      "lockfileSha256": "2d8be78f1c5ba8a69b7eaecf1cf864b7de1256a5347e10091b82b66fd0b318a4"
     }
   },
   "lanes": [
@@ -299,7 +299,7 @@
         {
           "path": "packages/three/typetests/subpath-api.test.ts",
           "role": "support",
-          "sha256": "9e83adc4cc2fef155fa32f24a193ca453736a2a70348a5badc2f5f3d0875a1de"
+          "sha256": "653286f90e45ed269849efaa8fdbe64151eba24027b8e42c07a976ed5c113746"
         }
       ]
     }

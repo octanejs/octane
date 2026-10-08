@@ -13,7 +13,7 @@ It does **not** replace `@octanejs/vite-plugin`. Astro still owns routing, pages
 ## Install
 
 ```bash
-pnpm add octane @octanejs/astro @tsrx/oxc@0.18.0
+pnpm add octane @octanejs/astro @tsrx/oxc@0.20.0
 ```
 
 ## Setup

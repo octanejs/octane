@@ -31,6 +31,18 @@ import {
 	StagedTemplateApp,
 } from './_fixtures/view-transition-features.tsrx';
 
+/** Wait for a host task posted now, after every task the runtime posted before it. */
+function nextTask(): Promise<void> {
+	return new Promise((resolve) => {
+		const channel = new MessageChannel();
+		channel.port1.onmessage = () => {
+			channel.port1.close();
+			resolve();
+		};
+		channel.port2.postMessage(null);
+	});
+}
+
 function evalServer(source: string, filename: string): Record<string, any> {
 	return loadCompiledFixtureSource(source, {
 		id: filename,
@@ -542,8 +554,8 @@ describe('ViewTransition features', () => {
 		expect(vt.calls).toHaveLength(0);
 		expect(container.querySelector('div')?.textContent).toBe('Short');
 
-		// A delegated click commits in its microtask batch, which routes the
-		// transition through startViewTransition. Hold the first transition's
+		// A delegated click's transition flushes in a later host task (#1864), which
+		// routes it through startViewTransition. Hold the first transition's
 		// `finished` promise open so the second click's batch lands while it is in
 		// flight and exercises the controller's in-flight path instead of repeating
 		// the idle case.
@@ -563,9 +575,11 @@ describe('ViewTransition features', () => {
 		const button = container.querySelector('button')!;
 		button.click();
 		await Promise.resolve();
+		expect(vt.calls).toHaveLength(0);
+		await nextTask();
 		expect(vt.calls).toHaveLength(1);
 		button.click();
-		await Promise.resolve();
+		await nextTask();
 		// The second transition waits for the first to finish rather than
 		// interrupting it.
 		expect(vt.calls).toHaveLength(1);

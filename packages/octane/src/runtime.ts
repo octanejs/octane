@@ -306,7 +306,6 @@ import {
 	type SignalHandle,
 	type SignalOwner,
 	type ScopeSeed,
-	type SignalOwnerIdentity,
 	type SignalRendererOwnerIdentity,
 	type WritableSignal,
 } from './signals/types.js';
@@ -1633,6 +1632,7 @@ function scheduleNativeRead(target: Block): void {
 		scheduleRender(
 			target,
 			inFlush,
+			false,
 			nativeProducerPublication && !inFlush && !inCommitCallback() && _dispatchDepth === 0,
 		);
 	} finally {
@@ -1694,7 +1694,13 @@ function currentSignalDeclarationStage(declaring?: number): SignalDeclarationSta
 function ensureNativeReadDriver(): NativeReadDriver {
 	if (NATIVE_READ_DRIVER !== null) return NATIVE_READ_DRIVER;
 	installNativeSignalActionExtension();
-	TASK_FLUSH = scheduleTaskFlush;
+	// Native producers share the landed host-task queue without installing
+	// the transition root or offscreen-rendering capabilities.
+	TRANSITION_TASK_DRIVER ??= {
+		queue: queueTransitionBlock,
+		adopt: adoptTransitionQueue,
+		upgrade: upgradeTransitionBlock,
+	};
 	registerSignalDeclarationStage(currentSignalDeclarationStage);
 	NATIVE_READ_DRIVER = createNativeReadDriver({
 		capture: () => WIP_CAPTURE,
@@ -2650,7 +2656,8 @@ function runEffectCleanupCallback(
 }
 
 // ---------------------------------------------------------------------------
-// Scheduler — urgent microtask batches and coalesced transition host tasks
+// Scheduler — React-18-shaped automatic batching: urgent work flushes in a
+// microtask, transition work in a later host task (TRANSITION_QUEUE)
 // ---------------------------------------------------------------------------
 
 const QUEUE: Block[] = [];
@@ -2658,95 +2665,6 @@ const QUEUE: Block[] = [];
 // another drain. Readers use this epoch to discard cursors into the old layout.
 let QUEUE_REINDEX_EPOCH = 0;
 let scheduled = false;
-// Transition work shares one host task. An urgent microtask may consume the
-// same queue first; leave the posted callback armed so later work can reuse it.
-// Native producer publications share this admission without changing Suspense priority.
-let taskScheduled = false;
-let TASK_FLUSH: (() => void) | null = null;
-let inDeferredTask = false;
-let inUrgentFlush = false;
-let transitionCompletions: Array<() => void> | null = null;
-let urgentActionCue = false;
-
-function scheduleFlush(background = false): void {
-	if (syncFlush) return;
-	if (background && !inDeferredTask && TASK_FLUSH !== null) {
-		TASK_FLUSH();
-	} else if (!scheduled) {
-		scheduled = true;
-		queueMicrotask(flushScheduled);
-	}
-}
-
-/** Resuming an existing queue must preserve the priority of its pending work. */
-function scheduleQueuedFlush(): void {
-	if (TRANSITION_ROOT_DRIVER !== null) TRANSITION_ROOT_DRIVER.resume();
-	else scheduleFlush();
-}
-
-function scheduleTaskFlush(): void {
-	if (taskScheduled || scheduled) return;
-	// Native ViewTransition owns its capture boundary. Start that controller
-	// before an unrelated next-frame update can consume its animation batch.
-	// Async results must coalesce before their first capture too. Unsupported
-	// hosts and work behind an active capture likewise use our task.
-	if (ASYNC_TRANSITION_COUNT === 0 && VIEW_TRANSITION_DRIVER?.wouldWrap() === true) {
-		scheduleFlush();
-		return;
-	}
-	taskScheduled = true;
-	postHostTask(flushTask);
-}
-
-function scheduleTransitionQueue(): void {
-	for (let i = 0; i < QUEUE.length; i++) {
-		if (QUEUE[i].pending && QUEUE[i].pendingMode !== 'transition') {
-			scheduleFlush();
-			return;
-		}
-	}
-	scheduleFlush(true);
-}
-
-function flushScheduled(): void {
-	// flushSync can consume an urgent queue before this callback runs. Do not
-	// let that stale callback pull a newer transition back into a microtask.
-	if (!scheduled) return;
-	if (TRANSITION_ROOT_DRIVER !== null) TRANSITION_ROOT_DRIVER.flushUrgent();
-	else flush();
-}
-
-/** Pending cues use transition render semantics but urgent animation admission. */
-function flushUrgent(): void {
-	inUrgentFlush = urgentActionCue;
-	urgentActionCue = false;
-	try {
-		flush();
-	} finally {
-		inUrgentFlush = false;
-	}
-}
-
-function flushTask(): void {
-	taskScheduled = false;
-	flush();
-}
-
-function takeTransitionCompletions(): Array<() => void> | null {
-	urgentActionCue = false;
-	const completions = transitionCompletions;
-	transitionCompletions = null;
-	return completions;
-}
-
-function hasTransitionCompletions(): boolean {
-	return transitionCompletions !== null;
-}
-
-/** Release work after its render has had the opportunity to acquire a hold. */
-function finishTransitionCompletions(completions: Array<() => void>): void {
-	for (let i = 0; i < completions.length; i++) queueMicrotask(completions[i]);
-}
 let syncFlush = false; // flushSync sets this to drain the queue synchronously
 // True while a flush (drainQueue/commitEffects) is on the stack. A flushSync
 // that lands during it — a handler's own flushSync, or maybeFlushDiscrete when a
@@ -2759,6 +2677,39 @@ let syncFlush = false; // flushSync sets this to drain the queue synchronously
 // from inside a lifecycle method… cannot flush when already rendering"): run
 // the callback, let the ambient flush pick up whatever it scheduled.
 let inFlush = false;
+// Transition-priority renders and native producer refreshes wait here for a host
+// task of their own instead of the microtask flush (#1864, G1), as React renders
+// a transition lane in a Scheduler task. The urgent commit before them can then
+// paint and the host can deliver input first, and a burst of ready
+// continuations (an Action backlog, a transition started after each `await`)
+// renders once rather than once per microtask hop. The microtask flush never
+// drains this queue; the task, flushSync and act() do. An urgent update to a
+// waiting block moves it onto the microtask flush.
+const TRANSITION_QUEUE: Block[] = [];
+// The live posted task's id, or 0. A flush that absorbs the queue retires that
+// task, so transitions scheduled afterwards post a task of their own rather than
+// joining one posted before input that arrived in between.
+let transitionTask = 0;
+let transitionTaskIds = 0;
+// Callbacks that must run after the posted task's flush (afterTransitionFlush).
+let TRANSITION_FOLLOWUPS: Array<() => void> | null = null;
+// Set while a posted transition task runs (the transition flush, or the
+// useDeferredValue swap). That task already follows the urgent commit, so
+// transition work it schedules, including from the passive effects drained
+// before its render, joins its own flush rather than posting another task.
+let TRANSITION_TASK_ACTIVE = false;
+
+/**
+ * The task path, installed by transitions or native component readers. An
+ * application using neither capability does not retain the queue or its poster.
+ */
+interface TransitionTaskDriver {
+	queue: typeof queueTransitionBlock;
+	adopt: typeof adoptTransitionQueue;
+	upgrade: typeof upgradeTransitionBlock;
+}
+
+let TRANSITION_TASK_DRIVER: TransitionTaskDriver | null = null;
 
 // ---------------------------------------------------------------------------
 // Transitions — React 18 priority lanes, simplified to two levels.
@@ -2812,12 +2763,6 @@ function ensureOffscreenSwapDriver(): void {
  * application therefore does not retain it.
  */
 interface TransitionRootDriver {
-	// Task/completion machinery belongs to transition users, not ordinary roots.
-	resume: typeof scheduleTransitionQueue;
-	flushUrgent: typeof flushUrgent;
-	takeCompletions: typeof takeTransitionCompletions;
-	finishCompletions: typeof finishTransitionCompletions;
-	hasCompletions: typeof hasTransitionCompletions;
 	begin: typeof beginTransitionAttempt;
 	end: typeof endTransitionAttempt;
 	beginUrgent: typeof beginUrgentTransitionRender;
@@ -2836,7 +2781,6 @@ interface TransitionRootDriver {
 let TRANSITION_ROOT_DRIVER: TransitionRootDriver | null = null;
 
 function ensureTransitionSwapDriver(): void {
-	TASK_FLUSH = scheduleTaskFlush;
 	// Written out rather than calling ensureOffscreenSwapDriver, so applications
 	// that start transitions but render no Suspense pending arm carry one install.
 	TRANSITION_SWAP_DRIVER ??= {
@@ -2845,11 +2789,6 @@ function ensureTransitionSwapDriver(): void {
 		splice: spliceWipCapture,
 	};
 	TRANSITION_ROOT_DRIVER ??= {
-		resume: scheduleTransitionQueue,
-		flushUrgent,
-		takeCompletions: takeTransitionCompletions,
-		finishCompletions: finishTransitionCompletions,
-		hasCompletions: hasTransitionCompletions,
 		begin: beginTransitionAttempt,
 		end: endTransitionAttempt,
 		beginUrgent: beginUrgentTransitionRender,
@@ -2863,6 +2802,11 @@ function ensureTransitionSwapDriver(): void {
 		hasHeld: hasHeldTransitionUpdate,
 		heldUpdate: getHeldTransitionUpdate,
 		rebaseHeld: rebaseHeldTransitionUpdate,
+	};
+	TRANSITION_TASK_DRIVER ??= {
+		queue: queueTransitionBlock,
+		adopt: adoptTransitionQueue,
+		upgrade: upgradeTransitionBlock,
 	};
 }
 
@@ -2956,7 +2900,12 @@ function retireNativeTransitionBlock(block: Block): void {
 }
 
 function scheduleNativeTransitionFlush(): void {
-	scheduleFlush(true);
+	if (syncFlush) return;
+	if (!inFlush && CURRENT_BLOCK === null && !TRANSITION_TASK_ACTIVE) scheduleTransitionTask();
+	else if (!scheduled) {
+		scheduled = true;
+		queueMicrotask(flush);
+	}
 }
 
 /**
@@ -6833,7 +6782,10 @@ function vtPruneStaticDimensions(effect: KeyframeEffect, owner: Document): void 
 }
 
 function vtScheduleQueuedWork(): void {
-	if (QUEUE.length > 0 || ROOT_RENDER_TRANSACTIONS.length > 0) scheduleQueuedFlush();
+	if ((QUEUE.length > 0 || ROOT_RENDER_TRANSACTIONS.length > 0) && !scheduled) {
+		scheduled = true;
+		queueMicrotask(flush);
+	}
 }
 
 /** Native slots are shared with streamed reveals, using the actual native handles. */
@@ -6998,37 +6950,13 @@ function vtInterrupt(): void {
 	vtInterruptOwners(null);
 }
 
-/** Is this an animation-eligible transition batch? A cue alone never animates. */
+/** Is every queued block scheduled at transition priority? (Empty → false.) */
 function queueAllTransition(): boolean {
 	if (QUEUE.length === 0) return false;
-	let cueOnly = inUrgentFlush && NATIVE_TRANSITION_DRIVER?.hasWork() !== true;
 	for (let i = 0; i < QUEUE.length; i++) {
-		const block = QUEUE[i];
-		if (block.pendingMode !== 'transition') return false;
-		if (
-			cueOnly &&
-			(block.idState.renderOwner?.request != null || (block.kind === 'root' && !block.mounted))
-		)
-			cueOnly = false;
+		if (QUEUE[i].pendingMode !== 'transition') return false;
 	}
-	if (!cueOnly) return true;
-	// A pending cue can share a block or queue with an explicit transition.
-	// Reuse its retained receipts rather than giving the cue a second queue or
-	// upgrading the render priority (which would lose Suspense hold semantics).
-	for (const entries of FLUSHED_TRANSITION_UPDATES) {
-		for (const entry of entries) {
-			if (
-				!entry.superseded &&
-				!entry.block.disposed &&
-				entry.block.pending &&
-				(entry.state !== undefined || entry.reducer !== undefined
-					? entry.slot.renderTransition === entry
-					: !Object.is(entry.slot.value, entry.baseValue))
-			)
-				return true;
-		}
-	}
-	return false;
+	return true;
 }
 
 function vtHasActiveHandles(): boolean {
@@ -7131,17 +7059,21 @@ function ensureViewTransitionDriver(): ViewTransitionDriver {
 				return false;
 			// A resume commits pending render work in its layout drain too. Flush
 			// the previous commit's passives before choosing either owners or waits,
-			// then include every sibling update those passives scheduled.
+			// then include every sibling update those passives scheduled. Transitions
+			// waiting for their task join the commit that drains here, so one view
+			// transition captures them; they are adopted only by a drain that runs.
 			const passivesSettled = vtDrainPassivesBeforeCapture();
 			const capture = VT_CAPTURE;
 			const resumed = getBlocks?.() ?? [];
-			const blocks = QUEUE.length === 0 ? resumed : [...new Set([...resumed, ...QUEUE])];
+			const queued = TRANSITION_QUEUE.length === 0 ? QUEUE : QUEUE.concat(TRANSITION_QUEUE);
+			const blocks = queued.length === 0 ? resumed : [...new Set([...resumed, ...queued])];
 			const owners = vtQueuedOwners(blocks);
 			if (!passivesSettled || (QUEUE.length > 0 && !queueAllTransition())) {
 				// An urgent sibling keeps its priority. A still-open passive cascade
 				// can touch further owners, so only that fallback interrupts all scopes.
 				if (passivesSettled) vtInterruptOwners(owners);
 				else vtInterrupt();
+				adoptTransitionQueue();
 				work();
 				flushWork();
 				return true;
@@ -7161,6 +7093,7 @@ function ensureViewTransitionDriver(): ViewTransitionDriver {
 			if (!vtNativeAvailable(owners)) return false;
 			vtFlush(
 				() => {
+					adoptTransitionQueue();
 					work();
 					if (QUEUE.length > 0 || ROOT_RENDER_TRANSACTIONS.length > 0) flushWork();
 				},
@@ -7594,8 +7527,21 @@ function warnCrossComponentRenderUpdate(target: Block, source: Block): void {
 	);
 }
 
-/** `flushed` preserves nested-update accounting; `background` changes admission, not render mode. */
-function scheduleRender(block: Block, flushed?: boolean, background = false): void {
+/**
+ * `flushed`: a signal notification delivered during a flush (see scheduleNativeRead).
+ * `cue`: useTransition or useActionState raising isPending, or useOptimistic
+ * showing a value. These renders are the transition's in-flight surface, which
+ * React renders urgently: they keep the microtask flush at the priority computed
+ * here, so they commit before the transition work they announce.
+ * `background`: a native producer refresh shares task admission without
+ * changing its existing render/Suspense priority.
+ */
+function scheduleRender(
+	block: Block,
+	flushed?: boolean,
+	cue?: boolean,
+	background?: boolean,
+): void {
 	if (block.disposed) return;
 	if (process.env.NODE_ENV !== 'production' && CURRENT_EFFECT_PHASE === INSERTION) {
 		console.error(
@@ -7659,10 +7605,11 @@ function scheduleRender(block: Block, flushed?: boolean, background = false): vo
 	const deferred = DEFERRED_SPAWN || (renderPhaseSelf && block.currentRenderDeferred);
 	DEFERRED_LAYOUT_DRIVER?.schedulePending(block);
 	if (block.pending) {
+		if (!background && TRANSITION_QUEUE.length !== 0)
+			TRANSITION_TASK_DRIVER!.upgrade(block, mode, cue);
 		if (mode === 'urgent') {
 			block.pendingMode = 'urgent';
 			block.pendingDeferred = false;
-			if (!syncFlush) scheduleFlush(background);
 		}
 		return;
 	}
@@ -7715,8 +7662,80 @@ function scheduleRender(block: Block, flushed?: boolean, background = false): vo
 	block.pending = true;
 	block.pendingMode = mode;
 	block.pendingDeferred = deferred;
+	if ((background || mode === 'transition') && TRANSITION_TASK_DRIVER?.queue(block, cue)) return;
 	QUEUE.push(block);
-	if (!syncFlush) scheduleFlush(background || mode === 'transition');
+	if (syncFlush) return;
+	if (!scheduled) {
+		scheduled = true;
+		queueMicrotask(flush);
+	}
+}
+
+/**
+ * Hold a render for the shared host task (see TRANSITION_QUEUE).
+ * Work scheduled inside a render or flush belongs to the drain already on the
+ * stack, and a pending cue keeps the microtask flush.
+ */
+function queueTransitionBlock(block: Block, cue?: boolean): boolean {
+	if (syncFlush || inFlush || CURRENT_BLOCK !== null || cue || TRANSITION_TASK_ACTIVE) return false;
+	TRANSITION_QUEUE.push(block);
+	scheduleTransitionTask();
+	return true;
+}
+
+/** An urgent update or pending cue moves a waiting block onto the microtask flush. */
+function upgradeTransitionBlock(block: Block, mode: 'urgent' | 'transition', cue?: boolean): void {
+	// flushSync adopts the whole queue itself. Outside it, a queued block is
+	// still pending, including producer refreshes with urgent render semantics.
+	if ((mode !== 'urgent' && !cue) || syncFlush) return;
+	const index = TRANSITION_QUEUE.indexOf(block);
+	if (index === -1) return;
+	TRANSITION_QUEUE.splice(index, 1);
+	QUEUE.push(block);
+	if (!scheduled) {
+		scheduled = true;
+		queueMicrotask(flush);
+	}
+	// Nothing is left for the task: retire it, and run its follow-ups after this flush.
+	if (TRANSITION_QUEUE.length === 0) adoptTransitionQueue();
+}
+
+function scheduleTransitionTask(): void {
+	if (transitionTask !== 0) return;
+	const id = (transitionTask = ++transitionTaskIds);
+	postHostTask(() => {
+		if (transitionTask !== id) return;
+		TRANSITION_TASK_ACTIVE = true;
+		try {
+			adoptTransitionQueue();
+			flush();
+		} finally {
+			TRANSITION_TASK_ACTIVE = false;
+		}
+	});
+}
+
+/** Move waiting transition renders onto the flush about to run. */
+function adoptTransitionQueue(): void {
+	transitionTask = 0;
+	for (let i = 0; i < TRANSITION_QUEUE.length; i++) QUEUE.push(TRANSITION_QUEUE[i]);
+	TRANSITION_QUEUE.length = 0;
+	const followups = TRANSITION_FOLLOWUPS;
+	if (followups !== null) {
+		TRANSITION_FOLLOWUPS = null;
+		// Queued before the caller drains, so they run right after its commit.
+		for (let i = 0; i < followups.length; i++) queueMicrotask(followups[i]);
+	}
+}
+
+/**
+ * Run `callback` after the flush that renders the transition work scheduled so
+ * far, as the microtask after it. While a transition task is posted, that is
+ * the task's flush rather than the next microtask flush.
+ */
+function afterTransitionFlush(callback: () => void): void {
+	if (transitionTask !== 0) (TRANSITION_FOLLOWUPS ??= []).push(callback);
+	else queueMicrotask(callback);
 }
 
 // Monotonic id per drainQueue pass, paired with Block.drainStamp/drainRenders
@@ -8081,21 +8100,24 @@ function flush(): void {
 	// Re-entrancy backstop (see `inFlush`): a flush landing inside an active
 	// flush re-arms the scheduler instead of draining over the outer walk.
 	if (inFlush) {
-		if (QUEUE.length > 0 || ROOT_RENDER_TRANSACTIONS.length > 0) scheduleQueuedFlush();
+		if ((QUEUE.length > 0 || ROOT_RENDER_TRANSACTIONS.length > 0) && !scheduled) {
+			scheduled = true;
+			queueMicrotask(flush);
+		}
 		return;
 	}
 	// A discrete event can synchronously drain work after its microtask was
 	// armed. An empty render queue alone is not enough: first mounts/hydration
 	// still need their commit, and refs/Fragment bindings are intentionally not
 	// included in hasPendingWork(). Retained Actions and ViewTransition also
-	// carry flush-finalization work outside those queues.
+	// carry flush-finalization work outside those queues. Transition renders
+	// waiting for their task are not this flush's work.
 	if (
-		!hasPendingWork() &&
+		!hasScheduledWork() &&
 		refDetachQueue.length === 0 &&
 		refAttachQueue.length === 0 &&
 		activeFragments.size === 0 &&
 		FLUSHED_TRANSITION_UPDATES.length === 0 &&
-		TRANSITION_ROOT_DRIVER?.hasCompletions() !== true &&
 		VIEW_TRANSITION_DRIVER === null
 	) {
 		if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__)
@@ -8505,9 +8527,10 @@ function drainLayoutUpdates(pendingError: { err: any } | null): { err: any } | n
  */
 function flushWork(): void {
 	inFlush = true;
-	const completions = TRANSITION_ROOT_DRIVER?.takeCompletions();
 	// Any retained sync-transition updates belong to the drain below. Whatever
-	// a hold did not consume is finished with once the flush completes.
+	// a hold did not consume is finished with once the flush completes, unless
+	// their renders still wait for the transition task: an urgent flush before
+	// it must leave them for that render's hold.
 	const clearRetainedTransitionUpdates = FLUSHED_TRANSITION_UPDATES.length > 0;
 	// addTransitionType types belong to the transition batch this drain commits:
 	// an UNWRAPPED drain (no boundary, no startViewTransition, flushSync) that
@@ -8536,8 +8559,10 @@ function flushWork(): void {
 		if (pendingError !== null) throw pendingError.err;
 	} finally {
 		inFlush = false;
-		if (completions != null) TRANSITION_ROOT_DRIVER!.finishCompletions(completions);
-		if (clearRetainedTransitionUpdates || FLUSHED_TRANSITION_UPDATES.length > 0)
+		if (
+			(clearRetainedTransitionUpdates || FLUSHED_TRANSITION_UPDATES.length > 0) &&
+			TRANSITION_QUEUE.length === 0
+		)
 			FLUSHED_TRANSITION_UPDATES.length = 0;
 		if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__)
 			__devtoolsNotifyFlush();
@@ -9346,17 +9371,17 @@ export function flushSync<T>(fn: () => T): T {
 	syncFlush = true;
 	try {
 		const result = runNativeBatch(fn);
+		// flushSync drains both priorities, including transitions waiting for their task.
+		TRANSITION_TASK_DRIVER?.adopt();
 		// `inFlush` guards only the DRAIN below, not fn(): a nested flushSync
 		// inside fn still flushes inline (React isn't "rendering" during the
 		// callback), while one landing inside the drain defers (guard above).
 		inFlush = true;
-		scheduled = false;
 		// The drain is a commit of its own, outside the phase of an effect that
 		// called flushSync: its ref callbacks and store checks are not passive work.
 		const effectPhase = CURRENT_EFFECT_PHASE;
 		CURRENT_EFFECT_PHASE = -1;
 		let pendingError: { err: any } | null = null;
-		const completions = TRANSITION_ROOT_DRIVER?.takeCompletions();
 		try {
 			// Drain anything scheduled by fn (same depth-sorted, coalescing drain as flush()).
 			// Octane drains insertion + layout synchronously. Newly queued passive
@@ -9380,20 +9405,18 @@ export function flushSync<T>(fn: () => T): T {
 			}
 		} finally {
 			inFlush = false;
-			if (completions != null) TRANSITION_ROOT_DRIVER!.finishCompletions(completions);
-			// This drain consumed the retained cells just like flushWork. A later
-			// cue must not mistake them for a still-pending transition.
-			FLUSHED_TRANSITION_UPDATES.length = 0;
 			CURRENT_EFFECT_PHASE = effectPhase;
 			if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__)
 				__devtoolsNotifyFlush();
+		}
+		if ((QUEUE.length > 0 || ROOT_RENDER_TRANSACTIONS.length > 0) && !scheduled) {
+			scheduled = true;
+			queueMicrotask(flush);
 		}
 		if (pendingError !== null) throw pendingError.err;
 		return result;
 	} finally {
 		syncFlush = prevSync;
-		if (QUEUE.length > 0 || ROOT_RENDER_TRANSACTIONS.length > 0) scheduleQueuedFlush();
-		else if (TRANSITION_ROOT_DRIVER?.hasCompletions()) scheduleFlush(true);
 	}
 }
 
@@ -10096,7 +10119,8 @@ function ensureDeferredLayoutDriver(): void {
 				else if (PENDING_DEFERRED_LAYOUT?.pendingWork?.delete(block) && !scheduled) {
 					// The original microtask yielded for resources. A later write to
 					// that same pending block must arm a fresh interruption check.
-					scheduleQueuedFlush();
+					scheduled = true;
+					queueMicrotask(flush);
 				}
 				if (DEFERRED_LAYOUT_HELD_WORK?.delete(block)) QUEUE.push(block);
 			},
@@ -10642,11 +10666,17 @@ export function drainPassiveEffects(): void {
  * True if there's a queued render or any uncommitted effect. Used by `act`,
  * and exported (tier 2, binding infrastructure) so @octanejs/testing-library's
  * synchronous settle can loop to EXACT quiescence instead of a fixed bound.
- * Purely promise-driven work (use(promise), async transitions) and a
+ * A transition render waiting for its host task is pending: flushSync drains
+ * it. Purely promise-driven work (use(promise), async transitions) and a
  * useDeferredValue swap waiting for its host task are not "pending" by this
  * definition — they need `waitFor`/async `act`.
  */
 export function hasPendingWork(): boolean {
+	return TRANSITION_QUEUE.length > 0 || hasScheduledWork();
+}
+
+/** hasPendingWork() without the transition renders waiting for their task. */
+function hasScheduledWork(): boolean {
 	return (
 		QUEUE.length > 0 ||
 		ROOT_RENDER_TRANSACTIONS.length > 0 ||
@@ -10755,7 +10785,8 @@ function actCheckpoint(): Promise<void> {
  *  - ASYNC callback (returns a thenable) → awaited, then the scheduler is
  *    drained across microtask ticks until quiescent (renders, effects,
  *    microtask chains from `use(promise)` / transition retries, and
- *    useDeferredValue swaps, which wait for their own host task).
+ *    transition renders and useDeferredValue swaps, which wait for their own
+ *    host task).
  *
  * While the act() scope is active, scheduleRender's "update outside act(...)"
  * dev warning is suppressed (see `IS_OCTANE_ACT_ENVIRONMENT` and
@@ -10792,10 +10823,7 @@ export function act<T>(fn: () => T | Promise<T>): Promise<T> {
 				for (let i = 0; i < ACT_DRAIN_LIMIT; i++) {
 					await actCheckpoint();
 					throwPendingActErrors();
-					const hadWork =
-						hasPendingWork() ||
-						DEFERRED_SWAPS !== null ||
-						TRANSITION_ROOT_DRIVER?.hasCompletions() === true;
+					const hadWork = hasPendingWork() || DEFERRED_SWAPS !== null || transitionTask !== 0;
 					drainPassiveEffects();
 					if (!hadWork && !hasPendingWork()) return value;
 				}
@@ -10826,6 +10854,8 @@ export function act<T>(fn: () => T | Promise<T>): Promise<T> {
 			// callback synchronously, so this stays a synchronous drain; a REAL async
 			// startViewTransition under sync act() cannot be awaited here (use the
 			// async act form, which drains through the scheduled microtask flush).
+			// Transitions waiting for their task join this drain, wrapped or not.
+			TRANSITION_TASK_DRIVER?.adopt();
 			if (VIEW_TRANSITION_DRIVER?.wouldWrap() === true) flush();
 			else flushSync(() => {});
 			throwPendingActErrors();
@@ -10847,10 +10877,7 @@ export function act<T>(fn: () => T | Promise<T>): Promise<T> {
 			for (let i = 0; i < ACT_DRAIN_LIMIT; i++) {
 				await actCheckpoint();
 				throwPendingActErrors();
-				const hadWork =
-					hasPendingWork() ||
-					DEFERRED_SWAPS !== null ||
-					TRANSITION_ROOT_DRIVER?.hasCompletions() === true;
+				const hadWork = hasPendingWork() || DEFERRED_SWAPS !== null || transitionTask !== 0;
 				drainPassiveEffects();
 				if (!hadWork && !hasPendingWork()) return result as T;
 			}
@@ -13678,11 +13705,6 @@ function endUrgentTransitionCell(
 	for (let entry: TransitionActionUpdate<any> | undefined = update; entry; entry = entry.previous)
 		entry.baseValue = cell.value;
 }
-
-type AssertUseStateType<T extends true> = T;
-type _UseStateAcceptsNoArguments = AssertUseStateType<
-	typeof useState extends <T = undefined>() => StateTuple<T | undefined> ? true : false
->;
 
 /** Compiler-emitted useState variant for a tuple whose third member is observable. */
 export function __useStateWithGetter<T>(initial: T | (() => T), slot?: symbol): StateTuple<T>;
@@ -17564,14 +17586,15 @@ export const ErrorBoundary: ComponentBody<{
 
 /**
  * The virtual-TSX (IDE / tsrx-tsc) name for `@try { … } @catch (e) { … }`: the
- * shared tsrx transform's type-only output imports `TsrxErrorBoundary` from
- * 'octane' and emits the catch clause as `fallback={(error, _reset) => …}`.
- * Runtime compilation never references this name (`@try` lowers to `tryBlock`),
- * so this exists for TYPES: the function-typed `fallback` (unlike
- * `ErrorBoundary`'s renderable-or-render-prop union, which collapses to
- * `unknown`) gives the emitted arrow contextual parameter types, so authored
- * `@catch` bindings type-check under `noImplicitAny`. `content` is the
- * transform's expression-position prop form of children.
+ * shared tsrx transform's type-only output emits the catch clause as
+ * `fallback={(error, _reset) => …}`. Runtime compilation never references this
+ * name (`@try` lowers to `tryBlock`), so this exists for TYPES: the
+ * function-typed `fallback` (unlike `ErrorBoundary`'s renderable-or-render-prop
+ * union, which collapses to `unknown`) gives the emitted arrow contextual
+ * parameter types, so authored `@catch` bindings type-check under
+ * `noImplicitAny`. `content` is the transform's expression-position prop form of
+ * children. The virtual TSX now imports the renderer-neutral stand-in from
+ * `octane/tsrx-boundary`; this export remains for existing imports.
  */
 export const TsrxErrorBoundary = ErrorBoundary as unknown as (props: {
 	fallback?: (error: unknown, reset: () => void) => unknown;
@@ -30211,6 +30234,8 @@ function maybeFlushDiscrete(type: DelegatedEventType): void {
 			// it here meant the canonical onInput={() => startTransition(...)} pattern
 			// could never call document.startViewTransition. flush() also knows how to
 			// leave a second transition queued while an earlier one is still in flight.
+			// Transitions waiting for their task commit here too, before the restore.
+			TRANSITION_TASK_DRIVER?.adopt();
 			if (VIEW_TRANSITION_DRIVER?.queueAllTransition() === true) flush();
 			else flushSync(noop);
 		}
@@ -35992,18 +36017,8 @@ function iterableChildArray(value: any): any[] | null {
 // Flatten a descriptor's `children` (a single value, or a possibly-nested array —
 // `createElement` collapses positional children and `.map()` results into arrays)
 // into a flat list of renderable values, dropping empties (null/undefined/false/
-// true/'') which render nothing.
-function flattenDeoptChildren(out: any[], v: any): void {
-	if (v == null || v === false || v === true || v === '') return;
-	if (Array.isArray(v)) {
-		for (let i = 0; i < v.length; i++) flattenDeoptChildren(out, v[i]);
-		return;
-	}
-	out.push(v);
-}
-
-// flattenDeoptChildren + a parallel SLOT-SCOPED position key per kept child
-// (React identity semantics, same compound scheme as flattenChildItemsKeyed):
+// true/'') which render nothing, with a parallel SLOT-SCOPED position key per kept
+// child (React identity semantics, same compound scheme as flattenChildItemsKeyed):
 // a child keeps its top-level position as its implicit key even when EMPTY
 // siblings (`{cond && <input/>}` flipped off) render nothing — so a hole
 // going falsy never shifts the following siblings onto different DOM nodes
@@ -39939,8 +39954,6 @@ interface HmrMeta {
 	update(incoming: ComponentBody<any>): boolean;
 }
 
-type HmrWrapper = ComponentBody<any> & { [HMR]: HmrMeta };
-
 export function hmr<P>(fn: ComponentBody<P>): ComponentBody<P> {
 	const meta: HmrMeta = {
 		fn,
@@ -40613,7 +40626,10 @@ function endDetachedBoundaryRender(frame: RootRenderFrame | null): void {
 	if (ROOT_RENDER_TRANSACTION === null) commitRootRenders();
 	// A timeout or passive error can enter without any scheduled Block. Its
 	// captured ref/effect work still needs the existing commit drain to run.
-	scheduleFlush();
+	if (!syncFlush && !scheduled) {
+		scheduled = true;
+		queueMicrotask(flush);
+	}
 }
 
 // Single mutation point for boundary branches. The bare assignment is the hot
@@ -43586,8 +43602,14 @@ function runTransition(fn: () => void | Promise<unknown>, hook?: TransitionHookS
 		return;
 	}
 	if (result != null && typeof (result as { then?: unknown }).then === 'function') {
-		// Keep automatic post-await priority only while the Action is running.
-		// Rendering may wait for a task; that wait must not extend this window.
+		// React 19 Actions parity: an async callback returns a promise. Keep the
+		// transition pending until that promise settles — the awaited
+		// continuation (and any setters after `await`) resumes on a later
+		// microtask, AFTER a fixed queueMicrotask decrement would have already
+		// dropped isPending. Decrement exactly once on settle (fulfil OR reject).
+		// ASYNC_TRANSITION_COUNT stays elevated across the same window so setters
+		// fired after the `await` schedule at transition priority (TRANSITION_DEPTH
+		// is already 0 by then — the synchronous slice has returned).
 		ASYNC_TRANSITION_COUNT++;
 		let settled = false;
 		const settle = () => {
@@ -43595,33 +43617,35 @@ function runTransition(fn: () => void | Promise<unknown>, hook?: TransitionHookS
 			settled = true;
 			actionBatch.pendingActions--;
 			flushTransitionActionBatchIfReady(actionBatch);
-			// Clear optimistic state before rendering the completed result, while
-			// the async priority window still prevents an urgent upgrade.
+			// Notify pending listeners while the async priority window is still
+			// active, so their render cannot upgrade the just-promoted Action batch
+			// to urgent before a suspending transition render gets to hold its DOM.
 			tickTransitionCount(-1);
 			ASYNC_TRANSITION_COUNT--;
 			if (submitRec !== null) settleSubmitTransition(submitRec);
+			// The action window (may have) closed — apply queued requestFormReset()s.
 			flushFormResets();
-			(transitionCompletions ??= []).push(() => {
+			afterTransitionFlush(() => {
 				actionBatch.workComplete = true;
 				finishTransitionHookBatch(actionBatch);
 			});
-			scheduleFlush(true);
 		};
 		(result as Promise<unknown>).then(settle, (error) => {
 			settle();
 			reportTransitionError(error, hook);
 		});
 	} else {
-		// A synchronous transition's render may acquire a Suspense hold. Release
-		// its work count and pending cue only after that render has run.
-		(transitionCompletions ??= []).push(() => {
+		// Synchronous callback: decrement after the scheduler has had a chance to
+		// flush the queued renders this transition produced — if any of those
+		// renders held the transition open by suspending, they incremented the
+		// count themselves via handleSuspense, so the net count stays > 0.
+		afterTransitionFlush(() => {
 			tickTransitionCount(-1);
 			if (submitRec !== null) settleSubmitTransition(submitRec);
 			flushFormResets();
 			actionBatch.workComplete = true;
 			finishTransitionHookBatch(actionBatch);
 		});
-		scheduleFlush(true);
 	}
 }
 
@@ -43675,7 +43699,8 @@ export function useTransition(
 				try {
 					if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__)
 						__profileSchedule(block, 'transition-pending', slot);
-					scheduleRender(block);
+					// The rising edge is a pending cue; the falling edge follows the transition.
+					scheduleRender(block, false, pending);
 				} finally {
 					TRANSITION_LISTENER_PUBLISH_DEPTH--;
 				}
@@ -43756,14 +43781,8 @@ export function useActionState<S>(
 				if (!block.disposed) {
 					if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__)
 						__profileSchedule(block, 'action-state-pending', slot);
-					if (next) {
-						// Publish the cue promptly without upgrading sibling transition
-						// state in this block, which must retain its Suspense hold policy.
-						ensureTransitionSwapDriver();
-						if (!syncFlush && !inFlush) urgentActionCue = true;
-					}
-					scheduleRender(block);
-					if (next) scheduleFlush();
+					// The rising edge is a pending cue; the falling edge commits with the result.
+					scheduleRender(block, false, next);
 				}
 			}
 		};
@@ -43936,7 +43955,7 @@ export function useFormStatus(slot?: HookSlot): FormStatus {
 // addOptimistic should be called inside an Action.
 // ---------------------------------------------------------------------------
 
-interface OptimisticSlot<S, V> {
+interface OptimisticSlot<V> {
 	queue: V[];
 	add: (value: V) => void;
 	/**
@@ -43978,7 +43997,7 @@ export function useOptimistic<S, V = S>(
 	if (slot === undefined) missingSlot('useOptimistic');
 	const scope = CURRENT_SCOPE!;
 	const block = CURRENT_BLOCK!;
-	let s = scope.hooks?.get(slot) as OptimisticSlot<S, V> | undefined;
+	let s = scope.hooks?.get(slot) as OptimisticSlot<V> | undefined;
 	if (s === undefined) {
 		const clear = (): void => {
 			slotRef.armed = false;
@@ -43991,7 +44010,7 @@ export function useOptimistic<S, V = S>(
 				}
 			}
 		};
-		const slotRef: OptimisticSlot<S, V> = {
+		const slotRef: OptimisticSlot<V> = {
 			queue: [],
 			armed: false,
 			add: (value: V) => {
@@ -44018,7 +44037,7 @@ export function useOptimistic<S, V = S>(
 				if (!block.disposed) {
 					if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__)
 						__profileSchedule(block, 'optimistic', slot);
-					scheduleRender(block);
+					scheduleRender(block, false, true);
 				}
 			},
 		};
@@ -44107,12 +44126,12 @@ function runDeferredSwaps(): void {
 	DEFERRED_SWAPS = null;
 	if (slots === null) return;
 	// Every swap schedules its render here, so they all join the one flush
-	// that ends this task.
-	inDeferredTask = true;
+	// that ends this task rather than posting another.
+	TRANSITION_TASK_ACTIVE = true;
 	try {
 		for (let i = 0; i < slots.length; i++) swapDeferredValue(slots[i]);
 	} finally {
-		inDeferredTask = false;
+		TRANSITION_TASK_ACTIVE = false;
 	}
 }
 
@@ -50012,8 +50031,12 @@ function makeRoot(
 			if (mode === undefined && (TRANSITION_DEPTH > 0 || ASYNC_TRANSITION_COUNT > 0)) {
 				rootBlock.pending = true;
 				rootBlock.pendingMode = 'transition';
+				if (TRANSITION_TASK_DRIVER?.queue(rootBlock)) return;
 				QUEUE.push(rootBlock);
-				scheduleFlush(true);
+				if (!syncFlush && !scheduled) {
+					scheduled = true;
+					queueMicrotask(flush);
+				}
 				return;
 			}
 			const mountedRoot = rootBlock;
@@ -50050,7 +50073,10 @@ function makeRoot(
 			}
 			if (staged) deferRootReplacement(previousRoot!, container, oldFirst, oldLast);
 			// First render commits effects on next microtask flush.
-			scheduleFlush();
+			if (!syncFlush && !scheduled) {
+				scheduled = true;
+				queueMicrotask(flush);
+			}
 		} finally {
 			endRootRender(frame);
 			if (!inFlush && ROOT_RENDER_TRANSACTION === null) commitRootRenders();
@@ -50765,7 +50791,10 @@ function hydrateRootWithOutputHandler(
 		owner.retry = () => {
 			if (!rootBlock.disposed) scheduleRender(rootBlock);
 		};
-		scheduleFlush();
+		if (!syncFlush && !scheduled) {
+			scheduled = true;
+			queueMicrotask(flush);
+		}
 	};
 	// Only the first attempt has a hydrateRoot caller to receive a refused lease.
 	// A resumed or retried attempt reports it to the root instead.

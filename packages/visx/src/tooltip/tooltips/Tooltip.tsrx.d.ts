@@ -32,10 +32,10 @@ export type TooltipProps = {
     unstyled?: boolean;
 };
 export declare const defaultStyles: CSSProperties;
-declare const Tooltip: {
-    ({ className, top, left, offsetLeft, offsetTop, style, children, unstyled, applyPositionStyle, ref, ...restProps }: TooltipProps & Omit<Octane.HTMLAttributes<HTMLDivElement>, keyof TooltipProps> & {
-        ref?: Ref<HTMLDivElement>;
-    }): import("react").JSX.Element;
-    displayName: string;
-};
+declare function Tooltip({ className, top, left, offsetLeft, offsetTop, style, children, unstyled, applyPositionStyle, ref, ...restProps }: TooltipProps & Omit<Octane.HTMLAttributes<HTMLDivElement>, keyof TooltipProps> & {
+    ref?: Ref<HTMLDivElement>;
+}): import("react").JSX.Element;
+declare namespace Tooltip {
+    var displayName: string;
+}
 export default Tooltip;

@@ -1,5 +1,6 @@
-import { readFileSync, unlinkSync, writeFileSync } from 'node:fs';
-import { dirname, join, resolve } from 'node:path';
+import { cpSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { basename, dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { verifyReactResizablePanelsUpstream } from '../../../scripts/react-parity/react-resizable-panels-upstream-lib.mjs';
@@ -61,6 +62,26 @@ function verifyApi(
 	}
 }
 
+/**
+ * A copy of the inputs the verifiers read, at their repository paths. Negative
+ * controls weaken the copy: other parity tests read the real adapted suite
+ * concurrently, and must never observe a weakened file.
+ */
+function negativeControlRoot() {
+	const root = mkdtempSync(join(tmpdir(), 'rrp-negative-controls-'));
+	cpSync(packageRoot, join(root, 'packages/resizable-panels'), {
+		recursive: true,
+		filter: (source) => basename(source) !== 'node_modules',
+	});
+	const auditTests = join(repoRoot, 'scripts/react-parity');
+	for (const name of readdirSync(auditTests)) {
+		if (name.startsWith('react-resizable-panels-') && name.endsWith('.test.mjs')) {
+			cpSync(join(auditTests, name), join(root, 'scripts/react-parity', name));
+		}
+	}
+	return root;
+}
+
 function expectFailure(label, callback) {
 	try {
 		callback();
@@ -82,25 +103,26 @@ if (process.argv.includes('--negative-controls')) {
 	expectFailure('extra public type', function extraType() {
 		verifyApi({ ...api, types: [...api.types, 'WeakenedType'] });
 	});
-	const adaptedFile = join(packageRoot, 'tests/upstream/hooks/useId.test.ts');
-	const originalAdapted = readFileSync(adaptedFile);
-	const weakenedAdapted = `${originalAdapted.toString('utf8').replace(/\n\s*expect\([^;]+;/, '\n')}`;
+	const controlRoot = negativeControlRoot();
 	try {
+		const controlPackage = join(controlRoot, 'packages/resizable-panels');
+		const adaptedFile = join(controlPackage, 'tests/upstream/hooks/useId.test.ts');
+		const originalAdapted = readFileSync(adaptedFile);
+		const weakenedAdapted = `${originalAdapted.toString('utf8').replace(/\n\s*expect\([^;]+;/, '\n')}`;
 		writeFileSync(adaptedFile, weakenedAdapted);
 		expectFailure('deleted adapted assertion body', function deletedAssertion() {
-			verifyReactResizablePanelsUpstream(repoRoot);
+			verifyReactResizablePanelsUpstream(controlRoot);
 		});
-	} finally {
 		writeFileSync(adaptedFile, originalAdapted);
-	}
-	const extraAdaptedPath = join(packageRoot, 'tests/upstream/extra-unlisted.test.ts');
-	writeFileSync(extraAdaptedPath, "test('unlisted', () => {})\n");
-	try {
+		writeFileSync(
+			join(controlPackage, 'tests/upstream/extra-unlisted.test.ts'),
+			"test('unlisted', () => {})\n",
+		);
 		expectFailure('extra adapted upstream file', function extraAdaptedFile() {
-			verifyReactResizablePanelsTestClassifications(repoRoot);
+			verifyReactResizablePanelsTestClassifications(controlRoot);
 		});
 	} finally {
-		unlinkSync(extraAdaptedPath);
+		rmSync(controlRoot, { recursive: true, force: true });
 	}
 }
 

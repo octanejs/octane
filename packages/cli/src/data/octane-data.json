@@ -1290,6 +1290,19 @@
       "verified": "2026-09-12"
     },
     {
+      "name": "@octanejs/tanstack-query-devtools",
+      "version": "0.0.0",
+      "category": "Developer Tools",
+      "upstream": { "package": "@tanstack/react-query-devtools", "version": "5.102.8" },
+      "surface": "Complete published adapter surface: ReactQueryDevtools, ReactQueryDevtoolsPanel, the DevtoolsPanelOptions type, and the ./production entry, over the unchanged @tanstack/query-devtools core. All 37 upstream runtime registrations run unchanged against React and, with import rewrites only, against Octane.",
+      "divergences": [
+        "The devtools core instance is created in a lazy useState initializer instead of being constructed on every render.",
+        "Public prop types use Octane's CSSProperties and OctaneNode; element construction is authored in .tsrx."
+      ],
+      "ssr": "Supported and tested: both components render only their parent container through octane/server without a DOM; the core is constructed but never mounted server-side (mount is a client-only effect).",
+      "verified": "2026-09-30"
+    },
+    {
       "name": "@octanejs/tanstack-router",
       "version": "0.2.4",
       "category": "Routing",

@@ -879,8 +879,9 @@ export function App(props) @{
 		for (const mode of ['client', 'server'] as const) {
 			expect(() => compile(source, '/src/App.tsrx', { mode })).toThrow(
 				expect.objectContaining({
-					name: 'SyntaxError',
-					message: expect.stringContaining("'count'"),
+					name: 'Error',
+					code: 'TS2300',
+					message: "Identifier 'count' has already been declared",
 				}),
 			);
 		}

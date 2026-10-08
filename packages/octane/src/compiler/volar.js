@@ -86,17 +86,19 @@ import {
  * octane (we lower `@try`/`@pending` to `tryBlock` and fragments to
  * concrete templates), but the descriptor still needs a value because the
  * shared transform emits TSX-level `<Fragment>` / `<Suspense>` wrappers
- * when running in TSX mode. We point them at `octane` so editors at
- * least don't fail to resolve the imports; users won't actually see those
- * names in source. (Volar TSX is virtual — its imports never run.)
+ * when running in TSX mode. `@try`'s boundaries come from
+ * `octane/tsrx-boundary`, whose type-only stand-ins are valid components under
+ * every renderer's JSX; the fragment points at `octane` so editors at least
+ * don't fail to resolve the import. Users won't actually see those names in
+ * source. (Volar TSX is virtual — its imports never run.)
  */
 const OCTANE_PLATFORM = {
 	name: 'octane',
 	imports: {
 		fragment: 'octane',
-		suspense: 'octane',
+		suspense: 'octane/tsrx-boundary',
 		dynamic: 'octane',
-		errorBoundary: 'octane',
+		errorBoundary: 'octane/tsrx-boundary',
 		forOfIterableHelper: 'octane/tsrx-iterable',
 		// Host-element spreads in the virtual TSX lower to
 		// `__normalize_spread_props(...)`; the shared transform imports the
@@ -362,7 +364,7 @@ function selectOctaneTransform(ast) {
 		(statement) =>
 			statement.type === 'ImportDeclaration' &&
 			statement.importKind !== 'type' &&
-			statement.source.value === OCTANE_PLATFORM.imports.suspense &&
+			statement.source.value === DOM_RENDERER_MODULE &&
 			statement.specifiers.some(
 				(specifier) =>
 					specifier.type === 'ImportSpecifier' &&

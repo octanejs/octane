@@ -153,7 +153,7 @@ Returns a skill by name. Bundled skills (shipped with this package):
 When running inside the octane monorepo, the skills from `.rulesync/skills` are
 also available: `authoring-tsrx`, `octane-react-library-port`, `bug-hunter`,
 `create-a-pr`, `handle-issue`, `octane-core-extend`, `triage`,
-`performance-audit`. A test compares this map against the directory in both
+`performance-audit`, `perf-review`. A test compares this map against the directory in both
 directions, so a new skill cannot stay unreachable here. This tool reads the RuleSync source, and
 `pnpm rules:generate` writes the per-agent copies (`.claude/skills/`,
 `.github/skills/`, `.cursor/skills/`, `.gemini/skills/`) from the same text, so

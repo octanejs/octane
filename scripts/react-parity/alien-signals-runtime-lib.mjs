@@ -7,7 +7,13 @@
 import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
-import ts from 'typescript';
+import {
+	is,
+	NodeFlags,
+	parseSourceFile,
+	ScriptKind,
+	SyntaxKind,
+} from '../octane-tsc/native-syntax.mjs';
 
 const DISABLED_REGISTRATION =
 	/\b(?:fdescribe|fit|xdescribe|xit|xtest)(?:\s*\(|\.each\s*\()|\b(?:describe|it|test)\.(?:failing|fails|only|skip|todo)(?:\s*\(|\.each\s*\()/;
@@ -57,11 +63,11 @@ function stripSuitePrefix(fullName) {
 
 function isJsonStringifyCall(node) {
 	return (
-		ts.isCallExpression(node) &&
-		ts.isPropertyAccessExpression(node.expression) &&
-		ts.isIdentifier(node.expression.expression) &&
+		is.isCallExpression(node) &&
+		is.isPropertyAccessExpression(node.expression) &&
+		is.isIdentifier(node.expression.expression) &&
 		node.expression.expression.text === 'JSON' &&
-		ts.isIdentifier(node.expression.name) &&
+		is.isIdentifier(node.expression.name) &&
 		node.expression.name.text === 'stringify' &&
 		node.arguments[0] !== undefined
 	);
@@ -73,14 +79,14 @@ function evaluateLiteral(node, sourceFile) {
 		return evaluateLiteral(node.arguments[0], sourceFile);
 	}
 	if (
-		ts.isStringLiteral(node) ||
-		ts.isNoSubstitutionTemplateLiteral(node) ||
-		(typeof ts.isNumericLiteral === 'function' && ts.isNumericLiteral(node)) ||
-		ts.isPrefixUnaryExpression(node) ||
-		node.kind === ts.SyntaxKind.TrueKeyword ||
-		node.kind === ts.SyntaxKind.FalseKeyword ||
-		node.kind === ts.SyntaxKind.NullKeyword ||
-		node.kind === ts.SyntaxKind.UndefinedKeyword
+		is.isStringLiteral(node) ||
+		is.isNoSubstitutionTemplateLiteral(node) ||
+		(typeof is.isNumericLiteral === 'function' && is.isNumericLiteral(node)) ||
+		is.isPrefixUnaryExpression(node) ||
+		node.kind === SyntaxKind.TrueKeyword ||
+		node.kind === SyntaxKind.FalseKeyword ||
+		node.kind === SyntaxKind.NullKeyword ||
+		node.kind === SyntaxKind.UndefinedKeyword
 	) {
 		const text = node.getText(sourceFile).trim();
 		try {
@@ -90,7 +96,7 @@ function evaluateLiteral(node, sourceFile) {
 			return { kind: 'text', text: text.replace(/\s+/g, '') };
 		}
 	}
-	if (ts.isObjectLiteralExpression(node) || ts.isArrayLiteralExpression(node)) {
+	if (is.isObjectLiteralExpression(node) || is.isArrayLiteralExpression(node)) {
 		const text = node.getText(sourceFile);
 		try {
 			const value = Function(`"use strict"; return (${text});`)();
@@ -100,7 +106,7 @@ function evaluateLiteral(node, sourceFile) {
 		}
 	}
 	if (
-		ts.isIdentifier(node) &&
+		is.isIdentifier(node) &&
 		(node.text === 'undefined' || node.text === 'Infinity' || node.text === 'NaN')
 	) {
 		return { kind: 'value', value: Function(`"use strict"; return (${node.text});`)() };
@@ -169,11 +175,11 @@ function expandContract(contract) {
 }
 
 function callTitle(node) {
-	if (!ts.isCallExpression(node)) return null;
-	if (!ts.isIdentifier(node.expression)) return null;
+	if (!is.isCallExpression(node)) return null;
+	if (!is.isIdentifier(node.expression)) return null;
 	if (node.expression.text !== 'it' && node.expression.text !== 'test') return null;
 	const titleNode = node.arguments[0];
-	if (!titleNode || !ts.isStringLiteralLike(titleNode)) return null;
+	if (!titleNode || !is.isStringLiteralLikeNode(titleNode)) return null;
 	return {
 		title: titleNode.text,
 		body: node.arguments[1],
@@ -184,23 +190,23 @@ function callTitle(node) {
 function normalizeReceiver(node, sourceFile) {
 	if (node === undefined) return 'empty';
 	if (
-		ts.isStringLiteral(node) ||
-		ts.isNoSubstitutionTemplateLiteral(node) ||
-		(typeof ts.isNumericLiteral === 'function' && ts.isNumericLiteral(node)) ||
-		node.kind === ts.SyntaxKind.TrueKeyword ||
-		node.kind === ts.SyntaxKind.FalseKeyword ||
-		node.kind === ts.SyntaxKind.NullKeyword
+		is.isStringLiteral(node) ||
+		is.isNoSubstitutionTemplateLiteral(node) ||
+		(typeof is.isNumericLiteral === 'function' && is.isNumericLiteral(node)) ||
+		node.kind === SyntaxKind.TrueKeyword ||
+		node.kind === SyntaxKind.FalseKeyword ||
+		node.kind === SyntaxKind.NullKeyword
 	) {
 		return `literal:${node.getText(sourceFile).trim()}`;
 	}
 	if (
-		ts.isCallExpression(node) &&
-		ts.isIdentifier(node.expression) &&
+		is.isCallExpression(node) &&
+		is.isIdentifier(node.expression) &&
 		node.arguments.length === 0
 	) {
 		return `call:${node.expression.text}`;
 	}
-	if (ts.isPropertyAccessExpression(node) || ts.isElementAccessExpression(node)) {
+	if (is.isPropertyAccessExpression(node) || is.isElementAccessExpression(node)) {
 		const text = node.getText(sourceFile).replace(/\s+/g, '');
 		// `result.current`, a named handle's `hook.result.current`, and their
 		// tuple index or object member reads are the rendered hook surface.
@@ -209,7 +215,7 @@ function normalizeReceiver(node, sourceFile) {
 		}
 		if (text.endsWith('.textContent')) return 'surface';
 	}
-	if (ts.isIdentifier(node)) {
+	if (is.isIdentifier(node)) {
 		if (node.text === 'undefined') return 'literal:undefined';
 		return `id:${node.text}`;
 	}
@@ -259,13 +265,7 @@ function citationLineForCase(node, sourceFile) {
 }
 
 export function extractPristineCaseLines(source, fileName = 'pristine.ts') {
-	const sourceFile = ts.createSourceFile(
-		fileName,
-		source,
-		ts.ScriptTarget.Latest,
-		true,
-		ts.ScriptKind.TS,
-	);
+	const sourceFile = parseSourceFile(fileName, source, ScriptKind.TS);
 	const byTitle = new Map();
 	function visit(node) {
 		const titled = callTitle(node);
@@ -275,20 +275,14 @@ export function extractPristineCaseLines(source, fileName = 'pristine.ts') {
 			byTitle.set(titled.title, line);
 			return;
 		}
-		ts.forEachChild(node, visit);
+		node.forEachChild(visit);
 	}
 	visit(sourceFile);
 	return byTitle;
 }
 
 export function extractCaseAssertionContracts(source, fileName = 'suite.ts') {
-	const sourceFile = ts.createSourceFile(
-		fileName,
-		source,
-		ts.ScriptTarget.Latest,
-		true,
-		ts.ScriptKind.TS,
-	);
+	const sourceFile = parseSourceFile(fileName, source, ScriptKind.TS);
 	const cases = [];
 	function visit(node) {
 		const titled = callTitle(node);
@@ -296,16 +290,16 @@ export function extractCaseAssertionContracts(source, fileName = 'suite.ts') {
 			const contracts = [];
 			function visitAssertions(assertionNode) {
 				if (
-					ts.isCallExpression(assertionNode) &&
-					ts.isPropertyAccessExpression(assertionNode.expression) &&
-					ts.isIdentifier(assertionNode.expression.name) &&
+					is.isCallExpression(assertionNode) &&
+					is.isPropertyAccessExpression(assertionNode.expression) &&
+					is.isIdentifier(assertionNode.expression.name) &&
 					MATCHER_NAMES.has(assertionNode.expression.name.text)
 				) {
 					const matcher = assertionNode.expression.name.text;
 					const expectCall = assertionNode.expression.expression;
 					const receiverNode =
-						ts.isCallExpression(expectCall) &&
-						ts.isIdentifier(expectCall.expression) &&
+						is.isCallExpression(expectCall) &&
+						is.isIdentifier(expectCall.expression) &&
 						expectCall.expression.text === 'expect'
 							? expectCall.arguments[0]
 							: undefined;
@@ -315,7 +309,7 @@ export function extractCaseAssertionContracts(source, fileName = 'suite.ts') {
 					);
 					contracts.push(`${normalizeReceiver(receiverNode, sourceFile)}|${matcherContract}`);
 				}
-				ts.forEachChild(assertionNode, visitAssertions);
+				assertionNode.forEachChild(visitAssertions);
 			}
 			visitAssertions(titled.body);
 			cases.push({
@@ -325,7 +319,7 @@ export function extractCaseAssertionContracts(source, fileName = 'suite.ts') {
 			});
 			return;
 		}
-		ts.forEachChild(node, visit);
+		node.forEachChild(visit);
 	}
 	visit(sourceFile);
 	return cases;
@@ -342,12 +336,12 @@ export function extractReferencedFixtureIds(adaptedSource) {
 }
 
 function isResultCurrentAccess(node) {
-	if (ts.isElementAccessExpression(node)) {
+	if (is.isElementAccessExpression(node)) {
 		return isResultCurrentAccess(node.expression);
 	}
 	if (
-		!ts.isPropertyAccessExpression(node) ||
-		!ts.isIdentifier(node.name) ||
+		!is.isPropertyAccessExpression(node) ||
+		!is.isIdentifier(node.name) ||
 		node.name.text !== 'current'
 	) {
 		return false;
@@ -355,10 +349,10 @@ function isResultCurrentAccess(node) {
 	const owner = node.expression;
 	// `result.current` or a named renderHook handle's `hook.result.current`.
 	return (
-		(ts.isIdentifier(owner) && owner.text === 'result') ||
-		(ts.isPropertyAccessExpression(owner) &&
-			ts.isIdentifier(owner.expression) &&
-			ts.isIdentifier(owner.name) &&
+		(is.isIdentifier(owner) && owner.text === 'result') ||
+		(is.isPropertyAccessExpression(owner) &&
+			is.isIdentifier(owner.expression) &&
+			is.isIdentifier(owner.name) &&
 			owner.name.text === 'result')
 	);
 }
@@ -369,13 +363,13 @@ function isResultCurrentAccess(node) {
  */
 function isRecordedSetterLookup(node, pushedArrays) {
 	let arrayName = null;
-	if (ts.isElementAccessExpression(node) && ts.isIdentifier(node.expression)) {
+	if (is.isElementAccessExpression(node) && is.isIdentifier(node.expression)) {
 		arrayName = node.expression.text;
 	} else if (
-		ts.isCallExpression(node) &&
-		ts.isPropertyAccessExpression(node.expression) &&
-		ts.isIdentifier(node.expression.expression) &&
-		ts.isIdentifier(node.expression.name) &&
+		is.isCallExpression(node) &&
+		is.isPropertyAccessExpression(node.expression) &&
+		is.isIdentifier(node.expression.expression) &&
+		is.isIdentifier(node.expression.name) &&
 		node.expression.name.text === 'at'
 	) {
 		arrayName = node.expression.expression.text;
@@ -384,22 +378,22 @@ function isRecordedSetterLookup(node, pushedArrays) {
 }
 
 function functionLikeOf(node) {
-	if (ts.isFunctionExpression(node) || ts.isArrowFunction(node) || ts.isFunctionDeclaration(node)) {
+	if (is.isFunctionExpression(node) || is.isArrowFunction(node) || is.isFunctionDeclaration(node)) {
 		return node;
 	}
 	return null;
 }
 
 function isTrueLiteral(node) {
-	return node !== undefined && node.kind === ts.SyntaxKind.TrueKeyword;
+	return node !== undefined && node.kind === SyntaxKind.TrueKeyword;
 }
 
 function isFalseLiteral(node) {
-	return node !== undefined && node.kind === ts.SyntaxKind.FalseKeyword;
+	return node !== undefined && node.kind === SyntaxKind.FalseKeyword;
 }
 
 function isUnconditionalTerminator(statement) {
-	return ts.isReturnStatement(statement) || ts.isThrowStatement(statement);
+	return is.isReturnStatement(statement) || is.isThrowStatement(statement);
 }
 
 /**
@@ -408,11 +402,11 @@ function isUnconditionalTerminator(statement) {
  */
 function bindingNameDeclares(nameNode, name) {
 	if (nameNode === undefined || nameNode === null) return false;
-	if (ts.isIdentifier(nameNode)) return nameNode.text === name;
-	if (ts.isBindingElement(nameNode)) return bindingNameDeclares(nameNode.name, name);
-	if (ts.isObjectBindingPattern(nameNode) || ts.isArrayBindingPattern(nameNode)) {
+	if (is.isIdentifier(nameNode)) return nameNode.text === name;
+	if (is.isBindingElement(nameNode)) return bindingNameDeclares(nameNode.name, name);
+	if (is.isObjectBindingPattern(nameNode) || is.isArrayBindingPattern(nameNode)) {
 		for (const element of nameNode.elements) {
-			if (ts.isOmittedExpression(element)) continue;
+			if (is.isOmittedExpression(element)) continue;
 			if (bindingNameDeclares(element, name)) return true;
 		}
 	}
@@ -420,18 +414,18 @@ function bindingNameDeclares(nameNode, name) {
 }
 
 function isVarDeclarationList(list) {
-	return (list.flags & ts.NodeFlags.Let) === 0 && (list.flags & ts.NodeFlags.Const) === 0;
+	return (list.flags & NodeFlags.Let) === 0 && (list.flags & NodeFlags.Const) === 0;
 }
 
 function isFunctionLikeScope(node) {
 	return (
-		ts.isFunctionDeclaration(node) ||
-		ts.isFunctionExpression(node) ||
-		ts.isArrowFunction(node) ||
-		ts.isMethodDeclaration(node) ||
-		ts.isConstructorDeclaration(node) ||
-		ts.isGetAccessorDeclaration(node) ||
-		ts.isSetAccessorDeclaration(node)
+		is.isFunctionDeclaration(node) ||
+		is.isFunctionExpression(node) ||
+		is.isArrowFunction(node) ||
+		is.isMethodDeclaration(node) ||
+		is.isConstructorDeclaration(node) ||
+		is.isGetAccessorDeclaration(node) ||
+		is.isSetAccessorDeclaration(node)
 	);
 }
 
@@ -444,12 +438,12 @@ function hasHoistedNameBinding(root, name) {
 	let found = false;
 	function visit(node) {
 		if (found) return;
-		if (ts.isFunctionDeclaration(node)) {
+		if (is.isFunctionDeclaration(node)) {
 			if (node.name && node.name.text === name) found = true;
 			return;
 		}
 		if (isFunctionLikeScope(node)) return;
-		if (ts.isVariableDeclarationList(node) && isVarDeclarationList(node)) {
+		if (is.isVariableDeclarationList(node) && isVarDeclarationList(node)) {
 			for (const declaration of node.declarations) {
 				if (bindingNameDeclares(declaration.name, name)) {
 					found = true;
@@ -457,7 +451,7 @@ function hasHoistedNameBinding(root, name) {
 				}
 			}
 		}
-		ts.forEachChild(node, visit);
+		node.forEachChild(visit);
 	}
 	visit(root);
 	return found;
@@ -477,7 +471,7 @@ function identifierHasLocalBinding(identifier) {
 	let current = identifier.parent;
 	while (current !== undefined && current !== null) {
 		if (isFunctionLikeScope(current)) {
-			if (current.name && ts.isIdentifier(current.name) && current.name.text === name) {
+			if (current.name && is.isIdentifier(current.name) && current.name.text === name) {
 				return true;
 			}
 			for (const parameter of current.parameters) {
@@ -487,28 +481,28 @@ function identifierHasLocalBinding(identifier) {
 			if (hasHoistedNameBinding(hoistedRoot, name)) return true;
 		}
 
-		if (ts.isSourceFile(current)) scriptScope = current;
+		if (is.isSourceFile(current)) scriptScope = current;
 
-		if (ts.isCatchClause(current) && current.variableDeclaration) {
+		if (is.isCatchClause(current) && current.variableDeclaration) {
 			if (bindingNameDeclares(current.variableDeclaration.name, name)) return true;
 		}
 
 		if (
-			ts.isForStatement(current) ||
-			ts.isForInStatement(current) ||
-			ts.isForOfStatement(current)
+			is.isForStatement(current) ||
+			is.isForInStatement(current) ||
+			is.isForOfStatement(current)
 		) {
 			const initializer = current.initializer;
-			if (initializer && ts.isVariableDeclarationList(initializer)) {
+			if (initializer && is.isVariableDeclarationList(initializer)) {
 				for (const declaration of initializer.declarations) {
 					if (bindingNameDeclares(declaration.name, name)) return true;
 				}
 			}
 		}
 
-		if (ts.isBlock(current) || ts.isSourceFile(current) || ts.isModuleBlock(current)) {
+		if (is.isBlock(current) || is.isSourceFile(current) || is.isModuleBlock(current)) {
 			for (const statement of current.statements) {
-				if (ts.isVariableStatement(statement)) {
+				if (is.isVariableStatement(statement)) {
 					// `var` is handled by the per-function hoisted deep-scan.
 					if (!isVarDeclarationList(statement.declarationList)) {
 						for (const declaration of statement.declarationList.declarations) {
@@ -516,20 +510,20 @@ function identifierHasLocalBinding(identifier) {
 						}
 					}
 				}
-				if (ts.isFunctionDeclaration(statement) && statement.name && statement.name.text === name) {
+				if (is.isFunctionDeclaration(statement) && statement.name && statement.name.text === name) {
 					return true;
 				}
-				if (ts.isClassDeclaration(statement) && statement.name && statement.name.text === name) {
+				if (is.isClassDeclaration(statement) && statement.name && statement.name.text === name) {
 					return true;
 				}
-				if (ts.isImportDeclaration(statement) && statement.importClause) {
+				if (is.isImportDeclaration(statement) && statement.importClause) {
 					const clause = statement.importClause;
 					if (clause.name && clause.name.text === name) return true;
 					const bindings = clause.namedBindings;
-					if (bindings && ts.isNamespaceImport(bindings) && bindings.name.text === name) {
+					if (bindings && is.isNamespaceImport(bindings) && bindings.name.text === name) {
 						return true;
 					}
-					if (bindings && ts.isNamedImports(bindings)) {
+					if (bindings && is.isNamedImports(bindings)) {
 						for (const element of bindings.elements) {
 							if (element.name.text === name) return true;
 						}
@@ -538,9 +532,9 @@ function identifierHasLocalBinding(identifier) {
 			}
 		}
 
-		if (ts.isCaseClause(current) || ts.isDefaultClause(current)) {
+		if (is.isCaseClause(current) || is.isDefaultClause(current)) {
 			for (const statement of current.statements) {
-				if (ts.isVariableStatement(statement) && !isVarDeclarationList(statement.declarationList)) {
+				if (is.isVariableStatement(statement) && !isVarDeclarationList(statement.declarationList)) {
 					for (const declaration of statement.declarationList.declarations) {
 						if (bindingNameDeclares(declaration.name, name)) return true;
 					}
@@ -561,10 +555,10 @@ function identifierHasLocalBinding(identifier) {
  * binding that shadows `Promise` also does not — only the unshadowed global.
  */
 function isPromiseResolveCall(node) {
-	if (!ts.isCallExpression(node)) return false;
-	if (!ts.isPropertyAccessExpression(node.expression)) return false;
-	if (!ts.isIdentifier(node.expression.expression)) return false;
-	if (!ts.isIdentifier(node.expression.name)) return false;
+	if (!is.isCallExpression(node)) return false;
+	if (!is.isPropertyAccessExpression(node.expression)) return false;
+	if (!is.isIdentifier(node.expression.expression)) return false;
+	if (!is.isIdentifier(node.expression.name)) return false;
 	if (node.expression.expression.text !== 'Promise' || node.expression.name.text !== 'resolve') {
 		return false;
 	}
@@ -589,19 +583,19 @@ function identifierIsNamedImportFrom(identifier, modules) {
 	const name = identifier.text;
 
 	function importBindingKind(statement) {
-		if (!ts.isImportDeclaration(statement) || !statement.importClause) return null;
+		if (!is.isImportDeclaration(statement) || !statement.importClause) return null;
 		const clause = statement.importClause;
 		if (clause.name && clause.name.text === name) return 'local';
 		const bindings = clause.namedBindings;
-		if (bindings && ts.isNamespaceImport(bindings) && bindings.name.text === name) {
+		if (bindings && is.isNamespaceImport(bindings) && bindings.name.text === name) {
 			return 'local';
 		}
-		if (bindings && ts.isNamedImports(bindings)) {
+		if (bindings && is.isNamedImports(bindings)) {
 			for (const element of bindings.elements) {
 				if (element.name.text !== name) continue;
 				const exportName = element.propertyName ? element.propertyName.text : element.name.text;
 				if (exportName !== name) return 'local';
-				if (!ts.isStringLiteral(statement.moduleSpecifier)) return 'local';
+				if (!is.isStringLiteral(statement.moduleSpecifier)) return 'local';
 				return modules.has(statement.moduleSpecifier.text) ? 'auth-import' : 'local';
 			}
 		}
@@ -610,17 +604,17 @@ function identifierIsNamedImportFrom(identifier, modules) {
 
 	function bindingKindInStatementList(statements) {
 		for (const statement of statements) {
-			if (ts.isVariableStatement(statement)) {
+			if (is.isVariableStatement(statement)) {
 				if (!isVarDeclarationList(statement.declarationList)) {
 					for (const declaration of statement.declarationList.declarations) {
 						if (bindingNameDeclares(declaration.name, name)) return 'local';
 					}
 				}
 			}
-			if (ts.isFunctionDeclaration(statement) && statement.name && statement.name.text === name) {
+			if (is.isFunctionDeclaration(statement) && statement.name && statement.name.text === name) {
 				return 'local';
 			}
-			if (ts.isClassDeclaration(statement) && statement.name && statement.name.text === name) {
+			if (is.isClassDeclaration(statement) && statement.name && statement.name.text === name) {
 				return 'local';
 			}
 			const kind = importBindingKind(statement);
@@ -633,7 +627,7 @@ function identifierIsNamedImportFrom(identifier, modules) {
 	let current = identifier.parent;
 	while (current !== undefined && current !== null) {
 		if (isFunctionLikeScope(current)) {
-			if (current.name && ts.isIdentifier(current.name) && current.name.text === name) {
+			if (current.name && is.isIdentifier(current.name) && current.name.text === name) {
 				return false;
 			}
 			for (const parameter of current.parameters) {
@@ -643,34 +637,34 @@ function identifierIsNamedImportFrom(identifier, modules) {
 			if (hasHoistedNameBinding(hoistedRoot, name)) return false;
 		}
 
-		if (ts.isSourceFile(current)) scriptScope = current;
+		if (is.isSourceFile(current)) scriptScope = current;
 
-		if (ts.isCatchClause(current) && current.variableDeclaration) {
+		if (is.isCatchClause(current) && current.variableDeclaration) {
 			if (bindingNameDeclares(current.variableDeclaration.name, name)) return false;
 		}
 
 		if (
-			ts.isForStatement(current) ||
-			ts.isForInStatement(current) ||
-			ts.isForOfStatement(current)
+			is.isForStatement(current) ||
+			is.isForInStatement(current) ||
+			is.isForOfStatement(current)
 		) {
 			const initializer = current.initializer;
-			if (initializer && ts.isVariableDeclarationList(initializer)) {
+			if (initializer && is.isVariableDeclarationList(initializer)) {
 				for (const declaration of initializer.declarations) {
 					if (bindingNameDeclares(declaration.name, name)) return false;
 				}
 			}
 		}
 
-		if (ts.isBlock(current) || ts.isSourceFile(current) || ts.isModuleBlock(current)) {
+		if (is.isBlock(current) || is.isSourceFile(current) || is.isModuleBlock(current)) {
 			const kind = bindingKindInStatementList(current.statements);
 			if (kind === 'auth-import') return true;
 			if (kind === 'local') return false;
 		}
 
-		if (ts.isCaseClause(current) || ts.isDefaultClause(current)) {
+		if (is.isCaseClause(current) || is.isDefaultClause(current)) {
 			for (const statement of current.statements) {
-				if (ts.isVariableStatement(statement) && !isVarDeclarationList(statement.declarationList)) {
+				if (is.isVariableStatement(statement) && !isVarDeclarationList(statement.declarationList)) {
 					for (const declaration of statement.declarationList.declarations) {
 						if (bindingNameDeclares(declaration.name, name)) return false;
 					}
@@ -691,7 +685,7 @@ function identifierIsNamedImportFrom(identifier, modules) {
  * does not authenticate nested writes.
  */
 function isAuthenticatedActCall(call) {
-	if (!ts.isIdentifier(call.expression)) return false;
+	if (!is.isIdentifier(call.expression)) return false;
 	if (call.expression.text !== 'act') return false;
 	return identifierIsNamedImportFrom(call.expression, AUTHENTICATED_ACT_MODULES);
 }
@@ -710,8 +704,8 @@ function isAuthenticatedActCall(call) {
  */
 function alwaysExecutedCallbackArgIndexes(call) {
 	if (
-		ts.isPropertyAccessExpression(call.expression) &&
-		ts.isIdentifier(call.expression.name) &&
+		is.isPropertyAccessExpression(call.expression) &&
+		is.isIdentifier(call.expression.name) &&
 		call.expression.name.text === 'then' &&
 		isPromiseResolveCall(call.expression.expression)
 	) {
@@ -738,7 +732,7 @@ function alwaysExecutedCallbackArgIndexes(call) {
 function forEachAlwaysExecutedNode(root, visitNode) {
 	function visitFunctionBody(fn) {
 		if (fn.body === undefined) return;
-		if (ts.isBlock(fn.body)) {
+		if (is.isBlock(fn.body)) {
 			visitStatementList(fn.body.statements);
 			return;
 		}
@@ -757,25 +751,25 @@ function forEachAlwaysExecutedNode(root, visitNode) {
 			return;
 		}
 
-		if (ts.isParenthesizedExpression(node)) {
+		if (is.isParenthesizedExpression(node)) {
 			visitExpression(node.expression, context);
 			return;
 		}
 
-		if (ts.isBinaryExpression(node)) {
-			if (node.operatorToken.kind === ts.SyntaxKind.AmpersandAmpersandToken) {
+		if (is.isBinaryExpression(node)) {
+			if (node.operatorToken.kind === SyntaxKind.AmpersandAmpersandToken) {
 				visitExpression(node.left, 'value');
 				if (!isFalseLiteral(node.left)) visitExpression(node.right, 'value');
 				return;
 			}
-			if (node.operatorToken.kind === ts.SyntaxKind.BarBarToken) {
+			if (node.operatorToken.kind === SyntaxKind.BarBarToken) {
 				visitExpression(node.left, 'value');
 				if (!isTrueLiteral(node.left)) visitExpression(node.right, 'value');
 				return;
 			}
 		}
 
-		if (ts.isConditionalExpression(node)) {
+		if (is.isConditionalExpression(node)) {
 			visitExpression(node.condition, 'value');
 			if (isTrueLiteral(node.condition)) {
 				visitExpression(node.whenTrue, 'value');
@@ -801,9 +795,9 @@ function forEachAlwaysExecutedNode(root, visitNode) {
 			return;
 		}
 
-		ts.forEachChild(node, function visitChild(child) {
+		node.forEachChild(function visitChild(child) {
 			if (functionLikeOf(child) !== null) return;
-			if (ts.isStatement(child) && !ts.isBlock(child)) return;
+			if (is.isStatement(child) && !is.isBlock(child)) return;
 			visitExpression(child, 'value');
 		});
 	}
@@ -811,11 +805,11 @@ function forEachAlwaysExecutedNode(root, visitNode) {
 	function visitStatement(statement) {
 		visitNode(statement);
 
-		if (ts.isBlock(statement)) {
+		if (is.isBlock(statement)) {
 			return visitStatementList(statement.statements);
 		}
 
-		if (ts.isIfStatement(statement)) {
+		if (is.isIfStatement(statement)) {
 			visitExpression(statement.expression, 'value');
 			if (isTrueLiteral(statement.expression)) {
 				return visitStatement(statement.thenStatement);
@@ -826,22 +820,22 @@ function forEachAlwaysExecutedNode(root, visitNode) {
 			return false;
 		}
 
-		if (ts.isExpressionStatement(statement)) {
+		if (is.isExpressionStatement(statement)) {
 			visitExpression(statement.expression, 'value');
 			return false;
 		}
 
-		if (ts.isReturnStatement(statement)) {
+		if (is.isReturnStatement(statement)) {
 			if (statement.expression !== undefined) visitExpression(statement.expression, 'value');
 			return true;
 		}
 
-		if (ts.isThrowStatement(statement)) {
+		if (is.isThrowStatement(statement)) {
 			visitExpression(statement.expression, 'value');
 			return true;
 		}
 
-		if (ts.isVariableStatement(statement)) {
+		if (is.isVariableStatement(statement)) {
 			for (const declaration of statement.declarationList.declarations) {
 				visitNode(declaration);
 				if (declaration.initializer !== undefined) {
@@ -851,21 +845,21 @@ function forEachAlwaysExecutedNode(root, visitNode) {
 			return false;
 		}
 
-		if (ts.isLabeledStatement(statement)) {
+		if (is.isLabeledStatement(statement)) {
 			return visitStatement(statement.statement);
 		}
 
-		if (ts.isWhileStatement(statement) || ts.isDoStatement(statement)) {
+		if (is.isWhileStatement(statement) || is.isDoStatement(statement)) {
 			visitExpression(statement.expression, 'value');
 			return false;
 		}
 
-		if (ts.isForStatement(statement)) {
+		if (is.isForStatement(statement)) {
 			// Initializer + condition run before the first iteration attempt.
 			// The incrementor only runs after a successful body iteration, so
 			// it is not always-executed (e.g. `for (; false; props.record(s))`).
 			if (statement.initializer !== undefined) {
-				if (ts.isVariableDeclarationList(statement.initializer)) {
+				if (is.isVariableDeclarationList(statement.initializer)) {
 					for (const declaration of statement.initializer.declarations) {
 						visitNode(declaration);
 						if (declaration.initializer !== undefined) {
@@ -880,8 +874,8 @@ function forEachAlwaysExecutedNode(root, visitNode) {
 			return false;
 		}
 
-		if (ts.isForInStatement(statement) || ts.isForOfStatement(statement)) {
-			if (ts.isVariableDeclarationList(statement.initializer)) {
+		if (is.isForInStatement(statement) || is.isForOfStatement(statement)) {
+			if (is.isVariableDeclarationList(statement.initializer)) {
 				for (const declaration of statement.initializer.declarations) {
 					visitNode(declaration);
 				}
@@ -892,12 +886,12 @@ function forEachAlwaysExecutedNode(root, visitNode) {
 			return false;
 		}
 
-		if (ts.isSwitchStatement(statement)) {
+		if (is.isSwitchStatement(statement)) {
 			visitExpression(statement.expression, 'value');
 			return false;
 		}
 
-		if (ts.isTryStatement(statement)) {
+		if (is.isTryStatement(statement)) {
 			visitStatement(statement.tryBlock);
 			if (statement.finallyBlock !== undefined) visitStatement(statement.finallyBlock);
 			return false;
@@ -921,7 +915,7 @@ function forEachAlwaysExecutedNode(root, visitNode) {
 		visitFunctionBody(rootFn);
 		return;
 	}
-	if (ts.isBlock(root)) {
+	if (is.isBlock(root)) {
 		visitStatementList(root.statements);
 		return;
 	}
@@ -931,7 +925,7 @@ function forEachAlwaysExecutedNode(root, visitNode) {
 function firstParameterName(fn) {
 	if (fn === null || fn.parameters.length === 0) return null;
 	const name = fn.parameters[0].name;
-	return ts.isIdentifier(name) ? name.text : null;
+	return is.isIdentifier(name) ? name.text : null;
 }
 
 /**
@@ -940,32 +934,34 @@ function firstParameterName(fn) {
  */
 function parseFixtureSource(fixtureSource, fileName = 'hooks.tsx') {
 	const normalized = fixtureSource.replace(/@\{/g, '{');
-	return ts.createSourceFile(fileName, normalized, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
+	return parseSourceFile(fileName, normalized, ScriptKind.TSX);
 }
 
 function collectUseSignalSetterNames(fnBody) {
 	const setters = new Set();
 	function visit(node) {
 		if (
-			ts.isVariableDeclaration(node) &&
+			is.isVariableDeclaration(node) &&
 			node.initializer &&
-			ts.isCallExpression(node.initializer) &&
-			ts.isIdentifier(node.initializer.expression) &&
+			is.isCallExpression(node.initializer) &&
+			is.isIdentifier(node.initializer.expression) &&
 			node.initializer.expression.text === 'useSignal' &&
-			ts.isArrayBindingPattern(node.name) &&
+			is.isArrayBindingPattern(node.name) &&
 			node.name.elements.length >= 2
 		) {
 			const setterElement = node.name.elements[1];
+			// TypeScript 7 spells an array-pattern hole as a nameless binding element.
 			if (
 				setterElement &&
-				!ts.isOmittedExpression(setterElement) &&
-				ts.isBindingElement(setterElement) &&
-				ts.isIdentifier(setterElement.name)
+				!is.isOmittedExpression(setterElement) &&
+				is.isBindingElement(setterElement) &&
+				setterElement.name &&
+				is.isIdentifier(setterElement.name)
 			) {
 				setters.add(setterElement.name.text);
 			}
 		}
-		ts.forEachChild(node, visit);
+		node.forEachChild(visit);
 	}
 	visit(fnBody);
 	return setters;
@@ -975,16 +971,16 @@ function collectHookReturnedSetterNames(fnBody) {
 	const setters = collectUseSignalSetterNames(fnBody);
 	function visit(node) {
 		if (
-			ts.isVariableDeclaration(node) &&
+			is.isVariableDeclaration(node) &&
 			node.initializer &&
-			ts.isCallExpression(node.initializer) &&
-			ts.isIdentifier(node.initializer.expression) &&
+			is.isCallExpression(node.initializer) &&
+			is.isIdentifier(node.initializer.expression) &&
 			node.initializer.expression.text === 'useSetSignal' &&
-			ts.isIdentifier(node.name)
+			is.isIdentifier(node.name)
 		) {
 			setters.add(node.name.text);
 		}
-		ts.forEachChild(node, visit);
+		node.forEachChild(visit);
 	}
 	visit(fnBody);
 	return setters;
@@ -996,7 +992,7 @@ function normalizeUpdateShape(expression, sourceFile) {
 	if (fn !== null) {
 		const params = [];
 		for (const parameter of fn.parameters) {
-			if (ts.isIdentifier(parameter.name)) params.push(parameter.name.text);
+			if (is.isIdentifier(parameter.name)) params.push(parameter.name.text);
 		}
 		let bodyText = fn.body.getText(sourceFile);
 		for (let index = 0; index < params.length; index++) {
@@ -1009,10 +1005,10 @@ function normalizeUpdateShape(expression, sourceFile) {
 
 function isPropsSourceCall(call) {
 	return (
-		ts.isPropertyAccessExpression(call.expression) &&
-		ts.isIdentifier(call.expression.expression) &&
+		is.isPropertyAccessExpression(call.expression) &&
+		is.isIdentifier(call.expression.expression) &&
 		call.expression.expression.text === 'props' &&
-		ts.isIdentifier(call.expression.name) &&
+		is.isIdentifier(call.expression.name) &&
 		call.expression.name.text === 'source'
 	);
 }
@@ -1036,7 +1032,7 @@ function collectAuthenticatedHandlerSetterInvocations(expression, names, sourceF
 			hasDirectSourceWrite = true;
 			return;
 		}
-		ts.forEachChild(node, function visitChild(child) {
+		node.forEachChild(function visitChild(child) {
 			if (!hasDirectSourceWrite) scanForDirectSourceWrite(child, rootExpression);
 		});
 	}
@@ -1051,11 +1047,11 @@ function collectAuthenticatedHandlerSetterInvocations(expression, names, sourceF
 	}
 
 	function visitAlwaysExecutedStatement(statement) {
-		if (ts.isExpressionStatement(statement)) {
+		if (is.isExpressionStatement(statement)) {
 			countTopLevelSetterCall(statement.expression);
 			return;
 		}
-		if (ts.isReturnStatement(statement) && statement.expression !== undefined) {
+		if (is.isReturnStatement(statement) && statement.expression !== undefined) {
 			countTopLevelSetterCall(statement.expression);
 		}
 	}
@@ -1070,7 +1066,7 @@ function collectAuthenticatedHandlerSetterInvocations(expression, names, sourceF
 		return { shapes: [], hasDirectSourceWrite: false };
 	}
 	scanForDirectSourceWrite(fn, fn);
-	if (!ts.isBlock(fn.body)) {
+	if (!is.isBlock(fn.body)) {
 		countTopLevelSetterCall(fn.body);
 		return { shapes: hasDirectSourceWrite ? [] : shapes, hasDirectSourceWrite };
 	}
@@ -1085,12 +1081,12 @@ function collectAuthenticatedHandlerSetterInvocations(expression, names, sourceF
 function jsxAttributeInitializer(attribute) {
 	if (attribute.initializer === undefined) return null;
 	if (
-		ts.isStringLiteral(attribute.initializer) ||
-		ts.isNoSubstitutionTemplateLiteral(attribute.initializer)
+		is.isStringLiteral(attribute.initializer) ||
+		is.isNoSubstitutionTemplateLiteral(attribute.initializer)
 	) {
 		return attribute.initializer;
 	}
-	if (ts.isJsxExpression(attribute.initializer)) {
+	if (is.isJsxExpression(attribute.initializer)) {
 		return attribute.initializer.expression ?? null;
 	}
 	return null;
@@ -1099,8 +1095,8 @@ function jsxAttributeInitializer(attribute) {
 function elementIdFromJsxAttributes(attributes) {
 	for (const attribute of attributes.properties) {
 		if (
-			!ts.isJsxAttribute(attribute) ||
-			!ts.isIdentifier(attribute.name) ||
+			!is.isJsxAttribute(attribute) ||
+			!is.isIdentifier(attribute.name) ||
 			attribute.name.text !== 'id'
 		) {
 			continue;
@@ -1108,7 +1104,7 @@ function elementIdFromJsxAttributes(attributes) {
 		const value = jsxAttributeInitializer(attribute);
 		if (
 			value !== null &&
-			(ts.isStringLiteral(value) || ts.isNoSubstitutionTemplateLiteral(value))
+			(is.isStringLiteral(value) || is.isNoSubstitutionTemplateLiteral(value))
 		) {
 			return value.text;
 		}
@@ -1119,8 +1115,8 @@ function elementIdFromJsxAttributes(attributes) {
 function onClickExpressionFromJsxAttributes(attributes) {
 	for (const attribute of attributes.properties) {
 		if (
-			!ts.isJsxAttribute(attribute) ||
-			!ts.isIdentifier(attribute.name) ||
+			!is.isJsxAttribute(attribute) ||
+			!is.isIdentifier(attribute.name) ||
 			attribute.name.text !== 'onClick'
 		) {
 			continue;
@@ -1141,7 +1137,7 @@ export function extractFixturesThatRecordHookSetters(fixtureSource) {
 	const sourceFile = parseFixtureSource(fixtureSource);
 	for (const statement of sourceFile.statements) {
 		if (
-			!ts.isFunctionDeclaration(statement) ||
+			!is.isFunctionDeclaration(statement) ||
 			statement.name === undefined ||
 			statement.body === undefined
 		) {
@@ -1155,13 +1151,13 @@ export function extractFixturesThatRecordHookSetters(fixtureSource) {
 			const call = callExpressionOf(node);
 			if (
 				call !== null &&
-				ts.isPropertyAccessExpression(call.expression) &&
-				ts.isIdentifier(call.expression.expression) &&
+				is.isPropertyAccessExpression(call.expression) &&
+				is.isIdentifier(call.expression.expression) &&
 				call.expression.expression.text === 'props' &&
-				ts.isIdentifier(call.expression.name) &&
+				is.isIdentifier(call.expression.name) &&
 				call.expression.name.text === 'record' &&
 				call.arguments.length > 0 &&
-				ts.isIdentifier(call.arguments[0]) &&
+				is.isIdentifier(call.arguments[0]) &&
 				setters.has(call.arguments[0].text)
 			) {
 				recordsHookSetter = true;
@@ -1186,7 +1182,7 @@ export function extractFixtureHookSetterClickIds(fixtureSource) {
 	const sourceFile = parseFixtureSource(fixtureSource);
 	for (const statement of sourceFile.statements) {
 		if (
-			!ts.isFunctionDeclaration(statement) ||
+			!is.isFunctionDeclaration(statement) ||
 			statement.name === undefined ||
 			statement.body === undefined
 		) {
@@ -1196,12 +1192,12 @@ export function extractFixtureHookSetterClickIds(fixtureSource) {
 		const ids = new Map();
 		if (setters.size > 0) {
 			function visit(node) {
-				if (ts.isJsxOpeningElement(node) || ts.isJsxSelfClosingElement(node)) {
+				if (is.isJsxOpeningElement(node) || is.isJsxSelfClosingElement(node)) {
 					const id = elementIdFromJsxAttributes(node.attributes);
 					const onClick = onClickExpressionFromJsxAttributes(node.attributes);
 					if (id !== null && onClick !== null) {
 						let shapes = [];
-						if (ts.isIdentifier(onClick) && setters.has(onClick.text)) {
+						if (is.isIdentifier(onClick) && setters.has(onClick.text)) {
 							// Bare setter reference as the handler: one invocation per click,
 							// argument shape unknown until event time.
 							shapes = ['fn:event'];
@@ -1217,7 +1213,7 @@ export function extractFixtureHookSetterClickIds(fixtureSource) {
 						}
 					}
 				}
-				ts.forEachChild(node, visit);
+				node.forEachChild(visit);
 			}
 			visit(statement.body);
 		}
@@ -1229,51 +1225,51 @@ export function extractFixtureHookSetterClickIds(fixtureSource) {
 function clickSelectorId(call) {
 	if (call.arguments.length === 0) return null;
 	const arg = call.arguments[0];
-	if (!ts.isStringLiteral(arg) && !ts.isNoSubstitutionTemplateLiteral(arg)) return null;
+	if (!is.isStringLiteral(arg) && !is.isNoSubstitutionTemplateLiteral(arg)) return null;
 	const text = arg.text;
 	return text.startsWith('#') ? text.slice(1) : text;
 }
 
 function mountFixtureName(call) {
-	if (call.arguments.length === 0 || !ts.isIdentifier(call.arguments[0])) return null;
+	if (call.arguments.length === 0 || !is.isIdentifier(call.arguments[0])) return null;
 	return call.arguments[0].text;
 }
 
 function collectFunctionBindings(body) {
 	const bindings = new Map();
 	function visit(node) {
-		if (ts.isFunctionDeclaration(node) && node.name) {
+		if (is.isFunctionDeclaration(node) && node.name) {
 			bindings.set(node.name.text, node);
 		}
 		if (
-			ts.isVariableDeclaration(node) &&
+			is.isVariableDeclaration(node) &&
 			node.name &&
-			ts.isIdentifier(node.name) &&
+			is.isIdentifier(node.name) &&
 			node.initializer
 		) {
 			const fn = functionLikeOf(node.initializer);
 			if (fn !== null) bindings.set(node.name.text, fn);
 		}
-		ts.forEachChild(node, visit);
+		node.forEachChild(visit);
 	}
 	visit(body);
 	return bindings;
 }
 
 function recordPropFromMount(call) {
-	if (call.arguments.length < 2 || !ts.isObjectLiteralExpression(call.arguments[1])) {
+	if (call.arguments.length < 2 || !is.isObjectLiteralExpression(call.arguments[1])) {
 		return null;
 	}
 	for (const prop of call.arguments[1].properties) {
-		if (ts.isShorthandPropertyAssignment(prop) && prop.name.text === 'record') {
+		if (is.isShorthandPropertyAssignment(prop) && prop.name.text === 'record') {
 			return { kind: 'ref', name: prop.name.text };
 		}
 		if (
-			ts.isPropertyAssignment(prop) &&
-			ts.isIdentifier(prop.name) &&
+			is.isPropertyAssignment(prop) &&
+			is.isIdentifier(prop.name) &&
 			prop.name.text === 'record'
 		) {
-			if (ts.isIdentifier(prop.initializer)) {
+			if (is.isIdentifier(prop.initializer)) {
 				return { kind: 'ref', name: prop.initializer.text };
 			}
 			const fn = functionLikeOf(prop.initializer);
@@ -1300,9 +1296,9 @@ function collectAuthenticRecordedSetterArrays(caseBody, recordSetterFixtures) {
 			const call = callExpressionOf(node);
 			if (
 				call === null ||
-				!ts.isPropertyAccessExpression(call.expression) ||
-				!ts.isIdentifier(call.expression.expression) ||
-				!ts.isIdentifier(call.expression.name) ||
+				!is.isPropertyAccessExpression(call.expression) ||
+				!is.isIdentifier(call.expression.expression) ||
+				!is.isIdentifier(call.expression.name) ||
 				call.expression.name.text !== 'push' ||
 				call.arguments.length === 0
 			) {
@@ -1310,7 +1306,7 @@ function collectAuthenticRecordedSetterArrays(caseBody, recordSetterFixtures) {
 			}
 			const arrayName = call.expression.expression.text;
 			const argument = call.arguments[0];
-			if (ts.isIdentifier(argument) && argument.text === paramName) {
+			if (is.isIdentifier(argument) && argument.text === paramName) {
 				candidateArrays.add(arrayName);
 				return;
 			}
@@ -1326,10 +1322,10 @@ function collectAuthenticRecordedSetterArrays(caseBody, recordSetterFixtures) {
 		const call = callExpressionOf(node);
 		if (
 			call !== null &&
-			ts.isIdentifier(call.expression) &&
+			is.isIdentifier(call.expression) &&
 			call.expression.text === 'mount' &&
 			call.arguments[0] &&
-			ts.isIdentifier(call.arguments[0]) &&
+			is.isIdentifier(call.arguments[0]) &&
 			recordSetterFixtures.has(call.arguments[0].text)
 		) {
 			const recordProp = recordPropFromMount(call);
@@ -1345,43 +1341,51 @@ function collectAuthenticRecordedSetterArrays(caseBody, recordSetterFixtures) {
 }
 
 function collectBindingNames(nameNode, into) {
-	if (ts.isIdentifier(nameNode)) {
+	if (is.isIdentifier(nameNode)) {
 		into.add(nameNode.text);
 		return;
 	}
-	if (ts.isArrayBindingPattern(nameNode) || ts.isObjectBindingPattern(nameNode)) {
+	if (is.isArrayBindingPattern(nameNode) || is.isObjectBindingPattern(nameNode)) {
 		for (const element of nameNode.elements) {
-			if (ts.isBindingElement(element)) collectBindingNames(element.name, into);
+			// TypeScript 7 spells an array-pattern hole as a nameless binding element.
+			if (is.isBindingElement(element) && element.name) collectBindingNames(element.name, into);
 		}
 	}
 }
 
 function callExpressionOf(node) {
-	if (ts.isCallExpression(node)) return node;
-	if (typeof ts.isOptionalCallExpression === 'function' && ts.isOptionalCallExpression(node)) {
+	if (is.isCallExpression(node)) return node;
+	if (typeof is.isOptionalCallExpression === 'function' && is.isOptionalCallExpression(node)) {
 		return node;
 	}
 	return null;
 }
 
+// The classic `isOptionalChain`; TypeScript 7's `is` module has no counterpart.
+function isOptionalChain(node) {
+	return (
+		(node.flags & NodeFlags.OptionalChain) !== 0 &&
+		(is.isPropertyAccessExpression(node) ||
+			is.isElementAccessExpression(node) ||
+			is.isCallExpression(node) ||
+			is.isNonNullExpression(node))
+	);
+}
+
 function calleeRootIdentifier(expression) {
 	let current = expression;
 	while (
-		ts.isPropertyAccessExpression(current) ||
-		ts.isElementAccessExpression(current) ||
-		(typeof ts.isNonNullExpression === 'function' && ts.isNonNullExpression(current)) ||
-		(typeof ts.isParenthesizedExpression === 'function' && ts.isParenthesizedExpression(current))
+		is.isPropertyAccessExpression(current) ||
+		is.isElementAccessExpression(current) ||
+		(typeof is.isNonNullExpression === 'function' && is.isNonNullExpression(current)) ||
+		(typeof is.isParenthesizedExpression === 'function' && is.isParenthesizedExpression(current))
 	) {
 		current = current.expression;
 	}
-	if (
-		typeof ts.isOptionalChain === 'function' &&
-		ts.isOptionalChain(current) &&
-		'expression' in current
-	) {
+	if (isOptionalChain(current) && 'expression' in current) {
 		return calleeRootIdentifier(current.expression);
 	}
-	return ts.isIdentifier(current) ? current.text : null;
+	return is.isIdentifier(current) ? current.text : null;
 }
 
 /**
@@ -1403,13 +1407,7 @@ export function extractCaseTransitionStructure(
 	fileName = 'suite.ts',
 	{ recordSetterFixtures = null, fixtureHookSetterClicks = null } = {},
 ) {
-	const sourceFile = ts.createSourceFile(
-		fileName,
-		source,
-		ts.ScriptTarget.Latest,
-		true,
-		ts.ScriptKind.TS,
-	);
+	const sourceFile = parseSourceFile(fileName, source, ScriptKind.TS);
 	const cases = [];
 	function visit(node) {
 		const titled = callTitle(node);
@@ -1430,10 +1428,10 @@ export function extractCaseTransitionStructure(
 			const hookPathShapes = [];
 
 			function observeExecutedNode(bodyNode) {
-				if (ts.isVariableDeclaration(bodyNode) && bodyNode.initializer && bodyNode.name) {
+				if (is.isVariableDeclaration(bodyNode) && bodyNode.initializer && bodyNode.name) {
 					if (
-						ts.isCallExpression(bodyNode.initializer) &&
-						ts.isIdentifier(bodyNode.initializer.expression) &&
+						is.isCallExpression(bodyNode.initializer) &&
+						is.isIdentifier(bodyNode.initializer.expression) &&
 						bodyNode.initializer.expression.text === 'createSignal'
 					) {
 						collectBindingNames(bodyNode.name, signalBindings);
@@ -1447,9 +1445,9 @@ export function extractCaseTransitionStructure(
 					const mountCall = callExpressionOf(bodyNode.initializer);
 					if (
 						mountCall !== null &&
-						ts.isIdentifier(mountCall.expression) &&
+						is.isIdentifier(mountCall.expression) &&
 						mountCall.expression.text === 'mount' &&
-						ts.isIdentifier(bodyNode.name)
+						is.isIdentifier(bodyNode.name)
 					) {
 						const fixtureName = mountFixtureName(mountCall);
 						if (fixtureName !== null) mountBindings.set(bodyNode.name.text, fixtureName);
@@ -1460,9 +1458,9 @@ export function extractCaseTransitionStructure(
 				if (call === null) return;
 				const expression = call.expression;
 				if (
-					ts.isPropertyAccessExpression(expression) &&
-					ts.isIdentifier(expression.expression) &&
-					ts.isIdentifier(expression.name) &&
+					is.isPropertyAccessExpression(expression) &&
+					is.isIdentifier(expression.expression) &&
+					is.isIdentifier(expression.name) &&
 					expression.name.text === 'click'
 				) {
 					const fixtureName = mountBindings.get(expression.expression.text);
@@ -1511,7 +1509,7 @@ export function extractCaseTransitionStructure(
 			});
 			return;
 		}
-		ts.forEachChild(node, visit);
+		node.forEachChild(visit);
 	}
 	visit(sourceFile);
 	return cases;
@@ -1567,25 +1565,19 @@ export function extractFixtureElementIds(fixtureSource) {
 }
 
 export function extractMountedFixtures(adaptedSource, fileName = 'adapted.ts') {
-	const sourceFile = ts.createSourceFile(
-		fileName,
-		adaptedSource,
-		ts.ScriptTarget.Latest,
-		true,
-		ts.ScriptKind.TS,
-	);
+	const sourceFile = parseSourceFile(fileName, adaptedSource, ScriptKind.TS);
 	const fixtures = new Set();
 	function visit(node) {
 		if (
-			ts.isCallExpression(node) &&
-			ts.isIdentifier(node.expression) &&
+			is.isCallExpression(node) &&
+			is.isIdentifier(node.expression) &&
 			node.expression.text === 'mount' &&
 			node.arguments[0] &&
-			ts.isIdentifier(node.arguments[0])
+			is.isIdentifier(node.arguments[0])
 		) {
 			fixtures.add(node.arguments[0].text);
 		}
-		ts.forEachChild(node, visit);
+		node.forEachChild(visit);
 	}
 	visit(sourceFile);
 	return [...fixtures].sort();

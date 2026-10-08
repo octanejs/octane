@@ -167,4 +167,59 @@ describe('Node and browser parsers compile the same output', () => {
 			expect.objectContaining({ code: DIAGNOSTIC_CODES.DYNAMIC_TAG_EXPRESSION }),
 		);
 	});
+
+	// Build tools show these fields: Vite takes the code frame from `pos` and the
+	// position from `loc`. A syntax error is Acorn's, its zero-based position on
+	// `loc` and at the end of its message; a template diagnostic is core's plain
+	// `Error` with a `loc` range.
+	it.each([
+		[
+			'a syntax error',
+			'export function App() @{\n\t<div>{1 +}</div>\n}',
+			{
+				name: 'SyntaxError',
+				message: 'Unexpected token (2:10)',
+				code: 'TS1012',
+				pos: 35,
+				loc: { line: 2, column: 10 },
+			},
+		],
+		[
+			'an unclosed tag',
+			'export function App() @{\n\t<div>\n\t\t<span>hi</span>\n}',
+			{
+				name: 'SyntaxError',
+				message: "Unclosed tag '<div>'. Expected '</div>' before end of template. (4:0)",
+				code: 'TSRX1001',
+				pos: 50,
+				loc: { line: 4, column: 0 },
+			},
+		],
+		[
+			'two outputs in one code block',
+			'export function App() @{\n\t<div />\n\t<span />\n}',
+			{
+				name: 'Error',
+				message:
+					"A code block renders a single node; wrap multiple nodes or text in a fragment '<>…</>'.",
+				code: DIAGNOSTIC_CODES.CODE_BLOCK_SINGLE_OUTPUT,
+				pos: 35,
+				loc: { start: { line: 3, column: 1 }, end: { line: 3, column: 9 } },
+			},
+		],
+	])('reports %s at its position, as the browser compiler does', (_name, source, expected) => {
+		const reported = (compileSource: () => unknown) => {
+			try {
+				compileSource();
+			} catch (error) {
+				const { name, message, code, pos, loc } = error as Error & Record<string, unknown>;
+				return { name, message, code, pos, loc };
+			}
+			throw new Error('expected the source to be rejected');
+		};
+		expect(reported(() => parseBrowserModule(source, 'App.tsrx'))).toEqual(expected);
+		for (const mode of ['client', 'server'] as const) {
+			expect(reported(() => compileWith('oxc', source, mode))).toEqual(expected);
+		}
+	});
 });

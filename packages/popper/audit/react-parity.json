@@ -32,7 +32,7 @@
       "arch": "any",
       "packageManager": "pnpm@12.9.1",
       "lockfile": "pnpm-lock.yaml",
-      "lockfileSha256": "84dbefa8929419194a46ef5ec966ae8459aa05f40399e583828134ccc8121aad"
+      "lockfileSha256": "2d8be78f1c5ba8a69b7eaecf1cf864b7de1256a5347e10091b82b66fd0b318a4"
     }
   },
   "lanes": [
@@ -236,7 +236,7 @@
         {
           "path": "packages/popper/typetests/tsconfig.adapted.json",
           "role": "support",
-          "sha256": "37208c57a988ebb90dad45dc4ee9a8723910b089cd99472b38c9ad2b3c8ec110"
+          "sha256": "7b01220390c8faf87c8b6524f4dace3fcae188ecb5738b1f788e367350fbf044"
         },
         {
           "path": "packages/popper/audit/type-parity.json",
@@ -266,7 +266,7 @@
         {
           "path": "scripts/react-parity/popper-types-lib.mjs",
           "role": "support",
-          "sha256": "3104875c9593670fda5a486f2085aa1d8adbf938b6dd5fd44f7f08ec6c998da1"
+          "sha256": "d9f132a69adc5ce9245b74add88016b60ecbb9583659588b9b9219049a00f86a"
         }
       ]
     }
