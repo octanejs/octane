@@ -1,6 +1,6 @@
 import { formatClientError } from '../error-codes.client.generated.js';
-import { postHostTask } from '../host-task.js';
 import { decodeSignalValue } from '../data-encoding.js';
+import { postHostTask } from '../host-task.js';
 import type { ScopeSeed, SignalOwner, SignalRendererOwnerIdentity } from '../signals/types.js';
 import { captureInitialDocumentSignals } from '../signals/native-read-seeds.js';
 import {

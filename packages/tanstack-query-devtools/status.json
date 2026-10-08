@@ -1,0 +1,17 @@
+{
+  "upstream": {
+    "package": "@tanstack/react-query-devtools",
+    "version": "5.102.8"
+  },
+  "surface": "Complete published adapter surface: ReactQueryDevtools, ReactQueryDevtoolsPanel, the DevtoolsPanelOptions type, and the ./production entry, over the unchanged @tanstack/query-devtools core. All 37 upstream runtime registrations run unchanged against React and, with import rewrites only, against Octane.",
+  "divergences": [
+    "The devtools core instance is created in a lazy useState initializer instead of being constructed on every render.",
+    "Public prop types use Octane's CSSProperties and OctaneNode; element construction is authored in .tsrx."
+  ],
+  "ssr": "Supported and tested: both components render only their parent container through octane/server without a DOM; the core is constructed but never mounted server-side (mount is a client-only effect).",
+  "notes": [
+    "The root entry renders nothing unless NODE_ENV is development, matching upstream; the ./production entry always renders.",
+    "npm publishes no gitHead for this release; the pinned commit comes from the release tag and npm provenance, and matches the @octanejs/tanstack-query pin."
+  ],
+  "verified": "2026-09-30"
+}

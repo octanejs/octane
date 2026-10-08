@@ -270,16 +270,9 @@ server.
 
 <h2 id="async-work">Transitions without time slicing</h2>
 
-Octane batches urgent updates in a microtask and normally coalesces transition
-updates, including ready Action results, in a later host task. Each render still runs to
-completion; there is no CPU time slicing or selective hydration. A task boundary
-gives the browser an opportunity to paint or deliver input, but does not interrupt
-a render that has already started.
-
-Synchronous native View Transitions retain their microtask capture admission;
-the existing animation controller owns their staged commit. Async Action results
-still coalesce in a host task. An urgent flush can consume other queued work,
-and `flushSync` explicitly drains both priorities.
+Octane batches updates in a microtask, then runs each render to completion. There are
+urgent and transition updates, but no lanes, yield points, CPU time slicing, or
+selective hydration.
 
 The useful transition behavior remains: when a slower replacement suspends, the
 current screen can stay visible and `isPending` can explain the wait. `flushSync`
@@ -290,9 +283,7 @@ elements, use [createResizeObserver](/docs/core-apis#createResizeObserver) from
 `octane`. Native observer callbacks run inside the browser's resize delivery loop,
 where a microtask commit that changes an observed size can report
 `ResizeObserver loop completed with undelivered notifications`, even if the layout
-eventually settles. A transition waits for a task, but an urgent update to the
-same component, an urgent ancestor, or `flushSync` can still consume that work
-inside the delivery loop.
+eventually settles. `startTransition` does not move that commit out of the loop.
 
 The helper returns a native observer and delivers coalesced measurements in a
 separate task. Use its instance methods for observation and cleanup so unobserve
