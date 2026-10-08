@@ -21,8 +21,8 @@ BENCH_SOURCE_REF=1bc1926e809b6f1958dbc274dc68ad1334f68efc \
 The default guard bounds per-row materializer arrays for static plans and scoped
 lists, and requires unkeyed array Set work to stay constant as the list grows.
 Removing `--measure` from the baseline command demonstrates that the old work
-fails these bounds. The unified benchmark runner also tracks these deterministic
-counts in its ratio baselines.
+fails these bounds. The unified benchmark runner also records these
+deterministic counts.
 
 ## Controls and measurement boundary
 
