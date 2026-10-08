@@ -366,7 +366,11 @@ function normalizeFixedScalar(binding: BindingOperation, value: unknown): string
 			return value == null ||
 				type === 'function' ||
 				type === 'symbol' ||
-				(binding[1] === 'attr' && type === 'boolean')
+				(binding[1] === 'attr' &&
+					(type === 'boolean' ||
+						// React's numeric props, as the renderer and SSR write them. The
+						// compiler admits only these canonical spellings.
+						((binding[2] === 'start' || binding[2] === 'rowspan') && Number.isNaN(Number(value)))))
 				? null
 				: String(value);
 	}
