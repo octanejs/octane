@@ -4,9 +4,9 @@ import { test } from 'node:test';
 import {
 	ISSUE_MARKER,
 	buildPrompt,
+	entrySha,
 	findGrowth,
-	mergeIssueBody,
-	parseEntries,
+	issueBody,
 	publishEntry,
 	renderEntry,
 } from './size-review.mjs';
@@ -105,119 +105,98 @@ test('an entry names the pull request, the largest growth, the table, and the re
 	assert.match(entryFor('a'.repeat(40), ''), /add an `ANTHROPIC_API_KEY` repository secret/);
 });
 
-test('the rolling issue keeps one entry per commit, newest first', () => {
-	const options = (headSha) => ({ headSha, repository: 'octanejs/octane', minGzip: 32 });
-	const first = mergeIssueBody('', entryFor('1'.repeat(40)), options('1'.repeat(40)));
-	assert.ok(first.startsWith(ISSUE_MARKER));
-	assert.match(first, /at least 32 gzip bytes/);
-	const second = mergeIssueBody(first, entryFor('2'.repeat(40)), options('2'.repeat(40)));
-	assert.deepEqual(
-		parseEntries(second).map(({ sha }) => sha[0]),
-		['2', '1'],
-	);
-	// A rerun for the first commit replaces its entry and moves it to the top.
-	const rerun = mergeIssueBody(
-		second,
-		entryFor('1'.repeat(40), '**Verdict:** slop — rerun.'),
-		options('1'.repeat(40)),
-	);
-	const entries = parseEntries(rerun);
-	assert.deepEqual(
-		entries.map(({ sha }) => sha[0]),
-		['1', '2'],
-	);
-	assert.match(entries[0].text, /rerun/);
-	assert.doesNotMatch(rerun, /needed for the thing[\s\S]*needed for the thing[\s\S]*needed for/);
+test('the rolling issue body explains its entries, which are comments', () => {
+	const body = issueBody('octanejs/octane', 32);
+	assert.ok(body.startsWith(ISSUE_MARKER));
+	assert.match(body, /at least 32 gzip bytes/);
+	assert.equal(entrySha(entryFor('1'.repeat(40))), '1'.repeat(40));
+	assert.equal(entrySha('Folded into #1.'), null);
+	assert.equal(entrySha(body), null);
 });
 
-test('the oldest entries are dropped to fit GitHub issue limits', () => {
-	let body = '';
-	const long = 'x'.repeat(11_000);
-	for (let index = 0; index < 8; index++) {
-		const sha = String(index).repeat(40);
-		body = mergeIssueBody(body, entryFor(sha, long), { headSha: sha, minGzip: 32 });
-	}
-	assert.ok(body.length <= 60_000);
-	const kept = parseEntries(body).map(({ sha }) => sha[0]);
-	assert.equal(kept[0], '7');
-	assert.ok(kept.length < 8 && kept.length >= 4);
-	assert.deepEqual(kept, [...kept].sort().reverse());
-});
-
-test('duplicate issue bodies fold into one, newest first, one entry per commit', () => {
-	const options = (headSha) => ({ headSha, repository: 'octanejs/octane', minGzip: 32 });
-	const oldest = mergeIssueBody('', entryFor('1'.repeat(40)), options('1'.repeat(40)));
-	const duplicate = mergeIssueBody('', entryFor('2'.repeat(40)), options('2'.repeat(40)));
-	const folded = mergeIssueBody(
-		[duplicate, oldest],
-		entryFor('3'.repeat(40)),
-		options('3'.repeat(40)),
-	);
-	assert.deepEqual(
-		parseEntries(folded).map(({ sha }) => sha[0]),
-		['3', '2', '1'],
-	);
-	// Each entry ends at its own marker, so a folded body's header is not carried along.
-	assert.equal(folded.split(ISSUE_MARKER).length, 2);
-	assert.equal(folded.split('## Bundle size review').length, 2);
-});
-
-// An in-memory issue tracker. `beforeCreate` runs once, inside the next create,
-// to replay another publish landing between this one's read and its write.
+// An in-memory issue tracker. Each hook runs once, inside the next call of its
+// name, to replay another publish landing between this one's read and write.
 function fakeIssues() {
 	const issues = new Map();
-	let next = 1;
-	const hooks = { beforeCreate: null };
+	let nextIssue = 1;
+	let nextComment = 1;
+	const hooks = { beforeCreate: null, beforeComment: null };
+	const runHook = (name) => {
+		const hook = hooks[name];
+		hooks[name] = null;
+		hook?.();
+	};
 	const github = {
-		openIssues: () =>
-			[...issues].filter(([, issue]) => issue.open).map(([number, { body }]) => ({ number, body })),
-		body: (number) => issues.get(number).body,
+		openIssues: () => [...issues].filter(([, issue]) => issue.open).map(([number]) => number),
+		comments: (number) => issues.get(number).comments.map((comment) => ({ ...comment })),
 		create(body) {
-			const hook = hooks.beforeCreate;
-			hooks.beforeCreate = null;
-			hook?.();
-			const number = next++;
-			issues.set(number, { body, open: true });
+			runHook('beforeCreate');
+			const number = nextIssue++;
+			issues.set(number, { body, open: true, comments: [] });
 			return number;
 		},
-		edit(number, body) {
-			issues.get(number).body = body;
+		comment(number, body) {
+			runHook('beforeComment');
+			issues.get(number).comments.push({ id: nextComment++, body });
 		},
-		close(number) {
+		editComment(id, body) {
+			for (const issue of issues.values()) {
+				for (const comment of issue.comments) if (comment.id === id) comment.body = body;
+			}
+		},
+		close(number, comment) {
 			issues.get(number).open = false;
+			issues.get(number).comments.push({ id: nextComment++, body: comment });
 		},
 	};
-	return { github, issues, hooks };
-}
-
-test('two publishes that each open an issue converge on the oldest one', () => {
-	const { github, issues, hooks } = fakeIssues();
-	const publishAs = (sha) =>
+	const entries = (number) =>
+		issues
+			.get(number)
+			.comments.map(({ body }) => entrySha(body)?.[0])
+			.filter(Boolean);
+	const publishAs = (sha, analysis) =>
 		publishEntry(github, {
-			entry: entryFor(sha),
+			entry: entryFor(sha, analysis),
 			headSha: sha,
 			repository: 'octanejs/octane',
 			minGzip: 32,
 		});
+	return { github, issues, hooks, entries, publishAs };
+}
+
+test('each push adds one entry comment, and a rerun edits its own', () => {
+	const { issues, entries, publishAs } = fakeIssues();
+	assert.equal(publishAs('1'.repeat(40)), 1);
+	assert.match(issues.get(1).body, /at least 32 gzip bytes/);
+	assert.equal(publishAs('2'.repeat(40)), 1);
+	assert.equal(publishAs('1'.repeat(40), '**Verdict:** slop — rerun.'), 1);
+	assert.deepEqual(entries(1), ['1', '2']);
+	assert.match(issues.get(1).comments[0].body, /rerun/);
+	assert.equal(issues.size, 1);
+});
+
+test('concurrent publishes to the open issue keep both entries', () => {
+	const { hooks, entries, publishAs } = fakeIssues();
+	assert.equal(publishAs('a'.repeat(40)), 1);
+	// Both read the open issue; the second push publishes start to finish
+	// before the first writes its entry.
+	hooks.beforeComment = () => assert.equal(publishAs('c'.repeat(40)), 1);
+	assert.equal(publishAs('d'.repeat(40)), 1);
+	assert.deepEqual(entries(1), ['a', 'c', 'd']);
+});
+
+test('two publishes that each open an issue converge on the oldest one', () => {
+	const { github, issues, hooks, entries, publishAs } = fakeIssues();
 	// Both find no open issue: the second push publishes start to finish while
-	// the first is about to create its own.
+	// the first is about to open its own.
 	hooks.beforeCreate = () => assert.equal(publishAs('c'.repeat(40)), 1);
 	assert.equal(publishAs('a'.repeat(40)), 1);
-	assert.deepEqual(
-		github.openIssues().map(({ number }) => number),
-		[1],
-	);
-	assert.deepEqual(
-		parseEntries(issues.get(1).body).map(({ sha }) => sha[0]),
-		['a', 'c'],
-	);
+	assert.deepEqual(github.openIssues(), [1]);
+	assert.deepEqual(entries(1), ['c', 'a']);
 	assert.equal(issues.get(2).open, false);
 	// A later push keeps writing to the surviving issue.
 	assert.equal(publishAs('d'.repeat(40)), 1);
-	assert.deepEqual(
-		parseEntries(issues.get(1).body).map(({ sha }) => sha[0]),
-		['d', 'a', 'c'],
-	);
+	assert.deepEqual(entries(1), ['c', 'a', 'd']);
 });
 
 test('the prompt gives Claude the range, the landed pull requests, and the growth', () => {
@@ -255,6 +234,14 @@ test('the workflow reviews main after the push and keeps Claude read-only', () =
 	);
 	assert.match(claude, /@anthropic-ai\/claude-code@\d+\.\d+\.\d+ /);
 	assert.doesNotMatch(claude, /GH_TOKEN|github\.token/);
+	// A failed or timed-out review still lets the growth be recorded, and only
+	// a finished review becomes analysis.md.
+	assert.match(claude, /continue-on-error: true/);
+	assert.doesNotMatch(claude, />\s*"\$RESULTS\/review\/analysis\.md"/);
+	assert.match(
+		claude,
+		/\n\s+mv "\$RESULTS\/review\/analysis\.partial\.md" "\$RESULTS\/review\/analysis\.md"\n/,
+	);
 	const record = step('Record the review in the size issue');
 	assert.match(record, /if: steps\.growth\.outputs\.grew == 'true'\n/);
 	assert.doesNotMatch(record, /ANTHROPIC/);

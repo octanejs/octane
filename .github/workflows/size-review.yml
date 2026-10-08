@@ -6,8 +6,8 @@ name: Size review
 # by at least SIZE_REVIEW_MIN_GZIP_BYTES gzip bytes (default 32), Claude reads
 # the landed diff and judges whether the growth is earned or slop and how the
 # change could have been written smaller. benchmarks/size-review.mjs records
-# that in one rolling "Bundle size review" issue: an open one is edited in
-# place, newest entry first, and a new one is opened only when none is open.
+# that as a comment on one rolling "Bundle size review" issue, opening a new
+# issue only when none is open.
 #
 # Claude runs only when the ANTHROPIC_API_KEY repository secret is set, and only
 # with read-only tools: Read, Grep, Glob, and git diff/log/show. Without the
@@ -123,8 +123,11 @@ jobs:
         run: node benchmarks/size-review.mjs prompt --out="$RESULTS/review"
 
       # Read-only tools, no GitHub token, and the output only becomes issue text.
+      # A failed or timed-out review must not stop the growth being recorded:
+      # the step may fail, and analysis.md exists only when Claude finished.
       - name: Review the growth with Claude
         if: steps.growth.outputs.grew == 'true' && env.HAS_ANTHROPIC_KEY == 'true'
+        continue-on-error: true
         timeout-minutes: 20
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
@@ -135,8 +138,8 @@ jobs:
             --max-turns 60 \
             --max-budget-usd 5 \
             --allowedTools "Read,Grep,Glob,Bash(git diff:*),Bash(git log:*),Bash(git show:*)" \
-            < "$RESULTS/review/prompt.md" > "$RESULTS/review/analysis.md" \
-            || { echo "::warning::Claude review failed; the issue records the growth only"; rm -f "$RESULTS/review/analysis.md"; }
+            < "$RESULTS/review/prompt.md" > "$RESULTS/review/analysis.partial.md"
+          mv "$RESULTS/review/analysis.partial.md" "$RESULTS/review/analysis.md"
 
       - name: Record the review in the size issue
         if: steps.growth.outputs.grew == 'true'

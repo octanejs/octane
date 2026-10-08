@@ -10,8 +10,8 @@
 // `grew=true` to GITHUB_OUTPUT when some bundle grew by at least
 // SIZE_REVIEW_MIN_GZIP_BYTES gzip bytes. `prompt` writes the instructions
 // Claude reviews the landed diff with. `publish` records the growth and
-// Claude's review (analysis.md, when present) in one rolling issue: an open
-// issue is edited in place, newest entry first, and a new issue is opened only
+// Claude's review (analysis.md, when present) as one comment on a rolling
+// issue: the open issue collects every entry, and a new issue is opened only
 // when none is open. Concurrent publishes converge on the oldest open issue.
 // Nothing here gates a merge; it reports what landed.
 //
@@ -28,11 +28,9 @@ export const SIZE_SUITES = ['bundle-size', 'bundle-reachability'];
 export const ISSUE_TITLE = 'Bundle size review';
 export const ISSUE_MARKER = '<!-- octane-size-review -->';
 export const DEFAULT_MIN_GZIP_BYTES = 32;
-const ENTRY_END = '<!-- size-review:end -->';
 const entryStart = (sha) => `<!-- size-review:entry ${sha} -->`;
-const ENTRY_START = /<!-- size-review:entry ([0-9a-f]+) -->/g;
-// GitHub rejects issue bodies over 65,536 characters.
-const BODY_LIMIT = 60_000;
+const ENTRY_START = /^<!-- size-review:entry ([0-9a-f]+) -->/;
+// Keeps an entry comment well under GitHub's 65,536-character limit.
 const ANALYSIS_LIMIT = 12_000;
 const TABLE_ROWS = 20;
 const METRIC = /^(?:(.*)_)?(raw|gzip|brotli)$/;
@@ -160,13 +158,13 @@ export function renderEntry({ baseSha, headSha, commits, growth, analysis, runUr
 		review,
 		'',
 		runUrl ? `<sub>[Workflow run](${runUrl})</sub>` : '',
-		ENTRY_END,
 	]
 		.filter((line, index, lines) => line !== '' || lines[index - 1] !== '')
 		.join('\n');
 }
 
-function header(repository, minGzip) {
+// The rolling issue's body. Its entries are comments, one per reviewed push.
+export function issueBody(repository, minGzip) {
 	const workflow = repository
 		? `[size-review.yml](https://github.com/${repository}/blob/main/.github/workflows/size-review.yml)`
 		: '`size-review.yml`';
@@ -174,53 +172,20 @@ function header(repository, minGzip) {
 		ISSUE_MARKER,
 		'## Bundle size review',
 		'',
-		`Each entry is a change that landed on \`main\` and grew a production bundle by at least ${minGzip} gzip bytes, ` +
+		`Each comment below is a change that landed on \`main\` and grew a production bundle by at least ${minGzip} gzip bytes, ` +
 			'measured by deterministic builds of the bundle-size and reachability scenarios before and after the push. ' +
 			'Claude reviewed each landed diff for where the bytes went, whether the growth is earned or slop, and how the ' +
 			'change could have been written smaller.',
 		'',
-		`${workflow} adds new entries to the top while this issue is open. Close it once the entries are triaged; ` +
+		`${workflow} adds a comment for each new entry while this issue is open. Close it once the entries are triaged; ` +
 			'the next growth opens a new one.',
 		'',
 	].join('\n');
 }
 
-export function parseEntries(body) {
-	const entries = [];
-	const starts = [...(body ?? '').matchAll(ENTRY_START)];
-	for (const [index, match] of starts.entries()) {
-		let end = index + 1 < starts.length ? starts[index + 1].index : body.length;
-		// Stop at the entry's own end marker, so text after it is never carried along.
-		const close = body.indexOf(ENTRY_END, match.index);
-		if (close !== -1 && close < end) end = close + ENTRY_END.length;
-		const text = body.slice(match.index, end).trimEnd();
-		entries.push({ sha: match[1], text });
-	}
-	return entries;
-}
-
-// Puts the entry at the top, replacing an earlier entry for the same commit (a
-// rerun), and drops the oldest entries until the body fits GitHub's limit.
-// `bodies` is one issue body, or several in order when duplicate issues fold
-// into one; each commit keeps its first entry.
-export function mergeIssueBody(bodies, entry, { headSha, repository, minGzip }) {
-	const seen = new Set([headSha]);
-	const entries = [{ sha: headSha, text: entry }];
-	for (const body of [bodies].flat()) {
-		for (const existing of parseEntries(body)) {
-			if (seen.has(existing.sha)) continue;
-			seen.add(existing.sha);
-			entries.push(existing);
-		}
-	}
-	const top = header(repository, minGzip);
-	const render = () => top + '\n' + entries.map((existing) => existing.text).join('\n\n') + '\n';
-	let next = render();
-	while (next.length > BODY_LIMIT && entries.length > 1) {
-		entries.pop();
-		next = render();
-	}
-	return next;
+// The commit an entry comment records, or null for any other comment.
+export function entrySha(comment) {
+	return ENTRY_START.exec(comment ?? '')?.[1] ?? null;
 }
 
 function readSuites(directory) {
@@ -265,37 +230,44 @@ function landedCommits(baseSha, headSha, repository) {
 	});
 }
 
-// Records `entry` in the oldest open review issue. Two pushes can publish at
-// once, and both can find no open issue and open one each. So every attempt
-// writes to the oldest open issue, folds in the entries of any newer review
-// issue and closes it, then re-reads the oldest open issue to confirm this
-// entry survived. A racing publish that wrote a newer issue converges on the
-// same oldest one on its next attempt.
+// Records `entry` as a comment on the oldest open review issue. Other runs
+// only ever add comments, so concurrent publishes cannot overwrite each
+// other's entries. A rerun for the same commit edits its own comment, and the
+// workflow's per-commit concurrency group serializes those reruns. Two runs
+// that both find no open issue can each open one, so every attempt also copies
+// the entries of any newer review issue onto the oldest and closes it, then
+// confirms this entry is on the oldest open issue. A copy can repeat an entry;
+// it never loses one.
 //
-// `github` reads and writes issues: openIssues() lists the open review issues
-// oldest first as { number, body }, body(number) re-reads one, create(body)
-// returns the new number, edit(number, body), and close(number, comment).
+// `github` reads and writes issues: openIssues() lists the open review issue
+// numbers oldest first, comments(number) lists { id, body }, create(body)
+// returns the new number, comment(number, body), editComment(id, body), and
+// close(number, comment).
 export function publishEntry(github, { entry, headSha, repository, minGzip }) {
-	const options = { headSha, repository, minGzip };
+	const hasEntry = (number) =>
+		github.comments(number).some(({ body }) => entrySha(body) === headSha);
 	for (let attempt = 1; attempt <= 5; attempt++) {
-		const [issue, ...duplicates] = github.openIssues();
-		// Entries from a racing publish's duplicate are newer than the oldest issue's.
-		const body = mergeIssueBody(
-			[...duplicates.map(({ body }) => body), issue?.body ?? ''],
-			entry,
-			options,
-		);
-		const number = issue === undefined ? github.create(body) : issue.number;
-		if (issue !== undefined) github.edit(number, body);
+		const [oldest, ...duplicates] = github.openIssues();
+		const number = oldest ?? github.create(issueBody(repository, minGzip));
+		const comments = github.comments(number);
+		const recorded = new Set(comments.map(({ body }) => entrySha(body)));
+		const own = comments.find(({ body }) => entrySha(body) === headSha);
+		if (own === undefined) github.comment(number, entry);
+		else if (own.body !== entry) github.editComment(own.id, entry);
+		recorded.add(headSha);
 		for (const duplicate of duplicates) {
-			github.close(duplicate.number, `Folded into #${number}.`);
+			for (const { body } of github.comments(duplicate)) {
+				const sha = entrySha(body);
+				if (sha === null || recorded.has(sha)) continue;
+				recorded.add(sha);
+				github.comment(number, body);
+			}
+			github.close(duplicate, `Folded into #${number}.`);
 		}
-		const [oldest] = github.openIssues();
-		if (oldest !== undefined && github.body(oldest.number).includes(entryStart(headSha))) {
-			return oldest.number;
-		}
+		const [current] = github.openIssues();
+		if (current !== undefined && hasEntry(current)) return current;
 		console.warn(
-			`size review entry is not in the oldest open issue on attempt ${attempt}; retrying`,
+			`size review entry is not on the oldest open issue on attempt ${attempt}; retrying`,
 		);
 	}
 	throw new Error('could not record the size review entry');
@@ -304,10 +276,14 @@ export function publishEntry(github, { entry, headSha, repository, minGzip }) {
 function githubIssues(repository, bodyFile) {
 	// An issue this run opened is kept in view even if the listing lags behind.
 	const created = new Set();
-	const write = (body) => fs.writeFileSync(bodyFile, body);
+	const api = (route) => JSON.parse(run('gh', ['api', route]));
+	const write = (body) => {
+		fs.writeFileSync(bodyFile, body);
+		return bodyFile;
+	};
 	return {
 		openIssues() {
-			const listed = JSON.parse(
+			const numbers = JSON.parse(
 				run('gh', [
 					'api',
 					'--paginate',
@@ -316,19 +292,29 @@ function githubIssues(repository, bodyFile) {
 				]),
 			)
 				.flat()
-				.filter((issue) => !issue.pull_request && issue.body?.includes(ISSUE_MARKER));
+				.filter((issue) => !issue.pull_request && issue.body?.includes(ISSUE_MARKER))
+				.map((issue) => issue.number);
 			for (const number of created) {
-				if (listed.some((issue) => issue.number === number)) continue;
-				const issue = JSON.parse(run('gh', ['api', `repos/${repository}/issues/${number}`]));
-				if (issue.state === 'open') listed.push(issue);
+				if (
+					!numbers.includes(number) &&
+					api(`repos/${repository}/issues/${number}`).state === 'open'
+				)
+					numbers.push(number);
 			}
-			return listed
-				.map(({ number, body }) => ({ number, body: body ?? '' }))
-				.sort((a, b) => a.number - b.number);
+			return numbers.sort((a, b) => a - b);
 		},
-		body: (number) => run('gh', ['api', `repos/${repository}/issues/${number}`, '--jq', '.body']),
+		comments: (number) =>
+			JSON.parse(
+				run('gh', [
+					'api',
+					'--paginate',
+					'--slurp',
+					`repos/${repository}/issues/${number}/comments?per_page=100`,
+				]),
+			)
+				.flat()
+				.map(({ id, body }) => ({ id, body: body ?? '' })),
 		create(body) {
-			write(body);
 			const url = run('gh', [
 				'issue',
 				'create',
@@ -337,15 +323,24 @@ function githubIssues(repository, bodyFile) {
 				'--title',
 				ISSUE_TITLE,
 				'--body-file',
-				bodyFile,
+				write(body),
 			]).trim();
 			const number = Number(url.split('/').pop());
 			created.add(number);
 			return number;
 		},
-		edit(number, body) {
-			write(body);
-			run('gh', ['issue', 'edit', String(number), '-R', repository, '--body-file', bodyFile]);
+		comment(number, body) {
+			run('gh', ['issue', 'comment', String(number), '-R', repository, '--body-file', write(body)]);
+		},
+		editComment(id, body) {
+			run('gh', [
+				'api',
+				'--method',
+				'PATCH',
+				`repos/${repository}/issues/comments/${id}`,
+				'--input',
+				write(JSON.stringify({ body })),
+			]);
 		},
 		close(number, comment) {
 			run('gh', ['issue', 'close', String(number), '-R', repository, '--comment', comment]);
