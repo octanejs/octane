@@ -13526,10 +13526,7 @@ function unmountSlot(val: any, detachDom: boolean): void {
 		// never reaches it, so portals must always self-detach individually.
 		const childDetach = k === 'portalSlotSlot' ? true : detachDom;
 		if (val.block) unmountBlock(val.block, childDetach);
-		if (k === 'portalSlotSlot' && val.target) {
-			unregisterPortalEventRange(val.target, val);
-			unregisterDelegationTarget(val.target);
-		}
+		if (k === 'portalSlotSlot') releasePortalTarget(val);
 	}
 }
 
@@ -33024,10 +33021,7 @@ function renderPortalState(
 		registerDelegationTarget(target);
 		if (ROOT_RENDER_TRANSACTION !== null) {
 			const created = state;
-			journalUndo(() => {
-				unregisterPortalEventRange(target, created);
-				unregisterDelegationTarget(target);
-			});
+			journalUndo(() => releasePortalTarget(created));
 		}
 		renderBlock(block);
 	} else {
@@ -33097,6 +33091,16 @@ function teardownPortalState(state: PortalSlot): void {
 		unmountBlock(state.block, true);
 		state.block = null;
 	}
+	releasePortalTarget(state);
+}
+
+/**
+ * Give back this portal's share of its target's event delegation. The share is
+ * a refcount, so it is released once: a root render that rolls back reaches a
+ * portal it created through the portal's creation undo and again through its
+ * owner's teardown. A released portal no longer owns a target.
+ */
+function releasePortalTarget(state: PortalSlot): void {
 	if (state.target) {
 		unregisterPortalEventRange(state.target, state);
 		unregisterDelegationTarget(state.target);
