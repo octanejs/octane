@@ -295,19 +295,28 @@ export function Effect({ id, log }: { id: number; log: string[] }) @{
 		hydratedRoot.unmount();
 	});
 
-	it('reports an unowned directive in a render-only block instead of dropping it', () => {
-		// A render-only block is transparent, so its `@if` is as unowned as a bare one.
+	it('renders a callback-owned directive in a transparent render-only block', () => {
 		const blockSource = `const render = (ok: boolean) => <p>@{ @if (ok) { <b /> } }</p>;
 export function App() @{ <div>{render(true)}</div> }
 `;
 		for (const mode of ['client', 'server'] as const) {
-			expect(() =>
-				loadCompiledFixtureSource(blockSource, {
-					id: `module-callback-block-if-${mode}.tsrx`,
-					mode,
-					compileOptions: { dev },
-				}),
-			).toThrow(/`@if` is not supported inside a module-level callback/);
+			const compiled = loadCompiledFixtureSource(blockSource, {
+				id: `module-callback-block-if-${mode}.tsrx`,
+				mode,
+				compileOptions: { dev },
+			});
+			if (mode === 'server') {
+				expect(ServerRT.renderToString(compiled.App, {}).html).toContain('<b');
+			} else {
+				const container = newContainer();
+				const root = createRoot(container);
+				try {
+					root.render(compiled.App, {});
+					expect(container.querySelector('p > b')).not.toBeNull();
+				} finally {
+					root.unmount();
+				}
+			}
 		}
 	});
 });
