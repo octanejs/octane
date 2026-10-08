@@ -49,6 +49,47 @@ afterEach(async () => {
 });
 
 describe('transition rendering yields to the host', () => {
+	it('does not let a layout-committed Action cue suppress a later native capture', async () => {
+		const native = installViewTransitionMocks();
+		let update!: (value: number) => void;
+		function ActionOwner() {
+			const [value, dispatch, pending] = useActionState(
+				() => 1,
+				0,
+				Symbol.for('transition-task.layout-action'),
+			);
+			useLayoutEffect(
+				() => {
+					dispatch();
+				},
+				[],
+				Symbol.for('transition-task.layout-dispatch'),
+			);
+			return createElement('p', null, `${value}${pending ? 'P' : ''}`);
+		}
+		function Animated() {
+			const [value, setValue] = useState(0, Symbol.for('transition-task.after-layout-action'));
+			update = setValue;
+			return createElement(
+				ViewTransition,
+				{ default: 'fade' },
+				createElement('output', null, String(value)),
+			);
+		}
+		try {
+			const animated = mount(Animated);
+			const action = mount(ActionOwner);
+			expect(action.textContent).toBe('0P');
+			startTransition(() => update(1));
+			await microtasks();
+			expect(animated.textContent).toBe('1');
+			expect(native.calls).toHaveLength(1);
+		} finally {
+			await act(() => {});
+			native.restore();
+		}
+	});
+
 	it('preserves a View Transition when another root updates before its task', async () => {
 		const native = installViewTransitionMocks();
 		try {
