@@ -1,3 +1,5 @@
+import { yieldForHostBudget } from '../host-budget.js';
+import { publishNativeProducer } from './read-protocol.js';
 import { formatClientError } from '../error-codes.client.generated.js';
 import { decodeSignalValue, encodeSignalValue } from './encoding.js';
 import { createResourceCellWith } from './engine.js';
@@ -405,7 +407,7 @@ function observePromise(attempt: Attempt, result: unknown): void {
 		(value) => {
 			const entry = currentEntry(attempt);
 			if (!entry) return;
-			signalBatch(() => {
+			publishNativeProducer(() => {
 				entry.state = readyState(value, { requestKey: entry.request.identity });
 				completeAttempt(attempt);
 				entry.deliver();
@@ -419,7 +421,7 @@ function failAttempt(attempt: Attempt, error: unknown): void {
 	const entry = currentEntry(attempt);
 	if (!entry) return;
 	attempt.observations?.fail(error);
-	signalBatch(() => {
+	publishNativeProducer(() => {
 		const iterator = attempt.iterator;
 		entry.state = errorState(
 			error,
@@ -483,6 +485,11 @@ function observeStream(attempt: Attempt, result: unknown): void {
 
 function nextStreamStep(attempt: Attempt): void {
 	if (!currentEntry(attempt) || !attempt.iterator) return;
+	const wait = yieldForHostBudget();
+	if (wait !== undefined) {
+		wait.then(() => nextStreamStep(attempt));
+		return;
+	}
 	let step: PromiseLike<IteratorResult<unknown>> | IteratorResult<unknown>;
 	try {
 		step = untrack(() => signalBatch(() => attempt.iterator!.next()));
@@ -501,6 +508,11 @@ function nextStreamStep(attempt: Attempt): void {
 function receiveStreamStep(attempt: Attempt, result: IteratorResult<unknown>): void {
 	let entry = currentEntry(attempt);
 	if (!entry) return;
+	const wait = yieldForHostBudget();
+	if (wait !== undefined) {
+		wait.then(() => receiveStreamStep(attempt, result));
+		return;
+	}
 	if (!result || (typeof result !== 'object' && typeof result !== 'function')) {
 		failAttempt(attempt, new TypeError(formatClientError(114)));
 		return;
@@ -528,7 +540,7 @@ function receiveStreamStep(attempt: Attempt, result: IteratorResult<unknown>): v
 			failAttempt(attempt, new Error(formatClientError(115)));
 			return;
 		}
-		signalBatch(() => {
+		publishNativeProducer(() => {
 			accepted.state = readyState((accepted.state.snapshot as { value: unknown }).value, {
 				connection: 'closed',
 				complete: true,
@@ -540,7 +552,7 @@ function receiveStreamStep(attempt: Attempt, result: IteratorResult<unknown>): v
 		return;
 	}
 	attempt.hasYielded = true;
-	signalBatch(() => {
+	publishNativeProducer(() => {
 		accepted.state = readyState(value, {
 			connection: 'open',
 			complete: false,

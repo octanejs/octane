@@ -194,9 +194,14 @@ test('resets the editor between draft routes and updates one draft across repeat
 	await page.getByRole('button', { name: 'Save draft' }).click();
 	await expect(page).toHaveURL(new RegExp(`/compose/draft-1[?]session=${session}$`));
 	const savedDraftURL = page.url();
+	// The URL can change while the new editor's route-reset effect is pending.
+	// Wait for its loaded heading and cleared fetcher result before editing again.
+	await expect(page.getByRole('heading', { level: 1, name: 'One durable draft' })).toBeVisible();
+	await expect(draftState).toHaveText('Saved just now');
 	await expect(body).toHaveValue('First version of the planning note.');
 
 	await body.fill('Second version replaces the first without creating another draft.');
+	await expect(draftState).toHaveText('Unsaved changes');
 	await page.getByRole('button', { name: 'Save draft' }).click();
 	await expect(draftState).toHaveText('Draft saved');
 	await expect(page).toHaveURL(savedDraftURL);
