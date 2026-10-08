@@ -264,9 +264,7 @@ export function App() @{
 
 		for (const [label, typeSource] of positions) {
 			it(`keeps both arms for a directive in ${label}`, () => {
-				// The type view carries the arms regardless of whether the emitters can
-				// fold them — a module-level callback is rejected for output, but its
-				// arms still have to type-check.
+				// Every renderable arm must remain visible to the type checker.
 				const { code } = compileToVolarMappings(typeSource, 'App.tsrx') as { code: string };
 				expect(code).toContain('tsA');
 				expect(code).toContain('tsB');
