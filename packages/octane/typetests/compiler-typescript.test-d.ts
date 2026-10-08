@@ -1,6 +1,8 @@
 import { compile, type CompileOptions, type CompileResult } from 'octane/compiler';
 import {
 	createTextTypeProject,
+	validateNativeSignalNames,
+	type NativeTypeScriptProgram,
 	type TextTypeFacts,
 	type TextTypeProject,
 	type TextTypeProjectOptions,
@@ -30,6 +32,16 @@ export const virtualSourceOffset: number = virtual.mappings[0].sourceOffsets[0];
 export const inspection = compileTypesInspection('', 'src/App.tsrx');
 export const inspectedSourceOffset: number = inspection.segments[0].srcStart;
 
+// An aliased TypeScript install, such as TypeScript 7 beside a classic 5.9.
+export const nativeOptions = {
+	tsconfig: './tsconfig.json',
+	typescript: 'typescript-native',
+} satisfies TextTypeProjectOptions;
+declare const nativeProgram: NativeTypeScriptProgram;
+export const nativeDiagnostics = validateNativeSignalNames(nativeProgram, 'src/App.tsx', {
+	typescript: 'typescript-native',
+});
+
 project.invalidate('src/model.ts');
 project.invalidate();
 project.dispose();
@@ -38,6 +50,8 @@ project.dispose();
 createTextTypeProject({});
 // @ts-expect-error — adapter options are a closed public surface.
 createTextTypeProject({ tsconfig: './tsconfig.json', watch: true });
+// @ts-expect-error — `typescript` names a package or directory, not a loaded module.
+createTextTypeProject({ tsconfig: './tsconfig.json', typescript: {} });
 // @ts-expect-error — authored source is text, not a TypeScript AST.
 project.snapshot('src/App.tsrx', {});
 // @ts-expect-error — snapshots expose immutable authored ranges.
