@@ -9,8 +9,7 @@ import { loadCompiledFixtureSource, type CompiledFixtureModule } from '../_serve
 // the call, with its props, its control flow, and whatever it closes over. The
 // other `Object` statics that return their first argument behave the same way.
 // A template function passed to a call that may call it, like `xs.map(Row)`,
-// still lowers to returned JSX, and a directive in it inside a module-level
-// function is still reported.
+// lowers to returned JSX and owns the directives in that returned value.
 
 type Props = { show: boolean; xs: string[] };
 
@@ -198,8 +197,9 @@ export function H(props: Props) @{
 };
 
 // Calls that may call the function they receive, in a module-level function.
-const UNOWNED: Record<string, string> = {
-	'a nested component passed to map': `function make(xs: { done: boolean }[]) {
+const CALLBACKS: Record<string, [string, string, string]> = {
+	'a nested component passed to map': [
+		`function make(xs: { done: boolean }[]) {
 	function Row(x: { done: boolean }) @{
 		<li>
 			@if (x.done) {
@@ -209,10 +209,14 @@ const UNOWNED: Record<string, string> = {
 	}
 	return xs.map(Row);
 }
-export function H() @{ <ul>{make([{ done: true }])}</ul> }
+export function H(props: { show: boolean }) @{ <ul>{make([{ done: props.show }])}</ul> }
 `,
-	'a nested component passed to a user function': `const run = (fn: (props: { done: boolean }) => unknown) => fn({ done: true });
-function make() {
+		'<ul><li><b>done</b></li></ul>',
+		'<ul><li></li></ul>',
+	],
+	'a nested component passed to a user function': [
+		`const run = (fn: (props: { done: boolean }) => unknown, props: { done: boolean }) => fn(props);
+function make(done: boolean) {
 	function Row(x: { done: boolean }) @{
 		<li>
 			@if (x.done) {
@@ -220,11 +224,15 @@ function make() {
 			}
 		</li>
 	}
-	return run(Row);
+	return run(Row, { done });
 }
-export function H() @{ <ul>{make()}</ul> }
+export function H(props: { show: boolean }) @{ <ul>{make(props.show)}</ul> }
 `,
-	'a nested component passed to an Object static that calls it': `function make(xs: { done: boolean }[]) {
+		'<ul><li><b>done</b></li></ul>',
+		'<ul><li></li></ul>',
+	],
+	'a nested component passed to an Object static that calls it': [
+		`function make(xs: { done: boolean }[]) {
 	function Row(x: { done: boolean }) @{
 		<li>
 			@if (x.done) {
@@ -234,9 +242,13 @@ export function H() @{ <ul>{make()}</ul> }
 	}
 	return Object.groupBy(xs, Row);
 }
-export function H() @{ <ul>{Object.keys(make([{ done: true }])).length as number}</ul> }
+export function H(props: { show: boolean }) @{ <ul>{String(Object.keys(make(props.show ? [{ done: true }] : [])).length)}</ul> }
 `,
-	'an inline function passed to a user function at module scope': `const run = (fn: (props: { done: boolean }) => unknown) => fn({ done: true });
+		'<ul>1</ul>',
+		'<ul>0</ul>',
+	],
+	'an inline function passed to a user function at module scope': [
+		`const run = (fn: (props: { done: boolean }) => unknown) => fn({ done: true });
 const row = run((x) => @{
 	<li>
 		@if (x.done) {
@@ -246,6 +258,9 @@ const row = run((x) => @{
 });
 export function H() @{ <ul>{row}</ul> }
 `,
+		'<ul><li><b>done</b></li></ul>',
+		'<ul><li><b>done</b></li></ul>',
+	],
 };
 
 const STATES: Props[] = [
@@ -363,18 +378,21 @@ describe.each([false, true])('a @{} component passed to an Object static (dev: %
 		});
 	}
 
-	for (const [name, source] of Object.entries(UNOWNED)) {
-		it(`still reports a directive in ${name}`, () => {
-			const index = Object.keys(UNOWNED).indexOf(name);
-			for (const mode of ['client', 'server'] as const) {
-				expect(() =>
-					loadCompiledFixtureSource(source, {
-						id: `object-assign-code-block-unowned-${index}-${mode}.tsrx`,
-						mode,
-						compileOptions: { dev },
-					}),
-				).toThrow(/`@if` is not supported inside a module-level callback/);
-			}
+	for (const [name, [source, shown, hidden]] of Object.entries(CALLBACKS)) {
+		it(`renders and hydrates directives in ${name}`, async () => {
+			const index = Object.keys(CALLBACKS).indexOf(name);
+			const compiled = load(source, `object-assign-code-block-callback-${index}.tsrx`, dev);
+			const expected = [shown, hidden];
+			expect(STATES.map((props) => content(serverHtml(compiled, props)))).toEqual(expected);
+			const mounted = mount(compiled);
+			expect(mounted.errors).toEqual([]);
+			expect(mounted.seen).toEqual(expected);
+			const hydrated = await hydrate(compiled);
+			expect(hydrated.recoverable).toEqual([]);
+			expect(hydrated.errors).toEqual([]);
+			expect(hydrated.hydrated).toBe(shown);
+			expect(hydrated.updated).toBe(hidden);
+			expect(hydrated.hydratedElements).toEqual(hydrated.serverElements);
 		});
 	}
 });
