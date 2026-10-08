@@ -4290,15 +4290,16 @@ function journalRootSlot(
 	before: Node | null,
 	after: Node | null,
 ): void {
-	const transaction = ROOT_RENDER_TRANSACTION;
-	if (transaction === null || transaction.aborted || ROOT_RENDER_ROLLBACK) return;
-	const structures = (transaction.structures ??= new Map());
-	if ((structures.get(state) ?? -1) >= TRANSITION_JOURNAL_CHECKPOINT) return;
-	structures.set(state, TRANSITION_JOURNAL!.length);
-	journalObjectOnce(state);
-	journalUndo(() => {
-		structures.delete(state);
-	});
+	if (ROOT_RENDER_TRANSACTION === null || ROOT_RENDER_TRANSACTION.aborted || ROOT_RENDER_ROLLBACK)
+		return;
+	const seen = TRANSITION_JOURNAL_BAGS!;
+	const at = seen.get(state) ?? -1;
+	// `seen` holds the snapshot's log index, plus one when the range was taken
+	// with it. A plain snapshot (journalObjectOnce) has no range, so take
+	// another with one; replay restores the older snapshot last.
+	if (at >= TRANSITION_JOURNAL_CHECKPOINT && (at & 1) !== 0) return;
+	seen.set(state, TRANSITION_JOURNAL!.length + 1);
+	TRANSITION_JOURNAL!.push(JOURNAL_BAG, state, { ...state }, null);
 	// Strict adoption prepares scopes, never an undo of the early owner's live DOM.
 	if (!hydrationStarted || PRESENTATION_HYDRATION?.revision === undefined)
 		journalRootRange(parent, before, after);
@@ -32686,8 +32687,11 @@ function unregisterPortalEventRange(target: Node, portal: PortalSlot): void {
 		return;
 	const start = portal.start as PortalEventBoundary | null;
 	const end = portal.end as PortalEventBoundary | null;
-	if (start?.$$portalEventRange === portal) delete start.$$portalEventRange;
-	if (end?.$$portalEventStart === start) delete end.$$portalEventStart;
+	// Clear, never `delete`: deleting an expando from a DOM wrapper drops it into
+	// dictionary mode (a fresh property dictionary per marker, every teardown).
+	// resolvePortalEventOwner reads both fields with `!== undefined`.
+	if (start?.$$portalEventRange === portal) start.$$portalEventRange = undefined;
+	if (end?.$$portalEventStart === start) end.$$portalEventStart = undefined;
 	const ranges = _portalEventRanges.get(target);
 	if (ranges === undefined) return;
 	ranges.delete(portal);
