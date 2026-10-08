@@ -966,7 +966,7 @@ export function PublishedSourceConsumer() @{
 	const commandRef = useRef<HTMLDivElement | null>(null);
 	const inputRef = useRef<HTMLInputElement | null>(null);
 	const toasterRef = useRef<HTMLElement | null>(null);
-	const [springStyles] = useSpring({ from: { opacity: 0 }, to: { opacity: 1 } });
+	const springStyles = useSpring({ from: { opacity: 0 }, to: { opacity: 1 } });
 
 	<section>
 		<BarChart width={320} height={160} data={[{ name: 'Packed', value: 1 }]}>
