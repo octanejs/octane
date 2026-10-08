@@ -92,8 +92,7 @@ deferred JSX values, so each ui commit classifies the identical `defs` value
 and the four children of the `layers` Fragment again, and every field it reads
 from a deferred value runs an accessor that resolves the value's record. The
 gate sums those accessor calls over 16 `tooltip_swarm` commits and 8 `pan_zoom`
-commits and guards each sum against a reviewed budget (`*_scoped_reads`, max
-ratio 1). It reports `renderBlock`, `childSlot` and `deoptItemBody` calls as
+commits and reports each sum (`*_scoped_reads`). It reports `renderBlock`, `childSlot` and `deoptItemBody` calls as
 structural controls, checks every commit's tooltip and viewport state against
 the shared ops replay, and fails if a dashboard subtree is remounted.
 

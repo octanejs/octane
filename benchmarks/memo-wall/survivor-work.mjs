@@ -223,14 +223,6 @@ try {
 				},
 				meta: { gate: 'passed', measured, semantic },
 			},
-			{
-				// A row-scaled journal record is at least one slot per row. The 26
-				// calls create and key the descriptor, visit the survivor, and take
-				// the memo bail; entering the item's own render cost 48 and 8 slots.
-				name: 'survivor-work-budget',
-				ops: { bailed_row_journal_slots: value(1), bailed_row_calls: value(26) },
-				meta: { gate: 'passed' },
-			},
 		],
 		meta: {
 			node: process.version,

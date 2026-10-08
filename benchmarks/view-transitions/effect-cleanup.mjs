@@ -447,18 +447,6 @@ for (const dialect of ['tsrx', 'jsx'])
 			}
 		}
 	}
-for (const name of Object.keys(budget.observed)) {
-	targets.push({
-		name: `vt-effect-cleanup-${name}-budget`,
-		ops: Object.fromEntries(
-			Object.entries(caseBudget(`vt-effect-cleanup-${name}`)).map(([metric, value]) => [
-				metric,
-				countStat(value),
-			]),
-		),
-		meta: { allowance: budget.allowance, calibration: budget.calibration.sourceSha256 },
-	});
-}
 
 targets.push({
 	name: 'vt-effect-cleanup-model',

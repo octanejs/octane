@@ -7,7 +7,7 @@ This suite covers the first two; the existing
 arguments and stale-entry membership.
 
 ```sh
-node benchmarks/bench.mjs effect-scheduling --ratios
+node benchmarks/bench.mjs effect-scheduling
 node benchmarks/effect-scheduling/wave.mjs 8a45222ab
 node benchmarks/effect-postorder/refs.mjs 8a45222ab
 node benchmarks/effect-postorder/run.mjs 8a45222ab
@@ -67,8 +67,10 @@ are unchanged. See the production lifecycle measurements below for the full
 
 ## Coverage and limits
 
-Seventeen deterministic ratio guards cover wave collections/ancestry work and
-ref sort calls, including entries without an owning block. Behavioral tests protect ancestor removal, deep render-phase
+The suite reports wave collections/ancestry work and ref sort calls, including
+entries without an owning block. `wave.mjs` asserts zero collections and
+bounded parent reads, and `refs.mjs` asserts that 1,000 sibling refs drain
+without sorting. Behavioral tests protect ancestor removal, deep render-phase
 convergence, sibling notification order, failed-root isolation, node identity
 through hydration, and nested ref attachment. Deliberate positive depth stamps,
 reversed stable ties, and omitted mixed-ref sorting each fail the corresponding

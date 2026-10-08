@@ -6,7 +6,7 @@ These dispositions complete the remaining investigations; retained costs are
 explicit decisions, not claims that those operations have disappeared.
 
 ```sh
-node benchmarks/bench.mjs --quick --ratios ssr-final-replay
+node benchmarks/bench.mjs --quick ssr-final-replay
 SSR_SOURCE_ROOT=/path/to/frozen/source node benchmarks/ssr-final-replay/work.mjs
 node benchmarks/ssr-final-replay/diagnostics.mjs
 node benchmarks/ssr-final-replay/strings.mjs

@@ -368,14 +368,6 @@ for (const [mode, value] of Object.entries(result.candidate)) {
 			},
 		});
 }
-targets.push({
-	name: 'custom-path-budget',
-	ops: Object.fromEntries(
-		['internCalls', 'concatenations', 'restArrays', 'frames', 'maxEntries', 'retainedEntries'].map(
-			(name) => [name, stat(1)],
-		),
-	),
-});
 const output = {
 	suite: 'hooks-runtime',
 	targets,

@@ -5,8 +5,7 @@ source. It runs actual production runtime code with visible output, retained
 identity, subscription, and teardown controls. Counts from observed bundles
 describe source work; a reached rest site does not prove V8 allocated an array,
 and observed bundles are not timed. The suite is registered in
-the existing benchmark runner, with same-run ratio guards in
-`benchmarks/baselines/ratios.json`.
+the existing benchmark runner.
 
 | Path | Disposition | Evidence |
 | --- | --- | --- |
@@ -48,7 +47,7 @@ From the repository root, use the benchmark runner directly (`pnpm bench`
 runs a separate news benchmark):
 
 ```sh
-node benchmarks/bench.mjs --ratios hooks-runtime
+node benchmarks/bench.mjs hooks-runtime
 ```
 
 To compare the frozen source with this branch using the same local dependencies,
@@ -68,7 +67,7 @@ node benchmarks/recursive-context/context-provider-work.mjs 6284156ce
 
 The benchmark runner writes gitignored results under `benchmarks/results`.
 Individual runners print hashes and semantic checks; set `BENCH_JSON` to a
-temporary file when inspecting their ratio payloads. Keep Node, dependencies,
+temporary file when inspecting their `targets` payloads. Keep Node, dependencies,
 and source provenance the same across paired measurements.
 
 ## Combined production browser measurements
@@ -160,7 +159,7 @@ argument parsing caused the timing gap; reverting both does not eliminate it.
 The source-work savings, bounded retention, and behavior are the supported
 results. Store-update latency remains an explicitly inconclusive performance
 risk, rather than a claimed gain or a new timing budget. The source-operation
-guards do not substitute for a stable-browser latency comparison.
+counts do not substitute for a stable-browser latency comparison.
 
 For the recorded setup, materialize the frozen source as above and link its
 `node_modules`, `packages/octane/node_modules`, and

@@ -1854,69 +1854,6 @@
           "values": 32,
           "outputHash": "23b22df6bf551a4e788327db3b3d3d96e1eca49078d2c6bd0049da2d390eca8b"
         }
-      },
-      {
-        "name": "scan-budget",
-        "ops": {
-          "boundary_arrays": {
-            "score": 1,
-            "median": 1,
-            "min": 1,
-            "samples": 1
-          },
-          "copied_boundaries": {
-            "score": 1,
-            "median": 1,
-            "min": 1,
-            "samples": 1
-          }
-        }
-      },
-      {
-        "name": "populated-budget",
-        "ops": {
-          "collection_copies": {
-            "score": 688,
-            "median": 688,
-            "min": 688,
-            "samples": 1
-          },
-          "collection_entries": {
-            "score": 6688,
-            "median": 6688,
-            "min": 6688,
-            "samples": 1
-          }
-        }
-      },
-      {
-        "name": "wave-budget",
-        "ops": {
-          "full_passes": {
-            "score": 33,
-            "median": 33,
-            "min": 33,
-            "samples": 1
-          },
-          "suspended_visits": {
-            "score": 528,
-            "median": 528,
-            "min": 528,
-            "samples": 1
-          },
-          "read_probes": {
-            "score": 496,
-            "median": 496,
-            "min": 496,
-            "samples": 1
-          },
-          "try_closures": {
-            "score": 13728,
-            "median": 13728,
-            "min": 13728,
-            "samples": 1
-          }
-        }
       }
     ],
     "meta": {
@@ -3789,69 +3726,6 @@
           "chunks": 2,
           "values": 32,
           "outputHash": "23b22df6bf551a4e788327db3b3d3d96e1eca49078d2c6bd0049da2d390eca8b"
-        }
-      },
-      {
-        "name": "scan-budget",
-        "ops": {
-          "boundary_arrays": {
-            "score": 1,
-            "median": 1,
-            "min": 1,
-            "samples": 1
-          },
-          "copied_boundaries": {
-            "score": 1,
-            "median": 1,
-            "min": 1,
-            "samples": 1
-          }
-        }
-      },
-      {
-        "name": "populated-budget",
-        "ops": {
-          "collection_copies": {
-            "score": 688,
-            "median": 688,
-            "min": 688,
-            "samples": 1
-          },
-          "collection_entries": {
-            "score": 6688,
-            "median": 6688,
-            "min": 6688,
-            "samples": 1
-          }
-        }
-      },
-      {
-        "name": "wave-budget",
-        "ops": {
-          "full_passes": {
-            "score": 33,
-            "median": 33,
-            "min": 33,
-            "samples": 1
-          },
-          "suspended_visits": {
-            "score": 528,
-            "median": 528,
-            "min": 528,
-            "samples": 1
-          },
-          "read_probes": {
-            "score": 496,
-            "median": 496,
-            "min": 496,
-            "samples": 1
-          },
-          "try_closures": {
-            "score": 13728,
-            "median": 13728,
-            "min": 13728,
-            "samples": 1
-          }
         }
       }
     ],

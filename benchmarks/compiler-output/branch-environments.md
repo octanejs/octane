@@ -36,7 +36,7 @@ node benchmarks/compiler-output/branch-environments.mjs
 
 The optional source directory must contain the baseline `packages/octane/src`
 and its dependency links. `BENCH_JSON=/path/report.json` also writes the standard
-suite/targets report used by the ratio runner. `OCTANE_BRANCH_COMPILER` can select
+suite/targets report. `OCTANE_BRANCH_COMPILER` can select
 an isolated compiler module for mutation checks. Every report records source and
 compiler SHA-256 hashes and the Node version.
 

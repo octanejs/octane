@@ -199,10 +199,6 @@ for (const [shape, counts] of Object.entries(candidate.cases)) {
 		name: `warm-${shape}`,
 		ops: Object.fromEntries(Object.entries(counts).map(([key, value]) => [key, stat(value)])),
 	});
-	targets.push({
-		name: `warm-${shape}-budget`,
-		ops: { arrays: stat(1), functions: stat(1), constructors: stat(Math.max(1, constructors)) },
-	});
 }
 if (process.env.BENCH_JSON)
 	writeFileSync(

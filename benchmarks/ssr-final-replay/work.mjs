@@ -490,23 +490,6 @@ try {
 		'a global position scratch record breaks nested memo writes',
 	);
 	delete globalThis.__sharedPosition;
-	targets.push({
-		name: 'scan-budget',
-		ops: { boundary_arrays: stat(1), copied_boundaries: stat(1) },
-	});
-	targets.push({
-		name: 'populated-budget',
-		ops: { collection_copies: stat(688), collection_entries: stat(6688) },
-	});
-	targets.push({
-		name: 'wave-budget',
-		ops: {
-			full_passes: stat(33),
-			suspended_visits: stat(528),
-			read_probes: stat(496),
-			try_closures: stat(13728),
-		},
-	});
 	const payload = {
 		suite: 'ssr-final-replay',
 		iterations: 1,

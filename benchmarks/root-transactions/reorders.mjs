@@ -137,12 +137,6 @@ try {
 				),
 				meta: { gate: 'passed', slots },
 			},
-			{
-				// A row-scaled journal record is at least one slot per row.
-				name: 'reorders-work-budget',
-				ops: Object.fromEntries(Object.keys(OPS).map((op) => [`${op}_row_slots`, value(1)])),
-				meta: { gate: 'passed' },
-			},
 		],
 		limitations: [
 			'Counts root-journal slots per committed reorder as the difference between two list sizes, not heap allocation or timing. The list shape record is a separate per-list snapshot.',

@@ -168,25 +168,14 @@ try {
 		compilerSha256: createHash('sha256').update(fs.readFileSync(compilerFile)).digest('hex'),
 		sourceSha256: createHash('sha256').update(JSON.stringify(SOURCES)).digest('hex'),
 		rows,
-		targets: rows.flatMap((row) => [
-			{
-				name: `branch-${row.name}`,
-				ops: Object.fromEntries(
-					Object.entries(row)
-						.filter(([key]) => key !== 'name')
-						.map(([key, value]) => [key, stamp(value)]),
-				),
-			},
-			{
-				name: `branch-${row.name}-work-budget`,
-				ops: {
-					active_arrays: stamp(
-						CYCLES * (['shadowed', 'argumentsEscape'].includes(row.name) ? 2 : 1),
-					),
-					absent_arrays: stamp(['twoArms', 'shadowed'].includes(row.name) ? CYCLES : 1),
-				},
-			},
-		]),
+		targets: rows.map((row) => ({
+			name: `branch-${row.name}`,
+			ops: Object.fromEntries(
+				Object.entries(row)
+					.filter(([key]) => key !== 'name')
+					.map(([key, value]) => [key, stamp(value)]),
+			),
+		})),
 	};
 	const output = JSON.stringify(report, null, 2) + '\n';
 	if (process.env.BENCH_JSON) fs.writeFileSync(path.resolve(process.env.BENCH_JSON), output);

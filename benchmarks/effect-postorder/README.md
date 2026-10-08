@@ -30,9 +30,10 @@ node benchmarks/effect-postorder/refs.mjs <baseline-git-ref> --measure
 node benchmarks/effect-postorder/refs.mjs <baseline-git-ref>
 ```
 
-The `effect-scheduling` ratio suite runs this guard alongside the scheduler
-wave guard. Single-ref, 1,000-sibling, and ownerless-only batches must call
-native sort zero times; mixed-ancestry, deep-disjoint, and mixed-owner batches
+The `effect-scheduling` suite runs this guard alongside the scheduler wave
+guard and reports each case's native sort calls. Single-ref, 1,000-sibling,
+and ownerless-only batches call native sort zero times, and the guard asserts
+it for 1,000 siblings; mixed-ancestry, deep-disjoint, and mixed-owner batches
 retain one sort and the same postorder callbacks. At base `8a45222ab`, all
 seven cases each sorted once. The candidate skips three sorts and retains the
 other four. Null owners compare equal to unrelated entries, so an ownerless

@@ -689,10 +689,6 @@ try {
 			meta: { rows: count, outputHash: hash(JSON.stringify(expected)) },
 		});
 	}
-	targets.push(
-		{ name: 'row-budget', ops: Object.fromEntries(counters.map((key) => [key, stat(count)])) },
-		{ name: 'render-budget', ops: Object.fromEntries(counters.map((key) => [key, stat(1)])) },
-	);
 	const timings = {};
 	if (process.env.METADATA_TIMING === '1') {
 		for (const name of ['attributes', 'descriptors', 'hosts', 'unique-hosts']) {

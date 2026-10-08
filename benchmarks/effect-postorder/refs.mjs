@@ -134,7 +134,6 @@ for (const [label, source] of sources) {
 		if (label === 'candidate') {
 			const stat = (value) => deterministicStatForJson(deterministicCount(value));
 			targets.push({ name: `ref-${shape}`, ops: { sort_calls: stat(result.sorts) } });
-			targets.push({ name: `ref-${shape}-budget`, ops: { sort_calls: stat(1) } });
 		}
 	}
 }

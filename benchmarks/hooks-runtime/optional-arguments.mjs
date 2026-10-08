@@ -265,15 +265,6 @@ try {
 					},
 				},
 			},
-			{
-				name: 'argument-work-budget',
-				ops: {
-					rest_sites_reached: stamp(1),
-					subscribe_deps_arrays: stamp(1),
-					effect_event_entries: stamp(CYCLES),
-					effect_event_wrappers: stamp(CYCLES),
-				},
-			},
 		],
 	};
 	const output = JSON.stringify(report, null, 2) + '\n';

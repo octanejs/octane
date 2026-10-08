@@ -46,8 +46,8 @@ benchmarks/memo-wall/
 ├── svelte/       # Vite app, dev :5278 (fine-grained creation/text probes)
 ├── run.mjs        # Playwright harness — drives all targets, enforces the gates
 ├── work.mjs       # untimed Chromium precise-call-coverage work gates
-├── bail-compare.mjs  # own-prop lookups per bailed row (ratio guard)
-├── survivor-work.mjs # journal slots and calls per bailed wall-B row (ratio guards)
+├── bail-compare.mjs  # own-prop lookups per bailed row
+├── survivor-work.mjs # journal slots and calls per bailed wall-B row
 ├── package.json   # umbrella: `pnpm bench`
 └── README.md
 ```
@@ -137,12 +137,11 @@ updates still refresh exactly 1000 leaves. Returned-JSX wrapper descriptor
 counts have upper ceilings rather than exact requirements.
 Mount and one-change A/B also carry exact compiled-work gates.
 
-`survivor-work.mjs` runs in every suite run and feeds two ratio guards with the
-per-row cost of wall B's one-change shape: a compiled memo row, a plain-JS
-`createElement` helper and a `{rows}` hole, at 128 and 256 rows, with one row
-changed. The difference between the two sizes gives the root-journal slots
-(budget 0) and the jitless production-bundle calls (budget 26) each bailed row
-adds. Render probes, host identity and the changed row's text are checked in
+`survivor-work.mjs` runs in every suite run and reports the per-row cost of
+wall B's one-change shape: a compiled memo row, a plain-JS `createElement`
+helper and a `{rows}` hole, at 128 and 256 rows, with one row changed. The
+difference between the two sizes gives the root-journal slots and the jitless
+production-bundle calls each bailed row adds. Render probes, host identity and the changed row's text are checked in
 the same run. Pass a runtime source path to compare another revision:
 `node survivor-work.mjs /path/to/runtime.ts`.
 
