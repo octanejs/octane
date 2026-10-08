@@ -8,7 +8,122 @@
  *
  * Profiling deliberately stores identities and timings, never live props,
  * state, reducer actions, DOM nodes, errors, or promises.
+ *
+ * Engine work counters live beside the event buffer. A renderer declares the
+ * counters it records when its module loads, and its runtime increments them
+ * from profile-guarded probes. Counters are session totals: they are never
+ * evicted with buffered events, and only `clear()` resets them.
  */
+
+declare const process: { env: { NODE_ENV?: string } };
+
+/**
+ * Version of the counter names and units below. A change to a counter's
+ * meaning or unit bumps it, so stored baselines cannot be compared silently
+ * across incompatible definitions.
+ */
+export const PROFILE_COUNTER_SCHEMA = 1;
+
+/**
+ * Counter names, in table order. Each counts work attempted, including work a
+ * later rollback discards, unless its name says otherwise:
+ *
+ * - `component.render`: component body invocations, including attempts that
+ *   suspend, throw, or replay after a render-phase update.
+ * - `component.renderSuspended` / `component.renderErrored`: the subset of
+ *   those attempts that ended by suspending or by throwing an error. A throw
+ *   ends every component attempt it unwinds through, so a suspended child
+ *   rendered inside its parent's body counts for both.
+ * - `component.bailout`: memo and implicit bailouts that skipped a body.
+ * - `block.create` / `block.unmount`: render Blocks allocated and torn down
+ *   (roots, components, directive arms, portals). Lite component scopes are
+ *   not Blocks; their work appears as component renders.
+ * - `arm.keep`: `@if`/`@switch` evaluations that re-rendered the current arm.
+ * - `arm.swap`: evaluations that replaced the current arm with another,
+ *   including an empty arm. A slot's first arm is not a swap.
+ * - `boundary.fallback`: Suspense boundaries switching to their fallback.
+ * - `boundary.catch`: error boundaries switching to their catch arm.
+ * - `scheduler.drain`: passes over the render queue.
+ * - `commit.root`: root render transactions accepted for commit.
+ * - `rollback.root`: root render transactions rolled back.
+ * - `rollback.journalEntries`: journal entries replayed by rollbacks, one per
+ *   recorded write, created Block, or rendered Block that was undone.
+ * - `rollback.capture`: speculative render captures whose commit work (effects,
+ *   refs, bindings) was dropped without becoming visible.
+ */
+const COUNTER_NAMES = [
+	'component.render',
+	'component.renderSuspended',
+	'component.renderErrored',
+	'component.bailout',
+	'block.create',
+	'block.unmount',
+	'arm.keep',
+	'arm.swap',
+	'boundary.fallback',
+	'boundary.catch',
+	'scheduler.drain',
+	'commit.root',
+	'rollback.root',
+	'rollback.journalEntries',
+	'rollback.capture',
+] as const;
+
+export type ProfileCounterName = (typeof COUNTER_NAMES)[number];
+
+// A literal, checked against the tuple, so allocating the tables reads no
+// property a bundler must preserve (see `counts`).
+const COUNTER_COUNT: (typeof COUNTER_NAMES)['length'] = 15;
+
+const COMPONENT_RENDER = 0;
+const COMPONENT_RENDER_SUSPENDED = 1;
+const COMPONENT_RENDER_ERRORED = 2;
+const COMPONENT_BAILOUT = 3;
+const BLOCK_CREATE = 4;
+const BLOCK_UNMOUNT = 5;
+const ARM_KEEP = 6;
+const ARM_SWAP = 7;
+const BOUNDARY_FALLBACK = 8;
+const BOUNDARY_CATCH = 9;
+const SCHEDULER_DRAIN = 10;
+const COMMIT_ROOT = 11;
+const ROLLBACK_ROOT = 12;
+const ROLLBACK_JOURNAL_ENTRIES = 13;
+const ROLLBACK_CAPTURE = 14;
+
+/**
+ * Counter totals since the last `clear()`, restricted to the counters at least
+ * one installed renderer records. A counter no renderer records is absent,
+ * which distinguishes it from a recorded counter that saw no work.
+ */
+export type ProfileCounters = Partial<Record<ProfileCounterName, number>>;
+
+export interface ProfileCounterSnapshot {
+	/** {@link PROFILE_COUNTER_SCHEMA} of the runtime that took the snapshot. */
+	schema: number;
+	/** Recording generation. `stop()` and `clear()` each start a new one. */
+	generation: number;
+	/** The runtime's `NODE_ENV` specialization. */
+	build: 'development' | 'production';
+	/** Renderers that installed counters, sorted. */
+	renderers: string[];
+	/** Whether counters were incrementing when the snapshot was taken. */
+	recording: boolean;
+	/** `performance.now()` when the snapshot was taken. */
+	time: number;
+	counters: ProfileCounters;
+}
+
+export interface ProfileCounterDiff {
+	schema: number;
+	generation: number;
+	build: 'development' | 'production';
+	renderers: string[];
+	/** Milliseconds between the two snapshots. */
+	duration: number;
+	/** Work counted after `before` and up to `after`. */
+	counters: ProfileCounters;
+}
 
 export interface ComponentProfileMetadata {
 	id: string;
@@ -138,6 +253,14 @@ let eventBuffer: ProfileEvent[] = [];
 let eventHead = 0;
 let eventCount = 0;
 let pendingTimelineEvents: ProfileEvent[] = [];
+// Float64 keeps long sessions exact far beyond 2^32 events. Bundlers cannot
+// prove a typed-array constructor pure; without the annotations, a build that
+// never calls the profiler would still retain these tables and the name list.
+const counts = /* @__PURE__ */ new Float64Array(COUNTER_COUNT);
+const counterSupported = /* @__PURE__ */ new Uint8Array(COUNTER_COUNT);
+const counterRenderers: string[] = [];
+// Several teardown paths can drop the same capture. Count each capture once.
+let discardedCaptures = new WeakSet<object>();
 
 const MAX_CAUSES = 8;
 
@@ -438,6 +561,9 @@ export function __profileEndRender(
 		: isSuspension(thrown)
 			? 'suspended'
 			: 'errored';
+	counts[COMPONENT_RENDER]++;
+	if (outcome === 'suspended') counts[COMPONENT_RENDER_SUSPENDED]++;
+	else if (outcome === 'errored') counts[COMPONENT_RENDER_ERRORED]++;
 	const event: ProfileEvent = {
 		type: 'component-render',
 		componentId: frame.metadata.id,
@@ -466,6 +592,7 @@ export function __profileBail(subject: object, component: Function, kind: string
 	const tracked = trackedComponents.get(subject);
 	if (tracked === undefined) return;
 	component = tracked;
+	counts[COMPONENT_BAILOUT]++;
 	installGlobal();
 	const metadata = metadataFor(component);
 	const instance = instanceFor(subject);
@@ -494,6 +621,132 @@ export function __profileBail(subject: object, component: Function, kind: string
 	});
 }
 
+/**
+ * Runtime ABI: declare the counters a renderer records. Called once when the
+ * renderer's module loads in a profile build.
+ */
+export function __profileCounters(renderer: string, names: readonly ProfileCounterName[]): void {
+	if (counterRenderers.includes(renderer)) return;
+	counterRenderers.push(renderer);
+	counterRenderers.sort();
+	for (const name of names) {
+		const index = COUNTER_NAMES.indexOf(name);
+		if (index !== -1) counterSupported[index] = 1;
+	}
+	installGlobal();
+}
+
+/** Runtime ABI: a render Block was allocated. */
+export function __profileBlockCreated(): void {
+	if (active) counts[BLOCK_CREATE]++;
+}
+
+/** Runtime ABI: a render Block was torn down. */
+export function __profileBlockUnmounted(): void {
+	if (active) counts[BLOCK_UNMOUNT]++;
+}
+
+/** Runtime ABI: an `@if`/`@switch` evaluation kept or replaced its arm. */
+export function __profileArm(swapped: boolean): void {
+	if (active) counts[swapped ? ARM_SWAP : ARM_KEEP]++;
+}
+
+/**
+ * Runtime ABI: a boundary's branch changed. Branches follow the runtime's try
+ * slot encoding: -1 unset, 0 catch, 1 content, 2 pending fallback.
+ */
+export function __profileBoundary(previous: number, next: number): void {
+	if (!active || previous === next) return;
+	if (next === 2) counts[BOUNDARY_FALLBACK]++;
+	else if (next === 0) counts[BOUNDARY_CATCH]++;
+}
+
+/** Runtime ABI: the scheduler began a pass over its render queue. */
+export function __profileDrain(): void {
+	if (active) counts[SCHEDULER_DRAIN]++;
+}
+
+/** Runtime ABI: a root render transaction passed validation and committed. */
+export function __profileRootCommitted(): void {
+	if (active) counts[COMMIT_ROOT]++;
+}
+
+/** Runtime ABI: a root render transaction was rolled back. */
+export function __profileRootRolledBack(): void {
+	if (active) counts[ROLLBACK_ROOT]++;
+}
+
+/** Runtime ABI: a rollback replayed `entries` journal entries. */
+export function __profileJournalRolledBack(entries: number): void {
+	if (active && entries > 0) counts[ROLLBACK_JOURNAL_ENTRIES] += entries;
+}
+
+/** Runtime ABI: a speculative render capture's commit work was dropped. */
+export function __profileCaptureDiscarded(capture: object): void {
+	if (!active || discardedCaptures.has(capture)) return;
+	discardedCaptures.add(capture);
+	counts[ROLLBACK_CAPTURE]++;
+}
+
+function currentCounters(): ProfileCounters {
+	const counters: ProfileCounters = {};
+	for (let index = 0; index < COUNTER_NAMES.length; index++) {
+		if (counterSupported[index] === 1) counters[COUNTER_NAMES[index]] = counts[index];
+	}
+	return counters;
+}
+
+function counterSnapshot(): ProfileCounterSnapshot {
+	return {
+		schema: PROFILE_COUNTER_SCHEMA,
+		generation: recordingGeneration,
+		build: process.env.NODE_ENV === 'production' ? 'production' : 'development',
+		renderers: counterRenderers.slice(),
+		recording: active,
+		time: now(),
+		counters: currentCounters(),
+	};
+}
+
+function incompatibleSnapshots(reason: string): Error {
+	return new Error(`Octane profiler cannot diff these counter snapshots: ${reason}.`);
+}
+
+function diffCounterSnapshots(
+	before: ProfileCounterSnapshot,
+	after: ProfileCounterSnapshot,
+): ProfileCounterDiff {
+	if (before.schema !== PROFILE_COUNTER_SCHEMA || after.schema !== PROFILE_COUNTER_SCHEMA)
+		throw incompatibleSnapshots(
+			`this runtime uses counter schema ${PROFILE_COUNTER_SCHEMA}, the snapshots use ${before.schema} and ${after.schema}`,
+		);
+	if (before.generation !== after.generation)
+		throw incompatibleSnapshots('recording was stopped or cleared between them');
+	if (!after.recording) throw incompatibleSnapshots('recording was stopped when they were taken');
+	if (before.build !== after.build)
+		throw incompatibleSnapshots('they come from development and production runtimes');
+	if (before.renderers.join('\0') !== after.renderers.join('\0'))
+		throw incompatibleSnapshots('the renderers recording counters changed between them');
+	const counters: ProfileCounters = {};
+	for (const name of COUNTER_NAMES) {
+		const start = before.counters[name];
+		const end = after.counters[name];
+		if (start === undefined && end === undefined) continue;
+		if (start === undefined || end === undefined)
+			throw incompatibleSnapshots(`only one of them records ${name}`);
+		if (end < start) throw incompatibleSnapshots('`before` was taken after `after`');
+		counters[name] = end - start;
+	}
+	return {
+		schema: PROFILE_COUNTER_SCHEMA,
+		generation: after.generation,
+		build: after.build,
+		renderers: after.renderers.slice(),
+		duration: after.time - before.time,
+		counters,
+	};
+}
+
 function eventMatches(event: ProfileEvent, target: string | Function): boolean {
 	if (typeof target === 'function') return event.componentId === metadataFor(target).id;
 	return event.component === target || event.componentId === target;
@@ -507,11 +760,22 @@ export interface OctaneProfiler {
 	summary(): ProfileSummary[];
 	why(component: string | Function): ProfileEvent[];
 	exportTrace(): ChromeTrace;
+	/** Current counter totals; shorthand for `snapshot().counters`. */
+	counters(): ProfileCounters;
+	/** Counter totals with the envelope `diff()` needs to validate them. */
+	snapshot(): ProfileCounterSnapshot;
+	/**
+	 * Work counted between two snapshots. Throws when the snapshots cannot be
+	 * compared: different schemas, builds or renderers, a `stop()` or `clear()`
+	 * between them, recording off, or arguments in the wrong order.
+	 */
+	diff(before: ProfileCounterSnapshot, after: ProfileCounterSnapshot): ProfileCounterDiff;
 }
 
 declare global {
-	// Installed lazily by profile-compiled metadata or profiler.start(), so a
-	// normal build does not mutate the global object.
+	// Installed lazily by profile-compiled metadata, a renderer declaring its
+	// counters in a profile build, or profiler.start(), so a normal build does
+	// not mutate the global object.
 	var __OCTANE_PROFILER__: OctaneProfiler | undefined;
 }
 
@@ -546,6 +810,17 @@ export const profiler: OctaneProfiler = {
 		nextInstanceId = 1;
 		recordingGeneration++;
 		currentFrame = null;
+		counts.fill(0);
+		discardedCaptures = new WeakSet();
+	},
+	counters() {
+		return currentCounters();
+	},
+	snapshot() {
+		return counterSnapshot();
+	},
+	diff(before, after) {
+		return diffCounterSnapshots(before, after);
 	},
 	getEvents() {
 		return orderedEvents().map((event) => ({
