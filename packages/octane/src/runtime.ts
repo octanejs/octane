@@ -13618,7 +13618,7 @@ function unmountSlot(val: any, detachDom: boolean): void {
 	const k = val.__kind;
 	if (k === 'ifBlockSlot' || k === 'switchBlockSlot' || k === 'activityBlockSlot') {
 		if (val.block) unmountBlock(val.block, detachDom);
-		else if (val.lite != null) unmountLiteArm(val, detachDom);
+		else if (val.lite != null) UNMOUNT_LITE_ARM!(val, detachDom);
 	} else if (k === 'forBlockSlot') {
 		// Item Blocks form an intrusive chain (head → nextSibling) — walk it
 		// instead of the keyed Map's iterator (zero-alloc, monomorphic).
@@ -45319,6 +45319,10 @@ function releaseLiteArm(scope: Scope): void {
 	scope._slots = null;
 }
 
+// Core slot teardown reaches a lite arm only through a slot that mounted one,
+// which installs this. A root without control flow then carries none of it.
+let UNMOUNT_LITE_ARM: ((state: BranchSlot, detachDom: boolean) => void) | null = null;
+
 /**
  * Remove a slot's lite arm: its Scope and, with `detachDom`, its DOM. A pair
  * that delimits the arm stays for the slot's next arm, as an arm Block's
@@ -45921,6 +45925,7 @@ function renderBranchSlot(
 				arm = scope.block = new LiteBlockImpl(domParent, after, parentBlock) as unknown as Block;
 				arm.startMarker = null;
 				state.lite = scope;
+				UNMOUNT_LITE_ARM ??= unmountLiteArm;
 				renderMarkerlessArm(state, domParent, scope, marker, body, env);
 			} else {
 				arm = createBlock(

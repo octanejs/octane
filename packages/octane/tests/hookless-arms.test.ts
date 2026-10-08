@@ -1,9 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import { act, createLog, flushEffects, mount } from './_helpers';
 import { flushSync, startTransition, type ComponentBody } from '../src/index.js';
+import { compile } from 'octane/compiler';
 import {
 	ActivityHooked,
 	ActivityPlain,
+	NestedHooked,
+	NestedPlain,
 	RollbackHooked,
 	RollbackPlain,
 	RowsHooked,
@@ -30,6 +33,7 @@ function deferred<T>() {
 
 interface Run<P> {
 	render(props: P): void;
+	unmount(): void;
 	log: (entry: string) => void;
 	ref: (el: Element | null) => void;
 }
@@ -44,11 +48,13 @@ async function compare<P>(
 		const log = createLog();
 		const run: Run<P> = {
 			render() {},
+			unmount() {},
 			log: log.push,
 			ref: (el) => log.push(el === null ? 'ref null' : 'ref ' + el.tagName),
 		};
 		const r = mount(body, initial(run));
 		run.render = (next) => r.root.render(body, next);
+		run.unmount = () => r.unmount();
 		flushEffects();
 		return { run, r, log, html: [r.html()], logs: [log.drain()] };
 	});
@@ -160,6 +166,22 @@ describe('hookless control-flow arms', () => {
 		expect(logs[4]).toEqual(['layout inside', 'effect inside']);
 	});
 
+	it('stop swapping a nested arm once its teardown unmounts the root', async () => {
+		const setters = new WeakMap<Run<any>, (on: boolean) => void>();
+		const logs = await compare(
+			NestedPlain,
+			NestedHooked,
+			(run) => ({
+				log: run.log,
+				onGone: () => run.unmount(),
+				expose: (set: (on: boolean) => void) => setters.set(run, set),
+			}),
+			[(run) => flushSync(() => setters.get(run)!(false))],
+		);
+		// The swap's teardown unmounted everything, so its replacement never mounts.
+		expect(logs[1]).toEqual(['layout cleanup leaver']);
+	});
+
 	it('restore the outgoing arm when its root render suspends outside a boundary', async () => {
 		const pending = deferred<string>();
 		const logs = await compare(
@@ -177,5 +199,47 @@ describe('hookless control-flow arms', () => {
 		);
 		expect(logs[1]).toEqual([]);
 		expect(logs[2]).toEqual(['layout cleanup on', 'layout off', 'effect cleanup on', 'effect off']);
+	});
+});
+
+// The compiler marks an arm hookless with a trailing lite mask on its ifBlock
+// call. Anything that may run a hook while the arm renders must keep it off.
+function armIsLite(arm: string): boolean {
+	const source = `import { useCallback, useRef, useState } from 'octane';
+function helper() { return 'x'; }
+export function App(props: any) @{
+	const [x, setX] = useState(0);
+	<div>
+		@if (props.on) {
+			${arm}
+		}
+	</div>
+}`;
+	const call = /ifBlock\(([^;]*)\)/s.exec(compile(source, 'arm.tsrx').code)![1];
+	return /,\s*1\s*$/.test(call);
+}
+
+describe('hookless control-flow arm proof', () => {
+	it.each([
+		['static output', `<b>{'on'}</b>`],
+		['an inline event handler that calls a setter', `<b onClick={() => setX(1)}>{'on'}</b>`],
+		['a ref read through a member', `<b ref={props.refLog}>{'on'}</b>`],
+		['a member-tagged template', 'const s = String.raw`x`;\n<b>{s as string}</b>'],
+	])('keeps %s lite', (_, arm) => {
+		expect(armIsLite(arm)).toBe(true);
+	});
+
+	it.each([
+		['a hook producing a ref', `<b ref={useRef(null)}>{'on'}</b>`],
+		['a hook producing a handler', `<b onClick={useCallback(() => setX(1), [])}>{'on'}</b>`],
+		['a bare call', `<b>{helper() as string}</b>`],
+		['a cast callee', `<b>{(helper as any)() as string}</b>`],
+		['a non-null callee', `<b>{helper!() as string}</b>`],
+		['an optional call', `<b>{helper?.() as string}</b>`],
+		['a comma callee', `<b>{(0, helper)() as string}</b>`],
+		['helper.call', `<b>{helper.call(null) as string}</b>`],
+		['a bare tag', 'const s = helper`x`;\n<b>{s as string}</b>'],
+	])('gives an arm with %s a Block', (_, arm) => {
+		expect(armIsLite(arm)).toBe(false);
 	});
 });

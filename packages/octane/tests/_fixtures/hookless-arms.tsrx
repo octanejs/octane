@@ -1,4 +1,4 @@
-import { Activity, use, useEffect, useLayoutEffect, useRef } from 'octane';
+import { Activity, use, useEffect, useLayoutEffect, useRef, useState } from 'octane';
 
 // Each scenario comes in two forms with identical output. In the `Plain` form
 // every arm is hookless. In the `Hooked` form each arm also calls `useRef`,
@@ -165,6 +165,53 @@ export function RollbackHooked(props: RollbackProps) @{
 		@if (props.promise !== null) {
 			useRef(0);
 			<Resource promise={props.promise} />
+		}
+	</div>
+}
+
+// An arm nested in a hookless arm, whose teardown unmounts the whole root.
+function Leaver(props: { log: Log; onGone: () => void }) @{
+	useLayoutEffect(() => {
+		props.log('layout leaver');
+		return () => {
+			props.log('layout cleanup leaver');
+			props.onGone();
+		};
+	}, []);
+	<u>{'leaver'}</u>
+}
+
+type NestedProps = { log: Log; onGone: () => void; expose: (set: (on: boolean) => void) => void };
+
+export function NestedPlain(props: NestedProps) @{
+	const [inner, setInner] = useState(true);
+	props.expose(setInner);
+	<div>
+		@if (props.log !== null) {
+			<>
+				@if (inner) {
+					<Leaver log={props.log} onGone={props.onGone} />
+				} @else {
+					<Probe name="replacement" log={props.log} />
+				}
+			</>
+		}
+	</div>
+}
+
+export function NestedHooked(props: NestedProps) @{
+	const [inner, setInner] = useState(true);
+	props.expose(setInner);
+	<div>
+		@if (props.log !== null) {
+			useRef(0);
+			<>
+				@if (inner) {
+					<Leaver log={props.log} onGone={props.onGone} />
+				} @else {
+					<Probe name="replacement" log={props.log} />
+				}
+			</>
 		}
 	</div>
 }

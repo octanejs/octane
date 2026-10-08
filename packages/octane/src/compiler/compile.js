@@ -32883,9 +32883,11 @@ function hoistBodyHelper(
  * mask ifBlock and switchBlock take). Mirrors componentSlotLite's proof,
  * tightened for arms: no hook, `use` or context read; no @try; and no call
  * through a bare identifier while the arm renders, since a helper may call a
- * hook or update state. Event-handler and ref callbacks run after the render,
- * so their bodies do not count. A call through a member is allowed unless its
- * name reads as a hook.
+ * hook or update state. That includes a callee behind a TS cast, `!`, `?.` or
+ * a comma, a tag, and `helper.call`/`helper.apply`. An event-handler or ref
+ * callback written inline runs after the render, so its body does not count;
+ * any other value of those attributes is walked. A call through a member is
+ * allowed unless its name reads as a hook.
  */
 function controlFlowArmIsLite(stmts) {
 	const seen = new WeakSet();
@@ -32908,20 +32910,35 @@ function controlFlowArmIsLite(stmts) {
 				n.name === 'createPortal')
 		)
 			return true;
-		if (t === 'CallExpression') {
-			const callee = n.callee;
+		if (t === 'CallExpression' || t === 'OptionalCallExpression') {
+			let callee = unwrapValueExpression(n.callee);
+			if (callee?.type === 'SequenceExpression')
+				callee = unwrapValueExpression(callee.expressions.at(-1));
 			if (callee?.type === 'Identifier') return true;
 			if (
-				callee?.type === 'MemberExpression' &&
+				(callee?.type === 'MemberExpression' || callee?.type === 'OptionalMemberExpression') &&
 				!callee.computed &&
 				callee.property?.type === 'Identifier' &&
-				/^use[A-Z]/.test(callee.property.name)
+				// `helper.call(…)` and `helper.apply(…)` call a bare function too.
+				(/^use[A-Z]/.test(callee.property.name) ||
+					((callee.property.name === 'call' || callee.property.name === 'apply') &&
+						unwrapValueExpression(callee.object)?.type === 'Identifier'))
 			)
 				return true;
 		}
+		if (t === 'TaggedTemplateExpression' && unwrapValueExpression(n.tag)?.type === 'Identifier')
+			return true;
 		if (t === 'Attribute' || t === 'JSXAttribute') {
 			const name = n.name?.name ?? n.name;
-			if (typeof name === 'string' && (name === 'ref' || isEventAttrName(name))) return false;
+			if (typeof name === 'string' && (name === 'ref' || isEventAttrName(name))) {
+				// The callback runs after the render, but whatever produces it runs
+				// now: `ref={useRef(null)}` calls a hook while the arm renders.
+				let value = n.value;
+				if (value?.type === 'JSXExpressionContainer') value = value.expression;
+				value = unwrapValueExpression(value);
+				if (value?.type === 'ArrowFunctionExpression' || value?.type === 'FunctionExpression')
+					return false;
+			}
 		}
 		for (const k in n) {
 			if (AST_WALK_SKIP_KEYS.has(k)) continue;
