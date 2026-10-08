@@ -12,7 +12,9 @@
       "@tanstack/react-table": ["../../upstream/src/index.ts"],
       "@tanstack/react-table/*": ["../../upstream/src/*.ts"]
     },
-    "verbatimModuleSyntax": false
+    "verbatimModuleSyntax": false,
+    "noUnusedLocals": false,
+    "noUnusedParameters": false
   },
   "include": ["./*.test-d.ts", "../../upstream/src/**/*"],
   "exclude": ["node_modules"],

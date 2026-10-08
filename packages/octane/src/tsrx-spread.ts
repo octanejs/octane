@@ -14,11 +14,26 @@ export function normalize_spread_props<T>(props: T): T {
 	return props;
 }
 
+// The keys a type declares, without the ones only an index signature admits.
+type DeclaredKeys<T> = keyof {
+	[
+		K in keyof T as string extends K
+			? never
+			: number extends K
+				? never
+				: symbol extends K
+					? never
+					: K
+	]: T[K];
+};
+
 // Distribute over unions so a ref-less alternative cannot erase a declared ref.
-// Keep unknown untouched: intersecting it with the optional ref shape would
-// incorrectly make an unsafe spread look like a valid object.
+// A ref that only an index signature admits counts as absent, as TSX ignores a
+// spread's index signature. Keep unknown untouched: intersecting it with the
+// optional ref shape would incorrectly make an unsafe spread look like a valid
+// object.
 type SpreadPropsWithRef<T> = T extends {}
-	? T & { ref?: 'ref' extends keyof T ? T['ref'] : undefined }
+	? T & { ref?: 'ref' extends DeclaredKeys<T> ? T['ref'] : undefined }
 	: T extends null | undefined
 		? never
 		: T;

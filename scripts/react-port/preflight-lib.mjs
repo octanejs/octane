@@ -3,7 +3,7 @@ import { readFileSync, existsSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
 import path from 'node:path';
 import { gunzipSync } from 'node:zlib';
-import ts from 'typescript';
+import { is, isReparsed, parseSourceFile, SyntaxKind } from '../octane-tsc/native-syntax.mjs';
 import { verifyNpmProvenance } from './npm-provenance.mjs';
 import { bridgeReportFromSource } from '../../packages/octane-mcp-server/src/bridge.js';
 import {
@@ -836,17 +836,17 @@ function commandPathPatterns(testScripts) {
 }
 
 function propertyName(name) {
-	return ts.isIdentifier(name) || ts.isStringLiteralLike(name) ? name.text : null;
+	return is.isIdentifier(name) || is.isStringLiteralLikeNode(name) ? name.text : null;
 }
 
 function staticConfigurationPatterns(node) {
-	if (ts.isStringLiteralLike(node) || ts.isNoSubstitutionTemplateLiteral(node)) {
+	if (is.isStringLiteralLikeNode(node) || is.isNoSubstitutionTemplateLiteral(node)) {
 		const pattern = normalizeConfigurationPattern(node.text);
 		return pattern ? [pattern] : [];
 	}
-	if (ts.isArrayLiteralExpression(node)) {
+	if (is.isArrayLiteralExpression(node)) {
 		return node.elements.flatMap((element) =>
-			ts.isSpreadElement(element) ? [] : staticConfigurationPatterns(element),
+			is.isSpreadElement(element) ? [] : staticConfigurationPatterns(element),
 		);
 	}
 	return [];
@@ -854,7 +854,7 @@ function staticConfigurationPatterns(node) {
 
 function configurationSectionName(node) {
 	for (let parent = node.parent; parent; parent = parent.parent) {
-		if (ts.isPropertyAssignment(parent)) {
+		if (is.isPropertyAssignment(parent)) {
 			return propertyName(parent.name);
 		}
 	}
@@ -862,16 +862,12 @@ function configurationSectionName(node) {
 }
 
 function configurationPathSelections(configurationSource, fileName) {
-	const sourceFile = ts.createSourceFile(
-		fileName,
-		configurationSource,
-		ts.ScriptTarget.Latest,
-		true,
-	);
+	const sourceFile = parseSourceFile(fileName, configurationSource);
 	const testFiles = [];
 	const inlineSources = [];
 	const visit = (node) => {
-		if (ts.isPropertyAssignment(node)) {
+		if (isReparsed(node)) return;
+		if (is.isPropertyAssignment(node)) {
 			const name = propertyName(node.name);
 			const section = configurationSectionName(node);
 			const withinTestConfiguration = ['test', 'vitest', 'jest', 'ava', 'mocha'].includes(section);
@@ -886,7 +882,7 @@ function configurationPathSelections(configurationSource, fileName) {
 				testFiles.push(...staticConfigurationPatterns(node.initializer));
 			}
 		}
-		ts.forEachChild(node, visit);
+		node.forEachChild(visit);
 	};
 	visit(sourceFile);
 	return { inlineSources, testFiles };
@@ -902,20 +898,21 @@ function referencedByTestConfiguration(relativePath, configurationPatterns) {
 }
 
 function containsInlineTestMarker(source, fileName) {
-	const sourceFile = ts.createSourceFile(fileName, source, ts.ScriptTarget.Latest, true);
+	const sourceFile = parseSourceFile(fileName, source);
 	let found = false;
 	const visit = (node) => {
+		if (isReparsed(node)) return;
 		if (
-			ts.isPropertyAccessExpression(node) &&
+			is.isPropertyAccessExpression(node) &&
 			node.name.text === 'vitest' &&
-			ts.isMetaProperty(node.expression) &&
-			node.expression.keywordToken === ts.SyntaxKind.ImportKeyword &&
+			is.isMetaProperty(node.expression) &&
+			node.expression.keywordToken === SyntaxKind.ImportKeyword &&
 			node.expression.name.text === 'meta'
 		) {
 			found = true;
 			return;
 		}
-		ts.forEachChild(node, visit);
+		node.forEachChild(visit);
 	};
 	visit(sourceFile);
 	return found;
@@ -929,17 +926,19 @@ function extractTypeAssertionGroups(source, file) {
 	) {
 		return [];
 	}
-	const sourceFile = ts.createSourceFile(file, source, ts.ScriptTarget.Latest, true);
+	const sourceFile = parseSourceFile(file, source);
 
 	function containsAssertion(node) {
-		if (ts.isJsxElement(node) || ts.isJsxSelfClosingElement(node)) return true;
-		if (ts.isCallExpression(node)) return true;
-		if (ts.isSatisfiesExpression(node)) return true;
-		if (ts.isVariableDeclaration(node) && node.type && node.initializer) return true;
-		return ts.forEachChild(node, containsAssertion) ?? false;
+		if (isReparsed(node)) return false;
+		if (is.isJsxElement(node) || is.isJsxSelfClosingElement(node)) return true;
+		if (is.isCallExpression(node)) return true;
+		if (is.isSatisfiesExpression(node) && !isReparsed(node.type)) return true;
+		if (is.isVariableDeclaration(node) && node.type && !isReparsed(node.type) && node.initializer)
+			return true;
+		return node.forEachChild(containsAssertion) ?? false;
 	}
 	return sourceFile.statements
-		.filter((statement) => !ts.isImportDeclaration(statement) && containsAssertion(statement))
+		.filter((statement) => !is.isImportDeclaration(statement) && containsAssertion(statement))
 		.map((statement, index) => {
 			const title = statement.getText(sourceFile).replace(/\s+/g, ' ').trim();
 			const id = `react-case-v1:${createHash('sha256').update(`${file}\0type-assertion\0${index}\0${title}`).digest('hex').slice(0, 20)}`;
@@ -1185,36 +1184,32 @@ export async function immutableTestInventory(tree, subdirectory, manifest, optio
 function collectModuleSpecifiers(sourceFiles) {
 	const imports = new Set();
 	for (const [entryPath, bytes] of sourceFiles) {
-		const sourceFile = ts.createSourceFile(
-			entryPath,
-			bytes.toString('utf8'),
-			ts.ScriptTarget.Latest,
-			false,
-		);
+		const sourceFile = parseSourceFile(entryPath, bytes.toString('utf8'));
 		function visit(node) {
+			if (isReparsed(node)) return;
 			if (
-				(ts.isImportDeclaration(node) || ts.isExportDeclaration(node)) &&
+				(is.isImportDeclaration(node) || is.isExportDeclaration(node)) &&
 				node.moduleSpecifier &&
-				ts.isStringLiteralLike(node.moduleSpecifier)
+				is.isStringLiteralLikeNode(node.moduleSpecifier)
 			) {
 				imports.add(node.moduleSpecifier.text);
 			} else if (
-				ts.isImportEqualsDeclaration(node) &&
-				ts.isExternalModuleReference(node.moduleReference) &&
+				is.isImportEqualsDeclaration(node) &&
+				is.isExternalModuleReference(node.moduleReference) &&
 				node.moduleReference.expression &&
-				ts.isStringLiteralLike(node.moduleReference.expression)
+				is.isStringLiteralLikeNode(node.moduleReference.expression)
 			) {
 				imports.add(node.moduleReference.expression.text);
 			} else if (
-				ts.isCallExpression(node) &&
+				is.isCallExpression(node) &&
 				node.arguments.length === 1 &&
-				ts.isStringLiteralLike(node.arguments[0]) &&
-				(node.expression.kind === ts.SyntaxKind.ImportKeyword ||
-					(ts.isIdentifier(node.expression) && node.expression.text === 'require'))
+				is.isStringLiteralLikeNode(node.arguments[0]) &&
+				(node.expression.kind === SyntaxKind.ImportKeyword ||
+					(is.isIdentifier(node.expression) && node.expression.text === 'require'))
 			) {
 				imports.add(node.arguments[0].text);
 			}
-			ts.forEachChild(node, visit);
+			node.forEachChild(visit);
 		}
 		visit(sourceFile);
 	}

@@ -465,7 +465,6 @@ class MapImpl extends Evented {
 export class Marker extends Evented {
 	private _element: HTMLElement;
 	private _lngLat: LngLat = new LngLat(0, 0);
-	private _map: MapImpl | null = null;
 	private _offset: [number, number] | null = null;
 	private _draggable: boolean;
 	private _rotation: number;
@@ -503,14 +502,12 @@ export class Marker extends Evented {
 	}
 
 	addTo(map: MapImpl): this {
-		this._map = map;
 		map.getContainer()?.appendChild(this._element);
 		return this;
 	}
 
 	remove(): this {
 		this._element.remove();
-		this._map = null;
 		return this;
 	}
 
@@ -564,7 +561,6 @@ export class Marker extends Evented {
 export class Popup extends Evented {
 	options: any;
 	_container: HTMLElement;
-	private _content: HTMLElement | null = null;
 	private _lngLat: LngLat = new LngLat(0, 0);
 	private _map: MapImpl | null = null;
 
@@ -594,7 +590,6 @@ export class Popup extends Evented {
 	}
 
 	setDOMContent(content: HTMLElement): this {
-		this._content = content;
 		this._container.appendChild(content);
 		return this;
 	}

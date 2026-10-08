@@ -50,9 +50,9 @@ function App() @{
 - everything from `@tanstack/query-core` (`QueryClient`, `QueryCache`, observers,
   `dehydrate`/`hydrate`, …), re-exported verbatim.
 
-The whole `@tanstack/react-query` surface is bound. The separate companion packages
-(`@tanstack/react-query-persist-client`, `@tanstack/react-query-devtools`) are not
-included.
+The whole `@tanstack/react-query` surface is bound. The separate companion package
+`@tanstack/react-query-persist-client` is not included. The devtools live in
+[`@octanejs/tanstack-query-devtools`](../tanstack-query-devtools).
 
 ## How it works
 

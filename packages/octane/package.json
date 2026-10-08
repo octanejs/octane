@@ -63,6 +63,7 @@
     "./jsx-dev-runtime": "./src/jsx-runtime.d.ts",
     "./tsrx-iterable": "./src/tsrx-iterable.ts",
     "./tsrx-spread": "./src/tsrx-spread.ts",
+    "./tsrx-boundary": "./src/tsrx-boundary.ts",
     "./react": "./src/react/index.ts",
     "./hydration": "./src/hydration/index.ts",
     "./hydration/streamed-signals": "./src/hydration/streamed-signals.ts",
@@ -160,6 +161,11 @@
         "types": "./dist/tsrx-spread.d.ts",
         "node": "./dist/node/tsrx-spread.js",
         "default": "./dist/tsrx-spread.js"
+      },
+      "./tsrx-boundary": {
+        "types": "./dist/tsrx-boundary.d.ts",
+        "node": "./dist/node/tsrx-boundary.js",
+        "default": "./dist/tsrx-boundary.js"
       },
       "./react": {
         "types": "./dist/react/index.d.ts",
@@ -388,7 +394,7 @@
     "@tsrx/oxc": "catalog:default",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
-    "typescript": "^5.9.3",
+    "typescript": "^5.9.3 || ^6.0.0 || >=7.1.0-0",
     "vite": "^8.0.16"
   },
   "peerDependenciesMeta": {
@@ -420,6 +426,7 @@
     "react": "catalog:default",
     "react-dom": "catalog:default",
     "typescript": "catalog:default",
+    "typescript-native": "catalog:native",
     "viem": "catalog:default",
     "vite": "catalog:default",
     "vitest": "catalog:default"

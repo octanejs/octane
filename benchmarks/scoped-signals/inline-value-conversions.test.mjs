@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { createRequire } from 'node:module';
 import test from 'node:test';
 import path from 'node:path';
 import fs from 'node:fs';
@@ -365,12 +366,27 @@ test('actual TypeScript constructor-alias and call proofs preserve live values a
 		return { label, filename, source, hole };
 	});
 	const project = createTextTypeProject({ tsconfig: path.join(directory, 'tsconfig.json') });
+	// The repository's TypeScript 7 must prove the same ranges from the same project.
+	const nativeProject = createTextTypeProject({
+		tsconfig: path.join(directory, 'tsconfig.json'),
+		typescript: path.dirname(
+			createRequire(path.join(import.meta.dirname, '../../packages/octane/package.json')).resolve(
+				'typescript-native/package.json',
+			),
+		),
+	});
 	try {
 		for (const { label, filename, source, hole } of sources) {
 			const facts = project.snapshot(filename);
 			assert.ok(
 				facts.stringChildRanges.some(([start, end]) => source.slice(start, end) === hole),
 				`${label} needs an actual project-supplied string proof`,
+			);
+			const nativeFacts = nativeProject.snapshot(filename);
+			assert.deepEqual(
+				[nativeFacts.stringChildRanges, nativeFacts.primitiveTextChildRanges],
+				[facts.stringChildRanges, facts.primitiveTextChildRanges],
+				`${label} needs the same proof on TypeScript 7`,
 			);
 			for (const dev of [true, false]) {
 				for (const mode of ['client', 'server']) {
@@ -400,6 +416,7 @@ export function run(host,prepare){const scope=createScope({scopeKey:'typed-const
 		}
 	} finally {
 		project.dispose();
+		nativeProject.dispose();
 		fs.rmSync(directory, { recursive: true, force: true });
 	}
 });

@@ -1,6 +1,6 @@
 import { postHostTask } from './host-task.js';
 
-// All framework-owned producers in this host share one window. A cold I/O wait
+// All callers in this host share one window. A cold I/O wait
 // lets the sentinel reset it; a ready backlog cannot reset it per producer.
 const HOST_BUDGET_MS = 5;
 let started = 0;

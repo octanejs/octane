@@ -1301,6 +1301,10 @@ a request, so the whole example works without a backend:
 
 <FormActionDemo />
 
+Submissions queue and run one after another, each receiving the previous result. When
+several of them finish together, Octane renders only the final result, in a later task
+than the input that settled them, so that input can paint first.
+
 `useFormStatus` lets a child of the form read its status. `useOptimistic` temporarily
 shows the expected result while an action runs. `requestFormReset(form)` asks Octane to
 reset uncontrolled fields after the surrounding action or transition settles.

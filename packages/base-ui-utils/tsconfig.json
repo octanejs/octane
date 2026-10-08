@@ -14,7 +14,9 @@
     "allowSyntheticDefaultImports": true,
     "types": [],
     "strict": true,
-    "allowImportingTsExtensions": true
+    "allowImportingTsExtensions": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true
   },
   "include": ["./src/"],
   "exclude": ["node_modules", "dist", "tests"],

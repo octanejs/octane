@@ -9,7 +9,9 @@
     "noEmit": true,
     "allowImportingTsExtensions": true,
     "strict": true,
-    "types": ["node"]
+    "types": ["node"],
+    "noUnusedLocals": true,
+    "noUnusedParameters": true
   },
   "include": [
     "src/**/*.ts",

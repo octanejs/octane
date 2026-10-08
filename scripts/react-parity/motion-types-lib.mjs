@@ -1,7 +1,12 @@
 import { createHash } from 'node:crypto';
 import { existsSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
-import ts from 'typescript';
+import { is, parseSourceFile, ScriptKind } from '../octane-tsc/native-syntax.mjs';
+import {
+	flattenDiagnosticText,
+	parseProjectConfigContent,
+	readProjectConfig,
+} from './native-typescript-lib.mjs';
 
 export const ASSERTIONS_DOC = 'packages/motion/typetests/assertions.md';
 export const PRISTINE_TYPES = 'packages/motion/typetests/pristine/types.test-d.ts';
@@ -36,16 +41,10 @@ export function assertionGroups(source) {
 }
 
 function structuralSource(source) {
-	const sourceFile = ts.createSourceFile(
-		'types.test-d.ts',
-		source,
-		ts.ScriptTarget.Latest,
-		true,
-		ts.ScriptKind.TS,
-	);
+	const sourceFile = parseSourceFile('types.test-d.ts', source, ScriptKind.TS);
 	const replacements = [];
 	for (const statement of sourceFile.statements) {
-		if (!ts.isImportDeclaration(statement) || !ts.isStringLiteral(statement.moduleSpecifier))
+		if (!is.isImportDeclaration(statement) || !is.isStringLiteral(statement.moduleSpecifier))
 			continue;
 		const specifier = statement.moduleSpecifier.text;
 		if (specifier !== 'motion/react' && specifier !== '@octanejs/motion') continue;
@@ -75,17 +74,13 @@ function readRequired(root, relativePath) {
 
 function compilerOwnsFile(root, tsconfigPath, relativeFile) {
 	const absoluteConfig = resolve(root, tsconfigPath);
-	const configFile = ts.readConfigFile(absoluteConfig, ts.sys.readFile);
+	const configFile = readProjectConfig(absoluteConfig);
 	if (configFile.error) {
-		throw new Error(
-			`failed to read ${tsconfigPath}: ${ts.flattenDiagnosticMessageText(configFile.error.messageText, '\n')}`,
-		);
+		throw new Error(`failed to read ${tsconfigPath}: ${flattenDiagnosticText(configFile.error)}`);
 	}
-	const parsed = ts.parseJsonConfigFileContent(
-		configFile.config,
-		ts.sys,
-		resolve(root, tsconfigPath, '..'),
-	);
+	const parsed = parseProjectConfigContent(configFile.config, {
+		configDirectory: resolve(root, tsconfigPath, '..'),
+	});
 	const absoluteFile = resolve(root, relativeFile);
 	return parsed.fileNames.some(function matches(fileName) {
 		return resolve(fileName) === absoluteFile;

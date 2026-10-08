@@ -14,7 +14,8 @@
 import { createHash } from 'node:crypto';
 import { existsSync, readFileSync } from 'node:fs';
 import { resolve, sep } from 'node:path';
-import ts from 'typescript';
+import { is, parseSourceFile, ScriptKind } from '../octane-tsc/native-syntax.mjs';
+import { printNodeWithoutComments } from './native-typescript-lib.mjs';
 
 export const XSTATE_TYPE_PARITY_CONFIG = 'packages/xstate/audit/type-parity.json';
 export const XSTATE_STORE_TYPE_PARITY_CONFIG = 'packages/xstate-store/audit/type-parity.json';
@@ -77,14 +78,7 @@ function applyTransformations(body, transformations, path) {
 // marker cannot be moved onto a different line unnoticed, and annotated
 // bindings capture the type-level assignments that are the positive assertions.
 export function assertionGroups(source, fileName) {
-	const sourceFile = ts.createSourceFile(
-		fileName,
-		source,
-		ts.ScriptTarget.Latest,
-		true,
-		ts.ScriptKind.TSX,
-	);
-	const printer = ts.createPrinter({ removeComments: true });
+	const sourceFile = parseSourceFile(fileName, source, ScriptKind.TSX);
 	const groups = [];
 	for (const match of source.matchAll(/\b(describe|it|test)\((['"`])((?:\\.|[^\\])*?)\2/g)) {
 		groups.push(`${match[1]}:${match[3]}`);
@@ -93,14 +87,14 @@ export function assertionGroups(source, fileName) {
 		groups.push(`expect-error:${match[1].trim()}:${collapse(match[2]).replace(/;$/, '')}`);
 	}
 	function visit(node) {
-		if (ts.isVariableDeclaration(node) && node.type) {
+		if (is.isVariableDeclaration(node) && node.type) {
 			groups.push(
 				`typed-binding:${collapse(node.name.getText(sourceFile))}:${collapse(
-					printer.printNode(ts.EmitHint.Unspecified, node.type, sourceFile),
+					printNodeWithoutComments(node.type),
 				)}`,
 			);
 		}
-		ts.forEachChild(node, visit);
+		node.forEachChild(visit);
 	}
 	visit(sourceFile);
 	return groups;

@@ -1,7 +1,8 @@
 import { createHash } from 'node:crypto';
 import { existsSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
-import ts from 'typescript';
+import { is, parseSourceFile, ScriptKind } from '../octane-tsc/native-syntax.mjs';
+import { printFileWithoutComments, printNodeWithoutComments } from './native-typescript-lib.mjs';
 
 export const TYPE_PARITY_CONFIG = 'packages/drei/audit/type-parity.json';
 
@@ -10,33 +11,21 @@ function sha256(value) {
 }
 
 function assertionGroups(source, fileName) {
-	const sourceFile = ts.createSourceFile(
-		fileName,
-		source,
-		ts.ScriptTarget.Latest,
-		true,
-		ts.ScriptKind.TS,
-	);
-	const printer = ts.createPrinter({ removeComments: true });
+	const sourceFile = parseSourceFile(fileName, source, ScriptKind.TS);
 	const groups = [];
 	for (const match of source.matchAll(/\/\/\s*@ts-expect-error([^\n]*)\n\s*([^\n]+)/g)) {
 		groups.push(`expect-error:${match[1].trim()}:${match[2].replace(/\s+/g, ' ').trim()}`);
 	}
 	function visit(node) {
 		if (
-			ts.isVariableStatement(node) &&
+			is.isVariableStatement(node) &&
 			node.declarationList.declarations.some(function hasType(declaration) {
 				return declaration.type !== undefined;
 			})
 		) {
-			groups.push(
-				`typed:${printer
-					.printNode(ts.EmitHint.Unspecified, node, sourceFile)
-					.replace(/\s+/g, ' ')
-					.trim()}`,
-			);
+			groups.push(`typed:${printNodeWithoutComments(node).replace(/\s+/g, ' ').trim()}`);
 		}
-		ts.forEachChild(node, visit);
+		node.forEachChild(visit);
 	}
 	visit(sourceFile);
 	return groups;
@@ -48,16 +37,10 @@ function normalizePackageRoot(specifier) {
 }
 
 function structuralSource(source) {
-	const sourceFile = ts.createSourceFile(
-		'public-api.test-d.ts',
-		source,
-		ts.ScriptTarget.Latest,
-		true,
-		ts.ScriptKind.TS,
-	);
+	const sourceFile = parseSourceFile('public-api.test-d.ts', source, ScriptKind.TS);
 	const replacements = [];
 	for (const statement of sourceFile.statements) {
-		if (!ts.isImportDeclaration(statement) || !ts.isStringLiteral(statement.moduleSpecifier))
+		if (!is.isImportDeclaration(statement) || !is.isStringLiteral(statement.moduleSpecifier))
 			continue;
 		replacements.push({
 			start: statement.moduleSpecifier.getStart(sourceFile) + 1,
@@ -71,18 +54,8 @@ function structuralSource(source) {
 	})) {
 		transformed = `${transformed.slice(0, replacement.start)}${replacement.value}${transformed.slice(replacement.end)}`;
 	}
-	const normalizedFile = ts.createSourceFile(
-		'public-api.test-d.ts',
-		transformed,
-		ts.ScriptTarget.Latest,
-		true,
-		ts.ScriptKind.TS,
-	);
-	return ts
-		.createPrinter({ removeComments: true })
-		.printFile(normalizedFile)
-		.replace(/\s+/g, ' ')
-		.trim();
+	const normalizedFile = parseSourceFile('public-api.test-d.ts', transformed, ScriptKind.TS);
+	return printFileWithoutComments(normalizedFile).replace(/\s+/g, ' ').trim();
 }
 
 export function buildDreiTypeInventory(root, config) {
