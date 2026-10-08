@@ -4522,6 +4522,31 @@ function deferRootUnmount(block: Block, detachDom: boolean): boolean {
 		isCreatedInRootRender(transaction, block)
 	)
 		return false;
+	deferRootTeardown(
+		transaction,
+		block,
+		block.exclusiveMarkers || (!detachDom && block.startMarker !== block.endMarker),
+		detachDom,
+		unmountBlock as (scope: Scope, detachDom: boolean) => void,
+	);
+	return true;
+}
+
+/**
+ * Hand a committed subtree's teardown to its root's commit. With `detachDom`
+ * its range leaves the document now. Rollback restores the range, and the
+ * commit reconnects it so `release`'s deletion cleanups observe connected DOM.
+ * `scope` is a Block, or a lite arm's Scope whose stand-in carries the range; a
+ * stand-in reads as neither a root nor disposed.
+ */
+function deferRootTeardown(
+	transaction: RootRenderTransaction,
+	scope: Scope,
+	exclusive: boolean,
+	detachDom: boolean,
+	release: (scope: Scope, detachDom: boolean) => void,
+): void {
+	const block = scope.block;
 	retireRootBlock(block);
 	const start = block.startMarker;
 	const end = block.endMarker;
@@ -4530,7 +4555,6 @@ function deferRootUnmount(block: Block, detachDom: boolean): boolean {
 	let after: Node | null = null;
 	if (start !== null && end !== null && (STAGED_DOM?.view(start) ?? start).parentNode !== null) {
 		parent = (STAGED_DOM?.view(start) ?? start).parentNode;
-		const exclusive = block.exclusiveMarkers || (!detachDom && start !== end);
 		after = exclusive ? end : getNextSibling(end);
 		for (
 			let node: Node | null = exclusive ? getNextSibling(start) : start;
@@ -4565,7 +4589,7 @@ function deferRootUnmount(block: Block, detachDom: boolean): boolean {
 		const previousSuppression = REF_DETACH_SUPPRESSION;
 		REF_DETACH_SUPPRESSION = suppressedRefs;
 		try {
-			unmountBlock(block, false);
+			release(scope, false);
 		} finally {
 			REF_DETACH_SUPPRESSION = previousSuppression;
 		}
@@ -4576,7 +4600,6 @@ function deferRootUnmount(block: Block, detachDom: boolean): boolean {
 	});
 	if (detachDom && parent !== null)
 		for (const node of nodes) (STAGED_DOM?.view(parent) ?? parent).removeChild(node);
-	return true;
 }
 
 function isCreatedInRootRender(transaction: RootRenderTransaction, block: Block): boolean {
@@ -45334,69 +45357,25 @@ function unmountLiteArm(state: BranchSlot, detachDom: boolean): void {
 	const scope = state.lite!;
 	const arm = scope.block;
 	state.lite = null;
+	// A pair that delimits the arm belongs to its slot, as an arm Block's does.
+	const exclusive = arm.startMarker === state.start;
 	const transaction = ROOT_RENDER_TRANSACTION;
-	const deferred =
+	if (
 		transaction !== null &&
 		!transaction.aborted &&
 		!ROOT_RENDER_ROLLBACK &&
 		arm.idState.renderOwner === transaction.owner &&
-		!isCreatedInRootRender(transaction, owningBlock(arm));
-	// An enclosing removal takes the DOM with it: release the Scope alone.
-	if (!deferred && !detachDom) {
-		releaseLiteArm(scope);
+		!isCreatedInRootRender(transaction, owningBlock(arm))
+	) {
+		deferRootTeardown(transaction, scope, exclusive, detachDom, releaseLiteArm);
 		return;
 	}
-	const start = arm.startMarker!;
-	const end = arm.endMarker!;
-	const nodes: Node[] = [];
-	let parent: Node | null = null;
-	let after: Node | null = null;
-	if (start != null && end != null && (STAGED_DOM?.view(start) ?? start).parentNode !== null) {
-		parent = (STAGED_DOM?.view(start) ?? start).parentNode;
-		const exclusive = start === state.start;
-		after = exclusive ? end : getNextSibling(end);
-		for (
-			let node: Node | null = exclusive ? getNextSibling(start) : start;
-			node !== null && node !== after;
-			node = getNextSibling(node)
-		)
-			nodes.push(node);
-	}
-	if (deferred) {
-		retireRootBlock(arm);
-		let cancelled = false;
-		journalUndo(() => {
-			cancelled = true;
-			if (parent !== null) {
-				const anchor = (STAGED_DOM?.view(after) ?? after)?.parentNode === parent ? after : null;
-				restoreRootNodes(parent, nodes, anchor);
-			}
-		});
-		const suppressedRefs = REF_DETACH_SUPPRESSION;
-		(transaction.commit ??= []).push(() => {
-			if (cancelled) return;
-			// Deletion cleanups observe connected DOM, as deferRootUnmount's do.
-			if (parent !== null) {
-				const anchor = (STAGED_DOM?.view(after) ?? after)?.parentNode === parent ? after : null;
-				for (const node of nodes)
-					if ((STAGED_DOM?.view(node) ?? node).parentNode !== parent)
-						(STAGED_DOM?.view(parent) ?? parent).insertBefore(node, anchor);
-			}
-			const previousSuppression = REF_DETACH_SUPPRESSION;
-			REF_DETACH_SUPPRESSION = suppressedRefs;
-			try {
-				releaseLiteArm(scope);
-			} finally {
-				REF_DETACH_SUPPRESSION = previousSuppression;
-			}
-			if (parent !== null)
-				for (const node of nodes)
-					if ((STAGED_DOM?.view(node) ?? node).parentNode === parent)
-						(STAGED_DOM?.view(parent) ?? parent).removeChild(node);
-		});
-	} else releaseLiteArm(scope);
-	if (detachDom && parent !== null)
-		for (const node of nodes) (STAGED_DOM?.view(parent) ?? parent).removeChild(node);
+	const start = arm.startMarker;
+	const end = arm.endMarker;
+	releaseLiteArm(scope);
+	// As unmountBlock does, remove the range after its cleanups ran.
+	if (detachDom && start !== null && end !== null && domNode(start).parentNode !== null)
+		removeRange(exclusive ? getNextSibling(start) : start, exclusive ? end : getNextSibling(end));
 }
 
 /**
