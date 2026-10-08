@@ -1,11 +1,11 @@
 import { createHash } from 'node:crypto';
 import { readFileSync, readdirSync } from 'node:fs';
 import { relative, resolve, sep } from 'node:path';
-import ts from 'typescript';
+import { is, parseSourceFile, ScriptKind } from '../octane-tsc/native-syntax.mjs';
+import { printFileWithoutComments, printNodeWithoutComments } from './native-typescript-lib.mjs';
 
 const sha256 = (value) => createHash('sha256').update(value).digest('hex');
 const posix = (value) => value.split(sep).join('/');
-const printer = ts.createPrinter({ removeComments: true });
 
 function listFiles(root) {
 	return readdirSync(root, { recursive: true, withFileTypes: true })
@@ -14,77 +14,82 @@ function listFiles(root) {
 		.sort();
 }
 
-function text(node, sourceFile) {
-	return printer.printNode(ts.EmitHint.Unspecified, node, sourceFile).replace(/\s+/g, ' ').trim();
+function text(node) {
+	return printNodeWithoutComments(node).replace(/\s+/g, ' ').trim();
+}
+
+// The classic `isStatement`: TypeScript 7's also accepts the block that is a
+// function body or a try, catch or finally clause.
+function isStatement(node) {
+	if (!is.isBlock(node)) return is.isStatement(node);
+	return (
+		!is.isTryStatement(node.parent) &&
+		!is.isCatchClause(node.parent) &&
+		!is.isSignatureDeclaration(node.parent)
+	);
 }
 
 function literalName(node) {
-	return node && (ts.isStringLiteral(node) || ts.isNoSubstitutionTemplateLiteral(node))
+	return node && (is.isStringLiteral(node) || is.isNoSubstitutionTemplateLiteral(node))
 		? node.text
 		: undefined;
 }
 
 function calleeName(call) {
-	if (ts.isIdentifier(call.expression)) return call.expression.text;
-	if (ts.isPropertyAccessExpression(call.expression)) return call.expression.name.text;
+	if (is.isIdentifier(call.expression)) return call.expression.text;
+	if (is.isPropertyAccessExpression(call.expression)) return call.expression.name.text;
 	return undefined;
 }
 
 function isRootedAtExpectTypeOf(node) {
-	if (ts.isCallExpression(node)) {
-		if (ts.isIdentifier(node.expression) && node.expression.text === 'expectTypeOf') return true;
+	if (is.isCallExpression(node)) {
+		if (is.isIdentifier(node.expression) && node.expression.text === 'expectTypeOf') return true;
 		return isRootedAtExpectTypeOf(node.expression);
 	}
-	if (ts.isPropertyAccessExpression(node)) return isRootedAtExpectTypeOf(node.expression);
+	if (is.isPropertyAccessExpression(node)) return isRootedAtExpectTypeOf(node.expression);
 	return false;
 }
 
 function outerExpectTypeOfCalls(node) {
 	const calls = [];
 	function visit(current) {
-		if (ts.isCallExpression(current) && isRootedAtExpectTypeOf(current)) {
+		if (is.isCallExpression(current) && isRootedAtExpectTypeOf(current)) {
 			const parent = current.parent;
 			if (
-				!(ts.isPropertyAccessExpression(parent) && parent.expression === current) &&
-				!(ts.isCallExpression(parent) && parent.expression === current)
+				!(is.isPropertyAccessExpression(parent) && parent.expression === current) &&
+				!(is.isCallExpression(parent) && parent.expression === current)
 			)
 				calls.push(current);
 			return;
 		}
-		ts.forEachChild(current, visit);
+		current.forEachChild(visit);
 	}
 	visit(node);
 	return calls;
 }
 
 function assertionGroups(source, fileName) {
-	const sourceFile = ts.createSourceFile(
-		fileName,
-		source,
-		ts.ScriptTarget.Latest,
-		true,
-		ts.ScriptKind.TS,
-	);
+	const sourceFile = parseSourceFile(fileName, source, ScriptKind.TS);
 	const groups = [];
 	const describeStack = [];
 	function visit(node) {
-		if (ts.isCallExpression(node) && calleeName(node) === 'describe') {
+		if (is.isCallExpression(node) && calleeName(node) === 'describe') {
 			const name = literalName(node.arguments[0]);
 			const body = node.arguments[1];
-			if (name && body && (ts.isArrowFunction(body) || ts.isFunctionExpression(body))) {
+			if (name && body && (is.isArrowFunction(body) || is.isFunctionExpression(body))) {
 				describeStack.push(name);
-				ts.forEachChild(body.body, visit);
+				body.body.forEachChild(visit);
 				describeStack.pop();
 				return;
 			}
 		}
-		if (ts.isCallExpression(node) && ['test', 'it'].includes(calleeName(node))) {
+		if (is.isCallExpression(node) && ['test', 'it'].includes(calleeName(node))) {
 			const name = literalName(node.arguments[0]);
 			const body = node.arguments[1];
-			if (name && body && (ts.isArrowFunction(body) || ts.isFunctionExpression(body))) {
+			if (name && body && (is.isArrowFunction(body) || is.isFunctionExpression(body))) {
 				const identity = [...describeStack, name].join(' > ');
 				const assertions = outerExpectTypeOfCalls(body.body).map(
-					(call) => `expectTypeOf:${text(call, sourceFile)}`,
+					(call) => `expectTypeOf:${text(call)}`,
 				);
 				const bodyStart = body.body.getStart(sourceFile);
 				const bodyEnd = body.body.getEnd();
@@ -93,18 +98,18 @@ function assertionGroups(source, fileName) {
 					const directiveEnd = bodyStart + match.index + match[0].length;
 					let followingStatement;
 					function findFollowingStatement(current) {
-						if (ts.isStatement(current) && current.getStart(sourceFile) >= directiveEnd) {
+						if (isStatement(current) && current.getStart(sourceFile) >= directiveEnd) {
 							if (
 								!followingStatement ||
 								current.getStart(sourceFile) < followingStatement.getStart(sourceFile)
 							)
 								followingStatement = current;
 						}
-						ts.forEachChild(current, findFollowingStatement);
+						current.forEachChild(findFollowingStatement);
 					}
 					findFollowingStatement(body.body);
 					assertions.push(
-						`expect-error:${match[1].trim()}:${followingStatement ? text(followingStatement, sourceFile) : '<missing-statement>'}`,
+						`expect-error:${match[1].trim()}:${followingStatement ? text(followingStatement) : '<missing-statement>'}`,
 					);
 				}
 				groups.push(`group:${identity}`);
@@ -113,7 +118,7 @@ function assertionGroups(source, fileName) {
 				return;
 			}
 		}
-		ts.forEachChild(node, visit);
+		node.forEachChild(visit);
 	}
 	visit(sourceFile);
 	return groups;
@@ -126,20 +131,14 @@ function mappingsFor(config, fileName) {
 }
 
 function structuralSource(source, fileName, side, config) {
-	const sourceFile = ts.createSourceFile(
-		fileName,
-		source,
-		ts.ScriptTarget.Latest,
-		true,
-		ts.ScriptKind.TS,
-	);
+	const sourceFile = parseSourceFile(fileName, source, ScriptKind.TS);
 	const rules = mappingsFor(config, fileName);
 	const replacements = [];
 	for (const statement of sourceFile.statements) {
 		if (
-			(!ts.isImportDeclaration(statement) && !ts.isExportDeclaration(statement)) ||
+			(!is.isImportDeclaration(statement) && !is.isExportDeclaration(statement)) ||
 			!statement.moduleSpecifier ||
-			!ts.isStringLiteral(statement.moduleSpecifier)
+			!is.isStringLiteral(statement.moduleSpecifier)
 		)
 			continue;
 		const specifier = statement.moduleSpecifier.text;
@@ -157,10 +156,7 @@ function structuralSource(source, fileName, side, config) {
 	for (const replacement of replacements.sort((a, b) => b.start - a.start)) {
 		transformed = `${transformed.slice(0, replacement.start)}${replacement.value}${transformed.slice(replacement.end)}`;
 	}
-	return printer
-		.printFile(
-			ts.createSourceFile(fileName, transformed, ts.ScriptTarget.Latest, true, ts.ScriptKind.TS),
-		)
+	return printFileWithoutComments(parseSourceFile(fileName, transformed, ScriptKind.TS))
 		.replace(/\s+/g, ' ')
 		.trim();
 }

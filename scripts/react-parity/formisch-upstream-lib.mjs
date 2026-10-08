@@ -3,7 +3,8 @@ import { readFileSync, readdirSync } from 'node:fs';
 import { relative, resolve } from 'node:path';
 import { toPortablePath } from './harness-lib.mjs';
 import { extractTestCases } from './inventory-lib.mjs';
-import ts from 'typescript';
+import { is, parseSourceFile, ScriptKind } from '../octane-tsc/native-syntax.mjs';
+import { printNodeWithoutComments } from './native-typescript-lib.mjs';
 
 const REACT_UPSTREAM = 'packages/formisch/upstream/frameworks/react/src';
 const REACT_ADAPTED = 'packages/formisch/tests/upstream/frameworks/react/src';
@@ -18,60 +19,48 @@ const RUNTIME_INVENTORIES = [
 	'packages/formisch/audit/adapted-runtime-resolver-canary.json',
 	'packages/formisch/audit/adapted-runtime-react.json',
 ];
-const printer = ts.createPrinter({ removeComments: true });
 
 function expectSignaturesByTest(source, file) {
-	const sourceFile = ts.createSourceFile(
-		file,
-		source.replaceAll('@{', ' {'),
-		ts.ScriptTarget.Latest,
-		true,
-		ts.ScriptKind.TSX,
-	);
+	const sourceFile = parseSourceFile(file, source.replaceAll('@{', ' {'), ScriptKind.TSX);
 	const tests = [];
 	function isRootedAtExpect(node) {
-		if (ts.isCallExpression(node)) {
-			if (ts.isIdentifier(node.expression) && node.expression.text === 'expect') return true;
+		if (is.isCallExpression(node)) {
+			if (is.isIdentifier(node.expression) && node.expression.text === 'expect') return true;
 			return isRootedAtExpect(node.expression);
 		}
-		if (ts.isPropertyAccessExpression(node)) return isRootedAtExpect(node.expression);
+		if (is.isPropertyAccessExpression(node)) return isRootedAtExpect(node.expression);
 		return false;
 	}
 	function expectCalls(node) {
 		const calls = [];
 		function visit(current) {
-			if (ts.isCallExpression(current) && isRootedAtExpect(current)) {
+			if (is.isCallExpression(current) && isRootedAtExpect(current)) {
 				const parent = current.parent;
 				if (
-					!(ts.isPropertyAccessExpression(parent) && parent.expression === current) &&
-					!(ts.isCallExpression(parent) && parent.expression === current)
+					!(is.isPropertyAccessExpression(parent) && parent.expression === current) &&
+					!(is.isCallExpression(parent) && parent.expression === current)
 				) {
-					calls.push(
-						printer
-							.printNode(ts.EmitHint.Unspecified, current, sourceFile)
-							.replace(/\s+/g, ' ')
-							.trim(),
-					);
+					calls.push(printNodeWithoutComments(current).replace(/\s+/g, ' ').trim());
 					return;
 				}
 			}
-			ts.forEachChild(current, visit);
+			current.forEachChild(visit);
 		}
 		visit(node);
 		return calls;
 	}
 	function visit(node) {
 		if (
-			ts.isCallExpression(node) &&
-			ts.isIdentifier(node.expression) &&
+			is.isCallExpression(node) &&
+			is.isIdentifier(node.expression) &&
 			['test', 'it'].includes(node.expression.text) &&
-			(ts.isStringLiteral(node.arguments[0]) ||
-				ts.isNoSubstitutionTemplateLiteral(node.arguments[0]))
+			(is.isStringLiteral(node.arguments[0]) ||
+				is.isNoSubstitutionTemplateLiteral(node.arguments[0]))
 		) {
 			tests.push({ title: node.arguments[0].text, assertions: expectCalls(node.arguments[1]) });
 			return;
 		}
-		ts.forEachChild(node, visit);
+		node.forEachChild(visit);
 	}
 	visit(sourceFile);
 	return tests;
