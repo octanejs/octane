@@ -1277,6 +1277,23 @@ export function Chart<T extends Octane.SVGProps<SVGTextElement>>(props: T) {
 	return <text ref={null} {...props} />;
 }`,
 				],
+				// As in plain TSX, a key that only an index signature admits is not a
+				// declared ref, so the bag's ref composes as absent.
+				[
+					'index-signature spread with an explicit ref',
+					`export function Tooltip(props: { rest: Record<string, unknown> }) {
+	return <input ref={null} {...props.rest} />;
+}`,
+				],
+				[
+					'index-signature props with a forwarded ref',
+					`import type { Octane } from 'octane/jsx-runtime';
+type InputProps = { [key: string]: unknown; innerRef?: Octane.Ref<HTMLInputElement>; id?: string };
+export function Input(props: InputProps) @{
+	const { innerRef, ...innerProps } = props;
+	<input ref={innerRef ?? null} {...innerProps} />
+}`,
+				],
 			];
 			const files = sources.map(([name, source], index) => {
 				const compiled = compileToVolarMappings(source, `/src/Spread${index}.tsrx`);
@@ -1372,7 +1389,7 @@ export function Invalid(value: SignalHandle<string>) @{ <p>{value as string}</p>
 					2698,
 				],
 				[
-					`export function Invalid(props: { rest: Record<string, unknown> }) {
+					`export function Invalid(props: { rest: { [key: string]: unknown; ref: (node: SVGSVGElement | null) => void } }) {
 	return <input ref={null} {...props.rest} />;
 }`,
 					2322,
