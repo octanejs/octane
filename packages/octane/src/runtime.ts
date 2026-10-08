@@ -24915,7 +24915,7 @@ function updateTextValue(node: Text, value: string): void {
 	}
 }
 
-export function setText(node: Text, value: any, host?: Node): void {
+export function setText(node: Text | null, value: any, host?: Node): void {
 	// Unconditional writer: explicit text bindings guard cached raw values inline;
 	// textHoleUpdate and childTextHoleUpdate do the equivalent primitive check
 	// before using a cached Text node. The cache stores the raw input, not its
@@ -24923,37 +24923,34 @@ export function setText(node: Text, value: any, host?: Node): void {
 	// Do not read nodeValue here: the binding paths already chose this write, and
 	// a DOM text getter can materialize an extra string on every update.
 	//
-	// An only-child text binding passes its host. One parent read (no string)
-	// confirms the Text is still the node the host shows; see resetOnlyChildHost.
-	if (host !== undefined && (STAGED_DOM?.view(node) ?? node).parentNode !== host)
-		resetOnlyChildHost(host, node);
+	// An only-child text binding passes its host, so a Text that a page translator
+	// took out of it is put back (see resetOnlyChildHost). One parent read, with
+	// no string, confirms a cached Text. A binding that keeps only its host passes
+	// no node: htext seeded the Text as the host's first child, and a first child
+	// that is not a Text means a translator replaced it.
+	if (host !== undefined) {
+		if (node === null) {
+			node = (STAGED_DOM?.view(host) ?? host).firstChild as Text | null;
+			if (node === null || node.nodeType !== 3) {
+				node = (STAGED_DOM?.view(document) ?? document).createTextNode('');
+				resetOnlyChildHost(host, node);
+			}
+		} else if ((STAGED_DOM?.view(node) ?? node).parentNode !== host) resetOnlyChildHost(host, node);
+	}
+	const target = node as Text;
 	//
 	// View-transition dirty tracking and journaling remain at this write boundary.
 	// The optional driver marks the innermost boundary only during a wrapped drain.
 	VIEW_TRANSITION_DRIVER?.markDirty();
-	if (TRANSITION_JOURNAL !== null) journalText(node, (STAGED_DOM?.view(node) ?? node).nodeValue);
+	if (TRANSITION_JOURNAL !== null)
+		journalText(target, (STAGED_DOM?.view(target) ?? target).nodeValue);
 	//
 	// Write via `nodeValue` (a `Node`-level accessor) rather than `data` (which
 	// lives on `CharacterData` one prototype hop deeper) — it's measurably faster
 	// for the hot text-update path.
 	const text = coerceText(value);
-	if (hiddenTextWriter !== null && hiddenTextWriter(node, text)) return;
-	(STAGED_DOM?.view(node) ?? node).nodeValue = text;
-}
-
-/**
- * @internal Compiler target for an only-child `{x as string}` update on a native
- * host, whose only child is the binding's Text (htext seeded it there). Writing
- * the host's first child rather than a cached Text node also finds a Text that a
- * page translator replaced, as React's setTextContent does.
- */
-export function setOnlyText(host: Node, value: any): void {
-	let text = (STAGED_DOM?.view(host) ?? host).firstChild as Text | null;
-	if (text === null || text.nodeType !== 3) {
-		text = (STAGED_DOM?.view(document) ?? document).createTextNode('');
-		resetOnlyChildHost(host, text);
-	}
-	setText(text, value);
+	if (hiddenTextWriter !== null && hiddenTextWriter(target, text)) return;
+	(STAGED_DOM?.view(target) ?? target).nodeValue = text;
 }
 
 /**

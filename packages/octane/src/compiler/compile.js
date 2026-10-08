@@ -1697,7 +1697,6 @@ const INTERNAL_CLIENT_RUNTIME_HELPERS = new Set([
 	'updateFreshClassAttr',
 	'textHoleUpdate',
 	'childTextHoleUpdate',
-	'setOnlyText',
 	...HOOK_MEMO_RUNTIME_HELPERS,
 	...NATIVE_READ_RUNTIME_HELPERS,
 ]);
@@ -16876,7 +16875,6 @@ function preparePresentationHydration(body, node, ctx, hostEnd) {
 	]);
 	if (proof.structural) {
 		writers.add('setText');
-		writers.add('setOnlyText');
 		writers.add('bindSignalText');
 		writers.add('markDangerouslySetInnerHTMLChildren');
 	}
@@ -27631,7 +27629,7 @@ function planJsx(
 				ctx.runtimeNeeded.add(attrBindingHelper(b));
 		}
 		if (!b.signalDirect && (b.kind === 'text' || b.kind === 'textOnlyChild')) {
-			ctx.runtimeNeeded.add(onlyTextKeepsHost(b, elVar, bag) ? 'setOnlyText' : 'setText');
+			ctx.runtimeNeeded.add('setText');
 		}
 		if (b.kind === 'text') ctx.runtimeNeeded.add(b.bindingMarker ? 'bindingText' : 'htextSwap');
 		if (b.kind === 'textOnlyChild') ctx.runtimeNeeded.add('htext');
@@ -29463,11 +29461,11 @@ function directSignalAttributeWriter(bind) {
 		: b.id(`_$${attrBindingHelper(bind)}`);
 }
 
-// A seeded native host's only child is the binding's Text, so when no other
-// binding already keeps that host in the bag, keeping the host in place of the
-// Text costs no field: an update writes the host's first child (setOnlyText).
-// Otherwise the Text stays cached and setText receives the shared host, or the
-// excluded host whose Text may follow children it does not own.
+// A seeded native host's only child is the binding's Text. When no other binding
+// already keeps that host in the bag, keeping the host in place of the Text costs
+// no field: an update passes setText the host and no node, and setText writes the
+// host's first child. Otherwise the Text stays cached and setText receives the
+// shared host, or the excluded host whose Text may follow children it does not own.
 function onlyTextKeepsHost(bind, elVar, bag) {
 	return bind.kind === 'textOnlyChild' && bind.seededText && !bind.mountOnly && !bag.hasHost(elVar);
 }
@@ -29612,7 +29610,7 @@ function emitBindingMount(bind, elVar, bag) {
 			// hydration mismatch re-render).
 			//
 			// Updates also need the host, to replace what a page translator put in place
-			// of the Text (see the runtime's setOnlyText). See onlyTextKeepsHost.
+			// of the Text (see the runtime's setText). See onlyTextKeepsHost.
 			if (onlyTextKeepsHost(bind, elVar, bag)) {
 				return st(
 					b.block([
@@ -30133,7 +30131,7 @@ function emitBindingUpdate(bind, bag, inlineBindingGuards = false) {
 			// node does not receive either.
 			const write = bag.has(`_txt$${bind.id}`)
 				? b.call('_$setText', F('_txt'), V(), ...(bind.kind === 'textOnlyChild' ? [F('_el')] : []))
-				: b.call('_$setOnlyText', F('_el'), V());
+				: b.call('_$setText', b.literal(null), V(), F('_el'));
 			return st(
 				b.block([
 					b.const('_v', bind.expr),
