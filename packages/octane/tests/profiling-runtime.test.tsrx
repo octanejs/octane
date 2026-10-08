@@ -166,8 +166,46 @@ function KeyedPortalApp(props: { target: Element; id: string }) {
 	return createPortal(<PortalBody key={props.id} label={props.id} />, props.target, 'stable');
 }
 
+function ArmA() @{
+	<b>first arm</b>
+}
+
+function ArmB() @{
+	<i>second arm</i>
+}
+
+function ArmApp() @{
+	const [first, setFirst] = useState(true);
+	const [count, setCount] = useState(0);
+	<div>
+		<button id="toggle" onClick={() => setFirst(!first)}>
+			toggle
+		</button>
+		<button id="bump" onClick={() => setCount(count + 1)}>
+			{String(count)}
+		</button>
+		@if (first) {
+			<ArmA />
+		} @else {
+			<ArmB />
+		}
+	</div>
+}
+
+function UnboundedReader(props: { promise: Promise<string> }) @{
+	const value = use(props.promise);
+	<p>{value as string}</p>
+}
+
 function renders(component) {
 	return profiler.why(component).filter((event) => event.type === 'component-render');
+}
+
+/** Counter changes across `run`, which must leave its work committed. */
+async function measure(run: () => unknown) {
+	const before = profiler.snapshot();
+	await run();
+	return profiler.diff(before, profiler.snapshot()).counters;
 }
 
 function render(component, phase) {
@@ -422,5 +460,121 @@ describe('profile build component boundaries', () => {
 		expect(new Set(portalEvents.map((event) => event.instanceId)).size).toBe(2);
 		view.unmount();
 		target.remove();
+	});
+});
+
+describe('profile build engine counters', () => {
+	it('records every engine counter for the DOM renderer', () => {
+		const snapshot = profiler.snapshot();
+
+		expect(snapshot.renderers).toContain('dom');
+		expect(Object.keys(snapshot.counters).sort()).toEqual(
+			[
+				'arm.keep',
+				'arm.swap',
+				'block.create',
+				'block.unmount',
+				'boundary.catch',
+				'boundary.fallback',
+				'commit.root',
+				'component.bailout',
+				'component.render',
+				'component.renderErrored',
+				'component.renderSuspended',
+				'rollback.capture',
+				'rollback.journalEntries',
+				'rollback.root',
+				'scheduler.drain',
+			].sort(),
+		);
+	});
+
+	it('distinguishes a kept arm from a replaced one', async () => {
+		const mounted = mount(ArmApp);
+
+		const kept = await measure(() => act(() => mounted.click('#bump')));
+		expect(kept).toMatchObject({ 'arm.keep': 1, 'arm.swap': 0, 'commit.root': 1 });
+
+		const swapped = await measure(() => act(() => mounted.click('#toggle')));
+		expect(mounted.container.textContent).toContain('second arm');
+		expect(swapped).toMatchObject({ 'arm.keep': 0, 'arm.swap': 1, 'commit.root': 1 });
+		expect(swapped['block.create']).toBeGreaterThan(0);
+		expect(swapped['block.unmount']).toBeGreaterThan(0);
+
+		mounted.unmount();
+	});
+
+	it('counts a skipped memo body as a bailout, not a render', async () => {
+		const mounted = mount(CounterApp);
+
+		const update = await measure(() => act(() => mounted.click('button')));
+
+		// CounterApp and CounterLeaf render; the memoized StaticBadge bails out.
+		expect(update).toMatchObject({
+			'component.render': 2,
+			'component.bailout': 1,
+			'rollback.root': 0,
+		});
+		expect(update['scheduler.drain']).toBeGreaterThan(0);
+		mounted.unmount();
+	});
+
+	it('counts a Suspense fallback and an error catch at their boundaries', async () => {
+		let suspended!: ReturnType<typeof mount>;
+		const pending = await measure(() => {
+			suspended = mount(SuspenseApp, { promise: new Promise<string>(() => {}) });
+		});
+		expect(suspended.container.textContent).toBe('pending');
+		expect(pending).toMatchObject({
+			'boundary.fallback': 1,
+			'boundary.catch': 0,
+			'component.renderSuspended': 1,
+			'commit.root': 1,
+			'rollback.root': 0,
+		});
+		suspended.unmount();
+
+		let failed!: ReturnType<typeof mount>;
+		const caught = await measure(() => {
+			failed = mount(ErrorBoundaryApp, { value: new Error('boom') });
+		});
+		expect(failed.container.textContent).toBe('caught');
+		expect(caught).toMatchObject({
+			'boundary.catch': 1,
+			'boundary.fallback': 0,
+			'component.renderErrored': 1,
+		});
+		failed.unmount();
+	});
+
+	it('counts a root render discarded by suspension outside any boundary', async () => {
+		let resolve!: (value: string) => void;
+		const promise = new Promise<string>((done) => {
+			resolve = done;
+		});
+		let mounted!: ReturnType<typeof mount>;
+
+		const held = await measure(() => {
+			mounted = mount(UnboundedReader, { promise });
+		});
+		expect(mounted.container.textContent).toBe('');
+		expect(held).toMatchObject({
+			'rollback.root': 1,
+			'commit.root': 0,
+			'component.renderSuspended': 1,
+		});
+		expect(held['rollback.capture']).toBeGreaterThan(0);
+		expect(held['rollback.journalEntries']).toBeGreaterThan(0);
+
+		const retried = await measure(() =>
+			act(async () => {
+				resolve('ready');
+				await promise;
+			}),
+		);
+		expect(mounted.container.textContent).toBe('ready');
+		expect(retried).toMatchObject({ 'rollback.root': 0, 'commit.root': 1 });
+
+		mounted.unmount();
 	});
 });

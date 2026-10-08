@@ -21,6 +21,9 @@ const { JSDOM } = require('jsdom') as {
 		window: Window &
 			typeof globalThis & {
 				__OCTANE_DEVTOOLS__?: { getTree(): Array<{ name: string }> };
+				__OCTANE_PROFILER__?: {
+					snapshot(): { build: string; renderers: string[]; counters: Record<string, number> };
+				};
 			};
 	};
 };
@@ -86,6 +89,14 @@ describe('custom esbuild production profiling', () => {
 		expect(profiled.dom.window.__OCTANE_DEVTOOLS__?.getTree()).toEqual([
 			expect.objectContaining({ name: 'ProfileConsumer' }),
 		]);
+		// Engine counters ride the same define: present in the production profiling
+		// build, which commits its first render synchronously, and absent otherwise.
+		expect(normal.dom.window.__OCTANE_PROFILER__).toBeUndefined();
+		expect(profiled.dom.window.__OCTANE_PROFILER__?.snapshot()).toMatchObject({
+			build: 'production',
+			renderers: ['dom'],
+			counters: { 'commit.root': 1, 'rollback.root': 0, 'component.render': 1 },
+		});
 
 		for (const optionalModule of ['/src/profiling.ts', '/src/devtools-hook.ts']) {
 			expect(normal.retainedInputs.some((input) => input.endsWith(optionalModule))).toBe(false);

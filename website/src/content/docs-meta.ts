@@ -529,12 +529,13 @@ export const docsMeta: DocMeta[] = [
 		slug: 'profiling',
 		title: 'Profiling',
 		description:
-			'Profile component renders, render causes, and schedule-to-render delay in Chrome.',
+			'Profile component renders, render causes, schedule-to-render delay, and engine work counters in Chrome.',
 		group: 'Explore',
 		sections: [
 			{ id: 'enable-profiling', title: 'Enable profiling' },
 			{ id: 'record-in-chrome', title: 'Record in Chrome' },
 			{ id: 'console-api', title: 'Console API' },
+			{ id: 'engine-counters', title: 'Engine counters' },
 			{ id: 'reading-the-data', title: 'Reading the data' },
 			{ id: 'render-causes', title: 'Render causes' },
 			{ id: 'cost-and-privacy', title: 'Cost and privacy' },

@@ -36,3 +36,27 @@ runner fails on semantic or bounded-work violations, writes source/toolchain/ass
 hashes with its counts, and keeps build artifacts under ignored `dist/root-work/`.
 Without `BENCH_JSON`, the result is `dist/root-work/result.json`. This standalone
 control does not change the seven-framework async-status suite above.
+
+## Root suspension profile counters
+
+The same fixture, controls, and semantic verification also run through a DEV +
+PROFILING build, which records Octane's engine counters (`octane/profiling`)
+around each operation:
+
+```bash
+BENCH_JSON=benchmarks/results/root-suspension-profile-counters.json node benchmarks/suspense-recovery/profile-counters.mjs
+```
+
+Each sample loads a fresh page, runs setup, snapshots the counters, performs the
+hold or retry (which resolves only once its completion condition holds),
+snapshots again, and verifies the visible outcome afterwards. Every hold must
+roll back exactly one root render without committing; every retry must commit
+once without a rollback. The remaining counters (renders, Blocks, arms, journal
+entries, discarded captures) are recorded per shape for comparison across
+revisions.
+
+Counter names describe engine work and survive refactors, but a profile build
+compiles the generic program, not production output. This lane complements the
+production precise-coverage lane above rather than replacing it. The weekly
+Bench workflow runs it, and fails on a semantic violation. Without `BENCH_JSON`,
+the result is `dist/profile-counters/result.json`.
