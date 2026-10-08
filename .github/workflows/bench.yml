@@ -42,8 +42,8 @@ jobs:
           node-version: 24
           cache: "pnpm"
 
-      - name: Test benchmark work collector
-        run: node --test benchmarks/lib/precise-work.test.mjs
+      - name: Test benchmark work collectors
+        run: node --test benchmarks/lib/precise-work.test.mjs benchmarks/lib/profile-counters.test.mjs
 
       - name: Install dependencies
         run: pnpm install --prod=false --frozen-lockfile
@@ -67,6 +67,13 @@ jobs:
 
       - name: Verify browser benchmark timing boundaries
         run: node --test benchmarks/js-framework/timing.test.mjs
+
+      # Drives a real interaction through a DEV + PROFILING build and fails on
+      # a semantic violation, so the profiler's counter path cannot rot unseen.
+      - name: Record root-suspension profile counters
+        env:
+          BENCH_JSON: benchmarks/results/root-suspension-profile-counters.json
+        run: node benchmarks/suspense-recovery/profile-counters.mjs
 
       # --quick keeps every code path + correctness gate exercised at reduced
       # iterations; --ratios enforces the committed ratio guards and fails the job

@@ -270,3 +270,183 @@ describe('profiling metadata ABI', () => {
 		).toEqual([1, 4]);
 	});
 });
+
+// Counter state is module-wide and renderer declarations are permanent, so
+// each case loads its own instance of the profiler module.
+async function freshProfiling() {
+	vi.resetModules();
+	const module = await import('../src/profiling');
+	module.profiler.start({ timeline: false });
+	return module;
+}
+
+describe('profiler counters', () => {
+	it('reports only the counters an installed renderer records', async () => {
+		const { __profileCounters, profiler, PROFILE_COUNTER_SCHEMA } = await freshProfiling();
+
+		expect(profiler.snapshot()).toMatchObject({
+			schema: PROFILE_COUNTER_SCHEMA,
+			renderers: [],
+			recording: true,
+			counters: {},
+		});
+
+		__profileCounters('dom', ['block.create', 'arm.swap']);
+		// A renderer declares its counters once, when its module loads.
+		__profileCounters('dom', ['boundary.catch']);
+		__profileCounters('universal', ['component.render']);
+
+		expect(profiler.counters()).toEqual({
+			'component.render': 0,
+			'block.create': 0,
+			'arm.swap': 0,
+		});
+		expect(profiler.snapshot().renderers).toEqual(['dom', 'universal']);
+	});
+
+	it('measures the work recorded between two snapshots', async () => {
+		const profiling = await freshProfiling();
+		const { profiler } = profiling;
+		profiling.__profileCounters('dom', [
+			'block.create',
+			'block.unmount',
+			'arm.keep',
+			'arm.swap',
+			'boundary.fallback',
+			'boundary.catch',
+			'scheduler.drain',
+			'commit.root',
+			'rollback.root',
+			'rollback.journalEntries',
+			'rollback.capture',
+		]);
+		const before = profiler.snapshot();
+
+		profiling.__profileBlockCreated();
+		profiling.__profileBlockCreated();
+		profiling.__profileBlockUnmounted();
+		profiling.__profileArm(true);
+		profiling.__profileArm(false);
+		profiling.__profileArm(false);
+		// Only a change into the fallback or catch branch counts.
+		profiling.__profileBoundary(1, 2);
+		profiling.__profileBoundary(2, 2);
+		profiling.__profileBoundary(2, -1);
+		profiling.__profileBoundary(-1, 1);
+		profiling.__profileBoundary(1, 0);
+		profiling.__profileDrain();
+		profiling.__profileRootCommitted();
+		profiling.__profileRootRolledBack();
+		profiling.__profileJournalRolledBack(3);
+		profiling.__profileJournalRolledBack(0);
+		const capture = {};
+		profiling.__profileCaptureDiscarded(capture);
+		profiling.__profileCaptureDiscarded(capture);
+		profiling.__profileCaptureDiscarded({});
+		const after = profiler.snapshot();
+
+		const diff = profiler.diff(before, after);
+		expect(diff).toMatchObject({
+			renderers: ['dom'],
+			counters: {
+				'block.create': 2,
+				'block.unmount': 1,
+				'arm.keep': 2,
+				'arm.swap': 1,
+				'boundary.fallback': 1,
+				'boundary.catch': 1,
+				'scheduler.drain': 1,
+				'commit.root': 1,
+				'rollback.root': 1,
+				'rollback.journalEntries': 3,
+				'rollback.capture': 2,
+			},
+		});
+		expect(diff.duration).toBeGreaterThanOrEqual(0);
+	});
+
+	it('keeps session totals when the event buffer evicts render detail', async () => {
+		const profiling = await freshProfiling();
+		const { profiler } = profiling;
+		profiling.__profileCounters('dom', [
+			'component.render',
+			'component.renderSuspended',
+			'component.renderErrored',
+			'component.bailout',
+		]);
+		profiler.start({ bufferSize: 1, timeline: false });
+		function Evicted() {}
+		profiling.__profileComponent(Evicted, metadata('Evicted'));
+		const subject = {};
+		profiling.__profileTrackComponent(subject, Evicted);
+		const attempt = (mounted: boolean, didThrow: boolean, thrown?: unknown) =>
+			profiling.__profileEndRender(
+				profiling.__profileBeginRender(subject, Evicted, mounted),
+				didThrow,
+				thrown,
+			);
+
+		attempt(false, false);
+		attempt(true, false);
+		attempt(true, false);
+		attempt(true, true, { __isSuspense: true });
+		attempt(true, true, new Error('render failed'));
+		profiling.__profileBail(subject, Evicted, 'memo-bailout');
+
+		expect(profiler.getEvents()).toHaveLength(1);
+		expect(profiler.counters()).toEqual({
+			'component.render': 5,
+			'component.renderSuspended': 1,
+			'component.renderErrored': 1,
+			'component.bailout': 1,
+		});
+	});
+
+	it('does not count while recording is stopped, and clear() resets totals', async () => {
+		const profiling = await freshProfiling();
+		const { profiler } = profiling;
+		profiling.__profileCounters('dom', ['block.create']);
+		profiling.__profileBlockCreated();
+
+		profiler.stop();
+		profiling.__profileBlockCreated();
+		profiler.start({ timeline: false });
+
+		expect(profiler.counters()).toEqual({ 'block.create': 1 });
+		profiler.clear();
+		expect(profiler.counters()).toEqual({ 'block.create': 0 });
+	});
+
+	it('rejects snapshots that cannot be compared', async () => {
+		const profiling = await freshProfiling();
+		const { profiler } = profiling;
+		profiling.__profileCounters('dom', ['block.create']);
+		const first = profiler.snapshot();
+		profiling.__profileBlockCreated();
+		const second = profiler.snapshot();
+
+		expect(() => profiler.diff(second, first)).toThrow(/`before` was taken after `after`/);
+		expect(() => profiler.diff(first, { ...second, schema: second.schema + 1 })).toThrow(
+			/counter schema/,
+		);
+		expect(() =>
+			profiler.diff(first, {
+				...second,
+				build: second.build === 'production' ? 'development' : 'production',
+			}),
+		).toThrow(/development and production/);
+
+		profiling.__profileCounters('universal', ['component.render']);
+		expect(() => profiler.diff(second, profiler.snapshot())).toThrow(/renderers/);
+
+		const beforeClear = profiler.snapshot();
+		profiler.clear();
+		expect(() => profiler.diff(beforeClear, profiler.snapshot())).toThrow(/stopped or cleared/);
+
+		const beforeStop = profiler.snapshot();
+		profiler.stop();
+		const stopped = profiler.snapshot();
+		expect(() => profiler.diff(beforeStop, stopped)).toThrow(/stopped or cleared/);
+		expect(() => profiler.diff(stopped, profiler.snapshot())).toThrow(/recording was stopped/);
+	});
+});
