@@ -1082,6 +1082,18 @@ range active, retire only its receiver-owned outer anchors, and hydrate the
 original component HTML. Later placement is rejected for that active range;
 the renderer alone reconciles subsequent model updates.
 
+The optional response reader shares the host execution budget with direct
+streamed RPC readers. It checks before transport pulls, frame parsing, and receiver
+admission, so buffered frames or a released delivery backlog can return control
+to the host between units. Ordering and the bounded pending window are unchanged.
+Cancellation and transport timeout are rechecked after waits; the transport read
+deadline excludes budget admission, while delivery deadlines still include queue
+and style waits. Inline document frame delivery keeps its existing path.
+
+The approximately 5 ms budget cannot interrupt one frame parse or receiver call,
+or pace work that resumes inside a receiver after its own style/composition wait.
+Measure that work separately before attributing an entire frame's cost to parsing.
+
 The [conversation-history fixture](../packages/vite-plugin-octane/tests/_fixtures/app/src/conversation-history/)
 demonstrates this integration, cached/fresh responses, stable-key updates,
 completed-page cursors, and independent document-owned drafts. Custom fetches

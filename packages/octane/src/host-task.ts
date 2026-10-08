@@ -28,7 +28,8 @@ export function postHostTask(callback: () => void): void {
 	}
 	if (typeof MessageChannel === 'function') {
 		const channel = new MessageChannel();
-		channel.port1.onmessage = () => {
+		// Node exposes the web-compatible handler, but its DOM-free typings omit it.
+		(channel.port1 as typeof channel.port1 & { onmessage: () => void }).onmessage = () => {
 			channel.port1.close();
 			callback();
 		};

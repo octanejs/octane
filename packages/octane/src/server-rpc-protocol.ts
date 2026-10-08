@@ -1,3 +1,4 @@
+import { yieldForHostBudget } from './host-budget.js';
 import { decodeSignalValue, encodeSignalValue } from './data-encoding.js';
 import type { EncodedSignalValue } from './signals/types.js';
 
@@ -114,6 +115,7 @@ export function decodeServerResultFrame(line: string, sequence: number): ServerR
 export function serverResultReader(
 	reader: ReadableStreamDefaultReader<Uint8Array>,
 	limits: ResolvedServerResultLimits,
+	isClosed: () => boolean,
 ) {
 	let chunk: Uint8Array = new Uint8Array(0);
 	let offset = 0;
@@ -123,11 +125,19 @@ export function serverResultReader(
 		const parts: Uint8Array[] = [];
 		let bytes = 0;
 		while (true) {
+			if (isClosed()) return { kind: 'complete' };
+			const wait = yieldForHostBudget();
+			if (wait !== undefined) {
+				await wait;
+				continue;
+			}
 			if (offset === chunk.length) {
 				const next = await reader.read();
 				if (next.done) throw new Error('Server result ended without a terminal frame');
 				chunk = next.value;
 				offset = 0;
+				// Ready transport results re-enter the shared budget and retirement guard.
+				continue;
 			}
 			const newline = chunk.indexOf(10, offset);
 			const end = newline === -1 ? chunk.length : newline + 1;

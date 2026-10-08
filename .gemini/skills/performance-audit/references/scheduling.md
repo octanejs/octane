@@ -78,6 +78,7 @@ all inside one checkpoint. Measured in the #1864 investigation:
    A new poster must state why none of these fits. It must also cover hosts
    without `MessageChannel`, hidden tabs where rAF never fires, and `act()`,
    which drains through `MessageChannel` checkpoints.
+
 6. **Never depend on rAF for progress.** Pair it with a bounded timer, as
    `schedulePostPaint` does.
 7. **Defer to #1864 on the contract.** §Scheduler documents microtask batching,
@@ -138,3 +139,16 @@ against the same app built with React.
   frame gaps under 6× CPU throttling;
 - `passive-scheduling` and `effect-scheduling`: post-paint callback work;
 - `chat-stream` and `conversation-streaming`: streamed updates.
+
+## Direct buffered transport readers
+
+Direct streamed RPC and optional renderer-response readers share one approximately
+5 ms host budget. Check reader retirement before every retry, including after a
+ready transport result. RPC `return()` retires a pending pull; it must not convert
+a fresh protocol error into successful completion. Custom delivery admission
+checks cancellation after each wait, keeps channel order/backpressure, and leaves
+inline document frame delivery on its existing path. Transport read timeouts
+exclude budget admission; delivery timeouts still include queue and style waits.
+A receiver's own later asynchronous continuation remains an indivisible
+receiver-owned unit. This does not change component render admission or the
+signal producers' own scheduling policy.
