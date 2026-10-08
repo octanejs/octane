@@ -386,6 +386,8 @@ describe.each([
 		for (const leaf of [
 			[document.createElement('b')],
 			[document.createTextNode('Le'), document.createElement('font')],
+			// Translation replaces one Text node with one wrapper.
+			[document.createElement('font'), document.createTextNode(' en plus')],
 		]) {
 			span.replaceChildren(...leaf);
 			const model = source(props);
@@ -646,11 +648,16 @@ describe.each([false, true])('addressed text leaf adoption (dev=%s)', (dev) => {
 	});
 
 	it('still refuses a leaf holding any other element', () => {
-		const { props, heading, adopt } = feed();
-		heading.replaceChildren(document.createElement('b'));
-		const model = source(props);
-		expect(() => adopt(model.state)).toThrow(/mismatched addressed element topology/);
-		expect(model.subscribers.size).toBe(0);
+		for (const leaf of [
+			[document.createElement('b')],
+			[document.createElement('font'), document.createElement('font')],
+		]) {
+			const { props, heading, adopt } = feed();
+			heading.replaceChildren(...leaf);
+			const model = source(props);
+			expect(() => adopt(model.state)).toThrow(/mismatched addressed element topology/);
+			expect(model.subscribers.size).toBe(0);
+		}
 	});
 
 	// Unbound children may change; the bound header's children may not.

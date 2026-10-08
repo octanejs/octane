@@ -237,12 +237,12 @@ function assertBindingRoot(root: Element, descriptor: CompiledBindings<unknown>)
 	return root;
 }
 
-/** One Text node or none, or the <font> wrappers Chrome Translate leaves in its place. */
+/** No child, or one: a Text node or the <font> wrapper Chrome Translate puts in its place. */
 function isTextLeaf(node: Element): boolean {
 	const first = node.firstChild;
 	return (
 		first === null ||
-		(first.nodeType === 3 ? !first.nextSibling : (first as Element).localName === 'font')
+		(!first.nextSibling && (first.nodeType === 3 || (first as Element).localName === 'font'))
 	);
 }
 
