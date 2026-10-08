@@ -50,7 +50,7 @@ const FEED = `import { unbound } from 'octane/behavior';
 export function Feed(props) @{
   'use dom bindings';
   <section>
-    <h2>{props.title as string}</h2>
+    <header><h2>{props.title as string}</h2><hr /></header>
     {unbound(props.children)}
   </section>
 }`;
@@ -394,6 +394,25 @@ describe.each([
 		}
 	});
 
+	it('refuses element children that differ from the server topology', () => {
+		const changes: Array<(nav: Element) => void> = [
+			(nav) => nav.append(document.createElement('i')),
+			(nav) => nav.querySelector('a')!.after(document.createTextNode(' ')),
+			(nav) => nav.querySelector('img')!.remove(),
+			(nav) => nav.append(nav.querySelector('a')!),
+			// An element the server rendered without children.
+			(nav) => nav.querySelector('use')!.append(document.createElement('i')),
+		];
+		for (const change of changes) {
+			const { nav, anchor, adopt } = links();
+			change(nav);
+			const model = source({ ...linked, href: '/never' });
+			expect(() => adopt(model.state)).toThrow(/mismatched static element topology/);
+			expect(model.subscribers.size).toBe(0);
+			expect(anchor.getAttribute('href')).toBe('/a');
+		}
+	});
+
 	it('presents signal writes from an async transition Action atomically when it settles', async () => {
 		const { paragraph, adopt } = badge();
 		const scope = createScope({ scopeKey: `scalar-transition-${dev}-${lane}` });
@@ -632,6 +651,29 @@ describe.each([false, true])('addressed text leaf adoption (dev=%s)', (dev) => {
 		const model = source(props);
 		expect(() => adopt(model.state)).toThrow(/mismatched addressed element topology/);
 		expect(model.subscribers.size).toBe(0);
+	});
+
+	// Unbound children may change; the bound header's children may not.
+	it('refuses closed element children that differ from the server topology', () => {
+		const changes: Array<(header: Element) => void> = [
+			(header) => header.append(document.createElement('i')),
+			(header) => header.firstElementChild!.after(document.createTextNode(' ')),
+			(header) => header.lastElementChild!.remove(),
+			(header) => header.append(header.firstElementChild!),
+			(header) => header.lastElementChild!.append(document.createElement('i')),
+		];
+		for (const change of changes) {
+			const { props, heading, adopt } = feed();
+			change(heading.parentElement!);
+			const model = source({ ...props, title: 'Jamais' });
+			expect(() => adopt(model.state)).toThrow(/mismatched addressed element topology/);
+			expect(model.subscribers.size).toBe(0);
+			expect(heading.textContent).toBe('Nouvelles');
+		}
+		const { props, heading, adopt } = feed();
+		heading.closest('section')!.append(document.createElement('aside'), ' unbound ');
+		adopt(source({ ...props, title: 'Archives' }).state).dispose();
+		expect(heading.textContent).toBe('Archives');
 	});
 });
 

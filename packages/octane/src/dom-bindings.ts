@@ -250,35 +250,37 @@ function resolveFixedNodes(root: Element, descriptor: CompiledBindings<unknown>)
 	assertBindingRoot(root, descriptor);
 	const nodes: Element[] = [];
 	const childIndices: number[] = [];
+	// Each parent's next unclaimed child. Walking siblings keeps validation O(1)
+	// per node; counting a live child list is not.
+	const cursors: Array<ChildNode | null> = [];
 	for (let i = 0; i < descriptor.nodes.length; i++) {
 		const [parent, tag, namespace, children, , text] = descriptor.nodes[i]!;
-		const node =
-			i === 0
-				? parent === -1
-					? root
-					: undefined
-				: parent >= 0 && parent < i && descriptor.nodes[parent]![3] !== null
-					? nodes[parent]?.children[childIndices[parent]++]
-					: undefined;
+		// An opaque or text parent's cursor is null, and an unvisited parent has none.
+		const node = (i === 0 ? (parent === -1 ? root : undefined) : cursors[parent]) as
+			Element | null | undefined;
 		if (
-			node === undefined ||
+			node == null ||
 			descriptor.nodes[i]![4] === true ||
 			node.localName !== tag ||
 			node.namespaceURI !== namespaces[namespace] ||
-			(text
-				? !isTextLeaf(node)
-				: children !== null &&
-					(node.childNodes.length !== children || node.children.length !== children))
+			(text && !isTextLeaf(node))
 		) {
 			throw new Error(formatClientError(318));
 		}
+		if (i !== 0) {
+			cursors[parent] = node.nextSibling;
+			childIndices[parent]++;
+		}
 		nodes.push(node);
 		childIndices.push(0);
+		cursors.push(text || children === null ? null : node.firstChild);
 	}
 	for (let i = 0; i < nodes.length; i++) {
 		if (childIndices[i] !== (descriptor.nodes[i]![3] ?? 0)) {
 			throw new Error(formatClientError(319));
 		}
+		// A child the server topology does not have.
+		if (cursors[i] !== null) throw new Error(formatClientError(318));
 	}
 	return nodes;
 }
@@ -318,6 +320,9 @@ function resolveAddressedNodes(root: Element, descriptor: CompiledBindings<unkno
 		current = current.nextElementSibling;
 	}
 	const childCounts = new Array<number>(descriptor.nodes.length).fill(0);
+	// A closed parent's next unclaimed child; undefined for open, opaque and text
+	// children. Walking siblings keeps validation O(1) per node.
+	const cursors: Array<ChildNode | null | undefined> = [];
 	for (let i = 0; i < descriptor.nodes.length; i++) {
 		const [parent, tag, namespace, children, openChildren, text] = descriptor.nodes[i]!;
 		const node = nodes[i];
@@ -329,25 +334,26 @@ function resolveAddressedNodes(root: Element, descriptor: CompiledBindings<unkno
 				? parent !== -1 || node !== root
 				: parent < 0 ||
 					parent >= i ||
-					descriptor.nodes[parent]![3] === null ||
 					node.parentElement !== nodes[parent] ||
-					(descriptor.nodes[parent]![4] !== true &&
-						nodes[parent]!.children[childCounts[parent]!] !== node)) ||
+					// A parent without a cursor claims no children.
+					(descriptor.nodes[parent]![4] !== true && cursors[parent] !== node)) ||
 			(openChildren && children === null) ||
-			(text
-				? !isTextLeaf(node)
-				: children !== null &&
-					!openChildren &&
-					(node.childNodes.length !== children || node.children.length !== children))
+			(text && !isTextLeaf(node))
 		) {
 			throw new Error(formatClientError(321));
 		}
-		if (parent !== -1) childCounts[parent]++;
+		if (parent !== -1) {
+			childCounts[parent]++;
+			if (cursors[parent] !== undefined) cursors[parent] = node.nextSibling;
+		}
+		cursors.push(text || children === null || openChildren ? undefined : node.firstChild);
 	}
 	for (let i = 0; i < descriptor.nodes.length; i++) {
 		if (childCounts[i] !== (descriptor.nodes[i]![3] ?? 0)) {
 			throw new Error(formatClientError(322));
 		}
+		// A child the server topology does not have.
+		if (cursors[i]) throw new Error(formatClientError(321));
 	}
 	return nodes;
 }
