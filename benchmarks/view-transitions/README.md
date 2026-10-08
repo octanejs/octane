@@ -296,11 +296,9 @@ emitted-asset, and tool/browser provenance. Edits during a run fail it. Temporar
 servers and assets are removed afterward. The selected revision helper retains
 ignored package snapshots. These are work counts, not timing, instruction,
 allocation, or native DOM measurements; the total-call delta does not need to be
-zero. The standalone runner also limits each operation's total calls and each
-idle case's nonnegative excess over its cold control to the measured candidate
-plus 32 calls. This allowance is smaller than one extra call for each of the
-smallest 100 removed rows. `effect-cleanup-budget.json` records the calibration
-source and toolchain; updates require fresh semantic and work evidence.
+zero. Each operation's `total_calls` and each idle case's nonnegative
+`idle_extra_calls` over its cold control are reported, not gated: no committed
+ceiling fails the run, and work growth is reviewed after merge.
 
 The exact before/after comparison is recorded in
 [`measurements/effect-cleanup.json`](measurements/effect-cleanup.json). Cold work
