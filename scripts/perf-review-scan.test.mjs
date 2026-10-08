@@ -275,7 +275,7 @@ test('flags writes of undeclared fields through Block and Scope receivers', () =
 test('every Block and Scope field write in the current runtime targets a declared field', () => {
 	const source = readFileSync(RUNTIME_SOURCE, 'utf8');
 	const hotFields = hotClassFields(source);
-	assert.ok(hotFields.has('pending') && hotFields.has('slots') && hotFields.has('vt'));
+	assert.ok(hotFields.has('pending') && hotFields.has('slots') && hotFields.has('rare'));
 	const lines = source.split('\n').map((line) => '+' + line);
 	const findings = scanFiles(parseDiff(diff('packages/octane/src/runtime.ts', lines, 1)), {
 		hotFields,

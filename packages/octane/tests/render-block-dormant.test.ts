@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import {
 	createElement as h,
 	Suspense,
@@ -8,6 +8,7 @@ import {
 	use,
 	useContext,
 	useEffect,
+	useEffectEvent,
 	useState,
 } from '../src/index.js';
 import { act, mount, nextPaint } from './_helpers';
@@ -34,6 +35,7 @@ function deferred<T>() {
 const SLOT_COUNT = Symbol('count');
 const SLOT_EFF = Symbol('eff');
 const SLOT_PROMISE = Symbol('promise');
+const SLOT_EVENT = Symbol('event');
 
 describe('first use of effects, context, suspension, and transitions', () => {
 	it('re-renders a component that uses only state correctly', () => {
@@ -128,6 +130,47 @@ describe('first use of effects, context, suspension, and transitions', () => {
 		expect(r.findAll('.f')).toHaveLength(0);
 		r.unmount();
 	});
+
+	// Each render below mints a fresh promise for the same use() call; only the
+	// first one ever settles. The replay after it resolves must find that promise
+	// at the call's position and keep it (React's "reuse the previous thenable,
+	// drop the new one"). A position that kept counting from the suspended attempt
+	// lands on an empty entry and suspends on the fresh, never-settling promise,
+	// so the fallback stays up.
+	it.each([
+		['only use()', false],
+		['an Effect Event before use()', true],
+	])(
+		'replays an uncached use() promise from its call position in a component with %s',
+		async (_label, withEffectEvent) => {
+			const errors = vi.spyOn(console, 'error').mockImplementation(() => {});
+			const source = deferred<string>();
+			let attempts = 0;
+			function Reader() {
+				if (withEffectEvent) useEffectEvent(() => source, SLOT_EVENT);
+				const promise = attempts++ === 0 ? source.promise : new Promise<string>(() => {});
+				return h('b', { className: 'v' }, use(promise));
+			}
+			function App() {
+				return h(Suspense, {
+					fallback: h('i', { className: 'f' }, 'loading'),
+					children: h(Reader, null),
+				});
+			}
+			try {
+				const r = mount(App, {});
+				expect(r.find('.f').textContent).toBe('loading');
+				await act(async () => {
+					source.resolve('ready');
+				});
+				expect(r.find('.v').textContent).toBe('ready');
+				expect(r.findAll('.f')).toHaveLength(0);
+				r.unmount();
+			} finally {
+				errors.mockRestore();
+			}
+		},
+	);
 
 	it('still refreshes a memo component that first reads context mid-life on later provider commits', () => {
 		// Reader is memo'd and props-stable after arming, so the only way the
