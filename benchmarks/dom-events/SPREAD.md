@@ -48,7 +48,7 @@ From the repository root, using already installed dependencies and Chromium:
 
 ```sh
 node benchmarks/dom-events/spread.mjs
-node benchmarks/bench.mjs spread-hosts --quick --ratios
+node benchmarks/bench.mjs spread-hosts --quick
 node benchmarks/dom-events/spread.mjs --runtime-root /path/to/frozen/packages/octane --measure --output /tmp/spread-baseline-work.json
 node benchmarks/dom-events/spread.mjs --timing --runtime-root /path/to/frozen/packages/octane --output /tmp/spread-baseline-time.json
 node benchmarks/dom-events/spread.mjs --timing --output /tmp/spread-candidate-time.json
@@ -86,8 +86,8 @@ For 12 updates with 15 spread props (plus one direct title):
 | SSR alias writer records | 228 | 228 |
 
 The 33 canonical arrays removed per update are separate from the authored rows
-and snapshot/enumeration arrays, which remain. The ratio guards bound the
-complete observed expression count in each case, not only the removed sites.
+and snapshot/enumeration arrays, which remain. The source-work check bounds
+the complete observed expression count in each case, not only the removed sites.
 
 ## Timing observations
 

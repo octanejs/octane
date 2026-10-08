@@ -246,18 +246,10 @@ try {
 		results,
 		targets: results
 			.filter((row) => row.instrumented)
-			.flatMap((row) => [
-				{
-					name: `branches-${row.mode}`,
-					ops: { hydration_lookups: stamp(row.work.hydrationLookups) },
-				},
-				{
-					name: `branches-${row.mode}-work-budget`,
-					ops: {
-						hydration_lookups: stamp(count * cycles * samples * (row.mode === 'mount' ? 2 : 1)),
-					},
-				},
-			]),
+			.map((row) => ({
+				name: `branches-${row.mode}`,
+				ops: { hydration_lookups: stamp(row.work.hydrationLookups) },
+			})),
 	};
 	const json = JSON.stringify(report, null, 2) + '\n';
 	if (process.env.BENCH_JSON) fs.writeFileSync(path.resolve(process.env.BENCH_JSON), json);

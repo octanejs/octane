@@ -46,9 +46,8 @@ Default: 128 warmups, seven samples of 128 operations (896 measured operations).
 | Stable empty arms | 57,344 | 28,672 |
 | Fresh roots | 57,344 | 57,344 |
 
-All 33 registered work guards pass. The frozen baseline fails exactly the three
-update-lookup guards; mount and key controls pass. These are executed source-call
-counts, not measured heap allocations or a latency guarantee. A JIT may already inline or eliminate some original work.
+These are executed source-call counts, not measured heap allocations or a
+latency guarantee. A JIT may already inline or eliminate some original work.
 The clean fixture remains 196,097 minified bytes; gzip changes from 60,227 to
 60,236 bytes. The nine-byte compression increase adds no source machinery.
 
@@ -98,9 +97,9 @@ BRANCH_BROWSER_SAMPLES=30 BRANCH_BROWSER_CYCLES=4096 BRANCH_BROWSER_WARMUP=4096 
   node benchmarks/client-hot-paths/branches-browser.mjs BASELINE LOOKUPS SPLIT
 ```
 
-`BENCH_JSON` writes reports. The suite registers deterministic branch/key work
-guards. Browser timing and V8 tier diagnostics remain standalone because their
-engine-dependent results are not stable CI thresholds.
+`BENCH_JSON` writes reports. The suite records deterministic branch/key work
+counts. Browser timing and V8 tier diagnostics remain standalone because their
+results are engine-dependent.
 
 ## Correctness and review
 

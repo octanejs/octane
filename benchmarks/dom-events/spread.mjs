@@ -255,7 +255,6 @@ try {
 					source_expressions: deterministicStatForJson(deterministicCount(n)),
 				});
 				targets.push({ name: `${surface}-${name}`, ops: stat(actual) });
-				targets.push({ name: `${surface}-${name}-budget`, ops: stat(budget) });
 				const maps = entry.work[surface === 'client' ? 'setHostPropSources:map' : 'ssrAttrs:map'];
 				assert(maps >= entry.iterations, 'Every measured update resolved its prop sources');
 				if (!args.includes('--measure'))

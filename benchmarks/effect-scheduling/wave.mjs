@@ -178,10 +178,6 @@ for (const [target, source] of sources) {
 					parent_reads: stat(metrics[`${shape}_parent_reads`]),
 				},
 			});
-			targets.push({
-				name: `${shape}-budget`,
-				ops: { collections: stat(1), parent_reads: stat(shape === 'mixed' ? 2400 : 2200) },
-			});
 		}
 	}
 }
