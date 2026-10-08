@@ -264,9 +264,7 @@ export function App() @{
 
 		for (const [label, typeSource] of positions) {
 			it(`keeps both arms for a directive in ${label}`, () => {
-				// The type view carries the arms regardless of whether the emitters can
-				// fold them — a module-level callback is rejected for output, but its
-				// arms still have to type-check.
+				// Every renderable arm must remain visible to the type checker.
 				const { code } = compileToVolarMappings(typeSource, 'App.tsrx') as { code: string };
 				expect(code).toContain('tsA');
 				expect(code).toContain('tsB');
@@ -718,16 +716,10 @@ export function App() @{
 		});
 	});
 
-	describe('diagnostic for an unowned directive', () => {
-		// Every value position an unowned directive can occupy has to report the
-		// authored keyword. Reaching the printer instead yields
-		// `Not implemented: JSXIfExpression`, which names an internal node type and
-		// tells the author nothing about their source.
-		// What remains unowned is a directive inside a MODULE-level callback: there is
-		// no component context to compute an env tuple against, so its params cannot
-		// be threaded into the hoisted arms. Inside a component body the same shapes
-		// fold (see the capture tests above).
-		const unowned: [string, string][] = [
+	describe('module-level callback ownership', () => {
+		// A module-level callback owns its helpers, so its parameters remain in
+		// scope in every returned value position, including component props.
+		const moduleCallbacks: [string, string][] = [
 			[
 				'bare directive at an attribute value in a module-level callback',
 				`const render = (row: any) => <Cell slot={@if (row.ok) { <a /> } @else { <b /> }} />;
@@ -754,19 +746,28 @@ export function App(props: { rows: any[] }) @{
 			],
 		];
 
-		for (const [label, source] of unowned) {
+		for (const [label, source] of moduleCallbacks) {
 			for (const mode of ['client', 'server'] as const) {
-				it(`names the authored keyword for a ${label} (${mode})`, () => {
-					let message = '';
-					try {
-						compile(source, 'App.tsrx', { mode });
-					} catch (error) {
-						message = String((error as Error).message);
+				it(`renders a ${label} (${mode})`, () => {
+					const compiled = loadCompiledFixtureSource(
+						source + '\nfunction Cell(props) @{ <section>{props.slot}</section> }',
+						{ id: 'module-callback.tsrx', mode },
+					);
+					const on = { rows: [{ ok: true, xs: ['one'], k: 1 }] };
+					const off = { rows: [{ ok: false, xs: [], k: 2 }] };
+					if (mode === 'server') {
+						expect(ServerRuntime.renderToString(compiled.App, on).html).toContain('<a');
+						expect(ServerRuntime.renderToString(compiled.App, off).html).not.toContain('<a');
+					} else {
+						const result = mount(compiled.App, on);
+						try {
+							expect(result.findAll('a')).toHaveLength(1);
+							result.update(compiled.App, off);
+							expect(result.findAll('a')).toHaveLength(0);
+						} finally {
+							result.unmount();
+						}
 					}
-					expect(message).toMatch(/is not supported inside a module-level callback/);
-					// The authored spelling, not the parser's node type.
-					expect(message).toMatch(/`@(if|for|switch|try)`/);
-					expect(message).not.toMatch(/Not implemented/);
 				});
 			}
 		}

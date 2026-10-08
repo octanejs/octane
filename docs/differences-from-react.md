@@ -1799,6 +1799,25 @@ error-boundary lifecycles. Catch fallbacks mount fresh nodes (like React's
 `forceUnmountCurrentAndReconcile`); deletion-phase and ref-detach errors route
 to the enclosing boundary.
 
+Directives are also renderable values. A module-level arrow can return a
+boundary directly, with or without parentheses or an explicit `return`:
+
+```tsx
+export const Content = (props: { promise: Promise<string> }) => @try {
+  const message = use(props.promise);
+  <p>{message as string}</p>
+} @pending {
+  <p>Loading…</p>
+} @catch (error) {
+  <p>{String(error)}</p>
+};
+```
+
+Render that function as `<Content promise={promise} />`. An assigned boundary
+value, `const content = @try { … } @catch (error) { … };`, renders as `{content}`.
+The function owns its directive helpers, so an `@{ … }` body is optional for
+these return forms.
+
 React 19's root error-callback options are supported on `createRoot` and
 `hydrateRoot`: `onCaughtError` (a boundary claimed an error from the render,
 passive-effect, or ref-attach channel), `onUncaughtError` (no boundary claimed

@@ -23602,6 +23602,68 @@ function nativeValueFunction(node, authored, ctx) {
 	};
 }
 
+// Directive arms become ordinary helper functions. Snapshot the containing
+// function's receiver/arguments into explicit captures before moving those arms;
+// nested arrows share them, while another ordinary function owns its own.
+function captureCallbackLexicalValues(fn, ctx) {
+	if (!mapCallbackCapturesLexicalReceiver(fn.body)) return null;
+	const lexical = createLexicalAnalysis(fn.body);
+	const replacements = new Map();
+	const captures = new Map();
+	const visit = (node, parent, key) => {
+		if (!node || typeof node !== 'object') return;
+		if (
+			node.type === 'FunctionDeclaration' ||
+			node.type === 'FunctionExpression' ||
+			node.type === 'ClassDeclaration' ||
+			node.type === 'ClassExpression'
+		)
+			return;
+		const kind =
+			node.type === 'ThisExpression'
+				? 'receiver'
+				: node.type === 'Identifier' &&
+					  node.name === 'arguments' &&
+					  isIdentifierReference(node, parent, key, lexical)
+					? 'arguments'
+					: null;
+		if (kind !== null) {
+			let capture = captures.get(kind);
+			if (capture === undefined) {
+				capture = { name: allocCompilerName(ctx, `__${kind}`), value: node };
+				captures.set(kind, capture);
+			}
+			replacements.set(node, inheritOriginLoc(b.id(capture.name), node));
+			return;
+		}
+		forEachRuntimeAstChild(node, (child, childKey) => visit(child, node, childKey));
+	};
+	visit(fn.body, fn, 'body');
+	if (captures.size === 0) return null;
+	return {
+		body: mapAst(fn.body, (node) => {
+			if (node.type === 'Property' && node.shorthand && replacements.has(node.value)) {
+				return { ...node, shorthand: false, value: replacements.get(node.value) };
+			}
+			return replacements.get(node) ?? null;
+		}),
+		captures: [...captures.values()],
+	};
+}
+
+function containsValueDirective(body) {
+	let found = false;
+	mapAst(body, (node) => {
+		if (found) return node;
+		if (VALUE_DIRECTIVE_ARM_TYPES.has(node.type)) {
+			found = true;
+			return node;
+		}
+		return null;
+	});
+	return found;
+}
+
 /**
  * Lower a JSX COMPONENT element used at VALUE position (not as a component body's
  * rendered output) into a `createElement(Comp, props)` call, so JSX-as-a-value
@@ -23707,26 +23769,49 @@ function rewriteJsxValues(node, ctx, eagerMapCallbackRoots = false, eagerMapCall
 		// only the component's own locals and would silently drop `row` from the tuple,
 		// leaving the arm referencing it free.
 		//
-		// The env tuple only exists when there is a component context to compute it
-		// against (`helperCaptures` returns null without one, which pins helpers inline
-		// next to values they cannot reach). With no context, leave the directive for
-		// the unowned diagnostic below rather than folding it into the wrong scope.
+		// A JSX-producing callback at module scope establishes its own helper sink
+		// and capture context; an enclosing component is not required to own it.
 		if (lower != null && isFunctionNode(n)) {
 			const previousLocals = ctx.currentComponentLocals;
 			const previousLower = ctx._valueDirectiveLowering;
 			let previousCallbackScope = ctx._callbackScopeNames;
+			const previousMapTemps = ctx.currentMapTemps;
+			const inspectBody = previousLocals == null || n.type !== 'ArrowFunctionExpression';
+			const hasDirectives = inspectBody && containsValueDirective(n.body);
+			const ownedSubs = previousLocals == null && hasDirectives ? [] : null;
+			const ownedTemps = ownedSubs === null ? null : [];
+			const lexicalValues = hasDirectives ? captureCallbackLexicalValues(n, ctx) : null;
 			if (previousLocals == null) {
-				// No component context, so `helperCaptures` would return null and pin the
-				// arms beside values they cannot reach. Drop the fold for this subtree so
-				// re-entries below (an attribute value re-enters rewriteJsxValues, with no
-				// function node left in view) cannot pick it back up, and the directive
-				// reaches the unowned diagnostic instead of folding into the wrong scope. A
-				// `@{ … }` child block has no arms, so lowerJsxChild compiles it in place.
-				ctx._valueDirectiveLowering = null;
+				// A module-level JSX callback owns its returned directive helpers just
+				// as a return-JSX declaration does. Keep those helpers inside the original
+				// function so parameters, setup locals and arrow lexical bindings survive.
+				if (ownedSubs !== null) {
+					const name = n.id?.name ?? 'callback';
+					ctx.currentComponentLocals = collectCallbackBindings(n);
+					for (const capture of lexicalValues?.captures ?? [])
+						ctx.currentComponentLocals.add(capture.name);
+					// The descriptor may be built inside a nested block whose bindings
+					// are unavailable to helpers placed at the start of this function.
+					ctx._callbackScopeNames = new Set(ctx.currentComponentLocals);
+					ctx.currentMapTemps = ownedTemps;
+					ctx._valueDirectiveLowering =
+						ctx.mode === 'server'
+							? serverValueDirectiveFold(ctx, name, ownedSubs, null)
+							: (directive) =>
+									lowerHostFragment(
+										setupDirectiveFragment(prepareSetupValueDirective(directive, ctx, name)),
+										ctx,
+										ownedSubs,
+										'opaque',
+									);
+				} else {
+					ctx._valueDirectiveLowering = null;
+				}
 			} else {
 				// Including names bound in the callback's nested blocks, which a fold
 				// written in one of those blocks reads just the same.
 				const introduced = collectCallbackBindings(n);
+				for (const capture of lexicalValues?.captures ?? []) introduced.add(capture.name);
 				const extended = new Set(previousLocals);
 				for (const name of introduced) extended.add(name);
 				ctx.currentComponentLocals = extended;
@@ -23743,7 +23828,7 @@ function rewriteJsxValues(node, ctx, eagerMapCallbackRoots = false, eagerMapCall
 				let out = n;
 				for (const key in n) {
 					if (key === 'loc' || key === 'start' || key === 'end' || key === 'metadata') continue;
-					const child = n[key];
+					const child = key === 'body' && lexicalValues !== null ? lexicalValues.body : n[key];
 					if (child === null || typeof child !== 'object') continue;
 					const mapped = rewriteJsxValues(
 						child,
@@ -23756,11 +23841,37 @@ function rewriteJsxValues(node, ctx, eagerMapCallbackRoots = false, eagerMapCall
 						out[key] = mapped;
 					}
 				}
+				if (
+					lexicalValues !== null ||
+					(ownedSubs !== null && (ownedSubs.length > 0 || ownedTemps.length > 0))
+				) {
+					const statements =
+						out.body.type === 'BlockStatement' ? out.body.body : [b.return(out.body)];
+					let prologue = 0;
+					while (typeof statements[prologue]?.directive === 'string') prologue++;
+					out = {
+						...out,
+						...(out.type === 'ArrowFunctionExpression' ? { expression: false } : null),
+						body: inheritOriginLoc(
+							b.block([
+								...statements.slice(0, prologue),
+								...(lexicalValues?.captures ?? []).map((capture) =>
+									inheritOriginLoc(b.const(capture.name, capture.value), capture.value),
+								),
+								...(ownedTemps ?? []).map((temp) => inheritOriginLoc(b.let(temp), n)),
+								...(ownedSubs ?? []),
+								...statements.slice(prologue),
+							]),
+							n.body,
+						),
+					};
+				}
 				return nativeValueFunction(out, n, ctx);
 			} finally {
 				ctx.currentComponentLocals = previousLocals;
 				ctx._valueDirectiveLowering = previousLower;
 				ctx._callbackScopeNames = previousCallbackScope;
+				ctx.currentMapTemps = previousMapTemps;
 			}
 		}
 		// Host OR component JSX at a VALUE position (a `.map(...)` callback, a
