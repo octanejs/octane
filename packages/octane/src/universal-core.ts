@@ -24,6 +24,7 @@ import { resolveHookPath } from './hook-slot-cache.js';
 import {
 	__profileBeginRender,
 	__profileComponentSource,
+	__profileCounters,
 	__profileEndRender,
 	__profileSchedule,
 	__profileTrackComponent,
@@ -53,6 +54,15 @@ import {
 } from './owner-kernel/hooks.js';
 
 declare const __OCTANE_PROFILE_ENABLED__: boolean;
+
+// Universal renderers record component render frames only. Engine counters
+// (Blocks, arms, boundaries, commits, rollbacks) belong to the DOM runtime.
+if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__)
+	__profileCounters('universal', [
+		'component.render',
+		'component.renderSuspended',
+		'component.renderErrored',
+	]);
 
 // Compiler-emitted dependency helper — pure function, no DOM. Re-exported here
 // so the 'octane' import it lowers to resolves under the universal entries the
