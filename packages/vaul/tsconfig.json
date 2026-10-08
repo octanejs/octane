@@ -14,7 +14,9 @@
     "allowSyntheticDefaultImports": true,
     "verbatimModuleSyntax": true,
     "types": ["node"],
-    "strict": true
+    "strict": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true
   },
   "include": ["src/**/*.ts", "src/**/*.tsrx", "tests/**/*.ts", "tests/**/*.tsrx"]
 }

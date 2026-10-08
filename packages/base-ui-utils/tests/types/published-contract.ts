@@ -200,6 +200,7 @@ type SharedKeys3 =
 	| 'contains'
 	| 'contentEditable'
 	| 'currentCSSZoom'
+	| 'customElementRegistry'
 	| 'dataset'
 	| 'dir'
 	| 'disabled'
@@ -257,6 +258,7 @@ type SharedKeys3 =
 	| 'lookupNamespaceURI'
 	| 'lookupPrefix'
 	| 'matches'
+	| 'moveBefore'
 	| 'namespaceURI'
 	| 'nextElementSibling'
 	| 'nextSibling'
@@ -285,6 +287,7 @@ type SharedKeys3 =
 	| 'onchange'
 	| 'onclick'
 	| 'onclose'
+	| 'oncommand'
 	| 'oncontextlost'
 	| 'oncontextmenu'
 	| 'oncontextrestored'
@@ -475,9 +478,9 @@ type SharedKeys5 =
 	| 'useSyncExternalStore'
 	| 'useTransition'
 	| 'version';
-type SharedKeys6 = 'didChangeStore' | 'syncHooks' | 'syncIndex' | 'syncTick';
+type SharedKeys6 = 'create' | 'prototype';
 type SharedKeys7 = 'getSnapshot' | 'subscribe';
-type SharedKeys8 = 'create' | 'prototype';
+type SharedKeys8 = 'didChangeStore' | 'syncHooks' | 'syncIndex' | 'syncTick';
 type SharedKeys9 = 'additionalData' | 'defaultOpen' | 'handle';
 type SharedKeys10 = 'cancel' | 'request';
 type SharedKeys11 = 'controlled' | 'default';
@@ -1383,13 +1386,13 @@ type PublishedKeys1 = 'didInitialize';
 type PublishedKeys2 = SharedKeys3 | 'name' | 'normalize' | 'title' | 'translate';
 type PublishedKeys3 = SharedKeys4;
 type PublishedKeys4 = SharedKeys5;
-type PublishedKeys5 = 'didInitialize' | SharedKeys6 | SharedKeys7;
-type PublishedKeys6 = SharedKeys8;
-type PublishedKeys7 = SharedKeys7 | 'state';
+type PublishedKeys5 = SharedKeys6;
+type PublishedKeys6 = SharedKeys7 | 'state';
+type PublishedKeys7 = 'didInitialize' | SharedKeys7 | SharedKeys8;
 type PublishedKeys8 = 'store' | 'subscribeStore';
 type PublishedKeys9 = 'title' | 'store' | SharedKeys9;
 type PublishedKeys10 = 'valueOf';
-type PublishedKeys11 = SharedKeys8 | SharedKeys10;
+type PublishedKeys11 = SharedKeys6 | SharedKeys10;
 type PublishedKeys12 = 'name' | 'state' | SharedKeys11;
 type PublishedKeys13 = SharedKeys0 | 'normalize' | 'valueOf' | SharedKeys12;
 type PublishedKeys14 = SharedKeys2 | 'translate' | SharedKeys13;
@@ -1406,30 +1409,30 @@ type Contract6 = Assert<
 type Contract7 = Assert<Equal<keyof typeof Native4.EMPTY_OBJECT, never>>;
 type Contract8 = Assert<Equal<Parameters<typeof Native5.error>['length'], number>>;
 type Contract9 = Assert<Equal<Parameters<typeof Native5.reset>['length'], 0>>;
-type Contract10 = Assert<Equal<Parameters<typeof Native6.getInstance>['length'], 0>>;
-type Contract11 = Assert<Equal<Parameters<typeof Native6.setInstance>['length'], 1>>;
-type Contract12 = Assert<Equal<Parameters<typeof Native6.register>['length'], 1>>;
-type Contract13 = Assert<Equal<Parameters<typeof Native6.fastComponent>['length'], 1>>;
-type Contract14 = Assert<Equal<Parameters<typeof Native6.fastComponentRef>['length'], 1>>;
-type Contract15 = Assert<Equal<keyof Pick<Native6.Instance, PublishedKeys1>, PublishedKeys1>>;
+type Contract10 = Assert<Equal<keyof Pick<Native6.Instance, PublishedKeys1>, PublishedKeys1>>;
+type Contract11 = Assert<Equal<Parameters<typeof Native6.getInstance>['length'], 0>>;
+type Contract12 = Assert<Equal<Parameters<typeof Native6.setInstance>['length'], 1>>;
+type Contract13 = Assert<Equal<Parameters<typeof Native6.register>['length'], 1>>;
+type Contract14 = Assert<Equal<Parameters<typeof Native6.fastComponent>['length'], 1>>;
+type Contract15 = Assert<Equal<Parameters<typeof Native6.fastComponentRef>['length'], 1>>;
 type Contract16 = Assert<Equal<Parameters<typeof Native7.fastObjectShallowCompare>['length'], 2>>;
 type Contract17 = Assert<Equal<Parameters<typeof Native8.createFormatErrorMessage>['length'], 2>>;
 type Contract18 = Assert<Equal<Parameters<typeof Native8.default>['length'], number>>;
 type Contract19 = Assert<Equal<Parameters<typeof Native9.getFormatter>['length'], 0 | 1 | 2>>;
 type Contract20 = Assert<Equal<Parameters<typeof Native9.formatNumber>['length'], 1 | 2 | 3>>;
 type Contract21 = Assert<Equal<Parameters<typeof Native10.generateId>['length'], 1>>;
-type Contract22 = Assert<Equal<Parameters<typeof Native11.getDefaultFormSubmitter>['length'], 1>>;
-type Contract23 = Assert<
+type Contract22 = Assert<
 	Equal<keyof Pick<Native11.DefaultFormSubmitter, PublishedKeys2>, PublishedKeys2>
 >;
+type Contract23 = Assert<Equal<Parameters<typeof Native11.getDefaultFormSubmitter>['length'], 1>>;
 type Contract24 = Assert<Equal<Parameters<typeof Native12.getReactElementRef>['length'], 1>>;
 type Contract25 = Assert<Equal<Parameters<typeof Native13.inertValue>['length'], 0 | 1>>;
 type Contract26 = Assert<Equal<Parameters<typeof Native14.isElementDisabled>['length'], 1>>;
 type Contract27 = Assert<Equal<Parameters<typeof Native15.isMouseWithinBounds>['length'], 1>>;
 type Contract28 = Assert<Equal<Parameters<typeof Native16.mergeCleanups>['length'], number>>;
 type Contract29 = Assert<Equal<Parameters<typeof Native17.mergeObjects>['length'], 2>>;
-type Contract30 = Assert<Equal<Parameters<typeof Native18.ownerDocument>['length'], 1>>;
-type Contract31 = Assert<Equal<Parameters<typeof Native18.ownerWindow>['length'], 1>>;
+type Contract30 = Assert<Equal<Parameters<typeof Native18.ownerWindow>['length'], 1>>;
+type Contract31 = Assert<Equal<Parameters<typeof Native18.ownerDocument>['length'], 1>>;
 type Contract32 = Assert<
 	Equal<keyof Pick<typeof Native19.platform, PublishedKeys3>, PublishedKeys3>
 >;
@@ -1449,54 +1452,54 @@ type Contract41 = Assert<
 type Contract42 = Assert<
 	Equal<Parameters<typeof Native23.createSelectorMemoized>['length'], number>
 >;
-type Contract43 = Assert<Equal<Parameters<typeof Native23.useStore>['length'], 5>>;
-type Contract44 = Assert<Equal<keyof Pick<Native23.StoreInstance, PublishedKeys5>, PublishedKeys5>>;
-type Contract45 = Assert<Equal<keyof Pick<typeof Native23.Store, PublishedKeys6>, PublishedKeys6>>;
-type Contract46 = Assert<
-	Equal<keyof Pick<Native23.ReadonlyStore<{ sample: string }>, PublishedKeys7>, PublishedKeys7>
+type Contract43 = Assert<Equal<keyof Pick<typeof Native23.Store, PublishedKeys5>, PublishedKeys5>>;
+type Contract44 = Assert<
+	Equal<keyof Pick<Native23.ReadonlyStore<{ sample: string }>, PublishedKeys6>, PublishedKeys6>
 >;
+type Contract45 = Assert<Equal<Parameters<typeof Native23.useStore>['length'], 5>>;
+type Contract46 = Assert<Equal<keyof Pick<Native23.StoreInstance, PublishedKeys7>, PublishedKeys7>>;
 type Contract47 = Assert<
-	Equal<keyof Pick<typeof Native23.ReactStore, PublishedKeys6>, PublishedKeys6>
+	Equal<keyof Pick<typeof Native23.ReactStore, PublishedKeys5>, PublishedKeys5>
 >;
-type Contract48 = Assert<Equal<Parameters<typeof Native23.StoreInspector>['length'], 1>>;
-type Contract49 = Assert<Equal<Parameters<typeof Native23.StoreInspectorPanel>['length'], 1>>;
-type Contract50 = Assert<Equal<keyof Pick<Native23.StoreOwner, PublishedKeys8>, PublishedKeys8>>;
-type Contract51 = Assert<
+type Contract48 = Assert<Equal<keyof Pick<Native23.StoreOwner, PublishedKeys8>, PublishedKeys8>>;
+type Contract49 = Assert<
 	Equal<keyof Pick<Native23.StoreInspectorProps, PublishedKeys9>, PublishedKeys9>
 >;
+type Contract50 = Assert<Equal<Parameters<typeof Native23.StoreInspector>['length'], 1>>;
+type Contract51 = Assert<Equal<Parameters<typeof Native23.StoreInspectorPanel>['length'], 1>>;
 type Contract52 = Assert<Equal<Parameters<typeof Native24.stringifyLocale>['length'], 0 | 1>>;
-type Contract53 = Assert<Equal<Parameters<typeof Native25.expectType>['length'], 1>>;
-type Contract54 = Assert<
+type Contract53 = Assert<
 	Equal<keyof Pick<typeof Native25.isJSDOM, PublishedKeys10>, PublishedKeys10>
 >;
-type Contract55 = Assert<
+type Contract54 = Assert<
 	Equal<keyof Native25.IfEquals<{ sample: string }, { sample: string }>, never>
 >;
+type Contract55 = Assert<Equal<Parameters<typeof Native25.expectType>['length'], 1>>;
 type Contract56 = Assert<
 	Equal<Parameters<typeof Native26.resetAnimationFrameScheduler>['length'], 0>
 >;
-type Contract57 = Assert<Equal<Parameters<typeof Native26.useAnimationFrame>['length'], 0>>;
-type Contract58 = Assert<
+type Contract57 = Assert<
 	Equal<keyof Pick<typeof Native26.AnimationFrame, PublishedKeys11>, PublishedKeys11>
 >;
-type Contract59 = Assert<Equal<Parameters<typeof Native27.useControlled>['length'], 1>>;
-type Contract60 = Assert<
+type Contract58 = Assert<Equal<Parameters<typeof Native26.useAnimationFrame>['length'], 0>>;
+type Contract59 = Assert<
 	Equal<keyof Pick<Native27.UseControlledProps, PublishedKeys12>, PublishedKeys12>
 >;
-type Contract61 = Assert<Equal<Parameters<typeof Native28.useEnhancedClickHandler>['length'], 1>>;
-type Contract62 = Assert<
+type Contract60 = Assert<Equal<Parameters<typeof Native27.useControlled>['length'], 1>>;
+type Contract61 = Assert<
 	Equal<keyof Pick<Native28.InteractionType, PublishedKeys13>, PublishedKeys13>
 >;
+type Contract62 = Assert<Equal<Parameters<typeof Native28.useEnhancedClickHandler>['length'], 1>>;
 type Contract63 = Assert<Equal<Parameters<typeof Native29.useForcedRerendering>['length'], 0>>;
 type Contract64 = Assert<Equal<Parameters<typeof Native30.useId>['length'], 0 | 1 | 2>>;
-type Contract65 = Assert<Equal<Parameters<typeof Native31.useIdleCallback>['length'], 0>>;
-type Contract66 = Assert<
-	Equal<keyof Pick<typeof Native31.IdleCallback, PublishedKeys6>, PublishedKeys6>
+type Contract65 = Assert<
+	Equal<keyof Pick<typeof Native31.IdleCallback, PublishedKeys5>, PublishedKeys5>
 >;
-type Contract67 = Assert<Equal<Parameters<typeof Native32.useInterval>['length'], 0>>;
-type Contract68 = Assert<
-	Equal<keyof Pick<typeof Native32.Interval, PublishedKeys6>, PublishedKeys6>
+type Contract66 = Assert<Equal<Parameters<typeof Native31.useIdleCallback>['length'], 0>>;
+type Contract67 = Assert<
+	Equal<keyof Pick<typeof Native32.Interval, PublishedKeys5>, PublishedKeys5>
 >;
+type Contract68 = Assert<Equal<Parameters<typeof Native32.useInterval>['length'], 0>>;
 type Contract69 = Assert<
 	Equal<typeof Native33.useIsoLayoutEffect, typeof import('octane').useLayoutEffect>
 >;
@@ -1508,10 +1511,10 @@ type Contract74 = Assert<Equal<Parameters<typeof Native37.usePreviousValue>['len
 type Contract75 = Assert<Equal<Parameters<typeof Native38.useRefWithInit>['length'], 2>>;
 type Contract76 = Assert<Equal<Parameters<typeof Native39.useScrollLock>['length'], 0 | 1 | 2>>;
 type Contract77 = Assert<Equal<Parameters<typeof Native40.useStableCallback>['length'], 1>>;
-type Contract78 = Assert<Equal<Parameters<typeof Native41.useTimeout>['length'], 0>>;
-type Contract79 = Assert<
-	Equal<keyof Pick<typeof Native41.Timeout, PublishedKeys6>, PublishedKeys6>
+type Contract78 = Assert<
+	Equal<keyof Pick<typeof Native41.Timeout, PublishedKeys5>, PublishedKeys5>
 >;
+type Contract79 = Assert<Equal<Parameters<typeof Native41.useTimeout>['length'], 0>>;
 type Contract80 = Assert<Equal<Parameters<typeof Native42.useValueAsRef>['length'], 1>>;
 type Contract81 = Assert<
 	Equal<keyof Pick<typeof Native43.visuallyHidden, PublishedKeys14>, PublishedKeys14>

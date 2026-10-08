@@ -1,7 +1,14 @@
 import { createHash } from 'node:crypto';
 import { existsSync, readFileSync, readdirSync } from 'node:fs';
-import { dirname, relative, resolve, sep } from 'node:path';
-import ts from 'typescript';
+import { relative, resolve, sep } from 'node:path';
+import { is, parseSourceFile, ScriptKind } from '../octane-tsc/native-syntax.mjs';
+import {
+	flattenDiagnosticText,
+	parseProjectConfigContent,
+	printFileWithoutComments,
+	printNodeWithoutComments,
+	readProjectConfig,
+} from './native-typescript-lib.mjs';
 
 export const TYPE_PARITY_CONFIG = 'packages/textarea-autosize/audit/type-parity.json';
 
@@ -18,23 +25,13 @@ function compilerProgramFiles(root, projectPath) {
 	if (!existsSync(configPath)) {
 		throw new Error(`missing compiler project: ${projectPath}`);
 	}
-	const configFile = ts.readConfigFile(configPath, ts.sys.readFile);
+	const configFile = readProjectConfig(configPath);
 	if (configFile.error) {
-		throw new Error(
-			`failed to read ${projectPath}: ${ts.flattenDiagnosticMessageText(configFile.error.messageText, '\n')}`,
-		);
+		throw new Error(`failed to read ${projectPath}: ${flattenDiagnosticText(configFile.error)}`);
 	}
-	const parsed = ts.parseJsonConfigFileContent(
-		configFile.config,
-		ts.sys,
-		dirname(configPath),
-		undefined,
-		configPath,
-	);
+	const parsed = parseProjectConfigContent(configFile.config, { configFileName: configPath });
 	if (parsed.errors.length > 0) {
-		throw new Error(
-			`failed to parse ${projectPath}: ${ts.flattenDiagnosticMessageText(parsed.errors[0].messageText, '\n')}`,
-		);
+		throw new Error(`failed to parse ${projectPath}: ${flattenDiagnosticText(parsed.errors[0])}`);
 	}
 	return new Set(
 		parsed.fileNames.map(function toRepoPath(fileName) {
@@ -105,19 +102,12 @@ function normalizeComment(comment) {
 }
 
 function containsExpect(node) {
-	if (ts.isIdentifier(node) && node.text === 'Expect') return true;
+	if (is.isIdentifier(node) && node.text === 'Expect') return true;
 	return node.getChildren().some(containsExpect);
 }
 
 function assertionGroups(source, fileName) {
-	const sourceFile = ts.createSourceFile(
-		fileName,
-		source,
-		ts.ScriptTarget.Latest,
-		true,
-		ts.ScriptKind.TS,
-	);
-	const printer = ts.createPrinter({ removeComments: true });
+	const sourceFile = parseSourceFile(fileName, source, ScriptKind.TS);
 	const groups = [];
 	for (const match of source.matchAll(/\/\*\*[\s\S]*?\*\//g)) {
 		groups.push(`doc:${normalizeComment(match[0])}`);
@@ -128,24 +118,19 @@ function assertionGroups(source, fileName) {
 		);
 	}
 	function visit(node) {
-		if (ts.isTypeAliasDeclaration(node) && node.type && containsExpect(node.type)) {
+		if (is.isTypeAliasDeclaration(node) && node.type && containsExpect(node.type)) {
 			groups.push(
-				`expect:${node.name.text}:${printer.printNode(ts.EmitHint.Unspecified, node.type, sourceFile).replace(/\s+/g, ' ').trim()}`,
+				`expect:${node.name.text}:${printNodeWithoutComments(node.type).replace(/\s+/g, ' ').trim()}`,
 			);
 		}
 		if (
-			ts.isCallExpression(node) &&
-			ts.isIdentifier(node.expression) &&
+			is.isCallExpression(node) &&
+			is.isIdentifier(node.expression) &&
 			node.expression.text === 'expectType'
 		) {
-			groups.push(
-				`expectType:${printer
-					.printNode(ts.EmitHint.Unspecified, node, sourceFile)
-					.replace(/\s+/g, ' ')
-					.trim()}`,
-			);
+			groups.push(`expectType:${printNodeWithoutComments(node).replace(/\s+/g, ' ').trim()}`);
 		}
-		ts.forEachChild(node, visit);
+		node.forEachChild(visit);
 	}
 	visit(sourceFile);
 	return groups;
@@ -169,16 +154,10 @@ function normalizeRefType(value) {
 }
 
 function structuralSource(source, fileName) {
-	const sourceFile = ts.createSourceFile(
-		fileName,
-		source,
-		ts.ScriptTarget.Latest,
-		true,
-		ts.ScriptKind.TS,
-	);
+	const sourceFile = parseSourceFile(fileName, source, ScriptKind.TS);
 	const replacements = [];
 	for (const statement of sourceFile.statements) {
-		if (!ts.isImportDeclaration(statement) || !ts.isStringLiteral(statement.moduleSpecifier)) {
+		if (!is.isImportDeclaration(statement) || !is.isStringLiteral(statement.moduleSpecifier)) {
 			continue;
 		}
 		const specifier = statement.moduleSpecifier.text;
@@ -196,20 +175,8 @@ function structuralSource(source, fileName) {
 	})) {
 		transformed = `${transformed.slice(0, replacement.start)}${replacement.value}${transformed.slice(replacement.end)}`;
 	}
-	const normalizedFile = ts.createSourceFile(
-		fileName,
-		transformed,
-		ts.ScriptTarget.Latest,
-		true,
-		ts.ScriptKind.TS,
-	);
-	return normalizeRefType(
-		ts
-			.createPrinter({ removeComments: true })
-			.printFile(normalizedFile)
-			.replace(/\s+/g, ' ')
-			.trim(),
-	);
+	const normalizedFile = parseSourceFile(fileName, transformed, ScriptKind.TS);
+	return normalizeRefType(printFileWithoutComments(normalizedFile).replace(/\s+/g, ' ').trim());
 }
 
 export function buildTypeInventory(root, config) {

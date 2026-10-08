@@ -1,7 +1,14 @@
 import { createHash } from 'node:crypto';
 import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { dirname, relative, resolve, sep } from 'node:path';
-import ts from 'typescript';
+import { is, parseSourceFile, ScriptKind } from '../octane-tsc/native-syntax.mjs';
+import {
+	flattenDiagnosticText,
+	parseProjectConfigContent,
+	printFileWithoutComments,
+	printNodeWithoutComments,
+	readProjectConfig,
+} from './native-typescript-lib.mjs';
 
 export const TYPE_PARITY_CONFIG = 'packages/popper/audit/type-parity.json';
 
@@ -26,22 +33,22 @@ function normalizeComment(comment) {
 }
 
 function containsExpect(node) {
-	if (ts.isIdentifier(node) && node.text === 'Expect') return true;
+	if (is.isIdentifier(node) && node.text === 'Expect') return true;
 	return node.getChildren().some(containsExpect);
 }
 
 function jsxTagName(tagName) {
-	if (ts.isIdentifier(tagName)) return tagName.text;
+	if (is.isIdentifier(tagName)) return tagName.text;
 	return tagName.getText();
 }
 
 function callName(expression) {
-	if (ts.isIdentifier(expression)) return expression.text;
+	if (is.isIdentifier(expression)) return expression.text;
 	if (
-		ts.isPropertyAccessExpression(expression) &&
-		ts.isIdentifier(expression.expression) &&
+		is.isPropertyAccessExpression(expression) &&
+		is.isIdentifier(expression.expression) &&
 		expression.expression.text === 'React' &&
-		ts.isIdentifier(expression.name)
+		is.isIdentifier(expression.name)
 	) {
 		return expression.name.text;
 	}
@@ -55,14 +62,7 @@ function callName(expression) {
  * controls remain recognized when present.
  */
 export function assertionGroups(source, fileName) {
-	const sourceFile = ts.createSourceFile(
-		fileName,
-		source,
-		ts.ScriptTarget.Latest,
-		true,
-		ts.ScriptKind.TSX,
-	);
-	const printer = ts.createPrinter({ removeComments: true });
+	const sourceFile = parseSourceFile(fileName, source, ScriptKind.TSX);
 	const groups = [];
 	for (const match of source.matchAll(/\/\*\*[\s\S]*?\*\//g)) {
 		const text = normalizeComment(match[0]);
@@ -73,68 +73,65 @@ export function assertionGroups(source, fileName) {
 		groups.push(`expect-error:${match[1].trim()}:${match[2].replace(/\s+/g, ' ').trim()}`);
 	}
 	function visit(node) {
-		if (ts.isTypeAliasDeclaration(node) && node.type && containsExpect(node.type)) {
+		if (is.isTypeAliasDeclaration(node) && node.type && containsExpect(node.type)) {
 			groups.push(
-				`expect:${node.name.text}:${printer.printNode(ts.EmitHint.Unspecified, node.type, sourceFile).replace(/\s+/g, ' ').trim()}`,
+				`expect:${node.name.text}:${printNodeWithoutComments(node.type).replace(/\s+/g, ' ').trim()}`,
 			);
 		}
-		if (ts.isJsxOpeningElement(node) || ts.isJsxSelfClosingElement(node)) {
+		if (is.isJsxOpeningElement(node) || is.isJsxSelfClosingElement(node)) {
 			const tag = jsxTagName(node.tagName);
 			if (JSX_COMPONENTS.has(tag)) {
 				groups.push(`jsx:${tag}`);
 				for (const property of node.attributes.properties) {
-					if (!ts.isJsxAttribute(property) || !property.name) continue;
+					if (!is.isJsxAttribute(property) || !property.name) continue;
 					groups.push(`jsx-prop:${tag}.${property.name.getText()}`);
 				}
 			}
 		}
-		if (ts.isJsxAttribute(node) && node.name) {
+		if (is.isJsxAttribute(node) && node.name) {
 			const name = node.name.getText();
 			if (name === 'ref' || name === 'style' || name === 'data-placement') {
 				groups.push(`jsx-attr:${name}`);
 			}
 		}
-		if (ts.isJsxSpreadAttribute(node)) {
+		if (is.isJsxSpreadAttribute(node)) {
 			const spread = node.expression
 				.getText(sourceFile)
 				.replace(/\s+/g, '')
 				.replace(/^attributes\./, 'attributes.');
 			if (spread.startsWith('attributes.')) groups.push(`jsx-spread:${spread}`);
 		}
-		if (ts.isParameter(node) && ts.isObjectBindingPattern(node.name)) {
+		if (is.isParameterDeclaration(node) && is.isObjectBindingPattern(node.name)) {
 			for (const element of node.name.elements) {
-				if (element.dotDotDotToken || !ts.isIdentifier(element.name)) continue;
+				if (element.dotDotDotToken || !is.isIdentifier(element.name)) continue;
 				groups.push(`render-param:${element.name.text}`);
 			}
 		}
-		if (ts.isCallExpression(node)) {
+		if (is.isCallExpression(node)) {
 			const name = callName(node.expression);
 			if (name === 'usePopper') groups.push('call:usePopper');
 			if (name === 'update') groups.push('call:update');
 			if (name === 'useState') {
 				const typeArgs = (node.typeArguments ?? [])
 					.map(function printType(typeNode) {
-						return printer
-							.printNode(ts.EmitHint.Unspecified, typeNode, sourceFile)
-							.replace(/\s+/g, ' ')
-							.trim();
+						return printNodeWithoutComments(typeNode).replace(/\s+/g, ' ').trim();
 					})
 					.join(',');
 				groups.push(`call:useState<${typeArgs}>`);
 			}
 		}
-		if (ts.isPropertyAccessExpression(node) && ts.isIdentifier(node.expression)) {
+		if (is.isPropertyAccessExpression(node) && is.isIdentifier(node.expression)) {
 			const root = node.expression.text;
 			if (ACCESS_ROOTS.has(root)) groups.push(`access:${root}.${node.name.text}`);
 		}
-		if (ts.isObjectLiteralExpression(node)) {
+		if (is.isObjectLiteralExpression(node)) {
 			let modifierName = null;
 			for (const property of node.properties) {
 				if (
-					!ts.isPropertyAssignment(property) ||
-					!ts.isIdentifier(property.name) ||
+					!is.isPropertyAssignment(property) ||
+					!is.isIdentifier(property.name) ||
 					property.name.text !== 'name' ||
-					!ts.isStringLiteral(property.initializer)
+					!is.isStringLiteral(property.initializer)
 				) {
 					continue;
 				}
@@ -142,7 +139,7 @@ export function assertionGroups(source, fileName) {
 			}
 			if (modifierName) groups.push(`modifier:${modifierName}`);
 		}
-		ts.forEachChild(node, visit);
+		node.forEachChild(visit);
 	}
 	visit(sourceFile);
 	return groups;
@@ -160,16 +157,10 @@ export function structuralSource(source, fileName) {
 	let transformed = source
 		.replace(/^\/\*\*\s*@jsxImportSource\s+octane\s*\*\/\s*/m, '')
 		.replace(/\bReact\.useState\b/g, 'useState');
-	const sourceFile = ts.createSourceFile(
-		fileName,
-		transformed,
-		ts.ScriptTarget.Latest,
-		true,
-		ts.ScriptKind.TSX,
-	);
+	const sourceFile = parseSourceFile(fileName, transformed, ScriptKind.TSX);
 	const dropRanges = [];
 	for (const statement of sourceFile.statements) {
-		if (!ts.isImportDeclaration(statement) || !ts.isStringLiteral(statement.moduleSpecifier))
+		if (!is.isImportDeclaration(statement) || !is.isStringLiteral(statement.moduleSpecifier))
 			continue;
 		const specifier = statement.moduleSpecifier.text;
 		if (specifier === 'react' || specifier === 'octane') {
@@ -184,16 +175,10 @@ export function structuralSource(source, fileName) {
 	})) {
 		transformed = `${transformed.slice(0, range.start)}${transformed.slice(range.end)}`;
 	}
-	const afterDrop = ts.createSourceFile(
-		fileName,
-		transformed,
-		ts.ScriptTarget.Latest,
-		true,
-		ts.ScriptKind.TSX,
-	);
+	const afterDrop = parseSourceFile(fileName, transformed, ScriptKind.TSX);
 	const rewrite = [];
 	for (const statement of afterDrop.statements) {
-		if (!ts.isImportDeclaration(statement) || !ts.isStringLiteral(statement.moduleSpecifier))
+		if (!is.isImportDeclaration(statement) || !is.isStringLiteral(statement.moduleSpecifier))
 			continue;
 		const specifier = statement.moduleSpecifier.text;
 		const normalized = normalizeSpecifier(specifier);
@@ -209,18 +194,8 @@ export function structuralSource(source, fileName) {
 	})) {
 		transformed = `${transformed.slice(0, replacement.start)}${replacement.value}${transformed.slice(replacement.end)}`;
 	}
-	const normalizedFile = ts.createSourceFile(
-		fileName,
-		transformed,
-		ts.ScriptTarget.Latest,
-		true,
-		ts.ScriptKind.TSX,
-	);
-	return ts
-		.createPrinter({ removeComments: true })
-		.printFile(normalizedFile)
-		.replace(/\s+/g, ' ')
-		.trim();
+	const normalizedFile = parseSourceFile(fileName, transformed, ScriptKind.TSX);
+	return printFileWithoutComments(normalizedFile).replace(/\s+/g, ' ').trim();
 }
 
 function listPairedFiles(rootDir) {
@@ -242,19 +217,13 @@ function listPairedFiles(rootDir) {
 function readConfigFileNames(repoRoot, configPath) {
 	const absolute = resolve(repoRoot, configPath);
 	if (!existsSync(absolute)) throw new Error(`missing TypeScript project ${configPath}`);
-	const read = ts.readConfigFile(absolute, function readFile(path) {
-		try {
-			return readFileSync(path, 'utf8');
-		} catch {
-			return undefined;
-		}
-	});
+	const read = readProjectConfig(absolute);
 	if (read.error) {
 		throw new Error(
-			`unable to read TypeScript project ${configPath}: ${ts.flattenDiagnosticMessageText(read.error.messageText, '\n')}`,
+			`unable to read TypeScript project ${configPath}: ${flattenDiagnosticText(read.error)}`,
 		);
 	}
-	const parsed = ts.parseJsonConfigFileContent(read.config, ts.sys, dirname(absolute));
+	const parsed = parseProjectConfigContent(read.config, { configDirectory: dirname(absolute) });
 	return new Set(
 		parsed.fileNames.map(function resolveFile(fileName) {
 			return resolve(fileName);

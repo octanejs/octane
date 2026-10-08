@@ -10,7 +10,10 @@
     "allowImportingTsExtensions": true,
     "strict": true,
     "jsx": "react-jsx",
-    "jsxImportSource": "octane"
+    "jsxImportSource": "octane",
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "types": ["node"]
   },
   "include": ["./src/", "./typetests/"],
   "exclude": ["node_modules", "dist", "tests"]

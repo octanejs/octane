@@ -3,7 +3,14 @@
 import { existsSync, readFileSync, readdirSync, realpathSync, statSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import ts from 'typescript';
+import {
+	hasModifier,
+	is,
+	isReparsed,
+	parseSourceFile,
+	ScriptKind,
+	SyntaxKind,
+} from '../octane-tsc/native-syntax.mjs';
 
 function exportTargets(value, keyPath = 'exports', subpath = '.', conditions = []) {
 	if (typeof value === 'string') return [{ conditions, keyPath, subpath, target: value }];
@@ -61,10 +68,10 @@ function isExcludedSubpath(subpath, includedPattern, exclusions) {
 }
 
 function scriptKind(filePath) {
-	if (/\.(?:tsx|tsrx)$/i.test(filePath)) return ts.ScriptKind.TSX;
-	if (/\.jsx$/i.test(filePath)) return ts.ScriptKind.JSX;
-	if (/\.(?:js|mjs|cjs)$/i.test(filePath)) return ts.ScriptKind.JS;
-	return ts.ScriptKind.TS;
+	if (/\.(?:tsx|tsrx)$/i.test(filePath)) return ScriptKind.TSX;
+	if (/\.jsx$/i.test(filePath)) return ScriptKind.JSX;
+	if (/\.(?:js|mjs|cjs)$/i.test(filePath)) return ScriptKind.JS;
+	return ScriptKind.TS;
 }
 
 function packageFiles(packageDirectory) {
@@ -138,15 +145,15 @@ function resolveLocalModule(fromPath, specifier, packageDirectory) {
 
 function exportedDeclarationNames(statement, output) {
 	const addBindingNames = (name) => {
-		if (ts.isIdentifier(name)) output.add(name.text);
-		else if (ts.isObjectBindingPattern(name) || ts.isArrayBindingPattern(name)) {
+		if (is.isIdentifier(name)) output.add(name.text);
+		else if (is.isObjectBindingPattern(name) || is.isArrayBindingPattern(name)) {
 			for (const element of name.elements) {
-				if (ts.isBindingElement(element)) addBindingNames(element.name);
+				if (is.isBindingElement(element)) addBindingNames(element.name);
 			}
 		}
 	};
 	if (statement.name) addBindingNames(statement.name);
-	if (ts.isVariableStatement(statement)) {
+	if (is.isVariableStatement(statement)) {
 		for (const declaration of statement.declarationList.declarations) {
 			addBindingNames(declaration.name);
 		}
@@ -154,23 +161,23 @@ function exportedDeclarationNames(statement, output) {
 }
 
 function commonjsExportName(node) {
-	if (!ts.isBinaryExpression(node) || node.operatorToken.kind !== ts.SyntaxKind.EqualsToken) {
+	if (!is.isBinaryExpression(node) || node.operatorToken.kind !== SyntaxKind.EqualsToken) {
 		return null;
 	}
 	const left = node.left;
 	if (
-		ts.isPropertyAccessExpression(left) &&
-		ts.isIdentifier(left.expression) &&
+		is.isPropertyAccessExpression(left) &&
+		is.isIdentifier(left.expression) &&
 		left.expression.text === 'module' &&
 		left.name.text === 'exports'
 	) {
 		return 'module.exports';
 	}
-	if (ts.isPropertyAccessExpression(left) && ts.isIdentifier(left.expression)) {
+	if (is.isPropertyAccessExpression(left) && is.isIdentifier(left.expression)) {
 		if (left.expression.text === 'exports') return left.name.text;
 		if (
-			ts.isPropertyAccessExpression(left.expression) &&
-			ts.isIdentifier(left.expression.expression) &&
+			is.isPropertyAccessExpression(left.expression) &&
+			is.isIdentifier(left.expression.expression) &&
 			left.expression.expression.text === 'module' &&
 			left.expression.name.text === 'exports'
 		) {
@@ -183,9 +190,9 @@ function commonjsExportName(node) {
 function importHasRuntimeEffect(statement) {
 	const clause = statement.importClause;
 	if (!clause) return true;
-	if (clause.isTypeOnly) return false;
+	if (clause.phaseModifier === SyntaxKind.TypeKeyword) return false;
 	if (clause.name) return true;
-	if (clause.namedBindings && ts.isNamedImports(clause.namedBindings)) {
+	if (clause.namedBindings && is.isNamedImports(clause.namedBindings)) {
 		return (
 			clause.namedBindings.elements.length === 0 ||
 			clause.namedBindings.elements.some((element) => !element.isTypeOnly)
@@ -218,25 +225,22 @@ function inspectModule(targetPath, packageDirectory, visiting = new Set()) {
 		/^\s*(?:\/\*\s*@octane-public-empty-marker\s*\*\/|\/\/\s*@octane-public-empty-marker)\s*$/.test(
 			source,
 		);
-	const sourceFile = ts.createSourceFile(
-		targetPath,
-		source,
-		ts.ScriptTarget.Latest,
-		true,
-		scriptKind(targetPath),
-	);
+	const sourceFile = parseSourceFile(targetPath, source, scriptKind(targetPath));
 	const exports = new Set();
 	let sideEffect = false;
 	const nextVisiting = new Set(visiting).add(targetPath);
 	for (const statement of sourceFile.statements) {
-		if (ts.isExportAssignment(statement)) {
+		// TypeScript 7 adds a JavaScript file's JSDoc `@import` and `@typedef` as
+		// reparsed statements; only authored statements form the module contract.
+		if (isReparsed(statement)) continue;
+		if (is.isExportAssignment(statement)) {
 			exports.add(statement.isExportEquals ? 'module.exports' : 'default');
 			continue;
 		}
-		if (ts.isExportDeclaration(statement)) {
+		if (is.isExportDeclaration(statement)) {
 			if (statement.exportClause) {
 				let nested = null;
-				if (statement.moduleSpecifier && ts.isStringLiteral(statement.moduleSpecifier)) {
+				if (statement.moduleSpecifier && is.isStringLiteral(statement.moduleSpecifier)) {
 					const resolved = resolveLocalModule(
 						targetPath,
 						statement.moduleSpecifier.text,
@@ -245,7 +249,7 @@ function inspectModule(targetPath, packageDirectory, visiting = new Set()) {
 					if (resolved) nested = inspectModule(resolved, packageDirectory, nextVisiting);
 					else if (!statement.moduleSpecifier.text.startsWith('.')) nested = 'external';
 				}
-				if (ts.isNamespaceExport(statement.exportClause)) {
+				if (is.isNamespaceExport(statement.exportClause)) {
 					if (nested === 'external' || (nested && nested.exports.size > 0)) {
 						exports.add(statement.exportClause.name.text);
 					}
@@ -264,7 +268,7 @@ function inspectModule(targetPath, packageDirectory, visiting = new Set()) {
 				}
 				continue;
 			}
-			if (statement.moduleSpecifier && ts.isStringLiteral(statement.moduleSpecifier)) {
+			if (statement.moduleSpecifier && is.isStringLiteral(statement.moduleSpecifier)) {
 				const resolved = resolveLocalModule(
 					targetPath,
 					statement.moduleSpecifier.text,
@@ -279,29 +283,20 @@ function inspectModule(targetPath, packageDirectory, visiting = new Set()) {
 			}
 			continue;
 		}
-		if (
-			ts.canHaveModifiers(statement) &&
-			ts.getModifiers(statement)?.some((modifier) => modifier.kind === ts.SyntaxKind.ExportKeyword)
-		) {
+		if (hasModifier(statement, SyntaxKind.ExportKeyword)) {
 			exportedDeclarationNames(statement, exports);
-			if (
-				ts
-					.getModifiers(statement)
-					?.some((modifier) => modifier.kind === ts.SyntaxKind.DefaultKeyword)
-			) {
-				exports.add('default');
-			}
+			if (hasModifier(statement, SyntaxKind.DefaultKeyword)) exports.add('default');
 			continue;
 		}
-		if (ts.isExpressionStatement(statement)) {
+		if (is.isExpressionStatement(statement)) {
 			const commonjsName = commonjsExportName(statement.expression);
 			if (
 				commonjsName === 'module.exports' &&
-				ts.isBinaryExpression(statement.expression) &&
-				ts.isCallExpression(statement.expression.right) &&
-				ts.isIdentifier(statement.expression.right.expression) &&
+				is.isBinaryExpression(statement.expression) &&
+				is.isCallExpression(statement.expression.right) &&
+				is.isIdentifier(statement.expression.right.expression) &&
 				statement.expression.right.expression.text === 'require' &&
-				ts.isStringLiteral(statement.expression.right.arguments[0])
+				is.isStringLiteral(statement.expression.right.arguments[0])
 			) {
 				const specifier = statement.expression.right.arguments[0].text;
 				const resolved = resolveLocalModule(targetPath, specifier, packageDirectory);
@@ -311,38 +306,38 @@ function inspectModule(targetPath, packageDirectory, visiting = new Set()) {
 				} else if (!specifier.startsWith('.')) exports.add('external-reexport');
 			} else if (
 				commonjsName === 'module.exports' &&
-				ts.isBinaryExpression(statement.expression) &&
-				ts.isObjectLiteralExpression(statement.expression.right)
+				is.isBinaryExpression(statement.expression) &&
+				is.isObjectLiteralExpression(statement.expression.right)
 			) {
 				for (const property of statement.expression.right.properties) {
 					if (
-						(ts.isPropertyAssignment(property) || ts.isMethodDeclaration(property)) &&
+						(is.isPropertyAssignment(property) || is.isMethodDeclaration(property)) &&
 						property.name
 					) {
 						exports.add(property.name.getText(sourceFile));
-					} else if (ts.isShorthandPropertyAssignment(property)) {
+					} else if (is.isShorthandPropertyAssignment(property)) {
 						exports.add(property.name.text);
-					} else if (ts.isSpreadAssignment(property)) {
+					} else if (is.isSpreadAssignment(property)) {
 						exports.add('spread-export');
 					}
 				}
 			} else if (commonjsName) exports.add(commonjsName);
-			else if (!ts.isStringLiteral(statement.expression)) sideEffect = true;
+			else if (!is.isStringLiteral(statement.expression)) sideEffect = true;
 			continue;
 		}
-		if (ts.isImportDeclaration(statement)) {
+		if (is.isImportDeclaration(statement)) {
 			sideEffect ||= importHasRuntimeEffect(statement);
 			continue;
 		}
 		if (
-			ts.isThrowStatement(statement) ||
-			ts.isIfStatement(statement) ||
-			ts.isForStatement(statement) ||
-			ts.isForOfStatement(statement) ||
-			ts.isForInStatement(statement) ||
-			ts.isWhileStatement(statement) ||
-			ts.isDoStatement(statement) ||
-			ts.isTryStatement(statement)
+			is.isThrowStatement(statement) ||
+			is.isIfStatement(statement) ||
+			is.isForStatement(statement) ||
+			is.isForOfStatement(statement) ||
+			is.isForInStatement(statement) ||
+			is.isWhileStatement(statement) ||
+			is.isDoStatement(statement) ||
+			is.isTryStatement(statement)
 		) {
 			sideEffect = true;
 		}

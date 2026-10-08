@@ -23,6 +23,7 @@ import { assertApprovedGateCommand } from './evidence.mjs';
 import { createBatchManifest } from './state-lib.mjs';
 import { buildUpstreamLock, gitBlobSha1 } from './materialize-lib.mjs';
 import { fixtureIdentity, fixtureTreeEntries } from './__fixtures__/materialize-fixtures.mjs';
+import { linkTsrxTypeTools } from './__fixtures__/tsrx-type-tools.mjs';
 
 const SCRIPT_DIRECTORY = path.dirname(fileURLToPath(import.meta.url));
 const MIT_TEXT =
@@ -330,6 +331,7 @@ function sha256(content) {
 function createReadyBatch({ cleanRoomDependency = false, workRootPath = '.react-port-work' } = {}) {
 	const workspaceRoot = mkdtempSync(path.join(tmpdir(), 'react-port-evidence-cli-'));
 	spawnSync('git', ['init', '--quiet'], { cwd: workspaceRoot });
+	linkTsrxTypeTools(workspaceRoot);
 	mkdirSync(path.join(workspaceRoot, 'scripts/react-port'), { recursive: true });
 	copyFileSync(
 		path.join(SCRIPT_DIRECTORY, 'type-assertions.d.ts'),

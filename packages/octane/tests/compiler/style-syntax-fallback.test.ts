@@ -17,7 +17,10 @@
  * A native rejection is a translated `SyntaxError` or, for a source carrying a
  * `<style>` expression child (`<style>{css}</style>`), the bare `Error` the
  * facade's CSS reader raises after its error translation. The Node entry
- * (`parser.node.js`) retries both in JavaScript; the probe mirrors that rule.
+ * (`parser.node.js`) retries both in JavaScript. A diagnostic `@tsrx/core`
+ * reports itself, such as two outputs in one code block, is also a rejection,
+ * but it arrives as the plain `Error` core throws for it, so the Node entry
+ * surfaces it as-is, as the browser compiler does.
  */
 
 import { describe, expect, it } from 'vitest';
@@ -40,8 +43,8 @@ const FILENAME = 'App.tsrx';
  * the list rather than the parser wiring.
  */
 const NEEDS_FALLBACK = [
-	// Multiple outputs are rejected in strict mode by both parsers.
-	// Collection mode now preserves the native recovery tree and diagnostics.
+	// Multiple outputs are rejected in strict mode by both parsers, with the same
+	// error. Collection mode preserves the native recovery tree and diagnostics.
 	'style before the output node in a @{} body is the multiple-outputs error',
 	'style after the output node in a @{} body is the multiple-outputs error',
 	'style beside the output node in an @if consequent is the multiple-outputs error',
@@ -67,10 +70,30 @@ function probeNative(source: string): NativeOutcome {
 			(error instanceof Error &&
 				error.name === 'Error' &&
 				error.constructor === Error &&
-				/<style\b[^>]*>\s*\{/.test(source));
+				(/<style\b[^>]*>\s*\{/.test(source) || isCoreDiagnostic(error)));
 		if (!rejection) throw error;
 		return { accepted: false, error: (error as Error).message };
 	}
+}
+
+/** A compile diagnostic `@tsrx/core` throws: a `TSRX`/`TS` code and a source range. */
+function isCoreDiagnostic(error: Error): boolean {
+	const { code, type, pos } = error as Error & { code?: unknown; type?: unknown; pos?: unknown };
+	return (
+		typeof code === 'string' &&
+		/^TS(?:RX)?\d+$/.test(code) &&
+		type === 'fatal' &&
+		Number.isInteger(pos)
+	);
+}
+
+function thrownBy(parse: () => unknown): Error & { code?: string; pos?: number; loc?: unknown } {
+	try {
+		parse();
+	} catch (error) {
+		return error as Error;
+	}
+	throw new Error('expected the source to be rejected');
 }
 
 // --- structural matcher -------------------------------------------------------
@@ -254,7 +277,16 @@ describe('style syntax spec table through the Node parser (native first, JS fall
 			});
 
 			it(`${spec.name}: the Node entry throws in strict mode and collects the spec diagnostic`, () => {
-				expect(() => parseModule(spec.source, FILENAME)).toThrow(SyntaxError);
+				// Strict mode surfaces the error the browser compiler's parser throws.
+				const thrown = thrownBy(() => parseModule(spec.source, FILENAME));
+				const reference = thrownBy(() => parseJavaScriptModule(spec.source, FILENAME));
+				expect(thrown.constructor).toBe(reference.constructor);
+				expect(thrown).toMatchObject({
+					message: reference.message,
+					code: spec.error!.code,
+					pos: reference.pos,
+					loc: reference.loc,
+				});
 				const errors: any[] = [];
 				const ast = parseModule(spec.source, FILENAME, { collect: true, errors });
 				expect(errors.map((error) => error.code)).toEqual([spec.error!.code]);

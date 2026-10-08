@@ -16,7 +16,9 @@
     "strict": true,
     "isolatedModules": true,
     "jsx": "react-jsx",
-    "jsxImportSource": "octane"
+    "jsxImportSource": "octane",
+    "noUnusedLocals": true,
+    "noUnusedParameters": true
   },
   "tsrx": { "compiler": "octane/compiler/volar" },
   "include": ["./src/"],

@@ -34,10 +34,11 @@ terminal. Reference: https://octanejs.dev/docs/strong-mode
    suggestions may carry source edits; apply them as one unit. On the hosted
    server, `octane_compile` with `strong: true` returns every finding with its
    suggestions and docs link. Narrow a run with `--code <CODE>`.
-5. **Verify behavior.** Run the module's tests and typecheck (`octane-tsc` for
-   programs with `.tsrx`). Rewrites that change timing, such as an effect
-   becoming `useLinkedState` or `useLayoutSnapshot`, need a test that drives the
-   real interaction: prop change, resize, slow request, or unmount.
+5. **Verify behavior.** Run the module's tests and typecheck with `tsrx-tsc`,
+   which reads `.tsrx` (the `typecheck` script `octane init` scaffolds runs it).
+   Rewrites that change timing, such as an effect becoming `useLinkedState` or
+   `useLayoutSnapshot`, need a test that drives the real interaction: prop
+   change, resize, slow request, or unmount.
 6. **Keep what you converted.** Run `octane analyze --strong-baseline init`
    once to write `octane-strong-baseline.json`, the modules still allowed to be
    non-Strong. While it exists, a module leaving Strong mode or a new

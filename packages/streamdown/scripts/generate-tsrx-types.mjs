@@ -10,7 +10,7 @@ import {
 } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join, relative, resolve } from 'node:path';
-import ts from 'typescript';
+import { emitNativeDeclarations } from '../../../scripts/octane-tsc/native.mjs';
 
 const packageRoot = resolve(import.meta.dirname, '..');
 const sourceRoot = join(packageRoot, 'src');
@@ -67,30 +67,21 @@ try {
 	const roots = (outputRoot === null ? components : sources).map((file) =>
 		join(temporarySource, relative(sourceRoot, file).replace(/\.tsrx$/, '.tsx')),
 	);
-	const program = ts.createProgram(roots, {
-		declaration: true,
-		emitDeclarationOnly: true,
+	emitNativeDeclarations(temporaryRoot, roots, {
 		esModuleInterop: true,
-		jsx: ts.JsxEmit.ReactJSX,
+		jsx: 'react-jsx',
 		jsxImportSource: 'octane',
-		module: ts.ModuleKind.ESNext,
-		moduleResolution: ts.ModuleResolutionKind.Bundler,
+		module: 'esnext',
+		moduleResolution: 'bundler',
 		noCheck: true,
 		outDir: temporaryOutput,
 		preserveSymlinks: true,
 		rootDir: temporarySource,
 		skipLibCheck: true,
 		strictNullChecks: true,
-		target: ts.ScriptTarget.ESNext,
+		target: 'esnext',
 		types: ['node'],
 	});
-	const result = program.emit();
-	if (result.emitSkipped) {
-		const diagnostics = [...ts.getPreEmitDiagnostics(program), ...result.diagnostics]
-			.map((diagnostic) => ts.flattenDiagnosticMessageText(diagnostic.messageText, '\n'))
-			.join('\n');
-		throw new Error(`TypeScript skipped Streamdown declaration generation.\n${diagnostics}`);
-	}
 
 	if (outputRoot !== null) {
 		for (const source of sources) {
