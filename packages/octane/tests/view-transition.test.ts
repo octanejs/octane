@@ -8,7 +8,7 @@ import { loadCompiledFixtureSource } from './_server-fixture.js';
  * jsdom environment via the shared conformance mock helper.
  */
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { act } from './_helpers';
+import { act, nextTask } from './_helpers';
 import { createRoot, startTransition, addTransitionType, type Root } from '../src/index.js';
 import { compile } from '../src/compiler/compile.js';
 import * as ServerRuntime from '../src/server/index.js';
@@ -30,18 +30,6 @@ import {
 	NestedSiblingsApp,
 	StagedTemplateApp,
 } from './_fixtures/view-transition-features.tsrx';
-
-/** Wait for a host task posted now, after every task the runtime posted before it. */
-function nextTask(): Promise<void> {
-	return new Promise((resolve) => {
-		const channel = new MessageChannel();
-		channel.port1.onmessage = () => {
-			channel.port1.close();
-			resolve();
-		};
-		channel.port2.postMessage(null);
-	});
-}
 
 function evalServer(source: string, filename: string): Record<string, any> {
 	return loadCompiledFixtureSource(source, {

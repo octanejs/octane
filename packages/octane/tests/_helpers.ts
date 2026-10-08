@@ -104,6 +104,26 @@ export function nextPaint(): Promise<void> {
 	return Promise.resolve();
 }
 
+// Captured at load so a test that stubs MessageChannel cannot break the helper.
+const HostMessageChannel = globalThis.MessageChannel;
+
+/**
+ * Wait for a host task posted now. It runs after every host task the runtime
+ * posted before it, such as the task that renders a transition (#1864). Do not
+ * wait for that render with `setTimeout(0)`: a timer can come due and run
+ * before an already-posted task when the host is busy.
+ */
+export function nextTask(): Promise<void> {
+	return new Promise((resolve) => {
+		const channel = new HostMessageChannel();
+		channel.port1.onmessage = () => {
+			channel.port1.close();
+			resolve();
+		};
+		channel.port2.postMessage(null);
+	});
+}
+
 /**
  * Ordered side-effect log — the standard substitute for React reconciler tests
  * that assert `Scheduler.log([...])` of yields/effects. A fixture pushes labels
