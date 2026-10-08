@@ -15,68 +15,68 @@
     "brotli": 4477
   },
   "cli-spa-starter": {
-    "raw": 102414,
-    "gzip": 34064,
+    "raw": 102441,
+    "gzip": 34082,
     "brotli": 29988
   },
   "root-static-specialized": {
-    "raw": 72929,
-    "gzip": 23904,
+    "raw": 72953,
+    "gzip": 23915,
     "brotli": 21377
   },
   "root-chained-jsx": {
-    "raw": 74807,
-    "gzip": 24404,
+    "raw": 74831,
+    "gzip": 24407,
     "brotli": 21886
   },
   "root-static": {
-    "raw": 165780,
-    "gzip": 52363,
+    "raw": 165805,
+    "gzip": 52372,
     "brotli": 45579
   },
   "root-static-local": {
-    "raw": 72928,
-    "gzip": 23889,
+    "raw": 72952,
+    "gzip": 23900,
     "brotli": 21377
   },
   "root-callback-local": {
-    "raw": 74833,
-    "gzip": 24409,
+    "raw": 74857,
+    "gzip": 24408,
     "brotli": 21916
   },
   "hooks-state": {
-    "raw": 84650,
-    "gzip": 27850,
+    "raw": 84674,
+    "gzip": 27858,
     "brotli": 24823
   },
   "prop-attributes": {
-    "raw": 84904,
-    "gzip": 27847,
+    "raw": 84928,
+    "gzip": 27867,
     "brotli": 24869
   },
   "context": {
-    "raw": 96855,
-    "gzip": 31551,
+    "raw": 96879,
+    "gzip": 31563,
     "brotli": 28038
   },
   "hydrate-root": {
-    "raw": 138304,
-    "gzip": 44258,
+    "raw": 138328,
+    "gzip": 44267,
     "brotli": 38747
   },
   "deferred-hydration": {
-    "raw": 221600,
-    "gzip": 69794,
+    "raw": 221625,
+    "gzip": 69804,
     "brotli": 60183
   },
   "hydrate-frame": {
-    "raw": 364755,
-    "gzip": 113031,
-    "brotli": 96887
+    "raw": 364780,
+    "gzip": 113046,
+    "brotli": 96616
   },
   "suspense-transition": {
-    "raw": 140406,
-    "gzip": 44419,
+    "raw": 140429,
+    "gzip": 44432,
     "brotli": 39132
   },
   "server-hooks": {
@@ -90,8 +90,8 @@
     "brotli": 20110
   },
   "component-owned-effects": {
-    "raw": 77293,
-    "gzip": 25236,
+    "raw": 77317,
+    "gzip": 25248,
     "brotli": 22600
   },
   "binding-vanilla": {
@@ -100,18 +100,18 @@
     "brotli": 596
   },
   "binding-hooks": {
-    "raw": 83150,
-    "gzip": 27493,
+    "raw": 83174,
+    "gzip": 27504,
     "brotli": 24555
   },
   "binding-base-ui-vite": {
-    "raw": 198597,
-    "gzip": 62458,
+    "raw": 198621,
+    "gzip": 62464,
     "brotli": 54383
   },
   "binding-base-ui-esbuild": {
-    "raw": 214108,
-    "gzip": 69405,
+    "raw": 214133,
+    "gzip": 69414,
     "brotli": 60247
   },
   "binding-aria-vite": {
@@ -135,14 +135,14 @@
     "brotli": 21224
   },
   "binding-radix-vite": {
-    "raw": 200627,
-    "gzip": 63073,
+    "raw": 200651,
+    "gzip": 63076,
     "brotli": 54923
   },
   "binding-radix-esbuild": {
-    "raw": 215932,
-    "gzip": 69958,
-    "brotli": 60828
+    "raw": 215957,
+    "gzip": 69970,
+    "brotli": 60813
   },
   "binding-floating-ui-vite": {
     "raw": 10726,
@@ -155,33 +155,33 @@
     "brotli": 4377
   },
   "binding-mantine-hooks-vite": {
-    "raw": 86707,
-    "gzip": 28452,
+    "raw": 86731,
+    "gzip": 28464,
     "brotli": 25371
   },
   "binding-mantine-hooks-esbuild": {
-    "raw": 91076,
-    "gzip": 30589,
+    "raw": 91100,
+    "gzip": 30597,
     "brotli": 27258
   },
   "binding-apollo-client-vite": {
-    "raw": 341040,
-    "gzip": 104777,
-    "brotli": 91597
+    "raw": 341065,
+    "gzip": 104787,
+    "brotli": 91544
   },
   "binding-apollo-client-esbuild": {
-    "raw": 364247,
-    "gzip": 115751,
+    "raw": 364272,
+    "gzip": 115762,
     "brotli": 101084
   },
   "binding-usehooks-ts-vite": {
-    "raw": 87473,
-    "gzip": 28669,
+    "raw": 87497,
+    "gzip": 28693,
     "brotli": 25593
   },
   "binding-usehooks-ts-esbuild": {
-    "raw": 91842,
-    "gzip": 30831,
-    "brotli": 27475
+    "raw": 91866,
+    "gzip": 30839,
+    "brotli": 27762
   }
 }
