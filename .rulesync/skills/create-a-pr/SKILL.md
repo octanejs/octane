@@ -72,6 +72,13 @@ finding. Each `needs-evidence` finding needs its evidence in the PR, or an
 entry under Risk / follow-ups that says why it is missing. For a diff outside
 these paths, write `perf-review: not applicable`.
 
+## Concision gate
+
+Load the `concise-code` skill and run its simplification pass on the final diff
+before the first `gh pr ready`, for every PR with authored code. Put its report
+line in the PR body under Validation, including the smaller alternatives you
+rejected and why.
+
 ## PR body template
 
 ```md
@@ -90,6 +97,7 @@ these paths, write `perf-review: not applicable`.
 - [ ] `pnpm test`
 - [ ] targeted tests: ...
 - [ ] `perf-review`: <findings and evidence, or not applicable>
+- [ ] `concise-code`: <size, alternatives, bytes>
 
 ## Risk / follow-ups
 - ...
