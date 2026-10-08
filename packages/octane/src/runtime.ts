@@ -43733,7 +43733,7 @@ export function useActionState<S>(
 						// Publish the cue promptly without upgrading sibling transition
 						// state in this block, which must retain its Suspense hold policy.
 						ensureTransitionSwapDriver();
-						urgentActionCue = true;
+						if (!syncFlush && !inFlush) urgentActionCue = true;
 					}
 					scheduleRender(block);
 					if (next) scheduleFlush();
