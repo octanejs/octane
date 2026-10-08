@@ -140,13 +140,13 @@ export function ScopedPortalApp(props: { value: string; portal: Element; clicks:
 	</ViewTransition>
 }
 
-export function ScopedImageApp(props: { value: string; inside: boolean }) @{
+export function ScopedImageApp(props: { value: string; inside: boolean; onLoad?: () => void }) @{
 	<>
 		<ViewTransition scope="element">
 			<section data-scope="left">
 				<span>{props.value as string}</span>
 				@if (props.inside) {
-					<img src={props.value + '.png'} />
+					<img src={props.value + '.png'} onLoad={props.onLoad} />
 				}
 			</section>
 		</ViewTransition>
