@@ -8194,7 +8194,9 @@ function raiseTransitionHook(hook: TransitionHookSlot): void {
  * Settle the armed completions once the drain's renders have decided their
  * holds (drainQueue), returning whether that queued more renders. A hook whose
  * block rendered nothing in the drain publishes its falling edge here, and that
- * render joins the same commit (renderTransitionFall).
+ * render joins the same commit (renderTransitionFall). A root that suspended
+ * discards the drain's renders in it, including a falling edge already shown
+ * and any this would queue, so such a completion waits for the next task.
  */
 function settleTransitionFalls(): boolean {
 	const armed = ARMED_TRANSITION_FALLS;
@@ -8203,7 +8205,15 @@ function settleTransitionFalls(): boolean {
 	for (let i = 0; i < armed.length; i += 2) {
 		const batch = armed[i] as TransitionActionBatch;
 		const submit = armed[i + 1] as SubmitDispatchRec | null | undefined;
-		batch.falling = false;
+		if (batch.falling) {
+			if (discardsTransitionFall(batch)) {
+				cancelTransitionFall(batch);
+				TRANSITION_FALLS.push(batch, submit);
+				scheduleTransitionTask();
+				continue;
+			}
+			batch.falling = false;
+		}
 		if (submit !== undefined) {
 			tickTransitionCount(-1);
 			if (submit !== null) settleSubmitTransition(submit);
@@ -8219,6 +8229,15 @@ function settleTransitionFalls(): boolean {
 	TRANSITION_FALL_DRAIN = DRAIN_ID;
 	TRANSITION_FALL_FROM = from;
 	return QUEUE.length !== from;
+}
+
+/** Whether a suspended root discarded this drain's renders of a hook of the batch. */
+function discardsTransitionFall(batch: TransitionActionBatch): boolean {
+	return (
+		batch.hook!.block.idState.renderOwner?.transaction?.aborted === true ||
+		batch.hooks?.some((hook) => hook.block.idState.renderOwner?.transaction?.aborted === true) ===
+			true
+	);
 }
 
 /**

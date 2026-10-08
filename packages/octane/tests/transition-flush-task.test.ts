@@ -15,6 +15,7 @@ import {
 	PendingShell,
 	PendingTabs,
 	PendingTabsHeldPanel,
+	PendingTabsRootReader,
 	PendingTabsPanel,
 	PendingTransitionInput,
 	StateProbe,
@@ -612,6 +613,29 @@ describe('a pending cue in the component that holds the transition update', () =
 		await untilTasks(() => button.textContent === 'b idle');
 		expect(container.querySelector('p')!.textContent).toBe('two');
 		expect(log.at(-1)).toBe('b idle');
+	});
+
+	it("drops isPending when another transition's suspended root discards its render", async () => {
+		let setPromise!: (promise: Promise<string>) => void;
+		const next = new Promise<string>(() => {});
+		const initial = Object.assign(Promise.resolve('one'), { status: 'fulfilled', value: 'one' });
+		const { container } = mountWith(PendingTabsRootReader, {
+			initial,
+			exposeReader: (set: (promise: Promise<string>) => void) => (setPromise = set),
+			onCommit: () => {},
+			onPress: (controls: TabsControls) => {
+				controls.start(() => controls.setTab('b'));
+				startTransition(() => setPromise(next));
+			},
+		});
+		const button = container.querySelector('button') as HTMLButtonElement;
+
+		button.click();
+		await untilTasks(() => button.textContent === 'b idle');
+
+		// The suspended transition holds the root, and the other one still completes.
+		expect(button.textContent).toBe('b idle');
+		expect(container.querySelector('p')!.textContent).toBe('one');
 	});
 
 	it('shows an optimistic value with the previous state, then the transition and its revert in a task', async () => {

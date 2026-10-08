@@ -238,7 +238,7 @@ again. Creation events per 64 cycles against `385d6aba9`, with the `cycle`,
 `held` keeps five renders: its suspended attempt now shows the falling edge, so the
 journal snapshots one more binding bag before the hold restores it (+1 object), and
 promotion still renders before the falling edge that the boundary's release
-publishes. The bundle grows from 255,404 to 256,841 minified bytes (81,562 to
-82,090 gzip): the completion queue, its hold cancellation, and the effect ordering
+publishes. The bundle grows from 255,404 to 257,059 minified bytes (81,562 to
+82,166 gzip): the completion queue, its hold cancellation, and the effect ordering
 that commits a falling edge rendered after its drain's holds as the transition's
 first update.
