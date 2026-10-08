@@ -29,9 +29,9 @@ every application creation event belongs to the compiled template.
 
 | Scenario | Cycle | Control |
 | --- | --- | --- |
-| `cycle` | `start(() => setValue(next))` | two renders: pending cue with the new value, then the falling edge; text `next:idle` |
+| `cycle` | `start(() => setValue(next))` | three renders: the pending cue with the committed value, the new value in the transition's task, then the falling edge; text `next:idle` |
 | `updater` | `start(() => setValue((v) => v + 1))` | identical render sequence to `cycle` through the queued-updater path |
-| `held` | transition to a value whose `use()` request is pending, then resolve it | hold: pending cue, then the cue re-render with the committed value, no fallback, previous text retained; release: promotion, then the falling edge with the new text |
+| `held` | transition to a value whose `use()` request is pending, then resolve it | hold: the pending cue with the committed value, the transition suspending in its task, then the cue re-render with the committed value, no fallback, previous text retained; release: promotion, then the falling edge with the new text |
 | `dispatch` | `setValue((v) => v + 1)` outside any transition | exactly one render |
 | `bail` | `setValue(same)` on an idle cell | no render at all |
 | `click` | a native `button.click()` whose delegated handler dispatches a functional update | exactly one render through the discrete-event flush |
@@ -180,3 +180,32 @@ fix, every counter matches the work model again. `held` and `urgent` each
 create 64 fewer functions as well, because they run the same transition path.
 The root-render transaction cost that #833 added to `hook-memo` is not involved
 here, since every cycle in this suite is a hook update.
+
+## Pending cue apart from its transition (#1864)
+
+In `cycle`, `updater`, and `held`, one component raises `isPending` and holds the
+state its transition sets. That component used to render the cue and the new value
+together in the click's microtask flush. It now renders the cue with the committed
+value, as React renders `isPending` urgently, and the transition's own render waits
+for its posted task. `urgent` already rendered its child's cue apart from the
+transition; that transition now also waits for the task. Creation events per 64
+cycles against `823e100dd`, with every semantic control updated to the new order:
+
+| Scenario | Counter | `823e100dd` | Split cue |
+| --- | --- | ---: | ---: |
+| `cycle` | renders | 128 | 192 |
+| `cycle` | functions / arrays / objects / constructors | 128 / 1,728 / 707 / 192 | 256 / 2,624 / 1,155 / 320 |
+| `updater` | renders | 128 | 192 |
+| `updater` | functions / arrays / objects / constructors | 64 / 1,728 / 704 / 192 | 192 / 2,624 / 1,152 / 320 |
+| `held` | renders | 256 | 320 |
+| `held` | functions / arrays / objects / constructors | 640 / 4,480 / 1,344 / 834 | 768 / 5,376 / 1,664 / 962 |
+| `urgent` | functions / arrays / objects / constructors | 192 / 1,984 / 1,088 / 256 | 256 / 2,688 / 1,280 / 320 |
+
+The extra render is the cue's own. A render of this component costs 11 arrays,
+4 objects, and 1 constructor (`dispatch`). The rest is the transition's posted task
+and its separate flush: the task closure and its `MessageChannel`, and the follow-up
+list for the falling edge. The cue's committed-cell exposure no longer allocates a
+slot index or a predicate closure. React renders this pattern twice, folding the
+falling edge into the transition render. Octane still publishes it after the
+transition's render, as it does when the cue and the transition live in different
+components.

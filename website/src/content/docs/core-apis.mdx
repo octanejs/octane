@@ -1176,9 +1176,10 @@ export function ProjectTabs() @{
 }
 ```
 
-The live example keeps the current report on screen while another one loads. The
-`isPending` flag gives you a place to explain what is happening instead of flashing a
-full-page loading state.
+The click commits `Opening…` with the current tab first, so the browser can paint it, and
+`TabPanel` renders the new tab in a later task. The live example keeps the current report
+on screen while another one loads. The `isPending` flag gives you a place to explain what
+is happening instead of flashing a full-page loading state.
 
 <TransitionDemo />
 

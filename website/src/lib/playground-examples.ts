@@ -1010,8 +1010,9 @@ const TRANSITIONS_TSRX = `import { memo, useState, useDeferredValue, useTransiti
 
 // useDeferredValue lets the slow list lag one step behind the input: each
 // keystroke commits and paints first, and the list catches up with the latest
-// query in a later task. useTransition keeps the UI responsive while a heavy
-// update commits.
+// query in a later task. useTransition does the same for Sort: the click commits
+// "Sorting…" with the current list, and the sorted list renders in a later task.
+// Neither makes the slow render itself interruptible.
 const WORDS = ['ember', 'orchid', 'quartz', 'saffron', 'thistle', 'umbra', 'verdant', 'willow'];
 const ITEMS = Array.from({ length: 1500 }, (_, i) => WORDS[i % WORDS.length] + '-' + i);
 

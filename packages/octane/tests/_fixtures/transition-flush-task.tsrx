@@ -1,7 +1,9 @@
 import {
+	addTransitionType,
 	startTransition,
 	use,
 	useActionState,
+	useDeferredValue,
 	useLayoutEffect,
 	useOptimistic,
 	useState,
@@ -161,5 +163,176 @@ export function ViewTransitionPair(props: ViewTransitionPairProps) @{
 		<ViewTransition>
 			<StateProbe expose={props.exposeB} onCommit={() => {}} />
 		</ViewTransition>
+	</>
+}
+
+export interface TabsControls {
+	start: (fn: () => void | Promise<unknown>) => void;
+	setTab: (tab: string | ((tab: string) => string)) => void;
+	setCount: (count: number) => void;
+}
+
+interface PendingTabsProps {
+	onCommit: (entry: string) => void;
+	expose?: (controls: TabsControls) => void;
+	onPress?: (controls: TabsControls) => void;
+}
+
+// The pending cue and the transition's own update live in the same component,
+// the canonical useTransition pattern.
+export function PendingTabs(props: PendingTabsProps) @{
+	const [isPending, start] = useTransition();
+	const [tab, setTab] = useState('a');
+	const [count, setCount] = useState(0);
+	const controls = { start, setTab, setCount };
+	props.expose?.(controls);
+	const label = `${tab}${count === 0 ? '' : String(count)} ${isPending ? 'pending' : 'idle'}`;
+	useLayoutEffect(() => {
+		props.onCommit(label);
+	}, null);
+	<button
+		onClick={() => {
+			if (props.onPress) props.onPress(controls);
+			else start(() => setTab('b'));
+		}}
+	>
+		{label}
+	</button>
+}
+
+interface PendingTabsPanelProps extends PendingTabsProps {
+	exposePanel: (setValue: (value: number) => void) => void;
+}
+
+// The same component, beside a sibling that also takes part in its transitions.
+export function PendingTabsPanel(props: PendingTabsPanelProps) @{
+	<>
+		<PendingTabs expose={props.expose} onCommit={props.onCommit} onPress={props.onPress} />
+		<Panel expose={props.exposePanel} onCommit={props.onCommit} />
+	</>
+}
+
+interface HeldPendingTabsProps extends HeldPanelProps {
+	onCommit: (entry: string) => void;
+	next: Promise<string>;
+}
+
+// The cue and the suspending transition state share one component.
+export function HeldPendingTabs(props: HeldPendingTabsProps) @{
+	const [isPending, start] = useTransition();
+	const [promise, setPromise] = useState(props.initial);
+	props.expose(setPromise);
+	useLayoutEffect(() => {
+		props.onCommit(isPending ? 'pending' : 'idle');
+	}, null);
+	<>
+		<button onClick={() => start(() => setPromise(props.next))}>
+			{isPending ? 'pending' : 'idle'}
+		</button>
+		@try {
+			<Reader promise={promise} />
+		} @pending {
+			<p>{'loading'}</p>
+		}
+	</>
+}
+
+interface OptimisticTabsProps {
+	onCommit: (entry: string) => void;
+}
+
+// An optimistic cue and the transition's own update in one component.
+export function OptimisticTabs(props: OptimisticTabsProps) @{
+	const [value, setValue] = useState(0);
+	const [optimistic, addOptimistic] = useOptimistic(value);
+	useLayoutEffect(() => {
+		props.onCommit(`${value}/${optimistic}`);
+	}, null);
+	<button
+		onClick={() =>
+			startTransition(() => {
+				addOptimistic(1);
+				setValue(1);
+			})
+		}
+	>
+		{`${value}/${optimistic}`}
+	</button>
+}
+
+interface ViewTransitionTabsProps {
+	onUpdate: (types: string[]) => void;
+}
+
+// The cue sits outside the ViewTransition; the transition's own update inside it.
+export function ViewTransitionTabs(props: ViewTransitionTabsProps) @{
+	const [isPending, start] = useTransition();
+	const [tab, setTab] = useState('a');
+	<>
+		<button
+			onClick={() =>
+				start(() => {
+					addTransitionType('tabs');
+					setTab('bbbb');
+				})
+			}
+		>
+			{isPending ? 'pending' : 'idle'}
+		</button>
+		<ViewTransition onUpdate={(_instance: unknown, types: string[]) => props.onUpdate(types)}>
+			<p>{tab as string}</p>
+		</ViewTransition>
+	</>
+}
+
+// A controlled input whose component also shows isPending for the transition.
+export function PendingTransitionInput() @{
+	const [isPending, start] = useTransition();
+	const [text, setText] = useState('');
+	const [query, setQuery] = useState('');
+	<>
+		<input
+			value={text}
+			onInput={(event: Event) => {
+				const next = (event.currentTarget as HTMLInputElement).value;
+				setText(next);
+				start(() => setQuery(next));
+			}}
+		/>
+		<p>{`${query} ${isPending ? 'pending' : 'idle'}`}</p>
+	</>
+}
+
+export interface DeferredTabsControls {
+	start: (fn: () => void | Promise<unknown>) => void;
+	setQuery: (query: string) => void;
+	setTab: (tab: string) => void;
+}
+
+interface DeferredPendingTabsProps {
+	onCommit: (entry: string) => void;
+	expose: (controls: DeferredTabsControls) => void;
+	exposePanel: (setValue: (value: number) => void) => void;
+}
+
+function DeferredTabs(props: Omit<DeferredPendingTabsProps, 'exposePanel'>) @{
+	const [isPending, start] = useTransition();
+	const [query, setQuery] = useState('a');
+	const deferred = useDeferredValue(query);
+	const [tab, setTab] = useState('x');
+	props.expose({ start, setQuery, setTab });
+	const label = `${query}/${deferred}/${tab} ${isPending ? 'pending' : 'idle'}`;
+	useLayoutEffect(() => {
+		props.onCommit(label);
+	}, null);
+	<output>{label}</output>
+}
+
+// useDeferredValue and a pending cue in one component, beside a sibling whose
+// transition can keep waiting for its task.
+export function DeferredPendingTabs(props: DeferredPendingTabsProps) @{
+	<>
+		<DeferredTabs expose={props.expose} onCommit={props.onCommit} />
+		<Panel expose={props.exposePanel} onCommit={() => {}} />
 	</>
 }
