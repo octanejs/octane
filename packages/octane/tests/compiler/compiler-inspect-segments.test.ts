@@ -291,7 +291,7 @@ describe.each([
 		it('claims the event attribute NAME for the slot key it lowers to', () => {
 			// Every other token of the binding maps to the handler expression, so
 			// without this `onClick` is unreachable from the output.
-			const claims = claimsFor("'$$click'");
+			const claims = claimsFor("'$oclick'");
 			// The mount and update writes both name the same authored attribute.
 			expect(claims.length).toBeGreaterThan(0);
 			for (const claim of claims) expect(claim).toBe('onClick');
@@ -299,7 +299,7 @@ describe.each([
 	} else {
 		it('binds no events, so it claims no event attribute', () => {
 			const { code } = inspect();
-			expect(code).not.toContain('$$click');
+			expect(code).not.toContain('$oclick');
 		});
 	}
 });

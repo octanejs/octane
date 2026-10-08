@@ -727,7 +727,7 @@ describe('Counter example — per-node mapping coverage', () => {
 		['the loop variable', '{item}', 1, ['item']],
 		// An event attribute name emits nothing of its own — the compiler claims
 		// it for the slot key the binding lowers to.
-		['an event attribute name', 'onClick', 1, ["'$$click'"]],
+		['an event attribute name', 'onClick', 1, ["'$oclick'"]],
 		// A directive resolves to its helper call AND every function it hoisted.
 		// A directive resolves to the helper call AND to every function it
 		// hoisted — both the declaration and the reference, so a click can land

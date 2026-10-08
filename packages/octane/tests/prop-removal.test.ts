@@ -36,9 +36,9 @@ describe('setSpread — removal parity with the SET path', () => {
 		const el = document.createElement('button');
 		const fn = () => {};
 		setSpread(el, { onClick: fn }, undefined);
-		expect((el as any).$$click).toBe(fn);
+		expect((el as any).$oclick).toBe(fn);
 		setSpread(el, {}, { onClick: fn });
-		expect((el as any).$$click).toBe(null);
+		expect((el as any).$oclick).toBe(null);
 	});
 });
 

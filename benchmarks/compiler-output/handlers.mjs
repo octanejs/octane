@@ -111,9 +111,9 @@ try {
 			const update = (value) => flushSync(() => root.render(App, { log, value, type: 'click' }));
 			update(0);
 			const button = container.querySelector('button');
-			let slot = button.$$click;
+			let slot = button.$oclick;
 			let writes = 0;
-			Object.defineProperty(button, '$$click', {
+			Object.defineProperty(button, '$oclick', {
 				configurable: true,
 				get: () => slot,
 				set: (next) => {
@@ -122,7 +122,7 @@ try {
 				},
 			});
 			for (let i = 1; i <= 128; i++) update(i);
-			Object.defineProperty(button, '$$click', { value: slot, configurable: true, writable: true });
+			Object.defineProperty(button, '$oclick', { value: slot, configurable: true, writable: true });
 			const fire = () => {
 				const event = new MouseEvent('click', { bubbles: true, cancelable: true });
 				button.dispatchEvent(event);
