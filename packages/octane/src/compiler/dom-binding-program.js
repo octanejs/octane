@@ -607,7 +607,12 @@ export function planBindingProgram(fn, render, context) {
 					childPrograms.add(local);
 					dependencies.push(origin(b.imports([['default', local]], request), node));
 				}
-				if (child) {
+				if (child?.cycle) {
+					// This view and the child recurse into each other. They complete as
+					// one unit, which shares capabilities, imports and hoists among its
+					// members and declares the child's descriptor ahead of its root.
+					local = child.cycle;
+				} else if (child) {
 					// Child capability is checked for the entered view instance when the
 					// lease is acquired and published, including a changed active branch.
 					signals ||= child.signals;
@@ -623,26 +628,31 @@ export function planBindingProgram(fn, render, context) {
 					for (const dependency of child.dependencies)
 						if (!dependencies.includes(dependency)) dependencies.push(dependency);
 					for (const hoist of child.hoists) if (!hoists.includes(hoist)) hoists.push(hoist);
-					// A cached plan identifies one declaration and ordered prop specialization.
-					// Share only its immutable descriptor; each entered region owns its state.
-					const childHoists = (lexical.domBindingChildHoists ??= new WeakMap());
-					let hoist = childHoists.get(child);
-					if (hoist === undefined) {
-						hoist = origin(
-							b.const(
-								b.id(allocateProgramName('_bindingChild')),
-								object({
-									id: b.literal(child.id),
-									root: child.root,
-									...(child.prepareProps ? { prepareProps: child.prepareProps } : {}),
-								}),
-							),
-							child.fn,
-						);
-						childHoists.set(child, hoist);
+					if (child.descriptor !== null) {
+						// A completed recursive unit already declares its members' descriptors.
+						local = child.descriptor;
+					} else {
+						// A cached plan identifies one declaration and ordered prop specialization.
+						// Share only its immutable descriptor; each entered region owns its state.
+						const childHoists = (lexical.domBindingChildHoists ??= new WeakMap());
+						let hoist = childHoists.get(child);
+						if (hoist === undefined) {
+							hoist = origin(
+								b.const(
+									b.id(allocateProgramName('_bindingChild')),
+									object({
+										id: b.literal(child.id),
+										root: child.root,
+										...(child.prepareProps ? { prepareProps: child.prepareProps } : {}),
+									}),
+								),
+								child.fn,
+							);
+							childHoists.set(child, hoist);
+						}
+						if (!hoists.includes(hoist)) hoists.push(hoist);
+						local = hoist.declarations[0].id.name;
 					}
-					if (!hoists.includes(hoist)) hoists.push(hoist);
-					local = hoist.declarations[0].id.name;
 					expressions.push(...child.expressions);
 				} else signals = true;
 				if ((node.children ?? []).some(significant)) {
@@ -1126,5 +1136,7 @@ export function planBindingProgram(fn, render, context) {
 		projectionsEnabled,
 		structural: structural && !controls,
 		childPrograms,
+		// The forward-declared descriptor of a view that recurses through local children.
+		descriptor: null,
 	};
 }
