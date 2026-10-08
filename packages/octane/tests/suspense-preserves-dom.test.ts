@@ -949,6 +949,22 @@ export function CatchApp(props) @{
     <Gate gate={props.gate} />
   </main>
 }
+function Advance(props) @{ props.advance(); <em>{'advance'}</em> }
+export function RevealAgainApp(props) @{
+  const [step, setStep] = useState(0);
+  <main>
+    <b>{props.selection as string}</b>
+    @try {
+      <>
+        <span>{props.selection as string}</span>
+        @if (props.wait) { <Hold wait={props.wait} /> }
+        @if (step === 1 && props.again) { <Hold wait={props.again} /> }
+      </>
+    } @pending { <p>{'pending'}</p> }
+    @if (props.again) { <Advance advance={() => setStep(1)} /> }
+    <Gate gate={step === 1 ? props.gate : null} />
+  </main>
+}
 export function StatefulApp(props) @{
   const [view, setView] = useState(() => props.initial);
   props.controls.setView = setView;
@@ -983,13 +999,14 @@ export function LinkedApp(props) @{
 `;
 
 describe.each([false, true])('Boundaries after a rolled-back root render (dev=%s)', (dev) => {
-	const { App, JsxApp, CatchApp, StatefulApp, LinkedApp } = loadCompiledFixtureSource<
-		Record<'App' | 'JsxApp' | 'CatchApp' | 'StatefulApp' | 'LinkedApp', any>
-	>(ROLLED_BACK_REVEAL, {
-		id: `/src/rolled-back-reveal-${dev ? 'dev' : 'prod'}.tsrx`,
-		mode: 'client',
-		compileOptions: { strong: true, dev, hmr: false },
-	});
+	const { App, JsxApp, CatchApp, StatefulApp, LinkedApp, RevealAgainApp } =
+		loadCompiledFixtureSource<
+			Record<'App' | 'JsxApp' | 'CatchApp' | 'StatefulApp' | 'LinkedApp' | 'RevealAgainApp', any>
+		>(ROLLED_BACK_REVEAL, {
+			id: `/src/rolled-back-reveal-${dev ? 'dev' : 'prod'}.tsrx`,
+			mode: 'client',
+			compileOptions: { strong: true, dev, hmr: false },
+		});
 
 	const never = () => new Promise<never>(() => {});
 
@@ -1139,6 +1156,32 @@ describe.each([false, true])('Boundaries after a rolled-back root render (dev=%s
 			expect(root.findAll('span')).toHaveLength(1);
 		} finally {
 			root.unmount();
+		}
+	});
+
+	it('restores a hidden primary that one rolled-back render revealed and suspended again', () => {
+		// Advance updates RevealAgainApp while rendering, which development builds report.
+		const error = vi.spyOn(console, 'error').mockImplementation(() => {});
+		const root = mount(RevealAgainApp, { selection: 'A' });
+		try {
+			root.update(RevealAgainApp, { selection: 'B', wait: never() });
+			expect(screen(root)).toEqual(pendingB);
+			const primary = root.find('span');
+			const held = root.container.innerHTML;
+
+			// The first pass reveals the boundary. Advance then renders the app
+			// again in the same attempt: the boundary suspends again and the gate
+			// suspends the root, so the whole attempt rolls back.
+			root.update(RevealAgainApp, { selection: 'C', again: never(), gate: never() });
+			expect(root.container.innerHTML).toBe(held);
+			expect(root.find('span')).toBe(primary);
+
+			root.update(RevealAgainApp, { selection: 'D' });
+			expect(screen(root)).toEqual({ selection: 'D', primary: ['D'], fallback: [] });
+			expect(root.find('span')).toBe(primary);
+		} finally {
+			root.unmount();
+			error.mockRestore();
 		}
 	});
 
