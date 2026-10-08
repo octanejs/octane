@@ -54,6 +54,9 @@ export function validateCatalog(catalog) {
 		if (entry.status !== 'active' && entry.status !== 'retired') {
 			fail(`code ${code} status must be "active" or "retired".`);
 		}
+		if (entry.note !== undefined && (typeof entry.note !== 'string' || entry.note.length === 0)) {
+			fail(`code ${code} note must be a non-empty string when present.`);
+		}
 		if (
 			!Array.isArray(entry.runtime) ||
 			entry.runtime.length === 0 ||

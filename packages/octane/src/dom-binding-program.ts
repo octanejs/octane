@@ -410,7 +410,8 @@ interface RegionInstance {
 	arm: number;
 	child: FragmentInstance | null;
 	items: Map<string, FragmentInstance> | null;
-	text: Text | null;
+	/** `undefined` while adopted translated text awaits its first written value. */
+	text: Text | null | undefined;
 	signal?: BindingSignalConnection;
 	signalPlan?: RegionPlan;
 	signalFrame?: number;
@@ -632,7 +633,7 @@ export function __createStructuralBindingHandoff(
 				if (
 					region.definition.kind === 'text' &&
 					(node.nextSibling !== (region.text ?? region.range.end) ||
-						(region.text !== null && region.text.nextSibling !== region.range.end))
+						(region.text != null && region.text.nextSibling !== region.range.end))
 				)
 					return false;
 				next = region.range.end.nextSibling;
@@ -865,7 +866,12 @@ function resolveFragment(
 				mismatch();
 			if (proof[4] !== null) cursors.set(index, node.firstChild);
 		} else if (proof[1] === 'text') {
-			if (node.nodeType !== 3 || node.nodeValue !== proof[2]) mismatch();
+			// Chrome Translate wraps translated text in <font> elements. The marker id
+			// already hashes this template text, so only the slot is checked then.
+			if (
+				node.nodeType === 3 ? node.nodeValue !== proof[2] : (node as Element).localName !== 'font'
+			)
+				mismatch();
 		} else {
 			const childRange = rangeAt(node, parent === -1 ? range.end : null);
 			const marker = parseBindingMarker(childRange.start.data);
@@ -941,10 +947,17 @@ function adoptRegion(region: RegionInstance, id: string, transaction: Transactio
 			transaction,
 		);
 	} else if (definition.kind === 'text') {
+		const end = range.end;
 		const text = range.start.nextSibling;
-		if (text !== range.end) {
-			if (text?.nodeType !== 3 || text.nextSibling !== range.end) mismatch();
-			region.text = text as Text;
+		if (text !== end) {
+			if (text?.nextSibling !== end) mismatch();
+			// Chrome Translate's <font> wrappers stay until the value changes.
+			region.text =
+				text.nodeType === 3
+					? (text as Text)
+					: (text as Element).localName === 'font'
+						? undefined
+						: mismatch();
 		}
 	} else if (definition.kind === 'try') {
 		transaction.tryRegions!.adopt(region, definition, id, transaction);
@@ -1544,12 +1557,24 @@ function commitRegion(plan: RegionPlan, id: string, transaction: Transaction): v
 }
 
 function writeText(region: RegionInstance, value: string): void {
-	if (region.text === null) {
-		if (value !== '') {
-			region.text = region.range.start.ownerDocument.createTextNode(value);
-			region.range.end.parentNode!.insertBefore(region.text, region.range.end);
+	const text = region.text;
+	if (text == null) {
+		// Adopted translated text stays; the detached node only records its value.
+		if (text === undefined || value !== '') {
+			const end = region.range.end;
+			const node = (region.text = end.ownerDocument.createTextNode(value));
+			if (text === null) end.parentNode!.insertBefore(node, end);
 		}
-	} else if (region.text.data !== value) region.text.data = value;
+	} else if (text.data !== value) {
+		text.data = value;
+		const range = region.range;
+		const end = range.end;
+		// Translation displaced the node, so its range is replaced only now that the value changed.
+		if (text.nextSibling !== end) {
+			removeRange(range, true);
+			end.parentNode!.insertBefore(text, end);
+		}
+	}
 }
 
 function writeOperation(
@@ -1559,7 +1584,9 @@ function writeOperation(
 	group: { commit(): void } | undefined,
 	transaction: Transaction,
 ): void {
-	if (transaction.disposed || instance.disposed || value === instance.previous[index]) return;
+	if (transaction.disposed || instance.disposed) return;
+	const previous = instance.previous[index];
+	if (value === previous) return;
 	const operation = instance.definition.bindings[index]!;
 	if (operation[1] === 'classToken') instance.previous[index] = value;
 	if (operation[1] === 'styleObject') {
@@ -1582,7 +1609,13 @@ function writeOperation(
 				)),
 			);
 		style.write(value as string | null);
-	} else __writeBinding(instance.nodes[operation[0]] as Element, operation, value as string | null);
+	} else
+		__writeBinding(
+			instance.nodes[operation[0]] as Element,
+			operation,
+			value as string | null,
+			previous,
+		);
 	if (!transaction.disposed && !instance.disposed) instance.previous[index] = value;
 }
 
