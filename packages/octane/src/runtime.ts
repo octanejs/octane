@@ -5901,7 +5901,7 @@ interface ViewTransitionDriver {
 	addType(type: string): void;
 	routeFlush(): boolean;
 	markActionCue(): void;
-	clearCue(): void;
+	endCue(): void;
 	shouldClearTypesAfterFlush(): boolean;
 	clearTypes(): void;
 	interrupt(): void;
@@ -7054,9 +7054,9 @@ function ensureViewTransitionDriver(): ViewTransitionDriver {
 			return true;
 		},
 		markActionCue() {
-			VT_ACTION_CUE = true;
+			if (!syncFlush && !inFlush) VT_ACTION_CUE = true;
 		},
-		clearCue() {
+		endCue() {
 			VT_ACTION_CUE = false;
 		},
 		shouldClearTypesAfterFlush() {
@@ -9425,7 +9425,7 @@ export function flushSync<T>(fn: () => T): T {
 			}
 		} finally {
 			inFlush = false;
-			VIEW_TRANSITION_DRIVER?.clearCue();
+			VIEW_TRANSITION_DRIVER?.endCue();
 			FLUSHED_TRANSITION_UPDATES.length = 0;
 			CURRENT_EFFECT_PHASE = effectPhase;
 			if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__)
@@ -43804,7 +43804,7 @@ export function useActionState<S>(
 					if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__)
 						__profileSchedule(block, 'action-state-pending', slot);
 					// The rising edge is a pending cue; the falling edge commits with the result.
-					if (next && !syncFlush && !inFlush) VIEW_TRANSITION_DRIVER?.markActionCue();
+					if (next) VIEW_TRANSITION_DRIVER?.markActionCue();
 					scheduleRender(block, false, next);
 				}
 			}
