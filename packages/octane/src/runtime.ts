@@ -12829,7 +12829,7 @@ function disposeReturnSlot(block: Block, state: any): void {
 					: (STAGED_DOM?.view(parent) ?? parent).lastChild,
 			borrowed ? end : ((STAGED_DOM?.view(last) ?? last)?.nextSibling ?? null),
 		);
-		const retiredBlock = state.block ?? state.portal?.block;
+		const retiredBlock = state.block ?? state.portal?.block ?? state.lite?.block;
 		if (retiredBlock != null) retireRootBlock(retiredBlock);
 		if (state.forSlot != null) {
 			for (let item = state.forSlot.head; item !== null; item = item.nextSibling) {
@@ -45259,7 +45259,7 @@ function delimitMarkerlessBranch(
 
 /** The nearest real Block that owns a Scope's output; lite stand-ins are not Blocks. */
 function owningBlock(block: Block): Block {
-	while (block.block !== block) block = block.parentBlock!;
+	while (block instanceof LiteBlockImpl) block = block.parentBlock;
 	return block;
 }
 
@@ -45552,7 +45552,7 @@ function renderBranchSlot(
 			state.block = null;
 			state.unfinalized = false;
 			unmountBlock(pending, false);
-			if (parentBlock.disposed) return;
+			if (owningBlock(parentBlock).disposed) return;
 			while (node !== null && node !== provisionalAfter) {
 				const nextNode = getNextSibling(node);
 				if ((STAGED_DOM?.view(node) ?? node).parentNode === domParent)
@@ -45564,7 +45564,7 @@ function renderBranchSlot(
 			provisionalAfter = state.lite.block.endMarker;
 			state.unfinalized = false;
 			unmountLiteArm(state, false);
-			if (parentBlock.disposed) return;
+			if (owningBlock(parentBlock).disposed) return;
 		}
 		// A markerless branch may share its host boundary with a nested sole-root
 		// branch. The nested branch updates Block markers when it replaces that
@@ -45790,7 +45790,12 @@ function renderBranchSlot(
 							STAGED_DOM?.view(oldEnd as ChildNode | null) ?? (oldEnd as ChildNode | null)
 						)?.remove();
 					}
-					if (parentBlock.disposed || state.block !== r.wip.block || r.wip.block.disposed) return;
+					if (
+						owningBlock(parentBlock).disposed ||
+						state.block !== r.wip.block ||
+						r.wip.block.disposed
+					)
+						return;
 					return;
 				}
 			}
@@ -45805,11 +45810,11 @@ function renderBranchSlot(
 		const oldBoundaryShared = sharesBlockBoundary(parentBlock, oldBlockStart, oldBlockEnd);
 		if (state.block) {
 			unmountBlock(state.block);
-			if (parentBlock.disposed) return;
+			if (owningBlock(parentBlock).disposed) return;
 			state.block = null;
 		} else if (state.lite !== null) {
 			unmountLiteArm(state, true);
-			if (parentBlock.disposed) return;
+			if (owningBlock(parentBlock).disposed) return;
 		}
 		state.branch = next;
 		if (state.start === null && body !== null && oldBoundaryShared) {
