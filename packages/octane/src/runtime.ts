@@ -32842,11 +32842,11 @@ function teardownPortalState(state: PortalSlot): void {
  * owner's teardown. A released portal no longer owns a target.
  */
 function releasePortalTarget(state: PortalSlot): void {
-	const target = state.target;
-	if (target === null) return;
-	state.target = null;
-	unregisterPortalEventRange(target, state);
-	unregisterDelegationTarget(target);
+	if (state.target) {
+		unregisterPortalEventRange(state.target, state);
+		unregisterDelegationTarget(state.target);
+		state.target = null;
+	}
 }
 
 // A portal body may be a ComponentBody (the octane contract + the compiler fast
