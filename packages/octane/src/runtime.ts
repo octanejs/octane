@@ -45818,6 +45818,8 @@ function renderBranchSlot(
 		if (state.unfinalized) renderMarkerlessArm(state, domParent, state.block, marker);
 		else renderBlock(state.block);
 	} else if (state.lite !== null) {
+		if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__)
+			__profileArm(false);
 		// Same lite arm. Its body and env arrive with every owner render.
 		if (state.unfinalized) renderMarkerlessArm(state, domParent, state.lite, marker, body!, env);
 		else renderLiteArm(state.lite, body!, env);

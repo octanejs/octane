@@ -499,7 +499,13 @@ describe('profile build engine counters', () => {
 		expect(mounted.container.textContent).toContain('second arm');
 		expect(swapped).toMatchObject({ 'arm.keep': 0, 'arm.swap': 1, 'commit.root': 1 });
 		expect(swapped['block.create']).toBeGreaterThan(0);
-		expect(swapped['block.unmount']).toBeGreaterThan(0);
+
+		// The first arm is hookless and was mounted with the root, so it was not a
+		// Block. The arm the swap mounted is one, and swapping back tears it down.
+		const restored = await measure(() => act(() => mounted.click('#toggle')));
+		expect(mounted.container.textContent).toContain('first arm');
+		expect(restored).toMatchObject({ 'arm.keep': 0, 'arm.swap': 1, 'commit.root': 1 });
+		expect(restored['block.unmount']).toBeGreaterThan(0);
 
 		mounted.unmount();
 	});
