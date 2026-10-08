@@ -8,6 +8,7 @@ import {
 	type TextTypeProjectOptions,
 } from 'octane/compiler/typescript';
 import { compileToVolarMappings, compileTypesInspection } from 'octane/compiler/volar';
+import type ts from 'typescript';
 
 export const options = {
 	tsconfig: './tsconfig.json',
@@ -37,6 +38,10 @@ export const nativeOptions = {
 	tsconfig: './tsconfig.json',
 	typescript: 'typescript-native',
 } satisfies TextTypeProjectOptions;
+// A classic Program and its SourceFile, without naming TypeScript in the declaration.
+declare const classicProgram: ts.Program;
+declare const classicSourceFile: ts.SourceFile;
+export const classicDiagnostics = validateNativeSignalNames(classicProgram, classicSourceFile);
 declare const nativeProgram: NativeTypeScriptProgram;
 export const nativeDiagnostics = validateNativeSignalNames(nativeProgram, 'src/App.tsx', {
 	typescript: 'typescript-native',
@@ -52,6 +57,8 @@ createTextTypeProject({});
 createTextTypeProject({ tsconfig: './tsconfig.json', watch: true });
 // @ts-expect-error — `typescript` names a package or directory, not a loaded module.
 createTextTypeProject({ tsconfig: './tsconfig.json', typescript: {} });
+// @ts-expect-error — validation needs a Program, not an arbitrary object.
+validateNativeSignalNames({ getSourceFile: () => undefined }, 'src/App.tsx');
 // @ts-expect-error — authored source is text, not a TypeScript AST.
 project.snapshot('src/App.tsrx', {});
 // @ts-expect-error — snapshots expose immutable authored ranges.

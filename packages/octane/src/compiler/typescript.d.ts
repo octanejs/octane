@@ -66,6 +66,16 @@ export interface TextTypeProject {
 export function createTextTypeProject(options: TextTypeProjectOptions): TextTypeProject;
 
 /**
+ * The parts of a classic (TypeScript 5.9 or 6) `Program` this entry relies on,
+ * declared structurally: a consumer whose `typescript` is TypeScript 7 resolves
+ * `import('typescript')` to a root that exports only its version.
+ */
+export interface ClassicTypeScriptProgram {
+	getTypeChecker(): unknown;
+	getSourceFile(fileName: string): { readonly fileName: string } | undefined;
+}
+
+/**
  * The parts of a TypeScript 7 `Program` (from `typescript/unstable/sync`) this
  * entry relies on, declared structurally so the declaration does not require
  * TypeScript 7's types.
@@ -94,7 +104,7 @@ export interface NativeSignalValidationOptions {
  * sampled values are not native capabilities.
  */
 export function validateNativeSignalNames(
-	program: import('typescript').Program | NativeTypeScriptProgram,
-	file: string | import('typescript').SourceFile | { readonly fileName: string },
+	program: ClassicTypeScriptProgram | NativeTypeScriptProgram,
+	file: string | { readonly fileName: string },
 	options?: NativeSignalValidationOptions,
 ): import('./index.js').CompileDiagnostic[];
