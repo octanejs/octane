@@ -741,6 +741,7 @@ import {
 	type RowComponentProps,
 } from '@octanejs/window';
 import { map_iterable } from 'octane/tsrx-iterable';
+import { Suspense as TsrxSuspense, TsrxErrorBoundary } from 'octane/tsrx-boundary';
 import {
 	normalize_spread_props,
 	normalize_spread_props_for_ref_attr,
@@ -819,6 +820,7 @@ export function packageSurfaceProbe() {
 	void listApi;
 	void gridApi;
 	return {
+		boundary: typeof TsrxSuspense === 'function' && typeof TsrxErrorBoundary === 'function',
 		config: config === threeRenderers,
 		core: typeof coreApi.createRoot === 'function',
 		dropzone:

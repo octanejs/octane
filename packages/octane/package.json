@@ -63,6 +63,7 @@
     "./jsx-dev-runtime": "./src/jsx-runtime.d.ts",
     "./tsrx-iterable": "./src/tsrx-iterable.ts",
     "./tsrx-spread": "./src/tsrx-spread.ts",
+    "./tsrx-boundary": "./src/tsrx-boundary.ts",
     "./react": "./src/react/index.ts",
     "./hydration": "./src/hydration/index.ts",
     "./hydration/streamed-signals": "./src/hydration/streamed-signals.ts",
@@ -160,6 +161,11 @@
         "types": "./dist/tsrx-spread.d.ts",
         "node": "./dist/node/tsrx-spread.js",
         "default": "./dist/tsrx-spread.js"
+      },
+      "./tsrx-boundary": {
+        "types": "./dist/tsrx-boundary.d.ts",
+        "node": "./dist/node/tsrx-boundary.js",
+        "default": "./dist/tsrx-boundary.js"
       },
       "./react": {
         "types": "./dist/react/index.d.ts",

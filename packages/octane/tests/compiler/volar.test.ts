@@ -608,10 +608,10 @@ declare module '@fixture/object-intrinsics/jsx-runtime' {
 		}
 	});
 
-	it('type-checks @try/@catch under a renderer whose JSX.Element is a closed union', () => {
+	it('type-checks @try boundaries under a renderer whose JSX.Element is a closed union', () => {
 		// Universal renderers such as ink type JSX.Element as UniversalRenderable
 		// and declare no JSX.ElementType, so every component in their virtual TSX,
-		// including the boundary that `@try` becomes, must return a member of it.
+		// including the boundaries that `@try` becomes, must return a member of it.
 		const root = mkdtempSync(join(tmpdir(), 'octane-volar-universal-try-'));
 		try {
 			mkdirSync(join(root, 'node_modules/@fixture'), { recursive: true });
@@ -654,11 +654,28 @@ export function Boundary() @{
 		<Fallback error={error as Error} />
 	}
 }
+export function Pending() @{
+	@try {
+		<Content />
+	} @pending {
+		<fixture-text>loading</fixture-text>
+	}
+}
+export function PendingOrFailed() @{
+	@try {
+		<Content />
+	} @pending {
+		<fixture-text>loading</fixture-text>
+	} @catch (error) {
+		<Fallback error={error as Error} />
+	}
+}
 `,
 				'/src/Boundary.tsrx',
 			);
 			expect(compiled.errors).toEqual([]);
 			expect(compiled.code).toContain('<TsrxErrorBoundary');
+			expect(compiled.code).toContain('<Suspense');
 			const file = join(root, 'Boundary.tsx');
 			writeFileSync(file, compiled.code);
 			const program = ts.createProgram({

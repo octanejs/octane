@@ -17427,25 +17427,21 @@ export const ErrorBoundary: ComponentBody<{
 
 /**
  * The virtual-TSX (IDE / tsrx-tsc) name for `@try { … } @catch (e) { … }`: the
- * shared tsrx transform's type-only output imports `TsrxErrorBoundary` from
- * 'octane' and emits the catch clause as `fallback={(error, _reset) => …}`.
- * Runtime compilation never references this name (`@try` lowers to `tryBlock`),
- * so this exists for TYPES: the function-typed `fallback` (unlike
- * `ErrorBoundary`'s renderable-or-render-prop union, which collapses to
- * `unknown`) gives the emitted arrow contextual parameter types, so authored
- * `@catch` bindings type-check under `noImplicitAny`. `content` is the
- * transform's expression-position prop form of children.
- *
- * The virtual TSX imports this name from 'octane' whatever renderer the file
- * targets, and nothing ever calls it, so it returns `never`: TypeScript then
- * accepts it as a component under every renderer's JSX namespace, including
- * universal renderers whose `JSX.Element` is the closed `UniversalRenderable`.
+ * shared tsrx transform's type-only output emits the catch clause as
+ * `fallback={(error, _reset) => …}`. Runtime compilation never references this
+ * name (`@try` lowers to `tryBlock`), so this exists for TYPES: the
+ * function-typed `fallback` (unlike `ErrorBoundary`'s renderable-or-render-prop
+ * union, which collapses to `unknown`) gives the emitted arrow contextual
+ * parameter types, so authored `@catch` bindings type-check under
+ * `noImplicitAny`. `content` is the transform's expression-position prop form of
+ * children. The virtual TSX now imports the renderer-neutral stand-in from
+ * `octane/tsrx-boundary`; this export remains for existing imports.
  */
 export const TsrxErrorBoundary = ErrorBoundary as unknown as (props: {
 	fallback?: (error: unknown, reset: () => void) => unknown;
 	content?: unknown;
 	children?: unknown;
-}) => never;
+}) => OctaneNode;
 
 /**
  * React 19's `use()` — accepts either a Context<T> or a thenable (Promise<T>).
