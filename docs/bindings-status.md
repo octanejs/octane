@@ -3,7 +3,7 @@
 <!-- GENERATED FILE — do not edit. Edit packages/<name>/status.json and
      regenerate with `pnpm bindings:status`. -->
 
-The central status table for the 109 `@octanejs/*` framework bindings.
+The central status table for the 110 `@octanejs/*` framework bindings.
 Each row is sourced from that package's `packages/<name>/status.json` — the
 machine-readable status block maintained next to the code it describes — merged
 with the version in its `package.json`. CI runs `pnpm bindings:status:check`,
@@ -101,6 +101,7 @@ supported surface and known test coverage described for that package.
 | [`@octanejs/tanstack-hotkeys`](#octanejstanstack-hotkeys) | `@tanstack/react-hotkeys@0.10.0` | Surface-present for all 22 `@tanstack/react-hotkeys@0.10.0` adapter exports plus the byte-identical `@tanstack/hotkeys@0.8.0` core re-export. The pinned 41-case upstream runtime suite runs pristine and adapted as verified vitest-full lanes; type suites compile upstream source with tsc and the Octane surface with tsrx-tsc. | `target` refs are plain `{ current }` objects (Octane has no `React.RefObject`); the `isRef` guard and behavior are otherwise identical | Supported: every hook registers listeners in effects and resolves `document` lazily, so server rendering produces no registrations and no browser access (matching upstream's `typeof document` guards). | 2026-08-03 |
 | [`@octanejs/tanstack-pacer`](#octanejstanstack-pacer) | `@tanstack/react-pacer@0.23.0` | All 15 runtime/type entrypoints from @tanstack/react-pacer@0.23.0, with framework-neutral @tanstack/pacer@0.22.0 imported directly. Complete source/type structural crosswalk and strict public contracts accompany paired scheduler runtime scenarios, all ten scheduler stores and cleanup, nested providers, and server/hydration adoption. The three async callback helpers preserve Awaited results and possible undefined. Upstream publishes no runtime or dedicated type-assertion suite; independent probes retain that distinction. | Upstream types spelled with `React.Dispatch<React.SetStateAction<T>>` use structurally identical local aliases (Octane state setters have the same shape) | Supported: instances are created lazily in `useState` initializers, cleanup runs in effects, and no browser globals are touched during render, so server rendering produces the initial (non-pending) state exactly like upstream. | 2026-09-12 |
 | [`@octanejs/tanstack-query`](#octanejstanstack-query) | `@tanstack/react-query@5.102.8` | Complete published root adapter and neutral core re-exports. Exact runtime export comparison, 213 public value/type probes, 404 pristine and 404 adapted runtime registrations, and 167 pristine/adapted type registrations. | Native compiler-assigned hook slots and retained suspense promises preserve observer ownership across replay; Native renderer types replace React renderables and context types; Upstream React-only StrictMode/render-stream, console formatting, render counts, timer observation and SSR harnesses are adapted with committed patches | Nine adapted upstream server cases, three real server/client hydration cases with surviving DOM identity, and the DOM-free Octane conformance scenario. No separate React streaming entry is published by this adapter. | 2026-09-12 |
+| [`@octanejs/tanstack-query-devtools`](#octanejstanstack-query-devtools) | `@tanstack/react-query-devtools@5.102.8` | Complete published adapter surface: ReactQueryDevtools, ReactQueryDevtoolsPanel, the DevtoolsPanelOptions type, and the ./production entry, over the unchanged @tanstack/query-devtools core. All 37 upstream runtime registrations run unchanged against React and, with import rewrites only, against Octane. | The devtools core instance is created in a lazy useState initializer instead of being constructed on every render; Public prop types use Octane's CSSProperties and OctaneNode; element construction is authored in .tsrx | Supported and tested: both components render only their parent container through octane/server without a DOM; the core is constructed but never mounted server-side (mount is a client-only effect). | 2026-09-30 |
 | [`@octanejs/tanstack-router`](#octanejstanstack-router) | `@tanstack/react-router@1.170.41` | Octane's TanStack Router binding: typed route factories and hooks, the full Match pipeline and lifecycle, file routes with TSRX-aware generator integration, full Link navigation/preloading/masking behavior, blocking, Await/deferred hydration, scroll restoration, lazy routes, not-found handling, document/head assets, and client/server SSR entries. | Refs are props — `createLink`'s `forwardRef` becomes a `ref` prop; Link callbacks receive native DOM events rather than React synthetic events; Router devtools are distributed separately | Full-document buffered and readable-stream SSR through `./ssr/server`, client hydration through `./ssr/client`, route-owned head/scripts, CSP nonce propagation, per-route SSR modes, and native Octane stream injection; covered by Octane-only framework-contract tests in ordinary shards (not a React SSR oracle). | 2026-08-02 |
 | [`@octanejs/tanstack-router-ssr-query`](#octanejstanstack-router-ssr-query) | `@tanstack/react-router-ssr-query@1.167.3` | Surface-present for the pinned adapter's only runtime entrypoint (`Options` and `setupRouterSsrQueryIntegration`). The metadata-only `./package.json` subpath is intentionally omitted. A representative differential covers provider-backed SSR, existing-wrapper preservation, setup mutations, and the wrapping control; upstream has no runtime suite, and type evidence is the upstream source compile plus the adapted Octane compile, so verification remains recorded-unverified. | none known | Supported — this package IS the SSR integration (dehydrates query state into the router stream and wraps the app in the query provider). | 2026-08-03 |
 | [`@octanejs/tanstack-store`](#octanejstanstack-store) | `@tanstack/react-store@0.11.1` | Re-exports `@tanstack/store@0.11.1` unchanged and implements the stable React binding surface (`useSelector`, `useAtom`, `useCreateAtom`, `useCreateStore`, `createStoreContext`, and deprecated `useStore`) on Octane hooks. | The upstream experimental `_useStore` hook is intentionally omitted; use `useSelector` with `store.actions` or `store.setState` instead | Supported: selectors, writable atoms, and store context read their current snapshots during server rendering; the adapter has no browser-only initialization. | 2026-08-09 |
@@ -1664,6 +1665,24 @@ SSR / hydration: Nine adapted upstream server cases, three real server/client hy
 Scope/evidence last checked: 2026-09-12.
 
 See also: [`docs/tanstack-parity-audit.md`](tanstack-parity-audit.md)
+
+## @octanejs/tanstack-query-devtools
+
+[`packages/tanstack-query-devtools`](../packages/tanstack-query-devtools) `0.0.0` — ports `@tanstack/react-query-devtools@5.102.8`. Status data: [`packages/tanstack-query-devtools/status.json`](../packages/tanstack-query-devtools/status.json).
+
+Complete published adapter surface: ReactQueryDevtools, ReactQueryDevtoolsPanel, the DevtoolsPanelOptions type, and the ./production entry, over the unchanged @tanstack/query-devtools core. All 37 upstream runtime registrations run unchanged against React and, with import rewrites only, against Octane.
+
+Known divergences:
+
+- The devtools core instance is created in a lazy useState initializer instead of being constructed on every render.
+- Public prop types use Octane's CSSProperties and OctaneNode; element construction is authored in .tsrx.
+
+SSR / hydration: Supported and tested: both components render only their parent container through octane/server without a DOM; the core is constructed but never mounted server-side (mount is a client-only effect).
+
+Scope/evidence last checked: 2026-09-30.
+
+- The root entry renders nothing unless NODE_ENV is development, matching upstream; the ./production entry always renders.
+- npm publishes no gitHead for this release; the pinned commit comes from the release tag and npm provenance, and matches the @octanejs/tanstack-query pin.
 
 ## @octanejs/tanstack-router
 

@@ -676,6 +676,12 @@
         "packageName": "@octanejs/tanstack-devtools",
         "title": "TanStack Devtools",
         "tags": ["devtools", "debugging"]
+      },
+      {
+        "packageName": "@octanejs/tanstack-query-devtools",
+        "title": "TanStack Query Devtools",
+        "searchTerms": ["react-query-devtools", "React Query Devtools"],
+        "tags": ["devtools", "debugging", "data"]
       }
     ]
   }

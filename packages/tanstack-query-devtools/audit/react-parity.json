@@ -1,0 +1,270 @@
+{
+  "schemaVersion": 1,
+  "provenance": {
+    "repo": "https://github.com/TanStack/query.git",
+    "version": "5.102.8",
+    "commit": "2969edf32f7e0c48e2a108d84712d6e01edfde21",
+    "sourceRoot": "packages/react-query-devtools/src",
+    "testRoot": "packages/react-query-devtools/src/__tests__",
+    "license": "MIT",
+    "integrity": "sha256:1bccdde83d37fb391ea62a13efc14baabe4d7af37bac4cd6504091df0b81fa2b",
+    "verification": "verified"
+  },
+  "upstreamSuites": { "runtime": "present", "types": "absent" },
+  "adaptedRoots": {
+    "source": {
+      "roots": ["packages/tanstack-query-devtools/src"],
+      "include": ["\\.(?:ts|tsrx)$"],
+      "exclude": ["\\.d\\.ts$"]
+    },
+    "tests": {
+      "roots": ["packages/tanstack-query-devtools/tests/upstream"],
+      "include": ["\\.test\\.(?:ts|tsx)$"],
+      "exclude": []
+    }
+  },
+  "adaptedRuntimeSummary": {
+    "inventoryEntries": 37,
+    "uniqueIdentities": 37,
+    "duplicateEntriesWithinLanes": 0,
+    "identitiesSharedAcrossLanes": 0
+  },
+  "environments": {
+    "workspace-node": {
+      "node": ">=22",
+      "platform": "any",
+      "arch": "any",
+      "packageManager": "pnpm@12.9.1",
+      "lockfile": "pnpm-lock.yaml",
+      "lockfileSha256": "2d8be78f1c5ba8a69b7eaecf1cf864b7de1256a5347e10091b82b66fd0b318a4"
+    }
+  },
+  "lanes": [
+    {
+      "id": "tanstack-query-devtools-pristine-full",
+      "type": "pristine-upstream",
+      "oracle": "required",
+      "environment": "workspace-node",
+      "project": "tanstack-query-devtools-pristine",
+      "evidenceOrigin": "upstream-suite",
+      "notes": "Runs all 37 pinned runtime registrations unchanged against React.",
+      "execution": {
+        "kind": "vitest-full",
+        "inventory": "packages/tanstack-query-devtools/audit/pristine-wrapper-runtime.json"
+      },
+      "files": [
+        {
+          "path": "packages/tanstack-query-devtools/audit/pristine-wrapper-runtime.json",
+          "role": "support",
+          "sha256": "5a179ea9be8d625d29a2d5d4b4f7a2c1161eb6cce4e6661263b36e91ee98907e"
+        },
+        {
+          "path": "packages/tanstack-query-devtools/audit/pristine-runtime.json",
+          "role": "support",
+          "sha256": "67153f8c4697c5126e05e25a69ddfd47a1ab41f058d2de0a421f3af012b3d63d"
+        },
+        {
+          "path": "packages/tanstack-query-devtools/audit/upstream.lock.json",
+          "role": "support",
+          "sha256": "46fbb523bd8bb05e5cac1689e1a2fe5cdc3183f5c8337f3087d0891fd67050eb"
+        },
+        {
+          "path": "packages/tanstack-query-devtools/audit/provenance.json",
+          "role": "support",
+          "sha256": "fb6b2f599577ccc68819b9a31d2b7a4c371aaf961c66a26e1e89e22263e17cda"
+        },
+        {
+          "path": "packages/tanstack-query-devtools/audit/registrations.json",
+          "role": "support",
+          "sha256": "ced972c44df50a21801af795fe695ad2bf53b1b55e6a2681ba3fa18dbf68b9e5"
+        },
+        {
+          "path": "packages/tanstack-query-devtools/audit/crosswalk.json",
+          "role": "support",
+          "sha256": "3581b77bda5fdfe03dc833eb3cda065f6385d3c0c00ac5d09e384246f3eedfd8"
+        },
+        {
+          "path": "packages/tanstack-query-devtools/scripts/update-audit.mjs",
+          "role": "support",
+          "sha256": "c9fff1af82e6adb8d5c123e21b1e0b0f19832d19528962cd8a4b36399af1bf12"
+        },
+        {
+          "path": "packages/tanstack-query-devtools/audit/pristine-suite.json",
+          "role": "support",
+          "sha256": "55cf3e98ad1e4bccb1fc5fb57f12cc189fd66e907e7eff179661bf3d17c7781e"
+        },
+        {
+          "path": "packages/tanstack-query-devtools/tests/upstream-vitest.config.ts",
+          "role": "support",
+          "sha256": "b965a625665b087afc9a124e19faebbcab30d5c6c4eb207dd5de4956099447c4"
+        },
+        {
+          "path": "packages/tanstack-query-devtools/tests/upstream-original.test.ts",
+          "role": "support",
+          "sha256": "97cbc0c883cd05fdc3a2ca59941c370d6f99bbf27a378ace9b910c1af3a61c25"
+        },
+        {
+          "path": "scripts/react-parity/tanstack-query-devtools-pristine-runtime.mjs",
+          "role": "support",
+          "sha256": "ac75389efb8df5c2614a50bc57e74cf5d921de2a6c7c55a25928354993317df7"
+        },
+        {
+          "path": "scripts/react-parity/pristine-suite-lib.mjs",
+          "role": "support",
+          "sha256": "d34ffc2dca00e6eef7dcaf5bc002024cc511f32dd20c681547555af520438bbb"
+        }
+      ]
+    },
+    {
+      "id": "tanstack-query-devtools-adapted-full",
+      "type": "adapted-octane",
+      "oracle": "required",
+      "environment": "workspace-node",
+      "project": "tanstack-query-devtools-adapted",
+      "evidenceOrigin": "upstream-suite",
+      "notes": "Runs all 37 pinned runtime registrations against Octane with import rewrites only.",
+      "execution": {
+        "kind": "vitest-full",
+        "inventory": "packages/tanstack-query-devtools/audit/adapted-runtime.json"
+      },
+      "files": [
+        {
+          "path": "packages/tanstack-query-devtools/audit/adapted-runtime.json",
+          "role": "support",
+          "sha256": "13d4f6ad3ba601b121b2cf1cab45bd2897378808fa5ef2f83b0267522ca229b1"
+        },
+        {
+          "path": "packages/tanstack-query-devtools/audit/upstream.lock.json",
+          "role": "support",
+          "sha256": "46fbb523bd8bb05e5cac1689e1a2fe5cdc3183f5c8337f3087d0891fd67050eb"
+        },
+        {
+          "path": "packages/tanstack-query-devtools/audit/provenance.json",
+          "role": "support",
+          "sha256": "fb6b2f599577ccc68819b9a31d2b7a4c371aaf961c66a26e1e89e22263e17cda"
+        },
+        {
+          "path": "packages/tanstack-query-devtools/audit/registrations.json",
+          "role": "support",
+          "sha256": "ced972c44df50a21801af795fe695ad2bf53b1b55e6a2681ba3fa18dbf68b9e5"
+        },
+        {
+          "path": "packages/tanstack-query-devtools/audit/crosswalk.json",
+          "role": "support",
+          "sha256": "3581b77bda5fdfe03dc833eb3cda065f6385d3c0c00ac5d09e384246f3eedfd8"
+        },
+        {
+          "path": "packages/tanstack-query-devtools/scripts/update-audit.mjs",
+          "role": "support",
+          "sha256": "c9fff1af82e6adb8d5c123e21b1e0b0f19832d19528962cd8a4b36399af1bf12"
+        },
+        {
+          "path": "packages/tanstack-query-devtools/tests/vitest.adapted.config.ts",
+          "role": "support",
+          "sha256": "a7e31c2fbec48d266bc5d8a30118a072d14739a38e7fbf7708d5b4d0d18b345d"
+        },
+        {
+          "path": "packages/tanstack-query-devtools/tests/adapted-setup.ts",
+          "role": "support",
+          "sha256": "db9eae8327af4a7fdb2e7dfbbb01a22ed41a82794486243ba2eef3b8b2d7448c"
+        }
+      ]
+    }
+  ],
+  "ordinaryEvidence": [
+    {
+      "path": "packages/tanstack-query-devtools/tests/conformance/devtools.test.ts",
+      "sha256": "f7977dfcdd86a2ee10323cca023c56130c1427cd8a8d3783cd5f12ed4434cb85",
+      "cases": [
+        {
+          "id": "conformance:tanstack-query-devtools-renders-the-parent-container-the-core-mounts-into",
+          "testName": "renders the parent container the core mounts into",
+          "fullName": "@octanejs/tanstack-query-devtools renders the parent container the core mounts into"
+        },
+        {
+          "id": "conformance:tanstack-query-devtools-constructs-the-core-once-across-re-renders-and-updates-it-in-place",
+          "testName": "constructs the core once across re-renders and updates it in place",
+          "fullName": "@octanejs/tanstack-query-devtools constructs the core once across re-renders and updates it in place"
+        },
+        {
+          "id": "conformance:tanstack-query-devtools-passes-the-react-query-flavor-and-version-to-the-core",
+          "testName": "passes the React Query flavor and version to the core",
+          "fullName": "@octanejs/tanstack-query-devtools passes the React Query flavor and version to the core"
+        },
+        {
+          "id": "conformance:tanstack-query-devtools-resolves-the-client-from-queryclientprovider-context",
+          "testName": "resolves the client from QueryClientProvider context",
+          "fullName": "@octanejs/tanstack-query-devtools resolves the client from QueryClientProvider context"
+        },
+        {
+          "id": "conformance:tanstack-query-devtools-unmounts-the-core-when-the-component-unmounts",
+          "testName": "unmounts the core when the component unmounts",
+          "fullName": "@octanejs/tanstack-query-devtools unmounts the core when the component unmounts"
+        },
+        {
+          "id": "conformance:tanstack-query-devtools-defaults-to-a-500px-tall-container-and-merges-the-style-prop-over-it",
+          "testName": "defaults to a 500px tall container and merges the style prop over it",
+          "fullName": "@octanejs/tanstack-query-devtools ReactQueryDevtoolsPanel defaults to a 500px tall container and merges the style prop over it"
+        },
+        {
+          "id": "conformance:tanstack-query-devtools-opens-the-panel-initially-and-mounts-into-its-container",
+          "testName": "opens the panel initially and mounts into its container",
+          "fullName": "@octanejs/tanstack-query-devtools ReactQueryDevtoolsPanel opens the panel initially and mounts into its container"
+        },
+        {
+          "id": "conformance:tanstack-query-devtools-keeps-the-core-in-sync-with-a-changed-onclose-callback",
+          "testName": "keeps the core in sync with a changed onClose callback",
+          "fullName": "@octanejs/tanstack-query-devtools ReactQueryDevtoolsPanel keeps the core in sync with a changed onClose callback"
+        }
+      ]
+    },
+    {
+      "path": "packages/tanstack-query-devtools/tests/conformance/production-switch.test.ts",
+      "sha256": "50bfcf6de469924ba95c1eafc2c00b4435c791259d58ed5c66a51ab3c75285c2",
+      "cases": [
+        {
+          "id": "conformance:tanstack-query-devtools-renders-nothing-outside-development",
+          "testName": "renders nothing outside development",
+          "fullName": "@octanejs/tanstack-query-devtools root entry renders nothing outside development"
+        },
+        {
+          "id": "conformance:tanstack-query-devtools-exposes-the-real-components-in-development-and-from-the-production-entry",
+          "testName": "exposes the real components in development and from the production entry",
+          "fullName": "@octanejs/tanstack-query-devtools root entry exposes the real components in development and from the production entry"
+        },
+        {
+          "id": "conformance:tanstack-query-devtools-exposes-the-real-components-from-the-production-entry-regardless-of-node-env",
+          "testName": "exposes the real components from the production entry regardless of NODE_ENV",
+          "fullName": "@octanejs/tanstack-query-devtools root entry exposes the real components from the production entry regardless of NODE_ENV"
+        }
+      ]
+    },
+    {
+      "path": "packages/tanstack-query-devtools/tests/ssr/server.test.ts",
+      "sha256": "e98d0219b3f659e5b139b071dba504987851551cd8a7ed21c29884fa83f92b28",
+      "cases": [
+        {
+          "id": "conformance:tanstack-query-devtools-renders-only-the-parent-containers-on-the-server-and-never-mounts-the-core",
+          "testName": "renders only the parent containers on the server and never mounts the core",
+          "fullName": "@octanejs/tanstack-query-devtools SSR renders only the parent containers on the server and never mounts the core"
+        }
+      ]
+    }
+  ],
+  "divergences": [
+    {
+      "id": "lazy-core-construction",
+      "caseIds": [
+        "conformance:tanstack-query-devtools-constructs-the-core-once-across-re-renders-and-updates-it-in-place"
+      ],
+      "upstreamResult": "The React adapter passes an eagerly constructed core to useState, building and discarding a new core on every render after the first.",
+      "octaneResult": "The Octane port constructs the core in a lazy useState initializer, once per mounted component.",
+      "rationale": "Avoids repeated construction of the devtools core; mount, unmount and every setter observe the same instance either way.",
+      "classification": "implementation",
+      "consumerImpact": "None observable: the upstream suite asserts no constructor call count, and the mounted core is identical.",
+      "migrationGuidance": "No change needed.",
+      "owner": "@octanejs/tanstack-query-devtools",
+      "reviewCondition": "Revisit if a pinned upstream release asserts constructor call counts or changes how it initializes the core."
+    }
+  ]
+}

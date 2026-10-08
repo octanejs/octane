@@ -1,0 +1,197 @@
+{
+  "schemaVersion": 1,
+  "project": "tanstack-query-devtools-pristine",
+  "roots": ["packages/tanstack-query-devtools/upstream"],
+  "files": [
+    "packages/tanstack-query-devtools/upstream/src/__tests__/ReactQueryDevtools.test.tsx",
+    "packages/tanstack-query-devtools/upstream/src/__tests__/ReactQueryDevtoolsPanel.test.tsx"
+  ],
+  "tests": [
+    {
+      "id": "runtime:7552522278d1ab93",
+      "file": "packages/tanstack-query-devtools/upstream/src/__tests__/ReactQueryDevtools.test.tsx",
+      "fullName": "ReactQueryDevtools should call \"unmount\" on the devtools instance when the component unmounts"
+    },
+    {
+      "id": "runtime:b7a589216c1a07ae",
+      "file": "packages/tanstack-query-devtools/upstream/src/__tests__/ReactQueryDevtools.test.tsx",
+      "fullName": "ReactQueryDevtools should default \"errorTypes\" to an empty array when the prop is omitted"
+    },
+    {
+      "id": "runtime:8c281a3649951336",
+      "file": "packages/tanstack-query-devtools/upstream/src/__tests__/ReactQueryDevtools.test.tsx",
+      "fullName": "ReactQueryDevtools should default \"initialIsOpen\" to \"false\" when the prop is omitted"
+    },
+    {
+      "id": "runtime:b3fb95dd8937206a",
+      "file": "packages/tanstack-query-devtools/upstream/src/__tests__/ReactQueryDevtools.test.tsx",
+      "fullName": "ReactQueryDevtools should forward \"buttonPosition\" to the devtools instance"
+    },
+    {
+      "id": "runtime:f6fd28ebac40e732",
+      "file": "packages/tanstack-query-devtools/upstream/src/__tests__/ReactQueryDevtools.test.tsx",
+      "fullName": "ReactQueryDevtools should forward \"errorTypes\" to the devtools instance"
+    },
+    {
+      "id": "runtime:48a79149117edf3c",
+      "file": "packages/tanstack-query-devtools/upstream/src/__tests__/ReactQueryDevtools.test.tsx",
+      "fullName": "ReactQueryDevtools should forward \"hideDisabledQueries\" to the devtools constructor"
+    },
+    {
+      "id": "runtime:b01af453bd9e9628",
+      "file": "packages/tanstack-query-devtools/upstream/src/__tests__/ReactQueryDevtools.test.tsx",
+      "fullName": "ReactQueryDevtools should forward \"initialIsOpen\" to the devtools instance"
+    },
+    {
+      "id": "runtime:f8ff33b29cc122f1",
+      "file": "packages/tanstack-query-devtools/upstream/src/__tests__/ReactQueryDevtools.test.tsx",
+      "fullName": "ReactQueryDevtools should forward \"position\" to the devtools instance"
+    },
+    {
+      "id": "runtime:3dbc6c5c9b782a91",
+      "file": "packages/tanstack-query-devtools/upstream/src/__tests__/ReactQueryDevtools.test.tsx",
+      "fullName": "ReactQueryDevtools should forward \"shadowDOMTarget\" to the devtools constructor"
+    },
+    {
+      "id": "runtime:94e7262c51be8de5",
+      "file": "packages/tanstack-query-devtools/upstream/src/__tests__/ReactQueryDevtools.test.tsx",
+      "fullName": "ReactQueryDevtools should forward \"styleNonce\" to the devtools constructor"
+    },
+    {
+      "id": "runtime:77fd0a861606e751",
+      "file": "packages/tanstack-query-devtools/upstream/src/__tests__/ReactQueryDevtools.test.tsx",
+      "fullName": "ReactQueryDevtools should forward \"theme\" to the devtools instance"
+    },
+    {
+      "id": "runtime:3cc3a53f5b86f1bf",
+      "file": "packages/tanstack-query-devtools/upstream/src/__tests__/ReactQueryDevtools.test.tsx",
+      "fullName": "ReactQueryDevtools should forward a \"buttonPosition\" change to the devtools instance after mount"
+    },
+    {
+      "id": "runtime:25280a534d6ee68a",
+      "file": "packages/tanstack-query-devtools/upstream/src/__tests__/ReactQueryDevtools.test.tsx",
+      "fullName": "ReactQueryDevtools should forward a \"position\" change to the devtools instance after mount"
+    },
+    {
+      "id": "runtime:4af0c559ebed4b97",
+      "file": "packages/tanstack-query-devtools/upstream/src/__tests__/ReactQueryDevtools.test.tsx",
+      "fullName": "ReactQueryDevtools should forward a \"theme\" change to the devtools instance after mount"
+    },
+    {
+      "id": "runtime:cb95285b981f5085",
+      "file": "packages/tanstack-query-devtools/upstream/src/__tests__/ReactQueryDevtools.test.tsx",
+      "fullName": "ReactQueryDevtools should forward an \"errorTypes\" change to the devtools instance after mount"
+    },
+    {
+      "id": "runtime:c65d78664ae18950",
+      "file": "packages/tanstack-query-devtools/upstream/src/__tests__/ReactQueryDevtools.test.tsx",
+      "fullName": "ReactQueryDevtools should forward an \"initialIsOpen\" change to the devtools instance after mount"
+    },
+    {
+      "id": "runtime:dd99c68ae925a8a3",
+      "file": "packages/tanstack-query-devtools/upstream/src/__tests__/ReactQueryDevtools.test.tsx",
+      "fullName": "ReactQueryDevtools should forward the resolved \"QueryClient\" via \"setClient\""
+    },
+    {
+      "id": "runtime:8a0baff52a1ada73",
+      "file": "packages/tanstack-query-devtools/upstream/src/__tests__/ReactQueryDevtools.test.tsx",
+      "fullName": "ReactQueryDevtools should not throw an error if query client is provided via context"
+    },
+    {
+      "id": "runtime:d678adfe87eceef2",
+      "file": "packages/tanstack-query-devtools/upstream/src/__tests__/ReactQueryDevtools.test.tsx",
+      "fullName": "ReactQueryDevtools should not throw an error if query client is provided via props"
+    },
+    {
+      "id": "runtime:fc411aa74a57ed9a",
+      "file": "packages/tanstack-query-devtools/upstream/src/__tests__/ReactQueryDevtools.test.tsx",
+      "fullName": "ReactQueryDevtools should return null in non-development environments"
+    },
+    {
+      "id": "runtime:2136d852107c1a68",
+      "file": "packages/tanstack-query-devtools/upstream/src/__tests__/ReactQueryDevtools.test.tsx",
+      "fullName": "ReactQueryDevtools should throw an error if no query client has been set"
+    },
+    {
+      "id": "runtime:1a662c61dfb4b9c1",
+      "file": "packages/tanstack-query-devtools/upstream/src/__tests__/ReactQueryDevtoolsPanel.test.tsx",
+      "fullName": "ReactQueryDevtoolsPanel should call \"unmount\" on the devtools instance when the component unmounts"
+    },
+    {
+      "id": "runtime:2940feac18ef2390",
+      "file": "packages/tanstack-query-devtools/upstream/src/__tests__/ReactQueryDevtoolsPanel.test.tsx",
+      "fullName": "ReactQueryDevtoolsPanel should default \"errorTypes\" to an empty array when the prop is omitted"
+    },
+    {
+      "id": "runtime:02faeee38b85291e",
+      "file": "packages/tanstack-query-devtools/upstream/src/__tests__/ReactQueryDevtoolsPanel.test.tsx",
+      "fullName": "ReactQueryDevtoolsPanel should default \"onClose\" to a no-op function when the prop is omitted"
+    },
+    {
+      "id": "runtime:42703fef71859c48",
+      "file": "packages/tanstack-query-devtools/upstream/src/__tests__/ReactQueryDevtoolsPanel.test.tsx",
+      "fullName": "ReactQueryDevtoolsPanel should forward \"errorTypes\" to the devtools instance"
+    },
+    {
+      "id": "runtime:fea6c320da651b98",
+      "file": "packages/tanstack-query-devtools/upstream/src/__tests__/ReactQueryDevtoolsPanel.test.tsx",
+      "fullName": "ReactQueryDevtoolsPanel should forward \"hideDisabledQueries\" to the devtools constructor"
+    },
+    {
+      "id": "runtime:9ccca8313769edb8",
+      "file": "packages/tanstack-query-devtools/upstream/src/__tests__/ReactQueryDevtoolsPanel.test.tsx",
+      "fullName": "ReactQueryDevtoolsPanel should forward \"onClose\" to the devtools instance"
+    },
+    {
+      "id": "runtime:a76600bc009d5605",
+      "file": "packages/tanstack-query-devtools/upstream/src/__tests__/ReactQueryDevtoolsPanel.test.tsx",
+      "fullName": "ReactQueryDevtoolsPanel should forward \"shadowDOMTarget\" to the devtools constructor"
+    },
+    {
+      "id": "runtime:320c8ffc8271929d",
+      "file": "packages/tanstack-query-devtools/upstream/src/__tests__/ReactQueryDevtoolsPanel.test.tsx",
+      "fullName": "ReactQueryDevtoolsPanel should forward \"styleNonce\" to the devtools constructor"
+    },
+    {
+      "id": "runtime:5e16a27647662ee3",
+      "file": "packages/tanstack-query-devtools/upstream/src/__tests__/ReactQueryDevtoolsPanel.test.tsx",
+      "fullName": "ReactQueryDevtoolsPanel should forward \"theme\" to the devtools instance"
+    },
+    {
+      "id": "runtime:4b1e80d95e34db1f",
+      "file": "packages/tanstack-query-devtools/upstream/src/__tests__/ReactQueryDevtoolsPanel.test.tsx",
+      "fullName": "ReactQueryDevtoolsPanel should forward the resolved \"QueryClient\" via \"setClient\""
+    },
+    {
+      "id": "runtime:94f8532469b8ffcd",
+      "file": "packages/tanstack-query-devtools/upstream/src/__tests__/ReactQueryDevtoolsPanel.test.tsx",
+      "fullName": "ReactQueryDevtoolsPanel should let \"style\" override the default container height on the rendered element"
+    },
+    {
+      "id": "runtime:1eccb2a7d17e01fe",
+      "file": "packages/tanstack-query-devtools/upstream/src/__tests__/ReactQueryDevtoolsPanel.test.tsx",
+      "fullName": "ReactQueryDevtoolsPanel should not throw an error if query client is provided via context"
+    },
+    {
+      "id": "runtime:5087ba187b81faa5",
+      "file": "packages/tanstack-query-devtools/upstream/src/__tests__/ReactQueryDevtoolsPanel.test.tsx",
+      "fullName": "ReactQueryDevtoolsPanel should not throw an error if query client is provided via props"
+    },
+    {
+      "id": "runtime:53f01474e4a97c41",
+      "file": "packages/tanstack-query-devtools/upstream/src/__tests__/ReactQueryDevtoolsPanel.test.tsx",
+      "fullName": "ReactQueryDevtoolsPanel should preserve the default container height when \"style\" omits \"height\""
+    },
+    {
+      "id": "runtime:58a2ce4a0ef1087b",
+      "file": "packages/tanstack-query-devtools/upstream/src/__tests__/ReactQueryDevtoolsPanel.test.tsx",
+      "fullName": "ReactQueryDevtoolsPanel should return null in non-development environments"
+    },
+    {
+      "id": "runtime:28c107b9ceeb61a8",
+      "file": "packages/tanstack-query-devtools/upstream/src/__tests__/ReactQueryDevtoolsPanel.test.tsx",
+      "fullName": "ReactQueryDevtoolsPanel should throw an error if no query client has been set"
+    }
+  ],
+  "snapshots": 0
+}

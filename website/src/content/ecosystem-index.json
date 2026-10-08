@@ -1448,5 +1448,18 @@
     "searchTerms": [],
     "tags": ["devtools", "debugging"],
     "order": 111
+  },
+  {
+    "kind": "library-binding",
+    "id": "binding-tanstack-query-devtools",
+    "title": "TanStack Query Devtools",
+    "packageName": "@octanejs/tanstack-query-devtools",
+    "upstreamPackage": "@tanstack/react-query-devtools",
+    "category": "Developer Tools",
+    "categoryId": "developer-tools",
+    "description": "Use @tanstack/react-query-devtools with Octane.",
+    "searchTerms": ["react-query-devtools", "React Query Devtools"],
+    "tags": ["devtools", "debugging", "data"],
+    "order": 112
   }
 ]

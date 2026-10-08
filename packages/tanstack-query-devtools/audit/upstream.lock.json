@@ -1,0 +1,142 @@
+{
+  "schemaVersion": 1,
+  "identity": {
+    "packageName": "@tanstack/react-query-devtools",
+    "version": "5.102.8",
+    "repository": {
+      "owner": "TanStack",
+      "repo": "query",
+      "subdirectory": "packages/react-query-devtools"
+    },
+    "commit": "2969edf32f7e0c48e2a108d84712d6e01edfde21",
+    "integrity": "sha512-QKb7A44BZOU7nxsGA4gFN1fofjYovar5O0T83Ff4Y+2eRq09RGFrAzzutVdF/6/emfSaMDohp6e759BjB3fxEw=="
+  },
+  "license": {
+    "spdx": "MIT",
+    "evidence": [
+      {
+        "path": "LICENSE",
+        "sha256": "a405ee70c632bb938acb7ac5f210e814409b3760ea9d2329d8ed8ffcfd11a0e7"
+      }
+    ],
+    "notices": []
+  },
+  "scopes": [
+    "CHANGELOG.md",
+    "eslint.config.js",
+    "package.json",
+    "src",
+    "test-setup.ts",
+    "tsconfig.json",
+    "tsconfig.legacy.json",
+    "tsconfig.prod.json",
+    "tsdown.config.ts",
+    "vite.config.ts"
+  ],
+  "adaptedMappings": [
+    {
+      "fromRoot": "src/__tests__",
+      "toRoot": "tests/upstream"
+    }
+  ],
+  "adaptedRewrites": [
+    {
+      "find": "'@testing-library/react'",
+      "replace": "'@octanejs/testing-library'"
+    },
+    {
+      "find": "'@tanstack/react-query'",
+      "replace": "'@octanejs/tanstack-query'"
+    },
+    {
+      "find": "'../ReactQueryDevtools'",
+      "replace": "'../../src/ReactQueryDevtools.tsrx'"
+    },
+    {
+      "find": "'../ReactQueryDevtoolsPanel'",
+      "replace": "'../../src/ReactQueryDevtoolsPanel.tsrx'"
+    },
+    {
+      "find": "'..'",
+      "replace": "'../../src'"
+    }
+  ],
+  "files": [
+    {
+      "path": "CHANGELOG.md",
+      "gitBlob": "dc8f82ab5cc06cf070c4fe0bec80f2cc49d42875",
+      "size": 9692
+    },
+    {
+      "path": "eslint.config.js",
+      "gitBlob": "d75c6a72f733c0aa8ea0195572d9c6fa88beb852",
+      "size": 655
+    },
+    {
+      "path": "package.json",
+      "gitBlob": "e464acfe738e6eebdb60bac71fe5a2229028c3df",
+      "size": 3052
+    },
+    {
+      "path": "src/__tests__/ReactQueryDevtools.test.tsx",
+      "gitBlob": "a55b98970b5626eaefa997b102cfa4ecbe4d1906",
+      "size": 7454
+    },
+    {
+      "path": "src/__tests__/ReactQueryDevtoolsPanel.test.tsx",
+      "gitBlob": "bdee2f39e9a6ffd2783ebaeabb39840534627710",
+      "size": 5872
+    },
+    {
+      "path": "src/index.ts",
+      "gitBlob": "f0636e62b8f0f4a248870bee99756128d0153497",
+      "size": 616
+    },
+    {
+      "path": "src/production.ts",
+      "gitBlob": "3858485421602420dc3dd1ea06cbf578234f3f8b",
+      "size": 262
+    },
+    {
+      "path": "src/ReactQueryDevtools.tsx",
+      "gitBlob": "936664f90352e64625c44484c2d8b8d0eff019d6",
+      "size": 3292
+    },
+    {
+      "path": "src/ReactQueryDevtoolsPanel.tsx",
+      "gitBlob": "316119ce39aecf302c39a00abb25971b18f3dc74",
+      "size": 2879
+    },
+    {
+      "path": "test-setup.ts",
+      "gitBlob": "8331ed6615339a41f334f885e57112f41b3b27fa",
+      "size": 421
+    },
+    {
+      "path": "tsconfig.json",
+      "gitBlob": "03d5e6eead332c048d14532af26079dce82719b9",
+      "size": 327
+    },
+    {
+      "path": "tsconfig.legacy.json",
+      "gitBlob": "28e2218e7282bb8e842bea75e17165093ec183d4",
+      "size": 255
+    },
+    {
+      "path": "tsconfig.prod.json",
+      "gitBlob": "2de70e52771cc49f11b608395898906c5ecbb2df",
+      "size": 219
+    },
+    {
+      "path": "tsdown.config.ts",
+      "gitBlob": "0b5fe78c512c666ba44d0eac5f9dd27ab217af5e",
+      "size": 249
+    },
+    {
+      "path": "vite.config.ts",
+      "gitBlob": "823b662c58517009c799838a33e767ebf14a82f9",
+      "size": 804
+    }
+  ],
+  "fingerprint": "2dd3c5042b71507a8a1c2e208632e3c3df717a480cdf3b2d37e65e7529bb05fb"
+}

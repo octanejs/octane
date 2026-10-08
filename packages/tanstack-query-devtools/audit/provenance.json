@@ -1,0 +1,21 @@
+{
+  "schemaVersion": 1,
+  "artifacts": [
+    {
+      "path": "upstream-artifact/tanstack-react-query-devtools-5.102.8.tgz",
+      "sha256": "1bccdde83d37fb391ea62a13efc14baabe4d7af37bac4cd6504091df0b81fa2b"
+    },
+    {
+      "path": "LICENSE.upstream",
+      "sha256": "a405ee70c632bb938acb7ac5f210e814409b3760ea9d2329d8ed8ffcfd11a0e7"
+    }
+  ],
+  "requiredFiles": ["audit/upstream.lock.json"],
+  "packageIdentity": {
+    "path": "upstream/package.json",
+    "name": "@tanstack/react-query-devtools",
+    "version": "5.102.8",
+    "license": "MIT"
+  },
+  "unpublishedDirs": ["audit", "scripts", "tests", "upstream", "upstream-artifact"]
+}
