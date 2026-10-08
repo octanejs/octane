@@ -1055,8 +1055,8 @@ range active, retire only its receiver-owned outer anchors, and hydrate the
 original component HTML. Later placement is rejected for that active range;
 the renderer alone reconciles subsequent model updates.
 
-The optional response reader shares the host execution budget with query and
-derived streams. It checks before transport pulls, frame parsing, and receiver
+The optional response reader shares the host execution budget with direct
+streamed RPC readers. It checks before transport pulls, frame parsing, and receiver
 admission, so buffered frames or a released delivery backlog can return control
 to the host between units. Ordering and the bounded pending window are unchanged.
 Cancellation and transport timeout are rechecked after waits; the transport read

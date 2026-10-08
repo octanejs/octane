@@ -1,4 +1,4 @@
-// Direct transport consumers after signal/render coalescing. Production code,
+// Direct buffered transport consumers, independent of render scheduling. Production code,
 // ordered frames, marker responsiveness, and full completion on the same host.
 import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';

@@ -1063,13 +1063,8 @@ controlled state and radio cousins.
 
 Form **actions**
 (`<form action={fn}>`, `useActionState`, `useFormStatus`, `useOptimistic`,
-`requestFormReset`, auto-reset) follow React 19's state and form contracts, with
-these scheduling differences: `useActionState` executes every dispatch in order,
-using the action captured at dispatch and the previous completed result, while
-ready result renders coalesce until a host task. The pending cue can commit
-urgently before the results. Intermediate results do not each require a render
-or effect commit. An action error does **not** cancel queued dispatches (Octane
-keeps threading from the last successful state).
+`requestFormReset`, auto-reset) match React 19; an action error does **not**
+cancel queued dispatches (octane keeps threading).
 
 ## Attributes: native names, React's value rules
 
@@ -1355,70 +1350,29 @@ physically-moved nodes can differ.
 
 ## Scheduler: synchronous, two priorities
 
-Urgent updates are microtask-batched. Transition-only rendering normally coalesces
-in a later host task, including ready results from `useActionState`. Both priorities
-run each render and commit to completion: there is no time-slicing, expiration,
-or selective hydration. Transition priority also preserves visible Suspense
-content:
+Renders are microtask-batched and run to completion — no lanes, yields,
+time-slicing, expiration, or selective hydration. Priority changes Suspense
+behavior, not whether ordinary work is time-sliced:
 
 ```tsx
-setPage(next); // Urgent; if it suspends, show the pending fallback.
-startTransition(() => setPage(next)); // Later task; keep previous content while pending.
+setPage(next); // If it suspends, show the pending fallback.
+startTransition(() => setPage(next)); // Keep the previous content while pending.
 ```
 
-Octane posts tasks with `scheduler.postTask` where available, then
-`MessageChannel`, then `setTimeout`. A task boundary gives the host an opportunity
-to paint or deliver input; it does not guarantee either. A running render cannot
-be interrupted, so input that arrives during it waits until it completes.
-
-Both priorities share a render queue. An urgent update can upgrade a block
-already waiting for a transition task, and an urgent flush can also drain queued
-transition work. `flushSync` explicitly drains both priorities. Layout updates
-remain part of the current commit. Pure transition bursts need no urgent flush
-and therefore coalesce across promise and microtask continuations.
-
-A synchronous transition eligible for native `<ViewTransition>` capture keeps
-its microtask admission: that controller owns the staged commit and native
-capture boundary. This preserves capture before unrelated next-frame updates.
-Async Action results still coalesce in a host task before their first capture.
-Hosts without the native API use normal task batching. An Action's pending cue
-on its own publishes promptly without starting an animation. Explicit transition
-work queued alongside that cue keeps its native capture, including state in the
-same component. Neither case changes sibling state to urgent Suspense semantics.
-
-Ready query and asynchronous `derived$` publications coalesce native component
-rendering in the same host-task queue. Source subscriptions, graph effects, and
-direct signal bindings still observe every publication. Plain signal writes,
-native events, lifecycle updates, and `flushSync` retain their existing timing.
-The admission change does not turn an urgent signal render into a Suspense
-transition; held native-read frames keep their existing retention policy.
-
-Query and derived stream pulls share an approximately 5 ms host budget. Both a
-pull and a ready-result publication check the same window, so many producers do
-not each receive a separate allowance. A posted sentinel resets that window;
-ready continuations wait for it when the budget is spent, then recheck their
-current producer lease. Ordered values, cancellation, and server observation
-backpressure are preserved. This is a scheduling opportunity between complete
-units, not a hard 5 ms limit: one iterator call, subscriber, render, or commit can
-itself take longer. Cold I/O lets the sentinel run between results.
-
-`useDeferredValue` similarly keeps the previous value through the urgent commit
-and swaps to the latest value in a later host task. Urgent updates before that
-task retarget the swap, so skipped values never render deferred. The swap and
-its render share that task; transition scheduling adds no further task boundary.
-
-An async transition's priority window ends when its promise settles, even if
-its result rendering is still waiting for a task. Ordinary delegated events,
-commit callbacks, and `flushSync` stay urgent during that window. Unrelated
-non-event updates can join the global async window; Octane does not have a
-browser-wide async context that distinguishes those continuations. Async
-`act()` waits for posted transition work; a microtask-only wait does not.
+`useDeferredValue` is the exception. Its deferred render runs in a later host task,
+not in the microtask checkpoint of the urgent commit that returned the previous value,
+so the browser can paint that commit and deliver input first, as it can before React's
+Scheduler task. Octane posts the task with `scheduler.postTask` where available, then
+`MessageChannel`, then `setTimeout`. Urgent updates that arrive before the task runs
+only change the value it renders, so a fast typist's skipped values never render
+deferred. There is still no time-slicing: once the deferred render starts it runs to
+completion, and a keystroke that arrives during it waits until it commits, where React
+would yield to handle it.
 
 Native `ResizeObserver` callbacks run inside the browser's resize delivery loop.
 An ordinary microtask commit that resizes an already-delivered target can trigger
 `ResizeObserver loop completed with undelivered notifications`, even when the
-layout eventually settles. Transition-only updates now wait for a task, but an
-urgent update or `flushSync` can still drain that work in the delivery loop.
+layout eventually settles. `startTransition` does not change that scheduling.
 Use Octane's `createResizeObserver` when a callback updates state or writes DOM
 that can resize its observed targets:
 
@@ -1454,8 +1408,8 @@ Delegated events commit on React's `batchedUpdates` schedule. The outermost
 dispatch of a discrete event such as `click`, `keydown`, `input`, or `submit`
 flushes synchronously only when a controlled `value`/`checked` host armed a state
 restore during that dispatch (an accepted edit commits, an unheard edit snaps
-back, both before the dispatch returns). Other urgent handler updates stay in the
-microtask batch; explicit transitions follow the task policy above. For a browser-dispatched event that microtask runs before the
+back, both before the dispatch returns). Every other handler update stays in the
+microtask batch. For a browser-dispatched event that microtask runs before the
 next native listener and before the default action, so later listeners and the
 next interaction observe committed state; a script-dispatched event
 (`dispatchEvent`, `click()`, `requestSubmit()`) commits only after the dispatching
@@ -1491,10 +1445,7 @@ flushSync(() => {
 ```
 
 Passive effects normally run after paint, including effects queued by discrete
-events and external-store updates. A later render drains pending passives first,
-so an urgent burst or an application-owned microtask loop can still pull that
-work into the same checkpoint. Coalescing producer renders avoids paying this
-drain once per ready signal value. A listener installed by `useEffect` can miss
+events and external-store updates. A listener installed by `useEffect` can miss
 another event dispatched before that drain. Use `useLayoutEffect` when the
 subscription must be installed by the end of the commit. Passive timing is not
 React's synchronous discrete-event effect timing.
@@ -1505,8 +1456,8 @@ returning, so root-owned subscriptions cannot outlive the unmount call.
 Octane also skips React's extra same-value render after a previous state change.
 If a component body does run, its children can render even when the final state
 is unchanged; do not depend on React's incidental render counts. Updates across
-roots share a queue. An `await` continuation can observe an urgent commit after
-`setState(); await 0`; that microtask wait does not wait for transition rendering. Cross-component render-time updates join the current
+roots share a microtask wave, and an `await` continuation can observe the commit
+after `setState(); await 0`. Cross-component render-time updates join the current
 drain. Finite layout-effect cascades complete before DOM mutation observers run,
 including commits started by the scheduler. `flushSync` drains them before returning.
 
@@ -1519,9 +1470,9 @@ before-mutation ref-detach phase.
 
 Other consequences:
 
-- Priority (`urgent` vs `transition`) governs both Suspense hold semantics and
-  scheduling: urgent updates use microtasks and transition updates use host tasks
-  (above). A render already in progress still runs to completion.
+- Priority (`urgent` vs `transition`) governs Suspense hold semantics, not
+  general commit deferral. Only `useDeferredValue`'s deferred render waits for a
+  later task (above).
 - Fallback-visible boundaries whose retries fully stage reveal together,
   including refs and layout effects.
 - Retry-only Suspense reveals use a shared 100ms fallback window (React uses
