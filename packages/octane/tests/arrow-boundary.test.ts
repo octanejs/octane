@@ -90,6 +90,72 @@ describe('module-level arrows returning @try', () => {
 		}
 	});
 
+	it.each([
+		[
+			'nested block locals',
+			`export const Content = (props) => {
+			if (props.label) {
+				const label = props.label;
+				return @try { <p>{label as string}</p> } @catch (error) { <p>failed</p> };
+			}
+			return null;
+		};`,
+		],
+		[
+			'a function expression name',
+			`const Child = function Self(props) {
+			return @try { <p>{(Self === props.self ? props.label : 'wrong') as string}</p> } @catch (error) { <p>failed</p> };
+		};
+		export function Content(props) @{ <Child self={Child} label={props.label} /> }`,
+		],
+		[
+			'nested regular function receivers',
+			`export const Content = (props) => {
+			const render = function(suffix) {
+				return @try { <p>{this.label + arguments[0]}</p> } @catch (error) { <p>failed</p> };
+			};
+			return render.call({ label: props.label }, '');
+		};`,
+		],
+		[
+			'a nested binding that shadows an outer local',
+			`export const Content = (props) => {
+			const label = 'wrong';
+			if (props.label) {
+				const label = props.label;
+				return @try { <p>{label as string}</p> } @catch (error) { <p>failed</p> };
+			}
+			return null;
+		};`,
+		],
+		[
+			'a local captured before a later assignment',
+			`export const Content = (props) => {
+			let label = props.label;
+			const content = @try { <p>{label as string}</p> } @catch (error) { <p>failed</p> };
+			label = 'wrong';
+			return content;
+		};`,
+		],
+	] as const)('keeps %s in scope across updates', (_name, source) => {
+		for (const mode of ['client', 'server'] as const) {
+			const compiled = loadCompiledFixtureSource(source, { id: 'callback-scope.tsrx', mode });
+			if (mode === 'server') {
+				expect(renderToString(compiled.Content, { label: 'first' }).html).toContain('first');
+				expect(renderToString(compiled.Content, { label: 'second' }).html).toContain('second');
+			} else {
+				const view = mount(compiled.Content, { label: 'first' });
+				try {
+					expect(view.find('p').textContent).toBe('first');
+					view.update(compiled.Content, { label: 'second' });
+					expect(view.find('p').textContent).toBe('second');
+				} finally {
+					view.unmount();
+				}
+			}
+		}
+	});
+
 	it.each(runtimeForms)(
 		'%s suspends, catches, resets with latest props, and cleans up',
 		async (_name, Component) => {

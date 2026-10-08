@@ -23773,19 +23773,23 @@ function rewriteJsxValues(node, ctx, eagerMapCallbackRoots = false, eagerMapCall
 			const previousLower = ctx._valueDirectiveLowering;
 			let previousCallbackScope = ctx._callbackScopeNames;
 			const previousMapTemps = ctx.currentMapTemps;
-			const ownedSubs = previousLocals == null && containsValueDirective(n.body) ? [] : null;
+			const inspectBody = previousLocals == null || n.type !== 'ArrowFunctionExpression';
+			const hasDirectives = inspectBody && containsValueDirective(n.body);
+			const ownedSubs = previousLocals == null && hasDirectives ? [] : null;
 			const ownedTemps = ownedSubs === null ? null : [];
-			const lexicalValues = ownedSubs === null ? null : captureCallbackLexicalValues(n, ctx);
+			const lexicalValues = hasDirectives ? captureCallbackLexicalValues(n, ctx) : null;
 			if (previousLocals == null) {
 				// A module-level JSX callback owns its returned directive helpers just
 				// as a return-JSX declaration does. Keep those helpers inside the original
 				// function so parameters, setup locals and arrow lexical bindings survive.
 				if (ownedSubs !== null) {
 					const name = n.id?.name ?? 'callback';
-					ctx.currentComponentLocals = collectComponentLocals(n);
+					ctx.currentComponentLocals = collectCallbackBindings(n);
 					for (const capture of lexicalValues?.captures ?? [])
 						ctx.currentComponentLocals.add(capture.name);
-					ctx._callbackScopeNames = null;
+					// The descriptor may be built inside a nested block whose bindings
+					// are unavailable to helpers placed at the start of this function.
+					ctx._callbackScopeNames = new Set(ctx.currentComponentLocals);
 					ctx.currentMapTemps = ownedTemps;
 					ctx._valueDirectiveLowering =
 						ctx.mode === 'server'
@@ -23804,6 +23808,7 @@ function rewriteJsxValues(node, ctx, eagerMapCallbackRoots = false, eagerMapCall
 				// Including names bound in the callback's nested blocks, which a fold
 				// written in one of those blocks reads just the same.
 				const introduced = collectCallbackBindings(n);
+				for (const capture of lexicalValues?.captures ?? []) introduced.add(capture.name);
 				const extended = new Set(previousLocals);
 				for (const name of introduced) extended.add(name);
 				ctx.currentComponentLocals = extended;
@@ -23834,8 +23839,8 @@ function rewriteJsxValues(node, ctx, eagerMapCallbackRoots = false, eagerMapCall
 					}
 				}
 				if (
-					ownedSubs !== null &&
-					(ownedSubs.length > 0 || ownedTemps.length > 0 || lexicalValues !== null)
+					lexicalValues !== null ||
+					(ownedSubs !== null && (ownedSubs.length > 0 || ownedTemps.length > 0))
 				) {
 					const statements =
 						out.body.type === 'BlockStatement' ? out.body.body : [b.return(out.body)];
@@ -23850,8 +23855,8 @@ function rewriteJsxValues(node, ctx, eagerMapCallbackRoots = false, eagerMapCall
 								...(lexicalValues?.captures ?? []).map((capture) =>
 									inheritOriginLoc(b.const(capture.name, capture.value), capture.value),
 								),
-								...ownedTemps.map((temp) => inheritOriginLoc(b.let(temp), n)),
-								...ownedSubs,
+								...(ownedTemps ?? []).map((temp) => inheritOriginLoc(b.let(temp), n)),
+								...(ownedSubs ?? []),
 								...statements.slice(prologue),
 							]),
 							n.body,
