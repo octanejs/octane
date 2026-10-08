@@ -1697,6 +1697,7 @@ const INTERNAL_CLIENT_RUNTIME_HELPERS = new Set([
 	'updateFreshClassAttr',
 	'textHoleUpdate',
 	'childTextHoleUpdate',
+	'setOnlyText',
 	...HOOK_MEMO_RUNTIME_HELPERS,
 	...NATIVE_READ_RUNTIME_HELPERS,
 ]);
@@ -16875,6 +16876,7 @@ function preparePresentationHydration(body, node, ctx, hostEnd) {
 	]);
 	if (proof.structural) {
 		writers.add('setText');
+		writers.add('setOnlyText');
 		writers.add('bindSignalText');
 		writers.add('markDangerouslySetInnerHTMLChildren');
 	}
@@ -26991,7 +26993,9 @@ function inlineRenderableValueDeclarations(valueExpr) {
 	];
 }
 
-function emitInlineRenderableUpdate(previous, cachedNode, slowCall) {
+// `host` is given for an only-child hole: setText restores its Text there when a
+// page translator took it out (see the runtime's resetOnlyChildHost).
+function emitInlineRenderableUpdate(previous, cachedNode, slowCall, host = null) {
 	const V = () => b.id('_v');
 	return b.if(
 		b.logical('||', b.id('_o'), b.binary('!==', previous(), V())),
@@ -27010,6 +27014,7 @@ function emitInlineRenderableUpdate(previous, cachedNode, slowCall) {
 						// Bare renderable booleans are empty; explicit text bindings
 						// retain their ordinary coercion through setText.
 						b.conditional(b.binary('===', V(), b.literal(true)), b.literal(''), V()),
+						...(host === null ? [] : [host()]),
 					),
 				),
 				b.stmt(b.assignment('=', cachedNode(), slowCall)),
@@ -27626,7 +27631,7 @@ function planJsx(
 				ctx.runtimeNeeded.add(attrBindingHelper(b));
 		}
 		if (!b.signalDirect && (b.kind === 'text' || b.kind === 'textOnlyChild')) {
-			ctx.runtimeNeeded.add('setText');
+			ctx.runtimeNeeded.add(onlyTextKeepsHost(b, elVar, bag) ? 'setOnlyText' : 'setText');
 		}
 		if (b.kind === 'text') ctx.runtimeNeeded.add(b.bindingMarker ? 'bindingText' : 'htextSwap');
 		if (b.kind === 'textOnlyChild') ctx.runtimeNeeded.add('htext');
@@ -27948,7 +27953,8 @@ function planJsx(
 		for (const binding of elementBindings) {
 			const key = binding.id;
 			const text = binding.kind === 'textOnlyChild' || binding.kind === 'text';
-			const host = text && !binding.signalDirect ? `_txt$${key}` : `_el$${key}`;
+			const host =
+				text && !binding.signalDirect && bag.has(`_txt$${key}`) ? `_txt$${key}` : `_el$${key}`;
 			if (text && binding.signalDirect)
 				fields.push(bag.letter(`_sig$${key}`), bag.letter(host), '#text-token');
 			if (binding.kind === 'nativeStyle') {
@@ -28597,6 +28603,7 @@ function planJsx(
 									V(),
 									b.id('_t'),
 								),
+								hostExpr,
 							)
 						: b.block([
 								b.stmt(
@@ -29141,6 +29148,10 @@ function makeBag() {
 			}
 			return true;
 		},
+		/** Whether a field for `key` was registered. */
+		has: (key) => byKey.has(key),
+		/** Whether a DOM-host field already holds `host`. */
+		hasHost: (host) => byHost.has(host),
 		/** Seed `key` with a constant expression (no local, no mount write). */
 		constField: (key, expr) => {
 			reg(key, expr);
@@ -29452,6 +29463,15 @@ function directSignalAttributeWriter(bind) {
 		: b.id(`_$${attrBindingHelper(bind)}`);
 }
 
+// A seeded native host's only child is the binding's Text, so when no other
+// binding already keeps that host in the bag, keeping the host in place of the
+// Text costs no field: an update writes the host's first child (setOnlyText).
+// Otherwise the Text stays cached and setText receives the shared host, or the
+// excluded host whose Text may follow children it does not own.
+function onlyTextKeepsHost(bind, elVar, bag) {
+	return bind.kind === 'textOnlyChild' && bind.seededText && !bind.mountOnly && !bag.hasHost(elVar);
+}
+
 function emitBindingMount(bind, elVar, bag) {
 	const knownExpression = resolveKnownAttributeSource(bind.expr, (source) =>
 		b.id(bag.local(`_prev$${source.binding.id}`)),
@@ -29590,8 +29610,22 @@ function emitBindingMount(bind, elVar, bag) {
 			// Hydration adopts the server text in either case. Seeding `_prev` to the client value
 			// makes the first update a no-op when it matches the server text (no
 			// hydration mismatch re-render).
+			//
+			// Updates also need the host, to replace what a page translator put in place
+			// of the Text (see the runtime's setOnlyText). See onlyTextKeepsHost.
+			if (onlyTextKeepsHost(bind, elVar, bag)) {
+				return st(
+					b.block([
+						...mountHost(),
+						b.const('_v', bind.expr),
+						b.stmt(b.call('_$htext', el(), V(), b.literal(1))),
+						b.stmt(b.assignment('=', local(`_prev$${bind.id}`), V())),
+					]),
+				);
+			}
 			return st(
 				b.block([
+					...(bind.mountOnly ? [] : mountHost()),
 					b.const('_v', bind.expr),
 					b.stmt(
 						b.assignment(
@@ -30094,15 +30128,18 @@ function emitBindingUpdate(bind, bag, inlineBindingGuards = false) {
 		}
 		case 'textOnlyChild':
 		case 'text': {
+			// Only an only-child Text has a host whose whole content it owns. A
+			// sibling-position Text keeps React's HostText write, which a translated
+			// node does not receive either.
+			const write = bag.has(`_txt$${bind.id}`)
+				? b.call('_$setText', F('_txt'), V(), ...(bind.kind === 'textOnlyChild' ? [F('_el')] : []))
+				: b.call('_$setOnlyText', F('_el'), V());
 			return st(
 				b.block([
 					b.const('_v', bind.expr),
 					b.if(
 						b.binary('!==', F('_prev'), V()),
-						b.block([
-							b.stmt(b.call('_$setText', F('_txt'), V())),
-							b.stmt(b.assignment('=', F('_prev'), V())),
-						]),
+						b.block([b.stmt(write), b.stmt(b.assignment('=', F('_prev'), V()))]),
 						null,
 					),
 				]),
