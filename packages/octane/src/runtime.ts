@@ -4544,15 +4544,16 @@ function createdInRootRender(block: Block): void {
 		preserveRootCreatedDom(block);
 	(transaction.created ??= []).push(block);
 	// The root window discards a Block together with a parent this attempt also
-	// created, so it needs no creation entry, nor render entries in
-	// renderBlockInner: the parent's creation undo unmounts the subtree it can
-	// reach, and rollbackRootRender sweeps `created` for the rest, such as a
-	// portal whose content suspended before its slot was registered, or an arm a
-	// restored slot no longer names. The parent's render entries invalidate the
-	// committed path above it. A nested boundary window replays only its own
-	// entries and has no sweep, so it keeps them all, as do hydration and adopted
-	// DOM, where ROOT_DISCARD_STAMP is -1. A hookless child's stand-in is not a
-	// Block; its owner's teardown reaches what is created below it.
+	// created, so it needs no creation entry. The parent's creation undo unmounts
+	// the subtree it can reach, and rollbackRootRender sweeps `created` for the
+	// rest, such as a portal whose content suspended before its slot was
+	// registered, or an arm a restored slot no longer names. When that parent is
+	// its own parentBlock, renderBlockInner skips its render entries too: the
+	// parent's entries invalidate the committed path above it. A nested boundary
+	// window replays only its own entries and has no sweep, so it keeps them all,
+	// as do hydration and adopted DOM, where ROOT_DISCARD_STAMP is -1. A hookless
+	// child's stand-in is not a Block; its owner's teardown reaches what is
+	// created below it.
 	let parent = TRANSITION_JOURNAL_DEPTH === 1 ? block.parentBlock : null;
 	while (parent instanceof LiteBlockImpl) parent = parent.parentBlock;
 	if (parent === null || parent.createdStamp !== ROOT_DISCARD_STAMP)
@@ -11933,15 +11934,14 @@ function renderBlockInner(block: Block): true | undefined {
 	// A held in-place attempt has no capture. Its completed bodies must lose
 	// bailout validity with their rolled-back DOM. Record both owners: a nested
 	// journal can roll back even while its enclosing capture survives.
-	if (TRANSITION_JOURNAL !== null) {
-		// Not for a Block the root window discards with its parent (createdInRootRender).
-		let parent =
-			TRANSITION_JOURNAL_DEPTH === 1 && block.createdStamp === ROOT_DISCARD_STAMP
-				? block.parentBlock
-				: null;
-		while (parent instanceof LiteBlockImpl) parent = parent.parentBlock;
-		if (parent === null || parent.createdStamp !== ROOT_DISCARD_STAMP)
-			TRANSITION_JOURNAL.push(JOURNAL_RENDER, block, null, null);
+	// Not for a Block the root window discards with its parent (createdInRootRender).
+	if (
+		TRANSITION_JOURNAL !== null &&
+		(TRANSITION_JOURNAL_DEPTH !== 1 ||
+			block.createdStamp !== ROOT_DISCARD_STAMP ||
+			block.parentBlock?.createdStamp !== ROOT_DISCARD_STAMP)
+	) {
+		TRANSITION_JOURNAL.push(JOURNAL_RENDER, block, null, null);
 	}
 	const prevScope = CURRENT_SCOPE;
 	const prevBlock = CURRENT_BLOCK;
