@@ -59,9 +59,6 @@ const FUNCTION_OR_CLASS = new Set([
 
 class Unsupported extends Error {}
 
-// Stands in for whichever nested chain node holds an operand.
-const OPERAND_PARENT = { type: 'LogicalExpression' };
-
 function isNode(value) {
 	return value !== null && typeof value === 'object' && typeof value.type === 'string';
 }
@@ -308,12 +305,13 @@ export function foldProfileGuards(source, program, enabled) {
 	};
 
 	// `truthOnly`: only the value's truthiness is observed, as for an `if` test.
+	// A null `parent` is a logical-chain operand, which is always read.
 	const fold = (node, parent, key, truthOnly = false) => {
 		if (!mentionsDefine(node) || isErasedNode(node)) return;
 		switch (node.type) {
 			case 'Identifier':
 				if (node.name !== PROFILE_DEFINE) return;
-				switch (defineUse(parent, key)) {
+				switch (parent === null ? 'read' : defineUse(parent, key)) {
 					case 'read':
 						replace(node.start, node.end, literalText(enabled));
 						return;
@@ -426,7 +424,7 @@ export function foldProfileGuards(source, program, enabled) {
 			if (value !== null && value.profile && literalText(value.value) !== null) {
 				replace(operands[index].start, operands[index].end, literalText(value.value));
 			} else {
-				fold(operands[index], OPERAND_PARENT, 'right', truthOnly);
+				fold(operands[index], null, null, truthOnly);
 			}
 		}
 	};
