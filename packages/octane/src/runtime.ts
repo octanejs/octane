@@ -24468,8 +24468,11 @@ export function presentationWrite<T>(
 	}
 	if (kind === 'bindSignalText') return preparePresentationSignalBinding(args, frame, true) as T;
 	if (kind === 'setText') {
-		const text = coerceText(args[1]);
-		preparePresentationOperation(frame, args[0], 'text', () => writer(args[0], text));
+		const [node, value, host] = args as [Text | null, unknown, Node | undefined];
+		const text = coerceText(value);
+		// A text binding that keeps only its host passes no Text (see setText), so
+		// the host keys its prepared write; the host also reaches the deferred write.
+		preparePresentationOperation(frame, node ?? host!, 'text', () => writer(node, text, host));
 		return undefined as T;
 	}
 	if (kind === 'bindSignalAttribute') return preparePresentationSignalBinding(args, frame) as T;
