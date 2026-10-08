@@ -1,7 +1,8 @@
 import {
 	hasModifier,
+	hasParseErrors,
 	is,
-	NodeFlags,
+	isReparsed,
 	parseSourceFile,
 	ScriptKind,
 	SyntaxKind,
@@ -28,24 +29,6 @@ const EQUALITY = new Map([
 	[SyntaxKind.ExclamationEqualsEqualsToken, true],
 	[SyntaxKind.ExclamationEqualsToken, true],
 ]);
-
-// TypeScript 7 reparses a JavaScript module's JSDoc (`@type`, `@typedef`,
-// `@import`, `@overload`, ...) into nodes flagged Reparsed, inside the tree and
-// among its statements. They never evaluate, so the walk skips them.
-const fromJSDoc = (node) => (node.flags & NodeFlags.Reparsed) !== 0;
-
-// The syntax-only parse reports no diagnostics; the parser marks the node it
-// finished after each error instead.
-function hasParseErrors(sourceFile) {
-	let found = false;
-	const visit = (node) => {
-		if (found || fromJSDoc(node)) return;
-		if (node.flags & NodeFlags.ThisNodeHasError) found = true;
-		else node.forEachChild(visit);
-	};
-	visit(sourceFile);
-	return found;
-}
 
 function isEnvironmentRead(node) {
 	return (
@@ -120,7 +103,7 @@ export function compileNodeEnvReads(source, filename) {
 	const edits = [];
 	let shadowed;
 	function visit(node) {
-		if (fromJSDoc(node)) return;
+		if (isReparsed(node)) return;
 		// Types never evaluate, including the ambient `process` declaration's.
 		if (is.isTypeNode(node) || is.isInterfaceDeclaration(node) || is.isTypeAliasDeclaration(node)) {
 			return;
@@ -163,7 +146,7 @@ export function compileNodeEnvReads(source, filename) {
 
 	// The flag precedes every other statement, including the leading comments of
 	// the first one, so annotations such as @__NO_SIDE_EFFECTS__ stay attached.
-	const statements = sourceFile.statements.filter((statement) => !fromJSDoc(statement));
+	const statements = sourceFile.statements.filter((statement) => !isReparsed(statement));
 	let index = 0;
 	while (
 		index < statements.length &&

@@ -44,6 +44,29 @@ export function printNode(node, options) {
 	return syntaxApi().printer.printNode(node, options);
 }
 
+/**
+ * Whether TypeScript 7 made a node from JSDoc. In a JavaScript file it reparses
+ * `@import`, `@typedef`, `@type`, `@satisfies` and other tags into syntax-tree
+ * nodes (and statements) flagged `Reparsed`, which the classic parser never
+ * produced. That text is a comment, so walks of authored syntax skip them.
+ */
+export function isReparsed(node) {
+	return (node.flags & NodeFlags.Reparsed) !== 0;
+}
+
+/**
+ * Whether a parse hit a syntax error. A parsed file carries no parse
+ * diagnostics; the parser flags the node it finishes after each error instead.
+ * Nodes reparsed from JSDoc are skipped, as classic parse diagnostics ignored
+ * malformed JSDoc.
+ */
+export function hasParseErrors(node) {
+	if (isReparsed(node)) return false;
+	return (
+		(node.flags & NodeFlags.ThisNodeHasError) !== 0 || Boolean(node.forEachChild(hasParseErrors))
+	);
+}
+
 /** Whether a node carries the modifier keyword `kind` (a TypeScript 7 `SyntaxKind`). */
 export function hasModifier(node, kind) {
 	return Boolean(node.modifiers?.some((modifier) => modifier.kind === kind));

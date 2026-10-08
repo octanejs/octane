@@ -2,8 +2,8 @@ import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import {
 	hasModifier,
+	hasParseErrors,
 	is,
-	NodeFlags,
 	parseSourceFile,
 	ScriptKind,
 	SyntaxKind,
@@ -100,20 +100,12 @@ function hasConfinedPackageTests(repoRoot, binding) {
 	return tests.length > 0;
 }
 
-// TypeScript 7 reports no parse diagnostics for a lone source file; its parser
-// flags the node it finishes after each syntax error instead. JSDoc that it
-// reparses into a JavaScript file's tree is comment text, not the file's syntax.
-function hasParseError(node) {
-	if (node.flags & NodeFlags.Reparsed) return false;
-	return Boolean(node.flags & NodeFlags.ThisNodeHasError || node.forEachChild(hasParseError));
-}
-
 // Registrations belong to the inspected checkout. Parse their literal data;
 // importing the bridge would execute that checkout's code in the audit process.
 function readBridgeRegistrations(repoRoot) {
 	const filePath = confinedRepositoryPath(repoRoot, 'packages/octane-mcp-server/src/bridge.js');
 	const source = parseSourceFile(filePath, readFileSync(filePath, 'utf8'), ScriptKind.JS);
-	if (hasParseError(source)) throw new Error(`Cannot parse registrations in ${filePath}`);
+	if (hasParseErrors(source)) throw new Error(`Cannot parse registrations in ${filePath}`);
 	const declarations = new Map();
 	for (const statement of source.statements) {
 		if (!is.isVariableStatement(statement) || !hasModifier(statement, SyntaxKind.ExportKeyword))

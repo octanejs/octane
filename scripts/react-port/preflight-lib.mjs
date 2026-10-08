@@ -3,7 +3,7 @@ import { readFileSync, existsSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
 import path from 'node:path';
 import { gunzipSync } from 'node:zlib';
-import { is, NodeFlags, parseSourceFile, SyntaxKind } from '../octane-tsc/native-syntax.mjs';
+import { is, isReparsed, parseSourceFile, SyntaxKind } from '../octane-tsc/native-syntax.mjs';
 import { verifyNpmProvenance } from './npm-provenance.mjs';
 import { bridgeReportFromSource } from '../../packages/octane-mcp-server/src/bridge.js';
 import {
@@ -833,13 +833,6 @@ function commandPathPatterns(testScripts) {
 	return Object.values(testScripts).flatMap((command) =>
 		String(command).split(/\s+/).map(normalizeConfigurationPattern).filter(Boolean),
 	);
-}
-
-// TypeScript 7 reparses a JavaScript file's JSDoc (`@import`, `@typedef`,
-// `@type`, `@satisfies`) into its syntax tree as nodes flagged `Reparsed`.
-// That text is a comment, so these scans read authored syntax alone.
-function isReparsed(node) {
-	return Boolean(node.flags & NodeFlags.Reparsed);
 }
 
 function propertyName(name) {

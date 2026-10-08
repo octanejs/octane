@@ -6,7 +6,7 @@ import { fileURLToPath } from 'node:url';
 import {
 	hasModifier,
 	is,
-	NodeFlags,
+	isReparsed,
 	parseSourceFile,
 	ScriptKind,
 	SyntaxKind,
@@ -232,7 +232,7 @@ function inspectModule(targetPath, packageDirectory, visiting = new Set()) {
 	for (const statement of sourceFile.statements) {
 		// TypeScript 7 adds a JavaScript file's JSDoc `@import` and `@typedef` as
 		// reparsed statements; only authored statements form the module contract.
-		if (statement.flags & NodeFlags.Reparsed) continue;
+		if (isReparsed(statement)) continue;
 		if (is.isExportAssignment(statement)) {
 			exports.add(statement.isExportEquals ? 'module.exports' : 'default');
 			continue;

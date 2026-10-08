@@ -4,7 +4,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
 	is,
-	NodeFlags,
+	isReparsed,
 	parseSourceFile,
 	ScriptKind,
 	SyntaxKind,
@@ -738,7 +738,7 @@ function staticModuleSpecifiers(filePath) {
 	function visit(node) {
 		// JSDoc that TypeScript 7 reparses into a JavaScript file (`@import`) is
 		// comment text, never a runtime import.
-		if (node.flags & NodeFlags.Reparsed) return;
+		if (isReparsed(node)) return;
 		if (
 			is.isImportDeclaration(node) &&
 			node.moduleSpecifier &&
