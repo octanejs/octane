@@ -13,6 +13,6 @@
     "noUnusedLocals": true,
     "noUnusedParameters": true
   },
-  "include": ["./src/", "./typetests/"],
+  "include": ["./src/"],
   "exclude": ["node_modules", "dist", "tests"]
 }
