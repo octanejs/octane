@@ -36,10 +36,18 @@ interface SignalTransitionSuspense<T extends SignalTransitionTypes> {
 interface SignalTransitionBlock<T extends SignalTransitionTypes> {
 	disposed: boolean;
 	parentBlock: T['Block'] | null;
+	/** The renderer's feature-only record; a Suspense boundary registers its handler there. */
+	rare: { suspenseHandler?: SignalTransitionSuspenseHandler<T> | null } | null;
 	idState: { renderOwner?: T['Owner'] };
 	pendingMode: 'urgent' | 'transition' | null;
 	inactive: boolean;
 }
+
+// Method syntax keeps the parameters bivariant: the renderer's handler takes its
+// own thenable and Block types, which this model only sees structurally.
+type SignalTransitionSuspenseHandler<T extends SignalTransitionTypes> = {
+	handle(thenable: T['Thenable'], sourceBlock: T['Block']): void;
+}['handle'];
 
 interface SignalTransitionOwner<T extends SignalTransitionTypes> {
 	disposed: boolean;
@@ -189,7 +197,7 @@ export function createSignalTransitionCoordinator<T extends SignalTransitionType
 				// Independent consumers enter below their boundary's render catch.
 				// Route only to the real boundary to retain its configured timeout.
 				for (let owner: Block | null = block; owner !== null; owner = owner.parentBlock) {
-					const handler = (owner as any).__suspenseHandler;
+					const handler = owner.rare?.suspenseHandler;
 					if (handler) {
 						try {
 							handler(error.thenable, block);
