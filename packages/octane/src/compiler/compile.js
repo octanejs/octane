@@ -13913,18 +13913,21 @@ function ssrEmitNodes(
 	// runtime.ts, which treats separators as protocol nodes. Keep the comment
 	// payload in sync with HYDRATION_TEXT_SEP (constants.ts).
 	//
-	// A dynamic hole with siblings is a `<!>` position the client walks from
-	// (htextSwap), so an empty value must still serialize ONE node: wrap it in
-	// ssrTextSlot, which emits an empty anchor comment for ''. A sole child
-	// needs no stand-in: the client mounts it with htext (element) or it ends
-	// its block range (root/arm), and no later walk starts from it.
+	// A dynamic hole is a `<!>` template position the client claims and mounts
+	// with htextSwap, so an empty value must still serialize ONE node: wrap it
+	// in ssrTextSlot, which emits an empty anchor comment for ''. That holds for
+	// a sole body/sub root too (a fragment, arm or list item): its template is
+	// that one `<!>`, and an empty range leaves nothing to claim. Only a host
+	// element's sole child needs no stand-in: the client mounts it with htext,
+	// which hydrates an empty host as ''.
+	const textSlots = nodes.length > 1 || ctx._ssrHostChildPos !== true;
 	let prevText = null; // 'static' | 'dyn' | null — last emitted part's text kind
 	for (const n of nodes) {
 		const kind = textAdjacencyKind(n, ctx);
 		if (kind === 'empty') continue; // serializes nothing — skip, adjacency-transparent
 		const nlGuard = nlGuardFirst && parts.length === 0;
 		let p = ssrEmitNode(n, ctx, name, inlinedSubs, parentNs, cssHash, componentNs, nlGuard);
-		if (p && kind === 'dyn' && nodes.length > 1) {
+		if (p && kind === 'dyn' && textSlots) {
 			ctx.runtimeNeeded.add('ssrTextSlot');
 			p = ssrCall('ssrTextSlot', [p], n);
 		}
