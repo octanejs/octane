@@ -7049,18 +7049,20 @@ function ensureViewTransitionDriver(): ViewTransitionDriver {
 			// A resume commits pending render work in its layout drain too. Flush
 			// the previous commit's passives before choosing either owners or waits,
 			// then include every sibling update those passives scheduled. Transitions
-			// waiting for their task join too, so one view transition captures them.
+			// waiting for their task join the commit that drains here, so one view
+			// transition captures them; they are adopted only by a drain that runs.
 			const passivesSettled = vtDrainPassivesBeforeCapture();
-			adoptTransitionQueue();
 			const capture = VT_CAPTURE;
 			const resumed = getBlocks?.() ?? [];
-			const blocks = QUEUE.length === 0 ? resumed : [...new Set([...resumed, ...QUEUE])];
+			const queued = TRANSITION_QUEUE.length === 0 ? QUEUE : QUEUE.concat(TRANSITION_QUEUE);
+			const blocks = queued.length === 0 ? resumed : [...new Set([...resumed, ...queued])];
 			const owners = vtQueuedOwners(blocks);
 			if (!passivesSettled || (QUEUE.length > 0 && !queueAllTransition())) {
 				// An urgent sibling keeps its priority. A still-open passive cascade
 				// can touch further owners, so only that fallback interrupts all scopes.
 				if (passivesSettled) vtInterruptOwners(owners);
 				else vtInterrupt();
+				adoptTransitionQueue();
 				work();
 				flushWork();
 				return true;
@@ -7077,13 +7079,10 @@ function ensureViewTransitionDriver(): ViewTransitionDriver {
 				Promise.allSettled(waits).then(resume);
 				return true;
 			}
-			if (!vtNativeAvailable(owners)) {
-				// The caller commits only the resume; adopted transitions still need a flush.
-				vtScheduleQueuedWork();
-				return false;
-			}
+			if (!vtNativeAvailable(owners)) return false;
 			vtFlush(
 				() => {
+					adoptTransitionQueue();
 					work();
 					if (QUEUE.length > 0 || ROOT_RENDER_TRANSACTIONS.length > 0) flushWork();
 				},
