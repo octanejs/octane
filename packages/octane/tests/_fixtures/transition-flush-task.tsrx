@@ -6,6 +6,7 @@ import {
 	useOptimistic,
 	useState,
 	useTransition,
+	ViewTransition,
 } from 'octane';
 
 // Fixtures for transition-flush-task.test.ts (#1864). Each component reports
@@ -128,5 +129,22 @@ export function HeldPendingPanel(props: HeldPendingPanelProps) @{
 	<>
 		<TransitionButton onCommit={props.onCommit} onPress={props.onPress} />
 		<HeldPanel initial={props.initial} expose={props.expose} />
+	</>
+}
+
+// A controlled input whose value updates only inside a transition.
+export function TransitionInput() @{
+	const [value, setValue] = useState('');
+	<>
+		<input
+			value={value}
+			onInput={(event: Event) => {
+				const next = (event.currentTarget as HTMLInputElement).value;
+				startTransition(() => setValue(next));
+			}}
+		/>
+		<ViewTransition>
+			<p>{value as string}</p>
+		</ViewTransition>
 	</>
 }

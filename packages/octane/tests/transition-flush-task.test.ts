@@ -6,7 +6,9 @@ import {
 	OptimisticProbe,
 	PendingPanel,
 	StateProbe,
+	TransitionInput,
 } from './_fixtures/transition-flush-task.tsrx';
+import { installViewTransitionMocks } from './conformance/_helpers/view-transition-mocks';
 
 // Transition-priority renders flush in a later host task than the urgent work
 // before them (#1864, G1). A microtask flush rendered and committed once per
@@ -311,5 +313,26 @@ describe('pending cues commit before the transition they announce', () => {
 
 		expect(log).toEqual(['0/0', '0/1', 'task', '1/1']);
 		expect(container.textContent).toBe('1/1');
+	});
+});
+
+describe('controlled input restores', () => {
+	it('commit a transition-only input update in its event, through startViewTransition', () => {
+		const vt = installViewTransitionMocks();
+		try {
+			const { container } = mountWith(TransitionInput, {});
+			const input = container.querySelector('input') as HTMLInputElement;
+
+			// A controlled value armed a restore, so the event commits its work
+			// before restoring, the transition included, as one view transition.
+			input.value = 'a';
+			input.dispatchEvent(new Event('input', { bubbles: true }));
+
+			expect(vt.calls).toHaveLength(1);
+			expect(input.value).toBe('a');
+			expect(container.querySelector('p')!.textContent).toBe('a');
+		} finally {
+			vt.restore();
+		}
 	});
 });

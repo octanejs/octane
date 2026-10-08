@@ -30221,6 +30221,8 @@ function maybeFlushDiscrete(type: DelegatedEventType): void {
 			// it here meant the canonical onInput={() => startTransition(...)} pattern
 			// could never call document.startViewTransition. flush() also knows how to
 			// leave a second transition queued while an earlier one is still in flight.
+			// Transitions waiting for their task commit here too, before the restore.
+			TRANSITION_TASK_DRIVER?.adopt();
 			if (VIEW_TRANSITION_DRIVER?.queueAllTransition() === true) flush();
 			else flushSync(noop);
 		}
