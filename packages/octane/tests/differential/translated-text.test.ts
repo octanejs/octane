@@ -1,7 +1,12 @@
 import { describe, it } from 'vitest';
 import { resolve } from 'node:path';
 import { translateTextHosts } from '../_page-translation.js';
-import { mountDifferential, preloadDifferentialFixture, type DiffMount } from './_rig.js';
+import {
+	mountDifferential,
+	preloadDifferentialFixture,
+	type DiffMount,
+	type DiffPair,
+} from './_rig.js';
 
 const FIXTURE = resolve(__dirname, '../_fixtures/translated-text.tsrx');
 const SPREAD_FIXTURE = resolve(__dirname, '../_fixtures/translated-text-spread.tsrx');
@@ -20,12 +25,7 @@ function translate(m: DiffMount, selector: string): void {
 
 // Translate, update, update again untranslated, then translate the restored
 // text and update once more.
-async function translateThenAdvance(
-	name: string,
-	selector: string,
-	fixture: string = FIXTURE,
-): Promise<void> {
-	const d = await mountDifferential(fixture, name);
+async function translateThenAdvance(d: DiffPair, selector: string): Promise<void> {
 	const next = async (i: DiffMount, r: DiffMount) => {
 		await i.click('button');
 		await r.click('button');
@@ -48,39 +48,42 @@ async function translateThenAdvance(
 
 describe('differential: a translated only-child text host keeps updating', () => {
 	it('replaces translated text in an explicit text binding', async () => {
-		await translateThenAdvance('TextBinding', '#text');
+		await translateThenAdvance(await mountDifferential(FIXTURE, 'TextBinding'), '#text');
 	});
 
 	it('replaces translated text in a text binding whose host has other bindings', async () => {
-		await translateThenAdvance('ClassedTextBinding', '#text');
+		await translateThenAdvance(await mountDifferential(FIXTURE, 'ClassedTextBinding'), '#text');
 	});
 
 	it('replaces translated text in a custom element text binding', async () => {
-		await translateThenAdvance('CustomElementText', '#text');
+		await translateThenAdvance(await mountDifferential(FIXTURE, 'CustomElementText'), '#text');
 	});
 
 	it('replaces translated text in a renderable value hole', async () => {
-		await translateThenAdvance('RenderableHole', '#hole');
+		await translateThenAdvance(await mountDifferential(FIXTURE, 'RenderableHole'), '#hole');
 	});
 
 	it('replaces translated text in keyed rows', async () => {
-		await translateThenAdvance('KeyedRows', 'b, i');
+		await translateThenAdvance(await mountDifferential(FIXTURE, 'KeyedRows'), 'b, i');
 	});
 
 	it('replaces translated text in keyed rows that read component state', async () => {
-		await translateThenAdvance('KeyedRowsReadingState', 'b, i');
+		await translateThenAdvance(await mountDifferential(FIXTURE, 'KeyedRowsReadingState'), 'b, i');
 	});
 
 	it('clears translated text when the hole switches to an element', async () => {
-		await translateThenAdvance('TextToElement', '#hole');
+		await translateThenAdvance(await mountDifferential(FIXTURE, 'TextToElement'), '#hole');
 	});
 
 	it('replaces translated text in a host with spread props', async () => {
-		await translateThenAdvance('SpreadHost', '#hole', SPREAD_FIXTURE);
+		await translateThenAdvance(await mountDifferential(SPREAD_FIXTURE, 'SpreadHost'), '#hole');
 	});
 
 	it('clears translated text when a spread host switches to an element', async () => {
-		await translateThenAdvance('SpreadTextToElement', '#hole', SPREAD_FIXTURE);
+		await translateThenAdvance(
+			await mountDifferential(SPREAD_FIXTURE, 'SpreadTextToElement'),
+			'#hole',
+		);
 	});
 
 	it('clears translated text when the next message is empty', async () => {
