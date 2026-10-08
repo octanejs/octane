@@ -1,0 +1,155 @@
+name: Size review
+
+# Reviews bundle growth after it lands instead of gating it before merge. Each
+# push to main builds every bundle-size and reachability scenario on the commit
+# before the push and on the pushed commit, on one runner. When some bundle grew
+# by at least SIZE_REVIEW_MIN_GZIP_BYTES gzip bytes (default 32), Claude reads
+# the landed diff and judges whether the growth is earned or slop and how the
+# change could have been written smaller. benchmarks/size-review.mjs records
+# that in one rolling "Bundle size review" issue: an open one is edited in
+# place, newest entry first, and a new one is opened only when none is open.
+#
+# Claude runs only when the ANTHROPIC_API_KEY repository secret is set, and only
+# with read-only tools: Read, Grep, Glob, and git diff/log/show. Without the
+# secret the issue still records the measured growth. SIZE_REVIEW_MODEL and
+# SIZE_REVIEW_MIN_GZIP_BYTES are optional repository variables. Run it by hand
+# with a base and head to review an earlier range.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "packages/**"
+      - "benchmarks/**"
+      - "package.json"
+      - "pnpm-lock.yaml"
+      - ".github/workflows/size-review.yml"
+  workflow_dispatch:
+    inputs:
+      base:
+        description: "Base commit (default: the head's first parent)"
+        required: false
+        default: ""
+      head:
+        description: "Head commit (default: the selected ref)"
+        required: false
+        default: ""
+
+concurrency:
+  group: ${{ github.workflow }}-${{ inputs.head || github.sha }}
+
+permissions:
+  contents: read
+
+jobs:
+  review:
+    name: review bundle growth
+    runs-on: blacksmith-4vcpu-ubuntu-2404
+    timeout-minutes: 60
+    permissions:
+      contents: read
+      issues: write
+      pull-requests: read
+    env:
+      HAS_ANTHROPIC_KEY: ${{ secrets.ANTHROPIC_API_KEY != '' }}
+      SIZE_REVIEW_MIN_GZIP_BYTES: ${{ vars.SIZE_REVIEW_MIN_GZIP_BYTES }}
+
+    steps:
+      - name: Checkout head commit
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          ref: ${{ inputs.head || github.sha }}
+          persist-credentials: false
+          # Claude reads the landed diff, so the base commit must be present.
+          fetch-depth: 0
+
+      - name: Resolve the landed range
+        id: range
+        env:
+          INPUT_BASE: ${{ inputs.base }}
+          PUSH_BEFORE: ${{ github.event.before }}
+        run: |
+          head=$(git rev-parse HEAD)
+          base=${INPUT_BASE:-$PUSH_BEFORE}
+          if [ -z "$base" ] || [ -z "${base//0/}" ]; then
+            base=$(git rev-parse HEAD^1)
+          fi
+          base=$(git rev-parse "$base^{commit}")
+          echo "BASE_SHA=$base" >> "$GITHUB_ENV"
+          echo "HEAD_SHA=$head" >> "$GITHUB_ENV"
+          echo "BASE_TREE=$RUNNER_TEMP/base" >> "$GITHUB_ENV"
+          echo "RESULTS=$RUNNER_TEMP/size-review" >> "$GITHUB_ENV"
+          git worktree add --detach "$RUNNER_TEMP/base" "$base"
+          echo "Reviewing $base..$head"
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@d9184bf108216479bc5a137cc391f4d7b14c870b # v6.1.0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: 24
+          cache: "pnpm"
+
+      - name: Install dependencies
+        run: |
+          pnpm install --prod=false --frozen-lockfile
+          pnpm --dir "$BASE_TREE" install --prod=false --frozen-lockfile
+
+      # Byte suites are deterministic and run once per tree, both trees at once.
+      - name: Measure bundles before and after
+        run: |
+          mkdir -p "$RESULTS"
+          (cd "$BASE_TREE" && node benchmarks/bench.mjs --results-dir="$RESULTS/base" bundle-size bundle-reachability) > "$RESULTS/base-bytes.log" 2>&1 &
+          base=$!
+          node benchmarks/bench.mjs --results-dir="$RESULTS/head" bundle-size bundle-reachability > "$RESULTS/head-bytes.log" 2>&1 &
+          head=$!
+          wait "$base" || echo "::warning::base bundle benchmarks failed"
+          wait "$head" || echo "::warning::head bundle benchmarks failed"
+          for side in base head; do
+            echo "::group::$side bundle benchmarks"
+            cat "$RESULTS/$side-bytes.log"
+            echo "::endgroup::"
+          done
+
+      - name: Compare bundle bytes
+        id: growth
+        run: node benchmarks/size-review.mjs growth --base="$RESULTS/base" --head="$RESULTS/head" --out="$RESULTS/review"
+
+      - name: Collect the landed pull requests
+        if: steps.growth.outputs.grew == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: node benchmarks/size-review.mjs prompt --out="$RESULTS/review"
+
+      # Read-only tools, no GitHub token, and the output only becomes issue text.
+      - name: Review the growth with Claude
+        if: steps.growth.outputs.grew == 'true' && env.HAS_ANTHROPIC_KEY == 'true'
+        timeout-minutes: 20
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          MODEL: ${{ vars.SIZE_REVIEW_MODEL || 'claude-opus-5-5' }}
+        run: |
+          npx --yes @anthropic-ai/claude-code@2.1.283 --print \
+            --model "$MODEL" \
+            --max-turns 60 \
+            --max-budget-usd 5 \
+            --allowedTools "Read,Grep,Glob,Bash(git diff:*),Bash(git log:*),Bash(git show:*)" \
+            < "$RESULTS/review/prompt.md" > "$RESULTS/review/analysis.md" \
+            || { echo "::warning::Claude review failed; the issue records the growth only"; rm -f "$RESULTS/review/analysis.md"; }
+
+      - name: Record the review in the size issue
+        if: steps.growth.outputs.grew == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: node benchmarks/size-review.mjs publish --out="$RESULTS/review"
+
+      - name: Upload results
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: size-review
+          path: ${{ env.RESULTS }}/
+          if-no-files-found: ignore
+          retention-days: 14
