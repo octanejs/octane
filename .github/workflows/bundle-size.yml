@@ -1,0 +1,62 @@
+name: Bundle size
+
+# Called by CI so the existing release and lightweight-change classification
+# stays authoritative. This job reports separately from the runtime test shards
+# and remains part of the CI run that must pass before publishing.
+on:
+  workflow_call:
+    inputs:
+      run-benchmarks:
+        description: Build all bundle scenarios unless CI authenticated inherited coverage
+        required: true
+        type: boolean
+
+permissions:
+  contents: read
+
+jobs:
+  checks:
+    name: bundle size checks
+    runs-on: blacksmith-4vcpu-ubuntu-2404
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@d9184bf108216479bc5a137cc391f4d7b14c870b # v6.1.0
+
+      - name: Setup Node.js 24
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: 24
+          cache: "pnpm"
+
+      # A raised budget must be reviewed separately from the implementation.
+      # Keep this inexpensive policy check even when builds inherit coverage.
+      - name: Check that byte budget raises land alone
+        env:
+          BUDGET_BASE: ${{ github.event_name == 'pull_request' && 'HEAD^1' || github.event.before }}
+        run: node benchmarks/bundle-size/budget-raises.mjs --base "$BUDGET_BASE"
+
+      - name: Install dependencies
+        if: inputs.run-benchmarks
+        run: pnpm install --prod=false --frozen-lockfile
+
+      # All public-import scenarios and complete applications retain their
+      # existing byte ceilings, ratchets, and executable reachability gates.
+      - name: Verify every bundle budget
+        if: inputs.run-benchmarks
+        env:
+          BUDGET_BASE: ${{ github.event_name == 'pull_request' && 'HEAD^1' || github.event.before }}
+        run: |
+          node benchmarks/bundle-size/run-minimal.mjs --budgets --ratchet
+          node benchmarks/bundle-size/run.mjs --budgets --ratchet octane-tsrx octane-jsx
+
+      - name: Verify client-only bundles retain no hydration code
+        if: inputs.run-benchmarks
+        run: node benchmarks/bundle-size/run-hydration-free.mjs

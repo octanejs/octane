@@ -294,6 +294,12 @@ application in `app-budgets.json` and `jsx-budgets.json`) is a ratchet at the
 measured production bytes plus 32 for raw and gzip. Brotli gets 256, because
 removing code can raise it. CI enforces all of them on every pull request.
 
+The dedicated `Bundle size` workflow reports these checks separately from
+`test (24)`, so a byte regression does not prevent the runtime tests from
+running. CI calls it as `bundle size / bundle size checks` and includes it in
+the coverage required before publishing. Repository branch protection should
+require that check alongside `lint`, `typecheck`, and `test (24)`.
+
 - A feature or fix pull request never raises a budget. Make the growth smaller,
   usually by moving the new code behind the capability that needs it, or raise
   the budget first in a separate pull request.

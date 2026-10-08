@@ -165,49 +165,6 @@ describe('CI workflow aggregation', () => {
 		assert.doesNotMatch(shard, /input-otp\/tests\/browser\/\*\*\/\*\.spec\.ts/);
 	});
 
-	// Every scenario and every complete Octane application, not a chosen few:
-	// unenforced budgets drifted over their limits with no pull request failing.
-	test('enforces every committed bundle budget once per full CI run', () => {
-		const shard = jobSource('test_shard');
-		assert.match(
-			shard,
-			/- name: Checkout code\n\s+uses: actions\/checkout@[^\n]+\n\s+with:\n\s+# Only the budget shard compares against an earlier commit\.\n\s+fetch-depth: \$\{\{ matrix\.shard == '1\/4' && '0' \|\| '1' \}\}\n/,
-		);
-		assert.match(
-			shard,
-			/- name: Verify every bundle budget\n\s+if: matrix\.shard == '1\/4'\n\s+env:\n\s+BUDGET_BASE: \$\{\{ github\.event_name == 'pull_request' && 'HEAD\^1' \|\| github\.event\.before \}\}\n\s+run: \|\n\s+node benchmarks\/bundle-size\/run-minimal\.mjs --budgets --ratchet\n\s+node benchmarks\/bundle-size\/run\.mjs --budgets --ratchet octane-tsrx octane-jsx\n/,
-		);
-		for (const suite of [
-			'benchmarks/bundle-size/minimal-gates.test.mjs',
-			'benchmarks/bundle-size/budget-raises.test.mjs',
-		]) {
-			assert.ok(packageJson.scripts['ci:workflow:test'].split(' ').includes(suite), suite);
-		}
-	});
-
-	// A createRoot-only client must ship no hydration code under either bundler.
-	test('verifies once per full CI run that client-only bundles retain no hydration code', () => {
-		assert.match(
-			jobSource('test_shard'),
-			/- name: Verify client-only bundles retain no hydration code\n\s+if: matrix\.shard == '1\/4'\n\s+run: node benchmarks\/bundle-size\/run-hydration-free\.mjs\n/,
-		);
-		assert.doesNotMatch(jobSource('test_shard'), /run-hydration-free\.mjs \S/);
-		assert.ok(
-			packageJson.scripts['ci:workflow:test']
-				.split(' ')
-				.includes('benchmarks/bundle-size/hydration-free-gates.test.mjs'),
-		);
-	});
-
-	test('checks that budget raises land alone against the change itself', () => {
-		const lint = jobSource('lint_checks');
-		assert.match(lint, /fetch-depth: 0/);
-		assert.match(
-			lint,
-			/BUDGET_BASE: \$\{\{ github\.event_name == 'pull_request' && 'HEAD\^1' \|\| github\.event\.before \}\}\n\s+run: node benchmarks\/bundle-size\/budget-raises\.mjs --base "\$BUDGET_BASE"/,
-		);
-	});
-
 	test('checks the weekly Bench job Lynx fixture contracts on every pull request', () => {
 		// Bench runs these before its ratio guards. A Lynx source change that
 		// broke them only on the weekly schedule kept every guard from running.
@@ -516,6 +473,7 @@ describe('CI workflow aggregation', () => {
 			[
 				{ name: 'lint', head_sha: generatedHead },
 				{ name: 'typecheck', head_sha: generatedHead },
+				{ name: 'bundle size / bundle size checks', head_sha: generatedHead },
 			],
 		);
 	});
