@@ -3317,6 +3317,14 @@
     "note": "Same-process exact remove-run acknowledgement preparation retires 65,536 versus 1,024 logical compact hosts while materializing the same 64 boundary handles. The untouched-source baseline at 69a56855c on Node v26.7.0 measured 2.911 versus 2.808 ms/1k (1.04x); final eight-iteration evidence measured 1.071 versus 1.088 ms/1k (0.98x). The 1.5x ceiling leaves timing headroom while rejecting a replacement that walks every mostly unmaterialized logical id."
   },
   {
+    "suite": "scoped-signals-trace",
+    "op": "trace_event",
+    "target": "wrapped-max-budget",
+    "reference": "unfilled-max-budget",
+    "maxRatio": 1.5,
+    "note": "Same-process production trace retention at the supported 10,000-event budget, with exact chronological history checks outside timing. Front-removal measured 15.93x the unfilled control in the full run and 5.60x in quick mode; bounded slot replacement measured 0.58-0.62x across full runs and 0.18x in quick mode. The 1.5x ceiling leaves more than 2.4x timing headroom over the slowest candidate ratio while catching the previous path by more than 3.7x in quick mode."
+  },
+  {
     "suite": "scoped-native-reads",
     "op": "five_dependency_hit_calls",
     "target": "current:native",
