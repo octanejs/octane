@@ -5941,6 +5941,8 @@ type VtActivationKind = 'enter' | 'exit' | 'update' | 'share' | 'parent-enter' |
 interface ViewTransitionDriver {
 	addType(type: string): void;
 	routeFlush(): boolean;
+	markActionCue(): void;
+	endCue(): void;
 	shouldClearTypesAfterFlush(): boolean;
 	clearTypes(): void;
 	interrupt(): void;
@@ -6979,13 +6981,44 @@ function vtInterrupt(): void {
 	vtInterruptOwners(null);
 }
 
-/** Is every queued block scheduled at transition priority? (Empty → false.) */
+// A pending Action cue keeps transition rendering semantics, but alone it
+// should publish before native capture. Only this optional capability owns it.
+let VT_ACTION_CUE = false;
+
+/** Is this an animation-eligible transition batch? */
 function queueAllTransition(): boolean {
 	if (QUEUE.length === 0) return false;
+	let cueOnly = VT_ACTION_CUE && NATIVE_TRANSITION_DRIVER?.hasWork() !== true;
 	for (let i = 0; i < QUEUE.length; i++) {
-		if (QUEUE[i].pendingMode !== 'transition') return false;
+		const block = QUEUE[i];
+		if (block.pendingMode !== 'transition') return false;
+		if (cueOnly && block.pending && !block.disposed) {
+			const owner = block.idState.renderOwner;
+			if (
+				(block.kind === 'root' && !block.mounted) ||
+				(owner?.request != null && owner.current !== null && QUEUE.includes(owner.current))
+			)
+				cueOnly = false;
+		}
 	}
-	return true;
+	if (!cueOnly) return true;
+	// The separate task queue can hold sibling work while this cue drains.
+	// Only receipts belonging to this drain make the cue share a capture.
+	for (const entries of FLUSHED_TRANSITION_UPDATES) {
+		for (const entry of entries) {
+			if (
+				!entry.superseded &&
+				!entry.block.disposed &&
+				entry.block.pending &&
+				QUEUE.includes(entry.block) &&
+				(entry.state !== undefined || entry.reducer !== undefined
+					? entry.slot.renderTransition === entry
+					: !Object.is(entry.slot.value, entry.baseValue))
+			)
+				return true;
+		}
+	}
+	return false;
 }
 
 function vtHasActiveHandles(): boolean {
@@ -7061,7 +7094,14 @@ function ensureViewTransitionDriver(): ViewTransitionDriver {
 			vtFlush();
 			return true;
 		},
+		markActionCue() {
+			if (!syncFlush && !inFlush) VT_ACTION_CUE = true;
+		},
+		endCue() {
+			VT_ACTION_CUE = false;
+		},
 		shouldClearTypesAfterFlush() {
+			VT_ACTION_CUE = false;
 			if (VT_PENDING_TYPES.length === 0) return false;
 			for (let i = 0; i < QUEUE.length; i++) {
 				if (QUEUE[i].pendingMode === 'transition') return true;
@@ -9428,6 +9468,8 @@ export function flushSync<T>(fn: () => T): T {
 			}
 		} finally {
 			inFlush = false;
+			VIEW_TRANSITION_DRIVER?.endCue();
+			FLUSHED_TRANSITION_UPDATES.length = 0;
 			CURRENT_EFFECT_PHASE = effectPhase;
 			if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__)
 				__devtoolsNotifyFlush();
@@ -43809,6 +43851,7 @@ export function useActionState<S>(
 					if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__)
 						__profileSchedule(block, 'action-state-pending', slot);
 					// The rising edge is a pending cue; the falling edge commits with the result.
+					if (next) VIEW_TRANSITION_DRIVER?.markActionCue();
 					scheduleRender(block, false, next);
 				}
 			}

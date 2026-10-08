@@ -106,7 +106,7 @@
   },
   "binding-base-ui-vite": {
     "raw": 198341,
-    "gzip": 62393,
+    "gzip": 62384,
     "brotli": 54383
   },
   "binding-base-ui-esbuild": {
