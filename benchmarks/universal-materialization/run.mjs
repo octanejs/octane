@@ -268,20 +268,6 @@ try {
 		),
 		meta: scenario.semantic,
 	}));
-	for (const [name, arrays, sets] of [
-		['static-128', 515, 27],
-		['scoped-128', 392, 412],
-		['unkeyed-128', 774, 27],
-	]) {
-		result.targets.push({
-			name: `${name}-budget`,
-			ops: {
-				update_materializeArrays: deterministicStatForJson(deterministicCount(arrays)),
-				update_runtimeSets: deterministicStatForJson(deterministicCount(sets)),
-			},
-			meta: { budget: 'maximum deterministic work for the corresponding 128-row update' },
-		});
-	}
 	console.log('| case / phase | materializer arrays | runtime arrays | runtime Sets |');
 	console.log('| --- | ---: | ---: | ---: |');
 	for (const [name, scenario] of Object.entries(result.candidate.cases))

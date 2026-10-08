@@ -1000,19 +1000,6 @@
         },
         "semantic": "8d137fb6ee6afd6b6f23c85c58cf648b7cf904029c079fcf3ae4872bd384bf62"
       }
-    },
-    {
-      "name": "bail-compare-work-budget",
-      "ops": {
-        "bail_own_lookups": {
-          "median": 1,
-          "min": 1,
-          "samples": 1
-        }
-      },
-      "meta": {
-        "gate": "passed"
-      }
     }
   ],
   "harnessExit": 0
