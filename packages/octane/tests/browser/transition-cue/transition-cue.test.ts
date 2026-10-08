@@ -10,12 +10,13 @@ import { fileURLToPath } from 'node:url';
 import { octane } from 'octane/compiler/vite';
 import type {} from './main';
 
-// A component that raises `isPending` and also holds its transition's own update
-// commits the pending cue first, with the previous state, and renders the
-// transition in a later task (#1864). Rendering both in the click's microtask
-// checkpoint delayed the click's next paint by the whole slow render, which
-// Chromium's Event Timing reports as the interaction's latency. React 19.2.7
-// commits "Sorting…" urgently and renders the sort in a Scheduler task.
+// A pending cue commits first, with the previous state, and the transition renders
+// in a later task (#1864), whether the component that raises `isPending` holds the
+// transition's own update or is an ancestor of the component that does. Rendering
+// both in the click's microtask checkpoint delayed the click's next paint by the
+// whole slow render, which Chromium's Event Timing reports as the interaction's
+// latency. React 19.2.7 commits "Sorting…" urgently and renders the sort in a
+// Scheduler task.
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const FIXTURE = resolve(HERE, '../../_fixtures/transition-sort.tsrx');
@@ -83,7 +84,7 @@ afterAll(async () => {
 	await server?.close();
 });
 
-async function clickSort(runtime: 'octane' | 'react') {
+async function clickSort(runtime: 'octane' | 'react', variant: 'component' | 'ancestor') {
 	page = await browser.newPage();
 	page.on('pageerror', (error) => pageFailures.push(error.message));
 	page.on('console', (message) => {
@@ -92,10 +93,10 @@ async function clickSort(runtime: 'octane' | 'react') {
 	});
 	await page.goto(baseUrl);
 	await page.waitForFunction(() => Boolean(window.__transitionCue));
-	await page.evaluate(([runtime, busyMs]) => window.__transitionCue.mount(runtime, busyMs), [
-		runtime,
-		BUSY_MS,
-	] as const);
+	await page.evaluate(
+		([runtime, busyMs, variant]) => window.__transitionCue.mount(runtime, busyMs, variant),
+		[runtime, BUSY_MS, variant] as const,
+	);
 	await page.waitForSelector(`#${runtime}-root [data-sort]`);
 	const before = await page.evaluate((runtime) => window.__transitionCue.commits(runtime), runtime);
 	await page.locator(`#${runtime}-root [data-sort]`).click();
@@ -118,16 +119,18 @@ async function clickSort(runtime: 'octane' | 'react') {
 	return { commits: after.slice(before.length), latency };
 }
 
-describe.sequential('a pending cue in the component that holds the transition', () => {
-	it.each(['octane', 'react'] as const)(
-		'%s: paints the cue before the slow transition render',
-		async (runtime) => {
-			const { commits, latency } = await clickSort(runtime);
+describe.sequential('a pending cue paints before the slow transition render', () => {
+	it.each([
+		['octane', 'component'],
+		['react', 'component'],
+		['octane', 'ancestor'],
+		['react', 'ancestor'],
+	] as const)("%s: cue in the transition's %s", async (runtime, variant) => {
+		const { commits, latency } = await clickSort(runtime, variant);
 
-			expect(commits[0]).toEqual({ label: 'Sorting…', sorted: false });
-			expect(commits.at(-1)).toEqual({ label: 'Unsort', sorted: true });
-			// The slow list renders once, after the cue's paint, not within the click.
-			expect(latency).toBeLessThan(BUSY_MS / 2);
-		},
-	);
+		expect(commits[0]).toEqual({ label: 'Sorting…', sorted: false });
+		expect(commits.at(-1)).toEqual({ label: 'Unsort', sorted: true });
+		// The slow list renders once, after the cue's paint, not within the click.
+		expect(latency).toBeLessThan(BUSY_MS / 2);
+	});
 });

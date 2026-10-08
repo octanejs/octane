@@ -336,3 +336,147 @@ export function DeferredPendingTabs(props: DeferredPendingTabsProps) @{
 		<Panel expose={props.exposePanel} onCommit={() => {}} />
 	</>
 }
+
+interface FilterListProps {
+	isPending: boolean;
+	start: (fn: () => void | Promise<unknown>) => void;
+	onCommit: (entry: string) => void;
+}
+
+function FilterList(props: FilterListProps) @{
+	const [filter, setFilter] = useState('a');
+	const label = `${filter} ${props.isPending ? 'pending' : 'idle'}`;
+	useLayoutEffect(() => {
+		props.onCommit(label);
+	}, null);
+	<button onClick={() => props.start(() => setFilter('b'))}>{label}</button>
+}
+
+interface PendingShellProps {
+	onCommit: (entry: string) => void;
+}
+
+// The pending cue lives in an ancestor of the component whose state the
+// transition sets, and its re-render reaches that component.
+export function PendingShell(props: PendingShellProps) @{
+	const [isPending, start] = useTransition();
+	<FilterList isPending={isPending} start={start} onCommit={props.onCommit} />
+}
+
+// The cue's re-render reaches a child whose transition state suspends.
+export function HeldShell(props: HeldPendingPanelProps) @{
+	const [isPending, start] = useTransition();
+	useLayoutEffect(() => {
+		props.onCommit(isPending ? 'pending' : 'idle');
+	}, null);
+	<>
+		<button onClick={() => props.onPress(start)}>{isPending ? 'pending' : 'idle'}</button>
+		<HeldPanel initial={props.initial} expose={props.expose} />
+	</>
+}
+
+interface FilterViewProps {
+	label: string;
+	expose: (setFilter: (filter: string) => void) => void;
+	onCommit: (entry: string) => void;
+}
+
+function FilterView(props: FilterViewProps) @{
+	const [filter, setFilter] = useState('a');
+	props.expose(setFilter);
+	const entry = `${filter} ${props.label}`;
+	useLayoutEffect(() => {
+		props.onCommit(entry);
+	}, null);
+	<p>{entry}</p>
+}
+
+interface CueShellProps {
+	expose: (setFilter: (filter: string) => void) => void;
+	onCommit: (entry: string) => void;
+	onPress: (cue: () => void) => void;
+}
+
+// An optimistic cue in an ancestor of the transition's state.
+export function OptimisticShell(props: CueShellProps) @{
+	const [saving, setSaving] = useOptimistic(false);
+	<>
+		<button onClick={() => props.onPress(() => setSaving(true))}>{'save'}</button>
+		<FilterView
+			label={saving ? 'saving' : 'saved'}
+			expose={props.expose}
+			onCommit={props.onCommit}
+		/>
+	</>
+}
+
+// A useActionState cue in an ancestor of the transition's state.
+export function ActionShell(props: CueShellProps) @{
+	const [count, dispatch, isPending] = useActionState(
+		(previous: number, step: number) => previous + step,
+		0,
+	);
+	<>
+		<button onClick={() => props.onPress(() => dispatch(1))}>{'add'}</button>
+		<FilterView
+			label={`${count}${isPending ? ' pending' : ''}`}
+			expose={props.expose}
+			onCommit={props.onCommit}
+		/>
+	</>
+}
+
+interface ViewTransitionShellProps {
+	expose: (setTab: (tab: string) => void) => void;
+	onPress: (start: (fn: () => void | Promise<unknown>) => void) => void;
+	onUpdate: (types: string[]) => void;
+}
+
+interface TabViewProps {
+	isPending: boolean;
+	expose: (setTab: (tab: string) => void) => void;
+	onUpdate: (types: string[]) => void;
+}
+
+function TabView(props: TabViewProps) @{
+	const [tab, setTab] = useState('a');
+	props.expose(setTab);
+	<>
+		<span>{props.isPending ? 'pending' : 'idle'}</span>
+		<ViewTransition onUpdate={(_instance: unknown, types: string[]) => props.onUpdate(types)}>
+			<p>{tab as string}</p>
+		</ViewTransition>
+	</>
+}
+
+// The cue's re-render reaches a child whose transition state sits in a ViewTransition.
+export function ViewTransitionShell(props: ViewTransitionShellProps) @{
+	const [isPending, start] = useTransition();
+	<>
+		<button onClick={() => props.onPress(start)}>{'go'}</button>
+		<TabView isPending={isPending} expose={props.expose} onUpdate={props.onUpdate} />
+	</>
+}
+
+interface SuspendingCueShellProps {
+	spinner: Promise<string>;
+	onPress: (start: (fn: () => void | Promise<unknown>) => void) => void;
+}
+
+// The pending cue itself renders content that suspends.
+export function SuspendingCueShell(props: SuspendingCueShellProps) @{
+	const [isPending, start] = useTransition();
+	<>
+		<button onClick={() => props.onPress(start)}>{'go'}</button>
+		@try {
+			<>
+				@if (isPending) {
+					<Reader promise={props.spinner} />
+				}
+				<p>{isPending ? 'pending' : 'idle'}</p>
+			</>
+		} @pending {
+			<p>{'loading'}</p>
+		}
+	</>
+}
