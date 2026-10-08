@@ -237,6 +237,15 @@ function assertBindingRoot(root: Element, descriptor: CompiledBindings<unknown>)
 	return root;
 }
 
+/** One Text node or none, or the <font> wrappers Chrome Translate leaves in its place. */
+function isTextLeaf(node: Element): boolean {
+	const first = node.firstChild;
+	return (
+		first === null ||
+		(first.nodeType === 3 ? !first.nextSibling : (first as Element).localName === 'font')
+	);
+}
+
 function resolveFixedNodes(root: Element, descriptor: CompiledBindings<unknown>): Element[] {
 	assertBindingRoot(root, descriptor);
 	const nodes: Element[] = [];
@@ -257,10 +266,7 @@ function resolveFixedNodes(root: Element, descriptor: CompiledBindings<unknown>)
 			node.localName !== tag ||
 			node.namespaceURI !== namespaces[namespace] ||
 			(text
-				? (node.childNodes.length > 1 ||
-						(node.firstChild !== null && node.firstChild.nodeType !== 3)) &&
-					// Chrome Translate wraps a translated text leaf in <font> elements.
-					(node.firstChild as Element).localName !== 'font'
+				? !isTextLeaf(node)
 				: children !== null &&
 					(node.childNodes.length !== children || node.children.length !== children))
 		) {
@@ -329,10 +335,7 @@ function resolveAddressedNodes(root: Element, descriptor: CompiledBindings<unkno
 						nodes[parent]!.children[childCounts[parent]!] !== node)) ||
 			(openChildren && children === null) ||
 			(text
-				? (node.childNodes.length > 1 ||
-						(node.firstChild !== null && node.firstChild.nodeType !== 3)) &&
-					// Chrome Translate wraps a translated text leaf in <font> elements.
-					(node.firstChild as Element).localName !== 'font'
+				? !isTextLeaf(node)
 				: children !== null &&
 					!openChildren &&
 					(node.childNodes.length !== children || node.children.length !== children))
@@ -396,10 +399,12 @@ function writeFixedScalar(
 	const name = binding[2];
 	if (binding[1] === 'text') {
 		const text = node.firstChild;
+		const current = text?.nodeValue;
 		if (text === null) node.appendChild(node.ownerDocument.createTextNode(value!));
-		else if (text.nodeValue !== value) {
-			if (text.nodeType === 3) text.nodeValue = value;
-			// A translated leaf survives the channel's first write, then is replaced on change.
+		else if (current !== value) {
+			if (current !== null) text.nodeValue = value;
+			// A translated leaf's <font> has no nodeValue. It survives the channel's
+			// first write, then is replaced once the value changes.
 			else if (previous !== undefined) node.textContent = value;
 		}
 	} else if (value === null) {
