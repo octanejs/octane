@@ -28413,6 +28413,11 @@ function planJsx(
 			);
 			continue;
 		}
+		const structural = ctx.presentationHydration?.structural && ic.bindingSite;
+		if (ic.liteMask && !structural) {
+			while (trailing.length < 2) trailing.push(undefinedNode());
+			trailing.push(b.literal(ic.liteMask));
+		}
 		ctx.runtimeNeeded.add('ifBlock');
 		registerDirectiveOrigin(ctx, org, ['_$ifBlock', ic.thenHelper, ic.elseHelper]);
 		registerClauseOrigin(ctx, ic.alternateKeyword, [ic.elseHelper]);
@@ -28426,7 +28431,7 @@ function planJsx(
 			inheritOriginLoc(helperRefNode(ic.elseHelper ?? 'null'), ic.alternateKeyword),
 			...trailing,
 		);
-		if (ctx.presentationHydration?.structural && ic.bindingSite) {
+		if (structural) {
 			invocation = b.call(
 				requireRuntimeForContext(ctx, 'presentationStructure'),
 				invocation.callee,
@@ -28970,6 +28975,10 @@ function planJsx(
 		if (switchAnchor) trailing.push(switchAnchor);
 		else if (swEnv) trailing.push(undefinedNode());
 		if (swEnv) trailing.push(swEnv);
+		if (sc.liteMask) {
+			while (trailing.length < 2) trailing.push(undefinedNode());
+			trailing.push(b.literal(sc.liteMask));
+		}
 		pushAfterStmt(
 			sc.id,
 			org,
@@ -32869,6 +32878,59 @@ function hoistBodyHelper(
 // if-statement inside element children → ifBlock call
 // ===========================================================================
 
+/**
+ * Whether a control-flow arm may render without a Block of its own (the lite
+ * mask ifBlock and switchBlock take). Mirrors componentSlotLite's proof,
+ * tightened for arms: no hook, `use` or context read; no @try; and no call
+ * through a bare identifier while the arm renders, since a helper may call a
+ * hook or update state. Event-handler and ref callbacks run after the render,
+ * so their bodies do not count. A call through a member is allowed unless its
+ * name reads as a hook.
+ */
+function controlFlowArmIsLite(stmts) {
+	const seen = new WeakSet();
+	return !(function reject(n) {
+		if (!n) return false;
+		if (Array.isArray(n)) {
+			for (const x of n) if (reject(x)) return true;
+			return false;
+		}
+		if (typeof n !== 'object' || !n.type || seen.has(n)) return false;
+		seen.add(n);
+		const t = n.type;
+		if (t === 'TryStatement' || t === 'JSXTryExpression') return true;
+		if (
+			t === 'Identifier' &&
+			(HOOK_NAMES.has(n.name) ||
+				n.name === 'use' ||
+				n.name === 'useContext' ||
+				n.name === 'memo' ||
+				n.name === 'createPortal')
+		)
+			return true;
+		if (t === 'CallExpression') {
+			const callee = n.callee;
+			if (callee?.type === 'Identifier') return true;
+			if (
+				callee?.type === 'MemberExpression' &&
+				!callee.computed &&
+				callee.property?.type === 'Identifier' &&
+				/^use[A-Z]/.test(callee.property.name)
+			)
+				return true;
+		}
+		if (t === 'Attribute' || t === 'JSXAttribute') {
+			const name = n.name?.name ?? n.name;
+			if (typeof name === 'string' && (name === 'ref' || isEventAttrName(name))) return false;
+		}
+		for (const k in n) {
+			if (AST_WALK_SKIP_KEYS.has(k)) continue;
+			if (reject(n[k])) return true;
+		}
+		return false;
+	})(stmts);
+}
+
 function makeIfCall(node, ctx, inlinedSubs, parentNs = 'html', cssHash = null) {
 	// node.test, node.consequent (BlockStatement | Element | null), node.alternate (BlockStatement | IfStatement | null)
 	// A null consequent (`{cond ? null : <Jsx/>}` lowered by wrapAsBlockStmt)
@@ -32929,6 +32991,10 @@ function makeIfCall(node, ctx, inlinedSubs, parentNs = 'html', cssHash = null) {
 		envNames,
 		thenHelper: thenHelperName,
 		elseHelper: elseHelperName,
+		// ifBlock's lite mask: 1 when the then arm is hookless, 2 when the else arm is.
+		liteMask:
+			(thenStmts !== null && controlFlowArmIsLite(thenStmts) ? 1 : 0) |
+			(elseStmts !== null && controlFlowArmIsLite(elseStmts) ? 2 : 0),
 		// `@else`'s own keyword — the clause is a BlockStatement starting at `{`.
 		alternateKeyword: node.alternateKeyword ?? null,
 		hostPath: null,
@@ -34013,9 +34079,13 @@ function makeSwitchCall(node, ctx, inlinedSubs, parentNs = 'html', cssHash = nul
 		ctx,
 		(node.cases || []).map((c) => ({ stmts: c.consequent || [], params: [] })),
 	);
+	// switchBlock's lite mask: bit 0 for a hookless default, bit i + 1 for case i.
+	let liteMask = 0;
 	for (const c of node.cases || []) {
 		const stmts = c.consequent || [];
 		const isDefault = c.test == null;
+		if ((isDefault || caseRecords.length < 30) && stmts.length > 0 && controlFlowArmIsLite(stmts))
+			liteMask |= isDefault ? 1 : 2 << caseRecords.length;
 		const helperName = hoistBodyHelper(
 			ctx,
 			inlinedSubs,
@@ -34059,6 +34129,7 @@ function makeSwitchCall(node, ctx, inlinedSubs, parentNs = 'html', cssHash = nul
 		caseRecords, // { testNode, helper } per case — the fold builds the cases hole
 		defaultHelper,
 		defaultKeyword,
+		liteMask,
 		hostPath: null,
 	};
 }

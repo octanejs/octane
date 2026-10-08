@@ -4459,6 +4459,21 @@ function deferRootReplacement(
 	);
 }
 
+/** Retire an outgoing arm, a Block or a lite arm's Scope, once its root commits. */
+function deferRootArmReplacement(
+	block: Block | null,
+	lite: Scope | null,
+	parent: Node,
+	first: Node | null,
+	last: Node | null,
+): void {
+	if (block !== null) deferRootReplacement(block, parent, first, last);
+	else {
+		retireRootBlock(lite!.block);
+		deferRootRange(parent, first, last, () => releaseLiteArm(lite!));
+	}
+}
+
 function deferRootRange(
 	parent: Node,
 	first: Node | null,
@@ -12619,13 +12634,15 @@ function renderReturnedValue(block: Block, out: unknown, reset?: true): void {
 // also use this path to replace native control-flow output with a different kind.
 function disposeReturnSlot(block: Block, state: any): void {
 	const kind = state.__kind;
+	// A branch slot's arm is a Block, or a lite arm's stand-in with the same bound.
+	const arm = state.block ?? state.lite?.block;
 	// A nested sole-root branch can replace its host without refreshing the
 	// outer slot's cached tail. Snapshot/remove only the live owned range.
 	const end =
 		(kind === 'ifBlockSlot' || kind === 'switchBlockSlot') &&
 		state.start === null &&
-		state.block?.endMarker != null
-			? state.block.endMarker
+		arm?.endMarker != null
+			? arm.endMarker
 			: state.end;
 	const transaction = ROOT_RENDER_TRANSACTION;
 	if (transaction !== null && !transaction.aborted && !ROOT_RENDER_ROLLBACK) {
@@ -12636,12 +12653,7 @@ function disposeReturnSlot(block: Block, state: any): void {
 				? getFirstChild(parent)
 				: borrowed
 					? getNextSibling(state.start)
-					: (state.start ??
-						state.hostNode ??
-						state.text ??
-						state.block?.startMarker ??
-						end ??
-						null);
+					: (state.start ?? state.hostNode ?? state.text ?? arm?.startMarker ?? end ?? null);
 		if (borrowed && first === end) first = null;
 		const last: Node | null =
 			first === null
@@ -12650,7 +12662,7 @@ function disposeReturnSlot(block: Block, state: any): void {
 					? (STAGED_DOM?.view(parent) ?? parent).lastChild
 					: borrowed
 						? domNode(end).previousSibling
-						: (end ?? state.block?.endMarker ?? first);
+						: (end ?? arm?.endMarker ?? first);
 		journalRootSlot(
 			state,
 			parent,
@@ -12768,6 +12780,11 @@ class LiteBlockImpl {
 	declare signalInstanceValue: unknown;
 	declare signalInstanceHasKey: boolean;
 	declare signalInstanceResolved: string | undefined;
+	// A lite component's stand-in has no range of its own (undefined), so a sole
+	// component root inside it declines to borrow one. A lite control-flow arm's
+	// stand-in carries its arm's bound exactly as an arm Block would: null until
+	// its first render publishes the bound (renderMarkerlessArm).
+	declare startMarker: Node | null | undefined;
 
 	constructor(parentNode: Node, endMarker: Node | null, parentBlock: Block) {
 		this.parentNode = parentNode;
@@ -12781,6 +12798,7 @@ class LiteBlockImpl {
 		this.signalInstanceValue = undefined;
 		this.signalInstanceHasKey = false;
 		this.signalInstanceResolved = undefined;
+		this.startMarker = undefined;
 	}
 }
 
@@ -13440,6 +13458,7 @@ function unmountSlot(val: any, detachDom: boolean): void {
 	const k = val.__kind;
 	if (k === 'ifBlockSlot' || k === 'switchBlockSlot' || k === 'activityBlockSlot') {
 		if (val.block) unmountBlock(val.block, detachDom);
+		else if (val.lite != null) unmountLiteArm(val, detachDom);
 	} else if (k === 'forBlockSlot') {
 		// Item Blocks form an intrusive chain (head → nextSibling) — walk it
 		// instead of the keyed Map's iterator (zero-alloc, monomorphic).
@@ -44843,6 +44862,14 @@ interface BranchSlot {
 	branch: number;
 	block: Block | null;
 	/**
+	 * The active arm when it renders without a Block of its own: a Scope whose
+	 * stand-in (`lite.block`) carries the DOM context and the arm's bound. Only
+	 * an arm the compiler proved hookless gets one, on a client mount under a
+	 * root render that also created its owning Block (liteArmAllowed). At most
+	 * one of `block` and `lite` is set.
+	 */
+	lite: Scope | null;
+	/**
 	 * A markerless arm threw before inserting anything, so its mount is
 	 * incomplete: it owns no DOM, so it retains no bound. Siblings can replace
 	 * or remove the node that preceded it, or stage a replacement right after
@@ -44957,7 +44984,7 @@ function markerlessBranchRoots(
 function finalizeMarkerlessBranch(
 	state: BranchSlot,
 	domParent: Node,
-	block: Block,
+	scope: Scope,
 	marker: string,
 	before: Node | null,
 	after: Node | null,
@@ -44976,12 +45003,12 @@ function finalizeMarkerlessBranch(
 		last !== null &&
 		first === last &&
 		first.nodeType === 1 &&
-		markerlessBranchRoots(block, domParent, after) <= 1
+		markerlessBranchRoots(scope, domParent, after) <= 1
 	) {
-		block.startMarker = first;
-		block.endMarker = first;
+		scope.block.startMarker = first;
+		scope.block.endMarker = first;
 		state.end = first;
-	} else delimitMarkerlessBranch(state, domParent, block, marker, first, after);
+	} else delimitMarkerlessBranch(state, domParent, scope, marker, first, after);
 }
 
 /**
@@ -45008,27 +45035,31 @@ function pendingArmBefore(block: Block, domParent: Node): Node | null {
 function renderMarkerlessArm(
 	state: BranchSlot,
 	domParent: Node,
-	block: Block,
+	scope: Scope,
 	marker: string,
+	body?: ComponentBody,
+	env?: any[],
 ): void {
+	const block = scope.block;
 	const after = block.endMarker;
 	const before = pendingArmBefore(block, domParent);
 	state.unfinalized = true;
 	try {
-		renderBlock(block);
+		if (scope === block) renderBlock(block);
+		else renderLiteArm(scope, body!, env);
 	} catch (error) {
 		if ((before ? getNextSibling(before) : getFirstChild(domParent)) !== after)
-			finalizeMarkerlessBranch(state, domParent, block, marker, before, after, false);
+			finalizeMarkerlessBranch(state, domParent, scope, marker, before, after, false);
 		throw error;
 	}
-	finalizeMarkerlessBranch(state, domParent, block, marker, before, after, true);
+	finalizeMarkerlessBranch(state, domParent, scope, marker, before, after, true);
 }
 
 /** Bound a markerless arm's content, from `first` up to `after`, with a marker pair. */
 function delimitMarkerlessBranch(
 	state: BranchSlot,
 	domParent: Node,
-	block: Block,
+	scope: Scope,
 	marker: string,
 	first: Node | null,
 	after: Node | null,
@@ -45037,12 +45068,152 @@ function delimitMarkerlessBranch(
 	const end = (STAGED_DOM?.view(document) ?? document).createComment('/' + marker);
 	(STAGED_DOM?.view(domParent) ?? domParent).insertBefore(start, first ?? after);
 	(STAGED_DOM?.view(domParent) ?? domParent).insertBefore(end, after);
+	const block = scope.block;
 	block.startMarker = start;
 	block.endMarker = end;
-	block.exclusiveMarkers = true;
+	// A lite arm's pair belongs to its slot, which keeps it for the next arm.
+	if (block === scope) block.exclusiveMarkers = true;
 	state.start = start;
 	state.end = end;
-	markerlessBranchRoots(block, domParent, after, end);
+	markerlessBranchRoots(scope, domParent, after, end);
+}
+
+/** The nearest real Block that owns a Scope's output; lite stand-ins are not Blocks. */
+function owningBlock(block: Block): Block {
+	while (block.block !== block) block = block.parentBlock!;
+	return block;
+}
+
+/**
+ * Whether an arm the compiler proved hookless may render in a Scope of its own
+ * rather than a Block. A root render must have created the arm's owning Block:
+ * that Block's creation undo then discards the arm with it, and a later root
+ * render that swaps the arm out defers its teardown to the commit, as it does a
+ * committed Block's (unmountLiteArm). Hydration, signal ownership and native
+ * reads keep their per-Block bookkeeping.
+ */
+function liteArmAllowed(parentScope: Scope): boolean {
+	const transaction = ROOT_RENDER_TRANSACTION;
+	return (
+		transaction !== null &&
+		!hydrating &&
+		NATIVE_READ_DRIVER === null &&
+		!signalDocumentEnabled &&
+		parentScope !== SHARED_BODY_SCOPE &&
+		parentScope.block.idState.renderOwner?.signalOwner === undefined &&
+		isCreatedInRootRender(transaction, owningBlock(parentScope.block))
+	);
+}
+
+/** Render a lite arm's body in its Scope, within its owning Block's render. */
+function renderLiteArm(scope: Scope, body: ComponentBody, env: any[] | undefined): void {
+	const previous = CURRENT_SCOPE;
+	CURRENT_SCOPE = scope;
+	try {
+		(body as (p: any, s: Scope, e: any) => unknown)(undefined, scope, env);
+	} finally {
+		CURRENT_SCOPE = previous;
+	}
+	scope.mounted = true;
+}
+
+/**
+ * Release a lite arm's Scope. A rollback can restore a slot that names an arm
+ * the attempt already released, and the owner's undo then releases it again,
+ * so a released Scope keeps nothing left to release.
+ */
+function releaseLiteArm(scope: Scope): void {
+	// A lite arm's stand-in always has its owner's Block above it.
+	const parent = scope.block.parentBlock!;
+	if (TEARDOWN_DEPTH === 0) {
+		TEARDOWN_HANDLER = findTryHandler(parent) ?? rendererRegionTryHandler(parent);
+		TEARDOWN_BLOCK = owningBlock(parent);
+	}
+	TEARDOWN_DEPTH++;
+	try {
+		unmountScope(scope, false);
+	} finally {
+		if (--TEARDOWN_DEPTH === 0) dispatchTeardownErrors();
+	}
+	scope.cleanups = null;
+	scope.children = null;
+	scope._slots = null;
+}
+
+/**
+ * Remove a slot's lite arm: its Scope and, with `detachDom`, its DOM. A pair
+ * that delimits the arm stays for the slot's next arm, as an arm Block's
+ * borrowed markers do. When a root render that did not create the arm removes
+ * it, the release waits for the commit and rollback restores the nodes, as
+ * deferRootUnmount does for a committed Block.
+ */
+function unmountLiteArm(state: BranchSlot, detachDom: boolean): void {
+	const scope = state.lite!;
+	const arm = scope.block;
+	state.lite = null;
+	const transaction = ROOT_RENDER_TRANSACTION;
+	const deferred =
+		transaction !== null &&
+		!transaction.aborted &&
+		!ROOT_RENDER_ROLLBACK &&
+		arm.idState.renderOwner === transaction.owner &&
+		!isCreatedInRootRender(transaction, owningBlock(arm));
+	// An enclosing removal takes the DOM with it: release the Scope alone.
+	if (!deferred && !detachDom) {
+		releaseLiteArm(scope);
+		return;
+	}
+	const start = arm.startMarker!;
+	const end = arm.endMarker!;
+	const nodes: Node[] = [];
+	let parent: Node | null = null;
+	let after: Node | null = null;
+	if (start != null && end != null && (STAGED_DOM?.view(start) ?? start).parentNode !== null) {
+		parent = (STAGED_DOM?.view(start) ?? start).parentNode;
+		const exclusive = start === state.start;
+		after = exclusive ? end : getNextSibling(end);
+		for (
+			let node: Node | null = exclusive ? getNextSibling(start) : start;
+			node !== null && node !== after;
+			node = getNextSibling(node)
+		)
+			nodes.push(node);
+	}
+	if (deferred) {
+		retireRootBlock(arm);
+		let cancelled = false;
+		journalUndo(() => {
+			cancelled = true;
+			if (parent !== null) {
+				const anchor = (STAGED_DOM?.view(after) ?? after)?.parentNode === parent ? after : null;
+				restoreRootNodes(parent, nodes, anchor);
+			}
+		});
+		const suppressedRefs = REF_DETACH_SUPPRESSION;
+		(transaction.commit ??= []).push(() => {
+			if (cancelled) return;
+			// Deletion cleanups observe connected DOM, as deferRootUnmount's do.
+			if (parent !== null) {
+				const anchor = (STAGED_DOM?.view(after) ?? after)?.parentNode === parent ? after : null;
+				for (const node of nodes)
+					if ((STAGED_DOM?.view(node) ?? node).parentNode !== parent)
+						(STAGED_DOM?.view(parent) ?? parent).insertBefore(node, anchor);
+			}
+			const previousSuppression = REF_DETACH_SUPPRESSION;
+			REF_DETACH_SUPPRESSION = suppressedRefs;
+			try {
+				releaseLiteArm(scope);
+			} finally {
+				REF_DETACH_SUPPRESSION = previousSuppression;
+			}
+			if (parent !== null)
+				for (const node of nodes)
+					if ((STAGED_DOM?.view(node) ?? node).parentNode === parent)
+						(STAGED_DOM?.view(parent) ?? parent).removeChild(node);
+		});
+	} else releaseLiteArm(scope);
+	if (detachDom && parent !== null)
+		for (const node of nodes) (STAGED_DOM?.view(parent) ?? parent).removeChild(node);
 }
 
 /**
@@ -45106,6 +45277,8 @@ function renderBranchSlot(
 	// on its OWN reads the block's stored tuple (last parent render's values,
 	// the same staleness a per-render closure had).
 	env?: any[],
+	// The compiler proved this arm hookless (ifBlock/switchBlock's lite mask).
+	lite?: boolean,
 ): void {
 	const parentBlock = parentScope.block;
 	const hydration = hydrating ? activeHydration() : null;
@@ -45117,7 +45290,8 @@ function renderBranchSlot(
 		)
 			__profileArm(true);
 		if (ROOT_RENDER_TRANSACTION !== null && (state.branch !== -1 || hydration !== null)) {
-			const previousBlock = state.block;
+			// A lite arm's stand-in carries the bound an arm Block would.
+			const previousBlock = state.block ?? state.lite?.block ?? null;
 			if (state.unfinalized && previousBlock !== null) {
 				// A client arm without a bound owns only its own range before its
 				// anchor; the content in front of that belongs to its siblings.
@@ -45202,31 +45376,40 @@ function renderBranchSlot(
 					(STAGED_DOM?.view(domParent) ?? domParent).removeChild(node);
 				node = nextNode;
 			}
+		} else if (state.unfinalized && state.lite !== null) {
+			// A lite arm never hydrates, so no resumed leaf left content to sweep.
+			provisionalAfter = state.lite.block.endMarker;
+			state.unfinalized = false;
+			unmountLiteArm(state, false);
+			if (parentBlock.disposed) return;
 		}
 		// A markerless branch may share its host boundary with a nested sole-root
 		// branch. The nested branch updates Block markers when it replaces that
 		// host, but this slot's cached `end` is intentionally not part of the Block
 		// chain. Follow the live block boundary for positioning/probing so an outer
 		// swap never inserts relative to a detached former root.
+		const armBlock = state.block ?? state.lite?.block ?? null;
 		const liveEnd =
 			provisionalAfter === null &&
 			state.start === null &&
-			state.block !== null &&
-			state.block.endMarker !== null
-				? state.block.endMarker
+			armBlock !== null &&
+			armBlock.endMarker !== null
+				? armBlock.endMarker
 				: state.end;
 		const rootTransaction = ROOT_RENDER_TRANSACTION;
 		if (
 			rootTransaction !== null &&
 			!committedSuspense &&
 			hydration === null &&
-			state.block !== null &&
-			state.block.mounted &&
-			!isCreatedInRootRender(rootTransaction, state.block)
+			(state.block !== null
+				? state.block.mounted && !isCreatedInRootRender(rootTransaction, state.block)
+				: state.lite !== null &&
+					!isCreatedInRootRender(rootTransaction, owningBlock(state.lite.block)))
 		) {
 			const oldBlock = state.block;
-			const oldStart = oldBlock.startMarker;
-			const oldEnd = oldBlock.endMarker;
+			const oldLite = state.lite;
+			const oldStart = armBlock!.startMarker;
+			const oldEnd = armBlock!.endMarker;
 			const borrowed = state.borrowed;
 			let first = borrowed
 				? state.start === null
@@ -45266,8 +45449,9 @@ function renderBranchSlot(
 					}
 				}
 				state.block = null;
+				state.lite = null;
 				state.branch = next;
-				deferRootReplacement(oldBlock, domParent, first, last);
+				deferRootArmReplacement(oldBlock, oldLite, domParent, first, last);
 				return;
 			}
 			const stageAfter = first === null ? (borrowed ? state.start : null) : last;
@@ -45311,6 +45495,7 @@ function renderBranchSlot(
 				state.end = r.wip.end;
 				state.borrowed = false;
 				state.block = r.wip.block;
+				state.lite = null;
 				state.branch = next;
 				if (!borrowed) {
 					replaceSharedBlockBoundary(parentBlock, oldStart, oldEnd, r.wip.start, r.wip.end);
@@ -45320,7 +45505,7 @@ function renderBranchSlot(
 				journalRootProperty(r.wip.block, 'exclusiveMarkers', r.wip.block.exclusiveMarkers);
 				r.wip.block.exclusiveMarkers = true;
 				spliceWipCapture(r.wip);
-				deferRootReplacement(oldBlock, domParent, first, last);
+				deferRootArmReplacement(oldBlock, oldLite, domParent, first, last);
 				return;
 			}
 		}
@@ -45432,14 +45617,16 @@ function renderBranchSlot(
 		// branch's trailing node is removed by it).
 		const after: Node | null =
 			provisionalAfter ?? (liveEnd !== null ? getNextSibling(liveEnd) : state.anchor);
-		const oldBlock = state.block;
-		const oldBlockStart = oldBlock?.startMarker ?? null;
-		const oldBlockEnd = oldBlock?.endMarker ?? null;
+		const oldBlockStart = armBlock?.startMarker ?? null;
+		const oldBlockEnd = armBlock?.endMarker ?? null;
 		const oldBoundaryShared = sharesBlockBoundary(parentBlock, oldBlockStart, oldBlockEnd);
 		if (state.block) {
 			unmountBlock(state.block);
 			if (parentBlock.disposed) return;
 			state.block = null;
+		} else if (state.lite !== null) {
+			unmountLiteArm(state, true);
+			if (parentBlock.disposed) return;
 		}
 		state.branch = next;
 		if (state.start === null && body !== null && oldBoundaryShared) {
@@ -45547,24 +45734,35 @@ function renderBranchSlot(
 			// a single host can self-mark without first manufacturing a pair. A
 			// hydrating slot without a server range is borrowed (passthroughRanges):
 			// its content adopts the server's from the cursor.
-			const b = createBlock(
-				'control-flow',
-				parentBlock,
-				domParent,
-				null,
-				after,
-				body,
-				undefined,
-				env,
-			);
-			state.block = b;
-			renderMarkerlessArm(state, domParent, b, marker);
+			let arm: Block;
+			if (lite === true && liteArmAllowed(parentScope)) {
+				// A hookless arm renders in a Scope of its own, without a Block. Its
+				// stand-in starts with the bound an arm Block mounts with.
+				const scope = new ScopeImpl(parentScope, parentBlock);
+				arm = scope.block = new LiteBlockImpl(domParent, after, parentBlock) as unknown as Block;
+				arm.startMarker = null;
+				state.lite = scope;
+				renderMarkerlessArm(state, domParent, scope, marker, body, env);
+			} else {
+				arm = createBlock(
+					'control-flow',
+					parentBlock,
+					domParent,
+					null,
+					after,
+					body,
+					undefined,
+					env,
+				);
+				state.block = arm;
+				renderMarkerlessArm(state, domParent, arm, marker);
+			}
 			replaceSharedBlockBoundary(
 				parentBlock,
 				oldBlockStart,
 				oldBlockEnd,
-				b.startMarker,
-				b.endMarker,
+				arm.startMarker,
+				arm.endMarker,
 			);
 		} else if (!oldBoundaryShared) {
 			// A truly empty client arm needs only its existing insertion anchor.
@@ -45595,6 +45793,10 @@ function renderBranchSlot(
 		state.block.extra = env;
 		if (state.unfinalized) renderMarkerlessArm(state, domParent, state.block, marker);
 		else renderBlock(state.block);
+	} else if (state.lite !== null) {
+		// Same lite arm. Its body and env arrive with every owner render.
+		if (state.unfinalized) renderMarkerlessArm(state, domParent, state.lite, marker, body!, env);
+		else renderLiteArm(state.lite, body!, env);
 	}
 	// Hydration consumed the whole outer control-flow slot, not only the active
 	// branch nested inside it. Park the shared cursor after that outer range so a
@@ -45634,6 +45836,8 @@ export function ifBlock(
 	anchor?: Node | null,
 	// Hoisted-helper env tuple (compiled-output Phase 2) — see renderBranchSlot.
 	env?: any[],
+	// Arms the compiler proved hookless: 1 for then, 2 for else (renderBranchSlot).
+	lite?: number,
 ): void {
 	// Evaluating this call's or an earlier slot's arguments can queue the
 	// component's own update, and the render then replays. Leave the slot to the
@@ -45675,7 +45879,7 @@ export function ifBlock(
 		} else if (hydration !== null && !passthrough) {
 			// Inside a range the client built (branchOpen).
 			hydration.suspend(() =>
-				ifBlock(parentScope, slotKey, domParent, cond, thenBody, elseBody, anchor, env),
+				ifBlock(parentScope, slotKey, domParent, cond, thenBody, elseBody, anchor, env, lite),
 			);
 			return;
 		}
@@ -45687,6 +45891,7 @@ export function ifBlock(
 			borrowed: passthrough,
 			branch: -1,
 			block: null,
+			lite: null,
 			unfinalized: false,
 		};
 		parentScope.slots[slotKey] = state;
@@ -45702,6 +45907,7 @@ export function ifBlock(
 		next ? thenBody : elseBody,
 		'if',
 		env,
+		lite !== undefined && (lite & (next ? 1 : 2)) !== 0,
 	);
 }
 
@@ -46332,7 +46538,7 @@ function forEachSubtreeChild(
 				) {
 					visit(val.tryBlock);
 				}
-			}
+			} else if (val.lite != null) visit(val.lite);
 		}
 	}
 }
@@ -46593,6 +46799,8 @@ export function switchBlock(
 	anchor?: Node | null,
 	// Hoisted-helper env tuple (compiled-output Phase 2) — see renderBranchSlot.
 	env?: any[],
+	// Arms the compiler proved hookless: bit 0 for the default, bit i + 1 for case i.
+	lite?: number,
 ): void {
 	// Leave the slot to a pending replay, as ifBlock does.
 	if (CURRENT_BLOCK?.pending && !CURRENT_BLOCK.crossRenderUpdate) return;
@@ -46628,7 +46836,17 @@ export function switchBlock(
 		} else if (hydration !== null && !passthrough) {
 			// Inside a range the client built (branchOpen).
 			hydration.suspend(() =>
-				switchBlock(parentScope, slotKey, domParent, discriminant, cases, defaultBody, anchor, env),
+				switchBlock(
+					parentScope,
+					slotKey,
+					domParent,
+					discriminant,
+					cases,
+					defaultBody,
+					anchor,
+					env,
+					lite,
+				),
 			);
 			return;
 		}
@@ -46640,6 +46858,7 @@ export function switchBlock(
 			borrowed: passthrough,
 			branch: -1,
 			block: null,
+			lite: null,
 			unfinalized: false,
 		};
 		parentScope.slots[slotKey] = state;
@@ -46655,7 +46874,17 @@ export function switchBlock(
 			break;
 		}
 	}
-	renderBranchSlot(parentScope, slotKey, state, domParent, nextIdx, body, 'switch', env);
+	renderBranchSlot(
+		parentScope,
+		slotKey,
+		state,
+		domParent,
+		nextIdx,
+		body,
+		'switch',
+		env,
+		lite !== undefined && (lite & (nextIdx < 0 ? 1 : 2 << nextIdx)) !== 0,
+	);
 }
 
 // ---------------------------------------------------------------------------
