@@ -1397,6 +1397,22 @@ skipped values never render deferred. There is still no time-slicing: once a
 transition or deferred render starts it runs to completion, and a keystroke that
 arrives during it waits until it commits, where React would yield to handle it.
 
+Ready query and asynchronous `derived$` publications coalesce native component
+rendering in the same host-task queue. Source subscriptions, graph effects, and
+direct signal bindings still observe every publication. Plain signal writes,
+native events, lifecycle updates, and `flushSync` retain their existing timing.
+The admission change does not turn an urgent signal render into a Suspense
+transition; held native-read frames keep their existing retention policy.
+
+Query and derived stream pulls share an approximately 5 ms host budget. Both a
+pull and a ready-result publication check the same window, so many producers do
+not each receive a separate allowance. A posted sentinel resets that window;
+ready continuations wait for it when the budget is spent, then recheck their
+current producer lease. Ordered values, cancellation, and server observation
+backpressure are preserved. This is a scheduling opportunity between complete
+units, not a hard 5 ms limit: one iterator call, subscriber, render, or commit can
+itself take longer. Cold I/O lets the sentinel run between results.
+
 Native `ResizeObserver` callbacks run inside the browser's resize delivery loop.
 An ordinary microtask commit that resizes an already-delivered target can trigger
 `ResizeObserver loop completed with undelivered notifications`, even when the

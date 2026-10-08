@@ -1,3 +1,4 @@
+import { yieldForHostBudget } from '../host-budget.js';
 import { formatClientError } from '../error-codes.client.generated.js';
 import { createDerivedCellWith } from './engine.js';
 import {
@@ -27,7 +28,11 @@ import {
 	type GraphOwner,
 	type SignalCandidateFrame,
 } from './graph.js';
-import { SIGNAL_DEPENDENT_NODE, type SignalDependencyNotify } from './read-protocol.js';
+import {
+	SIGNAL_DEPENDENT_NODE,
+	publishNativeProducer,
+	type SignalDependencyNotify,
+} from './read-protocol.js';
 import { RedeclarableBinding } from './redeclaration.js';
 import { candidateHooks } from './transition-state.js';
 import { installDerivedCandidates } from '#octane/signal-actions/bindings';
@@ -459,7 +464,7 @@ export class DerivedBinding<T> extends RedeclarableBinding<DerivedCompute<T>> {
 					return;
 				}
 				if (iteratorFactory) {
-					signalBatch(() =>
+					publishNativeProducer(() =>
 						publishNode(
 							binding.node,
 							pendingState(current.waiting, 'connecting', undefined, current.resolve),
@@ -494,6 +499,11 @@ export class DerivedBinding<T> extends RedeclarableBinding<DerivedCompute<T>> {
 
 	private next(current: DerivedAttempt<T>): void {
 		if (!this.valid(current) || !current.iterator) return;
+		const wait = yieldForHostBudget();
+		if (wait !== undefined) {
+			wait.then(() => current.binding?.next(current));
+			return;
+		}
 		let step: PromiseLike<IteratorResult<T>> | IteratorResult<T>;
 		try {
 			step = untrack(() => current.iterator!.next());
@@ -513,41 +523,48 @@ export class DerivedBinding<T> extends RedeclarableBinding<DerivedCompute<T>> {
 		step: PromiseLike<IteratorResult<T>> | IteratorResult<T>,
 	): void {
 		Promise.resolve(step).then(
-			(result) => {
-				const binding = current.binding;
-				if (!binding?.valid(current)) return;
-				if (!result || (typeof result !== 'object' && typeof result !== 'function')) {
-					binding.fail(current, new TypeError(formatClientError(114)));
-					return;
-				}
-				if (result.done) {
-					if (!current.hasYielded) {
-						binding.fail(current, new Error(formatClientError(115)));
-						return;
-					}
-					const snapshot = binding.node.state?.snapshot;
-					if (snapshot?.status === 'ready') {
-						binding.accept(
-							current,
-							readyState(snapshot.value, { connection: 'closed', complete: true }),
-						);
-					}
-					return;
-				}
-				current.hasYielded = true;
-				binding.accept(
-					current,
-					readyState(result.value, { connection: 'open', complete: false }),
-					false,
-				);
-				// Publish the yield before asking the producer for another one. Besides
-				// providing a bounded cancellation point, this lets dependency writes
-				// triggered by a subscriber close an async generator before it becomes
-				// suspended inside its next nested `for await` pull.
-				DerivedBinding.queueNext(current);
-			},
+			(result) => DerivedBinding.receiveStep(current, result),
 			(error) => current.binding?.fail(current, error),
 		);
+	}
+
+	private static receiveStep<T>(current: DerivedAttempt<T>, result: IteratorResult<T>): void {
+		const binding = current.binding;
+		if (!binding?.valid(current)) return;
+		const wait = yieldForHostBudget();
+		if (wait !== undefined) {
+			wait.then(() => DerivedBinding.receiveStep(current, result));
+			return;
+		}
+		if (!result || (typeof result !== 'object' && typeof result !== 'function')) {
+			binding.fail(current, new TypeError(formatClientError(114)));
+			return;
+		}
+		if (result.done) {
+			if (!current.hasYielded) {
+				binding.fail(current, new Error(formatClientError(115)));
+				return;
+			}
+			const snapshot = binding.node.state?.snapshot;
+			if (snapshot?.status === 'ready') {
+				binding.accept(
+					current,
+					readyState(snapshot.value, { connection: 'closed', complete: true }),
+				);
+			}
+			return;
+		}
+		current.hasYielded = true;
+		binding.accept(
+			current,
+			readyState(result.value, { connection: 'open', complete: false }),
+			false,
+		);
+		// Publish the yield before asking the producer for another one. Besides
+		// providing a bounded cancellation point, this lets dependency writes
+		// triggered by a subscriber close an async generator before it becomes
+		// suspended inside its next nested `for await` pull.
+		DerivedBinding.queueNext(current);
 	}
 
 	private accept(current: DerivedAttempt<T>, state: NodeState<T>, complete = true): void {
@@ -568,13 +585,13 @@ export class DerivedBinding<T> extends RedeclarableBinding<DerivedCompute<T>> {
 		const previousOwners = this.node.state?.owners;
 		if (previousOwners) for (const owner of previousOwners) current.owners!.add(owner);
 		const published = current.owners!.size ? { ...state, owners: current.owners! } : state;
-		signalBatch(() => publishNode(this.node, published));
+		publishNativeProducer(() => publishNode(this.node, published));
 		if (complete) this.finish(current);
 	}
 
 	private fail(current: DerivedAttempt<T>, error: unknown): void {
 		if (!this.valid(current)) return;
-		signalBatch(() =>
+		publishNativeProducer(() =>
 			publishNode(this.node, errorState(error, current.iterator ? 'closed' : 'none')),
 		);
 		this.finish(current);
