@@ -12,7 +12,8 @@
 // Claude reviews the landed diff with. `publish` records the growth and
 // Claude's review (analysis.md, when present) in one rolling issue: an open
 // issue is edited in place, newest entry first, and a new issue is opened only
-// when none is open. Nothing here gates a merge; it reports what landed.
+// when none is open. Concurrent publishes converge on the oldest open issue.
+// Nothing here gates a merge; it reports what landed.
 //
 // BASE_SHA, HEAD_SHA, GITHUB_REPOSITORY, and RUN_URL describe the range; `gh`
 // with GH_TOKEN reads pull requests and writes the issue.
@@ -47,7 +48,7 @@ export function findGrowth(base, head, { minGzip = DEFAULT_MIN_GZIP_BYTES } = {}
 		const { deterministic } = compareSuite(suite, base[suite], head[suite]);
 		for (const row of deterministic) {
 			const match = METRIC.exec(row.op);
-			if (!match || row.before == null || row.target.endsWith('-budget')) continue;
+			if (!match || row.before == null) continue;
 			const bundle = match[1] ?? '';
 			const key = `${suite}\0${row.target}\0${bundle}`;
 			let entry = bundles.get(key);
@@ -188,7 +189,10 @@ export function parseEntries(body) {
 	const entries = [];
 	const starts = [...(body ?? '').matchAll(ENTRY_START)];
 	for (const [index, match] of starts.entries()) {
-		const end = index + 1 < starts.length ? starts[index + 1].index : body.length;
+		let end = index + 1 < starts.length ? starts[index + 1].index : body.length;
+		// Stop at the entry's own end marker, so text after it is never carried along.
+		const close = body.indexOf(ENTRY_END, match.index);
+		if (close !== -1 && close < end) end = close + ENTRY_END.length;
 		const text = body.slice(match.index, end).trimEnd();
 		entries.push({ sha: match[1], text });
 	}
@@ -197,11 +201,18 @@ export function parseEntries(body) {
 
 // Puts the entry at the top, replacing an earlier entry for the same commit (a
 // rerun), and drops the oldest entries until the body fits GitHub's limit.
-export function mergeIssueBody(body, entry, { headSha, repository, minGzip }) {
-	const entries = [
-		{ sha: headSha, text: entry },
-		...parseEntries(body).filter((existing) => existing.sha !== headSha),
-	];
+// `bodies` is one issue body, or several in order when duplicate issues fold
+// into one; each commit keeps its first entry.
+export function mergeIssueBody(bodies, entry, { headSha, repository, minGzip }) {
+	const seen = new Set([headSha]);
+	const entries = [{ sha: headSha, text: entry }];
+	for (const body of [bodies].flat()) {
+		for (const existing of parseEntries(body)) {
+			if (seen.has(existing.sha)) continue;
+			seen.add(existing.sha);
+			entries.push(existing);
+		}
+	}
 	const top = header(repository, minGzip);
 	const render = () => top + '\n' + entries.map((existing) => existing.text).join('\n\n') + '\n';
 	let next = render();
@@ -254,20 +265,92 @@ function landedCommits(baseSha, headSha, repository) {
 	});
 }
 
-function openIssue(repository) {
-	const issues = JSON.parse(
-		run('gh', [
-			'api',
-			'--paginate',
-			'--slurp',
-			`repos/${repository}/issues?state=open&creator=github-actions%5Bbot%5D&per_page=100`,
-		]),
-	).flat();
-	return (
-		issues
-			.filter((issue) => !issue.pull_request && issue.body?.includes(ISSUE_MARKER))
-			.sort((a, b) => a.number - b.number)[0] ?? null
-	);
+// Records `entry` in the oldest open review issue. Two pushes can publish at
+// once, and both can find no open issue and open one each. So every attempt
+// writes to the oldest open issue, folds in the entries of any newer review
+// issue and closes it, then re-reads the oldest open issue to confirm this
+// entry survived. A racing publish that wrote a newer issue converges on the
+// same oldest one on its next attempt.
+//
+// `github` reads and writes issues: openIssues() lists the open review issues
+// oldest first as { number, body }, body(number) re-reads one, create(body)
+// returns the new number, edit(number, body), and close(number, comment).
+export function publishEntry(github, { entry, headSha, repository, minGzip }) {
+	const options = { headSha, repository, minGzip };
+	for (let attempt = 1; attempt <= 5; attempt++) {
+		const [issue, ...duplicates] = github.openIssues();
+		// Entries from a racing publish's duplicate are newer than the oldest issue's.
+		const body = mergeIssueBody(
+			[...duplicates.map(({ body }) => body), issue?.body ?? ''],
+			entry,
+			options,
+		);
+		const number = issue === undefined ? github.create(body) : issue.number;
+		if (issue !== undefined) github.edit(number, body);
+		for (const duplicate of duplicates) {
+			github.close(duplicate.number, `Folded into #${number}.`);
+		}
+		const [oldest] = github.openIssues();
+		if (oldest !== undefined && github.body(oldest.number).includes(entryStart(headSha))) {
+			return oldest.number;
+		}
+		console.warn(
+			`size review entry is not in the oldest open issue on attempt ${attempt}; retrying`,
+		);
+	}
+	throw new Error('could not record the size review entry');
+}
+
+function githubIssues(repository, bodyFile) {
+	// An issue this run opened is kept in view even if the listing lags behind.
+	const created = new Set();
+	const write = (body) => fs.writeFileSync(bodyFile, body);
+	return {
+		openIssues() {
+			const listed = JSON.parse(
+				run('gh', [
+					'api',
+					'--paginate',
+					'--slurp',
+					`repos/${repository}/issues?state=open&creator=github-actions%5Bbot%5D&per_page=100`,
+				]),
+			)
+				.flat()
+				.filter((issue) => !issue.pull_request && issue.body?.includes(ISSUE_MARKER));
+			for (const number of created) {
+				if (listed.some((issue) => issue.number === number)) continue;
+				const issue = JSON.parse(run('gh', ['api', `repos/${repository}/issues/${number}`]));
+				if (issue.state === 'open') listed.push(issue);
+			}
+			return listed
+				.map(({ number, body }) => ({ number, body: body ?? '' }))
+				.sort((a, b) => a.number - b.number);
+		},
+		body: (number) => run('gh', ['api', `repos/${repository}/issues/${number}`, '--jq', '.body']),
+		create(body) {
+			write(body);
+			const url = run('gh', [
+				'issue',
+				'create',
+				'-R',
+				repository,
+				'--title',
+				ISSUE_TITLE,
+				'--body-file',
+				bodyFile,
+			]).trim();
+			const number = Number(url.split('/').pop());
+			created.add(number);
+			return number;
+		},
+		edit(number, body) {
+			write(body);
+			run('gh', ['issue', 'edit', String(number), '-R', repository, '--body-file', bodyFile]);
+		},
+		close(number, comment) {
+			run('gh', ['issue', 'close', String(number), '-R', repository, '--comment', comment]);
+		},
+	};
 }
 
 function publish(directory) {
@@ -286,36 +369,9 @@ function publish(directory) {
 		analysis,
 		runUrl: process.env.RUN_URL,
 	});
-	const bodyFile = path.join(directory, 'issue-body.md');
-	const options = { headSha, repository, minGzip: growth.minGzip };
-	// Two pushes can publish at once; re-read and retry until this entry survives.
-	for (let attempt = 1; attempt <= 3; attempt++) {
-		const issue = openIssue(repository);
-		fs.writeFileSync(bodyFile, mergeIssueBody(issue?.body ?? '', entry, options));
-		let number = issue?.number;
-		if (number == null) {
-			const url = run('gh', [
-				'issue',
-				'create',
-				'-R',
-				repository,
-				'--title',
-				ISSUE_TITLE,
-				'--body-file',
-				bodyFile,
-			]).trim();
-			number = Number(url.split('/').pop());
-		} else {
-			run('gh', ['issue', 'edit', String(number), '-R', repository, '--body-file', bodyFile]);
-		}
-		const body = run('gh', ['api', `repos/${repository}/issues/${number}`, '--jq', '.body']);
-		if (body.includes(entryStart(headSha))) {
-			console.log(`size review recorded in ${repository}#${number}`);
-			return;
-		}
-		console.warn(`size review entry was overwritten on attempt ${attempt}; retrying`);
-	}
-	throw new Error('could not record the size review entry');
+	const github = githubIssues(repository, path.join(directory, 'issue-body.md'));
+	const number = publishEntry(github, { entry, headSha, repository, minGzip: growth.minGzip });
+	console.log(`size review recorded in ${repository}#${number}`);
 }
 
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {

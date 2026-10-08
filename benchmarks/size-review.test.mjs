@@ -7,6 +7,7 @@ import {
 	findGrowth,
 	mergeIssueBody,
 	parseEntries,
+	publishEntry,
 	renderEntry,
 } from './size-review.mjs';
 
@@ -24,7 +25,6 @@ const base = {
 			name: 'octane-tsrx',
 			ops: { ...metrics(1000, 400, 350, 'todo_app_'), ...metrics(9000, 3000, 2600, 'js_') },
 		},
-		{ name: 'octane-tsrx-budget', ops: metrics(1, 1, 1, 'js_') },
 		{ name: 'react', ops: metrics(50000, 16000, 14000, 'js_') },
 	]),
 	'bundle-reachability': suite('bundle-reachability', [
@@ -38,7 +38,6 @@ const head = {
 			name: 'octane-tsrx',
 			ops: { ...metrics(1100, 440, 380, 'todo_app_'), ...metrics(9000, 3000, 2600, 'js_') },
 		},
-		{ name: 'octane-tsrx-budget', ops: metrics(9, 9, 9, 'js_') },
 		{ name: 'react', ops: metrics(60000, 20000, 18000, 'js_') },
 	]),
 	'bundle-reachability': suite('bundle-reachability', [
@@ -143,6 +142,82 @@ test('the oldest entries are dropped to fit GitHub issue limits', () => {
 	assert.equal(kept[0], '7');
 	assert.ok(kept.length < 8 && kept.length >= 4);
 	assert.deepEqual(kept, [...kept].sort().reverse());
+});
+
+test('duplicate issue bodies fold into one, newest first, one entry per commit', () => {
+	const options = (headSha) => ({ headSha, repository: 'octanejs/octane', minGzip: 32 });
+	const oldest = mergeIssueBody('', entryFor('1'.repeat(40)), options('1'.repeat(40)));
+	const duplicate = mergeIssueBody('', entryFor('2'.repeat(40)), options('2'.repeat(40)));
+	const folded = mergeIssueBody(
+		[duplicate, oldest],
+		entryFor('3'.repeat(40)),
+		options('3'.repeat(40)),
+	);
+	assert.deepEqual(
+		parseEntries(folded).map(({ sha }) => sha[0]),
+		['3', '2', '1'],
+	);
+	// Each entry ends at its own marker, so a folded body's header is not carried along.
+	assert.equal(folded.split(ISSUE_MARKER).length, 2);
+	assert.equal(folded.split('## Bundle size review').length, 2);
+});
+
+// An in-memory issue tracker. `beforeCreate` runs once, inside the next create,
+// to replay another publish landing between this one's read and its write.
+function fakeIssues() {
+	const issues = new Map();
+	let next = 1;
+	const hooks = { beforeCreate: null };
+	const github = {
+		openIssues: () =>
+			[...issues].filter(([, issue]) => issue.open).map(([number, { body }]) => ({ number, body })),
+		body: (number) => issues.get(number).body,
+		create(body) {
+			const hook = hooks.beforeCreate;
+			hooks.beforeCreate = null;
+			hook?.();
+			const number = next++;
+			issues.set(number, { body, open: true });
+			return number;
+		},
+		edit(number, body) {
+			issues.get(number).body = body;
+		},
+		close(number) {
+			issues.get(number).open = false;
+		},
+	};
+	return { github, issues, hooks };
+}
+
+test('two publishes that each open an issue converge on the oldest one', () => {
+	const { github, issues, hooks } = fakeIssues();
+	const publishAs = (sha) =>
+		publishEntry(github, {
+			entry: entryFor(sha),
+			headSha: sha,
+			repository: 'octanejs/octane',
+			minGzip: 32,
+		});
+	// Both find no open issue: the second push publishes start to finish while
+	// the first is about to create its own.
+	hooks.beforeCreate = () => assert.equal(publishAs('c'.repeat(40)), 1);
+	assert.equal(publishAs('a'.repeat(40)), 1);
+	assert.deepEqual(
+		github.openIssues().map(({ number }) => number),
+		[1],
+	);
+	assert.deepEqual(
+		parseEntries(issues.get(1).body).map(({ sha }) => sha[0]),
+		['a', 'c'],
+	);
+	assert.equal(issues.get(2).open, false);
+	// A later push keeps writing to the surviving issue.
+	assert.equal(publishAs('d'.repeat(40)), 1);
+	assert.deepEqual(
+		parseEntries(issues.get(1).body).map(({ sha }) => sha[0]),
+		['d', 'a', 'c'],
+	);
 });
 
 test('the prompt gives Claude the range, the landed pull requests, and the growth', () => {
