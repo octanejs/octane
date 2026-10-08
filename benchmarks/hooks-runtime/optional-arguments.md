@@ -13,7 +13,7 @@ wrapper identity is a benchmark control, not a correctness test assertion.
 ```bash
 BENCH_JSON=/tmp/hooks-baseline.json node benchmarks/hooks-runtime/optional-arguments.mjs /private/tmp/981-hooks-frozen
 BENCH_JSON=/tmp/hooks-candidate.json node benchmarks/hooks-runtime/optional-arguments.mjs
-node benchmarks/bench.mjs --ratios hooks-runtime
+node benchmarks/bench.mjs hooks-runtime
 ```
 
 The frozen baseline at `6284156ce` includes its complete `packages/octane`
@@ -24,8 +24,7 @@ observed component render, based on the six actual client/server/universal hook
 signatures. It **does not** claim V8 materialized a heap array for each call.
 `subscribe_deps_arrays` counts creation at the client runtime source in the
 observed bundle. The source observer is never present in the clean bundle; no
-observed bundle is timed. The fixed budget's one-unit reference lets zero-work
-guards use a zero ratio without division by zero.
+observed bundle is timed.
 
 ## Frozen baseline and candidate source work
 

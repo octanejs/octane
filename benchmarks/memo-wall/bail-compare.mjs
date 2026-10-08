@@ -157,12 +157,6 @@ try {
 				ops: { bail_own_lookups: value(perRow) },
 				meta: { gate: 'passed', measured, semantic },
 			},
-			{
-				// One ownership lookup per row, for its callback prop.
-				name: 'bail-compare-work-budget',
-				ops: { bail_own_lookups: value(1) },
-				meta: { gate: 'passed' },
-			},
 		],
 		meta: {
 			node: process.version,
