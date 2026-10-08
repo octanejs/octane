@@ -260,6 +260,7 @@ import {
 	ADOPTION_CONTROL,
 	NativeAdoptionMiss,
 	NATIVE_TRANSITION_CONSUMER,
+	nativeProducerPublication,
 	readNativeDomStyle,
 	registerNativeActionResolver,
 	registerNativeReadRebase,
@@ -1659,7 +1660,12 @@ function scheduleNativeRead(target: Block): void {
 		// flush. Like an update from a layout effect, it spends the flush's
 		// nested-update budget, so a render whose acceptance changes what it reads
 		// fails with the depth error instead of rendering again without end.
-		scheduleRender(target, inFlush);
+		scheduleRender(
+			target,
+			inFlush,
+			false,
+			nativeProducerPublication && !inFlush && !inCommitCallback() && _dispatchDepth === 0,
+		);
 	} finally {
 		if (retainPriority) TRANSITION_DEPTH--;
 	}
@@ -1719,6 +1725,13 @@ function currentSignalDeclarationStage(declaring?: number): SignalDeclarationSta
 function ensureNativeReadDriver(): NativeReadDriver {
 	if (NATIVE_READ_DRIVER !== null) return NATIVE_READ_DRIVER;
 	installNativeSignalActionExtension();
+	// Native producers share the landed host-task queue without installing
+	// the transition root or offscreen-rendering capabilities.
+	TRANSITION_TASK_DRIVER ??= {
+		queue: queueTransitionBlock,
+		adopt: adoptTransitionQueue,
+		upgrade: upgradeTransitionBlock,
+	};
 	registerSignalDeclarationStage(currentSignalDeclarationStage);
 	NATIVE_READ_DRIVER = createNativeReadDriver({
 		capture: () => WIP_CAPTURE,
@@ -2695,7 +2708,7 @@ let syncFlush = false; // flushSync sets this to drain the queue synchronously
 // from inside a lifecycle method… cannot flush when already rendering"): run
 // the callback, let the ambient flush pick up whatever it scheduled.
 let inFlush = false;
-// Transition-priority renders scheduled outside a flush wait here for a host
+// Transition-priority renders and native producer refreshes wait here for a host
 // task of their own instead of the microtask flush (#1864, G1), as React renders
 // a transition lane in a Scheduler task. The urgent commit before them can then
 // paint and the host can deliver input first, and a burst of ready
@@ -2706,9 +2719,9 @@ let inFlush = false;
 // block does not: the block is queued in both places, and the microtask flush
 // renders only its cue (renderTransitionCue).
 const TRANSITION_QUEUE: Block[] = [];
-// Blocks a pending cue queued for the microtask flush outside a flush, which
-// renders them at urgent priority (splitTransitionCue). They hold until a drain
-// empties or reindexes QUEUE, while TRANSITION_CUE_EPOCH is current.
+// Blocks whose pending cue was scheduled outside a flush (markTransitionCue); the
+// microtask flush renders them at urgent priority (splitTransitionCue). They hold
+// until a drain empties or reindexes QUEUE, while TRANSITION_CUE_EPOCH is current.
 const TRANSITION_CUES: Block[] = [];
 let TRANSITION_CUE_EPOCH = -1;
 // The live posted task's id, or 0. A flush that absorbs the queue retires that
@@ -2725,16 +2738,13 @@ let TRANSITION_FOLLOWUPS: Array<() => void> | null = null;
 let TRANSITION_TASK_ACTIVE = false;
 
 /**
- * The task path, installed with the first transition (ensureTransitionSwapDriver).
- * Until then no render is scheduled at transition priority, so an application
- * that never starts a transition does not retain the queue or its poster.
+ * The task path, installed by transitions or native component readers. An
+ * application using neither capability does not retain the queue or its poster.
  */
 interface TransitionTaskDriver {
 	queue: typeof queueTransitionBlock;
 	adopt: typeof adoptTransitionQueue;
 	upgrade: typeof upgradeTransitionBlock;
-	splitCue: typeof splitTransitionCue;
-	splitsCue: typeof splitsTransitionCue;
 }
 
 let TRANSITION_TASK_DRIVER: TransitionTaskDriver | null = null;
@@ -2795,6 +2805,8 @@ interface TransitionRootDriver {
 	end: typeof endTransitionAttempt;
 	beginUrgent: typeof beginUrgentTransitionRender;
 	endUrgent: typeof endUrgentTransitionRender;
+	splitCue: typeof splitTransitionCue;
+	splitsCue: typeof splitsTransitionCue;
 	holdRoot: typeof holdRootTransition;
 	retryRoot: typeof retryRootTransition;
 	commitRoot: typeof commitRootTransition;
@@ -2821,6 +2833,8 @@ function ensureTransitionSwapDriver(): void {
 		end: endTransitionAttempt,
 		beginUrgent: beginUrgentTransitionRender,
 		endUrgent: endUrgentTransitionRender,
+		splitCue: splitTransitionCue,
+		splitsCue: splitsTransitionCue,
 		holdRoot: holdRootTransition,
 		retryRoot: retryRootTransition,
 		commitRoot: commitRootTransition,
@@ -2835,8 +2849,6 @@ function ensureTransitionSwapDriver(): void {
 		queue: queueTransitionBlock,
 		adopt: adoptTransitionQueue,
 		upgrade: upgradeTransitionBlock,
-		splitCue: splitTransitionCue,
-		splitsCue: splitsTransitionCue,
 	};
 }
 
@@ -7048,7 +7060,7 @@ function queueAllTransition(): boolean {
 }
 
 function queuedTransitionCue(block: Block): boolean {
-	return TRANSITION_TASK_DRIVER !== null && TRANSITION_TASK_DRIVER.splitsCue(block);
+	return TRANSITION_ROOT_DRIVER !== null && TRANSITION_ROOT_DRIVER.splitsCue(block);
 }
 
 function vtHasActiveHandles(): boolean {
@@ -7635,8 +7647,15 @@ function warnCrossComponentRenderUpdate(target: Block, source: Block): void {
  * urgent priority there (splitTransitionCue), so they commit before the
  * transition work they announce, over its committed state. That work keeps its
  * task even when it belongs to the cue's own block (upgradeTransitionBlock).
+ * `background`: a native producer refresh shares task admission without
+ * changing its existing render/Suspense priority.
  */
-function scheduleRender(block: Block, flushed?: boolean, cue?: boolean): void {
+function scheduleRender(
+	block: Block,
+	flushed?: boolean,
+	cue?: boolean,
+	background?: boolean,
+): void {
 	if (block.disposed) return;
 	if (process.env.NODE_ENV !== 'production' && CURRENT_EFFECT_PHASE === INSERTION) {
 		console.error(
@@ -7700,7 +7719,8 @@ function scheduleRender(block: Block, flushed?: boolean, cue?: boolean): void {
 	const deferred = DEFERRED_SPAWN || (renderPhaseSelf && block.currentRenderDeferred);
 	DEFERRED_LAYOUT_DRIVER?.schedulePending(block);
 	if (block.pending) {
-		if (TRANSITION_QUEUE.length !== 0) TRANSITION_TASK_DRIVER!.upgrade(block, mode, cue);
+		if (!background && TRANSITION_QUEUE.length !== 0)
+			TRANSITION_TASK_DRIVER!.upgrade(block, mode, cue);
 		if (mode === 'urgent') {
 			block.pendingMode = 'urgent';
 			block.pendingDeferred = false;
@@ -7756,7 +7776,7 @@ function scheduleRender(block: Block, flushed?: boolean, cue?: boolean): void {
 	block.pending = true;
 	block.pendingMode = mode;
 	block.pendingDeferred = deferred;
-	if (mode === 'transition' && TRANSITION_TASK_DRIVER?.queue(block, cue)) return;
+	if ((background || mode === 'transition') && TRANSITION_TASK_DRIVER?.queue(block, cue)) return;
 	QUEUE.push(block);
 	if (syncFlush) return;
 	if (!scheduled) {
@@ -7766,10 +7786,10 @@ function scheduleRender(block: Block, flushed?: boolean, cue?: boolean): void {
 }
 
 /**
- * Hold a transition render for the transition task (see TRANSITION_QUEUE).
+ * Hold a render for the shared host task (see TRANSITION_QUEUE).
  * Work scheduled inside a render or flush belongs to the drain already on the
  * stack. A pending cue keeps the microtask flush, which renders it at urgent
- * priority (splitTransitionCue).
+ * priority (markTransitionCue).
  */
 function queueTransitionBlock(block: Block, cue?: boolean): boolean {
 	// The block is not queued, so a render consumed every update retained for it.
@@ -7779,15 +7799,7 @@ function queueTransitionBlock(block: Block, cue?: boolean): boolean {
 			for (const entry of entries) if (entry.block === block) entry.rendered = true;
 		}
 	}
-	if (syncFlush || inFlush || CURRENT_BLOCK !== null || TRANSITION_TASK_ACTIVE) return false;
-	if (cue) {
-		if (TRANSITION_CUE_EPOCH !== QUEUE_REINDEX_EPOCH) {
-			TRANSITION_CUE_EPOCH = QUEUE_REINDEX_EPOCH;
-			TRANSITION_CUES.length = 0;
-		}
-		TRANSITION_CUES.push(block);
-		return false;
-	}
+	if (syncFlush || inFlush || CURRENT_BLOCK !== null || cue || TRANSITION_TASK_ACTIVE) return false;
 	TRANSITION_QUEUE.push(block);
 	scheduleTransitionTask();
 	return true;
@@ -7890,6 +7902,21 @@ function splitTransitionCue(block: Block): typeof renderBlock | undefined {
 		TRANSITION_QUEUE.splice(index, 1);
 		if (TRANSITION_QUEUE.length === 0) adoptTransitionQueue();
 	}
+}
+
+/**
+ * Record a pending cue its hook schedules outside a render, flush, or the
+ * transition task (TRANSITION_CUES), so the microtask flush renders it at urgent
+ * priority (splitTransitionCue). Hooks call this, not scheduleRender, so native
+ * readers that share the task queue never reach it.
+ */
+function markTransitionCue(block: Block): void {
+	if (syncFlush || inFlush || CURRENT_BLOCK !== null || TRANSITION_TASK_ACTIVE) return;
+	if (TRANSITION_CUE_EPOCH !== QUEUE_REINDEX_EPOCH) {
+		TRANSITION_CUE_EPOCH = QUEUE_REINDEX_EPOCH;
+		TRANSITION_CUES.length = 0;
+	}
+	TRANSITION_CUES.push(block);
 }
 
 /** A split cue that already rendered keeps its block waiting for the transition task. */
@@ -8190,7 +8217,7 @@ function drainQueue(): { err: any } | null {
 		const crossRenderUpdate = block.crossRenderUpdate;
 		block.crossRenderUpdate = false;
 		// A pending cue whose transition work waits for the task renders alone.
-		const render = TRANSITION_TASK_DRIVER?.splitCue(block) ?? renderBlock;
+		const render = TRANSITION_ROOT_DRIVER?.splitCue(block) ?? renderBlock;
 		const visibilityDriver = SCHEDULED_VISIBILITY_DRIVER;
 		const visibilityOwner =
 			visibilityDriver === null
@@ -43967,6 +43994,7 @@ export function useTransition(
 					if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__)
 						__profileSchedule(block, 'transition-pending', slot);
 					// The rising edge is a pending cue; the falling edge follows the transition.
+					if (pending) markTransitionCue(block);
 					scheduleRender(block, false, pending);
 				} finally {
 					TRANSITION_LISTENER_PUBLISH_DEPTH--;
@@ -44049,7 +44077,10 @@ export function useActionState<S>(
 					if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__)
 						__profileSchedule(block, 'action-state-pending', slot);
 					// The rising edge is a pending cue; the falling edge commits with the result.
-					if (next) VIEW_TRANSITION_DRIVER?.markActionCue();
+					if (next) {
+						VIEW_TRANSITION_DRIVER?.markActionCue();
+						markTransitionCue(block);
+					}
 					scheduleRender(block, false, next);
 				}
 			}
@@ -44305,6 +44336,7 @@ export function useOptimistic<S, V = S>(
 				if (!block.disposed) {
 					if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__)
 						__profileSchedule(block, 'optimistic', slot);
+					markTransitionCue(block);
 					scheduleRender(block, false, true);
 				}
 			},

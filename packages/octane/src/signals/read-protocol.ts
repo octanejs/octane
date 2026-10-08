@@ -331,6 +331,20 @@ export function runNativeBatch<T>(callback: () => T): T {
 	}
 }
 
+/** Only DOM admission coalesces; graph publication remains synchronous. */
+export let nativeProducerPublication = false;
+
+/** Keep the context active through the graph batch's subscriber notifications. */
+export function publishNativeProducer<T>(callback: () => T): T {
+	const previous = nativeProducerPublication;
+	nativeProducerPublication = true;
+	try {
+		return runNativeBatch(callback);
+	} finally {
+		nativeProducerPublication = previous;
+	}
+}
+
 /** Report the revision actually read, including reads that subsequently throw. */
 export function reportNativeRead(source: NativeReadSource, version: number): void {
 	nativeReadObserver?.(source, version);

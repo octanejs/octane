@@ -111,7 +111,7 @@
   },
   "binding-base-ui-esbuild": {
     "raw": 213931,
-    "gzip": 69370,
+    "gzip": 69369,
     "brotli": 60247
   },
   "binding-aria-vite": {
@@ -161,7 +161,7 @@
   },
   "binding-mantine-hooks-esbuild": {
     "raw": 90897,
-    "gzip": 30556,
+    "gzip": 30555,
     "brotli": 27258
   },
   "binding-apollo-client-vite": {
@@ -181,7 +181,7 @@
   },
   "binding-usehooks-ts-esbuild": {
     "raw": 91663,
-    "gzip": 30795,
+    "gzip": 30794,
     "brotli": 27475
   }
 }

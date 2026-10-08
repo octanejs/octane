@@ -12,10 +12,13 @@ import {
 	useLayoutEffect,
 	useLinkedState,
 	useState,
+	useTransition,
 	ViewTransition,
 	type Root,
 	type ComponentBody,
 } from '../src/index.js';
+import { enableNativeReadCollection } from '../src/runtime.js';
+import { createScope } from '../src/signals/index.js';
 import { installViewTransitionMocks } from './conformance/_helpers/view-transition-mocks.js';
 
 const roots: Root[] = [];
@@ -48,6 +51,37 @@ afterEach(async () => {
 });
 
 describe('Action cues and native capture', () => {
+	it('keeps cue ordering and urgent signal writes when native readers follow transitions', async () => {
+		startTransition(() => {});
+		enableNativeReadCollection();
+		const owner = createScope({ scopeKey: 'transition-task.native-readers' });
+		const count$ = owner.signal$('count', 0);
+		let begin!: () => void;
+		try {
+			const container = mount(() => {
+				const [value, setValue] = useState(0, Symbol.for('transition-task.native-value'));
+				const [pending, start] = useTransition(Symbol.for('transition-task.native-pending'));
+				begin = () => start(() => setValue(1));
+				return createElement(
+					'output',
+					null,
+					`${count$.get()}:${value}:${pending ? 'pending' : 'idle'}`,
+				);
+			});
+			count$.set(1);
+			await microtasks();
+			expect(container.textContent).toBe('1:0:idle');
+			begin();
+			await microtasks();
+			expect(container.textContent).toBe('1:0:pending');
+			await act(() => {});
+			expect(container.textContent).toBe('1:1:idle');
+		} finally {
+			for (const root of roots.splice(0)) root.unmount();
+			owner.dispose();
+		}
+	});
+
 	it('does not let a layout-committed Action cue suppress a later native capture', async () => {
 		const native = installViewTransitionMocks();
 		let update!: (value: number) => void;
