@@ -275,7 +275,8 @@ later task, then runs each render to completion. There are urgent and transition
 updates, but no lanes, yield points, CPU time slicing, or selective hydration.
 
 The useful transition behavior remains. `isPending` commits first, with the previous
-state, so the browser can paint it before the transition renders. When a slower
+state, so the browser can paint it before the transition renders, and it falls in
+the render that commits the transition, as in React. When a slower
 replacement suspends, the current screen can stay visible while `isPending` explains
 the wait. `flushSync` drains the full update queue, while passive effects still run
 after paint.

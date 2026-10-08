@@ -212,6 +212,45 @@ export function PendingTabsPanel(props: PendingTabsPanelProps) @{
 	</>
 }
 
+interface PendingTabsHeldPanelProps extends PendingTabsProps {
+	initial: Promise<string>;
+	exposePanel: (setPromise: (promise: Promise<string>) => void) => void;
+}
+
+// The same component, beside a sibling whose boundary can hold its transitions.
+export function PendingTabsHeldPanel(props: PendingTabsHeldPanelProps) @{
+	<>
+		<PendingTabs expose={props.expose} onCommit={props.onCommit} onPress={props.onPress} />
+		<HeldPanel initial={props.initial} expose={props.exposePanel} />
+	</>
+}
+
+interface RootReaderProps {
+	initial: Promise<string>;
+	expose: (setPromise: (promise: Promise<string>) => void) => void;
+}
+
+// Reads its promise with no Suspense boundary, so a suspension holds the root.
+function RootReader(props: RootReaderProps) @{
+	const [promise, setPromise] = useState(props.initial);
+	props.expose(setPromise);
+	const value = use(promise);
+	<p>{value as string}</p>
+}
+
+interface PendingTabsRootReaderProps extends PendingTabsProps {
+	initial: Promise<string>;
+	exposeReader: (setPromise: (promise: Promise<string>) => void) => void;
+}
+
+// The same component, beside a sibling whose suspension holds the whole root.
+export function PendingTabsRootReader(props: PendingTabsRootReaderProps) @{
+	<>
+		<PendingTabs expose={props.expose} onCommit={props.onCommit} onPress={props.onPress} />
+		<RootReader initial={props.initial} expose={props.exposeReader} />
+	</>
+}
+
 interface HeldPendingTabsProps extends HeldPanelProps {
 	onCommit: (entry: string) => void;
 	next: Promise<string>;
