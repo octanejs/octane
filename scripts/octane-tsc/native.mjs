@@ -1,6 +1,8 @@
 // The repository's TypeScript 7 (`typescript-native`, the `native` catalog's 7.1
 // nightly) and the project settings every local use of it shares, so octane-tsc
 // and the tools on its `typescript/unstable/*` API check `.tsrx` the same way.
+import { execFileSync } from 'node:child_process';
+import { writeFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
@@ -35,6 +37,40 @@ export const NATIVE_LIBRARY_DIRECTORY = path.join(
 export function importNativeTypeScript(subpath) {
 	// The package resolves its own name (`typescript`) through its exports.
 	return import(pathToFileURL(createRequire(nativePackage).resolve(`typescript/${subpath}`)).href);
+}
+
+/**
+ * Emit declarations for `files` with the native compiler, through a tsconfig
+ * written to `directory`. `compilerOptions` use tsconfig spelling. As with the
+ * classic `program.emit()`, diagnostics do not fail the emit (exit status 2:
+ * outputs generated); only skipped outputs throw, with the compiler's output.
+ *
+ * @param {string} directory
+ * @param {readonly string[]} files
+ * @param {Record<string, unknown>} compilerOptions
+ */
+export function emitNativeDeclarations(directory, files, compilerOptions) {
+	const tsconfig = path.join(directory, 'tsconfig.json');
+	writeFileSync(
+		tsconfig,
+		JSON.stringify({
+			compilerOptions: { ...compilerOptions, declaration: true, emitDeclarationOnly: true },
+			files,
+		}),
+	);
+	try {
+		execFileSync(process.execPath, [NATIVE_TSC, '-p', tsconfig, '--pretty', 'false'], {
+			encoding: 'utf8',
+			stdio: 'pipe',
+		});
+	} catch (error) {
+		const failure = /** @type {{ status?: number, stdout?: string, stderr?: string }} */ (error);
+		if (failure.status === 2) return;
+		throw new Error(
+			`Native TypeScript skipped declaration emit:\n${failure.stdout ?? ''}${failure.stderr ?? String(error)}`,
+			{ cause: error },
+		);
+	}
 }
 
 /** The `.tsrx` content mapper, run with `--runExternalCode` (or the API's `runExternalCode`). */
