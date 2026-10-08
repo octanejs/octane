@@ -4139,11 +4139,13 @@ let ROOT_RENDER_TRANSACTION: RootRenderTransaction | null = null;
 /**
  * The `createdStamp` of the Blocks the active root attempt discards whole on
  * rollback (undoCreatedInRootRender), or -1. Inside the root window, a write
- * such a Block makes into its own hosts and bag needs no undo entry. Hydration
- * and adopted DOM (retainedCreated) keep every entry, because rollback keeps
- * those hosts. Kept in step with the transaction by beginRootRender,
- * endRootRender, preserveRootCreatedDom and hydrateRoot's hydrating mark, so a
- * write tests one field instead of the transaction's shape.
+ * such a Block makes into its own hosts and bag needs no undo entry, and a
+ * Block created below one needs no creation or render entry
+ * (discardedWithParent). Hydration and adopted DOM (retainedCreated) keep
+ * every entry, because rollback keeps those hosts. Kept in step with the
+ * transaction by beginRootRender, endRootRender, preserveRootCreatedDom and
+ * hydrateRoot's hydrating mark, so a write tests one field instead of the
+ * transaction's shape.
  */
 let ROOT_DISCARD_STAMP = -1;
 let ROOT_RENDER_TRANSACTIONS: RootRenderTransaction[] = [];
@@ -4541,7 +4543,28 @@ function createdInRootRender(block: Block): void {
 	)
 		preserveRootCreatedDom(block);
 	(transaction.created ??= []).push(block);
-	TRANSITION_JOURNAL!.push(JOURNAL_CREATED, block, transaction, null);
+	if (!discardedWithParent(block))
+		TRANSITION_JOURNAL!.push(JOURNAL_CREATED, block, transaction, null);
+}
+
+/**
+ * Whether the root window will discard `block` together with its parent, which
+ * this attempt also created. Neither its creation nor its renders then need an
+ * entry: the parent's creation undo unmounts the subtree it can reach, and
+ * rollbackRootRender sweeps `created`, which holds every Block with this stamp,
+ * for the rest: a portal whose content suspended before its slot was
+ * registered, or an arm a restored slot no longer names. The parent's render
+ * entries invalidate the committed path above it. A nested boundary window
+ * replays only its own entries and has no sweep, so it keeps them all, as do
+ * hydration and adopted DOM, where ROOT_DISCARD_STAMP is -1.
+ */
+function discardedWithParent(block: Block): boolean {
+	if (TRANSITION_JOURNAL_DEPTH !== 1 || block.createdStamp !== ROOT_DISCARD_STAMP) return false;
+	// A hookless child's stand-in is not a Block; its owner's teardown reaches
+	// what is created below it.
+	let parent = block.parentBlock;
+	while (parent instanceof LiteBlockImpl) parent = parent.parentBlock;
+	return parent !== null && parent.createdStamp === ROOT_DISCARD_STAMP;
 }
 
 /** An upgraded runtime descriptor can give a fresh Block existing host DOM. */
@@ -4578,6 +4601,12 @@ function rollbackRootRender(transaction: RootRenderTransaction): void {
 			}
 			transaction.log.length = 0;
 		}
+		// A Block discarded with its parent has no creation entry
+		// (discardedWithParent). Unmount any its parent's undo did not reach.
+		const created = transaction.created;
+		if (created !== null)
+			for (let i = created.length - 1; i >= 0; i--)
+				if (!created[i].disposed) undoCreatedInRootRender(created[i], transaction);
 		discardOffscreenCapture(transaction.capture);
 		transaction.commit = null;
 		// Restored rows have already left the parked list. Only speculative
@@ -11870,7 +11899,7 @@ function renderBlockInner(block: Block): true | undefined {
 	// A held in-place attempt has no capture. Its completed bodies must lose
 	// bailout validity with their rolled-back DOM. Record both owners: a nested
 	// journal can roll back even while its enclosing capture survives.
-	if (TRANSITION_JOURNAL !== null) {
+	if (TRANSITION_JOURNAL !== null && !discardedWithParent(block)) {
 		TRANSITION_JOURNAL.push(JOURNAL_RENDER, block, null, null);
 	}
 	const prevScope = CURRENT_SCOPE;
