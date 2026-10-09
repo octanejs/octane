@@ -53,6 +53,7 @@ async function buildCustomEsbuildApp(
 		'custom-esbuild-profile.tsrx',
 		{ dev: false, hmr: false, profile: compilerProfile },
 	).code;
+	if (!compilerProfile) expect(source).not.toMatch(/from ['"]octane\/profiling['"]/);
 	const result = await build({
 		stdin: {
 			contents: source,

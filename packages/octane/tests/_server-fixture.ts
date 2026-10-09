@@ -13,7 +13,6 @@ import { compile } from 'octane/compiler';
 import { slotHooks } from '../src/compiler/slot-hooks.js';
 import * as ServerRuntime from 'octane/server';
 import * as HydrationRuntime from 'octane/hydration';
-import * as ProfilingRuntime from 'octane/profiling';
 import * as InternalClientRuntime from 'octane/internal/client';
 import * as InternalServerRuntime from 'octane/internal/server';
 import * as ClientRuntime from '../src/index.js';
@@ -127,11 +126,6 @@ export function evaluateCompiledFixtureCode<T extends CompiledFixtureModule>(
 		(_match: string, names: string) =>
 			importBinding(`const {${names.replace(/\s+as\s+/g, ': ')}} = __hydrationRuntime;`),
 	);
-	code = code.replace(
-		/import\s*\{([^}]*)\}\s*from\s*['"]octane\/profiling['"];?/g,
-		(_match: string, names: string) =>
-			importBinding(`const {${names.replace(/\s+as\s+/g, ': ')}} = __profilingRuntime;`),
-	);
 	// The signals entrypoint was initialized by this loader's own bare import.
 	code = code.replace(/import\s*['"]octane\/signals['"];?/g, '');
 	code = code.replace(
@@ -212,19 +206,11 @@ export function evaluateCompiledFixtureCode<T extends CompiledFixtureModule>(
 		'__runtime',
 		'__internalRuntime',
 		'__hydrationRuntime',
-		'__profilingRuntime',
 		'__runtimeModules',
 		'__exports',
 		`'use strict';\n${imports.join('\n')}\n${code}\n//# sourceURL=${id}?${mode}-fixture\nreturn __exports;`,
 	);
-	return evaluate(
-		runtime,
-		internalRuntime,
-		HydrationRuntime,
-		ProfilingRuntime,
-		runtimeModules,
-		{},
-	) as T;
+	return evaluate(runtime, internalRuntime, HydrationRuntime, runtimeModules, {}) as T;
 }
 
 export function loadServerFixture<T extends CompiledFixtureModule = CompiledFixtureModule>(

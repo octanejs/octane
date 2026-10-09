@@ -27201,8 +27201,8 @@ function emitAutoMemoRegion(
 	const markInit = () =>
 		b.stmt(b.assignment('=', cacheAt(cell.init), initValue ?? b.literal(true)));
 	// The context helper runs on misses too; only this branch proves a cache hit.
-	// The same runtime define erases the probe and import from ordinary builds.
-	ctx.profileRuntimeNeeded.add('__profileCacheHit');
+	// Reuse the region ABI so ordinary optimized output needs no profiling module.
+	const memoRegionHelper = requireRuntimeForContext(ctx, 'compilerMemoRegion');
 	const profileHit = () =>
 		b.if(
 			b.logical(
@@ -27214,7 +27214,7 @@ function emitAutoMemoRegion(
 				),
 				b.id('__OCTANE_PROFILE_ENABLED__'),
 			),
-			b.stmt(b.call('_$__profileCacheHit')),
+			b.stmt(b.call(b.member(b.id(memoRegionHelper), '__profileHit'))),
 			null,
 		);
 	// `statement` is the guarded region's statement NODE; the returned region is

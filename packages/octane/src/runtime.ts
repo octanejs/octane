@@ -119,6 +119,7 @@ import {
 	__profileComponentSource,
 	__profileCounters,
 	__profileCount,
+	__profileCacheHit,
 	__profileFlush,
 	__profileFlushPriority,
 	ProfileCounter,
@@ -15577,6 +15578,11 @@ export function compilerMemoRegion(scope: Scope, bodyId: number): CompilerMemoRe
 	}
 	return region;
 }
+
+// Optimized modules share this ABI with ordinary builds. Only a profiling
+// runtime installs the observer, and generated calls use the same define.
+if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__)
+	compilerMemoRegion.__profileHit = __profileCacheHit;
 
 function createCompilerMemoRegion(
 	scope: Scope,
