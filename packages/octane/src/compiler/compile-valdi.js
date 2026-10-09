@@ -433,7 +433,11 @@ function attributeEntries(node, state) {
 		}
 		const name = attribute.name?.type === 'JSXIdentifier' ? attribute.name.name : null;
 		if (name === null) throw valdiError(state, attribute, 'namespaced attributes are unsupported.');
-		if (name === 'ref' || name === 'children') {
+		if (
+			name === 'children' ||
+			(name === 'ref' &&
+				(intrinsicTag(node) === null || !state.renderer.capabilities?.includes('host-ref')))
+		) {
 			throw valdiError(state, attribute, `authored ${name} props are not supported yet.`);
 		}
 		return { name, value: attributeValue(attribute, state), origin: attribute };
@@ -598,6 +602,8 @@ function keyExpression(state, prototype, keys, explicit, origin) {
 }
 
 function mergedAttributes(entries, state, origin) {
+	const allowRef =
+		intrinsicTag(origin) !== null && state.renderer.capabilities?.includes('host-ref');
 	const keyName = allocName(state, '__octaneValdiKey');
 	const refName = allocName(state, '__octaneValdiRef');
 	const childrenName = allocName(state, '__octaneValdiChildren');
@@ -611,18 +617,20 @@ function mergedAttributes(entries, state, origin) {
 	);
 	const pattern = b.object_pattern([
 		b.prop('init', b.id('key'), b.id(keyName)),
-		b.prop('init', b.id('ref'), b.id(refName)),
+		...(allowRef ? [] : [b.prop('init', b.id('ref'), b.id(refName))]),
 		b.prop('init', b.id('children'), b.id(childrenName)),
 		b.rest(b.id(propsName)),
 	]);
 	const prelude = [
 		b.const(pattern, expression),
 		b.if(
-			b.logical(
-				'||',
-				b.binary('!==', b.id(refName), b.unary('void', b.literal(0))),
-				b.binary('!==', b.id(childrenName), b.unary('void', b.literal(0))),
-			),
+			allowRef
+				? b.binary('!==', b.id(childrenName), b.unary('void', b.literal(0)))
+				: b.logical(
+						'||',
+						b.binary('!==', b.id(refName), b.unary('void', b.literal(0))),
+						b.binary('!==', b.id(childrenName), b.unary('void', b.literal(0))),
+					),
 			b.block([
 				b.throw_error('Octane Valdi compiler: spread ref/children props are not supported yet.'),
 			]),
@@ -648,7 +656,12 @@ function prepareAttributes(entries, state, origin) {
 	const dynamic = [];
 	let key = null;
 	for (const entry of entries) {
-		if (entry.name !== 'key' && counts.get(entry.name) === 1 && isStaticAttribute(entry.value)) {
+		if (
+			entry.name !== 'key' &&
+			entry.name !== 'ref' &&
+			counts.get(entry.name) === 1 &&
+			isStaticAttribute(entry.value)
+		) {
 			statics.push(withOrigin(b.literal(entry.name), entry.origin), entry.value);
 			continue;
 		}
@@ -762,10 +775,14 @@ function emitIntrinsicContents(node, state, attrs) {
 	return statements;
 }
 
-function isEmptyChild(node) {
+function isEmptyChild(node, state) {
+	const raw = node?.raw ?? node?.value ?? '';
 	return (
 		node == null ||
-		(node.type === 'JSXText' && /^[ \t\r\n;]*$/.test(node.raw ?? node.value ?? '')) ||
+		(node.type === 'JSXText' &&
+			(state.renderer.text === 'host'
+				? /^[ \t\r\n]*$/.test(raw) && /[\r\n]/.test(raw)
+				: /^[ \t\r\n;]*$/.test(raw))) ||
 		(node.type === 'JSXExpressionContainer' && node.expression?.type === 'JSXEmptyExpression')
 	);
 }
@@ -796,7 +813,7 @@ function emitElement(node, state, keys) {
 		return statements;
 	}
 	const component = componentExpression(name, state, node);
-	const children = (node.children ?? []).filter((child) => !isEmptyChild(child));
+	const children = (node.children ?? []).filter((child) => !isEmptyChild(child, state));
 	if (children.length !== 0) {
 		throw valdiError(state, node, 'component children/render props are not supported yet.');
 	}
@@ -955,6 +972,16 @@ function emitRenderable(node, state, keys) {
 		return emitNodes(value.children ?? [], state, keys, false);
 	if (value?.type === 'JSXForExpression') return emitFor(value, state, keys);
 	if (value?.type === 'JSXIfExpression') return emitIf(value, state, keys);
+	if (state.renderer.text === 'host') {
+		return [
+			writerStatement(
+				state,
+				'appendText',
+				[assertNoTemplate(node, state, 'JSX within host text')],
+				node,
+			),
+		];
+	}
 	throw valdiError(
 		state,
 		node,
@@ -1001,9 +1028,13 @@ function rewriteComponentStatement(node, state, keys, allowReturn) {
 function emitNodes(nodes, state, keys, allowReturn) {
 	const output = [];
 	for (const node of nodes) {
-		if (isEmptyChild(node)) continue;
+		if (isEmptyChild(node, state)) continue;
 		if (node.type === 'JSXText') {
 			if (state.renderer.text === 'ignore') continue;
+			if (state.renderer.text === 'host') {
+				output.push(writerStatement(state, 'appendText', [b.literal(node.value)], node));
+				continue;
+			}
 			throw valdiError(
 				state,
 				node,
@@ -1103,9 +1134,6 @@ export function compileValdi(
 			'Octane profiling is not supported by the Valdi writer target yet.',
 		);
 	}
-	if (renderer.text === 'host') {
-		throw valdiError(state, ast, 'host text is unsupported; use text: "reject" or "ignore".');
-	}
 	const boundaries = assertRendererBoundaryAnalysis(
 		analyzeRendererBoundaries(source, {
 			ast,
@@ -1138,7 +1166,20 @@ export function compileValdi(
 	}
 	const origin = ast.body?.[0] ?? ast;
 	const guard = withOrigin(
-		b.stmt(call(state, 'assertValdiCompilerAbi', [b.literal(VALDI_COMPILER_ABI_VERSION)], origin)),
+		b.stmt(
+			call(
+				state,
+				'assertValdiCompilerAbi',
+				[
+					b.literal(
+						renderer.text === 'host' || renderer.capabilities?.includes('host-ref')
+							? 2
+							: VALDI_COMPILER_ABI_VERSION,
+					),
+				],
+				origin,
+			),
+		),
 		origin,
 	);
 	const writerPrelude =
