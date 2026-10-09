@@ -9264,10 +9264,54 @@ function stripTypeOnlySpecifiers(node) {
 
 function dropTypeOnlyStatements(body) {
 	const result = [];
+	const typeNames = new Set();
 	for (const statement of body) {
-		if (isTypeOnlyStatement(statement)) continue;
+		if (isTypeOnlyStatement(statement)) {
+			collectTypeOnlyNames(statement, typeNames);
+			continue;
+		}
 		const stripped = stripTypeOnlySpecifiers(statement);
+		if (stripped !== statement) collectTypeOnlyNames(statement, typeNames);
 		if (stripped != null) result.push(stripped);
+	}
+	return typeNames.size === 0 ? result : dropTypeOnlyExports(result, typeNames);
+}
+
+// Local names declared only by an erased statement or specifier.
+function collectTypeOnlyNames(statement, names) {
+	const node = statement.type === 'ExportNamedDeclaration' ? statement.declaration : statement;
+	if (node == null) return;
+	if (node.type === 'ImportDeclaration') {
+		for (const specifier of node.specifiers) {
+			if (node.importKind === 'type' || specifier.importKind === 'type') {
+				names.add(specifier.local.name);
+			}
+		}
+	} else if (node.id?.type === 'Identifier') {
+		names.add(node.id.name);
+	}
+}
+
+// tsc drops `export { T }` and `export default T` when `T` names only a type.
+// A name declared only by erased syntax, ambient `declare` included, has no
+// runtime binding to export, unless a kept declaration merges a value into it.
+function dropTypeOnlyExports(body, typeNames) {
+	const values = collectModuleTopLevelBindings(body, new Set()).all;
+	const isTypeOnly = (node) =>
+		node?.type === 'Identifier' && typeNames.has(node.name) && !values.has(node.name);
+	const result = [];
+	for (const statement of body) {
+		if (statement.type === 'ExportDefaultDeclaration' && isTypeOnly(statement.declaration)) {
+			continue;
+		}
+		if (statement.type === 'ExportNamedDeclaration' && statement.source == null) {
+			const specifiers = statement.specifiers.filter((specifier) => !isTypeOnly(specifier.local));
+			if (specifiers.length !== statement.specifiers.length) {
+				if (specifiers.length > 0) result.push({ ...statement, specifiers });
+				continue;
+			}
+		}
+		result.push(statement);
 	}
 	return result;
 }
@@ -26748,6 +26792,8 @@ const TS_TYPE_PROPS = [
 	'returnType', // FunctionDeclaration / Arrow / MethodDefinition return type
 	'typeParameters', // Generic `<T>` declaration on function / class / interface
 	'typeArguments', // Generic `<T>` ARGS on a call / new / JSX (`new Promise<string>()`, `foo<T>()`)
+	'superTypeArguments', // `class X extends Base<T>` ARGS (native parser)
+	'superTypeParameters', // The same ARGS from the JavaScript parser
 	'definite', // `let x!: T` definite-assignment assertion
 	'accessibility', // class member `public` / `private` / `protected`
 	'readonly', // class member `readonly`
