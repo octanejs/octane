@@ -1768,7 +1768,27 @@ async function runSuite(suite) {
 		if (started.length) {
 			console.error(`  stopping ${started.length} server(s)…`);
 			stopServers(started);
-			started.length = 0;
+			try {
+				// Dispatching SIGKILL does not wait for listeners to disappear.
+				// The next suite may reuse these ports, so await its precondition.
+				const deadline = Date.now() + 5_000;
+				while (true) {
+					const listening = started.filter(
+						(srv) => pidsOnPort(srv.port).length || portUp(srv.port),
+					);
+					if (listening.length === 0) break;
+					if (Date.now() >= deadline) {
+						const error = new Error(
+							`preview ports did not close after shutdown: ${listening.map((srv) => srv.port).join(', ')}`,
+						);
+						error.code = 'BENCH_PREVIEW_SHUTDOWN_TIMEOUT';
+						throw error;
+					}
+					await sleep(100);
+				}
+			} finally {
+				started.length = 0;
+			}
 		}
 	}
 }
@@ -1944,6 +1964,7 @@ function formatRatioBounds(guard) {
 		} catch (e) {
 			console.error(`✗ ${suite.name}: ${e.message}`);
 			hardErrors.push(`${suite.name}: ${e.message}`);
+			if (e.code === 'BENCH_PREVIEW_SHUTDOWN_TIMEOUT') break;
 		}
 	}
 

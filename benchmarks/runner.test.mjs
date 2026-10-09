@@ -10,6 +10,8 @@ import {
 	writeFileSync,
 } from 'node:fs';
 import { tmpdir } from 'node:os';
+import { createServer } from 'node:net';
+import { once } from 'node:events';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import test from 'node:test';
@@ -131,3 +133,127 @@ test('invalid repeat counts fail before any harness starts', (t) => {
 	}
 	assert.equal(existsSync(path.join(f.root, 'benchmarks/js-framework/count')), false);
 });
+
+for (const { name, signalDelay, shutdownTimeout } of [
+	{
+		name: 'consecutive suites wait for their previous preview to release a shared port',
+		signalDelay: 400,
+		shutdownTimeout: false,
+	},
+	{
+		name: 'a preview shutdown timeout stops subsequent suites',
+		signalDelay: 60_000,
+		shutdownTimeout: true,
+	},
+]) {
+	test(name, async (t) => {
+		const f = fixture(t);
+		const reservation = createServer();
+		reservation.listen(0);
+		await once(reservation, 'listening');
+		const port = reservation.address().port;
+		await new Promise((resolve, reject) =>
+			reservation.close((error) => (error ? reject(error) : resolve())),
+		);
+		const bench = path.join(f.root, 'benchmarks');
+		const runner = path.join(bench, 'bench.mjs');
+		// Change only the fixture's manifest metadata; run the real CLI lifecycle.
+		writeFileSync(
+			runner,
+			readFileSync(runner, 'utf8').replaceAll(
+				"{ filter: 'react-jsbench', port: 5175 }",
+				`{ filter: 'react-jsbench', port: ${port} }`,
+			),
+		);
+		copyFileSync(
+			path.join(bench, 'js-framework/run.mjs'),
+			path.join(bench, 'js-framework/run-reorder.mjs'),
+		);
+		const bin = path.join(f.root, 'bin');
+		mkdirSync(bin);
+		const serverPids = path.join(f.root, 'server-pids');
+		writeFileSync(
+			path.join(bin, 'pnpm'),
+			`#!/usr/bin/env node
+const fs = require('node:fs');
+const http = require('node:http');
+if (process.argv.at(-1) === 'preview') {
+  const server = http.createServer((request, response) => response.end('ready'));
+  server.listen(Number(process.env.FIXTURE_PORT), () => {
+    fs.appendFileSync(process.env.FIXTURE_SERVER_PIDS, process.pid + '\\n');
+  });
+  setTimeout(() => process.exit(1), 15000).unref();
+}
+`,
+			{ mode: 0o755 },
+		);
+		const delayedSignals = path.join(f.root, 'delayed-signals.mjs');
+		writeFileSync(
+			delayedSignals,
+			`const kill = process.kill.bind(process);
+process.kill = (pid, signal) => {
+  if (pid < 0 && signal === 'SIGKILL') {
+    setTimeout(() => {
+      try { kill(pid, signal); } catch (error) { if (error.code !== 'ESRCH') throw error; }
+    }, ${signalDelay});
+    return true;
+  }
+  return kill(pid, signal);
+};
+`,
+		);
+		try {
+			const run = spawnSync(
+				process.execPath,
+				[
+					'--import',
+					delayedSignals,
+					runner,
+					'js-framework',
+					'js-framework-reorder',
+					'--servers=react-jsbench',
+				],
+				{
+					cwd: f.root,
+					env: {
+						...process.env,
+						TMPDIR: f.root,
+						TMP: f.root,
+						TEMP: f.root,
+						PATH: `${bin}${path.delimiter}${process.env.PATH}`,
+						FIXTURE_PORT: String(port),
+						FIXTURE_SERVER_PIDS: serverPids,
+						FIXTURE_MODE: '',
+					},
+					encoding: 'utf8',
+					timeout: 20_000,
+				},
+			);
+			assert.equal(run.error, undefined);
+			assert.equal(f.read('results/js-framework.json').harnessExit, 0);
+			if (shutdownTimeout) {
+				assert.equal(run.status, 1, run.stderr);
+				assert.match(run.stderr, /preview ports did not close after shutdown/);
+				assert.doesNotMatch(run.stderr, /=== js-framework-reorder ===/);
+				assert.equal(existsSync(path.join(bench, 'results/js-framework-reorder.json')), false);
+				assert.equal(readFileSync(serverPids, 'utf8').trim().split('\n').length, 1);
+			} else {
+				assert.equal(run.status, 0, run.stderr);
+				assert.equal(f.read('results/js-framework-reorder.json').harnessExit, 0);
+				assert.equal(readFileSync(serverPids, 'utf8').trim().split('\n').length, 2);
+			}
+		} finally {
+			// The reproduction fails before queued signals run, so independently
+			// clean up only the child PIDs recorded by our own preview fixtures.
+			if (existsSync(serverPids)) {
+				for (const pid of readFileSync(serverPids, 'utf8').trim().split('\n')) {
+					try {
+						process.kill(Number(pid), 'SIGKILL');
+					} catch (error) {
+						if (error.code !== 'ESRCH') throw error;
+					}
+				}
+			}
+		}
+	});
+}
