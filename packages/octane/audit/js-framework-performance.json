@@ -1,0 +1,912 @@
+{
+  "date": "2026-10-09",
+  "baseline": {
+    "baseSha": "a5e1816385fba69afde2b667943d98822b129e23",
+    "branch": "upstream/main",
+    "latestAtInvestigationStart": true,
+    "artifactTree": "/tmp/octane-js-framework-baseline-a5e1816"
+  },
+  "environment": {
+    "cpu": "Apple M5 Max",
+    "os": "macOS 26.7.1 arm64",
+    "node": "22.22.3",
+    "pnpm": "12.10.1",
+    "vite": "8.1.5",
+    "playwright": "1.61.1",
+    "chromium": "149.0.7827.55",
+    "dependencySetup": "Exact selected entries from baseline lockfile, frozen install with managed supply-chain checks in /tmp/octane-performance-tools-a5e1816. Repository manifests and lockfile unchanged."
+  },
+  "retainedChange": {
+    "owner": "packages/octane/src/runtime.ts:reconcileKeyed",
+    "description": "Omit key-index Map entries for stable positions in equal-length middles whose first actual middle key already exists. Preserve full replacement and prefix/suffix paths; use recorded keys and a stable-survivor guard.",
+    "noRowRenderShortcut": true,
+    "runtimeGitBlobAtInvestigationCompletion": "38066bc53"
+  },
+  "bundles": {
+    "octane-tsrx": {
+      "baseline": {
+        "path": "benchmarks/js-framework/octane-tsrx/dist/assets/index-HRiP9m4N.js",
+        "sha256": "ccd796503a6b19d9465af7c51617152845954e2b7d1b9f32d3a7379b220772f0",
+        "bytes": 121779,
+        "gzipBytes": 40404
+      },
+      "candidate": {
+        "path": "benchmarks/js-framework/octane-tsrx/dist/assets/index-HrYil42V.js",
+        "sha256": "956a7980a01654e5b9ded9a82541c4f10b71735443e938df7c617d7bbf86d9b2",
+        "bytes": 121951,
+        "gzipBytes": 40467
+      }
+    },
+    "octane-jsx": {
+      "baseline": {
+        "path": "benchmarks/js-framework/octane-jsx/dist/assets/index-BP_ifW5p.js",
+        "sha256": "fcb146c13723f150caade318654917d5928e0f7fe820a9c2492d23d64735a8fe",
+        "bytes": 205653,
+        "gzipBytes": 66713
+      },
+      "candidate": {
+        "path": "benchmarks/js-framework/octane-jsx/dist/assets/index-DmQgr7Y9.js",
+        "sha256": "d63076fee857b4eab0f1111392445ddca0ef57355a5df53fff3c27c29767f786",
+        "bytes": 205809,
+        "gzipBytes": 66794
+      }
+    }
+  },
+  "method": {
+    "metric": "candidate / baseline; lower is better",
+    "pairs": 30,
+    "warmupPairs": 5,
+    "sampleOrder": "alternating baseline/candidate",
+    "statistics": "Median paired log-ratio, exponentiated; 95% bootstrap interval with 2000 resamples from benchmarks/lib/stats.mjs:pairedRatio.",
+    "timingBoundary": "Existing timeSample/timeClick click and commit work, excludes paint and Playwright transport. Fixed repeat counts, minified builds, separate uninstrumented browser for timings.",
+    "observation": "Visible row counts, update text and reorder output verified after batches. Native Map observation and production call/DOM coverage collected in separate runs.",
+    "history": "Same browser page proceeds through update, swap, front removal, reverse, shuffle, replacement; each batch mounts fresh rows.",
+    "scope": "Local homepage fixture diagnostic, not the official upstream js-framework-benchmark timeline suite. No full-suite headline or published-data refresh claimed."
+  },
+  "finalTsrxControls": {
+    "source": "paired-sparse-only-controls.json",
+    "operations": {
+      "update": {
+        "repeat": 200,
+        "baselineMedianMs": 0.15300000011920928,
+        "candidateMedianMs": 0.15100000023841859,
+        "paired": {
+          "ratio": 0.9899214257083934,
+          "low": 0.9714385871382147,
+          "high": 1.0014825808564862,
+          "pairs": 30
+        }
+      },
+      "swaprows": {
+        "repeat": 1001,
+        "baselineMedianMs": 0.032667332655423646,
+        "candidateMedianMs": 0.018581418545691522,
+        "paired": {
+          "ratio": 0.5640191158489152,
+          "low": 0.5583716939443246,
+          "high": 0.5774143328017632,
+          "pairs": 30
+        }
+      },
+      "removefirst": {
+        "repeat": 200,
+        "baselineMedianMs": 0.014000000059604644,
+        "candidateMedianMs": 0.01449999988079071,
+        "paired": {
+          "ratio": 1,
+          "low": 0.9999999793484506,
+          "high": 1.032558215678507,
+          "pairs": 30
+        }
+      },
+      "reverse": {
+        "repeat": 31,
+        "baselineMedianMs": 0.6838709673573894,
+        "candidateMedianMs": 0.6838709673573894,
+        "paired": {
+          "ratio": 0.9950592798698633,
+          "low": 0.9858728236644502,
+          "high": 1.0023337246233384,
+          "pairs": 30
+        }
+      },
+      "shuffle": {
+        "repeat": 31,
+        "baselineMedianMs": 0.9258064512283571,
+        "candidateMedianMs": 0.9129032261909977,
+        "paired": {
+          "ratio": 0.9862778332236389,
+          "low": 0.9783390280909272,
+          "high": 1.0071155382654922,
+          "pairs": 30
+        }
+      },
+      "run": {
+        "repeat": 10,
+        "baselineMedianMs": 2.260000002384186,
+        "candidateMedianMs": 2.209999996423721,
+        "paired": {
+          "ratio": 0.9777272794460831,
+          "low": 0.9730169921655814,
+          "high": 0.9906540011255862,
+          "pairs": 30
+        }
+      }
+    }
+  },
+  "tsrxRepeat": {
+    "source": "paired-sparse-only-controls-initial.json",
+    "swap": {
+      "repeat": 1001,
+      "baselineMedianMs": 0.02977022978213879,
+      "candidateMedianMs": 0.015584415548688524,
+      "paired": {
+        "ratio": 0.5230263149026534,
+        "low": 0.5165147604628175,
+        "high": 0.5286914058346553,
+        "pairs": 30
+      }
+    },
+    "note": "Same final artifact. A short core typecheck overlapped startup; no typecheck during swaps. Clean repeated comparison is primary. Point-estimate swap reduction across runs is 44-48%."
+  },
+  "finalJsxSwap": {
+    "source": "final-jsx-swap.json",
+    "operations": {
+      "swaprows": {
+        "repeat": 101,
+        "baselineMedianMs": 0.21782178217821782,
+        "candidateMedianMs": 0.16831683168316833,
+        "paired": {
+          "ratio": 0.7700621187642492,
+          "low": 0.7631321876798052,
+          "high": 0.778051403319487,
+          "pairs": 30
+        }
+      }
+    }
+  },
+  "nativeMapWrites": {
+    "sources": ["baseline-key-map-calls.json", "final-native-map-calls.json"],
+    "baseline": {
+      "run": 1003,
+      "replace": 2003,
+      "add": 1004,
+      "update": 102,
+      "select": 2,
+      "swap": 1005,
+      "remove": 4,
+      "runlots": 10003,
+      "select_lots": 2,
+      "clear": 3
+    },
+    "candidate": {
+      "run": 1003,
+      "replace": 2003,
+      "add": 1004,
+      "update": 102,
+      "select": 2,
+      "swap": 9,
+      "remove": 4,
+      "runlots": 10003,
+      "select_lots": 2,
+      "clear": 3
+    },
+    "interpretation": "Swap reduces native Map.set calls from 1005 to 9. All other canonical operations unchanged. Counts are not heap allocations."
+  },
+  "canonicalWork": {
+    "sources": ["retained-work-base.json", "retained-work-candidate.json"],
+    "identical": true,
+    "targets": [
+      {
+        "name": "octane-tsrx",
+        "ops": {
+          "calls_run": {
+            "median": 25087,
+            "min": 25087,
+            "samples": 1
+          },
+          "dom_run": {
+            "median": 2000,
+            "min": 2000,
+            "samples": 1
+          },
+          "calls_replace": {
+            "median": 32100,
+            "min": 32100,
+            "samples": 1
+          },
+          "dom_replace": {
+            "median": 3000,
+            "min": 3000,
+            "samples": 1
+          },
+          "calls_add": {
+            "median": 33086,
+            "min": 33086,
+            "samples": 1
+          },
+          "dom_add": {
+            "median": 2000,
+            "min": 2000,
+            "samples": 1
+          },
+          "calls_update": {
+            "median": 3583,
+            "min": 3583,
+            "samples": 1
+          },
+          "dom_update": {
+            "median": 100,
+            "min": 100,
+            "samples": 1
+          },
+          "calls_select": {
+            "median": 86,
+            "min": 86,
+            "samples": 1
+          },
+          "dom_select": {
+            "median": 1,
+            "min": 1,
+            "samples": 1
+          },
+          "calls_swap": {
+            "median": 2097,
+            "min": 2097,
+            "samples": 1
+          },
+          "dom_swap": {
+            "median": 4,
+            "min": 4,
+            "samples": 1
+          },
+          "calls_remove": {
+            "median": 3102,
+            "min": 3102,
+            "samples": 1
+          },
+          "dom_remove": {
+            "median": 1,
+            "min": 1,
+            "samples": 1
+          },
+          "calls_runlots": {
+            "median": 250084,
+            "min": 250084,
+            "samples": 1
+          },
+          "dom_runlots": {
+            "median": 20000,
+            "min": 20000,
+            "samples": 1
+          },
+          "calls_select_lots": {
+            "median": 86,
+            "min": 86,
+            "samples": 1
+          },
+          "dom_select_lots": {
+            "median": 1,
+            "min": 1,
+            "samples": 1
+          },
+          "calls_clear": {
+            "median": 97,
+            "min": 97,
+            "samples": 1
+          },
+          "dom_clear": {
+            "median": 10004,
+            "min": 10004,
+            "samples": 1
+          }
+        },
+        "meta": {
+          "work": {
+            "run": {
+              "calls": 25087,
+              "added": 1000,
+              "removed": 0,
+              "attributes": 1000,
+              "text": 0
+            },
+            "replace": {
+              "calls": 32100,
+              "added": 1000,
+              "removed": 1000,
+              "attributes": 1000,
+              "text": 0
+            },
+            "add": {
+              "calls": 33086,
+              "added": 1000,
+              "removed": 0,
+              "attributes": 1000,
+              "text": 0
+            },
+            "update": {
+              "calls": 3583,
+              "added": 0,
+              "removed": 0,
+              "attributes": 0,
+              "text": 100
+            },
+            "select": {
+              "calls": 86,
+              "added": 0,
+              "removed": 0,
+              "attributes": 1,
+              "text": 0
+            },
+            "swap": {
+              "calls": 2097,
+              "added": 2,
+              "removed": 2,
+              "attributes": 0,
+              "text": 0
+            },
+            "remove": {
+              "calls": 3102,
+              "added": 0,
+              "removed": 1,
+              "attributes": 0,
+              "text": 0
+            },
+            "runlots": {
+              "calls": 250084,
+              "added": 10000,
+              "removed": 0,
+              "attributes": 10000,
+              "text": 0
+            },
+            "select_lots": {
+              "calls": 86,
+              "added": 0,
+              "removed": 0,
+              "attributes": 1,
+              "text": 0
+            },
+            "clear": {
+              "calls": 97,
+              "added": 2,
+              "removed": 10002,
+              "attributes": 0,
+              "text": 0
+            }
+          }
+        }
+      },
+      {
+        "name": "octane-jsx",
+        "ops": {
+          "calls_run": {
+            "median": 35163,
+            "min": 35163,
+            "samples": 1
+          },
+          "dom_run": {
+            "median": 4000,
+            "min": 4000,
+            "samples": 1
+          },
+          "calls_replace": {
+            "median": 42178,
+            "min": 42178,
+            "samples": 1
+          },
+          "dom_replace": {
+            "median": 5000,
+            "min": 5000,
+            "samples": 1
+          },
+          "calls_add": {
+            "median": 50164,
+            "min": 50164,
+            "samples": 1
+          },
+          "dom_add": {
+            "median": 4000,
+            "min": 4000,
+            "samples": 1
+          },
+          "calls_update": {
+            "median": 9761,
+            "min": 9761,
+            "samples": 1
+          },
+          "dom_update": {
+            "median": 100,
+            "min": 100,
+            "samples": 1
+          },
+          "calls_select": {
+            "median": 9166,
+            "min": 9166,
+            "samples": 1
+          },
+          "dom_select": {
+            "median": 1,
+            "min": 1,
+            "samples": 1
+          },
+          "calls_swap": {
+            "median": 9173,
+            "min": 9173,
+            "samples": 1
+          },
+          "dom_swap": {
+            "median": 4,
+            "min": 4,
+            "samples": 1
+          },
+          "calls_remove": {
+            "median": 9178,
+            "min": 9178,
+            "samples": 1
+          },
+          "dom_remove": {
+            "median": 1,
+            "min": 1,
+            "samples": 1
+          },
+          "calls_runlots": {
+            "median": 350160,
+            "min": 350160,
+            "samples": 1
+          },
+          "dom_runlots": {
+            "median": 40000,
+            "min": 40000,
+            "samples": 1
+          },
+          "calls_select_lots": {
+            "median": 90166,
+            "min": 90166,
+            "samples": 1
+          },
+          "dom_select_lots": {
+            "median": 1,
+            "min": 1,
+            "samples": 1
+          },
+          "calls_clear": {
+            "median": 175,
+            "min": 175,
+            "samples": 1
+          },
+          "dom_clear": {
+            "median": 10004,
+            "min": 10004,
+            "samples": 1
+          }
+        },
+        "meta": {
+          "work": {
+            "run": {
+              "calls": 35163,
+              "added": 3000,
+              "removed": 0,
+              "attributes": 1000,
+              "text": 0
+            },
+            "replace": {
+              "calls": 42178,
+              "added": 3000,
+              "removed": 1000,
+              "attributes": 1000,
+              "text": 0
+            },
+            "add": {
+              "calls": 50164,
+              "added": 3000,
+              "removed": 0,
+              "attributes": 1000,
+              "text": 0
+            },
+            "update": {
+              "calls": 9761,
+              "added": 0,
+              "removed": 0,
+              "attributes": 0,
+              "text": 100
+            },
+            "select": {
+              "calls": 9166,
+              "added": 0,
+              "removed": 0,
+              "attributes": 1,
+              "text": 0
+            },
+            "swap": {
+              "calls": 9173,
+              "added": 2,
+              "removed": 2,
+              "attributes": 0,
+              "text": 0
+            },
+            "remove": {
+              "calls": 9178,
+              "added": 0,
+              "removed": 1,
+              "attributes": 0,
+              "text": 0
+            },
+            "runlots": {
+              "calls": 350160,
+              "added": 30000,
+              "removed": 0,
+              "attributes": 10000,
+              "text": 0
+            },
+            "select_lots": {
+              "calls": 90166,
+              "added": 0,
+              "removed": 0,
+              "attributes": 1,
+              "text": 0
+            },
+            "clear": {
+              "calls": 175,
+              "added": 2,
+              "removed": 10002,
+              "attributes": 0,
+              "text": 0
+            }
+          }
+        }
+      }
+    ],
+    "browserSemanticAndErrorGate": "passed"
+  },
+  "currentRippleDiagnostic": {
+    "source": "refined-ripple-paired-diagnostic.json",
+    "ratio": "final Octane / Ripple; lower is better",
+    "operations": {
+      "update": {
+        "repeat": 200,
+        "baselineMedianMs": 0.08299999982118607,
+        "candidateMedianMs": 0.12900000005960466,
+        "paired": {
+          "ratio": 1.5630680778523485,
+          "low": 1.5495565331130505,
+          "high": 1.572729880634812,
+          "pairs": 30
+        }
+      },
+      "select": {
+        "repeat": 5000,
+        "baselineMedianMs": 0.0018799999952316285,
+        "candidateMedianMs": 0.003179999995231628,
+        "paired": {
+          "ratio": 1.6861901195497995,
+          "low": 1.6597003507454535,
+          "high": 1.7096774145996987,
+          "pairs": 30
+        }
+      },
+      "swap": {
+        "repeat": 501,
+        "baselineMedianMs": 0.012375249477203734,
+        "candidateMedianMs": 0.014371257461235671,
+        "paired": {
+          "ratio": 1.16666667118217,
+          "low": 1.1639344207031437,
+          "high": 1.1803278622848954,
+          "pairs": 30
+        }
+      },
+      "remove": {
+        "repeat": 799,
+        "baselineMedianMs": 0.011639549451715806,
+        "candidateMedianMs": 0.010763454273137938,
+        "paired": {
+          "ratio": 0.9139784963809903,
+          "low": 0.9120879104324274,
+          "high": 0.9234948897533959,
+          "pairs": 30
+        }
+      },
+      "select_lots": {
+        "repeat": 5000,
+        "baselineMedianMs": 0.003459999990463257,
+        "candidateMedianMs": 0.005360000002384186,
+        "paired": {
+          "ratio": 1.6033158876116722,
+          "low": 1.5510204050601497,
+          "high": 1.6522655731488434,
+          "pairs": 30
+        }
+      }
+    },
+    "caveat": "Fixed local artifacts and longer samples. Framework label mapping differs despite seeded RNG. Does not isolate historical Ripple changes or establish whole-suite parity."
+  },
+  "deferredExperiments": [
+    {
+      "name": "DEP-PURE lightweight row-render eligibility",
+      "result": "Partial update 5-7% faster and 3583 to 3283 production calls, but operation-history front removal approximately 15% slower. Fresh-context removal neutral.",
+      "disposition": "Reverted. Precise JIT/GC mechanism remains unproven; dedicated fixtures removed.",
+      "sources": [
+        "pair-candidate-tsrx-only.json",
+        "paired-middle-gate-controls.json",
+        "isolated-removefirst-control.json",
+        "sparse-vs-update-only-history.json"
+      ]
+    },
+    {
+      "name": "Unconditional sparse indexing for equal-length middles",
+      "result": "Repeated fresh replacement approximately 3% slower.",
+      "disposition": "Superseded by strategy selection inside first authoritative middle-key read.",
+      "sources": ["paired-reorder-focused.json"]
+    }
+  ],
+  "validation": {
+    "testExecutions": 798,
+    "suites": 12,
+    "fileModeExecutions": 24,
+    "modes": ["development", "production"],
+    "log": "octane-sparse-only-regression-final.log",
+    "config": "octane-all-list-regression-vitest.config.mjs",
+    "newContractsOnUnmodifiedBaseline": "pass",
+    "mutationChecks": [
+      {
+        "mutation": "Remove direct stable-index lookup",
+        "result": "10 identity failures; restored",
+        "log": "octane-stable-index-mutant.log"
+      },
+      {
+        "mutation": "Remove stable-key full-clear safeguard",
+        "result": "Changing key getter fails in development and production; restored",
+        "log": "octane-middle-fullreplace-mutant.log"
+      }
+    ],
+    "coreTypecheck": "pass, TypeScript 7.1.0-dev.20260921.1",
+    "coreTypecheckLog": "octane-core-typecheck-sparse-only.log",
+    "scopedStandardTsFormatting": "pass; no retained TSRX fixture edits",
+    "gitDiffCheck": "pass",
+    "independentComplexityReview": "clean on final retained change",
+    "fullWorkspace": "Not run. Managed publication-age policy blocked unrelated @tsrx/prettier-plugin@0.6.3, @tsrx/content-mapper@0.1.2, @tsrx/react@0.4.5. No registry bypass.",
+    "ci": "not run",
+    "publication": "no commit, push, PR, merge, deployment or homepage refresh",
+    "phase": "Investigation-completion snapshot before PR publication; current-head CI is reported in the pull request."
+  },
+  "separateExistingDefect": {
+    "description": "Completed child whole-list memo cache can survive rollback after a later sibling suspends, leaving old text after retry. Reproduced on unmodified baseline in production compilation; not fixed here.",
+    "reproduction": [
+      "octane-captured-row-cache-repro.tsrx",
+      "octane-captured-row-cache-repro.json"
+    ],
+    "upstreamFix": "4f82777bbdd1cc255afc4220f26906d062ebc09f, octanejs/octane#1937; incorporated as the PR base, outside this optimization."
+  },
+  "commands": {
+    "canonicalWork": "node benchmarks/js-framework/pair.mjs --base-tree=/tmp/octane-js-framework-baseline-a5e1816 --base-json=benchmarks/results/js-framework-investigation/retained-work-base.json --head-json=benchmarks/results/js-framework-investigation/retained-work-candidate.json --work-only --no-build",
+    "tsrxTiming": "node benchmarks/results/js-framework-investigation/playwright-octane-sparse-only-controls.cjs",
+    "jsxTiming": "node benchmarks/results/js-framework-investigation/playwright-octane-jsx-swap.cjs",
+    "rippleTiming": "node benchmarks/results/js-framework-investigation/playwright-octane-ripple-final.cjs",
+    "typecheck": "/tmp/octane-performance-tools-a5e1816/node_modules/typescript-native/bin/tsc --noEmit -p packages/octane/tsconfig.json"
+  },
+  "rawEvidenceDirectory": "../../../benchmarks/results/js-framework-investigation",
+  "rawEvidenceTracked": false,
+  "prPreparation": {
+    "baseSha": "4f82777bbdd1cc255afc4220f26906d062ebc09f",
+    "runtimeGitBlob": "a2133649bb000de607befc96b82c986917264eee",
+    "runtimeSourceSha256": "3b8bd3b1db8db76ddc7578af46cb1db4b80a5d47957b1741dcfd59afc47efe2e",
+    "artifacts": {
+      "base": {
+        "octane-tsrx": {
+          "dist": "/tmp/octane-swap-pr-base-4f82777b/benchmarks/js-framework/octane-tsrx/dist",
+          "port": 5476,
+          "files": {
+            "assets/index-9teDukqY.js": {
+              "bytes": 121842,
+              "sha256": "1634ff33baca793517c81555d5f377a4ca008efdbd80b632e6cf5cb068360aee"
+            },
+            "index.html": {
+              "bytes": 542,
+              "sha256": "3d64759fe9ae795825a512d4f32c8d91a997e048727692f6005434e4385177d2"
+            },
+            "octane-client-build.json": {
+              "bytes": 135,
+              "sha256": "b01bd42915ce0630c686048ea1194e5084c8a2f568d47bdd5b8989ccfe37a580"
+            }
+          }
+        },
+        "octane-jsx": {
+          "dist": "/tmp/octane-swap-pr-base-4f82777b/benchmarks/js-framework/octane-jsx/dist",
+          "port": 5479,
+          "files": {
+            "assets/index-BP_ifW5p.js": {
+              "bytes": 205653,
+              "sha256": "fcb146c13723f150caade318654917d5928e0f7fe820a9c2492d23d64735a8fe"
+            },
+            "index.html": {
+              "bytes": 541,
+              "sha256": "d1b127f9ff741d6a242e1dbee629ada8ab6c6e9ba18bbb0cc5fb6707cf41c303"
+            },
+            "octane-client-build.json": {
+              "bytes": 135,
+              "sha256": "8c30f64c7e72017bc6e9d9e09a4360ae9e078b75d6e1d2a83c1116c8d6d36b0b"
+            }
+          }
+        }
+      },
+      "candidate": {
+        "octane-tsrx": {
+          "dist": "/Users/domgan/.codex/worktrees/js-framework-performance/octane/benchmarks/js-framework/octane-tsrx/dist",
+          "port": 5477,
+          "files": {
+            "assets/index-DpoEp5IP.js": {
+              "bytes": 122014,
+              "sha256": "e5f20a13f436b5ea6f20c4847fac75ae472e9458111718429fe65e91744c28c2"
+            },
+            "index.html": {
+              "bytes": 542,
+              "sha256": "a68886fd2630e03d8972064cb8fcfb69a5b818d262462a007a7e0f5704312723"
+            },
+            "octane-client-build.json": {
+              "bytes": 135,
+              "sha256": "a2a8e02a4fa27dcb35eb289bc43a99e0ecf5ba5348a23ab4ab1fc81e82fa33b3"
+            }
+          }
+        },
+        "octane-jsx": {
+          "dist": "/Users/domgan/.codex/worktrees/js-framework-performance/octane/benchmarks/js-framework/octane-jsx/dist",
+          "port": 5480,
+          "files": {
+            "assets/index-DmQgr7Y9.js": {
+              "bytes": 205809,
+              "sha256": "d63076fee857b4eab0f1111392445ddca0ef57355a5df53fff3c27c29767f786"
+            },
+            "index.html": {
+              "bytes": 541,
+              "sha256": "231debbb5c826f5a9a7198bb1df7e5cd868ee528e656e800493c90db4fa44221"
+            },
+            "octane-client-build.json": {
+              "bytes": 135,
+              "sha256": "ec2ede6059281f42512c8f543162bb8832e569ff98373b7f0600631578386ee4"
+            }
+          }
+        }
+      }
+    },
+    "tsrxFirst": {
+      "source": "pr-base-tsrx-controls.json",
+      "operations": {
+        "update": {
+          "repeat": 200,
+          "paired": {
+            "ratio": 1.0037813789981715,
+            "low": 0.9944012335792939,
+            "high": 1.0133351713585559,
+            "pairs": 30
+          }
+        },
+        "swaprows": {
+          "repeat": 1001,
+          "paired": {
+            "ratio": 0.5149814807285795,
+            "low": 0.5118838536786537,
+            "high": 0.5206003838271088,
+            "pairs": 30
+          }
+        },
+        "removefirst": {
+          "repeat": 200,
+          "paired": {
+            "ratio": 1,
+            "low": 0.9999999740849373,
+            "high": 1.0425720675835417,
+            "pairs": 30
+          }
+        },
+        "reverse": {
+          "repeat": 31,
+          "paired": {
+            "ratio": 1.0435858498714623,
+            "low": 1.0202363422586653,
+            "high": 1.05352283206438,
+            "pairs": 30
+          }
+        },
+        "shuffle": {
+          "repeat": 31,
+          "paired": {
+            "ratio": 1.0160427797770986,
+            "low": 0.9948978263397259,
+            "high": 1.0376344095755758,
+            "pairs": 30
+          }
+        },
+        "run": {
+          "repeat": 10,
+          "paired": {
+            "ratio": 1.0249490316818664,
+            "low": 1.0105820131183074,
+            "high": 1.0826500577209328,
+            "pairs": 30
+          }
+        }
+      }
+    },
+    "tsrxRepeat": {
+      "source": "pr-base-tsrx-controls-repeat.json",
+      "operations": {
+        "update": {
+          "repeat": 200,
+          "paired": {
+            "ratio": 1.0038461547631483,
+            "low": 0.9980897781015021,
+            "high": 1.0129029659997553,
+            "pairs": 30
+          }
+        },
+        "swaprows": {
+          "repeat": 1001,
+          "paired": {
+            "ratio": 0.5237138998304071,
+            "low": 0.5198462632967745,
+            "high": 0.5248095134244768,
+            "pairs": 30
+          }
+        },
+        "removefirst": {
+          "repeat": 200,
+          "paired": {
+            "ratio": 1.0000000265040419,
+            "low": 1,
+            "high": 1.0454545294450335,
+            "pairs": 30
+          }
+        },
+        "reverse": {
+          "repeat": 31,
+          "paired": {
+            "ratio": 0.9942188769140581,
+            "low": 0.9837257757842245,
+            "high": 1.0088379252220174,
+            "pairs": 30
+          }
+        },
+        "shuffle": {
+          "repeat": 31,
+          "paired": {
+            "ratio": 0.9997521539098738,
+            "low": 0.9639037453249515,
+            "high": 1.0107529966974484,
+            "pairs": 30
+          }
+        },
+        "run": {
+          "repeat": 10,
+          "paired": {
+            "ratio": 1.0223311050526136,
+            "low": 0.9918289693569682,
+            "high": 1.0475241110035416,
+            "pairs": 30
+          }
+        }
+      }
+    },
+    "jsxSwap": {
+      "source": "pr-base-jsx-swap.json",
+      "operations": {
+        "swaprows": {
+          "repeat": 101,
+          "paired": {
+            "ratio": 0.7990225653846523,
+            "low": 0.789201504703521,
+            "high": 0.8112244888261947,
+            "pairs": 30
+          }
+        }
+      }
+    },
+    "interpretation": "TSRX swap 48-49% faster; JSX swap 20% faster. Reverse +4.4% on first run did not repeat (second -0.6%). Replacement point estimates +2.2-2.5%; second interval crosses 1. These remain an uncertain possible small replacement cost, not uniformly neutral controls.",
+    "canonicalWork": "All 20 call/DOM counters per dialect identical; browser semantic gates passed.",
+    "testExecutions": 800,
+    "testLog": "octane-swap-pr-tests.log",
+    "coreTypecheck": "pass",
+    "typecheckLog": "octane-swap-pr-core-typecheck.log",
+    "perfReviewScan": "0 candidates against 4f82777b",
+    "ci": "pending publication"
+  }
+}
