@@ -1731,10 +1731,12 @@ function isStaticallyPrimitiveTextExpression(node) {
 }
 
 function validateHostTemplates(ast, state, validation, isAuthored) {
+	const allowedTags = validation.allowedTags === undefined ? null : new Set(validation.allowedTags);
 	const textParents = validation.textParents === undefined ? null : new Set(validation.textParents);
 	const textHosts = validation.textHosts === undefined ? null : new Set(validation.textHosts);
 	const hostProps = validation.hostProps;
-	if (textParents === null && textHosts === null && hostProps === undefined) return;
+	if (allowedTags === null && textParents === null && textHosts === null && hostProps === undefined)
+		return;
 	const sharedProps = hostProps?.['*'] ?? [];
 	const seen = new WeakSet();
 	const visit = (node, nearestHost = null) => {
@@ -1785,6 +1787,13 @@ function validateHostTemplates(ast, state, validation, isAuthored) {
 			// the caller's nearest host through that semantic boundary; the component
 			// body is validated independently at the host site it actually authors.
 			const nextHost = isHost ? name : null;
+			if (isHost && allowedTags !== null && !allowedTags.has(name) && isAuthored(node)) {
+				throw universalError(
+					state.filename,
+					node,
+					`renderer ${JSON.stringify(state.renderer.id)} does not allow <${name}>.`,
+				);
+			}
 			if (
 				isHost &&
 				textHosts !== null &&
