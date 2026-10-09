@@ -437,6 +437,9 @@ async function buildScenario(scenario, entry) {
 		id.endsWith('/packages/octane/src/runtime.server.ts'),
 	);
 	const streamModule = modules.find((id) => id.endsWith('/packages/octane/src/stream-protocol.ts'));
+	const hookPathModule = modules.find((id) =>
+		id.endsWith('/packages/octane/src/hook-slot-cache.ts'),
+	);
 	return {
 		code: chunk.code,
 		modules,
@@ -446,6 +449,7 @@ async function buildScenario(scenario, entry) {
 			? chunk.modules[serverRuntimeModule].renderedExports
 			: [],
 		streamExports: streamModule ? chunk.modules[streamModule].renderedExports : [],
+		hookPathExports: hookPathModule ? chunk.modules[hookPathModule].renderedExports : [],
 	};
 }
 
@@ -461,7 +465,15 @@ try {
 			runtimeExports,
 			serverRuntimeExports = [],
 			streamExports = [],
+			hookPathExports = [],
 		} = await buildScenario(scenario, entry);
+		if (id === 'hooks-state' || id === 'binding-hooks') {
+			assert.equal(
+				hookPathExports.includes('resolveHookPath'),
+				id === 'binding-hooks',
+				`${name}: only custom-hook calls should retain composed hook paths`,
+			);
+		}
 		for (const [label, pattern] of forbidden) {
 			if (serverScenario && label === 'server runtime') continue;
 			const leaked = modules.find((id) => pattern.test(id));

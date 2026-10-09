@@ -1,5 +1,5 @@
 import { defineConfig } from 'vite';
-import solid from 'vite-plugin-solid';
+import solid from '@solidjs/vite-plugin';
 
 // Force Solid 2.0-beta's production bundle (its dev bundle crashes) — see the
 // recursive-context bench for the full rationale: dev:false + mode:production +
