@@ -1,6 +1,6 @@
 import loader from '@monaco-editor/loader';
 import type { IDisposable, editor } from 'monaco-editor';
-import { memo, useEffect, useRef, useState } from 'octane';
+import { memo, useEffect, useLayoutEffect, useRef, useState } from 'octane';
 
 import MonacoContainer from '../MonacoContainer';
 import { isLoaderCancelation } from '../loader';
@@ -58,14 +58,17 @@ function EditorComponent(props: EditorProps) @{
 		saveViewState,
 	});
 
-	latestRef.current = {
-		beforeMount,
-		keepCurrentModel,
-		onChange,
-		onMount,
-		onValidate,
-		saveViewState,
-	};
+	// Pending renders must not replace the visible editor's callbacks or disposal policy.
+	useLayoutEffect(() => {
+		latestRef.current = {
+			beforeMount,
+			keepCurrentModel,
+			onChange,
+			onMount,
+			onValidate,
+			saveViewState,
+		};
+	}, [beforeMount, keepCurrentModel, onChange, onMount, onValidate, saveViewState]);
 
 	useEffect(() => {
 		let active = true;
