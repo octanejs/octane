@@ -1,4 +1,27 @@
-import { usePermissions, useSuspendingLiveQuery } from '@octanejs/dexie';
+import {
+	usePermissions,
+	useSuspendingLiveQuery,
+	useSuspendingObservable,
+	type Subscribable,
+} from '@octanejs/dexie';
+
+type ObservableProps = {
+	getObservable: Subscribable<string> | (() => Subscribable<string>);
+	cacheKey: readonly unknown[];
+};
+
+function SuspendingObservableValue({ getObservable, cacheKey }: ObservableProps) @{
+	const value = useSuspendingObservable(getObservable, cacheKey);
+	<div id="observable-value">{value as string}</div>
+}
+
+export function SuspendingObservableBoundary({ getObservable, cacheKey }: ObservableProps) @{
+	@try {
+		<SuspendingObservableValue getObservable={getObservable} cacheKey={cacheKey} />
+	} @pending {
+		<div id="observable-pending">loading</div>
+	}
+}
 
 export function SuspendingValue({
 	querier,
