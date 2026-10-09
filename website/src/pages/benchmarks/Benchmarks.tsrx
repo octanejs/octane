@@ -276,7 +276,7 @@ export function Benchmarks() @{
 								{'benchmarks/'}
 							</a>
 							{
-								' for what each suite measures. This snapshot measures Octane main at 89f90427e1 on 9 October 2026. See the '
+								' for what each suite measures. This snapshot measures revision 969428fcce on 9 October 2026, with updated Svelte, Solid and Vue dependencies. See the '
 							}
 							<a
 								href="https://github.com/octanejs/octane/blob/main/benchmarks/baselines/website-refresh.md"
