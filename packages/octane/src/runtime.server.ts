@@ -28,6 +28,10 @@ export { readNativeDomStyle, readNativeDomProps } from './signals/read-protocol.
 
 import { resolveHookPath } from './hook-slot-cache.js';
 import type {
+	useEffect as ClientUseEffect,
+	useImperativeHandle as ClientUseImperativeHandle,
+} from './runtime.js';
+import type {
 	LayoutSnapshotOptions,
 	LayoutSnapshotOptionsWithInitial,
 } from './layout-snapshot-types.js';
@@ -359,7 +363,7 @@ export function mapSlot(receiver: any, method: any, callback?: (...args: any[]) 
 	return true;
 }
 
-interface SSRScope {
+export interface SSRScope {
 	parent: SSRScope | null;
 	/** Context Provider values stamped on this scope (lazily allocated). */
 	$$ctxValues: Map<unknown, unknown> | null;
@@ -6954,7 +6958,7 @@ function hasExternalHydrationOwner(thenable: PromiseLike<unknown>): boolean {
 // mirrors the client runtime's `use()` (see NotAnElementDescriptor there).
 export function use<T>(
 	usable: Context<T> | (PromiseLike<T> & { $$kind?: never }),
-	siteKey?: symbol | string,
+	siteKey?: ServerHookSlot,
 	directSite?: string,
 ): T;
 export function use<T>(
@@ -7708,7 +7712,7 @@ export function useState<T = undefined>(): [
 ];
 export function useState<T>(
 	initial: T | (() => T),
-	slot?: symbol,
+	slot?: ServerHookSlot,
 ): [T, (next: T | ((value: T) => T)) => void, () => T];
 export function useState<T>(
 	initial?: T | (() => T),
@@ -7735,12 +7739,12 @@ export function useState<T>(
 /** Compiler-emitted useState variant for a tuple whose third member is observable. */
 export function __useStateWithGetter<T>(
 	initial: T | (() => T),
-	slot?: symbol,
-): [T, (next: any) => void, () => T];
+	slot?: ServerHookSlot,
+): [T, (next: T | ((value: T) => T)) => void, () => T];
 export function __useStateWithGetter<T>(
 	initial: T | (() => T),
 	slot?: ServerHookSlot,
-): [T, (next: any) => void, () => T] {
+): [T, (next: T | ((value: T) => T)) => void, () => T] {
 	// Mirror the public hook's legacy lone-slot compatibility before creating
 	// the getter cell, preserving authored alias arguments inside a custom path.
 	if (
@@ -7757,7 +7761,7 @@ export function __useStateWithGetter<T>(
 		() => (typeof initial === 'function' ? (initial as () => T)() : initial),
 		slot,
 		true,
-	) as [T, (next: any) => void, () => T];
+	) as [T, (next: T | ((value: T) => T)) => void, () => T];
 }
 
 export interface LinkedStatePrevious<Source, Value> {
@@ -7844,7 +7848,7 @@ export function useLinkedState<Source, Value extends Previous, Previous = Value>
 	source: Source,
 	reconcile: (source: Source, previous: LinkedStatePrevious<Source, Previous> | undefined) => Value,
 	options?: LinkedStateOptions<Source, Previous>,
-	slot?: symbol,
+	slot?: ServerHookSlot,
 ): LinkedStateTuple<LinkedStateValue<Value, Previous>>;
 export function useLinkedState<Source, Value>(
 	source: Source,
@@ -7864,7 +7868,7 @@ export function __useLinkedStateWithGetter<Source, Value extends Previous, Previ
 	source: Source,
 	reconcile: (source: Source, previous: LinkedStatePrevious<Source, Previous> | undefined) => Value,
 	options?: LinkedStateOptions<Source, Previous>,
-	slot?: symbol,
+	slot?: ServerHookSlot,
 ): LinkedStateTuple<LinkedStateValue<Value, Previous>>;
 export function __useLinkedStateWithGetter<Source, Value>(
 	source: Source,
@@ -7883,7 +7887,7 @@ export function useReducer<S, A, I = S>(
 	reducer: (s: S, a: A) => S,
 	initialArg: I,
 	initOrSlot?: ((arg: I) => S) | symbol,
-	maybeSlot?: symbol,
+	maybeSlot?: ServerHookSlot,
 ): [S, (action: A) => void, () => S];
 export function useReducer<S, A, I = S>(
 	reducer: (s: S, a: A) => S,
@@ -7905,7 +7909,7 @@ export function __useReducerWithGetter<S, A, I = S>(
 	reducer: (s: S, a: A) => S,
 	initialArg: I,
 	initOrSlot?: ((arg: I) => S) | symbol,
-	maybeSlot?: symbol,
+	maybeSlot?: ServerHookSlot,
 ): [S, (action: A) => void, () => S];
 export function __useReducerWithGetter<S, A, I = S>(
 	reducer: (s: S, a: A) => S,
@@ -7925,10 +7929,20 @@ export function __useReducerWithGetter<S, A, I = S>(
 
 // Effects never run on the server. An islands shell never runs them on the
 // client either, so a development render can witness each one it reaches.
+export function useEffect(
+	fn: Parameters<typeof ClientUseEffect>[0],
+	deps?: any[] | null,
+	slot?: ServerHookSlot,
+): void;
 export function useEffect(): void {
 	if (SHELL_WITNESS !== null && process.env.NODE_ENV !== 'production')
 		witnessShellHook('useEffect', useEffect);
 }
+export function useLayoutEffect(
+	fn: Parameters<typeof ClientUseEffect>[0],
+	deps?: any[] | null,
+	slot?: ServerHookSlot,
+): void;
 export function useLayoutEffect(): void {
 	if (SHELL_WITNESS !== null && process.env.NODE_ENV !== 'production')
 		witnessShellHook('useLayoutEffect', useLayoutEffect);
@@ -7936,12 +7950,12 @@ export function useLayoutEffect(): void {
 export function useLayoutSnapshot<T>(
 	measure: () => T,
 	options: LayoutSnapshotOptionsWithInitial<T>,
-	slot?: symbol,
+	slot?: ServerHookSlot,
 ): T;
 export function useLayoutSnapshot<T>(
 	measure: () => T,
 	options?: LayoutSnapshotOptions<T>,
-	slot?: symbol,
+	slot?: ServerHookSlot,
 ): T | undefined;
 export function useLayoutSnapshot<T>(
 	_measure: () => T,
@@ -7967,7 +7981,18 @@ export function useLayoutSnapshot<T>(
 	return record.snapshot as T | undefined;
 }
 // Insertion effects inject styles the server render already emitted.
+export function useInsertionEffect(
+	fn: Parameters<typeof ClientUseEffect>[0],
+	deps?: any[] | null,
+	slot?: ServerHookSlot,
+): void;
 export function useInsertionEffect(): void {}
+export function useImperativeHandle<T>(
+	ref: Parameters<typeof ClientUseImperativeHandle<T>>[0],
+	factory: () => T,
+	deps?: any[] | null,
+	slot?: ServerHookSlot,
+): void;
 export function useImperativeHandle(): void {
 	if (SHELL_WITNESS !== null && process.env.NODE_ENV !== 'production')
 		witnessShellHook('useImperativeHandle', useImperativeHandle);
@@ -8004,7 +8029,11 @@ function memoHookValue<T>(
 	return rec.value as T;
 }
 
-export function useMemo<T>(compute: () => T, deps?: readonly unknown[] | null, slot?: symbol): T;
+export function useMemo<T>(
+	compute: () => T,
+	deps?: readonly unknown[] | null,
+	slot?: ServerHookSlot,
+): T;
 export function useMemo<T>(
 	compute: () => T,
 	depsOrSlot?: readonly unknown[] | null | ServerHookSlot,
@@ -8021,7 +8050,7 @@ export function useMemo<T>(
 	return memoHookValue<T>(compute, true, depsOrSlot, maybeSlot);
 }
 
-export function useCallback<F>(fn: F, deps?: readonly unknown[] | null, slot?: symbol): F;
+export function useCallback<F>(fn: F, deps?: readonly unknown[] | null, slot?: ServerHookSlot): F;
 export function useCallback<F>(
 	fn: F,
 	depsOrSlot?: readonly unknown[] | null | ServerHookSlot,
@@ -8031,7 +8060,7 @@ export function useCallback<F>(
 }
 
 export function useRef<T = undefined>(): { current: T | undefined };
-export function useRef<T>(initial: T, slot?: symbol): { current: T };
+export function useRef<T>(initial: T, slot?: ServerHookSlot): { current: T };
 export function useRef<T>(initial?: T, slot?: ServerHookSlot): { current: T | undefined } {
 	// Legacy lone-slot calls remain valid outside custom paths. Compiled spread
 	// calls use the path for identity and preserve the original argument count.
@@ -8054,7 +8083,7 @@ export function useRef<T>(initial?: T, slot?: ServerHookSlot): { current: T | un
 	return rec.ref as { current: T | undefined };
 }
 
-export function useLazyRef<T>(factory: () => T, slot?: symbol): { current: T };
+export function useLazyRef<T>(factory: () => T, slot?: ServerHookSlot): { current: T };
 export function useLazyRef<T>(factory: () => T, slot?: ServerHookSlot): { current: T } {
 	const position = hookPosition(slot);
 	if (position === null) return { current: factory() };
@@ -8067,6 +8096,7 @@ export function useLazyRef<T>(factory: () => T, slot?: ServerHookSlot): { curren
 }
 
 /** React's `useDebugValue` — devtools-only on the client, no-op everywhere. */
+export function useDebugValue(_value?: unknown, _format?: unknown, _slot?: ServerHookSlot): void;
 export function useDebugValue(_value?: unknown, _format?: unknown): void {}
 
 /**
@@ -8076,6 +8106,7 @@ export function useDebugValue(_value?: unknown, _format?: unknown): void {}
  */
 export function requestFormReset(_form?: unknown): void {}
 
+export function useId(slot?: ServerHookSlot): string;
 export function useId(): string {
 	// Same root-local namespace/counter shape as the client hydration pass.
 	return formatUseId(ID_PREFIX, ID_COUNTER++);
@@ -8085,6 +8116,7 @@ function throwOnServerEffectEventCall(): never {
 	throw new Error(formatServerError(11));
 }
 
+export function useEffectEvent<F extends (...args: any[]) => any>(fn: F, slot?: ServerHookSlot): F;
 export function useEffectEvent<F>(_fn: F): F {
 	// A server pass may declare an Effect Event so the same component can hydrate,
 	// but invoking it during render is forbidden. React deliberately returns one
@@ -8093,6 +8125,9 @@ export function useEffectEvent<F>(_fn: F): F {
 	return throwOnServerEffectEventCall as unknown as F;
 }
 
+export function useTransition(
+	slot?: ServerHookSlot,
+): [boolean, (fn: () => void | Promise<unknown>) => void];
 export function useTransition(): [boolean, (fn: () => void | Promise<unknown>) => void] {
 	return [false, NOOP];
 }
@@ -8127,6 +8162,12 @@ export function useSyncExternalStore<T>(
 }
 
 export function useActionState<S>(
+	action: (prevState: S, payload: any) => S | Promise<S>,
+	initialState: S,
+	permalinkOrSlot?: string | symbol,
+	slot?: ServerHookSlot,
+): [S, (payload?: any) => void, boolean];
+export function useActionState<S>(
 	_action: unknown,
 	initialState: S,
 ): [S, (payload?: any) => void, boolean] {
@@ -8139,6 +8180,7 @@ export interface FormStatus {
 	method: string | null;
 	action: ((formData: FormData) => unknown) | string | null;
 }
+export function useFormStatus(slot?: ServerHookSlot): FormStatus;
 export function useFormStatus(): FormStatus {
 	return { pending: false, data: null, method: null, action: null };
 }
@@ -8149,6 +8191,11 @@ export function useOptimistic<S>(
 export function useOptimistic<S, V = S>(
 	passthrough: S,
 	updateFn: (state: S, value: V) => S,
+): [S, (value: V) => void];
+export function useOptimistic<S, V = S>(
+	passthrough: S,
+	updateFnOrSlot: ((state: S, value: V) => S) | symbol | undefined,
+	slot?: ServerHookSlot,
 ): [S, (value: V) => void];
 export function useOptimistic<S>(passthrough: S): [S, (value: never) => void] {
 	return [passthrough, NOOP];
@@ -8268,7 +8315,7 @@ export function callWithReceiver<T>(
 	return NATIVE_REFLECT_APPLY(fn, receiver, args);
 }
 
-export function withSlot<T>(sym: symbol, fn: (...a: any[]) => T, ...args: any[]): T;
+export function withSlot<T>(sym: ServerHookSlot, fn: (...a: any[]) => T, ...args: any[]): T;
 export function withSlot<T>(sym: ServerHookSlot, fn: (...a: any[]) => T, ...args: any[]): T {
 	const driver = MANUAL_HOOK_DRIVER;
 	const pending = driver?.pending;

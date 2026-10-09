@@ -473,14 +473,15 @@ describe('TypeScript output option boundaries', () => {
 			}),
 		).toThrow(/output/);
 	});
-	it.each([undefined, { ...renderer, target: 'universal' as const }])(
-		'rejects TypeScript output without a Valdi writer target: %j',
-		(selected) => {
-			expect(() =>
-				compile(SOURCE, '/src/Scene.tsrx', { renderer: selected, hmr: false, output: 'ts' }),
-			).toThrow(/TypeScript|output.*ts/i);
-		},
-	);
+	it('rejects TypeScript output for the universal renderer', () => {
+		expect(() =>
+			compile(SOURCE, '/src/Scene.tsrx', {
+				renderer: { ...renderer, target: 'universal' },
+				hmr: false,
+				output: 'ts',
+			}),
+		).toThrow(/TypeScript|output.*ts/i);
+	});
 	it.each([
 		[{ mode: 'server' as const }, /server/],
 		[{ hmr: true }, /HMR/],

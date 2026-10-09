@@ -79,6 +79,7 @@ import {
 	UNIVERSAL_THREAD_RUNTIME_IMPORTS,
 } from './compile-universal.js';
 import { compileValdi, VALDI_COMPILER_RUNTIME_IMPORTS } from './compile-valdi.js';
+import { prepareWebTypeScript } from './typescript-output.js';
 import {
 	ARM_BREAK_MESSAGE,
 	ARM_VALUE_RETURN_MESSAGE,
@@ -8947,12 +8948,12 @@ function singleHostComponentRoot(node) {
 // eligibility, emission, export handling, css scoping) works unchanged. Returns
 // null when the var-decl is not an arrow/function component.
 /** @param {any} varDecl @returns {any|null} */
-function arrowComponentToFunctionDecl(varDecl) {
+function arrowComponentToFunctionDecl(varDecl, preserveTypes = false) {
 	if (!varDecl || varDecl.type !== 'VariableDeclaration') return null;
 	if (!varDecl.declarations || varDecl.declarations.length !== 1) return null;
 	const d = varDecl.declarations[0];
 	if (!d || !d.id || d.id.type !== 'Identifier') return null;
-	const init = d.init;
+	const init = preserveTypes ? unwrapTsExpr(d.init) : d.init;
 	if (
 		!init ||
 		(init.type !== 'ArrowFunctionExpression' && init.type !== 'FunctionExpression') ||
@@ -8977,7 +8978,20 @@ function arrowComponentToFunctionDecl(varDecl) {
 		);
 		if (body !== init.body) fn = { ...init, body };
 	}
-	return componentFunctionDeclaration(d.id, fn, varDecl);
+	const declaration = componentFunctionDeclaration(d.id, fn, varDecl);
+	if (preserveTypes) {
+		let wrapper = d.init;
+		while (wrapper.expression && !wrapper.typeAnnotation) wrapper = wrapper.expression;
+		declaration.metadata = {
+			...declaration.metadata,
+			octaneTypeBinding: {
+				id: d.id,
+				init: d.init,
+				contextual: !!(d.id.typeAnnotation || wrapper.typeAnnotation),
+			},
+		};
+	}
+	return declaration;
 }
 
 // The canonical FunctionDeclaration for an arrow/function-expression `@{…}`
@@ -9040,6 +9054,8 @@ function functionExpressionFromDeclaration(declaration, origin = declaration) {
 		origin,
 	);
 	expression.generator = !!declaration.generator;
+	if (declaration._octaneTypedBody) expression._octaneTypedBody = true;
+	if (declaration._octaneContextualProps) expression._octaneContextualProps = true;
 	if (declaration.returnType !== undefined) expression.returnType = declaration.returnType;
 	if (declaration.predicate !== undefined) expression.predicate = declaration.predicate;
 	return declaration._octaneInlineMemoOpaqueOwner === true
@@ -9052,7 +9068,7 @@ function functionExpressionFromDeclaration(declaration, origin = declaration) {
 // the component pipeline see the same canonical FunctionDeclaration shape as a
 // standalone `const X = () => @{…}` declaration.
 /** @param {any} varDecl @returns {any[]|null} */
-function splitArrowComponentDeclaration(varDecl) {
+function splitArrowComponentDeclaration(varDecl, preserveTypes) {
 	if (
 		!varDecl ||
 		varDecl.type !== 'VariableDeclaration' ||
@@ -9070,7 +9086,7 @@ function splitArrowComponentDeclaration(varDecl) {
 			end: declarator.end ?? varDecl.end,
 			loc: declarator.loc ?? varDecl.loc,
 		};
-		const component = arrowComponentToFunctionDecl(single);
+		const component = arrowComponentToFunctionDecl(single, preserveTypes);
 		if (component !== null) {
 			found = true;
 			return component;
@@ -9080,10 +9096,10 @@ function splitArrowComponentDeclaration(varDecl) {
 	return found ? declarations : null;
 }
 
-function normalizeArrowComponentDeclaration(declaration) {
-	const component = arrowComponentToFunctionDecl(declaration);
+function normalizeArrowComponentDeclaration(declaration, preserveTypes) {
+	const component = arrowComponentToFunctionDecl(declaration, preserveTypes);
 	if (component !== null) return [component];
-	return splitArrowComponentDeclaration(declaration) ?? [declaration];
+	return splitArrowComponentDeclaration(declaration, preserveTypes) ?? [declaration];
 }
 
 // Rewrite top-level arrow/function-expression components (`const X = () =>
@@ -9092,17 +9108,36 @@ function normalizeArrowComponentDeclaration(declaration) {
 // statements are split in source order when one declarator is a component.
 // Copy-on-write: returns the input module when nothing changed.
 /** @param {any} ast @returns {any} */
-function normalizeArrowComponents(ast) {
+function normalizeArrowComponents(ast, preserveTypes = false) {
 	if (!ast || !Array.isArray(ast.body)) return ast;
 	let changed = false;
 	const body = [];
 	for (const node of ast.body) {
+		if (
+			preserveTypes &&
+			node.type === 'ExportDefaultDeclaration' &&
+			unwrapTsExpr(node.declaration) !== node.declaration
+		) {
+			const name = allocCompilerName(
+				{ usedCompilerNames: collectIdentifierNames(ast), compilerNameSuffixes: null },
+				'_default',
+			);
+			const declaration = arrowComponentToFunctionDecl(
+				b.set_location(b.const(name, node.declaration), node),
+				true,
+			);
+			if (declaration !== null) {
+				body.push({ ...node, declaration });
+				changed = true;
+				continue;
+			}
+		}
 		if (node.type === 'VariableDeclaration') {
-			const declarations = normalizeArrowComponentDeclaration(node);
+			const declarations = normalizeArrowComponentDeclaration(node, preserveTypes);
 			if (declarations.length !== 1 || declarations[0] !== node) changed = true;
 			body.push(...declarations);
 		} else if (node.type === 'ExportNamedDeclaration' && node.declaration) {
-			const declarations = normalizeArrowComponentDeclaration(node.declaration);
+			const declarations = normalizeArrowComponentDeclaration(node.declaration, preserveTypes);
 			if (declarations.length === 1 && declarations[0] === node.declaration) {
 				body.push(node);
 			} else {
@@ -10800,8 +10835,8 @@ function compileAuthored(source, filename, options, bundlerMetadata, analyzed = 
 	if (output !== 'js' && output !== 'ts') {
 		throw new Error(`Unknown compile output "${output}" — expected 'js' or 'ts'.`);
 	}
-	if (output === 'ts' && options?.renderer?.target !== 'valdi') {
-		throw new Error("TypeScript output requires the Valdi renderer target (output: 'ts').");
+	if (output === 'ts' && options?.renderer?.target === 'universal') {
+		throw new Error('TypeScript output is not yet supported for the universal renderer target.');
 	}
 	const mode = (options && options.mode) || 'client';
 	if (mode !== 'client' && mode !== 'server') {
@@ -10942,7 +10977,7 @@ function compileAuthored(source, filename, options, bundlerMetadata, analyzed = 
 		result.diagnostics = [...strongAnalysis.diagnostics, ...(result.diagnostics ?? [])];
 	}
 	if (bindingConstants !== undefined) result.bindingConstants = bindingConstants;
-	// Valdi lowers every template before the shared finisher; no JSX remains.
+	// The supported targets lower templates before the final print; no JSX remains.
 	if (output === 'ts') result.lang = 'ts';
 	return result;
 }
@@ -11278,7 +11313,7 @@ function compileInternal(
 	const serverModuleInfo = analyzeServerModule(ast, filename);
 	// Normalize arrow-function components (`const X = () => @{…}`) to
 	// FunctionDeclaration form so the component pipeline recognizes them.
-	ast = bindDefaultComponent(normalizeArrowComponents(ast));
+	ast = bindDefaultComponent(normalizeArrowComponents(ast, options?.output === 'ts'));
 	ast = annotatePureFactoryCalls(
 		ast,
 		octanePureFactoryNames({
@@ -11509,6 +11544,7 @@ function compileInternal(
 		mapSource: source,
 		mapSourceName: (filename || 'module.tsrx').split(/[\\/]/).pop(),
 		output: options?.output,
+		typescriptWeb: options?.output === 'ts' && options?.__valdiAbiGuard === undefined,
 		// Coarse origin for module scaffolding with no authored source position
 		// (imports, delegate/style/template consts, hook-slot consts, HMR/stamp
 		// tails): the module's first located statement. Every node handed to the
@@ -12289,6 +12325,7 @@ function compileInternal(
 	const bodyNodes = emitServerModuleClientStubs(serverModuleInfo, ctx);
 	const compileOpts = { hmrWrap: hmrEnabled, hmrMutable: hmrEnabled };
 	for (let node of ast.body) {
+		const firstStatement = bodyNodes.length;
 		if (
 			node === serverModuleInfo?.declaration ||
 			(node.type === 'ImportDeclaration' && node.source?.value === 'server')
@@ -12374,6 +12411,12 @@ function compileInternal(
 			// Top-level passthrough (imports, plain consts/functions): already a
 			// rewritten statement node — embedded directly in the module AST.
 			bodyNodes.push(lowered);
+		}
+		if (ctx.typescriptWeb && node.leadingComments && bodyNodes.length > firstStatement) {
+			bodyNodes[firstStatement] = {
+				...bodyNodes[firstStatement],
+				leadingComments: node.leadingComments,
+			};
 		}
 	}
 
@@ -12851,11 +12894,11 @@ function compileServer(
 	// Drop type-only statements and inline `type` specifiers before emit (see
 	// isTypeOnlyStatement) — same as the client path; the server HTML-string
 	// output is plain JS too.
-	ast = { ...ast, body: dropTypeOnlyStatements(ast.body) };
+	if (options?.output !== 'ts') ast = { ...ast, body: dropTypeOnlyStatements(ast.body) };
 	const serverModuleInfo = analyzeServerModule(ast, filename);
 	// Normalize arrow-function components (`const X = () => @{…}`) to
 	// FunctionDeclaration form so the component pipeline recognizes them.
-	ast = bindDefaultComponent(normalizeArrowComponents(ast));
+	ast = bindDefaultComponent(normalizeArrowComponents(ast, options?.output === 'ts'));
 	ast = annotatePureFactoryCalls(ast, octanePureFactoryNames({ clientDom: false }));
 	const errorBoundaryLowering = lowerImportedErrorBoundaries(ast);
 	ast = errorBoundaryLowering.ast;
@@ -12938,6 +12981,8 @@ function compileServer(
 		ssrSingleRootComponents: new Map(),
 		mapSource: source,
 		mapSourceName: (filename || 'module.tsrx').split(/[\\/]/).pop(),
+		output: options?.output,
+		typescriptWeb: options?.output === 'ts',
 		// Scaffolding without a more precise authored construct maps here.
 		_moduleOrigin: ast.body.find((n) => n?.loc != null) ?? ast,
 	};
@@ -13007,6 +13052,7 @@ function compileServer(
 
 	const bodyNodes = emitServerModuleServerNodes(serverModuleInfo, ctx);
 	for (const node of ast.body) {
+		const firstStatement = bodyNodes.length;
 		if (
 			node === serverModuleInfo?.declaration ||
 			(node.type === 'ImportDeclaration' && node.source?.value === 'server')
@@ -13022,12 +13068,12 @@ function compileServer(
 		} else if (isReturnJsxFunction(node)) {
 			if (ctx.nativeReads) {
 				bodyNodes.push(...compileReturnJsxFunction(node, ctx).nodes);
-				continue;
+			} else {
+				// A `function C() { return <jsx> }` form (no `@{}`). SSR it through the same
+				// component path as `@{}` so its host element + directives emit server markup
+				// (the client folds it; the two must agree for hydration).
+				bodyNodes.push(...compileServerComponent(node, ctx));
 			}
-			// A `function C() { return <jsx> }` form (no `@{}`). SSR it through the same
-			// component path as `@{}` so its host element + directives emit server markup
-			// (the client folds it; the two must agree for hydration).
-			bodyNodes.push(...compileServerComponent(node, ctx));
 		} else if (node.type === 'ExportNamedDeclaration' && isReturnJsxFunction(node.declaration)) {
 			bodyNodes.push(
 				...(ctx.nativeReads
@@ -13041,6 +13087,14 @@ function compileServer(
 					: compileServerComponent({ ...node.declaration, default: true }, ctx)),
 			);
 		} else if (node.type === 'ImportDeclaration' && node.source.value === 'octane') {
+			if (node.importKind === 'type') {
+				bodyNodes.push(node);
+				continue;
+			}
+			if (ctx.output === 'ts') {
+				const types = node.specifiers.filter((specifier) => specifier.importKind === 'type');
+				if (types.length) bodyNodes.push({ ...node, specifiers: types });
+			}
 			// Preserve an authored `defer` or `source` phase import while routing it to the
 			// server runtime. Other user imports are merged into the eager server runtime prelude.
 			if (node.phase != null) {
@@ -13071,6 +13125,12 @@ function compileServer(
 		} else {
 			const fnName = node.id?.name || node.declaration?.id?.name || 'module';
 			bodyNodes.push(rewriteModuleJsxValues(rewriteHookCalls(node, ctx, fnName), ctx));
+		}
+		if (ctx.typescriptWeb && node.leadingComments && bodyNodes.length > firstStatement) {
+			bodyNodes[firstStatement] = {
+				...bodyNodes[firstStatement],
+				leadingComments: node.leadingComments,
+			};
 		}
 	}
 
@@ -13165,6 +13225,17 @@ function rejectAsyncOrGenerator(node, name) {
 				`target does not support.`,
 		);
 	}
+}
+
+// Type-only wrappers still provide contextual typing to the rebuilt component.
+function typedComponentInitializer(node, initializer, ctx) {
+	if (!ctx.typescriptWeb || !node.metadata?.octaneTypeBinding) return initializer;
+	const { init } = node.metadata.octaneTypeBinding;
+	const restore = (value) =>
+		value.type === 'ArrowFunctionExpression' || value.type === 'FunctionExpression'
+			? initializer
+			: { ...value, expression: restore(value.expression) };
+	return restore(init);
 }
 
 function compileServerComponent(node, ctx) {
@@ -13300,7 +13371,15 @@ function compileServerComponent(node, ctx) {
 			),
 		);
 	}
-	const declaration = inheritOriginLoc(b.const(name, initializer), node);
+	const declaration = inheritOriginLoc(
+		b.const(
+			ctx.typescriptWeb && node.metadata?.octaneTypeBinding
+				? node.metadata?.octaneTypeBinding.id
+				: name,
+			typedComponentInitializer(node, initializer, ctx),
+		),
+		node,
+	);
 	const nodes = [
 		isExported && !isDefault ? inheritOriginLoc(b.export(declaration), node) : declaration,
 	];
@@ -13724,7 +13803,21 @@ function ssrCompileBodyWithMapTemps(
 		? wrapNativeReadScope(body, b.id('__s'), nativeReadNames(ctx))
 		: body;
 	return inheritOriginLoc(
-		b.function_declaration(b.id(name), params, b.block([...paramBindings, ...scopedBody])),
+		{
+			...b.function_declaration(
+				b.id(name),
+				params,
+				b.block([...paramBindings, ...scopedBody]),
+				false,
+				ctx.typescriptWeb ? node.typeParameters : undefined,
+			),
+			...(ctx.typescriptWeb
+				? {
+						_octaneTypedBody: true,
+						_octaneContextualProps: !!node.metadata?.octaneTypeBinding?.contextual,
+					}
+				: null),
+		},
 		origin,
 	);
 }
@@ -16867,7 +16960,14 @@ function compileComponent(node, ctx, options) {
 	}
 	const declKind = options && options.hmrMutable ? 'let' : 'const';
 	const declNode = inheritOriginLoc(
-		b.declaration(declKind, [b.declarator(b.id(name, node.id ?? node), valueExpr)]),
+		b.declaration(declKind, [
+			b.declarator(
+				ctx.typescriptWeb && node.metadata?.octaneTypeBinding
+					? node.metadata?.octaneTypeBinding.id
+					: b.id(name, node.id ?? node),
+				typedComponentInitializer(node, valueExpr, ctx),
+			),
+		]),
 		node,
 	);
 	if (owner !== null) {
@@ -17777,7 +17877,13 @@ function compileFunctionBody(node, ctx, name, parentNs = 'html', cssHash = null,
 		b.id(name, node.id ?? node),
 		fnParams,
 		b.block([...paramBindings, ...scopedBody]),
+		false,
+		ctx.typescriptWeb ? node.typeParameters : undefined,
 	);
+	if (ctx.typescriptWeb) {
+		emittedFunction._octaneTypedBody = true;
+		emittedFunction._octaneContextualProps = !!node.metadata?.octaneTypeBinding?.contextual;
+	}
 	return inheritOriginLoc(
 		hookMemoOpaqueOwner
 			? { ...emittedFunction, _octaneInlineMemoOpaqueOwner: true }
@@ -21551,7 +21657,13 @@ function compileReturnJsxFunction(node, ctx, options) {
 		b.block(
 			ctx.nativeReads ? wrapNativeReadScope(returnBody, b.void0, nativeReadNames(ctx)) : returnBody,
 		),
+		false,
+		ctx.typescriptWeb ? node.typeParameters : undefined,
 	);
+	if (ctx.typescriptWeb) {
+		emittedFunction._octaneTypedBody = true;
+		if (node.returnType) emittedFunction.returnType = node.returnType;
+	}
 	const fn = inheritOriginLoc(
 		hookMemoOpaqueOwner
 			? { ...emittedFunction, _octaneInlineMemoOpaqueOwner: true }
@@ -27574,6 +27686,10 @@ function planJsx(
 			ctx.runtimeNeeded.add('child');
 			ctx.runtimeNeeded.add('sibling');
 		}
+		// Template paths prove the node kind and presence; the runtime's generic
+		// navigation signatures cannot express that compile-time topology.
+		const typedPath = (expression) =>
+			ctx.typescriptWeb ? b.ts_as(expression, b.ts_keyword_type('any')) : expression;
 		ensureVar = (path) => {
 			// Base: empty path → the template root. Single-root cloned the element
 			// directly (`_root`); multi-root cloned a frag that's drained on mount, so
@@ -27608,10 +27724,10 @@ function planJsx(
 				// hydrating); raw `.nextSibling` for hole-free templates. sibVar already resolves to the
 				// (k−sibSteps)-th child, so n steps across lands on the k-th.
 				if (hasHoles) {
-					step = b.call('_$sibling', b.id(sibVar), b.literal(sibSteps));
+					step = typedPath(b.call('_$sibling', b.id(sibVar), b.literal(sibSteps)));
 				} else {
 					step = b.id(sibVar);
-					for (let i = 0; i < sibSteps; i++) step = b.member(step, 'nextSibling');
+					for (let i = 0; i < sibSteps; i++) step = typedPath(b.member(step, 'nextSibling'));
 				}
 			} else {
 				// Materialize the ANCESTOR first (cached + reused across siblings), then take
@@ -27622,11 +27738,11 @@ function planJsx(
 				// navigating elements that still live inside `_root` at mount time.
 				const parentVar = prefix.length === 0 ? '_root' : ensureVar(prefix);
 				if (hasHoles) {
-					step = b.call('_$child', b.id(parentVar));
-					if (k > 0) step = b.call('_$sibling', step, b.literal(k));
+					step = typedPath(b.call('_$child', b.id(parentVar)));
+					if (k > 0) step = typedPath(b.call('_$sibling', step, b.literal(k)));
 				} else {
-					step = b.member(b.id(parentVar), 'firstChild');
-					for (let n = 0; n < k; n++) step = b.member(step, 'nextSibling');
+					step = typedPath(b.member(b.id(parentVar), 'firstChild'));
+					for (let n = 0; n < k; n++) step = typedPath(b.member(step, 'nextSibling'));
 				}
 			}
 			const v = `_el${varCounter++}`;
@@ -34210,6 +34326,15 @@ function makeTryCall(node, ctx, inlinedSubs, parentNs = 'html', cssHash = null) 
 			]),
 			b.id('__props'),
 		);
+		if (ctx.typescriptWeb && param?.typeAnnotation) {
+			const binding = destructure.declarations[0].id;
+			binding.typeAnnotation = b.ts_type_annotation(
+				b.ts_type_literal([
+					b.ts_property_signature(b.id('err'), param.typeAnnotation),
+					b.ts_property_signature(b.id('reset'), b.ts_type_annotation(b.ts_keyword_type('any'))),
+				]),
+			);
+		}
 		// The synthesized err/reset destructure maps to the authored catch clause.
 		catchBodyStmts = [inheritOriginLoc(destructure, handler.param ?? handler), ...catchStmts];
 	}
@@ -36448,6 +36573,12 @@ function typescriptCommentOptions(source) {
  */
 function printNodeWithMap(node, ctx) {
 	let printable = escapeMultilineStringLiterals(node);
+	if (ctx.typescriptWeb) {
+		printable = inheritOriginLoc(
+			prepareWebTypeScript(printable, ctx, (name) => allocCompilerName(ctx, name)),
+			ctx._moduleOrigin,
+		);
+	}
 	if (ctx.output !== 'ts') {
 		printable = stripTsOnlyWrappers(printable, {
 			filename: ctx.mapSourceName,

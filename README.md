@@ -283,7 +283,8 @@ generated inventory; the shape of it is:
   rendering, the hook API, the server (SSR) and client (hydration) entry points,
   and the compiler itself, exposed at `octane/compiler` with bundler adapters at
   `octane/compiler/vite` and `octane/compiler/bundler`. Custom Node build pipelines
-  can opt into [type-aware text compilation](./docs/compiler-text-inference.md).
+  can opt into [type-aware text compilation](./docs/compiler-text-inference.md)
+  and [TypeScript output](./docs/compiler-typescript-output.md).
 - The app layer: [`@octanejs/app-core`](./packages/app-core) holds the
   bundler-neutral config, routing, SSR, hydration codegen, and production
   handler, and the [Vite](./packages/vite-plugin-octane),

@@ -61,8 +61,9 @@ not a native application build, packaging, or deployment integration.
 Direct compiler integrations can set `output: 'ts'` alongside the Valdi renderer
 and `hmr: false`. Both `.tsrx` components and plain `.ts` custom-hook modules then
 produce TypeScript, with `result.lang === 'ts'`. The output contains writer calls,
-not JSX. The default remains `output: 'js'`; TypeScript output is currently
-rejected for DOM and universal targets. Valdi's existing client-only, HMR, and
+not JSX. The default remains `output: 'js'`. The same option also supports
+[web DOM and SSR output](./compiler-typescript-output.md); universal-renderer
+TypeScript output is not yet supported. Valdi's existing client-only, HMR, and
 syntax restrictions still apply.
 
 TypeScript output retains interfaces, type aliases, type-only imports and exports,
