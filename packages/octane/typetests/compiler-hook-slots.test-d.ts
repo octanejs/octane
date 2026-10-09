@@ -33,8 +33,6 @@ for (const slot of [client.hookSlots(32), Symbol('hook')]) {
 		server.withSlot(slot, () => 1),
 		client.useRef(1, slot).current,
 		server.useRef(1, slot).current,
-		client.useLazyRef(() => 1, slot).current,
-		server.useLazyRef(() => 1, slot).current,
 		client.useLayoutSnapshot(() => 1, { initial: 0 }, slot),
 		server.useLayoutSnapshot(() => 1, { initial: 0 }, slot),
 	];

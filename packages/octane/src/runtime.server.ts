@@ -8083,7 +8083,7 @@ export function useRef<T>(initial?: T, slot?: ServerHookSlot): { current: T | un
 	return rec.ref as { current: T | undefined };
 }
 
-export function useLazyRef<T>(factory: () => T, slot?: ServerHookSlot): { current: T };
+export function useLazyRef<T>(factory: () => T, slot?: symbol): { current: T };
 export function useLazyRef<T>(factory: () => T, slot?: ServerHookSlot): { current: T } {
 	const position = hookPosition(slot);
 	if (position === null) return { current: factory() };

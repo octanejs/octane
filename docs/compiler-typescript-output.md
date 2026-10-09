@@ -32,9 +32,12 @@ runtime parameters, DOM navigation, and capture environments that do not exist
 in the source. These receive compiler-owned types; opaque environments and
 template paths may use `any`. TypeScript output does not reconstruct every
 inferred type after code is moved into a helper. Explicit types remain, and local
-type declarations used by hoisted bodies follow those bodies. The generated
+type declarations used by hoisted bodies and signatures are lifted with fresh
+names. Copies of types derived from component-local values may also become
+opaque; their original authored declarations remain intact. The generated
 code's runtime calls use Octane's actual declarations, including numeric hook
-slots accepted by the compiler ABI.
+slots accepted by the compiler ABI. Public `useLazyRef` calls still accept only
+manual Symbol slots; generated numeric slots use a type-only ABI bridge.
 
 Leading comments on retained declarations, statements, and members survive,
 including JSDoc annotations. Comments inside lowered templates, expression

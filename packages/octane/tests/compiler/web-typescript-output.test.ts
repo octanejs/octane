@@ -94,6 +94,15 @@ const COMPONENTS = {
 			const value: U = props.value;
 			<p>{String(value)}</p>
 		}</section>
+	}
+	export function Scoped<T = string>(props: { value: T; show: boolean }) @{
+		type Box<U> = { external: T; own: U };
+		type Own<T> = { value: T };
+		<section>@if (props.show) {
+			const box: Box<number> = { external: props.value, own: 1 };
+			const own: Own<number> = { value: box.own };
+			<p>{String(box.external) + own.value}</p>
+		}</section>
 	}`,
 	contextual: `interface Props { label: string }
 		export const App: (props: Props) => unknown = props => @{ <p>{props.label as string}</p> };`,
@@ -109,7 +118,7 @@ const COMPONENTS = {
 
 const IMPORTS = `import { App as Empty } from './empty';
 import { App as Annotated } from './annotated';
-import { App as Generic, Defaulted } from './generic';
+import { App as Generic, Defaulted, Scoped } from './generic';
 import { App as Contextual } from './contextual';
 import { App as Asserted } from './asserted';
 import { App as Satisfied } from './satisfies';
@@ -134,6 +143,7 @@ for (const parserName of ['native', 'javascript']) {
 					const a: Parameters<typeof Annotated>[0] = { label: 'ok' };
 					const b: Parameters<typeof Specialized>[0] = { value: { label: 'ok', count: 1 } };
 					const defaults: Parameters<typeof Defaulted<string>>[0] = { value: 'ok', show: true };
+					const scoped: Parameters<typeof Scoped<string>>[0] = { value: 'ok', show: true };
 					const c: Parameters<typeof Contextual>[0] = { label: 'ok' };
 					const d: Parameters<typeof Asserted>[0] = { label: 'ok' };
 					const e: Parameters<typeof Satisfied>[0] = { label: 'ok' };
@@ -156,25 +166,68 @@ for (const parserName of ['native', 'javascript']) {
 				}
 			});
 
+			it('preserves local types in capture-free hook callbacks moved out of their component', () => {
+				parser.javascript = parserName === 'javascript';
+				const source = `import { useMemo as useCached, useSyncExternalStore } from 'octane';
+					export function App() @{
+						interface Base { label: string }
+						interface Value extends Base {}
+						type Label = string;
+						type Listener = () => void;
+						const value = useCached((() => {
+							const current: Value = { label: 'ready' };
+							return current;
+						}) satisfies (() => Value));
+						const external = useSyncExternalStore(
+							(notify: Listener) => () => {},
+							(): Label => 'external',
+							(): Label => 'server',
+						);
+						const inferred = useSyncExternalStore(
+							notify => () => {},
+							() => 'inferred',
+							() => 'server',
+						);
+						<p>{value.label + external + inferred}</p>
+					}`;
+				const result = compile(source, '/src/callback-types.tsrx', {
+					mode,
+					dev: false,
+					hmr: false,
+					output: 'ts',
+				});
+				expect(
+					typecheck({
+						'callbacks.ts': result.code,
+						'consumer.ts': `import { App } from './callbacks'; App();`,
+					}),
+				).toEqual([]);
+			});
+
 			it('emits valid typed hook and control-flow code with scoped type aliases', () => {
 				parser.javascript = parserName === 'javascript';
 				vi.stubEnv('OCTANE_COMPILE_FROZEN_AST', '1');
 				vi.stubEnv('OCTANE_COMPILE_ASSERT_LOC', '1');
-				const source = `import { useState, useMemo, useCallback, useLayoutEffect } from 'octane';
+				const source = `import { useState, useMemo, useCallback, useLayoutEffect, useLazyRef as useCell } from 'octane';
+					import * as Octane from 'octane';
 					export interface Props<T> { items: T[]; visible: boolean; prefix: string; report: (value: string) => void }
 					export function App<T extends { id: string; label: string }>(props: Props<T>) @{
 						type Label = string;
+						type Prefix = typeof props.prefix;
 						type Item = T;
 						type Key = string;
+						const first = useCell(() => props.prefix);
+						const second = Octane.useLazyRef<string>(() => props.prefix);
 						const [count, setCount, getCount] = useState<number | null>(null);
-						const suffix = useMemo<Label>(() => props.prefix + (count ?? 0));
+						const suffix = useMemo<Label>(() => first.current + second.current + (count ?? 0));
 						const click = useCallback(() => setCount((getCount() ?? 0) + 1));
 						useLayoutEffect(() => { props.report(suffix); });
 						<section>
 							@if (props.visible) {
+								const prefix: Prefix = props.prefix;
 								const labels = props.items.map(item => item.label).join(',');
 								const namedLabels = props.items.map(__s => __s.label).join(',');
-								<ul title={labels + namedLabels}>@for (const item of props.items; key item.id as Key) {
+								<ul title={prefix + labels + namedLabels}>@for (const item of props.items; key item.id as Key) {
 									type ItemLabel = Label;
 									const selected: Item = item;
 									const read = (__s: T): ItemLabel => __s.label;
@@ -215,12 +268,43 @@ for (const parserName of ['native', 'javascript']) {
 					'/src/catch-misuse.tsrx',
 					{ mode, hmr: false, output: 'ts' },
 				);
-				const catchDiagnostics = typecheck({ 'catch-misuse.ts': catchMisuse.code });
+				const lazyRefMisuse = compile(
+					`import { useLazyRef } from 'octane';
+					 export function App() @{ const ref = useLazyRef<string>(() => 123); <p>{ref.current}</p> }`,
+					'/src/lazy-ref-misuse.tsrx',
+					{ mode, hmr: false, output: 'ts' },
+				);
+				const moduleQuery = compile(
+					`const label = 'allowed' as const;
+					export function App(props: { show: boolean }) @{
+						type Label = typeof label;
+						@if (props.show) { const value: Label = 'wrong'; <p>{value}</p> }
+					}`,
+					'/src/module-query.tsrx',
+					{ mode, hmr: false, output: 'ts' },
+				);
+				const queryDiagnostics = typecheck({ 'module-query.ts': moduleQuery.code });
+				expect(queryDiagnostics).toEqual([
+					{
+						file: 'module-query.ts',
+						code: 2322,
+						message: `Type '"wrong"' is not assignable to type '"allowed"'.`,
+					},
+				]);
+				const catchDiagnostics = typecheck({
+					'catch-misuse.ts': catchMisuse.code,
+					'lazy-ref-misuse.ts': lazyRefMisuse.code,
+				});
 				expect(catchDiagnostics).toEqual([
 					{
 						file: 'catch-misuse.ts',
 						code: 2322,
 						message: "Type 'unknown' is not assignable to type 'string'.",
+					},
+					{
+						file: 'lazy-ref-misuse.ts',
+						code: 2322,
+						message: "Type 'number' is not assignable to type 'string'.",
 					},
 				]);
 				expect(

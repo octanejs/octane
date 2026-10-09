@@ -15599,7 +15599,7 @@ export function useRef<T>(initial?: T, slot?: HookSlot): { current: T | undefine
 	return s;
 }
 
-export function useLazyRef<T>(factory: () => T, slot?: HookSlot): { current: T };
+export function useLazyRef<T>(factory: () => T, slot?: symbol): { current: T };
 export function useLazyRef<T>(factory: () => T, slot?: HookSlot): { current: T } {
 	slot = resolveSlot(slot);
 	if (slot === undefined) missingSlot('useLazyRef');

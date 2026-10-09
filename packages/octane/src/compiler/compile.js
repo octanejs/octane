@@ -5044,14 +5044,14 @@ function hoistCaptureFreeHookCallbacks(ast, options = {}) {
 				const walked = mapAst(arg, visit);
 				if (ownsIdentity || arg?.type === 'SpreadElement') return walked;
 				// A callback written `((s) => …) as Sel` is still a function; the
-				// assertion is erased from the emitted module either way. The
-				// UNWRAPPED node is what moves, so a component-local type alias
-				// cannot be dragged out of the scope that declares it.
+				// unwrapped function moves; TypeScript assertions stay at the
+				// callsite, where their component-local types are still in scope.
 				const fn = unwrapTsExpr(walked);
 				if (!isHoistableHookCallback(fn, componentBound)) return walked;
 				const name = `_fn$${nextId++}`;
 				hoisted.push(inheritOriginLoc(b.const(name, fn), arg));
-				return inheritOriginLoc(b.id(name), arg);
+				const reference = inheritOriginLoc(b.id(name), arg);
+				return options.preserveTypes ? replaceTsInner(walked, fn, reference) : reference;
 			});
 			return { ...n, arguments: args };
 		};
@@ -11430,6 +11430,7 @@ function compileInternal(
 	// so materialised dep arrays are already in place — module scope reads as
 	// non-reactive, so re-ordering the two would change what inference produces.
 	ast = hoistCaptureFreeHookCallbacks(ast, {
+		preserveTypes: options?.output === 'ts',
 		enabled: !hmrEnabled && !devEnabled && !profileEnabled,
 	});
 	const universalUnits =
@@ -13231,11 +13232,7 @@ function rejectAsyncOrGenerator(node, name) {
 function typedComponentInitializer(node, initializer, ctx) {
 	if (!ctx.typescriptWeb || !node.metadata?.octaneTypeBinding) return initializer;
 	const { init } = node.metadata.octaneTypeBinding;
-	const restore = (value) =>
-		value.type === 'ArrowFunctionExpression' || value.type === 'FunctionExpression'
-			? initializer
-			: { ...value, expression: restore(value.expression) };
-	return restore(init);
+	return replaceTsInner(init, unwrapTsExpr(init), initializer);
 }
 
 function compileServerComponent(node, ctx) {
@@ -18256,6 +18253,13 @@ function collectPatternNames(pat, into) {
 	return into;
 }
 
+// Retain assertions in their authored type scope when only their value moves.
+function replaceTsInner(node, inner, replacement) {
+	return node === inner
+		? replacement
+		: { ...node, expression: replaceTsInner(node.expression, inner, replacement) };
+}
+
 // Strip TS value-preserving wrappers (`x as T`, `x!`, `<T>x`, `x satisfies T`).
 function unwrapTsExpr(n) {
 	while (
@@ -20445,15 +20449,22 @@ const NUMERIC_HOOK_SLOT_POSITION = {
 	useSignal$: 1,
 };
 
-function appendHookSlotArgument(name, args, slot, numeric, origin) {
+function appendHookSlotArgument(name, args, slot, numeric, origin, ctx) {
 	const out = [...args];
 	const position =
 		numeric || INITIAL_VALUE_HOOKS.has(name) ? NUMERIC_HOOK_SLOT_POSITION[name] : undefined;
 	if (position !== undefined) {
 		while (out.length < position) out.push(b.id('undefined', origin));
 	}
+	const expression = typeof slot === 'string' ? b.id(slot, origin) : slot;
+	// Lazy refs reserve numeric slots for the compiler; their authored API only
+	// accepts manual Symbols. The runtime already supports this private ABI.
+	const typedSlot =
+		ctx.typescriptWeb && numeric && name === 'useLazyRef'
+			? b.ts_as(expression, b.ts_keyword_type('any'))
+			: expression;
 	out.push({
-		...(typeof slot === 'string' ? b.id(slot, origin) : inheritOriginLoc(slot, origin)),
+		...inheritOriginLoc(typedSlot, origin),
 		_octaneCompilerSlot: true,
 	});
 	return out;
@@ -21242,7 +21253,7 @@ function rewriteHookCalls(node, ctx, componentName, localRoot = false) {
 
 				const hookArgs = explicitMemoSlot
 					? args
-					: appendHookSlotArgument(name, args, slot, numericSlot, n);
+					: appendHookSlotArgument(name, args, slot, numericSlot, n, ctx);
 				if (isServerUse && n._octaneHydrationSite !== undefined) {
 					hookArgs.push(
 						inheritOriginLoc(
@@ -21334,7 +21345,7 @@ function rewriteHookCalls(node, ctx, componentName, localRoot = false) {
 					callee,
 					arguments: explicitMemoSlot
 						? args
-						: appendHookSlotArgument(name, args, slot, numericSlot, n),
+						: appendHookSlotArgument(name, args, slot, numericSlot, n, ctx),
 				};
 			}
 		}
