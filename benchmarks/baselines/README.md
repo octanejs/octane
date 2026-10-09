@@ -53,6 +53,10 @@ observable snapshots; those remain meaningful when the toolchain and fixture are
 unchanged. The absolute-baseline comparison is still a local developer aid, not
 a CI gate, and the committed copy reflects whoever last ran `--record`.
 
+The website's published subset can also be refreshed from normal-sample CI
+artifacts; [`website-refresh.md`](website-refresh.md) records its provenance.
+Re-record those timing baselines on your own machine before using `--compare`.
+
 `--compare` uses a noise-aware rule (a regression needs score > 1.15× *and*
 min > 1.10× baseline, plus an absolute >0.1ms excess for sub-1ms ops), but it is
 still only meaningful against a baseline you recorded on the *same* machine.

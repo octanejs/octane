@@ -21,6 +21,10 @@ on:
         description: "Space-separated suite names to run (default: every suite)"
         required: false
         default: ""
+      full:
+        description: "Use normal sample counts for a published benchmark snapshot"
+        type: boolean
+        default: false
   schedule:
     # Mondays 06:00 UTC.
     - cron: "0 6 * * 1"
@@ -65,6 +69,30 @@ jobs:
       - name: Install Playwright Chromium
         run: pnpm --filter octane-js-framework-benchmarks exec playwright install --with-deps chromium
 
+      - name: Record measurement environment
+        working-directory: benchmarks/js-framework
+        run: |
+          mkdir -p ../results
+          node --input-type=module <<'JS' > ../results/environment.json
+          import os from 'node:os';
+          import { execFileSync } from 'node:child_process';
+          import { createRequire } from 'node:module';
+          import { chromium } from 'playwright';
+          const require = createRequire(import.meta.url);
+          const browser = await chromium.launch();
+          console.log(JSON.stringify({
+            revision: process.env.GITHUB_SHA,
+            recordedAt: new Date().toISOString(),
+            platform: os.platform(), release: os.release(), arch: os.arch(),
+            cpu: os.cpus()[0].model, cpus: os.cpus().length,
+            node: process.version,
+            pnpm: execFileSync('pnpm', ['--version'], { encoding: 'utf8' }).trim(),
+            playwright: require('playwright/package.json').version,
+            chromium: browser.version(),
+          }, null, 2));
+          await browser.close();
+          JS
+
       - name: Verify browser benchmark timing boundaries
         run: node --test benchmarks/js-framework/timing.test.mjs
 
@@ -76,13 +104,14 @@ jobs:
         run: node benchmarks/suspense-recovery/profile-counters.mjs
 
       # --quick keeps every code path + correctness gate exercised at reduced
-      # iterations; --ratios enforces the committed ratio guards and fails the job
-      # on any breach. Absolute baselines are intentionally not compared here.
-      - name: Run benchmarks (quick, ratio guards)
+      # iterations by default. Manual full runs collect normal sample counts.
+      # --ratios enforces the committed guards; absolute baselines are not compared.
+      - name: Run benchmarks (ratio guards)
         env:
           BENCH_SUITES: ${{ inputs.suites }}
+          BENCH_QUICK: ${{ inputs.full != true && '--quick' || '' }}
         # BENCH_SUITES is unquoted on purpose: each word is one suite argument.
-        run: node benchmarks/bench.mjs --quick --ratios $BENCH_SUITES
+        run: node benchmarks/bench.mjs $BENCH_QUICK --ratios $BENCH_SUITES
 
       - name: Upload results
         if: always()
