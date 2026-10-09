@@ -11202,8 +11202,11 @@ function commitEffects(): void {
 		!hasControlledSyncs()
 	) {
 		if (DEFERRED_LAYOUT_DRIVER && DEFERRED_LAYOUT_DRIVER.defer(null, null)) return;
-		if (effectQueues[PASSIVE].length > 0 || pendingPassiveUnmounts.length > 0)
-			if (DEFERRED_LAYOUT_DRIVER) DEFERRED_LAYOUT_DRIVER.beforeCommit();
+		if (
+			DEFERRED_LAYOUT_DRIVER &&
+			(effectQueues[PASSIVE].length > 0 || pendingPassiveUnmounts.length > 0)
+		)
+			DEFERRED_LAYOUT_DRIVER.beforeCommit();
 		if (
 			(effectQueues[PASSIVE].length > 0 || pendingPassiveUnmounts.length > 0) &&
 			!passiveScheduled
@@ -14304,8 +14307,13 @@ function readStateHook<T>(
 	}
 	if (s.renderTransition !== undefined || s.updates !== undefined) {
 		const value = readQueuedState(s);
-		if (!s.urgentTransition && s.updates !== undefined && Object.is(value, s.value))
-			if (TRANSITION_ROOT_DRIVER) TRANSITION_ROOT_DRIVER.rebaseHeld(s, block, s.updates);
+		if (
+			TRANSITION_ROOT_DRIVER &&
+			!s.urgentTransition &&
+			s.updates !== undefined &&
+			Object.is(value, s.value)
+		)
+			TRANSITION_ROOT_DRIVER.rebaseHeld(s, block, s.updates);
 		s.value = value;
 		if (!s.urgentTransition) {
 			if (s.renderTransition !== undefined) {
@@ -14924,9 +14932,13 @@ function readReducerHook<S, A, I>(
 		s.reducer = reducer;
 		if (s.renderTransition !== undefined || s.renderPhaseActions !== undefined) {
 			const value = readQueuedReducer(s);
-			if (!s.urgentTransition && s.renderPhaseActions !== undefined && Object.is(value, s.value))
-				if (TRANSITION_ROOT_DRIVER)
-					TRANSITION_ROOT_DRIVER.rebaseHeld(s, block, s.renderPhaseActions, reducer);
+			if (
+				TRANSITION_ROOT_DRIVER &&
+				!s.urgentTransition &&
+				s.renderPhaseActions !== undefined &&
+				Object.is(value, s.value)
+			)
+				TRANSITION_ROOT_DRIVER.rebaseHeld(s, block, s.renderPhaseActions, reducer);
 			s.value = value;
 			if (!s.urgentTransition) {
 				if (s.renderTransition !== undefined) {
@@ -31804,8 +31816,12 @@ let DEV_FORM_CHECK_GENERATION = 1;
 let AUTOFOCUS_QUEUE: Element[] = [];
 
 function queueControlledCommit<T>(queue: T[], item: T): void {
-	if (item !== null && (typeof item === 'object' || typeof item === 'function'))
-		if (DEFERRED_LAYOUT_DRIVER) DEFERRED_LAYOUT_DRIVER.recordStageEntry(item);
+	if (
+		DEFERRED_LAYOUT_DRIVER &&
+		item !== null &&
+		(typeof item === 'object' || typeof item === 'function')
+	)
+		DEFERRED_LAYOUT_DRIVER.recordStageEntry(item);
 	queue.push(item);
 	if (ROOT_RENDER_TRANSACTION !== null)
 		journalUndo(() => {
@@ -35812,8 +35828,8 @@ function spliceOffscreenCapture(capture: OffscreenCapture, deferredNativeAccepta
 	// A staged root has queued native acceptance but has not published it yet.
 	// Keep that candidate on its original capture for the publication guard;
 	// there is no enclosing speculative capture to transfer it into here.
-	if (WIP_CAPTURE !== null || !deferredNativeAcceptance)
-		if (NATIVE_READ_DRIVER) NATIVE_READ_DRIVER.spliceCapture(capture, WIP_CAPTURE);
+	if (NATIVE_READ_DRIVER && (WIP_CAPTURE !== null || !deferredNativeAcceptance))
+		NATIVE_READ_DRIVER.spliceCapture(capture, WIP_CAPTURE);
 	const rendered = capture.renderedBlocks;
 	capture.renderedBlocks = null;
 	capture.renderRoot = null;
@@ -51444,9 +51460,9 @@ function makeRoot(
 				// A same-component request supersedes retry generations without
 				// invalidating a prepared DOM plan for that still-current root.
 				// Identity replacements and unmounts never refresh its receipt.
-				if (inFlush)
+				if (inFlush) {
 					if (DEFERRED_LAYOUT_DRIVER) DEFERRED_LAYOUT_DRIVER.refreshPublishingOwner(renderOwner);
-					else if (VIEW_TRANSITION_DRIVER) VIEW_TRANSITION_DRIVER.refreshPendingOwner(renderOwner);
+				} else if (VIEW_TRANSITION_DRIVER) VIEW_TRANSITION_DRIVER.refreshPendingOwner(renderOwner);
 			}
 			renderOwner.nativeRetry?.clear();
 			if (renderOwner.retrySignalOwners !== undefined) clearSignalRetryOwners(renderOwner);
