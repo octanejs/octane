@@ -1140,6 +1140,7 @@ export function App(props) @{
 				'function Row(props) { return <>@if (props.show) { <p>shown</p> }<Field load={props.load}/></>; }',
 				'function Row(props) { return <><p>shown</p><Field load={props.load}/></>; }',
 				'function Row(props) { return <div>@if (props.show) { <p>shown</p> }<Field load={props.load}/></div>; }',
+				'function Row(props) { return cloneElement(<div/>, null, <p>head</p>, [<Field key="a" load={props.load}/>]); }',
 			].map((row) => ({ dev, row })),
 		),
 	)(
@@ -1158,7 +1159,8 @@ export function App(props) @{
 			// Importing signals compiles a returning Row as a plain function whose
 			// JSX is a scoped value. Field's query must resolve to the same
 			// instance on both sides so the browser resumes the server result.
-			const source = `import { query$ } from 'octane/signals';
+			const source = `import { cloneElement } from 'octane';
+import { query$ } from 'octane/signals';
 function Field(props) @{
  const value$ = query$(() => 'field', props.load);
  <section><output>{value$}</output></section>
@@ -1845,6 +1847,10 @@ export function App(props) @{ <main><Card on={true} remember={props.remember}/><
 function Inner(props) @{ <span>@if (props.on) { <b>{props.content}</b> }</span> }
 function Card(props) @{ <section>@if (props.on) { <Inner on={true} content={props.content}/> }</section> }
 export function App(props) @{ <main><Card on={true} content={<Leaf remember={props.remember}/>}/></main> }`,
+	'array in cloneElement children': `import { cloneElement } from 'octane';
+import { Leaf } from './leaf';
+function Card(props) { return cloneElement(<div/>, null, [<Leaf key="a" remember={props.remember}/>, <b>b</b>], <p>c</p>); }
+export function App(props) @{ <main><Card remember={props.remember}/></main> }`,
 };
 
 // Hookless siblings retried after a browser-only suspension keep their own
