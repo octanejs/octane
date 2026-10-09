@@ -672,7 +672,7 @@
     },
     {
       "name": "@octanejs/monaco-editor",
-      "version": "0.0.31",
+      "version": "0.0.32",
       "category": "Content",
       "upstream": {
         "package": "@monaco-editor/react",

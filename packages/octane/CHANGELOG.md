@@ -1,5 +1,61 @@
 # octane
 
+## 0.12.1
+
+### Patch Changes
+
+- 114e3b8: Fix `compile()` output for `.ts`, `.mts`, and `.cts` modules, including Valdi
+  custom hooks. The native parser returned these files without their type
+  information, so `import type`, inline `type` specifiers, `export type { … }`, and
+  `export type *` were emitted as value imports and exports that fail to link.
+  Parameter properties also lost their `this.x = x` assignment, and `declare`
+  fields became real fields. These modules are now parsed with TypeScript's own
+  grammar, which keeps all of that, and `<T>value` type assertions still parse.
+
+  Type erasure also covers two cases that broke `.tsx` and `.tsrx` output: type
+  arguments on a superclass (`extends Base<T>`), and re-exports of a name that is
+  only a type (`import type { T }` then `export { T }`). Both previously left
+  invalid JavaScript.
+- 7af43dc: Ship less runtime to Vite applications that do not use optional capabilities
+  such as ViewTransition, Activity, form actions, or native signal reads. Vite's
+  default production minifier can now drop the code behind each capability an
+  application never installs. The js-framework rows app ships 2.6 kB less gzip,
+  and TodoMVC 3.0 kB less. Behavior is unchanged.
+- 4f82777: Fix a keyed list row that kept showing its old props after a suspended root
+  update resolved. The production build's output cache for the row recorded the
+  update's props while the update was held, and the rollback restored the screen
+  but not the cache, so the retry skipped the row.
+- 4f32daf: Keep keyed `@for` rows in order when a row-local binding shadows an imported component.
+
+  A keyed `@for` row whose only child is an imported one-element component uses
+  that element as its own boundary. The compiler read the import's single-root
+  mark even when a row declared its own component under the same name, such as
+  `const Row = row.id % 2 ? Pair : RowImpl`. Rows that rendered two elements then
+  lost their boundary, so reordering or removing rows left stale nodes behind.
+  The mark is now read only when the tag resolves to the import itself.
+- 77571d9: Mount `memo()` rows without extra comment markers.
+
+  A component whose body renders one element uses that element as its own
+  boundary when another module renders it, including as the only child of a
+  keyed `@for` row. A `memo()` wrapper around such a component did not inherit
+  that, so every memoized row added four comment nodes: an item pair and a
+  component pair. Mounting and clearing 1,000 memoized rows cost up to a third
+  more than the same rows without `memo()`. `memo()` wrappers now carry their
+  component's single-root mark, in development and production builds alike,
+  so memoized and plain rows build the same DOM. A static-hoisting
+  higher-order component that copies the wrapper's statics does not inherit
+  the mark.
+- 9728968: Keep controlled-input event restoration out of bundles that never use controlled bindings, while preserving restoration when controls are mounted later.
+- e241164: Reduce key-index construction for local keyed reorders while preserving DOM identity and rollback behavior.
+- 77571d9: Mount same-module `memo()` components without extra comment markers.
+
+  A `const Row = memo(RowImpl)` rendered in the module that declares it now
+  mounts the same DOM as an imported one. A keyed `@for` row or a template child
+  whose component renders one element uses that element as its own boundary, so
+  1,000 memoized rows no longer add up to 4,000 comment nodes. A local `Row` that
+  shadows the module binding keeps the marked path, because it can name a
+  different component on each render.
+
 ## 0.12.0
 
 ### Minor Changes
