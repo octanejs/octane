@@ -1,5 +1,5 @@
 import { defineConfig } from 'vite';
-import solid from 'vite-plugin-solid';
+import solid from '@solidjs/vite-plugin';
 
 // Solid 2's development runtime currently crashes in this workspace, so the
 // existing Solid benchmark fixtures all exercise its production runtime even
