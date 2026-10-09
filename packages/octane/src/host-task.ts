@@ -1,3 +1,7 @@
+import { __profileCount, ProfileCounter } from './profiling.js';
+
+declare const __OCTANE_PROFILE_ENABLED__: boolean;
+
 interface HostScheduler {
 	postTask?: (callback: () => void) => unknown;
 }
@@ -21,6 +25,8 @@ interface HostScheduler {
  * these tasks first in, first out on every host.
  */
 export function postHostTask(callback: () => void): void {
+	if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__)
+		__profileCount(ProfileCounter.TASK_POST);
 	const scheduler = (globalThis as { scheduler?: HostScheduler }).scheduler;
 	if (typeof scheduler?.postTask === 'function') {
 		scheduler.postTask(callback);
