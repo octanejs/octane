@@ -47834,9 +47834,14 @@ function mountFastHostItems<T>(
 			block.currentRenderDeferred = deferred;
 			CURRENT_SCOPE = block;
 			CURRENT_BLOCK = block;
+			// Give each row the native frame renderBlock would. A native row body
+			// otherwise opens one implicitly that nothing closes, leaving the
+			// signal write guard active after the render returns.
+			NATIVE_READ_DRIVER?.beginRender(block);
 			(itemBody as any)(item, block, deps);
 			CURRENT_SCOPE = previousScope;
 			CURRENT_BLOCK = previousBlock;
+			NATIVE_READ_DRIVER?.endRender(block, true, false);
 			block.mounted = true;
 			const end = state.end;
 			const root = (STAGED_DOM?.view(end) ?? end).previousSibling!;
@@ -47855,6 +47860,7 @@ function mountFastHostItems<T>(
 		CURRENT_SCOPE = previousScope;
 		CURRENT_BLOCK = previousBlock;
 		if (current !== null) {
+			NATIVE_READ_DRIVER?.endRender(current, false, isSuspenseException(error));
 			// A value-position child can throw or suspend after commitBag inserted
 			// its host. The still-unregistered row owns that host and any nested
 			// child scopes, so dispose it before unwinding the completed prefix.
