@@ -230,6 +230,21 @@ export function Pair(props) @{ 'use dom bindings'; <section>
 		}
 	});
 
+	it('forwards TypeScript output and its native-transform requirement to the compiler', async () => {
+		await expect(
+			resolveConfig(
+				{
+					root: '/repo',
+					configFile: false,
+					logLevel: 'silent',
+					plugins: octane({ output: 'ts', hmr: false }),
+					oxc: false,
+				},
+				'build',
+			),
+		).rejects.toThrow("output: 'ts' requires Vite's OXC transform to be enabled");
+	});
+
 	it('forwards typed-text and native attribute provider options to the compiler', async () => {
 		expect(() => octane({ textTypes: { tsconfig: ' tsconfig.json ' } })).toThrow(
 			'`textTypes` requires { tsconfig: string }.',

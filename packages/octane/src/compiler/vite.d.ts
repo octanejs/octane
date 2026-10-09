@@ -72,6 +72,8 @@ export interface OctaneCssModuleConstantModule {
 }
 
 export interface OctaneVitePluginOptions {
+	/** Opt into a typed compiler intermediate; Vite emits JavaScript with composed source maps. */
+	output?: 'js' | 'ts';
 	/** Override HMR code generation. It defaults to on while Vite is serving. */
 	hmr?: boolean;
 	/** Force every transform to server (`true`) or client (`false`) code generation. */

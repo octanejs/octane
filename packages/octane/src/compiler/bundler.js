@@ -269,6 +269,12 @@ function metadata(dependencies = [], missingDependencies = []) {
 	return { dependencies, missingDependencies };
 }
 
+function normalizeOutput(output = 'js') {
+	if (output !== 'js' && output !== 'ts')
+		throw new TypeError("Octane compiler output must be 'js' or 'ts'.");
+	return output;
+}
+
 const OCTANE_NO_SLOT = /\/\/\s*octane-no-slot\b/;
 
 function isPlainHelperSource(file) {
@@ -814,6 +820,7 @@ class OctaneBundlerCompiler {
 		}
 		this.exclude = [...(options.exclude ?? [])];
 		this.defaults = {
+			output: normalizeOutput(options.output),
 			environment: options.environment ?? 'client',
 			hmr: normalizeHmrDialect(options.hmr),
 			dev: options.dev,
@@ -1497,6 +1504,7 @@ class OctaneBundlerCompiler {
 			missingDependencies: new Set(),
 		};
 		const environment = options.environment ?? this.defaults.environment;
+		const output = normalizeOutput(options.output ?? this.defaults.output);
 		if (environment !== 'client' && environment !== 'server') {
 			throw new Error(
 				`Unknown Octane environment ${JSON.stringify(environment)} — expected 'client' or 'server'.`,
@@ -1585,7 +1593,7 @@ class OctaneBundlerCompiler {
 			// the existing hook-slot/pass-through branch below remains authoritative.
 			validateRendererModuleSource(code, filename, renderer);
 		}
-		if (fullCompile) {
+		const compileModule = () => {
 			const profileFilename = profile ? this._profileModuleId(file, collected) : undefined;
 			const clientReference =
 				renderer.server === 'client-only' ? createClientReference(renderer.id, filename) : null;
@@ -1618,6 +1626,7 @@ class OctaneBundlerCompiler {
 									isHydrateIslandRendererRequest(id) ? `&${HYDRATE_ISLAND_RENDERER_QUERY}=1` : ''
 								}`;
 			const compileOptions = {
+				...(output === 'ts' ? { output } : null),
 				hmr,
 				mode: environment,
 				dev,
@@ -1697,6 +1706,7 @@ class OctaneBundlerCompiler {
 				map: out.map,
 				diagnostics: out.diagnostics,
 				kind: 'compile',
+				...(out.lang === undefined ? null : { lang: out.lang }),
 				...(out.streamedSignals === true ? { streamedSignals: true } : null),
 				...(out.bindingConstants === undefined ? null : { bindingConstants: out.bindingConstants }),
 				renderer,
@@ -1715,7 +1725,8 @@ class OctaneBundlerCompiler {
 						: [...preparedDescriptorChildrenExports],
 				...finishMetadata(collected),
 			};
-		}
+		};
+		if (fullCompile) return compileModule();
 		if (clientOnlyImports.length > 0) {
 			assertNoLiveClientOnlyImports(code, filename, clientOnlyImports);
 		}
@@ -1758,6 +1769,27 @@ class OctaneBundlerCompiler {
 				!this._pragmaClaimsOwnership(code)
 			)
 				return passThrough();
+			if (output === 'ts' && !manualSlots) {
+				// The cheap ownership regex also matches documentation examples. A
+				// full compile needs a real import (or an explicit ownership pragma).
+				const requests =
+					lexStaticImportRequests(code, filename) ??
+					findStaticRuntimeImportRequests(code, filename);
+				if (
+					pragmaOwned ||
+					this._pragmaClaimsOwnership(code) ||
+					requests.some(
+						(request) =>
+							request === 'octane' ||
+							request === 'octane/server' ||
+							request === 'octane/signals' ||
+							request === 'octane/signals/client' ||
+							request === 'octane/signals/server',
+					)
+				) {
+					return compileModule();
+				}
+			}
 			const inlinePlainMemo =
 				inlineHookMemo &&
 				environment === 'client' &&

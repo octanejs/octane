@@ -429,7 +429,7 @@ function collect_hydrate_module_paths(config) {
  * it). An explicit `profile` (true or false) always takes precedence over
  * `devtools`.
  *
- * @param {{ hmr?: boolean, profile?: boolean, devtools?: boolean, strong?: boolean, textTypes?: import('octane/compiler/vite').OctaneVitePluginOptions['textTypes'], knownAttributeSpreads?: import('octane/compiler/vite').OctaneVitePluginOptions['knownAttributeSpreads'], domBindingFixedProps?: import('octane/compiler/vite').OctaneVitePluginOptions['domBindingFixedProps'], opaqueSignalHandles?: boolean, exclude?: string[], requireDirective?: boolean, renderers?: import('@octanejs/app-core').ExperimentalRendererConfigOptions, cssModuleConstants?: import('octane/compiler/vite').OctaneVitePluginOptions['cssModuleConstants'] }} [inlineOptions]
+ * @param {{ hmr?: boolean, output?: 'js' | 'ts', profile?: boolean, devtools?: boolean, strong?: boolean, textTypes?: import('octane/compiler/vite').OctaneVitePluginOptions['textTypes'], knownAttributeSpreads?: import('octane/compiler/vite').OctaneVitePluginOptions['knownAttributeSpreads'], domBindingFixedProps?: import('octane/compiler/vite').OctaneVitePluginOptions['domBindingFixedProps'], opaqueSignalHandles?: boolean, exclude?: string[], requireDirective?: boolean, renderers?: import('@octanejs/app-core').ExperimentalRendererConfigOptions, cssModuleConstants?: import('octane/compiler/vite').OctaneVitePluginOptions['cssModuleConstants'] }} [inlineOptions]
  * @returns {Plugin[]}
  */
 export function octane(inlineOptions = {}) {
@@ -1385,6 +1385,7 @@ export function octane(inlineOptions = {}) {
 	/**
 	 * @type {{
 	 *   hmr?: boolean,
+	 *   output?: 'js' | 'ts',
 	 *   profile?: boolean | 'auto',
 	 *   strong?: boolean,
 	 *   textTypes?: import('octane/compiler/vite').OctaneVitePluginOptions['textTypes'],
@@ -1404,6 +1405,7 @@ export function octane(inlineOptions = {}) {
 		__clientBuildId: () => clientBuild.buildId,
 	};
 	if (inlineOptions.hmr !== undefined) compilerOptions.hmr = inlineOptions.hmr;
+	if (inlineOptions.output !== undefined) compilerOptions.output = inlineOptions.output;
 	// Explicit `profile` wins; otherwise `devtools: true` opts into the
 	// command-aware `'auto'` signal the compiler resolves to DEV-only profiling.
 	if (inlineOptions.profile !== undefined) compilerOptions.profile = inlineOptions.profile;

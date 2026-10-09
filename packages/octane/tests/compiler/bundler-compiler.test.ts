@@ -56,6 +56,46 @@ function emittedHeadKey(code: string | undefined): string | undefined {
 }
 
 describe('bundler-neutral compiler integration', () => {
+	it('retains TypeScript and maps across renderer-selected components and custom hooks', () => {
+		const directory = mkdtempSync(join(tmpdir(), 'octane-ts-handoff-'));
+		try {
+			writeFileSync(
+				join(directory, 'package.json'),
+				JSON.stringify({ dependencies: { octane: '*' } }),
+			);
+			for (const target of ['dom', 'valdi']) {
+				const compiler = createOctaneCompiler({
+					root: directory,
+					output: 'ts',
+					hmr: false,
+					renderers:
+						target === 'valdi'
+							? {
+									registry: { native: { module: '@fixture/adapter', target: 'valdi' } },
+									default: 'native',
+								}
+							: undefined,
+				});
+				const component = compiler.transform(
+					'export interface Props { label: string }\nexport function App(props: Props) @{ <label value={props.label} /> }',
+					join(directory, 'App.tsrx'),
+				);
+				expect(component?.lang).toBe('ts');
+				expect(component?.code).toContain('interface Props');
+				const source =
+					"import { useState } from 'octane';\nexport function useCount(initial: number) { return useState<number>(initial); }";
+				const helper = compiler.transform(source, join(directory, 'useCount.ts'));
+				expect(helper?.lang).toBe('ts');
+				expect(helper?.map.sourcesContent).toEqual([source]);
+				expect(helper?.code).toContain('initial: number');
+				expect(helper?.code).toContain(target === 'valdi' ? '@fixture/adapter' : 'octane');
+				if (target === 'valdi') expect(helper?.code).not.toMatch(/from ['"]octane['"]/);
+			}
+		} finally {
+			rmSync(directory, { recursive: true, force: true });
+		}
+	});
+
 	it.each(['online', 'once', 'only', 'onclick', 'onkeydown', 'ONCLICK'])(
 		'diagnoses %s as an unsupported binding attribute, not an event handler',
 		(name) => {

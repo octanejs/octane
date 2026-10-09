@@ -5,7 +5,7 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it, vi } from 'vitest';
-import type { Plugin } from 'vite';
+import { resolveConfig, type Plugin } from 'vite';
 import { octane } from 'octane/compiler/vite';
 import { compile } from 'octane/compiler';
 import { createTextTypeFixture } from '../_text-type-project.js';
@@ -155,6 +155,38 @@ function isChildrenBlock(code: string, value: any): boolean {
 }
 
 describe('octane/compiler/vite public options', () => {
+	it('rejects TypeScript output when Vite disables its OXC transform globally', async () => {
+		await expect(
+			resolveConfig(
+				{
+					root: ROOT,
+					configFile: false,
+					logLevel: 'silent',
+					plugins: [octane({ output: 'ts', hmr: false })],
+					oxc: false,
+				},
+				'build',
+			),
+		).rejects.toThrow("output: 'ts' requires Vite's OXC transform to be enabled");
+	});
+
+	it.each(['client', 'server'] as const)(
+		'rejects TypeScript output when the %s environment disables OXC',
+		async (consumer) => {
+			const plugin = octane({ output: 'ts', hmr: false });
+			configure(plugin, 'build');
+			await expect(
+				Promise.resolve().then(() =>
+					(plugin.transform as any).call(
+						{ environment: { name: consumer, config: { consumer, oxc: false } } },
+						'export function App(props: { label: string }) @{ <p>{props.label as string}</p> }',
+						`${ROOT}/src/App.tsrx`,
+					),
+				),
+			).rejects.toThrow("output: 'ts' requires Vite's OXC transform to be enabled");
+		},
+	);
+
 	it('keeps fixed child facts opt-in and shared across compiler resets', async () => {
 		const source = `import { FixedChild } from './FixedChild.tsrx';
 export function Pair(props) @{ 'use dom bindings'; <section>

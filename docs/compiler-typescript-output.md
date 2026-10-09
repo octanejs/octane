@@ -49,3 +49,32 @@ as its one source and with `sourcesContent` included. TypeScript does not
 automatically consume this input map: the build host must compose it with the
 downstream TypeScript emit map for authored stack-trace locations. Source checking
 through `octane-tsc` already reports diagnostics against the authored file.
+
+## Build integrations
+
+Vite accepts the same opt-in through `octane/compiler/vite` and
+`@octanejs/vite-plugin`:
+
+```ts
+import { octane } from 'octane/compiler/vite';
+
+export default {
+	plugins: [octane({ output: 'ts' })],
+	build: { sourcemap: true },
+};
+```
+
+Octane produces the typed intermediate, then Vite's OXC transform emits
+JavaScript and composes its map with Octane's map. This applies to development,
+client builds, and SSR. Vite's configured OXC TypeScript options remain in
+effect; disabling OXC is incompatible with this option. The plugin still returns
+JavaScript to Vite's remaining pipeline. Production builds need
+`build.sourcemap: true` to retain the final maps.
+
+Other build hosts can use `createOctaneCompiler({ output: 'ts' })` from
+`octane/compiler/bundler`. Its transform result carries `lang: 'ts'` and the
+authored source map for components and eligible automatically slotted TypeScript
+hook modules. Existing module ownership and manual-slot rules still apply.
+The host owns module resolution, type checking, downstream emission, and map
+composition. See the [executable Valdi Workspace integration](./valdi-compiler.md#valdi-workspace-handoff)
+for the pinned public SDK setup and post-emit composition recipe.
