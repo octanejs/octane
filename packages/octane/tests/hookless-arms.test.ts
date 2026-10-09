@@ -15,6 +15,7 @@ import {
 	SuspendPlain,
 	SwapHooked,
 	SwapPlain,
+	WideSwitch,
 } from './_fixtures/hookless-arms.tsrx';
 
 // An @if or @switch arm that calls no hook has no state of its own. Mounting,
@@ -241,5 +242,15 @@ describe('hookless control-flow arm proof', () => {
 		['a bare tag', 'const s = helper`x`;\n<b>{s as string}</b>'],
 	])('gives an arm with %s a Block', (_, arm) => {
 		expect(armIsLite(arm)).toBe(false);
+	});
+
+	it('re-renders only a hooked @switch case past the cases with lite bits', () => {
+		const log = createLog();
+		const r = mount(WideSwitch, { which: 32, log: log.push });
+		expect(log.drain()).toEqual(['render owner', 'layout 0']);
+		flushSync(() => r.container.querySelector('button')!.click());
+		expect(r.container.querySelector('button')!.textContent).toBe('1');
+		expect(log.drain()).toEqual(['layout cleanup 0', 'layout 1']);
+		r.unmount();
 	});
 });
