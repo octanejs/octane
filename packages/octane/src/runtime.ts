@@ -601,6 +601,14 @@ function registerHookCleanup(scope: Scope, cleanup: Cleanup): void {
 // only null checks at renderer boundaries; no Alien graph, consumer maps,
 // callbacks, or per-Scope fields are allocated by the default runtime.
 let NATIVE_READ_DRIVER: NativeReadDriver | null = null;
+// Only controlled bindings install event restoration. Keeping its concrete
+// entry points at that owner lets event-only applications drop the restore
+// graph without adding a wrapper call to dispatch. Read the live capability:
+// a native target listener can arm the first control after root capture.
+let CONTROLLED_RESTORE_DRIVER: {
+	enqueue: typeof maybeEnqueueRestore;
+	finish: typeof maybeFlushDiscrete;
+} | null = null;
 let NATIVE_BLOCK_RETRIES: WeakMap<Block, NativeReadRetry> | null = null;
 // Hydration-only state: client paths read it behind `hydrationStarted`.
 let NATIVE_ADOPTION_RELEASES: NativeAdoptionState[] | null = null;
@@ -30945,8 +30953,9 @@ function maybeFlushDiscrete(type: DelegatedEventType): void {
 
 function finishCaptureDispatch(event: Event, type: DelegatedEventType): void {
 	if (!event.bubbles || event.cancelBubble || (type.flags & EVENT_BUBBLE) === 0) {
-		if (event.bubbles && (type.flags & EVENT_BUBBLE) !== 0) maybeEnqueueRestore(event, type);
-		maybeFlushDiscrete(type);
+		if (event.bubbles && (type.flags & EVENT_BUBBLE) !== 0 && CONTROLLED_RESTORE_DRIVER)
+			CONTROLLED_RESTORE_DRIVER.enqueue(event, type);
+		if (CONTROLLED_RESTORE_DRIVER) CONTROLLED_RESTORE_DRIVER.finish(type);
 		return;
 	}
 	if ((type.flags & EVENT_DISCRETE) === 0) return;
@@ -30965,8 +30974,10 @@ function finishCaptureDispatch(event: Event, type: DelegatedEventType): void {
 		// (controlled restores and their sync flush). When a native listener stops
 		// the event below its root, close that window here instead.
 		if ((event as any)[DELEGATED_BUBBLE_VERSION] === bubbleVersion) {
-			maybeEnqueueRestore(event, type);
-			maybeFlushDiscrete(type);
+			if (CONTROLLED_RESTORE_DRIVER) {
+				CONTROLLED_RESTORE_DRIVER.enqueue(event, type);
+				CONTROLLED_RESTORE_DRIVER.finish(type);
+			}
 		}
 	};
 	// The browser performs a microtask checkpoint after EVERY listener callback
@@ -31018,7 +31029,7 @@ function dispatchDelegated(this: Node, event: Event): void {
 	const nativeCapture = (type.flags & EVENT_NATIVE_CAPTURE) !== 0;
 	let path = nativeCapture ? prepareDelegatedEvent(event, this) : undefined;
 	(event as any)[DELEGATED_BUBBLE_VERSION] = ((event as any)[DELEGATED_BUBBLE_VERSION] || 0) + 1;
-	maybeEnqueueRestore(event, type);
+	if (CONTROLLED_RESTORE_DRIVER) CONTROLLED_RESTORE_DRIVER.enqueue(event, type);
 	const targetOnly = (type.flags & EVENT_TARGET_ONLY) !== 0;
 	_dispatchDepth++;
 	const node = event.target as any;
@@ -31100,7 +31111,7 @@ function dispatchDelegated(this: Node, event: Event): void {
 		if (propagationStarted) clearCurrentTarget(event);
 		closeNativeEventBatch(event, nativeBatch, false);
 		_dispatchDepth--;
-		maybeFlushDiscrete(type);
+		if (CONTROLLED_RESTORE_DRIVER) CONTROLLED_RESTORE_DRIVER.finish(type);
 	}
 }
 
@@ -31116,7 +31127,8 @@ function dispatchDelegatedCapture(
 	path ??= prepareDelegatedEvent(event, this);
 	if (type === undefined || (type.flags & EVENT_CAPTURE) === 0) return false;
 	path ??= event.composedPath();
-	if (!event.bubbles || (type.flags & EVENT_BUBBLE) === 0) maybeEnqueueRestore(event, type);
+	if ((!event.bubbles || (type.flags & EVENT_BUBBLE) === 0) && CONTROLLED_RESTORE_DRIVER)
+		CONTROLLED_RESTORE_DRIVER.enqueue(event, type);
 	const pathBase = CAPTURE_PATH.length;
 	buildDelegatedPath(event, this, path);
 	// Without a capture handler on the path no callback can observe the frame, so
@@ -31751,6 +31763,10 @@ function renderControlledState(el: Element): ControlledState | undefined {
 function armControlledBase(el: Element): ControlledState {
 	let ctrl = renderControlledState(el);
 	if (ctrl === undefined) {
+		CONTROLLED_RESTORE_DRIVER ??= {
+			enqueue: maybeEnqueueRestore,
+			finish: maybeFlushDiscrete,
+		};
 		ctrl = {
 			v: UNCONTROLLED,
 			c: -1,
