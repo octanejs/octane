@@ -109,7 +109,7 @@ export function createWriterRecorder(abi = 1) {
 
 	const adapter = {
 		assertValdiCompilerAbi(version: number) {
-			if (version !== abi) throw new Error(`Unsupported writer ABI ${version}`);
+			if (version > abi) throw new Error(`Unsupported writer ABI ${version}`);
 		},
 		jsx: {
 			makeNodePrototype(tag: string, pairs: any[] | undefined): Prototype {
@@ -145,6 +145,19 @@ export function createWriterRecorder(abi = 1) {
 					props: { value: String(value) },
 					children: [],
 				});
+			},
+			renderText(prototype: Prototype, value: unknown, key: string | undefined) {
+				if (value == null || typeof value === 'boolean') return;
+				if (!Array.isArray(value) && typeof value !== 'number' && typeof value !== 'string')
+					throw new TypeError('Writer text must be a string, number, or array');
+				const node = {
+					tag: prototype.tag,
+					key: key ?? (entry(keys, [...path, prototype]).value ??= `test-key-${nextKey++}`),
+					props: { value },
+					children: [],
+				};
+				if (elements.length === 0) roots.push(node);
+				else current().children.push(node);
 			},
 			beginComponent(component: Component, prototype: Prototype, key: string | undefined) {
 				components.push({ component, props: { ...prototype.props } });
