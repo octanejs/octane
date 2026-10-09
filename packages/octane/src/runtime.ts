@@ -36168,7 +36168,13 @@ export function hostComponent(
 	if (state === undefined) {
 		// Its props are arbitrary, so any of them can be a function form action.
 		enableDescriptorFormActions();
-		const el = (STAGED_DOM?.view(document) ?? document).createElement(tag);
+		// `motion.circle` and friends: inherit the destination's namespace, as
+		// hostStringTagBody does for a component tag that resolves to a host string.
+		const elNs = inferTagNs(tag, deoptChildNamespace(block.parentNode));
+		const el =
+			elNs !== undefined
+				? (STAGED_DOM?.view(document) ?? document).createElementNS(elNs, tag)
+				: (STAGED_DOM?.view(document) ?? document).createElement(tag);
 		// The children childSlot exclusively OWNS `el`'s content (owns-parent
 		// mode) — no `<!---->` insertion anchor needed (marker-elision M2).
 		state = {

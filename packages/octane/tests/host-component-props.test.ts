@@ -7,7 +7,12 @@ import {
 	type ComponentBody,
 	type OctaneNode,
 } from '../src/index.js';
-import { HostComponentChildren } from './_fixtures/host-component-children.tsrx';
+import {
+	HostComponentChildren,
+	HostComponentInSvg,
+} from './_fixtures/host-component-children.tsrx';
+
+const SVG_NS = 'http://www.w3.org/2000/svg';
 
 // `hostComponent` (the runtime primitive behind @octanejs/motion's `motion.<tag>`) REUSES its
 // element across renders. Regressions fixed here:
@@ -257,6 +262,29 @@ describe('hostComponent — reused host and children', () => {
 			expect(document.activeElement).not.toBe(el);
 		} finally {
 			existing.unmount();
+		}
+	});
+
+	// `motion.circle` inside an `<svg>` and a root `motion.svg` reach hostComponent with
+	// the tag alone, so the namespace must come from the parent, as for descriptors.
+	it('creates an SVG-only tag in the SVG namespace inside a compiled <svg>', () => {
+		const host: ComponentBody = (_props, scope) => {
+			hostComponent(scope, 0, 'circle', { r: '4' });
+		};
+		const r = mount(HostComponentInSvg, { host });
+		try {
+			expect(r.find('#host-svg circle').namespaceURI).toBe(SVG_NS);
+		} finally {
+			r.unmount();
+		}
+	});
+
+	it('creates <svg> in the SVG namespace at an HTML position', () => {
+		const r = mount(HostBody as any, { tag: 'svg', hp: null });
+		try {
+			expect(r.find('svg').namespaceURI).toBe(SVG_NS);
+		} finally {
+			r.unmount();
 		}
 	});
 
