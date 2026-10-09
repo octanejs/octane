@@ -30,3 +30,10 @@ export function HostComponentChildren(props: HostChildrenProps) @{
 		}
 	</Host>
 }
+
+export function HostComponentInSvg(props: { host: ComponentBody }) @{
+	const Host = props.host;
+	<svg id="host-svg">
+		<Host />
+	</svg>
+}
