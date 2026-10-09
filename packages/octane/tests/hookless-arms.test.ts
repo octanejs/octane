@@ -244,13 +244,28 @@ describe('hookless control-flow arm proof', () => {
 		expect(armIsLite(arm)).toBe(false);
 	});
 
-	it('re-renders only a hooked @switch case past the cases with lite bits', () => {
+	it('marks only the first 30 @switch cases lite', () => {
+		const cases = Array.from({ length: 33 }, (_, i) => `@case ${i}: { <b>{'on'}</b> }`);
+		const source = `export function App(props: any) @{
+	<div>
+		@switch (props.which) {
+			${cases.join('\n')}
+		}
+	</div>
+}`;
+		const mask = /switchBlock\([^;]*,\s*(\d+)\s*\)/s.exec(compile(source, 'switch.tsrx').code)![1];
+		// Bit i + 1 marks case i, so cases 30 and later keep a Block.
+		expect(Number(mask)).toBe(2 ** 31 - 2);
+	});
+
+	it('runs a hooked @switch case past case 31 with its own state and effects', () => {
 		const log = createLog();
 		const r = mount(WideSwitch, { which: 32, log: log.push });
-		expect(log.drain()).toEqual(['render owner', 'layout 0']);
+		expect(log.drain()).toEqual(['layout 0']);
 		flushSync(() => r.container.querySelector('button')!.click());
 		expect(r.container.querySelector('button')!.textContent).toBe('1');
 		expect(log.drain()).toEqual(['layout cleanup 0', 'layout 1']);
 		r.unmount();
+		expect(log.drain()).toEqual(['layout cleanup 1']);
 	});
 });

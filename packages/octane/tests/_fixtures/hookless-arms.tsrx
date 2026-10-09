@@ -219,7 +219,6 @@ export function NestedHooked(props: NestedProps) @{
 // Only the first 30 cases can be marked hookless, and case 0 is. Case 32 calls a
 // hook, so it needs a Block of its own and must not read case 0's mark.
 export function WideSwitch(props: { which: number; log: Log }) @{
-	props.log('render owner');
 	<div>
 		@switch (props.which) {
 			@case 0: {
