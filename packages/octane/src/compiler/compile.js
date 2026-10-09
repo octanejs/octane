@@ -33633,8 +33633,16 @@ function isPrivateSplitContextProvider(node, ctx) {
 	);
 }
 
-function isImmutableSplitComponentTag(tag, ctx) {
+// A certified module-function capture or a top-level `const X = memo(C)` keeps
+// one identity for the module's life, unless a nearer local shadows the tag.
+function isImmutableComponentTag(tag, ctx) {
 	if (tag?.type !== 'JSXIdentifier' && tag?.type !== 'Identifier') return false;
+	if (ctx.defaultMemoBindings.has(tag.name)) {
+		const lexical = (ctx.activityLexical ??= createLexicalAnalysis(ctx.activityModuleAst));
+		return (
+			lexical.resolveBinding(lexical.nodeScopes.get(tag), tag.name)?.scope === lexical.rootScope
+		);
+	}
 	const binding = ctx.splitModuleFunctions?.get(tag.name);
 	if (binding === undefined) return false;
 	const lexical = (ctx.activityLexical ??= createLexicalAnalysis(ctx.activityModuleAst));
@@ -34007,11 +34015,12 @@ function makeCompCall(
 		} else if (
 			keyExpr == null &&
 			(ctx.importedNames?.has(compName) ||
-				isImmutableSplitComponentTag(node.openingElement?.name ?? node.id, ctx))
+				isImmutableComponentTag(node.openingElement?.name ?? node.id, ctx))
 		) {
-			// Imports and certified module-function captures keep one identity for
-			// the slot's whole life. Other local callees can change each render,
-			// so their marker regime cannot follow the first identity's stamp.
+			// Imports, certified module-function captures, and module memo walls
+			// keep one identity for the slot's whole life. Other local callees can
+			// change each render, so their marker regime cannot follow the first
+			// identity's stamp.
 			maybeSingleRoot = callSiteOk;
 		}
 		const importedBinding = ctx.importedComponentBindings?.get(compName);
@@ -34957,8 +34966,8 @@ function makeForCall(node, ctx, inlinedSubs, parentNs = 'html', cssHash = null) 
 			} else if ((c.type === 'Element' || c.type === 'JSXElement') && isComponentTag(c)) {
 				// A sole component item can share the component's proven host root as
 				// its keyed boundary. Keep the same conservative call-site exclusions
-				// as componentSlot's singleRoot path. Imported bindings are immutable,
-				// so resolve their definition-site stamp once per parent render.
+				// as componentSlot's singleRoot path. Imported bindings and module memo
+				// walls are immutable, so resolve their stamp once per parent render.
 				const tagName = c.openingElement?.name || c.id || c.name;
 				const bare =
 					tagName &&
@@ -34977,7 +34986,7 @@ function makeForCall(node, ctx, inlinedSubs, parentNs = 'html', cssHash = null) 
 					const compName = tagName.name;
 					const local = ctx.componentInfo?.get(compName);
 					if (local?.singleRoot === true) singleRoot = true;
-					else if (ctx.importedNames?.has(compName) || isImmutableSplitComponentTag(tagName, ctx))
+					else if (ctx.importedNames?.has(compName) || isImmutableComponentTag(tagName, ctx))
 						singleRootExpr = compName;
 				}
 			}

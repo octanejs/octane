@@ -303,6 +303,15 @@ const memoShapes: Record<string, Program> = {
 	'a same-module memo row': {
 		app: list(`<Row id={row.id}/>`, `${memoRow} const Row = memo(RowImpl);`),
 	},
+	// The list reads its row's mark in the parent's scope, where `Row` is the
+	// one-element memo. Each row renders its own `Row` instead.
+	'a same-module memo row shadowed by a row-local component': {
+		app: list(
+			`const Row = row.id % 2 ? Pair : RowImpl; <Row id={row.id}/>`,
+			`${memoRow} const Row = memo(RowImpl);
+			function Pair({id}) @{ <><p class="row">{String(id)}</p><b>{String(id)}</b></> }`,
+		),
+	},
 	'a two-element row carrying hoisted memo statics': {
 		app: list(`<Row id={row.id}/>`, `import { Row } from '${ROW_MODULE}';`),
 		row: `${memoRow}
@@ -384,6 +393,10 @@ const conditionalShapes: Record<string, Program> = {
 	},
 	'a noscript component root': {
 		app: `function Row({id}) @{ <noscript class="row">{String(id)}</noscript> }
+			export function App({show, id}) @{ <div class="host"><i>head</i>@if (show) { <Row id={id}/> }<span>tail</span></div> }`,
+	},
+	'a same-module memo component root': {
+		app: `${memoRow} const Row = memo(RowImpl);
 			export function App({show, id}) @{ <div class="host"><i>head</i>@if (show) { <Row id={id}/> }<span>tail</span></div> }`,
 	},
 	'an imported memo component root': {

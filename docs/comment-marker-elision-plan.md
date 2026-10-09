@@ -138,7 +138,9 @@ element) currently helps only same-module call sites. Extend:
 - `lazy` wrappers don't carry it → conservative miss, fine. `memo(Comp)`
   wrappers forward `Comp`'s stamp through an owner-bound accessor: the
   conservative miss cost memoized 1k-row lists 4,000 comment nodes, 7–13%
-  slower mounts and about 30% slower clears.
+  slower mounts and about 30% slower clears. A same-module top-level
+  `const X = memo(C)` call site reads that stamp like an import's when the
+  tag resolves to the module binding rather than a shadowing local.
 
 Wins: client-rendered subtrees everywhere (post-navigation route content, the
 playground, client-only apps). Does NOT change SSR'd pages (adoption keeps
