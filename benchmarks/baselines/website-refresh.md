@@ -1,37 +1,43 @@
-# Website benchmark refresh — Octane 0.8.0, 3 October 2026
+# Website benchmark refresh — Octane 0.12.0, 9 October 2026
 
-The website imports 29 records from `local/`. This refresh measures the complete
-framework matrix for every published suite with its normal sample count. The
-home-page summary is recomputed with `createHomeSummary(FRAMEWORK_CARDS)`.
+The website imports 29 records from `local/`. This snapshot measures every
+published suite with its normal sample count and complete framework matrix.
+The homepage's 20 summary rows and bundle-size ranges are recomputed with
+`createHomeSummary(FRAMEWORK_CARDS)`.
 
-## Environment
+## Source and environment
 
-- Octane 0.8.0 release source:
-  [`7442a19ed355e5d3d5c6a925ddd8e2f704b176dd`](https://github.com/octanejs/octane/commit/7442a19ed355e5d3d5c6a925ddd8e2f704b176dd).
-  npm's `latest` tag was verified as 0.8.0 during the run.
-- Apple M5 Max, 18 CPU cores, arm64, macOS 27.0 (26A428).
-- Node 24.18.0, pnpm 11.15.1, Playwright 1.61.1, Chromium 149.0.7827.55.
+- Octane 0.12.0 release source:
+  [`961638e3c41dce5020560b56fa5e084b4257e33e`](https://github.com/octanejs/octane/commit/961638e3c41dce5020560b56fa5e084b4257e33e).
+  npm's `latest` tag was verified as 0.12.0 before recording.
+- [Measurement run](https://github.com/octanejs/octane/actions/runs/37902746685),
+  9 October 2026, 08:05–08:49 UTC, at
+  [`f7de4535041c607c0766756e3dafd2a472c52323`](https://github.com/octanejs/octane/commit/f7de4535041c607c0766756e3dafd2a472c52323).
+  This revision differs from the release only in the benchmark workflow and its
+  documentation; packages, fixtures, harnesses, lockfile, and guards are identical.
+- Blacksmith `blacksmith-4vcpu-ubuntu-2404` runner: AMD EPYC, four vCPUs,
+  Linux 6.6.141, x64.
+- Node 24.19.0, pnpm 12.9.1, Playwright 1.61.1, Chromium 149.0.7827.55,
+  Vite 8.1.5.
 - Frozen repository lockfile: React 19.2.7 with React Compiler 1.0.0,
   Preact 10.29.8, Solid 2.0.0-beta.20, Svelte 5.56.7, Ripple 0.4.0,
-  Vue 3.6.0-rc.1, and Inferno 9.1.0. The website's Ripple label now matches
-  the measured version.
+  Vue 3.6.0-rc.1, and Inferno 9.1.0.
 
-Suites ran sequentially, with no concurrent tests or builds from this task.
-Two pre-existing Node test workers from another checkout remained CPU-active;
-this was a shared development machine, not an isolated performance host.
-Framework comparisons use measurements from the same suite invocation.
-Absolute timings are specific to this environment, including its OS and load;
-this refresh does not compare them with the previous snapshot as evidence of
-an Octane release speedup.
+Suites ran sequentially in one CI job. Framework comparisons use targets from
+the same suite invocation. The previous snapshot used an Apple M5 Max on macOS;
+these absolute timings must not be compared with it as evidence of a release
+speedup. Hardware, operating system, and some harness methodology have changed
+since that snapshot. The current source and normal sampling configuration are
+recorded here so those changes stay visible.
 
 ## Reproduction
 
-Check out the source revision above, install the frozen lockfile and Playwright
-Chromium, then run from the repository root:
+Check out the measurement revision above, install the frozen lockfile and
+Playwright Chromium, then run from the repository root:
 
 ```sh
 pnpm install --frozen-lockfile
-pnpm --filter octane-js-framework-benchmarks exec playwright install chromium
+pnpm --filter octane-js-framework-benchmarks exec playwright install --with-deps chromium
 node benchmarks/bench.mjs --record \
   js-framework js-framework-reorder js-framework-deopt todomvc \
   weather-app weather-app-lighthouse chat-stream svg-dashboard uibench \
@@ -41,57 +47,34 @@ node benchmarks/bench.mjs --record \
   three-renderer three-bundle-size lynx-table lynx-table-web
 ```
 
-The normal runner performs each harness's warmups, repeated measurements, and
-semantic/identity/lifecycle checks. No quick-run results are substituted.
-All framework targets from the previous snapshot remain present. The current
-memo-wall harness additionally records `bail-compare` and its work-budget
-control. Framework, fixture, harness, lockfile, and ratio-guard sources are
-unchanged by this refresh.
+CI used the same suite list with `--ratios` instead of `--record`, selected by
+the Bench workflow's `full: true` input. The 29 suite JSON files were imported
+from its `bench-results` artifact and formatted without changing their values.
+The artifact's `environment.json` supplies the environment above. No quick-run
+results are substituted, and no guard thresholds are changed.
 
-## Validation and performance guards
+## Validation and guard observations
 
-All 29 suite invocations exited successfully. The records contain 233 targets
-(including diagnostics and budget controls) and 3,077 operations, with finite
-scores and no failed harnesses. The homepage's 20 summary rows are derived from
-these records rather than copied by hand.
+All 29 harnesses exited successfully. The records contain 232 targets and 3,092
+operations, with finite scores and no failed harnesses. No operation from the
+previous checked-in records is removed. The current harness adds two memo-wall
+work counters and 20 SVG-dashboard work counters.
 
-Auditing the records against the applicable committed ratio guards checks 215
-guards and finds 19 breaches:
+Of 169 applicable ratio guards, 162 pass and seven bundle-size guards breach:
 
-| Suite | Breaches | Observation |
-| --- | ---: | --- |
-| Bundle size | 18 | Six framework/total byte budgets each for JSX rows, TSRX TodoMVC, and TSRX chat; values exceed their budgets by 0.13–1.18%. |
-| Three renderer | 1 | `update_1k`: Octane/R3F 1.073 against a 1.05 ceiling. |
+| Gzip metric | Octane TSRX / reference | Observed ratio | Maximum |
+| --- | --- | ---: | ---: |
+| Rows total | Ripple | 2.53113 | 2.51 |
+| Rows total | Solid | 2.52752 | 2.50 |
+| Rows total | Svelte | 2.44207 | 2.42 |
+| TodoMVC total | Svelte | 2.63061 | 2.58 |
+| Chat total | Svelte | 2.51165 | 2.46 |
+| Weather total | React | 0.76917 | 0.76 |
+| Weather framework | React | 0.73489 | 0.72 |
 
-The 18 byte breaches measure the unchanged release source and its frozen
-lockfile; this refresh changes neither emitted benchmark code nor budgets.
-They are release-source budget overruns, not growth caused by updating the
-website records. The Three timing breach is retained as measured and remains
-an observation on this shared machine, not proof of a release regression.
-Neither result is hidden by raising thresholds or selecting a different run.
-This snapshot must not be described as passing `--ratios`.
-
-Existing follow-ups are the separate
-[byte-budget refresh (#1638)](https://github.com/octanejs/octane/pull/1638) and
-[Three retained-mesh update optimization (#1665)](https://github.com/octanejs/octane/pull/1665).
-Those changes are outside the measured 0.8.0 release snapshot.
-
-## Later re-record: bundle size, 5 October 2026
-
-`local/bundle-size.json` no longer comes from the 0.8.0 release source. It was
-re-recorded from `main` at
-[`91079dde42`](https://github.com/octanejs/octane/commit/91079dde42) when the
-bundle-size harness moved from Vite's `minify: 'esbuild'` to Vite 8's default
-`'oxc'` minifier, so each fixture measures what an ordinary Vite application
-ships. Every framework keeps identical build settings (`minify: 'oxc'`,
-`target: 'esnext'`).
-
-- Apple M5 Max, macOS 27.0 (26A428), Node 24.18.0, pnpm 12.9.1, Vite 8.1.5,
-  frozen repository lockfile.
-- Reproduce with `node benchmarks/bench.mjs --record bundle-size`.
-
-Every framework ships fewer bytes under Oxc, by different amounts. Rows total
-gzip moves from 39,805 to 37,868 bytes for Octane (−4.9%), from 18,325 to 15,233
-for Svelte 5 (−16.9%) and from 63,308 to 62,401 for React 19 (−1.4%), measured
-from the same source. The home page's bundle-size ratios therefore move with the
-methodology, as well as with Octane's own changes since the previous record.
+These breaches measure the unchanged published release and frozen lockfile;
+refreshing website data does not change the measured bundles. They need a
+separate bundle-size investigation or an explicitly justified guard update.
+The measurement workflow therefore finishes with a failed ratio verdict, and
+this snapshot must not be described as passing `--ratios`. Its correctness
+checks and every other applicable ratio guard pass.
