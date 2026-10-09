@@ -2224,7 +2224,8 @@ export function prepareDomBindings(ast, source, filename, selectedExport, helper
 		throw new Error('Octane domBindingFixedProps must be an array of child prop names.');
 	const fixedChildProps = helpers.fixedPropNames?.length ? new Set(helpers.fixedPropNames) : null;
 	const imports = importedBindings(ast);
-	const lexical = createLexicalAnalysis(ast);
+	// Binding state goes on a copy: the analysis is shared and frozen.
+	const lexical = { ...createLexicalAnalysis(ast) };
 	lexical.domBindingImportedReads = new Set();
 	lexical.domBindingSourceSamples = new Set();
 	lexical.domBindingReadExclusions = new WeakSet();

@@ -654,7 +654,15 @@ function createLexicalScope(parent, isFunction = false) {
 	return scope;
 }
 
+// Rewrites are copy-on-write, so an analysis depends only on its root node.
+// A pass that leaves the module unchanged hands the next pass the same root,
+// which reuses this analysis instead of walking the module again. Callers
+// share the result, so it is frozen; copy it to attach pass-local state.
+const lexicalAnalyses = new WeakMap();
+
 export function createLexicalAnalysis(ast) {
+	let analysis = lexicalAnalyses.get(ast);
+	if (analysis !== undefined) return analysis;
 	const bindingNodes = new WeakSet();
 	const nonReferenceNodes = new WeakSet();
 	const nodeScopes = new WeakMap();
@@ -908,7 +916,7 @@ export function createLexicalAnalysis(ast) {
 		return null;
 	};
 	const isBound = (scope, name) => resolveBinding(scope, name) !== null;
-	return {
+	analysis = Object.freeze({
 		bindingNodes,
 		commonJsSource,
 		nonReferenceNodes,
@@ -916,7 +924,9 @@ export function createLexicalAnalysis(ast) {
 		rootScope,
 		isBound,
 		resolveBinding,
-	};
+	});
+	lexicalAnalyses.set(ast, analysis);
+	return analysis;
 }
 
 export function isIdentifierReference(node, parent, key, lexicalAnalysis) {
