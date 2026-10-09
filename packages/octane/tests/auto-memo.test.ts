@@ -5497,6 +5497,53 @@ describe('compiler-owned component-region memoization', () => {
 		}
 	});
 
+	it('re-enters a keyed survivor whose cache a held root update rolled back', async () => {
+		const client = loadCompiledFixtureSource(
+			`import { use } from 'octane';
+			 function Item(props) @{ <li>{props.value + ':' + props.label}</li> }
+			 function Reader(props) @{
+				const value = use(props.promise);
+				<output>{value as string}</output>
+			 }
+			 export function App(props) @{
+				<main>
+					<ul>
+						@for (const item of props.items; key item) {
+							<Item value={item} label={props.label} />
+						}
+					</ul>
+					<Reader promise={props.promise} />
+				</main>
+			 }`,
+			{
+				id: 'held-root-survivor.tsrx',
+				mode: 'client',
+				compileOptions: { hmr: false, dev: false },
+			},
+		);
+		const first = Promise.resolve('first');
+		const root = mount(client.App, {
+			label: 'previous',
+			items: ['remove', 'keep'],
+			promise: first,
+		});
+		await act(() => first);
+		let resolve!: (value: string) => void;
+		const next = new Promise<string>((done) => (resolve = done));
+		await act(() =>
+			root.root.render(client.App, { label: 'next', items: ['add', 'keep'], promise: next }),
+		);
+		expect(root.findAll('li').map((li) => li.textContent)).toEqual([
+			'remove:previous',
+			'keep:previous',
+		]);
+
+		await act(() => resolve('second'));
+		expect(root.find('output').textContent).toBe('second');
+		expect(root.findAll('li').map((li) => li.textContent)).toEqual(['add:next', 'keep:next']);
+		root.unmount();
+	});
+
 	it('re-enters a cached region when an imported component it renders is not memo-stable', () => {
 		// The imported component's own memo contract is unknown at compile time, so
 		// the cached region must consult it on entry rather than trust its snapshot.
