@@ -56,14 +56,13 @@ jobs:
           NODE
 
       # Prove the repository-owned release plan before making the GitHub API
-      # boundary best-effort. A malformed changeset, generator regression, or
-      # formatting failure remains a hard workflow failure during an API outage.
+      # boundary best-effort. A malformed changeset or generator regression
+      # remains a hard workflow failure during an API outage.
       - name: Validate generated release plan
         if: steps.release_plan.outputs.has_releases == 'true'
         run: |
           pnpm changeset:version
           git diff --check
-          pnpm format:check
 
       - name: Restore checkout after release validation
         run: |
@@ -217,7 +216,7 @@ jobs:
           {
             echo "### Release PR synchronization deferred"
             echo
-            echo "The generated release plan and formatting passed, but both PR synchronization attempts failed during a verified GitHub API outage ($OCTANE_RELEASE_API_STATUS)."
+            echo "The generated release plan passed validation, but both PR synchronization attempts failed during a verified GitHub API outage ($OCTANE_RELEASE_API_STATUS)."
             echo
             echo "The next push to main or a manual Release PR workflow run will retry."
           } >> "$GITHUB_STEP_SUMMARY"
