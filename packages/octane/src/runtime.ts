@@ -118,6 +118,18 @@ import {
 	__profileCaptureDiscarded,
 	__profileComponentSource,
 	__profileCounters,
+	__profileCount,
+	__profileCacheHit,
+	__profileFlush,
+	__profileFlushPriority,
+	ProfileCounter,
+	__profileRootEnter,
+	__profileRootExit,
+	__profileDrainEnd,
+	__profileQueueWork,
+	__profileWorkEnter,
+	__profileQueueCleanup,
+	__profileEffect,
 	__profileDrain,
 	__profileEndRender,
 	__profileHasComponentMetadata,
@@ -344,6 +356,51 @@ if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLE
 		'rollback.root',
 		'rollback.journalEntries',
 		'rollback.capture',
+		'component.renderPhaseReplay',
+		'block.lite.mount',
+		'block.lite.fallback',
+		'block.deopt',
+		'block.cacheHit',
+		'arm.swapOffscreen',
+		'for.skip',
+		'for.empty.mount',
+		'for.empty.unmount',
+		'list.reconcile',
+		'list.insert',
+		'list.remove',
+		'list.update',
+		'list.move',
+		'list.lis',
+		'boundary.suspend',
+		'boundary.hold',
+		'boundary.reveal',
+		'boundary.retry',
+		'boundary.reset',
+		'activity.hide',
+		'activity.show',
+		'viewTransition.flush',
+		'rollback.journal',
+		'rollback.transitionDiscarded',
+		'rollback.renderInvalidated',
+		'rollback.hydration',
+		'row.park',
+		'flush.sync',
+		'flush.transition',
+		'flush.deferred',
+		'commit.effects',
+		'task.post',
+		'suspend.throw',
+		'use.stratum',
+		'cascade.layout',
+		'cascade.layoutDepth',
+		'effect.run.insertion',
+		'effect.run.layout',
+		'effect.run.passive',
+		'effect.cleanup.insertion',
+		'effect.cleanup.layout',
+		'effect.cleanup.passive',
+		'ref.attach',
+		'ref.detach',
 	]);
 
 let PROFILE_COMPONENT_OVERRIDE: { target: Function; component: Function | null } | null = null;
@@ -2711,6 +2768,8 @@ function runEffectCleanupCallback(
 	phase: number = -1,
 	scope: Scope | null = null,
 ): void {
+	if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__)
+		__profileEffect(phase, true, callback, scope);
 	const previousPhase = CURRENT_EFFECT_PHASE;
 	CURRENT_EFFECT_PHASE = phase;
 	EFFECT_BODY_DEPTH++;
@@ -4121,6 +4180,8 @@ function commitRootTransition(owner: RootRenderOwner, transaction: RootRenderTra
 function discardRootTransition(owner: RootRenderOwner): void {
 	const held = owner.transition;
 	if (held === undefined) return;
+	if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__)
+		__profileCount(ProfileCounter.ROLLBACK_TRANSITION);
 	owner.transition = undefined;
 	owner.wakeable = null;
 	owner.generation++;
@@ -4332,6 +4393,8 @@ function beginRootRender(owner: RootRenderOwner | undefined): RootRenderFrame | 
 		owner.transaction = transaction;
 		ROOT_RENDER_TRANSACTIONS.push(transaction);
 	}
+	if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__)
+		__profileRootEnter(transaction, owner);
 	const frame: RootRenderFrame = {
 		transaction,
 		previous: ROOT_RENDER_TRANSACTION,
@@ -4362,6 +4425,8 @@ function beginRootRender(owner: RootRenderOwner | undefined): RootRenderFrame | 
 
 function endRootRender(frame: RootRenderFrame | null): void {
 	if (frame === null) return;
+	if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__)
+		__profileRootExit();
 	frame.transaction.parked = PARKED_ITEMS;
 	ROOT_RENDER_TRANSACTION = frame.previous;
 	ROOT_DISCARD_STAMP = frame.discardStamp;
@@ -4762,14 +4827,14 @@ function preserveRootCreatedDom(block: Block): void {
 function rollbackRootRender(transaction: RootRenderTransaction): void {
 	if (transaction.aborted) return;
 	transaction.aborted = true;
-	if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__)
-		__profileRootRolledBack();
 	if (
 		transaction.owner.retrySignalOwners !== undefined &&
 		transaction.owner.retrySignalOwners !== RETAINED_SIGNAL_OWNERS
 	)
 		clearSignalRetryOwners(transaction.owner);
 	const frame = beginRootRender(transaction.owner);
+	if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__)
+		__profileRootRolledBack();
 	const previousRollback = ROOT_RENDER_ROLLBACK;
 	ROOT_RENDER_ROLLBACK = true;
 	try {
@@ -4882,6 +4947,8 @@ function commitRootRenders(): void {
 		const finishStagedOwner = DEFERRED_LAYOUT_DRIVER
 			? DEFERRED_LAYOUT_DRIVER.enterRootCommit(owner)
 			: undefined;
+		if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__)
+			__profileRootEnter(transaction, owner);
 		try {
 			if (transaction.aborted || owner.disposed) {
 				if (owner.transaction === transaction) owner.transaction = null;
@@ -4910,7 +4977,7 @@ function commitRootRenders(): void {
 				continue;
 			}
 			if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__)
-				__profileRootCommitted();
+				__profileRootCommitted(transaction);
 			if (owner.transaction === transaction) owner.transaction = null;
 			if (transaction.capture.presentations !== undefined && STAGED_COMMIT_CAPTURE) {
 				stagedOwnerGuard(STAGED_COMMIT_CAPTURE, owner);
@@ -4974,6 +5041,8 @@ function commitRootRenders(): void {
 			// transition. Inspect its lifetime after those deletions have completed.
 			if (owner.transition !== undefined) TRANSITION_ROOT_DRIVER!.commitRoot(owner, transaction);
 		} finally {
+			if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__)
+				__profileRootExit();
 			finishStagedOwner?.();
 		}
 	}
@@ -5331,6 +5400,8 @@ function retainedForSlotNodes(state: ForSlot, retained: Set<Node> | null): Set<N
 
 /** Retain an outgoing row's nodes and scope until its render can commit. */
 function parkItemForHold(block: Block, owningList?: ForSlot): void {
+	if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__)
+		__profileCount(ProfileCounter.ROW_PARK);
 	const retainConnected = ROOT_RENDER_TRANSACTION !== null && !ROOT_RENDER_ROLLBACK;
 	if (retainConnected) retireRootBlock(block);
 	// @empty borrows the list's markers. Its saved nodes must not overlap rows
@@ -8566,7 +8637,7 @@ function drainQueue(): { err: any } | null {
 	let activitiesToRehide: Set<ActivitySlot> | null = null;
 	const drainId = ++DRAIN_ID;
 	if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__)
-		__profileDrain();
+		__profileDrain(drainId);
 	if (QUEUE.length > 1) sortWaveByDepth(QUEUE, drainId);
 	// Iterate by index. A render may enqueue MORE work (e.g. a setState during
 	// render) — it appends to QUEUE, and `i < QUEUE.length` is re-evaluated every
@@ -8587,6 +8658,10 @@ function drainQueue(): { err: any } | null {
 		// A max-depth flag is not redundant work, however: it must still surface
 		// after an ancestor coalesces the flagged child's pending render.
 		if (!block.pending && !block.rare?.updateError) continue;
+		if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__)
+			__profileFlushPriority(
+				block.pendingDeferred ? 2 : block.pendingMode === 'transition' ? 1 : 0,
+			);
 		block.pending = false;
 		if (block.disposed) {
 			if (block.rare !== null) block.rare.updateError = false;
@@ -8751,6 +8826,8 @@ function drainQueue(): { err: any } | null {
 	}
 	commitRootRenders();
 	NATIVE_TRANSITION_DRIVER?.flush();
+	if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__)
+		__profileDrainEnd();
 	return pendingError;
 }
 
@@ -9174,6 +9251,10 @@ function drainLayoutUpdates(pendingError: { err: any } | null): { err: any } | n
 		(QUEUE.length > 0 || ROOT_RENDER_TRANSACTIONS.length > 0) && guard < LAYOUT_CASCADE_LIMIT;
 		guard++
 	) {
+		if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__)
+			__profileCount(ProfileCounter.CASCADE_LAYOUT);
+		if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__)
+			__profileCount(ProfileCounter.CASCADE_LAYOUT_DEPTH, guard + 1);
 		// Layout-driven updates belong to the same commit, including when the
 		// scheduler started it. Publish their final DOM before observer delivery.
 		drainPassivesBeforeRender();
@@ -9193,6 +9274,8 @@ function drainLayoutUpdates(pendingError: { err: any } | null): { err: any } | n
  */
 function flushWork(): void {
 	inFlush = true;
+	if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__)
+		__profileFlush();
 	// Any retained sync-transition updates belong to the drain below. Whatever
 	// a hold did not consume is finished with once the flush completes, unless
 	// their renders still wait for the transition task: an urgent flush before
@@ -9501,6 +9584,8 @@ function vtFlush(
 	queuedOwners?: Set<VTOwner> | null,
 	queuedBlocks?: readonly Block[],
 ): void {
+	if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__)
+		__profileCount(ProfileCounter.VIEW_TRANSITION_FLUSH);
 	// Both callers settle prior passives before choosing priority and owners.
 	// Do not drain again after an explicit resume batch has been snapshotted.
 	// `vtQueuedOwners` returns null for an unknown owner, so only an omitted
@@ -10860,6 +10945,8 @@ function ensureDeferredLayoutDriver(): void {
 				if (isRecordingTransitionJournal()) journalObjectOnce(slot);
 				const cleanup = slot.cleanup;
 				if (cleanup !== undefined) {
+					if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__)
+						__profileQueueCleanup(cleanup, scope);
 					const handler = findTryHandler(scope.block);
 					enqueueStagedAction(
 						capture,
@@ -11200,6 +11287,8 @@ function completeDeferredLayouts(capture: DeferredLayoutCapture, interrupted = f
 
 function commitEffects(): void {
 	if (DEFERRED_LAYOUT_DRIVER && DEFERRED_LAYOUT_DRIVER.stageEffects()) return;
+	if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__)
+		__profileCount(ProfileCounter.COMMIT_EFFECTS);
 	// No-work fast path: every commit queue the drains below consume is empty —
 	// the common case for a hydration adoption or an effect-free app's flush.
 	// One combined check (module-scope length reads, same emptiness conditions
@@ -11660,6 +11749,8 @@ function fireEffectCleanup(e: PendingEffect): void {
 	if (cleanup) {
 		slot.cleanup = undefined;
 		try {
+			if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__)
+				__profileQueueCleanup(cleanup, e.scope, e);
 			runEffectCleanupCallback(cleanup, e.phase, e.scope);
 		} catch (err) {
 			if (err instanceof MaximumUpdateDepthError) throw err;
@@ -11675,6 +11766,8 @@ function runEffectBody(e: PendingEffect): void {
 	const slot = e.scope.hooks?.get(e.slot) as EffectSlot | undefined;
 	if (slot === undefined || slot.revision !== e.revision) return;
 	if (!nativeEffectPublicationCurrent(e, slot)) return;
+	if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__)
+		__profileEffect(e.phase, false, e);
 	slot.connectedFn = e.fn;
 	slot.connectedArgs = e.args;
 	slot.disconnected = false;
@@ -11878,11 +11971,16 @@ function drainEffectEventCommitActions(): InlineCaughtErrorReport[] | null {
 	const q = effectEventCommitActions.splice(0);
 	let reports: InlineCaughtErrorReport[] | null = null;
 	for (let i = 0; i < q.length; i++) {
+		if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__)
+			__profileWorkEnter(q[i]);
 		try {
 			const report = q[i]();
 			if (report !== undefined) (reports ??= []).push(report);
 		} catch (err) {
 			console.error(err);
+		} finally {
+			if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__)
+				__profileRootExit();
 		}
 	}
 	return reports;
@@ -12432,6 +12530,8 @@ export function renderBlock(block: Block): void {
 	try {
 		let retries = 0;
 		while (renderBlockInner(block)) {
+			if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__)
+				__profileCount(ProfileCounter.RENDER_PHASE_REPLAY);
 			if (block.rare?.updateError) {
 				block.rare.updateError = false;
 				throw maximumUpdateDepthError(block);
@@ -12493,6 +12593,8 @@ function enqueueEffectEventUpdate(entry: PendingEffectEvent): void {
 }
 
 function enqueueEffectEventCommitAction(action: EffectEventCommitAction): void {
+	if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__)
+		__profileQueueWork(action);
 	if (DEFERRED_LAYOUT_DRIVER) DEFERRED_LAYOUT_DRIVER.recordStageEntry(action);
 	EFFECT_EVENT_ACTION_TARGET.push(action);
 }
@@ -12504,6 +12606,8 @@ function enqueueEffectEventCommitAction(action: EffectEventCommitAction): void {
  * Lifetime and hook state remain mounted; untouched sibling caches stay valid.
  */
 function invalidateRender(block: Block, owner: Block | null = null): void {
+	if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__)
+		__profileCount(ProfileCounter.ROLLBACK_INVALIDATED);
 	if (block.disposed) return;
 	for (let current: Block | null = block; current !== null; current = current.parentBlock) {
 		// Lite component scopes carry a DOM/context proxy in this chain, not a
@@ -13317,6 +13421,8 @@ export function componentSlotLite<P>(
 	// the same Scope. Their direct children need an identity-aware slot, including
 	// when one body selected the lite representation and another selected full.
 	if (parentScope === SHARED_BODY_SCOPE) {
+		if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__)
+			__profileCount(ProfileCounter.BLOCK_LITE_FALLBACK);
 		componentSlotImpl(
 			null,
 			parentScope,
@@ -13367,6 +13473,8 @@ export function componentSlotLite<P>(
 	// first render only): its body may adopt it in place.
 	let inPlace: Node | null = null;
 	if (scope === undefined) {
+		if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__)
+			__profileCount(ProfileCounter.BLOCK_LITE_MOUNT);
 		scope = new ScopeImpl(parentScope, parentScope.block);
 		// Lite scope's `block` exposes the host/anchor as the body's DOM context
 		// — so the compiled body's `__s.block.parentNode.insertBefore(_root,
@@ -13818,6 +13926,8 @@ function unmountScope(scope: Scope, detachDom: boolean = true): void {
 			const cleanup = slot.cleanup;
 			if (cleanup === undefined) continue;
 			slot.cleanup = undefined;
+			if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__)
+				__profileQueueCleanup(cleanup, slot.phase === PASSIVE ? TEARDOWN_BLOCK : scope);
 			if (slot.phase === PASSIVE) {
 				pendingPassiveUnmounts.push(cleanup, TEARDOWN_HANDLER, TEARDOWN_BLOCK);
 				// Arm the post-paint drain for unmounts OUTSIDE a commit
@@ -15087,6 +15197,8 @@ function finishEffectRender(scope: Scope): void {
 			phase: effect.phase,
 			seq: commitSeq++,
 		});
+		if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__)
+			__profileQueueWork(target[target.length - 1]);
 		markEffectReconnectQueued(effect, effect.phase, target);
 	}
 }
@@ -15203,6 +15315,8 @@ function enqueueEffect(slot: HookSlot, fn: EffectFn, deps: any[] | undefined, ph
 		seq: commitSeq++,
 	};
 	const target = WIP_CAPTURE !== null ? WIP_CAPTURE.effects[phase] : effectQueues[phase];
+	if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__)
+		__profileQueueWork(entry);
 	target.push(entry);
 	markEffectReconnectQueued(effect, phase, target);
 }
@@ -15483,6 +15597,11 @@ export function compilerMemoRegion(scope: Scope, bodyId: number): CompilerMemoRe
 	}
 	return region;
 }
+
+// Optimized modules share this ABI with ordinary builds. Only a profiling
+// runtime installs the observer, and generated calls use the same define.
+if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__)
+	compilerMemoRegion.__profileHit = __profileCacheHit;
 
 function createCompilerMemoRegion(
 	scope: Scope,
@@ -18950,7 +19069,10 @@ interface TrackedThenable<T = any> extends PromiseLike<T> {
  */
 class SuspenseException {
 	readonly __isSuspense = true;
-	constructor(public readonly thenable: TrackedThenable<any>) {}
+	constructor(public readonly thenable: TrackedThenable<any>) {
+		if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__)
+			__profileCount(ProfileCounter.SUSPEND_THROW);
+	}
 }
 
 function isSuspenseException(x: any): x is SuspenseException {
@@ -19299,6 +19421,8 @@ export function useBatch(items: any[], warm?: () => void): void {
 	// batch, and warming would duplicate fetches the server already resolved.
 	const hydration = hydrating ? seedHydration() : null;
 	if (hydration !== null && hydration.seeds !== null) return;
+	if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__)
+		__profileCount(ProfileCounter.USE_STRATUM);
 	let pending: TrackedThenable<any>[] | null = null;
 	for (let i = 0; i < items.length; i++) {
 		const it = items[i];
@@ -21247,6 +21371,8 @@ class HydrationCapability {
 
 	/** The attempt is discarded: restore the server nodes it changed. */
 	rollback(): void {
+		if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__)
+			__profileCount(ProfileCounter.ROLLBACK_HYDRATION);
 		const undo = this.undo;
 		this.speculative = this.undoable = false;
 		this.saved = this.undo = null;
@@ -26557,6 +26683,12 @@ export function attachRef(
 
 function applyRefValue(ref: any, el: object | null, prevTarget?: object | null): void {
 	if (ref == null) return;
+	if (
+		typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' &&
+		__OCTANE_PROFILE_ENABLED__ &&
+		!Array.isArray(ref)
+	)
+		__profileCount(el === null ? ProfileCounter.REF_DETACH : ProfileCounter.REF_ATTACH);
 	if (typeof ref === 'function') {
 		if (el === null) {
 			// Detach: prefer the React-19 cleanup the callback returned when it was
@@ -35875,7 +36007,11 @@ function spliceOffscreenCapture(capture: OffscreenCapture, deferredNativeAccepta
 	for (let p = 0 as Phase; p < 3; p++) {
 		const src = capture.effects[p];
 		const target = WIP_CAPTURE !== null ? WIP_CAPTURE.effects[p] : effectQueues[p];
-		for (let i = 0; i < src.length; i++) target.push(src[i]);
+		for (let i = 0; i < src.length; i++) {
+			if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__)
+				__profileQueueWork(src[i]);
+			target.push(src[i]);
+		}
 	}
 	const eventTarget = WIP_CAPTURE !== null ? WIP_CAPTURE.events : effectEventQueue;
 	for (let i = 0; i < capture.events.length; i++) {
@@ -35884,6 +36020,8 @@ function spliceOffscreenCapture(capture: OffscreenCapture, deferredNativeAccepta
 	const eventActionTarget =
 		WIP_CAPTURE !== null ? WIP_CAPTURE.eventActions : effectEventCommitActions;
 	for (let i = 0; i < capture.eventActions.length; i++) {
+		if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__)
+			__profileQueueWork(capture.eventActions[i]);
 		eventActionTarget.push(capture.eventActions[i]);
 	}
 	const refTarget = WIP_CAPTURE !== null ? WIP_CAPTURE.refs : refAttachQueue;
@@ -37144,6 +37282,8 @@ function reconcileDeoptNode(
 // not reused are removed; survivors are reordered to match the descriptor. No markers
 // are introduced — the element fully owns its children, so this is raw-DOM reuse.
 function reconcileDeoptChildren(el: Element, children: any, ownerBlock: Block): void {
+	if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__)
+		__profileCount(ProfileCounter.BLOCK_DEOPT);
 	// A scalar leaf keeps its sole owned Text node at the implicit first slot.
 	// Other shapes still need keyed matching: a lone text node may belong to a
 	// different array position, a nested wrapper, or independently inserted DOM.
@@ -43279,6 +43419,8 @@ function handleSuspense(
 	// the owner whose Action batch must keep its useTransition cue pending.
 	transitionOrigin = sourceBlock,
 ): void {
+	if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__)
+		__profileCount(ProfileCounter.BOUNDARY_SUSPEND);
 	if (NATIVE_TRANSITION_ATTEMPT !== null) {
 		NATIVE_TRANSITION_ATTEMPT.suspensions.set(state, thenable);
 		throw new SuspenseException(thenable);
@@ -43316,6 +43458,8 @@ function handleSuspense(
 	// suspends. The fallback must become visible and the old pending cue end.
 	const isTransition = sourceBlock.currentRenderMode === 'transition';
 	if (isTransition && state.hasResolved && state.branch === 1 && state.hiddenDom === null) {
+		if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__)
+			__profileCount(ProfileCounter.BOUNDARY_HOLD);
 		// The body got part of the way through patching this boundary before the
 		// suspend, so put back what it changed. Nothing has been painted since —
 		// the render and this undo are the same synchronous flush — so the
@@ -43518,6 +43662,8 @@ function hideTryContentAndMountPendingInner(
 		// write schedules the next transaction. The capture also drops this action
 		// if an enclosing render is abandoned before any lifecycle work runs.
 		const action = () => deactivateSuspensePrimary(state, persistent, uncommittedRefs);
+		if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__)
+			__profileQueueWork(action);
 		if (DEFERRED_LAYOUT_DRIVER) DEFERRED_LAYOUT_DRIVER.recordStageEntry(action);
 		if (WIP_CAPTURE === null) effectEventCommitActions.push(action);
 		else {
@@ -43525,7 +43671,11 @@ function hideTryContentAndMountPendingInner(
 			// Its body's Effect Event rollback must not erase the hide that the
 			// enclosing capture still commits. An abandoned capture drops it instead.
 			(WIP_CAPTURE.renderCleanups ??= []).push((discarded) => {
-				if (!discarded) effectEventCommitActions.push(action);
+				if (!discarded) {
+					if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__)
+						__profileQueueWork(action);
+					effectEventCommitActions.push(action);
+				}
 			});
 		}
 	}
@@ -44138,6 +44288,8 @@ function reconnectBailedEffects(block: Block): void {
 			// through one effective slot. They share a revision and all must commit.
 			for (let j = 0; j < replay.length; j++) {
 				queue.push({ ...replay[j], revision, seq: commitSeq++ });
+				if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__)
+					__profileQueueWork(queue[queue.length - 1]);
 			}
 		} else {
 			queue.push({
@@ -44150,6 +44302,8 @@ function reconnectBailedEffects(block: Block): void {
 				phase: effect.phase,
 				seq: commitSeq++,
 			});
+			if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__)
+				__profileQueueWork(queue[queue.length - 1]);
 		}
 		markEffectReconnectQueued(effect, effect.phase, queue);
 	}
@@ -44577,6 +44731,8 @@ function attachResume(state: TrySlot, thenable: TrackedThenable<any>): void {
 	state.pendingThenable = thenable;
 	const retry = () => {
 		if (state.pendingThenable !== thenable) return; // superseded by a fresher suspend
+		if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__)
+			__profileCount(ProfileCounter.BOUNDARY_RETRY);
 		state.pendingThenable = null;
 		// Cancel any pending transition-fallback timeout — the promise resolved
 		// before the timeout would have swapped to @pending, so the prior DOM
@@ -45370,6 +45526,8 @@ export function useDeferredValue<T>(
 
 function requestReset(state: TrySlot | ErrorSlot): void {
 	if (state.parentBlock.disposed || state.branch !== 0) return;
+	if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__)
+		__profileCount(ProfileCounter.BOUNDARY_RESET);
 	// React parity for catch reset(): don't synchronously re-run the try body.
 	// Rewind slot state and schedule the parent — sibling setState calls in
 	// the SAME event handler then batch into one commit, so when mountTry
@@ -46284,6 +46442,8 @@ function renderBranchSlot(
 				// Render the genuine new arm once beside the still-connected old
 				// content. Borrowed parent pairs stay in place; owned/self-marked
 				// ranges adopt the incoming pair and update their exact borrowers.
+				if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__)
+					__profileCount(ProfileCounter.ARM_SWAP_OFFSCREEN);
 				const r = renderOffscreen(
 					parentBlock,
 					domParent,
@@ -46360,6 +46520,8 @@ function renderBranchSlot(
 				const oldBlock = state.block;
 				const oldBlockStart = oldBlock.startMarker;
 				const oldBlockEnd = oldBlock.endMarker;
+				if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__)
+					__profileCount(ProfileCounter.ARM_SWAP_OFFSCREEN);
 				const r = transitionSwap.render(
 					parentBlock,
 					domParent,
@@ -47285,6 +47447,8 @@ export function activityBlock(
 
 	if (wantHidden) {
 		if (!state.hidden) {
+			if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__)
+				__profileCount(ProfileCounter.ACTIVITY_HIDE);
 			// visible → hidden: prerender latest content with effects suppressed,
 			// then commit deactivation after Effect Event publication and before
 			// hiding the still-connected DOM range.
@@ -47306,6 +47470,8 @@ export function activityBlock(
 		}
 	} else {
 		if (state.hidden) {
+			if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__)
+				__profileCount(ProfileCounter.ACTIVITY_SHOW);
 			// hidden → visible: restore DOM, clear inactive, re-render to re-fire
 			// effects (deactivateScope cleared their deps so they re-enqueue).
 			showActivityRange(state);
@@ -47973,6 +48139,8 @@ export function forBlock<T>(
 			// The ForSlot owns rollback of this borrowed range. Discarding the
 			// fresh empty scope must not also detach retained committed rows.
 			preserveRootCreatedDom(b);
+			if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__)
+				__profileCount(ProfileCounter.FOR_EMPTY_MOUNT);
 			state.emptyBlock = b;
 			renderBlock(b);
 		}
@@ -47991,6 +48159,8 @@ export function forBlock<T>(
 			journalForSlot(state);
 			parkItemForHold(state.emptyBlock, state);
 		} else unmountBlock(state.emptyBlock);
+		if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__)
+			__profileCount(ProfileCounter.FOR_EMPTY_UNMOUNT);
 		state.emptyBlock = null;
 	}
 	// Hydrating, the server rendered no items (its open marker says so, or, on a legacy
@@ -48031,6 +48201,8 @@ export function forBlock<T>(
 			pure = false;
 		} else {
 			if (state.cachedDeps !== null && depsEqual(state.cachedDeps, deps)) {
+				if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__)
+					__profileCount(ProfileCounter.FOR_SKIP);
 				pure = true;
 			} else {
 				lite = !requiresScope;
@@ -48614,6 +48786,8 @@ function updateSurvivor<T>(
 	// reads current values (a per-render closure saw the same).
 	env: any[] | undefined,
 ): void {
+	if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__)
+		__profileCount(ProfileCounter.LIST_UPDATE);
 	// Pure short-circuit: skip the body when the item ref is unchanged AND either
 	// the body can't observe position (indexIndependent — the common index-less
 	// `@for`) or the position is also unchanged. This is what makes a pure reorder
@@ -48949,6 +49123,8 @@ function reconcileKeyed<T>(
 	ssrMarkerless: boolean = false,
 	normalizeKey: boolean = false,
 ): void {
+	if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__)
+		__profileCount(ProfileCounter.LIST_RECONCILE);
 	const oldItems = state.items;
 	const oldSize = state.size;
 	const newLen = items.length;
@@ -49138,6 +49314,8 @@ function reconcileKeyed<T>(
 			const next: Block | null = cur!.nextSibling!;
 			if (itemRemovalDefers()) parkItemForHold(cur!);
 			else unmountBlock(cur!);
+			if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__)
+				__profileCount(ProfileCounter.LIST_REMOVE);
 			oldItems.delete(cur!.key);
 			cur = next;
 			removed++;
@@ -49263,6 +49441,8 @@ function reconcileKeyed<T>(
 				}
 				if (itemRemovalDefers()) parkItemForHold(cur!);
 				else unmountBlock(cur!);
+				if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__)
+					__profileCount(ProfileCounter.LIST_REMOVE);
 				oldItems.delete(cur!.key);
 				state.size--;
 			} else {
@@ -49676,6 +49856,8 @@ function batchClearItems(
 	oldItems: Map<any, Block>,
 	ownedRootClear: boolean = false,
 ): void {
+	if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__)
+		__profileCount(ProfileCounter.LIST_REMOVE, state.size);
 	// An immediate bulk DOM removal cannot be undone after a suspended render.
 	// A journaled clear remains undoable until the attempt commits. Root-owned
 	// inert rows can stay connected and clear together at commit; all other
@@ -49780,6 +49962,8 @@ function mountItem<T>(
 	// A list update inserts this row beside rows it already rendered.
 	inserted = false,
 ): Block {
+	if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__)
+		__profileCount(ProfileCounter.LIST_INSERT);
 	const hydration = hydrating ? activeHydration() : null;
 	if (hydration !== null) {
 		// A row that a list update inserts beside rows that already adopted the
@@ -50007,6 +50191,8 @@ function discardThrownItem(block: Block, error: unknown, selfMarkedAnchor: Node 
 }
 
 function moveBlockBefore(block: Block, anchor: Node): void {
+	if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__)
+		__profileCount(ProfileCounter.LIST_MOVE);
 	const parent = domNode(block.startMarker!).parentNode!;
 	const end = block.endMarker!;
 	let n: Node | null = block.startMarker!;
@@ -50150,6 +50336,8 @@ function moveFocusedNodeBefore(
  * Ported from the standard O(n log n) patience-sort algorithm used by Ripple/Solid/Vue.
  */
 function lis(arr: Int32Array, n: number): number[] {
+	if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__)
+		__profileCount(ProfileCounter.LIST_LIS);
 	let p = keyedLisPredecessors;
 	if (p === null || p.length < n) {
 		p = new Int32Array(n);

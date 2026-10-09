@@ -37,8 +37,11 @@ import { pairedRatio, summarizeSamples, timingStatForJson } from '../lib/stats.m
 import {
 	CANONICAL_OPS,
 	DIRECT_LIST_MOUNTS,
+	calibrate,
 	ensureState,
+	prepare,
 	seedRandom,
+	selectorsFor,
 	sleep,
 	timeClick,
 	verifyDirectListMount,
@@ -64,13 +67,7 @@ if (!options['base-tree'] || !options['base-json'] || !options['head-json']) {
 const BASE_TREE = path.resolve(options['base-tree']);
 const PAIRS = Number(options.pairs ?? 30);
 if (!Number.isSafeInteger(PAIRS) || PAIRS < 2) throw new Error('--pairs must be an integer >= 2');
-const SAMPLE_MS = 20;
 const WARMUP = 3;
-// Upper bounds on the repetitions in one sample. Each `remove` deletes a row,
-// so it stays inside the 1,000-row table. A warm selection takes a few
-// microseconds, so it needs thousands of clicks to fill a sample.
-const MAX_REPEAT = { remove: 800, default: 5000 };
-const REPEATABLE = new Set(['update', 'select', 'swap', 'remove', 'select_lots']);
 const FIXTURES = [
 	{ name: 'octane-tsrx', directory: 'octane-tsrx', head: 5176, base: 6176 },
 	{ name: 'octane-jsx', directory: 'octane-jsx', head: 5177, base: 6177 },
@@ -147,66 +144,6 @@ async function openPage(context, fixture, side) {
 		await seedRandom(page);
 		return page;
 	});
-}
-
-const selectorsFor = (op, index, repeat) =>
-	op.alternateClick
-		? repeat > 1
-			? [op.click, op.alternateClick]
-			: [index % 2 === 1 ? op.alternateClick : op.click]
-		: [op.click];
-
-// Repetitions per sample, sized on the head page and shared by both sides, so
-// each pair compares the same work. A looped operation runs far faster than a
-// cold single one, so the count is refined on loops until a sample really takes
-// about SAMPLE_MS; a shorter sample quantizes on the 0.1ms timer.
-const parityFor = (op, repeat) => {
-	// A selection sample ends on the alternate row, so the next one starts by
-	// selecting a different row instead of re-selecting the current one.
-	if (op.alternateClick && repeat % 2 === 1) repeat++;
-	// An even number of swaps restores the original order, which a swap that
-	// did nothing would also leave. An odd count keeps every sample verifiable.
-	if (op.name === 'swap' && repeat % 2 === 0) repeat++;
-	return repeat;
-};
-
-// `update` appends to every tenth label on each click, so a looped sample
-// would leave longer labels for the next one. Each update sample starts from
-// freshly built rows instead.
-async function prepare(page, op) {
-	if (op.name === 'update') {
-		// Commit the rebuild before the sample and prove it replaced the rows, so
-		// no stale labels or in-flight random draws reach the timed window.
-		await page.evaluate(async () => {
-			const before = document.querySelector('tbody tr');
-			document.getElementById('run').click();
-			if (window.__benchFlush) await window.__benchFlush();
-			const rows = document.querySelectorAll('tbody tr');
-			if (rows.length !== 1000 || rows[0] === before) {
-				throw new Error('update preparation did not rebuild the 1,000 rows');
-			}
-		});
-	}
-	await ensureState(page, op.pre);
-}
-
-// Returns the repeat count and every trial count it ran. The trials are replayed
-// on the base page, so both pages run the identical operation sequence and their
-// seeded data streams stay in step.
-async function calibrate(page, op) {
-	if (!REPEATABLE.has(op.name)) return { repeat: 1, trials: [] };
-	const cap = MAX_REPEAT[op.name] ?? MAX_REPEAT.default;
-	const trials = [];
-	let repeat = parityFor(op, 2);
-	for (let round = 0; round < 5; round++) {
-		await prepare(page, op);
-		const elapsed = await timeClick(page, op, selectorsFor(op, 1, repeat), repeat);
-		trials.push(repeat);
-		await sleep(30);
-		if (elapsed >= SAMPLE_MS * 0.8 || repeat >= cap) break;
-		repeat = parityFor(op, Math.min(cap, Math.ceil((repeat * SAMPLE_MS) / Math.max(elapsed, 0.1))));
-	}
-	return { repeat: Math.min(repeat, parityFor(op, cap)), trials };
 }
 
 async function replayCalibration(page, op, trials) {
