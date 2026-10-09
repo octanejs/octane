@@ -1,5 +1,38 @@
 # octane
 
+## 0.12.0
+
+### Minor Changes
+
+- 7d5a0df: Complete the writer compiler's optional host-text mode and add an opt-in host-ref capability.
+  Existing adapters keep ABI 1; opted-in modules guard ABI 2 before creating prototypes.
+
+### Patch Changes
+
+- 28552d9: Keep signals writable after an empty list fills with 16 or more rows.
+
+  With native signal reads enabled, a production build mounts host-only rows into
+  an existing empty `@for` list without the ordinary row renderer once there are
+  at least 16 rows. Each row that read signals natively left its read frame open,
+  so the signal write guard stayed active after the render returned and the next
+  unrelated write threw `SignalWriteError` (#152). Each row now opens and closes
+  that frame as the ordinary renderer does, including when a row throws or
+  suspends, and rows holding a signal handle keep updating.
+- f934732: `hostComponent` now creates its element in the namespace of the node it is inserted into, as descriptor and dynamic host tags already do. A `motion.circle` inside an `<svg>`, or a `motion.svg` in HTML, now renders as an SVG element instead of an unknown HTML element.
+- ae05de0: Fix a custom `map` list row that keeps its key but changes from a single host
+  element to a component. The update used to throw `NotFoundError`. When a root
+  render held such a change, it could also drop the committed row until the render
+  committed, or leave the old row in the DOM after it did. The row now promotes to
+  a marked range before its host element is retired, and that retirement is undone
+  if the root render is held.
+- dbab7f5: Resume server signals below `cloneElement` children during hydration.
+
+  The server's `cloneElement` did not mark two or more positional children as
+  fixed siblings, as the client's does. Components inside a nested array or
+  Fragment among those children got a different signal identity on each side,
+  so hydration refetched a server-resolved `query$` and reported a mismatch.
+- ec86041: A `@switch` case that calls a hook now gets its own render scope when it is the 33rd case or later. Such a case could take an earlier hookless case's flag, so a state update inside it re-rendered the component that owns the `@switch` instead of only the case.
+
 ## 0.11.0
 
 ### Minor Changes

@@ -1,5 +1,18 @@
 # @octanejs/dexie
 
+## 0.1.57
+
+### Patch Changes
+
+- 02602b7: Align `useSuspendingObservable` inputs with Dexie's observer-based `Subscribable<T>` contract. Accept observer sources and factories in public types and reject callback subscriptions that previously typechecked but failed at runtime. Callback subscriptions remain supported by `useObservable`.
+- Updated dependencies [28552d9]
+- Updated dependencies [f934732]
+- Updated dependencies [7d5a0df]
+- Updated dependencies [ae05de0]
+- Updated dependencies [dbab7f5]
+- Updated dependencies [ec86041]
+  - octane@0.12.0
+
 ## 0.1.56
 
 ### Patch Changes

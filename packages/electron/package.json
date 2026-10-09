@@ -1,6 +1,6 @@
 {
   "name": "@octanejs/electron",
-  "version": "0.0.40",
+  "version": "0.0.41",
   "license": "MIT",
   "type": "module",
   "engines": {
@@ -46,7 +46,7 @@
   },
   "peerDependencies": {
     "electron": ">=33.0.0",
-    "octane": "workspace:^0.11.0"
+    "octane": "workspace:^0.12.0"
   },
   "devDependencies": {
     "electron": "catalog:default",

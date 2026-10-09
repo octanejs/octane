@@ -1,6 +1,6 @@
 {
   "name": "@octanejs/monaco-editor",
-  "version": "0.0.30",
+  "version": "0.0.31",
   "license": "MIT",
   "type": "module",
   "sideEffects": false,
@@ -43,7 +43,7 @@
   },
   "peerDependencies": {
     "monaco-editor": ">=0.25.0 <1",
-    "octane": "workspace:^0.11.0"
+    "octane": "workspace:^0.12.0"
   },
   "devDependencies": {
     "@monaco-editor/react": "catalog:default",
