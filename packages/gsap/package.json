@@ -1,6 +1,6 @@
 {
   "name": "@octanejs/gsap",
-  "version": "0.0.31",
+  "version": "0.0.32",
   "license": "MIT",
   "type": "module",
   "engines": {
@@ -44,7 +44,7 @@
   },
   "peerDependencies": {
     "gsap": "^3.12.5",
-    "octane": "workspace:^0.11.0"
+    "octane": "workspace:^0.12.0"
   },
   "devDependencies": {
     "@gsap/react": "catalog:default",
