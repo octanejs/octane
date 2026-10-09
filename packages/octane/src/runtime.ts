@@ -624,6 +624,13 @@ let FORM_SUBMIT_DRIVER: typeof handleFormSubmit | null = null;
 // the committed identity is the one that must be disconnected exactly once.
 let activityRefState: WeakMap<Element | FragmentInstance, ActivityRefState> | null = null;
 let EFFECT_RECONNECT_CONTEXT: EffectReconnectContext | null = null;
+// Only enqueueEffect publishes effect slots. Keep their commit work at that
+// owner, with live calls so the first effects may appear during a ref callback.
+let drainMutationEffects: typeof drainRegisteredMutationEffects = () => null;
+let runLayoutEffects: typeof runRegisteredLayoutEffects = noop;
+let drainPassivePhase: typeof drainRegisteredPassivePhase = noop;
+let drainDeferredPassiveUnmounts: typeof drainRegisteredPassiveUnmounts = noop;
+let schedulePassiveFlush: typeof scheduleRegisteredPassiveFlush = noop;
 
 // Native reads are a compiler-selected capability. Ordinary applications keep
 // only driver tests at renderer boundaries, which their minifier removes; no
@@ -11300,7 +11307,7 @@ function commitEffects(): void {
 }
 
 /** Arm the post-paint passive drain. Callers check `passiveScheduled` first. */
-function schedulePassiveFlush(): void {
+function scheduleRegisteredPassiveFlush(): void {
 	passiveScheduled = true;
 	schedulePostPaint(flushPassivePostPaint);
 }
@@ -11771,7 +11778,7 @@ function nativeEffectPublicationCurrent(entry: PendingEffect, slot: EffectSlot):
  * inInactiveSubtree. INSERTION entries are exempt — they stay connected and
  * keep firing while hidden (deactivateScope spares them too).
  */
-function drainMutationEffects(): PendingEffect[] | null {
+function drainRegisteredMutationEffects(): PendingEffect[] | null {
 	const ins = effectQueues[INSERTION];
 	const lay = effectQueues[LAYOUT];
 	if (ins.length === 0 && lay.length === 0) return null;
@@ -11818,7 +11825,7 @@ function drainMutationEffects(): PendingEffect[] | null {
  * Guards re-checked per entry: a mutation-walk effect (or the ref work in
  * between) may have unmounted or hidden a later entry's subtree.
  */
-function runLayoutEffects(q: PendingEffect[]): void {
+function runRegisteredLayoutEffects(q: PendingEffect[]): void {
 	for (let i = 0; i < q.length; i++) {
 		const e = q[i];
 		if (e.phase !== LAYOUT) continue;
@@ -11834,7 +11841,7 @@ function runLayoutEffects(q: PendingEffect[]): void {
  * Snapshot-and-splice up front for the same re-entrancy contract as
  * drainMutationEffects (see its comment).
  */
-function drainPassivePhase(): void {
+function drainRegisteredPassivePhase(): void {
 	// Held passives wait for the queued render that settles the exhausted chain;
 	// its commit re-arms the post-paint drain (see scheduleRender).
 	if (HELD_PASSIVE_CHAIN === NESTED_UPDATE_CHAIN_ID) {
@@ -11889,7 +11896,7 @@ function drainEffectEventCommitActions(): InlineCaughtErrorReport[] | null {
 // the deletion — the same routing reportTeardownError gave the sync destroys.
 const pendingPassiveUnmounts: Array<Cleanup | TryHandler | Block | null> = [];
 
-function drainDeferredPassiveUnmounts(): void {
+function drainRegisteredPassiveUnmounts(): void {
 	if (pendingPassiveUnmounts.length === 0) return;
 	const q = pendingPassiveUnmounts.splice(0);
 	for (let i = 0; i < q.length; i += 3) {
@@ -15168,8 +15175,16 @@ function enqueueEffect(slot: HookSlot, fn: EffectFn, deps: any[] | undefined, ph
 		ensureHooks(scope).set(slot, slotObj);
 		// Parallel flat list in declaration order — unmountScope's phase-correct
 		// deletion walk reads it (see Scope.effectSlots).
-		if (scope.effectSlots === null) scope.effectSlots = [slotObj];
-		else scope.effectSlots.push(slotObj);
+		if (scope.effectSlots === null) {
+			if (runLayoutEffects === noop) {
+				drainMutationEffects = drainRegisteredMutationEffects;
+				runLayoutEffects = runRegisteredLayoutEffects;
+				drainPassivePhase = drainRegisteredPassivePhase;
+				drainDeferredPassiveUnmounts = drainRegisteredPassiveUnmounts;
+				schedulePassiveFlush = scheduleRegisteredPassiveFlush;
+			}
+			scope.effectSlots = [slotObj];
+		} else scope.effectSlots.push(slotObj);
 		effect = slotObj;
 	} else {
 		prev.deps = deps;
