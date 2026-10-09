@@ -15,6 +15,6 @@
     "@tsrx/solid": "catalog:default",
     "@tsrx/vite-plugin-solid": "catalog:default",
     "vite": "catalog:default",
-    "vite-plugin-solid": "catalog:default"
+    "@solidjs/vite-plugin": "catalog:default"
   }
 }

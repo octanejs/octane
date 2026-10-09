@@ -1,5 +1,5 @@
 import { defineConfig } from 'vite';
-import solid from 'vite-plugin-solid';
+import solid from '@solidjs/vite-plugin';
 
 // Solid 2.0-beta's dev bundle (@solidjs/web/dist/dev.js) crashes with
 // "Cannot read properties of undefined (reading 'name')" in devComponent.

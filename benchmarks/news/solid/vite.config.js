@@ -1,8 +1,8 @@
 import { defineConfig } from 'vite';
 import tsrxSolid from '@tsrx/vite-plugin-solid';
-import solidPlugin from 'vite-plugin-solid';
+import solidPlugin from '@solidjs/vite-plugin';
 
-// `.tsrx` → (tsrxSolid) Solid-flavoured TSX → (vite-plugin-solid) Solid runtime.
+// `.tsrx` → (tsrxSolid) Solid-flavoured TSX → (@solidjs/vite-plugin) Solid runtime.
 // `ssr: true` makes BOTH transforms hydratable: the SSR pass (ssrLoadModule,
 // `generate: 'ssr'`) emits hydration-keyed HTML, the client pass
 // (`generate: 'dom', hydratable: true`) emits matching adopt code — so

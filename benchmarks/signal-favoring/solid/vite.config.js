@@ -1,5 +1,5 @@
 import { defineConfig } from 'vite';
-import solid from 'vite-plugin-solid';
+import solid from '@solidjs/vite-plugin';
 
 // Same prod-mode setup as the recursive-context bench: Solid 2.0-beta's dev
 // runtime crashes on devComponent reading undefined.name, so we force the

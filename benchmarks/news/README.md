@@ -105,15 +105,11 @@ backwards-compat path's SSR + hydration cost.
 
 ## Solid 2.0 toolchain note
 
-`vite-plugin-solid@3.0.0-next.5` transitively resolves
-`babel-preset-solid@2.0.0-beta.7` (→ `babel-plugin-jsx-dom-expressions` 0.41,
-which still **emits** the `ssrRunInScope` SSR helper), but
-`@solidjs/web@2.0.0-beta.14` **removed** that export (dom-expressions 0.50 stopped
-emitting it). Without alignment, Solid SSR throws _"does not provide an export
-named 'ssrRunInScope'"_. A pnpm override in `pnpm-workspace.yaml` forces the
-0.50-era preset the catalog already intends (`babel-preset-solid: 2.0.0-beta.14`),
-so the SSR transform matches the installed runtime. Run `pnpm install` after
-pulling to apply it.
+The fixtures use `solid-js` and `@solidjs/web` 2.0.0-rc.14 with
+`@solidjs/vite-plugin` 3.0.0-next.49 and its matching RC compiler. The former
+`babel-preset-solid` and DOM Expressions overrides are no longer needed.
+The existing `@tsrx/vite-plugin-solid` pass still lowers the authored `.tsrx`
+fixtures before Solid's JSX transform.
 
 The Solid feed uses a plain (non-keyed) `@for`: Solid's keyed `<For>` passes each
 item as an accessor (`a().title`), the default passes it directly (`a.title`).

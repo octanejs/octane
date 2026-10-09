@@ -14,7 +14,7 @@
     "solid-js": "catalog:default"
   },
   "devDependencies": {
-    "vite-plugin-solid": "catalog:default",
+    "@solidjs/vite-plugin": "catalog:default",
     "vite": "catalog:default"
   }
 }

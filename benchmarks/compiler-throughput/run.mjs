@@ -48,7 +48,7 @@ async function loadFromTarget(target, specifier) {
 	} catch (error) {
 		const compilerPlugin =
 			target === 'solid'
-				? 'vite-plugin-solid'
+				? '@solidjs/vite-plugin'
 				: target === 'vue-vapor'
 					? '@vitejs/plugin-vue'
 					: null;
@@ -109,13 +109,13 @@ async function compilerFor(target) {
 	}
 	if (target === 'solid') {
 		const babel = await loadFromTarget(target, '@babel/core');
-		const preset = await loadFromTarget(target, 'babel-preset-solid');
+		const plugin = await loadFromTarget(target, '@solidjs/babel-plugin');
 		return (source, filename) =>
 			babel.transformSync(source, {
 				babelrc: false,
 				configFile: false,
 				filename,
-				presets: [[preset.default ?? preset, { generate: 'dom', hydratable: true }]],
+				plugins: [[plugin.default ?? plugin, { generate: 'dom', hydratable: true }]],
 			}).code;
 	}
 	if (target === 'svelte') {

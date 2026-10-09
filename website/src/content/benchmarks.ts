@@ -108,7 +108,7 @@ const FRAMEWORKS: SeriesDef[] = [
 	{ key: 'react', label: 'React 19 + Compiler', color: '#1e93b0' },
 	{ key: 'react-uncompiled', label: 'React 19 (uncompiled control)', color: '#4bafe7' },
 	{ key: 'preact', label: 'Preact 10', color: '#7478fb' },
-	{ key: 'solid', label: 'Solid 2.0 beta', color: '#1baf7a' },
+	{ key: 'solid', label: 'Solid 2.0 RC', color: '#1baf7a' },
 	{ key: 'svelte', label: 'Svelte 5', color: '#f57547' },
 	{ key: 'ripple', label: 'Ripple 0.4', color: '#9085e9' },
 	{ key: 'vue-vapor', label: 'Vue Vapor 3.6 RC', color: '#e06ec4' },
