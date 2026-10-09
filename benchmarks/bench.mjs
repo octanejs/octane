@@ -4,8 +4,8 @@
 // It knows how to, for each suite: production-build the fixture apps, start
 // their preview servers (pnpm --filter <pkg> preview), wait for their strict
 // ports, run the suite's harness with BENCH_JSON pointed at a temp file, collect
-// the machine-readable results, then kill the servers by port. Suites run
-// SEQUENTIALLY so ports and CPU never contend. The collected JSON per suite
+// the machine-readable results, then stop its preview process groups. Suites run
+// SEQUENTIALLY under a per-user lock. The collected JSON per suite
 // lands in the results dir (default benchmarks/results, gitignored) and drives
 // three checks:
 //
@@ -28,6 +28,7 @@
 //   node benchmarks/bench.mjs --compare          # regression check vs baselines
 //   node benchmarks/bench.mjs --ratios           # ratio-guard check (CI gate)
 //   node benchmarks/bench.mjs --record --ratios  # also write ratios.suggested.json
+//   --repeat=N  median of N fresh harness runs, retaining every result
 //   flags: --quick  --baseline-dir=<dir>  --results-dir=<dir>  --list
 //
 // See benchmarks/README.md for the manifest / how to add a suite.
@@ -36,6 +37,8 @@ import { spawn, spawnSync, execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { summarizeRuns } from './lib/repeat-results.mjs';
+import { acquireBenchmarkLock } from './lib/run-lock.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const REPO = path.resolve(__dirname, '..');
@@ -1495,6 +1498,10 @@ const RECORD = flags.has('--record');
 const COMPARE = flags.has('--compare');
 const RATIOS = flags.has('--ratios');
 const LIST = flags.has('--list');
+const REPETITIONS = Number(kv.get('repeat') ?? 1);
+if (flags.has('--repeat') || !Number.isSafeInteger(REPETITIONS) || REPETITIONS < 1) {
+	throw new Error('--repeat=<count> requires a positive integer');
+}
 
 const BASELINE_DIR = path.resolve(REPO, kv.get('baseline-dir') || 'benchmarks/baselines/local');
 const RATIOS_FILE = path.resolve(REPO, 'benchmarks/baselines/ratios.json');
@@ -1556,16 +1563,6 @@ function pidsOnPort(port) {
 	}
 }
 
-function killPort(port) {
-	for (const pid of pidsOnPort(port)) {
-		try {
-			process.kill(Number(pid), 'SIGKILL');
-		} catch {
-			/* already gone */
-		}
-	}
-}
-
 function tailFile(file, lines = 15) {
 	if (!fs.existsSync(file)) return '(no log)';
 	return fs.readFileSync(file, 'utf8').split('\n').slice(-lines).join('\n');
@@ -1592,10 +1589,8 @@ function buildServer(filter, logDir) {
 
 // Start `pnpm --filter <filter> preview` detached, logging to the results dir.
 // The corresponding `build` has already run, so browser suites compare
-// production bundles instead of Vite's dev transform/runtime. We track BOTH the
-// child (to signal its process group) and the port (the reliable kill handle —
-// vite forks, so killing by listening port is what actually frees it, per the
-// spec).
+// production bundles instead of Vite's dev transform/runtime. The detached
+// process group contains pnpm and its preview children; only kill our group.
 function startServer(filter, port, logDir) {
 	const logPath = path.join(logDir, `server-${port}.log`);
 	const logFd = fs.openSync(logPath, 'w');
@@ -1604,15 +1599,13 @@ function startServer(filter, port, logDir) {
 		detached: true,
 		stdio: ['ignore', logFd, logFd],
 	});
+	fs.closeSync(logFd);
 	child.unref();
 	return { filter, port, child, logPath };
 }
 
 function stopServers(servers) {
 	for (const s of servers) {
-		// Kill the listening port first (frees it for the next suite), then the
-		// spawned process group as a belt-and-braces cleanup.
-		killPort(s.port);
 		try {
 			if (s.child.pid) process.kill(-s.child.pid, 'SIGKILL');
 		} catch {
@@ -1620,6 +1613,8 @@ function stopServers(servers) {
 		}
 	}
 }
+
+const activeServers = [];
 
 // Run one harness invocation; returns { code, json|null }.
 function runHarness(suite, run, outPath) {
@@ -1691,15 +1686,27 @@ function printHydrationInteractivityUx(result) {
 async function runSuite(suite) {
 	console.error(`\n=== ${suite.name} ===`);
 	fs.mkdirSync(RESULTS_DIR, { recursive: true });
+	const resultPath = path.join(RESULTS_DIR, `${suite.name}.json`);
+	fs.rmSync(resultPath, { force: true });
+	for (const file of fs.readdirSync(RESULTS_DIR)) {
+		if (
+			file.startsWith(`${suite.name}.run-`) &&
+			/^\d+\.json$/.test(file.slice(suite.name.length + 5))
+		) {
+			fs.rmSync(path.join(RESULTS_DIR, file));
+		}
+	}
 
-	const started = [];
+	const started = activeServers;
 	try {
 		for (const srv of suite.servers) {
 			if (SERVER_FILTERS && !SERVER_FILTERS.includes(srv.filter)) continue;
+			if (pidsOnPort(srv.port).length || portUp(srv.port)) {
+				throw new Error(`port ${srv.port} is already in use; stop its owner before benchmarking`);
+			}
 			console.error(`  building ${srv.filter}…`);
 			buildServer(srv.filter, RESULTS_DIR);
 			console.error(`  starting ${srv.filter} preview on :${srv.port}…`);
-			killPort(srv.port); // clear any stale listener from a crashed prior run
 			started.push(startServer(srv.filter, srv.port, RESULTS_DIR));
 		}
 		for (const srv of started) {
@@ -1712,38 +1719,70 @@ async function runSuite(suite) {
 			console.error(`  ✓ :${srv.port} ready`);
 		}
 
-		// Run each invocation; merge their payloads' targets into one result.
-		const merged = { suite: suite.name, iterations: null, targets: [] };
-		const failedParts = [];
-		let anyExit = 0;
-		for (let i = 0; i < suite.runs.length; i++) {
-			const run = suite.runs[i];
-			const outPath = path.join(RESULTS_DIR, `_tmp-${suite.name}-${run.label || i}.json`);
-			const { code, json } = runHarness(suite, run, outPath);
-			if (code !== 0) anyExit = code;
-			if (json) {
-				merged.iterations = json.iterations ?? merged.iterations;
-				if (Array.isArray(json.targets)) merged.targets.push(...json.targets);
-				if (json.failed) failedParts.push(json.failed);
+		const runs = [];
+		for (let repeat = 0; repeat < REPETITIONS; repeat++) {
+			if (REPETITIONS > 1) console.error(`  repetition ${repeat + 1}/${REPETITIONS}`);
+			const result = { suite: suite.name, iterations: null, targets: [], harnessExit: 0 };
+			const failedParts = [];
+			for (let i = 0; i < suite.runs.length; i++) {
+				const run = suite.runs[i];
+				const outPath = path.join(RESULTS_DIR, `_tmp-${suite.name}-${run.label || i}.json`);
+				const { code, json } = runHarness(suite, run, outPath);
+				if (code !== 0) result.harnessExit = code;
+				if (!json || !Array.isArray(json.targets) || json.targets.length === 0) {
+					failedParts.push(`${run.label || i}: harness produced no targets`);
+				} else {
+					result.iterations = json.iterations ?? result.iterations;
+					result.targets.push(...json.targets);
+					if (json.failed) failedParts.push(json.failed);
+				}
+				fs.rmSync(outPath, { force: true });
 			}
-			fs.rmSync(outPath, { force: true });
+			if (failedParts.length) {
+				result.failed = failedParts.join(' | ');
+				result.harnessExit ||= 1;
+			}
+			runs.push(result);
+			// Persist every run before aggregation, including failed/incomplete ones.
+			// Never let a later success erase a correctness failure.
+			if (REPETITIONS > 1) {
+				fs.writeFileSync(
+					path.join(RESULTS_DIR, `${suite.name}.run-${repeat + 1}.json`),
+					JSON.stringify(result, null, '\t') + '\n',
+				);
+			}
+			printHydrationInteractivityUx(result);
+			if (result.harnessExit) break;
 		}
-		if (failedParts.length) merged.failed = failedParts.join(' | ');
-		merged.harnessExit = anyExit;
+		const merged = REPETITIONS > 1 ? summarizeRuns(runs) : runs[0];
+		if (REPETITIONS > 1) printRepeatability(merged);
 
-		const resultPath = path.join(RESULTS_DIR, `${suite.name}.json`);
 		fs.writeFileSync(resultPath, JSON.stringify(merged, null, '\t') + '\n');
 		console.error(`  → wrote ${path.relative(REPO, resultPath)}`);
 		if (merged.targets.length === 0) {
 			throw new Error('no targets produced numbers (harness wrote no parseable BENCH_JSON)');
 		}
-		printHydrationInteractivityUx(merged);
 		if (merged.failed) console.error(`  ! harness reported gate failure(s): ${merged.failed}`);
 		return merged;
 	} finally {
 		if (started.length) {
 			console.error(`  stopping ${started.length} server(s)…`);
 			stopServers(started);
+			started.length = 0;
+		}
+	}
+}
+
+function printRepeatability(result) {
+	console.error(`\n  Median of ${result.repetitions} independent harness runs (original units)`);
+	console.error('  target / operation                         score      run range       CV');
+	for (const target of result.targets) {
+		for (const [op, stat] of Object.entries(target.ops)) {
+			const spread = stat.betweenRuns;
+			console.error(
+				`  ${`${target.name} / ${op}`.padEnd(42)} ${scoreOf(stat).toFixed(3).padStart(9)}  ` +
+					`${spread.min.toFixed(3)}–${spread.max.toFixed(3)}  ${spread.cvPercent?.toFixed(1) ?? 'n/a'}%`,
+			);
 		}
 	}
 }
@@ -1880,6 +1919,13 @@ function formatRatioBounds(guard) {
 // ── main ──────────────────────────────────────────────────────────────────────
 
 (async () => {
+	const releaseLock = acquireBenchmarkLock();
+	process.once('exit', () => {
+		stopServers(activeServers);
+		releaseLock();
+	});
+	process.once('SIGINT', () => process.exit(130));
+	process.once('SIGTERM', () => process.exit(143));
 	const modeBits = [QUICK && 'quick', RECORD && 'record', COMPARE && 'compare', RATIOS && 'ratios']
 		.filter(Boolean)
 		.join(' + ');
@@ -1905,6 +1951,7 @@ function formatRatioBounds(guard) {
 	if (RECORD) {
 		fs.mkdirSync(BASELINE_DIR, { recursive: true });
 		for (const [name, res] of resultsBySuite) {
+			if (res.harnessExit || res.failed) continue;
 			const p = path.join(BASELINE_DIR, `${name}.json`);
 			fs.writeFileSync(p, JSON.stringify(res, null, '\t') + '\n');
 			console.error(`[record] wrote ${path.relative(REPO, p)}`);
@@ -1923,6 +1970,12 @@ function formatRatioBounds(guard) {
 				continue;
 			}
 			const baseline = JSON.parse(fs.readFileSync(bpath, 'utf8'));
+			if ((res.repetitions ?? 1) !== (baseline.repetitions ?? 1)) {
+				hardErrors.push(
+					`${name}: baseline repetition count differs; re-record with --repeat=${REPETITIONS}`,
+				);
+				continue;
+			}
 			regressionCount += printCompareTable(name, compareResult(res, baseline));
 		}
 	}

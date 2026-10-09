@@ -34,8 +34,10 @@ import {
 	CANONICAL_OPS,
 	DIRECT_LIST_MOUNTS,
 	ROW_COUNT,
+	calibrate,
 	ensureState,
 	seedRandom,
+	selectorsFor,
 	sleep,
 	timeClick,
 	verifyDirectListMount,
@@ -67,6 +69,10 @@ const TARGETS = process.env.TARGETS
 		];
 
 const OPS = CLEAR_1K ? [{ name: 'clear_1k', pre: 'rows', click: '#clear' }] : CANONICAL_OPS;
+// These operations alternate between the same two states at any batch size.
+// Update/remove change their workload on every click, so local cross-framework
+// comparisons keep those and all other operations on the single-click protocol.
+const BATCHED_OPS = new Set(['select', 'swap', 'select_lots']);
 
 // Minified production bundles rename runtime helpers, so count all production
 // calls instead of pinning private aliases. A separate --jitless browser keeps
@@ -164,16 +170,27 @@ async function runTarget(t) {
 
 	const results = {};
 	for (const op of OPS) {
+		const { repeat } = BATCHED_OPS.has(op.name) ? await calibrate(page, op) : { repeat: 1 };
+		// Warm the exact batch before recording it. Operations that cannot repeat
+		// retain their original single-click protocol and startup warmup.
+		const warmup = repeat > 1 ? WARMUP : 0;
 		const samples = [];
-		for (let i = 0; i < ITER; i++) {
+		for (let i = -warmup; i < ITER; i++) {
 			await ensureState(page, op.pre);
-			const selector = i % 2 === 1 && op.alternateClick ? op.alternateClick : op.click;
-			const dt = await timeClick(page, op, [selector]);
-			if (op.alternateClick) await verifySelection(page, selector);
-			samples.push(dt);
+			const selectors = selectorsFor(op, i, repeat);
+			const elapsed = await timeClick(page, op, selectors, repeat);
+			if (op.alternateClick) await verifySelection(page, selectors.at(-1));
+			if (i >= 0) {
+				samples.push(elapsed / repeat);
+			}
 			await sleep(60);
 		}
-		results[op.name] = summarizeSamples(samples);
+		const summary = summarizeSamples(samples);
+		results[op.name] = {
+			...summary,
+			repeat,
+			sampleMs: summary.median * repeat,
+		};
 	}
 
 	if (!CLEAR_1K && (t.name === 'octane-tsrx' || t.name === 'octane-jsx')) {
@@ -272,7 +289,7 @@ async function runTarget(t) {
 						name,
 						r.score == null
 							? { median: r.median, min: r.min, samples: r.samples.length }
-							: timingStatForJson(r),
+							: { ...timingStatForJson(r), repeat: r.repeat, sampleMs: r.sampleMs },
 					]),
 				),
 			})),
