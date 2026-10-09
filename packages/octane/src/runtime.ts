@@ -40582,6 +40582,14 @@ const MEMO_MARKER_DESCRIPTOR: PropertyDescriptor = {
 		return this === (this as any)[MEMO_OWNER];
 	},
 };
+// The wrapper renders exactly its component's output, so it self-delimits
+// exactly when that component carries the compiler's single-root stamp. Read
+// live: a module-tail stamp can land after `memo()` has run.
+const MEMO_SINGLE_ROOT_DESCRIPTOR: PropertyDescriptor = {
+	get(this: { type: ComponentBody<any> }) {
+		return this === (this as any)[MEMO_OWNER] && (this.type as any).$$singleRoot === true;
+	},
+};
 const MEMO_DEFAULT_PROPS_DESCRIPTOR: PropertyDescriptor = {
 	configurable: true,
 	// Static hoisters must copy `type` along with this accessor.
@@ -40638,6 +40646,7 @@ export function memo<P>(
 		value: (component as any).displayName || component.name || 'Memo',
 	});
 	Object.defineProperty(memoWrapper, '__memo', MEMO_MARKER_DESCRIPTOR);
+	Object.defineProperty(memoWrapper, '$$singleRoot', MEMO_SINGLE_ROOT_DESCRIPTOR);
 	// `createElement(memo(Component), …)` and `lazy(() => ({default:
 	// memo(Component)}))` resolve defaults at the public wrapper boundary. Keep the
 	// property live so a component that updates its defaultProps between renders
