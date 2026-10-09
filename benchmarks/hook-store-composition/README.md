@@ -58,11 +58,14 @@ and statistics contracts.
 
 `work.mjs` makes an unminified production build and runs Chromium with JIT disabled.
 It reuses `benchmarks/lib/precise-work.mjs` to count named calls to `useCallback`,
-`useMemo`, `resolveHookArgs`, `resolveSlot`, `resolveHookPath`, and `withSlot` without
-adding probes to the component render bodies. An operation must activate at least
+`useMemo`, `resolveHookArgs`, `resolveSlot`, `resolveCustomSlot`, `resolveHookPath`,
+and `withSlot` without adding probes to the component render bodies. The two slot
+resolvers count together: direct hooks use identity resolution until the first
+custom hook installs path-aware resolution. An operation must activate at least
 128 × 20 runtime callbacks; the nested operation must actually reach the composed
 slot path, and the direct operation must not. `work-metrics.test.mjs` keeps the
-composed-slot probe on the helper that the runtime's `resolveSlot` calls. Native identity probes and cleanup run only after the coverage snapshot.
+composed-slot probe on the helper that `resolveCustomSlot` calls. Native identity
+probes and cleanup run only after the coverage snapshot.
 
 The actual-binding diagnostics use separate fixture instances with instrumented
 store reads, selectors, equality functions, and subscription lifecycles. Their

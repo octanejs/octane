@@ -24,6 +24,7 @@ const names = new Set([
 	'appendSlotKey',
 	'appendHookSlotPath',
 	'resolveSlot',
+	'resolveCustomSlot',
 	'resolveHookSlot',
 	'invokeManualHook',
 	'manualHook',
@@ -50,6 +51,7 @@ function extract(mode, ref) {
 						'NO_SLOT',
 						'UNIVERSAL_SLOT_STACK',
 						'MANUAL_HOOK_DRIVER',
+						'resolveSlot',
 					].includes(declaration.name.getText(ast)),
 				)),
 	);
@@ -84,7 +86,7 @@ function instantiate(code, mode) {
 	 function currentAttempt() { return {}; }
 	 function activateLazyLeafOwner() { return owner; }
 	 ${code}
-	 return { ...module.exports, resolve: ${mode === 'client' ? 'resolveSlot' : 'resolveHookSlot'},
+	 return { ...module.exports, get resolve() { return ${mode === 'client' ? 'resolveSlot' : 'resolveHookSlot'}; },
 	 inspect: ${
 			code.includes('function resolveHookPath')
 				? `() => ({
