@@ -82,7 +82,10 @@ changes break most often:
   packed.
 - **Reachability.** Never name a heavy function from a compiled hot path.
   Optional features stay behind their driver or capability, and hydration-only
-  reads behind `hydrating` guards that fold.
+  reads behind `hydrating` guards that fold. Declare a driver above its readers
+  and test it by truthiness (`if (D)`, `D ? D.f() : x`), never `D !== null` or
+  `D?.f()`, or Vite's minifier keeps the code it guards (see the driver
+  declarations in `runtime.ts`).
 - **DOM.** The commit writes and does not read geometry. Measure in a batched
   phase or after paint.
 - **Scheduling.** `scheduleRender` coalesces a synchronous burst into one

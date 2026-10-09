@@ -229,23 +229,23 @@ function inspectProgram(program, file) {
 	function preparedReceiver(expression, depth = 0) {
 		if (depth > 12) return false;
 		const node = unwrap(expression);
-		if (
-			is.isBinaryExpression(node) &&
-			node.operatorToken.kind === SyntaxKind.QuestionQuestionToken
-		) {
-			const native = unwrap(node.right);
-			const prepared = unwrap(node.left);
+		if (is.isConditionalExpression(node)) {
+			const native = unwrap(node.whenFalse);
+			const prepared = unwrap(node.whenTrue);
 			const view = is.isCallExpression(prepared) ? unwrap(prepared.expression) : undefined;
 			// The cold preparation branch is inlined only around local identifiers.
-			// Matching bindings proves that the optional stage and both selected receivers
-			// refer to the renderer's actual stage and the same native node. Restricting
-			// the receiver also preserves evaluation order for getters and function calls.
+			// Matching bindings proves that the tested stage, its view, and both selected
+			// receivers refer to the renderer's actual stage and the same native node.
+			// Restricting the receiver also preserves evaluation order for getters and
+			// function calls. Only a truthiness test of the stage lets a bundle without
+			// ViewTransition drop the branch (see the driver declarations in runtime.ts).
 			return (
+				moduleBinding(unwrap(node.condition), 'STAGED_DOM') &&
 				is.isIdentifier(native) &&
 				is.isCallExpression(prepared) &&
 				prepared.questionDotToken === undefined &&
 				is.isPropertyAccessExpression(view) &&
-				view.questionDotToken !== undefined &&
+				view.questionDotToken === undefined &&
 				view.name.text === 'view' &&
 				moduleBinding(unwrap(view.expression), 'STAGED_DOM') &&
 				prepared.arguments.length === 1 &&
