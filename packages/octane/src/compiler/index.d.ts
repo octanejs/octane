@@ -294,13 +294,18 @@ export function collectDiagnostics(
 	options?: CompileOptions,
 ): { diagnostics: CompileDiagnostic[]; error: unknown };
 
-/** Produce typed virtual TSX and authored-source mappings for language tooling. */
+/**
+ * Produce typed virtual TSX and authored-source mappings for language tooling.
+ * `intrinsics` selects its JSX type namespace independently of the runtime
+ * renderer and any authored pragma.
+ */
 export function compileToVolarMappings(
 	source: string,
 	filename?: string,
 	options?: {
 		loose?: boolean;
 		renderers?: unknown;
+		intrinsics?: string;
 		strong?: boolean;
 		knownAttributeSpreads?: readonly KnownAttributeSpread[];
 	},

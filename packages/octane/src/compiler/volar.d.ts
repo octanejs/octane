@@ -6,6 +6,7 @@ export function compileToVolarMappings(
 	options?: {
 		loose?: boolean;
 		renderers?: unknown;
+		intrinsics?: string;
 		strong?: boolean;
 		knownAttributeSpreads?: readonly import('./index.js').KnownAttributeSpread[];
 	},

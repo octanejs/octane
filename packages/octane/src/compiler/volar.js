@@ -394,7 +394,7 @@ function authoredLeadingPragma(ast, comments) {
 	);
 }
 
-function createRendererTypePragma(renderer, ast, strong = false) {
+function createRendererTypePragma(renderer, ast, strong = false, typeIntrinsics = undefined) {
 	// A `.tsrx` file's JSX is octane's dialect BY DEFINITION, so the built-in
 	// DOM renderer pins the virtual TSX to octane's jsx-runtime types even when
 	// the registry entry declares no `intrinsics`. Without the pragma the host
@@ -403,8 +403,10 @@ function createRendererTypePragma(renderer, ast, strong = false) {
 	// React shell hosting islands through `octane/react`, tsrx-tsc over a
 	// `react-jsx` tsconfig) every island would be typed against REACT's JSX and
 	// reject octane's real contract (`class`, native event payloads, …).
-	// An authored leading pragma still wins (checked by the caller).
+	// An authored leading pragma wins unless tooling explicitly selects a
+	// separate type-only surface (checked by the caller).
 	const intrinsics =
+		typeIntrinsics ??
 		renderer.intrinsics ??
 		(renderer.module === DOM_RENDERER_MODULE && renderer.target === 'dom'
 			? DOM_RENDERER_MODULE
@@ -415,7 +417,7 @@ function createRendererTypePragma(renderer, ast, strong = false) {
 		type: 'Block',
 		// @tsrx/core's semantic-comment formatter turns this into the canonical
 		// `/** @jsxImportSource … */` spelling during the one type-only print.
-		value: `*@jsxImportSource ${strong && intrinsics === DOM_RENDERER_MODULE ? 'octane/strong' : intrinsics}`,
+		value: `*@jsxImportSource ${typeIntrinsics === undefined && strong && intrinsics === DOM_RENDERER_MODULE ? 'octane/strong' : intrinsics}`,
 		start: ast.start ?? 0,
 		end: ast.start ?? 0,
 		loc: { start: { ...start }, end: { ...start } },
@@ -472,7 +474,9 @@ function markNativeTemplateBodies(root) {
  * `intrinsics`; when present, the virtual TSX gets a file-local pragma so host
  * element types cannot leak into files owned by another renderer.
  *
- * @param {{ loose?: boolean, renderers?: unknown, strong?: boolean, knownAttributeSpreads?: readonly import('./index.js').KnownAttributeSpread[] }} [options]
+ * The optional `intrinsics` selects the virtual TSX's JSX type namespace
+ * independently of the runtime renderer and any authored pragma.
+ * @param {{ loose?: boolean, renderers?: unknown, intrinsics?: string, strong?: boolean, knownAttributeSpreads?: readonly import('./index.js').KnownAttributeSpread[] }} [options]
  * @returns {import('./index.js').VolarCompileResult}
  */
 export function compileToVolarMappings(source, filename, options) {
@@ -534,24 +538,30 @@ export function compileToVolarMappings(source, filename, options) {
 	// coordinate system instead of prepending text and shifting every mapping.
 	const authoredPragma = authoredLeadingPragma(ast, comments);
 	const strongDOM = strongAnalysis?.enabled === true && renderer.target === 'dom';
-	const rendererPragma = authoredPragma ? null : createRendererTypePragma(renderer, ast, strongDOM);
+	const rendererPragma = authoredPragma
+		? null
+		: createRendererTypePragma(renderer, ast, strongDOM, options?.intrinsics);
 	const replacePragma =
 		authoredPragma &&
-		strongDOM &&
-		jsxImportSourcePragmaModule(authoredPragma.value) === DOM_RENDERER_MODULE;
-	// Keep the authored comment form: a line pragma prints as `// …`, so the
-	// block-comment body would leave TypeScript with no readable pragma.
-	const strongPragma = replacePragma
+		(options?.intrinsics !== undefined ||
+			(strongDOM && jsxImportSourcePragmaModule(authoredPragma.value) === DOM_RENDERER_MODULE));
+	// A type-only override needs a block pragma: TypeScript does not recognize
+	// @jsxImportSource in line comments. Preserve existing strong-mode behavior
+	// when tooling has not opted in.
+	const typePragma = replacePragma
 		? {
 				...authoredPragma,
+				type: options?.intrinsics !== undefined ? 'Block' : authoredPragma.type,
 				value:
-					authoredPragma.type === 'Line'
-						? ' @jsxImportSource octane/strong'
-						: '*@jsxImportSource octane/strong',
+					options?.intrinsics !== undefined
+						? `*@jsxImportSource ${options.intrinsics}`
+						: authoredPragma.type === 'Line'
+							? ' @jsxImportSource octane/strong'
+							: '*@jsxImportSource octane/strong',
 			}
 		: null;
-	const printComments = strongPragma
-		? comments.map((comment) => (comment === authoredPragma ? strongPragma : comment))
+	const printComments = typePragma
+		? comments.map((comment) => (comment === authoredPragma ? typePragma : comment))
 		: rendererPragma === null
 			? comments
 			: [rendererPragma, ...comments];
@@ -559,11 +569,11 @@ export function compileToVolarMappings(source, filename, options) {
 	// attached copy on a cloned statement so the printer cannot retain a second,
 	// compatibility pragma. The parsed source tree and source positions stay intact.
 	let transformAst = ast;
-	if (strongPragma && ast.body.length > 0) {
+	if (typePragma && ast.body.length > 0) {
 		const first = cloneAstNode(ast.body[0]);
 		first.leadingComments = first.leadingComments?.map((comment) =>
 			comment.start === authoredPragma.start && comment.end === authoredPragma.end
-				? strongPragma
+				? typePragma
 				: comment,
 		);
 		transformAst = { ...ast, body: [first, ...ast.body.slice(1)] };

@@ -443,12 +443,27 @@ is checked again against the active driver. Renderer-specific host/property
 validation belongs to renderer capability metadata or the driver, not to DOM
 attribute, class, or style rules in the universal core.
 
-Volar prepends a file-local `@jsxImportSource` pragma only when the selected
-descriptor declares `intrinsics`. Its mappings are shifted back to authored
-TSRX offsets, so DOM and non-DOM files can assign conflicting types to names
-such as `line`, `path`, `audio`, and `source`. Renderer-local module
-augmentation extends only that renderer's catalogue; it does not merge into a
-process-global intrinsic namespace.
+Volar prints a file-local `@jsxImportSource` pragma as part of the mapped
+type-only output. Without an explicit override, a leading authored pragma
+wins, followed by the selected descriptor's `intrinsics`; DOM files default
+to Octane's JSX types (or `octane/strong` in strong mode). DOM and non-DOM files
+can therefore assign conflicting types to names such as `line`, `path`,
+`audio`, and `source` without merging into a process-global namespace.
+
+Editor integrations that check shared sources against a portable JSX surface
+can pass `intrinsics` to `compileToVolarMappings`:
+
+```ts
+compileToVolarMappings(source, filename, {
+  renderers,
+  intrinsics: '@example/portable-intrinsics',
+});
+```
+
+The type-only override takes precedence over an authored pragma and the
+renderer defaults. The chosen renderer and its diagnostics still describe
+the runtime target. The override changes neither runtime compilation nor the
+original source, and mappings still refer to authored TSRX positions.
 
 Universal source maps compose the lowered intermediate map back to the
 original TSRX source. Boundary lowering likewise preserves the authored file

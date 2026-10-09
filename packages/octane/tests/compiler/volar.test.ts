@@ -608,6 +608,126 @@ declare module '@fixture/object-intrinsics/jsx-runtime' {
 		}
 	});
 
+	it('checks a portable JSX surface independently of the runtime renderer and authored pragma', () => {
+		const root = mkdtempSync(join(tmpdir(), 'octane-volar-portable-intrinsics-'));
+		try {
+			mkdirSync(join(root, 'node_modules/@fixture'), { recursive: true });
+			symlinkSync(
+				fileURLToPath(new URL('../..', import.meta.url)),
+				join(root, 'node_modules/octane'),
+				'dir',
+			);
+			const intrinsics = '@fixture/portable-intrinsics';
+			const moduleRoot = join(root, 'node_modules', intrinsics);
+			mkdirSync(moduleRoot);
+			writeFileSync(
+				join(moduleRoot, 'package.json'),
+				JSON.stringify({
+					name: intrinsics,
+					exports: { './jsx-runtime': './jsx-runtime.d.ts' },
+				}),
+			);
+			writeFileSync(
+				join(moduleRoot, 'jsx-runtime.d.ts'),
+				`import type { UniversalRenderable } from 'octane/universal';
+export namespace JSX {
+	type Element = UniversalRenderable;
+	interface ElementChildrenAttribute { children: {}; }
+	interface IntrinsicElements {
+		div: { columns?: number; children?: UniversalRenderable };
+	}
+}
+`,
+			);
+
+			const portable = 'export function Scene() @{ <div columns={3}>ready</div> }\n';
+			const cases = [
+				['NoPragma', portable, { intrinsics }],
+				[
+					'ConfiguredRenderer',
+					portable,
+					{ intrinsics, renderers: { ...OBJECT_RENDERERS, default: 'object' } },
+				],
+				['BlockPragma', '/** @jsxImportSource octane */\n' + portable, { intrinsics }],
+				['LinePragma', '// @jsxImportSource octane\n' + portable, { intrinsics }],
+				['Strong', '"use strong";\n' + portable, { intrinsics }],
+				[
+					'StrongPragma',
+					'/** @jsxImportSource octane */\n"use strong";\n' + portable,
+					{ intrinsics },
+				],
+				['OrdinaryDom', 'export function Dom() @{ <div id="ordinary">ready</div> }', {}],
+				[
+					'InvalidPortable',
+					'export function Invalid() @{ <div columns="three">ready</div> }',
+					{ intrinsics },
+				],
+				[
+					'InvalidBlockPragma',
+					'/** @jsxImportSource octane */\nexport function Invalid() @{ <div columns="three">ready</div> }',
+					{ intrinsics },
+				],
+				[
+					'InvalidLinePragma',
+					'// @jsxImportSource octane\nexport function Invalid() @{ <div columns="three">ready</div> }',
+					{ intrinsics },
+				],
+			] as const;
+			const compilations: ReturnType<typeof compileToVolarMappings>[] = [];
+			const rootNames = cases.map(([name, source, options]) => {
+				const compiled = compileToVolarMappings(source, `/src/${name}.tsrx`, options);
+				expect(compiled.errors).toEqual([]);
+				compilations.push(compiled);
+				const file = join(root, `${name}.tsx`);
+				writeFileSync(file, compiled.code);
+				return file;
+			});
+			const program = ts.createProgram({
+				rootNames,
+				options: {
+					jsx: ts.JsxEmit.ReactJSX,
+					module: ts.ModuleKind.ESNext,
+					moduleResolution: ts.ModuleResolutionKind.Bundler,
+					noEmit: true,
+					skipLibCheck: true,
+					strict: true,
+					target: ts.ScriptTarget.ESNext,
+					types: [],
+				},
+			});
+			const diagnostics = rootNames.flatMap((name) =>
+				program.getSemanticDiagnostics(program.getSourceFile(name)!),
+			);
+			expect(
+				diagnostics.map((diagnostic) => ({
+					file: diagnostic.file!.fileName,
+					code: diagnostic.code,
+					message: ts.flattenDiagnosticMessageText(diagnostic.messageText, ' '),
+				})),
+			).toEqual(
+				['InvalidPortable', 'InvalidBlockPragma', 'InvalidLinePragma'].map((name) => ({
+					file: join(root, `${name}.tsx`),
+					code: 2322,
+					message: "Type 'string' is not assignable to type 'number'.",
+				})),
+			);
+			for (const diagnostic of diagnostics) {
+				const index = rootNames.indexOf(diagnostic.file!.fileName);
+				const sourceOffset = cases[index][1].indexOf('columns=');
+				expect(
+					compilations[index].mappings.some((mapping) =>
+						mapping.sourceOffsets.some(
+							(start, position) =>
+								start === sourceOffset && mapping.generatedOffsets[position] === diagnostic.start,
+						),
+					),
+				).toBe(true);
+			}
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	}, 15_000);
+
 	it('type-checks @try boundaries under a renderer whose JSX.Element is a closed union', () => {
 		// Universal renderers such as ink type JSX.Element as UniversalRenderable
 		// and declare no JSX.ElementType, so every component in their virtual TSX,
