@@ -2,6 +2,10 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { describe, it, expect, vi } from 'vitest';
 import * as ServerRuntime from 'octane/server';
+import * as Signals from 'octane/signals';
+import { createScope, type SignalHandle } from 'octane/signals';
+import * as ClientSignals from 'octane/signals/client';
+import * as ServerSignals from 'octane/signals/server';
 import {
 	createElement,
 	flushSync,
@@ -2084,6 +2088,126 @@ describe('large keyed list fills', () => {
 		} finally {
 			resolve('resolved row 3');
 			r.unmount();
+		}
+	});
+
+	describe('compiled with native signal reads', () => {
+		// Rows that read signals natively must leave signals writable once the
+		// render returns, whether the fill completes, throws, or suspends. Dev
+		// compiles mount every list through the ordinary row renderer.
+		const source = `
+import type { SignalHandle } from 'octane/signals';
+import 'octane/signals';
+
+export function NativeRows(props: {
+	items: readonly { id: number; label: string | SignalHandle<string> }[];
+}) @{
+	@try {
+		<ul>
+			@for (const row of props.items; key row.id) {
+				<li class="native-row">{row.label as string}</li>
+			}
+		</ul>
+	} @pending {
+		<span id="native-rows-pending">{'loading'}</span>
+	} @catch (error) {
+		<span id="native-rows-error">{(error as Error).message as string}</span>
+	}
+}
+`;
+		const rowText = (r: ReturnType<typeof mount>) =>
+			r.findAll('.native-row').map((row) => row.textContent);
+		const expectWritable = (key: string) => {
+			const scope = createScope({ scopeKey: key });
+			try {
+				const probe$ = scope.signal$('probe', 0);
+				probe$.set(1);
+				expect(probe$.get()).toBe(1);
+			} finally {
+				scope.dispose();
+			}
+		};
+
+		for (const strong of [false, true]) {
+			const { NativeRows } = loadCompiledFixtureSource(source, {
+				id: `/native-fast-host-rows-${strong}.tsrx`,
+				mode: 'client',
+				compileOptions: { dev: false, hmr: false, strong, nativeReads: true },
+				runtimeModules: {
+					'octane/signals': Signals,
+					'octane/signals/client': ClientSignals,
+					'octane/signals/server': ServerSignals,
+				},
+			});
+			const mode = strong ? 'Strong' : 'production';
+
+			it(`keeps signals writable and rows live after an empty list fills (${mode})`, () => {
+				const scope = createScope({ scopeKey: `native-fast-host-fill-${mode}` });
+				const label$ = scope.signal$('label', 'live row');
+				const items: { id: number; label: string | SignalHandle<string> }[] = makeRows();
+				items[7] = { id: 8, label: label$ };
+				const expected = makeRows().map((row) => row.label);
+				const r = mount(NativeRows, { items: [] });
+				try {
+					r.update(NativeRows, { items });
+					expected[7] = 'live row';
+					expect(rowText(r)).toEqual(expected);
+					expectWritable(`native-fast-host-fill-probe-${mode}`);
+
+					flushSync(() => label$.set('updated row'));
+					expected[7] = 'updated row';
+					expect(rowText(r)).toEqual(expected);
+				} finally {
+					r.unmount();
+					scope.dispose();
+				}
+			});
+
+			it(`keeps signals writable after a filling row throws (${mode})`, () => {
+				const items = makeRows().map(({ id, label }) => ({
+					id,
+					get label() {
+						if (id === 8) throw new Error('row failed');
+						return label;
+					},
+				}));
+				const r = mount(NativeRows, { items: [] });
+				try {
+					r.update(NativeRows, { items });
+					expect(r.find('#native-rows-error').textContent).toBe('row failed');
+					expectWritable(`native-fast-host-throw-${mode}`);
+				} finally {
+					r.unmount();
+				}
+			});
+
+			it(`keeps signals writable while and after a filling row suspends (${mode})`, async () => {
+				let resolve!: (value: string) => void;
+				const promise = new Promise<string>((done) => {
+					resolve = done;
+				});
+				const items = makeRows().map(({ id, label }) => ({
+					id,
+					get label() {
+						return id === 8 ? use(promise) : label;
+					},
+				}));
+				const r = mount(NativeRows, { items: [] });
+				try {
+					r.update(NativeRows, { items });
+					expect(r.find('#native-rows-pending').textContent).toBe('loading');
+					expectWritable(`native-fast-host-pending-${mode}`);
+
+					await act(() => resolve('resolved row'));
+					const expected = makeRows().map((row) => row.label);
+					expected[7] = 'resolved row';
+					expect(rowText(r)).toEqual(expected);
+					expectWritable(`native-fast-host-resolved-${mode}`);
+				} finally {
+					resolve('resolved row');
+					r.unmount();
+				}
+			});
 		}
 	});
 
