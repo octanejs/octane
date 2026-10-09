@@ -961,6 +961,39 @@ function emitRenderable(node, state, keys) {
 			? [withOrigin(b.stmt(assertNoTemplate(value, state, 'JSX inside a void expression')), node)]
 			: [];
 	}
+	if (
+		state.textSites &&
+		(value?.type === 'ConditionalExpression' ||
+			value?.type === 'LogicalExpression' ||
+			value?.type === 'ArrayExpression')
+	) {
+		let template = false;
+		walk(value, (child) => {
+			if (template) return false;
+			if (isTemplate(child)) {
+				template = true;
+				return false;
+			}
+		});
+		// A scalar expression is one authored site, even when its value chooses
+		// different branches. Preserve its normal short-circuit evaluation.
+		if (!template) return emitHostText(value, state, keys, node);
+		if (value.type === 'ArrayExpression') {
+			return value.elements.flatMap((element) =>
+				element?.type === 'SpreadElement'
+					? emitHostText(
+							withOrigin(
+								b.array([assertNoTemplate(element, state, 'JSX within a text spread')]),
+								element,
+							),
+							state,
+							keys,
+							element,
+						)
+					: emitRenderable(element, state, keys),
+			);
+		}
+	}
 	if (value?.type === 'ConditionalExpression') {
 		return [
 			withOrigin(
@@ -974,6 +1007,24 @@ function emitRenderable(node, state, keys) {
 		];
 	}
 	if (value?.type === 'LogicalExpression' && value.operator === '&&') {
+		if (state.textSites) {
+			const name = allocName(state, '__octaneWriterCondition');
+			const condition = withOrigin(b.id(name), value.left);
+			return [
+				withOrigin(
+					b.const(name, assertNoTemplate(value.left, state, 'conditional JSX tests')),
+					value.left,
+				),
+				withOrigin(
+					b.if(
+						condition,
+						b.block(emitRenderable(value.right, state, keys)),
+						b.block(emitHostText(condition, state, keys, node)),
+					),
+					node,
+				),
+			];
+		}
 		return [
 			withOrigin(
 				b.if(
@@ -992,20 +1043,20 @@ function emitRenderable(node, state, keys) {
 	if (value?.type === 'JSXForExpression') return emitFor(value, state, keys);
 	if (value?.type === 'JSXIfExpression') return emitIf(value, state, keys);
 	if (state.renderer.text === 'host') {
-		return [
-			writerStatement(
-				state,
-				'appendText',
-				[assertNoTemplate(node, state, 'JSX within host text')],
-				node,
-			),
-		];
+		return emitHostText(assertNoTemplate(node, state, 'JSX within host text'), state, keys, node);
 	}
 	throw valdiError(
 		state,
 		node,
 		`unsupported renderable ${value?.type ?? 'value'}; render text with a <label value={...} />.`,
 	);
+}
+
+function emitHostText(value, state, keys, origin) {
+	if (!state.textSites) return [writerStatement(state, 'appendText', [value], origin)];
+	const prototype = hoistPrototype(state, 'makeNodePrototype', [b.literal('#text')], origin);
+	const key = keyExpression(state, prototype, keys, null, origin);
+	return [writerStatement(state, 'renderText', [prototype, value, key], origin)];
 }
 
 function rewriteComponentStatement(node, state, keys, allowReturn) {
@@ -1051,7 +1102,7 @@ function emitNodes(nodes, state, keys, allowReturn) {
 		if (node.type === 'JSXText') {
 			if (state.renderer.text === 'ignore') continue;
 			if (state.renderer.text === 'host') {
-				output.push(writerStatement(state, 'appendText', [b.literal(node.value)], node));
+				output.push(...emitHostText(b.literal(node.value), state, keys, node));
 				continue;
 			}
 			throw valdiError(
@@ -1154,7 +1205,11 @@ export function compileValdi(
 		lexical: createLexicalAnalysis(ast),
 		attributeFacts: null,
 		writerFacts: normalizeWriterFacts(options.valdiWriterFacts, source.length, filename),
+		textSites: renderer.capabilities?.includes('host-text-site') === true,
 	};
+	if (state.textSites && renderer.text !== 'host') {
+		throw valdiError(state, ast, 'the host-text-site capability requires text: "host".');
+	}
 	if (options.hmr !== undefined && options.hmr !== false) {
 		throw valdiError(state, ast, 'HMR is not supported yet; compile with hmr: false.');
 	}
@@ -1203,9 +1258,11 @@ export function compileValdi(
 				'assertValdiCompilerAbi',
 				[
 					b.literal(
-						renderer.text === 'host' || renderer.capabilities?.includes('host-ref')
-							? 2
-							: VALDI_COMPILER_ABI_VERSION,
+						state.textSites
+							? 3
+							: renderer.text === 'host' || renderer.capabilities?.includes('host-ref')
+								? 2
+								: VALDI_COMPILER_ABI_VERSION,
 					),
 				],
 				origin,

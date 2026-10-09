@@ -157,6 +157,34 @@ after the selected adapter implements the corresponding contract.
   getter evaluated once. The host owns ref attachment, replacement, and cleanup.
   Component refs and `children` props remain unsupported.
 
+### Authored text sites and supported hosts
+
+An adapter that needs identity for each authored text site may opt into
+`text: 'host'` plus `capabilities: ['host-text-site']`. It must accept compiler
+ABI 3 and implement `jsx.renderText(prototype, value, key)`. The compiler
+creates one opaque `jsx.makeNodePrototype('#text')` per authored text site.
+`key` carries the same ordered keyed-loop path as an element; outside a loop
+it is `undefined` and the prototype identifies the site within its parent.
+The adapter owns identity, updates, cleanup, and validation of the value.
+It must accept primitive strings/numbers, ignore nullish and boolean values,
+and reject other non-array values. Arrays of text values arrive unchanged as
+one authored site; the adapter owns how their contents are written. Scalar
+conditionals keep one site across branch changes. In an array literal that
+contains JSX, each distinct JSX/text site is emitted in authored order.
+
+This option allows a text-only root as well as text beneath an open host.
+Adapters that only implement ABI 1 or 2 are rejected before prototypes are
+created; append-only text retains its ABI 2 contract when this capability is
+omitted. `'host-text-site'` is invalid unless `text` is `'host'`.
+
+To restrict the authored intrinsic vocabulary, set
+`validation: { allowedTags: ['frame', 'badge', 'text-box'] }` on a renderer.
+Only lower-case intrinsic host names are checked, before prototypes are
+created. Component names are unaffected; their implementations are checked
+normally. An omitted list allows every otherwise-supported tag, while an
+empty list allows no authored host tags. This composes with `textParents`,
+`textHosts` and `hostProps`; it never overrides other target restrictions.
+
 Editor integrations can already use `compileToVolarMappings` with
 `options.renderers` and the renderer's `intrinsics` module. Use the same
 default/rules as build-time compilation. The adapter is never executed during
