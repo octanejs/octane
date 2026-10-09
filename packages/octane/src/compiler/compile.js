@@ -12289,11 +12289,7 @@ function compileInternal(
 			// `const el = <App/>`) to createElement(...) before printing — esrap
 			// can't print raw JSX, and this is what makes root.render(<App/>) match
 			// React's shape.
-			const lowered = markSingleRootMemoInitializers(
-				stampAnonymousDefaultFunctionLoc(rewriteModuleJsxValues(hooked, ctx), ctx),
-				ctx,
-				memoImportNames,
-			);
+			const lowered = stampAnonymousDefaultFunctionLoc(rewriteModuleJsxValues(hooked, ctx), ctx);
 			// Top-level passthrough (imports, plain consts/functions): already a
 			// rewritten statement node — embedded directly in the module AST.
 			bodyNodes.push(lowered);
@@ -16447,42 +16443,6 @@ function isOctaneMemoCallee(callee, ctx, memoImportNames) {
 		callee.property.name === 'memo' &&
 		ctx.octaneImportNamespaces?.has(callee.object.name) === true
 	);
-}
-
-// An exact public memo wrapper preserves the already-proven host output of its
-// immutable local component. Stamp only the fresh compiler-owned wrapper:
-// probing arbitrary component metadata would invoke observable getters, and
-// dev/HMR, custom comparators, imported components, and renderer units remain
-// deliberately opaque.
-function markSingleRootMemoInitializers(node, ctx, memoImportNames) {
-	if (ctx.hmr || ctx.dev || ctx.profile || ctx.defaultMemoBindings.size === 0) return node;
-	const exported = node.type === 'ExportNamedDeclaration';
-	const declaration = exported ? node.declaration : node;
-	if (declaration?.type !== 'VariableDeclaration' || declaration.kind !== 'const') return node;
-	let changed = false;
-	const declarations = declaration.declarations.map((item) => {
-		const init = item.init;
-		const wrapped = init?.arguments?.[0];
-		if (
-			item.id?.type !== 'Identifier' ||
-			!ctx.defaultMemoBindings.has(item.id.name) ||
-			init?.type !== 'CallExpression' ||
-			!isOctaneMemoCallee(init.callee, ctx, memoImportNames) ||
-			init.arguments.length !== 1 ||
-			wrapped?.type !== 'Identifier' ||
-			!ctx.moduleFunctionDeclarations.has(wrapped.name) ||
-			ctx.componentInfo.get(wrapped.name)?.singleRoot !== true ||
-			ctx._universalRuntimeUnitsByBinding.has(item.id.name) ||
-			ctx._universalRuntimeUnitsByBinding.has(wrapped.name)
-		) {
-			return item;
-		}
-		changed = true;
-		return { ...item, init: inheritOriginLoc(singleRootInitializer(ctx, init), init) };
-	});
-	if (!changed) return node;
-	const next = { ...declaration, declarations };
-	return exported ? { ...node, declaration: next } : next;
 }
 
 function finalizeComponentInitializers(ctx, bodyNodes) {
