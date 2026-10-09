@@ -96,6 +96,166 @@ const labels = (r: ReturnType<typeof mount>) => r.findAll('li').map((li) => li.t
 const stripComments = (html: string) => html.replace(/<!--[\s\S]*?-->/g, '');
 
 describe('manual keyed lists', () => {
+	it.each([
+		['string', 'b'],
+		['object', {}],
+		['NaN', Number.NaN],
+		['undefined', undefined],
+	])('preserves a stable middle %s key across replacements and reorders', (_kind, key) => {
+		type Row = { id: string; key: unknown };
+		const ManualList: ComponentBody<{ items: Row[] }> = (props, scope) => {
+			const parent = hostComponent(scope, 0, 'div', null);
+			forBlock(
+				scope,
+				1,
+				parent,
+				props.items,
+				(item) => item.key,
+				(item, rowScope) => {
+					hostComponent(rowScope, 0, 'input', { 'data-id': item.id, defaultValue: item.id });
+				},
+			);
+		};
+		const initial = [
+			{ id: 'a', key: 'a' },
+			{ id: 'b', key },
+			{ id: 'c', key: 'c' },
+		];
+		const view = mount(ManualList, { items: initial });
+		try {
+			const survivor = view.find('[data-id="b"]') as HTMLInputElement;
+			survivor.value = 'typed b';
+			survivor.focus();
+			const changed = { id: 'changed b', key };
+			const originalLast = view.find('[data-id="c"]');
+			view.update(ManualList, { items: [initial[2]!, changed, { id: 'new d', key: 'd' }] });
+			expect(view.findAll('input').map((node) => node.getAttribute('data-id'))).toEqual([
+				'c',
+				'changed b',
+				'new d',
+			]);
+			expect(view.findAll('input')[0]).toBe(originalLast);
+			expect(view.findAll('input')[1]).toBe(survivor);
+			expect(survivor.value).toBe('typed b');
+
+			const replacements = [{ id: 'x', key: 'x' }, changed, { id: 'y', key: 'y' }];
+			view.update(ManualList, { items: replacements });
+			expect(view.findAll('input').map((node) => node.getAttribute('data-id'))).toEqual([
+				'x',
+				'changed b',
+				'y',
+			]);
+			expect(view.findAll('input')[1]).toBe(survivor);
+			expect(survivor.value).toBe('typed b');
+			expect(document.activeElement).toBe(survivor);
+
+			const beforeReorder = view.findAll('input');
+			view.update(ManualList, { items: replacements.toReversed() });
+			const reordered = view.findAll('input');
+			for (let index = 0; index < reordered.length; index++)
+				expect(reordered[index]).toBe(beforeReorder[beforeReorder.length - 1 - index]);
+
+			const unequal = [replacements[0]!, changed, { id: 'z', key: 'z' }, { id: 'w', key: 'w' }];
+			view.update(ManualList, { items: unequal });
+			expect(view.findAll('input').map((node) => node.getAttribute('data-id'))).toEqual([
+				'x',
+				'changed b',
+				'z',
+				'w',
+			]);
+			expect(view.findAll('input')[1]).toBe(survivor);
+			expect(view.findAll('input')[0]).toBe(beforeReorder[0]);
+
+			const prefix = { id: 'prefix', key: 'prefix' };
+			const suffix = { id: 'suffix', key: 'suffix' };
+			view.update(ManualList, { items: [prefix, ...unequal, suffix] });
+			const framed = view.findAll('input');
+			view.update(ManualList, {
+				items: [
+					prefix,
+					{ id: 'next x', key: 'next x' },
+					{ id: 'latest b', key },
+					{ id: 'next z', key: 'next z' },
+					unequal[3]!,
+					suffix,
+				],
+			});
+			expect(view.findAll('input').map((node) => node.getAttribute('data-id'))).toEqual([
+				'prefix',
+				'next x',
+				'latest b',
+				'next z',
+				'w',
+				'suffix',
+			]);
+			expect(view.findAll('input')[0]).toBe(framed[0]);
+			expect(view.findAll('input')[2]).toBe(survivor);
+			expect(view.findAll('input')[4]).toBe(framed[4]);
+			expect(view.findAll('input')[5]).toBe(framed[5]);
+			expect(survivor.value).toBe('typed b');
+			expect(document.activeElement).toBe(survivor);
+		} finally {
+			view.unmount();
+		}
+	});
+
+	it.each(['x', 'a'])(
+		'preserves other rows when a changing key getter settles on %s',
+		(settledKey) => {
+			type Row = { id: string; key: string };
+			const ManualList: ComponentBody<{ items: Row[] }> = (props, scope) => {
+				const parent = hostComponent(scope, 0, 'div', null);
+				forBlock(
+					scope,
+					1,
+					parent,
+					props.items,
+					(item) => item.key,
+					(item, rowScope) => {
+						hostComponent(rowScope, 0, 'input', { 'data-id': item.id, defaultValue: item.id });
+					},
+				);
+			};
+			const initial = ['a', 'b', 'c'].map((id) => ({ id, key: id }));
+			const view = mount(ManualList, { items: initial });
+			try {
+				const survivor = view.find('[data-id="b"]') as HTMLInputElement;
+				survivor.value = 'typed b';
+				let firstRead = true;
+				const incoming = {
+					id: 'incoming',
+					get key() {
+						if (firstRead) {
+							firstRead = false;
+							return 'c';
+						}
+						return settledKey;
+					},
+				};
+				view.update(ManualList, { items: [incoming, initial[1]!, { id: 'y', key: 'y' }] });
+				expect(view.findAll('input').map((node) => node.getAttribute('data-id'))).toEqual([
+					'incoming',
+					'b',
+					'y',
+				]);
+				expect(view.findAll('input')[1]).toBe(survivor);
+				expect(survivor.value).toBe('typed b');
+				view.update(ManualList, {
+					items: [{ id: 'settled', key: settledKey }, initial[1]!, { id: 'y', key: 'y' }],
+				});
+				expect(view.findAll('input').map((node) => node.getAttribute('data-id'))).toEqual([
+					'settled',
+					'b',
+					'y',
+				]);
+				expect(view.findAll('input')[1]).toBe(survivor);
+				expect(survivor.value).toBe('typed b');
+			} finally {
+				view.unmount();
+			}
+		},
+	);
+
 	it('preserves object keys and callback arguments, and unmounts the root after an unhandled key error', () => {
 		type Row = { id: string; label: string };
 		type Props = { items: Row[]; getKey: (item: Row, index: number) => Row };

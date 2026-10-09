@@ -48782,10 +48782,23 @@ function reconcileKeyed<T>(
 	const newMidLen = newEnd - prefixLen + 1;
 	const newKeys: any[] = [];
 	const newKeysToIdx = new Map<any, number>(); // key → MIDDLE-RELATIVE index (0..newMidLen-1)
+	// Equal-length middles can match unchanged positions directly. Keep only
+	// the other keys in the lookup map; local swaps then avoid indexing every
+	// untouched row between the moved ones. NaN retains Map's equality semantics.
+	// A fresh first key commonly starts a full replacement, where the extra
+	// chain walk earns nothing. Select the strategy from the first middle key,
+	// without keeping another value live across the prefix/suffix fast paths.
+	let keyCursor = oldRemain === newMidLen ? oldFirst : null;
+	let hasStableKeys = false;
 	for (let i = 0; i < newMidLen; i++) {
 		const key = readListKey(keySource, items[prefixLen + i], prefixLen + i, normalizeKey);
 		newKeys[i] = key;
-		newKeysToIdx.set(key, i);
+		if (i === 0 && keyCursor !== null && !oldItems.has(key)) keyCursor = null;
+		if (keyCursor !== null) {
+			if (keyCursor.key === key) hasStableKeys = true;
+			else newKeysToIdx.set(key, i);
+			keyCursor = keyCursor.nextSibling;
+		} else newKeysToIdx.set(key, i);
 		if (observeKey !== undefined) observeKey(prefixLen + i, key);
 	}
 
@@ -48793,7 +48806,12 @@ function reconcileKeyed<T>(
 	// survive, batch-clear with `textContent = ''` (one DOM op vs N removeChild)
 	// and mass-mount. Detect "no survivors" by checking just the first old block
 	// (the loop in the original code exits after one hit too).
-	if (beforeMiddle === null && afterMiddle === null && !newKeysToIdx.has(oldFirst!.key)) {
+	if (
+		!hasStableKeys &&
+		beforeMiddle === null &&
+		afterMiddle === null &&
+		!newKeysToIdx.has(oldFirst!.key)
+	) {
 		// Quick scan: confirm no survivor before committing to batch-clear.
 		let anySurvivors = false;
 		let cur: Block | null = oldFirst!.nextSibling!;
@@ -48863,7 +48881,8 @@ function reconcileKeyed<T>(
 		let oldIdx = 0;
 		while (cur !== afterMiddle) {
 			const next: Block | null = cur!.nextSibling!;
-			const newRelIdx = newKeysToIdx.get(cur!.key);
+			const newRelIdx =
+				hasStableKeys && newKeys[oldIdx] === cur!.key ? oldIdx : newKeysToIdx.get(cur!.key);
 			if (newRelIdx === undefined) {
 				if (journalShape || record !== null) {
 					journalForSlot(state);
