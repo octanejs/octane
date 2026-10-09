@@ -11,6 +11,7 @@ import {
 import { profiler } from 'octane/profiling';
 import { act, mount, nextPaint } from './_helpers';
 import { App as ContextApp } from './_fixtures/context-bailout.tsrx';
+import { WideSwitch } from './_fixtures/hookless-arms.tsrx';
 import { makeStore, Reader } from './_fixtures/sync-external-store.tsrx';
 
 function CounterLeaf(props) @{
@@ -508,6 +509,15 @@ describe('profile build engine counters', () => {
 		expect(restored['block.unmount']).toBeGreaterThan(0);
 
 		mounted.unmount();
+	});
+
+	it('mounts a hooked @switch case past case 31 as a Block', async () => {
+		const mountOn = (which: number) =>
+			measure(() => mount(WideSwitch, { which, log() {} }).unmount());
+		// Case 0 is hookless, so case 32 mounts exactly one more Block.
+		const hookless = await mountOn(0);
+		const hooked = await mountOn(32);
+		expect(hooked['block.create']).toBe(hookless['block.create']! + 1);
 	});
 
 	it('counts a skipped memo body as a bailout, not a render', async () => {

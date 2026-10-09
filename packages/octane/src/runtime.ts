@@ -47336,7 +47336,8 @@ export function switchBlock(
 		body,
 		'switch',
 		env,
-		lite !== undefined && (lite & (nextIdx < 0 ? 1 : 2 << nextIdx)) !== 0,
+		// Only the first 30 cases have lite bits, and a shift count wraps at 32.
+		lite !== undefined && nextIdx < 30 && (lite & (nextIdx < 0 ? 1 : 2 << nextIdx)) !== 0,
 	);
 }
 
