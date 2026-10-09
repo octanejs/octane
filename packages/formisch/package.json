@@ -1,6 +1,6 @@
 {
   "name": "@octanejs/formisch",
-  "version": "0.0.17",
+  "version": "0.0.18",
   "license": "MIT",
   "type": "module",
   "engines": {
@@ -42,7 +42,7 @@
     "test:parity": "node ../../scripts/react-parity/formisch-check.mjs"
   },
   "peerDependencies": {
-    "octane": "workspace:^0.11.0",
+    "octane": "workspace:^0.12.0",
     "valibot": "^1.4.1"
   },
   "devDependencies": {

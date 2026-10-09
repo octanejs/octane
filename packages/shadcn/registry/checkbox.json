@@ -12,8 +12,8 @@
     }
   ],
   "dependencies": [
-    "@octanejs/base-ui@0.1.64",
-    "@octanejs/lucide@0.1.57",
+    "@octanejs/base-ui@0.1.65",
+    "@octanejs/lucide@0.1.58",
     "cn"
   ]
 }

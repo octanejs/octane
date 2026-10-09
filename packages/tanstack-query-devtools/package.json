@@ -1,6 +1,6 @@
 {
   "name": "@octanejs/tanstack-query-devtools",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "license": "MIT",
   "type": "module",
   "engines": {
@@ -41,7 +41,7 @@
   },
   "peerDependencies": {
     "@octanejs/tanstack-query": "workspace:*",
-    "octane": "workspace:^0.11.0"
+    "octane": "workspace:^0.12.0"
   },
   "devDependencies": {
     "@octanejs/tanstack-query": "workspace:*",
