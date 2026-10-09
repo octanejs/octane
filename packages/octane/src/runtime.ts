@@ -14085,7 +14085,7 @@ export function callWithReceiver<T>(
 	return NATIVE_REFLECT_APPLY(fn, receiver, args);
 }
 
-export function withSlot<T>(sym: symbol, fn: (...a: any[]) => T, ...args: any[]): T;
+export function withSlot<T>(sym: HookSlot, fn: (...a: any[]) => T, ...args: any[]): T;
 export function withSlot<T>(sym: HookSlot, fn: (...a: any[]) => T, ...args: any[]): T {
 	const driver = MANUAL_HOOK_DRIVER;
 	const pending = driver?.pending;
@@ -14179,7 +14179,7 @@ type StateSetter<T> = (next: T | ((prev: T) => T)) => void;
 type StateTuple<T> = [T, StateSetter<T>, () => T];
 
 export function useState<T = undefined>(): StateTuple<T | undefined>;
-export function useState<T>(initial: T | (() => T), slot?: symbol): StateTuple<T>;
+export function useState<T>(initial: T | (() => T), slot?: HookSlot): StateTuple<T>;
 export function useState<T>(initial?: T | (() => T), slot?: HookSlot): StateTuple<T> {
 	const s = readStateHook(initial, slot, arguments.length === 1);
 	// The compiler selects the getter variant only when the third member is observed.
@@ -14452,7 +14452,7 @@ function endUrgentTransitionCell(
 }
 
 /** Compiler-emitted useState variant for a tuple whose third member is observable. */
-export function __useStateWithGetter<T>(initial: T | (() => T), slot?: symbol): StateTuple<T>;
+export function __useStateWithGetter<T>(initial: T | (() => T), slot?: HookSlot): StateTuple<T>;
 export function __useStateWithGetter<T>(initial: T | (() => T), slot?: HookSlot): StateTuple<T> {
 	const s = readStateHook(initial, slot, arguments.length === 1);
 	const getter =
@@ -14614,7 +14614,7 @@ export function useLinkedState<Source, Value extends Previous, Previous = Value>
 	source: Source,
 	reconcile: (source: Source, previous: LinkedStatePrevious<Source, Previous> | undefined) => Value,
 	options?: LinkedStateOptions<Source, Previous>,
-	slot?: symbol,
+	slot?: HookSlot,
 ): LinkedStateTuple<LinkedStateValue<Value, Previous>>;
 export function useLinkedState<Source, Value>(
 	source: Source,
@@ -14783,7 +14783,7 @@ export function __useLinkedStateWithGetter<Source, Value extends Previous, Previ
 	source: Source,
 	reconcile: (source: Source, previous: LinkedStatePrevious<Source, Previous> | undefined) => Value,
 	options?: LinkedStateOptions<Source, Previous>,
-	slot?: symbol,
+	slot?: HookSlot,
 ): LinkedStateTuple<LinkedStateValue<Value, Previous>>;
 export function __useLinkedStateWithGetter<Source, Value>(
 	source: Source,
@@ -14835,7 +14835,7 @@ export function useReducer<S, A, I = S>(
 	reducer: (s: S, a: A) => S,
 	initialArg: I,
 	initOrSlot?: ((arg: I) => S) | symbol,
-	slot?: symbol,
+	slot?: HookSlot,
 ): ReducerTuple<S, A>;
 export function useReducer<S, A, I = S>(
 	reducer: (s: S, a: A) => S,
@@ -14979,7 +14979,7 @@ export function __useReducerWithGetter<S, A, I = S>(
 	reducer: (s: S, a: A) => S,
 	initialArg: I,
 	initOrSlot?: ((arg: I) => S) | symbol,
-	slot?: symbol,
+	slot?: HookSlot,
 ): ReducerTuple<S, A>;
 export function __useReducerWithGetter<S, A, I = S>(
 	reducer: (s: S, a: A) => S,
@@ -15208,12 +15208,12 @@ function resolveHookArgs(
 	return [deps as any[] | undefined, slot];
 }
 
-export function useEffect(fn: EffectFn, deps?: any[] | null, slot?: symbol): void;
+export function useEffect(fn: EffectFn, deps?: any[] | null, slot?: HookSlot): void;
 export function useEffect(fn: EffectFn, deps?: any[] | null, slot?: HookSlot): void {
 	const [d, s] = resolveHookArgs('useEffect', deps, slot);
 	enqueueEffect(s, fn, d, PASSIVE);
 }
-export function useLayoutEffect(fn: EffectFn, deps?: any[] | null, slot?: symbol): void;
+export function useLayoutEffect(fn: EffectFn, deps?: any[] | null, slot?: HookSlot): void;
 export function useLayoutEffect(fn: EffectFn, deps?: any[] | null, slot?: HookSlot): void {
 	const [d, s] = resolveHookArgs('useLayoutEffect', deps, slot);
 	enqueueEffect(s, fn, d, LAYOUT);
@@ -15258,12 +15258,12 @@ function settleLayoutSnapshot(cell: object, block: Block): void {
 export function useLayoutSnapshot<T>(
 	measure: () => T,
 	options: LayoutSnapshotOptionsWithInitial<T>,
-	slot?: symbol,
+	slot?: HookSlot,
 ): T;
 export function useLayoutSnapshot<T>(
 	measure: () => T,
 	options?: LayoutSnapshotOptions<T>,
-	slot?: symbol,
+	slot?: HookSlot,
 ): T | undefined;
 export function useLayoutSnapshot<T>(
 	measure: () => T,
@@ -15308,7 +15308,7 @@ export function useLayoutSnapshot<T>(
 	return box.value;
 }
 
-export function useInsertionEffect(fn: EffectFn, deps?: any[] | null, slot?: symbol): void;
+export function useInsertionEffect(fn: EffectFn, deps?: any[] | null, slot?: HookSlot): void;
 export function useInsertionEffect(fn: EffectFn, deps?: any[] | null, slot?: HookSlot): void {
 	const [d, s] = resolveHookArgs('useInsertionEffect', deps, slot);
 	enqueueEffect(s, fn, d, INSERTION);
@@ -15406,7 +15406,7 @@ function computeMemoWithDiagnostics<T>(compute: (...deps: any[]) => T, deps: any
 	}
 }
 
-export function useMemo<T>(compute: (...deps: any[]) => T, deps?: any[] | null, slot?: symbol): T;
+export function useMemo<T>(compute: (...deps: any[]) => T, deps?: any[] | null, slot?: HookSlot): T;
 export function useMemo<T>(
 	compute: (...deps: any[]) => T,
 	deps?: any[] | null,
@@ -15430,7 +15430,7 @@ export function useMemo<T>(
 export function useCallback<F extends (...args: any[]) => any>(
 	fn: F,
 	deps?: any[] | null,
-	slot?: symbol,
+	slot?: HookSlot,
 ): F;
 export function useCallback<F extends (...args: any[]) => any>(
 	fn: F,
@@ -15576,7 +15576,7 @@ export function hookMemoPublishInvariant<T>(cells: any[], base: number, value: T
 }
 
 export function useRef<T = undefined>(): { current: T | undefined };
-export function useRef<T>(initial: T, slot?: symbol): { current: T };
+export function useRef<T>(initial: T, slot?: HookSlot): { current: T };
 export function useRef<T>(initial?: T, slot?: HookSlot): { current: T | undefined } {
 	// Same legacy lone-slot compatibility and authored alias arguments as useState.
 	if (
@@ -15618,7 +15618,7 @@ export function useLazyRef<T>(factory: () => T, slot?: HookSlot): { current: T }
  * hooks ported from React run unchanged. Accepts (and ignores) the compiler's
  * trailing compiler slot like every other hook.
  */
-export function useDebugValue(_value?: unknown, _format?: unknown, _slot?: symbol): void;
+export function useDebugValue(_value?: unknown, _format?: unknown, _slot?: HookSlot): void;
 export function useDebugValue(_value?: unknown, _format?: unknown, _slot?: HookSlot): void {}
 
 type ImperativeRef<T> =
@@ -15697,7 +15697,7 @@ export function useImperativeHandle<T>(
 	ref: ImperativeRef<T>,
 	factory: () => T,
 	deps?: any[] | null,
-	slot?: symbol,
+	slot?: HookSlot,
 ): void;
 export function useImperativeHandle<T>(
 	ref: ImperativeRef<T>,
@@ -15858,7 +15858,7 @@ export function useSyncExternalStore<T>(
 	subscribe: (onStoreChange: () => void) => () => void,
 	getSnapshot: () => T,
 	getServerSnapshot?: () => T,
-	slot?: symbol,
+	slot?: HookSlot,
 ): T;
 export function useSyncExternalStore<T>(
 	subscribe: (onStoreChange: () => void) => () => void,
@@ -15989,7 +15989,7 @@ export function useSyncExternalStore<T>(
  * is intentionally not stable. Publishing the cell in commit prevents a
  * suspended or failed render from leaking an uncommitted closure.
  */
-export function useEffectEvent<F extends (...args: any[]) => any>(fn: F, slot?: symbol): F;
+export function useEffectEvent<F extends (...args: any[]) => any>(fn: F, slot?: HookSlot): F;
 export function useEffectEvent<F extends (...args: any[]) => any>(fn: F, slot?: HookSlot): F {
 	slot = resolveSlot(slot);
 	if (slot === undefined) missingSlot('useEffectEvent');
@@ -20386,7 +20386,7 @@ export function lazy<C extends ComponentBody<any>>(
 	return lazyWrapper as unknown as C & { displayName?: string };
 }
 
-export function useId(slot?: symbol): string;
+export function useId(slot?: HookSlot): string;
 export function useId(slot?: HookSlot): string {
 	slot = resolveSlot(slot);
 	if (slot === undefined) missingSlot('useId');
@@ -44761,7 +44761,7 @@ function reportTransitionError(error: unknown, hook?: TransitionHookSlot): void 
 }
 
 export function useTransition(
-	slot?: symbol,
+	slot?: HookSlot,
 ): [boolean, (fn: () => void | Promise<unknown>) => void];
 export function useTransition(
 	slot?: HookSlot,
@@ -44842,7 +44842,7 @@ export function useActionState<S>(
 	action: (prevState: S, payload: any) => S | Promise<S>,
 	initialState: S,
 	permalinkOrSlot?: string | symbol,
-	slot?: symbol,
+	slot?: HookSlot,
 ): [S, (payload?: any) => void, boolean];
 export function useActionState<S>(
 	action: (prevState: S, payload: any) => S | Promise<S>,
@@ -44992,7 +44992,7 @@ interface FormStatusSlot {
 	listener: (() => void) | null;
 }
 
-export function useFormStatus(slot?: symbol): FormStatus;
+export function useFormStatus(slot?: HookSlot): FormStatus;
 export function useFormStatus(slot?: HookSlot): FormStatus {
 	slot = resolveSlot(slot);
 	if (slot === undefined) missingSlot('useFormStatus');
@@ -45079,7 +45079,7 @@ export function useOptimistic<S, V = S>(
 export function useOptimistic<S, V = S>(
 	passthrough: S,
 	updateFnOrSlot: ((state: S, value: V) => S) | symbol | undefined,
-	slot?: symbol,
+	slot?: HookSlot,
 ): [S, (value: V) => void];
 export function useOptimistic<S, V = S>(
 	passthrough: S,
