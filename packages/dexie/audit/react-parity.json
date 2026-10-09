@@ -147,7 +147,7 @@
         {
           "path": "packages/dexie/typetests/public-api.test-d.ts",
           "role": "support",
-          "sha256": "0ecda58208a991438b6404b57705d4ffa45c0e8dd1680e9c1f17f6a2d3aacad5"
+          "sha256": "723935cc9f8d8917f1285b4dee5f6efce928174d7ff85b122cbb2219f7537ddb"
         },
         {
           "path": "packages/dexie/typetests/tsconfig.json",

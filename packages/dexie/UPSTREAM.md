@@ -17,6 +17,8 @@ The binding reuses Dexie's IndexedDB core and ports every public dexie-react-hoo
 
 `useObservable`, `useLiveQuery`, `useSuspendingObservable`, `useSuspendingLiveQuery`, `usePermissions`, and `useDocument` are all exported and covered by the package conformance/type suites. Dexie's framework-neutral exports are re-exported from the package root. `useDocument` retains the upstream optional `y-dexie`/`yjs` integration boundary.
 
+`useSuspendingObservable` follows the pinned upstream `libs/dexie-react-hooks/src/useSuspendingObservable.ts` contract: direct sources and factories use Dexie's `Subscribable<T>`, whose subscription accepts an observer object and returns an `Unsubscribable`. The public type suite covers observer inputs, result inference, explicit Octane slots, and rejection of callback subscriptions. The conformance integration suite covers pending UI, first values, and updates for direct and factory observer sources. Callback subscriptions remain supported by the ordinary `useObservable` hook.
+
 ## Test-suite disposition
 
 The canonical package has one Karma/QUnit browser integration suite with four IndexedDB scenarios and TypeScript compilation over its source/tests. All four runtime scenarios are adapted and execute in real Chromium against the Octane binding. A same-fixture differential additionally runs `useLiveQuery` against real dexie-react-hooks and Octane over one fake-indexeddb database, including an affected write. SSR and hydration are Octane-specific contracts; the adapted type lane compiles the complete supported public surface.
