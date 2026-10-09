@@ -23,6 +23,14 @@
   "main": "src/index.ts",
   "module": "src/index.ts",
   "types": "src/index.ts",
+  "typesVersions": {
+    "*": {
+      "compiler/valdi": [
+        "src/compiler/valdi.d.ts",
+        "dist/compiler/valdi.d.ts"
+      ]
+    }
+  },
   "files": [
     "dist",
     "README.md"
@@ -108,6 +116,9 @@
       "default": "./src/compiler/vite.js"
     },
     "./compiler/volar": "./src/compiler/volar.js",
+    "./compiler/valdi": {
+      "types": "./src/compiler/valdi.d.ts"
+    },
     "./strong/jsx-runtime": "./src/jsx-runtime-strong.d.ts",
     "./strong/jsx-dev-runtime": "./src/jsx-runtime-strong.d.ts"
   },
@@ -365,6 +376,9 @@
         "default": "./dist/compiler/vite.js"
       },
       "./compiler/volar": "./dist/compiler/volar.js",
+      "./compiler/valdi": {
+        "types": "./dist/compiler/valdi.d.ts"
+      },
       "./strong/jsx-runtime": {
         "types": "./dist/jsx-runtime-strong.d.ts"
       },

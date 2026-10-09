@@ -1,7 +1,8 @@
 // @vitest-environment node
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import ts from 'typescript';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { compile } from 'octane/compiler';
@@ -31,50 +32,29 @@ const renderer = {
 	text: 'reject',
 } as const;
 
-// A deliberately typed version of the external adapter contract. A permissive
-// untyped adapter would conceal erased component props and hook type arguments.
-const ADAPTER = `declare module '@test/valdi-writer' {
-	type Prototype = { readonly tag: string };
-	type Component<P> = (props: P) => void;
-	type Slot = number | symbol;
-	type Update<T> = (next: T | ((previous: T) => T)) => void;
-	export function assertValdiCompilerAbi(version: number): void;
-	export function defineValdiComponent<F extends (...args: any[]) => void>(render: F, options: { hasHooks: boolean }): F;
-	export function getValdiComponentConstructor<P>(component: Component<P>): Component<P>;
-	export function valdiKey(prototype: Prototype, ...parts: unknown[]): string;
-	export function setValdiAttributes(props: object): void;
-	export function hookSlots(count: number): number;
-	export function withSlot<A extends unknown[], R>(slot: Slot, callback: (...args: A) => R, ...args: A): R;
-	export function useState<T>(initial: T | (() => T), slot: Slot): [T, Update<T>, () => T];
-	export { useState as __useStateWithGetter };
-	export function useMemo<T>(calculate: (...args: any[]) => T, deps: readonly unknown[] | null, slot: Slot): T;
-	export function useCallback<F extends (...args: any[]) => any>(callback: F, deps: readonly unknown[] | null, slot: Slot): F;
-	export function useRef<T>(initial: T, slot: Slot): { current: T };
-	export function useLayoutEffect(create: () => void | (() => void), deps: readonly unknown[] | null, slot: Slot): void;
-	export function __methodDep<T, K extends keyof T>(object: T, name: K): T[K];
-	export const jsx: {
-		makeNodePrototype(tag: string, pairs?: readonly unknown[]): Prototype;
-		makeComponentPrototype(pairs?: readonly unknown[]): Prototype;
-		beginRender(prototype: Prototype, key?: string): void;
-		endRender(): void;
-		setAttribute(name: string, value: unknown): void;
-		setAttributeBool(name: string, value: boolean | null | undefined): void;
-		setAttributeNumber(name: string, value: number | null | undefined): void;
-		setAttributeString(name: string, value: string | null | undefined): void;
-		setAttributeFunction(name: string, value: Function | null | undefined): void;
-		setAttributeStyle(name: string, value: unknown): void;
-		beginComponent<P>(component: Component<P>, prototype: Prototype, key?: string): void;
-		setViewModelProperty(name: string, value: unknown): void;
-		setViewModelFull(props: object): void;
-		endComponent(): void;
-	};
-}`;
+// Both the compiler consumer and real Valdi Workspace fixture resolve this
+// adapter through the published contract rather than copied hook signatures.
+const ADAPTER = readFileSync(
+	new URL('../../../../scripts/fixtures/valdi-typescript-build/writer.d.ts', import.meta.url),
+	'utf8',
+);
 
 function typecheck(code: string, consumer: string, extraFiles: Record<string, string> = {}) {
 	const directory = mkdtempSync(join(tmpdir(), 'octane-valdi-ts-'));
 	try {
+		const adapterDirectory = join(directory, 'node_modules/@test/valdi-writer');
+		mkdirSync(adapterDirectory, { recursive: true });
+		writeFileSync(join(adapterDirectory, 'index.d.ts'), ADAPTER);
+		writeFileSync(
+			join(adapterDirectory, 'package.json'),
+			JSON.stringify({ name: '@test/valdi-writer', types: './index.d.ts' }),
+		);
+		symlinkSync(
+			fileURLToPath(new URL('../../', import.meta.url)),
+			join(directory, 'node_modules/octane'),
+			'dir',
+		);
 		const files = {
-			'adapter.d.ts': ADAPTER,
 			'scene.ts': code,
 			'consumer.ts': consumer,
 			...extraFiles,
@@ -93,6 +73,11 @@ function typecheck(code: string, consumer: string, extraFiles: Record<string, st
 				target: ts.ScriptTarget.ESNext,
 				lib: ['lib.es2020.d.ts'],
 				types: [],
+				// Tests of preserved author-facing types supply a small root-module
+				// fixture. The compiler/valdi subpath still uses real package resolution.
+				...(extraFiles['octane.d.ts']
+					? { paths: { octane: [join(directory, 'octane.d.ts')] } }
+					: {}),
 			},
 		});
 		return ts.getPreEmitDiagnostics(program).map((diagnostic) => ({
@@ -169,6 +154,122 @@ describe.each(['native', 'javascript'])(
 				typecheck(
 					result.code,
 					`import { Scene } from './scene'; Scene({ items: [{ id: 'a', label: 'A' }], visible: true, attrs: { padding: 4 } });`,
+				),
+			).toEqual([]);
+		});
+
+		it('preserves omitted initializers and spread hook arguments through the public adapter types', () => {
+			parser.javascript = parserName === 'javascript';
+			const source = `import { useState, useRef } from 'octane';
+			export function useOptional() {
+				const [value, setValue, getValue] = useState<string>();
+				const ref = useRef<string>();
+				return { value, setValue, getValue, ref };
+			}
+			export function useEmptySpread() {
+				const [value, setValue, getValue] = useState<string>(...([] as []));
+				const ref = useRef<string>(...([] as []));
+				return { value, setValue, getValue, ref };
+			}
+			export function useSpread(initial: number) {
+				const [value, setValue, getValue] = useState<number>(...([initial] as [number]));
+				const ref = useRef<number>(...([initial] as [number]));
+				return { value, setValue, getValue, ref };
+			}`;
+			const result = compile(source, '/src/useValue.ts', { renderer, hmr: false, output: 'ts' });
+			expect(
+				typecheck(
+					result.code,
+					`import { useOptional, useEmptySpread, useSpread } from './scene';
+					const optional = useOptional();
+					const value: string | undefined = optional.value;
+					const current: string | undefined = optional.getValue();
+					optional.setValue(previous => previous?.toUpperCase());
+					optional.ref.current = value;
+					const empty = useEmptySpread();
+					const absent: string | undefined = empty.getValue();
+					empty.ref.current = absent;
+					empty.setValue(previous => previous?.toUpperCase());
+					const spread = useSpread(1);
+					const count: number = spread.getValue();
+					const ref: number = spread.ref.current;
+					spread.setValue(previous => previous + count + ref);`,
+				),
+			).toEqual([]);
+			const misuse = typecheck(
+				result.code,
+				`import { useOptional, useEmptySpread, useSpread } from './scene';
+				const optional = useOptional();
+				optional.setValue(1);
+				const required: string = optional.getValue();
+				const absent: string = useEmptySpread().getValue();
+				useSpread(1).setValue('wrong');`,
+			);
+			expect(misuse.map(({ file, code }) => ({ file, code }))).toEqual([
+				{ file: 'consumer.ts', code: 2345 },
+				{ file: 'consumer.ts', code: 2322 },
+				{ file: 'consumer.ts', code: 2322 },
+				{ file: 'consumer.ts', code: 2345 },
+			]);
+		});
+
+		it('types inferred guarded method dependencies without narrowing the runtime probes', () => {
+			parser.javascript = parserName === 'javascript';
+			const source = `import { useMemo, useCallback, useLayoutEffect } from 'octane';
+			interface Receiver { value: string; read?(): string }
+			export function useLabels(receiver: Receiver | null, count: number, enabled: boolean) {
+				const label = useMemo(() => receiver?.read?.() ?? count.toFixed(0));
+				const value = useMemo(() => enabled && receiver?.value);
+				const format = useCallback((input: number) => receiver?.read?.() ?? input.toFixed(0));
+				useLayoutEffect(() => { receiver?.read?.(); });
+				return { label, value, format };
+			}`;
+			const result = compile(source, '/src/useLabels.ts', { renderer, hmr: false, output: 'ts' });
+			expect(
+				typecheck(
+					result.code,
+					`import { useLabels } from './scene';
+					const result = useLabels(null, 1, true);
+					const label: string = result.label;
+					const value: string | false | undefined = result.value;
+					const formatted: string = result.format(2);`,
+				),
+			).toEqual([]);
+			const misuse = typecheck(
+				result.code,
+				`import { useLabels } from './scene'; useLabels(null, 1, true).format('wrong');`,
+			);
+			expect(misuse).toHaveLength(1);
+			expect(misuse[0]).toMatchObject({ file: 'consumer.ts', code: 2345 });
+		});
+
+		it.each([
+			{ name: 'ABI 2 append-only text', capabilities: [] },
+			{ name: 'ABI 3 authored text sites', capabilities: ['host-text-site'] },
+		])('typechecks $name against the public writer contract', ({ capabilities }) => {
+			parser.javascript = parserName === 'javascript';
+			const source = `export interface Props {
+				value: string | number | null;
+				items: { id: string; value: string }[];
+			}
+			export function Scene(props: Props) @{
+				<view>
+					Heading {props.value}
+					@for (const item of props.items; key item.id) {
+						<label>{item.value as string}</label>
+					}
+				</view>
+			}`;
+			const result = compile(source, '/src/Scene.tsrx', {
+				renderer: { ...renderer, text: 'host', capabilities },
+				hmr: false,
+				output: 'ts',
+			});
+			expect(
+				typecheck(
+					result.code,
+					`import { Scene } from './scene';
+					Scene({ value: 1, items: [{ id: 'one', value: 'first' }] });`,
 				),
 			).toEqual([]);
 		});
@@ -275,7 +376,7 @@ describe.each(['native', 'javascript'])(
 					result.code,
 					`import { useText } from './scene'; const value: string | number | null = useText('ok');`,
 					{
-						'octane.d.ts': `declare module 'octane' { export type OctaneNode = string | number | null; }`,
+						'octane.d.ts': `export type OctaneNode = string | number | null;`,
 					},
 				),
 			).toEqual([]);
@@ -292,7 +393,7 @@ describe.each(['native', 'javascript'])(
 				{ renderer, hmr: false, output: 'ts' },
 			);
 			const types = {
-				'octane.d.ts': `declare module 'octane' { export type OctaneNode = string | number | null; }`,
+				'octane.d.ts': `export type OctaneNode = string | number | null;`,
 			};
 			expect(
 				typecheck(
