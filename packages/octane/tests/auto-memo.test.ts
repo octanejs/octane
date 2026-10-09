@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import * as ServerRuntime from 'octane/server';
 import { prerender } from 'octane/static';
 import { compile } from '../src/compiler/compile.js';
-import { createContext, createElement, flushSync, hydrateRoot } from '../src/index.js';
+import { createContext, createElement, flushSync, hydrateRoot, use } from '../src/index.js';
 import { act, flushEffects, mount } from './_helpers';
 import { loadCompiledFixtureSource } from './_server-fixture.js';
 import { AutoMemoApp } from './_fixtures/auto-memo.tsrx';
@@ -2187,6 +2187,89 @@ describe('compiler-owned component-region memoization', () => {
 		expect(effects.filter((event) => event === 'cleanup:1')).toHaveLength(1);
 		expect(effects.filter((event) => event === 'cleanup:2')).toHaveLength(2);
 	});
+
+	// A custom map can turn a keyed host row into a component. A row first mounted
+	// as host markup is its own range; a row that replaced a component sits in the
+	// component's range. A held root render keeps the committed host row until the
+	// component can commit.
+	it.each([
+		{ firstRows: 'host', hold: false },
+		{ firstRows: 'host', hold: true },
+		{ firstRows: 'components', hold: true },
+	])(
+		'replaces a keyed custom-map host row with a component (first rows: $firstRows, held: $hold)',
+		async ({ firstRows, hold }) => {
+			const items = [
+				{ id: 1, label: 'first' },
+				{ id: 2, label: 'second' },
+			];
+			let open!: (value: string) => void;
+			const gate = new Promise<string>((resolve) => {
+				open = resolve;
+			});
+			const Gate = (props: { gate: Promise<string> }) => {
+				use(props.gate);
+				return null;
+			};
+			const effects: string[] = [];
+			const mixedRows = {
+				map<T>(callback: (item: (typeof items)[number], index: number) => T): T[] {
+					return [
+						callback(items[0]!, 0),
+						createElement('li', { key: 2, 'data-mixed': 'host' }, 'host') as T,
+					];
+				},
+			};
+			const componentRows = {
+				map<T>(callback: (item: (typeof items)[number], index: number) => T): T[] {
+					const rows = [callback(items[0]!, 0), callback(items[1]!, 1)];
+					if (hold) rows.push(createElement(Gate, { key: 3, gate }) as T);
+					return rows;
+				},
+			};
+			const onEffect = (event: string) => effects.push(event);
+			const onItem = (_id: number, index: number): string => String(index);
+			const props = { prefix: 'mixed', theme: 't0', onEffect, onItem };
+			const root = mount(TsxMappedComponentApp, {
+				...props,
+				rows: firstRows === 'host' ? mixedRows : items,
+			});
+			if (firstRows === 'components')
+				root.update(TsxMappedComponentApp, { ...props, rows: mixedRows });
+			flushEffects();
+			const first = root.find('.tracked-own-1');
+			root.click('.tracked-own-1');
+			const host = root.find('[data-mixed="host"]');
+			const committed = effects.length;
+
+			root.update(TsxMappedComponentApp, {
+				...props,
+				rows: componentRows,
+				prefix: 'components',
+				theme: 't1',
+			});
+			flushEffects();
+			if (hold) {
+				expect(root.find('[data-mixed="host"]')).toBe(host);
+				expect(first.textContent).toBe('t0:mixed:0:first:1');
+				expect(root.findAll('.tracked-own-2')).toHaveLength(0);
+				expect(effects.slice(committed)).toEqual([]);
+				open('ready');
+				await gate;
+				await Promise.resolve();
+				flushEffects();
+			}
+			expect(host.isConnected).toBe(false);
+			expect(root.find('.tracked-own-1')).toBe(first);
+			expect(first.textContent).toBe('t1:components:0:first:1');
+			expect(root.find('.tracked-own-2').textContent).toBe('t1:components:1:second:0');
+			expect(effects.slice(committed)).toEqual(['mount:2']);
+
+			root.unmount();
+			flushEffects();
+			expect(effects.slice(committed + 1).toSorted()).toEqual(['cleanup:1', 'cleanup:2']);
+		},
+	);
 
 	it.each([
 		{ serverReceiver: 'native', clientReceiver: 'custom' },
