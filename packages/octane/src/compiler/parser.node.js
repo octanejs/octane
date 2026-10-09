@@ -2,7 +2,7 @@
 /** @import { Program } from 'estree' */
 
 import { parseModule as parseNativeModule } from '@tsrx/oxc/tsrx-core-compat';
-import { parseModule as parseJavaScriptModule } from './parser.browser.js';
+import { parseModule as parseJavaScriptModule, parseTypeScriptModule } from './parser.browser.js';
 
 import { isolateOutputOptions, publishOutput } from './parser-output.js';
 import { adoptTemplateShape } from './parser-template-shape.js';
@@ -51,6 +51,11 @@ function isNativeSyntaxRejection(error, source) {
  */
 export function parseModule(source, filename = 'module.tsrx', options) {
 	const resolvedFilename = filename || 'module.tsrx';
+	// The native facade returns an untyped AST for `.ts`, which turns `import type`
+	// into a value import and drops parameter properties. TypeScript's grammar
+	// keeps them; the native parser still reports what that grammar rejects.
+	const typeScript = parseTypeScriptModule(source, resolvedFilename, options);
+	if (typeScript !== null) return adoptTemplateShape(typeScript);
 	const nativeOptions = isolateOutputOptions(options);
 	let program;
 	try {

@@ -79,7 +79,7 @@ describe('Node parser compatibility', () => {
 		vi.mocked(parseNativeModule).mockImplementationOnce(() => {
 			throw failure;
 		});
-		expect(() => parseModule('export const value = 1;', 'valid.ts')).toThrow(failure);
+		expect(() => parseModule('export const value = 1;', 'valid.tsx')).toThrow(failure);
 	});
 
 	it.each([
@@ -122,33 +122,40 @@ describe('Node parser compatibility', () => {
 		expect(vi.mocked(parseJavaScriptModule)).not.toHaveBeenCalled();
 	});
 
-	it('keeps native comments and diagnostics on a successful parse', () => {
-		const comments: NonNullable<ParseOptions['comments']> = [];
-		const errors: NonNullable<ParseOptions['errors']> = [];
-		const program = parseModule('/* native */ export const value = 1;', 'valid.ts', {
-			comments,
-			errors,
-		});
-		expect(program.body[0].type).toBe('ExportNamedDeclaration');
-		expect(comments.map((comment) => comment.value.trim())).toEqual(['native']);
-		expect(errors).toEqual([]);
-	});
+	// `.ts` takes TypeScript's grammar first; `.tsx` takes the native parser.
+	it.each(['valid.ts', 'valid.tsx'])(
+		'keeps comments and diagnostics on a successful parse: %s',
+		(filename) => {
+			const comments: NonNullable<ParseOptions['comments']> = [];
+			const errors: NonNullable<ParseOptions['errors']> = [];
+			const program = parseModule('/* native */ export const value = 1;', filename, {
+				comments,
+				errors,
+			});
+			expect(program.body[0].type).toBe('ExportNamedDeclaration');
+			expect(comments.map((comment) => comment.value.trim())).toEqual(['native']);
+			expect(errors).toEqual([]);
+		},
+	);
 
-	it('does not reinterpret caller output-buffer failures as parser errors', () => {
-		const failure = new SyntaxError('output buffer rejected a comment');
-		const comments: NonNullable<ParseOptions['comments']> = [];
-		let rejected = false;
-		comments.push = (...items) => {
-			if (!rejected) {
-				rejected = true;
-				throw failure;
-			}
-			return Array.prototype.push.apply(comments, items);
-		};
-		expect(() => parseModule('/* native */ const value = 1;', 'valid.ts', { comments })).toThrow(
-			failure,
-		);
-	});
+	it.each(['valid.ts', 'valid.tsx'])(
+		'does not reinterpret caller output-buffer failures as parser errors: %s',
+		(filename) => {
+			const failure = new SyntaxError('output buffer rejected a comment');
+			const comments: NonNullable<ParseOptions['comments']> = [];
+			let rejected = false;
+			comments.push = (...items) => {
+				if (!rejected) {
+					rejected = true;
+					throw failure;
+				}
+				return Array.prototype.push.apply(comments, items);
+			};
+			expect(() => parseModule('/* native */ const value = 1;', filename, { comments })).toThrow(
+				failure,
+			);
+		},
+	);
 });
 
 describe('TSRX destructuring syntax', () => {
