@@ -1962,43 +1962,6 @@ export function App() @{ <Boundary fallback={async (error) => String(error)}><sp
 		expect(ordinaryTry?.code).not.toContain('_$errorBlock(');
 	});
 
-	it('preserves proven single-host roots through exact production memo wrappers only', () => {
-		const compiler = createOctaneCompiler({ root: '/project', hmr: false, dev: false });
-		const source = `
-import { memo as remember } from 'octane';
-import { External } from './external';
-function Host(props) @{ <li>{props.label as string}</li> }
-function Optional(props) @{ if (!props.visible) return null; <li>{props.label as string}</li> }
-const indirect = remember;
-export const Stable = remember(Host);
-export const Nullable = remember(Optional);
-export const Compared = remember(Host, () => true);
-export const Imported = remember(External);
-export const Indirect = indirect(Host);
-`;
-		const id = '/project/src/MemoRoots.tsrx';
-		const production = compiler.transform(source, id, { hmr: false, dev: false });
-		expect(production?.code).toMatch(
-			/Stable\s*=\s*(?:\/\*[^*]*\*\/\s*)?_\$__s\((?:\/\*[^*]*\*\/\s*)?remember\(Host\)\)/,
-		);
-		expect(production?.code).toMatch(/Nullable\s*=\s*(?:\/\*[^*]*\*\/\s*)?remember\(Optional\)/);
-		expect(production?.code).toMatch(
-			/Compared\s*=\s*(?:\/\*[^*]*\*\/\s*)?remember\(Host,\s*\(\)\s*=>\s*true\)/,
-		);
-		expect(production?.code).toMatch(/Imported\s*=\s*(?:\/\*[^*]*\*\/\s*)?remember\(External\)/);
-		expect(production?.code).toMatch(/Indirect\s*=\s*indirect\(Host\)/);
-
-		for (const options of [
-			{ hmr: false, dev: true },
-			{ hmr: 'vite' as const, dev: true },
-			{ hmr: false, dev: false, profile: true },
-			{ environment: 'server' as const, hmr: false, dev: false },
-		]) {
-			const output = compiler.transform(source, id, options);
-			expect(output?.code).not.toMatch(/_\$__s\((?:\/\*[^*]*\*\/\s*)?remember\(Host\)\)/);
-		}
-	});
-
 	it('applies profiling metadata only to client transforms', () => {
 		const compiler = createOctaneCompiler({ root: '/project', profile: true });
 		const client = compiler.transform(COMPONENT, '/project/src/App.tsrx', {

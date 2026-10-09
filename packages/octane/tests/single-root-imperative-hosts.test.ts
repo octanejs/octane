@@ -213,44 +213,46 @@ const listShapes: Record<string, ListShape> = {
 	},
 };
 
+async function reordersAndRemoves(kind: 'mount' | 'hydrate', program: Program) {
+	const s = start(kind, program, { rows: rows([0, 1, 2, 3]) }, '.row');
+	const rowsOf = () => [...s.container.querySelectorAll('.list > .row')];
+	const initial = rowsOf();
+	expect(initial.map((row) => row.textContent)).toEqual(['0', '1', '2', '3']);
+	if (kind === 'hydrate') expectSameNodes(initial, s.serverNodes);
+
+	s.render({ rows: rows([1, 2, 3, 4]) });
+	const shifted = rowsOf();
+	expect(shifted.map((row) => row.textContent)).toEqual(['1', '2', '3', '4']);
+	expectSameNodes(shifted.slice(0, 3), initial.slice(1));
+	expect(initial[0].isConnected).toBe(false);
+
+	s.render({ rows: rows([3, 2, 5]) });
+	const reordered = rowsOf();
+	expect(reordered.map((row) => row.textContent)).toEqual(['3', '2', '5']);
+	expectSameNodes(reordered.slice(0, 2), [initial[3], initial[2]]);
+	expect(initial[1].isConnected).toBe(false);
+	expect(shifted[3].isConnected).toBe(false);
+
+	// Emptying the list leaves only its own boundary, and a full refill
+	// and empty cycle returns to exactly that state.
+	s.render({ rows: [] });
+	const empty = between(s.container, '.list');
+	expect(content(empty)).toEqual([]);
+	s.render({ rows: rows([3, 2, 5]) });
+	expect(rowsOf().map((row) => row.textContent)).toEqual(['3', '2', '5']);
+	s.render({ rows: [] });
+	expect(between(s.container, '.list')).toEqual(empty);
+
+	await Promise.resolve();
+	expect(s.recovered).toEqual([]);
+	expect(s.mismatches()).toEqual([]);
+}
+
 describe('@for rows whose sole host is not a template element', () => {
 	describe.each(['mount', 'hydrate'] as const)('%s', (kind) => {
 		it.each(Object.entries(listShapes).filter(([, shape]) => kind === 'mount' || !shape.mountOnly))(
 			'reorders and removes %s without leaking nodes',
-			async (_name, { program }) => {
-				const s = start(kind, program, { rows: rows([0, 1, 2, 3]) }, '.row');
-				const rowsOf = () => [...s.container.querySelectorAll('.list > .row')];
-				const initial = rowsOf();
-				expect(initial.map((row) => row.textContent)).toEqual(['0', '1', '2', '3']);
-				if (kind === 'hydrate') expectSameNodes(initial, s.serverNodes);
-
-				s.render({ rows: rows([1, 2, 3, 4]) });
-				const shifted = rowsOf();
-				expect(shifted.map((row) => row.textContent)).toEqual(['1', '2', '3', '4']);
-				expectSameNodes(shifted.slice(0, 3), initial.slice(1));
-				expect(initial[0].isConnected).toBe(false);
-
-				s.render({ rows: rows([3, 2, 5]) });
-				const reordered = rowsOf();
-				expect(reordered.map((row) => row.textContent)).toEqual(['3', '2', '5']);
-				expectSameNodes(reordered.slice(0, 2), [initial[3], initial[2]]);
-				expect(initial[1].isConnected).toBe(false);
-				expect(shifted[3].isConnected).toBe(false);
-
-				// Emptying the list leaves only its own boundary, and a full refill
-				// and empty cycle returns to exactly that state.
-				s.render({ rows: [] });
-				const empty = between(s.container, '.list');
-				expect(content(empty)).toEqual([]);
-				s.render({ rows: rows([3, 2, 5]) });
-				expect(rowsOf().map((row) => row.textContent)).toEqual(['3', '2', '5']);
-				s.render({ rows: [] });
-				expect(between(s.container, '.list')).toEqual(empty);
-
-				await Promise.resolve();
-				expect(s.recovered).toEqual([]);
-				expect(s.mismatches()).toEqual([]);
-			},
+			(_name, { program }) => reordersAndRemoves(kind, program),
 		);
 	});
 
@@ -277,6 +279,57 @@ describe('@for rows whose sole host is not a template element', () => {
 		onlyRows();
 		s.render({ rows: [] });
 		expect(content(between(s.container, '.list'))).toEqual([]);
+	});
+});
+
+// memo() renders exactly its component's output, so a memoized one-element row
+// may share that element as its boundary too. A static-hoisting HOC copies the
+// wrapper's statics onto a component whose output is its own.
+const memoRow = `import { memo } from 'octane';
+	function RowImpl({id}) @{ <p class="row">{String(id)}</p> }`;
+const memoShapes: Record<string, Program> = {
+	'an imported default memo row': {
+		app: list(`<Row id={row.id}/>`, `import Row from '${ROW_MODULE}';`),
+		row: `${memoRow} export default memo(RowImpl);`,
+	},
+	'an imported const memo row': {
+		app: list(`<Row id={row.id}/>`, `import { Row } from '${ROW_MODULE}';`),
+		row: `${memoRow} export const Row = memo(RowImpl);`,
+	},
+	'an imported nested memo row': {
+		app: list(`<Row id={row.id}/>`, `import { Row } from '${ROW_MODULE}';`),
+		row: `${memoRow} export const Row = memo(memo(RowImpl));`,
+	},
+	'a same-module memo row': {
+		app: list(`<Row id={row.id}/>`, `${memoRow} const Row = memo(RowImpl);`),
+	},
+	// The list reads its row's mark in the parent's scope, where `Row` is the
+	// one-element memo. Each row renders its own `Row` instead.
+	'a same-module memo row shadowed by a row-local component': {
+		app: list(
+			`const Row = row.id % 2 ? Pair : RowImpl; <Row id={row.id}/>`,
+			`${memoRow} const Row = memo(RowImpl);
+			function Pair({id}) @{ <><p class="row">{String(id)}</p><b>{String(id)}</b></> }`,
+		),
+	},
+	'a two-element row carrying hoisted memo statics': {
+		app: list(`<Row id={row.id}/>`, `import { Row } from '${ROW_MODULE}';`),
+		row: `${memoRow}
+			const Memo = memo(RowImpl);
+			export function Row({id}) @{ <><p class="row">{String(id)}</p><b>{String(id)}</b></> }
+			for (const key of Reflect.ownKeys(Memo)) {
+				if (!Object.prototype.hasOwnProperty.call(Row, key))
+					Object.defineProperty(Row, key, Object.getOwnPropertyDescriptor(Memo, key));
+			}`,
+	},
+};
+
+describe('memoized @for rows', () => {
+	describe.each(['mount', 'hydrate'] as const)('%s', (kind) => {
+		it.each(Object.entries(memoShapes))(
+			'reorders and removes %s without leaking nodes',
+			(_name, program) => reordersAndRemoves(kind, program),
+		);
 	});
 });
 
@@ -341,6 +394,15 @@ const conditionalShapes: Record<string, Program> = {
 	'a noscript component root': {
 		app: `function Row({id}) @{ <noscript class="row">{String(id)}</noscript> }
 			export function App({show, id}) @{ <div class="host"><i>head</i>@if (show) { <Row id={id}/> }<span>tail</span></div> }`,
+	},
+	'a same-module memo component root': {
+		app: `${memoRow} const Row = memo(RowImpl);
+			export function App({show, id}) @{ <div class="host"><i>head</i>@if (show) { <Row id={id}/> }<span>tail</span></div> }`,
+	},
+	'an imported memo component root': {
+		app: `import Row from '${ROW_MODULE}';
+			export function App({show, id}) @{ <div class="host"><i>head</i>@if (show) { <Row id={id}/> }<span>tail</span></div> }`,
+		row: `${memoRow} export default memo(RowImpl);`,
 	},
 };
 

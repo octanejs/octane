@@ -42,9 +42,11 @@ function appListFlags(code: string): number[] {
 	let match: RegExpExecArray | null;
 	while ((match = FOR_CALL.exec(region))) {
 		const args = callArguments(region, match.index + match[0].length - 1);
-		const literal = args[6]?.match(/^\d+$/);
-		// A non-literal flags expression (an itemMemo witness guard) cannot
-		// satisfy a plain-integer assertion — fail loudly rather than misread it.
+		// A row component's runtime `$$singleRoot` stamp only adds the single-root
+		// bit, which these tests never assert. Any other non-literal flags
+		// expression (an itemMemo witness guard) cannot satisfy a plain-integer
+		// assertion — fail loudly rather than misread it.
+		const literal = args[6]?.match(/^\d+(?= \| \([\w$]+\.\$\$singleRoot === true \? 2 : 0\)$|$)/);
 		expect(literal, `expected a literal forBlock flags argument, saw ${args[6]}`).not.toBeNull();
 		flags.push(Number(literal![0]));
 	}
