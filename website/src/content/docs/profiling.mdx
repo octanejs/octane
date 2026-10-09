@@ -155,8 +155,14 @@ falling back or catching, commits, and work thrown away by rollbacks. Counts are
 deterministic for a fixed build, fixture, and interaction, so they are useful
 for catching regressions that timing noise would hide.
 
+Use `profiler.counters()` for the current session totals; it is shorthand for
+`profiler.snapshot().counters`. To isolate one interaction, take snapshots
+before and after it and pass them to `diff()`:
+
 ```js
 const profiler = globalThis.__OCTANE_PROFILER__;
+
+console.table(profiler.counters());
 
 const before = profiler.snapshot();
 // ...perform one interaction and wait for it to finish...
