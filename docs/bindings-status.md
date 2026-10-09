@@ -890,7 +890,7 @@ Scope/evidence last checked: 2026-08-02.
 
 ## @octanejs/monaco-editor
 
-[`packages/monaco-editor`](../packages/monaco-editor) `0.0.31` — ports `@monaco-editor/react@4.7.0`. Status data: [`packages/monaco-editor/status.json`](../packages/monaco-editor/status.json).
+[`packages/monaco-editor`](../packages/monaco-editor) `0.0.32` — ports `@monaco-editor/react@4.7.0`. Status data: [`packages/monaco-editor/status.json`](../packages/monaco-editor/status.json).
 
 Editor (default), DiffEditor, loader, useMonaco, and the complete upstream 4.7.0 prop and callback type surface, including controlled values, model paths, languages, themes, options, view-state restoration, validation, and model ownership.
 
