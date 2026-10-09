@@ -1,5 +1,11 @@
 # @octanejs/monaco-editor
 
+## 0.0.32
+
+### Patch Changes
+
+- a84ff34: Keep the visible editor's callbacks tied to committed props during suspended tab transitions, so edits and validation events cannot reach a pending file's handlers.
+
 ## 0.0.31
 
 ### Patch Changes
