@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import {
 	createPortal,
 	createContext,
@@ -938,6 +938,17 @@ describe('profile work lifecycle', () => {
 });
 
 describe('profile boundary and fallback probes', () => {
+	// Load and compile the server fixture in a hook with its own deadline: a
+	// first module load inside the test body can outlast the 5 s test timeout on
+	// a loaded runner. The hook still runs only when this block starts.
+	let server: ReturnType<typeof import('./_server-fixture').loadServerFixture>;
+	beforeAll(async () => {
+		const { loadServerFixture } = await import('./_server-fixture');
+		server = loadServerFixture(
+			'packages/octane/tests/hydration/_fixtures/suspended-arm-value-mismatch.tsrx',
+		);
+	}, 30_000);
+
 	it('records an error reset and descriptor reconciliation', async () => {
 		const view = mount(RenderBoundary, { bang: true });
 		view.update(RenderBoundary, { bang: false });
@@ -980,10 +991,6 @@ describe('profile boundary and fallback probes', () => {
 	});
 
 	it('records a suspended hydration rollback and retains the server nodes', async () => {
-		const { loadServerFixture } = await import('./_server-fixture');
-		const server = loadServerFixture(
-			'packages/octane/tests/hydration/_fixtures/suspended-arm-value-mismatch.tsrx',
-		);
 		const container = document.createElement('div');
 		document.body.append(container);
 		container.innerHTML = renderToString(server.TextArm, { label: 'same' }).html;
