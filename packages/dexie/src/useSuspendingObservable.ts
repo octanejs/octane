@@ -1,5 +1,5 @@
 import { use, useEffect, useReducer, useRef } from 'octane';
-import type { InteropableObservable } from './useObservable';
+import type { Subscribable } from 'dexie';
 import { splitSlot, subSlot } from './internal';
 
 type Observer<T> = {
@@ -12,7 +12,7 @@ type Subscription = { unsubscribe(): unknown } | (() => unknown);
 
 type CacheEntry<T> = {
 	key: readonly unknown[];
-	source: any;
+	source: Subscribable<T>;
 	current?: T;
 	hasValue: boolean;
 	promise?: Promise<T>;
@@ -34,16 +34,13 @@ function stop(subscription: Subscription | undefined) {
 }
 
 function getEntry<T>(
-	getObservable: (() => InteropableObservable<T>) | InteropableObservable<T>,
+	getObservable: (() => Subscribable<T>) | Subscribable<T>,
 	cacheKey: readonly unknown[],
 ): CacheEntry<T> {
 	const existing = cache.find((entry) => sameKey(entry.key, cacheKey)) as CacheEntry<T> | undefined;
 	if (existing) return existing;
 
-	const source: any =
-		typeof getObservable === 'function'
-			? getObservable()
-			: (getObservable as InteropableObservable<T>);
+	const source = typeof getObservable === 'function' ? getObservable() : getObservable;
 	const entry = {
 		key: [...cacheKey],
 		source,
@@ -119,16 +116,16 @@ function getEntry<T>(
 }
 
 export function useSuspendingObservable<T>(
-	getObservable: (() => InteropableObservable<T>) | InteropableObservable<T>,
+	getObservable: (() => Subscribable<T>) | Subscribable<T>,
 	cacheKey: readonly unknown[],
 ): T;
 export function useSuspendingObservable<T>(
-	getObservable: (() => InteropableObservable<T>) | InteropableObservable<T>,
+	getObservable: (() => Subscribable<T>) | Subscribable<T>,
 	cacheKey: readonly unknown[],
 	slot: symbol | undefined,
 ): T;
 export function useSuspendingObservable<T>(
-	getObservable: (() => InteropableObservable<T>) | InteropableObservable<T>,
+	getObservable: (() => Subscribable<T>) | Subscribable<T>,
 	...rest: [readonly unknown[], symbol?]
 ): T {
 	const [args, slot] = splitSlot(rest);

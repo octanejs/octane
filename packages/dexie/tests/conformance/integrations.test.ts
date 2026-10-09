@@ -1,4 +1,4 @@
-import Dexie from 'dexie';
+import Dexie, { type Observer, type Subscribable } from 'dexie';
 import { act } from 'octane';
 import { afterEach, describe, expect, it } from 'vitest';
 import { flushEffects, mount, nextPaint } from '../_helpers';
@@ -6,6 +6,7 @@ import {
 	PermissionReader,
 	SequentialSuspendingValues,
 	SuspendingBoundary,
+	SuspendingObservableBoundary,
 } from '../_fixtures/integrations.tsrx';
 
 function deferred<T>() {
@@ -43,6 +44,48 @@ async function flush() {
 		await nextPaint();
 	}
 }
+
+describe('suspending observables', () => {
+	it.each(['direct', 'factory'] as const)(
+		'suspends for the first value and updates from %s observer sources',
+		async (kind) => {
+			const observers = new Set<Observer<string>>();
+			const observable: Subscribable<string> = {
+				subscribe(observer) {
+					observers.add(observer);
+					return {
+						unsubscribe: () => {
+							observers.delete(observer);
+						},
+					};
+				},
+			};
+			const result = mount(SuspendingObservableBoundary, {
+				getObservable: kind === 'factory' ? () => observable : observable,
+				cacheKey: [observable, kind],
+			});
+			try {
+				await flush();
+				expect(result.find('#observable-pending').textContent).toBe('loading');
+
+				await act(async () => {
+					for (const observer of observers) observer.next?.('first');
+					await flush();
+				});
+				expect(result.find('#observable-value').textContent).toBe('first');
+				expect(result.findAll('#observable-pending')).toHaveLength(0);
+
+				await act(async () => {
+					for (const observer of observers) observer.next?.('updated');
+					await flush();
+				});
+				expect(result.find('#observable-value').textContent).toBe('updated');
+			} finally {
+				result.unmount();
+			}
+		},
+	);
+});
 
 describe('suspending live queries', () => {
 	it('shows pending UI and then renders the first result', async () => {
