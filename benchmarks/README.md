@@ -147,6 +147,11 @@ node --test benchmarks/js-framework/timing.test.mjs
   explicit noise headroom. `.github/workflows/bench.yml` runs
   `node benchmarks/bench.mjs --quick --ratios` on manual dispatch + a weekly
   cron, uploads `benchmarks/results/` as an artifact, and fails on a breach.
+  Set the manual `full` input to `true` to use normal sample counts for a
+  website snapshot. The artifact includes `environment.json` with the source
+  revision, runner hardware, and toolchain versions. Framework comparisons must
+  use targets measured together; absolute timings from different machines are
+  not release-to-release performance evidence.
 - **`--record` / `--compare` are local-only.** Absolute timing baselines are
   specific to the recording machine; deterministic byte/count records are
   portable only across the same fixture and toolchain. Neither is a CI gate. See
