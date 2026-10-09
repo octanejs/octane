@@ -27200,6 +27200,23 @@ function emitAutoMemoRegion(
 		);
 	const markInit = () =>
 		b.stmt(b.assignment('=', cacheAt(cell.init), initValue ?? b.literal(true)));
+	// The context helper runs on misses too; only this branch proves a cache hit.
+	// The same runtime define erases the probe and import from ordinary builds.
+	ctx.profileRuntimeNeeded.add('__profileCacheHit');
+	const profileHit = () =>
+		b.if(
+			b.logical(
+				'&&',
+				b.binary(
+					'!==',
+					b.unary('typeof', b.id('__OCTANE_PROFILE_ENABLED__')),
+					b.literal('undefined'),
+				),
+				b.id('__OCTANE_PROFILE_ENABLED__'),
+			),
+			b.stmt(b.call('_$__profileCacheHit')),
+			null,
+		);
 	// `statement` is the guarded region's statement NODE; the returned region is
 	// a statement node too — the caller stamps the origin.
 	if (!contextAware) {
@@ -27208,7 +27225,7 @@ function emitAutoMemoRegion(
 			b.if(
 				orChain(misses),
 				b.block([...computeStatements, writable(), ...publish(), markInit()]),
-				replayNative.length === 0 ? null : b.block(replayNative),
+				b.block([profileHit(), ...replayNative]),
 			),
 		]);
 	}
@@ -27236,6 +27253,7 @@ function emitAutoMemoRegion(
 				markInit(),
 			]),
 			b.block([
+				profileHit(),
 				...replayNative,
 				b.const('_c', cacheContextCall()),
 				b.if(
