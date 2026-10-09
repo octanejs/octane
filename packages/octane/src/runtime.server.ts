@@ -1896,6 +1896,7 @@ export function cloneElement(
 	if (n === 1) {
 		kids = children[0];
 	} else if (n > 1) {
+		POSITIONAL_CHILDREN.add(children);
 		kids = children;
 	} else if (scopedChildren !== undefined && !replacedChildren) {
 		Object.defineProperty(
