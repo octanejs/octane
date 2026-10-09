@@ -27,43 +27,44 @@ test('accepts native receivers guarded by the renderer stage and their prepared 
 		inspectStagedDOM(`
 	declare let STAGED_DOM: { view<T extends Node | null | undefined>(node: T): T } | null;
 	function renderHost(el: HTMLElement, parent: Node | null) {
-	 (STAGED_DOM?.view(el) ?? el).setAttribute('title', 'prepared');
-	 const host = (STAGED_DOM?.view(el!) ?? (el as HTMLElement));
+	 (STAGED_DOM ? STAGED_DOM.view(el) : el).setAttribute('title', 'prepared');
+	 const host = (STAGED_DOM ? STAGED_DOM.view(el!) : (el as HTMLElement));
 	 host.textContent = 'prepared';
-	 (STAGED_DOM?.view(parent) ?? parent)?.appendChild(el);
+	 (STAGED_DOM ? STAGED_DOM.view(parent) : parent)?.appendChild(el);
 	}`),
 		[],
 	);
 });
 
-test('rejects receiver alternatives without the optional stage and matching node', () => {
+test('rejects receiver alternatives without the tested stage and matching node', () => {
 	const findings = inspectStagedDOM(`
 	declare let STAGED_DOM: { view<T extends Node>(node: T): T; other<T extends Node>(node: T): T } | null;
 	declare function domNode<T extends Node>(node: T): T;
 	function renderHost(el: HTMLElement, other: HTMLElement, unrelated: typeof STAGED_DOM) {
-	 (el ?? STAGED_DOM?.view(el)).setAttribute('title', 'swapped');
-	 (unrelated?.view(el) ?? el).setAttribute('title', 'unrelated stage');
-	 (STAGED_DOM?.view(other) ?? el).setAttribute('title', 'wrong node');
-	 (STAGED_DOM?.view(el) || el).setAttribute('title', 'wrong operator');
-	 (STAGED_DOM!.view(el) ?? el).setAttribute('title', 'unguarded stage');
-	 (STAGED_DOM!.view?.(el) ?? el).setAttribute('title', 'optional method');
-	 (STAGED_DOM?.other(el) ?? el).setAttribute('title', 'wrong method');
+	 (STAGED_DOM ? el : STAGED_DOM!.view(el)).setAttribute('title', 'swapped');
+	 (unrelated ? unrelated.view(el) : el).setAttribute('title', 'unrelated stage');
+	 (STAGED_DOM ? STAGED_DOM.view(other) : el).setAttribute('title', 'wrong node');
+	 (STAGED_DOM?.view(el) ?? el).setAttribute('title', 'optional stage');
+	 (STAGED_DOM !== null ? STAGED_DOM.view(el) : el).setAttribute('title', 'null test');
+	 (STAGED_DOM ? STAGED_DOM?.view(el) : el).setAttribute('title', 'optional view');
+	 (STAGED_DOM ? STAGED_DOM.view?.(el) : el).setAttribute('title', 'optional method');
+	 (STAGED_DOM ? STAGED_DOM.other(el) : el).setAttribute('title', 'wrong method');
 	 (STAGED_DOM === null ? el : domNode(el)).setAttribute('title', 'unclassified ternary');
 	 const holder = { current: el };
-	 (STAGED_DOM?.view(holder.current) ?? holder.current).setAttribute('title', 'getter');
+	 (STAGED_DOM ? STAGED_DOM.view(holder.current) : holder.current).setAttribute('title', 'getter');
 	 const getHost = () => el;
-	 (STAGED_DOM?.view(getHost()) ?? getHost()).setAttribute('title', 'function');
+	 (STAGED_DOM ? STAGED_DOM.view(getHost()) : getHost()).setAttribute('title', 'function');
 	}
 	function shadowStage(el: HTMLElement, STAGED_DOM: { view(node: HTMLElement): HTMLElement } | null) {
-	 (STAGED_DOM?.view(el) ?? el).setAttribute('title', 'shadowed stage');
+	 (STAGED_DOM ? STAGED_DOM.view(el) : el).setAttribute('title', 'shadowed stage');
 	}`);
 	assert.deepEqual(
 		findings.map((finding) => finding.operation),
-		Array(11).fill('call:setAttribute'),
+		Array(12).fill('call:setAttribute'),
 	);
 	assert.deepEqual(
 		findings.map((finding) => finding.owner),
-		[...Array(10).fill('renderHost'), 'shadowStage'],
+		[...Array(11).fill('renderHost'), 'shadowStage'],
 	);
 });
 
