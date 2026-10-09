@@ -28,6 +28,7 @@ const REGISTRY_ENTRY_KEYS = new Set([
 ]);
 const BOUNDARY_ENTRY_KEYS = new Set(['childRenderer', 'ownerRenderer', 'prop', 'server']);
 const VALIDATION_KEYS = new Set([
+	'allowedTags',
 	'forbiddenGlobals',
 	'forbiddenImports',
 	'hostProps',
@@ -149,6 +150,13 @@ function normalizeValidation(value, path) {
 	}
 	assertKnownKeys(value, VALIDATION_KEYS, path);
 	const validation = {};
+	if (value.allowedTags !== undefined) {
+		validation.allowedTags = normalizeValidationList(
+			value.allowedTags,
+			`${path}.allowedTags`,
+			validateHostName,
+		);
+	}
 	if (value.textHosts !== undefined) {
 		validation.textHosts = normalizeValidationList(
 			value.textHosts,

@@ -83,6 +83,7 @@ describe('renderer configuration', () => {
 				native: {
 					module: '@octanejs/native/renderer',
 					validation: {
+						allowedTags: ['text', 'raw-text', 'text', 'label'],
 						textHosts: ['raw-text', 'raw-text'],
 						textParents: ['text', 'label', 'text'],
 						forbiddenGlobals: ['window', 'document', 'window'],
@@ -98,6 +99,7 @@ describe('renderer configuration', () => {
 		});
 
 		expect(config.registry.native.validation).toEqual({
+			allowedTags: ['label', 'raw-text', 'text'],
 			textHosts: ['raw-text'],
 			textParents: ['label', 'text'],
 			forbiddenGlobals: ['document', 'window'],
@@ -118,6 +120,7 @@ describe('renderer configuration', () => {
 				native: {
 					module: '@octanejs/native/renderer',
 					validation: {
+						allowedTags: ['label', 'text', 'raw-text'],
 						hostProps: {
 							text: ['value'],
 							'*': ['data-*', 'id'],
