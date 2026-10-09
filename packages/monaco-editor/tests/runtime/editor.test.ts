@@ -1,6 +1,6 @@
 import loader from '@monaco-editor/loader';
 import type { editor } from 'monaco-editor';
-import { flushSync } from 'octane';
+import { flushSync, startTransition } from 'octane';
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 
 import Editor, {
@@ -9,12 +9,13 @@ import Editor, {
 	type MonacoDiffEditor,
 	type MonacoEditor,
 } from '../../src/index';
-import { flushEffects, mount } from '../../../octane/tests/_helpers';
+import { flushEffects, mount, nextTask } from '../../../octane/tests/_helpers';
 import { createFakeMonaco, FakeCodeEditor } from './_fake-monaco';
 import {
 	DiffEditorCreationErrorBoundary,
 	EditorCreationErrorBoundary,
 } from './_fixtures/creation-error.tsrx';
+import { PendingTab } from './_fixtures/pending-tab.tsrx';
 
 const harness = createFakeMonaco();
 
@@ -43,6 +44,118 @@ afterAll(() => {
 });
 
 describe('@octanejs/monaco-editor Editor', () => {
+	it.each([false, true])(
+		'uses committed model retention when unmounted before passive effects (initial %s)',
+		async (initialKeep) => {
+			let editorInstance: MonacoEditor | undefined;
+			const onMount = (instance: MonacoEditor) => {
+				editorInstance = instance;
+			};
+			const path = `file:///immediate-cleanup-${initialKeep}.ts`;
+			const result = mount(Editor as any, { path, keepCurrentModel: initialKeep, onMount });
+			let model: editor.ITextModel | undefined;
+			try {
+				await settle();
+				model = editorInstance!.getModel()!;
+				result.update(Editor as any, { path, keepCurrentModel: !initialKeep, onMount });
+				result.unmount();
+				expect(model.isDisposed()).toBe(initialKeep);
+			} finally {
+				result.unmount();
+				if (model && !model.isDisposed()) model.dispose();
+			}
+		},
+	);
+
+	it('routes edits and validation to the displayed tab while a transition is suspended', async () => {
+		let editorInstance: MonacoEditor | undefined;
+		const onMount = (instance: MonacoEditor) => {
+			editorInstance = instance;
+		};
+		const onChangeA = vi.fn();
+		const onChangeB = vi.fn();
+		const onValidateA = vi.fn();
+		const onValidateB = vi.fn();
+		const result = mount(PendingTab, {
+			tab: 'A',
+			gate: null,
+			onMount,
+			onChange: onChangeA,
+			onValidate: onValidateA,
+		});
+		try {
+			await settle();
+			const modelA = editorInstance!.getModel()!;
+			expect(modelA.uri.toString()).toBe('file:///A.ts');
+			editorInstance!.setValue('initial A');
+			expect(onChangeA).toHaveBeenCalledWith('initial A', expect.any(Object));
+			onChangeA.mockClear();
+
+			let resolveGate!: () => void;
+			const gate = new Promise<void>((resolve) => {
+				resolveGate = resolve;
+			});
+			startTransition(() =>
+				result.update(PendingTab, {
+					tab: 'B',
+					gate,
+					onMount,
+					onChange: onChangeB,
+					onValidate: onValidateB,
+				}),
+			);
+			await nextTask();
+			await settle();
+
+			expect(result.find('[data-tab]').textContent).toBe('A');
+			expect(result.findAll('[data-pending]')).toHaveLength(0);
+			expect((result.find('.pending-tab-editor') as HTMLElement).style.display).toBe('');
+			expect(editorInstance!.getModel()).toBe(modelA);
+			editorInstance!.setValue('edited visible A');
+			expect.soft(onChangeA).toHaveBeenCalledWith('edited visible A', expect.any(Object));
+			expect.soft(onChangeB).not.toHaveBeenCalled();
+			harness.monaco.editor.setModelMarkers(modelA, 'owner', []);
+			expect.soft(onValidateA).toHaveBeenCalledWith([]);
+			expect.soft(onValidateB).not.toHaveBeenCalled();
+
+			resolveGate();
+			await settle();
+			await nextTask();
+			await settle();
+			expect(result.find('[data-tab]').textContent).toBe('B');
+			const modelB = editorInstance!.getModel()!;
+			expect(modelB.uri.toString()).toBe('file:///B.ts');
+			onChangeA.mockClear();
+			onValidateA.mockClear();
+			onChangeB.mockClear();
+			onValidateB.mockClear();
+			editorInstance!.setValue('committed B');
+			expect(onChangeB).toHaveBeenCalledWith('committed B', expect.any(Object));
+			expect(onChangeA).not.toHaveBeenCalled();
+			harness.monaco.editor.setModelMarkers(modelB, 'owner', []);
+			expect(onValidateB).toHaveBeenCalledWith([]);
+			expect(onValidateA).not.toHaveBeenCalled();
+
+			result.update(PendingTab, {
+				tab: 'B',
+				gate: null,
+				onMount,
+				onChange: undefined,
+				onValidate: undefined,
+			});
+			await settle();
+			onChangeB.mockClear();
+			onValidateB.mockClear();
+			editorInstance!.setValue('callbacks removed');
+			harness.monaco.editor.setModelMarkers(modelB, 'owner', []);
+			expect(onChangeB).not.toHaveBeenCalled();
+			expect(onValidateB).not.toHaveBeenCalled();
+		} finally {
+			result.unmount();
+			await settle();
+		}
+	});
+
 	it('creates the editor and synchronizes controlled props and public callbacks', async () => {
 		const beforeMount = vi.fn();
 		const onMount = vi.fn();
