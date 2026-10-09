@@ -58,7 +58,8 @@ not a native application build, packaging, or deployment integration.
 
 ## TypeScript output
 
-Direct compiler integrations can set `output: 'ts'` alongside the Valdi renderer
+Direct compiler integrations and `createOctaneCompiler` from
+`octane/compiler/bundler` can set `output: 'ts'` alongside the Valdi renderer
 and `hmr: false`. Both `.tsrx` components and plain `.ts` custom-hook modules then
 produce TypeScript, with `result.lang === 'ts'`. The output contains writer calls,
 not JSX. The default remains `output: 'js'`. The same option also supports
@@ -89,11 +90,67 @@ callback types. Compiler tests check the output and consumer prop errors against
 a typed stub adapter; Octane does not yet ship a complete adapter declaration
 contract or a native Valdi integration.
 
-The returned source map still has one source, the authored `.tsrx` or `.ts` file,
-and includes its source content. A host can append an inline map when writing the
-generated `.ts` file. TypeScript does not automatically compose input source maps:
-the host or Valdi emit integration must compose the TypeScript-to-JavaScript map
-with this map before reporting authored diagnostic or stack-trace locations.
+The returned source map has one source, the authored `.tsrx` or `.ts` file, and
+includes its source content. Keep it alongside the generated code until the
+downstream emit; TypeScript does not automatically compose input source maps.
+
+### Valdi Workspace handoff
+
+The [public Valdi companion](https://github.com/Snapchat/Valdi/blob/3ed77a5ace883991e51169168ccf3e68a7c68599/compiler/companion/src/Workspace.ts)
+accepts generated TypeScript through `registerInMemoryFile`. Its constructor
+takes ordinary TypeScript compiler options, rather than a source-transform or
+input-map callback. Use `createOctaneCompiler({ output: 'ts', hmr: false,
+renderers: ... })` with the same renderer selection for components and their
+plain TypeScript hook modules.
+
+Register each `.tsrx` result under an absolute virtual filename ending in
+`.tsrx.ts`; register plain `.ts` helpers under their original filename. This lets
+an unchanged `./Widget.tsrx` import resolve through TypeScript's normal lookup.
+Open the registered files, then use `doEmitFile(filename, cancellationToken,
+customTransformers)` or `emitFile(filename)`. The former retains the caller's
+TypeScript transformers alongside Valdi's defaults. Re-registering changed
+content invalidates Valdi's source-file snapshot; invalidate the corresponding
+authored path in the Octane compiler as well.
+
+For source maps, enable `inlineSourceMap` and `inlineSources` in the Workspace
+options and pass **map-free `result.code`** to `registerInMemoryFile`. TypeScript
+5.3.3 copies an incoming inline-map comment before appending its own, while
+Valdi's `SourceMapUtils` reads the first comment. Feeding an inline Octane map
+into this emit therefore selects the wrong downstream map.
+
+After emission, create a separate inline-map carrier from `result.code` and
+`result.map`, and pass that carrier and the emitted JavaScript to the companion's
+`SourceMapUtils.mergeSourceMaps`. Normalize the prior map to an absolute authored
+`sources[0]` and an empty `sourceRoot`; this keeps files with the same basename
+distinct and avoids dependence on the downstream root. The composed map must
+retain the original `sourcesContent`, and the final JavaScript must have one
+source-map comment. The carrier is composition data, not the Workspace input.
+
+The executable recipe is
+[`scripts/test-valdi-typescript-build.mjs`](../scripts/test-valdi-typescript-build.mjs).
+It uses the unmodified public companion at the revision linked above, rather
+than a consumer's patched compiler:
+
+```bash
+node scripts/prepare-valdi-companion.mjs "$HOME/.cache/octane/valdi-companion-3ed77a5"
+OCTANE_VALDI_COMPANION_DIR="$HOME/.cache/octane/valdi-companion-3ed77a5" \
+  node scripts/test-valdi-typescript-build.mjs
+```
+
+Setup keeps the SDK outside the checkout, verifies immutable public source and
+license hashes, and installs three exact dependencies with npm integrity checks
+and lifecycle scripts disabled. A missing or mismatched SDK fails the integration
+check; it never silently skips. The companion's `valdi-compiler-js` package is
+not published to npm at this pin, so setup builds its Workspace dependency
+closure from public source.
+
+The check covers the real TypeScript program emit, default and supplied host
+transformers, declarations/native-model annotations, plain hook import routing,
+unchanged cross-file imports, repeated edits, same-basename source identity,
+and composed error locations. It executes the result with the existing synthetic
+writer recorder. This establishes a build handoff; Swift/native packaging,
+native lifecycle behavior, and a published adapter remain separate acceptance
+steps.
 
 ## Adapter contract
 
@@ -210,11 +267,11 @@ See [Octane's hook semantics](./differences-from-react.md) for the observable
 state and dependency behavior.
 
 Custom hooks that import Octane hooks must pass through the same full compiler
-with the same Valdi renderer, for example in a `.tsrx` module or a direct
-`compile()` call. The bundler's lighter plain `.ts`/`.js` hook-slot pass does
-not reroute those imports to the adapter. Such helpers need explicit adapter
-imports or application-owned module resolution; selecting the target for a
-component alone does not adapt its entire dependency graph.
+with the same Valdi renderer. The bundler-neutral `output: 'ts'` path does this
+for plain `.ts` helpers as well as `.tsrx` components. Cover both with the
+renderer registry's default or rules. The default JavaScript path's lighter
+plain-module hook-slot pass does not reroute those imports; selecting the target
+for a component alone does not adapt that dependency graph.
 
 ## Attribute type facts
 

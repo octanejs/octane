@@ -5,7 +5,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { afterEach, describe, expect, it } from 'vitest';
-import { createServer, type ViteDevServer } from 'vite';
+import { createServer, parseAst, type ViteDevServer } from 'vite';
 import { octane } from '../../src/compiler/vite.js';
 
 const OCTANE_PACKAGE_ROOT = fileURLToPath(new URL('../..', import.meta.url));
@@ -21,42 +21,47 @@ describe('octane/compiler/vite integration', () => {
 		fixtureRoot = null;
 	});
 
-	for (const hmr of [false, true]) {
-		it(`renders import.meta environment attributes through component props (hmr=${hmr})`, async () => {
-			fixtureRoot = mkdtempSync(join(tmpdir(), 'octane-vite-import-meta-'));
-			mkdirSync(join(fixtureRoot, 'node_modules'));
-			symlinkSync(OCTANE_PACKAGE_ROOT, join(fixtureRoot, 'node_modules/octane'), 'dir');
-			writeFileSync(join(fixtureRoot, 'package.json'), JSON.stringify({ type: 'module' }));
-			writeFileSync(
-				join(fixtureRoot, 'Form.tsrx'),
-				`function Form(props) @{ <form {...props.attributes} /> }
-				export function App(props) @{
+	for (const output of [undefined, 'ts'] as const) {
+		for (const hmr of [false, true]) {
+			it(`serves typed components and renders environment attributes (output=${output ?? 'default JS'}, hmr=${hmr})`, async () => {
+				fixtureRoot = mkdtempSync(join(tmpdir(), 'octane-vite-import-meta-'));
+				mkdirSync(join(fixtureRoot, 'node_modules'));
+				symlinkSync(OCTANE_PACKAGE_ROOT, join(fixtureRoot, 'node_modules/octane'), 'dir');
+				writeFileSync(join(fixtureRoot, 'package.json'), JSON.stringify({ type: 'module' }));
+				const source = `type Attributes = { method?: string; action?: string };
+				function Form(props: { attributes: Attributes }) @{ <form {...props.attributes} /> }
+				export function App(props: { attributes: Attributes; action: string }) @{
 					<Form attributes={{
 						...Object.assign({}, props.attributes),
 						...(import.meta.env.SSR ? { action: props.action } : {}),
 					}} />
-				}`,
-			);
-			writeFileSync(
-				join(fixtureRoot, 'entry.ts'),
-				`import { renderToStaticMarkup } from 'octane/server';
+				}`;
+				writeFileSync(join(fixtureRoot, 'Form.tsrx'), source);
+				writeFileSync(
+					join(fixtureRoot, 'entry.ts'),
+					`import { renderToStaticMarkup } from 'octane/server';
 				import { App } from './Form.tsrx';
 				export const render = (action) => renderToStaticMarkup(App, {
 					action, attributes: { method: 'post' },
 				}).html;`,
-			);
-			server = await createServer({
-				root: fixtureRoot,
-				configFile: false,
-				logLevel: 'silent',
-				appType: 'custom',
-				plugins: [octane({ hmr, strong: true })],
-				server: { middlewareMode: true },
+				);
+				server = await createServer({
+					root: fixtureRoot,
+					configFile: false,
+					logLevel: 'silent',
+					appType: 'custom',
+					plugins: [octane({ output, hmr, strong: true })],
+					server: { middlewareMode: true },
+				});
+				const loaded = await server.ssrLoadModule('/entry.ts');
+				expect(loaded.render('/first')).toBe('<form method="post" action="/first"></form>');
+				expect(loaded.render('/second')).toBe('<form method="post" action="/second"></form>');
+				const client = await server.transformRequest('/Form.tsrx');
+				expect(client).not.toBeNull();
+				expect(() => parseAst(client!.code)).not.toThrow();
+				expect(client!.map).toHaveProperty('sourcesContent', expect.arrayContaining([source]));
 			});
-			const loaded = await server.ssrLoadModule('/entry.ts');
-			expect(loaded.render('/first')).toBe('<form method="post" action="/first"></form>');
-			expect(loaded.render('/second')).toBe('<form method="post" action="/second"></form>');
-		});
+		}
 	}
 
 	it('discovers a parent package and routes raw dependency imports to the SSR runtime', async () => {

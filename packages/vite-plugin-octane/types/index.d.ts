@@ -11,6 +11,8 @@ import type {
 export * from '@octanejs/app-core';
 
 export interface OctanePluginOptions {
+	/** Compile through a typed intermediate; Vite emits JavaScript and composed maps. */
+	output?: OctaneVitePluginOptions['output'];
 	/** Override the client HMR default (on in serve mode, off for SSR). */
 	hmr?: boolean;
 	/** Enable component profiling in client transforms. */
