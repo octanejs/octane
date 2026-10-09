@@ -56,6 +56,44 @@ octane({
 HMR must be disabled for this target. Registry selection is a compiler facility,
 not a native application build, packaging, or deployment integration.
 
+## TypeScript output
+
+Direct compiler integrations can set `output: 'ts'` alongside the Valdi renderer
+and `hmr: false`. Both `.tsrx` components and plain `.ts` custom-hook modules then
+produce TypeScript, with `result.lang === 'ts'`. The output contains writer calls,
+not JSX. The default remains `output: 'js'`; TypeScript output is currently
+rejected for DOM and universal targets. Valdi's existing client-only, HMR, and
+syntax restrictions still apply.
+
+TypeScript output retains interfaces, type aliases, type-only imports and exports,
+annotations, type arguments, assertions, `satisfies`, non-null assertions, enums,
+namespaces, ambient declarations, and parameter properties. The downstream
+TypeScript compiler owns their erasure and runtime lowering. This mode is intended
+for typed build pipelines such as Valdi's; bundler integrations still emit
+JavaScript by default.
+
+Leading comments on retained declarations, statements, and members are preserved,
+including Valdi's JSDoc annotations. Leading component comments follow the generated
+component declaration. Comments inside lowered templates, expression comments,
+and trailing comments are not preserved. TypeScript output omits generated
+indentation so that multiline annotation blocks keep their authored text even
+inside nested scopes. Writer component bodies return `void`;
+their authored JSX return annotation is replaced by that inferred writer result.
+Props annotations, generic parameters, and explicit component-binding types remain.
+
+The adapter must provide typed declarations for generated calls. In particular,
+`defineValdiComponent` must carry the render function's props type through to its
+returned descriptor, and slot-taking hooks must preserve their generic state and
+callback types. Compiler tests check the output and consumer prop errors against
+a typed stub adapter; Octane does not yet ship a complete adapter declaration
+contract or a native Valdi integration.
+
+The returned source map still has one source, the authored `.tsrx` or `.ts` file,
+and includes its source content. A host can append an inline map when writing the
+generated `.ts` file. TypeScript does not automatically compose input source maps:
+the host or Valdi emit integration must compose the TypeScript-to-JavaScript map
+with this map before reporting authored diagnostic or stack-trace locations.
+
 ## Adapter contract
 
 `VALDI_COMPILER_ABI_VERSION`, exported by `octane/compiler`, identifies the

@@ -74,6 +74,8 @@ export interface KnownAttributeSpread {
 }
 
 export interface CompileOptions {
+	/** Preserve TypeScript syntax and declaration comments. Currently Valdi-only. */
+	output?: 'js' | 'ts';
 	mode?: 'client' | 'server';
 	hmr?: boolean | 'vite' | 'webpack';
 	dev?: boolean;
@@ -260,6 +262,8 @@ export interface CompileInspection {
 
 export interface CompileResult {
 	code: string;
+	/** Present for output: 'ts'. Valdi output contains no JSX. */
+	lang?: 'ts';
 	map: CompileSourceMap;
 	diagnostics: readonly CompileDiagnostic[];
 	inspect?: CompileInspection;
@@ -274,7 +278,7 @@ export interface CompileResult {
 	};
 }
 
-/** Compile authored TSRX/JSX to Octane client or server JavaScript. */
+/** Compile authored TSRX/JSX to JavaScript, or TypeScript for the Valdi target. */
 export function compile(
 	source: string,
 	filename: string,

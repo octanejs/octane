@@ -36,6 +36,7 @@ import {
 	builders as b,
 	createStyleClassMapFromStylesheet,
 	clone_ast_node as cloneAstNode,
+	getCommentHandlers,
 	strongHash,
 	withDeferredImports,
 } from '@tsrx/core';
@@ -1787,6 +1788,7 @@ function buildProfileRuntimeImportNodes(ctx, origin) {
 // references (including `imported as local` renames).
 function addUserImportSpecifiers(ctx, node) {
 	for (const sp of node.specifiers || []) {
+		if (sp.importKind === 'type') continue;
 		if (sp.local?.name && ctx.consumedRuntimeLocals?.has(sp.local.name)) continue;
 		if (sp.type === 'ImportNamespaceSpecifier') {
 			if (sp.local?.name) ctx.userRuntimeNamespaces.add(sp.local.name);
@@ -10697,12 +10699,27 @@ export function compileForBundler(source, filename, options) {
 // Everything compilation validates before Strong analysis, shared with
 // diagnostic collection so both see the same authored tree and options.
 function prepareAuthoredAst(source, cleanFilename, options) {
+	// Comment collection disables native eager parsing; only TS consumers need it.
+	const comments = options?.output === 'ts' ? [] : undefined;
+	let parsed = parseModule(source, cleanFilename, comments ? { comments } : undefined);
+	if (comments?.length) {
+		// JS parsers can both attach and return comments. Attach only the buffer
+		// entries still unowned (the native path), on a copy of the parser AST.
+		const attached = new Set();
+		mapAst(parsed, (node) => {
+			for (const key of ['leadingComments', 'trailingComments', 'innerComments']) {
+				for (const comment of node[key] ?? []) attached.add(comment.start);
+			}
+			return null;
+		});
+		const unattached = comments.filter((comment) => !attached.has(comment.start));
+		if (unattached.length) {
+			parsed = cloneAstNode(parsed);
+			getCommentHandlers(source, unattached).add_comments(parsed);
+		}
+	}
 	const ast = markParserSensitiveHosts(
-		declareBareForBindings(
-			normalizeAuthoredJsxLiterals(parseModule(source, cleanFilename)),
-			source,
-			cleanFilename,
-		),
+		declareBareForBindings(normalizeAuthoredJsxLiterals(parsed), source, cleanFilename),
 	);
 	analyzeTsrx(ast, cleanFilename);
 	assertForOfHeaders(ast, source, cleanFilename);
@@ -10779,6 +10796,13 @@ export function collectDiagnostics(source, filename, options) {
  *   passed through Strong analysis without an error, so neither is repeated
  */
 function compileAuthored(source, filename, options, bundlerMetadata, analyzed = null) {
+	const output = options?.output ?? 'js';
+	if (output !== 'js' && output !== 'ts') {
+		throw new Error(`Unknown compile output "${output}" — expected 'js' or 'ts'.`);
+	}
+	if (output === 'ts' && options?.renderer?.target !== 'valdi') {
+		throw new Error("TypeScript output requires the Valdi renderer target (output: 'ts').");
+	}
 	const mode = (options && options.mode) || 'client';
 	if (mode !== 'client' && mode !== 'server') {
 		throw new Error(`Unknown compile mode "${mode}" — expected 'client' or 'server'.`);
@@ -10918,6 +10942,8 @@ function compileAuthored(source, filename, options, bundlerMetadata, analyzed = 
 		result.diagnostics = [...strongAnalysis.diagnostics, ...(result.diagnostics ?? [])];
 	}
 	if (bindingConstants !== undefined) result.bindingConstants = bindingConstants;
+	// Valdi lowers every template before the shared finisher; no JSX remains.
+	if (output === 'ts') result.lang = 'ts';
 	return result;
 }
 
@@ -11248,7 +11274,7 @@ function compileInternal(
 	// and inline `type` specifiers before emit — they carry no runtime value and
 	// would leak invalid TS into the .js (or crash the printer). Runtime-only;
 	// Volar keeps them.
-	ast = { ...ast, body: dropTypeOnlyStatements(ast.body) };
+	if (options?.output !== 'ts') ast = { ...ast, body: dropTypeOnlyStatements(ast.body) };
 	const serverModuleInfo = analyzeServerModule(ast, filename);
 	// Normalize arrow-function components (`const X = () => @{…}`) to
 	// FunctionDeclaration form so the component pipeline recognizes them.
@@ -11482,6 +11508,7 @@ function compileInternal(
 		// per-token mappings against the original .tsrx.
 		mapSource: source,
 		mapSourceName: (filename || 'module.tsrx').split(/[\\/]/).pop(),
+		output: options?.output,
 		// Coarse origin for module scaffolding with no authored source position
 		// (imports, delegate/style/template consts, hook-slot consts, HMR/stamp
 		// tails): the module's first located statement. Every node handed to the
@@ -12311,6 +12338,14 @@ function compileInternal(
 			// Preserve ALL user-imported names from octane (Portal, createContext,
 			// use, custom helpers, etc.) — merged into the single prelude import.
 			// A `defer` or `source` phase import stays its own declaration.
+			if (node.importKind === 'type') {
+				bodyNodes.push(node);
+				continue;
+			}
+			if (ctx.output === 'ts') {
+				const types = node.specifiers.filter((specifier) => specifier.importKind === 'type');
+				if (types.length) bodyNodes.push({ ...node, specifiers: types });
+			}
 			addUserImportSpecifiers(ctx, node);
 		} else {
 			// Style blocks anywhere in a non-component statement: assigned blocks
@@ -36365,6 +36400,45 @@ const esrapCommentOptions = {
 	getLeadingComments: (node) => (node.__octanePure ? PURE_ANNOTATION_COMMENTS : undefined),
 };
 
+const COMMENT_MEMBER_TYPES = new Set([
+	'VariableDeclarator',
+	'Property',
+	'PropertyDefinition',
+	'AccessorProperty',
+	'MethodDefinition',
+	'TSAbstractPropertyDefinition',
+	'TSAbstractAccessorProperty',
+	'TSAbstractMethodDefinition',
+	'TSPropertySignature',
+	'TSMethodSignature',
+	'TSIndexSignature',
+	'TSEnumMember',
+	'TSExportAssignment',
+]);
+function typescriptCommentOptions(source) {
+	return {
+		getLeadingComments(node) {
+			// As in core's TS printer, a newline is safe before declarations and
+			// members, but could change `return expression` or invalidate `throw`.
+			const comments =
+				node.type.endsWith('Declaration') ||
+				node.type.endsWith('Statement') ||
+				COMMENT_MEMBER_TYPES.has(node.type)
+					? node.leadingComments?.map((comment) => ({
+							...comment,
+							// The JS parser normalizes block-comment indentation. Recover
+							// comment text from its authored range, not its normalized value.
+							value: source.slice(
+								comment.start + 2,
+								comment.end - (comment.type === 'Block' ? 2 : 0),
+							),
+						}))
+					: undefined;
+			return node.__octanePure ? [...(comments ?? []), ...PURE_ANNOTATION_COMMENTS] : comments;
+		},
+	};
+}
+
 /**
  * Perform the compiler's ONE generated-program print and return esrap's real
  * per-token mappings (decoded, not VLQ-encoded) plus the exact printable AST
@@ -36373,15 +36447,23 @@ const esrapCommentOptions = {
  * literal raws are re-derived centrally before the print.
  */
 function printNodeWithMap(node, ctx) {
-	let printable = stripTsOnlyWrappers(escapeMultilineStringLiterals(node), {
-		filename: ctx.mapSourceName,
-		enums: null,
-	});
+	let printable = escapeMultilineStringLiterals(node);
+	if (ctx.output !== 'ts') {
+		printable = stripTsOnlyWrappers(printable, {
+			filename: ctx.mapSourceName,
+			enums: null,
+		});
+	}
 	if (ctx.deferredReads === true) {
 		printable = snapshotDeferredReads(printable, (name) => allocCompilerName(ctx, `${name}$`));
 	}
 	if (assertPrintedLocs()) assertNodeLocs(printable);
-	const { code, map } = esrapPrint(printable, withDeferredImports(esrapTsx(esrapCommentOptions)), {
+	const commentOptions =
+		ctx.output === 'ts' ? typescriptCommentOptions(ctx.mapSource) : esrapCommentOptions;
+	const { code, map } = esrapPrint(printable, withDeferredImports(esrapTsx(commentOptions)), {
+		// esrap indents every continuation of a block comment. TS consumers need
+		// authored annotation bytes, including indentation inside nested comments.
+		indent: ctx.output === 'ts' ? '' : undefined,
 		sourceMapSource: ctx.mapSourceName,
 		sourceMapContent: ctx.mapSource,
 		sourceMapEncodeMappings: false,

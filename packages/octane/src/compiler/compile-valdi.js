@@ -309,7 +309,7 @@ function componentShape(node) {
 			item.id?.type === 'Identifier' &&
 			(fn?.type === 'FunctionExpression' || fn?.type === 'ArrowFunctionExpression')
 		) {
-			return { node, fn, name: item.id.name, exportKind };
+			return { node, fn, name: item.id.name, exportKind, binding: item.id, initializer: item.init };
 		}
 	}
 	return null;
@@ -608,13 +608,32 @@ function mergedAttributes(entries, state, origin) {
 	const refName = allocName(state, '__octaneValdiRef');
 	const childrenName = allocName(state, '__octaneValdiChildren');
 	const propsName = allocName(state, '__octaneValdiProps');
-	const expression = b.object(
+	let expression = b.object(
 		entries.map((entry) =>
 			entry.name === null
 				? b.spread(entry.value)
 				: b.prop('init', b.literal(entry.name), entry.value, entry.name === '__proto__'),
 		),
 	);
+	if (state.output === 'ts') {
+		// Reserved fields are optional even when the inferred spread type has
+		// none of them. Keep the runtime checks typed without adding properties.
+		expression = b.ts_as(
+			expression,
+			b.ts_type_literal(
+				['key', 'ref', 'children'].map((name) => ({
+					...b.ts_property_signature(
+						b.id(name, origin),
+						b.ts_type_annotation(b.ts_keyword_type('unknown', origin), origin),
+						origin,
+					),
+					optional: true,
+				})),
+				origin,
+			),
+			origin,
+		);
+	}
 	const pattern = b.object_pattern([
 		b.prop('init', b.id('key'), b.id(keyName)),
 		...(allowRef ? [] : [b.prop('init', b.id('ref'), b.id(refName))]),
@@ -1081,14 +1100,25 @@ function emitComponent(shape, state) {
 		fn,
 	);
 	const options = b.object([b.prop('init', b.id('hasHooks'), b.literal(hasRenderTimeCalls(fn)))]);
+	let initializer = call(state, 'defineValdiComponent', [render, options], fn);
+	if (state.output === 'ts' && shape.initializer !== undefined) {
+		// Keep authored export constraints and the context they provide to props.
+		const wrap = (node) =>
+			node === fn ? initializer : { ...node, expression: wrap(node.expression) };
+		initializer = wrap(shape.initializer);
+	}
 	const declaration = withOrigin(
-		b.const(name, call(state, 'defineValdiComponent', [render, options], fn)),
+		b.const(state.output === 'ts' ? (shape.binding ?? name) : name, initializer),
 		fn,
 	);
-	if (exportKind === 'named') return [withOrigin(b.export(declaration), shape.node)];
-	if (exportKind === 'default')
-		return [declaration, withOrigin(b.export_default(b.id(name)), shape.node)];
-	return [declaration];
+	const output =
+		exportKind === 'named'
+			? [withOrigin(b.export(declaration), shape.node)]
+			: exportKind === 'default'
+				? [declaration, withOrigin(b.export_default(b.id(name)), shape.node)]
+				: [declaration];
+	if (state.output === 'ts') output[0].leadingComments = shape.node.leadingComments;
+	return output;
 }
 
 /** Lower an authored module and finish it through the shared client pipeline. */
@@ -1111,6 +1141,7 @@ export function compileValdi(
 	const ast = parsedAst ?? parseModule(source, filename);
 	const state = {
 		filename,
+		output: options.output,
 		renderer,
 		names: new Set(),
 		helpers: new Map(),
