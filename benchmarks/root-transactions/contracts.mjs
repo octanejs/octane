@@ -78,7 +78,7 @@ function instrument(variant) {
 	source = source.includes('function journalAttr(el: Element, name: string, ns?: string | null)')
 		? replaceOnce(
 				source,
-				'(STAGED_DOM?.view(el) ?? el).getAttribute(name),\n\t);',
+				'(STAGED_DOM ? STAGED_DOM.view(el) : el).getAttribute(name),\n\t);',
 				`globalThis.__rootContractAudit.${reads}Attr(el, name),\n\t);`,
 			)
 		: replaceOnce(
