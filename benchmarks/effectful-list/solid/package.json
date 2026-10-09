@@ -16,6 +16,6 @@
   "devDependencies": {
     "esbuild": "catalog:default",
     "vite": "catalog:default",
-    "vite-plugin-solid": "catalog:default"
+    "@solidjs/vite-plugin": "catalog:default"
   }
 }
