@@ -4,7 +4,7 @@ import { resolve } from 'node:path';
 import { build } from 'esbuild';
 import { JSDOM } from 'jsdom';
 import { describe, expect, it } from 'vitest';
-import { compile } from '../src/compiler/compile.js';
+import { compile } from 'octane/compiler';
 
 const TESTS = import.meta.dirname;
 const DOM_GLOBALS = [
@@ -108,6 +108,7 @@ describe('production form-action reachability', () => {
 		);
 		expect(text).not.toMatch(/function handleFormSubmit\(/);
 		expect(text).not.toMatch(/function startTransition\(/);
+		expect(text).not.toMatch(/function (?:maybeEnqueueRestore|maybeFlushDiscrete)\(/);
 
 		await withDom(async (window) => {
 			const { App, createRoot } = await load(text);
@@ -147,6 +148,107 @@ describe('production form-action reachability', () => {
 				expect(calls).toEqual([true]);
 			} finally {
 				root.unmount();
+			}
+		});
+	});
+});
+
+describe('production controlled-event reachability', () => {
+	it('restores an input first controlled by a native listener after capture stops bubbling', async () => {
+		const text = await bundleApp(
+			`import { createElement } from 'octane';
+			export function App(props: { attributes: Record<string, unknown>; onCapture: (event: Event) => void; onInput: () => void }) @{
+				const input = createElement('input', { ...props.attributes, onInputCapture: props.onCapture, onInput: props.onInput });
+				<div>{input}</div>
+			}`,
+			"export { flushSync } from 'octane';",
+		);
+		expect(text).toMatch(/function maybeEnqueueRestore\(/);
+
+		await withDom(async (window) => {
+			const { App, createRoot, flushSync } = await load(text);
+			const container = window.document.createElement('div');
+			window.document.body.append(container);
+			const root = createRoot(container);
+			const calls: string[] = [];
+			const handlers = {
+				onCapture: (event: Event) => calls.push((event.target as HTMLInputElement).value),
+				onInput: () => calls.push('bubble'),
+			};
+			try {
+				flushSync(() => root.render(App, { attributes: {}, ...handlers }));
+				const input = container.querySelector('input')!;
+				input.addEventListener('input', (event: Event) => {
+					flushSync(() => root.render(App, { attributes: { value: 'kept' }, ...handlers }));
+					input.value = 'uncommitted';
+					event.stopPropagation();
+				});
+				input.value = 'edit';
+				input.dispatchEvent(new window.Event('input', { bubbles: true }));
+				expect(container.querySelector('input')).toBe(input);
+				expect(calls).toEqual(['edit']);
+				expect(input.value).toBe('uncommitted');
+				await Promise.resolve();
+				expect(input.value).toBe('kept');
+			} finally {
+				root.unmount();
+			}
+		});
+	});
+
+	it('restores nested edits across roots and remains active after another root unmounts', async () => {
+		const text = await bundleApp(
+			`export function App(props: { value: string; onInput: () => void }) @{
+				<input value={props.value} onInput={props.onInput} />
+			}`,
+		);
+		expect(text).toMatch(/function maybeEnqueueRestore\(/);
+
+		await withDom(async (window) => {
+			const { App, createRoot } = await load(text);
+			const firstContainer = window.document.createElement('div');
+			const secondContainer = window.document.createElement('div');
+			window.document.body.append(firstContainer, secondContainer);
+			const first = createRoot(firstContainer);
+			const second = createRoot(secondContainer);
+			let replacement: ReturnType<typeof createRoot> | undefined;
+			const calls: string[] = [];
+			try {
+				second.render(App, { value: 'second', onInput: () => calls.push('second') });
+				const secondInput = secondContainer.querySelector('input')!;
+				first.render(App, {
+					value: 'first',
+					onInput: () => {
+						calls.push('first');
+						secondInput.value = 'nested';
+						secondInput.dispatchEvent(new window.Event('input', { bubbles: true }));
+						calls.push(secondInput.value);
+					},
+				});
+				const firstInput = firstContainer.querySelector('input')!;
+				firstInput.value = 'outer';
+				firstInput.dispatchEvent(new window.Event('input', { bubbles: true }));
+				expect(calls).toEqual(['first', 'second', 'nested']);
+				expect(firstInput.value).toBe('first');
+				expect(secondInput.value).toBe('second');
+
+				first.unmount();
+				secondInput.value = 'later';
+				secondInput.dispatchEvent(new window.Event('input', { bubbles: true }));
+				expect(secondInput.value).toBe('second');
+				expect(calls).toEqual(['first', 'second', 'nested', 'second']);
+
+				replacement = createRoot(firstContainer);
+				replacement.render(App, { value: 'replacement', onInput: () => calls.push('replacement') });
+				const replacementInput = firstContainer.querySelector('input')!;
+				replacementInput.value = 'new edit';
+				replacementInput.dispatchEvent(new window.Event('input', { bubbles: true }));
+				expect(replacementInput.value).toBe('replacement');
+				expect(calls).toEqual(['first', 'second', 'nested', 'second', 'replacement']);
+			} finally {
+				first.unmount();
+				second.unmount();
+				replacement?.unmount();
 			}
 		});
 	});
