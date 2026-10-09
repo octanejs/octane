@@ -37090,6 +37090,36 @@ function nextDeoptOwnedChild(scan: Node | null, adoptHydrationChildren: boolean)
 	return null;
 }
 
+// Marker-elision M4: a SELF-MARKED item (mounted while its value was a pure
+// single-element host descriptor — startMarker === endMarker === that element,
+// see mountItem's `2` sentinel) whose NEW value no longer fits one raw element
+// (null / primitive / component-bearing) PROMOTES one-way to a real `it` pair
+// minted around the current node, so the new content — and reorder/teardown —
+// keep a live range after that node is retired. Client-only by construction
+// (hydrated items always adopt the server's pair).
+function promoteSelfMarkedItem(block: Block): void {
+	const sm = block.startMarker;
+	if (
+		sm === null ||
+		sm !== block.endMarker ||
+		sm.nodeType === 8 /* COMMENT_NODE — i.e. already a pair */ ||
+		(STAGED_DOM?.view(sm) ?? sm).parentNode === null
+	)
+		return;
+	const p = (STAGED_DOM?.view(sm) ?? sm).parentNode!;
+	if (ROOT_RENDER_TRANSACTION !== null) {
+		journalRootRange(p, (STAGED_DOM?.view(sm) ?? sm).previousSibling, getNextSibling(sm));
+		journalRootProperty(block, 'startMarker', block.startMarker);
+		journalRootProperty(block, 'endMarker', block.endMarker);
+	}
+	const s = (STAGED_DOM?.view(document) ?? document).createComment('it');
+	const e = (STAGED_DOM?.view(document) ?? document).createComment('/it');
+	(STAGED_DOM?.view(p) ?? p).insertBefore(s, sm);
+	(STAGED_DOM?.view(p) ?? p).insertBefore(e, getNextSibling(sm));
+	block.startMarker = s;
+	block.endMarker = e;
+}
+
 // `reconcileKeyed` item body for one de-opt array element. A pure host/text item
 // is reconciled IN PLACE against the node from last render (`block.deoptNode`) —
 // props patched, children matched — so host node identity and DOM-resident state
@@ -37099,13 +37129,6 @@ function nextDeoptOwnedChild(scan: Node | null, adoptHydrationChildren: boolean)
 function deoptItemBody(item: any, scope: Scope): void {
 	const block = scope.block;
 	const hydration = hydrating ? activeHydration() : null;
-	// Marker-elision M4: a SELF-MARKED item (mounted while its value was a pure
-	// single-element host descriptor — startMarker === endMarker === that
-	// element, see mountItem's `2` sentinel) whose NEW value no longer fits one
-	// raw element (null / primitive / component-bearing) PROMOTES one-way to a
-	// real `it` pair minted around the current node, so the pure/Blocks paths
-	// below — and reorder/teardown — keep a live range. Client-only by
-	// construction (hydrated items always adopt the server's pair).
 	const existingChild = scope.slots[0] as ChildSlot | undefined;
 	// Each field read of a scoped JSX value resolves its record again. A component
 	// descriptor always needs Blocks, so it skips descNeedsBlocks' second read.
@@ -37117,27 +37140,7 @@ function deoptItemBody(item: any, scope: Scope): void {
 			existingChild.currentComp === (hostElementBody as unknown as ComponentBody)) ||
 		typeof itemType === 'function' ||
 		descNeedsBlocks(item);
-	const sm = block.startMarker;
-	if (
-		sm !== null &&
-		sm === block.endMarker &&
-		sm.nodeType !== 8 /* COMMENT_NODE — i.e. self-marked, not a pair */ &&
-		(STAGED_DOM?.view(sm) ?? sm).parentNode !== null &&
-		(needsBlocks || !hostItem)
-	) {
-		const p = (STAGED_DOM?.view(sm) ?? sm).parentNode!;
-		if (ROOT_RENDER_TRANSACTION !== null) {
-			journalRootRange(p, (STAGED_DOM?.view(sm) ?? sm).previousSibling, getNextSibling(sm));
-			journalRootProperty(block, 'startMarker', block.startMarker);
-			journalRootProperty(block, 'endMarker', block.endMarker);
-		}
-		const s = (STAGED_DOM?.view(document) ?? document).createComment('it');
-		const e = (STAGED_DOM?.view(document) ?? document).createComment('/it');
-		(STAGED_DOM?.view(p) ?? p).insertBefore(s, sm);
-		(STAGED_DOM?.view(p) ?? p).insertBefore(e, getNextSibling(sm));
-		block.startMarker = s;
-		block.endMarker = e;
-	}
+	if (needsBlocks || !hostItem) promoteSelfMarkedItem(block);
 	// An item whose subtree contains a COMPONENT descriptor (a bare `<Comp/>`, or a
 	// host element with component children like `<li><Comp/></li>`) needs real Blocks
 	// for hooks/reconciliation, which the raw host reconciler can't give it. Delegate to a
@@ -37411,9 +37414,22 @@ function mappedDeoptItemBody(item: any, scope: Scope): void {
 		if (state === undefined || state.__kind === 'componentSlotSlot') {
 			const stale = block.deoptNode;
 			if (stale !== null) {
-				detachDeoptTreeRefs(stale, null);
-				if ((STAGED_DOM?.view(stale) ?? stale).parentNode === block.parentNode)
-					domNode(block.parentNode).removeChild(stale);
+				// A self-marked host node is the item's whole range; mint the pair
+				// the component renders into before that node is retired.
+				promoteSelfMarkedItem(block);
+				journalRootProperty(block, 'deoptNode', stale);
+				const attached = (STAGED_DOM?.view(stale) ?? stale).parentNode === block.parentNode;
+				if (attached && ROOT_RENDER_TRANSACTION !== null) {
+					journalRootRange(
+						block.parentNode,
+						(STAGED_DOM?.view(stale) ?? stale).previousSibling,
+						getNextSibling(stale),
+					);
+					deferRootRange(block.parentNode, stale, stale, () => detachDeoptTreeRefs(stale, null));
+				} else {
+					detachDeoptTreeRefs(stale, null);
+					if (attached) domNode(block.parentNode).removeChild(stale);
+				}
 				block.deoptNode = null;
 			}
 			componentSlot(
