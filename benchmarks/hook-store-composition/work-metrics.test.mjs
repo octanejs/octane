@@ -22,9 +22,19 @@ const RUNTIME_SOURCES = ['runtime.ts', 'hook-slot-cache.ts'].map((file) => {
 function declaredFunction(name) {
 	for (const source of RUNTIME_SOURCES) {
 		const declaration = source.statements.find(
-			(statement) => ts.isFunctionDeclaration(statement) && statement.name?.text === name,
+			(statement) =>
+				ts.isFunctionDeclaration(statement) &&
+				statement.body !== undefined &&
+				statement.name?.text === name,
 		);
 		if (declaration !== undefined) return declaration;
+		for (const statement of source.statements) {
+			if (!ts.isVariableStatement(statement)) continue;
+			const value = statement.declarationList.declarations.find(
+				(declaration) => declaration.name.getText() === name,
+			)?.initializer;
+			if (value && (ts.isArrowFunction(value) || ts.isFunctionExpression(value))) return value;
+		}
 	}
 	return undefined;
 }
@@ -42,12 +52,25 @@ function calledNames(node, names = new Set()) {
 // The callback-nested work gate requires nonzero composed-slot calls. If the
 // runtime moves path composition to another helper, the old name still counts
 // zero in the browser and the weekly bench fails with no composed-slot coverage.
-test('the composed-slot probe names the helper resolveSlot composes paths with', () => {
-	const resolveSlot = declaredFunction('resolveSlot');
-	assert.ok(resolveSlot, 'client runtime no longer declares resolveSlot');
+test('the composed-slot probe names the helper the installed resolver composes paths with', () => {
+	const resolver = declaredFunction('resolveCustomSlot');
+	assert.ok(resolver, 'client runtime no longer declares resolveCustomSlot');
 	assert.ok(
-		calledNames(resolveSlot.body).has(COMPOSED_SLOT_HELPER),
-		`resolveSlot no longer calls ${COMPOSED_SLOT_HELPER}; point the work probe at its composed-path helper`,
+		calledNames(resolver.body).has(COMPOSED_SLOT_HELPER),
+		`resolveCustomSlot no longer calls ${COMPOSED_SLOT_HELPER}; update the work probe`,
+	);
+	const withSlot = declaredFunction('withSlot');
+	assert.ok(withSlot, 'client runtime no longer declares withSlot');
+	assert.ok(
+		withSlot.body.statements.some(
+			(statement) =>
+				ts.isExpressionStatement(statement) &&
+				ts.isBinaryExpression(statement.expression) &&
+				statement.expression.operatorToken.kind === ts.SyntaxKind.EqualsToken &&
+				statement.expression.left.getText() === 'resolveSlot' &&
+				statement.expression.right.getText() === 'resolveCustomSlot',
+		),
+		'withSlot no longer installs the composed-slot resolver; update the work probe',
 	);
 });
 

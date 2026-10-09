@@ -630,6 +630,9 @@ let EFFECT_RECONNECT_CONTEXT: EffectReconnectContext | null = null;
 // Alien graph, consumer maps, callbacks, or per-Scope fields are allocated by
 // the default runtime.
 let NATIVE_READ_DRIVER: NativeReadDriver | null = null;
+// Until withSlot first runs, the private path stack is empty. Direct component
+// hooks use their own slot; only custom-hook callers retain path composition.
+let resolveSlot = (slot: HookSlot | undefined): HookSlot | undefined => slot;
 // Only controlled bindings install event restoration. Keeping its concrete
 // entry points at that owner lets event-only applications drop the restore
 // graph without adding a wrapper call to dispatch. Read the live capability:
@@ -14087,6 +14090,7 @@ export function callWithReceiver<T>(
 
 export function withSlot<T>(sym: HookSlot, fn: (...a: any[]) => T, ...args: any[]): T;
 export function withSlot<T>(sym: HookSlot, fn: (...a: any[]) => T, ...args: any[]): T {
+	resolveSlot = resolveCustomSlot;
 	const driver = MANUAL_HOOK_DRIVER;
 	const pending = driver?.pending;
 	const active = driver?.active ?? false;
@@ -14130,7 +14134,7 @@ function appendSlotKey(key: string, slot: HookSlot): string {
 // wrapper's call-site symbol is folded in, so the SAME custom hook used at two call
 // sites (or reused) keeps its inner hooks independent. A base hook with no slot of
 // its own (a hand-written or library-binding base hook) falls back to the path.
-function resolveSlot(slot: HookSlot | undefined): HookSlot | undefined {
+function resolveCustomSlot(slot: HookSlot | undefined): HookSlot | undefined {
 	const n = slotStack.length;
 	if (n === 0) return slot;
 	if (slot === undefined && n === 1) return slotStack[0];

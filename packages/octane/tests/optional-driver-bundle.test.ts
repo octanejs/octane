@@ -103,6 +103,61 @@ export function run(container) {
 }
 `;
 
+const LATE_CUSTOM_HOOK_APP = `import { createRoot, flushSync, useState } from 'octane';
+
+function useCounter(initial) {
+	const [value, setValue] = useState(initial);
+	return { value, increment: () => setValue(value + 1) };
+}
+
+function useNestedCounter(initial, fail) {
+	const counter = useCounter(initial);
+	if (fail) throw new Error('caught');
+	return counter;
+}
+
+function App(props) @{
+	const [direct, setDirect] = useState(0);
+	let left, right, failure = '';
+	if (props.show) {
+		try { left = useNestedCounter(10, props.fail); }
+		catch (error) { failure = error.message; }
+		right = useNestedCounter(20, false);
+	}
+	<div>
+		<button id="direct" onClick={() => setDirect(direct + 1)}>{String(direct)}</button>
+		<output>{failure as string}</output>
+		@if (left) { <button id="left" onClick={left.increment}>{String(left.value)}</button> }
+		@if (right) { <button id="right" onClick={right.increment}>{String(right.value)}</button> }
+	</div>
+}
+
+export function run(container) {
+	const root = createRoot(container);
+	const snapshots = [];
+	const snapshot = () => snapshots.push(Array.from(container.querySelectorAll('button, output'), el => el.textContent));
+	try {
+		flushSync(() => root.render(App, { show: false }));
+		flushSync(() => container.querySelector('#direct').click());
+		snapshot();
+		flushSync(() => root.render(App, { show: true, fail: true }));
+		snapshot();
+		flushSync(() => container.querySelector('#right').click());
+		flushSync(() => root.render(App, { show: true, fail: false }));
+		snapshot();
+		flushSync(() => container.querySelector('#left').click());
+		snapshot();
+		flushSync(() => root.render(App, { show: false }));
+		snapshot();
+		flushSync(() => root.render(App, { show: true, fail: false }));
+		snapshot();
+	} finally {
+		root.unmount();
+	}
+	return { snapshots, empty: container.childNodes.length === 0 };
+}
+`;
+
 const roots: string[] = [];
 afterAll(() => {
 	for (const root of roots.splice(0)) rmSync(root, { recursive: true, force: true });
@@ -173,5 +228,20 @@ describe('optional capability drivers in production bundles', { timeout: 60_000 
 		const { retained, chunk } = await buildApp(CAPABILITIES_APP);
 		expect(OPTIONAL_DECLARATIONS.filter((name) => !retained.has(name))).toEqual([]);
 		expect(run(chunk)).toEqual({ before: '0', after: '1', empty: true });
+	});
+
+	it('preserves direct and nested state when custom hooks first run during a later render', async () => {
+		const { chunk } = await buildApp(LATE_CUSTOM_HOOK_APP);
+		expect(run(chunk)).toEqual({
+			snapshots: [
+				['1', ''],
+				['1', 'caught', '20'],
+				['1', '', '10', '21'],
+				['1', '', '11', '21'],
+				['1', ''],
+				['1', '', '11', '21'],
+			],
+			empty: true,
+		});
 	});
 });
