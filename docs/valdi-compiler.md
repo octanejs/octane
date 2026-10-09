@@ -97,6 +97,32 @@ Prototypes are created once per generated module. A missing key is passed as
 and spread getters retain authored evaluation order; `key` is not forwarded as
 a host attribute or component prop.
 
+### Optional host text and refs
+
+The default compiler ABI stays at 1. A renderer can opt into ABI 2 by setting
+`text: 'host'` or by including `'host-ref'` in its `capabilities`. A compiled
+module using either option calls `assertValdiCompilerAbi(2)` before any
+prototypes are created; an ABI 1 adapter must reject it. Set these options only
+after the selected adapter implements the corresponding contract.
+
+- With `text: 'host'`, implement `jsx.appendText(value)`. It writes text under
+  the current open host in authored order. Values may be dynamic; the adapter
+  must accept strings and numbers, ignore nullish/boolean values, and reject
+  other values visibly. It owns retaining, updating, and clearing the text.
+  Use the existing `validation.textParents` and `validation.textHosts` to
+  restrict where authored text and text hosts can occur. Dynamic values still
+  require adapter-side checks.
+- With `capabilities: ['host-ref']`, authored host refs use the existing
+  generic `jsx.setAttribute('ref', value)` path. Spread refs are included in
+  `setValdiAttributes(props)` after normal last-write-wins merging, with each
+  getter evaluated once. The host owns ref attachment, replacement, and cleanup.
+  Component refs and `children` props remain unsupported.
+
+Editor integrations can already use `compileToVolarMappings` with
+`options.renderers` and the renderer's `intrinsics` module. Use the same
+default/rules as build-time compilation. The adapter is never executed during
+type checking, and an authored leading JSX pragma still takes precedence.
+
 The adapter also owns component instances, scheduling, error recovery, unmount,
 hook state, and effect cleanup. Writer calls are not a transaction or a native
 renderer implementation supplied by this compiler. If rendering throws, the
