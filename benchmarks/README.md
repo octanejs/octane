@@ -70,6 +70,8 @@ changing the primary compiled React comparison.
 node benchmarks/bench.mjs                       # every suite, normal iterations
 node benchmarks/bench.mjs js-framework memo-wall   # only these suites
 node benchmarks/bench.mjs --quick js-framework  # reduced-iteration smoke pass
+pnpm bench:stable js-framework                 # median of five full harness runs
+node benchmarks/bench.mjs --repeat=3 dbmon      # choose a fixed repetition count
 node benchmarks/bench.mjs --list                # list suite names
 pnpm bench:all -- --quick                        # same via the root script
 ```
@@ -77,9 +79,10 @@ pnpm bench:all -- --quick                        # same via the root script
 For server-backed browser suites, the runner first production-builds each fixture
 app (`pnpm --filter <pkg> build`), starts its preview server
 (`pnpm --filter <pkg> preview`), waits for the strict port, runs the harness with
-`BENCH_JSON` pointed at a temp file, then kills the server **by port**
-(`lsof -ti tcp:<port>`). Suites run **sequentially** so ports and CPU never
-contend. A fixture is built at most once per runner invocation, even if multiple
+`BENCH_JSON` pointed at a temp file, then stops its preview process groups.
+Occupied ports are rejected rather than cleared. Suites run **sequentially**;
+a per-user host lock prevents another unified runner, including one in another
+worktree, from running alongside it. A fixture is built at most once per runner invocation, even if multiple
 suites reuse it. Collected results land in `benchmarks/results/<suite>.json`
 (gitignored), one file per suite.
 
@@ -99,6 +102,50 @@ servers per sample — that spawn/listen/first-byte cycle IS the measurement —
 and **codegen-size** / **bundle-size** / **bundle-reachability** /
 **three-bundle-size** /
 **lynx-bundle-size** are deterministic build/byte checks.
+
+## Repeatable local measurements
+
+Use `pnpm bench:stable <suite...>` for local performance work. It runs each
+suite five times in fresh harness processes, sequentially, and reports the
+**median of the five run scores**. `--repeat=N` chooses a fixed count. This
+reduces the influence of an unusually slow or fast process lifetime without
+discarding inconvenient runs or retrying until a threshold passes. It costs
+roughly N times the measurement time. Single-run defaults and `--quick` stay
+available for smoke checks; `--quick --repeat=N` repeats the smoke protocol.
+
+Preview builds and servers are reused across repetitions. Harnesses that build
+their own fixtures still perform their normal build each time. Each harness's
+sampling protocol is unchanged by `--repeat`. The local js-framework harness
+also [batches reversible short operations](js-framework/README.md) to avoid
+timer-resolution noise, using the same calibration as its paired PR harness.
+Timing results
+can still move with CPU contention, power state, temperature and browser or
+toolchain updates; no local wall-clock protocol can make them identical.
+
+The summary table includes the range and coefficient of variation (sample
+standard deviation / mean) of **run scores**, so persistent noise remains visible.
+Original merged suite summaries and target metadata are saved in `runs` and in
+`<suite>.run-N.json` alongside `<suite>.json`. Aggregated operations use
+`scoreKind: "run-median"`; timing `score` and legacy `median` are the median run score,
+and `min` is the median of the per-run minima for the existing comparison rule.
+`betweenRuns` holds the individual scores, range and `cvPercent`. These are
+not pooled timing distributions: within-run percentiles, errors and sample
+counts remain attached to their original runs. Byte/count operations keep their median-only fields and
+their original units and expose any between-run disagreement too.
+
+Missing/changed targets or operations and non-finite measurements fail
+aggregation. Any harness failure stops repetition, remains a failed run, and
+cannot overwrite a baseline. Completed repetitions are saved before aggregation
+so an incomplete run is inspectable. `--compare` requires the same repetition
+count as the baseline; re-record existing single-run baselines before comparing
+repeated results. Keep the same iterations, target selection, machine and
+toolchain when recording and comparing.
+
+The lock covers unified-runner invocations only: avoid standalone harnesses,
+builds, tests or other CPU-heavy work alongside measurements. The lock is
+released on normal exit and handled termination signals. After an unhandled
+crash or forced kill, the error prints the lock path, PID and checkout; verify
+that no benchmark is running before manually removing the stale lock.
 
 ## Browser sample preparation
 
@@ -136,6 +183,7 @@ node --test benchmarks/js-framework/timing.test.mjs
 | `--compare` | diff current numbers vs `baselines/local/<suite>.json` | on any regression |
 | `--ratios` | check `baselines/ratios.json` guards | on any breach |
 | `--quick` | reduced iterations / seconds per suite | — |
+| `--repeat=N` | median of N sequential fresh-process runs, retaining every result | on any harness failure or incompatible results |
 | `--baseline-dir=<dir>` | override the absolute-baseline dir | — |
 | `--results-dir=<dir>` | override where per-suite JSON is written | — |
 

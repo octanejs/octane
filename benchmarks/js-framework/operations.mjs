@@ -59,6 +59,67 @@ export const DIRECT_LIST_MOUNTS = [
 
 export const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
+const SAMPLE_MS = 20;
+// Each remove consumes a row. Selection can need thousands of clicks to rise
+// above the timer floor, but every calibration remains bounded.
+const MAX_REPEAT = { remove: 800, default: 5000 };
+const REPEATABLE = new Set(['update', 'select', 'swap', 'remove', 'select_lots']);
+
+export const selectorsFor = (op, index, repeat) =>
+	op.alternateClick
+		? repeat > 1
+			? [op.click, op.alternateClick]
+			: [index % 2 === 1 ? op.alternateClick : op.click]
+		: [op.click];
+
+const parityFor = (op, repeat) => {
+	// A selection sample ends on the alternate row, so the next one starts by
+	// selecting a different row instead of re-selecting the current one.
+	if (op.alternateClick && repeat % 2 === 1) repeat++;
+	// An even number of swaps restores the original order, which a swap that
+	// did nothing would also leave. An odd count keeps every sample verifiable.
+	if (op.name === 'swap' && repeat % 2 === 0) repeat++;
+	return repeat;
+};
+
+// Each update appends to every tenth label. Rebuild before each batch so
+// calibration, warmup, and measured batches start with the same label lengths.
+export async function prepare(page, op) {
+	if (op.name === 'update') {
+		// Commit the rebuild before the sample and prove it replaced the rows, so
+		// no stale labels or in-flight random draws reach the timed window.
+		await page.evaluate(async () => {
+			const before = document.querySelector('tbody tr');
+			document.getElementById('run').click();
+			if (window.__benchFlush) await window.__benchFlush();
+			const rows = document.querySelectorAll('tbody tr');
+			if (rows.length !== 1000 || rows[0] === before) {
+				throw new Error('update preparation did not rebuild the 1,000 rows');
+			}
+		});
+	}
+	await ensureState(page, op.pre);
+}
+
+// Refine a repeatable operation's batch until it takes about 20ms, above the
+// timer floor. Keep trial counts so the paired runner can replay exactly the
+// same operation sequence on its other page and preserve seeded data parity.
+export async function calibrate(page, op) {
+	if (!REPEATABLE.has(op.name)) return { repeat: 1, trials: [] };
+	const cap = MAX_REPEAT[op.name] ?? MAX_REPEAT.default;
+	const trials = [];
+	let repeat = parityFor(op, 2);
+	for (let round = 0; round < 5; round++) {
+		await prepare(page, op);
+		const elapsed = await timeClick(page, op, selectorsFor(op, 1, repeat), repeat);
+		trials.push(repeat);
+		await sleep(30);
+		if (elapsed >= SAMPLE_MS * 0.8 || repeat >= cap) break;
+		repeat = parityFor(op, Math.min(cap, Math.ceil((repeat * SAMPLE_MS) / Math.max(elapsed, 0.1))));
+	}
+	return { repeat: Math.min(repeat, parityFor(op, cap)), trials };
+}
+
 // Use the same data stream for every target. Label generation is inside the
 // measured create operations, so uncontrolled randomness would add dialect
 // noise through different string lengths and allocation patterns.
