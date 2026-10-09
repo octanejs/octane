@@ -15341,9 +15341,18 @@ export const hookMemoEqual = Object.is;
 
 /** @internal The usual compiled body takes the first-region fast path. */
 export function compilerMemoRegion(scope: Scope, bodyId: number): CompilerMemoRegion {
-	const region = scope.compilerMemo;
-	if (region !== null && region.bodyId === bodyId) return region;
-	return createCompilerMemoRegion(scope, bodyId, region);
+	const first = scope.compilerMemo;
+	const region =
+		first !== null && first.bodyId === bodyId
+			? first
+			: createCompilerMemoRegion(scope, bodyId, first);
+	// The body may publish a new output cache. A held or rolled-back render
+	// restores the cache with the screen it describes, so a retry re-enters what
+	// the rollback undid.
+	if (TRANSITION_JOURNAL !== null && region.auto !== undefined && !ROOT_RENDER_ROLLBACK) {
+		TRANSITION_JOURNAL.push(JOURNAL_PROP, region, 'auto', region.auto);
+	}
+	return region;
 }
 
 function createCompilerMemoRegion(
