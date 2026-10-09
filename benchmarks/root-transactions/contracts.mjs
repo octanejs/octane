@@ -61,12 +61,13 @@ function instrument(variant) {
 	}
 	const reads = variant === 'binding-cache' ? 'cached' : 'live';
 	if (source.includes('function journalText(node: Text, previous: string | null)')) {
-		// The text writer journals the staged view's value when a staged DOM is
-		// active; the audit substitutes its own read for that previous value.
+		// setText journals the staged view's value when a staged DOM is active;
+		// the audit substitutes its own read for that previous value. The pattern
+		// accepts any spelling of the staged-view read.
 		source = replaceOnce(
 			source,
-			'if (TRANSITION_JOURNAL !== null) journalText(node, (STAGED_DOM?.view(node) ?? node).nodeValue);',
-			`if (TRANSITION_JOURNAL !== null) journalText(node, globalThis.__rootContractAudit.${reads}Text(node));`,
+			/journalText\(target, \(STAGED_DOM.*\)\.nodeValue\);/,
+			`journalText(target, globalThis.__rootContractAudit.${reads}Text(target));`,
 		);
 	} else {
 		source = replaceOnce(
