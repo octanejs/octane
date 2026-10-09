@@ -39,6 +39,19 @@ Code outside render works as before. Event handlers update state, effects synchr
 external systems and release what they acquire in cleanup, and refs hold DOM nodes,
 timers, and other values for events and effects to read and write.
 
+Effect setup may read or write a ref's `current` and call a state getter. Neither
+subscribes the effect to changes; read the state snapshot when the effect should
+re-run as state changes. Reading a reassigned module `let` or `var` in setup still
+reports [`OCTANE_STRONG_EFFECT_HIDDEN_DEPENDENCY`](#octane-strong-effect-hidden-dependency).
+
+Resource cleanup analysis follows same-module helpers and `useEffectEvent` callbacks
+called during setup, using that call's arguments. If `start()` acquires a listener
+and returns its disposer, `useLayoutEffect(() => start())` returns that cleanup to
+Octane and satisfies the check; `useLayoutEffect(() => { start(); })` discards it.
+An imported helper remains opaque: the analysis cannot see resources it acquires
+internally or cleanup it returns. See the [resource cleanup reference](https://github.com/octanejs/octane/blob/main/docs/strong-compiler-checks.md#effect-cleanup)
+for the supported resources and proof limits.
+
 Strong is off by default. Compatibility mode keeps React's rules, including manual memo
 hooks and explicit dependency arrays, so an app can opt in one module at a time. The
 setting applies to the application's own modules: installed dependencies keep their own
