@@ -9287,6 +9287,8 @@ function collectTypeOnlyNames(statement, names) {
 				names.add(specifier.local.name);
 			}
 		}
+	} else if (node.type === 'VariableDeclaration') {
+		for (const declarator of node.declarations) collectBindings(declarator.id, names);
 	} else if (node.id?.type === 'Identifier') {
 		names.add(node.id.name);
 	}

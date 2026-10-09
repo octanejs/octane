@@ -117,13 +117,17 @@ describe('compile() erases TypeScript-only syntax from .ts modules', () => {
 			});
 		}
 
-		it(`keeps a re-export whose type name also declares a value (${parserName} parser)`, () => {
+		// An ambient `declare` has no runtime binding either, so its re-export goes
+		// too; a name that also declares a value keeps its export.
+		it(`re-exports only names with a runtime value (${parserName} parser)`, () => {
 			const code = compileWith(
 				parserName,
 				`import type { Foo } from './types.mjs';
 				interface Shape { sides: number }
 				const Shape = { sides: 4 };
-				export { Foo, Shape };`,
+				declare const ambient: number;
+				declare function helper(): void;
+				export { Foo, Shape, ambient, helper };`,
 				'/src/merged.ts',
 				{ mode: 'client' },
 			);
