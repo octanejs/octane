@@ -40,10 +40,14 @@ const OPTIONAL_DECLARATIONS = [
 	'NATIVE_READ_DRIVER',
 	'beginActiveNativeReadScope',
 ];
+const CAPTURE_DECLARATIONS = ['finishCaptureDispatch'];
 const ranges = resolveDeclarationRanges(
 	(source: string) => readFileSync(join(SOURCE, source), 'utf8'),
 	(text: string, source: string) => parseAst(text, { lang: 'ts' }, source),
-	OPTIONAL_DECLARATIONS.map((name) => ({ name, source: 'runtime.ts' })),
+	[...OPTIONAL_DECLARATIONS, ...CAPTURE_DECLARATIONS].map((name) => ({
+		name,
+		source: 'runtime.ts',
+	})),
 );
 
 const PLAIN_APP = `import { createRoot, flushSync, useState } from 'octane';
@@ -237,6 +241,50 @@ export async function run(container, scenario) {
 }
 `;
 
+const LATE_CAPTURE_RESTORE_APP = `import { createElement, createRoot, flushSync } from 'octane';
+
+export async function run(container) {
+	const log = [], edits = [];
+	const root = createRoot(container);
+	const bubble = event => log.push('bubble:' + event.currentTarget.value);
+	const capture = event => log.push('capture:' + event.target.value);
+	const show = active => {
+		const props = {};
+		// An omitted property keeps initial registration genuinely bubble-only.
+		if (active) props.onInputCapture = capture;
+		flushSync(() => root.render(createElement('section', props,
+			createElement('input', { value: '', onInput: bubble }))));
+	};
+	try {
+		show(false);
+		const input = container.querySelector('input');
+		input.focus();
+		input.value = 'warm';
+		input.dispatchEvent(new Event('input', { bubbles: true }));
+		await Promise.resolve();
+		const before = { log: log.slice(), value: input.value };
+		show(true);
+		input.addEventListener('input', event => {
+			log.push('native:' + input.value);
+			event.stopPropagation();
+		});
+		for (const value of ['late', 'again']) {
+			input.value = value;
+			input.dispatchEvent(new Event('input', { bubbles: true }));
+			const during = input.value;
+			await Promise.resolve();
+			edits.push({ during, restored: input.value });
+		}
+		const same = input === container.querySelector('input');
+		const focused = document.activeElement === input;
+		root.unmount();
+		return { before, log, edits, same, focused, empty: container.childNodes.length === 0 };
+	} finally {
+		root.unmount();
+	}
+}
+`;
+
 const roots: string[] = [];
 afterAll(() => {
 	for (const root of roots.splice(0)) rmSync(root, { recursive: true, force: true });
@@ -294,13 +342,31 @@ async function run(chunk: Rolldown.OutputChunk, scenario?: string) {
 describe('optional capability drivers in production bundles', { timeout: 60_000 }, () => {
 	it('ships none of their code in an application that uses none of them', async () => {
 		const { retained, chunk } = await buildApp(PLAIN_APP);
-		expect(OPTIONAL_DECLARATIONS.filter((name) => retained.has(name))).toEqual([]);
+		expect(
+			[...OPTIONAL_DECLARATIONS, ...CAPTURE_DECLARATIONS].filter((name) => retained.has(name)),
+		).toEqual([]);
 		expect(await run(chunk)).toEqual({
 			before: 'reverseabc',
 			after: 'reversecba',
 			refs: ['a', 'b', 'c'],
 			empty: true,
 		});
+	});
+
+	it('restores stopped input edits after capture handlers are first added to a live root', async () => {
+		const { chunk, retained } = await buildApp(LATE_CAPTURE_RESTORE_APP);
+		expect(await run(chunk)).toEqual({
+			before: { log: ['bubble:warm'], value: '' },
+			log: ['bubble:warm', 'capture:late', 'native:late', 'capture:again', 'native:again'],
+			edits: [
+				{ during: 'late', restored: '' },
+				{ during: 'again', restored: '' },
+			],
+			same: true,
+			focused: true,
+			empty: true,
+		});
+		expect(CAPTURE_DECLARATIONS.filter((name) => !retained.has(name))).toEqual([]);
 	});
 
 	it('keeps each driver in an application that uses its capability', async () => {
