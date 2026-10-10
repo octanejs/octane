@@ -14,7 +14,10 @@ const baselineRef = process.argv.slice(2).find((arg) => !arg.startsWith('--'));
 const measure = process.argv.includes('--measure');
 
 function instantiate(source) {
-	const refStart = source.indexOf('function drainRefAttaches():');
+	const refName = source.includes('function drainQueuedRefAttaches():')
+		? 'drainQueuedRefAttaches'
+		: 'drainRefAttaches';
+	const refStart = source.indexOf(`function ${refName}():`);
 	const refEnd = source.indexOf('// Callback replacement', refStart);
 	const comparisonStart = source.indexOf('function blockIsAncestorOf(');
 	const comparisonEnd = source.indexOf('function finishEffectCommit()', comparisonStart);
@@ -42,7 +45,7 @@ function instantiate(source) {
 		function reportCaughtError() { throw new Error('unexpected caught ref error'); }
 		function reportUncaughtError() { throw new Error('unexpected uncaught ref error'); }
 		${code}
-		return { counts, log, enqueue(entries) { refAttachQueue.push(...entries); }, drain: drainRefAttaches };
+		return { counts, log, enqueue(entries) { refAttachQueue.push(...entries); }, drain: ${refName} };
 	`)();
 }
 
