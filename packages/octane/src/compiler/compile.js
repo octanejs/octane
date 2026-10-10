@@ -6560,19 +6560,33 @@ function classifySameModuleWarmPotential(ctx) {
 
 			if ((node.type === 'Element' || node.type === 'JSXElement') && isComponentTag(node)) {
 				const name = tagBindingName(node);
+				const contextProvider = ctx.provenContextBindings.has(name);
 				if (
 					name === null ||
 					locals.has(name) ||
 					ctx._octaneBoundaryNames.has(name) ||
-					!ctx.componentInfo.has(name)
+					(!contextProvider && !ctx.componentInfo.has(name))
 				) {
 					opaque = true;
 					return;
 				}
 				// Keep the immutable JSX node so the fixed point can prove the
 				// descendant's required own props separately for each call site.
-				dependencies.add(node);
+				// A known provider contributes no promise creation of its own. Its
+				// attributes and children still pass through the ordinary walk below.
+				if (!contextProvider) dependencies.add(node);
 			} else if (node.type === 'CallExpression' || node.type === 'NewExpression') {
+				if (
+					node.type === 'CallExpression' &&
+					!followsOptionalLink(node) &&
+					(node._octaneImportedHook === 'use' || node._octaneImportedHook === 'useContext') &&
+					node.arguments.length === 1 &&
+					isProvenContextUse(node.arguments[0], ctx.provenContextBindings)
+				) {
+					// Context reads create nothing a warm plan can pre-start. Keep the
+					// authored read: a hosted renderer may still request an owner retry.
+					return;
+				}
 				const hook = stableHookCallName(node);
 				if (
 					hook !== 'useState' ||
