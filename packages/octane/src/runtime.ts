@@ -33329,8 +33329,11 @@ function restoreControlledStates(): void {
 	if (pendingRestores.length === 0) return;
 	// A handler inside a render/commit cannot flush its own update. The ambient
 	// owner restores after its complete cascade, including held foreign work.
+	// A prepared view transition owns projected control values until publication;
+	// restoring the physical snapshot now would overwrite that pending edit.
 	if (
 		inFlush ||
+		STAGED_DOM ||
 		_dispatchDepth !== 0 ||
 		QUEUE.length > 0 ||
 		ROOT_RENDER_TRANSACTIONS.length > 0 ||

@@ -31,18 +31,16 @@ function Editor(props: EditorProps) @{
 			onInput={(event: Event) => setDraft((event.currentTarget as HTMLInputElement).value)}
 		/>
 		<output id="deferred-draft">{draft as string}</output>
-		<button type="button" onClick={send}>{'Send'}</button>
+		<button type="button" onClick={send}>
+			{'Send'}
+		</button>
 		<output id="deferred-submitted">{submitted as string}</output>
 	</section>
 }
 
 export function DeferredControlledEditor(props: EditorProps) @{
 	<Hydrate when={interaction()} split={false}>
-		<Editor
-			adoptInLayout={props.adoptInLayout}
-			onAdopt={props.onAdopt}
-			onSend={props.onSend}
-		/>
+		<Editor adoptInLayout={props.adoptInLayout} onAdopt={props.onAdopt} onSend={props.onSend} />
 	</Hydrate>
 }
 
