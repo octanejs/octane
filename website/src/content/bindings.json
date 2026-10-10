@@ -529,11 +529,6 @@
         "tags": ["virtualization", "lists", "performance"]
       },
       {
-        "packageName": "@octanejs/tanstack-table",
-        "title": "TanStack Table",
-        "tags": ["tables", "data grid"]
-      },
-      {
         "packageName": "@octanejs/tanstack-virtual",
         "title": "TanStack Virtual",
         "tags": ["virtualization", "lists", "performance"]

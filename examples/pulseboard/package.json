@@ -14,7 +14,7 @@
   },
   "dependencies": {
     "@tanstack/octane-hotkeys": "^0.3.0",
-    "@octanejs/tanstack-table": "workspace:*",
+    "@tanstack/octane-table": "^9.3.0",
     "@octanejs/tanstack-virtual": "workspace:*",
     "@octanejs/visx": "workspace:*",
     "octane": "workspace:*"

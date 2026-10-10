@@ -870,7 +870,7 @@
       "host": "octane",
       "renderModes": ["client"],
       "dialects": ["tsrx"],
-      "bindings": ["@octanejs/tanstack-table", "@octanejs/tanstack-virtual", "@octanejs/visx"],
+      "bindings": ["@octanejs/tanstack-virtual", "@octanejs/visx"],
       "octaneFeatures": [
         "async-recovery",
         "keyed-reconciliation",

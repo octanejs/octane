@@ -1,5 +1,3 @@
-import tanstackTableAdapted from './packages/tanstack-table/tests/vitest.adapted.config.ts';
-import tanstackTableAdaptedSSR from './packages/tanstack-table/tests/vitest.adapted-ssr.config.ts';
 import { realpathSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { dirname, isAbsolute, relative, resolve } from 'node:path';
@@ -606,16 +604,6 @@ export default defineConfig({
 		silent: true,
 		projects: [
 			{ ...tanstackVirtualAdapted, testExecution: { group: 'react-parity' } },
-			{ ...tanstackTableAdapted, testExecution: { group: 'react-parity' } },
-			{ ...tanstackTableAdaptedSSR, testExecution: { group: 'react-parity' } },
-			{
-				testExecution: { group: 'react-parity' },
-				test: {
-					name: 'tanstack-table-pristine',
-					include: ['packages/tanstack-table/tests/upstream-original.test.ts'],
-					environment: 'node',
-				},
-			},
 			{ ...tanstackQueryAdapted, testExecution: { group: 'react-parity' } },
 			{ ...tanstackQueryAdaptedSSR, testExecution: { group: 'react-parity' } },
 			{ ...tanstackQueryDevtoolsAdapted, testExecution: { group: 'react-parity' } },
@@ -2337,46 +2325,6 @@ export default defineConfig({
 						{
 							find: /^@octanejs\/testing-library\/(.*)$/,
 							replacement: resolve(import.meta.dirname, 'packages/testing-library/src') + '/$1.ts',
-						},
-					],
-				},
-			},
-			{
-				// Focused hydration and export cases belong to parity; other conformance runs normally.
-				testExecution: {
-					group: 'react-parity',
-					include: [
-						'packages/tanstack-table/tests/ssr-hydration.test.ts',
-						'packages/tanstack-table/tests/conformance/parity-legacy-api.test.ts',
-					],
-				},
-				test: {
-					name: 'tanstack-table',
-					include: ['packages/tanstack-table/tests/**/*.test.ts'],
-					environment: 'jsdom',
-					exclude: [
-						'packages/tanstack-table/tests/differential/**/*.test.ts',
-						'packages/tanstack-table/tests/upstream-original.test.ts',
-					],
-					// Same differential precompile, but for table fixtures: also rewrites
-					// `@octanejs/tanstack-table` → `@tanstack/react-table` so the React side
-					// runs the real react-table adapter over the SAME table-core.
-					globals: false,
-				},
-				plugins: [octane()],
-				// `@octanejs/tanstack-table` is the package under test; alias the public
-				// name (and subpaths) to source so fixtures import it exactly as a
-				// consumer would (and the differential React side rewrites the same
-				// specifiers to `@tanstack/react-table`).
-				resolve: {
-					alias: [
-						{
-							find: /^@octanejs\/tanstack-table$/,
-							replacement: resolve(import.meta.dirname, 'packages/tanstack-table/src/index.ts'),
-						},
-						{
-							find: /^@octanejs\/tanstack-table\/(.*)$/,
-							replacement: resolve(import.meta.dirname, 'packages/tanstack-table/src') + '/$1.ts',
 						},
 					],
 				},
@@ -7273,39 +7221,6 @@ export default defineConfig({
 						{
 							find: /^@octanejs\/tanstack-store$/,
 							replacement: resolve(import.meta.dirname, 'packages/tanstack-store/src/index.ts'),
-						},
-					],
-				},
-			},
-			{
-				// Isolated differential ownership: react-parity:check runs this lane
-				// via selectHarnessAction while ordinary Vitest shards omit it.
-				// recorded-unverified provenance still blocks a verified parity claim.
-				testExecution: { group: 'react-parity' },
-				test: {
-					name: 'tanstack-table-differential',
-					include: ['packages/tanstack-table/tests/differential/**/*.test.ts'],
-					environment: 'jsdom',
-					// Same differential precompile, but for table fixtures: also rewrites
-					// `@octanejs/tanstack-table` → `@tanstack/react-table` so the React side
-					// runs the real react-table adapter over the SAME table-core.
-					globalSetup: ['packages/tanstack-table/tests/differential/_setup.ts'],
-					globals: false,
-				},
-				plugins: [octane()],
-				// `@octanejs/tanstack-table` is the package under test; alias the public
-				// name (and subpaths) to source so fixtures import it exactly as a
-				// consumer would (and the differential React side rewrites the same
-				// specifiers to `@tanstack/react-table`).
-				resolve: {
-					alias: [
-						{
-							find: /^@octanejs\/tanstack-table$/,
-							replacement: resolve(import.meta.dirname, 'packages/tanstack-table/src/index.ts'),
-						},
-						{
-							find: /^@octanejs\/tanstack-table\/(.*)$/,
-							replacement: resolve(import.meta.dirname, 'packages/tanstack-table/src') + '/$1.ts',
 						},
 					],
 				},

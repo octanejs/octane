@@ -142,7 +142,6 @@ export const SOURCE_PUBLICATION_DEBT = {
 		'packages/tanstack-router/tsconfig.json',
 		'packages/tanstack-start/tsconfig.json',
 		'packages/tanstack-store/tsconfig.json',
-		'packages/tanstack-table/tsconfig.json',
 		'packages/tanstack-virtual/tsconfig.json',
 		'packages/tauri/tsconfig.json',
 		'packages/textarea-autosize/tsconfig.json',

@@ -6,9 +6,6 @@ importers:
   .:
     configDependencies: {}
     packageManagerDependencies:
-      '@pnpm/exe':
-        specifier: 12.9.1
-        version: 12.9.1
       pnpm:
         specifier: 12.9.1
         version: 12.9.1
@@ -92,11 +89,6 @@ packages:
     cpu: [x64]
     os: [win32]
 
-  '@pnpm/exe@12.9.1':
-    resolution: {integrity: sha512-TZOVvYq8nwzmw8IR3P1GKZk87tV7vDPCT3oJlL7IhgYNZfLGov4jX0J8RJxuAXxIT3uxg/uiconrLLBv+X5KyA==}
-    engines: {node: '>=18.*'}
-    hasBin: true
-
   pnpm@12.9.1:
     resolution: {integrity: sha512-BrBV//XNINwSeB3hc87TMQzglRvy7GICEaFgRdVETVyTpmMhB2TvKaZTphBFm6A2jw50+E2AxUcjz5Wq57wNbQ==}
     engines: {node: '>=18.*'}
@@ -145,23 +137,6 @@ snapshots:
 
   '@pnpm/exe.win32-x64@12.9.1':
     optional: true
-
-  '@pnpm/exe@12.9.1':
-    optionalDependencies:
-      '@pnpm/exe.android-arm64': 12.9.1
-      '@pnpm/exe.android-x64': 12.9.1
-      '@pnpm/exe.darwin-arm64': 12.9.1
-      '@pnpm/exe.darwin-x64': 12.9.1
-      '@pnpm/exe.freebsd-x64': 12.9.1
-      '@pnpm/exe.linux-arm64': 12.9.1
-      '@pnpm/exe.linux-arm64-musl': 12.9.1
-      '@pnpm/exe.linux-ppc64': 12.9.1
-      '@pnpm/exe.linux-riscv64': 12.9.1
-      '@pnpm/exe.linux-s390x': 12.9.1
-      '@pnpm/exe.linux-x64': 12.9.1
-      '@pnpm/exe.linux-x64-musl': 12.9.1
-      '@pnpm/exe.win32-arm64': 12.9.1
-      '@pnpm/exe.win32-x64': 12.9.1
 
   pnpm@12.9.1:
     optionalDependencies:
@@ -4905,9 +4880,6 @@ importers:
 
   examples/pulseboard:
     dependencies:
-      '@octanejs/tanstack-table':
-        specifier: workspace:*
-        version: link:../../packages/tanstack-table
       '@octanejs/tanstack-virtual':
         specifier: workspace:*
         version: link:../../packages/tanstack-virtual
@@ -4917,6 +4889,9 @@ importers:
       '@tanstack/octane-hotkeys':
         specifier: ^0.3.0
         version: 0.3.0(octane@packages+octane)
+      '@tanstack/octane-table':
+        specifier: ^9.3.0
+        version: 9.3.0(octane@packages+octane)
       octane:
         specifier: workspace:*
         version: link:../../packages/octane
@@ -9492,49 +9467,6 @@ importers:
       use-sync-external-store:
         specifier: catalog:tanstack-store-react-oracle
         version: 1.6.0(react@19.2.3)
-      vitest:
-        specifier: catalog:default
-        version: 4.1.10(@edge-runtime/vm@5.0.0)(@opentelemetry/api@1.9.1)(@types/node@24.13.3)(@vitest/browser-playwright@4.1.10)(@vitest/coverage-istanbul@4.1.10)(@vitest/coverage-v8@4.1.10)(happy-dom@20.11.2(bufferutil@4.1.0)(utf-8-validate@5.0.10))(jsdom@30.0.1(@noble/hashes@2.2.0))(vite@8.1.5(@types/node@24.13.3)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.49.0)(tsx@4.23.1)(yaml@2.9.0))
-
-  packages/tanstack-table:
-    dependencies:
-      '@octanejs/tanstack-store':
-        specifier: workspace:*
-        version: link:../tanstack-store
-      '@tanstack/table-core':
-        specifier: 9.2.4
-        version: 9.2.4
-    devDependencies:
-      '@octanejs/testing-library':
-        specifier: workspace:*
-        version: link:../testing-library
-      '@tanstack/react-store':
-        specifier: 0.11.1
-        version: 0.11.1(react-dom@19.2.7(react@19.2.7))(react@19.2.7)
-      '@tanstack/react-table':
-        specifier: 9.2.4
-        version: 9.2.4(react-dom@19.2.7(react@19.2.7))(react@19.2.7)
-      '@testing-library/react':
-        specifier: catalog:default
-        version: 16.3.2(@testing-library/dom@10.4.1)(@types/react-dom@19.2.7(@types/react@19.2.18))(@types/react@19.2.18)(react-dom@19.2.7(react@19.2.7))(react@19.2.7)
-      '@tsrx/react':
-        specifier: catalog:default
-        version: 0.4.5(react@19.2.7)
-      '@types/react':
-        specifier: catalog:default
-        version: 19.2.18
-      esbuild:
-        specifier: catalog:default
-        version: 0.28.1
-      octane:
-        specifier: workspace:*
-        version: link:../octane
-      react:
-        specifier: catalog:default
-        version: 19.2.7
-      react-dom:
-        specifier: catalog:default
-        version: 19.2.7(react@19.2.7)
       vitest:
         specifier: catalog:default
         version: 4.1.10(@edge-runtime/vm@5.0.0)(@opentelemetry/api@1.9.1)(@types/node@24.13.3)(@vitest/browser-playwright@4.1.10)(@vitest/coverage-istanbul@4.1.10)(@vitest/coverage-v8@4.1.10)(happy-dom@20.11.2(bufferutil@4.1.0)(utf-8-validate@5.0.10))(jsdom@30.0.1(@noble/hashes@2.2.0))(vite@8.1.5(@types/node@24.13.3)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.49.0)(tsx@4.23.1)(yaml@2.9.0))
@@ -19994,6 +19926,12 @@ packages:
     peerDependencies:
       octane: '>=0.12.0'
 
+  '@tanstack/octane-table@9.3.0':
+    resolution: {integrity: sha512-+88QERcuDdllDrFxlvqA1FS3xfiI2ANkxHjO7TxmPXWpWilE1Wk0UginpfXyYtABIdSaixceYGhK/+MRkvQfIw==}
+    engines: {node: '>=22'}
+    peerDependencies:
+      octane: '>=0.12.0'
+
   '@tanstack/openai-base@0.3.5':
     resolution: {integrity: sha512-szmbmt5jMCbKT+Mbn13ooAj+V1ZHj6EimwYhNCWURD+CCkOSWn1+qGEwYXFXksfEWUJ49rFwEWApodaPMQdvVA==}
     peerDependencies:
@@ -20211,12 +20149,6 @@ packages:
       react: '>=16.8'
       react-dom: '>=16.8'
 
-  '@tanstack/react-table@9.2.4':
-    resolution: {integrity: sha512-Rzp1Q4e0/nIgEjmISYR5HeEgLTNtrG+C7NFZf/AbCxPO5hg+zC3yNGwcoECigUk8SFzzvhXbd2rFdtP2ZiGrfA==}
-    engines: {node: '>=20'}
-    peerDependencies:
-      react: '>=18'
-
   '@tanstack/react-virtual@3.14.12':
     resolution: {integrity: sha512-EOJkBss/FRqzFrCpX8M96lIh+ZMc0jPt0LILhxWQ3tOHQ3XdVvuE0jceS2yZXpDtayNfpjeg2EnuYPm90CxIlA==}
     peerDependencies:
@@ -20339,8 +20271,8 @@ packages:
     resolution: {integrity: sha512-ldZXEhOBb8Is7xLs01fR3YEc3DERiz5silj8tnGkFZytt1abEvl/GhUmCE0PMLaMPTa3Jk4HbKmRlHmu+gCftg==}
     engines: {node: '>=12'}
 
-  '@tanstack/table-core@9.2.4':
-    resolution: {integrity: sha512-GwdDyGGr6UXAtubF14yAwcXvdaogqfsQgIk89Suebjxob/Rjq2xvfmXsjDF1rQmKmhHsJm9TOY7myxv3i6geJw==}
+  '@tanstack/table-core@9.2.8':
+    resolution: {integrity: sha512-M4D6fY5jnc7z7TaoD3Pjvz5R+8MbhzCGYdkcFf2T1AgjigwLinvFWZh6mtqfN016A7yGIroOL0GiTlVGsTh6Vg==}
     engines: {node: '>=20'}
 
   '@tanstack/virtual-core@3.17.10':
@@ -46794,6 +46726,12 @@ snapshots:
       '@tanstack/store': 0.11.2
       octane: link:packages/octane
 
+  '@tanstack/octane-table@9.3.0(octane@packages+octane)':
+    dependencies:
+      '@tanstack/octane-store': 0.13.0(octane@packages+octane)
+      '@tanstack/table-core': 9.2.8
+      octane: link:packages/octane
+
   '@tanstack/openai-base@0.3.5(@tanstack/ai@0.20.1(@opentelemetry/api@1.9.1))(ws@8.21.1(bufferutil@4.1.0)(utf-8-validate@5.0.10))(zod@4.4.3)':
     dependencies:
       '@tanstack/ai': 0.20.1(@opentelemetry/api@1.9.1)
@@ -47186,13 +47124,6 @@ snapshots:
       react-dom: 19.2.3(react@19.2.3)
       use-sync-external-store: 1.6.0(react@19.2.3)
 
-  '@tanstack/react-store@0.11.1(react-dom@19.2.7(react@19.2.7))(react@19.2.7)':
-    dependencies:
-      '@tanstack/store': 0.11.1
-      react: 19.2.7
-      react-dom: 19.2.7(react@19.2.7)
-      use-sync-external-store: 1.6.0(react@19.2.7)
-
   '@tanstack/react-store@0.11.2(react-dom@19.2.3(react@19.2.3))(react@19.2.3)':
     dependencies:
       '@tanstack/store': 0.11.2
@@ -47219,14 +47150,6 @@ snapshots:
       '@tanstack/table-core': 8.21.3
       react: 19.2.3
       react-dom: 19.2.3(react@19.2.3)
-
-  '@tanstack/react-table@9.2.4(react-dom@19.2.7(react@19.2.7))(react@19.2.7)':
-    dependencies:
-      '@tanstack/react-store': 0.11.1(react-dom@19.2.7(react@19.2.7))(react@19.2.7)
-      '@tanstack/table-core': 9.2.4
-      react: 19.2.7
-    transitivePeerDependencies:
-      - react-dom
 
   '@tanstack/react-virtual@3.14.12(react-dom@19.2.7(react@19.2.7))(react@19.2.7)':
     dependencies:
@@ -47542,9 +47465,9 @@ snapshots:
 
   '@tanstack/table-core@8.21.3': {}
 
-  '@tanstack/table-core@9.2.4':
+  '@tanstack/table-core@9.2.8':
     dependencies:
-      '@tanstack/store': 0.11.1
+      '@tanstack/store': 0.11.2
 
   '@tanstack/virtual-core@3.17.10': {}
 

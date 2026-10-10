@@ -288,11 +288,9 @@ catalogs:
     '@tanstack/react-query': ^5.102.8
     '@tanstack/react-router': 1.170.41
     '@tanstack/react-store': ^0.11.1
-    '@tanstack/react-table': 8.21.3
     '@tanstack/react-virtual': 3.14.5
     '@tanstack/router-core': 1.171.34
     '@tanstack/store': ^0.9.3
-    '@tanstack/table-core': 8.21.3
     '@tanstack/virtual-core': 3.17.3
     '@wagmi/connectors': 8.2.0
     '@wagmi/core': 3.6.5
@@ -618,6 +616,7 @@ minimumReleaseAgeExclude:
   - '@tanstack/octane-hotkeys@0.3.0'
   - '@tanstack/octane-pacer@0.3.0'
   - '@tanstack/octane-store@0.13.0'
+  - '@tanstack/octane-table@9.3.0'
   - '@ripple-ts/adapter@0.4.0'
   - '@ripple-ts/vite-plugin@0.4.0'
   - '@tsrx/core@0.5.5'

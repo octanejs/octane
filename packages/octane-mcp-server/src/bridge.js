@@ -34,7 +34,6 @@ export const KNOWN_BINDINGS = {
 	'@xstate/store-react': '@octanejs/xstate-store',
 	'@xyflow/react': '@octanejs/xyflow',
 	'@tanstack/react-router-ssr-query': '@octanejs/tanstack-router-ssr-query',
-	'@tanstack/react-table': '@octanejs/tanstack-table',
 	'@tanstack/react-virtual': '@octanejs/tanstack-virtual',
 	'react-waypoint': '@octanejs/waypoint',
 	'react-window': '@octanejs/window',
@@ -184,6 +183,7 @@ export const KNOWN_BINDINGS = {
 export const UPSTREAM_ADAPTERS = {
 	'@tanstack/react-hotkeys': '@tanstack/octane-hotkeys',
 	'@tanstack/react-pacer': '@tanstack/octane-pacer',
+	'@tanstack/react-table': '@tanstack/octane-table',
 };
 
 // Octane-specific ecosystem packages that have no React import to rewrite.

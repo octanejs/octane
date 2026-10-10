@@ -1315,19 +1315,6 @@
       "verified": "2026-08-09"
     },
     {
-      "name": "@octanejs/tanstack-table",
-      "version": "0.1.63",
-      "category": "Tables",
-      "upstream": { "package": "@tanstack/react-table", "version": "9.2.4" },
-      "surface": "TanStack Table 9.2.4 adapter using table-core 9.2.4 and the existing Octane Store integration. Covers useTable, Subscribe, FlexRender/flexRender, createTableHook, scoped contexts and the legacy migration hook/markers/types. Root, flex-render, legacy, static-functions, experimental-worker-plugin and package.json imports remain available. Core algorithms and worker helpers are imported directly.",
-      "divergences": [
-        "`flexRender`'s class-component and `react.memo`/`forwardRef` exotic-component branches are dropped — octane has no class components or forwardRef, and octane's `memo()` returns a plain function, so `typeof === 'function'` covers every component.",
-        "A held transition performs Octane's documented committed-state cue render. Raw table-store observers may receive the unchanged committed snapshot once; suspended controlled values are neither published nor written to base atoms."
-      ],
-      "ssr": "All three pinned SSR cases execute with server compilation. A real SSR/client hydration test preserves row and button identity, updates data interactively, and unmounts the adopted nodes.",
-      "verified": "2026-09-12"
-    },
-    {
       "name": "@octanejs/tanstack-virtual",
       "version": "0.1.61",
       "category": "Tables",
@@ -1713,7 +1700,6 @@
     "@tanstack/react-router": "@octanejs/tanstack-router",
     "@tanstack/react-router-ssr-query": "@octanejs/tanstack-router-ssr-query",
     "@tanstack/react-store": "@octanejs/tanstack-store",
-    "@tanstack/react-table": "@octanejs/tanstack-table",
     "@tanstack/react-virtual": "@octanejs/tanstack-virtual",
     "@testing-library/react": "@octanejs/testing-library",
     "@tiptap/react": "@octanejs/tiptap",
