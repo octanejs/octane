@@ -40,6 +40,14 @@ const OPTIONAL_DECLARATIONS = [
 	'NATIVE_READ_DRIVER',
 	'beginActiveNativeReadScope',
 ];
+const TRANSITION_HOOK_DECLARATIONS = [
+	'stagedTransitionValue',
+	'stageTransitionValue',
+	'readQueuedTransition',
+	'captureTransitionHookQueue',
+	'recordUrgentActionUpdate',
+	'finishQueuedTransition',
+];
 const COMMIT_DECLARATIONS = ['drainQueuedEffectEventUpdates', 'drainQueuedStoreSyncs'];
 const FORM_COMMIT_DECLARATIONS = [
 	'drainQueuedControlledSyncs',
@@ -56,6 +64,7 @@ const ranges = resolveDeclarationRanges(
 	(text: string, source: string) => parseAst(text, { lang: 'ts' }, source),
 	[
 		...OPTIONAL_DECLARATIONS,
+		...TRANSITION_HOOK_DECLARATIONS,
 		...COMMIT_DECLARATIONS,
 		...FORM_COMMIT_DECLARATIONS,
 		...REF_DECLARATIONS,
@@ -357,6 +366,47 @@ export async function run(container, scenario) {
 }
 `;
 
+const UPDATER_TRANSITION_APP = `import { createRoot, flushSync, startTransition, useLinkedState, useState } from 'octane';
+
+function View(props) @{
+	const [value, update, read] = props.linked
+		? useLinkedState(0, (source) => source)
+		: useState(0);
+	props.bind(update, read);
+	<output>{String(value)}</output>
+}
+
+export async function run(container, kind) {
+	let update, read, release, started = false;
+	const gate = new Promise(resolve => { release = resolve; });
+	const root = createRoot(container);
+	try {
+		root.render(View, { linked: kind === 'linked', bind: (setter, getter) => { update = setter; read = getter; } });
+		const before = container.textContent;
+		update(previous => {
+			if (!started) {
+				started = true;
+				startTransition(async () => { await gate; });
+			}
+			return previous + 1;
+		});
+		flushSync(() => {});
+		const pending = { text: container.textContent, value: read() };
+		release();
+		for (let tick = 0; tick < 20 && container.textContent !== '1'; tick++) {
+			await new Promise(resolve => setTimeout(resolve, 0));
+			flushSync(() => {});
+		}
+		const settled = { text: container.textContent, value: read() };
+		root.unmount();
+		return { before, pending, settled, empty: container.childNodes.length === 0 };
+	} finally {
+		release();
+		root.unmount();
+	}
+}
+`;
+
 const LATE_COMMIT_HOOKS_APP = `import { createRoot, flushSync, useEffectEvent, useLayoutEffect, useSyncExternalStore } from 'octane';
 
 function Plain() @{ <p>plain</p> }
@@ -614,9 +664,12 @@ describe('optional capability drivers in production bundles', { timeout: 60_000 
 	it('ships none of their code in an application that uses none of them', async () => {
 		const { retained, chunk } = await buildApp(PLAIN_APP);
 		expect(
-			[...OPTIONAL_DECLARATIONS, ...COMMIT_DECLARATIONS, ...FORM_COMMIT_DECLARATIONS].filter(
-				(name) => retained.has(name),
-			),
+			[
+				...OPTIONAL_DECLARATIONS,
+				...TRANSITION_HOOK_DECLARATIONS,
+				...COMMIT_DECLARATIONS,
+				...FORM_COMMIT_DECLARATIONS,
+			].filter((name) => retained.has(name)),
 		).toEqual([]);
 		expect(await run(chunk)).toEqual({
 			before: 'reverseabc',
@@ -625,6 +678,20 @@ describe('optional capability drivers in production bundles', { timeout: 60_000 
 			empty: true,
 		});
 	});
+
+	it.each(['state', 'linked'])(
+		'holds the first async transition opened by a %s updater until it settles',
+		async (kind) => {
+			const { retained, chunk } = await buildApp(UPDATER_TRANSITION_APP);
+			expect(await run(chunk, kind)).toEqual({
+				before: '0',
+				pending: { text: '0', value: 1 },
+				settled: { text: '1', value: 1 },
+				empty: true,
+			});
+			expect(TRANSITION_HOOK_DECLARATIONS.filter((name) => !retained.has(name))).toEqual([]);
+		},
+	);
 
 	it('keeps each driver in an application that uses its capability', async () => {
 		const { retained, chunk } = await buildApp(CAPABILITIES_APP);
