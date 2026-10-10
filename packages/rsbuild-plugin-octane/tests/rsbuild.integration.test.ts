@@ -491,7 +491,10 @@ export function App() @{
 			write(
 				root,
 				'node_modules/octane/package.json',
-				JSON.stringify({ name: 'octane', exports: './index.cjs' }) + '\n',
+				JSON.stringify({
+					name: 'octane',
+					exports: { '.': './index.cjs', './internal/client': './index.cjs' },
+				}) + '\n',
 			);
 			write(
 				root,
