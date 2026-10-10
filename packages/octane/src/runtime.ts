@@ -5121,7 +5121,8 @@ function suspendRootRender(
  * fixed bag; restoring a boundary's own state as a bag would corrupt its hold.
  */
 const BINDING_BAG_ARITY = Symbol();
-// Keep one spread site per arity so cloning stays monomorphic, without an extra call.
+// Keep one spread site per arity for monomorphic cloning, without an extra call.
+// Downstream minifiers may merge these sites; the optimization requires separate sites.
 // Spread preserves enumerable string and symbol values; rollback removes additions.
 
 function cloneBindingBag(bag: any, arity: number): object {
