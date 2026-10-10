@@ -352,6 +352,11 @@ export function createNativeReadDriver(host: NativeReadHost) {
 		},
 		replayDeferredRefs: host.replayRefs,
 		beginRender(block: Block): void {
+			// Any call here can exhaust the native stack, and the renderer then ends
+			// whatever was published. Publish only state endRender can restore: the
+			// invocation is already entered, and the collector token stays -1 until
+			// the collector has entered too.
+			const outerInvocation = setSignalDeclarationInvocation(++invocations);
 			const frame = (frames[depth++] ??= {
 				block: null,
 				collectorToken: -1,
@@ -362,12 +367,13 @@ export function createNativeReadDriver(host: NativeReadHost) {
 				outerInvocation: 0,
 			});
 			frame.block = block;
-			frame.collectorToken = collector.beginRender(block);
+			frame.collectorToken = -1;
 			frame.candidates = null;
 			frame.invocationData = null;
-			frame.invocation = ++invocations;
+			frame.invocation = invocations;
+			frame.outerInvocation = outerInvocation;
+			frame.collectorToken = collector.beginRender(block);
 			frame.capture = host.capture();
-			frame.outerInvocation = setSignalDeclarationInvocation(invocations);
 			// Parameters precede compiler body scopes. Start with the actual Block
 			// owner, and retire prior reads even when this invocation no longer
 			// enters an instrumented body or reads a native source.

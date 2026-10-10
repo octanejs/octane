@@ -87,7 +87,6 @@ describe('signal writes after a render exhausts the native stack', () => {
 	});
 
 	it.each([
-		['the root', 1],
 		['a child', 2],
 		['a grandchild', 3],
 	])('allows a write after %s overflows while entering its render', (_owner, failAt) => {
@@ -104,5 +103,33 @@ describe('signal writes after a render exhausts the native stack', () => {
 		expect(() => value$.set(1)).not.toThrow();
 		expect(subscribers()).toBe(0);
 		expectLiveRender(value$, 2);
+	});
+
+	it('keeps a later root updating after a root overflows while entering', async () => {
+		const value$ = source$('stack-overflow-root-entry');
+		collectorEntry.failAt = 1;
+		expect(() => mount(Reader, { value$, depth: 2 })).toThrow(RangeError);
+		// More updates than the nested-update limit: none may count as nested
+		// inside the failed render.
+		rendered = mount(Reader, { value$, depth: 0 });
+		for (let depth = 1; depth <= 60; depth++) {
+			rendered.root.render(Reader, { value$, depth });
+			await new Promise((resolve) => setTimeout(resolve, 0));
+			expect(rendered.container.textContent).toBe('0');
+		}
+		client.flushSync(() => value$.set(1));
+		expect(rendered.container.textContent).toBe('1');
+	});
+
+	it('keeps a parent subscribed after its @try catches a child that overflowed while entering', async () => {
+		// A static import would create the native driver before the collector spy.
+		const { CaughtReader } = await import('./_fixtures/native-read-collection.tsrx');
+		const count$ = source$('stack-overflow-caught-entry');
+		collectorEntry.failAt = 2;
+		rendered = mount(CaughtReader, { count$ });
+		expect(collectorEntry.failAt).toBe(0);
+		expect(rendered.container.textContent).toBe('caught0');
+		client.flushSync(() => count$.set(1));
+		expect(rendered.container.textContent).toBe('caught1');
 	});
 });

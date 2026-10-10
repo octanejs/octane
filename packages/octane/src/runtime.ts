@@ -12951,9 +12951,11 @@ function renderBlockInner(block: Block): true | undefined {
 	let profileThrown: unknown;
 	let renderCompleted = false;
 	let renderRetry = false;
-	if (NATIVE_READ_DRIVER) NATIVE_READ_DRIVER.beginRender(block);
-	NATIVE_BLOCK_RETRIES?.get(block)?.clear();
 	try {
+		// Setup can throw too, if only by exhausting the native stack. The finally
+		// must still restore this render's state before a caller catches the error.
+		if (NATIVE_READ_DRIVER) NATIVE_READ_DRIVER.beginRender(block);
+		NATIVE_BLOCK_RETRIES?.get(block)?.clear();
 		if (urgentTransitionRender !== null)
 			urgentTransitionDriver!.beginUrgent(block, urgentTransitionRender);
 		const out = (block.body as (p: any, s: Scope, e: any) => unknown)(
