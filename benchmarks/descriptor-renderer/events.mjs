@@ -86,7 +86,11 @@ function visitCatalog(node) {
 	}
 	ts.forEachChild(node, visitCatalog);
 }
-visitCatalog(catalogAst);
+const catalogClassifier = catalogAst.statements.find(
+	(node) => ts.isFunctionDeclaration(node) && node.name?.text === 'isDelegatedEventProp',
+);
+assert(catalogClassifier, 'the shared JSX event-prop classifier exists');
+visitCatalog(catalogClassifier);
 assert.deepEqual(catalogSites, { catalog_checks: 1, catalog_entries: 2, catalog_splits: 1 });
 let observedCatalog = catalogSource;
 for (const [offset, text] of catalogInsertions.sort((a, b) => b[0] - a[0]))
