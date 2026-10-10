@@ -2345,7 +2345,7 @@
         {
           "kind": "test",
           "file": "packages/octane/tests/suspense-preserves-dom.test.ts",
-          "testName": "does not suppress ref teardown in an independent root during hidden cleanup",
+          "testName": "detaches a shared callback ref for an independent root during hidden cleanup",
           "note": "Ref-detach suppression is scoped to exact hidden hosts, so reentrant cleanup still detaches unrelated roots normally."
         },
         {
@@ -2477,7 +2477,7 @@
         },
         {
           "file": "packages/octane/tests/suspense-preserves-dom.test.ts",
-          "testName": "does not suppress ref teardown in an independent root during hidden cleanup",
+          "testName": "detaches a shared callback ref for an independent root during hidden cleanup",
           "modes": ["client", "production-compile"],
           "observables": ["refs", "effects", "errors"]
         },
