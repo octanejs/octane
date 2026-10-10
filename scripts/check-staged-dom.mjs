@@ -100,8 +100,8 @@ const NATIVE_OPERATIONS = new Map(
 		'FragmentInstance.scrollIntoView': ['call:scrollIntoView'],
 		focusFragmentElement: ['read:focus'],
 		// Root delegation and native submit/default restoration are publication work.
-		delegateEvents: ['call:addEventListener'],
-		delegateCaptureEvents: ['call:addEventListener'],
+		registerDelegatedBubble: ['call:addEventListener'],
+		registerDelegatedCapture: ['call:addEventListener'],
 		registerDelegationTarget: ['read:onclick', 'write:onclick', 'call:addEventListener'],
 		unregisterDelegationTarget: ['call:removeEventListener'],
 		publishRegisteredManualFormPending: ['read:method'],
