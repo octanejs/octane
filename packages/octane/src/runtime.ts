@@ -427,6 +427,17 @@ function profileTrackComponent(subject: object, fallback: Function): void {
 	);
 }
 
+// Ref queues own commit and subtree visibility work. Install before either
+// queue publishes its first entry, including deferred or unpublished refs.
+let drainRefAttaches: typeof drainQueuedRefAttaches = noop;
+let drainRefDetaches: typeof drainQueuedRefDetaches = noop;
+let detachSubtreeRefs: typeof detachRegisteredSubtreeRefs = noop;
+let withRefDetachSuppression: typeof withRegisteredRefDetachSuppression =
+	withoutRefDetachSuppression;
+function withoutRefDetachSuppression<T>(_entries: SuspenseRefEntry[] | null, fn: () => T): T {
+	return fn();
+}
+
 function profilePortalComponent(rawBody: unknown, body: Function): Function | null {
 	if (typeof rawBody === 'function' && __profileHasComponentMetadata(rawBody)) return rawBody;
 	// Only a component element unwrapped into the portal block is that block's
@@ -5135,62 +5146,46 @@ function suspendRootRender(
  * fixed bag; restoring a boundary's own state as a bag would corrupt its hold.
  */
 const BINDING_BAG_ARITY = Symbol();
-// Each clone has its own spread site, so normal bag arities stay monomorphic.
-// Spread retains prior enumerable string fields; rollback removes speculative additions.
-/* prettier-ignore */ function cloneBag0(bag: any): object { return { ...bag }; }
-/* prettier-ignore */ function cloneBag1(bag: any): object { return { ...bag }; }
-/* prettier-ignore */ function cloneBag2(bag: any): object { return { ...bag }; }
-/* prettier-ignore */ function cloneBag3(bag: any): object { return { ...bag }; }
-/* prettier-ignore */ function cloneBag4(bag: any): object { return { ...bag }; }
-/* prettier-ignore */ function cloneBag5(bag: any): object { return { ...bag }; }
-/* prettier-ignore */ function cloneBag6(bag: any): object { return { ...bag }; }
-/* prettier-ignore */ function cloneBag7(bag: any): object { return { ...bag }; }
-/* prettier-ignore */ function cloneBag8(bag: any): object { return { ...bag }; }
-/* prettier-ignore */ function cloneBag9(bag: any): object { return { ...bag }; }
-/* prettier-ignore */ function cloneBag10(bag: any): object { return { ...bag }; }
-/* prettier-ignore */ function cloneBag11(bag: any): object { return { ...bag }; }
-/* prettier-ignore */ function cloneBag12(bag: any): object { return { ...bag }; }
-/* prettier-ignore */ function cloneBag13(bag: any): object { return { ...bag }; }
-/* prettier-ignore */ function cloneBag14(bag: any): object { return { ...bag }; }
-/* prettier-ignore */ function cloneBag15(bag: any): object { return { ...bag }; }
-/* prettier-ignore */ function cloneBag16(bag: any): object { return { ...bag }; }
+// Keep one spread site per arity for monomorphic cloning, without an extra call.
+// Downstream minifiers may merge these sites; the optimization requires separate sites.
+// Spread preserves enumerable string and symbol values; rollback removes additions.
 
 function cloneBindingBag(bag: any, arity: number): object {
 	switch (arity) {
 		case 0:
-			return cloneBag0(bag);
+			return { ...bag };
 		case 1:
-			return cloneBag1(bag);
+			return { ...bag };
 		case 2:
-			return cloneBag2(bag);
+			return { ...bag };
 		case 3:
-			return cloneBag3(bag);
+			return { ...bag };
 		case 4:
-			return cloneBag4(bag);
+			return { ...bag };
 		case 5:
-			return cloneBag5(bag);
+			return { ...bag };
 		case 6:
-			return cloneBag6(bag);
+			return { ...bag };
 		case 7:
-			return cloneBag7(bag);
+			return { ...bag };
 		case 8:
-			return cloneBag8(bag);
+			return { ...bag };
 		case 9:
-			return cloneBag9(bag);
+			return { ...bag };
 		case 10:
-			return cloneBag10(bag);
+			return { ...bag };
 		case 11:
-			return cloneBag11(bag);
+			return { ...bag };
 		case 12:
-			return cloneBag12(bag);
+			return { ...bag };
 		case 13:
-			return cloneBag13(bag);
+			return { ...bag };
 		case 14:
-			return cloneBag14(bag);
+			return { ...bag };
 		case 15:
-			return cloneBag15(bag);
+			return { ...bag };
 		case 16:
-			return cloneBag16(bag);
+			return { ...bag };
 		default:
 			return { ...bag };
 	}
@@ -10214,6 +10209,12 @@ const LAYOUT_CASCADE_LIMIT = 50;
  * hopping between elements never ends null, whichever binding updates first.
  */
 export function queueRefAttach(scope: Scope, ref: any, el: Element | FragmentInstance): void {
+	if (drainRefAttaches === noop) {
+		drainRefAttaches = drainQueuedRefAttaches;
+		detachSubtreeRefs = detachRegisteredSubtreeRefs;
+		withRefDetachSuppression = withRegisteredRefDetachSuppression;
+	}
+
 	activityRefCreated?.(scope.block, el);
 	const entry: RefAttach = {
 		ref,
@@ -10251,6 +10252,8 @@ const refDetachQueue: any[] = [];
  * callback ref shared across elements releases ITS element's React-19 cleanup.
  */
 export function queueRefDetach(ref: any, el: Element | FragmentInstance | null): void {
+	if (drainRefDetaches === noop) drainRefDetaches = drainQueuedRefDetaches;
+
 	if (ref == null || isRefDetachSuppressed(el)) return;
 	if (el !== null && NATIVE_READ_DRIVER && NATIVE_READ_DRIVER.unpublishedRef(el, ref)) {
 		NATIVE_READ_DRIVER.forgetUnpublishedRef(el);
@@ -10315,7 +10318,7 @@ function isRefDetachSuppressed(el: Element | FragmentInstance | null): boolean {
 	return false;
 }
 
-function withRefDetachSuppression<T>(entries: SuspenseRefEntry[] | null, fn: () => T): T {
+function withRegisteredRefDetachSuppression<T>(entries: SuspenseRefEntry[] | null, fn: () => T): T {
 	if (entries === null || entries.length === 0) return fn();
 	const elements = new Set<Element | FragmentInstance>();
 	for (let i = 0; i < entries.length; i++) {
@@ -10332,7 +10335,7 @@ function withRefDetachSuppression<T>(entries: SuspenseRefEntry[] | null, fn: () 
 	}
 }
 
-function drainRefDetaches(): void {
+function drainQueuedRefDetaches(): void {
 	if (refDetachQueue.length === 0) return;
 	const q = refDetachQueue.splice(0);
 	for (let i = 0; i < q.length; i += 4) {
@@ -10358,7 +10361,7 @@ function drainRefDetaches(): void {
 }
 
 /** Drain queued mount ref attaches in React's post-order (descendant-before-ancestor). */
-function drainRefAttaches(): void {
+function drainQueuedRefAttaches(): void {
 	if (refAttachQueue.length === 0) return;
 	const q = refAttachQueue.splice(0);
 	// ES stable sort preserves the queue's DFS/source order for disjoint subtrees;
@@ -47584,7 +47587,7 @@ function forEachSubtreeChild(
 // slots[0] (no key scan, and the fields take normal 1-char names). De-opt host slots
 // store `state.ref` + the node. We recurse through children + control-flow slots via
 // forEachSubtreeChild (the same walk deactivateScope uses).
-function detachSubtreeRefs(
+function detachRegisteredSubtreeRefs(
 	scope: Scope,
 	out: SuspenseRefEntry[],
 	shouldDetach: boolean = true,
