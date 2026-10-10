@@ -1,5 +1,11 @@
 # @octanejs/mcp-server
 
+## 0.3.3
+
+### Patch Changes
+
+- 384b600: Map `@tanstack/react-pacer`, `@tanstack/react-hotkeys`, and `@tanstack/react-table` to the official TanStack adapters `@tanstack/octane-pacer`, `@tanstack/octane-hotkeys`, and `@tanstack/octane-table`.
+
 ## 0.3.2
 
 ### Patch Changes

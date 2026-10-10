@@ -1,5 +1,31 @@
 # @octanejs/aria
 
+## 0.0.62
+
+### Patch Changes
+
+- Updated dependencies [64c33de]
+- Updated dependencies [7dcbc75]
+- Updated dependencies [a0c7f0e]
+- Updated dependencies [a03d79d]
+- Updated dependencies [dd8805f]
+- Updated dependencies [4cc2a1e]
+- Updated dependencies [974a3a6]
+- Updated dependencies [05699de]
+- Updated dependencies [773144a]
+- Updated dependencies [152e4f7]
+- Updated dependencies [0258e74]
+- Updated dependencies [36c6bf3]
+- Updated dependencies [b27d8db]
+- Updated dependencies [5d6d02c]
+- Updated dependencies [6101f66]
+- Updated dependencies [54ee25f]
+- Updated dependencies [2075c0e]
+- Updated dependencies [bdc21d8]
+- Updated dependencies [c9d4793]
+- Updated dependencies [440fb6f]
+  - octane@0.13.0
+
 ## 0.0.61
 
 ### Patch Changes
