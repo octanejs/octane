@@ -6578,7 +6578,7 @@ function classifySameModuleWarmPotential(ctx) {
 			} else if (node.type === 'CallExpression' || node.type === 'NewExpression') {
 				if (
 					node.type === 'CallExpression' &&
-					node.optional !== true &&
+					!followsOptionalLink(node) &&
 					(node._octaneImportedHook === 'use' || node._octaneImportedHook === 'useContext') &&
 					node.arguments.length === 1 &&
 					isProvenContextUse(node.arguments[0], ctx.provenContextBindings)
