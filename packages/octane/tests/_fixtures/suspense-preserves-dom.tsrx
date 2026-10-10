@@ -359,7 +359,9 @@ export function HiddenInsertionCleanupApp(props) @{
 	@try {
 		const value = use(props.promise);
 		useInsertionEffect(() => props.onInsertionCleanup, [props.onInsertionCleanup]);
-		<span id="hidden-insertion-primary" ref={props.hostRef}>{value as string}</span>
+		<span id="hidden-insertion-primary" ref={props.hostRef}>
+			{value as string}
+		</span>
 	} @pending {
 		<span id="hidden-insertion-fallback">{'loading'}</span>
 	}
