@@ -87,6 +87,15 @@ builds) and renders it as two views:
 Until the app has rendered anything with profiling enabled, the tab shows
 "No profiling data yet — interact with the app." instead of empty tables.
 
+The console API also exposes engine work counters through `counters()`,
+`snapshot()`/`diff()`, and `getCommits()`. Commit history identifies accepted root
+transactions independently of queue drains and attributes delayed effects to
+their originating transaction. `summary()` includes per-component work counters.
+These APIs have bounded detail retention and unbounded session totals until
+`clear()`; see the [profiling guide](../website/src/content/docs/profiling.mdx).
+The tab's existing “Recent commits” list still displays component render events;
+the engine-counter UI is a separate follow-up.
+
 ## The Transitions & Suspense tab
 
 The Transitions & Suspense tab shows the live pending-transition count — how
