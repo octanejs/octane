@@ -27,7 +27,7 @@ function fixtureProgram(files, compilerOptions) {
 	return createTypeEvidenceProgram(files, project, { tsrx: false });
 }
 
-function check(actual, expected, constraintWitness = false) {
+function check(actual, expected) {
 	const root = mkdtempSync(path.join(tmpdir(), 'public-opacity-'));
 	let evidence;
 	try {
@@ -58,16 +58,7 @@ function check(actual, expected, constraintWitness = false) {
 				.getExportsOfModule(checker.getSymbolAtLocation(program.getSourceFile(file)))
 				.find((symbol) => symbol.name === 'value'),
 		);
-		const witness = constraintWitness
-			? pinnedPublicExport(
-					new Map([['@octanejs/tanstack-table', files[1]]]),
-					program,
-					checker,
-					'@octanejs/tanstack-table',
-					'TableComponentType',
-				)
-			: symbols[1];
-		return newOpaquePublicSymbol(symbols[0], witness, checker);
+		return newOpaquePublicSymbol(symbols[0], symbols[1], checker);
 	} finally {
 		evidence?.close();
 		rmSync(root, { recursive: true, force: true });
@@ -632,21 +623,6 @@ test('matches intersected call signatures by their argument shape', () => {
 			'export declare const value: (() => boolean) & ((props: {text:string}) => string);',
 		),
 		/unknown/,
-	);
-});
-
-test('derives a native component alias witness from the published registry constraint', () => {
-	const expected =
-		'type Component<P> = (props: P) => string; export type CreateTableHookOptions<Features, Components extends Record<string, Component<any>>> = {components: Components}; export type value = unknown;';
-	assert.equal(check('export type value<P = any> = (props: P) => string;', expected, true), null);
-	assert.match(check('export type value<P = any> = (props: P) => any;', expected, true), /any/);
-	assert.match(
-		check(
-			'export type value<P = any> = (props: P) => string;',
-			'export type CreateTableHookOptions<Features, Components extends {named: string}> = {components: Components}; export type value = unknown;',
-			true,
-		),
-		/any/,
 	);
 });
 

@@ -1,9 +1,0 @@
-{
-  "extends": "./tsconfig.json",
-  "compilerOptions": {
-    "paths": {
-      "@tanstack/pacer": ["../pacer/src"]
-    }
-  },
-  "include": ["src"]
-}
