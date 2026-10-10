@@ -292,7 +292,9 @@ for (const set of SETS)
 			}
 			const verdict = !runtimeSeen
 				? 'no-runtime-module'
-				: runtimeExports.includes('__createVoidRoot') && !runtimeExports.includes('createRoot')
+				: (runtimeExports.includes('__createVoidRoot') ||
+							runtimeExports.includes('__createVoidRootDefaultOptions')) &&
+					  !runtimeExports.includes('createRoot')
 					? 'specialized'
 					: 'generic-root';
 			entry.meta.voidRoots[`${set.prefix}${name}`] = verdict;

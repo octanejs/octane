@@ -149,7 +149,11 @@ import { collectProvenContextBindings, isProvenContextUse } from './context-use.
 import { assertNoLegacyContextProviders } from './context-provider.js';
 import { applyCssModuleConstants } from './css-module-constants.js';
 import { assertUniversalRuntimeTarget, normalizeUniversalRuntime } from './universal-runtime.js';
-import { findRootFactoryImports, proveVoidRoots } from './void-roots.js';
+import {
+	findRootFactoryImports,
+	findDefaultOptionsRootCalls,
+	proveVoidRoots,
+} from './void-roots.js';
 import {
 	lowerParameterProperties,
 	lowerTypeScriptStatements,
@@ -1653,6 +1657,8 @@ const NATIVE_READ_RUNTIME_HELPERS = new Set([
 	'nativeCreateScopedElement',
 ]);
 const INTERNAL_CLIENT_RUNTIME_HELPERS = new Set([
+	'__createVoidRootDefaultOptions',
+	'__createRootDefaultOptions',
 	'__delegateEvents',
 	'__delegateCaptureEvents',
 	'__createCompiledContext',
@@ -11848,11 +11854,7 @@ function compileInternal(
 			});
 		}
 	}
-	if (
-		rootFactories.size > 0 &&
-		(authoredVoidRootIds.size > 0 ||
-			(ctx.isVoidComponentImport !== null && ctx.importedComponentBindings.size > 0))
-	) {
+	if (rootFactories.size > 0) {
 		// Definition IDs come from the authored, exact shorthand declarations:
 		// arrow normalization and return-JSX lowering cannot manufacture this
 		// evidence. Imports rely on the adapter's proof of the loaded export ABI.
@@ -11862,27 +11864,40 @@ function compileInternal(
 			if (info.voidOutput && authoredVoidRootIds.has(info.node.id) && !writes.has(info.node.id))
 				stableComponents.add(info.node.id.name);
 		const components = new Set([...ctx.componentInfo.values()].map((info) => info.node));
-		const callees = new Map();
+		// Component lowering still holds each authored body in componentInfo;
+		// a late COW rewrite must not replace nodes inside those bodies.
+		const skip = (node) => node.type === 'JSXCodeBlock' || components.has(node);
+		const callees = new Map(
+			findDefaultOptionsRootCalls(ast, { factories: rootFactories, skip }).map((callee) => [
+				callee,
+				'__createRootDefaultOptions',
+			]),
+		);
 		let loweredElements = null;
-		for (const root of proveVoidRoots(ast, {
-			factories: rootFactories,
-			component(name) {
-				if (stableComponents.has(name)) return true;
-				const imported = ctx.importedComponentBindings.get(name);
-				return imported !== undefined &&
-					ctx.isVoidComponentImport?.(imported.request, imported.imported) === true
-					? true
-					: undefined;
-			},
-			// Roots created or used inside a component body stay on the generic
-			// path: component lowering still reads each body's authored nodes.
-			skip: (node) => node.type === 'JSXCodeBlock' || components.has(node),
-		})) {
-			callees.set(root.callee, root.helper);
-			// Native reads keep their scoped element resolver around `$` reads.
-			for (const { call, index } of ctx.nativeReads ? [] : root.elements) {
-				const props = voidRootElementProps(call.arguments[index]);
-				if (props !== null) (loweredElements ??= new Map()).set(call, { index, props });
+		if (
+			authoredVoidRootIds.size > 0 ||
+			(ctx.isVoidComponentImport !== null && ctx.importedComponentBindings.size > 0)
+		) {
+			for (const root of proveVoidRoots(ast, {
+				factories: rootFactories,
+				defaultOptionsRoot: true,
+				component(name) {
+					if (stableComponents.has(name)) return true;
+					const imported = ctx.importedComponentBindings.get(name);
+					return imported !== undefined &&
+						ctx.isVoidComponentImport?.(imported.request, imported.imported) === true
+						? true
+						: undefined;
+				},
+				skip,
+			})) {
+				// A complete void-output proof takes precedence over the call-only proof.
+				callees.set(root.callee, root.helper);
+				// Native reads keep their scoped element resolver around `$` reads.
+				for (const { call, index } of ctx.nativeReads ? [] : root.elements) {
+					const props = voidRootElementProps(call.arguments[index]);
+					if (props !== null) (loweredElements ??= new Map()).set(call, { index, props });
+				}
 			}
 		}
 		if (callees.size > 0) {
