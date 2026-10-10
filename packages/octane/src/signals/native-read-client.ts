@@ -352,6 +352,11 @@ export function createNativeReadDriver(host: NativeReadHost) {
 		},
 		replayDeferredRefs: host.replayRefs,
 		beginRender(block: Block): void {
+			// Any call here can exhaust the native stack, and the renderer then ends
+			// whatever was published. Publish only state endRender can restore: the
+			// invocation is already entered, and the collector token stays -1 until
+			// the collector has entered too.
+			const outerInvocation = setSignalDeclarationInvocation(++invocations);
 			const frame = (frames[depth++] ??= {
 				block: null,
 				collectorToken: -1,
@@ -362,23 +367,34 @@ export function createNativeReadDriver(host: NativeReadHost) {
 				outerInvocation: 0,
 			});
 			frame.block = block;
-			frame.collectorToken = collector.beginRender(block);
+			frame.collectorToken = -1;
 			frame.candidates = null;
 			frame.invocationData = null;
-			frame.invocation = ++invocations;
+			frame.invocation = invocations;
+			frame.outerInvocation = outerInvocation;
+			frame.collectorToken = collector.beginRender(block);
 			frame.capture = host.capture();
-			frame.outerInvocation = setSignalDeclarationInvocation(invocations);
 			// Parameters precede compiler body scopes. Start with the actual Block
 			// owner, and retire prior reads even when this invocation no longer
 			// enters an instrumented body or reads a native source.
 			if (consumers.has(block)) getCandidate(frame, block);
 		},
 		endRender(block: Block, completed: boolean, suspended: boolean): void {
-			const frame = frames[depth - 1];
+			// A native stack overflow can stop a descendant's setup or cleanup before
+			// it ends its frame, leaving that frame above this Block's own.
+			let index = depth - 1;
+			while (index >= 0 && frames[index].block !== block) index--;
 			// The first native component can install the driver inside a child of
 			// an already-running non-native Block. That outer Block has no frame.
-			if (frame === undefined || frame.block !== block) return;
+			if (index < 0) return;
+			const frame = frames[index];
 			try {
+				// Restoring this frame's collector token and invocation below also
+				// restores whatever abandoned frames entered. Only their reads remain.
+				for (let above = depth - 1; above > index; above--) {
+					const candidates = frames[above].candidates;
+					if (candidates !== null) for (const candidate of candidates.values()) release(candidate);
+				}
 				if (frame.candidates !== null) {
 					if (completed) {
 						const capture = host.capture();
@@ -395,12 +411,14 @@ export function createNativeReadDriver(host: NativeReadHost) {
 			} finally {
 				collector.endRender(frame.collectorToken);
 				setSignalDeclarationInvocation(frame.outerInvocation);
-				frame.block = null;
-				frame.candidates = null;
-				frame.invocationData = null;
-				// A reused frame must not retain a settled capture's commit work.
-				frame.capture = null;
-				depth--;
+				while (depth > index) {
+					const ended = frames[--depth];
+					ended.block = null;
+					ended.candidates = null;
+					ended.invocationData = null;
+					// A reused frame must not retain a settled capture's commit work.
+					ended.capture = null;
+				}
 			}
 		},
 		/**

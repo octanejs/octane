@@ -30,6 +30,43 @@ export function findRootFactoryImports(ast) {
 	return imports;
 }
 
+/**
+ * Calls of the module's own createRoot import with exactly one non-spread
+ * argument cannot receive root options. Unlike the void-output proof, this
+ * says nothing about the root's lifetime or the values it may later render.
+ * Return callee nodes only; callers preserve the original arguments and ABI.
+ */
+export function findDefaultOptionsRootCalls(ast, { factories, skip }) {
+	if (![...factories.values()].includes('createRoot')) return [];
+	const analysis = createLexicalAnalysis(ast);
+	const callees = [];
+	let opaque = false;
+	const visit = (node, skipped) => {
+		if (node === null || typeof node !== 'object') return;
+		if (skip?.(node)) skipped = true;
+		if (node.type === 'WithStatement') opaque = true;
+		if (
+			!skipped &&
+			node.type === 'CallExpression' &&
+			node.optional !== true &&
+			node.callee?.type === 'Identifier' &&
+			factories.get(node.callee.name) === 'createRoot' &&
+			node.arguments.length === 1 &&
+			node.arguments[0].type !== 'SpreadElement'
+		) {
+			const binding = analysis.resolveBinding(
+				analysis.nodeScopes.get(node.callee),
+				node.callee.name,
+			);
+			if (binding?.scope === analysis.rootScope && binding.importSource?.value === 'octane')
+				callees.push(node.callee);
+		}
+		forEachRuntimeAstChild(node, (child) => visit(child, skipped));
+	};
+	visit(ast, false);
+	return opaque ? [] : callees;
+}
+
 const isFunction = (node) =>
 	node.type === 'FunctionDeclaration' ||
 	node.type === 'FunctionExpression' ||
@@ -67,7 +104,7 @@ const directCall = (member, call) =>
  * `components` holds the `component(name)` value of each target and `elements`
  * locates each JSX target as `{ call, index }` (its argument position).
  */
-export function proveVoidRoots(ast, { factories, component, skip }) {
+export function proveVoidRoots(ast, { factories, component, skip, defaultOptionsRoot = false }) {
 	if (factories.size === 0) return [];
 	const analysis = createLexicalAnalysis(ast);
 	const moduleScoped = (node) =>
@@ -143,7 +180,13 @@ export function proveVoidRoots(ast, { factories, component, skip }) {
 		const factory = factories.get(call.callee.name);
 		const root = {
 			callee: call.callee,
-			helper: VOID_ROOT_HELPERS[factory],
+			helper:
+				defaultOptionsRoot &&
+				factory === 'createRoot' &&
+				call.arguments.length === 1 &&
+				call.arguments[0].type !== 'SpreadElement'
+					? '__createVoidRootDefaultOptions'
+					: VOID_ROOT_HELPERS[factory],
 			components: [],
 			elements: [],
 			valid: true,

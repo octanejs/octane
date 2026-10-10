@@ -147,8 +147,8 @@ export function run() { const host=document.querySelector('#host'); return {text
 
 	it('does not collide with an authored helper-like binding', async () => {
 		const source = `${IMPORTS + VIEW}
-const _$__createVoidRoot='authored';
-export function run() { const host=document.querySelector('#host'),root=createRoot(host); root.render(View,{label:_$__createVoidRoot});
+const _$__createVoidRootDefaultOptions='authored';
+export function run() { const host=document.querySelector('#host'),root=createRoot(host); root.render(View,{label:_$__createVoidRootDefaultOptions});
  const text=host.textContent; root.unmount(); return {text,cleaned:host.childNodes.length===0}; }`;
 		expect(await consume(source)).toEqual({ text: 'authored', cleaned: true });
 	});
@@ -160,6 +160,26 @@ export function run() { const host=document.querySelector('#host'),root=createRo
  const text=host.textContent; root.unmount(); return {text,cleaned:host.childNodes.length===0}; }`;
 		for (const dev of [false, true])
 			expect(await consume(source, dev)).toEqual({ text: 'holes', cleaned: true });
+	});
+
+	it('keeps exported roots generic across future descriptors and helper-name collisions', async () => {
+		const source = `import {createRoot,createElement,flushSync} from 'octane';
+const _$__createRootDefaultOptions='authored';
+export const root=createRoot(document.querySelector('#host'));
+export async function run(){const host=document.querySelector('#host');
+ root.render(createElement('section',null,createElement('input',{defaultValue:'initial'}),_$__createRootDefaultOptions));
+ const input=host.querySelector('input');input.value='typed';input.focus();
+ flushSync(()=>root.render(createElement('section',null,createElement('input',{defaultValue:'initial'}),'updated')));
+ const retained=input===host.querySelector('input')&&input.value==='typed'&&document.activeElement===input;
+ const text=host.textContent;root.render('ordinary');await Promise.resolve();const replaced=host.textContent;
+ root.unmount();return {retained,text,replaced,cleaned:host.childNodes.length===0};}`;
+		for (const dev of [false, true])
+			expect(await consume(source, dev)).toEqual({
+				retained: true,
+				text: 'updated',
+				replaced: 'ordinary',
+				cleaned: true,
+			});
 	});
 
 	it('resolves the factory import through lexical shadows', async () => {
@@ -177,9 +197,167 @@ export function run() { const host=document.querySelector('#host'),root=createRo
 		for (const dev of [false, true])
 			expect(await consume(source, dev)).toEqual({ text: 'ordinary', cleaned: true });
 	});
+
+	it('commits a scheduled child error fallback and cleanup without root callbacks', async () => {
+		const source = `import {createRoot,flushSync,useState,useLayoutEffect} from 'octane';
+let fail,cleanups=0;
+function Child() @{
+ const [failed,setFailed]=useState(false);fail=()=>setFailed(true);
+ useLayoutEffect(()=>()=>{cleanups++;},[]);
+ if(failed)throw new Error('child-boom');
+ <span>ready</span>
+}
+function View() @{
+ @try { <Child /> } @catch(error) { <strong>{'caught:'+error.message as string}</strong> }
+}
+export function run(){const host=document.querySelector('#host'),root=createRoot(host);root.render(View);flushSync(()=>{});
+ const initial=host.textContent;fail();flushSync(()=>{});
+ const recovered={text:host.textContent,cleanups};root.unmount();
+ return {initial,recovered,cleanups,cleaned:host.childNodes.length===0};}`;
+		for (const dev of [false, true])
+			expect(await consume(source, dev)).toEqual({
+				initial: 'ready',
+				recovered: { text: 'caught:child-boom', cleanups: 1 },
+				cleanups: 1,
+				cleaned: true,
+			});
+	});
+
+	it('keeps error reporting and recovery local to roots created before and after callback roots', async () => {
+		const source = `import {createRoot,flushSync,useState} from 'octane';
+function Child(props) @{
+ const [failed,setFailed]=useState(false);props.api.fail=()=>setFailed(true);
+ if(failed)throw props.error;
+ <span>{props.label as string}</span>
+}
+function Caught(props) @{
+ @try { <Child {...props} /> } @catch(error) { <strong>{'caught:'+error.message as string}</strong> }
+}
+function Uncaught(props) @{ <Child {...props} /> }
+export function run(){const host=document.querySelector('#host'),early=createRoot(host),earlyApi={};
+ const earlyError=new Error('early');early.render(Uncaught,{label:'early ready',api:earlyApi,error:earlyError});flushSync(()=>{});
+ const aHost=document.createElement('div'),bHost=document.createElement('div'),lateHost=document.createElement('div');document.body.append(aHost,bHost,lateHost);
+ const reportsA=[],reportsB=[],aApi={},bApi={},lateApi={};
+ const a=createRoot(aHost,{onCaughtError(error){reportsA.push('caught:'+error.message)},onUncaughtError(error){reportsA.push('uncaught:'+error.message)}});
+ const b=createRoot(bHost,{onCaughtError(error){reportsB.push('caught:'+error.message)},onUncaughtError(error){reportsB.push('uncaught:'+error.message)}});
+ const late=createRoot(lateHost);
+ a.render(Caught,{label:'a ready',api:aApi,error:new Error('a')});
+ b.render(Uncaught,{label:'b ready',api:bApi,error:new Error('b')});
+ late.render(Caught,{label:'late ready',api:lateApi,error:new Error('late')});flushSync(()=>{});
+ let rethrown=false;try{flushSync(()=>earlyApi.fail())}catch(error){rethrown=error===earlyError}
+ flushSync(()=>lateApi.fail());flushSync(()=>aApi.fail());flushSync(()=>bApi.fail());
+ const failed={early:host.textContent,a:aHost.textContent,b:bHost.textContent,late:lateHost.textContent};
+ early.render(Caught,{label:'early recovered',api:earlyApi,error:earlyError});
+ b.render(Caught,{label:'b recovered',api:bApi,error:new Error('b again')});flushSync(()=>{});
+ const recovered={early:host.textContent,b:bHost.textContent};
+ early.unmount();a.unmount();b.unmount();late.unmount();
+ return {rethrown,failed,recovered,reportsA,reportsB,cleaned:[host,aHost,bHost,lateHost].every(node=>node.childNodes.length===0)};}`;
+		for (const dev of [false, true])
+			expect(await consume(source, dev)).toEqual({
+				rethrown: true,
+				failed: { early: '', a: 'caught:a', b: '', late: 'caught:late' },
+				recovered: { early: 'early recovered', b: 'b recovered' },
+				reportsA: ['caught:a'],
+				reportsB: ['uncaught:b'],
+				cleaned: true,
+			});
+	});
+
+	it('reads mutable error callbacks at body creation, retry and replacement, including reentrant roots', async () => {
+		const source = `import {createRoot,flushSync,useState} from 'octane';
+let ready=false,release;const gate=new Promise(resolve=>release=resolve);
+function Thrower() @{ if(true)throw new Error('boom'); <span>unreachable</span> }
+function Waiting() @{
+ if(!ready)throw gate;
+ @try { <Thrower /> } @catch(error) { <strong>{'waiting:'+error.message as string}</strong> }
+}
+function Replacement() @{
+ @try { <Thrower /> } @catch(error) { <strong>{'replacement:'+error.message as string}</strong> }
+}
+function Nested(props) @{
+ const [failed,setFailed]=useState(false);props.api.fail=()=>setFailed(true);
+ if(failed)throw new Error('nested-boom');
+ <span>nested ready</span>
+}
+export async function run(){const host=document.querySelector('#host'),nestedHost=document.createElement('div');document.body.append(nestedHost);
+ const reads=[],reports=[],nestedApi={};let phase='construction',nested;
+ const options={
+  get onCaughtError(){const label=phase;reads.push(label+':caught');
+   if(phase==='replacement'&&!nested){nested=createRoot(nestedHost,{onUncaughtError(error){reports.push('nested:uncaught:'+error.message)}});nested.render(Nested,{api:nestedApi});}
+   return error=>reports.push(label+':caught:'+error.message);},
+  get onUncaughtError(){const label=phase;reads.push(label+':uncaught');return error=>reports.push(label+':uncaught:'+error.message);},
+  get onRecoverableError(){const label=phase;reads.push(label+':recoverable');return error=>reports.push(label+':recoverable:'+error.message);}
+ };
+ const root=createRoot(host,options),construction=reads.slice();phase='first';root.render(Waiting);
+ const pending={text:host.textContent,reads:reads.slice()};phase='retry';ready=true;release();await Promise.resolve();await Promise.resolve();flushSync(()=>{});
+ const retried={text:host.textContent,reads:reads.slice()};phase='replacement';root.render(Replacement);flushSync(()=>{});
+ const replaced={text:host.textContent,nested:nestedHost.textContent,reads:reads.slice()};flushSync(()=>nestedApi.fail());
+ const nestedFailed=nestedHost.textContent;root.unmount();nested.unmount();
+ return {construction,pending,retried,replaced,nestedFailed,reports,cleaned:host.childNodes.length===0&&nestedHost.childNodes.length===0};}`;
+		const first = ['first:caught', 'first:uncaught', 'first:recoverable'];
+		const retry = [...first, 'retry:caught', 'retry:uncaught', 'retry:recoverable'];
+		for (const dev of [false, true])
+			expect(await consume(source, dev)).toEqual({
+				construction: [],
+				pending: { text: '', reads: first },
+				retried: { text: 'waiting:boom', reads: retry },
+				replaced: {
+					text: 'replacement:boom',
+					nested: 'nested ready',
+					reads: [
+						...retry,
+						'replacement:caught',
+						'replacement:uncaught',
+						'replacement:recoverable',
+					],
+				},
+				nestedFailed: '',
+				reports: ['retry:caught:boom', 'replacement:caught:boom', 'nested:uncaught:nested-boom'],
+				cleaned: true,
+			});
+	});
 });
 
 describe('same-file production hydration roots', () => {
+	it('keeps callback getter order across a suspended adoption and root replacement', async () => {
+		const source = `import {hydrateRoot,flushSync} from 'octane';
+let ready=false,release;const gate=new Promise(resolve=>release=resolve);
+function Waiting() @{ if(!ready)throw gate; <span>ready</span> }
+function Thrower() @{ if(true)throw new Error('replacement-boom'); <span>unreachable</span> }
+function Replacement() @{ @try { <Thrower /> } @catch(error) { <strong>{error.message as string}</strong> } }
+export async function run(){const host=document.querySelector('#host');host.innerHTML='<span>ready</span>';
+ const original=host.firstChild,reads=[],reports=[];let phase='adopt';
+ const options={
+  get onCaughtError(){const label=phase;reads.push(label+':caught');return error=>reports.push(label+':caught:'+error.message);},
+  get onUncaughtError(){reads.push(phase+':uncaught');return undefined;},
+  get onRecoverableError(){reads.push(phase+':recoverable');return undefined;}
+ };
+ const root=hydrateRoot(host,Waiting,undefined,options),pending={same:host.firstChild===original,reads:reads.slice()};
+ phase='retry';ready=true;release();await Promise.resolve();await Promise.resolve();flushSync(()=>{});
+ const adopted={same:host.firstChild===original,text:host.textContent,reads:reads.slice()};
+ phase='replacement';root.render(Replacement);flushSync(()=>{});
+ const replaced={text:host.textContent,reads:reads.slice(),reports};root.unmount();
+ return {pending,adopted,replaced,cleaned:host.childNodes.length===0};}`;
+		const reads = ['adopt:caught', 'adopt:uncaught', 'adopt:recoverable'];
+		const retry = [...reads, 'retry:caught', 'retry:uncaught', 'retry:recoverable'];
+		for (const dev of [false, true])
+			expect(await consume(source, dev)).toEqual({
+				pending: { same: true, reads },
+				adopted: { same: true, text: 'ready', reads: retry },
+				replaced: {
+					text: 'replacement-boom',
+					reads: [
+						...retry,
+						'replacement:caught',
+						'replacement:uncaught',
+						'replacement:recoverable',
+					],
+					reports: ['replacement:caught:replacement-boom'],
+				},
+				cleaned: true,
+			});
+	});
+
 	it.each([false, true])(
 		'adopts nodes while preserving state, drafts and body/options evaluation (Strong: %s)',
 		async (strong) => {
@@ -406,7 +584,7 @@ export async function run() {
  return {updated,disposed,later,cleanups,cleaned:other.childNodes.length===0};
 }`;
 			expect(specialized(source)).toContain(
-				hydrate ? '__hydrateVoidRoot as' : '__createVoidRoot as',
+				hydrate ? '__hydrateVoidRoot as' : '__createVoidRootDefaultOptions as',
 			);
 			for (const dev of [false, true])
 				expect(await consume(source, dev)).toEqual({
@@ -427,7 +605,7 @@ export function replace(label) { flushSync(()=>root.render(<View label={label} /
 export function run() { const host=document.querySelector('#host'), input=host.querySelector('input'); input.value='typed';
  replace('second'); const result={text:host.textContent,draft:host.querySelector('input').value};
  root.unmount(); return {...result,cleaned:host.childNodes.length===0}; }`;
-		expect(specialized(source)).toContain('__createVoidRoot as');
+		expect(specialized(source)).toContain('__createVoidRootDefaultOptions as');
 		for (const dev of [false, true])
 			expect(await consume(source, dev)).toEqual({ text: 'second', draft: 'typed', cleaned: true });
 	});
@@ -485,7 +663,7 @@ const label = 'first';
 createRoot(document.querySelector('#host')).render(<View label={label} flag />);
 export function run() { const host=document.querySelector('#host'); return {text:host.textContent}; }`;
 		const code = specialized(source);
-		expect(code).toContain('__createVoidRoot as');
+		expect(code).toContain('__createVoidRootDefaultOptions as');
 		expect(code).toContain('__voidRootProps as');
 		expect(code).not.toContain('createElementFromConfig');
 		for (const dev of [false, true])
@@ -524,7 +702,7 @@ const cleaned = host.childNodes.length === 0;
 export function run() { return {order, keyed, same, cleaned}; }`;
 		const code = specialized(source);
 		// A module-private root with only proven uses is a closed lifetime.
-		expect(code).toContain('__createVoidRoot as');
+		expect(code).toContain('__createVoidRootDefaultOptions as');
 		expect(code.match(/createElementFromConfig\(/g)).toHaveLength(3);
 		for (const dev of [false, true])
 			expect(await consume(source, dev)).toEqual({
@@ -599,7 +777,7 @@ export async function run() { await Promise.resolve();
 				'consumer.tsrx',
 				{ dev: false, hmr: false, isVoidComponentImport: () => true },
 			).code;
-		expect(entry("import View from './View.tsrx';")).toContain('__createVoidRoot as');
+		expect(entry("import View from './View.tsrx';")).toContain('__createVoidRootDefaultOptions as');
 		expect(entry('function View() @{ <main>first</main> }')).not.toContain('__createVoidRoot');
 	});
 });

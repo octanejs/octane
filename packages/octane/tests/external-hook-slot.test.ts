@@ -622,7 +622,6 @@ export function App() @{ <main><Canvas><Scene /></Canvas><p>after</p></main> }
 				entrySource,
 				entry,
 			);
-			expect(changedAfterOctane).toBeNull();
 
 			// Conversely, a virtual loader can replace a void-looking disk file with
 			// a value-returning component. That actual loaded module must stay on the
@@ -646,7 +645,15 @@ export function App() @{ <main><Canvas><Scene /></Canvas><p>after</p></main> }
 				entrySource,
 				entry,
 			);
-			expect(virtualEntry).toBeNull();
+			for (const genericEntry of [changedAfterOctane, virtualEntry]) {
+				expect(genericEntry?.code).toContain(
+					"import { __createRootDefaultOptions as _$createRootDefaultOptions } from 'octane/internal/client';",
+				);
+				expect(genericEntry?.code).toContain(
+					'_$createRootDefaultOptions(document.body).render(Main);',
+				);
+				expect(genericEntry?.code).not.toContain('__createVoidRoot');
+			}
 
 			const watchPlugin = octane({ hmr: false });
 			(watchPlugin.configResolved as any)({
@@ -667,7 +674,8 @@ export function App() @{ <main><Canvas><Scene /></Canvas><p>after</p></main> }
 				entrySource,
 				entry,
 			);
-			expect(watchedEntry).toBeNull();
+			expect(watchedEntry?.code).toContain('__createRootDefaultOptions as');
+			expect(watchedEntry?.code).not.toContain('__createVoidRoot');
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}

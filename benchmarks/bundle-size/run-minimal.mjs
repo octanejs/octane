@@ -633,7 +633,8 @@ try {
 			(id === 'binding-apollo-client' && scenario.bundler === 'vite')
 		) {
 			assert.equal(
-				runtimeExports.includes('__createVoidRoot'),
+				runtimeExports.includes('__createVoidRoot') ||
+					runtimeExports.includes('__createVoidRootDefaultOptions'),
 				true,
 				`${name}: the compiled application root lost compiler specialization`,
 			);
@@ -644,9 +645,16 @@ try {
 			);
 		} else if (id === 'root-static') {
 			assert.equal(
-				runtimeExports.includes('createRoot'),
+				runtimeExports.includes('createRoot') ||
+					runtimeExports.includes('__createRootDefaultOptions'),
 				true,
-				`${name}: the reusable public root was replaced by the disposable contract`,
+				`${name}: the reusable root lost its returned-value contract`,
+			);
+			assert.equal(
+				runtimeExports.includes('__createVoidRoot') ||
+					runtimeExports.includes('__createVoidRootDefaultOptions'),
+				false,
+				`${name}: the reusable root was replaced by the void contract`,
 			);
 		} else if (name === 'component-owned-effects') {
 			assert.equal(
