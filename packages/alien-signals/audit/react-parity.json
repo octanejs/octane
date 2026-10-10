@@ -80,7 +80,7 @@
         {
           "path": "scripts/react-parity/run-pristine.mjs",
           "role": "support",
-          "sha256": "ce5c2fc3c13e7f405456323a94fe67dcabeabf2fe8f48f5526d915d196cec501"
+          "sha256": "f08d44ab79ccb107a77f3532cfcbc4b442a7e387d3f513dcc45a6879db22d1ce"
         },
         {
           "path": "packages/alien-signals/audit/pristine-oracle-environment.json",
