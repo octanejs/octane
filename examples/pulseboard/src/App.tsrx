@@ -762,7 +762,7 @@ function CampaignTable() @{
 				<tbody>
 					@if (rows.length === 0) {
 						<tr>
-							<td class="table-empty" colspan={CAMPAIGN_COLUMNS.length + 1}>
+							<td class="table-empty" colSpan={CAMPAIGN_COLUMNS.length + 1}>
 								<strong>No campaigns match “{query}”</strong>
 								<span>Clear the search to return to the deterministic report.</span>
 								<button
