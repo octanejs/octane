@@ -118,6 +118,21 @@ function textChildren(leaf: Element) {
 	return [...leaf.childNodes].map((node) => [node.nodeType, node.nodeValue]);
 }
 
+// Page translation can move a text leaf's boundary whitespace between elements.
+function insertBoundaryWhitespace(parent: Element) {
+	for (const before of [...parent.children, null]) {
+		for (const value of ['', '\t', '\n', '\f', '\r', '   ']) {
+			parent.insertBefore(document.createTextNode(value), before);
+		}
+	}
+	return [...parent.childNodes];
+}
+
+function expectChildIdentity(parent: Element, children: readonly ChildNode[]) {
+	expect(parent.childNodes).toHaveLength(children.length);
+	for (let i = 0; i < children.length; i++) expect(parent.childNodes[i]).toBe(children[i]);
+}
+
 const plain = { title: 'First', classes: 'a', live: 'polite', hidden: false, count: 1 };
 const linked = { title: 'Links', href: '/a', label: 'Open', src: '/a.png', icon: '#send' };
 
@@ -381,11 +396,42 @@ describe.each([
 		}
 	});
 
+	it.each([false, true])(
+		'preserves whitespace between fixed elements through adoption and updates (hidden=%s)',
+		(hidden) => {
+			const { props, root, span, button, adopt } = panel(hidden);
+			const children = insertBoundaryWhitespace(root);
+			const childValues = children.map((node) => node.nodeValue);
+			const model = source(props);
+			const handle = adopt(model.state);
+			try {
+				expectChildIdentity(root, children);
+				expect(children.map((node) => node.nodeValue)).toEqual(childValues);
+				expect(model.subscribers.size).toBe(1);
+				model.publish({ message: 'Updated message', label: 'Continue', hidden: !hidden });
+				expect([span.textContent, button.textContent]).toEqual(['Updated message', 'Continue']);
+				expect([root.hidden, button.hidden]).toEqual([!hidden, !hidden]);
+				expect(root.querySelector('span')).toBe(span);
+				expect(root.querySelector('button')).toBe(button);
+				expectChildIdentity(root, children);
+			} finally {
+				handle.dispose();
+			}
+			expect(model.cleanup).toHaveBeenCalledOnce();
+			expect(model.subscribers.size).toBe(0);
+			model.publish({ message: 'After disposal' });
+			expect(span.textContent).toBe('Updated message');
+			expectChildIdentity(root, children);
+			expect(children.map((node) => node.nodeValue)).toEqual(childValues);
+		},
+	);
+
 	it('still refuses a text leaf holding any other element', () => {
 		const { props, span, adopt } = panel(false);
 		for (const leaf of [
 			[document.createElement('b')],
 			[document.createTextNode('Le'), document.createElement('font')],
+			[document.createTextNode(' '), document.createElement('font')],
 			// Translation replaces one Text node with one wrapper.
 			[document.createElement('font'), document.createTextNode(' en plus')],
 		]) {
@@ -399,7 +445,10 @@ describe.each([
 	it('refuses element children that differ from the server topology', () => {
 		const changes: Array<(nav: Element) => void> = [
 			(nav) => nav.append(document.createElement('i')),
-			(nav) => nav.querySelector('a')!.after(document.createTextNode(' ')),
+			(nav) => nav.querySelector('a')!.after(document.createTextNode(' unexpected text')),
+			(nav) => nav.append(document.createTextNode('\t'), document.createComment('extra')),
+			(nav) => nav.prepend(document.createTextNode('\n'), document.createElement('i')),
+			(nav) => nav.querySelector('a')!.after(document.createTextNode('\u00a0')),
 			(nav) => nav.querySelector('img')!.remove(),
 			(nav) => nav.append(nav.querySelector('a')!),
 			// An element the server rendered without children.
@@ -647,6 +696,39 @@ describe.each([false, true])('addressed text leaf adoption (dev=%s)', (dev) => {
 		}
 	});
 
+	it('preserves whitespace between closed addressed children and leaves open children alone', () => {
+		const { props, heading, adopt } = feed();
+		const header = heading.parentElement!;
+		const children = insertBoundaryWhitespace(header);
+		const childValues = children.map((node) => node.nodeValue);
+		const section = header.parentElement!;
+		const external = document.createElement('aside');
+		section.append(document.createComment('external'), external, '\u00a0 unbound ');
+		const openChildren = [...section.childNodes];
+		const model = source(props);
+		const handle = adopt(model.state);
+		try {
+			expectChildIdentity(header, children);
+			expect(children.map((node) => node.nodeValue)).toEqual(childValues);
+			expectChildIdentity(section, openChildren);
+			expect(model.subscribers.size).toBe(1);
+			model.publish({ title: 'Archives' });
+			expect(heading.textContent).toBe('Archives');
+			expect(header.querySelector('h2')).toBe(heading);
+			expectChildIdentity(header, children);
+			expectChildIdentity(section, openChildren);
+		} finally {
+			handle.dispose();
+		}
+		expect(model.cleanup).toHaveBeenCalledOnce();
+		expect(model.subscribers.size).toBe(0);
+		model.publish({ title: 'After disposal' });
+		expect(heading.textContent).toBe('Archives');
+		expectChildIdentity(header, children);
+		expect(children.map((node) => node.nodeValue)).toEqual(childValues);
+		expectChildIdentity(section, openChildren);
+	});
+
 	it('still refuses a leaf holding any other element', () => {
 		for (const leaf of [
 			[document.createElement('b')],
@@ -664,7 +746,10 @@ describe.each([false, true])('addressed text leaf adoption (dev=%s)', (dev) => {
 	it('refuses closed element children that differ from the server topology', () => {
 		const changes: Array<(header: Element) => void> = [
 			(header) => header.append(document.createElement('i')),
-			(header) => header.firstElementChild!.after(document.createTextNode(' ')),
+			(header) => header.firstElementChild!.after(document.createTextNode(' unexpected text')),
+			(header) => header.append(document.createTextNode('\t'), document.createComment('extra')),
+			(header) => header.prepend(document.createTextNode('\n'), document.createElement('i')),
+			(header) => header.firstElementChild!.after(document.createTextNode('\u00a0')),
 			(header) => header.lastElementChild!.remove(),
 			(header) => header.append(header.firstElementChild!),
 			(header) => header.lastElementChild!.append(document.createElement('i')),

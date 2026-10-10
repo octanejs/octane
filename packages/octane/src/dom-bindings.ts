@@ -246,12 +246,22 @@ function isTextLeaf(node: Element): boolean {
 	);
 }
 
+const htmlWhitespace = /^[\t\n\f\r ]*$/;
+
+// Translators can move boundary whitespace outside the text hosts they rewrite.
+function skipBindingWhitespace(node: ChildNode | null): ChildNode | null {
+	while (node !== null && node.nodeType === 3 && htmlWhitespace.test(node.nodeValue!)) {
+		node = node.nextSibling;
+	}
+	return node;
+}
+
 function resolveFixedNodes(root: Element, descriptor: CompiledBindings<unknown>): Element[] {
 	assertBindingRoot(root, descriptor);
 	const nodes: Element[] = [];
 	const childIndices: number[] = [];
-	// Each parent's next unclaimed child. Walking siblings keeps validation O(1)
-	// per node; counting a live child list is not.
+	// Each parent's next unclaimed child. Walking siblings avoids rescanning a
+	// parent's live child list.
 	const cursors: Array<ChildNode | null> = [];
 	for (let i = 0; i < descriptor.nodes.length; i++) {
 		const [parent, tag, namespace, children, openChildren, text] = descriptor.nodes[i]!;
@@ -268,12 +278,12 @@ function resolveFixedNodes(root: Element, descriptor: CompiledBindings<unknown>)
 			throw new Error(formatClientError(318));
 		}
 		if (i !== 0) {
-			cursors[parent] = node.nextSibling;
+			cursors[parent] = skipBindingWhitespace(node.nextSibling);
 			childIndices[parent]++;
 		}
 		nodes.push(node);
 		childIndices.push(0);
-		cursors.push(text || children === null ? null : node.firstChild);
+		cursors.push(text || children === null ? null : skipBindingWhitespace(node.firstChild));
 	}
 	for (let i = 0; i < nodes.length; i++) {
 		if (childIndices[i] !== (descriptor.nodes[i]![3] ?? 0)) {
@@ -321,7 +331,7 @@ function resolveAddressedNodes(root: Element, descriptor: CompiledBindings<unkno
 	}
 	const childCounts = new Array<number>(descriptor.nodes.length).fill(0);
 	// A closed parent's next unclaimed child; undefined for open, opaque and text
-	// children. Walking siblings keeps validation O(1) per node.
+	// children. Walking siblings avoids rescanning a parent's live child list.
 	const cursors: Array<ChildNode | null | undefined> = [];
 	for (let i = 0; i < descriptor.nodes.length; i++) {
 		const [parent, tag, namespace, children, openChildren, text] = descriptor.nodes[i]!;
@@ -344,9 +354,13 @@ function resolveAddressedNodes(root: Element, descriptor: CompiledBindings<unkno
 		}
 		if (parent !== -1) {
 			childCounts[parent]++;
-			if (cursors[parent] !== undefined) cursors[parent] = node.nextSibling;
+			if (cursors[parent] !== undefined) cursors[parent] = skipBindingWhitespace(node.nextSibling);
 		}
-		cursors.push(text || children === null || openChildren ? undefined : node.firstChild);
+		cursors.push(
+			text || children === null || openChildren
+				? undefined
+				: skipBindingWhitespace(node.firstChild),
+		);
 	}
 	for (let i = 0; i < descriptor.nodes.length; i++) {
 		if (childCounts[i] !== (descriptor.nodes[i]![3] ?? 0)) {
