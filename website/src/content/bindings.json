@@ -362,16 +362,6 @@
         "tags": ["scroll", "chat"]
       },
       {
-        "packageName": "@octanejs/tanstack-hotkeys",
-        "title": "TanStack Hotkeys",
-        "tags": ["keyboard", "shortcuts"]
-      },
-      {
-        "packageName": "@octanejs/tanstack-pacer",
-        "title": "TanStack Pacer",
-        "tags": ["debounce", "throttle", "events"]
-      },
-      {
         "packageName": "@octanejs/usehooks-ts",
         "title": "usehooks-ts",
         "tags": ["hooks", "browser"]
@@ -537,11 +527,6 @@
         "packageName": "@octanejs/window",
         "title": "React Window",
         "tags": ["virtualization", "lists", "performance"]
-      },
-      {
-        "packageName": "@octanejs/tanstack-table",
-        "title": "TanStack Table",
-        "tags": ["tables", "data grid"]
       },
       {
         "packageName": "@octanejs/tanstack-virtual",

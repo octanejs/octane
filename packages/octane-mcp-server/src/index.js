@@ -7,7 +7,12 @@ import { readFile } from 'node:fs/promises';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { z } from 'zod';
-import { bridgeReport, KNOWN_BINDINGS, KNOWN_BINDING_PACKAGE_DIRS } from './bridge.js';
+import {
+	bridgeReport,
+	KNOWN_BINDINGS,
+	KNOWN_BINDING_PACKAGE_DIRS,
+	UPSTREAM_ADAPTERS,
+} from './bridge.js';
 import { explainStrong, STRONG_EXPLAIN_TOOL } from './strong.js';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -601,10 +606,10 @@ function registerUserTools(server, repoRoot, repoMode) {
 		{
 			title: 'List official Octane bindings',
 			description:
-				'Return the map of React packages that already have maintained @octanejs/* Octane ports. Check here before bridging by hand.',
+				'Return the map of React packages that already have maintained Octane ports, from @octanejs/* or the upstream library. Check here before bridging by hand.',
 			inputSchema: {},
 		},
-		async () => text(JSON.stringify(KNOWN_BINDINGS, null, 2)),
+		async () => text(JSON.stringify({ ...KNOWN_BINDINGS, ...UPSTREAM_ADAPTERS }, null, 2)),
 	);
 }
 

@@ -1,5 +1,5 @@
 import { useEffect } from 'octane';
-import { useHeldKeys, useHotkey } from '@octanejs/tanstack-hotkeys';
+import { useHeldKeys, useHotkey } from '@tanstack/octane-hotkeys';
 
 interface ApplicationStarterHotkeysProps {
 	onSubmit: () => void;
