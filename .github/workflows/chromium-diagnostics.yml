@@ -4,12 +4,19 @@ name: JSX selection artifact diagnostics
 # 38090072943, retain actual Linux bundles, and test fixed harness-side effects.
 on:
   workflow_dispatch:
+  pull_request:
+    branches: [main]
+    types: [opened, synchronize]
+    paths:
+      - ".github/workflows/chromium-diagnostics.yml"
+      - "benchmarks/js-framework/pair*.mjs"
 
 permissions:
   contents: read
 
 jobs:
   probe:
+    if: ${{ github.event_name == 'workflow_dispatch' || github.head_ref == 'codex/jsx-ci-bundle-capture' }}
     name: JSX selection artifacts (trial ${{ matrix.trial }})
     runs-on: blacksmith-4vcpu-ubuntu-2404
     timeout-minutes: 60
