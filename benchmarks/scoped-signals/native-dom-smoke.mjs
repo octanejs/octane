@@ -36,7 +36,6 @@ function packageVersion(specifier) {
 	}
 	return JSON.parse(fs.readFileSync(path.join(directory, 'package.json'), 'utf8')).version;
 }
-assert.equal(packageVersion('alien-signals/system'), '3.2.0');
 
 async function main() {
 	const bundle = await esbuild.build({
@@ -1149,7 +1148,6 @@ async function main() {
 		versions: {
 			esbuild: esbuild.version,
 			jsdom: packageVersion('jsdom'),
-			alienSignals: packageVersion('alien-signals/system'),
 		},
 		runnerSha256: hash(fs.readFileSync(fileURLToPath(import.meta.url))),
 		request: process.argv,

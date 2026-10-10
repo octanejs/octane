@@ -21,7 +21,7 @@ export function scopedAdapter({ createScope }) {
 // needs. It does not imitate Octane's epochs, request state, or retained values.
 export function alienAdapter({ signal, computed, effect, startBatch, endBatch }) {
 	return {
-		name: 'alien-3.2.0',
+		name: 'alien-3.2.1',
 		create: () => new Set(),
 		signal$: (_owner, _key, initial) => signal(initial),
 		derived$: (_owner, _key, read) => computed(read),

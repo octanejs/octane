@@ -139,7 +139,7 @@ const withSceneBoundary = (source, output) =>
 	source.replace(output, `<><Canvas><mesh /></Canvas>${output}</>`);
 const scenario = (id) => BUNDLE_CASES.find((entry) => entry.id === id);
 const source = (name) => ({ path: `packages/octane/src/${name}` });
-const alien = (version = '3.2.0') => ({
+const alien = (version = '3.2.1') => ({
 	path: 'node_modules/alien-signals/esm/system.mjs',
 	package: { name: 'alien-signals', version },
 });
@@ -672,7 +672,20 @@ for (const id of ['ordinary-client', 'ordinary-server']) {
 }
 
 test('independent engine rejects rendering, compiler, DevTools, and the old Alien version', () => {
-	const independent = [source('signals/index.ts'), source('signals/graph.ts'), alien()];
+	const independent = [source('signals/index.ts'), source('signals/graph.ts')];
+	verifyBundleInputs(scenario('engine'), [...independent, alien()], 'external');
+	assert.throws(
+		() => verifyBundleInputs(scenario('engine'), [...independent, alien()]),
+		/vendored engine reached/,
+	);
+	assert.throws(
+		() => verifyBundleInputs(scenario('engine'), independent, 'external'),
+		/dependency is missing/,
+	);
+	assert.throws(
+		() => verifyBundleInputs(scenario('engine'), [alien()], 'external'),
+		/graph source is missing/,
+	);
 	verifyBundleInputs(scenario('engine'), independent);
 	for (const entry of BUNDLE_CASES.filter((entry) => entry.id === 'engine' || entry.rendererFree)) {
 		verifyTransitionBoundary(entry, [source('signals/transition-state.ts')]);
@@ -701,8 +714,11 @@ test('independent engine rejects rendering, compiler, DevTools, and the old Alie
 		() => verifyBundleInputs(scenario('engine'), [...independent, source('compiler/compile.js')]),
 		/compiler reached/,
 	);
-	assert.throws(() => verifyBundleInputs(scenario('engine'), [alien('1.0.4')]), /wrong Alien/);
-	assert.throws(() => verifyBundleInputs(scenario('engine'), []), /dependency is missing/);
+	assert.throws(
+		() => verifyBundleInputs(scenario('engine'), [...independent, alien('1.0.4')], 'external'),
+		/wrong Alien/,
+	);
+	assert.throws(() => verifyBundleInputs(scenario('engine'), []), /graph source is missing/);
 	verifyBundleInputs(scenario('engine'), [
 		...independent,
 		{ ...source('signals/scope-streams.ts'), bytesInOutput: 0 },
@@ -718,15 +734,18 @@ test('independent engine rejects rendering, compiler, DevTools, and the old Alie
 });
 
 test('native entries require their actual runtime and pinned engine', () => {
-	verifyBundleInputs(scenario('native-client'), [source('runtime.ts'), alien()]);
-	verifyBundleInputs(scenario('native-server'), [source('runtime.server.ts'), alien()]);
+	verifyBundleInputs(scenario('native-client'), [source('runtime.ts'), source('signals/graph.ts')]);
+	verifyBundleInputs(scenario('native-server'), [
+		source('runtime.server.ts'),
+		source('signals/graph.ts'),
+	]);
 	assert.throws(
-		() => verifyBundleInputs(scenario('native-client'), [alien()]),
+		() => verifyBundleInputs(scenario('native-client'), [source('signals/graph.ts')]),
 		/native runtime missing/,
 	);
 	assert.throws(
 		() => verifyBundleInputs(scenario('native-server'), [source('runtime.server.ts')]),
-		/dependency is missing/,
+		/graph source is missing/,
 	);
 });
 
@@ -764,7 +783,7 @@ test('scalar and result-only entries do not retain their optional implementation
 			);
 		}
 	}
-	const inputs = [source('signals/engine.ts'), source('signals/graph.ts'), alien()];
+	const inputs = [source('signals/engine.ts'), source('signals/graph.ts')];
 	verifyBundleInputs(scenario('compiled-plain-signals'), inputs);
 	verifyBundleInputs(scenario('compiled-plain-signals'), [
 		...inputs,

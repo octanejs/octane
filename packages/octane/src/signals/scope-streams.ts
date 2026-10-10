@@ -6,7 +6,13 @@ import {
 	type StreamedSignalResultFrame,
 } from '../streamed-signals-protocol.js';
 import type { ScopeImpl } from './engine.js';
-import type { ResourceBinding } from './requests.js';
+import {
+	acceptResourceStreamedResult,
+	bindResourceStreamedSelection,
+	failResourceStreamedResult,
+	isResourceStreamedSelectionReady,
+	type ResourceBinding,
+} from './requests.js';
 
 /**
  * Receiver-owned streamed results for one scope. Only the stream ingress
@@ -41,7 +47,11 @@ export class ScopeStreams {
 	/** A refreshed resource may bind the selection that survived suspension. */
 	resume(node: ScopedNode, binding: ResourceBinding): void {
 		const identity = this.selections.get(node.key);
-		if (identity && this.results.has(node.key) && binding.bindStreamedSelection(identity)) {
+		if (
+			identity &&
+			this.results.has(node.key) &&
+			bindResourceStreamedSelection(binding, identity)
+		) {
 			this.flush(node, binding);
 		}
 	}
@@ -62,25 +72,28 @@ export class ScopeStreams {
 		}
 		this.selections.set(identity.nodeKey, identity);
 		if (!node) return true;
-		return this.owner.resources?.get(node)?.bindStreamedSelection(identity) === true;
+		const binding = this.owner.resources?.get(node);
+		return binding !== undefined && bindResourceStreamedSelection(binding, identity);
 	}
 
 	isPending(identity: StreamFrameIdentity): boolean {
 		const selected = this.selections.get(identity.nodeKey);
 		const node = this.owner.nodes.get(identity.nodeKey);
-		return (
-			!this.owner.retired &&
-			selected !== undefined &&
-			sameStreamFrameIdentity(selected, identity) &&
-			node?.kind === 'async' &&
-			this.owner.resources?.get(node)?.isStreamedSelectionReady(selected) === false
-		);
+		if (
+			this.owner.retired ||
+			selected === undefined ||
+			!sameStreamFrameIdentity(selected, identity) ||
+			node?.kind !== 'async'
+		)
+			return false;
+		const binding = this.owner.resources?.get(node);
+		return binding !== undefined && !isResourceStreamedSelectionReady(binding, selected);
 	}
 
 	whenReady(identity: StreamFrameIdentity, ready: () => void): () => void {
 		const node = this.owner.nodes.get(identity.nodeKey);
-		if (node && this.owner.resources?.get(node)?.isStreamedSelectionReady(identity))
-			return () => {};
+		const binding = node && this.owner.resources?.get(node);
+		if (binding && isResourceStreamedSelectionReady(binding, identity)) return () => {};
 		const registration = { identity, ready };
 		this.waiting.set(identity.nodeKey, registration);
 		return () => {
@@ -93,7 +106,7 @@ export class ScopeStreams {
 		if (this.owner.readBarrier !== undefined || this.owner.retired) return;
 		this.flush(binding.node, binding);
 		const registration = this.waiting.get(binding.node.key);
-		if (registration && binding.isStreamedSelectionReady(registration.identity)) {
+		if (registration && isResourceStreamedSelectionReady(binding, registration.identity)) {
 			this.waiting.delete(binding.node.key);
 			registration.ready();
 		}
@@ -136,7 +149,8 @@ export class ScopeStreams {
 			return true;
 		}
 		if (node.kind !== 'async') return false;
-		return this.owner.resources?.get(node)?.acceptStreamed(frame) === true;
+		const binding = this.owner.resources?.get(node);
+		return binding !== undefined && acceptResourceStreamedResult(binding, frame);
 	}
 
 	fail(identity: StreamFrameIdentity, error: Error): boolean {
@@ -148,20 +162,21 @@ export class ScopeStreams {
 			return true;
 		}
 		if (node.kind !== 'async') return false;
-		return this.owner.resources?.get(node)?.failStreamed(identity, error) === true;
+		const binding = this.owner.resources?.get(node);
+		return binding !== undefined && failResourceStreamedResult(binding, identity, error);
 	}
 
 	/** Deliver results that arrived before their resource declaration executed. */
 	flush(node: ScopedNode, binding: ResourceBinding): void {
 		if (this.owner.readBarrier !== undefined) return;
 		const identity = this.selections.get(node.key);
-		if (!identity || !binding.isStreamedSelectionReady(identity)) return;
+		if (!identity || !isResourceStreamedSelectionReady(binding, identity)) return;
 		const frames = this.results.get(node.key);
 		if (frames) {
 			this.results.delete(node.key);
 			for (const frame of frames) {
-				if (!binding.acceptStreamed(frame)) {
-					binding.failStreamed(identity, new SignalStreamError('identity'));
+				if (!acceptResourceStreamedResult(binding, frame)) {
+					failResourceStreamedResult(binding, identity, new SignalStreamError('identity'));
 					break;
 				}
 			}
@@ -169,7 +184,7 @@ export class ScopeStreams {
 		const failure = this.failures.get(node.key);
 		if (failure) {
 			this.failures.delete(node.key);
-			binding.failStreamed(failure.identity, failure.error);
+			failResourceStreamedResult(binding, failure.identity, failure.error);
 		}
 	}
 }

@@ -75,11 +75,9 @@ try {
 	const packageRoot = path.join(REPO, 'packages/octane');
 	const toolingRoot = options.has('tooling-root')
 		? fs.realpathSync(path.resolve(options.get('tooling-root')))
-		: null;
-	const requirePackage = createRequire(path.join(toolingRoot ?? packageRoot, 'package.json'));
-	const buildEntry = (toolingRoot ? requirePackage : createRequire(import.meta.url)).resolve(
-		'esbuild',
-	);
+		: fs.realpathSync(HERE);
+	const requirePackage = createRequire(path.join(toolingRoot, 'package.json'));
+	const buildEntry = requirePackage.resolve('esbuild');
 	const esbuild = await import(pathToFileURL(buildEntry).href);
 	const dependencies = {
 		esbuild: packageEvidence(buildEntry, 'esbuild'),
@@ -88,8 +86,8 @@ try {
 	assert.equal(dependencies.esbuild.version, esbuild.version);
 	assert.equal(
 		dependencies.alien.version,
-		'3.2.0',
-		'Retention must use the pinned Alien Signals 3.2.0',
+		'3.2.1',
+		'Retention must use the pinned Alien Signals 3.2.1',
 	);
 	const entrySource = 'export * from "octane/signals";\n';
 	const entryName = 'async-retention-public-entry.mjs';
@@ -114,15 +112,14 @@ try {
 			{
 				name: 'scoped-signals-retention-inputs',
 				setup(builder) {
-					if (toolingRoot)
-						builder.onResolve({ filter: /^alien-signals(?:\/|$)/ }, (resolution) => {
-							if (resolution.pluginData?.retentionTooling) return undefined;
-							return builder.resolve(resolution.path, {
-								kind: resolution.kind,
-								resolveDir: toolingRoot,
-								pluginData: { retentionTooling: true },
-							});
+					builder.onResolve({ filter: /^alien-signals(?:\/|$)/ }, (resolution) => {
+						if (resolution.pluginData?.retentionTooling) return undefined;
+						return builder.resolve(resolution.path, {
+							kind: resolution.kind,
+							resolveDir: toolingRoot,
+							pluginData: { retentionTooling: true },
 						});
+					});
 					builder.onLoad({ filter: /\.(?:[cm]?[jt]s|json)$/ }, ({ path: filename }) => ({
 						contents: read(filename),
 						loader: filename.endsWith('.json') ? 'json' : /\.[cm]?ts$/.test(filename) ? 'ts' : 'js',
@@ -200,7 +197,9 @@ try {
 		lockfileSha256: sha256(fs.readFileSync(path.join(REPO, 'pnpm-lock.yaml'))),
 		packageManifestSha256: sha256(fs.readFileSync(path.join(packageRoot, 'package.json'))),
 		toolingRoot,
-		dependencyMode: toolingRoot ? 'explicit-tooling-root' : 'workspace-installation',
+		dependencyMode: options.has('tooling-root')
+			? 'explicit-tooling-root'
+			: 'benchmark-installation',
 		dependencies,
 		build: { options: buildOptions, bytes: bundle.length, sha256: sha256(bundle), inputs },
 		snapshotDirectory: snapshots,

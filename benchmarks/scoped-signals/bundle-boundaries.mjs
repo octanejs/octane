@@ -198,7 +198,11 @@ export function verifyTransitionBoundary(scenario, inputs) {
 // that tree shaking removes. A zero-byte engine dependency is still a defect.
 // Runtime exports can resolve their optional native adapters, but an ordinary
 // entry must tree-shake every byte of those concrete implementations.
-export function verifyBundleInputs(scenario, inputs) {
+export function verifyBundleInputs(scenario, inputs, engineDependency = 'vendored') {
+	assert.ok(
+		engineDependency === 'external' || engineDependency === 'vendored',
+		'Unknown engine dependency expectation',
+	);
 	const names = inputs.map((input) => input.path.replaceAll('\\', '/'));
 	const alien = inputs.filter((input) => input.package?.name === 'alien-signals');
 	const engine = names.filter((name) =>
@@ -241,9 +245,17 @@ export function verifyBundleInputs(scenario, inputs) {
 		assert.deepEqual(alien, [], `${scenario.id}: binding entry reached Alien Signals`);
 		assert.deepEqual(engine, [], `${scenario.id}: binding entry reached the signal graph`);
 	} else {
-		assert.ok(alien.length > 0, `${scenario.id}: selected engine dependency is missing`);
-		for (const input of alien) {
-			assert.equal(input.package.version, '3.2.0', `${scenario.id}: wrong Alien Signals version`);
+		assert.ok(
+			names.some((name) => /\/src\/signals\/graph\.[jt]s$/.test(name)),
+			`${scenario.id}: selected graph source is missing`,
+		);
+		if (engineDependency === 'external') {
+			assert.ok(alien.length > 0, `${scenario.id}: selected engine dependency is missing`);
+			for (const input of alien) {
+				assert.equal(input.package.version, '3.2.1', `${scenario.id}: wrong Alien Signals version`);
+			}
+		} else {
+			assert.deepEqual(alien, [], `${scenario.id}: vendored engine reached Alien Signals`);
 		}
 	}
 	if (scenario.id === 'engine' || scenario.rendererFree) {

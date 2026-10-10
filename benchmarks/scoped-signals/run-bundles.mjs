@@ -160,15 +160,18 @@ try {
 					sha256: sha256(contents),
 					gitBlob: label === 'baseline' ? verifyBaseline(manifest, contents) : undefined,
 					exports: data.exports,
+					engineDependency: Object.hasOwn(data.dependencies ?? {}, 'alien-signals')
+						? 'external'
+						: 'vendored',
 				},
 			];
 		}),
 	);
 	const toolingRoot = options.has('tooling-root')
 		? fs.realpathSync(path.resolve(options.get('tooling-root')))
-		: null;
-	const requireDependency = createRequire(path.join(toolingRoot ?? candidateRoot, 'package.json'));
-	const requireBuild = toolingRoot ? requireDependency : createRequire(import.meta.url);
+		: fs.realpathSync(HERE);
+	const requireDependency = createRequire(path.join(toolingRoot, 'package.json'));
+	const requireBuild = requireDependency;
 	const buildEntry = requireBuild.resolve('esbuild');
 	const esbuild = await import(pathToFileURL(buildEntry).href);
 	const dependencies = {
@@ -179,8 +182,8 @@ try {
 	assert.equal(esbuild.version, dependencies.esbuild.version, 'esbuild module/manifest mismatch');
 	assert.equal(
 		dependencies.alien.version,
-		'3.2.0',
-		'Optional engine must resolve Alien Signals 3.2.0',
+		'3.2.1',
+		'Optional engine must resolve Alien Signals 3.2.1',
 	);
 	const archive = path.resolve(baselineRoot, '../..', 'source.tar');
 	payload.environment = {
@@ -197,7 +200,9 @@ try {
 		platform: process.platform,
 		architecture: process.arch,
 		cpu: os.cpus()[0]?.model,
-		dependencyMode: toolingRoot ? 'explicit-tooling-root' : 'workspace-installation',
+		dependencyMode: options.has('tooling-root')
+			? 'explicit-tooling-root'
+			: 'benchmark-installation',
 		toolingRoot,
 		dependencies,
 		runnerSha256: sha256(fs.readFileSync(import.meta.filename)),
@@ -206,16 +211,14 @@ try {
 	const sourcePlugin = {
 		name: 'scoped-signals-hashed-source-inputs',
 		setup(builder) {
-			if (toolingRoot) {
-				builder.onResolve({ filter: /^(?:alien-signals|devalue)(?:\/|$)/ }, (resolution) => {
-					if (resolution.pluginData?.scopedBundleTooling) return undefined;
-					return builder.resolve(resolution.path, {
-						kind: resolution.kind,
-						resolveDir: toolingRoot,
-						pluginData: { scopedBundleTooling: true },
-					});
+			builder.onResolve({ filter: /^(?:alien-signals|devalue)(?:\/|$)/ }, (resolution) => {
+				if (resolution.pluginData?.scopedBundleTooling) return undefined;
+				return builder.resolve(resolution.path, {
+					kind: resolution.kind,
+					resolveDir: toolingRoot,
+					pluginData: { scopedBundleTooling: true },
 				});
-			}
+			});
 			// Hash the exact bytes supplied to esbuild, not a later disk read.
 			// Repeated inputs use the same bytes across all builds.
 			builder.onLoad({ filter: /\.(?:[cm]?[jt]s|jsx|tsx|json)$/ }, ({ path: filename }) => {
@@ -400,7 +403,7 @@ try {
 				if (label === 'candidate') failures.push(`${row.name}: ${error.message}`);
 			}
 			try {
-				verifyBundleInputs(scenario, inputs);
+				verifyBundleInputs(scenario, inputs, manifests[label].engineDependency);
 				for (const request of [
 					scenario.request,
 					...Object.keys(scenario.additionalExports ?? {}),

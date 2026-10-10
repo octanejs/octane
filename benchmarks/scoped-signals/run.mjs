@@ -18,7 +18,7 @@ import {
 
 const HERE = import.meta.dirname;
 const REPO = path.resolve(HERE, '../..');
-const EXPECTED_ALIEN_VERSION = '3.2.0';
+const EXPECTED_ALIEN_VERSION = '3.2.1';
 const args = process.argv.slice(2);
 const knownFlags = new Set(['--quick', '--heap']);
 const knownOptions = new Set([
@@ -124,10 +124,9 @@ let build;
 let dependencyRequire;
 let alienManifest;
 let toolingRoot;
-async function loadApi(request, label) {
-	// Both candidates are built with identical production options. Resolution
-	// starts at octane's dependency scope, where the exact experimental version
-	// lives; the old binding's 1.0.4 catalog entry is deliberately not used.
+async function loadApi(request, label, engineDependency) {
+	// Both candidates use identical production options and the benchmark's
+	// selected dependency installation. Octane still resolves from sourceRoot.
 	const entrySource = `export * from ${JSON.stringify(request)};`;
 	const entryName = `${label}-benchmark-entry.mjs`;
 	const result = await build({
@@ -146,23 +145,21 @@ async function loadApi(request, label) {
 		target: 'node22',
 		define: { 'process.env.NODE_ENV': '"production"' },
 		logLevel: 'silent',
-		plugins: dependencyRequire
-			? [
-					{
-						name: 'explicit-scoped-signals-dependency',
-						setup(builder) {
-							builder.onResolve({ filter: /^alien-signals(?:\/|$)/ }, (resolution) => {
-								if (resolution.pluginData?.scopedSignalsTooling) return undefined;
-								return builder.resolve(resolution.path, {
-									kind: resolution.kind,
-									resolveDir: toolingRoot,
-									pluginData: { scopedSignalsTooling: true },
-								});
-							});
-						},
-					},
-				]
-			: [],
+		plugins: [
+			{
+				name: 'scoped-signals-selected-dependency',
+				setup(builder) {
+					builder.onResolve({ filter: /^alien-signals(?:\/|$)/ }, (resolution) => {
+						if (resolution.pluginData?.scopedSignalsTooling) return undefined;
+						return builder.resolve(resolution.path, {
+							kind: resolution.kind,
+							resolveDir: toolingRoot,
+							pluginData: { scopedSignalsTooling: true },
+						});
+					});
+				},
+			},
+		],
 	});
 	const inputs = Object.keys(result.metafile.inputs);
 	const forbidden = inputs.filter((input) =>
@@ -178,10 +175,26 @@ async function loadApi(request, label) {
 	const alienInputs = inputs.filter((input) =>
 		/(?:^|\/)node_modules\/alien-signals\//.test(input.replaceAll('\\', '/')),
 	);
-	assert.ok(
-		alienInputs.length > 0,
-		`${label} did not include the selected Alien Signals dependency`,
-	);
+	if (engineDependency === 'external') {
+		assert.ok(
+			alienInputs.length > 0,
+			`${label} did not include the selected Alien Signals dependency`,
+		);
+	} else {
+		assert.equal(engineDependency, 'vendored');
+		assert.deepEqual(alienInputs, [], `${label} vendored engine reached Alien Signals`);
+	}
+	if (label === 'scoped') {
+		const graph = fs.realpathSync(path.join(sourceRoot, 'packages/octane/src/signals/graph.ts'));
+		assert.ok(
+			inputs.some(
+				(input) =>
+					path.basename(input) !== entryName &&
+					fs.realpathSync(path.resolve(REPO, input)) === graph,
+			),
+			'scoped benchmark did not include its selected graph source',
+		);
+	}
 	for (const input of alienInputs) {
 		const bundledPackage = packageFromEntry(path.resolve(REPO, input));
 		assert.equal(
@@ -236,12 +249,16 @@ let failure;
 let environment;
 try {
 	assert.equal(typeof globalThis.document, 'undefined', 'engine benchmark must run without a DOM');
-	const requireOctane = createRequire(path.join(sourceRoot, 'packages/octane/package.json'));
+	const sourceManifest = path.join(sourceRoot, 'packages/octane/package.json');
+	const sourcePackage = JSON.parse(fs.readFileSync(sourceManifest, 'utf8'));
+	const engineDependency = Object.hasOwn(sourcePackage.dependencies ?? {}, 'alien-signals')
+		? 'external'
+		: 'vendored';
 	toolingRoot = options.has('tooling-root')
 		? fs.realpathSync(path.resolve(options.get('tooling-root')))
-		: null;
-	dependencyRequire = toolingRoot ? createRequire(path.join(toolingRoot, 'package.json')) : null;
-	const buildEntry = (dependencyRequire ?? createRequire(import.meta.url)).resolve('esbuild');
+		: fs.realpathSync(HERE);
+	dependencyRequire = createRequire(path.join(toolingRoot, 'package.json'));
+	const buildEntry = dependencyRequire.resolve('esbuild');
 	const buildPackage = packageFromEntry(buildEntry, 'esbuild');
 	const buildModule = await import(pathToFileURL(buildEntry).href);
 	assert.equal(
@@ -250,9 +267,7 @@ try {
 		'esbuild module and manifest versions differ',
 	);
 	build = buildModule.build;
-	const alienPackage = packageFromEntry(
-		(dependencyRequire ?? requireOctane).resolve('alien-signals'),
-	);
+	const alienPackage = packageFromEntry(dependencyRequire.resolve('alien-signals'));
 	alienManifest = fs.realpathSync(alienPackage.manifest);
 	assert.equal(
 		alienPackage.version,
@@ -263,8 +278,8 @@ try {
 	assert.equal(typeof alienImport, 'string', 'selected Alien package has no direct import export');
 	const alienEntry = fs.realpathSync(path.resolve(path.dirname(alienManifest), alienImport));
 	const [raw, scoped] = await Promise.all([
-		loadApi('alien-signals', 'alien'),
-		loadApi('octane/signals', 'scoped'),
+		loadApi('alien-signals', 'alien', 'external'),
+		loadApi('octane/signals', 'scoped', engineDependency),
 	]);
 	assert.ok(
 		raw.bundle.inputs.some(
@@ -300,11 +315,12 @@ try {
 		runnerSha256: hashFile(import.meta.filename),
 		alienVersion: alienPackage.version,
 		dependencies: {
-			mode: toolingRoot ? 'explicit-tooling-root' : 'workspace-installation',
+			mode: options.has('tooling-root') ? 'explicit-tooling-root' : 'benchmark-installation',
 			toolingRoot,
 			esbuild: packageEvidence(buildEntry, buildPackage),
 			alien: packageEvidence(alienEntry, alienPackage),
 		},
+		sourcePackage: { path: sourceManifest, sha256: hashFile(sourceManifest), engineDependency },
 		builds: { raw: raw.bundle, scoped: scoped.bundle },
 		mode: heap ? 'heap-diagnostics' : 'timing',
 		options: { iterations, scales, rounds, cycles, unrelatedScales },

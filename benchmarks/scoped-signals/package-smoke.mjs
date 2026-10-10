@@ -37,18 +37,6 @@ const ts = requireTool('typescript');
 assert.equal(esbuild.version, '0.28.1');
 assert.equal(ts.version, '5.9.3');
 
-function packageFor(specifier) {
-	let directory = dirname(requireTool.resolve(specifier));
-	while (!existsSync(join(directory, 'package.json'))) {
-		const parent = dirname(directory);
-		if (parent === directory) throw new Error(`No package metadata for ${specifier}`);
-		directory = parent;
-	}
-	return { directory, manifest: JSON.parse(readFileSync(join(directory, 'package.json'), 'utf8')) };
-}
-const alien = packageFor('alien-signals');
-assert.equal(alien.manifest.version, '3.2.0');
-
 const scratch = mkdtempSync(join(tmpdir(), 'octane-signals-package-'));
 const packageDir = join(scratch, 'package');
 const sourcePackageDir = join(repo, 'packages/octane');
@@ -235,7 +223,7 @@ const report = {
 	measuredAt: new Date().toISOString(),
 	node: process.version,
 	toolingRoot,
-	tools: { esbuild: esbuild.version, typescript: ts.version, alienSignals: alien.manifest.version },
+	tools: { esbuild: esbuild.version, typescript: ts.version },
 	scratch,
 	status: 'passed',
 	scope:

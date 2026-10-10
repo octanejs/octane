@@ -1,4 +1,3 @@
-import type { createReactiveSystem } from 'alien-signals/system';
 import type { DerivedBinding } from './computations.js';
 import type {
 	CandidateProducer,
@@ -7,6 +6,7 @@ import type {
 	ScopedNode,
 	NodeState,
 	SignalReadMode,
+	SignalGraph,
 } from './graph.js';
 import type { ResourceBinding } from './requests.js';
 import type { SignalActionFrame } from './transition-action.js';
@@ -17,7 +17,7 @@ import { setNativeCandidateResolver, type NativeReadSource } from './read-protoc
 /** Shared state keeps model registration separate from optional native presentation. */
 interface CandidateGraph {
 	ScopedNode: typeof import('./graph.js').ScopedNode;
-	graph: ReturnType<typeof createReactiveSystem>;
+	graph: SignalGraph;
 	flags: { Dirty: number; Mutable: number; Watching: number };
 	historical(): boolean;
 	link(from: ScopedNode, to: ScopedNode): void;

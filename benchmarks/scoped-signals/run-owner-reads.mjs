@@ -78,9 +78,7 @@ function read(file) {
 	}
 	return inputs.get(file);
 }
-const toolingRoot = fs.realpathSync(
-	options.get('tooling-root') ?? path.join(REPO, 'packages/octane'),
-);
+const toolingRoot = fs.realpathSync(options.get('tooling-root') ?? import.meta.dirname);
 const requireTool = createRequire(path.join(toolingRoot, 'package.json'));
 const dependencies = Object.fromEntries(
 	['esbuild', 'alien-signals', 'devalue'].map((name) => {
@@ -110,7 +108,7 @@ const dependencies = Object.fromEntries(
 );
 assert.deepEqual(
 	Object.values(dependencies).map((dependency) => dependency.version),
-	['0.28.1', '3.2.0', '5.8.2'],
+	['0.28.1', '3.2.1', '5.8.2'],
 	'Update the explicit toolchain pins before measuring different dependencies',
 );
 const { build } = requireTool('esbuild');
