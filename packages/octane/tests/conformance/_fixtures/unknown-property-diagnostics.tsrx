@@ -46,6 +46,19 @@ export function CanonicalInputProperties() @{
 	/>
 }
 
+export function TableCellSpans(props: { span: number }) @{
+	<table>
+		<tbody>
+			<tr>
+				<td id="canonical-static-cell" colSpan={2} rowSpan={3} />
+				<td id="canonical-dynamic-cell" colSpan={props.span} rowSpan={props.span} />
+				<td id="native-static-cell" colspan={2} rowspan={3} />
+				<td id="native-dynamic-cell" colspan={props.span} rowspan={props.span} />
+			</tr>
+		</tbody>
+	</table>
+}
+
 export function CanonicalAliasedProperties() @{
 	<label id="canonical-aliased-properties" htmlFor="canonical-input" tabIndex={-1} />
 }
