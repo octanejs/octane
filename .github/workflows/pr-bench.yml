@@ -80,18 +80,16 @@ jobs:
 
       # A failing suite is recorded in its result JSON and rendered in the
       # report, so both trees always run to completion before the verdict.
-      # Byte suites are deterministic and run once per tree, both trees at once.
+      # Byte suites run once per tree, sequentially under the shared benchmark lock.
       - name: Benchmark bundle size
         id: bytes
         run: |
           mkdir -p "$RESULTS"
-          (cd "$BASE_TREE" && node benchmarks/bench.mjs --results-dir="$RESULTS/base" bundle-size bundle-reachability) > "$RESULTS/base-bytes.log" 2>&1 &
-          base=$!
-          node benchmarks/bench.mjs --results-dir="$RESULTS/head" bundle-size bundle-reachability > "$RESULTS/head-bytes.log" 2>&1 &
-          head=$!
-          wait "$base" || echo "::warning::base bundle benchmarks failed"
+          (cd "$BASE_TREE" && node benchmarks/bench.mjs --results-dir="$RESULTS/base" bundle-size bundle-reachability) > "$RESULTS/base-bytes.log" 2>&1 \
+            || echo "::warning::base bundle benchmarks failed"
           status=0
-          wait "$head" || status=$?
+          node benchmarks/bench.mjs --results-dir="$RESULTS/head" bundle-size bundle-reachability > "$RESULTS/head-bytes.log" 2>&1 \
+            || status=$?
           for side in base head; do
             echo "::group::$side bundle benchmarks"
             cat "$RESULTS/$side-bytes.log"
