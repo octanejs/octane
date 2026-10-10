@@ -2942,7 +2942,9 @@ function ensureOffscreenSwapDriver(): void {
  * installs this driver before raising TRANSITION_DEPTH. Until then no render
  * runs at transition priority, so a missing driver means what an installed one
  * would report: no attempt, no root hold and no held update. A Suspense-only
- * application therefore does not retain it.
+ * application therefore does not retain it. Hook setters read the driver again
+ * after evaluating authored updaters: an updater can start the first Action,
+ * so staging must observe that newly installed transition capability.
  */
 interface TransitionRootDriver {
 	begin: typeof beginTransitionAttempt;
@@ -2963,6 +2965,12 @@ interface TransitionRootDriver {
 	hasHeld: typeof hasHeldTransitionUpdate;
 	heldUpdate: typeof getHeldTransitionUpdate;
 	rebaseHeld: typeof rebaseHeldTransitionUpdate;
+	stagedValue: typeof stagedTransitionValue;
+	stageValue: typeof stageTransitionValue;
+	readQueued: typeof readQueuedTransition;
+	captureQueue: typeof captureTransitionHookQueue;
+	recordUrgent: typeof recordUrgentActionUpdate;
+	finishQueued: typeof finishQueuedTransition;
 }
 
 function ensureTransitionSwapDriver(): void {
@@ -2992,6 +3000,12 @@ function ensureTransitionSwapDriver(): void {
 		hasHeld: hasHeldTransitionUpdate,
 		heldUpdate: getHeldTransitionUpdate,
 		rebaseHeld: rebaseHeldTransitionUpdate,
+		stagedValue: stagedTransitionValue,
+		stageValue: stageTransitionValue,
+		readQueued: readQueuedTransition,
+		captureQueue: captureTransitionHookQueue,
+		recordUrgent: recordUrgentActionUpdate,
+		finishQueued: finishQueuedTransition,
 	};
 	TRANSITION_TASK_DRIVER ??= {
 		queue: queueTransitionBlock,
@@ -14396,7 +14410,7 @@ function readStateHook<T>(
 			setter: (next) => {
 				if (block.disposed) return;
 				if (s!.pendingActionBatch !== undefined && transitionActionBatchForUpdate() === null)
-					recordUrgentActionUpdate(s!, next);
+					TRANSITION_ROOT_DRIVER!.recordUrgent(s!, next);
 				// Preserve the idle eager bailout. Once work is already queued, a
 				// functional update must observe the next render's inputs instead.
 				if (
@@ -14414,7 +14428,9 @@ function readStateHook<T>(
 					scheduleRender(block);
 					return;
 				}
-				const previous = stagedTransitionValue(s!, block);
+				const previous = TRANSITION_ROOT_DRIVER
+					? TRANSITION_ROOT_DRIVER.stagedValue(s!, block)
+					: s!.value;
 				let computed: T;
 				let failed = false;
 				try {
@@ -14448,11 +14464,13 @@ function readStateHook<T>(
 					}
 					return;
 				}
-				const update = stageTransitionValue(s!, block, next, computed, forceRender);
+				const update = TRANSITION_ROOT_DRIVER
+					? TRANSITION_ROOT_DRIVER.stageValue(s!, block, next, computed, forceRender)
+					: null;
 				if (update !== null) {
 					if (update.state === undefined) {
 						update.state = s!;
-						captureTransitionHookQueue(update, s!);
+						TRANSITION_ROOT_DRIVER!.captureQueue(update, s!);
 					}
 					if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__) {
 						update.profileType = 'state';
@@ -14503,7 +14521,7 @@ function readStateHook<T>(
 		s.value = value;
 		if (!s.urgentTransition) {
 			if (s.renderTransition !== undefined) {
-				finishQueuedTransition(s.renderTransition, s.value);
+				TRANSITION_ROOT_DRIVER!.finishQueued(s.renderTransition, s.value);
 				s.renderTransition = undefined;
 			}
 			s.updates = undefined;
@@ -14517,7 +14535,7 @@ function readQueuedState<T>(state: StateSlot<T>): T {
 	let value =
 		transition === undefined
 			? state.value
-			: readQueuedTransition(transition, state.urgentTransition === true);
+			: TRANSITION_ROOT_DRIVER!.readQueued(transition, state.urgentTransition === true);
 	if (state.updates !== undefined) {
 		for (const update of state.updates)
 			value = typeof update === 'function' ? (update as (previous: T) => T)(value) : update;
@@ -14639,7 +14657,9 @@ export function __useStateWithGetter<T>(initial: T | (() => T), slot?: HookSlot)
 			const batch = s.pendingActionBatch;
 			if (batch === undefined) return readQueuedState(s);
 			const update = batch.updates.get(s) as TransitionActionUpdate<T> | undefined;
-			return update === undefined ? readQueuedState(s) : readQueuedTransition(update, false);
+			return update === undefined
+				? readQueuedState(s)
+				: TRANSITION_ROOT_DRIVER!.readQueued(update, false);
 		});
 	return [s.value, s.setter, getter];
 }
@@ -14840,7 +14860,9 @@ export function useLinkedState<Source, Value>(
 				const updatingDraft = renderingDraft || updatingParkedDraft;
 				const previous = updatingDraft
 					? (state!.renderValue as Value)
-					: stagedTransitionValue(state!);
+					: TRANSITION_ROOT_DRIVER
+						? TRANSITION_ROOT_DRIVER.stagedValue(state!)
+						: state!.value;
 				const operation =
 					typeof next === 'function' ? (next as (value: Value) => Value) : () => next;
 				const computed = operation(previous);
@@ -14853,7 +14875,9 @@ export function useLinkedState<Source, Value>(
 					else scheduleRender(block);
 					return;
 				}
-				const update = stageTransitionValue(state!, block, operation, computed);
+				const update = TRANSITION_ROOT_DRIVER
+					? TRANSITION_ROOT_DRIVER.stageValue(state!, block, operation, computed)
+					: null;
 				if (update !== null) {
 					if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__) {
 						update.profileType = 'state';
@@ -15070,13 +15094,13 @@ function readReducerHook<S, A, I>(
 				if (CURRENT_BLOCK === block || transitionActionBatchForUpdate() === null) {
 					if (CURRENT_BLOCK === block) captureRenderPhaseUpdate(s!, 'renderPhaseActions');
 					if (s!.pendingActionBatch !== undefined && transitionActionBatchForUpdate() === null)
-						recordUrgentActionUpdate(s!, (value) => s!.reducer(value, action));
+						TRANSITION_ROOT_DRIVER!.recordUrgent(s!, (value) => s!.reducer(value, action));
 					const actions = (s!.renderPhaseActions ??= []);
 					actions.push(action);
 					scheduleRender(block);
 					return;
 				}
-				const previous = stagedTransitionValue(s!, block);
+				const previous = TRANSITION_ROOT_DRIVER!.stagedValue(s!, block);
 				const operation = (value: S) => s!.reducer(value, action);
 				let computed = previous;
 				try {
@@ -15084,11 +15108,11 @@ function readReducerHook<S, A, I>(
 				} catch {
 					/* Re-evaluate in render. */
 				}
-				const update = stageTransitionValue(s!, block, operation, computed, true);
+				const update = TRANSITION_ROOT_DRIVER!.stageValue(s!, block, operation, computed, true);
 				if (update !== null) {
 					if (update.reducer === undefined) {
 						update.reducer = s!;
-						captureTransitionHookQueue(update, s!);
+						TRANSITION_ROOT_DRIVER!.captureQueue(update, s!);
 					}
 					if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__) {
 						update.profileType = 'reducer';
@@ -15128,7 +15152,7 @@ function readReducerHook<S, A, I>(
 			s.value = value;
 			if (!s.urgentTransition) {
 				if (s.renderTransition !== undefined) {
-					finishQueuedTransition(s.renderTransition, s.value);
+					TRANSITION_ROOT_DRIVER!.finishQueued(s.renderTransition, s.value);
 					s.renderTransition = undefined;
 				}
 				s.renderPhaseActions = undefined;
@@ -15142,7 +15166,7 @@ function readQueuedReducer<S, A>(state: ReducerSlot<S, A>): S {
 	let value =
 		state.renderTransition === undefined
 			? state.value
-			: readQueuedTransition(
+			: TRANSITION_ROOT_DRIVER!.readQueued(
 					state.renderTransition,
 					state.urgentTransition === true,
 					state.reducer,
@@ -15174,7 +15198,7 @@ export function __useReducerWithGetter<S, A, I = S>(
 			const update = batch.updates.get(s) as TransitionActionUpdate<S> | undefined;
 			return update === undefined
 				? readQueuedReducer(s)
-				: readQueuedTransition(update, false, s.reducer);
+				: TRANSITION_ROOT_DRIVER!.readQueued(update, false, s.reducer);
 		});
 	return [s.value, s.dispatch, getter];
 }
@@ -45463,7 +45487,7 @@ function swapDeferredValue<T>(s: DeferredSlot<T>): void {
 	startTransition(() => {
 		DEFERRED_SPAWN = true;
 		try {
-			stageTransitionValue(s, s.block, s.next, s.next, true);
+			TRANSITION_ROOT_DRIVER!.stageValue(s, s.block, s.next, s.next, true);
 			if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__) {
 				__profileSchedule(s.block, 'deferred-value', s.profileSlot);
 				scheduleRender(s.block);
