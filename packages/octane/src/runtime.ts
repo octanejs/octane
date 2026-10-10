@@ -5121,62 +5121,46 @@ function suspendRootRender(
  * fixed bag; restoring a boundary's own state as a bag would corrupt its hold.
  */
 const BINDING_BAG_ARITY = Symbol();
-// Each clone has its own spread site, so normal bag arities stay monomorphic.
-// Spread retains prior enumerable string fields; rollback removes speculative additions.
-/* prettier-ignore */ function cloneBag0(bag: any): object { return { ...bag }; }
-/* prettier-ignore */ function cloneBag1(bag: any): object { return { ...bag }; }
-/* prettier-ignore */ function cloneBag2(bag: any): object { return { ...bag }; }
-/* prettier-ignore */ function cloneBag3(bag: any): object { return { ...bag }; }
-/* prettier-ignore */ function cloneBag4(bag: any): object { return { ...bag }; }
-/* prettier-ignore */ function cloneBag5(bag: any): object { return { ...bag }; }
-/* prettier-ignore */ function cloneBag6(bag: any): object { return { ...bag }; }
-/* prettier-ignore */ function cloneBag7(bag: any): object { return { ...bag }; }
-/* prettier-ignore */ function cloneBag8(bag: any): object { return { ...bag }; }
-/* prettier-ignore */ function cloneBag9(bag: any): object { return { ...bag }; }
-/* prettier-ignore */ function cloneBag10(bag: any): object { return { ...bag }; }
-/* prettier-ignore */ function cloneBag11(bag: any): object { return { ...bag }; }
-/* prettier-ignore */ function cloneBag12(bag: any): object { return { ...bag }; }
-/* prettier-ignore */ function cloneBag13(bag: any): object { return { ...bag }; }
-/* prettier-ignore */ function cloneBag14(bag: any): object { return { ...bag }; }
-/* prettier-ignore */ function cloneBag15(bag: any): object { return { ...bag }; }
-/* prettier-ignore */ function cloneBag16(bag: any): object { return { ...bag }; }
+// Keep one spread site per arity for monomorphic cloning, without an extra call.
+// Downstream minifiers may merge these sites; the optimization requires separate sites.
+// Spread preserves enumerable string and symbol values; rollback removes additions.
 
 function cloneBindingBag(bag: any, arity: number): object {
 	switch (arity) {
 		case 0:
-			return cloneBag0(bag);
+			return { ...bag };
 		case 1:
-			return cloneBag1(bag);
+			return { ...bag };
 		case 2:
-			return cloneBag2(bag);
+			return { ...bag };
 		case 3:
-			return cloneBag3(bag);
+			return { ...bag };
 		case 4:
-			return cloneBag4(bag);
+			return { ...bag };
 		case 5:
-			return cloneBag5(bag);
+			return { ...bag };
 		case 6:
-			return cloneBag6(bag);
+			return { ...bag };
 		case 7:
-			return cloneBag7(bag);
+			return { ...bag };
 		case 8:
-			return cloneBag8(bag);
+			return { ...bag };
 		case 9:
-			return cloneBag9(bag);
+			return { ...bag };
 		case 10:
-			return cloneBag10(bag);
+			return { ...bag };
 		case 11:
-			return cloneBag11(bag);
+			return { ...bag };
 		case 12:
-			return cloneBag12(bag);
+			return { ...bag };
 		case 13:
-			return cloneBag13(bag);
+			return { ...bag };
 		case 14:
-			return cloneBag14(bag);
+			return { ...bag };
 		case 15:
-			return cloneBag15(bag);
+			return { ...bag };
 		case 16:
-			return cloneBag16(bag);
+			return { ...bag };
 		default:
 			return { ...bag };
 	}
