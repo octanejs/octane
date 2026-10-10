@@ -20,6 +20,12 @@ const PACKAGE = path.join(REPO, 'packages/octane');
 const SHARED = 'shared-document-thread';
 const DISTINCT = 'different-document-thread';
 const requireDependency = createRequire(path.join(PACKAGE, 'package.json'));
+const requireBenchmark = createRequire(new URL('./package.json', import.meta.url));
+const resolveDependency = (request) =>
+	(request === 'alien-signals' || request.startsWith('alien-signals/')
+		? requireBenchmark
+		: requireDependency
+	).resolve(request);
 const hash = (value) => createHash('sha256').update(value).digest('hex');
 const git = (...args) =>
 	execFileSync('git', args, {
@@ -100,7 +106,7 @@ export async function hydrate(host,initialDocumentSignals){
 }`;
 
 function dependencyEvidence(request) {
-	const entry = requireDependency.resolve(request);
+	const entry = resolveDependency(request);
 	let directory = path.dirname(fs.realpathSync(entry));
 	while (true) {
 		const manifestPath = path.join(directory, 'package.json');
@@ -158,7 +164,7 @@ async function bundle({ label, mode, source, compiled, candidateInputs }) {
 					builder.onResolve(
 						{ filter: /^(?:alien-signals|devalue)(?:\/|$)/ },
 						({ path: request }) => ({
-							path: requireDependency.resolve(request),
+							path: resolveDependency(request),
 						}),
 					);
 					builder.onLoad({ filter: /\.(?:[cm]?[jt]s|json)$/ }, ({ path: filename }) => {
