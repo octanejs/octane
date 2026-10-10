@@ -1,4 +1,11 @@
-import { Hydrate, useLayoutEffect, useRef, useState } from 'octane';
+import {
+	Hydrate,
+	ViewTransition,
+	startTransition,
+	useLayoutEffect,
+	useRef,
+	useState,
+} from 'octane';
 import { interaction } from 'octane/hydration';
 
 type EditorProps = {
@@ -60,16 +67,123 @@ export function LockedEditor(props: {
 
 export function PendingControlledEditor(props: {
 	expose: (setter: (value: string) => void) => void;
+	acceptInput?: () => boolean;
+	onCapture?: (event: Event) => void;
 }) @{
 	const [draft, setDraft] = useState('');
 	props.expose(setDraft);
 	<section>
 		<input
 			value={draft}
-			onInput={(event: Event) => setDraft((event.currentTarget as HTMLInputElement).value)}
+			onInputCapture={(event: Event) => props.onCapture?.(event)}
+			onInput={(event: Event) => {
+				if (props.acceptInput?.() !== false)
+					setDraft((event.currentTarget as HTMLInputElement).value);
+			}}
 		/>
 		<output>{draft as string}</output>
 	</section>
+}
+
+export function AnimatedControlledEditor(props: {
+	expose: (setter: (value: number) => void) => void;
+	acceptInput: boolean;
+	onInput: (value: string) => void;
+}) @{
+	const [page, setPage] = useState(0);
+	const [draft, setDraft] = useState('locked');
+	props.expose(setPage);
+	const onInput = (event: Event) => {
+		const value = (event.currentTarget as HTMLInputElement).value;
+		props.onInput(value);
+		if (props.acceptInput) startTransition(() => setDraft(value));
+	};
+	<ViewTransition>
+		<section>
+			<input value={draft} onInput={onInput} />
+			<output>{draft as string}</output>
+			<p>
+				{
+					(page === 0
+						? 'Initial page'
+						: page === 1
+							? 'First animated page'
+							: 'Second animated page') as string
+				}
+			</p>
+		</section>
+	</ViewTransition>
+}
+
+type ChoiceProps = {
+	kind: 'checkbox' | 'radio' | 'select';
+	onEdit?: (selected: boolean, type: string) => void;
+	onSend?: (selected: boolean) => void;
+};
+
+function ChoiceEditor(props: ChoiceProps) @{
+	const control = useRef<HTMLInputElement | HTMLSelectElement | null>(null);
+	const setControl = (element: HTMLInputElement | HTMLSelectElement | null) => {
+		control.current = element;
+	};
+	const [selected, setSelected] = useState(false);
+	const read = (element: HTMLInputElement | HTMLSelectElement) =>
+		props.kind === 'select' ? element.value === 'second' : (element as HTMLInputElement).checked;
+	useLayoutEffect(() => {
+		setSelected(read(control.current!));
+	}, []);
+	const onEdit = (event: Event) => {
+		const value = read(event.currentTarget as HTMLInputElement | HTMLSelectElement);
+		props.onEdit?.(value, event.type);
+		setSelected(value);
+	};
+	<section>
+		@if (props.kind === 'select') {
+			<select
+				id="deferred-choice"
+				ref={setControl}
+				value={selected ? 'second' : 'first'}
+				onInput={onEdit}
+				onChange={onEdit}
+			>
+				<option value="first">{'First'}</option>
+				<option value="second">{'Second'}</option>
+			</select>
+		} @else {
+			<>
+				@if (props.kind === 'radio') {
+					<input
+						id="deferred-first-choice"
+						type="radio"
+						name="deferred-choice-group"
+						checked={!selected}
+						onChange={(event: Event) =>
+							setSelected(!(event.currentTarget as HTMLInputElement).checked)
+						}
+					/>
+				}
+				<input
+					id="deferred-choice"
+					type={props.kind}
+					name="deferred-choice-group"
+					ref={setControl}
+					checked={selected}
+					onInput={onEdit}
+					onChange={onEdit}
+				/>
+			</>
+		}
+		<output>{selected ? 'second' : 'first'}</output>
+		<button type="button" onClick={() => props.onSend?.(read(control.current!))}>
+			{'Send'}
+		</button>
+	</section>
+}
+
+export function DeferredControlledChoice(props: ChoiceProps) @{
+	<Hydrate when={interaction()} split={false}>
+		<ChoiceEditor kind={props.kind} onEdit={props.onEdit} onSend={props.onSend} />
+	</Hydrate>
 }
 
 export function FailingLayout(props: {

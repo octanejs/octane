@@ -702,6 +702,8 @@ let resolveSlot = (slot: HookSlot | undefined): HookSlot | undefined => slot;
 // graph without adding a wrapper call to dispatch. Read the live capability:
 // a native target listener can arm the first control after root capture.
 let CONTROLLED_RESTORE_DRIVER: {
+	begin: typeof beginControlledDelivery;
+	delivery: typeof controlledDelivery;
 	enqueue: typeof maybeEnqueueRestore;
 	finish: typeof maybeFlushDiscrete;
 	restore: typeof restoreControlledStates;
@@ -9274,6 +9276,15 @@ function drainLayoutUpdates(pendingError: { err: any } | null): { err: any } | n
 	return pendingError;
 }
 
+function rethrowAfterControlledRestore(error: unknown): never {
+	try {
+		if (CONTROLLED_RESTORE_DRIVER) CONTROLLED_RESTORE_DRIVER.restore();
+	} finally {
+		// A restoration failure must not replace the render/commit failure.
+		throw error;
+	}
+}
+
 /**
  * The flush body proper — render+mutate drain plus the effect commit. Shared
  * verbatim by the plain flush() path and the view-transition update callback
@@ -9326,12 +9337,7 @@ function flushWork(): void {
 			if (clearViewTransitionTypes) VIEW_TRANSITION_DRIVER!.clearTypes();
 		}
 	} catch (error) {
-		// Preserve the render/commit failure if restoring a surviving control also fails.
-		try {
-			if (CONTROLLED_RESTORE_DRIVER) CONTROLLED_RESTORE_DRIVER.restore();
-		} finally {
-			throw error;
-		}
+		rethrowAfterControlledRestore(error);
 	}
 	if (CONTROLLED_RESTORE_DRIVER) CONTROLLED_RESTORE_DRIVER.restore();
 }
@@ -10193,12 +10199,7 @@ export function flushSync<T>(fn: () => T): T {
 			syncFlush = prevSync;
 		}
 	} catch (error) {
-		// Preserve the render/commit failure if restoring a surviving control also fails.
-		try {
-			if (CONTROLLED_RESTORE_DRIVER) CONTROLLED_RESTORE_DRIVER.restore();
-		} finally {
-			throw error;
-		}
+		rethrowAfterControlledRestore(error);
 	}
 	if (CONTROLLED_RESTORE_DRIVER) CONTROLLED_RESTORE_DRIVER.restore();
 	return result;
@@ -11313,12 +11314,7 @@ function completeDeferredLayouts(capture: DeferredLayoutCapture, interrupted = f
 			}
 		}
 	} catch (error) {
-		// Preserve the render/commit failure if restoring a surviving control also fails.
-		try {
-			if (CONTROLLED_RESTORE_DRIVER) CONTROLLED_RESTORE_DRIVER.restore();
-		} finally {
-			throw error;
-		}
+		rethrowAfterControlledRestore(error);
 	}
 	if (CONTROLLED_RESTORE_DRIVER) CONTROLLED_RESTORE_DRIVER.restore();
 }
@@ -30383,12 +30379,14 @@ function prepareDelegatedEvent(event: Event, listener: Node): EventTarget[] | un
 	// can build the path once, after native target listeners have run.
 	if (_delegationTargets.size === 1 && portalEventTargetCount === 0) {
 		beginBindingEvent(event);
+		if (CONTROLLED_RESTORE_DRIVER) CONTROLLED_RESTORE_DRIVER.begin(event, true);
 		(event as any)[EVENT_ROOT_EPOCH] = eventRootEpoch;
 		return;
 	}
 	const path = event.composedPath();
 	if (_delegationTargets.size === 1) {
 		beginBindingEvent(event);
+		if (CONTROLLED_RESTORE_DRIVER) CONTROLLED_RESTORE_DRIVER.begin(event, true);
 		(event as any)[EVENT_ROOT_EPOCH] = eventRootEpoch;
 		if (portalEventTargetCount !== 0) {
 			preparePortalEventOwners(path, eventRootEpoch);
@@ -30400,19 +30398,24 @@ function prepareDelegatedEvent(event: Event, listener: Node): EventTarget[] | un
 		if (_delegationTargets.has(path[i] as Node)) {
 			if (path[i] === listener) {
 				beginBindingEvent(event);
+				if (CONTROLLED_RESTORE_DRIVER) CONTROLLED_RESTORE_DRIVER.begin(event, true);
 				(event as any)[EVENT_ROOT_EPOCH] = eventRootEpoch;
 				if (portalEventTargetCount !== 0) {
 					preparePortalEventOwners(path, eventRootEpoch);
 					(event as any)[PORTAL_EVENT_PATH_LENGTH] = path.length;
 				}
-			} else if (
-				portalEventTargetCount !== 0 &&
-				path.length > ((event as any)[PORTAL_EVENT_PATH_LENGTH] || 0)
-			) {
-				// A closed shadow root reveals additional nodes only to its inner
-				// listener. Keep just a length on the Event, never a retained DOM path.
-				preparePortalEventOwners(path, (event as any)[EVENT_ROOT_EPOCH] ?? eventRootEpoch);
-				(event as any)[PORTAL_EVENT_PATH_LENGTH] = path.length;
+			} else {
+				// Inner capture may reveal a control behind a closed shadow root.
+				// It observes this delivery, without starting another one.
+				if (CONTROLLED_RESTORE_DRIVER) CONTROLLED_RESTORE_DRIVER.begin(event, false);
+				if (
+					portalEventTargetCount !== 0 &&
+					path.length > ((event as any)[PORTAL_EVENT_PATH_LENGTH] || 0)
+				) {
+					// Keep just a length on the Event, never a retained DOM path.
+					preparePortalEventOwners(path, (event as any)[EVENT_ROOT_EPOCH] ?? eventRootEpoch);
+					(event as any)[PORTAL_EVENT_PATH_LENGTH] = path.length;
+				}
 			}
 			break;
 		}
@@ -31358,13 +31361,20 @@ function finishCaptureDispatch(event: Event, type: DelegatedEventType): void {
 		if (tag !== 'input' && tag !== 'textarea' && tag !== 'select') return;
 	}
 	const bubbleVersion = (event as any)[DELEGATED_BUBBLE_VERSION];
+	const duringFlush = inFlush;
+	const target = event.target;
+	const delivery = CONTROLLED_RESTORE_DRIVER
+		? CONTROLLED_RESTORE_DRIVER.delivery(event)
+		: undefined;
 	const fallback = () => {
 		// A delivered bubble segment closes the capture segment's commit boundary
 		// (controlled restores and their sync flush). When a native listener stops
 		// the event below its root, close that window here instead.
 		if ((event as any)[DELEGATED_BUBBLE_VERSION] === bubbleVersion) {
-			if (CONTROLLED_RESTORE_DRIVER) {
-				CONTROLLED_RESTORE_DRIVER.enqueue(event, type);
+			if (
+				CONTROLLED_RESTORE_DRIVER &&
+				CONTROLLED_RESTORE_DRIVER.enqueue(event, type, duringFlush, target, delivery)
+			) {
 				CONTROLLED_RESTORE_DRIVER.finish(type);
 			}
 		}
@@ -31976,11 +31986,50 @@ interface ControlledState {
 const RESTORE_EVENT_LIST = ['input', 'change', 'click'];
 const RESTORE_EVENTS = /* @__PURE__ */ new Set(RESTORE_EVENT_LIST);
 
-// Armed elements an in-flight dispatch touched — drained (restored) by
-// maybeFlushDiscrete AFTER the discrete flush, so the restore compares the
-// DOM against the values the handlers just committed. Tiny array + linear
-// dedupe: one event targets one element; nesting stays single-digit.
-let pendingRestores: Element[] = [];
+const CONTROLLED_DELIVERY = /* @__PURE__ */ Symbol('octane.controlledDelivery');
+let controlledDeliverySequence = 0;
+
+function controlledDelivery(event: Event): number | undefined {
+	return event.type === 'input' || event.type === 'change'
+		? (event as any)[CONTROLLED_DELIVERY]
+		: undefined;
+}
+
+function beginControlledDelivery(event: Event, fresh: boolean): void {
+	if (event.type !== 'input' && event.type !== 'change') return;
+	if (fresh) {
+		// Never reset: a stopped delivery can still have a delayed fallback.
+		const sequence = ++controlledDeliverySequence;
+		(event as any)[CONTROLLED_DELIVERY] = inFlush ? -sequence : sequence;
+	}
+	const type = _delegated.get(event.type) ?? _delegatedCapture.get(event.type);
+	// Only an observed capture has a finisher. A later stopped event with no
+	// capture handler must not cancel an older delivery's only restoration.
+	// Its bubble can take ownership if that segment actually arrives.
+	if (type === undefined || (type.flags & EVENT_CAPTURE) === 0) return;
+	const delivery = controlledDelivery(event);
+	const target = event.target as any;
+	if (
+		delivery === undefined ||
+		target === null ||
+		(target.localName !== 'input' &&
+			target.localName !== 'textarea' &&
+			target.localName !== 'select')
+	)
+		return;
+	// A control can arm below capture. Keep delivery ownership on the physical
+	// host, outside its journaled controlled state, and never let an older outer
+	// delivery reclaim a target after a nested edit or shadow-root continuation.
+	const previous = target.$$restoreDelivery as number | undefined;
+	if (previous === undefined || Math.abs(previous) < Math.abs(delivery))
+		target.$$restoreDelivery = delivery;
+}
+
+// Armed elements an in-flight dispatch touched, paired with whether the edit
+// arrived during a flush. Only those edits wait for held work after the flush;
+// an outside event still restores before its dispatch returns. Tiny flat array
+// + linear dedupe: one event targets one element; nesting stays single-digit.
+let pendingRestores: Array<Element | boolean> = [];
 
 // The checkable input whose click ACTIVATION is currently in flight: the
 // platform has toggled `checked` but the activation's `input`/`change`
@@ -32154,6 +32203,8 @@ function armControlledBase(el: Element): ControlledState {
 	let ctrl = renderControlledState(el);
 	if (ctrl === undefined) {
 		CONTROLLED_RESTORE_DRIVER ??= {
+			begin: beginControlledDelivery,
+			delivery: controlledDelivery,
 			enqueue: maybeEnqueueRestore,
 			finish: maybeFlushDiscrete,
 			restore: restoreControlledStates,
@@ -33328,21 +33379,32 @@ function restoreRadioCousins(input: HTMLInputElement): void {
 function restoreControlledStates(): void {
 	if (pendingRestores.length === 0) return;
 	// A handler inside a render/commit cannot flush its own update. The ambient
-	// owner restores after its complete cascade, including held foreign work.
+	// owner restores after its complete cascade.
 	// A prepared view transition owns projected control values until publication;
 	// restoring the physical snapshot now would overwrite that pending edit.
 	if (
 		inFlush ||
 		STAGED_DOM ||
 		_dispatchDepth !== 0 ||
-		QUEUE.length > 0 ||
 		ROOT_RENDER_TRANSACTIONS.length > 0 ||
 		(DEFERRED_LAYOUT_DRIVER && DEFERRED_LAYOUT_DRIVER.capturing())
 	)
 		return;
+	const waitForQueue = QUEUE.length > 0;
 	const list = pendingRestores;
 	pendingRestores = [];
-	for (let i = 0; i < list.length; i++) restoreControlledElement(list[i]);
+	// Publish held edits before any restoration can synchronously dispatch a
+	// newer event. That event owns its target's latest restore timing.
+	if (waitForQueue) {
+		for (let i = 0; i < list.length; i += 2) {
+			if (list[i + 1] === true) pendingRestores.push(list[i], true);
+		}
+	}
+	for (let i = 0; i < list.length; i += 2) {
+		if (waitForQueue && list[i + 1] === true) continue;
+		const element = list[i] as Element;
+		if (pendingRestores.indexOf(element) === -1) restoreControlledElement(element);
+	}
 }
 
 /**
@@ -33373,9 +33435,31 @@ function isControlledHostProp(el: Element, name: string): boolean {
  * form control and the event can carry a user edit (see RESTORE_EVENTS).
  * Called by both delegated dispatchers, right after their dispatch stamp.
  */
-function maybeEnqueueRestore(event: Event, type: DelegatedEventType): void {
-	const t = event.target as any;
-	if (t === null || t.$$ctrl === undefined || (type.flags & EVENT_RESTORE) === 0) return;
+function maybeEnqueueRestore(
+	event: Event,
+	type: DelegatedEventType,
+	duringFlush: boolean = inFlush,
+	target?: EventTarget | null,
+	delivery?: number,
+): boolean {
+	const t = (target === undefined ? event.target : target) as any;
+	if (t === null || t.$$ctrl === undefined || (type.flags & EVENT_RESTORE) === 0) return true;
+	if (event.type === 'input' || event.type === 'change') {
+		if (target === undefined) {
+			delivery = controlledDelivery(event);
+			const previous = t.$$restoreDelivery as number | undefined;
+			if (
+				delivery !== undefined &&
+				(previous === undefined || Math.abs(previous) < Math.abs(delivery))
+			)
+				t.$$restoreDelivery = delivery;
+			// A delivered segment still owns its handlers' commit boundary. If a
+			// nested edit is newer, retain that edit's restore timing while flushing
+			// the work these handlers schedule.
+			delivery = t.$$restoreDelivery;
+		} else if (t.$$restoreDelivery !== delivery) return false;
+		if (delivery !== undefined) duringFlush = delivery < 0;
+	}
 	const ctrl = t.$$ctrl as ControlledState;
 	if (event.type === 'input' && ctrl.compositionEndTask !== undefined) {
 		const inputEvent = event as InputEvent;
@@ -33427,7 +33511,7 @@ function maybeEnqueueRestore(event: Event, type: DelegatedEventType): void {
 				}
 			}, 0);
 		}
-		return;
+		return true;
 	}
 	// The activation's follow-up events have arrived — the write-guard window is over.
 	if (t === activationCheckable) activationCheckable = null;
@@ -33447,14 +33531,17 @@ function maybeEnqueueRestore(event: Event, type: DelegatedEventType): void {
 				restoreControlledElement(t);
 			}
 		}, 0);
-		return;
+		return true;
 	}
-	if (event.type === 'input' && checkable && t.$$checkableActivation === true) return;
+	if (event.type === 'input' && checkable && t.$$checkableActivation === true) return true;
 	if (event.type === 'change') {
 		if (checkable) t.$$checkableActivation = false;
 		if (t.localName === 'select') t.$$selectPick = false;
 	}
-	if (pendingRestores.indexOf(t) === -1) pendingRestores.push(t);
+	const index = pendingRestores.indexOf(t);
+	if (index === -1) pendingRestores.push(t, duringFlush);
+	else pendingRestores[index + 1] = duringFlush;
+	return true;
 }
 
 /**
