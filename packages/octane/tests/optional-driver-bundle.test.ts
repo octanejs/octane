@@ -41,6 +41,10 @@ const OPTIONAL_DECLARATIONS = [
 	'beginActiveNativeReadScope',
 ];
 const CAPTURE_DECLARATIONS = ['finishCaptureDispatch'];
+const FORM_COMMIT_DECLARATIONS = [
+	'drainQueuedControlledSyncs',
+	'publishRegisteredManualFormPending',
+];
 const REF_DECLARATIONS = [
 	'drainQueuedRefAttaches',
 	'drainQueuedRefDetaches',
@@ -50,7 +54,12 @@ const REF_DECLARATIONS = [
 const ranges = resolveDeclarationRanges(
 	(source: string) => readFileSync(join(SOURCE, source), 'utf8'),
 	(text: string, source: string) => parseAst(text, { lang: 'ts' }, source),
-	[...OPTIONAL_DECLARATIONS, ...CAPTURE_DECLARATIONS, ...REF_DECLARATIONS].map((name) => ({
+	[
+		...OPTIONAL_DECLARATIONS,
+		...CAPTURE_DECLARATIONS,
+		...FORM_COMMIT_DECLARATIONS,
+		...REF_DECLARATIONS,
+	].map((name) => ({
 		name,
 		source: 'runtime.ts',
 	})),
@@ -165,6 +174,107 @@ export function run(container) {
 		root.unmount();
 	}
 	return { snapshots, empty: container.childNodes.length === 0 };
+}
+`;
+
+const LATE_FORM_COMMIT_APP = `import { createRoot, flushSync } from 'octane';
+
+function Idle() @{ <p>idle</p> }
+
+function Fields(props) @{
+	<form>
+		<select id="controlled" value={props.value} onChange={() => {}}>
+			@for (const value of props.options; key value) { <option value={value}>{value as string}</option> }
+		</select>
+		<select id="defaulted" defaultValue={props.defaultValue}>
+			@for (const value of props.options; key value) { <option value={value}>{value as string}</option> }
+		</select>
+		<input id="focused" autoFocus />
+	</form>
+}
+
+function Launcher(props) @{ <div ref={props.onReady} /> }
+
+export function run(container) {
+	const target = document.createElement('div');
+	document.body.append(target);
+	const root = createRoot(container);
+	const owner = createRoot(target);
+	try {
+		flushSync(() => owner.render(Idle));
+		const before = target.textContent;
+		flushSync(() => root.render(Launcher, { onReady: (node) => {
+			if (node !== null) owner.render(Fields, { value: 'b', defaultValue: 'b', options: ['a', 'b'] });
+		} }));
+		const controlled = target.querySelector('#controlled');
+		const defaulted = target.querySelector('#defaulted');
+		const mounted = [controlled.value, defaulted.value, document.activeElement.id];
+		const defaults = Array.from(defaulted.options, option => option.defaultSelected);
+		defaulted.value = 'a';
+		target.querySelector('form').reset();
+		const reset = defaulted.value;
+		flushSync(() => owner.render(Fields, { value: 'c', defaultValue: 'a', options: ['b', 'c'] }));
+		return { before, mounted, defaults, reset, updated: controlled.value, sameSelect: target.querySelector('#controlled') === controlled };
+	} finally {
+		owner.unmount();
+		root.unmount();
+		target.remove();
+	}
+}
+`;
+
+const LATE_MANUAL_FORM_APP = `import { createRoot, flushSync, startTransition, useFormStatus, useTransition } from 'octane';
+
+function Idle() @{ <p>idle</p> }
+
+function Status() @{
+	const status = useFormStatus();
+	<output>{status.pending ? 'pending:' + status.method + ':' + status.data?.get('draft') : 'idle'}</output>
+}
+
+function Form(props) @{
+	const [pending, start] = useTransition();
+	<form method="post" onSubmit={event => { event.preventDefault(); props.begin(start); }}>
+		<input name="draft" defaultValue="kept" />
+		<Status />
+		<span>{pending ? 'working' : 'ready'}</span>
+	</form>
+}
+
+export async function run(container) {
+	let releaseFirst, releaseSecond;
+	const first = new Promise(resolve => { releaseFirst = resolve; });
+	const second = new Promise(resolve => { releaseSecond = resolve; });
+	const settle = async () => {
+		for (let i = 0; i < 30; i++) await Promise.resolve();
+		flushSync(() => {});
+	};
+	const root = createRoot(container);
+	try {
+		flushSync(() => root.render(Idle));
+		const before = container.textContent;
+		flushSync(() => root.render(Form, { begin(start) {
+			start(() => first);
+			startTransition(() => second);
+		} }));
+		const snapshots = [];
+		const snapshot = () => snapshots.push(container.textContent);
+		snapshot();
+		flushSync(() => container.querySelector('form').dispatchEvent(new Event('submit', { bubbles: true, cancelable: true })));
+		await settle();
+		snapshot();
+		releaseFirst();
+		await settle();
+		snapshot();
+		releaseSecond();
+		await settle();
+		snapshot();
+		return { before, snapshots };
+	} finally {
+		releaseFirst();
+		releaseSecond();
+		root.unmount();
+	}
 }
 `;
 
@@ -480,7 +590,9 @@ describe('optional capability drivers in production bundles', { timeout: 60_000 
 	it('ships none of their code in an application that uses none of them', async () => {
 		const { retained, chunk } = await buildApp(PLAIN_APP);
 		expect(
-			[...OPTIONAL_DECLARATIONS, ...CAPTURE_DECLARATIONS].filter((name) => retained.has(name)),
+			[...OPTIONAL_DECLARATIONS, ...CAPTURE_DECLARATIONS, ...FORM_COMMIT_DECLARATIONS].filter(
+				(name) => retained.has(name),
+			),
 		).toEqual([]);
 		expect(await run(chunk)).toEqual({
 			before: 'reverseabc',
@@ -525,6 +637,28 @@ describe('optional capability drivers in production bundles', { timeout: 60_000 
 			],
 			empty: true,
 		});
+	});
+
+	it('commits the first late select defaults and autofocus opened from another root’s ref', async () => {
+		const { retained, chunk } = await buildApp(LATE_FORM_COMMIT_APP);
+		expect(await run(chunk)).toEqual({
+			before: 'idle',
+			mounted: ['b', 'b', 'focused'],
+			defaults: [false, true],
+			reset: 'b',
+			updated: 'c',
+			sameSelect: true,
+		});
+		expect(retained.has('drainQueuedControlledSyncs')).toBe(true);
+	});
+
+	it('keeps a late manual submit pending until its public and hook transitions settle', async () => {
+		const { retained, chunk } = await buildApp(LATE_MANUAL_FORM_APP);
+		expect(await run(chunk)).toEqual({
+			before: 'idle',
+			snapshots: ['idleready', 'pending:post:keptworking', 'pending:post:keptworking', 'idleready'],
+		});
+		expect(retained.has('publishRegisteredManualFormPending')).toBe(true);
 	});
 
 	const cycle = ['insertion+', 'layout+', 'passive+', 'insertion-', 'layout-', 'passive-'];
