@@ -374,11 +374,21 @@ export function createNativeReadDriver(host: NativeReadHost) {
 			if (consumers.has(block)) getCandidate(frame, block);
 		},
 		endRender(block: Block, completed: boolean, suspended: boolean): void {
-			const frame = frames[depth - 1];
+			// A native stack overflow can stop a descendant's setup or cleanup before
+			// it ends its frame, leaving that frame above this Block's own.
+			let index = depth - 1;
+			while (index >= 0 && frames[index].block !== block) index--;
 			// The first native component can install the driver inside a child of
 			// an already-running non-native Block. That outer Block has no frame.
-			if (frame === undefined || frame.block !== block) return;
+			if (index < 0) return;
+			const frame = frames[index];
 			try {
+				// Restoring this frame's collector token and invocation below also
+				// restores whatever abandoned frames entered. Only their reads remain.
+				for (let above = depth - 1; above > index; above--) {
+					const candidates = frames[above].candidates;
+					if (candidates !== null) for (const candidate of candidates.values()) release(candidate);
+				}
 				if (frame.candidates !== null) {
 					if (completed) {
 						const capture = host.capture();
@@ -395,12 +405,14 @@ export function createNativeReadDriver(host: NativeReadHost) {
 			} finally {
 				collector.endRender(frame.collectorToken);
 				setSignalDeclarationInvocation(frame.outerInvocation);
-				frame.block = null;
-				frame.candidates = null;
-				frame.invocationData = null;
-				// A reused frame must not retain a settled capture's commit work.
-				frame.capture = null;
-				depth--;
+				while (depth > index) {
+					const ended = frames[--depth];
+					ended.block = null;
+					ended.candidates = null;
+					ended.invocationData = null;
+					// A reused frame must not retain a settled capture's commit work.
+					ended.capture = null;
+				}
 			}
 		},
 		/**
