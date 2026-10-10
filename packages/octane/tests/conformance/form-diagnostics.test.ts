@@ -33,6 +33,29 @@ afterEach(() => {
 });
 
 describe('controlled/default form prop conflicts', () => {
+	it('diagnoses the first text field introduced after an initially field-free render', async () => {
+		vi.resetModules();
+		const runtime = await import('../../src/index.js');
+		const { ConflictingInput } = await import('./_fixtures/form-diagnostics.tsrx');
+		const error = vi.spyOn(console, 'error').mockImplementation(() => {});
+		const container = document.createElement('div');
+		document.body.append(container);
+		const root = runtime.createRoot(container);
+		try {
+			runtime.flushSync(() => root.render(runtime.createElement('p', null, 'idle')));
+			expect(errorMessages(error)).toEqual([]);
+			runtime.flushSync(() =>
+				root.render(ConflictingInput, { value: 'controlled', defaultValue: 'default' }),
+			);
+			expect(container.querySelector('input')?.value).toBe('controlled');
+			expectWarnings(error, ['both `value` and `defaultValue`']);
+		} finally {
+			root.unmount();
+			container.remove();
+			error.mockRestore();
+		}
+	});
+
 	// Per ReactDOMInput-test.js:2063: readOnly suppresses missing-handler
 	// guidance, but never suppresses contradictory controlled/default writers.
 	it('warns when an input has both value and defaultValue', () => {
