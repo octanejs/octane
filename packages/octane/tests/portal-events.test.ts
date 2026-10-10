@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { mount } from './_helpers';
 import { createRoot, createElement, createPortal, flushSync } from '../src/index.js';
 import {
@@ -179,33 +179,44 @@ describe('portal — event delegation', () => {
 		r.unmount();
 	});
 
-	it('unmounting the entire root detaches portal-target listeners', () => {
-		const r = mount(BasicPortalClick, { target: portalTarget });
-
-		// Sanity: click works before unmount.
-		clickIn(portalTarget, '.inside-btn');
-		expect(r.find('.count').textContent).toBe('1');
-
-		r.unmount();
-		// Portal contents are gone — the DOM was removed when the parent block
-		// unmounted (recursive disposal). The listener on portalTarget was also
-		// released via registerDelegationTarget's refcount.
-		expect(portalTarget.querySelector('.inside-btn')).toBe(null);
-
-		// Manually inject a button that would have BEEN a handler-attached node
-		// before the listener was detached. Clicking it should fire NOTHING (no
-		// exception, no leaked handler).
-		const stray = document.createElement('button');
-		stray.className = 'stray';
-		portalTarget.appendChild(stray);
-		let leakedHandlerFired = false;
-		// Attach an $oclick via the same DOM-property convention the runtime uses,
-		// to detect whether the (now-detached) octane listener still runs.
-		(stray as any).$oclick = () => {
-			leakedHandlerFired = true;
+	it('releases a shared target’s native subscriptions when its last portal unmounts', () => {
+		let nativeClicks = 0;
+		const nativeClick = () => nativeClicks++;
+		portalTarget.addEventListener('click', nativeClick);
+		const attached = vi.spyOn(portalTarget, 'addEventListener');
+		const detached = vi.spyOn(portalTarget, 'removeEventListener');
+		const first = mount(BasicPortalClick, { target: portalTarget });
+		const second = mount(BasicPortalClick, { target: portalTarget });
+		const clicks = attached.mock.calls.filter(([type]) => type === 'click');
+		const released = ([type, listener, options]: (typeof clicks)[number]) => {
+			const capture = typeof options === 'boolean' ? options : (options?.capture ?? false);
+			return detached.mock.calls.some(([removedType, removedListener, removedOptions]) => {
+				const removedCapture =
+					typeof removedOptions === 'boolean' ? removedOptions : (removedOptions?.capture ?? false);
+				return type === removedType && listener === removedListener && capture === removedCapture;
+			});
 		};
-		stray.click();
-		expect(leakedHandlerFired).toBe(false);
-		stray.remove();
+		try {
+			expect(clicks.length).toBeGreaterThan(0);
+			const button = portalTarget.querySelectorAll<HTMLButtonElement>('.inside-btn')[1];
+			first.unmount();
+			expect(clicks.some(released)).toBe(false);
+			flushSync(() => button.click());
+			expect(second.find('.count').textContent).toBe('1');
+			expect(nativeClicks).toBe(1);
+			second.unmount();
+			expect(portalTarget.querySelector('.inside-btn')).toBeNull();
+			// Match callback identity and capture mode without fixing registration
+			// order or the number of listeners the delegation implementation uses.
+			expect(clicks.every(released)).toBe(true);
+			portalTarget.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+			expect(nativeClicks).toBe(2);
+		} finally {
+			first.unmount();
+			second.unmount();
+			attached.mockRestore();
+			detached.mockRestore();
+			portalTarget.removeEventListener('click', nativeClick);
+		}
 	});
 });
