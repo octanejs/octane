@@ -10,6 +10,8 @@
 // submissions cannot make.
 export * from '../../octane/src/index.js';
 export {
+	__delegateEvents,
+	__delegateCaptureEvents,
 	enableSignalBindings,
 	createElementAt,
 	createElementFromConfig,

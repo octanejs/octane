@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { compile } from 'octane/compiler';
 import ts from 'typescript';
 import { mount } from './_helpers';
+import { loadCompiledFixtureSource } from './_server-fixture';
 import {
 	ShadowSetText,
 	ShadowHtext,
@@ -20,6 +21,36 @@ import {
 // user's state setter).
 
 describe('helper shadowing — user bindings named after runtime helpers', () => {
+	it('preserves authored names alongside both event-registration initializers', () => {
+		const { Bubble, Capture } = loadCompiledFixtureSource(
+			`
+export function Bubble(props) @{ <button onClick={props.handler}>{_$__delegateEvents as string}</button> }
+export function Capture(props) @{ <button onClickCapture={props.handler}>{_$__delegateCaptureEvents as string}</button> }
+const _$__delegateEvents = 'authored bubble';
+const _$__delegateCaptureEvents = 'authored capture';
+`,
+			{
+				id: 'event-registration-shadowing.tsrx',
+				mode: 'client',
+				compileOptions: { hmr: false, dev: process.env.OCTANE_TEST_COMPILE_MODE !== 'prod' },
+			},
+		);
+		for (const [component, label] of [
+			[Bubble, 'authored bubble'],
+			[Capture, 'authored capture'],
+		] as const) {
+			const calls: string[] = [];
+			const r = mount(component, { handler: () => calls.push(label) });
+			try {
+				expect(r.find('button').textContent).toBe(label);
+				r.click('button');
+				expect(calls).toEqual([label]);
+			} finally {
+				r.unmount();
+			}
+		}
+	});
+
 	it('state setter named setText: DOM text updates and state stays a string', () => {
 		const r = mount(ShadowSetText);
 		expect(r.find('#st-label').textContent).toBe('');
