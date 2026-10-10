@@ -59,8 +59,11 @@ try {
 							'__activityConfirm',
 							'__activityCleanup',
 						],
-						metrics: METRICS,
+						metrics: [...METRICS, 'detachRegisteredSubtreeRefs'],
 					});
+					// Preserve the existing work key across the collector's ownership rename.
+					calls.detachSubtreeRefs += calls.detachRegisteredSubtreeRefs;
+					delete calls.detachRegisteredSubtreeRefs;
 					for (const [metric, value] of Object.entries(calls)) {
 						ops[`${operation}_${metric}`] = countStat(value);
 					}
