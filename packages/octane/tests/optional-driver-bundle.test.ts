@@ -318,6 +318,7 @@ export async function run(container, scenario) {
 	flushSync(() => root.render(App, { attrs, pending: gate }));
 	const pending = container.querySelector('#pending-ref')?.textContent;
 	const callsAtHide = calls.slice();
+	const cleanupsAtHide = cleanups;
 	let retained = false, revealed = false;
 	if (scenario !== 'discard') {
 		release();
@@ -327,7 +328,7 @@ export async function run(container, scenario) {
 		revealed = container.querySelector('#pending-ref') === null && node.style.display !== 'none';
 	}
 	root.unmount();
-	return { committed, pending, callsAtHide, calls, cleanups, retained, revealed, empty: container.childNodes.length === 0 };
+	return { committed, pending, callsAtHide, cleanupsAtHide, calls, cleanups, retained, revealed, empty: container.childNodes.length === 0 };
 }
 `;
 
@@ -411,6 +412,7 @@ describe('optional capability drivers in production bundles', { timeout: 60_000 
 			const result = await run(chunk, scenario);
 			expect(result.committed).toEqual(['attach']);
 			expect(result.callsAtHide).toEqual(['attach']);
+			expect(result.cleanupsAtHide).toBe(1);
 			expect(result.pending).toBe('loading');
 			expect(result.empty).toBe(true);
 			if (scenario === 'reveal') {
