@@ -692,6 +692,11 @@ with their current owner. An application must stop previous manual writers for
 the channels it hands over. Template compatibility is not document or request
 authorization: retain the enclosing application's lifetime and stream fencing.
 
+Fixed and addressed views tolerate extra Text nodes containing only ASCII tab,
+line feed, form feed, carriage return or space in a closed child list; empty
+Text nodes are included. These nodes remain untouched, while other text,
+comments and unexpected elements still fail topology validation.
+
 Browser page translation is the one text rewrite adoption accepts. Chrome's
 Translate replaces each translated Text node with `<font>` wrappers. Adoption
 keeps that text as it is and writes nothing to it, so the page neither flashes
