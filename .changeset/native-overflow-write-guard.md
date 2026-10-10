@@ -2,4 +2,4 @@
 'octane': patch
 ---
 
-Allow signal writes after a render throws a native stack overflow. An ancestor ending its native-read frame now also ends any descendant frames that the overflow left open, instead of leaving signal writes rejected with `SignalWriteError`.
+Recover from a render that throws a native stack overflow. Signal writes are no longer rejected with `SignalWriteError` afterwards, a parent whose `@try` catches the failure keeps its signal subscriptions, and later updates no longer count as nested inside the failed render.
