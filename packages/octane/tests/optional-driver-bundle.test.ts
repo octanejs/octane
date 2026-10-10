@@ -40,10 +40,16 @@ const OPTIONAL_DECLARATIONS = [
 	'NATIVE_READ_DRIVER',
 	'beginActiveNativeReadScope',
 ];
+const REF_DECLARATIONS = [
+	'drainQueuedRefAttaches',
+	'drainQueuedRefDetaches',
+	'detachRegisteredSubtreeRefs',
+	'withRegisteredRefDetachSuppression',
+];
 const ranges = resolveDeclarationRanges(
 	(source: string) => readFileSync(join(SOURCE, source), 'utf8'),
 	(text: string, source: string) => parseAst(text, { lang: 'ts' }, source),
-	OPTIONAL_DECLARATIONS.map((name) => ({ name, source: 'runtime.ts' })),
+	[...OPTIONAL_DECLARATIONS, ...REF_DECLARATIONS].map((name) => ({ name, source: 'runtime.ts' })),
 );
 
 const PLAIN_APP = `import { createRoot, flushSync, useState } from 'octane';
@@ -237,6 +243,94 @@ export async function run(container, scenario) {
 }
 `;
 
+const NO_REFS_APP = `import { createRoot, flushSync, useState } from 'octane';
+function App() @{
+	const [count, setCount] = useState(0);
+	<button onClick={() => setCount(count + 1)}>{String(count)}</button>
+}
+export function run(container) {
+	const root = createRoot(container);
+	flushSync(() => root.render(App));
+	const before = container.textContent;
+	flushSync(() => container.querySelector('button').click());
+	const after = container.textContent;
+	root.unmount();
+	return { before, after, empty: container.childNodes.length === 0 };
+}
+`;
+
+const LATE_REFS_APP = `import { createRoot, flushSync, useLayoutEffect } from 'octane';
+function App(props) @{
+	useLayoutEffect(() => { props.layout(props.objectRef.current?.textContent ?? null); }, [props.show]);
+	@if (props.show) { <div ref={props.refs}>ref</div> }
+	@else { <p>plain</p> }
+}
+export function run(container) {
+	const root = createRoot(container), objectRef = { current: null };
+	const calls = [], layouts = [], snapshots = [];
+	const callback = node => {
+		if (node === null) { calls.push('null'); return; }
+		calls.push('attach:' + node.isConnected);
+		return () => calls.push('cleanup');
+	};
+	const refs = [objectRef, callback], layout = value => layouts.push(value);
+	const render = show => flushSync(() => root.render(App, { show, refs, objectRef, layout }));
+	render(false);
+	snapshots.push(container.textContent);
+	render(true);
+	snapshots.push(objectRef.current === container.querySelector('div'));
+	render(false);
+	snapshots.push(objectRef.current === null);
+	render(true);
+	snapshots.push(objectRef.current === container.querySelector('div'));
+	root.unmount();
+	return { snapshots, calls, layouts, cleared: objectRef.current === null, empty: container.childNodes.length === 0 };
+}
+`;
+
+const LATE_SPREAD_REFS_APP = `import { createRoot, flushSync, use } from 'octane';
+function Wait(props) @{
+	if (props.pending !== null) use(props.pending);
+	<span>ready</span>
+}
+function App(props) @{
+	@try {
+		<><div {...props.attrs}>target</div><Wait pending={props.pending} /></>
+	} @pending {
+		<p id="pending-ref">loading</p>
+	}
+}
+export async function run(container, scenario) {
+	let release;
+	const emptyAttrs = { id: 'spread-ref' };
+	const gate = new Promise(resolve => { release = resolve; });
+	const root = createRoot(container), calls = [];
+	let cleanups = 0;
+	flushSync(() => root.render(App, { attrs: emptyAttrs, pending: null }));
+	const node = container.querySelector('#spread-ref');
+	const ref = value => {
+		calls.push(value === null ? 'null' : value === node ? 'attach' : 'wrong-node');
+		if (value !== null) return () => { cleanups++; };
+	};
+	const attrs = { ...emptyAttrs, ref };
+	flushSync(() => root.render(App, { attrs, pending: null }));
+	const committed = calls.slice();
+	flushSync(() => root.render(App, { attrs, pending: gate }));
+	const pending = container.querySelector('#pending-ref')?.textContent;
+	const callsAtHide = calls.slice();
+	let retained = false, revealed = false;
+	if (scenario !== 'discard') {
+		release();
+		await gate;
+		flushSync(() => root.render(App, { attrs, pending: null }));
+		retained = container.querySelector('#spread-ref') === node;
+		revealed = container.querySelector('#pending-ref') === null && node.style.display !== 'none';
+	}
+	root.unmount();
+	return { committed, pending, callsAtHide, calls, cleanups, retained, revealed, empty: container.childNodes.length === 0 };
+}
+`;
+
 const roots: string[] = [];
 afterAll(() => {
 	for (const root of roots.splice(0)) rmSync(root, { recursive: true, force: true });
@@ -292,6 +386,47 @@ async function run(chunk: Rolldown.OutputChunk, scenario?: string) {
 }
 
 describe('optional capability drivers in production bundles', { timeout: 60_000 }, () => {
+	it('omits ref consumers when no ref queue or potential spread can use them', async () => {
+		const { retained, chunk } = await buildApp(NO_REFS_APP);
+		expect(await run(chunk)).toEqual({ before: '0', after: '1', empty: true });
+		expect(REF_DECLARATIONS.filter((name) => retained.has(name))).toEqual([]);
+	});
+
+	it('activates late ref attachments and releases every mounted ref at commit', async () => {
+		const { retained, chunk } = await buildApp(LATE_REFS_APP);
+		expect(await run(chunk)).toEqual({
+			snapshots: ['plain', true, true, true],
+			calls: ['attach:true', 'cleanup', 'attach:true', 'cleanup'],
+			layouts: [null, 'ref', null, 'ref'],
+			cleared: true,
+			empty: true,
+		});
+		expect(REF_DECLARATIONS.filter((name) => !retained.has(name))).toEqual([]);
+	});
+
+	it.each(['reveal', 'discard'])(
+		'keeps a late spread ref live through Suspense %s',
+		async (scenario) => {
+			const { retained, chunk } = await buildApp(LATE_SPREAD_REFS_APP);
+			const result = await run(chunk, scenario);
+			expect(result.committed).toEqual(['attach']);
+			expect(result.callsAtHide).toEqual(['attach']);
+			expect(result.pending).toBe('loading');
+			expect(result.empty).toBe(true);
+			if (scenario === 'reveal') {
+				expect(result.retained).toBe(true);
+				expect(result.revealed).toBe(true);
+				expect(result.calls).toEqual(['attach', 'attach']);
+				expect(result.cleanups).toBe(2);
+			} else {
+				expect(result.calls).toEqual(result.callsAtHide);
+				expect(result.cleanups).toBe(1);
+			}
+			expect(retained.has('detachRegisteredSubtreeRefs')).toBe(true);
+			expect(retained.has('withRegisteredRefDetachSuppression')).toBe(true);
+		},
+	);
+
 	it('ships none of their code in an application that uses none of them', async () => {
 		const { retained, chunk } = await buildApp(PLAIN_APP);
 		expect(OPTIONAL_DECLARATIONS.filter((name) => retained.has(name))).toEqual([]);
