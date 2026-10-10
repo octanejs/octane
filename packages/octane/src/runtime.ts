@@ -2492,11 +2492,10 @@ export interface Block extends Scope {
 	extra: any;
 	outputHandler: OutputHandler | null;
 	/**
-	 * True when this block OR any ancestor is a `memo()` block. Monotone up the
-	 * parentBlock chain (computed once at creation), so `useContextInternal` can
-	 * skip its memo-ancestor stamping walk entirely on the common no-memo tree —
-	 * the walk only ever stamps memo blocks, so if there are none above us it is
-	 * pure overhead (~ancestor-depth iterations per `use()` call).
+	 * False proves neither this block nor any ancestor is memoized or armed for
+	 * implicit bailout. Inherited on creation and promoted through retained
+	 * descendants when a boundary gains memo/implicit metadata. True remains
+	 * conservative across body changes and rollback.
 	 */
 	memoInChain: boolean;
 	pending: boolean;
@@ -18781,6 +18780,19 @@ function isHostContextRequest(err: unknown): err is HostContextRequestSignal {
 	);
 }
 
+// A retained subtree can acquire a memo/implicit boundary after construction.
+// Promote its existing Blocks and lite proxies before a context read checks its
+// memoInChain flag. True is conservative and remains valid after
+// rollback or a later body change, so this metadata needs no journal entry.
+function promoteMemoAncestry(scope: Scope): void {
+	const block = scope.block;
+	if (scope === block && block.memoInChain) return;
+	block.memoInChain = true;
+	// A host child Scope can borrow the already-promoted Block. Its own children
+	// still need visiting; only an actual Block owns the subtree proof above.
+	forEachSubtreeChild(scope, promoteMemoAncestry);
+}
+
 function recordContextDependency(block: Block | null, context: Context<any>): void {
 	if (block === null || !block.memoInChain) return;
 	(block.$$ctxDirect ??= new Map()).set(context, context.$$version);
@@ -20468,7 +20480,7 @@ export function lazy<C extends ComponentBody<any>>(
 			// The Block was created while the payload was unresolved, before it could
 			// inherit memo metadata. Arm context dependency stamping before executing
 			// the resolved memo body.
-			scope.block.memoInChain = true;
+			if (!scope.block.memoInChain) promoteMemoAncestry(scope);
 		}
 		if (
 			profiledComponent !== comp &&
@@ -40001,7 +40013,7 @@ export function childSlot(
 				// The slot previously hosted an arbitrary render function. Arm before
 				// rendering the tagged body so its context reads stamp this block.
 				state.block.$$implicitBail = true;
-				state.block.memoInChain = true;
+				if (!state.block.memoInChain) promoteMemoAncestry(state.block);
 			}
 			if (
 				wasImplicitlyArmed &&
@@ -41111,6 +41123,16 @@ export function memo<P>(
 	arePropsEqual?: (prevProps: Readonly<P>, nextProps: Readonly<P>) => boolean,
 ): ComponentBody<P> & { readonly type: ComponentBody<P>; displayName?: string } {
 	function memoWrapper(props: P, scope: Scope, extra: any): unknown {
+		// A render-function slot may replace its body while retaining children.
+		// Arm only the Block this wrapper actually owns, never a direct call that
+		// happens to execute inside another component's render scope.
+		if (
+			scope === CURRENT_SCOPE &&
+			scope !== null &&
+			!scope.block.memoInChain &&
+			scope.block.body === memoWrapper
+		)
+			promoteMemoAncestry(scope);
 		// Propagate the wrapped body's return so a folded (return-based) component
 		// memo()'d here still hands its descriptor back to renderBlock to mount.
 		return component(props, scope, extra);
