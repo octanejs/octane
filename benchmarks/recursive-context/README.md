@@ -169,11 +169,14 @@ removing its redundant context-only `useBatch`, the 1024-leaf mount and root
 update each called `useBatch` 3072 times; the 32-leaf partial update and
 remount each called it 94 times. The baseline after that removal was 2048 and
 62 calls, respectively, all
-`useBatch([], warmThunk)` child-plan registrations. The child-only plan now
-registers through `registerWarmPlan(plan, props)`, with exact production-call
-gates of 2048 on mount/root update and 62 on partial update/remount. The same
-operations must call `useBatch` zero times; the JSX twin stays at zero for both
-helpers. `setText` still runs exactly 1024/32 times for root/partial updates.
+`useBatch([], warmThunk)` child-plan registrations. Replacing that empty batch
+with `registerWarmPlan(plan, props)` retained 2048 registrations on mount/root
+update and 62 on partial update/remount. The compiler now recognizes that these
+local context reads and providers add no async work to start early, so both
+helpers have zero-call gates for these operations. The JSX twin also stays at
+zero. Authored context reads remain, and `setText` still runs exactly 1024/32
+times for root/partial updates. These counts measure eliminated registration
+work, not end-user latency.
 The normal DOM checks in `run.mjs` verify all 1024 leaf paths, both context
 values, the isolated 32-leaf provider update, and remount identity.
 

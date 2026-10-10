@@ -230,7 +230,7 @@ const GATES = {
 				reconcileKeyed: 0,
 				updateSurvivor: 0,
 			},
-			exact: { useBatch: 0, registerWarmPlan: 2048 },
+			exact: { useBatch: 0, registerWarmPlan: 0 },
 		},
 		update_root: {
 			maxFullSlotCalls: 1027,
@@ -245,7 +245,7 @@ const GATES = {
 				reconcileKeyed: 0,
 				updateSurvivor: 0,
 			},
-			exact: { setText: 1024, useBatch: 0, registerWarmPlan: 2048 },
+			exact: { setText: 1024, useBatch: 0, registerWarmPlan: 0 },
 		},
 		update_partial: {
 			maxFullSlotCalls: 33,
@@ -260,7 +260,7 @@ const GATES = {
 				reconcileKeyed: 0,
 				updateSurvivor: 0,
 			},
-			exact: { setText: 32, useBatch: 0, registerWarmPlan: 62 },
+			exact: { setText: 32, useBatch: 0, registerWarmPlan: 0 },
 		},
 		partial_unmount: {
 			maxFullSlotCalls: 0,
@@ -292,7 +292,7 @@ const GATES = {
 				reconcileKeyed: 0,
 				updateSurvivor: 0,
 			},
-			exact: { useBatch: 0, registerWarmPlan: 62 },
+			exact: { useBatch: 0, registerWarmPlan: 0 },
 		},
 		unmount: {
 			maxFullSlotCalls: 0,
