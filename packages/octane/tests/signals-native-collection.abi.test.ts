@@ -185,6 +185,50 @@ describe('native reads throughout component invocation', () => {
 		expect(model.scope.inspect().nodes.every((node) => node.subscribers === 0)).toBe(true);
 	});
 
+	it.each([
+		['render', '__isSuspense'],
+		['render', '$$kind'],
+		['hydrate', '__isSuspense'],
+		['hydrate', '$$kind'],
+	])(
+		'restores signal writes after a %s error with an unreadable %s property',
+		async (mode, property) => {
+			const model = state$('collection-abi-unreadable-error');
+			const error = new Error('render failed');
+			Object.defineProperty(error, property, {
+				get() {
+					throw new Error('error property failed');
+				},
+			});
+			let caught: unknown;
+			function Reader() {
+				model.count$.get();
+				throw error;
+			}
+			if (mode === 'hydrate') {
+				const container = document.createElement('div');
+				container.innerHTML = '<p>Initial content</p>';
+				const root = client.hydrateRoot(container, Reader, undefined, {
+					onUncaughtError(failure) {
+						caught = failure;
+					},
+				});
+				root.unmount();
+			} else {
+				try {
+					mount(Reader);
+				} catch (failure) {
+					caught = failure;
+				}
+			}
+			await Promise.resolve();
+			expect(() => model.count$.set(5)).not.toThrow();
+			expect(model.count$.get()).toBe(5);
+			expect(caught).toBe(error);
+			expect(model.scope.inspect().nodes.every((node) => node.subscribers === 0)).toBe(true);
+		},
+	);
+
 	it('serializes both parameter and body reads from the completed server invocation', () => {
 		const model = state$('collection-abi-server-defaults');
 		function Reader(
