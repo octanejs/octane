@@ -6,538 +6,538 @@
       "name": "news-50/octane-tsrx",
       "ops": {
         "render": {
-          "score": 0.030023724587500022,
-          "median": 0.028583,
-          "min": 0.02121,
-          "mean": 0.029754159014999337,
-          "p95": 0.034585,
-          "sd": 0.008718018783260327,
-          "rme": 0.12841365112211506,
-          "scoreRme": 0.21885158956191733,
-          "warmupRatio": 0.991282906564875,
-          "samples": 200000,
-          "p99": 0.045455,
-          "opsPerSec": 33306.99351060317
+          "score": 0.05852996715344899,
+          "median": 0.055073,
+          "min": 0.0319,
+          "mean": 0.059760063919908825,
+          "p95": 0.088066,
+          "sd": 0.03888269366151746,
+          "rme": 0.31214586144208895,
+          "scoreRme": 0.49020577269770504,
+          "warmupRatio": 1.0579121088555377,
+          "samples": 166912,
+          "p99": 0.110408,
+          "opsPerSec": 17085.26501267775
         }
       },
       "meta": {
         "bodyBytes": 42398,
         "hydrationMarkerPairs": 2,
         "memRenders": 5000,
-        "rssGrowthBytes": -5234688,
-        "heapUsedGrowthBytes": -17636016
+        "rssGrowthBytes": -262144,
+        "heapUsedGrowthBytes": -14646920
       }
     },
     {
       "name": "news-50/react",
       "ops": {
         "render": {
-          "score": 0.08319611209330662,
-          "median": 0.081994,
-          "min": 0.06958,
-          "mean": 0.08676724528465937,
-          "p95": 0.107171,
-          "sd": 0.029749089864894804,
-          "rme": 0.19807543750859213,
-          "scoreRme": 0.26091767012734396,
-          "warmupRatio": 1.1084078053200928,
-          "samples": 115103,
-          "p99": 0.135985,
-          "opsPerSec": 12019.792449898066
+          "score": 0.13993893325623097,
+          "median": 0.133622,
+          "min": 0.082234,
+          "mean": 0.1490211583345794,
+          "p95": 0.221888,
+          "sd": 0.08042952073427298,
+          "rme": 0.40865216902288654,
+          "scoreRme": 0.647108261479205,
+          "warmupRatio": 1.0974842122112731,
+          "samples": 67010,
+          "p99": 0.294665,
+          "opsPerSec": 7145.974152661148
         }
       },
       "meta": {
         "bodyBytes": 42364,
         "hydrationMarkerPairs": 0,
         "memRenders": 5000,
-        "rssGrowthBytes": -1179648,
-        "heapUsedGrowthBytes": 15110880
+        "rssGrowthBytes": -1703936,
+        "heapUsedGrowthBytes": 15568792
       }
     },
     {
       "name": "news-50/preact",
       "ops": {
         "render": {
-          "score": 0.0798964109410932,
-          "median": 0.071394,
-          "min": 0.060213,
-          "mean": 0.07988739708447436,
-          "p95": 0.099176,
-          "sd": 0.1212745033007238,
-          "rme": 0.8416211101022453,
-          "scoreRme": 1.2056191714922715,
-          "warmupRatio": 1.0145437083508995,
-          "samples": 124986,
-          "p99": 0.178374,
-          "opsPerSec": 12516.206776012625
+          "score": 0.12265885515540818,
+          "median": 0.09524,
+          "min": 0.066546,
+          "mean": 0.12157368923904999,
+          "p95": 0.190809,
+          "sd": 0.23723526087129174,
+          "rme": 1.3346537180748528,
+          "scoreRme": 2.1475275683283517,
+          "warmupRatio": 1.0035534392252983,
+          "samples": 82121,
+          "p99": 0.320985,
+          "opsPerSec": 8152.693083047325
         }
       },
       "meta": {
         "bodyBytes": 42364,
         "hydrationMarkerPairs": 0,
         "memRenders": 5000,
-        "rssGrowthBytes": -7651328,
-        "heapUsedGrowthBytes": -88796632
+        "rssGrowthBytes": -3952640,
+        "heapUsedGrowthBytes": -11828192
       }
     },
     {
       "name": "news-50/solid",
       "ops": {
         "render": {
-          "score": 0.06449779161347423,
-          "median": 0.060103,
-          "min": 0.051627,
-          "mean": 0.0653680784520398,
-          "p95": 0.067928,
-          "sd": 0.17586610590932192,
-          "rme": 1.34924818306165,
-          "scoreRme": 0.9156338143318313,
-          "warmupRatio": 1.0436332658472258,
-          "samples": 152743,
-          "p99": 0.091873,
-          "opsPerSec": 15504.406817412491
+          "score": 0.0850731398854458,
+          "median": 0.07438,
+          "min": 0.04242,
+          "mean": 0.09562506053663469,
+          "p95": 0.155333,
+          "sd": 0.1646188542244673,
+          "rme": 1.0446874522019172,
+          "scoreRme": 1.4521934674128731,
+          "warmupRatio": 1.1472167503399366,
+          "samples": 104317,
+          "p99": 0.309744,
+          "opsPerSec": 11754.591418002647
         }
       },
       "meta": {
         "bodyBytes": 42820,
         "hydrationMarkerPairs": 0,
         "memRenders": 5000,
-        "rssGrowthBytes": 16613376,
-        "heapUsedGrowthBytes": 13559456
+        "rssGrowthBytes": -2752512,
+        "heapUsedGrowthBytes": -1562112
       }
     },
     {
       "name": "news-50/svelte",
       "ops": {
         "render": {
-          "score": 0.06356584495998219,
-          "median": 0.029045,
-          "min": 0.021942,
-          "mean": 0.0648260523277312,
-          "p95": 0.043592,
-          "sd": 1.7612523486790992,
-          "rme": 13.570017619367809,
-          "scoreRme": 18.639530798842717,
-          "warmupRatio": 1.0963159395108388,
-          "samples": 153991,
-          "p99": 0.056927,
-          "opsPerSec": 15731.718828398316
+          "score": 0.04001039950000013,
+          "median": 0.037,
+          "min": 0.023875,
+          "mean": 0.04219224629999998,
+          "p95": 0.062648,
+          "sd": 0.03941912980848071,
+          "rme": 0.4094637492118458,
+          "scoreRme": 0.599806722849282,
+          "warmupRatio": 1.1241411323573514,
+          "samples": 200000,
+          "p99": 0.088096,
+          "opsPerSec": 24993.502001898203
         }
       },
       "meta": {
         "bodyBytes": 42656,
         "hydrationMarkerPairs": 2,
         "memRenders": 5000,
-        "rssGrowthBytes": 262144,
-        "heapUsedGrowthBytes": 434605808
+        "rssGrowthBytes": -4718592,
+        "heapUsedGrowthBytes": -20505440
       }
     },
     {
       "name": "news-50/ripple",
       "ops": {
         "render": {
-          "score": 0.04624293656250022,
-          "median": 0.039845,
-          "min": 0.03162,
-          "mean": 0.04553144714000049,
-          "p95": 0.048971,
-          "sd": 0.08487479977125705,
-          "rme": 0.8169742765083923,
-          "scoreRme": 1.2833153936312567,
-          "warmupRatio": 0.9571182404296591,
-          "samples": 200000,
-          "p99": 0.058559,
-          "opsPerSec": 21624.92424434243
+          "score": 0.05470666439780864,
+          "median": 0.050986,
+          "min": 0.033132,
+          "mean": 0.056494027515198386,
+          "p95": 0.077677,
+          "sd": 0.045173424151899164,
+          "rme": 0.3728722450435025,
+          "scoreRme": 0.5883863513284578,
+          "warmupRatio": 1.0852457509943603,
+          "samples": 176666,
+          "p99": 0.098976,
+          "opsPerSec": 18279.30858164433
         }
       },
       "meta": {
         "bodyBytes": 47196,
         "hydrationMarkerPairs": 302,
         "memRenders": 5000,
-        "rssGrowthBytes": -2883584,
-        "heapUsedGrowthBytes": -33051392
+        "rssGrowthBytes": -4194304,
+        "heapUsedGrowthBytes": -35778840
       }
     },
     {
       "name": "news-50/vue-vapor",
       "ops": {
         "render": {
-          "score": 0.03447657585000033,
-          "median": 0.029245,
-          "min": 0.02109,
-          "mean": 0.035904322769999025,
-          "p95": 0.0374,
-          "sd": 0.42437319134592727,
-          "rme": 5.180149273733168,
-          "scoreRme": 2.0637709479470994,
-          "warmupRatio": 1.0994510262537975,
+          "score": 0.04330800909999992,
+          "median": 0.034915,
+          "min": 0.025928,
+          "mean": 0.04299877969499988,
+          "p95": 0.053511,
+          "sd": 0.1334569442772293,
+          "rme": 1.3602731312759937,
+          "scoreRme": 2.1778554612772445,
+          "warmupRatio": 1.0023720479683897,
           "samples": 200000,
-          "p99": 0.049873,
-          "opsPerSec": 29005.200642626765
+          "p99": 0.072356,
+          "opsPerSec": 23090.41724109183
         }
       },
       "meta": {
         "bodyBytes": 42380,
         "hydrationMarkerPairs": 1,
         "memRenders": 5000,
-        "rssGrowthBytes": -2621440,
-        "heapUsedGrowthBytes": 11220368
+        "rssGrowthBytes": 18657280,
+        "heapUsedGrowthBytes": 13790568
       }
     },
     {
       "name": "news-50/inferno",
       "ops": {
         "render": {
-          "score": 0.06108621244115348,
-          "median": 0.054863,
-          "min": 0.046547,
-          "mean": 0.060838935261531765,
-          "p95": 0.066865,
-          "sd": 0.0788263331315,
-          "rme": 0.6269074198306637,
-          "scoreRme": 1.0046298029956322,
-          "warmupRatio": 0.9901304993659503,
-          "samples": 164091,
-          "p99": 0.083457,
-          "opsPerSec": 16370.306163004221
+          "score": 0.06575980732334621,
+          "median": 0.061636,
+          "min": 0.046387,
+          "mean": 0.06936974329528496,
+          "p95": 0.097755,
+          "sd": 0.05910846856464075,
+          "rme": 0.4403263955344862,
+          "scoreRme": 0.44013328097488774,
+          "warmupRatio": 0.9543496209058739,
+          "samples": 143854,
+          "p99": 0.170561,
+          "opsPerSec": 15206.857208125935
         }
       },
       "meta": {
         "bodyBytes": 42364,
         "hydrationMarkerPairs": 0,
         "memRenders": 5000,
-        "rssGrowthBytes": -4849664,
-        "heapUsedGrowthBytes": -33610064
+        "rssGrowthBytes": -1835008,
+        "heapUsedGrowthBytes": 34549192
       }
     },
     {
       "name": "news-500/octane-tsrx",
       "ops": {
         "render": {
-          "score": 0.41444700445411187,
-          "median": 0.367979,
-          "min": 0.332042,
-          "mean": 0.41413098205776866,
-          "p95": 0.42699,
-          "sd": 0.35131668551266076,
-          "rme": 1.0703146488115023,
-          "scoreRme": 1.7209282055296724,
-          "warmupRatio": 1.0048797002454664,
-          "samples": 24133,
-          "p99": 3.337863,
-          "opsPerSec": 2412.8537285898547
+          "score": 0.39629716472595805,
+          "median": 0.367473,
+          "min": 0.307891,
+          "mean": 0.40140622623780403,
+          "p95": 0.450099,
+          "sd": 0.23255676830657518,
+          "rme": 0.7195734256708528,
+          "scoreRme": 1.1260714621475791,
+          "warmupRatio": 1.0169253833397254,
+          "samples": 24903,
+          "p99": 2.259729,
+          "opsPerSec": 2523.3589563819014
         }
       },
       "meta": {
         "bodyBytes": 418692,
         "hydrationMarkerPairs": 2,
         "memRenders": 5000,
-        "rssGrowthBytes": 35049472,
-        "heapUsedGrowthBytes": 28489672
+        "rssGrowthBytes": -32714752,
+        "heapUsedGrowthBytes": -66021920
       }
     },
     {
       "name": "news-500/react",
       "ops": {
         "render": {
-          "score": 1.0910334912959412,
-          "median": 0.97654,
-          "min": 0.89153,
-          "mean": 1.1051899223966406,
-          "p95": 1.358465,
-          "sd": 0.5686718599530094,
-          "rme": 1.0603582060660484,
-          "scoreRme": 1.6621698388543504,
-          "warmupRatio": 1.020656820718343,
-          "samples": 9046,
-          "p99": 4.194739,
-          "opsPerSec": 916.5621477047321
+          "score": 1.0781772238566472,
+          "median": 0.956823,
+          "min": 0.823352,
+          "mean": 1.0700995607746637,
+          "p95": 1.294821,
+          "sd": 0.5042571421075843,
+          "rme": 0.9553688024985104,
+          "scoreRme": 1.537419356599643,
+          "warmupRatio": 1.0022927307225262,
+          "samples": 9346,
+          "p99": 3.634782,
+          "opsPerSec": 927.4913046511901
         }
       },
       "meta": {
         "bodyBytes": 418658,
         "hydrationMarkerPairs": 0,
         "memRenders": 5000,
-        "rssGrowthBytes": 224051200,
-        "heapUsedGrowthBytes": 266938072
+        "rssGrowthBytes": 175120384,
+        "heapUsedGrowthBytes": 218437928
       }
     },
     {
       "name": "news-500/preact",
       "ops": {
         "render": {
-          "score": 0.9591283775766709,
-          "median": 0.824535,
-          "min": 0.749084,
-          "mean": 1.0055577944282406,
-          "p95": 0.998802,
-          "sd": 5.2061706637589245,
-          "rme": 10.176740854314023,
-          "scoreRme": 10.154683867059607,
-          "warmupRatio": 1.0249462744486981,
-          "samples": 9943,
-          "p99": 3.959469,
-          "opsPerSec": 1042.6132970088895
+          "score": 1.0493089584585953,
+          "median": 0.93418,
+          "min": 0.716601,
+          "mean": 1.093023052153945,
+          "p95": 1.786617,
+          "sd": 0.7691805063461166,
+          "rme": 1.442246257257957,
+          "scoreRme": 2.3257914241560296,
+          "warmupRatio": 0.9259595492303062,
+          "samples": 9146,
+          "p99": 3.75048,
+          "opsPerSec": 953.0081602171502
         }
       },
       "meta": {
         "bodyBytes": 418658,
         "hydrationMarkerPairs": 0,
         "memRenders": 5000,
-        "rssGrowthBytes": -7663616,
-        "heapUsedGrowthBytes": -55962056
+        "rssGrowthBytes": -5222400,
+        "heapUsedGrowthBytes": -48009968
       }
     },
     {
       "name": "news-500/solid",
       "ops": {
         "render": {
-          "score": 0.7325660112338847,
-          "median": 0.669494,
-          "min": 0.617748,
-          "mean": 0.7365969349443766,
-          "p95": 0.753091,
-          "sd": 0.5021624843799386,
-          "rme": 1.146918356465648,
-          "scoreRme": 1.7727266302257572,
-          "warmupRatio": 1.016332932477853,
-          "samples": 13573,
-          "p99": 4.822956,
-          "opsPerSec": 1365.0646967850278
+          "score": 0.5810571198591552,
+          "median": 0.505082,
+          "min": 0.430061,
+          "mean": 0.5632032240563354,
+          "p95": 0.703216,
+          "sd": 0.3167151266319922,
+          "rme": 0.8272953182342314,
+          "scoreRme": 1.272219663712507,
+          "warmupRatio": 0.9402729915269972,
+          "samples": 17750,
+          "p99": 2.577128,
+          "opsPerSec": 1721.0011990600754
         }
       },
       "meta": {
         "bodyBytes": 423614,
         "hydrationMarkerPairs": 0,
         "memRenders": 5000,
-        "rssGrowthBytes": 20115456,
-        "heapUsedGrowthBytes": 37354712
+        "rssGrowthBytes": 103399424,
+        "heapUsedGrowthBytes": 161445376
       }
     },
     {
       "name": "news-500/svelte",
       "ops": {
         "render": {
-          "score": 0.5809649590088722,
-          "median": 0.376485,
-          "min": 0.331462,
-          "mean": 0.611725735789022,
-          "p95": 0.718356,
-          "sd": 7.082736203562067,
-          "rme": 17.751477070722547,
-          "scoreRme": 35.39530944639189,
-          "warmupRatio": 1.11691539967963,
-          "samples": 16343,
-          "p99": 1.849065,
-          "opsPerSec": 1721.2742085271418
+          "score": 0.39844613247172855,
+          "median": 0.363405,
+          "min": 0.303852,
+          "mean": 0.4037257168188061,
+          "p95": 0.461159,
+          "sd": 0.2739959564940892,
+          "rme": 0.8453879077945645,
+          "scoreRme": 1.3033106918400066,
+          "warmupRatio": 1.0380803203864364,
+          "samples": 24758,
+          "p99": 2.544967,
+          "opsPerSec": 2509.749545808314
         }
       },
       "meta": {
         "bodyBytes": 421200,
         "hydrationMarkerPairs": 2,
         "memRenders": 5000,
-        "rssGrowthBytes": 616255488,
-        "heapUsedGrowthBytes": 586576000
+        "rssGrowthBytes": 20381696,
+        "heapUsedGrowthBytes": 3204904
       }
     },
     {
       "name": "news-500/ripple",
       "ops": {
         "render": {
-          "score": 0.5562296421155997,
-          "median": 0.514554,
-          "min": 0.463008,
-          "mean": 0.5610431945675962,
-          "p95": 0.588623,
-          "sd": 0.3297051324860289,
-          "rme": 0.862866913776445,
-          "scoreRme": 1.3688947742877904,
-          "warmupRatio": 1.000662098911169,
-          "samples": 17819,
-          "p99": 3.194645,
-          "opsPerSec": 1797.8186063521096
+          "score": 0.561661138912369,
+          "median": 0.517776,
+          "min": 0.430431,
+          "mean": 0.5633824454463487,
+          "p95": 0.628995,
+          "sd": 0.3002205081440106,
+          "rme": 0.7840925944212371,
+          "scoreRme": 1.2441469253973592,
+          "warmupRatio": 0.9971728628554536,
+          "samples": 17744,
+          "p99": 2.911538,
+          "opsPerSec": 1780.4329527523553
         }
       },
       "meta": {
         "bodyBytes": 466690,
         "hydrationMarkerPairs": 3002,
         "memRenders": 5000,
-        "rssGrowthBytes": 33464320,
-        "heapUsedGrowthBytes": 45720104
+        "rssGrowthBytes": 27656192,
+        "heapUsedGrowthBytes": 41608232
       }
     },
     {
       "name": "news-500/vue-vapor",
       "ops": {
         "render": {
-          "score": 0.4280942203634863,
-          "median": 0.364012,
-          "min": 0.316042,
-          "mean": 0.4129019759170527,
-          "p95": 0.459902,
-          "sd": 0.356781073614517,
-          "rme": 1.0885075930524841,
-          "scoreRme": 1.760623538885738,
-          "warmupRatio": 0.9464990886876926,
-          "samples": 24208,
-          "p99": 3.274735,
-          "opsPerSec": 2335.9343631196884
+          "score": 0.413368245839714,
+          "median": 0.361251,
+          "min": 0.297831,
+          "mean": 0.40818171997386565,
+          "p95": 0.470857,
+          "sd": 0.32308103383858666,
+          "rme": 0.9913937879766511,
+          "scoreRme": 1.6056159922205955,
+          "warmupRatio": 0.9644880136251927,
+          "samples": 24487,
+          "p99": 2.86047,
+          "opsPerSec": 2419.1505033692306
         }
       },
       "meta": {
         "bodyBytes": 418674,
         "hydrationMarkerPairs": 1,
         "memRenders": 5000,
-        "rssGrowthBytes": -32608256,
-        "heapUsedGrowthBytes": -43528128
+        "rssGrowthBytes": 34603008,
+        "heapUsedGrowthBytes": 38131968
       }
     },
     {
       "name": "news-500/inferno",
       "ops": {
         "render": {
-          "score": 0.7444739730958028,
-          "median": 0.651982,
-          "min": 0.587972,
-          "mean": 0.7271308981892248,
-          "p95": 0.772156,
-          "sd": 0.41021732032262315,
-          "rme": 0.9429536024304228,
-          "scoreRme": 1.5428744045728828,
-          "warmupRatio": 0.9541838027890837,
-          "samples": 13751,
-          "p99": 3.26078,
-          "opsPerSec": 1343.2303023860243
+          "score": 0.7913156725226991,
+          "median": 0.683288,
+          "min": 0.559695,
+          "mean": 0.7894686346047497,
+          "p95": 1.182138,
+          "sd": 0.44960182312977814,
+          "rme": 0.9919298309289976,
+          "scoreRme": 1.5833341131212586,
+          "warmupRatio": 0.9763819399179459,
+          "samples": 12663,
+          "p99": 3.162198,
+          "opsPerSec": 1263.71817812229
         }
       },
       "meta": {
         "bodyBytes": 418658,
         "hydrationMarkerPairs": 0,
         "memRenders": 5000,
-        "rssGrowthBytes": 107839488,
-        "heapUsedGrowthBytes": 103068224
+        "rssGrowthBytes": -200892416,
+        "heapUsedGrowthBytes": -164428224
       }
     },
     {
       "name": "parallel-k4",
       "ops": {
         "render": {
-          "score": 4.141385567875648,
-          "median": 4.140807,
-          "min": 3.082956,
-          "mean": 4.1482256238075506,
-          "p95": 4.244312,
-          "sd": 0.11892200207898354,
-          "rme": 0.11443458747912721,
-          "scoreRme": 0.1771400066786134,
-          "warmupRatio": 1.003373616237094,
-          "samples": 2411,
-          "p99": 4.337747,
-          "opsPerSec": 241.465080613819
+          "score": 4.203926951271192,
+          "median": 4.231074,
+          "min": 3.090835,
+          "mean": 4.241359158608997,
+          "p95": 4.488769,
+          "sd": 0.1950751215487084,
+          "rme": 0.18564403831654552,
+          "scoreRme": 0.2755167361170527,
+          "warmupRatio": 1.0130449563153352,
+          "samples": 2358,
+          "p99": 4.61713,
+          "opsPerSec": 237.8728297592369
         }
       },
       "meta": {
         "bodyBytes": 23353,
         "hydrationMarkerPairs": 4,
         "memRenders": 5000,
-        "rssGrowthBytes": 3407872,
-        "heapUsedGrowthBytes": -16390528
+        "rssGrowthBytes": 131072,
+        "heapUsedGrowthBytes": -15314704
       }
     },
     {
       "name": "parallel-k8",
       "ops": {
         "render": {
-          "score": 4.1749966075156655,
-          "median": 4.157609,
-          "min": 3.077867,
-          "mean": 4.178877344337636,
-          "p95": 4.373154,
-          "sd": 0.16233126765762657,
-          "rme": 0.15564217026525345,
-          "scoreRme": 0.20716410069989136,
-          "warmupRatio": 1.0021677811921748,
-          "samples": 2393,
-          "p99": 4.509979,
-          "opsPerSec": 239.5211527117984
+          "score": 4.236844831401478,
+          "median": 4.185725,
+          "min": 3.16016,
+          "mean": 4.217744234500206,
+          "p95": 4.457327,
+          "sd": 0.15501327680440102,
+          "rme": 0.14793773010736008,
+          "scoreRme": 0.21704332268735782,
+          "warmupRatio": 0.9863460060889463,
+          "samples": 2371,
+          "p99": 4.637417,
+          "opsPerSec": 236.02469285362443
         }
       },
       "meta": {
         "bodyBytes": 23361,
         "hydrationMarkerPairs": 4,
         "memRenders": 5000,
-        "rssGrowthBytes": 1703936,
-        "heapUsedGrowthBytes": -7246152
+        "rssGrowthBytes": 8519680,
+        "heapUsedGrowthBytes": -7377304
       }
     },
     {
       "name": "parallel-nested-d4",
       "ops": {
         "render": {
-          "score": 4.103682920502093,
-          "median": 4.096175,
-          "min": 3.036499,
-          "mean": 4.1841834987447655,
-          "p95": 4.208445,
-          "sd": 3.6864530493140726,
-          "rme": 3.5322798637943347,
-          "scoreRme": 0.19352314259810902,
-          "warmupRatio": 1.0486945934710938,
-          "samples": 2390,
-          "p99": 4.664399,
-          "opsPerSec": 243.6835446042815
+          "score": 4.138450716062176,
+          "median": 4.116124,
+          "min": 3.043641,
+          "mean": 4.147096167980087,
+          "p95": 4.339375,
+          "sd": 0.13876602557181314,
+          "rme": 0.13356618128271375,
+          "scoreRme": 0.18507127924210576,
+          "warmupRatio": 1.0063582743849573,
+          "samples": 2411,
+          "p99": 4.475962,
+          "opsPerSec": 241.63631963014438
         }
       },
       "meta": {
         "bodyBytes": 763,
         "hydrationMarkerPairs": 13,
         "memRenders": 5000,
-        "rssGrowthBytes": 6422528,
-        "heapUsedGrowthBytes": 1222720
+        "rssGrowthBytes": 4063232,
+        "heapUsedGrowthBytes": 19541984
       }
     },
     {
       "name": "parallel-nested-d8",
       "ops": {
         "render": {
-          "score": 4.148191253360909,
-          "median": 4.123937,
-          "min": 3.078457,
-          "mean": 4.137253823334711,
-          "p95": 4.260312,
-          "sd": 0.1398595392633745,
-          "rme": 0.13477137938565004,
-          "scoreRme": 0.21185881119720062,
-          "warmupRatio": 0.9950840641764045,
-          "samples": 2417,
-          "p99": 4.690838,
-          "opsPerSec": 241.0689235193265
+          "score": 4.152236096173735,
+          "median": 4.115465,
+          "min": 3.051646,
+          "mean": 4.140240411423854,
+          "p95": 4.218952,
+          "sd": 0.7750285721409733,
+          "rme": 0.7464483455794346,
+          "scoreRme": 1.8521397347684136,
+          "warmupRatio": 0.9957599318026602,
+          "samples": 2416,
+          "p99": 4.328348,
+          "opsPerSec": 240.83408959367583
         }
       },
       "meta": {
         "bodyBytes": 1267,
         "hydrationMarkerPairs": 25,
         "memRenders": 5000,
-        "rssGrowthBytes": 9961472,
-        "heapUsedGrowthBytes": 832488
+        "rssGrowthBytes": 7208960,
+        "heapUsedGrowthBytes": 2813472
       }
     },
     {
       "name": "waterfall-d1",
       "ops": {
         "render": {
-          "score": 0.05495071595619049,
-          "median": 0.053009,
-          "min": 0.047699,
-          "mean": 0.05478336526035786,
-          "p95": 0.057969,
-          "sd": 0.02468748685636182,
-          "rme": 0.20694917428511617,
-          "scoreRme": 0.42829269511651635,
-          "warmupRatio": 0.9901739530804421,
-          "samples": 182155,
-          "p99": 0.07494,
-          "opsPerSec": 18198.12503984936
+          "score": 0.05295420398405124,
+          "median": 0.051427,
+          "min": 0.048342,
+          "mean": 0.05286016020047621,
+          "p95": 0.055756,
+          "sd": 0.019328490261887925,
+          "rme": 0.164960854884779,
+          "scoreRme": 0.33428487254981704,
+          "warmupRatio": 0.9981789403819671,
+          "samples": 188751,
+          "p99": 0.073759,
+          "opsPerSec": 18884.24194425017
         }
       },
       "meta": {
@@ -545,26 +545,26 @@
         "hydrationMarkerPairs": 5,
         "suspensePasses": 2,
         "memRenders": 5000,
-        "rssGrowthBytes": -4718592,
-        "heapUsedGrowthBytes": -27749304
+        "rssGrowthBytes": -4415488,
+        "heapUsedGrowthBytes": -30226704
       }
     },
     {
       "name": "waterfall-d2",
       "ops": {
         "render": {
-          "score": 0.06618036458765254,
-          "median": 0.06418,
-          "min": 0.05889,
-          "mean": 0.0662259214405103,
-          "p95": 0.070592,
-          "sd": 0.017834623826058386,
-          "rme": 0.13594413445913336,
-          "scoreRme": 0.21897102512267014,
-          "warmupRatio": 1.0105930907716267,
-          "samples": 150752,
-          "p99": 0.088797,
-          "opsPerSec": 15110.22198548862
+          "score": 0.06257121761437343,
+          "median": 0.061797,
+          "min": 0.05824,
+          "mean": 0.06303480643328054,
+          "p95": 0.066446,
+          "sd": 0.011502147389214543,
+          "rme": 0.08987240110480807,
+          "scoreRme": 0.11212443080952997,
+          "warmupRatio": 1.0105963411576215,
+          "samples": 158364,
+          "p99": 0.073709,
+          "opsPerSec": 15981.789041776405
         }
       },
       "meta": {
@@ -572,26 +572,26 @@
         "hydrationMarkerPairs": 10,
         "suspensePasses": 3,
         "memRenders": 5000,
-        "rssGrowthBytes": -2691072,
-        "heapUsedGrowthBytes": -36804680
+        "rssGrowthBytes": 2228224,
+        "heapUsedGrowthBytes": 35086848
       }
     },
     {
       "name": "waterfall-d4",
       "ops": {
         "render": {
-          "score": 0.0917085503926415,
-          "median": 0.086242,
-          "min": 0.081994,
-          "mean": 0.08963876000466647,
-          "p95": 0.099406,
-          "sd": 0.024019607638006393,
-          "rme": 0.15733984440133036,
-          "scoreRme": 0.32677537987013283,
-          "warmupRatio": 0.9668309205050652,
-          "samples": 111423,
-          "p99": 0.125075,
-          "opsPerSec": 10904.108676002339
+          "score": 0.0838252278413913,
+          "median": 0.083317,
+          "min": 0.078889,
+          "mean": 0.084699249054267,
+          "p95": 0.088808,
+          "sd": 0.012040477253034563,
+          "rme": 0.08114597710514078,
+          "scoreRme": 0.1224796025632105,
+          "warmupRatio": 1.0177254366009283,
+          "samples": 117898,
+          "p99": 0.097154,
+          "opsPerSec": 11929.582844583918
         }
       },
       "meta": {
@@ -599,26 +599,26 @@
         "hydrationMarkerPairs": 20,
         "suspensePasses": 5,
         "memRenders": 5000,
-        "rssGrowthBytes": 786432,
-        "heapUsedGrowthBytes": 3708952
+        "rssGrowthBytes": 917504,
+        "heapUsedGrowthBytes": 3956736
       }
     },
     {
       "name": "waterfall-d4-x32",
       "ops": {
         "render": {
-          "score": 3.0913637154908002,
-          "median": 2.835944,
-          "min": 2.646098,
-          "mean": 3.068694762503841,
-          "p95": 4.358366,
-          "sd": 0.5222945328548847,
-          "rme": 0.5843535394056919,
-          "scoreRme": 1.0512745610134935,
-          "warmupRatio": 0.9884173192039214,
-          "samples": 3259,
-          "p99": 4.817977,
-          "opsPerSec": 323.48183262584325
+          "score": 3.0065720308596635,
+          "median": 2.745421,
+          "min": 2.66046,
+          "mean": 2.9403351287477966,
+          "p95": 3.750786,
+          "sd": 0.413644850240855,
+          "rme": 0.47273712104326204,
+          "scoreRme": 0.8551702427758037,
+          "warmupRatio": 0.9592474752249402,
+          "samples": 3402,
+          "p99": 4.582677,
+          "opsPerSec": 332.6047038740236
         }
       },
       "meta": {
@@ -626,36 +626,36 @@
         "hydrationMarkerPairs": 20,
         "concurrency": 32,
         "suspensePasses": 5,
-        "rendersPerSec": 10351.418644026984,
+        "rendersPerSec": 10643.350523968755,
         "memRenders": 5024,
-        "rssGrowthBytes": 5242880,
-        "heapUsedGrowthBytes": 9506592
+        "rssGrowthBytes": 1703936,
+        "heapUsedGrowthBytes": 9657528
       }
     },
     {
       "name": "deopt-page/octane-fast",
       "ops": {
         "render": {
-          "score": 1.592855391971668,
-          "median": 1.53182,
-          "min": 1.47288,
-          "mean": 1.5742686339735528,
-          "p95": 1.743917,
-          "sd": 0.17116953096371043,
-          "rme": 0.2673920215922151,
-          "scoreRme": 0.45208632374239016,
-          "warmupRatio": 0.9773350127026784,
-          "samples": 6352,
-          "p99": 2.45018,
-          "opsPerSec": 627.803380671098
+          "score": 1.4968036999625878,
+          "median": 1.462278,
+          "min": 1.413898,
+          "mean": 1.4967225813500973,
+          "p95": 1.556456,
+          "sd": 0.18859761818817147,
+          "rme": 0.30215530815984537,
+          "scoreRme": 0.3416997021137772,
+          "warmupRatio": 1.0027929017939867,
+          "samples": 6681,
+          "p99": 2.223916,
+          "opsPerSec": 668.0902779870164
         }
       },
       "meta": {
         "bodyBytes": 134189,
         "hydrationMarkerPairs": 901,
         "memRenders": 5000,
-        "rssGrowthBytes": 23863296,
-        "heapUsedGrowthBytes": -27069168,
+        "rssGrowthBytes": 28635136,
+        "heapUsedGrowthBytes": 43534208,
         "htmlFactoryCalls": 601,
         "htmlFactoryCallBudget": 601
       }
@@ -664,26 +664,26 @@
       "name": "deopt-page/octane-deopt",
       "ops": {
         "render": {
-          "score": 3.908547732142859,
-          "median": 3.778389,
-          "min": 3.545944,
-          "mean": 3.968054926984124,
-          "p95": 5.314236,
-          "sd": 0.6552545538272083,
-          "rme": 0.6447452832443912,
-          "scoreRme": 1.159286466953463,
-          "warmupRatio": 1.044943220921095,
-          "samples": 2520,
-          "p99": 6.111841,
-          "opsPerSec": 255.84950435075038
+          "score": 3.8512363056092864,
+          "median": 3.685323,
+          "min": 3.559636,
+          "mean": 3.869431986847195,
+          "p95": 5.092277,
+          "sd": 0.5999315449000646,
+          "rme": 0.5976959021577899,
+          "scoreRme": 1.0895734362064378,
+          "warmupRatio": 1.0074081466175608,
+          "samples": 2585,
+          "p99": 6.182074,
+          "opsPerSec": 259.65687915423683
         }
       },
       "meta": {
         "bodyBytes": 148003,
         "hydrationMarkerPairs": 1802,
         "memRenders": 5000,
-        "rssGrowthBytes": 64458752,
-        "heapUsedGrowthBytes": 36548048,
+        "rssGrowthBytes": 65277952,
+        "heapUsedGrowthBytes": 34213360,
         "htmlFactoryCalls": 0,
         "htmlFactoryCallBudget": 0
       }
@@ -692,26 +692,26 @@
       "name": "escape-heavy",
       "ops": {
         "render": {
-          "score": 4.298178109458027,
-          "median": 3.975217,
-          "min": 3.539863,
-          "mean": 4.2543894032326675,
-          "p95": 6.067246,
-          "sd": 0.7743107316151069,
-          "rme": 0.7357119275281039,
-          "scoreRme": 1.269705970575536,
-          "warmupRatio": 0.983389526238882,
-          "samples": 2351,
-          "p99": 7.310567,
-          "opsPerSec": 232.65671513228514
+          "score": 4.123985868025757,
+          "median": 4.001698,
+          "min": 3.448093,
+          "mean": 4.295390339776632,
+          "p95": 6.060941,
+          "sd": 0.8296376812833347,
+          "rme": 0.7846038165102941,
+          "scoreRme": 1.1262937236640085,
+          "warmupRatio": 1.0777107228304343,
+          "samples": 2328,
+          "p99": 7.451423,
+          "opsPerSec": 242.48385712309
         }
       },
       "meta": {
         "bodyBytes": 996364,
         "hydrationMarkerPairs": 1,
         "memRenders": 5000,
-        "rssGrowthBytes": -94400512,
-        "heapUsedGrowthBytes": -95289144,
+        "rssGrowthBytes": -116539392,
+        "heapUsedGrowthBytes": -118580072,
         "regexEscapePasses": 0,
         "arraySnapshotCopies": 1,
         "arraySnapshotEntries": 10000,

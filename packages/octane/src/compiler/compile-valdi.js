@@ -309,7 +309,7 @@ function componentShape(node) {
 			item.id?.type === 'Identifier' &&
 			(fn?.type === 'FunctionExpression' || fn?.type === 'ArrowFunctionExpression')
 		) {
-			return { node, fn, name: item.id.name, exportKind };
+			return { node, fn, name: item.id.name, exportKind, binding: item.id, initializer: item.init };
 		}
 	}
 	return null;
@@ -608,13 +608,32 @@ function mergedAttributes(entries, state, origin) {
 	const refName = allocName(state, '__octaneValdiRef');
 	const childrenName = allocName(state, '__octaneValdiChildren');
 	const propsName = allocName(state, '__octaneValdiProps');
-	const expression = b.object(
+	let expression = b.object(
 		entries.map((entry) =>
 			entry.name === null
 				? b.spread(entry.value)
 				: b.prop('init', b.literal(entry.name), entry.value, entry.name === '__proto__'),
 		),
 	);
+	if (state.output === 'ts') {
+		// Reserved fields are optional even when the inferred spread type has
+		// none of them. Keep the runtime checks typed without adding properties.
+		expression = b.ts_as(
+			expression,
+			b.ts_type_literal(
+				['key', 'ref', 'children'].map((name) => ({
+					...b.ts_property_signature(
+						b.id(name, origin),
+						b.ts_type_annotation(b.ts_keyword_type('unknown', origin), origin),
+						origin,
+					),
+					optional: true,
+				})),
+				origin,
+			),
+			origin,
+		);
+	}
 	const pattern = b.object_pattern([
 		b.prop('init', b.id('key'), b.id(keyName)),
 		...(allowRef ? [] : [b.prop('init', b.id('ref'), b.id(refName))]),
@@ -942,6 +961,39 @@ function emitRenderable(node, state, keys) {
 			? [withOrigin(b.stmt(assertNoTemplate(value, state, 'JSX inside a void expression')), node)]
 			: [];
 	}
+	if (
+		state.textSites &&
+		(value?.type === 'ConditionalExpression' ||
+			value?.type === 'LogicalExpression' ||
+			value?.type === 'ArrayExpression')
+	) {
+		let template = false;
+		walk(value, (child) => {
+			if (template) return false;
+			if (isTemplate(child)) {
+				template = true;
+				return false;
+			}
+		});
+		// A scalar expression is one authored site, even when its value chooses
+		// different branches. Preserve its normal short-circuit evaluation.
+		if (!template) return emitHostText(value, state, keys, node);
+		if (value.type === 'ArrayExpression') {
+			return value.elements.flatMap((element) =>
+				element?.type === 'SpreadElement'
+					? emitHostText(
+							withOrigin(
+								b.array([assertNoTemplate(element, state, 'JSX within a text spread')]),
+								element,
+							),
+							state,
+							keys,
+							element,
+						)
+					: emitRenderable(element, state, keys),
+			);
+		}
+	}
 	if (value?.type === 'ConditionalExpression') {
 		return [
 			withOrigin(
@@ -955,6 +1007,24 @@ function emitRenderable(node, state, keys) {
 		];
 	}
 	if (value?.type === 'LogicalExpression' && value.operator === '&&') {
+		if (state.textSites) {
+			const name = allocName(state, '__octaneWriterCondition');
+			const condition = withOrigin(b.id(name), value.left);
+			return [
+				withOrigin(
+					b.const(name, assertNoTemplate(value.left, state, 'conditional JSX tests')),
+					value.left,
+				),
+				withOrigin(
+					b.if(
+						condition,
+						b.block(emitRenderable(value.right, state, keys)),
+						b.block(emitHostText(condition, state, keys, node)),
+					),
+					node,
+				),
+			];
+		}
 		return [
 			withOrigin(
 				b.if(
@@ -973,20 +1043,20 @@ function emitRenderable(node, state, keys) {
 	if (value?.type === 'JSXForExpression') return emitFor(value, state, keys);
 	if (value?.type === 'JSXIfExpression') return emitIf(value, state, keys);
 	if (state.renderer.text === 'host') {
-		return [
-			writerStatement(
-				state,
-				'appendText',
-				[assertNoTemplate(node, state, 'JSX within host text')],
-				node,
-			),
-		];
+		return emitHostText(assertNoTemplate(node, state, 'JSX within host text'), state, keys, node);
 	}
 	throw valdiError(
 		state,
 		node,
 		`unsupported renderable ${value?.type ?? 'value'}; render text with a <label value={...} />.`,
 	);
+}
+
+function emitHostText(value, state, keys, origin) {
+	if (!state.textSites) return [writerStatement(state, 'appendText', [value], origin)];
+	const prototype = hoistPrototype(state, 'makeNodePrototype', [b.literal('#text')], origin);
+	const key = keyExpression(state, prototype, keys, null, origin);
+	return [writerStatement(state, 'renderText', [prototype, value, key], origin)];
 }
 
 function rewriteComponentStatement(node, state, keys, allowReturn) {
@@ -1032,7 +1102,7 @@ function emitNodes(nodes, state, keys, allowReturn) {
 		if (node.type === 'JSXText') {
 			if (state.renderer.text === 'ignore') continue;
 			if (state.renderer.text === 'host') {
-				output.push(writerStatement(state, 'appendText', [b.literal(node.value)], node));
+				output.push(...emitHostText(b.literal(node.value), state, keys, node));
 				continue;
 			}
 			throw valdiError(
@@ -1081,14 +1151,25 @@ function emitComponent(shape, state) {
 		fn,
 	);
 	const options = b.object([b.prop('init', b.id('hasHooks'), b.literal(hasRenderTimeCalls(fn)))]);
+	let initializer = call(state, 'defineValdiComponent', [render, options], fn);
+	if (state.output === 'ts' && shape.initializer !== undefined) {
+		// Keep authored export constraints and the context they provide to props.
+		const wrap = (node) =>
+			node === fn ? initializer : { ...node, expression: wrap(node.expression) };
+		initializer = wrap(shape.initializer);
+	}
 	const declaration = withOrigin(
-		b.const(name, call(state, 'defineValdiComponent', [render, options], fn)),
+		b.const(state.output === 'ts' ? (shape.binding ?? name) : name, initializer),
 		fn,
 	);
-	if (exportKind === 'named') return [withOrigin(b.export(declaration), shape.node)];
-	if (exportKind === 'default')
-		return [declaration, withOrigin(b.export_default(b.id(name)), shape.node)];
-	return [declaration];
+	const output =
+		exportKind === 'named'
+			? [withOrigin(b.export(declaration), shape.node)]
+			: exportKind === 'default'
+				? [declaration, withOrigin(b.export_default(b.id(name)), shape.node)]
+				: [declaration];
+	if (state.output === 'ts') output[0].leadingComments = shape.node.leadingComments;
+	return output;
 }
 
 /** Lower an authored module and finish it through the shared client pipeline. */
@@ -1111,6 +1192,7 @@ export function compileValdi(
 	const ast = parsedAst ?? parseModule(source, filename);
 	const state = {
 		filename,
+		output: options.output,
 		renderer,
 		names: new Set(),
 		helpers: new Map(),
@@ -1123,7 +1205,11 @@ export function compileValdi(
 		lexical: createLexicalAnalysis(ast),
 		attributeFacts: null,
 		writerFacts: normalizeWriterFacts(options.valdiWriterFacts, source.length, filename),
+		textSites: renderer.capabilities?.includes('host-text-site') === true,
 	};
+	if (state.textSites && renderer.text !== 'host') {
+		throw valdiError(state, ast, 'the host-text-site capability requires text: "host".');
+	}
 	if (options.hmr !== undefined && options.hmr !== false) {
 		throw valdiError(state, ast, 'HMR is not supported yet; compile with hmr: false.');
 	}
@@ -1172,9 +1258,11 @@ export function compileValdi(
 				'assertValdiCompilerAbi',
 				[
 					b.literal(
-						renderer.text === 'host' || renderer.capabilities?.includes('host-ref')
-							? 2
-							: VALDI_COMPILER_ABI_VERSION,
+						state.textSites
+							? 3
+							: renderer.text === 'host' || renderer.capabilities?.includes('host-ref')
+								? 2
+								: VALDI_COMPILER_ABI_VERSION,
 					),
 				],
 				origin,

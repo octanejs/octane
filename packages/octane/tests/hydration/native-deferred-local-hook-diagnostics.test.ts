@@ -15,10 +15,11 @@ const filename = resolve(
 const authored = readFileSync(filename, 'utf8');
 const pkg = JSON.parse(readFileSync(resolve(packageRoot, 'package.json'), 'utf8'));
 const exports = Object.fromEntries(
-	Object.entries(pkg.exports).map(([name, target]: [string, any]) => [
-		name === '.' ? 'octane' : 'octane' + name.slice(1),
-		resolve(packageRoot, typeof target === 'string' ? target : target.default),
-	]),
+	Object.entries(pkg.exports).flatMap(([name, target]: [string, any]) => {
+		const file = typeof target === 'string' ? target : target.default;
+		if (typeof file !== 'string') return [];
+		return [[name === '.' ? 'octane' : 'octane' + name.slice(1), resolve(packageRoot, file)]];
+	}),
 );
 const bundles = new Map<boolean, Promise<{ server: any; code: string }>>();
 

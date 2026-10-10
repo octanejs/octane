@@ -1,5 +1,5 @@
 import { defineConfig } from 'vite';
-import solid from 'vite-plugin-solid';
+import solid from '@solidjs/vite-plugin';
 
 // Force Solid 2.0-beta's production bundle — same rationale as the other Solid
 // bench fixtures (dev bundle crashes; hot:false skips solid-refresh).
