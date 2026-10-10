@@ -81,7 +81,20 @@ import {
 	// Read only on setAttribute's cold dangerouslySetInnerHTML arm.
 	VOID_ELEMENTS,
 } from './constants.js';
-import { isDelegatedEventProp } from './event-names.js';
+import {
+	isDelegatedEventProp,
+	delegatedEventFlags,
+	RESTORE_EVENT_LIST,
+	EVENT_BUBBLE,
+	EVENT_CAPTURE,
+	EVENT_NATIVE_CAPTURE,
+	EVENT_TARGET_ONLY,
+	EVENT_DISCRETE,
+	EVENT_RESTORE,
+	EVENT_DISABLED_MOUSE,
+	EVENT_DISABLED_ENTER,
+	EVENT_CUSTOM_NATIVE_ONLY,
+} from './event-names.js';
 import { hasOwnProp } from './has-own.js';
 import { postHostTask } from './host-task.js';
 import { headOwnershipKey } from './head-ownership.js';
@@ -30285,15 +30298,6 @@ interface DelegatedEventType {
 	captureKey: string;
 	flags: number;
 }
-const EVENT_BUBBLE = 1;
-const EVENT_CAPTURE = 2;
-const EVENT_NATIVE_CAPTURE = 4;
-const EVENT_TARGET_ONLY = 8;
-const EVENT_DISCRETE = 16;
-const EVENT_RESTORE = 32;
-const EVENT_DISABLED_MOUSE = 64;
-const EVENT_DISABLED_ENTER = 128;
-const EVENT_CUSTOM_NATIVE_ONLY = 256;
 const _delegated = new Map<string, DelegatedEventType>();
 
 // Active delegation targets (createRoot containers + portal targets). A
@@ -30394,68 +30398,6 @@ function prepareDelegatedEvent(event: Event, listener: Node): EventTarget[] | un
 // one native capture callback for their capture and emulated bubble queues.
 const _delegatedCapture = new Map<string, DelegatedEventType>();
 
-// Non-bubbling events must be delegated in the CAPTURE phase so the single root
-// listener still sees them (the capture phase reaches the root even when the event
-// doesn't bubble). For focus/blur the dispatcher then walks from `event.target`
-// upward, which reproduces React's bubbling `onFocus`/`onBlur`. (All other events
-// keep the cheaper bubbling-phase delegation.) The flag must match between
-// add/removeEventListener, so it is derived from the name both times.
-// The remaining NON-BUBBLING native families (media/resource lifecycle,
-// <details>/<dialog> state events, resize). A bubble-phase root listener cannot
-// hear them, so listen in capture and emulate React's target→root propagation in
-// dispatchDelegated. This lets an ancestor onPlay/onToggle/onLoad observe an
-// event from its descendant without installing a direct listener on every host.
-const EMULATED_BUBBLING_EVENTS = [
-	'abort',
-	'beforetoggle',
-	'cancel',
-	'canplay',
-	'canplaythrough',
-	'close',
-	'durationchange',
-	'emptied',
-	'encrypted',
-	'ended',
-	'error',
-	'load',
-	'loadeddata',
-	'loadedmetadata',
-	'loadstart',
-	'pause',
-	'play',
-	'playing',
-	'progress',
-	'ratechange',
-	'resize',
-	'seeked',
-	'seeking',
-	'stalled',
-	'suspend',
-	'timeupdate',
-	'toggle',
-	'volumechange',
-	'waiting',
-];
-
-const CAPTURE_DELEGATED = /* @__PURE__ */ new Set([
-	'focus',
-	'blur',
-	// `invalid` doesn't bubble either, but React's onInvalid propagates (a form's
-	// onInvalid observes its controls' invalid events) — so it gets the focus/blur
-	// walking treatment, NOT the enter/leave target-only one.
-	'invalid',
-	'pointerenter',
-	'pointerleave',
-	'mouseenter',
-	'mouseleave',
-	// Element `scroll`/`scrollend` don't bubble either. React 17+ made onScroll
-	// NON-bubbling (it fires only on the scrolled element), so they get the
-	// enter/leave target-only treatment below.
-	'scroll',
-	'scrollend',
-	...EMULATED_BUBBLING_EVENTS,
-]);
-const delegatedCapture = (name: string): boolean => CAPTURE_DELEGATED.has(name);
 const ACTIVE_TOUCH_BUBBLE: AddEventListenerOptions = { passive: false };
 const ACTIVE_TOUCH_CAPTURE: AddEventListenerOptions = { capture: true, passive: false };
 
@@ -30470,83 +30412,88 @@ function delegatedListenerOptions(
 		: capture;
 }
 
-// The enter/leave family is dispatched PER ELEMENT by the browser — each
-// entered/left element receives its OWN non-bubbling event — so the delegated
-// dispatcher must fire ONLY the target's handler. Ascending the ancestor chain
-// (the focus/blur treatment) would double-fire ancestors, which receive their own
-// enter/leave events natively. Matches React, where the enter/leave events do not
-// bubble either.
-const TARGET_ONLY_DELEGATED = /* @__PURE__ */ new Set([
-	'pointerenter',
-	'pointerleave',
-	'mouseenter',
-	'mouseleave',
-	// React 17+ parity: onScroll fires on the scrolled element only (no synthetic
-	// bubbling), and ancestors receive their own scroll events natively.
-	'scroll',
-	'scrollend',
-]);
-
+// Public dynamic registration keeps classification at runtime; compiled static
+// registrations supply the same immutable categories through the private ABI.
 export function delegateEvents(eventNames: string[]): void {
-	// Registries and listener attachment are infrastructure, not visual writes.
-	// They must move together even if the render that first needs a type rolls back.
-	// Seedable prototype may not exist at compiled-module load in exotic hosts.
 	const canSeed = typeof Element !== 'undefined' && Object.isExtensible(Element.prototype);
 	for (let i = 0; i < eventNames.length; i++) {
 		const name = eventNames[i];
 		if (_delegated.has(name)) continue;
-		const type = _delegatedCapture.get(name) ?? createDelegatedEventType(name);
-		type.flags |= EVENT_BUBBLE;
-		_delegated.set(name, type);
-		// Pre-seed the handler-slot key: the dispatch walk polls `$o<type>` on
-		// EVERY logical ancestor of every delegated event, and most of them carry
-		// no handler (see initDomOperations, trick 2).
-		if (canSeed) seedExpando(Element.prototype, '$o' + name);
-		// A new event type was registered after some roots/portals already mounted —
-		// back-attach the listener to every active target so handlers stamped on
-		// their DOM via `el.$oclick = …` still receive events.
-		for (const target of _delegationTargets.keys()) {
-			if (delegatedCapture(name) && _delegatedCapture.has(name)) continue;
-			target.addEventListener(
-				name,
-				dispatchDelegated,
-				delegatedListenerOptions(name, delegatedCapture(name)),
-			);
-			if (!delegatedCapture(name)) {
-				target.addEventListener(
-					name,
-					dispatchDelegatedCapture,
-					delegatedListenerOptions(name, true),
-				);
-			}
+		registerDelegatedBubble(
+			_delegatedCapture.get(name) ?? createDelegatedEventType(name, delegatedEventFlags(name)),
+			canSeed,
+		);
+	}
+}
+
+/** Compiler-only registration for already classified static event names. */
+export function __delegateEvents(eventNames: string[], eventFlags: number[]): void {
+	const canSeed = typeof Element !== 'undefined' && Object.isExtensible(Element.prototype);
+	for (let i = 0; i < eventNames.length; i++) {
+		const name = eventNames[i];
+		if (_delegated.has(name)) continue;
+		registerDelegatedBubble(
+			_delegatedCapture.get(name) ?? createDelegatedEventType(name, eventFlags[i]),
+			canSeed,
+		);
+	}
+}
+
+// Registries and listener attachment are infrastructure, not visual writes.
+// Both installers publish them together even if the first render rolls back.
+function registerDelegatedBubble(type: DelegatedEventType, canSeed: boolean): void {
+	const name = type.name;
+	type.flags |= EVENT_BUBBLE;
+	_delegated.set(name, type);
+	// Pre-seed the key polled on every logical ancestor, including unbound ones.
+	if (canSeed) seedExpando(Element.prototype, '$o' + name);
+	const capture = (type.flags & EVENT_NATIVE_CAPTURE) !== 0;
+	for (const target of _delegationTargets.keys()) {
+		if (capture && _delegatedCapture.has(name)) continue;
+		target.addEventListener(name, dispatchDelegated, delegatedListenerOptions(name, capture));
+		if (!capture) {
+			target.addEventListener(name, dispatchDelegatedCapture, delegatedListenerOptions(name, true));
 		}
 	}
 }
 
-// Register capture-phase delegated events (for `onXxxCapture` handlers). Attaches a
-// capture-phase `dispatchDelegatedCapture` listener to every active target, which
-// fires the matching `$ocapture:<type>` slots root→target (capture order). Compiled
-// modules call this at load for the capture handlers they contain; the spread path
-// lazy-registers dynamically-supplied ones.
 export function delegateCaptureEvents(eventNames: string[]): void {
 	const canSeed = typeof Element !== 'undefined' && Object.isExtensible(Element.prototype);
 	for (let i = 0; i < eventNames.length; i++) {
 		const name = eventNames[i];
 		if (_delegatedCapture.has(name)) continue;
-		const type = _delegated.get(name) ?? createDelegatedEventType(name);
-		type.flags |= EVENT_CAPTURE;
-		_delegatedCapture.set(name, type);
-		// Same seeding rationale as delegateEvents (the capture walk polls
-		// `$ocapture:<type>` along the built path).
-		if (canSeed) seedExpando(Element.prototype, CAPTURE_PREFIX + name);
-		for (const target of _delegationTargets.keys()) {
-			if (_delegated.has(name)) continue;
-			target.addEventListener(
-				name,
-				delegatedCapture(name) ? dispatchDelegated : dispatchDelegatedCapture,
-				delegatedListenerOptions(name, true),
-			);
-		}
+		registerDelegatedCapture(
+			_delegated.get(name) ?? createDelegatedEventType(name, delegatedEventFlags(name)),
+			canSeed,
+		);
+	}
+}
+
+/** Compiler-only capture registration for already classified static names. */
+export function __delegateCaptureEvents(eventNames: string[], eventFlags: number[]): void {
+	const canSeed = typeof Element !== 'undefined' && Object.isExtensible(Element.prototype);
+	for (let i = 0; i < eventNames.length; i++) {
+		const name = eventNames[i];
+		if (_delegatedCapture.has(name)) continue;
+		registerDelegatedCapture(
+			_delegated.get(name) ?? createDelegatedEventType(name, eventFlags[i]),
+			canSeed,
+		);
+	}
+}
+
+function registerDelegatedCapture(type: DelegatedEventType, canSeed: boolean): void {
+	const name = type.name;
+	type.flags |= EVENT_CAPTURE;
+	_delegatedCapture.set(name, type);
+	if (canSeed) seedExpando(Element.prototype, CAPTURE_PREFIX + name);
+	for (const target of _delegationTargets.keys()) {
+		if (_delegated.has(name)) continue;
+		target.addEventListener(
+			name,
+			(type.flags & EVENT_NATIVE_CAPTURE) !== 0 ? dispatchDelegated : dispatchDelegatedCapture,
+			delegatedListenerOptions(name, true),
+		);
 	}
 }
 
@@ -30570,13 +30517,14 @@ function registerDelegationTarget(target: Node, root = false): void {
 		if ((target as any).onclick == null && (target as any).nodeType === 1) {
 			(target as any).onclick = noop;
 		}
-		for (const name of _delegated.keys()) {
+		for (const type of _delegated.values()) {
+			const name = type.name;
 			target.addEventListener(
 				name,
 				dispatchDelegated,
-				delegatedListenerOptions(name, delegatedCapture(name)),
+				delegatedListenerOptions(name, (type.flags & EVENT_NATIVE_CAPTURE) !== 0),
 			);
-			if (!delegatedCapture(name)) {
+			if ((type.flags & EVENT_NATIVE_CAPTURE) === 0) {
 				target.addEventListener(
 					name,
 					dispatchDelegatedCapture,
@@ -30584,11 +30532,12 @@ function registerDelegationTarget(target: Node, root = false): void {
 				);
 			}
 		}
-		for (const name of _delegatedCapture.keys()) {
+		for (const type of _delegatedCapture.values()) {
+			const name = type.name;
 			if (_delegated.has(name)) continue;
 			target.addEventListener(
 				name,
-				delegatedCapture(name) ? dispatchDelegated : dispatchDelegatedCapture,
+				(type.flags & EVENT_NATIVE_CAPTURE) !== 0 ? dispatchDelegated : dispatchDelegatedCapture,
 				delegatedListenerOptions(name, true),
 			);
 		}
@@ -30605,14 +30554,21 @@ function unregisterDelegationTarget(target: Node, root = false): void {
 	if (!prev) return;
 	if (prev === 1) {
 		_delegationTargets.delete(target);
-		for (const name of _delegated.keys()) {
-			target.removeEventListener(name, dispatchDelegated, delegatedCapture(name));
-			if (!delegatedCapture(name)) target.removeEventListener(name, dispatchDelegatedCapture, true);
-		}
-		for (const name of _delegatedCapture.keys()) {
+		for (const type of _delegated.values()) {
+			const name = type.name;
 			target.removeEventListener(
 				name,
-				delegatedCapture(name) ? dispatchDelegated : dispatchDelegatedCapture,
+				dispatchDelegated,
+				(type.flags & EVENT_NATIVE_CAPTURE) !== 0,
+			);
+			if ((type.flags & EVENT_NATIVE_CAPTURE) === 0)
+				target.removeEventListener(name, dispatchDelegatedCapture, true);
+		}
+		for (const type of _delegatedCapture.values()) {
+			const name = type.name;
+			target.removeEventListener(
+				name,
+				(type.flags & EVENT_NATIVE_CAPTURE) !== 0 ? dispatchDelegated : dispatchDelegatedCapture,
 				true,
 			);
 		}
@@ -30620,81 +30576,6 @@ function unregisterDelegationTarget(target: Node, root = false): void {
 		_delegationTargets.set(target, prev - 1);
 	}
 }
-
-/**
- * Event types whose outermost delegated dispatch is a commit boundary. React's
- * `batchedUpdates` (react-dom-bindings ReactDOMUpdateBatching.js) flushes sync
- * work at the end of the outermost event handler ONLY when a controlled
- * form control has a pending state restore; every other discrete update lands
- * in the sync-lane microtask. Octane follows the same policy (maybeFlushDiscrete):
- * a dispatch that armed a controlled restore commits synchronously so the
- * restore compares the DOM against the values the handlers just rendered, and
- * any other handler-scheduled work keeps the ordinary microtask batch. For a
- * browser-dispatched event the microtask checkpoint runs before the next native
- * listener and before the default action, so later listeners still observe
- * committed state; a script-dispatched event (dispatchEvent, click(),
- * requestSubmit()) commits only after the dispatching script yields, exactly
- * as React does. Updates still batch inside a handler: setState followed by a
- * DOM read does not observe the update without an explicit flushSync.
- *
- * Based on facebook/react packages/react-dom-bindings/src/events/
- * ReactDOMEventListener.js — getEventPriority. React's priority classification
- * is separate from its sync-lane microtask flush boundary.
- */
-const DISCRETE_EVENTS = new Set<string>([
-	'auxclick',
-	'beforeblur',
-	'beforeinput',
-	'blur',
-	'cancel',
-	'change',
-	'click',
-	'close',
-	'compositionend',
-	'compositionstart',
-	'compositionupdate',
-	'contextmenu',
-	'copy',
-	'cut',
-	'dblclick',
-	'dragend',
-	'dragstart',
-	'drop',
-	'focus',
-	'focusin',
-	'focusout',
-	'fullscreenchange',
-	'gotpointercapture',
-	'hashchange',
-	'input',
-	'invalid',
-	'keydown',
-	'keypress',
-	'keyup',
-	'lostpointercapture',
-	'mousedown',
-	'mouseup',
-	'paste',
-	'pause',
-	'play',
-	'pointercancel',
-	'pointerdown',
-	'pointerup',
-	'popstate',
-	'ratechange',
-	'reset',
-	'resize',
-	'seeked',
-	'select',
-	'selectionchange',
-	'selectstart',
-	'submit',
-	'textInput',
-	'touchcancel',
-	'touchend',
-	'touchstart',
-	'volumechange',
-]);
 
 /**
  * Re-entrancy depth for dispatchDelegated. Only the outermost dispatch flushes
@@ -30706,30 +30587,9 @@ const DISCRETE_EVENTS = new Set<string>([
  */
 let _dispatchDepth = 0;
 
-// Registration pays name parsing and category lookups once. Both native phases
-// share this record, including capture handlers registered after a root mounts.
-function createDelegatedEventType(name: string): DelegatedEventType {
-	return {
-		name,
-		bubbleKey: '$o' + name,
-		captureKey: CAPTURE_PREFIX + name,
-		flags:
-			(delegatedCapture(name) ? EVENT_NATIVE_CAPTURE : 0) |
-			(TARGET_ONLY_DELEGATED.has(name) ? EVENT_TARGET_ONLY : 0) |
-			(DISCRETE_EVENTS.has(name) ? EVENT_DISCRETE : 0) |
-			(RESTORE_EVENTS.has(name) ? EVENT_RESTORE : 0) |
-			(name === 'click' ||
-			name === 'dblclick' ||
-			name === 'mousedown' ||
-			name === 'mousemove' ||
-			name === 'mouseup'
-				? EVENT_DISABLED_MOUSE
-				: 0) |
-			(name === 'mouseenter' ? EVENT_DISABLED_ENTER : 0) |
-			(name === 'invalid' || EMULATED_BUBBLING_EVENTS.includes(name)
-				? EVENT_CUSTOM_NATIVE_ONLY
-				: 0),
-	};
+// Both native phases share the same record, including late registrations.
+function createDelegatedEventType(name: string, flags: number): DelegatedEventType {
+	return { name, bubbleKey: '$o' + name, captureKey: CAPTURE_PREFIX + name, flags };
 }
 
 // A bubble version closes capture-only flush fallbacks without retaining a DOM
@@ -31926,23 +31786,6 @@ interface ControlledState {
 	 *  live child binding may still own Text inside the element. */
 	formChildren: boolean;
 }
-
-/**
- * Events whose dispatch can carry a user edit to a form control — React's
- * ChangeEventPlugin extraction set. Armed elements targeted by one of these
- * are restored after the discrete flush. `click` is delegated (a checkable's
- * edit STARTS there) but never ARMS the restore itself: the platform toggles
- * a checkable before its click dispatch, then fires `input`/`change` AFTER
- * it (activation post-steps) — and octane handlers are native, so they run
- * in those later dispatches. Restoring after the click flush would revert
- * the toggle before any handler could read or commit it (React avoids this
- * only because its synthetic onChange runs during the click); the follow-up
- * input/change arms the restore at the right time, and a NON-toggling click
- * (preventDefault, re-clicking a checked radio) fires no follow-up and
- * leaves no drift to restore.
- */
-const RESTORE_EVENT_LIST = ['input', 'change', 'click'];
-const RESTORE_EVENTS = /* @__PURE__ */ new Set(RESTORE_EVENT_LIST);
 
 // Armed elements an in-flight dispatch touched — drained (restored) by
 // maybeFlushDiscrete AFTER the discrete flush, so the restore compares the
