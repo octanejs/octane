@@ -24,7 +24,7 @@ const EAGER_METADATA = /* @__PURE__ */ new Set([
 	// maybeEnqueueRestore: native input/change event sequence state.
 	'$$checkableActivation',
 	'$$selectPick',
-	// handleFormSubmit/publishManualFormPending: native submit lifetime counter.
+	// handleFormSubmit/publishRegisteredManualFormPending: native submit lifetime counter.
 	'$$pendingSubmits',
 ]);
 

@@ -729,6 +729,10 @@ let CONTROLLED_RESTORE_DRIVER: {
 	enqueue: typeof maybeEnqueueRestore;
 	finish: typeof maybeFlushDiscrete;
 } | null = null;
+// Install before queued work drains or a submit transition publishes pending status.
+// Keep the call targets stable after installation, including after rollback.
+let drainControlledSyncs: typeof drainQueuedControlledSyncs = noop;
+let publishManualFormPending: typeof publishRegisteredManualFormPending = noop;
 // A PortalSlot installs its consumers before deferred range publication. Keep
 // them installed after the last removal: an event can still be between capture
 // and bubble with a route through the former portal.
@@ -2516,11 +2520,10 @@ export interface Block extends Scope {
 	extra: any;
 	outputHandler: OutputHandler | null;
 	/**
-	 * True when this block OR any ancestor is a `memo()` block. Monotone up the
-	 * parentBlock chain (computed once at creation), so `useContextInternal` can
-	 * skip its memo-ancestor stamping walk entirely on the common no-memo tree —
-	 * the walk only ever stamps memo blocks, so if there are none above us it is
-	 * pure overhead (~ancestor-depth iterations per `use()` call).
+	 * False proves neither this block nor any ancestor is memoized or armed for
+	 * implicit bailout. Inherited on creation and promoted through retained
+	 * descendants when a boundary gains memo/implicit metadata. True remains
+	 * conservative across body changes and rollback.
 	 */
 	memoInChain: boolean;
 	pending: boolean;
@@ -18814,11 +18817,29 @@ export function createHostContextRequest(thenable: PromiseLike<unknown>): HostCo
 }
 
 function isHostContextRequest(err: unknown): err is HostContextRequestSignal {
-	return (
-		err !== null &&
-		typeof err === 'object' &&
-		(err as { $$kind?: unknown }).$$kind === HOST_CONTEXT_REQUEST_TAG
-	);
+	try {
+		return (
+			err !== null &&
+			typeof err === 'object' &&
+			(err as { $$kind?: unknown }).$$kind === HOST_CONTEXT_REQUEST_TAG
+		);
+	} catch {
+		// An opaque application error must not interrupt render cleanup.
+		return false;
+	}
+}
+
+// A retained subtree can acquire a memo/implicit boundary after construction.
+// Promote its existing Blocks and lite proxies before a context read checks its
+// memoInChain flag. True is conservative and remains valid after
+// rollback or a later body change, so this metadata needs no journal entry.
+function promoteMemoAncestry(scope: Scope): void {
+	const block = scope.block;
+	if (scope === block && block.memoInChain) return;
+	block.memoInChain = true;
+	// A host child Scope can borrow the already-promoted Block. Its own children
+	// still need visiting; only an actual Block owns the subtree proof above.
+	forEachSubtreeChild(scope, promoteMemoAncestry);
 }
 
 function recordContextDependency(block: Block | null, context: Context<any>): void {
@@ -19122,7 +19143,12 @@ class SuspenseException {
 }
 
 function isSuspenseException(x: any): x is SuspenseException {
-	return x !== null && typeof x === 'object' && (x as any).__isSuspense === true;
+	try {
+		return x !== null && typeof x === 'object' && (x as any).__isSuspense === true;
+	} catch {
+		// Error values can expose throwing accessors instead of a control marker.
+		return false;
+	}
 }
 
 const HYDRATION_REJECTION_SEED = Symbol('octane.hydration.rejection-seed');
@@ -20508,7 +20534,7 @@ export function lazy<C extends ComponentBody<any>>(
 			// The Block was created while the payload was unresolved, before it could
 			// inherit memo metadata. Arm context dependency stamping before executing
 			// the resolved memo body.
-			scope.block.memoInChain = true;
+			if (!scope.block.memoInChain) promoteMemoAncestry(scope);
 		}
 		if (
 			profiledComponent !== comp &&
@@ -31525,7 +31551,7 @@ function snapshotSubmitDispatch(form: HTMLFormElement, event: SubmitEvent): Subm
 let ACTIVE_SUBMIT_DISPATCH: SubmitDispatchRec | null = null;
 
 // Runs when the submit dispatch's handler walk finishes (dispatchDelegated).
-function publishManualFormPending(rec: SubmitDispatchRec): void {
+function publishRegisteredManualFormPending(rec: SubmitDispatchRec): void {
 	if (rec.intercepted || rec.transitions === 0 || !rec.event.defaultPrevented) return;
 	const form = rec.form;
 	let data: FormData | null = null;
@@ -31855,6 +31881,7 @@ let DEV_FORM_CHECK_GENERATION = 1;
 let AUTOFOCUS_QUEUE: Element[] = [];
 
 function queueControlledCommit<T>(queue: T[], item: T): void {
+	if (drainControlledSyncs === noop) drainControlledSyncs = drainQueuedControlledSyncs;
 	if (
 		DEFERRED_LAYOUT_DRIVER &&
 		item !== null &&
@@ -31870,6 +31897,7 @@ function queueControlledCommit<T>(queue: T[], item: T): void {
 }
 
 function queueDevFormCheck(queue: Element[], el: Element): void {
+	if (drainControlledSyncs === noop) drainControlledSyncs = drainQueuedControlledSyncs;
 	if (DEFERRED_LAYOUT_DRIVER) DEFERRED_LAYOUT_DRIVER.recordStageEntry(el);
 	queue.push(el);
 	if (ROOT_RENDER_TRANSACTION !== null) {
@@ -33057,7 +33085,7 @@ function drainDevFormDiagnostics(target?: Element): void {
  * element's full listener set). Default projections run first; a controlled
  * `value` then wins.
  */
-function drainControlledSyncs(): void {
+function drainQueuedControlledSyncs(): void {
 	if (AUTOFOCUS_QUEUE.length > 0) {
 		const q = AUTOFOCUS_QUEUE;
 		AUTOFOCUS_QUEUE = [];
@@ -39871,7 +39899,7 @@ export function childSlot(
 				// The slot previously hosted an arbitrary render function. Arm before
 				// rendering the tagged body so its context reads stamp this block.
 				state.block.$$implicitBail = true;
-				state.block.memoInChain = true;
+				if (!state.block.memoInChain) promoteMemoAncestry(state.block);
 			}
 			if (
 				wasImplicitlyArmed &&
@@ -40981,6 +41009,16 @@ export function memo<P>(
 	arePropsEqual?: (prevProps: Readonly<P>, nextProps: Readonly<P>) => boolean,
 ): ComponentBody<P> & { readonly type: ComponentBody<P>; displayName?: string } {
 	function memoWrapper(props: P, scope: Scope, extra: any): unknown {
+		// A render-function slot may replace its body while retaining children.
+		// Arm only the Block this wrapper actually owns, never a direct call that
+		// happens to execute inside another component's render scope.
+		if (
+			scope === CURRENT_SCOPE &&
+			scope !== null &&
+			!scope.block.memoInChain &&
+			scope.block.body === memoWrapper
+		)
+			promoteMemoAncestry(scope);
 		// Propagate the wrapped body's return so a folded (return-based) component
 		// memo()'d here still hands its descriptor back to renderBlock to mount.
 		return component(props, scope, extra);
@@ -44705,7 +44743,11 @@ function runTransition(fn: () => void | Promise<unknown>, hook?: TransitionHookS
 	// see publishManualFormPending). Registered here; every settle path below
 	// notifies the record exactly once.
 	const submitRec = ACTIVE_SUBMIT_DISPATCH;
-	if (submitRec !== null) submitRec.transitions++;
+	if (submitRec !== null) {
+		if (publishManualFormPending === noop)
+			publishManualFormPending = publishRegisteredManualFormPending;
+		submitRec.transitions++;
+	}
 	let result: unknown;
 	try {
 		tickTransitionCount(+1);
