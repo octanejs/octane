@@ -239,6 +239,13 @@ state:
 {use(resource)} // Re-runs: hook and suspension point.
 ```
 
+Host-only TSRX children with stable refs and dependency-tracked effects can also
+reuse a parent's unchanged output region without an explicit `memo()` wrapper.
+Live imports read by the child invalidate that region when their values change.
+Effects with `null` dependencies, callback or dependency factories, render-time
+ref reads, and unsupported hooks keep the child live. This proof is specific to
+compiled TSRX bodies; returned JSX retains its existing behavior.
+
 A call keeps its surrounding region memoizable only when the callee is an
 imported binding or an unreassigned same-module function whose body is itself a
 value projection. Arguments must satisfy the same rule.

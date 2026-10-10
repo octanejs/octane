@@ -15682,6 +15682,37 @@ export function useCallback<F extends (...args: any[]) => any>(
 /** Compiler-owned intrinsics cannot be shadowed by bindings in an authored body. */
 export const hookMemoEqual = Object.is;
 
+interface CompilerMemoProof {
+	read: (() => unknown[]) | null;
+	values: unknown[];
+}
+let COMPILER_MEMO_PROOFS: WeakMap<Function, CompilerMemoProof> | null = null;
+
+/** Definition-site proof; copying a function's statics cannot transfer it. */
+export function markCompilerMemo<T extends Function>(
+	component: T,
+	read: (() => unknown[]) | null,
+): T {
+	(COMPILER_MEMO_PROOFS ??= new WeakMap()).set(component, { read, values: [] });
+	return component;
+}
+
+/** One witness per cached region, outside its component/list work. */
+export function compilerMemoWitness(component: any): unknown[] | Function | undefined {
+	if (component.__memo === true && component.__compare === undefined) return component;
+	const proof = COMPILER_MEMO_PROOFS?.get(component);
+	if (proof === undefined || 'defaultProps' in component) return undefined;
+	if (proof.read === null) return proof.values;
+	const values = proof.read();
+	const previous = proof.values;
+	if (values.length !== previous.length) return (proof.values = values);
+	for (let index = 0; index < values.length; index++) {
+		if (!Object.is(values[index], previous[index])) return (proof.values = values);
+	}
+	// A token already published in a committed region must never be mutated.
+	return previous;
+}
+
 /** @internal The usual compiled body takes the first-region fast path. */
 export function compilerMemoRegion(scope: Scope, bodyId: number): CompilerMemoRegion {
 	const first = scope.compilerMemo;

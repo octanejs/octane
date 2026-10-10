@@ -8,6 +8,8 @@ import { loadCompiledFixtureSource } from './_server-fixture.js';
 import { AutoMemoApp } from './_fixtures/auto-memo.tsrx';
 import { CompilerNameCollisionApp } from './_fixtures/auto-memo-name-collisions.tsrx';
 import { ParentCaptureApp } from './_fixtures/auto-memo-parent-capture.tsrx';
+import { EffectImportRow } from './_fixtures/auto-memo-effect-row.tsrx';
+import { setEffectRowImports } from './_fixtures/auto-memo-effect-imports';
 import {
 	TsxAutoMemoApp,
 	TsxBoundMapApp,
@@ -18,6 +20,50 @@ import {
 	TsxMapExtraArgumentApp,
 	TsxStatefulMappedApp,
 } from './_fixtures/tsx-auto-memo.tsx';
+
+function loadEffectRowParent(Row: any, mode: 'client' | 'server' = 'client') {
+	return loadCompiledFixtureSource(
+		`import { Row } from './row';
+		 export function App(props) @{
+			const items = props.items;
+			const onEffect = props.onEffect;
+			<section data-tick={props.tick}>
+				<ul>@for (const item of items; key item.id) {
+					<Row item={item} onEffect={onEffect} />
+				}</ul>
+			</section>
+		 }`,
+		{
+			id: 'effectful-parent.tsrx',
+			mode,
+			compileOptions: { hmr: false, dev: false },
+			runtimeModules: { './row': { Row } },
+		},
+	);
+}
+
+const EFFECT_ROW_SOURCE = `
+	import { useEffect, useLayoutEffect, useRef } from 'octane';
+	export function Row(props) @{
+		const cell = useRef(null);
+		useEffect(() => {
+			props.onEffect('effect:' + props.item.label);
+			return () => props.onEffect('cleanup:' + props.item.label);
+		}, [props.item.label]);
+		useLayoutEffect(() => {
+			props.onEffect('layout:' + cell.current.textContent);
+		}, [props.item.label]);
+		<li><span ref={cell}>{props.item.label as string}</span></li>
+	}
+`;
+
+function loadEffectRow(source = EFFECT_ROW_SOURCE, mode: 'client' | 'server' = 'client') {
+	return loadCompiledFixtureSource(source, {
+		id: 'effectful-row.tsrx',
+		mode,
+		compileOptions: { hmr: false, dev: false },
+	});
+}
 
 function trailingVersion(text: string | null): number {
 	return Number(text?.match(/(\d+)$/)?.[1]);
@@ -803,6 +849,329 @@ describe('state-derived collections and independent host bindings', () => {
 			root?.unmount();
 			container.remove();
 		}
+	});
+});
+
+describe('effectful component regions', () => {
+	it('keeps changed props, effect cleanup and row identity synchronized', () => {
+		const { App } = loadEffectRowParent(loadEffectRow().Row);
+		const events: string[] = [];
+		const onEffect = (event: string) => events.push(event);
+		const items = [{ id: 'row', label: 'first' }];
+		const root = mount(App, { items, tick: 0, onEffect });
+		flushEffects();
+		const row = root.find('li');
+		expect(events).toEqual(['layout:first', 'effect:first']);
+		root.update(App, { items, tick: 1, onEffect });
+		flushEffects();
+		expect(root.find('li')).toBe(row);
+		expect(events).toEqual(['layout:first', 'effect:first']);
+		events.length = 0;
+		root.update(App, { items: [{ id: 'row', label: 'second' }], tick: 2, onEffect });
+		flushEffects();
+		expect(root.find('li')).toBe(row);
+		expect(row.textContent).toBe('second');
+		expect(events).toContain('layout:second');
+		expect(events.filter((event) => !event.startsWith('layout:'))).toEqual([
+			'cleanup:first',
+			'effect:second',
+		]);
+		root.unmount();
+		flushEffects();
+		expect(events.at(-1)).toBe('cleanup:second');
+	});
+
+	it('updates live imported refs independently in two retained roots', () => {
+		const attached = [new Set<Element>(), new Set<Element>()];
+		const ref = (index: number) => (element: Element | null) => {
+			if (element === null) return;
+			attached[index].add(element);
+			return () => {
+				attached[index].delete(element);
+			};
+		};
+		setEffectRowImports(ref(0), 0);
+		const { App } = loadEffectRowParent(EffectImportRow);
+		const props = { items: [{ id: 'row', label: 'same' }], tick: 0 };
+		const first = mount(App, props);
+		const second = mount(App, props);
+		const firstRow = first.find('li');
+		const secondRow = second.find('li');
+		try {
+			expect(attached[0]).toEqual(new Set([firstRow, secondRow]));
+			setEffectRowImports(ref(1), 0);
+			first.update(App, { ...props, tick: 1 });
+			expect(attached[0]).toEqual(new Set([secondRow]));
+			expect(attached[1]).toEqual(new Set([firstRow]));
+			second.update(App, { ...props, tick: 1 });
+			expect(attached[0].size).toBe(0);
+			expect(attached[1]).toEqual(new Set([firstRow, secondRow]));
+			expect(first.find('li')).toBe(firstRow);
+			expect(second.find('li')).toBe(secondRow);
+		} finally {
+			first.unmount();
+			second.unmount();
+			flushEffects();
+			setEffectRowImports(() => {}, 0);
+		}
+		expect(attached[1].size).toBe(0);
+	});
+
+	it('observes signed-zero changes in a live imported value across roots', () => {
+		const ref = () => {};
+		setEffectRowImports(ref, 0);
+		const { App } = loadEffectRowParent(EffectImportRow);
+		const props = { items: [{ id: 'row', label: 'value' }], tick: 0 };
+		const first = mount(App, props);
+		const second = mount(App, props);
+		try {
+			expect(first.find('li').textContent).toBe('value:Infinity');
+			setEffectRowImports(ref, -0);
+			first.update(App, { ...props, tick: 1 });
+			second.update(App, { ...props, tick: 1 });
+			expect(first.find('li').textContent).toBe('value:-Infinity');
+			expect(second.find('li').textContent).toBe('value:-Infinity');
+			setEffectRowImports(ref, 0);
+			second.update(App, { ...props, tick: 2 });
+			first.update(App, { ...props, tick: 2 });
+			expect(first.find('li').textContent).toBe('value:Infinity');
+			expect(second.find('li').textContent).toBe('value:Infinity');
+		} finally {
+			first.unmount();
+			second.unmount();
+			flushEffects();
+			setEffectRowImports(() => {}, 0);
+		}
+	});
+
+	it.each(['null', 'callback factory', 'dependency factory'])(
+		'preserves %s effects on unchanged parent updates',
+		(kind) => {
+			const call =
+				kind === 'null'
+					? "useEffect(() => { props.onEffect('effect'); return () => props.onEffect('cleanup'); }, null);"
+					: kind === 'callback factory'
+						? 'useEffect(props.callbackFactory(), []);'
+						: "useEffect(() => props.onEffect('effect'), props.dependencyFactory());";
+			const { Row } = loadEffectRow(
+				`import { useEffect } from 'octane'; export function Row(props) @{ ${call} <li>{props.item.label as string}</li> }`,
+			);
+			const events: string[] = [];
+			const parent = loadCompiledFixtureSource(
+				`import { Row } from './row'; export function App(props) @{
+					const items = props.items;
+					const onEffect = props.onEffect;
+					const callbackFactory = props.callbackFactory;
+					const dependencyFactory = props.dependencyFactory;
+					<ul data-tick={props.tick}>@for (const item of items; key item.id) {
+						<Row item={item} onEffect={onEffect} callbackFactory={callbackFactory} dependencyFactory={dependencyFactory} />
+					}</ul>
+				}`,
+				{
+					id: 'effect-factories-parent.tsrx',
+					mode: 'client',
+					compileOptions: { hmr: false, dev: false },
+					runtimeModules: { './row': { Row } },
+				},
+			);
+			const props = {
+				items: [{ id: 'row', label: 'same' }],
+				onEffect: (event: string) => events.push(event),
+				callbackFactory: () => {
+					events.push('callback');
+					return () => {};
+				},
+				dependencyFactory: () => {
+					events.push('dependencies');
+					return [];
+				},
+			};
+			const root = mount(parent.App, props);
+			flushEffects();
+			events.length = 0;
+			root.update(parent.App, { ...props, tick: 1 });
+			flushEffects();
+			expect(events).toEqual(
+				kind === 'null'
+					? ['cleanup', 'effect']
+					: [kind === 'callback factory' ? 'callback' : 'dependencies'],
+			);
+			root.unmount();
+			flushEffects();
+		},
+	);
+
+	it('does not transfer component behavior guarantees when statics are copied to a wrapper', () => {
+		const { Row } = loadEffectRow();
+		let label = 'first';
+		function Wrapper(props: any, scope: any, extra: any) {
+			return Row({ ...props, item: { ...props.item, label } }, scope, extra);
+		}
+		Object.defineProperties(Wrapper, Object.getOwnPropertyDescriptors(Row));
+		const { App } = loadEffectRowParent(Wrapper);
+		const props = { items: [{ id: 'row', label: 'ignored' }], tick: 0, onEffect: () => {} };
+		const root = mount(App, props);
+		expect(root.find('li').textContent).toBe('first');
+		label = 'second';
+		root.update(App, { ...props, tick: 1 });
+		expect(root.find('li').textContent).toBe('second');
+		root.unmount();
+		flushEffects();
+	});
+
+	it('observes defaults added and changed on an effectful provider child', () => {
+		const { Row } = loadEffectRow(
+			`import { useEffect } from 'octane'; export function Row(props) @{ useEffect(() => {}, []); <li>{props.label as string}</li> }`,
+		);
+		const parent = loadCompiledFixtureSource(
+			`import { createContext } from 'octane'; import { Row } from './row'; const Theme = createContext(null); export function App(props) { return <Theme value={null}><Row /></Theme>; }`,
+			{
+				id: 'effect-defaults-parent.tsx',
+				mode: 'client',
+				compileOptions: { hmr: false, dev: false },
+				runtimeModules: { './row': { Row } },
+			},
+		);
+		const props = { items: [{ id: 'row' }] };
+		const root = mount(parent.App, props);
+		Row.defaultProps = { label: 'first' };
+		root.update(parent.App, props);
+		expect(root.find('li').textContent).toBe('first');
+		Row.defaultProps = { label: 'second' };
+		root.update(parent.App, props);
+		expect(root.find('li').textContent).toBe('second');
+		root.unmount();
+		flushEffects();
+	});
+
+	it('reconnects retained effects when an Activity becomes visible again', () => {
+		const { Row } = loadEffectRow();
+		const { App } = loadCompiledFixtureSource(
+			`
+			import { Activity } from 'octane';
+			import { Row } from './row';
+			function Rows(props) @{
+				const items = props.items;
+				const onEffect = props.onEffect;
+				<ul>@for (const item of items; key item.id) {
+					<Row item={item} onEffect={onEffect} />
+				}</ul>
+			}
+			export function App(props) @{ <Activity mode={props.mode}><Rows items={props.items} onEffect={props.onEffect} /></Activity> }
+		`,
+			{
+				id: 'effectful-activity.tsrx',
+				mode: 'client',
+				compileOptions: { hmr: false, dev: false },
+				runtimeModules: { './row': { Row } },
+			},
+		);
+		const events: string[] = [];
+		const props = {
+			items: [{ id: 'row', label: 'live' }],
+			onEffect: (event: string) => events.push(event),
+			mode: 'visible',
+		};
+		const root = mount(App, props);
+		flushEffects();
+		const row = root.find('li');
+		expect(events).toEqual(['layout:live', 'effect:live']);
+		root.update(App, { ...props, mode: 'hidden' });
+		flushEffects();
+		expect(events).toContain('cleanup:live');
+		events.length = 0;
+		root.update(App, props);
+		flushEffects();
+		expect(root.find('li')).toBe(row);
+		expect(row.textContent).toBe('live');
+		expect(events).toEqual(['layout:live', 'effect:live']);
+		root.unmount();
+		flushEffects();
+		expect(events.at(-1)).toBe('cleanup:live');
+	});
+
+	it('restores effectful row output before retrying a held root update', async () => {
+		const { Row } = loadEffectRow();
+		const { App } = loadCompiledFixtureSource(
+			`
+			import { use } from 'octane';
+			import { Row } from './row';
+			function Reader(props) @{ const value = use(props.promise); <output>{value as string}</output> }
+			export function App(props) @{
+				const items = props.items;
+				const onEffect = props.onEffect;
+				<main><ul>@for (const item of items; key item.id) {
+					<Row item={item} onEffect={onEffect} />
+				}</ul><Reader promise={props.promise} /></main>
+			}
+		`,
+			{
+				id: 'effectful-held-root.tsrx',
+				mode: 'client',
+				compileOptions: { hmr: false, dev: false },
+				runtimeModules: { './row': { Row } },
+			},
+		);
+		const events: string[] = [];
+		const onEffect = (event: string) => events.push(event);
+		const first = Promise.resolve('ready');
+		const root = mount(App, { items: [{ id: 'row', label: 'first' }], onEffect, promise: first });
+		await act(() => first);
+		flushEffects();
+		const row = root.find('li');
+		let resolve!: (value: string) => void;
+		const pending = new Promise<string>((done) => {
+			resolve = done;
+		});
+		await act(() =>
+			root.root.render(App, {
+				items: [{ id: 'row', label: 'second' }],
+				onEffect,
+				promise: pending,
+			}),
+		);
+		expect(root.find('li')).toBe(row);
+		expect(row.textContent).toBe('first');
+		expect(events.filter((event) => !event.startsWith('layout:'))).toEqual(['effect:first']);
+		await act(() => resolve('accepted'));
+		flushEffects();
+		expect(root.find('li')).toBe(row);
+		expect(row.textContent).toBe('second');
+		expect(root.find('output').textContent).toBe('accepted');
+		expect(events.filter((event) => !event.startsWith('layout:'))).toEqual([
+			'effect:first',
+			'cleanup:first',
+			'effect:second',
+		]);
+		root.unmount();
+		flushEffects();
+	});
+
+	it('hydrates effectful rows in place and preserves changed dependencies', () => {
+		const server = loadEffectRowParent(loadEffectRow(EFFECT_ROW_SOURCE, 'server').Row, 'server');
+		const client = loadEffectRowParent(loadEffectRow().Row);
+		const events: string[] = [];
+		const onEffect = (event: string) => events.push(event);
+		const props = { items: [{ id: 'row', label: 'server' }], tick: 0, onEffect };
+		const container = document.createElement('div');
+		container.innerHTML = ServerRuntime.renderToString(server.App, props).html;
+		const row = container.querySelector('li');
+		const root = hydrateRoot(container, client.App, props);
+		flushEffects();
+		expect(container.querySelector('li')).toBe(row);
+		expect(events).toEqual(['layout:server', 'effect:server']);
+		flushSync(() => root.render(client.App, { ...props, tick: 1 }));
+		flushEffects();
+		expect(events).toEqual(['layout:server', 'effect:server']);
+		flushSync(() => root.render(client.App, { ...props, items: [{ id: 'row', label: 'client' }] }));
+		flushEffects();
+		expect(container.querySelector('li')).toBe(row);
+		expect(row?.textContent).toBe('client');
+		expect(events).toContain('cleanup:server');
+		expect(events).toContain('effect:client');
+		root.unmount();
+		flushEffects();
+		expect(events.at(-1)).toBe('cleanup:client');
 	});
 });
 
@@ -5544,18 +5913,25 @@ describe('compiler-owned component-region memoization', () => {
 		root.unmount();
 	});
 
-	it('re-enters a cached region when an imported component it renders is not memo-stable', () => {
-		// The imported component's own memo contract is unknown at compile time, so
-		// the cached region must consult it on entry rather than trust its snapshot.
-		const code = compile(
+	it('keeps an unproven imported component live when parent props are unchanged', () => {
+		let label = 'first';
+		const client = loadCompiledFixtureSource(
 			`import { Icon } from './icon';
 			 function Child(props) @{ <span>{props.v}<Icon /></span> }
 			 export function App(props) @{ <Child v={props.v} /> }`,
-			'auto-memo-witness.tsrx',
-			{ hmr: false, autoMemo: true },
-		).code;
-		expect(code).toContain('__memoCommitted');
-		expect(code).toMatch(/Icon\.__memo !== true \|\| Icon\.__compare !== undefined/);
+			{
+				id: 'auto-memo-witness.tsrx',
+				mode: 'client',
+				compileOptions: { hmr: false, dev: false },
+				runtimeModules: { './icon': { Icon: () => label } },
+			},
+		);
+		const root = mount(client.App, { v: 'label:' });
+		expect(root.find('span').textContent).toBe('label:first');
+		label = 'second';
+		root.update(client.App, { v: 'label:' });
+		expect(root.find('span').textContent).toBe('label:second');
+		root.unmount();
 	});
 
 	it('rejects a callback that reads a ref through a binding pattern', () => {

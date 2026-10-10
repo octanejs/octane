@@ -1614,6 +1614,8 @@ function importSpecifierPair(entry) {
 // New compiler-only helpers use the private, renderer-specific ABI instead.
 const HOOK_MEMO_RUNTIME_HELPERS = new Set([
 	'compilerMemoRegion',
+	'compilerMemoWitness',
+	'markCompilerMemo',
 	'hookMemoCreate',
 	'hookMemoEqual',
 	'hookMemoPublish',
@@ -5913,6 +5915,85 @@ function containsRenderCall(stmts, memoCtx = null) {
 	}
 	for (const s of stmts) walk(s);
 	return found;
+}
+
+// A host-only effectful child can reuse its parent's output region while its
+// props and live imports are unchanged. Only these built-ins own the deferred
+// callback position; ordinary closures and calls retain the existing hazards.
+function effectfulMemoCaptures(node, ctx) {
+	const refs = new Set();
+	let hasEffect = false;
+	const statements = [];
+	for (const statement of node.body.body || []) {
+		const declaration = statement.declarations?.length === 1 ? statement.declarations[0] : null;
+		const initializer = unwrapTsExpr(declaration?.init);
+		if (
+			statement.type === 'VariableDeclaration' &&
+			statement.kind === 'const' &&
+			declaration?.id?.type === 'Identifier' &&
+			autoMemoBuiltinHookName(initializer, ctx) === 'useRef' &&
+			initializer.arguments.length === 1 &&
+			unwrapTsExpr(initializer.arguments[0])?.type === 'Literal'
+		) {
+			refs.add(declaration.id.name);
+			statements.push({
+				...statement,
+				declarations: [{ ...declaration, init: initializer.arguments[0] }],
+			});
+			continue;
+		}
+		const call = unwrapTsExpr(statement.expression);
+		const hook = autoMemoBuiltinHookName(call, ctx);
+		if (
+			statement.type === 'ExpressionStatement' &&
+			(hook === 'useEffect' || hook === 'useLayoutEffect' || hook === 'useInsertionEffect')
+		) {
+			const callback = unwrapTsExpr(call.arguments[0]);
+			const deps = unwrapTsExpr(call.arguments[1]);
+			if (
+				(callback?.type !== 'ArrowFunctionExpression' && callback?.type !== 'FunctionExpression') ||
+				deps?.type !== 'ArrayExpression' ||
+				deps.elements.some((element) => element?.type === 'SpreadElement')
+			)
+				return null;
+			hasEffect = true;
+			statements.push(b.stmt(b.array(call.arguments.slice(1))));
+			continue;
+		}
+		statements.push(statement);
+	}
+	if (!hasEffect) return null;
+	if (node.body.render) statements.push(node.body.render);
+	let unsafeRef = false;
+	const analyzed = mapAst(statements, (entry) => {
+		if (
+			(entry.type !== 'Attribute' && entry.type !== 'JSXAttribute') ||
+			jsxAttrRawName(entry) !== 'ref'
+		)
+			return null;
+		const value = unwrapTsExpr(entry.value?.expression ?? entry.value);
+		if (
+			value?.type !== 'Identifier' ||
+			(!refs.has(value.name) && !ctx.importedNames.has(value.name)) ||
+			ctx.importNamespaceNames.has(value.name)
+		)
+			unsafeRef = true;
+		return value;
+	});
+	if (
+		unsafeRef ||
+		containsComponentCallOrControlFlow(analyzed) ||
+		containsRenderCall(analyzed, ctx) ||
+		containsAutoMemoUnsafeStructure(analyzed, ctx) ||
+		containsImportedMemberRead(analyzed, ctx.importedNames)
+	)
+		return null;
+	const captures = [];
+	for (const name of collectFreeIdentifiers(b.block(analyzed), collectComponentLocals(node))) {
+		if (!ctx.importedNames.has(name) || ctx.importNamespaceNames.has(name)) return null;
+		captures.push(name);
+	}
+	return captures.sort();
 }
 
 // Built-in hooks whose render-time work cannot schedule an update for the
@@ -12023,6 +12104,10 @@ function compileInternal(
 		const ordinaryPropsParam =
 			(compNode.params?.length ?? 0) <= 1 &&
 			(compNode.params?.length !== 1 || isAutoMemoPropsParam(compNode.params[0]));
+		info.effectfulMemoCaptures =
+			ctx.autoMemo && ctx.mode === 'client' && info.voidOutput && ordinaryPropsParam
+				? effectfulMemoCaptures(compNode, ctx)
+				: null;
 		let autoMemoSafe =
 			ordinaryPropsParam &&
 			!containsRenderCall(stmts, ctx) &&
@@ -16840,6 +16925,15 @@ function compileComponent(node, ctx, options) {
 	const pendingWarm = ctx._pendingWarm;
 	ctx._pendingWarm = null;
 	const componentInfo = ctx.componentInfo.get(name);
+	const memoCaptures = componentInfo?.effectfulMemoCaptures;
+	const memoInitializer = (component) =>
+		b.call(
+			requireRuntimeForContext(ctx, 'markCompilerMemo'),
+			component,
+			memoCaptures.length === 0
+				? b.literal(null)
+				: b.arrow([], b.array(memoCaptures.map((capture) => b.id(capture)))),
+		);
 
 	// The compiled function stays a NODE (M2 AST emit): compileComponent returns
 	// `{ nodes }` — the declaration statement plus any capability-stamp/HMR/
@@ -16919,6 +17013,7 @@ function compileComponent(node, ctx, options) {
 				componentInfo.singleRootInitialized = true;
 			}
 		}
+		if (memoCaptures) statements.push(guarded(memoInitializer(b.id(name))));
 		if (hmrWrap && isExported) {
 			// `_$hmr` returns a stable wrapper with a DIFFERENT identity; rebinding
 			// keeps later references hot-updatable while the pre-declaration capture
@@ -16982,6 +17077,7 @@ function compileComponent(node, ctx, options) {
 		valueExpr = inheritOriginLoc(singleRootInitializer(ctx, valueExpr), node);
 		componentInfo.singleRootInitialized = true;
 	}
+	if (memoCaptures) valueExpr = inheritOriginLoc(markPure(memoInitializer(valueExpr)), node);
 	const declKind = options && options.hmrMutable ? 'let' : 'const';
 	const declNode = inheritOriginLoc(
 		b.declaration(declKind, [
@@ -27140,15 +27236,21 @@ function emitAutoMemoRegion(
 	publicationWitnesses = null,
 	sameValueDependencies = false,
 	strictEqualityDependencyIndex = -1,
+	componentWitnesses = [],
 ) {
 	const witnessCount = publicationWitnesses?.length ?? 0;
 	const cell = allocAutoMemoCell(
 		ctx,
-		dependencies.length + (contextAware ? 1 : 0) + witnessCount + (ctx.nativeReads ? 1 : 0),
+		dependencies.length +
+			(contextAware ? 1 : 0) +
+			witnessCount +
+			componentWitnesses.length +
+			(ctx.nativeReads ? 1 : 0),
 	);
 	const contextIndex = contextAware ? cell.base + dependencies.length : null;
 	const witnessBase = cell.base + dependencies.length + (contextAware ? 1 : 0);
-	const nativeWitnessIndex = witnessBase + witnessCount;
+	const componentBase = witnessBase + witnessCount;
+	const nativeWitnessIndex = componentBase + componentWitnesses.length;
 	const cache = ctx.currentAutoMemoCacheName;
 	const cacheAt = (i) => b.member(b.id(cache), b.literal(i), true);
 	const nativeCapture = ctx.nativeReads
@@ -27176,6 +27278,18 @@ function emitAutoMemoRegion(
 	const depDecls = dependencies.map((dependency, index) =>
 		b.const(depNames[index], depNode ? depNode(dependency) : b.id(dependency)),
 	);
+	const componentNames = componentWitnesses.map(() => allocCompilerName(ctx, '__memoComponent'));
+	for (let index = 0; index < componentWitnesses.length; index++) {
+		depDecls.push(
+			b.const(
+				componentNames[index],
+				b.call(
+					requireRuntimeForContext(ctx, 'compilerMemoWitness'),
+					b.id(componentWitnesses[index]),
+				),
+			),
+		);
+	}
 	const misses = [
 		b.binary(
 			'===',
@@ -27205,6 +27319,10 @@ function emitAutoMemoRegion(
 	for (let index = 0; index < witnessCount; index++) {
 		misses.push(b.binary('!==', cacheAt(witnessBase + index), b.id(publicationWitnesses[index])));
 	}
+	for (let index = 0; index < componentNames.length; index++) {
+		misses.push(b.binary('===', b.id(componentNames[index]), b.id('undefined')));
+		misses.push(b.binary('!==', cacheAt(componentBase + index), b.id(componentNames[index])));
+	}
 	const publish = () => [
 		...depNames.map((name, index) =>
 			b.stmt(b.assignment('=', cacheAt(cell.base + index), b.id(name))),
@@ -27214,6 +27332,9 @@ function emitAutoMemoRegion(
 			// Sampling the binding before the call would cache the OLD owner and
 			// make the next equal-props render miss or skip the wrong publication.
 			b.stmt(b.assignment('=', cacheAt(witnessBase + index), b.id(name))),
+		),
+		...componentNames.map((name, index) =>
+			b.stmt(b.assignment('=', cacheAt(componentBase + index), b.id(name))),
 		),
 		...(nativeCapture === null
 			? []
@@ -28610,17 +28731,13 @@ function planJsx(
 					b.const('_v', fc.itemsExpr),
 					b.const(nativeName, b.call('_$mapSlot', b.id('_v'), fc.mapMethodExpr)),
 				];
-				const witnessMiss = fc.autoMemoWitnesses.length
-					? witnessMissChain(fc.autoMemoWitnesses)
-					: null;
 				const customMiss = b.unary('!', b.id(nativeName));
-				const forcedMiss = witnessMiss ? b.logical('||', customMiss, witnessMiss) : customMiss;
 				const guarded = emitAutoMemoRegion(
 					ctx,
 					['_v', ...fc.autoMemoDeps],
 					slotIndex,
 					mappedCall,
-					forcedMiss,
+					customMiss,
 					fc.autoMemoContextAware,
 					depNode,
 					b.id(nativeName),
@@ -28628,6 +28745,7 @@ function planJsx(
 					null,
 					sameValueListDependencies,
 					strictListDependencyIndex,
+					fc.autoMemoWitnesses,
 				);
 				pushAfterStmt(fc.id, org, b.block([...prefix, guarded]));
 			} else {
@@ -28656,9 +28774,6 @@ function planJsx(
 			continue;
 		}
 		if (fc.autoMemoDeps !== null) {
-			const witnessMiss = fc.autoMemoWitnesses.length
-				? witnessMissChain(fc.autoMemoWitnesses)
-				: null;
 			const guarded = emitAutoMemoRegion(
 				ctx,
 				['_v', ...fc.autoMemoDeps],
@@ -28673,7 +28788,7 @@ function planJsx(
 						...tailArgs,
 					),
 				),
-				witnessMiss,
+				null,
 				fc.autoMemoContextAware,
 				depNode,
 				null,
@@ -28681,6 +28796,7 @@ function planJsx(
 				null,
 				sameValueListDependencies,
 				strictListDependencyIndex,
+				fc.autoMemoWitnesses,
 			);
 			pushAfterStmt(fc.id, org, b.block([b.const('_v', fc.itemsExpr), guarded]));
 		} else {
@@ -29085,9 +29201,6 @@ function planJsx(
 						cc.singleRoot ? b.literal(true) : null,
 						cc.inheritRange ? b.literal(true) : null,
 					);
-			const witnessMiss = cc.autoMemoWitnesses.length
-				? witnessMissChain(cc.autoMemoWitnesses)
-				: null;
 			let invocation = b.call(
 				componentHelper,
 				b.id('__s'),
@@ -29113,13 +29226,15 @@ function planJsx(
 					cc.autoMemoDeps,
 					slotIndex,
 					b.stmt(invocation),
-					witnessMiss,
+					null,
 					cc.autoMemoContextAware,
 					depNodeFor(cc),
 					null,
 					false,
 					cc.autoMemoPublicationWitnesses,
 					true,
+					-1,
+					cc.autoMemoWitnesses,
 				),
 			);
 			continue;
@@ -29568,21 +29683,14 @@ const depNodeFor = (rec) => (dep) => {
 	return dep.startsWith('props.') ? b.member(b.id('props'), dep.slice('props.'.length)) : b.id(dep);
 };
 
-// `<name>.__memo === true && <name>.__compare === undefined` chains (and the
-// negated miss form) for imported-component memo witnesses.
+// Only explicit default memo boundaries can promote individual list items.
+// Automatic proofs belong to the enclosing region, whose token also witnesses
+// live captures and must force ordinary row work when an import changes.
 function witnessOkChain(names) {
 	return andChain(
 		names.flatMap((name) => [
 			b.binary('===', b.member(b.id(name), '__memo'), b.literal(true)),
 			b.binary('===', b.member(b.id(name), '__compare'), b.id('undefined')),
-		]),
-	);
-}
-function witnessMissChain(names) {
-	return orChain(
-		names.flatMap((name) => [
-			b.binary('!==', b.member(b.id(name), '__memo'), b.literal(true)),
-			b.binary('!==', b.member(b.id(name), '__compare'), b.id('undefined')),
 		]),
 	);
 }
