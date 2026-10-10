@@ -27292,6 +27292,10 @@ function emitDescriptorProjectionHole(ctx, projection, host, value, slotIndex, s
 					b.literal(0),
 				),
 			),
+			b.void0,
+			b.void0,
+			b.void0,
+			result(),
 		),
 	);
 	const fallback = b.block([

@@ -367,6 +367,7 @@ export function emitDescriptorProjection(a, { originalRequest, exportName, impor
 	const descriptorKey = name('__descriptorKey');
 	const reused = name('__reused');
 	const preparedKeys = name('__preparedKeys');
+	const changedIndex = name('__changedIndex');
 	const cache = name('__cache');
 	const captureNames = new Map(a.captures.map(({ local }) => [local, name('__capture')]));
 	const access = (object, property) =>
@@ -410,11 +411,19 @@ export function emitDescriptorProjection(a, { originalRequest, exportName, impor
 			b.id(captureNames.get(a.componentLocal)),
 			b.array(a.staticPropNames.map((prop) => b.literal(prop))),
 		);
-	const result = (value, retained, isDense) =>
+	const result = (
+		value,
+		retained,
+		isDense,
+		previousToken = b.literal(null),
+		changed = b.literal(-2),
+	) =>
 		b.object([
 			b.init('value', value),
 			b.init('cache', retained),
 			b.init('denseExplicitKeys', isDense),
+			b.init('previousToken', previousToken),
+			b.init('changedIndex', changed),
 		]);
 	const prior = (field, index) => at(access(previous, field), index);
 	const primitive = b.logical(
@@ -510,6 +519,7 @@ export function emitDescriptorProjection(a, { originalRequest, exportName, impor
 			),
 		),
 		b.let(dense, b.literal(true)),
+		b.let(changedIndex, b.literal(-1)),
 		b.let(a.index, b.literal(0)),
 		b.for(
 			null,
@@ -546,6 +556,19 @@ export function emitDescriptorProjection(a, { originalRequest, exportName, impor
 						b.binary('===', b.id(previousPrepared), b.literal(null)),
 					),
 					b.block([
+						// This branch already observes every new descriptor. A missing
+						// prior key snapshot cannot admit a delta, so it needs no extra
+						// per-item test to distinguish reused descriptors here.
+						b.stmt(
+							assign(
+								changedIndex,
+								b.conditional(
+									b.binary('===', b.id(changedIndex), b.literal(-1)),
+									b.id(a.index),
+									b.literal(-2),
+								),
+							),
+						),
 						b.const(descriptorKey, access(descriptor, 'key')),
 						b.if(
 							b.binary('!==', b.unary('typeof', b.id(descriptorKey)), b.literal('string')),
@@ -671,7 +694,34 @@ export function emitDescriptorProjection(a, { originalRequest, exportName, impor
 				b.literal(null),
 			),
 		),
-		b.return(result(b.id(a.output), b.id(cache), b.id(dense))),
+		// The same prepared-key object certifies unchanged length and key order.
+		// Fresh capture arrays identify their output without retaining row payloads.
+		// Equal captures ensure a prior token holds only values the new cache holds.
+		b.if(
+			b.logical(
+				'||',
+				b.unary('!', b.id(same)),
+				b.logical(
+					'||',
+					b.binary('===', b.id(preparedKeys), b.literal(null)),
+					b.binary('!==', b.id(preparedKeys), b.id(previousPrepared)),
+				),
+			),
+			b.stmt(assign(changedIndex, b.literal(-2))),
+		),
+		b.return(
+			result(
+				b.id(a.output),
+				b.id(cache),
+				b.id(dense),
+				b.conditional(
+					b.binary('!==', b.id(changedIndex), b.literal(-2)),
+					access(previous, 'captures'),
+					b.literal(null),
+				),
+				b.id(changedIndex),
+			),
+		),
 	];
 	const body = [
 		b.imports([[a.exported, original]], originalRequest),

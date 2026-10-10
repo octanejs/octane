@@ -93,8 +93,11 @@ how `<Row>` is put on screen:
   consumers when a Provider changes. In TSRX, the compiler proves this helper's
   elementwise shape and ordinary default-memo component, then uses a private
   render-only projection. A changed input still scans all 1000 items and keys,
-  but unchanged item/key pairs at the same index reuse their descriptors. The
-  mapped keyed-list path skips those unchanged descriptor bodies; `one_change_B`
+  but unchanged item/key pairs at the same index reuse their descriptors. With
+  stable explicit keys and length, zero or one changed descriptor can also skip
+  the second reconciliation pass when the list's accepted predecessor token
+  matches and the canonical mapped-list guards hold. Other updates keep ordinary
+  list reconciliation. The mapped path skips unchanged descriptor bodies; `one_change_B`
   creates one descriptor and performs two shallow comparisons. Ordinary exported
   helper calls keep their authored behavior. Returned JSX retains the original
   helper and `childSlot` keyed de-opt path: changed inputs create 1000 descriptors
@@ -243,8 +246,9 @@ per-operation counts.
   enters only the changed item helper. TSRX wall B also skips unchanged
   descriptors after checking item/key identity; JSX wall B performs the 999
   successful prop bails around the single miss. Neither is a constant-time
-  single-row update: array copying, projection, and keyed reconciliation remain
-  part of the operation.
+  single-row update: array copying and the producer's full item/key scan remain.
+  Eligible TSRX wall-B updates can omit the second reconciliation pass; wall A,
+  returned JSX and fallback paths still reconcile keyed lists.
 - The uncompiled React control's `parent_rerender_equal` recreates or reconciles
   1000 row descriptions. Both Octane dialects skip wall A's unchanged `RowsA`
   region; JSX retains one outer descriptor wrapper. Unchanged wall-B helper

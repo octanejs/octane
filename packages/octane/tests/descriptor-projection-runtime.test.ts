@@ -42,17 +42,29 @@ function View(props) @{
  </article>
 }
 export const Row = memo(View);`,
-	'App.tsrx': `import { Activity, descriptorChildren, useState } from 'octane';
+	'App.tsrx': `import { Activity, descriptorChildren, memo, useState } from 'octane';
 import { buildRows } from './helper.ts';
 import { Theme } from './rows.tsrx';
 export function Rows(props) @{ const rows = buildRows(props.items); <section>{rows}</section> }
+export function ReadAfter(props) @{ const value = props.read?.(); <i>{value as string}</i> }
+export function AfterRows(props) @{
+ <main>
+  @if (props.active !== false) { <Rows items={props.items} /> }
+  <ReadAfter read={props.after} />
+ </main>
+}
+const MemoShell = memo(function Shell(props) { return props.children; }, (_previous, next) => next.hold);
+export function BufferedRows(props) @{
+ const rows = buildRows(props.items);
+ <MemoShell hold={props.hold}><section>{rows}</section></MemoShell>
+}
 export function BeforeRows(props) @{ const rows = buildRows(props.items); props.before(); <section>{rows}</section> }
 export function App(props) @{ <main><Theme value={props.theme}><Rows items={props.items} /></Theme></main> }
 export function TransitionRows(props) @{
  const [items, setItems] = useState(props.items);
  props.bind(setItems);
  const rows = buildRows(items);
- <Theme value={props.theme}><section>{rows}</section></Theme>
+ <main><Theme value={props.theme}><section>{rows}</section></Theme><ReadAfter read={props.after} /></main>
 }
 export function Retained(props) @{
  const rows = buildRows(props.items);
@@ -67,7 +79,7 @@ export function Boundary(props) @{
  @try { <App items={props.items} theme={props.theme} /> }
  @catch (error) { <output data-error>{error.message as string}</output> }
 }`,
-	'entry.ts': `export { App, Rows, BeforeRows, TransitionRows, Boundary, Retained, Inspected, readInspection } from './App.tsrx';
+	'entry.ts': `export { App, Rows, BeforeRows, ReadAfter, AfterRows, BufferedRows, TransitionRows, Boundary, Retained, Inspected, readInspection } from './App.tsrx';
 export { Row } from './rows.tsrx';
 export { setOnPick, setOnRender, lifecycle } from './events.ts';
 export { buildRows } from './helper.ts';
@@ -126,7 +138,7 @@ async function observe(source: string, html = '') {
 		window.document.body.innerHTML = `<div id="host">${html}</div>`;
 		window.eval(clientCode);
 		const result = await window.eval(`(async () => {
- const {App, Rows, BeforeRows, TransitionRows, Boundary, Retained, Inspected, readInspection, Row, setOnPick, setOnRender, lifecycle, buildRows, createRoot, hydrateRoot, flushSync, act, startTransition} = fixture;
+ const {App, Rows, BeforeRows, AfterRows, BufferedRows, TransitionRows, Boundary, Retained, Inspected, readInspection, Row, setOnPick, setOnRender, lifecycle, buildRows, createRoot, hydrateRoot, flushSync, act, startTransition} = fixture;
  const host = document.querySelector('#host');
  ${source}
 })()`);
@@ -137,6 +149,167 @@ async function observe(source: string, html = '') {
 }
 
 describe('descriptor projection runtime fallbacks', () => {
+	it('applies both row changes after a custom comparator retains the earlier children', async () => {
+		expect(
+			await observe(`
+ const a0={id:'a',label:'A0',value:0},b0={id:'b',label:'B0',value:0},root=createRoot(host),events=[];
+ const a1={...a0,label:'A1',value:1},b1={...b0,label:'B1',value:1};
+ const rows=()=>[...host.querySelectorAll('article')];
+ const content=()=>({labels:rows().map(row=>row.querySelector('button').textContent),values:rows().map(row=>row.querySelector('b').textContent),state:rows().map(row=>row.querySelector('small').textContent)});
+ setOnPick((id,label)=>events.push([id,label]));
+ root.render(BufferedRows,{items:[a0,b0],hold:false});await act(()=>{});
+ const first=rows(),input=first[0].querySelector('input');input.value='typed';
+ await act(()=>input.dispatchEvent(new Event('input',{bubbles:true})));
+ const snapshot=()=>{const current=rows();return {...content(),identity:current.length===first.length&&current.every((row,index)=>row===first[index]),inputIdentity:current[0]?.querySelector('input')===input,input:current[0]?.querySelector('input').value};};
+ flushSync(()=>root.render(BufferedRows,{items:[a1,b0],hold:true}));
+ const held=snapshot();
+ flushSync(()=>root.render(BufferedRows,{items:[a1,b1],hold:false}));
+ const accepted=snapshot();
+ for(const button of host.querySelectorAll('button')) button.click();
+ root.unmount();return {held,accepted,events};`),
+		).toEqual({
+			held: {
+				labels: ['A0', 'B0'],
+				values: ['0', '0'],
+				state: ['1', '0'],
+				identity: true,
+				inputIdentity: true,
+				input: 'typed',
+			},
+			accepted: {
+				labels: ['A1', 'B1'],
+				values: ['1', '1'],
+				state: ['1', '0'],
+				identity: true,
+				inputIdentity: true,
+				input: 'typed',
+			},
+			events: [
+				['a', 'A1'],
+				['b', 'B1'],
+			],
+		});
+	});
+
+	it.each(['ordinary', 'transition'])(
+		'keeps both row changes after a later sibling suspends an intermediate %s update',
+		async (mode) => {
+			const { attempted, ...result } = await observe(`
+ const a0={id:'a',label:'A0',value:0},b0={id:'b',label:'B0',value:0},root=createRoot(host),events=[];
+ const a1={...a0,label:'A1',value:1},b1={...b0,label:'B1',value:1};
+ const rows=()=>[...host.querySelectorAll('article')];
+ const content=()=>({labels:rows().map(row=>row.querySelector('button').textContent),values:rows().map(row=>row.querySelector('b').textContent),state:rows().map(row=>row.querySelector('small').textContent)});
+ let resolve;const wait=new Promise(done=>{resolve=done;});let paused=false;const attempted=[];
+ const after=()=>{if(paused){attempted.push(content());throw wait;}return '';};
+ setOnPick((id,label)=>events.push([id,label]));
+ let update;
+ if(${JSON.stringify(mode)}==='transition') {
+  root.render(TransitionRows,{items:[a0,b0],theme:'one',after,bind:next=>{update=next;}});
+ } else {
+  root.render(AfterRows,{items:[a0,b0],after});
+  update=items=>root.render(AfterRows,{items,after});
+ }
+ await act(()=>{});
+ const first=rows(),input=first[0].querySelector('input');input.value='typed';
+ await act(()=>input.dispatchEvent(new Event('input',{bubbles:true})));
+ const snapshot=()=>{const current=rows();return {...content(),identity:current.length===first.length&&current.every((row,index)=>row===first[index]),inputIdentity:current[0]?.querySelector('input')===input,input:current[0]?.querySelector('input').value};};
+ paused=true;
+ if(${JSON.stringify(mode)}==='transition') await act(()=>startTransition(()=>update([a1,b0])));
+ else flushSync(()=>update([a1,b0]));
+ const held=snapshot();
+ paused=false;
+ // C differs only in its second row from the attempted B, but both rows differ from committed A.
+ await act(()=>update([a1,b1]));
+ const accepted=snapshot();
+ for(const button of host.querySelectorAll('button')) button.click();
+ await act(()=>resolve('ready'));
+ const stale=snapshot();root.unmount();return {attempted,held,accepted,stale,events};`);
+			expect(attempted).toContainEqual({
+				labels: ['A1', 'B0'],
+				values: ['1', '0'],
+				state: ['1', '0'],
+			});
+			expect(result).toEqual({
+				held: {
+					labels: ['A0', 'B0'],
+					values: ['0', '0'],
+					state: ['1', '0'],
+					identity: true,
+					inputIdentity: true,
+					input: 'typed',
+				},
+				accepted: {
+					labels: ['A1', 'B1'],
+					values: ['1', '1'],
+					state: ['1', '0'],
+					identity: true,
+					inputIdentity: true,
+					input: 'typed',
+				},
+				stale: {
+					labels: ['A1', 'B1'],
+					values: ['1', '1'],
+					state: ['1', '0'],
+					identity: true,
+					inputIdentity: true,
+					input: 'typed',
+				},
+				events: [
+					['a', 'A1'],
+					['b', 'B1'],
+				],
+			});
+		},
+	);
+
+	it('builds both rows after a later sibling aborts their first appearance', async () => {
+		expect(
+			await observe(`
+ const a1={id:'a',label:'A1',value:1},b0={id:'b',label:'B0',value:0},b1={...b0,label:'B1',value:1},root=createRoot(host),events=[];
+ const rows=()=>[...host.querySelectorAll('article')];
+ const content=()=>({labels:rows().map(row=>row.querySelector('button').textContent),values:rows().map(row=>row.querySelector('b').textContent),state:rows().map(row=>row.querySelector('small').textContent),inputs:rows().map(row=>row.querySelector('input').value)});
+ let resolve;const wait=new Promise(done=>{resolve=done;});let paused=false,attempted;
+ const after=()=>{if(paused){attempted=content();throw wait;}return '';};
+ setOnPick((id,label)=>events.push([id,label]));
+ root.render(AfterRows,{active:false,items:[a1,b0],after});await act(()=>{});
+ const initial=content();paused=true;
+ flushSync(()=>root.render(AfterRows,{active:true,items:[a1,b0],after}));
+ const held=content();paused=false;
+ await act(()=>root.render(AfterRows,{active:true,items:[a1,b1],after}));
+ const accepted=content(),first=rows();
+ for(const button of host.querySelectorAll('button')) button.click();
+ await act(()=>resolve('ready'));
+ const current=rows(),stale=content(),identity=current.length===first.length&&current.every((row,index)=>row===first[index]);
+ root.unmount();return {initial,attempted,held,accepted,stale,identity,events};`),
+		).toEqual({
+			initial: { labels: [], values: [], state: [], inputs: [] },
+			attempted: {
+				labels: ['A1', 'B0'],
+				values: ['1', '0'],
+				state: ['0', '0'],
+				inputs: ['draft', 'draft'],
+			},
+			held: { labels: [], values: [], state: [], inputs: [] },
+			accepted: {
+				labels: ['A1', 'B1'],
+				values: ['1', '1'],
+				state: ['0', '0'],
+				inputs: ['draft', 'draft'],
+			},
+			stale: {
+				labels: ['A1', 'B1'],
+				values: ['1', '1'],
+				state: ['0', '0'],
+				inputs: ['draft', 'draft'],
+			},
+			identity: true,
+			events: [
+				['a', 'A1'],
+				['b', 'B1'],
+			],
+		});
+	});
+
 	it('keeps keyed state when an urgent update supersedes a suspended reordered transition', async () => {
 		expect(
 			await observe(`

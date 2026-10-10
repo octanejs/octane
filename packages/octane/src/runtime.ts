@@ -36150,6 +36150,10 @@ function disposeWip(wip: OffscreenWip): void {
 // preserving its marker pair, so a mode switch (or component-identity swap)
 // rebuilds in place.
 function clearChildContent(state: ChildSlot): void {
+	if (state.forSlot !== null && state.forSlot.selectionItems !== undefined) {
+		journalRootProperty(state.forSlot, 'selectionItems', state.forSlot.selectionItems);
+		state.forSlot.selectionItems = undefined;
+	}
 	const transaction = ROOT_RENDER_TRANSACTION;
 	if (transaction !== null && !transaction.aborted && !ROOT_RENDER_ROLLBACK) {
 		// A previous mode exit can already have retired the content while
@@ -38332,6 +38336,10 @@ function renderHostTagChildren(d: ElementDescriptor, block: Block, el: Element):
 // (disposeReturnSlot has its own variant — it also unmounts @empty and skips the
 // bookkeeping reset because the whole slot is being discarded.)
 function teardownChildForSlot(state: ChildSlot): void {
+	if (state.forSlot !== null && state.forSlot.selectionItems !== undefined) {
+		journalRootProperty(state.forSlot, 'selectionItems', state.forSlot.selectionItems);
+		state.forSlot.selectionItems = undefined;
+	}
 	const fs = state.forSlot!;
 	batchClearItems(fs, fs.items);
 	fs.head = null;
@@ -38775,6 +38783,12 @@ function journalRootChildShape(state: ChildSlot, parent: Node): void {
 	}
 }
 
+interface CompiledListDelta {
+	previousToken: any[] | null;
+	cache: { captures: any[] } | null;
+	changedIndex: number;
+}
+
 function renderPreparedChildList(
 	state: ChildSlot,
 	parentBlock: Block,
@@ -38788,7 +38802,17 @@ function renderPreparedChildList(
 	compiledMapFlags?: number,
 	compiledMapDeps?: any[],
 	mappedFallback?: boolean,
+	compiledDelta?: CompiledListDelta,
 ): void {
+	// A child-owned list shares selectionItems with the direct keyed-selection
+	// ABI only by field shape. Here it certifies the last complete canonical
+	// mapped render; every attempt invalidates it before running an item body.
+	const previousList = state.forSlot;
+	const previousToken = previousList?.selectionItems;
+	if (previousList !== null && previousToken !== undefined) {
+		journalRootProperty(previousList, 'selectionItems', previousToken);
+		previousList.selectionItems = undefined;
+	}
 	const passthroughList = hydrating
 		? hydration?.passthroughRanges === true && state.borrowed
 		: false;
@@ -39011,12 +39035,71 @@ function renderPreparedChildList(
 			state.forSlot.cachedDeps = compiledMapDeps;
 		}
 	}
+	const list = state.forSlot;
+	const owner = CURRENT_BLOCK;
+	const canonical =
+		compiledDelta !== undefined &&
+		compiledDelta.cache !== null &&
+		compiledMapBody !== undefined &&
+		body === compiledMapBody &&
+		hydration === null &&
+		!upgradeArmed &&
+		list.adopt === null &&
+		pure &&
+		!lite &&
+		(fastFlags & 8) !== 0 &&
+		Array.isArray(compiledMapKey) &&
+		compiledMapKey.length === items.length &&
+		compiledMapDeps === undefined &&
+		list.signalSite === undefined &&
+		!NATIVE_READ_DRIVER &&
+		parentBlock.idState.renderOwner?.signalOwner === undefined &&
+		RENDERER_REGION_OWNER_COUNT === 0 &&
+		!ROOT_RENDER_ROLLBACK &&
+		!TRANSITION_JOURNAL_REPLAYING &&
+		(TRANSITION_JOURNAL === null || ROOT_RENDER_TRANSACTION !== null) &&
+		(ROOT_RENDER_TRANSACTION === null || !ROOT_RENDER_TRANSACTION.aborted) &&
+		owner !== null &&
+		!owner.disposed &&
+		!owner.pending &&
+		owner.renderStatus === RENDER_VALID;
+	let appliedDelta = false;
+	if (
+		canonical &&
+		owner!.mounted &&
+		previousList === list &&
+		previousToken !== undefined &&
+		compiledDelta!.previousToken === previousToken &&
+		list.size === items.length &&
+		list.items.size === list.size &&
+		list.head !== null &&
+		list.head.body === body
+	) {
+		const index = compiledDelta!.changedIndex;
+		if (index === -1) {
+			appliedDelta = true;
+		} else if (index >= 0 && index < items.length) {
+			const key = (compiledMapKey as any[])[index];
+			const block = list.items.get(key);
+			if (
+				block !== undefined &&
+				block.forSlot === list &&
+				block.key === key &&
+				block.itemIndex === index &&
+				block.body === body &&
+				!block.disposed
+			) {
+				updateSurvivor(block, items[index], index, body, true, false, true, list.env);
+				appliedDelta = true;
+			}
+		}
+	}
 	// singleRoot=2 (marker-elision M4): pure single-element items self-mark —
 	// no `it` pair per item — resolved per item value in mountItem; shape
 	// flips promote to a minted pair in place (deoptItemBody).
 	// First fill dispatches to the linear pass directly (see mountItemsLinear)
 	// so a de-opt list's hydration adopt skips the full reconciler too.
-	if (state.forSlot.size === 0) {
+	if (!appliedDelta && state.forSlot.size === 0) {
 		try {
 			mountItemsLinear(
 				parentBlock,
@@ -39043,7 +39126,7 @@ function renderPreparedChildList(
 		}
 		// Only first-fill adoption consumes unowned server items, as in forBlock.
 		if (hydration !== null && !passthroughList) hydration.settleItems(state.forSlot.end);
-	} else {
+	} else if (!appliedDelta) {
 		reconcileKeyed(
 			parentBlock,
 			state.forSlot,
@@ -39082,6 +39165,32 @@ function renderPreparedChildList(
 		// Once this list consumed the selected owner, its containing item must
 		// end after the entire list, including its own closing marker.
 		hydration!.node = getNextSibling(state.forSlot.end);
+	}
+	// No-root transition windows follow keyedForBlock's conservative policy:
+	// leave the witness invalid rather than extend its publication journal.
+	// Reentry may complete a different list while an item body runs. Never
+	// overwrite that publication with this attempt's input.
+	const completedList = state.forSlot;
+	if (
+		canonical &&
+		completedList === list &&
+		owner === CURRENT_BLOCK &&
+		!owner!.disposed &&
+		!owner!.pending &&
+		owner!.renderStatus === RENDER_VALID &&
+		list.selectionItems === undefined &&
+		list.mappedNative === true &&
+		list.size === items.length &&
+		list.items.size === list.size &&
+		list.head !== null &&
+		list.head.body === body
+	) {
+		if (previousList !== list || previousToken === undefined)
+			journalRootProperty(list, 'selectionItems', undefined);
+		list.selectionItems = compiledDelta!.cache!.captures;
+	} else if (completedList !== null && completedList.selectionItems !== undefined) {
+		journalRootProperty(completedList, 'selectionItems', completedList.selectionItems);
+		completedList.selectionItems = undefined;
 	}
 	return;
 }
@@ -39361,6 +39470,7 @@ export function childSlot(
 	compiledMapDeps?: any[],
 	mappedFallback?: boolean,
 	bindingMarker?: string,
+	compiledDelta?: CompiledListDelta,
 ): void {
 	if (CURRENT_BLOCK?.pending && !CURRENT_BLOCK.crossRenderUpdate) return;
 	if (slotKey === 0 && parentScope !== RETURNED_OUTPUT_SCOPE) {
@@ -39451,6 +39561,7 @@ export function childSlot(
 				compiledMapDeps,
 				mappedFallback,
 				bindingMarker,
+				compiledDelta,
 			),
 		);
 		return;
@@ -39865,6 +39976,7 @@ export function childSlot(
 			compiledMapFlags,
 			compiledMapDeps,
 			mappedFallback,
+			compiledDelta,
 		);
 		return;
 	}
@@ -48056,8 +48168,10 @@ interface ForSlot {
 	// childSlot, which already retains that graph. Both ForSlot literals declare
 	// it so every slot shares one hidden class.
 	plainDeopt: ((block: Block, item: any, index: number) => boolean) | null;
-	// Set only when the compiler proved a keyed equality selection. Identity
-	// gates the two-row update without retaining extra state on ordinary lists.
+	// Compiler-owned identity witness: keyed equality selections use their input
+	// array for the two-row update. ChildSlot-owned lists use a private projection
+	// token after a complete canonical pass, certifying homogeneous item bodies.
+	// Noncanonical child-list routes clear it before mutating the list.
 	selectionItems: ArrayLike<any> | undefined;
 }
 
@@ -48702,6 +48816,10 @@ export function fastMapSlot(
 		(slot as any).returnedOutput === true
 	) {
 		setReturnedOutputOwner(slot, false);
+	}
+	if (state!.selectionItems !== undefined) {
+		journalRootProperty(state!, 'selectionItems', state!.selectionItems);
+		state!.selectionItems = undefined;
 	}
 	mountFastHostItems(
 		scopeOrItems as Scope,
