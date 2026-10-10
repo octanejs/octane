@@ -130,16 +130,28 @@ function render(directory: string, entry: 'render' | 'renderValue' = 'render') {
 }
 
 function expectSpecialized(sources: Sources) {
-	// The App root is proven; the Value root returns JSX and stays generic.
-	expect(sources.get('entry.ts')).toContain('__createVoidRoot');
-	expect(sources.get('entry.ts')).toMatch(/\bcreateRoot\b/);
+	// Both roots omit options; only App has the complete void-return proof.
+	const entry = sources.get('entry.ts');
+	expect(entry).toContain(
+		"import { __createVoidRootDefaultOptions as _$createVoidRootDefaultOptions, __createRootDefaultOptions as _$createRootDefaultOptions } from 'octane';",
+	);
+	expect(entry).toMatch(
+		/function render\(container\) \{\s+var root = _\$createVoidRootDefaultOptions\(container\);/,
+	);
+	expect(entry).toMatch(
+		/function renderValue\(container\) \{\s+var root = _\$createRootDefaultOptions\(container\);/,
+	);
 	// Greeting's call drops its (absent) return; Value's keeps reconciliation.
 	expect(sources.get('App.tsrx')).toContain('componentSlotVoid');
 	expect(sources.get('App.tsrx')).toMatch(/\bcomponentSlot\b/);
 }
 
 function expectGeneric(sources: Sources) {
-	expect(sources.get('entry.ts')).not.toContain('__createVoidRoot');
+	const entry = sources.get('entry.ts');
+	expect(entry).toContain("import { createRoot } from 'octane';");
+	expect(entry).toContain('createRoot(container)');
+	expect(entry).not.toContain('__createVoidRoot');
+	expect(entry).not.toContain('__createRootDefaultOptions');
 	expect(sources.get('App.tsrx')).not.toContain('componentSlotVoid');
 }
 
@@ -196,7 +208,13 @@ describe.each(parallelModes)('imported void components on %s', (_name, parallel)
 		const rules = [postLoader(root, /App\.tsrx$/, `return source + '\\nApp = Value;';`)];
 		const { directory, sources } = await build(root, { parallel, rules });
 		expect(render(directory)).toBe('<b>value</b>');
-		expect(sources.get('entry.ts')).not.toContain('__createVoidRoot');
+		// The invalidated module rebuilds without a proof predicate, so it also
+		// keeps the public factory instead of the default-options fallback.
+		const entry = sources.get('entry.ts');
+		expect(entry).toContain("import { createRoot } from 'octane';");
+		expect(entry).toMatch(/function render\(container\) \{\s+var root = createRoot\(container\);/);
+		expect(entry).not.toContain('__createVoidRoot');
+		expect(entry).not.toContain('__createRootDefaultOptions');
 		// App's own proven call is unaffected.
 		expect(sources.get('App.tsrx')).toContain('componentSlotVoid');
 	}, 60_000);
