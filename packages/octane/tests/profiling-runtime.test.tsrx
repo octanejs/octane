@@ -70,6 +70,7 @@ function ErrorBoundaryApp(props) @{
 		@try {
 			<ThrowingChild value={props.value} />
 		} @catch (error) {
+			props.onError?.(error);
 			<em>caught</em>
 		}
 	</>
@@ -301,6 +302,29 @@ describe('profile build component events', () => {
 		expect(JSON.stringify(profiler.getEvents())).not.toContain('sensitive application detail');
 
 		mounted.unmount();
+	});
+
+	it('preserves errors with unreadable suspension metadata while profiling', () => {
+		const original = new Error('application failure');
+		Object.defineProperty(original, '__isSuspense', {
+			get() {
+				throw new Error('unreadable suspension metadata');
+			},
+		});
+		let caught: unknown;
+		const mounted = mount(ErrorBoundaryApp, {
+			value: original,
+			onError: (error: unknown) => {
+				caught = error;
+			},
+		});
+		try {
+			expect(caught).toBe(original);
+			expect(mounted.container.textContent).toBe('caught');
+			expect(render('ThrowingChild', 'mount')?.outcome).toBe('errored');
+		} finally {
+			mounted.unmount();
+		}
 	});
 
 	it('reports a resource-thrown thenable as a suspended render attempt', () => {

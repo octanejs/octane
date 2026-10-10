@@ -18790,11 +18790,16 @@ export function createHostContextRequest(thenable: PromiseLike<unknown>): HostCo
 }
 
 function isHostContextRequest(err: unknown): err is HostContextRequestSignal {
-	return (
-		err !== null &&
-		typeof err === 'object' &&
-		(err as { $$kind?: unknown }).$$kind === HOST_CONTEXT_REQUEST_TAG
-	);
+	try {
+		return (
+			err !== null &&
+			typeof err === 'object' &&
+			(err as { $$kind?: unknown }).$$kind === HOST_CONTEXT_REQUEST_TAG
+		);
+	} catch {
+		// An opaque application error must not interrupt render cleanup.
+		return false;
+	}
 }
 
 function recordContextDependency(block: Block | null, context: Context<any>): void {
@@ -19098,7 +19103,12 @@ class SuspenseException {
 }
 
 function isSuspenseException(x: any): x is SuspenseException {
-	return x !== null && typeof x === 'object' && (x as any).__isSuspense === true;
+	try {
+		return x !== null && typeof x === 'object' && (x as any).__isSuspense === true;
+	} catch {
+		// Error values can expose throwing accessors instead of a control marker.
+		return false;
+	}
 }
 
 const HYDRATION_REJECTION_SEED = Symbol('octane.hydration.rejection-seed');

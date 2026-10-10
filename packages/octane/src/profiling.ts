@@ -688,11 +688,16 @@ function pushEvent(event: ProfileEvent): void {
 }
 
 function isSuspension(value: unknown): boolean {
-	return (
-		typeof value === 'object' &&
-		value !== null &&
-		(value as { __isSuspense?: unknown }).__isSuspense === true
-	);
+	try {
+		return (
+			typeof value === 'object' &&
+			value !== null &&
+			(value as { __isSuspense?: unknown }).__isSuspense === true
+		);
+	} catch {
+		// Error metadata must not interrupt render cleanup or replace the error.
+		return false;
+	}
 }
 
 /** Compiler ABI: attach source metadata without wrapping or replacing the function. */
