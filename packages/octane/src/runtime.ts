@@ -705,6 +705,10 @@ let FORM_SUBMIT_DRIVER: typeof handleFormSubmit | null = null;
 // the committed identity is the one that must be disconnected exactly once.
 let activityRefState: WeakMap<Element | FragmentInstance, ActivityRefState> | null = null;
 let EFFECT_RECONNECT_CONTEXT: EffectReconnectContext | null = null;
+// Cells install their own commit drains so apps without these hooks can omit them.
+// Captured updates already passed cell creation and use the same live drains.
+let drainEffectEventUpdates: typeof drainQueuedEffectEventUpdates = noop;
+let drainStoreSyncs: typeof drainQueuedStoreSyncs = noop;
 // Only enqueueEffect publishes effect slots. Keep their commit work at that
 // owner, with live calls so the first effects may appear during a ref callback.
 let drainMutationEffects: typeof drainRegisteredMutationEffects = () => null;
@@ -11508,7 +11512,7 @@ function hasScheduledWork(): boolean {
 	);
 }
 
-function drainEffectEventUpdates(): void {
+function drainQueuedEffectEventUpdates(): void {
 	if (effectEventQueue.length === 0) return;
 	const q = effectEventQueue.splice(0);
 	for (let i = 0; i < q.length; i++) {
@@ -12081,7 +12085,7 @@ function checkStoreChanged(inst: StoreInst<any>): boolean {
 // layout effect that mutated+notified), force a re-render so the DOM catches up.
 // No sort (order is irrelevant: each entry only touches its own inst) and no
 // cleanup bookkeeping — the whole point of not routing these through the effect drains.
-function drainStoreSyncs(): void {
+function drainQueuedStoreSyncs(): void {
 	if (storeSyncQueue.length === 0) return;
 	// Snapshot-and-clear up front (like the effect drains): a forced re-render below could
 	// synchronously re-enter this drain; it must see only entries queued AFTER this
@@ -16096,6 +16100,7 @@ export function useSyncExternalStore<T>(
 	const scope = CURRENT_SCOPE!;
 	let inst = scope.hooks?.get(subs.inst) as StoreInst<T> | undefined;
 	if (inst === undefined) {
+		drainStoreSyncs = drainQueuedStoreSyncs;
 		// MOUNT — create the stable cell once (useEffectEvent's mount-once pattern).
 		// forceUpdate schedules the block directly (identical to a useState setter,
 		// which also captures CURRENT_BLOCK at mount and calls scheduleRender —
@@ -16190,6 +16195,7 @@ export function useEffectEvent<F extends (...args: any[]) => any>(fn: F, slot?: 
 	if (rare.eventRender === 0) rare.eventRender = 1;
 	let s = scope.hooks?.get(slot) as EffectEventCell | undefined;
 	if (s === undefined) {
+		drainEffectEventUpdates = drainQueuedEffectEventUpdates;
 		s = { impl: fn, active: true };
 		ensureHooks(scope).set(slot, s);
 		const cell = s;
