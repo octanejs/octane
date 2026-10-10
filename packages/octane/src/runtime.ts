@@ -698,6 +698,12 @@ let CONTROLLED_RESTORE_DRIVER: {
 	enqueue: typeof maybeEnqueueRestore;
 	finish: typeof maybeFlushDiscrete;
 } | null = null;
+// A PortalSlot installs its consumers before deferred range publication. Keep
+// them installed after the last removal: an event can still be between capture
+// and bubble with a route through the former portal.
+let preparePortalEventOwners: typeof prepareRegisteredPortalEventOwners = noop;
+let teardownPortalState: typeof teardownRegisteredPortalState = noop;
+let releasePortalTarget: typeof releaseRegisteredPortalTarget = noop;
 let NATIVE_BLOCK_RETRIES: WeakMap<Block, NativeReadRetry> | null = null;
 // Hydration-only state: client paths read it behind `hydrationStarted`.
 let NATIVE_ADOPTION_RELEASES: NativeAdoptionState[] | null = null;
@@ -31001,7 +31007,7 @@ function resolvePortalEventOwner(node: DelegatedNode): void {
 	node.$$portalContainer = target;
 }
 
-function preparePortalEventOwners(path: EventTarget[], epoch: number): void {
+function prepareRegisteredPortalEventOwners(path: EventTarget[], epoch: number): void {
 	for (let i = 0; i < path.length; i++) {
 		const node = eventPathNode(path[i]);
 		if (node === null) continue;
@@ -33428,6 +33434,11 @@ interface PortalSlot {
 }
 
 function registerPortalEventRange(target: Node, portal: PortalSlot): void {
+	if (preparePortalEventOwners === noop) {
+		preparePortalEventOwners = prepareRegisteredPortalEventOwners;
+		teardownPortalState = teardownRegisteredPortalState;
+		releasePortalTarget = releaseRegisteredPortalTarget;
+	}
 	if (
 		DEFERRED_LAYOUT_DRIVER &&
 		DEFERRED_LAYOUT_DRIVER.stageAction(() => registerPortalEventRange(target, portal))
@@ -33874,7 +33885,7 @@ function renderPortalState(
 // Tear a portal down: fire its body's cleanups, remove its DOM (incl. the owned
 // markers) from the target, and release the target's delegated listeners. Idempotent
 // — safe to call twice (childSlot teardown + a later scope-unmount sweep).
-function teardownPortalState(state: PortalSlot): void {
+function teardownRegisteredPortalState(state: PortalSlot): void {
 	const transaction = ROOT_RENDER_TRANSACTION;
 	if (
 		transaction !== null &&
@@ -33904,7 +33915,7 @@ function teardownPortalState(state: PortalSlot): void {
  * portal it created through the portal's creation undo and again through its
  * owner's teardown. A released portal no longer owns a target.
  */
-function releasePortalTarget(state: PortalSlot): void {
+function releaseRegisteredPortalTarget(state: PortalSlot): void {
 	if (state.target) {
 		unregisterPortalEventRange(state.target, state);
 		unregisterDelegationTarget(state.target);
