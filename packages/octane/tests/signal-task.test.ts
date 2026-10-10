@@ -52,7 +52,7 @@ function hostTask(): Promise<void> {
 async function microtasks() {
 	for (let i = 0; i < 30; i++) await Promise.resolve();
 }
-function finished(owner: Scope, value$: SignalHandle<number>): Promise<void> {
+function finished(owner: Scope, value$: SignalHandle<unknown>): Promise<void> {
 	return new Promise((resolve) => {
 		let stop = () => {};
 		const check = () => {
@@ -297,6 +297,92 @@ describe('signal producer task admission', () => {
 			expect(runWithSignalOwner(owner, () => value$.get())).toBe(0);
 		},
 	);
+
+	it.each(['finish', 'replace', 'dispose'] as const)(
+		'paces ready query results and preserves %s after the wait',
+		async (operation) => {
+			let elapsed = 0;
+			vi.spyOn(performance, 'now').mockImplementation(() => elapsed);
+			const owner = scope();
+			const selected$ = owner.signal$('selected', 'old');
+			const seen: string[] = [];
+			const resources = Array.from({ length: 12 }, (_, index) => {
+				const request = query(`promise-${index}`, (selected: string) =>
+					Promise.resolve(`${selected}:${index}`),
+				);
+				const value$ = createResource(owner, `promise-${index}`, () => request(selected$.get()));
+				runWithSignalOwner(owner, () =>
+					value$.subscribe(() => {
+						const snapshot = value$.snapshot();
+						if (snapshot.status === 'ready') {
+							seen.push(snapshot.value);
+							elapsed += 2;
+						}
+					}),
+				);
+				return value$;
+			});
+			await hostTask();
+			expect(seen.length).toBeGreaterThan(0);
+			expect(seen.length).toBeLessThan(resources.length);
+			const atBoundary = seen.slice();
+			if (operation === 'dispose') owner.dispose();
+			else if (operation === 'replace') selected$.set('new');
+			if (operation !== 'dispose')
+				await Promise.all(resources.map((value$) => finished(owner, value$)));
+			await hostTask();
+			if (operation === 'dispose') expect(seen).toEqual(atBoundary);
+			else if (operation === 'replace') {
+				expect(seen.slice(atBoundary.length)).toEqual(resources.map((_, index) => `new:${index}`));
+				expect(resources.map((value$) => runWithSignalOwner(owner, () => value$.get()))).toEqual(
+					resources.map((_, index) => `new:${index}`),
+				);
+			} else expect(seen).toEqual(resources.map((_, index) => `old:${index}`));
+		},
+	);
+
+	for (const callback of ['sync', 'async'] as const) {
+		it.each(['promise', 'query', 'derived'] as const)(
+			`awaited act with a ${callback} callback drains paced %s publications and their UI`,
+			async (kind) => {
+				let elapsed = 0;
+				vi.spyOn(performance, 'now').mockImplementation(() => elapsed);
+				const owner = scope();
+				const seen: number[] = [];
+				let publish!: () => void;
+				const container = mount(() => {
+					const [count, setCount] = useState(0, Symbol.for('signal-task.act-count'));
+					publish = () => setCount((value) => value + 1);
+					return createElement('output', null, String(count));
+				});
+				const start = () => {
+					const values =
+						kind === 'promise'
+							? Array.from({ length: 12 }, (_, index) =>
+									createResource(owner, `act-${index}`, () =>
+										query(`act-${index}`, () => Promise.resolve(index))(undefined),
+									),
+								)
+							: [producer(owner, kind, 12)];
+					for (const value$ of values) {
+						runWithSignalOwner(owner, () =>
+							value$.subscribe(() => {
+								const snapshot = value$.snapshot();
+								if (snapshot.status === 'ready' && (kind === 'promise' || !snapshot.complete)) {
+									seen.push(snapshot.value);
+									elapsed += 2;
+									publish();
+								}
+							}),
+						);
+					}
+				};
+				await act(callback === 'async' ? async () => start() : start);
+				expect(seen).toEqual(Array.from({ length: 12 }, (_, index) => index));
+				expect(container.textContent).toBe('12');
+			},
+		);
+	}
 
 	it('shares elapsed work across concurrently ready query and derived streams', async () => {
 		let elapsed = 0;

@@ -9510,9 +9510,8 @@ export function Lazy({ node }: { node: Branch }) @{
 			);
 			const generation$ = scope.signal$('generation', 0);
 			const answer$ = createResource(scope, 'answer', () => loadAnswer(generation$.get()));
-			const settle = async () => {
-				for (let index = 0; index < 4; index++) await Promise.resolve();
-			};
+			// Ready query publication may cross a host-task boundary.
+			const settle = () => act(async () => {});
 			const tree = (deep: boolean): Branch => ({
 				key: 'root',
 				lazy: false,
@@ -9758,9 +9757,8 @@ export function Answer() @{
 			const answer$ = createResource(scope, 'answer', () => loadAnswer(generation$.get()));
 			const fixture = () =>
 				authoredPresentation('Answer', {}, dev, source, { './island-state': { answer$ } });
-			const settle = async () => {
-				for (let index = 0; index < 4; index++) await Promise.resolve();
-			};
+			// Ready query publication may cross a host-task boundary.
+			const settle = () => act(async () => {});
 			try {
 				// The server rendered @pending; activation adopts that fallback.
 				const pending = fixture();
@@ -9869,7 +9867,7 @@ export function Answer() @{
 				expect(container.querySelector('section')).toBe(section);
 				expect(section.querySelector('[data-pending]')!.textContent).toBe('waiting');
 				answer.resolve('fresh');
-				for (let index = 0; index < 4; index++) await Promise.resolve();
+				await act(async () => {});
 				expect(section.querySelector('[data-answer]')!.textContent).toBe('fresh');
 				expect(section.querySelector('[data-pending]')).toBeNull();
 				open$.set(false);
@@ -9908,7 +9906,7 @@ export function Answer() @{
 				const answer$ = createResource(scope, 'answer', () => loadAnswer(undefined));
 				if (outcome === 'ready') answer.resolve('ready');
 				else answer.reject(new Error('failed'));
-				for (let index = 0; index < 4; index++) await Promise.resolve();
+				await act(async () => {});
 				const fixture = authoredPresentation('Answer', {}, dev, source, {
 					'./island-state': { answer$ },
 				});
@@ -10042,7 +10040,7 @@ export function Streamed() @{
 				expect(container.querySelector('[data-pending]')).toBe(fallback);
 				expect(container.querySelector('[data-answer]')).toBeNull();
 				clientAnswer.resolve('live');
-				for (let index = 0; index < 4; index++) await Promise.resolve();
+				await act(async () => {});
 				expect(container.querySelectorAll('[data-answer]')).toHaveLength(1);
 				expect(container.querySelector('[data-answer]')!.textContent).toBe('live');
 				expect(container.querySelector('[data-pending]')).toBeNull();
@@ -10107,9 +10105,8 @@ export function Answer() @{
 					log,
 				},
 			});
-			const settle = async () => {
-				for (let index = 0; index < 4; index++) await Promise.resolve();
-			};
+			// Ready query publication may cross a host-task boundary.
+			const settle = () => act(async () => {});
 			try {
 				serverAnswer.resolve('server');
 				await settle();

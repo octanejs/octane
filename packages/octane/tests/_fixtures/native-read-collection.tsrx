@@ -108,3 +108,18 @@ export function HydrationDefault({
 		<output ref={output}>{value + ':' + body}</output>
 	</section>
 }
+
+export function CaughtReader(props: { count$: SignalHandle<number> }) @{
+	<section>
+		@try {
+			<span>{'primary'}</span>
+		} @catch (_error) {
+			<span>{'caught'}</span>
+		}
+		@if (props.count$.get() === 0) {
+			<output>{'0'}</output>
+		} @else {
+			<output>{'1'}</output>
+		}
+	</section>
+}
