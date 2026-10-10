@@ -6,7 +6,7 @@ The example deliberately exercises browser and binding boundaries that a final-H
 
 - `@octanejs/visx` `ParentSize` observes a real report container, and its measured width drives Visx scales, grid rows, line geometry, and focusable SVG points;
 - every chart point has a consumer-readable label and roving keyboard focus with arrow, Home, and End navigation;
-- `@octanejs/tanstack-table` owns sorting, global filtering, row selection, and visible row models in a semantic native table;
+- `@tanstack/octane-table` owns sorting, global filtering, row selection, and visible row models in a semantic native table;
 - `@octanejs/tanstack-virtual` windows and dynamically measures 360 variable-content activity rows, including an off-screen incident jump;
 - the responsive console retains keyboard navigation through a dismissible mobile workspace menu;
 - deterministic load, refresh, empty-segment, and overlapping range states retain usable data and converge to the latest user choice.
