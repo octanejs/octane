@@ -11,6 +11,29 @@ const FIXTURE = 'packages/octane/tests/conformance/_fixtures/unknown-property-di
 const devServer = loadServerFixture<typeof client>(FIXTURE, { compileOptions: { dev: true } });
 const prodServer = loadServerFixture<typeof client>(FIXTURE, { compileOptions: { dev: false } });
 
+// React's possibleStandardNames HTML spellings that lower to a native attribute.
+const CANONICAL_HTML_NAMES = [
+	'accessKey',
+	'autoSave',
+	'cellPadding',
+	'cellSpacing',
+	'classID',
+	'contextMenu',
+	'controlsList',
+	'dateTime',
+	'frameBorder',
+	'hrefLang',
+	'keyParams',
+	'keyType',
+	'marginHeight',
+	'marginWidth',
+	'mediaGroup',
+	'popoverTarget',
+	'popoverTargetAction',
+	'radioGroup',
+	'useMap',
+];
+
 const nativeImageProperties = {
 	fetchpriority: 'low',
 	srcset: '/image.svg 1x, /image-large.svg 2x',
@@ -81,6 +104,15 @@ function emptyUrlWarning(name: string): string {
 		'This may cause the browser to download the whole page again. ' +
 		'Pass null instead of an empty string.'
 	);
+}
+
+// TableCellSpans with `span: 4`: static 2x3 and dynamic 4x4 cells in both spellings.
+function expectTableCellSpans(find: (selector: string) => Element | null): void {
+	for (const spelling of ['canonical', 'native']) {
+		const fixed = find(`#${spelling}-static-cell`) as HTMLTableCellElement;
+		const dynamic = find(`#${spelling}-dynamic-cell`) as HTMLTableCellElement;
+		expect([fixed.colSpan, fixed.rowSpan, dynamic.colSpan, dynamic.rowSpan]).toEqual([2, 3, 4, 4]);
+	}
 }
 
 afterEach(() => {
@@ -328,6 +360,33 @@ describe('React DOM unknown-property diagnostics', () => {
 			expect(element.getAttribute('inputmode')).toBe('numeric');
 			expect(element.getAttribute('autocapitalize')).toBe('none');
 			expect(element.getAttribute('autocorrect')).toBe('off');
+			expect(messages(error)).toEqual([]);
+		} finally {
+			root.unmount();
+		}
+	});
+
+	// Per React's possibleStandardNames, with the native spelling still accepted.
+	it('accepts canonical and native table cell spans without diagnostics', () => {
+		const error = captureErrors();
+		const root = mount(client.TableCellSpans, { span: 4 });
+		try {
+			expectTableCellSpans((selector) => root.find(selector));
+			expect(messages(error)).toEqual([]);
+		} finally {
+			root.unmount();
+		}
+	});
+
+	it('accepts the remaining canonical HTML spellings through a spread', () => {
+		const error = captureErrors();
+		const attributes = Object.fromEntries(CANONICAL_HTML_NAMES.map((name) => [name, '1']));
+		const root = mount(client.SpreadUnknownProperties, { attributes });
+		try {
+			const element = root.find('#unknown-properties');
+			for (const name of CANONICAL_HTML_NAMES) {
+				expect(element.getAttribute(name.toLowerCase())).toBe('1');
+			}
 			expect(messages(error)).toEqual([]);
 		} finally {
 			root.unmount();
@@ -818,6 +877,24 @@ describe('server and hydration unknown-property diagnostics', () => {
 		expect(html.toLowerCase()).toContain('autocapitalize="none"');
 		expect(html.toLowerCase()).toContain('autocorrect="off"');
 		expect(messages(error)).toEqual([]);
+	});
+
+	it('serializes and adopts canonical and native table cell spans without diagnostics', () => {
+		const error = captureErrors();
+		const html = Server.renderToString(devServer.TableCellSpans, { span: 4 }).html;
+		expect(messages(error)).toEqual([]);
+		const container = document.createElement('div');
+		container.innerHTML = html;
+		const original = container.querySelector('#canonical-dynamic-cell');
+		const root = hydrateRoot(container, client.TableCellSpans, { span: 4 });
+		try {
+			flushSync(() => {});
+			expectTableCellSpans((selector) => container.querySelector(selector));
+			expect(container.querySelector('#canonical-dynamic-cell')).toBe(original);
+			expect(messages(error)).toEqual([]);
+		} finally {
+			root.unmount();
+		}
 	});
 
 	it('accepts canonical server tabIndex and htmlFor direct attributes', () => {
