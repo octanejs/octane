@@ -204,7 +204,7 @@ export const FRAMEWORK_CARDS: BenchCard[] = [
 		jsFramework,
 		'js-framework',
 		'js-framework',
-		'krausest-style table operations over 1,000 rows — create, replace, partial update, select, swap, remove, clear.',
+		'krausest-style table operations over 1,000 rows — create, replace, partial update, select, swap, remove, clear. Selection and swap scores are per-click averages of warmed batches.',
 		undefined,
 		// Keep only shared timings; insertion/fragment diagnostics in Octane's
 		// baseline are not measured by the reference frameworks.
