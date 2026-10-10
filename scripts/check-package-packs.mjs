@@ -1,6 +1,7 @@
 import { execFileSync, spawnSync } from 'node:child_process';
 import { build } from 'esbuild';
 import { createOctaneSourcePlugin } from './packed-source-compiler.mjs';
+import { checkPackedValdiContract } from './check-packed-valdi-contract.mjs';
 import {
 	cpSync,
 	existsSync,
@@ -2157,6 +2158,10 @@ try {
 	}
 	if (!failures.length) {
 		const consumerValidations = [
+			{
+				label: 'external packed Valdi adapter type contract',
+				run: () => checkPackedValdiContract(packedArchives.get('octane')),
+			},
 			{
 				label: 'external packed runtime-only consumer',
 				run: () => validatePackedRuntimeWithoutCompiler(tempRoot, packedArchives),
