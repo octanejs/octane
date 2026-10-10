@@ -351,6 +351,10 @@ export function emitDescriptorProjection(a, { originalRequest, exportName, impor
 		return result;
 	};
 	const previous = name('__previous');
+	const previousItems = name('__previousItems');
+	const previousKeys = name('__previousKeys');
+	const previousValues = name('__previousValues');
+	const previousLength = name('__previousLength');
 	const original = name('__original');
 	const guard = name('__canProject');
 	const equal = name('__equal');
@@ -438,9 +442,9 @@ export function emitDescriptorProjection(a, { originalRequest, exportName, impor
 	const hit = and(
 		b.id(same),
 		primitive,
-		b.binary('<', b.id(a.index), access(access(previous, 'items'), 'length')),
-		b.call(b.id(equal), prior('items', a.index), b.id(a.item)),
-		b.call(b.id(equal), prior('keys', a.index), b.id(key)),
+		b.binary('<', b.id(a.index), b.id(previousLength)),
+		b.call(b.id(equal), at(previousItems, a.index), b.id(a.item)),
+		b.call(b.id(equal), at(previousKeys, a.index), b.id(key)),
 	);
 	const declarations = [
 		b.const(
@@ -471,6 +475,15 @@ export function emitDescriptorProjection(a, { originalRequest, exportName, impor
 		// Keep allocation/length/index/key and cold import reads in authored order.
 		// A previous eligible cache proves these direct ESM reads left their TDZ.
 		b.const(a.output, clone(a.allocation.declarations[0].init)),
+		// Prior cache snapshots are private and immutable, including during reentry.
+		// Keep their local reads after the authored allocation/length read.
+		b.const(previousItems, b.conditional(b.id(warm), access(previous, 'items'), b.literal(null))),
+		b.const(previousKeys, b.conditional(b.id(warm), access(previous, 'keys'), b.literal(null))),
+		b.const(previousValues, b.conditional(b.id(warm), access(previous, 'values'), b.literal(null))),
+		b.const(
+			previousLength,
+			b.conditional(b.id(warm), access(previousItems, 'length'), b.literal(0)),
+		),
 		b.const(
 			same,
 			and(
@@ -493,13 +506,9 @@ export function emitDescriptorProjection(a, { originalRequest, exportName, impor
 						assign(
 							access(keys, 'length'),
 							b.conditional(
-								b.binary(
-									'<',
-									access(a.output, 'length'),
-									access(access(previous, 'items'), 'length'),
-								),
+								b.binary('<', access(a.output, 'length'), b.id(previousLength)),
 								access(a.output, 'length'),
-								access(access(previous, 'items'), 'length'),
+								b.id(previousLength),
 							),
 						),
 					),
@@ -538,7 +547,11 @@ export function emitDescriptorProjection(a, { originalRequest, exportName, impor
 								b.id(warm),
 								b.sequence([
 									assign(key, capture(a.props.properties[0].value, false)),
-									b.conditional(assign(reused, hit), prior('values', a.index), makeElement(false)),
+									b.conditional(
+										assign(reused, hit),
+										at(previousValues, a.index),
+										makeElement(false),
+									),
 								]),
 								makeElement(true),
 							),
@@ -580,7 +593,7 @@ export function emitDescriptorProjection(a, { originalRequest, exportName, impor
 								b.logical(
 									'||',
 									b.binary('>=', b.id(a.index), access(previousPrepared, 'length')),
-									b.binary('!==', b.id(descriptorKey), access(prior('values', a.index), 'key')),
+									b.binary('!==', b.id(descriptorKey), access(at(previousValues, a.index), 'key')),
 								),
 							),
 							b.block([b.stmt(assign(firstChangedKey, b.id(a.index)))]),
@@ -665,7 +678,7 @@ export function emitDescriptorProjection(a, { originalRequest, exportName, impor
 												b.binary(
 													'===',
 													b.id(descriptorKey),
-													access(prior('values', a.index), 'key'),
+													access(at(previousValues, a.index), 'key'),
 												),
 											),
 											at(previousPrepared, a.index),
