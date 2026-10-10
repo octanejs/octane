@@ -1,6 +1,6 @@
 import { Hydrate, useLayoutEffect } from 'octane';
 import { interaction } from 'octane/hydration';
-import { recordClick, recordHydrated } from './actions.js';
+import { recordClick, recordHydrated, recordEditor } from './actions.js';
 
 export interface FormProps {
 	opted: boolean;
@@ -23,7 +23,14 @@ export function Form(props: FormProps) @{
 				>
 					<label>
 						Draft
-						<input id="draft-input" name="draft" defaultValue="server" />
+						<input
+							id="draft-input"
+							name="draft"
+							defaultValue="server"
+							onInput={recordEditor}
+							onCompositionStart={recordEditor}
+							onCompositionEnd={recordEditor}
+						/>
 					</label>
 					@if (props.controls) {
 						<>

@@ -22,12 +22,13 @@ scheduling contract; read its latest decisions before touching any of this.
 
 ## How Octane schedules today
 
-The contract is `docs/differences-from-react.md`, §Scheduler: renders are
-microtask-batched and run to completion, with no time-slicing.
+The contract is `docs/differences-from-react.md`, §Scheduler: urgent renders are microtask-batched; transitions, deferred swaps, and ready
+producer admission use host tasks. All renders run to completion, with no time-slicing.
 
-- `scheduleRender` pushes the block onto `QUEUE`. If no flush is armed, it sets
-  `scheduled` and calls `queueMicrotask(flush)` once, so every update in one
-  synchronous burst shares a flush.
+- `scheduleRender` routes urgent work to `QUEUE` and queued transition/producer
+  work to the host-task admission queue. Ordinary urgent updates arm one
+  `queueMicrotask(flush)` for a synchronous burst; a posted task admits the
+  waiting work. `flushSync` and `act()` drain both priorities.
 - `flush` calls `flushWork`. `drainQueue` renders ancestors before descendants,
   so a parent's render absorbs queued descendants, and then the root commits.
   `commitEffects` runs insertion and layout work synchronously, then hands
@@ -37,10 +38,10 @@ microtask-batched and run to completion, with no time-slicing.
 
 ## The megatask hazard (#1864)
 
-The flush microtask runs before the next asynchronous value arrives. So a
-producer that publishes one value per microtask hop pays for a full render, a
-commit, and an early drain of the previous commit's passive effects at every hop,
-all inside one checkpoint. Measured in the #1864 investigation:
+Before the fixes in #1864, the flush microtask ran before the next asynchronous
+value arrived. A producer publishing one value per microtask hop paid for a full
+render, commit, and early drain of the previous commit's passive effects at every
+hop, all inside one checkpoint. Historical pre-fix measurements (not current behavior):
 
 - 100 ready stream values, or 100 action dispatches: 101 Octane commits against
   2 in React 19.2.7. A task armed before the burst ran after all of them.
@@ -65,29 +66,19 @@ all inside one checkpoint. Measured in the #1864 investigation:
    render and commit: latency improves and total work stays the same or grows.
 4. **One shared budget, not one per producer.** A per-producer budget resets for
    every producer, so N producers still make a megatask.
-5. **Reuse a task poster; don't add one.** The runtime already has four ad-hoc
-   posters, and #1864 proposes replacing them with one shared poster:
-   - `schedulePostPaint`: post-paint, via rAF, then `MessageChannel`, with a
-     bounded timer fallback;
-   - `actCheckpoint`: test drains, via `MessageChannel`;
-   - `createResizeObserver`'s `enqueue`: `MessageChannel` with a `setTimeout`
-     fallback (`resize-observer.ts`);
-   - `resumeOnSettle`: `setTimeout(retry, 0)` once a settlement was already
-     observed, so retries do not starve timers or network callbacks.
-
-   A new poster must state why none of these fits. It must also cover hosts
-   without `MessageChannel`, hidden tabs where rAF never fires, and `act()`,
-   which drains through `MessageChannel` checkpoints.
+5. **Reuse `postHostTask`; do not add a poster.** `host-task.ts` selects
+   `scheduler.postTask`, then a fresh `MessageChannel`, then `setTimeout`.
+   Deferred swaps, transition/producer admission, the shared elapsed budget,
+   island activation, and resize delivery use it. Post-paint scheduling and
+   test checkpoints have distinct observation requirements; preserve those.
 
 6. **Never depend on rAF for progress.** Pair it with a bounded timer, as
    `schedulePostPaint` does.
-7. **Defer to #1864 on the contract.** §Scheduler documents microtask batching,
-   that an `await 0` continuation can observe the commit after `setState`, and
-   that priority governs Suspense holds rather than commit deferral. Do not
-   change any of that in passing. A change that #1864 has decided ships with
-   the doc update, the evidence below, and a React-parity check; when in doubt,
-   prefer React semantics. Without such a decision, new code must simply not
-   make megatasks worse.
+7. **Preserve the documented timing contract.** An urgent `setState(); await 0`
+   can observe the commit. Transition and deferred work waits for a task.
+   Pending cues expose committed values first, subject to the documented hold,
+   native-signal and synchronous-drain exceptions. New changes need a contract
+   update and the evidence below; do not infer React behavior from surface syntax.
 
 ## Evidence for a scheduling change
 
@@ -152,7 +143,9 @@ an ordinary unrelated urgent microtask flush does not consume its waiting
 producer refresh. Controlled restoration can drain both queues, and an urgent
 ancestor can absorb a queued descendant.
 
-Query and derived streams share `yieldForHostBudget` from `host-budget.ts`. Check
+Query promise results and query/derived streams share `yieldForHostBudget` from
+`host-budget.ts`. Successful one-shot results check it before publication;
+retained-value/seed reads and rejection delivery keep their existing paths. Check
 it before a pull and before processing a ready result: checking only the next
 pull leaves a concurrent batch of already-ready results unbounded. Re-enter the
 producer lease guard after waking, and preserve observation acknowledgements
@@ -160,6 +153,12 @@ before requesting another value. The approximately 5 ms window is shared across
 producers and reset by a host task, not by each value or owner. It cannot interrupt
 an expensive iterator, subscriber, render, or commit. A cold I/O wait lets the
 sentinel run without adding another timer to each result.
+
+Even one successful query can wait if earlier work spent the shared window;
+synchronous SSR immediately after promise resolution may still see pending.
+Awaited `act()` includes the pending budget sentinel in both of its async drains.
+Rejections retain prompt failure notification and cleanup, so rejection bursts
+remain outside the successful-publication pacing guarantee.
 
 `benchmarks/scheduler-responsiveness/signal-backlog.mjs` records ordered source
 publications, component commits, marker latency, and total completion for ready

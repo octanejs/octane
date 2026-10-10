@@ -1401,6 +1401,12 @@ when the cue starts during a render, a commit, or the transition's task. An urge
 update to a component whose transition is waiting renders it in the microtask
 flush. `flushSync` and `act()` drain both priorities.
 
+Action result rendering is task-batched; Action callback invocation is not paced.
+As in React, a callback can run synchronously during dispatch, and queued callbacks
+run as earlier Actions complete. Many already-ready callbacks doing substantial
+application work can therefore share a long checkpoint even when their resulting
+UI commits only once. The render-admission guarantee does not bound Action bodies.
+
 `useDeferredValue`'s deferred render also runs in a later host task. Urgent updates
 that arrive before the task runs only change the value it renders, so a fast typist's
 skipped values never render deferred. There is still no time-slicing: once a
@@ -1414,14 +1420,34 @@ native events, lifecycle updates, and `flushSync` retain their existing timing.
 The admission change does not turn an urgent signal render into a Suspense
 transition; held native-read frames keep their existing retention policy.
 
-Query and derived stream pulls share an approximately 5 ms host budget. Both a
-pull and a ready-result publication check the same window, so many producers do
-not each receive a separate allowance. A posted sentinel resets that window;
-ready continuations wait for it when the budget is spent, then recheck their
+Successful query promise results and query/derived stream pulls share an
+approximately 5 ms host budget. Retained ready values and hydration seeds keep their synchronous
+reads. Both a pull and a ready-result publication check the same window, so many
+producers do not each receive a separate allowance. A posted sentinel resets
+that window; ready continuations wait for it when the budget is spent, then recheck their
 current producer lease. Ordered values, cancellation, and server observation
 backpressure are preserved. This is a scheduling opportunity between complete
 units, not a hard 5 ms limit: one iterator call, subscriber, render, or commit can
-itself take longer. Cold I/O lets the sentinel run between results.
+itself take longer. Cold I/O lets the sentinel run between results. Buffered RPC
+and custom renderer response readers use the same window; transport chunks are
+not scheduling units.
+Independent islands instead activate at most once per document task, prioritizing
+captured input. None of these boundaries guarantees a particular next input or
+paint. The [backlog investigation](../benchmarks/scheduler-responsiveness/investigation.md)
+records browser measurements, policy comparisons, and the remaining atomic work.
+
+Even a single successful query can wait for a later host task if earlier work
+has exhausted the shared window. A synchronous `renderToString` immediately
+after its promise resolves can therefore still render the pending arm. Tests
+should await `act()` or the observable result across host tasks, rather than
+counting microtasks. Awaited `act()` drains budget-paced publications and the
+renders they schedule, for both synchronous and asynchronous callbacks.
+
+Query rejections retain prompt failure notification and failed-attempt cleanup;
+they do not wait for the shared budget. An error can therefore publish before an
+earlier-settled success that is waiting for admission. Bursts of expensive error
+subscribers or `@catch` work remain unpaced. This preserves the existing failure
+contract; the successful-publication guarantee does not bound rejection work.
 
 Native `ResizeObserver` callbacks run inside the browser's resize delivery loop.
 An ordinary microtask commit that resizes an already-delivered target can trigger
@@ -1489,20 +1515,26 @@ visible primary while `isPending` remains true. `getTransitionFallbackTimeout()`
 returns `Infinity` by default; setting `Infinity` restores the no-timeout policy
 for subsequent holds.
 
-`flushSync` drains both priorities but leaves passive effects asynchronous:
+`flushSync` drains both priorities without forcing the new commit's passive
+effects. Previously queued passive work can still run before its render:
 
 ```tsx
 flushSync(() => {
   setQuery('octane');
   startTransition(() => setResults(nextResults));
 });
-// Both updates committed; passive effects still run later.
+// Both updates committed; their new passive effects remain queued.
 ```
 
-Passive effects normally run after paint, including effects queued by discrete
-events and external-store updates. A listener installed by `useEffect` can miss
-another event dispatched before that drain. Use `useLayoutEffect` when the
-subscription must be installed by the end of the commit. Passive timing is not
+Passive effects use a post-paint callback with a timer fallback, including effects
+queued by discrete events and external-store updates. This is not an after-paint
+guarantee: before beginning another render, Octane drains the previous commit's
+pending passive work. Back-to-back urgent renders or layout-triggered updates
+can therefore run passive effects before a paint. A task boundary does not
+change that ordering, and one effect callback still runs to completion.
+A listener installed by `useEffect` can miss another event dispatched before
+that drain. Use `useLayoutEffect` when the subscription must be installed by
+the end of the commit. Passive timing is not
 React's synchronous discrete-event effect timing.
 
 `root.unmount()` drains pending passive work and its passive cleanups before

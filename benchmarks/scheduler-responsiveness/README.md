@@ -43,3 +43,11 @@ The same shared budget covers partial transport reads, complete frame parsing,
 and optional response-reader delivery admission. Inline document delivery keeps
 its existing path, and one receiver's later asynchronous continuation is outside
 this admission boundary.
+
+## Complete backlog investigation
+
+The [#1864 investigation](./investigation.md) documents the cold/ready,
+small/large, multi-root and fragmented-transport matrix, Chromium trace and
+allocation measurements, count/time policy comparison, and lifecycle decisions.
+The existing browser runner now includes ordinary query-promise bursts, direct
+RPC/custom readers, and deferred swaps with a React control.
