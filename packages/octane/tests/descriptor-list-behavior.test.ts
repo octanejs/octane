@@ -7,8 +7,8 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { build } from 'vite';
 import { octane } from 'octane/compiler/vite';
 
-// The real adapter owns admission. Ordinary helper calls and the server build
-// retain the authored factory; these consumers exercise the admitted DOM path.
+// Build the ordinary imported helper through the real client/server adapter.
+// Assertions cover visible rows, local state, events, retained DOM and lifecycle.
 const files = {
 	'helper.ts': `import { createElement } from 'octane';
 import { Row } from './rows.tsrx';
@@ -17,7 +17,7 @@ export function buildRows(items: any[]) {
  const out = new Array(items.length);
  for (let i = 0; i < items.length; i++) {
   const item = items[i];
-  out[i] = createElement(Row, { key: item.id, id: item.id, projectionText: item.label, value: item.value, wait: item.wait, onPick });
+  out[i] = createElement(Row, { key: item.id, id: item.id, rowLabel: item.label, value: item.value, wait: item.wait, onPick });
  }
  return out;
 }`,
@@ -37,7 +37,7 @@ function View(props) @{
  if (props.wait !== undefined) use(props.wait);
  <article data-row={props.id}>
   <input defaultValue="draft" onInput={() => setCount(count + 1)} />
-  <button onClick={() => props.onPick(props.id, props.projectionText)}>{props.projectionText as string}</button>
+  <button onClick={() => props.onPick(props.id, props.rowLabel)}>{props.rowLabel as string}</button>
   <b>{props.value as string}</b><output>{theme as string}</output><small>{count as string}</small>
  </article>
 }
@@ -58,7 +58,6 @@ export function BufferedRows(props) @{
  const rows = buildRows(props.items);
  <MemoShell hold={props.hold}><section>{rows}</section></MemoShell>
 }
-export function BeforeRows(props) @{ const rows = buildRows(props.items); props.before(); <section>{rows}</section> }
 export function App(props) @{ <main><Theme value={props.theme}><Rows items={props.items} /></Theme></main> }
 export function TransitionRows(props) @{
  const [items, setItems] = useState(props.items);
@@ -75,14 +74,9 @@ export function readInspection() { return inspected; }
 function InspectBody(props) { inspected = props.children; return props.children; }
 const Inspect = descriptorChildren(InspectBody);
 export function Inspected(props) @{ const rows = buildRows(props.items); <Inspect>{rows}</Inspect> }
-export function Boundary(props) @{
- @try { <App items={props.items} theme={props.theme} /> }
- @catch (error) { <output data-error>{error.message as string}</output> }
-}`,
-	'entry.ts': `export { App, Rows, BeforeRows, ReadAfter, AfterRows, BufferedRows, TransitionRows, Boundary, Retained, Inspected, readInspection } from './App.tsrx';
-export { Row } from './rows.tsrx';
+`,
+	'entry.ts': `export { App, AfterRows, BufferedRows, TransitionRows, Retained, Inspected, readInspection } from './App.tsrx';
 export { setOnPick, setOnRender, lifecycle } from './events.ts';
-export { buildRows } from './helper.ts';
 export { createRoot, hydrateRoot, flushSync, act, startTransition } from 'octane';`,
 	'entry.server.ts': `export { App } from './App.tsrx'; export { renderToString } from 'octane/server';`,
 };
@@ -92,7 +86,7 @@ let clientCode: string;
 let server: { App: unknown; renderToString: (...args: any[]) => { html: string } };
 
 beforeAll(async () => {
-	root = realpathSync(mkdtempSync(join(tmpdir(), 'octane-descriptor-runtime-')));
+	root = realpathSync(mkdtempSync(join(tmpdir(), 'octane-descriptor-list-')));
 	mkdirSync(join(root, 'node_modules'));
 	symlinkSync(resolve(import.meta.dirname, '..'), join(root, 'node_modules/octane'), 'dir');
 	writeFileSync(join(root, 'package.json'), JSON.stringify({ type: 'module' }));
@@ -138,7 +132,7 @@ async function observe(source: string, html = '') {
 		window.document.body.innerHTML = `<div id="host">${html}</div>`;
 		window.eval(clientCode);
 		const result = await window.eval(`(async () => {
- const {App, Rows, BeforeRows, AfterRows, BufferedRows, TransitionRows, Boundary, Retained, Inspected, readInspection, Row, setOnPick, setOnRender, lifecycle, buildRows, createRoot, hydrateRoot, flushSync, act, startTransition} = fixture;
+ const {App, Rows, AfterRows, BufferedRows, TransitionRows, Retained, Inspected, readInspection, setOnPick, setOnRender, lifecycle, buildRows, createRoot, hydrateRoot, flushSync, act, startTransition} = fixture;
  const host = document.querySelector('#host');
  ${source}
 })()`);
@@ -148,7 +142,7 @@ async function observe(source: string, html = '') {
 	}
 }
 
-describe('descriptor projection runtime fallbacks', () => {
+describe('descriptor list state and lifecycle', () => {
 	it('applies both row changes after a custom comparator retains the earlier children', async () => {
 		expect(
 			await observe(`
@@ -337,25 +331,6 @@ describe('descriptor projection runtime fallbacks', () => {
 		});
 	});
 
-	it('observes key conversion installed after the helper returns', async () => {
-		expect(
-			await observe(`
- const a={id:'key:a',label:'A',value:1}, b={id:'key:b',label:'B',value:2}, root=createRoot(host), string=String;
- const before=()=>{ globalThis.String=new Proxy(string,{apply(target,receiver,args){
-  if(args[0]==='key:b') throw new Error('application key conversion');
-  return Reflect.apply(target,receiver,args);
- }}); };
- root.render(BeforeRows,{items:[a,b],before:()=>{}});flushSync(()=>{});
- let error;
- try { flushSync(()=>root.render(BeforeRows,{items:[b,a],before})); }
- catch(failure) { error=failure.message; }
- finally { globalThis.String=string; }
- flushSync(()=>root.render(BeforeRows,{items:[a,b],before:()=>{}}));
- const result={error,labels:[...host.querySelectorAll('button')].map(node=>node.textContent)};
- root.unmount();return result;`),
-		).toEqual({ error: 'application key conversion', labels: ['A', 'B'] });
-	});
-
 	it('keeps survivor state across key replacement, shrinking, and appending', async () => {
 		expect(
 			await observe(`
@@ -379,26 +354,6 @@ describe('descriptor projection runtime fallbacks', () => {
 			state: '1',
 			input: 'typed',
 		});
-	});
-
-	it('prepares the list keys before a child changes application conversion', async () => {
-		expect(
-			await observe(`
- const a={id:'key:a',label:'A',value:1}, b={id:'key:b',label:'B',value:2}, root=createRoot(host), string=String;
- root.render(App,{items:[a,b],theme:'one'});flushSync(()=>{});
- const first=[...host.querySelectorAll('article')], input=first[1].querySelector('input');input.value='typed';
- setOnRender(id=>{ if(id==='key:a') globalThis.String=new Proxy(string,{apply(target,receiver,args){
-  if(args[0]==='key:b') throw new Error('conversion after child render');
-  return Reflect.apply(target,receiver,args);
- }}); });
- let error;
- try { flushSync(()=>root.render(App,{items:[{...a,label:'changed'},b],theme:'one'})); }
- catch(failure) { error=failure.message; }
- finally { globalThis.String=string;setOnRender(()=>{}); }
- const after=[...host.querySelectorAll('article')];
- const result={error:error??null,identity:after[0]===first[0]&&after[1]===first[1],labels:[...host.querySelectorAll('button')].map(node=>node.textContent),input:input.value};
- root.unmount();return result;`),
-		).toEqual({ error: null, identity: true, labels: ['changed', 'B'], input: 'typed' });
 	});
 
 	it.each(['helper', 'row'])(
@@ -427,109 +382,6 @@ describe('descriptor projection runtime fallbacks', () => {
 			});
 		},
 	);
-
-	it.each([
-		'own defaults',
-		'wrapper accessor',
-		'inherited defaults',
-		'object defaults',
-		'custom prototype',
-	])('observes %s installed between helper calls', async (mode) => {
-		const result = await observe(`
- const item = {id:'a',label:undefined,value:1}, root = createRoot(host);
- root.render(App,{items:[item],theme:'first'}); flushSync(()=>{});
- const article = host.querySelector('article'), input = host.querySelector('input'); input.value='typed';
- const mode=${JSON.stringify(mode)}, body=Row.type, originalProto=Object.getPrototypeOf(body);
- const target=mode==='wrapper accessor'?Row:mode==='inherited defaults'?Function.prototype:mode==='object defaults'?Object.prototype:body;
- const previous=Object.getOwnPropertyDescriptor(target,'defaultProps');
- try {
-  if(mode==='custom prototype') Object.setPrototypeOf(body,Object.create(originalProto,{defaultProps:{value:{projectionText:'late'}}}));
-  else Object.defineProperty(target,'defaultProps',{configurable:true,...(mode==='wrapper accessor'?{get(){return {projectionText:'late'};}}:{value:{projectionText:'late'}})});
-  flushSync(()=>root.render(App,{items:[item],theme:'first'}));
-  return {text:host.querySelector('button').textContent,identity:host.querySelector('article')===article,input:input.value};
- } finally {
-  if(mode==='custom prototype') Object.setPrototypeOf(body,originalProto);
-  else if(previous) Object.defineProperty(target,'defaultProps',previous); else delete target.defaultProps;
-  root.unmount();
- }`);
-		expect(result).toEqual({ text: 'late', identity: true, input: 'typed' });
-	});
-
-	it('keeps authored default reads after the original input reads', async () => {
-		expect(
-			await observe(`
- const item={id:'a',label:undefined,value:1}, root=createRoot(host), trace=[];
- root.render(App,{items:[item],theme:'first'}); flushSync(()=>{});
- Object.defineProperty(Row.type,'defaultProps',{configurable:true,get(){trace.push('defaults');return {projectionText:'late'};}});
- const items=new Proxy([item],{get(target,key,receiver){if(key==='length')trace.push('length');return Reflect.get(target,key,receiver);}});
- try {
-  flushSync(()=>root.render(App,{items,theme:'first'}));
-  return {first:trace[0],defaults:trace.includes('defaults'),text:host.querySelector('button').textContent};
- } finally {delete Row.type.defaultProps;root.unmount();}`),
-		).toEqual({ first: 'length', defaults: true, text: 'late' });
-	});
-
-	it('preserves copied-property setters installed between helper calls', async () => {
-		expect(
-			await observe(`
- const item={id:'a',label:'original',value:1}, root=createRoot(host), copies=[];
- root.render(Boundary,{items:[item],theme:'first'}); flushSync(()=>{});
- try {
-  Object.defineProperty(Object.prototype,'projectionText',{configurable:true,get(){return 'inherited';},set(value){copies.push(value);}});
-  flushSync(()=>root.render(Boundary,{items:[item],theme:'first'}));
-  const inherited=host.querySelector('button').textContent;
-  return {inherited,copies};
- } finally {delete Object.prototype.projectionText;root.unmount();}`),
-		).toEqual({ inherited: 'inherited', copies: ['original'] });
-	});
-
-	it('keeps a nonwritable copied property on the ordinary factory path', async () => {
-		expect(
-			await observe(`
- const item={id:'a',label:'original',value:1}, root=createRoot(host);
- root.render(Boundary,{items:[item],theme:'first'}); flushSync(()=>{});
- try {
-  Object.defineProperty(Object.prototype,'projectionText',{configurable:true,writable:false,value:'blocked'});
-  let expected;
-  try {expected={text:buildRows([item])[0].props.projectionText,error:false};}
-  catch {expected={text:null,error:true};}
-  flushSync(()=>root.render(Boundary,{items:[item],theme:'first'}));
-  const actual={text:host.querySelector('button')?.textContent??null,error:host.querySelector('[data-error]')!==null};
-  return {same:JSON.stringify(actual)===JSON.stringify(expected),ordinaryChanged:expected.text==='blocked'||expected.error};
- } finally {delete Object.prototype.projectionText;root.unmount();}`),
-		).toEqual({ same: true, ordinaryChanged: true });
-	});
-
-	it.each(['children', 'ref'])('preserves inherited factory %s reads', async (name) => {
-		expect(
-			await observe(`
- const item={id:'a',label:'original',value:1}, root=createRoot(host);
- root.render(Boundary,{items:[item],theme:'first'}); flushSync(()=>{});
- try {
-  Object.defineProperty(Object.prototype,${JSON.stringify(name)},{configurable:true,set(value){Object.defineProperty(this,${JSON.stringify(name)},{configurable:true,writable:true,enumerable:true,value});},get(){
-   if(Object.hasOwn(this,'projectionText')) throw new Error('factory inherited ${name}');
-   return undefined;
-  }});
-  flushSync(()=>root.render(Boundary,{items:[item],theme:'first'}));
-  return host.querySelector('[data-error]')?.textContent;
- } finally {delete Object.prototype[${JSON.stringify(name)}];root.unmount();}`),
-		).toBe(`factory inherited ${name}`);
-	});
-
-	it('does not move cold empty or throwing-input reads into a metadata guard', async () => {
-		expect(
-			await observe(`
- const root=createRoot(host), reads=[];
- Object.defineProperty(Row.type,'defaultProps',{configurable:true,get(){reads.push('defaults');return {};}});
- try {
-  root.render(Boundary,{items:[],theme:'first'}); flushSync(()=>{});
-  const emptyReads=reads.slice();
-  const items={get length(){throw new Error('length failed');}};
-  flushSync(()=>root.render(Boundary,{items,theme:'first'}));
-  return {emptyReads,reads,error:host.querySelector('[data-error]')?.textContent};
- } finally {delete Row.type.defaultProps;root.unmount();}`),
-		).toEqual({ emptyReads: [], reads: [], error: 'length failed' });
-	});
 
 	it('refreshes unchanged context consumers beside an immutable changed row', async () => {
 		expect(
@@ -675,78 +527,6 @@ describe('descriptor projection runtime fallbacks', () => {
 			labels: ['B', 'changed'],
 			themes: ['next', 'next'],
 			errors: [],
-		});
-	});
-});
-
-describe('rows when input length changes', () => {
-	it.each([
-		{
-			name: 'shrinking with trailing holes',
-			allocation: 4,
-			limits: [4, 1],
-			labels: ['A'],
-			retainedA: true,
-		},
-		{
-			name: 'zero writes after allocation',
-			allocation: 2,
-			limits: [0],
-			labels: [],
-			retainedA: false,
-		},
-		{
-			name: 'growing while iterating',
-			allocation: 0,
-			limits: [1, 2, 3, 3],
-			labels: ['A', 'B', 'C'],
-			retainedA: true,
-		},
-		{
-			name: 'string allocation followed by growth',
-			allocation: '3',
-			limits: [2],
-			labels: ['A', 'B'],
-			retainedA: true,
-		},
-		{
-			name: 'string allocation without writes',
-			allocation: 'x',
-			limits: [0],
-			labels: [],
-			retainedA: false,
-		},
-	])('preserves rows and authored reads while $name', async (scenario) => {
-		const result = await observe(`
- const a={id:'a',label:'A',value:1},b={id:'b',label:'B',value:2},c={id:'c',label:'C',value:3},root=createRoot(host);
- root.render(App,{items:[a,b],theme:'one'});flushSync(()=>{});
- const first=host.querySelector('article'), input=first.querySelector('input');input.value='typed';
- const scenario=${JSON.stringify(scenario)},rows=[a,b,c];
- const source=()=>{
-  const reads=[];let lengthReads=0;
-  return {reads,items:new Proxy({}, {get(_target,key){
-   reads.push(String(key));
-   if(key==='length'){const at=lengthReads++;return at===0?scenario.allocation:scenario.limits[Math.min(at-1,scenario.limits.length-1)];}
-   return rows[Number(key)];
-  }})};
- };
- const expected=source();buildRows(expected.items);
- const actual=source();flushSync(()=>root.render(App,{items:actual.items,theme:'two'}));
- const labels=[...host.querySelectorAll('button')].map(node=>node.textContent),current=host.querySelector('article');
- const retainedA=current===first,visibleInput=current?.querySelector('input').value??null;
- const literalText=scenario.allocation==='x'?host.querySelector('section').textContent:null;
- flushSync(()=>root.render(App,{items:[a,b],theme:'three'}));
- const result={labels,retainedA,visibleInput,literalText,reads:actual.reads,expectedReads:expected.reads,recovered:[...host.querySelectorAll('button')].map(node=>node.textContent)};
- root.unmount();return result;`);
-		expect(result.reads).toEqual(result.expectedReads);
-		expect(result).toEqual({
-			labels: scenario.labels,
-			retainedA: scenario.retainedA,
-			visibleInput: scenario.labels.length ? 'typed' : null,
-			literalText: scenario.allocation === 'x' ? 'x' : null,
-			reads: expect.any(Array),
-			expectedReads: expect.any(Array),
-			recovered: ['A', 'B'],
 		});
 	});
 });

@@ -49,68 +49,6 @@ const VIEW = 'function View(props) @{ <main>{props.label as string}<input /></ma
 
 // Untyped views that render handles from a lazily loaded engine opt in.
 const LATE_ENGINE = { opaqueSignalHandles: true };
-
-describe('hookless lifetime ownership', () => {
-	it.each([false, true])(
-		'releases an abandoned arm under a committed lite owner (dev: %s)',
-		async (dev) => {
-			const source = `${IMPORTS} import {use, useState} from 'octane';
-// A live module read keeps this wrapper on its hookless call path.
-let enabled = true;
-function Content(props) @{
- <section>
-  @if (props.active && enabled) {
-   <>
-    <meta name="owner-lifetime" content="candidate" />
-    <button onClick={props.click}>expand</button>
-    @if (props.expanded) { <b>detail</b> }
-   </>
-  }
-  <input defaultValue="initial" />
- </section>
-}
-function Reader(props) @{ const value=use(props.promise); <output>{('resource:'+value) as string}</output> }
-function App(props) @{
- const [expanded,setExpanded]=useState(false);
- <main><Content active={props.active} expanded={expanded} click={()=>setExpanded(!expanded)} /><Reader promise={props.promise}/></main>
-}
-export async function run() {
- const host=document.querySelector('#host'), root=createRoot(host);
- const before=Array.from(document.head.childNodes);
- const ready=value=>({status:'fulfilled',value,then(){}});
- let resolve; const pending=new Promise(done=>{resolve=done;});
- const accepted=ready('C'); const states=[];
- root.render(App,{active:false,promise:ready('A')}); flushSync(()=>{});
- const input=host.querySelector('input'); input.value='typed';
- const snapshot=()=>states.push([host.textContent,document.head.childNodes.length-before.length,host.querySelector('input')===input,input.value]);
- try {
-  flushSync(()=>root.render(App,{active:true,promise:pending})); snapshot();
-  flushSync(()=>root.render(App,{active:true,promise:accepted})); snapshot();
-  flushSync(()=>host.querySelector('button').click()); snapshot();
-  flushSync(()=>root.render(App,{active:false,promise:accepted})); snapshot();
-  resolve('B'); await new Promise(done=>setTimeout(done,0)); flushSync(()=>{}); snapshot();
-  flushSync(()=>root.render(App,{active:true,promise:accepted})); snapshot();
-  flushSync(()=>host.querySelector('button').click()); snapshot();
- } finally {root.unmount();}
- return {states,cleared:host.childNodes.length===0,headRestored:before.length===document.head.childNodes.length&&before.every((node,i)=>document.head.childNodes[i]===node)};
-}`;
-			expect(await consume(source, dev)).toEqual({
-				states: [
-					['resource:A', 0, true, 'typed'],
-					['expandresource:C', 1, true, 'typed'],
-					['expanddetailresource:C', 1, true, 'typed'],
-					['resource:C', 0, true, 'typed'],
-					['resource:C', 0, true, 'typed'],
-					['expanddetailresource:C', 1, true, 'typed'],
-					['expandresource:C', 1, true, 'typed'],
-				],
-				cleared: true,
-				headRestored: true,
-			});
-		},
-	);
-});
-
 describe('same-file production roots', () => {
 	it.each([false, true])(
 		'preserves props, state, survivor identity and cleanup (Strong: %s)',

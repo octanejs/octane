@@ -20,7 +20,6 @@
 declare const process: { env: { NODE_ENV?: string } };
 
 import { hydrating, hydrationStarted, setHydrating, startHydration } from './hydration-flag.js';
-export { hydrating as compilerHydrating } from './hydration-flag.js';
 import { resolveHookPath } from './hook-slot-cache.js';
 import type {
 	LayoutSnapshotOptions,
@@ -2493,11 +2492,11 @@ export interface Block extends Scope {
 	extra: any;
 	outputHandler: OutputHandler | null;
 	/**
-	 * False proves neither this block nor any ancestor is memoized or armed for
-	 * implicit bailout. Inherited on creation and promoted through retained
-	 * descendants when a boundary gains memo/implicit metadata. True stays
-	 * conservative across body changes and rollback, so context dependency walks
-	 * can stop at the first false value without retaining ancestor pointers.
+	 * True when this block OR any ancestor is a `memo()` block. Monotone up the
+	 * parentBlock chain (computed once at creation), so `useContextInternal` can
+	 * skip its memo-ancestor stamping walk entirely on the common no-memo tree —
+	 * the walk only ever stamps memo blocks, so if there are none above us it is
+	 * pure overhead (~ancestor-depth iterations per `use()` call).
 	 */
 	memoInChain: boolean;
 	pending: boolean;
@@ -13967,24 +13966,20 @@ function unmountScope(scope: Scope, detachDom: boolean = true): void {
 	// (React never invokes refs for uncommitted work; ReactErrorBoundaries:1158).
 	// De-opt refs are unaffected: their detaches queue from detachDeoptTreeRefs
 	// walks outside this cleanups loop.
-	if (scope.mounted === true) unmountScopeChildrenAndSlots(scope, detachDom);
-	else unmountAbortedScopeChildrenAndSlots(scope, detachDom);
+	let abortedRefs: SuspenseRefEntry[] | null = null;
+	if ((scope as any).mounted !== true) {
+		abortedRefs = [];
+		collectVisibleSubtreeRefs(scope, abortedRefs);
+	}
+	withRefDetachSuppression(abortedRefs, () => {
+		unmountScopeChildrenAndSlots(scope, detachDom);
+	});
 }
 
 // Keep an aborted mount's exact-host ref suppression active for the complete
 // recursive teardown. A child may have finished rendering and queued an attach
 // before a later sibling aborts its parent; that child's attach never commits,
 // so its recursive cleanup must not manufacture a matching detach.
-// The callback lives here so ordinary mounted teardown does not capture its
-// scope and detachDom arguments in a closure.
-function unmountAbortedScopeChildrenAndSlots(scope: Scope, detachDom: boolean): void {
-	const abortedRefs: SuspenseRefEntry[] = [];
-	collectVisibleSubtreeRefs(scope, abortedRefs);
-	withRefDetachSuppression(abortedRefs, () => {
-		unmountScopeChildrenAndSlots(scope, detachDom);
-	});
-}
-
 function runScopeCleanups(scope: Scope, retireUnowned: boolean): void {
 	const c = scope.cleanups;
 	if (c !== null)
@@ -18786,30 +18781,12 @@ function isHostContextRequest(err: unknown): err is HostContextRequestSignal {
 	);
 }
 
-// A retained subtree can acquire a memo/implicit boundary after construction.
-// Promote its existing Blocks and lite proxies before a context walk uses a
-// false memoInChain value to stop. True is conservative and remains valid after
-// rollback or a later body change, so this metadata needs no journal entry.
-function promoteMemoAncestry(scope: Scope): void {
-	const block = scope.block;
-	if (scope === block && block.memoInChain) return;
-	block.memoInChain = true;
-	// A host child Scope can borrow the already-promoted Block. Its own children
-	// still need visiting; only an actual Block owns the subtree proof above.
-	forEachSubtreeChild(scope, promoteMemoAncestry);
-}
-
 function recordContextDependency(block: Block | null, context: Context<any>): void {
 	if (block === null || !block.memoInChain) return;
 	(block.$$ctxDirect ??= new Map()).set(context, context.$$version);
-	let current: Block | null = block;
-	while (current !== null) {
+	for (let current: Block | null = block; current !== null; current = current.parentBlock) {
 		if ((current.body as any)?.__memo === true || current.$$implicitBail === true) {
 			(current.$$ctxReads ??= new Map()).set(context, context.$$version);
-			current = current.parentBlock;
-			if (current !== null && !current.memoInChain) break;
-		} else {
-			current = current.parentBlock;
 		}
 	}
 }
@@ -20491,7 +20468,7 @@ export function lazy<C extends ComponentBody<any>>(
 			// The Block was created while the payload was unresolved, before it could
 			// inherit memo metadata. Arm context dependency stamping before executing
 			// the resolved memo body.
-			if (!scope.block.memoInChain) promoteMemoAncestry(scope);
+			scope.block.memoInChain = true;
 		}
 		if (
 			profiledComponent !== comp &&
@@ -36150,10 +36127,6 @@ function disposeWip(wip: OffscreenWip): void {
 // preserving its marker pair, so a mode switch (or component-identity swap)
 // rebuilds in place.
 function clearChildContent(state: ChildSlot): void {
-	if (state.forSlot !== null && state.forSlot.selectionItems !== undefined) {
-		journalRootProperty(state.forSlot, 'selectionItems', state.forSlot.selectionItems);
-		state.forSlot.selectionItems = undefined;
-	}
 	const transaction = ROOT_RENDER_TRANSACTION;
 	if (transaction !== null && !transaction.aborted && !ROOT_RENDER_ROLLBACK) {
 		// A previous mode exit can already have retired the content while
@@ -37006,11 +36979,6 @@ function deoptWrapperKind(value: any[]): DeoptWrapperKind {
 
 const DEOPT_KEY_STRINGIFY = JSON.stringify;
 const DEOPT_KEY_STRING = String;
-
-/** Prepared keys are valid only while the original String conversion is installed. */
-export function compilerCanUsePreparedKeys(): boolean {
-	return String === DEOPT_KEY_STRING;
-}
 
 function nestedDeoptKeyPrefix(path: readonly (string | number)[]): string | null {
 	// Object-valued wrapper keys and custom array serialization may differ for
@@ -37973,8 +37941,6 @@ function mappedDeoptItemBody(item: any, scope: Scope): void {
 	deoptItemBody(item, scope);
 }
 
-export { mappedDeoptItemBody as compilerMappedDescriptorBody };
-
 // True when `value` (a descriptor, an array, or a primitive) contains a COMPONENT
 // descriptor anywhere in its tree. Such a subtree can't be a raw host reconcile —
 // its components need reconcilable, unmountable Blocks — so the de-opt
@@ -38336,10 +38302,6 @@ function renderHostTagChildren(d: ElementDescriptor, block: Block, el: Element):
 // (disposeReturnSlot has its own variant — it also unmounts @empty and skips the
 // bookkeeping reset because the whole slot is being discarded.)
 function teardownChildForSlot(state: ChildSlot): void {
-	if (state.forSlot !== null && state.forSlot.selectionItems !== undefined) {
-		journalRootProperty(state.forSlot, 'selectionItems', state.forSlot.selectionItems);
-		state.forSlot.selectionItems = undefined;
-	}
 	const fs = state.forSlot!;
 	batchClearItems(fs, fs.items);
 	fs.head = null;
@@ -38783,12 +38745,6 @@ function journalRootChildShape(state: ChildSlot, parent: Node): void {
 	}
 }
 
-interface CompiledListDelta {
-	previousToken: any[] | null;
-	cache: { captures: any[] } | null;
-	changedIndex: number;
-}
-
 function renderPreparedChildList(
 	state: ChildSlot,
 	parentBlock: Block,
@@ -38798,21 +38754,11 @@ function renderPreparedChildList(
 	upgradeArmed: boolean,
 	upgradeChildren: any,
 	compiledMapBody?: (item: any, scope: Scope) => void,
-	compiledMapKey?: ListKeySource<any>,
+	compiledMapKey?: (item: any, index: number) => any,
 	compiledMapFlags?: number,
 	compiledMapDeps?: any[],
 	mappedFallback?: boolean,
-	compiledDelta?: CompiledListDelta,
 ): void {
-	// A child-owned list shares selectionItems with the direct keyed-selection
-	// ABI only by field shape. Here it certifies the last complete canonical
-	// mapped render; every attempt invalidates it before running an item body.
-	const previousList = state.forSlot;
-	const previousToken = previousList?.selectionItems;
-	if (previousList !== null && previousToken !== undefined) {
-		journalRootProperty(previousList, 'selectionItems', previousToken);
-		previousList.selectionItems = undefined;
-	}
 	const passthroughList = hydrating
 		? hydration?.passthroughRanges === true && state.borrowed
 		: false;
@@ -39035,71 +38981,12 @@ function renderPreparedChildList(
 			state.forSlot.cachedDeps = compiledMapDeps;
 		}
 	}
-	const list = state.forSlot;
-	const owner = CURRENT_BLOCK;
-	const canonical =
-		compiledDelta !== undefined &&
-		compiledDelta.cache !== null &&
-		compiledMapBody !== undefined &&
-		body === compiledMapBody &&
-		hydration === null &&
-		!upgradeArmed &&
-		list.adopt === null &&
-		pure &&
-		!lite &&
-		(fastFlags & 8) !== 0 &&
-		Array.isArray(compiledMapKey) &&
-		compiledMapKey.length === items.length &&
-		compiledMapDeps === undefined &&
-		list.signalSite === undefined &&
-		!NATIVE_READ_DRIVER &&
-		parentBlock.idState.renderOwner?.signalOwner === undefined &&
-		RENDERER_REGION_OWNER_COUNT === 0 &&
-		!ROOT_RENDER_ROLLBACK &&
-		!TRANSITION_JOURNAL_REPLAYING &&
-		(TRANSITION_JOURNAL === null || ROOT_RENDER_TRANSACTION !== null) &&
-		(ROOT_RENDER_TRANSACTION === null || !ROOT_RENDER_TRANSACTION.aborted) &&
-		owner !== null &&
-		!owner.disposed &&
-		!owner.pending &&
-		owner.renderStatus === RENDER_VALID;
-	let appliedDelta = false;
-	if (
-		canonical &&
-		owner!.mounted &&
-		previousList === list &&
-		previousToken !== undefined &&
-		compiledDelta!.previousToken === previousToken &&
-		list.size === items.length &&
-		list.items.size === list.size &&
-		list.head !== null &&
-		list.head.body === body
-	) {
-		const index = compiledDelta!.changedIndex;
-		if (index === -1) {
-			appliedDelta = true;
-		} else if (index >= 0 && index < items.length) {
-			const key = (compiledMapKey as any[])[index];
-			const block = list.items.get(key);
-			if (
-				block !== undefined &&
-				block.forSlot === list &&
-				block.key === key &&
-				block.itemIndex === index &&
-				block.body === body &&
-				!block.disposed
-			) {
-				updateSurvivor(block, items[index], index, body, true, false, true, list.env);
-				appliedDelta = true;
-			}
-		}
-	}
 	// singleRoot=2 (marker-elision M4): pure single-element items self-mark —
 	// no `it` pair per item — resolved per item value in mountItem; shape
 	// flips promote to a minted pair in place (deoptItemBody).
 	// First fill dispatches to the linear pass directly (see mountItemsLinear)
 	// so a de-opt list's hydration adopt skips the full reconciler too.
-	if (!appliedDelta && state.forSlot.size === 0) {
+	if (state.forSlot.size === 0) {
 		try {
 			mountItemsLinear(
 				parentBlock,
@@ -39126,7 +39013,7 @@ function renderPreparedChildList(
 		}
 		// Only first-fill adoption consumes unowned server items, as in forBlock.
 		if (hydration !== null && !passthroughList) hydration.settleItems(state.forSlot.end);
-	} else if (!appliedDelta) {
+	} else {
 		reconcileKeyed(
 			parentBlock,
 			state.forSlot,
@@ -39165,32 +39052,6 @@ function renderPreparedChildList(
 		// Once this list consumed the selected owner, its containing item must
 		// end after the entire list, including its own closing marker.
 		hydration!.node = getNextSibling(state.forSlot.end);
-	}
-	// No-root transition windows follow keyedForBlock's conservative policy:
-	// leave the witness invalid rather than extend its publication journal.
-	// Reentry may complete a different list while an item body runs. Never
-	// overwrite that publication with this attempt's input.
-	const completedList = state.forSlot;
-	if (
-		canonical &&
-		completedList === list &&
-		owner === CURRENT_BLOCK &&
-		!owner!.disposed &&
-		!owner!.pending &&
-		owner!.renderStatus === RENDER_VALID &&
-		list.selectionItems === undefined &&
-		list.mappedNative === true &&
-		list.size === items.length &&
-		list.items.size === list.size &&
-		list.head !== null &&
-		list.head.body === body
-	) {
-		if (previousList !== list || previousToken === undefined)
-			journalRootProperty(list, 'selectionItems', undefined);
-		list.selectionItems = compiledDelta!.cache!.captures;
-	} else if (completedList !== null && completedList.selectionItems !== undefined) {
-		journalRootProperty(completedList, 'selectionItems', completedList.selectionItems);
-		completedList.selectionItems = undefined;
 	}
 	return;
 }
@@ -39465,12 +39326,11 @@ export function childSlot(
 	// in another one-item list.
 	includeKeyedSingle: boolean = true,
 	compiledMapBody?: (item: any, scope: Scope) => void,
-	compiledMapKey?: ListKeySource<any>,
+	compiledMapKey?: (item: any, index: number) => any,
 	compiledMapFlags?: number,
 	compiledMapDeps?: any[],
 	mappedFallback?: boolean,
 	bindingMarker?: string,
-	compiledDelta?: CompiledListDelta,
 ): void {
 	if (CURRENT_BLOCK?.pending && !CURRENT_BLOCK.crossRenderUpdate) return;
 	if (slotKey === 0 && parentScope !== RETURNED_OUTPUT_SCOPE) {
@@ -39561,7 +39421,6 @@ export function childSlot(
 				compiledMapDeps,
 				mappedFallback,
 				bindingMarker,
-				compiledDelta,
 			),
 		);
 		return;
@@ -39976,7 +39835,6 @@ export function childSlot(
 			compiledMapFlags,
 			compiledMapDeps,
 			mappedFallback,
-			compiledDelta,
 		);
 		return;
 	}
@@ -40143,7 +40001,7 @@ export function childSlot(
 				// The slot previously hosted an arbitrary render function. Arm before
 				// rendering the tagged body so its context reads stamp this block.
 				state.block.$$implicitBail = true;
-				if (!state.block.memoInChain) promoteMemoAncestry(state.block);
+				state.block.memoInChain = true;
 			}
 			if (
 				wasImplicitlyArmed &&
@@ -40962,7 +40820,7 @@ function restampCtxDeps(block: Block): void {
 	const hasReads = reads !== null && reads.size > 0;
 	const hasDirect = direct !== null && direct.size > 0;
 	if (!hasReads && !hasDirect) return;
-	for (let b: Block | null = block.parentBlock; b !== null && b.memoInChain; b = b.parentBlock) {
+	for (let b: Block | null = block.parentBlock; b !== null; b = b.parentBlock) {
 		if ((b.body as any)?.__memo !== true && b.$$implicitBail !== true) continue;
 		const m = (b.$$ctxReads ??= new Map());
 		if (hasReads) {
@@ -41075,11 +40933,6 @@ function refreshCachedBlock(block: Block, contextChanged: boolean): void {
 	else if (contextChanged) refreshBlockForContext(block);
 }
 
-/** Compiler-owned context caches cannot witness a foreign renderer's context publication. */
-export function compilerCanCacheContext(): boolean {
-	return RENDERER_REGION_OWNER_COUNT === 0;
-}
-
 /**
  * Compiler ABI for a flat output-cache hit. Context consumers are normally
  * reached while their parent slot reconciles; a cache hit intentionally skips
@@ -41155,9 +41008,6 @@ export function compilerCacheContext(
 }
 
 const OBJ_PROTO = Object.prototype;
-const FN_PROTO = Function.prototype;
-const GET_OWN_PROPERTY_DESCRIPTOR = Object.getOwnPropertyDescriptor;
-const GET_PROTOTYPE_OF = Object.getPrototypeOf;
 
 // Runs on every re-render for every memo child (both tryMemoBail call sites),
 // so the common plain-object case is a zero-allocation for-in compare — no
@@ -41232,59 +41082,6 @@ const MEMO_DEFAULT_PROPS_DESCRIPTOR: PropertyDescriptor = {
 };
 
 /**
- * Guard one compiler-owned descriptor projection, never an individual row.
- * The compiler proves an ordinary, genuine memo wrapper and wrapped function:
- * this is not an opaque function or Proxy validator. MEMO_OWNER and type are
- * immutable own data fields installed by memo(), so their reads invoke no
- * authored accessor. Mutable defaults and prototype surfaces are inspected
- * without reading their values; declining preserves the original factory call.
- * @internal
- */
-export function compilerCanCacheDescriptorProjection(
-	component: unknown,
-	staticPropNames: readonly string[],
-): boolean {
-	if (
-		typeof component !== 'function' ||
-		(component as any)[MEMO_OWNER] !== component ||
-		GET_PROTOTYPE_OF(component) !== FN_PROTO ||
-		GET_PROTOTYPE_OF(FN_PROTO) !== OBJ_PROTO
-	) {
-		return false;
-	}
-	const type = (component as any).type;
-	if (typeof type !== 'function' || GET_PROTOTYPE_OF(type) !== FN_PROTO) return false;
-	const defaults = GET_OWN_PROPERTY_DESCRIPTOR(component, 'defaultProps');
-	if (
-		defaults === undefined ||
-		!hasOwnProp.call(defaults, 'get') ||
-		defaults.get !== MEMO_DEFAULT_PROPS_DESCRIPTOR.get ||
-		defaults.set !== MEMO_DEFAULT_PROPS_DESCRIPTOR.set ||
-		GET_OWN_PROPERTY_DESCRIPTOR(type, 'defaultProps') !== undefined ||
-		GET_OWN_PROPERTY_DESCRIPTOR(FN_PROTO, 'defaultProps') !== undefined ||
-		GET_OWN_PROPERTY_DESCRIPTOR(OBJ_PROTO, 'defaultProps') !== undefined ||
-		GET_OWN_PROPERTY_DESCRIPTOR(component, '__compare') !== undefined ||
-		GET_OWN_PROPERTY_DESCRIPTOR(FN_PROTO, '__compare') !== undefined ||
-		GET_OWN_PROPERTY_DESCRIPTOR(OBJ_PROTO, '__compare') !== undefined ||
-		// createElement also reads children and ref when neither was copied.
-		GET_OWN_PROPERTY_DESCRIPTOR(OBJ_PROTO, 'children') !== undefined ||
-		GET_OWN_PROPERTY_DESCRIPTOR(OBJ_PROTO, 'ref') !== undefined
-	) {
-		return false;
-	}
-	for (let index = 0; index < staticPropNames.length; index++) {
-		const inherited = GET_OWN_PROPERTY_DESCRIPTOR(OBJ_PROTO, staticPropNames[index]);
-		if (
-			inherited !== undefined &&
-			(!hasOwnProp.call(inherited, 'value') || inherited.writable !== true)
-		) {
-			return false;
-		}
-	}
-	return true;
-}
-
-/**
  * `memo(Component)` — React-shape HOC. Returns a wrapper component that
  * skips its body when the incoming props are shallow-equal to the committed
  * ones. Children inside the wrapped body still mount/update normally on the
@@ -41314,16 +41111,6 @@ export function memo<P>(
 	arePropsEqual?: (prevProps: Readonly<P>, nextProps: Readonly<P>) => boolean,
 ): ComponentBody<P> & { readonly type: ComponentBody<P>; displayName?: string } {
 	function memoWrapper(props: P, scope: Scope, extra: any): unknown {
-		// A render-function slot may replace its body while retaining children.
-		// Arm only the Block this wrapper actually owns, never a direct call that
-		// happens to execute inside another component's render scope.
-		if (
-			scope === CURRENT_SCOPE &&
-			scope !== null &&
-			!scope.block.memoInChain &&
-			scope.block.body === memoWrapper
-		)
-			promoteMemoAncestry(scope);
 		// Propagate the wrapped body's return so a folded (return-based) component
 		// memo()'d here still hands its descriptor back to renderBlock to mount.
 		return component(props, scope, extra);
@@ -48168,10 +47955,8 @@ interface ForSlot {
 	// childSlot, which already retains that graph. Both ForSlot literals declare
 	// it so every slot shares one hidden class.
 	plainDeopt: ((block: Block, item: any, index: number) => boolean) | null;
-	// Compiler-owned identity witness: keyed equality selections use their input
-	// array for the two-row update. ChildSlot-owned lists use a private projection
-	// token after a complete canonical pass, certifying homogeneous item bodies.
-	// Noncanonical child-list routes clear it before mutating the list.
+	// Set only when the compiler proved a keyed equality selection. Identity
+	// gates the two-row update without retaining extra state on ordinary lists.
 	selectionItems: ArrayLike<any> | undefined;
 }
 
@@ -48816,10 +48601,6 @@ export function fastMapSlot(
 		(slot as any).returnedOutput === true
 	) {
 		setReturnedOutputOwner(slot, false);
-	}
-	if (state!.selectionItems !== undefined) {
-		journalRootProperty(state!, 'selectionItems', state!.selectionItems);
-		state!.selectionItems = undefined;
 	}
 	mountFastHostItems(
 		scopeOrItems as Scope,

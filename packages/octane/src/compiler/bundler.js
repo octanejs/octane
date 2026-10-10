@@ -511,7 +511,7 @@ function hasValueReturn(node) {
 // directly, through a runtime wrapper above, or as a setup IIFE's result, and
 // bound by a lexical binding nothing reassigns. Re-exports, namespace objects
 // and every other shape stay unknown.
-function compiledComponentExports(ast) {
+function compiledVoidExports(ast) {
 	const reassigned = collectReassignedBindings(ast);
 	const wrappers = new Map();
 	// Top-level value bindings with a statically known value. Imports and other
@@ -527,7 +527,7 @@ function compiledComponentExports(ast) {
 					specifier.importKind !== 'type' &&
 					VOID_PRESERVING_WRAPPERS.has(imported)
 				)
-					wrappers.set(specifier.local.name, imported);
+					wrappers.set(specifier.local.name, VOID_PRESERVING_WRAPPERS.get(imported));
 			}
 			continue;
 		}
@@ -545,56 +545,39 @@ function compiledComponentExports(ast) {
 		}
 	}
 
-	// A void return ABI and a genuine ordinary default memo are different facts.
-	// Only __s/markWarm preserve function identity; presentation wrappers need
-	// the existing void proof but cannot authorize descriptor reuse.
-	const ORDINARY = 1;
-	const VOID = 2;
-	const DEFAULT_MEMO = 4;
-	const classify = (node, seen) => {
+	const isVoid = (node, seen) => {
 		switch (node?.type) {
 			case 'FunctionDeclaration':
 			case 'FunctionExpression':
+				return !node.async && !node.generator && !hasValueReturn(node.body);
 			case 'ArrowFunctionExpression':
-				return node.async || node.generator
-					? 0
-					: ORDINARY |
-							(node.body?.type === 'BlockStatement' && !hasValueReturn(node.body) ? VOID : 0);
+				return !node.async && node.body?.type === 'BlockStatement' && !hasValueReturn(node.body);
 			case 'Identifier': {
-				if (seen.has(node.name)) return 0;
+				if (seen.has(node.name)) return false;
 				seen.add(node.name);
-				return classify(values.get(node.name), seen);
+				return isVoid(values.get(node.name), seen);
 			}
 			case 'SequenceExpression':
-				return classify(node.expressions?.at(-1), seen);
+				return isVoid(node.expressions?.at(-1), seen);
 			case 'CallExpression': {
-				if (node.optional === true) return 0;
+				if (node.optional === true) return false;
 				if (node.callee?.type === 'Identifier') {
-					const wrapper = wrappers.get(node.callee.name);
-					if (
-						wrapper === undefined ||
-						node.arguments?.length !== VOID_PRESERVING_WRAPPERS.get(wrapper) ||
-						node.arguments[0].type === 'SpreadElement'
-					)
-						return 0;
-					const target = classify(node.arguments[0], seen);
-					if (wrapper === 'memo') return (target & VOID) | (target & ORDINARY ? DEFAULT_MEMO : 0);
-					return wrapper === 'bindPresentationView' ? target & VOID : target;
+					const arity = wrappers.get(node.callee.name);
+					return (
+						arity !== undefined &&
+						node.arguments?.length === arity &&
+						node.arguments[0].type !== 'SpreadElement' &&
+						isVoid(node.arguments[0], seen)
+					);
 				}
 				const result = immediateResult(node);
-				return result == null ? 0 : classify(result, seen);
+				return result != null && isVoid(result, seen);
 			}
 		}
-		return 0;
+		return false;
 	};
 
-	const voidComponentExports = [];
-	const defaultMemoComponentExports = [];
-	const addExport = (name, value) => {
-		const facts = classify(value, new Set());
-		if (facts & VOID) voidComponentExports.push(name);
-		if (facts & DEFAULT_MEMO) defaultMemoComponentExports.push(name);
-	};
+	const exports = [];
 	for (const node of ast.body || []) {
 		if (node.type === 'ExportDefaultDeclaration') {
 			const declaration = node.declaration;
@@ -603,28 +586,33 @@ function compiledComponentExports(ast) {
 				declaration?.type === 'FunctionDeclaration' && declaration.id?.name
 					? values.get(declaration.id.name)
 					: declaration;
-			addExport('default', value);
+			if (isVoid(value, new Set())) exports.push('default');
 			continue;
 		}
 		if (node.type !== 'ExportNamedDeclaration' || node.source != null || node.exportKind === 'type')
 			continue;
 		const declaration = node.declaration;
 		if (declaration?.type === 'FunctionDeclaration' && declaration.id?.name) {
-			addExport(declaration.id.name, values.get(declaration.id.name));
+			if (isVoid(values.get(declaration.id.name), new Set())) exports.push(declaration.id.name);
 		} else if (declaration?.type === 'VariableDeclaration') {
 			for (const item of declaration.declarations || []) {
-				if (item.id?.type === 'Identifier') addExport(item.id.name, values.get(item.id.name));
+				if (item.id?.type === 'Identifier' && isVoid(values.get(item.id.name), new Set()))
+					exports.push(item.id.name);
 			}
 		} else if (declaration == null) {
 			for (const specifier of node.specifiers || []) {
 				const local = specifier.local?.name ?? specifier.local?.value;
 				const exported = specifier.exported?.name ?? specifier.exported?.value;
-				if (specifier.exportKind !== 'type' && typeof exported === 'string')
-					addExport(exported, values.get(local));
+				if (
+					specifier.exportKind !== 'type' &&
+					typeof exported === 'string' &&
+					isVoid(values.get(local), new Set())
+				)
+					exports.push(exported);
 			}
 		}
 	}
-	return { voidComponentExports, defaultMemoComponentExports };
+	return exports;
 }
 
 // The value bindings a module's static import declarations create.
@@ -662,9 +650,6 @@ function moduleImportBindings(ast) {
  *   transforms can rewrite compiled output (transpiler lowering, other
  *   loaders) pairs {@link findVoidComponentExports}, the authored contract,
  *   with this check of the code that actually runs.
- * - `defaultMemoComponentExports`: genuine comparator-free memo wrappers over
- *   ordinary local functions, through identity-preserving runtime stamps only.
- *   Runtime metadata guards still check their mutable statics and prototypes.
  * - `importBindings`: each value import binding as `{ local, request,
  *   imported }` (`imported` is `default` or `*` for those forms). Comparing
  *   the bindings Octane's output read a proof through with the final code's
@@ -679,7 +664,7 @@ export function analyzeCompiledModule(source, id) {
 		return null;
 	}
 	return {
-		...compiledComponentExports(ast),
+		voidComponentExports: compiledVoidExports(ast),
 		importBindings: moduleImportBindings(ast),
 	};
 }
@@ -1684,16 +1669,6 @@ class OctaneBundlerCompiler {
 				...(clientOnlyImports.length > 0 ? { clientOnlyImports } : null),
 				...(environment === 'client' && typeof options.isVoidComponentImport === 'function'
 					? { isVoidComponentImport: options.isVoidComponentImport }
-					: null),
-				...(environment === 'client' &&
-				renderer.target === 'dom' &&
-				!hasRendererBoundaries &&
-				!hmr &&
-				!dev &&
-				!profile &&
-				inlineHookMemo &&
-				typeof options.resolveDescriptorProjectionImport === 'function'
-					? { resolveDescriptorProjectionImport: options.resolveDescriptorProjectionImport }
 					: null),
 				...(typeof options.isDescriptorChildrenImport === 'function'
 					? { isDescriptorChildrenImport: options.isDescriptorChildrenImport }

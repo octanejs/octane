@@ -19,13 +19,13 @@ import { bindWallA, bindWallB, initialItemsA, initialItemsB, selectRow } from '.
 //     identical component structure.
 //
 //   wall B — value-position: the plain-.ts wall-b helper builds
-//     `createElement(Row, props)` descriptors for the `{rows}` children hole.
-//     Production TSRX recognizes this render-only projection and reuses its
-//     output for unchanged inputs. Changed inputs still scan every item and
-//     raw key, reusing descriptors only for unchanged same-index snapshots.
-//     The mapped list then updates changed survivors. Ordinary helper calls,
-//     unsupported build modes, and the JSX twin retain descriptor creation
-//     and shallow prop comparisons through childSlot's keyed de-opt list.
+//     `createElement(Row, props)` descriptors that reach the DOM through the
+//     `{rows}` children hole → childSlot's keyed de-opt list → the childSlot
+//     arm of tryMemoBail. autoMemo does not reach through an imported helper's
+//     returned descriptors (that calculation/output phase ships together with
+//     per-key descriptor reuse), so every parent render rebuilds all 1000
+//     descriptors and the bail must succeed on prop VALUES, not object
+//     identity. This is the shape every @octanejs binding produces.
 //
 // Each wall owns its items, an unrelated `tick`, and its theme. The theme
 // provider sits ABOVE the rows inside the wall, so a ctx op re-renders the

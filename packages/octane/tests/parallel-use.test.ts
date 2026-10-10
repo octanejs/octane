@@ -2034,182 +2034,6 @@ describe('parallel use() — adjacent async component trees', () => {
 		root.unmount();
 	});
 
-	it('starts independent siblings below lite wrappers owned by the rendering root', async () => {
-		const client = loadCompiledFixtureSource(
-			`import { use } from 'octane';
-			 function First(props) @{
-				const value = use(props.load('owner-first', props.version));
-				<span class="owner-first">{value as string}</span>
-			 }
-			 function Second(props) @{
-				const value = use(props.load('owner-second', props.version));
-				<span class="owner-second">{value as string}</span>
-			 }
-			 function Inner(props) @{
-				<div><First load={props.load} version={props.version} /><Second load={props.load} version={props.version} /></div>
-			 }
-			 function Outer(props) @{ <section><Inner load={props.load} version={props.version} /></section> }
-			 export function Tree(props) @{ <main><Outer load={props.load} version={props.version} /></main> }`,
-			{
-				id: 'lite-root-warm-ancestry.tsrx',
-				mode: 'client',
-				compileOptions: { hmr: false, dev: false },
-			},
-		);
-		const resources = resourceFetcher();
-		const root = mount(client.Tree, { load: resources.load, version: 0 });
-		try {
-			expect([...resources.calls].sort()).toEqual(['owner-first:0', 'owner-second:0']);
-			await act(() => {
-				resources.settle('owner-first', 0);
-				resources.settle('owner-second', 0);
-			});
-			expect(root.find('.owner-first').textContent).toBe('owner-first-v0');
-			expect(root.find('.owner-second').textContent).toBe('owner-second-v0');
-			expect([...resources.calls].sort()).toEqual(['owner-first:0', 'owner-second:0']);
-		} finally {
-			root.unmount();
-		}
-	});
-
-	it.each([
-		['use', 'use(Theme)'],
-		['aliased use', 'read(Theme)'],
-		['useContext', 'readContext(Theme)'],
-		['namespace use', 'Octane.use(Theme)'],
-	])(
-		'defers a later context consumer using %s until its preceding sibling resolves',
-		async (name, read) => {
-			const source = `
-			import { createContext, use, use as read, useContext as readContext } from 'octane';
-			import * as Octane from 'octane';
-			const Theme = createContext('default');
-			function Profile(props) @{
-				const theme = ${read};
-				<span class="context-profile">{props.label + ':' + theme as string}</span>
-			}
-			function Provider(props) @{
-				<Theme value={props.theme}><Profile label={props.label} /></Theme>
-			}
-			export function DefaultProfile(props) @{ <Profile label={props.label} /> }
-			export function setDefault(value) { Theme.defaultValue = value; }
-			function AsyncSibling(props) @{
-				const value = use(props.load('context-sibling', 0));
-				<span class="context-sibling">{value as string}</span>
-			}
-			function Branches(props) @{
-				<main>
-					<AsyncSibling load={props.load} />
-					<Provider label={props.profile.label} theme={props.theme} />
-				</main>
-			}
-			export function App(props) @{
-				@try { <Branches load={props.load} profile={props.profile} theme={props.theme} /> }
-				@pending { <span class="context-pending">loading</span> }
-			}
-		`;
-			for (const dev of [false, true]) {
-				const client = loadCompiledFixtureSource(source, {
-					id: `context-consumer-${name.replace(/\W+/g, '-')}.tsrx`,
-					mode: 'client',
-					compileOptions: { hmr: false, dev },
-				});
-				const resources = resourceFetcher();
-				const reads: string[] = [];
-				const profile = {
-					get label() {
-						reads.push('label');
-						return 'Ada';
-					},
-				};
-				const root = mount(client.App, { load: resources.load, profile, theme: 'provided' });
-				try {
-					expect(resources.calls).toEqual(['context-sibling:0']);
-					expect(root.find('.context-pending').textContent).toBe('loading');
-					expect(reads).toEqual([]);
-					await act(() => resources.settle('context-sibling', 0));
-					const node = root.find('.context-profile');
-					expect(node.textContent).toBe('Ada:provided');
-					expect(root.find('.context-sibling').textContent).toBe('context-sibling-v0');
-					root.update(client.App, { load: resources.load, profile, theme: 'updated' });
-					expect(root.find('.context-profile')).toBe(node);
-					expect(node.textContent).toBe('Ada:updated');
-				} finally {
-					root.unmount();
-				}
-				const defaultRoot = mount(client.DefaultProfile, { label: 'Ada' });
-				try {
-					const node = defaultRoot.find('.context-profile');
-					expect(node.textContent).toBe('Ada:default');
-					client.setDefault('next default');
-					defaultRoot.update(client.DefaultProfile, { label: 'Ada' });
-					expect(defaultRoot.find('.context-profile')).toBe(node);
-					expect(node.textContent).toBe('Ada:next default');
-				} finally {
-					defaultRoot.unmount();
-				}
-			}
-		},
-	);
-
-	it.each(['same-module', 'imported'])(
-		'starts async child work (%s) behind a known context provider with its sibling',
-		async (kind) => {
-			const child = `
-			export function AsyncLeaf(props) @{
-				const value = use(props.load('context-leaf', 0));
-				<span class="context-leaf">{value as string}</span>
-			}
-		`;
-			const imported = loadCompiledFixtureSource(`import { use } from 'octane'; ${child}`, {
-				id: 'imported-context-async-child.tsrx',
-				mode: 'client',
-				compileOptions: { hmr: false, dev: false },
-			});
-			const client = loadCompiledFixtureSource(
-				`
-			import { createContext, use } from 'octane';
-			${kind === 'imported' ? "import { AsyncLeaf } from './context-child';" : child}
-			const Theme = createContext('default');
-			function Provider(props) @{
-				<Theme value="provided"><AsyncLeaf load={props.load} /></Theme>
-			}
-			function AsyncSibling(props) @{
-				const value = use(props.load('context-sibling', 0));
-				<span class="context-sibling">{value as string}</span>
-			}
-			function Branches(props) @{
-				<main><AsyncSibling load={props.load} /><Provider load={props.load} /></main>
-			}
-			export function App(props) @{
-				@try { <Branches load={props.load} /> }
-				@pending { <span class="context-pending">loading</span> }
-			}
-		`,
-				{
-					id: `${kind}-context-async-tree.tsrx`,
-					mode: 'client',
-					compileOptions: { hmr: false, dev: false },
-					runtimeModules: { './context-child': imported },
-				},
-			);
-			const resources = resourceFetcher();
-			const root = mount(client.App, { load: resources.load });
-			try {
-				expect([...resources.calls].sort()).toEqual(['context-leaf:0', 'context-sibling:0']);
-				expect(root.find('.context-pending').textContent).toBe('loading');
-				await act(() => {
-					resources.settle('context-leaf', 0);
-					resources.settle('context-sibling', 0);
-				});
-				expect(root.find('.context-leaf').textContent).toBe('context-leaf-v0');
-				expect(root.find('.context-sibling').textContent).toBe('context-sibling-v0');
-			} finally {
-				root.unmount();
-			}
-		},
-	);
-
 	it.each([
 		['destructured props', '{ label }', 'label'],
 		['aliased destructured props', '{ label: name }', 'name'],
@@ -2428,18 +2252,13 @@ describe('parallel use() — adjacent async component trees', () => {
 		},
 	);
 
-	it.each([
-		[
-			'component',
-			'function MutableComponent(props) { return <span>initially synchronous</span>; }',
-		],
-		['context provider', 'let MutableComponent = createContext(0);'],
-	])(
-		'starts async work hidden behind a reassigned same-module %s before its sibling resolves',
-		async (_kind, declaration) => {
-			const source = `
-			import { createContext, use } from 'octane';
-			${declaration}
+	it('starts async work hidden behind a reassigned same-module component before its sibling resolves', async () => {
+		const source = `
+			import { use } from 'octane';
+
+			function MutableComponent(props) {
+				return <span>initially synchronous</span>;
+			}
 
 			function AsyncReplacement(props) @{
 				const value = use(props.load('mutable-reassigned', props.version));
@@ -2474,29 +2293,28 @@ describe('parallel use() — adjacent async component trees', () => {
 				</>
 			}
 		`;
-			const client = loadCompiledFixtureSource(source, {
-				id: 'mutable-component-warming.tsrx',
-				mode: 'client',
-				compileOptions: { hmr: false, dev: false },
-			});
-			const resources = resourceFetcher();
-			const root = mount(client.App, { load: resources.load, version: 0 });
-			const expected = ['mutable-reassigned:0', 'mutable-sibling:0'];
+		const client = loadCompiledFixtureSource(source, {
+			id: 'mutable-component-warming.tsrx',
+			mode: 'client',
+			compileOptions: { hmr: false, dev: false },
+		});
+		const resources = resourceFetcher();
+		const root = mount(client.App, { load: resources.load, version: 0 });
+		const expected = ['mutable-reassigned:0', 'mutable-sibling:0'];
 
-			expect([...resources.calls].sort()).toEqual(expected);
-			expect(root.find('.mutable-warm-pending').textContent).toBe('loading');
+		expect([...resources.calls].sort()).toEqual(expected);
+		expect(root.find('.mutable-warm-pending').textContent).toBe('loading');
 
-			await act(() => {
-				resources.settle('mutable-reassigned', 0);
-				resources.settle('mutable-sibling', 0);
-			});
+		await act(() => {
+			resources.settle('mutable-reassigned', 0);
+			resources.settle('mutable-sibling', 0);
+		});
 
-			expect(root.find('.mutable-warm-reassigned').textContent).toBe('mutable-reassigned-v0');
-			expect(root.find('.mutable-warm-sibling').textContent).toBe('mutable-sibling-v0');
-			expect([...resources.calls].sort()).toEqual(expected);
-			root.unmount();
-		},
-	);
+		expect(root.find('.mutable-warm-reassigned').textContent).toBe('mutable-reassigned-v0');
+		expect(root.find('.mutable-warm-sibling').textContent).toBe('mutable-sibling-v0');
+		expect([...resources.calls].sort()).toEqual(expected);
+		root.unmount();
+	});
 
 	it('warms again when an update returns to previously consumed dependency values', async () => {
 		const resources = freshResourceFetcher();
