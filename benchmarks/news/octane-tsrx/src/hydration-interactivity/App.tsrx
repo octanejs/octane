@@ -1,4 +1,4 @@
-import { Hydrate, useState } from 'octane';
+import { Hydrate, useLayoutEffect, useState } from 'octane';
 import { interaction } from 'octane/hydration';
 import {
 	CARDS,
@@ -12,10 +12,15 @@ type HydrationBenchmarkProps = {
 };
 
 function Editor(props: HydrationBenchmarkProps) @{
-	const [draft, setDraft] = useState(readHydrationDraft());
+	const [draft, setDraft] = useState(INITIAL_VALUE);
 	const [clicks, setClicks] = useState(0);
 	const [focuses, setFocuses] = useState(0);
 	const [submitted, setSubmitted] = useState(INITIAL_VALUE);
+	// Match the server's first output, then adopt the browser edit during commit.
+	useLayoutEffect(() => {
+		const value = readHydrationDraft();
+		if (value !== INITIAL_VALUE) setDraft(value);
+	}, []);
 	const onInput = (event: Event) => setDraft((event.currentTarget as HTMLInputElement).value);
 	const onSend = () => {
 		const input = document.querySelector<HTMLInputElement>('#hydration-input');
