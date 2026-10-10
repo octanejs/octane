@@ -40,6 +40,7 @@ const OPTIONAL_DECLARATIONS = [
 	'NATIVE_READ_DRIVER',
 	'beginActiveNativeReadScope',
 ];
+const CAPTURE_DECLARATIONS = ['finishCaptureDispatch'];
 const TRANSITION_HOOK_DECLARATIONS = [
 	'stagedTransitionValue',
 	'stageTransitionValue',
@@ -64,6 +65,7 @@ const ranges = resolveDeclarationRanges(
 	(text: string, source: string) => parseAst(text, { lang: 'ts' }, source),
 	[
 		...OPTIONAL_DECLARATIONS,
+		...CAPTURE_DECLARATIONS,
 		...TRANSITION_HOOK_DECLARATIONS,
 		...COMMIT_DECLARATIONS,
 		...FORM_COMMIT_DECLARATIONS,
@@ -362,6 +364,50 @@ export async function run(container, scenario) {
 		root.unmount();
 		childRoot?.unmount();
 		other.remove();
+	}
+}
+`;
+
+const LATE_CAPTURE_RESTORE_APP = `import { createElement, createRoot, flushSync } from 'octane';
+
+export async function run(container) {
+	const log = [], edits = [];
+	const root = createRoot(container);
+	const bubble = event => log.push('bubble:' + event.currentTarget.value);
+	const capture = event => log.push('capture:' + event.target.value);
+	const show = active => {
+		const props = {};
+		// An omitted property keeps initial registration genuinely bubble-only.
+		if (active) props.onInputCapture = capture;
+		flushSync(() => root.render(createElement('section', props,
+			createElement('input', { value: '', onInput: bubble }))));
+	};
+	try {
+		show(false);
+		const input = container.querySelector('input');
+		input.focus();
+		input.value = 'warm';
+		input.dispatchEvent(new Event('input', { bubbles: true }));
+		await Promise.resolve();
+		const before = { log: log.slice(), value: input.value };
+		show(true);
+		input.addEventListener('input', event => {
+			log.push('native:' + input.value);
+			event.stopPropagation();
+		});
+		for (const value of ['late', 'again']) {
+			input.value = value;
+			input.dispatchEvent(new Event('input', { bubbles: true }));
+			const during = input.value;
+			await Promise.resolve();
+			edits.push({ during, restored: input.value });
+		}
+		const same = input === container.querySelector('input');
+		const focused = document.activeElement === input;
+		root.unmount();
+		return { before, log, edits, same, focused, empty: container.childNodes.length === 0 };
+	} finally {
+		root.unmount();
 	}
 }
 `;
@@ -666,6 +712,7 @@ describe('optional capability drivers in production bundles', { timeout: 60_000 
 		expect(
 			[
 				...OPTIONAL_DECLARATIONS,
+				...CAPTURE_DECLARATIONS,
 				...TRANSITION_HOOK_DECLARATIONS,
 				...COMMIT_DECLARATIONS,
 				...FORM_COMMIT_DECLARATIONS,
@@ -677,6 +724,22 @@ describe('optional capability drivers in production bundles', { timeout: 60_000 
 			refs: ['a', 'b', 'c'],
 			empty: true,
 		});
+	});
+
+	it('restores stopped input edits after capture handlers are first added to a live root', async () => {
+		const { chunk, retained } = await buildApp(LATE_CAPTURE_RESTORE_APP);
+		expect(await run(chunk)).toEqual({
+			before: { log: ['bubble:warm'], value: '' },
+			log: ['bubble:warm', 'capture:late', 'native:late', 'capture:again', 'native:again'],
+			edits: [
+				{ during: 'late', restored: '' },
+				{ during: 'again', restored: '' },
+			],
+			same: true,
+			focused: true,
+			empty: true,
+		});
+		expect(CAPTURE_DECLARATIONS.filter((name) => !retained.has(name))).toEqual([]);
 	});
 
 	it.each(['state', 'linked'])(

@@ -30491,6 +30491,8 @@ function prepareDelegatedEvent(event: Event, listener: Node): EventTarget[] | un
 // only these names also run a logical capture queue. Non-bubbling families share
 // one native capture callback for their capture and emulated bubble queues.
 const _delegatedCapture = new Map<string, DelegatedEventType>();
+// Capture registration installs this target before publishing its capture flag.
+let CAPTURE_FINISH: typeof finishCaptureDispatch;
 
 const ACTIVE_TOUCH_BUBBLE: AddEventListenerOptions = { passive: false };
 const ACTIVE_TOUCH_CAPTURE: AddEventListenerOptions = { capture: true, passive: false };
@@ -30578,6 +30580,7 @@ export function __delegateCaptureEvents(eventNames: string[], eventFlags: number
 
 function registerDelegatedCapture(type: DelegatedEventType, canSeed: boolean): void {
 	const name = type.name;
+	CAPTURE_FINISH = finishCaptureDispatch;
 	type.flags |= EVENT_CAPTURE;
 	_delegatedCapture.set(name, type);
 	if (canSeed) seedExpando(Element.prototype, CAPTURE_PREFIX + name);
@@ -31491,7 +31494,7 @@ function dispatchDelegatedCapture(
 			event.bubbles && !event.cancelBubble && (type.flags & EVENT_BUBBLE) !== 0,
 		);
 		_dispatchDepth--;
-		finishCaptureDispatch(event, type);
+		CAPTURE_FINISH(event, type);
 	}
 	return stopped;
 }
