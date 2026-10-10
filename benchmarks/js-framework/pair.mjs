@@ -19,7 +19,7 @@
 //
 // Run from the repository root:
 //   node benchmarks/js-framework/pair.mjs --base-tree=<checkout> \
-//     --base-json=<file> --head-json=<file> [--pairs=30] [--no-build] [--work-only]
+//     --base-json=<file> --head-json=<file> [--pairs=30] [--no-build] [--work-only] [--artifacts-dir=<directory>]
 //
 // `--work-only` collects the exact counters without timing. With the same
 // checkout as both trees it is the determinism control: every counter must match.
@@ -34,6 +34,11 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { chromium } from 'playwright';
 import { pairedRatio, summarizeSamples, timingStatForJson } from '../lib/stats.mjs';
+import {
+	capturePairedArtifacts,
+	waitForPreviewPortsClosed,
+	writePairedSamples,
+} from './pair-artifacts.mjs';
 import {
 	CANONICAL_OPS,
 	DIRECT_LIST_MOUNTS,
@@ -60,7 +65,7 @@ const options = Object.fromEntries(
 );
 if (!options['base-tree'] || !options['base-json'] || !options['head-json']) {
 	console.error(
-		'usage: node benchmarks/js-framework/pair.mjs --base-tree=<checkout> --base-json=<file> --head-json=<file> [--pairs=30] [--no-build] [--work-only]',
+		'usage: node benchmarks/js-framework/pair.mjs --base-tree=<checkout> --base-json=<file> --head-json=<file> [--pairs=30] [--no-build] [--work-only] [--artifacts-dir=<directory>]',
 	);
 	process.exit(2);
 }
@@ -68,6 +73,7 @@ const BASE_TREE = path.resolve(options['base-tree']);
 const PAIRS = Number(options.pairs ?? 30);
 if (!Number.isSafeInteger(PAIRS) || PAIRS < 2) throw new Error('--pairs must be an integer >= 2');
 const WARMUP = 3;
+const ARTIFACTS_DIR = options['artifacts-dir'] ? path.resolve(options['artifacts-dir']) : null;
 const FIXTURES = [
 	{ name: 'octane-tsrx', directory: 'octane-tsrx', head: 5176, base: 6176 },
 	{ name: 'octane-jsx', directory: 'octane-jsx', head: 5177, base: 6177 },
@@ -187,19 +193,36 @@ async function timeFixture(fixture) {
 			});
 			const samples = { base: [], head: [] };
 			const sampleMs = { base: [], head: [] };
-			for (let index = 0; index < PAIRS; index++) {
-				const order = index % 2 === 0 ? SIDES : [...SIDES].reverse();
-				const selectors = selectorsFor(op, index, repeat);
-				for (const side of order) {
-					await onSide(side, async () => {
-						// The sampled page is the active one, so its frames keep running.
-						await pages[side].bringToFront();
-						await prepare(pages[side], op);
-						const elapsed = await timeClick(pages[side], op, selectors, repeat);
-						if (op.alternateClick) await verifySelection(pages[side], selectors.at(-1));
-						samples[side].push(elapsed / repeat);
-						sampleMs[side].push(elapsed);
-						await sleep(30);
+			try {
+				for (let index = 0; index < PAIRS; index++) {
+					const order = index % 2 === 0 ? SIDES : [...SIDES].reverse();
+					const selectors = selectorsFor(op, index, repeat);
+					for (const side of order) {
+						await onSide(side, async () => {
+							// The sampled page is the active one, so its frames keep running.
+							await pages[side].bringToFront();
+							await prepare(pages[side], op);
+							const elapsed = await timeClick(pages[side], op, selectors, repeat);
+							if (op.alternateClick) await verifySelection(pages[side], selectors.at(-1));
+							samples[side].push(elapsed / repeat);
+							sampleMs[side].push(elapsed);
+							await sleep(30);
+						});
+					}
+				}
+			} finally {
+				if (ARTIFACTS_DIR) {
+					writePairedSamples(ARTIFACTS_DIR, fixture.name, op.name, {
+						repeat,
+						calibrationTrials: trials,
+						expectedPairs: PAIRS,
+						complete: samples.base.length === PAIRS && samples.head.length === PAIRS,
+						samples,
+						sampleMs,
+						order: Array.from(
+							{ length: Math.max(samples.base.length, samples.head.length) },
+							(_, index) => (index % 2 === 0 ? SIDES : [...SIDES].reverse()),
+						),
 					});
 				}
 			}
@@ -324,6 +347,13 @@ try {
 	for (const fixture of FIXTURES) {
 		for (const side of SIDES) servers.push(await serve(side, fixture));
 	}
+	if (ARTIFACTS_DIR) {
+		await capturePairedArtifacts(ARTIFACTS_DIR, {
+			trees: treeOf,
+			fixtures: FIXTURES,
+			chromiumExecutable: chromium.executablePath(),
+		});
+	}
 	for (const fixture of FIXTURES) {
 		console.error(`Pairing ${fixture.name} base/head × ${PAIRS}…`);
 		const timing = options['work-only'] ? { base: {}, head: {} } : await timeFixture(fixture);
@@ -348,6 +378,19 @@ try {
 			process.kill(-child.pid, 'SIGKILL');
 		} catch {
 			/* already gone */
+		}
+	}
+	if (ARTIFACTS_DIR) {
+		try {
+			await waitForPreviewPortsClosed(
+				FIXTURES.flatMap((fixture) => SIDES.map((side) => fixture[side])),
+			);
+		} catch (error) {
+			payloads.head.failed = [payloads.head.failed, error.stack ?? String(error)]
+				.filter(Boolean)
+				.join('\n\n');
+			payloads.head.harnessExit = 1;
+			exitCode = 1;
 		}
 	}
 	for (const side of SIDES) {

@@ -1,73 +1,127 @@
-name: Chromium diagnostics
+name: JSX selection artifact diagnostics
 
+# Investigation branch only. Reproduce the sources used by PR bench run
+# 38090072943, retain actual Linux bundles, and test fixed harness-side effects.
 on:
   workflow_dispatch:
-    inputs:
-      shard:
-        description: Parity shard (same native sharding as CI)
-        type: choice
-        default: "4/4"
-        options: ["1/4", "2/4", "3/4", "4/4"]
-      trials:
-        description: Independent attempts (each keeps its own result)
-        type: choice
-        default: "1"
-        options: ["1", "2", "3"]
 
 permissions:
   contents: read
 
 jobs:
   probe:
-    name: Chromium diagnostics (${{ inputs.shard }}, trial ${{ matrix.trial }})
+    name: JSX selection artifacts (trial ${{ matrix.trial }})
     runs-on: blacksmith-4vcpu-ubuntu-2404
-    # Step budgets total 56 minutes, leaving room for post-job cleanup.
     timeout-minutes: 60
     strategy:
       fail-fast: false
       matrix:
-        trial: ${{ fromJSON(inputs.trials == '3' && '[1,2,3]' || inputs.trials == '2' && '[1,2]' || '[1]') }}
+        trial: [1, 2, 3, 4, 5]
+    env:
+      BASE_SHA: d7c1de0b960643c4dff07a4bc58869896129bd54
+      CANDIDATE_SHA: 79f1459cc04f6caa8bdbd47f9d1e6fc474c42e17
+      PR_HEAD_SHA: 83e356b2b8e6c4d48f22130121a2f27e117be156
+      TRIAL: ${{ matrix.trial }}
     steps:
-      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
-        timeout-minutes: 2
-      - uses: pnpm/action-setup@d9184bf108216479bc5a137cc391f4d7b14c870b # v6.1.0
-        timeout-minutes: 2
-      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
-        timeout-minutes: 2
+      - name: Checkout diagnostic driver
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
         with:
-          node-version: 24
+          persist-credentials: false
+      - name: Check out original measured source trees
+        run: |
+          git fetch --depth=1 origin "$BASE_SHA" "$CANDIDATE_SHA" "$PR_HEAD_SHA"
+          base_tree="$RUNNER_TEMP/jsx-base"
+          candidate_tree="$RUNNER_TEMP/jsx-candidate"
+          results="$RUNNER_TEMP/jsx-diagnostics"
+          git worktree add --detach "$base_tree" "$BASE_SHA"
+          git worktree add --detach "$candidate_tree" "$CANDIDATE_SHA"
+          test "$(git rev-parse "$CANDIDATE_SHA^{tree}")" = "$(git rev-parse "$PR_HEAD_SHA^{tree}")"
+          mkdir -p "$results/original-harness"
+          echo "BASE_TREE=$base_tree" >> "$GITHUB_ENV"
+          echo "CANDIDATE_TREE=$candidate_tree" >> "$GITHUB_ENV"
+          echo "RESULTS=$results" >> "$GITHUB_ENV"
+          for file in pair.mjs operations.mjs; do
+            cp "$candidate_tree/benchmarks/js-framework/$file" "$results/original-harness/$file"
+            cmp "$base_tree/benchmarks/js-framework/$file" "$candidate_tree/benchmarks/js-framework/$file"
+          done
+          cmp "$base_tree/benchmarks/lib/stats.mjs" "$candidate_tree/benchmarks/lib/stats.mjs"
+          cp "$candidate_tree/benchmarks/lib/stats.mjs" "$results/original-harness/stats.mjs"
+          git diff "$PR_HEAD_SHA" -- benchmarks/js-framework .github/workflows/chromium-diagnostics.yml > "$results/diagnostic-driver.patch"
+          git rev-parse HEAD > "$results/diagnostic-driver-sha"
+          git show -s --format=fuller "$CANDIDATE_SHA" > "$results/original-ci-merge.txt"
+      - name: Install pinned pnpm
+        uses: pnpm/action-setup@d9184bf108216479bc5a137cc391f4d7b14c870b # v6.1.0
+      - name: Set up original CI Node version
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: 24.19.0
           cache: pnpm
-      - name: Install dependencies
-        timeout-minutes: 10
-        run: pnpm install --prod=false --frozen-lockfile
-      - name: Install Chromium
+      - name: Install original dependencies
         timeout-minutes: 10
         run: |
-          bash scripts/ci-apt-https.sh
-          pnpm exec playwright install --with-deps chromium
-      - name: Run parity audit with diagnostics
-        # Leave a bounded window for resource collection and artifact upload.
+          pnpm --dir "$BASE_TREE" install --prod=false --frozen-lockfile
+          pnpm --dir "$CANDIDATE_TREE" install --prod=false --frozen-lockfile
+      - name: Install pinned Chromium
+        timeout-minutes: 10
+        run: pnpm --dir "$CANDIDATE_TREE" --filter octane-js-framework-benchmarks exec playwright install --with-deps chromium
+      - name: Build original fixtures once before adding capture instrumentation
+        timeout-minutes: 10
+        run: |
+          for tree in "$BASE_TREE" "$CANDIDATE_TREE"; do
+            git -C "$tree" diff --exit-code -- packages/octane/src benchmarks/js-framework pnpm-lock.yaml
+            pnpm --dir "$tree" --filter octane-tsrx-jsbench --filter octane-jsx-jsbench build
+          done
+          for tree in "$BASE_TREE" "$CANDIDATE_TREE"; do
+            cp benchmarks/js-framework/pair.mjs "$tree/benchmarks/js-framework/pair.mjs"
+            cp benchmarks/js-framework/pair-artifacts.mjs "$tree/benchmarks/js-framework/pair-artifacts.mjs"
+          done
+      - name: Run all three fixed comparisons with unchanged workload
         timeout-minutes: 25
-        env:
-          CI: "true"
-          DEBUG: pw:browser*,vitest:browser:api,vitest:browser:pool,vitest:browser:playwright
-          VITEST_PW_DEBUG: "1"
-          PARITY_SHARD: ${{ inputs.shard }}
-          DIAGNOSTICS_DIR: ${{ runner.temp }}/chromium-diagnostics
-        run: node scripts/react-parity/browser-diagnostics.mjs --shard "$PARITY_SHARD" --output-dir "$DIAGNOSTICS_DIR"
-      - name: Runner resources after audit
-        timeout-minutes: 2
-        if: ${{ always() }}
         run: |
-          free -m
-          df -h /tmp /dev/shm
-          if [ -r /sys/fs/cgroup/memory.events ]; then cat /sys/fs/cgroup/memory.events; fi
-          sudo -n dmesg --ctime | tail -120 || true
-      - name: Upload diagnostics
-        timeout-minutes: 3
+          # AB: original base/candidate. BA: reversed source roles. AA: candidate
+          # on both sides. Each invocation starts new browsers and retains every
+          # canonical operation, warmup, calibration trial and all 30 pairs.
+          case "$TRIAL" in
+            1) order="AB BA AA" ;;
+            2) order="BA AA AB" ;;
+            3) order="AA AB BA" ;;
+            4) order="AB AA BA" ;;
+            5) order="BA AB AA" ;;
+          esac
+          printf '%s\n' "$order" > "$RESULTS/order.txt"
+          diagnostic_status=0
+          for comparison in $order; do
+            case "$comparison" in
+              AB) base="$BASE_TREE"; head="$CANDIDATE_TREE" ;;
+              BA) base="$CANDIDATE_TREE"; head="$BASE_TREE" ;;
+              AA) base="$CANDIDATE_TREE"; head="$CANDIDATE_TREE" ;;
+            esac
+            out="$RESULTS/$comparison"
+            mkdir -p "$out"
+            printf 'trial=%s\ncomparison=%s\nbase=%s\nhead=%s\n' \
+              "$TRIAL" "$comparison" "$(git -C "$base" rev-parse HEAD)" "$(git -C "$head" rev-parse HEAD)" > "$out/assignment.txt"
+            cat /proc/loadavg /proc/stat > "$out/resources-before.txt"
+            result=0
+            node "$head/benchmarks/js-framework/pair.mjs" \
+              --base-tree="$base" --base-json="$out/base.json" --head-json="$out/head.json" \
+              --pairs=30 --no-build --artifacts-dir="$out/browser-artifacts" \
+              > "$out/run.log" 2>&1 || result=$?
+            cat "$out/run.log"
+            printf '%s\n' "$result" > "$out/exit-code.txt"
+            cat /proc/loadavg /proc/stat > "$out/resources-after.txt"
+            if [ "$result" -ne 0 ]; then
+              diagnostic_status=1
+              printf 'Remaining passes were not run after %s failed with status %s.\n' \
+                "$comparison" "$result" > "$RESULTS/aborted.txt"
+              break
+            fi
+          done
+          exit "$diagnostic_status"
+      - name: Upload actual CI bundles, served responses and every result
         if: ${{ always() }}
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
-          name: chromium-diagnostics-${{ matrix.trial }}-attempt-${{ github.run_attempt }}
-          path: ${{ runner.temp }}/chromium-diagnostics/
-          retention-days: 7
+          name: jsx-ci-artifacts-trial-${{ matrix.trial }}-attempt-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/jsx-diagnostics/
+          retention-days: 30
+          if-no-files-found: error
