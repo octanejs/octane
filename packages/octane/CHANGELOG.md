@@ -1,5 +1,59 @@
 # octane
 
+## 0.13.0
+
+### Minor Changes
+
+- 974a3a6: Complete the profiling counter core with bounded accepted-commit history, delayed effect attribution, per-component counters, and counters for lists, effects, refs, boundaries, Activity, scheduler work, and discarded renders. Profiling-disabled builds erase the probes; counter snapshots now use schema 2.
+- b27d8db: Add opt-in TypeScript output for the web (DOM client and SSR) and the experimental Valdi compiler target, preserving authored declarations, component API types, declaration comments, and source maps for downstream typed build pipelines.
+- bdc21d8: Add opt-in TypeScript build handoff for web and Valdi. Preserve typed compiler output and maps for automatic custom-hook modules, and let Vite's native TypeScript transform compose maps through client and SSR builds. Document and verify real Valdi Workspace emission with separately composed authored source maps.
+- c9d4793: Publish the Valdi adapter and writer type contract through `octane/compiler/valdi` and `octane/compiler`. Preserve component and hook types, opaque host representations, optional text capabilities, and compiler-padded or spread hook arguments. Support Valdi's legacy TypeScript resolver and validate the shipped declarations against real compiler and Workspace consumers.
+- 440fb6f: Allow writer adapters to opt into stable authored text sites and restrict
+  authored host tags. Existing append-only text and tag defaults remain unchanged.
+
+### Patch Changes
+
+- 64c33de: Allow fixed and addressed DOM bindings to adopt closed element children separated by ASCII-whitespace Text nodes, including whitespace relocated by browser translation. Preserve those nodes and continue rejecting unexpected content and invalid text leaves.
+- 7dcbc75: Reduce production bundle size by cloning binding snapshots directly in each arity branch, preserving separate spread sites and rollback behavior.
+- 4fe0867: Reduce production runtime code retained by applications without capture handlers while preserving controlled-input restoration after stopped native events.
+- a0c7f0e: Allow unused Effect Event and external-store commit drains to tree-shake from production bundles.
+- 6518d90: Avoid generating async warm plans for proven context reads and providers that
+  add no async work to start early. Preserve authored context reads and warming
+  for async descendants, opaque components, and reassigned context bindings.
+- a03d79d: Allow applications without deferred form work or manual-submit transitions to omit their commit helpers. Preserve controlled selection, autofocus, development diagnostics, and form pending lifetimes when these features are first used later.
+- dd8805f: Restore controlled inputs after queued hydration events and layout-triggered
+  updates finish. Accepted drafts survive replay, and rejected edits return to the
+  controlled value even when a render or commit throws.
+- 4cc2a1e: Allow applications without effects to tree-shake effect lifecycle code while preserving late and reentrant effect registration.
+- 4ff7d0d: Reuse production component regions containing eligible effectful TSRX children when their inputs are unchanged. Preserve live imported values, refs, effect cleanup, hydration and interrupted-render retries without requiring an explicit memo wrapper.
+- 05699de: Preserve render errors with unreadable control-marker properties and restore signal writes after their render or hydration attempt fails.
+- 773144a: Keep existing context consumers reactive when their retained ancestor becomes a
+  memoized component or compiler-cached child boundary. Preserve DOM identity and
+  context subscriptions across suspended updates.
+- c30f912: Recover from a render that throws a native stack overflow. Signal writes are no longer rejected with `SignalWriteError` afterwards, a parent whose `@try` catches the failure keeps its signal subscriptions, and later updates no longer count as nested inside the failed render.
+- d7c1de0: Share the stream host budget when publishing ready query promise results, allowing input and other tasks to run between large bursts of independent query completions. Recheck request ownership after each wait so replacement and disposal cannot publish stale results.
+
+  Even a single successful query can wait for a later host task when the shared budget is exhausted, so a synchronous `renderToString` immediately after promise resolution may still render pending. Awaited `act()` now drains budget-paced query and stream publications as well as their renders; tests should await it instead of counting microtasks. Query rejections retain their existing prompt failure delivery.
+- 152e4f7: Allow editor integrations to check shared TSRX sources against an explicit portable JSX type namespace. The `compileToVolarMappings` type-only `intrinsics` option takes precedence over authored pragmas without changing the runtime renderer or ordinary JSX defaults.
+- 0258e74: Allow applications without portals to omit portal event-ownership preparation and teardown code. Portal registration activates these helpers before rendering or deferred publication, preserving late children, rollback, and events crossing portal removal.
+- 36c6bf3: Keep custom-hook path resolution out of client bundles that only use direct component hooks. Nested and manually forwarded custom hooks retain the same state identity and argument behavior.
+- 5d6d02c: Stop warning in development about React's canonical camelCase HTML prop names
+  such as `colSpan`, `rowSpan`, `dateTime`, `hrefLang`, `useMap`, `accessKey`,
+  and `popoverTarget`. These names were missing from the host-property
+  diagnostics table, so they were reported as unrecognized props even though they
+  render correctly on the client and the server. Their native lowercase spellings
+  (`colspan`, `rowspan`, ...) remain accepted without a warning, and a miscased
+  spelling such as `COLSPAN` now suggests the canonical name.
+- 6101f66: Omit unused ref commit and subtree collection helpers from production bundles. Install the existing helpers when a ref queue first needs them, preserving ref timing, visibility and cleanup.
+- 2fe1f9f: Allow production bundles with proven roots that omit options to remove unused root error callback reporting, including roots whose components return arbitrary renderable values. Preserve callback registration, recovery, and hydration behavior for roots that accept options.
+- 54ee25f: Compile `.tsrx` modules faster. Most compiles scope-analyzed the same module
+  two or more times, because each compiler pass that left the module unchanged
+  handed it to a pass that analyzed it again. Passes now share one analysis per
+  module tree, which removes more than half of those walks. Compiled output is
+  unchanged.
+- 2075c0e: Classify compiled DOM events ahead of time so applications with static handlers can omit runtime event-category tables, while preserving dynamic registration and native event propagation.
+- 8c09d81: Keep transition hook replay behind the existing transition capability so applications without transitions can remove it. Preserve state and reducer update order, async Actions, linked state, and deferred values.
+
 ## 0.12.1
 
 ### Patch Changes
