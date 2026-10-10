@@ -666,30 +666,49 @@ describe('Suspense preserves committed host DOM', () => {
 		root.unmount();
 	});
 
-	it('does not suppress ref teardown in an independent root during hidden cleanup', () => {
+	it('detaches a shared callback ref for an independent root during hidden cleanup', () => {
 		const refLog: string[] = [];
 		const hostRef = (node: Element | null) => {
 			if (node === null) {
 				refLog.push('detach:null');
 				return;
 			}
-			refLog.push('attach');
-			return () => refLog.push('detach:cleanup');
+			refLog.push('attach:' + node.id);
+			return () => refLog.push('detach:' + node.id);
 		};
 		const independent = mount(IndependentRefApp, { hostRef });
 		const pending = deferred<string>();
+		const onInsertionCleanup = () => independent.unmount();
 		const owner = mount(HiddenInsertionCleanupApp, {
 			promise: fulfilled('ready'),
-			onInsertionCleanup: () => independent.unmount(),
+			hostRef,
+			onInsertionCleanup,
 		});
-
-		owner.update(HiddenInsertionCleanupApp, {
-			promise: pending.promise,
-			onInsertionCleanup: () => independent.unmount(),
-		});
-		expect(owner.find('#hidden-insertion-fallback')).toBeTruthy();
-		owner.unmount();
-		expect(refLog).toEqual(['attach', 'detach:cleanup']);
+		try {
+			owner.update(HiddenInsertionCleanupApp, {
+				promise: pending.promise,
+				hostRef,
+				onInsertionCleanup,
+			});
+			expect(owner.find('#hidden-insertion-fallback')).toBeTruthy();
+			expect(independent.find('#independent-ref')).toBeTruthy();
+			expect(refLog).toEqual([
+				'attach:independent-ref',
+				'attach:hidden-insertion-primary',
+				'detach:hidden-insertion-primary',
+			]);
+			owner.unmount();
+			expect(independent.container.childNodes).toHaveLength(0);
+			expect(refLog).toEqual([
+				'attach:independent-ref',
+				'attach:hidden-insertion-primary',
+				'detach:hidden-insertion-primary',
+				'detach:independent-ref',
+			]);
+		} finally {
+			owner.unmount();
+			independent.unmount();
+		}
 	});
 
 	it('never detaches a completed child from an aborted parent mount', () => {

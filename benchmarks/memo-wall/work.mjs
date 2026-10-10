@@ -20,12 +20,15 @@ if (DIALECT !== 'tsrx' && DIALECT !== 'jsx') {
 }
 const URL = process.env.TARGET_URL || `http://localhost:${DIALECT === 'jsx' ? 5207 : 5206}/`;
 const ROWS = 1000;
+// Public createElement and compiled JSX both construct descriptors through this
+// shared factory. Counting only the public wrapper misses compiled JSX work.
 const METRICS = [
 	'RowsA',
 	'updateSurvivor',
 	'itemBody',
 	'buildValueRows',
-	'createElement',
+	'__octaneDescriptorProjection',
+	'createElementFromConfig',
 	'shallowEqualProps',
 	'restampCachedContextScope',
 	'RowImpl',
@@ -41,8 +44,9 @@ const OPS = [
 			RowsA: 1,
 			updateSurvivor: 0,
 			itemBody: ROWS,
-			buildValueRows: 1,
-			createElement: ROWS,
+			buildValueRows: 0,
+			__octaneDescriptorProjection: 1,
+			createElementFromConfig: ROWS,
 			shallowEqualProps: 0,
 			RowImpl: ROWS * 2,
 			InnerImpl: ROWS * 2,
@@ -57,7 +61,7 @@ const OPS = [
 			updateSurvivor: 0,
 			itemBody: 0,
 			buildValueRows: 0,
-			createElement: 0,
+			createElementFromConfig: 0,
 			shallowEqualProps: 0,
 			RowImpl: 0,
 			InnerImpl: 0,
@@ -69,10 +73,10 @@ const OPS = [
 		hook: '__oneChangeA',
 		expect: {
 			RowsA: 1,
-			updateSurvivor: ROWS,
+			updateSurvivor: 1,
 			itemBody: 1,
 			buildValueRows: 0,
-			createElement: 0,
+			createElementFromConfig: 0,
 			shallowEqualProps: 2,
 			RowImpl: 1,
 			InnerImpl: 1,
@@ -87,7 +91,7 @@ const OPS = [
 			updateSurvivor: 0,
 			itemBody: 0,
 			buildValueRows: 0,
-			createElement: 0,
+			createElementFromConfig: 0,
 			shallowEqualProps: 0,
 			RowImpl: 0,
 			InnerImpl: 0,
@@ -99,11 +103,12 @@ const OPS = [
 		hook: '__oneChangeB',
 		expect: {
 			RowsA: 0,
-			updateSurvivor: ROWS,
+			updateSurvivor: 1,
 			itemBody: 0,
-			buildValueRows: 1,
-			createElement: ROWS,
-			shallowEqualProps: ROWS + 1,
+			buildValueRows: 0,
+			__octaneDescriptorProjection: 1,
+			createElementFromConfig: 1,
+			shallowEqualProps: 2,
 			RowImpl: 1,
 			InnerImpl: 1,
 			Leaf: 1,
@@ -121,7 +126,7 @@ const OPS = [
 			updateSurvivor: 0,
 			itemBody: 0,
 			buildValueRows: 0,
-			createElement: 0,
+			createElementFromConfig: 0,
 			shallowEqualProps: 0,
 			RowImpl: 0,
 			InnerImpl: 0,
@@ -136,7 +141,7 @@ const OPS = [
 			updateSurvivor: 0,
 			itemBody: 0,
 			buildValueRows: 0,
-			createElement: 0,
+			createElementFromConfig: 0,
 			shallowEqualProps: 0,
 			RowImpl: 0,
 			InnerImpl: 0,
@@ -147,25 +152,31 @@ const OPS = [
 
 // Return-JSX components keep their public descriptor ABI, so their wrapper
 // allocations differ from TSRX even when both dialects do the same keyed-list
-// work. Keep the consumer-visible bodies and the optimized list work exact:
-// an unchanged wall must visit no keyed survivors, while a changed item must
-// visit the survivors but run exactly one item/row/inner/leaf body.
+// work. JSX retains the original wall-B helper; TSRX's proven projection reuses
+// unchanged descriptors and skips their item bodies. Keep both paths exact: an
+// unchanged wall visits no survivors, and a changed item runs one Row/Inner/Leaf.
 const JSX_EXPECTATIONS = {
-	mount: { createElement: 11007 },
-	equal_A: { RowsA: 0, createElement: 1 },
-	one_change_A: { createElement: 8 },
-	context_A: { RowsA: 0, createElement: ROWS + 1 },
-	one_change_B: { createElement: ROWS + 6 },
+	mount: { buildValueRows: 1, __octaneDescriptorProjection: 0, createElementFromConfig: 11007 },
+	equal_A: { RowsA: 0, createElementFromConfig: 1 },
+	one_change_A: { createElementFromConfig: 8 },
+	context_A: { RowsA: 0, createElementFromConfig: ROWS + 1 },
+	one_change_B: {
+		updateSurvivor: ROWS,
+		buildValueRows: 1,
+		__octaneDescriptorProjection: 0,
+		createElementFromConfig: ROWS + 6,
+		shallowEqualProps: ROWS + 1,
+	},
 	context_B: {
 		updateSurvivor: 0,
 		buildValueRows: 0,
-		createElement: ROWS + 1,
+		createElementFromConfig: ROWS + 1,
 		shallowEqualProps: 0,
 	},
 	equal_B_control: {
 		updateSurvivor: 0,
 		buildValueRows: 0,
-		createElement: 1,
+		createElementFromConfig: 1,
 		shallowEqualProps: 0,
 	},
 };
@@ -174,10 +185,10 @@ const JSX_EXPECTATIONS = {
 // These ceilings allow equivalent returned-JSX output to allocate fewer while
 // keeping row/context execution and keyed-list visits exact.
 const JSX_MAXIMUMS = {
-	equal_A: { createElement: 1 },
-	context_A: { createElement: ROWS + 1 },
-	context_B: { createElement: ROWS + 1 },
-	equal_B_control: { createElement: 1 },
+	equal_A: { createElementFromConfig: 1 },
+	context_A: { createElementFromConfig: ROWS + 1 },
+	context_B: { createElementFromConfig: ROWS + 1 },
+	equal_B_control: { createElementFromConfig: 1 },
 };
 
 function callCounts(coverage) {
@@ -242,6 +253,7 @@ try {
 		const counts = await measure(browser, op);
 		results[op.name] = counts;
 		const expected = {
+			__octaneDescriptorProjection: 0,
 			...op.expect,
 			...(DIALECT === 'jsx' ? JSX_EXPECTATIONS[op.name] : {}),
 			// Legacy context-aware list regions must never walk their memoized rows
@@ -262,15 +274,15 @@ try {
 }
 
 console.log(
-	'Operation       | RowsA | survivors | item body | buildB | descriptors | memo cmp | restamp | Row/Inner/Leaf',
+	'Operation       | RowsA | survivors | item body | buildB | projectB | descriptors | memo cmp | restamp | Row/Inner/Leaf',
 );
 console.log(
-	'----------------+-------+-----------+-----------+--------+-------------+----------+---------+---------------',
+	'----------------+-------+-----------+-----------+--------+----------+-------------+----------+---------+---------------',
 );
 for (const op of OPS) {
 	const c = results[op.name];
 	console.log(
-		`${op.name.padEnd(15)} | ${String(c.RowsA).padStart(5)} | ${String(c.updateSurvivor).padStart(9)} | ${String(c.itemBody).padStart(9)} | ${String(c.buildValueRows).padStart(6)} | ${String(c.createElement).padStart(11)} | ${String(c.shallowEqualProps).padStart(8)} | ${String(c.restampCachedContextScope).padStart(7)} | ${c.RowImpl}/${c.InnerImpl}/${c.Leaf}`,
+		`${op.name.padEnd(15)} | ${String(c.RowsA).padStart(5)} | ${String(c.updateSurvivor).padStart(9)} | ${String(c.itemBody).padStart(9)} | ${String(c.buildValueRows).padStart(6)} | ${String(c.__octaneDescriptorProjection).padStart(8)} | ${String(c.createElementFromConfig).padStart(11)} | ${String(c.shallowEqualProps).padStart(8)} | ${String(c.restampCachedContextScope).padStart(7)} | ${c.RowImpl}/${c.InnerImpl}/${c.Leaf}`,
 	);
 }
 

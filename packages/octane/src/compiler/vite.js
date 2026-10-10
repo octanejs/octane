@@ -21,6 +21,7 @@ import { parseModule } from '@tsrx/core';
 import {
 	CLIENT_REFERENCE_MANIFEST_FILENAME,
 	INDEPENDENT_HYDRATION_MANIFEST_FILENAME,
+	analyzeCompiledModule,
 	cleanModuleId,
 	createClientReferenceManifest,
 	createOctaneCompiler,
@@ -35,10 +36,17 @@ import {
 	readCssModuleExports,
 	validateCssModuleConstants,
 } from './css-module-imports.js';
+import {
+	analyzeDescriptorProjection,
+	emitDescriptorProjection,
+	findDescriptorProjectionExports,
+	findDescriptorProjectionImports,
+} from './descriptor-projections.js';
 import { PROFILE_DEFINE, foldProfileGuards } from './profile-guards.js';
 
 export { discoverOctaneSourceDependencies };
 const VOID_EXPORTS_META = 'octane:void-component-exports';
+const DESCRIPTOR_PROJECTIONS_META = 'octane:descriptor-projections';
 const DESCRIPTOR_CHILDREN_EXPORTS_META = 'octane:descriptor-children-exports';
 const CLIENT_REFERENCE_META = 'octane:client-reference';
 const INDEPENDENT_WIDGETS_META = 'octane:independent-widgets';
@@ -314,7 +322,7 @@ function verifyCssModuleProofs(context, state) {
 function createProofWaitGraph() {
 	// `structures` caches a loaded module's structural fingerprint by its byte
 	// fingerprint, so a component imported from many modules is parsed once.
-	return { waits: new Map(), cut: new Set(), structures: new Map() };
+	return { waits: new Map(), cut: new Set(), structures: new Map(), projections: new Map() };
 }
 
 // Whether a void-export proof still describes the module's final code: the
@@ -468,6 +476,91 @@ async function loadImportMetadata(
 				if (!metadata.exports.includes(imported)) continue;
 				proven.add(voidImportKey(request, imported));
 				if (exported !== undefined) proven.add(`export\0${exported}`);
+			}
+		}),
+	);
+	return proven;
+}
+
+// A companion is minted only from the final code for the exact authored helper
+// shape. It imports the unchanged ordinary helper as its fallback and resolves
+// every capture from that helper's issuer, retaining its original module identity.
+async function loadDescriptorProjectionImports(context, imports, importer, graph) {
+	const proven = new Map();
+	if (typeof context.resolve !== 'function' || typeof context.load !== 'function') return proven;
+	await Promise.all(
+		imports.map(async ({ request, imported }) => {
+			try {
+				const helper = await context.resolve(request, importer, { skipSelf: true });
+				if (!helper || helper.external || helper.id === importer) return;
+				const loaded = await loadProofModule(context, graph, importer, helper.id);
+				if (typeof loaded?.code !== 'string') return;
+				const authored = (context.getModuleInfo?.(helper.id) ?? loaded).meta?.[
+					DESCRIPTOR_PROJECTIONS_META
+				];
+				const claim = authored?.find((entry) => entry.exported === imported);
+				if (!claim) return;
+				const analysis = analyzeDescriptorProjection(loaded.code, helper.id, imported);
+				if (!analysis || analysis.fingerprint !== claim.fingerprint) return;
+				const resolvedImports = new Map();
+				for (const { request: captureRequest } of analysis.imports) {
+					if (resolvedImports.has(captureRequest)) continue;
+					const resolved = await context.resolve(captureRequest, helper.id, { skipSelf: true });
+					if (!resolved) return;
+					resolvedImports.set(captureRequest, resolved);
+				}
+				const component = resolvedImports.get(analysis.component.request);
+				if (!component || component.external || component.id === importer) return;
+				const componentModule = await loadProofModule(context, graph, importer, component.id);
+				if (typeof componentModule?.code !== 'string') return;
+				const facts = analyzeCompiledModule(componentModule.code, component.id);
+				if (!facts?.defaultMemoComponentExports.includes(analysis.component.imported)) return;
+				// A resolver may select a different runtime per issuer. The component,
+				// original factory and generated callsite must share the same runtime.
+				for (const runtime of ['octane', 'octane/internal/client']) {
+					const [fromHelper, fromComponent, fromCaller] = await Promise.all(
+						[helper.id, component.id, importer].map((id) =>
+							context.resolve(runtime, id, { skipSelf: true }),
+						),
+					);
+					if (
+						!fromHelper ||
+						!fromComponent ||
+						!fromCaller ||
+						fromHelper.id !== fromComponent.id ||
+						fromHelper.id !== fromCaller.id ||
+						!!fromHelper.external !== !!fromComponent.external ||
+						!!fromHelper.external !== !!fromCaller.external
+					)
+						return;
+					resolvedImports.set(runtime, fromHelper);
+				}
+				const query = `${helper.id}${helper.id.includes('?') ? '&' : '?'}octane-descriptor-projection=${encodeURIComponent(imported)}`;
+				const importedLocals = new Set(analysis.imports.map(({ local }) => local));
+				let exportName = '__octaneDescriptorProjection';
+				while (importedLocals.has(exportName)) exportName += '$';
+				const result = emitDescriptorProjection(analysis, {
+					originalRequest: helper.id,
+					exportName,
+					importRequests: Object.fromEntries(
+						[...resolvedImports].map(([key, value]) => [key, value.id]),
+					),
+				});
+				const bindings = new Map(
+					[...resolvedImports.values()].map((resolved) => [resolved.id, resolved]),
+				);
+				// The emitter's internal runtime import is compiler-owned, too.
+				bindings.set('octane/internal/client', resolvedImports.get('octane/internal/client'));
+				bindings.set(helper.id, helper);
+				graph.projections.set(query, { ...result, bindings });
+				proven.set(voidImportKey(request, imported), {
+					request: query,
+					imported: exportName,
+					componentCaptureIndex: analysis.componentCaptureIndex,
+				});
+			} catch {
+				// Classification is optional. Unresolved, cyclic or unsupported modules
+				// retain their ordinary authored helper and children-hole behavior.
 			}
 		}),
 	);
@@ -986,7 +1079,11 @@ export function octane(options = {}) {
 		// only for a module absent from disk, which publishes it as barrel
 		// metadata; importers read a filesystem barrel directly.
 		const descriptorImports = compiled || !nodeFs.existsSync(cleanModuleId(id));
-		if (!compiled && !voidImports && !descriptorImports) {
+		const projectionExports =
+			specializeVoidRoots &&
+			/\.[cm]?[jt]s$/.test(cleanModuleId(id)) &&
+			authoredSource.includes('createElement');
+		if (!compiled && !voidImports && !descriptorImports && !projectionExports) {
 			const preflight = {
 				digest,
 				cssRequests: NO_PREFLIGHT_FACTS,
@@ -996,6 +1093,8 @@ export function octane(options = {}) {
 					? retainedPreflightFacts(compiler.findServerImportRequests(authoredSource, id))
 					: NO_PREFLIGHT_FACTS,
 				voidImports: NO_PREFLIGHT_FACTS,
+				projectionImports: NO_PREFLIGHT_FACTS,
+				projectionExports: NO_PREFLIGHT_FACTS,
 			};
 			preflightCache.set(key, preflight);
 			return preflight;
@@ -1016,6 +1115,8 @@ export function octane(options = {}) {
 				descriptorImports: NO_PREFLIGHT_FACTS,
 				serverImportRequests: NO_PREFLIGHT_FACTS,
 				voidImports: NO_PREFLIGHT_FACTS,
+				projectionImports: NO_PREFLIGHT_FACTS,
+				projectionExports: NO_PREFLIGHT_FACTS,
 			};
 			preflightCache.set(key, failed);
 			return failed;
@@ -1041,6 +1142,18 @@ export function octane(options = {}) {
 				: NO_PREFLIGHT_FACTS,
 			serverImportRequests: server
 				? retainedPreflightFacts(compiler.findServerImportRequests(ast, id))
+				: NO_PREFLIGHT_FACTS,
+			projectionImports:
+				compiled &&
+				specializeVoidRoots &&
+				cleanModuleId(id).endsWith('.tsrx') &&
+				Object.keys(compiler.renderers.boundaries).length === 0 &&
+				resolveRendererForFile(compiler.renderers, compiler._canonicalModuleId(cleanModuleId(id)))
+					.target === 'dom'
+					? retainedPreflightFacts(findDescriptorProjectionImports(ast, id))
+					: NO_PREFLIGHT_FACTS,
+			projectionExports: projectionExports
+				? retainedPreflightFacts(findDescriptorProjectionExports(ast, id))
 				: NO_PREFLIGHT_FACTS,
 			voidImports: voidImports
 				? retainedPreflightFacts(findVoidComponentImports(ast, id))
@@ -1220,13 +1333,22 @@ export function octane(options = {}) {
 			}
 		},
 		async resolveId(source, importer, resolveOptions) {
+			const graph = proofWaitGraphs.get(this.environment ?? 'client');
+			if (graph?.projections.has(source)) return source;
+			const binding = graph?.projections.get(importer)?.bindings.get(source);
+			if (binding) return binding;
 			if (!resolveOptions?.ssr) return null;
 			const runtimeRequest = compiler.resolveRuntimeRequest(source, 'server');
 			if (runtimeRequest === null || runtimeRequest === source) return null;
 			const resolved = await this.resolve(runtimeRequest, importer, { skipSelf: true });
 			return resolved ?? null;
 		},
+		load(id) {
+			const projection = proofWaitGraphs.get(this.environment ?? 'client')?.projections.get(id);
+			return projection ? { code: projection.code, map: projection.map } : null;
+		},
 		transform(code, id, transformOptions) {
+			if (proofWaitGraphs.get(this.environment ?? 'client')?.projections.has(id)) return null;
 			const foldedCode = foldDevProfileGuards ? foldServedProfileGuards(this, code, id) : null;
 			if (foldedCode !== null) code = foldedCode;
 			// A module the compiler leaves alone still serves its folded code.
@@ -1257,6 +1379,7 @@ export function octane(options = {}) {
 				descriptorProven = new Set(),
 				clientOnlyImports = [],
 				cssImports = null,
+				projectionImports = new Map(),
 			) => {
 				const propagatedExports = [...descriptorProven]
 					.filter((key) => key.startsWith('export\0'))
@@ -1292,6 +1415,12 @@ export function octane(options = {}) {
 									proven.has(voidImportKey(request, imported)),
 							}
 						: {}),
+					...(projectionImports.size
+						? {
+								resolveDescriptorProjectionImport: (request, imported) =>
+									projectionImports.get(voidImportKey(request, imported)) ?? null,
+							}
+						: null),
 					...(descriptorProven.size
 						? {
 								isDescriptorChildrenImport: (request, imported) =>
@@ -1310,11 +1439,15 @@ export function octane(options = {}) {
 				});
 				if (result === null) {
 					options.__onIndependentWidgets?.(id, environment, [], false);
-					if (propagatedExports.length === 0) return passThrough;
+					if (propagatedExports.length === 0 && preflight.projectionExports.length === 0)
+						return passThrough;
 					return {
 						code,
 						map: null,
 						meta: {
+							...(preflight.projectionExports.length
+								? { [DESCRIPTOR_PROJECTIONS_META]: preflight.projectionExports }
+								: null),
 							[DESCRIPTOR_CHILDREN_EXPORTS_META]: {
 								exports: [...new Set(propagatedExports)],
 							},
@@ -1329,7 +1462,9 @@ export function octane(options = {}) {
 					result.streamedSignals === true,
 				);
 				for (const dependency of result.dependencies) this.addWatchFile?.(dependency);
-				const meta = {};
+				const meta = preflight.projectionExports.length
+					? { [DESCRIPTOR_PROJECTIONS_META]: preflight.projectionExports }
+					: {};
 				if (result.bindingConstants !== undefined) {
 					meta['octane:binding-constants'] = result.bindingConstants;
 				}
@@ -1397,11 +1532,22 @@ export function octane(options = {}) {
 			const descriptorImports = preflight.descriptorImports.filter(
 				(candidate) => candidate.local !== undefined || !nodeFs.existsSync(cleanModuleId(id)),
 			);
-			if (voidImports.length === 0 && descriptorImports.length === 0 && cssRequests.length === 0) {
+			if (
+				voidImports.length === 0 &&
+				descriptorImports.length === 0 &&
+				cssRequests.length === 0 &&
+				preflight.projectionImports.length === 0
+			) {
 				return transformWithProof(null);
 			}
 			return Promise.all([
 				loadVoidComponentImports(this, voidImports, id, proofWaitGraph(this, environment)),
+				loadDescriptorProjectionImports(
+					this,
+					preflight.projectionImports,
+					id,
+					proofWaitGraph(this, environment),
+				),
 				loadDescriptorChildrenImports(
 					this,
 					descriptorImports,
@@ -1412,8 +1558,8 @@ export function octane(options = {}) {
 					allowDescriptorGraphLoad,
 				),
 				loadCssImports(),
-			]).then(([proven, descriptorProven, cssImports]) =>
-				transformWithProof(proven, descriptorProven, [], cssImports),
+			]).then(([proven, projectionImports, descriptorProven, cssImports]) =>
+				transformWithProof(proven, descriptorProven, [], cssImports, projectionImports),
 			);
 		},
 	};

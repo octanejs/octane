@@ -176,3 +176,34 @@ import './side-effect';`,
 		expect(analyzeCompiledModule('import {', '/project/Entry.ts')).toBeNull();
 	});
 });
+
+describe('final-code ordinary default memo provenance', () => {
+	const facts = (body: string) =>
+		analyzeCompiledModule(
+			`import { memo, __s, markWarm } from 'octane';
+import { bindPresentationView } from 'octane/internal/client';
+${body}`,
+			'/project/Final.js',
+		)?.defaultMemoComponentExports ?? [];
+	it('keeps identity stamps and rejects arbitrary wrappers or live replacements', () => {
+		for (const [body, expected] of [
+			['function View() {} export const Row = memo(View);', ['Row']],
+			['const View = () => null; export const Row = __s(memo(markWarm(View, () => {})));', ['Row']],
+			['const View = () => null; const Row = memo(View); export { Row as default };', ['default']],
+			['function View() {} export const Row = memo(View, () => true);', []],
+			['function View() {} export const Row = memo(new Proxy(View, {}));', []],
+			['function View() {} export const Row = new Proxy(memo(View), {});', []],
+			['function View() {} export const Row = memo(bindPresentationView(View, "x"));', []],
+			['function View() {} export const Row = bindPresentationView(memo(View), "x");', []],
+			['function View() {} export const Row = memo(memo(View));', []],
+			['function View() {} eval("View = new Proxy(View, {})"); export const Row = memo(View);', []],
+			[
+				'function View() {} function replace() { View = new Proxy(View, {}); } export const Row = memo(View);',
+				[],
+			],
+			['import { View } from "./other"; export const Row = memo(View);', []],
+			['const Row = memo(View); const View = Row; export { Row };', []],
+		] as const)
+			expect(facts(body), body).toEqual(expected);
+	});
+});

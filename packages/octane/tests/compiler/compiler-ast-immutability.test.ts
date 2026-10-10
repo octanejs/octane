@@ -18,8 +18,20 @@ import { compile, compileToVolarMappings } from 'octane/compiler';
 // received in-place module positions — hooks with inferred deps, events,
 // directive control flow, and spreads.
 const SOURCE = `
-import { useState, useEffect, useMemo } from 'octane';
+import { createContext, use, useState, useEffect, useMemo } from 'octane';
 import type { OctaneNode } from 'octane';
+
+const Theme = createContext('default');
+
+function ContextLabel(props) @{
+	const theme = use(Theme);
+	<span>{props.label + ':' + theme as string}</span>
+}
+
+function ContextPanel() @{
+	const [value, setValue] = useState('provided');
+	<Theme value={value}><ContextLabel label="context" /></Theme>
+}
 
 interface RowData {
 	id: number;
@@ -51,6 +63,7 @@ export function App() @{
 			}
 		</style>
 		<Title />
+		<ContextPanel />
 		<input value={query} onInput={(e) => setQuery((e.target as HTMLInputElement).value)} />
 		@if (visible.length > 0) {
 			<>

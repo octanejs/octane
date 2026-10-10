@@ -1,15 +1,16 @@
-// Wall B's row factory — a PLAIN .ts module the octane compiler never touches.
-// It hands back raw `createElement(Row, props)` descriptors that reach the DOM
-// through the wall's `{rows}` children hole, i.e. childSlot's keyed de-opt
-// list → the childSlot arm of tryMemoBail. This is exactly the shape every
-// @octanejs binding produces (no compiled template for the rows at all).
+// Wall B's row factory is an ordinary exported helper. Direct callers retain
+// this loop and its fresh createElement descriptors; the compiler never changes
+// the helper's public implementation or installs a shared mutable cache.
 //
-// A fresh descriptor + fresh props OBJECT is allocated every parent render —
-// that is the point: the memo bail must succeed on prop VALUES (all primitives
-// + the module-level selectRow handler), not on object identity. autoMemo
-// deliberately does not cache through an imported helper's returned
-// descriptors; that calculation/output phase ships together with per-key
-// descriptor reuse so its miss path is at parity first.
+// In production TSRX, the Vite adapter can prove this helper's factory/component
+// imports and its render-only callsite. A private companion then reuses output
+// for unchanged inputs and descriptors for unchanged same-index item/key pairs.
+// Changed inputs still execute every authored item and raw-key read. The JSX
+// twin and unsupported calls/build modes keep the ordinary helper path.
+//
+// Both paths exercise Row's default memo contract and retain native event
+// handlers. The work gates distinguish factory/reconciler savings from skipped
+// Row, Inner, and Leaf bodies.
 import { createElement } from 'octane';
 
 import { Row } from './rows.tsrx';

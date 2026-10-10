@@ -1649,6 +1649,10 @@ const NATIVE_READ_RUNTIME_HELPERS = new Set([
 	'nativeCreateScopedElement',
 ]);
 const INTERNAL_CLIENT_RUNTIME_HELPERS = new Set([
+	'compilerCanCacheContext',
+	'compilerCanUsePreparedKeys',
+	'compilerMappedDescriptorBody',
+	'compilerHydrating',
 	'__createCompiledContext',
 	'ownSlotAnchor',
 	'isContext',
@@ -4065,7 +4069,13 @@ function renderTreeWrites(nodes) {
 // projection contract that admitted the calculation also witnesses the whole
 // array. Preserve the exact Identifier nodes rather than just their spelling so
 // a nested shadow cannot accidentally inherit an outer calculation's proof.
-function collectAutoCalculatedRenderableRefs(statements, jsxNodes, calculated) {
+function collectAutoCalculatedRenderableRefs(
+	statements,
+	jsxNodes,
+	calculated,
+	byName = null,
+	projectionContext = null,
+) {
 	if (calculated.size === 0) return null;
 	const references = new Map();
 	const seen = new WeakSet();
@@ -4078,6 +4088,10 @@ function collectAutoCalculatedRenderableRefs(statements, jsxNodes, calculated) {
 		if (seen.has(node)) return;
 		seen.add(node);
 		if (node.type === 'Element' || node.type === 'JSXElement') {
+			// Whole-call calculation caching may retain an inspectable value. Item
+			// reuse across NEW inputs is narrower: descriptor-children consumers
+			// can observe those individual descriptor/props identities directly.
+			if (projectionContext !== null && isDescriptorChildrenTag(node, projectionContext)) return;
 			visit(node.children, true);
 			return;
 		}
@@ -4115,10 +4129,93 @@ function collectAutoCalculatedRenderableRefs(statements, jsxNodes, calculated) {
 			}
 		}
 		if (escaped || collectFreeIdentifiers(jsxNodes, [], nodes).has(name)) continue;
+		byName?.set(name, nodes);
 		if (proven === null) proven = new WeakSet();
 		for (const node of nodes) proven.add(node);
 	}
 	return proven;
+}
+
+// The adapter proves the imported helper; this scope proves its result never
+// escapes rendering. Only the already-admitted flat auto-calculation changes
+// representation. Its existing memo cell owns the immutable projection result.
+function prepareDescriptorProjections(statements, authored, jsxNodes, calculated, ctx) {
+	if (calculated === null || ctx.resolveDescriptorProjectionImport === null) return null;
+	const uses = new Map();
+	collectAutoCalculatedRenderableRefs(authored, jsxNodes, calculated, uses, ctx);
+	const replacements = new WeakMap();
+	let changed = false;
+	const next = statements.map((statement) => {
+		const entry = authoredHookMemoOf(statement);
+		const nodes = uses.get(entry?.decl.id.name);
+		if (nodes === undefined || nodes.size !== 1 || entry?.call.callee._octaneGenerated !== true)
+			return statement;
+		const call = unwrapTsExpr(entry.expression);
+		if (
+			call?.type !== 'CallExpression' ||
+			call.optional ||
+			call.callee.type !== 'Identifier' ||
+			call.arguments.length !== 1 ||
+			call.arguments[0].type === 'SpreadElement'
+		)
+			return statement;
+		const binding = ctx.importedComponentBindings.get(call.callee.name);
+		if (binding === undefined || ctx.currentComponentLocals.has(call.callee.name)) return statement;
+		const proof = ctx.resolveDescriptorProjectionImport(binding.request, binding.imported);
+		if (
+			proof == null ||
+			typeof proof.request !== 'string' ||
+			typeof proof.imported !== 'string' ||
+			!Number.isInteger(proof.componentCaptureIndex) ||
+			proof.componentCaptureIndex < 0
+		)
+			return statement;
+		const importKey = `${proof.request}\0${proof.imported}`;
+		let companion = ctx.descriptorProjectionImports.get(importKey);
+		if (companion === undefined) {
+			companion = allocCompilerName(ctx, '__projectDescriptors');
+			ctx.descriptorProjectionImports.set(importKey, companion);
+			ctx.hoistedHelpers.push(
+				inheritOriginLoc(b.imports([[proof.imported, companion]], proof.request), call),
+			);
+		}
+		const projection = {
+			result: allocCompilerName(ctx, '__projectedDescriptors'),
+			companion,
+			componentCaptureIndex: proof.componentCaptureIndex,
+		};
+		ctx.currentComponentLocals = new Set([...ctx.currentComponentLocals, projection.result]);
+		for (const node of nodes) replacements.set(node, projection);
+		changed = true;
+		return {
+			...statement,
+			declarations: [
+				{
+					...entry.decl,
+					init: {
+						...entry.call,
+						callee: { ...entry.call.callee, _octaneDescriptorProjection: projection },
+					},
+				},
+			],
+		};
+	});
+	if (!changed) return null;
+	return {
+		statements: next,
+		jsxNodes: mapAst(jsxNodes, (node) => {
+			const projection = replacements.get(node);
+			return projection === undefined
+				? null
+				: inheritOriginLoc(
+						{
+							...b.member(b.id(projection.result), 'value'),
+							_octaneDescriptorProjection: projection,
+						},
+						node,
+					);
+		}),
+	};
 }
 
 // Names the render tree actually reads, resolved against the scopes the
@@ -6553,19 +6650,33 @@ function classifySameModuleWarmPotential(ctx) {
 
 			if ((node.type === 'Element' || node.type === 'JSXElement') && isComponentTag(node)) {
 				const name = tagBindingName(node);
+				const contextProvider = ctx.provenContextBindings.has(name);
 				if (
 					name === null ||
 					locals.has(name) ||
 					ctx._octaneBoundaryNames.has(name) ||
-					!ctx.componentInfo.has(name)
+					(!contextProvider && !ctx.componentInfo.has(name))
 				) {
 					opaque = true;
 					return;
 				}
 				// Keep the immutable JSX node so the fixed point can prove the
 				// descendant's required own props separately for each call site.
-				dependencies.add(node);
+				// A known provider contributes no promise creation of its own. Its
+				// attributes and children still pass through the ordinary walk below.
+				if (!contextProvider) dependencies.add(node);
 			} else if (node.type === 'CallExpression' || node.type === 'NewExpression') {
+				if (
+					node.type === 'CallExpression' &&
+					node.optional !== true &&
+					(node._octaneImportedHook === 'use' || node._octaneImportedHook === 'useContext') &&
+					node.arguments.length === 1 &&
+					isProvenContextUse(node.arguments[0], ctx.provenContextBindings)
+				) {
+					// Context reads create nothing a warm plan can pre-start. Keep the
+					// authored read: a hosted renderer may still request an owner retry.
+					return;
+				}
 				const hook = stableHookCallName(node);
 				if (
 					hook !== 'useState' ||
@@ -11401,6 +11512,15 @@ function compileInternal(
 		hmr: hmrEnabled, // gates Symbol.for vs Symbol() hook slots (allocHookSymbol)
 		isVoidComponentImport:
 			typeof options?.isVoidComponentImport === 'function' ? options.isVoidComponentImport : null,
+		resolveDescriptorProjectionImport:
+			autoMemoEnabled &&
+			mode === 'client' &&
+			!devEnabled &&
+			options?.__universal == null &&
+			typeof options?.resolveDescriptorProjectionImport === 'function'
+				? options.resolveDescriptorProjectionImport
+				: null,
+		descriptorProjectionImports: new Map(),
 		descriptorChildrenBindings: collectDescriptorChildrenBindings(
 			ast,
 			options?.isDescriptorChildrenImport,
@@ -17322,6 +17442,24 @@ function compileFunctionBody(node, ctx, name, parentNs = 'html', cssHash = null,
 	// authored tier is limited to proven render-scope bodies (localHookSlots),
 	// exactly the numeric-slot proof.
 	if (inlineLowering) {
+		if (
+			options?.localHookSlots === true &&
+			ctx.currentHookMemoOwnerSafe &&
+			!returnedOutput &&
+			!ctx.nativeReads
+		) {
+			const projected = prepareDescriptorProjections(
+				workingStatements,
+				hoistedCalculations === null ? statements : [...statements, ...hoistedCalculations],
+				jsxNodes,
+				autoCalculatedDeclarations,
+				ctx,
+			);
+			if (projected !== null) {
+				workingStatements = projected.statements;
+				jsxNodes = projected.jsxNodes;
+			}
+		}
 		workingStatements = inlineHookMemoPass(
 			workingStatements,
 			ctx,
@@ -20589,6 +20727,7 @@ function flatHookMemoOf(call) {
 	const callee = entry.call.callee;
 	return {
 		...entry,
+		descriptorProjection: callee._octaneDescriptorProjection ?? null,
 		immutableArrayFilter: callee._octaneImmutableArrayFilter ?? null,
 		generatedInvariant:
 			entry.name === 'useCallback' &&
@@ -20662,6 +20801,20 @@ function buildFlatHookMemoExpression(entry, ctx) {
 		sequence.push(hkAssign(b.id(name), withoutInferredMemoName(dependency)));
 		return name;
 	});
+	const projection = entry.descriptorProjection;
+	const valueCell = () => cell(base + entry.deps.length + 1);
+	const computation =
+		projection === null
+			? entry.expression
+			: b.call(
+					b.id(projection.companion),
+					...unwrapTsExpr(entry.expression).arguments,
+					b.conditional(
+						b.binary('===', cell(base), b.literal(true)),
+						b.member(valueCell(), 'cache'),
+						b.literal(null),
+					),
+				);
 	sequence.push(
 		b.conditional(
 			hookMemoMissTest(entry, ctx, base, depNames),
@@ -20669,7 +20822,7 @@ function buildFlatHookMemoExpression(entry, ctx) {
 				hookMemoPublishAlias(ctx, entry.deps.length),
 				b.id(names.cache),
 				hkNumLit(base),
-				entry.expression,
+				computation,
 				...depNames.map((name) => b.id(name)),
 			),
 			cell(base + entry.deps.length + 1),
@@ -20786,7 +20939,13 @@ function lowerAuthoredHookMemo(stmt, ctx) {
 		declarations: [{ ...decl, init }],
 	});
 	if (entry.expression !== null) {
-		return [declarationWith(buildFlatHookMemoExpression(entry, ctx))];
+		const expression = buildFlatHookMemoExpression(entry, ctx);
+		return entry.descriptorProjection === null
+			? [declarationWith(expression)]
+			: [
+					b.const(entry.descriptorProjection.result, expression),
+					declarationWith(b.member(b.id(entry.descriptorProjection.result), 'value')),
+				];
 	}
 	// Multi-statement useMemo factories need a statement region, but the
 	// authored declaration stays after it with its original binding kind.
@@ -26942,6 +27101,78 @@ function nativeReadNames(ctx) {
 	};
 }
 
+function emitDescriptorProjectionHole(ctx, projection, host, value, slotIndex, skip, chv, chp) {
+	const result = () => b.id(projection.result);
+	const cache = () => b.member(result(), 'cache');
+	const component = () =>
+		b.member(b.member(cache(), 'captures'), b.literal(projection.componentCaptureIndex), true);
+	const args = () => [
+		b.id('__s'),
+		b.literal(slotIndex),
+		host(),
+		value(),
+		b.literal(null),
+		b.literal(false),
+		host(),
+		b.literal(false),
+		b.literal(true),
+	];
+	const slot = allocCompilerName(ctx, '__projectionSlot');
+	const childSlot = requireRuntimeForContext(ctx, 'childSlot');
+	const mapped = b.stmt(
+		b.call(
+			childSlot,
+			...args(),
+			b.id(requireRuntimeForContext(ctx, 'compilerMappedDescriptorBody')),
+			b.member(cache(), 'preparedKeys'),
+			b.binary(
+				'|',
+				b.binary('|', b.literal(8), b.conditional(b.id(skip), b.literal(1), b.literal(0))),
+				b.conditional(
+					b.binary('===', b.member(component(), '$$singleRoot'), b.literal(true)),
+					b.literal(2),
+					b.literal(0),
+				),
+			),
+		),
+	);
+	const fallback = b.block([
+		b.stmt(b.call(childSlot, ...args(), b.void0, b.void0, b.void0, b.void0, b.literal(true))),
+		b.const(slot, b.member(b.member(b.id('__s'), 'slots'), b.literal(slotIndex), true)),
+		// Match mapSlot's successful fallback publication. The next compiled
+		// dispatch uses its existing adoption path, including legacy hydrated slots.
+		b.if(
+			b.logical(
+				'&&',
+				b.binary('!=', b.id(slot), b.literal(null)),
+				b.binary('!=', b.member(b.id(slot), 'forSlot'), b.literal(null)),
+			),
+			b.block([
+				b.stmt(
+					b.assignment(
+						'=',
+						b.member(b.member(b.id(slot), 'forSlot'), 'mappedNative'),
+						b.literal(false),
+					),
+				),
+			]),
+		),
+	]);
+	return b.block([
+		b.if(
+			b.logical(
+				'&&',
+				b.member(result(), 'denseExplicitKeys'),
+				b.call(requireRuntimeForContext(ctx, 'compilerCanUsePreparedKeys')),
+			),
+			mapped,
+			fallback,
+		),
+		b.stmt(b.assignment('=', chv(), b.literal(null))),
+		b.stmt(b.assignment('=', chp(), value())),
+	]);
+}
+
 function emitAutoMemoRegion(
 	ctx,
 	dependencies,
@@ -28715,7 +28946,7 @@ function planJsx(
 				}
 				ctx.runtimeNeeded.add(inlineBindingGuards ? 'childTextHole' : 'childTextHoleUpdate');
 				if (inlineBindingGuards) ctx.runtimeNeeded.add('setText');
-				const updateHole = () =>
+				const ordinaryUpdateHole = () =>
 					inlineBindingGuards
 						? emitInlineRenderableUpdate(
 								chp,
@@ -28748,6 +28979,26 @@ function planJsx(
 								),
 								b.stmt(b.assignment('=', chp(), V())),
 							]);
+				const projection = cc.descriptorProjection;
+				const projectionSkip =
+					projection === undefined ? null : allocCompilerName(ctx, '__projectionSkip');
+				const updateHole = () =>
+					projection === undefined
+						? ordinaryUpdateHole()
+						: b.if(
+								b.id(requireRuntimeForContext(ctx, 'compilerHydrating')),
+								ordinaryUpdateHole(),
+								emitDescriptorProjectionHole(
+									ctx,
+									projection,
+									hostExpr,
+									V,
+									slotIndex,
+									projectionSkip,
+									chv,
+									chp,
+								),
+							);
 				const ordinary = updateHole();
 				let update = ordinary;
 				if (cc.autoMemoValue === true) {
@@ -28762,7 +29013,9 @@ function planJsx(
 						slotIndex,
 						updateHole(),
 						// Array → scalar → the same array must reconstruct the list.
-						b.binary('!==', chp(), V()),
+						projection === undefined
+							? b.binary('!==', chp(), V())
+							: b.logical('||', b.unary('!', b.id(projectionSkip)), b.binary('!==', chp(), V())),
 						true,
 						undefined,
 						null,
@@ -28774,6 +29027,14 @@ function planJsx(
 					cc.id,
 					org,
 					b.block([
+						...(projection === undefined
+							? []
+							: [
+									b.const(
+										projectionSkip,
+										b.call(requireRuntimeForContext(ctx, 'compilerCanCacheContext')),
+									),
+								]),
 						...(inlineBindingGuards
 							? inlineRenderableValueDeclarations(cc.valueExpr)
 							: [b.const('_v', cc.valueExpr)]),
@@ -33424,6 +33685,10 @@ function makeChildCall(expr, ctx, componentName, inlinedSubs, cssHash, parentNs 
 			cssHash,
 		),
 	};
+	if (expr?._octaneDescriptorProjection !== undefined) {
+		child.descriptorProjection = expr._octaneDescriptorProjection;
+		child.autoMemoValue = true;
+	}
 	if (
 		ctx.autoMemo &&
 		// Imported calculations do not expose their return type. Restrict the
