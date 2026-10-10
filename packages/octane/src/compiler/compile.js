@@ -181,7 +181,7 @@ import {
 	cssStyleValue,
 	hyphenateStyleName,
 } from '../dom-tables.js';
-import { isDelegatedEventProp } from '../event-names.js';
+import { isDelegatedEventProp, delegatedEventFlags } from '../event-names.js';
 import {
 	collectPureFactoryLocals,
 	isPureFactoryCall,
@@ -1552,6 +1552,8 @@ function requireRuntimeForContext(ctx, name) {
 	ctx.runtimeNeeded.add(name);
 	if (
 		name === 'isContext' ||
+		name === '__delegateEvents' ||
+		name === '__delegateCaptureEvents' ||
 		name === METHOD_DEP_IMPORT ||
 		HOOK_MEMO_RUNTIME_HELPERS.has(name) ||
 		NATIVE_READ_RUNTIME_HELPERS.has(name)
@@ -1651,6 +1653,8 @@ const NATIVE_READ_RUNTIME_HELPERS = new Set([
 	'nativeCreateScopedElement',
 ]);
 const INTERNAL_CLIENT_RUNTIME_HELPERS = new Set([
+	'__delegateEvents',
+	'__delegateCaptureEvents',
 	'__createCompiledContext',
 	'ownSlotAnchor',
 	'isContext',
@@ -11456,6 +11460,18 @@ function compileInternal(
 		compilerNameSuffixes: null,
 		profileFilename: (options && options.profileFilename) || filename,
 		mode,
+		// Valdi/universal finishers re-enter with renderer cleared. Keep explicit
+		// routes for the historical registration helpers on their existing ABI.
+		staticEventFlags:
+			domSignalTarget(options) &&
+			options?.__valdiAbiGuard === undefined &&
+			!options?.__runtimeImportRoutes?.some(
+				(route) =>
+					route.imported?.has('delegateEvents') ||
+					route.imported?.has('delegateCaptureEvents') ||
+					route.locals?.has(rtAlias('delegateEvents')) ||
+					route.locals?.has(rtAlias('delegateCaptureEvents')),
+			),
 		nativeChangeClassifications: nativeChangeAnalysis.classifications,
 		dev: devEnabled,
 		profile: profileEnabled,
@@ -12437,15 +12453,6 @@ function compileInternal(
 
 	finalizeComponentInitializers(ctx, bodyNodes);
 
-	// Auto-emit delegateEvents([...]) / delegateCaptureEvents([...]) once at module
-	// scope for every (bubble / capture) event seen.
-	if (ctx.delegatedEvents.size > 0) {
-		ctx.runtimeNeeded.add('delegateEvents');
-	}
-	if (ctx.capturedEvents.size > 0) {
-		ctx.runtimeNeeded.add('delegateCaptureEvents');
-	}
-
 	// Build prelude nodes. NOTE: the runtime import is built BELOW (after the
 	// HMR block possibly registers more runtime needs); we postpone that so the
 	// final import list includes `hmr` / `HMR` when needed. Module scaffolding
@@ -12458,12 +12465,7 @@ function compileInternal(
 	if (ctx.delegatedEvents.size > 0) {
 		delegateNodes.push(
 			inheritOriginLoc(
-				b.stmt(
-					b.call(
-						'_$delegateEvents',
-						b.array([...ctx.delegatedEvents].sort().map((n) => b.literal(n, JSON.stringify(n)))),
-					),
-				),
+				b.stmt(eventRegistration(ctx, [...ctx.delegatedEvents].sort(), false)),
 				moduleOrigin,
 			),
 		);
@@ -12471,12 +12473,7 @@ function compileInternal(
 	if (ctx.capturedEvents.size > 0) {
 		delegateNodes.push(
 			inheritOriginLoc(
-				b.stmt(
-					b.call(
-						'_$delegateCaptureEvents',
-						b.array([...ctx.capturedEvents].sort().map((n) => b.literal(n, JSON.stringify(n)))),
-					),
-				),
+				b.stmt(eventRegistration(ctx, [...ctx.capturedEvents].sort(), true)),
 				moduleOrigin,
 			),
 		);
@@ -16630,6 +16627,19 @@ function isOctaneMemoCallee(callee, ctx, memoImportNames) {
 	);
 }
 
+function eventRegistration(ctx, names, capture) {
+	const name =
+		(ctx.staticEventFlags ? '__' : '') + (capture ? 'delegateCaptureEvents' : 'delegateEvents');
+	ctx.runtimeNeeded.add(name);
+	const args = [b.array(names.map((event) => b.literal(event, JSON.stringify(event))))];
+	if (ctx.staticEventFlags)
+		args.push(b.array(names.map((event) => b.literal(delegatedEventFlags(event)))));
+	return b.call(
+		ctx.staticEventFlags ? requireRuntimeForContext(ctx, name) : rtAlias(name),
+		...args,
+	);
+}
+
 function finalizeComponentInitializers(ctx, bodyNodes) {
 	if (!ctx.componentEffectOwnership || ctx.componentOwners.length === 0) return;
 
@@ -16662,13 +16672,7 @@ function finalizeComponentInitializers(ctx, bodyNodes) {
 			.sort();
 		if (delegated.length !== 0) {
 			for (const event of delegated) ctx.delegatedEvents.delete(event);
-			ctx.runtimeNeeded.add('delegateEvents');
-			calls.push(
-				b.call(
-					'_$delegateEvents',
-					b.array(delegated.map((event) => b.literal(event, JSON.stringify(event)))),
-				),
-			);
+			calls.push(eventRegistration(ctx, delegated, false));
 		}
 
 		const captured = [...owner.capturedEvents]
@@ -16676,13 +16680,7 @@ function finalizeComponentInitializers(ctx, bodyNodes) {
 			.sort();
 		if (captured.length !== 0) {
 			for (const event of captured) ctx.capturedEvents.delete(event);
-			ctx.runtimeNeeded.add('delegateCaptureEvents');
-			calls.push(
-				b.call(
-					'_$delegateCaptureEvents',
-					b.array(captured.map((event) => b.literal(event, JSON.stringify(event)))),
-				),
-			);
+			calls.push(eventRegistration(ctx, captured, true));
 		}
 
 		if (!preserveModuleStyleOrder) {
