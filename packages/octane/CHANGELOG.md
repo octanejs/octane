@@ -1,5 +1,48 @@
 # octane
 
+## 0.13.0
+
+### Minor Changes
+
+- 974a3a6: Complete the profiling counter core with bounded accepted-commit history, delayed effect attribution, per-component counters, and counters for lists, effects, refs, boundaries, Activity, scheduler work, and discarded renders. Profiling-disabled builds erase the probes; counter snapshots now use schema 2.
+- b27d8db: Add opt-in TypeScript output for the web (DOM client and SSR) and the experimental Valdi compiler target, preserving authored declarations, component API types, declaration comments, and source maps for downstream typed build pipelines.
+- bdc21d8: Add opt-in TypeScript build handoff for web and Valdi. Preserve typed compiler output and maps for automatic custom-hook modules, and let Vite's native TypeScript transform compose maps through client and SSR builds. Document and verify real Valdi Workspace emission with separately composed authored source maps.
+- c9d4793: Publish the Valdi adapter and writer type contract through `octane/compiler/valdi` and `octane/compiler`. Preserve component and hook types, opaque host representations, optional text capabilities, and compiler-padded or spread hook arguments. Support Valdi's legacy TypeScript resolver and validate the shipped declarations against real compiler and Workspace consumers.
+- 440fb6f: Allow writer adapters to opt into stable authored text sites and restrict
+  authored host tags. Existing append-only text and tag defaults remain unchanged.
+
+### Patch Changes
+
+- 64c33de: Allow fixed and addressed DOM bindings to adopt closed element children separated by ASCII-whitespace Text nodes, including whitespace relocated by browser translation. Preserve those nodes and continue rejecting unexpected content and invalid text leaves.
+- 7dcbc75: Reduce production bundle size by cloning binding snapshots directly in each arity branch, preserving separate spread sites and rollback behavior.
+- a0c7f0e: Allow unused Effect Event and external-store commit drains to tree-shake from production bundles.
+- a03d79d: Allow applications without deferred form work or manual-submit transitions to omit their commit helpers. Preserve controlled selection, autofocus, development diagnostics, and form pending lifetimes when these features are first used later.
+- dd8805f: Restore controlled inputs after queued hydration events and layout-triggered
+  updates finish. Accepted drafts survive replay, and rejected edits return to the
+  controlled value even when a render or commit throws.
+- 4cc2a1e: Allow applications without effects to tree-shake effect lifecycle code while preserving late and reentrant effect registration.
+- 05699de: Preserve render errors with unreadable control-marker properties and restore signal writes after their render or hydration attempt fails.
+- 773144a: Keep existing context consumers reactive when their retained ancestor becomes a
+  memoized component or compiler-cached child boundary. Preserve DOM identity and
+  context subscriptions across suspended updates.
+- 152e4f7: Allow editor integrations to check shared TSRX sources against an explicit portable JSX type namespace. The `compileToVolarMappings` type-only `intrinsics` option takes precedence over authored pragmas without changing the runtime renderer or ordinary JSX defaults.
+- 0258e74: Allow applications without portals to omit portal event-ownership preparation and teardown code. Portal registration activates these helpers before rendering or deferred publication, preserving late children, rollback, and events crossing portal removal.
+- 36c6bf3: Keep custom-hook path resolution out of client bundles that only use direct component hooks. Nested and manually forwarded custom hooks retain the same state identity and argument behavior.
+- 5d6d02c: Stop warning in development about React's canonical camelCase HTML prop names
+  such as `colSpan`, `rowSpan`, `dateTime`, `hrefLang`, `useMap`, `accessKey`,
+  and `popoverTarget`. These names were missing from the host-property
+  diagnostics table, so they were reported as unrecognized props even though they
+  render correctly on the client and the server. Their native lowercase spellings
+  (`colspan`, `rowspan`, ...) remain accepted without a warning, and a miscased
+  spelling such as `COLSPAN` now suggests the canonical name.
+- 6101f66: Omit unused ref commit and subtree collection helpers from production bundles. Install the existing helpers when a ref queue first needs them, preserving ref timing, visibility and cleanup.
+- 54ee25f: Compile `.tsrx` modules faster. Most compiles scope-analyzed the same module
+  two or more times, because each compiler pass that left the module unchanged
+  handed it to a pass that analyzed it again. Passes now share one analysis per
+  module tree, which removes more than half of those walks. Compiled output is
+  unchanged.
+- 2075c0e: Classify compiled DOM events ahead of time so applications with static handlers can omit runtime event-category tables, while preserving dynamic registration and native event propagation.
+
 ## 0.12.1
 
 ### Patch Changes

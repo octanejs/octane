@@ -1,6 +1,6 @@
 {
   "name": "@octanejs/sanity-icons",
-  "version": "0.1.13",
+  "version": "0.1.14",
   "license": "MIT",
   "type": "module",
   "engines": {
@@ -275,7 +275,7 @@
     "typecheck": "octane-tsc -p tsconfig.json"
   },
   "peerDependencies": {
-    "octane": "workspace:^0.12.0"
+    "octane": "workspace:^0.13.0"
   },
   "devDependencies": {
     "@sanity/icons": "catalog:default",

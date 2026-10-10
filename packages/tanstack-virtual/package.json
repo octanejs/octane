@@ -1,6 +1,6 @@
 {
   "name": "@octanejs/tanstack-virtual",
-  "version": "0.1.61",
+  "version": "0.1.62",
   "license": "MIT",
   "type": "module",
   "engines": {
@@ -46,7 +46,7 @@
     "@tanstack/virtual-core": "3.17.10"
   },
   "peerDependencies": {
-    "octane": "workspace:^0.12.0"
+    "octane": "workspace:^0.13.0"
   },
   "devDependencies": {
     "@tanstack/react-virtual": "3.14.12",

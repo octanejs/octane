@@ -1,6 +1,6 @@
 {
   "name": "@octanejs/syntax-highlighter",
-  "version": "0.0.29",
+  "version": "0.0.30",
   "license": "MIT",
   "type": "module",
   "engines": {
@@ -49,7 +49,7 @@
     "verify:upstream": "node scripts/upstream-inventory.mjs --check"
   },
   "peerDependencies": {
-    "octane": "workspace:^0.12.0"
+    "octane": "workspace:^0.13.0"
   },
   "dependencies": {
     "highlight.js": "^10.4.1",
