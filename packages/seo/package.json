@@ -1,6 +1,6 @@
 {
   "name": "@octanejs/seo",
-  "version": "0.0.50",
+  "version": "0.0.51",
   "license": "MIT",
   "type": "module",
   "engines": {
@@ -33,7 +33,7 @@
     "test": "vitest run"
   },
   "peerDependencies": {
-    "octane": "workspace:^0.12.0"
+    "octane": "workspace:^0.13.0"
   },
   "devDependencies": {
     "octane": "workspace:*",

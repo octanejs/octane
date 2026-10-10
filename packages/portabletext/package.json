@@ -1,6 +1,6 @@
 {
   "name": "@octanejs/portabletext",
-  "version": "0.1.13",
+  "version": "0.1.14",
   "license": "MIT",
   "type": "module",
   "engines": {
@@ -41,7 +41,7 @@
     "@portabletext/types": "catalog:default"
   },
   "peerDependencies": {
-    "octane": "workspace:^0.12.0"
+    "octane": "workspace:^0.13.0"
   },
   "devDependencies": {
     "@portabletext/react": "catalog:default",
