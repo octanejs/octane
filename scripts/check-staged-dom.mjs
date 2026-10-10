@@ -104,7 +104,7 @@ const NATIVE_OPERATIONS = new Map(
 		delegateCaptureEvents: ['call:addEventListener'],
 		registerDelegationTarget: ['read:onclick', 'write:onclick', 'call:addEventListener'],
 		unregisterDelegationTarget: ['call:removeEventListener'],
-		publishManualFormPending: ['read:method'],
+		publishRegisteredManualFormPending: ['read:method'],
 		resetFormNow: ['call:reset'],
 		handleFormSubmit: ['call:reset'],
 		reassertControlledIn: ['read:elements'],
