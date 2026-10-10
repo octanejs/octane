@@ -1,34 +1,24 @@
-type Component<P> = (props: P) => void;
-type Update<T> = (next: T | ((previous: T) => T)) => void;
-type Slot = number | symbol;
+import type { ValdiAdapter } from 'octane/compiler/valdi';
+
 interface Prototype {
 	readonly tag: string;
 }
+type Constructor = (props: unknown) => void;
+type Adapter = ValdiAdapter<Prototype, Constructor, string>;
 
-export declare function assertValdiCompilerAbi(version: number): void;
-export declare function defineValdiComponent<F extends (...args: any[]) => void>(
-	render: F,
-	options: { hasHooks: boolean },
-): F;
-export declare function getValdiComponentConstructor<P>(component: Component<P>): Component<P>;
-export declare function hookSlots(count: number): number;
-export declare function withSlot<A extends unknown[], R>(
-	slot: Slot,
-	callback: (...args: A) => R,
-	...args: A
-): R;
-export declare function useState<T>(initial: T | (() => T), slot: Slot): [T, Update<T>, () => T];
-export { useState as __useStateWithGetter };
-
-export declare const jsx: {
-	makeNodePrototype(tag: string, pairs?: readonly unknown[]): Prototype;
-	makeComponentPrototype(pairs?: readonly unknown[]): Prototype;
-	beginRender(prototype: Prototype, key?: string): void;
-	endRender(): void;
-	setAttribute(name: string, value: unknown): void;
-	setAttributeString(name: string, value: string | null | undefined): void;
-	setAttributeFunction(name: string, value: Function | null | undefined): void;
-	beginComponent<P>(component: Component<P>, prototype: Prototype, key?: string): void;
-	setViewModelProperty(name: string, value: unknown): void;
-	endComponent(): void;
-};
+export declare const assertValdiCompilerAbi: Adapter['assertValdiCompilerAbi'];
+export declare const defineValdiComponent: Adapter['defineValdiComponent'];
+export declare const getValdiComponentConstructor: Adapter['getValdiComponentConstructor'];
+export declare const valdiKey: Adapter['valdiKey'];
+export declare const setValdiAttributes: Adapter['setValdiAttributes'];
+export declare const hookSlots: Adapter['hookSlots'];
+export declare const withSlot: Adapter['withSlot'];
+export declare const useState: Adapter['useState'];
+export declare const __useStateWithGetter: Adapter['__useStateWithGetter'];
+export declare const useMemo: Adapter['useMemo'];
+export declare const useCallback: Adapter['useCallback'];
+export declare const useRef: Adapter['useRef'];
+export declare const useLayoutEffect: Adapter['useLayoutEffect'];
+export declare const __methodDep: Adapter['__methodDep'];
+// The recorder implements both optional host-text capabilities.
+export declare const jsx: Required<Adapter['jsx']>;

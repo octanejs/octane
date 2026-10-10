@@ -96,16 +96,12 @@ jobs:
           pnpm install --prod=false --frozen-lockfile
           pnpm --dir "$BASE_TREE" install --prod=false --frozen-lockfile
 
-      # Byte suites are deterministic and run once per tree, both trees at once.
+      # Byte suites are deterministic and run once per tree, sharing one lock.
       - name: Measure bundles before and after
         run: |
           mkdir -p "$RESULTS"
-          (cd "$BASE_TREE" && node benchmarks/bench.mjs --results-dir="$RESULTS/base" bundle-size bundle-reachability) > "$RESULTS/base-bytes.log" 2>&1 &
-          base=$!
-          node benchmarks/bench.mjs --results-dir="$RESULTS/head" bundle-size bundle-reachability > "$RESULTS/head-bytes.log" 2>&1 &
-          head=$!
-          wait "$base" || echo "::warning::base bundle benchmarks failed"
-          wait "$head" || echo "::warning::head bundle benchmarks failed"
+          (cd "$BASE_TREE" && node benchmarks/bench.mjs --results-dir="$RESULTS/base" bundle-size bundle-reachability) > "$RESULTS/base-bytes.log" 2>&1 || echo "::warning::base bundle benchmarks failed"
+          node benchmarks/bench.mjs --results-dir="$RESULTS/head" bundle-size bundle-reachability > "$RESULTS/head-bytes.log" 2>&1 || echo "::warning::head bundle benchmarks failed"
           for side in base head; do
             echo "::group::$side bundle benchmarks"
             cat "$RESULTS/$side-bytes.log"

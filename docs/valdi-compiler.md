@@ -86,9 +86,9 @@ Props annotations, generic parameters, and explicit component-binding types rema
 The adapter must provide typed declarations for generated calls. In particular,
 `defineValdiComponent` must carry the render function's props type through to its
 returned descriptor, and slot-taking hooks must preserve their generic state and
-callback types. Compiler tests check the output and consumer prop errors against
-a typed stub adapter; Octane does not yet ship a complete adapter declaration
-contract or a native Valdi integration.
+callback types. Compiler tests and the public Workspace integration check against
+the [published declaration contract](#published-adapter-types), including consumer
+prop errors. A native renderer and its lifecycle remain the adapter's responsibility.
 
 The returned source map has one source, the authored `.tsrx` or `.ts` file, and
 includes its source content. Keep it alongside the generated code until the
@@ -149,7 +149,7 @@ transformers, declarations/native-model annotations, plain hook import routing,
 unchanged cross-file imports, repeated edits, same-basename source identity,
 and composed error locations. It executes the result with the existing synthetic
 writer recorder. This establishes a build handoff; Swift/native packaging,
-native lifecycle behavior, and a published adapter remain separate acceptance
+native lifecycle behavior, and a published adapter implementation remain separate acceptance
 steps.
 
 ## Adapter contract
@@ -160,6 +160,66 @@ generated contract. Its initial value is `1`. Each generated module calls
 components. An adapter must reject incompatible versions before any of that
 work happens. Include the compiler version, ABI version, and renderer
 configuration in persistent compilation cache keys.
+
+### Published adapter types
+
+Import `ValdiAdapter`, `ValdiWriter`, and `ValdiHookSlot` from the declaration-only
+`octane/compiler/valdi` entry. It has no runtime export or DOM/Node ambient-type
+dependency and also resolves with Valdi's TypeScript 5.3.3 Node10 resolver. The
+same types are re-exported from `octane/compiler` for modern compiler consumers.
+
+`ValdiAdapter<Prototype, Constructor, Key>` describes the module exports below;
+`ValdiWriter<Prototype, Constructor, Key>` describes its `jsx` facade. Supply
+your adapter's own opaque representations: no prototype fields, constructor
+layout, or string key encoding is prescribed. For example, an adapter's
+declaration module can derive its public exports without copying signatures:
+
+```ts
+import type { ValdiAdapter } from 'octane/compiler/valdi';
+import type { NativePrototype, NativeConstructor, NativeKey } from './native-types';
+
+type Adapter = ValdiAdapter<NativePrototype, NativeConstructor, NativeKey>;
+export declare const jsx: Adapter['jsx'];
+export declare const defineValdiComponent: Adapter['defineValdiComponent'];
+export declare const getValdiComponentConstructor: Adapter['getValdiComponentConstructor'];
+export declare const useState: Adapter['useState'];
+export declare const __useStateWithGetter: Adapter['__useStateWithGetter'];
+```
+
+Derive the other exports the same way. For a TypeScript implementation, use
+`satisfies ValdiAdapter<...>` on an object containing the module's named exports to check compatibility
+while retaining its concrete types. A restricted implementation can check only
+the exports it supports with `Pick<ValdiAdapter<...>, ...>`; it must reject source
+or renderer configurations requiring omitted exports.
+
+The typed component contract preserves the render function's complete callable
+type (`F` to `F`), including generic parameters and overloads. This lets generated
+component bindings retain their authored props API. It does not describe an
+arbitrary non-callable descriptor representation. The compiler still consumes
+registered components only through `getValdiComponentConstructor`; the adapter
+owns the implementation and lifecycle. Preserving an overloaded callable passed
+to registration does not add support for lowering overloaded component declarations.
+
+`appendText` and `renderText` are optional on the baseline writer. They must be
+present for the renderer capabilities described below. Using `satisfies` retains
+implemented methods as required; an explicit declaration for a writer implementing
+both can use `Required<Adapter['jsx']>`. Host refs use the existing generic attribute
+methods and do not introduce a separate writer method.
+
+These are compiler-facing hook signatures. Numeric/symbol slots trail the authored
+arguments; `withSlot` provides the slot path when a spread call cannot append one.
+The base `useState` contract requires a value/setter pair, while
+`__useStateWithGetter` requires the third getter when the compiler can observe it.
+Adapters may return a third member from the base call too. Omitted initializers
+retain `undefined`, including compiler-padded and tuple-spread calls. `__methodDep`
+returns an opaque dependency identity, which can be a receiver, member value, or
+sentinel. Continue checking authored source with `octane-tsc`; stateful writer
+setters do not independently validate all props for the current component.
+
+Publication is checked against the actual Octane tarball with strict Bundler,
+NodeNext, and Node10 consumers using only the ES2020 library. The executable
+Workspace handoff above uses these same declarations. Neither check implements
+or validates a native renderer.
 
 The following exports are required when used by a compiled module:
 
@@ -310,14 +370,15 @@ contract.
 Unsupported constructs fail with diagnostics rather than falling back to DOM
 code. These include server rendering/hydration, HMR, Octane profiling,
 cross-renderer boundaries, dynamic or namespace component tags, component
-children/render props, authored `ref`/`children` props, `@try`, `@switch`, and
-`style`/`slot`/`slotted` elements. Spread `ref`/`children` values are checked at
+children/render props and refs, authored host `children` props, `@try`, `@switch`, and
+`style`/`slot`/`slotted` elements. Host refs require the `host-ref` capability;
+component refs remain unsupported. Spread `ref`/`children` values are checked at
 execution time. Unkeyed or asynchronous template loops and slot-keyed hooks
 directly inside loops are rejected; put hooks in a keyed child component.
 
 Raw text is rejected by default. Use a host attribute such as a label's value,
-or explicitly choose `text: 'ignore'` to discard raw text. `text: 'host'` is not
-supported.
+or explicitly choose `text: 'ignore'` to discard raw text. `text: 'host'` requires
+the corresponding ABI 2 or 3 writer capabilities described above.
 
 Tests execute generated modules against a small synthetic writer recorder and
 check diagnostics, source maps, compiler selection, and neighboring targets.

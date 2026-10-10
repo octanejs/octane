@@ -206,6 +206,38 @@ function build(round) {
 
 try {
 	workspace.initialize();
+	// Workspace owns a virtual filesystem. Register the actual package metadata
+	// and public declaration so Node10 resolves its typesVersions entry normally.
+	for (const name of ['package.json', 'src/compiler/valdi.d.ts']) {
+		workspace.registerDiskFile(
+			path.join(project, 'node_modules/octane', name),
+			fileURLToPath(new URL(`../packages/octane/${name}`, import.meta.url)),
+		);
+	}
+	// Reuse the packed-package consumer to validate the complete type contract
+	// with the SDK's TypeScript version, without emitting or executing assertions.
+	const contractFile = path.join(project, 'compiler-valdi-adapter.test-d.ts');
+	workspace.registerDiskFile(
+		contractFile,
+		fileURLToPath(
+			new URL('../packages/octane/typetests/compiler-valdi-adapter.test-d.ts', import.meta.url),
+		),
+	);
+	workspace.addSourceFileAtPath(contractFile);
+	const contract = workspace.getOpenedFile(contractFile);
+	// The companion's separate runtime-module validator does not resolve type-only
+	// npm package entries. Check this diagnostic-only consumer in its SDK Program.
+	const contractDiagnostics = ts.getPreEmitDiagnostics(
+		contract.workspaceProject.program,
+		contract.sourceFile,
+	);
+	assert.deepEqual(
+		contractDiagnostics.map((diagnostic) => ({
+			code: diagnostic.code,
+			message: ts.flattenDiagnosticMessageText(diagnostic.messageText, '\n'),
+		})),
+		[],
+	);
 	workspace.registerInMemoryFile(
 		adapterFile,
 		readFileSync(path.join(fixture, 'writer.d.ts'), 'utf8'),

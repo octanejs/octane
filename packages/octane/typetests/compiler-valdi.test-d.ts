@@ -5,10 +5,12 @@ import {
 	type CompileRenderer,
 	type CompileResult,
 	type ValdiWriterFacts,
+	type ValdiAdapter,
 } from 'octane/compiler';
 import { octane, type OctaneVitePluginOptions } from 'octane/compiler/vite';
 
 export const abi: number = VALDI_COMPILER_ABI_VERSION;
+export type Adapter = ValdiAdapter;
 export const renderer = {
 	id: 'valdi',
 	module: '@example/valdi-adapter',
