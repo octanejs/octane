@@ -51,7 +51,9 @@ for (const production of [false, true]) {
 				const fixture = loadServerFixture<typeof FormFixture>(join(HERE, 'Form.tsrx'), {
 					id: join(HERE, 'Form.tsrx'),
 					compileOptions: { dev: !production, hmr: false },
-					runtimeModules: { './actions.js': { recordClick() {}, recordHydrated() {} } },
+					runtimeModules: {
+						'./actions.js': { recordClick() {}, recordHydrated() {}, recordEditor() {} },
+					},
 				});
 				const shellPlugin: Plugin = {
 					name: 'compiled-native-form-command-shell',
@@ -206,6 +208,91 @@ for (const production of [false, true]) {
 					},
 				};
 			}
+
+			it('keeps selection and IME live in a waiting independent island without renewing user activation', async () => {
+				const { page, load } = await openPage('index', '?hold-island');
+				await load();
+				await page.locator('#activate-button').click();
+				const editor = page.locator('#draft-input');
+				await editor.click();
+				await editor.pressSequentially(' draft');
+				await editor.evaluate((node: HTMLInputElement) => node.setSelectionRange(1, 3));
+				const cdp = await page.context().newCDPSession(page);
+				await cdp.send('Input.imeSetComposition', {
+					text: '한',
+					selectionStart: 1,
+					selectionEnd: 1,
+				});
+				const pending = await page.evaluate(() => window.__formSubmission.state());
+				expect(pending).toMatchObject({
+					hydrated: 0,
+					islandLoads: 1,
+					inputSame: true,
+					focused: true,
+				});
+				expect(pending.value).toContain('한');
+				// Playwright evaluation/polling grants userGesture. Keep expiration,
+				// release and the replay observation inside one CDP call without it.
+				const replay = await cdp.send('Runtime.evaluate', {
+					userGesture: false,
+					awaitPromise: true,
+					returnByValue: true,
+					expression: `(async () => {
+						const deadline = performance.now() + 10000;
+						while (navigator.userActivation.isActive) {
+							if (performance.now() > deadline) throw Error('activation did not expire');
+							await new Promise(resolve => setTimeout(resolve, 25));
+						}
+						window.__formSubmission.release();
+						while (!window.__formSubmission.state().clicks.includes('activate-button')) {
+							if (performance.now() > deadline) throw Error('replay did not finish');
+							await new Promise(resolve => setTimeout(resolve, 25));
+						}
+						return window.__formSubmission.state();
+					})()`,
+				});
+				expect(replay.exceptionDetails).toBeUndefined();
+				const active = replay.result.value as typeof pending;
+				expect(active).toMatchObject({
+					inputSame: true,
+					focused: true,
+					value: pending.value,
+					selectionStart: pending.selectionStart,
+					selectionEnd: pending.selectionEnd,
+					errors: [],
+				});
+				expect(active.activations).toEqual([{ trusted: false, active: false }]);
+				// This fixture captures only clicks; editing stays native while waiting.
+				expect(active.editorEvents).toEqual([]);
+				await cdp.send('Input.imeSetComposition', {
+					text: '한국',
+					selectionStart: 2,
+					selectionEnd: 2,
+				});
+				await cdp.send('Input.insertText', { text: '한국' });
+				const final = await page.evaluate(() => window.__formSubmission.state());
+				expect(final.value).toContain('한국');
+				expect(final.editorEvents.filter((event) => event.type === 'compositionstart')).toEqual([]);
+				expect(final.editorEvents).toContainEqual({
+					type: 'input',
+					trusted: true,
+					data: '한국',
+					composing: true,
+				});
+				expect(final.originalComposition.map((event) => event.type)).toEqual([
+					'compositionstart',
+					'compositionend',
+				]);
+				// CDP insertText can emit an untrusted compositionend even on a bare
+				// input. Assert continuity/data; trusted composing input is checked above.
+				expect(final.editorEvents).toContainEqual(
+					expect.objectContaining({
+						type: 'compositionend',
+						data: '한국',
+						composing: null,
+					}),
+				);
+			});
 
 			async function addGetterControls(current: Page): Promise<boolean[]> {
 				return current.evaluate(() => {

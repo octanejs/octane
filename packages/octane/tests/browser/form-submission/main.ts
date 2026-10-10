@@ -5,7 +5,7 @@ import {
 	type CapturedFormSubmission,
 } from 'octane/behavior';
 import { bootstrapIndependentHydration } from 'octane/hydration';
-import { clicks, hydrated } from './actions.js';
+import { clicks, hydrated, editorEvents, activations } from './actions.js';
 
 type SerializableField = readonly [string, string | { name: string; size: number; type: string }];
 type SubmissionPayload = {
@@ -18,6 +18,13 @@ type SubmissionPayload = {
 
 const form = document.querySelector('#command-form') as HTMLFormElement;
 const originalInput = form.elements.namedItem('draft') as HTMLInputElement;
+const originalComposition: Array<{ type: string; trusted: boolean }> = [];
+for (const type of ['compositionstart', 'compositionend'])
+	originalInput.addEventListener(
+		type,
+		(event) => originalComposition.push({ type, trusted: event.isTrusted }),
+		true,
+	);
 const container = document.querySelector('#behavior-container')!;
 const root = attachBehaviorRoot(
 	new URLSearchParams(location.search).has('form-root') ? form : container,
@@ -127,6 +134,7 @@ const stopHydration = bootstrapIndependentHydration(container, {
 	loadStyles() {},
 	async loadModule() {
 		islandLoads++;
+		if (new URLSearchParams(location.search).has('hold-island')) await ready;
 		// The query requests the compiler's real independent boundary entrypoint.
 		// @ts-expect-error The bundler owns independent Hydrate query modules.
 		return import('./Form.tsrx?octane-hydrate=0');
@@ -169,6 +177,12 @@ const harness = {
 			adoptions: adoptions.slice(),
 			cleanups: cleanups.slice(),
 			clicks: clicks.slice(),
+			editorEvents: editorEvents.slice(),
+			originalComposition,
+			activations: activations.slice(),
+			selectionStart: originalInput.selectionStart,
+			selectionEnd: originalInput.selectionEnd,
+			focused: document.activeElement === originalInput,
 			islandLoads,
 			hydrated,
 			errors: errors.slice(),

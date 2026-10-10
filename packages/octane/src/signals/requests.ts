@@ -404,17 +404,26 @@ function completeAttempt(attempt: Attempt): void {
 
 function observePromise(attempt: Attempt, result: unknown): void {
 	Promise.resolve(result).then(
-		(value) => {
-			const entry = currentEntry(attempt);
-			if (!entry) return;
-			publishNativeProducer(() => {
-				entry.state = readyState(value, { requestKey: entry.request.identity });
-				completeAttempt(attempt);
-				entry.deliver();
-			});
-		},
+		(value) => receivePromiseValue(attempt, value),
 		(error) => failAttempt(attempt, error),
 	);
+}
+
+function receivePromiseValue(attempt: Attempt, value: unknown): void {
+	const entry = currentEntry(attempt);
+	if (!entry) return;
+	// Independent ready promises share the stream/read budget too. Coalescing
+	// their component renders does not bound synchronous subscriber work.
+	const wait = yieldForHostBudget();
+	if (wait !== undefined) {
+		wait.then(() => receivePromiseValue(attempt, value));
+		return;
+	}
+	publishNativeProducer(() => {
+		entry.state = readyState(value, { requestKey: entry.request.identity });
+		completeAttempt(attempt);
+		entry.deliver();
+	});
 }
 
 function failAttempt(attempt: Attempt, error: unknown): void {
