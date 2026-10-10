@@ -28,6 +28,86 @@ async function bundleRuntimeEntry(source: string) {
 }
 
 describe('private compiler-runtime package entries', () => {
+	it('keeps eventful explicit DOM targets on the same runtime contract', () => {
+		const source = `export function Surface(props) @{ <button onClick={props.click} onScrollCapture={props.scroll} /> }`;
+		for (const output of ['js', 'ts'] as const) {
+			const options = { dev: false, hmr: false, output };
+			const ordinary = compile(source, 'event-target.tsrx', options);
+			for (const module of ['octane', 'custom-dom-metadata']) {
+				expect(
+					compile(source, 'event-target.tsrx', {
+						...options,
+						renderer: { id: 'dom', module, target: 'dom' },
+					}),
+				).toEqual(ordinary);
+			}
+			const nativeReads = compile(source, 'event-target.tsrx', { ...options, nativeReads: true });
+			const requests = parseModule(nativeReads.code, 'event-target.ts')
+				.body.filter((statement: any) => statement.type === 'ImportDeclaration')
+				.map((statement: any) => statement.source.value);
+			expect(requests).toContain('octane/internal/client');
+			expect(
+				requests.every(
+					(request: string) => request === 'octane' || request === 'octane/internal/client',
+				),
+			).toBe(true);
+		}
+	});
+
+	it('keeps native event props within the selected non-DOM renderer ABI', () => {
+		for (const target of ['universal', 'valdi'] as const) {
+			const renderer = { id: 'native', module: 'custom-native-runtime', target };
+			const { code } = compile(
+				'export function Surface(props) @{ <view onTap={props.handle} /> }',
+				'event-native.tsrx',
+				{ renderer, hmr: false },
+			);
+			const requests = parseModule(code, 'event-native.js')
+				.body.filter((statement: any) => statement.type === 'ImportDeclaration')
+				.map((statement: any) => statement.source.value);
+			expect(new Set(requests)).toEqual(new Set([renderer.module]));
+		}
+		const server = compile(
+			'export function Surface(props) @{ <button onClick={props.handle} onScrollCapture={props.handle} /> }',
+			'event-server.tsrx',
+			{ mode: 'server', hmr: false },
+		);
+		const requests = parseModule(server.code, 'event-server.js')
+			.body.filter((statement: any) => statement.type === 'ImportDeclaration')
+			.map((statement: any) => statement.source.value);
+		expect(
+			requests.every(
+				(request: string) => request === 'octane/server' || request === 'octane/internal/server',
+			),
+		).toBe(true);
+	});
+
+	it('preserves an explicitly routed registration ABI', () => {
+		const options = {
+			hmr: false,
+			__runtimeImportRoutes: [
+				{
+					module: 'custom-delegation',
+					imported: new Set(['delegateEvents', 'delegateCaptureEvents']),
+				},
+			],
+		};
+		const { code } = compile(
+			'export function Surface(props) @{ <button onClick={props.handle} onScrollCapture={props.handle} /> }',
+			'event-route.tsrx',
+			options,
+		);
+		const routed = parseModule(code, 'event-route.js')
+			.body.filter(
+				(statement: any) =>
+					statement.type === 'ImportDeclaration' && statement.source.value === 'custom-delegation',
+			)
+			.flatMap((statement: any) =>
+				statement.specifiers.map((specifier: any) => specifier.imported.name),
+			);
+		expect(routed.sort()).toEqual(['delegateCaptureEvents', 'delegateEvents']);
+	});
+
 	it('preserves public application imports alongside private generated client imports', () => {
 		const { code } = compile(
 			`import { useState } from 'octane';

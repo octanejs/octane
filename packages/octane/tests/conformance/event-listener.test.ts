@@ -10,10 +10,8 @@
 import { describe, it, expect, vi } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { compile } from 'octane/compiler';
 import { act, mount, createLog, type EffectLog } from '../_helpers';
-import { loadServerFixture } from '../_server-fixture';
-import * as ClientRT from '../../src/index.js';
+import { loadCompiledFixtureSource, loadServerFixture } from '../_server-fixture';
 import { createRoot, flushSync, hydrateRoot } from '../../src/index.js';
 import * as ServerRT from 'octane/server';
 import {
@@ -1193,28 +1191,11 @@ describe('ReactDOMEventListener — scroll (not emulated upward)', () => {
 			'packages/octane/tests/conformance/_fixtures/event-listener-hydrate.tsrx',
 		);
 		const FILE = 'event-listener-hydrate.tsrx';
-		const serverModule = (): Record<string, any> => {
-			let { code } = compile(readFileSync(FIX, 'utf8'), FILE, { mode: 'server' });
-			code = code.replace(
-				/import\s*\{([^}]*)\}\s*from\s*['"]octane\/server['"];?/g,
-				(_m: string, names: string) => `const {${names.replace(/ as /g, ': ')}} = __rt;`,
-			);
-			code = code.replace(/export const (\w+) =/g, 'const $1 = __exports.$1 =');
-			code = code.replace(/export function (\w+)/g, '__exports.$1 = function $1');
-			return new Function('__rt', '__exports', code + '\nreturn __exports;')(ServerRT, {});
-		};
-		const clientModule = (): Record<string, any> => {
-			let { code } = compile(readFileSync(FIX, 'utf8'), FILE, { mode: 'client' });
-			code = code.replace(
-				/import\s*\{([^}]*)\}\s*from\s*['"]octane['"];?/g,
-				(_m: string, names: string) => `const {${names.replace(/ as /g, ': ')}} = __rt;`,
-			);
-			code = code.replace(/export const (\w+) =/g, 'const $1 = __exports.$1 =');
-			code = code.replace(/export function (\w+)/g, '__exports.$1 = function $1');
-			return new Function('__rt', '__exports', code + '\nreturn __exports;')(ClientRT, {});
-		};
-		const server = serverModule();
-		const client = clientModule();
+		const server = loadServerFixture(FIX, { id: FILE });
+		const client = loadCompiledFixtureSource(readFileSync(FIX, 'utf8'), {
+			id: FILE,
+			mode: 'client',
+		});
 
 		const log = createLog();
 		const handlers = {

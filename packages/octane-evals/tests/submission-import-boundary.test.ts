@@ -92,7 +92,10 @@ export function App() @{
 			<button
 				aria-label="Remove seat"
 				disabled={count === 0}
-				onClick={() => setCount(Math.max(0, count - 1))}
+				onClickCapture={(event) => event.preventDefault()}
+				onClick={(event) => {
+					if (event.defaultPrevented) setCount(Math.max(0, count - 1));
+				}}
 			>{'−'}</button>
 			<SeatCount count={count} />
 			<button
