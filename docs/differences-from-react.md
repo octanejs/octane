@@ -1420,20 +1420,34 @@ native events, lifecycle updates, and `flushSync` retain their existing timing.
 The admission change does not turn an urgent signal render into a Suspense
 transition; held native-read frames keep their existing retention policy.
 
-Query promise results and query/derived stream pulls share an approximately 5 ms
-host budget. Retained ready values and hydration seeds keep their synchronous
-reads. Both a pull and a ready-result publication check the same window, so many producers do
-not each receive a separate allowance. A posted sentinel resets that window;
-ready continuations wait for it when the budget is spent, then recheck their
+Successful query promise results and query/derived stream pulls share an
+approximately 5 ms host budget. Retained ready values and hydration seeds keep their synchronous
+reads. Both a pull and a ready-result publication check the same window, so many
+producers do not each receive a separate allowance. A posted sentinel resets
+that window; ready continuations wait for it when the budget is spent, then recheck their
 current producer lease. Ordered values, cancellation, and server observation
 backpressure are preserved. This is a scheduling opportunity between complete
 units, not a hard 5 ms limit: one iterator call, subscriber, render, or commit can
 itself take longer. Cold I/O lets the sentinel run between results. Buffered RPC
-and custom renderer response readers use the same window; transport chunks are not scheduling units.
+and custom renderer response readers use the same window; transport chunks are
+not scheduling units.
 Independent islands instead activate at most once per document task, prioritizing
 captured input. None of these boundaries guarantees a particular next input or
 paint. The [backlog investigation](../benchmarks/scheduler-responsiveness/investigation.md)
 records browser measurements, policy comparisons, and the remaining atomic work.
+
+Even a single successful query can wait for a later host task if earlier work
+has exhausted the shared window. A synchronous `renderToString` immediately
+after its promise resolves can therefore still render the pending arm. Tests
+should await `act()` or the observable result across host tasks, rather than
+counting microtasks. Awaited `act()` drains budget-paced publications and the
+renders they schedule, for both synchronous and asynchronous callbacks.
+
+Query rejections retain prompt failure notification and failed-attempt cleanup;
+they do not wait for the shared budget. An error can therefore publish before an
+earlier-settled success that is waiting for admission. Bursts of expensive error
+subscribers or `@catch` work remain unpaced. This preserves the existing failure
+contract; the successful-publication guarantee does not bound rejection work.
 
 Native `ResizeObserver` callbacks run inside the browser's resize delivery loop.
 An ordinary microtask commit that resizes an already-delivered target can trigger
@@ -1518,8 +1532,9 @@ guarantee: before beginning another render, Octane drains the previous commit's
 pending passive work. Back-to-back urgent renders or layout-triggered updates
 can therefore run passive effects before a paint. A task boundary does not
 change that ordering, and one effect callback still runs to completion.
-A listener installed by `useEffect` can miss another event dispatched before that drain. Use `useLayoutEffect` when the
-subscription must be installed by the end of the commit. Passive timing is not
+A listener installed by `useEffect` can miss another event dispatched before
+that drain. Use `useLayoutEffect` when the subscription must be installed by
+the end of the commit. Passive timing is not
 React's synchronous discrete-event effect timing.
 
 `root.unmount()` drains pending passive work and its passive cleanups before

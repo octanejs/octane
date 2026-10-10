@@ -97,6 +97,7 @@ import {
 } from './event-names.js';
 import { hasOwnProp } from './has-own.js';
 import { postHostTask } from './host-task.js';
+import { hasPendingHostBudget } from './host-budget.js';
 import { headOwnershipKey } from './head-ownership.js';
 import { resourceHintWarning } from './resource-hint-diagnostics.js';
 import {
@@ -11664,7 +11665,11 @@ export function act<T>(fn: () => T | Promise<T>): Promise<T> {
 				for (let i = 0; i < ACT_DRAIN_LIMIT; i++) {
 					await actCheckpoint();
 					throwPendingActErrors();
-					const hadWork = hasPendingWork() || DEFERRED_SWAPS !== null || transitionTask !== 0;
+					const hadWork =
+						hasPendingWork() ||
+						DEFERRED_SWAPS !== null ||
+						transitionTask !== 0 ||
+						hasPendingHostBudget();
 					drainPassiveEffects();
 					if (!hadWork && !hasPendingWork()) return value;
 				}
@@ -11718,7 +11723,11 @@ export function act<T>(fn: () => T | Promise<T>): Promise<T> {
 			for (let i = 0; i < ACT_DRAIN_LIMIT; i++) {
 				await actCheckpoint();
 				throwPendingActErrors();
-				const hadWork = hasPendingWork() || DEFERRED_SWAPS !== null || transitionTask !== 0;
+				const hadWork =
+					hasPendingWork() ||
+					DEFERRED_SWAPS !== null ||
+					transitionTask !== 0 ||
+					hasPendingHostBudget();
 				drainPassiveEffects();
 				if (!hadWork && !hasPendingWork()) return result as T;
 			}

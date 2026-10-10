@@ -6,6 +6,11 @@ const HOST_BUDGET_MS = 5;
 let started = 0;
 let sentinel: Promise<void> | undefined;
 
+/** Test drains must wait for admitted producer work as well as queued renders. */
+export function hasPendingHostBudget(): boolean {
+	return sentinel !== undefined;
+}
+
 /**
  * Before an indivisible pull or publication, yield when this host's current
  * window is spent. Callers re-enter their lease guard and this check after the

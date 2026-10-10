@@ -28,19 +28,19 @@ node benchmarks/scheduler-responsiveness/browser-backlogs.mjs --memory --scenari
 A positional checkout path selects the runtime baseline while retaining the
 same fixture. `--quick` keeps one measured sample after one excluded warmup;
 the default keeps five. Run serially on the same machine. `--cpu=1` provides the
-unthrottled control. Use `--work-ms=0` for the cheap-result policy comparison. The matrix includes four ordinary zero-work values and 100
+unthrottled control. Use `--work-ms=0` for the cheap-result policy comparison.
+The matrix includes four ordinary zero-work values and 100
 values with 2 ms of subscriber/render work, ready and pending inputs, twelve
 concurrent producers/roots, one chunk and 17-byte fragments, and 16 distinct
 64 KiB transport payloads. A blocked-first Action control then drains 100 ready
-callbacks with 2 ms of application work each in both runtimes. Pending producers await native timers; ready
-producers return settled promises. Ordinary independent query completions are
-separate from query streams. Reused retained values and hydration seeds do not
+callbacks with 2 ms of application work each in both runtimes. Pending producers
+await native timers; ready producers return settled promises. Ordinary independent
+query completions are separate from query streams. Reused retained values and hydration seeds do not
 create a ready continuation chain; their synchronous semantics are covered by
 `signals-native-seeds` and the signals node suite.
 
 Reports include startup, first contentful paint, first publication, first commit,
-completion, commits,
-passive bodies/cleanups, trusted input and Event Timing grouped by interaction ID,
+completion, commits, passive bodies/cleanups, trusted input and Event Timing grouped by interaction ID,
 rAF opportunities, and Chromium trace `RunTask`, `RunMicrotasks`, and `Paint`
 events. Traces select the renderer thread from `backlog-start`; task/checkpoint
 maxima include the **whole** overlapping event, not a clipped 5 ms slice.
@@ -65,9 +65,10 @@ component rendering but still delivered every subscriber in one checkpoint.
 `observePromise` bypassed `yieldForHostBudget`, which already guarded stream
 results. The fix uses that same budget before publishing a promise result and
 revalidates the request lease on every retry. It adds no queue, record fields,
-public configuration, or unconditional per-render work. Rejections preserve their
-existing error path. A waiting successful payload is retained only until its
-posted admission retry; retirement prevents publication.
+public configuration, or unconditional per-render work. Rejections preserve prompt
+failure notification and cleanup; expensive rejection bursts remain unpaced and
+may overtake an earlier success waiting on the budget. A waiting successful
+payload is retained only until its posted admission retry; retirement prevents publication.
 
 The deterministic regression fails before the fix: all twelve results arrive
 before the independent marker. It covers full completion, replacement while
@@ -161,8 +162,8 @@ when only the query publication fix changes; the React bundle is identical.
 Against current main `c82354bf84`, the minimal `root-static`, `hooks-state`,
 and `server-render` controls pass with identical raw/gzip/brotli sizes before
 and after the fix (147117/47717, 62863/21102, and 64032/22031 raw/gzip bytes).
-CI reports the broader byte/work matrix. No compiler output or runtime record shape changes.
-
+CI reports the broader byte/work matrix. No compiler output or runtime record shape
+changes.
 
 ## Policy decision and compatibility audit
 
@@ -191,6 +192,16 @@ More windows can mean more commits and earlier passive drains. Preserve lifecycl
 work for accepted commits instead of dropping it to recover a benchmark count.
 One-shot query results now pay the same admission check as streams; retained
 ready reads still bypass producer execution entirely.
+
+The same budget can defer a lone success after other work spends the window;
+synchronous SSR after promise resolution may still see pending. Tests must await
+the result across host tasks instead of counting microtasks. Awaited `act()` now
+checks the existing budget sentinel in both async drains, including query and
+derived streams. Before that fix, both callback forms returned with only 3–6 of
+12 paced values published. The dev/prod regressions require all values and their
+UI updates before the awaited call returns. The check runs only in the test
+utility's drain, adds no queue or record fields, and preserves synchronous act
+behavior before its returned promise is awaited.
 
 The effect audit retains the established insertion/layout/ref commit phases,
 cleanup-before-next-body, and passive drain before the next render. Passive

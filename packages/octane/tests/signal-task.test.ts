@@ -341,6 +341,49 @@ describe('signal producer task admission', () => {
 		},
 	);
 
+	for (const callback of ['sync', 'async'] as const) {
+		it.each(['promise', 'query', 'derived'] as const)(
+			`awaited act with a ${callback} callback drains paced %s publications and their UI`,
+			async (kind) => {
+				let elapsed = 0;
+				vi.spyOn(performance, 'now').mockImplementation(() => elapsed);
+				const owner = scope();
+				const seen: number[] = [];
+				let publish!: () => void;
+				const container = mount(() => {
+					const [count, setCount] = useState(0, Symbol.for('signal-task.act-count'));
+					publish = () => setCount((value) => value + 1);
+					return createElement('output', null, String(count));
+				});
+				const start = () => {
+					const values =
+						kind === 'promise'
+							? Array.from({ length: 12 }, (_, index) =>
+									createResource(owner, `act-${index}`, () =>
+										query(`act-${index}`, () => Promise.resolve(index))(undefined),
+									),
+								)
+							: [producer(owner, kind, 12)];
+					for (const value$ of values) {
+						runWithSignalOwner(owner, () =>
+							value$.subscribe(() => {
+								const snapshot = value$.snapshot();
+								if (snapshot.status === 'ready' && (kind === 'promise' || !snapshot.complete)) {
+									seen.push(snapshot.value);
+									elapsed += 2;
+									publish();
+								}
+							}),
+						);
+					}
+				};
+				await act(callback === 'async' ? async () => start() : start);
+				expect(seen).toEqual(Array.from({ length: 12 }, (_, index) => index));
+				expect(container.textContent).toBe('12');
+			},
+		);
+	}
+
 	it('shares elapsed work across concurrently ready query and derived streams', async () => {
 		let elapsed = 0;
 		vi.spyOn(performance, 'now').mockImplementation(() => elapsed);

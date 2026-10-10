@@ -154,6 +154,12 @@ producers and reset by a host task, not by each value or owner. It cannot interr
 an expensive iterator, subscriber, render, or commit. A cold I/O wait lets the
 sentinel run without adding another timer to each result.
 
+Even one successful query can wait if earlier work spent the shared window;
+synchronous SSR immediately after promise resolution may still see pending.
+Awaited `act()` includes the pending budget sentinel in both of its async drains.
+Rejections retain prompt failure notification and cleanup, so rejection bursts
+remain outside the successful-publication pacing guarantee.
+
 `benchmarks/scheduler-responsiveness/signal-backlog.mjs` records ordered source
 publications, component commits, marker latency, and total completion for ready
 and CPU-heavy streams. Direct binding writes are outside its component commit
