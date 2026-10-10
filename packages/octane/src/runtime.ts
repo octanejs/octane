@@ -729,6 +729,10 @@ let CONTROLLED_RESTORE_DRIVER: {
 	enqueue: typeof maybeEnqueueRestore;
 	finish: typeof maybeFlushDiscrete;
 } | null = null;
+// Install before queued work drains or a submit transition publishes pending status.
+// Keep the call targets stable after installation, including after rollback.
+let drainControlledSyncs: typeof drainQueuedControlledSyncs = noop;
+let publishManualFormPending: typeof publishRegisteredManualFormPending = noop;
 // A PortalSlot installs its consumers before deferred range publication. Keep
 // them installed after the last removal: an event can still be between capture
 // and bubble with a route through the former portal.
@@ -31511,7 +31515,7 @@ function snapshotSubmitDispatch(form: HTMLFormElement, event: SubmitEvent): Subm
 let ACTIVE_SUBMIT_DISPATCH: SubmitDispatchRec | null = null;
 
 // Runs when the submit dispatch's handler walk finishes (dispatchDelegated).
-function publishManualFormPending(rec: SubmitDispatchRec): void {
+function publishRegisteredManualFormPending(rec: SubmitDispatchRec): void {
 	if (rec.intercepted || rec.transitions === 0 || !rec.event.defaultPrevented) return;
 	const form = rec.form;
 	let data: FormData | null = null;
@@ -31841,6 +31845,7 @@ let DEV_FORM_CHECK_GENERATION = 1;
 let AUTOFOCUS_QUEUE: Element[] = [];
 
 function queueControlledCommit<T>(queue: T[], item: T): void {
+	if (drainControlledSyncs === noop) drainControlledSyncs = drainQueuedControlledSyncs;
 	if (
 		DEFERRED_LAYOUT_DRIVER &&
 		item !== null &&
@@ -31856,6 +31861,7 @@ function queueControlledCommit<T>(queue: T[], item: T): void {
 }
 
 function queueDevFormCheck(queue: Element[], el: Element): void {
+	if (drainControlledSyncs === noop) drainControlledSyncs = drainQueuedControlledSyncs;
 	if (DEFERRED_LAYOUT_DRIVER) DEFERRED_LAYOUT_DRIVER.recordStageEntry(el);
 	queue.push(el);
 	if (ROOT_RENDER_TRANSACTION !== null) {
@@ -33043,7 +33049,7 @@ function drainDevFormDiagnostics(target?: Element): void {
  * element's full listener set). Default projections run first; a controlled
  * `value` then wins.
  */
-function drainControlledSyncs(): void {
+function drainQueuedControlledSyncs(): void {
 	if (AUTOFOCUS_QUEUE.length > 0) {
 		const q = AUTOFOCUS_QUEUE;
 		AUTOFOCUS_QUEUE = [];
@@ -44691,7 +44697,11 @@ function runTransition(fn: () => void | Promise<unknown>, hook?: TransitionHookS
 	// see publishManualFormPending). Registered here; every settle path below
 	// notifies the record exactly once.
 	const submitRec = ACTIVE_SUBMIT_DISPATCH;
-	if (submitRec !== null) submitRec.transitions++;
+	if (submitRec !== null) {
+		if (publishManualFormPending === noop)
+			publishManualFormPending = publishRegisteredManualFormPending;
+		submitRec.transitions++;
+	}
 	let result: unknown;
 	try {
 		tickTransitionCount(+1);
