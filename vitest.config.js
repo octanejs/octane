@@ -551,18 +551,6 @@ const PUCK_SOURCE_ALIASES = [
 		find: /^@octanejs\/lucide\/(.*)$/,
 		replacement: resolve(import.meta.dirname, 'packages/lucide/src') + '/$1.ts',
 	},
-	{
-		find: /^@octanejs\/tanstack-pacer$/,
-		replacement: resolve(import.meta.dirname, 'packages/tanstack-pacer/src/index.ts'),
-	},
-	{
-		find: /^@octanejs\/tanstack-pacer\/(.*)$/,
-		replacement: resolve(import.meta.dirname, 'packages/tanstack-pacer/src') + '/$1/index.ts',
-	},
-	{
-		find: /^@octanejs\/tanstack-store$/,
-		replacement: resolve(import.meta.dirname, 'packages/tanstack-store/src/index.ts'),
-	},
 ];
 const BLOCKNOTE_SOURCE_ALIASES = [
 	{
@@ -1627,16 +1615,6 @@ export default defineConfig({
 				},
 			},
 			{
-				testExecution: { group: 'react-parity' },
-				test: {
-					name: 'tanstack-hotkeys-pristine',
-					include: ['packages/tanstack-hotkeys/tests/upstream-original.test.ts'],
-					environment: 'node',
-					sequence: { groupOrder: 1 },
-					globals: false,
-				},
-			},
-			{
 				test: {
 					name: 'animejs',
 					include: ['packages/animejs/tests/**/*.test.ts'],
@@ -1676,121 +1654,6 @@ export default defineConfig({
 						{
 							find: /^@octanejs\/animejs$/,
 							replacement: resolve(import.meta.dirname, 'packages/animejs/src/index.ts'),
-						},
-					],
-				},
-			},
-			{
-				testExecution: {
-					group: 'react-parity',
-					include: [
-						'packages/tanstack-hotkeys/tests/upstream/**/*.test.ts',
-						'packages/tanstack-hotkeys/tests/upstream/**/*.test.tsx',
-					],
-				},
-				test: {
-					name: 'tanstack-hotkeys',
-					include: [
-						'packages/tanstack-hotkeys/tests/**/*.test.ts',
-						'packages/tanstack-hotkeys/tests/upstream/**/*.test.tsx',
-					],
-					exclude: [
-						'packages/tanstack-hotkeys/tests/upstream-original.test.ts',
-						'packages/tanstack-hotkeys/tests/differential/**/*.test.ts',
-						'packages/tanstack-hotkeys/tests/parity/**/*.test.ts',
-					],
-					environment: 'jsdom',
-					setupFiles: ['packages/tanstack-hotkeys/tests/_setup.ts'],
-					globals: false,
-				},
-				plugins: [octane()],
-				resolve: {
-					alias: [
-						{
-							find: /^@octanejs\/tanstack-hotkeys$/,
-							replacement: resolve(import.meta.dirname, 'packages/tanstack-hotkeys/src/index.ts'),
-						},
-						{
-							find: /^@octanejs\/tanstack-store$/,
-							replacement: resolve(import.meta.dirname, 'packages/tanstack-store/src/index.ts'),
-						},
-						{
-							find: /^@octanejs\/testing-library$/,
-							replacement: resolve(import.meta.dirname, 'packages/testing-library/src/index.ts'),
-						},
-						{
-							find: /^@octanejs\/testing-library\/(.*)$/,
-							replacement: resolve(import.meta.dirname, 'packages/testing-library/src') + '/$1.ts',
-						},
-					],
-				},
-			},
-			{
-				test: {
-					name: 'tanstack-hotkeys-differential',
-					include: ['packages/tanstack-hotkeys/tests/differential/**/*.test.ts'],
-					environment: 'jsdom',
-					globalSetup: ['packages/tanstack-hotkeys/tests/differential/_setup.ts'],
-					globals: false,
-				},
-				testExecution: { group: 'react-parity' },
-				plugins: [octane()],
-				resolve: {
-					alias: [
-						{
-							find: /^@octanejs\/tanstack-hotkeys$/,
-							replacement: resolve(import.meta.dirname, 'packages/tanstack-hotkeys/src/index.ts'),
-						},
-						{
-							find: /^@octanejs\/tanstack-store$/,
-							replacement: resolve(import.meta.dirname, 'packages/tanstack-store/src/index.ts'),
-						},
-					],
-				},
-			},
-			{
-				test: {
-					name: 'tanstack-hotkeys-parity-audit',
-					include: ['packages/tanstack-hotkeys/tests/parity/**/*.test.ts'],
-					environment: 'node',
-					globals: false,
-				},
-			},
-			{
-				testExecution: {
-					group: 'react-parity',
-					include: [
-						'packages/tanstack-pacer/tests/lifecycle.test.ts',
-						'packages/tanstack-pacer/tests/pacer.test.ts',
-						'packages/tanstack-pacer/tests/ssr-hydration.test.ts',
-					],
-				},
-				test: {
-					name: 'tanstack-pacer',
-					include: [
-						'packages/tanstack-pacer/tests/**/*.test.ts',
-						'!packages/tanstack-pacer/tests/adapted/**/*.test.ts',
-						'!packages/tanstack-pacer/tests/differential/**/*.test.ts',
-						'!packages/tanstack-pacer/tests/parity/**/*.test.ts',
-					],
-					environment: 'jsdom',
-					globals: false,
-				},
-				plugins: [octane()],
-				resolve: {
-					alias: [
-						{
-							find: /^@octanejs\/tanstack-pacer$/,
-							replacement: resolve(import.meta.dirname, 'packages/tanstack-pacer/src/index.ts'),
-						},
-						{
-							find: /^@octanejs\/tanstack-pacer\/(.*)$/,
-							replacement:
-								resolve(import.meta.dirname, 'packages/tanstack-pacer/src') + '/$1/index.ts',
-						},
-						{
-							find: /^@octanejs\/tanstack-store$/,
-							replacement: resolve(import.meta.dirname, 'packages/tanstack-store/src/index.ts'),
 						},
 					],
 				},
@@ -5175,19 +5038,6 @@ export default defineConfig({
 							find: /^@octanejs\/lucide\/(.*)$/,
 							replacement: resolve(import.meta.dirname, 'packages/lucide/src') + '/$1.ts',
 						},
-						{
-							find: /^@octanejs\/tanstack-pacer$/,
-							replacement: resolve(import.meta.dirname, 'packages/tanstack-pacer/src/index.ts'),
-						},
-						{
-							find: /^@octanejs\/tanstack-pacer\/(.*)$/,
-							replacement:
-								resolve(import.meta.dirname, 'packages/tanstack-pacer/src') + '/$1/index.ts',
-						},
-						{
-							find: /^@octanejs\/tanstack-store$/,
-							replacement: resolve(import.meta.dirname, 'packages/tanstack-store/src/index.ts'),
-						},
 					],
 				},
 			},
@@ -8160,69 +8010,6 @@ export default defineConfig({
 			},
 			{
 				test: {
-					name: 'tanstack-pacer-adapted',
-					include: ['packages/tanstack-pacer/tests/adapted/**/*.test.ts'],
-					environment: 'jsdom',
-					globals: false,
-				},
-				testExecution: { group: 'react-parity' },
-				plugins: [octane()],
-				resolve: {
-					alias: [
-						{
-							find: /^@octanejs\/tanstack-pacer$/,
-							replacement: resolve(import.meta.dirname, 'packages/tanstack-pacer/src/index.ts'),
-						},
-						{
-							find: /^@octanejs\/tanstack-pacer\/(.*)$/,
-							replacement:
-								resolve(import.meta.dirname, 'packages/tanstack-pacer/src') + '/$1/index.ts',
-						},
-						{
-							find: /^@octanejs\/tanstack-store$/,
-							replacement: resolve(import.meta.dirname, 'packages/tanstack-store/src/index.ts'),
-						},
-					],
-				},
-			},
-			{
-				test: {
-					name: 'tanstack-pacer-differential',
-					include: ['packages/tanstack-pacer/tests/differential/**/*.test.ts'],
-					environment: 'jsdom',
-					globalSetup: ['packages/tanstack-pacer/tests/differential/_setup.ts'],
-					globals: false,
-				},
-				testExecution: { group: 'react-parity' },
-				plugins: [octane()],
-				resolve: {
-					alias: [
-						{
-							find: /^@octanejs\/tanstack-pacer$/,
-							replacement: resolve(import.meta.dirname, 'packages/tanstack-pacer/src/index.ts'),
-						},
-						{
-							find: /^@octanejs\/tanstack-pacer\/(.*)$/,
-							replacement:
-								resolve(import.meta.dirname, 'packages/tanstack-pacer/src') + '/$1/index.ts',
-						},
-						{
-							find: /^@octanejs\/tanstack-store$/,
-							replacement: resolve(import.meta.dirname, 'packages/tanstack-store/src/index.ts'),
-						},
-					],
-				},
-			},
-			{
-				test: {
-					name: 'tanstack-pacer-parity-audit',
-					include: ['packages/tanstack-pacer/tests/parity/**/*.test.ts'],
-					environment: 'node',
-					globals: false,
-				},
-			},
-			{
-				test: {
 					name: 'tanstack-devtools-differential',
 					include: ['packages/tanstack-devtools/tests/differential/**/*.test.ts'],
 					environment: 'jsdom',
@@ -9478,6 +9265,8 @@ export default defineConfig({
 					environment: 'jsdom',
 					testTimeout: 30_000,
 					setupFiles: ['packages/puck/tests/_setup.ts'],
+					// The official pacer adapter ships from npm; inline it so Vite compiles it.
+					server: { deps: { inline: [/@tanstack\/octane-/] } },
 					globals: false,
 				},
 				aliases: PUCK_SOURCE_ALIASES,
@@ -9489,6 +9278,8 @@ export default defineConfig({
 					environment: 'jsdom',
 					testTimeout: 30_000,
 					globalSetup: ['packages/puck/tests/differential/_setup.ts'],
+					// The official pacer adapter ships from npm; inline it so Vite compiles it.
+					server: { deps: { inline: [/@tanstack\/octane-/] } },
 					globals: false,
 				},
 				aliases: PUCK_SOURCE_ALIASES,

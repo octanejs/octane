@@ -123,7 +123,6 @@ const packedExampleCanaries = [
 			'octane',
 			'@octanejs/tanstack-table',
 			'@octanejs/tanstack-store',
-			'@octanejs/tanstack-hotkeys',
 			'@octanejs/tanstack-virtual',
 			'@octanejs/visx',
 			'@octanejs/floating-ui',

@@ -13,7 +13,7 @@
     "test:e2e:dev": "playwright test --config e2e/playwright.config.ts"
   },
   "dependencies": {
-    "@octanejs/tanstack-hotkeys": "workspace:*",
+    "@tanstack/octane-hotkeys": "^0.3.0",
     "@octanejs/tanstack-table": "workspace:*",
     "@octanejs/tanstack-virtual": "workspace:*",
     "@octanejs/visx": "workspace:*",

@@ -549,11 +549,6 @@ catalogs:
   dnd-kit-react-oracle:
     react: 19.2.7
     react-dom: 19.2.7
-  tanstack-pacer-react-oracle:
-    "@types/react": 19.2.17
-    "@types/react-dom": 19.2.3
-    react: 19.2.7
-    react-dom: 19.2.7
   tanstack-devtools-react-oracle:
     "@types/react": 19.2.17
     "@types/react-dom": 19.2.3
@@ -620,6 +615,9 @@ minimumReleaseAgeExclude:
   - '@tsrx/oxc-win32-arm64-msvc@0.20.0'
   - '@tsrx/oxc-win32-x64-msvc@0.20.0'
   - '@tsrx/oxc@0.20.0'
+  - '@tanstack/octane-hotkeys@0.3.0'
+  - '@tanstack/octane-pacer@0.3.0'
+  - '@tanstack/octane-store@0.13.0'
   - '@ripple-ts/adapter@0.4.0'
   - '@ripple-ts/vite-plugin@0.4.0'
   - '@tsrx/core@0.5.5'

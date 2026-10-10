@@ -15,7 +15,7 @@ import {
 	useTable,
 } from '@octanejs/tanstack-table';
 import type { Cell, CellSelectionBounds, CellSelectionState, Row } from '@octanejs/tanstack-table';
-import { useHotkeys } from '@octanejs/tanstack-hotkeys';
+import { useHotkeys } from '@tanstack/octane-hotkeys';
 import { useVirtualizer } from '@octanejs/tanstack-virtual';
 import { ParentSize } from '@octanejs/visx/responsive';
 import { scaleLinear, scalePoint } from '@octanejs/visx/scale';
@@ -635,7 +635,7 @@ function CampaignRowView(props: { row: Row<typeof CAMPAIGN_FEATURES, CampaignRow
 
 function CampaignTable() @{
 	const [query, setQuery] = useState('');
-	const gridRef = useRef<HTMLDivElement | null>(null);
+	const [grid, setGrid] = useState<HTMLDivElement | null>(null);
 	const table = useTable(
 		{
 			features: CAMPAIGN_FEATURES,
@@ -659,7 +659,7 @@ function CampaignTable() @{
 
 	// table-core ships no keydown handling of its own — keyboard navigation is
 	// TanStack Hotkeys driving the table's imperative selection APIs. Scoping the
-	// registrations to `gridRef` keeps them off the rest of the dashboard, so
+	// registrations to the grid element keeps them off the rest of the dashboard, so
 	// typing in the campaign search never moves a cell selection.
 	useHotkeys(
 		[
@@ -680,7 +680,7 @@ function CampaignTable() @{
 				},
 			},
 		],
-		{ target: gridRef, preventDefault: true },
+		{ target: grid, preventDefault: true },
 	);
 
 	<section
@@ -713,7 +713,7 @@ function CampaignTable() @{
 				/>
 			</label>
 		</header>
-		<div class="table-scroll" ref={gridRef} tabIndex={0}>
+		<div class="table-scroll" ref={setGrid} tabIndex={0}>
 			<table>
 				<caption class="sr-only">Deterministic campaign performance report</caption>
 				<thead>

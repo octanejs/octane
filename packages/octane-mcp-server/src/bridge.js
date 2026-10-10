@@ -34,8 +34,6 @@ export const KNOWN_BINDINGS = {
 	'@xstate/store-react': '@octanejs/xstate-store',
 	'@xyflow/react': '@octanejs/xyflow',
 	'@tanstack/react-router-ssr-query': '@octanejs/tanstack-router-ssr-query',
-	'@tanstack/react-hotkeys': '@octanejs/tanstack-hotkeys',
-	'@tanstack/react-pacer': '@octanejs/tanstack-pacer',
 	'@tanstack/react-table': '@octanejs/tanstack-table',
 	'@tanstack/react-virtual': '@octanejs/tanstack-virtual',
 	'react-waypoint': '@octanejs/waypoint',
@@ -179,6 +177,13 @@ export const KNOWN_BINDINGS = {
 	'dexie-react-hooks': '@octanejs/dexie',
 	'@livestore/react': '@octanejs/livestore',
 	wouter: '@octanejs/wouter',
+};
+
+// React package → Octane adapter published by the upstream library itself.
+// These live outside this workspace, so they stay out of KNOWN_BINDINGS.
+export const UPSTREAM_ADAPTERS = {
+	'@tanstack/react-hotkeys': '@tanstack/octane-hotkeys',
+	'@tanstack/react-pacer': '@tanstack/octane-pacer',
 };
 
 // Octane-specific ecosystem packages that have no React import to rewrite.
@@ -592,6 +597,10 @@ export async function readPackageJson(dir) {
 	}
 }
 
+function existingBindingFor(packageName) {
+	return KNOWN_BINDINGS[packageName] ?? UPSTREAM_ADAPTERS[packageName] ?? null;
+}
+
 export function detectVanillaCore(packageName, packageJson) {
 	if (packageName in KNOWN_VANILLA_CORES) {
 		return KNOWN_VANILLA_CORES[packageName];
@@ -609,7 +618,7 @@ export function detectVanillaCore(packageName, packageJson) {
 export async function bridgeReport({ packageName, path, projectRoot }) {
 	const report = {
 		target: packageName ?? path,
-		existingBinding: packageName ? (KNOWN_BINDINGS[packageName] ?? null) : null,
+		existingBinding: packageName ? existingBindingFor(packageName) : null,
 	};
 
 	let scanRoot = path;
@@ -650,7 +659,7 @@ export async function bridgeReport({ packageName, path, projectRoot }) {
 export function bridgeReportFromSource(source, { packageName } = {}) {
 	const report = {
 		target: packageName ?? 'pasted-source',
-		existingBinding: packageName ? (KNOWN_BINDINGS[packageName] ?? null) : null,
+		existingBinding: packageName ? existingBindingFor(packageName) : null,
 	};
 	if (packageName) {
 		report.vanillaCore = detectVanillaCore(packageName, null);

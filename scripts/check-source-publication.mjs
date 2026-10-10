@@ -137,8 +137,6 @@ export const SOURCE_PUBLICATION_DEBT = {
 		'packages/tanstack-ai/tsconfig.json',
 		'packages/tanstack-devtools/tsconfig.json',
 		'packages/tanstack-form/tsconfig.json',
-		'packages/tanstack-hotkeys/tsconfig.json',
-		'packages/tanstack-pacer/tsconfig.json',
 		'packages/tanstack-query/tsconfig.json',
 		'packages/tanstack-router-ssr-query/tsconfig.octane.json',
 		'packages/tanstack-router/tsconfig.json',

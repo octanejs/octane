@@ -362,16 +362,6 @@
         "tags": ["scroll", "chat"]
       },
       {
-        "packageName": "@octanejs/tanstack-hotkeys",
-        "title": "TanStack Hotkeys",
-        "tags": ["keyboard", "shortcuts"]
-      },
-      {
-        "packageName": "@octanejs/tanstack-pacer",
-        "title": "TanStack Pacer",
-        "tags": ["debounce", "throttle", "events"]
-      },
-      {
         "packageName": "@octanejs/usehooks-ts",
         "title": "usehooks-ts",
         "tags": ["hooks", "browser"]
