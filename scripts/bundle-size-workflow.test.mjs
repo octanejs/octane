@@ -1,6 +1,8 @@
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import { readFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { test } from 'node:test';
 
 const read = (file) => readFileSync(new URL(`../${file}`, import.meta.url), 'utf8');
@@ -16,6 +18,115 @@ function jobSource(name) {
 	const bodyStart = start + marker.length;
 	const next = ci.slice(bodyStart).search(/\n  [a-zA-Z][a-zA-Z0-9_]*:\n/);
 	return ci.slice(start, next === -1 ? undefined : bodyStart + next);
+}
+
+function runStep(workflow, name) {
+	const marker = `      - name: ${name}\n`;
+	const start = workflow.indexOf(marker);
+	assert.notEqual(start, -1, `missing ${name} step`);
+	const next = workflow.indexOf('\n      - name:', start + marker.length);
+	const step = workflow.slice(start, next === -1 ? undefined : next);
+	const script = step.match(/        run: \|\n((?:          .*\n|\n)*)/);
+	assert.ok(script, `missing shell script for ${name}`);
+	return script[1].replace(/^          /gm, '');
+}
+
+for (const [workflow, stepName, reportsHeadStatus] of [
+	['pr-bench', 'Benchmark bundle size', true],
+	['size-review', 'Measure bundles before and after', false],
+]) {
+	for (const [baseStatus, headStatus] of [
+		[0, 0],
+		[7, 0],
+		[0, 9],
+		[7, 9],
+	]) {
+		test(`${workflow} serializes bundle measurements and retains results when base=${baseStatus}, head=${headStatus}`, (t) => {
+			const directory = mkdtempSync(join(tmpdir(), 'octane-bundle-workflow-'));
+			t.after(() => rmSync(directory, { recursive: true, force: true }));
+			const output = join(directory, 'output');
+			writeFileSync(output, '');
+			const events = join(directory, 'events');
+			const lockModule = new URL('../benchmarks/lib/run-lock.mjs', import.meta.url).href;
+			const benchmark = `import { appendFileSync } from 'node:fs';
+import { basename } from 'node:path';
+import { acquireBenchmarkLock } from ${JSON.stringify(lockModule)};
+const side = basename(process.cwd());
+const record = (event) => appendFileSync(process.env.WORKFLOW_TEST_EVENTS, side + ':' + event + '\\n');
+record('start');
+const release = acquireBenchmarkLock(process.env.WORKFLOW_TEST_LOCK);
+try {
+  console.log(side + ' bundle measurement');
+  // Keep a real lock held while a competing shell command can start. This is
+  // controlled work, not a timing threshold or a benchmark measurement.
+  await new Promise(resolve => setTimeout(resolve, 100));
+  record('finish');
+  process.exitCode = Number(process.env[side === 'base' ? 'WORKFLOW_TEST_BASE_STATUS' : 'WORKFLOW_TEST_HEAD_STATUS']);
+} finally {
+  release();
+}
+`;
+			for (const side of ['base', 'head']) {
+				const benchmarks = join(directory, side, 'benchmarks');
+				mkdirSync(benchmarks, { recursive: true });
+				writeFileSync(join(benchmarks, 'bench.mjs'), benchmark);
+			}
+			const result = spawnSync(
+				'bash',
+				[
+					'--noprofile',
+					'--norc',
+					'-e',
+					'-o',
+					'pipefail',
+					'-c',
+					runStep(read(`.github/workflows/${workflow}.yml`), stepName),
+				],
+				{
+					cwd: join(directory, 'head'),
+					encoding: 'utf8',
+					timeout: 10_000,
+					env: {
+						...process.env,
+						BASE_TREE: join(directory, 'base'),
+						RESULTS: join(directory, 'results'),
+						GITHUB_OUTPUT: output,
+						WORKFLOW_TEST_EVENTS: events,
+						WORKFLOW_TEST_LOCK: join(directory, 'benchmark.lock'),
+						WORKFLOW_TEST_BASE_STATUS: String(baseStatus),
+						WORKFLOW_TEST_HEAD_STATUS: String(headStatus),
+					},
+				},
+			);
+			assert.equal(result.error, undefined);
+			assert.equal(result.status, 0, result.stderr);
+			assert.deepEqual(readFileSync(events, 'utf8').trim().split('\n'), [
+				'base:start',
+				'base:finish',
+				'head:start',
+				'head:finish',
+			]);
+			for (const side of ['base', 'head']) {
+				assert.match(
+					readFileSync(join(directory, 'results', `${side}-bytes.log`), 'utf8'),
+					new RegExp(`${side} bundle measurement`),
+				);
+				assert.ok(result.stdout.includes(`${side} bundle measurement`));
+			}
+			assert.equal(
+				result.stdout.includes('::warning::base bundle benchmarks failed'),
+				baseStatus !== 0,
+			);
+			if (reportsHeadStatus) {
+				assert.equal(readFileSync(output, 'utf8').trim(), `status=${headStatus}`);
+			} else {
+				assert.equal(
+					result.stdout.includes('::warning::head bundle benchmarks failed'),
+					headStatus !== 0,
+				);
+			}
+		});
+	}
 }
 
 test('runs bundle gates in a separate workflow without blocking runtime test execution', () => {

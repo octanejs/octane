@@ -68,7 +68,10 @@ try {
 				counts.useCallback >= expectedCallbacks,
 				`${lane}/${operation}: only ${counts.useCallback} runtime callbacks; expected at least ${expectedCallbacks}`,
 			);
-			ensure(counts.resolveSlot > 0, `${lane}/${operation}: no slot-resolution coverage`);
+			ensure(
+				counts.resolveSlot + counts.resolveCustomSlot > 0,
+				`${lane}/${operation}: no slot-resolution coverage`,
+			);
 			if (lane === 'callback-nested') {
 				ensure(counts.withSlot > 0, `${lane}/${operation}: no custom-hook composition coverage`);
 				ensure(counts[COMPOSED_SLOT_HELPER] > 0, `${lane}/${operation}: no composed-slot coverage`);

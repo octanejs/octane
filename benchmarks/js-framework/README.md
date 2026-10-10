@@ -118,10 +118,25 @@ Chrome timeline measurements.
 
 Output is a table of median + min millis per operation: `run`, `replace`,
 `add`, `update`, `select`, `swap`, `remove`, `runlots`, `select_lots`, `clear`.
+Local `select`, `swap`, and `select_lots` samples use the paired PR harness's
+bounded calibration to target about 20 ms per batch, followed by untimed
+per-operation warmup. Durations are divided by the number of committed clicks.
+This moves these short operations away from Chromium's 0.1 ms clock quantum.
+Selection alternates rows; swaps use an odd count so a no-op cannot pass the
+identity gate. Every click retains its adapter's synchronous or awaited commit.
+JSON includes `repeat` and `sampleMs` to expose the batch size and median duration.
+
+Only these reversible operations are batched locally. Repeating `remove` shrinks
+the table, and repeating `update` grows labels, so their work would depend on the
+target's calibrated batch size. They and the other operations retain single-click
+samples. The paired PR harness still shares its counts across base/head, keeping
+its existing protocol. Re-record local selection/swap timing baselines after this
+change; warm batch averages are a different measurement from isolated clicks.
+
 The harness uses `page.evaluate(el.click)` to fire clicks synchronously inside
 the page — avoids per-click CDP IPC overhead (~10ms each on Chromium) so the
 numbers reflect the renderer's wall time, not Playwright transport. Each timed
-click also verifies its DOM change immediately after its timer ends, before
+sample also verifies its DOM change immediately after its timer ends, before
 another scheduler turn can commit. Before warmup, each target receives the same
 seeded `Math.random` stream so generated label lengths and allocation patterns
 cannot drift between dialects.

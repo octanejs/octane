@@ -22,10 +22,11 @@ import { brotliCompressSync, constants as zlib, gzipSync } from 'node:zlib';
 import { build as buildEsbuild } from 'esbuild';
 import { createOctaneCompiler } from 'octane/compiler/bundler';
 import { octane } from 'octane/compiler/vite';
-import { build as buildVite } from 'vite';
+import { build as buildVite, parseAst } from 'vite';
 import { appComponent, clientEntry } from '../../packages/cli/src/commands/init/templates.js';
 import { verifyScenario } from './verify-reachability.mjs';
 import { selectMinimalScenarios } from './minimal-gates.mjs';
+import { resolveDeclarationRanges, retainedDeclarations } from './hydration-free-gates.mjs';
 
 const directory = path.dirname(fileURLToPath(import.meta.url));
 const repository = path.resolve(directory, '../..');
@@ -256,6 +257,25 @@ function verifyBindingSideEffectsInventory() {
 verifyBindingSideEffectsInventory();
 
 const selectedScenarios = selectMinimalScenarios(process.argv.slice(2), scenarios);
+// Existing semantic controls exercise synchronous and passive effect lifetimes.
+// Hidden maps measure retained implementation bodies even after inlining.
+const effectControls = {
+	'root-static-specialized': [],
+	'hooks-state': ['drainRegisteredMutationEffects', 'runRegisteredLayoutEffects'],
+	'binding-hooks': [
+		'drainRegisteredPassivePhase',
+		'drainRegisteredPassiveUnmounts',
+		'scheduleRegisteredPassiveFlush',
+	],
+};
+const effectDeclarations = Object.values(effectControls).flat();
+const effectRanges = selectedScenarios.some(({ id }) => Object.hasOwn(effectControls, id))
+	? resolveDeclarationRanges(
+			(source) => fs.readFileSync(path.join(repository, 'packages/octane/src', source), 'utf8'),
+			(text, source) => parseAst(text, { lang: 'ts' }, source),
+			effectDeclarations.map((name) => ({ name, source: 'runtime.ts' })),
+		)
+	: [];
 
 const payload = { suite: 'bundle-reachability', iterations: 1, targets: [] };
 
@@ -403,6 +423,7 @@ async function buildScenario(scenario, entry) {
 		build: {
 			write: false,
 			minify: 'oxc',
+			sourcemap: Object.hasOwn(effectControls, scenario.id) ? 'hidden' : false,
 			target: 'esnext',
 			lib: {
 				entry,
@@ -437,6 +458,9 @@ async function buildScenario(scenario, entry) {
 		id.endsWith('/packages/octane/src/runtime.server.ts'),
 	);
 	const streamModule = modules.find((id) => id.endsWith('/packages/octane/src/stream-protocol.ts'));
+	const hookPathModule = modules.find((id) =>
+		id.endsWith('/packages/octane/src/hook-slot-cache.ts'),
+	);
 	return {
 		code: chunk.code,
 		modules,
@@ -446,6 +470,8 @@ async function buildScenario(scenario, entry) {
 			? chunk.modules[serverRuntimeModule].renderedExports
 			: [],
 		streamExports: streamModule ? chunk.modules[streamModule].renderedExports : [],
+		hookPathExports: hookPathModule ? chunk.modules[hookPathModule].renderedExports : [],
+		effects: chunk.map ? retainedDeclarations(chunk.map, effectRanges) : null,
 	};
 }
 
@@ -461,7 +487,27 @@ try {
 			runtimeExports,
 			serverRuntimeExports = [],
 			streamExports = [],
+			hookPathExports = [],
+			effects,
 		} = await buildScenario(scenario, entry);
+		if (Object.hasOwn(effectControls, id)) {
+			assert.ok(effects, `${name}: missing effect reachability map`);
+			const required = effectControls[id];
+			assert.deepEqual(
+				required.length === 0
+					? effectDeclarations.filter((name) => effects.has(name))
+					: required.filter((name) => !effects.has(name)),
+				[],
+				`${name}: effect implementation must follow actual effect registration`,
+			);
+		}
+		if (id === 'hooks-state' || id === 'binding-hooks') {
+			assert.equal(
+				hookPathExports.includes('resolveHookPath'),
+				id === 'binding-hooks',
+				`${name}: only custom-hook calls should retain composed hook paths`,
+			);
+		}
 		for (const [label, pattern] of forbidden) {
 			if (serverScenario && label === 'server runtime') continue;
 			const leaked = modules.find((id) => pattern.test(id));

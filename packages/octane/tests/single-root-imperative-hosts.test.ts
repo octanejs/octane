@@ -304,13 +304,22 @@ const memoShapes: Record<string, Program> = {
 		app: list(`<Row id={row.id}/>`, `${memoRow} const Row = memo(RowImpl);`),
 	},
 	// The list reads its row's mark in the parent's scope, where `Row` is the
-	// one-element memo. Each row renders its own `Row` instead.
+	// module's one-element component. Each row renders its own `Row` instead.
 	'a same-module memo row shadowed by a row-local component': {
 		app: list(
 			`const Row = row.id % 2 ? Pair : RowImpl; <Row id={row.id}/>`,
 			`${memoRow} const Row = memo(RowImpl);
 			function Pair({id}) @{ <><p class="row">{String(id)}</p><b>{String(id)}</b></> }`,
 		),
+	},
+	'an imported one-element row shadowed by a row-local component': {
+		app: list(
+			`const Row = row.id % 2 ? Pair : RowImpl; <Row id={row.id}/>`,
+			`import { Row } from '${ROW_MODULE}';
+			function RowImpl({id}) @{ <p class="row">{String(id)}</p> }
+			function Pair({id}) @{ <><p class="row">{String(id)}</p><b>{String(id)}</b></> }`,
+		),
+		row: `export function Row({id}) @{ <p class="row">{String(id)}</p> }`,
 	},
 	'a two-element row carrying hoisted memo statics': {
 		app: list(`<Row id={row.id}/>`, `import { Row } from '${ROW_MODULE}';`),

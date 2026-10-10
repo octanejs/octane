@@ -891,6 +891,7 @@ export function octane(options = {}) {
 		);
 	}
 	let hmrEnabled = options.hmr;
+	let resolvedConfig;
 	let foldDevProfileGuards = false;
 	let specializeProductionRoots = false;
 	let specializeCssModuleConstants = false;
@@ -1025,6 +1026,7 @@ export function octane(options = {}) {
 		_descriptorPreflightAuthority: DESCRIPTOR_PREFLIGHT_AUTHORITY,
 		root: projectRoot,
 		exclude: options.exclude,
+		output: options.output,
 		profile: profileEnabled,
 		strong: options.strong,
 		knownAttributeSpreads: options.knownAttributeSpreads,
@@ -1050,6 +1052,7 @@ export function octane(options = {}) {
 			_descriptorPreflightAuthority: DESCRIPTOR_PREFLIGHT_AUTHORITY,
 			root: projectRoot,
 			exclude: options.exclude,
+			output: options.output,
 			profile: profileEnabled,
 			strong: options.strong,
 			knownAttributeSpreads: options.knownAttributeSpreads,
@@ -1222,6 +1225,10 @@ export function octane(options = {}) {
 			};
 		},
 		configResolved(config) {
+			resolvedConfig = config;
+			if (options.output === 'ts' && config.oxc === false) {
+				throw new Error("octane output: 'ts' requires Vite's OXC transform to be enabled.");
+			}
 			logger = config.logger ?? null;
 			// Re-resolve from the finalized command (ResolvedConfig.command) so a
 			// command-aware `'auto'` signal stays correct even if `config` ran
@@ -1374,69 +1381,7 @@ export function octane(options = {}) {
 					options.cssModuleConstants,
 					cssModuleProofState(this, environment),
 				);
-			const transformWithProof = (
-				proven,
-				descriptorProven = new Set(),
-				clientOnlyImports = [],
-				cssImports = null,
-				projectionImports = new Map(),
-			) => {
-				const propagatedExports = [...descriptorProven]
-					.filter((key) => key.startsWith('export\0'))
-					.map((key) => key.slice('export\0'.length));
-				// Mint this transform's one-use proof from the reusable receipt.
-				const descriptorExportsProof =
-					preflight.descriptorExportsReceipt === null
-						? null
-						: compiler._prepareDescriptorChildrenExports(
-								DESCRIPTOR_PREFLIGHT_AUTHORITY,
-								preflight.descriptorExportsReceipt,
-								code,
-								id,
-							);
-				const result = compiler.transform(code, id, {
-					...(descriptorExportsProof === null
-						? null
-						: { _descriptorChildrenExportsProof: descriptorExportsProof }),
-					environment,
-					...(typedTextEnabled ? { textTypeFacts: textFactsFor(code, id, environment) } : null),
-					hmr: !server && hmrEnabled ? 'vite' : false,
-					// DEV server transforms also carry SSR-only diagnostics. HMR itself
-					// remains client-only; an explicit `hmr: false` keeps both transforms
-					// on the production compiler path.
-					dev: !!hmrEnabled,
-					profile: !server && profileEnabled,
-					collectVoidComponentExports:
-						specializeProductionRoots && !server && !hmrEnabled && !profileEnabled,
-					...(clientOnlyImports.length > 0 ? { clientOnlyImports } : null),
-					...(proven?.size
-						? {
-								isVoidComponentImport: (request, imported) =>
-									proven.has(voidImportKey(request, imported)),
-							}
-						: {}),
-					...(projectionImports.size
-						? {
-								resolveDescriptorProjectionImport: (request, imported) =>
-									projectionImports.get(voidImportKey(request, imported)) ?? null,
-							}
-						: null),
-					...(descriptorProven.size
-						? {
-								isDescriptorChildrenImport: (request, imported) =>
-									descriptorProven.has(voidImportKey(request, imported)),
-							}
-						: {}),
-					...(cssImports === null
-						? null
-						: {
-								resolveCssModuleConstant: cssImports.resolve,
-								// A real class read must survive in each independently retained
-								// template. A global side-effect override would make styles from
-								// an unused exported component newly eager.
-								preserveCssModuleReferences: cssImports.requests,
-							}),
-				});
+			const finishTransform = (result, cssImports, propagatedExports) => {
 				if (result === null) {
 					options.__onIndependentWidgets?.(id, environment, [], false);
 					if (propagatedExports.length === 0 && preflight.projectionExports.length === 0)
@@ -1502,6 +1447,105 @@ export function octane(options = {}) {
 					map: result.map,
 					...(Object.keys(meta).length === 0 ? null : { meta }),
 				};
+			};
+
+			const transformWithProof = (
+				proven,
+				descriptorProven = new Set(),
+				clientOnlyImports = [],
+				cssImports = null,
+				projectionImports = new Map(),
+			) => {
+				const propagatedExports = [...descriptorProven]
+					.filter((key) => key.startsWith('export\0'))
+					.map((key) => key.slice('export\0'.length));
+				// Mint this transform's one-use proof from the reusable receipt.
+				const descriptorExportsProof =
+					preflight.descriptorExportsReceipt === null
+						? null
+						: compiler._prepareDescriptorChildrenExports(
+								DESCRIPTOR_PREFLIGHT_AUTHORITY,
+								preflight.descriptorExportsReceipt,
+								code,
+								id,
+							);
+				const result = compiler.transform(code, id, {
+					...(descriptorExportsProof === null
+						? null
+						: { _descriptorChildrenExportsProof: descriptorExportsProof }),
+					environment,
+					...(typedTextEnabled ? { textTypeFacts: textFactsFor(code, id, environment) } : null),
+					hmr: !server && hmrEnabled ? 'vite' : false,
+					// DEV server transforms also carry SSR-only diagnostics. HMR itself
+					// remains client-only; an explicit `hmr: false` keeps both transforms
+					// on the production compiler path.
+					dev: !!hmrEnabled,
+					profile: !server && profileEnabled,
+					collectVoidComponentExports:
+						specializeProductionRoots && !server && !hmrEnabled && !profileEnabled,
+					...(clientOnlyImports.length > 0 ? { clientOnlyImports } : null),
+					...(proven?.size
+						? {
+								isVoidComponentImport: (request, imported) =>
+									proven.has(voidImportKey(request, imported)),
+							}
+						: {}),
+					...(projectionImports.size
+						? {
+								resolveDescriptorProjectionImport: (request, imported) =>
+									projectionImports.get(voidImportKey(request, imported)) ?? null,
+							}
+						: null),
+					...(descriptorProven.size
+						? {
+								isDescriptorChildrenImport: (request, imported) =>
+									descriptorProven.has(voidImportKey(request, imported)),
+							}
+						: {}),
+					...(cssImports === null
+						? null
+						: {
+								resolveCssModuleConstant: cssImports.resolve,
+								// A real class read must survive in each independently retained
+								// template. A global side-effect override would make styles from
+								// an unused exported component newly eager.
+								preserveCssModuleReferences: cssImports.requests,
+							}),
+				});
+				if (result?.lang === 'ts') {
+					// Vite owns this downstream compiler and map composition. Keep it
+					// lazy so ordinary JS compilation and browser imports do not load Vite.
+					const oxc = this.environment?.config?.oxc ?? resolvedConfig?.oxc ?? {};
+					if (oxc === false) {
+						throw new Error("octane output: 'ts' requires Vite's OXC transform to be enabled.");
+					}
+					const {
+						include,
+						exclude,
+						jsxInject,
+						jsxRefreshInclude,
+						jsxRefreshExclude,
+						...transformOptions
+					} = oxc;
+					return import('vite')
+						.then(({ transformWithOxc }) =>
+							transformWithOxc(
+								result.code,
+								cleanModuleId(id),
+								{ ...transformOptions, lang: 'ts', sourcemap: true },
+								result.map,
+								resolvedConfig,
+							),
+						)
+						.then((emitted) =>
+							finishTransform(
+								{ ...result, code: emitted.code, map: emitted.map },
+								cssImports,
+								propagatedExports,
+							),
+						);
+				}
+				return finishTransform(result, cssImports, propagatedExports);
 			};
 
 			if (server) {

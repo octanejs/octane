@@ -56,6 +56,102 @@ octane({
 HMR must be disabled for this target. Registry selection is a compiler facility,
 not a native application build, packaging, or deployment integration.
 
+## TypeScript output
+
+Direct compiler integrations and `createOctaneCompiler` from
+`octane/compiler/bundler` can set `output: 'ts'` alongside the Valdi renderer
+and `hmr: false`. Both `.tsrx` components and plain `.ts` custom-hook modules then
+produce TypeScript, with `result.lang === 'ts'`. The output contains writer calls,
+not JSX. The default remains `output: 'js'`. The same option also supports
+[web DOM and SSR output](./compiler-typescript-output.md); universal-renderer
+TypeScript output is not yet supported. Valdi's existing client-only, HMR, and
+syntax restrictions still apply.
+
+TypeScript output retains interfaces, type aliases, type-only imports and exports,
+annotations, type arguments, assertions, `satisfies`, non-null assertions, enums,
+namespaces, ambient declarations, and parameter properties. The downstream
+TypeScript compiler owns their erasure and runtime lowering. This mode is intended
+for typed build pipelines such as Valdi's; bundler integrations still emit
+JavaScript by default.
+
+Leading comments on retained declarations, statements, and members are preserved,
+including Valdi's JSDoc annotations. Leading component comments follow the generated
+component declaration. Comments inside lowered templates, expression comments,
+and trailing comments are not preserved. TypeScript output omits generated
+indentation so that multiline annotation blocks keep their authored text even
+inside nested scopes. Writer component bodies return `void`;
+their authored JSX return annotation is replaced by that inferred writer result.
+Props annotations, generic parameters, and explicit component-binding types remain.
+
+The adapter must provide typed declarations for generated calls. In particular,
+`defineValdiComponent` must carry the render function's props type through to its
+returned descriptor, and slot-taking hooks must preserve their generic state and
+callback types. Compiler tests and the public Workspace integration check against
+the [published declaration contract](#published-adapter-types), including consumer
+prop errors. A native renderer and its lifecycle remain the adapter's responsibility.
+
+The returned source map has one source, the authored `.tsrx` or `.ts` file, and
+includes its source content. Keep it alongside the generated code until the
+downstream emit; TypeScript does not automatically compose input source maps.
+
+### Valdi Workspace handoff
+
+The [public Valdi companion](https://github.com/Snapchat/Valdi/blob/3ed77a5ace883991e51169168ccf3e68a7c68599/compiler/companion/src/Workspace.ts)
+accepts generated TypeScript through `registerInMemoryFile`. Its constructor
+takes ordinary TypeScript compiler options, rather than a source-transform or
+input-map callback. Use `createOctaneCompiler({ output: 'ts', hmr: false,
+renderers: ... })` with the same renderer selection for components and their
+plain TypeScript hook modules.
+
+Register each `.tsrx` result under an absolute virtual filename ending in
+`.tsrx.ts`; register plain `.ts` helpers under their original filename. This lets
+an unchanged `./Widget.tsrx` import resolve through TypeScript's normal lookup.
+Open the registered files, then use `doEmitFile(filename, cancellationToken,
+customTransformers)` or `emitFile(filename)`. The former retains the caller's
+TypeScript transformers alongside Valdi's defaults. Re-registering changed
+content invalidates Valdi's source-file snapshot; invalidate the corresponding
+authored path in the Octane compiler as well.
+
+For source maps, enable `inlineSourceMap` and `inlineSources` in the Workspace
+options and pass **map-free `result.code`** to `registerInMemoryFile`. TypeScript
+5.3.3 copies an incoming inline-map comment before appending its own, while
+Valdi's `SourceMapUtils` reads the first comment. Feeding an inline Octane map
+into this emit therefore selects the wrong downstream map.
+
+After emission, create a separate inline-map carrier from `result.code` and
+`result.map`, and pass that carrier and the emitted JavaScript to the companion's
+`SourceMapUtils.mergeSourceMaps`. Normalize the prior map to an absolute authored
+`sources[0]` and an empty `sourceRoot`; this keeps files with the same basename
+distinct and avoids dependence on the downstream root. The composed map must
+retain the original `sourcesContent`, and the final JavaScript must have one
+source-map comment. The carrier is composition data, not the Workspace input.
+
+The executable recipe is
+[`scripts/test-valdi-typescript-build.mjs`](../scripts/test-valdi-typescript-build.mjs).
+It uses the unmodified public companion at the revision linked above, rather
+than a consumer's patched compiler:
+
+```bash
+node scripts/prepare-valdi-companion.mjs "$HOME/.cache/octane/valdi-companion-3ed77a5"
+OCTANE_VALDI_COMPANION_DIR="$HOME/.cache/octane/valdi-companion-3ed77a5" \
+  node scripts/test-valdi-typescript-build.mjs
+```
+
+Setup keeps the SDK outside the checkout, verifies immutable public source and
+license hashes, and installs three exact dependencies with npm integrity checks
+and lifecycle scripts disabled. A missing or mismatched SDK fails the integration
+check; it never silently skips. The companion's `valdi-compiler-js` package is
+not published to npm at this pin, so setup builds its Workspace dependency
+closure from public source.
+
+The check covers the real TypeScript program emit, default and supplied host
+transformers, declarations/native-model annotations, plain hook import routing,
+unchanged cross-file imports, repeated edits, same-basename source identity,
+and composed error locations. It executes the result with the existing synthetic
+writer recorder. This establishes a build handoff; Swift/native packaging,
+native lifecycle behavior, and a published adapter implementation remain separate acceptance
+steps.
+
 ## Adapter contract
 
 `VALDI_COMPILER_ABI_VERSION`, exported by `octane/compiler`, identifies the
@@ -64,6 +160,66 @@ generated contract. Its initial value is `1`. Each generated module calls
 components. An adapter must reject incompatible versions before any of that
 work happens. Include the compiler version, ABI version, and renderer
 configuration in persistent compilation cache keys.
+
+### Published adapter types
+
+Import `ValdiAdapter`, `ValdiWriter`, and `ValdiHookSlot` from the declaration-only
+`octane/compiler/valdi` entry. It has no runtime export or DOM/Node ambient-type
+dependency and also resolves with Valdi's TypeScript 5.3.3 Node10 resolver. The
+same types are re-exported from `octane/compiler` for modern compiler consumers.
+
+`ValdiAdapter<Prototype, Constructor, Key>` describes the module exports below;
+`ValdiWriter<Prototype, Constructor, Key>` describes its `jsx` facade. Supply
+your adapter's own opaque representations: no prototype fields, constructor
+layout, or string key encoding is prescribed. For example, an adapter's
+declaration module can derive its public exports without copying signatures:
+
+```ts
+import type { ValdiAdapter } from 'octane/compiler/valdi';
+import type { NativePrototype, NativeConstructor, NativeKey } from './native-types';
+
+type Adapter = ValdiAdapter<NativePrototype, NativeConstructor, NativeKey>;
+export declare const jsx: Adapter['jsx'];
+export declare const defineValdiComponent: Adapter['defineValdiComponent'];
+export declare const getValdiComponentConstructor: Adapter['getValdiComponentConstructor'];
+export declare const useState: Adapter['useState'];
+export declare const __useStateWithGetter: Adapter['__useStateWithGetter'];
+```
+
+Derive the other exports the same way. For a TypeScript implementation, use
+`satisfies ValdiAdapter<...>` on an object containing the module's named exports to check compatibility
+while retaining its concrete types. A restricted implementation can check only
+the exports it supports with `Pick<ValdiAdapter<...>, ...>`; it must reject source
+or renderer configurations requiring omitted exports.
+
+The typed component contract preserves the render function's complete callable
+type (`F` to `F`), including generic parameters and overloads. This lets generated
+component bindings retain their authored props API. It does not describe an
+arbitrary non-callable descriptor representation. The compiler still consumes
+registered components only through `getValdiComponentConstructor`; the adapter
+owns the implementation and lifecycle. Preserving an overloaded callable passed
+to registration does not add support for lowering overloaded component declarations.
+
+`appendText` and `renderText` are optional on the baseline writer. They must be
+present for the renderer capabilities described below. Using `satisfies` retains
+implemented methods as required; an explicit declaration for a writer implementing
+both can use `Required<Adapter['jsx']>`. Host refs use the existing generic attribute
+methods and do not introduce a separate writer method.
+
+These are compiler-facing hook signatures. Numeric/symbol slots trail the authored
+arguments; `withSlot` provides the slot path when a spread call cannot append one.
+The base `useState` contract requires a value/setter pair, while
+`__useStateWithGetter` requires the third getter when the compiler can observe it.
+Adapters may return a third member from the base call too. Omitted initializers
+retain `undefined`, including compiler-padded and tuple-spread calls. `__methodDep`
+returns an opaque dependency identity, which can be a receiver, member value, or
+sentinel. Continue checking authored source with `octane-tsc`; stateful writer
+setters do not independently validate all props for the current component.
+
+Publication is checked against the actual Octane tarball with strict Bundler,
+NodeNext, and Node10 consumers using only the ES2020 library. The executable
+Workspace handoff above uses these same declarations. Neither check implements
+or validates a native renderer.
 
 The following exports are required when used by a compiled module:
 
@@ -118,6 +274,34 @@ after the selected adapter implements the corresponding contract.
   getter evaluated once. The host owns ref attachment, replacement, and cleanup.
   Component refs and `children` props remain unsupported.
 
+### Authored text sites and supported hosts
+
+An adapter that needs identity for each authored text site may opt into
+`text: 'host'` plus `capabilities: ['host-text-site']`. It must accept compiler
+ABI 3 and implement `jsx.renderText(prototype, value, key)`. The compiler
+creates one opaque `jsx.makeNodePrototype('#text')` per authored text site.
+`key` carries the same ordered keyed-loop path as an element; outside a loop
+it is `undefined` and the prototype identifies the site within its parent.
+The adapter owns identity, updates, cleanup, and validation of the value.
+It must accept primitive strings/numbers, ignore nullish and boolean values,
+and reject other non-array values. Arrays of text values arrive unchanged as
+one authored site; the adapter owns how their contents are written. Scalar
+conditionals keep one site across branch changes. In an array literal that
+contains JSX, each distinct JSX/text site is emitted in authored order.
+
+This option allows a text-only root as well as text beneath an open host.
+Adapters that only implement ABI 1 or 2 are rejected before prototypes are
+created; append-only text retains its ABI 2 contract when this capability is
+omitted. `'host-text-site'` is invalid unless `text` is `'host'`.
+
+To restrict the authored intrinsic vocabulary, set
+`validation: { allowedTags: ['frame', 'badge', 'text-box'] }` on a renderer.
+Only lower-case intrinsic host names are checked, before prototypes are
+created. Component names are unaffected; their implementations are checked
+normally. An omitted list allows every otherwise-supported tag, while an
+empty list allows no authored host tags. This composes with `textParents`,
+`textHosts` and `hostProps`; it never overrides other target restrictions.
+
 Editor integrations can already use `compileToVolarMappings` with
 `options.renderers` and the renderer's `intrinsics` module. Use the same
 default/rules as build-time compilation. The adapter is never executed during
@@ -143,11 +327,11 @@ See [Octane's hook semantics](./differences-from-react.md) for the observable
 state and dependency behavior.
 
 Custom hooks that import Octane hooks must pass through the same full compiler
-with the same Valdi renderer, for example in a `.tsrx` module or a direct
-`compile()` call. The bundler's lighter plain `.ts`/`.js` hook-slot pass does
-not reroute those imports to the adapter. Such helpers need explicit adapter
-imports or application-owned module resolution; selecting the target for a
-component alone does not adapt its entire dependency graph.
+with the same Valdi renderer. The bundler-neutral `output: 'ts'` path does this
+for plain `.ts` helpers as well as `.tsrx` components. Cover both with the
+renderer registry's default or rules. The default JavaScript path's lighter
+plain-module hook-slot pass does not reroute those imports; selecting the target
+for a component alone does not adapt that dependency graph.
 
 ## Attribute type facts
 
@@ -186,14 +370,15 @@ contract.
 Unsupported constructs fail with diagnostics rather than falling back to DOM
 code. These include server rendering/hydration, HMR, Octane profiling,
 cross-renderer boundaries, dynamic or namespace component tags, component
-children/render props, authored `ref`/`children` props, `@try`, `@switch`, and
-`style`/`slot`/`slotted` elements. Spread `ref`/`children` values are checked at
+children/render props and refs, authored host `children` props, `@try`, `@switch`, and
+`style`/`slot`/`slotted` elements. Host refs require the `host-ref` capability;
+component refs remain unsupported. Spread `ref`/`children` values are checked at
 execution time. Unkeyed or asynchronous template loops and slot-keyed hooks
 directly inside loops are rejected; put hooks in a keyed child component.
 
 Raw text is rejected by default. Use a host attribute such as a label's value,
-or explicitly choose `text: 'ignore'` to discard raw text. `text: 'host'` is not
-supported.
+or explicitly choose `text: 'ignore'` to discard raw text. `text: 'host'` requires
+the corresponding ABI 2 or 3 writer capabilities described above.
 
 Tests execute generated modules against a small synthetic writer recorder and
 check diagnostics, source maps, compiler selection, and neighboring targets.

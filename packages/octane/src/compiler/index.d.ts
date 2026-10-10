@@ -2,6 +2,7 @@ import type { CodeInformation, Mapping } from '@volar/language-core';
 import type { TextTypeFacts } from './typescript.js';
 
 export type { TextTypeFacts } from './typescript.js';
+export type { ValdiAdapter, ValdiHookSlot, ValdiWriter } from './valdi.js';
 
 export interface CompileRenderer {
 	id: string;
@@ -74,6 +75,8 @@ export interface KnownAttributeSpread {
 }
 
 export interface CompileOptions {
+	/** Preserve TypeScript syntax and declaration comments for DOM/SSR and Valdi. */
+	output?: 'js' | 'ts';
 	mode?: 'client' | 'server';
 	hmr?: boolean | 'vite' | 'webpack';
 	dev?: boolean;
@@ -260,6 +263,8 @@ export interface CompileInspection {
 
 export interface CompileResult {
 	code: string;
+	/** Present for output: 'ts'. Templates are lowered; no JSX remains. */
+	lang?: 'ts';
 	map: CompileSourceMap;
 	diagnostics: readonly CompileDiagnostic[];
 	inspect?: CompileInspection;
@@ -274,7 +279,7 @@ export interface CompileResult {
 	};
 }
 
-/** Compile authored TSRX/JSX to Octane client or server JavaScript. */
+/** Compile authored TSRX/JSX to JavaScript, or TypeScript for DOM/SSR and Valdi. */
 export function compile(
 	source: string,
 	filename: string,
@@ -294,13 +299,18 @@ export function collectDiagnostics(
 	options?: CompileOptions,
 ): { diagnostics: CompileDiagnostic[]; error: unknown };
 
-/** Produce typed virtual TSX and authored-source mappings for language tooling. */
+/**
+ * Produce typed virtual TSX and authored-source mappings for language tooling.
+ * `intrinsics` selects its JSX type namespace independently of the runtime
+ * renderer and any authored pragma.
+ */
 export function compileToVolarMappings(
 	source: string,
 	filename?: string,
 	options?: {
 		loose?: boolean;
 		renderers?: unknown;
+		intrinsics?: string;
 		strong?: boolean;
 		knownAttributeSpreads?: readonly KnownAttributeSpread[];
 	},

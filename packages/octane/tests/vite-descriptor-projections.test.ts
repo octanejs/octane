@@ -57,7 +57,11 @@ export function run() {
 }`,
 };
 
-async function consume(plugins: Plugin[] = [], overrides: Record<string, string> = {}) {
+async function consume(
+	plugins: Plugin[] = [],
+	overrides: Record<string, string> = {},
+	compilerOutput?: 'ts',
+) {
 	const root = realpathSync(mkdtempSync(join(tmpdir(), 'octane-descriptor-adapter-')));
 	roots.push(root);
 	mkdirSync(join(root, 'node_modules'));
@@ -74,7 +78,7 @@ async function consume(plugins: Plugin[] = [], overrides: Record<string, string>
 		logLevel: 'silent',
 		define: { 'process.env.NODE_ENV': JSON.stringify('production') },
 		plugins: [
-			octane({ hmr: false }),
+			octane({ hmr: false, output: compilerOutput }),
 			...plugins,
 			{
 				name: 'capture-descriptor-output',
@@ -120,11 +124,17 @@ const hasProjection = (compiled: Record<string, string>) =>
 // These execute the final transformed graph: source-only metadata cannot prove
 // the function or imports that a later plugin leaves in the bundle.
 describe('Vite imported descriptor projection proofs', { timeout: 30_000 }, () => {
-	it('preserves ordinary helper calls, keyed state and current event props', async () => {
-		const { compiled, behavior } = await consume();
-		expect(hasProjection(compiled)).toBe(true);
-		expect(behavior).toEqual(expected());
-	});
+	it.each([
+		['default JavaScript', undefined],
+		['TypeScript', 'ts'],
+	] as const)(
+		'preserves ordinary helper calls, keyed state and current event props (%s output)',
+		async (_label, output) => {
+			const { compiled, behavior } = await consume([], {}, output);
+			expect(hasProjection(compiled)).toBe(true);
+			expect(behavior).toEqual(expected());
+		},
+	);
 
 	it('declines a later transform that changes a still-projectable helper', async () => {
 		const { compiled, behavior } = await consume([

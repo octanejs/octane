@@ -13,6 +13,7 @@ export {
 	unref,
 	triggerRef,
 	computed,
+	withKeys,
 	nextTick,
 	toDisplayString,
 	onMounted,

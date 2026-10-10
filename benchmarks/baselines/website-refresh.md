@@ -1,4 +1,4 @@
-# Website benchmark refresh — Octane 0.12.0, 9 October 2026
+# Website benchmark refresh — peer updates, 9 October 2026
 
 The website imports 29 records from `local/`. This snapshot measures every
 published suite with its normal sample count and complete framework matrix.
@@ -7,28 +7,42 @@ The homepage's 20 summary rows and bundle-size ranges are recomputed with
 
 ## Source and environment
 
-- Octane 0.12.0 release source:
-  [`961638e3c41dce5020560b56fa5e084b4257e33e`](https://github.com/octanejs/octane/commit/961638e3c41dce5020560b56fa5e084b4257e33e).
-  npm's `latest` tag was verified as 0.12.0 before recording.
-- [Measurement run](https://github.com/octanejs/octane/actions/runs/37902746685),
-  9 October 2026, 08:05–08:49 UTC, at
-  [`f7de4535041c607c0766756e3dafd2a472c52323`](https://github.com/octanejs/octane/commit/f7de4535041c607c0766756e3dafd2a472c52323).
-  This revision differs from the release only in the benchmark workflow and its
-  documentation; packages, fixtures, harnesses, lockfile, and guards are identical.
-- Blacksmith `blacksmith-4vcpu-ubuntu-2404` runner: AMD EPYC, four vCPUs,
-  Linux 6.6.141, x64.
+- Measured revision:
+  [`969428fcce3a7b33294cfc03a34a94c204805e76`](https://github.com/octanejs/octane/commit/969428fcce3a7b33294cfc03a34a94c204805e76).
+  This uses Octane main at `7bb02657b4918469a959a451016454291d5db4af`
+  (package version 0.12.1), plus the Svelte, Solid and Vue dependency updates
+  in [PR #1954](https://github.com/octanejs/octane/pull/1954). It does not
+  measure subsequent changes to main or the published Octane release.
+- [First measurement run](https://github.com/octanejs/octane/actions/runs/37995046442):
+  the first 21 suites in the reproduction list, through `streaming-ssr`.
+  These records completed on 9 October 2026, 21:43–22:18 UTC.
+- [Remaining measurement run](https://github.com/octanejs/octane/actions/runs/37999134761):
+  the final eight suites, from `ssr-throughput` through `lynx-table-web`,
+  on 9 October 2026, 22:27–22:38 UTC, at the identical source revision and
+  normal sample counts.
+- Both Blacksmith `blacksmith-4vcpu-ubuntu-2404` runners report AMD EPYC,
+  four vCPUs, Linux 6.6.141, x64.
 - Node 24.19.0, pnpm 12.9.1, Playwright 1.61.1, Chromium 149.0.7827.55,
   Vite 8.1.5.
 - Frozen repository lockfile: React 19.2.7 with React Compiler 1.0.0,
-  Preact 10.29.8, Solid 2.0.0-beta.20, Svelte 5.56.7, Ripple 0.4.0,
-  Vue 3.6.0-rc.1, and Inferno 9.1.0.
+  Preact 10.29.8, Solid 2.0.0-rc.14, Svelte 5.57.2, Ripple 0.4.0,
+  Vue 3.6.0-rc.10, and Inferno 9.1.0. Solid uses
+  `@solidjs/vite-plugin` 3.0.0-next.49 and the matching compiler/Babel
+  plugin at 2.0.0-rc.14. Vue Vapor uses the matching runtime and compiler
+  packages at 3.6.0-rc.10.
 
-Suites ran sequentially in one CI job. Framework comparisons use targets from
-the same suite invocation. The previous snapshot used an Apple M5 Max on macOS;
-these absolute timings must not be compared with it as evidence of a release
-speedup. Hardware, operating system, and some harness methodology have changed
-since that snapshot. The current source and normal sampling configuration are
-recorded here so those changes stay visible.
+Suites ran sequentially within each CI job. The first job was interrupted
+during SSR throughput after a stale live-log display was mistaken for a stall;
+the downloaded log confirmed that it was progressing. Its 21 completed records
+are retained, and the remaining eight suites ran in the second job. No partial
+SSR throughput measurements or diagnostic repeat timings are used.
+
+Every framework comparison uses targets from the same complete suite
+invocation. These are separate runs with potentially different runner state,
+including from the previous snapshot. Absolute timing differences between
+snapshots do not establish a framework or dependency speedup. The source,
+toolchain, and normal sampling configuration are recorded here so the results
+can be reproduced.
 
 ## Reproduction
 
@@ -47,34 +61,37 @@ node benchmarks/bench.mjs --record \
   three-renderer three-bundle-size lynx-table lynx-table-web
 ```
 
-CI used the same suite list with `--ratios` instead of `--record`, selected by
-the Bench workflow's `full: true` input. The 29 suite JSON files were imported
-from its `bench-results` artifact and formatted without changing their values.
-The artifact's `environment.json` supplies the environment above. No quick-run
-results are substituted, and no guard thresholds are changed.
+CI used the same suite list, split as described above, with `--ratios` instead
+of `--record`, selected by the Bench workflow's `full: true` input. The 29 suite
+JSON files were imported from the two `bench-results` artifacts and formatted
+without changing their values. The artifacts' `environment.json` files supply
+the environment above. No quick-run results are substituted, and no guard
+thresholds are changed.
 
 ## Validation and guard observations
 
 All 29 harnesses exited successfully. The records contain 232 targets and 3,092
-operations, with finite scores and no failed harnesses. No operation from the
-previous checked-in records is removed. The current harness adds two memo-wall
-work counters and 20 SVG-dashboard work counters.
+operations, with finite scores and no failed harnesses. The target and operation
+inventory and normal sample counts are unchanged from the previous snapshot.
 
-Of 169 applicable ratio guards, 162 pass and seven bundle-size guards breach:
+Of 169 applicable ratio guards, 164 are within their limits. All bundle-size
+guards pass. Four timing guards breach, and one further timing breach has an
+existing waiver:
 
-| Gzip metric | Octane TSRX / reference | Observed ratio | Maximum |
-| --- | --- | ---: | ---: |
-| Rows total | Ripple | 2.53113 | 2.51 |
-| Rows total | Solid | 2.52752 | 2.50 |
-| Rows total | Svelte | 2.44207 | 2.42 |
-| TodoMVC total | Svelte | 2.63061 | 2.58 |
-| Chat total | Svelte | 2.51165 | 2.46 |
-| Weather total | React | 0.76917 | 0.76 |
-| Weather framework | React | 0.73489 | 0.72 |
+| Suite / operation | Target / reference | Observed ratio | Maximum | Status |
+| --- | --- | ---: | ---: | --- |
+| js-framework-reorder / rotateb | Octane TSRX / React | 0.60286 | 0.60 | Existing waiver through 24 October |
+| tanstack-start / warm_seq_request_home | Octane minimal / React | 3.89025 | 3.50 | Breach |
+| svg-dashboard / select_toggle | Octane TSRX / Solid | 1.03210 | 0.90 | Breach |
+| uibench / tree/[2,2,2,2,2,2,2,2,2,2]/render | Octane TSRX / React | 2.08455 | 1.90 | Breach |
+| uibench / tree/[2,2,2,2,2,2,2,2,2,2]/render | Octane TSRX / Preact | 1.90704 | 1.90 | Breach |
 
-These breaches measure the unchanged published release and frozen lockfile;
-refreshing website data does not change the measured bundles. They need a
-separate bundle-size investigation or an explicitly justified guard update.
-The measurement workflow therefore finishes with a failed ratio verdict, and
-this snapshot must not be described as passing `--ratios`. Its correctness
-checks and every other applicable ratio guard pass.
+The first workflow was cancelled after its 21 complete records; auditing those
+records gives three unwaived breaches and the existing waiver. The remaining
+workflow finishes with a failed ratio verdict because of the TanStack Start
+breach. The combined snapshot must not be described as passing `--ratios`.
+These observations are retained with the normal-sample records and need
+reproduction and attribution before any runtime fix or guard change. The deep
+UIbench tree also breached against React in the preceding snapshot. This data
+refresh changes neither the measured source nor the guards. Correctness checks
+passed for every suite.

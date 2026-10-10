@@ -654,7 +654,15 @@ function createLexicalScope(parent, isFunction = false) {
 	return scope;
 }
 
+// Rewrites are copy-on-write, so an analysis depends only on its root node.
+// A pass that leaves the module unchanged hands the next pass the same root,
+// which reuses this analysis instead of walking the module again. Callers
+// share the result, so it is frozen; copy it to attach pass-local state.
+const lexicalAnalyses = new WeakMap();
+
 export function createLexicalAnalysis(ast) {
+	let analysis = lexicalAnalyses.get(ast);
+	if (analysis !== undefined) return analysis;
 	const bindingNodes = new WeakSet();
 	const nonReferenceNodes = new WeakSet();
 	const nodeScopes = new WeakMap();
@@ -908,7 +916,7 @@ export function createLexicalAnalysis(ast) {
 		return null;
 	};
 	const isBound = (scope, name) => resolveBinding(scope, name) !== null;
-	return {
+	analysis = Object.freeze({
 		bindingNodes,
 		commonJsSource,
 		nonReferenceNodes,
@@ -916,7 +924,9 @@ export function createLexicalAnalysis(ast) {
 		rootScope,
 		isBound,
 		resolveBinding,
-	};
+	});
+	lexicalAnalyses.set(ast, analysis);
+	return analysis;
 }
 
 export function isIdentifierReference(node, parent, key, lexicalAnalysis) {
@@ -1721,10 +1731,12 @@ function isStaticallyPrimitiveTextExpression(node) {
 }
 
 function validateHostTemplates(ast, state, validation, isAuthored) {
+	const allowedTags = validation.allowedTags === undefined ? null : new Set(validation.allowedTags);
 	const textParents = validation.textParents === undefined ? null : new Set(validation.textParents);
 	const textHosts = validation.textHosts === undefined ? null : new Set(validation.textHosts);
 	const hostProps = validation.hostProps;
-	if (textParents === null && textHosts === null && hostProps === undefined) return;
+	if (allowedTags === null && textParents === null && textHosts === null && hostProps === undefined)
+		return;
 	const sharedProps = hostProps?.['*'] ?? [];
 	const seen = new WeakSet();
 	const visit = (node, nearestHost = null) => {
@@ -1775,6 +1787,13 @@ function validateHostTemplates(ast, state, validation, isAuthored) {
 			// the caller's nearest host through that semantic boundary; the component
 			// body is validated independently at the host site it actually authors.
 			const nextHost = isHost ? name : null;
+			if (isHost && allowedTags !== null && !allowedTags.has(name) && isAuthored(node)) {
+				throw universalError(
+					state.filename,
+					node,
+					`renderer ${JSON.stringify(state.renderer.id)} does not allow <${name}>.`,
+				);
+			}
 			if (
 				isHost &&
 				textHosts !== null &&

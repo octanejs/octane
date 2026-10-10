@@ -733,6 +733,17 @@ jobs:
           packages/octane-evals/tests/user-app-corpus.test.ts
           --maxWorkers=1
 
+      - name: Prepare pinned public Valdi compiler
+        id: prepare_valdi_companion
+        if: ${{ !cancelled() && steps.install_heavy_node_dependencies.outcome == 'success' }}
+        run: node scripts/prepare-valdi-companion.mjs "$RUNNER_TEMP/octane-valdi-sdk"
+
+      - name: Run real Valdi TypeScript build integration
+        if: ${{ !cancelled() && steps.prepare_valdi_companion.outcome == 'success' }}
+        env:
+          OCTANE_VALDI_COMPANION_DIR: ${{ runner.temp }}/octane-valdi-sdk
+        run: node scripts/test-valdi-typescript-build.mjs
+
       - name: Run runtime-loader integration tests
         if: ${{ !cancelled() && steps.install_heavy_node_dependencies.outcome == 'success' }}
         run: >-

@@ -170,18 +170,32 @@ const after = profiler.snapshot();
 console.table(profiler.diff(before, after).counters);
 ```
 
-| Counter                                                | Counts                                                                        |
-| ------------------------------------------------------ | ----------------------------------------------------------------------------- |
-| `component.render`                                     | Component body invocations, including attempts that suspend, throw, or replay |
-| `component.renderSuspended`, `component.renderErrored` | Attempts that ended by suspending or throwing, for every component unwound    |
-| `component.bailout`                                    | Memo and implicit bailouts that skipped a body                                |
-| `block.create`, `block.unmount`                        | Render Blocks allocated and torn down                                         |
-| `arm.keep`, `arm.swap`                                 | `@if`/`@switch` evaluations that re-rendered or replaced the current arm      |
-| `boundary.fallback`, `boundary.catch`                  | Boundaries switching to their fallback or catch arm                           |
-| `scheduler.drain`                                      | Passes over the render queue                                                  |
-| `commit.root`, `rollback.root`                         | Root render attempts committed, and rolled back                               |
-| `rollback.journalEntries`                              | Recorded writes, created Blocks, and rendered Blocks undone by rollbacks      |
-| `rollback.capture`                                     | Speculative renders whose effects, refs, and bindings were dropped            |
+| Counter                                                                       | Unit                                                                                                                          |
+| ----------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------- |
+| `component.render`, `component.renderSuspended`, `component.renderErrored`    | Body invocations, and the subset unwound by suspension or error                                                               |
+| `component.bailout`, `component.renderPhaseReplay`                            | Skipped bodies, and retries after a render-phase update                                                                       |
+| `block.create`, `block.unmount`                                               | Full render Blocks allocated and torn down                                                                                    |
+| `block.lite.mount`, `block.lite.fallback`                                     | Lite component scopes allocated, and calls delegated to the full component path                                               |
+| `block.deopt`, `block.cacheHit`                                               | Descriptor reconciliations, and compiler regions skipped by their dependency cache                                            |
+| `arm.keep`, `arm.swap`, `arm.swapOffscreen`                                   | Existing arms rerendered, replaced, and replacements prepared offscreen; first mounts are not swaps                           |
+| `for.skip`                                                                    | List dependency-cache hits that enable survivor skips; the list can still reconcile                                           |
+| `for.empty.mount`, `for.empty.unmount`                                        | Empty arms created or removed by list evaluations                                                                             |
+| `list.reconcile`, `list.insert`, `list.remove`, `list.update`                 | Keyed diff passes (excluding direct first fills), row mount attempts, rows removed by a diff, and survivor update evaluations |
+| `list.move`, `list.lis`                                                       | Row ranges moved and longest-increasing-subsequence calculations; moves count rows, not DOM nodes                             |
+| `boundary.suspend`, `boundary.hold`, `boundary.retry`                         | Suspensions handled, attempts retaining visible content, and current thenables settling into a retry                          |
+| `boundary.fallback`, `boundary.reveal`, `boundary.catch`, `boundary.reset`    | Fallback/content/catch switches, and accepted explicit catch-reset requests                                                   |
+| `activity.hide`, `activity.show`                                              | Visibility changes of an existing Activity; initial hidden mounts are excluded                                                |
+| `viewTransition.flush`                                                        | View Transition flush attempts                                                                                                |
+| `scheduler.drain`, `flush.sync`, `flush.transition`, `flush.deferred`         | Queue passes, and flushes processing each priority; a mixed flush can count in several priorities                             |
+| `commit.root`, `commit.effects`                                               | Accepted root transactions, and effect-commit passes (including empty passes)                                                 |
+| `effect.run.insertion`, `effect.run.layout`, `effect.run.passive`             | Actual setup invocations, including callbacks that throw                                                                      |
+| `effect.cleanup.insertion`, `effect.cleanup.layout`, `effect.cleanup.passive` | Actual cleanup invocations, including deletion, Activity hide, and throwing callbacks                                         |
+| `ref.attach`, `ref.detach`                                                    | Individual callback/object ref writes; arrays count their members, and throwing callbacks count                               |
+| `rollback.root`, `rollback.journal`, `rollback.journalEntries`                | Rolled-back root attempts, nonempty journal rollbacks, and entries undone after the checkpoint                                |
+| `rollback.capture`, `rollback.transitionDiscarded`                            | Discarded speculative captures (once per capture), and discarded held root transitions                                        |
+| `rollback.renderInvalidated`, `rollback.hydration`, `row.park`                | Render invalidations, hydration undo attempts, and rows parked pending commit; parking is not rollback                        |
+| `task.post`, `suspend.throw`, `use.stratum`                                   | Host task posts, suspension sentinels created, and nonempty client `use()` batches evaluated                                  |
+| `cascade.layout`, `cascade.layoutDepth`                                       | Layout cascade passes, and the sum of their one-based depths                                                                  |
 
 Counters measure work attempted: a render that a later rollback discards still
 counts as a render. They are session totals, so they never shrink when the
@@ -194,10 +208,40 @@ come from different counter schemas, builds, or renderer sets, when recording
 was stopped or cleared between them, or when they are passed in the wrong
 order.
 
+`profiler.getCommits()` returns `{ commits, dropped }`. Each retained record has
+an `id`, `attemptId`, `rootId`, `drainId`, recording `generation`, acceptance
+`time`, and `counters`. Commit IDs identify accepted root transactions, not
+scheduler drains: several roots can commit in one drain, while a synchronous
+mount can commit with `drainId: null`. A layout cascade can accept another root
+transaction. Rolled-back attempts remain in the session totals but never appear
+as accepted commits.
+
+Commit counters cover work inside that root transaction. Delayed effect setups
+and queued cleanups retain the transaction that queued them, so a later call to
+`getCommits()` can show more effect work on the same commit. Work outside a root
+transaction, such as posting an independent task or explicitly unmounting a root,
+is counted in session totals. Commit counters are therefore not a partition of
+all session counters. Returned records are copies, with no live application
+objects.
+
+`summary()` adds exclusive `counters` for each component: work while its own
+body was active, excluding nested component bodies. These include discarded
+attempts. Counters survive eviction of render events; timing columns still
+cover the retained events. `bufferSize` separately bounds events, commits, and
+component counter rows. Commit history reports the number evicted in `dropped`;
+summary rows report `truncated` when events or component rows have been evicted.
+`clear()` resets all three histories and totals. `stop()` freezes recording and
+ends pending attribution; `start()` resumes it without resetting totals.
+
+Counter schema 2 adds these engine families. Hook calls and hydration claim or
+mismatch counters are separate profiling milestones.
+
 Profile builds turn off the compiler optimizations that only production builds
 apply, as development builds do. Counter totals therefore describe that generic
 program rather than optimized production output; compare them between two
-profile builds of the same app.
+profile builds of the same app. `block.cacheHit` also observes optimized
+dependencies compiled separately and run against a profiling runtime; ordinary
+profile compilation disables those compiler caches.
 
 <h2 id="reading-the-data">Reading the data</h2>
 
