@@ -266,6 +266,85 @@ export async function run(container) {
 }
 `;
 
+const LATE_EFFECT_APP = `import { createRoot, flushSync, useEffect, useInsertionEffect, useLayoutEffect } from 'octane';
+
+function Effects(props) @{
+	if (props.enabled) {
+		useInsertionEffect(() => {
+			props.record('insertion+');
+			return () => props.record('insertion-');
+		}, []);
+		useLayoutEffect(() => {
+			props.record('layout+');
+			props.connected.push(props.container.querySelector('[data-effect]')?.isConnected ?? false);
+			return () => props.record('layout-');
+		}, []);
+		useEffect(() => {
+			props.record('passive+');
+			return () => props.record('passive-');
+		}, []);
+	}
+	if (props.fail) throw new Error('aborted');
+	<p data-effect="">{String(props.enabled)}</p>
+}
+
+function Trigger(props) @{
+	<span ref={node => { if (node !== null) props.open(); }}>trigger</span>
+}
+
+export async function run(container, scenario) {
+	const events = [], snapshots = [], connected = [], errors = [];
+	const record = event => events.push(event);
+	const root = createRoot(container);
+	const other = document.createElement('div');
+	document.body.append(other);
+	let childRoot;
+	const show = (enabled, fail = false) => flushSync(() => root.render(Effects, {
+		enabled, fail, record, connected, container,
+	}));
+	const waitFor = async (event, count) => {
+		const deadline = Date.now() + 2000;
+		while (events.filter(value => value === event).length < count) {
+			if (Date.now() >= deadline) throw new Error('Missing scheduled ' + event);
+			await new Promise(resolve => setTimeout(resolve, 5));
+		}
+	};
+	try {
+		if (scenario === 'conditional') {
+			show(false);
+			snapshots.push(events.slice());
+			show(true);
+			snapshots.push(events.slice());
+			await waitFor('passive+', 1);
+			show(false);
+			snapshots.push(events.slice());
+			await waitFor('passive-', 1);
+			show(true);
+			await waitFor('passive+', 2);
+		} else if (scenario === 'reentrant') {
+			root.render(Trigger, { open() {
+				childRoot = createRoot(other);
+				childRoot.render(Effects, { enabled: true, record, connected, container: other });
+			} });
+			await waitFor('passive+', 1);
+		} else {
+			try { show(true, true); } catch (error) { errors.push(error.message); }
+			snapshots.push(events.slice());
+			show(true);
+			await waitFor('passive+', 1);
+		}
+		root.unmount();
+		childRoot?.unmount();
+		await waitFor('passive-', scenario === 'conditional' ? 2 : 1);
+		return { events, snapshots, connected, errors, empty: container.childNodes.length === 0 && other.childNodes.length === 0 };
+	} finally {
+		root.unmount();
+		childRoot?.unmount();
+		other.remove();
+	}
+}
+`;
+
 const roots: string[] = [];
 afterAll(() => {
 	for (const root of roots.splice(0)) rmSync(root, { recursive: true, force: true });
@@ -309,12 +388,12 @@ async function buildApp(source: string) {
 }
 
 // The bundle carries its own runtime, so it imports nothing from the test's.
-async function run(chunk: Rolldown.OutputChunk) {
+async function run(chunk: Rolldown.OutputChunk, scenario?: string) {
 	const app = evaluateCompiledFixtureCode(chunk.code, chunk.fileName, 'client', undefined);
 	const container = document.createElement('div');
 	document.body.append(container);
 	try {
-		return await app.run(container);
+		return await app.run(container, scenario);
 	} finally {
 		container.remove();
 	}
@@ -376,4 +455,23 @@ describe('optional capability drivers in production bundles', { timeout: 60_000 
 		});
 		expect(retained.has('publishRegisteredManualFormPending')).toBe(true);
 	});
+
+	const cycle = ['insertion+', 'layout+', 'passive+', 'insertion-', 'layout-', 'passive-'];
+	it.each([
+		{
+			scenario: 'conditional',
+			events: [...cycle, ...cycle],
+			snapshots: [[], cycle.slice(0, 2), cycle.slice(0, 5)],
+			connected: [true, true],
+			errors: [],
+		},
+		{ scenario: 'reentrant', events: cycle, snapshots: [], connected: [true], errors: [] },
+		{ scenario: 'aborted', events: cycle, snapshots: [[]], connected: [true], errors: ['aborted'] },
+	])(
+		'preserves the first $scenario effect lifecycle and its cleanup',
+		async ({ scenario, ...expected }) => {
+			const { chunk } = await buildApp(LATE_EFFECT_APP);
+			expect(await run(chunk, scenario)).toEqual({ ...expected, empty: true });
+		},
+	);
 });

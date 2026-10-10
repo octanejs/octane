@@ -681,6 +681,13 @@ let FORM_SUBMIT_DRIVER: typeof handleFormSubmit | null = null;
 // the committed identity is the one that must be disconnected exactly once.
 let activityRefState: WeakMap<Element | FragmentInstance, ActivityRefState> | null = null;
 let EFFECT_RECONNECT_CONTEXT: EffectReconnectContext | null = null;
+// Only enqueueEffect publishes effect slots. Keep their commit work at that
+// owner, with live calls so the first effects may appear during a ref callback.
+let drainMutationEffects: typeof drainRegisteredMutationEffects = () => null;
+let runLayoutEffects: typeof runRegisteredLayoutEffects = noop;
+let drainPassivePhase: typeof drainRegisteredPassivePhase = noop;
+let drainDeferredPassiveUnmounts: typeof drainRegisteredPassiveUnmounts = noop;
+let schedulePassiveFlush: typeof scheduleRegisteredPassiveFlush = noop;
 
 // Native reads are a compiler-selected capability. Ordinary applications keep
 // only driver tests at renderer boundaries, which their minifier removes; no
@@ -702,6 +709,12 @@ let CONTROLLED_RESTORE_DRIVER: {
 // Keep the call targets stable after installation, including after rollback.
 let drainControlledSyncs: typeof drainQueuedControlledSyncs = noop;
 let publishManualFormPending: typeof publishRegisteredManualFormPending = noop;
+// A PortalSlot installs its consumers before deferred range publication. Keep
+// them installed after the last removal: an event can still be between capture
+// and bubble with a route through the former portal.
+let preparePortalEventOwners: typeof prepareRegisteredPortalEventOwners = noop;
+let teardownPortalState: typeof teardownRegisteredPortalState = noop;
+let releasePortalTarget: typeof releaseRegisteredPortalTarget = noop;
 let NATIVE_BLOCK_RETRIES: WeakMap<Block, NativeReadRetry> | null = null;
 // Hydration-only state: client paths read it behind `hydrationStarted`.
 let NATIVE_ADOPTION_RELEASES: NativeAdoptionState[] | null = null;
@@ -11393,7 +11406,7 @@ function commitEffects(): void {
 }
 
 /** Arm the post-paint passive drain. Callers check `passiveScheduled` first. */
-function schedulePassiveFlush(): void {
+function scheduleRegisteredPassiveFlush(): void {
 	passiveScheduled = true;
 	schedulePostPaint(flushPassivePostPaint);
 }
@@ -11868,7 +11881,7 @@ function nativeEffectPublicationCurrent(entry: PendingEffect, slot: EffectSlot):
  * inInactiveSubtree. INSERTION entries are exempt — they stay connected and
  * keep firing while hidden (deactivateScope spares them too).
  */
-function drainMutationEffects(): PendingEffect[] | null {
+function drainRegisteredMutationEffects(): PendingEffect[] | null {
 	const ins = effectQueues[INSERTION];
 	const lay = effectQueues[LAYOUT];
 	if (ins.length === 0 && lay.length === 0) return null;
@@ -11915,7 +11928,7 @@ function drainMutationEffects(): PendingEffect[] | null {
  * Guards re-checked per entry: a mutation-walk effect (or the ref work in
  * between) may have unmounted or hidden a later entry's subtree.
  */
-function runLayoutEffects(q: PendingEffect[]): void {
+function runRegisteredLayoutEffects(q: PendingEffect[]): void {
 	for (let i = 0; i < q.length; i++) {
 		const e = q[i];
 		if (e.phase !== LAYOUT) continue;
@@ -11931,7 +11944,7 @@ function runLayoutEffects(q: PendingEffect[]): void {
  * Snapshot-and-splice up front for the same re-entrancy contract as
  * drainMutationEffects (see its comment).
  */
-function drainPassivePhase(): void {
+function drainRegisteredPassivePhase(): void {
 	// Held passives wait for the queued render that settles the exhausted chain;
 	// its commit re-arms the post-paint drain (see scheduleRender).
 	if (HELD_PASSIVE_CHAIN === NESTED_UPDATE_CHAIN_ID) {
@@ -11991,7 +12004,7 @@ function drainEffectEventCommitActions(): InlineCaughtErrorReport[] | null {
 // the deletion — the same routing reportTeardownError gave the sync destroys.
 const pendingPassiveUnmounts: Array<Cleanup | TryHandler | Block | null> = [];
 
-function drainDeferredPassiveUnmounts(): void {
+function drainRegisteredPassiveUnmounts(): void {
 	if (pendingPassiveUnmounts.length === 0) return;
 	const q = pendingPassiveUnmounts.splice(0);
 	for (let i = 0; i < q.length; i += 3) {
@@ -15284,8 +15297,16 @@ function enqueueEffect(slot: HookSlot, fn: EffectFn, deps: any[] | undefined, ph
 		ensureHooks(scope).set(slot, slotObj);
 		// Parallel flat list in declaration order — unmountScope's phase-correct
 		// deletion walk reads it (see Scope.effectSlots).
-		if (scope.effectSlots === null) scope.effectSlots = [slotObj];
-		else scope.effectSlots.push(slotObj);
+		if (scope.effectSlots === null) {
+			if (runLayoutEffects === noop) {
+				drainMutationEffects = drainRegisteredMutationEffects;
+				runLayoutEffects = runRegisteredLayoutEffects;
+				drainPassivePhase = drainRegisteredPassivePhase;
+				drainDeferredPassiveUnmounts = drainRegisteredPassiveUnmounts;
+				schedulePassiveFlush = scheduleRegisteredPassiveFlush;
+			}
+			scope.effectSlots = [slotObj];
+		} else scope.effectSlots.push(slotObj);
 		effect = slotObj;
 	} else {
 		prev.deps = deps;
@@ -31005,7 +31026,7 @@ function resolvePortalEventOwner(node: DelegatedNode): void {
 	node.$$portalContainer = target;
 }
 
-function preparePortalEventOwners(path: EventTarget[], epoch: number): void {
+function prepareRegisteredPortalEventOwners(path: EventTarget[], epoch: number): void {
 	for (let i = 0; i < path.length; i++) {
 		const node = eventPathNode(path[i]);
 		if (node === null) continue;
@@ -33434,6 +33455,11 @@ interface PortalSlot {
 }
 
 function registerPortalEventRange(target: Node, portal: PortalSlot): void {
+	if (preparePortalEventOwners === noop) {
+		preparePortalEventOwners = prepareRegisteredPortalEventOwners;
+		teardownPortalState = teardownRegisteredPortalState;
+		releasePortalTarget = releaseRegisteredPortalTarget;
+	}
 	if (
 		DEFERRED_LAYOUT_DRIVER &&
 		DEFERRED_LAYOUT_DRIVER.stageAction(() => registerPortalEventRange(target, portal))
@@ -33880,7 +33906,7 @@ function renderPortalState(
 // Tear a portal down: fire its body's cleanups, remove its DOM (incl. the owned
 // markers) from the target, and release the target's delegated listeners. Idempotent
 // — safe to call twice (childSlot teardown + a later scope-unmount sweep).
-function teardownPortalState(state: PortalSlot): void {
+function teardownRegisteredPortalState(state: PortalSlot): void {
 	const transaction = ROOT_RENDER_TRANSACTION;
 	if (
 		transaction !== null &&
@@ -33910,7 +33936,7 @@ function teardownPortalState(state: PortalSlot): void {
  * portal it created through the portal's creation undo and again through its
  * owner's teardown. A released portal no longer owns a target.
  */
-function releasePortalTarget(state: PortalSlot): void {
+function releaseRegisteredPortalTarget(state: PortalSlot): void {
 	if (state.target) {
 		unregisterPortalEventRange(state.target, state);
 		unregisterDelegationTarget(state.target);
