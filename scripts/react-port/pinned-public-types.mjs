@@ -13,7 +13,6 @@ import { validateUpstreamLock, verifyPristineTree } from './materialize-lib.mjs'
 import {
 	declarationsOf,
 	hasModifier,
-	IndexKind,
 	is,
 	isTypeScriptLibraryFile,
 	isTypeScriptLibraryNode,
@@ -179,31 +178,10 @@ export function pinnedPublicExport(entries, program, checker, specifier, name) {
 		if (symbol.flags & SymbolFlags.Alias) symbol = checker.getAliasedSymbol(symbol);
 		symbol = checker.getExportsOfModule(symbol).find((entry) => entry.name === part);
 	}
-	if (compatibility?.constraintIndex !== undefined) {
-		if (symbol?.flags & SymbolFlags.Alias) symbol = checker.getAliasedSymbol(symbol);
-		const declaration = declarationsOf(symbol).find(
-			(node) => node.typeParameters?.[compatibility.constraintIndex]?.constraint,
-		);
-		const constraint = declaration?.typeParameters?.[compatibility.constraintIndex]?.constraint;
-		if (!constraint) return undefined;
-		const type = checker.getTypeFromTypeNode(constraint);
-		const projection = checker.getIndexTypeOfType(type, IndexKind.String);
-		if (!projection) return undefined;
-		return {
-			flags: SymbolFlags.Transient,
-			name,
-			// Declaration handles, like a TypeScript 7 symbol's.
-			declarations:
-				projection.getAliasSymbol()?.declarations ?? projection.getSymbol()?.declarations ?? [],
-			projectedPublicType: projection,
-			projectedPublicArguments: typeArgumentsOf(projection, checker),
-		};
-	}
 	return symbol;
 }
 
 export function publicSymbolType(symbol, checker) {
-	if (symbol.projectedPublicType) return symbol.projectedPublicType;
 	if (symbol.flags & SymbolFlags.Alias) symbol = checker.getAliasedSymbol(symbol);
 	const declaration = primaryDeclarationOf(symbol);
 	return symbol.flags & (SymbolFlags.TypeAlias | SymbolFlags.Interface)
@@ -702,9 +680,7 @@ export function newOpaquePublicSymbol(symbol, witness, checker, options = {}) {
 				const expected = original?.typeParameters?.[i]?.[field];
 				const failure = newOpaquePublicType(
 					checker.getTypeFromTypeNode(parameter[field]),
-					key === 'default' && witness?.projectedPublicArguments?.[i]
-						? witness.projectedPublicArguments[i]
-						: expected && checker.getTypeFromTypeNode(expected),
+					expected && checker.getTypeFromTypeNode(expected),
 					checker,
 					new Map(),
 					`export.generic${i}.${key}`,

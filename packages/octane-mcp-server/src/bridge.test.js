@@ -321,6 +321,14 @@ describe('bridgeReportFromSource', () => {
 		expect(report.plan[0]).toContain('@octanejs/tanstack-query');
 	});
 
+	it('surfaces an Octane adapter published by the upstream library', () => {
+		const report = bridgeReportFromSource(`export {};`, {
+			packageName: '@tanstack/react-pacer',
+		});
+		expect(report.existingBinding).toBe('@tanstack/octane-pacer');
+		expect(report.plan[0]).toContain('@tanstack/octane-pacer');
+	});
+
 	it('routes the React Monaco adapter to its framework-neutral editor core', () => {
 		const report = bridgeReportFromSource(`export {};`, {
 			packageName: '@monaco-editor/react',

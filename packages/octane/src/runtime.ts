@@ -705,6 +705,10 @@ let FORM_SUBMIT_DRIVER: typeof handleFormSubmit | null = null;
 // the committed identity is the one that must be disconnected exactly once.
 let activityRefState: WeakMap<Element | FragmentInstance, ActivityRefState> | null = null;
 let EFFECT_RECONNECT_CONTEXT: EffectReconnectContext | null = null;
+// Cells install their own commit drains so apps without these hooks can omit them.
+// Captured updates already passed cell creation and use the same live drains.
+let drainEffectEventUpdates: typeof drainQueuedEffectEventUpdates = noop;
+let drainStoreSyncs: typeof drainQueuedStoreSyncs = noop;
 // Only enqueueEffect publishes effect slots. Keep their commit work at that
 // owner, with live calls so the first effects may appear during a ref callback.
 let drainMutationEffects: typeof drainRegisteredMutationEffects = () => null;
@@ -726,8 +730,11 @@ let resolveSlot = (slot: HookSlot | undefined): HookSlot | undefined => slot;
 // graph without adding a wrapper call to dispatch. Read the live capability:
 // a native target listener can arm the first control after root capture.
 let CONTROLLED_RESTORE_DRIVER: {
+	begin: typeof beginControlledDelivery;
+	delivery: typeof controlledDelivery;
 	enqueue: typeof maybeEnqueueRestore;
 	finish: typeof maybeFlushDiscrete;
+	restore: typeof restoreControlledStates;
 } | null = null;
 // Install before queued work drains or a submit transition publishes pending status.
 // Keep the call targets stable after installation, including after rollback.
@@ -9284,56 +9291,70 @@ function drainLayoutUpdates(pendingError: { err: any } | null): { err: any } | n
 	return pendingError;
 }
 
+function rethrowAfterControlledRestore(error: unknown): never {
+	try {
+		if (CONTROLLED_RESTORE_DRIVER) CONTROLLED_RESTORE_DRIVER.restore();
+	} finally {
+		// A restoration failure must not replace the render/commit failure.
+		throw error;
+	}
+}
+
 /**
  * The flush body proper — render+mutate drain plus the effect commit. Shared
  * verbatim by the plain flush() path and the view-transition update callback
  * (vtFlush), so both drain with identical semantics.
  */
 function flushWork(): void {
-	inFlush = true;
-	if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__)
-		__profileFlush();
-	// Any retained sync-transition updates belong to the drain below. Whatever
-	// a hold did not consume is finished with once the flush completes, unless
-	// their renders still wait for the transition task: an urgent flush before
-	// it must leave them for that render's hold.
-	const clearRetainedTransitionUpdates = FLUSHED_TRANSITION_UPDATES.length > 0;
-	// addTransitionType types belong to the transition batch this drain commits:
-	// an UNWRAPPED drain (no boundary, no startViewTransition, flushSync) that
-	// contains transition work consumes them too — they must not leak into a
-	// later, unrelated wrapped flush. (vtFlush captures them before its update
-	// callback runs flushWork, so the wrapped path never reaches this.)
-	const clearViewTransitionTypes =
-		!!VIEW_TRANSITION_DRIVER && VIEW_TRANSITION_DRIVER.shouldClearTypesAfterFlush();
 	try {
-		// React parity: pending PASSIVE effects from an earlier commit flush BEFORE the next
-		// render begins (React's flushPassiveEffects-at-render-start). Without this, a
-		// cascade that mounts new children (e.g. a layout-effect-driven Presence reveal)
-		// merges the earlier commit's passive effects (e.g. an event dispatch) into the same
-		// drain as the new children's listener-attach effects — re-ordering them child-first
-		// and letting a child observe an event announcing its own mount.
-		if (QUEUE.length > 0) drainPassivesBeforeRender();
-		const focused = QUEUE.length === 0 ? null : captureQueuedFocusSelection();
-		let pendingError = drainQueueWithFocus(focused);
-		if (focused !== null) restoreQueuedFocusSelection(focused);
-		commitEffects();
-		if (
-			(!DEFERRED_LAYOUT_DRIVER || !DEFERRED_LAYOUT_DRIVER.capturing()) &&
-			(QUEUE.length > 0 || ROOT_RENDER_TRANSACTIONS.length > 0)
-		)
-			pendingError = drainLayoutUpdates(pendingError);
-		if (pendingError !== null) throw pendingError.err;
-	} finally {
-		inFlush = false;
-		if (
-			(clearRetainedTransitionUpdates || FLUSHED_TRANSITION_UPDATES.length > 0) &&
-			TRANSITION_QUEUE.length === 0
-		)
-			FLUSHED_TRANSITION_UPDATES.length = 0;
+		inFlush = true;
 		if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__)
-			__devtoolsNotifyFlush();
-		if (clearViewTransitionTypes) VIEW_TRANSITION_DRIVER!.clearTypes();
+			__profileFlush();
+		// Any retained sync-transition updates belong to the drain below. Whatever
+		// a hold did not consume is finished with once the flush completes, unless
+		// their renders still wait for the transition task: an urgent flush before
+		// it must leave them for that render's hold.
+		const clearRetainedTransitionUpdates = FLUSHED_TRANSITION_UPDATES.length > 0;
+		// addTransitionType types belong to the transition batch this drain commits:
+		// an UNWRAPPED drain (no boundary, no startViewTransition, flushSync) that
+		// contains transition work consumes them too — they must not leak into a
+		// later, unrelated wrapped flush. (vtFlush captures them before its update
+		// callback runs flushWork, so the wrapped path never reaches this.)
+		const clearViewTransitionTypes =
+			!!VIEW_TRANSITION_DRIVER && VIEW_TRANSITION_DRIVER.shouldClearTypesAfterFlush();
+		try {
+			// React parity: pending PASSIVE effects from an earlier commit flush BEFORE the next
+			// render begins (React's flushPassiveEffects-at-render-start). Without this, a
+			// cascade that mounts new children (e.g. a layout-effect-driven Presence reveal)
+			// merges the earlier commit's passive effects (e.g. an event dispatch) into the same
+			// drain as the new children's listener-attach effects — re-ordering them child-first
+			// and letting a child observe an event announcing its own mount.
+			if (QUEUE.length > 0) drainPassivesBeforeRender();
+			const focused = QUEUE.length === 0 ? null : captureQueuedFocusSelection();
+			let pendingError = drainQueueWithFocus(focused);
+			if (focused !== null) restoreQueuedFocusSelection(focused);
+			commitEffects();
+			if (
+				(!DEFERRED_LAYOUT_DRIVER || !DEFERRED_LAYOUT_DRIVER.capturing()) &&
+				(QUEUE.length > 0 || ROOT_RENDER_TRANSACTIONS.length > 0)
+			)
+				pendingError = drainLayoutUpdates(pendingError);
+			if (pendingError !== null) throw pendingError.err;
+		} finally {
+			inFlush = false;
+			if (
+				(clearRetainedTransitionUpdates || FLUSHED_TRANSITION_UPDATES.length > 0) &&
+				TRANSITION_QUEUE.length === 0
+			)
+				FLUSHED_TRANSITION_UPDATES.length = 0;
+			if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__)
+				__devtoolsNotifyFlush();
+			if (clearViewTransitionTypes) VIEW_TRANSITION_DRIVER!.clearTypes();
+		}
+	} catch (error) {
+		rethrowAfterControlledRestore(error);
 	}
+	if (CONTROLLED_RESTORE_DRIVER) CONTROLLED_RESTORE_DRIVER.restore();
 }
 
 /** Names and activation relays never cross a native capture owner. */
@@ -10140,57 +10161,63 @@ export function flushSync<T>(fn: () => T): T {
 	if (VIEW_TRANSITION_DRIVER) VIEW_TRANSITION_DRIVER.interrupt();
 	const prevSync = syncFlush;
 	syncFlush = true;
+	let result: T;
 	try {
-		const result = runNativeBatch(fn);
-		// flushSync drains both priorities, including transitions waiting for their task.
-		if (TRANSITION_TASK_DRIVER) TRANSITION_TASK_DRIVER.adopt(true);
-		// `inFlush` guards only the DRAIN below, not fn(): a nested flushSync
-		// inside fn still flushes inline (React isn't "rendering" during the
-		// callback), while one landing inside the drain defers (guard above).
-		inFlush = true;
-		// The drain is a commit of its own, outside the phase of an effect that
-		// called flushSync: its ref callbacks and store checks are not passive work.
-		const effectPhase = CURRENT_EFFECT_PHASE;
-		CURRENT_EFFECT_PHASE = -1;
-		let pendingError: { err: any } | null = null;
 		try {
-			// Drain anything scheduled by fn (same depth-sorted, coalescing drain as flush()).
-			// Octane drains insertion + layout synchronously. Newly queued passive
-			// effects retain the documented post-paint policy in commitEffects.
-			if (QUEUE.length > 0) drainPassivesBeforeRender();
-			const focused = QUEUE.length === 0 ? null : captureQueuedFocusSelection();
-			pendingError = drainQueueWithFocus(focused);
-			if (focused !== null) restoreQueuedFocusSelection(focused);
-			commitEffects();
-			// A sync-committed effect (a LAYOUT effect calling setState) can schedule MORE
-			// renders. While `syncFlush` is set, scheduleRender pushes to QUEUE without arming a
-			// microtask. React's flushSync drains such layout-effect cascades SYNCHRONOUSLY —
-			// needed so derived layout state (e.g. a presence/exit-animation gate) is committed
-			// before flushSync returns. Revisiting a block does not prove a loop:
-			// finite layout measurements can update the same parent several times.
-			// Drain those passes before DOM observers can see intermediate state.
-			// The existing nested-update guard and LAYOUT_CASCADE_LIMIT bound loops;
-			// any remaining work retains its per-chain count in the async scheduler.
-			if (QUEUE.length > 0 || ROOT_RENDER_TRANSACTIONS.length > 0) {
-				pendingError = drainLayoutUpdates(pendingError);
+			result = runNativeBatch(fn);
+			// flushSync drains both priorities, including transitions waiting for their task.
+			if (TRANSITION_TASK_DRIVER) TRANSITION_TASK_DRIVER.adopt(true);
+			// `inFlush` guards only the DRAIN below, not fn(): a nested flushSync
+			// inside fn still flushes inline (React isn't "rendering" during the
+			// callback), while one landing inside the drain defers (guard above).
+			inFlush = true;
+			// The drain is a commit of its own, outside the phase of an effect that
+			// called flushSync: its ref callbacks and store checks are not passive work.
+			const effectPhase = CURRENT_EFFECT_PHASE;
+			CURRENT_EFFECT_PHASE = -1;
+			let pendingError: { err: any } | null = null;
+			try {
+				// Drain anything scheduled by fn (same depth-sorted, coalescing drain as flush()).
+				// Octane drains insertion + layout synchronously. Newly queued passive
+				// effects retain the documented post-paint policy in commitEffects.
+				if (QUEUE.length > 0) drainPassivesBeforeRender();
+				const focused = QUEUE.length === 0 ? null : captureQueuedFocusSelection();
+				pendingError = drainQueueWithFocus(focused);
+				if (focused !== null) restoreQueuedFocusSelection(focused);
+				commitEffects();
+				// A sync-committed effect (a LAYOUT effect calling setState) can schedule MORE
+				// renders. While `syncFlush` is set, scheduleRender pushes to QUEUE without arming a
+				// microtask. React's flushSync drains such layout-effect cascades SYNCHRONOUSLY —
+				// needed so derived layout state (e.g. a presence/exit-animation gate) is committed
+				// before flushSync returns. Revisiting a block does not prove a loop:
+				// finite layout measurements can update the same parent several times.
+				// Drain those passes before DOM observers can see intermediate state.
+				// The existing nested-update guard and LAYOUT_CASCADE_LIMIT bound loops;
+				// any remaining work retains its per-chain count in the async scheduler.
+				if (QUEUE.length > 0 || ROOT_RENDER_TRANSACTIONS.length > 0) {
+					pendingError = drainLayoutUpdates(pendingError);
+				}
+			} finally {
+				inFlush = false;
+				if (VIEW_TRANSITION_DRIVER) VIEW_TRANSITION_DRIVER.endCue();
+				FLUSHED_TRANSITION_UPDATES.length = 0;
+				CURRENT_EFFECT_PHASE = effectPhase;
+				if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__)
+					__devtoolsNotifyFlush();
 			}
+			if ((QUEUE.length > 0 || ROOT_RENDER_TRANSACTIONS.length > 0) && !scheduled) {
+				scheduled = true;
+				queueMicrotask(flush);
+			}
+			if (pendingError !== null) throw pendingError.err;
 		} finally {
-			inFlush = false;
-			if (VIEW_TRANSITION_DRIVER) VIEW_TRANSITION_DRIVER.endCue();
-			FLUSHED_TRANSITION_UPDATES.length = 0;
-			CURRENT_EFFECT_PHASE = effectPhase;
-			if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__)
-				__devtoolsNotifyFlush();
+			syncFlush = prevSync;
 		}
-		if ((QUEUE.length > 0 || ROOT_RENDER_TRANSACTIONS.length > 0) && !scheduled) {
-			scheduled = true;
-			queueMicrotask(flush);
-		}
-		if (pendingError !== null) throw pendingError.err;
-		return result;
-	} finally {
-		syncFlush = prevSync;
+	} catch (error) {
+		rethrowAfterControlledRestore(error);
 	}
+	if (CONTROLLED_RESTORE_DRIVER) CONTROLLED_RESTORE_DRIVER.restore();
+	return result;
 }
 
 // Bound render→layout-effect→render passes without mistaking a repeated block for a loop.
@@ -11201,113 +11228,118 @@ function completeDeferredLayouts(capture: DeferredLayoutCapture, interrupted = f
 		if (interrupted) releaseDeferredPassives(capture);
 		return;
 	}
-	capture.completed = true;
-	if (interrupted) capture.retainPassives = false;
-	if (PENDING_DEFERRED_LAYOUT === capture) PENDING_DEFERRED_LAYOUT = capture.parent;
-	const previousFlush = inFlush;
-	inFlush = true;
-	const previousCompleting = COMPLETING_DEFERRED_LAYOUT;
-	const previousHeldWork = DEFERRED_LAYOUT_HELD_WORK;
-	const heldWork: Block[] = [];
-	if (!interrupted) {
-		const queued = QUEUE.splice(0);
-		for (const block of queued) {
-			if (capture.pendingWork?.has(block)) QUEUE.push(block);
-			else heldWork.push(block);
-		}
-	}
-	capture.pendingWork = null;
-	const heldTransactions: RootRenderTransaction[] = [];
-	if (!interrupted) {
-		const transactions = ROOT_RENDER_TRANSACTIONS;
-		ROOT_RENDER_TRANSACTIONS = [];
-		for (const transaction of transactions) {
-			if (capture.transactions?.has(transaction)) ROOT_RENDER_TRANSACTIONS.push(transaction);
-			else heldTransactions.push(transaction);
-		}
-		QUEUE_REINDEX_EPOCH++;
-		COMPLETING_DEFERRED_LAYOUT = capture;
-		DEFERRED_LAYOUT_HELD_WORK = new Set(heldWork);
-	}
-	const nativeFrame = NATIVE_READ_DRIVER ? NATIVE_READ_DRIVER.pauseLifecycle() : -1;
-	// These are the commit's own refs and layout effects, so they run outside any
-	// transition, as in commitEffects. An interruption from a commit flushed
-	// inside startTransition must not stage their updates into that transition.
-	const transitionDepth = TRANSITION_DEPTH;
-	const actionBatch = ACTIVE_TRANSITION_ACTION_BATCH;
-	TRANSITION_DEPTH = 0;
-	ACTIVE_TRANSITION_ACTION_BATCH = null;
-	EFFECT_COMMIT_DEPTH++;
 	try {
-		// A direct root commit can arrive while readiness was pending. Its live
-		// ref attaches must stay after those from the already committed mutation.
-		const laterRefs = refAttachQueue.splice(0);
-		for (const ref of capture.refs) refAttachQueue.push(ref);
-		capture.refs.length = 0;
-		try {
-			drainCommitRefs(capture.refUpdates);
-		} finally {
-			capture.refUpdates = null;
-			for (const ref of laterRefs) refAttachQueue.push(ref);
-		}
-		reapplyFragmentBindings();
-		for (const commit of capture.commits) {
-			if (commit.mutationBatch !== null) runLayoutEffects(commit.mutationBatch);
-			if (commit.caughtReports !== null) publishInlineCaughtErrorReports(commit.caughtReports);
-		}
-		capture.commits.length = 0;
-		for (const adoption of capture.adoptions) adoption.release();
-		capture.adoptions.length = 0;
-		const laterStores = storeSyncQueue.splice(0);
-		for (const store of capture.stores) storeSyncQueue.push(store);
-		capture.stores.length = 0;
-		try {
-			drainStoreSyncs();
-		} finally {
-			for (const store of laterStores) storeSyncQueue.push(store);
-		}
-		if (interrupted) restoreDeferredPassives(capture);
-		if (QUEUE.length > 0 || ROOT_RENDER_TRANSACTIONS.length > 0) {
-			const error = drainLayoutUpdates(null);
-			if (error !== null) throw error.err;
-		}
-	} finally {
-		capture.commits.length = 0;
-		capture.refs.length = 0;
-		capture.refUpdates = null;
-		// A throwing layout callback must not strand resource leases or passive
-		// cleanup. Return unfinished queues to the normal recovery commit.
-		if (hydrationStarted && capture.adoptions.length > 0) {
-			const pending = (NATIVE_ADOPTION_RELEASES ??= []);
-			for (const adoption of capture.adoptions) pending.push(adoption);
-			capture.adoptions.length = 0;
-		}
-		for (const store of capture.stores) storeSyncQueue.push(store);
-		capture.stores.length = 0;
-		if (capture.retainPassives) captureDeferredPassives(capture);
-		else restoreDeferredPassives(capture);
+		capture.completed = true;
+		if (interrupted) capture.retainPassives = false;
+		if (PENDING_DEFERRED_LAYOUT === capture) PENDING_DEFERRED_LAYOUT = capture.parent;
+		const previousFlush = inFlush;
+		inFlush = true;
+		const previousCompleting = COMPLETING_DEFERRED_LAYOUT;
+		const previousHeldWork = DEFERRED_LAYOUT_HELD_WORK;
+		const heldWork: Block[] = [];
 		if (!interrupted) {
-			for (const block of heldWork) {
-				if (DEFERRED_LAYOUT_HELD_WORK!.has(block) && block.pending && !block.disposed)
-					QUEUE.push(block);
+			const queued = QUEUE.splice(0);
+			for (const block of queued) {
+				if (capture.pendingWork?.has(block)) QUEUE.push(block);
+				else heldWork.push(block);
 			}
-			ROOT_RENDER_TRANSACTIONS = heldTransactions.concat(ROOT_RENDER_TRANSACTIONS);
+		}
+		capture.pendingWork = null;
+		const heldTransactions: RootRenderTransaction[] = [];
+		if (!interrupted) {
+			const transactions = ROOT_RENDER_TRANSACTIONS;
+			ROOT_RENDER_TRANSACTIONS = [];
+			for (const transaction of transactions) {
+				if (capture.transactions?.has(transaction)) ROOT_RENDER_TRANSACTIONS.push(transaction);
+				else heldTransactions.push(transaction);
+			}
 			QUEUE_REINDEX_EPOCH++;
+			COMPLETING_DEFERRED_LAYOUT = capture;
+			DEFERRED_LAYOUT_HELD_WORK = new Set(heldWork);
 		}
-		COMPLETING_DEFERRED_LAYOUT = previousCompleting;
-		DEFERRED_LAYOUT_HELD_WORK = previousHeldWork;
-		TRANSITION_DEPTH = transitionDepth;
-		ACTIVE_TRANSITION_ACTION_BATCH = actionBatch;
+		const nativeFrame = NATIVE_READ_DRIVER ? NATIVE_READ_DRIVER.pauseLifecycle() : -1;
+		// These are the commit's own refs and layout effects, so they run outside any
+		// transition, as in commitEffects. An interruption from a commit flushed
+		// inside startTransition must not stage their updates into that transition.
+		const transitionDepth = TRANSITION_DEPTH;
+		const actionBatch = ACTIVE_TRANSITION_ACTION_BATCH;
+		TRANSITION_DEPTH = 0;
+		ACTIVE_TRANSITION_ACTION_BATCH = null;
+		EFFECT_COMMIT_DEPTH++;
 		try {
-			if (nativeFrame >= 0) NATIVE_READ_DRIVER!.resumeLifecycle(nativeFrame);
-		} finally {
+			// A direct root commit can arrive while readiness was pending. Its live
+			// ref attaches must stay after those from the already committed mutation.
+			const laterRefs = refAttachQueue.splice(0);
+			for (const ref of capture.refs) refAttachQueue.push(ref);
+			capture.refs.length = 0;
 			try {
-				finishEffectCommit();
+				drainCommitRefs(capture.refUpdates);
 			} finally {
-				inFlush = previousFlush;
+				capture.refUpdates = null;
+				for (const ref of laterRefs) refAttachQueue.push(ref);
+			}
+			reapplyFragmentBindings();
+			for (const commit of capture.commits) {
+				if (commit.mutationBatch !== null) runLayoutEffects(commit.mutationBatch);
+				if (commit.caughtReports !== null) publishInlineCaughtErrorReports(commit.caughtReports);
+			}
+			capture.commits.length = 0;
+			for (const adoption of capture.adoptions) adoption.release();
+			capture.adoptions.length = 0;
+			const laterStores = storeSyncQueue.splice(0);
+			for (const store of capture.stores) storeSyncQueue.push(store);
+			capture.stores.length = 0;
+			try {
+				drainStoreSyncs();
+			} finally {
+				for (const store of laterStores) storeSyncQueue.push(store);
+			}
+			if (interrupted) restoreDeferredPassives(capture);
+			if (QUEUE.length > 0 || ROOT_RENDER_TRANSACTIONS.length > 0) {
+				const error = drainLayoutUpdates(null);
+				if (error !== null) throw error.err;
+			}
+		} finally {
+			capture.commits.length = 0;
+			capture.refs.length = 0;
+			capture.refUpdates = null;
+			// A throwing layout callback must not strand resource leases or passive
+			// cleanup. Return unfinished queues to the normal recovery commit.
+			if (hydrationStarted && capture.adoptions.length > 0) {
+				const pending = (NATIVE_ADOPTION_RELEASES ??= []);
+				for (const adoption of capture.adoptions) pending.push(adoption);
+				capture.adoptions.length = 0;
+			}
+			for (const store of capture.stores) storeSyncQueue.push(store);
+			capture.stores.length = 0;
+			if (capture.retainPassives) captureDeferredPassives(capture);
+			else restoreDeferredPassives(capture);
+			if (!interrupted) {
+				for (const block of heldWork) {
+					if (DEFERRED_LAYOUT_HELD_WORK!.has(block) && block.pending && !block.disposed)
+						QUEUE.push(block);
+				}
+				ROOT_RENDER_TRANSACTIONS = heldTransactions.concat(ROOT_RENDER_TRANSACTIONS);
+				QUEUE_REINDEX_EPOCH++;
+			}
+			COMPLETING_DEFERRED_LAYOUT = previousCompleting;
+			DEFERRED_LAYOUT_HELD_WORK = previousHeldWork;
+			TRANSITION_DEPTH = transitionDepth;
+			ACTIVE_TRANSITION_ACTION_BATCH = actionBatch;
+			try {
+				if (nativeFrame >= 0) NATIVE_READ_DRIVER!.resumeLifecycle(nativeFrame);
+			} finally {
+				try {
+					finishEffectCommit();
+				} finally {
+					inFlush = previousFlush;
+				}
 			}
 		}
+	} catch (error) {
+		rethrowAfterControlledRestore(error);
 	}
+	if (CONTROLLED_RESTORE_DRIVER) CONTROLLED_RESTORE_DRIVER.restore();
 }
 
 function commitEffects(): void {
@@ -11480,7 +11512,7 @@ function hasScheduledWork(): boolean {
 	);
 }
 
-function drainEffectEventUpdates(): void {
+function drainQueuedEffectEventUpdates(): void {
 	if (effectEventQueue.length === 0) return;
 	const q = effectEventQueue.splice(0);
 	for (let i = 0; i < q.length; i++) {
@@ -12053,7 +12085,7 @@ function checkStoreChanged(inst: StoreInst<any>): boolean {
 // layout effect that mutated+notified), force a re-render so the DOM catches up.
 // No sort (order is irrelevant: each entry only touches its own inst) and no
 // cleanup bookkeeping — the whole point of not routing these through the effect drains.
-function drainStoreSyncs(): void {
+function drainQueuedStoreSyncs(): void {
 	if (storeSyncQueue.length === 0) return;
 	// Snapshot-and-clear up front (like the effect drains): a forced re-render below could
 	// synchronously re-enter this drain; it must see only entries queued AFTER this
@@ -16068,6 +16100,7 @@ export function useSyncExternalStore<T>(
 	const scope = CURRENT_SCOPE!;
 	let inst = scope.hooks?.get(subs.inst) as StoreInst<T> | undefined;
 	if (inst === undefined) {
+		drainStoreSyncs = drainQueuedStoreSyncs;
 		// MOUNT — create the stable cell once (useEffectEvent's mount-once pattern).
 		// forceUpdate schedules the block directly (identical to a useState setter,
 		// which also captures CURRENT_BLOCK at mount and calls scheduleRender —
@@ -16162,6 +16195,7 @@ export function useEffectEvent<F extends (...args: any[]) => any>(fn: F, slot?: 
 	if (rare.eventRender === 0) rare.eventRender = 1;
 	let s = scope.hooks?.get(slot) as EffectEventCell | undefined;
 	if (s === undefined) {
+		drainEffectEventUpdates = drainQueuedEffectEventUpdates;
 		s = { impl: fn, active: true };
 		ensureHooks(scope).set(slot, s);
 		const cell = s;
@@ -30384,12 +30418,14 @@ function prepareDelegatedEvent(event: Event, listener: Node): EventTarget[] | un
 	// can build the path once, after native target listeners have run.
 	if (_delegationTargets.size === 1 && portalEventTargetCount === 0) {
 		beginBindingEvent(event);
+		if (CONTROLLED_RESTORE_DRIVER) CONTROLLED_RESTORE_DRIVER.begin(event, true);
 		(event as any)[EVENT_ROOT_EPOCH] = eventRootEpoch;
 		return;
 	}
 	const path = event.composedPath();
 	if (_delegationTargets.size === 1) {
 		beginBindingEvent(event);
+		if (CONTROLLED_RESTORE_DRIVER) CONTROLLED_RESTORE_DRIVER.begin(event, true);
 		(event as any)[EVENT_ROOT_EPOCH] = eventRootEpoch;
 		if (portalEventTargetCount !== 0) {
 			preparePortalEventOwners(path, eventRootEpoch);
@@ -30401,19 +30437,24 @@ function prepareDelegatedEvent(event: Event, listener: Node): EventTarget[] | un
 		if (_delegationTargets.has(path[i] as Node)) {
 			if (path[i] === listener) {
 				beginBindingEvent(event);
+				if (CONTROLLED_RESTORE_DRIVER) CONTROLLED_RESTORE_DRIVER.begin(event, true);
 				(event as any)[EVENT_ROOT_EPOCH] = eventRootEpoch;
 				if (portalEventTargetCount !== 0) {
 					preparePortalEventOwners(path, eventRootEpoch);
 					(event as any)[PORTAL_EVENT_PATH_LENGTH] = path.length;
 				}
-			} else if (
-				portalEventTargetCount !== 0 &&
-				path.length > ((event as any)[PORTAL_EVENT_PATH_LENGTH] || 0)
-			) {
-				// A closed shadow root reveals additional nodes only to its inner
-				// listener. Keep just a length on the Event, never a retained DOM path.
-				preparePortalEventOwners(path, (event as any)[EVENT_ROOT_EPOCH] ?? eventRootEpoch);
-				(event as any)[PORTAL_EVENT_PATH_LENGTH] = path.length;
+			} else {
+				// Inner capture may reveal a control behind a closed shadow root.
+				// It observes this delivery, without starting another one.
+				if (CONTROLLED_RESTORE_DRIVER) CONTROLLED_RESTORE_DRIVER.begin(event, false);
+				if (
+					portalEventTargetCount !== 0 &&
+					path.length > ((event as any)[PORTAL_EVENT_PATH_LENGTH] || 0)
+				) {
+					// Keep just a length on the Event, never a retained DOM path.
+					preparePortalEventOwners(path, (event as any)[EVENT_ROOT_EPOCH] ?? eventRootEpoch);
+					(event as any)[PORTAL_EVENT_PATH_LENGTH] = path.length;
+				}
 			}
 			break;
 		}
@@ -31218,13 +31259,20 @@ function finishCaptureDispatch(event: Event, type: DelegatedEventType): void {
 		if (tag !== 'input' && tag !== 'textarea' && tag !== 'select') return;
 	}
 	const bubbleVersion = (event as any)[DELEGATED_BUBBLE_VERSION];
+	const duringFlush = inFlush;
+	const target = event.target;
+	const delivery = CONTROLLED_RESTORE_DRIVER
+		? CONTROLLED_RESTORE_DRIVER.delivery(event)
+		: undefined;
 	const fallback = () => {
 		// A delivered bubble segment closes the capture segment's commit boundary
 		// (controlled restores and their sync flush). When a native listener stops
 		// the event below its root, close that window here instead.
 		if ((event as any)[DELEGATED_BUBBLE_VERSION] === bubbleVersion) {
-			if (CONTROLLED_RESTORE_DRIVER) {
-				CONTROLLED_RESTORE_DRIVER.enqueue(event, type);
+			if (
+				CONTROLLED_RESTORE_DRIVER &&
+				CONTROLLED_RESTORE_DRIVER.enqueue(event, type, duringFlush, target, delivery)
+			) {
 				CONTROLLED_RESTORE_DRIVER.finish(type);
 			}
 		}
@@ -31819,11 +31867,50 @@ interface ControlledState {
 	formChildren: boolean;
 }
 
-// Armed elements an in-flight dispatch touched — drained (restored) by
-// maybeFlushDiscrete AFTER the discrete flush, so the restore compares the
-// DOM against the values the handlers just committed. Tiny array + linear
-// dedupe: one event targets one element; nesting stays single-digit.
-let pendingRestores: Element[] = [];
+const CONTROLLED_DELIVERY = /* @__PURE__ */ Symbol('octane.controlledDelivery');
+let controlledDeliverySequence = 0;
+
+function controlledDelivery(event: Event): number | undefined {
+	return event.type === 'input' || event.type === 'change'
+		? (event as any)[CONTROLLED_DELIVERY]
+		: undefined;
+}
+
+function beginControlledDelivery(event: Event, fresh: boolean): void {
+	if (event.type !== 'input' && event.type !== 'change') return;
+	if (fresh) {
+		// Never reset: a stopped delivery can still have a delayed fallback.
+		const sequence = ++controlledDeliverySequence;
+		(event as any)[CONTROLLED_DELIVERY] = inFlush ? -sequence : sequence;
+	}
+	const type = _delegated.get(event.type) ?? _delegatedCapture.get(event.type);
+	// Only an observed capture has a finisher. A later stopped event with no
+	// capture handler must not cancel an older delivery's only restoration.
+	// Its bubble can take ownership if that segment actually arrives.
+	if (type === undefined || (type.flags & EVENT_CAPTURE) === 0) return;
+	const delivery = controlledDelivery(event);
+	const target = event.target as any;
+	if (
+		delivery === undefined ||
+		target === null ||
+		(target.localName !== 'input' &&
+			target.localName !== 'textarea' &&
+			target.localName !== 'select')
+	)
+		return;
+	// A control can arm below capture. Keep delivery ownership on the physical
+	// host, outside its journaled controlled state, and never let an older outer
+	// delivery reclaim a target after a nested edit or shadow-root continuation.
+	const previous = target.$$restoreDelivery as number | undefined;
+	if (previous === undefined || Math.abs(previous) < Math.abs(delivery))
+		target.$$restoreDelivery = delivery;
+}
+
+// Armed elements an in-flight dispatch touched, paired with whether the edit
+// arrived during a flush. Only those edits wait for held work after the flush;
+// an outside event still restores before its dispatch returns. Tiny flat array
+// + linear dedupe: one event targets one element; nesting stays single-digit.
+let pendingRestores: Array<Element | boolean> = [];
 
 // The checkable input whose click ACTIVATION is currently in flight: the
 // platform has toggled `checked` but the activation's `input`/`change`
@@ -31999,8 +32086,11 @@ function armControlledBase(el: Element): ControlledState {
 	let ctrl = renderControlledState(el);
 	if (ctrl === undefined) {
 		CONTROLLED_RESTORE_DRIVER ??= {
+			begin: beginControlledDelivery,
+			delivery: controlledDelivery,
 			enqueue: maybeEnqueueRestore,
 			finish: maybeFlushDiscrete,
+			restore: restoreControlledStates,
 		};
 		ctrl = {
 			v: UNCONTROLLED,
@@ -33170,9 +33260,37 @@ function restoreRadioCousins(input: HTMLInputElement): void {
 
 /** Drain the event-restore queue (see maybeFlushDiscrete). */
 function restoreControlledStates(): void {
+	if (pendingRestores.length === 0) return;
+	// A handler inside a render/commit cannot flush its own update. The ambient
+	// owner restores after its complete cascade.
+	// A prepared view transition owns projected control values until publication;
+	// restoring the physical snapshot now would overwrite that pending edit.
+	// A first root render can be active without entering the scheduler's flush.
+	if (
+		inFlush ||
+		STAGED_DOM ||
+		_dispatchDepth !== 0 ||
+		ROOT_RENDER_TRANSACTION !== null ||
+		(DEFERRED_LAYOUT_DRIVER && DEFERRED_LAYOUT_DRIVER.capturing())
+	)
+		return;
+	// Pending root records may await resources after synchronous rendering ended.
+	// Like queued work, they only hold edits captured during a flush.
+	const waitForQueue = QUEUE.length > 0 || ROOT_RENDER_TRANSACTIONS.length > 0;
 	const list = pendingRestores;
 	pendingRestores = [];
-	for (let i = 0; i < list.length; i++) restoreControlledElement(list[i]);
+	// Publish held edits before any restoration can synchronously dispatch a
+	// newer event. That event owns its target's latest restore timing.
+	if (waitForQueue) {
+		for (let i = 0; i < list.length; i += 2) {
+			if (list[i + 1] === true) pendingRestores.push(list[i], true);
+		}
+	}
+	for (let i = 0; i < list.length; i += 2) {
+		if (waitForQueue && list[i + 1] === true) continue;
+		const element = list[i] as Element;
+		if (pendingRestores.indexOf(element) === -1) restoreControlledElement(element);
+	}
 }
 
 /**
@@ -33203,9 +33321,31 @@ function isControlledHostProp(el: Element, name: string): boolean {
  * form control and the event can carry a user edit (see RESTORE_EVENTS).
  * Called by both delegated dispatchers, right after their dispatch stamp.
  */
-function maybeEnqueueRestore(event: Event, type: DelegatedEventType): void {
-	const t = event.target as any;
-	if (t === null || t.$$ctrl === undefined || (type.flags & EVENT_RESTORE) === 0) return;
+function maybeEnqueueRestore(
+	event: Event,
+	type: DelegatedEventType,
+	duringFlush: boolean = inFlush,
+	target?: EventTarget | null,
+	delivery?: number,
+): boolean {
+	const t = (target === undefined ? event.target : target) as any;
+	if (t === null || t.$$ctrl === undefined || (type.flags & EVENT_RESTORE) === 0) return true;
+	if (event.type === 'input' || event.type === 'change') {
+		if (target === undefined) {
+			delivery = controlledDelivery(event);
+			const previous = t.$$restoreDelivery as number | undefined;
+			if (
+				delivery !== undefined &&
+				(previous === undefined || Math.abs(previous) < Math.abs(delivery))
+			)
+				t.$$restoreDelivery = delivery;
+			// A delivered segment still owns its handlers' commit boundary. If a
+			// nested edit is newer, retain that edit's restore timing while flushing
+			// the work these handlers schedule.
+			delivery = t.$$restoreDelivery;
+		} else if (t.$$restoreDelivery !== delivery) return false;
+		if (delivery !== undefined) duringFlush = delivery < 0;
+	}
 	const ctrl = t.$$ctrl as ControlledState;
 	if (event.type === 'input' && ctrl.compositionEndTask !== undefined) {
 		const inputEvent = event as InputEvent;
@@ -33257,7 +33397,7 @@ function maybeEnqueueRestore(event: Event, type: DelegatedEventType): void {
 				}
 			}, 0);
 		}
-		return;
+		return true;
 	}
 	// The activation's follow-up events have arrived — the write-guard window is over.
 	if (t === activationCheckable) activationCheckable = null;
@@ -33277,14 +33417,17 @@ function maybeEnqueueRestore(event: Event, type: DelegatedEventType): void {
 				restoreControlledElement(t);
 			}
 		}, 0);
-		return;
+		return true;
 	}
-	if (event.type === 'input' && checkable && t.$$checkableActivation === true) return;
+	if (event.type === 'input' && checkable && t.$$checkableActivation === true) return true;
 	if (event.type === 'change') {
 		if (checkable) t.$$checkableActivation = false;
 		if (t.localName === 'select') t.$$selectPick = false;
 	}
-	if (pendingRestores.indexOf(t) === -1) pendingRestores.push(t);
+	const index = pendingRestores.indexOf(t);
+	if (index === -1) pendingRestores.push(t, duringFlush);
+	else pendingRestores[index + 1] = duringFlush;
+	return true;
 }
 
 /**

@@ -28,6 +28,22 @@
         "searchNames": ["@tanstack/octane-store"]
       },
       {
+        "id": "tanstack-pacer",
+        "name": "TanStack Pacer",
+        "purpose": "Octane hooks for debouncing, throttling, rate limiting, queuing, and batching with TanStack Pacer.",
+        "owner": "TanStack",
+        "destination": "https://github.com/TanStack/pacer/tree/main/packages/octane-pacer",
+        "searchNames": ["@tanstack/octane-pacer"]
+      },
+      {
+        "id": "tanstack-hotkeys",
+        "name": "TanStack Hotkeys",
+        "purpose": "Octane hooks for type-safe keyboard shortcuts with TanStack Hotkeys.",
+        "owner": "TanStack",
+        "destination": "https://github.com/TanStack/hotkeys/tree/main/packages/octane-hotkeys",
+        "searchNames": ["@tanstack/octane-hotkeys"]
+      },
+      {
         "id": "tanstack-charts",
         "name": "TanStack Charts",
         "purpose": "Octane chart components with canvas, core, client, and server entry points.",

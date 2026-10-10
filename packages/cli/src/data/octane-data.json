@@ -1252,30 +1252,6 @@
       "verified": "2026-08-09"
     },
     {
-      "name": "@octanejs/tanstack-hotkeys",
-      "version": "0.0.55",
-      "category": "UI Utilities",
-      "upstream": { "package": "@tanstack/react-hotkeys", "version": "0.10.0" },
-      "surface": "Surface-present for all 22 `@tanstack/react-hotkeys@0.10.0` adapter exports plus the byte-identical `@tanstack/hotkeys@0.8.0` core re-export. The pinned 41-case upstream runtime suite runs pristine and adapted as verified vitest-full lanes; type suites compile upstream source with tsc and the Octane surface with tsrx-tsc.",
-      "divergences": [
-        "`target` refs are plain `{ current }` objects (Octane has no `React.RefObject`); the `isRef` guard and behavior are otherwise identical."
-      ],
-      "ssr": "Supported: every hook registers listeners in effects and resolves `document` lazily, so server rendering produces no registrations and no browser access (matching upstream's `typeof document` guards).",
-      "verified": "2026-08-03"
-    },
-    {
-      "name": "@octanejs/tanstack-pacer",
-      "version": "0.0.55",
-      "category": "UI Utilities",
-      "upstream": { "package": "@tanstack/react-pacer", "version": "0.23.0" },
-      "surface": "All 15 runtime/type entrypoints from @tanstack/react-pacer@0.23.0, with framework-neutral @tanstack/pacer@0.22.0 imported directly. Complete source/type structural crosswalk and strict public contracts accompany paired scheduler runtime scenarios, all ten scheduler stores and cleanup, nested providers, and server/hydration adoption. The three async callback helpers preserve Awaited results and possible undefined. Upstream publishes no runtime or dedicated type-assertion suite; independent probes retain that distinction.",
-      "divergences": [
-        "Upstream types spelled with `React.Dispatch<React.SetStateAction<T>>` use structurally identical local aliases (Octane state setters have the same shape)."
-      ],
-      "ssr": "Supported: instances are created lazily in `useState` initializers, cleanup runs in effects, and no browser globals are touched during render, so server rendering produces the initial (non-pending) state exactly like upstream.",
-      "verified": "2026-09-12"
-    },
-    {
       "name": "@octanejs/tanstack-query",
       "version": "0.1.64",
       "category": "Data",
@@ -1337,19 +1313,6 @@
       ],
       "ssr": "Supported: selectors, writable atoms, and store context read their current snapshots during server rendering; the adapter has no browser-only initialization.",
       "verified": "2026-08-09"
-    },
-    {
-      "name": "@octanejs/tanstack-table",
-      "version": "0.1.63",
-      "category": "Tables",
-      "upstream": { "package": "@tanstack/react-table", "version": "9.2.4" },
-      "surface": "TanStack Table 9.2.4 adapter using table-core 9.2.4 and the existing Octane Store integration. Covers useTable, Subscribe, FlexRender/flexRender, createTableHook, scoped contexts and the legacy migration hook/markers/types. Root, flex-render, legacy, static-functions, experimental-worker-plugin and package.json imports remain available. Core algorithms and worker helpers are imported directly.",
-      "divergences": [
-        "`flexRender`'s class-component and `react.memo`/`forwardRef` exotic-component branches are dropped — octane has no class components or forwardRef, and octane's `memo()` returns a plain function, so `typeof === 'function'` covers every component.",
-        "A held transition performs Octane's documented committed-state cue render. Raw table-store observers may receive the unchanged committed snapshot once; suspended controlled values are neither published nor written to base atoms."
-      ],
-      "ssr": "All three pinned SSR cases execute with server compilation. A real SSR/client hydration test preserves row and button identity, updates data interactively, and unmounts the adopted nodes.",
-      "verified": "2026-09-12"
     },
     {
       "name": "@octanejs/tanstack-virtual",
@@ -1732,14 +1695,11 @@
     "@tanstack/react-db": "@octanejs/tanstack-db",
     "@tanstack/react-devtools": "@octanejs/tanstack-devtools",
     "@tanstack/react-form": "@octanejs/tanstack-form",
-    "@tanstack/react-hotkeys": "@octanejs/tanstack-hotkeys",
-    "@tanstack/react-pacer": "@octanejs/tanstack-pacer",
     "@tanstack/react-query": "@octanejs/tanstack-query",
     "@tanstack/react-query-devtools": "@octanejs/tanstack-query-devtools",
     "@tanstack/react-router": "@octanejs/tanstack-router",
     "@tanstack/react-router-ssr-query": "@octanejs/tanstack-router-ssr-query",
     "@tanstack/react-store": "@octanejs/tanstack-store",
-    "@tanstack/react-table": "@octanejs/tanstack-table",
     "@tanstack/react-virtual": "@octanejs/tanstack-virtual",
     "@testing-library/react": "@octanejs/testing-library",
     "@tiptap/react": "@octanejs/tiptap",

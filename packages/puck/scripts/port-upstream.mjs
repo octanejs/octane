@@ -116,8 +116,8 @@ function transformSource(text, destRel) {
 	out = out.replace(/from "@dnd-kit\/react"/g, 'from "@octanejs/dnd-kit"');
 	out = out.replace(/from 'lucide-react'/g, "from '@octanejs/lucide'");
 	out = out.replace(/from "lucide-react"/g, 'from "@octanejs/lucide"');
-	out = out.replace(/from 'use-debounce'/g, "from '@octanejs/tanstack-pacer'");
-	out = out.replace(/from "use-debounce"/g, 'from "@octanejs/tanstack-pacer"');
+	out = out.replace(/from 'use-debounce'/g, "from '@tanstack/octane-pacer'");
+	out = out.replace(/from "use-debounce"/g, 'from "@tanstack/octane-pacer"');
 	out = out.replace(/\bReactNode\b/g, 'OctaneNode');
 	out = out.replace(/\bMutableRefObject\b/g, 'RefObject');
 	out = out.replace(/React\.memo\b/g, 'memo');

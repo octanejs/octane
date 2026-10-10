@@ -90,8 +90,6 @@ packages/*/.pristine-upstream-*/
 # convention, so this stays generic like the scratch-copy pattern above.
 packages/*/.upstream-vitest-cache/
 packages/*/.pristine-vitest-cache/
-# Pristine vitest cache for tanstack-hotkeys upstream suite
-packages/tanstack-hotkeys/.vite-pristine/
 
 # Resumable React-library port evidence and one-writer batch state.
 .react-port-work/

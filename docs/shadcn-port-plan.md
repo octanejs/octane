@@ -87,7 +87,7 @@ porting the missing primitive) — never worked around in this package.
 (`@octanejs/cmdk` — NOTE: in flight on the `cmdk-port-plan` PR; this phase
 blocks on it landing and publishing), sonner/toaster (`@octanejs/sonner`; the
 `next-themes` theme hook is replaced — see divergences), chart
-(`@octanejs/recharts`), data-table (`@octanejs/tanstack-table`), sidebar
+(`@octanejs/recharts`), data-table (`@tanstack/octane-table`), sidebar
 (context + `use-mobile` on octane hooks), field (the 2025+ form-replacement
 family; plain octane state, no hook-form dependency).
 
@@ -138,7 +138,7 @@ Dependency mapping (upstream → this port):
 | `sonner` + `next-themes` | `@octanejs/sonner` + a props/context theme divergence |
 | `recharts@3.8.0` | `@octanejs/recharts` |
 | `lucide-react` | `@octanejs/lucide` |
-| `@tanstack/react-table` (data-table docs) | `@octanejs/tanstack-table` |
+| `@tanstack/react-table` (data-table docs) | `@tanstack/octane-table` |
 | `class-variance-authority`, `clsx`, `tailwind-merge`, `tw-animate-css` | unchanged (framework-free), via `catalog:default` |
 | `react-hook-form` (legacy `form` item only) | not needed — Field family replaces it upstream |
 
