@@ -1866,8 +1866,8 @@ export default interface ErasedShape { value: string }
 			expect(named?.kind).toBe('slots');
 			expect(named?.code).toContain('__createVoidRoot');
 
-			// Specialize the proven disposable expression without changing a
-			// neighboring unknown render or a root retained for later renders.
+			// The unproven import keeps generic returned-value reconciliation while
+			// omitting options; the escaped root keeps the public factory.
 			const unknown = join(src, 'Unknown.js');
 			writeFileSync(unknown, 'export function Unknown() { return null; }\n');
 			const mixedEntry =
@@ -1883,8 +1883,10 @@ export default interface ErasedShape { value: string }
 					request === './Main.tsrx' && imported === 'Main',
 			});
 			expect(mixed?.kind).toBe('slots');
-			expect(mixed?.code.match(/_\$createVoidRoot\(/g)).toHaveLength(1);
-			expect(mixed?.code).toContain('createRoot(document.documentElement).render(Unknown)');
+			expect(mixed?.code.match(/_\$createVoidRootDefaultOptions\(/g)).toHaveLength(1);
+			expect(mixed?.code).toContain(
+				'_$createRootDefaultOptions(document.documentElement).render(Unknown)',
+			);
 			expect(mixed?.code).toContain('export const retained = createRoot(document.body)');
 
 			// A module-private root whose every use is proven has a closed lifetime.
@@ -1896,8 +1898,10 @@ export default interface ErasedShape { value: string }
 						request === './Main.tsrx' && imported === 'Main',
 				},
 			);
-			expect(privateRoot?.code.match(/_\$createVoidRoot\(/g)).toHaveLength(2);
-			expect(privateRoot?.code).toContain('createRoot(document.documentElement).render(Unknown)');
+			expect(privateRoot?.code.match(/_\$createVoidRootDefaultOptions\(/g)).toHaveLength(2);
+			expect(privateRoot?.code).toContain(
+				'_$createRootDefaultOptions(document.documentElement).render(Unknown)',
+			);
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}

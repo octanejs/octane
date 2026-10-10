@@ -150,7 +150,8 @@ function declaresHook(ast) {
 // shadows, aliases, escaping captures and unknown future renders on the generic
 // path, while a closure that only calls render/unmount stays proven. Each
 // candidate is one root and lists every relative import it renders.
-function collectVoidRootCandidates(ast) {
+// An exact one-argument call can omit options independently of that return ABI.
+function collectVoidRootCandidates(ast, defaultOptionsRoot = false) {
 	const factories = findRootFactoryImports(ast);
 	if (factories.size === 0) return [];
 	const componentImports = new Map();
@@ -177,6 +178,7 @@ function collectVoidRootCandidates(ast) {
 	if (componentImports.size === 0) return [];
 	return proveVoidRoots(ast, {
 		factories,
+		defaultOptionsRoot,
 		component: (name) => componentImports.get(name),
 	}).map(({ callee, helper, components }) => ({
 		helper,
@@ -291,18 +293,20 @@ export function findVoidComponentImports(source, id) {
 function collectVoidRootEdits(candidates, st, isVoidComponentImport) {
 	if (typeof isVoidComponentImport !== 'function') return;
 	for (const candidate of candidates) {
+		let helper = candidate.helper;
 		if (
 			!candidate.components.every(({ request, imported }) =>
 				isVoidComponentImport(request, imported),
 			)
-		)
-			continue;
-		let local = st.voidRootNames.get(candidate.helper);
+		) {
+			// The argument proof is independent of the component return ABI.
+			// Preserve generic returned-value reconciliation on this fallback.
+			if (helper !== '__createVoidRootDefaultOptions') continue;
+			helper = '__createRootDefaultOptions';
+		}
+		let local = st.voidRootNames.get(helper);
 		if (local === undefined)
-			st.voidRootNames.set(
-				candidate.helper,
-				(local = allocSlotName(st, '_$' + candidate.helper.slice(2))),
-			);
+			st.voidRootNames.set(helper, (local = allocSlotName(st, '_$' + helper.slice(2))));
 		st.edits.push({ pos: candidate.start, end: candidate.end, text: local });
 	}
 }
@@ -1293,7 +1297,15 @@ export function slotHooks(source, id, options) {
 	// preserved, so the text edits below stay valid), with the dependency
 	// inference keyed by the rebuilt calls.
 	// Annotation preserves offsets, so the authored tree's proof stays valid.
-	const voidRoots = canSpecializeRoot ? collectVoidRootCandidates(ast) : [];
+	const voidRoots = canSpecializeRoot
+		? collectVoidRootCandidates(
+				ast,
+				environment === 'client' &&
+					!options?.dev &&
+					(options?.renderer?.target ?? 'dom') === 'dom' &&
+					options?.universalRuntime == null,
+			)
+		: [];
 	let inferred = new Map();
 	if (importInfo.importsHook) {
 		const annotated = annotateHookCalls(ast, {

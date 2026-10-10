@@ -748,6 +748,14 @@ interface HydrationDriver {
 }
 let HYDRATION_DRIVER: HydrationDriver | null = null;
 
+// Root callback reporting is installed only by roots whose ABI permits options.
+// Keep every consumer callable: some calls pass the recovery itself as an argument.
+let registerRootErrorHandlers: typeof registerEnabledRootErrorHandlers = noop;
+let reportCaughtError: typeof registeredReportCaughtError = noop;
+let reportUncaughtError: typeof registeredReportUncaughtError = () => false;
+let enqueueInlineCaughtError: typeof registeredEnqueueInlineCaughtError = noop;
+let publishInlineCaughtErrorReports: typeof registeredPublishInlineCaughtErrorReports = noop;
+
 // Potential bindings retain invocation identities before a late signal module
 // arrives. They do not create document/instance owners until a genuine facade or
 // handle enables the shared document capability.
@@ -50902,7 +50910,7 @@ interface RootErrorHandlers {
 
 let ROOT_ERROR_HANDLERS: WeakMap<Block, RootErrorHandlers> | null = null;
 
-function registerRootErrorHandlers(root: Block, options: RootOptions | undefined): void {
+function registerEnabledRootErrorHandlers(root: Block, options: RootOptions | undefined): void {
 	if (options === undefined) return;
 	const { onCaughtError, onUncaughtError, onRecoverableError } = options;
 	if (
@@ -50911,6 +50919,12 @@ function registerRootErrorHandlers(root: Block, options: RootOptions | undefined
 		onRecoverableError === undefined
 	) {
 		return;
+	}
+	if (ROOT_ERROR_HANDLERS === null) {
+		reportCaughtError = registeredReportCaughtError;
+		reportUncaughtError = registeredReportUncaughtError;
+		enqueueInlineCaughtError = registeredEnqueueInlineCaughtError;
+		publishInlineCaughtErrorReports = registeredPublishInlineCaughtErrorReports;
 	}
 	(ROOT_ERROR_HANDLERS ??= new WeakMap()).set(root, {
 		onCaughtError,
@@ -50936,7 +50950,11 @@ function invokeRootErrorHandler(handler: (error: unknown) => void, err: unknown)
 }
 
 /** Report a boundary-claimed error to the owning root's onCaughtError, if any. */
-function reportCaughtError(block: Block | null, err: unknown, caught?: Block | null | void): void {
+function registeredReportCaughtError(
+	block: Block | null,
+	err: unknown,
+	caught?: Block | null | void,
+): void {
 	const h = rootErrorHandlersFor(block)?.onCaughtError;
 	if (h === undefined || caught === null || caught?.disposed) return;
 	if (caught !== undefined) {
@@ -51004,7 +51022,7 @@ function inlineCaughtErrorOwner(block: Block): ScheduledVisibilityOwner | null {
 }
 
 /** Inline boundary catches have no scheduled-error caller to report for them. */
-function enqueueInlineCaughtError(state: TrySlot | ErrorSlot): void {
+function registeredEnqueueInlineCaughtError(state: TrySlot | ErrorSlot): void {
 	if (ROOT_ERROR_HANDLERS === null || state.branch !== 0) return;
 	const block = state.block;
 	if (block === null) return;
@@ -51047,7 +51065,7 @@ function enqueueInlineCaughtError(state: TrySlot | ErrorSlot): void {
 	}
 }
 
-function publishInlineCaughtErrorReports(reports: InlineCaughtErrorReport[]): void {
+function registeredPublishInlineCaughtErrorReports(reports: InlineCaughtErrorReport[]): void {
 	for (let i = 0; i < reports.length; i++) {
 		const report = reports[i];
 		if (report.block.disposed || report.state.block !== report.block) continue;
@@ -51063,7 +51081,7 @@ function publishInlineCaughtErrorReports(reports: InlineCaughtErrorReport[]): vo
 }
 
 /** True when the owning root's onUncaughtError consumed the report (callers skip their default). */
-function reportUncaughtError(block: Block | null, err: unknown): boolean {
+function registeredReportUncaughtError(block: Block | null, err: unknown): boolean {
 	const h = rootErrorHandlersFor(block)?.onUncaughtError;
 	if (h === undefined) return false;
 	invokeRootErrorHandler(h, err);
@@ -51884,12 +51902,24 @@ function createRootWithOutputHandler(
 }
 
 export function createRoot(container: RootContainer, options?: RootOptions): Root {
+	registerRootErrorHandlers = registerEnabledRootErrorHandlers;
 	return createRootWithOutputHandler(container, options, renderReturnedValue);
+}
+
+/** Compiler-only generic root whose source call supplies no options argument. */
+export function __createRootDefaultOptions(container: RootContainer): Root {
+	return createRootWithOutputHandler(container, undefined, renderReturnedValue);
 }
 
 /** Compiler-only root for a statically proven void `@{}` entry component. */
 export function __createVoidRoot(container: RootContainer, options?: RootOptions): Root {
+	registerRootErrorHandlers = registerEnabledRootErrorHandlers;
 	return createRootWithOutputHandler(container, options, null);
+}
+
+/** Compiler-only void root whose source call supplies no options argument. */
+export function __createVoidRootDefaultOptions(container: RootContainer): Root {
+	return createRootWithOutputHandler(container, undefined, null);
 }
 
 /**
@@ -52020,6 +52050,7 @@ function hydrateRootWithOutputHandler(
 	rootOptions: RootOptions | undefined,
 	outputHandler: OutputHandler | null,
 ): Root {
+	registerRootErrorHandlers = registerEnabledRootErrorHandlers;
 	assertValidRootContainer(container);
 	// Leases, presentations and streamed arms below outlive the adoption pass.
 	installHydrationDriver();

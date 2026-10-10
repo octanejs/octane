@@ -40,10 +40,21 @@ const OPTIONAL_DECLARATIONS = [
 	'NATIVE_READ_DRIVER',
 	'beginActiveNativeReadScope',
 ];
+const ROOT_ERROR_DECLARATIONS = [
+	'ROOT_ERROR_HANDLERS',
+	'registerEnabledRootErrorHandlers',
+	'registeredReportCaughtError',
+	'registeredReportUncaughtError',
+	'registeredEnqueueInlineCaughtError',
+	'registeredPublishInlineCaughtErrorReports',
+];
 const ranges = resolveDeclarationRanges(
 	(source: string) => readFileSync(join(SOURCE, source), 'utf8'),
 	(text: string, source: string) => parseAst(text, { lang: 'ts' }, source),
-	OPTIONAL_DECLARATIONS.map((name) => ({ name, source: 'runtime.ts' })),
+	[...OPTIONAL_DECLARATIONS, ...ROOT_ERROR_DECLARATIONS].map((name) => ({
+		name,
+		source: 'runtime.ts',
+	})),
 );
 
 const PLAIN_APP = `import { createRoot, flushSync, useState } from 'octane';
@@ -72,6 +83,32 @@ export function run(container) {
 	const after = container.textContent;
 	root.unmount();
 	return { before, after, refs, empty: container.childNodes.length === 0 };
+}
+`;
+
+const NO_CALLBACK_ERROR_APP = `import { createRoot, flushSync, useLayoutEffect, useState } from 'octane';
+let fail, cleanups = 0;
+function Child() @{
+	const [failed, setFailed] = useState(false);
+	fail = () => setFailed(true);
+	useLayoutEffect(() => () => { cleanups++; }, []);
+	if (failed) throw new Error('child-boom');
+	<span>ready</span>
+}
+function View() @{
+	@try { <Child /> } @catch(error) { <strong>{'caught:' + error.message as string}</strong> }
+}
+export function run(container) {
+	const root = createRoot(container);
+	try {
+		root.render(View);
+		flushSync(() => {});
+		const before = container.textContent;
+		flushSync(() => fail());
+		return { before, after: container.textContent, cleanups };
+	} finally {
+		root.unmount();
+	}
 }
 `;
 
@@ -244,13 +281,14 @@ afterAll(() => {
 
 // An ordinary production build of the application: Vite's default minifier,
 // with the runtime bundled from source the way a consumer compiles it.
-async function buildApp(source: string) {
+async function buildApp(source: string, files: Record<string, string> = {}, entry = 'App.tsrx') {
 	const root = realpathSync(mkdtempSync(join(tmpdir(), 'octane-optional-drivers-')));
 	roots.push(root);
 	mkdirSync(join(root, 'node_modules'));
 	symlinkSync(PACKAGE_ROOT, join(root, 'node_modules/octane'), 'dir');
 	writeFileSync(join(root, 'package.json'), JSON.stringify({ type: 'module' }));
-	writeFileSync(join(root, 'App.tsrx'), source);
+	for (const [file, contents] of Object.entries({ ...files, [entry]: source }))
+		writeFileSync(join(root, file), contents);
 	const result = await build({
 		root,
 		configFile: false,
@@ -265,7 +303,7 @@ async function buildApp(source: string) {
 			write: false,
 			sourcemap: true,
 			target: 'esnext',
-			lib: { entry: join(root, 'App.tsrx'), formats: ['es'] },
+			lib: { entry: join(root, entry), formats: ['es'] },
 		},
 	});
 	const output = (Array.isArray(result) ? result : [result]).flatMap((item) => {
@@ -294,13 +332,50 @@ async function run(chunk: Rolldown.OutputChunk, scenario?: string) {
 describe('optional capability drivers in production bundles', { timeout: 60_000 }, () => {
 	it('ships none of their code in an application that uses none of them', async () => {
 		const { retained, chunk } = await buildApp(PLAIN_APP);
-		expect(OPTIONAL_DECLARATIONS.filter((name) => retained.has(name))).toEqual([]);
+		expect(
+			[...OPTIONAL_DECLARATIONS, ...ROOT_ERROR_DECLARATIONS].filter((name) => retained.has(name)),
+		).toEqual([]);
 		expect(await run(chunk)).toEqual({
 			before: 'reverseabc',
 			after: 'reversecba',
 			refs: ['a', 'b', 'c'],
 			empty: true,
 		});
+	});
+
+	it('commits boundary recovery and cleanup when root reporting is absent from production', async () => {
+		const { retained, chunk } = await buildApp(NO_CALLBACK_ERROR_APP);
+		expect(await run(chunk)).toEqual({ before: 'ready', after: 'caught:child-boom', cleanups: 1 });
+		expect(ROOT_ERROR_DECLARATIONS.filter((name) => retained.has(name))).toEqual([]);
+	});
+
+	it('reconciles arbitrary imported returns without retaining unused root reporting', async () => {
+		const { retained, chunk } = await buildApp(
+			`import {createRoot,createElement,flushSync} from 'octane';
+import View from './View.ts';
+export function run(container) {
+ const root=createRoot(container);
+ root.render(View,{value:createElement('main',null,createElement('input'), 'first')});
+ const main=container.firstElementChild,input=main.querySelector('input');input.value='draft';input.focus();
+ root.render(View,{value:createElement('main',null,createElement('input'), 'second')});flushSync(()=>{});
+ const updated={text:container.textContent,retained:main===container.firstElementChild&&input===main.querySelector('input'),draft:input.value,focused:document.activeElement===input};
+ root.render(View,{value:[createElement('strong',null,'array'),' tail']});flushSync(()=>{});
+ const array={text:container.textContent,tag:container.firstElementChild.tagName};
+ root.render(View,{value:'text'});flushSync(()=>{});const text=container.textContent;
+ root.render(View,{value:null});flushSync(()=>{});const cleared=container.textContent===''&&container.childElementCount===0;
+ root.unmount();return {updated,array,text,cleared,empty:container.childNodes.length===0};
+}`,
+			{ 'View.ts': 'export default function View(props) { return props.value; }' },
+			'entry.ts',
+		);
+		expect(await run(chunk)).toEqual({
+			updated: { text: 'second', retained: true, draft: 'draft', focused: true },
+			array: { text: 'array tail', tag: 'STRONG' },
+			text: 'text',
+			cleared: true,
+			empty: true,
+		});
+		expect(ROOT_ERROR_DECLARATIONS.filter((name) => retained.has(name))).toEqual([]);
 	});
 
 	it('keeps each driver in an application that uses its capability', async () => {

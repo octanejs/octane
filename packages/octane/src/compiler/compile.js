@@ -1651,6 +1651,8 @@ const NATIVE_READ_RUNTIME_HELPERS = new Set([
 	'nativeCreateScopedElement',
 ]);
 const INTERNAL_CLIENT_RUNTIME_HELPERS = new Set([
+	'__createVoidRootDefaultOptions',
+	'__createRootDefaultOptions',
 	'__createCompiledContext',
 	'ownSlotAnchor',
 	'isContext',
@@ -11850,6 +11852,7 @@ function compileInternal(
 		let loweredElements = null;
 		for (const root of proveVoidRoots(ast, {
 			factories: rootFactories,
+			defaultOptionsRoot: true,
 			component(name) {
 				if (stableComponents.has(name)) return true;
 				const imported = ctx.importedComponentBindings.get(name);

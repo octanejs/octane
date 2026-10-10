@@ -633,7 +633,8 @@ try {
 			(id === 'binding-apollo-client' && scenario.bundler === 'vite')
 		) {
 			assert.equal(
-				runtimeExports.includes('__createVoidRoot'),
+				runtimeExports.includes('__createVoidRoot') ||
+					runtimeExports.includes('__createVoidRootDefaultOptions'),
 				true,
 				`${name}: the compiled application root lost compiler specialization`,
 			);

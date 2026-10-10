@@ -129,6 +129,8 @@ export {
 	__useLinkedStateWithGetter,
 	__useReducerWithGetter,
 	__createVoidRoot,
+	__createVoidRootDefaultOptions,
+	__createRootDefaultOptions,
 	__hydrateVoidRoot,
 	__voidRootProps,
 	bindRendererRegionOwner,

@@ -67,7 +67,7 @@ const directCall = (member, call) =>
  * `components` holds the `component(name)` value of each target and `elements`
  * locates each JSX target as `{ call, index }` (its argument position).
  */
-export function proveVoidRoots(ast, { factories, component, skip }) {
+export function proveVoidRoots(ast, { factories, component, skip, defaultOptionsRoot = false }) {
 	if (factories.size === 0) return [];
 	const analysis = createLexicalAnalysis(ast);
 	const moduleScoped = (node) =>
@@ -143,7 +143,13 @@ export function proveVoidRoots(ast, { factories, component, skip }) {
 		const factory = factories.get(call.callee.name);
 		const root = {
 			callee: call.callee,
-			helper: VOID_ROOT_HELPERS[factory],
+			helper:
+				defaultOptionsRoot &&
+				factory === 'createRoot' &&
+				call.arguments.length === 1 &&
+				call.arguments[0].type !== 'SpreadElement'
+					? '__createVoidRootDefaultOptions'
+					: VOID_ROOT_HELPERS[factory],
 			components: [],
 			elements: [],
 			valid: true,

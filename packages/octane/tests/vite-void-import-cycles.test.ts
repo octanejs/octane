@@ -256,6 +256,7 @@ export function run(host) {
 			};
 			const { compiled, chunks } = await buildFixture(fixture(files), ['entry.ts'], [rewrite]);
 			expect(compiled['entry.ts']).not.toContain('__createVoidRoot');
+			expect(compiled['entry.ts']).toContain('__createRootDefaultOptions');
 			expect(compiled['A.tsx']).not.toContain('componentSlotVoid(');
 			expect(run(chunks[0])).toEqual({ text: 'A3', empty: true });
 		});

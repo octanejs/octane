@@ -1355,7 +1355,13 @@ export function octane(options = {}) {
 					collectVoidComponentExports:
 						specializeProductionRoots && !server && !hmrEnabled && !profileEnabled,
 					...(clientOnlyImports.length > 0 ? { clientOnlyImports } : null),
-					...(proven?.size
+					...(proven?.size ||
+					(proven &&
+						preflight.voidImports.length > 0 &&
+						specializeProductionRoots &&
+						!server &&
+						!hmrEnabled &&
+						!profileEnabled)
 						? {
 								isVoidComponentImport: (request, imported) =>
 									proven.has(voidImportKey(request, imported)),
