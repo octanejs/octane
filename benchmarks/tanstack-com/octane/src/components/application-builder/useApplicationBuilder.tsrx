@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'octane';
-import { useDebouncedValue } from '@octanejs/tanstack-pacer';
+import { useDebouncedValue } from '@tanstack/octane-pacer';
 import { useToast } from '~/components/ToastProvider.tsrx';
 import {
 	trackEvent,

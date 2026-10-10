@@ -305,7 +305,7 @@ generated inventory; the shape of it is:
   routing (tanstack-query, apollo-client, tanstack-router, remix-router), UI
   (radix, base-ui, aria, shadcn, motion, dnd-kit, sonner, floating-ui, lucide),
   forms and content (hook-form, tanstack-form, lexical, tiptap, mdx, i18next),
-  data-heavy screens (tanstack-table, tanstack-virtual, recharts, visx), 3D
+  data-heavy screens (tanstack-virtual, recharts, visx), 3D
   (three), Web3 (wagmi, rainbowkit), and more.
 
 Parity varies by package. Some are behaviorally complete, others are explicitly

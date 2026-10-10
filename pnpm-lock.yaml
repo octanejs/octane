@@ -1304,19 +1304,6 @@ catalogs:
     react-dom:
       specifier: 19.2.7
       version: 19.2.7
-  tanstack-pacer-react-oracle:
-    '@types/react':
-      specifier: 19.2.17
-      version: 19.2.17
-    '@types/react-dom':
-      specifier: 19.2.3
-      version: 19.2.3
-    react:
-      specifier: 19.2.7
-      version: 19.2.7
-    react-dom:
-      specifier: 19.2.7
-      version: 19.2.7
   tanstack-store-react-oracle:
     '@tanstack/react-store':
       specifier: 0.11.1
@@ -3670,12 +3657,6 @@ importers:
       '@octanejs/sonner':
         specifier: workspace:*
         version: link:../../../packages/sonner
-      '@octanejs/tanstack-hotkeys':
-        specifier: workspace:*
-        version: link:../../../packages/tanstack-hotkeys
-      '@octanejs/tanstack-pacer':
-        specifier: workspace:*
-        version: link:../../../packages/tanstack-pacer
       '@octanejs/tanstack-query':
         specifier: workspace:*
         version: link:../../../packages/tanstack-query
@@ -3706,6 +3687,12 @@ importers:
       '@tanstack/markdown':
         specifier: ^0.0.6
         version: 0.0.6(react@19.2.8)
+      '@tanstack/octane-hotkeys':
+        specifier: ^0.3.0
+        version: 0.3.0(octane@packages+octane)
+      '@tanstack/octane-pacer':
+        specifier: ^0.3.0
+        version: 0.3.0(octane@packages+octane)
       '@tanstack/pacer':
         specifier: ^0.21.1
         version: 0.21.1
@@ -4893,18 +4880,18 @@ importers:
 
   examples/pulseboard:
     dependencies:
-      '@octanejs/tanstack-hotkeys':
-        specifier: workspace:*
-        version: link:../../packages/tanstack-hotkeys
-      '@octanejs/tanstack-table':
-        specifier: workspace:*
-        version: link:../../packages/tanstack-table
       '@octanejs/tanstack-virtual':
         specifier: workspace:*
         version: link:../../packages/tanstack-virtual
       '@octanejs/visx':
         specifier: workspace:*
         version: link:../../packages/visx
+      '@tanstack/octane-hotkeys':
+        specifier: ^0.3.0
+        version: 0.3.0(octane@packages+octane)
+      '@tanstack/octane-table':
+        specifier: ^9.3.0
+        version: 9.3.0(octane@packages+octane)
       octane:
         specifier: workspace:*
         version: link:../../packages/octane
@@ -7653,12 +7640,12 @@ importers:
       '@octanejs/lucide':
         specifier: workspace:*
         version: link:../lucide
-      '@octanejs/tanstack-pacer':
-        specifier: workspace:*
-        version: link:../tanstack-pacer
       '@octanejs/zustand':
         specifier: workspace:*
         version: link:../zustand
+      '@tanstack/octane-pacer':
+        specifier: ^0.3.0
+        version: 0.3.0(octane@packages+octane)
       '@types/flat':
         specifier: ^5.0.5
         version: 5.0.5
@@ -9121,98 +9108,6 @@ importers:
         specifier: catalog:default
         version: 4.1.10(@edge-runtime/vm@5.0.0)(@opentelemetry/api@1.9.1)(@types/node@24.13.3)(@vitest/browser-playwright@4.1.10)(@vitest/coverage-istanbul@4.1.10)(@vitest/coverage-v8@4.1.10)(happy-dom@20.11.2(bufferutil@4.1.0)(utf-8-validate@5.0.10))(jsdom@30.0.1(@noble/hashes@2.2.0))(vite@8.1.5(@types/node@24.13.3)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.49.0)(tsx@4.23.1)(yaml@2.9.0))
 
-  packages/tanstack-hotkeys:
-    dependencies:
-      '@tanstack/hotkeys':
-        specifier: 0.8.0
-        version: 0.8.0
-    devDependencies:
-      '@octanejs/tanstack-store':
-        specifier: workspace:*
-        version: link:../tanstack-store
-      '@octanejs/testing-library':
-        specifier: workspace:*
-        version: link:../testing-library
-      '@tanstack/react-hotkeys':
-        specifier: 0.10.0
-        version: 0.10.0(react-dom@19.2.7(react@19.2.7))(react@19.2.7)
-      '@tanstack/react-store':
-        specifier: ^0.11.0
-        version: 0.11.0(react-dom@19.2.7(react@19.2.7))(react@19.2.7)
-      '@testing-library/react':
-        specifier: 16.3.2
-        version: 16.3.2(@testing-library/dom@10.4.1)(@types/react-dom@19.2.4(@types/react@19.2.18))(@types/react@19.2.18)(react-dom@19.2.7(react@19.2.7))(react@19.2.7)
-      '@tsrx/react':
-        specifier: catalog:default
-        version: 0.4.5(react@19.2.7)
-      '@types/react':
-        specifier: catalog:default
-        version: 19.2.18
-      '@types/react-dom':
-        specifier: catalog:default
-        version: 19.2.4(@types/react@19.2.18)
-      '@vitejs/plugin-react':
-        specifier: catalog:default
-        version: 6.0.3(@rolldown/plugin-babel@0.2.3(@babel/core@7.29.7(supports-color@10.2.2))(@babel/plugin-transform-runtime@7.29.7(@babel/core@7.29.7(supports-color@10.2.2))(supports-color@10.2.2))(@babel/runtime@7.29.7)(rolldown@1.2.0)(vite@8.1.5(@types/node@24.13.3)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.49.0)(tsx@4.23.1)(yaml@2.9.0)))(babel-plugin-react-compiler@1.0.0)(vite@8.1.5(@types/node@24.13.3)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.49.0)(tsx@4.23.1)(yaml@2.9.0))
-      esbuild:
-        specifier: catalog:default
-        version: 0.28.1
-      happy-dom:
-        specifier: catalog:default
-        version: 20.11.2(bufferutil@4.1.0)(utf-8-validate@5.0.10)
-      octane:
-        specifier: workspace:*
-        version: link:../octane
-      react:
-        specifier: catalog:default
-        version: 19.2.7
-      react-dom:
-        specifier: catalog:default
-        version: 19.2.7(react@19.2.7)
-      vitest:
-        specifier: catalog:default
-        version: 4.1.10(@edge-runtime/vm@5.0.0)(@opentelemetry/api@1.9.1)(@types/node@24.13.3)(@vitest/browser-playwright@4.1.10)(@vitest/coverage-istanbul@4.1.10)(@vitest/coverage-v8@4.1.10)(happy-dom@20.11.2(bufferutil@4.1.0)(utf-8-validate@5.0.10))(jsdom@30.0.1(@noble/hashes@2.2.0))(vite@8.1.5(@types/node@24.13.3)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.49.0)(tsx@4.23.1)(yaml@2.9.0))
-
-  packages/tanstack-pacer:
-    dependencies:
-      '@tanstack/pacer':
-        specifier: 0.22.0
-        version: 0.22.0
-    devDependencies:
-      '@octanejs/tanstack-store':
-        specifier: workspace:*
-        version: link:../tanstack-store
-      '@tanstack/react-pacer':
-        specifier: 0.23.0
-        version: 0.23.0(react-dom@19.2.7(react@19.2.7))(react@19.2.7)
-      '@tanstack/react-store':
-        specifier: 0.11.1
-        version: 0.11.1(react-dom@19.2.7(react@19.2.7))(react@19.2.7)
-      '@tsrx/react':
-        specifier: catalog:default
-        version: 0.4.5(react@19.2.7)
-      '@types/react':
-        specifier: catalog:tanstack-pacer-react-oracle
-        version: 19.2.17
-      '@types/react-dom':
-        specifier: catalog:tanstack-pacer-react-oracle
-        version: 19.2.3(@types/react@19.2.17)
-      esbuild:
-        specifier: catalog:default
-        version: 0.28.1
-      octane:
-        specifier: workspace:*
-        version: link:../octane
-      react:
-        specifier: catalog:tanstack-pacer-react-oracle
-        version: 19.2.7
-      react-dom:
-        specifier: catalog:tanstack-pacer-react-oracle
-        version: 19.2.7(react@19.2.7)
-      vitest:
-        specifier: catalog:default
-        version: 4.1.10(@edge-runtime/vm@5.0.0)(@opentelemetry/api@1.9.1)(@types/node@24.13.3)(@vitest/browser-playwright@4.1.10)(@vitest/coverage-istanbul@4.1.10)(@vitest/coverage-v8@4.1.10)(happy-dom@20.11.2(bufferutil@4.1.0)(utf-8-validate@5.0.10))(jsdom@30.0.1(@noble/hashes@2.2.0))(vite@8.1.5(@types/node@24.13.3)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.49.0)(tsx@4.23.1)(yaml@2.9.0))
-
   packages/tanstack-query:
     dependencies:
       '@tanstack/query-core':
@@ -9572,49 +9467,6 @@ importers:
       use-sync-external-store:
         specifier: catalog:tanstack-store-react-oracle
         version: 1.6.0(react@19.2.3)
-      vitest:
-        specifier: catalog:default
-        version: 4.1.10(@edge-runtime/vm@5.0.0)(@opentelemetry/api@1.9.1)(@types/node@24.13.3)(@vitest/browser-playwright@4.1.10)(@vitest/coverage-istanbul@4.1.10)(@vitest/coverage-v8@4.1.10)(happy-dom@20.11.2(bufferutil@4.1.0)(utf-8-validate@5.0.10))(jsdom@30.0.1(@noble/hashes@2.2.0))(vite@8.1.5(@types/node@24.13.3)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.49.0)(tsx@4.23.1)(yaml@2.9.0))
-
-  packages/tanstack-table:
-    dependencies:
-      '@octanejs/tanstack-store':
-        specifier: workspace:*
-        version: link:../tanstack-store
-      '@tanstack/table-core':
-        specifier: 9.2.4
-        version: 9.2.4
-    devDependencies:
-      '@octanejs/testing-library':
-        specifier: workspace:*
-        version: link:../testing-library
-      '@tanstack/react-store':
-        specifier: 0.11.1
-        version: 0.11.1(react-dom@19.2.7(react@19.2.7))(react@19.2.7)
-      '@tanstack/react-table':
-        specifier: 9.2.4
-        version: 9.2.4(react-dom@19.2.7(react@19.2.7))(react@19.2.7)
-      '@testing-library/react':
-        specifier: catalog:default
-        version: 16.3.2(@testing-library/dom@10.4.1)(@types/react-dom@19.2.7(@types/react@19.2.18))(@types/react@19.2.18)(react-dom@19.2.7(react@19.2.7))(react@19.2.7)
-      '@tsrx/react':
-        specifier: catalog:default
-        version: 0.4.5(react@19.2.7)
-      '@types/react':
-        specifier: catalog:default
-        version: 19.2.18
-      esbuild:
-        specifier: catalog:default
-        version: 0.28.1
-      octane:
-        specifier: workspace:*
-        version: link:../octane
-      react:
-        specifier: catalog:default
-        version: 19.2.7
-      react-dom:
-        specifier: catalog:default
-        version: 19.2.7(react@19.2.7)
       vitest:
         specifier: catalog:default
         version: 4.1.10(@edge-runtime/vm@5.0.0)(@opentelemetry/api@1.9.1)(@types/node@24.13.3)(@vitest/browser-playwright@4.1.10)(@vitest/coverage-istanbul@4.1.10)(@vitest/coverage-v8@4.1.10)(happy-dom@20.11.2(bufferutil@4.1.0)(utf-8-validate@5.0.10))(jsdom@30.0.1(@noble/hashes@2.2.0))(vite@8.1.5(@types/node@24.13.3)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.49.0)(tsx@4.23.1)(yaml@2.9.0))
@@ -19601,21 +19453,6 @@ packages:
     resolution: {integrity: sha512-s3v1wpPcX3wfNO0WUERrPrXS+qqJ4ylzH9QTIRKqrgcMVeLEOXgFa3hZrhEoVTp+lVAgido2NH6GCI79twe2fg==}
     engines: {node: '>=22.12.0'}
 
-  '@solidjs/vite-plugin@3.0.0-next.47':
-    resolution: {integrity: sha512-vcsZbXkTCt2RalJmUPp25iz+7KYGriP9w54BLf5uIJ0xDf5woTN92WdlDCh0udZV/Zb2xw2qrWQA977QeuScJw==}
-    engines: {node: '>=22.12.0'}
-    peerDependencies:
-      '@solidjs/start-devtools': ^1.0.0-next.2
-      '@solidjs/web': ^2.0.0-rc.13
-      '@testing-library/jest-dom': ^5.16.6 || ^5.17.0 || ^6.0.0 || ^7.0.0
-      solid-js: ^2.0.0-rc.13
-      vite: ^8.0.0 || ^9.0.0
-    peerDependenciesMeta:
-      '@solidjs/start-devtools':
-        optional: true
-      '@testing-library/jest-dom':
-        optional: true
-
   '@solidjs/vite-plugin@3.0.0-next.49':
     resolution: {integrity: sha512-s50Tz24Nh061/lTSvG6VyVIAraQ4gYnnwjUCe2XfDAHY2jD85vYIckJiH1XV4ZnF4I79PaOsSoa7HhzZGO99+w==}
     engines: {node: '>=22.12.0'}
@@ -20055,6 +19892,10 @@ packages:
     resolution: {integrity: sha512-utTS5L2OkeYUzXGohL1Z8sefu1GLNOJcxe8Hd6iIdc/Xo1K1nDB2JEp4iSFhvYh33xKC9V91TxrS8qfrpoKobQ==}
     engines: {node: '>=20.19'}
 
+  '@tanstack/hotkeys@0.11.0':
+    resolution: {integrity: sha512-uFKTuknj3sNp5ERoxsI0ISMMOVw3KmSkgy2iIcp19QR/zheYm7bkwzNndMv5NDAqhXpavOn6h4A6HPVJFCBXPg==}
+    engines: {node: '>=20'}
+
   '@tanstack/hotkeys@0.8.0':
     resolution: {integrity: sha512-vqH7X9nb0MTJ/O08++dB5bP9jgj4+BIPOUu/U+6myG86lDsirZSVSobpq5UQpE7nBuk62i8eIYeOhd+OMl/UrA==}
     engines: {node: '>=18'}
@@ -20066,6 +19907,30 @@ packages:
     peerDependenciesMeta:
       react:
         optional: true
+
+  '@tanstack/octane-hotkeys@0.3.0':
+    resolution: {integrity: sha512-h8toz8bJnSRUa7+XHmlrejKqM0RyyL6PE7zP9qMlM0mZ8kHo14rllaxW+aebWbo/r9bN0JrG8zmmXzCNuDvulg==}
+    engines: {node: '>=22.22.2'}
+    peerDependencies:
+      octane: '>=0.12.0'
+
+  '@tanstack/octane-pacer@0.3.0':
+    resolution: {integrity: sha512-2bzUsG4ctVFmg1LYDKDffNyZhYlTP0HiidF8b7XDk9LLuxgPR4ISoIDau8e4G0YaqbK26/635lKPGO5pFlQhoQ==}
+    engines: {node: '>=22.22.2'}
+    peerDependencies:
+      octane: '>=0.12.0'
+
+  '@tanstack/octane-store@0.13.0':
+    resolution: {integrity: sha512-No0LCGE4B3bnAMN3FZqXcpDvNbf4MUf1Grq9IxC8by7toXPWYVaBeDt0VkRr5lG7/0ElhNTu50GUA5xmn5Yhzg==}
+    engines: {node: '>=22'}
+    peerDependencies:
+      octane: '>=0.12.0'
+
+  '@tanstack/octane-table@9.3.0':
+    resolution: {integrity: sha512-+88QERcuDdllDrFxlvqA1FS3xfiI2ANkxHjO7TxmPXWpWilE1Wk0UginpfXyYtABIdSaixceYGhK/+MRkvQfIw==}
+    engines: {node: '>=22'}
+    peerDependencies:
+      octane: '>=0.12.0'
 
   '@tanstack/openai-base@0.3.5':
     resolution: {integrity: sha512-szmbmt5jMCbKT+Mbn13ooAj+V1ZHj6EimwYhNCWURD+CCkOSWn1+qGEwYXFXksfEWUJ49rFwEWApodaPMQdvVA==}
@@ -20084,9 +19949,9 @@ packages:
     resolution: {integrity: sha512-hB01dd4rlsYcTCNP7wK186jgAe6K5qimgM1Y5Jtvz+9PUaILvpmeLLjmQNUNSO1l23lIt+CeQR6mO1mjlPvRtQ==}
     engines: {node: '>=18'}
 
-  '@tanstack/pacer@0.22.0':
-    resolution: {integrity: sha512-Zq23KOn30tFiA6ZYWihs5x++ttHkOIcnIIjRrJq05tGrYx9+iHsmVaj8jb7UJVemEI+JRWGzJ9C+50YV4nRz0w==}
-    engines: {node: '>=18'}
+  '@tanstack/pacer@0.23.1':
+    resolution: {integrity: sha512-ROZj19aPPGYebeRPhFZNRlqNaR2e4vkcLbgiXfbi5uJu8WiW/etsYmkcAcoSQRGOwGZbbioWRX7xssewDRVRhw==}
+    engines: {node: '>=20'}
 
   '@tanstack/query-core@5.101.3':
     resolution: {integrity: sha512-pWLyu7AjFFVM5G+frjcL81kKEW9R8GCCPKnL3uaWbMwd2f3ZINFCuy+PtKkdz/+pKw/f/XMsFsYq/H+uJHM4GQ==}
@@ -20139,13 +20004,6 @@ packages:
 
   '@tanstack/react-pacer@0.22.1':
     resolution: {integrity: sha512-CenQqK0GluSPIrnsG1yuD7w5uMSQ/4lI9AcGEFxBrRd66r260boWcYRIsS5+eHtXb238FoZYhKmJPGlhRzmHRw==}
-    engines: {node: '>=18'}
-    peerDependencies:
-      react: '>=16.8'
-      react-dom: '>=16.8'
-
-  '@tanstack/react-pacer@0.23.0':
-    resolution: {integrity: sha512-Ec3h+kT8kYlpGb1M8F7836q+udE/M2RmE8KLr1rhs+UDBgvxjfmyR2bIUeaDEe9Zn1YXNI986RbErXyr5fEJIg==}
     engines: {node: '>=18'}
     peerDependencies:
       react: '>=16.8'
@@ -20291,12 +20149,6 @@ packages:
       react: '>=16.8'
       react-dom: '>=16.8'
 
-  '@tanstack/react-table@9.2.4':
-    resolution: {integrity: sha512-Rzp1Q4e0/nIgEjmISYR5HeEgLTNtrG+C7NFZf/AbCxPO5hg+zC3yNGwcoECigUk8SFzzvhXbd2rFdtP2ZiGrfA==}
-    engines: {node: '>=20'}
-    peerDependencies:
-      react: '>=18'
-
   '@tanstack/react-virtual@3.14.12':
     resolution: {integrity: sha512-EOJkBss/FRqzFrCpX8M96lIh+ZMc0jPt0LILhxWQ3tOHQ3XdVvuE0jceS2yZXpDtayNfpjeg2EnuYPm90CxIlA==}
     peerDependencies:
@@ -20419,8 +20271,8 @@ packages:
     resolution: {integrity: sha512-ldZXEhOBb8Is7xLs01fR3YEc3DERiz5silj8tnGkFZytt1abEvl/GhUmCE0PMLaMPTa3Jk4HbKmRlHmu+gCftg==}
     engines: {node: '>=12'}
 
-  '@tanstack/table-core@9.2.4':
-    resolution: {integrity: sha512-GwdDyGGr6UXAtubF14yAwcXvdaogqfsQgIk89Suebjxob/Rjq2xvfmXsjDF1rQmKmhHsJm9TOY7myxv3i6geJw==}
+  '@tanstack/table-core@9.2.8':
+    resolution: {integrity: sha512-M4D6fY5jnc7z7TaoD3Pjvz5R+8MbhzCGYdkcFf2T1AgjigwLinvFWZh6mtqfN016A7yGIroOL0GiTlVGsTh6Vg==}
     engines: {node: '>=20'}
 
   '@tanstack/virtual-core@3.17.10':
@@ -46322,7 +46174,7 @@ snapshots:
 
   '@solidjs/signals@2.0.0-rc.14': {}
 
-  '@solidjs/vite-plugin@3.0.0-next.47(@solidjs/web@2.0.0-rc.14(solid-js@1.9.14))(@testing-library/jest-dom@6.9.1)(solid-js@1.9.14)(supports-color@10.2.2)(vite@8.1.5(@types/node@24.13.3)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.49.0)(tsx@4.23.1)(yaml@2.9.0))':
+  '@solidjs/vite-plugin@3.0.0-next.49(@solidjs/web@2.0.0-rc.14(solid-js@1.9.14))(@testing-library/jest-dom@6.9.1)(solid-js@1.9.14)(supports-color@10.2.2)(vite@8.1.5(@types/node@24.13.3)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.49.0)(tsx@4.23.1)(yaml@2.9.0))':
     dependencies:
       '@ampproject/remapping': 2.3.0
       '@babel/core': 7.29.7(supports-color@10.2.2)
@@ -46341,7 +46193,7 @@ snapshots:
       - supports-color
     optional: true
 
-  '@solidjs/vite-plugin@3.0.0-next.47(@solidjs/web@2.0.0-rc.14(solid-js@1.9.14))(@testing-library/jest-dom@6.9.1)(solid-js@1.9.14)(supports-color@10.2.2)(vite@8.1.5(@types/node@25.9.5)(esbuild@0.27.7)(jiti@2.7.0)(terser@5.49.0)(tsx@4.23.1)(yaml@2.9.0))':
+  '@solidjs/vite-plugin@3.0.0-next.49(@solidjs/web@2.0.0-rc.14(solid-js@1.9.14))(@testing-library/jest-dom@6.9.1)(solid-js@1.9.14)(supports-color@10.2.2)(vite@8.1.5(@types/node@25.9.5)(esbuild@0.27.7)(jiti@2.7.0)(terser@5.49.0)(tsx@4.23.1)(yaml@2.9.0))':
     dependencies:
       '@ampproject/remapping': 2.3.0
       '@babel/core': 7.29.7(supports-color@10.2.2)
@@ -46353,25 +46205,6 @@ snapshots:
       solid-js: 1.9.14
       vite: 8.1.5(@types/node@25.9.5)(esbuild@0.27.7)(jiti@2.7.0)(terser@5.49.0)(tsx@4.23.1)(yaml@2.9.0)
       vitefu: 1.1.3(vite@8.1.5(@types/node@25.9.5)(esbuild@0.27.7)(jiti@2.7.0)(terser@5.49.0)(tsx@4.23.1)(yaml@2.9.0))
-    optionalDependencies:
-      '@testing-library/jest-dom': 6.9.1
-    transitivePeerDependencies:
-      - '@tsrx/core'
-      - supports-color
-    optional: true
-
-  '@solidjs/vite-plugin@3.0.0-next.47(@solidjs/web@2.0.0-rc.14(solid-js@2.0.0-rc.14))(@testing-library/jest-dom@6.9.1)(solid-js@2.0.0-rc.14)(supports-color@10.2.2)(vite@8.1.5(@types/node@24.13.3)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.49.0)(tsx@4.23.1)(yaml@2.9.0))':
-    dependencies:
-      '@ampproject/remapping': 2.3.0
-      '@babel/core': 7.29.7(supports-color@10.2.2)
-      '@solidjs/babel-plugin': 2.0.0-rc.14(@babel/core@7.29.7(supports-color@10.2.2))
-      '@solidjs/compiler': 2.0.0-rc.14
-      '@solidjs/web': 2.0.0-rc.14(solid-js@2.0.0-rc.14)
-      '@types/babel__core': 7.20.5
-      merge-anything: 5.1.7
-      solid-js: 2.0.0-rc.14
-      vite: 8.1.5(@types/node@24.13.3)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.49.0)(tsx@4.23.1)(yaml@2.9.0)
-      vitefu: 1.1.3(vite@8.1.5(@types/node@24.13.3)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.49.0)(tsx@4.23.1)(yaml@2.9.0))
     optionalDependencies:
       '@testing-library/jest-dom': 6.9.1
     transitivePeerDependencies:
@@ -46860,6 +46693,10 @@ snapshots:
 
   '@tanstack/history@1.162.4': {}
 
+  '@tanstack/hotkeys@0.11.0':
+    dependencies:
+      '@tanstack/store': 0.11.2
+
   '@tanstack/hotkeys@0.8.0':
     dependencies:
       '@tanstack/store': 0.11.1
@@ -46871,6 +46708,29 @@ snapshots:
   '@tanstack/markdown@0.0.6(react@19.2.8)':
     optionalDependencies:
       react: 19.2.8
+
+  '@tanstack/octane-hotkeys@0.3.0(octane@packages+octane)':
+    dependencies:
+      '@tanstack/hotkeys': 0.11.0
+      '@tanstack/octane-store': 0.13.0(octane@packages+octane)
+      octane: link:packages/octane
+
+  '@tanstack/octane-pacer@0.3.0(octane@packages+octane)':
+    dependencies:
+      '@tanstack/octane-store': 0.13.0(octane@packages+octane)
+      '@tanstack/pacer': 0.23.1
+      octane: link:packages/octane
+
+  '@tanstack/octane-store@0.13.0(octane@packages+octane)':
+    dependencies:
+      '@tanstack/store': 0.11.2
+      octane: link:packages/octane
+
+  '@tanstack/octane-table@9.3.0(octane@packages+octane)':
+    dependencies:
+      '@tanstack/octane-store': 0.13.0(octane@packages+octane)
+      '@tanstack/table-core': 9.2.8
+      octane: link:packages/octane
 
   '@tanstack/openai-base@0.3.5(@tanstack/ai@0.20.1(@opentelemetry/api@1.9.1))(ws@8.21.1(bufferutil@4.1.0)(utf-8-validate@5.0.10))(zod@4.4.3)':
     dependencies:
@@ -46893,10 +46753,10 @@ snapshots:
       '@tanstack/devtools-event-client': 0.4.4
       '@tanstack/store': 0.11.1
 
-  '@tanstack/pacer@0.22.0':
+  '@tanstack/pacer@0.23.1':
     dependencies:
       '@tanstack/devtools-event-client': 0.5.0
-      '@tanstack/store': 0.11.1
+      '@tanstack/store': 0.11.2
 
   '@tanstack/query-core@5.101.3': {}
 
@@ -46953,26 +46813,12 @@ snapshots:
       react: 19.2.3
       react-dom: 19.2.3(react@19.2.3)
 
-  '@tanstack/react-hotkeys@0.10.0(react-dom@19.2.7(react@19.2.7))(react@19.2.7)':
-    dependencies:
-      '@tanstack/hotkeys': 0.8.0
-      '@tanstack/react-store': 0.11.1(react-dom@19.2.7(react@19.2.7))(react@19.2.7)
-      react: 19.2.7
-      react-dom: 19.2.7(react@19.2.7)
-
   '@tanstack/react-pacer@0.22.1(react-dom@19.2.3(react@19.2.3))(react@19.2.3)':
     dependencies:
       '@tanstack/pacer': 0.21.1
       '@tanstack/react-store': 0.11.1(react-dom@19.2.3(react@19.2.3))(react@19.2.3)
       react: 19.2.3
       react-dom: 19.2.3(react@19.2.3)
-
-  '@tanstack/react-pacer@0.23.0(react-dom@19.2.7(react@19.2.7))(react@19.2.7)':
-    dependencies:
-      '@tanstack/pacer': 0.22.0
-      '@tanstack/react-store': 0.11.1(react-dom@19.2.7(react@19.2.7))(react@19.2.7)
-      react: 19.2.7
-      react-dom: 19.2.7(react@19.2.7)
 
   '@tanstack/react-query-devtools@5.101.3(@tanstack/react-query@5.101.3(react@19.2.3))(react@19.2.3)':
     dependencies:
@@ -47278,13 +47124,6 @@ snapshots:
       react-dom: 19.2.3(react@19.2.3)
       use-sync-external-store: 1.6.0(react@19.2.3)
 
-  '@tanstack/react-store@0.11.1(react-dom@19.2.7(react@19.2.7))(react@19.2.7)':
-    dependencies:
-      '@tanstack/store': 0.11.1
-      react: 19.2.7
-      react-dom: 19.2.7(react@19.2.7)
-      use-sync-external-store: 1.6.0(react@19.2.7)
-
   '@tanstack/react-store@0.11.2(react-dom@19.2.3(react@19.2.3))(react@19.2.3)':
     dependencies:
       '@tanstack/store': 0.11.2
@@ -47311,14 +47150,6 @@ snapshots:
       '@tanstack/table-core': 8.21.3
       react: 19.2.3
       react-dom: 19.2.3(react@19.2.3)
-
-  '@tanstack/react-table@9.2.4(react-dom@19.2.7(react@19.2.7))(react@19.2.7)':
-    dependencies:
-      '@tanstack/react-store': 0.11.1(react-dom@19.2.7(react@19.2.7))(react@19.2.7)
-      '@tanstack/table-core': 9.2.4
-      react: 19.2.7
-    transitivePeerDependencies:
-      - react-dom
 
   '@tanstack/react-virtual@3.14.12(react-dom@19.2.7(react@19.2.7))(react@19.2.7)':
     dependencies:
@@ -47634,9 +47465,9 @@ snapshots:
 
   '@tanstack/table-core@8.21.3': {}
 
-  '@tanstack/table-core@9.2.4':
+  '@tanstack/table-core@9.2.8':
     dependencies:
-      '@tanstack/store': 0.11.1
+      '@tanstack/store': 0.11.2
 
   '@tanstack/virtual-core@3.17.10': {}
 
@@ -65575,7 +65406,7 @@ snapshots:
 
   vite-plugin-solid@3.0.0-next.27(@solidjs/web@2.0.0-rc.14(solid-js@1.9.14))(@testing-library/jest-dom@6.9.1)(solid-js@1.9.14)(supports-color@10.2.2)(vite@8.1.5(@types/node@24.13.3)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.49.0)(tsx@4.23.1)(yaml@2.9.0)):
     dependencies:
-      '@solidjs/vite-plugin': 3.0.0-next.47(@solidjs/web@2.0.0-rc.14(solid-js@1.9.14))(@testing-library/jest-dom@6.9.1)(solid-js@1.9.14)(supports-color@10.2.2)(vite@8.1.5(@types/node@24.13.3)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.49.0)(tsx@4.23.1)(yaml@2.9.0))
+      '@solidjs/vite-plugin': 3.0.0-next.49(@solidjs/web@2.0.0-rc.14(solid-js@1.9.14))(@testing-library/jest-dom@6.9.1)(solid-js@1.9.14)(supports-color@10.2.2)(vite@8.1.5(@types/node@24.13.3)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.49.0)(tsx@4.23.1)(yaml@2.9.0))
     transitivePeerDependencies:
       - '@solidjs/start-devtools'
       - '@solidjs/web'
@@ -65588,7 +65419,7 @@ snapshots:
 
   vite-plugin-solid@3.0.0-next.27(@solidjs/web@2.0.0-rc.14(solid-js@1.9.14))(@testing-library/jest-dom@6.9.1)(solid-js@1.9.14)(supports-color@10.2.2)(vite@8.1.5(@types/node@25.9.5)(esbuild@0.27.7)(jiti@2.7.0)(terser@5.49.0)(tsx@4.23.1)(yaml@2.9.0)):
     dependencies:
-      '@solidjs/vite-plugin': 3.0.0-next.47(@solidjs/web@2.0.0-rc.14(solid-js@1.9.14))(@testing-library/jest-dom@6.9.1)(solid-js@1.9.14)(supports-color@10.2.2)(vite@8.1.5(@types/node@25.9.5)(esbuild@0.27.7)(jiti@2.7.0)(terser@5.49.0)(tsx@4.23.1)(yaml@2.9.0))
+      '@solidjs/vite-plugin': 3.0.0-next.49(@solidjs/web@2.0.0-rc.14(solid-js@1.9.14))(@testing-library/jest-dom@6.9.1)(solid-js@1.9.14)(supports-color@10.2.2)(vite@8.1.5(@types/node@25.9.5)(esbuild@0.27.7)(jiti@2.7.0)(terser@5.49.0)(tsx@4.23.1)(yaml@2.9.0))
     transitivePeerDependencies:
       - '@solidjs/start-devtools'
       - '@solidjs/web'
@@ -65601,7 +65432,7 @@ snapshots:
 
   vite-plugin-solid@3.0.0-next.27(@solidjs/web@2.0.0-rc.14(solid-js@2.0.0-rc.14))(@testing-library/jest-dom@6.9.1)(solid-js@2.0.0-rc.14)(supports-color@10.2.2)(vite@8.1.5(@types/node@24.13.3)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.49.0)(tsx@4.23.1)(yaml@2.9.0)):
     dependencies:
-      '@solidjs/vite-plugin': 3.0.0-next.47(@solidjs/web@2.0.0-rc.14(solid-js@2.0.0-rc.14))(@testing-library/jest-dom@6.9.1)(solid-js@2.0.0-rc.14)(supports-color@10.2.2)(vite@8.1.5(@types/node@24.13.3)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.49.0)(tsx@4.23.1)(yaml@2.9.0))
+      '@solidjs/vite-plugin': 3.0.0-next.49(@solidjs/web@2.0.0-rc.14(solid-js@2.0.0-rc.14))(@testing-library/jest-dom@6.9.1)(solid-js@2.0.0-rc.14)(supports-color@10.2.2)(vite@8.1.5(@types/node@24.13.3)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.49.0)(tsx@4.23.1)(yaml@2.9.0))
     transitivePeerDependencies:
       - '@solidjs/start-devtools'
       - '@solidjs/web'

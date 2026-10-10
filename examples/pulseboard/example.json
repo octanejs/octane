@@ -7,12 +7,7 @@
   "status": "active",
   "renderModes": ["client"],
   "dialects": ["tsrx"],
-  "bindings": [
-    "@octanejs/tanstack-hotkeys",
-    "@octanejs/tanstack-table",
-    "@octanejs/tanstack-virtual",
-    "@octanejs/visx"
-  ],
+  "bindings": ["@octanejs/tanstack-virtual", "@octanejs/visx"],
   "octaneFeatures": [
     "async-recovery",
     "keyed-reconciliation",

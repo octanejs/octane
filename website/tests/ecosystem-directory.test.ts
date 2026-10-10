@@ -81,7 +81,7 @@ describe('ecosystem directory', () => {
 			]),
 		);
 		expect(titles.every((title) => !title.includes(',') && !/\band\b/i.test(title))).toBe(true);
-		expect(Math.max(...BINDING_CATEGORIES.map((category) => category.packages.length))).toBe(16);
+		expect(Math.max(...BINDING_CATEGORIES.map((category) => category.packages.length))).toBe(15);
 		expect(
 			BINDING_CATEGORIES.find((category) => category.title === 'UI Utilities')?.packages.map(
 				(entry) => entry.packageName,

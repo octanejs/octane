@@ -17,7 +17,7 @@ of bridging by hand:
 | `@tanstack/react-query` | `@octanejs/tanstack-query` |
 | `@tanstack/react-router` | `@octanejs/tanstack-router` |
 | `@tanstack/react-store` | `@octanejs/tanstack-store` |
-| `@tanstack/react-table` | `@octanejs/tanstack-table` |
+| `@tanstack/react-table` | `@tanstack/octane-table` |
 | `@tanstack/react-virtual` | `@octanejs/tanstack-virtual` |
 | `framer-motion` / `motion` | `@octanejs/motion` |
 | `@stylexjs/stylex` | `@octanejs/stylex` |

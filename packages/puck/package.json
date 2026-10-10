@@ -47,7 +47,7 @@
     "@dnd-kit/state": "catalog:default",
     "@octanejs/dnd-kit": "workspace:*",
     "@octanejs/lucide": "workspace:*",
-    "@octanejs/tanstack-pacer": "workspace:*",
+    "@tanstack/octane-pacer": "^0.3.0",
     "@octanejs/zustand": "workspace:*",
     "@types/flat": "^5.0.5",
     "@types/object-hash": "^3.0.6",

@@ -7,7 +7,7 @@
 import { useState, useEffect, useCallback } from 'octane';
 import { Loader2, ExternalLink, AlertCircle, Check, Lock, Globe, Rocket } from '@octanejs/lucide';
 import { twMerge } from 'tailwind-merge';
-import { useAsyncDebouncer } from '@octanejs/tanstack-pacer';
+import { useAsyncDebouncer } from '@tanstack/octane-pacer';
 import { Button, GitHub } from '~/ui';
 import { useDeployAuth } from './useDeployAuth';
 import {

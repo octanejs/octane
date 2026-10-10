@@ -110,24 +110,10 @@ const packedTsrxTypeScriptLanes = createPackedTsrxTypeScriptLanes({
 const packedExampleCanaries = [
 	{
 		artifacts: ['dist/index.html'],
-		dependencyEdges: [
-			['@octanejs/visx', '@octanejs/floating-ui'],
-			// The table binding reads its state through @octanejs/tanstack-store's
-			// useSelector, so a second copy would mean a second @tanstack/store and
-			// atom identities that no longer match the table's.
-			['@octanejs/tanstack-table', '@octanejs/tanstack-store'],
-		],
+		dependencyEdges: [['@octanejs/visx', '@octanejs/floating-ui']],
 		directory: 'pulseboard',
 		label: 'Pulseboard client example',
-		packages: [
-			'octane',
-			'@octanejs/tanstack-table',
-			'@octanejs/tanstack-store',
-			'@octanejs/tanstack-hotkeys',
-			'@octanejs/tanstack-virtual',
-			'@octanejs/visx',
-			'@octanejs/floating-ui',
-		],
+		packages: ['octane', '@octanejs/tanstack-virtual', '@octanejs/visx', '@octanejs/floating-ui'],
 	},
 	{
 		artifacts: ['dist/client', 'dist/server/entry.js', 'dist/server/index.html'],

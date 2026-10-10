@@ -72,12 +72,8 @@ import { verifyReactTransitionGroupTypes } from './react-transition-group-types-
 import { verifyReactTransitionGroupUpstream } from './react-transition-group-upstream-lib.mjs';
 import { verifySolanaReactTypes } from './solana-kit-types-lib.mjs';
 import { verifyTanstackDevtoolsTestClassifications } from './tanstack-devtools-classifications-lib.mjs';
-import { verifyTanstackHotkeysTestClassifications } from './tanstack-hotkeys-classifications-lib.mjs';
-import { verifyTanstackPacerTypes } from './tanstack-pacer-types-lib.mjs';
 import { verifyTanstackStoreTypes } from './tanstack-store-types-lib.mjs';
 import { verifyTanstackStoreUpstreamEvidence } from './tanstack-store-upstream-lib.mjs';
-import { verifyTanstackTableTestClassifications } from './tanstack-table-classifications-lib.mjs';
-import { verifyTanstackTableTypes } from './tanstack-table-types-lib.mjs';
 import { verifyTiptapTestClassifications } from './tiptap-classifications-lib.mjs';
 import { verifyTiptapRuntimeCrosswalk } from './tiptap-runtime-lib.mjs';
 import { verifyTiptapTypes } from './tiptap-types-lib.mjs';
@@ -161,8 +157,6 @@ const SPECIALIZED_CLASSIFICATION_BINDINGS = new Set([
 	'select',
 	'transition-group',
 	'tanstack-devtools',
-	'tanstack-hotkeys',
-	'tanstack-table',
 	'textarea-autosize',
 	'tiptap',
 	'vaul',
@@ -269,12 +263,6 @@ await captureBinding('solana-kit', '@octanejs/solana-kit type evidence', () =>
 await captureBinding('spring', 'react-spring upstream evidence', () =>
 	verifyReactSpringUpstream(REPO),
 );
-await captureBinding('tanstack-table', '@octanejs/tanstack-table type evidence', () =>
-	verifyTanstackTableTypes(REPO),
-);
-await captureBinding('tanstack-table', 'tanstack-table test classifications', () =>
-	verifyTanstackTableTestClassifications(REPO),
-);
 await captureBinding('tiptap', '@octanejs/tiptap type evidence', () => verifyTiptapTypes(REPO));
 await captureBinding('tiptap', '@octanejs/tiptap runtime crosswalk', () =>
 	verifyTiptapRuntimeCrosswalk(REPO),
@@ -284,9 +272,6 @@ await captureBinding('tiptap', '@octanejs/tiptap test classifications', () =>
 );
 await captureBinding('motion', '@octanejs/motion type evidence', () => verifyMotionTypes(REPO));
 await captureBinding('nuqs', '@octanejs/nuqs type evidence', () => verifyNuqsTypes(REPO));
-await captureBinding('tanstack-pacer', '@octanejs/tanstack-pacer type evidence', () =>
-	verifyTanstackPacerTypes(REPO),
-);
 await captureBinding('colorful', '@octanejs/colorful upstream evidence', () =>
 	verifyReactColorfulUpstream(REPO),
 );
@@ -348,9 +333,6 @@ await captureBinding('vaul', 'vaul adapted runtime structural evidence', () =>
 );
 await captureBinding('drei', 'drei React-parity evidence', () => verifyDreiReactParity(REPO));
 await captureBinding('drei', 'drei type evidence', () => verifyDreiTypes(REPO));
-await captureBinding('tanstack-hotkeys', 'tanstack-hotkeys test classifications', () =>
-	verifyTanstackHotkeysTestClassifications(REPO),
-);
 await captureBinding('tanstack-devtools', 'tanstack-devtools test classifications', () =>
 	verifyTanstackDevtoolsTestClassifications(REPO),
 );

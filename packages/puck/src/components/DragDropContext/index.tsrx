@@ -20,7 +20,7 @@ import { getItem } from '../../lib/data/get-item';
 import { DropZoneContext, Preview, ZoneStore, ZoneStoreProvider } from '../DropZone/context.tsrx';
 import { createNestedDroppablePlugin } from '../../lib/dnd/NestedDroppablePlugin';
 import { insertComponent } from '../../lib/insert-component';
-import { useDebouncer } from '@octanejs/tanstack-pacer';
+import { useDebouncer } from '@tanstack/octane-pacer';
 import { ComponentDndData } from '../DraggableComponent/index.tsrx';
 
 import { collisionStore } from '../../lib/dnd/collision/dynamic/store';

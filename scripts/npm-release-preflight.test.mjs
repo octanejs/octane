@@ -119,14 +119,14 @@ describe('npm release preflight', () => {
 		const state = await inspectNpmReleaseState(
 			[
 				{ name: 'octane', version: '0.1.16' },
-				{ name: '@octanejs/tanstack-hotkeys', version: '0.0.5' },
+				{ name: '@octanejs/tanstack-virtual', version: '0.0.5' },
 			],
 			{ fetchImpl: registryFixture({ octane: metadata('0.1.13', ['0.1.13']) }) },
 		);
 
 		assert.deepEqual(
 			state.unbootstrapped.map((pkg) => `${pkg.name}@${pkg.version}`),
-			['@octanejs/tanstack-hotkeys@0.0.5'],
+			['@octanejs/tanstack-virtual@0.0.5'],
 		);
 		assert.match(releaseStateErrors(state)[0], /one-time bootstrap/);
 	});
