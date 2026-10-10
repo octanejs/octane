@@ -24,6 +24,11 @@ const METRICS = [
 	'hideActivityRefs',
 	'queueCurrentActivityRefs',
 ];
+// Keep metric keys comparable with revisions before the optional ref drains.
+const REF_DRAIN_NAMES = {
+	drainQueuedRefAttaches: 'drainRefAttaches',
+	drainQueuedRefDetaches: 'drainRefDetaches',
+};
 const targets = [];
 const failures = [];
 let browser;
@@ -58,8 +63,12 @@ try {
 						'__activityRefCleanup',
 						'__activityRefFinish',
 					],
-					metrics: METRICS,
+					metrics: [...METRICS, ...Object.keys(REF_DRAIN_NAMES)],
 				});
+				for (const [name, metric] of Object.entries(REF_DRAIN_NAMES)) {
+					calls[metric] += calls[name];
+					delete calls[name];
+				}
 				for (const [metric, value] of Object.entries(calls)) {
 					ops[`${operation}_${metric}`] = countStat(value);
 				}

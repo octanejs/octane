@@ -427,6 +427,17 @@ function profileTrackComponent(subject: object, fallback: Function): void {
 	);
 }
 
+// Ref queues own commit and subtree visibility work. Install before either
+// queue publishes its first entry, including deferred or unpublished refs.
+let drainRefAttaches: typeof drainQueuedRefAttaches = noop;
+let drainRefDetaches: typeof drainQueuedRefDetaches = noop;
+let detachSubtreeRefs: typeof detachRegisteredSubtreeRefs = noop;
+let withRefDetachSuppression: typeof withRegisteredRefDetachSuppression =
+	withoutRefDetachSuppression;
+function withoutRefDetachSuppression<T>(_entries: SuspenseRefEntry[] | null, fn: () => T): T {
+	return fn();
+}
+
 function profilePortalComponent(rawBody: unknown, body: Function): Function | null {
 	if (typeof rawBody === 'function' && __profileHasComponentMetadata(rawBody)) return rawBody;
 	// Only a component element unwrapped into the portal block is that block's
@@ -10184,6 +10195,12 @@ const LAYOUT_CASCADE_LIMIT = 50;
  * hopping between elements never ends null, whichever binding updates first.
  */
 export function queueRefAttach(scope: Scope, ref: any, el: Element | FragmentInstance): void {
+	if (drainRefAttaches === noop) {
+		drainRefAttaches = drainQueuedRefAttaches;
+		detachSubtreeRefs = detachRegisteredSubtreeRefs;
+		withRefDetachSuppression = withRegisteredRefDetachSuppression;
+	}
+
 	activityRefCreated?.(scope.block, el);
 	const entry: RefAttach = {
 		ref,
@@ -10221,6 +10238,8 @@ const refDetachQueue: any[] = [];
  * callback ref shared across elements releases ITS element's React-19 cleanup.
  */
 export function queueRefDetach(ref: any, el: Element | FragmentInstance | null): void {
+	if (drainRefDetaches === noop) drainRefDetaches = drainQueuedRefDetaches;
+
 	if (ref == null || isRefDetachSuppressed(el)) return;
 	if (el !== null && NATIVE_READ_DRIVER && NATIVE_READ_DRIVER.unpublishedRef(el, ref)) {
 		NATIVE_READ_DRIVER.forgetUnpublishedRef(el);
@@ -10285,7 +10304,7 @@ function isRefDetachSuppressed(el: Element | FragmentInstance | null): boolean {
 	return false;
 }
 
-function withRefDetachSuppression<T>(entries: SuspenseRefEntry[] | null, fn: () => T): T {
+function withRegisteredRefDetachSuppression<T>(entries: SuspenseRefEntry[] | null, fn: () => T): T {
 	if (entries === null || entries.length === 0) return fn();
 	const elements = new Set<Element | FragmentInstance>();
 	for (let i = 0; i < entries.length; i++) {
@@ -10302,7 +10321,7 @@ function withRefDetachSuppression<T>(entries: SuspenseRefEntry[] | null, fn: () 
 	}
 }
 
-function drainRefDetaches(): void {
+function drainQueuedRefDetaches(): void {
 	if (refDetachQueue.length === 0) return;
 	const q = refDetachQueue.splice(0);
 	for (let i = 0; i < q.length; i += 4) {
@@ -10328,7 +10347,7 @@ function drainRefDetaches(): void {
 }
 
 /** Drain queued mount ref attaches in React's post-order (descendant-before-ancestor). */
-function drainRefAttaches(): void {
+function drainQueuedRefAttaches(): void {
 	if (refAttachQueue.length === 0) return;
 	const q = refAttachQueue.splice(0);
 	// ES stable sort preserves the queue's DFS/source order for disjoint subtrees;
@@ -47544,7 +47563,7 @@ function forEachSubtreeChild(
 // slots[0] (no key scan, and the fields take normal 1-char names). De-opt host slots
 // store `state.ref` + the node. We recurse through children + control-flow slots via
 // forEachSubtreeChild (the same walk deactivateScope uses).
-function detachSubtreeRefs(
+function detachRegisteredSubtreeRefs(
 	scope: Scope,
 	out: SuspenseRefEntry[],
 	shouldDetach: boolean = true,
