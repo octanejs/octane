@@ -3386,12 +3386,25 @@ test('same-file void roots remove returned-value machinery while preserving stoc
 });
 
 test('same-file root optimization proves complete lifetimes across bindings and modes', (t) => {
+	const { parseModule } = createRequire(
+		new URL('../../packages/octane/package.json', import.meta.url),
+	)('@tsrx/core');
 	const previous = process.env.OCTANE_COMPILE_FROZEN_AST;
 	process.env.OCTANE_COMPILE_FROZEN_AST = '1';
 	let checked = 0;
 	const check = (source, helper, selected, options = {}) => {
 		const code = compile(source, 'root-proof.tsrx', { hmr: false, dev: false, ...options }).code;
-		assert.equal(code.includes(helper + ' as'), selected, source + JSON.stringify(options));
+		const imports = new Set(
+			parseModule(code, 'root-proof.js').body.flatMap((node) =>
+				node.type === 'ImportDeclaration'
+					? node.specifiers.map((specifier) => specifier.imported?.name)
+					: [],
+			),
+		);
+		const specialized =
+			imports.has(helper) ||
+			(helper === '__createVoidRoot' && imports.has('__createVoidRootDefaultOptions'));
+		assert.equal(specialized, selected, source + JSON.stringify(options));
 		checked++;
 	};
 	const createPrefix =
