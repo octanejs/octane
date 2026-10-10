@@ -162,6 +162,26 @@ export function run() { const host=document.querySelector('#host'),root=createRo
 			expect(await consume(source, dev)).toEqual({ text: 'holes', cleaned: true });
 	});
 
+	it('keeps exported roots generic across future descriptors and helper-name collisions', async () => {
+		const source = `import {createRoot,createElement,flushSync} from 'octane';
+const _$__createRootDefaultOptions='authored';
+export const root=createRoot(document.querySelector('#host'));
+export async function run(){const host=document.querySelector('#host');
+ root.render(createElement('section',null,createElement('input',{defaultValue:'initial'}),_$__createRootDefaultOptions));
+ const input=host.querySelector('input');input.value='typed';input.focus();
+ flushSync(()=>root.render(createElement('section',null,createElement('input',{defaultValue:'initial'}),'updated')));
+ const retained=input===host.querySelector('input')&&input.value==='typed'&&document.activeElement===input;
+ const text=host.textContent;root.render('ordinary');await Promise.resolve();const replaced=host.textContent;
+ root.unmount();return {retained,text,replaced,cleaned:host.childNodes.length===0};}`;
+		for (const dev of [false, true])
+			expect(await consume(source, dev)).toEqual({
+				retained: true,
+				text: 'updated',
+				replaced: 'ordinary',
+				cleaned: true,
+			});
+	});
+
 	it('resolves the factory import through lexical shadows', async () => {
 		const source = `import {createRoot as makeRoot} from 'octane'; ${VIEW}
 function mount(host,makeRoot) { const root=makeRoot(host); root.render(View); root.unmount(); }

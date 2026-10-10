@@ -647,7 +647,7 @@ export function App() @{ <main><Canvas><Scene /></Canvas><p>after</p></main> }
 			);
 			for (const genericEntry of [changedAfterOctane, virtualEntry]) {
 				expect(genericEntry?.code).toContain(
-					"import { __createRootDefaultOptions as _$createRootDefaultOptions } from 'octane';",
+					"import { __createRootDefaultOptions as _$createRootDefaultOptions } from 'octane/internal/client';",
 				);
 				expect(genericEntry?.code).toContain(
 					'_$createRootDefaultOptions(document.body).render(Main);',
@@ -674,7 +674,8 @@ export function App() @{ <main><Canvas><Scene /></Canvas><p>after</p></main> }
 				entrySource,
 				entry,
 			);
-			expect(watchedEntry).toBeNull();
+			expect(watchedEntry?.code).toContain('__createRootDefaultOptions as');
+			expect(watchedEntry?.code).not.toContain('__createVoidRoot');
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}

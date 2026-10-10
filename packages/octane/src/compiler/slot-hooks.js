@@ -16,7 +16,11 @@
 
 import { parseModule, builders as b } from '@tsrx/core';
 import { parseModule as parseFallbackModule } from '#octane/compiler-parser';
-import { findRootFactoryImports, proveVoidRoots } from './void-roots.js';
+import {
+	findRootFactoryImports,
+	findDefaultOptionsRootCalls,
+	proveVoidRoots,
+} from './void-roots.js';
 import { HOOK_NAMES, collectDepPaths, collectNestedBindingNames, hookSlotHash } from './compile.js';
 import { createLexicalAnalysis } from './compile-universal.js';
 import {
@@ -290,24 +294,26 @@ export function findVoidComponentImports(source, id) {
 	return [...unique.values()];
 }
 
-function collectVoidRootEdits(candidates, st, isVoidComponentImport) {
-	if (typeof isVoidComponentImport !== 'function') return;
-	for (const candidate of candidates) {
-		let helper = candidate.helper;
-		if (
-			!candidate.components.every(({ request, imported }) =>
-				isVoidComponentImport(request, imported),
+function collectRootEdits(candidates, defaultOptionsCalls, st, isVoidComponentImport) {
+	const roots = new Map(
+		defaultOptionsCalls.map((callee) => [
+			callee.start,
+			{ start: callee.start, end: callee.end, helper: '__createRootDefaultOptions' },
+		]),
+	);
+	if (typeof isVoidComponentImport === 'function')
+		for (const candidate of candidates)
+			if (
+				candidate.components.every(({ request, imported }) =>
+					isVoidComponentImport(request, imported),
+				)
 			)
-		) {
-			// The argument proof is independent of the component return ABI.
-			// Preserve generic returned-value reconciliation on this fallback.
-			if (helper !== '__createVoidRootDefaultOptions') continue;
-			helper = '__createRootDefaultOptions';
-		}
+				roots.set(candidate.start, candidate);
+	for (const { start, end, helper } of roots.values()) {
 		let local = st.voidRootNames.get(helper);
 		if (local === undefined)
 			st.voidRootNames.set(helper, (local = allocSlotName(st, '_$' + helper.slice(2))));
-		st.edits.push({ pos: candidate.start, end: candidate.end, text: local });
+		st.edits.push({ pos: start, end, text: local });
 	}
 }
 
@@ -1276,6 +1282,17 @@ export function slotHooks(source, id, options) {
 				options?.universalRuntime == null,
 		}),
 	);
+	const defaultOptionsRoot =
+		!options?.manualSlots &&
+		!options?.hmr &&
+		!options?.dev &&
+		!options?.profile &&
+		environment === 'client' &&
+		(options?.renderer?.target ?? 'dom') === 'dom' &&
+		options?.universalRuntime == null;
+	const defaultOptionsCalls = defaultOptionsRoot
+		? findDefaultOptionsRootCalls(ast, { factories: findRootFactoryImports(ast) })
+		: [];
 	const canSpecializeRoot =
 		!options?.manualSlots &&
 		!options?.hmr &&
@@ -1285,6 +1302,7 @@ export function slotHooks(source, id, options) {
 	if (
 		!importInfo.importsHook &&
 		!canSpecializeRoot &&
+		defaultOptionsCalls.length === 0 &&
 		!nativeReadActivation &&
 		!signalLowering.usesSignals &&
 		!manualProviders.size &&
@@ -1297,15 +1315,7 @@ export function slotHooks(source, id, options) {
 	// preserved, so the text edits below stay valid), with the dependency
 	// inference keyed by the rebuilt calls.
 	// Annotation preserves offsets, so the authored tree's proof stays valid.
-	const voidRoots = canSpecializeRoot
-		? collectVoidRootCandidates(
-				ast,
-				environment === 'client' &&
-					!options?.dev &&
-					(options?.renderer?.target ?? 'dom') === 'dom' &&
-					options?.universalRuntime == null,
-			)
-		: [];
+	const voidRoots = canSpecializeRoot ? collectVoidRootCandidates(ast, defaultOptionsRoot) : [];
 	let inferred = new Map();
 	if (importInfo.importsHook) {
 		const annotated = annotateHookCalls(ast, {
@@ -1351,6 +1361,8 @@ export function slotHooks(source, id, options) {
 			stateGetterHelpers: STATE_GETTER_HELPERS,
 			pureCalls,
 		});
+		// Preserve existing memo lowering; its whole-AST result takes precedence
+		// over the optional call-only root rewrite below.
 		if (inlined !== null) return { ...inlined, ...strongHints };
 	}
 	const st = {
@@ -1399,9 +1411,7 @@ export function slotHooks(source, id, options) {
 	if (manualProviders.size) {
 		collectManualHookEdits(ast, findManualHookProviders(ast), st);
 	}
-	if (canSpecializeRoot) {
-		collectVoidRootEdits(voidRoots, st, options.isVoidComponentImport);
-	}
+	collectRootEdits(voidRoots, defaultOptionsCalls, st, options?.isVoidComponentImport);
 	if (pureCalls.size) {
 		// A replacement covering the call's start owns that text, so its own
 		// output decides the annotation. Otherwise the mark goes first in the
@@ -1428,7 +1438,14 @@ export function slotHooks(source, id, options) {
 	const helperSpecifiers = [...st.getterHelpers].map(
 		([hook, local]) => `${STATE_GETTER_HELPERS[hook]} as ${local}`,
 	);
-	for (const [helper, local] of st.voidRootNames) helperSpecifiers.push(`${helper} as ${local}`);
+	const otherHelpers = new Map();
+	for (const [helper, local] of st.voidRootNames) {
+		if (helper === '__createRootDefaultOptions' || helper === '__createVoidRootDefaultOptions') {
+			let specifiers = otherHelpers.get('octane/internal/client');
+			if (specifiers === undefined) otherHelpers.set('octane/internal/client', (specifiers = []));
+			specifiers.push(`${helper} as ${local}`);
+		} else helperSpecifiers.push(`${helper} as ${local}`);
+	}
 	for (const helper of st.parallelHelpers.values()) {
 		if (helper.request === 'octane') {
 			helperSpecifiers.push(`${helper.imported} as ${helper.local}`);
@@ -1442,7 +1459,6 @@ export function slotHooks(source, id, options) {
 		helperSpecifiers.length === 0
 			? ''
 			: `import { ${helperSpecifiers.join(', ')} } from 'octane';\n`;
-	const otherHelpers = new Map();
 	for (const helper of st.parallelHelpers.values()) {
 		if (helper.request === 'octane') continue;
 		let specifiers = otherHelpers.get(helper.request);

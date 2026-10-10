@@ -231,19 +231,20 @@ async function buildFixture(fixture, variant) {
 		});
 	});
 	assert.deepEqual(scripts, ['main.js']);
-	// The adapter supplies no proof predicate to the rerouted control, so it
-	// keeps the public factory. Only the proven entry may use a void root.
+	// Rerouting removes the void-output proof, but not the exact one-argument
+	// createRoot proof. Hydration still needs its public generic factory.
 	const { factory } = fixture.scenario;
 	const helper = VOID_ROOT_HELPERS[factory];
-	const generic = factory;
+	const generic = factory === 'createRoot' ? '__createRootDefaultOptions' : factory;
 	const selected = variant === 'proven' ? helper : generic;
 	const local = selected === factory ? factory : '_$' + selected.slice(2);
+	const request = selected.endsWith('RootDefaultOptions') ? 'octane/internal/client' : 'octane';
 	const escapedLocal = local.replaceAll('$', '\\$');
 	const entrySource = sources.get('entry.ts');
 	assert.match(
 		entrySource,
 		new RegExp(
-			`import \\{[^}]*\\b${selected}\\b${selected === factory ? '' : ` as ${escapedLocal}`}[^}]*\\} from ['"]octane['"]`,
+			`import \\{[^}]*\\b${selected}\\b${selected === factory ? '' : ` as ${escapedLocal}`}[^}]*\\} from ['"]${request}['"]`,
 		),
 		`${fixture.name}: entry lost the ${selected} import`,
 	);
@@ -260,10 +261,6 @@ async function buildFixture(fixture, variant) {
 		assert.ok(
 			!entrySource.includes(voidPrefix),
 			`${fixture.name}: control entry was void-specialized`,
-		);
-		assert.ok(
-			!entrySource.includes('__createRootDefaultOptions'),
-			`${fixture.name}: control omitted options`,
 		);
 		assert.ok(entrySource.includes(REEXPORT), `${fixture.name}: control was not rerouted`);
 	}

@@ -750,10 +750,10 @@ let HYDRATION_DRIVER: HydrationDriver | null = null;
 
 // Root callback reporting is installed only by roots whose ABI permits options.
 // Keep every consumer callable: some calls pass the recovery itself as an argument.
+let ROOT_ERROR_HANDLERS: WeakMap<Block, RootErrorHandlers> | null = null;
 let registerRootErrorHandlers: typeof registerEnabledRootErrorHandlers = noop;
 let reportCaughtError: typeof registeredReportCaughtError = noop;
 let reportUncaughtError: typeof registeredReportUncaughtError = () => false;
-let enqueueInlineCaughtError: typeof registeredEnqueueInlineCaughtError = noop;
 let publishInlineCaughtErrorReports: typeof registeredPublishInlineCaughtErrorReports = noop;
 
 // Potential bindings retain invocation identities before a late signal module
@@ -41951,7 +41951,7 @@ function mountPassthroughCatch(
 			}
 		} else renderBlock(block);
 	} finally {
-		if (reportInline) enqueueInlineCaughtError(state);
+		if (reportInline && ROOT_ERROR_HANDLERS) registeredEnqueueInlineCaughtError(state);
 	}
 }
 
@@ -42349,7 +42349,7 @@ function switchErrorToCatchInner(
 		if (parent !== null) parent(propagated);
 		else console.error('catch body threw, no outer tryBlock:', nextError);
 	} finally {
-		if (reportInline && !control) enqueueInlineCaughtError(state);
+		if (reportInline && !control && ROOT_ERROR_HANDLERS) registeredEnqueueInlineCaughtError(state);
 	}
 }
 
@@ -45798,7 +45798,7 @@ function switchToCatchInner(
 		if (parent) parent(propagated);
 		else console.error('catch body threw, no outer tryBlock:', e2);
 	} finally {
-		if (reportInline && !control) enqueueInlineCaughtError(state);
+		if (reportInline && !control && ROOT_ERROR_HANDLERS) registeredEnqueueInlineCaughtError(state);
 	}
 }
 
@@ -50908,8 +50908,6 @@ interface RootErrorHandlers {
 	onRecoverableError: ((error: unknown) => void) | undefined;
 }
 
-let ROOT_ERROR_HANDLERS: WeakMap<Block, RootErrorHandlers> | null = null;
-
 function registerEnabledRootErrorHandlers(root: Block, options: RootOptions | undefined): void {
 	if (options === undefined) return;
 	const { onCaughtError, onUncaughtError, onRecoverableError } = options;
@@ -50923,7 +50921,6 @@ function registerEnabledRootErrorHandlers(root: Block, options: RootOptions | un
 	if (ROOT_ERROR_HANDLERS === null) {
 		reportCaughtError = registeredReportCaughtError;
 		reportUncaughtError = registeredReportUncaughtError;
-		enqueueInlineCaughtError = registeredEnqueueInlineCaughtError;
 		publishInlineCaughtErrorReports = registeredPublishInlineCaughtErrorReports;
 	}
 	(ROOT_ERROR_HANDLERS ??= new WeakMap()).set(root, {

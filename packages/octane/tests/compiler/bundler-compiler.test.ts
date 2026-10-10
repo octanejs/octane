@@ -1738,7 +1738,9 @@ export default interface ErasedShape { value: string }
 			// The neutral compiler cannot know what a bundler alias or virtual load
 			// makes this request mean, so an on-disk lookalike is never proof.
 			const unproven = compiler.transform(defaultEntry, entry);
-			expect(unproven).toMatchObject({ kind: 'none', code: defaultEntry });
+			expect(unproven?.kind).toBe('slots');
+			expect(unproven?.code).toContain('__createRootDefaultOptions as');
+			expect(unproven?.code).not.toContain('__createVoidRoot');
 			expect(unproven?.dependencies).not.toContain(component);
 
 			const compiledDefault = compiler.transform(defaultComponent, component, {
@@ -1867,7 +1869,7 @@ export default interface ErasedShape { value: string }
 			expect(named?.code).toContain('__createVoidRoot');
 
 			// The unproven import keeps generic returned-value reconciliation while
-			// omitting options; the escaped root keeps the public factory.
+			// omitting options; the escaped root keeps generic returned-value handling.
 			const unknown = join(src, 'Unknown.js');
 			writeFileSync(unknown, 'export function Unknown() { return null; }\n');
 			const mixedEntry =
@@ -1887,7 +1889,9 @@ export default interface ErasedShape { value: string }
 			expect(mixed?.code).toContain(
 				'_$createRootDefaultOptions(document.documentElement).render(Unknown)',
 			);
-			expect(mixed?.code).toContain('export const retained = createRoot(document.body)');
+			expect(mixed?.code).toContain(
+				'export const retained = _$createRootDefaultOptions(document.body)',
+			);
 
 			// A module-private root whose every use is proven has a closed lifetime.
 			const privateRoot = compiler.transform(

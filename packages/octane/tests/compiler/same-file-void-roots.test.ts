@@ -38,6 +38,7 @@ describe('same-file root compiler artifact origins', () => {
 		{ environment: 'server' },
 		{ manualSlots: true },
 		{ renderer: { id: 'test', module: 'octane/universal', target: 'universal' } },
+		{ renderer: { id: 'native', module: 'custom-native-runtime', target: 'valdi' } },
 	] as const)('keeps default-options DOM helpers out of other compile modes (%j)', (options) => {
 		const source = `import {createRoot} from 'octane';
 import View from './View.tsrx';
@@ -72,13 +73,12 @@ export function run(host, value) {
 	});
 
 	it.each([
+		['no argument', 'const root=createRoot();root.render(View);'],
+		['optional call', 'const root=createRoot?.(host);root.render(View);'],
 		['explicit undefined', 'const root=createRoot(host,undefined);root.render(View);'],
 		['options', 'const root=createRoot(host,options());root.render(View);'],
 		['spread', 'const root=createRoot(...[host]);root.render(View);'],
 		['extra argument', 'const root=createRoot(host,undefined,extra());root.render(View);'],
-		['escaped root', 'const root=createRoot(host);root.render(View);return root;'],
-		['unknown render', 'const root=createRoot(host);root.render(View);root.render(value);'],
-		['eval', 'const root=createRoot(host);root.render(View);eval("root");'],
 		[
 			'shadowed factory',
 			'function inner(createRoot){createRoot(host).render(View);}inner(factory);',
@@ -94,6 +94,107 @@ export function run(host,options,extra,value,factory){${body}}`;
 			isVoidComponentImport: () => false,
 		});
 		expect(result?.code ?? source).toBe(source);
+	});
+
+	it.each([
+		'export const root=createRoot(document.body);',
+		'export function make(host){return createRoot(host);}',
+		'export function make(host){const root=createRoot(host);root.render(value);return root;}',
+		'export function make(host){const root=createRoot(host);eval("root");return root;}',
+	])('omits options independently of root lifetime: %s', (body) => {
+		const source = `import {createRoot} from 'octane';
+${body}`;
+		for (const inlineHookMemo of [false, true]) {
+			const result = slotHooks(source, '/src/entry.ts', {
+				dev: false,
+				hmr: false,
+				inlineHookMemo,
+			});
+			expect(result?.code).toContain('__createRootDefaultOptions as');
+			expect(result?.code).toContain("from 'octane/internal/client'");
+			expect(result?.code).not.toContain('__createVoidRoot');
+		}
+	});
+
+	it('preserves memo lowering before optional exported-root specialization', () => {
+		const source = `import {createRoot,useMemo,useCallback} from 'octane';
+export const root=createRoot(document.body);
+export function useValue(value){
+ const memo=useMemo(()=>({value}),[value]);
+ const callback=useCallback(()=>memo.value,[memo]);
+ return {memo,callback};
+}`;
+		const result = slotHooks(source, '/src/memo-root.ts', {
+			dev: false,
+			hmr: false,
+			inlineHookMemo: true,
+		});
+		expect(result?.map).toMatchObject({ sources: ['/src/memo-root.ts'], sourcesContent: [source] });
+		expect(result?.code).not.toMatch(/\buse(?:Memo|Callback)\s*\(/);
+		expect(result?.code).not.toContain('__createRootDefaultOptions');
+		expect(result?.code.slice(rootCalleeOffset(result!.code))).toMatch(/^createRoot\(/);
+	});
+
+	it('routes only the new default-options factories through the private client entry', () => {
+		const source = `import {createRoot,hydrateRoot} from 'octane';
+import View from './View.tsrx';
+createRoot(document.body).render(View);
+createRoot(document.body,undefined).render(View);
+hydrateRoot(document.body,View);
+export const root=createRoot(document.body);`;
+		const code = slotHooks(source, '/src/entry.ts', {
+			dev: false,
+			hmr: false,
+			isVoidComponentImport: () => true,
+		})!.code;
+		const imports = parseModule(code, 'entry.js').body.filter(
+			(node: any) => node.type === 'ImportDeclaration',
+		);
+		const helpers = (request: string) =>
+			imports
+				.filter((node: any) => node.source.value === request)
+				.flatMap((node: any) => node.specifiers.map((specifier: any) => specifier.imported?.name));
+		expect(helpers('octane/internal/client').sort()).toEqual([
+			'__createRootDefaultOptions',
+			'__createVoidRootDefaultOptions',
+		]);
+		expect(helpers('octane')).toContain('__createVoidRoot');
+		expect(helpers('octane')).toContain('__hydrateVoidRoot');
+		expect(helpers('octane')).not.toContain('__createRootDefaultOptions');
+		expect(helpers('octane')).not.toContain('__createVoidRootDefaultOptions');
+	});
+
+	it('keeps call-only root specialization copy-on-write and outside component bodies', () => {
+		const previous = process.env.OCTANE_COMPILE_FROZEN_AST;
+		try {
+			process.env.OCTANE_COMPILE_FROZEN_AST = '1';
+			const source = `import {createRoot} from 'octane';
+const _$__createRootDefaultOptions='authored';
+export const root=createRoot(document.body);
+root.render(_$__createRootDefaultOptions);`;
+			const result = compile(source, 'escaping-root.tsrx', { dev: false, hmr: false });
+			expect(result.code).toContain('__createRootDefaultOptions as');
+			expect(result.code).not.toContain('__createVoidRoot');
+			expect(result.map.sourcesContent).toEqual([source]);
+			const offset = rootCalleeOffset(result.code)!;
+			const lines = result.code.slice(0, offset).split('\n');
+			expect(decodeMappings(result.map.mappings)[lines.length - 1]).toContainEqual([
+				lines.at(-1)!.length,
+				0,
+				2,
+				'export const root='.length,
+			]);
+			const inner = compile(
+				`import {createRoot} from 'octane';
+export function App(props) @{ const root=createRoot(props.host);props.expose(root);<div /> }`,
+				'component-root.tsrx',
+				{ dev: false, hmr: false },
+			);
+			expect(inner.code).not.toContain('__createRootDefaultOptions');
+		} finally {
+			if (previous === undefined) delete process.env.OCTANE_COMPILE_FROZEN_AST;
+			else process.env.OCTANE_COMPILE_FROZEN_AST = previous;
+		}
 	});
 
 	it.each([

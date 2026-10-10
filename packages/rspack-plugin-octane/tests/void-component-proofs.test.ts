@@ -133,7 +133,7 @@ function expectSpecialized(sources: Sources) {
 	// Both roots omit options; only App has the complete void-return proof.
 	const entry = sources.get('entry.ts');
 	expect(entry).toContain(
-		"import { __createVoidRootDefaultOptions as _$createVoidRootDefaultOptions, __createRootDefaultOptions as _$createRootDefaultOptions } from 'octane';",
+		"import { __createVoidRootDefaultOptions as _$createVoidRootDefaultOptions, __createRootDefaultOptions as _$createRootDefaultOptions } from 'octane/internal/client';",
 	);
 	expect(entry).toMatch(
 		/function render\(container\) \{\s+var root = _\$createVoidRootDefaultOptions\(container\);/,
@@ -148,10 +148,11 @@ function expectSpecialized(sources: Sources) {
 
 function expectGeneric(sources: Sources) {
 	const entry = sources.get('entry.ts');
-	expect(entry).toContain("import { createRoot } from 'octane';");
-	expect(entry).toContain('createRoot(container)');
+	expect(entry).toContain(
+		"import { __createRootDefaultOptions as _$createRootDefaultOptions } from 'octane/internal/client';",
+	);
+	expect(entry).toContain('_$createRootDefaultOptions(container)');
 	expect(entry).not.toContain('__createVoidRoot');
-	expect(entry).not.toContain('__createRootDefaultOptions');
 	expect(sources.get('App.tsrx')).not.toContain('componentSlotVoid');
 }
 
@@ -208,13 +209,16 @@ describe.each(parallelModes)('imported void components on %s', (_name, parallel)
 		const rules = [postLoader(root, /App\.tsrx$/, `return source + '\\nApp = Value;';`)];
 		const { directory, sources } = await build(root, { parallel, rules });
 		expect(render(directory)).toBe('<b>value</b>');
-		// The invalidated module rebuilds without a proof predicate, so it also
-		// keeps the public factory instead of the default-options fallback.
+		// Invalidating the component proof preserves returned-value handling;
+		// the independently proven one-argument factory still omits options.
 		const entry = sources.get('entry.ts');
-		expect(entry).toContain("import { createRoot } from 'octane';");
-		expect(entry).toMatch(/function render\(container\) \{\s+var root = createRoot\(container\);/);
+		expect(entry).toContain(
+			"import { __createRootDefaultOptions as _$createRootDefaultOptions } from 'octane/internal/client';",
+		);
+		expect(entry).toMatch(
+			/function render\(container\) \{\s+var root = _\$createRootDefaultOptions\(container\);/,
+		);
 		expect(entry).not.toContain('__createVoidRoot');
-		expect(entry).not.toContain('__createRootDefaultOptions');
 		// App's own proven call is unaffected.
 		expect(sources.get('App.tsrx')).toContain('componentSlotVoid');
 	}, 60_000);
@@ -287,6 +291,7 @@ describe('void component proof lifetime', () => {
 		await watchOnce(configuration);
 		expectGeneric(sources);
 		expect(render(directory)).toBe(EXPECTED_HTML);
+		expect(render(directory, 'renderValue')).toBe('<b>value</b>');
 	}, 60_000);
 
 	it('specializes again after a production watch shares its persistent cache', async () => {
@@ -335,6 +340,7 @@ describe('void component proof lifetime', () => {
 		await watchOnce(watched.configuration);
 		expectGeneric(watchSources);
 		expect(render(watched.directory)).toBe(EXPECTED_HTML);
+		expect(render(watched.directory, 'renderValue')).toBe('<b>value</b>');
 
 		const third = await run();
 		expectSpecialized(third.sources);
