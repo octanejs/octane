@@ -21,7 +21,10 @@ const require = createRequire(import.meta.url);
 const REPO = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const hash = (value) => createHash('sha256').update(value).digest('hex');
 const val = (bytes) => ({ median: bytes, min: bytes, samples: 1 });
-const VOID_ROOT_HELPERS = { createRoot: '__createVoidRoot', hydrateRoot: '__hydrateVoidRoot' };
+const VOID_ROOT_HELPERS = {
+	createRoot: '__createVoidRootDefaultOptions',
+	hydrateRoot: '__hydrateVoidRoot',
+};
 const REEXPORT = './root-reexport.js';
 
 // A post loader over the entry, after SWC. The control passes it the root's
@@ -228,22 +231,37 @@ async function buildFixture(fixture, variant) {
 		});
 	});
 	assert.deepEqual(scripts, ['main.js']);
-	// The adapter, not the fixture, decides the variant: the proven entry must
-	// call the specialized root and the control must keep the public factory.
+	// Rerouting removes the void-output proof, but not the exact one-argument
+	// createRoot proof. Hydration still needs its public generic factory.
 	const { factory } = fixture.scenario;
 	const helper = VOID_ROOT_HELPERS[factory];
+	const generic = factory === 'createRoot' ? '__createRootDefaultOptions' : factory;
+	const selected = variant === 'proven' ? helper : generic;
+	const local = selected === factory ? factory : '_$' + selected.slice(2);
+	const request = selected.endsWith('RootDefaultOptions') ? 'octane/internal/client' : 'octane';
+	const escapedLocal = local.replaceAll('$', '\\$');
 	const entrySource = sources.get('entry.ts');
-	const publicFactory = new RegExp(`\\b${factory}\\b`);
+	assert.match(
+		entrySource,
+		new RegExp(
+			`import \\{[^}]*\\b${selected}\\b${selected === factory ? '' : ` as ${escapedLocal}`}[^}]*\\} from ['"]${request}['"]`,
+		),
+		`${fixture.name}: entry lost the ${selected} import`,
+	);
+	assert.match(
+		entrySource,
+		new RegExp(`\\b${escapedLocal}\\(container(?:,|\\))`),
+		`${fixture.name}: entry lost the ${selected} call`,
+	);
 	if (variant === 'proven') {
-		assert.ok(entrySource.includes(helper), `${fixture.name}: proven entry lacks ${helper}`);
-		assert.doesNotMatch(
-			entrySource,
-			publicFactory,
-			`${fixture.name}: proven entry kept ${factory}`,
-		);
+		assert.doesNotMatch(entrySource, new RegExp(`\\b${generic}\\b`));
 	} else {
-		assert.ok(!entrySource.includes(helper), `${fixture.name}: control entry was specialized`);
-		assert.match(entrySource, publicFactory, `${fixture.name}: control entry lost ${factory}`);
+		// The prefix excludes both the options-capable and default-options void roots.
+		const voidPrefix = factory === 'createRoot' ? '__createVoidRoot' : helper;
+		assert.ok(
+			!entrySource.includes(voidPrefix),
+			`${fixture.name}: control entry was void-specialized`,
+		);
 		assert.ok(entrySource.includes(REEXPORT), `${fixture.name}: control was not rerouted`);
 	}
 	const code = fs.readFileSync(path.join(directory, 'main.js'));

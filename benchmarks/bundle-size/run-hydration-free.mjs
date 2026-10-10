@@ -220,13 +220,15 @@ const ranges = resolveDeclarationRanges(
 	(source) => fs.readFileSync(path.join(octaneSource, source), 'utf8'),
 	(text, source) => parseAst(text, { lang: 'ts' }, source),
 );
-// Non-vacuity: a client bundle must retain its public root.
+// Non-vacuity: a client bundle must retain its public or compiler-specialized root.
 const rootRanges = resolveDeclarationRanges(
 	(source) => fs.readFileSync(path.join(octaneSource, source), 'utf8'),
 	(text, source) => parseAst(text, { lang: 'ts' }, source),
 	[
 		{ name: 'createRoot', source: 'runtime.ts' },
 		{ name: '__createVoidRoot', source: 'runtime.ts' },
+		{ name: '__createVoidRootDefaultOptions', source: 'runtime.ts' },
+		{ name: '__createRootDefaultOptions', source: 'runtime.ts' },
 	],
 );
 const retainedBy = (maps, candidates) => {
@@ -251,11 +253,14 @@ try {
 
 for (const scenario of selectedClients) {
 	const { maps, modules } = await buildScenario(scenario);
-	assert.notEqual(
-		retainedBy(maps, rootRanges).size,
-		0,
-		`${scenario.name}: the client bundle lost its public root`,
-	);
+	const roots = retainedBy(maps, rootRanges);
+	if (scenario.name.startsWith('create-root-export-'))
+		assert.equal(
+			roots.has('createRoot'),
+			true,
+			`${scenario.name}: the public root export was lost`,
+		);
+	assert.notEqual(roots.size, 0, `${scenario.name}: the client bundle lost its root factory`);
 	const denied = deniedRangesFor(scenario.bundler === 'esbuild' ? 'esbuild' : 'rolldown', ranges);
 	const retained = retainedBy(maps, denied);
 	let clean = true;

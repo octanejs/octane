@@ -146,6 +146,26 @@ export async function run() {
 		},
 	);
 
+	it('preserves returned descriptors through an exported plain-module root', async () => {
+		const view = `export default function View(props) { return <section><input defaultValue="initial" />{props.label}</section>; }`;
+		const entry = `${IMPORTS}
+const _$createRootDefaultOptions='authored';
+export const root=createRoot(document.querySelector('#host'));
+export async function run(){const host=document.querySelector('#host');root.render(View,{label:_$createRootDefaultOptions});
+ const input=host.querySelector('input');input.value='typed';input.focus();
+ flushSync(()=>root.render(View,{label:'updated'}));
+ const retained=input===host.querySelector('input')&&input.value==='typed'&&document.activeElement===input;
+ const text=host.textContent;root.render('ordinary');await Promise.resolve();const replaced=host.textContent;
+ root.unmount();return {retained,text,replaced,cleaned:host.childNodes.length===0};}`;
+		for (const dev of [false, true])
+			expect(await runConsumer(view, entry, dev)).toEqual({
+				retained: true,
+				text: 'updated',
+				replaced: 'ordinary',
+				cleaned: true,
+			});
+	});
+
 	it('preserves forwarded signal props when the engine loads after the first mount', async () => {
 		const view =
 			'export default function View(props) @{ <main><span>{props.value as string}</span><input value={props.value} /><textarea /></main> }';
