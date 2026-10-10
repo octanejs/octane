@@ -40,10 +40,14 @@ const OPTIONAL_DECLARATIONS = [
 	'NATIVE_READ_DRIVER',
 	'beginActiveNativeReadScope',
 ];
+const COMMIT_DECLARATIONS = ['drainQueuedEffectEventUpdates', 'drainQueuedStoreSyncs'];
 const ranges = resolveDeclarationRanges(
 	(source: string) => readFileSync(join(SOURCE, source), 'utf8'),
 	(text: string, source: string) => parseAst(text, { lang: 'ts' }, source),
-	OPTIONAL_DECLARATIONS.map((name) => ({ name, source: 'runtime.ts' })),
+	[...OPTIONAL_DECLARATIONS, ...COMMIT_DECLARATIONS].map((name) => ({
+		name,
+		source: 'runtime.ts',
+	})),
 );
 
 const PLAIN_APP = `import { createRoot, flushSync, useState } from 'octane';
@@ -237,6 +241,74 @@ export async function run(container, scenario) {
 }
 `;
 
+const LATE_COMMIT_HOOKS_APP = `import { createRoot, flushSync, useEffectEvent, useLayoutEffect, useSyncExternalStore } from 'octane';
+
+function Plain() @{ <p>plain</p> }
+
+function EventReader(props) @{
+	const event = useEffectEvent(() => props.value);
+	props.remember(event);
+	useLayoutEffect(() => { props.record(event()); }, [props.value]);
+	<p>{String(props.value)}</p>
+}
+
+function StoreReader(props) @{
+	const value = useSyncExternalStore(props.store.subscribe, props.store.get);
+	<p>{String(value)}</p>
+}
+
+function LayoutWriter(props) @{
+	useLayoutEffect(() => props.store.set(props.value), [props.store, props.value]);
+	<span />
+}
+
+function StoreApp(props) @{
+	<div><StoreReader store={props.store} /><LayoutWriter store={props.store} value={props.value} /></div>
+}
+
+function makeStore(initial) {
+	let value = initial;
+	const listeners = new Set();
+	return {
+		get: () => value,
+		set(next) { value = next; for (const notify of listeners) notify(); },
+		subscribe(notify) { listeners.add(notify); return () => listeners.delete(notify); },
+	};
+}
+
+export function run(container, scenario) {
+	const root = createRoot(container);
+	const snapshots = [], observed = [];
+	flushSync(() => root.render(Plain));
+	snapshots.push(container.textContent);
+	try {
+		if (scenario === 'event') {
+			let first;
+			const remember = event => { first ??= event; };
+			const record = value => observed.push(value);
+			flushSync(() => root.render(EventReader, { value: 1, remember, record }));
+			snapshots.push(first());
+			flushSync(() => root.render(EventReader, { value: 2, remember, record }));
+			snapshots.push(first());
+			flushSync(() => root.render(EventReader, { value: 3, remember, record }));
+			snapshots.push(first());
+		} else {
+			const firstStore = makeStore(0);
+			flushSync(() => root.render(StoreApp, { store: firstStore, value: 5 }));
+			snapshots.push(container.textContent);
+			const node = container.querySelector('p');
+			const nextStore = makeStore(10);
+			flushSync(() => root.render(StoreApp, { store: nextStore, value: 11 }));
+			snapshots.push(container.textContent);
+			observed.push(container.querySelector('p') === node);
+		}
+	} finally {
+		root.unmount();
+	}
+	return { snapshots, observed, empty: container.childNodes.length === 0 };
+}
+`;
+
 const roots: string[] = [];
 afterAll(() => {
 	for (const root of roots.splice(0)) rmSync(root, { recursive: true, force: true });
@@ -294,7 +366,9 @@ async function run(chunk: Rolldown.OutputChunk, scenario?: string) {
 describe('optional capability drivers in production bundles', { timeout: 60_000 }, () => {
 	it('ships none of their code in an application that uses none of them', async () => {
 		const { retained, chunk } = await buildApp(PLAIN_APP);
-		expect(OPTIONAL_DECLARATIONS.filter((name) => retained.has(name))).toEqual([]);
+		expect(
+			[...OPTIONAL_DECLARATIONS, ...COMMIT_DECLARATIONS].filter((name) => retained.has(name)),
+		).toEqual([]);
 		expect(await run(chunk)).toEqual({
 			before: 'reverseabc',
 			after: 'reversecba',
@@ -323,6 +397,18 @@ describe('optional capability drivers in production bundles', { timeout: 60_000 
 			empty: true,
 		});
 	});
+
+	it.each([
+		{ scenario: 'event', snapshots: ['plain', 1, 2, 3], observed: [1, 2, 3] },
+		{ scenario: 'store', snapshots: ['plain', '5', '11'], observed: [true] },
+	])(
+		'preserves late $scenario hook commits after a plain root',
+		async ({ scenario, ...expected }) => {
+			const { retained, chunk } = await buildApp(LATE_COMMIT_HOOKS_APP);
+			expect(await run(chunk, scenario)).toEqual({ ...expected, empty: true });
+			expect(COMMIT_DECLARATIONS.filter((name) => !retained.has(name))).toEqual([]);
+		},
+	);
 
 	const cycle = ['insertion+', 'layout+', 'passive+', 'insertion-', 'layout-', 'passive-'];
 	it.each([
