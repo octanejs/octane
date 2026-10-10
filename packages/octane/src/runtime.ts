@@ -33228,15 +33228,18 @@ function restoreControlledStates(): void {
 	// owner restores after its complete cascade.
 	// A prepared view transition owns projected control values until publication;
 	// restoring the physical snapshot now would overwrite that pending edit.
+	// A first root render can be active without entering the scheduler's flush.
 	if (
 		inFlush ||
 		STAGED_DOM ||
 		_dispatchDepth !== 0 ||
-		ROOT_RENDER_TRANSACTIONS.length > 0 ||
+		ROOT_RENDER_TRANSACTION !== null ||
 		(DEFERRED_LAYOUT_DRIVER && DEFERRED_LAYOUT_DRIVER.capturing())
 	)
 		return;
-	const waitForQueue = QUEUE.length > 0;
+	// Pending root records may await resources after synchronous rendering ended.
+	// Like queued work, they only hold edits captured during a flush.
+	const waitForQueue = QUEUE.length > 0 || ROOT_RENDER_TRANSACTIONS.length > 0;
 	const list = pendingRestores;
 	pendingRestores = [];
 	// Publish held edits before any restoration can synchronously dispatch a

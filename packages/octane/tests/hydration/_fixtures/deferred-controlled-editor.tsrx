@@ -2,6 +2,7 @@ import {
 	Hydrate,
 	ViewTransition,
 	startTransition,
+	useInsertionEffect,
 	useLayoutEffect,
 	useRef,
 	useState,
@@ -202,4 +203,22 @@ export function FailingLayout(props: {
 		throw props.error;
 	}, []);
 	<span>{'Layout owner'}</span>
+}
+
+export function ResourceHold(props: {
+	text: string;
+	requestFont: () => void;
+	mutate: () => void;
+	layout: (text: string) => void;
+}) @{
+	useInsertionEffect(() => {
+		if (props.text === 'after') props.requestFont();
+	}, [props.text]);
+	useLayoutEffect(() => {
+		props.layout(props.text);
+		return () => props.mutate();
+	}, [props.text]);
+	<ViewTransition>
+		<div>{props.text as string}</div>
+	</ViewTransition>
 }

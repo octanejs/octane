@@ -489,6 +489,128 @@ describe('deferred controlled editor', () => {
 		}
 	});
 
+	it.each([false, true])(
+		'restores a rejected edit with cleanup root mount: %s',
+		async (mountInCleanup) => {
+			const transition = installViewTransitionMocks();
+			const container = document.createElement('div');
+			const foreignContainer = document.createElement('div');
+			document.body.append(container, foreignContainer);
+			const root = createRoot(container);
+			const foreignRoot = createRoot(foreignContainer);
+			const locked = mount(client.LockedEditor, {});
+			let setDraft!: (value: string) => void;
+			const pending = mount(client.PendingControlledEditor, {
+				expose: (setter: typeof setDraft) => {
+					setDraft = setter;
+				},
+			});
+			const input = locked.container.querySelector('input')!;
+			const pendingInput = pending.container.querySelector('input')!;
+			const layouts: string[] = [];
+			let mutations = 0;
+			let armed = false;
+			let release!: () => void;
+			const fonts = {
+				status: 'loaded',
+				ready: new Promise<void>((resolve) => {
+					release = resolve;
+				}),
+			};
+			const previousFonts = Object.getOwnPropertyDescriptor(document, 'fonts');
+			Object.defineProperty(document, 'fonts', { configurable: true, value: fonts });
+			let started!: () => void;
+			const nativeStarted = new Promise<void>((resolve) => {
+				started = resolve;
+			});
+			(document as any).startViewTransition = (options: { update: () => unknown }) => {
+				const ready = Promise.resolve(options.update());
+				started();
+				return { ready, finished: ready, skipTransition() {} };
+			};
+			const props = {
+				requestFont() {
+					fonts.status = 'loading';
+				},
+				layout(text: string) {
+					layouts.push(text);
+				},
+				mutate() {
+					if (!armed) return;
+					armed = false;
+					mutations++;
+					if (mountInCleanup) foreignRoot.render(client.LockedEditor, {});
+					startTransition(() => setDraft('pending accepted value'));
+				},
+			};
+			try {
+				await act(() => root.render(client.ResourceHold, { ...props, text: 'before' }));
+				armed = true;
+				startTransition(() => root.render(client.ResourceHold, { ...props, text: 'after' }));
+				await nativeStarted;
+				await nextTask();
+				expect(mutations).toBe(1);
+				expect(container.textContent).toBe('after');
+				expect(layouts).toEqual(['before']);
+				expect(foreignContainer.querySelector('input') !== null).toBe(mountInCleanup);
+				expect(pending.container.querySelector('output')!.textContent).toBe('');
+				input.value = 'outside rejected edit';
+				input.dispatchEvent(new Event('input', { bubbles: true }));
+				expect(locked.container.querySelector('input')).toBe(input);
+				expect(input.value).toBe('locked');
+				expect(layouts).toEqual(['before']);
+				fonts.status = 'loaded';
+				release();
+				await act(async () => {});
+				expect(layouts).toEqual(['before', 'after']);
+				expect(pending.container.querySelector('input')).toBe(pendingInput);
+				expect(pendingInput.value).toBe('pending accepted value');
+				expect(input.value).toBe('locked');
+			} finally {
+				armed = false;
+				fonts.status = 'loaded';
+				release();
+				try {
+					await act(async () => {});
+				} finally {
+					root.unmount();
+					foreignRoot.unmount();
+					locked.unmount();
+					pending.unmount();
+					container.remove();
+					foreignContainer.remove();
+					if (previousFonts) Object.defineProperty(document, 'fonts', previousFonts);
+					else Reflect.deleteProperty(document, 'fonts');
+					transition.restore();
+				}
+			}
+		},
+	);
+
+	it('preserves an accepted edit dispatched while another root first renders', async () => {
+		const editor = mount(client.PendingControlledEditor, { expose() {} });
+		const input = editor.container.querySelector('input')!;
+		const observed: string[] = [];
+		const draft = 'accepted during first render';
+		root = createRoot(container);
+		try {
+			root.render(() => {
+				input.value = draft;
+				input.dispatchEvent(new Event('input', { bubbles: true }));
+				observed.push(input.value);
+				return 'mounted';
+			});
+			expect(observed).toEqual([draft]);
+			await act(() => {});
+			expect(container.textContent).toBe('mounted');
+			expect(editor.container.querySelector('input')).toBe(input);
+			expect(input.value).toBe(draft);
+			expect(editor.container.querySelector('output')!.textContent).toBe(draft);
+		} finally {
+			editor.unmount();
+		}
+	});
+
 	it('restores a surviving editor when the layout that dispatched its edit throws', () => {
 		const editor = mount(client.LockedEditor, {});
 		const input = editor.container.querySelector('input')!;
