@@ -1674,6 +1674,9 @@ class OctaneBundlerCompiler {
 				...(environment === 'client' && typeof options.isLiteComponentImport === 'function'
 					? { isLiteComponentImport: options.isLiteComponentImport }
 					: null),
+				...(environment === 'client' && typeof options.isStrongLiteComponentImport === 'function'
+					? { isStrongLiteComponentImport: options.isStrongLiteComponentImport }
+					: null),
 				...(environment === 'client' && typeof options.isCompilerMemoImport === 'function'
 					? { isCompilerMemoImport: options.isCompilerMemoImport }
 					: null),
@@ -1730,6 +1733,9 @@ class OctaneBundlerCompiler {
 				...(out.liteComponentExports === undefined
 					? null
 					: { liteComponentExports: out.liteComponentExports }),
+				...(out.strongLiteComponentExports === undefined
+					? null
+					: { strongLiteComponentExports: out.strongLiteComponentExports }),
 				...(cssModuleConstantImports === undefined ? null : { cssModuleConstantImports }),
 				...(independentWidgets === undefined ? null : { independentWidgets }),
 				descriptorChildrenExports:

@@ -5709,6 +5709,20 @@ function isOpaqueRenderable(expression) {
 
 const AUTO_MEMO_SETUP_HOOK_NAMES = new Set([...HOOK_NAMES, 'use', 'useContext']);
 
+// Builtins a Strong callee may call and still render through componentSlotLite.
+// Each keeps its cell in CURRENT_SCOPE and schedules CURRENT_BLOCK. `use` stays
+// out: its thenables are positional on the Block, as are the Activity and
+// transition hooks' extra per-Block records.
+const STRONG_LITE_HOOKS = new Set([
+	'useState',
+	'useReducer',
+	'useRef',
+	'useEffect',
+	'useLayoutEffect',
+	'useContext',
+	'useId',
+]);
+
 function autoMemoBuiltinHookName(call, ctx) {
 	if (call?.type !== 'CallExpression' && call?.type !== 'OptionalCallExpression') return null;
 	const imported = call._octaneImportedHook ?? call._octaneHookRuntimeImportedHook;
@@ -11750,6 +11764,10 @@ function compileInternal(
 			typeof options?.isVoidComponentImport === 'function' ? options.isVoidComponentImport : null,
 		isLiteComponentImport:
 			typeof options?.isLiteComponentImport === 'function' ? options.isLiteComponentImport : null,
+		isStrongLiteComponentImport:
+			typeof options?.isStrongLiteComponentImport === 'function'
+				? options.isStrongLiteComponentImport
+				: null,
 		isCompilerMemoImport:
 			typeof options?.isCompilerMemoImport === 'function' ? options.isCompilerMemoImport : null,
 		compilerMemoExports: [],
@@ -12225,6 +12243,9 @@ function compileInternal(
 		? collectPrivateUnescapedComponents(ast.body, ctx)
 		: new Set();
 	ctx.exportedLocals = ctx.autoMemo ? collectExportedLocals(ast.body) : null;
+	const strongLiteHooks = ctx.strongMemo === true && !ctx.nativeReads;
+	// Inferred effect deps read methods through this compiler helper.
+	const methodDepLocal = ctx.privateRuntimeAliases?.get(METHOD_DEP_IMPORT);
 	for (const [, info] of ctx.componentInfo) {
 		const compNode = info.node;
 		// The body proof belongs to the initial function object. A writable
@@ -12333,7 +12354,11 @@ function compileInternal(
 		// Return-JSX functions reconcile their returned descriptor through
 		// renderBlock. componentSlotLite intentionally ignores return values, so
 		// these functions may participate in output-shape proofs but never lite.
+		// Strong render purity also admits the builtins in STRONG_LITE_HOOKS: their
+		// cells live in the lite Scope, and an update re-renders the nearest real
+		// Block, which re-runs this body without an observable difference.
 		let eligible = info.voidOutput;
+		let liteHooks = false;
 		for (const n of free) {
 			if (
 				HOOK_NAMES.has(n) ||
@@ -12342,6 +12367,10 @@ function compileInternal(
 				n === 'memo' ||
 				n === 'createPortal'
 			) {
+				if (strongLiteHooks && STRONG_LITE_HOOKS.has(ctx.octaneImportLocals.get(n))) {
+					liteHooks = true;
+					continue;
+				}
 				eligible = false;
 				break;
 			}
@@ -12383,7 +12412,12 @@ function compileInternal(
 				if (t === 'TryStatement' || t === 'JSXTryExpression') return true;
 				if (t === 'CallExpression' && n.callee && n.callee.type === 'Identifier') {
 					const cname = n.callee.name;
-					if (!locals.has(cname) && !ctx.componentInfo.has(cname) && !HOOK_NAMES.has(cname)) {
+					if (
+						!locals.has(cname) &&
+						!ctx.componentInfo.has(cname) &&
+						!HOOK_NAMES.has(cname) &&
+						!(liteHooks && (cname === 'useContext' || cname === methodDepLocal))
+					) {
 						return true;
 					}
 				}
@@ -12432,6 +12466,14 @@ function compileInternal(
 			if (inheritSoleCompRoot(bodyNodes, ctx)) eligible = false;
 		}
 		info.eligible = eligible && !compNode._octaneBindingView;
+		info.liteHooks = info.eligible && liteHooks;
+		// Whether a lite edge to this body can bring hook state into its caller's
+		// Block: settled across same-module callees below.
+		info.liteStateful =
+			info.liteHooks || (info.eligible && [...free].some((name) => isStrongLiteImport(ctx, name)));
+		info.liteCallees = strongLiteHooks
+			? [...free].filter((name) => ctx.componentInfo.has(name))
+			: [];
 		// Single-ELEMENT-root output: the component's body renders exactly one plain
 		// DOM element (not a component tag, fragment, or control-flow). Such a
 		// component self-delimits via that element on CLIENT mount — its
@@ -12544,6 +12586,15 @@ function compileInternal(
 		info.autoMemoCaptures = [...state.captures].sort();
 		info.autoMemoImportedComponents = [...state.importedComponents].sort();
 		info.autoMemoMayReadContext = state.mayReadContext;
+	}
+	for (let changed = strongLiteHooks; changed;) {
+		changed = false;
+		for (const info of ctx.componentInfo.values()) {
+			if (info.eligible !== true || info.liteStateful) continue;
+			if (info.liteCallees.some((name) => ctx.componentInfo.get(name).liteStateful)) {
+				info.liteStateful = changed = true;
+			}
+		}
 	}
 	if (ctx.autoMemo) {
 		classifyStableHookfulChildCalls(ast.body, ctx);
@@ -13116,8 +13167,10 @@ function compileInternal(
 		diagnostics: nativeChangeDiagnostics,
 	};
 	if (ctx.compilerMemoExports.length > 0) result.compilerMemoExports = ctx.compilerMemoExports;
-	const liteExports = ctx.autoMemo ? collectLiteComponentExports(ast.body, ctx) : [];
+	const liteExports = ctx.autoMemo ? collectLiteComponentExports(ast.body, ctx, false) : [];
 	if (liteExports.length > 0) result.liteComponentExports = liteExports;
+	const strongLiteExports = ctx.strongMemo ? collectLiteComponentExports(ast.body, ctx, true) : [];
+	if (strongLiteExports.length > 0) result.strongLiteComponentExports = strongLiteExports;
 	if (ctx.inspect) {
 		// Template-origin recording (opt-in, out-of-band): one entry per hoisted
 		// template. `html` is the logical (pre-backtick-escaping) template HTML;
@@ -17025,17 +17078,32 @@ function isProvenLiteImport(ctx, name) {
 	);
 }
 
-// Exports an importer may call through componentSlotLite: hookless void bodies
+// Whether a Strong importer may inline an export whose lite subtree holds hook
+// state: see collectLiteComponentExports.
+function isStrongLiteImport(ctx, name) {
+	const binding = ctx.importedComponentBindings.get(name);
+	return (
+		ctx.strongMemo === true &&
+		!ctx.nativeReads &&
+		binding !== undefined &&
+		ctx.isStrongLiteComponentImport?.(binding.request, binding.imported) === true
+	);
+}
+
+// Exports an importer may call through componentSlotLite: void bodies
 // (componentInfo.eligible) that a cached region can skip without refreshing
 // context. A region over a body without a compiler memo proof always misses,
 // so only a proven body must also be context-free. A native-read body would
 // subscribe the importer's region owner, which a cache hit does not re-run.
-function collectLiteComponentExports(body, ctx) {
+// A `stateful` body's hooks would run against the importer's Block, which only
+// a Strong importer may re-render unobservably, so it gets its own list.
+function collectLiteComponentExports(body, ctx, stateful) {
 	if (ctx.nativeReads) return [];
 	const lite = (name) => {
 		const info = ctx.componentInfo.get(name);
 		return (
 			info?.eligible === true &&
+			info.liteStateful === stateful &&
 			!(info.autoMemoSafe && info.autoMemoMayReadContext) &&
 			!ctx._universalRuntimeUnitsByBinding.has(name)
 		);
@@ -34594,7 +34662,7 @@ function makeCompCall(
 			if (ctx._universalRuntimeUnit == null && ctx.presentationHydration == null) {
 				// A proven lite export renders like a same-module lite callee.
 				const lite = isProvenLiteImport(ctx, compName);
-				if (lite) liteEligible = callSiteOk;
+				if (lite || isStrongLiteImport(ctx, compName)) liteEligible = callSiteOk;
 				if (isCompilerMemoImport(ctx, compName)) {
 					memoCallee = {
 						autoMemoSafe: true,
@@ -34681,6 +34749,9 @@ function makeCompCall(
 					});
 					autoMemoDepNodes = callsiteDeps.dependencyNodes;
 					if (stableHookful) {
+						// The region does not witness a Strong lite callee's own state, so
+						// that callee keeps the Block its updates re-render directly.
+						if (memoCallee.liteHooks) liteEligible = false;
 						autoMemoLite = liteEligible;
 						autoMemoPublicationWitnesses = memoCallee.stableHookfulChild.publications;
 					} else {
