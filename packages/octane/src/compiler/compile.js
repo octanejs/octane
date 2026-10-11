@@ -34367,10 +34367,12 @@ function makeCompCall(
 						} else {
 							autoMemoWitnesses = [...(calleeInfo.autoMemoImportedComponents || [])];
 							autoMemoContextAware = calleeInfo.autoMemoMayReadContext === true;
-							// The ordinary cache may need a context-stamping Block. The
-							// proven synchronous state-only path keeps its existing lite
-							// representation and therefore adds no mount boundaries.
-							liteEligible = false;
+							// A context-aware cache hit refreshes, retries, or reconnects
+							// the skipped child's Block (compilerCacheContext), so that
+							// child needs a real one. Any other cache keeps a lite callee
+							// lite, as the stable hookful path above does.
+							if (autoMemoContextAware) liteEligible = false;
+							else autoMemoLite = liteEligible;
 							singleRoot = calleeInfo.singleRoot === true;
 						}
 					}
