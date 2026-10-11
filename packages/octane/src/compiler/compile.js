@@ -34369,9 +34369,11 @@ function makeCompCall(
 							autoMemoContextAware = calleeInfo.autoMemoMayReadContext === true;
 							// A context-aware cache hit refreshes, retries, or reconnects
 							// the skipped child's Block (compilerCacheContext), so that
-							// child needs a real one. Any other cache keeps a lite callee
-							// lite, as the stable hookful path above does.
-							if (autoMemoContextAware) liteEligible = false;
+							// child needs a real one. So do native reads: a lite callee's
+							// would subscribe this Block, which a cache hit does not re-run.
+							// Any other cache keeps a lite callee lite, as the stable
+							// hookful path does.
+							if (autoMemoContextAware || ctx.nativeReads) liteEligible = false;
 							else autoMemoLite = liteEligible;
 							singleRoot = calleeInfo.singleRoot === true;
 						}
