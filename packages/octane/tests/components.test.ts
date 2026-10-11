@@ -21,6 +21,10 @@ import {
 	ArrowComp,
 	ArrowFragHost,
 } from './_fixtures/components.tsrx';
+import {
+	EnumReturnedChild,
+	readEnumReturnedDescriptor,
+} from './_fixtures/component-enum-escape.tsrx';
 
 describe('component composition', () => {
 	it('renders a static child component with props', () => {
@@ -485,8 +489,8 @@ describe('returned components inside templates', () => {
 	it.each([
 		{
 			name: 'an enum initializer',
-			read: fx.readEnumReturnedDescriptor,
-			App: fx.EnumReturnedChild,
+			read: readEnumReturnedDescriptor,
+			App: EnumReturnedChild,
 			selector: '.enum-escaped-icon',
 			text: 'enum icon',
 		},

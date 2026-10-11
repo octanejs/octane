@@ -246,31 +246,6 @@ export function ReturnedRetryBoundary(props: ReturnedRetryProps) @{
 	</main>
 }
 
-function EnumIcon() {
-	return <span class="enum-escaped-icon">enum icon</span>;
-}
-
-let enumReturnedDescriptor: ReturnType<typeof EnumIcon>;
-
-function captureEnumIcon(descriptor: ReturnType<typeof EnumIcon>): number {
-	enumReturnedDescriptor = descriptor;
-	return 0;
-}
-
-enum CapturedIconValues {
-	First = captureEnumIcon(EnumIcon()),
-}
-
-export function readEnumReturnedDescriptor() {
-	return enumReturnedDescriptor;
-}
-
-export function EnumReturnedChild() @{
-	<main>
-		<EnumIcon />
-	</main>
-}
-
 function ParameterIcon() {
 	return <span class="parameter-escaped-icon">parameter icon</span>;
 }
