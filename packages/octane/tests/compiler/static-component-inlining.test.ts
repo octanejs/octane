@@ -2,6 +2,8 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { compile } from 'octane/compiler';
+import { createOctaneCompiler } from '../../src/compiler/bundler.js';
+import { normalizeRendererConfig } from '../../src/compiler/renderers.js';
 
 const filename = join(
 	process.cwd(),
@@ -9,6 +11,30 @@ const filename = join(
 );
 const source = readFileSync(filename, 'utf8');
 const production = { dev: false, hmr: false };
+const projectRenderers = {
+	registry: {
+		object: {
+			module: '/src/object-renderer.js',
+			server: 'client-only' as const,
+			text: 'host' as const,
+		},
+	},
+	boundaries: {
+		'@scene/canvas': {
+			Canvas: {
+				ownerRenderer: 'dom',
+				childRenderer: 'object',
+				prop: 'children',
+				server: 'omit-child' as const,
+			},
+		},
+	},
+};
+const normalizedRenderers = normalizeRendererConfig(projectRenderers);
+const boundaryOptions = {
+	rendererBoundaries: normalizedRenderers.boundaries,
+	rendererRegistry: normalizedRenderers.registry,
+};
 
 function annotations(code: string) {
 	return Array.from(code.matchAll(/\/\*([\s\S]*?)\*\//g), (match) => match[1].trim())
@@ -28,6 +54,74 @@ function position(text: string, needle: string) {
 }
 
 describe('static component inlining compiler artifacts', () => {
+	it.each(
+		(['client', 'server'] as const).flatMap((mode) => [
+			{
+				mode,
+				configuration: 'registry alone',
+				options: { rendererRegistry: normalizedRenderers.registry },
+			},
+			{ mode, configuration: 'unrelated boundaries', options: boundaryOptions },
+		]),
+	)('keeps ordinary DOM $mode output unchanged with $configuration', ({ mode, options }) => {
+		const ordinary = compile(source, filename, { ...production, mode });
+		const configured = compile(source, filename, { ...production, mode, ...options });
+		expect(annotations(configured.code).some((entry) => entry.boundary === 'START')).toBe(true);
+		expect(configured.code).toBe(ordinary.code);
+		expect(configured.map).toEqual(ordinary.map);
+	});
+
+	it.each(['client', 'server'] as const)(
+		'keeps ordinary DOM %s inlining when a configured boundary import is unused',
+		(mode) => {
+			const input = `import { Canvas } from '@scene/canvas';\n${source}`;
+			const ordinary = compile(input, filename, { ...production, mode });
+			const configured = compile(input, filename, { ...production, mode, ...boundaryOptions });
+			expect(annotations(configured.code).some((entry) => entry.boundary === 'START')).toBe(true);
+			expect(configured.code).toBe(ordinary.code);
+			expect(configured.map).toEqual(ordinary.map);
+		},
+	);
+
+	it('inlines ordinary DOM modules through a project compiler with global renderer boundaries', () => {
+		const compiler = createOctaneCompiler({
+			root: '/project',
+			hmr: false,
+			renderers: projectRenderers,
+		});
+		const result = compiler.transform(source, '/project/src/App.tsrx');
+		expect(result).not.toBeNull();
+		expect(annotations(result!.code).some((entry) => entry.boundary === 'START')).toBe(true);
+	});
+
+	it.each(['client', 'server'] as const)(
+		'retains component boundaries when the %s module renders a configured boundary',
+		(mode) => {
+			const input = `import { Canvas } from '@scene/canvas';
+function Label() @{ <span>label</span> }
+function Card() @{ <section><Label/></section> }
+export function App() @{ <main><Card/><Canvas><node/></Canvas></main> }`;
+			const result = compile(input, '/src/CanvasPage.tsrx', {
+				...production,
+				mode,
+				...boundaryOptions,
+			});
+			expect(annotations(result.code)).toEqual([]);
+		},
+	);
+
+	it('retains component boundaries in an explicitly selected external renderer', () => {
+		const input = `function Label() @{ <span>label</span> }
+function Card() @{ <section><Label/></section> }
+export function App() @{ <Card/> }`;
+		const result = compile(input, '/src/Scene.object.tsrx', {
+			...production,
+			...boundaryOptions,
+			renderer: { id: 'object', ...normalizedRenderers.registry.object },
+		});
+		expect(annotations(result.code)).toEqual([]);
+	});
+
 	it.each(['client', 'server'] as const)(
 		'prints paired JS provenance with authored component locations in %s output',
 		(mode) => {

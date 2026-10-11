@@ -11067,37 +11067,6 @@ function compileAuthored(source, filename, options, bundlerMetadata, analyzed = 
 			bundlerMetadata.cssModuleConstantImports = constants.imports;
 		}
 	}
-	// Fuse before both DOM and SSR planning so each target sees the same tree.
-	// Development/HMR and alternate renderers retain their existing boundaries.
-	if (
-		!options?.dev &&
-		!options?.hmr &&
-		!options?.profile &&
-		output === 'js' &&
-		!strongModeEnabled &&
-		!hasDomBindings &&
-		!options?.nativeReads &&
-		!options?.opaqueSignalHandles &&
-		!options?.__signalModuleImport &&
-		!constantAst._octaneSignalDeclarations &&
-		!options?.renderer &&
-		!options?.rendererBoundaries &&
-		!options?.rendererRegistry &&
-		!options?.universalRuntime &&
-		hydrateBoundaryPathFromId(filename) === null
-	) {
-		constantAst = fuseStaticLocalComponentTemplates(constantAst, cleanFilename, {
-			mapAst,
-			cloneAstNode,
-			collectFreeIdentifiers,
-			collectReassignedBindings,
-			createLexicalAnalysis,
-			inheritOriginLoc,
-			isComponentTag,
-			unwrapTsExpr,
-			hasInlineMemoDirectEval,
-		});
-	}
 	const result = compileInternal(
 		source,
 		filename,
@@ -11123,6 +11092,41 @@ function compileAuthored(source, filename, options, bundlerMetadata, analyzed = 
 	// The supported targets lower templates before the final print; no JSX remains.
 	if (output === 'ts') result.lang = 'ts';
 	return result;
+}
+
+// Called only after the existing renderer preparation found no boundary in this
+// module. Project-wide registry options do not imply renderer participation.
+function fuseStaticDomComponentTemplates(ast, filename, options, strongModeEnabled) {
+	if (
+		options?.dev ||
+		options?.hmr ||
+		options?.profile ||
+		options?.output === 'ts' ||
+		strongModeEnabled ||
+		options?.nativeReads ||
+		options?.opaqueSignalHandles ||
+		options?.__signalModuleImport ||
+		ast._octaneSignalDeclarations ||
+		options?.renderer ||
+		options?.universalRuntime ||
+		options?.__universal ||
+		options?.__rendererBoundariesLowered ||
+		options?.__hydratePrepared ||
+		hydrateBoundaryPathFromId(filename) !== null
+	) {
+		return ast;
+	}
+	return fuseStaticLocalComponentTemplates(ast, cleanCompileFilename(filename), {
+		mapAst,
+		cloneAstNode,
+		collectFreeIdentifiers,
+		collectReassignedBindings,
+		createLexicalAnalysis,
+		inheritOriginLoc,
+		isComponentTag,
+		unwrapTsExpr,
+		hasInlineMemoDirectEval,
+	});
 }
 
 function compileInternal(
@@ -11287,7 +11291,8 @@ function compileInternal(
 					? null
 					: { __nativeChangeDiagnostics: serverAuthoredDiagnostics }),
 			},
-			serverBoundaryPreparation?.ast ?? analyzedAst,
+			serverBoundaryPreparation?.ast ??
+				fuseStaticDomComponentTemplates(analyzedAst, filename, options, strongModeEnabled),
 			hasStringChildProofs,
 		);
 		return compiled;
@@ -11387,7 +11392,12 @@ function compileInternal(
 	}
 	const parsedAst =
 		rendererBoundaryPreparation?.ast ??
-		(analyzedAst !== null ? analyzedAst : adoptParserAst(parseModule(source, filename)));
+		fuseStaticDomComponentTemplates(
+			analyzedAst !== null ? analyzedAst : adoptParserAst(parseModule(source, filename)),
+			filename,
+			options,
+			strongModeEnabled,
+		);
 	const nativeChangeAnalysis =
 		options?.__nativeChangeAnalysis ??
 		analyzeNativeChangeDiagnostics(parsedAst, source, filename, {
