@@ -1,4 +1,4 @@
-# Website benchmark refresh — main, 10 October 2026
+# Website benchmark refresh — main, 11 October 2026
 
 The website imports 29 records from `local/`. This snapshot measures every
 published suite with its normal sample count and complete framework matrix.
@@ -8,12 +8,13 @@ The homepage's 20 summary rows and bundle-size ranges are recomputed with
 ## Source and environment
 
 - Measured Octane main revision:
-  [`8c09d81526a48abf87d9c54d9aea0a690fa86eb1`](https://github.com/octanejs/octane/commit/8c09d81526a48abf87d9c54d9aea0a690fa86eb1)
-  (package version 0.12.1). This is a source snapshot, not a measurement of
+  [`e4d5908db954b9f399fb44da86f3547e84c15304`](https://github.com/octanejs/octane/commit/e4d5908db954b9f399fb44da86f3547e84c15304)
+  (package version 0.13.0). This is a source snapshot, not a measurement of
   the published Octane release or subsequent main changes.
-- [Measurement run](https://github.com/octanejs/octane/actions/runs/38081103617):
+- [Measurement run](https://github.com/octanejs/octane/actions/runs/38096539284):
   all 29 suites ran sequentially in one CI job with `full: true`.
-  Measurements ran on 10 October 2026, 19:47–20:28 UTC.
+  Measurements ran from 10 October 2026, 23:53:59 UTC to 11 October 2026,
+  00:35:10 UTC (11 October, 00:53:59–01:35:10 Europe/London).
 - Blacksmith `blacksmith-4vcpu-ubuntu-2404` runner: AMD EPYC, four vCPUs,
   Linux 6.6.141, x64.
 - Node 24.19.0, pnpm 12.9.1, Playwright 1.61.1, Chromium 149.0.7827.55,
@@ -32,13 +33,13 @@ complete suite invocation. The normal sample counts and default single harness
 invocation per suite are retained; this is not a quick run or a five-run
 `bench:stable` aggregate.
 
-The `js-framework` harness on this revision changes `select`, `swap`, and
-`select_lots` to bounded, calibrated batches targeting about 20 ms, followed by
-untimed warmup of the exact batch. Each score is normalized per committed click;
+As in the 10 October snapshot, the `js-framework` harness measures `select`,
+`swap`, and `select_lots` in bounded, calibrated batches targeting about 20 ms,
+followed by untimed warmup of the exact batch. Each score is normalized per committed click;
 `repeat` and `sampleMs` retain the batch size and median batch duration. Selection
 alternates rows and swaps use odd counts, with the usual correctness gates.
-These warm batch averages are a different measurement from the previous
-snapshot's isolated-click timings and must not be presented as direct speedups.
+These warm batch averages differ from the isolated-click timings published
+before 10 October 2026 and must not be presented as direct speedups over them.
 The other operations, including `update` and `remove`, retain single-click
 samples because repetition changes their workload.
 
@@ -69,25 +70,28 @@ from its `bench-results` artifact and formatted without changing their values.
 The artifact's `environment.json` supplies the environment above. No quick-run
 results are substituted, and no guard thresholds are changed.
 
-## Validation and guard observations
+## Import validation and ratio guards
 
-All 29 harnesses exited successfully. The records contain 232 targets and 3,092
-operations, with finite scores and no failed harnesses. Target and operation
-coverage, iteration counts, and fixed sample counts are unchanged from the
-previous snapshot. Duration-based SSR throughput render counts vary with the
-work completed during each timed interval.
+All 29 harnesses exited successfully. The imported records contain 232 targets
+and 3,092 target/operation measurements, with no missing targets, operations, or
+non-finite scores. Iteration counts, repetition counts, and fixed sample counts
+match the previous snapshot; duration-based SSR throughput counts vary with the
+number of renders completed. The calibrated JS Framework batching metadata is
+present and valid.
 
-Of 169 applicable ratio guards, 167 are within their limits. All bundle-size
-guards pass. Two timing guards breach:
+The run checked 169 applicable paired ratio guards: 167 passed and two timing
+guards breached their bounds. Neither breach has a waiver, so the measurement
+workflow failed its ratio gate even though every harness completed successfully.
+All applicable bundle-size guards passed.
 
 | Suite / operation | Target / reference | Observed ratio | Maximum |
 | --- | --- | ---: | ---: |
-| svg-dashboard / select_toggle | Octane TSRX / Solid | 1.03023 | 0.90 |
-| uibench / tree/[2,2,2,2,2,2,2,2,2,2]/render | Octane TSRX / React | 2.02572 | 1.90 |
+| `memo-wall` / `one_change_A` | Octane JSX / Octane TSRX | 10.1420× | 10× |
+| `svg-dashboard` / `select_toggle` | Octane TSRX / Solid | 1.0936× | 0.9× |
 
-The workflow finishes with a failed ratio verdict because of these two
-unwaived breaches; this snapshot must not be described as passing `--ratios`.
-Both also breached in the previous snapshot. These observations are retained
-with the normal-sample records and need reproduction and attribution before
-any runtime fix or guard change. This data refresh changes neither the measured
-source nor the guards. Correctness checks passed for every suite.
+These are the unmodified measurements from the complete run. The SVG guard also
+breached in the previous snapshot; the memo-wall guard breached in this run.
+This refresh records those outcomes without changing guard bounds or adding
+waivers. The prior snapshot's UIbench deep-binary-tree guard passed in this run.
+The timings alone do not determine whether a change is a regression or runner
+variation; that needs a controlled investigation.
