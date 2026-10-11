@@ -48,6 +48,13 @@ import {
 	unwrapServerFunctionInitializer,
 } from './server-context.js';
 import { createStyleScopePass } from './style-scopes.js';
+import {
+	fuseStaticLocalComponentTemplates,
+	templateFusionOrigins,
+	mergeTemplateFusionOrigins,
+	annotateTemplateFusion,
+	annotateFusionRenderer,
+} from './local-template-fusion.js';
 import { print as esrapPrint } from 'esrap';
 import esrapTsx from 'esrap/languages/tsx';
 import { buildFatSegments } from './fat-segments.js';
@@ -11060,6 +11067,37 @@ function compileAuthored(source, filename, options, bundlerMetadata, analyzed = 
 			bundlerMetadata.cssModuleConstantImports = constants.imports;
 		}
 	}
+	// Fuse before both DOM and SSR planning so each target sees the same tree.
+	// Development/HMR and alternate renderers retain their existing boundaries.
+	if (
+		!options?.dev &&
+		!options?.hmr &&
+		!options?.profile &&
+		output === 'js' &&
+		!strongModeEnabled &&
+		!hasDomBindings &&
+		!options?.nativeReads &&
+		!options?.opaqueSignalHandles &&
+		!options?.__signalModuleImport &&
+		!constantAst._octaneSignalDeclarations &&
+		!options?.renderer &&
+		!options?.rendererBoundaries &&
+		!options?.rendererRegistry &&
+		!options?.universalRuntime &&
+		hydrateBoundaryPathFromId(filename) === null
+	) {
+		constantAst = fuseStaticLocalComponentTemplates(constantAst, cleanFilename, {
+			mapAst,
+			cloneAstNode,
+			collectFreeIdentifiers,
+			collectReassignedBindings,
+			createLexicalAnalysis,
+			inheritOriginLoc,
+			isComponentTag,
+			unwrapTsExpr,
+			hasInlineMemoDirectEval,
+		});
+	}
 	const result = compileInternal(
 		source,
 		filename,
@@ -11542,6 +11580,7 @@ function compileInternal(
 		options?.__universalUnits ?? rendererBoundaryPreparation?.universalUnits ?? [];
 	const ctx = {
 		authoredModuleAst: parsedAst,
+		templateFusion: parsedAst._octaneHasTemplateFusion === true,
 		filename,
 		usedCompilerNames: collectIdentifierNames(ast),
 		compilerNameSuffixes: null,
@@ -12549,6 +12588,7 @@ function compileInternal(
 				leadingComments: node.leadingComments,
 			};
 		}
+		if (ctx.templateFusion) annotateFusionRenderer(bodyNodes, firstStatement, node);
 	}
 
 	finalizeComponentInitializers(ctx, bodyNodes);
@@ -12600,7 +12640,11 @@ function compileInternal(
 		const args = [b.literal(t.html, JSON.stringify(t.html))];
 		if (t.ns || t.frag) args.push(b.literal(t.ns | 0));
 		if (t.frag) args.push(b.literal(t.frag | 0));
-		return inheritOriginLoc(b.const(t.name, markPure(b.call('_$template', ...args))), moduleOrigin);
+		return annotateTemplateFusion(
+			inheritOriginLoc(b.const(t.name, markPure(b.call('_$template', ...args))), moduleOrigin),
+			t.fusionOrigins,
+			`template ${t.name}`,
+		);
 	});
 	// No tail slots exist on the client today (prop memos are server-only), but
 	// flush before assembly so a future client-side tail site cannot trip the
@@ -13039,6 +13083,7 @@ function compileServer(
 	});
 	const ctx = {
 		authoredModuleAst: parsedAst,
+		templateFusion: parsedAst._octaneHasTemplateFusion === true,
 		filename,
 		usedCompilerNames: collectIdentifierNames(ast),
 		compilerNameSuffixes: null,
@@ -13244,6 +13289,7 @@ function compileServer(
 				leadingComments: node.leadingComments,
 			};
 		}
+		if (ctx.templateFusion) annotateFusionRenderer(bodyNodes, firstStatement, node);
 	}
 
 	// Assign deferred (server-only) slot ids BEFORE the import list is built:
@@ -27805,7 +27851,13 @@ function planJsx(
 		// adds the wrapper the HTML parser needs. Hydration reads the count without
 		// parsing the template to find where the roots it adopted end.
 		const fragArg = single ? 0 : htmlIdx;
-		const tpl = allocTemplate(ctx, rootTemplate, flag, fragArg);
+		const tpl = allocTemplate(
+			ctx,
+			rootTemplate,
+			flag,
+			fragArg,
+			ctx.templateFusion ? templateFusionOrigins(jsxNodesRaw) : null,
+		);
 		// DEV: pass the root element's source location so a STRUCTURAL hydration mismatch
 		// (swapped @if/@switch branch, changed tag) warns with `file:line:col`. Single-root
 		// only (a multi-root <octane-frag> wrapper has no source position); prod omits it.
@@ -36637,7 +36689,7 @@ function bodyContainsJsx(node) {
 }
 
 /** @param {TemplateIR} ast */
-function allocTemplate(ctx, ast, ns = 0, frag = 0) {
+function allocTemplate(ctx, ast, ns = 0, frag = 0, fusionOrigins = null) {
 	const { html, origins } = serializeTemplateIr(ast);
 	const intern = !ctx.hmr && !ctx.dev && !ctx.profile;
 	const bucket = intern ? ctx.internedTemplates.get(html) : undefined;
@@ -36647,6 +36699,7 @@ function allocTemplate(ctx, ast, ns = 0, frag = 0) {
 			? bucket
 			: undefined;
 	if (existing !== undefined) {
+		if (fusionOrigins?.length) mergeTemplateFusionOrigins(existing, fusionOrigins);
 		if (ctx.inspect && origins !== null && existing.origins !== null) {
 			for (const origin of origins) {
 				const canonical = existing.origins.find(
@@ -36666,7 +36719,7 @@ function allocTemplate(ctx, ast, ns = 0, frag = 0) {
 	}
 	const id = ctx.nextTemplateId++;
 	const name = `_t$${id}`;
-	const template = { name, ast, html, ns, frag, origins };
+	const template = { name, ast, html, ns, frag, origins, fusionOrigins, fusionOriginKeys: null };
 	ctx.hoistedTemplates.push(template);
 	if (intern) {
 		if (bucket === undefined) ctx.internedTemplates.set(html, template);
@@ -36687,6 +36740,15 @@ function escapeAttr(s) {
 const PURE_ANNOTATION_COMMENTS = [{ type: 'Block', value: ' @__PURE__ ' }];
 const esrapCommentOptions = {
 	getLeadingComments: (node) => (node.__octanePure ? PURE_ANNOTATION_COMMENTS : undefined),
+};
+const fusionCommentOptions = {
+	getLeadingComments: (node) =>
+		node.__octaneFusionLeading
+			? [...node.__octaneFusionLeading, ...(node.__octanePure ? PURE_ANNOTATION_COMMENTS : [])]
+			: node.__octanePure
+				? PURE_ANNOTATION_COMMENTS
+				: undefined,
+	getTrailingComments: (node) => node.__octaneFusionTrailing,
 };
 
 const COMMENT_MEMBER_TYPES = new Set([
@@ -36754,7 +36816,11 @@ function printNodeWithMap(node, ctx) {
 	}
 	if (assertPrintedLocs()) assertNodeLocs(printable);
 	const commentOptions =
-		ctx.output === 'ts' ? typescriptCommentOptions(ctx.mapSource) : esrapCommentOptions;
+		ctx.output === 'ts'
+			? typescriptCommentOptions(ctx.mapSource)
+			: ctx.templateFusion
+				? fusionCommentOptions
+				: esrapCommentOptions;
 	const { code, map } = esrapPrint(printable, withDeferredImports(esrapTsx(commentOptions)), {
 		// esrap indents every continuation of a block comment. TS consumers need
 		// authored annotation bytes, including indentation inside nested comments.
