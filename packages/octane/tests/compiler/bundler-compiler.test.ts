@@ -1087,19 +1087,28 @@ export function Pair(props) @{ 'use dom bindings'; <section>
 
 	// A checkout-path-dependent ID changed every component site hash in files
 	// outside the Vite root, so identical source built to different bytes.
-	it('compiles files outside the root identically from any checkout location', () => {
-		const source =
-			"function Inner() @{ <span>{'inner'}</span> }\nexport function Card() @{ <div><Inner /></div> }";
-		const build = (checkout: string) =>
-			createOctaneCompiler({ root: `${checkout}/apps/web` }).transform(
-				source,
-				`${checkout}/packages/ui/src/Card.tsrx`,
-				{ environment: 'client' },
-			)?.code;
+	it.each(['private', 'exported'] as const)(
+		'compiles files outside the root identically from any checkout location with a %s child',
+		(visibility) => {
+			const source =
+				(visibility === 'exported' ? 'export ' : '') +
+				"function Inner() @{ <span>{'inner'}</span> }\nexport function Card() @{ <div><Inner /></div> }";
+			const build = (checkout: string) =>
+				createOctaneCompiler({ root: `${checkout}/apps/web` }).transform(
+					source,
+					`${checkout}/packages/ui/src/Card.tsrx`,
+					{ environment: 'client' },
+				)?.code;
+			const first = build('/checkout-a');
+			const second = build('/tmp/elsewhere/checkout-b');
 
-		expect(build('/checkout-a')).toContain('c:');
-		expect(build('/checkout-a')).toBe(build('/tmp/elsewhere/checkout-b'));
-	});
+			expect(first).toBeTypeOf('string');
+			// Exported children retain an invocation site even when private pure
+			// children can fuse into their caller's template.
+			if (visibility === 'exported') expect(first).toContain('c:');
+			expect(first).toBe(second);
+		},
+	);
 
 	it('uses the shared canonical module id for client/server head ownership', () => {
 		const compiler = createOctaneCompiler({ root: '/project' });
