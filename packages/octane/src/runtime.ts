@@ -49377,7 +49377,15 @@ function reconcileKeyed<T>(
 				record = journalForSlot(state, true);
 				journalShape = false;
 			}
-			updateSurvivor(block, newItem, newEnd, itemBody, pure, lite, indexIndependent, state.env);
+			// Mirror updateSurvivor's pure branch when its body is also unchanged.
+			// Keep profiling and index bookkeeping aligned with that branch.
+			if (pure && indexIndependent && block.props === newItem && block.body === itemBody) {
+				if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__)
+					__profileCount(ProfileCounter.LIST_UPDATE);
+				block.itemIndex = newEnd;
+			} else {
+				updateSurvivor(block, newItem, newEnd, itemBody, pure, lite, indexIndependent, state.env);
+			}
 		}
 		oldLast = block.prevSibling!;
 		newEnd--;
