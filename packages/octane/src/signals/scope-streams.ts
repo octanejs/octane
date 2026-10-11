@@ -25,11 +25,11 @@ import {
  */
 export class ScopeStreams {
 	readonly selections = new Map<string, StreamFrameIdentity>();
-	private readonly results = new Map<string, StreamedSignalResultFrame[]>();
+	readonly results = new Map<string, StreamedSignalResultFrame[]>();
 	private readonly failures = new Map<string, { identity: StreamFrameIdentity; error: Error }>();
-	private readonly waiting = new Map<string, { identity: StreamFrameIdentity; ready(): void }>();
+	readonly waiting = new Map<string, { identity: StreamFrameIdentity; ready(): void }>();
 
-	constructor(private readonly owner: ScopeImpl) {}
+	constructor(readonly owner: ScopeImpl) {}
 
 	/** Mark every unfinished channel expired before cancellation runs user code. */
 	suspend(): void {
@@ -76,32 +76,6 @@ export class ScopeStreams {
 		return binding !== undefined && bindResourceStreamedSelection(binding, identity);
 	}
 
-	isPending(identity: StreamFrameIdentity): boolean {
-		const selected = this.selections.get(identity.nodeKey);
-		const node = this.owner.nodes.get(identity.nodeKey);
-		if (
-			this.owner.retired ||
-			selected === undefined ||
-			!sameStreamFrameIdentity(selected, identity) ||
-			node?.kind !== 'async'
-		)
-			return false;
-		const binding = this.owner.resources?.get(node);
-		return binding !== undefined && !isResourceStreamedSelectionReady(binding, selected);
-	}
-
-	whenReady(identity: StreamFrameIdentity, ready: () => void): () => void {
-		const node = this.owner.nodes.get(identity.nodeKey);
-		const binding = node && this.owner.resources?.get(node);
-		if (binding && isResourceStreamedSelectionReady(binding, identity)) return () => {};
-		const registration = { identity, ready };
-		this.waiting.set(identity.nodeKey, registration);
-		return () => {
-			if (this.waiting.get(identity.nodeKey) === registration)
-				this.waiting.delete(identity.nodeKey);
-		};
-	}
-
 	selectionReady(binding: ResourceBinding): void {
 		if (this.owner.readBarrier !== undefined || this.owner.retired) return;
 		this.flush(binding.node, binding);
@@ -110,20 +84,6 @@ export class ScopeStreams {
 			this.waiting.delete(binding.node.key);
 			registration.ready();
 		}
-	}
-
-	retainCompleted(identity: StreamFrameIdentity, frames: StreamedSignalResultFrame[]): boolean {
-		if (!this.isPending(identity) || frames.at(-1)?.kind !== 'complete') return false;
-		const previous = this.results.get(identity.nodeKey);
-		if (previous?.at(-1)?.kind === 'complete') return false;
-		let sequence = previous?.length ?? 0;
-		for (const frame of frames) {
-			if (!sameStreamFrameIdentity(identity, frame.identity) || frame.sequence !== sequence++)
-				return false;
-		}
-		if (previous) previous.push(...frames);
-		else this.results.set(identity.nodeKey, frames);
-		return true;
 	}
 
 	discardCompleted(identity: StreamFrameIdentity): void {
@@ -191,4 +151,56 @@ export class ScopeStreams {
 
 export function scopeStreams(owner: ScopeImpl): ScopeStreams {
 	return (owner.streams ??= new ScopeStreams(owner));
+}
+
+/** Receiver attachment owns these checks; direct frame ingress does not need them. */
+export function isScopeStreamPending(
+	streams: ScopeStreams,
+	identity: StreamFrameIdentity,
+): boolean {
+	const selected = streams.selections.get(identity.nodeKey);
+	const node = streams.owner.nodes.get(identity.nodeKey);
+	if (
+		streams.owner.retired ||
+		selected === undefined ||
+		!sameStreamFrameIdentity(selected, identity) ||
+		node?.kind !== 'async'
+	)
+		return false;
+	const binding = streams.owner.resources?.get(node);
+	return binding !== undefined && !isResourceStreamedSelectionReady(binding, selected);
+}
+
+export function whenScopeStreamReady(
+	streams: ScopeStreams,
+	identity: StreamFrameIdentity,
+	ready: () => void,
+): () => void {
+	const node = streams.owner.nodes.get(identity.nodeKey);
+	const binding = node && streams.owner.resources?.get(node);
+	if (binding && isResourceStreamedSelectionReady(binding, identity)) return () => {};
+	const registration = { identity, ready };
+	streams.waiting.set(identity.nodeKey, registration);
+	return () => {
+		if (streams.waiting.get(identity.nodeKey) === registration)
+			streams.waiting.delete(identity.nodeKey);
+	};
+}
+
+export function retainCompletedScopeStream(
+	streams: ScopeStreams,
+	identity: StreamFrameIdentity,
+	frames: StreamedSignalResultFrame[],
+): boolean {
+	if (!isScopeStreamPending(streams, identity) || frames.at(-1)?.kind !== 'complete') return false;
+	const previous = streams.results.get(identity.nodeKey);
+	if (previous?.at(-1)?.kind === 'complete') return false;
+	let sequence = previous?.length ?? 0;
+	for (const frame of frames) {
+		if (!sameStreamFrameIdentity(identity, frame.identity) || frame.sequence !== sequence++)
+			return false;
+	}
+	if (previous) previous.push(...frames);
+	else streams.results.set(identity.nodeKey, frames);
+	return true;
 }

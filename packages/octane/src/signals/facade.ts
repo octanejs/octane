@@ -13,7 +13,12 @@ import {
 } from './engine.js';
 import { createDeclaredScalarCell } from './scalar-computations.js';
 import { ScopeDisposedError, SignalStreamError } from './errors.js';
-import { scopeStreams } from './scope-streams.js';
+import {
+	scopeStreams,
+	isScopeStreamPending,
+	whenScopeStreamReady,
+	retainCompletedScopeStream,
+} from './scope-streams.js';
 import {
 	isDeclarationView,
 	isRetiredDeclarationView,
@@ -792,18 +797,18 @@ export function attachStreamedSignalResult(
 			if (acceptStreamedSignalResult(owner, frame)) return;
 			// Only a still-authorized selector waiting on its dependencies may
 			// defer. Bad sequence/resource/attempt frames still fail closed.
-			if (streams.isPending(frame.identity)) return false;
+			if (isScopeStreamPending(streams, frame.identity)) return false;
 			fail(new SignalStreamError('identity'));
 			throw new SignalStreamError('identity');
 		},
 		retainCompleted(frames: StreamedSignalResultFrame[]): boolean {
-			return streams.retainCompleted(identity, frames);
+			return retainCompletedScopeStream(streams, identity, frames);
 		},
 		fail,
 	};
 	try {
 		let detach = receiver.attachResult(identity, consumer);
-		const stopWaiting = streams.whenReady(identity, () => {
+		const stopWaiting = whenScopeStreamReady(streams, identity, () => {
 			detach = receiver.attachResult(identity, consumer);
 		});
 		return () => {

@@ -33,10 +33,12 @@ import {
 	ListExitApp,
 	QueuedHydrationApp,
 } from './_fixtures/view-transition-ssr.tsrx';
+import * as Jsx from './_fixtures/view-transition-ssr-jsx.tsx';
 
 const FIXTURE = join(process.cwd(), 'packages/octane/tests/_fixtures/view-transition-ssr.tsrx');
 
 const server = loadServerFixture(FIXTURE);
+const serverJsx = loadServerFixture('packages/octane/tests/_fixtures/view-transition-ssr-jsx.tsx');
 function collector() {
 	const collection = createPipeableCollector();
 	return { ...collection, dest: collection.destination };
@@ -150,6 +152,59 @@ describe('ReactDOMFizzViewTransition (ported)', () => {
 		const root2 = hydrateRoot(container, AnnotationsApp, {});
 		root2.unmount();
 		container.innerHTML = '';
+	});
+
+	// A .tsx parent passes descriptor children, which ssrChild already frames as
+	// one childSlot range; a second frame made the client's adoption mismatch.
+	for (const name of [
+		'ComponentChild',
+		'HostChild',
+		'TextChild',
+		'ArrayChild',
+		'EmptyChild',
+		'SuspenseChild',
+	] as const) {
+		it(`hydrates a .tsx ${name} without regenerating it`, async () => {
+			container.innerHTML = ServerRT.renderToString(serverJsx[name], {}).html;
+			const glyph = container.querySelector('#glyph');
+			const onRecoverableError = vi.fn();
+			let root!: ReturnType<typeof hydrateRoot>;
+			await act(() => {
+				root = hydrateRoot(container, Jsx[name], {}, { onRecoverableError });
+			});
+			expect(onRecoverableError).not.toHaveBeenCalled();
+			expect(container.querySelector('#glyph')).toBe(glyph);
+			expect(vt(container.querySelector('span')!.firstElementChild)?.['vt-update']).toBe(
+				name === 'TextChild' || name === 'EmptyChild' ? undefined : 'none',
+			);
+			root.unmount();
+		});
+	}
+
+	it('frames compiler HTML children exactly like a compiled children body', () => {
+		const body = ServerRT.renderToString(server.AnnotationsApp, {}).html;
+		const carrier = ServerRT.renderToString(
+			(_props: object, scope: never) =>
+				ServerRT.ssrComponent(
+					scope,
+					ServerRT.ViewTransition,
+					{ default: 'none', children: ServerRT.ssrHtml('<i id="glyph">x</i>') },
+					false,
+				),
+			{},
+		).html;
+		const viaBody = ServerRT.renderToString(
+			(_props: object, scope: never) =>
+				ServerRT.ssrComponent(
+					scope,
+					ServerRT.ViewTransition,
+					{ default: 'none', children: () => ServerRT.ssrHtml('<i id="glyph">x</i>') },
+					false,
+				),
+			{},
+		).html;
+		expect(body).toContain('vt-update');
+		expect(carrier).toBe(viaBody);
 	});
 
 	// Per ReactDOMFizzViewTransition-test.js:142
