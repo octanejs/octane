@@ -437,8 +437,8 @@ bounds the incremental decoded/encoded cost of IFR against the equivalent
 background-rendered preview graph; its semantic checks remain source/build
 evidence rather than native execution.
 
-`bundle-size` classifies every build's emitted JavaScript into an `app` bucket
-(modules under the app's own src/) and a `framework` bucket (node_modules + the
+`bundle-size` classifies each comparative build's emitted JavaScript into an
+`app` bucket (modules under the app's own src/) and a `framework` bucket (node_modules + the
 Octane workspace runtime + virtual helpers) and reports both, plus totals:
 `app_*` / `fw_*` / `js_*` ×
 raw/gzip/brotli. The harness models each emitted JavaScript file as an
@@ -456,6 +456,20 @@ place, so a local benchmark run overwrites `examples/wayfinder/dist`. Hidden
 source maps gate the absence of unused form-action and Fragment-ref descriptor
 capabilities from this application's generated hydration entry; bytes remain
 report-only.
+
+The `threadline_{oxc,esbuild}_js_*` and `pagecraft_{oxc,esbuild}_js_*` rows also
+use the real applications' normal Vite configs and chunking. Each sums every
+emitted client JS asset, including deferred chunks, with raw/gzip/brotli reported
+separately for both minifiers. Outputs remain under `bundle-size/dist`; there is
+no app/framework split or committed byte budget. Threadline additionally gates
+the absence of generic component and return rendering from every client chunk's
+source map under both minifiers, with a retained void-component control. Its
+private static icons must retain paired START/END shared-renderer provenance in
+the actual App transform, without fixing their call-site counts. Runtime and
+hydration behavior stay in the owning tests.
+Compare the same operation names in base/head results. When an older base lacks
+these rows, its size is unknown, not zero; an initial change needs a matched
+local comparison, including a restored-baseline control.
 
 The `bindings_*` set is an Octane-only application,
 [`bundle-size/apps/bindings`](bundle-size/apps/bindings/octane-tsrx), that
