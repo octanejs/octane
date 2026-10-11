@@ -1,5 +1,6 @@
 import { loadCompiledFixtureSource } from './_server-fixture.js';
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
+import { flushSync, hydrateRoot, type Root } from 'octane';
 import * as Server from 'octane/server';
 import { prerender } from 'octane/static';
 
@@ -58,13 +59,10 @@ describe('renderToString — synchronous, fallbacks for suspended', () => {
 });
 
 describe('renderToStaticMarkup — clean, non-hydratable', () => {
-	// A nested component so the block-marker range (which wraps nested-component
-	// output) is present in the hydratable render and absent in static markup.
-	const m = evalServer(
-		`function Child() @{ <span>hi</span> }
-		 export function P() @{ <div class="x"><Child /></div> }`,
-		'static.tsrx',
-	);
+	// Hydratable output promises adoption, not a particular comment layout.
+	const source = `function Child() @{ <span>hi</span> }
+		 export function P() @{ <div class="x"><Child /></div> }`;
+	const m = evalServer(source, 'static.tsrx');
 
 	it('emits no block markers', () => {
 		const r = Server.renderToStaticMarkup(m.P);
@@ -73,8 +71,48 @@ describe('renderToStaticMarkup — clean, non-hydratable', () => {
 		expect(r.html).toContain('<div class="x"><span>hi</span></div>');
 	});
 
-	it('renderToString of the same component DOES carry markers (contrast)', () => {
-		expect(Server.renderToString(m.P).html).toContain('<!--[-->');
+	it('renderToString of the same component supports adopting the server DOM', () => {
+		const client = loadCompiledFixtureSource(source, {
+			id: 'static.tsrx',
+			mode: 'client',
+			compileOptions: { dev: process.env.OCTANE_TEST_COMPILE_MODE !== 'prod', hmr: false },
+		});
+		const container = document.createElement('div');
+		container.innerHTML = Server.renderToString(m.P).html;
+		document.body.appendChild(container);
+		const div = container.querySelector('.x')!;
+		const span = div.querySelector('span')!;
+		const text = Array.from(span.childNodes).find((node) => node.nodeType === 3)!;
+		const errors = vi.spyOn(console, 'error').mockImplementation(() => {});
+		const warnings = vi.spyOn(console, 'warn').mockImplementation(() => {});
+		let root: Root | undefined;
+		try {
+			flushSync(() => {
+				root = hydrateRoot(container, client.P);
+			});
+			expect(container.children).toHaveLength(1);
+			expect(container.querySelector('.x')).toBe(div);
+			expect(container.querySelector('span')).toBe(span);
+			expect(Array.from(span.childNodes)).toContain(text);
+			expect(container.textContent).toBe('hi');
+			flushSync(() => root!.render(client.P));
+			expect(container.children).toHaveLength(1);
+			expect(container.querySelector('.x')).toBe(div);
+			expect(container.querySelector('span')).toBe(span);
+			expect(Array.from(span.childNodes)).toContain(text);
+			expect(container.textContent).toBe('hi');
+			expect(errors.mock.calls).toEqual([]);
+			expect(warnings.mock.calls).toEqual([]);
+		} finally {
+			try {
+				root?.unmount();
+			} finally {
+				container.remove();
+				errors.mockRestore();
+				warnings.mockRestore();
+			}
+		}
+		expect(container.childNodes).toHaveLength(0);
 	});
 });
 
