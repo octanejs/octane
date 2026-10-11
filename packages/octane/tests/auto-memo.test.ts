@@ -10,6 +10,13 @@ import { CompilerNameCollisionApp } from './_fixtures/auto-memo-name-collisions.
 import { ParentCaptureApp } from './_fixtures/auto-memo-parent-capture.tsrx';
 import { EffectImportRow } from './_fixtures/auto-memo-effect-row.tsrx';
 import { setEffectRowImports } from './_fixtures/auto-memo-effect-imports';
+import { AutoMemoCycleA } from './_fixtures/auto-memo-cycle-a.tsrx';
+import { setAutoMemoCycleValue } from './_fixtures/auto-memo-cycle-b.tsrx';
+import { AutoMemoSwapApp } from './_fixtures/auto-memo-imported-swap-parent.tsrx';
+import {
+	setAutoMemoSwapProven,
+	setAutoMemoSwapValue,
+} from './_fixtures/auto-memo-imported-swap.tsrx';
 import {
 	TsxAutoMemoApp,
 	TsxBoundMapApp,
@@ -1172,6 +1179,173 @@ describe('effectful component regions', () => {
 		root.unmount();
 		flushEffects();
 		expect(events.at(-1)).toBe('cleanup:client');
+	});
+});
+
+function loadImportedModule(source: string, id: string, runtimeModules?: Record<string, any>) {
+	return loadCompiledFixtureSource(source, {
+		id,
+		mode: 'client',
+		compileOptions: { hmr: false, dev: false },
+		runtimeModules,
+	});
+}
+
+describe('imported component regions', () => {
+	it('marks exported pure components and caches their imported call sites', () => {
+		const child = compile(
+			`import { useState } from 'octane';
+			 import { Leaf } from './leaf';
+			 export function Card(props) @{ <div><Leaf label={props.label} /></div> }
+			 function Private(props) @{ <i>{props.label as string}</i> }
+			 export function Stateful() @{ const [count] = useState(0); <b>{count as number}</b> }
+			 export { Private };`,
+			'imported-memo-card.tsrx',
+			{ hmr: false, autoMemo: true },
+		).code;
+		// The proof witnesses the imported child it renders, live binding and proof.
+		expect(child).toMatch(/const Card = \/\* @__PURE__ \*\/ _\$markCompilerMemo\(/);
+		expect(child).toMatch(/\(\) => \[Leaf, _\$compilerMemoWitness\(Leaf\)\]/);
+		expect(child).toMatch(/const Private = \/\* @__PURE__ \*\/ _\$markCompilerMemo\(/);
+		expect(child).toMatch(/const Stateful = \/\* @__PURE__ \*\/ _\$__s\(/);
+
+		const parent = compile(
+			`import { Card } from './card';
+			 export function App(props) @{ <p data-tick={props.tick}><Card label={props.label} /></p> }`,
+			'imported-memo-parent.tsrx',
+			{ hmr: false, autoMemo: true },
+		).code;
+		expectCompilerRegion(parent);
+		expect(parent).toContain('_$compilerMemoWitness(Card)');
+
+		const withChildren = compile(
+			`import { Card } from './card';
+			 export function App(props) @{ <p data-tick={props.tick}><Card label={props.label}><b /></Card></p> }`,
+			'imported-memo-children.tsrx',
+			{ hmr: false, autoMemo: true },
+		).code;
+		expectNoCompilerRegion(withChildren);
+	});
+
+	it('re-renders a proven import whose imported child is unproven', () => {
+		const inner = loadImportedModule(
+			`let value = 'a';
+			 export function setValue(next) { value = next; }
+			 export function Inner(props) @{ <b>{(props.label + ':' + value) as string}</b> }`,
+			'imported-unproven-inner.tsrx',
+		);
+		const wrapper = loadImportedModule(
+			`import { Inner } from './inner';
+			 export function Wrapper(props) @{ <span><Inner label={props.label} /></span> }`,
+			'imported-proven-wrapper.tsrx',
+			{ './inner': inner },
+		);
+		const { App } = loadImportedModule(
+			`import { Wrapper } from './wrapper';
+			 export function App(props) @{ <p data-tick={props.tick}><Wrapper label={props.label} /></p> }`,
+			'imported-wrapper-parent.tsrx',
+			{ './wrapper': wrapper },
+		);
+		const root = mount(App, { label: 'x', tick: 0 });
+		try {
+			expect(root.find('b').textContent).toBe('x:a');
+			inner.setValue('b');
+			root.update(App, { label: 'x', tick: 1 });
+			expect(root.find('b').textContent).toBe('x:b');
+			root.update(App, { label: 'y', tick: 2 });
+			expect(root.find('b').textContent).toBe('y:b');
+		} finally {
+			root.unmount();
+		}
+	});
+
+	it('refreshes a memo() context consumer below a cached imported edge', () => {
+		const Theme = createContext('t0');
+		const reader = loadImportedModule(
+			`import { memo, useContext } from 'octane';
+			 import { Theme } from './theme';
+			 function ReaderImpl(props) @{
+				const theme = useContext(Theme);
+				<b>{(props.label + ':' + theme) as string}</b>
+			 }
+			 export const Reader = memo(ReaderImpl);`,
+			'imported-context-reader.tsrx',
+			{ './theme': { Theme } },
+		);
+		const wrapper = loadImportedModule(
+			`import { Reader } from './reader';
+			 export function Wrapper(props) @{ <span><Reader label={props.label} /></span> }`,
+			'imported-context-wrapper.tsrx',
+			{ './reader': reader },
+		);
+		const { App } = loadImportedModule(
+			`import { Theme } from './theme';
+			 import { Wrapper } from './wrapper';
+			 export function App(props) @{
+				<Theme value={props.theme}>
+					<p><Wrapper label={props.label} /></p>
+				</Theme>
+			 }`,
+			'imported-context-parent.tsrx',
+			{ './theme': { Theme }, './wrapper': wrapper },
+		);
+		const root = mount(App, { label: 'x', theme: 't1' });
+		try {
+			expect(root.find('b').textContent).toBe('x:t1');
+			root.update(App, { label: 'x', theme: 't2' });
+			expect(root.find('b').textContent).toBe('x:t2');
+		} finally {
+			root.unmount();
+		}
+	});
+
+	it('follows a live component binding between proven and unproven components', () => {
+		setAutoMemoSwapProven(true);
+		setAutoMemoSwapValue('v0');
+		const root = mount(AutoMemoSwapApp, { label: 'x', tick: 0 });
+		try {
+			expect(root.find('i').textContent).toBe('proven:x');
+			setAutoMemoSwapProven(false);
+			root.update(AutoMemoSwapApp, { label: 'x', tick: 1 });
+			expect(root.find('i').textContent).toBe('unproven:x:v0');
+			setAutoMemoSwapValue('v1');
+			root.update(AutoMemoSwapApp, { label: 'x', tick: 2 });
+			expect(root.find('i').textContent).toBe('unproven:x:v1');
+			setAutoMemoSwapProven(true);
+			root.update(AutoMemoSwapApp, { label: 'x', tick: 3 });
+			expect(root.find('i').textContent).toBe('proven:x');
+			root.update(AutoMemoSwapApp, { label: 'y', tick: 4 });
+			expect(root.find('i').textContent).toBe('proven:y');
+		} finally {
+			root.unmount();
+			setAutoMemoSwapProven(true);
+			setAutoMemoSwapValue('v0');
+		}
+	});
+
+	it('renders and updates components that recurse across modules', () => {
+		const { App } = loadImportedModule(
+			`import { AutoMemoCycleA } from './cycle';
+			 export function App(props) @{
+				<p data-tick={props.tick}><AutoMemoCycleA depth={2} label={props.label} /></p>
+			 }`,
+			'imported-cycle-parent.tsrx',
+			{ './cycle': { AutoMemoCycleA } },
+		);
+		setAutoMemoCycleValue('v0');
+		const root = mount(App, { label: 'x', tick: 0 });
+		try {
+			expect(root.findAll('.cycle-a')).toHaveLength(3);
+			expect(root.find('.cycle-leaf').textContent).toBe('x:v0');
+			setAutoMemoCycleValue('v1');
+			root.update(App, { label: 'x', tick: 1 });
+			expect(root.find('.cycle-leaf').textContent).toBe('x:v1');
+			root.update(App, { label: 'y', tick: 2 });
+			expect(root.find('.cycle-leaf').textContent).toBe('y:v1');
+		} finally {
+			root.unmount();
+			setAutoMemoCycleValue('v0');
+		}
 	});
 });
 

@@ -450,12 +450,13 @@ export function findVoidComponentExports(source, id) {
 }
 
 // Runtime wrappers that return a component with their first argument's render
-// ABI, by arity: the compiled single-root, warm-plan and presentation-view
-// stamps, and a comparator-free `memo`. Compiled output imports them from the
-// client runtime entry or its internal re-export.
+// ABI, by arity: the compiled single-root, warm-plan, presentation-view and
+// memo-proof stamps, and a comparator-free `memo`. Compiled output imports them
+// from the client runtime entry or its internal re-export.
 const VOID_PRESERVING_WRAPPERS = new Map([
 	['__s', 1],
 	['bindPresentationView', 2],
+	['markCompilerMemo', 2],
 	['markWarm', 2],
 	['memo', 1],
 ]);
