@@ -1,8 +1,11 @@
 import { spawnSync } from 'node:child_process';
+import { readFileSync } from 'node:fs';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import ts from 'typescript';
 import { parseAst } from 'vite';
 import { compile } from 'octane/compiler';
+import { isValidElement } from 'octane';
+import { mount } from '../_helpers.js';
 import { evaluateCompiledFixtureCode } from '../_server-fixture.js';
 
 // Octane parses with the native `@tsrx/oxc` parser and falls back to the
@@ -217,6 +220,40 @@ describe('TypeScript runtime declarations lower to plain JavaScript', () => {
 	}
 
 	for (const parserName of PARSERS) {
+		it(`observes defaults on an element exposed by an enum beside generic JSX (${parserName} parser)`, () => {
+			const source =
+				readFileSync('packages/octane/tests/_fixtures/compiler-generic-interface.tsrx', 'utf8') +
+				`
+				function Icon() { return <span>enum icon</span>; }
+				let captured;
+				export function readCaptured() { return captured; }
+				function capture(value) { captured = value; return 0; }
+				enum Values { First = capture(Icon()) }
+				export function App() { return <main><Icon /></main>; }
+				`;
+			parser.javascript = parserName === 'javascript';
+			const { code } = compile(source, ID, { mode: 'client', dev: false, hmr: false });
+			const fixture = evaluateCompiledFixtureCode(code, ID, 'client', undefined);
+			const captured = fixture.readCaptured();
+			expect(isValidElement(captured)).toBe(true);
+			const reads: string[] = [];
+			Object.defineProperty(captured.type, 'defaultProps', {
+				configurable: true,
+				get() {
+					reads.push('defaults');
+					return {};
+				},
+			});
+			const r = mount(fixture.App);
+			try {
+				expect(r.find('main span').textContent).toBe('enum icon');
+				expect(reads).toContain('defaults');
+			} finally {
+				r.unmount();
+				Reflect.deleteProperty(captured.type, 'defaultProps');
+			}
+		});
+
 		it(`exports a top-level export-import alias (${parserName} parser)`, () => {
 			const exports = octaneExports(
 				`namespace Source { export const value = 'aliased'; }

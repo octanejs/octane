@@ -4639,7 +4639,7 @@ function collectFreeIdentifiers(root, initiallyBound, ignoreNodes = null) {
 		// Member references belong to the enum, not equally named outer bindings.
 		if (t === 'TSEnumDeclaration') {
 			if (n.declare !== true) {
-				const members = n.body?.members || [];
+				const members = n.body?.members ?? n.members ?? [];
 				const enumScope = new Set(scope);
 				collectBindings(n.id, enumScope);
 				for (const member of members) {
