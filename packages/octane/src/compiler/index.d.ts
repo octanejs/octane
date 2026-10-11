@@ -133,6 +133,9 @@ export interface CompileOptions {
 	universalRuntime?: { runtime: string; thread: 'background' | 'main-thread' };
 	clientOnlyImports?: readonly unknown[];
 	isVoidComponentImport?: (request: string, imported: string) => boolean;
+	/** Whether an imported component's module published a compiler memo proof for it. */
+	isCompilerMemoImport?: (request: string, imported: string) => boolean;
+	/** Whether an imported component's module published it as a lite export. */
 	isLiteComponentImport?: (request: string, imported: string) => boolean;
 	isDescriptorChildrenImport?: (request: string, imported: string) => boolean;
 	/** Preserve the compiler's existing experimental integration options. */
@@ -272,6 +275,8 @@ export interface CompileResult {
 	universalRuntime?: CompileOptions['universalRuntime'];
 	/** This module contains compiler-proven signal declarations or native reads. */
 	streamedSignals?: true;
+	/** Exports carrying a production compiler memo proof; build-time adapter metadata. */
+	compilerMemoExports?: readonly string[];
 	/** Production client constants used by compiled binding views; build-time adapter metadata. */
 	bindingConstants?: {
 		version: 1;

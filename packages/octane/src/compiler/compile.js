@@ -7185,18 +7185,22 @@ function classifyStableHookfulChildCalls(moduleBody, ctx) {
 	}
 }
 
-// Names a module exports by specifier (`export { Row }`) or as a bare default
-// (`export default Row`); exported declarations carry their own flag.
+// The export names of each local a module exports by specifier
+// (`export { Row as Item }`) or as a bare default (`export default Row`);
+// exported declarations carry their own flag.
 function collectExportedLocals(body) {
-	const names = new Set();
+	const names = new Map();
+	const add = (local, exported) => names.set(local, [...(names.get(local) ?? []), exported]);
 	for (const statement of body) {
 		if (statement.type === 'ExportNamedDeclaration' && statement.source == null) {
-			for (const specifier of statement.specifiers || []) names.add(specifier.local.name);
+			for (const specifier of statement.specifiers || []) {
+				add(specifier.local.name, specifier.exported?.name ?? specifier.exported?.value);
+			}
 		} else if (
 			statement.type === 'ExportDefaultDeclaration' &&
 			statement.declaration?.type === 'Identifier'
 		) {
-			names.add(statement.declaration.name);
+			add(statement.declaration.name, 'default');
 		}
 	}
 	return names;
@@ -11684,6 +11688,9 @@ function compileInternal(
 			typeof options?.isVoidComponentImport === 'function' ? options.isVoidComponentImport : null,
 		isLiteComponentImport:
 			typeof options?.isLiteComponentImport === 'function' ? options.isLiteComponentImport : null,
+		isCompilerMemoImport:
+			typeof options?.isCompilerMemoImport === 'function' ? options.isCompilerMemoImport : null,
+		compilerMemoExports: [],
 		descriptorChildrenBindings: collectDescriptorChildrenBindings(
 			ast,
 			options?.isDescriptorChildrenImport,
@@ -13033,8 +13040,9 @@ function compileInternal(
 		},
 		diagnostics: nativeChangeDiagnostics,
 	};
-	if (options?.collectLiteComponentExports === true)
-		result.liteComponentExports = collectLiteComponentExports(ast.body, ctx);
+	if (ctx.compilerMemoExports.length > 0) result.compilerMemoExports = ctx.compilerMemoExports;
+	const liteExports = ctx.autoMemo ? collectLiteComponentExports(ast.body, ctx) : [];
+	if (liteExports.length > 0) result.liteComponentExports = liteExports;
 	if (ctx.inspect) {
 		// Template-origin recording (opt-in, out-of-band): one entry per hoisted
 		// template. `html` is the logical (pre-backtick-escaping) template HTML;
@@ -16944,8 +16952,8 @@ function isProvenLiteImport(ctx, name) {
 
 // Exports an importer may call through componentSlotLite: hookless void bodies
 // (componentInfo.eligible) that a cached region can skip without refreshing
-// context. A body without a compiler memo proof makes every region over it
-// miss, so only a proven body must also be context-free.
+// context. A region over a body without a compiler memo proof always misses,
+// so only a proven body must also be context-free.
 function collectLiteComponentExports(body, ctx) {
 	const lite = (name) => {
 		const info = ctx.componentInfo.get(name);
@@ -16958,18 +16966,10 @@ function collectLiteComponentExports(body, ctx) {
 	const exports = [];
 	for (const statement of body) {
 		const declaration = statement.declaration;
-		if (statement.type === 'ExportDefaultDeclaration') {
-			const name = declaration?.type === 'Identifier' ? declaration.name : declaration?.id?.name;
-			if (name !== undefined && lite(name)) exports.push('default');
-		} else if (statement.type === 'ExportNamedDeclaration' && statement.source == null) {
-			if (declaration?.type === 'FunctionDeclaration' && lite(declaration.id.name))
-				exports.push(declaration.id.name);
-			for (const specifier of statement.specifiers || []) {
-				if (lite(specifier.local.name))
-					exports.push(specifier.exported.name ?? specifier.exported.value);
-			}
-		}
+		if (declaration?.type === 'FunctionDeclaration' && declaration.id && lite(declaration.id.name))
+			exports.push(statement.type === 'ExportDefaultDeclaration' ? 'default' : declaration.id.name);
 	}
+	for (const [local, names] of ctx.exportedLocals) if (lite(local)) exports.push(...names);
 	return exports;
 }
 
@@ -16988,12 +16988,28 @@ function compilerMemoCaptures(ctx, info, name, exported) {
 		(!exported && !ctx.exportedLocals.has(name))
 	)
 		return null;
+	// With import facts available, a proof over an import that has none could
+	// never hold, so the export publishes none either.
+	if (
+		ctx.isCompilerMemoImport !== null &&
+		info.autoMemoImportedComponents.some((component) => !isCompilerMemoImport(ctx, component))
+	)
+		return null;
 	return [
 		...info.autoMemoCaptures.map((capture) => b.id(capture)),
 		...info.autoMemoImportedComponents.map((component) =>
 			b.call(requireRuntimeForContext(ctx, 'compilerMemoWitness'), b.id(component)),
 		),
 	];
+}
+
+// Whether the imported binding `name` names an export its module published a
+// compiler memo proof for.
+function isCompilerMemoImport(ctx, name) {
+	const binding = ctx.importedComponentBindings.get(name);
+	return (
+		binding !== undefined && ctx.isCompilerMemoImport?.(binding.request, binding.imported) === true
+	);
 }
 
 function compileComponent(node, ctx, options) {
@@ -17097,6 +17113,11 @@ function compileComponent(node, ctx, options) {
 	ctx._pendingWarm = null;
 	const componentInfo = ctx.componentInfo.get(name);
 	const memoCaptures = compilerMemoCaptures(ctx, componentInfo, name, isExported);
+	// Importers admit a cached region only for an export that carries a proof.
+	if (memoCaptures !== null) {
+		if (isExported) ctx.compilerMemoExports.push(isDefault ? 'default' : name);
+		ctx.compilerMemoExports.push(...(ctx.exportedLocals?.get(name) ?? []));
+	}
 	const memoInitializer = (component) =>
 		b.call(
 			requireRuntimeForContext(ctx, 'markCompilerMemo'),
@@ -27466,10 +27487,6 @@ function emitAutoMemoRegion(
 			b.id('undefined'),
 		),
 	];
-	// An unproven component's fresh witness misses before any dependency compares.
-	for (let index = 0; index < componentNames.length; index++) {
-		misses.push(b.binary('!==', cacheAt(componentBase + index), b.id(componentNames[index])));
-	}
 	if (extraMiss !== null) misses.push(extraMiss);
 	misses.push(b.binary('!==', cacheAt(cell.init), b.literal(true)));
 	if (nativeCapture !== null)
@@ -27491,6 +27508,9 @@ function emitAutoMemoRegion(
 	}
 	for (let index = 0; index < witnessCount; index++) {
 		misses.push(b.binary('!==', cacheAt(witnessBase + index), b.id(publicationWitnesses[index])));
+	}
+	for (let index = 0; index < componentNames.length; index++) {
+		misses.push(b.binary('!==', cacheAt(componentBase + index), b.id(componentNames[index])));
 	}
 	const publish = () => [
 		...depNames.map((name, index) =>
@@ -27534,33 +27554,6 @@ function emitAutoMemoRegion(
 			b.stmt(b.call(b.member(b.id(memoRegionHelper), '__profileHit'))),
 			null,
 		);
-	// An unproven component answers a fresh number, so once the cache holds one
-	// every render misses; republishing would only copy the cache again.
-	const unpublished = (statements) =>
-		componentNames.length === 0
-			? statements
-			: [
-					b.if(
-						b.unary(
-							'!',
-							orChain(
-								componentNames.map((name, index) =>
-									b.logical(
-										'&&',
-										b.binary('===', b.unary('typeof', b.id(name)), b.literal('number')),
-										b.binary(
-											'===',
-											b.unary('typeof', cacheAt(componentBase + index)),
-											b.literal('number'),
-										),
-									),
-								),
-							),
-						),
-						b.block(statements),
-						null,
-					),
-				];
 	// `statement` is the guarded region's statement NODE; the returned region is
 	// a statement node too — the caller stamps the origin.
 	if (!contextAware) {
@@ -27568,7 +27561,7 @@ function emitAutoMemoRegion(
 			...depDecls,
 			b.if(
 				orChain(misses),
-				b.block([...computeStatements, ...unpublished([writable(), ...publish(), markInit()])]),
+				b.block([...computeStatements, writable(), ...publish(), markInit()]),
 				b.block([profileHit(), ...replayNative]),
 			),
 		]);
@@ -27590,13 +27583,11 @@ function emitAutoMemoRegion(
 			orChain(misses),
 			b.block([
 				...computeStatements,
-				...unpublished([
-					b.const('_c', cacheContextCall()),
-					writable(),
-					...publish(),
-					b.stmt(b.assignment('=', cacheAt(contextIndex), b.id('_c'))),
-					markInit(),
-				]),
+				b.const('_c', cacheContextCall()),
+				writable(),
+				...publish(),
+				b.stmt(b.assignment('=', cacheAt(contextIndex), b.id('_c'))),
+				markInit(),
 			]),
 			b.block([
 				profileHit(),
@@ -34500,22 +34491,22 @@ function makeCompCall(
 			// change each render, so their marker regime cannot follow the first
 			// identity's stamp.
 			maybeSingleRoot = callSiteOk;
-			// An imported body is opaque here. Its module's definition-site proof,
-			// read through compilerMemoWitness, stands in for the same-module summary.
-			if (
-				ctx._universalRuntimeUnit == null &&
-				ctx.importedNames.has(compName) &&
-				!ctx.octaneImportLocals?.has(compName)
-			) {
+			// An imported body is opaque here. When its module published a
+			// definition-site proof, compilerMemoWitness reads it in place of the
+			// same-module summary; an import without one keeps the plain call. A
+			// presentation view keeps it too: hydration prepares only its own helpers.
+			if (ctx._universalRuntimeUnit == null && ctx.presentationHydration == null) {
 				// A proven lite export renders like a same-module lite callee.
 				const lite = isProvenLiteImport(ctx, compName);
 				if (lite) liteEligible = callSiteOk;
-				memoCallee = {
-					autoMemoSafe: true,
-					autoMemoCaptures: [],
-					autoMemoImportedComponents: [compName],
-					autoMemoMayReadContext: !lite,
-				};
+				if (isCompilerMemoImport(ctx, compName)) {
+					memoCallee = {
+						autoMemoSafe: true,
+						autoMemoCaptures: [],
+						autoMemoImportedComponents: [compName],
+						autoMemoMayReadContext: !lite,
+					};
+				}
 			}
 		}
 		if (memoCallee !== undefined && keyExpr == null) {

@@ -15691,14 +15691,9 @@ interface CompilerMemoProof {
 	read: (() => unknown[]) | null;
 	values: unknown[];
 	pass: number;
-	reading: boolean;
-	unproven: boolean;
 }
 let COMPILER_MEMO_PROOFS: WeakMap<Function, CompilerMemoProof> | null = null;
-// Every unproven answer is a fresh value, so a region over it always misses.
 let unprovenCompilerMemo = 0;
-// Counts re-entries into a proof that is still being read.
-let compilerMemoCycles = 0;
 
 /**
  * Definition-site proof; copying a function's statics cannot transfer it.
@@ -15709,62 +15704,36 @@ export function markCompilerMemo<T extends Function>(
 	component: T,
 	read: (() => unknown[]) | null,
 ): T {
-	(COMPILER_MEMO_PROOFS ??= new WeakMap()).set(component, {
-		read,
-		values: [],
-		pass: -1,
-		reading: false,
-		unproven: false,
-	});
+	(COMPILER_MEMO_PROOFS ??= new WeakMap()).set(component, { read, values: [], pass: -1 });
 	return component;
 }
 
 /**
- * One witness per cached region, outside its component/list work. It answers a
- * token that changes whenever the component's live inputs do, or a number for
- * an unproven component.
+ * One witness per cached region, outside its component/list work. An unproven
+ * component answers a value no earlier call returned, so every region over it,
+ * and every proof that reads its witness, misses.
  */
 export function compilerMemoWitness(component: any): unknown[] | Function | number {
 	if (typeof component !== 'function') return --unprovenCompilerMemo;
 	if (component.__memo === true && component.__compare === undefined) return component;
 	const proof = COMPILER_MEMO_PROOFS?.get(component);
 	if (proof === undefined || 'defaultProps' in component) return --unprovenCompilerMemo;
-	if (proof.read === null) return proof.values;
-	if (proof.pass !== compilerMemoPass) readCompilerMemoProof(proof);
-	// A re-entry is a component cycle across modules: answer the committed
-	// token, while the outer read still compares every value the cycle reaches.
-	else if (proof.reading) compilerMemoCycles++;
-	return proof.unproven ? --unprovenCompilerMemo : proof.values;
-}
-
-function readCompilerMemoProof(proof: CompilerMemoProof): void {
-	const cycles = compilerMemoCycles;
-	const unproven = unprovenCompilerMemo;
+	const read = proof.read;
+	if (read === null) return proof.values;
+	if (proof.pass === compilerMemoPass) return proof.values;
+	// A proof re-entered mid-read sits on a component cycle across modules, and
+	// one whose read threw this pass is incomplete; neither vouches for itself.
+	if (proof.pass === ~compilerMemoPass) return --unprovenCompilerMemo;
+	proof.pass = ~compilerMemoPass;
+	const values = read();
 	proof.pass = compilerMemoPass;
-	proof.reading = true;
-	let values: unknown[] | undefined;
-	try {
-		values = proof.read!();
-	} finally {
-		proof.reading = false;
-		// After a throw, or when the read saw an unfinished proof, read it again.
-		if (values === undefined || compilerMemoCycles !== cycles) proof.pass = -1;
-	}
-	// An unproven descendant leaves the whole subtree unproven.
-	proof.unproven = unprovenCompilerMemo !== unproven;
-	if (proof.unproven) return;
 	const previous = proof.values;
-	if (values.length !== previous.length) {
-		proof.values = values;
-		return;
-	}
+	if (values.length !== previous.length) return (proof.values = values);
 	for (let index = 0; index < values.length; index++) {
-		// A token already published in a committed region must never be mutated.
-		if (!Object.is(values[index], previous[index])) {
-			proof.values = values;
-			return;
-		}
+		if (!Object.is(values[index], previous[index])) return (proof.values = values);
 	}
+	// A token already published in a committed region must never be mutated.
+	return previous;
 }
 
 /** @internal The usual compiled body takes the first-region fast path. */
