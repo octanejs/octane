@@ -36,7 +36,7 @@ assert.ok(
 );
 if (options.has('snapshots')) fs.mkdirSync(directory);
 const packageRoot = path.join(REPO, 'packages/octane');
-const toolingRoot = fs.realpathSync(path.resolve(options.get('tooling-root') ?? packageRoot));
+const toolingRoot = fs.realpathSync(path.resolve(options.get('tooling-root') ?? HERE));
 const requireTool = createRequire(path.join(toolingRoot, 'package.json'));
 const { build, version: esbuildVersion } = requireTool('esbuild');
 const sha256 = (value) => createHash('sha256').update(value).digest('hex');
@@ -72,7 +72,7 @@ const dependencies = {
 	alien: dependency('alien-signals', 'alien-signals'),
 	esbuild: dependency('esbuild', 'esbuild'),
 };
-assert.equal(dependencies.alien.version, '3.2.0');
+assert.equal(dependencies.alien.version, '3.2.1');
 assert.equal(dependencies.esbuild.version, esbuildVersion);
 const payload = {
 	suite: 'scoped-signals-retained-foreign-owners',

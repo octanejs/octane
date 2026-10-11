@@ -9,7 +9,11 @@
     "test": "node --test workloads.test.mjs"
   },
   "dependencies": {
+    "@tsrx/core": "catalog:default",
+    "alien-signals": "catalog:default",
+    "devalue": "catalog:default",
     "esbuild": "catalog:default",
+    "happy-dom": "catalog:default",
     "octane": "workspace:*"
   }
 }

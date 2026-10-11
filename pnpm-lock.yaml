@@ -3028,9 +3028,21 @@ importers:
 
   benchmarks/scoped-signals:
     dependencies:
+      '@tsrx/core':
+        specifier: catalog:default
+        version: 0.5.5(patch_hash=ded7f85ce6e75409681e6374df7398569aff266b83d1bd63cfdf757c52366b07)
+      alien-signals:
+        specifier: catalog:default
+        version: 3.2.1
+      devalue:
+        specifier: catalog:default
+        version: 5.8.2
       esbuild:
         specifier: catalog:default
         version: 0.28.1
+      happy-dom:
+        specifier: catalog:default
+        version: 20.11.2(bufferutil@4.1.0)(utf-8-validate@5.0.10)
       octane:
         specifier: workspace:*
         version: link:../../packages/octane
@@ -7284,9 +7296,6 @@ importers:
       '@volar/typescript':
         specifier: catalog:default
         version: 2.4.28(typescript@5.9.3)
-      alien-signals:
-        specifier: 3.2.1
-        version: 3.2.1
       csstype:
         specifier: catalog:default
         version: 3.2.3
@@ -7315,6 +7324,9 @@ importers:
       '@wagmi/core':
         specifier: catalog:default
         version: 3.6.5(@tanstack/query-core@5.102.8)(@types/react@19.2.18)(immer@11.1.15)(react@19.2.7)(typescript@5.9.3)(use-sync-external-store@1.6.0(react@19.2.7))(viem@2.55.10(bufferutil@4.1.0)(typescript@5.9.3)(utf-8-validate@5.0.10)(zod@4.6.2))
+      alien-signals:
+        specifier: catalog:default
+        version: 3.2.1
       esbuild:
         specifier: catalog:default
         version: 0.28.1

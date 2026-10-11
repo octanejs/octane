@@ -8,11 +8,6 @@ import {
 import { installSignalActions } from '#octane/signal-actions/graph';
 import type { SignalCandidateFrame } from './transition-candidate.js';
 import {
-	createReactiveSystem,
-	type ReactiveFlags as AlienReactiveFlags,
-	type ReactiveNode,
-} from 'alien-signals/system';
-import {
 	ScopeDisposedError,
 	SignalCycleError,
 	SignalFrameError,
@@ -89,20 +84,40 @@ export type { SignalCandidateFrame, CandidatePreparation } from './transition-ca
 
 export type SignalReadMode = 'value' | 'latest' | 'snapshot';
 
-// The public system declarations expose an ambient const enum, which cannot
-// be imported as a value with verbatimModuleSyntax. Keep its ABI literals
-// checked against every upstream enum member instead of relying on TS emit
-// to inline them or importing a private Alien module.
-const ReactiveFlags = {
-	None: 0,
-	Mutable: 1,
-	Watching: 2,
-	RecursedCheck: 4,
-	Recursed: 8,
-	Dirty: 16,
-	Pending: 32,
-} as const satisfies { [K in keyof typeof AlienReactiveFlags]: (typeof AlienReactiveFlags)[K] };
-type ReactiveFlags = AlienReactiveFlags;
+// Dependency graph algorithms adapted from Alien Signals 3.2.1 (MIT), Johnson Chu.
+// Upstream: stackblitz/alien-signals@8734d386d925025d0e99419bd9161c17b112c5ee, src/system.ts.
+// The package LICENSE includes the upstream copyright and permission notice.
+interface ReactiveNode {
+	deps?: Link;
+	depsTail?: Link;
+	subs?: Link;
+	subsTail?: Link;
+	flags: ReactiveFlags;
+}
+
+interface Link {
+	version: number;
+	dep: ReactiveNode;
+	sub: ReactiveNode;
+	prevSub: Link | undefined;
+	nextSub: Link | undefined;
+	prevDep: Link | undefined;
+	nextDep: Link | undefined;
+}
+
+interface Stack<T> {
+	value: T;
+	prev: Stack<T> | undefined;
+}
+
+const REACTIVE_NONE = 0;
+const REACTIVE_MUTABLE = 1;
+const REACTIVE_WATCHING = 2;
+const REACTIVE_RECURSED_CHECK = 4;
+const REACTIVE_RECURSED = 8;
+const REACTIVE_DIRTY = 16;
+const REACTIVE_PENDING = 32;
+type ReactiveFlags = number;
 
 export interface NodeState<T = unknown> {
 	readonly snapshot: SignalSnapshot<T>;
@@ -140,41 +155,259 @@ const noActivity = {};
 const retainedOwners = new WeakMap<ScopedNode, ReadonlySet<GraphOwner>>();
 const retainedNodes = new WeakMap<GraphOwner, Set<ScopedNode>>();
 
-const graph = createReactiveSystem({
-	update(node) {
-		return evaluate(node as ScopedNode);
-	},
-	notify(node) {
-		if (node instanceof ScopedNode) {
-			node.revision++;
-			node.wakeup?.resolve();
-			node.wakeup = undefined;
-			if (retirementError) {
-				releaseRetention(node);
-				node.state?.resolveWaiting?.();
-				node.state = errorState(retirementError);
-				node.flags |= ReactiveFlags.Dirty;
-			}
-			node.owner.trace('invalidate', node);
-			if (node.invalidateAttempt) {
-				if (candidateHooks.defer) {
-					const invalidate = node.invalidateAttempt;
-					queued.add(() => {
-						// An accepted read can already have replaced this producer.
-						if (node.invalidateAttempt === invalidate) invalidate();
-					});
-				} else node.invalidateAttempt();
-				queued.add(node);
-			} else if (node.kind === 'async') queued.add(node);
-		} else {
-			queued.add(node as SignalObserver);
+function notifyNode(node: ReactiveNode): void {
+	if (node instanceof ScopedNode) {
+		node.revision++;
+		node.wakeup?.resolve();
+		node.wakeup = undefined;
+		if (retirementError) {
+			releaseRetention(node);
+			node.state?.resolveWaiting?.();
+			node.state = errorState(retirementError);
+			node.flags |= REACTIVE_DIRTY;
 		}
-	},
-	// A data scope owns producers, independently of UI subscription count. Keeping
-	// these edges also makes dormant compiler witnesses valid without evaluating a
-	// user computation from getVersion(). Scope retirement unlinks both directions.
-	unwatched() {},
-});
+		node.owner.trace('invalidate', node);
+		if (node.invalidateAttempt) {
+			if (candidateHooks.defer) {
+				const invalidate = node.invalidateAttempt;
+				queued.add(() => {
+					// An accepted read can already have replaced this producer.
+					if (node.invalidateAttempt === invalidate) invalidate();
+				});
+			} else node.invalidateAttempt();
+			queued.add(node);
+		} else if (node.kind === 'async') queued.add(node);
+	} else {
+		queued.add(node as SignalObserver);
+	}
+}
+
+export interface SignalGraph {
+	unlink: typeof unlink;
+	propagate: typeof propagate;
+	shallowPropagate: typeof shallowPropagate;
+}
+
+function linkDependency(dep: ReactiveNode, sub: ReactiveNode, version: number): void {
+	const prevDep = sub.depsTail;
+	if (prevDep !== undefined && prevDep.dep === dep) {
+		return;
+	}
+	const nextDep = prevDep !== undefined ? prevDep.nextDep : sub.deps;
+	if (nextDep !== undefined && nextDep.dep === dep) {
+		nextDep.version = version;
+		sub.depsTail = nextDep;
+		return;
+	}
+	const prevSub = dep.subsTail;
+	if (prevSub !== undefined && prevSub.version === version && prevSub.sub === sub) {
+		return;
+	}
+	const newLink =
+		(sub.depsTail =
+		dep.subsTail =
+			{
+				version,
+				dep,
+				sub,
+				prevDep,
+				nextDep,
+				prevSub,
+				nextSub: undefined,
+			});
+	if (nextDep !== undefined) {
+		nextDep.prevDep = newLink;
+	}
+	if (prevDep !== undefined) {
+		prevDep.nextDep = newLink;
+	} else {
+		sub.deps = newLink;
+	}
+	if (prevSub !== undefined) {
+		prevSub.nextSub = newLink;
+	} else {
+		dep.subs = newLink;
+	}
+}
+
+function unlink(link: Link, sub = link.sub): Link | undefined {
+	const { dep, prevDep, nextDep, nextSub, prevSub } = link;
+	if (nextDep !== undefined) {
+		nextDep.prevDep = prevDep;
+	} else {
+		sub.depsTail = prevDep;
+	}
+	if (prevDep !== undefined) {
+		prevDep.nextDep = nextDep;
+	} else {
+		sub.deps = nextDep;
+	}
+	if (nextSub !== undefined) {
+		nextSub.prevSub = prevSub;
+	} else {
+		dep.subsTail = prevSub;
+	}
+	if (prevSub !== undefined) {
+		prevSub.nextSub = nextSub;
+	} else {
+		// Scopes retain their producers independently of subscriber count.
+		dep.subs = nextSub;
+	}
+	return nextDep;
+}
+
+function propagate(link: Link, innerWrite: boolean): void {
+	let next = link.nextSub;
+	let stack: Stack<Link | undefined> | undefined;
+
+	top: do {
+		const sub = link.sub;
+		let flags = sub.flags;
+
+		if (
+			!(flags & (REACTIVE_RECURSED_CHECK | REACTIVE_RECURSED | REACTIVE_DIRTY | REACTIVE_PENDING))
+		) {
+			sub.flags = flags | REACTIVE_PENDING;
+			if (innerWrite) {
+				sub.flags |= REACTIVE_RECURSED;
+			}
+		} else if (!(flags & (REACTIVE_RECURSED_CHECK | REACTIVE_RECURSED))) {
+			flags = REACTIVE_NONE;
+		} else if (!(flags & REACTIVE_RECURSED_CHECK)) {
+			sub.flags = (flags & ~REACTIVE_RECURSED) | REACTIVE_PENDING;
+		} else if (!(flags & (REACTIVE_DIRTY | REACTIVE_PENDING)) && isValidLink(link, sub)) {
+			sub.flags = flags | (REACTIVE_RECURSED | REACTIVE_PENDING);
+			flags &= REACTIVE_MUTABLE;
+		} else {
+			flags = REACTIVE_NONE;
+		}
+
+		if (flags & REACTIVE_WATCHING) {
+			notifyNode(sub);
+		}
+
+		if (flags & REACTIVE_MUTABLE) {
+			const subSubs = sub.subs;
+			if (subSubs !== undefined) {
+				const nextSub = (link = subSubs).nextSub;
+				if (nextSub !== undefined) {
+					stack = { value: next, prev: stack };
+					next = nextSub;
+				}
+				continue;
+			}
+		}
+
+		if ((link = next!) !== undefined) {
+			next = link.nextSub;
+			continue;
+		}
+
+		while (stack !== undefined) {
+			link = stack.value!;
+			stack = stack.prev;
+			if (link !== undefined) {
+				next = link.nextSub;
+				continue top;
+			}
+		}
+
+		break;
+	} while (true);
+}
+
+function checkDirty(link: Link, sub: ReactiveNode): boolean {
+	let stack: Stack<Link> | undefined;
+	let checkDepth = 0;
+	let dirty = false;
+
+	top: do {
+		const dep = link.dep;
+		const flags = dep.flags;
+
+		if (sub.flags & REACTIVE_DIRTY) {
+			dirty = true;
+		} else if (
+			(flags & (REACTIVE_MUTABLE | REACTIVE_DIRTY)) ===
+			(REACTIVE_MUTABLE | REACTIVE_DIRTY)
+		) {
+			const subs = dep.subs!;
+			if (evaluate(dep as ScopedNode)) {
+				if (subs.nextSub !== undefined) {
+					shallowPropagate(subs);
+				}
+				dirty = true;
+			}
+		} else if (
+			(flags & (REACTIVE_MUTABLE | REACTIVE_PENDING)) ===
+			(REACTIVE_MUTABLE | REACTIVE_PENDING)
+		) {
+			stack = { value: link, prev: stack };
+			link = dep.deps!;
+			sub = dep;
+			++checkDepth;
+			continue;
+		}
+
+		if (!dirty) {
+			const nextDep = link.nextDep;
+			if (nextDep !== undefined) {
+				link = nextDep;
+				continue;
+			}
+		}
+
+		while (checkDepth--) {
+			link = stack!.value;
+			stack = stack!.prev;
+			if (dirty) {
+				const subs = sub.subs!;
+				if (evaluate(sub as ScopedNode)) {
+					if (subs.nextSub !== undefined) {
+						shallowPropagate(subs);
+					}
+					sub = link.sub;
+					continue;
+				}
+				dirty = false;
+			} else {
+				sub.flags &= ~REACTIVE_PENDING;
+			}
+			sub = link.sub;
+			const nextDep = link.nextDep;
+			if (nextDep !== undefined) {
+				link = nextDep;
+				continue top;
+			}
+		}
+
+		return dirty && !!sub.flags;
+	} while (true);
+}
+
+function shallowPropagate(link: Link): void {
+	do {
+		const sub = link.sub;
+		const flags = sub.flags;
+		if ((flags & (REACTIVE_PENDING | REACTIVE_DIRTY)) === REACTIVE_PENDING) {
+			sub.flags = flags | REACTIVE_DIRTY;
+			if ((flags & (REACTIVE_WATCHING | REACTIVE_RECURSED_CHECK)) === REACTIVE_WATCHING) {
+				notifyNode(sub);
+			}
+		}
+	} while ((link = link.nextSub!) !== undefined);
+}
+
+function isValidLink(checkLink: Link, sub: ReactiveNode): boolean {
+	let link = sub.depsTail;
+	while (link !== undefined) {
+		if (link === checkLink) {
+			return true;
+		}
+		link = link.prevDep;
+	}
+	return false;
+}
 
 export function isThenable(value: unknown): value is PromiseLike<unknown> {
 	return (
@@ -425,8 +658,8 @@ function revokeRetainedValues(owner: GraphOwner, error: ScopeDisposedError): voi
 		}
 		commitState(node, withOwners(errorState(error), surviving));
 		if (node.subs) {
-			graph.propagate(node.subs, executionDepth !== 0);
-			graph.shallowPropagate(node.subs);
+			propagate(node.subs, executionDepth !== 0);
+			shallowPropagate(node.subs);
 		}
 	}
 	retainedNodes.delete(owner);
@@ -496,7 +729,7 @@ export class ScopedNode<T = any> implements SignalHandle<T>, ReactiveNode {
 		readonly key: string,
 		readonly kind: 'signal' | 'derived' | 'async',
 	) {
-		this.flags = ReactiveFlags.Mutable | ReactiveFlags.Watching | ReactiveFlags.Dirty;
+		this.flags = REACTIVE_MUTABLE | REACTIVE_WATCHING | REACTIVE_DIRTY;
 	}
 
 	get(): T {
@@ -655,7 +888,7 @@ export function readNode<T>(node: ScopedNode<T>, read: SignalReadMode = 'value')
 	const state = refreshNode(node);
 	const observed =
 		read === 'latest' && state.snapshot.status !== 'ready' ? (node.lastState ?? state) : state;
-	if (activeNode) graph.link(node, activeNode, trackingCycle);
+	if (activeNode) linkDependency(node, activeNode, trackingCycle);
 	if (getNativeReadObserver()) {
 		const field =
 			read === 'value'
@@ -757,16 +990,16 @@ export function refreshNode<T>(node: ScopedNode<T>): NodeState<T> {
 		while (true) {
 			const flags = node.flags;
 			if (
-				flags & ReactiveFlags.Dirty ||
-				(flags & ReactiveFlags.Pending && (!node.deps || graph.checkDirty(node.deps, node)))
+				flags & REACTIVE_DIRTY ||
+				(flags & REACTIVE_PENDING && (!node.deps || checkDirty(node.deps, node)))
 			) {
 				if (++iterations > 100) throw new SignalCycleError(node.key);
-				if (evaluate(node) && node.subs) graph.shallowPropagate(node.subs);
-				if (node.flags & (ReactiveFlags.Dirty | ReactiveFlags.Pending)) continue;
+				if (evaluate(node) && node.subs) shallowPropagate(node.subs);
+				if (node.flags & (REACTIVE_DIRTY | REACTIVE_PENDING)) continue;
 			} else {
-				node.flags &= ~ReactiveFlags.Pending;
+				node.flags &= ~REACTIVE_PENDING;
 			}
-			node.flags &= ~ReactiveFlags.Recursed;
+			node.flags &= ~REACTIVE_RECURSED;
 			break;
 		}
 		return node.state!;
@@ -777,7 +1010,7 @@ export function refreshNode<T>(node: ScopedNode<T>): NodeState<T> {
 
 function evaluate(node: ScopedNode): boolean {
 	if (!node.compute) {
-		node.flags = ReactiveFlags.Mutable | ReactiveFlags.Watching;
+		node.flags = REACTIVE_MUTABLE | REACTIVE_WATCHING;
 		return true;
 	}
 	if (historicalReader || getNativeAdoptionResolver()) return evaluateLiveNode(node);
@@ -785,7 +1018,7 @@ function evaluate(node: ScopedNode): boolean {
 	const previousOwners = activeOwners;
 	const previousObserver = setNativeReadObserver(null);
 	node.depsTail = undefined;
-	node.flags = ReactiveFlags.Mutable | ReactiveFlags.Watching | ReactiveFlags.RecursedCheck;
+	node.flags = REACTIVE_MUTABLE | REACTIVE_WATCHING | REACTIVE_RECURSED_CHECK;
 	node.evaluating = true;
 	activeNode = node;
 	activeOwners = undefined;
@@ -821,10 +1054,10 @@ function evaluate(node: ScopedNode): boolean {
 		activeNode = previousNode;
 		setNativeReadObserver(previousObserver);
 		node.evaluating = false;
-		node.flags &= ~ReactiveFlags.RecursedCheck;
+		node.flags &= ~REACTIVE_RECURSED_CHECK;
 		const tail = (node as ReactiveNode).depsTail;
 		let obsolete = tail ? tail.nextDep : node.deps;
-		while (obsolete) obsolete = graph.unlink(obsolete, node);
+		while (obsolete) obsolete = unlink(obsolete, node);
 	}
 	next = withOwners(next, owners);
 	// A pending/error branch cannot make a revoked retained value usable again.
@@ -889,18 +1122,18 @@ export function publishNode<T>(node: ScopedNode<T>, next: NodeState<T>): void {
 	if (sameState(node.state, next)) return;
 	commitState(node, next);
 	if (node.subs) {
-		graph.propagate(node.subs, executionDepth !== 0);
-		graph.shallowPropagate(node.subs);
+		propagate(node.subs, executionDepth !== 0);
+		shallowPropagate(node.subs);
 	}
 }
 
 /** An explicit source retry invalidates even a cached description failure. */
 export function invalidateNode(node: ScopedNode): void {
-	node.flags |= ReactiveFlags.Dirty;
+	node.flags |= REACTIVE_DIRTY;
 	node.revision++;
 	node.wakeup?.resolve();
 	node.wakeup = undefined;
-	if (node.subs) graph.propagate(node.subs, executionDepth !== 0);
+	if (node.subs) propagate(node.subs, executionDepth !== 0);
 }
 
 /**
@@ -927,7 +1160,7 @@ export function readsDuring<T>(owner: GraphOwner, run: () => T): { value: T; rea
 		activeNode = previousNode;
 		activeOwners = previousOwners;
 		setNativeReadObserver(previousObserver);
-		while (probe.deps) graph.unlink(probe.deps, probe);
+		while (probe.deps) unlink(probe.deps, probe);
 	}
 }
 
@@ -941,7 +1174,7 @@ export function readsMatch(node: ScopedNode, reads: readonly ScopedNode[]): bool
 
 /** A private node evaluated from a probe's result depends on what the probe read. */
 export function linkReads(node: ScopedNode, reads: readonly ScopedNode[]): void {
-	for (const dep of reads) graph.link(dep, node, ++trackingCycle);
+	for (const dep of reads) linkDependency(dep, node, ++trackingCycle);
 }
 
 /**
@@ -951,11 +1184,11 @@ export function linkReads(node: ScopedNode, reads: readonly ScopedNode[]): void 
  */
 export function reevaluateNode(node: ScopedNode): void {
 	const revision = node.revision;
-	node.flags |= ReactiveFlags.Dirty;
+	node.flags |= REACTIVE_DIRTY;
 	refreshNode(node);
 	if (node.revision !== revision && node.subs) {
-		graph.propagate(node.subs, executionDepth !== 0);
-		graph.shallowPropagate(node.subs);
+		propagate(node.subs, executionDepth !== 0);
+		shallowPropagate(node.subs);
 	}
 }
 
@@ -1009,7 +1242,7 @@ export function derivedValueState<T>(
 export class SignalObserver implements ReactiveNode {
 	deps: ReactiveNode['deps'];
 	depsTail: ReactiveNode['depsTail'];
-	flags: ReactiveFlags = ReactiveFlags.Watching;
+	flags: ReactiveFlags = REACTIVE_WATCHING;
 
 	constructor(
 		public node: ScopedNode | undefined,
@@ -1026,7 +1259,7 @@ export function attachObserver(
 	state?: NodeState,
 ): () => void {
 	const observer = new SignalObserver(node, notify, native, state);
-	graph.link(node, observer, ++trackingCycle);
+	linkDependency(node, observer, ++trackingCycle);
 	node.owner.observers.add(observer);
 	return () => stopObserver(observer);
 }
@@ -1040,7 +1273,7 @@ export function subscribeNode(node: ScopedNode, notify: () => void): () => void 
 function runObserver(observer: SignalObserver): void {
 	const node = observer.node;
 	if (!node || !observer.flags) return;
-	observer.flags = ReactiveFlags.Watching;
+	observer.flags = REACTIVE_WATCHING;
 	if (!observer.native) {
 		const state = untrack(() => refreshNode(node));
 		if (sameState(observer.previous, state)) return;
@@ -1052,12 +1285,12 @@ function runObserver(observer: SignalObserver): void {
 export function stopObserver(observer: SignalObserver): void {
 	if (!observer.node) return;
 	queued.delete(observer);
-	observer.flags = ReactiveFlags.None;
+	observer.flags = REACTIVE_NONE;
 	observer.node.owner.observers.delete(observer);
 	observer.node = undefined;
 	observer.notify = undefined;
 	observer.previous = undefined;
-	while (observer.deps) graph.unlink(observer.deps, observer);
+	while (observer.deps) unlink(observer.deps, observer);
 }
 
 /**
@@ -1165,8 +1398,8 @@ function retireDeclarationView(view: ScopedNode, record: DeclarationView): void 
 	if (view.wakeup) view.wakeup.node = undefined;
 	view.compute = undefined;
 	view.invalidateAttempt = undefined;
-	while (view.deps) graph.unlink(view.deps, view);
-	view.flags = ReactiveFlags.Mutable | ReactiveFlags.Watching;
+	while (view.deps) unlink(view.deps, view);
+	view.flags = REACTIVE_MUTABLE | REACTIVE_WATCHING;
 }
 
 /**
@@ -1188,7 +1421,7 @@ function sameViewResult(node: ScopedNode, view: ScopedNode, state: NodeState): b
 	if (
 		committed.snapshot.status !== 'pending' ||
 		state.snapshot.status !== 'pending' ||
-		node.flags & (ReactiveFlags.Dirty | ReactiveFlags.Pending) ||
+		node.flags & (REACTIVE_DIRTY | REACTIVE_PENDING) ||
 		!sameState(committed, { ...state, waiting: committed.waiting })
 	)
 		return false;
@@ -1228,12 +1461,12 @@ export function promoteDeclarationView(view: ScopedNode, node: ScopedNode): void
 	// An evaluated view may also have been invalidated by one of its graph
 	// dependencies before acceptance, whatever it presented; preserve that
 	// evidence on the cell.
-	const invalidated =
-		state === undefined ? 0 : view.flags & (ReactiveFlags.Dirty | ReactiveFlags.Pending);
+	const invalidated = state === undefined ? 0 : view.flags & (REACTIVE_DIRTY | REACTIVE_PENDING);
 	const retry = Boolean(invalidated || settledPending);
 	const currentChanged = state !== undefined && !sameViewResult(node, view, state);
-	while (node.deps) graph.unlink(node.deps, node);
-	for (let link = view.deps; link; link = link.nextDep) graph.link(link.dep, node, ++trackingCycle);
+	while (node.deps) unlink(node.deps, node);
+	for (let link = view.deps; link; link = link.nextDep)
+		linkDependency(link.dep, node, ++trackingCycle);
 	const retainedChanged =
 		node.hasLast !== view.hasLast ||
 		!Object.is(node.last, view.last) ||
@@ -1274,23 +1507,23 @@ export function promoteDeclarationView(view: ScopedNode, node: ScopedNode): void
 	// A view nobody read has no state to install; the cell evaluates its new definition.
 	const unevaluated = state === undefined;
 	node.flags =
-		ReactiveFlags.Mutable |
-		ReactiveFlags.Watching |
+		REACTIVE_MUTABLE |
+		REACTIVE_WATCHING |
 		invalidated |
-		(unevaluated || settledPending ? ReactiveFlags.Dirty : 0);
+		(unevaluated || settledPending ? REACTIVE_DIRTY : 0);
 	// Committed consumers learn the accepted state first. The render's own
 	// consumers already presented it; move them without another notification.
 	if (!retry && (currentChanged || retainedChanged || unevaluated) && node.subs) {
-		graph.propagate(node.subs, executionDepth !== 0);
-		graph.shallowPropagate(node.subs);
+		propagate(node.subs, executionDepth !== 0);
+		shallowPropagate(node.subs);
 	}
 	retireDeclarationView(view, record);
 	for (let link = view.subs; link;) {
 		const next = link.nextSub;
 		const sub = link.sub;
-		graph.unlink(link, sub);
+		unlink(link, sub);
 		if (sub instanceof SignalObserver) sub.node = node;
-		graph.link(node, sub, ++trackingCycle);
+		linkDependency(node, sub, ++trackingCycle);
 		link = next;
 	}
 	record.promoted = true;
@@ -1299,8 +1532,8 @@ export function promoteDeclarationView(view: ScopedNode, node: ScopedNode): void
 	// The accepted render presented an invalidated result; its moved consumers
 	// must retry against the current definition as well.
 	if (retry && node.subs) {
-		graph.propagate(node.subs, executionDepth !== 0);
-		graph.shallowPropagate(node.subs);
+		propagate(node.subs, executionDepth !== 0);
+		shallowPropagate(node.subs);
 	}
 }
 
@@ -1315,7 +1548,7 @@ export function releaseDeclarationView(view: ScopedNode): void {
 		if (sub instanceof SignalObserver) {
 			if (sub.native && sub.notify) (retries ??= []).push(sub.notify);
 			stopObserver(sub);
-		} else graph.unlink(view.subs, sub);
+		} else unlink(view.subs, sub);
 	}
 	releaseRetention(view);
 	// A retained retry read re-renders against the current definition. A newer
@@ -1349,25 +1582,36 @@ export function retireGraph(owner: GraphOwner, nodes: Iterable<ScopedNode>): voi
 			node.invalidateAttempt = undefined;
 			if (node.kind === 'async') node.retry = ScopedNode.prototype.retry;
 			if (node.subs) {
-				graph.propagate(node.subs, executionDepth !== 0);
-				graph.shallowPropagate(node.subs);
+				propagate(node.subs, executionDepth !== 0);
+				shallowPropagate(node.subs);
 			}
-			while (node.deps) graph.unlink(node.deps, node);
-			while (node.subs) graph.unlink(node.subs);
-			node.flags = ReactiveFlags.None;
+			while (node.deps) unlink(node.deps, node);
+			while (node.subs) unlink(node.subs);
+			node.flags = REACTIVE_NONE;
 		}
 	} finally {
 		retirementError = previousError;
 	}
 }
 
+// Optional action code receives a runtime table; graph operations use compiled constants.
+const candidateGraphFlags = {
+	None: REACTIVE_NONE,
+	Mutable: REACTIVE_MUTABLE,
+	Watching: REACTIVE_WATCHING,
+	RecursedCheck: REACTIVE_RECURSED_CHECK,
+	Recursed: REACTIVE_RECURSED,
+	Dirty: REACTIVE_DIRTY,
+	Pending: REACTIVE_PENDING,
+};
+
 registerCandidateGraph({
 	ScopedNode,
-	graph,
-	flags: ReactiveFlags,
+	graph: { unlink, propagate, shallowPropagate },
+	flags: candidateGraphFlags,
 	historical: () => historicalReader !== undefined,
 	link: (from, to) => {
-		graph.link(from, to, ++trackingCycle);
+		linkDependency(from, to, ++trackingCycle);
 	},
 	removeQueued: (node) => {
 		queued.delete(node);

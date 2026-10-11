@@ -216,19 +216,12 @@ export class ScopeImpl implements Scope, GraphOwner {
 	frames: Set<AdoptionFrameImpl> | undefined = undefined;
 	/** Holds a writable or asynchronous derived cell that new render inputs cannot re-select. */
 	unkeyedState = false;
-
-	/** An attempt that never committed restarts with new inputs and keeps these cells. */
-	supersede(): void {
-		if (this.resources) for (const binding of this.resources.values()) binding.supersede();
-		if (this.derivedBindings)
-			for (const binding of this.derivedBindings.values()) binding.supersede();
-	}
 	readonly seedEntries: Map<string, DecodedSeedEntry> | undefined;
 	readonly traceLimit: number;
 	events: SignalTraceEvent[] | undefined = undefined;
 	sequence = 0;
 	private lifetime = 0;
-	private disposed = false;
+	disposed = false;
 	// Installed by installPublicScope, so only applications that can hold a
 	// scope (createScope, currentSignalOwner) ship these.
 	declare derived$: Scope['derived$'];
@@ -240,43 +233,6 @@ export class ScopeImpl implements Scope, GraphOwner {
 	declare serialize: Scope['serialize'];
 	declare inspect: Scope['inspect'];
 	readBarrier: Promise<void> | undefined;
-
-	/** Internal document lifecycle: mark every owner before cancellation runs user code. */
-	suspendReads(): void {
-		if (this.disposed || this.readBarrier === undefined) return;
-		this.streams?.suspend();
-		if (this.requests) for (const entry of this.requests.values()) entry.stopAttempt();
-		if (this.derivedBindings)
-			for (const binding of this.derivedBindings.values()) binding.suspend();
-	}
-
-	resumeReads(): void {
-		if (this.disposed || this.readBarrier !== undefined) return;
-		signalBatch(() => {
-			// Refresh descriptions first: cancellation callbacks may have selected a
-			// different key. Only entries still retained by consumers may restart.
-			if (this.resources)
-				for (const [node, binding] of this.resources) {
-					refreshNode(node);
-					this.streams?.resume(node, binding);
-				}
-			// Refreshing may have created the first request map.
-			if (this.requests)
-				for (const entry of this.requests.values()) {
-					if (this.readBarrier !== undefined) break;
-					if (
-						!entry.active &&
-						!entry.state.snapshot.complete &&
-						entry.state.snapshot.status !== 'error' &&
-						entry.consumers.size
-					) {
-						entry.start(entry.state.snapshot.status !== 'ready');
-					}
-				}
-			if (this.derivedBindings)
-				for (const binding of this.derivedBindings.values()) binding.resume();
-		});
-	}
 
 	constructor(
 		private readonly key: string,
@@ -301,150 +257,15 @@ export class ScopeImpl implements Scope, GraphOwner {
 		return this.disposed;
 	}
 
-	createNode<T>(key: string, kind: ScopedNode['kind'], allowDuringRead = false): ScopedNode<T> {
-		assertAlive(this);
-		// Component-local hook initialization is an allocation in its existing
-		// render lifetime, never a write to an already committed signal.
-		if (this.seedable && !allowDuringRead) assertWritable();
-		requireKey(key, 'Signal key');
-		if (this.nodes.has(key)) throw new TypeError(formatClientError(132, key));
-		const seeds = this.seedEntries;
-		if (seeds)
-			for (const read of ['value', 'latest', 'snapshot'] as const) {
-				const seed = seeds.get(seedKey(key, read));
-				if (seed && seed.entry.kind !== kind) {
-					throw new SignalFrameError(formatClientError(133, key));
-				}
-			}
-		const node = new ScopedNode<T>(this, key, kind);
-		this.nodes.set(key, node);
-		return node;
-	}
-
-	private declaredNode<T>(key: string, kind: ScopedNode['kind']): [ScopedNode<T>, boolean] {
-		assertAlive(this);
-		requireKey(key, 'Signal key');
-		const existing = this.nodes.get(key);
-		if (existing) {
-			if (existing.kind !== kind) {
-				throw new TypeError(formatClientError(134, key, existing.kind));
-			}
-			return [existing as ScopedNode<T>, false];
-		}
-		return [this.createNode<T>(key, kind, true), true];
-	}
-
-	private initialSeed(key: string): DecodedSeedEntry | undefined {
-		const seeds = this.seedEntries;
-		return seeds && (seeds.get(seedKey(key)) ?? seeds.get(seedKey(key, 'snapshot')));
-	}
-
-	private retainedSeed(key: string): DecodedSeedEntry | undefined {
-		const seeds = this.seedEntries;
-		if (!seeds) return undefined;
-		const seed = seeds.get(seedKey(key, 'latest')) ?? this.initialSeed(key);
-		return seed?.entry.available === false ? undefined : seed;
-	}
-
-	initializeRetention(node: ScopedNode): void {
-		const seed = this.retainedSeed(node.key);
-		if (!seed) return;
-		node.lastState = seedState(seed);
-		node.last = seed.value;
-		node.hasLast = true;
-	}
-
-	consumeSeed(key: string): void {
-		const seeds = this.seedEntries;
-		if (seeds)
-			for (const read of ['value', 'latest', 'snapshot'] as const) {
-				seeds.delete(seedKey(key, read));
-			}
-	}
-
 	signal$<T>(key: string, initial: T): WritableSignal<T> {
-		const node = this.createNode<T>(key, 'signal');
-		const seed = this.initialSeed(key) ?? this.retainedSeed(key);
+		const node = createScopeNode<T>(this, key, 'signal');
+		const seed = initialScopeSeed(this, key) ?? retainedScopeSeed(this, key);
 		node.state = readyState(seed ? (seed.value as T) : initial);
 		node.lastState = node.state;
 		node.last = (node.state.snapshot as { value: T }).value;
 		node.hasLast = true;
-		this.consumeSeed(key);
+		consumeScopeSeed(this, key);
 		return node as WritableSignal<T>;
-	}
-
-	createSignalDeclaration<T>(key: string, initial: T, preferInitial = false): WritableSignal<T> {
-		const [node, created] = this.declaredNode<T>(key, 'signal');
-		if (!created) return node as WritableSignal<T>;
-		const seed = this.initialSeed(key) ?? this.retainedSeed(key);
-		node.state = readyState(seed && !preferInitial ? (seed.value as T) : initial);
-		node.lastState = node.state;
-		node.last = (node.state.snapshot as { value: T }).value;
-		node.hasLast = true;
-		this.consumeSeed(key);
-		return node as WritableSignal<T>;
-	}
-
-	createDerivedDeclaration<T>(
-		key: string,
-		compute: DerivedCompute<T>,
-		options: DerivedOptions | undefined,
-		Binding: DerivedBindingFactory<T>,
-		sequence = 0,
-		captures?: readonly unknown[],
-		declaring = 0,
-	): DerivedSignal<T> {
-		if (typeof compute !== 'function') throw new TypeError(formatClientError(122));
-		const [node, created] = this.declaredNode<T>(key, 'derived');
-		if (!created) {
-			// A later render may declare the same cell with a new computation.
-			const binding = this.derivedBindings?.get(node);
-			return (binding?.redeclare(compute, sequence, captures, declaring) ??
-				node) as DerivedSignal<T>;
-		}
-		const binding = new Binding(this, node, compute, options);
-		binding.declared(sequence, captures, declaring);
-		(this.derivedBindings ??= new Map()).set(node, binding);
-		this.initializeRetention(node);
-		this.consumeSeed(key);
-		return node as DerivedSignal<T>;
-	}
-
-	createResourceDeclaration<T>(
-		key: string,
-		describe: () => QueryRequest<T> | typeof skip,
-		initialize: typeof initializeResource,
-		unique = false,
-		sequence = 0,
-		captures?: readonly unknown[],
-		declaring = 0,
-	): Resource<T> {
-		if (typeof describe !== 'function') throw new TypeError(formatClientError(137));
-		let node: ScopedNode<T>;
-		if (unique) node = this.createNode<T>(key, 'async');
-		else {
-			const [declared, created] = this.declaredNode<T>(key, 'async');
-			if (!created) {
-				// A later render may declare the same cell with a new description.
-				const binding = this.resources?.get(declared) as ResourceBinding<T> | undefined;
-				return (binding?.redeclare(describe, sequence, captures, declaring) ??
-					declared) as Resource<T>;
-			}
-			node = declared;
-		}
-		const seed = this.initialSeed(key);
-		const retained = this.retainedSeed(key);
-		this.initializeRetention(node);
-		signalBatch(() => {
-			const binding = initialize(this, node, describe, seed, retained);
-			binding.declared(sequence, captures, declaring);
-			(this.resources ??= new Map()).set(node, binding);
-			refreshNode(node);
-			// A selection bound before this declaration ran may already hold results.
-			this.streams?.flush(node, binding);
-		});
-		this.consumeSeed(key);
-		return node as Resource<T>;
 	}
 
 	// Server native reads serialize, and hydration adopts, internal owner scopes
@@ -499,6 +320,114 @@ export class ScopeImpl implements Scope, GraphOwner {
 			this.trace('retire');
 		});
 	}
+}
+
+/** Internal document lifecycle; the facade marks every owner before cancellation runs user code. */
+export function suspendScopeReads(scope: ScopeImpl): void {
+	if (scope.disposed || scope.readBarrier === undefined) return;
+	scope.streams?.suspend();
+	if (scope.requests) for (const entry of scope.requests.values()) entry.stopAttempt();
+	if (scope.derivedBindings)
+		for (const binding of scope.derivedBindings.values()) binding.suspend();
+}
+
+export function resumeScopeReads(scope: ScopeImpl): void {
+	if (scope.disposed || scope.readBarrier !== undefined) return;
+	signalBatch(() => {
+		// Refresh descriptions first: cancellation callbacks may have selected a
+		// different key. Only entries still retained by consumers may restart.
+		if (scope.resources)
+			for (const [node, binding] of scope.resources) {
+				refreshNode(node);
+				scope.streams?.resume(node, binding);
+			}
+		// Refreshing may have created the first request map.
+		if (scope.requests)
+			for (const entry of scope.requests.values()) {
+				if (scope.readBarrier !== undefined) break;
+				if (
+					!entry.active &&
+					!entry.state.snapshot.complete &&
+					entry.state.snapshot.status !== 'error' &&
+					entry.consumers.size
+				) {
+					entry.start(entry.state.snapshot.status !== 'ready');
+				}
+			}
+		if (scope.derivedBindings)
+			for (const binding of scope.derivedBindings.values()) binding.resume();
+	});
+}
+
+// Keep declaration helpers outside the class so unused creation paths can be removed.
+function createScopeNode<T>(
+	owner: ScopeImpl,
+	key: string,
+	kind: ScopedNode['kind'],
+	allowDuringRead = false,
+): ScopedNode<T> {
+	assertAlive(owner);
+	// Component-local hook initialization is an allocation in its existing
+	// render lifetime, never a write to an already committed signal.
+	if (owner.seedable && !allowDuringRead) assertWritable();
+	requireKey(key, 'Signal key');
+	if (owner.nodes.has(key)) throw new TypeError(formatClientError(132, key));
+	const seeds = owner.seedEntries;
+	if (seeds)
+		for (const read of ['value', 'latest', 'snapshot'] as const) {
+			const seed = seeds.get(seedKey(key, read));
+			if (seed && seed.entry.kind !== kind) {
+				throw new SignalFrameError(formatClientError(133, key));
+			}
+		}
+	const node = new ScopedNode<T>(owner, key, kind);
+	owner.nodes.set(key, node);
+	return node;
+}
+
+function declaredScopeNode<T>(
+	owner: ScopeImpl,
+	key: string,
+	kind: ScopedNode['kind'],
+): [ScopedNode<T>, boolean] {
+	assertAlive(owner);
+	requireKey(key, 'Signal key');
+	const existing = owner.nodes.get(key);
+	if (existing) {
+		if (existing.kind !== kind) {
+			throw new TypeError(formatClientError(134, key, existing.kind));
+		}
+		return [existing as ScopedNode<T>, false];
+	}
+	return [createScopeNode<T>(owner, key, kind, true), true];
+}
+
+function initialScopeSeed(owner: ScopeImpl, key: string): DecodedSeedEntry | undefined {
+	const seeds = owner.seedEntries;
+	return seeds && (seeds.get(seedKey(key)) ?? seeds.get(seedKey(key, 'snapshot')));
+}
+
+function retainedScopeSeed(owner: ScopeImpl, key: string): DecodedSeedEntry | undefined {
+	const seeds = owner.seedEntries;
+	if (!seeds) return undefined;
+	const seed = seeds.get(seedKey(key, 'latest')) ?? initialScopeSeed(owner, key);
+	return seed?.entry.available === false ? undefined : seed;
+}
+
+function initializeScopeRetention(owner: ScopeImpl, node: ScopedNode): void {
+	const seed = retainedScopeSeed(owner, node.key);
+	if (!seed) return;
+	node.lastState = seedState(seed);
+	node.last = seed.value;
+	node.hasLast = true;
+}
+
+function consumeScopeSeed(owner: ScopeImpl, key: string): void {
+	const seeds = owner.seedEntries;
+	if (seeds)
+		for (const read of ['value', 'latest', 'snapshot'] as const) {
+			seeds.delete(seedKey(key, read));
+		}
 }
 
 /** The seed a historical read channel presents. */
@@ -871,13 +800,13 @@ export function installPublicScope(): void {
 		compute: (() => T) & (T extends PromiseLike<unknown> ? never : unknown),
 	): DerivedSignal<T> {
 		if (typeof compute !== 'function') throw new TypeError(formatClientError(122));
-		const node = this.createNode<T>(key, 'derived');
+		const node = createScopeNode<T>(this, key, 'derived');
 		node.compute = (target) => derivedState(target, compute);
-		this.initializeRetention(node);
+		initializeScopeRetention(this, node);
 		// Live derived values always reflect live inputs, including edits made
 		// before this node was created. Only an adoption frame reads historical
 		// computed values from a seed.
-		this.consumeSeed(key);
+		consumeScopeSeed(this, key);
 		return node as DerivedSignal<T>;
 	};
 	prototype.get = function <T>(this: ScopeImpl, handle$: SignalHandle<T>): T {
@@ -960,7 +889,15 @@ export function createDeclaredSignalCell<T>(
 	preferInitial = false,
 ): WritableSignal<T> {
 	if (!(owner instanceof ScopeImpl)) throw new TypeError(formatClientError(148));
-	return owner.createSignalDeclaration(key, initial, preferInitial);
+	const [node, created] = declaredScopeNode<T>(owner, key, 'signal');
+	if (!created) return node as WritableSignal<T>;
+	const seed = initialScopeSeed(owner, key) ?? retainedScopeSeed(owner, key);
+	node.state = readyState(seed && !preferInitial ? (seed.value as T) : initial);
+	node.lastState = node.state;
+	node.last = (node.state.snapshot as { value: T }).value;
+	node.hasLast = true;
+	consumeScopeSeed(owner, key);
+	return node as WritableSignal<T>;
 }
 
 // The caller selects the implementation. Importing the owner must not retain
@@ -976,15 +913,19 @@ export function createDerivedCellWith<T>(
 	declaring = 0,
 ): DerivedSignal<T> {
 	if (!(owner instanceof ScopeImpl)) throw new TypeError(formatClientError(149));
-	return owner.createDerivedDeclaration(
-		key,
-		compute,
-		options,
-		Binding,
-		sequence,
-		captures,
-		declaring,
-	);
+	if (typeof compute !== 'function') throw new TypeError(formatClientError(122));
+	const [node, created] = declaredScopeNode<T>(owner, key, 'derived');
+	if (!created) {
+		// A later render may declare the same cell with a new computation.
+		const binding = owner.derivedBindings?.get(node);
+		return (binding?.redeclare(compute, sequence, captures, declaring) ?? node) as DerivedSignal<T>;
+	}
+	const binding = new Binding(owner, node, compute, options);
+	binding.declared(sequence, captures, declaring);
+	(owner.derivedBindings ??= new Map()).set(node, binding);
+	initializeScopeRetention(owner, node);
+	consumeScopeSeed(owner, key);
+	return node as DerivedSignal<T>;
 }
 
 let declarationSequence = 0;
@@ -1011,15 +952,32 @@ export function createResourceCellWith<T>(
 	declaring = 0,
 ): Resource<T> {
 	if (!(owner instanceof ScopeImpl)) throw new TypeError(formatClientError(150));
-	return owner.createResourceDeclaration(
-		key,
-		describe,
-		initialize,
-		unique,
-		sequence,
-		captures,
-		declaring,
-	);
+	if (typeof describe !== 'function') throw new TypeError(formatClientError(137));
+	let node: ScopedNode<T>;
+	if (unique) node = createScopeNode<T>(owner, key, 'async');
+	else {
+		const [declared, created] = declaredScopeNode<T>(owner, key, 'async');
+		if (!created) {
+			// A later render may declare the same cell with a new description.
+			const binding = owner.resources?.get(declared) as ResourceBinding<T> | undefined;
+			return (binding?.redeclare(describe, sequence, captures, declaring) ??
+				declared) as Resource<T>;
+		}
+		node = declared;
+	}
+	const seed = initialScopeSeed(owner, key);
+	const retained = retainedScopeSeed(owner, key);
+	initializeScopeRetention(owner, node);
+	signalBatch(() => {
+		const binding = initialize(owner, node, describe, seed, retained);
+		binding.declared(sequence, captures, declaring);
+		(owner.resources ??= new Map()).set(node, binding);
+		refreshNode(node);
+		// A selection bound before this declaration ran may already hold results.
+		owner.streams?.flush(node, binding);
+	});
+	consumeScopeSeed(owner, key);
+	return node as Resource<T>;
 }
 
 export function adoptResourceValue<T>(
@@ -1029,7 +987,22 @@ export function adoptResourceValue<T>(
 ): boolean {
 	if (!(handle$ instanceof ScopedNode) || !(handle$.owner instanceof ScopeImpl)) return false;
 	const binding = handle$.owner.resources?.get(handle$);
-	return binding ? binding.adopt(requestKey, value) : false;
+	if (!binding) return false;
+	assertAlive(binding.owner);
+	assertWritable();
+	const entry = binding.selected;
+	if (!entry || entry.request.identity !== requestKey) return false;
+	const streaming = entry.request.definition.kind === 'stream';
+	// A receipt reconciles the selected value, not the lifetime of its watch.
+	// Later server yields still own authoritative progress and completion.
+	if (!streaming) entry.stopAttempt();
+	entry.state = readyState(value, {
+		requestKey: entry.request.identity,
+		connection: streaming ? entry.state.snapshot.connection : 'none',
+		complete: streaming ? entry.state.snapshot.complete : true,
+	});
+	entry.deliver();
+	return true;
 }
 
 /** @internal Return the concrete owner for a proven runtime handle. */
@@ -1042,7 +1015,9 @@ export function getSignalScope(handle$: SignalHandle<unknown>): OwnerScope | und
 /** @internal Exact selection generation used to pin an optimistic query write. */
 export function getResourceSelectionAuthority(handle$: SignalHandle<unknown>): object | undefined {
 	if (!(handle$ instanceof ScopedNode) || !(handle$.owner instanceof ScopeImpl)) return;
-	return handle$.owner.resources?.get(handle$)?.authority;
+	const binding = handle$.owner.resources?.get(handle$);
+	if (!binding) return;
+	return binding.selected ? binding.selectionAuthority : undefined;
 }
 
 /**

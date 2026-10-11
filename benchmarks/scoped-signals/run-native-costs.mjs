@@ -66,9 +66,7 @@ if (options.has('baseline-root')) {
 		root: fs.realpathSync(path.resolve(options.get('baseline-root'))),
 	});
 }
-const toolingRoot = fs.realpathSync(
-	path.resolve(options.get('tooling-root') ?? path.join(REPO, 'packages/octane')),
-);
+const toolingRoot = fs.realpathSync(path.resolve(options.get('tooling-root') ?? HERE));
 const requireTool = createRequire(path.join(toolingRoot, 'package.json'));
 const { build, transformSync, version: esbuildVersion } = requireTool('esbuild');
 const { Window } = await import(pathToFileURL(requireTool.resolve('happy-dom')).href);
@@ -111,7 +109,7 @@ const dependencies = {
 	alien: packageEvidence('alien-signals', 'alien-signals'),
 	devalue: packageEvidence('devalue', 'devalue'),
 };
-assert.equal(dependencies.alien.version, '3.2.0');
+assert.equal(dependencies.alien.version, '3.2.1');
 assert.equal(dependencies.esbuild.version, esbuildVersion);
 const CASES = [
 	{ name: 'unread-block', component: 'UnreadBlock', reads: 0 },

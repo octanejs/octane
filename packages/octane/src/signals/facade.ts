@@ -6,7 +6,9 @@ import {
 	createOwnerScope,
 	createSeededOwnerScope,
 	failScopeStreamedResult,
+	resumeScopeReads,
 	signalDeclarationSequence,
+	suspendScopeReads,
 	ScopeImpl,
 } from './engine.js';
 import { createDeclaredScalarCell } from './scalar-computations.js';
@@ -218,7 +220,12 @@ function supersedeOwner(owner: SignalOwner): boolean {
 	if (retiredIdentities.has(identity)) return false;
 	const scope = identityScopes.get(identity) as ScopeImpl | undefined;
 	if (scope?.unkeyedState) return false;
-	scope?.supersede();
+	// An attempt that never committed restarts with new inputs and keeps these cells.
+	if (scope) {
+		if (scope.resources) for (const binding of scope.resources.values()) binding.supersede();
+		if (scope.derivedBindings)
+			for (const binding of scope.derivedBindings.values()) binding.supersede();
+	}
 	return true;
 }
 
@@ -251,7 +258,7 @@ export function createSignalOwnerLifecycle(owner: SignalOwner) {
 			const existing = scopes();
 			// Mark the whole document before abort handlers can cross instance scopes.
 			for (const scope of existing) scope.readBarrier = barrier;
-			for (const scope of existing) scope.suspendReads();
+			for (const scope of existing) suspendScopeReads(scope);
 		},
 		resume() {
 			if (this.retired || barrier === undefined) return;
@@ -263,7 +270,7 @@ export function createSignalOwnerLifecycle(owner: SignalOwner) {
 			release = undefined;
 			for (const scope of existing) {
 				if (barrier !== undefined || this.retired) break;
-				scope.resumeReads();
+				resumeScopeReads(scope);
 			}
 		},
 		retire() {
@@ -378,7 +385,7 @@ export abstract class Descriptor<T, H extends SignalHandle<T>> implements OwnerB
 	readonly [SIGNAL_HANDLE] = true as const;
 	private readonly cells: WeakMap<OwnerScope, H>;
 	// Identity-only token: renderer owners never retain their renderer tree.
-	private readonly owner: SignalRendererOwnerIdentity | undefined;
+	readonly owner: SignalRendererOwnerIdentity | undefined;
 	/** The render invocation that evaluated this declaration in `owner`. */
 	private readonly invocation: number;
 	/** A render's private presentation of a redeclared cell, until it is accepted or released. */
@@ -389,14 +396,14 @@ export abstract class Descriptor<T, H extends SignalHandle<T>> implements OwnerB
 	 * use (see __declared). It refers to itself. A field of every descriptor, so
 	 * the read path's check never changes or misses the descriptor's shape.
 	 */
-	private lexical: this | undefined;
+	lexical: this | undefined;
 
 	constructor(
 		readonly key: string,
 		readonly kind: H['kind'],
 		/** `declaring` is the invocation that evaluated the declaration of `owner`'s cell, or 0. */
-		private readonly create: (owner: OwnerScope, declaring: number) => H,
-		private readonly site: string | undefined,
+		readonly create: (owner: OwnerScope, declaring: number) => H,
+		readonly site: string | undefined,
 		declared?: Descriptor<T, H>,
 	) {
 		if (declared === undefined) {
@@ -412,20 +419,6 @@ export abstract class Descriptor<T, H extends SignalHandle<T>> implements OwnerB
 			this.invocation = declared.invocation;
 			this.lexical = this;
 		}
-	}
-
-	/** @internal See __declared. */
-	static declared<H>(handle$: H): H {
-		if (!(handle$ instanceof Descriptor) || handle$.owner === undefined) return handle$;
-		const declared: Descriptor<unknown, SignalHandle<unknown>> = handle$;
-		const Class = declared.constructor as DescriptorClass<unknown, SignalHandle<unknown>>;
-		return (declared.lexical ??= new Class(
-			declared.key,
-			declared.kind,
-			declared.create,
-			declared.site,
-			declared,
-		)) as H;
 	}
 
 	/** The owner a use resolves for: its reader, or for a lexical handle its declaring owner. */
@@ -581,7 +574,16 @@ export abstract class Descriptor<T, H extends SignalHandle<T>> implements OwnerB
  * as a value, is still resolved by its reader. Producer closures keep theirs.
  */
 export function __declared<H>(handle$: H): H {
-	return Descriptor.declared(handle$);
+	if (!(handle$ instanceof Descriptor) || handle$.owner === undefined) return handle$;
+	const declared: Descriptor<unknown, SignalHandle<unknown>> = handle$;
+	const Class = declared.constructor as DescriptorClass<unknown, SignalHandle<unknown>>;
+	return (declared.lexical ??= new Class(
+		declared.key,
+		declared.kind,
+		declared.create,
+		declared.site,
+		declared,
+	)) as H;
 }
 
 class SignalDescriptor<T> extends Descriptor<T, WritableSignal<T>> implements WritableSignal<T> {
