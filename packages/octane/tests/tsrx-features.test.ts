@@ -240,7 +240,7 @@ describe('TSRX features — for-of with `index` AND `key`', () => {
 		r.unmount();
 	});
 
-	it('re-renders the index on a SAME-ref reorder (index binding is conservative)', () => {
+	it('updates row indices after reordering and removing unchanged items', () => {
 		// The index-independent reorder skip must NOT apply when the header binds
 		// an `index` — otherwise a pure reorder of the SAME item objects would
 		// leave stale index text. Reversing identical refs must still update i.
@@ -252,6 +252,10 @@ describe('TSRX features — for-of with `index` AND `key`', () => {
 
 		r.update(ForOfIndexAndKey, { items: [c, b, a] }); // same refs, reversed
 		expect(r.findAll('li').map((li) => li.textContent)).toEqual(['0:c', '1:b', '2:a']);
+		const reordered = r.findAll('li');
+		r.update(ForOfIndexAndKey, { items: [b, a] });
+		expect(r.findAll('li').map((li) => li.textContent)).toEqual(['0:b', '1:a']);
+		expect(r.findAll('li')).toEqual(reordered.slice(1));
 		r.unmount();
 	});
 });

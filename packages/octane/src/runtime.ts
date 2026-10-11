@@ -49354,7 +49354,15 @@ function reconcileKeyed<T>(
 				record = journalForSlot(state, true);
 				journalShape = false;
 			}
-			updateSurvivor(block, newItem, newEnd, itemBody, pure, lite, indexIndependent, state.env);
+			// A shifted, otherwise unchanged suffix only needs its recorded position.
+			// Keep index-observing bodies and changed inputs on the ordinary path.
+			if (pure && indexIndependent && block.props === newItem && block.body === itemBody) {
+				if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__)
+					__profileCount(ProfileCounter.LIST_UPDATE);
+				block.itemIndex = newEnd;
+			} else {
+				updateSurvivor(block, newItem, newEnd, itemBody, pure, lite, indexIndependent, state.env);
+			}
 		}
 		oldLast = block.prevSibling!;
 		newEnd--;
