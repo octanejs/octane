@@ -10,6 +10,16 @@ const filename = join(
 	'packages/octane/tests/_fixtures/static-component-composition.tsrx',
 );
 const source = readFileSync(filename, 'utf8');
+const dynamicFilename = join(
+	process.cwd(),
+	'packages/octane/tests/_fixtures/dynamic-component-composition.tsrx',
+);
+const dynamicSource = readFileSync(dynamicFilename, 'utf8');
+const wrapperFilename = join(
+	process.cwd(),
+	'packages/octane/tests/_fixtures/wrapper-component-composition.tsrx',
+);
+const wrapperSource = readFileSync(wrapperFilename, 'utf8');
 const production = { dev: false, hmr: false };
 const projectRenderers = {
 	registry: {
@@ -54,6 +64,138 @@ function position(text: string, needle: string) {
 }
 
 describe('static component inlining compiler artifacts', () => {
+	it.each(
+		(['client', 'server'] as const).flatMap((mode) => [
+			{
+				mode,
+				name: 'keyed fixture',
+				id: dynamicFilename,
+				input: dynamicSource,
+				components: ['Frame', 'Panel', 'Details', 'Label'],
+			},
+			{
+				mode,
+				name: 'template-literal caller',
+				id: 'dynamic-string-components.tsrx',
+				input: `function Label({ label }) @{ <span title={label}>before{label as string}after</span> }
+function Entry({ label }) @{ <section><Label label={label}/></section> }
+export function App(props) @{ <main><Entry label={\`\${props.read()}\`}/></main> }`,
+				components: ['Label'],
+			},
+			...(mode === 'client'
+				? [
+						{
+							mode,
+							name: 'delegated component calls',
+							id: wrapperFilename,
+							input: wrapperSource,
+							components: [
+								'First',
+								'Details',
+								'Panel',
+								'ResourceFrame',
+								'ResourceDetails',
+								'ResourcePanel',
+							],
+						},
+					]
+				: []),
+			{
+				mode,
+				name: 'exported entry',
+				id: 'exported-entry-components.tsrx',
+				input: `import { useState } from 'octane';
+function Child({ text }) @{ <div>{text}</div> }
+export default function App() @{ <Child text="123"/> }`,
+				components: ['Child'],
+			},
+		]),
+	)(
+		'preserves paired provenance and source maps for $name in $mode output',
+		({ mode, id, input, components }) => {
+			const previous = process.env.OCTANE_COMPILE_FROZEN_AST;
+			try {
+				process.env.OCTANE_COMPILE_FROZEN_AST = '1';
+				const result = compile(input, id, { ...production, mode, inspect: true });
+				const comments = annotations(result.code);
+				const starts = comments.filter((entry) => entry.boundary === 'START');
+				expect(starts.length).toBeGreaterThan(0);
+				expect(
+					comments
+						.filter((entry) => entry.boundary === 'END')
+						.map((entry) => entry.region)
+						.sort(),
+				).toEqual(starts.map((entry) => entry.region).sort());
+				for (const name of components) {
+					const origin = `${name} (${id}:${position(input, `function ${name}`)}; call `;
+					expect(starts.some((entry) => entry.region.includes(origin))).toBe(true);
+				}
+				expect(result.map.sourcesContent).toContain(input);
+				for (const template of result.inspect?.templates ?? []) {
+					expect(template.html).not.toContain('octane-inline');
+				}
+				delete process.env.OCTANE_COMPILE_FROZEN_AST;
+				const unfrozen = compile(input, id, { ...production, mode, inspect: true });
+				expect(unfrozen.code).toBe(result.code);
+				expect(unfrozen.map).toEqual(result.map);
+			} finally {
+				if (previous === undefined) delete process.env.OCTANE_COMPILE_FROZEN_AST;
+				else process.env.OCTANE_COMPILE_FROZEN_AST = previous;
+			}
+		},
+	);
+
+	it('keeps ordinary forwarding bodies in server output', () => {
+		const result = compile(wrapperSource, wrapperFilename, { ...production, mode: 'server' });
+		expect(annotations(result.code)).toEqual([]);
+		expect(result.map.sourcesContent).toContain(wrapperSource);
+	});
+
+	it.each([
+		[
+			'exported entry inputs despite a known local caller',
+			`function Label({ label }) @{ <span>{label as string}</span> }
+export function Entry({ label }) @{ <Label label={label}/> }
+export function Known() @{ <Entry label="known"/> }`,
+		],
+		[
+			'a TypeScript-only string assertion',
+			`function Label({ label }: { label: string }) @{ <span title={label}>{label as string}</span> }
+function Entry({ label }: { label: string }) @{ <section><Label label={label}/></section> }
+export function App(props) @{ <Entry label={props.value as string}/> }`,
+		],
+		[
+			'mixed proven and unknown entry calls',
+			`function Label({ label }: { label: string }) @{ <span title={label}>{label as string}</span> }
+function Entry({ label }: { label: string }) @{ <section><Label label={label}/></section> }
+export function Proven(props) @{ <Entry label={\`\${props.value}\`}/> }
+export function Unknown(props) @{ <Entry label={props.value as string}/> }`,
+		],
+		...[
+			['a spread entry call', '<Entry {...props}/>'],
+			['a missing entry field', '<Entry/>'],
+			['a duplicate entry field', '<Entry label={`first`} label={`second`}/>'],
+			['an entry key', '<Entry key="entry" label={`${props.value}`}/>'],
+			['an entry ref', '<Entry ref={props.ref} label={`${props.value}`}/>'],
+			['an entry children prop', '<Entry children="child" label={`${props.value}`}/>'],
+			['an entry prototype prop', '<Entry __proto__="prototype" label={`${props.value}`}/>'],
+		].map(
+			([name, call]) =>
+				[
+					name,
+					`function Label({ label }) @{ <span title={label}>{label as string}</span> }
+function Entry({ label }) @{ <section><Label label={label}/></section> }
+export function Proven(props) @{ <Entry label={\`\${props.value}\`}/> }
+export function Unsupported(props) @{ ${call} }`,
+				] as const,
+		),
+	] as const)('keeps dynamic component boundaries for %s', (_name, input) => {
+		for (const mode of ['client', 'server'] as const) {
+			const result = compile(input, 'unknown-string-components.tsrx', { ...production, mode });
+			expect(annotations(result.code)).toEqual([]);
+		}
+	});
+
 	it.each(
 		(['client', 'server'] as const).flatMap((mode) => [
 			{
@@ -241,6 +383,11 @@ export function App() @{ <Card/> }`,
 			`export function Label() @{ <span>label</span> }
 function Card() @{ <div><Label/></div> }
 export function App() @{ <Card/> }`,
+		],
+		[
+			'exported child called directly by an exported entry',
+			`export function Label({ label }) @{ <span>{label}</span> }
+export default function App() @{ <Label label="known"/> }`,
 		],
 		[
 			'exported alias',

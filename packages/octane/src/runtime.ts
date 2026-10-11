@@ -1309,6 +1309,19 @@ function structuralSignalInstanceKey(
 	key: unknown,
 	hasKey: boolean,
 ): string {
+	// A contracted component call retains the authored invocation segments in
+	// its site string. Decode only when signals request the identity, before
+	// opaque row/key namespaces use the outer site. The suffix already contains
+	// ordinary unkeyed component segments, in order; renderer/template sentinels
+	// are never encoded. resolveSignalInstanceKey caches the completed path.
+	let delegatedSuffix = '';
+	if (invocationSite !== undefined) {
+		const separator = invocationSite.indexOf('\0');
+		if (separator !== -1) {
+			delegatedSuffix = invocationSite.slice(separator + 1);
+			invocationSite = invocationSite.slice(0, separator);
+		}
+	}
 	let base = resolveSignalInstanceKey(parentScope);
 	const itemTokens: SignalIdentityToken[] = [];
 	const visited = new Set<Block>();
@@ -1354,7 +1367,8 @@ function structuralSignalInstanceKey(
 			hasKey
 				? signalIdentityKey(signalIdentityToken(key), base, invocationSite, itemKeys, true, ids)
 				: '',
-		])
+		]) +
+		delegatedSuffix
 	);
 }
 

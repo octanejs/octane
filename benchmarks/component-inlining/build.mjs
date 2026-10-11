@@ -8,7 +8,7 @@ import { parseArgs } from 'node:util';
 import { gzipSync } from 'node:zlib';
 import { build } from 'vite';
 import ts from 'typescript';
-import { writeStaticSources } from './generate.mjs';
+import { writeSources } from './generate.mjs';
 
 const here = fileURLToPath(new URL('.', import.meta.url));
 const { values } = parseArgs({
@@ -16,10 +16,17 @@ const { values } = parseArgs({
 		'source-root': { type: 'string' },
 		out: { type: 'string' },
 		mode: { type: 'string', default: 'work' },
+		scenario: { type: 'string', default: 'static' },
 	},
 });
 assert(values['source-root'] && values.out, 'Pass --source-root and --out');
 assert(['work', 'timing'].includes(values.mode), 'Expected --mode work|timing');
+assert(
+	['static', 'dynamic', 'delegation', 'exported-entry', 'exported-example'].includes(
+		values.scenario,
+	),
+	'Expected --scenario static|dynamic|delegation|exported-entry|exported-example',
+);
 const sourceRoot = fs.realpathSync(values['source-root']);
 const out = path.resolve(values.out);
 assert(!fs.existsSync(out), 'Use a new output directory');
@@ -61,11 +68,15 @@ const sourceInputs = Object.fromEntries(
 		digest(file),
 	]),
 );
-const scenarios = writeStaticSources(path.join(fixtureRoot, 'cases'));
-fs.copyFileSync(path.join(here, 'client.ts'), path.join(fixtureRoot, 'client.ts'));
+const scenarios = writeSources(path.join(fixtureRoot, 'cases'), values.scenario);
+const example = values.scenario === 'exported-example';
+const clientScenario = values.scenario === 'exported-entry' ? 'static' : values.scenario;
+if (!example) fs.copyFileSync(path.join(here, 'client.ts'), path.join(fixtureRoot, 'client.ts'));
 fs.writeFileSync(
 	path.join(fixtureRoot, 'main.ts'),
-	"import { install } from './client';\nimport { cases } from './cases/registry';\ninstall(cases);\n",
+	example
+		? `import { createRoot } from 'octane';\nimport App from './cases/App.tsrx';\ncreateRoot(document.getElementById('mount')!).render(App);\n`
+		: `import { install } from './client';\nimport { cases } from './cases/registry';\ninstall(cases${clientScenario === 'static' ? '' : `, '${clientScenario}'`});\n`,
 );
 fs.writeFileSync(
 	path.join(fixtureRoot, 'index.html'),
@@ -163,7 +174,15 @@ const modules = compiled
 			...analyze(code, file),
 		};
 	});
-assert.equal(modules.length, 15, 'All six applications and nine imported components compiled');
+assert.equal(
+	modules.length,
+	example ? 1 : values.scenario === 'delegation' ? 21 : 15,
+	example
+		? 'The exact two-function example compiled'
+		: values.scenario === 'delegation'
+			? 'All eight applications, four imported children and nine imported wrappers compiled'
+			: 'All six applications and nine imported components compiled',
+);
 const assets = files(path.join(out, 'dist')).map((file) => {
 	const data = fs.readFileSync(file);
 	return {
@@ -187,10 +206,14 @@ const tools = Object.fromEntries(
 	]),
 );
 const scripts = Object.fromEntries(
-	['build.mjs', 'generate.mjs', 'client.ts'].map((file) => [file, digest(path.join(here, file))]),
+	['build.mjs', 'generate.mjs', ...(!example ? ['client.ts'] : [])].map((file) => [
+		file,
+		digest(path.join(here, file)),
+	]),
 );
 const js = assets.filter((asset) => asset.file.endsWith('.js'));
 const manifest = {
+	scenario: values.scenario,
 	sourceRoot,
 	node: process.version,
 	tools,

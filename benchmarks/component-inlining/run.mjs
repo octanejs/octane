@@ -42,10 +42,27 @@ const builds = Object.fromEntries(
 		}),
 );
 if (builds.candidate) {
-	for (const key of ['authored', 'scripts', 'tools', 'options', 'scenarios'])
+	for (const key of ['scenario', 'authored', 'scripts', 'tools', 'options', 'scenarios'])
 		assert.deepEqual(builds.base.manifest[key], builds.candidate.manifest[key], 'Matched ' + key);
 	assert.equal(builds.base.manifest.node, builds.candidate.manifest.node, 'Matched build Node');
 }
+const scenario = builds.base.manifest.scenario;
+assert(
+	['static', 'dynamic', 'delegation', 'exported-entry'].includes(scenario),
+	'Build manifest must identify its scenario',
+);
+const operations =
+	scenario === 'delegation'
+		? ['mount', 'changedLeaf', 'equalProps', 'childSelfUpdate', 'unmount']
+		: scenario === 'dynamic'
+			? ['mount', 'changedLeaf', 'equalProps', 'unmount']
+			: ['mount', 'update', 'unmount'];
+const timedRepetitions =
+	scenario === 'delegation'
+		? { mount: 64, changedLeaf: 64, equalProps: 2048, childSelfUpdate: 2048, unmount: 256 }
+		: scenario === 'dynamic'
+			? { mount: 64, changedLeaf: 64, equalProps: 2048, unmount: 256 }
+			: { mount: 64, update: 2048, unmount: 256 };
 function verifyArtifacts() {
 	for (const { directory, manifest, manifestSHA256 } of Object.values(builds)) {
 		assert.equal(digest(path.join(directory, 'manifest.json')), manifestSHA256);
@@ -57,6 +74,7 @@ verifyArtifacts();
 fs.mkdirSync(out, { recursive: true });
 const receipt = {
 	mode: values.mode,
+	scenario,
 	status: 'running',
 	node: process.version,
 	builds: Object.fromEntries(
@@ -76,8 +94,17 @@ const receipt = {
 		pairs: values.mode === 'work' ? null : 24,
 		warmupBatches: 10,
 		warmupRepetitions: 4,
-		timedRepetitions: { mount: 64, update: 2048, unmount: 256 },
+		timedRepetitions,
 		coldMountRepetitions: 1,
+		...(scenario === 'delegation'
+			? {
+					operationUnits: {
+						changedLeaf: 'all rows; changed child text and ancestor tick',
+						equalProps: 'all rows; unchanged child inputs and changed ancestor tick',
+						childSelfUpdate: 'one first-row native click and synchronous state flush',
+					},
+				}
+			: {}),
 	},
 	results: [],
 };
@@ -177,12 +204,23 @@ async function sample(name, scenario, pair) {
 			'Exact loaded JavaScript',
 		);
 		const result = await page.evaluate(
-			({ id, mode }) => {
+			({ id, mode, operations, timedRepetitions, cohort }) => {
 				const api = window.__inlining;
 				api.prepare(id, mode === 'work' ? 32 : 256);
+				const verifyUpdate = (operation) => {
+					api.verify(true);
+					if (operation === 'childSelfUpdate') {
+						// Parent passes must retain nonzero child state too. These
+						// extra semantic operations are outside counters and timers.
+						api.equalProps();
+						api.verify(true);
+						api.changedLeaf();
+						api.verify(true);
+					}
+				};
 				if (mode === 'work') {
-					const operations = {};
-					for (const operation of ['mount', 'update', 'unmount']) {
+					const countsByOperation = {};
+					for (const operation of operations) {
 						const counts = window.__dom;
 						for (const key of Object.keys(counts)) if (key !== 'enabled') counts[key] = 0;
 						counts.enabled = true;
@@ -191,32 +229,41 @@ async function sample(name, scenario, pair) {
 						} finally {
 							counts.enabled = false;
 						}
-						operations[operation] = { ...counts };
+						countsByOperation[operation] = { ...counts };
 						if (operation === 'mount') api.retain();
-						else if (operation === 'update') api.verify(true);
-						else api.verifyEmpty();
+						else if (operation === 'unmount') api.verifyEmpty();
+						else verifyUpdate(operation);
 					}
-					return operations;
+					if (cohort === 'delegation')
+						countsByOperation.ownerRetirement = api.verifyOwnerRetirement();
+					return countsByOperation;
 				}
 				const times = { coldMount: api.timed('mount', 1) };
 				api.retain();
-				api.update();
-				api.verify(true);
+				for (const operation of operations.slice(1, -1)) {
+					api[operation]();
+					verifyUpdate(operation);
+				}
 				api.unmount();
 				api.verifyEmpty();
-				for (const operation of ['mount', 'update', 'unmount']) {
+				for (const operation of operations) {
 					for (let warmup = 0; warmup < 10; warmup++) api.timed(operation, 4);
-					if (operation === 'update') api.retain();
-					times[operation] = api.timed(
-						operation,
-						{ mount: 64, update: 2048, unmount: 256 }[operation],
-					);
-					if (operation === 'update') api.verify(true);
+					const updating = operation !== 'mount' && operation !== 'unmount';
+					if (updating) api.retain();
+					times[operation] = api.timed(operation, timedRepetitions[operation]);
+					if (updating) verifyUpdate(operation);
 				}
 				api.verifyEmpty();
+				if (cohort === 'delegation') times.ownerRetirement = api.verifyOwnerRetirement();
 				return times;
 			},
-			{ id: scenario.id, mode: values.mode },
+			{
+				id: scenario.id,
+				mode: values.mode,
+				operations,
+				timedRepetitions,
+				cohort: build.manifest.scenario,
+			},
 		);
 		assert.deepEqual(errors, [], 'Browser errors');
 		receipt.results.push({
@@ -225,7 +272,10 @@ async function sample(name, scenario, pair) {
 			pair,
 			result,
 			semantics:
-				'all row values/nesting, all element identities, edited input draft, empty unmount',
+				'all row values/nesting, all Element and Text identities, edited input draft, empty unmount' +
+				(build.manifest.scenario === 'delegation'
+					? '; independent first-row state, queued child update retired before flush'
+					: ''),
 		});
 		save();
 	} finally {
@@ -255,7 +305,7 @@ try {
 	if (values.mode === 'timing') {
 		receipt.ratios = [];
 		for (const scenario of scenarios)
-			for (const operation of ['coldMount', 'mount', 'update', 'unmount']) {
+			for (const operation of ['coldMount', ...operations]) {
 				const data = (variant) =>
 					receipt.results
 						.filter((row) => row.variant === variant && row.case === scenario.id)

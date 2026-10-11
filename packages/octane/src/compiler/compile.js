@@ -50,6 +50,7 @@ import {
 import { createStyleScopePass } from './style-scopes.js';
 import {
 	fuseStaticLocalComponentTemplates,
+	markLocalComponentDelegations,
 	templateFusionOrigins,
 	mergeTemplateFusionOrigins,
 	annotateTemplateFusion,
@@ -11116,7 +11117,7 @@ function fuseStaticDomComponentTemplates(ast, filename, options, strongModeEnabl
 	) {
 		return ast;
 	}
-	return fuseStaticLocalComponentTemplates(ast, cleanCompileFilename(filename), {
+	const tools = {
 		mapAst,
 		cloneAstNode,
 		collectFreeIdentifiers,
@@ -11126,7 +11127,14 @@ function fuseStaticDomComponentTemplates(ast, filename, options, strongModeEnabl
 		isComponentTag,
 		unwrapTsExpr,
 		hasInlineMemoDirectEval,
-	});
+		isVoidJsxCodeBlockFunction,
+		forEachRuntimeAstChild,
+		isIdentifierReference,
+		componentInvocationSite,
+	};
+	const cleanFilename = cleanCompileFilename(filename);
+	const delegated = markLocalComponentDelegations(ast, cleanFilename, tools);
+	return fuseStaticLocalComponentTemplates(delegated, cleanFilename, tools);
 }
 
 function compileInternal(
@@ -29240,6 +29248,29 @@ function planJsx(
 			);
 			continue;
 		}
+		// Keep the terminal child's props copy when removing forwarding owners.
+		// Donating an incoming literal can slow independent child updates. Copy
+		// once at the original argument position; the retained owner then reuses
+		// that record. Existing spread sites already make the copy. A local temp
+		// keeps evaluation inside the memo miss below.
+		const delegatedPropsName =
+			cc.delegation != null && !cc.hasSpreadProp ? allocCompilerName(ctx, '__delegateProps') : null;
+		const componentProps =
+			delegatedPropsName === null
+				? cc.propsExpr
+				: b.sequence([
+						b.assignment('=', b.id(delegatedPropsName), cc.propsExpr),
+						b.object([b.spread(b.id(delegatedPropsName))]),
+					]);
+		const componentStatement = (call) => {
+			const statement =
+				delegatedPropsName === null
+					? b.stmt(call)
+					: b.block([b.let(delegatedPropsName), b.stmt(call)]);
+			return cc.delegation == null
+				? statement
+				: annotateTemplateFusion(statement, cc.delegation.origins, 'component call delegation');
+		};
 		// Compiler-owned whole-component region cache. The flat array belongs to
 		// this compiled scope; the ordinary component runtime never sees memo deps.
 		if (cc.autoMemoDeps !== null) {
@@ -29268,8 +29299,8 @@ function planJsx(
 				b.id('__s'),
 				b.literal(slotIndex),
 				hostExpr(),
-				cc.compNode,
-				cc.propsExpr,
+				cc.delegation?.body ?? cc.compNode,
+				componentProps,
 				...trailing,
 			);
 			if (ctx.presentationHydration?.structural && cc.bindingSite)
@@ -29287,7 +29318,7 @@ function planJsx(
 					ctx,
 					cc.autoMemoDeps,
 					slotIndex,
-					b.stmt(invocation),
+					componentStatement(invocation),
 					null,
 					cc.autoMemoContextAware,
 					depNodeFor(cc),
@@ -29316,14 +29347,14 @@ function planJsx(
 			pushAfterStmt(
 				cc.id,
 				org,
-				b.stmt(
+				componentStatement(
 					b.call(
 						componentHelper,
 						b.id('__s'),
 						b.literal(slotIndex),
 						hostExpr(),
-						cc.compNode,
-						cc.propsExpr,
+						cc.delegation?.body ?? cc.compNode,
+						componentProps,
 						...optionalCallArgs(
 							b.literal(cc.invocationSite),
 							anchorNodeFor(cc, 'compAnchor'),
@@ -29382,8 +29413,8 @@ function planJsx(
 			b.id('__s'),
 			b.literal(slotIndex),
 			hostExpr(),
-			cc.compNode,
-			cc.propsExpr,
+			cc.delegation?.body ?? cc.compNode,
+			componentProps,
 			...trailing,
 		);
 		if (ctx.presentationHydration?.structural && cc.bindingSite)
@@ -29394,7 +29425,7 @@ function planJsx(
 				b.literal(bindingMarker(cc.bindingSite, 'v')),
 				...invocation.arguments,
 			);
-		pushAfterStmt(cc.id, org, b.stmt(invocation));
+		pushAfterStmt(cc.id, org, componentStatement(invocation));
 	}
 	for (const pc of ctx._portalCalls) {
 		const slotIndex = pc.slotIndex;
@@ -34108,6 +34139,50 @@ function isCompiledHydrateTemplate(node, ctx, attrs) {
 	return binding?.scope === lexical.rootScope && binding.importSource?.value === 'octane';
 }
 
+// Certified wrappers occur only at static template sites: each slot keeps one
+// immutable callee, so its terminal body can also serve as its runtime identity.
+// Preserve the authored tag's range, memo and warm-plan classification. Resolve
+// both names here because a caller's local or keyed-loop binding can shadow
+// either declaration. Unmapped sites keep the wrapper's ordinary entry.
+function localComponentDelegation(node, ctx, compName) {
+	const delegation = ctx.componentInfo?.get(compName)?.node.metadata?.octaneLocalDelegation;
+	if (delegation === undefined || ctx.activityModuleAst == null) return null;
+	const lexical = (ctx.activityLexical ??= createLexicalAnalysis(ctx.activityModuleAst));
+	const tag = node.openingElement?.name ?? node.id;
+	const scope =
+		lexical.nodeScopes.get(tag) ??
+		lexical.nodeScopes.get(node.openingElement) ??
+		lexical.nodeScopes.get(node);
+	if (
+		scope === undefined ||
+		lexical.resolveBinding(scope, compName)?.scope !== lexical.rootScope ||
+		lexical.resolveBinding(scope, delegation.target)?.scope !== lexical.rootScope
+	)
+		return null;
+	const definition = ctx.componentInfo.get(compName).node.loc?.start;
+	const call = node.loc?.start;
+	const origins = [
+		{
+			component: compName,
+			file: delegation.origin.file,
+			definition: { line: definition?.line ?? null, column: definition?.column ?? null },
+			call: { line: call?.line ?? null, column: call?.column ?? null },
+		},
+	];
+	let suffix = '';
+	for (let path = delegation; path !== null; path = path.next) {
+		if (path.next !== null) origins.push(path.origin);
+		suffix += JSON.stringify([path.site, [], '']);
+	}
+	return {
+		body: inheritOriginLoc(b.id(delegation.target), tag),
+		origins,
+		// Runtime decodes only on a native-signal identity read. The outer site
+		// owns row/component keys; skipped exact-spread calls are unkeyed.
+		invocationSuffix: '\0' + suffix,
+	};
+}
+
 function makeCompCall(
 	node,
 	ctx,
@@ -34478,10 +34553,25 @@ function makeCompCall(
 	// info's shape proof holds.)
 	const anchorlessAppendSafe =
 		!liteEligible || ctx.componentInfo?.get(compName)?.anchorlessRootSafe === true;
+	const delegation =
+		voidComponent && !liteEligible && !autoMemoLite
+			? localComponentDelegation(node, ctx, compName)
+			: null;
+	// The retained owner can delimit itself with the terminal body's host root.
+	// Keep this proof local to the client call: hydration still adopts an existing
+	// server frame first, and the authored wrapper's keyed-item/SSR flags stay put.
+	if (
+		delegation !== null &&
+		keyExpr == null &&
+		!hasSpreadProp &&
+		!hasChildrenProp &&
+		ctx.componentInfo.get(delegation.body.name)?.singleRoot === true
+	)
+		singleRoot = true;
 
 	return {
 		id,
-		invocationSite,
+		invocationSite: invocationSite + (delegation?.invocationSuffix ?? ''),
 		compNode,
 		propsExpr,
 		hostPath: null,
@@ -34496,6 +34586,8 @@ function makeCompCall(
 		autoMemoLite,
 		autoMemoPublicationWitnesses,
 		voidComponent,
+		delegation,
+		hasSpreadProp,
 		singleRoot: node._octaneBindingSite ? false : singleRoot,
 		maybeSingleRoot: node._octaneBindingSite ? false : maybeSingleRoot,
 		loc: devLoc(ctx, node),
