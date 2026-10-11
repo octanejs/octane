@@ -1,0 +1,4 @@
+{
+  "extends": "../../packages/octane/tsconfig.json",
+  "include": ["client.ts"]
+}
