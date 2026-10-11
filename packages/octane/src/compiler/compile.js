@@ -4653,6 +4653,14 @@ function collectFreeIdentifiers(root, initiallyBound, ignoreNodes = null) {
 			}
 			return;
 		}
+		if (t === 'TSImportEqualsDeclaration') {
+			if (n.importKind !== 'type' && n.moduleReference?.type !== 'TSExternalModuleReference') {
+				let reference = n.moduleReference;
+				while (reference?.type === 'TSQualifiedName') reference = reference.left;
+				walk(reference, scope);
+			}
+			return;
+		}
 		// The compiler's own renderable child hole (a normalized `{expr}` or
 		// `@{ … }` child) shares the prefix, but its expression is runtime code.
 		if (t === 'TSRXExpression') {
@@ -7145,36 +7153,46 @@ function collectPrivateUnescapedComponents(body, ctx) {
 	if (candidates.size === 0) return candidates;
 
 	const allowed = new Set();
-	const visitOutput = (node) => {
+	const visitOutput = (node, returnedOwner = null) => {
 		if (node == null) return;
 		if (Array.isArray(node)) {
-			for (const child of node) visitOutput(child);
+			for (const child of node) visitOutput(child, returnedOwner);
 		} else if (node.type === 'Element' || node.type === 'JSXElement') {
-			if (!isComponentTag(node)) visitOutput(node.children);
+			if (!isComponentTag(node)) visitOutput(node.children, returnedOwner);
 			else {
 				const name = tagBindingName(node);
 				const attrs = node.attributes || node.openingElement?.attributes || [];
-				if (candidates.has(name) && attrs.length === 0 && !node.children?.length) allowed.add(node);
+				// Returned roots fold in declaration order. A later component has no
+				// renderer yet, so its descriptor can escape through the returned props.
+				if (
+					candidates.has(name) &&
+					attrs.length === 0 &&
+					!node.children?.length &&
+					(returnedOwner === null ||
+						ctx.moduleFunctionDeclarations.get(name).start < returnedOwner.start)
+				) {
+					allowed.add(node);
+				}
 			}
 		} else if (node.type === 'JSXFragment' || node.type === 'Fragment') {
-			visitOutput(node.children);
+			visitOutput(node.children, returnedOwner);
 		} else if (node.type === 'JSXCodeBlock') {
-			visitOutput(node.body);
-			visitOutput(node.render);
+			visitOutput(node.body, returnedOwner);
+			visitOutput(node.render, returnedOwner);
 		} else if (node.type === 'BlockStatement') {
-			visitOutput(node.body);
+			visitOutput(node.body, returnedOwner);
 		} else if (node.type === 'IfStatement' || node.type === 'JSXIfExpression') {
-			visitOutput(node.consequent);
-			visitOutput(node.alternate);
+			visitOutput(node.consequent, returnedOwner);
+			visitOutput(node.alternate, returnedOwner);
 		} else if (node.type === 'ForOfStatement' || node.type === 'JSXForExpression') {
-			visitOutput(node.body);
-			visitOutput(node.empty);
+			visitOutput(node.body, returnedOwner);
+			visitOutput(node.empty, returnedOwner);
 		} else if (node.type === 'SwitchStatement' || node.type === 'JSXSwitchExpression') {
-			for (const entry of node.cases || []) visitOutput(entry.consequent);
+			for (const entry of node.cases || []) visitOutput(entry.consequent, returnedOwner);
 		} else if (node.type === 'TryStatement' || node.type === 'JSXTryExpression') {
-			visitOutput(node.block);
-			visitOutput(node.handler?.body);
-			visitOutput(node.pending);
+			visitOutput(node.block, returnedOwner);
+			visitOutput(node.handler?.body, returnedOwner);
+			visitOutput(node.pending, returnedOwner);
 		}
 	};
 	for (const info of ctx.componentInfo.values()) {
@@ -7182,7 +7200,7 @@ function collectPrivateUnescapedComponents(body, ctx) {
 		if (!info.returnJsx) continue;
 		for (const statement of info.node.body.body || []) {
 			if (statement.type === 'ReturnStatement' && isPlainHostRoot(statement.argument)) {
-				visitOutput(statement.argument);
+				visitOutput(statement.argument, info.node);
 			}
 		}
 	}
@@ -36778,7 +36796,8 @@ function inlineComponentComments(node, edge) {
 const esrapCommentOptions = {
 	getLeadingComments: (node) => {
 		const comments = inlineComponentComments(node, 'START');
-		return node.__octanePure ? [...(comments ?? []), ...PURE_ANNOTATION_COMMENTS] : comments;
+		if (!node.__octanePure) return comments;
+		return comments ? [...comments, ...PURE_ANNOTATION_COMMENTS] : PURE_ANNOTATION_COMMENTS;
 	},
 	getTrailingComments: (node) => inlineComponentComments(node, 'END'),
 };
@@ -36804,9 +36823,10 @@ function typescriptCommentOptions(source) {
 			// As in core's TS printer, a newline is safe before declarations and
 			// members, but could change `return expression` or invalidate `throw`.
 			const comments =
-				node.type.endsWith('Declaration') ||
-				node.type.endsWith('Statement') ||
-				COMMENT_MEMBER_TYPES.has(node.type)
+				node.leadingComments?.length &&
+				(node.type.endsWith('Declaration') ||
+					node.type.endsWith('Statement') ||
+					COMMENT_MEMBER_TYPES.has(node.type))
 					? node.leadingComments?.map((comment) => ({
 							...comment,
 							// The JS parser normalizes block-comment indentation. Recover
@@ -36817,11 +36837,8 @@ function typescriptCommentOptions(source) {
 							),
 						}))
 					: undefined;
-			return [
-				...(comments ?? []),
-				...(inlineComponentComments(node, 'START') ?? []),
-				...(node.__octanePure ? PURE_ANNOTATION_COMMENTS : []),
-			];
+			const generated = esrapCommentOptions.getLeadingComments(node);
+			return comments ? (generated ? [...comments, ...generated] : comments) : generated;
 		},
 		getTrailingComments: esrapCommentOptions.getTrailingComments,
 	};

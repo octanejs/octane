@@ -462,9 +462,11 @@ use the real applications' normal Vite configs and chunking. Each sums every
 emitted client JS asset, including deferred chunks, with raw/gzip/brotli reported
 separately for both minifiers. Outputs remain under `bundle-size/dist`; there is
 no app/framework split or committed byte budget. Threadline additionally gates
-paired START/END shared-renderer comments for its five private static icons at
-their six call sites in the actual App transform, without pinning generated
-helper names. Runtime and hydration behavior stay in the owning tests.
+the absence of generic component and return rendering from every client chunk's
+source map under both minifiers, with a retained void-component control. Its
+private static icons must retain paired START/END shared-renderer provenance in
+the actual App transform, without fixing their call-site counts. Runtime and
+hydration behavior stay in the owning tests.
 Compare the same operation names in base/head results. When an older base lacks
 these rows, its size is unknown, not zero; an initial change needs a matched
 local comparison, including a restored-baseline control.

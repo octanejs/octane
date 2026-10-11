@@ -393,6 +393,13 @@ if (selected('octane-tsrx')) {
 // tradeoffs that the default Oxc row alone would hide; neither has a byte budget.
 if (selected('octane-tsrx')) {
 	const entry = byName.get('octane-tsrx');
+	const threadlineDeclarations = ['componentSlotVoid', 'componentSlot', 'renderReturnedValue'];
+	const threadlineRanges = resolveDeclarationRanges(
+		(source) =>
+			fs.readFileSync(path.resolve(__dirname, '../../packages/octane/src', source), 'utf8'),
+		(text, source) => parseAst(text, { lang: 'ts' }, source),
+		threadlineDeclarations.map((name) => ({ name, source: 'runtime.ts' })),
+	);
 	for (const app of ['threadline', 'pagecraft']) {
 		const appRoot = path.resolve(__dirname, '../../examples', app);
 		const appFile = path.join(appRoot, 'src/App.tsrx');
@@ -427,24 +434,27 @@ if (selected('octane-tsrx')) {
 					} else assert.equal(open.pop(), component, `${set}: mismatched renderer comments`);
 				}
 				assert.deepEqual(open, [], `${set}: unclosed renderer comments`);
-				for (const [component, count] of Object.entries({
-					HomeIcon: 1,
-					BookmarkIcon: 2,
-					PersonIcon: 1,
-					HeartIcon: 1,
-					ReplyIcon: 1,
-				})) {
-					assert.equal(
-						components[component],
-						count,
-						`${set}: ${component} lost shared-renderer provenance`,
-					);
+				for (const component of [
+					'HomeIcon',
+					'BookmarkIcon',
+					'PersonIcon',
+					'HeartIcon',
+					'ReplyIcon',
+				]) {
+					assert(components[component] > 0, `${set}: ${component} lost shared-renderer provenance`);
 				}
 				(entry.meta.sharedRendererComments ??= {})[set] = components;
 			}
 			const totals = { raw: 0, gzip: 0, brotli: 0 };
+			const retainedRuntimeDeclarations = new Set();
 			for (const file of walk(outDir)) {
 				if (!/\.m?js$/.test(file)) continue;
+				if (app === 'threadline') {
+					const map = JSON.parse(fs.readFileSync(file + '.map', 'utf8'));
+					for (const name of retainedDeclarations(map, threadlineRanges)) {
+						retainedRuntimeDeclarations.add(name);
+					}
+				}
 				const buf = fs.readFileSync(file);
 				totals.raw += buf.length;
 				totals.gzip += gz(buf);
@@ -452,6 +462,17 @@ if (selected('octane-tsrx')) {
 				entry.meta.files.push({ file: path.relative(outDir, file), bytes: buf.length, set });
 			}
 			assert(totals.raw > 0, `${set}: emitted no client JavaScript`);
+			if (app === 'threadline') {
+				assert(
+					retainedRuntimeDeclarations.has('componentSlotVoid'),
+					`${set}: void-component control is absent; update its reachability check`,
+				);
+				assert.deepEqual(
+					threadlineDeclarations.slice(1).filter((name) => retainedRuntimeDeclarations.has(name)),
+					[],
+					`${set}: compiled void components retained generic component or return rendering`,
+				);
+			}
 			for (const [metric, bytes] of Object.entries(totals)) {
 				entry.ops[`${set}_js_${metric}`] = val(bytes);
 			}

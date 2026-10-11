@@ -265,3 +265,21 @@ export function ParameterReturnedChild() @{
 		<ParameterIcon />
 	</main>
 }
+
+export function ForwardReturnedCard() {
+	return (
+		<div>
+			<ForwardReturnedIcon />
+		</div>
+	);
+}
+
+function ForwardReturnedIcon() {
+	return <span class="forward-escaped-icon">forward icon</span>;
+}
+
+export function ForwardReturnedChild() @{
+	<main>
+		<ForwardReturnedIcon />
+	</main>
+}

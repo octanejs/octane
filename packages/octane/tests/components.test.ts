@@ -25,6 +25,7 @@ import {
 	EnumReturnedChild,
 	readEnumReturnedDescriptor,
 } from './_fixtures/component-enum-escape.tsrx';
+import { AliasedIcon, ImportAliasChild } from './_fixtures/component-import-alias.tsrx';
 
 describe('component composition', () => {
 	it('renders a static child component with props', () => {
@@ -501,12 +502,40 @@ describe('returned components inside templates', () => {
 			selector: '.parameter-escaped-icon',
 			text: 'parameter icon',
 		},
+		{
+			name: 'an exported import-equals alias',
+			read: AliasedIcon,
+			App: ImportAliasChild,
+			selector: '.alias-escaped-icon',
+			text: 'alias icon',
+		},
+		{
+			name: 'an earlier returned host tree',
+			read: () => {
+				const child = Object.values(fx.ForwardReturnedCard().props).find(isValidElement);
+				return child ? (child.type as typeof fx.readParameterReturnedDescriptor)() : null;
+			},
+			// A compiler that folds this forward reference may remove the escape.
+			allowUnexposed: true,
+			App: fx.ForwardReturnedChild,
+			selector: '.forward-escaped-icon',
+			text: 'forward icon',
+		},
 	])(
 		'observes default props on a returned element exposed by $name',
-		({ read, App, selector, text }) => {
+		({ read, App, selector, text, allowUnexposed = false }) => {
 			const descriptor = read();
+			if (allowUnexposed && descriptor === null) {
+				const r = mount(App);
+				try {
+					expect(r.find(selector).textContent).toBe(text);
+				} finally {
+					r.unmount();
+				}
+				return;
+			}
 			expect(isValidElement(descriptor)).toBe(true);
-			const type = descriptor.type as object;
+			const type = descriptor!.type as object;
 			const previous = Object.getOwnPropertyDescriptor(type, 'defaultProps');
 			const reads: string[] = [];
 			let r: ReturnType<typeof mount> | undefined;
