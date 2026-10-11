@@ -1531,6 +1531,22 @@ describe('imported component regions', () => {
 		}
 	});
 
+	it('publishes no lite export over a body that renders a prop value', () => {
+		// Such a value may hold a component that reads context, so a cache hit
+		// over the export must keep refreshing it.
+		const shell = (child: string) => `${child}
+			export function Shell(props) @{ <div><Child on={props.on} content={props.content} /></div> }`;
+		const proven = "function Child(props) @{ <i>{props.on ? 'on' : 'off'}</i> }";
+		expect(liteExportsOf(shell(proven), 'lite-shell-text.tsrx')).toEqual(['Shell']);
+		for (const child of [
+			'function Child(props) @{ <i>{props.content}</i> }',
+			"function Child(props) { if (props.on) return props.content; return <i>{'off'}</i>; }",
+			'function Child(props) @{ const C = props.content; <C /> }',
+		]) {
+			expect(liteExportsOf(shell(child), 'lite-shell-opaque.tsrx')).toEqual([]);
+		}
+	});
+
 	it('publishes no lite export from a native-read module', () => {
 		// A native-read body subscribes the Block it renders in; behind a lite
 		// edge that is the importer's region owner, which a cache hit does not
