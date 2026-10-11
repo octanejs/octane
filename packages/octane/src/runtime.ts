@@ -49354,8 +49354,8 @@ function reconcileKeyed<T>(
 				record = journalForSlot(state, true);
 				journalShape = false;
 			}
-			// A shifted, otherwise unchanged suffix only needs its recorded position.
-			// Keep index-observing bodies and changed inputs on the ordinary path.
+			// Mirror updateSurvivor's pure branch when its body is also unchanged.
+			// Keep profiling and index bookkeeping aligned with that branch.
 			if (pure && indexIndependent && block.props === newItem && block.body === itemBody) {
 				if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__)
 					__profileCount(ProfileCounter.LIST_UPDATE);

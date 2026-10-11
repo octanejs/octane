@@ -1911,7 +1911,10 @@ describe('large keyed list fills', () => {
 			.filter((row) => row.id !== 5)
 			.map((row) => (row.id === 20 ? { ...row, label: 'updated row 20' } : row));
 		r.update(FastHostKeyedList, { items: removed, selected: 12, onPick });
-		expect(r.findAll('.fast-host-row')).toEqual(rows.filter((_, index) => index !== 4));
+		const survivors = rows.filter((_, index) => index !== 4);
+		const remaining = r.findAll('.fast-host-row');
+		expect(remaining).toHaveLength(survivors.length);
+		remaining.forEach((row, index) => expect(row).toBe(survivors[index]));
 		expect(r.find('[data-fast-host-id="20"]').textContent).toBe('updated row 20');
 		r.update(FastHostKeyedList, { items: removed.slice(1), selected: 20, onPick });
 		expect(r.find('.fast-host-row.selected')).toBe(rows[19]);

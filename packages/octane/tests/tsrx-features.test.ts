@@ -255,7 +255,9 @@ describe('TSRX features — for-of with `index` AND `key`', () => {
 		const reordered = r.findAll('li');
 		r.update(ForOfIndexAndKey, { items: [b, a] });
 		expect(r.findAll('li').map((li) => li.textContent)).toEqual(['0:b', '1:a']);
-		expect(r.findAll('li')).toEqual(reordered.slice(1));
+		const remaining = r.findAll('li');
+		expect(remaining).toHaveLength(reordered.length - 1);
+		remaining.forEach((row, index) => expect(row).toBe(reordered[index + 1]));
 		r.unmount();
 	});
 });
