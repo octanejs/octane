@@ -6538,8 +6538,10 @@ function vtSsrStrip(html: string, rawHtml: boolean): string {
  * (docs/view-transitions-plan.md). Renders the children transparently in the
  * same nested-block byte shape the client produces (componentSlot's comp pair
  * around the body's childSlot pair — renderComponentFramed adds the outer
- * frame, the explicit ssrBlock below is the inner childSlot range), stamped
- * with the Fizz-parity `vt-*` annotations described above.
+ * frame; ssrChild already frames descriptor, primitive and array children as
+ * the inner childSlot range, so the explicit ssrBlock below adds it only for
+ * a compiled children body or a compiler HTML carrier), stamped with the
+ * Fizz-parity `vt-*` annotations described above.
  */
 export const ViewTransition = /* @__PURE__ */ markComponentFlags(
 	function ViewTransition(props: VtSsrProps, scope: SSRScope): string {
