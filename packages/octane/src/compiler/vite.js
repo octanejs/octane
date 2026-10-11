@@ -1401,6 +1401,14 @@ export function octane(options = {}) {
 									memoProven?.has(voidImportKey(request, imported)) === true,
 							}
 						: {}),
+					// Production client output always answers this, so a component over
+					// an import without a proof publishes none of its own.
+					...(specializeProductionRoots && !server && !hmrEnabled && !profileEnabled
+						? {
+								isCompilerMemoImport: (request, imported) =>
+									memoProven?.has(voidImportKey(request, imported)) === true,
+							}
+						: {}),
 					...(descriptorProven.size
 						? {
 								isDescriptorChildrenImport: (request, imported) =>
